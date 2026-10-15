@@ -11,8 +11,9 @@ import { StatusDot, type StatusKind } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
-import { useT } from "@/i18n";
+import { useT, type T } from "@/i18n";
 import { blocklistErrorText, blocklistQuery, listsState, useBlocklistActions, type BlocklistSettings, type ListsOutcome, type ListsState } from "@/lib/blocklist";
+import { cx } from "@/lib/cx";
 import { minutesText, useFmt } from "@/lib/format";
 import {
   cardState,
@@ -28,15 +29,32 @@ import {
   type GlobalpingSettings,
   type TestOutcome,
 } from "@/lib/globalping";
-import { checksQuery, countryReason } from "@/lib/health";
+import { checksQuery, countryReason, tspuPortsText } from "@/lib/health";
+import {
+  isNotAFailure,
+  probeNodeOptions,
+  runLook,
+  tspuDefaultInterval,
+  tspuErrorText,
+  tspuIntervals,
+  tspuQuery,
+  tspuState,
+  useTspuActions,
+  type TspuOutcome,
+  type TspuSettings,
+  type TspuState,
+  type TspuTest,
+} from "@/lib/tspu";
+import { CountryMark } from "@/screens/health/country";
 import { card } from "./parts";
 
 type Actions = ReturnType<typeof useGlobalpingActions>;
 type ListsActions = ReturnType<typeof useBlocklistActions>;
+type TspuActions = ReturnType<typeof useTspuActions>;
 
 /**
- * "Reachability from a country": the country every source looks from, once, in the group's header, then a card per source,
- * side by side: Globalping and the block lists. A probe inside the country will be a card of its own next to them.
+ * "Reachability from a country": the country every source looks from, once, in the group's header, then a card per source:
+ * Globalping, the block lists and the TSPU probe, two to a row on a wide screen.
  */
 export function CountryGroup() {
   const t = useT();
@@ -54,6 +72,7 @@ export function CountryGroup() {
       <div className="grid items-start gap-3.5 xl:grid-cols-2">
         <GlobalpingCard />
         <BlocklistCard />
+        <TspuCard />
       </div>
     </section>
   );
@@ -135,7 +154,7 @@ function Body({ s, act }: { s: GlobalpingSettings; act: Actions }) {
       {s.enabled && (
         <div className="flex flex-col gap-3 border-t border-line pt-3">
           <TokenField s={s} act={act} />
-          <IntervalField s={s} act={act} />
+          <IntervalField current={s.intervalMin || 15} options={intervalOptions} onPick={(m) => act.update.mutate({ intervalMin: m })} />
         </div>
       )}
       {(s.enabled || s.hasToken) && (
@@ -316,26 +335,35 @@ function TokenField({ s, act }: { s: GlobalpingSettings; act: Actions }) {
   );
 }
 
-/** Minutes between rounds. The panel may space them out further when the hourly limit needs it. */
-function IntervalField({ s, act }: { s: GlobalpingSettings; act: Actions }) {
-  const t = useT();
-  const current = s.intervalMin || 15;
-  const minutes: readonly number[] = (intervalOptions as readonly number[]).includes(current) ? intervalOptions : [...intervalOptions, current].sort((a, b) => a - b);
+/** A setting of a source card: its name on the left, the control on the right; on a phone they wrap. */
+function SettingRow({ label, width, children }: { label: string; width: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <span aria-hidden className="text-[13px] font-bold">
-        {t("gp.interval")}
+        {label}
       </span>
-      <div className="w-[170px]">
-        <Select
-          compact
-          aria-label={t("gp.interval")}
-          value={String(current)}
-          onValueChange={(v) => Number(v) !== current && act.update.mutate({ intervalMin: Number(v) })}
-          options={minutes.map((m) => ({ value: String(m), label: t("gp.interval.every", { time: minutesText(t, m) }) }))}
-        />
-      </div>
+      <div className={width}>{children}</div>
     </div>
+  );
+}
+
+/** Whole hours from an hour on ("every 2 h", "every 24 h"), minutes below: a day reads as 24 hours, not as "1 d". */
+const everyText = (t: T, m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} ${t("unit.h")}` : minutesText(t, m));
+
+/** Minutes between rounds or runs. Globalping may space its rounds out further when the hourly limit needs it. */
+function IntervalField({ current, options, onPick }: { current: number; options: readonly number[]; onPick: (minutes: number) => void }) {
+  const t = useT();
+  const minutes = options.includes(current) ? options : [...options, current].sort((a, b) => a - b);
+  return (
+    <SettingRow label={t("cr.interval")} width="w-[170px]">
+      <Select
+        compact
+        aria-label={t("cr.interval")}
+        value={String(current)}
+        onValueChange={(v) => Number(v) !== current && onPick(Number(v))}
+        options={minutes.map((m) => ({ value: String(m), label: t("cr.interval.every", { time: everyText(t, m) }) }))}
+      />
+    </SettingRow>
   );
 }
 
@@ -420,7 +448,7 @@ function ListsStateLine({ state }: { state: ListsState }) {
       case "off":
         return ["off", t("cr.state.off"), t("bl.state.off.detail")];
       case "unavailable":
-        return ["off", t("bl.state.unavailable"), t("bl.state.onlyRU")];
+        return ["off", t("cr.state.unavailable"), t("bl.state.onlyRU")];
       case "untested":
         return ["blip", t("cr.state.on"), t("cr.state.untested")];
       case "works": {
@@ -440,4 +468,152 @@ function ListsStateLine({ state }: { state: ListsState }) {
     }
   })();
   return <StateLine state={state.kind} kind={kind} word={word} detail={detail} />;
+}
+
+/**
+ * The TSPU probe: off by default; on, one of the owner's nodes in Russia (the probe node) finds the TSPU on its path every
+ * interval and tests whether the TCP connections to the other nodes die there. Only for Russia, and not on the Cloudflare
+ * edition: the card says so, and there is no switch on the edge, where it could not run.
+ */
+export function TspuCard() {
+  const t = useT();
+  const q = useQuery(tspuQuery);
+  const act = useTspuActions();
+  const s = q.data;
+  return (
+    <section className={card}>
+      <CardHead icon="network" title={t("tp.title")} sub={t("tp.sub")}>
+        {s && s.unavailableReason !== "edition" && (
+          <Switch
+            checked={s.enabled}
+            disabled={act.update.isPending || act.disconnect.isPending}
+            onCheckedChange={(on) => act.update.mutate({ enabled: on })}
+            aria-label={t("tp.switch")}
+          />
+        )}
+      </CardHead>
+      {q.isPending && <Pending compact />}
+      {q.isError && !s && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+      {/* switched off and on again, the card starts over, as the other cards do */}
+      {s && <TspuBody key={String(s.enabled)} s={s} act={act} />}
+    </section>
+  );
+}
+
+function TspuBody({ s, act }: { s: TspuSettings; act: TspuActions }) {
+  const t = useT();
+  const fmt = useFmt();
+  const toast = useToast();
+  const [outcome, setOutcome] = useState<TspuOutcome | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const state = tspuState(s, outcome, act.test.isPending);
+  const ready = s.enabled && s.available;
+
+  // a run takes minutes: the state line spins until it ends, and nothing times it out on this side
+  const test = () => {
+    const started = Math.floor(Date.now() / 1000);
+    act.test.mutate(undefined, {
+      onSuccess: (ok) => setOutcome({ at: ok.run?.atUnix || started, ok }),
+      // asked again within the minute, or a scheduled run is on: not a failure of the probe
+      onError: (error) => (isNotAFailure(error) ? toast(tspuErrorText(error, t)) : setOutcome({ at: started, error })),
+    });
+  };
+
+  return (
+    <>
+      <TspuStateLine state={state} />
+      {state.kind === "run" && state.nodes && state.nodes.length > 0 && <NodeResults nodes={state.nodes} />}
+      {ready && (
+        <div className="flex flex-col gap-3 border-t border-line pt-3">
+          <SettingRow label={t("tp.node")} width="w-[200px]">
+            <Select
+              compact
+              aria-label={t("tp.node")}
+              value={s.probeNodeId}
+              onValueChange={(v) => v !== s.probeNodeId && act.update.mutate({ probeNodeId: v })}
+              options={probeNodeOptions(t, fmt, s.nodes, s.probeNodeId)}
+            />
+          </SettingRow>
+          <IntervalField current={s.intervalMin || tspuDefaultInterval} options={tspuIntervals} onPick={(m) => act.update.mutate({ intervalMin: m })} />
+        </div>
+      )}
+      {(s.enabled || s.probeNodeId !== "") && (
+        <div className="flex flex-wrap gap-2">
+          {ready && s.probeNodeId && (
+            <Button variant="secondary" size="sm" disabled={act.test.isPending} onClick={test}>
+              {act.test.isPending ? t("cr.testing") : t("cr.test")}
+            </Button>
+          )}
+          <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
+            {t("cr.disconnect")}
+          </Button>
+        </div>
+      )}
+      <Privacy>{t("tp.privacy")}</Privacy>
+      {disconnecting && (
+        <ConfirmDisconnect
+          title={t("tp.disconnect.title")}
+          body={t("tp.disconnect.body")}
+          busy={act.disconnect.isPending}
+          onClose={() => setDisconnecting(false)}
+          onConfirm={() => act.disconnect.mutate(undefined, { onSuccess: () => setDisconnecting(false) })}
+        />
+      )}
+    </>
+  );
+}
+
+/** The probe's state: off, not here, no probe node, a run in flight (a spinner), or the last run: its status, time, hop and reference. */
+function TspuStateLine({ state }: { state: TspuState }) {
+  const t = useT();
+  const fmt = useFmt();
+  const [kind, word, detail] = ((): [StatusKind, string, string] => {
+    switch (state.kind) {
+      case "off":
+        return ["off", t("cr.state.off"), t("tp.state.off.detail")];
+      case "unavailable":
+        return ["off", t("cr.state.unavailable"), t(state.reason === "edition" ? "tp.state.edition" : "tp.state.onlyRU")];
+      case "noNode":
+        return ["blip", t("cr.state.on"), t("tp.state.noNode")];
+      case "untested":
+        return ["blip", t("cr.state.on"), t("cr.state.untested")];
+      case "running":
+        return ["busy", t("cr.testing"), t("tp.state.running")];
+      case "run": {
+        const r = runLook(t, fmt, state.run);
+        return [r.kind, r.word, r.detail];
+      }
+      case "fails":
+        return ["bad", t("cr.state.fails"), tspuErrorText(state.error, t)];
+    }
+  })();
+  return <StateLine state={state.kind === "run" ? `run-${state.run.status}` : state.kind} kind={kind} word={word} detail={detail} />;
+}
+
+const nodeVerdicts: Record<string, ["ok" | "warn", "cr.v.ok" | "cr.v.tcp" | "tp.v.partial"]> = {
+  open: ["ok", "cr.v.ok"],
+  blocked: ["warn", "cr.v.tcp"],
+  partial: ["warn", "tp.v.partial"],
+};
+
+/** What the last Test found per node: its name, the verdict with its mark, the ports by what happened to them. */
+function NodeResults({ nodes }: { nodes: TspuTest["nodes"] }) {
+  const t = useT();
+  return (
+    <ul aria-label={t("tp.results")} className="flex flex-col divide-y divide-line rounded-field border border-line bg-canvas">
+      {nodes.map((n) => {
+        const [kind, key] = nodeVerdicts[n.verdict] ?? (["unknown", "cr.v.unknown"] as const);
+        return (
+          <li key={n.nodeId} data-testid="tspu-node" className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2">
+            <span className="min-w-14 font-mono text-[13px] font-bold">{n.name}</span>
+            <span className={cx("flex items-center gap-1.5 text-xs font-bold", kind === "warn" ? "tone-warn tone-text" : "text-muted")}>
+              <CountryMark kind={kind} />
+              {t(key)}
+            </span>
+            <span className="ml-auto font-mono text-[11px] text-muted">{tspuPortsText(t, n.ports)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }

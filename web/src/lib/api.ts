@@ -18,6 +18,7 @@ import { ProfileService } from "@/gen/mistgate/admin/v1/profile_pb";
 import { ProvisioningService } from "@/gen/mistgate/admin/v1/provisioning_pb";
 import { SubscriptionService } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { TelegramService } from "@/gen/mistgate/admin/v1/telegram_pb";
+import { TspuProbeService } from "@/gen/mistgate/admin/v1/tspu_probe_pb";
 import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
 import { UserService } from "@/gen/mistgate/admin/v1/user_pb";
 import { WarpService } from "@/gen/mistgate/admin/v1/warp_pb";
@@ -56,6 +57,8 @@ export const telegram = createClient(TelegramService, transport);
 export const globalping = createClient(GlobalpingService, transport);
 export const countryReach = createClient(CountryReachabilityService, transport);
 export const blocklist = createClient(BlocklistService, transport);
+// TestTspuProbe runs for minutes: no call here sets a deadline (timeoutMs), and the transport has none of its own.
+export const tspuProbe = createClient(TspuProbeService, transport);
 
 /** URL of a file next to the admin UI (respects the secret prefix), e.g. assetUrl("brand/logo.svg"). */
 export const assetUrl = (path: string) => new URL(path, document.baseURI).href;

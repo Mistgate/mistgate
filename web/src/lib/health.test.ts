@@ -465,6 +465,9 @@ describe("the server's vocabulary is covered", () => {
     "health.alert.users_impacted.why.gone",
     "health.alert.country_blocked.why.tcp_blocked",
     "health.alert.country_blocked.why.blocked",
+    "health.alert.country_blocked.why.tspu",
+    "health.alert.country_blocked.why.conflict.tcp_blocked",
+    "health.alert.country_blocked.why.conflict.blocked",
     "hl.res.accepted",
     "hl.res.superseded",
     "hl.fix.err.unknown_fix",
@@ -761,5 +764,139 @@ describe("reachability from a country", () => {
     expect(factWords(tPlural, fmt, fact)).toEqual(["A node is unreachable from the chosen country · Warning"]);
     expect(factWords(tRuPlural, fmtRu, fact)).toEqual(["Нода недоступна из выбранной страны · Внимание"]);
     expect(factWords(tZhPlural, fmtZh, fact)).toEqual(["从所选国家无法连接节点 · 警告"]);
+  });
+  // the TSPU probe: one of the owner's nodes in the country; a verdict of its own, or one that agrees or disagrees with Globalping
+  const runAt = roundAt - 600;
+  const probeRow = {
+    tspuVantageId: "nod_probe1",
+    tspuVantageName: "probe1",
+    tspuAtUnix: runAt,
+    dpiHop: 6,
+    tspuPorts: [
+      { port: 443, verdict: "blocked" },
+      { port: 8443, verdict: "blocked" },
+    ],
+  };
+  // the probe alone: no Globalping round, no probes, the row's time is the run's
+  const tspuOnly = (over: Partial<CountryCheck> = {}) =>
+    check({ verdict: CountryVerdict.TCP_BLOCKED, confidence: "dc_only", eyeball: false, probes: [], atUnix: runAt, sources: ["tspu"], tspuVerdict: CountryVerdict.TCP_BLOCKED, ...probeRow, ...over });
+  // Globalping's home networks connect, the probe node sees TCP die at the box: the worse is shown
+  const conflict = check({
+    verdict: CountryVerdict.TCP_BLOCKED,
+    confidence: "conflict",
+    sources: ["globalping", "tspu"],
+    globalpingVerdict: CountryVerdict.OK,
+    tspuVerdict: CountryVerdict.TCP_BLOCKED,
+    ...probeRow,
+  });
+
+  it("says a block the probe alone saw without a word on ICMP, which it never looks at, and names the probe as the source", () => {
+    const l = countryLook(tPlural, fmt, tspuOnly());
+    expect([l.kind, l.label, l.note, l.head]).toEqual(["warn", "TCP blocked", "TSPU probe", "TCP is blocked"]);
+    expect(l.state).toBe("TCP is blocked · TSPU probe");
+    expect(l.probes).toEqual([]);
+    expect(l.at).toBe("");
+    expect(l.tspu).toEqual({ where: "Probe node probe1 · TSPU after hop 6", ports: "TCP 443, 8443: blocked", at: `Probe run: ${fmt.stamp(runAt)}` });
+    expect(l.lists).toEqual([]); // no "Lists compared": this row is the probe's
+    expect(l.via).toBe("Checked by your TSPU probe from a data center, TCP only");
+    expect(l.line).toBe("TCP 443, 8443: blocked · probe node probe1 · 14 min ago");
+    expect(l.line).not.toContain("ICMP");
+    // the probe that sees the node through is quiet, as any OK
+    const ok = countryLook(tPlural, fmt, tspuOnly({ verdict: CountryVerdict.OK, tspuVerdict: CountryVerdict.OK, tspuPorts: [{ port: 443, verdict: "open" }] }));
+    expect([ok.kind, ok.note, ok.line]).toEqual(["ok", "", "TCP 443: open · probe node probe1 · 14 min ago"]);
+  });
+
+  it("says the same in Russian and Chinese", () => {
+    const r = countryLook(tRuPlural, fmtRu, tspuOnly());
+    expect([r.label, r.note, r.head, r.via]).toEqual(["TCP режут", "ТСПУ-зонд", "TCP режут", "Проверено твоим ТСПУ-зондом из датацентра, только TCP"]);
+    expect(r.tspu?.where).toBe("Нода-зонд probe1 · ТСПУ за 6-м хопом");
+    expect(r.line).toBe("TCP 443, 8443: режут · нода-зонд probe1 · 14 мин назад");
+    const z = countryLook(tZhPlural, fmtZh, tspuOnly());
+    expect([z.label, z.note, z.head]).toEqual(["TCP 被封锁", "TSPU 探测", "TCP 被封锁"]);
+    expect(z.tspu?.where).toBe("探测节点 probe1 · TSPU 位于第 6 跳之后");
+    expect(z.tspu?.ports).toBe("TCP 443, 8443：被封锁");
+    expect(z.via).toBe("由你的 TSPU 探测从数据中心检测，仅测 TCP");
+  });
+
+  it("says plainly that the sources disagree, and what each of them said", () => {
+    const l = countryLook(tPlural, fmt, conflict);
+    expect([l.kind, l.label, l.note, l.head]).toEqual(["warn", "TCP blocked", "sources disagree", "TCP is blocked"]);
+    expect(l.conflict).toBe("Globalping: reachable · probe: TCP blocked");
+    expect(l.state).toBe("TCP is blocked · The sources disagree · Globalping: reachable · probe: TCP blocked");
+    expect(l.probes).toHaveLength(2); // Globalping's probes stay in the tooltip
+    expect(l.at).toBe(`Last round: ${fmt.stamp(roundAt)}`);
+    expect(l.tspu?.ports).toBe("TCP 443, 8443: blocked");
+    expect(l.via).toBe("Checked by Globalping (home and mobile networks) and your TSPU probe (a data center)");
+    expect(l.line).toBe("sources disagree · Globalping: reachable · probe: TCP blocked · 4 min ago");
+    expect(countryLook(tRuPlural, fmtRu, conflict).conflict).toBe("Globalping: доступна · зонд: TCP режут");
+    expect(countryLook(tRuPlural, fmtRu, conflict).note).toBe("источники расходятся");
+    expect(countryLook(tZhPlural, fmtZh, conflict).conflict).toBe("Globalping：可访问 · TSPU 探测：TCP 被封锁");
+    // Globalping saw the TCP block and the probe went through: ICMP is still Globalping's word, the note says they disagree
+    const other = countryLook(tPlural, fmt, { ...conflict, globalpingVerdict: CountryVerdict.TCP_BLOCKED, tspuVerdict: CountryVerdict.OK });
+    expect([other.head, other.note, other.conflict]).toEqual(["TCP is blocked, ICMP passes", "sources disagree", "Globalping: TCP blocked · probe: reachable"]);
+  });
+
+  it("names both sources when they agree, and Globalping's reason when the probe decided alone", () => {
+    const both = countryLook(tPlural, fmt, check({ sources: ["globalping", "tspu"], globalpingVerdict: CountryVerdict.OK, tspuVerdict: CountryVerdict.OK, ...probeRow, tspuPorts: [{ port: 443, verdict: "open" }] }));
+    expect([both.kind, both.note, both.conflict]).toEqual(["ok", "", ""]);
+    expect(both.line).toBe("Rostelecom, Beeline · probe node probe1 · 4 min ago");
+    expect(countryLook(tPlural, fmt, check({ eyeball: false, sources: ["globalping", "tspu"], ...probeRow })).via).toBe(
+      "Checked by Globalping (data centers) and your TSPU probe (a data center)",
+    );
+    // a Globalping round with too few probes, and the probe's verdict: the round's networks are not the verdict's
+    const alone = countryLook(tPlural, fmt, tspuOnly({ reason: "too_few_probes", atUnix: roundAt, probes: [probe("Selectel", "Moscow", 38, [[443, true]])] }));
+    expect(alone.gpNone).toBe("Globalping: no data, too few probes answered");
+    expect(alone.line).toBe("TCP 443, 8443: blocked · probe node probe1 · 4 min ago");
+    expect(alone.via).toBe("Checked by your TSPU probe from a data center, TCP only");
+  });
+
+  it("has no data when no port got a verdict in time, and does not call it the lists' row", () => {
+    const l = countryLook(tPlural, fmt, tspuOnly({ verdict: CountryVerdict.UNKNOWN, confidence: "", sources: [], tspuVerdict: CountryVerdict.UNKNOWN, tspuPorts: [{ port: 443, verdict: "timeout" }] }));
+    expect([l.kind, l.head]).toEqual(["unknown", "No data: no port got a verdict in time"]);
+    expect(l.tspu?.ports).toBe("TCP 443: timed out");
+    expect(l.lists).toEqual([]);
+  });
+
+  it("words a country_blocked alert of the probe alone: no networks, TCP only, a data-center view", () => {
+    const base = { kind: AlertKind.COUNTRY_BLOCKED, nodeName: "se1", titleKey: "health.alert.country_blocked.title", whyKey: "health.alert.country_blocked.why.tcp_blocked" };
+    const a = alert({ ...base, params: { node: "se1", country: "RU", verdict: "tcp_blocked", confidence: "dc_only", sources: "tspu", networks: "", ports: "443, 8443" } });
+    expect(alertTitle(tPlural, a)).toBe("Unreachable from Russia");
+    expect(alertWhy(tPlural, fmt, a)).toBe(
+      "Your probe node inside Russia sees TCP to ports 443 and 8443 die at the filtering box (TSPU) on its path. That is a data-center view: home networks may differ. Two runs in a row saw it. It closes after two clean checks.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, a)).toBe(
+      "Твоя нода-зонд внутри России видит, что TCP на порты 443 и 8443 обрывается на коробке фильтрации (ТСПУ) по пути. Это взгляд из датацентра: в домашних сетях может быть иначе. Так показали два запуска подряд. Алерт закроется после двух чистых проверок.",
+    );
+    expect(alertWhy(tZhPlural, fmtZh, a)).toBe(
+      "你在俄罗斯境内的探测节点发现，到 TCP 端口 443 和 8443 的连接在途中的过滤设备（TSPU）处被切断。这是数据中心视角，家庭网络的情况可能不同。连续两次运行都是如此。连续两次正常后，告警会关闭。",
+    );
+    expect(alertWhy(tPlural, fmt, a)).not.toContain("()");
+  });
+
+  it("words a country_blocked alert of two sources that disagree", () => {
+    const params = { node: "nl1", country: "RU", confidence: "conflict", sources: "globalping,tspu", networks: "Beeline, Rostelecom", ports: "443, 8443" };
+    const tcp = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.tcp_blocked", params: { ...params, verdict: "tcp_blocked" } });
+    const gone = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.blocked", params: { ...params, verdict: "blocked" } });
+    expect(alertWhy(tPlural, fmt, tcp)).toBe(
+      "The sources disagree: Globalping (probes inside Russia: Beeline, Rostelecom) and your probe node there see this node differently. One of them finds TCP to ports 443 and 8443 cut, so that is shown. Two checks in a row saw it. It closes after two clean checks.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, tcp)).toBe(
+      "Источники расходятся: Globalping (зонды внутри России: Beeline, Rostelecom) и твоя нода-зонд там видят ноду по-разному. Один из них видит, что TCP на порты 443 и 8443 режут, поэтому показано это. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+    );
+    expect(alertWhy(tZhPlural, fmtZh, tcp)).toBe(
+      "各来源的结果不一致：Globalping（俄罗斯境内的探测点：Beeline, Rostelecom）和你在那里的探测节点看到的情况不同。其中一方发现 TCP 端口 443 和 8443 被封锁，因此显示这一结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+    );
+    expect(alertWhy(tPlural, fmt, gone)).toBe(
+      "The sources disagree: Globalping’s probes inside Russia (Beeline, Rostelecom) cannot reach the node at all, no answer to ping, no TCP connection, while your probe node there sees it differently. The worse result is shown. Two checks in a row saw it. It closes after two clean checks.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, gone)).toBe(
+      "Источники расходятся: зонды Globalping внутри России (Beeline, Rostelecom) совсем не достают до ноды, нет ответа ни на ping, ни по TCP, а твоя нода-зонд там видит иначе. Показан худший результат. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+    );
+    expect(alertWhy(tZhPlural, fmtZh, gone)).toBe(
+      "各来源的结果不一致：俄罗斯境内的 Globalping 探测点（Beeline, Rostelecom）完全无法到达节点，ping 和 TCP 都没有响应，而你在那里的探测节点看到的情况不同。此处显示较差的结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+    );
+    // both sources that agree keep Globalping's words: its probes saw it
+    const agree = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.tcp_blocked", params: { ...params, confidence: "eyeball", verdict: "tcp_blocked" } });
+    expect(alertWhy(tPlural, fmt, agree)).toMatch(/^Probes inside Russia \(Beeline, Rostelecom\) reach the node’s address/);
   });
 });

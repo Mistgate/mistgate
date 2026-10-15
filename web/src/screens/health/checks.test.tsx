@@ -167,7 +167,29 @@ const probe = (network: string, city: string, icmpMs: number, ports: [number, bo
   tcp: ports.map(([port, open]) => ({ port, ok: open, ms: open ? 40 : 0 })),
   valid,
 });
-const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof probe>[], over: object = {}) => ({ nodeId, country: "RU", verdict: v, atUnix: at, probes, reason: "", eyeball: true, confidence: "", listedBy: [] as string[], cdnProvider: "", cdnRegion: "", ...over });
+// every field of CountryCheck, as the client gets them: the sources and the TSPU probe's detail are empty unless a case sets them
+const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof probe>[], over: object = {}) => ({
+  nodeId,
+  country: "RU",
+  verdict: v,
+  atUnix: at,
+  probes,
+  reason: "",
+  eyeball: true,
+  confidence: "",
+  listedBy: [] as string[],
+  cdnProvider: "",
+  cdnRegion: "",
+  sources: [] as string[],
+  globalpingVerdict: CountryVerdict.UNSPECIFIED,
+  tspuVerdict: CountryVerdict.UNSPECIFIED,
+  tspuPorts: [] as { port: number; verdict: string }[],
+  dpiHop: 0,
+  tspuVantageId: "",
+  tspuVantageName: "",
+  tspuAtUnix: 0,
+  ...over,
+});
 const countryChecks = [
   verdict("nod_1", CountryVerdict.OK, [probe("Rostelecom", "Moscow", 42, [[443, true]]), probe("Beeline", "Kazan", 47, [[443, true]])]),
   verdict("nod_2", CountryVerdict.TCP_BLOCKED, [probe("Rostelecom", "Moscow", 51, [[443, false], [8443, false]]), probe("MegaFon", "Kazan", 0, [[443, false], [8443, false]], false)]),
@@ -402,5 +424,158 @@ describe("the block lists on the node page", () => {
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("In the RKN registry, not checked live");
     expect(document.body.textContent).toContain("From the block lists only");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// The TSPU probe in the same column: a conflict with Globalping, a verdict of the probe alone, the last run under the matrix
+
+const runAt = at - 600;
+const probeDetail = (ports: [number, string][]) => ({
+  tspuVantageId: "nod_probe1",
+  tspuVantageName: "probe1",
+  tspuAtUnix: runAt,
+  dpiHop: 6,
+  tspuPorts: ports.map(([port, v]) => ({ port, verdict: v })),
+});
+const withProbe = {
+  ...four,
+  countryChecks: [
+    // both agree
+    verdict("nod_1", CountryVerdict.OK, [probe("Rostelecom", "Moscow", 42, [[443, true]]), probe("Beeline", "Kazan", 47, [[443, true]])], {
+      confidence: "eyeball",
+      sources: ["globalping", "tspu"],
+      globalpingVerdict: CountryVerdict.OK,
+      tspuVerdict: CountryVerdict.OK,
+      ...probeDetail([[443, "open"]]),
+    }),
+    // Globalping's home networks connect, the probe node sees TCP die at the box
+    verdict("nod_2", CountryVerdict.TCP_BLOCKED, [probe("Rostelecom", "Moscow", 51, [[443, true], [8443, true]]), probe("Beeline", "Kazan", 55, [[443, true], [8443, true]])], {
+      confidence: "conflict",
+      sources: ["globalping", "tspu"],
+      globalpingVerdict: CountryVerdict.OK,
+      tspuVerdict: CountryVerdict.TCP_BLOCKED,
+      ...probeDetail([[443, "blocked"], [8443, "blocked"]]),
+    }),
+    verdict("nod_3", CountryVerdict.BLOCKED, [probe("MTS", "Omsk", 0, [[443, false]])], { confidence: "eyeball", sources: ["globalping"], globalpingVerdict: CountryVerdict.BLOCKED }),
+    // the probe alone: no Globalping round yet
+    verdict("nod_4", CountryVerdict.TCP_BLOCKED, [], {
+      atUnix: runAt,
+      eyeball: false,
+      confidence: "dc_only",
+      sources: ["tspu"],
+      tspuVerdict: CountryVerdict.TCP_BLOCKED,
+      ...probeDetail([[443, "blocked"], [8443, "blocked"]]),
+    }),
+  ],
+  tspuRun: { status: "ok", atUnix: runAt, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "" },
+};
+
+describe("the TSPU probe in the country column", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("says under the verdict that the sources disagree, and the screen reader hears both verdicts", async () => {
+    await mount(withProbe);
+    const box = countryCell("de2")!;
+    expect(box.textContent).toBe("!TCP blockedsources disagree");
+    expect(box.className).toContain("tone-warn");
+    expect(box.getAttribute("aria-label")).toBe("de2, From Russia: TCP is blocked · The sources disagree · Globalping: reachable · probe: TCP blocked");
+    // agreeing sources stay quiet
+    expect(countryCell("de1")!.textContent).toBe("reachable");
+  });
+
+  it("opens the conflict's tooltip on keyboard focus: both verdicts, Globalping's probes, the probe node with its ports, both sources", async () => {
+    await mount(withProbe);
+    await act(async () => countryCell("de2")!.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    const text = document.body.textContent ?? "";
+    for (const line of [
+      "TCP is blocked",
+      "The sources disagree",
+      "Globalping: reachable · probe: TCP blocked",
+      "Rostelecom, Moscow",
+      "ICMP 51 ms · TCP 443, 8443 ✓",
+      "Last round: ",
+      "Probe node probe1 · TSPU after hop 6",
+      "TCP 443, 8443: blocked",
+      "Probe run: ",
+      "Checked by Globalping (home and mobile networks) and your TSPU probe (a data center)",
+    ])
+      expect(text).toContain(line);
+  });
+
+  it("shows a verdict of the probe alone: TCP blocked with the probe's name under it, no word on ICMP", async () => {
+    await mount(withProbe);
+    const box = countryCell("fi1")!;
+    expect(box.textContent).toBe("!TCP blockedTSPU probe");
+    expect(box.getAttribute("aria-label")).toBe("fi1, From Russia: TCP is blocked · TSPU probe");
+    await act(async () => box.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    const text = document.body.textContent ?? "";
+    for (const line of ["TCP is blocked", "Probe node probe1 · TSPU after hop 6", "TCP 443, 8443: blocked", "Probe run: ", "Checked by your TSPU probe from a data center, TCP only"]) expect(text).toContain(line);
+    for (const absent of ["ICMP passes", "Last round", "Lists compared"]) expect(text).not.toContain(absent);
+  });
+
+  it("gives every phone card the same in words", async () => {
+    await mount(withProbe);
+    expect([...document.querySelectorAll("[data-testid=country-row]")].map((r) => r.textContent)).toEqual([
+      "From RussiareachableRostelecom, Beeline · probe node probe1 · 4 min ago",
+      "!From RussiaTCP blockedsources disagree · Globalping: reachable · probe: TCP blocked · 4 min ago",
+      "×From RussiaunreachableMTS · 4 min ago",
+      "!From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago",
+      "From Russia—not checked yet",
+    ]);
+  });
+
+  it("puts the probe's last run under the matrix: where it ran, when, where the box sits, or why it gave no verdicts", async () => {
+    await mount(withProbe);
+    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe("TSPU probe · probe1 · last run 14 min ago · TSPU after hop 6 · reference 31.13.72.36 · 3 nodes checked");
+    act(() => root?.unmount());
+    host?.remove();
+    // the probe node is a node of the fleet: its name comes from the rows; a run without verdicts leaves no row, only this line
+    await mount({ ...checks, rows: [...checks.rows, { ...checks.rows[0]!, nodeId: "nod_probe1", nodeName: "probe1", countryCode: "RU" }], countryChecks: [], tspuRun: { ...withProbe.tspuRun, status: "control_failed", dpiHop: 0, nodesChecked: 0 } });
+    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe(
+      "TSPU probe · probe1 · The method does not work on this network · even the control address is cut behind the TSPU, so there are no verdicts · last run 14 min ago",
+    );
+    expect(document.body.textContent).not.toContain("From Russia");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(four);
+    expect(document.querySelector("[data-testid=tspu-run]")).toBeNull();
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    await mount(withProbe);
+    expect(countryCell("de2")?.textContent).toBe("!TCP режутисточники расходятся");
+    expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2, Из России: TCP режут · Источники расходятся · Globalping: доступна · зонд: TCP режут");
+    expect(countryCell("fi1")?.textContent).toBe("!TCP режутТСПУ-зонд");
+    expect(document.querySelector("[data-testid=tspu-run]")?.textContent).toBe("ТСПУ-зонд · probe1 · последний запуск 14 мин назад · ТСПУ за 6-м хопом · опорный адрес 31.13.72.36 · проверены 3 ноды");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    await mount(withProbe);
+    expect(countryCell("de2")?.textContent).toBe("!TCP 被封锁来源不一致");
+    expect(countryCell("de2")?.getAttribute("aria-label")).toBe("de2，从俄罗斯访问：TCP 被封锁 · 各来源的结果不一致 · Globalping：可访问 · TSPU 探测：TCP 被封锁");
+    expect(countryCell("fi1")?.textContent).toBe("!TCP 被封锁TSPU 探测");
+  });
+});
+
+describe("the TSPU probe on the node page", () => {
+  it("shows a verdict of the probe alone in the country row, with its tooltip", async () => {
+    getChecks.mockResolvedValue({ ...checks, rows: [checks.rows[1]!], countryChecks: [withProbe.countryChecks[3]] });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_4" /></QueryClientProvider>));
+    for (let i = 0; i < 4; i++) await settle();
+    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
+    expect(row.textContent).toBe("!From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago");
+    expect(row.className).toContain("tone-warn");
+    await act(async () => row.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    expect(document.body.textContent).toContain("Probe node probe1 · TSPU after hop 6");
+    expect(document.body.textContent).toContain("Checked by your TSPU probe from a data center, TCP only");
   });
 });

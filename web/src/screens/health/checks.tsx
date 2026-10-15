@@ -5,6 +5,7 @@ import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
+import { StatusDot } from "@/components/ui/status";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { cellLook, countryColumn, listOf, SLOW_CONNECT_MS, type CheckCell, type CountryColumn } from "@/lib/health";
@@ -12,6 +13,7 @@ import type { GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
 import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
 import { protocolName } from "@/lib/series";
+import { runLook } from "@/lib/tspu";
 import { CheckRows } from "@/screens/node/checks";
 import { CountryCell, CountryHead, CountryRow } from "./country";
 import { CellTip, HistoryCard, SlowMark, useRunChecks } from "./history";
@@ -57,6 +59,32 @@ export function UdpLossNotice({ data }: { data: Checks }) {
   );
 }
 
+/**
+ * The newest run of the TSPU probe (GetChecksResponse.tspu_run), under the matrix: on which node it ran, when, and where the
+ * box sits, or why it gave no verdicts. A run that found nothing has no rows, so this line is the only trace of it here.
+ */
+export function TspuRunLine({ data }: { data: Checks }) {
+  const t = useT();
+  const fmt = useFmt();
+  const run = data.tspuRun;
+  if (!run) return null;
+  const look = runLook(t, fmt, run);
+  const node = data.rows.find((r) => r.nodeId === run.nodeId)?.nodeName || data.countryChecks.find((c) => c.tspuVantageId === run.nodeId)?.tspuVantageName || run.nodeId;
+  return (
+    <p data-testid="tspu-run" className="flex items-start gap-2 text-[11px] leading-snug text-muted">
+      <span className="mt-[3px] flex">
+        <StatusDot kind={look.kind} />
+      </span>
+      <span className="min-w-0 text-pretty">
+        <b className="text-fg">
+          {t("tp.title")} · {node}
+        </b>
+        {look.kind === "ok" ? ` · ${look.detail}` : ` · ${look.word} · ${look.detail}`}
+      </span>
+    </p>
+  );
+}
+
 /** What the words in the cells mean, under the matrix: the tooltip says it too, but a phone has no hover. */
 export function CheckLegend({ slow = false }: { slow?: boolean }) {
   const t = useT();
@@ -88,7 +116,8 @@ export function CheckLegend({ slow = false }: { slow?: boolean }) {
 
 /**
  * Node × profile matrix of the synthetic checks; a click opens the 24 h history of that cell under it. A phone gets a card per
- * node. With the country check on, a last column (a last row on the phone) says what probes inside that country saw.
+ * node. With the country check on, a last column (a last row on the phone) says what the sources inside that country saw, and
+ * the TSPU probe's last run is a line under the matrix.
  */
 export function ChecksTab({ data }: { data: Checks }) {
   const t = useT();
@@ -154,7 +183,8 @@ export function ChecksTab({ data }: { data: Checks }) {
             </div>
           ))}
         </div>
-        <div className="border-t border-line pt-3">
+        <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+          <TspuRunLine data={data} />
           <CheckLegend slow={slow} />
         </div>
       </section>

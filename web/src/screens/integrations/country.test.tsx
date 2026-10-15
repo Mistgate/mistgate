@@ -17,7 +17,17 @@ const getBlocklist = vi.fn();
 const updateBlocklist = vi.fn();
 const testBlocklist = vi.fn();
 const disconnectBlocklist = vi.fn();
+const getTspuProbe = vi.fn();
+const updateTspuProbe = vi.fn();
+const testTspuProbe = vi.fn();
+const disconnectTspuProbe = vi.fn();
 vi.mock("@/lib/api", () => ({
+  tspuProbe: {
+    getTspuProbe: (...a: unknown[]) => getTspuProbe(...a),
+    updateTspuProbe: (...a: unknown[]) => updateTspuProbe(...a),
+    testTspuProbe: (...a: unknown[]) => testTspuProbe(...a),
+    disconnectTspuProbe: (...a: unknown[]) => disconnectTspuProbe(...a),
+  },
   blocklist: {
     getBlocklist: (...a: unknown[]) => getBlocklist(...a),
     updateBlocklist: (...a: unknown[]) => updateBlocklist(...a),
@@ -50,6 +60,7 @@ beforeEach(() => {
   getCountryReachability.mockResolvedValue({ settings: { country: "RU" } });
   getChecks.mockResolvedValue({ nowUnix: 0, intervalS: 300, columns: [], rows: [], countryChecks: [] });
   getBlocklist.mockResolvedValue({ settings: lists() });
+  getTspuProbe.mockResolvedValue({ settings: tspu() });
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -57,10 +68,12 @@ afterEach(() => {
   root = host = null;
   act(() => setLang("en"));
   for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks, getBlocklist, updateBlocklist, testBlocklist, disconnectBlocklist]) m.mockReset();
+  for (const m of [getTspuProbe, updateTspuProbe, testTspuProbe, disconnectTspuProbe]) m.mockReset();
 });
 
 const settings = (over: Record<string, unknown> = {}) => ({ enabled: false, intervalMin: 15, hasToken: false, ...over });
 const lists = (over: Record<string, unknown> = {}) => ({ enabled: false, available: true, checkedUnix: 0, listsUnix: 0, ...over });
+const tspu = (over: Record<string, unknown> = {}) => ({ enabled: false, available: true, unavailableReason: "", probeNodeId: "", intervalMin: 120, nodes: [], ...over });
 
 async function mount(first: object) {
   getGlobalping.mockResolvedValue({ settings: first });
@@ -238,7 +251,7 @@ describe("the block-list card", () => {
   it("sits next to the Globalping card in the group, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
     await mount(settings());
     const grid = card()?.parentElement;
-    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists"]);
+    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe"]);
     expect(listsState()?.dataset.state).toBe("off");
     expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
     expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");
@@ -343,5 +356,226 @@ describe("the block-list card", () => {
     await mount(settings());
     expect(listsState("封锁名单")?.textContent).toBe("已关闭 · 不会下载任何内容。");
     expect(card("封锁名单")?.textContent).toContain("名单会下载到面板，并在面板上比对：节点地址不会离开面板。");
+  });
+});
+
+describe("the TSPU probe card", () => {
+  // the card of its own, third in the group: its state line, its buttons, its picker
+  const card = (title = "TSPU probe") => [...document.querySelectorAll("section")].find((s) => s.querySelector("h3")?.textContent === title);
+  const probeState = (title?: string) => card(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+  const probeButton = (label: string, title?: string) => [...(card(title)?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
+  const probeSwitch = () => card()?.querySelector("[role=switch]");
+  const ago12 = Math.floor(Date.now() / 1000) - 12 * 60;
+  const run = (over: Record<string, unknown> = {}) => ({ status: "ok", atUnix: ago12, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "", ...over });
+  const nodes = [
+    { id: "nod_probe1", name: "probe1", countryCode: "RU", inCountry: true, declares: true, online: true },
+    { id: "nod_ru2", name: "ru2", countryCode: "RU", inCountry: true, declares: false, online: true },
+    { id: "nod_ru3", name: "ru3", countryCode: "RU", inCountry: true, declares: true, online: false },
+    { id: "nod_de1", name: "de1", countryCode: "DE", inCountry: false, declares: true, online: true },
+  ];
+  const on = (over: Record<string, unknown> = {}) => tspu({ enabled: true, probeNodeId: "nod_probe1", nodes, ...over });
+  const found = {
+    run: run({ atUnix: Math.floor(Date.now() / 1000) }),
+    nodes: [
+      { nodeId: "nod_nl1", name: "nl1", verdict: "blocked", ports: [{ port: 443, verdict: "blocked" }, { port: 8443, verdict: "blocked" }] },
+      { nodeId: "nod_de1", name: "de1", verdict: "open", ports: [{ port: 443, verdict: "open" }] },
+      { nodeId: "nod_fi1", name: "fi1", verdict: "partial", ports: [{ port: 443, verdict: "blocked" }, { port: 8443, verdict: "refused" }] },
+    ],
+  };
+  /** Base UI opens a Select on the press and takes an option on the release. */
+  const press = async (el: Element) => {
+    await act(async () => {
+      for (const ev of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(ev, { bubbles: true, button: 0 }));
+    });
+    for (let i = 0; i < 3; i++) await settle();
+  };
+  async function openPicker() {
+    await press(card()!.querySelector("[aria-label='Probe node']")!);
+    // the popup opens asynchronously
+    for (let i = 0; i < 100 && !document.querySelector("[role=option]"); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    return [...document.querySelectorAll<HTMLElement>("[role=option]")];
+  }
+
+  it("is the third card of the group, off by default: nothing sent, nothing to test, the privacy line", async () => {
+    await mount(settings());
+    expect(probeState()?.dataset.state).toBe("off");
+    expect(probeState()?.textContent).toBe("Off · Nothing runs and nothing is sent.");
+    expect(probeSwitch()?.getAttribute("aria-checked")).toBe("false");
+    expect(probeSwitch()?.getAttribute("aria-label")).toBe("Use the TSPU probe");
+    expect(card()?.textContent).toContain("One of your nodes in Russia finds the filtering box (TSPU) on its path and checks whether connections to each node die there.");
+    expect(card()?.textContent).toContain("Node addresses go only to your own probe node and nowhere else.");
+    expect(probeButton("Test")).toBeUndefined();
+    expect(probeButton("Disconnect")).toBeUndefined();
+    expect(card()?.querySelector("[aria-label='Probe node']")).toBeNull();
+    expect(testTspuProbe).not.toHaveBeenCalled();
+  });
+
+  it("switches on and off through UpdateTspuProbe, and asks for a probe node first", async () => {
+    updateTspuProbe.mockResolvedValue({ settings: on({ probeNodeId: "" }) });
+    await mount(settings());
+    await click(probeSwitch());
+    expect(updateTspuProbe).toHaveBeenCalledTimes(1);
+    expect(updateTspuProbe).toHaveBeenCalledWith({ enabled: true });
+    expect(updateGlobalping).not.toHaveBeenCalled();
+    expect(probeState()?.dataset.state).toBe("noNode");
+    expect(probeState()?.textContent).toBe("On · pick a probe node; nothing runs until then");
+    expect(card()?.querySelector("[aria-label='Probe node']")?.textContent).toContain("not chosen");
+    expect(card()?.querySelector("[aria-label='How often']")?.textContent).toContain("every 2 h");
+    expect(probeButton("Test")).toBeUndefined(); // nothing to run it on
+    expect(probeButton("Disconnect")).toBeDefined();
+    updateTspuProbe.mockResolvedValue({ settings: tspu() });
+    await click(probeSwitch());
+    expect(updateTspuProbe).toHaveBeenLastCalledWith({ enabled: false });
+    expect(probeState()?.dataset.state).toBe("off");
+  });
+
+  it("greys out a node with an old agent and an offline one in the picker, and saves the one picked", async () => {
+    getTspuProbe.mockResolvedValue({ settings: on({ probeNodeId: "" }) });
+    updateTspuProbe.mockResolvedValue({ settings: on() });
+    await mount(settings());
+    const options = await openPicker();
+    const row = (name: string) => options.find((o) => o.textContent?.startsWith(name))!;
+    // in-country first, as the server sends them; the reason before the country
+    expect(options.map((o) => o.textContent)).toEqual(["not chosen", "probe1Russia", "ru2update the agent · Russia", "ru3offline · Russia", "de1Germany"]);
+    expect(row("ru2").hasAttribute("data-disabled")).toBe(true);
+    expect(row("ru3").hasAttribute("data-disabled")).toBe(true);
+    expect(row("probe1").hasAttribute("data-disabled")).toBe(false);
+    expect(row("de1").hasAttribute("data-disabled")).toBe(false);
+    await press(row("ru2"));
+    expect(updateTspuProbe).not.toHaveBeenCalled();
+    await press(row("probe1"));
+    expect(updateTspuProbe).toHaveBeenCalledWith({ probeNodeId: "nod_probe1" });
+    expect(probeState()?.dataset.state).toBe("untested");
+  });
+
+  it("says only for Russia when the country is another one, and that the Cloudflare edition has no probe, without a switch", async () => {
+    getTspuProbe.mockResolvedValue({ settings: on({ available: false, unavailableReason: "country" }) });
+    await mount(settings());
+    expect(probeState()?.dataset.state).toBe("unavailable");
+    expect(probeState()?.textContent).toBe("Not available · only for Russia; nothing is sent");
+    expect(probeButton("Test")).toBeUndefined();
+    expect(probeButton("Disconnect")).toBeDefined();
+    expect(card()?.querySelector("[aria-label='Probe node']")).toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: tspu({ available: false, unavailableReason: "edition" }) });
+    await mount(settings());
+    expect(probeState()?.textContent).toBe("Not available · not in the Cloudflare edition yet; nothing is sent");
+    expect(probeSwitch()).toBeNull();
+  });
+
+  it("shows the stored run: the time, the hop of the box, the reference that worked; and the limits of the method in words", async () => {
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run() }) });
+    await mount(settings());
+    expect(probeState()?.dataset.state).toBe("run-ok");
+    expect(probeState()?.textContent).toBe("Works · last run 12 min ago · TSPU after hop 6 · reference 31.13.72.36 · 3 nodes checked");
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "control_failed", dpiHop: 0, nodesChecked: 0 }) }) });
+    await mount(settings());
+    expect(probeState()?.dataset.state).toBe("run-control_failed");
+    expect(probeState()?.textContent).toBe("The method does not work on this network · even the control address is cut behind the TSPU, so there are no verdicts · last run 12 min ago");
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "no_dpi_hop" }) }) });
+    await mount(settings());
+    expect(probeState()?.textContent).toMatch(/^Could not find the TSPU on the path · no reference address placed it/);
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "failed", detail: "unreachable" }) }) });
+    await mount(settings());
+    expect(probeState()?.textContent).toBe("Does not work · the probe node did not answer · last run 12 min ago");
+  });
+
+  it("tests through TestTspuProbe with no deadline: a spinner while it runs for minutes, then the result per node", async () => {
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run() }) });
+    let finish!: (v: unknown) => void;
+    testTspuProbe.mockImplementation(() => new Promise((r) => (finish = r)));
+    await mount(settings());
+    await click(probeButton("Test"));
+    expect(testTspuProbe).toHaveBeenCalledTimes(1);
+    // the request alone: no call options, so no timeoutMs and no signal that could cut a run of several minutes
+    expect(testTspuProbe.mock.calls[0]).toEqual([{}]);
+    expect(probeState()?.dataset.state).toBe("running");
+    expect(probeState()?.textContent).toBe("Testing… · a run can take a few minutes");
+    expect(probeState()?.querySelector('[class*="mg-ui-spin"]')).not.toBeNull();
+    expect(probeButton("Testing…")?.disabled).toBe(true);
+    for (let i = 0; i < 5; i++) await settle();
+    expect(probeState()?.dataset.state).toBe("running"); // still waiting, nothing gave up
+    await act(async () => finish(found));
+    for (let i = 0; i < 3; i++) await settle();
+    expect(probeState()?.dataset.state).toBe("run-ok");
+    expect(probeState()?.textContent).toBe("Works · last run just now · TSPU after hop 6 · reference 31.13.72.36 · 3 nodes checked");
+    const rows = [...card()!.querySelectorAll("[data-testid=tspu-node]")].map((r) => r.textContent);
+    expect(rows).toEqual(["nl1!TCP blockedTCP 443, 8443: blocked", "de1reachableTCP 443: open", "fi1!partly blockedTCP 443: blocked · 8443: refused"]);
+    expect(card()?.querySelector("ul[aria-label='Result per node']")).not.toBeNull();
+    expect(probeButton("Test")?.disabled).toBe(false);
+    // the stored run is read again after the test: Health and the Get follow
+    expect(getTspuProbe.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("fails on a test the server refused, in words; a second test within the minute and a run already going are not failures", async () => {
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run() }) });
+    testTspuProbe.mockRejectedValue(new ConnectError("tested a moment ago: try again in 42 s", Code.ResourceExhausted));
+    await mount(settings());
+    await click(probeButton("Test"));
+    expect(probeState()?.dataset.state).toBe("run-ok");
+    testTspuProbe.mockRejectedValue(new ConnectError("tspu_run_in_progress", Code.FailedPrecondition));
+    await click(probeButton("Test"));
+    expect(probeState()?.dataset.state).toBe("run-ok");
+    testTspuProbe.mockRejectedValue(new ConnectError("tspu_probe_node_unfit", Code.FailedPrecondition));
+    await click(probeButton("Test"));
+    expect(probeState()?.dataset.state).toBe("fails");
+    expect(probeState()?.textContent).toBe("Does not work · The probe node is offline or its agent is too old.");
+  });
+
+  it("shows the run stored after a test whose answer was lost on the way", async () => {
+    getTspuProbe.mockResolvedValueOnce({ settings: on({ lastRun: run() }) });
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ atUnix: Math.floor(Date.now() / 1000) + 5, status: "no_dpi_hop" }) }) });
+    testTspuProbe.mockRejectedValue(new ConnectError("Failed to fetch", Code.Unavailable));
+    await mount(settings());
+    await click(probeButton("Test"));
+    expect(probeState()?.dataset.state).toBe("run-no_dpi_hop");
+  });
+
+  it("disconnects only after a confirmation, through DisconnectTspuProbe, which also deletes the results and settings", async () => {
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run() }) });
+    disconnectTspuProbe.mockResolvedValue({ settings: tspu() });
+    await mount(settings());
+    await click(probeButton("Disconnect"));
+    expect(disconnectTspuProbe).not.toHaveBeenCalled();
+    expect(dialog()?.textContent).toContain("Disconnect the TSPU probe?");
+    expect(dialog()?.textContent).toContain("its stored results and settings (probe node, interval, last run) are deleted");
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Disconnect"));
+    expect(disconnectTspuProbe).toHaveBeenCalledTimes(1);
+    expect(disconnectTspuProbe).toHaveBeenCalledWith({});
+    expect(updateTspuProbe).not.toHaveBeenCalled();
+    expect(disconnectBlocklist).not.toHaveBeenCalled();
+    expect(probeState()?.dataset.state).toBe("off");
+    expect(probeButton("Disconnect")).toBeUndefined();
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run({ status: "control_failed" }) }) });
+    await mount(settings());
+    const ru = "ТСПУ-зонд";
+    expect(probeState(ru)?.textContent).toBe("Метод не работает в этой сети · за ТСПУ режут даже контрольный адрес, поэтому вердиктов нет · последний запуск 12 мин назад");
+    expect(card(ru)?.textContent).toContain("Адреса нод уходят только на твою ноду-зонд и больше никуда.");
+    expect(card(ru)?.querySelector("[aria-label='Как часто']")?.textContent).toContain("раз в 2 ч");
+    expect(probeButton("Проверить", ru)).toBeDefined();
+    expect(probeButton("Отключить", ru)).toBeDefined();
+    act(() => root?.unmount());
+    host?.remove();
+    getTspuProbe.mockResolvedValue({ settings: on({ lastRun: run() }) });
+    await mount(settings());
+    expect(probeState(ru)?.textContent).toBe("Работает · последний запуск 12 мин назад · ТСПУ за 6-м хопом · опорный адрес 31.13.72.36 · проверены 3 ноды");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    getTspuProbe.mockResolvedValue({ settings: tspu() });
+    await mount(settings());
+    expect(probeState("TSPU 探测")?.textContent).toBe("已关闭 · 不会运行任何检测，也不会发送任何数据。");
+    expect(card("TSPU 探测")?.textContent).toContain("节点地址只会发送到你自己的探测节点，不会发往其他任何地方。");
   });
 });

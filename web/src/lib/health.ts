@@ -131,6 +131,15 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
     params.country = countryIn(t, a.params.country ?? "");
     const ports = (a.params.ports ?? "").split(",").map((p) => p.trim()).filter(Boolean);
     params.ports = ports.length ? t.n("cr.alert.ports", ports.length, { ports: listOf(fmt.locale, ports) }) : "";
+    // the server's key assumes Globalping's probes; the TSPU probe alone, and two sources that disagree, have their own
+    const sources = (a.params.sources ?? "").split(",");
+    const own =
+      sources.includes("tspu") && !sources.includes("globalping")
+        ? "health.alert.country_blocked.why.tspu"
+        : a.params.confidence === "conflict"
+          ? `health.alert.country_blocked.why.conflict.${a.params.verdict ?? ""}`
+          : "";
+    if (own && hasKey(own)) return t(own, params);
   }
   if (a.kind === AlertKind.PORT_LOSSY) {
     params.lost = String(lossPct(Number(a.params.sent), Number(a.params.got)));
@@ -320,15 +329,31 @@ export function cellLook(t: T, fmt: Fmt, cell: CheckCell, nodeStatus: NodeStatus
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Reachability from a country (GetChecksResponse.country_checks): what probes inside one country saw of each node and what
-// the block lists say of its address, combined by the server into one verdict. The server sends only codes and numbers;
-// empty while both sources are off.
+// Reachability from a country (GetChecksResponse.country_checks): what Globalping's probes inside one country saw of each node,
+// what the TSPU probe (one of the owner's nodes in the country) saw, and what the block lists say of its address, combined by
+// the server into one verdict. The server sends only codes and numbers; empty while every source is off.
 
 export type CountryCheck = Plain<CountryCheckMsg>;
 type CountryProbe = CountryCheck["probes"][number];
 
-/** A row from a live round (it has probes, or a reason why it has none); a row of the block lists alone has neither. */
+/** A row with a Globalping round (it has probes, or a reason why it has none); a row of the TSPU probe or the lists alone has neither. */
 export const isLive = (c: Pick<CountryCheck, "probes" | "reason">) => c.probes.length > 0 || c.reason !== "";
+
+const portOrder = ["blocked", "open", "refused", "timeout"];
+
+/**
+ * What the TSPU probe saw on a node's TCP ports, the ports of a verdict together: "TCP 443, 8443: blocked · 2053: open". A
+ * verdict this page does not know is shown as sent. Empty without ports.
+ */
+export function tspuPortsText(t: T, ports: readonly { port: number; verdict: string }[]): string {
+  if (!ports.length) return "";
+  const verdicts = [...new Set(ports.map((p) => p.verdict))].sort((a, b) => (portOrder.indexOf(a) + 1 || 9) - (portOrder.indexOf(b) + 1 || 9));
+  const groups = verdicts.map((v) => {
+    const key = `cr.port.${v}`;
+    return t("cr.port.group", { ports: ports.filter((p) => p.verdict === v).map((p) => p.port).join(", "), word: hasKey(key) ? t(key) : v });
+  });
+  return `TCP ${groups.join(" · ")}`;
+}
 
 /** A block list by its name ("RKN registry (antifilter ipsum)"); a code the dictionary does not know stays a code. */
 export function listName(t: T, code: string): string {
@@ -361,20 +386,28 @@ export type CountryLook = {
   kind: "ok" | "warn" | "bad" | "listed" | "unknown";
   /** What the cell says: "reachable", "TCP blocked", "unreachable", "listed", "no data". */
   label: string;
+  /** The cell's small second line: "ICMP passes" (Globalping saw TCP blocked), "sources disagree", or the TSPU probe's name for a block it alone saw. */
+  note: string;
   /** The verdict in a sentence: the tooltip's first line. */
   head: string;
-  /** What a screen reader says: the verdict, and that a live verdict's address is in the registry too. */
+  /** What a screen reader says: the verdict, the disagreement or the source, and that a live verdict's address is in the registry too. */
   state: string;
   /** A live verdict whose address is in a block list as well: the cell and the row carry the list mark beside the verdict. */
   alsoListed: boolean;
-  /** The quiet line of a row, where a phone has no tooltip: the networks that saw it, the lists, and when, or why there is no verdict. */
+  /** The quiet line of a row, where a phone has no tooltip: who saw it, the lists, and when, or why there is no verdict. */
   line: string;
-  /** The tooltip under the verdict: each probe (where it is, what it got, whether it counted) and the round's time; empty without a live round. */
+  /** Two live sources that disagree: what each said ("Globalping: reachable · probe: TCP blocked"); empty when they do not. */
+  conflict: string;
+  /** The tooltip under the verdict: each Globalping probe (where it is, what it got, whether it counted) and the round's time; empty without a round. */
   probes: { where: string; result: string; counted: boolean }[];
   at: string;
+  /** A Globalping round without a verdict while the TSPU probe decided: why the round said nothing. */
+  gpNone: string;
+  /** What the TSPU probe saw: the probe node and the hop of the box, the ports, the time of the run; null without a run for the node. */
+  tspu: { where: string; ports: string; at: string } | null;
   /** What the block lists add: why the live round said nothing, the lists, the CDN range, when the lists were compared. */
   lists: string[];
-  /** Where the verdict comes from: home and mobile networks, data centers, or the block lists only. */
+  /** Where the verdict comes from: Globalping from home and mobile networks or data centers, the TSPU probe, both, or the block lists only. */
   via: string;
 };
 
@@ -390,47 +423,86 @@ function probeOf(t: T, p: CountryProbe): CountryLook["probes"][number] {
 
 const viaKeys: Record<string, MessageKey> = { eyeball: "cr.tip.eyeball", dc_only: "cr.tip.dc", listed: "cr.tip.listsOnly" };
 
+/** A verdict of one source in a word, for "Globalping: reachable · probe: TCP blocked". */
+const verdictWord = (t: T, v: CountryVerdict) =>
+  v === CountryVerdict.OK ? t("cr.v.ok") : v === CountryVerdict.TCP_BLOCKED ? t("cr.v.tcp") : v === CountryVerdict.BLOCKED ? t("cr.v.blocked") : t("cr.v.unknown");
+
 export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   const live = isLive(c);
-  const reason = countryReason(t, c.reason);
+  const probed = c.tspuAtUnix > 0; // the TSPU probe has a run for this node, whatever it decided
+  // the sources the verdict rests on; a row from before the server named them is Globalping's when it has a round
+  const fromGp = c.sources.includes("globalping") || (c.sources.length === 0 && live);
+  const fromTspu = c.sources.includes("tspu");
+  const conflict = c.confidence === "conflict" ? t("cr.tip.said", { gp: verdictWord(t, c.globalpingVerdict), tspu: verdictWord(t, c.tspuVerdict) }) : "";
+  const reason = live ? countryReason(t, c.reason) : probed ? t("cr.reason.tspu") : "";
   const listed = c.listedBy.length > 0;
   const cdn = cdnOf(t, c);
   const names = c.listedBy.map((l) => listName(t, l));
-  const networks = [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ");
+  const networks = fromGp ? [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ") : "";
+  const ports = tspuPortsText(t, c.tspuPorts);
+  const vantage = c.tspuVantageName || c.tspuVantageId;
   const ago = fmt.ago(c.atUnix);
-  // the phone's line: what the live round saw, then what the lists add, then when
+  // only Globalping looks at ICMP: "ICMP passes" is its word for a TCP block, never the probe node's
+  const icmp = c.verdict === CountryVerdict.TCP_BLOCKED && fromGp && (c.globalpingVerdict === CountryVerdict.TCP_BLOCKED || c.sources.length === 0);
+  const tspuOnly = fromTspu && !fromGp;
+  // the phone's line: what the sources saw (or that they disagree), then what the lists add, then when
+  const seen = conflict
+    ? [t("cr.note.conflict"), conflict]
+    : [icmp ? t("cr.icmpPasses") : "", networks, tspuOnly ? ports : "", fromTspu ? t("cr.line.probe", { node: vantage }) : ""];
   const lineOf = (...first: string[]) => [...first, cdn, ago].filter(Boolean).join(" · ");
-  const look = (kind: CountryLook["kind"], label: string, head: string, line: string): CountryLook => ({
-    kind,
-    label,
-    head,
-    state: listed && kind !== "listed" ? `${head} · ${t("cr.line.listed")}` : head,
-    alsoListed: listed && kind !== "listed",
-    line,
-    probes: c.probes.map((p) => probeOf(t, p)),
-    at: live ? t("cr.tip.at", { time: fmt.stamp(c.atUnix) }) : "",
-    lists: [
-      kind === "listed" && reason ? t("cr.tip.liveNone", { reason }) : "",
-      listed ? t("cr.tip.listedBy", { lists: names.join(t("cr.tip.sep")) }) : "",
-      capital(cdn),
-      live ? "" : t("cr.tip.listsAt", { time: fmt.stamp(c.atUnix) }),
-    ].filter(Boolean),
-    // an unknown round has no confidence of its own: its probes still say where it looked from
-    via: viaKeys[c.confidence] ? t(viaKeys[c.confidence]!) : c.probes.length ? t(c.eyeball ? "cr.tip.eyeball" : "cr.tip.dc") : "",
-  });
+  const look = (kind: CountryLook["kind"], label: string, head: string, line: string): CountryLook => {
+    const note = conflict ? t("cr.note.conflict") : icmp ? t("cr.icmpPasses") : tspuOnly && kind !== "ok" ? t("tp.title") : "";
+    return {
+      kind,
+      label,
+      note,
+      head,
+      state: [head, conflict ? `${t("cr.tip.conflict")} · ${conflict}` : icmp ? "" : note, listed && kind !== "listed" ? t("cr.line.listed") : ""].filter(Boolean).join(" · "),
+      alsoListed: listed && kind !== "listed",
+      line,
+      conflict,
+      probes: c.probes.map((p) => probeOf(t, p)),
+      at: live ? t("cr.tip.at", { time: fmt.stamp(c.atUnix) }) : "",
+      gpNone: live && !fromGp && fromTspu && c.reason ? t("cr.tip.gpNone", { reason: countryReason(t, c.reason) || c.reason }) : "",
+      tspu: probed
+        ? {
+            where: c.dpiHop > 0 ? t("cr.tip.tspuWhere", { node: vantage, hop: c.dpiHop }) : t("cr.tip.tspuNode", { node: vantage }),
+            ports,
+            at: t("cr.tip.tspuAt", { time: fmt.stamp(c.tspuAtUnix) }),
+          }
+        : null,
+      lists: [
+        kind === "listed" && reason ? t("cr.tip.liveNone", { reason }) : "",
+        listed ? t("cr.tip.listedBy", { lists: names.join(t("cr.tip.sep")) }) : "",
+        capital(cdn),
+        live || probed ? "" : t("cr.tip.listsAt", { time: fmt.stamp(c.atUnix) }),
+      ].filter(Boolean),
+      via:
+        fromGp && fromTspu
+          ? t("cr.tip.both", { gp: t(c.eyeball ? "cr.tip.gpHome" : "cr.tip.gpDc") })
+          : fromTspu
+            ? t("cr.tip.tspu")
+            : viaKeys[c.confidence]
+              ? t(viaKeys[c.confidence]!)
+              : // an unknown round has no confidence of its own: its probes still say where it looked from
+                c.probes.length
+                ? t(c.eyeball ? "cr.tip.eyeball" : "cr.tip.dc")
+                : "",
+    };
+  };
   const inList = listed ? t("cr.line.listed") : "";
   switch (c.verdict) {
     case CountryVerdict.OK:
-      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), lineOf(networks, inList));
+      return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), lineOf(...seen, inList));
     case CountryVerdict.TCP_BLOCKED:
-      return look("warn", t("cr.v.tcp"), t("cr.tip.tcp"), lineOf(t("cr.icmpPasses"), networks, inList));
+      return look("warn", t("cr.v.tcp"), t(icmp ? "cr.tip.tcp" : "cr.tip.tcpOnly"), lineOf(...seen, inList));
     case CountryVerdict.BLOCKED:
-      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), lineOf(networks, inList));
+      return look("bad", t("cr.v.blocked"), t("cr.tip.blocked"), lineOf(...seen, inList));
     case CountryVerdict.LISTED:
       return look("listed", t("cr.v.listed"), t("cr.tip.listed"), lineOf(names.join(t("cr.tip.sep"))));
     default:
-      // with no live round the row is the lists' alone, and they do not hold the address
-      if (!live) return look("unknown", t("cr.v.unknown"), t("cr.tip.notListed"), lineOf(t("cr.line.notListed")));
+      // with neither a round nor a run the row is the lists' alone, and they do not hold the address
+      if (!live && !probed) return look("unknown", t("cr.v.unknown"), t("cr.tip.notListed"), lineOf(t("cr.line.notListed")));
       return look("unknown", t("cr.v.unknown"), reason ? t("cr.tip.unknown", { reason }) : t("cr.tip.unknownBare"), lineOf(reason));
   }
 }

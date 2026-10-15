@@ -7,11 +7,12 @@ import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { countryIn, countryLook, type CountryCheck, type CountryLook } from "@/lib/health";
 
-// What one country makes of a node (GetChecksResponse.country_checks): what probes inside it saw and what the block lists say
-// of its address, as a column of the Health matrix, a row of a node's card on the phone and on its page. OK stays quiet and
-// "no data" grey; the two blocks take a problem colour, and a node in a block list that nobody checked live the warn colour
-// drawn dashed: on record, not seen. Each carries a glyph as well, so the state never rests on colour alone. The tooltip
-// names the probes, their ICMP and TCP answers, the time of the round, the lists, and where the verdict comes from.
+// What one country makes of a node (GetChecksResponse.country_checks): what Globalping's probes inside it saw, what the TSPU
+// probe (one of the owner's nodes there) saw and what the block lists say of its address, as a column of the Health matrix, a
+// row of a node's card on the phone and on its page. OK stays quiet and "no data" grey; the two blocks take a problem colour,
+// and a node in a block list that nobody checked live the warn colour drawn dashed: on record, not seen. Each carries a glyph
+// as well, so the state never rests on colour alone. Two sources that disagree say so under the verdict. The tooltip names the
+// probes with their ICMP and TCP answers, the probe node with its ports, the times, the lists, and where the verdict comes from.
 
 type Kind = CountryLook["kind"] | "none";
 
@@ -48,18 +49,29 @@ function ListedGlyph() {
 }
 
 /** The shape of the state: a quiet tick, "!" and "×" on their colour, the list mark, a grey dot for no data. */
-function Mark({ kind }: { kind: Kind }) {
+export function CountryMark({ kind }: { kind: Kind }) {
   if (kind === "ok") return <Icon name="check" size={12} aria-hidden className="flex-none" />;
   if (kind === "warn" || kind === "bad") return <StatusGlyph kind={kind} />;
   if (kind === "listed") return <ListedGlyph />;
   return <StatusDot kind="off" />;
 }
 
-/** The verdict, each probe on two lines (where, then what it got; one that did not count is greyed), the time, what the lists add, where it comes from. */
+/**
+ * The verdict; two sources that disagree, and what each said; each Globalping probe on two lines (where, then what it got; one
+ * that did not count is greyed) and the round's time; the probe node with its ports and the run's time; what the lists add;
+ * where it comes from.
+ */
 function CountryTip({ look, children }: { look: CountryLook; children: ReactElement }) {
+  const t = useT();
   const label = (
     <span className="flex flex-col gap-1">
       <span>{look.head}</span>
+      {look.conflict && (
+        <span className="flex flex-col">
+          <span className="tone-warn tone-text">{t("cr.tip.conflict")}</span>
+          <span className="font-medium">{look.conflict}</span>
+        </span>
+      )}
       {look.probes.map((p, i) => (
         <span key={i} className={cx("flex flex-col font-medium", !p.counted && "text-muted")}>
           {p.where}
@@ -67,6 +79,14 @@ function CountryTip({ look, children }: { look: CountryLook; children: ReactElem
         </span>
       ))}
       {look.at && <span className="font-medium">{look.at}</span>}
+      {look.gpNone && <span className="font-medium text-muted">{look.gpNone}</span>}
+      {look.tspu && (
+        <span className="flex flex-col font-medium">
+          {look.tspu.where}
+          {look.tspu.ports && <span className="font-mono text-[11px] text-muted">{look.tspu.ports}</span>}
+        </span>
+      )}
+      {look.tspu && <span className="font-medium">{look.tspu.at}</span>}
       {look.lists.map((l) => (
         <span key={l} className="font-medium">
           {l}
@@ -116,10 +136,10 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
     <CountryTip look={look}>
       <span role="img" tabIndex={0} aria-label={t("hl.cell.aria", { node, profile: title, state: look.state })} className={cx(box, cellCls[look.kind])}>
         <span className="flex items-center gap-1">
-          <Mark kind={look.kind} />
+          <CountryMark kind={look.kind} />
           {look.label}
         </span>
-        {look.kind === "warn" && <span className="text-[10px] font-semibold text-muted">{t("cr.icmpPasses")}</span>}
+        {look.note && <span className="text-[10px] font-semibold text-muted">{look.note}</span>}
         {look.alsoListed && (
           <span data-testid="also-listed" className="absolute top-1 right-1 flex">
             <ListedGlyph />
@@ -147,7 +167,7 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
       className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-[13px]", rowCls[kind])}
     >
       <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
-        <Mark kind={kind} />
+        <CountryMark kind={kind} />
         <b className="break-words">{title}</b>
       </span>
       <span className={cx("flex items-center gap-1.5 text-xs font-bold", kind === "warn" || kind === "bad" || kind === "listed" ? "tone-text" : "text-muted")}>

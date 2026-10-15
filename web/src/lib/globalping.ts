@@ -132,6 +132,9 @@ export function useCountryActions() {
     mutationFn: async (country: string) => plain((await countryReach.updateCountryReachability({ country })).settings!),
     onSuccess: (s) => {
       qc.setQueryData(countryQuery.queryKey, s);
+      // the block lists and the TSPU probe exist only for Russia, and the probe's picker sorts by the country: ask them again
+      void qc.invalidateQueries({ queryKey: ["blocklist"] });
+      void qc.invalidateQueries({ queryKey: ["tspu-probe"] });
       toast(t("cr.country.saved", { country: countryIn(t, s.country) }));
     },
     onError: (e) => toast.error(errorText(e, t)),

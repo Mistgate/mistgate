@@ -303,6 +303,13 @@ export const en = {
     "Probes inside {country} ({networks}) reach the node’s address, but TCP to {ports} does not connect: the connection requests are dropped on the way. Two checks in a row saw it. It closes after two clean checks.",
   "health.alert.country_blocked.why.blocked":
     "Probes inside {country} ({networks}) cannot reach the node at all: no answer to ping, no TCP connection. Two checks in a row saw it. It closes after two clean checks.",
+  // the TSPU probe alone (sources "tspu"): no Globalping networks, only TCP, a data-center view; and two live sources that disagree
+  "health.alert.country_blocked.why.tspu":
+    "Your probe node inside {country} sees TCP to {ports} die at the filtering box (TSPU) on its path. That is a data-center view: home networks may differ. Two runs in a row saw it. It closes after two clean checks.",
+  "health.alert.country_blocked.why.conflict.tcp_blocked":
+    "The sources disagree: Globalping (probes inside {country}: {networks}) and your probe node there see this node differently. One of them finds TCP to {ports} cut, so that is shown. Two checks in a row saw it. It closes after two clean checks.",
+  "health.alert.country_blocked.why.conflict.blocked":
+    "The sources disagree: Globalping’s probes inside {country} ({networks}) cannot reach the node at all, no answer to ping, no TCP connection, while your probe node there sees it differently. The worse result is shown. Two checks in a row saw it. It closes after two clean checks.",
   "health.alert.torrent.attempts": "{n} attempt|{n} attempts",
   "health.alert.torrent.proof": " Evidence: {evidence}.",
   "health.alert.torrent.proofPorts": " Evidence: {evidence}, port {ports}.| Evidence: {evidence}, ports {ports}.",
@@ -807,6 +814,12 @@ export const ru: typeof en = {
     "Зонды внутри {country} ({networks}) достают до адреса ноды, но TCP на {ports} не соединяется: запросы на соединение режут по дороге. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
   "health.alert.country_blocked.why.blocked":
     "Зонды внутри {country} ({networks}) совсем не достают до ноды: нет ответа ни на ping, ни по TCP. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+  "health.alert.country_blocked.why.tspu":
+    "Твоя нода-зонд внутри {country} видит, что TCP на {ports} обрывается на коробке фильтрации (ТСПУ) по пути. Это взгляд из датацентра: в домашних сетях может быть иначе. Так показали два запуска подряд. Алерт закроется после двух чистых проверок.",
+  "health.alert.country_blocked.why.conflict.tcp_blocked":
+    "Источники расходятся: Globalping (зонды внутри {country}: {networks}) и твоя нода-зонд там видят ноду по-разному. Один из них видит, что TCP на {ports} режут, поэтому показано это. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+  "health.alert.country_blocked.why.conflict.blocked":
+    "Источники расходятся: зонды Globalping внутри {country} ({networks}) совсем не достают до ноды, нет ответа ни на ping, ни по TCP, а твоя нода-зонд там видит иначе. Показан худший результат. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
   "health.alert.torrent.attempts": "{n} попытка|{n} попытки|{n} попыток",
   "health.alert.torrent.proof": " Доказательство: {evidence}.",
   "health.alert.torrent.proofPorts": " Доказательство: {evidence}, порт {ports}.| Доказательство: {evidence}, порты {ports}.| Доказательство: {evidence}, порты {ports}.",
@@ -1276,6 +1289,12 @@ export const zh: typeof en = {
   "health.alert.country_blocked.title": "从{country}无法连接",
   "health.alert.country_blocked.why.tcp_blocked": "{country}境内的探测点（{networks}）能到达节点地址，但 TCP {ports} 连不上：连接请求在途中被丢弃。连续两次检测都是如此。连续两次正常后，告警会关闭。",
   "health.alert.country_blocked.why.blocked": "{country}境内的探测点（{networks}）完全无法到达节点：ping 和 TCP 都没有响应。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+  "health.alert.country_blocked.why.tspu":
+    "你在{country}境内的探测节点发现，到 TCP {ports} 的连接在途中的过滤设备（TSPU）处被切断。这是数据中心视角，家庭网络的情况可能不同。连续两次运行都是如此。连续两次正常后，告警会关闭。",
+  "health.alert.country_blocked.why.conflict.tcp_blocked":
+    "各来源的结果不一致：Globalping（{country}境内的探测点：{networks}）和你在那里的探测节点看到的情况不同。其中一方发现 TCP {ports} 被封锁，因此显示这一结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+  "health.alert.country_blocked.why.conflict.blocked":
+    "各来源的结果不一致：{country}境内的 Globalping 探测点（{networks}）完全无法到达节点，ping 和 TCP 都没有响应，而你在那里的探测节点看到的情况不同。此处显示较差的结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
   "health.alert.torrent.attempts": "{n} 次尝试",
   "health.alert.torrent.proof": "判定依据：{evidence}。",
   "health.alert.torrent.proofPorts": "判定依据：{evidence}，端口 {ports}。",

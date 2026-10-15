@@ -1,8 +1,8 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
 import { cx } from "@/lib/cx";
 
-/** `hint` is a second, muted line under the label in the list. */
-export type SelectOption = { value: string; label: string; hint?: string };
+/** `hint` is a second, muted line under the label in the list; a `disabled` option is greyed out and cannot be picked. */
+export type SelectOption = { value: string; label: string; hint?: string; disabled?: boolean };
 
 type Props = {
   value: string;
@@ -61,7 +61,8 @@ export function Select({ value, onValueChange, options, compact, className, ...r
                 <BaseSelect.Item
                   key={o.value}
                   value={o.value}
-                  className={selectItemClass}
+                  disabled={o.disabled}
+                  className={cx(selectItemClass, "data-disabled:cursor-default data-disabled:opacity-45")}
                 >
                   <span className="flex min-w-0 flex-1 flex-col">
                     <BaseSelect.ItemText>{o.label}</BaseSelect.ItemText>
