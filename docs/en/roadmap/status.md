@@ -3,22 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.41`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.42`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.41
+  meta: v0.1.0 – v0.1.42
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.41
+      release: v0.1.42
       current: true
       points:
-        - "**Reachability from a country.** Probes in home and mobile networks inside Russia ping each node and connect to its TCP ports (Globalping), and the antifilter block lists are checked on the panel. Each source is its own integration and off by default. The result is the *From Russia* column in Health → Checks and a row on the node page; an alert opens after two bad rounds. See [Country check](../operations/health.md#country-check)."
-        - "**Response and connect time** in the client-eye checks: the response through a tunnel that is already open, the connect time apart from it, a mark for a slow connect, and a notice when the panel's own host loses inbound UDP. See [What the numbers mean](../operations/health.md#what-the-numbers-mean)."
-        - "**The Cloudflare edition is six Workers:** a small JS router that keeps the address and five panel roles, each with its own wasm. `mistgate edge deploy` deploys all six, skips scripts that did not change and has `--rollback`. Still a preview. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
+        - "**TSPU probe**, a third source for reachability from Russia: one of your own nodes inside Russia finds the filtering box on its path and checks, port by port, whether TCP to each node dies there. Off by default, every 2 hours, node addresses go only to your probe node; a datacenter view, TCP only. See [TSPU probe](../operations/health.md#tspu-probe)."
+        - "**Sources that disagree** show the worse verdict marked *sources disagree*, with what each source saw; the alert says which source saw the block."
     - title: Profiles
       section: profiles
       points:
@@ -78,7 +77,7 @@ Mistgate is in **beta**; the current release is `v0.1.41`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.41
+  meta: v0.1.34 – v0.1.42
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
