@@ -353,10 +353,11 @@ function DeleteButton({ user, actions }: { user: User; actions: Actions }) {
 // ---- DNS picked on the user's page ----
 
 /**
- * "DNS per server": what the person picked on their page, one line per node. Nothing picked, nothing shown. A pick the
- * node does not offer any more does nothing: the line says what applies instead. "Reset" (helper and owner) removes them all.
+ * "DNS picked on the page": what the person picked on their page, for the apps on the link (one line) and per node. Nothing
+ * picked, nothing shown. A pick that is no longer offered does nothing: the line says what applies instead. "Reset" (helper and
+ * owner) removes them all.
  */
-function DnsChoicesPanel({ user, actions }: { user: User; actions: Actions }) {
+export function DnsChoicesPanel({ user, actions }: { user: Pick<User, "id" | "name">; actions: Pick<Actions, "refresh"> }) {
   const t = useTx();
   const toast = useToast();
   const can = useCan();
@@ -364,10 +365,11 @@ function DnsChoicesPanel({ user, actions }: { user: User; actions: Actions }) {
   const [open, setOpen] = useState(false);
   const q = useQuery({
     queryKey: ["users", "dns-choices", user.id],
-    queryFn: ({ signal }) => dns.getUserDnsChoices({ userId: user.id }, { signal }).then((r) => plain(r.choices)),
+    queryFn: ({ signal }) => dns.getUserDnsChoices({ userId: user.id }, { signal }).then((r) => plain(r)),
   });
   if (q.isError) return <QueryError compact error={q.error} onRetry={() => void q.refetch()} />;
-  if (!q.data || q.data.length === 0) return null;
+  if (!q.data || (q.data.choices.length === 0 && !q.data.link)) return null;
+  const link = q.data.link;
 
   async function reset() {
     try {
@@ -384,7 +386,16 @@ function DnsChoicesPanel({ user, actions }: { user: User; actions: Actions }) {
     <Panel title={t("subs.dnsChoice.title")} icon="dns" tone="sky">
       <p className="-mt-1 text-xs leading-snug text-muted">{t("subs.dnsChoice.hint")}</p>
       <ul className="flex flex-col">
-        {q.data.map((c) => (
+        {link && (
+          <li className="flex flex-col gap-0.5 border-t border-line py-2 text-[13px] first:border-t-0">
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="text-xs font-bold">{t("subs.dnsChoice.link")}</span>
+              <span className="min-w-0 flex-1 break-words">{label(link.presetId, link.presetName)}</span>
+            </span>
+            {!link.offered && <span className="text-[11px] leading-snug text-warn-text">{t("subs.dnsChoice.linkGone", { name: label(link.effectivePresetId, link.effectivePresetName) })}</span>}
+          </li>
+        )}
+        {q.data.choices.map((c) => (
           <li key={c.nodeId} className="flex flex-col gap-0.5 border-t border-line py-2 text-[13px] first:border-t-0">
             <span className="flex min-w-0 items-baseline gap-2">
               <span className="font-mono text-xs font-bold">{c.nodeName}</span>

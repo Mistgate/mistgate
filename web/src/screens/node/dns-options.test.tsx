@@ -75,7 +75,7 @@ describe("DNS choice on the user page (node)", () => {
     await mount(1);
     expect(text()).toContain("DNS choice on the user page");
     expect(text()).toContain(en["subs.dnsOpt.note"]);
-    expect(text()).toContain("In Happ and for Hysteria2 in Mihomo the DNS is one for all nodes — per node it works only for AmneziaWG keys.");
+    expect(text()).toContain("Happ, the Mihomo apps, Xray JSON and sing-box have one DNS for all nodes: offer it in Subscriptions → User page. Per node it works only for AmneziaWG keys.");
   });
 
   it("sends the offered presets in the owner's order and the default, and reads only its own node", async () => {
@@ -113,6 +113,6 @@ describe("DNS choice on the user page (node)", () => {
     expect(labelled("Move Preset B up")).toBeNull();
     expect(input("Offer Preset A")?.disabled).toBe(true);
     expect(input("Default: Preset B")?.disabled).toBe(true);
-    expect(text()).toContain("In Happ and for Hysteria2 in Mihomo"); // still shown
+    expect(text()).toContain("Happ, the Mihomo apps, Xray JSON and sing-box have one DNS for all nodes"); // still shown
   });
 });

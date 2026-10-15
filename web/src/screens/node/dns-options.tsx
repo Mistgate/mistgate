@@ -16,7 +16,7 @@ import { meQuery } from "@/lib/session";
 import { catalogOf, move, presetName, presetSubtitle, transportKey, type DnsData } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery } from "@/screens/subscriptions/queries";
 
-// the server refuses more (SetNodeDnsOptions)
+// the server refuses more (SetNodeDnsOptions, SubscriptionSettings.link_dns)
 const maxOffered = 20;
 
 /** What every node offers on the user page, in the owner's order. A node that is not in the list offers nothing. */
@@ -58,25 +58,23 @@ export function DnsOptionsCard({ nodeId }: { nodeId: string }) {
   );
 }
 
+/** An offer as saved, without the presets deleted since (they are not sent back) and with a default that is still offered. */
+export function offerOf(saved: Saved | undefined, data: DnsData): Saved {
+  const ids = (saved?.presetIds ?? []).filter((id) => data.presets.some((p) => p.id === id));
+  return { presetIds: ids, defaultPresetId: ids.includes(saved?.defaultPresetId ?? "") ? saved!.defaultPresetId : "" };
+}
+
 function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved | undefined; data: DnsData }) {
   const t = useT();
-  const lang = useLang();
   const toast = useToast();
   const qc = useQueryClient();
   const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
-  const catalog = useMemo(() => catalogOf(data.providers), [data.providers]);
-  const byId = new Map(data.presets.map((p) => [p.id, p]));
-
-  // an offered preset that was deleted since is gone from the list: it is not sent back
-  const startIds = (saved?.presetIds ?? []).filter((id) => byId.has(id));
-  const startDef = startIds.includes(saved?.defaultPresetId ?? "") ? saved!.defaultPresetId : "";
-  const [ids, setIds] = useState(startIds);
-  const [def, setDef] = useState(startDef);
-  const dirty = JSON.stringify([ids, def]) !== JSON.stringify([startIds, startDef]);
-  const full = ids.length >= maxOffered;
+  const start = offerOf(saved, data);
+  const [offer, setOffer] = useState(start);
+  const dirty = JSON.stringify(offer) !== JSON.stringify(start);
 
   const save = useMutation({
-    mutationFn: () => dns.setNodeDnsOptions({ nodeId, presetIds: ids, defaultPresetId: def }),
+    mutationFn: () => dns.setNodeDnsOptions({ nodeId, ...offer }),
     onSuccess: () => {
       toast(t("common.saved"));
       void qc.invalidateQueries({ queryKey: ["dns"] });
@@ -85,13 +83,40 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
     onError: (e) => toast.error(errorText(e, t)),
   });
 
-  const toggle = (id: string, on: boolean) => {
-    setIds((x) => (on ? [...x, id] : x.filter((y) => y !== id)));
-    if (!on && def === id) setDef("");
-  };
+  return (
+    <>
+      <OfferList data={data} offer={offer} onChange={setOffer} disabled={!owner} group={`dns-default-${nodeId}`} nothing={t("subs.dnsOpt.nothing")} defNoneHint={t("subs.dnsOpt.defNoneHint")} />
+      {data.presets.length > 0 &&
+        (owner ? (
+          <div className="flex justify-end">
+            <Button variant="primary" size="md" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
+              {t("common.save")}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs leading-snug text-muted">{t("subs.dnsOpt.ownerOnly")}</p>
+        ))}
+    </>
+  );
+}
+
+/**
+ * The presets of an offer (a node's, or the one for the apps on the link): tick what is offered, order it, mark the default.
+ * Controlled; `nothing` says what an empty offer means, `defNoneHint` what applies without a default.
+ */
+export function OfferList({ data, offer, onChange, disabled, group, nothing, defNoneHint }: { data: DnsData; offer: Saved; onChange: (o: Saved) => void; disabled: boolean; group: string; nothing: string; defNoneHint: string }) {
+  const t = useT();
+  const lang = useLang();
+  const catalog = useMemo(() => catalogOf(data.providers), [data.providers]);
+  const byId = new Map(data.presets.map((p) => [p.id, p]));
+  const ids = offer.presetIds;
+  const def = offer.defaultPresetId;
+  const full = ids.length >= maxOffered;
+  const setIds = (next: string[]) => onChange({ presetIds: next, defaultPresetId: next.includes(def) ? def : "" });
+  const setDef = (id: string) => onChange({ presetIds: ids, defaultPresetId: id });
+  const toggle = (id: string, on: boolean) => setIds(on ? [...ids, id] : ids.filter((y) => y !== id));
   // the offered ones first, in the owner's order, then the rest as the presets are listed
   const rows = [...ids.flatMap((id) => byId.get(id) ?? []), ...data.presets.filter((p) => !ids.includes(p.id))];
-  const group = `dns-default-${nodeId}`;
 
   if (data.presets.length === 0) return <p className="text-[13px] text-muted">{t("subs.dnsOpt.empty")}</p>;
 
@@ -111,7 +136,7 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
                   className="mt-0.5 size-4 flex-none accent-accent"
                   aria-label={t("subs.dnsOpt.offer", { name })}
                   checked={on}
-                  disabled={!owner || (!on && full)}
+                  disabled={disabled || (!on && full)}
                   onChange={(e) => toggle(p.id, e.target.checked)}
                 />
                 <span className="flex min-w-0 flex-col">
@@ -122,15 +147,15 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
               {on && (
                 <>
                   <label className="flex items-center gap-1.5 text-xs text-muted">
-                    <input type="radio" name={group} className="size-4 accent-accent" aria-label={t("subs.dnsOpt.def", { name })} checked={def === p.id} disabled={!owner} onChange={() => setDef(p.id)} />
+                    <input type="radio" name={group} className="size-4 accent-accent" aria-label={t("subs.dnsOpt.def", { name })} checked={def === p.id} disabled={disabled} onChange={() => setDef(p.id)} />
                     {t("subs.dnsOpt.defShort")}
                   </label>
-                  {owner && (
+                  {!disabled && (
                     <span className="flex gap-0.5">
-                      <IconButton variant="flat" aria-label={t("subs.dnsOpt.up", { name })} disabled={at === 0} onClick={() => setIds((x) => move(x, at, at - 1))}>
+                      <IconButton variant="flat" aria-label={t("subs.dnsOpt.up", { name })} disabled={at === 0} onClick={() => setIds(move(ids, at, at - 1))}>
                         <Icon name="arrowUp" size={14} />
                       </IconButton>
-                      <IconButton variant="flat" aria-label={t("subs.dnsOpt.down", { name })} disabled={at === ids.length - 1} onClick={() => setIds((x) => move(x, at, at + 1))}>
+                      <IconButton variant="flat" aria-label={t("subs.dnsOpt.down", { name })} disabled={at === ids.length - 1} onClick={() => setIds(move(ids, at, at + 1))}>
                         <Icon name="arrowDown" size={14} />
                       </IconButton>
                     </span>
@@ -143,23 +168,14 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
       </ul>
       {ids.length > 0 && (
         <label className="flex items-start gap-1.5 border-t border-line pt-3 text-xs text-muted">
-          <input type="radio" name={group} className="mt-px size-4 flex-none accent-accent" checked={def === ""} disabled={!owner} onChange={() => setDef("")} />
+          <input type="radio" name={group} className="mt-px size-4 flex-none accent-accent" checked={def === ""} disabled={disabled} onChange={() => setDef("")} />
           <span className="flex flex-col">
             <span className="font-bold text-fg">{t("subs.dnsOpt.defNone")}</span>
-            <span className="leading-snug">{t("subs.dnsOpt.defNoneHint")}</span>
+            <span className="leading-snug">{defNoneHint}</span>
           </span>
         </label>
       )}
-      <p className="text-xs leading-snug text-muted">{ids.length === 0 ? t("subs.dnsOpt.nothing") : t("subs.dnsOpt.count", { n: ids.length, max: maxOffered })}</p>
-      {owner ? (
-        <div className="flex justify-end">
-          <Button variant="primary" size="md" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
-            {t("common.save")}
-          </Button>
-        </div>
-      ) : (
-        <p className="text-xs leading-snug text-muted">{t("subs.dnsOpt.ownerOnly")}</p>
-      )}
+      <p className="text-xs leading-snug text-muted">{ids.length === 0 ? nothing : t("subs.dnsOpt.count", { n: ids.length, max: maxOffered })}</p>
     </>
   );
 }

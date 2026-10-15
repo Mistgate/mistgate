@@ -15,15 +15,18 @@ import { useCan } from "@/lib/health";
 import { useTx } from "@/screens/users/t";
 import { SwitchRow } from "@/screens/users/ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
+import { OfferList } from "@/screens/node/dns-options";
 import { kindKey, kinds, platformKey, platforms, previewUrl, validDownload, type PlatformApp, type Settings } from "./model";
 import { appOf, knownFor } from "./known-apps";
-import { pickerUsersQuery, useSaveSettings } from "./queries";
+import { dnsPresetsQuery, pickerUsersQuery, useSaveSettings } from "./queries";
 import { inputCls, SaveBar } from "./ui";
 
 type Options = { showAnnouncement: boolean; showSupport: boolean; showQr: boolean; allowDeviceSelfService: boolean; requirePagePassword: boolean; allowDnsChoice: boolean };
-type Draft = { apps: PlatformApp[]; options: Options };
+type LinkOffer = { presetIds: string[]; defaultPresetId: string };
+type Draft = { apps: PlatformApp[]; options: Options; linkDns: LinkOffer };
 const draftOf = (s: Settings): Draft => ({
   apps: s.apps,
+  linkDns: { presetIds: s.linkDns?.presetIds ?? [], defaultPresetId: s.linkDns?.defaultPresetId ?? "" },
   options: { showAnnouncement: s.userPage?.showAnnouncement ?? true, showSupport: s.userPage?.showSupport ?? true, showQr: s.userPage?.showQr ?? true, allowDeviceSelfService: s.userPage?.allowDeviceSelfService ?? true, requirePagePassword: s.userPage?.requirePagePassword ?? true, allowDnsChoice: s.userPage?.allowDnsChoice ?? false },
 });
 const descMax = 80;
@@ -67,6 +70,7 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
         ...cur,
         apps: d.apps.map((a) => ({ ...a, name: a.name.trim(), downloadUrl: a.downloadUrl.trim(), addLinkTemplate: a.addLinkTemplate.trim(), description: a.description.trim() })),
         userPage: d.options,
+        linkDns: d.linkDns,
       }))
       .then(() => toast(t("subs.saved")))
       .catch((e: unknown) => toast.error(errorText(e, t)));
@@ -83,6 +87,7 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
             <SwitchRow label={t("subs.page.opt.password")} hint={t("subs.page.opt.passwordHint")} checked={d.options.requirePagePassword} onCheckedChange={(on) => setOpt("requirePagePassword", on)} />
             <SwitchRow label={t("awg.page.selfService")} hint={t("awg.page.selfServiceHint")} checked={d.options.allowDeviceSelfService} onCheckedChange={(on) => setOpt("allowDeviceSelfService", on)} />
             <SwitchRow label={t("subs.page.opt.dnsChoice")} hint={t("subs.page.opt.dnsChoiceHint")} checked={d.options.allowDnsChoice} onCheckedChange={(on) => setOpt("allowDnsChoice", on)} />
+            {d.options.allowDnsChoice && <LinkDnsOffer offer={d.linkDns} onChange={(linkDns) => setD((x) => ({ ...x, linkDns }))} />}
           </Card>
 
           <Card lg className="flex min-w-0 flex-col gap-3 p-4">
@@ -116,6 +121,27 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
 
       {dirty && <SaveBar busy={save.isPending} canSave={ok} onSave={onSave} onDiscard={() => setD(base)} />}
     </div>
+  );
+}
+
+/** Under the switch: what a person may pick for Happ and the other apps on the link, one DNS for all servers (SubscriptionSettings.link_dns). */
+function LinkDnsOffer({ offer, onChange }: { offer: LinkOffer; onChange: (o: LinkOffer) => void }) {
+  const t = useTx();
+  const presets = useQuery(dnsPresetsQuery);
+  return (
+    <section aria-labelledby="link-dns-t" className="flex flex-col gap-2 border-t border-line pt-3 pb-3">
+      <h3 id="link-dns-t" className="text-[13px] font-bold">
+        {t("subs.linkDns.title")}
+      </h3>
+      <p className="-mt-1 text-[11px] leading-snug text-muted">{t("subs.linkDns.note")}</p>
+      {presets.isError ? (
+        <QueryError compact error={presets.error} onRetry={() => void presets.refetch()} />
+      ) : !presets.data ? (
+        <Pending compact />
+      ) : (
+        <OfferList data={presets.data} offer={offer} onChange={onChange} disabled={false} group="dns-default-link" nothing={t("subs.linkDns.nothing")} defNoneHint={t("subs.dnsOpt.defNoneHint")} />
+      )}
+    </section>
   );
 }
 

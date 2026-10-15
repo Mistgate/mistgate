@@ -10,12 +10,14 @@ import { PageTab } from "./page";
 
 const updateSubscriptionSettings = vi.fn();
 const getSubscriptionSettings = vi.fn();
+const listDnsPresets = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   subscriptions: {
     getSubscriptionSettings: (...a: unknown[]) => getSubscriptionSettings(...a),
     updateSubscriptionSettings: (...a: unknown[]) => updateSubscriptionSettings(...a),
   },
+  dns: { listDnsPresets: (...a: unknown[]) => listDnsPresets(...a) },
   users: { listUsers: () => Promise.resolve({ users: [] }) },
 }));
 
@@ -32,7 +34,10 @@ afterEach(() => {
   root = host = null;
   updateSubscriptionSettings.mockReset();
   getSubscriptionSettings.mockReset();
+  listDnsPresets.mockReset();
 });
+
+const preset = (id: string, name: string) => ({ id, name, servers: [], split: [], splitDirect: false, isDefault: false });
 
 const app = (platform: Platform, kind: App, name: string, extra: Partial<Settings["apps"][number]> = {}) => ({ platform, kind, name, downloadUrl: "https://example.com/" + name, addLinkTemplate: "", description: "", recommended: false, ...extra });
 
@@ -52,6 +57,7 @@ const settingsOf = (over: Partial<Settings> = {}): Settings =>
 
 async function mount(settings: Settings) {
   getSubscriptionSettings.mockResolvedValue({ settings, effectiveTitle: "" });
+  listDnsPresets.mockResolvedValue({ presets: [preset("dns_a", "Preset A"), preset("dns_b", "Preset B"), preset("dns_c", "Preset C")], providers: [], clientSupport: [] });
   updateSubscriptionSettings.mockImplementation(async (r: { settings: unknown }) => ({ settings: r.settings }));
   host = document.createElement("div");
   document.body.append(host);
@@ -260,5 +266,48 @@ describe("the known-apps catalog", () => {
     expect(appOf("happ", Platform.WINDOWS)).toMatchObject({ downloadUrl: "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe", addLinkTemplate: "happ://add/{url}" });
     expect(appOf("amnezia", Platform.LINUX)).toMatchObject({ kind: App.AMNEZIA, downloadUrl: "https://amnezia.org/downloads" });
     expect(appOf("klick", Platform.IOS)).toBeNull();
+  });
+});
+describe("the DNS offer for the apps on the link", () => {
+  const on = (linkDns?: Settings["linkDns"]) =>
+    settingsOf({ userPage: { showAnnouncement: true, showSupport: true, showQr: true, allowDeviceSelfService: true, allowDnsChoice: true } as Settings["userPage"], ...(linkDns && { linkDns }) });
+  const box = (aria: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${aria}"]`);
+  const ticked = () => [...document.querySelectorAll<HTMLInputElement>("input[type=checkbox][aria-label^=Offer]")].filter((c) => c.checked).map((c) => c.getAttribute("aria-label"));
+  const settle = async () => {
+    for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+  };
+
+  it("stands under the switch while the choice is on, says what it reaches and what goes first", async () => {
+    await mount(settingsOf());
+    expect(text()).not.toContain("DNS for the apps on the link");
+    await click(switchOf("DNS choice on the page"));
+    await settle();
+    expect(text()).toContain("DNS for the apps on the link");
+    expect(text()).toContain("One DNS for all servers in Happ, the Mihomo apps, Xray JSON and sing-box.");
+    expect(text()).toContain("Nothing offered: the page shows no DNS choice for the apps on the link.");
+    expect(document.querySelector("section[aria-labelledby=link-dns-t] h3")?.textContent).toBe("DNS for the apps on the link");
+  });
+
+  it("ticks presets in their order, marks a default and saves them with the settings", async () => {
+    await mount(on());
+    await click(box("Offer Preset C"));
+    await click(box("Offer Preset A"));
+    await click(labelled("Default: Preset A"));
+    await click(labelled("Move Preset A up"));
+    expect(ticked()).toEqual(["Offer Preset A", "Offer Preset C"]);
+    expect(text()).toContain("2 of 20 offered");
+    await click(button("Save"));
+    expect(saved().linkDns).toEqual({ presetIds: ["dns_a", "dns_c"], defaultPresetId: "dns_a" });
+    expect(saved().userPage?.allowDnsChoice).toBe(true);
+  });
+
+  it("reads a saved offer back; unticking the default leaves no default; the other settings go along with it", async () => {
+    await mount(on({ presetIds: ["dns_b", "dns_a"], defaultPresetId: "dns_b" }));
+    expect(ticked()).toEqual(["Offer Preset B", "Offer Preset A"]);
+    expect((labelled("Default: Preset B") as HTMLInputElement).checked).toBe(true);
+    await click(box("Offer Preset B"));
+    await click(button("Save"));
+    expect(saved().linkDns).toEqual({ presetIds: ["dns_a"], defaultPresetId: "" });
+    expect(saved().apps).toHaveLength(4);
   });
 });

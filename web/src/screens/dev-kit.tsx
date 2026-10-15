@@ -49,6 +49,7 @@ import type { ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
 import { FleetKit } from "./dev-kit-fleet";
 import { SettingsDemos } from "./dev-kit-settings";
 import { PolishKit } from "./dev-kit-polish";
+import { DnsLinkKit } from "./dev-kit-dns";
 import { EdgeKit } from "./dev-kit-edge";
 import { DecoyKit } from "./dev-kit-decoy";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
@@ -282,6 +283,13 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
+  // ?only=dns: the DNS kit alone, for its screenshots
+  if (new URLSearchParams(location.search).get("only") === "dns")
+    return (
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+        <DnsLinkKit />
+      </div>
+    );
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
       <div className="flex items-center gap-3">
@@ -512,6 +520,7 @@ export default function DevKit() {
       <FleetKit />
       <SettingsDemos />
       <PolishKit />
+      <DnsLinkKit />
       <EdgeKit />
       <DecoyKit />
 

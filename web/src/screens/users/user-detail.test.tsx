@@ -149,11 +149,12 @@ const choice = (nodeName: string, presetName: string, over: object = {}) => ({
   nodeId: `nod_${nodeName}`, nodeName, presetId: `dns_${presetName}`, presetName, offered: true, effectivePresetId: `dns_${presetName}`, effectivePresetName: presetName, updatedUnix: 0n, ...over,
 });
 
-async function mount(role = 1, choices: object[] = [], alerts: object[] = [], data: object = detail) {
+async function mount(role = 1, choices: object[] | { choices: object[]; link?: object } = [], alerts: object[] = [], data: object = detail) {
   me.mockResolvedValue({ admin: { id: "adm_1", role } });
   listAlerts.mockResolvedValue({ nowUnix: NOW, active: alerts, history: [] });
-  getUserDnsChoices.mockResolvedValue({ choices });
-  resetUserDnsChoices.mockResolvedValue({ removed: choices.length });
+  const picks = Array.isArray(choices) ? { choices } : choices;
+  getUserDnsChoices.mockResolvedValue(picks);
+  resetUserDnsChoices.mockResolvedValue({ removed: picks.choices.length + (picks.link ? 1 : 0) });
   getUser.mockResolvedValue(data);
   host = document.createElement("div");
   document.body.append(host);
@@ -282,20 +283,20 @@ describe("the user card", () => {
     expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", groupId: "grp_f" });
   });
 
-  describe("DNS per server", () => {
+  describe("DNS picked on the page", () => {
     const picks = [choice("de1", "Family"), choice("nl1", "Family", { offered: false, effectivePresetId: "dns_Plain", effectivePresetName: "Plain" })];
     // the card has another "Reset" (traffic): this one is inside the DNS panel
-    const resetButtons = () => [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Reset" && b.closest("section, div")?.parentElement?.textContent?.includes("DNS per server"));
+    const resetButtons = () => [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Reset" && b.closest("section, div")?.parentElement?.textContent?.includes("DNS picked on the page"));
 
     it("is not shown for a person who picked nothing", async () => {
       await mount(1, []);
-      expect(text()).not.toContain("DNS per server");
+      expect(text()).not.toContain("DNS picked on the page");
     });
 
     it("lists the picks per server and says what applies when the node stopped offering one", async () => {
       await mount(1, picks);
       expect(getUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" }, expect.anything());
-      expect(text()).toContain("DNS per server");
+      expect(text()).toContain("DNS picked on the page");
       expect(text()).toContain("de1");
       expect(text()).toContain("nl1");
       expect(text()).toContain("the node no longer offers it, Plain applies");
@@ -312,13 +313,44 @@ describe("the user card", () => {
       await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Reset"));
       await settle();
       expect(resetUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" });
-      expect(text()).not.toContain("DNS per server"); // refetched: nothing picked any more
+      expect(text()).not.toContain("DNS picked on the page"); // refetched: nothing picked any more
     });
 
     it("shows a read-only admin the picks but not the button", async () => {
       await mount(3, picks);
-      expect(text()).toContain("DNS per server");
+      expect(text()).toContain("DNS picked on the page");
       expect(resetButtons()).toHaveLength(0);
+    });
+
+    // the panel: its hint's card (the card lists devices too, one of them "Apps on the link"-like)
+    const panel = () => [...document.querySelectorAll("p")].find((p) => p.textContent === "What the person picked on their page: for the apps on the link and for each server.")?.parentElement ?? null;
+
+    it("shows the pick for the apps on the link first", async () => {
+      const link = { ...choice("", "AdGuard"), nodeId: "", nodeName: "" };
+      await mount(1, { choices: picks, link });
+      const rows = [...panel()!.querySelectorAll("li")].map((li) => li.textContent);
+      expect(rows[0]).toBe("Apps on the linkAdGuard");
+      expect(rows.slice(1).map((r) => r?.slice(0, 3))).toEqual(["de1", "nl1"]);
+    });
+
+    it("a pick for the apps on the link that is no longer offered says what applies", async () => {
+      const link = { ...choice("", "AdGuard"), nodeId: "", nodeName: "", offered: false, effectivePresetId: "dns_Plain", effectivePresetName: "Plain" };
+      await mount(1, { choices: [], link });
+      expect(panel()?.textContent).toContain("Apps on the link");
+      expect(panel()?.textContent).toContain("no longer offered, Plain applies");
+    });
+
+    it("a person who picked only for the apps on the link has the block and the reset, which clears it", async () => {
+      await mount(1, { choices: [], link: { ...choice("", "AdGuard"), nodeId: "", nodeName: "" } });
+      expect(text()).toContain("DNS picked on the page");
+      await click(resetButtons()[0]);
+      const dialog = document.querySelector("[role=dialog]")!;
+      expect(dialog.textContent).toContain("for the apps on the link and for every server");
+      getUserDnsChoices.mockResolvedValue({ choices: [] });
+      await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Reset"));
+      await settle();
+      expect(resetUserDnsChoices).toHaveBeenCalledWith({ userId: "usr_1" });
+      expect(panel()).toBeNull();
     });
   });
 
