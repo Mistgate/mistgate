@@ -400,8 +400,11 @@ package mistgate.agent.v1;
 //   - ANSWER. One CommandResult. ok = true: params{"dpi_hop": "<n>", "control": "ok", "t<host>:<port>": verdict}, verdict =
 //     blocked | open | refused | timeout (timeout = no verdict was reached for that pair: the deadline ran out, or the name
 //     did not resolve). ok = false: error = bad_params | unsupported_host | busy | unsupported | no_dpi_hop (blocked_ref
-//     was empty, silent from the first hop, or reachable, so the DPI box cannot be placed) | control_failed (params{
-//     "dpi_hop", "control": "fail"}) | "failed: <short message>".
+//     was empty, silent from the first hop, or reachable, so the DPI box cannot be placed; params{"reason"} says which:
+//     ref_open (the reference answered with a SYN-ACK: it passes on this path), ref_refused (it answered with a RST:
+//     something resets it, and this method does not see that filter), no_hops (no router answered at any TTL) or no_ref
+//     (the request had no blocked_ref); an older agent sends no reason) | control_failed (params{"dpi_hop", "control":
+//     "fail"}) | "failed: <short message>".
 //
 // NODE DECOY SITE (additive, protocol api_version stays 1)
 //   A node reports the active mode and bundle SHA-256 in Hello. Agents that implement this command list "decoy/1".

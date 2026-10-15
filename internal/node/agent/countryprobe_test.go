@@ -82,6 +82,7 @@ func TestCountryProbeMapsErrors(t *testing.T) {
 	}{
 		"control failed":   {tspuprobe.Result{DPIHop: 3}, tspuprobe.ErrControlFailed, "control_failed", map[string]string{"dpi_hop": "3", "control": "fail"}},
 		"no dpi hop":       {tspuprobe.Result{}, tspuprobe.ErrNoDPIHop, "no_dpi_hop", nil},
+		"no dpi hop, why":  {tspuprobe.Result{}, &tspuprobe.NoDPIHopError{Reason: tspuprobe.ReasonRefOpen}, "no_dpi_hop", map[string]string{"reason": "ref_open"}},
 		"unsupported host": {tspuprobe.Result{}, tspuprobe.ErrUnsupportedHost, "unsupported_host", nil},
 		"unsupported":      {tspuprobe.Result{}, tspuprobe.ErrUnsupported, "unsupported", nil},
 		"bad parameters":   {tspuprobe.Result{}, tspuprobe.ErrBadParams, "bad_params", nil},

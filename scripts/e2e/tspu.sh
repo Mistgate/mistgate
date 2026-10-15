@@ -241,11 +241,26 @@ step3() {
   local out
   out=$(probe_as_nobody -control $CONTROL -ref $DE2 $DE1:443) || die "the probe failed to run: $out"
   expect "a reference that connects" "$(field "$out" 'd.get("error","")')" no_dpi_hop
+  expect "its reason" "$(field "$out" 'd.get("reason","")')" ref_open
   out=$(probe_as_nobody -control $CONTROL $DE1:443) || die "the probe failed to run: $out"
   expect "no reference" "$(field "$out" 'd.get("error","")')" no_dpi_hop
+  expect "its reason" "$(field "$out" 'd.get("reason","")')" no_ref
+  # no router answers: the probe's own firewall drops every Time Exceeded, as a path that hides its hops would
+  ns probe nft -f - <<EOF
+table inet hidden {
+  chain in {
+    type filter hook input priority 0; policy accept;
+    icmp type time-exceeded drop
+  }
+}
+EOF
+  out=$(probe_as_nobody -control $CONTROL -ref $BLOCKED_REF $DE1:443) || die "the probe failed to run: $out"
+  ns probe nft delete table inet hidden
+  expect "a path with no answering router" "$(field "$out" 'd.get("error","")')" no_dpi_hop
+  expect "its reason" "$(field "$out" 'd.get("reason","")')" no_hops
 }
 step3
-pass "a blocked reference that connects, or none at all, answers no_dpi_hop"
+pass "no_dpi_hop says why: reason=ref_open for a reference that connects, no_ref for none, no_hops when no router answers"
 
 # ---------------------------------------------------------------- 4. ICMP rate limit: a parallel pass lies, the alone pass does not
 

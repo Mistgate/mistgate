@@ -58,12 +58,31 @@ var (
 	// ErrUnsupported: this host cannot run the probe (not Linux, or the socket options are refused).
 	ErrUnsupported = errors.New("tspuprobe: unsupported on this host")
 	// ErrNoDPIHop: the DPI box cannot be placed: no blocked reference, it was silent from the first hop, or it was reachable.
+	// The error a run returns is a *NoDPIHopError that says which (errors.Is matches this value).
 	ErrNoDPIHop = errors.New("tspuprobe: dpi hop not found")
 	// ErrControlFailed: the control target did not get past the DPI box, the method does not apply on this network.
 	ErrControlFailed = errors.New("tspuprobe: control failed")
 	// ErrDeadline: the total deadline ran out before the DPI hop and the control were settled.
 	ErrDeadline = errors.New("tspuprobe: deadline")
 )
+
+// Why the DPI box could not be placed (NoDPIHopError.Reason; the "reason" param of the agent's no_dpi_hop answer).
+const (
+	// ReasonRefOpen: the blocked reference answered with a SYN-ACK, so it passes on this path.
+	ReasonRefOpen = "ref_open"
+	// ReasonRefRefused: the reference answered with a RST: something resets it, and this method does not see that filter.
+	ReasonRefRefused = "ref_refused"
+	// ReasonNoHops: no router answered at any TTL, so the route is hidden.
+	ReasonNoHops = "no_hops"
+	// ReasonNoRef: the request had no blocked reference.
+	ReasonNoRef = "no_ref"
+)
+
+// NoDPIHopError is ErrNoDPIHop with the reason the box could not be placed.
+type NoDPIHopError struct{ Reason string }
+
+func (e *NoDPIHopError) Error() string        { return ErrNoDPIHop.Error() + ": " + e.Reason }
+func (e *NoDPIHopError) Is(target error) bool { return target == ErrNoDPIHop }
 
 // Target is one host and its TCP ports.
 type Target struct {
@@ -199,7 +218,7 @@ func run(ctx context.Context, req Request, e env) (Result, error) {
 		return Result{}, err
 	}
 	if req.BlockedRef == "" {
-		return Result{}, ErrNoDPIHop
+		return Result{}, &NoDPIHopError{ReasonNoRef}
 	}
 	if req.HopLimit == 0 {
 		req.HopLimit = DefaultHopLimit
@@ -369,6 +388,14 @@ func verdictOf(hops []hop) string {
 	return v
 }
 
+// passed is the error of a blocked reference that got an answer from its end: a SYN-ACK or a RST.
+func passed(h hop) error {
+	if h == hopOpen {
+		return &NoDPIHopError{ReasonRefOpen}
+	}
+	return &NoDPIHopError{ReasonRefRefused}
+}
+
 // findDPIHop is step 1: the highest TTL a router answered for the blocked reference, with a look one hop further for an
 // answer the first pass lost to a rate limit.
 func (r *runner) findDPIHop(ctx context.Context, ref netip.AddrPort, maxTTL int) (int, error) {
@@ -384,13 +411,13 @@ func (r *runner) findDPIHop(ctx context.Context, ref netip.AddrPort, maxTTL int)
 	for i, h := range hops {
 		switch h {
 		case hopOpen, hopRefused:
-			return 0, ErrNoDPIHop // the reference got through: there is no box in the way that this method can place
+			return 0, passed(h) // the reference got through: there is no box in the way that this method can place
 		case hopICMP:
 			top = i + 1
 		}
 	}
 	if top == 0 {
-		return 0, ErrNoDPIHop
+		return 0, &NoDPIHopError{ReasonNoHops}
 	}
 	for more := true; more; {
 		more = false
@@ -401,7 +428,7 @@ func (r *runner) findDPIHop(ctx context.Context, ref netip.AddrPort, maxTTL int)
 			}
 			switch h {
 			case hopOpen, hopRefused:
-				return 0, ErrNoDPIHop
+				return 0, passed(h)
 			case hopICMP:
 				top, more = ttl, true
 			}

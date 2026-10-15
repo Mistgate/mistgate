@@ -28,6 +28,7 @@ type output struct {
 	Raw    string            `json:"raw_socket"`
 	DPIHop int               `json:"dpi_hop"`
 	Err    string            `json:"error,omitempty"`
+	Reason string            `json:"reason,omitempty"` // why a no_dpi_hop could not place the box
 	Result map[string]string `json:"verdicts,omitempty"`
 }
 
@@ -66,6 +67,10 @@ func main() {
 			out.Err = "control_failed"
 		case errors.Is(err, tspuprobe.ErrNoDPIHop):
 			out.Err = "no_dpi_hop"
+			var noHop *tspuprobe.NoDPIHopError
+			if errors.As(err, &noHop) {
+				out.Reason = noHop.Reason
+			}
 		}
 	}
 	_ = json.NewEncoder(os.Stdout).Encode(out)

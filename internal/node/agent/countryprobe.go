@@ -73,7 +73,12 @@ func (a *Agent) countryProbe(s *session, r *pb.CountryProbe) {
 	case errors.Is(err, tspuprobe.ErrControlFailed):
 		reply(&pb.CommandResult{Error: "control_failed", Params: map[string]string{"dpi_hop": strconv.Itoa(res.DPIHop), "control": "fail"}})
 	default:
-		reply(&pb.CommandResult{Error: countryProbeError(err)})
+		out := &pb.CommandResult{Error: countryProbeError(err)}
+		var noHop *tspuprobe.NoDPIHopError
+		if errors.As(err, &noHop) {
+			out.Params = map[string]string{"reason": noHop.Reason}
+		}
+		reply(out)
 	}
 }
 

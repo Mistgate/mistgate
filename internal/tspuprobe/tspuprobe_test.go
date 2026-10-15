@@ -176,13 +176,14 @@ func TestRunControlFailed(t *testing.T) {
 
 func TestRunNoDPIHop(t *testing.T) {
 	for name, tc := range map[string]struct {
-		ref  string
-		path func(*fakePath)
+		ref    string
+		path   func(*fakePath)
+		reason string
 	}{
-		"no reference":           {ref: ""},
-		"the reference connects": {ref: tDE2},
-		"silent from hop one":    {ref: tRef, path: func(p *fakePath) { p.dpi = 0 }},
-		"the reference is refused": {ref: tDE1, path: func(p *fakePath) {
+		"no reference":           {ref: "", reason: ReasonNoRef},
+		"the reference connects": {ref: tDE2, reason: ReasonRefOpen},
+		"silent from hop one":    {ref: tRef, path: func(p *fakePath) { p.dpi = 0 }, reason: ReasonNoHops},
+		"the reference is refused": {ref: tDE1, reason: ReasonRefRefused, path: func(p *fakePath) {
 			p.closed = map[string]bool{tDE1 + ":443": true}
 		}},
 	} {
@@ -193,8 +194,10 @@ func TestRunNoDPIHop(t *testing.T) {
 			}
 			req := baseRequest()
 			req.BlockedRef = tc.ref
-			if _, err := run(context.Background(), req, testEnv(p)); !errors.Is(err, ErrNoDPIHop) {
-				t.Fatalf("err = %v, want ErrNoDPIHop", err)
+			_, err := run(context.Background(), req, testEnv(p))
+			var noHop *NoDPIHopError
+			if !errors.Is(err, ErrNoDPIHop) || !errors.As(err, &noHop) || noHop.Reason != tc.reason {
+				t.Fatalf("err = %v, want ErrNoDPIHop with reason %q", err, tc.reason)
 			}
 		})
 	}
