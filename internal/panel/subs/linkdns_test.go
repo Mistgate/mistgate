@@ -41,7 +41,9 @@ func decodeLink(t *testing.T, rec *httptest.ResponseRecorder) linkAnswer {
 }
 
 // adguard: the text names AdGuard DNS, by its name or its address.
-func adguard(s string) bool { return strings.Contains(s, "adguard") || strings.Contains(s, "94.140.14") }
+func adguard(s string) bool {
+	return strings.Contains(s, "adguard") || strings.Contains(s, "94.140.14")
+}
 
 // formatsDNS is what each link format of a person carries as its DNS: the Happ routing header, the dns of the Mihomo profile
 // (the AmneziaWG proxies keep their own), of the Xray JSON array and of the sing-box profile.
