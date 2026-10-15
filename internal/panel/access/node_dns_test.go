@@ -146,8 +146,8 @@ func TestMihomoAWGProxiesCarryTheDNSOfTheirNode(t *testing.T) {
 	if err != nil || pre.ID != "dns_builtin_ru_split" {
 		t.Errorf("the rule for the link: %v %v", pre.ID, err)
 	}
-	if v.DNSLink != "dns_builtin_ru_split" {
-		t.Errorf("DNSLink = %q", v.DNSLink)
+	if v.DNSLink.Effective != "dns_builtin_ru_split" || v.DNSLink.Choice != "" || len(v.DNSLink.Options) != 0 {
+		t.Errorf("DNSLink = %+v", v.DNSLink)
 	}
 }
 
@@ -222,8 +222,8 @@ func TestSubViewNodes(t *testing.T) {
 		}
 	}
 	// Nobody offers anything: no DNS rows, no presets to name.
-	if de.DNS != nil || nl.DNS != nil || len(v.DNSPresets) != 0 || v.DNSLink != "dns_builtin_ru_split" {
-		t.Errorf("DNS with no offers: %+v %+v %v %q", de.DNS, nl.DNS, v.DNSPresets, v.DNSLink)
+	if de.DNS != nil || nl.DNS != nil || len(v.DNSPresets) != 0 || v.DNSLink.Effective != "dns_builtin_ru_split" {
+		t.Errorf("DNS with no offers: %+v %+v %v %+v", de.DNS, nl.DNS, v.DNSPresets, v.DNSLink)
 	}
 
 	e.offer("nod_de1", "dns_builtin_adblock", "dns_builtin_adblock", "dns_builtin_standard", "dns_builtin_family")
@@ -412,7 +412,7 @@ func TestInactiveUserKeepsTheirKeysInTheView(t *testing.T) {
 	dev := must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: uid, ProfileId: m.profile, Platform: "ios", Label: "phone"}))).Msg.Device.Id
 	must(e.s.SetUsersEnabled(e.ctx, req(&adminv1.SetUsersEnabledRequest{UserIds: []string{uid}, Enabled: false})))
 	v := must(e.s.Subscription(e.ctx, token))
-	if v.Status == StatusActive || len(v.Nodes) != 0 || len(v.DNSPresets) != 0 || v.DNSLink != "" || v.AccessAmnezia || len(v.AWGProfiles) != 0 || !v.AppAmnezia {
+	if v.Status == StatusActive || len(v.Nodes) != 0 || len(v.DNSPresets) != 0 || v.DNSLink.Effective != "" || v.AccessAmnezia || len(v.AWGProfiles) != 0 || !v.AppAmnezia {
 		t.Errorf("inactive view: %+v", v)
 	}
 	if len(v.Devices) != 2 || v.Devices[len(v.Devices)-1].ID != dev && v.Devices[0].ID != dev {

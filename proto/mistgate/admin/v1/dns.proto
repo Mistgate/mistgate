@@ -25,9 +25,9 @@ service DnsService {
   // Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
   // repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
   rpc SetNodeDnsOptions(SetNodeDnsOptionsRequest) returns (SetNodeDnsOptionsResponse);
-  // What a person picked on their page, per node (read only).
+  // What a person picked on their page, per node and for the link apps (read only).
   rpc GetUserDnsChoices(GetUserDnsChoicesRequest) returns (GetUserDnsChoicesResponse);
-  // Removes every pick of a person: their servers go back to the node defaults.
+  // Removes every pick of a person: their servers go back to the node defaults, their link apps to the usual preset.
   rpc ResetUserDnsChoices(ResetUserDnsChoicesRequest) returns (ResetUserDnsChoicesResponse);
 }
 
@@ -233,16 +233,17 @@ message SetNodeDnsOptionsResponse {
   NodeDnsOptions options = 1;
 }
 
-// One pick of a person on one node.
+// One pick of a person on one node, or for the link apps (node_id empty).
 message UserDnsChoice {
   string node_id = 1;
   string node_name = 2;
   // What they picked and, for the UI language, its stored name (built-ins are named by id there).
   string preset_id = 3;
   string preset_name = 4;
-  // False when the node no longer offers it: the pick does nothing and the node default applies.
+  // False when the node (or the offer for the link apps) no longer has it: the pick does nothing and what applies without a
+  // pick applies.
   bool offered = 5;
-  // What applies to the person on this node now.
+  // What applies to the person on this node (or in the link apps) now.
   string effective_preset_id = 6;
   string effective_preset_name = 7;
   int64 updated_unix = 8;
@@ -254,6 +255,9 @@ message GetUserDnsChoicesRequest {
 
 message GetUserDnsChoicesResponse {
   repeated UserDnsChoice choices = 1;
+  // The pick for the apps that take the link (SubscriptionSettings.link_dns), one for all servers; node_id and node_name are
+  // empty. Absent when the person picked nothing for them.
+  UserDnsChoice link = 2;
 }
 
 message ResetUserDnsChoicesRequest {
@@ -261,6 +265,6 @@ message ResetUserDnsChoicesRequest {
 }
 
 message ResetUserDnsChoicesResponse {
-  // How many picks were removed.
+  // How many picks were removed, the one for the link apps included.
   uint32 removed = 1;
 }

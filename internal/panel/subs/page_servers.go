@@ -60,19 +60,28 @@ type pageDNS struct {
 	Link         pageDNSLink `json:"link"`
 }
 
-// pageDNSLink: the apps that take the link (Hysteria2 in Happ and in Mihomo) have one resolver for the whole subscription,
-// so a pick per server does not reach them: per_server is false and effective is the preset they all use.
+// pageDNSLink: the apps that take the link (Happ, the Mihomo apps, Xray JSON, sing-box) have one resolver for the whole
+// subscription, so a pick per server does not reach them: per_server is false and effective is the preset they all use. The
+// person may pick it from options (POST <link>/dns {"link": true}): choice is their pick ("" = none), default what applies
+// without one. No options: the owner offers no choice for them.
 type pageDNSLink struct {
-	PerServer bool   `json:"per_server"`
-	Effective string `json:"effective"`
+	PerServer bool     `json:"per_server"`
+	Effective string   `json:"effective"`
+	Choice    string   `json:"choice"`
+	Default   string   `json:"default"`
+	Options   []string `json:"options"`
 }
 
-// pageDNSPreset is a preset the page names, in the language of the page.
+// pageDNSPreset is a preset the page names, in the language of the browser (name, description). Names and descriptions hold
+// the stock texts of a built-in preset in ru, en and zh, so the page shows its own language when the visitor switched it; they
+// are absent for a text that is the same in every language (an owner's own preset, a renamed one).
 type pageDNSPreset struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Category    string `json:"category"` // "russia" | "regular" | "no_ads" | "family" | "security" | "" (the owner's own)
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	Category     string            `json:"category"` // "russia" | "regular" | "no_ads" | "family" | "security" | "" (the owner's own)
+	Names        map[string]string `json:"names,omitempty"`
+	Descriptions map[string]string `json:"descriptions,omitempty"`
 }
 
 // pageServers builds servers[] and, from it, the old server_loads. Only an active user has servers (Nodes is empty
@@ -145,17 +154,32 @@ func pageDNSOf(v access.SubView, set *adminv1.SubscriptionSettings, link string,
 	if hours == 0 {
 		hours = subsettings.DefaultUpdateHours
 	}
-	d := pageDNS{Enabled: subsettings.DNSChoice(set), RefreshHours: hours, Link: pageDNSLink{Effective: v.DNSLink}}
+	d := pageDNS{Enabled: subsettings.DNSChoice(set), RefreshHours: hours, Link: pageLinkDNS(v)}
 	if d.Enabled && !preview && link != "" && v.Status == access.StatusActive {
 		d.Endpoint = link + "/dns"
 	}
 	return d
 }
 
+func pageLinkDNS(v access.SubView) pageDNSLink {
+	l := v.DNSLink
+	return pageDNSLink{Effective: l.Effective, Choice: l.Choice, Default: l.Default, Options: nonNil(l.Options)}
+}
+
 func pageDNSPresets(v access.SubView, lang string) []pageDNSPreset {
 	out := []pageDNSPreset{}
 	for _, p := range v.DNSPresets {
-		out = append(out, pageDNSPreset{ID: p.ID, Name: p.NameIn(lang), Description: p.DescriptionIn(lang), Category: string(dns.CategoryOf(p))})
+		out = append(out, pageDNSPreset{ID: p.ID, Name: p.NameIn(lang), Description: p.DescriptionIn(lang), Category: string(dns.CategoryOf(p)),
+			Names: inPageLangs(p.NameIn), Descriptions: inPageLangs(p.DescriptionIn)})
 	}
 	return out
+}
+
+// inPageLangs is a text in the page's three languages; nil when it is the same in all of them.
+func inPageLangs(in func(lang string) string) map[string]string {
+	ru, en, zh := in("ru"), in("en"), in("zh")
+	if ru == en && en == zh {
+		return nil
+	}
+	return map[string]string{"ru": ru, "en": en, "zh": zh}
 }

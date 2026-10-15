@@ -1489,7 +1489,7 @@ func (x *SetNodeDnsOptionsResponse) GetOptions() *NodeDnsOptions {
 	return nil
 }
 
-// One pick of a person on one node.
+// One pick of a person on one node, or for the link apps (node_id empty).
 type UserDnsChoice struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	NodeId   string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
@@ -1497,9 +1497,10 @@ type UserDnsChoice struct {
 	// What they picked and, for the UI language, its stored name (built-ins are named by id there).
 	PresetId   string `protobuf:"bytes,3,opt,name=preset_id,json=presetId,proto3" json:"preset_id,omitempty"`
 	PresetName string `protobuf:"bytes,4,opt,name=preset_name,json=presetName,proto3" json:"preset_name,omitempty"`
-	// False when the node no longer offers it: the pick does nothing and the node default applies.
+	// False when the node (or the offer for the link apps) no longer has it: the pick does nothing and what applies without a
+	// pick applies.
 	Offered bool `protobuf:"varint,5,opt,name=offered,proto3" json:"offered,omitempty"`
-	// What applies to the person on this node now.
+	// What applies to the person on this node (or in the link apps) now.
 	EffectivePresetId   string `protobuf:"bytes,6,opt,name=effective_preset_id,json=effectivePresetId,proto3" json:"effective_preset_id,omitempty"`
 	EffectivePresetName string `protobuf:"bytes,7,opt,name=effective_preset_name,json=effectivePresetName,proto3" json:"effective_preset_name,omitempty"`
 	UpdatedUnix         int64  `protobuf:"varint,8,opt,name=updated_unix,json=updatedUnix,proto3" json:"updated_unix,omitempty"`
@@ -1638,8 +1639,11 @@ func (x *GetUserDnsChoicesRequest) GetUserId() string {
 }
 
 type GetUserDnsChoicesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Choices       []*UserDnsChoice       `protobuf:"bytes,1,rep,name=choices,proto3" json:"choices,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Choices []*UserDnsChoice       `protobuf:"bytes,1,rep,name=choices,proto3" json:"choices,omitempty"`
+	// The pick for the apps that take the link (SubscriptionSettings.link_dns), one for all servers; node_id and node_name are
+	// empty. Absent when the person picked nothing for them.
+	Link          *UserDnsChoice `protobuf:"bytes,2,opt,name=link,proto3" json:"link,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1677,6 +1681,13 @@ func (*GetUserDnsChoicesResponse) Descriptor() ([]byte, []int) {
 func (x *GetUserDnsChoicesResponse) GetChoices() []*UserDnsChoice {
 	if x != nil {
 		return x.Choices
+	}
+	return nil
+}
+
+func (x *GetUserDnsChoicesResponse) GetLink() *UserDnsChoice {
+	if x != nil {
+		return x.Link
 	}
 	return nil
 }
@@ -1727,7 +1738,7 @@ func (x *ResetUserDnsChoicesRequest) GetUserId() string {
 
 type ResetUserDnsChoicesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// How many picks were removed.
+	// How many picks were removed, the one for the link apps included.
 	Removed       uint32 `protobuf:"varint,1,opt,name=removed,proto3" json:"removed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1877,9 +1888,10 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x15effective_preset_name\x18\a \x01(\tR\x13effectivePresetName\x12!\n" +
 	"\fupdated_unix\x18\b \x01(\x03R\vupdatedUnix\"3\n" +
 	"\x18GetUserDnsChoicesRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"W\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x8d\x01\n" +
 	"\x19GetUserDnsChoicesResponse\x12:\n" +
-	"\achoices\x18\x01 \x03(\v2 .mistgate.admin.v1.UserDnsChoiceR\achoices\"5\n" +
+	"\achoices\x18\x01 \x03(\v2 .mistgate.admin.v1.UserDnsChoiceR\achoices\x124\n" +
+	"\x04link\x18\x02 \x01(\v2 .mistgate.admin.v1.UserDnsChoiceR\x04link\"5\n" +
 	"\x1aResetUserDnsChoicesRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"7\n" +
 	"\x1bResetUserDnsChoicesResponse\x12\x18\n" +
@@ -1989,27 +2001,28 @@ var file_mistgate_admin_v1_dns_proto_depIdxs = []int32{
 	18, // 21: mistgate.admin.v1.ListNodeDnsOptionsResponse.nodes:type_name -> mistgate.admin.v1.NodeDnsOptions
 	18, // 22: mistgate.admin.v1.SetNodeDnsOptionsResponse.options:type_name -> mistgate.admin.v1.NodeDnsOptions
 	23, // 23: mistgate.admin.v1.GetUserDnsChoicesResponse.choices:type_name -> mistgate.admin.v1.UserDnsChoice
-	10, // 24: mistgate.admin.v1.DnsService.ListDnsPresets:input_type -> mistgate.admin.v1.ListDnsPresetsRequest
-	12, // 25: mistgate.admin.v1.DnsService.CreateDnsPreset:input_type -> mistgate.admin.v1.CreateDnsPresetRequest
-	14, // 26: mistgate.admin.v1.DnsService.UpdateDnsPreset:input_type -> mistgate.admin.v1.UpdateDnsPresetRequest
-	16, // 27: mistgate.admin.v1.DnsService.DeleteDnsPreset:input_type -> mistgate.admin.v1.DeleteDnsPresetRequest
-	19, // 28: mistgate.admin.v1.DnsService.ListNodeDnsOptions:input_type -> mistgate.admin.v1.ListNodeDnsOptionsRequest
-	21, // 29: mistgate.admin.v1.DnsService.SetNodeDnsOptions:input_type -> mistgate.admin.v1.SetNodeDnsOptionsRequest
-	24, // 30: mistgate.admin.v1.DnsService.GetUserDnsChoices:input_type -> mistgate.admin.v1.GetUserDnsChoicesRequest
-	26, // 31: mistgate.admin.v1.DnsService.ResetUserDnsChoices:input_type -> mistgate.admin.v1.ResetUserDnsChoicesRequest
-	11, // 32: mistgate.admin.v1.DnsService.ListDnsPresets:output_type -> mistgate.admin.v1.ListDnsPresetsResponse
-	13, // 33: mistgate.admin.v1.DnsService.CreateDnsPreset:output_type -> mistgate.admin.v1.CreateDnsPresetResponse
-	15, // 34: mistgate.admin.v1.DnsService.UpdateDnsPreset:output_type -> mistgate.admin.v1.UpdateDnsPresetResponse
-	17, // 35: mistgate.admin.v1.DnsService.DeleteDnsPreset:output_type -> mistgate.admin.v1.DeleteDnsPresetResponse
-	20, // 36: mistgate.admin.v1.DnsService.ListNodeDnsOptions:output_type -> mistgate.admin.v1.ListNodeDnsOptionsResponse
-	22, // 37: mistgate.admin.v1.DnsService.SetNodeDnsOptions:output_type -> mistgate.admin.v1.SetNodeDnsOptionsResponse
-	25, // 38: mistgate.admin.v1.DnsService.GetUserDnsChoices:output_type -> mistgate.admin.v1.GetUserDnsChoicesResponse
-	27, // 39: mistgate.admin.v1.DnsService.ResetUserDnsChoices:output_type -> mistgate.admin.v1.ResetUserDnsChoicesResponse
-	32, // [32:40] is the sub-list for method output_type
-	24, // [24:32] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	23, // 24: mistgate.admin.v1.GetUserDnsChoicesResponse.link:type_name -> mistgate.admin.v1.UserDnsChoice
+	10, // 25: mistgate.admin.v1.DnsService.ListDnsPresets:input_type -> mistgate.admin.v1.ListDnsPresetsRequest
+	12, // 26: mistgate.admin.v1.DnsService.CreateDnsPreset:input_type -> mistgate.admin.v1.CreateDnsPresetRequest
+	14, // 27: mistgate.admin.v1.DnsService.UpdateDnsPreset:input_type -> mistgate.admin.v1.UpdateDnsPresetRequest
+	16, // 28: mistgate.admin.v1.DnsService.DeleteDnsPreset:input_type -> mistgate.admin.v1.DeleteDnsPresetRequest
+	19, // 29: mistgate.admin.v1.DnsService.ListNodeDnsOptions:input_type -> mistgate.admin.v1.ListNodeDnsOptionsRequest
+	21, // 30: mistgate.admin.v1.DnsService.SetNodeDnsOptions:input_type -> mistgate.admin.v1.SetNodeDnsOptionsRequest
+	24, // 31: mistgate.admin.v1.DnsService.GetUserDnsChoices:input_type -> mistgate.admin.v1.GetUserDnsChoicesRequest
+	26, // 32: mistgate.admin.v1.DnsService.ResetUserDnsChoices:input_type -> mistgate.admin.v1.ResetUserDnsChoicesRequest
+	11, // 33: mistgate.admin.v1.DnsService.ListDnsPresets:output_type -> mistgate.admin.v1.ListDnsPresetsResponse
+	13, // 34: mistgate.admin.v1.DnsService.CreateDnsPreset:output_type -> mistgate.admin.v1.CreateDnsPresetResponse
+	15, // 35: mistgate.admin.v1.DnsService.UpdateDnsPreset:output_type -> mistgate.admin.v1.UpdateDnsPresetResponse
+	17, // 36: mistgate.admin.v1.DnsService.DeleteDnsPreset:output_type -> mistgate.admin.v1.DeleteDnsPresetResponse
+	20, // 37: mistgate.admin.v1.DnsService.ListNodeDnsOptions:output_type -> mistgate.admin.v1.ListNodeDnsOptionsResponse
+	22, // 38: mistgate.admin.v1.DnsService.SetNodeDnsOptions:output_type -> mistgate.admin.v1.SetNodeDnsOptionsResponse
+	25, // 39: mistgate.admin.v1.DnsService.GetUserDnsChoices:output_type -> mistgate.admin.v1.GetUserDnsChoicesResponse
+	27, // 40: mistgate.admin.v1.DnsService.ResetUserDnsChoices:output_type -> mistgate.admin.v1.ResetUserDnsChoicesResponse
+	33, // [33:41] is the sub-list for method output_type
+	25, // [25:33] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_dns_proto_init() }

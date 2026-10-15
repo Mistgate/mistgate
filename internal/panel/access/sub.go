@@ -55,12 +55,12 @@ type SubView struct {
 	// Nodes are the servers of the person, one per node, in subscription order: the ones a link carries and the ones a key
 	// can be made for. Empty unless Status is active.
 	Nodes []SubNode
-	// DNSLink is the preset that applies to the apps that take the link (Hysteria2 in Mihomo and in Happ have one resolver for the
-	// whole subscription): the person's own, the group's, the instance's. DNSPresets are the presets the page names: the ones
-	// the nodes offer and apply, and DNSLink when any node offers a choice. Both empty unless Status is active.
-	DNSLink      string
+	// DNSLink is the DNS of the apps that take the link (they have one resolver for the whole subscription): the person's pick for
+	// them, what applies without it and what the owner offers. DNSPresets are the presets the page names: the ones the nodes
+	// and the link apps offer and apply. Both empty unless Status is active.
+	DNSLink      dns.LinkDNS
 	DNSPresets   []SubDNSPreset
-	EffectiveDNS *dns.Preset // the Mihomo link resolver, already read with the node choices
+	EffectiveDNS *dns.Preset // the preset of the link apps (Mihomo, Xray JSON, sing-box), already read with the node choices
 	// Format is what Lines hold (FormatURIList unless the view was asked for another).
 	Format plugin.ClientFormat
 	// LinkMode is the mode of the device limit for the apps on the link (store.LinkModeTrack, LinkModeEnforce or LinkModeStrict):
@@ -539,7 +539,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	if opt.NoPageData {
 		if format != plugin.FormatURIList && opt.IncludeEffectiveDNS && nd != nil {
-			if preset, ok := nd.withoutNode(); ok {
+			if preset, ok := nd.linkApps(); ok {
 				v.EffectiveDNS = &preset
 			}
 		}

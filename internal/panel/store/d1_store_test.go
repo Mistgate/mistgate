@@ -1643,3 +1643,59 @@ func TestD1BlocklistChecksStorage(t *testing.T) {
 func TestD1TSPUChecksStorage(t *testing.T) {
 	tspuCheckStoreProof(t, openD1Store(t))
 }
+
+// The DNS of the link apps on D1 (migration 00069): the offer and a person's pick are written, read back in the one batch of the
+// subscription's DNS read, removed by the reset with the picks per node, and taken away with a deleted preset.
+func TestD1LinkDNS(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	for _, q := range []string{
+		`INSERT INTO user_group (id, name, created_at) VALUES ('grp_link_dns', 'g', 1)`,
+		`INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_link_dns', 'alice', 'grp_link_dns', 1, x'01', x'02', 1)`,
+		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_link_dns', 'de1', '203.0.113.10', 'active', 1)`,
+		`INSERT INTO dns_preset (id, name, description, builtin, servers, split, created_at, updated_at) VALUES ('dns_link_own', 'Own', '', 0, '[]', '[]', 1, 1)`,
+	} {
+		if _, err := st.W.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	d := st.DNS()
+	if err := d.SetLinkOptions(ctx, []string{"dns_builtin_standard", "dns_link_own"}, "dns_link_own"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SetLinkOptions(ctx, []string{"dns_nope"}, ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("an unknown preset in the offer: %v", err)
+	}
+	if err := d.SetUserLinkChoice(ctx, "usr_link_dns", "dns_link_own", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SetUserLinkChoice(ctx, "usr_link_dns", "dns_link_own", now.Add(time.Second)); err != nil { // picked again: one row
+		t.Fatal(err)
+	}
+	if err := d.SetUserNodeChoice(ctx, "usr_link_dns", "nod_link_dns", "dns_builtin_standard", now); err != nil {
+		t.Fatal(err)
+	}
+	var data DNSSubscriptionData
+	var err error
+	calls := countD1Queries(t, js.Global().Get("__d1"), "SubscriptionData", func() { data, err = d.SubscriptionData(ctx, "usr_link_dns") })
+	if err != nil || calls.queries != 1 || calls.batches != 1 {
+		t.Fatalf("the DNS read: %v, %d calls in %d batches", err, calls.queries, calls.batches)
+	}
+	if data.LinkPick != "dns_link_own" || data.LinkPickMs != now.Add(time.Second).UnixMilli() || len(data.LinkOptions) != 2 ||
+		data.LinkOptions[0] != (LinkDNSOption{PresetID: "dns_builtin_standard"}) || data.LinkOptions[1] != (LinkDNSOption{PresetID: "dns_link_own", Default: true}) {
+		t.Fatalf("link data = %+v %+v %d", data.LinkOptions, data.LinkPick, data.LinkPickMs)
+	}
+	if n, err := d.ResetUserNodeChoices(ctx, "usr_link_dns"); err != nil || n != 2 {
+		t.Fatalf("reset = %d, %v", n, err)
+	}
+	if err := d.SetUserLinkChoice(ctx, "usr_link_dns", "dns_link_own", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Delete(ctx, "dns_link_own"); err != nil {
+		t.Fatal(err)
+	}
+	if eff, err := d.EffectiveData(ctx, "usr_link_dns"); err != nil || eff.LinkPick != "" || len(eff.LinkOptions) != 1 || eff.LinkOptions[0].Default {
+		t.Fatalf("after the preset was deleted: %+v %v", eff, err)
+	}
+}

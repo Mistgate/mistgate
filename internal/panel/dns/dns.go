@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -133,11 +134,23 @@ func (s *Service) Effective(ctx context.Context, userID string) (Preset, Source,
 	return preset, source, err
 }
 
-// SubscriptionState is the DNS read shared by the public user page and the access view.
+// SubscriptionState is the DNS read shared by the public user page and the access view. Effective is what applies where no
+// node decides (the AmneziaWG keys of a node without a choice); Link is what the link apps get, Link.Default what they get
+// without the person's pick.
 type SubscriptionState struct {
 	Choices   NodeChoices
 	Presets   map[string]Preset
 	Effective Preset
+	Link      LinkDNS
+}
+
+// LinkDNS is the DNS of a person's link apps (Happ, the Mihomo apps, Xray JSON, sing-box): one for all servers. Effective
+// and Default are "" only when no preset at all can be read.
+type LinkDNS struct {
+	Choice    string   // the person's pick while it is offered ("" = none)
+	Effective string   // what the link apps get: the pick, else Default
+	Default   string   // what they get without a pick: the user's own preset, the group's, the offer's default, the instance's
+	Options   []string // what the owner offers for them, in order; empty = no choice
 }
 
 // SubscriptionState reads node choices, presets and the effective preset in one D1 batch.
@@ -150,7 +163,51 @@ func (s *Service) SubscriptionState(ctx context.Context, userID string) (Subscri
 		Choices: NewNodeChoices(data.NodeOptions, data.UserChoices),
 	}
 	state.Presets, state.Effective, _, _ = s.resolve(data.DNSEffectiveData)
+	state.Link = linkOf(data.DNSEffectiveData, state.Presets)
 	return state, nil
+}
+
+// LinkEffective is the preset of a person's link apps (see linkOf). store.ErrNotFound for an unknown user or when no preset can
+// be read.
+func (s *Service) LinkEffective(ctx context.Context, userID string) (Preset, error) {
+	data, err := s.st.DNS().EffectiveData(ctx, userID)
+	if err != nil {
+		return Preset{}, err
+	}
+	presets, _, _, _ := s.resolve(data)
+	p, ok := presets[linkOf(data, presets).Effective]
+	if !ok {
+		return Preset{}, store.ErrNotFound
+	}
+	return p, nil
+}
+
+// linkOf resolves the DNS of the link apps: the person's pick while the owner offers it, else the user's own preset (an
+// admin's), else the group's, else the default of the offer, else the instance default, else the built-in default. A
+// preset that cannot be read counts as unset.
+func linkOf(data store.DNSEffectiveData, presets map[string]Preset) LinkDNS {
+	var out LinkDNS
+	offerDefault := ""
+	for _, o := range data.LinkOptions {
+		if _, ok := presets[o.PresetID]; !ok {
+			continue
+		}
+		out.Options = append(out.Options, o.PresetID)
+		if o.Default {
+			offerDefault = o.PresetID
+		}
+	}
+	if slices.Contains(out.Options, data.LinkPick) {
+		out.Choice = data.LinkPick
+	}
+	for _, id := range []string{data.OwnPresetID, data.GroupPresetID, offerDefault, data.DefaultID, store.DNSBuiltinDefaultID} {
+		if _, ok := presets[id]; ok && id != "" {
+			out.Default = id
+			break
+		}
+	}
+	out.Effective = cmpOr(out.Choice, out.Default)
+	return out
 }
 
 func (s *Service) resolve(data store.DNSEffectiveData) (map[string]Preset, Preset, Source, error) {

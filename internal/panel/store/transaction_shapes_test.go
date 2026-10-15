@@ -29,6 +29,8 @@ var transactionShape1 = map[string]string{
 	"health.go:PutDoctor":                          "A fixed batch applies the report replacement and its doctor-result upserts.",
 	"health.go:RollupDaily":                        "One SQL INSERT SELECT groups finished samples and inserts daily rows idempotently.",
 	"node_dns.go:SetNodeOptions":                   "Replaces a node's offered presets with the input rows in one fixed batch.",
+	"node_dns.go:SetLinkOptions":                   "Replaces the presets offered for the link apps with the input rows in one fixed batch.",
+	"node_dns.go:ResetUserNodeChoices":             "Deletes a person's picks per node and for the link apps in one fixed batch.",
 	"port_check.go:PutTCPChecks":                   "Deletes a node's TCP check rows and inserts the new ones in one fixed batch.",
 	"provision.go:FinishCancelledNodeProvisionJob": "The cancellation event and guarded state transition run in one fixed batch.",
 	"provision.go:RequeueNodeProvisionJobs":        "Set-based event inserts and state updates requeue interrupted jobs in one fixed batch.",

@@ -88,14 +88,77 @@ func (d DNS) SetUserNodeChoice(ctx context.Context, userID, nodeID, presetID str
 	return accMapErr(err)
 }
 
-// ResetUserNodeChoices removes every pick of a person and says how many there were.
+// ResetUserNodeChoices removes every pick of a person, per node and for the link apps, and says how many there were.
 func (d DNS) ResetUserNodeChoices(ctx context.Context, userID string) (int, error) {
-	res, err := d.s.W.ExecContext(ctx, `DELETE FROM user_node_dns WHERE user_id = ?`, userID)
+	res, err := d.s.batch(ctx,
+		Stmt{Query: `DELETE FROM user_node_dns WHERE user_id = ?`, Args: []any{userID}},
+		Stmt{Query: `DELETE FROM user_link_dns WHERE user_id = ?`, Args: []any{userID}},
+	)
 	if err != nil {
 		return 0, err
 	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
+	return int(res[0].RowsAffected + res[1].RowsAffected), nil
+}
+
+// ---- the link apps (migration 00069): one DNS for all servers ----
+
+// LinkDNSOption is one preset the owner offers for the link apps.
+type LinkDNSOption struct {
+	PresetID string
+	Default  bool
+}
+
+func scanLinkDNSOption(r rowScanner) (LinkDNSOption, error) {
+	var o LinkDNSOption
+	var def int
+	err := r.Scan(&o.PresetID, &def)
+	o.Default = def == 1
+	return o, err
+}
+
+// LinkOptions returns what the owner offers for the link apps, in order.
+func (d DNS) LinkOptions(ctx context.Context) ([]LinkDNSOption, error) {
+	rows, err := d.s.R.QueryContext(ctx, `SELECT preset_id, is_default FROM link_dns_option ORDER BY position, preset_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []LinkDNSOption
+	for rows.Next() {
+		o, err := scanLinkDNSOption(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// SetLinkOptions replaces what the owner offers for the link apps: presetIDs in order, defaultID (one of them, or "") as the
+// default. The caller checked the ids. ErrNotFound when a preset is gone. Picks of presets no longer offered stay (they do
+// nothing while the preset is not offered).
+func (d DNS) SetLinkOptions(ctx context.Context, presetIDs []string, defaultID string) error {
+	stmts := []Stmt{{Query: `DELETE FROM link_dns_option`}}
+	for i, id := range presetIDs {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO link_dns_option (preset_id, position, is_default) VALUES (?, ?, ?)`,
+			Args: []any{id, int64(i), int64(accBool(id == defaultID))}})
+	}
+	_, err := d.s.batch(ctx, stmts...)
+	return accMapErr(err)
+}
+
+// SetUserLinkChoice records a person's pick for the link apps (replacing the earlier one); presetID "" removes it. ErrNotFound
+// when the user or the preset is gone.
+func (d DNS) SetUserLinkChoice(ctx context.Context, userID, presetID string, now time.Time) error {
+	if presetID == "" {
+		_, err := d.s.W.ExecContext(ctx, `DELETE FROM user_link_dns WHERE user_id = ?`, userID)
+		return err
+	}
+	_, err := d.s.W.ExecContext(ctx,
+		`INSERT INTO user_link_dns (user_id, preset_id, updated_at) VALUES (?, ?, ?)
+		 ON CONFLICT (user_id) DO UPDATE SET preset_id = excluded.preset_id, updated_at = excluded.updated_at`,
+		userID, presetID, now.UnixMilli())
+	return accMapErr(err)
 }
 
 // NodeExists reports whether a node id exists (retired nodes included).

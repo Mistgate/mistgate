@@ -16,8 +16,9 @@ import (
 // (NodeChoices); this file carries it into what a client is handed and into the page's data.
 //
 // Where it reaches: the AmneziaWG keys (.conf, vpn://, QR) and the AmneziaWG proxies of a Mihomo profile carry a resolver
-// per server, so they get the DNS of their node. Hysteria2 in Mihomo and in Happ have one resolver for the whole
-// subscription: they keep the preset that applies to the person without a node (dns.Service.Effective).
+// per server, so they get the DNS of their node. The apps that take the link (Happ, Hysteria2 in Mihomo, Xray JSON, sing-box)
+// have one resolver for the whole subscription: they get the DNS of the link apps (dns.LinkDNS), which the person may pick on
+// their page too. A pick for the link apps never reaches the keys, and a pick per server never reaches the link apps.
 
 // nodeDNS resolves a person's DNS preset per node, for one request.
 type nodeDNS struct {
@@ -25,13 +26,14 @@ type nodeDNS struct {
 	choices dns.NodeChoices
 	cache   map[string]dns.Preset
 	user    *dns.Preset
+	link    dns.LinkDNS
 	all     map[string]dns.Preset // presets from the subscription read
 }
 
 func (s *Service) newNodeDNS(ctx context.Context, userID string) *nodeDNS {
 	state, err := s.dns.SubscriptionState(ctx, userID)
 	if err == nil {
-		n := &nodeDNS{s: s, choices: state.Choices, cache: map[string]dns.Preset{}, all: state.Presets}
+		n := &nodeDNS{s: s, choices: state.Choices, cache: map[string]dns.Preset{}, link: state.Link, all: state.Presets}
 		if state.Effective.ID != "" {
 			n.user = &state.Effective
 		}
@@ -41,7 +43,14 @@ func (s *Service) newNodeDNS(ctx context.Context, userID string) *nodeDNS {
 	return &nodeDNS{s: s, choices: dns.NewNodeChoices(nil, nil), cache: map[string]dns.Preset{}, all: map[string]dns.Preset{}}
 }
 
-// withoutNode is the preset that applies to the person where no node decides: their own, the group's, the instance's.
+// linkApps is the preset of the person's link apps: their pick for them, else their own, the group's, the offer's default or
+// the instance's.
+func (n *nodeDNS) linkApps() (dns.Preset, bool) {
+	p, ok := n.all[n.link.Effective]
+	return p, ok
+}
+
+// withoutNode is the preset that applies to the person where no node decides (the keys): their own, the group's, the instance's.
 func (n *nodeDNS) withoutNode() (dns.Preset, bool) {
 	if n.user == nil {
 		return dns.Preset{}, false
@@ -195,11 +204,13 @@ func (s *Service) nodeDNSData(ctx context.Context, v *SubView, n *nodeDNS, awgs 
 		add(d.Effective)
 		add(d.Default)
 	}
-	if link, ok := n.withoutNode(); ok {
-		v.DNSLink = link.ID
-		if len(ids) > 0 { // the note over the list names it
-			add(link.ID)
+	v.DNSLink = n.link
+	if len(ids) > 0 || len(n.link.Options) > 0 { // the note over the list and the choice for the link apps name them
+		for _, id := range n.link.Options {
+			add(id)
 		}
+		add(n.link.Effective)
+		add(n.link.Default)
 	}
 	for _, id := range ids {
 		if p, ok := n.cache[id]; ok {
@@ -214,11 +225,12 @@ func (s *Service) nodeDNSData(ctx context.Context, v *SubView, n *nodeDNS, awgs 
 
 // ---- the person's pick ----
 
-// PageDNSChoice is what the page's POST <link>/dns changes: the person's pick on one node. Nothing here reaches the
-// nodes (DNS is carried by the client); the next subscription fetch and the next fetch of a key carry it.
+// PageDNSChoice is what the page's POST <link>/dns changes: the person's pick on one node, or for the link apps. Nothing here
+// reaches the nodes (DNS is carried by the client); the next subscription fetch and the next fetch of a key carry it.
 type PageDNSChoice struct {
 	NodeID   string
-	PresetID string // "" = back to the node's default
+	Link     bool   // the pick for the link apps, one for all servers (NodeID is "")
+	PresetID string // "" = back to the default: the node's, or what the link apps get without a pick
 }
 
 // Error codes of SetPageDNS, the messages of its FailedPrecondition/NotFound errors (the page's codes).
@@ -227,9 +239,9 @@ const (
 	DNSNotAllowed = "not_allowed"
 )
 
-// SetPageDNS records the pick of a user on a node. NotFound: the node is not one of the person's servers. FailedPrecondition
-// "not_allowed": the node does not offer that preset. The audit row names the person and the node the owner gave names to,
-// and the preset; never the link and never an address.
+// SetPageDNS records the pick of a user on a node, or for the link apps. NotFound: the node is not one of the person's servers.
+// FailedPrecondition "not_allowed": the node (or the offer for the link apps) does not have that preset. The audit row names
+// the person, the node the owner gave names to and the preset; never the link and never an address.
 func (s *Service) SetPageDNS(ctx context.Context, userID string, c PageDNSChoice) error {
 	a := s.st.Access()
 	u, err := a.User(ctx, userID)
@@ -240,6 +252,9 @@ func (s *Service) SetPageDNS(ctx context.Context, userID string, c PageDNSChoice
 	}
 	if ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, s.now()) != StatusActive {
 		return failed("user_inactive") // a user without access has no servers
+	}
+	if c.Link {
+		return s.setLinkDNS(ctx, u, c.PresetID)
 	}
 	g, err := a.Group(ctx, u.GroupID)
 	if err != nil {
@@ -284,6 +299,33 @@ func (s *Service) SetPageDNS(ctx context.Context, userID string, c PageDNSChoice
 		params["preset_name"] = row.Name
 	}
 	s.auditNoAddress(ctx, "user:"+u.ID, "page_dns_choice", params)
+	return nil
+}
+
+// setLinkDNS records the pick of an active user for their link apps: one of the presets the owner offers for them, or "" for
+// none. Audit: page_link_dns_choice, the person's name and the preset.
+func (s *Service) setLinkDNS(ctx context.Context, u store.AccessUser, presetID string) error {
+	d := s.st.DNS()
+	if presetID != "" {
+		offers, err := d.LinkOptions(ctx)
+		if err != nil {
+			return s.internal("link dns options", err)
+		}
+		if !slices.ContainsFunc(offers, func(o store.LinkDNSOption) bool { return o.PresetID == presetID }) {
+			return failed(DNSNotAllowed)
+		}
+	}
+	switch err := d.SetUserLinkChoice(ctx, u.ID, presetID, s.now()); {
+	case errors.Is(err, store.ErrNotFound):
+		return failed(DNSNotAllowed) // the preset was deleted between the check and the write
+	case err != nil:
+		return s.internal("set link dns choice", err)
+	}
+	params := map[string]any{"user": u.Name, "preset": presetID}
+	if row, err := d.Get(ctx, presetID); err == nil {
+		params["preset_name"] = row.Name
+	}
+	s.auditNoAddress(ctx, "user:"+u.ID, "page_link_dns_choice", params)
 	return nil
 }
 

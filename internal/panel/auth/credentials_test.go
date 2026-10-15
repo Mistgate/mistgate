@@ -464,6 +464,7 @@ func TestListAuditByKind(t *testing.T) {
 		{"preset_default", "ok"}, {"node.awg_prepare", "ok"}, {"call", "ok"}, {"mcp_plan", "ok"}, {"security_update", "rejected"},
 		{"backup_settings_update", "ok"}, {"backup_create", "ok"}, {"backup_storage_test", "ok"}, {"panel_update", "ok"}, {"node_update_schedule", "ok"},
 		{"node_update_schedule_cancel", "ok"}, {"node_dns_options", "ok"}, {"page_dns_choice", "ok"}, {"user_dns_choices_reset", "ok"},
+		{"link_dns_options", "ok"}, {"page_link_dns_choice", "ok"},
 	} {
 		if err := st.Audit(context.Background(), s.now(), store.AuditEntry{Actor: "a", Action: r[0], Result: r[1]}); err != nil {
 			t.Fatal(err)
@@ -485,7 +486,7 @@ func TestListAuditByKind(t *testing.T) {
 		t.Errorf("sign-in: %s", got)
 	}
 	if got := list(adminv1.AuditKind_AUDIT_KIND_CHANGES); got != "user_delete inbound_add preset_default node.awg_prepare security_update "+
-		"backup_settings_update backup_create backup_storage_test panel_update node_update_schedule node_update_schedule_cancel node_dns_options page_dns_choice user_dns_choices_reset" {
+		"backup_settings_update backup_create backup_storage_test panel_update node_update_schedule node_update_schedule_cancel node_dns_options page_dns_choice user_dns_choices_reset link_dns_options page_link_dns_choice" {
 		t.Errorf("changes: %s", got)
 	}
 	if got := list(adminv1.AuditKind_AUDIT_KIND_FAILURES); got != "login page_unlock_lockout security_update" {

@@ -221,11 +221,16 @@ func (d DNS) Lookup(ctx context.Context) (DNSLookup, error) {
 	return l, nil
 }
 
-// DNSEffectiveData is the independent state needed to resolve a person's effective preset.
+// DNSEffectiveData is the independent state needed to resolve a person's effective preset, and the preset of their link apps.
 type DNSEffectiveData struct {
 	OwnPresetID, GroupPresetID string
 	DefaultID                  string
 	Presets                    []DNSPreset
+	// LinkOptions is what the owner offers for the link apps, in order (migration 00069); LinkPick is what the person picked
+	// for them ("" = nothing, offered or not) and LinkPickMs when (Unix milliseconds).
+	LinkOptions []LinkDNSOption
+	LinkPick    string
+	LinkPickMs  int64
 }
 
 // DNSSubscriptionData also carries the per-node offers and this person's picks for a subscription page.
@@ -236,13 +241,14 @@ type DNSSubscriptionData struct {
 }
 
 type dnsUserPresetIDs struct {
-	Own, Group string
-	Found      bool
+	Own, Group, Link string
+	LinkMs           int64
+	Found            bool
 }
 
 func scanDNSUserPresetIDs(r rowScanner) (dnsUserPresetIDs, error) {
 	var value dnsUserPresetIDs
-	if err := r.Scan(&value.Own, &value.Group); err != nil {
+	if err := r.Scan(&value.Own, &value.Group, &value.Link, &value.LinkMs); err != nil {
 		return dnsUserPresetIDs{}, err
 	}
 	value.Found = true
@@ -270,11 +276,14 @@ func (d DNS) scanEffectiveData(ctx context.Context, userID string, withNode bool
 	var defaultID string
 	var offerRows []NodeDNSOption
 	var choiceRows []UserNodeDNS
+	var linkRows []LinkDNSOption
 	r := reads{}
 	r.add(appendRows(&presets, scanDNSPreset), `SELECT `+dnsCols+` FROM dns_preset ORDER BY builtin DESC, sort, name`)
-	r.add(maybeOneRow(&presetIDs, scanDNSUserPresetIDs), `SELECT coalesce(u.dns_preset_id, '') AS own_preset_id, coalesce(g.dns_preset_id, '') AS group_preset_id
-		FROM user u JOIN user_group g ON g.id = u.group_id WHERE u.id = ?`, userID)
+	r.add(maybeOneRow(&presetIDs, scanDNSUserPresetIDs), `SELECT coalesce(u.dns_preset_id, '') AS own_preset_id, coalesce(g.dns_preset_id, '') AS group_preset_id,
+		coalesce(l.preset_id, '') AS link_preset_id, coalesce(l.updated_at, 0) AS link_updated_at
+		FROM user u JOIN user_group g ON g.id = u.group_id LEFT JOIN user_link_dns l ON l.user_id = u.id WHERE u.id = ?`, userID)
 	r.add(maybeOneRow(&defaultID, scanString), `SELECT v FROM setting WHERE k = ?`, dnsDefaultKey)
+	r.add(appendRows(&linkRows, scanLinkDNSOption), `SELECT preset_id, is_default FROM link_dns_option ORDER BY position, preset_id`)
 	if withNode {
 		r.add(appendRows(&offerRows, scanNodeDNSOffer), `SELECT node_id, preset_id, position, is_default FROM node_dns_option ORDER BY node_id, position, preset_id`)
 		r.add(appendRows(&choiceRows, scanUserNodeDNS), `SELECT node_id, preset_id, updated_at FROM user_node_dns WHERE user_id = ?`, userID)
@@ -286,6 +295,7 @@ func (d DNS) scanEffectiveData(ctx context.Context, userID string, withNode bool
 		return DNSEffectiveData{}, nil, nil, ErrNotFound
 	}
 	data.Presets, data.OwnPresetID, data.GroupPresetID = presets, presetIDs.Own, presetIDs.Group
+	data.LinkOptions, data.LinkPick, data.LinkPickMs = linkRows, presetIDs.Link, presetIDs.LinkMs
 	if defaultID != "" {
 		data.DefaultID = strings.TrimSpace(defaultID)
 	}
@@ -307,7 +317,7 @@ func (d DNS) scanEffectiveData(ctx context.Context, userID string, withNode bool
 	return data, offers, choices, nil
 }
 
-// EffectiveData reads a person's preset and the instance default in one batch.
+// EffectiveData reads a person's preset, the instance default and what applies to their link apps in one batch.
 func (d DNS) EffectiveData(ctx context.Context, userID string) (DNSEffectiveData, error) {
 	data, _, _, err := d.scanEffectiveData(ctx, userID, false)
 	return data, err

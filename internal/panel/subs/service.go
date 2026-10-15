@@ -61,13 +61,18 @@ func (s *Service) internal(what string, err error) error {
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }
 
-// fillDNS puts the instance default DNS preset id (kept by the DNS module) into the settings shown to the admin.
+// fillDNS puts the instance default DNS preset id and the offer for the link apps (kept by the DNS module) into the settings
+// shown to the admin.
 func (s *Service) fillDNS(ctx context.Context, set *adminv1.SubscriptionSettings) error {
 	if s.dns == nil {
 		return nil
 	}
 	id, err := s.dns.DefaultPresetID(ctx)
+	if err != nil {
+		return err
+	}
 	set.DefaultDnsPresetId = id
+	set.LinkDns, err = s.dns.LinkOptions(ctx)
 	return err
 }
 
@@ -189,6 +194,14 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("default_dns_preset_id: no such preset"))
 		case err != nil:
 			return nil, s.internal("set default dns preset", err)
+		}
+		if o := req.Msg.Settings.GetLinkDns(); o != nil { // absent: the offer stays as it is
+			switch err := s.dns.SetLinkOptions(ctx, o); {
+			case errors.Is(err, dns.ErrLinkOptions):
+				return nil, connect.NewError(connect.CodeInvalidArgument, err)
+			case err != nil:
+				return nil, s.internal("set link dns options", err)
+			}
 		}
 	}
 	if err := s.fillDNS(ctx, set); err != nil {

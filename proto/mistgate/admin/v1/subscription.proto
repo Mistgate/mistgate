@@ -42,6 +42,19 @@ message SubscriptionSettings {
   // or refuse it and also turn away the apps that report no device ID. Absent in a request = leave the stored mode as it is;
   // a panel that has never been given one counts only (LINK_DEVICE_LIMIT_TRACK).
   optional LinkDeviceLimit link_device_limit = 10;
+  // The DNS presets a person may pick on their page for the apps that take the link (Happ, the Mihomo apps, Xray JSON, sing-box):
+  // one DNS for all servers, since these apps have one resolver for the whole subscription. Kept by the DNS module, like
+  // default_dns_preset_id. Absent in a request = leave the stored offer as it is.
+  LinkDnsOptions link_dns = 11;
+}
+
+// What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the
+// user's own preset, else the group's, else default_preset_id, else the instance default.
+message LinkDnsOptions {
+  // In the order the page lists them; at most 20. Empty = the page offers no choice for the link apps.
+  repeated string preset_ids = 1;
+  // One of preset_ids, or "" (the instance default stays the default).
+  string default_preset_id = 2;
 }
 
 // How the device limit applies to the apps that take the subscription link (a key of AmneziaVPN is always limited).

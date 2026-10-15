@@ -30,8 +30,8 @@ func TestAppFetchDoesNotReadThePageData(t *testing.T) {
 	}
 
 	v, read1 := read(SubOptions{NoPageData: true})
-	if read1 || len(v.Nodes) != 2 || len(v.Lines) == 0 || v.Nodes[0].DNS != nil || len(v.DNSPresets) != 0 || v.DNSLink != "" {
-		t.Errorf("an app's fetch: read the DNS data %v, %d nodes, %d lines, dns %+v, presets %d, link %q", read1, len(v.Nodes), len(v.Lines), v.Nodes[0].DNS, len(v.DNSPresets), v.DNSLink)
+	if read1 || len(v.Nodes) != 2 || len(v.Lines) == 0 || v.Nodes[0].DNS != nil || len(v.DNSPresets) != 0 || v.DNSLink.Effective != "" {
+		t.Errorf("an app's fetch: read the DNS data %v, %d nodes, %d lines, dns %+v, presets %d, link %+v", read1, len(v.Nodes), len(v.Lines), v.Nodes[0].DNS, len(v.DNSPresets), v.DNSLink)
 	}
 	if _, read2 := read(SubOptions{Format: plugin.FormatMihomo, NoPageData: true}); !read2 {
 		t.Error("the Mihomo profile does not read the DNS of a node for its AmneziaWG proxies")

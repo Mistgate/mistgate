@@ -3,8 +3,8 @@
 // stored as one protojson value in the setting table under Key, validated on the way in, and read at request
 // time through a small cache that Update invalidates.
 //
-// default_dns_preset_id is not part of the stored document: the DNS module owns the instance default preset
-// (one source of truth), and SubscriptionService reads and writes it through that module.
+// default_dns_preset_id and link_dns are not part of the stored document: the DNS module owns the instance default preset
+// and the offer for the link apps (one source of truth), and SubscriptionService reads and writes them through that module.
 package subsettings
 
 import (
@@ -495,7 +495,7 @@ func Parse(value string) (*adminv1.SubscriptionSettings, error) {
 	if s.UserPage == nil {
 		s.UserPage = &adminv1.UserPageOptions{}
 	}
-	s.DefaultDnsPresetId = ""
+	s.DefaultDnsPresetId, s.LinkDns = "", nil
 	return s, nil
 }
 
@@ -575,7 +575,7 @@ func (c *Cache) Update(ctx context.Context, s *adminv1.SubscriptionSettings) (*a
 // as it is; the returned settings always carry the mode in force.
 func (c *Cache) UpdateRevoking(ctx context.Context, s *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, int, error) {
 	s = proto.Clone(s).(*adminv1.SubscriptionSettings)
-	s.DefaultDnsPresetId = "" // lives in the DNS module
+	s.DefaultDnsPresetId, s.LinkDns = "", nil // live in the DNS module
 	Normalize(s)
 	if err := Validate(s); err != nil {
 		return nil, 0, err

@@ -36,6 +36,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.PlatformApp.add_link_template":                     "a template with placeholders; the subscription URL is filled in only on the user's own page",
 		"mistgate.admin.v1.UserPageOptions.require_page_password":             "a bool: whether the pages ask for a password",
 		"mistgate.admin.v1.SubscriptionSettings.link_device_limit":            "an enum: how the device limit applies to the apps that take the link",
+		"mistgate.admin.v1.SubscriptionSettings.link_dns":                     "the DNS presets offered for the apps that take the link: preset ids",
 		"mistgate.admin.v1.GetSubscriptionSettingsResponse.shared_link_users": "a count of people, not a link",
 		"mistgate.admin.v1.WarpAccount.peer_public_key":                       "a public key; private keys are never returned",
 		"mistgate.admin.v1.WarpAccount.has_token":                             "a bool: whether refresh is available, not a token",

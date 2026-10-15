@@ -21,7 +21,16 @@ import (
 )
 
 // fakeDNS stands in for the DNS module: one known preset id.
-type fakeDNS struct{ id string }
+type fakeDNS struct {
+	id   string
+	link *adminv1.LinkDnsOptions
+}
+
+func (f *fakeDNS) LinkOptions(context.Context) (*adminv1.LinkDnsOptions, error) { return f.link, nil }
+func (f *fakeDNS) SetLinkOptions(_ context.Context, o *adminv1.LinkDnsOptions) error {
+	f.link = o
+	return nil
+}
 
 func (f *fakeDNS) DefaultPresetID(context.Context) (string, error) { return f.id, nil }
 func (f *fakeDNS) SetDefaultPresetID(_ context.Context, id string) error {

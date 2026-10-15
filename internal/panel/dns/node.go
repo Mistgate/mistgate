@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -214,6 +215,51 @@ func (p Preset) DescriptionIn(lang string) string {
 	return en
 }
 
+// ---- what the owner offers for the link apps (SubscriptionSettings.link_dns) ----
+
+// ErrLinkOptions wraps every refusal of SetLinkOptions: an unknown or repeated preset, a default that is not offered, too many.
+var ErrLinkOptions = errors.New("link_dns")
+
+// LinkOptions is what the owner offers for the link apps, in order.
+func (s *Service) LinkOptions(ctx context.Context) (*adminv1.LinkDnsOptions, error) {
+	rows, err := s.st.DNS().LinkOptions(ctx)
+	out := &adminv1.LinkDnsOptions{PresetIds: []string{}}
+	for _, o := range rows {
+		out.PresetIds = append(out.PresetIds, o.PresetID)
+		if o.Default {
+			out.DefaultPresetId = o.PresetID
+		}
+	}
+	return out, err
+}
+
+// SetLinkOptions replaces what the owner offers for the link apps (the rules of a node's offer, checkOffer). A real change is
+// written to the audit log as link_dns_options: how many presets and the default.
+func (s *Service) SetLinkOptions(ctx context.Context, o *adminv1.LinkDnsOptions) error {
+	d := s.st.DNS()
+	l, err := d.Lookup(ctx)
+	if err != nil {
+		return err
+	}
+	if msg := checkOffer(l, o.GetPresetIds(), o.GetDefaultPresetId()); msg != "" {
+		return fmt.Errorf("%w.%s", ErrLinkOptions, msg)
+	}
+	before, err := s.LinkOptions(ctx)
+	if err != nil {
+		return err
+	}
+	if slices.Equal(before.PresetIds, o.GetPresetIds()) && before.DefaultPresetId == o.GetDefaultPresetId() {
+		return nil
+	}
+	if err := d.SetLinkOptions(ctx, o.GetPresetIds(), o.GetDefaultPresetId()); errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("%w.preset_ids: unknown preset", ErrLinkOptions) // deleted between the check and the write
+	} else if err != nil {
+		return err
+	}
+	s.audit(ctx, "link_dns_options", map[string]any{"presets": len(o.GetPresetIds()), "default": o.GetDefaultPresetId()})
+	return nil
+}
+
 // ---- DnsService: what the owner offers per node, and what people picked ----
 
 func (s *Service) nodeOptionsProto(id string, offers []store.NodeDNSOption) *adminv1.NodeDnsOptions {
@@ -251,32 +297,17 @@ func invalidArg(msg string) error {
 func (s *Service) SetNodeDnsOptions(ctx context.Context, req *connect.Request[adminv1.SetNodeDnsOptionsRequest]) (*connect.Response[adminv1.SetNodeDnsOptionsResponse], error) {
 	m := req.Msg
 	d := s.st.DNS()
-	names := map[string]string{}
 	if ok, err := d.NodeExists(ctx, m.NodeId); err != nil {
 		return nil, s.internal("node", err)
 	} else if !ok {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
 	}
-	if len(m.PresetIds) > MaxNodeOptions {
-		return nil, invalidArg("preset_ids: too many presets")
-	}
 	l, err := d.Lookup(ctx)
 	if err != nil {
 		return nil, s.internal("lookup", err)
 	}
-	seen := map[string]bool{}
-	for _, id := range m.PresetIds {
-		if _, ok := l.Names[id]; !ok {
-			return nil, invalidArg("preset_ids: unknown preset")
-		}
-		if seen[id] {
-			return nil, invalidArg("preset_ids: a preset is listed twice")
-		}
-		seen[id] = true
-		names[id] = l.Names[id]
-	}
-	if m.DefaultPresetId != "" && !seen[m.DefaultPresetId] {
-		return nil, invalidArg("default_preset_id: the default must be one of the offered presets")
+	if msg := checkOffer(l, m.PresetIds, m.DefaultPresetId); msg != "" {
+		return nil, invalidArg(msg)
 	}
 	before, err := d.NodeOptions(ctx)
 	if err != nil {
@@ -302,6 +333,28 @@ func (s *Service) SetNodeDnsOptions(ctx context.Context, req *connect.Request[ad
 	return connect.NewResponse(&adminv1.SetNodeDnsOptionsResponse{Options: s.nodeOptionsProto(m.NodeId, offers[m.NodeId])}), nil
 }
 
+// checkOffer is what an offer must be, a node's or the link apps': known presets, none twice, at most MaxNodeOptions, the default
+// one of them or "". The answer is the refusal, naming the field; "" = fine.
+func checkOffer(l store.DNSLookup, ids []string, def string) string {
+	if len(ids) > MaxNodeOptions {
+		return "preset_ids: too many presets"
+	}
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if _, ok := l.Names[id]; !ok {
+			return "preset_ids: unknown preset"
+		}
+		if seen[id] {
+			return "preset_ids: a preset is listed twice"
+		}
+		seen[id] = true
+	}
+	if def != "" && !seen[def] {
+		return "default_preset_id: the default must be one of the offered presets"
+	}
+	return ""
+}
+
 func sameOffers(old []store.NodeDNSOption, ids []string, def string) bool {
 	if len(old) != len(ids) {
 		return false
@@ -317,21 +370,16 @@ func sameOffers(old []store.NodeDNSOption, ids []string, def string) bool {
 func (s *Service) GetUserDnsChoices(ctx context.Context, req *connect.Request[adminv1.GetUserDnsChoicesRequest]) (*connect.Response[adminv1.GetUserDnsChoicesResponse], error) {
 	userID := req.Msg.UserId
 	d := s.st.DNS()
-	own, group, err := d.UserRefs(ctx, userID)
+	data, err := d.SubscriptionData(ctx, userID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
 	} else if err != nil {
-		return nil, s.internal("user refs", err)
+		return nil, s.internal("dns of the user", err)
 	}
-	c, err := s.NodeChoices(ctx, userID)
-	if err != nil {
-		return nil, s.internal("node choices", err)
-	}
-	l, err := d.Lookup(ctx)
-	if err != nil {
-		return nil, s.internal("lookup", err)
-	}
-	fallback, _, _ := l.Resolve(own, group)
+	c := NewNodeChoices(data.NodeOptions, data.UserChoices)
+	presets, own, _, _ := s.resolve(data.DNSEffectiveData)
+	name := func(id string) string { return presets[id].Name }
+	fallback := own.ID
 	nodes, err := d.NodeNames(ctx)
 	if err != nil {
 		return nil, s.internal("node names", err)
@@ -346,9 +394,16 @@ func (s *Service) GetUserDnsChoices(ctx context.Context, req *connect.Request[ad
 		p := c.picks[nodeID]
 		eff := cmpOr(c.Effective(nodeID), fallback)
 		resp.Choices = append(resp.Choices, &adminv1.UserDnsChoice{
-			NodeId: nodeID, NodeName: nodes[nodeID], PresetId: p.PresetID, PresetName: l.Names[p.PresetID],
-			Offered: c.Pick(nodeID) != "", EffectivePresetId: eff, EffectivePresetName: l.Names[eff], UpdatedUnix: p.UpdatedMs / 1000,
+			NodeId: nodeID, NodeName: nodes[nodeID], PresetId: p.PresetID, PresetName: name(p.PresetID),
+			Offered: c.Pick(nodeID) != "", EffectivePresetId: eff, EffectivePresetName: name(eff), UpdatedUnix: p.UpdatedMs / 1000,
 		})
+	}
+	if pick := data.LinkPick; pick != "" {
+		link := linkOf(data.DNSEffectiveData, presets)
+		resp.Link = &adminv1.UserDnsChoice{
+			PresetId: pick, PresetName: name(pick), Offered: link.Choice != "",
+			EffectivePresetId: link.Effective, EffectivePresetName: name(link.Effective), UpdatedUnix: data.LinkPickMs / 1000,
+		}
 	}
 	return connect.NewResponse(resp), nil
 }

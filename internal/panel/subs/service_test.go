@@ -2,14 +2,18 @@ package subs_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
@@ -62,5 +66,50 @@ func TestSettingsCarryServerSamples(t *testing.T) {
 	must(m.svc.UpdateInbound(m.ctx, connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: off.Id, Enabled: new(false)})))
 	if r := get(); r.SampleGroup != "g2" || len(r.ServerSamples) != 1 || r.ServerSamples[0].Node != "de1" {
 		t.Errorf("busiest group = %q %v", r.SampleGroup, r.ServerSamples)
+	}
+}
+
+// The offer of DNS presets for the link apps is a subscription setting the DNS module keeps: saved with the settings, kept when a
+// request leaves it out, refused when it names a preset that does not exist; never part of the stored document.
+func TestSettingsCarryTheLinkDNSOffer(t *testing.T) {
+	m := newM3Rig(t)
+	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, dns.New(m.st), nil)
+	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_1"})
+	get := func() *adminv1.SubscriptionSettings {
+		return must(svc.GetSubscriptionSettings(ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	}
+	update := func(s *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, error) {
+		r, err := svc.UpdateSubscriptionSettings(ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: s}))
+		if err != nil {
+			return nil, err
+		}
+		return r.Msg.Settings, nil
+	}
+	if o := get().GetLinkDns(); o == nil || len(o.PresetIds) != 0 {
+		t.Fatalf("a fresh install offers nothing: %v", o)
+	}
+	s := get()
+	s.LinkDns = &adminv1.LinkDnsOptions{PresetIds: []string{"dns_builtin_standard", "dns_builtin_adblock"}, DefaultPresetId: "dns_builtin_adblock"}
+	out, err := update(s)
+	if err != nil || strings.Join(out.GetLinkDns().GetPresetIds(), ",") != "dns_builtin_standard,dns_builtin_adblock" || out.GetLinkDns().GetDefaultPresetId() != "dns_builtin_adblock" {
+		t.Fatalf("saved: %v %v", out.GetLinkDns(), err)
+	}
+	// An older admin that knows nothing of the offer saves the settings without it: the offer stays.
+	s = get()
+	s.LinkDns, s.Title = nil, "VPN"
+	if out, err := update(s); err != nil || len(out.GetLinkDns().GetPresetIds()) != 2 || out.Title != "VPN" {
+		t.Errorf("left out: %v %v", out.GetLinkDns(), err)
+	}
+	s = get()
+	s.LinkDns = &adminv1.LinkDnsOptions{PresetIds: []string{"dns_nope"}}
+	if _, err := update(s); connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "link_dns.preset_ids: unknown preset") {
+		t.Errorf("an unknown preset: %v", err)
+	}
+	if v, err := m.st.Setting(m.ctx, subsettings.Key); err != nil || strings.Contains(v, "link_dns") || strings.Contains(v, "dns_builtin") {
+		t.Errorf("the stored document: %s %v", v, err)
+	}
+	if o := get().GetLinkDns(); len(o.GetPresetIds()) != 2 {
+		t.Errorf("a refused save changed the offer: %v", o)
 	}
 }

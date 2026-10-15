@@ -94,8 +94,8 @@ type Config struct {
 	Brand func(ctx context.Context) (instance.Settings, error)
 	// Routing, if set, adds the Happ `routing` header for Happ-like clients.
 	Routing Routing
-	// DNS resolves the effective DNS preset of a user for the dns section of the Mihomo profile; nil = the Routing
-	// when it can do that (HappRouting's can), else the profile has no dns section.
+	// DNS resolves the DNS preset of a user's link apps for the dns section of the Mihomo, Xray JSON and sing-box profiles; nil =
+	// the Routing when it can do that (HappRouting's can), else the profile has no dns section.
 	DNS Effective
 	// Dist holds the build with sub.html (the user page); nil = the embedded web/dist. When the page is not
 	// there or has the wrong shape, browsers get the base64 list and one line is logged.
@@ -511,7 +511,7 @@ func (h *handler) appNote(v access.SubView, lang string, format plugin.ClientFor
 }
 
 // linkPreset is the DNS preset the document of a link carries (Mihomo, Xray JSON, sing-box): the one read with the view, else the
-// user's effective preset; nil when there is none (no DNS module, or it failed: the document has no dns section).
+// preset of the user's link apps; nil when there is none (no DNS module, or it failed: the document has no dns section).
 func (h *handler) linkPreset(ctx context.Context, v access.SubView) *dns.Preset {
 	if v.EffectiveDNS != nil {
 		return v.EffectiveDNS
@@ -519,7 +519,7 @@ func (h *handler) linkPreset(ctx context.Context, v access.SubView) *dns.Preset 
 	if h.cfg.DNS == nil || v.UserID == "" {
 		return nil
 	}
-	pre, _, err := h.cfg.DNS.Effective(ctx, v.UserID)
+	pre, err := h.cfg.DNS.LinkEffective(ctx, v.UserID)
 	if err != nil {
 		h.cfg.Log.Warn("profile: no dns section", "err", err)
 		return nil

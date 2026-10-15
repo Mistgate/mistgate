@@ -175,6 +175,12 @@
   },
   {
     "type": "index",
+    "name": "link_dns_option_default",
+    "tbl_name": "link_dns_option",
+    "sql": "CREATE UNIQUE INDEX link_dns_option_default ON link_dns_option (is_default) WHERE is_default = 1"
+  },
+  {
+    "type": "index",
     "name": "mcp_plan_status",
     "tbl_name": "mcp_plan",
     "sql": "CREATE INDEX mcp_plan_status ON mcp_plan(status, expires_at)"
@@ -463,6 +469,12 @@
   },
   {
     "type": "table",
+    "name": "link_dns_option",
+    "tbl_name": "link_dns_option",
+    "sql": "CREATE TABLE link_dns_option ( preset_id TEXT NOT NULL PRIMARY KEY REFERENCES dns_preset (id) ON DELETE CASCADE, position INTEGER NOT NULL, is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)) ) STRICT"
+  },
+  {
+    "type": "table",
     "name": "login_failure",
     "tbl_name": "login_failure",
     "sql": "CREATE TABLE login_failure ( login TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked_until INTEGER NOT NULL DEFAULT 0, last_at INTEGER NOT NULL ) STRICT"
@@ -646,6 +658,12 @@
     "name": "user_group_profile",
     "tbl_name": "user_group_profile",
     "sql": "CREATE TABLE user_group_profile ( group_id TEXT NOT NULL REFERENCES user_group (id) ON DELETE CASCADE, profile_id TEXT NOT NULL REFERENCES profile (id) ON DELETE CASCADE, PRIMARY KEY (group_id, profile_id) ) STRICT, WITHOUT ROWID"
+  },
+  {
+    "type": "table",
+    "name": "user_link_dns",
+    "tbl_name": "user_link_dns",
+    "sql": "CREATE TABLE user_link_dns ( user_id TEXT NOT NULL PRIMARY KEY REFERENCES user (id) ON DELETE CASCADE, preset_id TEXT NOT NULL REFERENCES dns_preset (id) ON DELETE CASCADE, updated_at INTEGER NOT NULL ) STRICT"
   },
   {
     "type": "table",

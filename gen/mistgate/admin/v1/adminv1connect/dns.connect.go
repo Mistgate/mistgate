@@ -77,9 +77,9 @@ type DnsServiceClient interface {
 	// Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
 	// repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
 	SetNodeDnsOptions(context.Context, *connect.Request[v1.SetNodeDnsOptionsRequest]) (*connect.Response[v1.SetNodeDnsOptionsResponse], error)
-	// What a person picked on their page, per node (read only).
+	// What a person picked on their page, per node and for the link apps (read only).
 	GetUserDnsChoices(context.Context, *connect.Request[v1.GetUserDnsChoicesRequest]) (*connect.Response[v1.GetUserDnsChoicesResponse], error)
-	// Removes every pick of a person: their servers go back to the node defaults.
+	// Removes every pick of a person: their servers go back to the node defaults, their link apps to the usual preset.
 	ResetUserDnsChoices(context.Context, *connect.Request[v1.ResetUserDnsChoicesRequest]) (*connect.Response[v1.ResetUserDnsChoicesResponse], error)
 }
 
@@ -215,9 +215,9 @@ type DnsServiceHandler interface {
 	// Replaces what one node offers (owner only). An empty list = the node offers nothing. INVALID_ARGUMENT for an unknown or
 	// repeated preset, a default that is not offered or too many presets; NOT_FOUND for an unknown node.
 	SetNodeDnsOptions(context.Context, *connect.Request[v1.SetNodeDnsOptionsRequest]) (*connect.Response[v1.SetNodeDnsOptionsResponse], error)
-	// What a person picked on their page, per node (read only).
+	// What a person picked on their page, per node and for the link apps (read only).
 	GetUserDnsChoices(context.Context, *connect.Request[v1.GetUserDnsChoicesRequest]) (*connect.Response[v1.GetUserDnsChoicesResponse], error)
-	// Removes every pick of a person: their servers go back to the node defaults.
+	// Removes every pick of a person: their servers go back to the node defaults, their link apps to the usual preset.
 	ResetUserDnsChoices(context.Context, *connect.Request[v1.ResetUserDnsChoicesRequest]) (*connect.Response[v1.ResetUserDnsChoicesResponse], error)
 }
 

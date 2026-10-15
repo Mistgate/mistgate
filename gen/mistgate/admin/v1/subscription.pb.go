@@ -229,8 +229,12 @@ type SubscriptionSettings struct {
 	// or refuse it and also turn away the apps that report no device ID. Absent in a request = leave the stored mode as it is;
 	// a panel that has never been given one counts only (LINK_DEVICE_LIMIT_TRACK).
 	LinkDeviceLimit *LinkDeviceLimit `protobuf:"varint,10,opt,name=link_device_limit,json=linkDeviceLimit,proto3,enum=mistgate.admin.v1.LinkDeviceLimit,oneof" json:"link_device_limit,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The DNS presets a person may pick on their page for the apps that take the link (Happ, the Mihomo apps, Xray JSON, sing-box):
+	// one DNS for all servers, since these apps have one resolver for the whole subscription. Kept by the DNS module, like
+	// default_dns_preset_id. Absent in a request = leave the stored offer as it is.
+	LinkDns       *LinkDnsOptions `protobuf:"bytes,11,opt,name=link_dns,json=linkDns,proto3" json:"link_dns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -333,6 +337,69 @@ func (x *SubscriptionSettings) GetLinkDeviceLimit() LinkDeviceLimit {
 	return LinkDeviceLimit_LINK_DEVICE_LIMIT_UNSPECIFIED
 }
 
+func (x *SubscriptionSettings) GetLinkDns() *LinkDnsOptions {
+	if x != nil {
+		return x.LinkDns
+	}
+	return nil
+}
+
+// What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the
+// user's own preset, else the group's, else default_preset_id, else the instance default.
+type LinkDnsOptions struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// In the order the page lists them; at most 20. Empty = the page offers no choice for the link apps.
+	PresetIds []string `protobuf:"bytes,1,rep,name=preset_ids,json=presetIds,proto3" json:"preset_ids,omitempty"`
+	// One of preset_ids, or "" (the instance default stays the default).
+	DefaultPresetId string `protobuf:"bytes,2,opt,name=default_preset_id,json=defaultPresetId,proto3" json:"default_preset_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LinkDnsOptions) Reset() {
+	*x = LinkDnsOptions{}
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkDnsOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkDnsOptions) ProtoMessage() {}
+
+func (x *LinkDnsOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkDnsOptions.ProtoReflect.Descriptor instead.
+func (*LinkDnsOptions) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *LinkDnsOptions) GetPresetIds() []string {
+	if x != nil {
+		return x.PresetIds
+	}
+	return nil
+}
+
+func (x *LinkDnsOptions) GetDefaultPresetId() string {
+	if x != nil {
+		return x.DefaultPresetId
+	}
+	return ""
+}
+
 // One app the user page recommends: e.g. iOS + APP_HAPP -> "Happ" (App Store link, happ://add/{url}),
 // Windows + APP_HAPP -> an instance's own desktop client, any platform + APP_AMNEZIA -> AmneziaVPN.
 type PlatformApp struct {
@@ -356,7 +423,7 @@ type PlatformApp struct {
 
 func (x *PlatformApp) Reset() {
 	*x = PlatformApp{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -368,7 +435,7 @@ func (x *PlatformApp) String() string {
 func (*PlatformApp) ProtoMessage() {}
 
 func (x *PlatformApp) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -381,7 +448,7 @@ func (x *PlatformApp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlatformApp.ProtoReflect.Descriptor instead.
 func (*PlatformApp) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PlatformApp) GetPlatform() Platform {
@@ -455,7 +522,7 @@ type UserPageOptions struct {
 
 func (x *UserPageOptions) Reset() {
 	*x = UserPageOptions{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +534,7 @@ func (x *UserPageOptions) String() string {
 func (*UserPageOptions) ProtoMessage() {}
 
 func (x *UserPageOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +547,7 @@ func (x *UserPageOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserPageOptions.ProtoReflect.Descriptor instead.
 func (*UserPageOptions) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{2}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UserPageOptions) GetShowAnnouncement() bool {
@@ -536,7 +603,7 @@ type ServeRule struct {
 
 func (x *ServeRule) Reset() {
 	*x = ServeRule{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +615,7 @@ func (x *ServeRule) String() string {
 func (*ServeRule) ProtoMessage() {}
 
 func (x *ServeRule) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +628,7 @@ func (x *ServeRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServeRule.ProtoReflect.Descriptor instead.
 func (*ServeRule) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ServeRule) GetUaContains() string {
@@ -586,7 +653,7 @@ type GetSubscriptionSettingsRequest struct {
 
 func (x *GetSubscriptionSettingsRequest) Reset() {
 	*x = GetSubscriptionSettingsRequest{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +665,7 @@ func (x *GetSubscriptionSettingsRequest) String() string {
 func (*GetSubscriptionSettingsRequest) ProtoMessage() {}
 
 func (x *GetSubscriptionSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +678,7 @@ func (x *GetSubscriptionSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubscriptionSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetSubscriptionSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{5}
 }
 
 type GetSubscriptionSettingsResponse struct {
@@ -635,7 +702,7 @@ type GetSubscriptionSettingsResponse struct {
 
 func (x *GetSubscriptionSettingsResponse) Reset() {
 	*x = GetSubscriptionSettingsResponse{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +714,7 @@ func (x *GetSubscriptionSettingsResponse) String() string {
 func (*GetSubscriptionSettingsResponse) ProtoMessage() {}
 
 func (x *GetSubscriptionSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +727,7 @@ func (x *GetSubscriptionSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubscriptionSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetSubscriptionSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetSubscriptionSettingsResponse) GetSettings() *SubscriptionSettings {
@@ -719,7 +786,7 @@ type ServerSample struct {
 
 func (x *ServerSample) Reset() {
 	*x = ServerSample{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +798,7 @@ func (x *ServerSample) String() string {
 func (*ServerSample) ProtoMessage() {}
 
 func (x *ServerSample) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +811,7 @@ func (x *ServerSample) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerSample.ProtoReflect.Descriptor instead.
 func (*ServerSample) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ServerSample) GetNode() string {
@@ -785,7 +852,7 @@ type UpdateSubscriptionSettingsRequest struct {
 
 func (x *UpdateSubscriptionSettingsRequest) Reset() {
 	*x = UpdateSubscriptionSettingsRequest{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -797,7 +864,7 @@ func (x *UpdateSubscriptionSettingsRequest) String() string {
 func (*UpdateSubscriptionSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateSubscriptionSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -810,7 +877,7 @@ func (x *UpdateSubscriptionSettingsRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use UpdateSubscriptionSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSubscriptionSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateSubscriptionSettingsRequest) GetSettings() *SubscriptionSettings {
@@ -829,7 +896,7 @@ type UpdateSubscriptionSettingsResponse struct {
 
 func (x *UpdateSubscriptionSettingsResponse) Reset() {
 	*x = UpdateSubscriptionSettingsResponse{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -841,7 +908,7 @@ func (x *UpdateSubscriptionSettingsResponse) String() string {
 func (*UpdateSubscriptionSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateSubscriptionSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -854,7 +921,7 @@ func (x *UpdateSubscriptionSettingsResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use UpdateSubscriptionSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateSubscriptionSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateSubscriptionSettingsResponse) GetSettings() *SubscriptionSettings {
@@ -879,7 +946,7 @@ type ClientInfo struct {
 
 func (x *ClientInfo) Reset() {
 	*x = ClientInfo{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -891,7 +958,7 @@ func (x *ClientInfo) String() string {
 func (*ClientInfo) ProtoMessage() {}
 
 func (x *ClientInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -904,7 +971,7 @@ func (x *ClientInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientInfo.ProtoReflect.Descriptor instead.
 func (*ClientInfo) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ClientInfo) GetId() string {
@@ -943,7 +1010,7 @@ type ListClientsRequest struct {
 
 func (x *ListClientsRequest) Reset() {
 	*x = ListClientsRequest{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -955,7 +1022,7 @@ func (x *ListClientsRequest) String() string {
 func (*ListClientsRequest) ProtoMessage() {}
 
 func (x *ListClientsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -968,7 +1035,7 @@ func (x *ListClientsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListClientsRequest.ProtoReflect.Descriptor instead.
 func (*ListClientsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{11}
 }
 
 type ListClientsResponse struct {
@@ -980,7 +1047,7 @@ type ListClientsResponse struct {
 
 func (x *ListClientsResponse) Reset() {
 	*x = ListClientsResponse{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -992,7 +1059,7 @@ func (x *ListClientsResponse) String() string {
 func (*ListClientsResponse) ProtoMessage() {}
 
 func (x *ListClientsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1005,7 +1072,7 @@ func (x *ListClientsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListClientsResponse.ProtoReflect.Descriptor instead.
 func (*ListClientsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListClientsResponse) GetClients() []*ClientInfo {
@@ -1024,7 +1091,7 @@ type TestUserAgentRequest struct {
 
 func (x *TestUserAgentRequest) Reset() {
 	*x = TestUserAgentRequest{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1036,7 +1103,7 @@ func (x *TestUserAgentRequest) String() string {
 func (*TestUserAgentRequest) ProtoMessage() {}
 
 func (x *TestUserAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1049,7 +1116,7 @@ func (x *TestUserAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestUserAgentRequest.ProtoReflect.Descriptor instead.
 func (*TestUserAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *TestUserAgentRequest) GetUserAgent() string {
@@ -1072,7 +1139,7 @@ type TestUserAgentResponse struct {
 
 func (x *TestUserAgentResponse) Reset() {
 	*x = TestUserAgentResponse{}
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1084,7 +1151,7 @@ func (x *TestUserAgentResponse) String() string {
 func (*TestUserAgentResponse) ProtoMessage() {}
 
 func (x *TestUserAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_subscription_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1097,7 +1164,7 @@ func (x *TestUserAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestUserAgentResponse.ProtoReflect.Descriptor instead.
 func (*TestUserAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *TestUserAgentResponse) GetRuleIndex() int32 {
@@ -1125,7 +1192,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x9e\x04\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xdc\x04\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -1138,8 +1205,13 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\x05rules\x18\b \x03(\v2\x1c.mistgate.admin.v1.ServeRuleR\x05rules\x121\n" +
 	"\x15default_dns_preset_id\x18\t \x01(\tR\x12defaultDnsPresetId\x12S\n" +
 	"\x11link_device_limit\x18\n" +
-	" \x01(\x0e2\".mistgate.admin.v1.LinkDeviceLimitH\x00R\x0flinkDeviceLimit\x88\x01\x01B\x14\n" +
-	"\x12_link_device_limit\"\x99\x02\n" +
+	" \x01(\x0e2\".mistgate.admin.v1.LinkDeviceLimitH\x00R\x0flinkDeviceLimit\x88\x01\x01\x12<\n" +
+	"\blink_dns\x18\v \x01(\v2!.mistgate.admin.v1.LinkDnsOptionsR\alinkDnsB\x14\n" +
+	"\x12_link_device_limit\"[\n" +
+	"\x0eLinkDnsOptions\x12\x1d\n" +
+	"\n" +
+	"preset_ids\x18\x01 \x03(\tR\tpresetIds\x12*\n" +
+	"\x11default_preset_id\x18\x02 \x01(\tR\x0fdefaultPresetId\"\x99\x02\n" +
 	"\vPlatformApp\x127\n" +
 	"\bplatform\x18\x01 \x01(\x0e2\x1b.mistgate.admin.v1.PlatformR\bplatform\x12*\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x16.mistgate.admin.v1.AppR\x04kind\x12\x12\n" +
@@ -1237,55 +1309,57 @@ func file_mistgate_admin_v1_subscription_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_subscription_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_mistgate_admin_v1_subscription_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_mistgate_admin_v1_subscription_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_mistgate_admin_v1_subscription_proto_goTypes = []any{
 	(LinkDeviceLimit)(0),                       // 0: mistgate.admin.v1.LinkDeviceLimit
 	(Platform)(0),                              // 1: mistgate.admin.v1.Platform
 	(SubFormat)(0),                             // 2: mistgate.admin.v1.SubFormat
 	(*SubscriptionSettings)(nil),               // 3: mistgate.admin.v1.SubscriptionSettings
-	(*PlatformApp)(nil),                        // 4: mistgate.admin.v1.PlatformApp
-	(*UserPageOptions)(nil),                    // 5: mistgate.admin.v1.UserPageOptions
-	(*ServeRule)(nil),                          // 6: mistgate.admin.v1.ServeRule
-	(*GetSubscriptionSettingsRequest)(nil),     // 7: mistgate.admin.v1.GetSubscriptionSettingsRequest
-	(*GetSubscriptionSettingsResponse)(nil),    // 8: mistgate.admin.v1.GetSubscriptionSettingsResponse
-	(*ServerSample)(nil),                       // 9: mistgate.admin.v1.ServerSample
-	(*UpdateSubscriptionSettingsRequest)(nil),  // 10: mistgate.admin.v1.UpdateSubscriptionSettingsRequest
-	(*UpdateSubscriptionSettingsResponse)(nil), // 11: mistgate.admin.v1.UpdateSubscriptionSettingsResponse
-	(*ClientInfo)(nil),                         // 12: mistgate.admin.v1.ClientInfo
-	(*ListClientsRequest)(nil),                 // 13: mistgate.admin.v1.ListClientsRequest
-	(*ListClientsResponse)(nil),                // 14: mistgate.admin.v1.ListClientsResponse
-	(*TestUserAgentRequest)(nil),               // 15: mistgate.admin.v1.TestUserAgentRequest
-	(*TestUserAgentResponse)(nil),              // 16: mistgate.admin.v1.TestUserAgentResponse
-	(App)(0),                                   // 17: mistgate.admin.v1.App
+	(*LinkDnsOptions)(nil),                     // 4: mistgate.admin.v1.LinkDnsOptions
+	(*PlatformApp)(nil),                        // 5: mistgate.admin.v1.PlatformApp
+	(*UserPageOptions)(nil),                    // 6: mistgate.admin.v1.UserPageOptions
+	(*ServeRule)(nil),                          // 7: mistgate.admin.v1.ServeRule
+	(*GetSubscriptionSettingsRequest)(nil),     // 8: mistgate.admin.v1.GetSubscriptionSettingsRequest
+	(*GetSubscriptionSettingsResponse)(nil),    // 9: mistgate.admin.v1.GetSubscriptionSettingsResponse
+	(*ServerSample)(nil),                       // 10: mistgate.admin.v1.ServerSample
+	(*UpdateSubscriptionSettingsRequest)(nil),  // 11: mistgate.admin.v1.UpdateSubscriptionSettingsRequest
+	(*UpdateSubscriptionSettingsResponse)(nil), // 12: mistgate.admin.v1.UpdateSubscriptionSettingsResponse
+	(*ClientInfo)(nil),                         // 13: mistgate.admin.v1.ClientInfo
+	(*ListClientsRequest)(nil),                 // 14: mistgate.admin.v1.ListClientsRequest
+	(*ListClientsResponse)(nil),                // 15: mistgate.admin.v1.ListClientsResponse
+	(*TestUserAgentRequest)(nil),               // 16: mistgate.admin.v1.TestUserAgentRequest
+	(*TestUserAgentResponse)(nil),              // 17: mistgate.admin.v1.TestUserAgentResponse
+	(App)(0),                                   // 18: mistgate.admin.v1.App
 }
 var file_mistgate_admin_v1_subscription_proto_depIdxs = []int32{
-	4,  // 0: mistgate.admin.v1.SubscriptionSettings.apps:type_name -> mistgate.admin.v1.PlatformApp
-	5,  // 1: mistgate.admin.v1.SubscriptionSettings.user_page:type_name -> mistgate.admin.v1.UserPageOptions
-	6,  // 2: mistgate.admin.v1.SubscriptionSettings.rules:type_name -> mistgate.admin.v1.ServeRule
+	5,  // 0: mistgate.admin.v1.SubscriptionSettings.apps:type_name -> mistgate.admin.v1.PlatformApp
+	6,  // 1: mistgate.admin.v1.SubscriptionSettings.user_page:type_name -> mistgate.admin.v1.UserPageOptions
+	7,  // 2: mistgate.admin.v1.SubscriptionSettings.rules:type_name -> mistgate.admin.v1.ServeRule
 	0,  // 3: mistgate.admin.v1.SubscriptionSettings.link_device_limit:type_name -> mistgate.admin.v1.LinkDeviceLimit
-	1,  // 4: mistgate.admin.v1.PlatformApp.platform:type_name -> mistgate.admin.v1.Platform
-	17, // 5: mistgate.admin.v1.PlatformApp.kind:type_name -> mistgate.admin.v1.App
-	2,  // 6: mistgate.admin.v1.ServeRule.format:type_name -> mistgate.admin.v1.SubFormat
-	3,  // 7: mistgate.admin.v1.GetSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	9,  // 8: mistgate.admin.v1.GetSubscriptionSettingsResponse.server_samples:type_name -> mistgate.admin.v1.ServerSample
-	3,  // 9: mistgate.admin.v1.UpdateSubscriptionSettingsRequest.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	3,  // 10: mistgate.admin.v1.UpdateSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	2,  // 11: mistgate.admin.v1.ClientInfo.formats:type_name -> mistgate.admin.v1.SubFormat
-	12, // 12: mistgate.admin.v1.ListClientsResponse.clients:type_name -> mistgate.admin.v1.ClientInfo
-	2,  // 13: mistgate.admin.v1.TestUserAgentResponse.format:type_name -> mistgate.admin.v1.SubFormat
-	7,  // 14: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:input_type -> mistgate.admin.v1.GetSubscriptionSettingsRequest
-	10, // 15: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:input_type -> mistgate.admin.v1.UpdateSubscriptionSettingsRequest
-	13, // 16: mistgate.admin.v1.SubscriptionService.ListClients:input_type -> mistgate.admin.v1.ListClientsRequest
-	15, // 17: mistgate.admin.v1.SubscriptionService.TestUserAgent:input_type -> mistgate.admin.v1.TestUserAgentRequest
-	8,  // 18: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:output_type -> mistgate.admin.v1.GetSubscriptionSettingsResponse
-	11, // 19: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:output_type -> mistgate.admin.v1.UpdateSubscriptionSettingsResponse
-	14, // 20: mistgate.admin.v1.SubscriptionService.ListClients:output_type -> mistgate.admin.v1.ListClientsResponse
-	16, // 21: mistgate.admin.v1.SubscriptionService.TestUserAgent:output_type -> mistgate.admin.v1.TestUserAgentResponse
-	18, // [18:22] is the sub-list for method output_type
-	14, // [14:18] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	4,  // 4: mistgate.admin.v1.SubscriptionSettings.link_dns:type_name -> mistgate.admin.v1.LinkDnsOptions
+	1,  // 5: mistgate.admin.v1.PlatformApp.platform:type_name -> mistgate.admin.v1.Platform
+	18, // 6: mistgate.admin.v1.PlatformApp.kind:type_name -> mistgate.admin.v1.App
+	2,  // 7: mistgate.admin.v1.ServeRule.format:type_name -> mistgate.admin.v1.SubFormat
+	3,  // 8: mistgate.admin.v1.GetSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	10, // 9: mistgate.admin.v1.GetSubscriptionSettingsResponse.server_samples:type_name -> mistgate.admin.v1.ServerSample
+	3,  // 10: mistgate.admin.v1.UpdateSubscriptionSettingsRequest.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	3,  // 11: mistgate.admin.v1.UpdateSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	2,  // 12: mistgate.admin.v1.ClientInfo.formats:type_name -> mistgate.admin.v1.SubFormat
+	13, // 13: mistgate.admin.v1.ListClientsResponse.clients:type_name -> mistgate.admin.v1.ClientInfo
+	2,  // 14: mistgate.admin.v1.TestUserAgentResponse.format:type_name -> mistgate.admin.v1.SubFormat
+	8,  // 15: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:input_type -> mistgate.admin.v1.GetSubscriptionSettingsRequest
+	11, // 16: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:input_type -> mistgate.admin.v1.UpdateSubscriptionSettingsRequest
+	14, // 17: mistgate.admin.v1.SubscriptionService.ListClients:input_type -> mistgate.admin.v1.ListClientsRequest
+	16, // 18: mistgate.admin.v1.SubscriptionService.TestUserAgent:input_type -> mistgate.admin.v1.TestUserAgentRequest
+	9,  // 19: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:output_type -> mistgate.admin.v1.GetSubscriptionSettingsResponse
+	12, // 20: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:output_type -> mistgate.admin.v1.UpdateSubscriptionSettingsResponse
+	15, // 21: mistgate.admin.v1.SubscriptionService.ListClients:output_type -> mistgate.admin.v1.ListClientsResponse
+	17, // 22: mistgate.admin.v1.SubscriptionService.TestUserAgent:output_type -> mistgate.admin.v1.TestUserAgentResponse
+	19, // [19:23] is the sub-list for method output_type
+	15, // [15:19] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_subscription_proto_init() }
@@ -1295,15 +1369,15 @@ func file_mistgate_admin_v1_subscription_proto_init() {
 	}
 	file_mistgate_admin_v1_common_proto_init()
 	file_mistgate_admin_v1_subscription_proto_msgTypes[0].OneofWrappers = []any{}
-	file_mistgate_admin_v1_subscription_proto_msgTypes[2].OneofWrappers = []any{}
-	file_mistgate_admin_v1_subscription_proto_msgTypes[6].OneofWrappers = []any{}
+	file_mistgate_admin_v1_subscription_proto_msgTypes[3].OneofWrappers = []any{}
+	file_mistgate_admin_v1_subscription_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_subscription_proto_rawDesc), len(file_mistgate_admin_v1_subscription_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
