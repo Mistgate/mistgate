@@ -110,9 +110,16 @@ Limits: only an active person can add a device, show a key or replace one; the d
 
 A person whose subscription is not active still sees their AmneziaVPN keys, and can rename and remove them; adding new ones is not possible.
 
-## DNS per server
+## DNS
 
-When the owner turns on **DNS choice on the page** (see below), a person picks the DNS for each server on their page, from the presets the owner offered on that node. The presets and the rule for which DNS applies are in [DNS](dns.md); this section covers what the page does with it.
+When the owner turns on **DNS choice on the page** (see below), a person picks on their page:
+
+- **one DNS for the apps on the link** (Happ, the apps on the mihomo core, Xray JSON and sing-box apps), from the presets the owner listed under the switch: a card at the top of **Servers**, named by the apps, "DNS in Happ and other apps that use the link". The apps get the new DNS with their next subscription update, within the refresh interval, and the card says so;
+- **the DNS of the AmneziaWG keys of each server**, from the presets the owner offered on that node: a **Key DNS** row on the server's card, with a key icon.
+
+The two never mix: the first does not reach the keys, the second does not reach the apps on the link. The **Key DNS** rows are shown only to a person who uses AmneziaVPN keys (the app is on for them, or they hold a key), on servers that carry keys; a person who uses both reads one line under the card that says the keys keep their own. When the owner offers nothing for the apps on the link, a person with keys reads instead that the apps on the link have one DNS for all servers, and which. The presets and the rule for which DNS applies are in [DNS](dns.md); this section covers what the page does with it.
+
+Preset names and descriptions follow the language of the page, also when it differs from the browser's: a person who switched the page to Russian in an English browser reads the built-in presets in Russian. A preset the owner renamed or made shows its own text in every language.
 
 ### What the page knows about a server
 
@@ -126,17 +133,17 @@ For each of the person's servers the page gets:
 
 ### Choosing and applying
 
-- The choice is made for one server at a time and written to the audit log as `page_dns_choice`: the person's name, the node's name and the preset, never the link or an address.
+- The choice for the apps on the link is written to the audit log as `page_link_dns_choice`: the person's name and the preset. A choice for the keys of a server is made for one server at a time and written as `page_dns_choice`: the person's name, the node's name and the preset. Neither has the link or an address.
 - It counts against the same limit as the other actions on the page: 20 changes an hour per link.
 - Where it works differs by format:
   - **AmneziaVPN and AmneziaWG keys** (`.conf`, `vpn://`, QR code): the DNS is written inside the key, so the person has to press **Get a new key** again. The key itself does not change; the device is marked "new key needed" with the reason DNS until they do. The mark follows what the key holds against what applies to the person on that server now, whatever changed it: their pick or going back to the default, the owner changing the offered presets or the default, a preset edited or deleted. The key counts as received only when the person's own device fetches it: an admin opening the key in the panel does not clear the mark. A key made before this was tracked gets no mark until the person fetches it once.
   - **The AmneziaWG proxies of a Mihomo profile** (Clash Verge Rev, FlClash and the like): the choice applies at the next subscription update.
-  - **Not per server**: Hysteria2 in Mihomo and Happ have one resolver for the whole subscription, so they use one DNS for all servers (the user's, the group's or the instance's preset). The person's choice does not reach them. Other apps on the base64 format (v2rayNG, Hiddify, Streisand, Shadowrocket) get no DNS from the panel at all.
+  - **Not per server**: Hysteria2 in Mihomo, Happ, Xray JSON and sing-box have one resolver for the whole subscription, so they use the DNS of the apps on the link: the person's own pick for them, or the usual preset. A choice per server does not reach them. Other apps on the base64 format (v2rayNG, Hiddify, Streisand, Shadowrocket) get no DNS from the panel at all.
 - In the owner's preview the choice cannot be changed, like every other action on the page.
 
 ### The option
 
-**Subscriptions** → **User page** → **DNS choice on the page** (off by default; a panel set up before the option existed counts as off). Turning it off does not erase the choices people already made: they keep working until you reset them in the user card (see [Users and groups](users-and-groups.md)). The admin warns: "In Happ and for Hysteria2 in Mihomo the DNS is one for all nodes — it works per node only for AmneziaWG keys."
+**Subscriptions** → **User page** → **DNS choice on the page** (off by default; a panel set up before the option existed counts as off). With it on, **DNS for the apps on the link** under the switch lists the presets a person may pick for them and the default; the presets each node offers for its keys are set on the node. Turning the option off does not erase the choices people already made: they keep working until you reset them in the user card (see [Users and groups](users-and-groups.md)).
 
 ## The preview in the admin
 

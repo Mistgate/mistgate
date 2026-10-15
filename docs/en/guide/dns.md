@@ -1,6 +1,6 @@
 ---
 title: DNS
-description: What a DNS preset is, how split DNS works, which preset applies to a person, DNS per server, how each app receives it, and when a change reaches people.
+description: What a DNS preset is, how split DNS works, which preset applies to a person, the DNS a person picks for the apps on the link and per server, how each app receives it, and when a change reaches people.
 ---
 
 A DNS preset decides which DNS servers a person's app asks, and how. The queries travel inside the tunnel, so the person's provider does not see them. The panel ships ready presets (one is the default for everyone), and you can make your own and give one to a user or a group. Presets live on the **DNS** tab of **Subscriptions**.
@@ -82,11 +82,37 @@ The first that is set wins:
 
 The user card says which preset applies and where it comes from: "set on the user", "from the group" or "the default preset". In the selects, the empty choice names what it inherits: "Default — Russia: .ru direct", "Like the group — AdGuard: no ads".
 
-This is the rule for one DNS for all servers. On a node that offers choices to people, a person's choice goes first: see "DNS per server" below.
+This is the rule when the person has picked nothing. The owner can let people pick on their page, in two places that never mix: one DNS for the apps on the link (see "DNS for the apps on the link" below) and a DNS for the AmneziaWG keys of each server (see "DNS per server").
+
+## DNS for the apps on the link
+
+Happ, the apps on the mihomo core, Xray JSON and sing-box apps have one resolver for the whole subscription. The owner can let a person pick it on their page from a list of presets: one DNS for all servers, in all these apps. A typical list: **Cloudflare + Google** as the default, **AdGuard: no ads**, **Russia: .ru direct**.
+
+### Setting it up
+
+**Subscriptions** → **User page**: turn on **DNS choice on the page**, then, right under it, in **DNS for the apps on the link**, tick the presets a person may pick (their order is their order on the page) and mark one as **default**, or leave **No default**. They are saved with the page settings (`link_dns` in the subscription settings); a real change is written to the audit log as `link_dns_options` (how many presets and the default). The owner and helpers can change it, as every other subscription setting. With nothing ticked the page offers no choice for the apps on the link, as before.
+
+### Which DNS a person's link apps have
+
+The first that applies wins:
+
+1. the person's own pick, while it is still in the list;
+2. the user's own preset;
+3. the group's preset;
+4. the default of the list;
+5. the default for everyone, then the built-in default.
+
+A preset you set on a user or a group goes before the default of the list: the person keeps your assignment until they pick themselves. Taking a preset out of the list makes the picks of it fall back to rules 2–5; the picks are kept and work again if you offer the preset again. A deleted preset leaves the list and the picks.
+
+### On the page
+
+At the top of **Servers** the person sees a card named by their apps: **DNS in Happ and other apps that use the link** (the app is the one the page recommends on that device). It shows what applies and **Change**, which opens the same list as the DNS of a server; the default is listed first under its name. The apps get the new DNS with their next subscription update, within the refresh interval (12 hours by default); the page says so. A person who also uses AmneziaVPN keys reads one line under the card: the keys are not affected, their DNS is on each server's card.
+
+The pick is written to the audit log as `page_link_dns_choice`: the person's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per link. Turning **DNS choice on the page** off hides the card and keeps the picks made.
 
 ## DNS per server
 
-By default a person has one DNS on every node. The owner can let people choose it per server (node) on their page, from the presets the owner picked for that node. Nothing changes until the owner turns it on and picks presets for a node.
+The DNS of the AmneziaWG keys can differ per server (node): the owner lets people choose it on their page, from the presets the owner picked for that node. Nothing changes until the owner turns it on and picks presets for a node.
 
 ### Setting it up
 
@@ -109,22 +135,23 @@ The first that applies wins:
 |:--|:--|:--|
 | AmneziaVPN and AmneziaWG keys (`.conf`, `vpn://`, QR code) | Yes | The DNS is written inside the key, so the person presses **Get a new key** on their page again. The key itself does not change; the page marks the device "new key needed" with the reason DNS, whenever the DNS that applies to the person on that server differs from the one in the key (their pick, the owner's offered presets or default, an edited or deleted preset). |
 | The AmneziaWG proxies of a Mihomo profile (Clash Verge Rev, FlClash and the like) | Yes | At the next subscription update. |
-| Hysteria2 in Mihomo | No | One resolver for the whole subscription: the user's, the group's or the instance's preset. A person's choice does not reach it. |
+| Hysteria2 in Mihomo | No | One resolver for the whole subscription: the DNS of the apps on the link (see above). A choice per server does not reach it. |
 | Happ | No | The same: one resolver for the whole subscription. |
-| Xray JSON and sing-box JSON | No | The same: the preset of the user, the group or the instance, one for all servers. A person's choice does not reach them. |
+| Xray JSON and sing-box JSON | No | The same: the DNS of the apps on the link, one for all servers. |
 | Other base64 apps (v2rayNG, Hiddify, Streisand, Shadowrocket) | No | They get no DNS from the panel at all. |
 
-The admin warns about it next to the switch: "In Happ and for Hysteria2 in Mihomo the DNS is one for all nodes — it works per node only for AmneziaWG keys."
+The node's block says so: "Happ, the Mihomo apps, Xray JSON and sing-box have one DNS for all nodes: offer it in Subscriptions → User page. Per node it works only for AmneziaWG keys."
 
 ### What the person does and what you see
 
-- The person picks a preset for each server on their page. The choice is written to the audit log as `page_dns_choice`: the person's name, the node's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per link.
-- On the user card, **DNS per server** lists the person's choices per node (read only). **Reset** removes them (the owner and helpers may); it is written to the audit log as `user_dns_choices_reset`. See [Users and groups](users-and-groups.md).
+- On their page the row is called **Key DNS**, with a key icon, and it is shown only to a person who uses AmneziaVPN keys (the app is on for them, or they hold a key), on a server that carries keys. A person who uses only the apps on the link does not see it.
+- The person picks a preset for each server. The choice is written to the audit log as `page_dns_choice`: the person's name, the node's name and the preset, never the link or an address. It counts against the limit shared by all actions on the page: 20 changes an hour per link.
+- On the user card, **DNS picked on the page** lists the person's pick for the apps on the link and their choices per node (read only). **Reset** removes all of them (the owner and helpers may); it is written to the audit log as `user_dns_choices_reset`. See [Users and groups](users-and-groups.md).
 - Turning the switch off does not reset the choices already made: they keep working until you reset them on the user card.
 
 ## How each app receives DNS
 
-This table is about the preset that applies to the person. A per-server choice reaches only some formats: see "DNS per server".
+This table is about the preset that applies to the person: for the apps on the link, the DNS of the apps on the link. A per-server choice reaches only some formats: see "DNS per server".
 
 | App | How the preset arrives | What it can carry |
 |:--|:--|:--|
@@ -150,8 +177,8 @@ Two things on the node side also involve DNS, and neither is a preset (the **DNS
 - **DNS resolvers for this node** in the node's **Settings**: the addresses the node and its VPN engines resolve names with, the names in its users' traffic included. The default, **Server's own resolver**, is an empty list: the node uses whatever the server uses (some hosters allow only their own resolvers). **Yandex DNS** (`77.88.8.8`, `77.88.8.1`), **Cloudflare + Google** (`1.1.1.1`, `8.8.8.8`) and **Custom DNS** (IP addresses of your own, up to 8) are choices you make; pick Yandex DNS for a node in Russia, so Russian services such as gosuslugi.ru resolve reliably. See [Nodes](nodes.md) and [Hysteria2](hysteria2.md).
 - **The server's system resolver** is the host DNS used by apt and certificate renewal. Doctor checks it and can offer to set it to the node's resolvers or, when the node has none, to Yandex DNS in Russia and Cloudflare + Google elsewhere. See [Health](../operations/health.md).
 
-A preset, on the other hand, goes to the apps in the subscription and is the same on every node the person can use, unless the person chose a DNS per server (see "DNS per server"): switching servers does not change it. For example, **Russia: .ru direct** sends Russian domains to Yandex DNS directly and everything else to Cloudflare and Google through the VPN, whichever node the person is on.
+A preset, on the other hand, goes to the apps in the subscription and is the same on every node the person can use, unless the person chose a DNS for the keys of a server (see "DNS per server"): switching servers does not change it. For example, **Russia: .ru direct** sends Russian domains to Yandex DNS directly and everything else to Cloudflare and Google through the VPN, whichever node the person is on.
 
 ## Who can do what
 
-Creating, editing and deleting presets are for the owner: a preset decides which resolvers people's traffic trusts. The owner and helpers choose the default for everyone (it is a subscription setting) and pick a preset for a user or a group. Every admin can see the presets. Choosing the presets a node offers is for the owner; resetting a person's per-server choices is for the owner and helpers; every admin can read them. MCP tokens cannot do any of this.
+Creating, editing and deleting presets are for the owner: a preset decides which resolvers people's traffic trusts. The owner and helpers choose the default for everyone and the presets offered for the apps on the link (both are subscription settings) and pick a preset for a user or a group. Every admin can see the presets. Choosing the presets a node offers is for the owner; resetting a person's choices on the page is for the owner and helpers; every admin can read them. MCP tokens cannot do any of this.

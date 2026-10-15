@@ -251,7 +251,7 @@ A fresh panel recommends kl!ck on Windows and macOS (Happ second) and Happ on iO
 | **QR for a second device** | on | Handy when the link is on a phone. |
 | **Password on the page** | on | Every person's page asks for a password, once per device. Apps fetch the subscription without one. |
 | **Devices on the page** | on | People add, re-key and remove their own AmneziaWG devices on their page, within their device limit. |
-| **DNS choice on the page** | off | People pick the DNS per server on their page, from the presets the owner offers on each node. Works per server only for AmneziaWG keys. See [DNS](dns.md) and [User page](user-page.md). |
+| **DNS choice on the page** | off | People pick on their page one DNS for the apps on the link, from the presets listed under the switch (**DNS for the apps on the link**), and the DNS of the AmneziaWG keys of each server, from the presets the owner offers on each node. See [DNS](dns.md) and [User page](user-page.md). |
 
 Rules are saved as soon as you add, move or remove one. On **Names & texts** and **User page**, changes wait for **Save** in the bar at the bottom (**Discard** drops them). Either way they apply at the next fetch, without a restart.
 
