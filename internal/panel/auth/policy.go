@@ -151,9 +151,10 @@ var procedureLevels = map[string]level{
 	adminv1connect.TspuProbeServiceDisconnectTspuProbeProcedure: levelOwner, // also needs a step-up
 	adminv1connect.TspuProbeServiceTestTspuProbeProcedure:       levelOwner,
 	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,
-	// so no step-up. Not open to tokens.
+	// so no step-up. Not open to tokens. The history of the verdicts is a read like GetChecks: every role, and tokens.
 	adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure:    levelOwner,
 	adminv1connect.CountryReachabilityServiceUpdateCountryReachabilityProcedure: levelOwner,
+	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure:    levelRead,
 
 	// UpdateService: the page is readable by everyone; every change decides what code runs as root on all
 	// nodes (or on the panel itself), so it is owner-only and the handler also requires a fresh step-up

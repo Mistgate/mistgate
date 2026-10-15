@@ -49,6 +49,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:    TokenAccessDirect,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
+	// The country verdicts of GetChecks over time (the Reachability page), read like them.
+	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,

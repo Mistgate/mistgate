@@ -22,6 +22,8 @@ func TestHealthServiceRolePolicy(t *testing.T) {
 		{"RunChecksNow", adminv1connect.HealthServiceRunChecksNowProcedure, true, true, false},
 		{"RunDoctor", adminv1connect.HealthServiceRunDoctorProcedure, true, true, false},
 		{"ApplyFix", adminv1connect.HealthServiceApplyFixProcedure, true, false, false},
+		// the Reachability page's history: the country verdicts of GetChecks over time, read like them
+		{"GetReachabilityHistory", adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure, true, true, true},
 	} {
 		if _, listed := procedureLevels[tc.path]; !listed {
 			t.Errorf("%s has no explicit level (it would silently be owner-only)", tc.name)
@@ -32,5 +34,16 @@ func TestHealthServiceRolePolicy(t *testing.T) {
 				t.Errorf("%s as %s: allowed = %v, want %v", tc.name, role, got, want)
 			}
 		}
+	}
+}
+
+// The history is open to tokens exactly as GetChecks is; the country itself stays the owner's and closed to them.
+func TestReachabilityHistoryTokenAccessIsGetChecks(t *testing.T) {
+	want, ok := TokenAccess(adminv1connect.HealthServiceGetChecksProcedure)
+	if got, gotOK := TokenAccess(adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure); !ok || gotOK != ok || got != want {
+		t.Errorf("TokenAccess(GetReachabilityHistory) = %d %v, GetChecks = %d %v", got, gotOK, want, ok)
+	}
+	if _, open := TokenAccess(adminv1connect.CountryReachabilityServiceGetCountryReachabilityProcedure); open {
+		t.Error("GetCountryReachability is open to tokens")
 	}
 }

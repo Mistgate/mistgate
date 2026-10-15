@@ -822,6 +822,26 @@ async function run() {
     assert.equal(tokens.response.status, 200, "the API-token admin RPC stays available on the edge");
     assert.ok(tokens.message.nowUnix, "the API-token RPC returns its current time");
 
+    // The Reachability page's history on D1: every source off says nothing; with the block lists on, their checks of the week
+    // come back as a lane, consecutive equal verdicts as one point.
+    const quiet = await connectRPC(secondPanel, "CountryReachabilityService/GetReachabilityHistory", {}, adminCookie);
+    assert.equal(quiet.response.status, 200, "the history RPC answers on the edge");
+    assert.equal(quiet.message.country, "RU", "the history names the country");
+    assert.ok(!quiet.message.sources && !quiet.message.nodes, "every source off: no sources, no nodes");
+    const nowS = Math.floor(Date.now() / 1000);
+    const hour = (n) => nowS - n * 3600;
+    await globalThis.__d1.prepare("INSERT INTO setting (k, v) VALUES ('blocklist.enabled', '1')").run();
+    for (const [at, listed] of [[hour(30), 0], [hour(24), 1], [hour(18), 1], [hour(24 * 9), 1]]) {
+      await globalThis.__d1.prepare("INSERT INTO country_blocklist_check (node_id, at, in_rkn, rkn_subnet, listed_by, cdn_provider, cdn_region, lists_at) VALUES (?, ?, ?, '', ?, '', '', 0)")
+        .bind("nod_hist", at, listed, listed ? "antifilter_ipsum" : "").run();
+    }
+    const week = await connectRPC(secondPanel, "CountryReachabilityService/GetReachabilityHistory", { days: 7 }, adminCookie);
+    assert.deepEqual(week.message.sources, ["lists"], "the block lists are the one source on");
+    assert.deepEqual(week.message.nodes?.[0]?.lanes?.[0]?.points?.map((p) => [Number(p.atUnix), p.verdict]),
+      [[hour(30), "COUNTRY_VERDICT_OK"], [hour(24), "COUNTRY_VERDICT_LISTED"]], "the lists' lane, compacted, without the check older than the week");
+    await globalThis.__d1.prepare("DELETE FROM setting WHERE k = 'blocklist.enabled'").run();
+    await globalThis.__d1.prepare("DELETE FROM country_blocklist_check").run();
+
     // Seed the node fixture like the Go subscription fixtures, then create the profiles and access rows through the admin API.
     await globalThis.__d1.prepare("INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, ?, ?)")
       .bind("nod_bridge", "node de", "de.example.com", "active", 1).run();

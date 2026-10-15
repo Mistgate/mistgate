@@ -1,6 +1,6 @@
-// Package countryreach holds the one setting that every source of the country check shares: the country to look from. The
-// Globalping integration reads it today; block lists and an in-country probe will read it later, which is why it is not a
-// setting of any of them.
+// Package countryreach holds the one setting that every source of the country check shares: the country to look from (Globalping,
+// the block lists and the TSPU probe all read it, which is why it is not a setting of any of them), and the history of what the
+// sources said, which the Reachability page draws.
 package countryreach
 
 import (
@@ -28,22 +28,30 @@ const (
 
 var countryRe = regexp.MustCompile(`^[A-Za-z]{2}$`)
 
+// HistoryDays is the longest history GetReachabilityHistory returns: the sources keep their results for 7 days.
+const HistoryDays = 7
+
+// History reads what the sources that are on said of each node since a time (health.Service.CountryHistory, which knows which
+// sources are on; this service is built before it).
+type History func(ctx context.Context, since time.Time) (sources []string, nodes []*adminv1.NodeReachabilityHistory, err error)
+
 // Service is the country setting and its admin API.
 type Service struct {
-	st  *store.Store
-	log *slog.Logger
-	now func() time.Time
+	st      *store.Store
+	log     *slog.Logger
+	now     func() time.Time
+	history History
 }
 
-// New builds the service.
-func New(st *store.Store, log *slog.Logger, now func() time.Time) *Service {
+// New builds the service. A nil history answers GetReachabilityHistory with no sources.
+func New(st *store.Store, log *slog.Logger, now func() time.Time, history History) *Service {
 	if log == nil {
 		log = slog.Default()
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{st: st, log: log, now: now}
+	return &Service{st: st, log: log, now: now, history: history}
 }
 
 // Country is the country to look from, upper case; the default when nothing valid is stored or the store cannot be read.
@@ -104,4 +112,24 @@ func (r rpc) UpdateCountryReachability(ctx context.Context, req *connect.Request
 		s.log.Warn("countryreach: audit", "err", err)
 	}
 	return connect.NewResponse(&adminv1.UpdateCountryReachabilityResponse{Settings: &adminv1.CountryReachability{Country: c}}), nil
+}
+
+// GetReachabilityHistory is a read like HealthService.GetChecks (policy.go): every role and API tokens, no owner check here.
+func (r rpc) GetReachabilityHistory(ctx context.Context, req *connect.Request[adminv1.GetReachabilityHistoryRequest]) (*connect.Response[adminv1.GetReachabilityHistoryResponse], error) {
+	s := r.s
+	days := req.Msg.Days
+	if days == 0 || days > HistoryDays {
+		days = HistoryDays
+	}
+	now := s.now()
+	since := now.Add(-time.Duration(days) * 24 * time.Hour)
+	out := &adminv1.GetReachabilityHistoryResponse{Country: s.Country(ctx), SinceUnix: since.Unix(), NowUnix: now.Unix()}
+	if s.history != nil {
+		var err error
+		if out.Sources, out.Nodes, err = s.history(ctx, since); err != nil {
+			s.log.Error("countryreach: read the history", "err", err)
+			return nil, fail(connect.CodeInternal, "internal error")
+		}
+	}
+	return connect.NewResponse(out), nil
 }

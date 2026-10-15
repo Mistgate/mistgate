@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -19,7 +20,7 @@ func newService(t *testing.T) (*Service, *store.Store) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	return New(st, nil, nil), st
+	return New(st, nil, nil, nil), st
 }
 
 func ownerCtx() context.Context {
@@ -81,5 +82,43 @@ func TestOnlyTheOwnerMayCallIt(t *testing.T) {
 	}
 	if s.Country(context.Background()) != "RU" {
 		t.Fatal("a refused call changed the country")
+	}
+}
+
+// The history: days 1..7 back from now (0 and more than 7 are 7), the country, and what the health module says of the sources.
+// It is a read like GetChecks, so no role and no token is refused here (the policy table lets every role and tokens in).
+func TestGetReachabilityHistory(t *testing.T) {
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	var asked time.Time
+	s := New(st, nil, func() time.Time { return now }, func(_ context.Context, since time.Time) ([]string, []*adminv1.NodeReachabilityHistory, error) {
+		asked = since
+		return []string{"lists"}, []*adminv1.NodeReachabilityHistory{{NodeId: "nod_se1"}}, nil
+	})
+	for _, tc := range []struct{ days, want uint32 }{{0, 7}, {1, 1}, {7, 7}, {30, 7}} {
+		r, err := rpc{s}.GetReachabilityHistory(ownerCtx(), connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{Days: tc.days}))
+		since := now.Add(-time.Duration(tc.want) * 24 * time.Hour)
+		if err != nil || !asked.Equal(since) || r.Msg.SinceUnix != since.Unix() || r.Msg.NowUnix != now.Unix() || r.Msg.Country != "RU" ||
+			len(r.Msg.Sources) != 1 || len(r.Msg.Nodes) != 1 {
+			t.Errorf("days %d: %+v, %v, asked since %v", tc.days, r, err, asked)
+		}
+	}
+	for name, ctx := range map[string]context.Context{
+		"helper":   auth.WithAdmin(context.Background(), store.Admin{ID: "adm_h", Role: store.RoleHelper}),
+		"readonly": auth.WithAdmin(context.Background(), store.Admin{ID: "adm_r", Role: store.RoleReadonly}),
+		"token":    auth.WithAdmin(context.Background(), store.Admin{ID: "token:tok_1", Role: store.RoleReadonly}),
+	} {
+		if _, err := (rpc{s}).GetReachabilityHistory(ctx, connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{})); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	// without the health module there are no sources, only the window and the country
+	r, err := rpc{New(st, nil, nil, nil)}.GetReachabilityHistory(ownerCtx(), connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{}))
+	if err != nil || len(r.Msg.Sources) != 0 || len(r.Msg.Nodes) != 0 || r.Msg.Country != "RU" {
+		t.Fatalf("no history: %+v, %v", r, err)
 	}
 }
