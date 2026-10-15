@@ -66,14 +66,23 @@ export type ServerEntry = {
   load: LoadLevel | null;
   dns: ServerDns | null;
 };
-export type DnsPreset = { id: string; name: string; description: string; category: string };
+/**
+ * A preset the page names. `name` and `description` are in the language of the browser; `names` and `descriptions` hold the
+ * stock words of a built-in preset in every page language (absent for an owner's own text), so a page switched to another
+ * language than the browser's shows its own.
+ */
+export type DnsPreset = { id: string; name: string; description: string; category: string; names?: Partial<Record<Lang, string>>; descriptions?: Partial<Record<Lang, string>> };
+/**
+ * The DNS of the apps that use the link: one for all servers. `effective` is what they get, `choice` the person's pick ("" =
+ * none), `default` what they get without one, `options` what the owner offers (empty: no choice).
+ */
+export type LinkDns = { effective: string; choice: string; default: string; options: string[] };
 export type DnsInfo = {
   enabled: boolean;
   /** Where the choice is posted ("" in the admin's preview and when the choice is off). */
   endpoint: string;
   refresh_hours: number;
-  /** `per_server` false: the apps that use the link have one DNS for all servers; `effective` is that preset. */
-  link: { per_server: boolean; effective: string };
+  link: LinkDns;
 };
 
 /**

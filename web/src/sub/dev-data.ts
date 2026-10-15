@@ -133,7 +133,7 @@ const ams: ServerEntry = {
 const hel: ServerEntry = { id: "nod_hel", country_code: "FI", place: "", label: "Финляндия", app_names: ["FI · Hysteria2"], connections: [{ way: "link", exit: "direct", app_name: "FI · Hysteria2", profile_id: "" }], online: false, load: null, dns: null };
 const ber: ServerEntry = { id: "nod_ber", country_code: "DE", place: "Берлин", label: "Германия · Берлин", app_names: ["DE · Hysteria2 2"], connections: [{ way: "link", exit: "direct", app_name: "DE · Hysteria2 2", profile_id: "" }], online: true, load: null, dns: dnsOf("dns_adblock", ["dns_adblock", "dns_standard"]) };
 const mow: ServerEntry = { id: "nod_mow", country_code: "RU", place: "Москва", label: "Россия · Москва", app_names: [], connections: [{ way: "key", exit: "direct", app_name: "", profile_id: "p31" }], online: true, load: "medium", dns: dnsOf("dns_yandex", ["dns_yandex"]) };
-const dnsOn: DnsInfo = { enabled: true, endpoint: "dev:", refresh_hours: 12, link: { per_server: false, effective: "dns_adblock" } };
+const dnsOn: DnsInfo = { enabled: true, endpoint: "dev:", refresh_hours: 12, link: { effective: "dns_adblock", choice: "", default: "dns_adblock", options: [] } };
 
 const base: MgData = {
   v: 1,
@@ -310,12 +310,10 @@ export const cases: Record<string, MgData> = {
   noapps: { ...base, apps: [], access: { happ: false, amnezia: false }, amnezia: null, devices: [] },
   // an older panel: no servers[], no dns; the cards come from server_loads and there is no DNS part
   old: { ...base, servers: [], dns: null, dns_presets: [], devices: shared(30, true), amnezia: amz([pixel]), user: withUser({ devices_used: 2 }) },
-  // the DNS choice works for every app that uses the link: no remark above the list
-  "per-server": { ...returning, dns: { ...dnsOn, link: { per_server: true, effective: "dns_adblock" } }, servers: [fra, ams, hel, ber, mow] },
   // the owner has not turned the DNS choice on: the rows only say what applies
   "dns-off": { ...returning, dns: { ...dnsOn, enabled: false, endpoint: "" } },
   // server variants: no load level, a key-only server, one that is down
-  variants: { ...returning, servers: [fra, ams, ber, mow, hel], dns: { ...dnsOn, link: { per_server: true, effective: "dns_adblock" } } },
+  variants: { ...returning, servers: [fra, ams, ber, mow, hel] },
   long: {
     ...base,
     title: "Мой очень длинный VPN для друзей и семьи",
@@ -326,9 +324,84 @@ export const cases: Record<string, MgData> = {
   },
 };
 
+// ---- one DNS for the link apps, one per server for the keys (alice, servers de1 and nl1) ----
+// The built-in presets as the server sends them: the stock name and description in the three languages, and `name` /
+// `description` in the language of the browser (Accept-Language), which devPage puts in from `lang`.
+const stock = (id: string, category: string, name: [string, string, string], description: [string, string, string]): DnsPreset => ({
+  id,
+  name: name[0],
+  description: description[0],
+  category,
+  names: { ru: name[0], en: name[1], zh: name[2] },
+  descriptions: { ru: description[0], en: description[1], zh: description[2] },
+});
+const builtins: DnsPreset[] = [
+  stock("dns_builtin_standard", "regular", ["Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"], ["Cloudflare и Google для всего", "Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google"]),
+  stock("dns_builtin_adblock", "no_ads", ["AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告"], ["AdGuard DNS: без рекламы и трекеров", "AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器"]),
+  stock("dns_builtin_family", "family", ["AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容"], ["AdGuard Family: без рекламы и сайтов для взрослых", "AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站"]),
+  stock("dns_builtin_ru_split", "russia", ["Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连"], ["Российские сайты напрямую, остальное через VPN", "Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN"]),
+];
+const keyDns = (): ServerEntry["dns"] => ({ choice: "", effective: "dns_builtin_standard", options: ["dns_builtin_standard", "dns_builtin_adblock", "dns_builtin_family"], default: "dns_builtin_standard", keys_to_refresh: [] });
+const de1: ServerEntry = {
+  id: "de1",
+  country_code: "DE",
+  place: "",
+  label: "Германия",
+  app_names: ["DE · Hysteria2", "DE · Hysteria2 WARP"],
+  connections: [
+    { way: "link", exit: "direct", app_name: "DE · Hysteria2", profile_id: "" },
+    { way: "link", exit: "warp", app_name: "DE · Hysteria2 WARP", profile_id: "" },
+    { way: "key", exit: "direct", app_name: "", profile_id: "p31" },
+  ],
+  online: true,
+  load: "low",
+  dns: keyDns(),
+};
+const nl1: ServerEntry = {
+  id: "nl1",
+  country_code: "NL",
+  place: "",
+  label: "Нидерланды",
+  app_names: ["NL · Hysteria2"],
+  connections: [
+    { way: "link", exit: "direct", app_name: "NL · Hysteria2", profile_id: "" },
+    { way: "key", exit: "direct", app_name: "", profile_id: "p31" },
+  ],
+  online: true,
+  load: "medium",
+  dns: keyDns(),
+};
+const linkOnlyServer = (s: ServerEntry): ServerEntry => ({ ...s, connections: s.connections.filter((x) => x.way === "link") });
+const linkDns = (options: string[], choice = ""): DnsInfo => ({
+  enabled: true,
+  endpoint: "dev:",
+  refresh_hours: 12,
+  link: { effective: choice || "dns_builtin_standard", choice, options, default: "dns_builtin_standard" },
+});
+const offered = ["dns_builtin_standard", "dns_builtin_adblock", "dns_builtin_family", "dns_builtin_ru_split"];
+const alice = withUser({ name: "alice", devices_used: 2, device_limit: 5 });
+const dnsBoth: MgData = {
+  ...returning,
+  user: alice,
+  server_count: 2,
+  server_loads: [],
+  servers: [de1, nl1],
+  dns: linkDns(offered),
+  dns_presets: builtins,
+  devices: [...shared(3 * hour, true), asDevice(pixel)],
+  amnezia: keys([pixel]),
+};
+cases["dns-both"] = dnsBoth;
+// the apps on the link alone: the DNS of the keys means nothing to this person
+cases["dns-link"] = { ...dnsBoth, access: { happ: true, amnezia: false }, amnezia: null, devices: [...shared(3 * hour, true), iphone], servers: [linkOnlyServer(de1), linkOnlyServer(nl1)] };
+// the owner offers nothing for the link apps: the note about the link apps stays, the keys keep their choice per server
+cases["dns-both-off"] = { ...dnsBoth, dns: linkDns([]) };
+
 export function devPage(query: string): MgData {
   const p = new URLSearchParams(query);
   const c = cases[p.get("case") ?? ""] ?? base;
   const lang = p.get("lang");
-  return lang === "en" || lang === "zh" ? { ...c, lang } : c;
+  const out: MgData = lang === "en" || lang === "zh" ? { ...c, lang } : c;
+  // the server words the built-in presets in the language of the browser; the page may be switched to another one
+  return { ...out, dns_presets: out.dns_presets.map((x) => (x.names ? { ...x, name: x.names[out.lang] ?? x.name, description: x.descriptions?.[out.lang] ?? x.description } : x)) };
 }

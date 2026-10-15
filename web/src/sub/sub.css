@@ -330,10 +330,11 @@ a { color: inherit; }
 .srv-app .mono { font-size: 12px; font-weight: 700; color: var(--text); background: var(--surface-2); padding: 3px 7px; border-radius: 7px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .dns { display: flex; align-items: center; gap: 10px; margin: auto -16px 0; padding: 4px 6px 4px 16px; border-top: 1px solid var(--border); min-height: 54px; }
 .dns .k { font-size: 13px; font-weight: 700; color: var(--muted); flex: none; }
+.dns > .i { color: var(--tone-mint); flex: none; }
 .dns .v { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; font-weight: 600; padding: 8px 0; }
 .dns .v small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
 .dns .tlink { padding: 0 10px; }
-.dns .busy { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.dns .busy, .dns-link .busy { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 14px; font-weight: 700; color: var(--muted); }
 .dns.plain { padding-right: 16px; }
 .dns-note { margin: 0 0 16px; }
 .dns-keys { display: flex; flex-direction: column; gap: 14px; margin: 0 -16px; padding: 16px; border-top: 1px solid var(--warning-line); background: color-mix(in oklch, var(--warning) 6%, var(--surface)); }
@@ -342,6 +343,17 @@ a { color: inherit; }
 .dns-keys-row + .dns-keys-row { border-top: 1px solid var(--border); }
 .dns-keys-row .btn { min-height: 44px; padding: 8px 14px; }
 .dns-err { margin: 0 16px 16px; }
+/* the DNS of the link apps: one card above the servers, for all of them */
+.dns-link { padding: 14px 6px 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.dns-link-top { display: flex; align-items: flex-start; gap: 12px; }
+.dns-link-top h3 { font-size: 15px; line-height: 1.35; margin: 7px 10px 0 0; overflow-wrap: anywhere; }
+.dns-link-row { display: flex; align-items: center; gap: 8px; }
+.dns-link-v { font-size: 14px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.dns-link-v .hint { display: block; font-weight: 400; }
+.dns-link .tlink { padding: 0 10px; flex: none; }
+.dns-link-keys { margin-right: 10px; padding-top: 12px; border-top: 1px solid var(--border); align-items: flex-start; }
+.dns-link-keys > .i { margin-top: 2px; color: var(--tone-mint); flex: none; }
+.dns-link > .note { margin-right: 10px; }
 .srv.off { background: transparent; border-style: dashed; }
 .srv.off .srv-name { color: var(--muted); }
 .srv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }

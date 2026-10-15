@@ -60,15 +60,15 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
 });
 
 export type DnsState = {
-  /** The server whose DNS picker is open. */
+  /** The server whose DNS picker is open, or LINK (logic.ts) for the one of the apps that use the link. */
   open: string | null;
-  /** The preset picked in it ("" = the server's default). */
+  /** The preset picked in it ("" = the default). */
   pick: string;
-  /** The server whose choice is being saved. */
+  /** The server (or LINK) whose choice is being saved. */
   busy: string;
   /** The last failure, where it happened. */
   error: { server: string; code: string; retryMin: number; preset: string } | null;
-  /** Servers whose choice was just saved: the card says what happens next. */
+  /** Servers (and LINK) whose choice was just saved: the card says what happens next. */
   done: Record<string, true>;
 };
 

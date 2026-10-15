@@ -1,7 +1,7 @@
 import type { Api } from "./amz-actions";
 import { ApiError, type Answer, type DnsAnswer } from "./api";
 import type { DnsApi } from "./dns-actions";
-import { awgConfig, awgDevice, serverEntry } from "./logic";
+import { awgConfig, awgDevice, linkDns, serverEntry } from "./logic";
 import type { ServerEntry } from "./types";
 
 // DEV SERVER ONLY (main.ts reaches this through `import.meta.env.DEV`, a build drops it): answers the self-service calls
@@ -73,15 +73,19 @@ export async function devUnlock(_url: string, password: string): Promise<void> {
   throw new ApiError(401, "wrong_password", 0, 3 - wrong);
 }
 
-// the page's own data, to answer a DNS choice with the server as it would be afterwards
-const pageServers = (): ServerEntry[] => {
+// the page's own data, to answer a DNS choice with the server (or the link apps' DNS) as it would be afterwards
+const pageData = (): { servers?: unknown; dns?: { link?: unknown } } => {
   try {
-    const raw = JSON.parse(document.getElementById("mg-data")?.textContent ?? "{}") as { servers?: unknown };
-    return Array.isArray(raw.servers) ? raw.servers.map(serverEntry) : [];
+    return JSON.parse(document.getElementById("mg-data")?.textContent ?? "{}") as { servers?: unknown; dns?: { link?: unknown } };
   } catch {
-    return [];
+    return {};
   }
 };
+const pageServers = (): ServerEntry[] => {
+  const raw = pageData();
+  return Array.isArray(raw.servers) ? raw.servers.map(serverEntry) : [];
+};
+const pageLink = () => linkDns(pageData().dns?.link);
 
 export const devApi: Api & DnsApi = {
   async renameDevice(_e, id, label): Promise<Answer> {
@@ -90,6 +94,11 @@ export const devApi: Api & DnsApi = {
   },
   async setDns(_e, body): Promise<DnsAnswer> {
     await pause();
+    if ("link" in body) {
+      const link = pageLink();
+      if (body.preset && !link.options.includes(body.preset)) throw new ApiError(409, "not_allowed");
+      return { server: undefined, link: { ...link, choice: body.preset, effective: body.preset || link.default }, stale_devices: [] };
+    }
     const srv = pageServers().find((x) => x.id === body.server);
     if (!srv?.dns) throw new ApiError(404, "not_found");
     if (body.preset && !srv.dns.options.includes(body.preset)) throw new ApiError(409, "not_allowed");

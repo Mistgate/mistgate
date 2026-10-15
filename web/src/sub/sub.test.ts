@@ -91,14 +91,14 @@ describe("normalize", () => {
         { id: "n2", online: false, load: "heavy", dns: null },
         { id: "n3", label: "Somewhere", online: true },
       ],
-      dns: { enabled: true, endpoint: "https://x/dns", refresh_hours: 0, link: { per_server: true, effective: "a" } },
+      dns: { enabled: true, endpoint: "https://x/dns", refresh_hours: 0, link: { per_server: false, effective: "a", choice: "b", default: "a", options: ["a", "b", 3] } },
       dns_presets: [{ id: "a", name: "A", description: "d" }, { id: "", name: "x" }, { id: "b" }],
     });
     expect(d.servers.map((s) => s.id)).toEqual(["n1", "n3"]); // no country and no label: nothing to call it
     expect(d.servers[0]).toMatchObject({ country_code: "DE", load: "high", connections: [{ way: "key", exit: "warp", profile_id: "p" }, { way: "link", exit: "direct" }] });
     expect(d.servers[0]!.dns).toMatchObject({ choice: "a", effective: "b", options: ["a", "b"], keys_to_refresh: ["d1"], default: "" });
     expect(d.servers[1]!.load).toBeNull();
-    expect(d.dns).toEqual({ enabled: true, endpoint: "https://x/dns", refresh_hours: 12, link: { per_server: true, effective: "a" } });
+    expect(d.dns).toEqual({ enabled: true, endpoint: "https://x/dns", refresh_hours: 12, link: { effective: "a", choice: "b", default: "a", options: ["a", "b"] } });
     expect(d.dns_presets.map((p) => p.id)).toEqual(["a"]);
     expect(normalize({ dns: "yes" }).dns).toBeNull();
   });

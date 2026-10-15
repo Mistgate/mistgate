@@ -11,6 +11,7 @@ import type {
   DnsPreset,
   Kind,
   Lang,
+  LinkDns,
   LinkMode,
   LoadLevel,
   MgData,
@@ -127,18 +128,33 @@ export function serverEntry(raw: unknown): ServerEntry {
   };
 }
 
-const dnsPreset = (p: Record<string, unknown>): DnsPreset => ({ id: str(p.id), name: str(p.name), description: str(p.description), category: str(p.category) });
+/** A text in the page's languages: only the strings of the languages the page has. */
+function inLangs(raw: unknown): Partial<Record<Lang, string>> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Partial<Record<Lang, string>> = {};
+  for (const [k, v] of Object.entries(raw)) if (isLang(k) && typeof v === "string" && v.trim()) out[k] = v;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+const dnsPreset = (p: Record<string, unknown>): DnsPreset => {
+  const out: DnsPreset = { id: str(p.id), name: str(p.name), description: str(p.description), category: str(p.category) };
+  const names = inLangs(p.names);
+  const descriptions = inLangs(p.descriptions);
+  if (names) out.names = names;
+  if (descriptions) out.descriptions = descriptions;
+  return out;
+};
+
+/** The DNS of the apps that use the link, as the page data and the DNS answer carry it. */
+export function linkDns(raw: unknown): LinkDns {
+  const x = rec(raw);
+  return { effective: str(x.effective), choice: str(x.choice), default: str(x.default), options: strs(x.options) };
+}
 
 function dnsInfo(raw: unknown): DnsInfo | null {
   if (!raw || typeof raw !== "object") return null;
   const x = rec(raw);
-  const link = rec(x.link);
-  return {
-    enabled: x.enabled === true,
-    endpoint: str(x.endpoint),
-    refresh_hours: num(x.refresh_hours) || 12,
-    link: { per_server: link.per_server === true, effective: str(link.effective) },
-  };
+  return { enabled: x.enabled === true, endpoint: str(x.endpoint), refresh_hours: num(x.refresh_hours) || 12, link: linkDns(x.link) };
 }
 
 /** Turns whatever the server embedded into a complete MgData: a missing or malformed field gets a safe default. */
@@ -464,8 +480,15 @@ export function defaultLabel(platform: string, taken: string[], t: Dict): string
 // --- DNS ---------------------------------------------------------------------------------------------------
 
 export const dnsPresetOf = (d: MgData, id: string): DnsPreset | undefined => d.dns_presets.find((p) => p.id === id);
+/** A preset's name in the language of the page (which the visitor may have switched from the browser's one). */
+export const presetName = (p: DnsPreset, lang: Lang): string => p.names?.[lang] || p.name;
+/** A preset's description in the language of the page. */
+export const presetDescription = (p: DnsPreset, lang: Lang): string => p.descriptions?.[lang] ?? describePreset(p.description, lang);
 /** A preset's name for the page; "" when the id is unknown. */
-export const dnsName = (d: MgData, id: string): string => dnsPresetOf(d, id)?.name ?? "";
+export const dnsName = (d: MgData, id: string, lang: Lang): string => {
+  const p = dnsPresetOf(d, id);
+  return p ? presetName(p, lang) : "";
+};
 
 /** The preset a server falls back to when nothing was chosen: what the server says, else what applies now when nothing is chosen, else the first allowed. */
 export function dnsDefault(s: ServerDns): string {
@@ -476,22 +499,55 @@ export function dnsDefault(s: ServerDns): string {
 export const hasKeys = (s: ServerEntry) => s.connections.some((c) => c.way === "key");
 export const hasLink = (s: ServerEntry) => s.connections.some((c) => c.way === "link");
 
-/** The choice may be made on this card: the owner turned it on, the page has an address to post to, there is something to choose from,
- * and the choice reaches something (the link apps share one DNS while `per_server` is off: then it is for the keys). */
+/** The person uses the AmneziaVPN keys: the app is on for them, or they hold a key. */
+export const usesKeys = (d: MgData) => d.access.amnezia || (d.amnezia?.devices.length ?? 0) > 0;
+
+/**
+ * The DNS of a server is about its AmneziaVPN keys (the link apps have one DNS for all servers): the card shows it to a person
+ * who uses the keys, on a server that has them.
+ */
+export const showsKeyDns = (d: MgData, s: ServerEntry) => s.dns !== null && hasKeys(s) && usesKeys(d);
+
+/** The choice may be made on this card: the row is shown, the owner turned it on, the page has an address to post to and there is something to choose from. */
 export function canChooseDns(d: MgData, s: ServerEntry): boolean {
-  if (!d.dns || !d.dns.enabled || d.dns.endpoint === "" || !s.dns || s.id === "") return false;
-  return dnsChoices(d, s, "ru").length > 1 && (d.dns.link.per_server || hasKeys(s));
+  if (!d.dns || !d.dns.enabled || d.dns.endpoint === "" || !s.dns || s.id === "" || !showsKeyDns(d, s)) return false;
+  return dnsChoices(d, s, "ru").length > 1;
 }
 
-/** What the picker lists: the server's default first, then the other allowed presets that the page knows. */
-export function dnsChoices(d: MgData, s: ServerEntry, lang: Lang): { id: string; name: string; description: string; isDefault: boolean }[] {
-  if (!s.dns) return [];
-  const def = dnsDefault(s.dns);
-  const ids = [...new Set([def, ...s.dns.options].filter(Boolean))];
+export type DnsChoice = { id: string; name: string; description: string; isDefault: boolean };
+
+/** The choices of a picker: the default first, then the other offered presets that the page knows. */
+function choicesOf(d: MgData, def: string, options: string[], lang: Lang): DnsChoice[] {
+  const ids = [...new Set([def, ...options].filter(Boolean))];
   return ids.flatMap((id) => {
     const p = dnsPresetOf(d, id);
-    return p ? [{ id, name: p.name, description: describePreset(p.description, lang), isDefault: id === def }] : [];
+    return p ? [{ id, name: presetName(p, lang), description: presetDescription(p, lang), isDefault: id === def }] : [];
   });
+}
+
+/** What the picker of a server lists: the server's default first, then the other allowed presets that the page knows. */
+export function dnsChoices(d: MgData, s: ServerEntry, lang: Lang): DnsChoice[] {
+  return s.dns ? choicesOf(d, dnsDefault(s.dns), s.dns.options, lang) : [];
+}
+
+/** The picker of the link apps is open (DnsState.open): no server id can be it. */
+export const LINK = "@link";
+
+/** What the picker of the link apps lists: what they get without a pick first, then what the owner offers. */
+export const linkChoices = (d: MgData, lang: Lang): DnsChoice[] => (d.dns ? choicesOf(d, d.dns.link.default, d.dns.link.options, lang) : []);
+
+/** The page shows the DNS of the link apps as a choice: the person uses them and the owner offers more than one way. */
+export function showsLinkDns(d: MgData): boolean {
+  if (!d.dns || !d.dns.enabled || d.dns.link.options.length === 0 || !d.access.happ) return false;
+  return linkChoices(d, "ru").length > 1;
+}
+
+/** ...and the page can post the pick (not in the owner's preview). */
+export const canChooseLinkDns = (d: MgData): boolean => showsLinkDns(d) && d.dns!.endpoint !== "";
+
+/** The link app the page names first for this platform (the recommended one), else any; "" when the settings name none. */
+export function linkAppName(d: MgData, platform: Platform | null): string {
+  return appsFor(d, platform, "happ")[0]?.name || d.apps.find((a) => a.kind === "happ")?.name || "";
 }
 
 /** A preset description: the built-in ones hold "ru text\nen text" in one field. */
