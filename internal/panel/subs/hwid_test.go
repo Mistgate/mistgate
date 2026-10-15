@@ -130,3 +130,25 @@ func TestBrowserHWIDMakesNoDevice(t *testing.T) {
 		t.Fatalf("devices = %d, %v; want none", devices, err)
 	}
 }
+
+// A link pasted into Telegram or WhatsApp is opened by the messenger's server for a preview: it gets the decoy, not the
+// subscription, and takes no device (it used to show as an app without a device ID, "TelegramBot").
+func TestLinkPreviewBotGetsTheDecoyAndMakesNoDevice(t *testing.T) {
+	r := newRig(t, "/k3xq8")
+	h, _ := r.handler(nil)
+	uid, tok := r.user("alice", nil)
+	for _, ua := range []string{"TelegramBot (like TwitterBot)", "WhatsApp/2.24.6.77 A", "facebookexternalhit/1.1", "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"} {
+		if rec := fetch(h, "/"+tok, ua); rec.Code != 404 || rec.Body.String() != decoyBody {
+			t.Errorf("%s: %d %q", ua, rec.Code, rec.Body.String())
+		}
+	}
+	var devices int
+	if err := r.st.R.QueryRow(`SELECT count(*) FROM device WHERE user_id = ?`, uid).Scan(&devices); err != nil || devices != 0 {
+		t.Fatalf("devices = %d, %v; want none", devices, err)
+	}
+	// the control: an app with no device ID makes the shared device
+	fetch(h, "/"+tok, "Happ/3.2.1")
+	if err := r.st.R.QueryRow(`SELECT count(*) FROM device WHERE user_id = ?`, uid).Scan(&devices); err != nil || devices != 1 {
+		t.Fatalf("after an app: devices = %d, %v; want one", devices, err)
+	}
+}

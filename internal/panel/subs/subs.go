@@ -295,6 +295,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
+	if IsLinkPreview(r.UserAgent()) {
+		// A link pasted into a chat: the messenger's server opens it for a preview. It gets the decoy, and the person's
+		// subscription, devices and limits never see it.
+		h.decoy.ServeHTTP(w, r)
+		return
+	}
 	switch {
 	case sub == "unlock":
 		h.serveUnlock(w, r, token, client, now)

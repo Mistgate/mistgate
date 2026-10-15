@@ -40,5 +40,23 @@ func IsBrowser(ua string) bool {
 	return strings.Contains(ua, "AppleWebKit") || strings.Contains(ua, "Gecko/") || strings.Contains(ua, "Firefox/") || strings.Contains(ua, "Trident/")
 }
 
+// previewBots are the fetchers of messengers and social sites that open a pasted link to draw its preview (Telegram's is
+// "TelegramBot (like TwitterBot)"), and the big search crawlers. Lower case, matched as substrings.
+var previewBots = []string{"telegrambot", "twitterbot", "whatsapp", "facebookexternalhit", "facebot", "meta-externalagent",
+	"slackbot", "slack-imgproxy", "discordbot", "vkshare", "skypeuripreview", "linkedinbot", "viber", "redditbot", "iframely",
+	"embedly", "mattermost", "googlebot", "bingbot", "yandexbot", "applebot"}
+
+// IsLinkPreview reports a link-preview bot or a crawler: it is not an app, gets nothing of the subscription and takes no
+// device of the person.
+func IsLinkPreview(ua string) bool {
+	l := strings.ToLower(ua)
+	for _, b := range previewBots {
+		if strings.Contains(l, b) {
+			return true
+		}
+	}
+	return false
+}
+
 // isHapp reports a Happ-like client, the ones that read the `routing` header.
 func isHapp(ua string) bool { return strings.Contains(strings.ToLower(ua), "happ") }
