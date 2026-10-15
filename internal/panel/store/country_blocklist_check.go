@@ -69,6 +69,27 @@ func (s *Store) RecentBlocklistChecks(ctx context.Context, nodeIDs ...string) ([
 	return out, rows.Err()
 }
 
+// BlocklistHistory reads every check since a time, oldest first inside a node, ordered by node id: the node, the time and whether
+// a list held the address (InRKN, ListedBy). The lists are compared every 6 hours, so a week is a few dozen rows a node.
+func (s *Store) BlocklistHistory(ctx context.Context, since time.Time) ([]BlocklistCheck, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT node_id, at, in_rkn, listed_by FROM country_blocklist_check WHERE at >= ? ORDER BY node_id, at`, unix(since))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BlocklistCheck
+	for rows.Next() {
+		var c BlocklistCheck
+		var at, inRKN int64
+		if err := rows.Scan(&c.NodeID, &at, &inRKN, &c.ListedBy); err != nil {
+			return nil, err
+		}
+		c.At, c.InRKN = fromUnix(at), inRKN != 0
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // PruneBlocklistChecks deletes the checks older than the cut and returns how many went.
 func (s *Store) PruneBlocklistChecks(ctx context.Context, before time.Time) (int64, error) {
 	res, err := s.W.ExecContext(ctx, `DELETE FROM country_blocklist_check WHERE at < ?`, unix(before))

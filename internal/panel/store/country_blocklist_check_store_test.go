@@ -43,6 +43,16 @@ func blocklistCheckStoreProof(t *testing.T, st *Store) {
 	if err != nil || len(one) != 1 || one[0].NodeID != "nod_nl1" {
 		t.Fatalf("RecentBlocklistChecks for one node = %+v, %v", one, err)
 	}
+	// the history: every check since the cut, oldest first inside a node, with whether a list held the address
+	hist, err := st.BlocklistHistory(ctx, base)
+	if err != nil || len(hist) != 3 || hist[0].NodeID != "nod_de1" || hist[0].InRKN || !hist[0].At.Equal(base) ||
+		!hist[1].InRKN || hist[1].ListedBy != "antifilter_ipsum" || !hist[1].At.Equal(base.Add(time.Minute)) ||
+		hist[2].NodeID != "nod_nl1" || !hist[2].InRKN || hist[2].ListedBy != "antifilter_community" {
+		t.Fatalf("BlocklistHistory(base) = %+v, %v", hist, err)
+	}
+	if hist, err := st.BlocklistHistory(ctx, base.Add(30*time.Second)); err != nil || len(hist) != 1 || hist[0].NodeID != "nod_de1" {
+		t.Fatalf("BlocklistHistory after the first check = %+v, %v", hist, err)
+	}
 	n, err := st.PruneBlocklistChecks(ctx, base.Add(30*time.Second))
 	if err != nil || n != 2 {
 		t.Fatalf("PruneBlocklistChecks = %d, %v, want the 2 rows older than the cut", n, err)

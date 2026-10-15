@@ -64,6 +64,32 @@ func (s *Store) RecentCountryChecks(ctx context.Context, perNode int, nodeIDs ..
 	return out, rows.Err()
 }
 
+// CountryVerdictChanges reads the rounds of one country since a time that changed a node's verdict: the first round of every
+// node and each round whose verdict differs from the one before it, oldest first inside a node, ordered by node id. Only the
+// node, the time and the verdict: the Reachability page's history needs no more, and a week of rounds every 10 minutes is a
+// thousand rows a node that would otherwise cross the D1 binding.
+func (s *Store) CountryVerdictChanges(ctx context.Context, country string, since time.Time) ([]CountryCheck, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT node_id, at, verdict FROM (
+			SELECT node_id, at, verdict, LAG(verdict) OVER (PARTITION BY node_id ORDER BY at) AS prev
+			FROM country_check WHERE country = ? AND at >= ?
+		) WHERE prev IS NULL OR prev <> verdict ORDER BY node_id, at`, country, unix(since))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CountryCheck
+	for rows.Next() {
+		c := CountryCheck{Country: country}
+		var at int64
+		if err := rows.Scan(&c.NodeID, &at, &c.Verdict); err != nil {
+			return nil, err
+		}
+		c.At = fromUnix(at)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // LastCountryCheckAt is the time of the newest stored round of any node, zero when there is none.
 func (s *Store) LastCountryCheckAt(ctx context.Context) (time.Time, error) {
 	var at int64

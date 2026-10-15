@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 )
@@ -51,5 +53,35 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	left, err := st.RecentCountryChecks(ctx, 10)
 	if err != nil || len(left) != 4 {
 		t.Fatalf("after the prune: %+v, %v", left, err)
+	}
+
+	// the verdict changes of one country: the first round of a node in the window and each round that differs from the one before
+	at := func(m int) time.Time { return base.Add(time.Duration(m) * time.Minute) }
+	if err := st.InsertCountryChecks(ctx, []CountryCheck{
+		{NodeID: "nod_fi1", At: at(-10), Country: "RU", Verdict: "blocked"}, // before the window
+		{NodeID: "nod_fi1", At: at(0), Country: "RU", Verdict: "ok"},
+		{NodeID: "nod_fi1", At: at(1), Country: "RU", Verdict: "ok"},
+		{NodeID: "nod_fi1", At: at(2), Country: "RU", Verdict: "tcp_blocked"},
+		{NodeID: "nod_fi1", At: at(3), Country: "RU", Verdict: "tcp_blocked"},
+		{NodeID: "nod_fi1", At: at(4), Country: "KZ", Verdict: "blocked"}, // another country: not in the lane, not a break
+		{NodeID: "nod_fi1", At: at(5), Country: "RU", Verdict: "tcp_blocked"},
+		{NodeID: "nod_fi1", At: at(6), Country: "RU", Verdict: "ok"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	changes, err := st.CountryVerdictChanges(ctx, "RU", base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got2 []string
+	for _, c := range changes {
+		got2 = append(got2, fmt.Sprintf("%s %d %s %s", c.NodeID, int(c.At.Sub(base)/time.Minute), c.Verdict, c.Country))
+	}
+	want := []string{"nod_de1 2 ok RU", "nod_fi1 0 ok RU", "nod_fi1 2 tcp_blocked RU", "nod_fi1 6 ok RU", "nod_nl1 2 blocked RU"}
+	if !slices.Equal(got2, want) {
+		t.Fatalf("CountryVerdictChanges(RU) = %q, want %q", got2, want)
+	}
+	if kz, err := st.CountryVerdictChanges(ctx, "KZ", base); err != nil || len(kz) != 1 || kz[0].Verdict != "blocked" {
+		t.Fatalf("CountryVerdictChanges(KZ) = %+v, %v", kz, err)
 	}
 }
