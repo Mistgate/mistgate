@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { ApprovalState, TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
+import { setLang } from "@/i18n";
 import { IntegrationsScreen } from "./index";
 
 const listApiTokens = vi.fn();
@@ -28,6 +29,7 @@ vi.mock("@/lib/api", () => ({
   // the Telegram card has its own tests (telegram.test.tsx); here it only has to render
   telegram: { getTelegram: () => Promise.resolve({ status: { bot: { configured: false, username: "", error: "" }, links: [], adminUrlKnown: false } }) },
   updates: {},
+  countryReach: { getCountryReachability: () => Promise.resolve({ settings: { country: "RU" } }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   isUnauthenticated: () => false,
   webauthnSupported: () => false,
@@ -479,5 +481,33 @@ describe("the Integrations screen: approvals", () => {
     expect(text()).toContain("By subscription link → AmneziaWG key");
     expect(text()).toMatch(/Recommended\s*yes → no/);
     expect(text()).toContain("App removed from the user page");
+  });
+});
+
+// The country check moved to its own section: one quiet line where its group was, for one release.
+describe("the Integrations screen: the country check moved", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("says where the sources are now and links there, in the language of the screen", async () => {
+    await mount(tokens([]));
+    const pointer = document.querySelector('a[href="/reachability"]');
+    expect(pointer?.textContent).toBe("The check from Russia is now in Reachability");
+    expect(text()).not.toContain("Globalping");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("ru"));
+    await mount(tokens([]));
+    expect(document.querySelector('a[href="/reachability"]')?.textContent).toBe("Проверка доступности из России теперь в разделе «Доступность»");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    await mount(tokens([]));
+    expect(document.querySelector('a[href="/reachability"]')?.textContent).toBe("从俄罗斯访问的检测已移至「可达性」");
+  });
+
+  it("is not there for anyone but the owner, who never had the group", async () => {
+    role = Role.HELPER;
+    await mount(tokens([]));
+    expect(document.querySelector('a[href="/reachability"]')).toBeNull();
   });
 });

@@ -46,40 +46,28 @@ import {
   type TspuTest,
 } from "@/lib/tspu";
 import { CountryMark } from "@/screens/health/country";
-import { card } from "./parts";
+import { card } from "@/screens/integrations/parts";
 
 type Actions = ReturnType<typeof useGlobalpingActions>;
 type ListsActions = ReturnType<typeof useBlocklistActions>;
 type TspuActions = ReturnType<typeof useTspuActions>;
 
 /**
- * "Reachability from a country": the country every source looks from, once, in the group's header, then a card per source:
- * Globalping, the block lists and the TSPU probe, two to a row on a wide screen.
+ * The sources of the Reachability page: a card per source (Globalping, the block lists, the TSPU probe), two to a row on a wide
+ * screen. Owner only, like the services behind them; the country they all look from is the picker in the page's header.
  */
-export function CountryGroup() {
-  const t = useT();
+export function SourceCards() {
   return (
-    <section aria-labelledby="country-group" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2.5 pt-1.5">
-        <div className="flex min-w-[240px] flex-1 flex-col gap-1">
-          <h2 id="country-group" className="text-[15px] font-extrabold tracking-[-0.02em]">
-            {t("cr.group.title")}
-          </h2>
-          <p className="max-w-2xl text-xs leading-normal text-pretty text-muted">{t("cr.group.sub")}</p>
-        </div>
-        <CountryPicker />
-      </div>
-      <div className="grid items-start gap-3.5 xl:grid-cols-2">
-        <GlobalpingCard />
-        <BlocklistCard />
-        <TspuCard />
-      </div>
-    </section>
+    <div className="grid items-start gap-3.5 xl:grid-cols-2">
+      <GlobalpingCard />
+      <BlocklistCard />
+      <TspuCard />
+    </div>
   );
 }
 
 /** The shared country: it only says where to look from and sends nothing, so it saves on the spot without a step-up. */
-function CountryPicker() {
+export function CountryPicker() {
   const t = useT();
   const fmt = useFmt();
   const q = useQuery(countryQuery);

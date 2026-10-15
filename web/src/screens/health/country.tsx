@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { Icon } from "@/components/ui/icons";
 import { StatusDot, StatusGlyph } from "@/components/ui/status";
@@ -104,14 +105,19 @@ export function useCountryTitle(code: string): string {
   return t("cr.from", { country: countryIn(t, code) });
 }
 
-/** The column's head in the matrix, set apart from the profiles: it is not a client check from the panel's server. */
+/** The column's head in the matrix, set apart from the profiles: it is not a client check from the panel's server. It leads to the Reachability page. */
 export function CountryHead({ code }: { code: string }) {
+  const t = useT();
   const title = useCountryTitle(code);
   return (
-    <span className="ml-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-bold text-muted">
+    <Link
+      to="/reachability"
+      title={t("rc.open")}
+      className="ml-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-bold text-muted underline-offset-2 transition-colors hover:text-fg hover:underline"
+    >
       <Icon name="globe" size={12} aria-hidden className="mb-px flex-none" />
       {title}
-    </span>
+    </Link>
   );
 }
 
@@ -151,6 +157,37 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
 }
 
 /**
+ * The verdict as a pill with the cell's second line under it (the Reachability page's table): the same colours, glyphs and
+ * tooltip as the cell. A node with no row yet gets a dash.
+ */
+export function CountryPill({ check, node, code }: { check: CountryCheck | undefined; node: string; code: string }) {
+  const t = useT();
+  const fmt = useFmt();
+  const title = useCountryTitle(code);
+  const pill = "inline-flex h-[26px] w-fit max-w-full items-center gap-1.5 rounded-[13px] px-2.5 text-xs leading-none font-bold whitespace-nowrap";
+  if (!check)
+    return (
+      <span className={cx(pill, cellCls.none)} title={t("cr.v.notYet")}>
+        <span aria-hidden>{t("hl.cell.none")}</span>
+        <span className="sr-only">{t("hl.cell.aria", { node, profile: title, state: t("cr.v.notYet") })}</span>
+      </span>
+    );
+  const look = countryLook(t, fmt, check);
+  return (
+    <span className="flex min-w-0 flex-col items-start gap-1">
+      <CountryTip look={look}>
+        <span role="img" tabIndex={0} aria-label={t("hl.cell.aria", { node, profile: title, state: look.state })} className={cx(pill, cellCls[look.kind])}>
+          <CountryMark kind={look.kind} />
+          {look.label}
+          {look.alsoListed && <ListedGlyph />}
+        </span>
+      </CountryTip>
+      {look.note && <span className="text-[11px] leading-tight font-semibold text-muted">{look.note}</span>}
+    </span>
+  );
+}
+
+/**
  * The same verdict as a row (a node's card on the phone, the node page): its words are what a screen reader reads on focus,
  * and the quiet line says what the tooltip would, for a phone that has no hover.
  */
@@ -168,7 +205,10 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
     >
       <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
         <CountryMark kind={kind} />
-        <b className="break-words">{title}</b>
+        {/* the title leads to the Reachability page, where the sources and the week are */}
+        <Link to="/reachability" title={t("rc.open")} className="font-bold break-words underline-offset-2 hover:underline">
+          {title}
+        </Link>
       </span>
       <span className={cx("flex items-center gap-1.5 text-xs font-bold", kind === "warn" || kind === "bad" || kind === "listed" ? "tone-text" : "text-muted")}>
         {look?.label ?? t("hl.cell.none")}

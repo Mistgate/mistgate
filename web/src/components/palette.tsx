@@ -46,6 +46,12 @@ export const places: readonly Place[] = [
   { id: "profiles", label: "nav.profiles", words: "протоколы protocols 协议 协议配置 配置 入站", go: { to: "/profiles" } },
   { id: "subscriptions", label: "nav.subscriptions", words: "ссылки links 订阅 链接 订阅链接", go: { to: "/subscriptions" } },
   { id: "health", label: "nav.health", words: "健康 状态 监控 告警 检测", go: { to: "/health" } },
+  {
+    id: "reachability",
+    label: "nav.reachability",
+    words: "россия ркн тспу блокировки списки реестр globalping зонд russia rkn tspu blocks lists registry probe 俄罗斯 封锁 名单 探测 访问",
+    go: { to: "/reachability" },
+  },
   { id: "updates", label: "nav.updates", words: "раскатка версии rollout versions 更新 升级 版本 滚动更新 发布", go: { to: "/updates" } },
   { id: "integrations", label: "nav.integrations", words: "集成 接口 令牌 智能体 审批", go: { to: "/integrations" } },
   { id: "settings", label: "nav.settings", words: "设置 配置 选项", go: { to: "/settings" } },

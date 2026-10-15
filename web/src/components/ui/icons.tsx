@@ -123,6 +123,7 @@ export const navPaths = {
     "mint",
   ],
   health: ["M3 12h4l3-7 4 14 3-7h4", "rose"],
+  reachability: ["M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8", "mint"],
   updates: ["M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5", "sky"],
   integrations: ["M9 3v4M15 3v4M6 7h12v4a6 6 0 0 1-12 0zM12 17v4", "lavender"],
   settings: [

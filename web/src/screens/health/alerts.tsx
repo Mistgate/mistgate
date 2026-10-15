@@ -111,8 +111,9 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
 
   return (
     <article
+      id={`alert-${a.id}`}
       className={cx(
-        "flex flex-col gap-2.5 rounded-card-lg border bg-surface p-4",
+        "flex scroll-mt-20 flex-col gap-2.5 rounded-card-lg border bg-surface p-4",
         kind === "bad" ? "border-[color-mix(in_oklch,var(--danger)_40%,var(--border))]" : "border-line",
         muted && "opacity-75",
       )}
@@ -355,7 +356,7 @@ function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
         const key = `${h.id}/${h.resolvedAtUnix}`;
         // the phone stacks the row: severity and time on one line, then what happened, then how it ended
         return phone ? (
-          <div key={key} className="flex flex-col gap-1 border-t border-line py-2.5 text-[13px]">
+          <div key={key} id={`alert-${h.id}-${h.resolvedAtUnix}`} className="flex scroll-mt-20 flex-col gap-1 border-t border-line py-2.5 text-[13px]">
             <div className="flex items-center justify-between gap-3">
               {sev}
               {when}
@@ -364,7 +365,11 @@ function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
             {how}
           </div>
         ) : (
-          <div key={key} className="grid min-h-[46px] grid-cols-[110px_minmax(0,1fr)_180px_110px] items-center gap-x-3 border-t border-line py-1.5 text-[13px]">
+          <div
+            key={key}
+            id={`alert-${h.id}-${h.resolvedAtUnix}`}
+            className="grid min-h-[46px] scroll-mt-20 grid-cols-[110px_minmax(0,1fr)_180px_110px] items-center gap-x-3 border-t border-line py-1.5 text-[13px]"
+          >
             {sev}
             {what}
             {how}

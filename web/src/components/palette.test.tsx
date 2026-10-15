@@ -72,6 +72,10 @@ describe("places", () => {
     expect(found("группы")).toContain("users");
     expect(found("здоровье")).toContain("health");
     expect(found("доктор")).toContain("health-doctor");
+    expect(found("доступность")).toContain("reachability");
+    expect(found("ркн")).toContain("reachability");
+    expect(found("tspu")).toContain("reachability");
+    expect(found("可达性")).toContain("reachability");
     expect(found("qwertyuiop")).toEqual([]);
   });
 });

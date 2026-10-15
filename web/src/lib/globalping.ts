@@ -10,8 +10,8 @@ import { errorText } from "./errors";
 import { countryIn, isLive, type CountryCheck } from "./health";
 import { plain, type Plain } from "./plain";
 
-// The "Reachability from a country" group of the Integrations screen: the shared country (country_reachability.proto) and the
-// Globalping card (globalping.proto). Owner only; changing Globalping needs a step-up, the country does not (it sends nothing).
+// The sources of the Reachability page: the shared country (country_reachability.proto) and the Globalping card
+// (globalping.proto). Owner only; changing Globalping needs a step-up, the country does not (it sends nothing).
 // The server answers with short codes; the words are in i18n/country.ts. The token goes up once and never comes back.
 
 export type GlobalpingSettings = Plain<SettingsMsg>;
@@ -132,9 +132,11 @@ export function useCountryActions() {
     mutationFn: async (country: string) => plain((await countryReach.updateCountryReachability({ country })).settings!),
     onSuccess: (s) => {
       qc.setQueryData(countryQuery.queryKey, s);
-      // the block lists and the TSPU probe exist only for Russia, and the probe's picker sorts by the country: ask them again
+      // the block lists and the TSPU probe exist only for Russia, and the probe's picker sorts by the country: ask them again;
+      // the verdicts and their week (the Reachability page) follow the country too
       void qc.invalidateQueries({ queryKey: ["blocklist"] });
       void qc.invalidateQueries({ queryKey: ["tspu-probe"] });
+      void qc.invalidateQueries({ queryKey: ["health", "checks"] });
       toast(t("cr.country.saved", { country: countryIn(t, s.country) }));
     },
     onError: (e) => toast.error(errorText(e, t)),

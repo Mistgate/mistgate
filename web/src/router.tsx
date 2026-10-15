@@ -190,6 +190,13 @@ const health = createRoute({
   component: lazyRouteComponent(() => import("@/screens/health"), "HealthScreen"),
 });
 
+// Reachability from a country: the sources, the verdict of every node and its week, the country_blocked alerts.
+const reachability = createRoute({
+  getParentRoute: () => app,
+  path: "/reachability",
+  component: lazyRouteComponent(() => import("@/screens/reachability"), "ReachabilityScreen"),
+});
+
 const updates = createRoute({
   getParentRoute: () => app,
   path: "/updates",
@@ -204,7 +211,7 @@ const integrations = createRoute({
   component: lazyRouteComponent(() => import("@/screens/integrations"), "IntegrationsScreen"),
 });
 
-const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "health", "updates", "integrations", "settings"]);
+const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "health", "reachability", "updates", "integrations", "settings"]);
 const placeholderRoutes = sections
   .filter((s) => !built.has(s.id))
   .map((s) => createRoute({ getParentRoute: () => app, path: s.to, component: () => <SectionScreen id={s.id} /> }));
@@ -224,6 +231,7 @@ const routeTree = root.addChildren([
     profile,
     subscriptions,
     health,
+    reachability,
     updates,
     integrations,
     ...placeholderRoutes,

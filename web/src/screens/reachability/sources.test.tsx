@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang } from "@/i18n";
-import { CountryGroup } from "./country";
+import { CountryPicker, SourceCards } from "./sources";
 
 const getGlobalping = vi.fn();
 const updateGlobalping = vi.fn();
@@ -84,7 +84,8 @@ async function mount(first: object) {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <CountryGroup />
+        <CountryPicker />
+        <SourceCards />
       </QueryClientProvider>,
     ),
   );
@@ -107,10 +108,9 @@ function type(input: Element | null, value: string) {
   });
 }
 
-describe("the country group", () => {
-  it("has its title, the shared country from its own service, and the Globalping card", async () => {
+describe("the sources", () => {
+  it("read the shared country from its own service for the picker, and start with the Globalping card", async () => {
     await mount(settings());
-    expect(text()).toContain("Reachability from a country");
     expect(getCountryReachability).toHaveBeenCalledTimes(1);
     expect(document.querySelector("[aria-label=Country]")?.textContent).toContain("Russia");
     expect(text()).toContain("Globalping");
@@ -224,14 +224,14 @@ describe("the Globalping card", () => {
   it("speaks Russian and Chinese", async () => {
     act(() => setLang("ru"));
     await mount(settings());
-    expect(text()).toContain("Доступность из страны");
+    expect(document.querySelector("[aria-label=Страна]")?.textContent).toContain("Россия");
     expect(state()?.textContent).toBe("Выключено · Ничего не запускается и никуда не отправляется.");
     expect(text()).toContain("Адреса нод уходят в Globalping и на его волонтёрские зонды.");
     act(() => root?.unmount());
     host?.remove();
     act(() => setLang("zh"));
     await mount(settings({ enabled: true, hasToken: true }));
-    expect(text()).toContain("从所选国家访问");
+    expect(document.querySelector("[aria-label=国家]")?.textContent).toContain("俄罗斯");
     expect(document.querySelector("[data-testid=gp-token]")?.textContent).toBe("已设置");
     expect(text()).toContain("节点地址会发送给 Globalping 及其志愿者探测点。");
     expect(button("测试")).toBeDefined();

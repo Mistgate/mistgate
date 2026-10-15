@@ -217,6 +217,15 @@ describe("the country column", () => {
     expect(document.querySelector("[data-testid=country-row]")).toBeNull();
   });
 
+  it("has a head that leads to the Reachability section, where the sources and their week are", async () => {
+    await mount(four);
+    const head = [...document.querySelectorAll('a[href="/reachability"]')].find((a) => a.textContent === "From Russia");
+    expect(head).toBeDefined();
+    // the phone cards' rows lead there too
+    const rows = document.querySelectorAll("[data-testid=country-row]");
+    expect([...document.querySelectorAll('[data-testid=country-row] a[href="/reachability"]')].map((a) => a.textContent)).toEqual(Array(rows.length).fill("From Russia"));
+  });
+
   it("shows each verdict: OK and no data quiet, the two blocks in their tone with a glyph", async () => {
     await mount(four);
     expect(document.body.textContent).toContain("From Russia");
@@ -305,6 +314,8 @@ describe("the country row on the node page", () => {
     const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
     expect(row.textContent).toBe("!From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago");
     expect(row.className).toContain("tone-warn");
+    // its title leads to the Reachability section
+    expect(row.querySelector('a[href="/reachability"]')?.textContent).toBe("From Russia");
     await act(async () => row.focus());
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("ICMP 51 ms · TCP 443, 8443 ✕");
