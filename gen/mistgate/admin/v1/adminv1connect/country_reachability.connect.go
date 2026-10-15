@@ -40,6 +40,9 @@ const (
 	// CountryReachabilityServiceUpdateCountryReachabilityProcedure is the fully-qualified name of the
 	// CountryReachabilityService's UpdateCountryReachability RPC.
 	CountryReachabilityServiceUpdateCountryReachabilityProcedure = "/mistgate.admin.v1.CountryReachabilityService/UpdateCountryReachability"
+	// CountryReachabilityServiceGetReachabilityHistoryProcedure is the fully-qualified name of the
+	// CountryReachabilityService's GetReachabilityHistory RPC.
+	CountryReachabilityServiceGetReachabilityHistoryProcedure = "/mistgate.admin.v1.CountryReachabilityService/GetReachabilityHistory"
 )
 
 // CountryReachabilityServiceClient is a client for the mistgate.admin.v1.CountryReachabilityService
@@ -48,6 +51,9 @@ type CountryReachabilityServiceClient interface {
 	GetCountryReachability(context.Context, *connect.Request[v1.GetCountryReachabilityRequest]) (*connect.Response[v1.GetCountryReachabilityResponse], error)
 	// Changes the country. The rounds that follow look from it; the stored rounds of another country stay for the retention.
 	UpdateCountryReachability(context.Context, *connect.Request[v1.UpdateCountryReachabilityRequest]) (*connect.Response[v1.UpdateCountryReachabilityResponse], error)
+	// What each source said of each node over the last days, as the Reachability page draws it: a lane per node and source. A
+	// source that is off has no lanes, the way GetChecks shows nothing of it; with every source off there are no nodes.
+	GetReachabilityHistory(context.Context, *connect.Request[v1.GetReachabilityHistoryRequest]) (*connect.Response[v1.GetReachabilityHistoryResponse], error)
 }
 
 // NewCountryReachabilityServiceClient constructs a client for the
@@ -74,6 +80,12 @@ func NewCountryReachabilityServiceClient(httpClient connect.HTTPClient, baseURL 
 			connect.WithSchema(countryReachabilityServiceMethods.ByName("UpdateCountryReachability")),
 			connect.WithClientOptions(opts...),
 		),
+		getReachabilityHistory: connect.NewClient[v1.GetReachabilityHistoryRequest, v1.GetReachabilityHistoryResponse](
+			httpClient,
+			baseURL+CountryReachabilityServiceGetReachabilityHistoryProcedure,
+			connect.WithSchema(countryReachabilityServiceMethods.ByName("GetReachabilityHistory")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -81,6 +93,7 @@ func NewCountryReachabilityServiceClient(httpClient connect.HTTPClient, baseURL 
 type countryReachabilityServiceClient struct {
 	getCountryReachability    *connect.Client[v1.GetCountryReachabilityRequest, v1.GetCountryReachabilityResponse]
 	updateCountryReachability *connect.Client[v1.UpdateCountryReachabilityRequest, v1.UpdateCountryReachabilityResponse]
+	getReachabilityHistory    *connect.Client[v1.GetReachabilityHistoryRequest, v1.GetReachabilityHistoryResponse]
 }
 
 // GetCountryReachability calls mistgate.admin.v1.CountryReachabilityService.GetCountryReachability.
@@ -94,12 +107,20 @@ func (c *countryReachabilityServiceClient) UpdateCountryReachability(ctx context
 	return c.updateCountryReachability.CallUnary(ctx, req)
 }
 
+// GetReachabilityHistory calls mistgate.admin.v1.CountryReachabilityService.GetReachabilityHistory.
+func (c *countryReachabilityServiceClient) GetReachabilityHistory(ctx context.Context, req *connect.Request[v1.GetReachabilityHistoryRequest]) (*connect.Response[v1.GetReachabilityHistoryResponse], error) {
+	return c.getReachabilityHistory.CallUnary(ctx, req)
+}
+
 // CountryReachabilityServiceHandler is an implementation of the
 // mistgate.admin.v1.CountryReachabilityService service.
 type CountryReachabilityServiceHandler interface {
 	GetCountryReachability(context.Context, *connect.Request[v1.GetCountryReachabilityRequest]) (*connect.Response[v1.GetCountryReachabilityResponse], error)
 	// Changes the country. The rounds that follow look from it; the stored rounds of another country stay for the retention.
 	UpdateCountryReachability(context.Context, *connect.Request[v1.UpdateCountryReachabilityRequest]) (*connect.Response[v1.UpdateCountryReachabilityResponse], error)
+	// What each source said of each node over the last days, as the Reachability page draws it: a lane per node and source. A
+	// source that is off has no lanes, the way GetChecks shows nothing of it; with every source off there are no nodes.
+	GetReachabilityHistory(context.Context, *connect.Request[v1.GetReachabilityHistoryRequest]) (*connect.Response[v1.GetReachabilityHistoryResponse], error)
 }
 
 // NewCountryReachabilityServiceHandler builds an HTTP handler from the service implementation. It
@@ -121,12 +142,20 @@ func NewCountryReachabilityServiceHandler(svc CountryReachabilityServiceHandler,
 		connect.WithSchema(countryReachabilityServiceMethods.ByName("UpdateCountryReachability")),
 		connect.WithHandlerOptions(opts...),
 	)
+	countryReachabilityServiceGetReachabilityHistoryHandler := connect.NewUnaryHandler(
+		CountryReachabilityServiceGetReachabilityHistoryProcedure,
+		svc.GetReachabilityHistory,
+		connect.WithSchema(countryReachabilityServiceMethods.ByName("GetReachabilityHistory")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.CountryReachabilityService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CountryReachabilityServiceGetCountryReachabilityProcedure:
 			countryReachabilityServiceGetCountryReachabilityHandler.ServeHTTP(w, r)
 		case CountryReachabilityServiceUpdateCountryReachabilityProcedure:
 			countryReachabilityServiceUpdateCountryReachabilityHandler.ServeHTTP(w, r)
+		case CountryReachabilityServiceGetReachabilityHistoryProcedure:
+			countryReachabilityServiceGetReachabilityHistoryHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -142,4 +171,8 @@ func (UnimplementedCountryReachabilityServiceHandler) GetCountryReachability(con
 
 func (UnimplementedCountryReachabilityServiceHandler) UpdateCountryReachability(context.Context, *connect.Request[v1.UpdateCountryReachabilityRequest]) (*connect.Response[v1.UpdateCountryReachabilityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.CountryReachabilityService.UpdateCountryReachability is not implemented"))
+}
+
+func (UnimplementedCountryReachabilityServiceHandler) GetReachabilityHistory(context.Context, *connect.Request[v1.GetReachabilityHistoryRequest]) (*connect.Response[v1.GetReachabilityHistoryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.CountryReachabilityService.GetReachabilityHistory is not implemented"))
 }

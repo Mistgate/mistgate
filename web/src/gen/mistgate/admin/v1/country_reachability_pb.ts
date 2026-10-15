@@ -4,13 +4,15 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { CountryVerdict } from "./health_pb";
+import { file_mistgate_admin_v1_health } from "./health_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file mistgate/admin/v1/country_reachability.proto.
  */
 export const file_mistgate_admin_v1_country_reachability: GenFile = /*@__PURE__*/
-  fileDesc("CixtaXN0Z2F0ZS9hZG1pbi92MS9jb3VudHJ5X3JlYWNoYWJpbGl0eS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiJgoTQ291bnRyeVJlYWNoYWJpbGl0eRIPCgdjb3VudHJ5GAEgASgJIh8KHUdldENvdW50cnlSZWFjaGFiaWxpdHlSZXF1ZXN0IloKHkdldENvdW50cnlSZWFjaGFiaWxpdHlSZXNwb25zZRI4CghzZXR0aW5ncxgBIAEoCzImLm1pc3RnYXRlLmFkbWluLnYxLkNvdW50cnlSZWFjaGFiaWxpdHkiMwogVXBkYXRlQ291bnRyeVJlYWNoYWJpbGl0eVJlcXVlc3QSDwoHY291bnRyeRgBIAEoCSJdCiFVcGRhdGVDb3VudHJ5UmVhY2hhYmlsaXR5UmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5hZG1pbi52MS5Db3VudHJ5UmVhY2hhYmlsaXR5MqQCChpDb3VudHJ5UmVhY2hhYmlsaXR5U2VydmljZRJ9ChZHZXRDb3VudHJ5UmVhY2hhYmlsaXR5EjAubWlzdGdhdGUuYWRtaW4udjEuR2V0Q291bnRyeVJlYWNoYWJpbGl0eVJlcXVlc3QaMS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDb3VudHJ5UmVhY2hhYmlsaXR5UmVzcG9uc2UShgEKGVVwZGF0ZUNvdW50cnlSZWFjaGFiaWxpdHkSMy5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVDb3VudHJ5UmVhY2hhYmlsaXR5UmVxdWVzdBo0Lm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNvdW50cnlSZWFjaGFiaWxpdHlSZXNwb25zZULTAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhhDb3VudHJ5UmVhY2hhYmlsaXR5UHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
+  fileDesc("CixtaXN0Z2F0ZS9hZG1pbi92MS9jb3VudHJ5X3JlYWNoYWJpbGl0eS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiJgoTQ291bnRyeVJlYWNoYWJpbGl0eRIPCgdjb3VudHJ5GAEgASgJIh8KHUdldENvdW50cnlSZWFjaGFiaWxpdHlSZXF1ZXN0IloKHkdldENvdW50cnlSZWFjaGFiaWxpdHlSZXNwb25zZRI4CghzZXR0aW5ncxgBIAEoCzImLm1pc3RnYXRlLmFkbWluLnYxLkNvdW50cnlSZWFjaGFiaWxpdHkiMwogVXBkYXRlQ291bnRyeVJlYWNoYWJpbGl0eVJlcXVlc3QSDwoHY291bnRyeRgBIAEoCSJdCiFVcGRhdGVDb3VudHJ5UmVhY2hhYmlsaXR5UmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5hZG1pbi52MS5Db3VudHJ5UmVhY2hhYmlsaXR5Ii0KHUdldFJlYWNoYWJpbGl0eUhpc3RvcnlSZXF1ZXN0EgwKBGRheXMYASABKA0iXAoRUmVhY2hhYmlsaXR5UG9pbnQSEwoHYXRfdW5peBgBIAEoA0ICMAISMgoHdmVyZGljdBgCIAEoDjIhLm1pc3RnYXRlLmFkbWluLnYxLkNvdW50cnlWZXJkaWN0InAKEFJlYWNoYWJpbGl0eUxhbmUSDgoGc291cmNlGAEgASgJEjQKBnBvaW50cxgCIAMoCzIkLm1pc3RnYXRlLmFkbWluLnYxLlJlYWNoYWJpbGl0eVBvaW50EhYKCnVudGlsX3VuaXgYAyABKANCAjACIl4KF05vZGVSZWFjaGFiaWxpdHlIaXN0b3J5Eg8KB25vZGVfaWQYASABKAkSMgoFbGFuZXMYAiADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWFjaGFiaWxpdHlMYW5lIqsBCh5HZXRSZWFjaGFiaWxpdHlIaXN0b3J5UmVzcG9uc2USDwoHY291bnRyeRgBIAEoCRIPCgdzb3VyY2VzGAIgAygJEhYKCnNpbmNlX3VuaXgYAyABKANCAjACEhQKCG5vd191bml4GAQgASgDQgIwAhI5CgVub2RlcxgFIAMoCzIqLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVSZWFjaGFiaWxpdHlIaXN0b3J5MqMDChpDb3VudHJ5UmVhY2hhYmlsaXR5U2VydmljZRJ9ChZHZXRDb3VudHJ5UmVhY2hhYmlsaXR5EjAubWlzdGdhdGUuYWRtaW4udjEuR2V0Q291bnRyeVJlYWNoYWJpbGl0eVJlcXVlc3QaMS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDb3VudHJ5UmVhY2hhYmlsaXR5UmVzcG9uc2UShgEKGVVwZGF0ZUNvdW50cnlSZWFjaGFiaWxpdHkSMy5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVDb3VudHJ5UmVhY2hhYmlsaXR5UmVxdWVzdBo0Lm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNvdW50cnlSZWFjaGFiaWxpdHlSZXNwb25zZRJ9ChZHZXRSZWFjaGFiaWxpdHlIaXN0b3J5EjAubWlzdGdhdGUuYWRtaW4udjEuR2V0UmVhY2hhYmlsaXR5SGlzdG9yeVJlcXVlc3QaMS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRSZWFjaGFiaWxpdHlIaXN0b3J5UmVzcG9uc2VC0wEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIYQ291bnRyeVJlYWNoYWJpbGl0eVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_health]);
 
 /**
  * @generated from message mistgate.admin.v1.CountryReachability
@@ -98,12 +100,159 @@ export const UpdateCountryReachabilityResponseSchema: GenMessage<UpdateCountryRe
   messageDesc(file_mistgate_admin_v1_country_reachability, 4);
 
 /**
+ * @generated from message mistgate.admin.v1.GetReachabilityHistoryRequest
+ */
+export type GetReachabilityHistoryRequest = Message<"mistgate.admin.v1.GetReachabilityHistoryRequest"> & {
+  /**
+   * Days back from now, 1 to 7. 0 means 7; more is cut to 7, the retention of the sources.
+   *
+   * @generated from field: uint32 days = 1;
+   */
+  days: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetReachabilityHistoryRequest.
+ * Use `create(GetReachabilityHistoryRequestSchema)` to create a new message.
+ */
+export const GetReachabilityHistoryRequestSchema: GenMessage<GetReachabilityHistoryRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_country_reachability, 5);
+
+/**
+ * A verdict from at_unix on, until the next point of the lane (the last one until the lane's until_unix).
+ *
+ * @generated from message mistgate.admin.v1.ReachabilityPoint
+ */
+export type ReachabilityPoint = Message<"mistgate.admin.v1.ReachabilityPoint"> & {
+  /**
+   * @generated from field: int64 at_unix = 1 [jstype = JS_NUMBER];
+   */
+  atUnix: bigint;
+
+  /**
+   * Globalping and the TSPU probe: OK, TCP_BLOCKED, BLOCKED or UNKNOWN, as CountryCheck.globalping_verdict and tspu_verdict.
+   * The block lists: LISTED when a list holds the address, OK when none does.
+   *
+   * @generated from field: mistgate.admin.v1.CountryVerdict verdict = 2;
+   */
+  verdict: CountryVerdict;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ReachabilityPoint.
+ * Use `create(ReachabilityPointSchema)` to create a new message.
+ */
+export const ReachabilityPointSchema: GenMessage<ReachabilityPoint> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_country_reachability, 6);
+
+/**
+ * One source's view of one node, oldest first. Consecutive measurements with the same verdict are one point.
+ *
+ * @generated from message mistgate.admin.v1.ReachabilityLane
+ */
+export type ReachabilityLane = Message<"mistgate.admin.v1.ReachabilityLane"> & {
+  /**
+   * "globalping" | "lists" | "tspu"
+   *
+   * @generated from field: string source = 1;
+   */
+  source: string;
+
+  /**
+   * @generated from field: repeated mistgate.admin.v1.ReachabilityPoint points = 2;
+   */
+  points: ReachabilityPoint[];
+
+  /**
+   * Where the last point ends: now, as GetChecks shows the newest measurement whatever its age; for the TSPU probe the moment
+   * its newest run stops counting (three intervals), when that is earlier.
+   *
+   * @generated from field: int64 until_unix = 3 [jstype = JS_NUMBER];
+   */
+  untilUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ReachabilityLane.
+ * Use `create(ReachabilityLaneSchema)` to create a new message.
+ */
+export const ReachabilityLaneSchema: GenMessage<ReachabilityLane> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_country_reachability, 7);
+
+/**
+ * @generated from message mistgate.admin.v1.NodeReachabilityHistory
+ */
+export type NodeReachabilityHistory = Message<"mistgate.admin.v1.NodeReachabilityHistory"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * In the order of GetReachabilityHistoryResponse.sources; a source with nothing on the node has no lane.
+   *
+   * @generated from field: repeated mistgate.admin.v1.ReachabilityLane lanes = 2;
+   */
+  lanes: ReachabilityLane[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.NodeReachabilityHistory.
+ * Use `create(NodeReachabilityHistorySchema)` to create a new message.
+ */
+export const NodeReachabilityHistorySchema: GenMessage<NodeReachabilityHistory> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_country_reachability, 8);
+
+/**
+ * @generated from message mistgate.admin.v1.GetReachabilityHistoryResponse
+ */
+export type GetReachabilityHistoryResponse = Message<"mistgate.admin.v1.GetReachabilityHistoryResponse"> & {
+  /**
+   * The country the sources look from (CountryReachability.country). Globalping's lane holds the rounds of this country only.
+   *
+   * @generated from field: string country = 1;
+   */
+  country: string;
+
+  /**
+   * The sources that are on: "globalping", "lists", "tspu", in this order.
+   *
+   * @generated from field: repeated string sources = 2;
+   */
+  sources: string[];
+
+  /**
+   * @generated from field: int64 since_unix = 3 [jstype = JS_NUMBER];
+   */
+  sinceUnix: bigint;
+
+  /**
+   * @generated from field: int64 now_unix = 4 [jstype = JS_NUMBER];
+   */
+  nowUnix: bigint;
+
+  /**
+   * Every node a source that is on measured in the window, by node id.
+   *
+   * @generated from field: repeated mistgate.admin.v1.NodeReachabilityHistory nodes = 5;
+   */
+  nodes: NodeReachabilityHistory[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetReachabilityHistoryResponse.
+ * Use `create(GetReachabilityHistoryResponseSchema)` to create a new message.
+ */
+export const GetReachabilityHistoryResponseSchema: GenMessage<GetReachabilityHistoryResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_country_reachability, 9);
+
+/**
  * The country the country check looks from. Every source of the check (the Globalping integration today, block lists and a
  * probe inside the country later) reads this one setting, so it lives here and not in any of them. Conventions: common.proto.
  * The check itself and its verdicts: health.proto CountryCheck.
  *
- * OWNER-ONLY, like the integrations; not open to API tokens or MCP. The country only says where to look from; it sends nothing
- * anywhere, so it needs no step-up.
+ * The country: OWNER-ONLY, like the integrations; not open to API tokens or MCP. The country only says where to look from; it
+ * sends nothing anywhere, so it needs no step-up. The history is a read like HealthService.GetChecks: every role and API tokens.
  *
  * ERRORS. INVALID_ARGUMENT: a country that is not two letters.
  *
@@ -127,6 +276,17 @@ export const CountryReachabilityService: GenService<{
     methodKind: "unary";
     input: typeof UpdateCountryReachabilityRequestSchema;
     output: typeof UpdateCountryReachabilityResponseSchema;
+  },
+  /**
+   * What each source said of each node over the last days, as the Reachability page draws it: a lane per node and source. A
+   * source that is off has no lanes, the way GetChecks shows nothing of it; with every source off there are no nodes.
+   *
+   * @generated from rpc mistgate.admin.v1.CountryReachabilityService.GetReachabilityHistory
+   */
+  getReachabilityHistory: {
+    methodKind: "unary";
+    input: typeof GetReachabilityHistoryRequestSchema;
+    output: typeof GetReachabilityHistoryResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_country_reachability, 0);

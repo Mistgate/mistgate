@@ -2,18 +2,23 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
+import "mistgate/admin/v1/health.proto";
+
 // The country the country check looks from. Every source of the check (the Globalping integration today, block lists and a
 // probe inside the country later) reads this one setting, so it lives here and not in any of them. Conventions: common.proto.
 // The check itself and its verdicts: health.proto CountryCheck.
 //
-// OWNER-ONLY, like the integrations; not open to API tokens or MCP. The country only says where to look from; it sends nothing
-// anywhere, so it needs no step-up.
+// The country: OWNER-ONLY, like the integrations; not open to API tokens or MCP. The country only says where to look from; it
+// sends nothing anywhere, so it needs no step-up. The history is a read like HealthService.GetChecks: every role and API tokens.
 //
 // ERRORS. INVALID_ARGUMENT: a country that is not two letters.
 service CountryReachabilityService {
   rpc GetCountryReachability(GetCountryReachabilityRequest) returns (GetCountryReachabilityResponse);
   // Changes the country. The rounds that follow look from it; the stored rounds of another country stay for the retention.
   rpc UpdateCountryReachability(UpdateCountryReachabilityRequest) returns (UpdateCountryReachabilityResponse);
+  // What each source said of each node over the last days, as the Reachability page draws it: a lane per node and source. A
+  // source that is off has no lanes, the way GetChecks shows nothing of it; with every source off there are no nodes.
+  rpc GetReachabilityHistory(GetReachabilityHistoryRequest) returns (GetReachabilityHistoryResponse);
 }
 
 message CountryReachability {
@@ -29,3 +34,43 @@ message UpdateCountryReachabilityRequest {
   string country = 1;
 }
 message UpdateCountryReachabilityResponse { CountryReachability settings = 1; }
+
+message GetReachabilityHistoryRequest {
+  // Days back from now, 1 to 7. 0 means 7; more is cut to 7, the retention of the sources.
+  uint32 days = 1;
+}
+
+// A verdict from at_unix on, until the next point of the lane (the last one until the lane's until_unix).
+message ReachabilityPoint {
+  int64 at_unix = 1 [jstype = JS_NUMBER];
+  // Globalping and the TSPU probe: OK, TCP_BLOCKED, BLOCKED or UNKNOWN, as CountryCheck.globalping_verdict and tspu_verdict.
+  // The block lists: LISTED when a list holds the address, OK when none does.
+  CountryVerdict verdict = 2;
+}
+
+// One source's view of one node, oldest first. Consecutive measurements with the same verdict are one point.
+message ReachabilityLane {
+  // "globalping" | "lists" | "tspu"
+  string source = 1;
+  repeated ReachabilityPoint points = 2;
+  // Where the last point ends: now, as GetChecks shows the newest measurement whatever its age; for the TSPU probe the moment
+  // its newest run stops counting (three intervals), when that is earlier.
+  int64 until_unix = 3 [jstype = JS_NUMBER];
+}
+
+message NodeReachabilityHistory {
+  string node_id = 1;
+  // In the order of GetReachabilityHistoryResponse.sources; a source with nothing on the node has no lane.
+  repeated ReachabilityLane lanes = 2;
+}
+
+message GetReachabilityHistoryResponse {
+  // The country the sources look from (CountryReachability.country). Globalping's lane holds the rounds of this country only.
+  string country = 1;
+  // The sources that are on: "globalping", "lists", "tspu", in this order.
+  repeated string sources = 2;
+  int64 since_unix = 3 [jstype = JS_NUMBER];
+  int64 now_unix = 4 [jstype = JS_NUMBER];
+  // Every node a source that is on measured in the window, by node id.
+  repeated NodeReachabilityHistory nodes = 5;
+}

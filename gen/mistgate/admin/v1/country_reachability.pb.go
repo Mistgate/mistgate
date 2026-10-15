@@ -235,11 +235,307 @@ func (x *UpdateCountryReachabilityResponse) GetSettings() *CountryReachability {
 	return nil
 }
 
+type GetReachabilityHistoryRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Days back from now, 1 to 7. 0 means 7; more is cut to 7, the retention of the sources.
+	Days          uint32 `protobuf:"varint,1,opt,name=days,proto3" json:"days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReachabilityHistoryRequest) Reset() {
+	*x = GetReachabilityHistoryRequest{}
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReachabilityHistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReachabilityHistoryRequest) ProtoMessage() {}
+
+func (x *GetReachabilityHistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReachabilityHistoryRequest.ProtoReflect.Descriptor instead.
+func (*GetReachabilityHistoryRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_country_reachability_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetReachabilityHistoryRequest) GetDays() uint32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+// A verdict from at_unix on, until the next point of the lane (the last one until the lane's until_unix).
+type ReachabilityPoint struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	AtUnix int64                  `protobuf:"varint,1,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	// Globalping and the TSPU probe: OK, TCP_BLOCKED, BLOCKED or UNKNOWN, as CountryCheck.globalping_verdict and tspu_verdict.
+	// The block lists: LISTED when a list holds the address, OK when none does.
+	Verdict       CountryVerdict `protobuf:"varint,2,opt,name=verdict,proto3,enum=mistgate.admin.v1.CountryVerdict" json:"verdict,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReachabilityPoint) Reset() {
+	*x = ReachabilityPoint{}
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReachabilityPoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReachabilityPoint) ProtoMessage() {}
+
+func (x *ReachabilityPoint) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReachabilityPoint.ProtoReflect.Descriptor instead.
+func (*ReachabilityPoint) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_country_reachability_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ReachabilityPoint) GetAtUnix() int64 {
+	if x != nil {
+		return x.AtUnix
+	}
+	return 0
+}
+
+func (x *ReachabilityPoint) GetVerdict() CountryVerdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return CountryVerdict_COUNTRY_VERDICT_UNSPECIFIED
+}
+
+// One source's view of one node, oldest first. Consecutive measurements with the same verdict are one point.
+type ReachabilityLane struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "globalping" | "lists" | "tspu"
+	Source string               `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
+	Points []*ReachabilityPoint `protobuf:"bytes,2,rep,name=points,proto3" json:"points,omitempty"`
+	// Where the last point ends: now, as GetChecks shows the newest measurement whatever its age; for the TSPU probe the moment
+	// its newest run stops counting (three intervals), when that is earlier.
+	UntilUnix     int64 `protobuf:"varint,3,opt,name=until_unix,json=untilUnix,proto3" json:"until_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReachabilityLane) Reset() {
+	*x = ReachabilityLane{}
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReachabilityLane) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReachabilityLane) ProtoMessage() {}
+
+func (x *ReachabilityLane) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReachabilityLane.ProtoReflect.Descriptor instead.
+func (*ReachabilityLane) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_country_reachability_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ReachabilityLane) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *ReachabilityLane) GetPoints() []*ReachabilityPoint {
+	if x != nil {
+		return x.Points
+	}
+	return nil
+}
+
+func (x *ReachabilityLane) GetUntilUnix() int64 {
+	if x != nil {
+		return x.UntilUnix
+	}
+	return 0
+}
+
+type NodeReachabilityHistory struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// In the order of GetReachabilityHistoryResponse.sources; a source with nothing on the node has no lane.
+	Lanes         []*ReachabilityLane `protobuf:"bytes,2,rep,name=lanes,proto3" json:"lanes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeReachabilityHistory) Reset() {
+	*x = NodeReachabilityHistory{}
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeReachabilityHistory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeReachabilityHistory) ProtoMessage() {}
+
+func (x *NodeReachabilityHistory) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeReachabilityHistory.ProtoReflect.Descriptor instead.
+func (*NodeReachabilityHistory) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_country_reachability_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *NodeReachabilityHistory) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeReachabilityHistory) GetLanes() []*ReachabilityLane {
+	if x != nil {
+		return x.Lanes
+	}
+	return nil
+}
+
+type GetReachabilityHistoryResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The country the sources look from (CountryReachability.country). Globalping's lane holds the rounds of this country only.
+	Country string `protobuf:"bytes,1,opt,name=country,proto3" json:"country,omitempty"`
+	// The sources that are on: "globalping", "lists", "tspu", in this order.
+	Sources   []string `protobuf:"bytes,2,rep,name=sources,proto3" json:"sources,omitempty"`
+	SinceUnix int64    `protobuf:"varint,3,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
+	NowUnix   int64    `protobuf:"varint,4,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
+	// Every node a source that is on measured in the window, by node id.
+	Nodes         []*NodeReachabilityHistory `protobuf:"bytes,5,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReachabilityHistoryResponse) Reset() {
+	*x = GetReachabilityHistoryResponse{}
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReachabilityHistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReachabilityHistoryResponse) ProtoMessage() {}
+
+func (x *GetReachabilityHistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_country_reachability_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReachabilityHistoryResponse.ProtoReflect.Descriptor instead.
+func (*GetReachabilityHistoryResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_country_reachability_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetReachabilityHistoryResponse) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
+}
+
+func (x *GetReachabilityHistoryResponse) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *GetReachabilityHistoryResponse) GetSinceUnix() int64 {
+	if x != nil {
+		return x.SinceUnix
+	}
+	return 0
+}
+
+func (x *GetReachabilityHistoryResponse) GetNowUnix() int64 {
+	if x != nil {
+		return x.NowUnix
+	}
+	return 0
+}
+
+func (x *GetReachabilityHistoryResponse) GetNodes() []*NodeReachabilityHistory {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
 var File_mistgate_admin_v1_country_reachability_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_country_reachability_proto_rawDesc = "" +
 	"\n" +
-	",mistgate/admin/v1/country_reachability.proto\x12\x11mistgate.admin.v1\"/\n" +
+	",mistgate/admin/v1/country_reachability.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/health.proto\"/\n" +
 	"\x13CountryReachability\x12\x18\n" +
 	"\acountry\x18\x01 \x01(\tR\acountry\"\x1f\n" +
 	"\x1dGetCountryReachabilityRequest\"d\n" +
@@ -248,10 +544,31 @@ const file_mistgate_admin_v1_country_reachability_proto_rawDesc = "" +
 	" UpdateCountryReachabilityRequest\x12\x18\n" +
 	"\acountry\x18\x01 \x01(\tR\acountry\"g\n" +
 	"!UpdateCountryReachabilityResponse\x12B\n" +
-	"\bsettings\x18\x01 \x01(\v2&.mistgate.admin.v1.CountryReachabilityR\bsettings2\xa4\x02\n" +
+	"\bsettings\x18\x01 \x01(\v2&.mistgate.admin.v1.CountryReachabilityR\bsettings\"3\n" +
+	"\x1dGetReachabilityHistoryRequest\x12\x12\n" +
+	"\x04days\x18\x01 \x01(\rR\x04days\"m\n" +
+	"\x11ReachabilityPoint\x12\x1b\n" +
+	"\aat_unix\x18\x01 \x01(\x03B\x020\x02R\x06atUnix\x12;\n" +
+	"\averdict\x18\x02 \x01(\x0e2!.mistgate.admin.v1.CountryVerdictR\averdict\"\x8b\x01\n" +
+	"\x10ReachabilityLane\x12\x16\n" +
+	"\x06source\x18\x01 \x01(\tR\x06source\x12<\n" +
+	"\x06points\x18\x02 \x03(\v2$.mistgate.admin.v1.ReachabilityPointR\x06points\x12!\n" +
+	"\n" +
+	"until_unix\x18\x03 \x01(\x03B\x020\x02R\tuntilUnix\"m\n" +
+	"\x17NodeReachabilityHistory\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x129\n" +
+	"\x05lanes\x18\x02 \x03(\v2#.mistgate.admin.v1.ReachabilityLaneR\x05lanes\"\xd8\x01\n" +
+	"\x1eGetReachabilityHistoryResponse\x12\x18\n" +
+	"\acountry\x18\x01 \x01(\tR\acountry\x12\x18\n" +
+	"\asources\x18\x02 \x03(\tR\asources\x12!\n" +
+	"\n" +
+	"since_unix\x18\x03 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +
+	"\bnow_unix\x18\x04 \x01(\x03B\x020\x02R\anowUnix\x12@\n" +
+	"\x05nodes\x18\x05 \x03(\v2*.mistgate.admin.v1.NodeReachabilityHistoryR\x05nodes2\xa3\x03\n" +
 	"\x1aCountryReachabilityService\x12}\n" +
 	"\x16GetCountryReachability\x120.mistgate.admin.v1.GetCountryReachabilityRequest\x1a1.mistgate.admin.v1.GetCountryReachabilityResponse\x12\x86\x01\n" +
-	"\x19UpdateCountryReachability\x123.mistgate.admin.v1.UpdateCountryReachabilityRequest\x1a4.mistgate.admin.v1.UpdateCountryReachabilityResponseB\xd3\x01\n" +
+	"\x19UpdateCountryReachability\x123.mistgate.admin.v1.UpdateCountryReachabilityRequest\x1a4.mistgate.admin.v1.UpdateCountryReachabilityResponse\x12}\n" +
+	"\x16GetReachabilityHistory\x120.mistgate.admin.v1.GetReachabilityHistoryRequest\x1a1.mistgate.admin.v1.GetReachabilityHistoryResponseB\xd3\x01\n" +
 	"\x15com.mistgate.admin.v1B\x18CountryReachabilityProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -266,26 +583,38 @@ func file_mistgate_admin_v1_country_reachability_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_country_reachability_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_country_reachability_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_mistgate_admin_v1_country_reachability_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_mistgate_admin_v1_country_reachability_proto_goTypes = []any{
 	(*CountryReachability)(nil),               // 0: mistgate.admin.v1.CountryReachability
 	(*GetCountryReachabilityRequest)(nil),     // 1: mistgate.admin.v1.GetCountryReachabilityRequest
 	(*GetCountryReachabilityResponse)(nil),    // 2: mistgate.admin.v1.GetCountryReachabilityResponse
 	(*UpdateCountryReachabilityRequest)(nil),  // 3: mistgate.admin.v1.UpdateCountryReachabilityRequest
 	(*UpdateCountryReachabilityResponse)(nil), // 4: mistgate.admin.v1.UpdateCountryReachabilityResponse
+	(*GetReachabilityHistoryRequest)(nil),     // 5: mistgate.admin.v1.GetReachabilityHistoryRequest
+	(*ReachabilityPoint)(nil),                 // 6: mistgate.admin.v1.ReachabilityPoint
+	(*ReachabilityLane)(nil),                  // 7: mistgate.admin.v1.ReachabilityLane
+	(*NodeReachabilityHistory)(nil),           // 8: mistgate.admin.v1.NodeReachabilityHistory
+	(*GetReachabilityHistoryResponse)(nil),    // 9: mistgate.admin.v1.GetReachabilityHistoryResponse
+	(CountryVerdict)(0),                       // 10: mistgate.admin.v1.CountryVerdict
 }
 var file_mistgate_admin_v1_country_reachability_proto_depIdxs = []int32{
-	0, // 0: mistgate.admin.v1.GetCountryReachabilityResponse.settings:type_name -> mistgate.admin.v1.CountryReachability
-	0, // 1: mistgate.admin.v1.UpdateCountryReachabilityResponse.settings:type_name -> mistgate.admin.v1.CountryReachability
-	1, // 2: mistgate.admin.v1.CountryReachabilityService.GetCountryReachability:input_type -> mistgate.admin.v1.GetCountryReachabilityRequest
-	3, // 3: mistgate.admin.v1.CountryReachabilityService.UpdateCountryReachability:input_type -> mistgate.admin.v1.UpdateCountryReachabilityRequest
-	2, // 4: mistgate.admin.v1.CountryReachabilityService.GetCountryReachability:output_type -> mistgate.admin.v1.GetCountryReachabilityResponse
-	4, // 5: mistgate.admin.v1.CountryReachabilityService.UpdateCountryReachability:output_type -> mistgate.admin.v1.UpdateCountryReachabilityResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: mistgate.admin.v1.GetCountryReachabilityResponse.settings:type_name -> mistgate.admin.v1.CountryReachability
+	0,  // 1: mistgate.admin.v1.UpdateCountryReachabilityResponse.settings:type_name -> mistgate.admin.v1.CountryReachability
+	10, // 2: mistgate.admin.v1.ReachabilityPoint.verdict:type_name -> mistgate.admin.v1.CountryVerdict
+	6,  // 3: mistgate.admin.v1.ReachabilityLane.points:type_name -> mistgate.admin.v1.ReachabilityPoint
+	7,  // 4: mistgate.admin.v1.NodeReachabilityHistory.lanes:type_name -> mistgate.admin.v1.ReachabilityLane
+	8,  // 5: mistgate.admin.v1.GetReachabilityHistoryResponse.nodes:type_name -> mistgate.admin.v1.NodeReachabilityHistory
+	1,  // 6: mistgate.admin.v1.CountryReachabilityService.GetCountryReachability:input_type -> mistgate.admin.v1.GetCountryReachabilityRequest
+	3,  // 7: mistgate.admin.v1.CountryReachabilityService.UpdateCountryReachability:input_type -> mistgate.admin.v1.UpdateCountryReachabilityRequest
+	5,  // 8: mistgate.admin.v1.CountryReachabilityService.GetReachabilityHistory:input_type -> mistgate.admin.v1.GetReachabilityHistoryRequest
+	2,  // 9: mistgate.admin.v1.CountryReachabilityService.GetCountryReachability:output_type -> mistgate.admin.v1.GetCountryReachabilityResponse
+	4,  // 10: mistgate.admin.v1.CountryReachabilityService.UpdateCountryReachability:output_type -> mistgate.admin.v1.UpdateCountryReachabilityResponse
+	9,  // 11: mistgate.admin.v1.CountryReachabilityService.GetReachabilityHistory:output_type -> mistgate.admin.v1.GetReachabilityHistoryResponse
+	9,  // [9:12] is the sub-list for method output_type
+	6,  // [6:9] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_country_reachability_proto_init() }
@@ -293,13 +622,14 @@ func file_mistgate_admin_v1_country_reachability_proto_init() {
 	if File_mistgate_admin_v1_country_reachability_proto != nil {
 		return
 	}
+	file_mistgate_admin_v1_health_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_country_reachability_proto_rawDesc), len(file_mistgate_admin_v1_country_reachability_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
