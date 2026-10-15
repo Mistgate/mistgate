@@ -1063,8 +1063,10 @@ type tspuPortV struct {
 }
 
 // tspuRunV: the newest run of the TSPU probe. Status: ok, control_failed (the method does not apply on the probe node's network),
-// no_dpi_hop (the TSPU could not be placed with the reference addresses), busy, failed (Detail says why). Absent while that
-// source is off or has not run.
+// no_dpi_hop (the TSPU could not be placed with the reference addresses; Reason says why), busy, failed (Detail says why).
+// Absent while that source is off or has not run. Reason, for no_dpi_hop: refs_pass (every blocked reference was tried and at
+// least one got an answer, so blocked addresses get through on the probe node's path and it has no TSPU this method can see),
+// no_hops (no router on the path answered, so the route is hidden); absent when not known.
 type tspuRunV struct {
 	Status       string `json:"status"`
 	AtUnix       int64  `json:"at_unix"`
@@ -1073,6 +1075,7 @@ type tspuRunV struct {
 	BlockedRef   string `json:"blocked_ref,omitempty"`
 	NodesChecked uint32 `json:"nodes_checked,omitempty"`
 	Detail       string `json:"detail,omitempty"`
+	Reason       string `json:"reason,omitempty"`
 }
 
 func tspuRunView(r *adminv1.TspuProbeRun, names map[string]string) *tspuRunV {
@@ -1084,7 +1087,7 @@ func tspuRunView(r *adminv1.TspuProbeRun, names map[string]string) *tspuRunV {
 		node = n
 	}
 	return &tspuRunV{Status: clean(r.GetStatus(), 20), AtUnix: r.GetAtUnix(), ProbeNode: nm(node), DPIHop: r.GetDpiHop(), BlockedRef: clean(r.GetBlockedRef(), 45),
-		NodesChecked: r.GetNodesChecked(), Detail: clean(r.GetDetail(), 40)}
+		NodesChecked: r.GetNodesChecked(), Detail: clean(r.GetDetail(), 40), Reason: clean(r.GetReason(), 20)}
 }
 
 func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {

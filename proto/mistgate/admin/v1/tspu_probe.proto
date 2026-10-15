@@ -62,7 +62,7 @@ message TspuProbeNode {
 message TspuProbeRun {
   // "ok": the probe ran and rows were stored. "control_failed": the control address is blocked behind the TSPU on this network,
   // so the method does not apply there (no verdict about any node). "no_dpi_hop": the TSPU could not be placed (every reference
-  // address was tried; check the references). "busy": the agent was busy, tried again later. "failed": no answer or an error.
+  // address was tried; see reason). "busy": the agent was busy, tried again later. "failed": no answer or an error.
   string status = 1;
   // When it ended.
   int64 at_unix = 2 [jstype = JS_NUMBER];
@@ -76,6 +76,10 @@ message TspuProbeRun {
   uint32 nodes_checked = 6;
   // For "failed", a machine word: "agent_too_old", "unreachable", "timeout", "agent_error"; "" otherwise.
   string detail = 7;
+  // For "no_dpi_hop", why the TSPU could not be placed: "refs_pass" (a reference address answered, so blocked addresses get
+  // through on the probe node's path: it has no TSPU this method can see), "no_hops" (no router on the path answered, so the
+  // route is hidden); "" when unknown (an older agent) and for every other status.
+  string reason = 8;
 }
 
 message TspuProbeSettings {

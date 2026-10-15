@@ -546,7 +546,7 @@ func TestEachAnswerCode(t *testing.T) {
 		{"control_failed", func(call) (fleet.CountryProbeResult, error) {
 			return fleet.CountryProbeResult{Code: "control_failed", DPIHop: 3}, nil
 		}, "control_failed", "", false, 120 * time.Minute, 3, 1},
-		{"no_dpi_hop", func(call) (fleet.CountryProbeResult, error) { return fleet.CountryProbeResult{Code: "no_dpi_hop"}, nil }, "no_dpi_hop", "", false, 120 * time.Minute, 0, 2},
+		{"no_dpi_hop", func(call) (fleet.CountryProbeResult, error) { return fleet.CountryProbeResult{Code: "no_dpi_hop"}, nil }, "no_dpi_hop", "", false, 120 * time.Minute, 0, 3},
 		{"busy", func(call) (fleet.CountryProbeResult, error) { return fleet.CountryProbeResult{Code: "busy"}, nil }, "busy", "", false, busyRetry, 0, 1},
 		{"agent too old", func(call) (fleet.CountryProbeResult, error) {
 			return fleet.CountryProbeResult{}, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
@@ -631,13 +631,13 @@ func TestAFailureInTheMiddleKeepsTheEarlierBatches(t *testing.T) {
 	}
 }
 
-// A probe node whose TSPU cannot be placed with the first reference is asked once more with the next; the one that worked is
-// recorded and is where the next run starts.
-func TestSecondReferenceOnNoDPIHop(t *testing.T) {
+// A probe node whose TSPU cannot be placed with a reference is asked with the next, until one works; the first success ends the
+// tries, and the reference that worked is recorded and is where the next run starts.
+func TestNextReferenceOnNoDPIHop(t *testing.T) {
 	e := newEnv(t)
 	refs, _ := ReferencesFor("RU")
-	if len(refs.Blocked) < 2 {
-		t.Fatal("the candidate list must hold at least two references")
+	if len(refs.Blocked) < 3 {
+		t.Fatal("the candidate list must hold at least three references")
 	}
 	e.ff.script = func(_ int, c call) (fleet.CountryProbeResult, error) {
 		if c.req.BlockedRef == refs.Blocked[0] {
@@ -653,7 +653,7 @@ func TestSecondReferenceOnNoDPIHop(t *testing.T) {
 	if len(calls) != 2 || calls[0].req.BlockedRef != refs.Blocked[0] || calls[1].req.BlockedRef != refs.Blocked[1] {
 		t.Fatalf("references tried: %+v", calls)
 	}
-	if r := e.lastRun(); r.Status != "ok" || r.Ref != refs.Blocked[1] {
+	if r := e.lastRun(); r.Status != "ok" || r.Ref != refs.Blocked[1] || r.Reason != "" {
 		t.Fatalf("last run = %+v, want ok through %s", r, refs.Blocked[1])
 	}
 	if g := e.get(); g.LastRun.BlockedRef != refs.Blocked[1] || g.LastRun.Status != "ok" {
@@ -667,18 +667,137 @@ func TestSecondReferenceOnNoDPIHop(t *testing.T) {
 	if calls = e.ff.sent(); len(calls) != 3 || calls[2].req.BlockedRef != refs.Blocked[1] {
 		t.Fatalf("the second run started with %+v", calls[2:])
 	}
-	// if the second fails too, the run says so, after two tries only
+	// the third reference is the one after two that failed
+	e.ff.script = func(_ int, c call) (fleet.CountryProbeResult, error) {
+		if c.req.BlockedRef == refs.Blocked[2] {
+			return openAll(c), nil
+		}
+		return fleet.CountryProbeResult{Code: "no_dpi_hop"}, nil
+	}
+	e.advance(121 * time.Minute)
+	e.tick()
+	calls = e.ff.sent()[3:]
+	if len(calls) != 2 || calls[0].req.BlockedRef != refs.Blocked[1] || calls[1].req.BlockedRef != refs.Blocked[2] {
+		t.Fatalf("references tried: %+v", calls)
+	}
+	// if none places it, every reference was asked once, and the run says so
 	e.ff.script = func(int, call) (fleet.CountryProbeResult, error) {
 		return fleet.CountryProbeResult{Code: "no_dpi_hop"}, nil
 	}
 	e.advance(121 * time.Minute)
 	e.tick()
-	if calls = e.ff.sent(); len(calls) != 5 {
-		t.Fatalf("%d commands for a run that never placed the TSPU, want 2", len(calls)-3)
+	calls = e.ff.sent()[5:]
+	if len(calls) != len(refs.Blocked) {
+		t.Fatalf("%d commands for a run that never placed the TSPU, want %d", len(calls), len(refs.Blocked))
+	}
+	seen := map[string]bool{}
+	for _, c := range calls {
+		seen[c.req.BlockedRef] = true
+	}
+	if len(seen) != len(refs.Blocked) {
+		t.Fatalf("references tried: %+v", calls)
 	}
 	if r := e.lastRun(); r.Status != "no_dpi_hop" {
 		t.Fatalf("last run = %+v", r)
 	}
+}
+
+// The agents' reasons become one reason of the run: refs_pass when any reference got through, no_hops when none saw a router,
+// "" when it is not known (an older agent says nothing).
+func TestNoDPIHopReason(t *testing.T) {
+	refs, _ := ReferencesFor("RU")
+	for _, tc := range []struct {
+		name    string
+		reasons []string // per reference, in the order they are asked
+		want    string
+	}{
+		{"all open", []string{"ref_open", "ref_open", "ref_open"}, ReasonRefsPass},
+		{"one open", []string{"no_hops", "ref_open", "no_hops"}, ReasonRefsPass},
+		{"one refused", []string{"no_hops", "no_hops", "ref_refused"}, ReasonRefsPass},
+		{"open beats an old agent", []string{"", "ref_open", ""}, ReasonRefsPass},
+		{"no hops anywhere", []string{"no_hops", "no_hops", "no_hops"}, ReasonNoHops},
+		{"an old agent", []string{"", "", ""}, ""},
+		{"no hops and unknown", []string{"no_hops", "", "no_hops"}, ""},
+		{"no reference", []string{"no_ref", "no_ref", "no_ref"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.ff.script = func(n int, _ call) (fleet.CountryProbeResult, error) {
+				return fleet.CountryProbeResult{Code: "no_dpi_hop", Reason: tc.reasons[n]}, nil
+			}
+			e.enable()
+			if !e.tick() {
+				t.Fatal("no run")
+			}
+			if n := len(e.ff.sent()); n != len(refs.Blocked) {
+				t.Fatalf("%d commands, want one per reference", n)
+			}
+			if r := e.lastRun(); r.Status != "no_dpi_hop" || r.Reason != tc.want {
+				t.Fatalf("last run = %+v, want reason %q", r, tc.want)
+			}
+			// it reaches the screens: Get, the health module's state and the stored JSON
+			if g := e.get(); g.LastRun == nil || g.LastRun.Reason != tc.want {
+				t.Errorf("Get last_run = %v", g.LastRun)
+			}
+			if st := e.svc.State(context.Background()); st.Run == nil || st.Run.Reason != tc.want {
+				t.Errorf("State run = %v", st.Run)
+			}
+		})
+	}
+}
+
+// A run with many batches costs one failed command per reference at most: once a reference could not place the TSPU, it is not
+// asked again in the same run, and a run that ends on no_dpi_hop sends no further batch.
+func TestEachReferenceFailsOncePerRun(t *testing.T) {
+	refs, _ := ReferencesFor("RU")
+	many := func(ns []Node) []Node {
+		for i := range 5 {
+			id := "x" + strconv.Itoa(i)
+			ns = append(ns, Node{ID: id, Name: id, Address: "192.0.2." + strconv.Itoa(10+i), Online: true, Ports: []uint16{443, 8443}})
+		}
+		return ns
+	}
+	t.Run("none works", func(t *testing.T) {
+		e := newEnv(t)
+		e.setNodes(many)
+		e.ff.script = func(int, call) (fleet.CountryProbeResult, error) {
+			return fleet.CountryProbeResult{Code: "no_dpi_hop", Reason: "ref_open"}, nil
+		}
+		e.enable()
+		e.tick()
+		if n := len(e.ff.sent()); n != len(refs.Blocked) {
+			t.Fatalf("%d commands, want %d", n, len(refs.Blocked))
+		}
+	})
+	t.Run("one works for a while", func(t *testing.T) {
+		e := newEnv(t)
+		e.setNodes(many)
+		// the first reference placed the TSPU in the first batch, then answered no_dpi_hop: it is not asked again
+		e.ff.script = func(n int, c call) (fleet.CountryProbeResult, error) {
+			if n == 0 {
+				return openAll(c), nil
+			}
+			return fleet.CountryProbeResult{Code: "no_dpi_hop", Reason: "no_hops"}, nil
+		}
+		e.enable()
+		e.tick()
+		calls := e.ff.sent()
+		fails := map[string]int{}
+		for _, c := range calls[1:] {
+			fails[c.req.BlockedRef]++
+		}
+		for ref, n := range fails {
+			if n != 1 {
+				t.Errorf("reference %s failed %d times in one run", ref, n)
+			}
+		}
+		if len(calls) != len(refs.Blocked)+1 {
+			t.Fatalf("%d commands, want %d", len(calls), len(refs.Blocked)+1)
+		}
+		if r := e.lastRun(); r.Status != "no_dpi_hop" || r.Reason != ReasonNoHops {
+			t.Fatalf("last run = %+v", r)
+		}
+	})
 }
 
 func TestDisconnectDeletesTheRowsAndTheSettings(t *testing.T) {

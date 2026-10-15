@@ -71,6 +71,14 @@ const (
 	StatusFailed        = "failed"
 )
 
+// The reasons of a no_dpi_hop run (TspuProbeRun.reason).
+const (
+	// ReasonRefsPass: a blocked reference answered, so blocked addresses get through on the probe node's path.
+	ReasonRefsPass = "refs_pass"
+	// ReasonNoHops: no router answered for any reference, so the route is hidden.
+	ReasonNoHops = "no_hops"
+)
+
 // Fleet is the part of the fleet the probe uses.
 type Fleet interface {
 	CountryProbe(ctx context.Context, nodeID string, req fleet.CountryProbeRequest) (fleet.CountryProbeResult, error)
@@ -152,6 +160,8 @@ type lastRun struct {
 	Ref     string `json:"ref,omitempty"`
 	Checked int    `json:"checked,omitempty"`
 	Detail  string `json:"detail,omitempty"`
+	// Reason is why a no_dpi_hop could not place the TSPU (RunRefsPass, RunNoHops); "" when unknown.
+	Reason string `json:"reason,omitempty"`
 }
 
 type settings struct {
@@ -324,21 +334,64 @@ func batches(targets []Node) [][]Node {
 
 func pairKey(n Node, port uint16) string { return n.Address + ":" + strconv.Itoa(int(port)) }
 
-// ask sends one batch. A probe node whose agent cannot place the TSPU with a reference ("no_dpi_hop") is asked once more with
-// the next reference of the list; *ref says which one is current and is left on the one used last.
-func (s *Service) ask(ctx context.Context, probeID string, refs References, ref *int, batch []Node) (fleet.CountryProbeResult, error) {
+// refWalk is a run's walk through the blocked references: the one in use, and those that could not place the TSPU in this run
+// with the agent's reason ("" when it gave none). A reference that failed is not asked again in the same run, so a run costs at
+// most one failed command per reference, however many batches it has.
+type refWalk struct {
+	cur    int
+	failed map[int]string
+}
+
+// ask sends one batch. A probe node whose agent cannot place the TSPU with a reference ("no_dpi_hop") is asked again with the
+// next one that has not failed yet in this run, until one places it or all have failed.
+func (s *Service) ask(ctx context.Context, probeID string, refs References, w *refWalk, batch []Node) (fleet.CountryProbeResult, error) {
 	req := fleet.CountryProbeRequest{Control: refs.Control, ControlSNI: refs.ControlSNI}
 	for _, n := range batch {
 		req.Targets = append(req.Targets, fleet.CountryProbeTarget{Host: n.Address, Ports: n.Ports})
 	}
-	for attempt := 0; ; attempt++ {
-		req.BlockedRef = refs.Blocked[*ref]
+	for {
+		req.BlockedRef = refs.Blocked[w.cur]
 		res, err := s.cfg.Fleet.CountryProbe(ctx, probeID, req)
-		if err != nil || res.Code != "no_dpi_hop" || attempt > 0 || len(refs.Blocked) < 2 {
+		if err != nil || res.Code != "no_dpi_hop" {
 			return res, err
 		}
-		*ref = (*ref + 1) % len(refs.Blocked)
+		w.failed[w.cur] = res.Reason
+		next := -1
+		for i := 1; i < len(refs.Blocked); i++ {
+			if j := (w.cur + i) % len(refs.Blocked); !has(w.failed, j) {
+				next = j
+				break
+			}
+		}
+		if next < 0 {
+			return res, nil
+		}
+		w.cur = next
 	}
+}
+
+func has(m map[int]string, k int) bool { _, ok := m[k]; return ok }
+
+// reason folds why the references failed into the run's reason: ReasonRefsPass when any of them got an answer from its end
+// (blocked addresses get through here), else ReasonNoHops when every one saw no router, else "" (not known, e.g. an older agent).
+func (w *refWalk) reason() string {
+	if len(w.failed) == 0 {
+		return ""
+	}
+	all := true
+	for _, r := range w.failed {
+		switch r {
+		case "ref_open", "ref_refused":
+			return ReasonRefsPass
+		case "no_hops":
+		default:
+			all = false
+		}
+	}
+	if all {
+		return ReasonNoHops
+	}
+	return ""
 }
 
 // transportDetail names why no answer came.
@@ -360,15 +413,15 @@ func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe No
 		return outcome{}, errors.New("countryprobe: no references for the country")
 	}
 	out := outcome{run: lastRun{Node: probe.ID}}
-	ref := 0
+	w := &refWalk{failed: map[int]string{}}
 	if st.last.Node == probe.ID {
 		if i := slices.Index(refs.Blocked, st.last.Ref); i >= 0 {
-			ref = i // start with the reference that worked last time
+			w.cur = i // start with the reference that worked last time
 		}
 	}
 	out.run.Status = StatusOK
 	for _, batch := range batches(targetsOf(probe, nodes)) {
-		res, err := s.ask(ctx, probe.ID, refs, &ref, batch)
+		res, err := s.ask(ctx, probe.ID, refs, w, batch)
 		if ctx.Err() != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return outcome{}, errSwitchedOff
 		}
@@ -377,13 +430,13 @@ func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe No
 			out.run.Status, out.run.Detail = StatusFailed, transportDetail(err)
 			break
 		}
-		out.run.DPIHop, out.run.Ref = res.DPIHop, refs.Blocked[ref]
+		out.run.DPIHop, out.run.Ref = res.DPIHop, refs.Blocked[w.cur]
 		switch res.Code {
 		case "":
 		case "control_failed":
 			out.run.Status = StatusControlFailed
 		case "no_dpi_hop":
-			out.run.Status = StatusNoDPIHop
+			out.run.Status, out.run.Reason = StatusNoDPIHop, w.reason()
 		case "busy":
 			out.run.Status = StatusBusy
 		default:
@@ -559,7 +612,7 @@ func owner(ctx context.Context) (store.Admin, error) {
 
 func runMsg(r lastRun) *adminv1.TspuProbeRun {
 	return &adminv1.TspuProbeRun{Status: r.Status, AtUnix: r.At, NodeId: r.Node, DpiHop: uint32(max(r.DPIHop, 0)), BlockedRef: r.Ref,
-		NodesChecked: uint32(max(r.Checked, 0)), Detail: r.Detail}
+		NodesChecked: uint32(max(r.Checked, 0)), Detail: r.Detail, Reason: r.Reason}
 }
 
 // current is the settings as an answer: the probe node picker lists every active node, those in the selected country first.

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -91,6 +92,18 @@ func TestChecksResultsContent(t *testing.T) {
 	}
 	if r := v.TSPUProbe; r == nil || r.Status != "ok" || r.ProbeNode != "de1" || r.DPIHop != 4 || r.BlockedRef != "31.13.72.36" || r.NodesChecked != 2 || r.AtUnix != 1700000400 {
 		t.Errorf("tspu_probe run: %+v", v.TSPUProbe)
+	}
+}
+
+// The tspu_probe view says why a no_dpi_hop could not place the TSPU, and omits the field when it is not known.
+func TestTspuRunViewReason(t *testing.T) {
+	r := &adminv1.TspuProbeRun{Status: "no_dpi_hop", AtUnix: 1700000400, NodeId: nodeA, Reason: "refs_pass"}
+	if v := tspuRunView(r, nil); v.Reason != "refs_pass" {
+		t.Errorf("view = %+v", v)
+	}
+	b, _ := json.Marshal(tspuRunView(&adminv1.TspuProbeRun{Status: "no_dpi_hop"}, nil))
+	if strings.Contains(string(b), "reason") {
+		t.Errorf("unknown reason is shown: %s", b)
 	}
 }
 

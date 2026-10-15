@@ -93,6 +93,31 @@ func TestCountryProbeAnswersThatAreNotVerdicts(t *testing.T) {
 	}
 }
 
+// A no_dpi_hop carries the agent's reason; an older agent sends none, and a word nobody knows is left out.
+func TestCountryProbeNoDPIHopReason(t *testing.T) {
+	for name, tc := range map[string]struct {
+		params map[string]string
+		want   string
+	}{
+		"ref open":     {map[string]string{"reason": "ref_open"}, "ref_open"},
+		"ref refused":  {map[string]string{"reason": "ref_refused"}, "ref_refused"},
+		"no hops":      {map[string]string{"reason": "no_hops"}, "no_hops"},
+		"no ref":       {map[string]string{"reason": "no_ref"}, "no_ref"},
+		"an old agent": {nil, ""},
+		"a new word":   {map[string]string{"reason": "unheard of"}, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			a := e.enroll("ru-probe")
+			c, _, _ := connectCaps(a, "ru-probe-1", capCountryProbe)
+			_, got := askCountry(t, e, a, c, &agentv1.CommandResult{Error: "no_dpi_hop", Params: tc.params})
+			if got.err != nil || got.res.Code != "no_dpi_hop" || got.res.Reason != tc.want {
+				t.Fatalf("result = %+v, err %v; want reason %q", got.res, got.err, tc.want)
+			}
+		})
+	}
+}
+
 func TestCountryProbeLeavesOutWhatIsNotAVerdict(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("ru-probe")

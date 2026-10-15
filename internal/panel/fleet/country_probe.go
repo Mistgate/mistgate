@@ -38,12 +38,14 @@ type CountryProbeRequest struct {
 // CountryProbeResult is the agent's answer. Code is "" when the probe ran; otherwise the agent's word for why it did not:
 // control_failed (the method does not apply on that network, no verdict about any node; DPIHop is set), no_dpi_hop, busy,
 // bad_params, unsupported_host, unsupported, or failed. Verdicts maps "host:port" to blocked | open | refused | timeout,
-// for the pairs the agent answered.
+// for the pairs the agent answered. Reason is the agent's word for why a no_dpi_hop could not place the box (ref_open,
+// ref_refused, no_hops, no_ref); "" for any other code and for an agent that does not say.
 type CountryProbeResult struct {
 	DPIHop    int
 	ControlOK bool
 	Verdicts  map[string]string
 	Code      string
+	Reason    string
 }
 
 // CountryProbe asks one node to run the probe and returns its answer. An error means no answer at all: the node is offline,
@@ -76,6 +78,9 @@ func parseCountryProbe(result *agentv1.CommandResult, req CountryProbeRequest) C
 	out.ControlOK = result.Params["control"] == "ok"
 	if !result.Ok {
 		out.Code = countryProbeCode(result.Error)
+		if out.Code == "no_dpi_hop" {
+			out.Reason = noDPIHopReason(result.Params["reason"])
+		}
 		return out
 	}
 	out.Verdicts = make(map[string]string)
@@ -98,6 +103,15 @@ func countryProbeCode(agentError string) string {
 	default:
 		return "failed"
 	}
+}
+
+// noDPIHopReason keeps the agent's four words and drops anything else.
+func noDPIHopReason(r string) string {
+	switch r {
+	case "ref_open", "ref_refused", "no_hops", "no_ref":
+		return r
+	}
+	return ""
 }
 
 func validCountryVerdict(v string) bool {

@@ -114,7 +114,7 @@ type TspuProbeRun struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "ok": the probe ran and rows were stored. "control_failed": the control address is blocked behind the TSPU on this network,
 	// so the method does not apply there (no verdict about any node). "no_dpi_hop": the TSPU could not be placed (every reference
-	// address was tried; check the references). "busy": the agent was busy, tried again later. "failed": no answer or an error.
+	// address was tried; see reason). "busy": the agent was busy, tried again later. "failed": no answer or an error.
 	Status string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	// When it ended.
 	AtUnix int64 `protobuf:"varint,2,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
@@ -127,7 +127,11 @@ type TspuProbeRun struct {
 	// Nodes that got a verdict in the run.
 	NodesChecked uint32 `protobuf:"varint,6,opt,name=nodes_checked,json=nodesChecked,proto3" json:"nodes_checked,omitempty"`
 	// For "failed", a machine word: "agent_too_old", "unreachable", "timeout", "agent_error"; "" otherwise.
-	Detail        string `protobuf:"bytes,7,opt,name=detail,proto3" json:"detail,omitempty"`
+	Detail string `protobuf:"bytes,7,opt,name=detail,proto3" json:"detail,omitempty"`
+	// For "no_dpi_hop", why the TSPU could not be placed: "refs_pass" (a reference address answered, so blocked addresses get
+	// through on the probe node's path: it has no TSPU this method can see), "no_hops" (no router on the path answered, so the
+	// route is hidden); "" when unknown (an older agent) and for every other status.
+	Reason        string `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -207,6 +211,13 @@ func (x *TspuProbeRun) GetNodesChecked() uint32 {
 func (x *TspuProbeRun) GetDetail() string {
 	if x != nil {
 		return x.Detail
+	}
+	return ""
+}
+
+func (x *TspuProbeRun) GetReason() string {
+	if x != nil {
+		return x.Reason
 	}
 	return ""
 }
@@ -798,7 +809,7 @@ const file_mistgate_admin_v1_tspu_probe_proto_rawDesc = "" +
 	"\n" +
 	"in_country\x18\x04 \x01(\bR\tinCountry\x12\x1a\n" +
 	"\bdeclares\x18\x05 \x01(\bR\bdeclares\x12\x16\n" +
-	"\x06online\x18\x06 \x01(\bR\x06online\"\xd3\x01\n" +
+	"\x06online\x18\x06 \x01(\bR\x06online\"\xeb\x01\n" +
 	"\fTspuProbeRun\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1b\n" +
 	"\aat_unix\x18\x02 \x01(\x03B\x020\x02R\x06atUnix\x12\x17\n" +
@@ -807,7 +818,8 @@ const file_mistgate_admin_v1_tspu_probe_proto_rawDesc = "" +
 	"\vblocked_ref\x18\x05 \x01(\tR\n" +
 	"blockedRef\x12#\n" +
 	"\rnodes_checked\x18\x06 \x01(\rR\fnodesChecked\x12\x16\n" +
-	"\x06detail\x18\a \x01(\tR\x06detail\"\xb5\x02\n" +
+	"\x06detail\x18\a \x01(\tR\x06detail\x12\x16\n" +
+	"\x06reason\x18\b \x01(\tR\x06reason\"\xb5\x02\n" +
 	"\x11TspuProbeSettings\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1c\n" +
 	"\tavailable\x18\x02 \x01(\bR\tavailable\x12-\n" +
