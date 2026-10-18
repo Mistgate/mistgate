@@ -43,14 +43,15 @@ func (c *clock) Advance(d time.Duration) {
 
 // fakeFleet is the fleet as the updates module sees it: the test plays the nodes.
 type fakeFleet struct {
-	mu       sync.Mutex
-	live     map[string]bool
-	liveErr  error
-	caps     map[string][]string
-	drift    map[string]bool
-	online   map[string]int
-	updates  []string // node ids UpdateAgent was sent to, in order
-	rollback []string
+	mu        sync.Mutex
+	live      map[string]bool
+	noSession map[string]bool // test-only override for a fresh durable projection after a panel restart
+	liveErr   error
+	caps      map[string][]string
+	drift     map[string]bool
+	online    map[string]int
+	updates   []string // node ids UpdateAgent was sent to, in order
+	rollback  []string
 	// onUpdate / onRollback decide the answer; nil = ok. They run in the command goroutine.
 	onUpdate   func(node string) (*agentv1.CommandResult, error)
 	onRollback func(node string) (*agentv1.CommandResult, error)
@@ -59,7 +60,13 @@ type fakeFleet struct {
 }
 
 func newFakeFleet() *fakeFleet {
-	return &fakeFleet{live: map[string]bool{}, caps: map[string][]string{}, drift: map[string]bool{}, online: map[string]int{}}
+	return &fakeFleet{live: map[string]bool{}, noSession: map[string]bool{}, caps: map[string][]string{}, drift: map[string]bool{}, online: map[string]int{}}
+}
+
+func (f *fakeFleet) HasSession(nodeID string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.live[nodeID] && !f.noSession[nodeID]
 }
 
 func (f *fakeFleet) Live(context.Context) ([]store.NodeLiveRow, error) {

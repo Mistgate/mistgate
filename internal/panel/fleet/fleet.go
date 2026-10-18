@@ -151,6 +151,13 @@ type Fleet struct {
 	settleUDP     func(context.Context) error
 }
 
+// HasSession reports whether this process currently owns the node's agent stream.
+func (f *Fleet) HasSession(nodeID string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.sessions[nodeID] != nil
+}
+
 // New builds the module: it loads (or creates) the panel CA. Call Run to start the background work.
 func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (*Fleet, error) {
 	if cfg.AgentSNI == "" {

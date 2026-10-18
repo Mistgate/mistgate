@@ -202,7 +202,7 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 			}
 			continue
 		}
-		if !node.connected || !updatable(node.state) {
+		if !node.connected || !s.fl.HasSession(schedule.NodeID) || !updatable(node.state) {
 			continue
 		}
 		actor := schedule.CreatedBy

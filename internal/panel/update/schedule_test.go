@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -35,6 +36,47 @@ func TestParseScheduleLocalTimeFixedOffset(t *testing.T) {
 
 func scheduleLocalAfter(e *env, d time.Duration, offset int32) string {
 	return e.clk.Now().Add(d).In(time.FixedZone("schedule", int(offset)*60)).Format("2006-01-02T15:04")
+}
+
+func TestScheduledUpdateSurvivesPanelRestartBeforeReconnect(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	id := e.addNode("scheduled_reconnect", nodeOpts{})
+	b := e.s.current()
+	local := scheduleLocalAfter(e, 2*time.Minute, defaultScheduleTimezoneOffsetMin)
+	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, local, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); err != nil {
+		t.Fatal(err)
+	}
+
+	e.restart()
+	e.clk.Advance(3 * time.Minute)
+	e.fl.mu.Lock()
+	e.fl.noSession[id] = true // the durable projection is fresh, but this process has no stream
+	e.fl.mu.Unlock()
+	rows, err := e.fl.Live(e.ctx)
+	if err != nil || len(rows) != 1 || !rows[0].Connected {
+		t.Fatalf("durable live projection after restart = %+v, %v; want connected", rows, err)
+	}
+	e.s.processScheduledNodeUpdates(e.ctx)
+	if got, err := e.st.NodeUpdateSchedules(e.ctx); err != nil || len(got) != 1 {
+		t.Fatalf("schedule before reconnect = %+v, %v; want it retained", got, err)
+	}
+	if _, err := e.st.ActiveRollout(e.ctx); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("scheduled rollout without a current stream = %v", err)
+	}
+
+	e.fl.mu.Lock()
+	delete(e.fl.noSession, id)
+	e.fl.onUpdate = func(node string) (*agentv1.CommandResult, error) {
+		e.upgrade(node)
+		return okResult(), nil
+	}
+	e.fl.mu.Unlock()
+	e.s.processScheduledNodeUpdates(e.ctx)
+	e.tick()
+	if node, err := e.st.Node(e.ctx, id); err != nil || node.AgentBuilt != newBuilt {
+		t.Fatalf("node after reconnect update = %+v, %v; want build %d", node, err, newBuilt)
+	}
 }
 
 func TestScheduledNodeUpdateSurvivesRestartAndRunsOnlyForSelectedNode(t *testing.T) {

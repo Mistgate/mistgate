@@ -36,6 +36,8 @@ type Fleet interface {
 	Live(ctx context.Context) ([]store.NodeLiveRow, error)
 	// NodeLive reads one node's durable liveness projection.
 	NodeLive(ctx context.Context, nodeID string) (store.NodeLiveRow, error)
+	// HasSession reports whether this panel process currently owns the node's agent stream.
+	HasSession(nodeID string) bool
 	// UpdateAgent sends a signed manifest and waits for the CommandResult (the download is part of it).
 	// FAILED_PRECONDITION when the node is not connected or did not list "update/1": nothing was sent.
 	UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error)
