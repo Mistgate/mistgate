@@ -674,6 +674,38 @@ func TestBaseMismatchAndDrift(t *testing.T) {
 	_ = ds
 }
 
+// A new agent build that observes its state right reconnects with exactly what the panel wants. Nothing is resent, so the
+// Hello itself must clear the drift an older build left and record the applied hash that the update gate compares.
+func TestHelloInSyncClearsAnEarlierDrift(t *testing.T) {
+	e := newEnv(t)
+	e.run()
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	c, _, ds := connectFull(a, "inst1")
+	c.send(0, applied(ds, "deadbeef"))
+	again := c.desired()
+	c.send(0, applied(again, "deadbeef"))
+	c.quiet(300 * time.Millisecond)
+	if n, _ := e.st.Node(e.ctx, a.nodeID); n.AppliedHash == n.DesiredHash {
+		t.Fatalf("setup: the drifting node's applied hash already matches: %+v", n)
+	}
+
+	c.st.CloseRequest()
+	c.ended()
+	c2 := a.open()
+	c2.send(0, hello("inst1", again.Revision, again.StateHash))
+	c2.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
+	c2.quiet(300 * time.Millisecond)
+	n, err := e.st.Node(e.ctx, a.nodeID)
+	if err != nil || n.AppliedHash != n.DesiredHash || n.AppliedHash != again.StateHash {
+		t.Errorf("applied %q, desired %q, sent %q (%v)", n.AppliedHash, n.DesiredHash, again.StateHash, err)
+	}
+	rows, err := e.st.NodeLive(e.ctx, time.Now(), a.nodeID, false)
+	if err != nil || len(rows) != 1 || rows[0].Drift {
+		t.Errorf("node_live after an in-sync hello: %v %+v", err, rows)
+	}
+}
+
 func TestApplyResultBaseMismatchResendPrecedesDesiredChange(t *testing.T) {
 	e := newEnv(t)
 	e.run()

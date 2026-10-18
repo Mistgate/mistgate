@@ -360,6 +360,20 @@ func (s *Store) NodeDesired(ctx context.Context, id string, rev uint64, hash str
 	return err
 }
 
+// NodeInSync records a node whose Hello reported the state the panel wants: its applied revision and hash, and no drift in
+// the session's live row.
+func (s *Store) NodeInSync(ctx context.Context, id string, session uint64, rev uint64, hash string) error {
+	sessionID, err := nodeSessionValue(session)
+	if err != nil {
+		return err
+	}
+	_, err = s.batch(ctx,
+		Stmt{Query: `UPDATE node SET applied_revision = ?, applied_hash = ? WHERE id = ?`, Args: []any{int64(rev), hash, id}},
+		Stmt{Query: `UPDATE node_live SET drift = 0 WHERE node_id = ? AND session = ?`, Args: []any{id, sessionID}},
+	)
+	return err
+}
+
 // InboundApplied is one InboundResult as stored on the inbound row.
 type InboundApplied struct {
 	ID, State, Error, SpecHash, CertPin string
