@@ -609,11 +609,20 @@ func TestAwgViaWarpIsRoutedBeforeItServes(t *testing.T) {
 		t.Errorf("a WARP tunnel must not be masqueraded by the tunnel table: %+v", ts)
 	}
 
-	// The routes cannot be installed: the interface is taken down, never left serving with a direct exit.
+	// A live update fails and leaves the old interface up: its held result now carries an error.
+	x.awg.applyErr["inb_a"] = errors.New("live update failed")
+	dsFail := fullState(2, awgInb("inb_a", 51842, "10.66.4", "warp", awgCred("c1"), awgCred("c2")))
+	dsFail.Warp = warpSpecPB(true)
+	if r = mustApply(t, x.panel, dsFail); r.Inbounds[0].Error == "" || !x.awg.has("inb_a") {
+		t.Fatalf("setup: the failed update must leave the old interface up: has=%v %v", x.awg.has("inb_a"), r)
+	}
+
+	// The routes cannot be installed: the interface is taken down, never left serving with a direct exit, even though
+	// its previous apply had failed.
 	x.warp.mu.Lock()
 	x.warp.routeErr = errors.New("rule pref 110 is taken")
 	x.warp.mu.Unlock()
-	ds2 := fullState(2, awgInb("inb_a", 51842, "10.66.4", "warp", awgCred("c1"), awgCred("c2")))
+	ds2 := fullState(3, awgInb("inb_a", 51842, "10.66.4", "warp", awgCred("c1"), awgCred("c2")))
 	ds2.Warp = warpSpecPB(true)
 	r = mustApply(t, x.panel, ds2)
 	if x.awg.has("inb_a") || !strings.Contains(r.Inbounds[0].Error, "warp routing") || r.Inbounds[0].State != pb.InboundRunState_INBOUND_RUN_STATE_FAILED {
@@ -626,6 +635,7 @@ func TestAwgViaWarpIsRoutedBeforeItServes(t *testing.T) {
 	x.warp.mu.Lock()
 	x.warp.routeErr = nil
 	x.warp.mu.Unlock()
+	x.awg.applyErr["inb_a"] = nil
 	eventually(t, func() bool { return x.awg.has("inb_a") }, "the inbound after the routes recovered")
 }
 

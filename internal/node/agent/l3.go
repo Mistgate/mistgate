@@ -363,13 +363,12 @@ func tunnelRejectRequested(ts []hostctl.Tunnel) bool {
 }
 
 // blockedFail is the failure of an inbound that may not run now. A running one is stopped: no engine keeps serving
-// when the host side of its path is gone.
-func (a *Agent) blockedFail(ctx context.Context, spec plugin.InboundSpec, h *held, why string) error {
-	if h != nil && h.res.Error == "" {
-		if e := a.engines[spec.Protocol]; e != nil {
-			if err := e.Remove(ctx, spec.ID); err != nil {
-				a.log.Warn("remove blocked inbound", "inbound", spec.ID, "err", err)
-			}
+// when the host side of its path is gone. Remove is idempotent and runs whatever the held result says: a failed live
+// update leaves the old interface up.
+func (a *Agent) blockedFail(ctx context.Context, spec plugin.InboundSpec, why string) error {
+	if e := a.engines[spec.Protocol]; e != nil {
+		if err := e.Remove(ctx, spec.ID); err != nil {
+			a.log.Warn("remove blocked inbound", "inbound", spec.ID, "err", err)
 		}
 	}
 	return errors.New(why)

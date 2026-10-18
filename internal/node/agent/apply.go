@@ -215,7 +215,7 @@ func (a *Agent) applyInbound(ctx context.Context, in *inbound, now time.Time, fo
 	var rep engine.ApplyReport
 	var err error
 	if blocked {
-		err = a.blockedFail(ctx, spec, h, why)
+		err = a.blockedFail(ctx, spec, why)
 	} else {
 		rep, err = eng.Apply(ctx, spec, creds)
 	}
