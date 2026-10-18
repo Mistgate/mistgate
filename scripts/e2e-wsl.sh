@@ -19,7 +19,9 @@
 # a manual RollbackNode and a second rollout, v3a (stamped older than its manifest: the agent rolls itself back at
 # once), v3b (cannot reach the panel: the agent rolls itself back when its commit window ends; built from a temporary
 # Go overlay of this tree with a dead dialer and a 20 s window, the tree itself has no test switch) and v5 (signed by
-# another key: the agent refuses it). With --old-node the node is a build without update/1 and the step checks that
+# another key: the agent refuses it). Step 2e then puts the node on v1d, a build that reports a wrong state hash (an overlay
+# of apply.go, like v3b; a persistent state_drift and a wrong applied hash, as the split-peer bug left in a fleet) and rolls it
+# out to v2: the update gate must pass and the stale drift and applied hash must clear. With --old-node the node is a build without update/1 and the step checks that
 # it is shown as UNSUPPORTED and never sent an update.
 #
 # SSH install (step 10b, scripts/e2e/sshnode.sh): after the first node is retired, a real OpenSSH sshd in the run's namespace
@@ -539,6 +541,13 @@ sed 's/DialContext:[[:space:]]*(&net.Dialer{Timeout: dial, KeepAlive: 30 \* time
 jq -nc --arg a "$REPO/internal/node/update/update.go" --arg b "$OVL/update.go" --arg c "$REPO/internal/node/agent/identity.go" --arg d "$OVL/identity.go" \
   '{Replace: {($a): $b, ($c): $d}}' >"$OVL/overlay.json"
 node_build v3b 0.1.0-e2e-v3b "$B3B" "$KEY_A" -overlay "$OVL/overlay.json"
+# v1d (step 2e) is v1 that reports a wrong state hash, in the Hello and in every ApplyResult, as the builds with the split-peer
+# bug did. Built the same way: an overlay replaces apply.go, so the tree and the release builds carry no test switch.
+sed '/^func (a \*Agent) observedHash/,/^}/ s/return statehash.StateWarp(all, m.warp)/return "00drift" + statehash.StateWarp(all, m.warp)/' \
+  "$REPO/internal/node/agent/apply.go" >"$OVL/apply.go"
+! cmp -s "$OVL/apply.go" "$REPO/internal/node/agent/apply.go" || die "e2e overlay: the wrong-hash patch did not apply (observedHash changed?)"
+jq -nc --arg a "$REPO/internal/node/agent/apply.go" --arg b "$OVL/apply.go" '{Replace: {($a): $b}}' >"$OVL/drift.json"
+node_build v1d 0.1.0-e2e-v1d "$B1" "$KEY_A" -overlay "$OVL/drift.json"
 fi
 cp "$WORK/rel/v1/mistgate-node-linux-$ARCH" "$BIN/mistgate-node"
 go build -trimpath -o "$BIN/h3get" ./scripts/e2e/h3get
@@ -949,6 +958,71 @@ else
   [ "$(node_ustate)" = NODE_UPDATE_STATE_UP_TO_DATE ] || die "after the whole scenario the node is $(node_ustate), want UP_TO_DATE"
   wait_for 60 "both inbounds ACTIVE" inbounds_active 2 || die "inbounds not ACTIVE after the update scenario"
   pass "panel under test restored with the v2 bundle: node UP_TO_DATE on built $B2, inbounds ACTIVE (the traffic steps below run on the updated node)"
+
+  # ---- 2e: an upgrade from an agent build that reports a wrong state hash. The panel marks a persistent drift and stores that
+  # wrong hash as the applied one; the correct build says the right hash in its Hello, so the panel sends nothing, and the update
+  # gate (drift, applied hash against the desired one) must still pass. Fleets in this state were rolled back (state_not_applied).
+  step "2e. updates: a node on a build that reports a wrong state hash is upgraded to a correct one"
+  T_E=$(date +%s)
+  node_reason() { api NodeService/ListNodes '{"includeRetired":true}' | jq -r --arg n "$NODE_NAME" '.nodes[] | select(.name == $n) | .reason.code // ""'; }
+  node_hashes() { # the panel's row: <desired hash> <applied hash> <drift of the live row>
+    python3 - "$DATA/mistgate.db" "$NODE_ID" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect("file:%s?mode=ro" % sys.argv[1], uri=True, timeout=10)
+print(*c.execute("SELECT n.desired_hash, n.applied_hash, COALESCE(l.drift, 0) FROM node n LEFT JOIN node_live l ON l.node_id = n.id WHERE n.id = ?", (sys.argv[2],)).fetchone())
+PY
+  }
+  drift_persists_since() { # <event id>
+    api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":200}" \
+      | jq -e --argjson m "$1" '[(.events // [])[] | select((.id | tonumber) > $m and .code == "state_drift" and .params.persists == "true")] | length >= 1'
+  }
+  drift_alert() { api HealthService/ListAlerts "{\"nodeId\":\"$NODE_ID\"}" | jq -e '[(.active // [])[] | select(.kind == "ALERT_KIND_STATE_DRIFT")] | length == 1'; }
+  no_drift_alert() { api HealthService/ListAlerts "{\"nodeId\":\"$NODE_ID\"}" | jq -e '[(.active // [])[] | select(.kind == "ALERT_KIND_STATE_DRIFT")] | length == 0'; }
+  in_sync() { local d a f; read -r d a f < <(node_hashes); [ -n "$d" ] && [ "$d" = "$a" ] && [ "$f" = 0 ] && [ "$(node_reason)" != state_drift ]; }
+  last_event() { api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":1}" | jq -r '(.events[0].id // "0") | tonumber'; }
+  start_faulty() { # a start on the wrong-hash build: a new session, so the drift is found again from the Hello
+    DRIFT_MARK=$(last_event)
+    start_node
+    NODE_PID=$LAST_PID
+    wait_for 60 "node ONLINE on the wrong-hash build" node_online || die "2e: the node did not come back on v1d (status: $(node_status))"
+    wait_for 90 "a persistent state_drift" drift_persists_since "$DRIFT_MARK" || die "2e: no state_drift persists=true event from v1d: $(node_events_since "$DRIFT_MARK" | sort | uniq -c | tr '\n' ' ')"
+    wait_for 60 "the node reason state_drift" test "$(node_reason)" = state_drift || die "2e: node reason is '$(node_reason)', want state_drift"
+    read -r D_HASH A_HASH D_FLAG < <(node_hashes)
+    [ -n "$D_HASH" ] && [ "$A_HASH" != "$D_HASH" ] && [ "$D_FLAG" = 1 ] || die "2e: on v1d desired=$D_HASH applied=$A_HASH drift=$D_FLAG, want applied != desired and drift"
+    case $A_HASH in 00drift*) ;; *) die "2e: the stored applied hash is not v1d's" ;; esac
+  }
+  stop_pid "$NODE_PID"
+  wait_for 30 "the panel to see the node go" node_offline || die "2e: the node is still ONLINE after its agent stopped"
+  cp "$WORK/rel/v1d/mistgate-node-linux-$ARCH" "$NODE_BIN"
+  rm -f "$NODE_BIN.prev"
+  start_faulty
+  wait_for 90 "a STATE_DRIFT alert" drift_alert || die "2e: no STATE_DRIFT alert for the node on v1d"
+  node_built_is "$B1" || die "2e: the node reports built $(node_built), want $B1"
+  # the fix must not hide a real mismatch: the same build again, a new session, finds the drift again and keeps it
+  stop_pid "$NODE_PID"
+  wait_for 30 "the panel to see the node go" node_offline || die "2e: the node is still ONLINE after its agent stopped"
+  start_faulty
+  pass "v1d (wrong state hash): state_drift persists=true, node reason state_drift, STATE_DRIFT alert, applied hash != desired; restarted, it is found drifting again (a real mismatch stays visible)"
+
+  EVENT_MARK_E=$(last_event)
+  RID=$(start_rollout "{\"nodeIds\":[\"$NODE_ID\"]}")
+  [ -n "$RID" ] && [ "$RID" != null ] || die "2e: StartRollout returned no rollout id"
+  wait_for 300 "the rollout v1d -> v2 to settle" ro_settled || die "2e: the rollout did not settle: $(ro_brief)"
+  [ "$(ro_status)" = ROLLOUT_STATUS_DONE ] || die "2e: rollout v1d -> v2 ended as $(ro_status), want DONE (an old build's drift must not fail the gate): $(ro_brief)"
+  ro_step | jq -e '.state == "STEP_STATE_PASSED" and ((.errorKey // "") == "")' >/dev/null || die "2e: the step is not PASSED: $(ro_step)"
+  node_built_is "$B2" || die "2e: after the rollout the node reports built $(node_built), want $B2"
+  alive "$NODE_PID" && [ "$(readlink "/proc/$NODE_PID/exe")" = "$NODE_BIN" ] || die "2e: the update did not re-execute pid $NODE_PID in place"
+  cmp -s "$NODE_BIN" "$WORK/rel/v2/mistgate-node-linux-$ARCH" || die "2e: the installed binary is not v2"
+  cmp -s "$NODE_BIN.prev" "$WORK/rel/v1d/mistgate-node-linux-$ARCH" || die "2e: $NODE_BIN.prev is not v1d"
+  wait_for 60 "the agent to commit" test ! -e "$NODE_STATE/update.pending" || die "2e: update.pending never went"
+  wait_for 60 "the drift to clear and the hashes to match" in_sync || die "2e: after the upgrade: reason '$(node_reason)', desired/applied/drift: $(node_hashes)"
+  wait_for 60 "the STATE_DRIFT alert to close" no_drift_alert || die "2e: the STATE_DRIFT alert is still open after the upgrade"
+  CODES=$(node_events_since "$EVENT_MARK_E" | sort | uniq -c | tr '\n' ' ')
+  node_events_since "$EVENT_MARK_E" | grep -qx update_committed || die "2e: no update_committed event (events: $CODES)"
+  ! node_events_since "$EVENT_MARK_E" | grep -Eqx 'update_step_rolled_back|update_step_failed|state_drift|node_down' || die "2e: the upgrade rolled back or drifted (events: $CODES)"
+  wait_for 60 "both inbounds ACTIVE" inbounds_active 2 || die "2e: inbounds not ACTIVE after the upgrade"
+  [ "$(node_ustate)" = NODE_UPDATE_STATE_UP_TO_DATE ] || die "2e: the node is $(node_ustate), want UP_TO_DATE"
+  pass "v1d -> v2: rollout DONE, step PASSED (no state_not_applied, no rollback), node on built $B2 and committed; the stale drift is gone (reason, live row, STATE_DRIFT alert), applied hash == desired hash (events: $CODES; $(($(date +%s) - T_E)) s for 2e)"
 fi
 
 # ================================================================ 3. user and subscription
