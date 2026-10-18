@@ -65,7 +65,7 @@ func dialVLESS(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
 	select { // each helper is an Xray process of ~40 MB inside the panel's memory budget
 	case vlessHelperSlots <- struct{}{}:
 	case <-ctx.Done():
-		return nil, &ProbeError{Code: "timeout", Detail: "waited too long for a free VLESS helper"}
+		return nil, &ProbeError{Code: "timeout", Detail: "waited too long for a free VLESS helper", Skip: true} // the panel's wait, not the node's failure
 	}
 	tunnel, err := startVLESSHelper(ctx, vlesswire.Request{
 		Client: params, SOCKSUsername: username, SOCKSPassword: password,

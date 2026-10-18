@@ -551,3 +551,27 @@ func TestVLESSHelperThatNeverReportsAListenerIsKilledWithTheRound(t *testing.T) 
 		t.Fatalf("silent helper: err=%v after %v", err, time.Since(started))
 	}
 }
+
+// Both helper slots are busy (a VLESS node that is really down holds each for the whole round budget, its retry again).
+// A healthy VLESS inbound waiting for a slot is a panel-side wait: its round is skipped, not recorded as a failure of the
+// inbound's node.
+func TestVLESSHelperWaitIsSkippedNotAFailure(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.HandshakeTimeout = time.Millisecond; c.ProbeTimeout = time.Millisecond })
+	e.node("de1", "hetzner", true)
+	in := e.vlessInbound("de1", 443)
+	sn, err := e.s.snapshot(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tg := sn.targets[in]
+	if tg == nil || tg.err != nil {
+		t.Fatalf("target: %+v", tg)
+	}
+	vlessHelperSlots <- struct{}{}
+	vlessHelperSlots <- struct{}{}
+	defer func() { <-vlessHelperSlots; <-vlessHelperSlots }()
+	res, skipped := e.s.attempt(e.ctx, tg)
+	if !skipped {
+		t.Errorf("a panel-side wait for a helper is not a failed round of the node: code %q, detail %q", res.ErrorCode, res.ErrorDetail)
+	}
+}
