@@ -1038,6 +1038,63 @@ func TestUpdateTimeouts(t *testing.T) {
 	})
 }
 
+func TestUpdateTimeoutDefersWhenNodeReadFailsOnce(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	nodeID := e.addNode("timeout_read_error", nodeOpts{})
+	e.st.R.SetMaxOpenConns(1)
+	e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+		if _, err := e.st.R.ExecContext(e.ctx, `PRAGMA query_only = OFF`); err != nil {
+			t.Errorf("enable transient reader setup: %v", err)
+		}
+		if _, err := e.st.R.ExecContext(e.ctx, `CREATE TEMP VIEW node AS SELECT 1 AS injected`); err != nil {
+			t.Errorf("inject a transient node read error: %v", err)
+		}
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("the node did not answer in time"))
+	}
+	e.startRollout()
+	e.tick()
+	if _, err := e.st.R.ExecContext(e.ctx, `DROP VIEW temp.node`); err != nil {
+		t.Fatalf("remove transient node read error: %v", err)
+	}
+	if _, err := e.st.R.ExecContext(e.ctx, `PRAGMA query_only = ON`); err != nil {
+		t.Fatalf("restore read-only reader: %v", err)
+	}
+	e.wantStep(nodeID, store.StepSent, "")
+
+	e.upgrade(nodeID)
+	e.tick()
+	e.wantStep(nodeID, store.StepGating, "")
+}
+
+func TestFinalStepWriteFailureDoesNotFinishRollout(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	nodeID := e.addNode("final_step_write", nodeOpts{})
+	e.fl.onUpdate = func(node string) (*agentv1.CommandResult, error) {
+		e.upgrade(node)
+		e.commit(node)
+		return okResult(), nil
+	}
+	e.startRollout()
+	e.tick()
+	e.tick()
+	e.wantStep(nodeID, store.StepGating, "")
+	e.exec(`CREATE TRIGGER fail_final_step_write BEFORE UPDATE ON update_step
+		WHEN NEW.state = 'passed' BEGIN SELECT RAISE(FAIL, 'injected step write failure'); END`)
+
+	e.tick()
+	if _, err := e.st.ActiveRollout(e.ctx); err != nil {
+		t.Fatalf("rollout after failed final step write = %v; want it to remain active", err)
+	}
+	e.wantStep(nodeID, store.StepGating, "")
+	e.exec(`DROP TRIGGER fail_final_step_write`)
+
+	e.tick()
+	e.wantStep(nodeID, store.StepPassed, "")
+	e.wantRollout(store.RolloutDone, "")
+}
+
 func TestPauseResumeCancel(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()

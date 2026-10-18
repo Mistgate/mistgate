@@ -538,16 +538,22 @@ func (s *Service) tick(ctx context.Context) {
 }
 
 // save writes a step, logging a failure (the next pass sees the old row and tries again).
-func (p *pass) save(x *store.StepRow) {
+func (p *pass) save(x *store.StepRow) bool {
 	if err := p.s.st.SaveStep(p.ctx, *x); err != nil {
 		p.s.log.Warn("update: save step", "node", x.NodeID, "err", err)
+		return false
 	}
+	return true
 }
 
 // finish records the outcome of a step.
 func (p *pass) finish(x *store.StepRow, state, key string, params map[string]string) {
-	x.State, x.ErrorKey, x.Params, x.FinishedAt = state, key, params, p.now
-	p.save(x)
+	updated := *x
+	updated.State, updated.ErrorKey, updated.Params, updated.FinishedAt = state, key, params, p.now
+	if !p.save(&updated) {
+		return
+	}
+	*x = updated
 	delete(p.s.failing, x.NodeID)
 	p.event(x, state, key)
 	if state == store.StepPassed {
@@ -998,14 +1004,16 @@ func (s *Service) onUpdateAnswer(rolloutID, nodeID string, res *agentv1.CommandR
 			}
 			p.finish(x, store.StepSkipped, key, nil)
 		case connect.CodeDeadlineExceeded: // no answer in AnswerWait: the node may still have updated; look before judging
-			if n, nodeErr := s.st.Node(ctx, x.NodeID); nodeErr == nil {
-				live, liveErr := s.fl.NodeLive(ctx, x.NodeID)
-				if liveErr != nil {
-					return // the next pass can decide with a fresh projection
-				}
-				if live.Connected && n.AgentBuilt >= p.ro.ToBuilt {
-					return
-				}
+			n, nodeErr := s.st.Node(ctx, x.NodeID)
+			if nodeErr != nil {
+				return // the next pass can decide with a fresh node row
+			}
+			live, liveErr := s.fl.NodeLive(ctx, x.NodeID)
+			if liveErr != nil {
+				return // the next pass can decide with a fresh projection
+			}
+			if live.Connected && n.AgentBuilt >= p.ro.ToBuilt {
+				return
 			}
 			p.finish(x, store.StepFailed, errNoAnswer, nil)
 			p.pause(pauseGateFailed, x, errNoAnswer)
