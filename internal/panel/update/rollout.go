@@ -766,6 +766,13 @@ func (p *pass) advanceGate(i int) {
 		return
 	}
 	g := p.gate(x, n, live.Drift)
+	if !g.pass && g.hard == "" && deadline {
+		// The node and its live row were read when this pass began; a Hello or an ApplyResult that landed since may have put
+		// the node in order. Look once more before undoing anything.
+		if n2, live2, ok := p.reread(x); ok && live2.Connected {
+			g = p.gate(x, n2, live2.Drift)
+		}
+	}
 	switch {
 	case g.pass:
 		p.finish(x, store.StepPassed, "", nil)
@@ -774,6 +781,19 @@ func (p *pass) advanceGate(i int) {
 	case deadline:
 		p.failGate(x, g.soft, g.with)
 	}
+}
+
+// reread loads the node and its live row afresh, for the last look before a soft gate failure is acted on.
+func (p *pass) reread(x *store.StepRow) (store.NodeRow, store.NodeLiveRow, bool) {
+	n, err := p.s.st.Node(p.ctx, x.NodeID)
+	if err != nil {
+		return n, store.NodeLiveRow{}, false
+	}
+	live, err := p.s.fl.NodeLive(p.ctx, x.NodeID)
+	if err != nil {
+		return n, store.NodeLiveRow{}, false
+	}
+	return n, live, true
 }
 
 // failGate undoes a node whose gate failed: RollbackAgent (in its own goroutine), then the step ends ROLLED_BACK and

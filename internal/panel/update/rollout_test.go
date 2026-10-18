@@ -663,6 +663,35 @@ func TestGateFailureRollsBackAndPauses(t *testing.T) {
 	e.wantRollout(store.RolloutFailed, "") // finished with a rolled back step
 }
 
+// The deadline pass read the node's drift when it began; the drift cleared before the gate acted (a Hello or an
+// ApplyResult landed in between). The last look before a rollback sees it and the step passes.
+func TestGateLooksAgainBeforeRollingBack(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	a := e.addNode("a", nodeOpts{online: 1, inbounds: 1})
+	e.hl.set(a, 1, 1, 0)
+	e.startRollout()
+	e.tick()
+	e.upgrade(a)
+	e.tick()
+	e.commit(a)
+	e.fl.mu.Lock()
+	e.fl.drift[a] = true
+	e.fl.mu.Unlock()
+	e.clk.Advance(2 * time.Minute)
+	e.tick()
+	e.wantStep(a, store.StepGating, "")
+	e.clk.Advance(3*time.Minute + time.Second) // the gate window is over
+	e.fl.mu.Lock()
+	e.fl.afterLive = func(f *fakeFleet) { f.drift[a] = false } // the pass's snapshot still has the drift
+	e.fl.mu.Unlock()
+	e.tick()
+	if got := e.fl.rolledBack(); len(got) != 0 {
+		t.Fatalf("rolled back %v although the node was in order at the last look", got)
+	}
+	e.wantStep(a, store.StepPassed, "")
+}
+
 // Hard failure: an inbound that worked before is FAILED on two evaluations at least 30 s apart: the gate does not
 // wait for its deadline. An inbound that was already FAILED before the update does not count.
 func TestGateFailsAtOnceOnAFailedInbound(t *testing.T) {

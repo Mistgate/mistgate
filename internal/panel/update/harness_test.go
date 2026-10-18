@@ -54,6 +54,8 @@ type fakeFleet struct {
 	// onUpdate / onRollback decide the answer; nil = ok. They run in the command goroutine.
 	onUpdate   func(node string) (*agentv1.CommandResult, error)
 	onRollback func(node string) (*agentv1.CommandResult, error)
+	// afterLive runs (under the lock) once a Live snapshot is built: what it changes is seen by the next read only.
+	afterLive func(f *fakeFleet)
 }
 
 func newFakeFleet() *fakeFleet {
@@ -88,6 +90,9 @@ func (f *fakeFleet) Live(context.Context) ([]store.NodeLiveRow, error) {
 		encoded, _ := json.Marshal(users)
 		rows = append(rows, store.NodeLiveRow{NodeID: id, State: "active", Exists: true, Connected: f.live[id],
 			AgentCaps: f.caps[id], Drift: f.drift[id], UsersJSON: string(encoded)})
+	}
+	if f.afterLive != nil {
+		f.afterLive(f)
 	}
 	return rows, nil
 }

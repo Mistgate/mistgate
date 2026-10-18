@@ -770,8 +770,8 @@ func torrentPortNumber(s string) bool {
 
 func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq uint64, ev *agentv1.Event, now time.Time) {
 	t := time.Unix(ev.TimeUnix, 0).UTC()
-	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) {
-		t = now
+	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) || ev.Code == "update_committed" {
+		t = now // update_committed: the gate compares it with when the panel sent the update, so a node clock behind must not fail it
 	}
 	sev := int(ev.Severity)
 	if sev < 1 || sev > 3 {
@@ -914,14 +914,13 @@ func (c *SessionCore) updateApplyDrift(ctx context.Context, tr *coreTransition, 
 	c.f.event(ctx, 3, "state_drift", tr.state.NodeID, map[string]string{"revision": fmt.Sprint(r.Revision), "persists": "true"})
 }
 
-// helloInSync records a Hello whose applied state is exactly what the panel wants: nothing is sent, so no ApplyResult will
-// clear a drift left from an earlier session (a new agent build that observes its state right, after an old one that did
-// not) or record the applied hash the update gate compares with the desired one.
-func (c *SessionCore) helloInSync(ctx context.Context, nodeID string, state *SessionState) {
+// helloInSync records a Hello whose applied state is exactly what the panel wants. Nothing is sent, so no ApplyResult will
+// record the applied hash that the update gate compares with the desired one; without this, a node that drifted under an old
+// agent build and runs a fixed one keeps the old build's hash and every update of it is rolled back. A failed write ends the
+// session like a failed storeDesired, so the agent reconnects and the write is tried again.
+func (c *SessionCore) helloInSync(ctx context.Context, nodeID string, state *SessionState) error {
 	state.Drift, state.DriftResent = false, false
-	if err := c.f.st.NodeInSync(ctx, nodeID, state.OwnerGeneration, state.HelloAppliedRevision, state.HelloAppliedStateHash); err != nil {
-		c.f.log.Warn("record a node in sync at hello", "node", nodeID, "err", err)
-	}
+	return c.f.st.NodeInSync(ctx, nodeID, state.OwnerGeneration, state.HelloAppliedRevision, state.HelloAppliedStateHash)
 }
 
 func (c *SessionCore) requestDesiredPreparation(tr *coreTransition) {
@@ -990,7 +989,9 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 			state.SentRevision = digest.Revision
 			state.SentStateHash = want.hash
 			state.SentWithheld = slices.Clone(want.withheld)
-			c.helloInSync(ctx, node.ID, state)
+			if err := c.helloInSync(ctx, node.ID, state); err != nil {
+				return err
+			}
 			if sig == state.SentSettingsHash {
 				return nil
 			}
@@ -999,9 +1000,6 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 			state.SentRevision = digest.Revision
 			state.SentStateHash = digest.Hash
 			state.SentWithheld = slices.Clone(want.withheld)
-			if digest.Hash == want.hash {
-				c.helloInSync(ctx, node.ID, state)
-			}
 		}
 	}
 	full := state.FullResendPending || state.SentRevision == 0 || digest == nil ||
