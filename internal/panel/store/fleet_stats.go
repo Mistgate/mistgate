@@ -148,7 +148,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				onNode[id] = protocol
 			}
 			return nil
-		}, `SELECT i.id, p.protocol FROM inbound i JOIN profile p ON p.id = i.profile_id WHERE i.node_id = ?`, in.NodeID)
+		}, `SELECT i.id, p.protocol FROM inbound i JOIN profile p ON p.id = i.profile_id WHERE i.node_id = ?
+			UNION ALL
+			SELECT t.inbound_id, t.protocol FROM node_inbound_stats_tombstone t
+			WHERE t.node_id = ? AND NOT EXISTS (SELECT 1 FROM inbound i WHERE i.id = t.inbound_id AND i.node_id = t.node_id)`, in.NodeID, in.NodeID)
 		r.add(func(rows [][]any) error {
 			for _, row := range rows {
 				var id string

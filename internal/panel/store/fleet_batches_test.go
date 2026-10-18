@@ -292,6 +292,25 @@ func TestIngestStatsKeepsTrafficWhenLiveProjectionIsSkipped(t *testing.T) {
 	}
 }
 
+func TestIngestStatsAfterInboundDelete(t *testing.T) {
+	s := openTemp(t)
+	f := newFleetBatchFixture(t, s, "stats_deleted_inbound")
+	ctx := context.Background()
+	if err := s.Access().DeleteInbound(ctx, f.inboundID, f.now, nil); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.IngestStats(ctx, FleetStatsIn{
+		NodeID: f.nodeID, Instance: "instance-deleted", Seq: 1, Now: f.now, HourStart: f.now.Unix() / 3600 * 3600,
+		Traffic: []FleetTraffic{{CredID: f.credID, InboundID: f.inboundID, Up: 123, Down: 456}},
+	})
+	if err != nil || out.Duplicate || out.Skipped != 0 {
+		t.Fatalf("delayed stats after inbound delete = %+v, %v; want the delta attributed", out, err)
+	}
+	if got := queryInt(t, s, `SELECT used_bytes FROM user WHERE id = ?`, f.userID); got != 579 {
+		t.Fatalf("used_bytes after delayed stats = %d, want 579", got)
+	}
+}
+
 // A batch adds its traffic to the device the credential belongs to, next to the person's total and not twice when it is resent; the live projection names the devices with a session, and OnlineDevices finds them on a connected node only.
 func TestIngestStatsAddsDeviceTrafficAndOnlineDevices(t *testing.T) {
 	s := openTemp(t)

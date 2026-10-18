@@ -339,10 +339,11 @@ func (a Access) RetainedKey(ctx context.Context, profileID, nodeID string) (Acce
 // unreadable key must not make the inbound undeletable).
 func (a Access) DeleteInbound(ctx context.Context, id string, now time.Time, retain func(stateEnc []byte, profileID, nodeID string) ([]byte, error)) error {
 	for range 8 { // the guard pins what retain saw; a change in between starts over
-		var profileID, nodeID, public string
+		var profileID, nodeID, public, protocol string
 		var enc []byte
-		err := a.s.W.QueryRowContext(ctx, `SELECT profile_id, node_id, plugin_state_enc, plugin_public_json FROM inbound WHERE id = ?`, id).
-			Scan(&profileID, &nodeID, &enc, &public)
+		err := a.s.W.QueryRowContext(ctx, `SELECT i.profile_id, i.node_id, i.plugin_state_enc, i.plugin_public_json, p.protocol
+			FROM inbound i JOIN profile p ON p.id = i.profile_id WHERE i.id = ?`, id).
+			Scan(&profileID, &nodeID, &enc, &public, &protocol)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -350,7 +351,8 @@ func (a Access) DeleteInbound(ctx context.Context, id string, now time.Time, ret
 			return err
 		}
 		stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM inbound WHERE id = ? AND profile_id = ? AND node_id = ?
-			AND plugin_state_enc IS ? AND plugin_public_json = ?)`, id, profileID, nodeID, enc, public)}
+			AND plugin_state_enc IS ? AND plugin_public_json = ?)
+			AND EXISTS (SELECT 1 FROM profile WHERE id = ? AND protocol = ?)`, id, profileID, nodeID, enc, public, profileID, protocol)}
 		if retain != nil && len(enc) > 0 {
 			kept, err := retain(enc, profileID, nodeID)
 			if err != nil {
@@ -362,6 +364,8 @@ func (a Access) DeleteInbound(ctx context.Context, id string, now time.Time, ret
 					Args: []any{profileID, nodeID, kept, accPublicJSON(public), unix(now)}})
 			}
 		}
+		stmts = append(stmts, Stmt{Query: `INSERT OR REPLACE INTO node_inbound_stats_tombstone (node_id, inbound_id, protocol)
+			VALUES (?, ?, ?)`, Args: []any{nodeID, id, protocol}})
 		stmts = append(stmts, Stmt{Query: `DELETE FROM inbound WHERE id = ?`, Args: []any{id}})
 		if _, err := a.s.batch(ctx, stmts...); errors.Is(err, errGuard) {
 			continue
