@@ -602,7 +602,7 @@ func TestUsersImpactedIsSuppressedByHeldActiveCheckFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := e.s.derive(e.ctx, e.clock.Now(), sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, mustActiveAlerts(t, e))
-	if !d.holdSynth["de1"] {
+	if !d.holdKeys[key{kCheckFailed, "de1", first}] {
 		t.Fatal("test did not leave CHECK_FAILED in the held state")
 	}
 	if _, ok := d.conds[key{kCheckFailed, "de1", first}]; ok {
@@ -1679,4 +1679,45 @@ func TestSilentNodesStayNodeDownWhenTheyAreNotMostOfTheFleet(t *testing.T) {
 	e.clock.Advance(11 * time.Minute)
 	e.evaluate()
 	want(t, e.active(), "node_down/n1/", "node_down/n2/", "node_down/n3/")
+}
+
+// One inbound of a node stops producing rounds while the node stays connected (every round is skipped by the dialer: an
+// AWG or VLESS client config the probe cannot build, an unreadable probe credential). Its old result goes stale. That is
+// its own question: it must not turn the node's other, passing inbound into a NO_TRAFFIC and must not freeze that
+// inbound's alert once it passes.
+func TestOneStaleInboundDoesNotFreezeTheNodesAlerts(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a, b := e.inbound("de1", 443), e.inbound("de1", 8443)
+	e.pass(b)                         // b's last round; from now on its rounds are skipped
+	e.clock.Advance(12 * time.Minute) // b's result is now older than 2*interval+1m
+	e.fail(a, "tls")
+	e.fail(a, "tls")
+	got := e.active()
+	if _, open := got["no_traffic/de1/"]; open {
+		t.Errorf("b was last seen passing and is not judged: the node is not NO_TRAFFIC (%v)", alertKeys(got))
+	}
+	want(t, got, "check_failed/de1/"+a)
+	for i := 0; i < 5; i++ {
+		e.clock.Advance(time.Minute)
+		e.pass(a)
+	}
+	if len(e.active()) != 0 {
+		t.Errorf("a passed 5 rounds in a row, alerts still open: %v (held by b's stale result)", alertKeys(e.active()))
+	}
+}
+
+// The stale inbound holds its own alert and the node's NO_TRAFFIC, and nothing else of the node.
+func TestStaleInboundHoldsOnlyItsOwnAlerts(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a, b := e.inbound("de1", 443), e.inbound("de1", 8443)
+	e.fail(a, "tls")
+	e.fail(a, "tls")
+	e.fail(b, "tls")
+	e.fail(b, "tls")
+	want(t, e.active(), "no_traffic/de1/")
+	e.clock.Advance(12 * time.Minute) // both results are stale now
+	e.evaluate()
+	want(t, e.active(), "no_traffic/de1/") // held, not resolved by silence
 }

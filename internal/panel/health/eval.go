@@ -104,8 +104,7 @@ type derived struct {
 	holdNode   map[string]bool // not connected, pending: only NODE_DOWN is decided for them
 	holdDown   map[string]bool // not connected and inside the start grace: NODE_DOWN stays as it is
 	holdDoctor map[string]bool // the doctor report is stale: doctor alerts stay as they are
-	holdSynth  map[string]bool // a check result of the node is stale (no round since it came back): check alerts stay
-	holdKeys   map[key]bool    // an alert's comparison window is still warming up
+	holdKeys   map[key]bool    // an alert cannot be judged yet: its comparison window is warming up, or the check result behind it is stale
 	superseded map[key]bool    // an open alert is explained by a more specific current check alert
 	guard      bool            // the panel's own network is suspect: no per-node synthetic alert is raised
 	health     map[string]nodeHealth
@@ -126,8 +125,6 @@ func (d *derived) holds(a store.HealthAlert) bool {
 	case a.Kind == kNodeDown:
 		return d.holdDown[a.NodeID]
 	case d.holdNode[a.NodeID]:
-		return true
-	case d.holdSynth[a.NodeID] && (a.Kind == kCheckFailed || a.Kind == kNoTraffic):
 		return true
 	case d.holdDoctor[a.NodeID] && (a.Kind == kDoctorWarn || a.Kind == kDoctorFail || a.Kind == kCertExpiry):
 		return true
@@ -234,7 +231,7 @@ func accepted(r store.DoctorRow, acc map[string]store.DoctorAccept) (store.Docto
 func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live map[string]store.NodeLiveRow, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept,
 	signals store.HealthSignalBatch, portChecks []store.PortCheck, active []store.HealthAlert) *derived {
 	d := &derived{conds: map[key]cond{}, accepted: map[key]bool{}, nodes: map[string]bool{}, holdNode: map[string]bool{}, holdDown: map[string]bool{},
-		holdDoctor: map[string]bool{}, holdSynth: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}, health: map[string]nodeHealth{}}
+		holdDoctor: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}, health: map[string]nodeHealth{}}
 	docs := map[string][]store.DoctorRow{}
 	for _, r := range rows {
 		docs[r.NodeID] = append(docs[r.NodeID], r)
@@ -246,6 +243,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 	byNode := map[string][]probed{}
 	var connected []store.NodeRow
 	var downs []cond
+	staleOn := map[string]bool{} // nodes with an inbound whose last result is older than the probe cadence allows
 	downProviders := map[string]bool{}
 	activeNodes := 0
 
@@ -294,7 +292,10 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 			switch {
 			case c.last == nil: // never probed: nothing to judge
 			case now.Sub(c.last.At) > staleAfter:
-				d.holdSynth[n.ID] = true // an old result from before the node was away is not the answer of now
+				// an old result is not the answer of now: it holds its own alert, and the node's NO_TRAFFIC cannot be decided
+				d.holdKeys[key{kCheckFailed, n.ID, t.in.ID}] = true
+				d.holdKeys[key{kNoTraffic, n.ID, ""}] = true
+				staleOn[n.ID] = true
 			default:
 				byNode[n.ID] = append(byNode[n.ID], probed{t, c})
 			}
@@ -397,7 +398,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 			}
 		}
 		if !d.guard && len(judgedFailing) > 0 {
-			if len(nodeProbed) > 0 && len(nodeJudgedFailing) == len(nodeProbed) {
+			if len(nodeProbed) > 0 && len(nodeJudgedFailing) == len(nodeProbed) && !staleOn[n.ID] {
 				h.noTraffic = true
 				params := map[string]string{"failed": strconv.Itoa(h.failed), "total": strconv.Itoa(h.total)}
 				ports := failedPorts(nodeJudgedFailing)
