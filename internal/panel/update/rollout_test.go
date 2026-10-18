@@ -692,6 +692,35 @@ func TestGateLooksAgainBeforeRollingBack(t *testing.T) {
 	e.wantStep(a, store.StepPassed, "")
 }
 
+// The same last look finds the node gone: no rollback is sent over a stream that is not there, the step fails as not
+// reconnected.
+func TestGateLastLookAtAGoneNodeSendsNoRollback(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	a := e.addNode("a", nodeOpts{online: 1, inbounds: 1})
+	e.hl.set(a, 1, 1, 0)
+	e.startRollout()
+	e.tick()
+	e.upgrade(a)
+	e.tick()
+	e.commit(a)
+	e.fl.mu.Lock()
+	e.fl.drift[a] = true
+	e.fl.mu.Unlock()
+	e.clk.Advance(2 * time.Minute)
+	e.tick()
+	e.wantStep(a, store.StepGating, "")
+	e.clk.Advance(3*time.Minute + time.Second)
+	e.fl.mu.Lock()
+	e.fl.afterLive = func(f *fakeFleet) { f.live[a] = false }
+	e.fl.mu.Unlock()
+	e.tick()
+	if got := e.fl.rolledBack(); len(got) != 0 {
+		t.Fatalf("a rollback went to a node that is gone: %v", got)
+	}
+	e.wantStep(a, store.StepFailed, "not_reconnected")
+}
+
 // Hard failure: an inbound that worked before is FAILED on two evaluations at least 30 s apart: the gate does not
 // wait for its deadline. An inbound that was already FAILED before the update does not count.
 func TestGateFailsAtOnceOnAFailedInbound(t *testing.T) {

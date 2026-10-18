@@ -768,10 +768,18 @@ func (p *pass) advanceGate(i int) {
 	g := p.gate(x, n, live.Drift)
 	if !g.pass && g.hard == "" && deadline {
 		// The node and its live row were read when this pass began; a Hello or an ApplyResult that landed since may have put
-		// the node in order. Look once more before undoing anything.
-		if n2, live2, ok := p.reread(x); ok && live2.Connected {
-			g = p.gate(x, n2, live2.Drift)
+		// the node in order. Look once more before undoing anything: a failed look decides nothing (the next pass looks
+		// again), and a node that is gone by now is not sent a rollback.
+		n2, live2, ok := p.reread(x)
+		if !ok {
+			return
 		}
+		if !live2.Connected {
+			p.finish(x, store.StepFailed, errNotReconnected, nil)
+			p.pause(pauseGateFailed, x, errNotReconnected)
+			return
+		}
+		g = p.gate(x, n2, live2.Drift)
 	}
 	switch {
 	case g.pass:
