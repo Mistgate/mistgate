@@ -235,10 +235,17 @@ func generatedShortIDs() ([]string, error) {
 			return nil, err
 		}
 		a, b := hex.EncodeToString(short), hex.EncodeToString(long)
-		if a != b {
+		if a != b && !numberLike(a) && !numberLike(b) {
 			return []string{a, b}, nil
 		}
 	}
+}
+
+// numberLike reports a hex short id that a YAML reader could take for a number (1234, 12e34): a client config that is
+// written out again without quotes (an app, a script) then carries a number, and mihomo refuses the REALITY short id. An id
+// with a letter other than e is a string in every YAML version.
+func numberLike(id string) bool {
+	return !strings.ContainsAny(id, "abcdf")
 }
 
 func randomPath(n int) (string, error) {
