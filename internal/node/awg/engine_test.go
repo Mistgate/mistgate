@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/netip"
 	"slices"
@@ -269,6 +270,29 @@ func TestRemovedPeerCountersAreFlushed(t *testing.T) {
 	c, _ = e.Collect(context.Background())
 	if len(c.Traffic) != 1 || c.Traffic[0].CredID != "a" || c.Traffic[0].Up != 50 {
 		t.Fatalf("a recreated interface must flush the old counters: %+v", c.Traffic)
+	}
+}
+
+// A removal the device refused leaves the peer on it: its bytes must be reported once, not flushed and then counted again
+// from zero.
+func TestFailedPeerRemovalDoesNotDoubleCount(t *testing.T) {
+	e, fb, _ := newTestEngine(t)
+	ctx := context.Background()
+	s := spec(t, "inb1", 51842, nil)
+	mustApply(t, e, s, cred("a", 0x0a, 5), cred("b", 0x0b, 6))
+	setRx := func(rx uint64) { fb.mutate(p1, func(d *fakeDev) { d.peers[pk(0x0a)].rx = rx }) }
+	setRx(100)
+	if c, _ := e.Collect(ctx); len(c.Traffic) != 1 || c.Traffic[0].Up != 100 {
+		t.Fatalf("first collect: %+v", c.Traffic)
+	}
+	setRx(150)
+	fb.peersErr = errors.New("device busy")
+	if _, err := e.Apply(ctx, s, []plugin.UserCred{cred("b", 0x0b, 6)}); err == nil { // a is dropped, the device refuses
+		t.Fatal("the failed removal was not reported")
+	}
+	fb.peersErr = nil
+	if c, _ := e.Collect(ctx); len(c.Traffic) != 1 || c.Traffic[0].CredID != "a" || c.Traffic[0].Up != 50 {
+		t.Fatalf("after the failed removal the peer's 50 new bytes must be counted once: %+v", c.Traffic)
 	}
 }
 

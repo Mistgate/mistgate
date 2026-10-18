@@ -279,7 +279,8 @@ func (e *Engine) updateLive(ctx context.Context, in *inbound, cfg nodeConfig, pe
 }
 
 // syncPeers moves the device from `have` (what it reports) to `want`. Removals go first in the first batch(es),
-// then additions and updates; batches are at most peerBatch peers.
+// then additions and updates; batches are at most peerBatch peers. The counters of a removed peer are queued after
+// its batch succeeded.
 func (e *Engine) syncPeers(ctx context.Context, in *inbound, have []awgcfg.PeerStat, want map[[32]byte]*wantPeer) error {
 	haveBy := make(map[[32]byte]awgcfg.PeerStat, len(have))
 	for _, h := range have {
@@ -288,7 +289,6 @@ func (e *Engine) syncPeers(ctx context.Context, in *inbound, have []awgcfg.PeerS
 	var removes, rest []awgcfg.Peer
 	for _, h := range sortedStats(have) {
 		if want[h.PublicKey] == nil {
-			e.flush(in, h)
 			removes = append(removes, awgcfg.Peer{PublicKey: h.PublicKey, Remove: true})
 		}
 	}
@@ -307,6 +307,12 @@ func (e *Engine) syncPeers(ctx context.Context, in *inbound, have []awgcfg.PeerS
 		n := min(len(ops), peerBatch)
 		if err := e.backend.SetPeers(ctx, in.cfg.name, false, ops[:n]); err != nil {
 			return fmt.Errorf("set peers: %w", err)
+		}
+		// Counters retire only once the device really dropped the peer; a refused removal keeps its baseline.
+		for _, op := range ops[:n] {
+			if op.Remove {
+				e.flush(in, haveBy[op.PublicKey])
+			}
 		}
 		ops = ops[n:]
 	}
