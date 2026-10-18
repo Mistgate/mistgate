@@ -540,22 +540,32 @@ func NewCacheWithoutMigrations(st *store.Store, log *slog.Logger) *Cache {
 	return &Cache{st: st, log: log, now: time.Now, ttl: time.Minute}
 }
 
-// Get returns the settings; the result is shared and must not be modified. A stored document that cannot be
-// read yields the defaults (logged once per refresh): a subscription fetch must not fail over settings.
+// Get returns the settings; the result is shared and must not be modified. A subscription fetch must not fail over
+// settings: when the document cannot be read, the last good copy is kept (the next call reads again), and the defaults
+// are returned without being cached. The read does not end with the caller's context: one app that gave up on a slow
+// panel must not decide what everyone else is served for the next minute.
 func (c *Cache) Get(ctx context.Context) *adminv1.SubscriptionSettings {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.cur != nil && c.now().Sub(c.at) < c.ttl {
 		return c.cur
 	}
-	s, err := Load(ctx, c.st)
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loadTimeout)
+	defer cancel()
+	s, err := Load(rctx, c.st)
 	if err != nil {
-		c.log.Warn("subscription settings unreadable, using the defaults", "err", err)
-		s = Defaults()
+		c.log.Warn("subscription settings unreadable, keeping the last good copy", "err", err)
+		if c.cur != nil {
+			return c.cur
+		}
+		return Defaults()
 	}
 	c.cur, c.at = s, c.now()
 	return s
 }
+
+// loadTimeout bounds one read of the document, which runs under the cache lock.
+const loadTimeout = 10 * time.Second
 
 // Invalidate drops the cached copy.
 func (c *Cache) Invalidate() {
