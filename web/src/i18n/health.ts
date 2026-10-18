@@ -266,6 +266,7 @@ export const en = {
     "{failed} of {total} profiles on {providers} different hosters fail at once. That is more likely the panel’s own connection than the nodes, so per-node alerts are paused until a round passes.",
   "health.alert.check_failed.why.probe_path":
     "The panel’s checks failed at the same time on {nodes}, at {providers} different hosters. That is more likely the panel’s own network than the nodes: no per-node alerts and no advice to change a port unless it lasts 20 minutes.",
+  "health.alert.check_failed.why.not_started": "“{profile}” did not start on the node, so it serves no one. Open the node for the error; restart the profile once it is fixed.",
   "health.alert.state_drift.why":
     "The node applied a different configuration than the panel holds, even after a full resend. Restart the profiles on the node; if it comes back, look at the node’s log.",
   "health.alert.cert_expiry.why":
@@ -777,6 +778,7 @@ export const ru: typeof en = {
     "{failed} из {total} профилей у {providers} разных хостеров отказали одновременно. Скорее всего, виновато собственное соединение панели, а не ноды, поэтому алерты по нодам на паузе, пока не пройдёт круг.",
   "health.alert.check_failed.why.probe_path":
     "Проверки панели сбоят одновременно на {nodes}, у {providers} разных хостеров. Скорее всего, дело в сети самой панели, а не в нодах: алертов по нодам и советов сменить порт не будет, если сбой не продлится 20 минут.",
+  "health.alert.check_failed.why.not_started": "«{profile}» не запустился на ноде, поэтому никому не отвечает. Причина — на странице ноды; после исправления перезапусти профиль.",
   "health.alert.state_drift.why":
     "Нода применила не ту конфигурацию, что хранит панель, даже после полной пересылки. Перезапусти профили на ноде; если вернётся, загляни в её лог.",
   "health.alert.cert_expiry.why":
@@ -1266,6 +1268,7 @@ export const zh: typeof en = {
   "health.alert.check_failed.why.unknown": "「{profile}」未通过客户端视角检测。请打开节点查看详情。",
   "health.alert.check_failed.why.panel_egress": "{providers} 个不同服务商的 {total} 个协议配置中有 {failed} 个同时失败。这更可能是面板自身的网络问题，而不是节点，因此在一轮检测通过之前，按节点的告警会暂停。",
   "health.alert.check_failed.why.probe_path": "面板的检测在 {nodes} 上同时失败，涉及 {providers} 个不同的服务商。这更可能是面板自身的网络问题，而不是节点：除非持续 20 分钟，否则不发出按节点的告警，也不建议更换端口。",
+  "health.alert.check_failed.why.not_started": "「{profile}」未能在节点上启动，因此无法为任何人提供服务。请打开节点查看错误；修复后重启该协议配置。",
   "health.alert.state_drift.why": "即使完整重发之后，节点应用的配置仍与面板保存的不同。请重启节点上的协议配置；如果问题再次出现，请查看节点的日志。",
   "health.alert.cert_expiry.why": "「{profile}」{server_part}的证书将在 {days_left} 天后到期。ACME 证书会自动续期，剩余时间很短说明续期失败：请检查域名以及端口 80 和 443。",
   "health.alert.cert_expiry.why.expired": "「{profile}」{server_part}的证书已过期，客户端无法连接。请检查域名以及端口 80 和 443 以便续期；如果是自签名证书，请重启该协议配置。",

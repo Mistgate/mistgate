@@ -429,7 +429,8 @@ func TestRecoveryMinutesCountFromTheReopen(t *testing.T) {
 }
 
 // The node's only inbound stops answering (no_traffic), then stops running (failed): nothing on the node is checked any
-// more, which is not traffic coming back. The alert ends as superseded and the history says nothing about a resume.
+// more, which is not traffic coming back. The alert ends as superseded, the failed profile raises its own alert and the
+// history says nothing about a resume.
 func TestTrafficIsNotResumedWhenNothingIsLeftToCheck(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)
@@ -440,7 +441,7 @@ func TestTrafficIsNotResumedWhenNothingIsLeftToCheck(t *testing.T) {
 	e.exec(`UPDATE inbound SET state = 'failed' WHERE id = ?`, a)
 	e.s.invalidateSnapshot()
 	e.evaluate()
-	want(t, e.active())
+	want(t, e.active(), "check_failed/de1/"+a) // the profile that does not start is the news now
 	if h := e.history(); len(h) != 1 || h[0].Kind != kNoTraffic || h[0].Resolution != "superseded" {
 		t.Fatalf("history %+v", h)
 	}

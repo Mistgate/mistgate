@@ -161,6 +161,7 @@ var whyVariants = map[string]localizedText{
 	"exit_unreachable": {en: "the node cannot reach the internet through the tunnel", ru: "нода не выходит в интернет через туннель", zh: "节点无法通过隧道访问互联网"},
 	"http_status":      {en: "the test sites answer with errors", ru: "тестовые сайты отвечают ошибками", zh: "测试网站返回错误"},
 	"warp_path":        {en: "the WARP exit is dead", ru: "выход через WARP не работает", zh: "WARP 出口已失效"},
+	"not_started":      {en: "the profile did not start on the node", ru: "профиль не запустился на ноде", zh: "协议配置未能在节点上启动"},
 	"mixed":            {en: "the profiles fail in different ways", ru: "профили падают по-разному", zh: "各协议配置的失败原因不同"},
 }
 

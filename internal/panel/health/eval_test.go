@@ -1530,3 +1530,75 @@ func TestPortLossyAlertCanCoexistWithClientEyeFailure(t *testing.T) {
 	e.fail(inbound, "timeout")
 	want(t, e.active(), "check_failed/de1/"+inbound, "port_lossy/de1/"+inbound)
 }
+
+// A profile the node could not start (state failed) is not probed, but its open check_failed alert must not end as
+// "cleared": that reads as a recovery in Telegram and on the Events tab while the profile does not run.
+func TestFailedInboundKeepsItsAlertOpen(t *testing.T) {
+	var seen []Transition
+	e := newEnv(t, func(c *Config) { c.OnTransition = func(tr Transition) { seen = append(seen, tr) } })
+	e.node("de1", "hetzner", true)
+	a := e.inbound("de1", 443)
+	b := e.inbound("de1", 8443)
+	e.pass(a)
+	e.fail(b, "timeout")
+	e.fail(b, "timeout")
+	want(t, e.active(), "check_failed/de1/"+b)
+
+	e.exec(`UPDATE inbound SET state = 'failed', last_error = 'listen udp :8443: bind: address already in use' WHERE id = ?`, b)
+	e.evaluate()
+
+	got, ok := e.active()["check_failed/de1/"+b]
+	if !ok {
+		t.Fatalf("the profile does not run, yet its alert ended: %v", alertKeys(e.active()))
+	}
+	if got.WhyKey != "health.alert.check_failed.why.not_started" || got.Params["error_detail"] != "listen udp :8443: bind: address already in use" || got.Params["port"] != "8443" {
+		t.Errorf("alert says %q %v", got.WhyKey, got.Params)
+	}
+	if got.Severity != sevWarning {
+		t.Errorf("severity %d: another profile of its protocol runs, want warning", got.Severity)
+	}
+	if last := seen[len(seen)-1]; last.Resolved {
+		t.Errorf("last transition is a resolution (%q)", last.Alert.Resolution)
+	}
+	for _, ev := range e.events("de1") {
+		if ev.Code == "check_recovered" {
+			t.Errorf("the Events tab says the check recovered: %+v", ev)
+		}
+	}
+}
+
+// A profile that fails straight after a reboot was never probed failing: it still raises an alert, a critical one
+// when it is the node's only profile of its protocol.
+func TestFailedInboundNeverProbedRaisesAnAlert(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a := e.inbound("de1", 443)
+	e.pass(a)
+	e.exec(`UPDATE inbound SET state = 'failed', last_error = 'bind: address already in use' WHERE id = ?`, a)
+	e.evaluate()
+	got := e.active()
+	want(t, got, "check_failed/de1/"+a)
+	if got["check_failed/de1/"+a].Severity != sevCritical {
+		t.Errorf("severity %d, want critical", got["check_failed/de1/"+a].Severity)
+	}
+}
+
+// A WARP-exit profile that does not start while the doctor already says the node's WARP is dead is the same news.
+func TestFailedWarpInboundIsLeftToTheDoctorWarpAlert(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.inbound("de1", 443)
+	w := e.warpInbound("de1", 2053)
+	e.report("de1", false, res("warp_path", dFail, ""))
+	e.exec(`UPDATE inbound SET state = 'failed', last_error = 'warp is down' WHERE id = ?`, w)
+	e.evaluate()
+	want(t, e.active(), "doctor_fail/de1/warp_path")
+}
+
+func alertKeys(m map[string]store.HealthAlert) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}

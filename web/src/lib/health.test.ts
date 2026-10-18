@@ -438,7 +438,7 @@ describe("the server's vocabulary is covered", () => {
   const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
     "access_ended", "user_connection", "users_impacted", "country_blocked"];
   const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
-  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path", "via_cdn"];
+  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path", "via_cdn", "not_started"];
   const expected = [
     ...checks.flatMap((c) => [`doctor.${c}.title`, `health.doctor.${c}.why`]),
     "health.doctor.dstate_tasks.why.qxl_ttm",

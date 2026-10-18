@@ -246,6 +246,20 @@ func TestProbePathAlertIsLocalized(t *testing.T) {
 	}
 }
 
+func TestNotStartedAlertIsLocalized(t *testing.T) {
+	a := store.HealthAlert{Kind: "check_failed", WhyKey: "health.alert.check_failed.why.not_started",
+		Params: map[string]string{"profile": "HY2", "port": "8443", "error_detail": "bind: address already in use"}}
+	for lang, want := range map[L]string{
+		"en": "The profile did not start on the node · port 8443",
+		"ru": "Профиль не запустился на ноде · порт 8443",
+		"zh": "协议配置未能在节点上启动 · 端口 8443",
+	} {
+		if got := alertReason(lang, a); got != want {
+			t.Errorf("%s reason = %q, want %q", lang, got, want)
+		}
+	}
+}
+
 func TestPortLossyAlertTextsAreLocalized(t *testing.T) {
 	now := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	a := store.HealthAlert{

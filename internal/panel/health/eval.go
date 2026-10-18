@@ -271,7 +271,15 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 		for _, c := range s.doctorConds(now, n, docs[n.ID], sn.byNode[n.ID], d, accepts[n.ID]) {
 			add(c)
 		}
+		warpDead := !d.holdDoctor[n.ID] && failsCheck(docs[n.ID], "warp_path")
 		for _, t := range sn.byNode[n.ID] {
+			if t.in.Enabled && t.in.State == "failed" { // the node could not start it: no round will ever say so
+				if warpDead && t.err == nil && t.spec.Egress == "warp" {
+					d.superseded[key{kCheckFailed, n.ID, t.in.ID}] = true // the doctor's warp_path alert says it
+				} else {
+					add(notStartedCond(sn.byNode[n.ID], t))
+				}
+			}
 			if s.skipReason(t, live[t.node.ID]) != "" {
 				continue
 			}
@@ -419,6 +427,20 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 	userConds(now, sn, signals, activeKeys, d, add)
 	s.addCountryConds(ctx, sn, live, activeKeys, d, add)
 	return d
+}
+
+// notStartedCond is the alert of a profile the node could not start (inbound state failed): critical when it was the
+// node's only profile of its protocol.
+func notStartedCond(ts []*target, t *target) cond {
+	sev := sevWarning
+	if sameProtocol(ts, t) == 1 {
+		sev = sevCritical
+	}
+	params := map[string]string{"inbound": t.in.ID, "profile": t.in.ProfileName, "error_detail": t.in.LastError}
+	if t.err == nil {
+		params["port"] = strconv.Itoa(int(t.spec.Listen.Port))
+	}
+	return cond{key: key{kCheckFailed, t.node.ID, t.in.ID}, severity: sev, why: "health.alert.check_failed.why.not_started", params: params}
 }
 
 func cdnHost(t *target) string {
