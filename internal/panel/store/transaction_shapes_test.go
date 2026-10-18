@@ -23,6 +23,7 @@ var transactionShape1 = map[string]string{
 	"batch_native.go:runSQLBatch":                  "Runs one SQL transaction on the explicitly selected reader or writer pool.",
 	"batch.go:retryGuarded":                        "Runs guarded batches and serializes local retries after a guard fails.",
 	"fleet_node.go:NodeDesired":                    "The desired revision update and node_sent digest upsert run in one fixed batch.",
+	"fleet_node.go:NodeInSync":                     "The applied revision update and the session's live drift reset run in one fixed batch.",
 	"node_decoy.go:UpdateNodeDecoyAgentState":      "A live-node guard precedes the confirmed agent mode and bundle hash update in one batch.",
 	"fleet_events.go:RecordDeviceLimitReached":     "A user-history event is inserted only when that user's hourly window has no matching event.",
 	"health.go:OpenAlert":                          "A fixed batch reopens a recent alert and upserts through the active-alert unique index.",
