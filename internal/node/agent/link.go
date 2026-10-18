@@ -163,3 +163,29 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 }
 
 var _ agentTransport = (*websocketAgentTransport)(nil)
+
+// keepalive pings the panel over the link every `every` and waits `timeout` for the pong. A link that went half-open
+// (the panel host froze, nothing answers, no RST ever comes) has no other way to be noticed. A failed ping sends the
+// error on dead and cancels the session, so connectLoop redials with its normal backoff. It needs a concurrent
+// reader to see the pong: the session's Receive loop is one from the first frame on.
+func (s *websocketAgentTransport) keepalive(every, timeout time.Duration, cancel context.CancelFunc, dead chan<- error) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-t.C:
+		}
+		pctx, stop := context.WithTimeout(s.ctx, timeout)
+		err := s.conn.Ping(pctx)
+		stop()
+		if err != nil {
+			if s.ctx.Err() == nil {
+				dead <- fmt.Errorf("no pong from the panel within %s: %w", timeout, err)
+				cancel()
+			}
+			return
+		}
+	}
+}

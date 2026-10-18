@@ -193,6 +193,9 @@ type Agent struct {
 	linkBusyWait time.Duration // 0 = linkBusyRecheck: how long the end of a held session is put off while it has work in flight
 	resetAfter   time.Duration // 0 = 1 min: a session that lived this long resets the reconnect delay
 
+	linkPingEvery   time.Duration // 0 = NodeSettings.keepalive_interval_s (20 s): how often the link is pinged
+	linkPingTimeout time.Duration // 0 = NodeSettings.keepalive_timeout_s (45 s): how long a pong may take
+
 	busy atomic.Int32 // operations started by a session that ending it would cut short (goBusy)
 
 	renewMu      sync.Mutex
@@ -552,6 +555,13 @@ func secs(v uint32, def time.Duration) time.Duration {
 	return time.Duration(v) * time.Second
 }
 
+func durOr(v, def time.Duration) time.Duration {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
 func dialTimeout(st *pb.NodeSettings) time.Duration { return secs(st.DialTimeoutS, 15*time.Second) }
 
 type ctlMsg struct {
@@ -741,7 +751,15 @@ func (a *Agent) linkSession(ctx context.Context) error {
 	if cleanup != nil {
 		defer cleanup()
 	}
+	st := a.settings.Load()
+	dead := make(chan error, 1)
+	go stream.keepalive(durOr(a.linkPingEvery, secs(st.KeepaliveIntervalS, 20*time.Second)), durOr(a.linkPingTimeout, secs(st.KeepaliveTimeoutS, 45*time.Second)), cancel, dead)
 	err = a.runSession(cancel, stream)
+	select {
+	case kerr := <-dead:
+		err = kerr
+	default:
+	}
 	if !stream.established {
 		if err == nil {
 			return errLinkNotEstablished

@@ -135,6 +135,8 @@ func TestAgentLinkSessionReconnectsAndResumesReliableSequence(t *testing.T) {
 	a.linkHTTPClient = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: publicPool,
 		ServerName: "127.0.0.1", NextProtos: []string{"http/1.1"}}}}
 	a.backoffMin, a.backoffMax, a.statsEvery, a.sweepEvery = 20*time.Millisecond, 80*time.Millisecond, time.Hour, time.Hour
+	// The real panel handler must answer the pings: a missed pong would redial and shift the link request numbers below.
+	a.linkPingEvery, a.linkPingTimeout = 20*time.Millisecond, 2*time.Second
 	runCtx, stop := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() { done <- a.Run(runCtx) }()
@@ -394,11 +396,13 @@ type holdLinkServer struct {
 	mu   sync.Mutex
 	at   []time.Time
 	fail int
+	deaf int           // the next `deaf` established links stop reading after HelloAck: no pong ever comes back, like a frozen panel host
+	stop chan struct{} // ends the deaf handlers
 }
 
 func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
 	t.Helper()
-	s := &holdLinkServer{fail: fail}
+	s := &holdLinkServer{fail: fail, stop: make(chan struct{})}
 	s.srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		s.at = append(s.at, time.Now())
@@ -434,6 +438,13 @@ func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
 		}}) != nil {
 			return
 		}
+		if n <= s.fail+s.deaf {
+			select {
+			case <-s.stop:
+			case <-r.Context().Done():
+			}
+			return
+		}
 		for {
 			if _, _, err := agentlink.ReadFrame(r.Context(), ws); err != nil {
 				return
@@ -441,6 +452,7 @@ func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
 		}
 	}))
 	t.Cleanup(s.srv.Close)
+	t.Cleanup(func() { close(s.stop) })
 	h.a.cfg.LinkURL = "wss" + strings.TrimPrefix(s.srv.URL, "https") + "/" + strings.Repeat("h", 24) + "/"
 	h.a.linkHTTPClient = s.srv.Client()
 	return s
@@ -944,4 +956,50 @@ func testLinkTLSCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key, Leaf: cert}, pool
+}
+
+// A link that went half-open (the panel host froze: it reads nothing, so no pong ever comes, and no RST arrives) is
+// cut by the ping and redialled within the ping timeout; the redial goes to the link again, not to mTLS.
+func TestAgentHalfOpenLinkIsRedialled(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	ls := newHoldLinkServer(t, h, 0)
+	ls.deaf = 1
+	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
+	h.a.linkPingEvery, h.a.linkPingTimeout = 50*time.Millisecond, 200*time.Millisecond
+	logs := &lockedLogBuffer{}
+	h.a.log = slog.New(slog.NewTextHandler(logs, nil))
+	h.start()
+
+	eventually(t, func() bool { return len(ls.attempts()) >= 1 }, "first (deaf) link attempt")
+	first := ls.attempts()[0]
+	eventually(t, func() bool { return len(ls.attempts()) == 2 && sessionOnLink(h.a) }, "redial after the missing pong")
+	if gap := ls.attempts()[1].Sub(first); gap > 3*time.Second {
+		t.Errorf("redialled %v after the first attempt, the ping timeout is 200 ms", gap)
+	}
+	if got := logs.String(); !strings.Contains(got, "no pong from the panel") {
+		t.Errorf("the keepalive failure is not in the log: %s", got)
+	}
+	if got := h.panel.connCount(); got != 1 {
+		t.Errorf("mTLS sessions = %d, want only the discovery session: the redial must use the link", got)
+	}
+}
+
+// A link whose panel answers is not cut, however many pings pass.
+func TestAgentHealthyLinkSurvivesPings(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
+	}})
+	h.panel.linkSupported.Store(true)
+	ls := newHoldLinkServer(t, h, 0)
+	h.a.linkPingEvery, h.a.linkPingTimeout = 20*time.Millisecond, 100*time.Millisecond
+	h.start()
+
+	eventually(t, func() bool { return sessionOnLink(h.a) }, "established link session")
+	time.Sleep(600 * time.Millisecond) // ~30 pings
+	if !sessionOnLink(h.a) || len(ls.attempts()) != 1 {
+		t.Fatalf("a healthy link was cut: onLink=%v attempts=%d", sessionOnLink(h.a), len(ls.attempts()))
+	}
 }
