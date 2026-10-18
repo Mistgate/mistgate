@@ -441,3 +441,39 @@ func TestCapabilitiesKeepTheWholeAgentList(t *testing.T) {
 		t.Fatalf("an oversized list keeps %d, want the bound %d", len(got), maxCapabilities)
 	}
 }
+
+// An agent that comes back as a new process within ten minutes of its previous connect is a restart worth a record
+// (a crash loop is a string of them); a new process after a long uptime, or the same process reconnecting, is not.
+func TestAgentRestartedSoonAfterConnectIsRecorded(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	count := func() int64 { return e.count(`SELECT count(*) FROM event WHERE code = 'agent_restarted'`) }
+	reconnect := func(instance string) {
+		t.Helper()
+		c := a.open()
+		c.send(0, hello(instance, 0, ""))
+		c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
+		c.st.CloseRequest()
+		c.ended()
+		time.Sleep(100 * time.Millisecond)
+	}
+	c, _, _ := connectFull(a, "inst1")
+	c.st.CloseRequest()
+	c.ended()
+	time.Sleep(100 * time.Millisecond)
+
+	reconnect("inst1") // the same process: a link drop, not a restart
+	if count() != 0 {
+		t.Fatal("a reconnect of the same process was recorded as a restart")
+	}
+	reconnect("inst2")
+	if count() != 1 {
+		t.Fatalf("a new process right after the previous connect: %d records, want 1", count())
+	}
+	e.exec(`UPDATE node SET last_connected_at = last_connected_at - 3600 WHERE id = ?`, a.nodeID)
+	reconnect("inst3")
+	if count() != 1 {
+		t.Fatalf("a new process after an hour of uptime was recorded: %d", count())
+	}
+}

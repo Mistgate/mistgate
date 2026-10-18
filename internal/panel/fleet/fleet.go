@@ -39,6 +39,7 @@ const (
 	defaultKeepaliveInterval = 20
 	defaultKeepaliveTimeout  = 45
 	blipWindow               = 10 * time.Minute // stream lost for less than this is a "blip", not an outage
+	crashLoopWindow          = 10 * time.Minute // a new agent process within this of the previous connect is a restart
 )
 
 // Remote sends requests through the edge edition's external node link. Ask receives an absolute deadline so a queued

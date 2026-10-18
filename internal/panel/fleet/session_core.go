@@ -146,6 +146,7 @@ type SessionEffect struct {
 	LogChunk     *agentv1.LogChunk
 	Users        []string
 	WarpReason   string
+	Instance     string // EffectConnectEvents: the agent process that said hello
 }
 
 // CloseClass identifies why a session should terminate.
@@ -316,7 +317,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.state.NextCertCheck = event.At.Add(c.f.certCheck)
 	tr.state.HelloAppliedRevision = h.AppliedRevision
 	tr.state.HelloAppliedStateHash = h.AppliedStateHash
-	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At})
+	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At, Instance: h.InstanceId})
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
 	autoMeasure = autoMeasure && slices.Contains(info.Caps, capBandwidth)
 	settings := nodeSettings(node, info.Caps)

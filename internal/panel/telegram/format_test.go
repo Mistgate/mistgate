@@ -246,6 +246,22 @@ func TestProbePathAlertIsLocalized(t *testing.T) {
 	}
 }
 
+func TestFlappingNodeAlertIsLocalized(t *testing.T) {
+	a := store.HealthAlert{Kind: "host_blip", Subject: "flapping", WhyKey: "health.alert.host_blip.why.flapping", Params: map[string]string{"count": "4"}}
+	for lang, want := range map[L][2]string{
+		"en": {"The node keeps dropping", "4 link drops or agent restarts in the last hour."},
+		"ru": {"Нода то и дело пропадает", "За последний час обрывов связи и перезапусков агента: 4."},
+		"zh": {"节点反复掉线", "最近一小时内连接中断或 Agent 重启 4 次。"},
+	} {
+		if got := alertTitle(lang, a); got != want[0] {
+			t.Errorf("%s title = %q, want %q", lang, got, want[0])
+		}
+		if got := alertReason(lang, a); got != want[1] {
+			t.Errorf("%s reason = %q, want %q", lang, got, want[1])
+		}
+	}
+}
+
 func TestNotStartedAlertIsLocalized(t *testing.T) {
 	a := store.HealthAlert{Kind: "check_failed", WhyKey: "health.alert.check_failed.why.not_started",
 		Params: map[string]string{"profile": "HY2", "port": "8443", "error_detail": "bind: address already in use"}}

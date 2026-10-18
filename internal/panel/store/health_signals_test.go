@@ -152,3 +152,24 @@ func TestHealthSignalsDeviceLimitCountsRefusalsOnly(t *testing.T) {
 		t.Fatalf("device limit signals = %+v, want %+v", batch.DeviceLimits, want)
 	}
 }
+
+func TestHealthSignalsNodeFlapQueryUsesTheSeverityTimeIndex(t *testing.T) {
+	s := openTemp(t)
+	rows, err := s.R.QueryContext(context.Background(), "EXPLAIN QUERY PLAN "+healthNodeFlapSQL, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var plan string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan += detail + "; "
+	}
+	if !strings.Contains(plan, "USING INDEX event_retention") && !strings.Contains(plan, "USING COVERING INDEX event_retention") {
+		t.Fatalf("node flap signal scans the whole event table: %s", plan)
+	}
+}

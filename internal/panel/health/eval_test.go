@@ -1602,3 +1602,35 @@ func alertKeys(m map[string]store.HealthAlert) []string {
 	}
 	return out
 }
+
+// A node that keeps dropping (or whose agent keeps restarting) is never down for long enough to alert, and each blip is
+// a quiet history record: three of them in an hour are one warning.
+func TestFlappingNodeRaisesAWarning(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.node("nl1", "provider-b", true)
+	blip := func(node, code string, ago time.Duration) {
+		t.Helper()
+		if err := e.st.InsertEvent(e.ctx, store.EventRow{Time: e.clock.Now().Add(-ago), Severity: 1, Code: code, Source: "panel", NodeID: node}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blip("de1", "node_blip", 50*time.Minute)
+	blip("de1", "agent_restarted", 30*time.Minute)
+	blip("nl1", "node_blip", 5*time.Minute)
+	e.evaluate()
+	want(t, e.active())
+
+	blip("de1", "node_blip", 2*time.Minute)
+	e.evaluate()
+	got := e.active()
+	want(t, got, "host_blip/de1/flapping")
+	a := got["host_blip/de1/flapping"]
+	if a.Severity != sevWarning || a.WhyKey != "health.alert.host_blip.why.flapping" || a.Params["count"] != "3" {
+		t.Errorf("alert %+v", a)
+	}
+
+	e.clock.Advance(15 * time.Minute) // the first blip leaves the hour
+	e.evaluate()
+	want(t, e.active())
+}

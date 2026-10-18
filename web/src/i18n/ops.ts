@@ -713,6 +713,7 @@ export const en = {
   "event.node_blip.rebooted": "the server rebooted ({span} without a link)",
   "event.node_recovered": "back online after {span}",
   // the health alerts on the node's history (eval.go alertEvent): when the traffic stopped and when it came back
+  "event.agent_restarted": "the node agent restarted soon after its previous start",
   "event.traffic_stopped": "traffic stopped: {failed} of {total} profiles fail the check",
   "event.traffic_resumed": "traffic flows again ({lasted})",
   "event.check_failing": "“{profile}” fails the client-eye check",
@@ -1727,6 +1728,7 @@ export const ru: typeof en = {
   "event.node_blip": "связь пропадала на {span} и вернулась сама",
   "event.node_blip.rebooted": "сервер перезагрузился ({span} без связи)",
   "event.node_recovered": "снова на связи после {span}",
+  "event.agent_restarted": "агент ноды перезапустился вскоре после предыдущего запуска",
   "event.traffic_stopped": "трафик перестал идти: {failed} из {total} профилей не проходят проверку",
   "event.traffic_resumed": "трафик снова идёт ({lasted})",
   "event.check_failing": "«{profile}» не проходит проверку глазами клиента",
@@ -2736,6 +2738,7 @@ export const zh: typeof en = {
   "event.node_blip": "连接中断了 {span}，随后自行恢复",
   "event.node_blip.rebooted": "服务器已重启（失联 {span}）",
   "event.node_recovered": "已在 {span} 后重新上线",
+  "event.agent_restarted": "节点 Agent 在上次启动后不久又重启了",
   "event.traffic_stopped": "流量已停止：{total} 个协议配置中有 {failed} 个未通过检测",
   "event.traffic_resumed": "流量已恢复（中断了 {lasted}）",
   "event.check_failing": "「{profile}」未通过客户端视角检测",

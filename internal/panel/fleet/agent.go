@@ -220,7 +220,7 @@ func (f *Fleet) runSharedEffect(ctx context.Context, nodeID string, effect Sessi
 		}
 	case EffectConnectEvents:
 		if effect.PreviousNode != nil {
-			f.connectEvents(ctx, nodeID, *effect.PreviousNode, effect.BootAt.UTC(), effect.At.UTC())
+			f.connectEvents(ctx, nodeID, *effect.PreviousNode, effect.Instance, effect.BootAt.UTC(), effect.At.UTC())
 		}
 	}
 }
@@ -579,7 +579,7 @@ func helloInfo(h *agentv1.Hello) store.HelloInfo {
 }
 
 // connectEvents records a blip (short gap) or a recovery (after node_down) when a node comes back.
-func (f *Fleet) connectEvents(ctx context.Context, id string, prev store.NodeRow, boot, now time.Time) {
+func (f *Fleet) connectEvents(ctx context.Context, id string, prev store.NodeRow, instance string, boot, now time.Time) {
 	if prev.State != "active" || f.updating(id) { // the re-exec of a self-update is neither a blip nor an outage
 		return
 	}
@@ -602,6 +602,9 @@ func (f *Fleet) connectEvents(ctx context.Context, id string, prev store.NodeRow
 		if h := f.hooks(); h != nil && params["rebooted"] != "true" {
 			h.NodeReturned(ctx, id, last, now) // the history record of the blip
 		}
+	} else if prev.AgentInstanceID != "" && instance != prev.AgentInstanceID && now.Sub(prev.LastConnectedAt) < crashLoopWindow {
+		// a new agent process soon after the last connect (too quick for a blip): Health counts these, a crash loop is a string of them
+		f.event(ctx, 2, "agent_restarted", id, params)
 	}
 }
 

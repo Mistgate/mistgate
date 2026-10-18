@@ -235,6 +235,8 @@ export const en = {
   "health.alert.node_down.why":
     "The agent has not answered for {duration} and the host did not come back on its own. Usually it is the hoster: check in their panel that the server is running.",
   "health.alert.host_blip.why": "The link dropped for a few minutes and came back by itself. If it happens more than three times a day, think about moving.",
+  "health.alert.host_blip.title.flapping": "The node keeps dropping",
+  "health.alert.host_blip.why.flapping": "In the last hour the link dropped or the agent restarted {count} times. Each break is short, but connections on this node drop every time. Look at the host and the agent log; if it keeps up, think about moving.",
   "health.alert.no_traffic.why.udp_blocked":
     "The node is up and the agent answers, but no client gets through: the panel’s check times out on port {port}. The hoster seems to cut this UDP port. Change the port of the profiles on this node.",
   "health.alert.no_traffic.why.udp_all_blocked":
@@ -747,6 +749,8 @@ export const ru: typeof en = {
   "health.alert.node_down.why":
     "Агент молчит {duration}, а хост сам не вернулся. Обычно виноват хостер: загляни в его панель и проверь, запущен ли сервер.",
   "health.alert.host_blip.why": "Связь пропадала на несколько минут и вернулась сама. Если это случается чаще трёх раз в сутки, стоит подумать о переезде.",
+  "health.alert.host_blip.title.flapping": "Нода то и дело пропадает",
+  "health.alert.host_blip.why.flapping": "За последний час связь обрывалась или агент перезапускался: {count}. Каждый обрыв короткий, но подключения на ноде рвутся каждый раз. Проверь хост и лог агента; если не прекращается, подумай о переезде.",
   "health.alert.no_traffic.why.udp_blocked":
     "Нода жива и агент отвечает, но клиенты не проходят: проверка панели упирается в таймаут на порту {port}. Похоже, хостер режет этот UDP-порт. Смени порт профилей на этой ноде.",
   "health.alert.no_traffic.why.udp_all_blocked":
@@ -1247,6 +1251,8 @@ export const zh: typeof en = {
 
   "health.alert.node_down.why": "Agent 已有 {duration} 没有应答，主机也没有自行恢复。通常是服务商的问题：请在其控制面板中确认服务器正在运行。",
   "health.alert.host_blip.why": "连接中断了几分钟后自行恢复。如果一天内超过三次，建议考虑更换服务商。",
+  "health.alert.host_blip.title.flapping": "节点反复掉线",
+  "health.alert.host_blip.why.flapping": "最近一小时内，连接中断或 Agent 重启共 {count} 次。每次中断都很短，但节点上的连接每次都会断开。请检查主机和 Agent 日志；如果持续出现，建议考虑更换服务商。",
   "health.alert.no_traffic.why.udp_blocked": "节点在线，Agent 也有响应，但客户端无法连通：面板在端口 {port} 上的检测超时，服务商似乎封锁了这个 UDP 端口。请更换此节点上各协议配置的端口。",
   "health.alert.no_traffic.why.udp_all_blocked": "所有端口均超时（{ports}）：服务商似乎封锁了全部入站 UDP。请检查服务商控制面板中的防火墙，或联系其技术支持。",
   "health.alert.no_traffic.why.mixed": "节点在线，Agent 也有响应，但所有协议配置都未通过客户端视角检测，且各有各的原因。请打开节点，查看各协议配置下的错误。",

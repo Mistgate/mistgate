@@ -62,6 +62,7 @@ const (
 	sevWarning  = 2
 	sevCritical = 3
 
+	flapMin            = 3 // blips and agent restarts in an hour that make a node "flapping"
 	panelEgressSubject = "panel_egress"
 	panelProbeSubject  = "probe_path"
 	certWarnBefore     = 14 * 24 * time.Hour
@@ -415,6 +416,18 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 			}
 		}
 		d.health[n.ID] = h
+	}
+	// A node that keeps dropping, or whose agent keeps restarting, is never silent long enough for NODE_DOWN: three events
+	// in the last hour are one warning. Its own subject keeps the quiet blip records of the history apart from it.
+	nodeActive := map[string]bool{}
+	for _, n := range sn.nodes {
+		nodeActive[n.ID] = n.State == "active"
+	}
+	for _, f := range signals.NodeFlaps {
+		if f.Count >= flapMin && nodeActive[f.NodeID] {
+			add(cond{key: key{kHostBlip, f.NodeID, "flapping"}, severity: sevWarning, why: "health.alert.host_blip.why.flapping",
+				params: map[string]string{"count": strconv.Itoa(f.Count)}})
+		}
 	}
 	for _, c := range s.extConds(ctx) { // e.g. a paused rollout (update_failed)
 		add(cond{key: key{c.Kind, c.NodeID, c.Subject}, severity: c.Severity, why: c.Why, params: c.Params})

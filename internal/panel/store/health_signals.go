@@ -47,6 +47,13 @@ type HealthDeviceLimitSignal struct {
 	Used, Limit int
 }
 
+// HealthNodeFlapSignal is how often a node lost its link (node_blip) or got a new agent process soon after the last connect
+// (agent_restarted) in the last hour.
+type HealthNodeFlapSignal struct {
+	NodeID string
+	Count  int
+}
+
 // HealthSignalBatch contains the stored inputs for user and fleet impact alerts.
 type HealthSignalBatch struct {
 	Users      []HealthUserSignal
@@ -55,6 +62,7 @@ type HealthSignalBatch struct {
 	Torrents   []HealthTorrentSignal
 	// DeviceLimits are the people refused at their device limit; the sightings TRACK writes are history only and are not here.
 	DeviceLimits []HealthDeviceLimitSignal
+	NodeFlaps    []HealthNodeFlapSignal
 }
 
 func scanHealthUserSignal(r rowScanner) (HealthUserSignal, error) {
@@ -128,6 +136,20 @@ const healthTorrentSQL = `
 	  AND coalesce(json_extract(params_json, '$.evidence'), '') <> ''
 	GROUP BY 1, 2`
 
+func scanHealthNodeFlap(r rowScanner) (HealthNodeFlapSignal, error) {
+	var signal HealthNodeFlapSignal
+	err := r.Scan(&signal.NodeID, &signal.Count)
+	return signal, err
+}
+
+// healthNodeFlapSQL counts the last hour's node_blip and agent_restarted events per node. It is served by event_retention
+// (severity, ts): both codes are severity 1 or 2 (TestHealthSignalsNodeFlapQueryUsesTheSeverityTimeIndex holds the plan).
+const healthNodeFlapSQL = `
+	SELECT node_id AS node_id, count(*) AS events
+	FROM event
+	WHERE severity IN (1, 2) AND ts >= ? AND code IN ('node_blip', 'agent_restarted') AND node_id IS NOT NULL
+	GROUP BY 1`
+
 func scanHealthDeviceLimit(r rowScanner) (HealthDeviceLimitSignal, error) {
 	var signal HealthDeviceLimitSignal
 	var lastAt int64
@@ -151,7 +173,7 @@ const healthDeviceLimitSQL = `
 	WHERE code = 'device_limit_reached' AND ts >= ? AND json_extract(params_json, '$.refused') = '1'
 	GROUP BY 1`
 
-// HealthSignals reads the user, AWG, hourly fleet, torrent and device-limit inputs in one read batch.
+// HealthSignals reads the user, AWG, hourly fleet, torrent, device-limit and node-flap inputs in one read batch.
 func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalBatch, error) {
 	var out HealthSignalBatch
 	currentHour := now.UTC().Truncate(time.Hour).Unix()
@@ -184,6 +206,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 		WHERE hour_start IN (?, ?, ?, ?, ?, ?, ?, ?)`, hourStarts...)
 	reads.add(appendRows(&out.Torrents, scanHealthTorrent), healthTorrentSQL, now.Add(-24*time.Hour).Unix())
 	reads.add(appendRows(&out.DeviceLimits, scanHealthDeviceLimit), healthDeviceLimitSQL, now.Add(-24*time.Hour).Unix())
+	reads.add(appendRows(&out.NodeFlaps, scanHealthNodeFlap), healthNodeFlapSQL, now.Add(-time.Hour).Unix())
 	if err := reads.run(ctx, s); err != nil {
 		return HealthSignalBatch{}, err
 	}

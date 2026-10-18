@@ -176,6 +176,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 	switch a.Kind {
 	case "node_down":
 		return l.pick("Node is unreachable", "Нода недоступна", "节点无法连接")
+	case "host_blip":
+		return l.pick("The node keeps dropping", "Нода то и дело пропадает", "节点反复掉线")
 	case "no_traffic":
 		return l.pick("Alive, but no traffic", "Жива, но трафик не идёт", "在线但无流量")
 	case "check_failed":
@@ -232,6 +234,9 @@ func alertReason(l L, a store.HealthAlert) string {
 		if m := p["minutes"]; m != "" {
 			return l.pick("No contact for "+data(m, 6)+" min.", "Нет связи уже "+data(m, 6)+" мин.", "已失联 "+data(m, 6)+" 分钟。")
 		}
+	case "host_blip":
+		return l.pick(data(p["count"], 4)+" link drops or agent restarts in the last hour.", "За последний час обрывов связи и перезапусков агента: "+data(p["count"], 4)+".",
+			"最近一小时内连接中断或 Agent 重启 "+data(p["count"], 4)+" 次。")
 	case "no_traffic":
 		line := l.pick(data(p["failed"], 4)+" of "+data(p["total"], 4)+" profiles fail the check.", data(p["failed"], 4)+" из "+data(p["total"], 4)+" профилей не проходят проверку.", data(p["total"], 4)+" 个协议配置中有 "+data(p["failed"], 4)+" 个未通过检测。")
 		if v, ok := whyVariants[variantOf(a.WhyKey, "no_traffic")]; ok {
