@@ -3,19 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.44`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.45`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.44
+  meta: v0.1.0 – v0.1.45
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.44
+      release: v0.1.45
       current: true
       points:
+        - "**Agent updates no longer roll back after a false drift.** A node whose old agent reported a wrong state now passes the update gate once the fixed agent reports the right one; the gate also looks at the node once more before a rollback, and a node clock behind the panel no longer fails it."
+        - "**A dropped subscription request no longer resets everyone's settings for a minute.** One app giving up while the panel refreshed its settings cache made every fetch of the next minute use the defaults (server names, formats)."
         - "**No more false \"state drift\" after a node reboot.** The agent misread AmneziaWG peers when the kernel split one peer across two dump messages: on nodes with IPv6 the alert stayed after every reboot and an agent update rolled back. Such a peer's traffic is no longer counted twice either."
         - "**A frozen panel is noticed.** The agent pings the panel over its link and reconnects by itself when no answer comes for 45 seconds."
         - "**The TSPU probe says why** it could not place the TSPU (no TSPU on the probe node's path, or routers that do not answer) and tries all three references. See [TSPU probe](../operations/reachability.md#tspu-probe)."
@@ -78,7 +80,7 @@ Mistgate is in **beta**; the current release is `v0.1.44`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.44
+  meta: v0.1.34 – v0.1.45
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
