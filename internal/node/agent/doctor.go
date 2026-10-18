@@ -45,7 +45,7 @@ func (a *Agent) doctorEnv() doctor.Env {
 	}
 	e.Inbounds = a.doctorInbounds
 	e.Samples = func(w time.Duration) []doctor.Sample { return a.hostRing.Since(a.now(), w) }
-	e.Offset = a.offset.Load
+	e.Offset = a.offsetNow
 	e.AgentCertNotAfter = func() time.Time { return a.id.Load().notAfter() }
 	e.UnitGen = a.cfg.UnitGen
 	e.UnderSystemd = a.cfg.UnitUnderSystemd

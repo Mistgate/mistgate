@@ -761,3 +761,42 @@ func TestNoHelloAckIsAnError(t *testing.T) {
 	h.panel.blackhole.Store(false)
 	h.waitConnected() // and the loop is still alive: it connects as soon as the panel answers
 }
+
+// The offset the doctor's time_sync judges is measured once per connection. When the node's clock is stepped later (NTP
+// catching up), the wall clock jumps against the monotonic clock; the reported offset follows the jump instead of showing
+// the old skew until the next reconnect.
+func TestOffsetFollowsAWallClockJump(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		off        int64
+		wall, mono time.Duration
+		want       int64
+	}{
+		{"no jump", 120, 90 * time.Second, 90 * time.Second, 120},
+		{"local clock stepped forward by the whole skew", 120, 90*time.Second + 120*time.Second, 90 * time.Second, 0},
+		{"local clock stepped forward past the panel's", 120, 90*time.Second + 150*time.Second, 90 * time.Second, -30},
+		{"local clock stepped back", -45, 90*time.Second - 45*time.Second, 90 * time.Second, 0},
+		{"drift under a second is no jump", 5, 90*time.Second + 300*time.Millisecond, 90 * time.Second, 5},
+	} {
+		if got := jumpedOffset(tc.off, tc.wall, tc.mono); got != tc.want {
+			t.Errorf("%s: offset %d, want %d", tc.name, got, tc.want)
+		}
+	}
+
+	panel := newFakePanel(t)
+	panel.serverSkew.Store(120)
+	h := &harness{t: t, panel: panel, eng: newFakeEngine("fake"), host: &fakeHost{}, dir: t.TempDir() + "/state"}
+	if _, err := Enroll(context.Background(), EnrollConfig{StateDir: h.dir, Panel: panel.addr(), SNI: testSNI, CASHA256: panel.fingerprint(), Token: panel.token}); err != nil {
+		t.Fatal(err)
+	}
+	h.a = h.newAgent()
+	h.a.elapsed = func(time.Time) (wall, mono time.Duration) { return time.Minute + 118*time.Second, time.Minute }
+	h.start()
+	eventually(t, func() bool { return panel.hasEvent("clock_skew") }, "clock_skew event")
+	if off := h.a.doctorEnv().Offset(); off < -3 || off > 3 {
+		t.Errorf("doctor offset after the node's clock was stepped = %d, want about 0", off)
+	}
+	if off := h.a.offset.Load(); off < 118 || off > 122 {
+		t.Errorf("the offset of the Hello itself = %d, it is what the agent's clock is corrected by", off)
+	}
+}

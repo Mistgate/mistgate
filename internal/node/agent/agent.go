@@ -131,6 +131,8 @@ type Agent struct {
 	skewed                  atomic.Bool
 	cur                     atomic.Pointer[session]
 	cancel                  context.CancelCauseFunc
+	offsetAt                atomic.Pointer[time.Time]                        // when offset was measured, with its monotonic reading; nil = never
+	elapsed                 func(since time.Time) (wall, mono time.Duration) // test seam: wall and monotonic time since offsetAt
 
 	upd          *update.Updater
 	helloOutcome atomic.Pointer[pb.LastUpdate] // the last_update the current Hello carried; acked by the HelloAck
@@ -389,6 +391,33 @@ func (a *Agent) masquerade(inboundID string) http.Handler {
 
 // now is the agent clock corrected by the offset measured at Hello.
 func (a *Agent) now() time.Time { return time.Now().Add(time.Duration(a.offset.Load()) * time.Second) }
+
+// offsetNow is the panel clock minus the local clock as of now, in seconds: the offset measured at Hello, moved by how far
+// the wall clock has jumped against the monotonic clock since (an NTP step on the node). The doctor's time_sync judges this.
+// The agent's own clock (now) keeps the Hello offset: it stamps events and statistics the panel orders by its own time.
+func (a *Agent) offsetNow() int64 {
+	off, at := a.offset.Load(), a.offsetAt.Load()
+	if at == nil {
+		return off
+	}
+	elapsed := a.elapsed
+	if elapsed == nil {
+		elapsed = wallAndMonoSince
+	}
+	wall, mono := elapsed(*at)
+	return jumpedOffset(off, wall, mono)
+}
+
+func wallAndMonoSince(at time.Time) (wall, mono time.Duration) {
+	now := time.Now()
+	return now.Round(0).Sub(at.Round(0)), now.Sub(at) // Round(0) drops the monotonic reading: wall difference only
+}
+
+// jumpedOffset moves an offset measured wallElapsed/monoElapsed ago by the wall clock's jump over that time. The panel
+// clock is the reference: when the local clock steps forward by d, panel minus local shrinks by d.
+func jumpedOffset(off int64, wallElapsed, monoElapsed time.Duration) int64 {
+	return off - int64(math.Round((wallElapsed - monoElapsed).Seconds()))
+}
 
 func (a *Agent) knows(protocol string) bool { _, ok := a.engines[protocol]; return ok }
 
@@ -905,6 +934,12 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 		off = 0
 	}
 	a.offset.Store(off)
+	if ack.ServerTimeUnix == 0 {
+		a.offsetAt.Store(nil)
+	} else {
+		at := time.Now()
+		a.offsetAt.Store(&at)
+	}
 	if ack.Settings != nil {
 		// A switch changed while the node was offline reaches it only here: the panel sends no desired state when the
 		// inbound hashes match, and the sweep is up to 30 s away. The tunnel firewall follows the switch at once.
