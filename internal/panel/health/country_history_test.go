@@ -122,3 +122,42 @@ func TestCountryHistoryCompactsEachSource(t *testing.T) {
 		t.Fatalf("KZ lanes: %q", lanes)
 	}
 }
+
+func TestCountryHistoryKeepsTheFullTSPUWindow(t *testing.T) {
+	c := newCountryEnv(t)
+	c.tspuOn()
+	start := c.clock.Now().Add(-7 * 24 * time.Hour)
+	rows := make([]store.TSPUCheck, 1000)
+	for i := range rows {
+		verdict := "blocked"
+		if i%2 == 1 {
+			verdict = "open"
+		}
+		rows[i] = store.TSPUCheck{NodeID: "de1", Vantage: "probe1", At: start.Add(time.Duration(i) * time.Minute), Verdict: verdict}
+	}
+	if err := c.st.InsertTSPUChecks(c.ctx, rows); err != nil {
+		t.Fatal(err)
+	}
+	_, nodes, err := c.s.CountryHistory(c.ctx, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.NodeId != "de1" {
+			continue
+		}
+		for _, lane := range n.Lanes {
+			if lane.Source == "tspu" {
+				if len(lane.Points) != len(rows) {
+					t.Fatalf("TSPU lane has %d points, want %d", len(lane.Points), len(rows))
+				}
+				if lane.Points[0].AtUnix != start.Unix() || lane.Points[len(lane.Points)-1].AtUnix != rows[len(rows)-1].At.Unix() {
+					t.Fatalf("TSPU lane covers %v through %v, want %v through %v", lane.Points[0].AtUnix,
+						lane.Points[len(lane.Points)-1].AtUnix, start.Unix(), rows[len(rows)-1].At.Unix())
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("no TSPU lane for de1")
+}

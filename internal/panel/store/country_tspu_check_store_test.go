@@ -68,6 +68,24 @@ func tspuCheckStoreProof(t *testing.T, st *Store) {
 	if left, err := st.RecentTSPUChecks(ctx); err != nil || len(left) != 1 || left[0].Verdict != "blocked" {
 		t.Fatalf("after the prune: %+v, %v", left, err)
 	}
+	start := base.Add(2 * time.Hour)
+	burst := make([]TSPUCheck, 1000)
+	for i := range burst {
+		burst[i] = TSPUCheck{NodeID: "nod_nl1", Vantage: "nod_probe1", At: start.Add(time.Duration(i) * time.Second), Verdict: "open"}
+	}
+	if err := st.InsertTSPUChecks(ctx, burst); err != nil {
+		t.Fatal(err)
+	}
+	window, err := st.TSPUHistorySince(ctx, "nod_probe1", start, 7*24*60+1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(window) != len(burst) {
+		t.Fatalf("TSPUHistorySince(probe1, start) returned %d rows, want %d", len(window), len(burst))
+	}
+	if !window[len(window)-1].At.Equal(start) {
+		t.Fatalf("TSPUHistorySince(probe1, start) begins at %v, want %v", window[len(window)-1].At, start)
+	}
 	// settings can be removed, not only blanked (Disconnect of the probe)
 	if err := st.SetSettings(ctx, map[string]string{"tspu.test_a": "1", "tspu.test_b": "2", "tspu.test_keep": "3"}); err != nil {
 		t.Fatal(err)

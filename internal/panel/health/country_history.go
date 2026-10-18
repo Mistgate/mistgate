@@ -10,9 +10,8 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 )
 
-// tspuHistoryRows is how many runs of the probe node are read back per node for the history: a week at its shortest interval
-// (30 minutes). Tests in a burst can push the oldest out of the window.
-const tspuHistoryRows = 7 * 24 * 2
+// tspuHistoryRows bounds one node's history to every 60-second manual test across seven days, including both window edges.
+const tspuHistoryRows = 7*24*60 + 1
 
 // CountryHistory is what CountryReachabilityService.GetReachabilityHistory shows: for every source that is on (the same test
 // GetChecks makes), what it said of each node since `since`, as a lane of verdicts where consecutive equal ones are one point.
@@ -56,7 +55,7 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 	}
 	if t := s.tspuState(ctx); t.On {
 		sources = append(sources, countryreach.SourceTSPU)
-		rows, err := s.st.TSPUHistory(ctx, t.Vantage, tspuHistoryRows)
+		rows, err := s.st.TSPUHistorySince(ctx, t.Vantage, since, tspuHistoryRows)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -79,9 +79,23 @@ func (s *Store) PruneTSPUChecks(ctx context.Context, before time.Time) (int64, e
 // TSPUHistory reads the newest perNode rows of every node from one vantage (of the given nodes only, when there are any),
 // newest first within a node, ordered by node id. The alert reads the last few runs from it.
 func (s *Store) TSPUHistory(ctx context.Context, vantage string, perNode int, nodeIDs ...string) ([]TSPUCheck, error) {
+	return s.tspuHistory(ctx, vantage, nil, perNode, nodeIDs...)
+}
+
+// TSPUHistorySince reads up to perNode rows from the requested window for every node from one vantage. Filtering by the
+// window before ranking keeps a burst of recent tests from crowding older rows out of a history view.
+func (s *Store) TSPUHistorySince(ctx context.Context, vantage string, since time.Time, perNode int, nodeIDs ...string) ([]TSPUCheck, error) {
+	return s.tspuHistory(ctx, vantage, &since, perNode, nodeIDs...)
+}
+
+func (s *Store) tspuHistory(ctx context.Context, vantage string, since *time.Time, perNode int, nodeIDs ...string) ([]TSPUCheck, error) {
 	q := `SELECT node_id, vantage, at, verdict, dpi_hop, control_ok, detail_json FROM (
 			SELECT *, ROW_NUMBER() OVER (PARTITION BY node_id ORDER BY at DESC) AS rank FROM country_tspu_check WHERE vantage = ?`
 	args := []any{vantage}
+	if since != nil {
+		q += ` AND at >= ?`
+		args = append(args, unix(*since))
+	}
 	if len(nodeIDs) > 0 {
 		q += ` AND node_id IN (SELECT value FROM json_each(?))`
 		args = append(args, jsonStrings(nodeIDs))
