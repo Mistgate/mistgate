@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
@@ -181,20 +182,18 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	if !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 	}
-	set, revoked, err := s.settings.UpdateRevoking(ctx, req.Msg.Settings)
-	if errors.Is(err, subsettings.ErrInvalid) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	} else if err != nil {
-		return nil, s.internal("save", err)
+	// The document is checked before anything is written, so an invalid one leaves the DNS offer as it was. Then the DNS offer
+	// is written before the settings: a deleted preset or an invalid offer must not leave the settings saved (and shared devices
+	// revoked) after a refused request.
+	pre, _ := proto.Clone(req.Msg.GetSettings()).(*adminv1.SubscriptionSettings)
+	if pre != nil {
+		pre.DefaultDnsPresetId, pre.LinkDns = "", nil
+		subsettings.Normalize(pre)
 	}
-	// The instance default DNS preset lives in the DNS module; the settings were valid, so set it now.
+	if err := subsettings.Validate(pre); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 	if s.dns != nil {
-		switch err := s.dns.SetDefaultPresetID(ctx, req.Msg.Settings.GetDefaultDnsPresetId()); {
-		case errors.Is(err, dns.ErrUnknownPreset):
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("default_dns_preset_id: no such preset"))
-		case err != nil:
-			return nil, s.internal("set default dns preset", err)
-		}
 		if o := req.Msg.Settings.GetLinkDns(); o != nil { // absent: the offer stays as it is
 			switch err := s.dns.SetLinkOptions(ctx, o); {
 			case errors.Is(err, dns.ErrLinkOptions):
@@ -203,6 +202,18 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 				return nil, s.internal("set link dns options", err)
 			}
 		}
+		switch err := s.dns.SetDefaultPresetID(ctx, req.Msg.Settings.GetDefaultDnsPresetId()); {
+		case errors.Is(err, dns.ErrUnknownPreset):
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("default_dns_preset_id: no such preset"))
+		case err != nil:
+			return nil, s.internal("set default dns preset", err)
+		}
+	}
+	set, revoked, err := s.settings.UpdateRevoking(ctx, req.Msg.Settings)
+	if errors.Is(err, subsettings.ErrInvalid) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	} else if err != nil {
+		return nil, s.internal("save", err)
 	}
 	if err := s.fillDNS(ctx, set); err != nil {
 		return nil, s.internal("default dns preset", err)

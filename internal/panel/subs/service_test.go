@@ -102,14 +102,33 @@ func TestSettingsCarryTheLinkDNSOffer(t *testing.T) {
 		t.Errorf("left out: %v %v", out.GetLinkDns(), err)
 	}
 	s = get()
+	beforeTitle, beforeDefaultDNS := s.Title, s.DefaultDnsPresetId
+	storedBefore, err := m.st.Setting(m.ctx, subsettings.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Title = "must not save"
+	s.DefaultDnsPresetId = "dns_builtin_family"
 	s.LinkDns = &adminv1.LinkDnsOptions{PresetIds: []string{"dns_nope"}}
 	if _, err := update(s); connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "link_dns.preset_ids: unknown preset") {
 		t.Errorf("an unknown preset: %v", err)
 	}
-	if v, err := m.st.Setting(m.ctx, subsettings.Key); err != nil || strings.Contains(v, "link_dns") || strings.Contains(v, "dns_builtin") {
-		t.Errorf("the stored document: %s %v", v, err)
+	if after := get(); after.Title != beforeTitle || after.DefaultDnsPresetId != beforeDefaultDNS {
+		t.Errorf("an invalid offer changed the settings: title %q default DNS %q", after.Title, after.DefaultDnsPresetId)
+	}
+	if v, err := m.st.Setting(m.ctx, subsettings.Key); err != nil || v != storedBefore || strings.Contains(v, "link_dns") || strings.Contains(v, "dns_builtin") {
+		t.Errorf("the stored document changed: %s %v", v, err)
 	}
 	if o := get().GetLinkDns(); len(o.GetPresetIds()) != 2 {
 		t.Errorf("a refused save changed the offer: %v", o)
+	}
+	s = get()
+	s.UpdateIntervalHours = 1 << 20 // an invalid document with a valid new offer: nothing is written
+	s.LinkDns = &adminv1.LinkDnsOptions{PresetIds: []string{"dns_builtin_family"}}
+	if _, err := update(s); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("an invalid document: %v", err)
+	}
+	if o := get().GetLinkDns(); len(o.GetPresetIds()) != 2 {
+		t.Errorf("an invalid document changed the offer: %v", o)
 	}
 }
