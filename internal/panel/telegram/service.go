@@ -454,7 +454,7 @@ func (s *Service) enqueue(it item) {
 
 // AlertTransition is health.Config.OnTransition: an alert opened (or re-opened) or ended. An alert already announced as open
 // is not announced again; one that ended because a worse one replaced it, was accepted as normal or lost its node says
-// nothing; one the admin muted ends quietly.
+// nothing; one the admin muted ends and re-opens quietly.
 func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 	if a.Severity < minSeverity {
 		return
@@ -481,6 +481,9 @@ func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 		if a.MutedUntil.After(s.now()) {
 			return
 		}
+	}
+	if !resolved && a.MutedUntil.After(s.now()) {
+		return // a muted alert that flaps back is the news the admin silenced
 	}
 	node := s.nodeName(context.Background(), a.NodeID)
 	adminURL := s.cfg.AdminURL

@@ -671,3 +671,34 @@ func TestDeviceLimitAlertIsOneMessagePerEpisodeAndResolvesSilently(t *testing.T)
 	e.svc.AlertTransition(a, false)
 	waitFor(t, "the next episode's message", func() bool { return len(e.tg.sentTo(777)) == 2 })
 }
+
+// The admin muted a flapping alert for a day. It resolves quietly, then re-opens (same row, still muted): the re-open is
+// the news the admin silenced, so it is not announced again.
+func TestMutedAlertThatReopensIsNotAnnounced(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.addNode("nod_1", "de-fra-1")
+	e.setBot()
+	e.link(owner, 777)
+	e.run()
+
+	a := alert("check_failed", "nod_1", 2)
+	e.svc.AlertTransition(a, false)
+	waitFor(t, "the first open", func() bool { return len(e.tg.sentTo(777)) == 1 })
+
+	a.MutedUntil = e.clk.now().Add(24 * time.Hour) // the admin mutes it
+	a.ResolvedAt, a.Resolution = e.clk.now(), "cleared"
+	e.svc.AlertTransition(a, true) // quiet: muted
+	e.quiet(1, 150*time.Millisecond)
+
+	a.ResolvedAt, a.Resolution = time.Time{}, "" // re-opened within the hour, muted_until kept
+	e.svc.AlertTransition(a, false)
+	e.quiet(1, 300*time.Millisecond)
+
+	a.MutedUntil = e.clk.now().Add(-time.Hour) // the mute ran out: the next flap is news again
+	a.ResolvedAt, a.Resolution = e.clk.now(), "cleared"
+	e.svc.AlertTransition(a, true)
+	a.ResolvedAt, a.Resolution = time.Time{}, ""
+	e.svc.AlertTransition(a, false)
+	waitFor(t, "an open after the mute ended", func() bool { return len(e.tg.sentTo(777)) >= 2 })
+}

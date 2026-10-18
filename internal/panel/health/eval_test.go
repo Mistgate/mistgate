@@ -1759,3 +1759,27 @@ func TestDoctorSkipThatCannotJudgeYetKeepsAFail(t *testing.T) {
 	e.report("de1", false, withCode(res("dstate_tasks", dSkip, ""), "dstate_tasks.interrupted"))
 	want(t, e.active(), "doctor_fail/de1/dstate_tasks")
 }
+
+// A muted alert that resolves and re-opens within the hour keeps its mute on the same row; the transition carries it, which
+// is how the notifier knows not to announce the re-open.
+func TestMutedAlertReopensWithItsMute(t *testing.T) {
+	var seen []Transition
+	e := newEnv(t, func(c *Config) { c.OnTransition = func(tr Transition) { seen = append(seen, tr) } })
+	e.node("de1", "hetzner", true)
+	a := e.inbound("de1", 443)
+	b := e.inbound("de1", 8443)
+	e.pass(a)
+	e.fail(b, "timeout")
+	e.fail(b, "timeout")
+	al := e.active()["check_failed/de1/"+b]
+	if _, err := e.st.MuteAlert(e.ctx, al.ID, e.clock.Now().Add(24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	e.pass(b) // resolves
+	e.fail(b, "timeout")
+	e.fail(b, "timeout") // re-opens within the hour
+	last := seen[len(seen)-1]
+	if last.Resolved || !last.Alert.MutedUntil.After(e.clock.Now()) {
+		t.Fatalf("expected a re-open that carries the mute, got %+v", last)
+	}
+}
