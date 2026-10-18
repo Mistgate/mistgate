@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -211,4 +212,41 @@ type PeerStat struct {
 	LastHS     time.Time // zero = never
 	Endpoint   netip.AddrPort
 	AllowedIPs []netip.Prefix
+}
+
+// MergeStats folds entries that share a public key into one, keeping the first-seen order. A kernel dump message can
+// end between two allowed ips of one peer and repeat the peer, with only its key and the remaining allowed ips, in the
+// next message. Allowed ips are concatenated without exact duplicates; every other field is taken from the first
+// entry that has it (a continuation carries zero counters).
+func MergeStats(in []PeerStat) []PeerStat {
+	out := make([]PeerStat, 0, len(in))
+	at := make(map[[32]byte]int, len(in))
+	for _, s := range in {
+		i, seen := at[s.PublicKey]
+		if !seen {
+			at[s.PublicKey] = len(out)
+			s.AllowedIPs = slices.Clone(s.AllowedIPs)
+			out = append(out, s)
+			continue
+		}
+		m := &out[i]
+		for _, p := range s.AllowedIPs {
+			if !slices.Contains(m.AllowedIPs, p) {
+				m.AllowedIPs = append(m.AllowedIPs, p)
+			}
+		}
+		if m.RxBytes == 0 {
+			m.RxBytes = s.RxBytes
+		}
+		if m.TxBytes == 0 {
+			m.TxBytes = s.TxBytes
+		}
+		if m.LastHS.IsZero() {
+			m.LastHS = s.LastHS
+		}
+		if !m.Endpoint.IsValid() {
+			m.Endpoint = s.Endpoint
+		}
+	}
+	return out
 }

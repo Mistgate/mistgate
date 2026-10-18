@@ -3,8 +3,10 @@ package awgcfg
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/netip"
 	"strings"
 	"testing"
+	"time"
 )
 
 func hpk() string { return base64.StdEncoding.EncodeToString(make([]byte, 32)) }
@@ -227,4 +229,25 @@ func FuzzCheckCPS(f *testing.F) {
 			t.Fatalf("CheckCPS(%q) = %d, nil", s, size)
 		}
 	})
+}
+
+func TestMergeStatsFoldsRepeatedPeers(t *testing.T) {
+	a, b := [32]byte{1}, [32]byte{2}
+	p4, p6 := netip.MustParsePrefix("10.0.0.5/32"), netip.MustParsePrefix("fd00::5/128")
+	hs := time.Unix(1_700_000_000, 0)
+	in := []PeerStat{
+		{PublicKey: a, RxBytes: 7, TxBytes: 9, LastHS: hs, AllowedIPs: []netip.Prefix{p4}},
+		{PublicKey: b, AllowedIPs: []netip.Prefix{p4}},
+		{PublicKey: a, AllowedIPs: []netip.Prefix{p4, p6}},
+	}
+	got := MergeStats(in)
+	if len(got) != 2 || got[0].PublicKey != a || got[1].PublicKey != b {
+		t.Fatalf("first-seen order, one entry per key: %+v", got)
+	}
+	if got[0].RxBytes != 7 || got[0].TxBytes != 9 || !got[0].LastHS.Equal(hs) || len(got[0].AllowedIPs) != 2 || got[0].AllowedIPs[1] != p6 {
+		t.Errorf("merged peer: %+v", got[0])
+	}
+	if len(in[0].AllowedIPs) != 1 {
+		t.Error("the input must not be modified")
+	}
 }

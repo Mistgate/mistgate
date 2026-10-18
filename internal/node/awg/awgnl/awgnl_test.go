@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"io"
 	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
@@ -219,5 +220,39 @@ func TestEndpointIPv6AndUnknownPeer(t *testing.T) {
 	msg.Header.Command = cmdSetDevice
 	if _, ok := decodeUnknownPeer(msg); ok {
 		t.Error("only WG_CMD_UNKNOWN_PEER is an event")
+	}
+}
+
+// A dump message ends where the buffer is full, and that can be between two allowed ips of one peer: the kernel repeats
+// the peer (public key and the rest of its allowed ips) at the start of the next message. Stats must give ONE peer.
+func TestStatsMergesPeerSplitAcrossMessages(t *testing.T) {
+	pub, other := key(0x55), key(0x66)
+	first := nest(0, attr(1, pub[:]), attr(7, n64(1234)), attr(8, n64(5678)),
+		nest(9, nest(0, attr(1, n16(2)), attr(2, []byte{10, 66, 4, 5}), attr(3, n8(32)))))
+	v6 := netip.MustParseAddr("fd66:66:0:1::5").As16()
+	// the continuation: key and the remaining allowed ips only, zero counters (here: no counter attributes at all)
+	second := nest(0, attr(1, pub[:]),
+		nest(9, nest(0, attr(1, n16(10)), attr(2, v6[:]), attr(3, n8(128)))))
+	next := nest(0, attr(1, other[:]), attr(7, n64(9)), nest(9, nest(0, attr(1, n16(2)), attr(2, []byte{10, 66, 4, 6}), attr(3, n8(32)))))
+	c := &Client{Info: Info{ID: famID, GenlVersion: 3, MaxAttr: 34}}
+	c.c = genltest.Dial(func(genetlink.Message, netlink.Message) ([]genetlink.Message, error) {
+		return []genetlink.Message{
+			{Data: cat(attr(2, str("mgawg1")), nest(8, first))},
+			{Data: cat(nest(8, second, next))},
+		}, nil
+	})
+	st, err := c.Stats("mgawg1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st) != 2 || st[0].PublicKey != pub || st[1].PublicKey != other {
+		t.Fatalf("want 2 peers in first-seen order (one split across two messages), got %+v", st)
+	}
+	want := []netip.Prefix{netip.MustParsePrefix("10.66.4.5/32"), netip.MustParsePrefix("fd66:66:0:1::5/128")}
+	if !slices.Equal(st[0].AllowedIPs, want) || st[0].RxBytes != 1234 || st[0].TxBytes != 5678 {
+		t.Errorf("split peer not merged, counters must come from the first fragment: %+v", st[0])
+	}
+	if st[1].RxBytes != 9 || len(st[1].AllowedIPs) != 1 {
+		t.Errorf("the peer after the split: %+v", st[1])
 	}
 }

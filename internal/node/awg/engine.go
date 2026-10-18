@@ -124,10 +124,11 @@ type counters struct{ rx, tx uint64 }
 
 // inbound is one interface.
 type inbound struct {
-	spec     plugin.InboundSpec
-	specHash string
-	cfg      nodeConfig
-	creds    []plugin.UserCred // as delivered, for Observed
+	spec          plugin.InboundSpec
+	specHash      string
+	cfg           nodeConfig
+	creds         []plugin.UserCred // as delivered, for Observed
+	warnedMissing bool              // Observed already warned about a delivered credential missing on the device since the last Apply
 
 	up     bool // the interface exists (created by this process)
 	gen    uint64
@@ -210,6 +211,7 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 			return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
 		}
 		old.spec, old.specHash, old.creds, old.cfg = spec, sh, creds, cfg
+		old.warnedMissing = false
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, nil
 	}
 
@@ -269,7 +271,7 @@ func (e *Engine) updateLive(ctx context.Context, in *inbound, cfg nodeConfig, pe
 		}
 		in.cfg.tunnel.MTU = cfg.tunnel.MTU
 	}
-	have, err := e.backend.Stats(ctx, cfg.name)
+	have, err := e.stats(ctx, cfg.name)
 	if err != nil {
 		return fmt.Errorf("read peers: %w", err)
 	}
@@ -341,7 +343,7 @@ func (e *Engine) destroy(ctx context.Context, in *inbound) {
 		delete(in.timers, k)
 	}
 	if in.up && e.backend != nil {
-		if st, err := e.backend.Stats(ctx, in.cfg.name); err == nil {
+		if st, err := e.stats(ctx, in.cfg.name); err == nil {
 			for _, h := range st {
 				e.flush(in, h)
 			}
@@ -379,7 +381,7 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 		if !in.up {
 			continue
 		}
-		st, err := e.backend.Stats(ctx, in.cfg.name)
+		st, err := e.stats(ctx, in.cfg.name)
 		if err != nil {
 			e.log.Warn("awg stats failed", "inbound", in.spec.ID, "err", err)
 			continue
@@ -431,7 +433,7 @@ func (e *Engine) Kick(ctx context.Context, credIDs []string) (int, error) {
 		if !in.up {
 			continue
 		}
-		st, err := e.backend.Stats(ctx, in.cfg.name)
+		st, err := e.stats(ctx, in.cfg.name)
 		if err != nil {
 			return len(hit), fmt.Errorf("awg inbound %q: %w", in.spec.ID, err)
 		}
@@ -487,8 +489,12 @@ func (e *Engine) Observed() []statehash.Inbound {
 	for _, in := range ins {
 		creds := in.creds
 		if in.up && in.state == plugin.RunRunning {
-			if st, err := e.backend.Stats(context.Background(), in.cfg.name); err == nil {
+			if st, err := e.stats(context.Background(), in.cfg.name); err == nil {
 				creds = e.presentCreds(in, st)
+				if len(creds) < len(in.creds) && !in.warnedMissing {
+					in.warnedMissing = true
+					e.log.Warn("awg: delivered credentials missing on the running interface", "inbound", in.spec.ID, "delivered", len(in.creds), "seen", len(creds))
+				}
 			}
 		}
 		out = append(out, statehash.Inbound{Spec: in.spec, Creds: creds})
@@ -570,7 +576,7 @@ func (e *Engine) AwgHealth() []InboundHealth {
 			continue
 		}
 		h := InboundHealth{InboundID: in.spec.ID, Backend: e.backend.Name(), BackendVersion: e.backend.Version(), IfaceUp: e.backend.LinkUp(in.cfg.name)}
-		if st, err := e.backend.Stats(context.Background(), in.cfg.name); err == nil {
+		if st, err := e.stats(context.Background(), in.cfg.name); err == nil {
 			h.Peers = uint32(len(st))
 			for _, p := range st {
 				if p.LastHS.IsZero() {
@@ -685,4 +691,11 @@ func cloneCreds(in []plugin.UserCred) []plugin.UserCred {
 		out[i].Data = append([]byte(nil), c.Data...)
 	}
 	return out
+}
+
+// stats reads the device with one entry per peer: a backend may repeat a peer whose allowed ips did not fit in one
+// dump message, and a repeat would hide allowed ips and look like a counter reset.
+func (e *Engine) stats(ctx context.Context, name string) ([]awgcfg.PeerStat, error) {
+	st, err := e.backend.Stats(ctx, name)
+	return awgcfg.MergeStats(st), err
 }

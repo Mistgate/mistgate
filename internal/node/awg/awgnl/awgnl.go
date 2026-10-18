@@ -254,7 +254,8 @@ func encodePeers(ae *netlink.AttributeEncoder, peers []awgcfg.Peer) {
 	})
 }
 
-// Stats dumps the device (NLM_F_DUMP; the peers of one device may arrive in several messages). The dump carries
+// Stats dumps the device (NLM_F_DUMP; the peers of one device may arrive in several messages, and one peer may be cut
+// between two of them: it is returned once, with all its allowed ips). The dump carries
 // the interface's private key and the header protection key in clear: nothing here decodes or keeps them.
 func (c *Client) Stats(ifname string) ([]awgcfg.PeerStat, error) {
 	ae := netlink.NewAttributeEncoder()
@@ -277,7 +278,7 @@ func (c *Client) Stats(ifname string) ([]awgcfg.PeerStat, error) {
 		}
 		out = append(out, ps...)
 	}
-	return out, nil
+	return awgcfg.MergeStats(out), nil // a peer can be cut between two messages
 }
 
 func decodeDump(data []byte) ([]awgcfg.PeerStat, error) {
