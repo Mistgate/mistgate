@@ -206,8 +206,10 @@ type apiRouter []AdminHandler
 func (a apiRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, h := range a {
 		if strings.HasPrefix(r.URL.Path, h.Path) {
-			if isStream(r) || longUnary[r.URL.Path] {
+			if isStream(r) {
 				liftDeadlines(w)
+			} else if longUnary[r.URL.Path] {
+				liftWriteDeadline(w)
 			}
 			h.Handler.ServeHTTP(w, r)
 			return
@@ -226,12 +228,18 @@ func isStream(r *http.Request) bool {
 	return strings.HasPrefix(ct, "application/connect+") || strings.HasPrefix(ct, "application/grpc")
 }
 
-// liftDeadlines removes the server's read and write deadlines for this request. An error
-// only means the ResponseWriter does not support deadlines (a test recorder): nothing to lift.
+// liftDeadlines removes the server's read and write deadlines for a stream. An error only
+// means the ResponseWriter does not support deadlines (a test recorder): nothing to lift.
 func liftDeadlines(w http.ResponseWriter) {
 	rc := http.NewResponseController(w)
 	_ = rc.SetReadDeadline(time.Time{})
 	_ = rc.SetWriteDeadline(time.Time{})
+}
+
+// liftWriteDeadline lets a long unary response outlive the listener's write timeout while
+// keeping the read deadline that bounds request headers and bodies.
+func liftWriteDeadline(w http.ResponseWriter) {
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 }
 
 func validSecretPrefix(p string) bool {
