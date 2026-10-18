@@ -762,6 +762,11 @@ func unitGenerationNeedsWarning(rows []store.DoctorRow, unitRow store.DoctorRow)
 	return false
 }
 
+// transientSkip are the doctor's SKIP codes that mean "not now", not "nothing to check": they hold the check's alert
+// (internal/node/doctor/codes.go: CodeCPUCollecting, CodeDstateCut, CodeSkipTimeout, CodeSkipInternal; the panel does not
+// import the node's package).
+var transientSkip = map[string]bool{"cpu_softirq.collecting": true, "dstate_tasks.interrupted": true, "skip.timeout": true, "skip.internal": true}
+
 // certWhy is the reason of a certificate alert about one profile: it names the profile and its domain (the agent's
 // own certificate keeps the doctor's general text).
 func certWhy(reason string) string {
@@ -794,6 +799,10 @@ func (s *Service) doctorConds(now time.Time, n store.NodeRow, rows []store.Docto
 		hasAWG = hasAWG || strings.Contains(t.in.Protocol, "awg") || strings.Contains(t.in.Protocol, "amnezia")
 	}
 	for _, r := range rows {
+		if r.Status == int(agentv1.DoctorStatus_DOCTOR_STATUS_SKIP) && transientSkip[r.DetailCode] { // could not judge now: keep what was said
+			d.holdKeys[key{kDoctorWarn, n.ID, r.CheckID}] = true
+			d.holdKeys[key{kDoctorFail, n.ID, r.CheckID}] = true
+		}
 		if r.Status != int(agentv1.DoctorStatus_DOCTOR_STATUS_WARN) && r.Status != int(agentv1.DoctorStatus_DOCTOR_STATUS_FAIL) {
 			continue
 		}

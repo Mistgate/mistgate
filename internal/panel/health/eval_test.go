@@ -1721,3 +1721,41 @@ func TestStaleInboundHoldsOnlyItsOwnAlerts(t *testing.T) {
 	e.evaluate()
 	want(t, e.active(), "no_traffic/de1/") // held, not resolved by silence
 }
+
+// After an agent start the first doctor report comes while cpu_softirq has too few samples and says SKIP (cannot judge
+// yet). That must not end the WARN it raised before: the full report replaces the rows and the alert would resolve as
+// "cleared", then re-open ten minutes later. Other SKIPs (the check does not apply) still clear it.
+func TestDoctorSkipThatCannotJudgeYetKeepsTheAlert(t *testing.T) {
+	for _, tc := range []struct {
+		code string
+		keep bool
+	}{
+		{"cpu_softirq.collecting", true},
+		{"dstate_tasks.interrupted", true},
+		{"skip.timeout", true},
+		{"skip.internal", true},
+		{"cpu_softirq.not_applicable", false},
+		{"ipv6.disabled", false},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("de1", "hetzner", true)
+			e.report("de1", false, res("cpu_softirq", dWarn, "", "softirq_pct", "62"), res("disk_space", dOK, ""))
+			want(t, e.active(), "doctor_warn/de1/cpu_softirq")
+			e.report("de1", false, withCode(res("cpu_softirq", dSkip, ""), tc.code), res("disk_space", dOK, ""))
+			if _, open := e.active()["doctor_warn/de1/cpu_softirq"]; open != tc.keep {
+				t.Errorf("skip %q: alert open = %v, want %v", tc.code, open, tc.keep)
+			}
+		})
+	}
+}
+
+// A held doctor FAIL is held the same way.
+func TestDoctorSkipThatCannotJudgeYetKeepsAFail(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.report("de1", false, res("dstate_tasks", dFail, "", "hint", "qxl_ttm"))
+	want(t, e.active(), "doctor_fail/de1/dstate_tasks")
+	e.report("de1", false, withCode(res("dstate_tasks", dSkip, ""), "dstate_tasks.interrupted"))
+	want(t, e.active(), "doctor_fail/de1/dstate_tasks")
+}
