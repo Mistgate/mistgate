@@ -160,6 +160,13 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	hops := a.syncHops(ctx, next, results, active)
 	a.syncInboundPorts(ctx, next, active, hops)
 	a.noteCerts(results)
+	var failed []string
+	for _, r := range results {
+		if r.Error != "" {
+			failed = append(failed, r.InboundId)
+		}
+	}
+	a.failedApply.Store(&failed)
 	return results
 }
 

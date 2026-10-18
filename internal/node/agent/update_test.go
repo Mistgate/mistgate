@@ -419,6 +419,44 @@ func TestCommitWaitsForAppliedStateWithoutNewFailures(t *testing.T) {
 	})
 }
 
+// A blocked inbound (egress WARP on a node without WARP) has no engine entry, so Health never says FAILED, yet the apply
+// is PARTIAL: the new build must not commit over it unless the inbound was already broken before the update.
+func TestCommitWatchRejectsNewBlockedPartial(t *testing.T) {
+	run := func(t *testing.T, preFailed string, wantCommit bool) {
+		f := newUpdFix(t)
+		_ = os.WriteFile(f.exe, newBin, 0o755)
+		_ = os.WriteFile(f.exe+".prev", oldBin, 0o755)
+		h := newHarness(t, harnessOpts{noStart: true, cfg: f.cfg(newBuilt, "0.2.0-new", func(c *update.Config) { c.Window = 1500 * time.Millisecond })})
+		marker := `{"from_version":"0.1.0-old","from_built":1000,"to_version":"0.2.0-new","to_built":2000,"started_unix":1` + preFailed + `}`
+		_ = os.WriteFile(filepath.Join(h.dir, update.FilePending), []byte(marker), 0o600)
+		h.a.commitTick, h.a.commitSettle = 10*time.Millisecond, 200*time.Millisecond
+		h.start()
+		h.nextHello()
+		in := inb("inb_w", 0, 0, cred("c1"))
+		in.Spec.Egress = "warp"
+		h.panel.push(fullState(1, in))
+		if r := h.panel.nextApply(); r.Status != pb.ApplyStatus_APPLY_STATUS_PARTIAL {
+			t.Fatalf("apply = %v", r)
+		}
+		if wantCommit {
+			eventually(t, func() bool { return h.panel.hasEvent("update_committed") }, "commit despite the inbound that was blocked before the update")
+			f.noExec(100 * time.Millisecond)
+			return
+		}
+		f.waitExec() // apply_failed: rolled back, not committed
+		if h.panel.hasEvent("update_committed") {
+			t.Error("committed over a new blocked inbound")
+		}
+		if b, _ := os.ReadFile(f.exe); string(b) != string(oldBin) {
+			t.Error("not rolled back")
+		}
+	}
+	t.Run("a new blocked inbound rolls the update back", func(t *testing.T) { run(t, "", false) })
+	t.Run("an inbound that was failing before the update is not its fault", func(t *testing.T) {
+		run(t, `,"pre_failed":["inb_w"]`, true)
+	})
+}
+
 func TestRollbackAgentOverTheWire(t *testing.T) {
 	f := newUpdFix(t)
 	h := newHarness(t, harnessOpts{noStart: true, cfg: f.cfg(newBuilt, "0.2.0-new", nil)})

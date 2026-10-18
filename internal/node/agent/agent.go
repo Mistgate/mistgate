@@ -154,6 +154,9 @@ type Agent struct {
 
 	mu    sync.Mutex
 	model *model // applied desired state; replaced wholesale, never mutated once stored
+	// Inbounds whose last reconcile result carried an error. A blocked inbound has no engine entry, so Health alone
+	// cannot say it failed; the update's commit watch reads this too.
+	failedApply atomic.Pointer[[]string]
 
 	// Owned by the worker goroutine (and by restore, which runs before the worker starts).
 	held    map[string]*held

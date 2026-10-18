@@ -83,14 +83,27 @@ func mapFetchErr(err error) error {
 	return err
 }
 
-// failedInbounds lists the inbounds the engines report FAILED, sorted (the same source the doctor reads; safe from any goroutine).
+// failedInbounds lists the inbounds the engines report FAILED or whose last apply carried an error (a blocked inbound has
+// no engine entry), sorted and unique (the same source the doctor reads; safe from any goroutine).
 func (a *Agent) failedInbounds() []string {
+	seen := map[string]bool{}
 	var out []string
+	add := func(id string) {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
 	for _, p := range a.protocols {
 		for _, h := range a.engines[p].Health() {
 			if h.State == plugin.RunFailed {
-				out = append(out, h.InboundID)
+				add(h.InboundID)
 			}
+		}
+	}
+	if f := a.failedApply.Load(); f != nil {
+		for _, id := range *f {
+			add(id)
 		}
 	}
 	sort.Strings(out)
