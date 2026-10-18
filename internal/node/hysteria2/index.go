@@ -33,6 +33,7 @@ type credState struct {
 	kickUntil  atomic.Int64                      // unix nano; unused kick tokens expire
 	lastKill   atomic.Int64                      // unix nano of the last token taken
 	removed    atomic.Bool                       // dropped from the index; its sessions are dying
+	inflight   atomic.Int32                      // LogTraffic callbacks running; a retired state is kept until they end
 }
 
 type credIdentity struct{ userID string }
@@ -147,6 +148,9 @@ func (in *inbound) LogTraffic(id string, tx, rx uint64) bool {
 	if cs == nil {
 		return false
 	}
+	// A retired state is flushed by Collect only while no callback holds it, or the bytes added after the flush are lost.
+	cs.inflight.Add(1)
+	defer cs.inflight.Add(-1)
 	if vu := cs.validUntil.Load(); vu != 0 && in.e.now().Unix() >= vu {
 		return false
 	}

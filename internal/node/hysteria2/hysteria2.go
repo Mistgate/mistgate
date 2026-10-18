@@ -523,10 +523,14 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 		}
 		in.smu.Unlock()
 	}
+	kept := e.retired[:0]
 	for _, cs := range e.retired {
 		flush(cs)
+		if cs.inflight.Load() > 0 { // a callback is still in the rate-limit wait: its bytes come with the next Collect
+			kept = append(kept, cs)
+		}
 	}
-	e.retired = nil
+	e.retired = kept
 	sort.Slice(out.Traffic, func(i, j int) bool {
 		a, b := out.Traffic[i], out.Traffic[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)

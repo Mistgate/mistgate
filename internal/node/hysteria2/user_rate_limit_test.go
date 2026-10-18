@@ -104,3 +104,32 @@ func TestPersonRateLimitSharedByDevices(t *testing.T) {
 		t.Fatalf("two devices of one person moved %d bytes each in %v: the person limit is not shared", size, took)
 	}
 }
+
+// A callback that sits in the rate-limit wait while its credential retires must still be counted: the retired state
+// stays until the callback is done, and the next Collect reports its bytes.
+func TestRetiredCredentialKeepsBytesOfAnInFlightCallback(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a", func(c *plugin.UserCred) { c.RateLimitBps = 800_000 }), cred("b"))
+	in := r.e.(*eng).inbounds["inb_1"]
+	cs := in.idx.Load().byID["crd_a"]
+
+	done := make(chan bool)
+	go func() { done <- in.LogTraffic("crd_a", 250_000, 0) }() // 100 kB burst, 100 kB/s: about 1.5 s in the wait
+	for cs.inflight.Load() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	r.apply(cred("b")) // a retires while the callback waits
+	if c := r.collect(); len(c.Traffic) != 0 {
+		t.Fatalf("nothing was added yet: %+v", c.Traffic)
+	}
+	if !<-done {
+		t.Fatal("LogTraffic refused")
+	}
+	c := r.collect()
+	if len(c.Traffic) != 1 || c.Traffic[0].CredID != "crd_a" || c.Traffic[0].Up != 250_000 {
+		t.Fatalf("the bytes of the in-flight callback are lost: %+v", c.Traffic)
+	}
+	if c = r.collect(); len(c.Traffic) != 0 || len(r.e.(*eng).retired) != 0 {
+		t.Fatalf("the retired state must be released once drained: %+v retired=%d", c.Traffic, len(r.e.(*eng).retired))
+	}
+}
