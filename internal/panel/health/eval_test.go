@@ -1634,3 +1634,49 @@ func TestFlappingNodeRaisesAWarning(t *testing.T) {
 	e.evaluate()
 	want(t, e.active())
 }
+
+// The panel's own network goes away: every node of several providers is silent at the same moment, yet they keep
+// serving people. That is one panel-side alert, not a NODE_DOWN on each node.
+func TestPanelOutageIsOneAlertNotNodeDownEverywhere(t *testing.T) {
+	e := newEnv(t)
+	ids := []string{"n1", "n2", "n3", "n4"}
+	for i, id := range ids {
+		e.node(id, "provider-"+string(rune('a'+i)), true)
+		e.inbound(id, 443)
+	}
+	silent := e.clock.Now()
+	for _, id := range ids {
+		e.fl.set(id, liveState{up: false, caps: []string{capDoctor}, lastSeen: silent})
+	}
+	e.clock.Advance(11 * time.Minute)
+	e.evaluate()
+	got := e.active()
+	want(t, got, "node_down//panel_link")
+	a := got["node_down//panel_link"]
+	if a.Severity != sevCritical || a.WhyKey != "health.alert.node_down.why.panel_link" || a.Params["nodes"] != "4" || a.Params["total"] != "4" {
+		t.Errorf("alert %+v", a)
+	}
+
+	// the link is back: the panel alert ends, no node was ever reported down
+	for _, id := range ids {
+		e.fl.set(id, liveState{up: true, caps: []string{capDoctor}, lastSeen: e.clock.Now()})
+	}
+	e.evaluate()
+	want(t, e.active())
+}
+
+// A few nodes silent, or nodes of fewer than three providers, are still each their own NODE_DOWN.
+func TestSilentNodesStayNodeDownWhenTheyAreNotMostOfTheFleet(t *testing.T) {
+	e := newEnv(t)
+	ids := []string{"n1", "n2", "n3", "n4", "n5"}
+	for i, id := range ids {
+		e.node(id, "provider-"+string(rune('a'+i)), true)
+	}
+	silent := e.clock.Now()
+	for _, id := range ids[:3] { // 3 providers, but 3 of 5 nodes
+		e.fl.set(id, liveState{up: false, caps: []string{capDoctor}, lastSeen: silent})
+	}
+	e.clock.Advance(11 * time.Minute)
+	e.evaluate()
+	want(t, e.active(), "node_down/n1/", "node_down/n2/", "node_down/n3/")
+}

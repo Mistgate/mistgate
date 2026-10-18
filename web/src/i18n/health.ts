@@ -234,6 +234,8 @@ export const en = {
   // ---- alert reasons (health.alert.<kind>.why[.<variant>])
   "health.alert.node_down.why":
     "The agent has not answered for {duration} and the host did not come back on its own. Usually it is the hoster: check in their panel that the server is running.",
+  "health.alert.node_down.title.panel_link": "The panel lost contact with most nodes",
+  "health.alert.node_down.why.panel_link": "{nodes} of {total} nodes stopped answering at once, at three or more hosters. That is more likely the panel’s own connection than the nodes, so per-node alerts are held. The nodes themselves are probably fine.",
   "health.alert.host_blip.why": "The link dropped for a few minutes and came back by itself. If it happens more than three times a day, think about moving.",
   "health.alert.host_blip.title.flapping": "The node keeps dropping",
   "health.alert.host_blip.why.flapping": "In the last hour the link dropped or the agent restarted {count} times. Each break is short, but connections on this node drop every time. Look at the host and the agent log; if it keeps up, think about moving.",
@@ -748,6 +750,8 @@ export const ru: typeof en = {
   // ---- alert reasons
   "health.alert.node_down.why":
     "Агент молчит {duration}, а хост сам не вернулся. Обычно виноват хостер: загляни в его панель и проверь, запущен ли сервер.",
+  "health.alert.node_down.title.panel_link": "Панель потеряла связь с большинством нод",
+  "health.alert.node_down.why.panel_link": "{nodes} из {total} нод замолчали одновременно у трёх и более хостеров. Скорее всего, дело в собственной связи панели, а не в нодах, поэтому алерты по нодам на паузе. Сами ноды, скорее всего, в порядке.",
   "health.alert.host_blip.why": "Связь пропадала на несколько минут и вернулась сама. Если это случается чаще трёх раз в сутки, стоит подумать о переезде.",
   "health.alert.host_blip.title.flapping": "Нода то и дело пропадает",
   "health.alert.host_blip.why.flapping": "За последний час связь обрывалась или агент перезапускался: {count}. Каждый обрыв короткий, но подключения на ноде рвутся каждый раз. Проверь хост и лог агента; если не прекращается, подумай о переезде.",
@@ -1250,6 +1254,8 @@ export const zh: typeof en = {
   "health.alert.subscription_shared_suspect.title": "疑似共享订阅",
 
   "health.alert.node_down.why": "Agent 已有 {duration} 没有应答，主机也没有自行恢复。通常是服务商的问题：请在其控制面板中确认服务器正在运行。",
+  "health.alert.node_down.title.panel_link": "面板与大多数节点失去联系",
+  "health.alert.node_down.why.panel_link": "{total} 个节点中有 {nodes} 个同时停止响应，涉及三个及以上服务商。这更可能是面板自身的连接问题，而不是节点，因此按节点的告警已暂停。节点本身多半没有问题。",
   "health.alert.host_blip.why": "连接中断了几分钟后自行恢复。如果一天内超过三次，建议考虑更换服务商。",
   "health.alert.host_blip.title.flapping": "节点反复掉线",
   "health.alert.host_blip.why.flapping": "最近一小时内，连接中断或 Agent 重启共 {count} 次。每次中断都很短，但节点上的连接每次都会断开。请检查主机和 Agent 日志；如果持续出现，建议考虑更换服务商。",

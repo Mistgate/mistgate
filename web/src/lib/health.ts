@@ -107,6 +107,7 @@ export function alertTitle(t: T, a: Alert): string {
   let key = a.titleKey;
   // the blind-panel alerts are fleet-wide and have no profile to name
   if (a.kind === AlertKind.CHECK_FAILED && (a.subject === "panel_egress" || a.subject === "probe_path")) key += "." + a.subject;
+  if (a.kind === AlertKind.NODE_DOWN && a.subject === "panel_link") key += ".panel_link"; // fleet-wide, no node to name
   if (a.kind === AlertKind.HOST_BLIP && a.subject === "flapping") key += ".flapping"; // the quiet blip records keep "Host blip"
   if ((a.kind === AlertKind.DOCTOR_WARN || a.kind === AlertKind.DOCTOR_FAIL) && params.check) params.check_title = checkTitle(t, params.check);
   if (a.kind === AlertKind.COUNTRY_BLOCKED) params.country = countryIn(t, params.country ?? "");

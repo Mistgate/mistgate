@@ -262,6 +262,22 @@ func TestFlappingNodeAlertIsLocalized(t *testing.T) {
 	}
 }
 
+func TestPanelLinkAlertIsLocalized(t *testing.T) {
+	a := store.HealthAlert{Kind: "node_down", Subject: "panel_link", WhyKey: "health.alert.node_down.why.panel_link", Params: map[string]string{"nodes": "4", "total": "5"}}
+	for lang, want := range map[L][2]string{
+		"en": {"The panel lost contact with most nodes", "4 of 5 nodes went silent at once, at several hosters: likely the panel’s own connection. Per-node alerts are held."},
+		"ru": {"Панель потеряла связь с большинством нод", "4 из 5 нод замолчали одновременно у нескольких хостеров: скорее всего, виновата связь самой панели. Алерты по нодам на паузе."},
+		"zh": {"面板与大多数节点失去联系", "5 个节点中有 4 个同时失去响应，涉及多个服务商：多半是面板自身的连接问题。按节点的告警已暂停。"},
+	} {
+		if got := alertTitle(lang, a); got != want[0] {
+			t.Errorf("%s title = %q, want %q", lang, got, want[0])
+		}
+		if got := alertReason(lang, a); got != want[1] {
+			t.Errorf("%s reason = %q, want %q", lang, got, want[1])
+		}
+	}
+}
+
 func TestNotStartedAlertIsLocalized(t *testing.T) {
 	a := store.HealthAlert{Kind: "check_failed", WhyKey: "health.alert.check_failed.why.not_started",
 		Params: map[string]string{"profile": "HY2", "port": "8443", "error_detail": "bind: address already in use"}}

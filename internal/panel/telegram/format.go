@@ -175,6 +175,9 @@ func alertTitle(l L, a store.HealthAlert) string {
 	p := a.Params
 	switch a.Kind {
 	case "node_down":
+		if a.Subject == "panel_link" {
+			return l.pick("The panel lost contact with most nodes", "Панель потеряла связь с большинством нод", "面板与大多数节点失去联系")
+		}
 		return l.pick("Node is unreachable", "Нода недоступна", "节点无法连接")
 	case "host_blip":
 		return l.pick("The node keeps dropping", "Нода то и дело пропадает", "节点反复掉线")
@@ -231,6 +234,11 @@ func alertReason(l L, a store.HealthAlert) string {
 	p := a.Params
 	switch a.Kind {
 	case "node_down":
+		if a.Subject == "panel_link" {
+			return l.pick(data(p["nodes"], 4)+" of "+data(p["total"], 4)+" nodes went silent at once, at several hosters: likely the panel’s own connection. Per-node alerts are held.",
+				data(p["nodes"], 4)+" из "+data(p["total"], 4)+" нод замолчали одновременно у нескольких хостеров: скорее всего, виновата связь самой панели. Алерты по нодам на паузе.",
+				data(p["total"], 4)+" 个节点中有 "+data(p["nodes"], 4)+" 个同时失去响应，涉及多个服务商：多半是面板自身的连接问题。按节点的告警已暂停。")
+		}
 		if m := p["minutes"]; m != "" {
 			return l.pick("No contact for "+data(m, 6)+" min.", "Нет связи уже "+data(m, 6)+" мин.", "已失联 "+data(m, 6)+" 分钟。")
 		}

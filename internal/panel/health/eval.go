@@ -64,6 +64,7 @@ const (
 
 	flapMin            = 3 // blips and agent restarts in an hour that make a node "flapping"
 	panelEgressSubject = "panel_egress"
+	panelLinkSubject   = "panel_link"
 	panelProbeSubject  = "probe_path"
 	certWarnBefore     = 14 * 24 * time.Hour
 	certCritBefore     = 3 * 24 * time.Hour
@@ -244,6 +245,9 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 
 	byNode := map[string][]probed{}
 	var connected []store.NodeRow
+	var downs []cond
+	downProviders := map[string]bool{}
+	activeNodes := 0
 
 	for _, n := range sn.nodes {
 		d.nodes[n.ID] = true
@@ -251,6 +255,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 			d.holdNode[n.ID] = true
 			continue
 		}
+		activeNodes++
 		nodeLive := live[n.ID]
 		if !nodeLive.Connected {
 			d.holdNode[n.ID] = true
@@ -260,8 +265,9 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 			case grace:
 				d.holdDown[n.ID] = true
 			default:
-				add(cond{key: key{kNodeDown, n.ID, ""}, severity: sevCritical, why: "health.alert.node_down.why",
+				downs = append(downs, cond{key: key{kNodeDown, n.ID, ""}, severity: sevCritical, why: "health.alert.node_down.why",
 					params: map[string]string{"minutes": strconv.Itoa(int(gap.Minutes()))}})
+				downProviders[providerKey(n)] = true
 			}
 			continue
 		}
@@ -292,6 +298,19 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 			default:
 				byNode[n.ID] = append(byNode[n.ID], probed{t, c})
 			}
+		}
+	}
+
+	// Most nodes of three providers silent at once: the panel lost its link, not the nodes (they keep serving people).
+	if len(downProviders) >= 3 && len(downs)*5 >= activeNodes*4 {
+		for _, c := range downs {
+			d.holdDown[c.node] = true
+		}
+		add(cond{key: key{kNodeDown, "", panelLinkSubject}, severity: sevCritical, why: "health.alert.node_down.why.panel_link",
+			params: map[string]string{"nodes": strconv.Itoa(len(downs)), "total": strconv.Itoa(activeNodes)}})
+	} else {
+		for _, c := range downs {
+			add(c)
 		}
 	}
 

@@ -121,6 +121,8 @@ describe("alerts", () => {
     expect(alertTitle(t, alert({ params: { profile: "hy2 · 443" } }))).toContain("hy2 · 443");
     const flapping = alert({ kind: AlertKind.HOST_BLIP, titleKey: "health.alert.host_blip.title", subject: "flapping", params: { count: "4" } });
     expect(alertTitle(t, flapping)).toBe(en["health.alert.host_blip.title.flapping"]);
+    const link = alert({ kind: AlertKind.NODE_DOWN, titleKey: "health.alert.node_down.title", subject: "panel_link", nodeId: "", params: { nodes: "4", total: "4" } });
+    expect(alertTitle(t, link)).toBe(en["health.alert.node_down.title.panel_link"]);
   });
   it("shows an unknown title key as it is and no reason for an unknown why key", () => {
     const a = alert({ titleKey: "health.alert.brand_new.title", whyKey: "health.alert.brand_new.why" });
@@ -454,6 +456,8 @@ describe("the server's vocabulary is covered", () => {
     "health.alert.check_failed.title.panel_egress",
     "health.alert.check_failed.title.probe_path",
     "health.alert.host_blip.title.flapping",
+    "health.alert.node_down.title.panel_link",
+    "health.alert.node_down.why.panel_link",
     "health.alert.host_blip.why.flapping",
     ...whyNoTraffic.map((v) => `health.alert.no_traffic.why.${v}`),
     ...whyCheck.map((v) => `health.alert.check_failed.why.${v}`),
@@ -523,7 +527,7 @@ describe("the server's vocabulary is covered", () => {
       no_traffic: ["failed", "total", "ports", "port"],
       check_failed: ["inbound", "profile", "port", "error_code", "error_detail", "failed", "total", "providers", "nodes", "cdn_host"],
       cert_expiry: ["inbound", "inbound_id", "profile", "server_name", "days_left", "reason", "server_part"],
-      node_down: ["duration"],
+      node_down: ["duration", "nodes", "total"],
       host_blip: ["count"],
       device_limit: ["user_name", "used", "limit"],
       country_blocked: ["country", "networks", "ports"],
