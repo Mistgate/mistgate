@@ -348,6 +348,33 @@ func TestUpdateValidatesTheSettings(t *testing.T) {
 	}
 }
 
+func TestRunWithSettingsReadBeforeDisableIsRejected(t *testing.T) {
+	e := newEnv(t)
+	e.enable()
+	gen := e.svc.generation()
+	st, err := e.svc.load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := e.svc.cfg.Nodes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe, fit := probeNode(nodes, st.node)
+	if !fit {
+		t.Fatal("probe1 is not fit")
+	}
+	if _, err := e.update(&adminv1.UpdateTspuProbeRequest{Enabled: ptr(false)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.runNow(context.Background(), gen, st, probe, nodes); !errors.Is(err, errSwitchedOff) {
+		t.Fatalf("run with stale settings = %v, want switched off", err)
+	}
+	if len(e.ff.sent()) != 0 || len(e.rows()) != 0 || e.lastRun().At != 0 {
+		t.Fatalf("stale run had effects: calls=%d rows=%v last=%+v", len(e.ff.sent()), e.rows(), e.lastRun())
+	}
+}
+
 // A run is due when the newest row of the probe node is older than the interval; the clock is read from the store, so a restart
 // does not fire one at once.
 func TestScheduleDueLogicAndRestart(t *testing.T) {

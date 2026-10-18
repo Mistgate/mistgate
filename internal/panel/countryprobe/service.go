@@ -239,20 +239,31 @@ func (s *Service) State(ctx context.Context) State {
 
 var errSwitchedOff = errors.New("countryprobe: switched off")
 
-// track registers a run in flight so that switching the source off can cancel it; gen is the generation to store under.
-func (s *Service) track(ctx context.Context) (context.Context, uint64, func()) {
+// generation is the version of the settings; a run takes it before it reads them.
+func (s *Service) generation() uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.gen
+}
+
+// track registers a run in flight so that switching the source off can cancel it. A run whose settings were read under an
+// older generation (the source was switched off or changed meanwhile) is not admitted.
+func (s *Service) track(ctx context.Context, gen uint64) (context.Context, func(), bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if gen != s.gen {
+		return nil, nil, false
+	}
 	ctx, cancel := context.WithTimeout(ctx, runBudget)
 	id := s.next
 	s.next++
 	s.inflight[id] = cancel
-	return ctx, s.gen, func() {
+	return ctx, func() {
 		s.mu.Lock()
 		delete(s.inflight, id)
 		s.mu.Unlock()
 		cancel()
-	}
+	}, true
 }
 
 // stop cancels every run in flight and keeps a run that started earlier from storing anything.
@@ -517,8 +528,11 @@ func probeNode(nodes []Node, id string) (Node, bool) {
 }
 
 // runNow runs the probe: runMu must be held.
-func (s *Service) runNow(ctx context.Context, st settings, probe Node, nodes []Node) (outcome, error) {
-	ctx, gen, done := s.track(ctx)
+func (s *Service) runNow(ctx context.Context, gen uint64, st settings, probe Node, nodes []Node) (outcome, error) {
+	ctx, done, admitted := s.track(ctx, gen)
+	if !admitted {
+		return outcome{}, errSwitchedOff
+	}
 	defer done()
 	return s.execute(ctx, gen, st, probe, nodes)
 }
@@ -550,6 +564,7 @@ func (s *Service) Tick(ctx context.Context) bool {
 	if s.cfg.Edge {
 		return false
 	}
+	gen := s.generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		s.log.Warn("countryprobe: read settings", "err", err)
@@ -576,7 +591,7 @@ func (s *Service) Tick(ctx context.Context) bool {
 	if !fit {
 		return false
 	}
-	if _, err := s.runNow(ctx, st, probe, nodes); err != nil {
+	if _, err := s.runNow(ctx, gen, st, probe, nodes); err != nil {
 		if ctx.Err() == nil && !errors.Is(err, errSwitchedOff) {
 			s.log.Warn("countryprobe: run failed", "err", err)
 		}
@@ -779,6 +794,7 @@ func (r rpc) TestTspuProbe(ctx context.Context, _ *connect.Request[adminv1.TestT
 	if err := edition.Check(s.cfg.Edge, edition.TSPUProbe); err != nil {
 		return nil, err
 	}
+	gen := s.generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		return nil, errInternal
@@ -817,7 +833,7 @@ func (r rpc) TestTspuProbe(ctx context.Context, _ *connect.Request[adminv1.TestT
 	// HTTP server lifts its write deadline for this procedure (httpserver.longUnary).
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), runBudget)
 	defer cancel()
-	res, err := s.runNow(rctx, st, probe, nodes)
+	res, err := s.runNow(rctx, gen, st, probe, nodes)
 	switch {
 	case errors.Is(err, errSwitchedOff):
 		return nil, fail(connect.CodeFailedPrecondition, "tspu_off")
