@@ -46,6 +46,17 @@ message SubscriptionSettings {
   // one DNS for all servers, since these apps have one resolver for the whole subscription. Kept by the DNS module, like
   // default_dns_preset_id. Absent in a request = leave the stored offer as it is.
   LinkDnsOptions link_dns = 11;
+  // How Happ pings the servers of the subscription. Unspecified = the app's own default: no ping headers are sent.
+  HappPing happ_ping = 12;
+  // With happ_ping set: Happ pings the servers each time it opens (subscription-ping-onopen-enabled: 1, else 0).
+  bool happ_ping_on_open = 13;
+}
+
+// The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).
+enum HappPing {
+  HAPP_PING_UNSPECIFIED = 0;
+  // ping-type: tcp, a TCP connection to the server's address and port.
+  HAPP_PING_TCP = 1;
 }
 
 // What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the

@@ -527,6 +527,9 @@ func (h *handler) linkPreset(ctx context.Context, v access.SubView) *dns.Preset 
 	return &pre
 }
 
+// happPing is the ping-type value of each choice of SubscriptionSettings.happ_ping; the app's default has none.
+var happPing = map[adminv1.HappPing]string{adminv1.HappPing_HAPP_PING_TCP: "tcp"}
+
 // headers sets what every subscription answer carries: the name, usage and term the apps show, the refresh
 // interval, the user's page and the announcement and support link. format is the one of the answer: the Happ `routing` header goes
 // out with the link list only (the other formats carry their own DNS, and Happ's routing profile is global: it would act on the
@@ -569,6 +572,17 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 			hd.Set("X-Hwid-Max-Devices-Reached", "true")
 		}
 		hd.Set("X-Hwid-Limit", strconv.Itoa(v.DeviceLimit))
+	}
+	if ping, ok := happPing[set.GetHappPing()]; ok && isHapp(r.UserAgent()) {
+		// The headers the old Remnawave setups sent Happ: how to ping the servers, show the delay in ms, and whether to ping
+		// when the app opens. Only Happ reads them, and only when the owner chose something other than the app's default.
+		hd.Set("Ping-Type", ping)
+		hd.Set("Ping-Result", "time")
+		onOpen := "0"
+		if set.GetHappPingOnOpen() {
+			onOpen = "1"
+		}
+		hd.Set("Subscription-Ping-Onopen-Enabled", onOpen)
 	}
 	if format == plugin.FormatURIList && h.cfg.Routing != nil && v.Status == access.StatusActive && v.UserID != "" && isHapp(r.UserAgent()) {
 		if val, err := h.cfg.Routing.HappRouting(ctx, v.UserID); err != nil {

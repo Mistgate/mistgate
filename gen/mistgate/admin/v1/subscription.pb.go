@@ -21,6 +21,54 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).
+type HappPing int32
+
+const (
+	HappPing_HAPP_PING_UNSPECIFIED HappPing = 0
+	// ping-type: tcp, a TCP connection to the server's address and port.
+	HappPing_HAPP_PING_TCP HappPing = 1
+)
+
+// Enum value maps for HappPing.
+var (
+	HappPing_name = map[int32]string{
+		0: "HAPP_PING_UNSPECIFIED",
+		1: "HAPP_PING_TCP",
+	}
+	HappPing_value = map[string]int32{
+		"HAPP_PING_UNSPECIFIED": 0,
+		"HAPP_PING_TCP":         1,
+	}
+)
+
+func (x HappPing) Enum() *HappPing {
+	p := new(HappPing)
+	*p = x
+	return p
+}
+
+func (x HappPing) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HappPing) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[0].Descriptor()
+}
+
+func (HappPing) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[0]
+}
+
+func (x HappPing) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HappPing.Descriptor instead.
+func (HappPing) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{0}
+}
+
 // How the device limit applies to the apps that take the subscription link (a key of AmneziaVPN is always limited).
 type LinkDeviceLimit int32
 
@@ -62,11 +110,11 @@ func (x LinkDeviceLimit) String() string {
 }
 
 func (LinkDeviceLimit) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_subscription_proto_enumTypes[0].Descriptor()
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[1].Descriptor()
 }
 
 func (LinkDeviceLimit) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_subscription_proto_enumTypes[0]
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[1]
 }
 
 func (x LinkDeviceLimit) Number() protoreflect.EnumNumber {
@@ -75,7 +123,7 @@ func (x LinkDeviceLimit) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use LinkDeviceLimit.Descriptor instead.
 func (LinkDeviceLimit) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{0}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{1}
 }
 
 type Platform int32
@@ -120,11 +168,11 @@ func (x Platform) String() string {
 }
 
 func (Platform) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_subscription_proto_enumTypes[1].Descriptor()
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[2].Descriptor()
 }
 
 func (Platform) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_subscription_proto_enumTypes[1]
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[2]
 }
 
 func (x Platform) Number() protoreflect.EnumNumber {
@@ -133,7 +181,7 @@ func (x Platform) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Platform.Descriptor instead.
 func (Platform) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{2}
 }
 
 type SubFormat int32
@@ -187,11 +235,11 @@ func (x SubFormat) String() string {
 }
 
 func (SubFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_mistgate_admin_v1_subscription_proto_enumTypes[2].Descriptor()
+	return file_mistgate_admin_v1_subscription_proto_enumTypes[3].Descriptor()
 }
 
 func (SubFormat) Type() protoreflect.EnumType {
-	return &file_mistgate_admin_v1_subscription_proto_enumTypes[2]
+	return &file_mistgate_admin_v1_subscription_proto_enumTypes[3]
 }
 
 func (x SubFormat) Number() protoreflect.EnumNumber {
@@ -200,7 +248,7 @@ func (x SubFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SubFormat.Descriptor instead.
 func (SubFormat) EnumDescriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{2}
+	return file_mistgate_admin_v1_subscription_proto_rawDescGZIP(), []int{3}
 }
 
 type SubscriptionSettings struct {
@@ -232,9 +280,13 @@ type SubscriptionSettings struct {
 	// The DNS presets a person may pick on their page for the apps that take the link (Happ, the Mihomo apps, Xray JSON, sing-box):
 	// one DNS for all servers, since these apps have one resolver for the whole subscription. Kept by the DNS module, like
 	// default_dns_preset_id. Absent in a request = leave the stored offer as it is.
-	LinkDns       *LinkDnsOptions `protobuf:"bytes,11,opt,name=link_dns,json=linkDns,proto3" json:"link_dns,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LinkDns *LinkDnsOptions `protobuf:"bytes,11,opt,name=link_dns,json=linkDns,proto3" json:"link_dns,omitempty"`
+	// How Happ pings the servers of the subscription. Unspecified = the app's own default: no ping headers are sent.
+	HappPing HappPing `protobuf:"varint,12,opt,name=happ_ping,json=happPing,proto3,enum=mistgate.admin.v1.HappPing" json:"happ_ping,omitempty"`
+	// With happ_ping set: Happ pings the servers each time it opens (subscription-ping-onopen-enabled: 1, else 0).
+	HappPingOnOpen bool `protobuf:"varint,13,opt,name=happ_ping_on_open,json=happPingOnOpen,proto3" json:"happ_ping_on_open,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -342,6 +394,20 @@ func (x *SubscriptionSettings) GetLinkDns() *LinkDnsOptions {
 		return x.LinkDns
 	}
 	return nil
+}
+
+func (x *SubscriptionSettings) GetHappPing() HappPing {
+	if x != nil {
+		return x.HappPing
+	}
+	return HappPing_HAPP_PING_UNSPECIFIED
+}
+
+func (x *SubscriptionSettings) GetHappPingOnOpen() bool {
+	if x != nil {
+		return x.HappPingOnOpen
+	}
+	return false
 }
 
 // What the owner offers for the link apps. A person's pick applies while it is offered; without one, their link apps get the
@@ -1192,7 +1258,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xdc\x04\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xc1\x05\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -1206,7 +1272,9 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\x15default_dns_preset_id\x18\t \x01(\tR\x12defaultDnsPresetId\x12S\n" +
 	"\x11link_device_limit\x18\n" +
 	" \x01(\x0e2\".mistgate.admin.v1.LinkDeviceLimitH\x00R\x0flinkDeviceLimit\x88\x01\x01\x12<\n" +
-	"\blink_dns\x18\v \x01(\v2!.mistgate.admin.v1.LinkDnsOptionsR\alinkDnsB\x14\n" +
+	"\blink_dns\x18\v \x01(\v2!.mistgate.admin.v1.LinkDnsOptionsR\alinkDns\x128\n" +
+	"\thapp_ping\x18\f \x01(\x0e2\x1b.mistgate.admin.v1.HappPingR\bhappPing\x12)\n" +
+	"\x11happ_ping_on_open\x18\r \x01(\bR\x0ehappPingOnOpenB\x14\n" +
 	"\x12_link_device_limit\"[\n" +
 	"\x0eLinkDnsOptions\x12\x1d\n" +
 	"\n" +
@@ -1268,7 +1336,10 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
 	"rule_index\x18\x01 \x01(\x05R\truleIndex\x124\n" +
 	"\x06format\x18\x02 \x01(\x0e2\x1c.mistgate.admin.v1.SubFormatR\x06format\x12\x18\n" +
-	"\abrowser\x18\x03 \x01(\bR\abrowser*\x8e\x01\n" +
+	"\abrowser\x18\x03 \x01(\bR\abrowser*8\n" +
+	"\bHappPing\x12\x19\n" +
+	"\x15HAPP_PING_UNSPECIFIED\x10\x00\x12\x11\n" +
+	"\rHAPP_PING_TCP\x10\x01*\x8e\x01\n" +
 	"\x0fLinkDeviceLimit\x12!\n" +
 	"\x1dLINK_DEVICE_LIMIT_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17LINK_DEVICE_LIMIT_TRACK\x10\x01\x12\x1d\n" +
@@ -1308,58 +1379,60 @@ func file_mistgate_admin_v1_subscription_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_subscription_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_subscription_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_mistgate_admin_v1_subscription_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_mistgate_admin_v1_subscription_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_mistgate_admin_v1_subscription_proto_goTypes = []any{
-	(LinkDeviceLimit)(0),                       // 0: mistgate.admin.v1.LinkDeviceLimit
-	(Platform)(0),                              // 1: mistgate.admin.v1.Platform
-	(SubFormat)(0),                             // 2: mistgate.admin.v1.SubFormat
-	(*SubscriptionSettings)(nil),               // 3: mistgate.admin.v1.SubscriptionSettings
-	(*LinkDnsOptions)(nil),                     // 4: mistgate.admin.v1.LinkDnsOptions
-	(*PlatformApp)(nil),                        // 5: mistgate.admin.v1.PlatformApp
-	(*UserPageOptions)(nil),                    // 6: mistgate.admin.v1.UserPageOptions
-	(*ServeRule)(nil),                          // 7: mistgate.admin.v1.ServeRule
-	(*GetSubscriptionSettingsRequest)(nil),     // 8: mistgate.admin.v1.GetSubscriptionSettingsRequest
-	(*GetSubscriptionSettingsResponse)(nil),    // 9: mistgate.admin.v1.GetSubscriptionSettingsResponse
-	(*ServerSample)(nil),                       // 10: mistgate.admin.v1.ServerSample
-	(*UpdateSubscriptionSettingsRequest)(nil),  // 11: mistgate.admin.v1.UpdateSubscriptionSettingsRequest
-	(*UpdateSubscriptionSettingsResponse)(nil), // 12: mistgate.admin.v1.UpdateSubscriptionSettingsResponse
-	(*ClientInfo)(nil),                         // 13: mistgate.admin.v1.ClientInfo
-	(*ListClientsRequest)(nil),                 // 14: mistgate.admin.v1.ListClientsRequest
-	(*ListClientsResponse)(nil),                // 15: mistgate.admin.v1.ListClientsResponse
-	(*TestUserAgentRequest)(nil),               // 16: mistgate.admin.v1.TestUserAgentRequest
-	(*TestUserAgentResponse)(nil),              // 17: mistgate.admin.v1.TestUserAgentResponse
-	(App)(0),                                   // 18: mistgate.admin.v1.App
+	(HappPing)(0),                              // 0: mistgate.admin.v1.HappPing
+	(LinkDeviceLimit)(0),                       // 1: mistgate.admin.v1.LinkDeviceLimit
+	(Platform)(0),                              // 2: mistgate.admin.v1.Platform
+	(SubFormat)(0),                             // 3: mistgate.admin.v1.SubFormat
+	(*SubscriptionSettings)(nil),               // 4: mistgate.admin.v1.SubscriptionSettings
+	(*LinkDnsOptions)(nil),                     // 5: mistgate.admin.v1.LinkDnsOptions
+	(*PlatformApp)(nil),                        // 6: mistgate.admin.v1.PlatformApp
+	(*UserPageOptions)(nil),                    // 7: mistgate.admin.v1.UserPageOptions
+	(*ServeRule)(nil),                          // 8: mistgate.admin.v1.ServeRule
+	(*GetSubscriptionSettingsRequest)(nil),     // 9: mistgate.admin.v1.GetSubscriptionSettingsRequest
+	(*GetSubscriptionSettingsResponse)(nil),    // 10: mistgate.admin.v1.GetSubscriptionSettingsResponse
+	(*ServerSample)(nil),                       // 11: mistgate.admin.v1.ServerSample
+	(*UpdateSubscriptionSettingsRequest)(nil),  // 12: mistgate.admin.v1.UpdateSubscriptionSettingsRequest
+	(*UpdateSubscriptionSettingsResponse)(nil), // 13: mistgate.admin.v1.UpdateSubscriptionSettingsResponse
+	(*ClientInfo)(nil),                         // 14: mistgate.admin.v1.ClientInfo
+	(*ListClientsRequest)(nil),                 // 15: mistgate.admin.v1.ListClientsRequest
+	(*ListClientsResponse)(nil),                // 16: mistgate.admin.v1.ListClientsResponse
+	(*TestUserAgentRequest)(nil),               // 17: mistgate.admin.v1.TestUserAgentRequest
+	(*TestUserAgentResponse)(nil),              // 18: mistgate.admin.v1.TestUserAgentResponse
+	(App)(0),                                   // 19: mistgate.admin.v1.App
 }
 var file_mistgate_admin_v1_subscription_proto_depIdxs = []int32{
-	5,  // 0: mistgate.admin.v1.SubscriptionSettings.apps:type_name -> mistgate.admin.v1.PlatformApp
-	6,  // 1: mistgate.admin.v1.SubscriptionSettings.user_page:type_name -> mistgate.admin.v1.UserPageOptions
-	7,  // 2: mistgate.admin.v1.SubscriptionSettings.rules:type_name -> mistgate.admin.v1.ServeRule
-	0,  // 3: mistgate.admin.v1.SubscriptionSettings.link_device_limit:type_name -> mistgate.admin.v1.LinkDeviceLimit
-	4,  // 4: mistgate.admin.v1.SubscriptionSettings.link_dns:type_name -> mistgate.admin.v1.LinkDnsOptions
-	1,  // 5: mistgate.admin.v1.PlatformApp.platform:type_name -> mistgate.admin.v1.Platform
-	18, // 6: mistgate.admin.v1.PlatformApp.kind:type_name -> mistgate.admin.v1.App
-	2,  // 7: mistgate.admin.v1.ServeRule.format:type_name -> mistgate.admin.v1.SubFormat
-	3,  // 8: mistgate.admin.v1.GetSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	10, // 9: mistgate.admin.v1.GetSubscriptionSettingsResponse.server_samples:type_name -> mistgate.admin.v1.ServerSample
-	3,  // 10: mistgate.admin.v1.UpdateSubscriptionSettingsRequest.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	3,  // 11: mistgate.admin.v1.UpdateSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
-	2,  // 12: mistgate.admin.v1.ClientInfo.formats:type_name -> mistgate.admin.v1.SubFormat
-	13, // 13: mistgate.admin.v1.ListClientsResponse.clients:type_name -> mistgate.admin.v1.ClientInfo
-	2,  // 14: mistgate.admin.v1.TestUserAgentResponse.format:type_name -> mistgate.admin.v1.SubFormat
-	8,  // 15: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:input_type -> mistgate.admin.v1.GetSubscriptionSettingsRequest
-	11, // 16: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:input_type -> mistgate.admin.v1.UpdateSubscriptionSettingsRequest
-	14, // 17: mistgate.admin.v1.SubscriptionService.ListClients:input_type -> mistgate.admin.v1.ListClientsRequest
-	16, // 18: mistgate.admin.v1.SubscriptionService.TestUserAgent:input_type -> mistgate.admin.v1.TestUserAgentRequest
-	9,  // 19: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:output_type -> mistgate.admin.v1.GetSubscriptionSettingsResponse
-	12, // 20: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:output_type -> mistgate.admin.v1.UpdateSubscriptionSettingsResponse
-	15, // 21: mistgate.admin.v1.SubscriptionService.ListClients:output_type -> mistgate.admin.v1.ListClientsResponse
-	17, // 22: mistgate.admin.v1.SubscriptionService.TestUserAgent:output_type -> mistgate.admin.v1.TestUserAgentResponse
-	19, // [19:23] is the sub-list for method output_type
-	15, // [15:19] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	6,  // 0: mistgate.admin.v1.SubscriptionSettings.apps:type_name -> mistgate.admin.v1.PlatformApp
+	7,  // 1: mistgate.admin.v1.SubscriptionSettings.user_page:type_name -> mistgate.admin.v1.UserPageOptions
+	8,  // 2: mistgate.admin.v1.SubscriptionSettings.rules:type_name -> mistgate.admin.v1.ServeRule
+	1,  // 3: mistgate.admin.v1.SubscriptionSettings.link_device_limit:type_name -> mistgate.admin.v1.LinkDeviceLimit
+	5,  // 4: mistgate.admin.v1.SubscriptionSettings.link_dns:type_name -> mistgate.admin.v1.LinkDnsOptions
+	0,  // 5: mistgate.admin.v1.SubscriptionSettings.happ_ping:type_name -> mistgate.admin.v1.HappPing
+	2,  // 6: mistgate.admin.v1.PlatformApp.platform:type_name -> mistgate.admin.v1.Platform
+	19, // 7: mistgate.admin.v1.PlatformApp.kind:type_name -> mistgate.admin.v1.App
+	3,  // 8: mistgate.admin.v1.ServeRule.format:type_name -> mistgate.admin.v1.SubFormat
+	4,  // 9: mistgate.admin.v1.GetSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	11, // 10: mistgate.admin.v1.GetSubscriptionSettingsResponse.server_samples:type_name -> mistgate.admin.v1.ServerSample
+	4,  // 11: mistgate.admin.v1.UpdateSubscriptionSettingsRequest.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	4,  // 12: mistgate.admin.v1.UpdateSubscriptionSettingsResponse.settings:type_name -> mistgate.admin.v1.SubscriptionSettings
+	3,  // 13: mistgate.admin.v1.ClientInfo.formats:type_name -> mistgate.admin.v1.SubFormat
+	14, // 14: mistgate.admin.v1.ListClientsResponse.clients:type_name -> mistgate.admin.v1.ClientInfo
+	3,  // 15: mistgate.admin.v1.TestUserAgentResponse.format:type_name -> mistgate.admin.v1.SubFormat
+	9,  // 16: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:input_type -> mistgate.admin.v1.GetSubscriptionSettingsRequest
+	12, // 17: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:input_type -> mistgate.admin.v1.UpdateSubscriptionSettingsRequest
+	15, // 18: mistgate.admin.v1.SubscriptionService.ListClients:input_type -> mistgate.admin.v1.ListClientsRequest
+	17, // 19: mistgate.admin.v1.SubscriptionService.TestUserAgent:input_type -> mistgate.admin.v1.TestUserAgentRequest
+	10, // 20: mistgate.admin.v1.SubscriptionService.GetSubscriptionSettings:output_type -> mistgate.admin.v1.GetSubscriptionSettingsResponse
+	13, // 21: mistgate.admin.v1.SubscriptionService.UpdateSubscriptionSettings:output_type -> mistgate.admin.v1.UpdateSubscriptionSettingsResponse
+	16, // 22: mistgate.admin.v1.SubscriptionService.ListClients:output_type -> mistgate.admin.v1.ListClientsResponse
+	18, // 23: mistgate.admin.v1.SubscriptionService.TestUserAgent:output_type -> mistgate.admin.v1.TestUserAgentResponse
+	20, // [20:24] is the sub-list for method output_type
+	16, // [16:20] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_subscription_proto_init() }
@@ -1376,7 +1449,7 @@ func file_mistgate_admin_v1_subscription_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_subscription_proto_rawDesc), len(file_mistgate_admin_v1_subscription_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,

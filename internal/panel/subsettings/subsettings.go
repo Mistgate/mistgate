@@ -364,6 +364,9 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if _, ok := adminv1.LinkDeviceLimit_name[int32(s.GetLinkDeviceLimit())]; !ok {
 		return invalid("link_device_limit: unknown mode")
 	}
+	if _, ok := adminv1.HappPing_name[int32(s.HappPing)]; !ok {
+		return invalid("happ_ping: unknown value")
+	}
 	if err := httpsURL("support_url", s.SupportUrl, true); err != nil {
 		return err
 	}

@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { HappPing } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { setLang } from "@/i18n";
+import { subscriptions } from "@/lib/api";
 import type { Settings } from "./model";
 import { TextsTab } from "./texts";
 
@@ -80,5 +82,42 @@ describe("the preview of names and texts", () => {
     const shown = document.querySelector(".whitespace-pre-line")!.textContent!;
     expect(shown.endsWith(" обновляю…")).toBe(true); // the cut fell inside "серверы": back to the word before
     expect([...shown].length).toBeLessThanOrEqual(200);
+  });
+});
+
+describe("how Happ pings the servers", () => {
+  const api = subscriptions as unknown as { getSubscriptionSettings: ReturnType<typeof vi.fn>; updateSubscriptionSettings: ReturnType<typeof vi.fn> };
+  const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent === label);
+  const onOpen = () => [...document.querySelectorAll("label")].find((l) => l.textContent?.includes("Пинговать при открытии"))!;
+  const toggle = () => onOpen().querySelector<HTMLElement>("[role=switch]")!;
+
+  it("leaves it to the app by default, and saves TCP with the ping on open", async () => {
+    api.getSubscriptionSettings.mockResolvedValue({ settings: settings(), effectiveTitle: "Mistgate" });
+    api.updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => ({ settings: r.settings }));
+    await mount({ settings: settings(), effectiveTitle: "Mistgate" });
+    expect(radio("Как в приложении")?.getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).toContain("Решает Happ, панель ничего не отправляет.");
+    // the switch means nothing without a ping type: it is off and says why
+    expect(toggle().hasAttribute("data-disabled")).toBe(true);
+    expect(onOpen().textContent).toContain("Только с TCP");
+
+    await click(radio("TCP"));
+    expect(radio("TCP")?.getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).toContain("TCP-подключение к порту каждого сервера");
+    expect(toggle().hasAttribute("data-disabled")).toBe(false);
+    await click(toggle());
+    expect(toggle().getAttribute("aria-checked")).toBe("true");
+
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Сохранить"));
+    for (let i = 0; i < 5; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(api.updateSubscriptionSettings).toHaveBeenCalledWith({ settings: expect.objectContaining({ happPing: HappPing.TCP, happPingOnOpen: true }) });
+  });
+
+  it("starts from what is saved", async () => {
+    await mount({ settings: settings({ happPing: HappPing.TCP, happPingOnOpen: true }), effectiveTitle: "Mistgate" });
+    expect(radio("TCP")?.getAttribute("aria-checked")).toBe("true");
+    expect(toggle().getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).not.toContain("Сохранить"); // nothing changed yet
   });
 });

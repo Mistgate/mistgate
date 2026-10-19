@@ -52,6 +52,7 @@ import { PolishKit } from "./dev-kit-polish";
 import { DnsLinkKit } from "./dev-kit-dns";
 import { EdgeKit } from "./dev-kit-edge";
 import { UsersKit } from "./dev-kit-users";
+import { SubsKit } from "./dev-kit-subs";
 import { DecoyKit } from "./dev-kit-decoy";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
 import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
@@ -284,8 +285,8 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|edge|node|health|users: one kit alone, for its screenshots
-  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit }[new URLSearchParams(location.search).get("only") ?? ""];
+  // ?only=dns|edge|node|health|users|subs: one kit alone, for its screenshots
+  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit }[new URLSearchParams(location.search).get("only") ?? ""];
   if (only) {
     const Kit = only;
     return (
@@ -528,6 +529,7 @@ export default function DevKit() {
       <EdgeKit />
       <DecoyKit />
       <UsersKit />
+      <SubsKit />
 
       <LinkModal
         target={

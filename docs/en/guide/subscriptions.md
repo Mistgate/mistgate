@@ -136,6 +136,7 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 | `Announce` | The announcement, or the reason the subscription does not work. |
 | `Support-Url` | The support link. |
 | `Routing` | The link list for Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
+| `Ping-Type`, `Ping-Result`, `Subscription-Ping-Onopen-Enabled` | Happ only, and only when **Ping in Happ** is not **App default**: how Happ pings the servers, the delay in ms, and whether it pings when it opens. See [Names & texts](#names-texts). |
 
 The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has one proxy group with every server and a `dns:` section; Xray JSON has one config per server; sing-box JSON has one switch with every server. Each takes the person's DNS preset in its own form.
 
@@ -164,6 +165,13 @@ In the link list every name is kept within 30 characters, Happ's limit for a ser
 In Happ, a node also ends its name with its current load: "🇩🇪 DE · Hysteria2 · 64％", its CPU use, or the higher of its receive and send rates as a share of the **Network capacity** in the node's **Settings** when that is set and higher. Other apps and the Mihomo profile get the name without it: they remember the chosen server by its name, and a name that changes would reset the choice at every refresh.
 
 **How it looks in the app** draws the list as Happ shows it, loads included, with the servers of the group most people are in, or with made-up servers when there is none.
+
+**Ping in Happ** sets how Happ measures the delay to the servers. Other apps ignore it.
+
+| Setting | What it does |
+|:--|:--|
+| **How to ping** | **App default** (the default) sends nothing, so Happ uses its own setting. **TCP** sends `Ping-Type: tcp` and `Ping-Result: time`: Happ opens a TCP connection to each server's port and shows the delay in ms. |
+| **Ping when the app opens** | With **TCP** only: Happ checks every server each time it starts (`Subscription-Ping-Onopen-Enabled: 1`; off sends `0`). |
 
 ## When a subscription does not work
 

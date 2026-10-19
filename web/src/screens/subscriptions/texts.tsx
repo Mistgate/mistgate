@@ -2,11 +2,14 @@ import { useRef, useState } from "react";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { FlagText } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
+import { Segmented } from "@/components/ui/segmented";
 import { Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
+import { HappPing } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { errorText } from "@/lib/errors";
 import { cx } from "@/lib/cx";
 import { useTx, type Tx } from "@/screens/users/t";
+import { SwitchRow } from "@/screens/users/ui";
 import { announceMax, cutAnnounce, defaultNameTemplate, serverNames, validSupportLink, type Settings } from "./model";
 import { useSaveSettings } from "./queries";
 import { FieldBlock, inputCls, Lead, SaveBar } from "./ui";
@@ -30,11 +33,14 @@ const madeUp: Sample[] = [
 
 type Data = { settings: Settings; effectiveTitle: string; samples?: Sample[]; sampleGroup?: string; namesLanguage?: string };
 
-/** "Names & texts": title, announcement, support link, update interval and the server name template, with a live preview of the app. */
+/**
+ * "Names & texts": title, announcement, support link, update interval, the server name template and how Happ pings the
+ * servers, with a live preview of the app.
+ */
 export function TextsTab({ data }: { data: Data }) {
   const s = data.settings;
   // keyed by what is saved: after a save (or a change from elsewhere) the form starts again from the server
-  const key = JSON.stringify([s.title, s.announcement, s.supportUrl, s.updateIntervalHours, s.serverNameTemplate]);
+  const key = JSON.stringify([s.title, s.announcement, s.supportUrl, s.updateIntervalHours, s.serverNameTemplate, s.happPing, s.happPingOnOpen]);
   return <TextsForm key={key} data={data} />;
 }
 
@@ -43,7 +49,15 @@ function TextsForm({ data }: { data: Data }) {
   const toast = useToast();
   const save = useSaveSettings();
   const s = data.settings;
-  const base = { title: s.title, announcement: s.announcement, supportUrl: s.supportUrl, hours: s.updateIntervalHours || DEFAULT_HOURS, template: s.serverNameTemplate };
+  const base = {
+    title: s.title,
+    announcement: s.announcement,
+    supportUrl: s.supportUrl,
+    hours: s.updateIntervalHours || DEFAULT_HOURS,
+    template: s.serverNameTemplate,
+    ping: s.happPing ?? HappPing.UNSPECIFIED,
+    pingOnOpen: !!s.happPingOnOpen,
+  };
   const [f, setF] = useState(base);
   const set = <K extends keyof typeof base>(k: K, v: (typeof base)[K]) => setF((x) => ({ ...x, [k]: v }));
   const tplRef = useRef<HTMLInputElement>(null);
@@ -64,7 +78,16 @@ function TextsForm({ data }: { data: Data }) {
 
   function onSave() {
     save
-      .mutateAsync((cur) => ({ ...cur, title: f.title.trim(), announcement: f.announcement.trim(), supportUrl: f.supportUrl.trim(), updateIntervalHours: f.hours, serverNameTemplate: f.template.trim() }))
+      .mutateAsync((cur) => ({
+        ...cur,
+        title: f.title.trim(),
+        announcement: f.announcement.trim(),
+        supportUrl: f.supportUrl.trim(),
+        updateIntervalHours: f.hours,
+        serverNameTemplate: f.template.trim(),
+        happPing: f.ping,
+        happPingOnOpen: f.pingOnOpen,
+      }))
       .then(() => toast(t("subs.saved")))
       .catch((e: unknown) => toast.error(errorText(e, t)));
   }
@@ -137,6 +160,34 @@ function TextsForm({ data }: { data: Data }) {
                 ))}
               </div>
             </FieldBlock>
+          </Card>
+
+          <Card lg className="flex flex-col px-4 pt-4 pb-1">
+            <SectionLabel className="pb-3" icon="pulse" tone="mint">
+              {t("subs.texts.ping")}
+            </SectionLabel>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-3.5">
+              <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
+                <span className="text-[13px] font-bold">{t("subs.texts.pingHow")}</span>
+                <span className="text-[11px] leading-snug text-muted">{t(f.ping === HappPing.TCP ? "subs.texts.pingHint.tcp" : "subs.texts.pingHint.default")}</span>
+              </div>
+              <Segmented
+                aria-label={t("subs.texts.pingHow")}
+                value={String(f.ping)}
+                onValueChange={(v) => set("ping", Number(v) as HappPing)}
+                options={[
+                  { value: String(HappPing.UNSPECIFIED), label: t("subs.texts.ping.default") },
+                  { value: String(HappPing.TCP), label: t("subs.texts.ping.tcp") },
+                ]}
+              />
+            </div>
+            <SwitchRow
+              label={t("subs.texts.pingOpen")}
+              hint={f.ping === HappPing.UNSPECIFIED ? t("subs.texts.pingOpenOff") : t("subs.texts.pingOpenHint")}
+              checked={f.pingOnOpen}
+              disabled={f.ping === HappPing.UNSPECIFIED}
+              onCheckedChange={(on) => set("pingOnOpen", on)}
+            />
           </Card>
         </div>
 

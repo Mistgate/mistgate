@@ -136,6 +136,7 @@ sequenceDiagram
 | `Announce` | 公告，或订阅无法使用的原因。 |
 | `Support-Url` | 支持链接。 |
 | `Routing` | 仅供 Happ 使用，且仅随链接列表发送：用户的 DNS 预设，以 Happ 路由配置形式提供。参见[DNS](dns.md)。其他格式自带 DNS，因此不发送 `Routing`。 |
+| `Ping-Type`、`Ping-Result`、`Subscription-Ping-Onopen-Enabled` | 仅供 Happ 使用，且仅在**Happ 延迟测试**不是**应用默认**时发送：Happ 测试服务器延迟的方式、以 ms 显示延迟，以及打开应用时是否测试。参见[名称与文本](#名称与文本)。 |
 
 Mihomo YAML、Xray JSON 和 sing-box JSON 包含相同的响应头，但没有 `Routing`。Mihomo YAML 有包含所有服务器的一个代理组和 `dns:` 部分；Xray JSON 每台服务器一份配置；sing-box JSON 是包含所有服务器的一个选择器。各格式都以自己的形式带上用户的 DNS 预设。
 
@@ -164,6 +165,13 @@ Mihomo YAML、Xray JSON 和 sing-box JSON 包含相同的响应头，但没有 `
 在 Happ 中，服务器名称末尾还会附带当前负载（例如「🇩🇪 DE · Hysteria2 · 64%」）：取 CPU 使用率；如果节点**设置**中填写了**网络带宽**且链路占用率更高，则取接收和发送中较高一方占带宽的比例。其他应用和 Mihomo 配置中的名称不带负载信息：它们会按名称记住用户选择的服务器，名称变化会导致每次更新订阅时都重置选择。
 
 **在应用中的效果**会按 Happ 的显示方式展示服务器列表及其负载，也会使用成员人数最多的分组中的服务器；如果没有分组服务器，则显示虚构服务器。
+
+**Happ 延迟测试**设置 Happ 测量到各服务器延迟的方式。其他应用不读取此设置。
+
+| 设置 | 作用 |
+|:--|:--|
+| **测试方式** | **应用默认**（默认值）不发送任何设置，Happ 使用自身设置。**TCP** 发送 `Ping-Type: tcp` 和 `Ping-Result: time`：Happ 与每台服务器的端口建立 TCP 连接，并以 ms 显示延迟。 |
+| **打开应用时测试延迟** | 仅适用于 **TCP**：Happ 每次启动时检测所有服务器（`Subscription-Ping-Onopen-Enabled: 1`；关闭时发送 `0`）。 |
 
 ## 订阅无法使用时
 
