@@ -7,9 +7,11 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { editionFeatures } from "@/i18n/edition";
+import { countryQuery } from "@/lib/globalping";
 import { alertsQuery, checksQuery } from "@/lib/health";
 import { approvalsQuery, tokensQuery } from "@/lib/integrations";
 import { overviewQuery, userCountQuery } from "@/lib/queries";
+import { telegramQuery } from "@/lib/telegram";
 import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { IntegrationsScreen } from "@/screens/integrations";
@@ -51,6 +53,7 @@ const token = (over: object) => ({
 });
 
 const tokens = { nowUnix: now, tokens: [token({}), token({ id: "tok_2", name: "nightly-report", profile: TokenProfile.READONLY, hint: "zz99", lastUsedUnix: now - 86400 })] };
+const telegramOff = { bot: { configured: false, username: "", error: "" }, links: [], adminUrlKnown: false };
 const approvals = { awaiting: 0, nowUnix: now, receivedMs: Date.now(), approvals: [] };
 
 // Health with two quiet nodes, no alert and no check result: the same data on both editions (?tab=people etc. switches the tab).
@@ -80,6 +83,14 @@ export function EdgeKit() {
         id="edge-integrations"
         title="Edge: Integrations (the token list stays, no new token; Telegram and MCP are a notice)"
         seed={[[tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals]]}
+      >
+        <IntegrationsScreen />
+      </Shot>
+      <Shot
+        id="vps-integrations"
+        title="VPS: Integrations with the country check set up (no pointer to Reachability any more)"
+        seed={[[tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals], [countryQuery.queryKey, { country: "RU" }], [telegramQuery.queryKey, telegramOff]]}
+        me={vpsMe}
       >
         <IntegrationsScreen />
       </Shot>

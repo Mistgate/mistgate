@@ -48,6 +48,8 @@ vi.mock("@/lib/api", () => ({
     getChecks: () => Promise.resolve(checksPage),
   },
   updates: { getUpdates: () => Promise.resolve(updatesPage) },
+  // the country check is set up: the one-release pointer "The check from Russia is now in Reachability" would have shown
+  countryReach: { getCountryReachability: () => Promise.resolve({ settings: { country: "RU" } }) },
   fleet: { overview: () => Promise.resolve({ nowUnix: 1000, nodesTotal: 1, nodes: [{ id: "nod_1", name: "de1", status: NodeStatus.ONLINE }], alertsActive: 0, alertsCritical: 0, traffic: [], online: [], events: [], topConsumers: [] }) },
   users: { listUsers: () => Promise.resolve({ users: [], counts: { all: 1 } }) },
   provisioning: {},
@@ -142,6 +144,7 @@ describe("Integrations on the edge", () => {
     expect(document.querySelector("[data-testid='mcp-url']")).toBeNull();
     expect(buttons().some((b) => b.includes("New token") || b.includes("Create token"))).toBe(false);
     expect(text()).toContain("API tokens");
+    expect(document.querySelector('a[href="/reachability"]')).toBeNull();
   });
 
   it("is unchanged on the VPS", async () => {
@@ -151,6 +154,8 @@ describe("Integrations on the edge", () => {
     expect(getTelegram).toHaveBeenCalled();
     expect(document.querySelector("[data-testid='mcp-url']")).not.toBeNull();
     expect(buttons().some((b) => b.includes("New token"))).toBe(true);
+    expect(document.querySelector('a[href="/reachability"]')).toBeNull();
+    expect(text()).not.toContain("is now in Reachability");
   });
 });
 

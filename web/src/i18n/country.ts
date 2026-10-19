@@ -12,7 +12,6 @@ export const en = {
   // ---- the Reachability page
   "rc.sub": "Whether the nodes open from {country}",
   "rc.open": "Open Reachability",
-  "rc.moved": "The check from {country} is now in Reachability",
   "rc.sum.title": "Nodes by verdict",
   "rc.sum.ok": "reachable",
   "rc.sum.warn": "TCP blocked",
@@ -237,7 +236,6 @@ export const en = {
 export const ru: Record<keyof typeof en, string> = {
   "rc.sub": "Открываются ли ноды из {country}",
   "rc.open": "Открыть раздел «Доступность»",
-  "rc.moved": "Проверка доступности из {country} теперь в разделе «Доступность»",
   "rc.sum.title": "Ноды по вердикту",
   "rc.sum.ok": "доступны",
   "rc.sum.warn": "TCP режут",
@@ -455,7 +453,6 @@ export const ru: Record<keyof typeof en, string> = {
 export const zh: Record<keyof typeof en, string> = {
   "rc.sub": "能否从{country}访问节点",
   "rc.open": "打开「可达性」",
-  "rc.moved": "从{country}访问的检测已移至「可达性」",
   "rc.sum.title": "按结论统计节点",
   "rc.sum.ok": "可访问",
   "rc.sum.warn": "TCP 被封锁",

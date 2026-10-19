@@ -1,12 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { Card, PageTitle } from "@/components/ui/bits";
-import { Icon, NavIcon } from "@/components/ui/icons";
+import { NavIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/notice";
 import { QueryError } from "@/components/ui/query-error";
 import { useT } from "@/i18n";
-import { countryQuery } from "@/lib/globalping";
-import { countryIn } from "@/lib/health";
 import { approvalsQuery } from "@/lib/integrations";
 import { useIsOwner } from "@/lib/updates";
 import { ApprovalHistory, ApprovalQueue } from "./approvals";
@@ -17,8 +14,7 @@ import { TokensCard } from "./tokens";
 /**
  * Integrations: API tokens (scripts and MCP share one model), how to connect an agent over MCP, the Telegram alerts and the
  * owner's inbox of what an agent planned that needs a human. Tokens and approvals are owner-only on the server; anyone else
- * gets a calm line, and their own Telegram link (every admin links their own chat). The sources of the country check moved to
- * the Reachability section; a line says so where they were.
+ * gets a calm line, and their own Telegram link (every admin links their own chat).
  */
 export function IntegrationsScreen() {
   const t = useT();
@@ -57,26 +53,7 @@ export function IntegrationsScreen() {
         <McpCard />
       </div>
       <TelegramCard owner />
-      <ReachPointer />
       {q.data && <ApprovalHistory data={q.data} />}
     </div>
-  );
-}
-
-/** Where the sources of the country check went. Kept for one release after the move (v0.1.42), then removed. */
-function ReachPointer() {
-  const t = useT();
-  const q = useQuery(countryQuery);
-  if (!q.data) return null;
-  return (
-    <Link
-      to="/reachability"
-      data-testid="reach-pointer"
-      className="flex items-center gap-2.5 rounded-card border border-dashed border-line px-4 py-3 text-[13px] text-muted transition-colors hover:text-fg"
-    >
-      <NavIcon name="reachability" />
-      <span className="min-w-0 flex-1 text-pretty">{t("rc.moved", { country: countryIn(t, q.data.country) })}</span>
-      <Icon name="chevronRight" size={14} className="flex-none text-faint" />
-    </Link>
   );
 }
