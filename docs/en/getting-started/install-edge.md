@@ -14,7 +14,7 @@ The Cloudflare edition is the same panel, built for WebAssembly and run by six C
 | Cloudflare plan | **Workers Paid.** On Workers Free a request may use only 10 ms of CPU and make 50 subrequests, and the panel's cold start alone (loading the WebAssembly panel) costs about 125 to 254 ms, so it does not fit. D1 and Durable Objects are billed by Cloudflare by use; what a panel costs on a real account has not been measured yet. |
 | Domain | A host name, for example `panel.example.com`, inside a zone that is **on Cloudflare DNS** and active. The command looks for the zone of the host in the accounts your token can see, and stops before it creates anything if there is none, or if the zone is not active yet (its nameservers must already point at Cloudflare). Use a name with no DNS record yet: Cloudflare adds the record for a Worker custom domain itself, and what it does with an existing record has not been tried. |
 | The command | `mistgate`, the same binary as the panel, on any computer with internet access to `api.cloudflare.com` and `github.com`. The official release binaries are for Linux (amd64 and arm64); on macOS or Windows build it from source (see [Requirements](requirements.md)). |
-| A release with the edge bundle | The command downloads `mistgate-edge.tar.gz` and its signed manifest from the GitHub release of its own version and checks them against the release key compiled into the binary, before anything is uploaded. No release has carried the bundle yet. A development build must be told which bundle to use with `--version` or `--bundle`. See [Releases and signing](../operations/releases.md). |
+| A release with the edge bundle | The command downloads `mistgate-edge.tar.gz` and its signed manifest from the GitHub release of its own version and checks them against the release key compiled into the binary, before anything is uploaded. The edge bundle has shipped in releases since v0.1.36. A development build must be told which bundle to use with `--version` or `--bundle`. See [Releases and signing](../operations/releases.md). |
 | Nodes | The same as for any panel: see [Requirements](requirements.md). Agents connect to `panel.example.com` over HTTPS (a WebSocket), so a node needs only outbound TCP 443 to it. |
 
 ## Create the API token
@@ -119,7 +119,7 @@ If the link has expired, or you closed the page before the account existed:
 - `mistgate edge setup-link --file mistgate-edge-mistgate-edge.json` prints the stored link again. It carries the same token, so it helps with a lost link but not with an expired one.
 - For a new token, run `mistgate edge deploy --host panel.example.com` again without `--resume`: it uploads the same bundle again and makes a new setup token. This works only while no admin exists; the link of a panel that has an owner does nothing.
 
-If the last line of the output says that the host did not answer HTTP 200 yet, Cloudflare is probably still issuing the certificate of the custom domain. The deploy itself is finished: open the link in a few minutes.
+If the last line of the output says that the host did not answer HTTP 200 yet, the custom domain may take a few minutes to resolve, and Cloudflare may still be issuing its certificate. The deploy itself is finished: open the link in a few minutes.
 
 ## Add nodes
 

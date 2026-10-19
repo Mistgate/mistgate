@@ -14,7 +14,7 @@ Cloudflare 版是为 WebAssembly 构建的同一面板，由六个 Cloudflare Wo
 | Cloudflare 计划 | **Workers Paid。** Workers Free 的每个请求最多只能使用 10 ms CPU 并发送 50 个子请求，而仅加载 WebAssembly 面板的冷启动就需要约 125 到 254 ms，因此无法满足要求。D1 和 Durable Objects 按 Cloudflare 的用量计费；尚未测量真实账户上面板的费用。 |
 | 域名 | 一个主机名，例如 `panel.example.com`，位于已启用且**使用 Cloudflare DNS** 的区域中。命令会在令牌可访问的账户中查找该主机所属区域；如果不存在对应区域，或区域尚未启用（名称服务器必须已经指向 Cloudflare），命令会在创建任何内容前停止。使用尚无 DNS 记录的名称：Cloudflare 会为 Worker 自定义域名自行添加记录；已有记录时的处理方式尚未测试。 |
 | 命令 | `mistgate`，即面板所用的同一个二进制文件。在任何可通过互联网访问 `api.cloudflare.com` 和 `github.com` 的计算机上运行。官方发布二进制文件适用于 Linux（amd64 和 arm64）；在 macOS 或 Windows 上，从源代码构建（见[系统要求](requirements.md)）。 |
-| 带有 Cloudflare 版发布包的发布版本 | 命令会下载该二进制文件自身版本对应的 GitHub 发布包 `mistgate-edge.tar.gz` 及其已签名清单；上传前会使用二进制文件内置的发布密钥验证它们。目前尚无发布版本包含此包。开发构建必须通过 `--version` 或 `--bundle` 指定要使用的包。见[发布版本和签名](../operations/releases.md)。 |
+| 带有 Cloudflare 版发布包的发布版本 | 命令会下载该二进制文件自身版本对应的 GitHub 发布包 `mistgate-edge.tar.gz` 及其已签名清单；上传前会使用二进制文件内置的发布密钥验证它们。从 v0.1.36 起，发布版本已包含此包。开发构建必须通过 `--version` 或 `--bundle` 指定要使用的包。见[发布版本和签名](../operations/releases.md)。 |
 | 节点 | 与其他面板相同：见[系统要求](requirements.md)。Agent 通过 HTTPS（WebSocket）连接到 `panel.example.com`，因此节点只需允许到该地址的出站 TCP 443。 |
 
 ## 创建 API 令牌
@@ -119,7 +119,7 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 - `mistgate edge setup-link --file mistgate-edge-mistgate-edge.json` 会再次输出已保存的链接。它使用同一个令牌，因此可找回丢失的链接，但无法续期已过期的链接。
 - 要获取新令牌，不使用 `--resume`，再次运行 `mistgate edge deploy --host panel.example.com`：它会重新上传相同的发布包并生成新设置令牌。只有尚未创建管理员时此方法才有效；面板已有所有者后，设置链接不会执行任何操作。
 
-如果输出的最后一行说主机尚未响应 HTTP 200，Cloudflare 可能仍在为自定义域名签发证书。部署本身已完成；几分钟后再打开链接。
+如果输出的最后一行说主机尚未响应 HTTP 200，自定义域名的 DNS 解析可能需要几分钟，Cloudflare 也可能仍在签发证书。部署本身已完成；几分钟后再打开链接。
 
 ## 添加节点
 

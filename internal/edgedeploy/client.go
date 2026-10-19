@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/textproto"
 	"net/url"
 	"strconv"
@@ -503,6 +505,65 @@ func publicGet(ctx context.Context, client *http.Client, rawURL string) (int, er
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 	return resp.StatusCode, nil
+}
+
+// newReachabilityClient pins the final custom-domain poll to addresses supplied by Resolve while leaving the URL hostname
+// intact for TLS SNI and the HTTP Host header. Copying the client and transport preserves their configured timeouts.
+func newReachabilityClient(client *http.Client, resolve func(context.Context, string) ([]netip.Addr, error)) (*http.Client, error) {
+	if resolve == nil {
+		return nil, errors.New("no resolver configured")
+	}
+	if client == nil {
+		client = newHTTPClient()
+	}
+	var base *http.Transport
+	switch t := client.Transport.(type) {
+	case nil:
+		base = http.DefaultTransport.(*http.Transport)
+	case *http.Transport:
+		base = t
+	default:
+		return nil, errors.New("HTTP client transport does not support resolver pinning")
+	}
+	transport := base.Clone()
+	dial := transport.DialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		var addrs []netip.Addr
+		if ip, parseErr := netip.ParseAddr(host); parseErr == nil {
+			addrs = []netip.Addr{ip}
+		} else {
+			addrs, err = resolve(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("resolve %s: %w", host, err)
+			}
+		}
+		if len(addrs) == 0 {
+			return nil, fmt.Errorf("resolve %s: no addresses", host)
+		}
+		var dialErrors []error
+		for _, addr := range addrs {
+			if !addr.IsValid() {
+				dialErrors = append(dialErrors, errors.New("resolver returned an invalid address"))
+				continue
+			}
+			conn, err := dial(ctx, network, net.JoinHostPort(addr.String(), port))
+			if err == nil {
+				return conn, nil
+			}
+			dialErrors = append(dialErrors, err)
+		}
+		return nil, errors.Join(dialErrors...)
+	}
+	out := *client
+	out.Transport = transport
+	return &out, nil
 }
 
 func waitContext(ctx context.Context, d time.Duration) error {

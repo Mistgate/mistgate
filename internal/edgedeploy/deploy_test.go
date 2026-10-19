@@ -7,13 +7,16 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -770,7 +773,7 @@ func setupDeploy(t *testing.T, bundleVersion string) (*fakeCloudflare, Options, 
 		Host: "panel.example.com", Name: "mistgate-edge", D1Location: "weur", BundleDir: bundleDir,
 		Token: testCFToken, StatePath: filepath.Join(t.TempDir(), "mistgate-edge.json"), PublicKey: pub,
 		APIBaseURL: server.URL, HTTPClient: server.Client(), Now: func() time.Time { return testNow }, Random: bytes.NewReader(seed),
-		PollAttempts: 2, PollInterval: time.Millisecond, DecoyURL: server.URL + "/",
+		PollAttempts: 2, PollInterval: time.Millisecond, Sleep: func(context.Context, time.Duration) error { return nil }, DecoyURL: server.URL + "/",
 	}
 	fake.statePath = opts.StatePath
 	t.Cleanup(server.Close)
@@ -1045,6 +1048,70 @@ func TestDeployFreshInstall(t *testing.T) {
 
 // A release that leaves a script alone does not upload it: FRONT is the one that matters, because uploading it restarts the
 // NodeLink objects and every agent reconnects.
+func TestDeployWaitsAfterAttachingTheDomainBeforePolling(t *testing.T) {
+	fake, opts, _ := setupDeploy(t, "v1.2.3")
+	observed := make(chan struct{ host, sni string }, 1)
+	slept := make(chan struct{})
+	var sleepOnce sync.Once
+	decoy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-slept:
+		default:
+			t.Error("reachability request arrived before the domain settle delay")
+		}
+		sni := ""
+		if r.TLS != nil {
+			sni = r.TLS.ServerName
+		}
+		observed <- struct{ host, sni string }{r.Host, sni}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer decoy.Close()
+	port := decoy.Listener.Addr().(*net.TCPAddr).Port
+	client := decoy.Client()
+	transport := client.Transport.(*http.Transport).Clone()
+	// The test server certificate is trusted by its client, but does not name this invented host. The assertion checks that
+	// the HTTP transport still sends the intended SNI and Host when the resolver pins the connection to loopback.
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	client.Transport = transport
+	opts.HTTPClient = client
+	opts.DecoyURL = fmt.Sprintf("https://panel.example.com:%d/", port)
+	opts.Resolve = func(_ context.Context, host string) ([]netip.Addr, error) {
+		select {
+		case <-slept:
+		default:
+			t.Error("custom resolver ran before the domain settle delay")
+		}
+		if host != "panel.example.com" {
+			t.Errorf("resolver host = %q, want panel.example.com", host)
+		}
+		return []netip.Addr{netip.MustParseAddr("127.0.0.1")}, nil
+	}
+	opts.PollAttempts = 1
+	opts.Sleep = func(_ context.Context, d time.Duration) error {
+		if d <= 0 {
+			t.Fatalf("domain settle delay = %v, want positive", d)
+		}
+		fake.mu.Lock()
+		defer fake.mu.Unlock()
+		if len(fake.requests) == 0 || fake.requests[len(fake.requests)-1] != reqDomain {
+			t.Fatalf("reachability delay started before domain attach: %v", fake.requests)
+		}
+		sleepOnce.Do(func() { close(slept) })
+		return nil
+	}
+
+	mustDeploy(t, opts)
+	select {
+	case got := <-observed:
+		if got.host != fmt.Sprintf("panel.example.com:%d", port) || got.sni != "panel.example.com" {
+			t.Fatalf("reachability request Host=%q SNI=%q", got.host, got.sni)
+		}
+	default:
+		t.Fatal("deploy did not reach the custom domain through the injected resolver")
+	}
+}
+
 func TestDeployUpdateSkipsTheScriptsThatDidNotChange(t *testing.T) {
 	fake, opts, priv := setupDeploy(t, "v1.2.3")
 	mustDeploy(t, opts)
@@ -1993,8 +2060,8 @@ func TestDeployDecoyTimeoutStillPrintsTheLink(t *testing.T) {
 	var sleeps []time.Duration
 	opts.Sleep = func(_ context.Context, d time.Duration) error { sleeps = append(sleeps, d); return nil }
 	out := mustDeploy(t, opts)
-	if !reflect.DeepEqual(sleeps, []time.Duration{5 * time.Second, 5 * time.Second}) {
-		t.Fatalf("poll sleeps %v: the default interval is 5 s, with no sleep after the last try", sleeps)
+	if !reflect.DeepEqual(sleeps, []time.Duration{domainReachabilityWarmup, 5 * time.Second, 5 * time.Second}) {
+		t.Fatalf("poll sleeps %v: the domain warmup is followed by 5 s intervals, with no sleep after the last try", sleeps)
 	}
 	state := mustState(t, opts.StatePath)
 	if !strings.Contains(out, setupLink(state)) || !strings.Contains(out, "certificate") {

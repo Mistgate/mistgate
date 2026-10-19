@@ -14,6 +14,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,10 +24,14 @@ import (
 	"strings"
 	"time"
 
+	panelprovision "github.com/mistgate/mistgate/internal/panel/provision"
 	"github.com/mistgate/mistgate/internal/release"
 )
 
-const stateVersion = 2
+const (
+	stateVersion             = 2
+	domainReachabilityWarmup = 2 * time.Second
+)
 
 var (
 	// dnsLabelRe is a DNS label; a Worker script name has the same shape.
@@ -63,6 +68,7 @@ type Options struct {
 	PollAttempts          int
 	Sleep                 func(context.Context, time.Duration) error
 	DecoyURL              string
+	Resolve               func(context.Context, string) ([]netip.Addr, error)
 }
 
 // localState is the key file. Schema 2 is the split edge: the names of the six scripts, what each one was before the last
@@ -214,6 +220,13 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 	}
 	if opts.HTTPClient == nil {
 		opts.HTTPClient = newHTTPClient()
+	}
+	if opts.Resolve == nil {
+		opts.Resolve = panelprovision.DoHLookup(opts.HTTPClient)
+	}
+	reachabilityClient, err := newReachabilityClient(opts.HTTPClient, opts.Resolve)
+	if err != nil {
+		return fmt.Errorf("prepare custom-domain reachability check: %w", err)
 	}
 	if opts.PollAttempts <= 0 {
 		opts.PollAttempts = 60
@@ -379,6 +392,9 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 	if err := run.deploy(); err != nil {
 		return err
 	}
+	if err := opts.Sleep(ctx, domainReachabilityWarmup); err != nil {
+		return fmt.Errorf("wait after attaching the custom domain: %w", err)
+	}
 
 	decoyURL := opts.DecoyURL
 	if decoyURL == "" {
@@ -391,7 +407,7 @@ func Deploy(ctx context.Context, opts Options, out io.Writer) (retErr error) {
 				return fmt.Errorf("wait for the decoy page: %w", err)
 			}
 		}
-		status, err := publicGet(ctx, opts.HTTPClient, decoyURL)
+		status, err := publicGet(ctx, reachabilityClient, decoyURL)
 		ready = err == nil && status == http.StatusOK
 	}
 	fmt.Fprintf(out, "Admin URL: %s%s\n", state.PublicURL, state.AdminPrefix)
