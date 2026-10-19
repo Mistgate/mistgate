@@ -5,10 +5,12 @@ import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { Tip } from "@/components/ui/tooltip";
+import { QuotaReset } from "@/gen/mistgate/admin/v1/user_pb";
 import { cx } from "@/lib/cx";
 import { useTx } from "./t";
 
@@ -53,6 +55,27 @@ export function SettingRow({ label, hint, children, className }: { label: ReactN
       </div>
       {children}
     </div>
+  );
+}
+
+const resetCodes = { [QuotaReset.DAY]: "day", [QuotaReset.WEEK]: "week", [QuotaReset.MONTH]: "month", [QuotaReset.ROLLING_MONTH]: "rolling", [QuotaReset.NONE]: "none" } as const;
+/** The word of a quota period in keys ("users.quotaPer.<code>"); unspecified is the server's default, the month. */
+export const resetCode = (r: QuotaReset) => resetCodes[r as keyof typeof resetCodes] ?? "month";
+
+/**
+ * How often the quota starts again: every day, week or month, or never. "Every 30 days" is offered only to a person who
+ * already has it (an agent can set it), so an edit never changes it unasked.
+ */
+export function ResetSelect({ value, onChange }: { value: QuotaReset; onChange: (r: QuotaReset) => void }) {
+  const t = useTx();
+  const list = [QuotaReset.DAY, QuotaReset.WEEK, QuotaReset.MONTH, ...(value === QuotaReset.ROLLING_MONTH ? [QuotaReset.ROLLING_MONTH] : []), QuotaReset.NONE];
+  return (
+    <Select
+      aria-label={t("users.resets")}
+      value={String(value === QuotaReset.UNSPECIFIED ? QuotaReset.MONTH : value)}
+      onValueChange={(v) => onChange(Number(v) as QuotaReset)}
+      options={list.map((r) => ({ value: String(r), label: t(`users.resetOpt.${resetCode(r)}`), hint: t(`users.resetHint.${resetCode(r)}`) }))}
+    />
   );
 }
 

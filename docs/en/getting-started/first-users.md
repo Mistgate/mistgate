@@ -52,7 +52,8 @@ Open **Users → New user**:
 |:--|:--|:--|
 | Name | | How the person appears in the admin, for example "Alice". |
 | Group | | Where the person's profiles come from. |
-| Quota | 100 GB | Traffic per month, reset on the 1st. 0 means unlimited. |
+| Quota | 100 GB | Traffic per period. 0 means unlimited. |
+| Resets | Monthly | Every day, week or month (00:00 UTC), or never. |
 | Term | 30 days | Access pauses afterwards. 0 means no end. |
 | Devices | 5 | How many devices can connect. |
 | Apps in the subscription | what the group gives | The subscription apps and AmneziaVPN, each a switch. A switch is off when the group has no running server for that app. |

@@ -7,7 +7,8 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { LinkDeviceLimit, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { DeviceKind, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { DeviceKind, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { dateTimeOf } from "@/lib/format";
 import { UserScreen } from "./user-detail";
 
 const getUser = vi.fn();
@@ -526,5 +527,40 @@ describe("the devices of the user card", () => {
     expect(text()).toContain("5 Mbit/s");
     await act(async () => void (await new Promise((r) => setTimeout(r, 600))));
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", deviceSpeedLimitBps: 5_000_000n });
+  });
+});
+
+describe("the quota period on the user card", () => {
+  const pick = (sel: HTMLSelectElement, value: QuotaReset) =>
+    act(async () => {
+      sel.value = String(value);
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  const select = () => document.querySelector<HTMLSelectElement>("select[aria-label='Resets']")!;
+  const labels = () => [...select().options].map((o) => o.textContent);
+
+  it("says when the quota starts again and changes the period with one pick", async () => {
+    updateUser.mockResolvedValue({ user });
+    const next = Date.UTC(2027, 0, 4) / 1000; // a Monday, 00:00 UTC
+    await mount(1, [], [], { ...detail, user: { ...user, quotaBytes: 100_000_000_000n, quotaReset: QuotaReset.WEEK, nextResetUnix: BigInt(next) } });
+    expect(text()).toContain("resets every week");
+    expect(text()).toContain(`Next reset ${dateTimeOf(next, "en")}`);
+    expect(labels()).toEqual(["Daily", "Weekly", "Monthly", "Never"]);
+    expect(select().value).toBe(String(QuotaReset.WEEK));
+    await pick(select(), QuotaReset.DAY);
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", quotaReset: QuotaReset.DAY });
+  });
+
+  it("keeps a 30-day period it was given, and names no next reset when there is none", async () => {
+    await mount(1, [], [], { ...detail, user: { ...user, quotaReset: QuotaReset.ROLLING_MONTH, nextResetUnix: 1_900_000_000n } });
+    expect(labels()).toEqual(["Daily", "Weekly", "Monthly", "Every 30 days", "Never"]);
+    expect(select().value).toBe(String(QuotaReset.ROLLING_MONTH));
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(1, [], [], { ...detail, user: { ...user, quotaReset: QuotaReset.NONE, nextResetUnix: 0n } });
+    expect(text()).toContain("no reset");
+    expect(text()).not.toContain("Next reset");
+    expect(updateUser).not.toHaveBeenCalled();
   });
 });

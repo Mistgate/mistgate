@@ -5,6 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
+import { QuotaReset } from "@/gen/mistgate/admin/v1/user_pb";
 import { CreateUserModal } from "./create-user";
 
 const listGroups = vi.fn();
@@ -136,6 +137,35 @@ describe("the new user form", () => {
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alice", speedLimitBps: 10_000_000n, deviceSpeedLimitBps: 5_000_000n }));
+  });
+
+  it("resets the quota every month by default, and sends the period picked instead", async () => {
+    createUser.mockResolvedValue({});
+    await mount([group()]);
+    const trigger = document.querySelector<HTMLElement>("[aria-label='Resets']")!;
+    expect(trigger.textContent).toContain("Monthly");
+    expect(text()).toContain("per month");
+    await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "alice");
+    await click(button("Create"));
+    await settle();
+    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alice", quotaReset: QuotaReset.MONTH, quotaBytes: 100_000_000_000n }));
+
+    // from the keyboard: the list opens on ArrowDown
+    await act(async () => {
+      trigger.focus();
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    });
+    await settle();
+    const options = () => [...document.querySelectorAll<HTMLElement>("[role=option]")];
+    // four periods, each with when it happens; the 30-day one only for a person who already has it
+    expect(options().map((o) => o.textContent)).toEqual(["Dailyat 00:00 UTC", "Weeklyon Monday, 00:00 UTC", "Monthlyon the 1st, 00:00 UTC", "Neveronly with “Reset traffic”"]);
+    await act(async () => options()[1]!.click());
+    await settle();
+    expect(trigger.textContent).toContain("Weekly");
+    expect(text()).toContain("per week");
+    await click(button("Create"));
+    await settle();
+    expect(createUser).toHaveBeenLastCalledWith(expect.objectContaining({ quotaReset: QuotaReset.WEEK }));
   });
 
   it("without a profile says to make one first, with the way to Profiles", async () => {

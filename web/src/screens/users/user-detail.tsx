@@ -34,7 +34,7 @@ import { big, detailN, type BlockedN, type DetailN, type DeviceN as Device, type
 import { useGo } from "./nav";
 import { groupsQuery, isCode, protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
-import { Check, ConfirmModal, Panel, SettingRow, SpeedPair, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
+import { Check, ConfirmModal, Panel, ResetSelect, SettingRow, SpeedPair, SwitchRow, TypeConfirmModal, useDraft } from "./ui";
 import { Pending, QueryError } from "@/components/ui/query-error";
 
 // the steppers of the Limits panel, wide enough for "50 Мбит/с" (the speed pair) so they all line up
@@ -46,6 +46,7 @@ type Patch = Partial<{
   subscriptionName: string;
   groupId: string;
   quotaBytes: number;
+  quotaReset: QuotaReset;
   expiresUnix: number;
   deviceLimit: number;
   speedLimitBps: number;
@@ -505,7 +506,7 @@ const resetKey = {
   [QuotaReset.ROLLING_MONTH]: "users.reset.rolling",
 } as const;
 
-function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
+export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
   const t = useTx();
   const user = data.user!;
   const protocols = useQuery(protocolsQuery);
@@ -524,6 +525,7 @@ function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
       <div className="h-1 rounded-sm bg-surface-2">
         <div className={cx("h-full rounded-sm", tone)} style={{ width: `${Math.min(100, pct * 100).toFixed(1)}%` }} />
       </div>
+      {user.nextResetUnix > 0 && <span className="text-xs text-muted">{t("users.nextReset", { when: fmt.dateTime(user.nextResetUnix) })}</span>}
       <div role="img" aria-label={t("users.chartLabel")} className="flex h-16 items-end gap-1 pt-1.5">
         {days.map((x, i) => (
           <span
@@ -743,13 +745,14 @@ export function DevicesPanel({
 
 // ---- limits ----
 
-function LimitsPanel({ user, actions }: { user: User; actions: Actions }) {
+export function LimitsPanel({ user, actions }: { user: User; actions: Actions }) {
   const t = useTx();
   const noop = () => {};
   const now = nowSec();
 
   const serverGb = user.quotaBytes === 0 ? 0 : Math.max(1, Math.round(user.quotaBytes / GB));
   const [gb, setGb] = useDraft(serverGb, (v) => actions.update({ quotaBytes: v * GB }));
+  const [reset, setReset] = useDraft(user.quotaReset, (v) => actions.update({ quotaReset: v }), 0);
 
   // The term stepper moves the expiry date by whole days from where it is, so a click on "+" adds exactly 5 days.
   const serverDays = daysLeft(user.expiresUnix, now);
@@ -781,6 +784,11 @@ function LimitsPanel({ user, actions }: { user: User; actions: Actions }) {
       <div className="-mt-1 flex flex-col">
         <SettingRow label={t("users.quota")}>
           <div className={WIDE}>{stepper(t("users.quota"), gb === 0 ? <Infinite label={t("users.unlimited")} /> : `${gb} ${t("users.unitGb")}`, gb, setGb, 10, 0, 10000)}</div>
+        </SettingRow>
+        <SettingRow label={t("users.resets")}>
+          <div className="w-[170px]">
+            <ResetSelect value={reset} onChange={setReset} />
+          </div>
         </SettingRow>
         <SettingRow label={t("users.term")}>
           <div className={WIDE}>

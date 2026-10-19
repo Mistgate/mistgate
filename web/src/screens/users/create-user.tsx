@@ -20,7 +20,7 @@ import { DnsSelect, useInheritedDns } from "./dns-select";
 import { defaultGroup, GroupEditModal, GroupForm, PillToggle, ReachLine } from "./groups";
 import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx } from "./t";
-import { InfoTip, SettingRow, SpeedPair, SwitchRow } from "./ui";
+import { InfoTip, ResetSelect, resetCode, SettingRow, SpeedPair, SwitchRow } from "./ui";
 
 export { GroupEditModal, PillToggle } from "./groups";
 
@@ -54,6 +54,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
   const [name, setName] = useState("");
   const [pickedGroup, setGroupId] = useState("");
   const [quotaGb, setQuotaGb] = useState(100);
+  const [reset, setReset] = useState(QuotaReset.MONTH);
   const [termDays, setTermDays] = useState(30);
   const [devices, setDevices] = useState(5);
   const [apps, setApps] = useState<{ happ: boolean; amnezia: boolean } | null>(null); // null = what the group gives
@@ -84,7 +85,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
         name: name.trim(),
         groupId,
         quotaBytes: big(quotaGb * GB),
-        quotaReset: QuotaReset.MONTH,
+        quotaReset: reset,
         termDays,
         deviceLimit: devices,
         apps: { happ, amnezia },
@@ -207,22 +208,27 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
       </Box>
 
       <Box>
-        <SettingRow label={t("users.quota")} hint={t("users.quotaHint")}>
-          <div className="w-[130px]">
+        <SettingRow label={t("users.quota")} hint={t(`users.quotaPer.${resetCode(reset)}`)}>
+          <div className="w-[150px]">
             <Stepper {...step(t("users.quota"), quotaGb, setQuotaGb, 10, 0, 10000)}>
               {quotaGb === 0 ? <Infinite label={t("users.unlimited")} /> : `${quotaGb} ${t("users.unitGb")}`}
             </Stepper>
           </div>
         </SettingRow>
+        <SettingRow label={t("users.resets")}>
+          <div className="w-[170px]">
+            <ResetSelect value={reset} onChange={setReset} />
+          </div>
+        </SettingRow>
         <SettingRow label={t("users.term")} hint={t("users.termHint")}>
-          <div className="w-[130px]">
+          <div className="w-[150px]">
             <Stepper {...step(t("users.term"), termDays, setTermDays, 5, 0, 3650)}>
               {termDays === 0 ? <Infinite label={t("users.never")} /> : `${termDays} ${t("users.unitD")}`}
             </Stepper>
           </div>
         </SettingRow>
         <SettingRow label={t("users.devices")} hint={t("users.devicesHint")}>
-          <div className="w-[130px]">
+          <div className="w-[150px]">
             <Stepper {...step(t("users.devices"), devices, setDevices, 1, 1, 100)}>{devices}</Stepper>
           </div>
         </SettingRow>

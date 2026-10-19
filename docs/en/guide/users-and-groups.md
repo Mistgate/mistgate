@@ -72,7 +72,8 @@ The API also enables, deletes and resets the traffic of many users in one call. 
 |:--|:--|:--|
 | **Name** | | Required, unique (case does not matter), up to 64 characters. |
 | **Group** | "Everyone" if there is such a group, else the first | The line **Gets** under it says what a person of this group gets: the subscription and AmneziaVPN keys, on how many nodes. A red line says when they would get nothing. **Edit group** opens the group. |
-| **Quota** | 100 GB | Steps of 10 GB; 0 is **Unlimited**. Per month, resets on the 1st. |
+| **Quota** | 100 GB | Steps of 10 GB; 0 is **Unlimited**. The hint under it names the period. |
+| **Resets** | **Monthly** | **Daily**, **Weekly**, **Monthly** or **Never**. See [Quota periods](#quota-periods). |
 | **Term** | 30 days | Steps of 5 days; 0 means it never expires. Access pauses afterwards. |
 | **Devices** | 5 | 1–100: how many devices can connect. |
 | **Apps in the subscription** | what the group gives | The link-app switch and **AmneziaVPN**. Until you touch them, they follow the group: a way the group gives nothing for starts off, with the reason under it. |
@@ -99,7 +100,7 @@ In the **Only count** mode nothing is refused, so this strip is not shown. A per
 
 ### Traffic
 
-The used traffic of the current period against the quota, the reset period ("resets on the 1st"), a chart of the last 14 days, and the traffic per node and protocol.
+The used traffic of the current period against the quota, the reset period ("resets every week") and when the next reset comes, in your time, a chart of the last 14 days, and the traffic per node and protocol.
 
 ### Devices
 
@@ -133,6 +134,7 @@ Once a person has picked a DNS on their page (see **DNS choice on the page**), t
 | Setting | Steps and range |
 |:--|:--|
 | **Quota** | 10 GB, 0–10000 GB; 0 is **Unlimited**. |
+| **Resets** | **Daily**, **Weekly**, **Monthly** or **Never**; saved as soon as you pick. A person given a rolling 30-day period through the API or MCP also has **Every 30 days**. |
 | **Term** | 5 days, up to 3650; ∞ is **Never**. "−" on ∞ sets 30 days. |
 | **Devices** | 1, from 1 to 100. |
 | **Speed per person** | Steps of 5 Mbit/s, 0–10000; 0 is **Unlimited**. All the person's devices together, on one node. Experimental. |
@@ -162,7 +164,7 @@ The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 
 ## Quota periods
 
-A user made in the admin resets on the 1st of every month (UTC). The API can also set a daily, weekly or rolling 30-day reset, or none; the card shows whichever applies. When the period ends, the used traffic starts again from zero and a person stopped by the quota gets access back by themselves.
+The quota starts again at 00:00 UTC: every day, every Monday or on the 1st of every month. **Never** keeps counting for the whole term; only **Reset traffic** sets it to zero. A new user resets every month unless you pick another period; the API and MCP can also set a rolling 30-day period. The card shows the period and the next reset. When the period ends, the used traffic starts again from zero and a person stopped by the quota gets access back by themselves.
 
 ## Devices and the device limit
 
