@@ -165,6 +165,20 @@ var whyVariants = map[string]localizedText{
 	"mixed":            {en: "the profiles fail in different ways", ru: "профили падают по-разному", zh: "各协议配置的失败原因不同"},
 }
 
+// updateReasons say why a rollout paused (the step error code in update_failed's "reason"), as the admin's updates.pause.why.*.
+var updateReasons = map[string]localizedText{
+	"not_committed":        {en: "the new build did not confirm the update", ru: "новая сборка не подтвердила обновление", zh: "新构建未确认此次更新"},
+	"state_not_applied":    {en: "the node did not apply its configuration", ru: "нода не применила настройки", zh: "节点没有应用其配置"},
+	"inbounds_unreadable":  {en: "the panel could not read the node’s profiles", ru: "панель не смогла прочитать профили ноды", zh: "面板未能读取此节点的协议配置"},
+	"warp_down":            {en: "WARP did not come up after the update", ru: "WARP не поднялся после обновления", zh: "更新后 WARP 未能启动"},
+	"inbound_failed":       {en: "a profile that worked before broke", ru: "сломался профиль, который работал до обновления", zh: "之前正常的协议配置出了故障"},
+	"probe_failed":         {en: "the client-eye check failed", ru: "не прошла проверка глазами клиента", zh: "客户端视角检测失败"},
+	"not_reconnected":      {en: "the node did not come back within 3 minutes", ru: "нода не вернулась на связь за 3 минуты", zh: "节点未在 3 分钟内重新连接"},
+	"no_answer":            {en: "the node did not answer the update command in 10 minutes", ru: "нода не ответила на команду обновления за 10 минут", zh: "节点未在 10 分钟内响应更新命令"},
+	"rolled_back_by_agent": {en: "the node went back to the previous version by itself", ru: "нода сама вернулась на прошлую версию", zh: "节点自行回到了上一个版本"},
+	"agent_failed":         {en: "the node reported that the update failed", ru: "нода сообщила, что обновление не удалось", zh: "节点报告更新失败"},
+}
+
 func variantOf(whyKey, kind string) string {
 	_, v, _ := strings.Cut(whyKey, "health.alert."+kind+".why.")
 	return v
@@ -288,6 +302,9 @@ func alertReason(l L, a store.HealthAlert) string {
 			return l.pick("“"+who+"”: "+data(p["days_left"], 4)+" days left.", "«"+who+"»: осталось "+data(p["days_left"], 4)+" дн.", "「"+who+"」：剩余 "+data(p["days_left"], 4)+" 天。")
 		}
 	case "update_failed":
+		if v, ok := updateReasons[p["reason"]]; ok {
+			return upperFirst(v.forLanguage(l)) + l.stop()
+		}
 		return data(p["reason"], 160)
 	case "access_ended":
 		name := data(p["user_name"], 60)

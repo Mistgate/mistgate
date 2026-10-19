@@ -38,7 +38,9 @@ const (
 const (
 	errNoAnswer        = "no_answer"
 	errNotReconnected  = "not_reconnected"
-	errStateNotApplied = "state_not_applied"
+	errNotCommitted    = "not_committed"     // the new build sent no update_committed
+	errStateNotApplied = "state_not_applied" // drift, or the applied hash is not the desired one (before 0.1.47 it also meant the other two)
+	errInboundsUnread  = "inbounds_unreadable"
 	errInboundFailed   = "inbound_failed"
 	errProbeFailed     = "probe_failed"
 	errRolledBackAgent = "rolled_back_by_agent"
@@ -698,14 +700,14 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 		}
 	}
 	if !committed {
-		miss(errStateNotApplied)
+		miss(errNotCommitted)
 	}
 	if drift || (n.DesiredHash != "" && n.AppliedHash != n.DesiredHash) {
 		miss(errStateNotApplied)
 	}
 	inbounds, err := s.st.FleetInbounds(p.ctx, x.NodeID, true)
 	if err != nil {
-		miss(errStateNotApplied)
+		miss(errInboundsUnread)
 	}
 	var newlyFailed []string
 	for _, in := range inbounds {

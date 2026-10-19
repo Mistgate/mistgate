@@ -170,6 +170,8 @@ describe("alerts", () => {
     expect(alertWhy(t, fmt, alert({ kind: AlertKind.NODE_DOWN, whyKey: "health.alert.node_down.why", params: { minutes: "185" } }))).toContain("for 3 h and");
     const paused = alert({ kind: AlertKind.UPDATE_FAILED, whyKey: "health.alert.update_failed.why.gate_failed", params: { node: "de2", reason: "probe_failed" } });
     expect(alertWhy(t, fmt, paused)).toContain("de2 did not pass the check after updating: the client-eye check failed. Where possible");
+    const unread = alert({ kind: AlertKind.UPDATE_FAILED, whyKey: "health.alert.update_failed.why.gate_failed", params: { node: "de2", reason: "inbounds_unreadable" } });
+    expect(alertWhy(tRu, fmtRu, unread)).toContain("de2 не прошла проверку после обновления: панель не смогла прочитать профили ноды. Где получилось");
   });
   it("says when access ended and names the protocol people dropped off", () => {
     const ended = alert({ kind: AlertKind.ACCESS_ENDED, whyKey: "health.alert.access_ended.why.expired", params: { user_name: "alice", since: "1700000000" } });

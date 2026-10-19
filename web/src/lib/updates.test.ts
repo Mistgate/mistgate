@@ -258,6 +258,25 @@ describe("the words of server keys", () => {
     expect(reasonText(t, "something odd")).toBe("something odd");
   });
 
+  it("tells apart the three ways a node can miss its configuration after an update, and still reads the old code", () => {
+    const codes = ["not_committed", "state_not_applied", "inbounds_unreadable"];
+    const views = codes.map((c) => [
+      stepErrorText(t, `updates.step.err.${c}`),
+      pauseText(t, "updates.pause.gate_failed", { node: "de1", reason: c }),
+      reasonText(t, `gate_${c}`),
+    ]);
+    expect(views[0]).toEqual([
+      "The new build did not confirm the update.",
+      expect.stringContaining("de1 did not pass the check after updating: the new build did not confirm the update. Where possible"),
+      "The panel put the previous version back: the new build did not confirm the update.",
+    ]);
+    expect(views[2]![0]).toBe("The panel could not read the node’s profiles.");
+    for (const i of [0, 1, 2]) expect(new Set(views.map((v) => v[i])).size).toBe(3);
+    // a rollout stored before the split still says what it said then
+    expect(stepErrorText(t, "updates.step.err.state_not_applied")).toBe("The node came back but did not apply its configuration.");
+    expect(pauseText(t, "updates.pause.gate_failed", { node: "de1", reason: "warp_down" })).toContain("WARP did not come up after the update.");
+  });
+
   it("does not call a rollback the gate made 'yours'", () => {
     expect(reasonText(t, "gate_probe_failed")).toBe("The panel put the previous version back: the client-eye check failed after the update.");
     expect(reasonText(t, "gate_some_new_check")).toBe("The panel put the previous version back: the check after the update failed (some_new_check).");
@@ -321,13 +340,13 @@ describe("manualCommands", () => {
 
 describe("dictionary", () => {
   // the codes the panel and the agents produce
-  const stepCodes = ["bad_signature", "unsigned_build", "bad_manifest", "expired", "downgrade", "no_file_for_platform", "download_failed", "size_mismatch", "hash_mismatch", "not_writable", "busy", "no_answer", "not_reconnected", "state_not_applied", "inbound_failed", "probe_failed", "rolled_back_by_agent", "manual", "offline", "unsupported", "up_to_date", "cancelled", "agent_failed", "rollback_failed", "failed"];
+  const stepCodes = ["bad_signature", "unsigned_build", "bad_manifest", "expired", "downgrade", "no_file_for_platform", "download_failed", "size_mismatch", "hash_mismatch", "not_writable", "busy", "no_answer", "not_reconnected", "not_committed", "state_not_applied", "inbounds_unreadable", "warp_down", "inbound_failed", "probe_failed", "rolled_back_by_agent", "manual", "offline", "unsupported", "up_to_date", "cancelled", "agent_failed", "rollback_failed", "failed"];
   const bundleCodes = ["no_manifest", "no_signature", "bad_manifest", "unsupported_schema", "bad_signature", "expired", "file_missing", "file_mismatch"];
   const pause = ["owner", "step_failed", "gate_failed", "bundle_changed", "panel_restart_ambiguous"];
   // the agent's own codes, and the panel's names for who sent a rollback (update/reason.go)
-  const reason = ["not_committed", "built_mismatch", "crash_loop", "apply_failed", "manual", "interrupted", "gate", "gate_probe_failed", "gate_inbound_failed", "gate_state_not_applied", "command"];
+  const reason = ["not_committed", "built_mismatch", "crash_loop", "apply_failed", "manual", "interrupted", "gate", "gate_probe_failed", "gate_inbound_failed", "gate_not_committed", "gate_state_not_applied", "gate_inbounds_unreadable", "gate_warp_down", "command"];
   // the gate's codes, which a pause names in a short form
-  const pauseWhy = ["probe_failed", "inbound_failed", "state_not_applied", "not_reconnected", "no_answer", "rolled_back_by_agent", "agent_failed"];
+  const pauseWhy = ["probe_failed", "inbound_failed", "not_committed", "state_not_applied", "inbounds_unreadable", "warp_down", "not_reconnected", "no_answer", "rolled_back_by_agent", "agent_failed"];
 
   it("has a sentence in both languages for every code the server can send", () => {
     const keys = [

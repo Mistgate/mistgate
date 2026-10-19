@@ -977,8 +977,9 @@ type RolloutStep struct {
 	StartedUnix  int64     `protobuf:"varint,7,opt,name=started_unix,json=startedUnix,proto3" json:"started_unix,omitempty"`
 	FinishedUnix int64     `protobuf:"varint,8,opt,name=finished_unix,json=finishedUnix,proto3" json:"finished_unix,omitempty"`
 	// "updates.step.err.<error_key>" for FAILED / ROLLED_BACK / SKIPPED. Codes: the agent's (bad_signature, expired,
-	// download_failed, ...), and the gate's: not_reconnected, state_not_applied, inbound_failed, probe_failed,
-	// rolled_back_by_agent, no_answer, offline, unsupported, up_to_date, cancelled.
+	// download_failed, ...), and the gate's: not_reconnected, not_committed, state_not_applied, inbounds_unreadable,
+	// warp_down, inbound_failed, probe_failed, rolled_back_by_agent, no_answer, offline, unsupported, up_to_date,
+	// cancelled. Before 0.1.47 state_not_applied also stood for not_committed and inbounds_unreadable.
 	ErrorKey      string            `protobuf:"bytes,9,opt,name=error_key,json=errorKey,proto3" json:"error_key,omitempty"`
 	Params        map[string]string `protobuf:"bytes,10,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields

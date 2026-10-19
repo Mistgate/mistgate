@@ -497,3 +497,21 @@ func TestCountryBlockedAlertNamesTheSources(t *testing.T) {
 		t.Errorf("the probe node tests TCP only, but the text mentions ICMP: %q", got)
 	}
 }
+
+// A paused rollout says in words what the check after the update saw; a code it does not know stays as it is.
+func TestUpdateFailedReasonIsASentence(t *testing.T) {
+	for _, tc := range []struct{ lang, reason, want string }{
+		{"en", "not_committed", "The new build did not confirm the update."},
+		{"en", "state_not_applied", "The node did not apply its configuration."},
+		{"en", "inbounds_unreadable", "The panel could not read the node’s profiles."},
+		{"ru", "inbounds_unreadable", "Панель не смогла прочитать профили ноды."},
+		{"zh", "not_committed", "新构建未确认此次更新。"},
+		{"en", "warp_down", "WARP did not come up after the update."},
+		{"en", "hash_mismatch", "hash_mismatch"},
+	} {
+		a := store.HealthAlert{Kind: "update_failed", Params: map[string]string{"node": "de1", "reason": tc.reason}}
+		if got := alertReason(L(tc.lang), a); got != tc.want {
+			t.Errorf("alertReason(%s, %s) = %q, want %q", tc.lang, tc.reason, got, tc.want)
+		}
+	}
+}

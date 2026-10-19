@@ -310,7 +310,7 @@ func (s *Store) NodeEventSince(ctx context.Context, nodeID, code string, since t
 
 // GateRollback is a rollout step the panel rolled back because the node failed its gate.
 type GateRollback struct {
-	ErrorKey string // the gate's code: probe_failed, inbound_failed, state_not_applied
+	ErrorKey string // the gate's code: probe_failed, inbound_failed, not_committed, state_not_applied, ...
 	ToBuilt  int64  // the build the rollout shipped
 	At       time.Time
 }

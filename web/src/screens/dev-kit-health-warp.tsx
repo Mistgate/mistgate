@@ -432,6 +432,39 @@ const pausedUpdates = updatesPage({
   },
 });
 
+// the three ways the check after an update can find a node without its configuration (0.1.47 split them)
+const gateStep = (nodeId: string, nodeName: string, code: string) => ({
+  nodeId, nodeName, stage: 1, state: StepState.ROLLED_BACK, fromVersion: "0.3.0-9dd4c", fromBuilt: CUR, startedUnix: NOW - 12 * 60, finishedUnix: NOW - 6 * 60, errorKey: `updates.step.err.${code}`, params: {},
+});
+const gateNode = (nodeId: string, name: string, code: string) =>
+  upNode({ nodeId, name, state: NodeUpdateState.ROLLED_BACK, address: `${name}.example.com`, lastUpdate: { outcome: "rolled_back", fromVersion: "0.3.0-9dd4c", toVersion: "0.3.1-77ab1", reason: `gate_${code}`, atUnix: NOW - 6 * 60 } });
+const gateUpdates = updatesPage({
+  bundle: { ...bundle, version: "0.3.1-77ab1", built: NEW },
+  nodes: [
+    upNode({ nodeId: "nod_de2", name: "de2", version: "0.3.1-77ab1", built: NEW, address: "de2.example.com" }),
+    gateNode("nod_de1", "de1", "not_committed"),
+    gateNode("nod_nl1", "nl1", "state_not_applied"),
+    gateNode("nod_fi1", "fi1", "inbounds_unreadable"),
+  ],
+  rollout: {
+    id: "rol_2",
+    status: RolloutStatus.PAUSED,
+    toVersion: "0.3.1-77ab1",
+    toBuilt: NEW,
+    batchSize: 3,
+    createdUnix: NOW - 25 * 60,
+    finishedUnix: 0,
+    pauseKey: "updates.pause.gate_failed",
+    pauseParams: { node: "de1", reason: "not_committed" },
+    steps: [
+      { nodeId: "nod_de2", nodeName: "de2", stage: 0, state: StepState.PASSED, fromVersion: "0.3.0-9dd4c", fromBuilt: CUR, startedUnix: NOW - 24 * 60, finishedUnix: NOW - 18 * 60, errorKey: "", params: {} },
+      gateStep("nod_de1", "de1", "not_committed"),
+      gateStep("nod_nl1", "nl1", "state_not_applied"),
+      gateStep("nod_fi1", "fi1", "inbounds_unreadable"),
+    ],
+  },
+});
+
 /** The health-warp blocks of the dev kit, as wide as the app's content column at 1280 px (the kit itself is narrower). */
 export function HealthWarpKit() {
   return (
@@ -513,6 +546,12 @@ export function HealthWarpKit() {
 
       <Shot id="updates-paused" title="Updates: paused because a node failed the check">
         <Mock fill={(c) => c.setQueryData(updatesQuery.queryKey, pausedUpdates as never)}>
+          <UpdatesScreen />
+        </Mock>
+      </Shot>
+
+      <Shot id="updates-gate" title="Updates: the check after the update names what is missing">
+        <Mock fill={(c) => c.setQueryData(updatesQuery.queryKey, gateUpdates as never)}>
           <UpdatesScreen />
         </Mock>
       </Shot>

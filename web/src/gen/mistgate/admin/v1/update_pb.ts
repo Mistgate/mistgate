@@ -458,8 +458,9 @@ export type RolloutStep = Message<"mistgate.admin.v1.RolloutStep"> & {
 
   /**
    * "updates.step.err.<error_key>" for FAILED / ROLLED_BACK / SKIPPED. Codes: the agent's (bad_signature, expired,
-   * download_failed, ...), and the gate's: not_reconnected, state_not_applied, inbound_failed, probe_failed,
-   * rolled_back_by_agent, no_answer, offline, unsupported, up_to_date, cancelled.
+   * download_failed, ...), and the gate's: not_reconnected, not_committed, state_not_applied, inbounds_unreadable,
+   * warp_down, inbound_failed, probe_failed, rolled_back_by_agent, no_answer, offline, unsupported, up_to_date,
+   * cancelled. Before 0.1.47 state_not_applied also stood for not_committed and inbounds_unreadable.
    *
    * @generated from field: string error_key = 9;
    */

@@ -805,6 +805,39 @@ func TestGateNeedsTheStateToBeApplied(t *testing.T) {
 	e.wantStep(a, store.StepPassed, "")
 }
 
+// Each thing the gate waits for fails it with its own code, so the owner can tell them apart.
+func TestGateNamesWhatIsMissing(t *testing.T) {
+	t.Run("the state", func(t *testing.T) {
+		e := newEnv(t)
+		e.defaultBundle()
+		a := e.addNode("a", nodeOpts{})
+		e.exec(`UPDATE node SET desired_hash = 'h2', applied_hash = 'h1' WHERE id = ?`, a)
+		e.startRollout()
+		e.tick()
+		e.upgrade(a)
+		e.tick()
+		e.commit(a)
+		e.clk.Advance(5*time.Minute + time.Second)
+		e.tick()
+		e.wantStep(a, store.StepRolledBack, "state_not_applied")
+	})
+	t.Run("the profiles", func(t *testing.T) {
+		e := newEnv(t)
+		e.defaultBundle()
+		a := e.addNode("a", nodeOpts{inbounds: 1})
+		e.hl.set(a, 0, 0, 0)
+		e.startRollout()
+		e.tick()
+		e.upgrade(a)
+		e.tick()
+		e.commit(a)
+		e.exec(`ALTER TABLE inbound RENAME COLUMN awg_health_at TO awg_health_gone`) // the read of the profiles fails
+		e.clk.Advance(5*time.Minute + time.Second)
+		e.tick()
+		e.wantStep(a, store.StepRolledBack, "inbounds_unreadable")
+	})
+}
+
 func TestGateTimesOutWithoutACommit(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
@@ -815,7 +848,7 @@ func TestGateTimesOutWithoutACommit(t *testing.T) {
 	e.tick()
 	e.clk.Advance(5*time.Minute + time.Second)
 	e.tick()
-	e.wantStep(a, store.StepRolledBack, "state_not_applied")
+	e.wantStep(a, store.StepRolledBack, "not_committed")
 	if got := e.fl.rolledBack(); len(got) != 1 {
 		t.Fatalf("rollbacks %v", got)
 	}
@@ -893,7 +926,7 @@ func TestRollbackThatFails(t *testing.T) {
 	e.clk.Advance(5*time.Minute + time.Second)
 	e.tick()
 	x := e.wantStep(a, store.StepFailed, "rollback_failed")
-	if x.Params["reason"] != "no_previous" || x.Params["gate"] != "state_not_applied" {
+	if x.Params["reason"] != "no_previous" || x.Params["gate"] != "not_committed" {
 		t.Fatalf("params %v", x.Params)
 	}
 	e.wantRollout(store.RolloutPaused, "gate_failed")
@@ -1331,7 +1364,7 @@ func TestRolloutSurvivesAPanelRestart(t *testing.T) {
 		e.wantStep(a, store.StepGating, "") // six minutes after the reconnect, but only two after the restart
 		e.clk.Advance(3*time.Minute + time.Second)
 		e.tick()
-		e.wantStep(a, store.StepRolledBack, "state_not_applied")
+		e.wantStep(a, store.StepRolledBack, "not_committed")
 	})
 	t.Run("a paused rollout stays paused", func(t *testing.T) {
 		e := newEnv(t)

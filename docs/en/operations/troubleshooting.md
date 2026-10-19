@@ -201,6 +201,8 @@ A node without IPv6 is fine for WARP. See [WARP](../guide/warp.md).
 | The panel put the previous version back: the client-eye check failed after the update | See [Health](health.md) for the failing profile. |
 | The panel put the previous version back: a profile that worked before broke after the update | Read the profile's error on the node. |
 | The panel put the previous version back: the node did not apply its configuration after the update | Read the node's log of that time. |
+| The panel put the previous version back: the new build did not confirm the update | The new agent never reported that the update took. Read the node's log of that time. |
+| The panel put the previous version back: it could not read the node's profiles after the update | A read from the panel's own database failed, not the node. Read the panel's log of that time. |
 
 After fixing the cause, resume or cancel the rollout and update the node again with a new rollout. See [Updates](updates.md).
 
