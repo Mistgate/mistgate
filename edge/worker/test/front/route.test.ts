@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FrontEnv } from "../../src/env";
-import { RETRY_MS, ROUTE_TTL_MS, createFront, hasSecretPrefix, parseRoutes, pickRole } from "../../src/route";
+import { READ_BOUND_MS, RETRY_MS, ROUTE_TTL_MS, createFront, hasSecretPrefix, parseRoutes, pickRole } from "../../src/route";
 
 // The router of src/front.ts with fake roles behind its bindings and a fake database: which role a request reaches, what the
 // instance settings do to that, and what a failing database does. It runs in workerd because the router compares prefixes with
@@ -15,10 +15,15 @@ type Rows = { k: string; v: string }[];
 const settings = (over: Record<string, string> = {}): Rows =>
   Object.entries({ link_prefix: LINK, admin_prefix: ADMIN, ...over }).map(([k, v]) => ({ k, v }));
 
-/** A database whose answer a test sets: rows, or an Error to throw. `reads` counts the queries. */
+/**
+ * A database whose answer a test sets: rows, or an Error to throw. `reads` counts the queries. With `hang` set a read waits for
+ * the test: `held[i]` settles the i-th held read (a read whose request was cancelled stays pending like this).
+ */
 function fakeDb(answer: Rows | Error = settings()) {
   const db = {
     answer,
+    hang: false,
+    held: [] as ((rows: Rows) => void)[],
     reads: 0,
     queries: [] as string[],
     prepare(sql: string) {
@@ -26,6 +31,7 @@ function fakeDb(answer: Rows | Error = settings()) {
       return {
         all: async () => {
           db.reads++;
+          if (db.hang) return new Promise<{ results: Rows }>((resolve) => db.held.push((rows) => resolve({ results: rows })));
           if (db.answer instanceof Error) throw db.answer;
           return { results: db.answer };
         },
@@ -60,11 +66,12 @@ function setup(answer?: Rows | Error) {
       return crypto.subtle.timingSafeEqual(a, b);
     },
   });
-  const ctx = {} as ExecutionContext;
+  const kept: Promise<unknown>[] = [];
+  const ctx = { waitUntil: (promise: Promise<unknown>) => void kept.push(promise) } as unknown as ExecutionContext;
   const req = (url: string, init?: RequestInit) => new Request(url, init) as unknown as Parameters<NonNullable<typeof front.fetch>>[0];
   /** The role that answered a GET of this URL. */
   const roleOf = async (url: string, init?: RequestInit) => (await (await front.fetch!(req(url, init), env, ctx)).text()) as string;
-  return { db, roles, env, front, ctx, req, roleOf, equalCalls, advance: (ms: number) => void (time += ms) };
+  return { db, roles, env, front, ctx, kept, req, roleOf, equalCalls, advance: (ms: number) => void (time += ms) };
 }
 
 let consoleError: ReturnType<typeof vi.spyOn>;
@@ -239,6 +246,93 @@ describe("the cache and a failing database", () => {
     t.advance(ROUTE_TTL_MS + 1);
     t.db.answer = [];
     expect(await t.roleOf("https://p.example.test/sub-secret/t")).toBe("ADMIN");
+  });
+});
+
+describe("a read of the routes that never settles (its request was cancelled)", () => {
+  const url = "https://p.example.test/sub-secret/t";
+  const adminUrl = `https://p.example.test${ADMIN}x`;
+  // Only the timers: the router's clock is the test's own `now`.
+  beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
+  afterEach(() => vi.useRealTimers());
+
+  it("hands the shared read to waitUntil, once, when it starts; a cache hit starts nothing", async () => {
+    const t = setup();
+    expect(await t.roleOf(url)).toBe("PUBLIC");
+    expect(t.kept).toHaveLength(1);
+    await t.roleOf(url);
+    expect(t.kept).toHaveLength(1);
+  });
+
+  it("a waiter goes on with the old routes after the bound, and the next request reads again", async () => {
+    const t = setup();
+    expect(await t.roleOf(adminUrl)).toBe("ADMIN");
+    t.advance(ROUTE_TTL_MS + 1);
+    t.db.hang = true;
+    const waiter = t.roleOf(adminUrl);
+    const other = t.roleOf(url);
+    await vi.advanceTimersByTimeAsync(READ_BOUND_MS - 1);
+    expect(t.db.reads).toBe(2); // the first read, shared by both
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await Promise.all([waiter, other])).toEqual(["ADMIN", "PUBLIC"]); // by the routes it had
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    t.db.hang = false;
+    await t.roleOf(url);
+    expect(t.db.reads).toBe(3);
+  });
+
+  it("with no routes at all the waiter goes to ADMIN, the fail-safe of a failed read", async () => {
+    const t = setup();
+    t.db.hang = true;
+    const waiter = t.roleOf(url);
+    await vi.advanceTimersByTimeAsync(READ_BOUND_MS);
+    expect(await waiter).toBe("ADMIN");
+    t.db.hang = false;
+    expect(await t.roleOf(url)).toBe("PUBLIC");
+  });
+
+  it("requests that arrive together still share one read", async () => {
+    const t = setup();
+    t.db.hang = true;
+    const all = [t.roleOf(url), t.roleOf(adminUrl), t.roleOf(url)];
+    await vi.advanceTimersByTimeAsync(10);
+    expect(t.db.reads).toBe(1);
+    t.db.held[0]!(settings());
+    expect(await Promise.all(all)).toEqual(["PUBLIC", "ADMIN", "PUBLIC"]);
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("the late result of a dropped read does not overwrite what a newer read cached", async () => {
+    const t = setup();
+    t.db.hang = true;
+    const first = t.roleOf(url);
+    await vi.advanceTimersByTimeAsync(READ_BOUND_MS);
+    expect(await first).toBe("ADMIN");
+    const second = t.roleOf(`https://p.example.test/new-link-9/link/nod_1`); // the newer read
+    await vi.advanceTimersByTimeAsync(1);
+    expect(t.db.held).toHaveLength(2);
+    t.db.held[1]!(settings({ link_prefix: "/new-link-9/" }));
+    expect(await second).toBe("LINK");
+    t.db.held[0]!(settings({ link_prefix: "/old-link-1/" })); // the cancelled request's read finally answers
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await t.roleOf("https://p.example.test/new-link-9/link/nod_1")).toBe("LINK");
+    expect(await t.roleOf("https://p.example.test/old-link-1/link/nod_1")).toBe("PUBLIC");
+    expect(t.db.reads).toBe(2);
+  });
+
+  it("the late result of a dropped read does not end the newer read's sharing", async () => {
+    const t = setup();
+    t.db.hang = true;
+    void t.roleOf(url);
+    await vi.advanceTimersByTimeAsync(READ_BOUND_MS);
+    void t.roleOf(url); // the newer read, still in flight
+    await vi.advanceTimersByTimeAsync(1);
+    t.db.held[0]!(settings());
+    await vi.advanceTimersByTimeAsync(1);
+    void t.roleOf(url);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(t.db.reads).toBe(2); // not a third: the second read is still the shared one
   });
 });
 

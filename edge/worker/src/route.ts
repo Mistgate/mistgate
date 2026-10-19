@@ -20,6 +20,11 @@ import type { FrontEnv } from "./env";
 export const ROUTE_TTL_MS = 5 * 60_000;
 /** After a failed read the old values are tried again no sooner than this. */
 export const RETRY_MS = 5_000;
+/**
+ * How long a request waits for a read of the routes that another request started. A read whose request was cancelled by the client
+ * can stay pending for ever; the waiter then goes on with the routes it has (none: ADMIN, as after a failed read) and the next request reads again.
+ */
+export const READ_BOUND_MS = 5_000;
 
 const SQL = "SELECT k, v FROM setting WHERE k IN ('link_prefix', 'admin_prefix', 'admin_host')";
 
@@ -102,36 +107,59 @@ export function createFront(options: FrontOptions = {}): ExportedHandler<FrontEn
   const equal: Equal = options.timingSafeEqual ?? ((a, b) => crypto.subtle.timingSafeEqual(a, b));
   let cache: { routes: Routes; readAt: number } | undefined;
   let reading: Promise<Routes | null> | undefined;
+  // Counts the reads given up on. A read writes the cache only if no read was given up on since it began: its late answer
+  // must not replace what a newer read stored.
+  let dropped = 0;
 
   async function read(db: D1Database): Promise<Routes | null> {
+    const began = dropped;
     try {
       const { results } = await db.prepare(SQL).all<{ k: string; v: string }>();
       const routes = parseRoutes(results);
       // Not cached when there is no instance: the admin role creates it within seconds of the first request, and the
       // next request must see it. (Until then every request is one small read; nobody has anything to protect yet.)
-      cache = routes ? { routes, readAt: now() } : undefined;
+      if (began === dropped) cache = routes ? { routes, readAt: now() } : undefined;
       return routes;
     } catch (error) {
       console.error("front: reading the routes failed:", error instanceof Error ? error.message : String(error));
       if (!cache) return null; // fail safe: the admin role, which answers 503 itself when the database is down
-      cache.readAt = now() - ROUTE_TTL_MS + RETRY_MS; // keep the old values, try again soon
+      if (began === dropped) cache.readAt = now() - ROUTE_TTL_MS + RETRY_MS; // keep the old values, try again soon
       return cache.routes;
     }
   }
 
-  function routes(db: D1Database): Promise<Routes | null> {
+  function routes(db: D1Database, ctx: ExecutionContext): Promise<Routes | null> {
     if (cache && now() - cache.readAt < ROUTE_TTL_MS) return Promise.resolve(cache.routes);
-    // Concurrent requests share one read.
-    reading ??= read(db).finally(() => {
-      reading = undefined;
+    if (!reading) {
+      // Concurrent requests share one read. It belongs to the request that starts it, so that request's context keeps it
+      // alive (waitUntil) even if its client leaves; read() never rejects. (Inline: this script must stay tiny.)
+      const attempt: Promise<Routes | null> = read(db).finally(() => {
+        if (reading === attempt) reading = undefined;
+      });
+      reading = attempt;
+      ctx.waitUntil(attempt);
+    }
+    const attempt = reading;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (reading === attempt) {
+          reading = undefined;
+          dropped++;
+          console.error(`front: reading the routes took over ${READ_BOUND_MS} ms; going on with the cached routes`);
+        }
+        resolve(cache?.routes ?? null);
+      }, READ_BOUND_MS);
+      void attempt.then((found) => {
+        clearTimeout(timer);
+        resolve(found);
+      });
     });
-    return reading;
   }
 
   return {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
       const url = new URL(request.url);
-      const role = pickRole(await routes(env.DB), url.pathname, url.hostname, equal);
+      const role = pickRole(await routes(env.DB, ctx), url.pathname, url.hostname, equal);
       return env[role].fetch(request);
     },
   };
