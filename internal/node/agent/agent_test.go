@@ -332,6 +332,10 @@ func TestHonestHelloAckDropsAckedMessages(t *testing.T) {
 func TestStatsBatchContent(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	h.waitConnected()
+	// The fake engine uses a fixed session timestamp; pin the live Hello clock correction so this checks batch content,
+	// not whether the handshake happened across a Unix-second boundary. Offset correction has dedicated coverage below.
+	eventually(t, func() bool { return h.a.offsetAt.Load() != nil }, "HelloAck clock offset")
+	h.a.offset.Store(0)
 	h.panel.push(fullState(1, inb("inb_1", 0, 0, cred("crd_a"))))
 	h.panel.nextApply()
 	h.eng.setEmit(true)
