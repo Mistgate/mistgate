@@ -215,7 +215,8 @@ export function HeroCard({
         {!active && <WhatsNew notes={data.agentNotes} />}
         {!owner && !noUpdates && (hero.id === "available" || active) && <p className="text-xs text-muted">{t("up.ownerOnly")}</p>}
       </div>
-      <BundleStrip data={data} owner={owner} actions={actions} />
+      {/* the edition has no node bundle: its card would only show the failed scan of a directory it does not have */}
+      {!noUpdates && <BundleStrip data={data} owner={owner} actions={actions} />}
     </section>
   );
 }

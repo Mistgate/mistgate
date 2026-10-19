@@ -216,10 +216,17 @@ describe("Updates on the edge", () => {
     expect(all).not.toContain("Read the folder again");
   });
 
+  it("shows no release bundle card: the edition has no bundle, its scan would only fail", async () => {
+    await mount(<UpdatesScreen />);
+    expect(text()).not.toContain("Release bundle");
+    expect(text()).not.toContain("manifest.json");
+  });
+
   it("is unchanged on the VPS", async () => {
     edition = "vps";
     await mount(<UpdatesScreen />);
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
+    expect(text()).toContain("Release bundle");
     expect(buttons()).toContain("Update panel");
     expect(buttons().some((b) => /^Update \d+ nodes?$/.test(b))).toBe(true);
   });
