@@ -27,6 +27,10 @@ func (r *edgeTickRemote) Ask(context.Context, string, string, *agentv1.ConnectRe
 	return nil, nil
 }
 
+func (r *edgeTickRemote) Send(context.Context, string, string, *agentv1.ConnectResponse, time.Time) error {
+	return nil
+}
+
 func (r *edgeTickRemote) Close(context.Context, string, string) error { return nil }
 
 func (r *edgeTickRemote) Poke(_ context.Context, nodeIDs []string) error {

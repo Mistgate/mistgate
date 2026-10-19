@@ -132,7 +132,7 @@ func TestCountryProbeLeavesOutWhatIsNotAVerdict(t *testing.T) {
 
 func TestCountryProbeNeedsAnAgentThatListsTheCapability(t *testing.T) {
 	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_CountryProbe{CountryProbe: &agentv1.CountryProbe{}}}
-	if capability, message := requestCapability(frame); capability != "country-probe/1" || message != "agent too old" {
+	if capability, message := requestCapability(frame, false); capability != "country-probe/1" || message != "agent too old" {
 		t.Fatalf("CountryProbe capability = %q, %q", capability, message)
 	}
 

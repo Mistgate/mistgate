@@ -250,6 +250,21 @@ func (e *nodeLinkEmu) Ask(ctx context.Context, nodeID, requestID string, frame *
 	return &out, nil
 }
 
+// Send is the non-blocking NodeLink.send seam for recorded update and rollback requests.
+func (e *nodeLinkEmu) Send(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) error {
+	if err := e.guard(ctx, nodeID, "Send"); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	raw, err := proto.Marshal(frame)
+	if err != nil {
+		return err
+	}
+	return e.object(nodeID).sendRecorded(requestID, raw, deadline.UnixMilli())
+}
+
 // Close is the Remote seam: NodeLink.close(4000, reason).
 func (e *nodeLinkEmu) Close(ctx context.Context, nodeID, reason string) error {
 	if err := e.guard(ctx, nodeID, "Close"); err != nil {
@@ -845,6 +860,59 @@ func (o *linkObject) onAlarm() {
 	})
 }
 
+// sendRecorded sends a fire-and-forget command through the session and records its result when it arrives.
+func (o *linkObject) sendRecorded(id string, frame []byte, deadlineAt int64) error {
+	var (
+		early   error
+		sent    bool
+		entered = o.do(func() {
+			if o.liveSocket() == nil {
+				early = errEmuLinkLost
+				return
+			}
+			if deadlineAt <= o.nowMs() {
+				early = errEmuTimeout
+				return
+			}
+			o.serial(func() {
+				s := o.liveSocket()
+				if s == nil {
+					early = errEmuLinkLost
+					return
+				}
+				out, err := o.run(s, emuEvent{kind: fleet.LinkRequest, at: o.nowMs(), requestID: id, frame: frame,
+					deadlineAt: deadlineAt, record: true}, s.att.generation)
+				if err != nil {
+					early = err
+					return
+				}
+				if out.Close != nil {
+					early = errEmuLinkLost
+					return
+				}
+				for _, reply := range out.Replies {
+					if reply.RequestID == id {
+						early = errEmuLinkLost
+						return
+					}
+				}
+				sent = true
+				o.arm()
+			})
+		})
+	)
+	if !entered {
+		return errors.New("link emulator stopped")
+	}
+	if early != nil {
+		return early
+	}
+	if !sent {
+		return errEmuLinkLost
+	}
+	return nil
+}
+
 // ask sends a request frame through a session step and waits for the reply a later step resolves; the wait is outside the
 // serial block. "link lost" when there is no session or it ends, "timeout" at deadlineAt.
 func (o *linkObject) ask(id string, frame []byte, deadlineAt int64) ([]byte, error) {
@@ -985,6 +1053,7 @@ type emuEvent struct {
 	frame        []byte
 	requestID    string
 	deadlineAt   int64
+	record       bool
 }
 
 // emuMessage names the oneof field of a ConnectRequest (frame) or ConnectResponse (request).
@@ -1026,9 +1095,9 @@ func takeFault(faults map[fleet.LinkKind]int, kind fleet.LinkKind) bool {
 
 // run is one session step on the Go side, applied to the session's socket (nil once it is gone). The state is written
 // first, then the frames go out. An error or a spent budget closes 1011, rejects the waiters and writes nothing.
-func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) {
+func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) (fleet.LinkOut, error) {
 	in := fleet.LinkIn{NodeID: o.id, State: o.state, Kind: ev.kind, At: time.UnixMilli(ev.at), Generation: ev.generation,
-		CertSerial: ev.certSerial, CertNotAfter: ev.certNotAfter, Frame: ev.frame, RequestID: ev.requestID}
+		CertSerial: ev.certSerial, CertNotAfter: ev.certNotAfter, Frame: ev.frame, RequestID: ev.requestID, Record: ev.record}
 	if ev.kind == fleet.LinkRequest {
 		in.DeadlineAt = time.UnixMilli(ev.deadlineAt)
 	}
@@ -1053,7 +1122,7 @@ func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) {
 			o.shut(s, 1011, "link error")
 		}
 		o.rejectWaiters()
-		return
+		return fleet.LinkOut{}, err
 	}
 	o.logStep(step)
 	if !lose {
@@ -1092,6 +1161,7 @@ func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) {
 		o.shut(s, int(out.Close.Code), out.Close.Reason)
 		o.dropLive(true)
 	}
+	return out, nil
 }
 
 // dropLive: the open session is over: its waiters fail, its alarm goes, and Go gets the closed step.

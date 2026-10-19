@@ -45,6 +45,7 @@ type LinkIn struct {
 	Frame        []byte    // frame: one ConnectRequest; request: one ConnectResponse
 	RequestID    string    // request
 	DeadlineAt   time.Time // request: the caller's absolute deadline
+	Record       bool      // request: persist a later CommandResult through the shared update service
 }
 
 // LinkOut is what the object does with the result of one event: write State, send Frames, resolve Replies, set the alarm,
@@ -141,7 +142,8 @@ func (f *Fleet) Link(ctx context.Context, in LinkIn) (LinkOut, error) {
 			c.out.Replies = append(c.out.Replies, LinkReply{RequestID: in.RequestID})
 			break
 		}
-		err = c.step(SessionEvent{Kind: EventAdminCommand, Request: &AdminRequest{RequestID: in.RequestID, Deadline: in.DeadlineAt, Frame: &frame}})
+		err = c.step(SessionEvent{Kind: EventAdminCommand, Request: &AdminRequest{RequestID: in.RequestID, Deadline: in.DeadlineAt,
+			Frame: &frame, Record: in.Record}})
 	case LinkClosed:
 		forget := !c.state.RetireAt.IsZero() // the closed step clears it; the store committed the retirement before the frame
 		if err = c.step(SessionEvent{Kind: EventDisconnected}); err == nil {

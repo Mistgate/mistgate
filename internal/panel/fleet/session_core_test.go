@@ -1933,6 +1933,90 @@ func TestSessionCoreRetireRepliesBeforeClosingAtAlarm(t *testing.T) {
 	}
 }
 
+func TestSessionCoreRecordsUpdateCommandAnswers(t *testing.T) {
+	_, core, ctx, state, now := coreFixture(t, "alice-recorded")
+	state = stepHello(t, core, ctx, state, now, hello("instance-recorded", 0, "").GetHello()).State
+	request := func(id string, deadline time.Time) *AdminRequest {
+		return &AdminRequest{RequestID: id, Deadline: deadline, Record: true, Frame: &agentv1.ConnectResponse{
+			Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: id}},
+		}}
+	}
+	started, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: request("req-recorded", now.Add(time.Minute))})
+	if err != nil || len(started.Frames) != 1 || started.State.Pending["req-recorded"].Kind != PendingRecorded {
+		t.Fatalf("recorded request = state %+v frames %d err %v", started.State, len(started.Frames), err)
+	}
+	result := &agentv1.CommandResult{RequestId: "req-recorded", Ok: true}
+	answered, err := coreStep(ctx, core, started.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}}})
+	if err != nil || len(answered.Effects) != 1 || answered.Effects[0].Kind != EffectRecordAnswer ||
+		answered.Effects[0].RequestID != "req-recorded" || answered.Effects[0].Result != result || hasEffect(answered, EffectReply) {
+		t.Fatalf("recorded answer effects = %+v err %v", answered.Effects, err)
+	}
+	if len(answered.State.Pending) != 0 {
+		t.Fatalf("recorded answer left a pending request: %+v", answered.State.Pending)
+	}
+
+	expiring, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: request("req-expiring", now.Add(time.Second))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired, err := coreStep(ctx, core, expiring.State, SessionEvent{Kind: EventAlarm, At: now.Add(time.Second)})
+	if err != nil || len(expired.State.Pending) != 0 || hasEffect(expired, EffectRecordAnswer) || hasEffect(expired, EffectReply) {
+		t.Fatalf("expired recorded request = pending %+v effects %+v err %v", expired.State.Pending, expired.Effects, err)
+	}
+	late, err := coreStep(ctx, core, expired.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(2 * time.Second),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: &agentv1.CommandResult{RequestId: "req-expiring", Ok: true}}}})
+	if err != nil || len(late.Effects) != 0 {
+		t.Fatalf("late result after expiry effects = %+v, err %v; want none", late.Effects, err)
+	}
+
+	disconnecting, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: request("req-disconnect", now.Add(time.Minute))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disconnected, err := coreStep(ctx, core, disconnecting.State, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
+	if err != nil || len(disconnected.State.Pending) != 0 {
+		t.Fatalf("disconnect left recorded requests pending: %+v err %v", disconnected.State.Pending, err)
+	}
+
+	logFrame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_LogRequest{LogRequest: &agentv1.LogRequest{RequestId: "req-log"}}}
+	logStarted, err := coreStep(ctx, core, answered.State, SessionEvent{Kind: EventLogStart, At: now, Request: &AdminRequest{
+		RequestID: "req-log", Deadline: now.Add(time.Minute), Record: true, Frame: logFrame,
+	}})
+	if err != nil || logStarted.State.Pending["req-log"].Kind == PendingRecorded {
+		t.Fatalf("non-command request was marked recorded: %+v err %v", logStarted.State.Pending, err)
+	}
+	command := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RestartInbound{RestartInbound: &agentv1.RestartInbound{RequestId: "req-restart", InboundId: "inb_test"}}}
+	commandStarted, err := coreStep(ctx, core, answered.State, SessionEvent{Kind: EventAdminCommand, At: now, Request: &AdminRequest{
+		RequestID: "req-restart", Deadline: now.Add(time.Minute), Record: true, Frame: command,
+	}})
+	if err != nil || commandStarted.State.Pending["req-restart"].Kind != PendingCommand {
+		t.Fatalf("recorded non-update command pending = %+v err %v; want PendingCommand", commandStarted.State.Pending, err)
+	}
+	commandAnswered, err := coreStep(ctx, core, commandStarted.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: &agentv1.CommandResult{RequestId: "req-restart", Ok: true}}}})
+	if err != nil || !hasEffect(commandAnswered, EffectReply) || hasEffect(commandAnswered, EffectRecordAnswer) {
+		t.Fatalf("recorded non-update command answer effects = %+v err %v; want normal reply", commandAnswered.Effects, err)
+	}
+
+	rollback := func(id string) *AdminRequest {
+		return &AdminRequest{RequestID: id, Deadline: now.Add(time.Minute), Record: true, Frame: &agentv1.ConnectResponse{
+			Message: &agentv1.ConnectResponse_RollbackAgent{RollbackAgent: &agentv1.RollbackAgent{RequestId: id}},
+		}}
+	}
+	rollbackStarted, err := coreStep(ctx, core, state, SessionEvent{Kind: EventAdminCommand, At: now, Request: rollback("req-rollback-recorded")})
+	if err != nil || rollbackStarted.State.Pending["req-rollback-recorded"].Kind != PendingRecorded {
+		t.Fatalf("recorded rollback request = %+v err %v", rollbackStarted.State.Pending, err)
+	}
+	rollbackResult := &agentv1.CommandResult{RequestId: "req-rollback-recorded", Ok: false, Error: "rollback failed"}
+	rollbackAnswered, err := coreStep(ctx, core, rollbackStarted.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(time.Second),
+		Frame: &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: rollbackResult}}})
+	if err != nil || hasEffect(rollbackAnswered, EffectReply) || len(rollbackAnswered.Effects) != 1 ||
+		rollbackAnswered.Effects[0].Kind != EffectRecordAnswer || rollbackAnswered.Effects[0].Result != rollbackResult {
+		t.Fatalf("recorded rollback answer effects = %+v err %v", rollbackAnswered.Effects, err)
+	}
+}
+
 func TestSessionCorePendingRequestExpiresAtNextAlarm(t *testing.T) {
 	_, core, ctx, state, now := coreFixture(t, "core-request-expiry")
 	tr := stepHello(t, core, ctx, state, now, hello("instance-request-expiry", 0, "").GetHello())

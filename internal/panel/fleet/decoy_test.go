@@ -59,7 +59,7 @@ func TestOldAgentKeepsBuiltinAndReportsDecoyReason(t *testing.T) {
 
 func TestSetDecoyRequestIsCapabilityGated(t *testing.T) {
 	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SetDecoy{SetDecoy: &agentv1.SetDecoy{Mode: decoy.ModeBuiltin}}}
-	capability, message := requestCapability(frame)
+	capability, message := requestCapability(frame, false)
 	if capability != capDecoy || message != "agent too old" {
 		t.Fatalf("SetDecoy capability = %q, %q", capability, message)
 	}

@@ -164,6 +164,12 @@ func (f *fakeFleet) RollbackAgent(_ context.Context, id string, _ time.Duration)
 	return okResult(), nil
 }
 
+func (f *fakeFleet) SendUpdateAgent(context.Context, string, string, []byte, []byte, string, time.Time) error {
+	return nil
+}
+
+func (f *fakeFleet) SendRollbackAgent(context.Context, string, string, time.Time) error { return nil }
+
 func (f *fakeFleet) sent() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -222,6 +222,12 @@ func (f *Fleet) runSharedEffect(ctx context.Context, nodeID string, effect Sessi
 		if effect.PreviousNode != nil {
 			f.connectEvents(ctx, nodeID, *effect.PreviousNode, effect.Instance, effect.BootAt.UTC(), effect.At.UTC())
 		}
+	case EffectRecordAnswer:
+		if u := f.updates(); u != nil {
+			if err := u.RecordAnswer(ctx, nodeID, effect.RequestID, effect.Result); err != nil {
+				f.log.Warn("record update answer", "node", nodeID, "err", err)
+			}
+		}
 	}
 }
 
@@ -788,14 +794,18 @@ func requestOfflineError(frame *agentv1.ConnectResponse) error {
 	return errNodeOffline
 }
 
-func requestCapability(frame *agentv1.ConnectResponse) (capability, message string) {
+func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capability, message string) {
+	updateCapability := capUpdate
+	if linkOnly {
+		updateCapability = capUpdateLink
+	}
 	switch {
 	case frame == nil:
 		return "", ""
 	case frame.GetRunDoctor() != nil, frame.GetApplyFix() != nil:
 		return capDoctor, "agent too old"
 	case frame.GetUpdateAgent() != nil, frame.GetRollbackAgent() != nil:
-		return capUpdate, "node cannot update itself"
+		return updateCapability, "node cannot update itself"
 	case frame.GetMeasureBandwidth() != nil:
 		return capBandwidth, "agent too old"
 	case frame.GetPrepareAwgKernel() != nil:
@@ -827,7 +837,7 @@ func (f *Fleet) readyForRequest(ctx context.Context, nodeID string, frame *agent
 	if !live.Connected {
 		return live, requestOfflineError(frame)
 	}
-	if capability, message := requestCapability(frame); capability != "" && !slices.Contains(live.AgentCaps, capability) {
+	if capability, message := requestCapability(frame, f.cfg.Remote != nil); capability != "" && !slices.Contains(live.AgentCaps, capability) {
 		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New(message))
 	}
 	if fix := frame.GetApplyFix(); fix != nil && fix.GetFixId() == "refresh_unit" && !slices.Contains(live.AgentCaps, capUnitRefresh) {

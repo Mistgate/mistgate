@@ -83,6 +83,20 @@ func TestParseInitOptionsNodeLink(t *testing.T) {
 		parsed.nodeLink.Get("close").Type() != js.TypeFunction || parsed.nodeLink.Get("poke").Type() != js.TypeFunction {
 		t.Fatalf("nodeLink functions: parsed=%+v err=%v", parsed, err)
 	}
+	send := js.FuncOf(func(js.Value, []js.Value) any { return true })
+	defer send.Release()
+	valid.Set("send", send)
+	if parsed, err := parseInitOptions(edgeInitOptions(valid, true)); err != nil || parsed.nodeLink.Get("send").Type() != js.TypeFunction {
+		t.Fatalf("optional nodeLink.send: parsed=%+v err=%v", parsed, err)
+	}
+	invalidSend := js.Global().Get("Object").New()
+	invalidSend.Set("ask", ask)
+	invalidSend.Set("close", closeNode)
+	invalidSend.Set("poke", poke)
+	invalidSend.Set("send", "invalid")
+	if _, err := parseInitOptions(edgeInitOptions(invalidSend, true)); !errors.Is(err, errInvalidNodeLink) {
+		t.Fatalf("invalid optional send error = %v, want %v", err, errInvalidNodeLink)
+	}
 
 	invalid := []struct {
 		name  string
@@ -112,6 +126,24 @@ func TestParseInitOptionsNodeLink(t *testing.T) {
 	missingPoke.Set("close", closeNode)
 	if _, err := parseInitOptions(edgeInitOptions(missingPoke, true)); !errors.Is(err, errInvalidNodeLink) {
 		t.Fatalf("missing poke error = %v, want %v", err, errInvalidNodeLink)
+	}
+}
+
+func TestStepFromJSReadsRecordedRequestFlag(t *testing.T) {
+	frame, err := proto.Marshal(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: "req_record"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := js.Global().Get("Object").New()
+	event.Set("kind", string(fleet.LinkRequest))
+	event.Set("at", int64(1_800_000_000_000))
+	event.Set("frame", bytesToJS(frame))
+	event.Set("requestId", "req_record")
+	event.Set("deadlineAt", int64(1_800_000_060_000))
+	event.Set("record", true)
+	in, _, err := stepFromJS(makeStepArgs("nod_alice", "{}", false, 1_800_000_120_000, event))
+	if err != nil || !in.Record || in.RequestID != "req_record" {
+		t.Fatalf("stepFromJS recorded request = %+v, %v", in, err)
 	}
 }
 

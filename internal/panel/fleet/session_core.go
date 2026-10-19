@@ -87,6 +87,7 @@ const (
 	PendingLog
 	PendingAutoBandwidth
 	PendingRetire
+	PendingRecorded PendingRequestKind = 6
 )
 
 // EventKind identifies one input that the session core can process.
@@ -111,6 +112,7 @@ type AdminRequest struct {
 	RequestID string
 	Deadline  time.Time
 	Frame     *agentv1.ConnectResponse
+	Record    bool // update/rollback command results are persisted instead of replied to the request adapter
 }
 
 // SessionEvent is a timestamped input to SessionCore.Step.
@@ -133,6 +135,7 @@ const (
 	EffectWarpAttention
 	EffectPrepareDesired
 	EffectConnectEvents
+	EffectRecordAnswer
 )
 
 // SessionEffect asks the adapter to perform work requested by a core transition.
@@ -147,6 +150,7 @@ type SessionEffect struct {
 	Users        []string
 	WarpReason   string
 	Instance     string // EffectConnectEvents: the agent process that said hello
+	Result       *agentv1.CommandResult
 }
 
 // CloseClass identifies why a session should terminate.
@@ -369,6 +373,9 @@ func (c *SessionCore) request(tr *coreTransition, request *AdminRequest, at time
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: request.RequestID})
 		return
 	}
+	if request.Record && kind == PendingCommand && (request.Frame.GetUpdateAgent() != nil || request.Frame.GetRollbackAgent() != nil) {
+		kind = PendingRecorded
+	}
 	deadline := request.Deadline
 	if deadline.IsZero() {
 		deadline = at
@@ -422,6 +429,11 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 		if pending.Kind == PendingAutoBandwidth {
 			deletePending(tr.state, r.RequestId)
 			c.f.storeAutoMeasureBandwidth(ctx, tr.state.NodeID, parseBandwidthResult(r))
+			return
+		}
+		if pending.Kind == PendingRecorded {
+			deletePending(tr.state, r.RequestId)
+			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectRecordAnswer, RequestID: r.RequestId, Result: r})
 			return
 		}
 		if pending.Kind != PendingCommand {
@@ -1084,7 +1096,9 @@ func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event Sessi
 			if req.Kind == PendingAutoBandwidth {
 				c.f.log.Info("first bandwidth measurement did not work", "node", tr.state.NodeID, "code", "timeout")
 			}
-			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: id})
+			if req.Kind != PendingRecorded {
+				tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: id})
+			}
 			deletePending(tr.state, id)
 		}
 	}

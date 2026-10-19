@@ -47,6 +47,8 @@ const (
 // that is context.DeadlineExceeded or carries connect.CodeDeadlineExceeded ("no answer"); any other error is "link lost".
 type Remote interface {
 	Ask(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) (*agentv1.ConnectRequest, error)
+	// Send writes one frame to the node's live link and returns immediately; any error means the frame was not sent.
+	Send(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) error
 	Close(ctx context.Context, nodeID, reason string) error
 	Poke(ctx context.Context, nodeIDs []string) error
 }

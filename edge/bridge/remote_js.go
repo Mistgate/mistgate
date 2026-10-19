@@ -23,6 +23,7 @@ var (
 
 type edgeRemote struct {
 	ask   js.Value
+	send  js.Value
 	close js.Value
 	poke  js.Value
 }
@@ -82,6 +83,43 @@ func (r *edgeRemote) Ask(ctx context.Context, nodeID, requestID string, frame *a
 		return nil, errRemoteLost
 	}
 	return &request, nil
+}
+
+func (r *edgeRemote) Send(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) error {
+	if err := r.checkNode(ctx, nodeID); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if r.send.Type() != js.TypeFunction || frame == nil {
+		return errRemoteLost
+	}
+	encoded, err := proto.Marshal(frame)
+	if err != nil {
+		return errRemoteLost
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	promise, err := invokeRemote(r.send, nodeID, requestID, bytesToJS(encoded), deadline.UnixMilli())
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errRemoteLost
+	}
+	result, err := d1driver.Await(ctx, promise)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errRemoteLost
+	}
+	if result.Type() != js.TypeBoolean || !result.Bool() {
+		return errRemoteLost
+	}
+	return nil
 }
 
 func (r *edgeRemote) Close(ctx context.Context, nodeID, reason string) error {

@@ -21,8 +21,13 @@ import (
 // capUpdate is the Hello.capabilities entry of an agent that can replace its own binary (agent.proto "UPDATE").
 const capUpdate = "update/1"
 
-// Updates is implemented by the updates module. Both methods must be cheap; Serve blocks for the length of a download.
+// capUpdateLink is the edge link-only agent update capability; VPS updates continue to require capUpdate.
+const capUpdateLink = "update-link/1"
+
+// Updates is implemented by the updates module. Its three metadata methods are cheap; Serve blocks for a download.
 type Updates interface {
+	// RecordAnswer stores the first result of an edge update command against its sent step. Other command results never call it.
+	RecordAnswer(ctx context.Context, nodeID, requestID string, result *agentv1.CommandResult) error
 	// Updating reports that a rollout step of the node is in flight (command sent, reconnect or gate pending): its
 	// stream drops when the agent re-executes, and that is neither a blip nor an outage.
 	Updating(nodeID string) bool
@@ -84,6 +89,37 @@ func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Dura
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RollbackAgent{
 			RollbackAgent: &agentv1.RollbackAgent{RequestId: reqID}}}
 	})
+}
+
+// SendUpdateAgent sends an update command through the edge link without waiting for CommandResult.
+func (f *Fleet) SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time) error {
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{
+		RequestId: requestID, Manifest: manifest, Signature: signature, DownloadToken: downloadToken,
+	}}}
+	return f.sendRecorded(ctx, nodeID, requestID, frame, deadline)
+}
+
+// SendRollbackAgent sends a rollback command through the edge link without waiting for CommandResult.
+func (f *Fleet) SendRollbackAgent(ctx context.Context, nodeID, requestID string, deadline time.Time) error {
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RollbackAgent{RollbackAgent: &agentv1.RollbackAgent{RequestId: requestID}}}
+	return f.sendRecorded(ctx, nodeID, requestID, frame, deadline)
+}
+
+func (f *Fleet) sendRecorded(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) error {
+	remote := f.cfg.Remote
+	if remote == nil {
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
+	}
+	if requestID == "" || frame == nil {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("invalid update request"))
+	}
+	if _, err := f.readyForRequest(ctx, nodeID, frame, nil); err != nil {
+		return err
+	}
+	if err := remote.Send(ctx, nodeID, requestID, frame, deadline); err != nil {
+		return requestOfflineError(frame)
+	}
+	return nil
 }
 
 // lastUpdateJSON is Hello.last_update as stored on the node row ("" = none). Strings are bounded: they are stored and shown.

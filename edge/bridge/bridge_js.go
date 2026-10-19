@@ -310,7 +310,7 @@ func initPanel(options js.Value) error {
 	afterResponse := newEdgeTaskRunner()
 	var remote fleet.Remote
 	if opts.hasNodeLink {
-		remote = &edgeRemote{ask: opts.nodeLink.Get("ask"), close: opts.nodeLink.Get("close"), poke: opts.nodeLink.Get("poke")}
+		remote = &edgeRemote{ask: opts.nodeLink.Get("ask"), send: opts.nodeLink.Get("send"), close: opts.nodeLink.Get("close"), poke: opts.nodeLink.Get("poke")}
 	}
 	newAuth := func(in app.InstanceConfig) (*auth.Service, error) {
 		return auth.New(st, auth.Config{

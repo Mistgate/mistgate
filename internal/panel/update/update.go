@@ -43,6 +43,10 @@ type Fleet interface {
 	UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error)
 	// RollbackAgent asks the node to put its previous binary back; same preconditions.
 	RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error)
+	// SendUpdateAgent hands an edge update command to the live node link without waiting for its result.
+	SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time) error
+	// SendRollbackAgent hands an edge rollback command to the live node link without waiting for its result.
+	SendRollbackAgent(ctx context.Context, nodeID, requestID string, deadline time.Time) error
 }
 
 // Health is what the rollout gate needs from the health module (*health.Service implements it); nil = no probe gate.

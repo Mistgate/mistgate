@@ -73,6 +73,10 @@ type StepRow struct {
 	RolloutID, NodeID, NodeName string
 	Stage                       int
 	State                       string
+	RequestID                   string
+	RequestAt                   time.Time
+	Answer                      string
+	DownloadSHA                 string
 	FromVersion                 string
 	FromBuilt                   int64
 	PreFailed                   []string // inbound ids that were FAILED before the update
@@ -80,6 +84,10 @@ type StepRow struct {
 	ReconnectedAt, FinishedAt   time.Time
 	ErrorKey                    string
 	Params                      map[string]string
+	loaded                      bool
+	loadedState                 string
+	loadedRequestID             string
+	loadedAnswer                string
 }
 
 // Decided is a step that will not change any more on its own (passed, failed, rolled back, skipped).
@@ -209,7 +217,7 @@ func (s *Store) Rollout(ctx context.Context, id string) (RolloutRow, error) {
 func (s *Store) RolloutSteps(ctx context.Context, rolloutID string) ([]StepRow, error) {
 	rows, err := s.R.QueryContext(ctx, `
 		SELECT rollout_id, node_id, node_name, stage, state, from_version, from_built, pre_failed_json, sent_at, acked_at,
-		       reconnected_at, finished_at, error_key, params_json
+		       reconnected_at, finished_at, error_key, params_json, request_id, request_at, answer_json, download_sha
 		FROM update_step WHERE rollout_id = ? ORDER BY stage, node_name COLLATE NOCASE, node_id`, rolloutID)
 	if err != nil {
 		return nil, err
@@ -219,14 +227,15 @@ func (s *Store) RolloutSteps(ctx context.Context, rolloutID string) ([]StepRow, 
 	for rows.Next() {
 		var x StepRow
 		var pre, params string
-		var sent, acked, recon, fin int64
+		var sent, acked, recon, fin, requestAt int64
 		if err := rows.Scan(&x.RolloutID, &x.NodeID, &x.NodeName, &x.Stage, &x.State, &x.FromVersion, &x.FromBuilt, &pre,
-			&sent, &acked, &recon, &fin, &x.ErrorKey, &params); err != nil {
+			&sent, &acked, &recon, &fin, &x.ErrorKey, &params, &x.RequestID, &requestAt, &x.Answer, &x.DownloadSHA); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(pre), &x.PreFailed)
 		_ = json.Unmarshal([]byte(params), &x.Params)
-		x.SentAt, x.AckedAt, x.ReconnectedAt, x.FinishedAt = fleetTime(sent), fleetTime(acked), fleetTime(recon), fleetTime(fin)
+		x.SentAt, x.AckedAt, x.ReconnectedAt, x.FinishedAt, x.RequestAt = fleetTime(sent), fleetTime(acked), fleetTime(recon), fleetTime(fin), fleetTime(requestAt)
+		x.loaded, x.loadedState, x.loadedRequestID, x.loadedAnswer = true, x.State, x.RequestID, x.Answer
 		out = append(out, x)
 	}
 	return out, rows.Err()
@@ -256,21 +265,93 @@ func (s *Store) SetRolloutStatus(ctx context.Context, id string, from []string, 
 	return n > 0, nil
 }
 
-// SaveStep overwrites the mutable fields of a step (the worker owns its rows).
-func (s *Store) SaveStep(ctx context.Context, x StepRow) error {
-	res, err := s.W.ExecContext(ctx, `
+// SaveStep overwrites the mutable fields of a step. A row read by RolloutSteps is a compare-and-set on the
+// state and recorded-answer identity; a caller that did not read the row saves without that guard.
+func (s *Store) SaveStep(ctx context.Context, x *StepRow) error {
+	if x == nil {
+		return ErrNotFound
+	}
+	query := `
 		UPDATE update_step SET state = ?, from_version = ?, from_built = ?, pre_failed_json = ?, sent_at = ?, acked_at = ?,
-			reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?
-		WHERE rollout_id = ? AND node_id = ?`,
-		x.State, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed), fleetUnix(x.SentAt), fleetUnix(x.AckedAt),
-		fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RolloutID, x.NodeID)
+			reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?, request_id = ?, request_at = ?,
+			answer_json = ?, download_sha = ?
+		WHERE rollout_id = ? AND node_id = ?`
+	args := []any{x.State, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed), fleetUnix(x.SentAt), fleetUnix(x.AckedAt),
+		fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RequestID, fleetUnix(x.RequestAt),
+		x.Answer, x.DownloadSHA, x.RolloutID, x.NodeID}
+	if x.loaded {
+		query += ` AND state = ? AND request_id = ? AND answer_json = ?`
+		args = append(args, x.loadedState, x.loadedRequestID, x.loadedAnswer)
+	}
+	res, err := s.W.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
+		if x.loaded {
+			return ErrConflict
+		}
 		return ErrNotFound
 	}
+	x.loaded, x.loadedState, x.loadedRequestID, x.loadedAnswer = true, x.State, x.RequestID, x.Answer
 	return nil
+}
+
+// MarkStepSent moves a pending step to SENT only while its rollout is running and the loaded snapshot is current.
+func (s *Store) MarkStepSent(ctx context.Context, x *StepRow) (bool, error) {
+	if x == nil || !x.loaded || x.loadedState != StepPending {
+		return false, nil
+	}
+	res, err := s.W.ExecContext(ctx, `UPDATE update_step SET state = ?, from_version = ?, from_built = ?, pre_failed_json = ?, sent_at = ?, acked_at = ?,
+		reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?, request_id = ?, request_at = ?, answer_json = ?, download_sha = ?
+		WHERE rollout_id = ? AND node_id = ? AND state = ? AND request_id = ? AND answer_json = ?
+		AND EXISTS (SELECT 1 FROM update_rollout WHERE id = ? AND status = 'running')`,
+		StepSent, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed), fleetUnix(x.SentAt), fleetUnix(x.AckedAt),
+		fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RequestID, fleetUnix(x.RequestAt), x.Answer, x.DownloadSHA,
+		x.RolloutID, x.NodeID, x.loadedState, x.loadedRequestID, x.loadedAnswer, x.RolloutID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return false, nil
+	}
+	x.State = StepSent
+	x.loaded, x.loadedState, x.loadedRequestID, x.loadedAnswer = true, x.State, x.RequestID, x.Answer
+	return true, nil
+}
+
+// SetStepAnswer records the first result for the current request while its node step belongs to an active rollout.
+func (s *Store) SetStepAnswer(ctx context.Context, nodeID, requestID, answer string) (bool, error) {
+	if nodeID == "" || requestID == "" || answer == "" {
+		return false, nil
+	}
+	res, err := s.W.ExecContext(ctx, `UPDATE update_step SET answer_json = ?
+		WHERE node_id = ? AND request_id = ? AND request_id != '' AND answer_json = '' AND state IN ('sent', 'gating')
+		AND EXISTS (SELECT 1 FROM update_rollout WHERE id = update_step.rollout_id AND status IN ('running', 'paused'))`,
+		answer, nodeID, requestID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// DownloadStep returns the pinned manifest and token digest only while the node has a SENT step in an active rollout.
+func (s *Store) DownloadStep(ctx context.Context, nodeID string) ([]byte, string, error) {
+	var manifest []byte
+	var downloadSHA string
+	err := s.R.QueryRowContext(ctx, `SELECT r.manifest, s.download_sha
+		FROM update_step s JOIN update_rollout r ON r.id = s.rollout_id
+		WHERE s.node_id = ? AND s.state = 'sent' AND r.status IN ('running', 'paused') LIMIT 1`, nodeID).
+		Scan(&manifest, &downloadSHA)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, "", ErrNotFound
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return manifest, downloadSHA, nil
 }
 
 // SkipPendingSteps turns every PENDING step of a rollout into SKIPPED with errorKey (cancel).

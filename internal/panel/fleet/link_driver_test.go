@@ -231,6 +231,37 @@ func TestLinkPreparationErrorIsRetriedByAlarm(t *testing.T) {
 	}
 }
 
+func TestLinkRecordedUpdateRequestStoresCommandResult(t *testing.T) {
+	r := newLinkRig(t, "alice-recorded-link")
+	updates := &fakeUpdates{}
+	r.e.f.SetUpdates(updates)
+	r.helloed(1, "instance-recorded-link")
+	requestID := "req-recorded-link"
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{RequestId: requestID}}}
+	raw, err := proto.Marshal(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent := r.call(LinkIn{Kind: LinkRequest, RequestID: requestID, DeadlineAt: r.now.Add(time.Minute), Frame: raw, Record: true})
+	if len(sent.Frames) != 1 || len(sent.Replies) != 0 || sent.Close != nil {
+		t.Fatalf("recorded request output = frames %d replies %+v close %+v", len(sent.Frames), sent.Replies, sent.Close)
+	}
+	result := &agentv1.CommandResult{RequestId: requestID, Ok: true, Detail: "accepted"}
+	answered := r.frame(&agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: result}})
+	if len(answered.Replies) != 0 || answered.Close != nil {
+		t.Fatalf("recorded command result output = replies %+v close %+v", answered.Replies, answered.Close)
+	}
+	updates.mu.Lock()
+	recorded := append([]fakeRecordedAnswer(nil), updates.recorded...)
+	updates.mu.Unlock()
+	if len(recorded) != 1 || recorded[0].nodeID != r.nodeID || recorded[0].requestID != requestID || !proto.Equal(recorded[0].result, result) {
+		t.Fatalf("recorded answers = %+v", recorded)
+	}
+	if len(r.decoded().Pending) != 0 {
+		t.Fatalf("recorded command remained pending: %+v", r.decoded().Pending)
+	}
+}
+
 func TestLinkRefusedRequestsAreRepliedInTheSameCall(t *testing.T) {
 	r := newLinkRig(t, "alice-refuse")
 	r.open(1)

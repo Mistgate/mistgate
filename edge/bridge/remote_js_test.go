@@ -108,6 +108,45 @@ func TestEdgeRemoteAskOutcomes(t *testing.T) {
 	}
 }
 
+func TestEdgeRemoteSendMapsResultAndRefusesMissingSend(t *testing.T) {
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{
+		RequestId: "req_send", Manifest: []byte("manifest"), Signature: []byte("signature"), DownloadToken: "invented-token",
+	}}}
+	var calls int
+	var gotNode, gotRequestID string
+	var gotFrame []byte
+	var gotDeadline int64
+	send := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		calls++
+		gotNode, gotRequestID = args[0].String(), args[1].String()
+		gotFrame, _ = bytesFromJS(args[2])
+		gotDeadline = int64(args[3].Float())
+		return jsResolved(js.ValueOf(true))
+	})
+	defer send.Release()
+	deadline := time.UnixMilli(1_800_000_000_000)
+	if err := (&edgeRemote{send: send.Value}).Send(context.Background(), "node-a", "req_send", frame, deadline); err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+	var decoded agentv1.ConnectResponse
+	if err := proto.Unmarshal(gotFrame, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || gotNode != "node-a" || gotRequestID != "req_send" || gotDeadline != deadline.UnixMilli() ||
+		decoded.GetUpdateAgent().GetDownloadToken() != "invented-token" {
+		t.Fatalf("Send() JS arguments or frame were not preserved: calls=%d node=%q request=%q deadline=%d", calls, gotNode, gotRequestID, gotDeadline)
+	}
+
+	falseSend := js.FuncOf(func(_ js.Value, _ []js.Value) any { return jsResolved(js.ValueOf(false)) })
+	defer falseSend.Release()
+	if err := (&edgeRemote{send: falseSend.Value}).Send(context.Background(), "node-a", "req_send", frame, deadline); !errors.Is(err, errRemoteLost) {
+		t.Fatalf("Send(false) error = %v, want %v", err, errRemoteLost)
+	}
+	if err := (&edgeRemote{}).Send(context.Background(), "node-a", "req_send", frame, deadline); !errors.Is(err, errRemoteLost) {
+		t.Fatalf("Send(without function) error = %v, want %v", err, errRemoteLost)
+	}
+}
+
 func TestEdgeRemoteCallerContextAndOwnNodeTripwire(t *testing.T) {
 	var askCalls, closeCalls int
 	ask := js.FuncOf(func(_ js.Value, _ []js.Value) any {

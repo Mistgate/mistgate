@@ -21,9 +21,15 @@ type fakeUpdates struct {
 	mu       sync.Mutex
 	updating map[string]bool
 	served   []string // "node/name@offset"
+	recorded []fakeRecordedAnswer
 	data     []byte
 	err      error
 	binary   map[string]string // "linux/amd64" -> path of the trusted bundle's file
+}
+
+type fakeRecordedAnswer struct {
+	nodeID, requestID string
+	result            *agentv1.CommandResult
 }
 
 func (u *fakeUpdates) NodeBinary(goos, goarch string) string {
@@ -36,6 +42,13 @@ func (u *fakeUpdates) Updating(id string) bool {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return u.updating[id]
+}
+
+func (u *fakeUpdates) RecordAnswer(_ context.Context, nodeID, requestID string, result *agentv1.CommandResult) error {
+	u.mu.Lock()
+	u.recorded = append(u.recorded, fakeRecordedAnswer{nodeID: nodeID, requestID: requestID, result: result})
+	u.mu.Unlock()
+	return nil
 }
 
 func (u *fakeUpdates) set(id string, v bool) {

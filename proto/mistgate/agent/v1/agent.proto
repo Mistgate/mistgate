@@ -209,6 +209,8 @@ package mistgate.agent.v1;
 //     "update-guard/1" when the systemd unit carries the crash-loop guard (ExecStartPre). The panel sends
 //     UpdateAgent / RollbackAgent ONLY to a stream that listed "update/1"; any other node is shown as
 //     "update by hand once". Old agents and old panels ignore the new messages like any unknown oneof member.
+//     An edge link-only agent uses "update-link/1" for UpdateAgent and receives a per-step token for the Worker's
+//     HTTPS download route instead of the VPS FetchUpdate stream.
 //   - MANIFEST. manifest is the exact byte string that was signed (JSON, schema 1: version, built, expires,
 //     files[{os, arch, name, size, sha256}]); signature is a detached ed25519 signature over those bytes. The
 //     agent never re-serialises it. "built" is the Unix time of the source commit: it, not the version string,
@@ -536,7 +538,8 @@ message Hello {
   // Optional features of this agent build, stable lowercase "name/version" strings. The panel sends a
   // feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
   // "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
-  // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
+  // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-link/1" (link-only UpdateAgent
+  // with a Worker download token), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
   // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
@@ -1308,6 +1311,8 @@ message UpdateAgent {
   bytes manifest = 2;
   // Detached ed25519 signature over `manifest` (64 bytes).
   bytes signature = 3;
+  // Edge link-only download credential. Empty for the VPS mTLS bundle stream.
+  string download_token = 4;
 }
 
 // Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.

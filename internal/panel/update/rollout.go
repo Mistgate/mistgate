@@ -543,7 +543,7 @@ func (s *Service) tick(ctx context.Context) {
 
 // save writes a step, logging a failure (the next pass sees the old row and tries again).
 func (p *pass) save(x *store.StepRow) bool {
-	if err := p.s.st.SaveStep(p.ctx, *x); err != nil {
+	if err := p.s.st.SaveStep(p.ctx, x); err != nil {
 		p.s.log.Warn("update: save step", "node", x.NodeID, "err", err)
 		return false
 	}
@@ -1088,7 +1088,7 @@ func (s *Service) recover(ctx context.Context) {
 			s.orphans[steps[i].NodeID] = true
 		case store.StepGating:
 			steps[i].ReconnectedAt = now
-			if err := s.st.SaveStep(ctx, steps[i]); err != nil {
+			if err := s.st.SaveStep(ctx, &steps[i]); err != nil {
 				s.log.Warn("update: restart gate window", "node", steps[i].NodeID, "err", err)
 			}
 		}

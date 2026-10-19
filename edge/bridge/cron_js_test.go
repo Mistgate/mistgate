@@ -32,6 +32,10 @@ func (*cronTestRemote) Ask(context.Context, string, string, *agentv1.ConnectResp
 
 func (*cronTestRemote) Close(context.Context, string, string) error { return nil }
 
+func (*cronTestRemote) Send(context.Context, string, string, *agentv1.ConnectResponse, time.Time) error {
+	return nil
+}
+
 func (r *cronTestRemote) Poke(context.Context, []string) error {
 	r.mu.Lock()
 	r.called++

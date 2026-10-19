@@ -154,6 +154,8 @@ func stepFromJS(value js.Value) (fleet.LinkIn, time.Time, error) {
 			}
 			out.RequestID = requestID.String()
 			out.DeadlineAt = time.UnixMilli(deadlineMS)
+			record := event.Get("record")
+			out.Record = record.Type() == js.TypeBoolean && record.Bool()
 		}
 	case fleet.LinkAlarm, fleet.LinkDesired, fleet.LinkClosed:
 		// closed.owned is deliberately ignored: a close can follow a reset or deploy too.

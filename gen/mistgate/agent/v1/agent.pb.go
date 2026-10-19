@@ -898,7 +898,8 @@ type Hello struct {
 	// Optional features of this agent build, stable lowercase "name/version" strings. The panel sends a
 	// feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
 	// "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
-	// "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-guard/1" (the unit has the
+	// "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-link/1" (link-only UpdateAgent
+	// with a Worker download token), "update-guard/1" (the unit has the
 	// crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
 	// InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
 	// "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
@@ -5676,7 +5677,9 @@ type UpdateAgent struct {
 	// The signed bytes of manifest.json, verbatim.
 	Manifest []byte `protobuf:"bytes,2,opt,name=manifest,proto3" json:"manifest,omitempty"`
 	// Detached ed25519 signature over `manifest` (64 bytes).
-	Signature     []byte `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	Signature []byte `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	// Edge link-only download credential. Empty for the VPS mTLS bundle stream.
+	DownloadToken string `protobuf:"bytes,4,opt,name=download_token,json=downloadToken,proto3" json:"download_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5730,6 +5733,13 @@ func (x *UpdateAgent) GetSignature() []byte {
 		return x.Signature
 	}
 	return nil
+}
+
+func (x *UpdateAgent) GetDownloadToken() string {
+	if x != nil {
+		return x.DownloadToken
+	}
+	return ""
 }
 
 // Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.
@@ -6365,12 +6375,13 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x06params\x18\x04 \x03(\v2'.mistgate.agent.v1.ApplyFix.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"f\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8d\x01\n" +
 	"\vUpdateAgent\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
 	"\bmanifest\x18\x02 \x01(\fR\bmanifest\x12\x1c\n" +
-	"\tsignature\x18\x03 \x01(\fR\tsignature\".\n" +
+	"\tsignature\x18\x03 \x01(\fR\tsignature\x12%\n" +
+	"\x0edownload_token\x18\x04 \x01(\tR\rdownloadToken\".\n" +
 	"\rRollbackAgent\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\"@\n" +

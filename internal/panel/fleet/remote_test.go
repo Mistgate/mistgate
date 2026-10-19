@@ -28,14 +28,22 @@ type remotePokeCall struct {
 	nodeIDs []string
 }
 
+type remoteSendCall struct {
+	nodeID, requestID string
+	frame             *agentv1.ConnectResponse
+	deadline          time.Time
+}
+
 type testRemote struct {
-	mu        sync.Mutex
-	askCalls  []remoteAskCall
-	closeCall []remoteCloseCall
-	pokeCalls []remotePokeCall
-	answer    func(context.Context, remoteAskCall) (*agentv1.ConnectRequest, error)
-	onPoke    func(context.Context, []string) error
-	closeErr  error
+	mu            sync.Mutex
+	askCalls      []remoteAskCall
+	closeCall     []remoteCloseCall
+	pokeCalls     []remotePokeCall
+	answer        func(context.Context, remoteAskCall) (*agentv1.ConnectRequest, error)
+	onPoke        func(context.Context, []string) error
+	closeErr      error
+	sendCallsList []remoteSendCall
+	sendErr       error
 }
 
 func (r *testRemote) Ask(ctx context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) (*agentv1.ConnectRequest, error) {
@@ -67,6 +75,19 @@ func (r *testRemote) Poke(ctx context.Context, nodeIDs []string) error {
 		return onPoke(ctx, ids)
 	}
 	return nil
+}
+
+func (r *testRemote) Send(_ context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sendCallsList = append(r.sendCallsList, remoteSendCall{nodeID: nodeID, requestID: requestID, frame: frame, deadline: deadline})
+	return r.sendErr
+}
+
+func (r *testRemote) sendCalls() []remoteSendCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]remoteSendCall(nil), r.sendCallsList...)
 }
 
 func (r *testRemote) calls() ([]remoteAskCall, []remoteCloseCall) {
@@ -229,7 +250,7 @@ func TestFleetRemoteAskPassesFrameIDAndDeadline(t *testing.T) {
 }
 
 func TestFleetRemoteMapsNilAndTimeoutToNoAnswer(t *testing.T) {
-	e, a, _ := remoteReadyNode(t, "update/1")
+	e, a, _ := remoteReadyNode(t, "update-link/1")
 	remote := &testRemote{}
 	e.f.cfg.Remote = remote
 	cases := []struct {
@@ -269,6 +290,43 @@ func TestFleetRemoteMapsNilAndTimeoutToNoAnswer(t *testing.T) {
 	}
 }
 
+func TestFleetRemoteSendRollbackAgentUsesLinkOnlyCapability(t *testing.T) {
+	e, a, _ := remoteReadyNode(t, "update-link/1")
+	remote := &testRemote{}
+	e.f.cfg.Remote = remote
+	deadline := e.f.now().Add(time.Minute)
+	if err := e.f.SendRollbackAgent(e.ctx, a.nodeID, "req-rollback", deadline); err != nil {
+		t.Fatalf("SendRollbackAgent = %v", err)
+	}
+	calls := remote.sendCalls()
+	if len(calls) != 1 {
+		t.Fatalf("remote Send calls = %d, want 1", len(calls))
+	}
+	call := calls[0]
+	frame := call.frame.GetRollbackAgent()
+	if call.nodeID != a.nodeID || call.requestID != "req-rollback" || frame == nil || frame.GetRequestId() != "req-rollback" || !call.deadline.Equal(deadline) {
+		t.Fatalf("remote Send did not receive the recorded rollback request: %+v", call)
+	}
+}
+
+func TestFleetRemoteRollbackAgentAllowsLinkOnlyCapability(t *testing.T) {
+	e, a, _ := remoteReadyNode(t, "update-link/1")
+	remote := &testRemote{answer: func(_ context.Context, call remoteAskCall) (*agentv1.ConnectRequest, error) {
+		return &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: &agentv1.CommandResult{
+			RequestId: call.requestID, Ok: true,
+		}}}, nil
+	}}
+	e.f.cfg.Remote = remote
+	result, err := e.f.RollbackAgent(e.ctx, a.nodeID, time.Second)
+	if err != nil || result == nil || !result.Ok {
+		t.Fatalf("RollbackAgent on link-only node = %+v, %v", result, err)
+	}
+	calls, _ := remote.calls()
+	if len(calls) != 1 || calls[0].frame.GetRollbackAgent() == nil {
+		t.Fatalf("remote Ask calls = %+v, want one rollback request", calls)
+	}
+}
+
 func TestFleetRemoteRefusesOfflineAndOldAgent(t *testing.T) {
 	offline := newEnv(t)
 	offlineAgent := offline.enroll("node-a")
@@ -293,6 +351,71 @@ func TestFleetRemoteRefusesOfflineAndOldAgent(t *testing.T) {
 		if len(tasks) != 0 {
 			t.Errorf("%s agent received %d remote requests", name, len(tasks))
 		}
+	}
+}
+
+func TestFleetRemoteSendRefusesOfflineAndMissingCapability(t *testing.T) {
+	offline := newEnv(t)
+	offlineAgent := offline.enroll("alice-send-offline")
+	offline.fixture(offlineAgent.nodeID)
+	offlineRemote := &testRemote{}
+	offline.f.cfg.Remote = offlineRemote
+	if err := offline.f.SendUpdateAgent(offline.ctx, offlineAgent.nodeID, "req-offline", []byte("manifest"), []byte("signature"),
+		"invented-token", offline.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
+		t.Fatalf("offline SendUpdateAgent error = %v", err)
+	}
+
+	old, oldAgent, _ := remoteReadyNode(t, "update/1")
+	oldRemote := &testRemote{}
+	old.f.cfg.Remote = oldRemote
+	if err := old.f.SendUpdateAgent(old.ctx, oldAgent.nodeID, "req-old", []byte("manifest"), []byte("signature"),
+		"invented-token", old.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node cannot update itself" {
+		t.Fatalf("old SendUpdateAgent error = %v", err)
+	}
+	for name, remote := range map[string]*testRemote{"offline": offlineRemote, "old": oldRemote} {
+		if calls := remote.sendCalls(); len(calls) != 0 {
+			t.Errorf("%s node received %d remote Send calls", name, len(calls))
+		}
+	}
+}
+
+func TestFleetRemoteSendPassesRecordedUpdateFrame(t *testing.T) {
+	e, a, _ := remoteReadyNode(t, "update-link/1")
+	remote := &testRemote{}
+	e.f.cfg.Remote = remote
+	deadline := e.f.now().Add(time.Minute)
+	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", []byte("manifest"), []byte("signature"), "invented-token", deadline); err != nil {
+		t.Fatalf("SendUpdateAgent = %v", err)
+	}
+	calls := remote.sendCalls()
+	if len(calls) != 1 {
+		t.Fatalf("remote Send calls = %d, want 1", len(calls))
+	}
+	call := calls[0]
+	frame := call.frame.GetUpdateAgent()
+	if call.nodeID != a.nodeID || call.requestID != "req-send" || call.frame.GetUpdateAgent() == nil ||
+		frame.GetRequestId() != "req-send" || string(frame.GetManifest()) != "manifest" || string(frame.GetSignature()) != "signature" ||
+		frame.GetDownloadToken() != "invented-token" || !call.deadline.Equal(deadline) {
+		t.Fatal("remote Send did not receive the recorded update request")
+	}
+}
+
+func TestFleetSendUpdateAgentRequiresRemote(t *testing.T) {
+	e, a, _ := remoteReadyNode(t, "update-link/1")
+	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", nil, nil, "invented-token", e.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("SendUpdateAgent without Remote = %v, want FailedPrecondition", err)
+	}
+}
+
+func TestFleetRemoteSendFailureMapsToOffline(t *testing.T) {
+	e, a, _ := remoteReadyNode(t, "update-link/1")
+	remote := &testRemote{sendErr: errors.New("link lost")}
+	e.f.cfg.Remote = remote
+	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", []byte("manifest"), []byte("signature"), "invented-token", e.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
+		t.Fatalf("SendUpdateAgent error = %v", err)
+	}
+	if calls := remote.sendCalls(); len(calls) != 1 {
+		t.Fatalf("remote Send calls = %d, want 1", len(calls))
 	}
 }
 

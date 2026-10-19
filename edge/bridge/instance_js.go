@@ -85,6 +85,10 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 			nodeLink.Get("poke").Type() != js.TypeFunction {
 			return out, errInvalidNodeLink
 		}
+		send := nodeLink.Get("send")
+		if send.Type() != js.TypeUndefined && !send.IsNull() && send.Type() != js.TypeFunction {
+			return out, errInvalidNodeLink
+		}
 		out.nodeLink = nodeLink
 		out.hasNodeLink = true
 	}

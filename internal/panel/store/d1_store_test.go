@@ -159,6 +159,56 @@ func TestD1JobLeaseTakeExpiryAndRelease(t *testing.T) {
 	take("alice", now.Add(time.Minute), true)
 }
 
+func TestD1RecordedUpdateStepMethods(t *testing.T) {
+	st := openD1Store(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	ro := RolloutRow{ID: "rol_d1_recorded", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20,
+		Manifest: []byte("signed-manifest"), Signature: []byte("signature"), BatchSize: 1, CreatedAt: now}
+	if err := st.CreateRollout(ctx, ro, []StepRow{{NodeID: "nod_alice", NodeName: "alice", State: StepPending}}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := st.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(loaded) != 1 {
+		t.Fatalf("RolloutSteps = %+v, %v", loaded, err)
+	}
+	if _, _, err := st.DownloadStep(ctx, "nod_alice"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("DownloadStep(pending) = %v, want ErrNotFound", err)
+	}
+	stale := loaded[0]
+	sent := loaded[0]
+	sent.RequestID, sent.RequestAt, sent.SentAt, sent.DownloadSHA = "req_d1", now, now, "sha256_d1"
+	if ok, err := st.MarkStepSent(ctx, &sent); err != nil || !ok {
+		t.Fatalf("MarkStepSent = %v, %v", ok, err)
+	}
+	stale.ErrorKey = "stale_write"
+	if err := st.SaveStep(ctx, &stale); !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale SaveStep = %v, want ErrConflict", err)
+	}
+	manifest, hash, err := st.DownloadStep(ctx, "nod_alice")
+	if err != nil || string(manifest) != "signed-manifest" || hash != "sha256_d1" {
+		t.Fatalf("DownloadStep(sent) = %q, %q, %v", manifest, hash, err)
+	}
+	if ok, err := st.SetStepAnswer(ctx, "nod_alice", "req_wrong", `{"ok":true}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(wrong request) = %v, %v", ok, err)
+	}
+	if ok, err := st.SetRolloutStatus(ctx, ro.ID, []string{RolloutRunning}, RolloutPaused, "gate_failed", nil, time.Time{}); err != nil || !ok {
+		t.Fatalf("pause rollout = %v, %v", ok, err)
+	}
+	if ok, err := st.SetStepAnswer(ctx, "nod_alice", "req_d1", `{"ok":true}`); err != nil || !ok {
+		t.Fatalf("SetStepAnswer(current request) = %v, %v", ok, err)
+	}
+	if ok, err := st.SetStepAnswer(ctx, "nod_alice", "req_d1", `{"ok":false}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(duplicate) = %v, %v", ok, err)
+	}
+	if ok, err := st.SetRolloutStatus(ctx, ro.ID, []string{RolloutPaused}, RolloutCancelled, "", nil, now.Add(time.Minute)); err != nil || !ok {
+		t.Fatalf("cancel rollout = %v, %v", ok, err)
+	}
+	if _, _, err := st.DownloadStep(ctx, "nod_alice"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("DownloadStep(inactive rollout) = %v, want ErrNotFound", err)
+	}
+}
+
 func TestD1FleetBatchSmoke(t *testing.T) {
 	st := openD1Store(t)
 	ctx := context.Background()

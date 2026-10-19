@@ -173,14 +173,14 @@ func TestRolloutStore(t *testing.T) {
 	}
 	// a step is saved in place
 	got[0].State, got[0].ErrorKey, got[0].PreFailed, got[0].SentAt = StepFailed, "hash_mismatch", []string{"inb_1"}, t0
-	if err := s.SaveStep(ctx, got[0]); err != nil {
+	if err := s.SaveStep(ctx, &got[0]); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = s.RolloutSteps(ctx, "rol_1")
 	if got[0].State != StepFailed || got[0].ErrorKey != "hash_mismatch" || len(got[0].PreFailed) != 1 || !got[0].SentAt.Equal(t0) || !got[0].Decided() || got[1].Decided() {
 		t.Fatalf("saved step: %+v", got)
 	}
-	if err := s.SaveStep(ctx, StepRow{RolloutID: "rol_1", NodeID: "nod_zz"}); !errors.Is(err, ErrNotFound) {
+	if err := s.SaveStep(ctx, &StepRow{RolloutID: "rol_1", NodeID: "nod_zz"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown step: %v", err)
 	}
 	if err := s.SkipPendingSteps(ctx, "rol_1", "cancelled", t0); err != nil {
@@ -203,6 +203,197 @@ func TestRolloutStore(t *testing.T) {
 	}
 	if last, err := s.LatestRollout(ctx); err != nil || last.ID != "rol_2" {
 		t.Fatalf("latest: %+v %v", last, err)
+	}
+}
+
+func TestSaveStepRejectsStaleSnapshot(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(20_000, 0)
+	ro := RolloutRow{ID: "rol_cas", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20, Manifest: []byte("manifest"),
+		Signature: []byte("signature"), BatchSize: 1, CreatedAt: now}
+	if err := s.CreateRollout(ctx, ro, []StepRow{
+		{NodeID: "nod_state", NodeName: "alice-state", State: StepPending},
+		{NodeID: "nod_request", NodeName: "alice-request", State: StepPending},
+		{NodeID: "nod_answer", NodeName: "alice-answer", State: StepPending},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(rows) != 3 {
+		t.Fatalf("RolloutSteps returned %d rows, %v", len(rows), err)
+	}
+	cases := []struct {
+		name   string
+		mutate func(*StepRow)
+		check  func(StepRow) bool
+	}{
+		{name: "state", mutate: func(x *StepRow) { x.State = StepSent }, check: func(x StepRow) bool { return x.State == StepSent }},
+		{name: "request", mutate: func(x *StepRow) { x.RequestID = "req-current"; x.RequestAt = now }, check: func(x StepRow) bool { return x.RequestID == "req-current" && x.RequestAt.Equal(now) }},
+		{name: "answer", mutate: func(x *StepRow) { x.Answer = `{"ok":true}` }, check: func(x StepRow) bool { return x.Answer == `{"ok":true}` }},
+	}
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			winner, stale := rows[i], rows[i]
+			tc.mutate(&winner)
+			if err := s.SaveStep(ctx, &winner); err != nil {
+				t.Fatalf("first SaveStep = %v", err)
+			}
+			stale.ErrorKey = "stale_write"
+			if err := s.SaveStep(ctx, &stale); !errors.Is(err, ErrConflict) {
+				t.Fatalf("stale SaveStep = %v, want ErrConflict", err)
+			}
+			got, err := s.RolloutSteps(ctx, ro.ID)
+			if err != nil || !tc.check(got[i]) || got[i].ErrorKey != "" {
+				t.Fatalf("step after stale SaveStep = %+v, %v", got[i], err)
+			}
+		})
+	}
+}
+
+func TestRecordedUpdateStepStoreMethods(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(21_000, 0)
+	ro := RolloutRow{ID: "rol_recorded", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20, Manifest: []byte("signed-manifest"),
+		Signature: []byte("signature"), BatchSize: 2, CreatedAt: now}
+	steps := []StepRow{
+		{NodeID: "nod_alice", NodeName: "alice", State: StepPending},
+		{NodeID: "nod_bob", NodeName: "bob", State: StepPending},
+		{NodeID: "nod_carol", NodeName: "carol", State: StepPending},
+	}
+	if err := s.CreateRollout(ctx, ro, steps); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(loaded) != len(steps) {
+		t.Fatalf("RolloutSteps returned %d rows, %v", len(loaded), err)
+	}
+	byID := make(map[string]StepRow, len(loaded))
+	for _, row := range loaded {
+		byID[row.NodeID] = row
+	}
+	if _, _, err := s.DownloadStep(ctx, "nod_bob"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("DownloadStep(pending) = %v, want ErrNotFound", err)
+	}
+	for _, id := range []string{"nod_alice", "nod_carol"} {
+		row := byID[id]
+		row.RequestID, row.RequestAt = "req_"+id, now
+		row.SentAt, row.DownloadSHA = now, "sha256_"+id
+		if id == "nod_alice" {
+			row.PreFailed, row.FromVersion, row.FromBuilt = []string{"in_failed"}, "v1", 10
+		}
+		ok, err := s.MarkStepSent(ctx, &row)
+		if err != nil || !ok || row.State != StepSent {
+			t.Fatalf("MarkStepSent(%s) = %v, %v", id, ok, err)
+		}
+		byID[id] = row
+	}
+	sentAlice := byID["nod_alice"]
+	if ok, err := s.MarkStepSent(ctx, &sentAlice); err != nil || ok {
+		t.Fatalf("MarkStepSent(non-pending) = %v, %v; want false, nil", ok, err)
+	}
+	manifest, hash, err := s.DownloadStep(ctx, "nod_alice")
+	if err != nil || string(manifest) != "signed-manifest" || hash != "sha256_nod_alice" {
+		t.Fatalf("DownloadStep(sent) = %q, %q, %v", manifest, hash, err)
+	}
+	rowsAfterSend, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(rowsAfterSend) != len(steps) {
+		t.Fatalf("RolloutSteps(after send) = %+v, %v", rowsAfterSend, err)
+	}
+	if got := rowsAfterSend[0]; got.NodeID != "nod_alice" || got.FromVersion != "v1" || got.FromBuilt != 10 ||
+		len(got.PreFailed) != 1 || got.PreFailed[0] != "in_failed" {
+		t.Fatalf("MarkStepSent did not persist send metadata: %+v", got)
+	}
+	if ok, err := s.SetStepAnswer(ctx, "nod_alice", "req_wrong", `{"ok":true}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(wrong request) = %v, %v; want false, nil", ok, err)
+	}
+	if ok, err := s.SetRolloutStatus(ctx, ro.ID, []string{RolloutRunning}, RolloutPaused, "gate_failed", nil, time.Time{}); err != nil || !ok {
+		t.Fatalf("pause rollout = %v, %v", ok, err)
+	}
+	bob := byID["nod_bob"]
+	if ok, err := s.MarkStepSent(ctx, &bob); err != nil || ok {
+		t.Fatalf("MarkStepSent(paused rollout) = %v, %v; want false, nil", ok, err)
+	}
+	answer := `{"ok":true}`
+	if ok, err := s.SetStepAnswer(ctx, "nod_alice", "req_nod_alice", answer); err != nil || !ok {
+		t.Fatalf("SetStepAnswer(current request) = %v, %v", ok, err)
+	}
+	if ok, err := s.SetStepAnswer(ctx, "nod_alice", "req_nod_alice", `{"ok":false}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(duplicate) = %v, %v; want false, nil", ok, err)
+	}
+	rows, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[0].NodeID != "nod_alice" || rows[0].Answer != answer {
+		t.Fatalf("recorded answer row = %+v", rows[0])
+	}
+	if ok, err := s.SetRolloutStatus(ctx, ro.ID, []string{RolloutPaused}, RolloutCancelled, "", nil, now.Add(time.Minute)); err != nil || !ok {
+		t.Fatalf("cancel rollout = %v, %v", ok, err)
+	}
+	if ok, err := s.SetStepAnswer(ctx, "nod_carol", "req_nod_carol", `{"ok":true}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(inactive rollout) = %v, %v; want false, nil", ok, err)
+	}
+	if _, _, err := s.DownloadStep(ctx, "nod_carol"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("DownloadStep(inactive rollout) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestSetStepAnswerAcceptsGatingRequestOnce(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(22_000, 0)
+	ro := RolloutRow{ID: "rol_gating_answer", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20,
+		Manifest: []byte("manifest"), Signature: []byte("signature"), BatchSize: 1, CreatedAt: now}
+	if err := s.CreateRollout(ctx, ro, []StepRow{{NodeID: "nod_gating", NodeName: "gating", State: StepGating}}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("RolloutSteps = %+v, %v", rows, err)
+	}
+	step := rows[0]
+	step.RequestID, step.RequestAt = "req_rollback", now
+	if err := s.SaveStep(ctx, &step); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := s.SetStepAnswer(ctx, "nod_gating", "req_wrong", `{"ok":true}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(wrong request) = %v, %v; want false, nil", ok, err)
+	}
+	answer := `{"ok":false,"error":"rollback rejected"}`
+	if ok, err := s.SetStepAnswer(ctx, "nod_gating", "req_rollback", answer); err != nil || !ok {
+		t.Fatalf("SetStepAnswer(gating request) = %v, %v; want true, nil", ok, err)
+	}
+	if ok, err := s.SetStepAnswer(ctx, "nod_gating", "req_rollback", `{"ok":true}`); err != nil || ok {
+		t.Fatalf("SetStepAnswer(duplicate gating answer) = %v, %v; want false, nil", ok, err)
+	}
+	rows, err = s.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(rows) != 1 || rows[0].Answer != answer {
+		t.Fatalf("gating answer row = %+v, %v", rows, err)
+	}
+}
+
+func TestMarkStepSentRejectsConcurrentCancel(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	now := time.Unix(23_000, 0)
+	ro := RolloutRow{ID: "rol_cancel_mark_sent", Status: RolloutRunning, ToVersion: "v2", ToBuilt: 20,
+		Manifest: []byte("manifest"), Signature: []byte("signature"), BatchSize: 1, CreatedAt: now}
+	if err := s.CreateRollout(ctx, ro, []StepRow{{NodeID: "nod_cancel", NodeName: "cancel", State: StepPending}}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.RolloutSteps(ctx, ro.ID)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("RolloutSteps = %+v, %v", rows, err)
+	}
+	step := rows[0]
+	step.RequestID, step.RequestAt, step.SentAt = "req_cancel", now, now
+	if err := s.SkipPendingSteps(ctx, ro.ID, "cancelled", now); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := s.MarkStepSent(ctx, &step); err != nil || ok {
+		t.Fatalf("MarkStepSent after SkipPendingSteps = %v, %v; want false, nil", ok, err)
 	}
 }
 
