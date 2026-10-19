@@ -277,7 +277,8 @@ export const en = {
   "awg.node.handshake": "last handshake {s}",
   "awg.node.handshakeNow": "last handshake just now",
   "awg.node.down": "The interface is down. The node brings it back at the next apply.",
-  "awg.node.noPackets": "Not one packet reached the port: the hoster or a firewall blocks this UDP port. Try another port.",
+  // no datagram yet: alone it proves nothing (nobody may have tried the key), so it blames the port only on that condition
+  "awg.node.noPackets": "No packet has reached this UDP port yet. If a device already tried to connect, the hoster or a firewall blocks the port: try another one.",
   "awg.node.noHandshake": "Packets arrive but no handshake completes: the obfuscation parameters on the node and in the config differ.",
 
   // ---- user page
@@ -566,7 +567,7 @@ export const ru: typeof en = {
   "awg.node.handshake": "последнее рукопожатие {s}",
   "awg.node.handshakeNow": "последнее рукопожатие только что",
   "awg.node.down": "Интерфейс не поднят. Нода вернёт его при следующем применении.",
-  "awg.node.noPackets": "До порта не дошёл ни один пакет: хостер или фаервол режет этот UDP-порт. Попробуй другой порт.",
+  "awg.node.noPackets": "До этого UDP-порта ещё не дошёл ни один пакет. Если устройство уже пробовало подключиться, порт режет хостер или фаервол: попробуй другой.",
   "awg.node.noHandshake": "Пакеты приходят, но рукопожатие не завершается: параметры обфускации на ноде и в конфиге различаются.",
 
   "awg.page.selfService": "Устройства на странице",
@@ -858,7 +859,7 @@ export const zh: typeof en = {
   "awg.node.handshake": "最近握手 {s}",
   "awg.node.handshakeNow": "最近握手：刚刚",
   "awg.node.down": "接口已关闭。节点会在下次应用配置时将其恢复。",
-  "awg.node.noPackets": "没有任何数据包到达该端口：服务商或防火墙封锁了这个 UDP 端口。请换一个端口。",
+  "awg.node.noPackets": "尚无数据包到达此 UDP 端口。如果已有设备尝试连接，说明服务商或防火墙封锁了此端口，请换一个端口。",
   "awg.node.noHandshake": "数据包能到达，但握手无法完成：节点与配置中的混淆参数不一致。",
 
   // ---- user page

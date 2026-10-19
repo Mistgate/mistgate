@@ -1,4 +1,5 @@
 import type { AwgInboundStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { cx } from "@/lib/cx";
 import type { Plain } from "@/lib/plain";
 import { useNow } from "@/lib/time";
 import { useTx } from "@/screens/users/t";
@@ -12,11 +13,13 @@ export function AwgStatusLine({ awg }: { awg: Plain<AwgInboundStatus> }) {
   const now = Math.floor(useNow() / 1000);
   const never = Math.max(0, awg.peers - awg.peersHandshaken);
   const newest = awg.newestHandshakeUnix > 0 ? Math.max(0, now - awg.newestHandshakeUnix) : -1;
-  // the numbers say where it breaks: no datagrams = the hoster or a firewall; datagrams without a handshake = the obfuscation
+  // the numbers say where it breaks: datagrams without a handshake = the obfuscation. No datagram at all proves nothing by itself
+  // (nobody may have tried the key yet: the node cannot tell), so that line is grey and blames the port only if a device tried.
+  const silent = awg.udpRxPackets === 0;
   const hint = !awg.ifaceUp
     ? t("awg.node.down")
     : awg.peers > 0 && awg.peersHandshaken === 0
-      ? awg.udpRxPackets === 0
+      ? silent
         ? t("awg.node.noPackets")
         : t("awg.node.noHandshake")
       : "";
@@ -29,7 +32,7 @@ export function AwgStatusLine({ awg }: { awg: Plain<AwgInboundStatus> }) {
           {newest >= 0 && <span>{newest < 60 ? t("awg.node.handshakeNow") : t("awg.node.handshake", { s: newest < 3600 ? t("users.ago.m", { n: Math.floor(newest / 60) }) : newest < 86400 ? t("users.ago.h", { n: Math.floor(newest / 3600) }) : t("users.ago.d", { n: Math.floor(newest / 86400) }) })}</span>}
         </div>
       )}
-      {hint && <p className="text-xs leading-snug text-warn-text">{hint}</p>}
+      {hint && <p className={cx("text-xs leading-snug", awg.ifaceUp && silent ? "text-muted" : "text-warn-text")}>{hint}</p>}
     </div>
   );
 }

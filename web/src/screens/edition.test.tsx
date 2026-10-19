@@ -18,6 +18,7 @@ import { ChecksTab } from "@/screens/health/checks";
 import { HealthScreen } from "@/screens/health";
 import { NodeChecks } from "@/screens/node/checks";
 import { IntegrationsScreen } from "@/screens/integrations";
+import { AwgStatusLine } from "@/screens/node/awg-status";
 import { LogsTab } from "@/screens/node/logs";
 import { BackupsPage } from "@/screens/settings-pages/backups";
 import { UpdatesScreen } from "@/screens/updates";
@@ -322,4 +323,28 @@ describe("the Health page on the edge", () => {
     expect(text()).toContain("Nobody has trouble connecting.");
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
   });
+});
+
+// A device that never connected and a port no packet reached yet: that alone does not prove a block (nobody may have tried the
+// key). The same line on both editions.
+describe("the AWG status line", () => {
+  const awg = (udpRxPackets: number) => ({ backend: "userspace", backendVersion: "", ifaceUp: true, peers: 1, peersHandshaken: 0, peersOnline: 0, newestHandshakeUnix: 0, udpRxPackets, unknownPeerEvents: 0, reportedUnix: 0 });
+  for (const ed of ["edge", "vps"])
+    it(`blames the port only if a device tried, and the obfuscation when packets come (${ed})`, async () => {
+      edition = ed;
+      await mount(<AwgStatusLine awg={awg(0)} />);
+      expect(text()).toContain("No packet has reached this UDP port yet. If a device already tried to connect, the hoster or a firewall blocks the port: try another one.");
+      expect(text()).not.toContain("Not one packet");
+      act(() => root?.unmount());
+      host?.remove();
+      setLang("ru");
+      await mount(<AwgStatusLine awg={awg(0)} />);
+      expect(text()).toContain("До этого UDP-порта ещё не дошёл ни один пакет. Если устройство уже пробовало подключиться");
+      act(() => root?.unmount());
+      host?.remove();
+      setLang("en");
+      await mount(<AwgStatusLine awg={awg(12)} />);
+      expect(text()).toContain("Packets arrive but no handshake completes");
+      expect(text()).not.toContain("No packet has reached");
+    });
 });

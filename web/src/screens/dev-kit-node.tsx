@@ -148,9 +148,9 @@ const nodeChecks = (status: NodeStatus, cells: object[]) => ({ nowUnix: now, int
 
 const doctorItem = (id: string, status: DoctorStatus, params: object = {}) => ({ id, status, titleKey: `doctor.${id}.title`, detail: "", detailCode: "", params, whyKey: `health.doctor.${id}.why`, fixId: "", measuredUnix: now });
 
-function Demo({ title, children }: { title: string; children: ReactNode }) {
+function Demo({ title, shot, children }: { title: string; shot?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3">
+    <section data-shot={shot} className="flex flex-col gap-3">
       <SectionLabel>{title}</SectionLabel>
       <div className="rounded-card-lg border border-dashed border-line p-4">{children}</div>
     </section>
@@ -200,6 +200,31 @@ export function NodeDemos() {
                   }),
                   inbound({}),
                   inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp", state: InboundState.FAILED, certNotAfterUnix: now + 5 * 86400, lastError: "egress warp: tunnel is down" }),
+                ],
+                metrics,
+                facts,
+              } as never
+            }
+          />
+        </Mock>
+      </Demo>
+
+      <Demo shot="node-awg-new" title="Node: a new AWG profile, a device that never connected, no packet yet (?tab=profiles)">
+        <Mock fill={nodeFill("nod_de1", { checks: nodeChecks(NodeStatus.ONLINE, [cell(CheckStatus.SKIPPED, "client_unsupported")]) })}>
+          <NodeDetail
+            data={
+              {
+                node: baseNode({ protocols: ["awg"], online: [] }),
+                inbounds: [
+                  inbound({
+                    profileId: "prf_awg",
+                    profileName: "AWG 3.1 · QUIC",
+                    protocol: "awg",
+                    port: 51820,
+                    tlsServerName: "",
+                    certNotAfterUnix: 0,
+                    awg: { backend: "userspace", backendVersion: "amneziawg-go v3.1.20260828", ifaceUp: true, peers: 1, peersOnline: 0, peersHandshaken: 0, newestHandshakeUnix: 0, udpRxPackets: 0 },
+                  }),
                 ],
                 metrics,
                 facts,
