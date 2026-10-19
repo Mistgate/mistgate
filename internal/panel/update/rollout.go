@@ -17,6 +17,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // The rollout state machine. Everything a rollout knows lives in the database; the
@@ -43,6 +44,7 @@ const (
 	errInboundsUnread  = "inbounds_unreadable"
 	errInboundFailed   = "inbound_failed"
 	errProbeFailed     = "probe_failed"
+	errWarpDown        = "warp_down"
 	errRolledBackAgent = "rolled_back_by_agent"
 	errAgentFailed     = "agent_failed"
 	errManual          = "manual"
@@ -710,10 +712,21 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 		miss(errInboundsUnread)
 	}
 	var newlyFailed []string
+	warpEgress := false
 	for _, in := range inbounds {
+		var settings struct {
+			Egress string `json:"egress"`
+		}
+		// the panel wrote these settings itself: one it cannot read says nothing about the node, so it only skips the WARP look
+		if json.Unmarshal([]byte(in.Settings), &settings) == nil && in.Enabled && settings.Egress == "warp" {
+			warpEgress = true
+		}
 		if in.State == "failed" && !slices.Contains(x.PreFailed, in.ID) {
 			newlyFailed = append(newlyFailed, in.ID)
 		}
+	}
+	if warpEgress && !s.warpUpSince(p.ctx, x.NodeID, x.ReconnectedAt) {
+		miss(errWarpDown)
 	}
 	if len(newlyFailed) > 0 {
 		with["inbound"] = newlyFailed[0]
@@ -739,6 +752,20 @@ func (p *pass) gate(x *store.StepRow, n store.NodeRow, drift bool) gateResult {
 		}
 	}
 	return gateResult{pass: soft == "", soft: soft, with: with}
+}
+
+// warpUpSince requires a WARP health report from this connection and a usable tunnel. Without a report, or while it is
+// starting/down/unavailable, WARP-egress profiles remain a soft gate miss until the gate deadline.
+func (s *Service) warpUpSince(ctx context.Context, nodeID string, since time.Time) bool {
+	account, err := s.st.WarpAccount(ctx, nodeID)
+	if err != nil || account.HealthAt.Before(since) {
+		return false
+	}
+	var health agentv1.WarpHealth
+	if err := protojson.Unmarshal([]byte(account.HealthJSON), &health); err != nil {
+		return false
+	}
+	return health.State == agentv1.WarpState_WARP_STATE_UP
 }
 
 // advanceGate runs the gate of a node that reconnected with the new build.

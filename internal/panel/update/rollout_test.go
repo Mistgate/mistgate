@@ -67,6 +67,54 @@ func TestReferenceBuiltFallsBackToThePanel(t *testing.T) {
 	}
 }
 
+func TestRolloutGateChecksWarpHealthForWarpEgressInbounds(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		egress     string
+		healthJSON string
+		healthAt   time.Time
+		wantSoft   string
+	}{
+		{name: "fresh down", egress: "warp", healthJSON: `{"state":"WARP_STATE_DOWN"}`, wantSoft: "warp_down"},
+		{name: "not fresh", egress: "warp", healthJSON: `{"state":"WARP_STATE_UP"}`, wantSoft: "warp_down"},
+		{name: "fresh up", egress: "warp", healthJSON: `{"state":"WARP_STATE_UP"}`},
+		{name: "no warp egress", egress: "direct", healthJSON: `{"state":"WARP_STATE_DOWN"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			nodeID := e.addNode("node-slate", nodeOpts{inbounds: 1})
+			e.exec(`UPDATE profile SET settings_json = ? WHERE id = ?`, `{"egress":"`+tc.egress+`"}`, "prf_node-slate_0")
+			now := e.clk.Now()
+			if tc.healthAt.IsZero() {
+				tc.healthAt = now
+			}
+			if tc.name == "not fresh" {
+				tc.healthAt = now.Add(-time.Second)
+			}
+			e.exec(`INSERT INTO warp_account (node_id, source, secret_enc, peer_public_key, endpoint_v4, address_v4, health_json, health_at, created_at, updated_at)
+				VALUES (?, 'imported', X'01', 'invented-peer-key', '198.51.100.8:2408', '172.16.0.2/32', ?, ?, 1, 1)`,
+				nodeID, tc.healthJSON, tc.healthAt.Unix())
+			e.hello(nodeID, "0.2.0-test", newBuilt, []string{"doctor/1", capUpdate, capGuard}, (store.LastUpdateRow{
+				Outcome: "ok", ToBuilt: newBuilt, AtUnix: now.Unix(),
+			}).JSON())
+			node, err := e.st.Node(e.ctx, nodeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			x := &store.StepRow{NodeID: nodeID, SentAt: now.Add(-time.Minute), ReconnectedAt: now}
+			p := &pass{s: e.s, ctx: e.ctx, ro: store.RolloutRow{ToBuilt: newBuilt}, now: now}
+			got := p.gate(x, node, false)
+			if tc.wantSoft != "" {
+				if got.pass || got.soft != tc.wantSoft {
+					t.Fatalf("gate = %+v, want soft %q", got, tc.wantSoft)
+				}
+			} else if !got.pass {
+				t.Fatalf("gate = %+v, want pass", got)
+			}
+		})
+	}
+}
+
 func idsOf(steps []store.StepRow, state string) []string {
 	var out []string
 	for _, x := range steps {
