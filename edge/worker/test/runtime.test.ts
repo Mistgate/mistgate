@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRuntime } from "../src/runtime";
+import { PANEL_START_BOUND_MS } from "../src/shell";
 
 // The runtime of one wasm module (src/runtime.ts) with the wasm replaced by a recorder: which module it instantiates, and what
 // init gets in a role script that has only some of the bindings (panel.test.ts has the single script's full set).
@@ -40,6 +41,52 @@ describe("createRuntime", () => {
     await Promise.all([runtime.getPanel(env, "https://x.test"), runtime.getPanel(env, "https://x.test")]);
     expect(instantiated).toEqual([wasm]);
     expect(initCalls).toHaveLength(1);
+  });
+
+  it("an init that never settles answers its waiters with an error after the bound, and the next request starts a new init", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      (globalThis as any).Go = class {
+        importObject = {};
+        run() {
+          (globalThis as any).mgPanel = { init: (): Promise<void> => (++calls === 1 ? new Promise(() => {}) : Promise.resolve()) };
+          return new Promise<void>(() => {});
+        }
+      };
+      const runtime = createRuntime({} as WebAssembly.Module);
+      const env = { DB: {}, MASTER_KEY: key } as any;
+      const first = runtime.getPanel(env, "https://x.test").catch((error: Error) => error as Error);
+      const second = runtime.getPanel(env, "https://x.test").catch((error: Error) => error as Error);
+      await vi.advanceTimersByTimeAsync(PANEL_START_BOUND_MS);
+      expect(((await first) as Error).message).toMatch(/did not start within/);
+      expect(((await second) as Error).message).toMatch(/did not start within/);
+      expect(calls).toBe(1); // the concurrent first requests shared one init
+      await expect(runtime.getPanel(env, "https://x.test")).resolves.toBeDefined();
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("an init that is rejected is retried by the next request", async () => {
+    let calls = 0;
+    (globalThis as any).Go = class {
+      importObject = {};
+      run() {
+        (globalThis as any).mgPanel = {
+          init: async () => {
+            if (++calls === 1) throw new Error("d1 down");
+          },
+        };
+        return new Promise<void>(() => {});
+      }
+    };
+    const runtime = createRuntime({} as WebAssembly.Module);
+    const env = { DB: {}, MASTER_KEY: key } as any;
+    await expect(runtime.getPanel(env, "")).rejects.toThrow("d1 down");
+    await expect(runtime.getPanel(env, "")).resolves.toBeDefined();
+    expect(calls).toBe(2);
   });
 
   it("two runtimes keep their own modules", async () => {

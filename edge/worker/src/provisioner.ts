@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ProvisionEnv } from "./env";
 import type { PanelApi } from "./panel";
-import { toFetchRequest, toResponse } from "./shell";
+import { keepAlive, toFetchRequest, toResponse } from "./shell";
 
 // The Provisioner: the one Durable Object of the second script (mistgate-edge-provision). It holds what a Worker needs to
 // install a node over SSH. A socket belongs to the I/O context it was opened in, and Go resumes on whichever JavaScript event
@@ -47,7 +47,7 @@ export class Provisioner extends DurableObject<ProvisionEnv> {
 
   private panel(): Promise<PanelApi> {
     if (!load) return Promise.reject(new Error("the Provisioner has no panel wired in"));
-    return load(this.env, kickCurrent);
+    return keepAlive(this.ctx, load(this.env, kickCurrent));
   }
 
   async fetch(request: Request): Promise<Response> {

@@ -158,6 +158,9 @@ var (
 	state   *edgeState
 )
 
+// initTimeout bounds one initPanel (its D1 work). A variable so that a test can shorten it.
+var initTimeout = 15 * time.Second
+
 // OpFetch is mgPanel.fetch: one buffered HTTP request through the role's handler.
 func OpFetch(api js.Value) {
 	api.Set("fetch", js.FuncOf(func(_ js.Value, args []js.Value) any {
@@ -256,12 +259,16 @@ func initPanel(options js.Value) error {
 	if state != nil {
 		return nil
 	}
+	// A D1 call whose Worker request was cancelled never settles; without a deadline this init would hold stateMu for ever and
+	// every fetch (RLock) behind it. The Worker gives up on an init after worker/src/shell.ts PANEL_START_BOUND_MS and retries.
+	ctx, cancel := context.WithTimeout(context.Background(), initTimeout)
+	defer cancel()
 
 	opts, err := parseInitOptions(options)
 	if err != nil {
 		return err
 	}
-	st, err := store.OpenD1(context.Background(), opts.d1)
+	st, err := store.OpenD1(ctx, opts.d1)
 	if err != nil {
 		return err
 	}
@@ -272,7 +279,7 @@ func initPanel(options js.Value) error {
 		}
 	}()
 
-	in, pendingSettings, err := loadEdgeInstance(context.Background(), st, opts)
+	in, pendingSettings, err := loadEdgeInstance(ctx, st, opts)
 	creates := active.CreatesInstance && !opts.provision.serve
 	if !creates && (errors.Is(err, errFreshPublicURL) || err == nil && pendingSettings["rp_id"] != "") {
 		// Only the admin creates an instance (the Provisioner never does, in whatever Worker): every other role reads what
@@ -294,7 +301,7 @@ func initPanel(options js.Value) error {
 		return err
 	}
 	web.SetAssets(opts.assets) // before app.Build: the admin SPA and sub.html are read through it
-	brand, err := instance.Load(context.Background(), st)
+	brand, err := instance.Load(ctx, st)
 	if err != nil {
 		return err
 	}
@@ -320,7 +327,7 @@ func initPanel(options js.Value) error {
 	}
 	if len(pendingSettings) != 0 {
 		rpID, rpOrigins := in.RPID, in.RPOrigins
-		if in, err = settleEdgeInstance(context.Background(), st, in, pendingSettings); err != nil {
+		if in, err = settleEdgeInstance(ctx, st, in, pendingSettings); err != nil {
 			return err
 		}
 		if !opts.hasNodeLink {
@@ -354,7 +361,7 @@ func initPanel(options js.Value) error {
 		return err
 	}
 	if creates { // the Provisioner never offers a setup token
-		if err := offerSetup(context.Background(), st, opts, in, time.Now()); err != nil {
+		if err := offerSetup(ctx, st, opts, in, time.Now()); err != nil {
 			return err
 		}
 	}

@@ -210,3 +210,56 @@ func TestOfferSetupWithHashLogsOnlyTheExpiry(t *testing.T) {
 		}
 	}
 }
+
+// A D1 call whose Worker request was cancelled never settles. initPanel must give up at its deadline and release stateMu
+// (otherwise every fetch waits behind the lock for ever), and the init the Worker retries must then succeed.
+func TestInitPanelGivesUpOnAD1CallThatNeverSettlesAndCanBeRetried(t *testing.T) {
+	stateMu.Lock()
+	previous := state
+	state = nil
+	stateMu.Unlock()
+	t.Cleanup(func() { stateMu.Lock(); state = previous; stateMu.Unlock() })
+	oldTimeout := initTimeout
+	initTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { initTimeout = oldTimeout })
+
+	hang := jsFunction("return new Promise(() => {})")
+	statement := jsObject(map[string]any{"all": hang, "first": hang, "raw": hang, "run": hang})
+	statement.Set("bind", jsFunction("return this"))
+	stuck := jsObject(map[string]any{"batch": hang})
+	stuck.Set("prepare", jsFunction("return this.statement").Call("bind", jsObject(map[string]any{"statement": statement})))
+	options := func(d1 js.Value) js.Value {
+		return jsObject(map[string]any{
+			"d1": d1, "masterKey": strings.Repeat("ab", 32), "publicURL": "https://example.com", "adminPrefix": "/test-admin/",
+		})
+	}
+
+	begun := time.Now()
+	err := initPanel(options(stuck))
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("initPanel on a D1 that never answers = %v, want the deadline", err)
+	}
+	if took := time.Since(begun); took > 5*time.Second {
+		t.Fatalf("initPanel took %v with a %v deadline", took, initTimeout)
+	}
+	if !stateMu.TryLock() {
+		t.Fatal("initPanel returned but still holds stateMu")
+	}
+	if state != nil {
+		t.Fatal("a failed init left a panel behind")
+	}
+	stateMu.Unlock()
+
+	// A healthy database for the retried init. It keeps the instance that init creates, which later tests (other keys) must not find.
+	t.Cleanup(func() { js.Global().Get("__d1").Call("__reset") })
+	openFakeD1(t)
+	if err := initPanel(options(js.Global().Get("__d1"))); err != nil {
+		t.Fatalf("the retried initPanel: %v", err)
+	}
+	stateMu.RLock()
+	ready := state != nil
+	stateMu.RUnlock()
+	if !ready {
+		t.Fatal("the retried initPanel stored no panel")
+	}
+}

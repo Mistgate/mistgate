@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { askNode, closeNode, detachWaitUntil, forwardLink, memoizeRetry, panelURL, pokeNodes, readAsset, toFetchRequest, toResponse } from "../src/shell";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PANEL_START_BOUND_MS, askNode, closeNode, detachWaitUntil, forwardLink, memoizeRetry, panelURL, pokeNodes, readAsset, toFetchRequest, toResponse } from "../src/shell";
 
 describe("toFetchRequest", () => {
   it("forces https and keeps the path, query and port", async () => {
@@ -93,6 +93,8 @@ describe("readAsset", () => {
 });
 
 describe("memoizeRetry", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("shares one start between concurrent callers", async () => {
     let release!: (value: string) => void;
     const start = vi.fn(() => new Promise<string>((resolve) => (release = resolve)));
@@ -115,6 +117,42 @@ describe("memoizeRetry", () => {
     expect(await get(3)).toBe("up");
     expect(start).toHaveBeenCalledTimes(2);
     expect(start).toHaveBeenLastCalledWith(3);
+  });
+
+  it("a start that never settles makes every waiter fail after the bound, and the next call starts again", async () => {
+    vi.useFakeTimers();
+    const start = vi.fn<(n: number) => Promise<string>>().mockReturnValueOnce(new Promise(() => {})).mockResolvedValue("up");
+    const get = memoizeRetry(start);
+    const first = get(1).catch((error: Error) => error);
+    const second = get(2).catch((error: Error) => error);
+    await vi.advanceTimersByTimeAsync(PANEL_START_BOUND_MS - 1);
+    expect(start).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(((await first) as Error).message).toMatch(/did not start within/);
+    expect(((await second) as Error).message).toMatch(/did not start within/);
+    expect(await get(3)).toBe("up");
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start).toHaveBeenLastCalledWith(3);
+  });
+
+  it("the bound runs from the start of the attempt, not from the arrival of a later waiter", async () => {
+    vi.useFakeTimers();
+    const get = memoizeRetry(() => new Promise<string>(() => {}));
+    const early = get().catch(() => "early");
+    await vi.advanceTimersByTimeAsync(PANEL_START_BOUND_MS - 1000);
+    const late = get().catch(() => "late");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await Promise.all([early, late])).toEqual(["early", "late"]);
+  });
+
+  it("a start that finishes in time clears its timer", async () => {
+    vi.useFakeTimers();
+    const get = memoizeRetry(async () => "ready");
+    expect(await get()).toBe("ready");
+    expect(vi.getTimerCount()).toBe(0);
+    const again = get(); // the panel is up: the hot path of every request sets no timer at all
+    expect(vi.getTimerCount()).toBe(0);
+    expect(await again).toBe("ready");
   });
 });
 

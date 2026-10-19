@@ -39,6 +39,64 @@ describe("fetchPanelRequest", () => {
   });
 });
 
+describe("fetchPanelRequest keeps started work alive past a client disconnect", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const answer = { status: 200, headers: [], body: new Uint8Array(), waitUntil: Promise.resolve() };
+  const settledFlag = (promise: Promise<unknown>) => {
+    const flag = { done: false };
+    void promise.then(() => (flag.done = true));
+    return flag;
+  };
+  const context = () => {
+    const kept: Promise<unknown>[] = [];
+    const ctx = { waitUntil: vi.fn((promise: Promise<unknown>) => void kept.push(promise)) } as unknown as ExecutionContext;
+    return { ctx, kept };
+  };
+
+  it("hands the panel promise to waitUntil before it is awaited, and the promise of panel.fetch once it is running", async () => {
+    let startPanel!: (panel: any) => void;
+    mockedGetPanel.mockReturnValue(new Promise((resolve) => (startPanel = resolve)));
+    let finishFetch!: (value: typeof answer) => void;
+    const panelFetch = vi.fn(() => new Promise<typeof answer>((resolve) => (finishFetch = resolve)));
+    const { ctx, kept } = context();
+
+    const response = fetchPanelRequest(new Request("https://example.com/admin/x"), {} as Env, ctx);
+    expect(kept).toHaveLength(1); // the start is already protected while the request still waits for it
+    const started = settledFlag(kept[0]!);
+    await Promise.resolve();
+    expect(started.done).toBe(false);
+
+    startPanel({ fetch: panelFetch });
+    await vi.waitFor(() => expect(panelFetch).toHaveBeenCalled());
+    expect(started.done).toBe(true);
+    expect(kept).toHaveLength(2);
+    const running = settledFlag(kept[1]!);
+    await Promise.resolve();
+    expect(running.done).toBe(false);
+
+    finishFetch(answer);
+    expect((await response).status).toBe(200);
+    expect(running.done).toBe(true);
+  });
+
+  it("a failed start or fetch does not make the kept-alive promise reject, and the client still gets its 503 or 500", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { ctx, kept } = context();
+    mockedGetPanel.mockRejectedValue(new Error("d1 down"));
+    const unavailable = await fetchPanelRequest(new Request("https://example.com/"), {} as Env, ctx);
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.headers.get("Retry-After")).toBe("5");
+
+    mockedGetPanel.mockResolvedValue({ fetch: vi.fn().mockRejectedValue(new Error("go failed")) } as unknown as Awaited<ReturnType<typeof getPanel>>);
+    expect((await fetchPanelRequest(new Request("https://example.com/"), {} as Env, ctx)).status).toBe(500);
+
+    expect(kept).toHaveLength(3);
+    await expect(Promise.all(kept)).resolves.toBeDefined();
+    log.mockRestore();
+  });
+});
+
 describe("scheduledPanel", () => {
   beforeEach(() => vi.resetAllMocks());
 
@@ -62,6 +120,21 @@ describe("scheduledPanel", () => {
     finishBackground();
   });
 
+  it("hands the panel promise and the cron promise to waitUntil", async () => {
+    let startPanel!: (panel: any) => void;
+    mockedGetPanel.mockReturnValue(new Promise((resolve) => (startPanel = resolve)));
+    const kept: Promise<unknown>[] = [];
+    const ctx = { waitUntil: vi.fn((promise: Promise<unknown>) => void kept.push(promise)) } as unknown as ExecutionContext;
+    const cron = vi.fn().mockResolvedValue({ waitUntil: Promise.resolve() });
+
+    const tick = scheduledPanel({ scheduledTime: 1 } as ScheduledController, {} as Env, ctx);
+    expect(kept).toHaveLength(1);
+    startPanel({ cron });
+    await tick;
+    expect(cron).toHaveBeenCalled();
+    expect(kept).toHaveLength(3); // the start, the cron call, the cron's own after-work
+  });
+
   it("logs initialization errors and skips the tick", async () => {
     const error = new Error("initialization failed");
     mockedGetPanel.mockRejectedValue(error);
@@ -71,7 +144,7 @@ describe("scheduledPanel", () => {
     await expect(scheduledPanel({ scheduledTime: 1 } as ScheduledController, {} as Env, ctx)).resolves.toBeUndefined();
 
     expect(log).toHaveBeenCalledWith("panel init failed:", error.message);
-    expect(ctx.waitUntil).not.toHaveBeenCalled();
+    expect(ctx.waitUntil).toHaveBeenCalledTimes(1); // only the kept-alive start; no cron work was handed over
     log.mockRestore();
   });
 
@@ -85,7 +158,7 @@ describe("scheduledPanel", () => {
     await expect(scheduledPanel({ scheduledTime: 1 } as ScheduledController, {} as Env, ctx)).resolves.toBeUndefined();
 
     expect(log).toHaveBeenCalledWith("panel cron failed:", error.message);
-    expect(ctx.waitUntil).not.toHaveBeenCalled();
+    expect(ctx.waitUntil).toHaveBeenCalledTimes(2); // the kept-alive start and cron call; no after-work came back
     log.mockRestore();
   });
 });

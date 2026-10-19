@@ -2,7 +2,7 @@ import { WorkerEntrypoint } from "cloudflare:workers";
 import type { PanelEnv } from "./env";
 import type { GetPanel } from "./handler";
 import type { PanelApi } from "./runtime";
-import { detachWaitUntil, type WaitUntilOutput } from "./shell";
+import { detachWaitUntil, keepAlive, type WaitUntilOutput } from "./shell";
 
 // The Go side of the agent link. A NodeLink object holds the socket and an opaque state string and reaches Go through
 // this entrypoint: in the single script through its own loopback (this.ctx.exports.PanelLink), in the split edition through the
@@ -75,8 +75,8 @@ export abstract class PanelLinkBase extends WorkerEntrypoint<PanelEnv> {
 
   // The Go op's answer is the shape its caller names; only its waitUntil is taken off before it crosses the RPC.
   private async call<T>(op: string, args: Record<string, unknown>): Promise<T> {
-    const panel = await this.panel();
-    return detachWaitUntil((await panel.link(op, args)) as WaitUntilOutput, this.ctx) as unknown as T;
+    const panel = await keepAlive(this.ctx, this.panel());
+    return detachWaitUntil((await keepAlive(this.ctx, panel.link(op, args))) as WaitUntilOutput, this.ctx) as unknown as T;
   }
 }
 

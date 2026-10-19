@@ -31,7 +31,7 @@ describe("public and admin roles", () => {
     expect(response.headers.get("X-A")).toBe("1");
     expect(f.getPanel).toHaveBeenCalledWith(expect.anything(), "https://p.example.test");
     expect(goFetch).toHaveBeenCalledWith(expect.objectContaining({ method: "POST", url: "https://p.example.test/x?y=1" }));
-    expect(c.waitUntil).toHaveBeenCalledTimes(1);
+    expect(c.waitUntil).toHaveBeenCalledTimes(3); // the panel start and the Go fetch, kept alive, then the answer's after-work
   });
 
   it("a panel that cannot start answers 503 and the next request tries again", async () => {

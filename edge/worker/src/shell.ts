@@ -134,18 +134,61 @@ export async function pokeNodes(ns: DurableObjectNamespace<NodeLink>, nodeIds: s
 }
 
 /**
- * Runs start() once and shares the promise between concurrent callers. A failure is not remembered: the next call
- * starts again, so a transient error (D1 not reachable yet) does not wedge the isolate.
+ * How long a request waits for the panel to start. Cloudflare cancels the I/O of a request whose client left, and a start that
+ * was begun by such a request never settles; every later request of the isolate would wait on it for ever. Longer than a
+ * healthy cold start (seconds), longer than the Go side's own deadline (initTimeout in edge/bridge), shorter than a client waits.
  */
-export function memoizeRetry<A extends unknown[], T>(start: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+export const PANEL_START_BOUND_MS = 20_000;
+
+/**
+ * Runs start() once and shares the promise between concurrent callers. A failure is not remembered: the next call
+ * starts again, so a transient error (D1 not reachable yet) does not wedge the isolate. A start that has not settled
+ * boundMs after it began is given up on the same way: every waiter fails and the next call starts a new one.
+ */
+export function memoizeRetry<A extends unknown[], T>(start: (...args: A) => Promise<T>, boundMs = PANEL_START_BOUND_MS): (...args: A) => Promise<T> {
   let current: Promise<T> | undefined;
+  let began = 0;
+  let ready = false; // the current attempt succeeded: every later call is the hot path and needs no timer
   return (...args) => {
-    const attempt: Promise<T> = (current ??= start(...args));
-    attempt.catch(() => {
-      if (current === attempt) current = undefined;
+    if (!current) {
+      began = Date.now();
+      ready = false;
+      current = start(...args);
+    }
+    const attempt = current;
+    attempt.then(
+      () => {
+        if (current === attempt) ready = true;
+      },
+      () => {
+        if (current === attempt) current = undefined;
+      },
+    );
+    if (ready) return attempt;
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (current === attempt) {
+          current = undefined;
+          console.error(`panel start gave up after ${boundMs} ms`); // once per attempt, not per waiter
+        }
+        reject(new Error(`the panel did not start within ${boundMs / 1000} s`));
+      }, Math.max(0, boundMs - (Date.now() - began)));
+      attempt.then(
+        (value) => (clearTimeout(timer), resolve(value)),
+        (error: unknown) => (clearTimeout(timer), reject(error)),
+      );
     });
-    return attempt;
   };
+}
+
+/**
+ * Lets `work` run to its end after the client of the request is gone (Cloudflare keeps waitUntil work for up to 30 s). Work that
+ * a cancelled request started and others share (the panel's start, a Go handler holding a lock) would otherwise never settle.
+ * A failure is the caller's to handle; here it is only not an unhandled rejection of the kept-alive copy. Returns `work`.
+ */
+export function keepAlive<T>(ctx: Pick<ExecutionContext, "waitUntil">, work: Promise<T>): Promise<T> {
+  ctx.waitUntil(work.then(() => {}, () => {}));
+  return work;
 }
 
 /** The header of the panel's answer to an SSH-install request (provision.ForwardHeader): "provision;v=<build>". */
