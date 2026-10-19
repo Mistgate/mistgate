@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/edition"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 const (
@@ -33,7 +35,7 @@ var edgeDeferred = map[string]string{
 	"backups":        "R2",
 	"telegram":       "enqueue remains local and messages are not delivered on edge",
 	"mcp-plan-sweep": "MCP is not served on the edge",
-	"tspu-probe":     "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 30 seconds; Get says it is unavailable and nothing runs",
+	"tspu-probe":     "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
 }
 
 // edgeDeferredFeatures maps every deferred job above to the admin features it takes away: the ids Me reports in
@@ -107,4 +109,16 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 		p.Fleet.StateChanged()
 	}
 	return errors.Join(errs...)
+}
+
+// EdgeRoundLease is health.Config.RoundLease on the Cloudflare edition: a D1 lease with a holder of its own per round, so
+// that of two isolates whose cron ticks overlap only one runs it. A failed read counts as taken by someone else.
+func EdgeRoundLease(st *store.Store, log *slog.Logger) func(ctx context.Context, name string, ttl time.Duration) bool {
+	return func(ctx context.Context, name string, ttl time.Duration) bool {
+		taken, err := st.TakeLease(ctx, name, store.NewID("lease_"), ttl, time.Now())
+		if err != nil {
+			log.Warn("edge: taking a round lease", "lease", name, "err", err)
+		}
+		return taken
+	}
 }

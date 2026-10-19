@@ -315,6 +315,10 @@ func (s *Service) CountryTick(ctx context.Context) bool {
 	if now.Before(last.Add(every)) || now.Before(s.countryHold(ctx)) {
 		return false
 	}
+	// Not released: it lapses after the round's own deadline, and the next due round is minutes away.
+	if s.cfg.RoundLease != nil && !s.cfg.RoundLease(ctx, "country-round", max(s.cfg.CountryRoundTimeout, countryRoundTime)) {
+		return false
+	}
 	s.countryRound(ctx, cc, src, nodes, probes, now)
 	return true
 }

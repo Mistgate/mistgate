@@ -6,7 +6,9 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/netip"
 	"sync"
+	"sync/atomic"
 	"syscall/js"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/app"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -171,6 +174,130 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 		t.Fatal("cron omitted waitUntil after EdgeTick returned an error")
 	}
 	awaitCronPromise(t, waitUntil)
+}
+
+type blockingCronCountrySource struct {
+	calls   atomic.Int32
+	started chan struct{}
+	release <-chan struct{}
+}
+
+func (*blockingCronCountrySource) Name() string     { return "alice" }
+func (*blockingCronCountrySource) HourlyLimit() int { return 250 }
+
+func (s *blockingCronCountrySource) Measure(ctx context.Context, _ health.CountryRound) (health.CountryObserved, error) {
+	if s.calls.Add(1) == 1 {
+		close(s.started)
+		select {
+		case <-s.release:
+		case <-ctx.Done():
+			return health.CountryObserved{}, ctx.Err()
+		}
+	}
+	return health.CountryObserved{Eyeball: true}, nil
+}
+
+func TestCronConcurrentTicksShareOneCountryRound(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	binding := js.Global().Get("__d1")
+	binding.Call("__reset")
+	st, err := store.OpenD1(ctx, binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	key := make([]byte, vault.KeySize)
+	for i := range key {
+		key[i] = byte(i + 1)
+	}
+	vlt, err := vault.New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	authSvc, err := auth.New(st, auth.Config{RPID: "example.com", Origins: []string{"https://example.com"}, Vault: vlt}, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	panel, err := app.Build(app.Config{
+		Store: st, Vault: vlt, Auth: authSvc, Clock: time.Now, Logger: log, DataDir: edgeNoFilesystemDataDir, MasterKey: key,
+		Instance: app.InstanceConfig{
+			PublicURL: "https://example.com", AdminPrefix: "/admin/", RPID: "example.com",
+			RPOrigins: []string{"https://example.com"}, AgentSNI: "agent.example.com", SubPrefix: "/sub/",
+		},
+		Remote: &cronTestRemote{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tickAt := time.Now().UTC()
+	if tickAt.Minute() == 10 || tickAt.Minute() == 17 {
+		tickAt = tickAt.Add(time.Minute)
+	}
+	const nodeID = "nod_country_lease"
+	if _, err := st.CreateEnrollment(ctx, &store.NodeRow{ID: nodeID, Name: "de1.example.com", Address: "de1.example.com"}, "",
+		[]byte("alice-enrollment-token"), "alice", tickAt, tickAt.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.NodeHello(ctx, nodeID, 1, store.HelloInfo{Instance: "alice"}, tickAt); err != nil {
+		t.Fatal(err)
+	}
+
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseRound := func() { releaseOnce.Do(func() { close(release) }) }
+	defer releaseRound()
+	source := &blockingCronCountrySource{started: make(chan struct{}), release: release}
+	newHealth := func() *health.Service {
+		return health.New(st, vlt, nil, panel.Fleet, health.Config{
+			Edge: true, CountryRoundTimeout: 55 * time.Second, Now: func() time.Time { return tickAt }, RoundLease: app.EdgeRoundLease(st, log),
+			Country: func(context.Context) (health.CountryConfig, health.CountrySource) {
+				return health.CountryConfig{Enabled: true, Country: "RU", Interval: 10 * time.Minute}, source
+			},
+			Resolve: func(context.Context, string) ([]netip.Addr, error) {
+				return []netip.Addr{netip.MustParseAddr("203.0.113.10")}, nil
+			},
+		})
+	}
+	panel.Health = newHealth()
+	// A second panel models another Worker isolate: it shares D1 but has its own health service and countryMu.
+	otherPanel := *panel
+	otherPanel.Health = newHealth()
+
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- panel.EdgeTick(ctx, tickAt) }()
+	select {
+	case <-source.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first country round did not start")
+	}
+
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- otherPanel.EdgeTick(ctx, tickAt) }()
+	select {
+	case err := <-secondDone:
+		if err != nil {
+			t.Fatalf("second EdgeTick: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("second EdgeTick did not finish while the first round was blocked")
+	}
+	gotRounds := source.calls.Load()
+	releaseRound()
+	select {
+	case err := <-firstDone:
+		if err != nil {
+			t.Fatalf("first EdgeTick: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("first EdgeTick did not finish after releasing its country round")
+	}
+	if gotRounds != 1 {
+		t.Fatalf("concurrent EdgeTicks started %d country rounds, want 1", gotRounds)
+	}
 }
 
 func awaitCronPromise(t *testing.T, promise js.Value) {

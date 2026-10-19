@@ -121,6 +121,9 @@ type Config struct {
 	Resolve func(ctx context.Context, host string) ([]netip.Addr, error)
 	// CountryRoundTimeout bounds one whole country round. Default 60 s.
 	CountryRoundTimeout time.Duration
+	// RoundLease, when set, must grant a due country round before it runs, for ttl. The Cloudflare edition takes a D1 lease
+	// (store.TakeLease): its cron ticks can overlap in two isolates, each with its own countryMu. Nil on the VPS.
+	RoundLease func(ctx context.Context, name string, ttl time.Duration) bool
 	// OnTransition is called after an alert was opened or resolved (notifications attach here).
 	OnTransition func(Transition)
 	Log          *slog.Logger

@@ -469,6 +469,12 @@
   },
   {
     "type": "table",
+    "name": "job_lease",
+    "tbl_name": "job_lease",
+    "sql": "CREATE TABLE job_lease ( name TEXT PRIMARY KEY, holder TEXT NOT NULL, expires_at INTEGER NOT NULL ) STRICT"
+  },
+  {
+    "type": "table",
     "name": "link_dns_option",
     "tbl_name": "link_dns_option",
     "sql": "CREATE TABLE link_dns_option ( preset_id TEXT NOT NULL PRIMARY KEY REFERENCES dns_preset (id) ON DELETE CASCADE, position INTEGER NOT NULL, is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)) ) STRICT"

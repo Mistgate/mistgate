@@ -121,6 +121,44 @@ func TestD1StoreSmoke(t *testing.T) {
 	}
 }
 
+func TestD1JobLeaseTakeExpiryAndRelease(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	binding := js.Global().Get("__d1")
+	now := time.Unix(1_800_000_000, 0).UTC()
+
+	take := func(holder string, at time.Time, want bool) {
+		t.Helper()
+		var got bool
+		var err error
+		calls := countD1Queries(t, binding, "TakeLease", func() {
+			got, err = st.TakeLease(ctx, "country", holder, time.Minute, at)
+		})
+		if err != nil || got != want {
+			t.Fatalf("TakeLease(%q, %s) = %v, %v; want %v", holder, at, got, err, want)
+		}
+		if calls.queries != 1 || calls.batches != 0 {
+			t.Fatalf("TakeLease used %d sequential D1 calls and %d batches, want one statement", calls.queries, calls.batches)
+		}
+	}
+
+	take("alice", now, true)
+	take("de1.example.com", now, false)
+	if err := st.ReleaseLease(ctx, "country", "de1.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	take("de1.example.com", now.Add(time.Minute-time.Second), false)
+	take("de1.example.com", now.Add(time.Minute), true)
+	if err := st.ReleaseLease(ctx, "country", "alice"); err != nil {
+		t.Fatal(err)
+	}
+	take("alice", now.Add(time.Minute), false)
+	if err := st.ReleaseLease(ctx, "country", "de1.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	take("alice", now.Add(time.Minute), true)
+}
+
 func TestD1FleetBatchSmoke(t *testing.T) {
 	st := openD1Store(t)
 	ctx := context.Background()
