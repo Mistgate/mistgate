@@ -4,12 +4,16 @@ import { AddNodeProvider, useAddNode } from "@/components/add-node";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { editionFeatures } from "@/i18n/edition";
+import { alertsQuery, checksQuery } from "@/lib/health";
 import { approvalsQuery, tokensQuery } from "@/lib/integrations";
+import { overviewQuery, userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { IntegrationsScreen } from "@/screens/integrations";
+import { HealthScreen } from "@/screens/health";
 import { BackupsPage } from "@/screens/settings-pages/backups";
 import { UpdatesScreen } from "@/screens/updates";
 import { available, panelOffer } from "./dev-kit-redesign";
@@ -20,10 +24,12 @@ import { available, panelOffer } from "./dev-kit-redesign";
 const now = Math.floor(Date.now() / 1000);
 const edgeMe = { admin: { id: "adm_1", displayName: "Owner", role: Role.OWNER }, version: "0.1.24", stepUpUntilUnix: 0n, edition: "edge", unavailable: [...editionFeatures] };
 
-function Shot({ id, title, seed = [], children }: { id: string; title: string; seed?: [readonly unknown[], unknown][]; children: ReactNode }) {
+const vpsMe = { ...edgeMe, edition: "vps", unavailable: [] };
+
+function Shot({ id, title, seed = [], me = edgeMe, children }: { id: string; title: string; seed?: [readonly unknown[], unknown][]; me?: object; children: ReactNode }) {
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
-    c.setQueryData(meQuery.queryKey, edgeMe as never);
+    c.setQueryData(meQuery.queryKey, me as never);
     for (const [key, data] of seed) c.setQueryData(key, data);
     return c;
   });
@@ -47,6 +53,15 @@ const token = (over: object) => ({
 const tokens = { nowUnix: now, tokens: [token({}), token({ id: "tok_2", name: "nightly-report", profile: TokenProfile.READONLY, hint: "zz99", lastUsedUnix: now - 86400 })] };
 const approvals = { awaiting: 0, nowUnix: now, receivedMs: Date.now(), approvals: [] };
 
+// Health with two quiet nodes, no alert and no check result: the same data on both editions (?tab=people etc. switches the tab).
+const fleetNode = (id: string, name: string) => ({ id, name, status: NodeStatus.ONLINE, countryCode: id === "nod_de1" ? "DE" : "NL", sparkBytes: [] });
+const healthSeed: [readonly unknown[], unknown][] = [
+  [overviewQuery().queryKey, { nowUnix: now, nodesTotal: 2, nodesProblem: 0, usersOnline: 3, nodes: [fleetNode("nod_de1", "de1"), fleetNode("nod_nl1", "nl1")], traffic: [], online: [], events: [], topConsumers: [], alertsActive: 0, alertsCritical: 0 }],
+  [userCountQuery.queryKey, { counts: { all: 3 } }],
+  [alertsQuery.queryKey, { nowUnix: now, active: [], history: [] }],
+  [checksQuery().queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [] }],
+];
+
 function AddNodeButton() {
   const addNode = useAddNode();
   return <Button onClick={() => addNode()}>Add node</Button>;
@@ -55,6 +70,12 @@ function AddNodeButton() {
 export function EdgeKit() {
   return (
     <div className="relative left-1/2 flex w-[min(calc(100vw-2rem),1040px)] -translate-x-1/2 flex-col gap-8">
+      <Shot id="edge-health" title="Edge: Health (no checker, no alerts: the notice in place of All quiet)" seed={healthSeed}>
+        <HealthScreen />
+      </Shot>
+      <Shot id="vps-health" title="VPS: Health, the same data (unchanged)" seed={healthSeed} me={vpsMe}>
+        <HealthScreen />
+      </Shot>
       <Shot
         id="edge-integrations"
         title="Edge: Integrations (the token list stays, no new token; Telegram and MCP are a notice)"

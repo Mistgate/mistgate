@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { CheckColumn, CheckRow } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { cellLook, checksQuery, countryColumn, type CheckCell } from "@/lib/health";
 import type { Plain } from "@/lib/plain";
@@ -75,6 +76,7 @@ export function NodeChecks({ nodeId }: { nodeId: string }) {
   const t = useT();
   const fmt = useFmt();
   const run = useRunChecks(nodeId);
+  const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
   const q = useQuery(checksQuery(nodeId));
 
   const row = q.data?.rows.find((r) => r.nodeId === nodeId);
@@ -96,7 +98,7 @@ export function NodeChecks({ nodeId }: { nodeId: string }) {
           )}
         </div>
         <span className="text-[11px] text-muted">
-          {newest > 0 ? t("hl.pills.when", { ago: fmt.ago(newest) }) : q.data ? t("hl.pills.interval", { min: Math.max(1, Math.round(q.data.intervalS / 60)) }) : ""}
+          {newest > 0 ? t("hl.pills.when", { ago: fmt.ago(newest) }) : q.data && !noChecks ? t("hl.pills.interval", { min: Math.max(1, Math.round(q.data.intervalS / 60)) }) : ""}
         </span>
       </div>
       <EditionNotice feature="health_checks" />

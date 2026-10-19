@@ -15,6 +15,8 @@ import { zh } from "@/i18n/zh";
 import { setLang } from "@/i18n";
 import { meQuery } from "@/lib/session";
 import { ChecksTab } from "@/screens/health/checks";
+import { HealthScreen } from "@/screens/health";
+import { NodeChecks } from "@/screens/node/checks";
 import { IntegrationsScreen } from "@/screens/integrations";
 import { LogsTab } from "@/screens/node/logs";
 import { BackupsPage } from "@/screens/settings-pages/backups";
@@ -30,6 +32,7 @@ const listBackups = vi.fn();
 const getTelegram = vi.fn();
 const streamLogs = vi.fn();
 const createEnrollment = vi.fn();
+let search: Record<string, string> = {};
 vi.mock("@/lib/api", () => ({
   basepath: "/",
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: Role.OWNER } }) },
@@ -38,10 +41,14 @@ vi.mock("@/lib/api", () => ({
   telegram: { getTelegram: (...a: unknown[]) => getTelegram(...a) },
   backups: { getBackupSettings: (...a: unknown[]) => getBackupSettings(...a), listBackups: (...a: unknown[]) => listBackups(...a) },
   nodes: { createEnrollment: (...a: unknown[]) => createEnrollment(...a), getNode: vi.fn(), streamLogs: (...a: unknown[]) => streamLogs(...a) },
-  health: { runChecksNow: () => Promise.resolve({ scheduled: 1, skipped: 0 }) },
+  health: {
+    runChecksNow: () => Promise.resolve({ scheduled: 1, skipped: 0 }),
+    listAlerts: () => Promise.resolve({ nowUnix: 1000, active: [], history: [] }),
+    getChecks: () => Promise.resolve(checksPage),
+  },
   updates: { getUpdates: () => Promise.resolve(updatesPage) },
-  fleet: {},
-  users: {},
+  fleet: { overview: () => Promise.resolve({ nowUnix: 1000, nodesTotal: 1, nodes: [{ id: "nod_1", name: "de1", status: NodeStatus.ONLINE }], alertsActive: 0, alertsCritical: 0, traffic: [], online: [], events: [], topConsumers: [] }) },
+  users: { listUsers: () => Promise.resolve({ users: [], counts: { all: 1 } }) },
   provisioning: {},
   assetUrl: (p: string) => p,
   isUnauthenticated: () => false,
@@ -53,18 +60,20 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
-  useSearch: () => ({}),
+  useSearch: () => search,
   useNavigate: () => () => {},
 }));
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  window.matchMedia = ((media: string) => ({ matches: false, media, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia; // jsdom has none
 });
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   edition = "edge";
+  search = {};
   setLang("en");
   getTelegram.mockResolvedValue({ status: { bot: { configured: false, username: "", error: "" }, links: [], adminUrlKnown: false } });
   getBackupSettings.mockResolvedValue({ settings: { accountId: "", jurisdiction: "default", bucket: "", accessKeyId: "", hasSecret: false, ageRecipient: "", enabled: false, intervalHours: 24, retentionDays: 0, lastSuccessUnix: 0, lastErrorCode: "" } });
@@ -249,18 +258,68 @@ describe("Node logs on the edge", () => {
   });
 });
 
+const checksPage = { nowUnix: 200, intervalS: 300, columns: [{ profileId: "prf_1", profileName: "hy2 · 443", protocol: "hysteria2" }], rows: [{ nodeId: "nod_1", nodeName: "de1", countryCode: "DE", nodeStatus: NodeStatus.ONLINE, cells: [{ deployed: false, inboundId: "", failStreak: 0, history: [] }] }] };
+
 describe("Health checks on the edge", () => {
-  const checks = { nowUnix: 200, intervalS: 300, columns: [{ profileId: "prf_1", profileName: "hy2 · 443", protocol: "hysteria2" }], rows: [{ nodeId: "nod_1", nodeName: "de1", countryCode: "DE", nodeStatus: NodeStatus.ONLINE, cells: [{ deployed: false, inboundId: "", failStreak: 0, history: [] }] }] };
-  it("says no checker runs and offers no Check now", async () => {
-    await mount(<ChecksTab data={checks as never} />);
+  it("says no checker runs, offers no Check now and claims no interval", async () => {
+    await mount(<ChecksTab data={checksPage as never} />);
     expect(text()).toContain(notice("health_checks"));
     expect(buttons()).not.toContain("Check now");
+    expect(text()).not.toContain("every 5 min");
   });
 
-  it("offers Check now on the VPS", async () => {
+  it("offers Check now and says how often on the VPS", async () => {
     edition = "vps";
-    await mount(<ChecksTab data={checks as never} />);
+    await mount(<ChecksTab data={checksPage as never} />);
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(buttons()).toContain("Check now");
+    expect(text()).toContain("Connects as a client, every 5 min");
+  });
+
+  it("claims no interval on the node page either, and does on the VPS", async () => {
+    await mount(<NodeChecks nodeId="nod_1" />);
+    expect(text()).toContain(notice("health_checks"));
+    expect(text()).not.toContain("every 5 min");
+    act(() => root?.unmount());
+    host?.remove();
+    edition = "vps";
+    await mount(<NodeChecks nodeId="nod_1" />);
+    expect(text()).toContain("every 5 min");
+  });
+});
+
+// No checker and no alert evaluator run on the edge (internal/panel/app/edge_tick.go): Health must not say "all quiet" there.
+describe("the Health page on the edge", () => {
+  const edgeAlerts = "Alerts are not raised either, apart from the country check. Node status and the doctor work as usual.";
+  it("claims no check interval and says no alerts are raised in place of All quiet", async () => {
+    await mount(<HealthScreen />);
+    expect(text()).toContain("No node problems");
+    expect(text()).not.toContain("checks every");
+    expect(text()).toContain(notice("health_checks"));
+    expect(text()).toContain(edgeAlerts);
+    expect(text()).not.toContain("All quiet.");
+    expect(text()).not.toContain("No alert in the last 7 days.");
+  });
+
+  it("says the same on People in place of Nobody has trouble connecting", async () => {
+    search = { tab: "people" };
+    await mount(<HealthScreen />);
+    expect(text()).toContain(notice("health_checks"));
+    expect(text()).toContain("Alerts about people are not raised either.");
+    expect(text()).not.toContain("Nobody has trouble connecting.");
+  });
+
+  it("is unchanged on the VPS", async () => {
+    edition = "vps";
+    await mount(<HealthScreen />);
+    expect(text()).toContain("No problems · checks every 5 min");
+    expect(text()).toContain("All quiet.");
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet");
+    act(() => root?.unmount());
+    host?.remove();
+    search = { tab: "people" };
+    await mount(<HealthScreen />);
+    expect(text()).toContain("Nobody has trouble connecting.");
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet");
   });
 });

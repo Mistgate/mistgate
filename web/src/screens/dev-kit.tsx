@@ -283,13 +283,16 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns: the DNS kit alone, for its screenshots
-  if (new URLSearchParams(location.search).get("only") === "dns")
+  // ?only=dns|edge|node: one kit alone, for its screenshots
+  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos }[new URLSearchParams(location.search).get("only") ?? ""];
+  if (only) {
+    const Kit = only;
     return (
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-        <DnsLinkKit />
+        <Kit />
       </div>
     );
+  }
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
       <div className="flex items-center gap-3">

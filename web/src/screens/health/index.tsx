@@ -10,6 +10,7 @@ import { StatusDot } from "@/components/ui/status";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { problemCount, useFleetSummary } from "@/lib/fleet";
 import { useNow } from "@/lib/time";
 import { alertsQuery, checksQuery, doctorQuery, isLoud, isPeopleAlert } from "@/lib/health";
@@ -48,6 +49,8 @@ export function HealthScreen() {
   const min = Math.max(1, Math.round((checks.data?.intervalS ?? 300) / 60));
   // the number of the header and the menu; the alerts tab counts its own rows
   const problems = problemCount(fleet);
+  // the Cloudflare edition runs no checker: the line keeps what node status says and claims no interval
+  const noChecks = useEdition().off("health_checks");
 
   const header = (sub: string) => (
     <div className="flex flex-col gap-[3px]">
@@ -113,7 +116,17 @@ export function HealthScreen() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      {header(fleet.loading ? t("hl.sum.loading") : problems > 0 ? t("hl.sum.active", { problems: t.n("health.problems", problems), min }) : t("hl.sum.quiet", { min }))}
+      {header(
+        fleet.loading
+          ? t("hl.sum.loading")
+          : noChecks
+            ? problems > 0
+              ? t.n("health.problems", problems)
+              : t("hl.sum.edgeQuiet")
+            : problems > 0
+              ? t("hl.sum.active", { problems: t.n("health.problems", problems), min })
+              : t("hl.sum.quiet", { min }),
+      )}
       <NodeProblems covered={new Set(loudAlerts.map((a) => a.nodeId))} />
       <Tabs aria-label={t("hl.tabs")} items={items} value={tab} onValueChange={setTab} />
       {flow.modal}

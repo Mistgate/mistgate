@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AlertKind } from "@/gen/mistgate/admin/v1/health_pb";
+import { EditionNotice } from "@/components/edition-notice";
 import { Chip, SectionLabel } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -14,6 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { useT, type T } from "@/i18n";
 import { health, nodes as nodesApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { quoteNames } from "@/lib/doctor-detail";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
@@ -53,16 +55,21 @@ export function useMute() {
     );
 }
 
-/** The alerts about nodes: the alerts about people (access ended, a connection that looks broken) are in the People tab, active or closed. */
+/**
+ * The alerts about nodes: the alerts about people (access ended, a connection that looks broken) are in the People tab, active or
+ * closed. The Cloudflare edition raises none but the country check's, so it says that instead of "All quiet".
+ */
 export function AlertsTab({ active: all, history: closed, now, flow }: { active: Alert[]; history: Alert[]; now: number; flow: FixFlow }) {
   const t = useT();
   const fmt = useFmt();
   const active = all.filter((a) => !isPeopleAlert(a));
   const history = closed.filter((a) => !isPeopleAlert(a));
   const lastClosed = history[0]?.resolvedAtUnix;
+  const noEval = useEdition().off("health_checks");
   return (
     <div className="flex flex-col gap-3.5">
-      {active.length === 0 && (
+      <EditionNotice feature="health_checks">{t("hl.alerts.edgeHint")}</EditionNotice>
+      {active.length === 0 && !noEval && (
         <div className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5 text-[13px]">
           <StatusDot kind="ok" />
           <b>{t("hl.alerts.quiet")}</b>

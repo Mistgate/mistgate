@@ -8,6 +8,7 @@ import { Notice } from "@/components/ui/notice";
 import { StatusDot } from "@/components/ui/status";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { cellLook, countryColumn, listOf, SLOW_CONNECT_MS, type CheckCell, type CountryColumn } from "@/lib/health";
 import type { GetChecksResponse } from "@/gen/mistgate/admin/v1/health_pb";
 import type { Plain } from "@/lib/plain";
@@ -123,6 +124,7 @@ export function ChecksTab({ data }: { data: Checks }) {
   const t = useT();
   const fmt = useFmt();
   const run = useRunChecks();
+  const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
   const [sel, setSel] = useState<{ node: string; col: number } | null>(null);
   const cols = data.columns;
   const country = countryColumn(data.countryChecks);
@@ -143,10 +145,12 @@ export function ChecksTab({ data }: { data: Checks }) {
           <SectionLabel as="h2" className="flex-1" icon="pulse" tone="rose">
             {t("hl.checks.title")}
           </SectionLabel>
-          <span className="text-xs text-muted">
-            {t("hl.checks.how", { min: Math.max(1, Math.round(data.intervalS / 60)) })}
-            {newest > 0 && ` · ${t("hl.checks.checkedAgo", { ago: fmt.ago(newest) })}`}
-          </span>
+          {!noChecks && (
+            <span className="text-xs text-muted">
+              {t("hl.checks.how", { min: Math.max(1, Math.round(data.intervalS / 60)) })}
+              {newest > 0 && ` · ${t("hl.checks.checkedAgo", { ago: fmt.ago(newest) })}`}
+            </span>
+          )}
           {run.can && (
             <Button variant="secondary" size="sm" onClick={run.run} disabled={run.running}>
               {t("hl.checks.now")}
