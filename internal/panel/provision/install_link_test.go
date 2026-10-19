@@ -180,7 +180,7 @@ func TestDrainInstallsOverTheLinkFromAStreamedRelease(t *testing.T) {
 		if strings.Contains(command, installNodeToken) || strings.Contains(command, authTestPassword) {
 			t.Fatalf("a secret is in the command line: %q", command)
 		}
-		if strings.Contains(command, "panel_reachable=%s") && strings.Contains(command, "'panel.example.com' '443'") {
+		if strings.Contains(command, "panel_reachable=%s") && strings.Contains(command, "getent ahostsv4 'panel.example.com'") && strings.Contains(command, "\"$probe_addr\" '443'") {
 			probed = true
 		}
 	}

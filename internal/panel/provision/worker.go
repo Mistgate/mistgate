@@ -625,15 +625,23 @@ func preflightCommand(panelAddr string) (string, error) {
 	if err != nil || host == "" || port == "" {
 		return "", errors.New("provision: invalid panel address")
 	}
-	// The TCP probe gets 5 s of the 20 s preflight budget: an unanswered SYN would otherwise hang for about two minutes
-	// and the panel would report ssh_preflight_timeout instead of panel_unreachable.
+	// The probe dials each address of the host, IPv4 first, at most three, 3 s each: bash's /dev/tcp tries one address, and a
+	// server whose IPv6 is configured but goes nowhere hangs on the first (IPv6) answer, while the agent's dialer falls back to
+	// IPv4 and connects. The budget stays well inside the 20 s preflight: an unanswered SYN would otherwise hang for about two
+	// minutes and the panel would report ssh_preflight_timeout instead of panel_unreachable.
 	return remotePreflightScript + `
 probe_timeout=""
-if command -v timeout >/dev/null 2>&1; then probe_timeout="timeout 5"; fi
-if command -v bash >/dev/null 2>&1 && $probe_timeout bash -c 'exec 3<>/dev/tcp/$1/$2' mistgate-probe ` + shellQuote(host) + ` ` + shellQuote(port) + ` >/dev/null 2>&1; then
-  panel_reachable=yes
-else
-  panel_reachable=no
+if command -v timeout >/dev/null 2>&1; then probe_timeout="timeout 3"; fi
+panel_reachable=no
+if command -v bash >/dev/null 2>&1; then
+  probe_addrs=$( { getent ahostsv4 ` + shellQuote(host) + ` 2>/dev/null; getent ahostsv6 ` + shellQuote(host) + ` 2>/dev/null; } | awk '!seen[$1]++ {print $1}' | head -n 3)
+  [ -n "$probe_addrs" ] || probe_addrs=` + shellQuote(host) + `
+  for probe_addr in $probe_addrs; do
+    if $probe_timeout bash -c 'exec 3<>/dev/tcp/$1/$2' mistgate-probe "$probe_addr" ` + shellQuote(port) + ` >/dev/null 2>&1; then
+      panel_reachable=yes
+      break
+    fi
+  done
 fi
 printf 'panel_reachable=%s\n' "$panel_reachable"
 `, nil

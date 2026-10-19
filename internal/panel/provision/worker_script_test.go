@@ -77,17 +77,66 @@ esac`,
 	}
 }
 
+// getentFake answers the probe's lookups the way glibc's getent does: one line per address and socket type.
+const getentFake = `case "$1" in
+ahostsv4) printf '192.0.2.10      STREAM panel.example.com\n192.0.2.10      DGRAM\n' ;;
+ahostsv6) printf '2001:db8::10    STREAM panel.example.com\n2001:db8::10    DGRAM\n' ;;
+esac`
+
 func TestPanelProbeIsBoundedByTimeout(t *testing.T) {
 	command, err := preflightCommand("panel.example.com:443")
 	if err != nil {
 		t.Fatal(err)
 	}
 	probe := "set -eu\n" + strings.TrimPrefix(command, remotePreflightScript)
-	out, calls := runScript(t, probe, nil, map[string]string{"timeout": "exit 124"})
+	out, calls := runScript(t, probe, nil, map[string]string{"timeout": "exit 124", "getent": getentFake})
 	if !strings.Contains(out, "panel_reachable=no") {
 		t.Fatalf("probe output = %q", out)
 	}
-	if len(calls) != 1 || !strings.HasPrefix(calls[0], "timeout 5 bash -c ") {
-		t.Fatalf("probe was not bounded by timeout: %q", calls)
+	var dials []string
+	for _, c := range calls {
+		if strings.HasPrefix(c, "timeout ") {
+			dials = append(dials, c)
+		}
+	}
+	if len(dials) != 2 {
+		t.Fatalf("want one bounded dial per address, got %q", calls)
+	}
+	for _, d := range dials {
+		if !strings.HasPrefix(d, "timeout 3 bash -c ") {
+			t.Fatalf("a dial was not bounded by timeout: %q", d)
+		}
+	}
+}
+
+// A server whose IPv6 is configured but goes nowhere: the IPv6 dial hangs, the IPv4 one connects. The probe tries IPv4
+// first and the panel counts as reachable, as it is for the agent's own dialer.
+func TestPanelProbeTriesIPv4FirstAndEveryAddress(t *testing.T) {
+	command, err := preflightCommand("panel.example.com:443")
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := "set -eu\n" + strings.TrimPrefix(command, remotePreflightScript)
+	out, calls := runScript(t, probe, nil, map[string]string{
+		"timeout": `case "$*" in *2001:db8::10*) exit 124 ;; esac`,
+		"getent":  getentFake,
+	})
+	if !strings.Contains(out, "panel_reachable=yes") {
+		t.Fatalf("probe output = %q (calls %q)", out, calls)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "timeout ") && !strings.Contains(c, "192.0.2.10 443") {
+			t.Fatalf("the first dial was not the IPv4 address: %q", calls)
+		}
+		if strings.HasPrefix(c, "timeout ") {
+			break
+		}
+	}
+	out, _ = runScript(t, probe, nil, map[string]string{
+		"timeout": `case "$*" in *192.0.2.10*) exit 124 ;; esac`,
+		"getent":  getentFake,
+	})
+	if !strings.Contains(out, "panel_reachable=yes") {
+		t.Fatalf("an IPv6-only path is not tried after IPv4: %q", out)
 	}
 }
