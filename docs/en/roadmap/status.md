@@ -3,22 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.46`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.47`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.46
+  meta: v0.1.0 – v0.1.47
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.46
+      release: v0.1.47
       current: true
       points:
-        - "**Stability release: 17 bugs found by a sweep of the panel, the agent and the alerts are fixed.** Among them: a WARP-exit profile that could serve directly after two failures in a row; an agent update that could commit with a profile left unapplied; traffic counted twice or lost in three rare cases; a scheduled update lost when the panel restarted; new alerts for a profile that did not start, a node that keeps dropping and a panel that lost most nodes at once; a muted alert no longer announced again. See [Alerts](../operations/health.md#alerts)."
-        - "**Agent updates no longer roll back after a false drift.** A node whose old agent reported a wrong state now passes the update gate once the fixed agent reports the right one; the gate also looks at the node once more before a rollback, and a node clock behind the panel no longer fails it."
-        - "**A dropped subscription request no longer resets everyone's settings for a minute.** One app giving up while the panel refreshed its settings cache made every fetch of the next minute use the defaults (server names, formats)."
+        - "**A failed update gate says which condition failed,** and a node whose WARP-exit profiles have no WARP tunnel after the update now fails it. Before, three different causes showed as one \"did not apply its configuration\". See [One node's update](../operations/updates.md#one-nodes-update)."
+        - "**How often a quota resets is a choice in the user form:** every day, week or month, or never; the card shows the next reset. **Ping in Happ:** a subscription setting that makes Happ ping the servers over TCP and when it opens. See [Quota periods](../guide/users-and-groups.md#quota-periods) and [Names & texts](../guide/subscriptions.md#names-texts)."
+        - "**Cloudflare edition fixes:** Health no longer says all is quiet where no checks run, a doctor action no longer opens an alert that nothing closes, the Updates page has no bundle card, and `mistgate edge deploy` no longer reports a fresh custom domain as unreachable while its DNS record is cached as missing."
     - title: Profiles
       section: profiles
       points:
@@ -78,7 +78,7 @@ Mistgate is in **beta**; the current release is `v0.1.46`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.46
+  meta: v0.1.34 – v0.1.47
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production

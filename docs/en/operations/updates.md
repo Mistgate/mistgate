@@ -123,7 +123,8 @@ Each update is pinned to a release:
    - the configuration the node applied is the panel's;
    - no profile that worked before the update has failed (a profile that stays failed for 30 seconds fails the gate at once);
    - every profile the panel can check has passed a [client-eye check](health.md) since the node came back (the panel starts a round at once).
-4. When the gate passes, the step is done. When it fails, the panel sends the node a rollback (the previous binary comes back), the step ends as "rolled back" and the rollout pauses.
+   - on a node with an enabled profile that exits through WARP, the WARP tunnel has been up since the node came back.
+4. When the gate passes, the step is done. A failed gate names the condition that did not hold: the new build did not confirm the update, the node did not apply its configuration, the panel could not read the node's profiles, a profile failed, or WARP did not come up. When it fails, the panel sends the node a rollback (the previous binary comes back), the step ends as "rolled back" and the rollout pauses.
 
 ### The agent's own safety net
 
