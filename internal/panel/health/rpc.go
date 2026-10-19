@@ -736,9 +736,12 @@ func (s *Service) doctorRow(ctx context.Context, nodeID, checkID string) (store.
 	return n, store.DoctorRow{}, notFound("doctor item")
 }
 
-// nodeView is the doctor state of one node after a change, with its alerts already brought up to date.
+// nodeView is the doctor state of one node after a change. The edge edition has no alert evaluator to reconcile one-off
+// evaluations, so its doctor actions refresh this view without opening alerts.
 func (s *Service) nodeView(ctx context.Context, nodeID string) (*adminv1.NodeDoctor, error) {
-	s.evaluate(ctx)
+	if !s.cfg.Edge {
+		s.evaluate(ctx)
+	}
 	views, err := s.doctorViews(ctx, nodeID)
 	if err != nil || len(views) != 1 {
 		return nil, s.internal("doctor view", err)
@@ -842,7 +845,9 @@ func (r rpc) apply(ctx context.Context, n store.NodeRow, fix string, params map[
 		case <-time.After(recheckBy):
 		case <-ctx.Done():
 		}
-		s.evaluate(ctx) // alerts that the fix cleared resolve now, as "fix_applied"
+		if !s.cfg.Edge {
+			s.evaluate(ctx) // alerts that the fix cleared resolve now, as "fix_applied"
+		}
 		views, err := s.doctorViews(ctx, n.ID)
 		if err != nil {
 			return nil, s.internal("apply fix", err)

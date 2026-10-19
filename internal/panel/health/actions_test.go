@@ -185,6 +185,54 @@ func TestAcceptDoctorWarning(t *testing.T) {
 	}
 }
 
+func TestEdgeDoctorActionsDoNotEvaluateAlerts(t *testing.T) {
+	t.Run("accept", func(t *testing.T) {
+		e := newEnv(t, func(c *Config) { c.Edge = true })
+		nodeID := "node-fern"
+		e.node(nodeID, "invented-provider", true)
+		e.s.DoctorReport(e.ctx, nodeID, &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{
+			withCode(res("foreign_nft", dWarn, "", "tables", "ip nat"), "foreign_nft.nat"),
+			res("disk_space", dFail, ""),
+		}})
+
+		_, err := (rpc{e.s}).AcceptDoctorItem(e.ctx, req(&adminv1.AcceptDoctorItemRequest{NodeId: nodeID, CheckId: "foreign_nft"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := e.active(); len(got) != 0 {
+			t.Fatalf("accepting a doctor item evaluated alerts on edge: %v", got)
+		}
+	})
+
+	t.Run("apply fix", func(t *testing.T) {
+		e := newEnv(t, func(c *Config) { c.Edge = true })
+		nodeID := "node-maple"
+		e.node(nodeID, "invented-provider", true)
+		report := func() {
+			e.s.DoctorReport(e.ctx, nodeID, &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{res("disk_space", dFail, "journald_vacuum")}})
+		}
+		report()
+		e.fl.fix = func(c fixCall) (*agentv1.CommandResult, error) {
+			if !c.dry {
+				report()
+			}
+			return &agentv1.CommandResult{Ok: true, Detail: "complete"}, nil
+		}
+		r := rpc{e.s}
+		plan, err := r.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: nodeID, FixId: "journald_vacuum", DryRun: true}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = r.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: nodeID, FixId: "journald_vacuum", PlanId: plan.Msg.PlanId}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := e.active(); len(got) != 0 {
+			t.Fatalf("applying a fix evaluated alerts on edge: %v", got)
+		}
+	})
+}
+
 // An acceptance lands only while the stored result is still that warning. An accept that read the WARN before a FAIL came
 // in (the FAIL dropped the acceptances already) must not be stored after it: the same WARN coming back would then be
 // hidden although a FAIL happened in between.

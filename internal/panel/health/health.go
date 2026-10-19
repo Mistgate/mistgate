@@ -71,6 +71,8 @@ const (
 
 // Config configures Service. The zero value is production: only Actor and Log are usually set.
 type Config struct {
+	// Edge keeps one-off doctor actions from evaluating alerts when the edge edition has no evaluator to reconcile them.
+	Edge bool
 	// Dialers maps a protocol plugin id to its tunnel client. Default: hysteria2, awg and vless. A protocol without one is
 	// SKIPPED (client_unsupported).
 	Dialers map[string]Dialer
