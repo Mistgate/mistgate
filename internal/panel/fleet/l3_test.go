@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -455,6 +456,40 @@ func awgBatch(seq uint64, end int64, inbound string, peersOnline uint32, warp *a
 				PeersHandshaken: 3, PeersOnline: peersOnline, NewestHandshakeUnix: end - 5, UdpRxPackets: 99, UnknownPeerEvents: 1}}},
 		Warp: warp,
 	}}}
+}
+
+// The node's facts name the awg backend the node reports, not what its Hello said: an agent connects before its first awg
+// inbound builds the engine, so that Hello says only "backend chosen at the first inbound", and no later Hello comes to correct it.
+func TestNodeFactsNameTheReportedAwgBackend(t *testing.T) {
+	x, a := newL3Env(t)
+	c := a.open()
+	h := hello("new", 0, "")
+	h.GetHello().Capabilities = []string{"awg/1"}
+	h.GetHello().Engines = append(h.GetHello().Engines, &agentv1.EngineInfo{Protocol: "awg", Version: "amneziawg (backend chosen at the first inbound)"})
+	c.send(0, h)
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
+	ds := c.desired()
+	m := newModel()
+	if !m.apply(ds) {
+		t.Fatal("full state did not apply")
+	}
+	c.send(0, applied(ds, m.hash()))
+	engines := func() []string {
+		t.Helper()
+		resp, err := (nodeService{x.f}).GetNode(x.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.Msg.GetFacts().GetEngines()
+	}
+	if got := engines(); !slices.Equal(got, []string{"fakehy: v1", "awg: amneziawg (backend chosen at the first inbound)"}) {
+		t.Fatalf("before any awg report the Hello is all there is: %v", got)
+	}
+	c.send(1, awgBatch(1, x.clock.now().Unix(), "inb_awg", 1, nil))
+	within(t, "the awg health is stored", func() bool { return x.inboundRow("inb_awg").AwgHealthJSON != "" })
+	if got := engines(); !slices.Equal(got, []string{"fakehy: v1", "awg: amneziawg-go v3.1.20260828"}) {
+		t.Errorf("after the report: %v", got)
+	}
 }
 
 func TestAwgAndWarpHealthIntakeIsStoredAndThrottled(t *testing.T) {

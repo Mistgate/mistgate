@@ -192,6 +192,21 @@ func awgStatusMsg(row store.FleetInboundRow) *adminv1.AwgInboundStatus {
 	}
 }
 
+// reportedAwgBackend is the AmneziaWG backend named by the newest AWG report of the node's inbounds ("" = none yet), for the
+// node's facts. Their engines come from Hello, and an agent names its awg backend only once the first awg inbound has built
+// the engine (cmd/mistgate-node awgEngine.Version), which is after the Hello of a fresh node; a changed backend setting
+// rebuilds the engine without a new Hello either. The report comes with the statistics, so it is the current one.
+func reportedAwgBackend(rows []store.FleetInboundRow) string {
+	var v string
+	var at time.Time
+	for _, r := range rows {
+		if h := awgStatusMsg(r); h != nil && h.BackendVersion != "" && !r.AwgHealthAt.Before(at) {
+			v, at = h.BackendVersion, r.AwgHealthAt
+		}
+	}
+	return v
+}
+
 // warpSummary is Node.warp: the module's badge, or "not configured"/"unknown" without a module.
 func (f *Fleet) warpSummary(ctx context.Context, nodeID string, online bool, now time.Time) *adminv1.WarpSummary {
 	a, err := f.st.WarpAccount(ctx, nodeID)

@@ -442,8 +442,13 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	if facts.Hostname != "" || facts.OS != "" || len(facts.Engines) > 0 {
 		nf := &adminv1.NodeFacts{Hostname: facts.Hostname, Os: facts.OS, Kernel: facts.Kernel, Arch: facts.Arch, CpuCount: facts.CPUCount,
 			RamTotalBytes: facts.RAMTotal, DiskTotalBytes: facts.DiskTotal, Virt: facts.Virt, HasIpv6: facts.HasIPv6, BootUnix: fleetUnix(n.BootAt)}
+		awgNow := reportedAwgBackend(inbounds)
 		for _, e := range facts.Engines {
-			nf.Engines = append(nf.Engines, e.Protocol+": "+e.Version)
+			v := e.Version
+			if e.Protocol == protocolAWG && awgNow != "" {
+				v = awgNow
+			}
+			nf.Engines = append(nf.Engines, e.Protocol+": "+v)
 		}
 		resp.Facts = nf
 	}

@@ -209,8 +209,8 @@ export function NodeDemos() {
         </Mock>
       </Demo>
 
-      <Demo shot="node-awg-new" title="Node: a new AWG profile, a device that never connected, no packet yet (?tab=profiles)">
-        <Mock fill={nodeFill("nod_de1", { checks: nodeChecks(NodeStatus.ONLINE, [cell(CheckStatus.SKIPPED, "client_unsupported")]) })}>
+      <Demo shot="node-awg-new" title="Node: a new AWG profile, a device that never connected, no packet yet (?tab=profiles); the facts name the reported backend">
+        <Mock fill={nodeFill("nod_de1", { checks: { nowUnix: now, intervalS: 300, columns: [columns[2]], rows: [{ ...matrix.rows[0], cells: [{ deployed: true, inboundId: "inb_1", failStreak: 0, history: [] }] }] } })}>
           <NodeDetail
             data={
               {
@@ -227,7 +227,8 @@ export function NodeDemos() {
                   }),
                 ],
                 metrics,
-                facts,
+                // GetNode names the backend of the newest AWG report, not the Hello's "backend chosen at the first inbound"
+                facts: { ...facts, engines: ["hysteria2: hysteria core v2.6.1", "awg: amneziawg-go v3.1.20260828"] },
               } as never
             }
           />
