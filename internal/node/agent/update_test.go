@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
@@ -299,6 +300,34 @@ func TestUpdateOverTheWire(t *testing.T) {
 	// .prev stays for a manual rollback.
 	if b, _ := os.ReadFile(f.exe + ".prev"); string(b) != string(oldBin) {
 		t.Error(".prev must survive the commit")
+	}
+}
+
+func TestUpdateUsesMTLSWhenLinkURLIsConfiguredOnVPSAgent(t *testing.T) {
+	f := newUpdFix(t)
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		f.cfg(oldBuilt, "0.1.0-old", nil)(c)
+		c.LinkURL = "wss://127.0.0.1:1/123456789012345678901234/"
+	}})
+	h.panel.mu.Lock()
+	h.panel.bundle = map[string][]byte{binName: newBin}
+	h.panel.mu.Unlock()
+	if h.a.linkOnly() || h.a.cfg.LinkURL == "" {
+		t.Fatalf("agent setup: linkOnly=%v LinkURL=%q", h.a.linkOnly(), h.a.cfg.LinkURL)
+	}
+
+	var got bytes.Buffer
+	total, err := (updSource{a: h.a, token: "provided-link-token"}).Fetch(context.Background(), binName, 0, &got)
+	if err != nil {
+		t.Fatalf("mTLS FetchUpdate failed: %v", err)
+	}
+	if total != uint64(len(newBin)) || !bytes.Equal(got.Bytes(), newBin) {
+		t.Fatalf("Fetch total=%d bytes=%d, want %d bytes via FetchUpdate", total, got.Len(), len(newBin))
+	}
+	h.panel.mu.Lock()
+	defer h.panel.mu.Unlock()
+	if len(h.panel.fetches) != 1 || h.panel.fetches[0] != 0 {
+		t.Errorf("FetchUpdate offsets = %v, want one mTLS request at offset 0", h.panel.fetches)
 	}
 }
 

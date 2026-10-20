@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -23,6 +26,8 @@ import (
 // UpdateAgent/RollbackAgent, drains the agent before a re-exec, and runs the commit watch of a new build.
 
 const (
+	capUpdateLink = "update-link/1"
+
 	// A new build commits only after it has been connected this long with its state applied: engines need a moment
 	// before a failing inbound shows up in their health.
 	commitSettle = 10 * time.Second
@@ -35,16 +40,23 @@ const (
 var errExec = errors.New("re-exec failed")
 
 // updSource is the update package's view of the agent.
-type updSource struct{ a *Agent }
+type updSource struct {
+	a     *Agent
+	token string
+}
 
 func (s updSource) Now() time.Time { return s.a.now() }
 
 func (s updSource) Failed() []string { return s.a.failedInbounds() }
 
-// Fetch downloads one bundle file from the panel with its own mTLS client, appending to w from offset. Errors are
-// mapped for the updater: a busy panel is ErrRetryLater, an unknown name or a missing bundle is ErrPermanent.
+// Fetch downloads one bundle file and appends to w from offset. VPS agents use the panel's mTLS stream; link-only agents
+// use the authenticated link route. Errors are mapped for the updater: busy is ErrRetryLater, unavailable files are
+// ErrPermanent.
 func (s updSource) Fetch(ctx context.Context, name string, offset uint64, w io.Writer) (uint64, error) {
 	a := s.a
+	if a.linkOnly() {
+		return s.fetchLink(ctx, name, offset, w)
+	}
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), &http.HTTP2Config{
 		SendPingTimeout: secs(st.KeepaliveIntervalS, 20*time.Second),
@@ -69,6 +81,161 @@ func (s updSource) Fetch(ctx context.Context, name string, offset uint64, w io.W
 	}
 	if err := stream.Err(); err != nil {
 		return total, mapFetchErr(err)
+	}
+	return total, nil
+}
+
+func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w io.Writer) (uint64, error) {
+	if s.token == "" {
+		return 0, fmt.Errorf("%w: missing download token", update.ErrPermanent)
+	}
+	a := s.a
+	rawURL, err := linkDownloadURL(a.cfg.LinkURL, a.meta.NodeID, name)
+	if err != nil {
+		return 0, fmt.Errorf("%w: invalid link download URL: %v", update.ErrPermanent, err)
+	}
+	keepaliveTimeout := 45 * time.Second
+	if st := a.settings.Load(); st != nil {
+		keepaliveTimeout = secs(st.KeepaliveTimeoutS, keepaliveTimeout)
+	}
+	idle := durOr(a.linkPingTimeout, keepaliveTimeout)
+	requestCtx, cancel := context.WithCancel(ctx)
+	var stallFired atomic.Bool
+	stall := time.AfterFunc(idle, func() {
+		stallFired.Store(true)
+		cancel()
+	})
+	defer func() {
+		stall.Stop()
+		cancel()
+	}()
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("%w: cannot build link download request", update.ErrPermanent)
+	}
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Accept-Encoding", "identity")
+	if offset > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+	}
+	client, cleanup := a.newLinkHTTPClient()
+	if cleanup != nil {
+		defer cleanup()
+	}
+	requestClient := *client
+	requestClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := requestClient.Do(req)
+	if err != nil {
+		if stallFired.Load() && ctx.Err() == nil {
+			return 0, fmt.Errorf("link download stalled for %s", idle)
+		}
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return 0, fmt.Errorf("link download request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body := linkStallReader{r: resp.Body, stall: stall, idle: idle}
+
+	var total uint64
+	switch resp.StatusCode {
+	case http.StatusOK:
+		if resp.ContentLength >= 0 {
+			total = uint64(resp.ContentLength)
+		}
+		if offset > 0 {
+			if offset > uint64(1<<63-1) {
+				return total, errors.New("link download offset is too large")
+			}
+			if _, err := io.CopyN(io.Discard, body, int64(offset)); err != nil {
+				if stallFired.Load() && ctx.Err() == nil {
+					return total, fmt.Errorf("link download stalled for %s", idle)
+				}
+				return total, fmt.Errorf("discard ranged response prefix: %w", err)
+			}
+		}
+	case http.StatusPartialContent:
+		total, err = linkContentRange(resp.Header.Get("Content-Range"), offset)
+		if err != nil {
+			return 0, err
+		}
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return 0, fmt.Errorf("%w: link download returned HTTP %d", update.ErrPermanent, resp.StatusCode)
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return 0, fmt.Errorf("%w: link download returned HTTP %d", update.ErrRetryLater, resp.StatusCode)
+	default:
+		return 0, fmt.Errorf("link download returned HTTP %d", resp.StatusCode)
+	}
+	if _, err := io.Copy(w, body); err != nil {
+		if stallFired.Load() && ctx.Err() == nil {
+			return total, fmt.Errorf("link download stalled for %s", idle)
+		}
+		return total, err
+	}
+	return total, nil
+}
+
+type linkStallReader struct {
+	r     io.Reader
+	stall *time.Timer
+	idle  time.Duration
+}
+
+func (r linkStallReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	if n > 0 {
+		r.stall.Reset(r.idle)
+	}
+	return n, err
+}
+
+func linkDownloadURL(linkBase, nodeID, name string) (string, error) {
+	if nodeID == "" || name == "" {
+		return "", errors.New("node id and file name are required")
+	}
+	u, err := parseLinkBase(linkBase)
+	if err != nil {
+		return "", err
+	}
+	escapedPrefix := strings.TrimRight(u.EscapedPath(), "/")
+	u.Path = strings.TrimRight(u.Path, "/") + "/update/" + nodeID + "/" + name
+	u.RawPath = escapedPrefix + "/update/" + url.PathEscape(nodeID) + "/" + url.PathEscape(name)
+	u.Scheme = "https"
+	u.RawQuery = ""
+	u.ForceQuery = false
+	u.Fragment = ""
+	u.Opaque = ""
+	return u.String(), nil
+}
+
+func linkContentRange(value string, offset uint64) (total uint64, err error) {
+	unit, value, ok := strings.Cut(strings.TrimSpace(value), " ")
+	if !ok || unit != "bytes" {
+		return 0, errors.New("link download returned an invalid Content-Range")
+	}
+	byteRange, size, ok := strings.Cut(value, "/")
+	if !ok {
+		return 0, errors.New("link download returned an invalid Content-Range")
+	}
+	startText, endText, ok := strings.Cut(byteRange, "-")
+	if !ok {
+		return 0, errors.New("link download returned an invalid Content-Range")
+	}
+	start, err := strconv.ParseUint(startText, 10, 64)
+	if err != nil || start != offset {
+		return 0, fmt.Errorf("link download Content-Range starts at %q, want %d", startText, offset)
+	}
+	end, err := strconv.ParseUint(endText, 10, 64)
+	if err != nil || end < start {
+		return 0, errors.New("link download returned an invalid Content-Range")
+	}
+	if size == "*" {
+		return 0, nil
+	}
+	total, err = strconv.ParseUint(size, 10, 64)
+	if err != nil || total == 0 || end >= total {
+		return 0, errors.New("link download returned an invalid Content-Range")
 	}
 	return total, nil
 }
@@ -177,7 +344,11 @@ func (a *Agent) applyUpdate(s *session, r *pb.UpdateAgent) {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "unsigned_build"}))
 		return
 	}
-	res, fin := a.upd.Apply(s.ctx, r, updSource{a})
+	ctx := s.ctx
+	if a.linkOnly() && a.runCtx != nil {
+		ctx = a.runCtx
+	}
+	res, fin := a.upd.Apply(ctx, r, updSource{a: a, token: r.GetDownloadToken()})
 	a.finishCommand(s, res, fin)
 }
 

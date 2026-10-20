@@ -91,18 +91,19 @@ func TestEnrollLinkSavesLinkMeta(t *testing.T) {
 
 }
 
-func TestLinkOnlyAgentListsNoSelfUpdate(t *testing.T) {
+func TestLinkOnlyAgentListsLinkUpdateCapability(t *testing.T) {
 	f := newUpdFix(t)
 	var cfg Config
 	cfg.StateDir = t.TempDir()
 	f.cfg(1000, "0.1.0", nil)(&cfg)
 	a := &Agent{cfg: cfg, host: &fakeHost{}, upd: cfg.Updater}
-	if caps := a.capabilities(); !contains(caps, "update/1") || !contains(caps, "update-guard/1") {
+	if caps := a.capabilities(); !contains(caps, "update/1") || contains(caps, "update-link/1") || !contains(caps, "update-guard/1") {
 		t.Fatalf("control: a VPS agent lists %v", caps)
 	}
 	a.meta.Link = "wss://de1.example.com/" + strings.Repeat("p", 24) + "/"
 	caps := a.capabilities()
-	if contains(caps, "update/1") || contains(caps, "update-guard/1") || !contains(caps, "doctor/1") || !contains(caps, "ws-link/1") {
+	if !contains(caps, "update-link/1") || contains(caps, "update/1") || !contains(caps, "update-guard/1") ||
+		!contains(caps, "doctor/1") || !contains(caps, "ws-link/1") {
 		t.Errorf("a link-only agent lists %v", caps)
 	}
 }

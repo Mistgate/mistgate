@@ -83,20 +83,7 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	endpoint.Fragment = ""
 	endpoint.Scheme = "wss"
 
-	client := a.linkHTTPClient
-	var cleanup func()
-	if client == nil {
-		st := a.settings.Load()
-		transport := &http.Transport{
-			TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}},
-			DialContext:         (&net.Dialer{Timeout: dialTimeout(st), KeepAlive: 30 * time.Second}).DialContext,
-			TLSHandshakeTimeout: dialTimeout(st),
-			IdleConnTimeout:     30 * time.Second,
-			MaxIdleConns:        1,
-		}
-		client = &http.Client{Transport: transport}
-		cleanup = client.CloseIdleConnections
-	}
+	client, cleanup := a.newLinkHTTPClient()
 
 	hctx, cancel := context.WithTimeout(ctx, linkHandshakeTimeout)
 	defer cancel()
@@ -160,6 +147,28 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 		return refuse(errors.New("panel link authentication failed"))
 	}
 	return &websocketAgentTransport{ctx: ctx, conn: ws}, cleanup, nil
+}
+
+// newLinkHTTPClient shares the link transport's TLS settings and test seam with link downloads.
+// A test-injected client is owned by the test; production clients are per operation and cleaned up by the caller.
+func (a *Agent) newLinkHTTPClient() (*http.Client, func()) {
+	if a.linkHTTPClient != nil {
+		return a.linkHTTPClient, nil
+	}
+	st := a.settings.Load()
+	if st == nil {
+		st = &pb.NodeSettings{}
+	}
+	timeout := dialTimeout(st)
+	transport := &http.Transport{
+		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}},
+		DialContext:         (&net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout: timeout,
+		IdleConnTimeout:     30 * time.Second,
+		MaxIdleConns:        1,
+	}
+	client := &http.Client{Transport: transport}
+	return client, client.CloseIdleConnections
 }
 
 var _ agentTransport = (*websocketAgentTransport)(nil)

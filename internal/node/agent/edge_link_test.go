@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -9,9 +10,11 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -27,6 +30,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/update"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
@@ -48,6 +52,7 @@ type edgeOpts struct {
 	statsEvery time.Duration // 0 = 20 ms
 	backoff    time.Duration // the reconnect delay (min = max), 0 = 20 ms
 	noEnroll   bool          // the test enrols the agent itself
+	updateHTTP http.Handler  // optional link download route
 }
 
 type edgeRig struct {
@@ -119,6 +124,9 @@ func newEdgeRig(t *testing.T, o edgeOpts) *edgeRig {
 	r.pool = pool
 	// The Worker under the secret prefix. The edge has no mTLS endpoint: anything outside the prefix is a 404.
 	root := http.NewServeMux()
+	if o.updateHTTP != nil {
+		root.Handle(r.prefix+"update/", http.StripPrefix(r.prefix+"update/", o.updateHTTP))
+	}
 	root.Handle(r.prefix, r.em.Worker(r.prefix))
 	ts := httptest.NewUnstartedServer(root)
 	ts.EnableHTTP2 = true
@@ -135,6 +143,166 @@ func newEdgeRig(t *testing.T, o edgeOpts) *edgeRig {
 		}
 	}
 	return r
+}
+
+func TestLinkUpdateOverEmulatedLink(t *testing.T) {
+	f := newUpdFix(t)
+	manifest, signature := f.manifest(newBin, newBuilt)
+	const token = "link-update-token"
+	requests := make(chan *http.Request, 1)
+	r := newEdgeRig(t, edgeOpts{updateHTTP: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		requests <- req.Clone(req.Context())
+		w.Header().Set("Content-Length", fmt.Sprint(len(newBin)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(newBin)
+	})})
+	r.start(func(a *Agent) {
+		cfg := a.cfg
+		f.cfg(oldBuilt, "0.1.0-old", func(c *update.Config) { c.Log = a.cfg.Log })(&cfg)
+		a.cfg, a.upd = cfg, cfg.Updater
+		fast(a)
+	})
+	eventually(t, func() bool { return r.session() != 0 }, "link-only agent session")
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{
+		RequestId: "update-edge-1", Manifest: manifest, Signature: signature, DownloadToken: token,
+	}}}
+	if err := r.em.Send(context.Background(), r.nodeID, "update-edge-1", frame, time.Now().Add(time.Minute)); err != nil {
+		t.Fatalf("send UpdateAgent: %v", err)
+	}
+	if got := f.waitExec(); got != f.exe {
+		t.Errorf("exec path = %q, want %q", got, f.exe)
+	}
+	if got, err := os.ReadFile(f.exe); err != nil || !bytes.Equal(got, newBin) {
+		t.Fatalf("updated executable = %d bytes, err %v", len(got), err)
+	}
+	select {
+	case req := <-requests:
+		if req.URL.Path != r.nodeID+"/"+binName || req.Header.Get("Authorization") != "Bearer "+token || req.Header.Get("Range") != "" {
+			t.Errorf("asset request path=%q headers=%v", req.URL.Path, req.Header)
+		}
+		if strings.Contains(req.RequestURI, token) {
+			t.Errorf("download token leaked into URL %q", req.RequestURI)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("link download route was not called")
+	}
+	eventually(t, func() bool {
+		for _, step := range r.em.steps(r.nodeID) {
+			if step.Result != nil && step.Result.RequestId == "update-edge-1" && step.Result.Ok {
+				return true
+			}
+		}
+		return false
+	}, "successful CommandResult over the emulated link")
+	if strings.Contains(r.logs.String(), token) {
+		t.Error("download token leaked into agent logs")
+	}
+}
+
+func TestLinkUpdateDownloadContinuesAfterLinkDrop(t *testing.T) {
+	f := newUpdFix(t)
+	manifest, signature := f.manifest(newBin, newBuilt)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseBody := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseBody)
+	r := newEdgeRig(t, edgeOpts{updateHTTP: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprint(len(newBin)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(newBin[:len(newBin)/2])
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		close(started)
+		<-release
+		_, _ = w.Write(newBin[len(newBin)/2:])
+	})})
+	runner := r.start(func(a *Agent) {
+		cfg := a.cfg
+		f.cfg(oldBuilt, "0.1.0-old", func(c *update.Config) { c.Log = a.cfg.Log })(&cfg)
+		a.cfg, a.upd = cfg, cfg.Updater
+		fast(a)
+	})
+	eventually(t, func() bool { return r.session() != 0 }, "link-only agent session")
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{
+		RequestId: "update-drop-1", Manifest: manifest, Signature: signature, DownloadToken: "drop-test-token",
+	}}}
+	if err := r.em.Send(context.Background(), r.nodeID, "update-drop-1", frame, time.Now().Add(time.Minute)); err != nil {
+		t.Fatalf("send UpdateAgent: %v", err)
+	}
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("download did not start")
+	}
+	session := runner.a.cur.Load()
+	if session == nil {
+		t.Fatal("agent has no link session during download")
+	}
+	if err := r.em.Close(context.Background(), r.nodeID, "drop during update download"); err != nil {
+		t.Fatalf("drop link: %v", err)
+	}
+	eventually(t, func() bool { return session.ctx.Err() != nil }, "link session to close")
+	releaseBody()
+	if got := f.waitExec(); got != f.exe {
+		t.Errorf("exec path = %q, want %q", got, f.exe)
+	}
+	if got, err := os.ReadFile(f.exe); err != nil || !bytes.Equal(got, newBin) {
+		t.Fatalf("updated executable after link drop = %d bytes, err %v", len(got), err)
+	}
+}
+
+func TestStoppingAgentCancelsLinkUpdateDownload(t *testing.T) {
+	f := newUpdFix(t)
+	manifest, signature := f.manifest(newBin, newBuilt)
+	started := make(chan struct{})
+	cancelled := make(chan struct{})
+	r := newEdgeRig(t, edgeOpts{updateHTTP: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprint(len(newBin)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(newBin[:len(newBin)/2])
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		close(started)
+		<-req.Context().Done()
+		close(cancelled)
+	})})
+	runner := r.start(func(a *Agent) {
+		cfg := a.cfg
+		f.cfg(oldBuilt, "0.1.0-old", func(c *update.Config) { c.Log = a.cfg.Log })(&cfg)
+		a.cfg, a.upd = cfg, cfg.Updater
+		fast(a)
+	})
+	eventually(t, func() bool { return r.session() != 0 }, "link-only agent session")
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{
+		RequestId: "update-stop-1", Manifest: manifest, Signature: signature, DownloadToken: "stop-test-token",
+	}}}
+	if err := r.em.Send(context.Background(), r.nodeID, "update-stop-1", frame, time.Now().Add(time.Minute)); err != nil {
+		t.Fatalf("send UpdateAgent: %v", err)
+	}
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("link download did not start")
+	}
+	if err := runner.stop(); err != nil {
+		t.Fatalf("stop agent: %v", err)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not observe the cancelled download request")
+	}
+	eventually(t, func() bool {
+		_, err := os.Stat(f.exe + ".new")
+		return errors.Is(err, os.ErrNotExist)
+	}, "temporary update file cleanup")
+	if got, err := os.ReadFile(f.exe); err != nil || !bytes.Equal(got, oldBin) {
+		t.Errorf("executable after stopping = %q, err %v; want the old build", got, err)
+	}
+	f.noExec(100 * time.Millisecond)
 }
 
 func (r *edgeRig) linkURL() string { return "wss://" + r.host + r.prefix }

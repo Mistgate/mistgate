@@ -385,10 +385,11 @@ func (e *nodeLinkEmu) loseState(nodeID string, kind fleet.LinkKind) {
 
 // emuStep is one Go step of an object.
 type emuStep struct {
-	Gen  uint64         // the generation of the session the step belongs to
-	Kind fleet.LinkKind //
-	Msg  string         // frame, request: the message field name
-	Err  bool           // the step failed (or its result was thrown away)
+	Gen    uint64                 // the generation of the session the step belongs to
+	Kind   fleet.LinkKind         //
+	Msg    string                 // frame, request: the message field name
+	Result *agentv1.CommandResult // the agent's command result, when this is a LinkFrame
+	Err    bool                   // the step failed (or its result was thrown away)
 }
 
 // emuClose is a close the object asked its socket for.
@@ -1102,6 +1103,12 @@ func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) (fleet.LinkOut,
 		in.DeadlineAt = time.UnixMilli(ev.deadlineAt)
 	}
 	step := emuStep{Gen: gen, Kind: ev.kind, Msg: emuMessage(ev.kind, ev.frame)}
+	if ev.kind == fleet.LinkFrame {
+		var frame agentv1.ConnectRequest
+		if proto.Unmarshal(ev.frame, &frame) == nil {
+			step.Result = frame.GetCommandResult()
+		}
+	}
 	fail, lose := takeFault(o.failNext, ev.kind), takeFault(o.loseState, ev.kind)
 	before := o.e.beforeHook()
 	out, err := emuCall(o, func(ctx context.Context) (fleet.LinkOut, error) {

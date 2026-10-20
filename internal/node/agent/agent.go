@@ -56,7 +56,7 @@ type Config struct {
 	Version string
 	// Built is the Unix time of the source commit (Hello.built); 0 = buildinfo.BuiltUnix().
 	Built int64
-	// Updater is the self-update machinery (internal/node/update). Nil = this agent never lists "update/1" and
+	// Updater is the self-update machinery (internal/node/update). Nil = this agent never lists an update capability and
 	// refuses UpdateAgent and RollbackAgent.
 	Updater *update.Updater
 	// Log receives the agent's records; every record also goes to the in-memory ring that LogRequest reads.
@@ -131,6 +131,7 @@ type Agent struct {
 	skewed                  atomic.Bool
 	cur                     atomic.Pointer[session]
 	cancel                  context.CancelCauseFunc
+	runCtx                  context.Context                                  // agent lifetime; link-only update downloads must outlive their panel session
 	offsetAt                atomic.Pointer[time.Time]                        // when offset was measured, with its monotonic reading; nil = never
 	elapsed                 func(since time.Time) (wall, mono time.Duration) // test seam: wall and monotonic time since offsetAt
 
@@ -439,6 +440,7 @@ func (a *Agent) closeEngines() {
 func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancelCause(ctx)
 	a.cancel = cancel
+	a.runCtx = ctx
 	defer cancel(nil)
 
 	if a.startUpdate(ctx) { // a rollback decided at start replaces this process before anything runs

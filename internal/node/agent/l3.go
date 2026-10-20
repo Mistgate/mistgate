@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/unit"
+	"github.com/mistgate/mistgate/internal/node/update"
 	"github.com/mistgate/mistgate/internal/node/warp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -165,10 +167,17 @@ func (a *Agent) capabilities() []string {
 	if a.cfg.AwgPrepare != nil && a.engines[awg.Protocol] != nil {
 		caps = append(caps, capAwgPrepare)
 	}
-	if a.linkOnly() { // FetchUpdate is an mTLS call (owner decision 2: no self-update on the edge edition yet)
+	updateCaps := a.upd.Capabilities()
+	if a.linkOnly() {
+		if slices.Contains(updateCaps, update.CapUpdate) {
+			caps = append(caps, capUpdateLink)
+			if slices.Contains(updateCaps, update.CapGuard) {
+				caps = append(caps, update.CapGuard)
+			}
+		}
 		return caps
 	}
-	return append(caps, a.upd.Capabilities()...)
+	return append(caps, updateCaps...)
 }
 
 // appliesUserRateLimit: some engine shares a bucket per person and none that shapes per credential cannot (an engine that
