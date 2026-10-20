@@ -10,6 +10,7 @@ import { StatusPill, kindTextClass, type StatusKind } from "@/components/ui/stat
 import { BundleStatus, NodeUpdateState, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt, type Fmt } from "@/lib/format";
 import { canRollbackNode, canUpdateNode, inActiveRollout, lastUpdateView, manualCommands, nodeStateKey, nodeStateKind, updateDateTimeAtOffset, updateTimezoneName, pendingStep, type NodeUpdate, type Rollout, type Step, type Updates } from "@/lib/updates";
 
@@ -86,10 +87,10 @@ function State({ node, step, open, onToggle }: { node: NodeUpdate; step?: Step; 
   );
 }
 
-function Command({ value }: { value: string }) {
+export function Command({ value }: { value: string }) {
   return (
     <div className="flex flex-wrap items-start gap-2">
-      <code className="min-w-0 flex-[1_1_260px] rounded-field border border-line bg-surface px-2.5 py-2 font-mono text-xs leading-relaxed break-all text-fg select-all">
+      <code className="min-w-0 flex-[1_1_260px] rounded-field border border-line bg-surface px-2.5 py-2 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-fg select-all">
         {value}
       </code>
       <CopyButton value={value} />
@@ -97,17 +98,21 @@ function Command({ value }: { value: string }) {
   );
 }
 
-/** The manual update of one node, as two commands to copy: put the release binary on it, run its install. */
+/**
+ * The manual update of one node, as two commands to copy: put the release binary on it, run its install. On the Cloudflare
+ * edition both run on the node, which downloads the panel's release itself and checks its SHA-256.
+ */
 function HowTo({ data, node }: { data: Updates; node: NodeUpdate }) {
   const t = useT();
-  const c = manualCommands(data, node);
+  const c = manualCommands(data, node, useEdition().edge);
+  const hint = c.onNode ? (c.guessedArch ? "up.howto.fetchHintArch" : "up.howto.fetchHint") : c.guessedArch ? "up.howto.copyHintArch" : "up.howto.copyHint";
   return (
     <div className="flex flex-col gap-3 rounded-field border border-line bg-canvas p-3.5">
       <ol className="flex flex-col gap-3">
         <li className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold">{t("up.howto.copy")}</span>
-          {c.copy ? <Command value={c.copy} /> : <p className="text-xs leading-snug text-pretty text-muted">{t("up.howto.noFile", { file: c.file })}</p>}
-          {c.copy && <span className="text-[11px] leading-snug text-muted">{t(c.guessedArch ? "up.howto.copyHintArch" : "up.howto.copyHint")}</span>}
+          <span className="text-xs font-bold">{t(c.onNode ? "up.howto.fetch" : "up.howto.copy")}</span>
+          {c.copy ? <Command value={c.copy} /> : <p className="text-xs leading-snug text-pretty text-muted">{t(c.onNode ? "up.howto.fetchNoFile" : "up.howto.noFile", { file: c.file })}</p>}
+          {c.copy && <span className="text-[11px] leading-snug text-pretty text-muted">{t(hint, { file: c.file })}</span>}
         </li>
         <li className="flex flex-col gap-1.5">
           <span className="text-xs font-bold">{t("up.howto.install")}</span>

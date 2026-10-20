@@ -12,6 +12,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { bundleErrorText, heroOf, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
+import { Command } from "./nodes";
 import { WhatsNew } from "./notes";
 
 const bundleStates: Record<BundleStatus, { kind: StatusKind; key: MessageKey }> = {
@@ -172,15 +173,20 @@ export function BundleStrip({ data, owner, actions }: { data: Updates; owner: bo
 
 const errorKinds = new Set(["check_failed", "install_failed"]);
 
-/** What the panel says about its own update, as a word, and how it should look. Shared by both cards of the panel. */
-function panelUpdate(t: ReturnType<typeof useT>, data: Updates) {
+/**
+ * What the panel says about its own update, as a word, and how it should look. Shared by both cards of the panel. On the
+ * Cloudflare edition "unsupported" is how it always is (the owner deploys a release from their computer), not a fault.
+ */
+function panelUpdate(t: ReturnType<typeof useT>, data: Updates, edge: boolean) {
   const p = data.panel;
   const update = p?.update;
+  const unsupported = edge ? t("up.panel.edge") : t("up.panel.unsupported");
+  const deployed = edge && update?.errorKey === "unsupported"; // nothing known yet beyond how the edition is updated
   const errorLabels: Record<string, string> = {
     no_release: t("up.panel.noRelease"),
     asset_missing: t("up.panel.noAsset"),
     check_failed: t("up.panel.checkFailed"),
-    unsupported: t("up.panel.unsupported"),
+    unsupported,
     unsigned: t("up.panel.unsigned", { version: update?.version ?? "" }),
     expired: t("up.panel.expired", { version: update?.version ?? "" }),
     no_key: t("up.panel.noKeyUpdate"),
@@ -190,7 +196,7 @@ function panelUpdate(t: ReturnType<typeof useT>, data: Updates) {
     ? t("up.panel.installing")
     : (update?.errorKey && errorLabels[update.errorKey]) ||
       (update?.available && !update.supported
-        ? t("up.panel.unsupported")
+        ? unsupported
         : update?.available
           ? t("up.panel.available", { version: update.version })
           : update?.checkedUnix
@@ -200,9 +206,11 @@ function panelUpdate(t: ReturnType<typeof useT>, data: Updates) {
     ? "busy"
     : update?.errorKey && errorKinds.has(update.errorKey)
       ? "bad"
-      : update?.available || (update?.errorKey && update.errorKey !== "no_release")
+      : update?.available || (update?.errorKey && update.errorKey !== "no_release" && !deployed)
         ? "warn"
-        : "ok";
+        : deployed
+          ? "off"
+          : "ok";
   return { p, update, label, kind };
 }
 
@@ -218,12 +226,27 @@ function PanelHow() {
   );
 }
 
+/**
+ * The Cloudflare edition's own update: one line on where it is done and the command, with the newest release in it once
+ * GitHub was checked. The admin is served on the panel's public host, which is what --host names.
+ */
+function EdgeDeploy({ version }: { version?: string }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs leading-normal text-pretty text-muted">{t("up.panel.edgeHint")}</p>
+      <Command value={`mistgate edge deploy --host ${location.hostname} --version ${version || "<version>"}`} />
+    </div>
+  );
+}
+
 /** This panel's build, its release key and GitHub self-update controls (Settings → System). */
 export function PanelCard({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
   const t = useT();
   const fmt = useFmt();
-  const off = useEdition().off("panel_update"); // the edition has no binary to swap: no install, no systemd steps
-  const { p, update, label, kind } = panelUpdate(t, data);
+  const edition = useEdition();
+  const off = edition.off("panel_update"); // the edition has no binary to swap: no install, no systemd steps
+  const { p, update, label, kind } = panelUpdate(t, data, edition.edge);
   return (
     <section className={card}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -283,7 +306,7 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
             </Button>
           )}
         </div>
-        {off ? <EditionNotice feature="panel_update" /> : <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
+        {edition.edge ? <EdgeDeploy version={update?.version} /> : off ? <EditionNotice feature="panel_update" /> : <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
       </div>
       {!update?.supported && !off && (
         <div className="border-t border-line pt-3">
@@ -302,8 +325,9 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
 export function PanelBar({ data, owner, actions }: { data: Updates; owner: boolean; actions: UpdateActions }) {
   const t = useT();
   const fmt = useFmt();
-  const off = useEdition().off("panel_update");
-  const { p, update, label, kind } = panelUpdate(t, data);
+  const edition = useEdition();
+  const off = edition.off("panel_update");
+  const { p, update, label, kind } = panelUpdate(t, data, edition.edge);
   const [touched, setTouched] = useState<boolean | null>(null);
   const open = touched ?? (!update?.supported && !off);
   const offer = !!update?.available && !update.installing;
@@ -328,7 +352,7 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
         )}
         <Fold open={open} onToggle={() => setTouched(!open)} label={t("up.panel.details")} controls="up-panel-details" />
       </div>
-      <EditionNotice feature="panel_update" />
+      {edition.edge ? <EdgeDeploy version={update?.version} /> : <EditionNotice feature="panel_update" />}
       <WhatsNew notes={data.panelNotes} />
       {open && (
         <div id="up-panel-details" className="flex flex-col gap-3 border-t border-line pt-3">

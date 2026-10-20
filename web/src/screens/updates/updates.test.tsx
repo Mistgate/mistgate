@@ -21,6 +21,8 @@ const rescanBundle = vi.fn();
 const checkPanelUpdate = vi.fn();
 const installPanelUpdate = vi.fn();
 let role = Role.OWNER;
+/** The edition fields of Me: none on the VPS fixtures (an older panel says nothing either), the edge's in its own tests. */
+let edition: { edition?: string; unavailable?: string[] } = {};
 vi.mock("@/lib/api", () => ({
   updates: {
     getUpdates: (...a: unknown[]) => getUpdates(...a),
@@ -36,7 +38,7 @@ vi.mock("@/lib/api", () => ({
     checkPanelUpdate: (...a: unknown[]) => checkPanelUpdate(...a),
     installPanelUpdate: (...a: unknown[]) => installPanelUpdate(...a),
   },
-  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
+  auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role }, ...edition }) },
   isUnauthenticated: () => false,
   webauthnSupported: () => false,
 }));
@@ -57,6 +59,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
+  edition = {};
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -859,5 +862,116 @@ describe("What's new", () => {
     } finally {
       act(() => setLang("en"));
     }
+  });
+});
+
+describe("the Cloudflare edition", () => {
+  // Me after node updates were wired there: every other gap of the edition is still listed, agent_updates is not
+  const edgeMe = { edition: "edge", unavailable: ["backups", "mcp", "health_checks", "agent_logs", "panel_update", "decoy_own", "tspu_probe"] };
+  const base = "https://github.com/Mistgate/mistgate/releases/download/v0.2.0-bbb/";
+  const sha = "9dd4c0" + "ab".repeat(29);
+  // the panel's own signed release, offered for download; no dist folder; the panel cannot swap its own binary
+  const edgePage = (over: Record<string, unknown> = {}) =>
+    page({
+      distDir: "",
+      bundle: bundle({ downloadBase: base, files: [{ os: "linux", arch: "amd64", name: "mistgate-node-linux-amd64", size: 1048576, sha256: sha }] }),
+      panel: { ...page().panel, update: { ...page().panel.update, supported: false, errorKey: "unsupported", checkedUnix: 0 } },
+      ...over,
+    });
+  // a v0.1.47 agent: older than the release and without update-link/1
+  const legacy = node({ nodeId: "nod_3", name: "nl1", version: "v0.1.47", state: NodeUpdateState.UNSUPPORTED, supportsUpdate: false, address: "nl1.example.com" });
+  const howTo = () => buttons().find((b) => b.textContent === "How to update");
+  const codes = () => [...document.querySelectorAll("code")].map((c) => c.textContent);
+  const remount = async (data: unknown) => {
+    await act(async () => root!.unmount());
+    host!.remove();
+    await mount(data);
+  };
+  const gateNote = "On the Cloudflare edition the client-eye check is skipped for now";
+  beforeEach(() => {
+    edition = edgeMe;
+  });
+
+  it("offers the same buttons as the VPS, with no notice that node updates are missing and no bundle card", async () => {
+    await mount(edgePage({ nodes: outdated }));
+    expect(bulk()?.textContent).toBe("Update 2 nodes");
+    expect(document.querySelector("button[aria-label='Update de1']")).toBeTruthy();
+    expect(text()).not.toContain("Updating nodes");
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet");
+    // the bundle card is the VPS's dist folder: its signing and copying steps do not apply
+    expect(text()).not.toContain("Release bundle");
+    expect(button("Read the folder again")).toBeUndefined();
+  });
+
+  it("gives a v0.1.47 node commands run on the node: download, SHA-256 check, install", async () => {
+    await mount(edgePage({ nodes: [node(), legacy] }));
+    expect(text()).toContain("1 node waits for a manual update: nl1");
+    expect(text()).toContain("Its agent was built before nodes could update on the Cloudflare edition.");
+    expect(text()).not.toContain("cannot update itself");
+    await click(howTo());
+    expect(howTo()!.getAttribute("aria-expanded")).toBe("true");
+    expect(codes()).toContain(`curl -fL -o /root/mistgate-node.new ${base}mistgate-node-linux-amd64 && echo "${sha}  /root/mistgate-node.new" | sha256sum -c -`);
+    expect(codes()).toContain("chmod +x /root/mistgate-node.new && mv /root/mistgate-node.new /root/mistgate-node && /root/mistgate-node install");
+    expect(text()).toContain("1. On the node: download the new agent and check its SHA-256");
+    expect(text()).toContain("If the node cannot reach GitHub, copy mistgate-node-linux-amd64 to /root/mistgate-node.new yourself.");
+    expect(text()).not.toContain("panel’s server");
+    expect(text()).not.toContain("The panel holds no");
+    expect(text()).not.toContain("scp ");
+  });
+
+  it("keeps the panel's server out of the steps while its release cannot be offered", async () => {
+    await mount(edgePage({ nodes: [legacy], bundle: bundle({ status: BundleStatus.UNTRUSTED, files: [], errorKey: "updates.bundle.err.release_unreachable" }) }));
+    await click(howTo());
+    expect(text()).toContain("There is no signed mistgate-node-linux-amd64 to download right now.");
+    expect(text()).not.toContain("panel’s server");
+    expect(text()).not.toContain("The panel holds no");
+  });
+
+  it("says the panel row is updated with mistgate edge deploy, without systemd, and gives the command", async () => {
+    await mount(edgePage({ nodes: [node()] }));
+    expect(text()).toContain("Updated with mistgate edge deploy");
+    expect(text()).toContain("This panel runs on Cloudflare. Update it from your computer with this command; --rollback in place of --version returns the previous version.");
+    expect(codes()).toContain(`mistgate edge deploy --host ${location.hostname} --version 0.2.0-bbb`);
+    expect(text()).not.toContain("systemd");
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet");
+    expect(button("Update panel")).toBeUndefined();
+    // the details hold no steps for a panel that cannot update itself
+    await click(document.querySelector("button[aria-controls='up-panel-details']"));
+    expect(text()).not.toContain("Updating the panel itself");
+  });
+
+  it("puts a newer release in the command once GitHub was checked", async () => {
+    const update = { ...page().panel.update, version: "v0.3.0", available: true, supported: false, installable: false, errorKey: "", checkedUnix: 1000 };
+    await mount(edgePage({ nodes: [node()], panel: { ...page().panel, update } }));
+    expect(text()).toContain("Updated with mistgate edge deploy");
+    expect(codes()).toContain(`mistgate edge deploy --host ${location.hostname} --version v0.3.0`);
+    expect(button("Update panel")).toBeUndefined();
+  });
+
+  it("notes the client-eye check is skipped, in the rollout window and on the rollout in progress", async () => {
+    await mount(edgePage({ nodes: outdated }));
+    await click(bulk());
+    expect(dialog()?.textContent).toContain(gateNote);
+    await remount(edgePage({ nodes: outdated, rollout: rollout({ steps: [step({ state: StepState.GATING }), step({ nodeId: "nod_2", nodeName: "nl1", stage: 1 })] }) }));
+    expect(text()).toContain(gateNote);
+  });
+
+  it("names the release errors of the edition in the hero", async () => {
+    await mount(edgePage({ nodes: outdated, bundle: bundle({ status: BundleStatus.UNTRUSTED, files: [], errorKey: "updates.bundle.err.release_unreachable" }) }));
+    expect(text()).toContain("The panel could not fetch its signed node release from GitHub. It tries again within a minute.");
+    await remount(edgePage({ nodes: outdated, bundle: bundle({ status: BundleStatus.MISSING, version: "", built: 0, files: [], errorKey: "updates.bundle.err.no_release" }) }));
+    expect(text()).toContain("This panel is not a release build, so it has no signed node release to offer.");
+    expect(text()).not.toContain("dist folder");
+  });
+
+  it("leaves the VPS page as it was: the bundle card, the scp step, no edition texts", async () => {
+    edition = {};
+    await mount(page({ nodes: [...outdated, legacy], rollout: rollout({ steps: [step({ state: StepState.GATING })] }) }));
+    expect(text()).toContain("Release bundle");
+    expect(text()).not.toContain(gateNote);
+    expect(text()).not.toContain("mistgate edge deploy");
+    await click(howTo());
+    expect(text()).toContain("1. On the panel’s server: put the new agent on the node");
+    expect(codes()).toContain("scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@nl1.example.com:/root/mistgate-node");
   });
 });

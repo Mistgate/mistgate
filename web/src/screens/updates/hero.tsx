@@ -28,8 +28,11 @@ import { WhatsNew } from "./notes";
 
 type Look = { kind: StatusKind; accent?: boolean; tint?: boolean; eyebrow: string; title: string; text: string };
 
-/** What the hero says for each situation: the page leads with the one thing the owner can do now. */
-function look(t: T, fmt: Fmt, d: Updates, hero: Hero): Look {
+/**
+ * What the hero says for each situation: the page leads with the one thing the owner can do now. `edge`: the Cloudflare
+ * edition offers its own signed release and has no bundle card, so its texts point at the node and the deploy, not at a folder.
+ */
+function look(t: T, fmt: Fmt, d: Updates, hero: Hero, edge: boolean): Look {
   const version = d.bundle?.version ?? "";
   switch (hero.id) {
     case "running":
@@ -42,7 +45,7 @@ function look(t: T, fmt: Fmt, d: Updates, hero: Hero): Look {
         tint: true,
         eyebrow: t("up.hero.manual"),
         title: t.n("up.hero.manual.title", hero.nodes.length, { names: hero.nodes.map((n) => n.name).join(", ") }),
-        text: t.n("up.hero.manual.text", hero.nodes.length),
+        text: t.n(edge ? "up.hero.manual.textEdge" : "up.hero.manual.text", hero.nodes.length),
       };
     case "available": {
       // "2 of 4 nodes on v0.1.24": how far the fleet is, and the one thing left to do
@@ -55,12 +58,14 @@ function look(t: T, fmt: Fmt, d: Updates, hero: Hero): Look {
         text: t("up.hero.available.text", { version }),
       };
     }
-    case "noBundle":
-      return { kind: "off", eyebrow: t("up.hero.noBundle"), title: t("up.hero.noBundle.title"), text: hero.older > 0 ? t.n("up.hero.noBundle.older", hero.older) : t("up.hero.noBundle.text") };
+    case "noBundle": {
+      const text = edge ? bundleErrorText(t, d.bundle?.errorKey ?? "", d.bundle?.params) : hero.older > 0 ? t.n("up.hero.noBundle.older", hero.older) : t("up.hero.noBundle.text");
+      return { kind: "off", eyebrow: t("up.hero.noBundle"), title: t("up.hero.noBundle.title"), text };
+    }
     case "untrusted":
       return { kind: "bad", eyebrow: t("up.hero.untrusted"), title: t("up.hero.untrusted.title"), text: bundleErrorText(t, d.bundle?.errorKey ?? "", d.bundle?.params) };
     case "noKey":
-      return { kind: "warn", eyebrow: t("up.hero.noKey"), title: t("up.hero.noKey.title"), text: t("up.hero.noKey.text") };
+      return { kind: "warn", eyebrow: t("up.hero.noKey"), title: t("up.hero.noKey.title"), text: t(edge ? "up.hero.noKey.edge" : "up.hero.noKey.text") };
     case "attention":
       return { kind: "warn", eyebrow: t("up.hero.attention"), title: t("up.hero.attention.title"), text: t.n("up.hero.attention.text", hero.retry) };
     case "none":
@@ -153,9 +158,10 @@ export function HeroCard({
 }) {
   const t = useT();
   const fmt = useFmt();
-  const noUpdates = useEdition().off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
+  const edition = useEdition();
+  const noUpdates = edition.off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
   const hero = heroOf(data);
-  const l = look(t, fmt, data, hero);
+  const l = look(t, fmt, data, hero, edition.edge);
   const active = hero.id === "running" || hero.id === "paused" ? hero.rollout : null;
   // a node failed and stopped the rollout: look at it first; going on is not the obvious next step then
   const failed = hero.id === "paused" && isFailurePause(hero.rollout.pauseKey);
@@ -215,8 +221,8 @@ export function HeroCard({
         {!active && <WhatsNew notes={data.agentNotes} />}
         {!owner && !noUpdates && (hero.id === "available" || active) && <p className="text-xs text-muted">{t("up.ownerOnly")}</p>}
       </div>
-      {/* the edition has no node bundle: its card would only show the failed scan of a directory it does not have */}
-      {!noUpdates && <BundleStrip data={data} owner={owner} actions={actions} />}
+      {/* the edition reads no folder: its release is the panel's own, and the card's signing and copying steps are the VPS's */}
+      {!edition.edge && <BundleStrip data={data} owner={owner} actions={actions} />}
     </section>
   );
 }

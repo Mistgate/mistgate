@@ -214,7 +214,7 @@ const V_OLD = "v0.1.23";
 const V_NEW = "v0.1.24";
 const B_OLD = NOW - 4 * D;
 const B_NEW = NOW - 6 * H;
-const upNode = (over: object) => ({
+export const upNode = (over: object) => ({
   nodeId: "nod_de1",
   name: "de1",
   version: V_NEW,
@@ -247,7 +247,7 @@ const bundle = {
   params: {},
   scannedUnix: NOW - 600,
 };
-const page = (over: object) => ({
+export const page = (over: object) => ({
   nowUnix: NOW,
   scheduleTimezoneOffsetMinutes: 180,
   panel: {

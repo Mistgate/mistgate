@@ -316,6 +316,19 @@ describe("manualCommands", () => {
     expect(c.copy).toBeNull();
     expect(c.file).toBe("mistgate-node-linux-riscv64");
   });
+  it("downloads and checks the release file on the node when the panel offers a download and has no dist folder", () => {
+    const base = "https://github.com/Mistgate/mistgate/releases/download/v0.2.0/";
+    const c = manualCommands(updates({ distDir: "", bundle: bundle(BundleStatus.TRUSTED, { files, downloadBase: base }) }), node({ arch: "arm64" }));
+    expect(c.onNode).toBe(true);
+    expect(c.copy).toBe(`curl -fL -o /root/mistgate-node.new ${base}mistgate-node-linux-arm64 && echo "b  /root/mistgate-node.new" | sha256sum -c -`);
+    expect(c.install).toBe("chmod +x /root/mistgate-node.new && mv /root/mistgate-node.new /root/mistgate-node && /root/mistgate-node install");
+    // the edition without a release to offer: still on the node, nothing to download yet
+    const none = manualCommands(updates({ distDir: "", bundle: bundle(BundleStatus.UNTRUSTED) }), node(), true);
+    expect(none.onNode).toBe(true);
+    expect(none.copy).toBeNull();
+    // a VPS panel keeps its scp line even when it knows a download base
+    expect(manualCommands(updates({ bundle: bundle(BundleStatus.TRUSTED, { files, downloadBase: base }) }), node()).onNode).toBe(false);
+  });
 
   it("describes the last update of a node", () => {
     expect(lastUpdateView(t, undefined)).toMatchObject({ head: "No update yet", kind: "off" });

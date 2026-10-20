@@ -6,6 +6,7 @@ import { StatusDot, StatusPill, kindTextClass } from "@/components/ui/status";
 import { RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { isActive, progressOf, rolloutInfo, stagesOf, stepErrorText, stepInfo, type Rollout, type Stage, type Step } from "@/lib/updates";
 
@@ -88,6 +89,7 @@ export function RolloutCard({ rollout }: { rollout: Rollout }) {
   const { done, total } = progressOf(rollout);
   const [touched, setTouched] = useState<boolean | null>(null);
   const open = touched ?? (active || rollout.status === RolloutStatus.FAILED);
+  const noProbe = useEdition().off("health_checks"); // the gate there has no client-eye check yet
 
   return (
     <section className="flex flex-col gap-2 rounded-card-lg border border-line bg-surface p-4 md:px-[18px]">
@@ -117,7 +119,10 @@ export function RolloutCard({ rollout }: { rollout: Rollout }) {
       {open && (
         <>
           <Stages rollout={rollout} />
-          <p className="border-t border-line pt-3 text-xs leading-normal text-pretty text-muted">{t("up.ro.safety")}</p>
+          <p className="border-t border-line pt-3 text-xs leading-normal text-pretty text-muted">
+            {t("up.ro.safety")}
+            {noProbe && ` ${t("up.gate.noProbe")}`}
+          </p>
         </>
       )}
     </section>

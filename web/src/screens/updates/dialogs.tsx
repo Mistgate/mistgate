@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
+import { useEdition } from "@/lib/edition";
 import { canaryOf, defaultBatch, updateDateTimeAtOffset, updateDateTimeInputAtOffset, updateTimezoneName, type NodeUpdate, type Updates } from "@/lib/updates";
 
 /**
@@ -25,6 +26,7 @@ export function RolloutDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const noProbe = useEdition().off("health_checks"); // the gate there has no client-eye check yet
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const picked = nodes.filter((n) => !off.has(n.nodeId));
   const canary = canaryOf(picked);
@@ -69,6 +71,7 @@ export function RolloutDialog({
         </ul>
         <p className="text-xs leading-normal text-pretty text-muted">
           {t("up.rollout.restart")} {t("up.ro.safety")}
+          {noProbe && ` ${t("up.gate.noProbe")}`}
         </p>
       </div>
     </Modal>
@@ -104,6 +107,7 @@ export function UpdateNodeDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const noProbe = useEdition().off("health_checks");
   const bundle = data.bundle;
   const version = bundle?.version ?? "";
   const offset = data.scheduleTimezoneOffsetMinutes;
@@ -172,7 +176,10 @@ export function UpdateNodeDialog({
         {mode === "now" ? (
           <div className="rounded-field border border-line bg-canvas p-3.5 text-[13px] leading-relaxed text-muted">
             <p>{t(queueAfterRollout ? "up.schedule.queueBody" : "up.schedule.nowBody", { name: node.name, version })}</p>
-            <p className="mt-1">{t("up.schedule.safety")}</p>
+            <p className="mt-1">
+              {t("up.schedule.safety")}
+              {noProbe && ` ${t("up.gate.noProbe")}`}
+            </p>
             {!canUpdateNow && blockedMessage && <p className="mt-2 text-warn">{blockedMessage}</p>}
           </div>
         ) : (

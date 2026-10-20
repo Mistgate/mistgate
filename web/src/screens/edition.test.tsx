@@ -227,7 +227,9 @@ describe("Updates on the edge", () => {
   it("lists the nodes and the release but offers no way to start an update", async () => {
     await mount(<UpdatesScreen />);
     expect(text()).toContain(notice("agent_updates"));
-    expect(text()).toContain(notice("panel_update"));
+    // the panel row says how the edition is updated instead of only that it cannot be done from here
+    expect(text()).not.toContain(notice("panel_update"));
+    expect(text()).toContain("This panel runs on Cloudflare. Update it from your computer");
     expect(text()).toContain("de1");
     expect(text()).not.toContain("Only the owner");
     const all = buttons().join("|");

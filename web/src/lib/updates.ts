@@ -329,28 +329,48 @@ export function heroOf(d: Updates): Hero {
 }
 
 export type ManualCommands = {
-  /** Run on the panel's server: puts the release binary on the node. Null when the panel holds no file for its architecture. */
+  /**
+   * Puts the release binary on the node: scp run on the panel's server, or (onNode) a download checked against the signed
+   * SHA-256, run on the node. Null when there is no file for its architecture.
+   */
   copy: string | null;
-  /** Run anywhere with SSH to the node: installs it (the binary, the unit, a restart). */
+  /** Installs it (the binary, the unit, a restart): over SSH from anywhere, or (onNode) on the node itself. */
   install: string;
   /** The binary's file name; the architecture was guessed ("amd64") when the node did not report one. */
   file: string;
   guessedArch: boolean;
+  /** Both commands run on the node: the panel has no dist folder and offers its release download instead (the Cloudflare edition). */
+  onNode: boolean;
 };
 
 /**
- * The manual update of a node whose agent cannot update itself, as two commands: copy the release binary from the panel's
- * dist folder to the node, then run its "install" (which replaces the installed binary and the unit, and restarts it).
+ * The manual update of a node whose agent cannot update itself, as two commands: put the release binary on the node (copied
+ * from the panel's dist folder, or downloaded on the node from the panel's release and checked), then run its "install"
+ * (which replaces the installed binary and the unit, and restarts it). `edge` keeps the node-side commands while the edition's
+ * release cannot be offered: its panel has no dist folder to copy from.
  */
-export function manualCommands(d: Pick<Updates, "distDir" | "bundle">, n: Pick<NodeUpdate, "address" | "arch">): ManualCommands {
+export function manualCommands(d: Pick<Updates, "distDir" | "bundle">, n: Pick<NodeUpdate, "address" | "arch">, edge = false): ManualCommands {
   const arch = n.arch || "amd64";
-  const file = d.bundle?.files.find((f) => f.os === "linux" && f.arch === arch)?.name;
+  const f = d.bundle?.files.find((x) => x.os === "linux" && x.arch === arch);
+  const file = f?.name ?? `mistgate-node-linux-${arch}`;
+  const base = d.bundle?.downloadBase ?? "";
+  if (edge || (base && !d.distDir)) {
+    const tmp = "/root/mistgate-node.new";
+    return {
+      copy: f && base ? `curl -fL -o ${tmp} ${base}${f.name} && echo "${f.sha256}  ${tmp}" | sha256sum -c -` : null,
+      install: `chmod +x ${tmp} && mv ${tmp} /root/mistgate-node && /root/mistgate-node install`,
+      file,
+      guessedArch: !n.arch,
+      onNode: true,
+    };
+  }
   const host = n.address.includes(":") ? `[${n.address}]` : n.address; // an IPv6 literal in scp needs brackets
   return {
-    copy: file ? `scp ${d.distDir || "<data-dir>/dist"}/${file} root@${host}:/root/mistgate-node` : null,
+    copy: f ? `scp ${d.distDir || "<data-dir>/dist"}/${f.name} root@${host}:/root/mistgate-node` : null,
     install: `ssh root@${n.address} 'chmod +x /root/mistgate-node && /root/mistgate-node install'`,
-    file: file ?? `mistgate-node-linux-${arch}`,
+    file,
     guessedArch: !n.arch,
+    onNode: false,
   };
 }
 
