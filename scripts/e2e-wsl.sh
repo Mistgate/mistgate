@@ -490,6 +490,50 @@ build_hysteria() {
   "$BIN/hysteria" version 2>&1 | head -3 | sed 's/^/    /'
 }
 
+# ---------------------------------------------------------------- update helpers (shared by the VPS step 2d and the edge step 2e)
+upd() { api UpdateService/GetUpdates; }
+upd_node() { upd | jq -c --arg n "$NODE_NAME" '.nodes[] | select(.name == $n)'; }
+node_built() { upd_node | jq -r '(.built // "0") | tonumber'; }
+node_ustate() { upd_node | jq -r '.state // ""'; }
+node_built_is() { [ "$(node_built)" = "$1" ]; }
+ro_json() { upd | jq -c '.rollout // {}'; }
+ro_status() { ro_json | jq -r '.status // ""'; }
+ro_id() { ro_json | jq -r '.id // ""'; }
+ro_step() { ro_json | jq -c --arg n "$NODE_NAME" '[(.steps // [])[] | select(.nodeName == $n)][0] // {}'; }
+ro_settled() { [ "$(ro_status)" != ROLLOUT_STATUS_RUNNING ]; }
+ro_brief() { ro_json | jq -c '{status, pauseKey, pauseParams, steps: [(.steps // [])[] | {nodeName, state, errorKey, params}]}'; }
+bundle_status() { upd | jq -r '.bundle.status // ""'; }
+update_alert_active() { api HealthService/ListAlerts '{}' | jq -e '[(.active // [])[] | select(.kind == "ALERT_KIND_UPDATE_FAILED")] | length == 1'; }
+no_update_alert() { api HealthService/ListAlerts '{}' | jq -e '[(.active // [])[] | select(.kind == "ALERT_KIND_UPDATE_FAILED")] | length == 0'; }
+node_events_since() { # <event id>: event codes of this node newer than that id, one per line
+  api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":200}" | jq -r --argjson m "$1" '(.events // [])[] | select((.id | tonumber) > $m) | .code'
+}
+# publish_bundle <dir> <key file> <version> <built> <binary>: sign into $WORK/bundles/<dir>
+publish_bundle() { "$BIN/signbundle" --key "$2" --version "$3" --built "$4" --out "$WORK/bundles/$1" "$5" >>"$WORK/release.log"; }
+# install_bundle <dir>: make it the panel's <data-dir>/dist and have the panel read it now
+install_bundle() {
+  rm -rf "$DATA/dist.new" "$DATA/dist"
+  cp -r "$WORK/bundles/$1" "$DATA/dist.new" && mv "$DATA/dist.new" "$DATA/dist"
+  mutate UpdateService/RescanBundle >/dev/null
+}
+# start_rollout [json]: on success the rollout id. Like the admin, it names the bundle it reviewed (the version and build
+# GetUpdates shows): the panel refuses a rollout of a bundle that changed since. A panel that just started checks GitHub
+# for a node bundle and refuses rollouts meanwhile ("... is being installed"): wait that out.
+start_rollout() {
+  local pin out i
+  for i in $(seq 60); do
+    pin=$(upd | jq -c '{expectedVersion: .bundle.version, expectedBuilt: .bundle.built}')
+    if out=$(mutate UpdateService/StartRollout "$(jq -c --argjson pin "$pin" '. + $pin' <<<"${1:-{\}}")" 2>&1); then
+      jq -r '.rollout.id' <<<"$out"
+      return
+    fi
+    grep -q 'is being installed' <<<"$out" || break
+    sleep 2
+  done
+  echo "$out" >&2
+  return 1
+}
+
 # ---------------------------------------------------------------- the Cloudflare edition (--edge)
 if [ -n "$EDGE" ]; then
   # shellcheck source=e2e/edge.sh
@@ -742,48 +786,6 @@ pass "agent restarted: node ONLINE, NODE_DOWN resolved ('$RES'), both inbounds A
 
 # ================================================================ 2d. self-update
 step "2d. updates: signed bundle, rollout, manual rollback, broken builds, a foreign signature"
-upd() { api UpdateService/GetUpdates; }
-upd_node() { upd | jq -c --arg n "$NODE_NAME" '.nodes[] | select(.name == $n)'; }
-node_built() { upd_node | jq -r '(.built // "0") | tonumber'; }
-node_ustate() { upd_node | jq -r '.state // ""'; }
-node_built_is() { [ "$(node_built)" = "$1" ]; }
-ro_json() { upd | jq -c '.rollout // {}'; }
-ro_status() { ro_json | jq -r '.status // ""'; }
-ro_id() { ro_json | jq -r '.id // ""'; }
-ro_step() { ro_json | jq -c --arg n "$NODE_NAME" '[(.steps // [])[] | select(.nodeName == $n)][0] // {}'; }
-ro_settled() { [ "$(ro_status)" != ROLLOUT_STATUS_RUNNING ]; }
-ro_brief() { ro_json | jq -c '{status, pauseKey, pauseParams, steps: [(.steps // [])[] | {nodeName, state, errorKey, params}]}'; }
-bundle_status() { upd | jq -r '.bundle.status // ""'; }
-update_alert_active() { api HealthService/ListAlerts '{}' | jq -e '[(.active // [])[] | select(.kind == "ALERT_KIND_UPDATE_FAILED")] | length == 1'; }
-no_update_alert() { api HealthService/ListAlerts '{}' | jq -e '[(.active // [])[] | select(.kind == "ALERT_KIND_UPDATE_FAILED")] | length == 0'; }
-node_events_since() { # <event id>: event codes of this node newer than that id, one per line
-  api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":200}" | jq -r --argjson m "$1" '(.events // [])[] | select((.id | tonumber) > $m) | .code'
-}
-# publish_bundle <dir> <key file> <version> <built> <binary>: sign into $WORK/bundles/<dir>
-publish_bundle() { "$BIN/signbundle" --key "$2" --version "$3" --built "$4" --out "$WORK/bundles/$1" "$5" >>"$WORK/release.log"; }
-# install_bundle <dir>: make it the panel's <data-dir>/dist and have the panel read it now
-install_bundle() {
-  rm -rf "$DATA/dist.new" "$DATA/dist"
-  cp -r "$WORK/bundles/$1" "$DATA/dist.new" && mv "$DATA/dist.new" "$DATA/dist"
-  mutate UpdateService/RescanBundle >/dev/null
-}
-# start_rollout [json]: on success the rollout id. Like the admin, it names the bundle it reviewed (the version and build
-# GetUpdates shows): the panel refuses a rollout of a bundle that changed since. A panel that just started checks GitHub
-# for a node bundle and refuses rollouts meanwhile ("... is being installed"): wait that out.
-start_rollout() {
-  local pin out i
-  for i in $(seq 60); do
-    pin=$(upd | jq -c '{expectedVersion: .bundle.version, expectedBuilt: .bundle.built}')
-    if out=$(mutate UpdateService/StartRollout "$(jq -c --argjson pin "$pin" '. + $pin' <<<"${1:-{\}}")" 2>&1); then
-      jq -r '.rollout.id' <<<"$out"
-      return
-    fi
-    grep -q 'is being installed' <<<"$out" || break
-    sleep 2
-  done
-  echo "$out" >&2
-  return 1
-}
 
 EVENT_MARK=$(api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":1}" | jq -r '(.events[0].id // "0") | tonumber')
 UPD0=$(upd)

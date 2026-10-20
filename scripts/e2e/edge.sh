@@ -242,6 +242,9 @@ edge_release_keys() {
   REL_PUB=$("$BIN/mistgate-tool" release keygen --out "$WORK/release.key" | sed -n 's/^public key: //p')
   [ -n "$REL_PUB" ] || die "release keygen printed no public key"
   SECRETS+=("$(cat "$WORK/release.key")")
+  # the release's build time (the binary's and the manifest's must be the same number) and the primary agent's: an hour older, so
+  # the panel offers it the release (step 2e)
+  REL_BUILT=$(date +%s) OLD_BUILT=$(($(date +%s) - 3600))
   REL_PORT=$(free_port tcp)
   TG_PORT=$(free_port tcp) # the fake Telegram (edge_telegram_serve); its address is built into the wasm like the release's
 }
@@ -252,28 +255,120 @@ edge_release_serve() {
   local arch d=$WORK/fake-release
   arch=$(go env GOARCH)
   mkdir -p "$WORK/rel/ssh"
-  go build -trimpath -ldflags "-X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.Built=$(date +%s) -X $SSHN_BI.ReleaseKey=$REL_PUB" \
+  go build -trimpath -ldflags "-X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.Built=$REL_BUILT -X $SSHN_BI.ReleaseKey=$REL_PUB" \
     -o "$WORK/rel/ssh/mistgate-node-linux-$arch" ./cmd/mistgate-node
-  "$BIN/signbundle" --key "$WORK/release.key" --version "$SSHN_TAG" --built "$(date +%s)" --out "$d/$SSHN_TAG" "$WORK/rel/ssh/mistgate-node-linux-$arch" >>"$WORK/signbundle.log" \
+  "$BIN/signbundle" --key "$WORK/release.key" --version "$SSHN_TAG" --built "$REL_BUILT" --out "$d/$SSHN_TAG" "$WORK/rel/ssh/mistgate-node-linux-$arch" >>"$WORK/signbundle.log" \
     || die "signing the fake release failed"
   SSHN_NODE_BIN=$d/$SSHN_TAG/mistgate-node-linux-$arch
   SSHN_NODE_BIN_SHA=$(sha256sum "$SSHN_NODE_BIN" | cut -d' ' -f1)
+  # One line per request in the log: time, request line, status, then range= for a Range header and authorization=present or
+  # cookie=present for credentials (the Worker must never forward either to the release host). Behaviour switches are files in
+  # $REL_FLAGS that a step creates and removes:
+  #   redirect  every download answers 302 to /cdn/<the same path> on this host, as GitHub's does. Off for the SSH steps: their
+  #             Go client refuses a redirect that does not stay on GitHub.
+  #   cut       one shot: the next full download of the agent sends 1 MiB, stays silent for 10 s, then closes the connection short.
   cat >"$WORK/fake-release.py" <<'PY'
-import http.server, sys, time
+import http.server, os, re, sys, time, urllib.parse
 
-root, port, log = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+root, port, log, flags = os.path.realpath(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
+CUT, HOLD = 1 << 20, 10
 
-class H(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *a, **k):
-        super().__init__(*a, directory=root, **k)
+
+def flag(name):
+    return os.path.exists(os.path.join(flags, name))
+
+
+def take(name):  # a one-shot flag: true for exactly one caller
+    try:
+        os.remove(os.path.join(flags, name))
+        return True
+    except OSError:
+        return False
+
+
+class H(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
-        with open(log, "a") as f:
-            f.write("%d %s\n" % (int(time.time()), fmt % args))
+        pass
 
-http.server.ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+    def note(self, text):
+        with open(log, "a") as f:
+            f.write("%d %s\n" % (int(time.time()), text))
+
+    def answer(self, code, extra, headers=()):
+        self.note('"%s" %d -%s' % (self.requestline, code, extra))
+        self.send_response(code)
+        for k, v in headers:
+            self.send_header(k, v)
+        if code >= 300 and code != 304 and code != 206:
+            self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_HEAD(self):
+        self.serve(False)
+
+    def do_GET(self):
+        self.serve(True)
+
+    def serve(self, with_body):
+        path = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
+        rng = self.headers.get("Range", "")
+        extra = (" range=" + rng if rng else "") + "".join(" %s=present" % h.lower() for h in ("Authorization", "Cookie") if self.headers.get(h))
+        cdn = path.startswith("/cdn/")
+        if cdn:
+            path = path[len("/cdn"):]
+        full = os.path.realpath(os.path.join(root, path.lstrip("/")))
+        if not full.startswith(root + os.sep) or not os.path.isfile(full):
+            return self.answer(404, extra)
+        if not cdn and flag("redirect"):
+            return self.answer(302, extra, [("Location", "http://%s/cdn%s" % (self.headers.get("Host", "127.0.0.1:%d" % port), path))])
+        size = os.path.getsize(full)
+        start, end, code = 0, size - 1, 200
+        if rng:
+            m = re.fullmatch(r"bytes=(\d+)-(\d*)", rng)
+            if not m or int(m.group(1)) >= size:
+                return self.answer(416, extra, [("Content-Range", "bytes */%d" % size)])
+            start, code = int(m.group(1)), 206
+            end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+        n = end - start + 1
+        kind = "application/json" if full.endswith(".json") else "application/octet-stream"
+        hdr = [("Content-Type", kind), ("Accept-Ranges", "bytes"), ("Content-Length", str(n))]
+        if code == 206:
+            hdr.append(("Content-Range", "bytes %d-%d/%d" % (start, end, size)))
+        cut = with_body and start == 0 and os.path.basename(full).startswith("mistgate-node-") and flag("cut") and take("cut")
+        self.answer(code, extra, hdr)
+        if not with_body:
+            return
+        with open(full, "rb") as f:
+            f.seek(start)
+            if cut:
+                self.wfile.write(f.read(CUT))
+                self.wfile.flush()
+                self.note("cut %s after %d of %d bytes (silent for %d s first)" % (path, CUT, n, HOLD))
+                time.sleep(HOLD)
+                self.close_connection = True
+                return
+            left = n
+            while left > 0:
+                b = f.read(min(left, 1 << 16))
+                if not b:
+                    break
+                self.wfile.write(b)
+                left -= len(b)
+
+
+class S(http.server.ThreadingHTTPServer):
+    def handle_error(self, request, client_address):  # a client that gives up mid-download (a cancelled install) is not an error
+        if not isinstance(sys.exc_info()[1], ConnectionError):
+            super().handle_error(request, client_address)
+
+
+S(("127.0.0.1", port), H).serve_forever()
 PY
-  spawn python3 "$WORK/fake-release.py" "$d" "$REL_PORT" "$WORK/fake-release.log"
+  REL_FLAGS=$WORK/fake-release.flags
+  mkdir -p "$REL_FLAGS"
+  spawn python3 "$WORK/fake-release.py" "$d" "$REL_PORT" "$WORK/fake-release.log" "$REL_FLAGS"
   wait_for 10 "the fake release to answer" curl -sf -o /dev/null "http://127.0.0.1:$REL_PORT/$SSHN_TAG/manifest.json" || die "the fake release server did not start"
   : >"$WORK/fake-release.log"
 }
@@ -419,6 +514,106 @@ sshn_load_stop() {
   note "load during the job: $SSHN_LOAD_SUMMARY"
 }
 
+# ---------------------------------------------------------------- 2e. a node update over the link
+
+# edge_event_id: the id of the newest event of the primary node (0 when none)
+edge_event_id() { api FleetService/ListEvents "{\"nodeId\":\"$NODE_ID\",\"limit\":1}" | jq -r '(.events[0].id // "0") | tonumber'; }
+edge_node_col() { edge_sql "SELECT $1 FROM node WHERE id = ?" "$NODE_ID"; } # agent_instance_id | agent_built | agent_caps
+
+# The update of the primary agent from the panel's own release, the way an owner does it from the Updates page: the release is
+# the fake one (the wasm's releaseDownloadBase points at it, its manifest is signed by the run's key), the panel signs nothing and
+# holds no bundle. The cron fires every 5 s instead of every minute. The fake release redirects every download (as GitHub does) and
+# cuts the first full download of the agent after 1 MiB, so the agent's resume with a Range header goes through the Worker and the
+# redirect. While that first download stalls, the step is SENT and its token is valid: a request with a wrong token must still get
+# the decoy's 404 and must not reach the release host.
+edge_update_over_link() {
+  local rel_file ticks=0 t_start t_cron probed="" code lines0 inst0 eid n cut_at ret
+  step "2e. agent update over the link: the panel's own release, through the Worker, with a cut download resumed through a redirect"
+  t_start=$(date +%s)
+  rel_file=mistgate-node-linux-$(go env GOARCH)
+  [ ! -e "$NODE_BIN.prev" ] || die "2e: $NODE_BIN.prev exists before the update"
+  cp "$NODE_BIN" "$WORK/node-before-update.bin"
+  : >"$REL_FLAGS/redirect"
+  : >"$REL_FLAGS/cut"
+  node_online || die "2e: the node is not online"
+
+  # the bundle and the node, as the Updates page shows them
+  upd | jq -e --arg v "$SSHN_TAG" --argjson b "$REL_BUILT" --arg base "http://127.0.0.1:$REL_PORT/$SSHN_TAG/" \
+    '.bundle.status == "BUNDLE_STATUS_TRUSTED" and .bundle.version == $v and (.bundle.built | tonumber) == $b and .bundle.downloadBase == $base and (.bundle.files | length) >= 1' >/dev/null \
+    || die "2e: GetUpdates: the release is not a TRUSTED bundle with this run's version, build time and download base: $(upd | jq -c .bundle)"
+  upd_node | jq -e --argjson b "$OLD_BUILT" '.supportsUpdate == true and .state == "NODE_UPDATE_STATE_OUTDATED" and (.built | tonumber) == $b' >/dev/null \
+    || die "2e: GetUpdates: the node is not OUTDATED at built $OLD_BUILT with update support: $(upd_node)"
+  case " $(edge_node_col agent_caps) " in *" update-link/1 "*) ;; *) die "2e: the node's capabilities lack update-link/1: $(edge_node_col agent_caps)" ;; esac
+  case " $(edge_node_col agent_caps) " in *" update/1 "*) die "2e: a link-only agent lists update/1: $(edge_node_col agent_caps)" ;; esac
+  inst0=$(edge_node_col agent_instance_id)
+  [ -n "$inst0" ] || die "2e: the node row has no agent instance id"
+  eid=$(edge_event_id)
+  lines0=$(wc -l <"$WORK/fake-release.log")
+
+  RID=$(start_rollout "{\"nodeIds\":[\"$NODE_ID\"]}")
+  [ -n "$RID" ] && [ "$RID" != null ] || die "2e: StartRollout returned no rollout id"
+  say "rollout $RID started; the cron fires every 5 s"
+  t_cron=$(date +%s)
+  while [ $(($(date +%s) - t_cron)) -lt 240 ]; do
+    code=$(edge_cron) || die "2e: a cron tick failed: $code"
+    ticks=$((ticks + 1))
+    ro_settled && break
+    for n in 1 2 3 4 5; do
+      if [ -z "$probed" ] && tail -n +"$((lines0 + 1))" "$WORK/fake-release.log" | grep -q '^[0-9]* cut /'; then
+        probed=1
+        edge_update_probe "$rel_file"
+      fi
+      sleep 1
+    done
+  done
+  ro_settled || die "2e: the rollout did not settle in 4 minutes ($ticks ticks): $(ro_brief)"
+  [ "$(ro_status)" = ROLLOUT_STATUS_DONE ] || die "2e: the rollout ended as $(ro_status): $(ro_brief)"
+  [ -n "$probed" ] || die "2e: the fake release never cut a download, so the wrong-token probe and the resume were not exercised: $(tail -n 12 "$WORK/fake-release.log")"
+  ro_step | jq -e '.state == "STEP_STATE_PASSED" and ((.errorKey // "") == "")' >/dev/null || die "2e: the step is not PASSED: $(ro_step)"
+
+  # the node: the new build, a new process image (the agent re-executes in place), the old binary kept for a rollback
+  node_built_is "$REL_BUILT" || die "2e: GetUpdates shows built $(node_built), want $REL_BUILT"
+  [ "$(edge_node_col agent_built)" = "$REL_BUILT" ] || die "2e: node.agent_built is $(edge_node_col agent_built), want $REL_BUILT"
+  [ "$(edge_node_col agent_instance_id)" != "$inst0" ] || die "2e: the agent instance id did not change ($inst0): the node was not restarted by the update"
+  alive "$NODE_PID" && [ "$(readlink "/proc/$NODE_PID/exe")" = "$NODE_BIN" ] || die "2e: the update did not re-execute pid $NODE_PID in place"
+  cmp -s "$NODE_BIN" "$SSHN_NODE_BIN" || die "2e: the installed binary is not the release's"
+  cmp -s "$NODE_BIN.prev" "$WORK/node-before-update.bin" || die "2e: $NODE_BIN.prev is not the build before the update"
+  wait_for 60 "the agent to commit" test ! -e "$NODE_STATE/update.pending" || die "2e: update.pending never went"
+  [ ! -e "$NODE_BIN.new" ] || die "2e: $NODE_BIN.new is left behind"
+  node_events_since "$eid" | grep -qx update_committed || die "2e: no update_committed event (events: $(node_events_since "$eid" | sort | uniq -c | tr '\n' ' '))"
+  ! node_events_since "$eid" | grep -Eqx 'update_step_failed|update_step_rolled_back' || die "2e: the update failed or rolled back (events: $(node_events_since "$eid" | sort | uniq -c | tr '\n' ' '))"
+  wait_for 60 "node ONLINE after the update" node_online || die "2e: the node is not online after the update"
+  wait_for 60 "the inbound ACTIVE" inbounds_active 1 || die "2e: the inbound is not ACTIVE after the update"
+  [ "$(node_ustate)" = NODE_UPDATE_STATE_UP_TO_DATE ] || die "2e: the node is $(node_ustate), want UP_TO_DATE"
+
+  # the fake release: the cut, then a ranged retry that went through the redirect
+  tail -n +"$((lines0 + 1))" "$WORK/fake-release.log" >"$WORK/fake-release.2e"
+  cut_at=$(sed -n 's/^[0-9]* cut \/.* after \([0-9]*\) of .*/\1/p' "$WORK/fake-release.2e" | head -1)
+  [ -n "$cut_at" ] || die "2e: the fake release logged no cut"
+  ret=$(sed -n 's/^[0-9]* "GET \/'"$SSHN_TAG"'\/'"$rel_file"' HTTP[^"]*" 302 - range=bytes=\([0-9]*\)-$/\1/p' "$WORK/fake-release.2e" | head -1)
+  [ -n "$ret" ] && [ "$ret" -gt 0 ] && [ "$ret" -le "$cut_at" ] || die "2e: no ranged request for the binary was redirected (302 with Range: bytes=N-, N up to $cut_at): $(grep -c . "$WORK/fake-release.2e") lines: $(tail -n 12 "$WORK/fake-release.2e")"
+  grep -q '^[0-9]* "GET /cdn/'"$SSHN_TAG"'/'"$rel_file"' HTTP[^"]*" 206 - range=bytes='"$ret"'-$' "$WORK/fake-release.2e" \
+    || die "2e: the redirected retry (Range: bytes=$ret-) did not get 206 from /cdn/: $(tail -n 12 "$WORK/fake-release.2e")"
+  ! grep -qE 'authorization=|cookie=' "$WORK/fake-release.2e" || die "2e: the Worker forwarded credentials to the release host: $(grep -E 'authorization=|cookie=' "$WORK/fake-release.2e" | head -3)"
+  rm -f "$REL_FLAGS/redirect" "$REL_FLAGS/cut"
+  pass "update over the link: StartRollout pinned the TRUSTED release $SSHN_TAG, $ticks cron ticks (every 5 s); the release cut the first download after $cut_at bytes and the agent resumed with Range: bytes=$ret- through the Worker and the redirect (206); step PASSED, rollout DONE, node built $OLD_BUILT -> $REL_BUILT, new instance id, same pid re-executed, .prev kept, update_committed; a wrong token got 404 and never reached the release host; no credentials went upstream ($(($(date +%s) - t_start)) s for 2e)"
+}
+
+# edge_update_probe <file>: while the first download stalls (the step is SENT, its token valid), a request with a wrong token, and
+# one with none, must get the decoy's 404, and neither may add a line to the fake release's log.
+edge_update_probe() {
+  local before after c1 c2 url
+  url=$(edge_url "/$LINK_SECRET/update/$NODE_ID/$1")
+  before=$(wc -l <"$WORK/fake-release.log")
+  c1=$(edge_get -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(openssl rand -hex 32)" "$url") || c1=curl-failed
+  c2=$(edge_get -o /dev/null -w '%{http_code}' "$url") || c2=curl-failed
+  after=$(wc -l <"$WORK/fake-release.log")
+  [ "$c1" = 404 ] || die "2e: a download with a wrong token answered HTTP $c1, want 404"
+  [ "$c2" = 404 ] || die "2e: a download with no token answered HTTP $c2, want 404"
+  [ "$before" = "$after" ] || die "2e: a download with a wrong or missing token reached the release host ($((after - before)) new line(s) in its log): $(tail -n $((after - before)) "$WORK/fake-release.log")"
+  say "wrong token: 404; no token: 404; the release host's log did not move ($after lines) while the real download stalled"
+}
+
 # ---------------------------------------------------------------- scenario
 
 edge_run() {
@@ -435,7 +630,9 @@ edge_run() {
   [ -f web/dist/index.html ] || die "web/dist is missing: build the SPA first (cd web && pnpm build)"
   edge_release_keys
   edge_build
-  go build -trimpath -o "$BIN/mistgate-node" ./cmd/mistgate-node
+  # The primary agent is a signed build older than the fake release (the run's key, Built an hour back): it lists update-link/1,
+  # so step 2e can update it over the link. Its version stays the default.
+  go build -trimpath -ldflags "-X $SSHN_BI.Built=$OLD_BUILT -X $SSHN_BI.ReleaseKey=$REL_PUB" -o "$BIN/mistgate-node" ./cmd/mistgate-node
   NODE_BIN=$BIN/mistgate-node
   build_hysteria
   edge_release_serve
@@ -588,6 +785,8 @@ PY
   step "2d. SSH wizard: the Worker reaches a real OpenSSH through the Provisioner object and connect()"
   sshn_up
   sshn_wizard
+
+  edge_update_over_link
 
   step "3. user, subscription"
   GROUP_ID=$(api GroupService/CreateGroup "{\"name\":\"e2e\",\"profileIds\":[\"$PROFILE_ID\"]}" | jq -r .group.id)
@@ -867,9 +1066,20 @@ PY
     done
   done
   [ "$LEAKS" = 0 ] || die "$LEAKS secret(s) found in logs"
+  # the download token of step 2e travels as an Authorization header only: no log of the run (the Worker's, wrangler's, the agent's,
+  # the fake release's with the headers it received) may hold a Bearer value or an Authorization header
+  CREDS=0
+  for f in "$WORK"/*.log "$WORK/wrangler-worker-output.txt" "$WORK/wrangler-file-log.txt"; do
+    [ -f "$f" ] || continue
+    if grep -qiE '\bbearer\b|authorization[:=]' "$f"; then
+      CREDS=$((CREDS + 1))
+      say "a Bearer or Authorization value in: $(basename "$f")"
+    fi
+  done
+  [ "$CREDS" = 0 ] || die "$CREDS log(s) hold a Bearer or Authorization value"
   ! grep -q 'Cannot perform I/O on behalf of a different request' "$WORK/wrangler.log" "$WORK/wrangler-file-log.txt"     || die "the Worker log has 'Cannot perform I/O on behalf of a different request'"
   # wrangler's dev server prints the path of every request: the secret prefixes are in those lines, by its design
   PATHS=$(grep -cE '^\[wrangler:info\] [A-Z]+ ' "$WORK/wrangler.log" || true)
-  pass "no secret (admin password, TOTP, cookie, master key, enrolment token, subscription token, hysteria credentials, the SSH passwords and the release key of the SSH installs) in the Worker's output, wrangler's file log, or the sshd, installed agent, fake release, node and client logs; wrangler's own request lines ($PATHS) print URL paths and are excluded"
+  pass "no secret (admin password, TOTP, cookie, master key, enrolment token, subscription token, hysteria credentials, the SSH passwords and the release key of the SSH installs) in the Worker's output, wrangler's file log, or the sshd, installed agent, fake release, node and client logs; wrangler's own request lines ($PATHS) print URL paths and are excluded; no log holds a Bearer value or an Authorization header (the update token of step 2e travelled in one)"
   ! grep -qE 'Error|error' "$WORK/wrangler-worker-output.txt" || note "the Worker log has error lines: $(grep -E 'Error|error' "$WORK/wrangler-worker-output.txt" | sort | uniq -c | sort -rn | head -5 | tr '\n' ';')"
 }
