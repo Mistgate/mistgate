@@ -12,7 +12,6 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
-	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -124,7 +123,6 @@ func (r rpc) SetTelegramBot(ctx context.Context, req *connect.Request[adminv1.Se
 			s.log.Error("telegram: clear bot", "err", err)
 			return nil, errInternal
 		}
-		s.dropCodes("")
 		s.resetOffset(ctx)
 		s.auditCtx(ctx, a, "telegram_bot_clear", map[string]any{"dropped_links": dropped})
 		s.botChanged(true)
@@ -158,7 +156,6 @@ func (r rpc) SetTelegramBot(ctx context.Context, req *connect.Request[adminv1.Se
 	}
 	newBot := prevErr != nil || prev.BotID != me.ID
 	if newBot {
-		s.dropCodes("")
 		s.resetOffset(ctx)
 	}
 	s.auditCtx(ctx, a, "telegram_bot_set", map[string]any{"bot": me.Username, "dropped_links": dropped})
@@ -175,9 +172,6 @@ func respondBot(ctx context.Context, s *Service, a store.Admin) (*connect.Respon
 }
 
 func (r rpc) BeginTelegramLink(ctx context.Context, _ *connect.Request[adminv1.BeginTelegramLinkRequest]) (*connect.Response[adminv1.BeginTelegramLinkResponse], error) {
-	if err := edition.Check(r.s.cfg.Edge, edition.Telegram); err != nil {
-		return nil, err
-	}
 	a, err := self(ctx)
 	if err != nil {
 		return nil, err
@@ -193,7 +187,11 @@ func (r rpc) BeginTelegramLink(ctx context.Context, _ *connect.Request[adminv1.B
 		r.s.log.Error("telegram: read bot", "err", err)
 		return nil, errInternal
 	}
-	code, expires := r.s.newCode(a.ID)
+	code, expires, err := r.s.newCode(ctx, a.ID)
+	if err != nil {
+		r.s.log.Error("telegram: create link code", "err", err)
+		return nil, errInternal
+	}
 	return connect.NewResponse(&adminv1.BeginTelegramLinkResponse{
 		Code: code, DeepLink: "https://t.me/" + b.Username + "?start=" + code, ExpiresUnix: expires.Unix(),
 	}), nil
@@ -209,7 +207,6 @@ func (r rpc) UnlinkTelegram(ctx context.Context, _ *connect.Request[adminv1.Unli
 		r.s.log.Error("telegram: unlink", "err", err)
 		return nil, errInternal
 	}
-	r.s.dropCodes(a.ID)
 	if had {
 		r.s.auditCtx(ctx, a, "telegram_unlink", nil)
 	}
@@ -240,9 +237,6 @@ func (r rpc) SetTelegramAlerts(ctx context.Context, req *connect.Request[adminv1
 }
 
 func (r rpc) SendTelegramTest(ctx context.Context, _ *connect.Request[adminv1.SendTelegramTestRequest]) (*connect.Response[adminv1.SendTelegramTestResponse], error) {
-	if err := edition.Check(r.s.cfg.Edge, edition.Telegram); err != nil {
-		return nil, err
-	}
 	a, err := self(ctx)
 	if err != nil {
 		return nil, err

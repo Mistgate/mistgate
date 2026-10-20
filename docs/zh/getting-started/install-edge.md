@@ -140,7 +140,6 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 | 功能 | 缺少的内容 |
 |:--|:--|
 | 备份 | 不支持加密备份和恢复。Cloudflare 自带的 D1 恢复功能（Time Travel）可以恢复数据库，但尚未与面板一起测试。妥善保管密钥文件。 |
-| 告警和 Telegram | 面板会评估并显示健康告警，但目前不会发送 Telegram 消息。 |
 | MCP 和 API 令牌 | 不提供 MCP 服务器。已有令牌会显示在列表中，也可以吊销；不能创建新令牌。 |
 | 隧道检测 | 面板目前不会从客户端视角检测服务器的隧道。 |
 | 更新节点 | 面板不会更新节点 Agent：不支持滚动更新和定时更新。 |

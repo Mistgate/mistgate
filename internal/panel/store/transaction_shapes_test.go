@@ -41,7 +41,8 @@ var transactionShape1 = map[string]string{
 	"store.go:SetSettingsIfAbsent":                 "Inserts each missing setting and reads the stored values back in one batch.",
 	"store.go:SetSettings":                         "Upserts the supplied settings in one fixed batch.",
 	"access_linkmode.go:SaveSubscriptionSettings":  "The settings upserts, the mode and, for STRICT, the revoke of every shared device run in one fixed batch.",
-	"telegram.go:ClearTelegramBot":                 "Deletes links and the bot as one fixed batch.",
+	"telegram.go:ClearTelegramBot":                 "Deletes links, pending link codes, and the bot as one fixed batch.",
+	"telegram.go:UnlinkTelegram":                   "Deletes the chat link and pending link code as one fixed batch.",
 	"token.go:RevokeAPIToken":                      "Revokes the token and cancels its open plans in one fixed batch.",
 }
 
@@ -85,7 +86,7 @@ var transactionShape2 = map[string]string{
 	"provision.go:RequestCancelNodeProvisionJob":   "A state diagnostic and queued/running compare-and-swap keep cancellation events atomic.",
 	"provision.go:updateNodeProvisionJobFromState": "The expected-state UPDATE is a compare-and-swap; its optional event shares the batch.",
 	"telegram.go:BindTelegramChat":                 "SQL checks the admin while replacing both unique link owners.",
-	"telegram.go:SetTelegramBot":                   "SQL drops links only when the stored bot differs, with the bot upsert in one batch.",
+	"telegram.go:SetTelegramBot":                   "SQL drops links and pending link codes only when the stored bot differs, with the bot upsert in one batch.",
 	"token.go:CreateAPIToken":                      "The insert guard enforces the live-token cap and unique active name in SQL.",
 	"update.go:AddNodeToRunningRollout":            "A current-rollout guard precedes stage shifting, insertion, and schedule consumption.",
 	"update.go:createRollout":                      "One SQL guard checks the rollout id, active slot, and optional exact schedule before fixed writes.",

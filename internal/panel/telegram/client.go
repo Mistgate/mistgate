@@ -20,10 +20,9 @@ import (
 // call is a JSON POST to <base>/bot<token>/<method>. The token is part of that URL, so an error from net/http (which prints
 // the URL) is never passed on: a transport failure becomes an apiError that says only that it was one.
 
-const (
-	defaultAPIBase = "https://api.telegram.org"
-	maxRetryAfter  = time.Hour
-)
+var defaultAPIBase = "https://api.telegram.org"
+
+const maxRetryAfter = time.Hour
 
 var botTokenInText = regexp.MustCompile(`bot[0-9]+:[A-Za-z0-9_-]+`)
 

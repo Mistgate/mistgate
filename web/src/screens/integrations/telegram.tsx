@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { CopyButton } from "@/components/copy-button";
-import { EditionNotice } from "@/components/edition-notice";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -13,7 +12,6 @@ import { TextField } from "@/components/ui/text-field";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { useFmt } from "@/lib/format";
-import { useEdition } from "@/lib/edition";
 import { clockText, useTick } from "@/lib/integrations";
 import {
   botErrorKey,
@@ -257,8 +255,7 @@ function Linked({ links }: { links: TelegramLink[] }) {
 export function TelegramCard({ owner }: { owner: boolean }) {
   const t = useT();
   const [code, setCode] = useState<Code | null>(null);
-  const unavailable = useEdition().off("telegram");
-  const q = useQuery({ ...telegramQuery, refetchInterval: code ? linkPollMs : telegramPollMs, enabled: !unavailable });
+  const q = useQuery({ ...telegramQuery, refetchInterval: code ? linkPollMs : telegramPollMs });
   const status = q.data;
   const bot = status?.bot;
   // the code is spent the moment the chat is linked
@@ -272,8 +269,7 @@ export function TelegramCard({ owner }: { owner: boolean }) {
         </SectionLabel>
         <span className="text-xs text-muted">{t("tg.sub")}</span>
       </div>
-      <EditionNotice feature="telegram" />
-      {!unavailable && q.isPending && <Pending compact />}
+      {q.isPending && <Pending compact />}
       {q.isError && !status && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
       {status && bot && (
         <>

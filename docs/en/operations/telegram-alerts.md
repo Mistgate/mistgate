@@ -53,6 +53,13 @@ How the messages behave:
 
 The panel connects out to `api.telegram.org` over HTTPS; the host must be able to reach it. A failed send is retried with a growing wait; a "too many requests" answer is waited out for as long as Telegram asks, capped at one hour to guard against invalid values; a chat that cannot be written to (you blocked the bot) is not retried. The messages waiting in memory when the panel stops are sent first, within a few seconds; a crash loses them. If Telegram refuses the token, or the panel cannot reach it, the card shows it under **Bot**.
 
+### On the Cloudflare edition
+
+- Messages go out from the one-minute schedule, so a message can arrive up to a minute late. Security notices (a lockout, a sign-in from a new address, a changed sign-in method) are sent right after the request that caused them.
+- Linking a chat is heard within about a minute: after you start linking, send `/start <code>` to the bot and wait for the reply.
+- A message held in memory is lost when Cloudflare evicts the Worker instance that holds it, as a VPS panel loses it in a crash.
+- There is no notice of a new panel release: the release check runs there only when an admin clicks to check for updates.
+
 ## Watch for a panel outage
 
 The [panel watcher](panel-watcher.md) is a separate Cloudflare Worker that checks the panel and sends down and recovery alerts to your linked chat. It uses the same bot and your **Chat ID** from your own linked card. It only sends Telegram messages; it does not poll the bot or set a webhook.

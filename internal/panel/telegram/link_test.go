@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -246,8 +249,14 @@ func TestExpiredAndReplacedCodes(t *testing.T) {
 	e.setBot()
 	e.run()
 
-	old, _ := e.svc.newCode(owner.ID)
-	stale, _ := e.svc.newCode(owner.ID) // replaces old
+	old, _, err := e.svc.newCode(context.Background(), owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale, _, err := e.svc.newCode(context.Background(), owner.ID) // replaces old
+	if err != nil {
+		t.Fatal(err)
+	}
 	e.tg.say(1, "/start "+old)
 	e.clk.advance(linkCodeTTL + time.Second)
 	e.tg.say(2, "/start "+stale)
@@ -314,7 +323,7 @@ func TestPendingCodesFollowUnlinkAndBotChanges(t *testing.T) {
 		if _, err := e.rpcSetBot(owner, "", true); err != nil {
 			t.Fatal(err)
 		}
-		if adminID, ok := e.svc.takeCode(code); ok {
+		if adminID, ok := e.svc.takeCode(context.Background(), code); ok {
 			t.Errorf("a code for %s survived clearing the bot", adminID)
 		}
 	})
@@ -478,7 +487,10 @@ func TestOffsetIsRemembered(t *testing.T) {
 	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
 	e.setBot()
 	cancel := e.run()
-	code, _ := e.svc.newCode(owner.ID)
+	code, _, err := e.svc.newCode(context.Background(), owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	e.tg.say(7, "/start "+code)
 	waitFor(t, "the link", func() bool { _, err := e.st.TelegramLink(context.Background(), owner.ID); return err == nil })
 	waitFor(t, "the offset to be saved", func() bool {
@@ -554,41 +566,220 @@ func TestAnotherBotStartsThePollFromTheBeginning(t *testing.T) {
 	})
 }
 
-// The edge delivers nothing and polls nothing: linking a chat and the test message are refused with the coded reason
-// (no fake-Telegram call, no pending code), and they work on the VPS.
-func TestEdgeRefusesLinkAndTest(t *testing.T) {
-	e := newEnv(t)
+func TestEdgeAllowsLinkAndTest(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.Edge = true })
 	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
 	e.setBot()
 	e.link(owner, 1)
 	r := rpc{e.svc}
 	ctx := e.ctxAs(owner)
-	begin := func() error {
-		_, err := r.BeginTelegramLink(ctx, connect.NewRequest(&adminv1.BeginTelegramLinkRequest{}))
-		return err
+	begin, err := r.BeginTelegramLink(ctx, connect.NewRequest(&adminv1.BeginTelegramLinkRequest{}))
+	if err != nil || len(begin.Msg.Code) != 12 {
+		t.Fatalf("edge BeginTelegramLink = %+v, %v", begin, err)
 	}
-	test := func() error {
-		_, err := r.SendTelegramTest(ctx, connect.NewRequest(&adminv1.SendTelegramTestRequest{}))
-		return err
+	if _, err := r.SendTelegramTest(ctx, connect.NewRequest(&adminv1.SendTelegramTestRequest{})); err != nil {
+		t.Fatalf("edge SendTelegramTest = %v", err)
 	}
+	if got := e.tg.sentTo(1); len(got) != 1 || !strings.Contains(strings.ToLower(got[0]), "test") {
+		t.Errorf("edge test messages = %v", got)
+	}
+}
 
-	e.svc.cfg.Edge = true
-	sent := e.tg.total()
-	for name, call := range map[string]func() error{"BeginTelegramLink": begin, "SendTelegramTest": test} {
-		err := call()
-		if connectCode(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "unavailable_in_edition: feature=telegram") {
-			t.Errorf("edge %s = %v, want the coded refusal", name, err)
+func TestLinkCodeIsSingleUseUnderConcurrency(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	code, _, err := e.svc.newCode(context.Background(), owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const contenders = 24
+	start := make(chan struct{})
+	var winners atomic.Int32
+	var wg sync.WaitGroup
+	for range contenders {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if _, ok := e.svc.takeCode(context.Background(), code); ok {
+				winners.Add(1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	if got := winners.Load(); got != 1 {
+		t.Fatalf("concurrent code takes = %d, want exactly one", got)
+	}
+}
+
+func TestEdgePollOnlyRunsForPendingCodeAndUsesLease(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/getUpdates") {
+			t.Errorf("unexpected Telegram method %q", r.URL.Path)
+			http.Error(w, "unexpected method", http.StatusNotFound)
+			return
 		}
+		if calls.Add(1) == 1 {
+			close(started)
+			select {
+			case <-release:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"result":[]}`))
+	}))
+	defer server.Close()
+
+	newPoller := func() *Service {
+		s, err := New(Config{
+			Store: e.st, Vault: e.svc.vault, StepUp: e.svc.cfg.StepUp,
+			APIBase: server.URL, Edge: true, PollTimeout: 1, Now: e.svc.now,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
 	}
-	if e.tg.total() != sent || len(e.svc.codes) != 0 {
-		t.Errorf("a refused call sent %d messages and left %d link codes", e.tg.total()-sent, len(e.svc.codes))
+	first, second := newPoller(), newPoller()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := first.PollPendingLinkCode(ctx); err != nil {
+		t.Fatalf("poll with no pending code: %v", err)
+	}
+	if got := calls.Load(); got != 0 {
+		t.Fatalf("polls with no pending code = %d, want zero", got)
+	}
+	if _, _, err := e.svc.newCode(context.Background(), owner.ID); err != nil {
+		t.Fatal(err)
 	}
 
-	e.svc.cfg.Edge = false
-	if err := begin(); err != nil {
-		t.Errorf("VPS BeginTelegramLink = %v", err)
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- first.PollPendingLinkCode(ctx) }()
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("first poll did not reach Telegram")
 	}
-	if err := test(); err != nil {
-		t.Errorf("VPS SendTelegramTest = %v", err)
+	if err := second.PollPendingLinkCode(ctx); err != nil {
+		t.Fatalf("overlapping poll: %v", err)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("overlapping polls reached Telegram %d times, want one", got)
+	}
+	close(release)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+}
+
+func TestEdgeWatcherRunsEveryFifthMinute(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.Edge = true })
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 80)
+
+	var checks atomic.Int32
+	e.svc.SetSources(Sources{PanelRelease: func() (string, bool) {
+		checks.Add(1)
+		return "9.9.9", true
+	}})
+	base := time.Date(2026, 10, 9, 12, 4, 0, 0, time.UTC)
+	e.svc.WatchTick(context.Background(), base)
+	if got := checks.Load(); got != 0 {
+		t.Fatalf("watcher checks at minute 4 = %d, want zero", got)
+	}
+	e.svc.WatchTick(context.Background(), base.Add(time.Minute))
+	if got := checks.Load(); got != 1 {
+		t.Fatalf("watcher checks at minute 5 = %d, want one", got)
+	}
+	e.svc.FlushNow(context.Background())
+	if got := e.tg.sentTo(80); len(got) != 1 {
+		t.Fatalf("minute 5 watcher sent %d release messages, want one", len(got))
+	}
+	e.svc.WatchTick(context.Background(), base.Add(2*time.Minute))
+	if got := checks.Load(); got != 1 {
+		t.Fatalf("watcher checks at minute 6 = %d, want one total", got)
+	}
+}
+
+func TestEdgePollTimeoutIsCappedAt25Seconds(t *testing.T) {
+	e := newEnv(t, func(c *Config) {
+		c.Edge = true
+		c.PollTimeout = 30
+	})
+	if got := e.svc.cfg.PollTimeout; got != 25 {
+		t.Fatalf("edge poll timeout = %d seconds, want 25", got)
+	}
+}
+
+func TestFlushNowSendsQueuedMessagesImmediately(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 77)
+	e.svc.AlertTransition(alert("node_down", "nod_1", 3), false)
+	if got := e.tg.total(); got != 0 {
+		t.Fatalf("queued before FlushNow: %d messages", got)
+	}
+	e.svc.FlushNow(context.Background())
+	if got := e.tg.sentTo(77); len(got) != 1 {
+		t.Fatalf("FlushNow sent %d messages, want one", len(got))
+	}
+}
+
+func TestEdgeRequestProducersFlushAfterResponse(t *testing.T) {
+	var after []func()
+	e := newEnv(t, func(c *Config) {
+		c.Edge = true
+		c.AfterResponse = func(work func()) { after = append(after, work) }
+	})
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 78)
+	e.svc.PlanWaiting("node_install", "alice")
+	if e.tg.total() != 0 || len(after) != 1 {
+		t.Fatalf("PlanWaiting sent %d messages and queued %d after-response tasks", e.tg.total(), len(after))
+	}
+	after[0]()
+	if got := e.tg.sentTo(78); len(got) != 1 {
+		t.Fatalf("PlanWaiting after-response sent %d messages, want one", len(got))
+	}
+	after = nil
+	e.svc.AwgPrepareFailed("nod_missing", "build_failed", 1)
+	if e.tg.total() != 1 || len(after) != 1 {
+		t.Fatalf("AwgPrepareFailed sent %d messages and queued %d after-response tasks", e.tg.total(), len(after))
+	}
+	after[0]()
+	if got := e.tg.sentTo(78); len(got) != 2 {
+		t.Fatalf("AwgPrepareFailed after-response sent %d total messages, want two", len(got))
+	}
+}
+
+func TestEdgeFlushKeepsFailedMessageForNextTick(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.Edge = true; c.RetryMax = 1 })
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 79)
+	e.tg.mu.Lock()
+	e.tg.sendPlan = append(e.tg.sendPlan, planned{status: http.StatusInternalServerError, desc: "temporary"})
+	e.tg.mu.Unlock()
+	e.svc.AlertTransition(alert("node_down", "nod_1", 3), false)
+	e.svc.FlushNow(context.Background())
+	if got := e.tg.total(); got != 0 {
+		t.Fatalf("failed first flush delivered %d messages, want zero", got)
+	}
+	e.svc.FlushNow(context.Background())
+	if got := e.tg.sentTo(79); len(got) != 1 {
+		t.Fatalf("retry flush delivered %d messages, want one", len(got))
 	}
 }

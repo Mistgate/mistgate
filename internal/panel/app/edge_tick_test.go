@@ -4,9 +4,13 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,6 +21,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/telegram"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
@@ -73,6 +78,11 @@ func buildPanelWith(t *testing.T, remote fleet.Remote, tweak func(*Config)) (*Pa
 
 // buildPanelOn assembles a panel on a store that is already open: two of them on one store are two isolates of the edge.
 func buildPanelOn(t *testing.T, st *store.Store, remote fleet.Remote, tweak func(*Config)) (*Panel, *auth.Service) {
+	p, authSvc, _ := buildPanelOnWithVault(t, st, remote, tweak)
+	return p, authSvc
+}
+
+func buildPanelOnWithVault(t *testing.T, st *store.Store, remote fleet.Remote, tweak func(*Config)) (*Panel, *auth.Service, *vault.Vault) {
 	t.Helper()
 	key := make([]byte, vault.KeySize)
 	for i := range key {
@@ -103,7 +113,7 @@ func buildPanelOn(t *testing.T, st *store.Store, remote fleet.Remote, tweak func
 	if err != nil {
 		t.Fatal(err)
 	}
-	return p, authSvc
+	return p, authSvc, vlt
 }
 
 func addExpiredAlice(t *testing.T, p *Panel, now time.Time) {
@@ -282,6 +292,152 @@ func TestConcurrentEdgeTicksAnnounceNodeDownOnceOnOpenAndOnResolve(t *testing.T)
 	assertActiveNodeDown(t, st, nodeID, false)
 	if opened.Load() != 1 || resolved.Load() != 1 {
 		t.Fatalf("after the node returned: node_down opened %d, resolved %d; want 1, 1", opened.Load(), resolved.Load())
+	}
+}
+
+func TestConcurrentEdgeTicksSendOneTelegramNodeDown(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	const token = "123456789:AAFakeFakeFakeFakeFakeFakeFakeFake_x"
+	type message struct {
+		chat int64
+		text string
+	}
+	var mu sync.Mutex
+	var sent []message
+	fakeTelegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		method := strings.TrimPrefix(r.URL.Path, "/bot"+token+"/")
+		switch method {
+		case "sendMessage":
+			var body struct {
+				ChatID int64  `json:"chat_id"`
+				Text   string `json:"text"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Errorf("decode fake Telegram send: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			sent = append(sent, message{chat: body.ChatID, text: body.Text})
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": 1}})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error_code": 404, "description": "Not Found"})
+		}
+	}))
+	t.Cleanup(fakeTelegram.Close)
+
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_alice', 'alice', 'owner', x'01', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	var opened atomic.Int32
+	configure := func(c *Config) {
+		c.TelegramAPIBase = fakeTelegram.URL
+		c.OnAlertTransition = func(tr health.Transition) {
+			if tr.Alert.Kind == "node_down" && !tr.Resolved {
+				opened.Add(1)
+			}
+		}
+	}
+	first, _, vlt := buildPanelOnWithVault(t, st, &edgeTickRemote{}, configure)
+	second, _ := buildPanelOn(t, st, &edgeTickRemote{}, configure)
+	if _, err := st.SetTelegramBot(ctx, store.TelegramBotRow{
+		Token: vlt.Seal([]byte(token), "telegram_bot.token"), BotID: 123456789, Username: "mist_alert_bot",
+	}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.BindTelegramChat(ctx, "adm_alice", 901, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	nodeID := addSilentNodeA(t, first, time.Now().UTC())
+	tickAt := time.Date(2026, 10, 9, 12, 3, 0, 0, time.UTC)
+
+	type gate struct {
+		once            sync.Once
+		entered, unlock chan struct{}
+	}
+	g := &gate{entered: make(chan struct{}), unlock: make(chan struct{})}
+	first.Health.AddConditionSource(func(context.Context) []health.ExtCond {
+		g.once.Do(func() { close(g.entered) })
+		<-g.unlock
+		return nil
+	})
+	done := make(chan error, 1)
+	go func() { done <- first.EdgeTick(ctx, tickAt) }()
+	select {
+	case <-g.entered:
+	case <-time.After(10 * time.Second):
+		close(g.unlock)
+		t.Fatal("the first isolate never reached its evaluator pass")
+	}
+	if err := second.EdgeTick(ctx, tickAt); err != nil {
+		close(g.unlock)
+		t.Fatal(err)
+	}
+	close(g.unlock)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	assertActiveNodeDown(t, st, nodeID, true)
+	mu.Lock()
+	got := append([]message(nil), sent...)
+	mu.Unlock()
+	if opened.Load() != 1 || len(got) != 1 || got[0].chat != 901 {
+		t.Fatalf("overlapping ticks opened %d alerts and sent %+v; want one alert and one message to chat 901", opened.Load(), got)
+	}
+}
+
+func TestEdgeTickRunsWatcherWhenTelegramPollFails(t *testing.T) {
+	ctx := context.Background()
+	const token = "123456789:AAFakeFakeFakeFakeFakeFakeFakeFake_x"
+	fakeTelegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/getUpdates") {
+			t.Errorf("unexpected Telegram method %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error_code": 503, "description": "Temporary failure"})
+	}))
+	t.Cleanup(fakeTelegram.Close)
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_alice', 'alice', 'owner', x'01', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	p, _, vlt := buildPanelOnWithVault(t, st, &edgeTickRemote{}, func(c *Config) { c.TelegramAPIBase = fakeTelegram.URL })
+	if _, err := st.SetTelegramBot(ctx, store.TelegramBotRow{
+		Token: vlt.Seal([]byte(token), "telegram_bot.token"), BotID: 123456789, Username: "mist_alert_bot",
+	}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.BindTelegramChat(ctx, "adm_alice", 901, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetTelegramLinkCode(ctx, strings.Repeat("a", 64), "adm_alice", time.Now().Add(10*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	var checks atomic.Int32
+	p.Telegram.SetSources(telegram.Sources{PanelRelease: func() (string, bool) {
+		checks.Add(1)
+		return "", false
+	}})
+
+	err = p.EdgeTick(ctx, time.Date(2026, 10, 9, 12, 10, 0, 0, time.UTC))
+	if err == nil {
+		t.Fatal("EdgeTick returned nil after Telegram's poll failed")
+	}
+	if got := checks.Load(); got != 1 {
+		t.Fatalf("watcher checks after poll failure = %d, want one", got)
 	}
 }
 

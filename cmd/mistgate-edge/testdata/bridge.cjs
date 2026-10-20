@@ -455,13 +455,14 @@ async function assertProvisioner(bytes, forwardPanel, adminCookie, initOptions, 
     return countedJob("cron tick with installs", () => Promise.race([forwardPanel.cron({ at: at.getTime() }), wasmFailure]));
   };
   await insertJob("prv_done", "failed");
-  // 6 for the sweeps and settings + 10 for a warm evaluator pass (see "cron tick" below); nothing in an install wakes more.
-  assert.equal((await tick(3)).queries.sequentialQueries, 16);
+  // 6 for the sweeps and settings, one Telegram pending-code check and 10 for a warm evaluator pass (see "cron tick" below);
+  // nothing in an install wakes more.
+  assert.equal((await tick(3)).queries.sequentialQueries, 17);
   assert.equal(provisionKicks, 0, "a finished install wakes nothing");
   for (const [i, state] of ["queued", "running", "cancel_requested"].entries()) {
     await globalThis.__d1.prepare("DELETE FROM node_provision_job WHERE id = 'prv_open'").run();
     await insertJob("prv_open", state);
-    assert.equal((await tick(3)).queries.sequentialQueries, 16, "waking costs no query beyond the look");
+    assert.equal((await tick(3)).queries.sequentialQueries, 17, "waking costs no query beyond the look");
     assert.equal(provisionKicks, i + 1, `a ${state} install wakes the Provisioner`);
   }
   await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
@@ -1085,8 +1086,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      19,
-      "a normal cron tick costs 19 D1 calls: 6 for the sweeps and the country settings, and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
+      20,
+      "a normal cron tick costs 20 D1 calls: 6 for the sweeps and the country settings, one Telegram pending-code check and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
     );
 
     liveProjectionQueries = 0;
@@ -1101,8 +1102,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
     assert.equal(
       cronQueries.sequentialQueries,
-      17,
-      "one cron tick costs 17 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
+      19,
+      "one minute 10 cron tick costs 19 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, one Telegram pending-code check, one Telegram bot check for the watcher, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
     );
     assert.equal(liveProjectionQueries, 3, "the node-down sweep, the evaluator and the ten-minute safety net each read live nodes once");
     assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
@@ -1117,8 +1118,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      26,
-      "a minute 17 cron tick costs 26 D1 calls: 6 for the sweeps and settings, 10 for retention (four of them prune statements) and 10 for a warm evaluator pass",
+      27,
+      "a minute 17 cron tick costs 27 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, 10 for retention (four of them prune statements) and 10 for a warm evaluator pass",
     );
 
     // The Overview is polled every 10 seconds. The health summary of every node is one settings row, read once: more connected

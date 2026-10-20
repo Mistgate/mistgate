@@ -132,11 +132,10 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, waitUntil)
 	counts := binding.Call("__endQueryCount")
 	ended = true
-	// four for the sweeps, one each for the settings of the two country sources (off by default: nothing else happens), and
-	// eight for the evaluator pass on an empty fleet: its lease, the nodes, the signal batch, the active alerts, the interval
-	// setting, the update rollout, the country settings and the write of the (empty) node-health summary.
-	if got := counts.Get("sequentialQueries").Int(); got != 14 {
-		t.Fatalf("cron used %d sequential D1 calls, want 14 (6 tick + 8 evaluator on an empty fleet)", got)
+	// The Telegram pending-code check adds one read; otherwise this tick costs the four sweeps, the two country settings and
+	// eight calls for the evaluator pass on an empty fleet.
+	if got := counts.Get("sequentialQueries").Int(); got != 16 {
+		t.Fatalf("cron used %d sequential D1 calls, want 16 (6 tick + Telegram code check + empty-owner watcher + 8 evaluator on an empty fleet)", got)
 	}
 	if got := remote.pokeCount(); got != 1 {
 		t.Fatalf("minute 10 remote fan-outs = %d, want 1", got)
@@ -162,9 +161,10 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	retentionCounts := binding.Call("__endQueryCount")
 	retentionEnded = true
 	// The nodes are still warm in the isolate and the empty summary is unchanged, so the evaluator pass is six calls: its lease,
-	// the signal batch, the active alerts, the interval setting, the update rollout and the country settings.
-	if got := retentionCounts.Get("sequentialQueries").Int(); got != 21 {
-		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 21 (5 tick + 10 retention + 6 evaluator)", got)
+	// the signal batch, the active alerts, the interval setting, the update rollout and the country settings. Telegram's pending
+	// code check adds one read on every tick.
+	if got := retentionCounts.Get("sequentialQueries").Int(); got != 22 {
+		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 22 (5 tick + Telegram code check + 10 retention + 6 evaluator)", got)
 	}
 	// Three batches: the node-down sweep's live read (every tick), the evaluator's signal batch and the daily rollup; the
 	// prunes are single statements.

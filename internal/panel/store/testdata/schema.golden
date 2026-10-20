@@ -265,6 +265,12 @@
   },
   {
     "type": "index",
+    "name": "telegram_link_code_expiry",
+    "tbl_name": "telegram_link_code",
+    "sql": "CREATE INDEX telegram_link_code_expiry ON telegram_link_code(expires_at)"
+  },
+  {
+    "type": "index",
     "name": "traffic_bucket_node_hour",
     "tbl_name": "traffic_bucket",
     "sql": "CREATE INDEX traffic_bucket_node_hour ON traffic_bucket (node_id, hour_start)"
@@ -640,6 +646,12 @@
     "name": "telegram_link",
     "tbl_name": "telegram_link",
     "sql": "CREATE TABLE telegram_link ( admin_id TEXT PRIMARY KEY REFERENCES admin(id) ON DELETE CASCADE, chat_id INTEGER NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)), linked_at INTEGER NOT NULL ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "telegram_link_code",
+    "tbl_name": "telegram_link_code",
+    "sql": "CREATE TABLE telegram_link_code ( hash TEXT PRIMARY KEY CHECK (length(hash) = 64), admin_id TEXT NOT NULL UNIQUE REFERENCES admin(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL ) STRICT"
   },
   {
     "type": "table",

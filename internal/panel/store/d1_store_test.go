@@ -159,6 +159,31 @@ func TestD1JobLeaseTakeExpiryAndRelease(t *testing.T) {
 	take("alice", now.Add(time.Minute), true)
 }
 
+func TestD1TelegramLinkCodeTakeIsOneStatement(t *testing.T) {
+	st := openD1Store(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_alice', 'alice', 'owner', x'01', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("a", 64)
+	if err := st.SetTelegramLinkCode(ctx, hash, "adm_alice", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	calls := countD1Queries(t, js.Global().Get("__d1"), "TakeTelegramLinkCode", func() {
+		adminID, err := st.TakeTelegramLinkCode(ctx, hash, now)
+		if err != nil || adminID != "adm_alice" {
+			t.Fatalf("TakeTelegramLinkCode = %q, %v", adminID, err)
+		}
+	})
+	if calls.queries != 1 || calls.batches != 0 {
+		t.Fatalf("TakeTelegramLinkCode used %d sequential D1 calls and %d batches, want one DELETE ... RETURNING statement", calls.queries, calls.batches)
+	}
+	if _, err := st.TakeTelegramLinkCode(ctx, hash, now); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second TakeTelegramLinkCode = %v, want ErrNotFound", err)
+	}
+}
+
 func TestD1RecordedUpdateStepMethods(t *testing.T) {
 	st := openD1Store(t)
 	ctx := context.Background()

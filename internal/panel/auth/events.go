@@ -47,9 +47,17 @@ func (s *Service) SetEventHook(fn func(Event)) {
 	s.hook.Store(&fn)
 }
 
+// SetEventRunner makes emit run the hook through run instead of a bare goroutine (on the edge, an after-response task the
+// Worker waits for). nil, the VPS, keeps the goroutine. Set it once while building.
+func (s *Service) SetEventRunner(run func(func())) { s.eventRunner = run }
+
 func (s *Service) emit(e Event) {
 	if h := s.hook.Load(); h != nil {
 		e.Time = s.now()
-		go (*h)(e)
+		if run := s.eventRunner; run != nil {
+			run(func() { (*h)(e) })
+		} else {
+			go (*h)(e)
+		}
 	}
 }

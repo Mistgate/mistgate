@@ -37,12 +37,12 @@ const (
 	notifiedRel   = "telegram.notified.release"
 	notifiedAgent = "telegram.notified.agents"
 
-	linkCodeTTL  = 10 * time.Minute
-	maxPending   = 200
-	minSeverity  = 2 // warning and up; info-level alerts are never sent
-	maxMessage   = 3500
-	maxLinkCodes = 64
-	ipSeenFor    = 30 * 24 * time.Hour
+	linkCodeTTL = 10 * time.Minute
+	maxPending  = 200
+	minSeverity = 2 // warning and up; info-level alerts are never sent
+	maxMessage  = 3500
+	ipSeenFor   = 30 * 24 * time.Hour
+	edgePollMax = 25 // seconds; leave time in the cron job for processing and offset persistence
 
 	nodeNameTimeout = 5 * time.Second // the node-name read of an alert message (D1 on the edge)
 )
@@ -64,8 +64,11 @@ type Config struct {
 	// AdminURL is the public address of the admin ("" = unknown: messages carry no link).
 	AdminURL string
 	Log      *slog.Logger
-	// Edge is the edge edition: nothing polls or delivers there, so linking a chat and the test message refuse.
+	// Edge is the Cloudflare edition: work is triggered by EdgeTick and bounded after-response tasks, not process loops.
 	Edge bool
+	// AfterResponse keeps short request producers alive until a post-response flush has finished. The runner is bounded by
+	// its caller; nil leaves delivery to the VPS background loop.
+	AfterResponse func(func())
 
 	// Test seams. The zero value is production.
 	APIBase     string       // https://api.telegram.org
@@ -95,7 +98,6 @@ type Service struct {
 	mu       sync.Mutex
 	pending  []item
 	open     map[string]bool      // health alerts announced as open and not yet resolved
-	codes    map[string]linkCode  // sha256 of a link code -> whom it is for
 	seenIP   map[string]time.Time // admin id + address -> last sign-in seen from it
 	lastTest map[string]time.Time // admin id -> last test message
 	botErr   string               // how the last conversation with Telegram went ("" = fine)
@@ -105,11 +107,6 @@ type Service struct {
 	pollFrom0 bool
 	notify    chan struct{} // an item was queued
 	wake      chan struct{} // the bot changed
-}
-
-type linkCode struct {
-	adminID string
-	expires time.Time
 }
 
 // item is a line of news waiting for the next message: who gets it and how it reads in a language.
@@ -126,7 +123,7 @@ func ownerAnd(id string) func(store.TelegramLinkRow) bool {
 	return func(l store.TelegramLinkRow) bool { return l.Role == store.RoleOwner || (id != "" && l.AdminID == id) }
 }
 
-// New builds the module. Call Run to start polling and sending.
+// New builds the module. VPS starts Run; the edge invokes the bounded polling, watcher, and flush methods from EdgeTick.
 func New(cfg Config) (*Service, error) {
 	if cfg.Store == nil || cfg.Vault == nil || cfg.StepUp == nil {
 		return nil, errors.New("telegram: store, vault and step-up are required")
@@ -150,13 +147,19 @@ func New(cfg Config) (*Service, error) {
 	}
 	if cfg.PollTimeout <= 0 {
 		cfg.PollTimeout = 30
+		if cfg.Edge {
+			cfg.PollTimeout = edgePollMax
+		}
+	}
+	if cfg.Edge && cfg.PollTimeout > edgePollMax {
+		cfg.PollTimeout = edgePollMax
 	}
 	if cfg.RetryMax <= 0 {
 		cfg.RetryMax = 6
 	}
 	return &Service{
 		st: cfg.Store, vault: cfg.Vault, api: &apiClient{base: strings.TrimRight(cfg.APIBase, "/"), hc: cfg.HTTPClient}, cfg: cfg, log: cfg.Log, now: cfg.Now,
-		open: map[string]bool{}, codes: map[string]linkCode{}, seenIP: map[string]time.Time{}, lastTest: map[string]time.Time{},
+		open: map[string]bool{}, seenIP: map[string]time.Time{}, lastTest: map[string]time.Time{},
 		notify: make(chan struct{}, 1), wake: make(chan struct{}, 1),
 	}, nil
 }
@@ -173,7 +176,8 @@ func (s *Service) SetSources(src Sources) {
 	s.mu.Unlock()
 }
 
-// Run polls, sends and watches until ctx ends, then flushes what is queued (briefly) and returns. No goroutine outlives it.
+// Run starts the VPS polling, sending, and watcher loops until ctx ends, then briefly flushes queued messages. No goroutine
+// outlives it; the edge runs bounded methods from EdgeTick instead.
 func (s *Service) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, f := range []func(context.Context){s.pollLoop, s.sendLoop, s.watchLoop} {
@@ -185,19 +189,24 @@ func (s *Service) Run(ctx context.Context) {
 
 // token is the bot token, opened from the vault for one use. ok is false when no bot is set.
 func (s *Service) token(ctx context.Context) (vault.Redacted, bool) {
+	token, _, ok := s.tokenAndBotID(ctx)
+	return token, ok
+}
+
+func (s *Service) tokenAndBotID(ctx context.Context) (vault.Redacted, int64, bool) {
 	b, err := s.st.TelegramBot(ctx)
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) && ctx.Err() == nil {
 			s.log.Warn("telegram: read bot", "err", err)
 		}
-		return "", false
+		return "", 0, false
 	}
 	pt, err := s.vault.Open(b.Token, tokenRecordID)
 	if err != nil {
 		s.log.Error("telegram: the stored bot token cannot be opened", "err", err)
-		return "", false
+		return "", 0, false
 	}
-	return vault.Redacted(pt), true
+	return vault.Redacted(pt), b.BotID, true
 }
 
 func (s *Service) setBotErr(code string) {
@@ -309,6 +318,85 @@ func (s *Service) pollLoop(ctx context.Context) {
 	}
 }
 
+// PollPendingLinkCode is one edge tick's bounded Telegram poll. It checks D1 before taking the cross-isolate lease, so the
+// edge does not long-poll when there is no link code to hear.
+func (s *Service) PollPendingLinkCode(ctx context.Context) error {
+	pending, err := s.st.HasPendingTelegramLinkCode(ctx, s.now())
+	if err != nil {
+		return err
+	}
+	if !pending {
+		return nil
+	}
+	holder := store.NewID("lease_")
+	taken, err := s.st.TakeLease(ctx, "telegram-poll", holder, 45*time.Second, s.now())
+	if err != nil || !taken {
+		return err
+	}
+	defer func() {
+		if err := s.st.ReleaseLease(ctx, "telegram-poll", holder); err != nil && ctx.Err() == nil {
+			s.log.Warn("telegram: release poll lease", "err", err)
+		}
+	}()
+
+	tok, botID, ok := s.tokenAndBotID(ctx)
+	if !ok {
+		return nil
+	}
+	offset := int64(0)
+	if value, err := s.st.Setting(ctx, offsetKey); err == nil {
+		offset, _ = strconv.ParseInt(value, 10, 64)
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	s.mu.Lock()
+	if s.pollFrom0 {
+		offset, s.pollFrom0 = 0, false
+	}
+	pctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.PollTimeout+15)*time.Second)
+	s.pollStop = cancel
+	s.mu.Unlock()
+	updates, err := s.api.getUpdates(pctx, tok, offset, s.cfg.PollTimeout)
+	pollErr := pctx.Err()
+	cancel()
+	s.mu.Lock()
+	s.pollStop = nil
+	s.mu.Unlock()
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if pollErr != nil && !errors.Is(pollErr, context.DeadlineExceeded) {
+			return nil // the bot changed during the poll
+		}
+		s.setBotErr(errCode(err))
+		s.log.Warn("telegram: getUpdates", "code", errCode(err))
+		return err
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	// Another isolate may have replaced the bot while this poll was in flight. Its updates and offset belong to the old bot.
+	current, err := s.st.TelegramBot(ctx)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && current.BotID != botID) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	s.setBotErr("")
+	for _, update := range updates {
+		offset = max(offset, update.UpdateID+1)
+		if update.Message != nil {
+			s.handleMessage(ctx, tok, *update.Message)
+		}
+	}
+	if len(updates) > 0 {
+		return s.st.SetSettings(ctx, map[string]string{offsetKey: strconv.FormatInt(offset, 10)})
+	}
+	return nil
+}
+
 // resetOffset forgets the position in the updates of the old bot.
 func (s *Service) resetOffset(ctx context.Context) {
 	_ = s.st.SetSettings(ctx, map[string]string{offsetKey: "0"})
@@ -329,7 +417,7 @@ func (s *Service) handleMessage(ctx context.Context, tok vault.Redacted, m tgMes
 		return
 	}
 	if len(fields) >= 2 {
-		if adminID, ok := s.takeCode(fields[1]); ok {
+		if adminID, ok := s.takeCode(ctx, fields[1]); ok {
 			l, brand := s.panel(ctx)
 			if err := s.st.BindTelegramChat(ctx, adminID, m.Chat.ID, s.now()); err != nil {
 				if !errors.Is(err, store.ErrNotFound) {
@@ -370,54 +458,29 @@ func codeHash(code string) string {
 
 // newCode makes the one-time code of an admin (12 characters of base32: 60 bits) that lives linkCodeTTL. A new code
 // replaces the admin's earlier one.
-func (s *Service) newCode(adminID string) (code string, expires time.Time) {
+func (s *Service) newCode(ctx context.Context, adminID string) (code string, expires time.Time, err error) {
 	var raw [8]byte
-	_, _ = rand.Read(raw[:])
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", time.Time{}, err
+	}
 	code = strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw[:]))[:12]
 	expires = s.now().Add(linkCodeTTL)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := s.now()
-	for h, c := range s.codes {
-		if c.adminID == adminID || !now.Before(c.expires) {
-			delete(s.codes, h)
-		}
+	if err := s.st.SetTelegramLinkCode(ctx, codeHash(code), adminID, expires); err != nil {
+		return "", time.Time{}, err
 	}
-	for len(s.codes) >= maxLinkCodes { // never more than a handful of admins link at once
-		for h := range s.codes {
-			delete(s.codes, h)
-			break
-		}
-	}
-	s.codes[codeHash(code)] = linkCode{adminID: adminID, expires: expires}
-	return code, expires
+	return code, expires, nil
 }
 
 // takeCode consumes a code: it works once, and only before it expires.
-func (s *Service) takeCode(code string) (adminID string, ok bool) {
-	h := codeHash(code)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	c, found := s.codes[h]
-	if !found {
-		return "", false
-	}
-	delete(s.codes, h)
-	if !s.now().Before(c.expires) {
-		return "", false
-	}
-	return c.adminID, true
-}
-
-// dropCodes invalidates pending link codes for one admin, or every code when adminID is empty.
-func (s *Service) dropCodes(adminID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for h, c := range s.codes {
-		if adminID == "" || c.adminID == adminID {
-			delete(s.codes, h)
+func (s *Service) takeCode(ctx context.Context, code string) (adminID string, ok bool) {
+	adminID, err := s.st.TakeTelegramLinkCode(ctx, codeHash(code), s.now())
+	if err != nil {
+		if !errors.Is(err, store.ErrNotFound) && ctx.Err() == nil {
+			s.log.Warn("telegram: consume link code", "err", err)
 		}
+		return "", false
 	}
+	return adminID, true
 }
 
 // ---- what is announced
@@ -454,6 +517,7 @@ func (s *Service) enqueue(it item) {
 	case s.notify <- struct{}{}:
 	default:
 	}
+	s.flushAfterResponse() // the edge has no send loop; a no-op on the VPS
 }
 
 // AlertTransition is health.Config.OnTransition: an alert opened (or re-opened) or ended. An alert already announced as open
@@ -463,17 +527,19 @@ func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 	if a.Severity < minSeverity {
 		return
 	}
-	key := a.Kind + "/" + a.NodeID + "/" + a.Subject
-	s.mu.Lock()
-	if resolved {
-		delete(s.open, key)
-	} else if s.open[key] {
+	if !s.cfg.Edge { // on the edge the alert row and the health-eval lease decide; a per-isolate map would drop a re-open
+		key := a.Kind + "/" + a.NodeID + "/" + a.Subject
+		s.mu.Lock()
+		if resolved {
+			delete(s.open, key)
+		} else if s.open[key] {
+			s.mu.Unlock()
+			return
+		} else {
+			s.open[key] = true
+		}
 		s.mu.Unlock()
-		return
-	} else {
-		s.open[key] = true
 	}
-	s.mu.Unlock()
 	if resolved {
 		switch a.Resolution {
 		case "superseded", "accepted", "node_retired":
@@ -584,6 +650,11 @@ func (s *Service) canSend(ctx context.Context, to func(store.TelegramLinkRow) bo
 
 // watch announces a signed panel release and agents behind a release, each once per version.
 func (s *Service) watch(ctx context.Context) {
+	// A watcher with no owner chat has no useful work; in particular, avoid the update-source reads on every edge isolate
+	// when Telegram has not been configured.
+	if !s.canSend(ctx, ownerOnly) {
+		return
+	}
 	s.mu.Lock()
 	src := s.sources
 	s.mu.Unlock()
@@ -598,16 +669,23 @@ func (s *Service) watch(ctx context.Context) {
 		}
 	}
 	if src.PanelRelease != nil {
-		if v, ok := src.PanelRelease(); ok && v != "" && !told(notifiedRel, v) && s.canSend(ctx, ownerOnly) {
+		if v, ok := src.PanelRelease(); ok && v != "" && !told(notifiedRel, v) {
 			s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return releaseText(l, v, adminURL) }})
 			mark(notifiedRel, v)
 		}
 	}
 	if src.OutdatedAgents != nil {
-		if v, nodes := src.OutdatedAgents(ctx); v != "" && len(nodes) > 0 && !told(notifiedAgent, v) && s.canSend(ctx, ownerOnly) {
+		if v, nodes := src.OutdatedAgents(ctx); v != "" && len(nodes) > 0 && !told(notifiedAgent, v) {
 			s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return agentsOutdatedText(l, v, nodes, adminURL) }})
 			mark(notifiedAgent, v)
 		}
+	}
+}
+
+// WatchTick runs the release and agent watcher every fifth scheduled minute on the edge.
+func (s *Service) WatchTick(ctx context.Context, now time.Time) {
+	if now.UTC().Minute()%5 == 0 {
+		s.watch(ctx)
 	}
 }
 
@@ -628,6 +706,22 @@ func (s *Service) sendLoop(ctx context.Context) {
 		}
 		s.flush(ctx)
 	}
+}
+
+// FlushNow replaces the VPS burst window for bounded edge jobs and request producers.
+func (s *Service) FlushNow(ctx context.Context) {
+	s.flush(ctx)
+}
+
+func (s *Service) flushAfterResponse() {
+	if !s.cfg.Edge || s.cfg.AfterResponse == nil {
+		return
+	}
+	s.cfg.AfterResponse(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) // ends before Cloudflare's 30 s waitUntil limit
+		defer cancel()
+		s.FlushNow(ctx)
+	})
 }
 
 // finalFlush sends what is queued when the panel stops (an update restarts it), but never holds the stop for long.
@@ -701,9 +795,15 @@ func (s *Service) flush(ctx context.Context) {
 				s.requeueUndelivered(items, links, finished)
 				return
 			}
-			if s.deliver(ctx, tok, link.ChatID, msg.text) {
+			result := s.deliver(ctx, tok, link.ChatID, msg.text)
+			switch result {
+			case deliveryCanceled:
 				s.requeueUndelivered(items, links, finished)
 				return
+			case deliveryGaveUp:
+				if s.cfg.Edge {
+					continue // the next tick tries again; a VPS drops it
+				}
 			}
 			for _, lineIndex := range msg.lineIndexes {
 				for _, itemIndex := range lineItems[lineIndex] {
@@ -711,6 +811,9 @@ func (s *Service) flush(ctx context.Context) {
 				}
 			}
 		}
+	}
+	if s.cfg.Edge {
+		s.requeueUndelivered(items, links, finished)
 	}
 }
 
@@ -785,26 +888,35 @@ type messageChunk struct {
 	lineIndexes []int
 }
 
+type deliveryResult uint8
+
+const (
+	deliverySent    deliveryResult = iota
+	deliveryRefused                // a 4xx or a refused token: retrying cannot help, dropped on both editions
+	deliveryGaveUp                 // retries used up: dropped on the VPS, requeued on the edge
+	deliveryCanceled
+)
+
 // deliver sends one message, trying again after a network failure or a server error with a doubling wait, and after 429 for
-// as long as Telegram asks. It returns true only when cancellation interrupted delivery. A chat that cannot be written to
-// (the user blocked the bot) or a refused token ends it at once.
-func (s *Service) deliver(ctx context.Context, tok vault.Redacted, chat int64, text string) bool {
+// as long as Telegram asks. A chat that cannot be written to (the user blocked the bot) or a refused token ends it at once
+// (deliveryRefused); when the retries are used up the edge keeps the message for the next tick (deliveryGaveUp).
+func (s *Service) deliver(ctx context.Context, tok vault.Redacted, chat int64, text string) deliveryResult {
 	wait := s.cfg.RetryBase
 	attempt := 1
 retry:
 	for {
 		if ctx.Err() != nil {
-			return true
+			return deliveryCanceled
 		}
 		sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		err := s.api.sendMessage(sctx, tok, chat, text)
 		cancel()
 		if err == nil {
 			s.setBotErr("")
-			return false
+			return deliverySent
 		}
 		if ctx.Err() != nil {
-			return true
+			return deliveryCanceled
 		}
 		var ae *apiError
 		errors.As(err, &ae)
@@ -813,16 +925,16 @@ retry:
 			d := retryAfterWait(ae.RetryAfter)
 			s.log.Warn("telegram: rate limited", "retry_in", d.String())
 			if !s.sleepPlain(ctx, d) {
-				return true
+				return deliveryCanceled
 			}
 			continue
 		case ae != nil && ae.Status == http.StatusUnauthorized:
 			s.setBotErr("unauthorized")
 			s.log.Warn("telegram: the bot token is refused")
-			return false
+			return deliveryRefused
 		case ae != nil && !ae.Transport && ae.Status >= 400 && ae.Status < 500:
 			s.log.Warn("telegram: message refused", "status", ae.Status, "desc", clip(ae.Desc, 80)) // a blocked bot, a deleted chat
-			return false
+			return deliveryRefused
 		default:
 			s.setBotErr("unreachable")
 			if attempt >= s.cfg.RetryMax {
@@ -831,14 +943,14 @@ retry:
 			}
 			s.log.Warn("telegram: send failed, will retry", "code", errCode(err), "attempt", attempt)
 			if !s.sleepPlain(ctx, wait) {
-				return true
+				return deliveryCanceled
 			}
 			wait *= 2
 			attempt++
 		}
 	}
 	s.log.Warn("telegram: message dropped after retries")
-	return false
+	return deliveryGaveUp
 }
 
 // ---- audit

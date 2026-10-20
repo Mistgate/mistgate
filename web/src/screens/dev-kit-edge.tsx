@@ -93,7 +93,7 @@ function AddNodeButton() {
 export function EdgeKit() {
   return (
     <div className="relative left-1/2 flex w-[min(calc(100vw-2rem),1040px)] -translate-x-1/2 flex-col gap-8">
-      <Shot id="edge-health" title="Edge: Health, quiet (alerts every minute, one line on the tunnel checks and Telegram)" seed={healthSeed}>
+      <Shot id="edge-health" title="Edge: Health, quiet (alerts every minute, one line on the tunnel checks)" seed={healthSeed}>
         <HealthScreen />
       </Shot>
       <Shot id="edge-health-down" title="Edge: Health, de1 down and alice on People" seed={downSeed}>
@@ -107,8 +107,8 @@ export function EdgeKit() {
       </Shot>
       <Shot
         id="edge-integrations"
-        title="Edge: Integrations (the token list stays, no new token; Telegram and MCP are a notice)"
-        seed={[[tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals]]}
+        title="Edge: Integrations (the token list stays, no new token; MCP is a notice; Telegram works as on the VPS)"
+        seed={[[tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals], [telegramQuery.queryKey, telegramOff]]}
       >
         <IntegrationsScreen />
       </Shot>

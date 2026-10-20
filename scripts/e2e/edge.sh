@@ -99,7 +99,7 @@ edge_build() {
   mkdir -p "$w/dist"
   WASM_BYTES=0 WASM_GZ=0
   for role in $EDGE_ROLES; do
-    GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/" \
+    GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -trimpath -ldflags="-s -w -X $SSHN_BI.Version=$SSHN_TAG -X $SSHN_BI.ReleaseKey=$REL_PUB -X $SSHN_UPD.releaseDownloadBase=http://127.0.0.1:$REL_PORT/ -X $TG_PKG.defaultAPIBase=http://127.0.0.1:$TG_PORT" \
       -o "$w/dist/$role.wasm" "./cmd/mistgate-edge-$role"
     n=$(stat -c %s "$w/dist/$role.wasm")
     WASM_BYTES=$((WASM_BYTES + n)) WASM_GZ=$((WASM_GZ + $(gzip -9 -c "$w/dist/$role.wasm" | wc -c)))
@@ -108,6 +108,11 @@ edge_build() {
   # a -X on a variable the linker does not see as a constant string is silently ignored: look for the value in the program that
   # uses it (the Provisioner downloads the agent from the release)
   grep -qa "http://127.0.0.1:$REL_PORT/" "$w/dist/provision.wasm" || die "provision.wasm does not carry the fake release's address: -X update.releaseDownloadBase did not take"
+  # the same for the fake Telegram, in every role that can send: a security notice from admin, the tick from jobs, a producer from
+  # link and provision. public (the decoy and the subscription) does not reach the Telegram code, so the linker drops the variable there.
+  for role in link admin jobs provision; do
+    grep -qa "http://127.0.0.1:$TG_PORT" "$w/dist/$role.wasm" || die "$role.wasm does not carry the fake Telegram's address: -X telegram.defaultAPIBase did not take"
+  done
   cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$w/dist/wasm_exec.js"
   cp -r "$src/src" "$w/src"
   cp "$src/package.json" "$src/pnpm-lock.yaml" "$src/tsconfig.json" "$w/"
@@ -227,6 +232,7 @@ edge_worker_log() { grep -vE '^\[wrangler:info\] [A-Z]+ ' "$WORK/wrangler.log" |
 SSHN_BI=github.com/mistgate/mistgate/internal/buildinfo
 SSHN_UPD=github.com/mistgate/mistgate/internal/panel/update
 SSHN_SQL=edge_sql
+TG_PKG=github.com/mistgate/mistgate/internal/panel/telegram
 SSHN_CLOSED_CODE=ssh_target_refused # the Worker's sockets cannot tell a closed port from a refusal, and say so
 
 # edge_release_keys: the run's release key pair (never the owner's) and the port of the fake release, before the wasm is built
@@ -237,6 +243,7 @@ edge_release_keys() {
   [ -n "$REL_PUB" ] || die "release keygen printed no public key"
   SECRETS+=("$(cat "$WORK/release.key")")
   REL_PORT=$(free_port tcp)
+  TG_PORT=$(free_port tcp) # the fake Telegram (edge_telegram_serve); its address is built into the wasm like the release's
 }
 
 # edge_release_serve: the agent of the fake release (the tag, the key), signed, served over HTTP from this namespace as a
@@ -269,6 +276,88 @@ PY
   spawn python3 "$WORK/fake-release.py" "$d" "$REL_PORT" "$WORK/fake-release.log"
   wait_for 10 "the fake release to answer" curl -sf -o /dev/null "http://127.0.0.1:$REL_PORT/$SSHN_TAG/manifest.json" || die "the fake release server did not start"
   : >"$WORK/fake-release.log"
+}
+
+# edge_telegram_serve: a fake Telegram Bot API on 127.0.0.1 in this namespace (the wasm has its address built in). It answers only
+# the fake token; it logs the method of every call to $WORK/tg-calls.txt and every sendMessage as one JSON line {chat_id, text}
+# to $WORK/tg-sent.jsonl. getUpdates returns the queued updates with an id >= offset, otherwise [] after a short wait;
+# POST /_say {"chat": N, "text": "..."} queues an update from a private chat.
+edge_telegram_serve() {
+  TG_TOKEN="4242424242:AAE2E$(openssl rand -hex 16)"
+  SECRETS+=("$TG_TOKEN")
+  TG_BOT_ID=4242424242 TG_BOT_NAME=e2e_alert_bot
+  : >"$WORK/tg-calls.txt"
+  : >"$WORK/tg-sent.jsonl"
+  cat >"$WORK/fake-telegram.py" <<'PY'
+import http.server, json, sys, threading, time, urllib.parse
+
+port, token, calls, sent = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+lock = threading.Lock()
+updates = []
+last_id = [1000]
+
+
+def append(path, line):
+    with lock:
+        with open(path, "a") as f:
+            f.write(line + "\n")
+
+
+class H(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, fmt, *args):  # the URL holds the token: log nothing
+        pass
+
+    def reply(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError:
+            body = {}
+        path = urllib.parse.urlsplit(self.path).path
+        if path == "/_say":
+            with lock:
+                last_id[0] += 1
+                updates.append({"update_id": last_id[0], "message": {"message_id": last_id[0], "chat": {"id": body["chat"], "type": "private"}, "text": body["text"]}})
+            return self.reply(200, {"ok": True})
+        tok, _, method = path[len("/bot"):].partition("/") if path.startswith("/bot") else ("", "", "")
+        if tok != token:
+            return self.reply(401, {"ok": False, "error_code": 401, "description": "Unauthorized"})
+        append(calls, method)
+        if method == "getMe":
+            return self.reply(200, {"ok": True, "result": {"id": BOT_ID, "is_bot": True, "username": BOT_NAME}})
+        if method == "deleteWebhook":
+            return self.reply(200, {"ok": True, "result": True})
+        if method == "sendMessage":
+            append(sent, json.dumps({"chat_id": body.get("chat_id"), "text": body.get("text", "")}))
+            return self.reply(200, {"ok": True, "result": {"message_id": 1}})
+        if method == "getUpdates":
+            offset, deadline = body.get("offset", 0), time.time() + min(body.get("timeout", 0), 2)
+            while True:
+                with lock:
+                    out = [u for u in updates if u["update_id"] >= offset]
+                if out or time.time() >= deadline:
+                    return self.reply(200, {"ok": True, "result": out})
+                time.sleep(0.1)
+        return self.reply(404, {"ok": False, "error_code": 404, "description": "Not Found"})
+
+
+BOT_ID, BOT_NAME = int(sys.argv[5]), sys.argv[6]
+http.server.ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+PY
+  spawn python3 "$WORK/fake-telegram.py" "$TG_PORT" "$TG_TOKEN" "$WORK/tg-calls.txt" "$WORK/tg-sent.jsonl" "$TG_BOT_ID" "$TG_BOT_NAME" >>"$WORK/fake-telegram.log" 2>&1
+  tg_up() { [ "$(curl -s -m 3 -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:$TG_PORT/bot0/getMe")" = 401 ]; } # it answers, and not to a wrong token
+  wait_for 10 "the fake Telegram to answer" tg_up || die "the fake Telegram did not start"
+  : >"$WORK/tg-calls.txt"
 }
 
 # edge_touch <file under src/>: appends a comment to a source file of the Worker copy; wrangler reloads (the runtime restarts, and
@@ -350,7 +439,8 @@ edge_run() {
   NODE_BIN=$BIN/mistgate-node
   build_hysteria
   edge_release_serve
-  pass "built the five role wasm files ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped; tag $SSHN_TAG, a release key and the fake release's address built in), the Worker copy (installed in the work directory, zero D1 id), the node agent, the signed fake release of the agent ($(($(stat -c %s "$SSHN_NODE_BIN") / 1048576)) MB) and the hysteria client"
+  edge_telegram_serve
+  pass "built the fake Telegram (its address is built into the four roles that can send) and the five role wasm files ($((WASM_BYTES / 1048576)) MB, $((WASM_GZ / 1048576)) MB gzipped; tag $SSHN_TAG, a release key and the fake release's address built in), the Worker copy (installed in the work directory, zero D1 id), the node agent, the signed fake release of the agent ($(($(stat -c %s "$SSHN_NODE_BIN") / 1048576)) MB) and the hysteria client"
 
   step "1. wrangler dev: the Worker answers on $EDGE_HOST:$PUB, first admin from the setup token given as SETUP_TOKEN_SHA256 (no link in the log)"
   edge_start_worker
@@ -522,6 +612,44 @@ PY
   [ -n "$OBFS_PW" ] && [ "$OBFS_PW" != "••••" ] && SECRETS+=("$OBFS_PW")
   grep -q 'insecure=1' <<<"$URI" && grep -q 'pinSHA256=' <<<"$URI" && grep -q 'obfs=salamander' <<<"$URI" || die "the self-signed URI must carry insecure=1, pinSHA256 and obfs=salamander"
   pass "subscription: 200, userinfo header, one hysteria2:// line with pin and obfs (credentials created on the first fetch reached the node)"
+
+  step "3b. Telegram: bot, linking a chat through the cron's poll, no poll once the code is spent, the test message, a security notice without a cron"
+  # The wasm talks to the fake Telegram (edge_telegram_serve): $TG_TOKEN is the only token it accepts. Nothing reaches api.telegram.org.
+  TG_CHAT=7100200300
+  tg_calls() { grep -c "^$1\$" "$WORK/tg-calls.txt" || true; }
+  tg_sent() { wc -l <"$WORK/tg-sent.jsonl"; }
+  mutate TelegramService/SetTelegramBot "$(jq -nc --arg t "$TG_TOKEN" '{token:$t}')" \
+    | jq -e --arg u "$TG_BOT_NAME" '.status.bot.username == $u' >/dev/null || die "SetTelegramBot with the fake token did not report the fake bot"
+  [ "$(tg_calls getMe)" -ge 1 ] || die "SetTelegramBot never asked the fake Telegram (getMe): is the API base built in?"
+  TG_LINK=$(mutate TelegramService/BeginTelegramLink '{}') || die "BeginTelegramLink failed"
+  TG_CODE=$(jq -r .code <<<"$TG_LINK")
+  [ ${#TG_CODE} = 12 ] || die "BeginTelegramLink gave a code of ${#TG_CODE} characters, want 12"
+  SECRETS+=("$TG_CODE")
+  curl -sS -m 5 -X POST "http://127.0.0.1:$TG_PORT/_say" -d "$(jq -nc --argjson c "$TG_CHAT" --arg t "/start $TG_CODE" '{chat:$c, text:$t}')" >/dev/null \
+    || die "queueing the /start update in the fake Telegram failed"
+  CODE=$(edge_cron) || die "the cron tick that polls Telegram failed: $CODE"
+  tg_linked() { api TelegramService/GetTelegram '{}' | jq -e --argjson c "$TG_CHAT" '(.status.mine.chatId | tonumber) == $c and (.status.links | length) == 1'; }
+  wait_for 30 "GetTelegram to list the chat the cron's poll linked" tg_linked \
+    || die "after the cron tick GetTelegram shows no link: $(api TelegramService/GetTelegram '{}' | jq -c '.status | {mine, links}')"
+  jq -e --argjson c "$TG_CHAT" 'select(.chat_id == $c)' "$WORK/tg-sent.jsonl" >/dev/null || die "the fake Telegram got no reply in the linked chat"
+  POLLS=$(tg_calls getUpdates)
+  [ "$POLLS" -ge 1 ] || die "the cron tick did not poll Telegram"
+  CODE=$(edge_cron) || die "the second cron tick failed: $CODE"
+  [ "$(tg_calls getUpdates)" = "$POLLS" ] || die "the second cron tick polled Telegram again ($POLLS -> $(tg_calls getUpdates) getUpdates) although the code was spent"
+  SENT0=$(tg_sent)
+  api TelegramService/SendTelegramTest '{}' >/dev/null || die "SendTelegramTest failed"
+  [ "$(($(tg_sent) - SENT0))" = 1 ] || die "SendTelegramTest sent $(($(tg_sent) - SENT0)) messages, want exactly one"
+  SENT0=$(tg_sent)
+  # a sign-in from an address this isolate has not seen: the notice is flushed after the response that caused it, with no cron tick
+  while TG_STEP=$(($(date +%s) / 30)); [ "$TG_STEP" -le "$TOTP_LAST" ]; do sleep 1; done
+  TG_CODE_OTP=$(totp_code)
+  TG_HTTP=$(edge_get -o /dev/null -w '%{http_code}' -X POST "$ADMIN/api/mistgate.admin.v1.AuthService/PasswordLogin" -H 'Content-Type: application/json' \
+    -d "$(jq -nc --arg l "$ADMIN_LOGIN" --arg p "$ADMIN_PASSWORD" --arg c "$TG_CODE_OTP" '{login:$l, password:$p, totpCode:$c}')") || TG_HTTP=curl-failed
+  TOTP_LAST=$TG_STEP
+  [ "$TG_HTTP" = 200 ] || die "the password sign-in answered HTTP $TG_HTTP"
+  signin_notice() { tail -n +"$((SENT0 + 1))" "$WORK/tg-sent.jsonl" | jq -e --argjson c "$TG_CHAT" 'select(.chat_id == $c and (.text | contains("E2E admin")))' >/dev/null; }
+  wait_for 20 "the sign-in notice, with no cron tick" signin_notice || die "no sign-in notice reached the fake Telegram within 20 s of a fresh sign-in ($(($(tg_sent) - SENT0)) new messages)"
+  pass "Telegram: the fake bot is accepted; the cron tick heard /start <code> (chat linked, GetTelegram lists it, the fake got the reply); a second tick made no getUpdates call; SendTelegramTest sent exactly one message; a fresh password sign-in sent its notice without any cron tick"
 
   if [ -z "${SSH_ONLY:-}" ]; then # ---- the traffic steps 4-8 (--ssh-only skips them)
   step "4. real Hysteria2 client, download through the node; the panel counts it"

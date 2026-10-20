@@ -180,12 +180,16 @@ func wireCore(c Config) (*core, error) {
 	if in.AdminListen == "" && len(in.RPOrigins) > 0 {
 		alertsURL = in.AdminURL()
 	}
-	k.tg, err = telegram.New(telegram.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, AdminURL: alertsURL, Edge: edge, Log: log})
+	k.tg, err = telegram.New(telegram.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, AdminURL: alertsURL, Edge: edge,
+		AfterResponse: c.AfterResponse, APIBase: c.TelegramAPIBase, Log: log})
 	if err != nil {
 		return nil, err
 	}
 	tg := k.tg
 	authSvc.SetEventHook(tg.Security)
+	if c.AfterResponse != nil {
+		authSvc.SetEventRunner(c.AfterResponse)
+	}
 	var acc *access.Service // set below; the fleet calls back into it only after serving started
 	var hl *health.Service  // likewise
 	// One source of truth for the access rule: access.Desired (adapter NodeInbound -> statehash.Inbound).

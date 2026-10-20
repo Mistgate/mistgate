@@ -117,6 +117,7 @@ type Config struct {
 	DataDir            string
 	UpdateService      string
 	Title              string
+	TelegramAPIBase    string // optional transport override for integration tests; production uses Telegram's API base
 	HealthBlipWindow   time.Duration
 	BackgroundStarters []BackgroundJob
 	AfterResponse      access.AfterResponseRunner

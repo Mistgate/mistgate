@@ -96,11 +96,6 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 		feature string
 		call    func(p *Panel, a *auth.Service) error
 	}{
-		"SendTelegramTest": {edition.Telegram, func(p *Panel, _ *auth.Service) error {
-			base, hc := serve(p.Telegram.Handler())
-			_, err := adminv1connect.NewTelegramServiceClient(hc, base).SendTelegramTest(ctx, connect.NewRequest(&adminv1.SendTelegramTestRequest{}))
-			return err
-		}},
 		"CreateBackup": {edition.Backups, func(p *Panel, _ *auth.Service) error {
 			base, hc := serve(p.Backup.Handler())
 			_, err := adminv1connect.NewBackupServiceClient(hc, base).CreateBackup(ctx, connect.NewRequest(&adminv1.CreateBackupRequest{}))

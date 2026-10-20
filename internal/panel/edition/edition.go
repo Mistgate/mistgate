@@ -19,7 +19,6 @@ const (
 // plus its own name; never rename one.
 const (
 	Backups      = "backups"
-	Telegram     = "telegram"
 	MCP          = "mcp"
 	HealthChecks = "health_checks"
 	AgentUpdates = "agent_updates"
@@ -34,7 +33,7 @@ const Code = "unavailable_in_edition"
 
 // edgeUnavailable is the source of truth for the edge. internal/panel/app keeps a test that every deferred edge job
 // maps onto ids here and every id here has a job.
-var edgeUnavailable = []string{Backups, Telegram, MCP, HealthChecks, AgentUpdates, AgentLogs, PanelUpdate, DecoyOwn, TSPUProbe}
+var edgeUnavailable = []string{Backups, MCP, HealthChecks, AgentUpdates, AgentLogs, PanelUpdate, DecoyOwn, TSPUProbe}
 
 // Unavailable is the feature ids the edition lacks: none on the VPS. The result is a copy.
 func Unavailable(isEdge bool) []string {

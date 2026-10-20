@@ -26,6 +26,7 @@ var edgeTickJobs = map[string]string{
 	"health":    "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
 	"blocklist": "the block-list check of the country check, when one is due (one setting read while it is off)",
 	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
+	"telegram":  "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
 }
 
 var edgeDeferred = map[string]string{
@@ -33,7 +34,6 @@ var edgeDeferred = map[string]string{
 	"health":         "client-eye checker and periodic UDP port rechecks",
 	"updates":        "owner decision 2",
 	"backups":        "R2",
-	"telegram":       "enqueue remains local and messages are not delivered on edge",
 	"mcp-plan-sweep": "MCP is not served on the edge",
 	"tspu-probe":     "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
 }
@@ -46,7 +46,6 @@ var edgeDeferredFeatures = map[string][]string{
 	"health":         {edition.HealthChecks},
 	"updates":        {edition.AgentUpdates, edition.PanelUpdate},
 	"backups":        {edition.Backups},
-	"telegram":       {edition.Telegram},
 	"mcp-plan-sweep": {edition.MCP},
 	"tspu-probe":     {edition.TSPUProbe},
 }
@@ -55,13 +54,14 @@ var edgeDeferredFeatures = map[string][]string{
 // consume another job's budget; all passes still inherit the invocation deadline.
 func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 	var errs []error
-	run := func(name string, work func(context.Context) error) {
-		jobCtx, cancel := context.WithTimeout(ctx, edgeTickJobTimeout)
+	runFor := func(name string, timeout time.Duration, work func(context.Context) error) {
+		jobCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		if err := work(jobCtx); err != nil {
 			errs = append(errs, fmt.Errorf("edge tick %s: %w", name, err))
 		}
 	}
+	run := func(name string, work func(context.Context) error) { runFor(name, edgeTickJobTimeout, work) }
 
 	run("user status sweep", func(ctx context.Context) error {
 		_, err := p.Access.Sweep(ctx)
@@ -109,6 +109,20 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 	if now.UTC().Minute()%10 == 0 {
 		// StateChanged schedules its fan-out; that work owns its own 20-second context.
 		p.Fleet.StateChanged()
+	}
+	if p.Telegram != nil {
+		// The poll is last: it may long-poll for up to 25 s, and it must not delay what is already queued.
+		run("telegram watcher", func(ctx context.Context) error {
+			p.Telegram.WatchTick(ctx, now)
+			return nil
+		})
+		run("telegram delivery", func(ctx context.Context) error {
+			p.Telegram.FlushNow(ctx)
+			return nil
+		})
+		runFor("telegram link poll", 40*time.Second, func(ctx context.Context) error {
+			return p.Telegram.PollPendingLinkCode(ctx)
+		})
 	}
 	return errors.Join(errs...)
 }

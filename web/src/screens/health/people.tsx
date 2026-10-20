@@ -1,4 +1,3 @@
-import { EditionNotice } from "@/components/edition-notice";
 import { StatusDot } from "@/components/ui/status";
 import { useT } from "@/i18n";
 import { peopleOrder, type Alert } from "@/lib/health";
@@ -9,14 +8,13 @@ import type { FixFlow } from "./fix";
  * People: the alerts the panel derives about a person, not a node (access ended but the app keeps asking; a key that
  * never connected or went stale; a quiet app). Warnings first, then info; each is an alert card with the person's name,
  * a button to their page and Mute. They come from the evaluator (subscription fetches, handshakes, torrent attempts, device-limit
- * refusals), not from the tunnel checks, so the Cloudflare edition raises them too; it only cannot send them to Telegram yet.
+ * refusals), not from the tunnel checks, so the Cloudflare edition raises them too.
  */
 export function PeopleTab({ active, now, flow }: { active: Alert[]; now: number; flow: FixFlow }) {
   const t = useT();
   const rows = peopleOrder(active);
   return (
     <div className="flex flex-col gap-3.5">
-      <EditionNotice feature="telegram">{t("hl.people.edgeHint")}</EditionNotice>
       {rows.length === 0 && (
         <div className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5 text-[13px]">
           <StatusDot kind="ok" />

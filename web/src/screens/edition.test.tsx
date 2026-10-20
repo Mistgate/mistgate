@@ -141,11 +141,11 @@ describe("EditionNotice", () => {
 });
 
 describe("Integrations on the edge", () => {
-  it("replaces the Telegram and MCP cards with a notice and offers no new API token, but keeps the token list", async () => {
+  it("keeps Telegram available while MCP is unavailable and offers no new API token", async () => {
     await mount(<IntegrationsScreen />);
-    expect(text()).toContain(notice("telegram"));
     expect(text()).toContain(notice("mcp"));
-    expect(getTelegram).not.toHaveBeenCalled();
+    expect(getTelegram).toHaveBeenCalled();
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet: Telegram alerts.");
     expect(document.querySelector("[data-testid='mcp-url']")).toBeNull();
     expect(buttons().some((b) => b.includes("New token") || b.includes("Create token"))).toBe(false);
     expect(text()).toContain("API tokens");
@@ -334,10 +334,9 @@ const torrentAlert = alertOf({
 });
 
 describe("the Health page on the edge", () => {
-  const edgeAlerts = `${notice("health_checks")} ${en["hl.alerts.edgeHint"]} ${en["hl.alerts.edgeTelegram"]}`;
-  const edgePeople = `${notice("telegram")} ${en["hl.people.edgeHint"]}`;
+  const edgeAlerts = `${notice("health_checks")} ${en["hl.alerts.edgeHint"]}`;
 
-  it("says All quiet and that alerts are evaluated every minute, with one line on the checks and Telegram", async () => {
+  it("says All quiet and that alerts are evaluated every minute, with one line about missing checks", async () => {
     await mount(<HealthScreen />);
     expect(text()).toContain("No problems · alerts evaluated every minute");
     expect(text()).not.toContain("checks every");
@@ -356,30 +355,23 @@ describe("the Health page on the edge", () => {
     expect(text()).not.toContain("All quiet.");
   });
 
-  it("drops the Telegram clause once Telegram works there", async () => {
-    lacking = editionFeatures.filter((f) => f !== "telegram");
-    await mount(<HealthScreen />);
-    expect(text()).toContain(`${notice("health_checks")} ${en["hl.alerts.edgeHint"]}`);
-    expect(text()).not.toContain(en["hl.alerts.edgeTelegram"]);
-  });
-
   it("says it in Russian and Chinese too", async () => {
     setLang("ru");
     await mount(<HealthScreen />);
     expect(text()).toContain(ru["hl.sum.edgeQuiet"]);
-    expect(text()).toContain(`${ru["hl.alerts.edgeHint"]} ${ru["hl.alerts.edgeTelegram"]}`);
+    expect(text()).toContain(ru["hl.alerts.edgeHint"]);
     act(() => root?.unmount());
     host?.remove();
     setLang("zh");
     await mount(<HealthScreen />);
     expect(text()).toContain(zh["hl.sum.edgeQuiet"]);
-    expect(text()).toContain(`${zh["hl.alerts.edgeHint"]} ${zh["hl.alerts.edgeTelegram"]}`);
+    expect(text()).toContain(zh["hl.alerts.edgeHint"]);
   });
 
-  it("shows People as the VPS does: the alerts about people need no checker, only Telegram is missing", async () => {
+  it("shows People alerts without an edition warning", async () => {
     search = { tab: "people" };
     await mount(<HealthScreen />);
-    expect(text()).toContain(edgePeople);
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(text()).not.toContain(notice("health_checks"));
     expect(text()).toContain("Nobody has trouble connecting.");
     act(() => root?.unmount());

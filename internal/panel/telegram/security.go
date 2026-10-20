@@ -13,7 +13,8 @@ import (
 
 // Security is the auth event hook. It is called on its own goroutine and may block.
 func (s *Service) Security(e auth.Event) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // D1 on the edge: a hung read must not hold the hook
+	defer cancel()
 	name := ""
 	if e.AdminID != "" {
 		if a, err := s.st.Admin(ctx, e.AdminID); err == nil {

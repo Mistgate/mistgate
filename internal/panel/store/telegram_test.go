@@ -5,6 +5,10 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -41,6 +45,29 @@ func TestTelegramMigrationUpAndDown(t *testing.T) {
 	}
 	if _, err := p.Up(ctx); err != nil {
 		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestTelegramLinkCodeMigrationUpAndDown(t *testing.T) {
+	ctx := context.Background()
+	s, p := openProvider(t)
+	if _, err := p.UpTo(ctx, 73); err != nil {
+		t.Fatalf("up to 73: %v", err)
+	}
+	if countT(t, s, `SELECT count(*) FROM sqlite_master WHERE name = 'telegram_link_code'`) != 0 {
+		t.Fatal("link-code table exists before migration 00074")
+	}
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatalf("up through migration 00074: %v", err)
+	}
+	if countT(t, s, `SELECT count(*) FROM sqlite_master WHERE name = 'telegram_link_code'`) != 1 {
+		t.Fatal("link-code table missing after migration 00074")
+	}
+	if _, err := p.DownTo(ctx, 73); err != nil {
+		t.Fatalf("down to 73: %v", err)
+	}
+	if countT(t, s, `SELECT count(*) FROM sqlite_master WHERE name = 'telegram_link_code'`) != 0 {
+		t.Fatal("link-code table remains after rolling back migration 00074")
 	}
 }
 
@@ -134,5 +161,75 @@ func TestTelegramBotAndLinks(t *testing.T) {
 	}
 	if _, err := s.TelegramBot(ctx); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("bot after clear: %v", err)
+	}
+}
+
+func TestTelegramLinkCodeLifecycleAndConcurrentTake(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	for _, ex := range []string{
+		`INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_alice', 'alice', 'owner', x'01', 1)`,
+		`INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_helper', 'helper', 'helper', x'02', 1)`,
+	} {
+		execT(t, s, ex)
+	}
+	now := time.Unix(1_800_000_000, 0).UTC()
+	oldHash := strings.Repeat("a", 64)
+	newHash := strings.Repeat("b", 64)
+	if err := s.SetTelegramLinkCode(ctx, oldHash, "adm_alice", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if pending, err := s.HasPendingTelegramLinkCode(ctx, now); err != nil || !pending {
+		t.Fatalf("pending code = %v, %v; want true", pending, err)
+	}
+	if err := s.SetTelegramLinkCode(ctx, newHash, "adm_alice", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TakeTelegramLinkCode(ctx, oldHash, now); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("replaced code take = %v, want ErrNotFound", err)
+	}
+
+	const contenders = 24
+	start := make(chan struct{})
+	var winners atomic.Int32
+	var unexpected atomic.Pointer[error]
+	var wg sync.WaitGroup
+	for range contenders {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			adminID, err := s.TakeTelegramLinkCode(ctx, newHash, now)
+			if err == nil {
+				if adminID != "adm_alice" {
+					e := fmt.Errorf("taken by %q", adminID)
+					unexpected.CompareAndSwap(nil, &e)
+				}
+				winners.Add(1)
+			} else if !errors.Is(err, ErrNotFound) {
+				unexpected.CompareAndSwap(nil, &err)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	if err := unexpected.Load(); err != nil {
+		t.Fatalf("concurrent take error: %v", *err)
+	}
+	if got := winners.Load(); got != 1 {
+		t.Fatalf("concurrent code takes = %d, want exactly one", got)
+	}
+	if pending, err := s.HasPendingTelegramLinkCode(ctx, now); err != nil || pending {
+		t.Fatalf("pending after take = %v, %v; want false", pending, err)
+	}
+
+	if err := s.SetTelegramLinkCode(ctx, oldHash, "adm_helper", now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TakeTelegramLinkCode(ctx, oldHash, now.Add(2*time.Second)); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expired code take = %v, want ErrNotFound", err)
+	}
+	if pending, err := s.HasPendingTelegramLinkCode(ctx, now.Add(2*time.Second)); err != nil || pending {
+		t.Fatalf("expired code pending = %v, %v; want false", pending, err)
 	}
 }

@@ -33,11 +33,13 @@ func (s *Store) TelegramBot(ctx context.Context) (TelegramBotRow, error) {
 	return b, nil
 }
 
-// SetTelegramBot stores the bot. When it is another bot than the one stored, every chat link is deleted with it (chat ids
-// belong to a bot); dropped says how many.
+// SetTelegramBot stores the bot. When it is another bot than the one stored, every chat link and pending link code is deleted
+// with it (chat ids belong to a bot); dropped says how many links went.
 func (s *Store) SetTelegramBot(ctx context.Context, b TelegramBotRow, now time.Time) (dropped int, err error) {
 	results, err := s.batch(ctx,
 		Stmt{Query: `DELETE FROM telegram_link WHERE NOT EXISTS (SELECT 1 FROM telegram_bot WHERE id = 1)
+			OR EXISTS (SELECT 1 FROM telegram_bot WHERE id = 1 AND bot_id <> ?)`, Args: []any{b.BotID}},
+		Stmt{Query: `DELETE FROM telegram_link_code WHERE NOT EXISTS (SELECT 1 FROM telegram_bot WHERE id = 1)
 			OR EXISTS (SELECT 1 FROM telegram_bot WHERE id = 1 AND bot_id <> ?)`, Args: []any{b.BotID}},
 		Stmt{Query: `INSERT INTO telegram_bot (id, token, bot_id, username, updated_at) VALUES (1, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET token = excluded.token, bot_id = excluded.bot_id, username = excluded.username, updated_at = excluded.updated_at`,
@@ -49,10 +51,11 @@ func (s *Store) SetTelegramBot(ctx context.Context, b TelegramBotRow, now time.T
 	return int(results[0].RowsAffected), nil
 }
 
-// ClearTelegramBot forgets the bot and every link; dropped says how many links went.
+// ClearTelegramBot forgets the bot, every link, and every pending link code; dropped says how many links went.
 func (s *Store) ClearTelegramBot(ctx context.Context) (dropped int, err error) {
 	results, err := s.batch(ctx,
 		Stmt{Query: `DELETE FROM telegram_link`},
+		Stmt{Query: `DELETE FROM telegram_link_code`},
 		Stmt{Query: `DELETE FROM telegram_bot`},
 	)
 	if err != nil {
@@ -140,12 +143,41 @@ func (s *Store) BindTelegramChat(ctx context.Context, adminID string, chatID int
 
 // UnlinkTelegram forgets the admin's chat; it reports whether there was one.
 func (s *Store) UnlinkTelegram(ctx context.Context, adminID string) (bool, error) {
-	res, err := s.W.ExecContext(ctx, `DELETE FROM telegram_link WHERE admin_id = ?`, adminID)
+	results, err := s.batch(ctx,
+		Stmt{Query: `DELETE FROM telegram_link WHERE admin_id = ?`, Args: []any{adminID}},
+		Stmt{Query: `DELETE FROM telegram_link_code WHERE admin_id = ?`, Args: []any{adminID}},
+	)
 	if err != nil {
 		return false, err
 	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
+	return results[0].RowsAffected > 0, nil
+}
+
+// SetTelegramLinkCode stores a one-time chat-link code by hash. There is at most one pending code for an admin.
+func (s *Store) SetTelegramLinkCode(ctx context.Context, hash, adminID string, expires time.Time) error {
+	_, err := s.W.ExecContext(ctx, `INSERT INTO telegram_link_code (hash, admin_id, expires_at) VALUES (?, ?, ?)
+		ON CONFLICT(admin_id) DO UPDATE SET hash = excluded.hash, expires_at = excluded.expires_at`, hash, adminID, unix(expires))
+	return err
+}
+
+// HasPendingTelegramLinkCode is the one-row check the edge tick uses before it starts a long poll.
+func (s *Store) HasPendingTelegramLinkCode(ctx context.Context, now time.Time) (bool, error) {
+	var one int
+	err := s.R.QueryRowContext(ctx, `SELECT 1 FROM telegram_link_code WHERE expires_at > ? LIMIT 1`, unix(now)).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// TakeTelegramLinkCode atomically consumes a code before it expires. DELETE ... RETURNING makes concurrent polls single use.
+func (s *Store) TakeTelegramLinkCode(ctx context.Context, hash string, now time.Time) (string, error) {
+	var adminID string
+	err := s.W.QueryRowContext(ctx, `DELETE FROM telegram_link_code WHERE hash = ? AND expires_at > ? RETURNING admin_id`, hash, unix(now)).Scan(&adminID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return adminID, err
 }
 
 // SetTelegramEnabled switches the admin's alerts; ErrNotFound when the admin has no chat.
