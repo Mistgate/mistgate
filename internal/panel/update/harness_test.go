@@ -131,7 +131,7 @@ func (f *fakeFleet) precondition(id string) error {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
 	}
 	for _, c := range f.caps[id] {
-		if c == capUpdate {
+		if c == capUpdate || c == capLinkUpdate { // the edge fleet asks link-only nodes with update-link/1
 			return nil
 		}
 	}

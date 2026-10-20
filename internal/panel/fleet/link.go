@@ -85,8 +85,45 @@ func (f *Fleet) LinkHandler() http.Handler {
 			enroll.ServeHTTP(w, r)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/update/") {
+			f.linkUpdateDownload(w, r)
+			return
+		}
 		sessions.ServeHTTP(w, r)
 	})
+}
+
+func (f *Fleet) linkUpdateDownload(w http.ResponseWriter, r *http.Request) {
+	if f.cfg.Remote == nil || r.Method != http.MethodGet {
+		http.NotFound(w, r)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	credentials := strings.Fields(r.Header.Get("Authorization"))
+	token := ""
+	if len(credentials) == 2 && strings.EqualFold(credentials[0], "Bearer") {
+		token = credentials[1]
+	}
+	updates := f.updates()
+	if updates == nil {
+		http.Error(w, "update unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	asset, err := updates.LinkDownload(r.Context(), parts[0], parts[1], token)
+	if err != nil {
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "update unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set(AssetMarkerHeader, asset)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (f *Fleet) linkSocketHandler() http.Handler {
@@ -218,6 +255,9 @@ func LinkMarker() http.Handler {
 
 // LinkMarkerHeader carries the node id of a LinkMarker answer; the Worker strips it.
 const LinkMarkerHeader = "X-Mistgate-Link"
+
+// AssetMarkerHeader carries the release asset URL of a download answer; the Worker streams that URL and strips the header.
+const AssetMarkerHeader = "X-Mistgate-Asset"
 
 func linkNodePath(path string) (string, bool) {
 	if !strings.HasPrefix(path, "/link/") {

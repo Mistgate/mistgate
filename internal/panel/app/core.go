@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/netip"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/globalping"
 	"github.com/mistgate/mistgate/internal/panel/health"
@@ -36,6 +39,28 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/warp"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
+
+func nodeUpdateReleaseKey(dataDir string, onEdge bool) (ed25519.PublicKey, error) {
+	key, err := buildinfo.ReleasePublicKey()
+	if dataDir != "" && !onEdge {
+		return buildinfo.LoadReleasePublicKey(dataDir)
+	}
+	return key, err
+}
+
+func nodeUpdateConfig(dataDir string, edge, onEdge bool, key ed25519.PublicKey, stepUp func(context.Context) error,
+	panelUpdater update.PanelUpdater, source update.NodeBundleSource, gate update.Health, log *slog.Logger) (update.Config, update.Health) {
+	if onEdge {
+		dataDir = ""
+		source = nil
+	}
+	var gateHealth update.Health
+	if !slices.Contains(edition.Unavailable(edge), edition.HealthChecks) {
+		gateHealth = gate
+	}
+	return update.Config{DataDir: dataDir, Key: key, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),
+		Edge: edge, StepUp: stepUp, PanelUpdater: panelUpdater, NodeBundleSource: source, Log: log}, gateHealth
+}
 
 // base is what every role needs from its Config: the defaults filled in, and the few values derived from it.
 type base struct {
@@ -277,13 +302,9 @@ func wireCore(c Config) (*core, error) {
 	// Node-agent updates: the signed bundle in <data-dir>/dist, its distribution through the agent endpoint and
 	// the staged rollout. The installation's release key is kept in dataDir; a binary with another compiled-in key
 	// trusts nothing until the owner runs `mistgate release trust-key`.
-	// The edge (and any js build, with or without a node link) has no data directory: its DataDir is a placeholder that
-	// does not exist. It uses the compiled-in key as it is and never tries release.pub.
+	// The edge (and any js build, with or without a node link) uses the compiled-in key as it is and never tries release.pub.
 	onEdge := edge || runtime.GOOS == "js"
-	relKey, err := buildinfo.ReleasePublicKey()
-	if c.DataDir != "" && !onEdge {
-		relKey, err = buildinfo.LoadReleasePublicKey(c.DataDir)
-	}
+	relKey, err := nodeUpdateReleaseKey(c.DataDir, onEdge)
 	switch {
 	case errors.Is(err, buildinfo.ErrReleaseKeyMismatch):
 		log.Error("release key mismatch: node bundles are not trusted and rollouts are off", "err", err)
@@ -299,20 +320,13 @@ func wireCore(c Config) (*core, error) {
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})
 	var nodeBundleSource update.NodeBundleSource
-	if onEdge {
-		// Node updates are not available on the edge: neither the updates service nor the bundle source gets the key,
-		// so no rollout or bundle sync can start there by accident (the RPCs refuse as well).
-		relKey = nil
-	}
-	if len(relKey) > 0 && c.DataDir != "" {
+	if len(relKey) > 0 && c.DataDir != "" && !onEdge {
 		nodeBundleSource = update.NewGitHubNodeBundleSource(update.GitHubNodeBundleConfig{
 			DataDir: c.DataDir, Key: relKey, Log: log,
 		})
 	}
-	k.upd, err = update.New(st, fl, hl, update.Config{
-		DataDir: c.DataDir, Key: relKey, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),
-		Edge: edge, StepUp: authSvc.RequireStepUp, PanelUpdater: panelUpdater, NodeBundleSource: nodeBundleSource, Log: log,
-	})
+	updateConfig, gateHealth := nodeUpdateConfig(c.DataDir, edge, onEdge, relKey, authSvc.RequireStepUp, panelUpdater, nodeBundleSource, hl, log)
+	k.upd, err = update.New(st, fl, gateHealth, updateConfig)
 	if err != nil {
 		return nil, err
 	}

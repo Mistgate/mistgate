@@ -26,6 +26,8 @@ const capUpdateLink = "update-link/1"
 
 // Updates is implemented by the updates module. Its three metadata methods are cheap; Serve blocks for a download.
 type Updates interface {
+	// LinkDownload authorizes one file of the signed manifest pinned to a current SENT step.
+	LinkDownload(ctx context.Context, nodeID, name, token string) (string, error)
 	// RecordAnswer stores the first result of an edge update command against its sent step. Other command results never call it.
 	RecordAnswer(ctx context.Context, nodeID, requestID string, result *agentv1.CommandResult) error
 	// Updating reports that a rollout step of the node is in flight (command sent, reconnect or gate pending): its

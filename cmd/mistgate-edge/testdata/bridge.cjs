@@ -296,6 +296,26 @@ function pbFields(frame) {
   return out;
 }
 
+// The panel reads the time through Date (wall clock) and performance.now (monotonic): moving both forward ages the
+// per-isolate caches without a sleep. The skew only grows, so no clock runs backwards.
+let clockSkewMs = 0;
+function advanceClock(ms) {
+  if (ms === 0) return;
+  if (clockSkewMs === 0) {
+    const RealDate = Date;
+    const realNow = performance.now.bind(performance);
+    globalThis.Date = class extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) super(RealDate.now() + clockSkewMs);
+        else super(...args);
+      }
+      static now() { return RealDate.now() + clockSkewMs; }
+    };
+    Object.defineProperty(performance, "now", { configurable: true, value: () => realNow() + clockSkewMs });
+  }
+  clockSkewMs += ms;
+}
+
 // The edge half of the signed agent link (cmd/mistgate-edge/link_js.go): mgPanel.link challenge and accept, with the
 // agent played by node:crypto. agentlink signs the SHA-256 digest of "domain NUL node NUL audience NUL nonce(s)", which is
 // plain ECDSA-SHA256 over that preimage, in IEEE P1363 r||s form.
@@ -379,6 +399,60 @@ async function assertLinkHandshake(panel) {
   assert.deepEqual(opened.frames, [], "an open step sends no frames");
   assert.ok(opened.alarmAt > at, "the open step returns the Hello deadline");
   await opened.waitUntil;
+
+  // A Hello on a bare node (no inbounds) costs 5 D1 calls. Its update cost is the per-isolate "updating" cache (10 s): a
+  // stale cache adds one read of the active rollout, and a second one for its steps when there is a rollout. nod_bridge has
+  // inbounds, so its own Hello is dominated by their reads. The clock is moved forward instead of sleeping, and each node
+  // and rollout is removed afterwards, so later counts and the connected-node lists are unchanged.
+  const helloCost = async (id, { advanceMs = 0, rollout = false } = {}) => {
+    await globalThis.__d1.prepare("INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, 'active', 1)")
+      .bind(id, id.replace("_", "-"), "hello.example.com").run();
+    const key = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+    const issuedResponse = await bridgeRequestFor(panel, "https://example.com/__edge_bridge_test__/issue-node-cert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "CF-Connecting-IP": "127.0.0.1" },
+      body: JSON.stringify({ nodeId: id, spki: key.publicKey.export({ type: "spki", format: "der" }).toString("base64") }),
+    });
+    const cert = JSON.parse(Buffer.from(issuedResponse.body).toString("utf8"));
+    await globalThis.__d1.prepare("INSERT INTO node_cert (serial, node_id, ca_id, pem, not_before, not_after, issued_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(cert.serial, id, cert.caId, cert.pem, cert.notBefore, cert.notAfter, cert.issuedAt).run();
+    if (rollout) {
+      await globalThis.__d1.prepare("INSERT INTO update_rollout (id, status, to_version, to_built, manifest, signature, batch_size, created_at) VALUES ('rol_bridge', 'running', 'v9.9.9', 1, x'00', x'00', 1, 1)").run();
+      await globalThis.__d1.prepare("INSERT INTO update_step (rollout_id, node_id, node_name, stage, state) VALUES ('rol_bridge', ?, ?, 0, 'pending')")
+        .bind(id, id.replace("_", "-")).run();
+    }
+    try {
+      const openedAt = Date.now();
+      const open = await link("step", {
+        nodeId: id,
+        state: null,
+        until: openedAt + 10_000,
+        event: { kind: "open", at: openedAt, generation: 1, certSerial: cert.serial, certNotAfterUnix: cert.notAfter },
+      });
+      await open.waitUntil;
+      advanceClock(advanceMs);
+      const helloBody = Buffer.concat([
+        pbField(1, Buffer.from(id)),
+        Buffer.from([0x18, 1]), // Hello.api_version = fleet.APIVersion
+        pbField(4, Buffer.from(`instance-${id}`)),
+      ]);
+      const step = await countedRequest(`link Hello ${id}`, () => link("step", {
+        nodeId: id,
+        state: open.state,
+        until: Date.now() + 10_000,
+        event: { kind: "frame", at: Date.now(), frame: new Uint8Array(pbField(10, helloBody)) }, // ConnectRequest.hello
+      }));
+      console.log(`D1 query count ${JSON.stringify(step.queries)}`);
+      return step.queries.sequentialQueries;
+    } finally {
+      await globalThis.__d1.prepare("DELETE FROM update_rollout WHERE id = 'rol_bridge'").run();
+      await globalThis.__d1.prepare("DELETE FROM node_cert WHERE node_id = ?").bind(id).run();
+      await globalThis.__d1.prepare("DELETE FROM node WHERE id = ?").bind(id).run(); // node_live, node_sent and the facts cascade
+    }
+  };
+  assert.equal(await helloCost("nod_hello_a", { advanceMs: 10_100 }), 6, "a Hello after the Updating cache went stale costs the 5 baseline calls and one read of the active rollout");
+  assert.equal(await helloCost("nod_hello_b"), 5, "a Hello inside the 10 s cache costs the 5 baseline calls");
+  assert.equal(await helloCost("nod_hello_c", { advanceMs: 10_100, rollout: true }), 7, "with an active rollout a stale cache also reads its steps");
   await assert.rejects(link("bogus", {}), /unknown operation/);
 
   const linkPrefix = await globalThis.__d1.prepare("SELECT v FROM setting WHERE k = 'link_prefix'").first("v");
@@ -389,6 +463,21 @@ async function assertLinkHandshake(panel) {
   assert.deepEqual(upgrade.headers.filter(([name]) => name.toLowerCase() === "x-mistgate-link"), [["X-Mistgate-Link", nodeID]]);
   const plain = await panel.fetch({ method: "GET", url: markerURL, headers: [["CF-Connecting-IP", "127.0.0.1"]], body: null });
   assert.equal(plain.status, 404, "a request without an upgrade gets no marker");
+
+  // The node's release download, /update/<node>/<file> with the step's bearer token. Without a token it is the decoy 404 and
+  // reads nothing; a token is checked against one stored digest, so a wrong one costs one D1 read and is the same 404.
+  const assetURL = `https://example.com${linkPrefix}update/${nodeID}/mistgate-node-linux-amd64`;
+  const assetGet = (label, extra) => countedRequest(label, () =>
+    panel.fetch({ method: "GET", url: assetURL, headers: [["CF-Connecting-IP", "127.0.0.1"], ...extra], body: null }));
+  const noToken = await assetGet("update download without a token", []);
+  console.log(`D1 query count ${JSON.stringify(noToken.queries)}`);
+  assert.equal(noToken.response.status, 404, "a download without a token is the decoy");
+  assert.equal(noToken.queries.sequentialQueries, 0, "and reads nothing");
+  const badToken = await assetGet("update download with a wrong token", [["Authorization", "Bearer not-the-step-token"]]);
+  console.log(`D1 query count ${JSON.stringify(badToken.queries)}`);
+  assert.equal(badToken.response.status, 404, "a wrong token is the decoy");
+  assert.equal(badToken.queries.sequentialQueries, 1, "and costs one read of the node's step");
+  assert.equal(badToken.response.headers.some(([name]) => name.toLowerCase() === "x-mistgate-asset"), false, "no asset marker for a wrong token");
 
   const enrollURL = `https://example.com${linkPrefix}mistgate.agent.v1.EnrollmentService/Enroll`;
   const enroll = await panel.fetch({
@@ -455,14 +544,14 @@ async function assertProvisioner(bytes, forwardPanel, adminCookie, initOptions, 
     return countedJob("cron tick with installs", () => Promise.race([forwardPanel.cron({ at: at.getTime() }), wasmFailure]));
   };
   await insertJob("prv_done", "failed");
-  // 6 for the sweeps and settings, one Telegram pending-code check and 10 for a warm evaluator pass (see "cron tick" below);
-  // nothing in an install wakes more.
-  assert.equal((await tick(3)).queries.sequentialQueries, 17);
+  // 6 for the sweeps and settings, one read of the active rollout for the updates job, one Telegram pending-code check and 10
+  // for a warm evaluator pass (see "cron tick" below); nothing in an install wakes more.
+  assert.equal((await tick(3)).queries.sequentialQueries, 18);
   assert.equal(provisionKicks, 0, "a finished install wakes nothing");
   for (const [i, state] of ["queued", "running", "cancel_requested"].entries()) {
     await globalThis.__d1.prepare("DELETE FROM node_provision_job WHERE id = 'prv_open'").run();
     await insertJob("prv_open", state);
-    assert.equal((await tick(3)).queries.sequentialQueries, 17, "waking costs no query beyond the look");
+    assert.equal((await tick(3)).queries.sequentialQueries, 18, "waking costs no query beyond the look");
     assert.equal(provisionKicks, i + 1, `a ${state} install wakes the Provisioner`);
   }
   await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
@@ -814,12 +903,14 @@ async function run() {
     assert.ok(backup.message.message.includes("unavailable_in_edition: feature=backups"), "the refusal is the coded edition reason");
 
     const rescan = await connectRPC(secondPanel, "UpdateService/RescanBundle", {}, adminCookie);
-    assert.equal(rescan.message.code, "failed_precondition", "filesystem update RPC fails cleanly on the edge");
-    assert.ok(rescan.message.message.includes("unavailable_in_edition: feature=agent_updates"), "the refusal is the coded edition reason");
+    assert.equal(rescan.response.status, 200, "RescanBundle refetches the trusted release on the edge");
+    // The test build is 0.1.0-dev, which is no release tag: the edge has nothing to fetch and says so with the coded key.
+    assert.equal(rescan.message.bundle.errorKey, "updates.bundle.err.no_release", "a dev build has no release to refetch");
 
     const me = await connectRPC(secondPanel, "AuthService/Me", {}, adminCookie);
     assert.equal(me.message.edition, "edge", "Me names the edge edition");
     assert.ok(me.message.unavailable.includes("backups") && me.message.unavailable.includes("mcp"), "Me lists the features the edge lacks");
+    assert.ok(!me.message.unavailable.includes("agent_updates"), "agent updates are available on the edge");
     assert.ok(!me.message.unavailable.includes("provision"), "SSH installs run on the edge: Me does not list them as unavailable");
 
     const tokens = await connectRPC(secondPanel, "ApiTokenService/ListApiTokens", {}, adminCookie);
@@ -1086,8 +1177,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      20,
-      "a normal cron tick costs 20 D1 calls: 6 for the sweeps and the country settings, one Telegram pending-code check and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
+      21,
+      "a normal cron tick costs 21 D1 calls: 6 for the sweeps and the country settings, one read of the active rollout for the updates job, one Telegram pending-code check and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
     );
 
     liveProjectionQueries = 0;
@@ -1102,8 +1193,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
     assert.equal(
       cronQueries.sequentialQueries,
-      19,
-      "one minute 10 cron tick costs 19 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, one Telegram pending-code check, one Telegram bot check for the watcher, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
+      20,
+      "one minute 10 cron tick costs 20 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, one read of the active rollout for the updates job, one Telegram pending-code check, one Telegram bot check for the watcher, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
     );
     assert.equal(liveProjectionQueries, 3, "the node-down sweep, the evaluator and the ten-minute safety net each read live nodes once");
     assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
@@ -1118,8 +1209,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      27,
-      "a minute 17 cron tick costs 27 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, 10 for retention (four of them prune statements) and 10 for a warm evaluator pass",
+      29,
+      "a minute 17 cron tick costs 29 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, 10 for retention (four of them prune statements), 10 for a warm evaluator pass, and 2 for the updates job (the active rollout read and its history prune)",
     );
 
     // The Overview is polled every 10 seconds. The health summary of every node is one settings row, read once: more connected

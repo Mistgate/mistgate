@@ -17,24 +17,36 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/telegram"
 	"github.com/mistgate/mistgate/internal/panel/vault"
+	"github.com/mistgate/mistgate/internal/release"
 )
+
+type edgeTickSend struct {
+	nodeID, requestID string
+	frame             *agentv1.ConnectResponse
+	deadline          time.Time
+}
 
 type edgeTickRemote struct {
 	mu    sync.Mutex
 	pokes [][]string
+	sends []edgeTickSend
 }
 
 func (r *edgeTickRemote) Ask(context.Context, string, string, *agentv1.ConnectResponse, time.Time) (*agentv1.ConnectRequest, error) {
 	return nil, nil
 }
 
-func (r *edgeTickRemote) Send(context.Context, string, string, *agentv1.ConnectResponse, time.Time) error {
+func (r *edgeTickRemote) Send(_ context.Context, nodeID, requestID string, frame *agentv1.ConnectResponse, deadline time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sends = append(r.sends, edgeTickSend{nodeID: nodeID, requestID: requestID, frame: frame, deadline: deadline})
 	return nil
 }
 
@@ -51,6 +63,12 @@ func (r *edgeTickRemote) pokeCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.pokes)
+}
+
+func (r *edgeTickRemote) sentFrames() []edgeTickSend {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]edgeTickSend(nil), r.sends...)
 }
 
 func buildEdgeTickPanel(t *testing.T, remote fleet.Remote) *Panel {
@@ -179,6 +197,96 @@ func TestEdgeTickSweepsUsersAndNodeDownEachTick(t *testing.T) {
 		t.Fatalf("unchanged status requested %d fan-outs, want 1 total", got)
 	}
 	assertNodeDownCount(t, p.Store, nodeID, 1)
+}
+
+// seedEdgeUpdateRollout stores a running rollout with one step for a live link-only node and returns both.
+func seedEdgeUpdateRollout(t *testing.T, p *Panel, now time.Time, step store.StepRow) (string, store.RolloutRow) {
+	t.Helper()
+	ctx := context.Background()
+	nodeID := addSilentNodeA(t, p, now)
+	if _, _, err := p.Store.NodeHello(ctx, nodeID, 1, store.HelloInfo{
+		AgentVersion: "0.1.0-old", APIVersion: 1, Instance: "edge-update-test", Built: 1, Caps: []string{"update-link/1"},
+	}, now); err != nil {
+		t.Fatalf("seed live link-only node: %v", err)
+	}
+	releaseManifest := release.Manifest{
+		Schema: release.Schema, Version: buildinfo.Version, Built: now.Unix(), Expires: now.Add(24 * time.Hour).Unix(),
+		Files: []release.File{{OS: "linux", Arch: "amd64", Name: "mistgate-node-linux-amd64", Size: 1,
+			SHA256: strings.Repeat("a", 64)}},
+	}
+	manifest, err := releaseManifest.Marshal()
+	if err != nil {
+		t.Fatalf("marshal pinned release: %v", err)
+	}
+	rollout := store.RolloutRow{
+		ID: "rol_edge_tick", Status: store.RolloutRunning, ToVersion: buildinfo.Version, ToBuilt: now.Unix(),
+		Manifest: manifest, Signature: []byte("pinned-signature"), BatchSize: 1, CreatedBy: "adm_test", CreatedAt: now,
+	}
+	step.NodeID, step.NodeName = nodeID, "node-a"
+	if err := p.Store.CreateRollout(ctx, rollout, []store.StepRow{step}); err != nil {
+		t.Fatalf("seed rollout: %v", err)
+	}
+	return nodeID, rollout
+}
+
+func TestEdgeTickAdvancesNodeUpdateRollout(t *testing.T) {
+	ctx := context.Background()
+	remote := &edgeTickRemote{}
+	p := buildEdgeTickPanel(t, remote)
+	now := time.Now().UTC().Truncate(time.Second)
+	nodeID, rollout := seedEdgeUpdateRollout(t, p, now, store.StepRow{State: store.StepPending})
+
+	if err := p.EdgeTick(ctx, now); err != nil {
+		t.Fatalf("edge tick: %v", err)
+	}
+	steps, err := p.Store.RolloutSteps(ctx, rollout.ID)
+	if err != nil || len(steps) != 1 {
+		t.Fatalf("rollout steps = %+v, %v", steps, err)
+	}
+	if steps[0].State != store.StepSent || steps[0].RequestID == "" || steps[0].DownloadSHA == "" {
+		t.Fatalf("edge tick step = %+v, want SENT with a link token digest", steps[0])
+	}
+	sends := remote.sentFrames()
+	if len(sends) != 1 || sends[0].nodeID != nodeID || sends[0].requestID != steps[0].RequestID || sends[0].deadline.IsZero() || sends[0].frame.GetUpdateAgent() == nil {
+		t.Fatalf("recorded update sends = %+v, want one UpdateAgent for %s", sends, nodeID)
+	}
+}
+
+// The update_failed alert is derived by the health evaluator from the rollout's state. The updates job runs first in the
+// tick, so a step that fails its wait and pauses the rollout raises the alert in that same tick, not one minute later.
+func TestEdgeTickRaisesUpdateFailedAlertInTheSameTick(t *testing.T) {
+	ctx := context.Background()
+	p := buildEdgeTickPanel(t, &edgeTickRemote{})
+	now := time.Now().UTC().Truncate(time.Second)
+	// SENT long ago, never acknowledged and never back: past the answer and reconnect waits, so the tick fails the step.
+	_, rollout := seedEdgeUpdateRollout(t, p, now, store.StepRow{State: store.StepSent, SentAt: now.Add(-time.Hour)})
+	updateFailed := func() int {
+		alerts, err := p.Store.ActiveAlerts(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		for _, a := range alerts {
+			if a.Kind == "update_failed" {
+				n++
+			}
+		}
+		return n
+	}
+	if got := updateFailed(); got != 0 {
+		t.Fatalf("update_failed alerts before the tick = %d", got)
+	}
+
+	if err := p.EdgeTick(ctx, now); err != nil {
+		t.Fatalf("edge tick: %v", err)
+	}
+	ro, err := p.Store.ActiveRollout(ctx)
+	if err != nil || ro.ID != rollout.ID || ro.Status != store.RolloutPaused {
+		t.Fatalf("rollout after the tick = %+v, %v; want it paused by the failed step", ro, err)
+	}
+	if got := updateFailed(); got != 1 {
+		t.Fatalf("active update_failed alerts after the same tick = %d, want 1", got)
+	}
 }
 
 func TestEdgeTickEvaluatesAndResolvesNodeDown(t *testing.T) {

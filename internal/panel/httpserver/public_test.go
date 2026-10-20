@@ -126,6 +126,49 @@ func TestAgentLinkAdmitsOnlyTheEnrolPathBesidesLinks(t *testing.T) {
 	sameResponse(t, "GET enrol path", decoy, do(t, http.MethodGet, e.public.URL, prefix+enrol, nil))
 }
 
+func TestAgentLinkRoutesOnlyWellFormedUpdateAssetGets(t *testing.T) {
+	prefix := "/" + strings.Repeat("u", 24) + "/"
+	var hits atomic.Int32
+	e := newTestEnv(t, func(c *Config) {
+		c.AgentLinkPrefix = prefix
+		c.AgentLinkHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			if r.Method != http.MethodGet || r.URL.Path != "/update/nod_test/mistgate-node-linux-amd64" {
+				http.NotFound(w, r)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		})
+	})
+	valid := do(t, http.MethodGet, e.public.URL, prefix+"update/nod_test/mistgate-node-linux-amd64", nil)
+	if valid.status != http.StatusNoContent || hits.Load() != 1 {
+		t.Fatalf("valid asset route: status=%d hits=%d", valid.status, hits.Load())
+	}
+	decoy := do(t, http.MethodGet, e.public.URL, "/nothing", nil)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, prefix + "update/nod_test/mistgate-node-linux-amd64"},
+		{http.MethodGet, prefix + "update/nod_test"},
+		{http.MethodGet, prefix + "update/nod_test/file/extra"},
+		{http.MethodGet, prefix + "update//file"},
+	} {
+		before := hits.Load()
+		got := do(t, tc.method, e.public.URL, tc.path, nil)
+		sameResponse(t, tc.method+" "+tc.path, decoy, got)
+		if hits.Load() != before {
+			t.Errorf("malformed asset route %s reached the handler", tc.path)
+		}
+	}
+
+	// The VPS LinkHandler answers this admitted route with 404; the public listener must turn it into its ordinary decoy.
+	vps := newTestEnv(t, func(c *Config) {
+		c.AgentLinkPrefix = prefix
+		c.AgentLinkHandler = http.NotFoundHandler()
+	})
+	vpsDecoy := do(t, http.MethodGet, vps.public.URL, "/nothing", nil)
+	update := do(t, http.MethodGet, vps.public.URL, prefix+"update/nod_test/mistgate-node-linux-amd64", nil)
+	sameResponse(t, "VPS update asset route", vpsDecoy, update)
+}
+
 func TestAgentLinkPrefixMustBeSeparateAndSecret(t *testing.T) {
 	for name, mutate := range map[string]func(*Config){
 		"short":         func(c *Config) { c.AgentLinkPrefix = "/short/" },

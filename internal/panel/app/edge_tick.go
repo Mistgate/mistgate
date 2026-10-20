@@ -27,24 +27,26 @@ var edgeTickJobs = map[string]string{
 	"blocklist": "the block-list check of the country check, when one is due (one setting read while it is off)",
 	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
 	"telegram":  "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
+	"updates":   "advances the edge node rollout and scheduled update state machines",
 }
 
+// edgeDeferred describes background-job functions that stay VPS-only; a job can also have an edge phase above.
 var edgeDeferred = map[string]string{
 	"fleet":          "event-driven Run, local sessions, closeAll and recomputeAll remain VPS-only",
 	"health":         "client-eye checker and periodic UDP port rechecks",
-	"updates":        "owner decision 2",
+	"updates":        "installing a panel binary remains an edge deploy operation",
 	"backups":        "R2",
 	"mcp-plan-sweep": "MCP is not served on the edge",
 	"tspu-probe":     "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
 }
 
-// edgeDeferredFeatures maps every deferred job above to the admin features it takes away: the ids Me reports in
+// edgeDeferredFeatures maps every deferred function above to the admin features it takes away: the ids Me reports in
 // "unavailable" (internal/panel/edition). A test keeps the two lists in step, so a job cannot be deferred without the
 // admin saying so, nor a feature be listed with nothing behind it.
 var edgeDeferredFeatures = map[string][]string{
 	"fleet":          {edition.AgentLogs},
 	"health":         {edition.HealthChecks},
-	"updates":        {edition.AgentUpdates, edition.PanelUpdate},
+	"updates":        {edition.PanelUpdate},
 	"backups":        {edition.Backups},
 	"mcp-plan-sweep": {edition.MCP},
 	"tspu-probe":     {edition.TSPUProbe},
@@ -79,6 +81,14 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 				return err
 			}
 			return p.provisionKick(ctx)
+		})
+	}
+	// The node updates go before the health evaluator: a step that fails its gate or a rollout that pauses shows as the
+	// update_failed alert, which only the evaluator derives, so it is raised in this tick and not in the next.
+	if p.Update != nil {
+		run("updates", func(ctx context.Context) error {
+			p.Update.EdgeTick(ctx, now)
+			return nil
 		})
 	}
 	if p.Health != nil {

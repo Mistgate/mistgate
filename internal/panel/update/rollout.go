@@ -827,6 +827,14 @@ func (p *pass) advanceGate(i int) {
 		if !ok {
 			return
 		}
+		if with["manual"] == "1" {
+			if live.Connected && n.AgentBuilt < p.ro.ToBuilt {
+				p.finishAndPause(x, store.StepRolledBack, errManual, nil, pauseOwner, errManual)
+			} else {
+				p.finishAndPause(x, store.StepFailed, errRollbackFailed, map[string]string{"reason": errNoAnswer}, pauseOwner, errManual)
+			}
+			return
+		}
 		if live.Connected && n.AgentBuilt < p.ro.ToBuilt {
 			p.finishAndPause(x, store.StepRolledBack, gateKey, with, pauseGateFailed, gateKey)
 		} else {
@@ -1254,6 +1262,14 @@ func (s *Service) rollbackNode(ctx context.Context, nodeID string) (nodeView, er
 	}
 	s.inflight[nodeID] = true // the pass leaves the step of this node alone meanwhile
 	s.mu.Unlock()
+	if s.cfg.Edge {
+		defer func() {
+			s.mu.Lock()
+			delete(s.inflight, nodeID)
+			s.mu.Unlock()
+		}()
+		return s.rollbackNodeEdge(ctx, n)
+	}
 
 	res, err := s.fl.RollbackAgent(ctx, nodeID, s.cfg.RollbackWait)
 
@@ -1278,6 +1294,92 @@ func (s *Service) rollbackNode(ctx context.Context, nodeID string) (nodeView, er
 		}
 	}
 	s.loadUpdating(ctx)
+	views, err := s.nodes(ctx, s.bundleFor(ctx), nil)
+	if err != nil {
+		return nodeView{}, s.internal("list nodes", err)
+	}
+	for _, v := range views {
+		if v.row.ID == nodeID {
+			return v, nil
+		}
+	}
+	return nodeView{}, notFound("node")
+}
+
+// rollbackNodeEdge asks the node to put its previous binary back, like the VPS path: the answer is awaited here (the agent
+// answers before it re-executes), so a refusal such as no_previous reaches the owner. A step of the active rollout is
+// claimed first with the compare-and-set that the admin and jobs isolates share: an EdgeTick holding an older GATING
+// step cannot send a second rollback frame, and the claim keeps the tick away. If this call dies before it settles the
+// claim, advanceGate ends the step after edgeRollbackTimeout.
+func (s *Service) rollbackNodeEdge(ctx context.Context, n store.NodeRow) (nodeView, error) {
+	ro, err := s.st.ActiveRollout(ctx)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return nodeView{}, s.internal("load active rollout before rollback", err)
+	}
+	var claim *store.StepRow
+	var orig store.StepRow
+	if err == nil {
+		steps, loadErr := s.st.RolloutSteps(ctx, ro.ID)
+		if loadErr != nil {
+			return nodeView{}, s.internal("load active rollout steps before rollback", loadErr)
+		}
+		for i := range steps {
+			x := &steps[i]
+			if x.NodeID != n.ID {
+				continue
+			}
+			if x.State == store.StepSent || (x.State == store.StepGating && (x.RequestID != "" || x.Answer != "")) {
+				return nodeView{}, precondition("a command is already running on this node")
+			}
+			if x.State == store.StepPending || x.State == store.StepGating || x.State == store.StepPassed {
+				orig = *x
+				c := *x
+				c.State = store.StepGating
+				c.RequestID = store.NewID("req_")
+				c.RequestAt = s.now()
+				c.Answer = ""
+				c.Params = map[string]string{"gate": errManual, "manual": "1"}
+				if err := s.st.SaveStep(ctx, &c); err != nil {
+					if errors.Is(err, store.ErrConflict) {
+						return nodeView{}, precondition("the update step changed; retry the rollback")
+					}
+					return nodeView{}, s.internal("claim manual rollback", err)
+				}
+				claim = &c
+				s.setUpdatingAdd(n.ID)
+			}
+			break
+		}
+	}
+	res, err := s.fl.RollbackAgent(ctx, n.ID, s.cfg.RollbackWait)
+	if claim != nil {
+		// The request context may have run out waiting for the agent: settle the claim on a context of its own.
+		settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err == nil && res.Ok {
+			p := &pass{s: s, ctx: settleCtx, ro: ro, now: s.now()}
+			p.finishAndPause(claim, store.StepRolledBack, errManual, nil, pauseOwner, errManual)
+		} else {
+			// Refused or unanswered: the step goes back to what it was, as on the VPS where nothing was recorded.
+			claim.State, claim.RequestID, claim.RequestAt, claim.Answer = orig.State, orig.RequestID, orig.RequestAt, orig.Answer
+			claim.Params, claim.ErrorKey = orig.Params, orig.ErrorKey
+			if saveErr := s.st.SaveStep(settleCtx, claim); saveErr != nil {
+				s.log.Warn("update: restore step after failed manual rollback", "node", n.ID, "err", saveErr)
+			}
+		}
+		s.loadUpdating(settleCtx)
+	}
+	if err != nil {
+		return nodeView{}, err
+	}
+	if !res.Ok {
+		return nodeView{}, precondition("agent refused: " + agentCode(res.Error))
+	}
+	s.audit(ctx, "update_rollback_node", map[string]string{"node_id": n.ID, "node": n.Name})
+	return s.rollbackNodeView(ctx, n.ID)
+}
+
+func (s *Service) rollbackNodeView(ctx context.Context, nodeID string) (nodeView, error) {
 	views, err := s.nodes(ctx, s.bundleFor(ctx), nil)
 	if err != nil {
 		return nodeView{}, s.internal("list nodes", err)

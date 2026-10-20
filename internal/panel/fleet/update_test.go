@@ -25,7 +25,12 @@ type fakeUpdates struct {
 	data     []byte
 	err      error
 	binary   map[string]string // "linux/amd64" -> path of the trusted bundle's file
+	assetURL string
+	assetErr error
+	assets   []fakeLinkAssetRequest
 }
+
+type fakeLinkAssetRequest struct{ nodeID, name, token string }
 
 type fakeRecordedAnswer struct {
 	nodeID, requestID string
@@ -49,6 +54,14 @@ func (u *fakeUpdates) RecordAnswer(_ context.Context, nodeID, requestID string, 
 	u.recorded = append(u.recorded, fakeRecordedAnswer{nodeID: nodeID, requestID: requestID, result: result})
 	u.mu.Unlock()
 	return nil
+}
+
+func (u *fakeUpdates) LinkDownload(_ context.Context, nodeID, name, token string) (string, error) {
+	u.mu.Lock()
+	u.assets = append(u.assets, fakeLinkAssetRequest{nodeID: nodeID, name: name, token: token})
+	assetURL, err := u.assetURL, u.assetErr
+	u.mu.Unlock()
+	return assetURL, err
 }
 
 func (u *fakeUpdates) set(id string, v bool) {

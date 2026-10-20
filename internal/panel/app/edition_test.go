@@ -20,13 +20,12 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-// Every deferred edge job takes some admin feature away, and every feature the admin lists as unavailable is behind a
-// deferred job: the two lists cannot drift apart.
+// Every deferred edge function takes some admin feature away, and every unavailable feature is backed by deferred work.
 func TestEdgeDeferredJobsMatchUnavailableFeatures(t *testing.T) {
 	jobs := slices.Sorted(maps.Keys(edgeDeferred))
 	mapped := slices.Sorted(maps.Keys(edgeDeferredFeatures))
 	if !slices.Equal(jobs, mapped) {
-		t.Fatalf("deferred jobs %v, jobs mapped to features %v: map every deferred job (and only those) in edgeDeferredFeatures", jobs, mapped)
+		t.Fatalf("deferred functions %v, functions mapped to features %v: map every deferred function (and only those) in edgeDeferredFeatures", jobs, mapped)
 	}
 	covered := map[string]bool{}
 	for job, ids := range edgeDeferredFeatures {
@@ -79,8 +78,8 @@ func TestBuildEditionDecidesMe(t *testing.T) {
 	}
 }
 
-// The wiring: through the panel's own handlers (an owner behind the session middleware), each RPC that starts work the edge
-// lacks is refused with the coded reason on the edge panel, and is not refused as an edition limit on the VPS panel.
+// Through the panel's own handlers, unavailable features receive the coded refusal, while StartRollout is no longer refused
+// as an edition limit on the edge. VPS behavior remains free of edge edition refusals.
 func TestBuildEditionWiresTheRefusals(t *testing.T) {
 	owner := store.Admin{ID: "adm_owner", Role: store.RoleOwner, DisplayName: "alice"}
 	// serve mounts a service handler the way the admin does, with the owner already signed in.
@@ -101,7 +100,7 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 			_, err := adminv1connect.NewBackupServiceClient(hc, base).CreateBackup(ctx, connect.NewRequest(&adminv1.CreateBackupRequest{}))
 			return err
 		}},
-		"StartRollout": {edition.AgentUpdates, func(p *Panel, _ *auth.Service) error {
+		"StartRollout": {"", func(p *Panel, _ *auth.Service) error {
 			base, hc := serve(p.Update.Handler())
 			_, err := adminv1connect.NewUpdateServiceClient(hc, base).StartRollout(ctx, connect.NewRequest(&adminv1.StartRolloutRequest{}))
 			return err
@@ -136,9 +135,15 @@ func TestBuildEditionWiresTheRefusals(t *testing.T) {
 	for name, c := range calls {
 		pe, ae := buildPanel(t, &edgeTickRemote{})
 		err := c.call(pe, ae)
-		want := "unavailable_in_edition: feature=" + c.feature
-		if err == nil || connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), want) {
-			t.Errorf("edge %s = %v, want %q", name, err, want)
+		if c.feature == "" {
+			if err != nil && strings.Contains(err.Error(), edition.Code) {
+				t.Errorf("edge %s was refused by edition policy: %v", name, err)
+			}
+		} else {
+			want := "unavailable_in_edition: feature=" + c.feature
+			if err == nil || connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), want) {
+				t.Errorf("edge %s = %v, want %q", name, err, want)
+			}
 		}
 		pv, av := buildPanel(t, nil)
 		if err := c.call(pv, av); err != nil && strings.Contains(err.Error(), edition.Code) {

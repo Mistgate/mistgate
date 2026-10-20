@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -16,6 +17,15 @@ import (
 // rpc is the admin UpdateService (update.proto). Roles are decided by auth/policy.go before a call gets here;
 // every change also needs a fresh step-up (Config.StepUp), checked first, before anything is read or written.
 type rpc struct{ s *Service }
+
+const edgeAdminRPCTimeout = 20 * time.Second
+
+func (r rpc) requestContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if !r.s.cfg.Edge {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, edgeAdminRPCTimeout)
+}
 
 var rolloutStatusProto = map[string]adminv1.RolloutStatus{
 	store.RolloutRunning: adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING, store.RolloutPaused: adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED,
@@ -76,6 +86,8 @@ func (r rpc) rolloutResp(ctx context.Context, ro store.RolloutRow) (*adminv1.Rol
 }
 
 func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdatesRequest]) (*connect.Response[adminv1.GetUpdatesResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	s := r.s
 	b := s.bundleFor(ctx)
 	resp := &adminv1.GetUpdatesResponse{NowUnix: s.now().Unix(), Bundle: b.view, Panel: &adminv1.PanelBuild{
@@ -187,6 +199,8 @@ func panelUpdateProto(s PanelUpdateStatus) *adminv1.PanelUpdate {
 }
 
 func (r rpc) CheckPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.CheckPanelUpdateRequest]) (*connect.Response[adminv1.CheckPanelUpdateResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if r.s.cfg.PanelUpdater == nil {
 		return connect.NewResponse(&adminv1.CheckPanelUpdateResponse{Update: &adminv1.PanelUpdate{ErrorKey: "unsupported"}}), nil
 	}
@@ -195,6 +209,8 @@ func (r rpc) CheckPanelUpdate(ctx context.Context, _ *connect.Request[adminv1.Ch
 }
 
 func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv1.InstallPanelUpdateRequest]) (*connect.Response[adminv1.InstallPanelUpdateResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := edition.Check(r.s.cfg.Edge, edition.PanelUpdate); err != nil {
 		return nil, err
 	}
@@ -225,9 +241,8 @@ func (r rpc) InstallPanelUpdate(ctx context.Context, req *connect.Request[adminv
 }
 
 func (r rpc) StartRollout(ctx context.Context, req *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {
-	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
-		return nil, err
-	}
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -243,6 +258,8 @@ func (r rpc) StartRollout(ctx context.Context, req *connect.Request[adminv1.Star
 }
 
 func (r rpc) PauseRollout(ctx context.Context, req *connect.Request[adminv1.PauseRolloutRequest]) (*connect.Response[adminv1.PauseRolloutResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -258,6 +275,8 @@ func (r rpc) PauseRollout(ctx context.Context, req *connect.Request[adminv1.Paus
 }
 
 func (r rpc) ResumeRollout(ctx context.Context, req *connect.Request[adminv1.ResumeRolloutRequest]) (*connect.Response[adminv1.ResumeRolloutResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -273,6 +292,8 @@ func (r rpc) ResumeRollout(ctx context.Context, req *connect.Request[adminv1.Res
 }
 
 func (r rpc) CancelRollout(ctx context.Context, req *connect.Request[adminv1.CancelRolloutRequest]) (*connect.Response[adminv1.CancelRolloutResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -288,9 +309,8 @@ func (r rpc) CancelRollout(ctx context.Context, req *connect.Request[adminv1.Can
 }
 
 func (r rpc) RollbackNode(ctx context.Context, req *connect.Request[adminv1.RollbackNodeRequest]) (*connect.Response[adminv1.RollbackNodeResponse], error) {
-	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
-		return nil, err
-	}
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -302,9 +322,8 @@ func (r rpc) RollbackNode(ctx context.Context, req *connect.Request[adminv1.Roll
 }
 
 func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.RescanBundleRequest]) (*connect.Response[adminv1.RescanBundleResponse], error) {
-	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
-		return nil, err
-	}
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -319,9 +338,8 @@ func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.Rescan
 }
 
 func (r rpc) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[adminv1.ScheduleNodeUpdateRequest]) (*connect.Response[adminv1.ScheduleNodeUpdateResponse], error) {
-	if err := edition.Check(r.s.cfg.Edge, edition.AgentUpdates); err != nil {
-		return nil, err
-	}
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -335,6 +353,8 @@ func (r rpc) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[adminv
 }
 
 func (r rpc) CancelNodeUpdateSchedule(ctx context.Context, req *connect.Request[adminv1.CancelNodeUpdateScheduleRequest]) (*connect.Response[adminv1.CancelNodeUpdateScheduleResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
@@ -350,6 +370,8 @@ func (r rpc) CancelNodeUpdateSchedule(ctx context.Context, req *connect.Request[
 }
 
 func (r rpc) SetUpdateTimezone(ctx context.Context, req *connect.Request[adminv1.SetUpdateTimezoneRequest]) (*connect.Response[adminv1.SetUpdateTimezoneResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}

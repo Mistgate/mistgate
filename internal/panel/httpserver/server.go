@@ -509,8 +509,14 @@ func (s *Server) agentLinkRequest(r *http.Request) bool {
 	if rel == agentv1connect.EnrollmentServiceEnrollProcedure { // link-only agents enrol here; nothing else but /link/<id>
 		return true
 	}
-	return strings.HasPrefix(rel, "/link/") && len(strings.TrimPrefix(rel, "/link/")) > 0 &&
-		!strings.Contains(strings.TrimPrefix(rel, "/link/"), "/")
+	if strings.HasPrefix(rel, "/link/") {
+		return len(strings.TrimPrefix(rel, "/link/")) > 0 && !strings.Contains(strings.TrimPrefix(rel, "/link/"), "/")
+	}
+	if r.Method != http.MethodGet || !strings.HasPrefix(rel, "/update/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(rel, "/update/"), "/")
+	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
 }
 
 func isWebSocketUpgrade(r *http.Request) bool {
