@@ -73,7 +73,17 @@ func cmdAwg(args []string) int {
 	}
 	fmt.Println("Plan (runs as root, installs packages and loads a kernel module):")
 	for i, s := range steps {
-		fmt.Printf("  %d. %s\n       $ %s\n", i+1, s.Desc, strings.Join(s.Cmd, " "))
+		fmt.Printf("  %d. %s\n", i+1, s.Desc)
+		for _, file := range s.Files {
+			if file.Remove {
+				fmt.Printf("       remove %s if present\n", file.Path)
+			} else {
+				fmt.Printf("       write %s\n", file.Path)
+			}
+		}
+		if len(s.Cmd) > 0 {
+			fmt.Printf("       $ %s\n", strings.Join(s.Cmd, " "))
+		}
 	}
 	for _, n := range notes {
 		fmt.Println("Note:", n)

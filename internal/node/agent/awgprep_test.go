@@ -25,7 +25,10 @@ type prepNode struct {
 }
 
 func okPrepEnv() awgprep.Env {
-	return awgprep.Env{OSRelease: map[string]string{"ID": "ubuntu", "ID_LIKE": "debian", "PRETTY_NAME": "Ubuntu 24.04"}, Kernel: "6.8.0-142-generic", CPUs: 2, Systemd: true}
+	return awgprep.Env{OSRelease: map[string]string{
+		"ID": "ubuntu", "ID_LIKE": "debian", "PRETTY_NAME": "Ubuntu 24.04",
+		"VERSION_ID": "24.04", "VERSION_CODENAME": "noble",
+	}, Kernel: "6.8.0-142-generic", CPUs: 2, Systemd: true}
 }
 
 func (p *prepNode) controller(stateDir string) *awgprep.Controller {
@@ -199,7 +202,7 @@ func TestAwgPrepareEndsAreEventsAndTheBackendIsLeftAlone(t *testing.T) {
 
 	// the job fails (it writes the file; the agent only reads it)
 	writeStatus(t, p.path, awgprep.Status{State: awgprep.StateFailed, Kernel: "6.8.0-142-generic", Started: time.Now().Add(-4 * time.Minute).Unix(),
-		Updated: time.Now().Unix(), Finished: time.Now().Unix(), Code: awgprep.CodeStepFailed, Reason: "step 2 of 4 failed: install the PPA tooling"})
+		Updated: time.Now().Unix(), Finished: time.Now().Unix(), Code: awgprep.CodeStepFailed, Reason: "step 5 of 6 failed: install amneziawg"})
 	eventually(t, func() bool { return h.panel.hasEvent("awg_kernel_prepare_failed") }, "the failed event")
 	e := h.panel.event("awg_kernel_prepare_failed")
 	if e.Severity != pb.Severity_SEVERITY_ERROR || e.Params["code"] != "step_failed" || e.Params["reason"] == "" || e.Params["minutes"] != "4" || e.Params["kernel"] != "6.8.0-142-generic" {

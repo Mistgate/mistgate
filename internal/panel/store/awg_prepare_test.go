@@ -74,7 +74,7 @@ func TestAwgPrepareStateMachine(t *testing.T) {
 	}
 
 	// A failure changes nothing but the record, and ends the wish: the backend is never "kernel" for a failed build.
-	if sw, err := s.AwgPrepareFinish(ctx, "nod_a", false, 160, "step_failed", "step 2 of 5 failed"); err != nil || sw {
+	if sw, err := s.AwgPrepareFinish(ctx, "nod_a", false, 160, "step_failed", "step 5 of 6 failed: install amneziawg"); err != nil || sw {
 		t.Fatalf("failed: switched %v, %v", sw, err)
 	}
 	if r, b := get(); r.State != AwgPrepareFailed || r.Code != "step_failed" || r.Reason == "" || r.Want || b != "auto" {

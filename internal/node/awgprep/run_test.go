@@ -42,10 +42,11 @@ func (r *recRun) run(ctx context.Context, _ io.Writer, _ string, cmd ...string) 
 
 func goodSys(written *string) Sys {
 	return Sys{
-		WriteFile: func(path, body string) error { *written = path + "\n" + body; return nil },
-		Exists:    func(string) bool { return true },
-		Probe:     func() (uint32, uint32, error) { return 3, 34, nil },
-		Sleep:     func(context.Context, time.Duration) {},
+		WriteFile:  func(path, body string) error { *written = path + "\n" + body; return nil },
+		RemoveFile: func(string) error { return nil },
+		Exists:     func(string) bool { return true },
+		Probe:      func() (uint32, uint32, error) { return 3, 34, nil },
+		Sleep:      func(context.Context, time.Duration) {},
 	}
 }
 
@@ -121,20 +122,83 @@ func TestRunStopsOnAMovedTag(t *testing.T) {
 
 // An apt failure: the run stops at that step, the short reason names the step and not the apt output.
 func TestRunReportsAFailedStep(t *testing.T) {
-	r := &recRun{fail: "add-apt-repository", out: map[string]string{"add-apt-repository": "E: some very long apt output\nmore lines\n"}}
+	r := &recRun{fail: aptOpts + "amneziawg", out: map[string]string{aptOpts + "amneziawg": "E: some very long apt output\nmore lines\n"}}
 	var wrote string
 	err := Run(context.Background(), io.Discard, ubuntuPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
-	if err == nil || !strings.Contains(err.Error(), "add-apt-repository") || !strings.Contains(err.Error(), "nothing is rolled back") {
+	if err == nil || !strings.Contains(err.Error(), "nothing is rolled back") {
 		t.Fatalf("err = %v", err)
 	}
-	if code, detail := Short(err); code != CodeStepFailed || !strings.Contains(detail, "add the Amnezia PPA") || strings.Contains(detail, "apt output") {
+	if code, detail := Short(err); code != CodeStepFailed || !strings.Contains(detail, "install amneziawg") || strings.Contains(detail, "apt output") {
 		t.Errorf("short = %q %q", code, detail)
 	}
-	if len(r.ran) != 3 {
+	if len(r.ran) != 4 {
 		t.Errorf("steps after the failed one ran: %v", r.ran)
 	}
-	if wrote != "" {
+	if strings.HasPrefix(wrote, modulesLoadFile+"\n") {
 		t.Error("the module was verified after a failed step")
+	}
+}
+
+func TestRunWritesUbuntuFilesThroughSysAndRemovesTheLegacyList(t *testing.T) {
+	steps, _, err := Plan(Env{
+		OSRelease: map[string]string{
+			"ID": "ubuntu", "ID_LIKE": "debian", "VERSION_ID": "24.04",
+			"VERSION_CODENAME": "noble",
+		},
+		Kernel: "6.8.0-142-generic", CPUs: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const legacy = "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-noble.list"
+	files := map[string]string{legacy: "deb [signed-by=/old/key.gpg] https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu/ noble main\n"}
+	var writes []string
+	var removes []string
+	var progress [][2]int
+	sys := goodSys(new(string))
+	sys.WriteFile = func(path, body string) error {
+		files[path] = body
+		writes = append(writes, path)
+		return nil
+	}
+	sys.RemoveFile = func(path string) error {
+		removes = append(removes, path)
+		delete(files, path)
+		return nil
+	}
+	r := &recRun{}
+	if err := Run(context.Background(), io.Discard, steps, "/tmp/src", r.run, sys, JobTimeout, func(i, n int) {
+		progress = append(progress, [2]int{i, n})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := files[legacy]; ok {
+		t.Errorf("legacy source remains: %v", files)
+	}
+	if got := files["/etc/apt/keyrings/amnezia-ppa.asc"]; got != string(amneziaPPAKey) || len(got) == 0 {
+		t.Errorf("embedded key write = %q", got)
+	}
+	const sourcePath = "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-noble.sources"
+	if got := files[sourcePath]; !strings.Contains(got, "Signed-By: /etc/apt/keyrings/amnezia-ppa.asc") {
+		t.Errorf("source write = %q", got)
+	}
+	if len(writes) != 3 || writes[0] != "/etc/apt/keyrings/amnezia-ppa.asc" || writes[1] != sourcePath || writes[2] != modulesLoadFile {
+		t.Errorf("writes = %v", writes)
+	}
+	if len(removes) != 1 || removes[0] != legacy {
+		t.Errorf("removes = %v", removes)
+	}
+	if len(progress) != 6 || progress[0] != [2]int{1, 6} || progress[5] != [2]int{6, 6} {
+		t.Errorf("progress = %v", progress)
+	}
+	for _, cmd := range r.ran {
+		if strings.Contains(cmd, "add-apt-repository") || strings.Contains(cmd, "launchpad") {
+			t.Errorf("unexpected command: %q", cmd)
+		}
+	}
+	if len(r.ran) != 5 {
+		t.Errorf("commands = %v", r.ran)
 	}
 }
 

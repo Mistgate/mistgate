@@ -8,13 +8,20 @@ import (
 )
 
 func osr(id, like string) map[string]string {
-	return map[string]string{"ID": id, "ID_LIKE": like, "PRETTY_NAME": id + " test"}
+	m := map[string]string{"ID": id, "ID_LIKE": like, "PRETTY_NAME": id + " test"}
+	if id == "ubuntu" {
+		m["VERSION_ID"] = "24.04"
+		m["VERSION_CODENAME"] = "noble"
+	}
+	return m
 }
 
 func cmds(steps []Step) []string {
 	var out []string
 	for _, s := range steps {
-		out = append(out, strings.Join(s.Cmd, " "))
+		if len(s.Cmd) > 0 {
+			out = append(out, strings.Join(s.Cmd, " "))
+		}
 	}
 	return out
 }
@@ -22,26 +29,141 @@ func cmds(steps []Step) []string {
 const aptOpts = "apt-get -o DPkg::Lock::Timeout=1800 install -y --no-install-recommends "
 
 func TestPlanUbuntu(t *testing.T) {
-	steps, notes, err := Plan(Env{OSRelease: osr("ubuntu", "debian"), Kernel: "6.8.0-142-generic", CPUs: 2})
+	for _, tc := range []struct {
+		name, version, codename, sourcePath, sourceBody string
+		wantRemove                                      string
+	}{
+		{
+			name: "noble", version: "24.04", codename: "noble",
+			sourcePath: "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-noble.sources",
+			sourceBody: "Types: deb\nURIs: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu/\nSuites: noble\nComponents: main\nSigned-By: /etc/apt/keyrings/amnezia-ppa.asc\n",
+			wantRemove: "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-noble.list",
+		},
+		{
+			name: "jammy", version: "22.04", codename: "jammy",
+			sourcePath: "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list",
+			sourceBody: "deb [signed-by=/etc/apt/keyrings/amnezia-ppa.asc] https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu/ jammy main\n",
+		},
+		{
+			name: "focal", version: "20.04", codename: "focal",
+			sourcePath: "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-focal.list",
+			sourceBody: "deb [signed-by=/etc/apt/keyrings/amnezia-ppa.asc] https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu/ focal main\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := Env{OSRelease: osr("ubuntu", "debian"), Kernel: "6.8.0-142-generic", CPUs: 2}
+			env.OSRelease["VERSION_ID"] = tc.version
+			env.OSRelease["VERSION_CODENAME"] = tc.codename
+			steps, notes, err := Plan(env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(steps) != 6 {
+				t.Fatalf("got %d steps, want 6: %+v", len(steps), steps)
+			}
+			wantDesc := []string{
+				"refresh the package index",
+				"install the headers of the running kernel",
+				"add the Amnezia PPA",
+				"refresh the package index from the Amnezia PPA",
+				"install amneziawg",
+				"load the module",
+			}
+			for i, want := range wantDesc {
+				if steps[i].Desc != want {
+					t.Errorf("step %d description = %q, want %q", i+1, steps[i].Desc, want)
+				}
+			}
+			got := strings.Join(cmds(steps), "\n")
+			for _, want := range []string{
+				"apt-get -o DPkg::Lock::Timeout=1800 update",
+				aptOpts + "linux-headers-6.8.0-142-generic",
+				aptOpts + "amneziawg",
+				"modprobe amneziawg",
+			} {
+				if !strings.Contains(got, want) {
+					t.Errorf("plan lacks %q:\n%s", want, got)
+				}
+			}
+			for _, unwanted := range []string{"add-apt-repository", "software-properties-common", "python3-launchpadlib", "gnupg2"} {
+				if strings.Contains(got, unwanted) {
+					t.Errorf("plan still uses %q:\n%s", unwanted, got)
+				}
+			}
+			if got := cmds(steps); len(got) != 5 || got[0] != got[2] || !strings.HasPrefix(got[1], aptOpts+"linux-headers-") {
+				t.Errorf("Ubuntu command sequence = %v", got)
+			}
+			if last := cmds(steps)[len(cmds(steps))-1]; last != "modprobe amneziawg" {
+				t.Errorf("the plan must end with the load, not %q", last)
+			}
+			files := steps[2].Files
+			if len(files) == 0 {
+				t.Fatal("the PPA step has no file operations")
+			}
+			if files[0].Path != "/etc/apt/keyrings/amnezia-ppa.asc" || files[0].Body != string(amneziaPPAKey) || files[0].Remove {
+				t.Errorf("key operation = %+v", files[0])
+			}
+			var source, removed *FileOp
+			for i := range files {
+				f := &files[i]
+				if f.Path == tc.sourcePath && !f.Remove {
+					source = f
+				}
+				if f.Path == tc.wantRemove && f.Remove {
+					removed = f
+				}
+			}
+			if source == nil || source.Body != tc.sourceBody {
+				t.Errorf("source operation = %+v, want %s with %q", source, tc.sourcePath, tc.sourceBody)
+			}
+			if tc.wantRemove != "" && removed == nil {
+				t.Errorf("legacy source %s is not removed: %+v", tc.wantRemove, files)
+			}
+			if tc.wantRemove == "" && len(files) != 2 {
+				t.Errorf("Jammy operations = %+v, want key and .list writes", files)
+			}
+			if len(notes) == 0 || !strings.Contains(strings.Join(notes, " "), "DKMS") {
+				t.Errorf("notes = %v", notes)
+			}
+		})
+	}
+}
+
+func TestPlanUbuntuMissingCodenameIsUnsupported(t *testing.T) {
+	osRelease := osr("ubuntu", "debian")
+	delete(osRelease, "VERSION_CODENAME")
+	delete(osRelease, "UBUNTU_CODENAME")
+	_, _, err := Plan(Env{OSRelease: osRelease, Kernel: "6.8.0"})
+	unsupported(t, err, CodeDistro)
+	if err == nil || !strings.Contains(err.Error(), "VERSION_CODENAME") || !strings.Contains(err.Error(), "UBUNTU_CODENAME") {
+		t.Errorf("missing codename error = %v", err)
+	}
+}
+
+func TestPlanUbuntuRejectsInvalidCodename(t *testing.T) {
+	osRelease := osr("ubuntu", "debian")
+	osRelease["VERSION_CODENAME"] = "noble/../../tmp"
+	_, _, err := Plan(Env{OSRelease: osRelease, Kernel: "6.8.0"})
+	unsupported(t, err, CodeDistro)
+	if err == nil || !strings.Contains(err.Error(), "valid") {
+		t.Errorf("invalid codename error = %v", err)
+	}
+}
+
+func TestPlanUbuntuUsesUbuntuCodenameFallback(t *testing.T) {
+	osRelease := osr("ubuntu", "debian")
+	delete(osRelease, "VERSION_CODENAME")
+	osRelease["UBUNTU_CODENAME"] = "jammy"
+	osRelease["VERSION_ID"] = "22.04"
+	steps, _, err := Plan(Env{OSRelease: osRelease, Kernel: "6.8.0"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := strings.Join(cmds(steps), "\n")
-	for _, want := range []string{
-		"apt-get -o DPkg::Lock::Timeout=1800 update",
-		aptOpts + "software-properties-common python3-launchpadlib gnupg2 linux-headers-6.8.0-142-generic",
-		"add-apt-repository -y ppa:amnezia/ppa",
-		aptOpts + "amneziawg",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("plan lacks %q:\n%s", want, got)
-		}
+	if len(steps) <= 2 || len(steps[2].Files) == 0 {
+		t.Fatalf("plan has no PPA step: %+v", steps)
 	}
-	if last := cmds(steps)[len(steps)-1]; last != "modprobe amneziawg" {
-		t.Errorf("the plan must end with the load, not %q", last)
-	}
-	if len(notes) == 0 || !strings.Contains(strings.Join(notes, " "), "DKMS") {
-		t.Errorf("notes = %v", notes)
+	if got := steps[2].Files[len(steps[2].Files)-1].Path; got != "/etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list" {
+		t.Errorf("source path = %q", got)
 	}
 }
 

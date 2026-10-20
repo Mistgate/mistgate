@@ -44,8 +44,9 @@ type Runner func(ctx context.Context, w io.Writer, dir string, cmd ...string) (s
 
 // Sys is the part of the machine the run and the verification touch.
 type Sys struct {
-	WriteFile func(path, body string) error
-	Exists    func(path string) bool
+	WriteFile  func(path, body string) error
+	RemoveFile func(path string) error
+	Exists     func(path string) bool
 	// Probe asks the kernel for the genetlink family: version and maxattr, or an error when it is not loaded.
 	Probe func() (genlVersion uint32, maxAttr uint32, err error)
 	// AptBusy says whether another package manager holds the dpkg or apt lock. Nil = never.
@@ -70,7 +71,7 @@ func (s Sys) sleep(ctx context.Context, d time.Duration) {
 // Progress is told before step i of n (1-based) starts. Optional.
 type Progress func(i, n int)
 
-// lockWords are what apt, dpkg and add-apt-repository print when another package manager holds the lock.
+// lockWords are what apt and dpkg print when another package manager holds the lock.
 var lockWords = []string{"could not get lock", "unable to acquire the dpkg", "unable to lock directory", "is held by process", "waiting for cache lock"}
 
 func lockBusy(out string) bool {
@@ -110,20 +111,52 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 		for j, a := range s.Cmd {
 			cmd[j] = strings.ReplaceAll(a, "{src}", src)
 		}
-		fmt.Fprintf(w, "\n[%d/%d] %s\n  $ %s\n", i+1, len(steps), s.Desc, strings.Join(cmd, " "))
-		out, err := run(ctx, w, s.Dir, cmd...)
-		if err != nil {
-			if f := ctxFailure(ctx, limit); f != nil {
+		fmt.Fprintf(w, "\n[%d/%d] %s\n", i+1, len(steps), s.Desc)
+		for _, op := range s.Files {
+			action := "write"
+			var err error
+			if op.Remove {
+				action = "remove"
+				if sys.RemoveFile == nil {
+					err = errors.New("file removal is unavailable")
+				} else {
+					err = sys.RemoveFile(op.Path)
+				}
+			} else if sys.WriteFile == nil {
+				err = errors.New("file writing is unavailable")
+			} else {
+				err = sys.WriteFile(op.Path, op.Body)
+			}
+			fmt.Fprintf(w, "  %s %s\n", action, op.Path)
+			if err != nil {
+				if f := ctxFailure(ctx, limit); f != nil {
+					return f
+				}
+				return &Failure{
+					Code:   CodeStepFailed,
+					Detail: fmt.Sprintf("step %d of %d failed: %s (%s %s: %v)", i+1, len(steps), s.Desc, action, op.Path, err),
+					Long:   fmt.Sprintf("step %d (%s %s) failed: %v (nothing is rolled back; fix the cause and run the command again)", i+1, action, op.Path, err),
+				}
+			}
+		}
+		var out string
+		if len(cmd) > 0 {
+			fmt.Fprintf(w, "  $ %s\n", strings.Join(cmd, " "))
+			var err error
+			out, err = run(ctx, w, s.Dir, cmd...)
+			if err != nil {
+				if f := ctxFailure(ctx, limit); f != nil {
+					return f
+				}
+				f := &Failure{Code: CodeStepFailed,
+					Detail: fmt.Sprintf("step %d of %d failed: %s (%v)", i+1, len(steps), s.Desc, err),
+					Long:   fmt.Sprintf("step %d (%s) failed: %v (nothing is rolled back; fix the cause and run the command again)", i+1, strings.Join(cmd, " "), err)}
+				if lockBusy(out) {
+					f.Code = CodeAptLock
+					f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) prevented access to the package lock", i+1, len(steps))
+				}
 				return f
 			}
-			f := &Failure{Code: CodeStepFailed,
-				Detail: fmt.Sprintf("step %d of %d failed: %s (%v)", i+1, len(steps), s.Desc, err),
-				Long:   fmt.Sprintf("step %d (%s) failed: %v (nothing is rolled back; fix the cause and run the command again)", i+1, strings.Join(cmd, " "), err)}
-			if lockBusy(out) {
-				f.Code = CodeAptLock
-				f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) prevented access to the package lock", i+1, len(steps))
-			}
-			return f
 		}
 		if s.Check != nil {
 			if err := s.Check(out); err != nil {

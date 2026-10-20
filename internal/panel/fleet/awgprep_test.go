@@ -185,7 +185,7 @@ func TestBackendSwitchesToKernelOnlyAfterTheNodeSaysDone(t *testing.T) {
 
 	start()
 	c.send(1, prepEvent(1, "awg_kernel_prepare_started", map[string]string{"kernel": "6.8.0"}))
-	c.send(2, prepEvent(2, "awg_kernel_prepare_failed", map[string]string{"code": "step_failed", "reason": "step 2 of 5 failed: install the build tools", "minutes": "3"}))
+	c.send(2, prepEvent(2, "awg_kernel_prepare_failed", map[string]string{"code": "step_failed", "reason": "step 5 of 6 failed: install amneziawg", "minutes": "3"}))
 	within(t, "the failure is recorded", func() bool { r, _ := x.prep(); return r.State == store.AwgPrepareFailed })
 	r, backend := x.prep()
 	if r.Code != "step_failed" || r.Reason == "" || r.Want || backend != "auto" {

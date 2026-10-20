@@ -61,11 +61,20 @@ type Env struct {
 	Systemd    bool // systemd-run is there and systemd is the init (the automatic run needs it)
 }
 
-// Step is one command of the plan. Dir is optional. Check, when set, runs after the command and fails the step with its
-// error (the pinned commit of the clone).
+// FileOp is one file change in a plan. Remove deletes a file if it exists; otherwise Run writes Body atomically with
+// mode 0644, creating its parent directory with mode 0755.
+type FileOp struct {
+	Path   string
+	Body   string
+	Remove bool
+}
+
+// Step is one command or a set of file changes in the plan. Dir is optional. Check, when set, runs after the command
+// and fails the step with its error (the pinned commit of the clone).
 type Step struct {
 	Desc  string
 	Cmd   []string
+	Files []FileOp
 	Dir   string
 	Check func(out string) error
 }
@@ -82,7 +91,7 @@ func aptUpdate() []string {
 	return []string{"apt-get", "-o", fmt.Sprintf("DPkg::Lock::Timeout=%d", aptLockTimeoutSeconds), "update"}
 }
 
-// Plan returns the commands for this machine, or an *Unsupported that says why the module cannot be installed here.
+// Plan returns the steps for this machine, or an *Unsupported that says why the module cannot be installed here.
 // notes are facts the owner should read before confirming.
 func Plan(e Env) (steps []Step, notes []string, err error) {
 	if e.Container != "" {
@@ -98,13 +107,16 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 	headers := "linux-headers-" + e.Kernel
 	switch {
 	case id == "ubuntu":
+		ppaFiles, err := ubuntuPPAFiles(e.OSRelease)
+		if err != nil {
+			return nil, nil, err
+		}
 		steps = []Step{
 			{Desc: "refresh the package index", Cmd: aptUpdate()},
-			{Desc: "install the PPA tooling and the headers of the running kernel (the DKMS package does not depend on them)",
-				Cmd: aptInstall("software-properties-common", "python3-launchpadlib", "gnupg2", headers)},
-			{Desc: "add the Amnezia PPA", Cmd: []string{"add-apt-repository", "-y", "ppa:amnezia/ppa"}},
-			{Desc: "install amneziawg (the DKMS source of the module, rebuilt for every new kernel, and the awg tools)",
-				Cmd: aptInstall("amneziawg")},
+			{Desc: "install the headers of the running kernel", Cmd: aptInstall(headers)},
+			{Desc: "add the Amnezia PPA", Files: ppaFiles},
+			{Desc: "refresh the package index from the Amnezia PPA", Cmd: aptUpdate()},
+			{Desc: "install amneziawg", Cmd: aptInstall("amneziawg")},
 		}
 		notes = append(notes, "DKMS rebuilds the module after a kernel upgrade; the build takes about a minute on a small VPS and also rebuilds the initramfs")
 	case id == "debian" || (strings.Contains(like, "debian") && id != ""):

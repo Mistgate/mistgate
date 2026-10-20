@@ -60,7 +60,7 @@ func ExecRunner(ctx context.Context, w io.Writer, dir string, cmd ...string) (st
 	c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 	c.Dir = dir
 	c.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C", "NEEDRESTART_MODE=l", "NEEDRESTART_SUSPEND=1")
-	if os.Getenv("HOME") == "" { // a transient unit of root has none; gpg, git and launchpadlib want one
+	if os.Getenv("HOME") == "" { // a transient unit of root has none; gpg and git want one
 		c.Env = append(c.Env, "HOME=/root")
 	}
 	var buf bytes.Buffer
@@ -73,16 +73,47 @@ func ExecRunner(ctx context.Context, w io.Writer, dir string, cmd ...string) (st
 // RealSys is the real machine behind Run, Verify and WaitAptLock.
 func RealSys() Sys {
 	return Sys{
-		WriteFile: func(path, body string) error {
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				return err
+		WriteFile: writeFileAtomic,
+		RemoveFile: func(path string) error {
+			err := os.Remove(path)
+			if os.IsNotExist(err) {
+				return nil
 			}
-			return os.WriteFile(path, []byte(body), 0o644)
+			return err
 		},
 		Exists:  func(p string) bool { _, err := os.Stat(p); return err == nil },
 		Probe:   probeModule,
 		AptBusy: aptBusy,
 	}
+}
+
+func writeFileAtomic(path, body string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".mistgate-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o644); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := io.WriteString(tmp, body); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func probeModule() (uint32, uint32, error) {

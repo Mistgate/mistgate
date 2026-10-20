@@ -188,7 +188,7 @@ func TestPollReportsEachEndOnce(t *testing.T) {
 
 func TestPollReportsAFailureWithItsCode(t *testing.T) {
 	f, c := newFake(t)
-	_ = WriteStatus(f.path, Status{State: StateFailed, Started: 1, Updated: 2, Finished: 2, Code: CodeStepFailed, Reason: "step 2 of 5 failed: install"})
+	_ = WriteStatus(f.path, Status{State: StateFailed, Started: 1, Updated: 2, Finished: 2, Code: CodeStepFailed, Reason: "step 5 of 6 failed: install amneziawg"})
 	var got []Status
 	c.Poll(func(s Status) { got = append(got, s) })
 	if len(got) != 1 || got[0].Code != CodeStepFailed || got[0].Reason == "" {
