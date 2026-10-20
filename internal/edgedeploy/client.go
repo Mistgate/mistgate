@@ -31,8 +31,9 @@ type cfClient struct {
 }
 
 type httpStatusError struct {
-	status int
-	text   string
+	status   int
+	text     string
+	apiCodes []int
 }
 
 func (e *httpStatusError) Error() string {
@@ -88,6 +89,7 @@ func (c *cfClient) redactError(err error) error {
 }
 
 type cfAPIError struct {
+	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
@@ -148,7 +150,11 @@ func (c *cfClient) do(ctx context.Context, method, path, contentType string, bod
 		if envErr == nil && len(env.Errors) != 0 {
 			text = c.redactString(cfErrorMessages(env.Errors))
 		}
-		return &httpStatusError{status: resp.StatusCode, text: text}
+		codes := make([]int, 0, len(env.Errors))
+		for _, apiErr := range env.Errors {
+			codes = append(codes, apiErr.Code)
+		}
+		return &httpStatusError{status: resp.StatusCode, text: text, apiCodes: codes}
 	}
 	if envErr != nil {
 		return fmt.Errorf("decode Cloudflare API response: %w", envErr)
@@ -163,6 +169,19 @@ func (c *cfClient) do(ctx context.Context, method, path, contentType string, bod
 		return fmt.Errorf("decode Cloudflare API result: %w", err)
 	}
 	return nil
+}
+
+func cloudflareHasErrorCode(err error, code int) bool {
+	var statusErr *httpStatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+	for _, got := range statusErr.apiCodes {
+		if got == code {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *cfClient) json(ctx context.Context, method, path string, in any, out any) error {

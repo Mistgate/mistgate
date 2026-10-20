@@ -64,3 +64,11 @@ func TestAdminPageRequiresOwnerSessionAndPreservesPrefix(t *testing.T) {
 	}
 
 }
+
+func TestRecoveryPageIsNotPresentOnVPS(t *testing.T) {
+	e := newTestEnv(t)
+	got := do(t, http.MethodGet, e.public.URL, testPrefix+"recover", nil)
+	if got.status != http.StatusNotFound {
+		t.Fatalf("VPS recovery page status = %d, want 404", got.status)
+	}
+}

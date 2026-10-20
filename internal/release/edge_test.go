@@ -444,7 +444,8 @@ func TestEdgeConfigBindings(t *testing.T) {
 }
 
 // Nothing in edge.json is bound that the TypeScript of the role does not read, and nothing it reads is missing: the names
-// of the bindings, secrets and vars of a script are the fields of its environment interface in env.ts.
+// of the bindings, secrets and vars of a script are the fields of its environment interface in env.ts. The one optional
+// recovery secret is applied separately by the owner after deploy, so it is deliberately absent from edge.json.
 func TestEdgeConfigMatchesTheEnvironmentOfEachRole(t *testing.T) {
 	env := string(readFile(t, filepath.Join("..", "..", "edge", "worker", "src", "env.ts")))
 	interfaces := map[string][]string{
@@ -469,6 +470,15 @@ func TestEdgeConfigMatchesTheEnvironmentOfEachRole(t *testing.T) {
 		var fields []string
 		for _, name := range interfaces[s.Role] {
 			fields = append(fields, interfaceFields(t, env, name)...)
+		}
+		if s.Role == RoleAdmin {
+			for i := 0; i < len(fields); {
+				if fields[i] == "RECOVERY_TOKEN_SHA256" {
+					fields = append(fields[:i], fields[i+1:]...)
+					continue
+				}
+				i++
+			}
 		}
 		if !reflect.DeepEqual(sortedCopy(bound), sortedCopy(fields)) {
 			t.Errorf("%s: edge.json binds %v, but its environment (%v) has %v", s.Role, sortedCopy(bound), interfaces[s.Role], sortedCopy(fields))

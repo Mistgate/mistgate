@@ -33,6 +33,9 @@ type Event struct {
 // CreateApiToken refuses (MCP is not served there). The app sets it once while building.
 func (s *Service) SetEdge(edge bool) { s.edge.Store(edge) }
 
+// RecoveryEnabled is true on the Cloudflare edition, where the one-time recovery token is offered by the Worker.
+func (s *Service) RecoveryEnabled() bool { return s.edge.Load() }
+
 // SetEventHook installs fn, called once per event on its own goroutine, so it may block
 // without slowing a sign-in down (and must be safe for concurrent use). nil removes it.
 // Events are fire-and-forget: the audit log is the record.

@@ -28,6 +28,8 @@ export interface Env {
    * panel offers it as the setup token (valid 30 minutes from the first start) instead of printing a random link to the log.
    */
   SETUP_TOKEN_SHA256?: string;
+  /** SHA-256 of the one-time owner recovery token. Set by `mistgate edge reset-login`; offered for 30 minutes on first start. */
+  RECOVERY_TOKEN_SHA256?: string;
 }
 
 /**

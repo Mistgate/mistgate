@@ -16,6 +16,8 @@ import (
 
 var transactionShape1 = map[string]string{
 	"admin.go:OfferSetupToken":                     "Inserts the supplied token hash only while no admin exists and reads it back, in one fixed batch.",
+	"admin.go:OfferRecoveryToken":                  "Offers a recovery hash only while an admin exists, preserves earlier rows, and reads back its first expiry in one fixed batch.",
+	"admin.go:ConsumeRecoveryToken":                "A single live, unused-token UPDATE RETURNING spends the recovery token atomically.",
 	"admin.go:PutSetupToken":                       "Replaces unused setup tokens and inserts the latest in one fixed batch.",
 	"access_user.go:CreateUser":                    "Inserts the user, selected nodes, and optional shared device credentials in one fixed batch.",
 	"access_profile.go:CreateInbound":              "Inserts the inbound and clears its retained key in one fixed batch.",

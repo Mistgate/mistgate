@@ -149,6 +149,14 @@ func TestSessionMiddlewareProtectsEverythingButPublicProcedures(t *testing.T) {
 	}
 }
 
+func TestVPSRecoveryEndpointIsNotFound(t *testing.T) {
+	e := newTestEnv(t)
+	r := rawDo(t, http.MethodPost, e.admin.URL+"/api/recover-login", "application/json", "", `{}`)
+	if r.status != http.StatusNotFound {
+		t.Fatalf("VPS POST /api/recover-login = %d %q; want 404", r.status, r.body)
+	}
+}
+
 func TestAdminHandlerConfigIsValidated(t *testing.T) {
 	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {

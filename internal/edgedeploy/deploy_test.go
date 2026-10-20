@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -46,21 +47,23 @@ type fakeCloudflare struct {
 	mu        sync.Mutex
 	statePath string
 
-	requests    []string
-	scripts     map[string]string // script name -> migration tag ("" = none)
-	databases   []d1Database
-	zoneStatus  string // "" = no zone
-	rejectToken bool
-	failScript  string // the PUT of this script fails
-	echoToken   bool
-	decoyStatus int
+	requests        []string
+	scripts         map[string]string // script name -> migration tag ("" = none)
+	databases       []d1Database
+	zoneStatus      string // "" = no zone
+	rejectToken     bool
+	failScript      string // the PUT of this script fails
+	echoToken       bool
+	secretErrorCode int // makes the recovery-secret endpoint return a specific Cloudflare API error
+	decoyStatus     int
 	// failNth makes the Nth state-changing request (any method but GET, counted in mutations) fail with HTTP 500 before it
 	// changes anything; 0 = never.
 	failNth   int
 	mutations int
 
-	metadatas    map[string][]string // script name -> raw metadata of every PUT
-	putJWTs      map[string][]string // script name -> assets.jwt of every PUT
+	metadatas    map[string][]string          // script name -> raw metadata of every PUT
+	secrets      map[string]map[string]string // script name -> secret binding values uploaded through the secrets API
+	putJWTs      map[string][]string          // script name -> assets.jwt of every PUT
 	sessions     map[string]*fakeSession
 	completion   map[string]string // completion token -> script it was issued for
 	uploaded     map[string]bool
@@ -86,6 +89,7 @@ func newFakeCloudflare(t *testing.T) *fakeCloudflare {
 	return &fakeCloudflare{
 		t: t, scripts: make(map[string]string), zoneStatus: "active", decoyStatus: http.StatusOK,
 		metadatas: make(map[string][]string), putJWTs: make(map[string][]string),
+		secrets:  make(map[string]map[string]string),
 		sessions: make(map[string]*fakeSession), completion: make(map[string]string), uploaded: make(map[string]bool),
 		versions: make(map[string][]string), deployments: make(map[string][][]deploymentVersion),
 		crons: make(map[string][]string), subdomainOff: make(map[string]bool),
@@ -218,6 +222,30 @@ func (f *fakeCloudflare) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.createDeployment(w, r, scriptOf(path, "/deployments"))
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/assets-upload-session"):
 		f.assetSession(w, r, scriptOf(path, "/assets-upload-session"))
+	case r.Method == http.MethodPut && strings.HasSuffix(path, "/secrets"):
+		name := scriptOf(path, "/secrets")
+		if f.secretErrorCode != 0 {
+			writeCFErrorCode(w, http.StatusBadRequest, f.secretErrorCode, "the latest Worker version is not deployed")
+			return
+		}
+		if _, ok := f.scripts[name]; !ok {
+			f.fail(w, "secret of unknown script")
+			return
+		}
+		var secret struct {
+			Name string `json:"name"`
+			Text string `json:"text"`
+			Type string `json:"type"`
+		}
+		if err := decodeStrict(r.Body, &secret); err != nil || secret.Name != "RECOVERY_TOKEN_SHA256" || secret.Type != "secret_text" || len(secret.Text) != 64 {
+			f.fail(w, "bad recovery secret body")
+			return
+		}
+		if f.secrets[name] == nil {
+			f.secrets[name] = make(map[string]string)
+		}
+		f.secrets[name][secret.Name] = secret.Text
+		writeCFResult(w, http.StatusOK, map[string]string{"name": secret.Name, "type": secret.Type})
 	case r.Method == http.MethodPut && strings.HasPrefix(path, acct+"/workers/scripts/") && strings.Count(path, "/") == 5:
 		f.putScript(w, r, strings.TrimPrefix(path, acct+"/workers/scripts/"))
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/schedules"):
@@ -657,9 +685,13 @@ func writeCFResult(w http.ResponseWriter, status int, result any) {
 }
 
 func writeCFError(w http.ResponseWriter, status int, message string) {
+	writeCFErrorCode(w, status, 1000, message)
+}
+
+func writeCFErrorCode(w http.ResponseWriter, status, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "result": nil, "errors": []map[string]any{{"code": 1000, "message": message}}})
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "result": nil, "errors": []map[string]any{{"code": code, "message": message}}})
 }
 
 // snapshot is what the fake holds after a deploy, without what legitimately differs between a clean run and a run that was
@@ -1529,6 +1561,97 @@ func TestDeployRerunIsIdempotent(t *testing.T) {
 	// the same bundle is not a new bundle: the versions recorded for a rollback stay
 	if !reflect.DeepEqual(after.Scripts[release.RoleLink].Previous, before.Scripts[release.RoleLink].Previous) {
 		t.Fatal("a rerun of the same bundle recorded new previous versions")
+	}
+}
+
+func TestResetLoginUploadsOneRecoverySecretWithoutChangingTheKeyFile(t *testing.T) {
+	fake, opts, _ := setupDeploy(t, "v1.2.3")
+	mustDeploy(t, opts)
+	before, err := os.ReadFile(opts.StatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.requests = nil
+
+	var out bytes.Buffer
+	resetOpts := RecoveryOptions{
+		StatePath: opts.StatePath, Token: testCFToken, AdminLogin: "alice",
+		APIBaseURL: opts.APIBaseURL, HTTPClient: opts.HTTPClient,
+		Random: bytes.NewReader(bytes.Repeat([]byte{0x2a}, 32)),
+	}
+	if err := ResetLogin(context.Background(), resetOpts, &out); err != nil {
+		t.Fatal(err)
+	}
+	state := mustState(t, opts.StatePath)
+	link, err := url.Parse(strings.TrimSpace(out.String()))
+	fragment, fragmentErr := url.ParseQuery(link.Fragment)
+	token := fragment.Get("recoveryToken")
+	if err != nil || fragmentErr != nil || link.Scheme != "https" || link.Host != "panel.example.com" ||
+		link.Path != state.AdminPrefix+"recover" || link.Query().Has("login") || fragment.Get("login") != "alice" || len(token) != 43 {
+		t.Fatal("reset-login did not print one recovery link for the selected login")
+	}
+	if len(fake.requests) != 1 || fake.requests[0] != "PUT "+apiPrefix+acct+"/workers/scripts/"+admin+"/secrets" {
+		t.Fatal("reset-login did not upload exactly one secret to the admin Worker")
+	}
+	hash := sha256.Sum256([]byte(token))
+	if fake.secrets[admin]["RECOVERY_TOKEN_SHA256"] != hex.EncodeToString(hash[:]) {
+		t.Fatal("the uploaded recovery secret does not match the printed token")
+	}
+	if strings.Count(out.String(), token) != 1 {
+		t.Fatal("the recovery token was not printed exactly once")
+	}
+	after, err := os.ReadFile(opts.StatePath)
+	if err != nil || !bytes.Equal(before, after) || bytes.Contains(after, []byte(token)) {
+		t.Fatal("reset-login changed the key file or wrote the recovery token to it")
+	}
+}
+
+func TestResetLoginUsesAuthFailureForCloudflare401(t *testing.T) {
+	fake, opts, _ := setupDeploy(t, "v1.2.3")
+	mustDeploy(t, opts)
+	fake.rejectToken = true
+	err := ResetLogin(context.Background(), RecoveryOptions{
+		StatePath: opts.StatePath, Token: testCFToken, AdminLogin: "alice",
+		APIBaseURL: opts.APIBaseURL, HTTPClient: opts.HTTPClient,
+		Random: bytes.NewReader(bytes.Repeat([]byte{0x2a}, 32)),
+	}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "Cloudflare rejected the API token") || strings.Contains(err.Error(), testCFToken) {
+		t.Fatalf("reset-login 401 error = %v; want authFailure message without token", err)
+	}
+}
+
+func TestResetLoginAsksToDeployFirstWhenLatestWorkerVersionIsNotDeployed(t *testing.T) {
+	fake, opts, _ := setupDeploy(t, "v1.2.3")
+	mustDeploy(t, opts)
+	fake.secretErrorCode = 10215
+	err := ResetLogin(context.Background(), RecoveryOptions{
+		StatePath: opts.StatePath, Token: testCFToken, AdminLogin: "alice",
+		APIBaseURL: opts.APIBaseURL, HTTPClient: opts.HTTPClient,
+		Random: bytes.NewReader(bytes.Repeat([]byte{0x2a}, 32)),
+	}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "deploy first") {
+		t.Fatalf("reset-login API code 10215 error = %v; want deploy-first guidance", err)
+	}
+}
+
+func TestResetLoginDryRunUploadsNothing(t *testing.T) {
+	fake, opts, _ := setupDeploy(t, "v1.2.3")
+	mustDeploy(t, opts)
+	fake.requests = nil
+	var out bytes.Buffer
+	err := ResetLogin(context.Background(), RecoveryOptions{
+		StatePath: opts.StatePath, Token: testCFToken, AdminLogin: "alice", DryRun: true,
+		APIBaseURL: opts.APIBaseURL, HTTPClient: opts.HTTPClient,
+		Random: bytes.NewReader(bytes.Repeat([]byte{0x2a}, 32)),
+	}, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.requests) != 0 {
+		t.Fatal("dry-run made a Cloudflare API request")
+	}
+	if strings.Contains(out.String(), "#") {
+		t.Fatal("dry-run printed an unusable recovery link")
 	}
 }
 

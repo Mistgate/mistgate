@@ -106,6 +106,7 @@ export function createRuntime(wasm: WebAssembly.Module): Runtime {
       subPrefix: env.SUB_PREFIX || undefined,
       // The deployer's setup token (hash only); without it the panel mints a random one and prints its link once.
       setupTokenSHA256: env.SETUP_TOKEN_SHA256?.trim() || undefined,
+      recoveryTokenSHA256: env.RECOVERY_TOKEN_SHA256?.trim() || undefined,
     });
     return panel;
   }

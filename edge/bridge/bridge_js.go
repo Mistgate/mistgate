@@ -364,6 +364,9 @@ func initPanel(options js.Value) error {
 		if err := offerSetup(ctx, st, opts, in, time.Now()); err != nil {
 			return err
 		}
+		if err := offerRecovery(ctx, st, opts, time.Now()); err != nil {
+			js.Global().Get("console").Call("error", "could not offer recovery token", err.Error())
+		}
 	}
 	handler := built.Handler
 	if handler != nil { // the scheduled-work role serves no HTTP
@@ -419,6 +422,28 @@ func offerSetup(ctx context.Context, st *store.Store, opts initOptions, in app.I
 		return err
 	}
 	console.Call("log", "No admin yet. Create one (link works once, 30 minutes):\n  "+in.AdminURL()+"setup#"+token)
+	return nil
+}
+
+// offerRecovery offers the hashed token configured on the admin Worker for thirty minutes from its first start. It logs
+// only the secret binding's name and the expiry; the plaintext token stays in the owner's recovery link.
+func offerRecovery(ctx context.Context, st *store.Store, opts initOptions, now time.Time) error {
+	if opts.recoveryTokenHash == nil {
+		return nil
+	}
+	offer, err := st.OfferRecoveryToken(ctx, opts.recoveryTokenHash, now.Add(auth.RecoveryTokenTTL))
+	if err != nil || !offer.AdminExists {
+		return err
+	}
+	if offer.Used {
+		return nil
+	}
+	when := offer.Expires.UTC().Format(time.RFC3339)
+	if !offer.Expires.After(now) {
+		js.Global().Get("console").Call("log", "The recovery token of RECOVERY_TOKEN_SHA256 has expired ("+when+"); run `mistgate edge reset-login` again")
+	} else {
+		js.Global().Get("console").Call("log", "The recovery token of RECOVERY_TOKEN_SHA256 is accepted until "+when)
+	}
 	return nil
 }
 

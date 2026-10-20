@@ -558,6 +558,12 @@ func (s *Server) newAdmin(base string) http.Handler {
 	spa := s.spa(base)
 	return s.securityHeaders(s.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch p := r.URL.Path; {
+		case p == "/api/recover-login":
+			if !s.auth.RecoveryEnabled() {
+				http.NotFound(w, r)
+				return
+			}
+			s.auth.RecoveryHandler().ServeHTTP(w, r)
 		case strings.HasPrefix(p, "/api/"): // "/api" itself is a 404 in the SPA handler
 			api.ServeHTTP(w, r)
 		case p == "/mcp" && s.mcp != nil:
@@ -565,6 +571,8 @@ func (s *Server) newAdmin(base string) http.Handler {
 			s.mcp.ServeHTTP(w, r)
 		case p == "/brand/logo.svg":
 			s.logo.ServeHTTP(w, r)
+		case p == "/recover" && !s.auth.RecoveryEnabled():
+			http.NotFound(w, r)
 		case s.preview != nil && strings.HasPrefix(p, previewPrefix):
 			s.preview.ServeHTTP(w, r)
 		case s.pages[p] != nil:

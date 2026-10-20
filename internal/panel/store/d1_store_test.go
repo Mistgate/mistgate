@@ -209,6 +209,63 @@ func TestD1RecordedUpdateStepMethods(t *testing.T) {
 	}
 }
 
+func TestD1RecoveryTokenLifecycle(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at)
+		VALUES ('adm_recovery_d1', 'Alice', 'owner', x'01', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	hash := sha256.Sum256([]byte("recovery-token"))
+	expires := time.Unix(1_800_000_000, 0).UTC()
+	offer, err := st.OfferRecoveryToken(ctx, hash[:], expires)
+	if err != nil || !offer.AdminExists || !offer.Found || offer.Used || !offer.Expires.Equal(expires) {
+		t.Fatal("D1 did not offer the recovery token")
+	}
+	if live, err := st.RecoveryTokenLive(ctx, hash[:], expires.Add(-time.Second)); err != nil || !live {
+		t.Fatal("D1 did not report the active recovery token as live")
+	}
+	if won, err := st.ConsumeRecoveryToken(ctx, hash[:], expires.Add(-time.Second)); err != nil || !won {
+		t.Fatal("D1 did not consume the active recovery token")
+	}
+	if live, err := st.RecoveryTokenLive(ctx, hash[:], expires.Add(-time.Second)); err != nil || live {
+		t.Fatal("D1 reported the used recovery token as live")
+	}
+	if won, err := st.ConsumeRecoveryToken(ctx, hash[:], expires.Add(-time.Second)); err != nil || won {
+		t.Fatal("D1 accepted a recovery token twice")
+	}
+	used, err := st.OfferRecoveryToken(ctx, hash[:], expires.Add(time.Hour))
+	if err != nil || !used.Found || !used.Used || !used.Expires.Equal(expires) {
+		t.Fatal("D1 revived a used recovery token")
+	}
+	expiredHash := sha256.Sum256([]byte("expired-recovery-token"))
+	if _, err := st.OfferRecoveryToken(ctx, expiredHash[:], expires); err != nil {
+		t.Fatal("D1 could not offer an expiring recovery token")
+	}
+	if won, err := st.ConsumeRecoveryToken(ctx, expiredHash[:], expires); err != nil || won {
+		t.Fatal("D1 accepted an expired recovery token")
+	}
+	if live, err := st.RecoveryTokenLive(ctx, expiredHash[:], expires); err != nil || live {
+		t.Fatal("D1 reported the expired recovery token as live")
+	}
+
+	a, b := sha256.Sum256([]byte("recovery-token-a")), sha256.Sum256([]byte("recovery-token-b"))
+	expiresA := expires.Add(30 * time.Minute)
+	if _, err := st.OfferRecoveryToken(ctx, a[:], expiresA); err != nil {
+		t.Fatal("D1 could not offer recovery token A")
+	}
+	if _, err := st.OfferRecoveryToken(ctx, b[:], expires.Add(5*time.Hour)); err != nil {
+		t.Fatal("D1 could not offer recovery token B")
+	}
+	again, err := st.OfferRecoveryToken(ctx, a[:], expires.Add(6*time.Hour))
+	if err != nil || !again.Expires.Equal(expiresA) {
+		t.Fatal("D1 revived superseded recovery token A")
+	}
+	if live, err := st.RecoveryTokenLive(ctx, a[:], expires.Add(6*time.Hour)); err != nil || live {
+		t.Fatal("D1 reported the re-offered, expired token A as live")
+	}
+}
+
 func TestD1FleetBatchSmoke(t *testing.T) {
 	st := openD1Store(t)
 	ctx := context.Background()

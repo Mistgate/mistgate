@@ -95,6 +95,9 @@ func (c EdgeConfig) WranglerConfig(role string) string {
 		p("\n# Secrets, never a value in this file: wrangler secret put <NAME> --name %s. Locally put NAME=value lines in the git-ignored", s.DefaultName)
 		p("# .dev.vars. MASTER_KEY is 32 random bytes as 64 hex characters, the same in every script that has it.")
 		p("#   %s", strings.Join(s.Secrets, ", "))
+		if role == RoleAdmin {
+			p("# Optional secret RECOVERY_TOKEN_SHA256 is set separately by `mistgate edge reset-login`.")
+		}
 	}
 	if len(s.Vars) > 0 {
 		p("\n# Optional first-run settings, read only while the database is empty (afterwards the database wins):")

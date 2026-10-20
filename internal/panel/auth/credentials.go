@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -262,6 +263,10 @@ type ResetLoginInput struct {
 	Login string
 	// AdminID picks that passkey-only admin; empty is fine when the panel has exactly one admin.
 	AdminID string
+	// Actor is the audit actor. Empty retains the CLI actor used by the VPS command.
+	Actor string
+	// IP is the client address for an HTTP-triggered reset, or invalid for the local CLI.
+	IP netip.Addr
 }
 
 // ResetLoginResult is what the operator is shown once: the new password and the new authenticator secret.
@@ -344,8 +349,15 @@ func ResetLogin(ctx context.Context, st *store.Store, v *vault.Vault, in ResetLo
 	out.TOTPURI, out.TOTPSecret = totpURI(brand, login, secret), b32.EncodeToString(secret)
 	cred := store.PasswordCred{AdminID: target.ID, Login: login, Hash: hash, TOTPSecret: v.Seal(secret, totpAAD(target.ID))}
 	params, _ := json.Marshal(map[string]any{"admin": target.ID, "login": login, "created": out.Created})
-	out.SessionsEnded, err = st.ResetPasswordLogin(ctx, cred, out.Created, []string{login, stepUpLockKey + target.ID}, now,
-		store.AuditEntry{Actor: "cli", Action: "reset_login", Result: "ok", Params: string(params)})
+	actor := in.Actor
+	if actor == "" {
+		actor = "cli"
+	}
+	audit := store.AuditEntry{Actor: actor, Action: "reset_login", Result: "ok", Params: string(params)}
+	if in.IP.IsValid() {
+		audit.IP = in.IP.String()
+	}
+	out.SessionsEnded, err = st.ResetPasswordLogin(ctx, cred, out.Created, []string{login, stepUpLockKey + target.ID}, now, audit)
 	if errors.Is(err, store.ErrLoginTaken) {
 		return out, &ResetTargetError{fmt.Sprintf("the login %q is taken", login)}
 	}

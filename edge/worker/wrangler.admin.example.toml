@@ -46,6 +46,7 @@ enabled = false
 # Secrets, never a value in this file: wrangler secret put <NAME> --name mistgate-edge-admin. Locally put NAME=value lines in the git-ignored
 # .dev.vars. MASTER_KEY is 32 random bytes as 64 hex characters, the same in every script that has it.
 #   MASTER_KEY, ADMIN_PREFIX, SUB_PREFIX, SETUP_TOKEN_SHA256
+# Optional secret RECOVERY_TOKEN_SHA256 is set separately by `mistgate edge reset-login`.
 
 # Optional first-run settings, read only while the database is empty (afterwards the database wins):
 # [vars]

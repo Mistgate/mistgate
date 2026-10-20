@@ -60,6 +60,34 @@ export const blocklist = createClient(BlocklistService, transport);
 // TestTspuProbe runs for minutes: no call here sets a deadline (timeoutMs), and the transport has none of its own.
 export const tspuProbe = createClient(TspuProbeService, transport);
 
+export type RecoveryLoginResult = {
+  adminDisplayName: string;
+  login: string;
+  password: string;
+  totpUri: string;
+  totpSecret: string;
+  created: boolean;
+  sessionsEnded: number;
+};
+
+/** The fragment token is sent only in the same-origin request body, never in the URL. */
+export async function recoverLogin(recoveryToken: string, login: string): Promise<RecoveryLoginResult> {
+  const response = await fetch(new URL("api/recover-login", document.baseURI), {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recoveryToken, login }),
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    const error = new Error(typeof body.message === "string" ? body.message : "recovery request failed") as Error & { code?: string };
+    error.code = typeof body.code === "string" ? body.code : "unknown"; // no code at all means the request never got an answer
+    throw error;
+  }
+  return body as RecoveryLoginResult;
+}
+
 /** URL of a file next to the admin UI (respects the secret prefix), e.g. assetUrl("brand/logo.svg"). */
 export const assetUrl = (path: string) => new URL(path, document.baseURI).href;
 

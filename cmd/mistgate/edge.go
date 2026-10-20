@@ -19,9 +19,11 @@ const edgeUsage = `usage:
   mistgate edge deploy --host panel.example.com [--name mistgate-edge] [--d1-location weur] [--bundle DIR | --version vX.Y.Z] [--resume] [--dry-run] [--insecure-skip-signature]
   mistgate edge deploy --host panel.example.com [--name mistgate-edge] --rollback [--dry-run]
   mistgate edge setup-link --file mistgate-edge-<name>.json
+  mistgate edge reset-login --file KEYFILE [--admin LOGIN] [--dry-run]
 
 The Cloudflare API token is read only from CLOUDFLARE_API_TOKEN.
-Edge deploy requires Cloudflare Workers Paid and the host's DNS zone on Cloudflare.
+Edge deploy requires Cloudflare Workers Paid and the host's DNS zone on Cloudflare. Reset-login needs Workers Scripts Edit.
+On edge, --admin takes an admin login; the VPS mistgate auth reset-login --admin flag takes an admin ID.
 `
 
 // releaseVersionRe matches the stamp of a release build (the tag, with or without the v); a development build
@@ -48,6 +50,8 @@ func runEdge(args []string, out io.Writer) error {
 		return runEdgeDeploy(args[1:], out)
 	case "setup-link":
 		return runEdgeSetupLink(args[1:], out)
+	case "reset-login":
+		return runEdgeResetLogin(args[1:], out)
 	default:
 		return errors.New(edgeUsage)
 	}
@@ -111,4 +115,23 @@ func runEdgeSetupLink(args []string, out io.Writer) error {
 		return errors.New(edgeUsage)
 	}
 	return edgedeploy.SetupLink(*file, out)
+}
+
+func runEdgeResetLogin(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("mistgate edge reset-login", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	file := fs.String("file", "", "local edge deployment file")
+	admin := fs.String("admin", "", "admin login to prefill on the recovery page (edge uses a login, not an admin ID)")
+	dryRun := fs.Bool("dry-run", false, "show the secret upload plan without making a Cloudflare request")
+	if err := fs.Parse(args); err != nil {
+		return edgeParseError(err, out)
+	}
+	if fs.NArg() != 0 || *file == "" {
+		return errors.New(edgeUsage)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	return edgedeploy.ResetLogin(ctx, edgedeploy.RecoveryOptions{
+		StatePath: *file, Token: os.Getenv("CLOUDFLARE_API_TOKEN"), AdminLogin: *admin, DryRun: *dryRun,
+	}, out)
 }

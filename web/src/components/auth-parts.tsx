@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Brand } from "@/components/brand";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
 import { QrCode } from "@/components/qr-code";
@@ -51,10 +51,17 @@ export function StepDots({ step, total }: { step: number; total: number }) {
   );
 }
 
-export function Heading({ title, children }: { title: ReactNode; children?: ReactNode }) {
+/** `focus` takes the focus on mount: a view that replaced the button just pressed (a result, an error) is read out from its title. */
+export function Heading({ title, children, focus }: { title: ReactNode; children?: ReactNode; focus?: boolean }) {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focus) ref.current?.focus();
+  }, [focus]);
   return (
     <div className="flex flex-col gap-1.5">
-      <h1 className="text-[26px] leading-tight font-extrabold tracking-[-0.04em]">{title}</h1>
+      <h1 ref={ref} tabIndex={focus ? -1 : undefined} className="text-[26px] leading-tight font-extrabold tracking-[-0.04em] outline-none">
+        {title}
+      </h1>
       {children && <p className="text-sm leading-normal text-pretty text-muted">{children}</p>}
     </div>
   );

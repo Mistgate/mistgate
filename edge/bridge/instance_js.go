@@ -41,6 +41,7 @@ var (
 	errInvalidLimitCallback  = errors.New("limit must be a function")
 	errInvalidNodeLink       = errors.New("nodeLink must provide ask, close and poke functions")
 	errInvalidSetupHash      = errors.New("setupTokenSHA256 must be 64 lowercase hex characters (the SHA-256 of the setup token)")
+	errInvalidRecoveryHash   = errors.New("recoveryTokenSHA256 must be 64 lowercase hex characters (the SHA-256 of the recovery token)")
 )
 
 type initOptions struct {
@@ -59,7 +60,8 @@ type initOptions struct {
 	rpOrigins   []string
 	sourceURL   string
 	// setupTokenHash is the SHA-256 of a setup token chosen by whoever deploys (SETUP_TOKEN_SHA256); nil: the panel mints a random one.
-	setupTokenHash []byte
+	setupTokenHash    []byte
+	recoveryTokenHash []byte // SHA-256 of the one-time token set by `mistgate edge reset-login`.
 }
 
 func parseInitOptions(value js.Value) (initOptions, error) {
@@ -149,6 +151,15 @@ func parseInitOptions(value js.Value) (initOptions, error) {
 			return out, err
 		}
 	}
+	recoveryHash, err := stringOption(value, "recoveryTokenSHA256")
+	if err != nil {
+		return out, err
+	}
+	if recoveryHash != "" {
+		if out.recoveryTokenHash, err = parseRecoveryTokenHash(recoveryHash); err != nil {
+			return out, err
+		}
+	}
 	if optionPresent(value, "sourceURL") {
 		if out.sourceURL, err = stringOption(value, "sourceURL"); err != nil {
 			return out, err
@@ -167,6 +178,17 @@ func parseSetupTokenHash(raw string) ([]byte, error) {
 	hash, err := hex.DecodeString(raw)
 	if err != nil {
 		return nil, errInvalidSetupHash
+	}
+	return hash, nil
+}
+
+func parseRecoveryTokenHash(raw string) ([]byte, error) {
+	if len(raw) != 2*sha256.Size || strings.ToLower(raw) != raw {
+		return nil, errInvalidRecoveryHash
+	}
+	hash, err := hex.DecodeString(raw)
+	if err != nil {
+		return nil, errInvalidRecoveryHash
 	}
 	return hash, nil
 }

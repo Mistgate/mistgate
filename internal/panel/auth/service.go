@@ -32,6 +32,7 @@ const (
 	CookieName = "__Host-sid"
 
 	SetupTokenTTL    = 30 * time.Minute
+	RecoveryTokenTTL = 30 * time.Minute
 	CeremonyTTL      = 5 * time.Minute
 	SessionIdleTTL   = 12 * time.Hour
 	SessionMaxAge    = 30 * 24 * time.Hour

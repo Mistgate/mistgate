@@ -148,6 +148,62 @@ func (s *Store) CreateFirstAdminPassword(ctx context.Context, tokenHash []byte, 
 	})
 }
 
+// RecoveryTokenOffer is what OfferRecoveryToken found after offering the hash.
+type RecoveryTokenOffer struct {
+	AdminExists bool
+	Found       bool
+	Expires     time.Time
+	Used        bool
+}
+
+// OfferRecoveryToken offers the current Worker secret once, for thirty minutes from the first offer. It keeps every
+// hash's first expiry across isolates, so superseded, expired, or used rows can never be revived by re-offering a hash.
+func (s *Store) OfferRecoveryToken(ctx context.Context, hash []byte, expires time.Time) (RecoveryTokenOffer, error) {
+	results, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO recovery_token (hash, expires_at) SELECT ?1, ?2 WHERE EXISTS (SELECT 1 FROM admin)
+			ON CONFLICT(hash) DO NOTHING`, Args: []any{hash, unix(expires)}},
+		Stmt{Query: `SELECT (SELECT count(*) FROM admin) AS admins,
+			(SELECT expires_at FROM recovery_token WHERE hash = ?1) AS expires_at,
+			(SELECT used_at FROM recovery_token WHERE hash = ?1) AS used_at`, Args: []any{hash}, Returning: true},
+	)
+	if err != nil {
+		return RecoveryTokenOffer{}, err
+	}
+	if len(results[1].Rows) != 1 {
+		return RecoveryTokenOffer{}, errors.New("store: recovery token read-back returned no row")
+	}
+	var admins int64
+	var expiresAt, usedAt sql.NullInt64
+	if err := batchRow(results[1].Rows[0]).Scan(&admins, &expiresAt, &usedAt); err != nil {
+		return RecoveryTokenOffer{}, err
+	}
+	out := RecoveryTokenOffer{AdminExists: admins > 0, Found: expiresAt.Valid, Used: usedAt.Valid}
+	if expiresAt.Valid {
+		out.Expires = fromUnix(expiresAt.Int64)
+	}
+	return out, nil
+}
+
+// RecoveryTokenLive reports whether hash is an unused, unexpired recovery token. It does not consume the token.
+func (s *Store) RecoveryTokenLive(ctx context.Context, hash []byte, now time.Time) (bool, error) {
+	var live bool
+	err := s.R.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM recovery_token WHERE hash = ? AND used_at IS NULL AND expires_at > ?
+	)`, hash, unix(now)).Scan(&live)
+	return live, err
+}
+
+// ConsumeRecoveryToken atomically spends an unused, unexpired recovery token. The row remains so a used token can never
+// be offered again, even if the same secret is accidentally uploaded later.
+func (s *Store) ConsumeRecoveryToken(ctx context.Context, hash []byte, now time.Time) (bool, error) {
+	results, err := s.batch(ctx, Stmt{Query: `UPDATE recovery_token SET used_at = ?
+		WHERE hash = ? AND used_at IS NULL AND expires_at > ? RETURNING hash`, Args: []any{unix(now), hash, unix(now)}, Returning: true})
+	if err != nil {
+		return false, err
+	}
+	return len(results[0].Rows) == 1, nil
+}
+
 func (s *Store) createFirstAdmin(ctx context.Context, tokenHash []byte, now time.Time, a Admin, insertCred Stmt) error {
 	_, err := s.batch(ctx,
 		guard(`EXISTS (SELECT 1 FROM setup_token WHERE hash = ? AND used_at IS NULL AND expires_at > ?)

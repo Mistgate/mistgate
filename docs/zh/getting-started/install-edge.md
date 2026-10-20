@@ -121,6 +121,10 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 
 如果输出的最后一行说主机尚未响应 HTTP 200，自定义域名的 DNS 解析可能需要几分钟，Cloudflare 也可能仍在签发证书。部署本身已完成；几分钟后再打开链接。
 
+## 无法登录时
+
+将具有 Workers Scripts Edit 权限的令牌设为 `CLOUDFLARE_API_TOKEN`，然后运行 `mistgate edge reset-login --file mistgate-edge-mistgate-edge.json`（添加 `--admin LOGIN` 可预填登录名）。命令会上传一次性令牌的哈希并打印恢复链接；请在 30 分钟内打开。新密码和身份验证器二维码只显示一次，所有会话都会结束，通行密钥仍会保留。之后可在**设置 → 安全**中删除丢失的通行密钥。`--dry-run` 只显示上传计划，不会上传密钥或生成链接。令牌不会写入密钥文件。
+
 ## 添加节点
 
 像使用 VPS 面板一样，在**节点 → 添加节点**中添加节点；见[添加节点](add-node.md)。此版本也支持通过 SSH 安装，差异如下（详情见[通过 SSH 安装节点](ssh-install.md)）：

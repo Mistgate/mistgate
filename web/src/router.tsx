@@ -71,6 +71,12 @@ const setup = createRoute({
   },
   component: lazyRouteComponent(() => import("@/screens/setup"), "SetupScreen"),
 });
+const recover = createRoute({
+  getParentRoute: () => root,
+  path: "/recover",
+  beforeLoad: leaveIfSignedIn,
+  component: lazyRouteComponent(() => import("@/screens/recover"), "RecoverScreen"),
+});
 
 // Development only: every UI primitive on one page (vite drops this branch from production builds).
 const devKit = import.meta.env.DEV
@@ -219,6 +225,7 @@ const placeholderRoutes = sections
 const routeTree = root.addChildren([
   login,
   setup,
+  recover,
   ...(devKit ? [devKit] : []),
   app.addChildren([
     overview,
@@ -244,7 +251,7 @@ export const router = createRouter({ routeTree, basepath });
 // A poll that finds the session gone (expired, ended from another device) lands on the sign-in screen.
 setSignedOutHandler(() => {
   const path = router.state.location.pathname;
-  if (path.endsWith("/login") || path.endsWith("/setup")) return;
+  if (path.endsWith("/login") || path.endsWith("/setup") || path.endsWith("/recover")) return;
   goToSignIn();
 });
 

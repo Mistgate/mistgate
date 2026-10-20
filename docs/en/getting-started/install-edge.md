@@ -121,6 +121,10 @@ If the link has expired, or you closed the page before the account existed:
 
 If the last line of the output says that the host did not answer HTTP 200 yet, the custom domain may take a few minutes to resolve, and Cloudflare may still be issuing its certificate. The deploy itself is finished: open the link in a few minutes.
 
+## Locked out
+
+Set `CLOUDFLARE_API_TOKEN` to a token with Workers Scripts Edit, then run `mistgate edge reset-login --file mistgate-edge-mistgate-edge.json` (add `--admin LOGIN` to prefill a login). It uploads a one-time token hash and prints a recovery link; open it within 30 minutes. The new password and authenticator QR appear once, all sessions end, and passkeys stay registered. Remove a lost passkey later in **Settings → Security**. `--dry-run` shows the upload plan without uploading a secret or creating a link. The token is never saved in the key file.
+
 ## Add nodes
 
 Add nodes in **Nodes → Add node** as on a VPS panel; see [Add a node](add-node.md). Installing over SSH works on this edition too, with these differences (the details are in [Install a node over SSH](ssh-install.md)):
