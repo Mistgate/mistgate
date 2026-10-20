@@ -3,9 +3,10 @@
 // doctor tests gosuslugi.ru through the server's resolver and offers Yandex DNS. Any other code can still be set through
 // the API.
 export const countryCodes = [
-  "AE", "AM", "AT", "AU", "BG", "BR", "CA", "CH", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GE", "HK",
-  "HU", "IE", "IL", "IN", "IT", "JP", "KR", "KZ", "LT", "LU", "LV", "MD", "NL", "NO", "PL", "RO", "RS", "RU",
-  "SE", "SG", "TR", "UA", "US",
+  "AE", "AM", "AR", "AT", "AU", "AZ", "BE", "BG", "BR", "BY", "CA", "CH", "CL", "CY", "CZ", "DE", "DK", "EE",
+  "ES", "FI", "FR", "GB", "GE", "GR", "HK", "HR", "HU", "ID", "IE", "IL", "IN", "IS", "IT", "JP", "KG", "KR",
+  "KZ", "LT", "LU", "LV", "MD", "MX", "MY", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE", "SG", "SI", "SK",
+  "TH", "TR", "TW", "UA", "US", "UZ", "VN", "ZA",
 ] as const; // prettier-ignore
 
 /** Region indicator flags would draw on some systems and not on Windows, so the UI shows the code itself. */
