@@ -142,6 +142,13 @@ func TestEdgeRemoteSendMapsResultAndRefusesMissingSend(t *testing.T) {
 	if err := (&edgeRemote{send: falseSend.Value}).Send(context.Background(), "node-a", "req_send", frame, deadline); !errors.Is(err, errRemoteLost) {
 		t.Fatalf("Send(false) error = %v, want %v", err, errRemoteLost)
 	}
+	rejectingSend := js.FuncOf(func(_ js.Value, _ []js.Value) any {
+		return js.Global().Get("Promise").Call("reject", js.Global().Get("Error").New("object reset"))
+	})
+	defer rejectingSend.Release()
+	if err := (&edgeRemote{send: rejectingSend.Value}).Send(context.Background(), "node-a", "req_send", frame, deadline); !errors.Is(err, errRemoteLost) {
+		t.Fatalf("Send(rejected) error = %v, want %v", err, errRemoteLost)
+	}
 	if err := (&edgeRemote{}).Send(context.Background(), "node-a", "req_send", frame, deadline); !errors.Is(err, errRemoteLost) {
 		t.Fatalf("Send(without function) error = %v, want %v", err, errRemoteLost)
 	}

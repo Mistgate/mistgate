@@ -1,6 +1,6 @@
 import type { PanelEnv } from "./env";
 import type { PanelApi } from "./runtime";
-import { forwardLink, forwardProvision, keepAlive, panelURL, toFetchRequest, toResponse } from "./shell";
+import { forwardAsset, forwardLink, forwardProvision, keepAlive, panelURL, toFetchRequest, toResponse } from "./shell";
 
 // The Worker's two entry points over a panel: an HTTP request and a cron tick. They do not know which wasm the panel is, so
 // the single script (src/fetch.ts) and every role script of the split edition (src/roles) share them.
@@ -20,11 +20,13 @@ export function fetchWith(getPanel: GetPanel) {
       const fetchRequest = await toFetchRequest(request);
       const answer = await keepAlive(ctx, panel.fetch(fetchRequest));
       ctx.waitUntil(answer.waitUntil);
-      // The panel marks what another object serves: an agent link upgrade (the node's NodeLink) and an SSH-install request
-      // (the Provisioner of the second script, which gets the body the panel already read).
+      // The panel marks what another object serves: an agent link upgrade (the node's NodeLink), an SSH-install request
+      // (the Provisioner of the second script, which gets the body the panel already read) and a node update download
+      // (a release asset the Worker streams through).
       return (
         (env.NODELINK ? await forwardLink(env.NODELINK, request, answer) : undefined) ??
         (await forwardProvision(env.PROVISIONER, fetchRequest, answer)) ??
+        (await forwardAsset(fetchRequest, answer)) ??
         toResponse(answer)
       );
     } catch (error) {

@@ -592,6 +592,7 @@ async function run() {
       provision: { role: "forward", kick: async () => { provisionKicks++; } },
       nodeLink: {
         ask: async () => ({ error: "lost" }),
+        send: async () => false,
         close: async () => {},
         poke: async (nodeIDs) => {
           nodePokeCalls++;

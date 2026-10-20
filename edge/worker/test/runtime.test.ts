@@ -108,13 +108,14 @@ describe("createRuntime", () => {
     expect(o.provision).toBeUndefined();
     await expect(o.limit({ name: "login", key: "k" })).rejects.toThrow(/LIMITER/);
     await expect(o.nodeLink.ask("nod_1", "r", new Uint8Array(), 1)).rejects.toThrow(/NODELINK/);
+    await expect(o.nodeLink.send("nod_1", "r", new Uint8Array(), 1)).rejects.toThrow(/NODELINK/);
     await expect(o.nodeLink.close("nod_1", "x")).rejects.toThrow(/NODELINK/);
     await expect(o.nodeLink.poke(["nod_1"])).rejects.toThrow(/NODELINK/);
   });
 
   it("a role with the bindings: limit and poke reach the objects", async () => {
     const poked: string[] = [];
-    const ns = (calls: string[]) => ({ idFromName: (n: string) => n, get: (id: string) => ({ limit: async () => ({ ok: true }), poke: async () => void calls.push(id) }) });
+    const ns = (calls: string[]) => ({ idFromName: (n: string) => n, get: (id: string) => ({ limit: async () => ({ ok: true }), poke: async () => void calls.push(id), send: async (r: string, _f: Uint8Array, at: number) => r === "r1" && at === 5 }) });
     const env = { DB: {}, MASTER_KEY: key, LIMITER: ns([]), NODELINK: ns(poked), ASSETS: {} } as any;
     await createRuntime({} as WebAssembly.Module).getPanel(env, "https://x.test");
     const o = initCalls[0]!;
@@ -122,5 +123,7 @@ describe("createRuntime", () => {
     expect(await o.limit({ name: "login", key: "k" })).toEqual({ ok: true });
     expect(await o.nodeLink.poke(["nod_1", "nod_2"])).toBe(0);
     expect(poked).toEqual(["nod_1", "nod_2"]);
+    expect(await o.nodeLink.send("nod_1", "r1", new Uint8Array(), 5)).toBe(true);
+    expect(await o.nodeLink.send("nod_1", "r2", new Uint8Array(), 5)).toBe(false);
   });
 });

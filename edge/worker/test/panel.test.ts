@@ -71,6 +71,7 @@ describe("getServePanel (the Provisioner's script)", () => {
     for (const absent of ["assets", "publicURL", "adminHost", "adminPrefix", "subPrefix", "setupTokenSHA256"]) expect(options).not.toHaveProperty(absent);
     expect(options.limit).toBeTypeOf("function");
     expect(options.nodeLink.ask).toBeTypeOf("function");
+    expect(options.nodeLink.send).toBeTypeOf("function");
   });
 
   it("initialises Go once for concurrent callers", async () => {

@@ -162,3 +162,26 @@ describe("scheduledPanel", () => {
     log.mockRestore();
   });
 });
+
+describe("fetchPanelRequest streams a marked node update download", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("answers a 204 with the asset marker with the release stream, and sends upstream no Authorization", async () => {
+    const upstream = vi.fn(async (_url: URL, _init: RequestInit) => new Response("file-bytes", { status: 206, headers: { "Content-Length": "10", "Content-Range": "bytes 5-14/15" } }));
+    vi.stubGlobal("fetch", upstream);
+    try {
+      const answer = { status: 204, headers: [["X-Mistgate-Asset", "https://github.com/example/mistgate/releases/download/v1.2.3/mistgate-node-linux-amd64"]], body: new Uint8Array(), waitUntil: Promise.resolve() };
+      mockedGetPanel.mockResolvedValue({ fetch: vi.fn().mockResolvedValue(answer) } as unknown as Awaited<ReturnType<typeof getPanel>>);
+      const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+      const request = new Request("https://example.com/p/link/update/nl1/mistgate-node-linux-amd64", { headers: { Authorization: "Bearer invented-token", Range: "bytes=5-" } });
+      const response = await fetchPanelRequest(request, {} as Env, ctx);
+      expect(response.status).toBe(206);
+      expect(await response.text()).toBe("file-bytes");
+      expect(response.headers.get("content-range")).toBe("bytes 5-14/15");
+      expect(new Headers(upstream.mock.calls[0]![1].headers).has("authorization")).toBe(false);
+      expect(new Headers(upstream.mock.calls[0]![1].headers).get("range")).toBe("bytes=5-");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

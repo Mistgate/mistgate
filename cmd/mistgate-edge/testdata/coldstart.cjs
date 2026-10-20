@@ -67,7 +67,7 @@ const options = () => ({
   subPrefix: "/test-sub/",
   assets: async () => null,
   limit: async () => ({ ok: true, retryAfterMs: 0, remaining: 100, first: true }),
-  nodeLink: { ask: async () => ({ error: "lost" }), close: async () => {}, poke: async () => 0 },
+  nodeLink: { ask: async () => ({ error: "lost" }), send: async () => false, close: async () => {}, poke: async () => 0 },
 });
 
 const fmt = (n) => n.toFixed(1).padStart(8);

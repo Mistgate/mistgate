@@ -22,7 +22,8 @@ export type LinkEvent =
   | { kind: "frame"; at: number; frame: Uint8Array }
   | { kind: "alarm"; at: number }
   | { kind: "desired"; at: number }
-  | { kind: "request"; at: number; requestId: string; frame: Uint8Array; deadlineAt: number }
+  /** record: nobody waits for the reply; the session core keeps the node's answer itself (a recorded request, NodeLink.send). */
+  | { kind: "request"; at: number; requestId: string; frame: Uint8Array; deadlineAt: number; record?: true }
   | { kind: "closed"; at: number; owned: boolean };
 
 export interface LinkStepIn {

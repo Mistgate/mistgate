@@ -1,5 +1,5 @@
 import type { PanelEnv, ProvisionEnv } from "./env";
-import { askNode, closeNode, kickProvisioner, pokeNodes, type FetchRequest, type FetchResponse, memoizeRetry, readAsset, routeLimit } from "./shell";
+import { askNode, closeNode, kickProvisioner, pokeNodes, sendNode, type FetchRequest, type FetchResponse, memoizeRetry, readAsset, routeLimit } from "./shell";
 
 // The Go panel inside a Worker isolate, for one wasm module. Which module it is does not matter here: the single script
 // passes dist/panel.wasm (src/panel.ts), each role script of the split edition passes its own (src/roles). The module's
@@ -39,10 +39,11 @@ export interface Runtime {
 function nodeLinkOf(ns: PanelEnv["NODELINK"]) {
   if (!ns) {
     const none = () => Promise.reject(new Error("this script has no NODELINK binding"));
-    return { ask: none, close: none, poke: none };
+    return { ask: none, send: none, close: none, poke: none };
   }
   return {
     ask: (nodeId: string, requestId: string, frame: Uint8Array, deadlineAt: number) => askNode(ns, nodeId, requestId, frame, deadlineAt),
+    send: (nodeId: string, requestId: string, frame: Uint8Array, deadlineAt: number) => sendNode(ns, nodeId, requestId, frame, deadlineAt),
     close: (nodeId: string, reason: string) => closeNode(ns, nodeId, reason),
     poke: (nodeIds: string[]) => pokeNodes(ns, nodeIds),
   };

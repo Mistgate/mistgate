@@ -78,6 +78,65 @@ export function forwardLink(ns: DurableObjectNamespace<NodeLink>, request: Reque
   return ns.get(ns.idFromName(id)).fetch(request);
 }
 
+/** The header of the panel's answer to a node update download (fleet.AssetMarkerHeader): the release asset's URL. */
+export const ASSET_MARKER = "x-mistgate-asset";
+
+/**
+ * The panel checked a node's download token and answers a node update download with 204 and the release asset's URL instead
+ * of the bytes. The Worker fetches that URL (following GitHub's redirect to the signed asset host) and returns the stream
+ * unchanged: no JS touches the bytes and nothing is buffered. Upstream gets only Range (resume), User-Agent and
+ * Accept-Encoding: identity (so ranges are byte ranges of the file itself); no Authorization, no cookies. 200 and 206 pass
+ * with their length headers, 416 stays 416, anything else is 502. The node checks size and SHA-256 itself, so a redirect
+ * cannot plant bytes. The marker never reaches the client. Undefined for any other panel answer.
+ * ponytail: any https redirect target is followed; restrict hosts if it ever matters.
+ */
+export function forwardAsset(request: FetchRequest, answer: FetchResponse, fetchUpstream: (url: URL, init: RequestInit) => Promise<Response> = fetch): Promise<Response> | undefined {
+  const marker = answer.status === 204 ? answer.headers.find(([name]) => name.toLowerCase() === ASSET_MARKER)?.[1] : undefined;
+  if (!marker) return undefined;
+  return (async () => {
+    let url: URL;
+    try {
+      url = new URL(marker);
+    } catch {
+      return new Response("Bad Gateway", { status: 502 });
+    }
+    if (url.protocol !== "https:") return new Response("Bad Gateway", { status: 502 });
+    const headers = new Headers({ "Accept-Encoding": "identity" });
+    for (const [name, value] of request.headers) {
+      const lower = name.toLowerCase();
+      if (lower === "range" || lower === "user-agent") headers.set(lower, value);
+    }
+    if (!headers.has("user-agent")) headers.set("User-Agent", "mistgate-edge");
+    let upstream: Response;
+    try {
+      upstream = await fetchUpstream(url, { method: request.method === "HEAD" ? "HEAD" : "GET", headers, redirect: "follow" });
+    } catch (error) {
+      console.error("asset fetch failed:", error instanceof Error ? error.message : String(error));
+      return new Response("Bad Gateway", { status: 502 });
+    }
+    if (upstream.status !== 200 && upstream.status !== 206) {
+      await upstream.body?.cancel();
+      return upstream.status === 416 ? new Response(null, { status: 416, headers: contentRangeOf(upstream) }) : new Response("Bad Gateway", { status: 502 });
+    }
+    const out = contentRangeOf(upstream);
+    for (const name of ["Content-Length", "Accept-Ranges"]) {
+      const value = upstream.headers.get(name);
+      if (value !== null) out.set(name, value);
+    }
+    out.set("Content-Type", "application/octet-stream");
+    out.set("Cache-Control", "no-store, no-transform");
+    // The body is the upstream stream itself; "manual": the runtime must not encode it again.
+    return new Response(upstream.body, { status: upstream.status, headers: out, encodeBody: "manual" });
+  })();
+}
+
+function contentRangeOf(upstream: Response): Headers {
+  const out = new Headers();
+  const range = upstream.headers.get("Content-Range");
+  if (range !== null) out.set("Content-Range", range);
+  return out;
+}
+
 /**
  * Reads one file of the SPA build from the Workers static assets, for the panel's `assets` init option. A path that is
  * not an exact 200 hit (missing, redirected) is null. Errors reject: the panel treats them as a failed read, not as a
@@ -119,6 +178,19 @@ export async function askNode(
     return { reply };
   } catch (error) {
     return { error: error instanceof Error && error.message === "timeout" ? "timeout" : "lost" };
+  }
+}
+
+/**
+ * Sends one recorded request frame to the node's session and does not wait for the node (NodeLink.send). Never rejects: an
+ * object that cannot be reached is "not sent", which the Go side maps to an offline node.
+ */
+export async function sendNode(ns: DurableObjectNamespace<NodeLink>, nodeId: string, requestId: string, frame: Uint8Array, deadlineAt: number): Promise<boolean> {
+  try {
+    return (await ns.get(ns.idFromName(nodeId)).send(requestId, frame, deadlineAt)) === true;
+  } catch (error) {
+    console.error("node send failed:", error instanceof Error ? error.message : String(error));
+    return false;
   }
 }
 

@@ -637,6 +637,91 @@ describe("NodeLink ask guards", () => {
     expect(c.inbox).not.toContain("two");
   });
 });
+describe("NodeLink send", () => {
+  const echo = () => script({ step: ({ event }) => ({ state: event.kind, frames: event.kind === "request" ? [event.frame] : [] }) });
+
+  it("is false with no session, and steps nothing", async () => {
+    const fake = echo();
+    const id = newNode();
+    expect(await stubFor(id).send("s-none", text("x"), Date.now() + 5_000)).toBe(false);
+    expect(steps(fake)).toEqual([]);
+  });
+
+  it("puts the frame on the open session's socket as a recorded request, and does not wait for a reply", async () => {
+    const fake = echo();
+    const id = newNode();
+    const c = await login(id);
+    expect(await stubFor(id).send("s-1", text("update"), Date.now() + 5_000)).toBe(true);
+    await c.until(() => c.inbox.includes("update"), "the request frame");
+    const request = steps(fake).find((s) => (s.args as LinkStepIn).event.kind === "request")?.args as LinkStepIn;
+    expect(request.event).toMatchObject({ kind: "request", requestId: "s-1", record: true });
+    expect(await alarmOf(id)).toBeNull(); // nothing waits: no timer or alarm is left for the reply
+  });
+
+  it("is false when the step refuses the request (a null reply for its id), and when the step closes the session", async () => {
+    script({
+      step: ({ event }) =>
+        event.kind === "request" && event.requestId === "s-refused"
+          ? { state: "r", frames: [], replies: [{ requestId: "s-refused", frame: null }] }
+          : event.kind === "request" && event.requestId === "s-close"
+            ? { state: "c", frames: [], close: { code: 4001, reason: "stop" } }
+            : defaultPanel().step({ state: null, nodeId: "", until: 0, event }),
+    });
+    const id = newNode();
+    const c = await login(id);
+    expect(await stubFor(id).send("s-refused", text("no"), Date.now() + 5_000)).toBe(false);
+    expect(c.inbox).not.toContain("no");
+    expect(await stubFor(id).send("s-close", text("bye"), Date.now() + 5_000)).toBe(false);
+  });
+
+  it("is false when the step fails", async () => {
+    script({ step: ({ event }) => (event.kind === "request" ? Promise.reject(new Error("go failed")) : defaultPanel().step({ state: null, nodeId: "", until: 0, event })) });
+    const id = newNode();
+    const c = await login(id);
+    expect(await stubFor(id).send("s-fail", text("x"), Date.now() + 5_000)).toBe(false);
+    expect(c.inbox).not.toContain("x");
+  });
+
+  it("is false past its deadline, also when the deadline passed while it waited behind a slow step, and steps nothing", async () => {
+    const fake = script({
+      step: async (input) => {
+        if (input.event.kind === "frame" && str(input.event.frame) === "slow") await sleep(300);
+        return defaultPanel().step(input);
+      },
+    });
+    const id = newNode();
+    const c = await login(id);
+    expect(await stubFor(id).send("s-old", text("old"), Date.now() - 1)).toBe(false);
+    c.send("slow");
+    await sleep(50);
+    expect(await stubFor(id).send("s-late", text("late"), Date.now() + 100)).toBe(false);
+    await sleep(50);
+    expect(c.inbox).not.toContain("old");
+    expect(c.inbox).not.toContain("late");
+    expect(seen(fake)).toEqual(["open", "frame:slow"]);
+  });
+
+  it("keeps arrival order with an ask in flight", async () => {
+    const fake = script({
+      step: async (input) => {
+        if (input.event.kind === "frame" && str(input.event.frame) === "slow") await sleep(200);
+        return defaultPanel().step(input);
+      },
+    });
+    const id = newNode();
+    const c = await login(id);
+    c.send("slow");
+    await sleep(50);
+    const asked = stubFor(id).ask("r-order", text("asked"), Date.now() + 1_500);
+    asked.catch(() => {}); // it is never answered: it ends with its own timeout
+    const sent = stubFor(id).send("s-order", text("sent"), Date.now() + 5_000);
+    expect(await sent).toBe(true);
+    await c.until(() => c.inbox.includes("sent"), "the sent frame");
+    expect(c.inbox.slice(-2)).toEqual(["asked", "sent"]);
+    expect(seen(fake)).toEqual(["open", "frame:slow", "request", "request"]);
+    await expect(asked).rejects.toThrow("timeout");
+  });
+});
 describe("the front door forward", () => {
   const fetchFront = (url: string, init?: RequestInit) => (exports as unknown as { default: Fetcher }).default.fetch(url, init);
 

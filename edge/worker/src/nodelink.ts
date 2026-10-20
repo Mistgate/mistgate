@@ -273,6 +273,25 @@ export class NodeLink extends DurableObject<NodeLinkEnv> {
     }
   }
 
+  /**
+   * Sends a request frame as a recorded request and does not wait for the node: its answer reaches the Go side as a later
+   * session step, which stores it itself (the cron that sends cannot wait for a download). true = the frame went out on the
+   * open session; false = it did not (no session, deadline passed, the step failed or refused the request). Never rejects.
+   */
+  async send(requestId: string, frame: Uint8Array, deadlineAt: number): Promise<boolean> {
+    if (deadlineAt <= Date.now()) return false;
+    const sent = await this.serial(async () => {
+      if (deadlineAt <= Date.now()) return false; // it waited behind a slow step: a request is never sent after its deadline
+      const ws = this.liveSocket();
+      if (!ws) return false;
+      const out = await this.run(ws, { kind: "request", at: Date.now(), requestId, frame, deadlineAt, record: true });
+      await this.arm();
+      // A refused or expired request comes back as a null reply for its id, and a step that closes the session sent nothing useful.
+      return out !== undefined && !out.close && !out.replies?.some((r) => r.requestId === requestId);
+    });
+    return sent === true;
+  }
+
   /** Closes the open session's socket (re-enrolment). */
   async close(code: number, reason: string): Promise<void> {
     await this.serial(async () => {
