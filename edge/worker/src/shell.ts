@@ -78,6 +78,8 @@ export function forwardLink(ns: DurableObjectNamespace<NodeLink>, request: Reque
   return ns.get(ns.idFromName(id)).fetch(request);
 }
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
 /** The header of the panel's answer to a node update download (fleet.AssetMarkerHeader): the release asset's URL. */
 export const ASSET_MARKER = "x-mistgate-asset";
 
@@ -100,7 +102,8 @@ export function forwardAsset(request: FetchRequest, answer: FetchResponse, fetch
     } catch {
       return new Response("Bad Gateway", { status: 502 });
     }
-    if (url.protocol !== "https:") return new Response("Bad Gateway", { status: 502 });
+    // https only; plain http just for a loopback host, where the e2e's fake release lives (no Cloudflare edge reaches a loopback)
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname))) return new Response("Bad Gateway", { status: 502 });
     const headers = new Headers({ "Accept-Encoding": "identity" });
     for (const [name, value] of request.headers) {
       const lower = name.toLowerCase();

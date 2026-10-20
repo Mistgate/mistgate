@@ -402,6 +402,19 @@ describe("forwardAsset", () => {
     }
   });
 
+  it("fetches a loopback http marker (the e2e's fake release) but no other http host", async () => {
+    for (const ok of ["http://127.0.0.1:8123/v1.2.3/f", "http://localhost/v1.2.3/f", "http://[::1]:9/v1.2.3/f"]) {
+      const fetchUpstream = upstream(new Response("x", { headers: { "Content-Length": "1" } }));
+      expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, ok]]), fetchUpstream))!.status, ok).toBe(200);
+      expect(fetchUpstream).toHaveBeenCalledOnce();
+    }
+    for (const bad of ["http://127.0.0.1.example.com/a", "http://10.0.0.1/a", "http://github.com/a"]) {
+      const fetchUpstream = upstream(new Response("x"));
+      expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, bad]]), fetchUpstream))!.status, bad).toBe(502);
+      expect(fetchUpstream).not.toHaveBeenCalled();
+    }
+  });
+
   it("does not fetch a marker that is not an https URL", async () => {
     for (const bad of ["http://github.com/a", "file:///etc/passwd", "not a url"]) {
       const fetchUpstream = upstream(new Response("x"));
