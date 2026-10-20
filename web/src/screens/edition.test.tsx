@@ -7,6 +7,7 @@ import { EditionNotice } from "@/components/edition-notice";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { editionFeatures } from "@/i18n/edition";
 import { en } from "@/i18n/en";
@@ -27,7 +28,9 @@ import { UpdatesScreen } from "@/screens/updates";
 // hides the buttons that would start it; the VPS edition is untouched. One mocked panel for all the screens.
 
 let edition = "edge";
-const unavailable = () => (edition === "edge" ? [...editionFeatures] : []);
+let lacking: string[] = [...editionFeatures]; // what the edge lists as unavailable
+const unavailable = () => (edition === "edge" ? lacking : []);
+let alertsPage: { nowUnix: number; active: unknown[]; history: unknown[] } = { nowUnix: 1000, active: [], history: [] };
 const getBackupSettings = vi.fn();
 const listBackups = vi.fn();
 const getTelegram = vi.fn();
@@ -44,13 +47,13 @@ vi.mock("@/lib/api", () => ({
   nodes: { createEnrollment: (...a: unknown[]) => createEnrollment(...a), getNode: vi.fn(), streamLogs: (...a: unknown[]) => streamLogs(...a) },
   health: {
     runChecksNow: () => Promise.resolve({ scheduled: 1, skipped: 0 }),
-    listAlerts: () => Promise.resolve({ nowUnix: 1000, active: [], history: [] }),
+    listAlerts: () => Promise.resolve(alertsPage),
     getChecks: () => Promise.resolve(checksPage),
   },
   updates: { getUpdates: () => Promise.resolve(updatesPage) },
   // the country check is set up: the one-release pointer "The check from Russia is now in Reachability" would have shown
   countryReach: { getCountryReachability: () => Promise.resolve({ settings: { country: "RU" } }) },
-  fleet: { overview: () => Promise.resolve({ nowUnix: 1000, nodesTotal: 1, nodes: [{ id: "nod_1", name: "de1", status: NodeStatus.ONLINE }], alertsActive: 0, alertsCritical: 0, traffic: [], online: [], events: [], topConsumers: [] }) },
+  fleet: { overview: () => Promise.resolve({ nowUnix: 1000, nodesTotal: 1, nodes: [{ id: "nod_1", name: "de1", status: NodeStatus.ONLINE }], alertsActive: alertsPage.active.length, alertsCritical: 0, traffic: [], online: [], events: [], topConsumers: [] }) },
   users: { listUsers: () => Promise.resolve({ users: [], counts: { all: 1 } }) },
   provisioning: {},
   assetUrl: (p: string) => p,
@@ -76,6 +79,8 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   edition = "edge";
+  lacking = [...editionFeatures];
+  alertsPage = { nowUnix: 1000, active: [], history: [] };
   search = {};
   setLang("en");
   getTelegram.mockResolvedValue({ status: { bot: { configured: false, username: "", error: "" }, links: [], adminUrlKnown: false } });
@@ -294,24 +299,95 @@ describe("Health checks on the edge", () => {
   });
 });
 
-// No checker and no alert evaluator run on the edge (internal/panel/app/edge_tick.go): Health must not say "all quiet" there.
+// The edge evaluates the alerts every minute (internal/panel/app/edge_tick.go) but runs no checker and sends nothing to Telegram yet:
+// Health shows the alerts and "All quiet" as the VPS does, with one line about what is missing.
+const alertOf = (over: Record<string, unknown>) => ({
+  id: "alt_1",
+  severity: AlertSeverity.CRITICAL,
+  kind: AlertKind.NODE_DOWN,
+  nodeId: "nod_1",
+  nodeName: "de1",
+  subject: "",
+  titleKey: "health.alert.node_down.title",
+  whyKey: "health.alert.node_down.why",
+  params: { minutes: "12" },
+  firstSeenUnix: 280,
+  openedUnix: 280,
+  lastSeenUnix: 1000,
+  resolvedAtUnix: 0,
+  resolution: "",
+  mutedUntilUnix: 0,
+  actions: ["open_node", "mute"],
+  ...over,
+});
+const torrentAlert = alertOf({
+  id: "alt_2",
+  severity: AlertSeverity.WARNING,
+  kind: AlertKind.TORRENT,
+  nodeId: "",
+  nodeName: "",
+  subject: "usr_alice",
+  titleKey: "health.alert.torrent.title",
+  whyKey: "health.alert.torrent.why",
+  params: { user_id: "usr_alice", user_name: "alice", nodes: "de1", count: "3", last_unix: "940", evidence: "tracker_connect", ports: "6969" },
+  actions: ["open_user", "mute"],
+});
+
 describe("the Health page on the edge", () => {
-  const edgeAlerts = "Alerts are not raised either, apart from the country check. Node status and the doctor work as usual.";
-  it("claims no check interval and says no alerts are raised in place of All quiet", async () => {
+  const edgeAlerts = `${notice("health_checks")} ${en["hl.alerts.edgeHint"]} ${en["hl.alerts.edgeTelegram"]}`;
+  const edgePeople = `${notice("telegram")} ${en["hl.people.edgeHint"]}`;
+
+  it("says All quiet and that alerts are evaluated every minute, with one line on the checks and Telegram", async () => {
     await mount(<HealthScreen />);
-    expect(text()).toContain("No node problems");
+    expect(text()).toContain("No problems · alerts evaluated every minute");
     expect(text()).not.toContain("checks every");
-    expect(text()).toContain(notice("health_checks"));
     expect(text()).toContain(edgeAlerts);
-    expect(text()).not.toContain("All quiet.");
-    expect(text()).not.toContain("No alert in the last 7 days.");
+    expect(text()).toContain("All quiet.");
+    expect(text()).toContain("No alert in the last 7 days.");
+    expect(document.querySelectorAll('[role="status"]')).toHaveLength(1); // the one notice
   });
 
-  it("says the same on People in place of Nobody has trouble connecting", async () => {
+  it("shows an open alert like the VPS does, and counts it in the line", async () => {
+    alertsPage = { nowUnix: 1000, active: [alertOf({})], history: [] };
+    await mount(<HealthScreen />);
+    expect(text()).toContain("1 problem · alerts evaluated every minute");
+    expect(text()).toContain("Node is unreachable");
+    expect(text()).toContain(edgeAlerts);
+    expect(text()).not.toContain("All quiet.");
+  });
+
+  it("drops the Telegram clause once Telegram works there", async () => {
+    lacking = editionFeatures.filter((f) => f !== "telegram");
+    await mount(<HealthScreen />);
+    expect(text()).toContain(`${notice("health_checks")} ${en["hl.alerts.edgeHint"]}`);
+    expect(text()).not.toContain(en["hl.alerts.edgeTelegram"]);
+  });
+
+  it("says it in Russian and Chinese too", async () => {
+    setLang("ru");
+    await mount(<HealthScreen />);
+    expect(text()).toContain(ru["hl.sum.edgeQuiet"]);
+    expect(text()).toContain(`${ru["hl.alerts.edgeHint"]} ${ru["hl.alerts.edgeTelegram"]}`);
+    act(() => root?.unmount());
+    host?.remove();
+    setLang("zh");
+    await mount(<HealthScreen />);
+    expect(text()).toContain(zh["hl.sum.edgeQuiet"]);
+    expect(text()).toContain(`${zh["hl.alerts.edgeHint"]} ${zh["hl.alerts.edgeTelegram"]}`);
+  });
+
+  it("shows People as the VPS does: the alerts about people need no checker, only Telegram is missing", async () => {
     search = { tab: "people" };
     await mount(<HealthScreen />);
-    expect(text()).toContain(notice("health_checks"));
-    expect(text()).toContain("Alerts about people are not raised either.");
+    expect(text()).toContain(edgePeople);
+    expect(text()).not.toContain(notice("health_checks"));
+    expect(text()).toContain("Nobody has trouble connecting.");
+    act(() => root?.unmount());
+    host?.remove();
+    alertsPage = { nowUnix: 1000, active: [torrentAlert], history: [] };
+    await mount(<HealthScreen />);
+    expect(text()).toContain("Torrent attempts");
+    expect(text()).toContain("alice");
     expect(text()).not.toContain("Nobody has trouble connecting.");
   });
 
@@ -321,8 +397,17 @@ describe("the Health page on the edge", () => {
     expect(text()).toContain("No problems · checks every 5 min");
     expect(text()).toContain("All quiet.");
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
+    expect(text()).not.toContain("evaluated every minute");
     act(() => root?.unmount());
     host?.remove();
+    alertsPage = { nowUnix: 1000, active: [alertOf({})], history: [] };
+    await mount(<HealthScreen />);
+    expect(text()).toContain("1 problem · checks every 5 min");
+    expect(text()).toContain("Node is unreachable");
+    expect(text()).not.toContain("Not available in the Cloudflare edition yet");
+    act(() => root?.unmount());
+    host?.remove();
+    alertsPage = { nowUnix: 1000, active: [], history: [] };
     search = { tab: "people" };
     await mount(<HealthScreen />);
     expect(text()).toContain("Nobody has trouble connecting.");

@@ -5,6 +5,7 @@ import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { editionFeatures } from "@/i18n/edition";
 import { countryQuery } from "@/lib/globalping";
@@ -22,6 +23,7 @@ import { available, panelOffer } from "./dev-kit-redesign";
 
 // Development only (the /dev-kit page): the Cloudflare ("edge") edition. Me says edition "edge" with every feature unavailable,
 // and the screens that carry a feature say so in place of its buttons. Private query caches with demo data, no panel behind them.
+// ?only=edge&tab=people shows the People tab of every Health shot.
 
 const now = Math.floor(Date.now() / 1000);
 const edgeMe = { admin: { id: "adm_1", displayName: "Owner", role: Role.OWNER }, version: "0.1.24", stepUpUntilUnix: 0n, edition: "edge", unavailable: [...editionFeatures] };
@@ -58,11 +60,29 @@ const approvals = { awaiting: 0, nowUnix: now, receivedMs: Date.now(), approvals
 
 // Health with two quiet nodes, no alert and no check result: the same data on both editions (?tab=people etc. switches the tab).
 const fleetNode = (id: string, name: string) => ({ id, name, status: NodeStatus.ONLINE, countryCode: id === "nod_de1" ? "DE" : "NL", sparkBytes: [] });
-const healthSeed: [readonly unknown[], unknown][] = [
-  [overviewQuery().queryKey, { nowUnix: now, nodesTotal: 2, nodesProblem: 0, usersOnline: 3, nodes: [fleetNode("nod_de1", "de1"), fleetNode("nod_nl1", "nl1")], traffic: [], online: [], events: [], topConsumers: [], alertsActive: 0, alertsCritical: 0 }],
+const overview = { nowUnix: now, nodesTotal: 2, nodesProblem: 0, usersOnline: 3, nodes: [fleetNode("nod_de1", "de1"), fleetNode("nod_nl1", "nl1")], traffic: [], online: [], events: [], topConsumers: [], alertsActive: 0, alertsCritical: 0 };
+const healthRest: [readonly unknown[], unknown][] = [
   [userCountQuery.queryKey, { counts: { all: 3 } }],
-  [alertsQuery.queryKey, { nowUnix: now, active: [], history: [] }],
   [checksQuery().queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [] }],
+];
+const healthSeed: [readonly unknown[], unknown][] = [[overviewQuery().queryKey, overview], [alertsQuery.queryKey, { nowUnix: now, active: [], history: [] }], ...healthRest];
+
+// The same with de1 down for 12 minutes and alice turned away by torrent protection (an alert about a person: the People tab).
+const alertBase = { nodeId: "", nodeName: "", subject: "", resolvedAtUnix: 0, resolution: "", mutedUntilUnix: 0, lastSeenUnix: now };
+const nodeDown = {
+  ...alertBase, id: "alt_down", severity: AlertSeverity.CRITICAL, kind: AlertKind.NODE_DOWN, nodeId: "nod_de1", nodeName: "de1",
+  titleKey: "health.alert.node_down.title", whyKey: "health.alert.node_down.why", params: { minutes: "12" },
+  firstSeenUnix: now - 720, openedUnix: now - 720, actions: ["open_node", "mute"],
+};
+const torrent = {
+  ...alertBase, id: "alt_torrent", severity: AlertSeverity.WARNING, kind: AlertKind.TORRENT, subject: "usr_alice",
+  titleKey: "health.alert.torrent.title", whyKey: "health.alert.torrent.why", firstSeenUnix: now - 3600, openedUnix: now - 3600, actions: ["open_user", "mute"],
+  params: { user_id: "usr_alice", user_name: "alice", nodes: "nl1", count: "4", last_unix: String(now - 300), evidence: "tracker_connect", ports: "6969" },
+};
+const downSeed: [readonly unknown[], unknown][] = [
+  [overviewQuery().queryKey, { ...overview, nodesProblem: 1, alertsActive: 1, alertsCritical: 1, nodes: [{ ...fleetNode("nod_de1", "de1"), status: NodeStatus.DOWN }, fleetNode("nod_nl1", "nl1")] }],
+  [alertsQuery.queryKey, { nowUnix: now, active: [nodeDown, torrent], history: [] }],
+  ...healthRest,
 ];
 
 function AddNodeButton() {
@@ -73,10 +93,16 @@ function AddNodeButton() {
 export function EdgeKit() {
   return (
     <div className="relative left-1/2 flex w-[min(calc(100vw-2rem),1040px)] -translate-x-1/2 flex-col gap-8">
-      <Shot id="edge-health" title="Edge: Health (no checker, no alerts: the notice in place of All quiet)" seed={healthSeed}>
+      <Shot id="edge-health" title="Edge: Health, quiet (alerts every minute, one line on the tunnel checks and Telegram)" seed={healthSeed}>
         <HealthScreen />
       </Shot>
-      <Shot id="vps-health" title="VPS: Health, the same data (unchanged)" seed={healthSeed} me={vpsMe}>
+      <Shot id="edge-health-down" title="Edge: Health, de1 down and alice on People" seed={downSeed}>
+        <HealthScreen />
+      </Shot>
+      <Shot id="vps-health" title="VPS: Health, the same quiet data (unchanged)" seed={healthSeed} me={vpsMe}>
+        <HealthScreen />
+      </Shot>
+      <Shot id="vps-health-down" title="VPS: Health, de1 down (unchanged)" seed={downSeed} me={vpsMe}>
         <HealthScreen />
       </Shot>
       <Shot

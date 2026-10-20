@@ -57,7 +57,8 @@ export function useMute() {
 
 /**
  * The alerts about nodes: the alerts about people (access ended, a connection that looks broken) are in the People tab, active or
- * closed. The Cloudflare edition raises none but the country check's, so it says that instead of "All quiet".
+ * closed. The Cloudflare edition evaluates them too, but has no tunnel checks (so none of their alerts) and no Telegram yet: one
+ * line says so above them.
  */
 export function AlertsTab({ active: all, history: closed, now, flow }: { active: Alert[]; history: Alert[]; now: number; flow: FixFlow }) {
   const t = useT();
@@ -65,11 +66,14 @@ export function AlertsTab({ active: all, history: closed, now, flow }: { active:
   const active = all.filter((a) => !isPeopleAlert(a));
   const history = closed.filter((a) => !isPeopleAlert(a));
   const lastClosed = history[0]?.resolvedAtUnix;
-  const noEval = useEdition().off("health_checks");
+  const noTelegram = useEdition().off("telegram");
   return (
     <div className="flex flex-col gap-3.5">
-      <EditionNotice feature="health_checks">{t("hl.alerts.edgeHint")}</EditionNotice>
-      {active.length === 0 && !noEval && (
+      <EditionNotice feature="health_checks">
+        {t("hl.alerts.edgeHint")}
+        {noTelegram && ` ${t("hl.alerts.edgeTelegram")}`}
+      </EditionNotice>
+      {active.length === 0 && (
         <div className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5 text-[13px]">
           <StatusDot kind="ok" />
           <b>{t("hl.alerts.quiet")}</b>

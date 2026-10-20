@@ -49,7 +49,7 @@ export function HealthScreen() {
   const min = Math.max(1, Math.round((checks.data?.intervalS ?? 300) / 60));
   // the number of the header and the menu; the alerts tab counts its own rows
   const problems = problemCount(fleet);
-  // the Cloudflare edition runs no checker: the line keeps what node status says and claims no interval
+  // the Cloudflare edition runs no checker: no check interval, but its alert pass runs every minute (internal/panel/app/edge_tick.go)
   const noChecks = useEdition().off("health_checks");
 
   const header = (sub: string) => (
@@ -121,7 +121,7 @@ export function HealthScreen() {
           ? t("hl.sum.loading")
           : noChecks
             ? problems > 0
-              ? t.n("health.problems", problems)
+              ? t("hl.sum.edgeActive", { problems: t.n("health.problems", problems) })
               : t("hl.sum.edgeQuiet")
             : problems > 0
               ? t("hl.sum.active", { problems: t.n("health.problems", problems), min })
