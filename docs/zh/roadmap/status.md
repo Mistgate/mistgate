@@ -3,22 +3,22 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.48`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.49`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.48
+  meta: v0.1.0 – v0.1.49
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.48
+      release: v0.1.49
       current: true
       points:
-        - "**白俄罗斯等二十多个国家**已加入节点的国家和地区列表（添加节点、SSH 安装和节点设置）。"
-        - "**Cloudflare 版：管理后台不再卡住。** 冷启动若因客户端离开而中断，管理后台 Worker 的某个副本可能一直等待，导致后台无法打开。现在启动会完整执行，请求最多等待 20 秒，下一个请求会重新启动。"
-        - "**Cloudflare 版：国家检测只运行一次**，即使两次每分钟任务重叠。"
+        - "**Ubuntu 上的 AmneziaWG 内核模块不再依赖 Launchpad。** 节点使用 Agent 内置的密钥（与 Launchpad 公布的指纹一致）添加 Amnezia PPA，不再调用 `add-apt-repository`，后者在 IPv6 故障的主机上会超时。参见[准备内核模块](../guide/amneziawg.md#准备内核模块)。"
+        - "**Cloudflare 版：告警可用了。** 节点无法连接、配置漂移、诊断、配额、设备、种子下载等告警每分钟计算一次，并显示在「健康」中；隧道检测和 Telegram 暂不可用。参见[此版本中尚不可用的功能](../getting-started/install-edge.md#此版本中尚不可用的功能)。"
+        - "**Cloudflare 版：丢失登录后可以恢复。** `mistgate edge reset-login` 会输出一次性链接，所有者通过它获得新密码和新的身份验证器。参见[无法登录时](../getting-started/install-edge.md#无法登录时)。"
     - title: 协议配置
       section: profiles
       points:
@@ -78,7 +78,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.48`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.48
+  meta: v0.1.34 – v0.1.49
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
