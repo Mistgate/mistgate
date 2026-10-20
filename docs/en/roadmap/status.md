@@ -3,22 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.47`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.48`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.47
+  meta: v0.1.0 – v0.1.48
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.47
+      release: v0.1.48
       current: true
       points:
-        - "**A failed update gate says which condition failed,** and a node whose WARP-exit profiles have no WARP tunnel after the update now fails it. Before, three different causes showed as one \"did not apply its configuration\". See [One node's update](../operations/updates.md#one-nodes-update)."
-        - "**How often a quota resets is a choice in the user form:** every day, week or month, or never; the card shows the next reset. **Ping in Happ:** a subscription setting that makes Happ ping the servers over TCP and when it opens. See [Quota periods](../guide/users-and-groups.md#quota-periods) and [Names & texts](../guide/subscriptions.md#names-texts)."
-        - "**Cloudflare edition fixes:** Health no longer says all is quiet where no checks run, a doctor action no longer opens an alert that nothing closes, the Updates page has no bundle card, and `mistgate edge deploy` no longer reports a fresh custom domain as unreachable while its DNS record is cached as missing."
+        - "**Belarus and twenty more countries** in the node's country list (Add node, SSH install and the node settings)."
+        - "**Cloudflare edition: the admin no longer hangs.** A cold start cut short by a client who left could leave a copy of the admin Worker waiting for ever, so the admin did not load. Now the start runs to its end, a request waits at most 20 seconds, and the next one starts again."
+        - "**Cloudflare edition: the country check runs once** when two minute ticks overlap."
     - title: Profiles
       section: profiles
       points:
@@ -78,7 +78,7 @@ Mistgate is in **beta**; the current release is `v0.1.47`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.47
+  meta: v0.1.34 – v0.1.48
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
