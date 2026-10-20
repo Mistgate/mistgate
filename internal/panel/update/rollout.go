@@ -17,6 +17,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -84,6 +85,11 @@ func lowerLess(a, b string) bool { return strings.ToLower(a) < strings.ToLower(b
 
 // bundleMatches reports whether the bundle on disk is trusted and is the release the rollout ships.
 func (s *Service) bundleMatches(ro store.RolloutRow) bool {
+	if s.cfg.Edge {
+		manifest, err := release.Parse(ro.Manifest)
+		return err == nil && ro.ToVersion == s.cfg.PanelVersion && manifest.Version == ro.ToVersion &&
+			manifest.Built == ro.ToBuilt && s.now().Unix() <= manifest.Expires
+	}
 	b := s.current()
 	return b != nil && b.trusted && bytes.Equal(b.raw, ro.Manifest)
 }
@@ -182,6 +188,10 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	if s.cfg.Key == nil {
 		return store.RolloutRow{}, precondition("no release key in this build")
 	}
+	var b *bundleState
+	if s.cfg.Edge {
+		b = s.releaseBundle(ctx)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.bundleSyncing {
@@ -190,7 +200,9 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 	if s.panelBusy() {
 		return store.RolloutRow{}, precondition("a panel update is being installed")
 	}
-	b := s.rescan() // what is on disk now is what ships
+	if !s.cfg.Edge {
+		b = s.rescan() // what is on disk now is what ships
+	}
 	if !b.trusted {
 		return store.RolloutRow{}, precondition("no trusted bundle")
 	}
@@ -500,6 +512,7 @@ type pass struct {
 }
 
 func (s *Service) tick(ctx context.Context) {
+	now := s.now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ro, err := s.st.ActiveRollout(ctx)
@@ -525,7 +538,7 @@ func (s *Service) tick(ctx context.Context) {
 	for _, row := range liveRows {
 		live[row.NodeID] = row
 	}
-	p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, live: live, now: s.now()}
+	p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, live: live, now: now}
 	for i := range p.steps {
 		switch p.steps[i].State {
 		case store.StepSent:
@@ -544,6 +557,10 @@ func (s *Service) tick(ctx context.Context) {
 // save writes a step, logging a failure (the next pass sees the old row and tries again).
 func (p *pass) save(x *store.StepRow) bool {
 	if err := p.s.st.SaveStep(p.ctx, x); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			p.s.log.Debug("update: step changed concurrently", "node", x.NodeID)
+			return false
+		}
 		p.s.log.Warn("update: save step", "node", x.NodeID, "err", err)
 		return false
 	}
@@ -551,11 +568,12 @@ func (p *pass) save(x *store.StepRow) bool {
 }
 
 // finish records the outcome of a step.
-func (p *pass) finish(x *store.StepRow, state, key string, params map[string]string) {
+func (p *pass) finish(x *store.StepRow, state, key string, params map[string]string) bool {
 	updated := *x
 	updated.State, updated.ErrorKey, updated.Params, updated.FinishedAt = state, key, params, p.now
+	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = "", time.Time{}, "", ""
 	if !p.save(&updated) {
-		return
+		return false
 	}
 	*x = updated
 	delete(p.s.failing, x.NodeID)
@@ -567,6 +585,14 @@ func (p *pass) finish(x *store.StepRow, state, key string, params map[string]str
 		if err := p.s.st.SetLastUpdateIfNewer(p.ctx, x.NodeID, lu); err != nil {
 			p.s.log.Warn("update: record last update", "node", x.NodeID, "err", err)
 		}
+	}
+	return true
+}
+
+// finishAndPause keeps the VPS handler's historical pause behavior, while an edge pass pauses only after it wins the step CAS.
+func (p *pass) finishAndPause(x *store.StepRow, state, key string, params map[string]string, pauseCode, reason string) {
+	if p.finish(x, state, key, params) || !p.s.cfg.Edge {
+		p.pause(pauseCode, x, reason)
 	}
 }
 
@@ -637,19 +663,32 @@ func (p *pass) advanceSent(i int) {
 	}
 	connected := live.Connected
 	if connected && n.AgentBuilt >= p.ro.ToBuilt {
-		x.State, x.ReconnectedAt = store.StepGating, p.now
-		p.save(x)
+		updated := *x
+		updated.State, updated.ReconnectedAt = store.StepGating, p.now
+		updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = "", time.Time{}, "", ""
+		if p.save(&updated) {
+			*x = updated
+		}
 		return
 	}
 	if connected {
 		if lu, ok := p.recentLast(n, x); ok && lu.Outcome == "rolled_back" {
-			p.finish(x, store.StepRolledBack, errRolledBackAgent, map[string]string{"reason": lu.Reason})
-			p.pause(pauseGateFailed, x, errRolledBackAgent)
+			p.finishAndPause(x, store.StepRolledBack, errRolledBackAgent, map[string]string{"reason": lu.Reason}, pauseGateFailed, errRolledBackAgent)
 			return
 		} else if ok && lu.Outcome == "failed" {
-			p.finish(x, store.StepFailed, errAgentFailed, map[string]string{"reason": lu.Reason})
-			p.pause(pauseStepFailed, x, errAgentFailed)
+			p.finishAndPause(x, store.StepFailed, errAgentFailed, map[string]string{"reason": lu.Reason}, pauseStepFailed, errAgentFailed)
 			return
+		}
+	}
+	if p.s.cfg.Edge && x.Answer != "" && x.AckedAt.IsZero() {
+		var result agentv1.CommandResult
+		if err := protojson.Unmarshal([]byte(x.Answer), &result); err != nil {
+			p.s.log.Warn("update: decode recorded update answer", "node", x.NodeID, "err", err)
+		} else {
+			p.s.applyUpdateAnswer(p, x, &result, nil)
+			if x.State != store.StepSent {
+				return
+			}
 		}
 	}
 	if p.s.inflight[x.NodeID] {
@@ -659,16 +698,14 @@ func (p *pass) advanceSent(i int) {
 	switch {
 	case !x.AckedAt.IsZero():
 		if p.now.After(x.AckedAt.Add(cfg.ReconnectWait)) {
-			p.finish(x, store.StepFailed, errNotReconnected, nil)
-			p.pause(pauseGateFailed, x, errNotReconnected)
+			p.finishAndPause(x, store.StepFailed, errNotReconnected, nil, pauseGateFailed, errNotReconnected)
 		}
 	case p.now.After(x.SentAt.Add(cfg.AnswerWait + cfg.ReconnectWait)):
-		p.finish(x, store.StepFailed, errNoAnswer, nil)
+		pauseCode := pauseGateFailed
 		if p.s.orphans[x.NodeID] { // nobody has been waiting for this answer since the panel restarted
-			p.pause(pausePanelRestart, x, errNoAnswer)
-		} else {
-			p.pause(pauseGateFailed, x, errNoAnswer)
+			pauseCode = pausePanelRestart
 		}
+		p.finishAndPause(x, store.StepFailed, errNoAnswer, nil, pauseCode, errNoAnswer)
 	}
 }
 
@@ -772,6 +809,36 @@ func (s *Service) warpUpSince(ctx context.Context, nodeID string, since time.Tim
 func (p *pass) advanceGate(i int) {
 	x := &p.steps[i]
 	s := p.s
+	if s.cfg.Edge && x.RequestID != "" {
+		gateKey, with := rollbackParams(x.Params)
+		if x.Answer != "" {
+			var result agentv1.CommandResult
+			if err := protojson.Unmarshal([]byte(x.Answer), &result); err != nil {
+				s.log.Warn("update: decode recorded rollback answer", "node", x.NodeID, "err", err)
+			} else {
+				s.applyRollbackAnswer(p, x, gateKey, with, &result, nil)
+				return
+			}
+		}
+		if p.now.Before(x.RequestAt.Add(edgeRollbackTimeout)) {
+			return
+		}
+		n, live, ok := p.node(x)
+		if !ok {
+			return
+		}
+		if live.Connected && n.AgentBuilt < p.ro.ToBuilt {
+			p.finishAndPause(x, store.StepRolledBack, gateKey, with, pauseGateFailed, gateKey)
+		} else {
+			params := make(map[string]string, len(with)+2)
+			for k, v := range with {
+				params[k] = v
+			}
+			params["reason"], params["gate"] = errNoAnswer, gateKey
+			p.finishAndPause(x, store.StepFailed, errRollbackFailed, params, pauseGateFailed, gateKey)
+		}
+		return
+	}
 	if s.inflight[x.NodeID] {
 		return // a RollbackAgent is on its way
 	}
@@ -783,20 +850,17 @@ func (p *pass) advanceGate(i int) {
 	deadline := !p.now.Before(x.ReconnectedAt.Add(s.cfg.GateWait))
 	if connected && n.AgentBuilt < p.ro.ToBuilt { // the old build is running again: it rolled itself back (or the guard did)
 		if lu, ok := p.recentLast(n, x); ok && lu.Outcome == "rolled_back" {
-			p.finish(x, store.StepRolledBack, errRolledBackAgent, map[string]string{"reason": lu.Reason})
-			p.pause(pauseGateFailed, x, errRolledBackAgent)
+			p.finishAndPause(x, store.StepRolledBack, errRolledBackAgent, map[string]string{"reason": lu.Reason}, pauseGateFailed, errRolledBackAgent)
 			return
 		}
 		if deadline {
-			p.finish(x, store.StepFailed, errNotReconnected, nil)
-			p.pause(pauseGateFailed, x, errNotReconnected)
+			p.finishAndPause(x, store.StepFailed, errNotReconnected, nil, pauseGateFailed, errNotReconnected)
 		}
 		return
 	}
 	if !connected { // gone again after coming back with the new build: nothing to roll back over the stream
 		if deadline {
-			p.finish(x, store.StepFailed, errNotReconnected, nil)
-			p.pause(pauseGateFailed, x, errNotReconnected)
+			p.finishAndPause(x, store.StepFailed, errNotReconnected, nil, pauseGateFailed, errNotReconnected)
 		}
 		return
 	}
@@ -810,8 +874,7 @@ func (p *pass) advanceGate(i int) {
 			return
 		}
 		if !live2.Connected {
-			p.finish(x, store.StepFailed, errNotReconnected, nil)
-			p.pause(pauseGateFailed, x, errNotReconnected)
+			p.finishAndPause(x, store.StepFailed, errNotReconnected, nil, pauseGateFailed, errNotReconnected)
 			return
 		}
 		g = p.gate(x, n2, live2.Drift)
@@ -843,6 +906,27 @@ func (p *pass) reread(x *store.StepRow) (store.NodeRow, store.NodeLiveRow, bool)
 // the rollout pauses.
 func (p *pass) failGate(x *store.StepRow, key string, with map[string]string) {
 	s := p.s
+	if s.cfg.Edge {
+		updated := *x
+		updated.RequestID = store.NewID("req_")
+		updated.RequestAt = p.now
+		updated.Answer = ""
+		updated.DownloadSHA = ""
+		params := make(map[string]string, len(with)+1)
+		for k, v := range with {
+			params[k] = v
+		}
+		params["gate"] = key
+		updated.Params = params
+		if !p.save(&updated) {
+			return
+		}
+		*x = updated
+		if err := s.fl.SendRollbackAgent(p.ctx, x.NodeID, x.RequestID, x.RequestAt.Add(edgeRollbackTimeout)); err != nil {
+			s.applyRollbackAnswer(p, x, key, with, nil, err)
+		}
+		return
+	}
 	s.inflight[x.NodeID] = true
 	rolloutID, nodeID, runCtx := p.ro.ID, x.NodeID, s.runCtx
 	s.wg.Add(1)
@@ -864,14 +948,18 @@ func (s *Service) onRollbackDone(rolloutID, nodeID, gateKey string, with map[str
 		return
 	}
 	defer s.settled(ctx, p)
+	s.applyRollbackAnswer(p, x, gateKey, with, res, err)
+}
+
+// applyRollbackAnswer contains the shared outcome handling for the VPS reply goroutine and an edge tick's recorded reply.
+func (s *Service) applyRollbackAnswer(p *pass, x *store.StepRow, gateKey string, with map[string]string, res *agentv1.CommandResult, err error) {
 	params := map[string]string{}
 	for k, v := range with {
 		params[k] = v
 	}
 	switch {
 	case err == nil && res.Ok:
-		p.finish(x, store.StepRolledBack, gateKey, params)
-		p.pause(pauseGateFailed, x, gateKey)
+		p.finishAndPause(x, store.StepRolledBack, gateKey, params, pauseGateFailed, gateKey)
 	default: // the node could not be rolled back (no_previous, gone): it needs a look
 		if err != nil {
 			params["reason"] = errText(err)
@@ -879,9 +967,19 @@ func (s *Service) onRollbackDone(rolloutID, nodeID, gateKey string, with map[str
 			params["reason"] = agentCode(res.Error)
 		}
 		params["gate"] = gateKey
-		p.finish(x, store.StepFailed, errRollbackFailed, params)
-		p.pause(pauseGateFailed, x, gateKey)
+		p.finishAndPause(x, store.StepFailed, errRollbackFailed, params, pauseGateFailed, gateKey)
 	}
+}
+
+func rollbackParams(params map[string]string) (string, map[string]string) {
+	gate := params["gate"]
+	with := make(map[string]string, len(params))
+	for k, v := range params {
+		if k != "gate" {
+			with[k] = v
+		}
+	}
+	return gate, with
 }
 
 // settled runs after a command goroutine recorded its result (the lock is held): the rollout may be over, the
@@ -968,7 +1066,7 @@ func (p *pass) launch() {
 		case !live.Connected:
 			p.finish(x, store.StepSkipped, errOffline, nil)
 			continue
-		case !slices.Contains(live.AgentCaps, capUpdate):
+		case !slices.Contains(live.AgentCaps, s.updateCap()):
 			p.finish(x, store.StepSkipped, errUnsupported, nil)
 			continue
 		case n.AgentBuilt >= p.ro.ToBuilt:
@@ -982,14 +1080,12 @@ func (p *pass) launch() {
 // send marks the step SENT (with the inbounds that are FAILED right now) and hands the command to its goroutine.
 func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 	s := p.s
-	if in, err := s.st.FleetInbounds(p.ctx, x.NodeID, true); err == nil {
-		x.PreFailed = nil
-		for _, i := range in {
-			if i.State == "failed" {
-				x.PreFailed = append(x.PreFailed, i.ID)
-			}
-		}
+	preFailed := p.preFailed(x)
+	if s.cfg.Edge {
+		p.sendLink(x, n, preFailed)
+		return
 	}
+	x.PreFailed = preFailed
 	x.State, x.SentAt, x.FromVersion, x.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	p.save(x)
 	delete(s.orphans, x.NodeID)
@@ -1007,6 +1103,49 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 	}()
 }
 
+func (p *pass) preFailed(x *store.StepRow) []string {
+	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
+	if err != nil {
+		return x.PreFailed
+	}
+	var preFailed []string
+	for _, inbound := range in {
+		if inbound.State == "failed" {
+			preFailed = append(preFailed, inbound.ID)
+		}
+	}
+	return preFailed
+}
+
+func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
+	s := p.s
+	token, digest, err := newDownloadToken()
+	if err != nil {
+		s.log.Warn("update: create link download token", "node", x.NodeID, "err", err)
+		return
+	}
+	updated := *x
+	updated.PreFailed = preFailed
+	updated.State, updated.SentAt, updated.FromVersion, updated.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
+	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = store.NewID("req_"), p.now, "", digest
+	ok, err := s.st.MarkStepSent(p.ctx, &updated)
+	if err != nil {
+		s.log.Warn("update: mark link update sent", "node", x.NodeID, "err", err)
+		return
+	}
+	if !ok {
+		return // the rollout was cancelled or another tick already changed the pending row
+	}
+	*x = updated
+	s.setUpdatingAdd(x.NodeID)
+	deadline := p.now.Add(s.cfg.AnswerWait + s.cfg.ReconnectWait)
+	if err := s.fl.SendUpdateAgent(p.ctx, x.NodeID, x.RequestID, p.ro.Manifest, p.ro.Signature, token, deadline); err != nil {
+		if !p.finish(x, store.StepSkipped, errOffline, nil) {
+			return // a recorded answer or another tick won the step CAS
+		}
+	}
+}
+
 func (s *Service) setUpdatingAdd(nodeID string) {
 	s.updMu.Lock()
 	s.updating[nodeID] = true
@@ -1022,6 +1161,11 @@ func (s *Service) onUpdateAnswer(rolloutID, nodeID string, res *agentv1.CommandR
 		return
 	}
 	defer s.settled(ctx, p)
+	s.applyUpdateAnswer(p, x, res, err)
+}
+
+// applyUpdateAnswer contains the shared outcome handling for the VPS reply goroutine and an edge tick's recorded reply.
+func (s *Service) applyUpdateAnswer(p *pass, x *store.StepRow, res *agentv1.CommandResult, err error) {
 	switch {
 	case err != nil:
 		switch connect.CodeOf(err) {
@@ -1033,19 +1177,18 @@ func (s *Service) onUpdateAnswer(rolloutID, nodeID string, res *agentv1.CommandR
 			}
 			p.finish(x, store.StepSkipped, key, nil)
 		case connect.CodeDeadlineExceeded: // no answer in AnswerWait: the node may still have updated; look before judging
-			n, nodeErr := s.st.Node(ctx, x.NodeID)
+			n, nodeErr := s.st.Node(p.ctx, x.NodeID)
 			if nodeErr != nil {
 				return // the next pass can decide with a fresh node row
 			}
-			live, liveErr := s.fl.NodeLive(ctx, x.NodeID)
+			live, liveErr := s.fl.NodeLive(p.ctx, x.NodeID)
 			if liveErr != nil {
 				return // the next pass can decide with a fresh projection
 			}
 			if live.Connected && n.AgentBuilt >= p.ro.ToBuilt {
 				return
 			}
-			p.finish(x, store.StepFailed, errNoAnswer, nil)
-			p.pause(pauseGateFailed, x, errNoAnswer)
+			p.finishAndPause(x, store.StepFailed, errNoAnswer, nil, pauseGateFailed, errNoAnswer)
 		default: // the link dropped after the send, or shutdown: the pass decides from what it sees
 			return
 		}
@@ -1055,8 +1198,7 @@ func (s *Service) onUpdateAnswer(rolloutID, nodeID string, res *agentv1.CommandR
 		if code == "failed" && res.Error != "" {
 			params["detail"] = store.Clip(res.Error, 200)
 		}
-		p.finish(x, store.StepFailed, code, params)
-		p.pause(pauseStepFailed, x, code)
+		p.finishAndPause(x, store.StepFailed, code, params, pauseStepFailed, code)
 	case res.Params["noop"] == "1":
 		p.finish(x, store.StepSkipped, errUpToDate, nil)
 	default:
@@ -1130,14 +1272,13 @@ func (s *Service) rollbackNode(ctx context.Context, nodeID string) (nodeView, er
 			p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, now: s.now()}
 			for i := range steps {
 				if steps[i].NodeID == nodeID && (steps[i].State == store.StepSent || steps[i].State == store.StepGating || steps[i].State == store.StepPassed) {
-					p.finish(&steps[i], store.StepRolledBack, errManual, nil)
-					p.pause(pauseOwner, &steps[i], errManual)
+					p.finishAndPause(&steps[i], store.StepRolledBack, errManual, nil, pauseOwner, errManual)
 				}
 			}
 		}
 	}
 	s.loadUpdating(ctx)
-	views, err := s.nodes(ctx, s.current(), nil)
+	views, err := s.nodes(ctx, s.bundleFor(ctx), nil)
 	if err != nil {
 		return nodeView{}, s.internal("list nodes", err)
 	}

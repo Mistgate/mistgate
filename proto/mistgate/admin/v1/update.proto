@@ -121,13 +121,15 @@ message Bundle {
   int64 built = 3 [jstype = JS_NUMBER];
   int64 expires_unix = 4 [jstype = JS_NUMBER];
   repeated BundleFile files = 5;
-  // Set for MISSING and UNTRUSTED. Codes: no_manifest, no_signature, bad_manifest, bad_signature, file_missing,
-  // file_mismatch, expired, unsupported_schema.
+  // Set for MISSING and UNTRUSTED. Codes: no_manifest, no_signature, no_release, release_unreachable, bad_manifest,
+  // bad_signature, file_missing, file_mismatch, expired, unsupported_schema.
   string error_key = 6;
   // {file: name} for file_missing / file_mismatch.
   map<string, string> params = 7;
   // When the directory was last read.
   int64 scanned_unix = 8 [jstype = JS_NUMBER];
+  // For an edge build, the base URL of this panel's signed node release (ending in <version>/).
+  string download_base = 9;
 }
 
 // ---------------------------------------------------------------------------------------------------

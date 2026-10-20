@@ -77,7 +77,7 @@ func (r rpc) rolloutResp(ctx context.Context, ro store.RolloutRow) (*adminv1.Rol
 
 func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdatesRequest]) (*connect.Response[adminv1.GetUpdatesResponse], error) {
 	s := r.s
-	b := s.current()
+	b := s.bundleFor(ctx)
 	resp := &adminv1.GetUpdatesResponse{NowUnix: s.now().Unix(), Bundle: b.view, Panel: &adminv1.PanelBuild{
 		Version: s.cfg.PanelVersion, Built: s.cfg.PanelBuilt, HasReleaseKey: s.cfg.Key != nil}}
 	offset, err := s.scheduleTimezoneOffset(ctx)
@@ -308,7 +308,12 @@ func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.Rescan
 	if err := r.s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	b := r.s.rescan()
+	var b *bundleState
+	if r.s.cfg.Edge {
+		b = r.s.refreshReleaseBundle(ctx)
+	} else {
+		b = r.s.rescan()
+	}
 	r.s.audit(ctx, "update_rescan", map[string]string{"status": b.view.Status.String()})
 	return connect.NewResponse(&adminv1.RescanBundleResponse{Bundle: b.view}), nil
 }

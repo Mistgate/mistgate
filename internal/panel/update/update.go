@@ -103,7 +103,7 @@ type Config struct {
 	// NodeBundleSource polls the official GitHub release for a bundle signed by this installation's release key.
 	// A trusted newer bundle is installed into dist and made available for owner-triggered node updates.
 	NodeBundleSource NodeBundleSource
-	// Edge is the edge edition: no node bundle, rollout or panel self-update there yet, so the RPCs that start one refuse.
+	// Edge uses the panel's own signed release and link-only commands for node updates. RPC availability is edition policy.
 	Edge bool
 	// StepUp is auth.Service.RequireStepUp: every change calls it first. Required.
 	StepUp func(context.Context) error
@@ -129,6 +129,9 @@ type Service struct {
 	hashes map[string]hashEntry
 	serves int // concurrent downloads, guarded by bmu
 
+	releaseCacheUntil time.Time
+	edgeBundle        *bundleState
+
 	mu              sync.Mutex // serialises every change of a rollout: the worker pass and the admin calls
 	panelInstalling bool       // an InstallPanelUpdate call is running (afterwards PanelUpdater.Status().Installing holds)
 	bundleSyncing   bool
@@ -138,8 +141,10 @@ type Service struct {
 	orphans         map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
 	failing         map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
 
-	updMu    sync.RWMutex
-	updating map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
+	updMu             sync.RWMutex
+	updating          map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
+	updatingCheckedAt time.Time
+	updRefreshMu      sync.Mutex
 
 	wake chan struct{}
 }
@@ -260,14 +265,45 @@ func (s *Service) auditAs(ctx context.Context, actor, action string, params map[
 
 // Updating is fleet.Updates.Updating: a SENT or GATING step of an active rollout exists for the node.
 func (s *Service) Updating(nodeID string) bool {
+	if s.cfg.Edge {
+		s.refreshUpdatingIfStale()
+	}
 	s.updMu.RLock()
 	defer s.updMu.RUnlock()
 	return s.updating[nodeID]
 }
 
+func (s *Service) refreshUpdatingIfStale() {
+	now := s.now()
+	s.updMu.RLock()
+	checkedAt := s.updatingCheckedAt
+	s.updMu.RUnlock()
+	if !checkedAt.IsZero() && !now.Before(checkedAt) && now.Sub(checkedAt) < updatingTTL {
+		return
+	}
+	if !s.updRefreshMu.TryLock() {
+		return
+	}
+	defer s.updRefreshMu.Unlock()
+
+	s.updMu.Lock()
+	checkedAt = s.updatingCheckedAt
+	if !checkedAt.IsZero() && !now.Before(checkedAt) && now.Sub(checkedAt) < updatingTTL {
+		s.updMu.Unlock()
+		return
+	}
+	s.updatingCheckedAt = now // throttle repeated lookups if D1 is unavailable
+	s.updMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	s.loadUpdating(ctx)
+}
+
 func (s *Service) setUpdating(ids map[string]bool) {
 	s.updMu.Lock()
 	s.updating = ids
+	s.updatingCheckedAt = s.now()
 	s.updMu.Unlock()
 }
 
@@ -275,6 +311,9 @@ func (s *Service) setUpdating(ids map[string]bool) {
 func (s *Service) loadUpdating(ctx context.Context) {
 	ro, err := s.st.ActiveRollout(ctx)
 	if err != nil {
+		if s.cfg.Edge && !errors.Is(err, store.ErrNotFound) {
+			return
+		}
 		s.setUpdating(map[string]bool{})
 		return
 	}

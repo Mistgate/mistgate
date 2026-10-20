@@ -586,13 +586,15 @@ type Bundle struct {
 	Built       int64         `protobuf:"varint,3,opt,name=built,proto3" json:"built,omitempty"`
 	ExpiresUnix int64         `protobuf:"varint,4,opt,name=expires_unix,json=expiresUnix,proto3" json:"expires_unix,omitempty"`
 	Files       []*BundleFile `protobuf:"bytes,5,rep,name=files,proto3" json:"files,omitempty"`
-	// Set for MISSING and UNTRUSTED. Codes: no_manifest, no_signature, bad_manifest, bad_signature, file_missing,
-	// file_mismatch, expired, unsupported_schema.
+	// Set for MISSING and UNTRUSTED. Codes: no_manifest, no_signature, no_release, release_unreachable, bad_manifest,
+	// bad_signature, file_missing, file_mismatch, expired, unsupported_schema.
 	ErrorKey string `protobuf:"bytes,6,opt,name=error_key,json=errorKey,proto3" json:"error_key,omitempty"`
 	// {file: name} for file_missing / file_mismatch.
 	Params map[string]string `protobuf:"bytes,7,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// When the directory was last read.
-	ScannedUnix   int64 `protobuf:"varint,8,opt,name=scanned_unix,json=scannedUnix,proto3" json:"scanned_unix,omitempty"`
+	ScannedUnix int64 `protobuf:"varint,8,opt,name=scanned_unix,json=scannedUnix,proto3" json:"scanned_unix,omitempty"`
+	// For an edge build, the base URL of this panel's signed node release (ending in <version>/).
+	DownloadBase  string `protobuf:"bytes,9,opt,name=download_base,json=downloadBase,proto3" json:"download_base,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -681,6 +683,13 @@ func (x *Bundle) GetScannedUnix() int64 {
 		return x.ScannedUnix
 	}
 	return 0
+}
+
+func (x *Bundle) GetDownloadBase() string {
+	if x != nil {
+		return x.DownloadBase
+	}
+	return ""
 }
 
 // What the node reported in Hello.last_update. outcome is the agent.proto UpdateOutcome name in lowercase:
@@ -2552,7 +2561,7 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x04arch\x18\x02 \x01(\tR\x04arch\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
 	"\x04size\x18\x04 \x01(\x04B\x020\x02R\x04size\x12\x16\n" +
-	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"\x8f\x03\n" +
+	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"\xb4\x03\n" +
 	"\x06Bundle\x127\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x1f.mistgate.admin.v1.BundleStatusR\x06status\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
@@ -2561,7 +2570,8 @@ const file_mistgate_admin_v1_update_proto_rawDesc = "" +
 	"\x05files\x18\x05 \x03(\v2\x1d.mistgate.admin.v1.BundleFileR\x05files\x12\x1b\n" +
 	"\terror_key\x18\x06 \x01(\tR\berrorKey\x12=\n" +
 	"\x06params\x18\a \x03(\v2%.mistgate.admin.v1.Bundle.ParamsEntryR\x06params\x12%\n" +
-	"\fscanned_unix\x18\b \x01(\x03B\x020\x02R\vscannedUnix\x1a9\n" +
+	"\fscanned_unix\x18\b \x01(\x03B\x020\x02R\vscannedUnix\x12#\n" +
+	"\rdownload_base\x18\t \x01(\tR\fdownloadBase\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdf\x01\n" +

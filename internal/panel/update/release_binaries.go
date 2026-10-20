@@ -19,6 +19,8 @@ var releaseDownloadBase = panelReleasePrefix
 
 const releaseMetadataTimeout = 30 * time.Second
 
+var errFetchReleaseMetadata = errors.New("update: release metadata fetch failed")
+
 // ReleaseNodeBinaries is a provision.BinarySource that has no bundle directory (the edge edition has no disk): it streams
 // the node binary of this panel's own release from the release download URLs, so the node needs no route to GitHub.
 // Trust is the compiled-in release key: the manifest must verify under Key, name this exact Version, be unexpired, and
@@ -37,48 +39,24 @@ type ReleaseNodeBinaries struct {
 
 // OpenNodeBinary implements provision.BinarySource. The returned reader streams the binary; nothing is buffered.
 func (r *ReleaseNodeBinaries) OpenNodeBinary(ctx context.Context, goos, goarch string) (io.ReadCloser, int64, string, error) {
-	if len(r.Key) != ed25519.PublicKeySize {
-		return nil, 0, "", errors.New("update: this build has no release key to verify the node bundle")
-	}
-	if !validReleaseTag(r.Version) {
-		return nil, 0, "", fmt.Errorf("update: %q is not a release tag: only a release build can fetch its node binary", r.Version)
-	}
 	client := r.Client
 	if client == nil {
 		client = &http.Client{CheckRedirect: githubReleaseRedirect}
 	}
-	base := r.Base
-	if base == "" {
-		base = releaseDownloadBase
-	}
-	fileURL := func(name string) string { return base + url.PathEscape(r.Version) + "/" + url.PathEscape(name) }
-
-	metaCtx, cancel := context.WithTimeout(ctx, releaseMetadataTimeout)
-	defer cancel()
-	manifestRaw, err := fetchSmall(metaCtx, client, fileURL(release.ManifestName), release.MaxManifestBytes)
+	manifest, _, _, err := fetchReleaseManifest(ctx, r.Key, r.Version, r.Base, client, time.Now())
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("update: fetch the release manifest: %w", err)
-	}
-	sig, err := fetchSmall(metaCtx, client, fileURL(release.SignatureName), ed25519.SignatureSize)
-	if err != nil {
-		return nil, 0, "", fmt.Errorf("update: fetch the release signature: %w", err)
-	}
-	manifest, err := release.Verify(r.Key, manifestRaw, sig)
-	if err != nil {
-		return nil, 0, "", fmt.Errorf("update: verify the release manifest: %w", err)
-	}
-	if manifest.Version != r.Version {
-		return nil, 0, "", fmt.Errorf("update: the manifest is for %q, not %q", manifest.Version, r.Version)
-	}
-	if time.Now().Unix() > manifest.Expires {
-		return nil, 0, "", fmt.Errorf("update: the release manifest: %w", release.ErrExpired)
+		return nil, 0, "", err
 	}
 	entry, err := manifest.FileFor(goos, goarch)
 	if err != nil {
 		return nil, 0, "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL(entry.Name), nil)
+	base := r.Base
+	if base == "" {
+		base = releaseDownloadBase
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releaseFileURL(base, r.Version, entry.Name), nil)
 	if err != nil {
 		return nil, 0, "", err
 	}
@@ -96,6 +74,50 @@ func (r *ReleaseNodeBinaries) OpenNodeBinary(ctx context.Context, goos, goarch s
 		return nil, 0, "", fmt.Errorf("update: the node binary is %d bytes, the manifest says %d: %w", resp.ContentLength, entry.Size, release.ErrSizeMismatch)
 	}
 	return resp.Body, entry.Size, entry.SHA256, nil
+}
+
+// fetchReleaseManifest downloads and verifies the signed manifest of one exact release tag. The edge update service uses
+// the returned manifest as its bundle view; the Provisioner uses the same validation before streaming one binary.
+func fetchReleaseManifest(ctx context.Context, key ed25519.PublicKey, version, base string, client *http.Client, now time.Time) (*release.Manifest, []byte, []byte, error) {
+	if len(key) != ed25519.PublicKeySize {
+		return nil, nil, nil, errors.New("update: this build has no release key to verify the node bundle")
+	}
+	if !validReleaseTag(version) {
+		return nil, nil, nil, fmt.Errorf("update: %q is not a release tag: only a release build can fetch its node binary", version)
+	}
+	if client == nil {
+		client = &http.Client{CheckRedirect: githubReleaseRedirect}
+	}
+	if base == "" {
+		base = releaseDownloadBase
+	}
+	fileURL := func(name string) string { return releaseFileURL(base, version, name) }
+
+	metaCtx, cancel := context.WithTimeout(ctx, releaseMetadataTimeout)
+	defer cancel()
+	manifestRaw, err := fetchSmall(metaCtx, client, fileURL(release.ManifestName), release.MaxManifestBytes)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("update: fetch the release manifest: %w: %w", errFetchReleaseMetadata, err)
+	}
+	sig, err := fetchSmall(metaCtx, client, fileURL(release.SignatureName), ed25519.SignatureSize)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("update: fetch the release signature: %w: %w", errFetchReleaseMetadata, err)
+	}
+	manifest, err := release.Verify(key, manifestRaw, sig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("update: verify the release manifest: %w", err)
+	}
+	if manifest.Version != version {
+		return nil, nil, nil, fmt.Errorf("update: the manifest is for %q, not %q", manifest.Version, version)
+	}
+	if now.Unix() > manifest.Expires {
+		return nil, nil, nil, fmt.Errorf("update: the release manifest: %w", release.ErrExpired)
+	}
+	return manifest, manifestRaw, sig, nil
+}
+
+func releaseFileURL(base, version, name string) string {
+	return base + url.PathEscape(version) + "/" + url.PathEscape(name)
 }
 
 // fetchSmall reads a whole small file that must be at most limit bytes.

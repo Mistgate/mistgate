@@ -104,7 +104,7 @@ func (s *Service) scheduleNodeUpdate(ctx context.Context, nodeID, localDateTime 
 	if scheduledAt.After(now.Add(maximumScheduleLead)) {
 		return store.NodeUpdateScheduleRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("scheduled time cannot be more than one year in the future"))
 	}
-	b := s.current()
+	b := s.bundleFor(ctx)
 	if b == nil || !b.trusted {
 		return store.NodeUpdateScheduleRow{}, precondition("no trusted bundle")
 	}
@@ -146,14 +146,33 @@ func (s *Service) scheduleNodeUpdate(ctx context.Context, nodeID, localDateTime 
 }
 
 func updatableWhenOffline(n nodeView) bool {
-	return n.row.State == "active" && slices.Contains(n.row.AgentCaps, capUpdate)
+	updateCap := n.updateCap
+	if updateCap == "" {
+		updateCap = capUpdate
+	}
+	return updatableWhenOfflineForCap(n, updateCap)
+}
+
+func updatableWhenOfflineForCap(n nodeView, updateCap string) bool {
+	return n.row.State == "active" && slices.Contains(n.row.AgentCaps, updateCap)
 }
 
 func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
+	now := s.now()
 	if s.cfg.Key == nil {
 		return
 	}
-	if n, err := s.st.MarkNodeUpdateSchedulesMissed(ctx, s.now().Add(-scheduleMissAfter), s.now()); err != nil {
+	if s.cfg.Edge {
+		all, err := s.st.NodeUpdateSchedules(ctx)
+		if err != nil {
+			s.log.Warn("update: load node update schedules", "err", err)
+			return
+		}
+		if len(all) == 0 {
+			return
+		}
+	}
+	if n, err := s.st.MarkNodeUpdateSchedulesMissed(ctx, now.Add(-scheduleMissAfter), now); err != nil {
 		s.log.Warn("update: mark missed node update schedules", "err", err)
 	} else if n > 0 {
 		s.log.Info("update: node update schedules missed their window", "count", n)
@@ -170,13 +189,21 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 		s.log.Warn("update: check active rollout before scheduled update", "err", err)
 		return
 	}
-	b := s.current()
-	if b == nil || !b.trusted {
-		return
-	}
-	schedules, err := s.st.DueNodeUpdateSchedules(ctx, s.now())
+	schedules, err := s.st.DueNodeUpdateSchedules(ctx, now)
 	if err != nil {
 		s.log.Warn("update: load due node updates", "err", err)
+		return
+	}
+	if len(schedules) == 0 {
+		return
+	}
+	var b *bundleState
+	if s.cfg.Edge {
+		b = s.releaseBundleAt(ctx, now, false)
+	} else {
+		b = s.current()
+	}
+	if b == nil || !b.trusted {
 		return
 	}
 	for _, schedule := range schedules {
@@ -202,7 +229,7 @@ func (s *Service) processScheduledNodeUpdates(ctx context.Context) {
 			}
 			continue
 		}
-		if !node.connected || !s.fl.HasSession(schedule.NodeID) || !updatable(node.state) {
+		if !node.connected || (!s.cfg.Edge && !s.fl.HasSession(schedule.NodeID)) || !updatable(node.state) {
 			continue
 		}
 		actor := schedule.CreatedBy

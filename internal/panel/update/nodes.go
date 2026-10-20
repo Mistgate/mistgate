@@ -29,6 +29,10 @@ func (s *Service) refBuilt(b *bundleState) int64 {
 
 // nodeState picks the first state whose condition applies. updating: the node has a SENT or GATING step.
 func nodeState(n store.NodeRow, connected, updating bool, ref int64) adminv1.NodeUpdateState {
+	return nodeStateForCap(n, connected, updating, ref, capUpdate)
+}
+
+func nodeStateForCap(n store.NodeRow, connected, updating bool, ref int64, updateCap string) adminv1.NodeUpdateState {
 	lu, hasLast := currentLastUpdate(n)
 	switch {
 	case updating:
@@ -37,7 +41,7 @@ func nodeState(n store.NodeRow, connected, updating bool, ref int64) adminv1.Nod
 		return adminv1.NodeUpdateState_NODE_UPDATE_STATE_OFFLINE
 	case n.AgentBuilt >= ref:
 		return adminv1.NodeUpdateState_NODE_UPDATE_STATE_UP_TO_DATE
-	case !slices.Contains(n.AgentCaps, capUpdate):
+	case !slices.Contains(n.AgentCaps, updateCap):
 		return adminv1.NodeUpdateState_NODE_UPDATE_STATE_UNSUPPORTED
 	case hasLast && lu.Outcome == "rolled_back":
 		return adminv1.NodeUpdateState_NODE_UPDATE_STATE_ROLLED_BACK
@@ -66,6 +70,7 @@ type nodeView struct {
 	inbounds  int    // enabled inbounds
 	online    int    // distinct users online now
 	arch      string // GOARCH from the node's facts; read only for a node that must be updated by hand
+	updateCap string
 }
 
 // nodes lists the active nodes with their update state. steps are those of the active rollout (nil = none).
@@ -83,6 +88,7 @@ func (s *Service) nodes(ctx context.Context, b *bundleState, steps []store.StepR
 		liveByID[live.NodeID] = live
 	}
 	ref := s.refBuilt(b)
+	updateCap := s.updateCap()
 	busy := updatingSet(steps)
 	var out []nodeView
 	for _, n := range rows {
@@ -98,7 +104,7 @@ func (s *Service) nodes(ctx context.Context, b *bundleState, steps []store.StepR
 		if err != nil {
 			return nil, err
 		}
-		v := nodeView{row: n, connected: live.Connected, state: nodeState(n, live.Connected, busy[n.ID], ref), inbounds: len(in), online: len(users)}
+		v := nodeView{row: n, connected: live.Connected, state: nodeStateForCap(n, live.Connected, busy[n.ID], ref, updateCap), inbounds: len(in), online: len(users), updateCap: updateCap}
 		if v.state == adminv1.NodeUpdateState_NODE_UPDATE_STATE_UNSUPPORTED { // the page builds its manual commands from it
 			f, err := s.st.NodeFacts(ctx, n.ID)
 			if err != nil {
@@ -114,7 +120,7 @@ func (s *Service) nodes(ctx context.Context, b *bundleState, steps []store.StepR
 // OutdatedAgents is the version of the release the nodes are compared with (the trusted bundle's, else this panel's own) and
 // the names of the connected nodes that run an older build and could be updated. The Telegram alerts tell it once per version.
 func (s *Service) OutdatedAgents(ctx context.Context) (version string, names []string) {
-	b := s.current()
+	b := s.bundleFor(ctx)
 	version = s.cfg.PanelVersion
 	if b != nil && b.trusted && b.manifest != nil {
 		version = b.manifest.Version
@@ -134,9 +140,13 @@ func (s *Service) OutdatedAgents(ctx context.Context) (version string, names []s
 
 // view is the admin message of a node.
 func (v nodeView) proto() *adminv1.NodeUpdate {
+	updateCap := v.updateCap
+	if updateCap == "" {
+		updateCap = capUpdate
+	}
 	m := &adminv1.NodeUpdate{
 		NodeId: v.row.ID, Name: v.row.Name, Version: v.row.AgentVersion, Built: v.row.AgentBuilt,
-		SupportsUpdate: slices.Contains(v.row.AgentCaps, capUpdate), CrashGuard: slices.Contains(v.row.AgentCaps, capGuard),
+		SupportsUpdate: slices.Contains(v.row.AgentCaps, updateCap), CrashGuard: slices.Contains(v.row.AgentCaps, capGuard),
 		State: v.state, Inbounds: uint32(v.inbounds), OnlineUsers: uint32(v.online), Address: v.row.Address, Arch: v.arch,
 	}
 	if lu, ok := currentLastUpdate(v.row); ok {

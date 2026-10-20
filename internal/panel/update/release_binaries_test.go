@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ type fakeRelease struct {
 	key      ed25519.PublicKey
 	binary   []byte
 	override map[string][]byte
+	requests atomic.Int32
 }
 
 type fakeReleaseOptions struct {
@@ -33,6 +35,7 @@ type fakeReleaseOptions struct {
 	signWith  ed25519.PrivateKey
 	platform  [2]string // os, arch listed in the manifest
 	manifestN int64     // size recorded in the manifest (0: the real one)
+	built     int64
 }
 
 func newFakeRelease(t *testing.T, binary []byte, opts fakeReleaseOptions) *fakeRelease {
@@ -56,12 +59,15 @@ func newFakeRelease(t *testing.T, binary []byte, opts fakeReleaseOptions) *fakeR
 	if opts.signWith == nil {
 		opts.signWith = priv
 	}
+	if opts.built == 0 {
+		opts.built = 1_000
+	}
 	size := int64(len(binary))
 	if opts.manifestN != 0 {
 		size = opts.manifestN
 	}
 	sum := sha256.Sum256(binary)
-	manifest := &release.Manifest{Schema: release.Schema, Version: opts.version, Built: 1_000, Expires: opts.expires,
+	manifest := &release.Manifest{Schema: release.Schema, Version: opts.version, Built: opts.built, Expires: opts.expires,
 		Files: []release.File{{OS: opts.platform[0], Arch: opts.platform[1], Name: "mistgate-node-" + opts.platform[0] + "-" + opts.platform[1],
 			Size: size, SHA256: hex.EncodeToString(sum[:])}}}
 	raw, err := manifest.Marshal()
@@ -75,6 +81,7 @@ func newFakeRelease(t *testing.T, binary []byte, opts fakeReleaseOptions) *fakeR
 		"/" + opts.tag + "/" + manifest.Files[0].Name: binary,
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.requests.Add(1)
 		body, ok := files[r.URL.Path]
 		if o, has := f.override[r.URL.Path]; has {
 			body, ok = o, true

@@ -43,15 +43,19 @@ func (c *clock) Advance(d time.Duration) {
 
 // fakeFleet is the fleet as the updates module sees it: the test plays the nodes.
 type fakeFleet struct {
-	mu        sync.Mutex
-	live      map[string]bool
-	noSession map[string]bool // test-only override for a fresh durable projection after a panel restart
-	liveErr   error
-	caps      map[string][]string
-	drift     map[string]bool
-	online    map[string]int
-	updates   []string // node ids UpdateAgent was sent to, in order
-	rollback  []string
+	mu              sync.Mutex
+	live            map[string]bool
+	noSession       map[string]bool // test-only override for a fresh durable projection after a panel restart
+	liveErr         error
+	caps            map[string][]string
+	drift           map[string]bool
+	online          map[string]int
+	updates         []string // node ids UpdateAgent was sent to, in order
+	rollback        []string
+	sendFrames      []sentUpdateFrame
+	rollbackFrames  []sentRollbackFrame
+	sendUpdateErr   error
+	sendRollbackErr error
 	// onUpdate / onRollback decide the answer; nil = ok. They run in the command goroutine.
 	onUpdate   func(node string) (*agentv1.CommandResult, error)
 	onRollback func(node string) (*agentv1.CommandResult, error)
@@ -164,11 +168,43 @@ func (f *fakeFleet) RollbackAgent(_ context.Context, id string, _ time.Duration)
 	return okResult(), nil
 }
 
-func (f *fakeFleet) SendUpdateAgent(context.Context, string, string, []byte, []byte, string, time.Time) error {
-	return nil
+type sentUpdateFrame struct {
+	nodeID, requestID, token string
+	manifest, signature      []byte
+	deadline                 time.Time
 }
 
-func (f *fakeFleet) SendRollbackAgent(context.Context, string, string, time.Time) error { return nil }
+type sentRollbackFrame struct {
+	nodeID, requestID string
+	deadline          time.Time
+}
+
+func (f *fakeFleet) SendUpdateAgent(_ context.Context, nodeID, requestID string, manifest, signature []byte, token string, deadline time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sendFrames = append(f.sendFrames, sentUpdateFrame{nodeID: nodeID, requestID: requestID, manifest: append([]byte(nil), manifest...),
+		signature: append([]byte(nil), signature...), token: token, deadline: deadline})
+	return f.sendUpdateErr
+}
+
+func (f *fakeFleet) SendRollbackAgent(_ context.Context, nodeID, requestID string, deadline time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.rollbackFrames = append(f.rollbackFrames, sentRollbackFrame{nodeID: nodeID, requestID: requestID, deadline: deadline})
+	return f.sendRollbackErr
+}
+
+func (f *fakeFleet) updateFrames() []sentUpdateFrame {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]sentUpdateFrame(nil), f.sendFrames...)
+}
+
+func (f *fakeFleet) rollbackRequestFrames() []sentRollbackFrame {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]sentRollbackFrame(nil), f.rollbackFrames...)
+}
 
 func (f *fakeFleet) sent() []string {
 	f.mu.Lock()
@@ -268,6 +304,20 @@ func (e *env) newService(key ed25519.PublicKey) *Service {
 	e.t.Helper()
 	s, err := New(e.st, e.fl, e.hl, Config{
 		DataDir: e.dir, Key: key, PanelVersion: "0.2.0-test", PanelBuilt: newBuilt,
+		StepUp: func(ctx context.Context) error { return e.stepUp(ctx) },
+		Actor:  func(context.Context) string { return "adm_test" },
+		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)), Now: e.clk.Now,
+	})
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return s
+}
+
+func (e *env) newEdgeService(key ed25519.PublicKey, version string) *Service {
+	e.t.Helper()
+	s, err := New(e.st, e.fl, nil, Config{
+		Edge: true, Key: key, PanelVersion: version, PanelBuilt: newBuilt,
 		StepUp: func(ctx context.Context) error { return e.stepUp(ctx) },
 		Actor:  func(context.Context) string { return "adm_test" },
 		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)), Now: e.clk.Now,

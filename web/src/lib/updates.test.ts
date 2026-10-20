@@ -91,6 +91,7 @@ const bundle = (status: BundleStatus, over: Partial<NonNullable<Updates["bundle"
   errorKey: "",
   params: {},
   scannedUnix: 0,
+  downloadBase: "",
   ...over,
 });
 const updates = (over: Partial<Updates> = {}): Updates => ({
