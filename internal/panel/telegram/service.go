@@ -43,6 +43,8 @@ const (
 	maxMessage   = 3500
 	maxLinkCodes = 64
 	ipSeenFor    = 30 * 24 * time.Hour
+
+	nodeNameTimeout = 5 * time.Second // the node-name read of an alert message (D1 on the edge)
 )
 
 // Sources are what the periodic watcher asks other modules (wired after they exist; nil = not watched).
@@ -433,6 +435,8 @@ func (s *Service) nodeName(ctx context.Context, id string) string {
 	if id == "" {
 		return ""
 	}
+	ctx, cancel := context.WithTimeout(ctx, nodeNameTimeout) // the callers pass Background: a hung read must not hold them for ever
+	defer cancel()
 	if n, err := s.st.Node(ctx, id); err == nil {
 		return n.Name
 	}

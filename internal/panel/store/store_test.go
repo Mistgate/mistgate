@@ -107,6 +107,31 @@ func TestSettings(t *testing.T) {
 	}
 }
 
+func TestSetSettingIfChangedSkipsUnchangedWrite(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	if _, err := s.W.ExecContext(ctx, `CREATE TABLE setting_change (k TEXT NOT NULL);
+		CREATE TRIGGER setting_change_count AFTER UPDATE OF v ON setting WHEN OLD.k = 'health.node_summary'
+		BEGIN INSERT INTO setting_change (k) VALUES (NEW.k); END;`); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{`{"nod_a":{"total":1}}`, `{"nod_a":{"total":1}}`, `{"nod_a":{"total":2}}`} {
+		if err := s.SetSettingIfChanged(ctx, "health.node_summary", value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var writes int
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM setting_change`).Scan(&writes); err != nil {
+		t.Fatal(err)
+	}
+	if writes != 1 {
+		t.Fatalf("changed setting updates = %d, want 1", writes)
+	}
+	if got, err := s.Setting(ctx, "health.node_summary"); err != nil || got != `{"nod_a":{"total":2}}` {
+		t.Fatalf("stored summary = %q, %v", got, err)
+	}
+}
+
 func TestSetupTokenSingleUse(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()

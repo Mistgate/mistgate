@@ -204,6 +204,14 @@ func (s *Store) Setting(ctx context.Context, key string) (string, error) {
 	return v, err
 }
 
+// SetSettingIfChanged stores a setting only when its value differs. The upsert is one statement so D1 does not need a
+// read before the write, and the conditional update avoids rewriting an unchanged value.
+func (s *Store) SetSettingIfChanged(ctx context.Context, key, value string) error {
+	_, err := s.W.ExecContext(ctx, `INSERT INTO setting (k, v) VALUES (?, ?)
+		ON CONFLICT(k) DO UPDATE SET v = excluded.v WHERE setting.v <> excluded.v`, key, value)
+	return err
+}
+
 // SettingValues returns the stored values among keys. Missing settings are omitted.
 func (s *Store) SettingValues(ctx context.Context, keys []string) (map[string]string, error) {
 	out := make(map[string]string, len(keys))

@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -11,20 +12,29 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // fakeHealth records what the stream hands over and answers what the admin views ask.
 type fakeHealth struct {
-	mu         sync.Mutex
-	reports    []*agentv1.DoctorReport
-	returned   []time.Time
-	noTraffic  bool
-	failed     int
-	total      int
-	doctorFail string
-	active     uint32
-	critical   uint32
+	mu        sync.Mutex
+	reports   []*agentv1.DoctorReport
+	returned  []time.Time
+	summaries map[string]store.NodeHealthSummary
+	reads     int // NodeHealthSummaries calls: on the edge each is a D1 read
+	active    uint32
+	critical  uint32
+}
+
+// setHealth is what the health module says about a node from now on.
+func (h *fakeHealth) setHealth(nodeID string, s store.NodeHealthSummary) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.summaries == nil {
+		h.summaries = map[string]store.NodeHealthSummary{}
+	}
+	h.summaries[nodeID] = s
 }
 
 func mustLive(t *testing.T, e *env) []store.NodeLiveRow {
@@ -38,7 +48,7 @@ func mustLive(t *testing.T, e *env) []store.NodeLiveRow {
 
 func mustStatus(t *testing.T, e *env, nodeID string) adminv1.NodeStatus {
 	t.Helper()
-	return e.f.NodeStatusWithLive(e.ctx, mustNode(e, nodeID), liveRowsByID(mustLive(t, e))[nodeID])
+	return e.f.NodeStatusWithLive(e.ctx, mustNode(e, nodeID), liveRowsByID(mustLive(t, e))[nodeID], e.f.healthSummaries(e.ctx))
 }
 
 func (h *fakeHealth) DoctorReport(_ context.Context, _ string, r *agentv1.DoctorReport) {
@@ -53,10 +63,11 @@ func (h *fakeHealth) NodeReturned(_ context.Context, _ string, silentSince, _ ti
 	h.mu.Unlock()
 }
 
-func (h *fakeHealth) NodeHealth(string) (bool, int, int, string) {
+func (h *fakeHealth) NodeHealthSummaries(context.Context) map[string]store.NodeHealthSummary {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.noTraffic, h.failed, h.total, h.doctorFail
+	h.reads++
+	return maps.Clone(h.summaries)
 }
 
 func (h *fakeHealth) AlertCounts(context.Context) (uint32, uint32) { return h.active, h.critical }
@@ -267,16 +278,12 @@ func TestHealthSeamFeedsStatusAndOverview(t *testing.T) {
 		t.Fatalf("overview: %+v", o)
 	}
 
-	h.mu.Lock()
-	h.doctorFail = "dstate_tasks"
-	h.mu.Unlock()
+	h.setHealth(a.nodeID, store.NodeHealthSummary{DoctorFail: "dstate_tasks"})
 	if st, r := statusOf(); st != adminv1.NodeStatus_NODE_STATUS_ONLINE || r == nil || r.Code != "doctor_fail" || r.Params["check"] != "dstate_tasks" {
 		t.Fatalf("doctor fail: %v %v", st, r)
 	}
 
-	h.mu.Lock()
-	h.noTraffic, h.failed, h.total = true, 2, 2
-	h.mu.Unlock()
+	h.setHealth(a.nodeID, store.NodeHealthSummary{NoTraffic: true, Failed: 2, Total: 2, DoctorFail: "dstate_tasks"})
 	st, r := statusOf()
 	if st != adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC || r.Code != "no_traffic" || r.Params["failed"] != "2" || r.Params["total"] != "2" {
 		t.Fatalf("no traffic: %v %v", st, r)
@@ -301,6 +308,64 @@ func TestHealthSeamFeedsStatusAndOverview(t *testing.T) {
 	e.f.SetHealth(nil) // without Health nothing changes
 	if st, _ := statusOf(); st != adminv1.NodeStatus_NODE_STATUS_ONLINE {
 		t.Fatalf("without health: %v", st)
+	}
+}
+
+// On the edge NodeHealthSummaries is one D1 read, and the Overview is polled every 10 seconds: a request reads it once,
+// whatever the number of nodes, and every node's card and row take their health from that one map.
+func TestHealthSummariesAreReadOncePerRequestWhateverTheNodeCount(t *testing.T) {
+	e := newEnv(t)
+	h := &fakeHealth{}
+	e.f.SetHealth(h)
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	connectFull(a, "inst1")
+	nodes := nodeService{e.f}
+	requests := map[string]func() error{
+		"overview": func() error {
+			_, err := fleetService{e.f}.Overview(e.ctx, connect.NewRequest(&adminv1.OverviewRequest{}))
+			return err
+		},
+		"list nodes": func() error {
+			_, err := nodes.ListNodes(e.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))
+			return err
+		},
+		"get node": func() error {
+			_, err := nodes.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+			return err
+		},
+		"decoy mode": func() error {
+			_, err := nodes.SetNodesDecoyMode(e.ctx, connect.NewRequest(&adminv1.SetNodesDecoyModeRequest{
+				NodeIds: []string{a.nodeID, "nod_b"}, Mode: decoy.ModeBuiltin,
+			}))
+			return err
+		},
+	}
+	readsOf := func(name string) int {
+		t.Helper()
+		h.mu.Lock()
+		h.reads = 0
+		h.mu.Unlock()
+		if err := requests[name](); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return h.reads
+	}
+	for name := range requests {
+		if got := readsOf(name); got != 1 {
+			t.Fatalf("%s with two nodes read the health summaries %d times, want 1", name, got)
+		}
+	}
+	for i := range 6 {
+		e.exec(`INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, 'x.example.com', 'active', ?)`,
+			"nod_x"+string(rune('a'+i)), "nodex"+string(rune('a'+i)), time.Now().Unix())
+	}
+	for name := range requests {
+		if got := readsOf(name); got != 1 {
+			t.Fatalf("%s with eight nodes read the health summaries %d times, want 1", name, got)
+		}
 	}
 }
 

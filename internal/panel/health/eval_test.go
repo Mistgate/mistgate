@@ -1,8 +1,11 @@
 package health
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -992,6 +995,133 @@ func TestStateDriftFollowsTheFleet(t *testing.T) {
 	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor}})
 	e.evaluate()
 	want(t, e.active())
+}
+
+// edgeLease is the D1 lease the Cloudflare edition takes for the evaluator pass (app.EdgeRoundLease), on the test's store.
+func edgeLease(e func() *env) func(context.Context, string, time.Duration) bool {
+	return func(ctx context.Context, name string, ttl time.Duration) bool {
+		taken, err := e().st.TakeLease(ctx, name, store.NewID("lease_"), ttl, time.Now())
+		return err == nil && taken
+	}
+}
+
+// Two edge isolates on one store, both ticking while the first is inside its pass: the lease lets only the first reconcile,
+// so the transition is announced once. Without the lease the second pass opens the alert and the first, resuming with the
+// alerts it read before, opens it again.
+func TestEdgeEvaluatorPassesOfTwoIsolatesAnnounceATransitionOnce(t *testing.T) {
+	var e *env
+	var opened, resolved atomic.Int32
+	edge := func(c *Config) {
+		c.Edge = true
+		c.RoundLease = edgeLease(func() *env { return e })
+		c.OnTransition = func(tr Transition) {
+			if tr.Alert.Kind != kDoctorFail {
+				return
+			}
+			if tr.Resolved {
+				resolved.Add(1)
+			} else {
+				opened.Add(1)
+			}
+		}
+	}
+	e = newEnv(t, edge)
+	a, b := e.s, e.sibling(edge)
+	e.node("de1", "provider", true)
+
+	var gate atomic.Pointer[evalGate]
+	a.AddConditionSource(func(context.Context) []ExtCond { // the first isolate stops inside its pass, after it read the alerts
+		if g := gate.Load(); g != nil {
+			g.once.Do(func() { close(g.entered) })
+			<-g.release
+		}
+		return nil
+	})
+	overlap := func(wantOpened, wantResolved int32) {
+		t.Helper()
+		g := &evalGate{entered: make(chan struct{}), release: make(chan struct{})}
+		gate.Store(g)
+		defer gate.Store(nil)
+		e.exec(`UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'`)
+		ctx, cancel := context.WithTimeout(e.ctx, 30*time.Second)
+		defer cancel()
+		firstDone := make(chan struct{})
+		go func() {
+			defer close(firstDone)
+			a.EvaluateOnce(ctx)
+		}()
+		select {
+		case <-g.entered:
+		case <-time.After(10 * time.Second):
+			g.finish()
+			t.Fatal("the first pass never started")
+		}
+		// the same isolate's next tick must not wait for the pass that is still running
+		again := make(chan struct{})
+		go func() {
+			defer close(again)
+			a.EvaluateOnce(ctx)
+		}()
+		select {
+		case <-again:
+		case <-time.After(5 * time.Second):
+			g.finish()
+			t.Fatal("a second tick of the same isolate waits for the running pass")
+		}
+		b.EvaluateOnce(ctx)
+		g.finish()
+		<-firstDone
+		if got := opened.Load(); got != wantOpened {
+			t.Fatalf("doctor fail opened %d times, want %d", got, wantOpened)
+		}
+		if got := resolved.Load(); got != wantResolved {
+			t.Fatalf("doctor fail resolved %d times, want %d", got, wantResolved)
+		}
+	}
+
+	e.s.DoctorReport(e.ctx, "de1", &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{res("disk_space", dFail, "journald_vacuum")}})
+	overlap(1, 0)
+	want(t, e.active(), "doctor_fail/de1/disk_space")
+	if summary := b.NodeHealthSummaries(e.ctx)["de1"]; summary.DoctorFail != "disk_space" {
+		t.Fatalf("node health summary read by the other isolate = %+v, want doctor_fail=disk_space", summary)
+	}
+
+	e.s.DoctorReport(e.ctx, "de1", &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{res("disk_space", dOK, "")}})
+	overlap(1, 1)
+	want(t, e.active())
+}
+
+// evalGate stops a pass inside the evaluator until release is closed.
+type evalGate struct {
+	once        sync.Once
+	entered     chan struct{}
+	release     chan struct{}
+	releaseOnce sync.Once
+}
+
+func (g *evalGate) finish() { g.releaseOnce.Do(func() { close(g.release) }) }
+
+// The row the admin isolate reads holds only what there is to report: a node without a verdict has no entry, so connects and
+// disconnects of healthy nodes do not rewrite the row.
+func TestEdgeNodeSummaryOmitsNodesWithNothingToReport(t *testing.T) {
+	var e *env
+	e = newEnv(t, func(c *Config) {
+		c.Edge = true
+		c.RoundLease = edgeLease(func() *env { return e })
+	})
+	e.node("quiet", "provider", true)
+	e.node("sick", "provider", true)
+	e.s.DoctorReport(e.ctx, "sick", &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{res("disk_space", dFail, "journald_vacuum")}})
+	ctx, cancel := context.WithTimeout(e.ctx, 30*time.Second)
+	defer cancel()
+	e.s.EvaluateOnce(ctx)
+	raw, err := e.st.Setting(e.ctx, nodeHealthSummarySetting)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"sick":{"no_traffic":false,"failed":0,"total":0,"doctor_fail":"disk_space"}}`; raw != want {
+		t.Fatalf("stored summary = %s, want %s", raw, want)
+	}
 }
 
 func TestRetiredNodeResolvesItsAlerts(t *testing.T) {

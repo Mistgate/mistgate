@@ -135,6 +135,8 @@ type Config struct {
 	SSHClient *nodeprovision.Client
 	// NodeBinaries is where an install gets the agent binary; nil: the update service (the signed bundle on disk).
 	NodeBinaries nodeprovision.BinarySource
+	// OnAlertTransition, when set, sees every alert the health module opens or resolves, besides the Telegram announcement.
+	OnAlertTransition func(health.Transition)
 }
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.

@@ -744,8 +744,8 @@ func countryCond(n store.NodeRow, e countryEvent) cond {
 }
 
 // ReconcileCountry brings the COUNTRY_BLOCKED alerts up to date without the full evaluator, which the Cloudflare edition
-// does not run. The edge calls it after a round and when the integration is switched off; alerts of other kinds are left
-// alone.
+// does not run on the admin isolate. The edge calls it when the integration is switched off (globalping.Config.OnChange);
+// the cron tick's evaluator (EvaluateOnce) derives these alerts itself. Alerts of other kinds are left alone.
 func (s *Service) ReconcileCountry(ctx context.Context) {
 	s.evalMu.Lock()
 	defer s.evalMu.Unlock()

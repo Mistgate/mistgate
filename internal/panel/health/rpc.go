@@ -449,11 +449,12 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 	}
 	resp.Columns = cols
 	var udpRounds []protoRounds
+	healthSummaries := s.NodeHealthSummaries(ctx)
 	for _, n := range sn.nodes {
 		if req.Msg.NodeId != "" && n.ID != req.Msg.NodeId {
 			continue
 		}
-		row := &adminv1.CheckRow{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode, NodeStatus: s.fl.NodeStatusWithLive(ctx, n, live[n.ID]),
+		row := &adminv1.CheckRow{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode, NodeStatus: s.fl.NodeStatusWithLive(ctx, n, live[n.ID], healthSummaries),
 			Cells: make([]*adminv1.CheckCell, len(cols))}
 		for i := range row.Cells {
 			row.Cells[i] = &adminv1.CheckCell{}
@@ -736,8 +737,8 @@ func (s *Service) doctorRow(ctx context.Context, nodeID, checkID string) (store.
 	return n, store.DoctorRow{}, notFound("doctor item")
 }
 
-// nodeView is the doctor state of one node after a change. The edge edition has no alert evaluator to reconcile one-off
-// evaluations, so its doctor actions refresh this view without opening alerts.
+// nodeView is the doctor state of one node after a change. The edge evaluator runs in the jobs isolate, so doctor actions
+// refresh this view without opening alerts in the admin isolate; the next tick reconciles them.
 func (s *Service) nodeView(ctx context.Context, nodeID string) (*adminv1.NodeDoctor, error) {
 	if !s.cfg.Edge {
 		s.evaluate(ctx)

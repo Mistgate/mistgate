@@ -136,9 +136,9 @@ The admin shows "Not available in the Cloudflare edition yet" in the places belo
 | Feature | What is missing |
 |:--|:--|
 | Backups | No encrypted backups and no restore. Cloudflare's own D1 recovery (Time Travel) can restore the database, but it has not been tried with the panel. Keep the key file. |
-| Telegram alerts | No messages are sent. |
+| Alerts and Telegram | Health alerts are evaluated and shown in the panel. Telegram messages are not sent yet. |
 | MCP and API tokens | The MCP server is not served. Tokens you already have are listed and can be revoked; new ones cannot be created. |
-| Tunnel checks | The panel's checks of the servers' tunnels, and the alerts built on them, do not run. |
+| Tunnel checks | The panel does not run client-eye checks of the servers' tunnels. |
 | Updating nodes | The panel does not update node agents: no rollouts, no scheduled updates. |
 | Node logs | The live log of a node's agent is not shown. |
 | Updating the panel | There is no self-update: update by running the command again (below). |

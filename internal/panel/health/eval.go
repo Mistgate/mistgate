@@ -89,7 +89,7 @@ func (c cond) alert() store.HealthAlert {
 
 func titleKey(kind string) string { return "health.alert." + kind + ".title" }
 
-// nodeHealth is what the node status needs (fleet.Health.NodeHealth).
+// nodeHealth is what the node status needs (Service.NodeHealthSummaries).
 type nodeHealth struct {
 	noTraffic     bool
 	failed, total int
@@ -151,40 +151,74 @@ func (s *Service) runEvaluator(ctx context.Context) {
 	}
 }
 
+// EvaluateOnce is the evaluator pass of the Cloudflare edition's cron tick (the VPS runs runEvaluator). The caller gives
+// the pass its deadline. The pass is skipped, not waited for, while this isolate is still in one (a mutex held across D1
+// I/O must never block the tick), and a D1 lease keeps two isolates from reconciling the same transitions twice.
+func (s *Service) EvaluateOnce(ctx context.Context) {
+	if !s.evalMu.TryLock() {
+		return
+	}
+	defer s.evalMu.Unlock()
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		s.log.Warn("health: edge evaluator requires a deadline")
+		return
+	}
+	ttl := time.Until(deadline)
+	if ttl <= 0 || s.cfg.RoundLease == nil || !s.cfg.RoundLease(ctx, "health-eval", ttl) {
+		return
+	}
+	s.evaluateLocked(ctx)
+}
+
 // evaluate runs one pass. Safe to call from anywhere; passes are serialised.
 func (s *Service) evaluate(ctx context.Context) {
 	s.evalMu.Lock()
 	defer s.evalMu.Unlock()
+	s.evaluateLocked(ctx)
+}
+
+// evaluateLocked is one pass; the caller holds evalMu.
+func (s *Service) evaluateLocked(ctx context.Context) {
 	now := s.now()
-	liveRows, err := s.fl.Live(ctx)
-	if err != nil {
-		s.log.Warn("health: evaluate live", "err", err)
-		return
-	}
 	sn, err := s.snapshot(ctx)
 	if err != nil {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
-	rows, err := s.st.DoctorResults(ctx, "")
-	if err != nil {
-		s.log.Warn("health: evaluate", "err", err)
-		return
-	}
-	accepts, err := s.st.DoctorAccepts(ctx, "")
-	if err != nil {
-		s.log.Warn("health: evaluate", "err", err)
-		return
+	var liveRows []store.NodeLiveRow
+	var rows []store.DoctorRow
+	var accepts []store.DoctorAccept
+	var portChecks []store.PortCheck
+	needFleetData := len(sn.nodes) > 0 || !s.cfg.Edge
+	if needFleetData {
+		liveRows, err = s.fl.Live(ctx)
+		if err != nil {
+			s.log.Warn("health: evaluate live", "err", err)
+			return
+		}
+		rows, err = s.st.DoctorResults(ctx, "")
+		if err != nil {
+			s.log.Warn("health: evaluate", "err", err)
+			return
+		}
+		accepts, err = s.st.DoctorAccepts(ctx, "")
+		if err != nil {
+			s.log.Warn("health: evaluate", "err", err)
+			return
+		}
 	}
 	signals, err := s.st.HealthSignals(ctx, now)
 	if err != nil {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
-	portChecks, err := s.st.PortChecks(ctx)
-	if err != nil {
-		s.log.Warn("health: evaluate", "err", err)
-		return
+	if needFleetData {
+		portChecks, err = s.st.PortChecks(ctx)
+		if err != nil {
+			s.log.Warn("health: evaluate", "err", err)
+			return
+		}
 	}
 	active, err := s.st.ActiveAlerts(ctx)
 	if err != nil {
@@ -195,6 +229,7 @@ func (s *Service) evaluate(ctx context.Context) {
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
 	s.nhMu.Unlock()
+	s.storeNodeHealth(ctx, d.health)
 	if err := s.reconcile(ctx, now, d, active); err != nil {
 		s.log.Warn("health: reconcile alerts", "err", err)
 	}
@@ -237,7 +272,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 		docs[r.NodeID] = append(docs[r.NodeID], r)
 	}
 	add := func(c cond) { d.conds[c.key] = c }
-	grace := now.Sub(s.startedAt) < s.cfg.StartGrace
+	grace := !s.cfg.Edge && now.Sub(s.startedAt) < s.cfg.StartGrace
 	staleAfter := 2*s.interval(ctx) + time.Minute
 
 	byNode := map[string][]probed{}

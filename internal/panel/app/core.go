@@ -257,7 +257,12 @@ func wireCore(c Config) (*core, error) {
 			st := k.cp.State(ctx)
 			return health.TSPUState(st)
 		},
-		OnTransition: func(t health.Transition) { tg.AlertTransition(t.Alert, t.Resolved) }}
+		OnTransition: func(t health.Transition) {
+			tg.AlertTransition(t.Alert, t.Resolved)
+			if c.OnAlertTransition != nil {
+				c.OnAlertTransition(t)
+			}
+		}}
 	if edge {
 		hcfg.RoundLease = EdgeRoundLease(st, log)
 	}

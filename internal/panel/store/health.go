@@ -12,6 +12,14 @@ import (
 // Queries of the health module (internal/panel/health): alerts, doctor results, the probe credential,
 // synthetic check samples and the retention sweeps. Tables: migration 00012.
 
+// NodeHealthSummary is the compact synthetic-check and doctor status copied to the edge admin role through a setting.
+type NodeHealthSummary struct {
+	NoTraffic  bool   `json:"no_traffic"`
+	Failed     int    `json:"failed"`
+	Total      int    `json:"total"`
+	DoctorFail string `json:"doctor_fail"`
+}
+
 func jsonMap(m map[string]string) string {
 	if len(m) == 0 {
 		return "{}"

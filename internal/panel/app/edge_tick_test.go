@@ -8,12 +8,14 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
+	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -61,13 +63,17 @@ func buildPanel(t *testing.T, remote fleet.Remote) (*Panel, *auth.Service) {
 // buildPanelWith is buildPanel with a last look at the config before Build.
 func buildPanelWith(t *testing.T, remote fleet.Remote, tweak func(*Config)) (*Panel, *auth.Service) {
 	t.Helper()
-	ctx := context.Background()
-	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "panel.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
+	return buildPanelOn(t, st, remote, tweak)
+}
 
+// buildPanelOn assembles a panel on a store that is already open: two of them on one store are two isolates of the edge.
+func buildPanelOn(t *testing.T, st *store.Store, remote fleet.Remote, tweak func(*Config)) (*Panel, *auth.Service) {
+	t.Helper()
 	key := make([]byte, vault.KeySize)
 	for i := range key {
 		key[i] = byte(i + 1)
@@ -163,6 +169,137 @@ func TestEdgeTickSweepsUsersAndNodeDownEachTick(t *testing.T) {
 		t.Fatalf("unchanged status requested %d fan-outs, want 1 total", got)
 	}
 	assertNodeDownCount(t, p.Store, nodeID, 1)
+}
+
+func TestEdgeTickEvaluatesAndResolvesNodeDown(t *testing.T) {
+	ctx := context.Background()
+	p := buildEdgeTickPanel(t, &edgeTickRemote{})
+	nodeID := addSilentNodeA(t, p, time.Now().UTC())
+	tickAt := time.Now().UTC().Truncate(time.Minute)
+
+	if err := p.EdgeTick(ctx, tickAt); err != nil {
+		t.Fatal(err)
+	}
+	assertActiveNodeDown(t, p.Store, nodeID, true)
+
+	returnedAt := time.Now().UTC()
+	if _, err := p.Store.W.ExecContext(ctx, `UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = ?`, returnedAt.Unix(), returnedAt.Unix(), nodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Store.W.ExecContext(ctx, `INSERT OR REPLACE INTO node_live (node_id, session) VALUES (?, 1)`, nodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Store.W.ExecContext(ctx, `UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.EdgeTick(ctx, tickAt.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	assertActiveNodeDown(t, p.Store, nodeID, false)
+}
+
+// Two edge isolates tick while the first is inside its evaluator pass, after it read the alerts. The D1 lease keeps the
+// second from reconciling, so the alert is announced once when it opens and once when it resolves; without the lease the
+// first isolate, resuming with the alerts it had read, opens the same alert a second time.
+func TestConcurrentEdgeTicksAnnounceNodeDownOnceOnOpenAndOnResolve(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	var opened, resolved atomic.Int32
+	count := func(c *Config) {
+		c.OnAlertTransition = func(tr health.Transition) {
+			if tr.Alert.Kind != "node_down" {
+				return
+			}
+			if tr.Resolved {
+				resolved.Add(1)
+			} else {
+				opened.Add(1)
+			}
+		}
+	}
+	first, _ := buildPanelOn(t, st, &edgeTickRemote{}, count)
+	second, _ := buildPanelOn(t, st, &edgeTickRemote{}, count)
+	nodeID := addSilentNodeA(t, first, time.Now().UTC())
+
+	type gate struct {
+		once            sync.Once
+		entered, unlock chan struct{}
+	}
+	var current atomic.Pointer[gate]
+	first.Health.AddConditionSource(func(context.Context) []health.ExtCond {
+		if g := current.Load(); g != nil {
+			g.once.Do(func() { close(g.entered) })
+			<-g.unlock
+		}
+		return nil
+	})
+	overlap := func(tickAt time.Time) {
+		t.Helper()
+		g := &gate{entered: make(chan struct{}), unlock: make(chan struct{})}
+		var unlockOnce sync.Once
+		unlock := func() { unlockOnce.Do(func() { close(g.unlock) }) }
+		defer unlock()
+		current.Store(g)
+		defer current.Store(nil)
+		if _, err := st.W.ExecContext(ctx, `UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'`); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() { done <- first.EdgeTick(ctx, tickAt) }()
+		select {
+		case <-g.entered:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the first isolate never reached its evaluator pass")
+		}
+		if err := second.EdgeTick(ctx, tickAt); err != nil {
+			t.Fatal(err)
+		}
+		unlock()
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tickAt := time.Now().UTC().Truncate(time.Minute)
+	overlap(tickAt)
+	assertActiveNodeDown(t, st, nodeID, true)
+	if opened.Load() != 1 || resolved.Load() != 0 {
+		t.Fatalf("after the overlapping ticks: node_down opened %d, resolved %d; want 1, 0", opened.Load(), resolved.Load())
+	}
+
+	returnedAt := time.Now().UTC()
+	if _, err := st.W.ExecContext(ctx, `UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = ?`, returnedAt.Unix(), returnedAt.Unix(), nodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT OR REPLACE INTO node_live (node_id, session) VALUES (?, 1)`, nodeID); err != nil {
+		t.Fatal(err)
+	}
+	overlap(tickAt.Add(time.Minute))
+	assertActiveNodeDown(t, st, nodeID, false)
+	if opened.Load() != 1 || resolved.Load() != 1 {
+		t.Fatalf("after the node returned: node_down opened %d, resolved %d; want 1, 1", opened.Load(), resolved.Load())
+	}
+}
+
+func assertActiveNodeDown(t *testing.T, st *store.Store, nodeID string, want bool) {
+	t.Helper()
+	alerts, err := st.ActiveAlerts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, alert := range alerts {
+		if alert.Kind == "node_down" && alert.NodeID == nodeID {
+			count++
+		}
+	}
+	if count != map[bool]int{true: 1, false: 0}[want] {
+		t.Fatalf("active NODE_DOWN alerts for %s = %d, want %t", nodeID, count, want)
+	}
 }
 
 func TestEdgeTickRunsRetentionAtMinute17(t *testing.T) {

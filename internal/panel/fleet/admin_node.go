@@ -132,7 +132,8 @@ func inboundsOf(all map[string]map[string]string, nodeID string) map[string]stri
 // statusOf derives the status shown in the UI from the stored state, its live projection and time. enabled is the node's
 // enabled inbounds (inbound id -> profile name); nil when the caller needs the status alone, and then the reasons that
 // count profiles (no_profiles, the profile and the counts of inbound_failed) are left out.
-func (f *Fleet) statusOfLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, enabled map[string]string, now time.Time) nodeStatus {
+// health is the node's entry of Health.NodeHealthSummaries, which the caller reads once per request.
+func (f *Fleet) statusOfLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, enabled map[string]string, now time.Time, health store.NodeHealthSummary) nodeStatus {
 	switch n.State {
 	case "retired":
 		return nodeStatus{status: adminv1.NodeStatus_NODE_STATUS_RETIRED}
@@ -175,15 +176,12 @@ func (f *Fleet) statusOfLive(ctx context.Context, n store.NodeRow, live store.No
 		case drift:
 			st.reason = reason("state_drift")
 		}
-		if h := f.hooks(); h != nil {
-			noTraffic, failed, total, doctorFail := h.NodeHealth(n.ID)
-			switch {
-			case noTraffic: // the agent talks but every synthetic check fails
-				st.status = adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC
-				st.reason = reason("no_traffic", "failed", fmt.Sprint(failed), "total", fmt.Sprint(total))
-			case st.reason == nil && doctorFail != "":
-				st.reason = reason("doctor_fail", "check", doctorFail)
-			}
+		switch {
+		case health.NoTraffic: // the agent talks but every synthetic check fails
+			st.status = adminv1.NodeStatus_NODE_STATUS_NO_TRAFFIC
+			st.reason = reason("no_traffic", "failed", fmt.Sprint(health.Failed), "total", fmt.Sprint(health.Total))
+		case st.reason == nil && health.DoctorFail != "":
+			st.reason = reason("doctor_fail", "check", health.DoctorFail)
 		}
 		if st.reason == nil && enabled != nil && len(enabled) == 0 { // the agent is fine, but nobody gets this node
 			st.reason = reason("no_profiles")
@@ -240,9 +238,9 @@ func capabilityPresent(caps []string, want string) bool {
 	return false
 }
 
-func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle) *adminv1.Node {
+func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary) *adminv1.Node {
 	view := decodeLiveView(live)
-	st := f.statusOfLive(ctx, n, live, enabled, now)
+	st := f.statusOfLive(ctx, n, live, enabled, now, health)
 	out := &adminv1.Node{
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
@@ -364,9 +362,10 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 	}
 	live := liveRowsByID(liveRows)
 	panelBundle, _ := f.panelDecoyBundle()
+	healthSummaries := f.healthSummaries(ctx)
 	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
 	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle))
+		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID]))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -433,7 +432,7 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	}
 	view := decodeLiveView(live)
 	panelBundle, _ := f.panelDecoyBundle()
-	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live, panelBundle)
+	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID])
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -621,7 +620,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
-		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle),
+		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}), // pending: no checks yet
 		InstallCommand: install,
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
@@ -933,7 +932,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	today, _ := f.todayBytesByNode(ctx, now)
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	panelBundle, _ := f.panelDecoyBundle()
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle)}), nil
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID])}), nil
 }
 
 // staleKeysOn marks the issued configs of every per-device (AmneziaWG) profile on the node stale: each one holds the

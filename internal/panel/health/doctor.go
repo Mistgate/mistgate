@@ -132,10 +132,10 @@ func (s *Service) nextReport(nodeID string) <-chan struct{} {
 // nodeDoctor builds the doctor state of one node from its stored rows. The offered fix is cleared when the
 // node cannot apply it now (offline, or an agent that predates the doctor). ts are the node's inbounds (the profile
 // names of the params), acc its accepted warnings.
-func (s *Service) nodeDoctor(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, rows []store.DoctorRow, now time.Time, ts []*target, acc map[string]store.DoctorAccept) *adminv1.NodeDoctor {
+func (s *Service) nodeDoctor(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, rows []store.DoctorRow, now time.Time, ts []*target, acc map[string]store.DoctorAccept, summaries map[string]store.NodeHealthSummary) *adminv1.NodeDoctor {
 	canFix := live.Connected && slices.Contains(live.AgentCaps, capDoctor)
 	canRefreshUnit := canFix && slices.Contains(live.AgentCaps, capUnitRefresh)
-	nd := &adminv1.NodeDoctor{NodeId: n.ID, NodeName: n.Name, NodeStatus: s.fl.NodeStatusWithLive(ctx, n, live),
+	nd := &adminv1.NodeDoctor{NodeId: n.ID, NodeName: n.Name, NodeStatus: s.fl.NodeStatusWithLive(ctx, n, live, summaries),
 		AgentSupported: canFix || len(rows) > 0 || slices.Contains(live.AgentCaps, capDoctor), HasReport: len(rows) > 0,
 		AgentVersion: n.AgentVersion, LastSeenUnix: fleetUnix(live.LastSeenAt)}
 	if len(rows) == 0 {
@@ -195,6 +195,7 @@ func (s *Service) doctorViews(ctx context.Context, nodeID string) ([]*adminv1.No
 		return nil, err
 	}
 	live := indexLiveRows(liveRows)
+	summaries := s.NodeHealthSummaries(ctx)
 	acc := acceptsByNode(accepts)
 	byNode := map[string][]store.DoctorRow{}
 	for _, r := range rows {
@@ -204,7 +205,7 @@ func (s *Service) doctorViews(ctx context.Context, nodeID string) ([]*adminv1.No
 	var out []*adminv1.NodeDoctor
 	for _, n := range nodes {
 		if nodeID == "" || n.ID == nodeID {
-			out = append(out, s.nodeDoctor(ctx, n, live[n.ID], byNode[n.ID], now, sn.byNode[n.ID], acc[n.ID]))
+			out = append(out, s.nodeDoctor(ctx, n, live[n.ID], byNode[n.ID], now, sn.byNode[n.ID], acc[n.ID], summaries))
 		}
 	}
 	return out, nil

@@ -31,9 +31,10 @@ type Health interface {
 	// NodeReturned says that an active node came back after a silence of less than the blip window with an
 	// unchanged boot time: health writes the history record.
 	NodeReturned(ctx context.Context, nodeID string, silentSince, now time.Time)
-	// NodeHealth is what the node status and card show: the synthetic checks of the node all failing
-	// (noTraffic, with how many of how many) and the check of the worst FAIL of its last doctor report.
-	NodeHealth(nodeID string) (noTraffic bool, failed, total int, doctorFail string)
+	// NodeHealthSummaries is what the node status and card show, per node: the synthetic checks of the node all failing
+	// (NoTraffic, with how many of how many) and the check of the worst FAIL of its last doctor report. A request reads
+	// it once: on the edge it is one D1 read.
+	NodeHealthSummaries(ctx context.Context) map[string]store.NodeHealthSummary
 	// AlertCounts feeds the badge of the Overview: active alerts not muted and not INFO, and the critical ones.
 	AlertCounts(ctx context.Context) (active, critical uint32)
 }
@@ -61,9 +62,18 @@ func (f *Fleet) OnlineByInbound(ctx context.Context) map[string]int {
 	return out
 }
 
-// NodeStatusWithLive derives status from a projection already read for the surrounding request.
-func (f *Fleet) NodeStatusWithLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow) adminv1.NodeStatus {
-	return f.statusOfLive(ctx, n, live, nil, f.now().UTC()).status
+// healthSummaries reads Health.NodeHealthSummaries (nil without a health module); the node's entry is the zero value
+// when it has none.
+func (f *Fleet) healthSummaries(ctx context.Context) map[string]store.NodeHealthSummary {
+	if h := f.hooks(); h != nil {
+		return h.NodeHealthSummaries(ctx)
+	}
+	return nil
+}
+
+// NodeStatusWithLive derives status from a projection and the health summaries already read for the surrounding request.
+func (f *Fleet) NodeStatusWithLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, summaries map[string]store.NodeHealthSummary) adminv1.NodeStatus {
+	return f.statusOfLive(ctx, n, live, nil, f.now().UTC(), summaries[n.ID]).status
 }
 
 // RunDoctor asks a connected node with the doctor capability to run checks (nil = all) and waits for the report

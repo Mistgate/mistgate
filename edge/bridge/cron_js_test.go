@@ -132,9 +132,11 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, waitUntil)
 	counts := binding.Call("__endQueryCount")
 	ended = true
-	// four for the sweeps, one each for the settings of the two country sources (off by default: nothing else happens)
-	if got := counts.Get("sequentialQueries").Int(); got != 6 {
-		t.Fatalf("cron used %d sequential D1 calls, want 6", got)
+	// four for the sweeps, one each for the settings of the two country sources (off by default: nothing else happens), and
+	// eight for the evaluator pass on an empty fleet: its lease, the nodes, the signal batch, the active alerts, the interval
+	// setting, the update rollout, the country settings and the write of the (empty) node-health summary.
+	if got := counts.Get("sequentialQueries").Int(); got != 14 {
+		t.Fatalf("cron used %d sequential D1 calls, want 14 (6 tick + 8 evaluator on an empty fleet)", got)
 	}
 	if got := remote.pokeCount(); got != 1 {
 		t.Fatalf("minute 10 remote fan-outs = %d, want 1", got)
@@ -142,6 +144,9 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 
 	retentionArgs := js.Global().Get("Object").New()
 	retentionArgs.Set("at", time.Date(2026, 10, 9, 12, 17, 0, 0, time.UTC).UnixMilli())
+	if _, err := st.W.ExecContext(ctx, `UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'`); err != nil {
+		t.Fatal(err)
+	}
 	binding.Call("__beginQueryCount", "cron minute 17")
 	retentionEnded := false
 	defer func() {
@@ -156,12 +161,15 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, retentionOut.Get("waitUntil"))
 	retentionCounts := binding.Call("__endQueryCount")
 	retentionEnded = true
-	if got := retentionCounts.Get("sequentialQueries").Int(); got != 15 {
-		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 15 (5 tick + 10 retention: the prunes of old revoked devices, of old country checks, of old block-list checks and of old TSPU checks are four of them)", got)
+	// The nodes are still warm in the isolate and the empty summary is unchanged, so the evaluator pass is six calls: its lease,
+	// the signal batch, the active alerts, the interval setting, the update rollout and the country settings.
+	if got := retentionCounts.Get("sequentialQueries").Int(); got != 21 {
+		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 21 (5 tick + 10 retention + 6 evaluator)", got)
 	}
-	// Two batches: the node-down sweep's live read (every tick) and the daily rollup; the prunes are single statements.
-	if got := retentionCounts.Get("batchCalls").Int(); got != 2 {
-		t.Fatalf("minute 17 cron used %d D1 batches, want 2 (the live read and the rollup)", got)
+	// Three batches: the node-down sweep's live read (every tick), the evaluator's signal batch and the daily rollup; the
+	// prunes are single statements.
+	if got := retentionCounts.Get("batchCalls").Int(); got != 3 {
+		t.Fatalf("minute 17 cron used %d D1 batches, want 3 (the live read, the signals and the rollup)", got)
 	}
 
 	if _, err := st.W.ExecContext(ctx, `DROP TABLE user`); err != nil {

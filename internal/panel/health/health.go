@@ -34,7 +34,9 @@ type Fleet interface {
 	Live(ctx context.Context) ([]store.NodeLiveRow, error)
 	// NodeLive reads one node's durable projection for a node-scoped check.
 	NodeLive(ctx context.Context, nodeID string) (store.NodeLiveRow, error)
-	NodeStatusWithLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow) adminv1.NodeStatus
+	// NodeStatusWithLive derives a node's status from its projection and the summaries (Service.NodeHealthSummaries) the
+	// caller read once for the request.
+	NodeStatusWithLive(ctx context.Context, n store.NodeRow, live store.NodeLiveRow, summaries map[string]store.NodeHealthSummary) adminv1.NodeStatus
 	// RunDoctor asks a node to run checks (nil = all) and waits for the report. FAILED_PRECONDITION: not
 	// connected, or an agent without "doctor/1".
 	RunDoctor(ctx context.Context, nodeID string, checks []string, wait time.Duration) (*agentv1.DoctorReport, error)
@@ -71,7 +73,7 @@ const (
 
 // Config configures Service. The zero value is production: only Actor and Log are usually set.
 type Config struct {
-	// Edge keeps one-off doctor actions from evaluating alerts when the edge edition has no evaluator to reconcile them.
+	// Edge runs alert evaluation from EdgeTick and leaves one-off doctor actions to that evaluator in the jobs isolate.
 	Edge bool
 	// Dialers maps a protocol plugin id to its tunnel client. Default: hysteria2, awg and vless. A protocol without one is
 	// SKIPPED (client_unsupported).
@@ -121,8 +123,8 @@ type Config struct {
 	Resolve func(ctx context.Context, host string) ([]netip.Addr, error)
 	// CountryRoundTimeout bounds one whole country round. Default 60 s.
 	CountryRoundTimeout time.Duration
-	// RoundLease, when set, must grant a due country round before it runs, for ttl. The Cloudflare edition takes a D1 lease
-	// (store.TakeLease): its cron ticks can overlap in two isolates, each with its own countryMu. Nil on the VPS.
+	// RoundLease, when set, must grant a due edge pass before it runs, for ttl. The Cloudflare edition takes a D1 lease
+	// (store.TakeLease): cron ticks can overlap in two isolates, each with its own local mutex. Nil on the VPS.
 	RoundLease func(ctx context.Context, name string, ttl time.Duration) bool
 	// OnTransition is called after an alert was opened or resolved (notifications attach here).
 	OnTransition func(Transition)
@@ -171,8 +173,10 @@ type Service struct {
 	portCheckRun      chan struct{} // one scheduled CheckPorts run at a time
 	portCheckAttempts map[string]int64
 
-	nhMu       sync.RWMutex
-	nodeHealth map[string]nodeHealth // computed by the last evaluation
+	nhMu             sync.RWMutex
+	nodeHealth       map[string]nodeHealth // computed by the last evaluation
+	nodeHealthJSON   string                // last edge summary stored by this isolate; evaluator passes are serialised by evalMu
+	nodeHealthStored bool
 
 	repMu   sync.Mutex
 	waiters map[string][]chan struct{} // node id -> channels closed at the next doctor report

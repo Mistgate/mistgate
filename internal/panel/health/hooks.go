@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -22,12 +23,65 @@ func (s *Service) NodeReturned(ctx context.Context, nodeID string, silentSince, 
 	}
 }
 
-// NodeHealth is the synthetic-check and doctor view of a node for its status (as of the last evaluation).
-func (s *Service) NodeHealth(nodeID string) (noTraffic bool, failed, total int, doctorFail string) {
+const nodeHealthSummarySetting = "health.node_summary"
+
+// NodeHealthSummaries is the synthetic-check and doctor view of the nodes for their status, as of the last evaluation:
+// a node without an entry has nothing to report. The edge admin and jobs roles have separate isolates, so the admin reads
+// the one settings row (one D1 read); a request calls this once, not per node. The VPS copies its in-memory result.
+func (s *Service) NodeHealthSummaries(ctx context.Context) map[string]store.NodeHealthSummary {
+	if s.cfg.Edge {
+		value, err := s.st.Setting(ctx, nodeHealthSummarySetting)
+		if errors.Is(err, store.ErrNotFound) {
+			return map[string]store.NodeHealthSummary{}
+		}
+		if err != nil {
+			s.log.Warn("health: read node summary", "err", err)
+			return map[string]store.NodeHealthSummary{}
+		}
+		var out map[string]store.NodeHealthSummary
+		if err := json.Unmarshal([]byte(value), &out); err != nil {
+			s.log.Warn("health: decode node summary", "err", err)
+			return map[string]store.NodeHealthSummary{}
+		}
+		if out == nil {
+			return map[string]store.NodeHealthSummary{}
+		}
+		return out
+	}
 	s.nhMu.RLock()
-	h := s.nodeHealth[nodeID]
-	s.nhMu.RUnlock()
-	return h.noTraffic, h.failed, h.total, h.doctorFail
+	defer s.nhMu.RUnlock()
+	out := make(map[string]store.NodeHealthSummary, len(s.nodeHealth))
+	for nodeID, h := range s.nodeHealth {
+		out[nodeID] = store.NodeHealthSummary{NoTraffic: h.noTraffic, Failed: h.failed, Total: h.total, DoctorFail: h.doctorFail}
+	}
+	return out
+}
+
+func (s *Service) storeNodeHealth(ctx context.Context, current map[string]nodeHealth) {
+	if !s.cfg.Edge {
+		return
+	}
+	summary := make(map[string]store.NodeHealthSummary, len(current))
+	for nodeID, h := range current {
+		if h == (nodeHealth{}) {
+			continue // nothing to report: absent reads the same, and the row is not rewritten on every connect or disconnect
+		}
+		summary[nodeID] = store.NodeHealthSummary{NoTraffic: h.noTraffic, Failed: h.failed, Total: h.total, DoctorFail: h.doctorFail}
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		s.log.Warn("health: encode node summary", "err", err)
+		return
+	}
+	value := string(data)
+	if s.nodeHealthStored && value == s.nodeHealthJSON {
+		return
+	}
+	if err := s.st.SetSettingIfChanged(ctx, nodeHealthSummarySetting, value); err != nil {
+		s.log.Warn("health: store node summary", "err", err)
+		return
+	}
+	s.nodeHealthJSON, s.nodeHealthStored = value, true
 }
 
 // AlertCounts is the badge: active alerts that are not muted and not INFO, and the critical ones among them. Alerts

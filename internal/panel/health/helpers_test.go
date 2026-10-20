@@ -102,7 +102,7 @@ func (f *fakeFleet) NodeLive(_ context.Context, nodeID string) (store.NodeLiveRo
 		LastSeenAt: live.lastSeen, AgentCaps: live.caps, Drift: live.drift}, nil
 }
 
-func (f *fakeFleet) NodeStatusWithLive(_ context.Context, n store.NodeRow, live store.NodeLiveRow) adminv1.NodeStatus {
+func (f *fakeFleet) NodeStatusWithLive(_ context.Context, n store.NodeRow, live store.NodeLiveRow, _ map[string]store.NodeHealthSummary) adminv1.NodeStatus {
 	if n.State == "retired" {
 		return adminv1.NodeStatus_NODE_STATUS_RETIRED
 	}
@@ -372,3 +372,19 @@ func want(t *testing.T, got map[string]store.HealthAlert, keys ...string) {
 }
 
 func nodeRow(addr string) store.NodeRow { return store.NodeRow{ID: "nod_x", Name: "x", Address: addr} }
+
+// NodeHealth is one node's entry of NodeHealthSummaries.
+func (s *Service) NodeHealth(nodeID string) (noTraffic bool, failed, total int, doctorFail string) {
+	h := s.NodeHealthSummaries(context.Background())[nodeID]
+	return h.NoTraffic, h.Failed, h.Total, h.DoctorFail
+}
+
+// sibling is a second Service on the same store, fleet and clock: another isolate of the Cloudflare edition.
+func (e *env) sibling(mut ...func(*Config)) *Service {
+	cfg := Config{Now: e.clock.Now, StartGrace: time.Nanosecond, RetryDelay: time.Millisecond, SnapshotTTL: time.Nanosecond,
+		Actor: func(context.Context) string { return "adm_test" }}
+	for _, m := range mut {
+		m(&cfg)
+	}
+	return New(e.st, e.v, builtin.Registry(), e.fl, cfg)
+}

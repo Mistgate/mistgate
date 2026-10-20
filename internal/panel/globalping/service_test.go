@@ -545,7 +545,7 @@ func (liveFleet) Live(context.Context) ([]store.NodeLiveRow, error) {
 func (liveFleet) NodeLive(context.Context, string) (store.NodeLiveRow, error) {
 	return store.NodeLiveRow{NodeID: "de1", State: "active", Exists: true, Connected: true}, nil
 }
-func (liveFleet) NodeStatusWithLive(context.Context, store.NodeRow, store.NodeLiveRow) adminv1.NodeStatus {
+func (liveFleet) NodeStatusWithLive(context.Context, store.NodeRow, store.NodeLiveRow, map[string]store.NodeHealthSummary) adminv1.NodeStatus {
 	return adminv1.NodeStatus_NODE_STATUS_ONLINE
 }
 func (liveFleet) RunDoctor(context.Context, string, []string, time.Duration) (*agentv1.DoctorReport, error) {

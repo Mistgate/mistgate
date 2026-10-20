@@ -137,10 +137,11 @@ func (s fleetService) Overview(ctx context.Context, req *connect.Request[adminv1
 	var consumers []consumer
 	liveUsers := map[string]bool{}
 	liveByProto := map[string]map[string]bool{}
+	healthSummaries := f.healthSummaries(ctx)
 	for _, n := range nodes {
 		row := liveByID[n.ID]
 		view := decodeLiveView(row)
-		st := f.statusOfLive(ctx, n, row, inboundsOf(enabled, n.ID), now)
+		st := f.statusOfLive(ctx, n, row, inboundsOf(enabled, n.ID), now, healthSummaries[n.ID])
 		card := &adminv1.NodeCard{Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider,
 			Status: st.status, Reason: st.reason, SparkBytes: make([]uint64, 24)}
 		for i := range 24 {

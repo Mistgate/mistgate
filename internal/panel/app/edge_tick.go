@@ -23,14 +23,14 @@ const (
 var edgeTickJobs = map[string]string{
 	"access":    "user status sweep every tick",
 	"fleet":     "node-down sweep every tick and desired-state safety net every 10 minutes",
-	"health":    "health retention at minute 17, and the country check when a round is due",
+	"health":    "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
 	"blocklist": "the block-list check of the country check, when one is due (one setting read while it is off)",
 	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
 }
 
 var edgeDeferred = map[string]string{
 	"fleet":          "event-driven Run, local sessions, closeAll and recomputeAll remain VPS-only",
-	"health":         "checker/evaluator (phase 2) and periodic UDP port rechecks",
+	"health":         "client-eye checker and periodic UDP port rechecks",
 	"updates":        "owner decision 2",
 	"backups":        "R2",
 	"telegram":       "enqueue remains local and messages are not delivered on edge",
@@ -85,9 +85,7 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 		// Nothing happens (no request, no data sent) while the Globalping integration is off, which is its default; the one read
 		// is its setting. Switching it off or disconnecting it reconciles the alerts at once (globalping.Config.OnChange).
 		cctx, cancel := context.WithTimeout(ctx, edgeCountryTimeout)
-		if p.Health.CountryTick(cctx) {
-			p.Health.ReconcileCountry(cctx)
-		}
+		p.Health.CountryTick(cctx) // the evaluator below derives the COUNTRY_BLOCKED alerts from what the round stored
 		cancel()
 		// The block lists, the second source: off by default, then it costs one read (its setting) and sends nothing. When it is
 		// on, a check is due for a node without a result and every six hours; the lists are then downloaded and kept for the
@@ -97,6 +95,10 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 			p.Blocklist.Tick(bctx)
 			bcancel()
 		}
+		run("health evaluator", func(ctx context.Context) error {
+			p.Health.EvaluateOnce(ctx)
+			return nil
+		})
 	}
 	if now.UTC().Minute() == 17 {
 		run("health retention", func(ctx context.Context) error {

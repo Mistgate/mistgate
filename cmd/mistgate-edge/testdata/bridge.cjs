@@ -448,18 +448,20 @@ async function assertProvisioner(bytes, forwardPanel, adminCookie, initOptions, 
     `INSERT INTO node_provision_job (id, node_id, name, address, country_code, location, provider, ssh_host, ssh_port, host_fingerprint, secret, state, phase, error_code, created_by, created_at, updated_at)
      VALUES (?, ?, ?, '198.51.100.9', '', '', '', '45.67.89.10', 22, 'SHA256:pin', X'01', ?, 'queued', '', 'adm_test', 1, 1)`,
   ).bind(id, `nod_${id}`, id.replace("_", "-"), state).run();
-  const tick = (minute) => {
+  const tick = async (minute) => {
+    await globalThis.__d1.prepare("UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'").run();
     const at = new Date(baseCronDate);
     at.setUTCMinutes(minute, 0, 0);
     return countedJob("cron tick with installs", () => Promise.race([forwardPanel.cron({ at: at.getTime() }), wasmFailure]));
   };
   await insertJob("prv_done", "failed");
-  assert.equal((await tick(3)).queries.sequentialQueries, 6);
+  // 6 for the sweeps and settings + 10 for a warm evaluator pass (see "cron tick" below); nothing in an install wakes more.
+  assert.equal((await tick(3)).queries.sequentialQueries, 16);
   assert.equal(provisionKicks, 0, "a finished install wakes nothing");
   for (const [i, state] of ["queued", "running", "cancel_requested"].entries()) {
     await globalThis.__d1.prepare("DELETE FROM node_provision_job WHERE id = 'prv_open'").run();
     await insertJob("prv_open", state);
-    assert.equal((await tick(3)).queries.sequentialQueries, 6, "waking costs no query beyond the look");
+    assert.equal((await tick(3)).queries.sequentialQueries, 16, "waking costs no query beyond the look");
     assert.equal(provisionKicks, i + 1, `a ${state} install wakes the Provisioner`);
   }
   await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
@@ -1070,6 +1072,10 @@ async function run() {
     const { linkPrefix, nodeID } = await assertLinkHandshake(secondPanel);
 
     const baseCronDate = new Date();
+    // This node is deliberately disconnected for the fleet fan-out assertion but still inside the blip window, so the
+    // evaluator pass has no alert transition to add a variable Telegram node-name lookup.
+    await globalThis.__d1.prepare("UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'nod_bridge'")
+      .bind(nowS, nowS).run();
     const normalCronDate = new Date(baseCronDate);
     normalCronDate.setUTCMinutes(3, 0, 0);
     const { queries: normalCronQueries } = await countedJob("cron normal tick", () =>
@@ -1078,13 +1084,14 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      6,
-      "a normal cron tick costs 6 D1 calls: status, node list, node live, the look for pending installs and the settings of the two country sources (both off: nothing more)",
+      19,
+      "a normal cron tick costs 19 D1 calls: 6 for the sweeps and the country settings, and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
     );
 
     liveProjectionQueries = 0;
     nodePokeCalls = 0;
     nodePokeIDs.length = 0;
+    await globalThis.__d1.prepare("UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'").run();
     const cronDate = new Date(baseCronDate);
     cronDate.setUTCMinutes(10, 0, 0);
     const { output: cron, queries: cronQueries } = await countedJob("cron tick", () =>
@@ -1093,24 +1100,48 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
     assert.equal(
       cronQueries.sequentialQueries,
-      7,
-      "one cron tick costs 7 D1 calls: status, node list, node live, pending installs, the two country-source settings, fan-out live",
+      17,
+      "one cron tick costs 17 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
     );
-    assert.equal(liveProjectionQueries, 2, "the node-down sweep and ten-minute safety net each read live nodes once");
+    assert.equal(liveProjectionQueries, 3, "the node-down sweep, the evaluator and the ten-minute safety net each read live nodes once");
     assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
     assert.deepEqual(nodePokeIDs, [[]], "the fan-out only includes connected nodes");
 
     const retentionDate = new Date(baseCronDate);
     retentionDate.setUTCMinutes(17, 0, 0);
+    await globalThis.__d1.prepare("UPDATE job_lease SET expires_at = 0 WHERE name = 'health-eval'").run();
     const { queries: retentionQueries } = await countedJob("cron minute 17", () =>
       Promise.race([secondPanel.cron({ at: retentionDate.getTime() }), wasmFailure]),
     );
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      16,
-      "a minute 17 cron tick costs 16 D1 calls: 6 normal and 10 retention (the 7th prunes old revoked devices, the 8th old country checks, the 9th old block-list checks, the 10th old TSPU checks)",
+      26,
+      "a minute 17 cron tick costs 26 D1 calls: 6 for the sweeps and settings, 10 for retention (four of them prune statements) and 10 for a warm evaluator pass",
     );
+
+    // The Overview is polled every 10 seconds. The health summary of every node is one settings row, read once: more connected
+    // nodes add no D1 call (a read per connected node was the first version of this).
+    const connectNode = async (id) => {
+      await globalThis.__d1.prepare("INSERT INTO node (id, name, address, state, created_at, last_seen_at, last_connected_at) VALUES (?, ?, '198.51.100.20', 'active', 1, ?, ?)")
+        .bind(id, id.replace("_", "-"), nowS, nowS).run();
+      await globalThis.__d1.prepare("INSERT INTO node_live (node_id, session) VALUES (?, 1)").bind(id).run();
+    };
+    const overviewCost = async (label) => {
+      const { response, queries } = await countedRequest(label, () => connectRPC(secondPanel, "FleetService/Overview", {}, adminCookie));
+      console.log(`D1 query count ${JSON.stringify(queries)}`);
+      assert.equal(response.response.status, 200, `${label} answers`);
+      return { queries, nodes: response.message.nodes.length };
+    };
+    await connectNode("nod_more0");
+    const overviewFew = await overviewCost("overview with one connected node");
+    for (let i = 1; i < 6; i++) await connectNode(`nod_more${i}`);
+    const overviewMany = await overviewCost("overview with six connected nodes");
+    assert.equal(overviewMany.nodes, overviewFew.nodes + 5, "the added nodes are on the Overview");
+    assert.equal(overviewMany.queries.sequentialQueries, overviewFew.queries.sequentialQueries, "an Overview costs the same D1 calls whatever the number of nodes");
+    assert.equal(overviewFew.queries.sequentialQueries, 8, "an Overview costs 8 D1 calls: the session, nodes, live nodes, traffic hours, events, enabled inbounds, the node-health summary row and the alert badge");
+    await globalThis.__d1.prepare("DELETE FROM node_live WHERE node_id LIKE 'nod_more%'").run();
+    await globalThis.__d1.prepare("DELETE FROM node WHERE id LIKE 'nod_more%'").run();
 
     assert.equal(provisionKicks, 0, "cron ticks without an install wake no Provisioner");
     await assertProvisioner(bytes, secondPanel, adminCookie, initOptions, baseCronDate);
