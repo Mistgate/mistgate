@@ -71,10 +71,13 @@ jobs:
       - run: go build ./...
       # GO-2026-5288 (an OOM in hysteria's QUIC sniffer) is fixed upstream by apernet/hysteria#1547, which v2.12.3
       # includes, but the vulnerability database names no fixed version; it is skipped, any other called one fails.
+      # GO-2026-6651 (xray-core: a pinned CA lets a client skip the host check when its dialer leaves ServerName empty) is
+      # fixed only in an untagged commit (Xray v26.7.11). Mistgate pins self-signed leaf certificates, never a CA, and runs
+      # xray-core as a server; its in-process VLESS check pins only in tests. Skipped until xray-core is bumped with a full e2e.
       - name: govulncheck
         run: |
           go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -format json ./... > vuln.json
-          n=$(jq -s '[.[] | .finding? // empty | select(.osv != "GO-2026-5288" and .trace[0].function != null)] | length' vuln.json)
+          n=$(jq -s '[.[] | .finding? // empty | select(.osv != "GO-2026-5288" and .osv != "GO-2026-6651" and .trace[0].function != null)] | length' vuln.json)
           if [ "$n" -gt 0 ]; then go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...; exit 1; fi
 
   buf:
