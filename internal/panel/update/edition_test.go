@@ -153,7 +153,8 @@ func TestEdgeUpdateRPCsRunUnderTheDeadline(t *testing.T) {
 				t.Errorf("%s (edge=%t) never reached its probe", name, edge)
 			case !edge && !deadline.IsZero():
 				t.Errorf("%s on the VPS gained an edge-only deadline", name)
-			case edge && (deadline.IsZero() || deadline.Before(started) || deadline.Sub(started) > edgeAdminRPCTimeout):
+			// The handler sets its deadline a moment after started; on Linux that is 20s plus microseconds, hence the slack.
+			case edge && (deadline.IsZero() || deadline.Before(started) || deadline.Sub(started) > edgeAdminRPCTimeout+time.Second):
 				t.Errorf("%s on the edge has deadline %v, want within %s of the call", name, deadline, edgeAdminRPCTimeout)
 			}
 		}
