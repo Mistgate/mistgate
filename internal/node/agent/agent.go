@@ -217,6 +217,9 @@ const (
 	defaultLinkHold = 10 * time.Minute
 	// linkBusyRecheck is how long the end of a held session is put off while an operation is in flight on it.
 	linkBusyRecheck = 30 * time.Second
+	// heldFlushWait is how long ending a held session waits for the queued messages to be written, and then for the panel
+	// to finish the stream.
+	heldFlushWait = 3 * time.Second
 )
 
 // linkWait is how long the link must still be left alone after a failed attempt; zero or less means it may be tried now.
@@ -266,6 +269,10 @@ func (a *Agent) endHeldSession(s *session, wait time.Duration, expired *atomic.B
 		}
 		a.log.Info("agent link hold over; retrying the link")
 		expired.Store(true)
+		// The last operation's answer is queued by the operation as it ends, which is what made the session idle: it
+		// has to be written, and to leave the transport, before the context is cancelled.
+		s.flush(heldFlushWait)
+		s.drain(heldFlushWait)
 		s.cancel()
 		return
 	}
@@ -684,6 +691,9 @@ func (s *session) sendSync(m *pb.ConnectRequest, timeout time.Duration) {
 	}
 }
 
+// flush returns once everything queued by send before it was written (the queue is in order), for at most timeout.
+func (s *session) flush(timeout time.Duration) { s.sendSync(nil, timeout) }
+
 // drain half-closes our side (queued data still goes out, then END_STREAM) and waits, for at most timeout,
 // for the panel to finish the stream. Cancelling the context right after a write could reset the stream
 // before the last frame left the transport, and the panel would never see it.
@@ -720,7 +730,7 @@ func (s *session) writer() {
 		case <-s.ctx.Done():
 			return
 		case c := <-s.ctl:
-			ok := write(c.m)
+			ok := c.m == nil || write(c.m) // nil: a marker (flush), nothing to write
 			if c.done != nil {
 				close(c.done)
 			}
@@ -886,7 +896,7 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	for {
 		msg, err := stream.Receive()
 		if err != nil {
-			if holdExpired.Load() && ctx.Err() != nil { // the error is the cancel of endHeldSession, not a real one
+			if holdExpired.Load() { // the end of the stream is endHeldSession's (its drain, then its cancel), not a real error
 				return errSwitchTransport
 			}
 			if errors.Is(err, io.EOF) {

@@ -654,6 +654,56 @@ func TestAgentHeldSessionIsNotEndedDuringWork(t *testing.T) {
 	eventually(t, func() bool { return sessionOnLink(h.a) }, "link session once the work is over")
 }
 
+// slowTransport is a session stream whose writes take a while, as on a loaded node; the panel finishes the stream when
+// our side is half-closed.
+type slowTransport struct {
+	ctx   context.Context
+	s     *session
+	mu    sync.Mutex
+	sent  []string
+	delay time.Duration
+}
+
+func (t *slowTransport) Context() context.Context { return t.ctx }
+func (t *slowTransport) Send(m *agentv1.ConnectRequest) error {
+	time.Sleep(t.delay)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.sent = append(t.sent, m.GetCommandResult().GetRequestId())
+	return nil
+}
+func (t *slowTransport) Receive() (*agentv1.ConnectResponse, error) {
+	<-t.ctx.Done()
+	return nil, t.ctx.Err()
+}
+func (t *slowTransport) CloseSend() error { close(t.s.recv); return nil }
+func (t *slowTransport) Close() error     { return nil }
+
+// What an operation queued as it ended is written before the end of the held session cancels it, however slowly the
+// stream takes it (the cancel used to follow the operation's last line by a few microseconds).
+func TestEndHeldSessionWritesWhatIsQueued(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a := &Agent{log: slog.New(slog.NewTextHandler(&lockedLogBuffer{}, nil)), linkBusyWait: time.Millisecond}
+	tr := &slowTransport{ctx: ctx, delay: 100 * time.Millisecond}
+	s := &session{a: a, ctx: ctx, cancel: cancel, stream: tr, ctl: make(chan ctlMsg, 4), wake: make(chan struct{}, 1), recv: make(chan struct{})}
+	tr.s = s
+	go s.writer()
+	s.send(cmdResult(&agentv1.CommandResult{RequestId: "one"}))
+	s.send(cmdResult(&agentv1.CommandResult{RequestId: "two"}))
+
+	var expired atomic.Bool
+	a.endHeldSession(s, time.Millisecond, &expired)
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	if !expired.Load() || ctx.Err() == nil {
+		t.Fatalf("the session was not ended: expired=%v ctx=%v", expired.Load(), ctx.Err())
+	}
+	if len(tr.sent) != 2 || tr.sent[0] != "one" || tr.sent[1] != "two" {
+		t.Fatalf("written before the end = %v, want both queued answers in order", tr.sent)
+	}
+}
+
 // A session that lived long resets the reconnect delay even when the loop goes on without waiting (here: the end of a
 // held session), so the next real failure waits the minimum, not what an earlier outage had grown the delay to.
 func TestAgentLongHeldSessionResetsBackoffDelay(t *testing.T) {
