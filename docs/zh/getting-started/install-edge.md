@@ -5,7 +5,7 @@ description: 使用 mistgate edge deploy 在 Cloudflare 上运行面板，无需
 
 Cloudflare 版是为 WebAssembly 构建的同一面板，由六个 Cloudflare Workers 和一个 D1 数据库运行，无需在自有 Linux 服务器上运行二进制文件。运行一条命令 `mistgate edge deploy` 即可在 Cloudflare 账户中创建所有内容。节点仍然是你自己的服务器，照常从管理后台添加。本页介绍如何从 Cloudflare 账户开始，在管理后台创建所有者账户。示例使用 `panel.example.com`。
 
-> **警告：** 此版本为预览版。`mistgate edge deploy` 和面板已在模拟的 Cloudflare 环境中测试，但尚未在真实账户上测试（这是下一轮工作）。从 v0.1.36 起，发布版本中已包含 Cloudflare 版发布包。不要将依赖面板的用户迁移到此版本。部分功能尚不可用，见下文「此版本中尚不可用的功能」。如果现在需要可靠的面板，使用[安装面板](install-panel.md)。
+> **警告：** 此版本为预览版。`mistgate edge deploy` 和面板已在模拟的 Cloudflare 环境中测试，并自 2026 年 10 月起在一个真实账户上配合一个测试节点运行。从 v0.1.36 起，发布版本中已包含 Cloudflare 版发布包。不要将依赖面板的用户迁移到此版本。部分功能尚不可用，见下文「此版本中尚不可用的功能」。如果现在需要可靠的面板，使用[安装面板](install-panel.md)。
 
 ## 要求
 
@@ -152,7 +152,7 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 - 每台设备在每个节点上都有自己的密钥，而面板把发给节点的内容记在 D1 的一行里，D1 限制这一行不超过 2 MB。这大约相当于每个节点 38,000 个凭据，即每人使用两个订阅链接协议、平均 2.5 台设备时约 7,500 人（设备还没有各自密钥时约为 19,000 人）。该行超过 1.5 MB 时，面板会在日志中对每个节点警告一次。
 - 每小时的清理多调用一次 D1（清除已删除的旧设备）。
 
-此版本也不支持从面板注册 WARP 账户；操作会失败并显示「此版本无法注册 WARP」，但管理后台暂时不会标明这一点。
+从面板注册 WARP 账户时，请求通过 Worker 自身的 `fetch` 发出，因此 Cloudflare 看到的是平台的 TLS 握手，而不是 VPS 面板模仿的 Android 应用握手。注册接口是否接受，只能通过真实尝试得知；如果被拒绝，对话框会显示返回结果（「Cloudflare 拒绝了注册（HTTP 429）」），并提供导入 wgcf 配置文件的选项。
 
 ## 更新
 

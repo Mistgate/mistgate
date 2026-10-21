@@ -5,7 +5,7 @@ description: "Run the panel on Cloudflare Workers instead of a server with mistg
 
 The Cloudflare edition is the same panel, built for WebAssembly and run by six Cloudflare Workers with a D1 database, instead of a binary on your own Linux server. One command, `mistgate edge deploy`, creates everything on your Cloudflare account. The nodes are still your servers, added from the admin as usual. This page takes you from a Cloudflare account to the owner account in the admin. The examples use `panel.example.com`.
 
-> **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare, not yet on a real account (that is the next round of work). The edge bundle is in the releases since v0.1.36. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
+> **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare and run on a real account with one test node since October 2026. The edge bundle is in the releases since v0.1.36. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
 
 ## Requirements
 
@@ -152,7 +152,7 @@ Limits of this edition that matter for devices:
 - Each device has its own keys on each node, and the panel remembers what it sent to a node in one D1 row, which D1 caps at 2 MB. That is about 38,000 credentials per node, roughly 7,500 people with two link protocols each at 2.5 devices on average (about 19,000 people before devices had keys of their own). The panel writes a warning to its log, once per node, when the row passes 1.5 MB.
 - The hourly cleanup makes one more D1 call (it removes old deleted devices).
 
-Registering a WARP account from the panel is not available either and fails with "WARP registration is unavailable in this edition"; the admin does not mark it yet.
+Registering a WARP account from the panel goes out through the Worker's own `fetch`, so Cloudflare sees the platform's TLS handshake and not the Android app's that a VPS panel imitates. Whether the registration endpoint accepts it is known only from a real attempt; when it refuses, the dialog says what it answered ("Cloudflare refused the registration (HTTP 429)") and offers to import a wgcf profile instead.
 
 ## Update
 

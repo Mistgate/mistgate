@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -212,6 +213,16 @@ describe("what the owner can do with a node's WARP", () => {
     await click(dialog().querySelector('[role="checkbox"]'));
     await click(button("Register again", dialog()));
     expect(registerWarp).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "nod_1", acceptTos: true, replaceExisting: true }));
+  });
+
+  it("a refused registration says what Cloudflare answered, and offers the import", async () => {
+    registerWarp.mockRejectedValue(new ConnectError("cloudflare_rate_limited: status=429", Code.ResourceExhausted));
+    await mount(data({ state: WarpState.DOWN, lastError: "warp_flag_off" }, { needsAttention: true, attentionReason: "revoked" }));
+    await click(button("Register again"));
+    await click(dialog().querySelector('[role="checkbox"]'));
+    await click(button("Register again", dialog()));
+    expect(dialog().textContent).toContain("Cloudflare refused the registration (HTTP 429)");
+    expect(button("Import wgcf profile", dialog())).toBeDefined();
   });
 
   it("a working but slow account still offers «Register again» and «Restart WARP», neither as the main action", async () => {

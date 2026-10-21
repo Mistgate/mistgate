@@ -176,7 +176,7 @@ func TestRegisterRateLimited(t *testing.T) {
 	// 429 on every attempt: back off (1 s, 4 s), then the owner is told to import a profile; nothing is stored.
 	e.cf.rate429 = 99
 	_, err := e.register(node)
-	e.wantErr(err, connect.CodeResourceExhausted, "cloudflare_rate_limited")
+	e.wantErr(err, connect.CodeResourceExhausted, "cloudflare_rate_limited: status=429")
 	if n := e.cf.count("POST"); n != 3 {
 		t.Errorf("attempts = %d, want 1 + 2 retries", n)
 	}
@@ -690,7 +690,7 @@ func TestCloudflareErrors(t *testing.T) {
 	e.cf.version = "v0a0000" // the client asks for v0a5641: the fake answers 404 to everything
 	e.cf.mu.Unlock()
 	_, err := e.register(node)
-	e.wantErr(err, connect.CodeUnavailable, "cloudflare_rejected")
+	e.wantErr(err, connect.CodeUnavailable, "cloudflare_rejected: status=404")
 	e.cf.srv.Close()
 	_, err = e.register(node)
 	e.wantErr(err, connect.CodeUnavailable, "cloudflare_unreachable")

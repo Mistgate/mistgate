@@ -216,17 +216,18 @@ func (s *Service) internal(what string, err error) error {
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }
 
-// cloudflareErr maps what a call to Cloudflare returned to the client error, and logs the class (never a body).
+// cloudflareErr maps what a call to Cloudflare returned to the client error, and logs the class (never a body). The
+// HTTP status travels as "code: status=N" (the web errorVars format) so the owner sees what Cloudflare answered.
 func (s *Service) cloudflareErr(nodeID, what string, err error) error {
 	st := apiStatus(err)
 	s.log.Warn("warp: cloudflare call failed", "node", nodeID, "call", what, "status", st, "err", err)
 	switch {
 	case st == http.StatusTooManyRequests:
-		return fail(connect.CodeResourceExhausted, "cloudflare_rate_limited") // import a wgcf profile instead
+		return fail(connect.CodeResourceExhausted, fmt.Sprintf("cloudflare_rate_limited: status=%d", st)) // import a wgcf profile instead
 	case what == "refresh" && revoked(st):
 		return fail(connect.CodeFailedPrecondition, "account_revoked")
 	case st != 0:
-		return fail(connect.CodeUnavailable, "cloudflare_rejected")
+		return fail(connect.CodeUnavailable, fmt.Sprintf("cloudflare_rejected: status=%d", st))
 	}
 	return fail(connect.CodeUnavailable, "cloudflare_unreachable")
 }

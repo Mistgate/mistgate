@@ -66,6 +66,9 @@ func tlsSpecIDs() []string {
 
 const tlsHandshakeTimeout = 10 * time.Second
 
+// sendConnectionHeader: the Android app's request carries "Connection: Keep-Alive".
+const sendConnectionHeader = true
+
 // newTransport builds an HTTP/1.1 transport whose TLS ClientHello is the given spec. roots nil = the system roots
 // (tests pass a pool with the fake API's certificate). It never goes through a proxy: a CONNECT proxy would make
 // net/http skip DialTLSContext and send its own hello.

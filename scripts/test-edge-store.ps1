@@ -40,6 +40,15 @@ try {
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+
+    # The WARP registration goes through Go's fetch transport; warpapi.cjs presents a Worker-like process (so net/http
+    # uses fetch, not its in-process network) and serves a fake WARP API on 127.0.0.1. Only these tests need it.
+    $warpApi = Join-Path $repoRoot "cmd/mistgate-edge/testdata/warpapi.cjs"
+    $warpExec = "node --disable-warning=ExperimentalWarning --require $trimEnv --require $warpApi $wasmExec"
+    & go test "-exec=$warpExec" -run "Fetch|OnEdition" ./internal/panel/warp/
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
 } finally {
     $env:GOOS = $previousGoos
     $env:GOARCH = $previousGoarch

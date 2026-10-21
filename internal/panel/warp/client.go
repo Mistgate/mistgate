@@ -161,7 +161,9 @@ func (c *Client) roundTrip(ctx context.Context, p Params, method, path, token st
 	// The request the Android app makes: its user agent and client version, JSON with an explicit charset, no Accept.
 	req.Header.Set("User-Agent", p.UserAgent)
 	req.Header.Set("CF-Client-Version", p.CFClientVersion)
-	req.Header.Set("Connection", "Keep-Alive")
+	if sendConnectionHeader {
+		req.Header.Set("Connection", "Keep-Alive")
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json; charset=UTF-8")
 	}
