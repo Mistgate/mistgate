@@ -209,8 +209,13 @@ package mistgate.agent.v1;
 //     "update-guard/1" when the systemd unit carries the crash-loop guard (ExecStartPre). The panel sends
 //     UpdateAgent / RollbackAgent ONLY to a stream that listed "update/1"; any other node is shown as
 //     "update by hand once". Old agents and old panels ignore the new messages like any unknown oneof member.
-//     An edge link-only agent uses "update-link/1" for UpdateAgent and receives a per-step token for the Worker's
-//     HTTPS download route instead of the VPS FetchUpdate stream.
+//     A link-only agent lists "update-link/1" instead of "update/1" (and "update-guard/1" as above). Only the
+//     Cloudflare edition's panel sends it UpdateAgent / RollbackAgent; a VPS panel still shows it as "update by
+//     hand once". UpdateAgent then carries download_token, a per-step credential, and the agent downloads over
+//     the link's HTTPS route instead of FetchUpdate: GET <link prefix>/update/<node id>/<file> with
+//     "Authorization: Bearer <token>" and "Range: bytes=N-" to resume. The token is good for that node's step
+//     while it waits for the answer and for files of the manifest in the same UpdateAgent. The edge panel does
+//     not wait for the CommandResult: it records it and acts on it at its next scheduled pass.
 //   - MANIFEST. manifest is the exact byte string that was signed (JSON, schema 1: version, built, expires,
 //     files[{os, arch, name, size, sha256}]); signature is a detached ed25519 signature over those bytes. The
 //     agent never re-serialises it. "built" is the Unix time of the source commit: it, not the version string,
@@ -219,8 +224,8 @@ package mistgate.agent.v1;
 //     error=<code>} and leaves the installed binary untouched: signature valid under the compiled-in key
 //     (bad_signature; unsigned_build when the binary has no key); schema known (bad_manifest); not expired
 //     (expired); built > own built (equal: ok=true, affected=0, params{noop:"1"}, detail "already current";
-//     lower: downgrade); a file for runtime.GOOS/GOARCH (no_file_for_platform); download via FetchUpdate to
-//     "<exe>.new" (download_failed); size and sha256 equal the manifest (size_mismatch, hash_mismatch); chmod
+//     lower: downgrade); a file for runtime.GOOS/GOARCH (no_file_for_platform); download via FetchUpdate (a
+//     link-only agent: the link route) to "<exe>.new" (download_failed); size and sha256 equal the manifest (size_mismatch, hash_mismatch); chmod
 //     0755 and fsync; copy the running exe to "<exe>.prev"; write the marker <state-dir>/update.pending; rename
 //     "<exe>.new" over the exe (any filesystem failure up to here is not_writable, and the marker and ".new"
 //     are removed again); answer CommandResult{ok=true, affected=1, params{from_version, from_built,

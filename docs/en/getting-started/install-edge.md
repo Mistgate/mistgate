@@ -142,7 +142,6 @@ The admin shows "Not available in the Cloudflare edition yet" in the places belo
 | Backups | No encrypted backups and no restore. Cloudflare's own D1 recovery (Time Travel) can restore the database, but it has not been tried with the panel. Keep the key file. |
 | MCP and API tokens | The MCP server is not served. Tokens you already have are listed and can be revoked; new ones cannot be created. |
 | Tunnel checks | The panel does not run client-eye checks of the servers' tunnels. |
-| Updating nodes | The panel does not update node agents: no rollouts, no scheduled updates. |
 | Node logs | The live log of a node's agent is not shown. |
 | Updating the panel | There is no self-update: update by running the command again (below). |
 | Own decoy site | A node cannot get the **Own site** decoy: this edition does not store uploaded bundles. |
@@ -164,6 +163,8 @@ mistgate edge deploy --host panel.example.com
 ```
 
 It reads the key file, so the keys, the database and the secret paths stay. It uploads the scripts whose content changed (a release that leaves the front Worker alone does not restart the agents' connections), applies the new Durable Object migrations and makes a new setup token, which you can ignore (it is why admin is uploaded every time). A bundle that is older than what is deployed is refused before anything is uploaded. While the front Worker is replaced, connected agents reconnect on their own and an SSH install in progress is retried (its third interruption fails it). The key file is rewritten with the new bundle version; the master key stays, so your earlier backup of the file still opens everything. Read the release notes first: there is no backup of the database to go back to, and a rollback does not touch it.
+
+Nodes are updated from the **Updates** page of the admin, not by this command. They follow the panel's release: the panel offers the version it was deployed from, so run `mistgate edge deploy --version vX.Y.Z` first and the page then offers that release to the nodes. An agent of v0.1.49 or older cannot download an update through the panel yet; the page gives it two commands to run on the node once. See [On the Cloudflare edition](../operations/updates.md#on-the-cloudflare-edition).
 
 ## Roll back
 

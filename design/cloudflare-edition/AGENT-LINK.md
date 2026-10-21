@@ -25,7 +25,9 @@ timer would keep all of them awake. A second slim wasm would double the build an
    Cloudflare already holds the database and the master key, so this adds no new trust. Existing VPS agents are
    unchanged.
 2. Until phase 2 the edge edition has no agent self-update (needs R2) and no log streaming; the UI says "not available
-   in this edition yet".
+   in this edition yet". **Superseded for updates (2026-10-21):** nodes update over the link and the Worker streams the
+   download from the GitHub release, so R2 is not needed (§8). Log streaming and the panel's own update (`mistgate edge
+   deploy`, not a button) stay unavailable.
 
 ### Architecture
 - **Ordering.** Every NodeLink entry point (message, alarm, close, RPC method) runs inside `blockConcurrencyWhile`:
@@ -393,7 +395,8 @@ Agent (`cmd/mistgate-node`, `internal/node/agent`):
   backoff on `errLinkNotEstablished` (no hot loop against a dead panel).
 - Renewal sends `ConnectRequest.renew` on the current session and waits up to 2 minutes; with no session it retries at
   the next hourly tick (10 days of slack).
-- `capabilities()` leaves out `update/1` for link-only agents (FetchUpdate is mTLS; owner decision 2).
+- `capabilities()` leaves out `update/1` for link-only agents (FetchUpdate is mTLS). Since 2026-10-21 (§8) they list
+  `update-link/1` instead (and `update-guard/1` when the unit has the guard), still never `update/1`.
 - VPS agents are unchanged: `Meta.Link` is empty, every branch behaves as today.
 
 Implementation notes (5c), decisions the design left open:
@@ -411,7 +414,8 @@ Implementation notes (5c), decisions the design left open:
   panel-sent frames.
 - **Agent.** `New` takes `meta.Link` as `Config.LinkURL` (the flag or environment link of `run` is overridden). `linkOnly()` is
   `meta.Link != ""`: `session()` always calls `linkSession`; `connectLoop` backs off on `errLinkNotEstablished` like on any lost
-  connection. `capabilities()` leaves out `update/1` and `update-guard/1` (the guard only makes sense with the update). The enrol
+  connection. `capabilities()` left out `update/1` and `update-guard/1` (the guard only makes sense with the update); now a link-only agent
+  lists `update-link/1`, and `update-guard/1` when its unit carries the guard (§8). The enrol
   client for `--link-url` follows no redirect (the token is in the body). A renewal whose answer is lost with the session leaves
   the agent on the old key: the old certificate is valid for the 3-hour grace, so the next try (renewLoop, hourly) works; scenario 7b
   covers it. A link-only agent that finds no session retries after 20 s, not an hour. The enrol client reads at most 1 MiB, the
@@ -737,7 +741,7 @@ should take a few ms CPU and 3 D1 round trips, a cold one ~254 ms CPU more.
 Parity test (`app`): every name in `Panel.BackgroundJobs` is either run by `EdgeTick` or listed in `edgeDeferred` with
 its phase, so a new VPS background job fails CI until it has an edge home. Deferred: health checker and evaluator
 (NODE_DOWN alerts; phase 2, the evaluator needs a stored start time instead of the per-isolate grace); periodic UDP port
-rechecks (on-demand checks already work through `Remote`); `updates` (owner decision 2), `backups` (R2), `telegram`,
+rechecks (on-demand checks already work through `Remote`); `updates` (only the panel's own update; node updates run in `EdgeTick`, §8), `backups` (R2), `telegram`,
 `provision` (phase 3); `mcp-plan-sweep` (MCP is not served on the edge); log streaming (owner decision 2).
 
 ### 7.5 workerd verification (`edge/worker/test/do/workerd.test.ts`, fake PanelLink)
@@ -1039,3 +1043,62 @@ Every round passes the §3 gate and the race tests (fleet, agent, store); bridge
   and 42 MB with limits of 40 and 32 MiB: the peak is live data (the batch, its JSON and bound arguments), which a GC limit cannot
   free, and a limit near the live set only adds collection work.
 - CI's wasm size step and `scripts/build-edge.ps1` print the remaining headroom under the CI limit: 50 MiB until 2026-10, then 42 MiB (44,040,192 bytes) after the edge diet left panel.wasm at about 40.6 MB; the Worker ceiling is 64 MiB.
+
+## 8. Node updates over the link (2026-10-21)
+
+This supersedes owner decision 2 for updates (§2, §6.2 "capabilities", the §7.4 deferred list). Log streaming stays VPS-only, and the
+panel's own update stays `mistgate edge deploy` (the `panel_update` feature is still unavailable on the edge).
+
+**What the edge runs.** The same `update.Service` state machine as the VPS: the canary, the batches, the gate, pause, resume, cancel,
+manual rollback and scheduled updates. Its pass (`tick`, then `processScheduledNodeUpdates`, and the prune at minute 17) is
+`Service.EdgeTick`, called from `app.EdgeTick` as the `updates` job. The release is the panel's own: the signed node manifest of the tag
+the wasm was built from, fetched from the release download base and verified with the compiled-in key (`release.pub` is never read on the
+edge), cached per isolate for 10 minutes. Nodes follow the panel; there is no `dist`, no GitHub API and no R2. The gate checks that the
+update committed, that the state is applied, that the inbounds are readable and not newly failed, and that WARP is up for a WARP-egress
+profile. The client-eye probe check is not wired while `health_checks` is unavailable (`edition.Unavailable`); removing that feature from
+the edge list turns it on, and the Updates page says so until then.
+
+**Capability `update-link/1`.** `UpdateAgent` carries `download_token` (field 4); `RollbackAgent` is as for `update/1`. A link-only agent
+lists `update-link/1` (and `update-guard/1` when its unit has the guard) and never `update/1`: a VPS panel can hold link-only agents
+too (its `LinkHandler` serves link enrolment), and must keep treating them as "update by hand" instead of sending an `UpdateAgent` whose
+download route it does not serve. An agent of v0.1.49 or older has neither, so the edge shows "Update by hand" for it; the Updates page
+gives two commands to run on the node once (download the release file, check its SHA-256, then `mistgate-node install`).
+
+**Recorded requests.** A cron tick cannot wait for an agent that is downloading a file, so for these two commands the answer is recorded
+instead of awaited:
+
+1. The step is marked sent (a compare-and-set `pending -> sent` while the rollout runs), then `Fleet.SendUpdateAgent` /
+   `SendRollbackAgent` call `Remote.Send(ctx, node, requestID, frame, deadline)`, which returns as soon as the frame is out.
+2. In the Worker, `NodeLink.send(requestId, frame, deadlineAt)` runs a `request` link step with `record: true` (`LinkIn.Record`,
+   `AdminRequest.Record`) and answers `true` only when the frame went out on the live session. No session, a deadline already
+   passed or a refused request answers `false`; the step is then skipped as `offline`.
+3. The session core stores the request as `PendingRecorded` (kind and deadline; the frame is not stored). When the agent's
+   `CommandResult` arrives the core emits `EffectRecordAnswer` instead of `EffectReply`, and the link step runs it:
+   `Updates.RecordAnswer` -> `store.SetStepAnswer`, which stores the first answer only for the step's current request id in an active
+   rollout (`detail` and `error` clipped to 200). A pending that expires is dropped without an effect; a disconnect clears it.
+   `PendingRecorded = 6` is appended to the state, so an older panel ignores it.
+4. The next tick (at most a minute later) applies the recorded answer with the code the VPS goroutines use. The deadlines
+   (`SentAt + AnswerWait + ReconnectWait`, and the gate's) are absolute, and a reconnect is checked before any deadline.
+   Step writes are compare-and-set on the state, request id and answer they read, because ticks can overlap.
+
+**Download route.** `GET <link prefix>/update/<node id>/<file>`, `Authorization: Bearer <token>`, `Range` for resume.
+
+- FRONT sends everything under the link prefix to LINK. `httpserver.agentLinkRequest` admits `GET /update/<node>/<file>` (one
+  segment each) behind the agent rate limit; `fleet.LinkHandler` serves it only when `Remote != nil`. On a VPS panel it stays a 404, and
+  therefore the decoy.
+- `Updates.LinkDownload(node, file, token)` compares SHA-256(token), in constant time, with the digest stored on that node's step
+  (`update_step.download_sha`), which exists only while the step is sent, and requires the file to be listed in the manifest pinned to
+  the rollout. The token is 32 random bytes per step, sent only inside the `UpdateAgent` frame, stored as a digest, never in a URL, a
+  log line or the Durable Object state. A wrong token, node, file or step state is a 404; a store error is a 503.
+- On success the answer is `204` with `X-Mistgate-Asset: <release asset URL>` (`fleet.AssetMarkerHeader`), built from the compile-time
+  release base and a validated tag. The Worker's `forwardAsset` (`shell.ts`, the same marker pattern as `forwardLink` and
+  `forwardProvision`) fetches that URL, follows GitHub's redirect and returns the stream unchanged: only `Range`, `User-Agent` and
+  `Accept-Encoding: identity` go upstream, 200 and 206 pass with their length headers, 416 stays 416, anything else is 502, and the
+  marker never reaches the node. No JavaScript touches the bytes. The agent resumes with `Range`, retries, and checks size and SHA-256
+  against the manifest it verified with its own key, so a redirect cannot plant bytes.
+
+**Checks.** `scripts/e2e-wsl.sh --edge` step 2e updates a real link-only agent over this route against a fake release: the release cuts
+the first download, the agent resumes with `Range` through the redirect, and a wrong or missing token gets the decoy's 404 without
+reaching the release host. (The VPS run's self-update step, which §7.6 says the edge skipped, is this step on the edge.) The warning
+about an unusable release key that §7.6 saw on every isolate start is gone: the edge uses the compiled-in key and never reads
+`release.pub`.

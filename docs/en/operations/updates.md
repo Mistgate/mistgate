@@ -11,14 +11,14 @@ This page is for running a fleet. Making the release key, signing releases and p
 
 - There is one Ed25519 key pair, the **release key**. Its private half stays offline with whoever signs the releases; both binaries carry the public half, stamped in at build time. The official binaries carry the project's key. The panel also saves the key in `<data-dir>/release.pub` on its first start.
 - Every release has two signed manifests: the node bundle (`manifest.json` with `manifest.sig`) and the panel manifest (`panel-manifest.json` with `panel-manifest.sig`). Each lists the version, the build time, an expiry date and, for every binary, its name, OS, architecture, size and SHA-256. The panel manifest is signed in its own Ed25519 context, so an agent never accepts it as its update and the panel never installs a node binary as itself.
-- The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. Then it downloads the file from the panel over its mutual-TLS connection and checks the size and the SHA-256. Any failure leaves the installed binary untouched.
+- The agent checks, in this order: the signature against its compiled-in key, the manifest format, the expiry, that the release is newer than itself, and that the bundle has a file for its OS and architecture. Then it downloads the file from the panel over its mutual-TLS connection (on the [Cloudflare edition](#on-the-cloudflare-edition), over its link) and checks the size and the SHA-256. Any failure leaves the installed binary untouched.
 - The panel is only a courier: a compromised panel cannot make a node run code that was not signed with the release key.
 - Releases are ordered by their build time (the Unix time of the source commit), not by the version string. A release with the same build time as the node is "already current"; an older one is refused as a downgrade.
 - A node agent built without a release key cannot update itself; `mistgate-node version` prints the fingerprint of the key it carries. If the key compiled into the panel and `release.pub` differ, the panel logs `release key mismatch` and trusts no bundle until the new key is confirmed: see "Rotate the release key" in [Releases and signing](releases.md).
 
 ## Where the bundle comes from
 
-The panel keeps the node bundle in `<data-dir>/dist`.
+The panel keeps the node bundle in `<data-dir>/dist`. (The [Cloudflare edition](#on-the-cloudflare-edition) has no such folder and uses its own release; this section and the **Release bundle** line describe a VPS panel.)
 
 - **From GitHub.** A panel with a release key checks the latest stable release of `Mistgate/mistgate` when it starts and every 10 minutes after that. When the release carries a node bundle that verifies with the panel's key and is newer than the bundle the panel has, the panel downloads it, checks every file and replaces `dist` in one step. A release signed with another key is ignored and `dist` stays as it is. Downloading a bundle never updates a node by itself.
 - **By hand.** A panel built with your own key gets the bundle you sign and copy into `dist`: see "Use a bundle of your own" in [Releases and signing](releases.md). The panel reads `dist` again within a minute; **Read the folder again** reads it at once.
@@ -72,7 +72,7 @@ From top to bottom, by what needs you:
 
 Under the top card and in the panel's line the page lists what the update brings, so you can tell whether to do it now or later: the notes of every stable release newer than your oldest node agent, up to the bundle on the panel (and, for the panel, every release between this one and the one it can install). The newest version is shown in full, with **Show all** when it is long; the earlier ones are folded behind "and N earlier versions". The notes appear in the language of the interface (English when the release has none in it).
 
-The text is the description of the release on GitHub, read by the panel over HTTPS from the official repository on the same schedule as the release check. It is informational and **not signed**: only the manifests are. Nothing is decided from it except one badge. A release whose notes have a **Security** section (a heading "Security", "Безопасность" or "安全") is marked **Security fixes**, and the card then says that the update includes security fixes and is worth doing soon. Without such a section the page says nothing about urgency. Without a trusted bundle, or when the panel could not read the notes (for example on the [Cloudflare edition](../getting-started/install-edge.md), which has no node bundle), the block is simply absent.
+The text is the description of the release on GitHub, read by the panel over HTTPS from the official repository on the same schedule as the release check. It is informational and **not signed**: only the manifests are. Nothing is decided from it except one badge. A release whose notes have a **Security** section (a heading "Security", "Безопасность" or "安全") is marked **Security fixes**, and the card then says that the update includes security fixes and is worth doing soon. Without such a section the page says nothing about urgency. Without a trusted bundle, or when the panel has not read the notes yet (on the [Cloudflare edition](../getting-started/install-edge.md) that happens when you press **Check GitHub**), the block is simply absent.
 
 ## Update a node
 
@@ -122,7 +122,7 @@ Each update is pinned to a release:
    - the new build has committed: it connected and applied its configuration without a failed profile;
    - the configuration the node applied is the panel's;
    - no profile that worked before the update has failed (a profile that stays failed for 30 seconds fails the gate at once);
-   - every profile the panel can check has passed a [client-eye check](health.md) since the node came back (the panel starts a round at once).
+   - every profile the panel can check has passed a [client-eye check](health.md) since the node came back (the panel starts a round at once). The [Cloudflare edition](#on-the-cloudflare-edition) leaves this one out.
    - on a node with an enabled profile that exits through WARP, the WARP tunnel has been up since the node came back.
 4. When the gate passes, the step is done. A failed gate names the condition that did not hold: the new build did not confirm the update, the node did not apply its configuration, the panel could not read the node's profiles, a profile failed, or WARP did not come up. When it fails, the panel sends the node a rollback (the previous binary comes back), the step ends as "rolled back" and the rollout pauses.
 
@@ -185,11 +185,32 @@ scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@de1.example.com:/root/
 ssh root@de1.example.com 'chmod +x /root/mistgate-node && /root/mistgate-node install'
 ```
 
-`install` copies the binary to `/usr/local/bin/mistgate-node`, writes the current hardened service file (with the crash-loop guard) and restarts the agent. After that the node updates from the Updates page. Without a bundle on the panel, take `mistgate-node` of the same release as the panel.
+`install` copies the binary to `/usr/local/bin/mistgate-node`, writes the current hardened service file (with the crash-loop guard) and restarts the agent. After that the node updates from the Updates page. Without a bundle on the panel, take `mistgate-node` of the same release as the panel. On the Cloudflare edition the two commands are different: see below.
 
 Older agents keep working with a newer panel: changes to the agent protocol are additive. A feature an old agent lacks is reported as "agent too old" where it is needed.
 
+## On the Cloudflare edition
+
+A panel on the [Cloudflare edition](../getting-started/install-edge.md) updates its nodes from this same page, and the canary, batches, gate, pause, resume, cancel, manual rollback and scheduled updates work as described above. These things differ:
+
+- **The release is the panel's own.** The panel offers the signed node release of the version it was deployed from, checked against the key compiled into it, and never looks for a newer one. To move the nodes to a newer release, deploy it to the panel first, then press **Update** here. A panel that is not a release build, or that cannot fetch its release from GitHub, says why in the top card (it tries again within a minute) and starts no rollout. Deploying another version while a rollout runs pauses the rollout if nodes are still waiting ("the release bundle changed"). There is no `dist` folder, so the **Release bundle** line and **Read the folder again** are not shown.
+- **The node downloads through the panel.** The update command carries a token that is good for one step. The agent asks `<link address>/update/<node id>/<file>` with that token, and the panel's Worker streams the file from the GitHub release, so the node never contacts GitHub and only has to reach the panel. An interrupted download resumes where it stopped. Before it swaps, the agent checks the size and the SHA-256 against the signed manifest. The token works for that node only, while its step waits for the answer, and only for files of the manifest the rollout started with.
+- **The gate has no client-eye check.** The panel does not run [client-eye checks](health.md) on this edition yet, so the gate leaves that condition out, and the rollout window and card say so. It still requires that the new build committed, that the node applied the panel's configuration, that no profile that worked before has failed and, for a profile that exits through WARP, that WARP is up. A build that keeps its profiles running but breaks their tunnels passes this gate; the canary and the batches limit the damage.
+- **Steps move on the minute.** The edition's scheduled job advances a rollout once a minute, so a decision can come up to a minute later than on a VPS panel. The waiting limits are the same.
+- **The panel itself** is updated from your computer, not from this page: `mistgate edge deploy --host panel.example.com --version vX.Y.Z`, and `--rollback` returns the previous version (see [Update](../getting-started/install-edge.md#update) and [Roll back](../getting-started/install-edge.md#roll-back)). The panel's row shows this instead of **Update panel**. After the deploy, the nodes show **Update available**.
+
+An agent of v0.1.49 or older cannot download over the link yet, so its row says **Update by hand**. **How to update** gives two commands to run on the node, once, as root; the page fills in the version, the file for the node's architecture and its SHA-256 from the signed manifest:
+
+```sh
+curl -fL -o /root/mistgate-node.new https://github.com/Mistgate/mistgate/releases/download/vX.Y.Z/mistgate-node-linux-amd64 && echo "<sha256>  /root/mistgate-node.new" | sha256sum -c -
+chmod +x /root/mistgate-node.new && mv /root/mistgate-node.new /root/mistgate-node && /root/mistgate-node install
+```
+
+Run the second command when the first printed `OK`. This is the one time a node needs GitHub; if it cannot reach it, copy the file to `/root/mistgate-node.new` yourself and run the check and the second command. `install` keeps the node's identity and its link to the panel, writes the current service file and restarts the agent. After that the node updates from this page. A node that has not reported its architecture gets the amd64 file; on an ARM server take the arm64 file and its SHA-256 from the release's `manifest.json`.
+
 ## Update the panel
+
+This section is about a VPS panel. A panel on the [Cloudflare edition](#on-the-cloudflare-edition) is updated with `mistgate edge deploy`.
 
 The Updates page checks the latest stable release of `Mistgate/mistgate` at startup and every ten minutes (the same pace as the node bundle). When a newer signed release is out, the owner sees a small card with its version on every page except Updates. It can be collapsed to a pill, or closed until a newer version appears. **Check GitHub** checks at once (a check made in the last three minutes is answered from memory, which keeps the unauthenticated GitHub quota for the bundle download).
 

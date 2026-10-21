@@ -113,7 +113,21 @@ the object calls it through `this.ctx.exports.PanelLink` (a loopback entrypoint,
   are billed). Nothing pending means no alarm and no timer, so the object hibernates.
 - RPC: `poke()` (desired state changed), `ask(requestId, frame, deadlineAt)` (a request frame and the reply a later step resolves;
   `deadlineAt` is the caller's own deadline in ms since the epoch, and a request that reaches the object after it is never
-  sent; rejects with `link lost` when there is no session or it ends, and `timeout` at the deadline), `close(code, reason)`.
+  sent; rejects with `link lost` when there is no session or it ends, and `timeout` at the deadline), `send(requestId, frame, deadlineAt)`
+  (a recorded request, below), `close(code, reason)`.
+- `send(requestId, frame, deadlineAt)` is `ask` that does not wait: the cron cannot hold a tick open for an agent that is downloading a
+  file. It runs a `request` step with `record: true` and returns `true` only when the frame went out on the open session; no session,
+  a deadline already passed (also after waiting behind a slow step), a refused request or a step that closes the session return `false`,
+  and it never rejects (`sendNode` in `shell.ts`; the Go side reads `false` as an offline node). The node's answer is not returned: it
+  reaches Go as a later `frame` step, where the session core records it instead of replying (`PendingRecorded`, used for the node
+  update commands). `runtime.ts` passes it as `nodeLink.send`; a script without the `NODELINK` binding rejects it.
+- Node update downloads: the agent fetches `GET <link prefix>/update/<node id>/<file>` with a Bearer token. The link role checks the
+  token and answers 204 with `X-Mistgate-Asset: <release URL>` (`fleet.AssetMarkerHeader`); `forwardAsset` (`shell.ts`, chained after
+  `forwardProvision` in `handler.ts`) fetches that URL and returns the stream unchanged, so no JavaScript touches the bytes. Only
+  `Range`, `User-Agent` and `Accept-Encoding: identity` go upstream (no `Authorization`, no cookies); a redirect is followed; 200 and 206
+  pass with `Content-Length`, `Content-Range` and `Accept-Ranges`, 416 stays 416, anything else becomes 502; the marker never reaches
+  the node. Only https URLs are fetched (plain http for a loopback host, for the e2e's fake release). The node checks size and SHA-256
+  itself, so the redirect target is not trusted with the content.
 - Step contract (`LinkEvent`, `LinkStepIn`, `LinkStepOut` in `panellink.ts`): the state goes in and out as one string; the
   object writes it first, then sends the frames, delivers replies, applies the close and re-arms the alarm.
 
@@ -178,7 +192,7 @@ printf %s "$TOKEN" | sha256sum | cut -d' ' -f1 | wrangler secret put SETUP_TOKEN
 
 ## Scheduled background work
 
-The jobs Worker (`wrangler.jobs.example.toml`) is the only one with a cron trigger, once a minute. In `wrangler dev` the other scripts are reached by service binding only, and the tick is fired through the local explorer API (`POST /cdn-cgi/local/explorer/api/local/scheduled?worker=<name>-jobs`, body `{"cron":"* * * * *"}`; `/cdn-cgi/handler/scheduled` reaches only the listening script). Each tick sweeps user status and silent nodes; at UTC minute 17
+The jobs Worker (`wrangler.jobs.example.toml`) is the only one with a cron trigger, once a minute. In `wrangler dev` the other scripts are reached by service binding only, and the tick is fired through the local explorer API (`POST /cdn-cgi/local/explorer/api/local/scheduled?worker=<name>-jobs`, body `{"cron":"* * * * *"}`; `/cdn-cgi/handler/scheduled` reaches only the listening script). Each tick sweeps user status and silent nodes and moves node update rollouts along (`NodeLink.send`, above); at UTC minute 17
 it also runs health retention, and at minutes divisible by 10 it runs the desired-state safety net.
 
 With `PUBLIC_URL` set, the first cron tick after deployment (within about 60 seconds) may initialize a fresh database and
