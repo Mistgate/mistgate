@@ -3,22 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.50`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.51`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.50
+  meta: v0.1.0 – v0.1.51
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.50
+      release: v0.1.51
       current: true
       points:
-        - "**Cloudflare edition: node updates.** The panel rolls out agent updates as on a VPS (canary, batches, the gate, schedules, rollback); nodes follow the panel's release and download it through the panel, never from GitHub. Agents v0.1.49 and older need one manual step. See [On the Cloudflare edition](../operations/updates.md#on-the-cloudflare-edition)."
-        - "**Cloudflare edition: Telegram.** Alerts, sign-in notices and update failures reach Telegram, with the chat linked from the panel. See [Telegram alerts](../operations/telegram-alerts.md#on-the-cloudflare-edition)."
-        - "**Telegram link codes survive a panel restart** (they are kept in the database)."
+        - "**Cloudflare edition: Enable WARP.** The panel registers the WARP account through the Worker's own fetch instead of refusing. A refused registration, on either edition, now says what Cloudflare answered (\"Cloudflare refused the registration (HTTP 429)\") instead of \"Something went wrong\". See [Enable WARP](../guide/warp.md#enable-warp-register)."
+        - "**The manual update commands close** once the node no longer needs them."
     - title: Profiles
       section: profiles
       points:
@@ -78,7 +77,7 @@ Mistgate is in **beta**; the current release is `v0.1.50`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.50
+  meta: v0.1.34 – v0.1.51
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production

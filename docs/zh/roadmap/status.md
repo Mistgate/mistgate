@@ -3,22 +3,21 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.50`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.51`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.50
+  meta: v0.1.0 – v0.1.51
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.50
+      release: v0.1.51
       current: true
       points:
-        - "**Cloudflare 版：节点更新。** 面板像 VPS 上一样滚动更新 Agent（金丝雀节点、分批、更新后检查、计划更新、回滚）；节点跟随面板自身的发布版本，并通过面板下载，不访问 GitHub。v0.1.49 及更早的 Agent 需要手动更新一次。参见[在 Cloudflare 版中](../operations/updates.md#在-cloudflare-版中)。"
-        - "**Cloudflare 版：Telegram。** 告警、登录通知和更新失败会发送到 Telegram，聊天在面板中绑定。参见[Telegram 告警](../operations/telegram-alerts.md#在-cloudflare-版本上)。"
-        - "**Telegram 绑定码在面板重启后依然有效**（保存在数据库中）。"
+        - "**Cloudflare 版：启用 WARP。** 面板通过 Worker 自身的 fetch 注册 WARP 账户，而不再直接拒绝。在两个版本中，注册被拒绝时都会显示 Cloudflare 的返回结果（「Cloudflare 拒绝了注册（HTTP 429）」），而不是「出了点问题」。参见[启用 WARP](../guide/warp.md#启用-warp注册)。"
+        - "**手动更新命令会在节点不再需要时自动收起。**"
     - title: 协议配置
       section: profiles
       points:
@@ -78,7 +77,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.50`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.50
+  meta: v0.1.34 – v0.1.51
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
