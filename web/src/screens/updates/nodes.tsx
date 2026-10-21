@@ -254,7 +254,7 @@ export function NodeTable({
                   <LastUpdate node={n} fmt={fmt} />
                   {owner && actions(n)}
                 </div>
-                {open.has(n.nodeId) && (
+                {open.has(n.nodeId) && manual(n) && (
                   <div className="px-5 pb-4">
                     <HowTo data={data} node={n} />
                   </div>
@@ -276,7 +276,7 @@ export function NodeTable({
                   <Version node={n} fmt={fmt} />
                   <LastUpdate node={n} fmt={fmt} />
                 </div>
-                {open.has(n.nodeId) && <HowTo data={data} node={n} />}
+                {open.has(n.nodeId) && manual(n) && <HowTo data={data} node={n} />}
                 {owner && actions(n, "main")}
               </div>
             ))}
