@@ -233,13 +233,24 @@ func TestCronConcurrentTicksShareOneCountryRound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// EdgeTick at a minute divisible by ten fans out to the nodes after the response. Without a runner that is a bare goroutine,
+	// which outlives the test and runs against whatever the next test resets the shared fake D1 to.
+	var background sync.WaitGroup
+	afterResponse := func(work func()) {
+		background.Add(1)
+		go func() {
+			defer background.Done()
+			work()
+		}()
+	}
+	t.Cleanup(background.Wait) // registered after the store's Close, so it runs first
 	panel, err := app.Build(app.Config{
 		Store: st, Vault: vlt, Auth: authSvc, Clock: time.Now, Logger: log, DataDir: edgeNoFilesystemDataDir, MasterKey: key,
 		Instance: app.InstanceConfig{
 			PublicURL: "https://example.com", AdminPrefix: "/admin/", RPID: "example.com",
 			RPOrigins: []string{"https://example.com"}, AgentSNI: "agent.example.com", SubPrefix: "/sub/",
 		},
-		Remote: &cronTestRemote{},
+		Remote: &cronTestRemote{}, AfterResponse: afterResponse,
 	})
 	if err != nil {
 		t.Fatal(err)
