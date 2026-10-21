@@ -3,22 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.49`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.50`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.49
+  meta: v0.1.0 – v0.1.50
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.49
+      release: v0.1.50
       current: true
       points:
-        - "**The AmneziaWG kernel module on Ubuntu no longer needs Launchpad.** The node adds the Amnezia PPA from a key built into the agent (the fingerprint Launchpad publishes) instead of `add-apt-repository`, which timed out on hosts whose IPv6 is broken. See [Preparing the kernel module](../guide/amneziawg.md#preparing-the-kernel-module)."
-        - "**Cloudflare edition: alerts work.** Node down, drift, the doctor, quotas, devices, torrents and the rest are evaluated once a minute and shown in Health; tunnel checks and Telegram are not there yet. See [Not available in this edition yet](../getting-started/install-edge.md#not-available-in-this-edition-yet)."
-        - "**Cloudflare edition: a way back in.** `mistgate edge reset-login` prints a one-time link that gives the owner a new password and authenticator. See [Locked out](../getting-started/install-edge.md#locked-out)."
+        - "**Cloudflare edition: node updates.** The panel rolls out agent updates as on a VPS (canary, batches, the gate, schedules, rollback); nodes follow the panel's release and download it through the panel, never from GitHub. Agents v0.1.49 and older need one manual step. See [On the Cloudflare edition](../operations/updates.md#on-the-cloudflare-edition)."
+        - "**Cloudflare edition: Telegram.** Alerts, sign-in notices and update failures reach Telegram, with the chat linked from the panel. See [Telegram alerts](../operations/telegram-alerts.md#on-the-cloudflare-edition)."
+        - "**Telegram link codes survive a panel restart** (they are kept in the database)."
     - title: Profiles
       section: profiles
       points:
@@ -78,7 +78,7 @@ Mistgate is in **beta**; the current release is `v0.1.49`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.49
+  meta: v0.1.34 – v0.1.50
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
