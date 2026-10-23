@@ -187,6 +187,18 @@
   },
   {
     "type": "index",
+    "name": "link_hour_hour",
+    "tbl_name": "link_hour",
+    "sql": "CREATE INDEX link_hour_hour ON link_hour (hour_start)"
+  },
+  {
+    "type": "index",
+    "name": "link_hour_user",
+    "tbl_name": "link_hour",
+    "sql": "CREATE INDEX link_hour_user ON link_hour (user_id, hour_start) WHERE user_id \u003c\u003e ''"
+  },
+  {
+    "type": "index",
     "name": "mcp_plan_status",
     "tbl_name": "mcp_plan",
     "sql": "CREATE INDEX mcp_plan_status ON mcp_plan(status, expires_at)"
@@ -496,6 +508,12 @@
     "name": "link_dns_option",
     "tbl_name": "link_dns_option",
     "sql": "CREATE TABLE link_dns_option ( preset_id TEXT NOT NULL PRIMARY KEY REFERENCES dns_preset (id) ON DELETE CASCADE, position INTEGER NOT NULL, is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)) ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "link_hour",
+    "tbl_name": "link_hour",
+    "sql": "CREATE TABLE link_hour ( node_id TEXT NOT NULL, hour_start INTEGER NOT NULL, inbound_id TEXT NOT NULL, cred_id TEXT NOT NULL, user_id TEXT NOT NULL DEFAULT '', connects INTEGER NOT NULL DEFAULT 0, rejects INTEGER NOT NULL DEFAULT 0, drops INTEGER NOT NULL DEFAULT 0, stalls INTEGER NOT NULL DEFAULT 0, online_s INTEGER NOT NULL DEFAULT 0, unknown_keys INTEGER NOT NULL DEFAULT 0, hellos INTEGER NOT NULL DEFAULT 0, handshakes INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (node_id, hour_start, inbound_id, cred_id) ) STRICT"
   },
   {
     "type": "table",

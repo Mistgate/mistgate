@@ -393,7 +393,7 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	for i := 0; i < certificates; i++ {
 		certs = append(certs, fleetInboundCertWrite{InboundID: fmt.Sprintf("inb_%03d", i), Pin: "pin", NotAfter: now.Add(time.Hour).Unix()})
 	}
-	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, deviceWrites, certs, touches, FleetLive{})
+	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, deviceWrites, certs, touches, nil, FleetLive{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,8 +401,8 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	if before != 1211 {
 		t.Fatalf("legacy batch statement count = %d, want 1211", before)
 	}
-	if len(stmts) != 9 {
-		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 9 after",
+	if len(stmts) != 10 {
+		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 10 after",
 			users, sessions, certificates, before, len(stmts))
 	}
 	t.Logf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d",

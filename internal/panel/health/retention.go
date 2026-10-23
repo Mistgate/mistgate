@@ -15,6 +15,7 @@ const (
 	retentionEvery = time.Hour
 	eventBatch     = 2000
 	deviceKeep     = 90 * 24 * time.Hour // how long a revoked device (not a blocked one) stays as a row
+	linkKeep       = 48 * time.Hour      // connection counters (link_hour), the most GetUserConnection and GetNodeConnections read
 )
 
 func (s *Service) runRetention(ctx context.Context) {
@@ -73,6 +74,12 @@ func (s *Service) sweep(ctx context.Context) {
 		s.log.Warn("health: prune kl!ck reports", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned kl!ck reports", "count", n)
+	}
+	// The connection counters (link_hour) are hour buckets; the window the RPCs read is 48 hours.
+	if n, err := s.st.PruneLinkHours(ctx, now.Add(-linkKeep)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune connection counters", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned connection counters", "count", n)
 	}
 	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
 	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {
