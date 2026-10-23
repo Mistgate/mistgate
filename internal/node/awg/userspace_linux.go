@@ -106,10 +106,8 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 	if warn != nil {
 		u.log.Warn("awg interface: IPv6 address not set, the tunnel runs IPv4 only", "iface", name, "err", warn)
 	}
-	u.mu.Lock()
-	u.devs[name] = dev
+	u.devs[name] = dev // u.mu is held since the top of Create
 	u.unknown[name] = unknown
-	u.mu.Unlock()
 	return nil
 }
 

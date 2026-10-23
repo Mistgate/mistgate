@@ -360,7 +360,11 @@ m3_awg_traffic() {
     || die "GetUser: the 3.1 device is not online with a handshake time: $(user_of "$CAROL" | jq -c '.devices[] | {id, online, lastHandshakeUnix}')"
   peers_seen() { inbound_of "$AWG31" | jq -e '.awg.peers >= 1 and .awg.peersHandshaken >= 1'; }
   wait_for 60 "the peer in the inbound status" peers_seen || die "inbound status: $(inbound_of "$AWG31" | jq -c .awg)"
-  pass "20 MB through the tunnel: the panel counted $after bytes (ratio $(python3 -c "print(round($after / 20000000, 3))")), the device is online with a handshake, the inbound reports the peer"
+  # the connection counters (agent links/1): the device's first handshake on the 3.1 inbound is a connect
+  awg_conn() { api NodeService/GetNodeConnections "{\"nodeId\":\"$NODE_ID\",\"hours\":1}" | jq -c --arg p "$AWG31" '[.inbounds[]? | select(.profileId == $p)][0] // {}'; }
+  awg_connected() { [ "$(awg_conn | jq -r '(.connects // 0) | tonumber')" -ge 1 ]; }
+  wait_for 30 "an AWG connect in the connection counters" awg_connected || die "GetNodeConnections: no connect on the 3.1 inbound: $(awg_conn)"
+  pass "20 MB through the tunnel: the panel counted $after bytes (ratio $(python3 -c "print(round($after / 20000000, 3))")), the device is online with a handshake, the inbound reports the peer and counts the connect"
 
   # ---- rotate: the old key stops at once, the address stays
   ts=$(date +%s)
