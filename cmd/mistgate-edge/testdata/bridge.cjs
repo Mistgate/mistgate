@@ -1209,8 +1209,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      29,
-      "a minute 17 cron tick costs 29 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, 10 for retention (four of them prune statements), 10 for a warm evaluator pass, and 2 for the updates job (the active rollout read and its history prune)",
+      30,
+      "a minute 17 cron tick costs 30 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, 11 for retention (five of them prune statements), 10 for a warm evaluator pass, and 2 for the updates job (the active rollout read and its history prune)",
     );
 
     // The Overview is polled every 10 seconds. The health summary of every node is one settings row, read once: more connected

@@ -150,7 +150,7 @@ func (b base) newSubParts(migrate bool) subParts {
 	p.cfg = subs.Config{
 		Title: b.c.Title, BaseURL: b.subBase, Settings: p.cache, Brand: p.brand,
 		Routing: subs.HappRouting(p.dns), Events: b.st, Log: b.log,
-		Limiter: b.limiter, AfterResponse: b.c.AfterResponse,
+		Limiter: b.limiter, AfterResponse: b.c.AfterResponse, ProbeReports: b.st,
 		PageKey: b.vlt.Derive(pagepass.KeyLabel), // the page password of every user: computed from the token, nothing stored
 	}
 	return p

@@ -2,8 +2,8 @@
 // client lines (hysteria2:// and vless:// URIs) with the headers Happ and other Xray/sing-box apps read, or, for a client the
 // settings send to the Mihomo format, a Mihomo YAML profile (mihomo.go), to the Xray JSON format an array of Xray configs (xrayjson.go), to the
 // sing-box format a sing-box profile (singbox.go; a hidden ?format=xray-json|sing-box on the link picks one of the two for a request); a browser gets the user page. Under the same
-// prefix the page's self-service endpoints manage the user's AmneziaWG devices (devices.go). Unknown tokens get the
-// decoy, so the endpoint cannot be told from any other path of the site.
+// prefix the page's self-service endpoints manage the user's AmneziaWG devices (devices.go), and the kl!ck app sends the reports
+// of its local server check (probe.go). Unknown tokens get the decoy, so the endpoint cannot be told from any other path of the site.
 //
 // Abuse protection, all in memory and bounded, none of it logging a token or an address:
 //   - token guessing: after MissLimit unknown tokens from one client network within MissWindow, that
@@ -34,6 +34,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/clientprobe"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/httpserver/ratelimit"
 	"github.com/mistgate/mistgate/internal/panel/instance"
@@ -112,6 +113,9 @@ type Config struct {
 	AfterResponse func(func())
 	// Limiter is the shared backend for security-sensitive subscription limits. Nil uses bounded in-memory state.
 	Limiter securitylimit.Limiter
+	// ProbeReports keeps the reports of the kl!ck probe (POST <prefix>/<token>/probe). The owner's switch is read with the
+	// settings (Settings.ProbeReports); while it is on, the app answers carry Probe-Report. Nil = the panel takes none.
+	ProbeReports ProbeStore
 	// Now is the clock (tests); default time.Now.
 	Now func() time.Time
 
@@ -307,6 +311,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case sub == "dns":
 		h.serveDNS(w, r, token, client, now)
+		return
+	case sub == "probe":
+		h.serveProbe(w, r, token, client, now)
 		return
 	case sub != "":
 		h.serveDevices(w, r, token, sub, client, now)
@@ -560,6 +567,10 @@ func (h *handler) headers(w http.ResponseWriter, r *http.Request, token string, 
 	if u := set.GetSupportUrl(); u != "" {
 		hd.Set("Support-Url", u)
 	}
+	if h.probeOn(ctx) {
+		// kl!ck sends the reports of its local server check only to a panel that says it takes them, and of what version.
+		hd.Set("Probe-Report", strconv.Itoa(clientprobe.Version))
+	}
 	if v.Refusal != "" {
 		// The headers of Remnawave, 3x-ui and v2RayTun, so the apps that read them say the same: the HWID check is on, and
 		// the limit is reached or the app has no device ID to give. A blocked device gets neither: the limit is not why,
@@ -788,7 +799,8 @@ func (h *handler) suspect(user string) {
 }
 
 // routeOf splits a request under the prefix into the token and what follows it: GET/HEAD <prefix>/<token> is the
-// subscription itself (sub ""), POST <prefix>/<token>/devices[/<id>/<action>] a self-service call (sub "devices..."), POST <prefix>/<token>/dns the pick of a DNS (sub "dns"), POST <prefix>/<token>/unlock the page password.
+// subscription itself (sub ""), POST <prefix>/<token>/devices[/<id>/<action>] a self-service call (sub "devices..."), POST <prefix>/<token>/dns the pick of a DNS (sub "dns"), POST <prefix>/<token>/unlock the page password,
+// POST <prefix>/<token>/probe a report of the kl!ck probe.
 // Anything else is not ours (ok false).
 func routeOf(r *http.Request, prefix string) (token, sub string, ok bool) {
 	p := r.URL.Path
@@ -812,7 +824,7 @@ func routeOf(r *http.Request, prefix string) (token, sub string, ok bool) {
 	switch {
 	case sub == "" && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 		return token, "", true
-	case r.Method == http.MethodPost && (sub == "unlock" || sub == "dns" || sub == "devices" || strings.HasPrefix(sub, "devices/")):
+	case r.Method == http.MethodPost && (sub == "unlock" || sub == "dns" || sub == "probe" || sub == "devices" || strings.HasPrefix(sub, "devices/")):
 		return token, sub, true
 	}
 	return "", "", false

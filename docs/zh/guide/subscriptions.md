@@ -135,6 +135,7 @@ sequenceDiagram
 | `Profile-Web-Page-Url` | 链接本身，即应用中指向用户页面的按钮。 |
 | `Announce` | 公告，或订阅无法使用的原因。 |
 | `Support-Url` | 支持链接。 |
+| `Probe-Report` | 面板接收 kl!ck 服务器检查报告时为 `1`（**可达性 → 来源**，参见 [kl!ck 报告](../operations/reachability.md#klck-报告)）。没有它，kl!ck 不会发送任何内容。 |
 | `Routing` | 仅供 Happ 使用，且仅随链接列表发送：用户的 DNS 预设，以 Happ 路由配置形式提供。参见[DNS](dns.md)。其他格式自带 DNS，因此不发送 `Routing`。 |
 | `Ping-Type`、`Ping-Result`、`Subscription-Ping-Onopen-Enabled` | 仅供 Happ 使用，且仅在**Happ 延迟测试**不是**应用默认**时发送：Happ 测试服务器延迟的方式、以 ms 显示延迟，以及打开应用时是否测试。参见[名称与文本](#名称与文本)。 |
 

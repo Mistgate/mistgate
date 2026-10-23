@@ -13,7 +13,7 @@ The client-eye checks run on the panel's server, which is not inside the country
 - **Summary**: how many nodes are reachable, TCP blocked, unreachable, listed (in a block list, not checked live) or without data, in the colours and marks of Health. With every source off it says so instead and points to the sources.
 - **Nodes**: for each node its verdict now, with the same tooltip as on Health, then a line per source (*Globalping*, *Lists*, *Probe*): what that source says now and a lane of its verdicts over 7 days. A lane is a strip of segments coloured by verdict; hover or focus a segment to see its verdict and when it started and ended, and move along a lane with the arrow keys. A source that is off is dimmed and its lanes are empty. On a screen narrower than 1280 pixels each node is a card with the lanes under its verdict.
 - **Recent events**: the `country_blocked` alerts of the last 7 days, open and closed, each a link to the alert on **Health → Alerts**.
-- **Sources**: the cards of [Globalping](#globalping), the [block lists](#block-lists) and the [TSPU probe](#tspu-probe).
+- **Sources**: the cards of [Globalping](#globalping), the [block lists](#block-lists), the [TSPU probe](#tspu-probe) and the [kl!ck reports](#klck-reports).
 
 **Health → Checks** still shows the verdict as its last column, *From Russia* (a row per node on a phone), and the node page as a row of its client-eye checks. Both are hidden while every source is off, and their titles lead to this section. The API has the week as `CountryReachabilityService.GetReachabilityHistory`: at most 7 days, readable like `GetChecks` by every role and by API tokens.
 
@@ -59,6 +59,16 @@ The third source of the country check, and the one that tests the TCP ports of y
   - *Could not find the TSPU on the path*: the agent did not say why, as an agent from before this field. Update the agent and run **Test** again.
 - **Off means off.** With the source off no command is sent, neither on schedule nor by **Test**, and Health shows nothing from it. Stored rows stay hidden for 7 days. **Disconnect** switches it off and deletes the stored rows and the settings (the probe node, the interval, the last run).
 - **Not on the Cloudflare edition yet.** A run takes minutes and the scheduled jobs of that edition have seconds, so the card says the source is unavailable there and nothing runs (see [Not available in this edition yet](../getting-started/install-edge.md#not-available-in-this-edition-yet)).
+
+## kl!ck reports
+
+The [kl!ck](https://github.com/vbu00/klick) VPN app (Windows, macOS) has a server check the person starts in its window: from their own home or mobile network it tells, per server of the subscription, a TSPU **freeze** (the server answers and the latency checks pass, but a download stalls after 1–64 KB), blocked TCP, a failed handshake or no answer, and whether the network's DNS lies. With **send to the panel** on in the app, the result comes to the panel that issued the subscription. It is a source of its own, **off by default**, and looks from wherever the people are, whatever the country of the page.
+
+- **Where**: the *kl!ck users* card in **Reachability → Sources**: the switch, how many reports came in 7 days and when the newest did, and per node how many reports checked it, how many of them saw a freeze, blocked TCP or no connection, and the same by operator and by region. A report counts once per node, in every verdict one of the node's servers got. Changing the switch asks for a fresh confirmation; **Disconnect** switches it off and deletes every stored report.
+- **How the app learns of it.** While the source is on, every subscription answer to an app carries `Probe-Report: 1`. Without it kl!ck sends nothing and shows no switch. The switch reaches the subscription answers within a minute.
+- **What comes in.** `POST <the subscription link>/probe`, JSON, at most once in 10 minutes per subscription (sooner gets `429` with `Retry-After`). The token in the link is the only authentication: an unknown link gets the decoy, like an unknown subscription link. The panel checks every field (version, ranges, the known words) and refuses anything else with `400`. It matches each server by host and port against the person's own subscription; a server that is not in it is dropped. It answers `200 {"accepted":N}`, or `403 probe_off` while the source is off.
+- **What is stored.** For 7 days: the node, the protocol type and port, the verdict and what was measured, and the network as the app saw it (operator, AS number, country, region, kind of network). Not the address the report came from (neither stored nor logged), no person, no device.
+- **Not in the verdict yet.** The reports are shown on their card only: they do not change a node's verdict, its lanes or the alert.
 
 ## The alert
 

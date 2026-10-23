@@ -24,6 +24,7 @@ vi.mock("@/lib/api", () => ({
   globalping: { getGlobalping: () => Promise.resolve({ settings: { enabled: true, intervalMin: 15, hasToken: true } }) },
   blocklist: { getBlocklist: () => Promise.resolve({ settings: { enabled: true, available: true, checkedUnix: 0, listsUnix: 0 } }) },
   tspuProbe: { getTspuProbe: () => Promise.resolve({ settings: { enabled: true, available: true, unavailableReason: "", probeNodeId: "nod_probe1", intervalMin: 120, nodes: [] } }) },
+  clientProbe: { getClientProbe: () => Promise.resolve({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   isUnauthenticated: () => false,
   webauthnSupported: () => false,
@@ -195,10 +196,10 @@ describe("the Reachability page with every source on", () => {
     expect(events[1]?.textContent).toContain("lasted 16 h");
   });
 
-  it("ends with the three source cards for the owner", async () => {
+  it("ends with the four source cards for the owner", async () => {
     await mount();
     expect(document.querySelector("#sources h2")?.textContent).toBe("Sources");
-    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe"]);
+    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "kl!ck users"]);
   });
 });
 
@@ -251,7 +252,7 @@ describe("the Reachability page with the sources off", () => {
     expect(document.querySelector("[data-kind]")).toBeNull();
     expect(rows()).toHaveLength(0);
     expect(document.querySelectorAll("[data-testid=reach-event]")).toHaveLength(2);
-    expect(document.querySelectorAll("#sources h3")).toHaveLength(3);
+    expect(document.querySelectorAll("#sources h3")).toHaveLength(4);
   });
 
   it("dims a source that is off and leaves its lanes empty, while the others draw", async () => {

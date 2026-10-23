@@ -21,7 +21,16 @@ const getTspuProbe = vi.fn();
 const updateTspuProbe = vi.fn();
 const testTspuProbe = vi.fn();
 const disconnectTspuProbe = vi.fn();
+const getClientProbe = vi.fn();
+const updateClientProbe = vi.fn();
+const disconnectClientProbe = vi.fn();
 vi.mock("@/lib/api", () => ({
+  clientProbe: {
+    getClientProbe: (...a: unknown[]) => getClientProbe(...a),
+    updateClientProbe: (...a: unknown[]) => updateClientProbe(...a),
+    disconnectClientProbe: (...a: unknown[]) => disconnectClientProbe(...a),
+  },
+  nodes: { listNodes: () => Promise.resolve({ nodes: [{ id: "nod_1", name: "de1" }] }) },
   tspuProbe: {
     getTspuProbe: (...a: unknown[]) => getTspuProbe(...a),
     updateTspuProbe: (...a: unknown[]) => updateTspuProbe(...a),
@@ -61,6 +70,7 @@ beforeEach(() => {
   getChecks.mockResolvedValue({ nowUnix: 0, intervalS: 300, columns: [], rows: [], countryChecks: [] });
   getBlocklist.mockResolvedValue({ settings: lists() });
   getTspuProbe.mockResolvedValue({ settings: tspu() });
+  getClientProbe.mockResolvedValue({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 });
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -68,7 +78,7 @@ afterEach(() => {
   root = host = null;
   act(() => setLang("en"));
   for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks, getBlocklist, updateBlocklist, testBlocklist, disconnectBlocklist]) m.mockReset();
-  for (const m of [getTspuProbe, updateTspuProbe, testTspuProbe, disconnectTspuProbe]) m.mockReset();
+  for (const m of [getTspuProbe, updateTspuProbe, testTspuProbe, disconnectTspuProbe, getClientProbe, updateClientProbe, disconnectClientProbe]) m.mockReset();
 });
 
 const settings = (over: Record<string, unknown> = {}) => ({ enabled: false, intervalMin: 15, hasToken: false, ...over });
@@ -251,7 +261,7 @@ describe("the block-list card", () => {
   it("sits next to the Globalping card in the group, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
     await mount(settings());
     const grid = card()?.parentElement;
-    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe"]);
+    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "kl!ck users"]);
     expect(listsState()?.dataset.state).toBe("off");
     expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
     expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");
@@ -589,5 +599,73 @@ describe("the TSPU probe card", () => {
     await mount(settings());
     expect(probeState("TSPU 探测")?.textContent).toBe("已关闭 · 不会运行任何检测，也不会发送任何数据。");
     expect(card("TSPU 探测")?.textContent).toContain("节点地址只会发送到你自己的探测节点，不会发往其他任何地方。");
+  });
+});
+
+describe("the kl!ck card", () => {
+  const card = (title = "kl!ck users") => [...document.querySelectorAll("section")].find((s) => s.querySelector("h3")?.textContent === title);
+  const klickState = (title?: string) => card(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+  const klickButton = (label: string) => [...(card()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
+  const ago = Math.floor(Date.now() / 1000) - 300;
+  const tally = (over: Record<string, number> = {}) => ({ reports: 0, ok: 0, freeze: 0, tcpBlocked: 0, handshakeFailed: 0, noAnswer: 0, lastUnix: ago, ...over });
+  const withReports = {
+    settings: { enabled: true, reports: 6, lastUnix: ago },
+    nowUnix: ago + 300,
+    nodes: [
+      {
+        nodeId: "nod_1",
+        tally: tally({ reports: 5, ok: 2, freeze: 3 }),
+        operators: [
+          { name: "MTS PJSC", tally: tally({ reports: 4, ok: 1, freeze: 3 }) },
+          { name: "", tally: tally({ reports: 1, ok: 1 }) },
+        ],
+        regions: [{ name: "RU · Moscow", tally: tally({ reports: 5, ok: 2, freeze: 3 }) }],
+      },
+      { nodeId: "nod_gone", tally: tally({ reports: 1, ok: 1 }), operators: [], regions: [] },
+    ],
+  };
+
+  it("is off by default and switches on through UpdateClientProbe", async () => {
+    updateClientProbe.mockResolvedValue({ settings: { enabled: true, reports: 0, lastUnix: 0 } });
+    await mount(settings());
+    expect(klickState()?.dataset.state).toBe("off");
+    expect(klickState()?.textContent).toBe("Off · The subscription does not offer it, and the app sends nothing.");
+    expect(card()?.textContent).toContain("never the person's address");
+    expect(klickButton("Disconnect")).toBeUndefined();
+    getClientProbe.mockResolvedValue({ settings: { enabled: true, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 });
+    await click(card()?.querySelector("[role=switch]"));
+    expect(updateClientProbe).toHaveBeenCalledWith({ enabled: true });
+    expect(klickState()?.dataset.state).toBe("waiting");
+  });
+
+  it("shows per node what went wrong, from which operators and regions, and how fresh", async () => {
+    getClientProbe.mockResolvedValue(withReports);
+    await mount(settings());
+    expect(klickState()?.textContent).toBe("Works · 6 reports in 7 days · the last 5 min ago");
+    const rows = [...card()!.querySelectorAll("[data-testid=klick-node]")].map((r) => r.textContent);
+    expect(rows).toEqual([
+      "de1!freeze 35 reports · 5 min agoOperators: MTS PJSC (4): freeze 3; unknown (1): okRegions: RU · Moscow (5): freeze 3",
+      "nod_goneok in every report1 report · 5 min ago",
+    ]);
+  });
+
+  it("disconnects after asking, and speaks Russian", async () => {
+    getClientProbe.mockResolvedValue(withReports);
+    disconnectClientProbe.mockResolvedValue({ settings: { enabled: false, reports: 0, lastUnix: 0 } });
+    await mount(settings());
+    await click(klickButton("Disconnect"));
+    expect(dialog()?.textContent).toContain("every stored report is deleted");
+    getClientProbe.mockResolvedValue({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 });
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Disconnect"));
+    expect(disconnectClientProbe).toHaveBeenCalledWith({});
+    expect(klickState()?.dataset.state).toBe("off");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("ru"));
+    getClientProbe.mockResolvedValue(withReports);
+    await mount(settings());
+    const ru = "Пользователи kl!ck";
+    expect(klickState(ru)?.textContent).toBe("Работает · 6 отчётов за 7 дней · последний 5 мин назад");
+    expect(card(ru)?.textContent).toContain("Операторы: MTS PJSC (4): заморозка 3; неизвестно (1): в порядке");
   });
 });

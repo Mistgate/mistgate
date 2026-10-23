@@ -135,6 +135,7 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 | `Profile-Web-Page-Url` | The link itself: the app's button to the person's page. |
 | `Announce` | The announcement, or the reason the subscription does not work. |
 | `Support-Url` | The support link. |
+| `Probe-Report` | `1` while the panel takes the reports of the kl!ck server check (**Reachability → Sources**, see [kl!ck reports](../operations/reachability.md#klck-reports)). Without it kl!ck sends nothing. |
 | `Routing` | The link list for Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
 | `Ping-Type`, `Ping-Result`, `Subscription-Ping-Onopen-Enabled` | Happ only, and only when **Ping in Happ** is not **App default**: how Happ pings the servers, the delay in ms, and whether it pings when it opens. See [Names & texts](#names-texts). |
 

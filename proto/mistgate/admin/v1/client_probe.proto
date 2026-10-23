@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// kl!ck reports: what the people who use the kl!ck VPN app see of the servers from their own networks. kl!ck has a local probe
+// the person starts in the app: per server of the subscription it tells a TSPU "freeze" (the server answers and latency checks
+// pass, but a download stalls after 1–64 KB), a blocked TCP connection, a failed handshake, no answer, and whether the DNS of
+// the network lies. With the person's consent ("send to the panel" in the app) the result comes here. Conventions:
+// common.proto.
+//
+// THE WIRE (fixed by the app). The subscription answer carries "Probe-Report: 1" while this source is on (the newest report
+// version the panel takes); without the header the app sends nothing and shows no switch. The app POSTs JSON to the
+// subscription link + "/probe" (https only, the query dropped): the token in the path is the only authentication, no device
+// id. At most once in 10 minutes per subscription (the panel answers 429 + Retry-After when it comes sooner), through the VPN
+// when it is on. Answers: 200 {"accepted":N} (N = server results that matched a node of the person's subscription), 403
+// {"error":"probe_off"} (this source is off), 429, anything else is "not sent". An unknown or rotated link gets what an unknown
+// subscription link gets (the decoy).
+//
+// WHAT IS STORED. Per server result that matched a node: the node, the protocol type and port the app named, the verdict and
+// what was measured, and the network the person was on as the app saw it (AS number, operator, country, region, kind of
+// network). NOT the address the report came from (it is neither stored nor logged), no user, no device, no server address.
+// Results live 7 days (the health retention sweep). The host and port of a result are matched against the person's own
+// subscription; a result for anything else is dropped.
+//
+// OFF IS THE DEFAULT. Off: no header, every report is refused with probe_off, and nothing is shown. Disconnect also forgets
+// every stored report. The switch reaches a subscription answer within a minute (the settings cache).
+//
+// WHO MAY CALL WHAT. All of it is OWNER-ONLY; UpdateClientProbe and DisconnectClientProbe need a step-up. Not open to API
+// tokens or MCP.
+service ClientProbeService {
+  // The switch and what the stored reports say, per node.
+  rpc GetClientProbe(GetClientProbeRequest) returns (GetClientProbeResponse);
+  // Changes the switch; absent fields stay. Owner only; needs a step-up.
+  rpc UpdateClientProbe(UpdateClientProbeRequest) returns (UpdateClientProbeResponse);
+  // Disconnect: switches it off AND forgets every stored report. Owner only; needs a step-up. Idempotent.
+  rpc DisconnectClientProbe(DisconnectClientProbeRequest) returns (DisconnectClientProbeResponse);
+}
+
+message ClientProbeSettings {
+  // Default false.
+  bool enabled = 1;
+  // Reports stored (the last 7 days) and when the newest came; 0 = none.
+  uint32 reports = 2;
+  int64 last_unix = 3 [jstype = JS_NUMBER];
+}
+
+// What the reports say of a node, or of the part of them from one operator or region. A report counts once per node however
+// many of the node's servers it checked, in every verdict one of them got: a report where VLESS froze and Hysteria2 passed is
+// one freeze. ok counts the reports where every server of the node that was checked was ok.
+message ClientProbeTally {
+  uint32 reports = 1;
+  uint32 ok = 2;
+  uint32 freeze = 3;
+  uint32 tcp_blocked = 4;
+  uint32 handshake_failed = 5;
+  uint32 no_answer = 6;
+  // The newest of these reports.
+  int64 last_unix = 7 [jstype = JS_NUMBER];
+}
+
+// One operator or region. name is as the app saw it: the operator ("MTS PJSC", else "AS8359", else ""), or the region with
+// its country ("RU · Moscow", "RU", or "" when the app did not know).
+message ClientProbeGroup {
+  string name = 1;
+  ClientProbeTally tally = 2;
+}
+
+message ClientProbeNode {
+  string node_id = 1;
+  ClientProbeTally tally = 2;
+  // Most reports first; at most 8 of each.
+  repeated ClientProbeGroup operators = 3;
+  repeated ClientProbeGroup regions = 4;
+}
+
+message GetClientProbeRequest {}
+message GetClientProbeResponse {
+  ClientProbeSettings settings = 1;
+  // Every node a stored report checked, by node id; empty while the source is off.
+  repeated ClientProbeNode nodes = 2;
+  int64 now_unix = 3 [jstype = JS_NUMBER];
+}
+
+message UpdateClientProbeRequest {
+  optional bool enabled = 1;
+}
+message UpdateClientProbeResponse { ClientProbeSettings settings = 1; }
+
+message DisconnectClientProbeRequest {}
+message DisconnectClientProbeResponse { ClientProbeSettings settings = 1; }

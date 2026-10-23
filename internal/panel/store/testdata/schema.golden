@@ -49,6 +49,12 @@
   },
   {
     "type": "index",
+    "name": "client_probe_report_at",
+    "tbl_name": "client_probe_report",
+    "sql": "CREATE INDEX client_probe_report_at ON client_probe_report (at)"
+  },
+  {
+    "type": "index",
     "name": "country_blocklist_check_at",
     "tbl_name": "country_blocklist_check",
     "sql": "CREATE INDEX country_blocklist_check_at ON country_blocklist_check (at)"
@@ -376,6 +382,12 @@
     "name": "batch_guard",
     "tbl_name": "batch_guard",
     "sql": "CREATE TABLE batch_guard ( failed INTEGER NOT NULL, CONSTRAINT batch_guard CHECK (failed = 0) )"
+  },
+  {
+    "type": "table",
+    "name": "client_probe_report",
+    "tbl_name": "client_probe_report",
+    "sql": "CREATE TABLE client_probe_report ( report TEXT NOT NULL, at INTEGER NOT NULL, node_id TEXT NOT NULL, kind TEXT NOT NULL, port INTEGER NOT NULL, verdict TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}', vpn INTEGER NOT NULL DEFAULT 0 CHECK (vpn IN (0, 1)), direct_checked INTEGER NOT NULL DEFAULT 0 CHECK (direct_checked IN (0, 1)), asn INTEGER NOT NULL DEFAULT 0, operator TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT '', region TEXT NOT NULL DEFAULT '', net_type TEXT NOT NULL DEFAULT '', PRIMARY KEY (report, node_id, kind, port) ) STRICT"
   },
   {
     "type": "table",

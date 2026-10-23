@@ -13,6 +13,7 @@ import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { useT, type T } from "@/i18n";
 import { blocklistErrorText, blocklistQuery, listsState, useBlocklistActions, type BlocklistSettings, type ListsOutcome, type ListsState } from "@/lib/blocklist";
+import { clientProbeQuery, clientProbeState, groupText, nodeKind, troubleText, useClientProbeActions, type ClientProbe, type ClientProbeNode } from "@/lib/clientprobe";
 import { cx } from "@/lib/cx";
 import { minutesText, useFmt } from "@/lib/format";
 import {
@@ -30,6 +31,7 @@ import {
   type TestOutcome,
 } from "@/lib/globalping";
 import { checksQuery, countryReason, tspuPortsText } from "@/lib/health";
+import { nodesQuery } from "@/lib/queries";
 import {
   isNotAFailure,
   probeNodeOptions,
@@ -53,8 +55,9 @@ type ListsActions = ReturnType<typeof useBlocklistActions>;
 type TspuActions = ReturnType<typeof useTspuActions>;
 
 /**
- * The sources of the Reachability page: a card per source (Globalping, the block lists, the TSPU probe), two to a row on a wide
- * screen. Owner only, like the services behind them; the country they all look from is the picker in the page's header.
+ * The sources of the Reachability page: a card per source (Globalping, the block lists, the TSPU probe, the reports of kl!ck
+ * users), two to a row on a wide screen. Owner only, like the services behind them; the country they all look from is the
+ * picker in the page's header (the kl!ck reports come from wherever the people are, and say where).
  */
 export function SourceCards() {
   return (
@@ -62,6 +65,7 @@ export function SourceCards() {
       <GlobalpingCard />
       <BlocklistCard />
       <TspuCard />
+      <KlickCard />
     </div>
   );
 }
@@ -603,5 +607,115 @@ function NodeResults({ nodes }: { nodes: TspuTest["nodes"] }) {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * The reports of kl!ck users: off by default; on, the subscription tells the kl!ck app that the panel takes the result of its
+ * local server check, and a person who switched "send to the panel" on sends it. Per node: how many reports, what went wrong
+ * (a TSPU freeze above all), from which operators and regions, and how fresh.
+ */
+export function KlickCard() {
+  const t = useT();
+  const q = useQuery(clientProbeQuery);
+  const act = useClientProbeActions();
+  const [disconnecting, setDisconnecting] = useState(false);
+  const p = q.data;
+  const on = !!p?.settings?.enabled;
+  return (
+    <section className={card}>
+      <CardHead icon="people" title={t("kc.title")} sub={t("kc.sub")}>
+        {p && (
+          <Switch
+            checked={on}
+            disabled={act.update.isPending || act.disconnect.isPending}
+            onCheckedChange={(v) => act.update.mutate({ enabled: v })}
+            aria-label={t("kc.switch")}
+          />
+        )}
+      </CardHead>
+      {q.isPending && <Pending compact />}
+      {q.isError && !p && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+      {p && (
+        <>
+          <KlickStateLine p={p} />
+          {on && p.nodes.length > 0 && <KlickNodes nodes={p.nodes} />}
+          {on && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
+                {t("cr.disconnect")}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+      <Privacy>{t("kc.privacy")}</Privacy>
+      {disconnecting && (
+        <ConfirmDisconnect
+          title={t("kc.disconnect.title")}
+          body={t("kc.disconnect.body")}
+          busy={act.disconnect.isPending}
+          onClose={() => setDisconnecting(false)}
+          onConfirm={() => act.disconnect.mutate(undefined, { onSuccess: () => setDisconnecting(false) })}
+        />
+      )}
+    </section>
+  );
+}
+
+function KlickStateLine({ p }: { p: ClientProbe }) {
+  const t = useT();
+  const fmt = useFmt();
+  const state = clientProbeState(p);
+  const [kind, word, detail] = ((): [StatusKind, string, string] => {
+    switch (state.kind) {
+      case "off":
+        return ["off", t("cr.state.off"), t("kc.state.off.detail")];
+      case "waiting":
+        return ["blip", t("cr.state.on"), t("kc.state.waiting")];
+      case "works":
+        return ["ok", t("cr.state.works"), [t.n("kc.state.reports", state.reports), t("kc.state.last", { ago: fmt.ago(state.lastAt) })].join(" · ")];
+    }
+  })();
+  return <StateLine state={state.kind} kind={kind} word={word} detail={detail} />;
+}
+
+/** Per node: its name, what went wrong (or "ok"), how many reports and the newest; under it the operators and the regions. */
+function KlickNodes({ nodes }: { nodes: ClientProbeNode[] }) {
+  const t = useT();
+  const fmt = useFmt();
+  const names = new Map((useQuery(nodesQuery).data?.nodes ?? []).map((n) => [n.id, n.name]));
+  return (
+    <ul aria-label={t("kc.results")} className="flex flex-col divide-y divide-line rounded-field border border-line bg-canvas">
+      {nodes.map((n) => {
+        const x = n.tally!;
+        const kind = nodeKind(x);
+        const trouble = troubleText(t, x);
+        return (
+          <li key={n.nodeId} data-testid="klick-node" className="flex flex-col gap-1 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              <span className="min-w-14 font-mono text-[13px] font-bold">{names.get(n.nodeId) ?? n.nodeId}</span>
+              <span className={cx("flex items-center gap-1.5 text-xs font-bold", kind === "warn" ? "tone-warn tone-text" : "text-muted")}>
+                <CountryMark kind={kind} />
+                {trouble || t("kc.ok")}
+              </span>
+              <span className="ml-auto font-mono text-[11px] text-muted">{[t.n("kc.reports", x.reports), fmt.ago(x.lastUnix)].join(" · ")}</span>
+            </div>
+            <GroupLine label={t("kc.operators")} groups={n.operators} />
+            <GroupLine label={t("kc.regions")} groups={n.regions} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function GroupLine({ label, groups }: { label: string; groups: ClientProbeNode["operators"] }) {
+  const t = useT();
+  if (groups.length === 0) return null;
+  return (
+    <p className="text-xs leading-normal text-pretty text-muted">
+      <b className="font-semibold text-fg">{label}:</b> {groups.map((g) => groupText(t, g.name, g.tally!)).join("; ")}
+    </p>
   );
 }
