@@ -5,12 +5,14 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	quic "github.com/apernet/quic-go"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -28,12 +30,16 @@ type credState struct {
 	limit      atomic.Pointer[ratelimit.Limiter] // the device limit: this credential's own bucket
 	person     atomic.Pointer[ratelimit.Limiter] // the person limit: the bucket of the whole user on this node (ratelimit.Registry)
 	up, down   atomic.Uint64                     // user's view: core tx = up, core rx = down
+	flushed    atomic.Uint64                     // bytes reported by Collect; used only to classify idle drops
 	conns      atomic.Int32                      // open QUIC connections
-	kicks      atomic.Int32                      // connections still to be closed at their next packet (see takeKick)
-	kickUntil  atomic.Int64                      // unix nano; unused kick tokens expire
-	lastKill   atomic.Int64                      // unix nano of the last token taken
-	removed    atomic.Bool                       // dropped from the index; its sessions are dying
-	inflight   atomic.Int32                      // LogTraffic callbacks running; a retired state is kept until they end
+	connects   atomic.Uint32
+	rejects    atomic.Uint32
+	drops      atomic.Uint32
+	kicks      atomic.Int32 // connections still to be closed at their next packet (see takeKick)
+	kickUntil  atomic.Int64 // unix nano; unused kick tokens expire
+	lastKill   atomic.Int64 // unix nano of the last token taken
+	removed    atomic.Bool  // dropped from the index; its sessions are dying
+	inflight   atomic.Int32 // LogTraffic callbacks running; a retired state is kept until they end
 }
 
 type credIdentity struct{ userID string }
@@ -127,14 +133,20 @@ func buildIndex(inboundID string, old *index, creds []plugin.UserCred, users *ra
 
 // Authenticate is called once per new QUIC connection.
 func (in *inbound) Authenticate(_ net.Addr, auth string, _ uint64) (bool, string) {
+	in.handshakes.Add(1)
 	h := sha256.Sum256([]byte(auth))
 	cs := in.idx.Load().byHash[h]
 	// The map key is already sha256(token), so probing it leaks nothing usable about the token; the explicit
 	// constant-time compare is belt and braces and costs nothing.
-	if cs == nil || subtle.ConstantTimeCompare(cs.hash[:], h[:]) != 1 {
+	if cs == nil {
+		in.unknownKeys.Add(1)
+		return false, ""
+	}
+	if subtle.ConstantTimeCompare(cs.hash[:], h[:]) != 1 {
 		return false, ""
 	}
 	if vu := cs.validUntil.Load(); vu != 0 && in.e.now().Unix() >= vu {
+		cs.rejects.Add(1)
 		return false, ""
 	}
 	return true, cs.id
@@ -226,8 +238,9 @@ func (cs *credState) clampKicks(open int32) {
 // QUIC connection; TrafficLogger.LogOnlineState has no address and is not needed.
 
 type session struct {
-	cs    *credState
-	since time.Time
+	cs         *credState
+	since      time.Time
+	startBytes uint64
 }
 
 func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
@@ -235,20 +248,46 @@ func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
 	if cs == nil {
 		return
 	}
-	s := session{cs: cs, since: in.e.now()}
+	s := session{cs: cs, since: in.e.now(), startBytes: cs.bytesMoved()}
 	in.smu.Lock()
 	in.sessions[addr.String()] = s
 	in.smu.Unlock()
 	cs.conns.Add(1)
+	cs.connects.Add(1)
 }
 
-func (in *inbound) Disconnect(addr net.Addr, _ string, _ error) {
+func (in *inbound) Disconnect(addr net.Addr, _ string, err error) {
 	in.smu.Lock()
-	s, ok := in.sessions[addr.String()]
-	delete(in.sessions, addr.String())
+	key := addr.String()
+	s, ok := in.sessions[key]
+	delete(in.sessions, key)
 	in.smu.Unlock()
 	if ok {
+		var idleTimeout *quic.IdleTimeoutError
+		if errors.As(err, &idleTimeout) {
+			moved := s.cs.bytesMoved()
+			if moved < s.startBytes || moved-s.startBytes < 64<<10 || in.e.now().Sub(s.since) < 60*time.Second {
+				s.cs.drops.Add(1)
+			}
+		}
 		s.cs.clampKicks(s.cs.conns.Add(-1))
+	}
+}
+
+func (cs *credState) bytesMoved() uint64 {
+	return cs.flushed.Load() + cs.up.Load() + cs.down.Load()
+}
+
+func (in *inbound) takeLinkStats() plugin.LinkStat {
+	return plugin.LinkStat{
+		InboundID: in.spec.ID, UnknownKeys: in.unknownKeys.Swap(0), Hellos: in.hellos.Swap(0), Handshakes: in.handshakes.Swap(0),
+	}
+}
+
+func (cs *credState) takeLinkStats() plugin.LinkStat {
+	return plugin.LinkStat{
+		CredID: cs.id, InboundID: cs.inboundID,
+		Connects: cs.connects.Swap(0), Rejects: cs.rejects.Swap(0), Drops: cs.drops.Swap(0),
 	}
 }
 

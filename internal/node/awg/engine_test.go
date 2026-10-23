@@ -254,6 +254,50 @@ func TestCollectDeltasSessionsAndCounterReset(t *testing.T) {
 	}
 }
 
+func TestCollectConnectionCountersAndUnknownPeers(t *testing.T) {
+	e, fb, clk := newTestEngine(t)
+	mustApply(t, e, spec(t, "inb1", 51842, nil), cred("a", 0x0a, 5))
+	ctx := context.Background()
+
+	if c, err := e.Collect(ctx); err != nil || len(c.Links) != 0 {
+		t.Fatalf("first peer snapshot is only a baseline: links=%+v err=%v", c.Links, err)
+	}
+	fb.mutate(p1, func(d *fakeDev) {
+		p := d.peers[pk(0x0a)]
+		p.hs = clk.Now()
+	})
+	c, err := e.Collect(ctx)
+	if err != nil || len(c.Links) != 1 || c.Links[0] != (plugin.LinkStat{CredID: "a", InboundID: "inb1", Connects: 1}) {
+		t.Fatalf("a handshake after an offline snapshot is a connect: links=%+v err=%v", c.Links, err)
+	}
+
+	clk.Add(200 * time.Second)
+	fb.mutate(p1, func(d *fakeDev) { d.peers[pk(0x0a)].rx = 10 })
+	fb.mu.Lock()
+	fb.unknown = 4
+	fb.mu.Unlock()
+	c, err = e.Collect(ctx)
+	if err != nil || len(c.Links) != 2 {
+		t.Fatalf("stalls and unknown-key events: links=%+v err=%v", c.Links, err)
+	}
+	got := map[string]plugin.LinkStat{}
+	for _, stat := range c.Links {
+		got[stat.CredID] = stat
+	}
+	if got["a"] != (plugin.LinkStat{CredID: "a", InboundID: "inb1", Stalls: 1}) ||
+		got[""] != (plugin.LinkStat{InboundID: "inb1", UnknownKeys: 4}) {
+		t.Fatalf("counter rows = %+v", c.Links)
+	}
+
+	health := e.AwgHealth()
+	if len(health) != 1 || health[0].UnknownPeerEvents != 4 || fb.unknownReadCount() != 3 {
+		t.Fatalf("AwgHealth must share Collect's third-round read: health=%+v reads=%d", health, fb.unknownReadCount())
+	}
+	if health = e.AwgHealth(); len(health) != 1 || health[0].UnknownPeerEvents != 0 || fb.unknownReadCount() != 3 {
+		t.Fatalf("AwgHealth reset must not consume the backend again: health=%+v reads=%d", health, fb.unknownReadCount())
+	}
+}
+
 func TestRemovedPeerCountersAreFlushed(t *testing.T) {
 	e, fb, _ := newTestEngine(t)
 	s := spec(t, "inb1", 51842, nil)
@@ -618,6 +662,10 @@ func TestAwgHealth(t *testing.T) {
 	})
 	fb.unknown = 3
 	var hr HealthReporter = e
+	c, err := e.Collect(context.Background())
+	if err != nil || len(c.Links) != 1 || c.Links[0] != (plugin.LinkStat{InboundID: "inb1", UnknownKeys: 3}) {
+		t.Fatalf("unknown peers in StatsBatch: links=%+v err=%v", c.Links, err)
+	}
 	h := hr.AwgHealth()
 	if len(h) != 1 {
 		t.Fatalf("%+v", h)
@@ -629,6 +677,9 @@ func TestAwgHealth(t *testing.T) {
 	}
 	if h = hr.AwgHealth(); h[0].UnknownPeerEvents != 0 {
 		t.Error("the unknown-peer counter restarts after each report")
+	}
+	if fb.unknownReadCount() != 1 {
+		t.Errorf("TakeUnknownPeers called %d times, want once", fb.unknownReadCount())
 	}
 }
 

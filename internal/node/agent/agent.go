@@ -142,14 +142,17 @@ type Agent struct {
 	dsOK         atomic.Bool                   // the last DesiredState on this stream was not refused
 	exiting      atomic.Bool                   // a re-exec is under way: the worker takes no new jobs
 
-	measuring    atomic.Bool // a bandwidth test is running (one at a time)
-	udpMu        sync.Mutex
-	udpArmed     *udpCountArm
-	udpSends     int
-	udpAfterFunc func(time.Duration, func()) udpCountTimer
-	sendUDP      func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
-	tcp          tcpProbeState
-	country      countryProbeState
+	measuring     atomic.Bool // a bandwidth test is running (one at a time)
+	udpMu         sync.Mutex
+	udpArmed      *udpCountArm
+	udpSends      int
+	udpAfterFunc  func(time.Duration, func()) udpCountTimer
+	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	tcp           tcpProbeState
+	country       countryProbeState
+	linkCounterMu sync.Mutex
+	linkVolumes   map[linkCounterKey]linkCounterVolume
+	linkWindow    time.Duration // test seam; zero selects the production ten-minute window
 
 	doc      *doctor.Doctor
 	hostRing doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
@@ -355,6 +358,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		jobs:          make(chan job, 256),
 		model:         newModel(),
 		held:          map[string]*held{},
+		linkVolumes:   map[linkCounterKey]linkCounterVolume{},
+		linkWindow:    defaultLinkCounterWindow,
 		backoffMin:    time.Second, backoffMax: time.Minute,
 		renewEvery: time.Hour, sweepEvery: 30 * time.Second,
 		commitTick: commitTick, commitSettle: commitSettle, upd: cfg.Updater,

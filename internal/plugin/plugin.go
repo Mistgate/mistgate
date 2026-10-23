@@ -91,6 +91,14 @@ type UserTraffic struct {
 	Up, Down  uint64
 }
 
+// LinkStat is a connection-counter delta. Event counters are reported in the next stats batch; hello and handshake
+// volume counters are accumulated by the agent until its next UTC ten-minute boundary.
+type LinkStat struct {
+	CredID, InboundID                             string
+	Connects, Rejects, Drops, Stalls, UnknownKeys uint32
+	Hellos, Handshakes                            uint32
+}
+
 // Session is one open client connection (QUIC connection for Hysteria2, recent handshake for AWG).
 type Session struct {
 	CredID    string

@@ -25,6 +25,9 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 	if !slices.Contains(a.capabilities(), "ws-link/1") {
 		t.Fatal("Hello.capabilities does not advertise ws-link/1")
 	}
+	if !slices.Contains(a.capabilities(), "links/1") {
+		t.Fatal("Hello.capabilities does not advertise links/1")
+	}
 }
 
 func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {

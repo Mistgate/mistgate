@@ -89,6 +89,7 @@ type CertInfo struct {
 type Collected struct {
 	Traffic  []plugin.UserTraffic // non-zero deltas only
 	Sessions []plugin.Session
+	Links    []plugin.LinkStat // non-zero connection-counter deltas
 }
 
 // Env is everything the agent (the owner of host state) gives an engine at construction. Engines never

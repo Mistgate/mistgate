@@ -54,6 +54,22 @@ func (loopFactory) New(net.Addr) (net.PacketConn, error) {
 	return net.ListenUDP("udp", &net.UDPAddr{IP: BindIP})
 }
 
+type silentLoopFactory struct{ pc net.PacketConn }
+
+func (f *silentLoopFactory) New(net.Addr) (net.PacketConn, error) {
+	pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: BindIP})
+	if err == nil {
+		f.pc = pc
+	}
+	return pc, err
+}
+
+func (f *silentLoopFactory) goSilent() {
+	if f.pc != nil {
+		_ = f.pc.Close()
+	}
+}
+
 func freeUDPPort(t *testing.T) int {
 	t.Helper()
 	pc, err := net.ListenPacket("udp", bindAddr(0))
@@ -541,6 +557,85 @@ func TestEndToEnd(t *testing.T) {
 	if len(r.e.Observed()) != 0 {
 		t.Fatal("removed inbound must not be observed")
 	}
+}
+
+func TestConnectionCounters(t *testing.T) {
+	r := newRig(t, "")
+	r.e.(*eng).quicIdleTimeout = 4 * time.Second
+	now := time.Now().Truncate(time.Second)
+	r.clock.Store(now.Unix())
+	r.apply(
+		cred("good"),
+		cred("expired", func(c *plugin.UserCred) { c.ValidUntil = now.Add(-time.Second) }),
+	)
+
+	if _, err := r.dial("unknown", nil); err == nil {
+		t.Fatal("unknown token must be refused")
+	}
+	unknown := r.collect()
+	if got := linkStatForTest(unknown, ""); got.UnknownKeys != 1 || got.Handshakes != 1 || got.Hellos == 0 {
+		t.Fatalf("unknown token counters = %+v, want one unknown key, hello and authentication", got)
+	}
+
+	if _, err := r.dial("expired", nil); err == nil {
+		t.Fatal("expired token must be refused")
+	}
+	expired := r.collect()
+	if got := linkStatForTest(expired, "crd_expired"); got.Rejects != 1 {
+		t.Fatalf("expired credential counters = %+v, want one reject", got)
+	}
+	if got := linkStatForTest(expired, ""); got.Handshakes != 1 || got.Hellos == 0 {
+		t.Fatalf("expired authentication counters = %+v, want one hello and authentication", got)
+	}
+
+	factory := &silentLoopFactory{}
+	c, _, err := client.NewClient(&client.Config{
+		ConnFactory: factory,
+		ServerAddr:  &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: r.udpPort},
+		Auth:        token("good"),
+		TLSConfig:   client.TLSConfig{ServerName: serverName, InsecureSkipVerify: true},
+		QUICConfig:  client.QUICConfig{MaxIdleTimeout: 4 * time.Second},
+	})
+	if err != nil {
+		t.Fatalf("connect valid token: %v", err)
+	}
+	defer c.Close()
+
+	var connects uint32
+	eventually(t, "connection counter", func() bool {
+		for _, stat := range r.collect().Links {
+			if stat.CredID == "crd_good" {
+				connects += stat.Connects
+			}
+		}
+		return connects > 0
+	})
+	if connects != 1 {
+		t.Fatalf("connects = %d, want one", connects)
+	}
+
+	factory.goSilent()
+	var drops uint32
+	eventually(t, "idle timeout drop counter", func() bool {
+		for _, stat := range r.collect().Links {
+			if stat.CredID == "crd_good" {
+				drops += stat.Drops
+			}
+		}
+		return drops > 0
+	})
+	if drops != 1 {
+		t.Fatalf("drops = %d, want one", drops)
+	}
+}
+
+func linkStatForTest(c engine.Collected, credID string) plugin.LinkStat {
+	for _, stat := range c.Links {
+		if stat.CredID == credID {
+			return stat
+		}
+	}
+	return plugin.LinkStat{}
 }
 
 func TestDecoyOnBothTransports(t *testing.T) {
@@ -1138,5 +1233,20 @@ func TestVersionAndFactory(t *testing.T) {
 	}
 	if _, err := New(engine.Env{}); err == nil {
 		t.Fatal("Env.Certs is required")
+	}
+}
+
+func BenchmarkAuthenticate(b *testing.B) {
+	const auth = "authenticate benchmark token"
+	h := sha256.Sum256([]byte(auth))
+	cs := &credState{id: "crd_bench", hash: h}
+	in := &inbound{e: &eng{now: time.Now}}
+	in.idx.Store(&index{byHash: map[[32]byte]*credState{h: cs}})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if ok, _ := in.Authenticate(nil, auth, 0); !ok {
+			b.Fatal("benchmark credential was refused")
+		}
 	}
 }

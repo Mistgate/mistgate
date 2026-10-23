@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
 	"github.com/amnezia-vpn/amneziawg-go/v3/device"
@@ -25,8 +26,9 @@ import (
 type userspace struct {
 	log *slog.Logger
 
-	mu   sync.Mutex
-	devs map[string]*device.Device
+	mu      sync.Mutex
+	devs    map[string]*device.Device
+	unknown map[string]*atomic.Uint32
 }
 
 func newUserspace(log *slog.Logger) (*userspace, error) {
@@ -35,7 +37,7 @@ func newUserspace(log *slog.Logger) (*userspace, error) {
 		return nil, fmt.Errorf("/dev/net/tun is not usable: %w", err)
 	}
 	f.Close()
-	return &userspace{log: log, devs: map[string]*device.Device{}}, nil
+	return &userspace{log: log, devs: map[string]*device.Device{}, unknown: map[string]*atomic.Uint32{}}, nil
 }
 
 func (u *userspace) Name() string { return "userspace" }
@@ -67,8 +69,13 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 	if err != nil {
 		return fmt.Errorf("create tun %s: %w", name, err)
 	}
+	unknown := &atomic.Uint32{}
 	logger := &device.Logger{
-		Verbosef: func(string, ...any) {},
+		Verbosef: func(format string, _ ...any) {
+			if isUnknownInitiationLog(format) {
+				unknown.Add(1)
+			}
+		},
 		Errorf: func(f string, a ...any) {
 			msg := "amneziawg-go: " + fmt.Sprintf(f, a...)
 			// A server learns a device's address only when the device writes first: after every restart, replies
@@ -99,7 +106,10 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 	if warn != nil {
 		u.log.Warn("awg interface: IPv6 address not set, the tunnel runs IPv4 only", "iface", name, "err", warn)
 	}
+	u.mu.Lock()
 	u.devs[name] = dev
+	u.unknown[name] = unknown
+	u.mu.Unlock()
 	return nil
 }
 
@@ -147,10 +157,21 @@ func (u *userspace) LinkUp(name string) bool {
 	return linkIsUp(name)
 }
 
+func (u *userspace) TakeUnknownPeers(name string) uint32 {
+	u.mu.Lock()
+	count := u.unknown[name]
+	u.mu.Unlock()
+	if count == nil {
+		return 0
+	}
+	return count.Swap(0)
+}
+
 func (u *userspace) Destroy(ctx context.Context, name string) error {
 	u.mu.Lock()
 	d := u.devs[name]
 	delete(u.devs, name)
+	delete(u.unknown, name)
 	u.mu.Unlock()
 	if d != nil {
 		d.Close() // closes the TUN, which removes the interface
@@ -165,6 +186,7 @@ func (u *userspace) Close() error {
 		d.Close()
 		_ = deleteLink(n)
 		delete(u.devs, n)
+		delete(u.unknown, n)
 	}
 	return nil
 }
