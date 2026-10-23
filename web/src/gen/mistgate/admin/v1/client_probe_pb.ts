@@ -285,14 +285,14 @@ export const DisconnectClientProbeResponseSchema: GenMessage<DisconnectClientPro
  * OFF IS THE DEFAULT. Off: no header, every report is refused with probe_off, and nothing is shown. Disconnect also forgets
  * every stored report. The switch reaches a subscription answer within a minute (the settings cache).
  *
- * WHO MAY CALL WHAT. All of it is OWNER-ONLY; UpdateClientProbe and DisconnectClientProbe need a step-up. Not open to API
- * tokens or MCP.
+ * WHO MAY CALL WHAT. GetClientProbe is a read like HealthService.GetChecks: every role and API tokens (the MCP tool
+ * klick_reports). UpdateClientProbe and DisconnectClientProbe are OWNER-ONLY and need a step-up; not open to tokens.
  *
  * @generated from service mistgate.admin.v1.ClientProbeService
  */
 export const ClientProbeService: GenService<{
   /**
-   * The switch and what the stored reports say, per node.
+   * The switch and what the stored reports say, per node. Every role and API tokens.
    *
    * @generated from rpc mistgate.admin.v1.ClientProbeService.GetClientProbe
    */

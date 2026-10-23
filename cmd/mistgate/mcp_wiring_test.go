@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 17 || b != 35 || c != 65 {
+	if a, b, c := count(ro), count(op), count(ad); a != 18 || b != 36 || c != 66 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -175,6 +175,10 @@ func TestMCPEndToEnd(t *testing.T) {
 	// -- reads on the real services
 	if out := ok(ro, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total":0`) {
 		t.Errorf("fleet_status: %s", out)
+	}
+	// the kl!ck reports are off by default: a readonly token reads the switch and no nodes
+	if out := ok(ro, "klick_reports", map[string]any{}); !strings.Contains(out, `"enabled":false`) || !strings.Contains(out, `"nodes":[]`) {
+		t.Errorf("klick_reports: %s", out)
 	}
 	if out := ok(ad, "updates_status", map[string]any{}); !strings.Contains(out, `"status":"missing"`) {
 		t.Errorf("updates_status: %s", out)
@@ -437,7 +441,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 17 {
+	if n := count(ps); n != 18 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {

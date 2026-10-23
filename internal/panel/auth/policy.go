@@ -150,9 +150,10 @@ var procedureLevels = map[string]level{
 	adminv1connect.TspuProbeServiceUpdateTspuProbeProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.TspuProbeServiceDisconnectTspuProbeProcedure: levelOwner, // also needs a step-up
 	adminv1connect.TspuProbeServiceTestTspuProbeProcedure:       levelOwner,
-	// ClientProbeService: the kl!ck reports, what the people who use the app send of the servers from their own networks. All of
-	// it is the owner's; changing it also needs a step-up (the handlers). Not open to tokens (policy_tokens.go).
-	adminv1connect.ClientProbeServiceGetClientProbeProcedure:        levelOwner,
+	// ClientProbeService: the kl!ck reports, what the people who use the app send of the servers from their own networks. The
+	// counts are a read like GetChecks (every role, and tokens: the MCP tool klick_reports); the switch and Disconnect are the
+	// owner's and need a step-up (the handlers).
+	adminv1connect.ClientProbeServiceGetClientProbeProcedure:        levelRead,
 	adminv1connect.ClientProbeServiceUpdateClientProbeProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.ClientProbeServiceDisconnectClientProbeProcedure: levelOwner, // also needs a step-up
 	// CountryReachabilityService: the country every source of the country check looks from. Owner's; it sends nothing anywhere,

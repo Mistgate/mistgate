@@ -54,6 +54,7 @@ type clients struct {
 	Auth         adminv1connect.AuthServiceClient
 	Provisioning adminv1connect.ProvisioningServiceClient
 	Warp         adminv1connect.WarpServiceClient
+	ClientProbe  adminv1connect.ClientProbeServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -70,6 +71,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Auth:         adminv1connect.NewAuthServiceClient(hc, base),
 		Provisioning: adminv1connect.NewProvisioningServiceClient(hc, base),
 		Warp:         adminv1connect.NewWarpServiceClient(hc, base),
+		ClientProbe:  adminv1connect.NewClientProbeServiceClient(hc, base),
 	}
 }
 

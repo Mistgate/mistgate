@@ -1136,6 +1136,76 @@ type udpLossV struct {
 	SharePercent uint32   `json:"share_percent"`
 }
 
+// KlickReportsV is the klick_reports result: the switch of the kl!ck reports and, while it is on, what they say per node.
+type KlickReportsV struct {
+	Enabled   bool         `json:"enabled"`
+	Reports   uint32       `json:"reports_7d"`
+	LastUnix  int64        `json:"last_unix,omitempty"`
+	NowUnix   int64        `json:"now_unix"`
+	Nodes     []klickNodeV `json:"nodes"`
+	Truncated bool         `json:"truncated,omitempty"`
+}
+
+type klickTallyV struct {
+	Reports         uint32 `json:"reports"`
+	OK              uint32 `json:"ok"`
+	Freeze          uint32 `json:"freeze"`
+	TCPBlocked      uint32 `json:"tcp_blocked"`
+	HandshakeFailed uint32 `json:"handshake_failed"`
+	NoAnswer        uint32 `json:"no_answer"`
+	LastUnix        int64  `json:"last_unix"`
+}
+
+type klickGroupV struct {
+	Name string `json:"name"`
+	klickTallyV
+}
+
+type klickNodeV struct {
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name,omitempty"`
+	klickTallyV
+	Operators []klickGroupV `json:"operators"`
+	Regions   []klickGroupV `json:"regions"`
+}
+
+func (v *KlickReportsV) shrink() bool {
+	v.Truncated = true
+	return cut(&v.Nodes)
+}
+
+func klickTally(t *adminv1.ClientProbeTally) klickTallyV {
+	return klickTallyV{Reports: t.GetReports(), OK: t.GetOk(), Freeze: t.GetFreeze(), TCPBlocked: t.GetTcpBlocked(),
+		HandshakeFailed: t.GetHandshakeFailed(), NoAnswer: t.GetNoAnswer(), LastUnix: t.GetLastUnix()}
+}
+
+func klickGroups(gs []*adminv1.ClientProbeGroup) []klickGroupV {
+	out := []klickGroupV{}
+	for _, g := range gs {
+		out = append(out, klickGroupV{Name: nm(g.GetName()), klickTallyV: klickTally(g.GetTally())})
+	}
+	return out
+}
+
+// klickReportsView projects GetClientProbe; node (an id, "" = every node) keeps one node. The operator and region names come
+// from the app, so they are cleaned like any other name.
+func klickReportsView(r *adminv1.GetClientProbeResponse, nodes []*adminv1.Node, node string) *KlickReportsV {
+	s := r.GetSettings()
+	v := &KlickReportsV{Enabled: s.GetEnabled(), Reports: s.GetReports(), LastUnix: s.GetLastUnix(), NowUnix: r.GetNowUnix(), Nodes: []klickNodeV{}}
+	names := map[string]string{}
+	for _, n := range nodes {
+		names[n.GetId()] = n.GetName()
+	}
+	for _, n := range r.GetNodes() {
+		if node != "" && n.GetNodeId() != node {
+			continue
+		}
+		v.Nodes = append(v.Nodes, klickNodeV{NodeID: clean(n.GetNodeId(), 80), NodeName: nm(names[n.GetNodeId()]), klickTallyV: klickTally(n.GetTally()),
+			Operators: klickGroups(n.GetOperators()), Regions: klickGroups(n.GetRegions())})
+	}
+	return v
+}
+
 // ChecksV is the checks_results result: the node x profile matrix, one cell per column in the order of columns.
 // All times are measured on the panel's server, not on a person's device.
 type ChecksV struct {

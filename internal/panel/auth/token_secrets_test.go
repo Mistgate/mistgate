@@ -42,6 +42,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.WarpAccount.has_token":                             "a bool: whether refresh is available, not a token",
 		"mistgate.admin.v1.WarpAccount.tos_url":                               "the public Cloudflare terms link",
 		"mistgate.admin.v1.GetWarpResponse.tos_url":                           "the public Cloudflare terms link",
+		"mistgate.admin.v1.GetClientProbeResponse.settings":                   "the kl!ck reports' switch and two counts",
 	}
 	seen := map[protoreflect.FullName]bool{}
 	var walk func(md protoreflect.MessageDescriptor, via string)

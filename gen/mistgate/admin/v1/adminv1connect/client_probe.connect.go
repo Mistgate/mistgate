@@ -46,7 +46,7 @@ const (
 
 // ClientProbeServiceClient is a client for the mistgate.admin.v1.ClientProbeService service.
 type ClientProbeServiceClient interface {
-	// The switch and what the stored reports say, per node.
+	// The switch and what the stored reports say, per node. Every role and API tokens.
 	GetClientProbe(context.Context, *connect.Request[v1.GetClientProbeRequest]) (*connect.Response[v1.GetClientProbeResponse], error)
 	// Changes the switch; absent fields stay. Owner only; needs a step-up.
 	UpdateClientProbe(context.Context, *connect.Request[v1.UpdateClientProbeRequest]) (*connect.Response[v1.UpdateClientProbeResponse], error)
@@ -111,7 +111,7 @@ func (c *clientProbeServiceClient) DisconnectClientProbe(ctx context.Context, re
 // ClientProbeServiceHandler is an implementation of the mistgate.admin.v1.ClientProbeService
 // service.
 type ClientProbeServiceHandler interface {
-	// The switch and what the stored reports say, per node.
+	// The switch and what the stored reports say, per node. Every role and API tokens.
 	GetClientProbe(context.Context, *connect.Request[v1.GetClientProbeRequest]) (*connect.Response[v1.GetClientProbeResponse], error)
 	// Changes the switch; absent fields stay. Owner only; needs a step-up.
 	UpdateClientProbe(context.Context, *connect.Request[v1.UpdateClientProbeRequest]) (*connect.Response[v1.UpdateClientProbeResponse], error)

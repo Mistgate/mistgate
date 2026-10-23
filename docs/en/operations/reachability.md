@@ -68,7 +68,7 @@ The [kl!ck](https://github.com/vbu00/klick) VPN app (Windows, macOS) has a serve
 - **How the app learns of it.** While the source is on, every subscription answer to an app carries `Probe-Report: 1`. Without it kl!ck sends nothing and shows no switch. The switch reaches the subscription answers within a minute.
 - **What comes in.** `POST <the subscription link>/probe`, JSON. The app sends one at most every 10 minutes; the panel takes two at once and then one every 10 minutes per subscription (sooner gets `429` with `Retry-After`). The token in the link is the only authentication: an unknown link gets the decoy, like an unknown subscription link. The panel checks every field (version, ranges, the known words) and refuses anything else with `400`. It matches each server by host and port against the person's own subscription; a server that is not in it is dropped. It answers `200 {"accepted":N}`, or `403 probe_off` while the source is off.
 - **What is stored.** For 7 days: the node, the protocol type and port, the verdict and what was measured, and the network as the app saw it (operator, AS number, country, region, kind of network). Not the address the report came from (neither stored nor logged), no person, no device.
-- **Not in the verdict yet.** The reports are shown on their card only: they do not change a node's verdict, its lanes or the alert.
+- **Not in the verdict yet.** The reports are shown on their card and through the MCP tool [`klick_reports`](../reference/mcp.md) (any token profile) only: they do not change a node's verdict, its lanes or the alert.
 
 ## The alert
 

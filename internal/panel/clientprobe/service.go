@@ -102,10 +102,8 @@ func (s *Service) current(ctx context.Context) (*adminv1.ClientProbeSettings, er
 	return m, nil
 }
 
+// GetClientProbe is a read like HealthService.GetChecks (policy.go): every role and API tokens, no owner check here.
 func (r rpc) GetClientProbe(ctx context.Context, _ *connect.Request[adminv1.GetClientProbeRequest]) (*connect.Response[adminv1.GetClientProbeResponse], error) {
-	if _, err := owner(ctx); err != nil {
-		return nil, err
-	}
 	s := r.s
 	cur, err := s.current(ctx)
 	if err != nil {

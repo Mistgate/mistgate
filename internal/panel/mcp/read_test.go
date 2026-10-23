@@ -41,6 +41,8 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"alerts_list", map[string]any{"include_history": true}},
 		{"events_search", map[string]any{}},
 		{"checks_results", map[string]any{}},
+		{"klick_reports", map[string]any{}},
+		{"klick_reports", map[string]any{"node": "de1"}},
 		{"audit_search", map[string]any{}},
 		{"updates_status", map[string]any{}},
 	}

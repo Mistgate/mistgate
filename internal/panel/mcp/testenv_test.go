@@ -296,6 +296,7 @@ type world struct {
 	adminv1connect.UnimplementedAuthServiceHandler
 	adminv1connect.UnimplementedProvisioningServiceHandler
 	adminv1connect.UnimplementedWarpServiceHandler
+	adminv1connect.UnimplementedClientProbeServiceHandler
 
 	rotateReq         []*adminv1.RotateNodeServerPasswordRequest
 	installReq        []*adminv1.StartNodeProvisionRequest
@@ -802,6 +803,22 @@ func (w *world) StartNodeProvision(_ context.Context, r *connect.Request[adminv1
 	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: &adminv1.NodeProvisionJob{Id: "prv_1", Name: r.Msg.GetName(), State: "queued"}}), nil
 }
 
+// GetClientProbe: two nodes, one with an operator name that carries a token (the app's text is hostile).
+func (w *world) GetClientProbe(context.Context, *connect.Request[adminv1.GetClientProbeRequest]) (*connect.Response[adminv1.GetClientProbeResponse], error) {
+	tally := func(reports, ok, freeze uint32) *adminv1.ClientProbeTally {
+		return &adminv1.ClientProbeTally{Reports: reports, Ok: ok, Freeze: freeze, LastUnix: 1700000600}
+	}
+	return connect.NewResponse(&adminv1.GetClientProbeResponse{
+		Settings: &adminv1.ClientProbeSettings{Enabled: true, Reports: 6, LastUnix: 1700000600}, NowUnix: 1700000700,
+		Nodes: []*adminv1.ClientProbeNode{
+			{NodeId: nodeA, Tally: tally(5, 2, 3),
+				Operators: []*adminv1.ClientProbeGroup{{Name: "MTS PJSC", Tally: tally(4, 1, 3)}, {Name: "Evil " + canaryTK, Tally: tally(1, 1, 0)}},
+				Regions:   []*adminv1.ClientProbeGroup{{Name: "RU · Moscow", Tally: tally(5, 2, 3)}}},
+			{NodeId: "nod_other", Tally: tally(1, 1, 0)},
+		},
+	}), nil
+}
+
 // api builds the fake admin API handler: the generated services behind fakeAuth.requireSession.
 func (w *world) api(a *fakeAuth) http.Handler {
 	mux := http.NewServeMux()
@@ -816,6 +833,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return adminv1connect.NewAuthServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewProvisioningServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewWarpServiceHandler(w) },
+		func() (string, http.Handler) { return adminv1connect.NewClientProbeServiceHandler(w) },
 	} {
 		p, hh := h()
 		mux.Handle(p, hh)

@@ -113,16 +113,23 @@ func TestSwitchAndDisconnect(t *testing.T) {
 	r := rpc{s}
 	owner := auth.WithAdmin(context.Background(), store.Admin{ID: "adm_owner", Role: store.RoleOwner})
 
+	on := true
+	// the switch and Disconnect are the owner's alone (the read is open to every role: the policy table)
 	for name, ctx := range map[string]context.Context{
 		"helper": auth.WithAdmin(context.Background(), store.Admin{ID: "adm_x", Role: store.RoleHelper}),
 		"token":  auth.WithAdmin(context.Background(), store.Admin{ID: "token:abc", Role: store.RoleOwner}),
 		"mcp":    auth.WithAdmin(context.Background(), store.Admin{ID: "mcp:abc", Role: store.RoleOwner}),
 	} {
-		if _, err := r.GetClientProbe(ctx, connect.NewRequest(&adminv1.GetClientProbeRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
-			t.Errorf("%s: %v", name, err)
+		if _, err := r.UpdateClientProbe(ctx, connect.NewRequest(&adminv1.UpdateClientProbeRequest{Enabled: &on})); connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Errorf("update by %s: %v", name, err)
+		}
+		if _, err := r.DisconnectClientProbe(ctx, connect.NewRequest(&adminv1.DisconnectClientProbeRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Errorf("disconnect by %s: %v", name, err)
 		}
 	}
-	on := true
+	if steps != 0 {
+		t.Fatalf("a refused change asked for a step-up %d times", steps)
+	}
 	up, err := r.UpdateClientProbe(owner, connect.NewRequest(&adminv1.UpdateClientProbeRequest{Enabled: &on}))
 	if err != nil || !up.Msg.Settings.Enabled || steps != 1 || invalidated != 1 {
 		t.Fatalf("switch on: %v %v, step-ups %d, invalidated %d", up, err, steps, invalidated)

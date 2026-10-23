@@ -51,6 +51,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
 	// The country verdicts of GetChecks over time (the Reachability page), read like them.
 	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure: TokenAccessDirect,
+	// The kl!ck reports per node, operator and region: counts and the names the app saw, no address or person.
+	adminv1connect.ClientProbeServiceGetClientProbeProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,
