@@ -420,6 +420,11 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 				if h.RxBytes > p.rx && handshakeOlderThan(h.LastHS, now) {
 					linkStatFor(links, in.spec.ID, w.credID).Stalls++
 				}
+			} else if h.LastHS.After(in.since) {
+				// The first round that sees the peer: a handshake made since the inbound runs is a connection that came between
+				// two rounds (a new device connects within seconds). An older one predates this agent: a kernel interface kept
+				// across a restart.
+				linkStatFor(links, in.spec.ID, w.credID).Connects++
 			}
 			e.addTraffic(in.spec.ID, w.credID, deltaOf(p.rx, h.RxBytes), deltaOf(p.tx, h.TxBytes))
 			in.prev[h.PublicKey] = counters{rx: h.RxBytes, tx: h.TxBytes, hs: h.LastHS, online: online(h, now), seen: true}

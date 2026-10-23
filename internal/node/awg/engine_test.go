@@ -298,6 +298,26 @@ func TestCollectConnectionCountersAndUnknownPeers(t *testing.T) {
 	}
 }
 
+// A device that connects before any round saw its peer still counts once: the handshake is newer than the inbound. A handshake
+// older than the inbound (a kernel interface that outlived the agent) is no connection.
+func TestCollectCountsAConnectBetweenTwoRounds(t *testing.T) {
+	e, fb, clk := newTestEngine(t)
+	clk.Add(time.Second)
+	mustApply(t, e, spec(t, "inb1", 51842, nil), cred("a", 0x0a, 5), cred("b", 0x0b, 6))
+	fb.mutate(p1, func(d *fakeDev) {
+		d.peers[pk(0x0a)].hs = clk.Now().Add(time.Second) // connected right after the apply
+		d.peers[pk(0x0b)].hs = clk.Now().Add(-time.Hour)  // older than the inbound
+	})
+	clk.Add(5 * time.Second)
+	c, err := e.Collect(context.Background())
+	if err != nil || len(c.Links) != 1 || c.Links[0] != (plugin.LinkStat{CredID: "a", InboundID: "inb1", Connects: 1}) {
+		t.Fatalf("links=%+v err=%v, want one connect for a only", c.Links, err)
+	}
+	if c, _ = e.Collect(context.Background()); len(c.Links) != 0 {
+		t.Fatalf("a connect is counted once: %+v", c.Links)
+	}
+}
+
 func TestRemovedPeerCountersAreFlushed(t *testing.T) {
 	e, fb, _ := newTestEngine(t)
 	s := spec(t, "inb1", 51842, nil)
