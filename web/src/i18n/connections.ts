@@ -1,0 +1,62 @@
+// What the nodes count of connection attempts (lib/connections.ts): the Connection block of a person's card and the line under
+// every profile on the node's Profiles tab. English is the source of truth: `ru` and `zh` are type-checked against it. The admin
+// speaks «ты». "a|b" is a plural.
+export const en = {
+  "conn.title": "What the nodes saw, last 24 hours",
+  "conn.none": "No connection attempt reached the nodes in the last 24 hours.",
+  "conn.oldAgents": "Not counted on {nodes}: the node's agent does not send connection counters yet. Update the agent.",
+  "conn.deviceGone": "A removed device",
+  "conn.where": "{node} · {profile}",
+  "conn.last": "last {ago}",
+  "conn.connects": "{n} connection|{n} connections",
+  "conn.drops": "dropped at once: {n}",
+  "conn.rejects": "key refused: {n}",
+  "conn.stalls": "handshake did not complete: {n}",
+  "conn.online": "online {time}",
+  "conn.hellos": "{pct}% of {n} handshakes did not complete",
+  "conn.keysStalled": "{n} of {tried} devices never completed a handshake",
+  "conn.unknown": "unknown keys: {n}",
+  "conn.node.label": "24 h",
+  "conn.node.quiet": "no attempts",
+  "conn.node.unsupported": "This node's agent does not count connections yet: update it to see attempts, refusals and drops per profile.",
+};
+
+export const ru: Record<keyof typeof en, string> = {
+  "conn.title": "Что видели ноды за 24 часа",
+  "conn.none": "За 24 часа до нод не дошло ни одной попытки подключения.",
+  "conn.oldAgents": "Не считается на {nodes}: агент ноды ещё не присылает счётчики соединений. Обнови агент.",
+  "conn.deviceGone": "Удалённое устройство",
+  "conn.where": "{node} · {profile}",
+  "conn.last": "последнее {ago}",
+  "conn.connects": "{n} подключение|{n} подключения|{n} подключений",
+  "conn.drops": "сразу оборвалось: {n}",
+  "conn.rejects": "ключ отклонён: {n}",
+  "conn.stalls": "рукопожатие не завершилось: {n}",
+  "conn.online": "онлайн {time}",
+  "conn.hellos": "{pct} % из {n} рукопожатий не завершились",
+  "conn.keysStalled": "{n} из {tried} устройств так и не завершили рукопожатие",
+  "conn.unknown": "неизвестных ключей: {n}",
+  "conn.node.label": "24 ч",
+  "conn.node.quiet": "попыток не было",
+  "conn.node.unsupported": "Агент этой ноды ещё не считает соединения: обнови его, чтобы видеть попытки, отказы и обрывы по профилям.",
+};
+
+export const zh: Record<keyof typeof en, string> = {
+  "conn.title": "节点在过去 24 小时看到的情况",
+  "conn.none": "过去 24 小时没有任何连接尝试到达节点。",
+  "conn.oldAgents": "{nodes} 未统计：该节点的 Agent 尚不发送连接计数。请更新 Agent。",
+  "conn.deviceGone": "已删除的设备",
+  "conn.where": "{node} · {profile}",
+  "conn.last": "最近一次 {ago}",
+  "conn.connects": "{n} 次连接",
+  "conn.drops": "立即断开：{n}",
+  "conn.rejects": "密钥被拒绝：{n}",
+  "conn.stalls": "握手未完成：{n}",
+  "conn.online": "在线 {time}",
+  "conn.hellos": "{n} 次握手中有 {pct}% 未完成",
+  "conn.keysStalled": "{tried} 台设备中有 {n} 台始终未完成握手",
+  "conn.unknown": "未知密钥：{n}",
+  "conn.node.label": "24 小时",
+  "conn.node.quiet": "没有尝试",
+  "conn.node.unsupported": "该节点的 Agent 尚不统计连接：请更新它，以按协议配置查看尝试、拒绝和断开。",
+};

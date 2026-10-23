@@ -5,7 +5,7 @@ import { Code } from "@connectrpc/connect";
 import type { DeviceConfig } from "@/gen/mistgate/admin/v1/device_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { QuotaReset, UserStatus, type AccessImpact, type NodeAccess, type ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
+import { DeviceKind, QuotaReset, UserStatus, type AccessImpact, type NodeAccess, type ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
 import { Card, DangerZone, PageTitle, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -17,6 +17,7 @@ import { TextField } from "@/components/ui/text-field";
 import { Infinite, Stepper } from "@/components/ui/stepper";
 import { useToast } from "@/components/ui/toast";
 import { dns, users } from "@/lib/api";
+import { deviceConnParts, userConnectionQuery, type Part, type UserConnection } from "@/lib/connections";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
@@ -224,7 +225,7 @@ function UserDetail({ data }: { data: DetailN }) {
 
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">
-          <ConnectionPanel userId={user.id} />
+          <ConnectionPanel userId={user.id} devices={data.devices} nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id} />
           <TrafficPanel data={data} fmt={fmt} />
           <DevicesPanel
             user={user}
@@ -424,35 +425,93 @@ export function DnsChoicesPanel({ user, actions }: { user: Pick<User, "id" | "na
  * "Connection": the open ACCESS_ENDED and USER_CONNECTION alerts of this person, from the same query as Health (no new
  * call): what the panel sees, why, and since when. Nothing open, nothing shown (also while the alerts load or fail).
  */
-export function ConnectionPanel({ userId }: { userId: string }) {
+/**
+ * The person's connection: the alerts about them, then what the nodes counted of their connections in the last 24 hours, per
+ * device and profile (lib/connections.ts). Nothing at all is shown while neither has anything to say.
+ */
+export function ConnectionPanel({ userId, devices = [], nodeName = (id) => id }: { userId: string; devices?: Device[]; nodeName?: (id: string) => string }) {
   const t = useT();
   const fmt = useFmt();
   const q = useQuery(alertsQuery);
+  const conn = useQuery(userConnectionQuery(userId)).data;
   const rows = (q.data?.active ?? []).filter((a) => alertIsAbout(a, userId)).sort((a, b) => b.severity - a.severity);
-  if (rows.length === 0) return null;
+  const counted = (conn?.rows.length ?? 0) > 0 || (conn?.nodesWithoutCounters.length ?? 0) > 0;
+  if (rows.length === 0 && !counted) return null;
   const now = q.data?.nowUnix ?? nowSec();
   return (
     <Panel title={t("users.connection")} icon="pulse" tone="rose">
-      <ul className="flex flex-col">
-        {rows.map((a) => {
-          const kind = severityKind(a.severity);
-          const why = alertWhy(t, fmt, a);
-          return (
-            <li key={a.id} className="flex flex-col gap-1 border-t border-line py-2.5 first:border-t-0 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <span className={cx("flex items-center gap-[7px] text-xs font-bold", kindTextClass[kind])}>
-                  <StatusDot kind={kind} />
-                  {t(severityWord(a.severity))}
-                </span>
-                <span className="min-w-40 flex-1 text-[13px] font-bold">{alertTitle(t, a)}</span>
-                <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
-              </div>
-              {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
-            </li>
-          );
-        })}
-      </ul>
+      {rows.length > 0 && (
+        <ul className="flex flex-col">
+          {rows.map((a) => {
+            const kind = severityKind(a.severity);
+            const why = alertWhy(t, fmt, a);
+            return (
+              <li key={a.id} className="flex flex-col gap-1 border-t border-line py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className={cx("flex items-center gap-[7px] text-xs font-bold", kindTextClass[kind])}>
+                    <StatusDot kind={kind} />
+                    {t(severityWord(a.severity))}
+                  </span>
+                  <span className="min-w-40 flex-1 text-[13px] font-bold">{alertTitle(t, a)}</span>
+                  <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
+                </div>
+                {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {conn && <ConnectionCounts conn={conn} devices={devices} nodeName={nodeName} separated={rows.length > 0} />}
     </Panel>
+  );
+}
+
+/** What the nodes counted of the person's connections: a line per device and profile, trouble in the warning colour. */
+function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserConnection; devices: Device[]; nodeName: (id: string) => string; separated: boolean }) {
+  const t = useT();
+  const tx = useTx();
+  const fmt = useFmt();
+  const name = (id: string) => {
+    const d = devices.find((x) => x.id === id);
+    if (!d) return t("conn.deviceGone");
+    if (d.kind === DeviceKind.LINK_SHARED) return tx("users.dev.shared");
+    return d.model || platformLabel(d.platform || "other", tx);
+  };
+  const missing = conn.nodesWithoutCounters.map(nodeName);
+  return (
+    <div data-testid="conn-counts" className={cx("flex flex-col gap-2", separated && "mt-2.5 border-t border-line pt-2.5")}>
+      <span className="text-xs font-bold text-muted">{t("conn.title")}</span>
+      {conn.rows.length === 0 && missing.length === 0 && <p className="text-[13px] text-muted">{t("conn.none")}</p>}
+      {conn.rows.length > 0 && (
+        <ul className="flex flex-col divide-y divide-line">
+          {conn.rows.map((r) => (
+            <li key={`${r.deviceId}/${r.inboundId}`} data-testid="conn-row" className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[13px]">
+                <b className="font-bold">{name(r.deviceId)}</b>
+                <span className="text-muted">{t("conn.where", { node: r.nodeName || r.nodeId, profile: r.profileName })}</span>
+                {r.lastHourUnix > 0 && <span className="ml-auto font-mono text-[11px] text-muted">{t("conn.last", { ago: fmt.ago(r.lastHourUnix) })}</span>}
+              </div>
+              <PartsLine parts={deviceConnParts(t, fmt, r)} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {missing.length > 0 && <p className="text-xs leading-normal text-pretty text-muted">{t("conn.oldAgents", { nodes: missing.join(", ") })}</p>}
+    </div>
+  );
+}
+
+/** The facts of a counter line, joined by middle dots; trouble in the warning colour. */
+export function PartsLine({ parts }: { parts: Part[] }) {
+  return (
+    <p className="text-xs leading-normal text-pretty text-muted">
+      {parts.map((p, i) => (
+        <span key={i}>
+          {i > 0 && " · "}
+          <span className={cx(p.warn && "font-semibold text-warn-text")}>{p.text}</span>
+        </span>
+      ))}
+    </p>
   );
 }
 

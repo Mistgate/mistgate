@@ -21,6 +21,7 @@ const listAlerts = vi.fn();
 const revokeDevice = vi.fn();
 const unblockDevice = vi.fn();
 const renameDevice = vi.fn();
+const getUserConnection = vi.fn();
 const subsMode = { v: LinkDeviceLimit.ENFORCE as LinkDeviceLimit };
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
@@ -31,6 +32,7 @@ vi.mock("@/lib/api", async (orig) => ({
     setUsersEnabled: (...a: unknown[]) => setUsersEnabled(...a),
     revokeDevice: (...a: unknown[]) => revokeDevice(...a),
     unblockDevice: (...a: unknown[]) => unblockDevice(...a),
+    getUserConnection: (...a: unknown[]) => getUserConnection(...a),
   },
   devices: { renameDevice: (...a: unknown[]) => renameDevice(...a) },
   groups: {
@@ -87,7 +89,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice]) m.mockReset();
+  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice, getUserConnection]) m.mockReset();
   subsMode.v = LinkDeviceLimit.ENFORCE;
 });
 
@@ -216,6 +218,40 @@ describe("the user card", () => {
     await mount(1, [], [alert({ id: "alt_3", subject: "usr_2", params: { user_name: "Other", user_id: "usr_2" } })]);
     expect(text()).not.toContain("Connection");
     expect(text()).not.toContain("Access ended, but the person keeps trying");
+  });
+
+  it("adds what the nodes counted per device and profile to the Connection block, trouble in the warning colour", async () => {
+    getUserConnection.mockResolvedValue({
+      sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],
+      rows: [
+        { deviceId: "dev_i", nodeId: "nod_1", nodeName: "de1", inboundId: "inb_hy", profileName: "hy2 · 443", protocol: "hysteria2", connects: 3, rejects: 0, drops: 2, stalls: 0, onlineS: 4500n, lastHourUnix: NOW - 3600 },
+        { deviceId: "dev_k", nodeId: "nod_1", nodeName: "de1", inboundId: "inb_awg", profileName: "AWG 3.1", protocol: "awg", connects: 0, rejects: 0, drops: 0, stalls: 7, onlineS: 0n, lastHourUnix: NOW - 7200 },
+        { deviceId: "dev_gone", nodeId: "nod_1", nodeName: "de1", inboundId: "inb_hy", profileName: "hy2 · 443", protocol: "hysteria2", connects: 1, rejects: 1, drops: 0, stalls: 0, onlineS: 60n, lastHourUnix: NOW - 3600 },
+      ],
+    });
+    await mount();
+    expect(text()).toContain("Connection");
+    const rows = [...document.querySelectorAll("[data-testid=conn-row]")].map((r) => r.textContent);
+    expect(rows[0]).toContain("Apps without a device ID");
+    expect(rows[0]).toContain("de1 · hy2 · 443");
+    expect(rows[0]).toContain("3 connections · dropped at once: 2 · online 1 h");
+    expect(rows[1]).toContain("Pixel");
+    expect(rows[1]).toContain("0 connections · handshake did not complete: 7");
+    expect(rows[2]).toContain("A removed device");
+    expect(rows[2]).toContain("key refused: 1");
+    const warned = [...document.querySelectorAll("[data-testid=conn-counts] .text-warn-text")].map((e) => e.textContent);
+    expect(warned).toEqual(["dropped at once: 2", "handshake did not complete: 7", "key refused: 1"]);
+  });
+
+  it("says which nodes do not count yet, by name, and keeps the block hidden when nothing is counted at all", async () => {
+    getUserConnection.mockResolvedValue({ sinceUnix: NOW - 86_400, nowUnix: NOW, rows: [], nodesWithoutCounters: ["nod_1"] });
+    await mount();
+    expect(text()).toContain("Not counted on de1: the node's agent does not send connection counters yet.");
+    act(() => root?.unmount());
+    host?.remove();
+    getUserConnection.mockResolvedValue({ sinceUnix: NOW - 86_400, nowUnix: NOW, rows: [], nodesWithoutCounters: [] });
+    await mount();
+    expect(text()).not.toContain("Connection");
   });
 
   it("saves a separate public name while the account name stays unchanged", async () => {

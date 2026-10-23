@@ -14,6 +14,7 @@ import { zh as portsZh } from "./ports";
 import { zh as editionZh } from "./edition";
 import { zh as decoyZh } from "./decoy";
 import { zh as countryZh } from "./country";
+import { zh as connectionsZh } from "./connections";
 
 // Simplified Chinese (zh-CN). Typed against the English shape: a missing or extra key fails `pnpm typecheck`. Plurals: one form, no "|".
 // `core` is the shell, auth and navigation copy (what ru.ts keeps in its own `core`).
@@ -264,4 +265,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "本节点站点或其他站点",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...countryZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...countryZh, ...connectionsZh };

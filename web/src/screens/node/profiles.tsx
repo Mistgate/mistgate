@@ -16,6 +16,7 @@ import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import type { Plain } from "@/lib/plain";
 import { nodes as nodesApi, profiles as profilesApi } from "@/lib/api";
+import { inboundConnParts, nodeConnectionsQuery, type InboundConn } from "@/lib/connections";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
@@ -26,6 +27,7 @@ import { agentLinked } from "@/lib/node-status";
 import { protocolName } from "@/lib/series";
 import { useNow } from "@/lib/time";
 import { profileListQuery } from "@/screens/users/rpc";
+import { PartsLine } from "@/screens/users/user-detail";
 import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
@@ -121,6 +123,9 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   const linked = agentLinked(node.status);
   const portTrouble = data.inbounds.some((i) => i.lastError && inboundErrorKind(i.lastError) === "port");
   const holders = usePortHolders(node.id, portTrouble);
+  // what the node counted of connection attempts per profile (lib/connections.ts); nothing while it cannot be read
+  const conn = useQuery({ ...nodeConnectionsQuery(node.id), enabled: data.inbounds.length > 0 && node.status !== NodeStatus.RETIRED }).data;
+  const connOf = new Map((conn?.inbounds ?? []).map((x) => [x.inboundId, x]));
 
   const add = (
     <Button variant="primary" size="md" onClick={() => setAdding(true)}>
@@ -138,13 +143,16 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
           </EmptyState>
         </div>
       ) : (
-        <div className="flex items-center gap-2 pb-1">
-          <span className="flex-1 text-xs text-muted">{t.n("node.profiles.count", data.inbounds.length)}</span>
-          <Button variant="primary" size="md" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={14} />
-            {t("node.profiles.add")}
-          </Button>
-        </div>
+        <>
+          {conn && !conn.supported && linked && <p data-testid="conn-unsupported" className="text-xs leading-normal text-pretty text-muted">{t("conn.node.unsupported")}</p>}
+          <div className="flex items-center gap-2 pb-1">
+            <span className="flex-1 text-xs text-muted">{t.n("node.profiles.count", data.inbounds.length)}</span>
+            <Button variant="primary" size="md" onClick={() => setAdding(true)}>
+              <Icon name="plus" size={14} />
+              {t("node.profiles.add")}
+            </Button>
+          </div>
+        </>
       )}
 
       {data.inbounds.map((i) => {
@@ -202,6 +210,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
               ))}
             </dl>
             {i.awg && <AwgStatusLine awg={i.awg} />}
+            {conn?.supported && <ConnLine x={connOf.get(i.id)} />}
             {i.lastError && <InboundErrorNote inbound={i} process={holders[i.id]} />}
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
               {fix}
@@ -464,5 +473,18 @@ function RestartInbound({ inbound, nodeId, nodeName, onClose }: { inbound: Plain
         </Notice>
       )}
     </Modal>
+  );
+}
+
+/** What the node counted of attempts on a profile in the last 24 hours, or that there were none. */
+function ConnLine({ x }: { x?: InboundConn }) {
+  const t = useT();
+  const fmt = useFmt();
+  const parts = x ? inboundConnParts(t, fmt, x) : [];
+  return (
+    <div data-testid="conn-line" className="flex items-baseline gap-2">
+      <span className="text-[11px] font-bold text-muted">{t("conn.node.label")}</span>
+      {parts.length > 0 ? <PartsLine parts={parts} /> : <span className="text-xs text-muted">{t("conn.node.quiet")}</span>}
+    </div>
   );
 }

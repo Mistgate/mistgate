@@ -10,6 +10,7 @@ import { DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { PrepareAwgOutcome } from "@/gen/mistgate/admin/v1/node_pb";
 import { ProfilesTab } from "./profiles";
 
+const getNodeConnections = vi.fn();
 const listProfiles = vi.fn();
 const createInbound = vi.fn();
 const updateInbound = vi.fn();
@@ -35,6 +36,7 @@ vi.mock("@/lib/api", () => ({
     updateNode: (...a: unknown[]) => updateNode(...a),
     prepareAwgKernel: (...a: unknown[]) => prepareAwgKernel(...a),
     restartInbounds: (...a: unknown[]) => restartInbounds(...a),
+    getNodeConnections: (...a: unknown[]) => getNodeConnections(...a),
   },
   groups: { listGroups: (...a: unknown[]) => listGroups(...a), updateGroup: (...a: unknown[]) => updateGroup(...a) },
   health: { getDoctor: (...a: unknown[]) => getDoctor(...a) },
@@ -73,7 +75,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [listProfiles, createInbound, updateInbound, deleteInbound, createProfile, updateProfile, updateNode, prepareAwgKernel, restartInbounds, getDoctor, listGroups, updateGroup]) m.mockReset();
+  for (const m of [listProfiles, createInbound, updateInbound, deleteInbound, createProfile, updateProfile, updateNode, prepareAwgKernel, restartInbounds, getDoctor, listGroups, updateGroup, getNodeConnections]) m.mockReset();
 });
 
 const node = (over: Record<string, unknown> = {}) => ({
@@ -491,6 +493,28 @@ describe("the profiles list by protocol", () => {
     expect(t).not.toContain("Domain (SNI)");
     expect(t).not.toContain("Certificate");
     expect(t).not.toContain("ignored.example.com");
+  });
+
+  it("puts what the node counted of connection attempts under each profile, and says so when there were none", async () => {
+    getNodeConnections.mockResolvedValue({
+      supported: true, sinceUnix: 0n, nowUnix: 0n,
+      inbounds: [
+        { inboundId: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", connects: 12, rejects: 0, drops: 3, stalls: 0, onlineS: 0n, unknownKeys: 4, hellos: 40, handshakes: 10, keysStalled: 0, keysTried: 0 },
+      ],
+    });
+    await mount(data({ inbounds: [hy, awg] }));
+    await settle();
+    const lines = [...document.querySelectorAll("[data-testid=conn-line]")].map((l) => l.textContent);
+    expect(lines).toEqual(["24 h12 connections · dropped at once: 3 · 75% of 40 handshakes did not complete · unknown keys: 4", "24 hno attempts"]);
+    expect(document.querySelector("[data-testid=conn-unsupported]")).toBeNull();
+  });
+
+  it("says once that an older agent does not count connections, and draws no lines", async () => {
+    getNodeConnections.mockResolvedValue({ supported: false, sinceUnix: 0n, nowUnix: 0n, inbounds: [] });
+    await mount(data({ inbounds: [hy] }));
+    await settle();
+    expect(document.querySelector("[data-testid=conn-unsupported]")?.textContent).toContain("does not count connections yet");
+    expect(document.querySelectorAll("[data-testid=conn-line]")).toHaveLength(0);
   });
 
   it("marks a certificate that runs out soon, and says 'none' instead of a dash for a profile that is not running", async () => {
