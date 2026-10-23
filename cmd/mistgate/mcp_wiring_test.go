@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 18 || b != 36 || c != 66 {
+	if a, b, c := count(ro), count(op), count(ad); a != 20 || b != 38 || c != 68 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -325,6 +325,18 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	t.Logf("node_fix_plan on a node that never connected: %s", out)
 
+	// -- the connection counters on the real services: a node that never connected does not send them, and a person nobody
+	// connected for has no rows; a readonly token reads both
+	if out := ok(ro, "node_connections", map[string]any{"node": "de1"}); !strings.Contains(out, `"supported":false`) || !strings.Contains(out, `"inbounds":[]`) {
+		t.Errorf("node_connections: %s", out)
+	}
+	if out := ok(ro, "user_connection", map[string]any{"user_id": ids[0], "hours": 48}); !strings.Contains(out, `"rows":[]`) || !strings.Contains(out, `"nodes_without_counters":[]`) {
+		t.Errorf("user_connection: %s", out)
+	}
+	if out, isErr := tool(ro, "user_connection", map[string]any{"user_id": "usr_missing"}); !isErr || !strings.Contains(out, "not found") {
+		t.Errorf("user_connection of an unknown user: %v %s", isErr, out)
+	}
+
 	// -- the subscription page's app list: any token reads it; an operator's change waits for the owner and then saves through
 	// the real SubscriptionService; an owner's save in between makes the apply refuse instead of overwriting it.
 	if out := ok(ro, "subscription_settings_get", map[string]any{}); !strings.Contains(out, `"name":"Happ"`) {
@@ -441,7 +453,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 18 {
+	if n := count(ps); n != 20 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {
