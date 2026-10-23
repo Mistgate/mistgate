@@ -604,15 +604,28 @@ func (o *linkObject) loop() {
 	}
 }
 
-// do runs fn as one event of the object and waits for it. False when the emulator stopped first.
+// do runs fn as one event of the object and waits for it. False when the emulator stopped before the event began; an event
+// that began is waited for, so fn never runs alongside what the caller does next (fetch answers the same request, the others
+// read what fn wrote). Whoever claims the event first decides: the loop runs it, or do gives it up.
 func (o *linkObject) do(fn func()) bool {
 	done := make(chan struct{})
-	o.enqueue(func() { defer close(done); fn() })
+	var claimed atomic.Bool
+	o.enqueue(func() {
+		if !claimed.CompareAndSwap(false, true) {
+			return
+		}
+		defer close(done)
+		fn()
+	})
 	select {
 	case <-done:
 		return true
 	case <-o.e.ctx.Done():
-		return false
+		if claimed.CompareAndSwap(false, true) {
+			return false
+		}
+		<-done
+		return true
 	}
 }
 
