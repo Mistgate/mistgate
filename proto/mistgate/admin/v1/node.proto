@@ -49,6 +49,10 @@ service NodeService {
   // Live log tail of the agent and its engines, relayed from the node. Ends with eof = true, on client
   // cancel, or when the node link drops (then the last chunk has error set).
   rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse);
+  // The connection counters of the node's inbounds over the last hours (agents with "links/1", agent.proto
+  // LinkCounters): attempts, refusals, early drops, handshakes that do not complete, unknown keys. Counts only, no
+  // address. A read: every role and API tokens (the MCP tool node_connections).
+  rpc GetNodeConnections(GetNodeConnectionsRequest) returns (GetNodeConnectionsResponse);
 }
 
 // One row of the nodes table / one card.
@@ -425,6 +429,40 @@ message RetireNodeRequest {
 message RetireNodeResponse {
   // false if the agent was offline; it cannot reconnect anyway (its certificate is revoked).
   bool agent_notified = 1;
+}
+
+message GetNodeConnectionsRequest {
+  string node_id = 1;
+  // Hours back from now, 1 to 48 (the retention). 0 means 24; more is cut to 48.
+  uint32 hours = 2;
+}
+
+// One inbound of the node: its counters summed over its keys and its own row, in the window.
+message InboundConnections {
+  string inbound_id = 1;
+  string profile_id = 2;
+  string profile_name = 3;
+  string protocol = 4;
+  uint32 connects = 5;
+  uint32 rejects = 6;
+  uint32 drops = 7;
+  uint32 stalls = 8;
+  uint64 online_s = 9 [jstype = JS_NUMBER];
+  uint32 unknown_keys = 10;
+  uint32 hellos = 11;
+  uint32 handshakes = 12;
+  // Keys that had a stall, and keys that tried at all (a connect or a stall), in the window.
+  uint32 keys_stalled = 13;
+  uint32 keys_tried = 14;
+}
+
+message GetNodeConnectionsResponse {
+  // false: the node's agent does not send connection counters (it does not list "links/1"); inbounds is then empty.
+  bool supported = 1;
+  int64 since_unix = 2 [jstype = JS_NUMBER];
+  int64 now_unix = 3 [jstype = JS_NUMBER];
+  // The node's inbounds that are not removed, in the order of the node page.
+  repeated InboundConnections inbounds = 4;
 }
 
 message StreamLogsRequest {

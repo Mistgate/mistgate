@@ -906,7 +906,8 @@ type Hello struct {
 	// (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
 	// UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
 	// "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
-	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE").
+	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
+	// LinkCounters).
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -1339,7 +1340,10 @@ type StatsBatch struct {
 	Health    []*InboundHealth `protobuf:"bytes,6,rep,name=health,proto3" json:"health,omitempty"`
 	Coalesced bool             `protobuf:"varint,7,opt,name=coalesced,proto3" json:"coalesced,omitempty"`
 	// Node-level WARP health; absent when the node has no WarpSpec. Newest batch wins (coalescing keeps the last).
-	Warp          *WarpHealth `protobuf:"bytes,8,opt,name=warp,proto3" json:"warp,omitempty"`
+	Warp *WarpHealth `protobuf:"bytes,8,opt,name=warp,proto3" json:"warp,omitempty"`
+	// Connection counters since the previous batch (agents with "links/1"); see LinkCounters. Rows with every counter zero
+	// are not sent. A coalescer adds rows of the same cred_id and inbound_id field by field.
+	Links         []*LinkCounters `protobuf:"bytes,9,rep,name=links,proto3" json:"links,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1430,6 +1434,152 @@ func (x *StatsBatch) GetWarp() *WarpHealth {
 	return nil
 }
 
+func (x *StatsBatch) GetLinks() []*LinkCounters {
+	if x != nil {
+		return x.Links
+	}
+	return nil
+}
+
+// CONNECTION COUNTERS. What a node saw of connection attempts, per credential of an inbound, so the panel can tell "the app
+// never reaches the node" from "the node refuses the key", "it connects and drops at once" and "it works". Counters, never
+// addresses: the client's address is not sent (Session.remote_ip is reserved), and no row says when a single connection
+// happened. The engines count on connection and handshake events only, never per data chunk.
+//
+// cred_id "" is the inbound itself: what cannot be put on a credential (an unknown key, the handshake totals). The event
+// counters (connects, rejects, drops, stalls, unknown_keys) leave in the next batch; the volume counters (online_s, hellos,
+// handshakes) are added up and leave in the first batch after a 10-minute boundary of UTC (:00, :10, ...). A restart of the
+// agent loses at most those 10 minutes of volume counters. What an engine cannot know stays zero:
+//   - hysteria2: every counter. hellos counts QUIC ClientHellos (not resumed TLS sessions), handshakes the auth requests
+//     that followed (accepted or not); drops are idle timeouts of a connection younger than 60 s or under 64 KiB.
+//   - awg: connects (a peer's handshake moved after it was offline), stalls (initiations arrive, no handshake completes:
+//     the answer does not reach the client) and unknown_keys (initiations of a key the interface does not hold; kernel
+//     backend and userspace). WireGuard drops anything else silently: no rejects, drops, hellos or handshakes.
+//   - vless: none yet (a later version of this feature).
+type LinkCounters struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "" = the inbound itself.
+	CredId    string `protobuf:"bytes,1,opt,name=cred_id,json=credId,proto3" json:"cred_id,omitempty"`
+	InboundId string `protobuf:"bytes,2,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
+	// Connections that were accepted (a new session).
+	Connects uint32 `protobuf:"varint,3,opt,name=connects,proto3" json:"connects,omitempty"`
+	// The key is known to the node but refused: its term ended or it was removed.
+	Rejects uint32 `protobuf:"varint,4,opt,name=rejects,proto3" json:"rejects,omitempty"`
+	// Accepted, then frozen or cut almost at once.
+	Drops uint32 `protobuf:"varint,5,opt,name=drops,proto3" json:"drops,omitempty"`
+	// A handshake was started and never completed.
+	Stalls uint32 `protobuf:"varint,6,opt,name=stalls,proto3" json:"stalls,omitempty"`
+	// Seconds online, from the agent's session snapshots.
+	OnlineS uint32 `protobuf:"varint,7,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
+	// Only on the inbound row: attempts with a key the node does not know.
+	UnknownKeys uint32 `protobuf:"varint,8,opt,name=unknown_keys,json=unknownKeys,proto3" json:"unknown_keys,omitempty"`
+	// Only on the inbound row: handshakes started and handshakes that reached authentication.
+	Hellos        uint32 `protobuf:"varint,9,opt,name=hellos,proto3" json:"hellos,omitempty"`
+	Handshakes    uint32 `protobuf:"varint,10,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkCounters) Reset() {
+	*x = LinkCounters{}
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkCounters) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkCounters) ProtoMessage() {}
+
+func (x *LinkCounters) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkCounters.ProtoReflect.Descriptor instead.
+func (*LinkCounters) Descriptor() ([]byte, []int) {
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *LinkCounters) GetCredId() string {
+	if x != nil {
+		return x.CredId
+	}
+	return ""
+}
+
+func (x *LinkCounters) GetInboundId() string {
+	if x != nil {
+		return x.InboundId
+	}
+	return ""
+}
+
+func (x *LinkCounters) GetConnects() uint32 {
+	if x != nil {
+		return x.Connects
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetRejects() uint32 {
+	if x != nil {
+		return x.Rejects
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetDrops() uint32 {
+	if x != nil {
+		return x.Drops
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetStalls() uint32 {
+	if x != nil {
+		return x.Stalls
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetOnlineS() uint32 {
+	if x != nil {
+		return x.OnlineS
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetUnknownKeys() uint32 {
+	if x != nil {
+		return x.UnknownKeys
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHellos() uint32 {
+	if x != nil {
+		return x.Hellos
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHandshakes() uint32 {
+	if x != nil {
+		return x.Handshakes
+	}
+	return 0
+}
+
 // Directions are from the END USER's point of view, not the server-remote view used inside the
 // Hysteria core (core "Tx" = bytes_up, core "Rx" = bytes_down).
 type TrafficDelta struct {
@@ -1448,7 +1598,7 @@ type TrafficDelta struct {
 
 func (x *TrafficDelta) Reset() {
 	*x = TrafficDelta{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[10]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1460,7 +1610,7 @@ func (x *TrafficDelta) String() string {
 func (*TrafficDelta) ProtoMessage() {}
 
 func (x *TrafficDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[10]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1473,7 +1623,7 @@ func (x *TrafficDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrafficDelta.ProtoReflect.Descriptor instead.
 func (*TrafficDelta) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *TrafficDelta) GetCredId() string {
@@ -1515,7 +1665,7 @@ type Session struct {
 
 func (x *Session) Reset() {
 	*x = Session{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1527,7 +1677,7 @@ func (x *Session) String() string {
 func (*Session) ProtoMessage() {}
 
 func (x *Session) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1540,7 +1690,7 @@ func (x *Session) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Session.ProtoReflect.Descriptor instead.
 func (*Session) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Session) GetCredId() string {
@@ -1584,7 +1734,7 @@ type HostMetrics struct {
 
 func (x *HostMetrics) Reset() {
 	*x = HostMetrics{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1596,7 +1746,7 @@ func (x *HostMetrics) String() string {
 func (*HostMetrics) ProtoMessage() {}
 
 func (x *HostMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1609,7 +1759,7 @@ func (x *HostMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostMetrics.ProtoReflect.Descriptor instead.
 func (*HostMetrics) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *HostMetrics) GetCpuPct() float32 {
@@ -1702,7 +1852,7 @@ type InboundHealth struct {
 
 func (x *InboundHealth) Reset() {
 	*x = InboundHealth{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1714,7 +1864,7 @@ func (x *InboundHealth) String() string {
 func (*InboundHealth) ProtoMessage() {}
 
 func (x *InboundHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1727,7 +1877,7 @@ func (x *InboundHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboundHealth.ProtoReflect.Descriptor instead.
 func (*InboundHealth) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *InboundHealth) GetInboundId() string {
@@ -1812,7 +1962,7 @@ type AwgHealth struct {
 
 func (x *AwgHealth) Reset() {
 	*x = AwgHealth{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[14]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1824,7 +1974,7 @@ func (x *AwgHealth) String() string {
 func (*AwgHealth) ProtoMessage() {}
 
 func (x *AwgHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[14]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1837,7 +1987,7 @@ func (x *AwgHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AwgHealth.ProtoReflect.Descriptor instead.
 func (*AwgHealth) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AwgHealth) GetBackend() string {
@@ -1934,7 +2084,7 @@ type WarpHealth struct {
 
 func (x *WarpHealth) Reset() {
 	*x = WarpHealth{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[15]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1946,7 +2096,7 @@ func (x *WarpHealth) String() string {
 func (*WarpHealth) ProtoMessage() {}
 
 func (x *WarpHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[15]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1959,7 +2109,7 @@ func (x *WarpHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WarpHealth.ProtoReflect.Descriptor instead.
 func (*WarpHealth) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *WarpHealth) GetState() WarpState {
@@ -2082,7 +2232,7 @@ type WarpProbeResult struct {
 
 func (x *WarpProbeResult) Reset() {
 	*x = WarpProbeResult{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[16]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2094,7 +2244,7 @@ func (x *WarpProbeResult) String() string {
 func (*WarpProbeResult) ProtoMessage() {}
 
 func (x *WarpProbeResult) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[16]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2107,7 +2257,7 @@ func (x *WarpProbeResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WarpProbeResult.ProtoReflect.Descriptor instead.
 func (*WarpProbeResult) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *WarpProbeResult) GetOk() bool {
@@ -2160,7 +2310,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[17]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2172,7 +2322,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[17]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2185,7 +2335,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Event) GetSeverity() Severity {
@@ -2240,7 +2390,7 @@ type ApplyResult struct {
 
 func (x *ApplyResult) Reset() {
 	*x = ApplyResult{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[18]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2252,7 +2402,7 @@ func (x *ApplyResult) String() string {
 func (*ApplyResult) ProtoMessage() {}
 
 func (x *ApplyResult) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[18]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2265,7 +2415,7 @@ func (x *ApplyResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyResult.ProtoReflect.Descriptor instead.
 func (*ApplyResult) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ApplyResult) GetRevision() uint64 {
@@ -2328,7 +2478,7 @@ type InboundResult struct {
 
 func (x *InboundResult) Reset() {
 	*x = InboundResult{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[19]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2340,7 +2490,7 @@ func (x *InboundResult) String() string {
 func (*InboundResult) ProtoMessage() {}
 
 func (x *InboundResult) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[19]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2353,7 +2503,7 @@ func (x *InboundResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboundResult.ProtoReflect.Descriptor instead.
 func (*InboundResult) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *InboundResult) GetInboundId() string {
@@ -2429,7 +2579,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[20]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2441,7 +2591,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[20]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2454,7 +2604,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *CommandResult) GetRequestId() string {
@@ -2514,7 +2664,7 @@ type LogChunk struct {
 
 func (x *LogChunk) Reset() {
 	*x = LogChunk{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[21]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2526,7 +2676,7 @@ func (x *LogChunk) String() string {
 func (*LogChunk) ProtoMessage() {}
 
 func (x *LogChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[21]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2539,7 +2689,7 @@ func (x *LogChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogChunk.ProtoReflect.Descriptor instead.
 func (*LogChunk) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *LogChunk) GetRequestId() string {
@@ -2591,7 +2741,7 @@ type LogLine struct {
 
 func (x *LogLine) Reset() {
 	*x = LogLine{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[22]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2603,7 +2753,7 @@ func (x *LogLine) String() string {
 func (*LogLine) ProtoMessage() {}
 
 func (x *LogLine) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[22]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2616,7 +2766,7 @@ func (x *LogLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogLine.ProtoReflect.Descriptor instead.
 func (*LogLine) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *LogLine) GetTimeUnixMs() int64 {
@@ -2663,7 +2813,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[23]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2675,7 +2825,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[23]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2688,7 +2838,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Pong) GetNonce() uint64 {
@@ -2731,7 +2881,7 @@ type ConnectResponse struct {
 
 func (x *ConnectResponse) Reset() {
 	*x = ConnectResponse{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[24]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2743,7 +2893,7 @@ func (x *ConnectResponse) String() string {
 func (*ConnectResponse) ProtoMessage() {}
 
 func (x *ConnectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[24]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2756,7 +2906,7 @@ func (x *ConnectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectResponse.ProtoReflect.Descriptor instead.
 func (*ConnectResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ConnectResponse) GetMessage() isConnectResponse_Message {
@@ -3123,7 +3273,7 @@ type SetDecoy struct {
 
 func (x *SetDecoy) Reset() {
 	*x = SetDecoy{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[25]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3135,7 +3285,7 @@ func (x *SetDecoy) String() string {
 func (*SetDecoy) ProtoMessage() {}
 
 func (x *SetDecoy) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[25]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3148,7 +3298,7 @@ func (x *SetDecoy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDecoy.ProtoReflect.Descriptor instead.
 func (*SetDecoy) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SetDecoy) GetRequestId() string {
@@ -3189,7 +3339,7 @@ type DecoyFile struct {
 
 func (x *DecoyFile) Reset() {
 	*x = DecoyFile{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[26]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3201,7 +3351,7 @@ func (x *DecoyFile) String() string {
 func (*DecoyFile) ProtoMessage() {}
 
 func (x *DecoyFile) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[26]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3214,7 +3364,7 @@ func (x *DecoyFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecoyFile.ProtoReflect.Descriptor instead.
 func (*DecoyFile) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DecoyFile) GetPath() string {
@@ -3242,7 +3392,7 @@ type MeasureBandwidth struct {
 
 func (x *MeasureBandwidth) Reset() {
 	*x = MeasureBandwidth{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[27]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3254,7 +3404,7 @@ func (x *MeasureBandwidth) String() string {
 func (*MeasureBandwidth) ProtoMessage() {}
 
 func (x *MeasureBandwidth) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[27]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3267,7 +3417,7 @@ func (x *MeasureBandwidth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeasureBandwidth.ProtoReflect.Descriptor instead.
 func (*MeasureBandwidth) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *MeasureBandwidth) GetRequestId() string {
@@ -3295,7 +3445,7 @@ type UdpCount struct {
 
 func (x *UdpCount) Reset() {
 	*x = UdpCount{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[28]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3307,7 +3457,7 @@ func (x *UdpCount) String() string {
 func (*UdpCount) ProtoMessage() {}
 
 func (x *UdpCount) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[28]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3320,7 +3470,7 @@ func (x *UdpCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UdpCount.ProtoReflect.Descriptor instead.
 func (*UdpCount) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{28}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *UdpCount) GetRequestId() string {
@@ -3381,7 +3531,7 @@ type UdpSend struct {
 
 func (x *UdpSend) Reset() {
 	*x = UdpSend{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[29]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3393,7 +3543,7 @@ func (x *UdpSend) String() string {
 func (*UdpSend) ProtoMessage() {}
 
 func (x *UdpSend) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[29]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3406,7 +3556,7 @@ func (x *UdpSend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UdpSend.ProtoReflect.Descriptor instead.
 func (*UdpSend) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{29}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UdpSend) GetRequestId() string {
@@ -3476,7 +3626,7 @@ type HttpMark struct {
 
 func (x *HttpMark) Reset() {
 	*x = HttpMark{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[30]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3488,7 +3638,7 @@ func (x *HttpMark) String() string {
 func (*HttpMark) ProtoMessage() {}
 
 func (x *HttpMark) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[30]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3501,7 +3651,7 @@ func (x *HttpMark) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpMark.ProtoReflect.Descriptor instead.
 func (*HttpMark) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{30}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *HttpMark) GetRequestId() string {
@@ -3547,7 +3697,7 @@ type TcpProbe struct {
 
 func (x *TcpProbe) Reset() {
 	*x = TcpProbe{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[31]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3559,7 +3709,7 @@ func (x *TcpProbe) String() string {
 func (*TcpProbe) ProtoMessage() {}
 
 func (x *TcpProbe) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[31]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3572,7 +3722,7 @@ func (x *TcpProbe) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TcpProbe.ProtoReflect.Descriptor instead.
 func (*TcpProbe) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{31}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *TcpProbe) GetRequestId() string {
@@ -3615,7 +3765,7 @@ type TcpTarget struct {
 
 func (x *TcpTarget) Reset() {
 	*x = TcpTarget{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[32]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3627,7 +3777,7 @@ func (x *TcpTarget) String() string {
 func (*TcpTarget) ProtoMessage() {}
 
 func (x *TcpTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[32]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3640,7 +3790,7 @@ func (x *TcpTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TcpTarget.ProtoReflect.Descriptor instead.
 func (*TcpTarget) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{32}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TcpTarget) GetPort() uint32 {
@@ -3710,7 +3860,7 @@ type CountryProbe struct {
 
 func (x *CountryProbe) Reset() {
 	*x = CountryProbe{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[33]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3722,7 +3872,7 @@ func (x *CountryProbe) String() string {
 func (*CountryProbe) ProtoMessage() {}
 
 func (x *CountryProbe) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[33]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3735,7 +3885,7 @@ func (x *CountryProbe) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountryProbe.ProtoReflect.Descriptor instead.
 func (*CountryProbe) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *CountryProbe) GetRequestId() string {
@@ -3799,7 +3949,7 @@ type CountryProbeTarget struct {
 
 func (x *CountryProbeTarget) Reset() {
 	*x = CountryProbeTarget{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[34]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3811,7 +3961,7 @@ func (x *CountryProbeTarget) String() string {
 func (*CountryProbeTarget) ProtoMessage() {}
 
 func (x *CountryProbeTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[34]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3824,7 +3974,7 @@ func (x *CountryProbeTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountryProbeTarget.ProtoReflect.Descriptor instead.
 func (*CountryProbeTarget) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{34}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *CountryProbeTarget) GetHost() string {
@@ -3853,7 +4003,7 @@ type PrepareAwgKernel struct {
 
 func (x *PrepareAwgKernel) Reset() {
 	*x = PrepareAwgKernel{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[35]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3865,7 +4015,7 @@ func (x *PrepareAwgKernel) String() string {
 func (*PrepareAwgKernel) ProtoMessage() {}
 
 func (x *PrepareAwgKernel) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[35]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3878,7 +4028,7 @@ func (x *PrepareAwgKernel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareAwgKernel.ProtoReflect.Descriptor instead.
 func (*PrepareAwgKernel) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{35}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *PrepareAwgKernel) GetRequestId() string {
@@ -3910,7 +4060,7 @@ type HelloAck struct {
 
 func (x *HelloAck) Reset() {
 	*x = HelloAck{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[36]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3922,7 +4072,7 @@ func (x *HelloAck) String() string {
 func (*HelloAck) ProtoMessage() {}
 
 func (x *HelloAck) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[36]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3935,7 +4085,7 @@ func (x *HelloAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloAck.ProtoReflect.Descriptor instead.
 func (*HelloAck) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{36}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *HelloAck) GetAckedSeq() uint64 {
@@ -3977,7 +4127,7 @@ type LinkChallenge struct {
 
 func (x *LinkChallenge) Reset() {
 	*x = LinkChallenge{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[37]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3989,7 +4139,7 @@ func (x *LinkChallenge) String() string {
 func (*LinkChallenge) ProtoMessage() {}
 
 func (x *LinkChallenge) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[37]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4002,7 +4152,7 @@ func (x *LinkChallenge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkChallenge.ProtoReflect.Descriptor instead.
 func (*LinkChallenge) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{37}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *LinkChallenge) GetNonce() []byte {
@@ -4030,7 +4180,7 @@ type LinkAuth struct {
 
 func (x *LinkAuth) Reset() {
 	*x = LinkAuth{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[38]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4042,7 +4192,7 @@ func (x *LinkAuth) String() string {
 func (*LinkAuth) ProtoMessage() {}
 
 func (x *LinkAuth) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[38]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4055,7 +4205,7 @@ func (x *LinkAuth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkAuth.ProtoReflect.Descriptor instead.
 func (*LinkAuth) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{38}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *LinkAuth) GetNodeId() string {
@@ -4088,7 +4238,7 @@ type LinkAccept struct {
 
 func (x *LinkAccept) Reset() {
 	*x = LinkAccept{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[39]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4100,7 +4250,7 @@ func (x *LinkAccept) String() string {
 func (*LinkAccept) ProtoMessage() {}
 
 func (x *LinkAccept) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[39]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4113,7 +4263,7 @@ func (x *LinkAccept) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkAccept.ProtoReflect.Descriptor instead.
 func (*LinkAccept) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{39}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *LinkAccept) GetSignature() []byte {
@@ -4132,7 +4282,7 @@ type Ack struct {
 
 func (x *Ack) Reset() {
 	*x = Ack{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[40]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4144,7 +4294,7 @@ func (x *Ack) String() string {
 func (*Ack) ProtoMessage() {}
 
 func (x *Ack) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[40]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4157,7 +4307,7 @@ func (x *Ack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ack.ProtoReflect.Descriptor instead.
 func (*Ack) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{40}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *Ack) GetUpToSeq() uint64 {
@@ -4200,7 +4350,7 @@ type NodeSettings struct {
 
 func (x *NodeSettings) Reset() {
 	*x = NodeSettings{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[41]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4212,7 +4362,7 @@ func (x *NodeSettings) String() string {
 func (*NodeSettings) ProtoMessage() {}
 
 func (x *NodeSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[41]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4225,7 +4375,7 @@ func (x *NodeSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeSettings.ProtoReflect.Descriptor instead.
 func (*NodeSettings) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{41}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *NodeSettings) GetStatsIntervalS() uint32 {
@@ -4313,7 +4463,7 @@ type DesiredState struct {
 
 func (x *DesiredState) Reset() {
 	*x = DesiredState{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[42]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4325,7 +4475,7 @@ func (x *DesiredState) String() string {
 func (*DesiredState) ProtoMessage() {}
 
 func (x *DesiredState) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[42]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4338,7 +4488,7 @@ func (x *DesiredState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DesiredState.ProtoReflect.Descriptor instead.
 func (*DesiredState) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{42}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *DesiredState) GetRevision() uint64 {
@@ -4416,7 +4566,7 @@ type WarpSpec struct {
 
 func (x *WarpSpec) Reset() {
 	*x = WarpSpec{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[43]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4428,7 +4578,7 @@ func (x *WarpSpec) String() string {
 func (*WarpSpec) ProtoMessage() {}
 
 func (x *WarpSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[43]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4441,7 +4591,7 @@ func (x *WarpSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WarpSpec.ProtoReflect.Descriptor instead.
 func (*WarpSpec) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{43}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *WarpSpec) GetEnabled() bool {
@@ -4537,7 +4687,7 @@ type InboundState struct {
 
 func (x *InboundState) Reset() {
 	*x = InboundState{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[44]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4549,7 +4699,7 @@ func (x *InboundState) String() string {
 func (*InboundState) ProtoMessage() {}
 
 func (x *InboundState) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[44]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4562,7 +4712,7 @@ func (x *InboundState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboundState.ProtoReflect.Descriptor instead.
 func (*InboundState) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{44}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *InboundState) GetInboundId() string {
@@ -4627,7 +4777,7 @@ type InboundSpec struct {
 
 func (x *InboundSpec) Reset() {
 	*x = InboundSpec{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[45]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4639,7 +4789,7 @@ func (x *InboundSpec) String() string {
 func (*InboundSpec) ProtoMessage() {}
 
 func (x *InboundSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[45]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4652,7 +4802,7 @@ func (x *InboundSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboundSpec.ProtoReflect.Descriptor instead.
 func (*InboundSpec) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{45}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *InboundSpec) GetInboundId() string {
@@ -4740,7 +4890,7 @@ type Tunnel struct {
 
 func (x *Tunnel) Reset() {
 	*x = Tunnel{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[46]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4752,7 +4902,7 @@ func (x *Tunnel) String() string {
 func (*Tunnel) ProtoMessage() {}
 
 func (x *Tunnel) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[46]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4765,7 +4915,7 @@ func (x *Tunnel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tunnel.ProtoReflect.Descriptor instead.
 func (*Tunnel) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{46}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *Tunnel) GetAddrV4() string {
@@ -4805,7 +4955,7 @@ type Listen struct {
 
 func (x *Listen) Reset() {
 	*x = Listen{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[47]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4817,7 +4967,7 @@ func (x *Listen) String() string {
 func (*Listen) ProtoMessage() {}
 
 func (x *Listen) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[47]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4830,7 +4980,7 @@ func (x *Listen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Listen.ProtoReflect.Descriptor instead.
 func (*Listen) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{47}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *Listen) GetNetwork() string {
@@ -4871,7 +5021,7 @@ type Tls struct {
 
 func (x *Tls) Reset() {
 	*x = Tls{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[48]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4883,7 +5033,7 @@ func (x *Tls) String() string {
 func (*Tls) ProtoMessage() {}
 
 func (x *Tls) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[48]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4896,7 +5046,7 @@ func (x *Tls) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tls.ProtoReflect.Descriptor instead.
 func (*Tls) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{48}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *Tls) GetMode() TlsMode {
@@ -4940,7 +5090,7 @@ type Credential struct {
 
 func (x *Credential) Reset() {
 	*x = Credential{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[49]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4952,7 +5102,7 @@ func (x *Credential) String() string {
 func (*Credential) ProtoMessage() {}
 
 func (x *Credential) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[49]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4965,7 +5115,7 @@ func (x *Credential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Credential.ProtoReflect.Descriptor instead.
 func (*Credential) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{49}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *Credential) GetCredId() string {
@@ -5028,7 +5178,7 @@ type Kick struct {
 
 func (x *Kick) Reset() {
 	*x = Kick{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[50]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5040,7 +5190,7 @@ func (x *Kick) String() string {
 func (*Kick) ProtoMessage() {}
 
 func (x *Kick) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[50]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5053,7 +5203,7 @@ func (x *Kick) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Kick.ProtoReflect.Descriptor instead.
 func (*Kick) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{50}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *Kick) GetRequestId() string {
@@ -5088,7 +5238,7 @@ type RestartInbound struct {
 
 func (x *RestartInbound) Reset() {
 	*x = RestartInbound{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[51]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5100,7 +5250,7 @@ func (x *RestartInbound) String() string {
 func (*RestartInbound) ProtoMessage() {}
 
 func (x *RestartInbound) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[51]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5113,7 +5263,7 @@ func (x *RestartInbound) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestartInbound.ProtoReflect.Descriptor instead.
 func (*RestartInbound) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{51}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *RestartInbound) GetRequestId() string {
@@ -5142,7 +5292,7 @@ type Retire struct {
 
 func (x *Retire) Reset() {
 	*x = Retire{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[52]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5154,7 +5304,7 @@ func (x *Retire) String() string {
 func (*Retire) ProtoMessage() {}
 
 func (x *Retire) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[52]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5167,7 +5317,7 @@ func (x *Retire) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Retire.ProtoReflect.Descriptor instead.
 func (*Retire) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{52}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *Retire) GetRequestId() string {
@@ -5195,7 +5345,7 @@ type LogRequest struct {
 
 func (x *LogRequest) Reset() {
 	*x = LogRequest{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[53]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5207,7 +5357,7 @@ func (x *LogRequest) String() string {
 func (*LogRequest) ProtoMessage() {}
 
 func (x *LogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[53]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5220,7 +5370,7 @@ func (x *LogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogRequest.ProtoReflect.Descriptor instead.
 func (*LogRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{53}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *LogRequest) GetRequestId() string {
@@ -5274,7 +5424,7 @@ type LogCancel struct {
 
 func (x *LogCancel) Reset() {
 	*x = LogCancel{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[54]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5286,7 +5436,7 @@ func (x *LogCancel) String() string {
 func (*LogCancel) ProtoMessage() {}
 
 func (x *LogCancel) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[54]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5299,7 +5449,7 @@ func (x *LogCancel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogCancel.ProtoReflect.Descriptor instead.
 func (*LogCancel) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{54}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *LogCancel) GetRequestId() string {
@@ -5318,7 +5468,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[55]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5330,7 +5480,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[55]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5343,7 +5493,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{55}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *Ping) GetNonce() uint64 {
@@ -5365,7 +5515,7 @@ type RunDoctor struct {
 
 func (x *RunDoctor) Reset() {
 	*x = RunDoctor{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[56]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5377,7 +5527,7 @@ func (x *RunDoctor) String() string {
 func (*RunDoctor) ProtoMessage() {}
 
 func (x *RunDoctor) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[56]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5390,7 +5540,7 @@ func (x *RunDoctor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunDoctor.ProtoReflect.Descriptor instead.
 func (*RunDoctor) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{56}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *RunDoctor) GetRequestId() string {
@@ -5425,7 +5575,7 @@ type DoctorReport struct {
 
 func (x *DoctorReport) Reset() {
 	*x = DoctorReport{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[57]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5437,7 +5587,7 @@ func (x *DoctorReport) String() string {
 func (*DoctorReport) ProtoMessage() {}
 
 func (x *DoctorReport) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[57]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5450,7 +5600,7 @@ func (x *DoctorReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DoctorReport.ProtoReflect.Descriptor instead.
 func (*DoctorReport) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{57}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *DoctorReport) GetRequestId() string {
@@ -5514,7 +5664,7 @@ type DoctorResult struct {
 
 func (x *DoctorResult) Reset() {
 	*x = DoctorResult{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[58]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5526,7 +5676,7 @@ func (x *DoctorResult) String() string {
 func (*DoctorResult) ProtoMessage() {}
 
 func (x *DoctorResult) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[58]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5539,7 +5689,7 @@ func (x *DoctorResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DoctorResult.ProtoReflect.Descriptor instead.
 func (*DoctorResult) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{58}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *DoctorResult) GetId() string {
@@ -5614,7 +5764,7 @@ type ApplyFix struct {
 
 func (x *ApplyFix) Reset() {
 	*x = ApplyFix{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[59]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5626,7 +5776,7 @@ func (x *ApplyFix) String() string {
 func (*ApplyFix) ProtoMessage() {}
 
 func (x *ApplyFix) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[59]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5639,7 +5789,7 @@ func (x *ApplyFix) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyFix.ProtoReflect.Descriptor instead.
 func (*ApplyFix) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{59}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *ApplyFix) GetRequestId() string {
@@ -5686,7 +5836,7 @@ type UpdateAgent struct {
 
 func (x *UpdateAgent) Reset() {
 	*x = UpdateAgent{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[60]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5698,7 +5848,7 @@ func (x *UpdateAgent) String() string {
 func (*UpdateAgent) ProtoMessage() {}
 
 func (x *UpdateAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[60]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5711,7 +5861,7 @@ func (x *UpdateAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgent.ProtoReflect.Descriptor instead.
 func (*UpdateAgent) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{60}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *UpdateAgent) GetRequestId() string {
@@ -5752,7 +5902,7 @@ type RollbackAgent struct {
 
 func (x *RollbackAgent) Reset() {
 	*x = RollbackAgent{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[61]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5764,7 +5914,7 @@ func (x *RollbackAgent) String() string {
 func (*RollbackAgent) ProtoMessage() {}
 
 func (x *RollbackAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[61]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5777,7 +5927,7 @@ func (x *RollbackAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackAgent.ProtoReflect.Descriptor instead.
 func (*RollbackAgent) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{61}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *RollbackAgent) GetRequestId() string {
@@ -5799,7 +5949,7 @@ type FetchUpdateRequest struct {
 
 func (x *FetchUpdateRequest) Reset() {
 	*x = FetchUpdateRequest{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[62]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5811,7 +5961,7 @@ func (x *FetchUpdateRequest) String() string {
 func (*FetchUpdateRequest) ProtoMessage() {}
 
 func (x *FetchUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[62]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5824,7 +5974,7 @@ func (x *FetchUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchUpdateRequest.ProtoReflect.Descriptor instead.
 func (*FetchUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{62}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *FetchUpdateRequest) GetName() string {
@@ -5853,7 +6003,7 @@ type FetchUpdateResponse struct {
 
 func (x *FetchUpdateResponse) Reset() {
 	*x = FetchUpdateResponse{}
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[63]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5865,7 +6015,7 @@ func (x *FetchUpdateResponse) String() string {
 func (*FetchUpdateResponse) ProtoMessage() {}
 
 func (x *FetchUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[63]
+	mi := &file_mistgate_agent_v1_agent_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5878,7 +6028,7 @@ func (x *FetchUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchUpdateResponse.ProtoReflect.Descriptor instead.
 func (*FetchUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{63}
+	return file_mistgate_agent_v1_agent_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *FetchUpdateResponse) GetData() []byte {
@@ -5978,7 +6128,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x04virt\x18\b \x01(\tR\x04virt\x12\x19\n" +
 	"\bhas_ipv6\x18\t \x01(\bR\ahasIpv6\x12\x1b\n" +
 	"\tboot_unix\x18\n" +
-	" \x01(\x03R\bbootUnix\"\x9a\x03\n" +
+	" \x01(\x03R\bbootUnix\"\xd1\x03\n" +
 	"\n" +
 	"StatsBatch\x12.\n" +
 	"\x13interval_start_unix\x18\x01 \x01(\x03R\x11intervalStartUnix\x12*\n" +
@@ -5988,7 +6138,23 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x04host\x18\x05 \x01(\v2\x1e.mistgate.agent.v1.HostMetricsR\x04host\x128\n" +
 	"\x06health\x18\x06 \x03(\v2 .mistgate.agent.v1.InboundHealthR\x06health\x12\x1c\n" +
 	"\tcoalesced\x18\a \x01(\bR\tcoalesced\x121\n" +
-	"\x04warp\x18\b \x01(\v2\x1d.mistgate.agent.v1.WarpHealthR\x04warp\"\x80\x01\n" +
+	"\x04warp\x18\b \x01(\v2\x1d.mistgate.agent.v1.WarpHealthR\x04warp\x125\n" +
+	"\x05links\x18\t \x03(\v2\x1f.mistgate.agent.v1.LinkCountersR\x05links\"\xa0\x02\n" +
+	"\fLinkCounters\x12\x17\n" +
+	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
+	"\n" +
+	"inbound_id\x18\x02 \x01(\tR\tinboundId\x12\x1a\n" +
+	"\bconnects\x18\x03 \x01(\rR\bconnects\x12\x18\n" +
+	"\arejects\x18\x04 \x01(\rR\arejects\x12\x14\n" +
+	"\x05drops\x18\x05 \x01(\rR\x05drops\x12\x16\n" +
+	"\x06stalls\x18\x06 \x01(\rR\x06stalls\x12\x19\n" +
+	"\bonline_s\x18\a \x01(\rR\aonlineS\x12!\n" +
+	"\funknown_keys\x18\b \x01(\rR\vunknownKeys\x12\x16\n" +
+	"\x06hellos\x18\t \x01(\rR\x06hellos\x12\x1e\n" +
+	"\n" +
+	"handshakes\x18\n" +
+	" \x01(\rR\n" +
+	"handshakes\"\x80\x01\n" +
 	"\fTrafficDelta\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +
@@ -6454,7 +6620,7 @@ func file_mistgate_agent_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_mistgate_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
+var file_mistgate_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 70)
 var file_mistgate_agent_v1_agent_proto_goTypes = []any{
 	(UpdateOutcome)(0),          // 0: mistgate.agent.v1.UpdateOutcome
 	(InboundRunState)(0),        // 1: mistgate.agent.v1.InboundRunState
@@ -6473,152 +6639,154 @@ var file_mistgate_agent_v1_agent_proto_goTypes = []any{
 	(*EngineInfo)(nil),          // 14: mistgate.agent.v1.EngineInfo
 	(*HostFacts)(nil),           // 15: mistgate.agent.v1.HostFacts
 	(*StatsBatch)(nil),          // 16: mistgate.agent.v1.StatsBatch
-	(*TrafficDelta)(nil),        // 17: mistgate.agent.v1.TrafficDelta
-	(*Session)(nil),             // 18: mistgate.agent.v1.Session
-	(*HostMetrics)(nil),         // 19: mistgate.agent.v1.HostMetrics
-	(*InboundHealth)(nil),       // 20: mistgate.agent.v1.InboundHealth
-	(*AwgHealth)(nil),           // 21: mistgate.agent.v1.AwgHealth
-	(*WarpHealth)(nil),          // 22: mistgate.agent.v1.WarpHealth
-	(*WarpProbeResult)(nil),     // 23: mistgate.agent.v1.WarpProbeResult
-	(*Event)(nil),               // 24: mistgate.agent.v1.Event
-	(*ApplyResult)(nil),         // 25: mistgate.agent.v1.ApplyResult
-	(*InboundResult)(nil),       // 26: mistgate.agent.v1.InboundResult
-	(*CommandResult)(nil),       // 27: mistgate.agent.v1.CommandResult
-	(*LogChunk)(nil),            // 28: mistgate.agent.v1.LogChunk
-	(*LogLine)(nil),             // 29: mistgate.agent.v1.LogLine
-	(*Pong)(nil),                // 30: mistgate.agent.v1.Pong
-	(*ConnectResponse)(nil),     // 31: mistgate.agent.v1.ConnectResponse
-	(*SetDecoy)(nil),            // 32: mistgate.agent.v1.SetDecoy
-	(*DecoyFile)(nil),           // 33: mistgate.agent.v1.DecoyFile
-	(*MeasureBandwidth)(nil),    // 34: mistgate.agent.v1.MeasureBandwidth
-	(*UdpCount)(nil),            // 35: mistgate.agent.v1.UdpCount
-	(*UdpSend)(nil),             // 36: mistgate.agent.v1.UdpSend
-	(*HttpMark)(nil),            // 37: mistgate.agent.v1.HttpMark
-	(*TcpProbe)(nil),            // 38: mistgate.agent.v1.TcpProbe
-	(*TcpTarget)(nil),           // 39: mistgate.agent.v1.TcpTarget
-	(*CountryProbe)(nil),        // 40: mistgate.agent.v1.CountryProbe
-	(*CountryProbeTarget)(nil),  // 41: mistgate.agent.v1.CountryProbeTarget
-	(*PrepareAwgKernel)(nil),    // 42: mistgate.agent.v1.PrepareAwgKernel
-	(*HelloAck)(nil),            // 43: mistgate.agent.v1.HelloAck
-	(*LinkChallenge)(nil),       // 44: mistgate.agent.v1.LinkChallenge
-	(*LinkAuth)(nil),            // 45: mistgate.agent.v1.LinkAuth
-	(*LinkAccept)(nil),          // 46: mistgate.agent.v1.LinkAccept
-	(*Ack)(nil),                 // 47: mistgate.agent.v1.Ack
-	(*NodeSettings)(nil),        // 48: mistgate.agent.v1.NodeSettings
-	(*DesiredState)(nil),        // 49: mistgate.agent.v1.DesiredState
-	(*WarpSpec)(nil),            // 50: mistgate.agent.v1.WarpSpec
-	(*InboundState)(nil),        // 51: mistgate.agent.v1.InboundState
-	(*InboundSpec)(nil),         // 52: mistgate.agent.v1.InboundSpec
-	(*Tunnel)(nil),              // 53: mistgate.agent.v1.Tunnel
-	(*Listen)(nil),              // 54: mistgate.agent.v1.Listen
-	(*Tls)(nil),                 // 55: mistgate.agent.v1.Tls
-	(*Credential)(nil),          // 56: mistgate.agent.v1.Credential
-	(*Kick)(nil),                // 57: mistgate.agent.v1.Kick
-	(*RestartInbound)(nil),      // 58: mistgate.agent.v1.RestartInbound
-	(*Retire)(nil),              // 59: mistgate.agent.v1.Retire
-	(*LogRequest)(nil),          // 60: mistgate.agent.v1.LogRequest
-	(*LogCancel)(nil),           // 61: mistgate.agent.v1.LogCancel
-	(*Ping)(nil),                // 62: mistgate.agent.v1.Ping
-	(*RunDoctor)(nil),           // 63: mistgate.agent.v1.RunDoctor
-	(*DoctorReport)(nil),        // 64: mistgate.agent.v1.DoctorReport
-	(*DoctorResult)(nil),        // 65: mistgate.agent.v1.DoctorResult
-	(*ApplyFix)(nil),            // 66: mistgate.agent.v1.ApplyFix
-	(*UpdateAgent)(nil),         // 67: mistgate.agent.v1.UpdateAgent
-	(*RollbackAgent)(nil),       // 68: mistgate.agent.v1.RollbackAgent
-	(*FetchUpdateRequest)(nil),  // 69: mistgate.agent.v1.FetchUpdateRequest
-	(*FetchUpdateResponse)(nil), // 70: mistgate.agent.v1.FetchUpdateResponse
-	nil,                         // 71: mistgate.agent.v1.Event.ParamsEntry
-	nil,                         // 72: mistgate.agent.v1.CommandResult.ParamsEntry
-	nil,                         // 73: mistgate.agent.v1.LogLine.AttrsEntry
-	nil,                         // 74: mistgate.agent.v1.DoctorResult.ParamsEntry
-	nil,                         // 75: mistgate.agent.v1.ApplyFix.ParamsEntry
+	(*LinkCounters)(nil),        // 17: mistgate.agent.v1.LinkCounters
+	(*TrafficDelta)(nil),        // 18: mistgate.agent.v1.TrafficDelta
+	(*Session)(nil),             // 19: mistgate.agent.v1.Session
+	(*HostMetrics)(nil),         // 20: mistgate.agent.v1.HostMetrics
+	(*InboundHealth)(nil),       // 21: mistgate.agent.v1.InboundHealth
+	(*AwgHealth)(nil),           // 22: mistgate.agent.v1.AwgHealth
+	(*WarpHealth)(nil),          // 23: mistgate.agent.v1.WarpHealth
+	(*WarpProbeResult)(nil),     // 24: mistgate.agent.v1.WarpProbeResult
+	(*Event)(nil),               // 25: mistgate.agent.v1.Event
+	(*ApplyResult)(nil),         // 26: mistgate.agent.v1.ApplyResult
+	(*InboundResult)(nil),       // 27: mistgate.agent.v1.InboundResult
+	(*CommandResult)(nil),       // 28: mistgate.agent.v1.CommandResult
+	(*LogChunk)(nil),            // 29: mistgate.agent.v1.LogChunk
+	(*LogLine)(nil),             // 30: mistgate.agent.v1.LogLine
+	(*Pong)(nil),                // 31: mistgate.agent.v1.Pong
+	(*ConnectResponse)(nil),     // 32: mistgate.agent.v1.ConnectResponse
+	(*SetDecoy)(nil),            // 33: mistgate.agent.v1.SetDecoy
+	(*DecoyFile)(nil),           // 34: mistgate.agent.v1.DecoyFile
+	(*MeasureBandwidth)(nil),    // 35: mistgate.agent.v1.MeasureBandwidth
+	(*UdpCount)(nil),            // 36: mistgate.agent.v1.UdpCount
+	(*UdpSend)(nil),             // 37: mistgate.agent.v1.UdpSend
+	(*HttpMark)(nil),            // 38: mistgate.agent.v1.HttpMark
+	(*TcpProbe)(nil),            // 39: mistgate.agent.v1.TcpProbe
+	(*TcpTarget)(nil),           // 40: mistgate.agent.v1.TcpTarget
+	(*CountryProbe)(nil),        // 41: mistgate.agent.v1.CountryProbe
+	(*CountryProbeTarget)(nil),  // 42: mistgate.agent.v1.CountryProbeTarget
+	(*PrepareAwgKernel)(nil),    // 43: mistgate.agent.v1.PrepareAwgKernel
+	(*HelloAck)(nil),            // 44: mistgate.agent.v1.HelloAck
+	(*LinkChallenge)(nil),       // 45: mistgate.agent.v1.LinkChallenge
+	(*LinkAuth)(nil),            // 46: mistgate.agent.v1.LinkAuth
+	(*LinkAccept)(nil),          // 47: mistgate.agent.v1.LinkAccept
+	(*Ack)(nil),                 // 48: mistgate.agent.v1.Ack
+	(*NodeSettings)(nil),        // 49: mistgate.agent.v1.NodeSettings
+	(*DesiredState)(nil),        // 50: mistgate.agent.v1.DesiredState
+	(*WarpSpec)(nil),            // 51: mistgate.agent.v1.WarpSpec
+	(*InboundState)(nil),        // 52: mistgate.agent.v1.InboundState
+	(*InboundSpec)(nil),         // 53: mistgate.agent.v1.InboundSpec
+	(*Tunnel)(nil),              // 54: mistgate.agent.v1.Tunnel
+	(*Listen)(nil),              // 55: mistgate.agent.v1.Listen
+	(*Tls)(nil),                 // 56: mistgate.agent.v1.Tls
+	(*Credential)(nil),          // 57: mistgate.agent.v1.Credential
+	(*Kick)(nil),                // 58: mistgate.agent.v1.Kick
+	(*RestartInbound)(nil),      // 59: mistgate.agent.v1.RestartInbound
+	(*Retire)(nil),              // 60: mistgate.agent.v1.Retire
+	(*LogRequest)(nil),          // 61: mistgate.agent.v1.LogRequest
+	(*LogCancel)(nil),           // 62: mistgate.agent.v1.LogCancel
+	(*Ping)(nil),                // 63: mistgate.agent.v1.Ping
+	(*RunDoctor)(nil),           // 64: mistgate.agent.v1.RunDoctor
+	(*DoctorReport)(nil),        // 65: mistgate.agent.v1.DoctorReport
+	(*DoctorResult)(nil),        // 66: mistgate.agent.v1.DoctorResult
+	(*ApplyFix)(nil),            // 67: mistgate.agent.v1.ApplyFix
+	(*UpdateAgent)(nil),         // 68: mistgate.agent.v1.UpdateAgent
+	(*RollbackAgent)(nil),       // 69: mistgate.agent.v1.RollbackAgent
+	(*FetchUpdateRequest)(nil),  // 70: mistgate.agent.v1.FetchUpdateRequest
+	(*FetchUpdateResponse)(nil), // 71: mistgate.agent.v1.FetchUpdateResponse
+	nil,                         // 72: mistgate.agent.v1.Event.ParamsEntry
+	nil,                         // 73: mistgate.agent.v1.CommandResult.ParamsEntry
+	nil,                         // 74: mistgate.agent.v1.LogLine.AttrsEntry
+	nil,                         // 75: mistgate.agent.v1.DoctorResult.ParamsEntry
+	nil,                         // 76: mistgate.agent.v1.ApplyFix.ParamsEntry
 }
 var file_mistgate_agent_v1_agent_proto_depIdxs = []int32{
 	12, // 0: mistgate.agent.v1.ConnectRequest.hello:type_name -> mistgate.agent.v1.Hello
 	16, // 1: mistgate.agent.v1.ConnectRequest.stats:type_name -> mistgate.agent.v1.StatsBatch
-	24, // 2: mistgate.agent.v1.ConnectRequest.event:type_name -> mistgate.agent.v1.Event
-	25, // 3: mistgate.agent.v1.ConnectRequest.apply_result:type_name -> mistgate.agent.v1.ApplyResult
-	27, // 4: mistgate.agent.v1.ConnectRequest.command_result:type_name -> mistgate.agent.v1.CommandResult
-	28, // 5: mistgate.agent.v1.ConnectRequest.log_chunk:type_name -> mistgate.agent.v1.LogChunk
-	30, // 6: mistgate.agent.v1.ConnectRequest.pong:type_name -> mistgate.agent.v1.Pong
-	64, // 7: mistgate.agent.v1.ConnectRequest.doctor_report:type_name -> mistgate.agent.v1.DoctorReport
+	25, // 2: mistgate.agent.v1.ConnectRequest.event:type_name -> mistgate.agent.v1.Event
+	26, // 3: mistgate.agent.v1.ConnectRequest.apply_result:type_name -> mistgate.agent.v1.ApplyResult
+	28, // 4: mistgate.agent.v1.ConnectRequest.command_result:type_name -> mistgate.agent.v1.CommandResult
+	29, // 5: mistgate.agent.v1.ConnectRequest.log_chunk:type_name -> mistgate.agent.v1.LogChunk
+	31, // 6: mistgate.agent.v1.ConnectRequest.pong:type_name -> mistgate.agent.v1.Pong
+	65, // 7: mistgate.agent.v1.ConnectRequest.doctor_report:type_name -> mistgate.agent.v1.DoctorReport
 	9,  // 8: mistgate.agent.v1.ConnectRequest.renew:type_name -> mistgate.agent.v1.RenewRequest
 	14, // 9: mistgate.agent.v1.Hello.engines:type_name -> mistgate.agent.v1.EngineInfo
 	15, // 10: mistgate.agent.v1.Hello.facts:type_name -> mistgate.agent.v1.HostFacts
 	13, // 11: mistgate.agent.v1.Hello.last_update:type_name -> mistgate.agent.v1.LastUpdate
 	0,  // 12: mistgate.agent.v1.LastUpdate.outcome:type_name -> mistgate.agent.v1.UpdateOutcome
-	17, // 13: mistgate.agent.v1.StatsBatch.traffic:type_name -> mistgate.agent.v1.TrafficDelta
-	18, // 14: mistgate.agent.v1.StatsBatch.sessions:type_name -> mistgate.agent.v1.Session
-	19, // 15: mistgate.agent.v1.StatsBatch.host:type_name -> mistgate.agent.v1.HostMetrics
-	20, // 16: mistgate.agent.v1.StatsBatch.health:type_name -> mistgate.agent.v1.InboundHealth
-	22, // 17: mistgate.agent.v1.StatsBatch.warp:type_name -> mistgate.agent.v1.WarpHealth
-	1,  // 18: mistgate.agent.v1.InboundHealth.state:type_name -> mistgate.agent.v1.InboundRunState
-	21, // 19: mistgate.agent.v1.InboundHealth.awg:type_name -> mistgate.agent.v1.AwgHealth
-	2,  // 20: mistgate.agent.v1.WarpHealth.state:type_name -> mistgate.agent.v1.WarpState
-	23, // 21: mistgate.agent.v1.WarpHealth.probe_cloudflare:type_name -> mistgate.agent.v1.WarpProbeResult
-	23, // 22: mistgate.agent.v1.WarpHealth.probe_other:type_name -> mistgate.agent.v1.WarpProbeResult
-	3,  // 23: mistgate.agent.v1.Event.severity:type_name -> mistgate.agent.v1.Severity
-	71, // 24: mistgate.agent.v1.Event.params:type_name -> mistgate.agent.v1.Event.ParamsEntry
-	4,  // 25: mistgate.agent.v1.ApplyResult.status:type_name -> mistgate.agent.v1.ApplyStatus
-	26, // 26: mistgate.agent.v1.ApplyResult.inbounds:type_name -> mistgate.agent.v1.InboundResult
-	1,  // 27: mistgate.agent.v1.InboundResult.state:type_name -> mistgate.agent.v1.InboundRunState
-	72, // 28: mistgate.agent.v1.CommandResult.params:type_name -> mistgate.agent.v1.CommandResult.ParamsEntry
-	29, // 29: mistgate.agent.v1.LogChunk.lines:type_name -> mistgate.agent.v1.LogLine
-	3,  // 30: mistgate.agent.v1.LogLine.level:type_name -> mistgate.agent.v1.Severity
-	73, // 31: mistgate.agent.v1.LogLine.attrs:type_name -> mistgate.agent.v1.LogLine.AttrsEntry
-	43, // 32: mistgate.agent.v1.ConnectResponse.hello_ack:type_name -> mistgate.agent.v1.HelloAck
-	47, // 33: mistgate.agent.v1.ConnectResponse.ack:type_name -> mistgate.agent.v1.Ack
-	49, // 34: mistgate.agent.v1.ConnectResponse.desired_state:type_name -> mistgate.agent.v1.DesiredState
-	57, // 35: mistgate.agent.v1.ConnectResponse.kick:type_name -> mistgate.agent.v1.Kick
-	58, // 36: mistgate.agent.v1.ConnectResponse.restart_inbound:type_name -> mistgate.agent.v1.RestartInbound
-	59, // 37: mistgate.agent.v1.ConnectResponse.retire:type_name -> mistgate.agent.v1.Retire
-	60, // 38: mistgate.agent.v1.ConnectResponse.log_request:type_name -> mistgate.agent.v1.LogRequest
-	61, // 39: mistgate.agent.v1.ConnectResponse.log_cancel:type_name -> mistgate.agent.v1.LogCancel
-	62, // 40: mistgate.agent.v1.ConnectResponse.ping:type_name -> mistgate.agent.v1.Ping
-	63, // 41: mistgate.agent.v1.ConnectResponse.run_doctor:type_name -> mistgate.agent.v1.RunDoctor
-	66, // 42: mistgate.agent.v1.ConnectResponse.apply_fix:type_name -> mistgate.agent.v1.ApplyFix
-	67, // 43: mistgate.agent.v1.ConnectResponse.update_agent:type_name -> mistgate.agent.v1.UpdateAgent
-	68, // 44: mistgate.agent.v1.ConnectResponse.rollback_agent:type_name -> mistgate.agent.v1.RollbackAgent
-	42, // 45: mistgate.agent.v1.ConnectResponse.prepare_awg_kernel:type_name -> mistgate.agent.v1.PrepareAwgKernel
-	34, // 46: mistgate.agent.v1.ConnectResponse.measure_bandwidth:type_name -> mistgate.agent.v1.MeasureBandwidth
-	35, // 47: mistgate.agent.v1.ConnectResponse.udp_count:type_name -> mistgate.agent.v1.UdpCount
-	36, // 48: mistgate.agent.v1.ConnectResponse.udp_send:type_name -> mistgate.agent.v1.UdpSend
-	10, // 49: mistgate.agent.v1.ConnectResponse.renew:type_name -> mistgate.agent.v1.RenewResponse
-	37, // 50: mistgate.agent.v1.ConnectResponse.http_mark:type_name -> mistgate.agent.v1.HttpMark
-	38, // 51: mistgate.agent.v1.ConnectResponse.tcp_probe:type_name -> mistgate.agent.v1.TcpProbe
-	32, // 52: mistgate.agent.v1.ConnectResponse.set_decoy:type_name -> mistgate.agent.v1.SetDecoy
-	40, // 53: mistgate.agent.v1.ConnectResponse.country_probe:type_name -> mistgate.agent.v1.CountryProbe
-	33, // 54: mistgate.agent.v1.SetDecoy.files:type_name -> mistgate.agent.v1.DecoyFile
-	39, // 55: mistgate.agent.v1.TcpProbe.targets:type_name -> mistgate.agent.v1.TcpTarget
-	41, // 56: mistgate.agent.v1.CountryProbe.targets:type_name -> mistgate.agent.v1.CountryProbeTarget
-	48, // 57: mistgate.agent.v1.HelloAck.settings:type_name -> mistgate.agent.v1.NodeSettings
-	51, // 58: mistgate.agent.v1.DesiredState.inbounds:type_name -> mistgate.agent.v1.InboundState
-	48, // 59: mistgate.agent.v1.DesiredState.settings:type_name -> mistgate.agent.v1.NodeSettings
-	50, // 60: mistgate.agent.v1.DesiredState.warp:type_name -> mistgate.agent.v1.WarpSpec
-	52, // 61: mistgate.agent.v1.InboundState.spec:type_name -> mistgate.agent.v1.InboundSpec
-	56, // 62: mistgate.agent.v1.InboundState.creds:type_name -> mistgate.agent.v1.Credential
-	54, // 63: mistgate.agent.v1.InboundSpec.listen:type_name -> mistgate.agent.v1.Listen
-	55, // 64: mistgate.agent.v1.InboundSpec.tls:type_name -> mistgate.agent.v1.Tls
-	53, // 65: mistgate.agent.v1.InboundSpec.tunnel:type_name -> mistgate.agent.v1.Tunnel
-	5,  // 66: mistgate.agent.v1.Tls.mode:type_name -> mistgate.agent.v1.TlsMode
-	3,  // 67: mistgate.agent.v1.LogRequest.min_level:type_name -> mistgate.agent.v1.Severity
-	65, // 68: mistgate.agent.v1.DoctorReport.results:type_name -> mistgate.agent.v1.DoctorResult
-	6,  // 69: mistgate.agent.v1.DoctorResult.status:type_name -> mistgate.agent.v1.DoctorStatus
-	74, // 70: mistgate.agent.v1.DoctorResult.params:type_name -> mistgate.agent.v1.DoctorResult.ParamsEntry
-	75, // 71: mistgate.agent.v1.ApplyFix.params:type_name -> mistgate.agent.v1.ApplyFix.ParamsEntry
-	7,  // 72: mistgate.agent.v1.EnrollmentService.Enroll:input_type -> mistgate.agent.v1.EnrollRequest
-	9,  // 73: mistgate.agent.v1.EnrollmentService.Renew:input_type -> mistgate.agent.v1.RenewRequest
-	11, // 74: mistgate.agent.v1.AgentService.Connect:input_type -> mistgate.agent.v1.ConnectRequest
-	69, // 75: mistgate.agent.v1.AgentService.FetchUpdate:input_type -> mistgate.agent.v1.FetchUpdateRequest
-	8,  // 76: mistgate.agent.v1.EnrollmentService.Enroll:output_type -> mistgate.agent.v1.EnrollResponse
-	10, // 77: mistgate.agent.v1.EnrollmentService.Renew:output_type -> mistgate.agent.v1.RenewResponse
-	31, // 78: mistgate.agent.v1.AgentService.Connect:output_type -> mistgate.agent.v1.ConnectResponse
-	70, // 79: mistgate.agent.v1.AgentService.FetchUpdate:output_type -> mistgate.agent.v1.FetchUpdateResponse
-	76, // [76:80] is the sub-list for method output_type
-	72, // [72:76] is the sub-list for method input_type
-	72, // [72:72] is the sub-list for extension type_name
-	72, // [72:72] is the sub-list for extension extendee
-	0,  // [0:72] is the sub-list for field type_name
+	18, // 13: mistgate.agent.v1.StatsBatch.traffic:type_name -> mistgate.agent.v1.TrafficDelta
+	19, // 14: mistgate.agent.v1.StatsBatch.sessions:type_name -> mistgate.agent.v1.Session
+	20, // 15: mistgate.agent.v1.StatsBatch.host:type_name -> mistgate.agent.v1.HostMetrics
+	21, // 16: mistgate.agent.v1.StatsBatch.health:type_name -> mistgate.agent.v1.InboundHealth
+	23, // 17: mistgate.agent.v1.StatsBatch.warp:type_name -> mistgate.agent.v1.WarpHealth
+	17, // 18: mistgate.agent.v1.StatsBatch.links:type_name -> mistgate.agent.v1.LinkCounters
+	1,  // 19: mistgate.agent.v1.InboundHealth.state:type_name -> mistgate.agent.v1.InboundRunState
+	22, // 20: mistgate.agent.v1.InboundHealth.awg:type_name -> mistgate.agent.v1.AwgHealth
+	2,  // 21: mistgate.agent.v1.WarpHealth.state:type_name -> mistgate.agent.v1.WarpState
+	24, // 22: mistgate.agent.v1.WarpHealth.probe_cloudflare:type_name -> mistgate.agent.v1.WarpProbeResult
+	24, // 23: mistgate.agent.v1.WarpHealth.probe_other:type_name -> mistgate.agent.v1.WarpProbeResult
+	3,  // 24: mistgate.agent.v1.Event.severity:type_name -> mistgate.agent.v1.Severity
+	72, // 25: mistgate.agent.v1.Event.params:type_name -> mistgate.agent.v1.Event.ParamsEntry
+	4,  // 26: mistgate.agent.v1.ApplyResult.status:type_name -> mistgate.agent.v1.ApplyStatus
+	27, // 27: mistgate.agent.v1.ApplyResult.inbounds:type_name -> mistgate.agent.v1.InboundResult
+	1,  // 28: mistgate.agent.v1.InboundResult.state:type_name -> mistgate.agent.v1.InboundRunState
+	73, // 29: mistgate.agent.v1.CommandResult.params:type_name -> mistgate.agent.v1.CommandResult.ParamsEntry
+	30, // 30: mistgate.agent.v1.LogChunk.lines:type_name -> mistgate.agent.v1.LogLine
+	3,  // 31: mistgate.agent.v1.LogLine.level:type_name -> mistgate.agent.v1.Severity
+	74, // 32: mistgate.agent.v1.LogLine.attrs:type_name -> mistgate.agent.v1.LogLine.AttrsEntry
+	44, // 33: mistgate.agent.v1.ConnectResponse.hello_ack:type_name -> mistgate.agent.v1.HelloAck
+	48, // 34: mistgate.agent.v1.ConnectResponse.ack:type_name -> mistgate.agent.v1.Ack
+	50, // 35: mistgate.agent.v1.ConnectResponse.desired_state:type_name -> mistgate.agent.v1.DesiredState
+	58, // 36: mistgate.agent.v1.ConnectResponse.kick:type_name -> mistgate.agent.v1.Kick
+	59, // 37: mistgate.agent.v1.ConnectResponse.restart_inbound:type_name -> mistgate.agent.v1.RestartInbound
+	60, // 38: mistgate.agent.v1.ConnectResponse.retire:type_name -> mistgate.agent.v1.Retire
+	61, // 39: mistgate.agent.v1.ConnectResponse.log_request:type_name -> mistgate.agent.v1.LogRequest
+	62, // 40: mistgate.agent.v1.ConnectResponse.log_cancel:type_name -> mistgate.agent.v1.LogCancel
+	63, // 41: mistgate.agent.v1.ConnectResponse.ping:type_name -> mistgate.agent.v1.Ping
+	64, // 42: mistgate.agent.v1.ConnectResponse.run_doctor:type_name -> mistgate.agent.v1.RunDoctor
+	67, // 43: mistgate.agent.v1.ConnectResponse.apply_fix:type_name -> mistgate.agent.v1.ApplyFix
+	68, // 44: mistgate.agent.v1.ConnectResponse.update_agent:type_name -> mistgate.agent.v1.UpdateAgent
+	69, // 45: mistgate.agent.v1.ConnectResponse.rollback_agent:type_name -> mistgate.agent.v1.RollbackAgent
+	43, // 46: mistgate.agent.v1.ConnectResponse.prepare_awg_kernel:type_name -> mistgate.agent.v1.PrepareAwgKernel
+	35, // 47: mistgate.agent.v1.ConnectResponse.measure_bandwidth:type_name -> mistgate.agent.v1.MeasureBandwidth
+	36, // 48: mistgate.agent.v1.ConnectResponse.udp_count:type_name -> mistgate.agent.v1.UdpCount
+	37, // 49: mistgate.agent.v1.ConnectResponse.udp_send:type_name -> mistgate.agent.v1.UdpSend
+	10, // 50: mistgate.agent.v1.ConnectResponse.renew:type_name -> mistgate.agent.v1.RenewResponse
+	38, // 51: mistgate.agent.v1.ConnectResponse.http_mark:type_name -> mistgate.agent.v1.HttpMark
+	39, // 52: mistgate.agent.v1.ConnectResponse.tcp_probe:type_name -> mistgate.agent.v1.TcpProbe
+	33, // 53: mistgate.agent.v1.ConnectResponse.set_decoy:type_name -> mistgate.agent.v1.SetDecoy
+	41, // 54: mistgate.agent.v1.ConnectResponse.country_probe:type_name -> mistgate.agent.v1.CountryProbe
+	34, // 55: mistgate.agent.v1.SetDecoy.files:type_name -> mistgate.agent.v1.DecoyFile
+	40, // 56: mistgate.agent.v1.TcpProbe.targets:type_name -> mistgate.agent.v1.TcpTarget
+	42, // 57: mistgate.agent.v1.CountryProbe.targets:type_name -> mistgate.agent.v1.CountryProbeTarget
+	49, // 58: mistgate.agent.v1.HelloAck.settings:type_name -> mistgate.agent.v1.NodeSettings
+	52, // 59: mistgate.agent.v1.DesiredState.inbounds:type_name -> mistgate.agent.v1.InboundState
+	49, // 60: mistgate.agent.v1.DesiredState.settings:type_name -> mistgate.agent.v1.NodeSettings
+	51, // 61: mistgate.agent.v1.DesiredState.warp:type_name -> mistgate.agent.v1.WarpSpec
+	53, // 62: mistgate.agent.v1.InboundState.spec:type_name -> mistgate.agent.v1.InboundSpec
+	57, // 63: mistgate.agent.v1.InboundState.creds:type_name -> mistgate.agent.v1.Credential
+	55, // 64: mistgate.agent.v1.InboundSpec.listen:type_name -> mistgate.agent.v1.Listen
+	56, // 65: mistgate.agent.v1.InboundSpec.tls:type_name -> mistgate.agent.v1.Tls
+	54, // 66: mistgate.agent.v1.InboundSpec.tunnel:type_name -> mistgate.agent.v1.Tunnel
+	5,  // 67: mistgate.agent.v1.Tls.mode:type_name -> mistgate.agent.v1.TlsMode
+	3,  // 68: mistgate.agent.v1.LogRequest.min_level:type_name -> mistgate.agent.v1.Severity
+	66, // 69: mistgate.agent.v1.DoctorReport.results:type_name -> mistgate.agent.v1.DoctorResult
+	6,  // 70: mistgate.agent.v1.DoctorResult.status:type_name -> mistgate.agent.v1.DoctorStatus
+	75, // 71: mistgate.agent.v1.DoctorResult.params:type_name -> mistgate.agent.v1.DoctorResult.ParamsEntry
+	76, // 72: mistgate.agent.v1.ApplyFix.params:type_name -> mistgate.agent.v1.ApplyFix.ParamsEntry
+	7,  // 73: mistgate.agent.v1.EnrollmentService.Enroll:input_type -> mistgate.agent.v1.EnrollRequest
+	9,  // 74: mistgate.agent.v1.EnrollmentService.Renew:input_type -> mistgate.agent.v1.RenewRequest
+	11, // 75: mistgate.agent.v1.AgentService.Connect:input_type -> mistgate.agent.v1.ConnectRequest
+	70, // 76: mistgate.agent.v1.AgentService.FetchUpdate:input_type -> mistgate.agent.v1.FetchUpdateRequest
+	8,  // 77: mistgate.agent.v1.EnrollmentService.Enroll:output_type -> mistgate.agent.v1.EnrollResponse
+	10, // 78: mistgate.agent.v1.EnrollmentService.Renew:output_type -> mistgate.agent.v1.RenewResponse
+	32, // 79: mistgate.agent.v1.AgentService.Connect:output_type -> mistgate.agent.v1.ConnectResponse
+	71, // 80: mistgate.agent.v1.AgentService.FetchUpdate:output_type -> mistgate.agent.v1.FetchUpdateResponse
+	77, // [77:81] is the sub-list for method output_type
+	73, // [73:77] is the sub-list for method input_type
+	73, // [73:73] is the sub-list for extension type_name
+	73, // [73:73] is the sub-list for extension extendee
+	0,  // [0:73] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_agent_v1_agent_proto_init() }
@@ -6637,7 +6805,7 @@ func file_mistgate_agent_v1_agent_proto_init() {
 		(*ConnectRequest_DoctorReport)(nil),
 		(*ConnectRequest_Renew)(nil),
 	}
-	file_mistgate_agent_v1_agent_proto_msgTypes[24].OneofWrappers = []any{
+	file_mistgate_agent_v1_agent_proto_msgTypes[25].OneofWrappers = []any{
 		(*ConnectResponse_HelloAck)(nil),
 		(*ConnectResponse_Ack)(nil),
 		(*ConnectResponse_DesiredState)(nil),
@@ -6667,7 +6835,7 @@ func file_mistgate_agent_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_agent_v1_agent_proto_rawDesc), len(file_mistgate_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   69,
+			NumMessages:   70,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

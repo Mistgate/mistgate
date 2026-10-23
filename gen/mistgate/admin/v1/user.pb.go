@@ -374,6 +374,263 @@ func (DeviceKind) EnumDescriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{5}
 }
 
+type GetUserConnectionRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Hours back from now, 1 to 48 (the retention). 0 means 24; more is cut to 48.
+	Hours         uint32 `protobuf:"varint,2,opt,name=hours,proto3" json:"hours,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserConnectionRequest) Reset() {
+	*x = GetUserConnectionRequest{}
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserConnectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserConnectionRequest) ProtoMessage() {}
+
+func (x *GetUserConnectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserConnectionRequest.ProtoReflect.Descriptor instead.
+func (*GetUserConnectionRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *GetUserConnectionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetUserConnectionRequest) GetHours() uint32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+// One device of the person on one inbound of a node, summed over the window. Rows without any counter are not sent.
+type DeviceConnection struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId    string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	NodeId      string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName    string                 `protobuf:"bytes,3,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	InboundId   string                 `protobuf:"bytes,4,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
+	ProfileName string                 `protobuf:"bytes,5,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
+	Protocol    string                 `protobuf:"bytes,6,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	Connects    uint32                 `protobuf:"varint,7,opt,name=connects,proto3" json:"connects,omitempty"`
+	Rejects     uint32                 `protobuf:"varint,8,opt,name=rejects,proto3" json:"rejects,omitempty"`
+	Drops       uint32                 `protobuf:"varint,9,opt,name=drops,proto3" json:"drops,omitempty"`
+	Stalls      uint32                 `protobuf:"varint,10,opt,name=stalls,proto3" json:"stalls,omitempty"`
+	OnlineS     uint64                 `protobuf:"varint,11,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
+	// Start of the newest hour with a counter.
+	LastHourUnix  int64 `protobuf:"varint,12,opt,name=last_hour_unix,json=lastHourUnix,proto3" json:"last_hour_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeviceConnection) Reset() {
+	*x = DeviceConnection{}
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceConnection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceConnection) ProtoMessage() {}
+
+func (x *DeviceConnection) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceConnection.ProtoReflect.Descriptor instead.
+func (*DeviceConnection) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *DeviceConnection) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetInboundId() string {
+	if x != nil {
+		return x.InboundId
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetProfileName() string {
+	if x != nil {
+		return x.ProfileName
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+func (x *DeviceConnection) GetConnects() uint32 {
+	if x != nil {
+		return x.Connects
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetRejects() uint32 {
+	if x != nil {
+		return x.Rejects
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetDrops() uint32 {
+	if x != nil {
+		return x.Drops
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetStalls() uint32 {
+	if x != nil {
+		return x.Stalls
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetOnlineS() uint64 {
+	if x != nil {
+		return x.OnlineS
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetLastHourUnix() int64 {
+	if x != nil {
+		return x.LastHourUnix
+	}
+	return 0
+}
+
+type GetUserConnectionResponse struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SinceUnix int64                  `protobuf:"varint,1,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
+	NowUnix   int64                  `protobuf:"varint,2,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
+	// Device, then node name, then profile name.
+	Rows []*DeviceConnection `protobuf:"bytes,3,rep,name=rows,proto3" json:"rows,omitempty"`
+	// Nodes the person can use whose agent does not send connection counters: nothing from them is in rows.
+	NodesWithoutCounters []string `protobuf:"bytes,4,rep,name=nodes_without_counters,json=nodesWithoutCounters,proto3" json:"nodes_without_counters,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *GetUserConnectionResponse) Reset() {
+	*x = GetUserConnectionResponse{}
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserConnectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserConnectionResponse) ProtoMessage() {}
+
+func (x *GetUserConnectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserConnectionResponse.ProtoReflect.Descriptor instead.
+func (*GetUserConnectionResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetUserConnectionResponse) GetSinceUnix() int64 {
+	if x != nil {
+		return x.SinceUnix
+	}
+	return 0
+}
+
+func (x *GetUserConnectionResponse) GetNowUnix() int64 {
+	if x != nil {
+		return x.NowUnix
+	}
+	return 0
+}
+
+func (x *GetUserConnectionResponse) GetRows() []*DeviceConnection {
+	if x != nil {
+		return x.Rows
+	}
+	return nil
+}
+
+func (x *GetUserConnectionResponse) GetNodesWithoutCounters() []string {
+	if x != nil {
+		return x.NodesWithoutCounters
+	}
+	return nil
+}
+
 type AppToggles struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Happ          bool                   `protobuf:"varint,1,opt,name=happ,proto3" json:"happ,omitempty"`
@@ -384,7 +641,7 @@ type AppToggles struct {
 
 func (x *AppToggles) Reset() {
 	*x = AppToggles{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[0]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -396,7 +653,7 @@ func (x *AppToggles) String() string {
 func (*AppToggles) ProtoMessage() {}
 
 func (x *AppToggles) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[0]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -409,7 +666,7 @@ func (x *AppToggles) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppToggles.ProtoReflect.Descriptor instead.
 func (*AppToggles) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{0}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AppToggles) GetHapp() bool {
@@ -437,7 +694,7 @@ type NodeSelection struct {
 
 func (x *NodeSelection) Reset() {
 	*x = NodeSelection{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -449,7 +706,7 @@ func (x *NodeSelection) String() string {
 func (*NodeSelection) ProtoMessage() {}
 
 func (x *NodeSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[1]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,7 +719,7 @@ func (x *NodeSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeSelection.ProtoReflect.Descriptor instead.
 func (*NodeSelection) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{1}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *NodeSelection) GetAll() bool {
@@ -535,7 +792,7 @@ type User struct {
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -547,7 +804,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[2]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -560,7 +817,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{2}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *User) GetId() string {
@@ -796,7 +1053,7 @@ type ListUsersRequest struct {
 
 func (x *ListUsersRequest) Reset() {
 	*x = ListUsersRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -808,7 +1065,7 @@ func (x *ListUsersRequest) String() string {
 func (*ListUsersRequest) ProtoMessage() {}
 
 func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -821,7 +1078,7 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListUsersRequest) GetFilter() UserFilter {
@@ -901,7 +1158,7 @@ type UserCounts struct {
 
 func (x *UserCounts) Reset() {
 	*x = UserCounts{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +1170,7 @@ func (x *UserCounts) String() string {
 func (*UserCounts) ProtoMessage() {}
 
 func (x *UserCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +1183,7 @@ func (x *UserCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserCounts.ProtoReflect.Descriptor instead.
 func (*UserCounts) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UserCounts) GetAll() uint32 {
@@ -990,7 +1247,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1002,7 +1259,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1015,7 +1272,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListUsersResponse) GetUsers() []*User {
@@ -1048,7 +1305,7 @@ type GetUserRequest struct {
 
 func (x *GetUserRequest) Reset() {
 	*x = GetUserRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1317,7 @@ func (x *GetUserRequest) String() string {
 func (*GetUserRequest) ProtoMessage() {}
 
 func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1330,7 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetUserRequest) GetUserId() string {
@@ -1128,7 +1385,7 @@ type Device struct {
 
 func (x *Device) Reset() {
 	*x = Device{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1140,7 +1397,7 @@ func (x *Device) String() string {
 func (*Device) ProtoMessage() {}
 
 func (x *Device) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,7 +1410,7 @@ func (x *Device) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Device.ProtoReflect.Descriptor instead.
 func (*Device) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Device) GetId() string {
@@ -1300,7 +1557,7 @@ type DayTraffic struct {
 
 func (x *DayTraffic) Reset() {
 	*x = DayTraffic{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1312,7 +1569,7 @@ func (x *DayTraffic) String() string {
 func (*DayTraffic) ProtoMessage() {}
 
 func (x *DayTraffic) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1325,7 +1582,7 @@ func (x *DayTraffic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DayTraffic.ProtoReflect.Descriptor instead.
 func (*DayTraffic) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DayTraffic) GetDayUnix() int64 {
@@ -1355,7 +1612,7 @@ type NodeTraffic struct {
 
 func (x *NodeTraffic) Reset() {
 	*x = NodeTraffic{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1367,7 +1624,7 @@ func (x *NodeTraffic) String() string {
 func (*NodeTraffic) ProtoMessage() {}
 
 func (x *NodeTraffic) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1380,7 +1637,7 @@ func (x *NodeTraffic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeTraffic.ProtoReflect.Descriptor instead.
 func (*NodeTraffic) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *NodeTraffic) GetNodeId() string {
@@ -1432,7 +1689,7 @@ type NodeAccess struct {
 
 func (x *NodeAccess) Reset() {
 	*x = NodeAccess{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1444,7 +1701,7 @@ func (x *NodeAccess) String() string {
 func (*NodeAccess) ProtoMessage() {}
 
 func (x *NodeAccess) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1457,7 +1714,7 @@ func (x *NodeAccess) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeAccess.ProtoReflect.Descriptor instead.
 func (*NodeAccess) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NodeAccess) GetNodeId() string {
@@ -1529,7 +1786,7 @@ type ProfileRef struct {
 
 func (x *ProfileRef) Reset() {
 	*x = ProfileRef{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1541,7 +1798,7 @@ func (x *ProfileRef) String() string {
 func (*ProfileRef) ProtoMessage() {}
 
 func (x *ProfileRef) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1554,7 +1811,7 @@ func (x *ProfileRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProfileRef.ProtoReflect.Descriptor instead.
 func (*ProfileRef) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ProfileRef) GetId() string {
@@ -1604,7 +1861,7 @@ type GetUserResponse struct {
 
 func (x *GetUserResponse) Reset() {
 	*x = GetUserResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1616,7 +1873,7 @@ func (x *GetUserResponse) String() string {
 func (*GetUserResponse) ProtoMessage() {}
 
 func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1629,7 +1886,7 @@ func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
 func (*GetUserResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetUserResponse) GetUser() *User {
@@ -1699,7 +1956,7 @@ type BlockedDevice struct {
 
 func (x *BlockedDevice) Reset() {
 	*x = BlockedDevice{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1711,7 +1968,7 @@ func (x *BlockedDevice) String() string {
 func (*BlockedDevice) ProtoMessage() {}
 
 func (x *BlockedDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1724,7 +1981,7 @@ func (x *BlockedDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockedDevice.ProtoReflect.Descriptor instead.
 func (*BlockedDevice) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *BlockedDevice) GetId() string {
@@ -1798,7 +2055,7 @@ type CreateUserRequest struct {
 
 func (x *CreateUserRequest) Reset() {
 	*x = CreateUserRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1810,7 +2067,7 @@ func (x *CreateUserRequest) String() string {
 func (*CreateUserRequest) ProtoMessage() {}
 
 func (x *CreateUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1823,7 +2080,7 @@ func (x *CreateUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CreateUserRequest) GetName() string {
@@ -1915,7 +2172,7 @@ type CreateUserResponse struct {
 
 func (x *CreateUserResponse) Reset() {
 	*x = CreateUserResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1927,7 +2184,7 @@ func (x *CreateUserResponse) String() string {
 func (*CreateUserResponse) ProtoMessage() {}
 
 func (x *CreateUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1940,7 +2197,7 @@ func (x *CreateUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CreateUserResponse) GetUser() *User {
@@ -1992,7 +2249,7 @@ type UpdateUserRequest struct {
 
 func (x *UpdateUserRequest) Reset() {
 	*x = UpdateUserRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2004,7 +2261,7 @@ func (x *UpdateUserRequest) String() string {
 func (*UpdateUserRequest) ProtoMessage() {}
 
 func (x *UpdateUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2017,7 +2274,7 @@ func (x *UpdateUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UpdateUserRequest) GetUserId() string {
@@ -2130,7 +2387,7 @@ type UpdateUserResponse struct {
 
 func (x *UpdateUserResponse) Reset() {
 	*x = UpdateUserResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2142,7 +2399,7 @@ func (x *UpdateUserResponse) String() string {
 func (*UpdateUserResponse) ProtoMessage() {}
 
 func (x *UpdateUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2155,7 +2412,7 @@ func (x *UpdateUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UpdateUserResponse) GetUser() *User {
@@ -2186,7 +2443,7 @@ type AccessImpact struct {
 
 func (x *AccessImpact) Reset() {
 	*x = AccessImpact{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2198,7 +2455,7 @@ func (x *AccessImpact) String() string {
 func (*AccessImpact) ProtoMessage() {}
 
 func (x *AccessImpact) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2211,7 +2468,7 @@ func (x *AccessImpact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccessImpact.ProtoReflect.Descriptor instead.
 func (*AccessImpact) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AccessImpact) GetLost() []*ImpactProfile {
@@ -2248,7 +2505,7 @@ type ImpactProfile struct {
 
 func (x *ImpactProfile) Reset() {
 	*x = ImpactProfile{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2260,7 +2517,7 @@ func (x *ImpactProfile) String() string {
 func (*ImpactProfile) ProtoMessage() {}
 
 func (x *ImpactProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2273,7 +2530,7 @@ func (x *ImpactProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImpactProfile.ProtoReflect.Descriptor instead.
 func (*ImpactProfile) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ImpactProfile) GetId() string {
@@ -2314,7 +2571,7 @@ type SetUsersEnabledRequest struct {
 
 func (x *SetUsersEnabledRequest) Reset() {
 	*x = SetUsersEnabledRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2326,7 +2583,7 @@ func (x *SetUsersEnabledRequest) String() string {
 func (*SetUsersEnabledRequest) ProtoMessage() {}
 
 func (x *SetUsersEnabledRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2339,7 +2596,7 @@ func (x *SetUsersEnabledRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUsersEnabledRequest.ProtoReflect.Descriptor instead.
 func (*SetUsersEnabledRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SetUsersEnabledRequest) GetUserIds() []string {
@@ -2365,7 +2622,7 @@ type SetUsersEnabledResponse struct {
 
 func (x *SetUsersEnabledResponse) Reset() {
 	*x = SetUsersEnabledResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2377,7 +2634,7 @@ func (x *SetUsersEnabledResponse) String() string {
 func (*SetUsersEnabledResponse) ProtoMessage() {}
 
 func (x *SetUsersEnabledResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2390,7 +2647,7 @@ func (x *SetUsersEnabledResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUsersEnabledResponse.ProtoReflect.Descriptor instead.
 func (*SetUsersEnabledResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SetUsersEnabledResponse) GetUsers() []*User {
@@ -2410,7 +2667,7 @@ type ExtendUsersRequest struct {
 
 func (x *ExtendUsersRequest) Reset() {
 	*x = ExtendUsersRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2422,7 +2679,7 @@ func (x *ExtendUsersRequest) String() string {
 func (*ExtendUsersRequest) ProtoMessage() {}
 
 func (x *ExtendUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2435,7 +2692,7 @@ func (x *ExtendUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtendUsersRequest.ProtoReflect.Descriptor instead.
 func (*ExtendUsersRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ExtendUsersRequest) GetUserIds() []string {
@@ -2461,7 +2718,7 @@ type ExtendUsersResponse struct {
 
 func (x *ExtendUsersResponse) Reset() {
 	*x = ExtendUsersResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2473,7 +2730,7 @@ func (x *ExtendUsersResponse) String() string {
 func (*ExtendUsersResponse) ProtoMessage() {}
 
 func (x *ExtendUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2486,7 +2743,7 @@ func (x *ExtendUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtendUsersResponse.ProtoReflect.Descriptor instead.
 func (*ExtendUsersResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ExtendUsersResponse) GetUsers() []*User {
@@ -2505,7 +2762,7 @@ type ResetUserTrafficRequest struct {
 
 func (x *ResetUserTrafficRequest) Reset() {
 	*x = ResetUserTrafficRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2517,7 +2774,7 @@ func (x *ResetUserTrafficRequest) String() string {
 func (*ResetUserTrafficRequest) ProtoMessage() {}
 
 func (x *ResetUserTrafficRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2530,7 +2787,7 @@ func (x *ResetUserTrafficRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetUserTrafficRequest.ProtoReflect.Descriptor instead.
 func (*ResetUserTrafficRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ResetUserTrafficRequest) GetUserIds() []string {
@@ -2549,7 +2806,7 @@ type ResetUserTrafficResponse struct {
 
 func (x *ResetUserTrafficResponse) Reset() {
 	*x = ResetUserTrafficResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2561,7 +2818,7 @@ func (x *ResetUserTrafficResponse) String() string {
 func (*ResetUserTrafficResponse) ProtoMessage() {}
 
 func (x *ResetUserTrafficResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2574,7 +2831,7 @@ func (x *ResetUserTrafficResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetUserTrafficResponse.ProtoReflect.Descriptor instead.
 func (*ResetUserTrafficResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ResetUserTrafficResponse) GetUsers() []*User {
@@ -2596,7 +2853,7 @@ type RevokeDeviceRequest struct {
 
 func (x *RevokeDeviceRequest) Reset() {
 	*x = RevokeDeviceRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2608,7 +2865,7 @@ func (x *RevokeDeviceRequest) String() string {
 func (*RevokeDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2621,7 +2878,7 @@ func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RevokeDeviceRequest) GetDeviceId() string {
@@ -2647,7 +2904,7 @@ type RevokeDeviceResponse struct {
 
 func (x *RevokeDeviceResponse) Reset() {
 	*x = RevokeDeviceResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2659,7 +2916,7 @@ func (x *RevokeDeviceResponse) String() string {
 func (*RevokeDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2672,7 +2929,7 @@ func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RevokeDeviceResponse) GetUser() *User {
@@ -2692,7 +2949,7 @@ type UnblockDeviceRequest struct {
 
 func (x *UnblockDeviceRequest) Reset() {
 	*x = UnblockDeviceRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2704,7 +2961,7 @@ func (x *UnblockDeviceRequest) String() string {
 func (*UnblockDeviceRequest) ProtoMessage() {}
 
 func (x *UnblockDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2717,7 +2974,7 @@ func (x *UnblockDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockDeviceRequest.ProtoReflect.Descriptor instead.
 func (*UnblockDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{28}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UnblockDeviceRequest) GetDeviceId() string {
@@ -2736,7 +2993,7 @@ type UnblockDeviceResponse struct {
 
 func (x *UnblockDeviceResponse) Reset() {
 	*x = UnblockDeviceResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2748,7 +3005,7 @@ func (x *UnblockDeviceResponse) String() string {
 func (*UnblockDeviceResponse) ProtoMessage() {}
 
 func (x *UnblockDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2761,7 +3018,7 @@ func (x *UnblockDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockDeviceResponse.ProtoReflect.Descriptor instead.
 func (*UnblockDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{29}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *UnblockDeviceResponse) GetUser() *User {
@@ -2780,7 +3037,7 @@ type DeleteUsersRequest struct {
 
 func (x *DeleteUsersRequest) Reset() {
 	*x = DeleteUsersRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2792,7 +3049,7 @@ func (x *DeleteUsersRequest) String() string {
 func (*DeleteUsersRequest) ProtoMessage() {}
 
 func (x *DeleteUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2805,7 +3062,7 @@ func (x *DeleteUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUsersRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUsersRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{30}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DeleteUsersRequest) GetUserIds() []string {
@@ -2823,7 +3080,7 @@ type DeleteUsersResponse struct {
 
 func (x *DeleteUsersResponse) Reset() {
 	*x = DeleteUsersResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2835,7 +3092,7 @@ func (x *DeleteUsersResponse) String() string {
 func (*DeleteUsersResponse) ProtoMessage() {}
 
 func (x *DeleteUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2848,7 +3105,7 @@ func (x *DeleteUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUsersResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUsersResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{31}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{34}
 }
 
 type GetSubscriptionLinkRequest struct {
@@ -2861,7 +3118,7 @@ type GetSubscriptionLinkRequest struct {
 
 func (x *GetSubscriptionLinkRequest) Reset() {
 	*x = GetSubscriptionLinkRequest{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2873,7 +3130,7 @@ func (x *GetSubscriptionLinkRequest) String() string {
 func (*GetSubscriptionLinkRequest) ProtoMessage() {}
 
 func (x *GetSubscriptionLinkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2886,7 +3143,7 @@ func (x *GetSubscriptionLinkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubscriptionLinkRequest.ProtoReflect.Descriptor instead.
 func (*GetSubscriptionLinkRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{32}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetSubscriptionLinkRequest) GetUserId() string {
@@ -2916,7 +3173,7 @@ type GetSubscriptionLinkResponse struct {
 
 func (x *GetSubscriptionLinkResponse) Reset() {
 	*x = GetSubscriptionLinkResponse{}
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2928,7 +3185,7 @@ func (x *GetSubscriptionLinkResponse) String() string {
 func (*GetSubscriptionLinkResponse) ProtoMessage() {}
 
 func (x *GetSubscriptionLinkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_user_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2941,7 +3198,7 @@ func (x *GetSubscriptionLinkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubscriptionLinkResponse.ProtoReflect.Descriptor instead.
 func (*GetSubscriptionLinkResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetSubscriptionLinkResponse) GetUrl() string {
@@ -2962,7 +3219,31 @@ var File_mistgate_admin_v1_user_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/user.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1fmistgate/admin/v1/profile.proto\":\n" +
+	"\x1cmistgate/admin/v1/user.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1fmistgate/admin/v1/profile.proto\"I\n" +
+	"\x18GetUserConnectionRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
+	"\x05hours\x18\x02 \x01(\rR\x05hours\"\xf0\x02\n" +
+	"\x10DeviceConnection\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x03 \x01(\tR\bnodeName\x12\x1d\n" +
+	"\n" +
+	"inbound_id\x18\x04 \x01(\tR\tinboundId\x12!\n" +
+	"\fprofile_name\x18\x05 \x01(\tR\vprofileName\x12\x1a\n" +
+	"\bprotocol\x18\x06 \x01(\tR\bprotocol\x12\x1a\n" +
+	"\bconnects\x18\a \x01(\rR\bconnects\x12\x18\n" +
+	"\arejects\x18\b \x01(\rR\arejects\x12\x14\n" +
+	"\x05drops\x18\t \x01(\rR\x05drops\x12\x16\n" +
+	"\x06stalls\x18\n" +
+	" \x01(\rR\x06stalls\x12\x1d\n" +
+	"\bonline_s\x18\v \x01(\x04B\x020\x02R\aonlineS\x12(\n" +
+	"\x0elast_hour_unix\x18\f \x01(\x03B\x020\x02R\flastHourUnix\"\xcc\x01\n" +
+	"\x19GetUserConnectionResponse\x12!\n" +
+	"\n" +
+	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +
+	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x127\n" +
+	"\x04rows\x18\x03 \x03(\v2#.mistgate.admin.v1.DeviceConnectionR\x04rows\x124\n" +
+	"\x16nodes_without_counters\x18\x04 \x03(\tR\x14nodesWithoutCounters\":\n" +
 	"\n" +
 	"AppToggles\x12\x12\n" +
 	"\x04happ\x18\x01 \x01(\bR\x04happ\x12\x18\n" +
@@ -3238,7 +3519,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x17DEVICE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DEVICE_KIND_LINK\x10\x01\x12\x1b\n" +
 	"\x17DEVICE_KIND_LINK_SHARED\x10\x02\x12\x13\n" +
-	"\x0fDEVICE_KIND_KEY\x10\x032\xbb\b\n" +
+	"\x0fDEVICE_KIND_KEY\x10\x032\xab\t\n" +
 	"\vUserService\x12V\n" +
 	"\tListUsers\x12#.mistgate.admin.v1.ListUsersRequest\x1a$.mistgate.admin.v1.ListUsersResponse\x12P\n" +
 	"\aGetUser\x12!.mistgate.admin.v1.GetUserRequest\x1a\".mistgate.admin.v1.GetUserResponse\x12Y\n" +
@@ -3252,7 +3533,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\fRevokeDevice\x12&.mistgate.admin.v1.RevokeDeviceRequest\x1a'.mistgate.admin.v1.RevokeDeviceResponse\x12b\n" +
 	"\rUnblockDevice\x12'.mistgate.admin.v1.UnblockDeviceRequest\x1a(.mistgate.admin.v1.UnblockDeviceResponse\x12\\\n" +
 	"\vDeleteUsers\x12%.mistgate.admin.v1.DeleteUsersRequest\x1a&.mistgate.admin.v1.DeleteUsersResponse\x12t\n" +
-	"\x13GetSubscriptionLink\x12-.mistgate.admin.v1.GetSubscriptionLinkRequest\x1a..mistgate.admin.v1.GetSubscriptionLinkResponseB\xc4\x01\n" +
+	"\x13GetSubscriptionLink\x12-.mistgate.admin.v1.GetSubscriptionLinkRequest\x1a..mistgate.admin.v1.GetSubscriptionLinkResponse\x12n\n" +
+	"\x11GetUserConnection\x12+.mistgate.admin.v1.GetUserConnectionRequest\x1a,.mistgate.admin.v1.GetUserConnectionResponseB\xc4\x01\n" +
 	"\x15com.mistgate.admin.v1B\tUserProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -3268,7 +3550,7 @@ func file_mistgate_admin_v1_user_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(UserStatus)(0),                     // 0: mistgate.admin.v1.UserStatus
 	(QuotaReset)(0),                     // 1: mistgate.admin.v1.QuotaReset
@@ -3276,106 +3558,112 @@ var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(UserSort)(0),                       // 3: mistgate.admin.v1.UserSort
 	(DnsSource)(0),                      // 4: mistgate.admin.v1.DnsSource
 	(DeviceKind)(0),                     // 5: mistgate.admin.v1.DeviceKind
-	(*AppToggles)(nil),                  // 6: mistgate.admin.v1.AppToggles
-	(*NodeSelection)(nil),               // 7: mistgate.admin.v1.NodeSelection
-	(*User)(nil),                        // 8: mistgate.admin.v1.User
-	(*ListUsersRequest)(nil),            // 9: mistgate.admin.v1.ListUsersRequest
-	(*UserCounts)(nil),                  // 10: mistgate.admin.v1.UserCounts
-	(*ListUsersResponse)(nil),           // 11: mistgate.admin.v1.ListUsersResponse
-	(*GetUserRequest)(nil),              // 12: mistgate.admin.v1.GetUserRequest
-	(*Device)(nil),                      // 13: mistgate.admin.v1.Device
-	(*DayTraffic)(nil),                  // 14: mistgate.admin.v1.DayTraffic
-	(*NodeTraffic)(nil),                 // 15: mistgate.admin.v1.NodeTraffic
-	(*NodeAccess)(nil),                  // 16: mistgate.admin.v1.NodeAccess
-	(*ProfileRef)(nil),                  // 17: mistgate.admin.v1.ProfileRef
-	(*GetUserResponse)(nil),             // 18: mistgate.admin.v1.GetUserResponse
-	(*BlockedDevice)(nil),               // 19: mistgate.admin.v1.BlockedDevice
-	(*CreateUserRequest)(nil),           // 20: mistgate.admin.v1.CreateUserRequest
-	(*CreateUserResponse)(nil),          // 21: mistgate.admin.v1.CreateUserResponse
-	(*UpdateUserRequest)(nil),           // 22: mistgate.admin.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),          // 23: mistgate.admin.v1.UpdateUserResponse
-	(*AccessImpact)(nil),                // 24: mistgate.admin.v1.AccessImpact
-	(*ImpactProfile)(nil),               // 25: mistgate.admin.v1.ImpactProfile
-	(*SetUsersEnabledRequest)(nil),      // 26: mistgate.admin.v1.SetUsersEnabledRequest
-	(*SetUsersEnabledResponse)(nil),     // 27: mistgate.admin.v1.SetUsersEnabledResponse
-	(*ExtendUsersRequest)(nil),          // 28: mistgate.admin.v1.ExtendUsersRequest
-	(*ExtendUsersResponse)(nil),         // 29: mistgate.admin.v1.ExtendUsersResponse
-	(*ResetUserTrafficRequest)(nil),     // 30: mistgate.admin.v1.ResetUserTrafficRequest
-	(*ResetUserTrafficResponse)(nil),    // 31: mistgate.admin.v1.ResetUserTrafficResponse
-	(*RevokeDeviceRequest)(nil),         // 32: mistgate.admin.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),        // 33: mistgate.admin.v1.RevokeDeviceResponse
-	(*UnblockDeviceRequest)(nil),        // 34: mistgate.admin.v1.UnblockDeviceRequest
-	(*UnblockDeviceResponse)(nil),       // 35: mistgate.admin.v1.UnblockDeviceResponse
-	(*DeleteUsersRequest)(nil),          // 36: mistgate.admin.v1.DeleteUsersRequest
-	(*DeleteUsersResponse)(nil),         // 37: mistgate.admin.v1.DeleteUsersResponse
-	(*GetSubscriptionLinkRequest)(nil),  // 38: mistgate.admin.v1.GetSubscriptionLinkRequest
-	(*GetSubscriptionLinkResponse)(nil), // 39: mistgate.admin.v1.GetSubscriptionLinkResponse
-	(App)(0),                            // 40: mistgate.admin.v1.App
-	(*ProfileFormat)(nil),               // 41: mistgate.admin.v1.ProfileFormat
+	(*GetUserConnectionRequest)(nil),    // 6: mistgate.admin.v1.GetUserConnectionRequest
+	(*DeviceConnection)(nil),            // 7: mistgate.admin.v1.DeviceConnection
+	(*GetUserConnectionResponse)(nil),   // 8: mistgate.admin.v1.GetUserConnectionResponse
+	(*AppToggles)(nil),                  // 9: mistgate.admin.v1.AppToggles
+	(*NodeSelection)(nil),               // 10: mistgate.admin.v1.NodeSelection
+	(*User)(nil),                        // 11: mistgate.admin.v1.User
+	(*ListUsersRequest)(nil),            // 12: mistgate.admin.v1.ListUsersRequest
+	(*UserCounts)(nil),                  // 13: mistgate.admin.v1.UserCounts
+	(*ListUsersResponse)(nil),           // 14: mistgate.admin.v1.ListUsersResponse
+	(*GetUserRequest)(nil),              // 15: mistgate.admin.v1.GetUserRequest
+	(*Device)(nil),                      // 16: mistgate.admin.v1.Device
+	(*DayTraffic)(nil),                  // 17: mistgate.admin.v1.DayTraffic
+	(*NodeTraffic)(nil),                 // 18: mistgate.admin.v1.NodeTraffic
+	(*NodeAccess)(nil),                  // 19: mistgate.admin.v1.NodeAccess
+	(*ProfileRef)(nil),                  // 20: mistgate.admin.v1.ProfileRef
+	(*GetUserResponse)(nil),             // 21: mistgate.admin.v1.GetUserResponse
+	(*BlockedDevice)(nil),               // 22: mistgate.admin.v1.BlockedDevice
+	(*CreateUserRequest)(nil),           // 23: mistgate.admin.v1.CreateUserRequest
+	(*CreateUserResponse)(nil),          // 24: mistgate.admin.v1.CreateUserResponse
+	(*UpdateUserRequest)(nil),           // 25: mistgate.admin.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),          // 26: mistgate.admin.v1.UpdateUserResponse
+	(*AccessImpact)(nil),                // 27: mistgate.admin.v1.AccessImpact
+	(*ImpactProfile)(nil),               // 28: mistgate.admin.v1.ImpactProfile
+	(*SetUsersEnabledRequest)(nil),      // 29: mistgate.admin.v1.SetUsersEnabledRequest
+	(*SetUsersEnabledResponse)(nil),     // 30: mistgate.admin.v1.SetUsersEnabledResponse
+	(*ExtendUsersRequest)(nil),          // 31: mistgate.admin.v1.ExtendUsersRequest
+	(*ExtendUsersResponse)(nil),         // 32: mistgate.admin.v1.ExtendUsersResponse
+	(*ResetUserTrafficRequest)(nil),     // 33: mistgate.admin.v1.ResetUserTrafficRequest
+	(*ResetUserTrafficResponse)(nil),    // 34: mistgate.admin.v1.ResetUserTrafficResponse
+	(*RevokeDeviceRequest)(nil),         // 35: mistgate.admin.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),        // 36: mistgate.admin.v1.RevokeDeviceResponse
+	(*UnblockDeviceRequest)(nil),        // 37: mistgate.admin.v1.UnblockDeviceRequest
+	(*UnblockDeviceResponse)(nil),       // 38: mistgate.admin.v1.UnblockDeviceResponse
+	(*DeleteUsersRequest)(nil),          // 39: mistgate.admin.v1.DeleteUsersRequest
+	(*DeleteUsersResponse)(nil),         // 40: mistgate.admin.v1.DeleteUsersResponse
+	(*GetSubscriptionLinkRequest)(nil),  // 41: mistgate.admin.v1.GetSubscriptionLinkRequest
+	(*GetSubscriptionLinkResponse)(nil), // 42: mistgate.admin.v1.GetSubscriptionLinkResponse
+	(App)(0),                            // 43: mistgate.admin.v1.App
+	(*ProfileFormat)(nil),               // 44: mistgate.admin.v1.ProfileFormat
 }
 var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
-	0,  // 0: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
-	6,  // 1: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
-	40, // 2: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
-	1,  // 3: mistgate.admin.v1.User.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	7,  // 4: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	4,  // 5: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
-	2,  // 6: mistgate.admin.v1.ListUsersRequest.filter:type_name -> mistgate.admin.v1.UserFilter
-	3,  // 7: mistgate.admin.v1.ListUsersRequest.sort:type_name -> mistgate.admin.v1.UserSort
-	8,  // 8: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
-	10, // 9: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
-	5,  // 10: mistgate.admin.v1.Device.kind:type_name -> mistgate.admin.v1.DeviceKind
-	41, // 11: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
-	8,  // 12: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
-	13, // 13: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
-	14, // 14: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
-	15, // 15: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
-	17, // 16: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
-	16, // 17: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
-	19, // 18: mistgate.admin.v1.GetUserResponse.blocked_devices:type_name -> mistgate.admin.v1.BlockedDevice
-	1,  // 19: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	6,  // 20: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	7,  // 21: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	8,  // 22: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
-	1,  // 23: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	6,  // 24: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	7,  // 25: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	8,  // 26: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
-	24, // 27: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
-	25, // 28: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
-	25, // 29: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
-	8,  // 30: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 31: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 32: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
-	8,  // 33: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	8,  // 34: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	9,  // 35: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
-	12, // 36: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
-	20, // 37: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
-	22, // 38: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
-	26, // 39: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
-	28, // 40: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
-	30, // 41: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
-	32, // 42: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
-	34, // 43: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
-	36, // 44: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
-	38, // 45: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
-	11, // 46: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
-	18, // 47: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
-	21, // 48: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
-	23, // 49: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
-	27, // 50: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
-	29, // 51: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
-	31, // 52: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
-	33, // 53: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
-	35, // 54: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
-	37, // 55: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
-	39, // 56: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
-	46, // [46:57] is the sub-list for method output_type
-	35, // [35:46] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	7,  // 0: mistgate.admin.v1.GetUserConnectionResponse.rows:type_name -> mistgate.admin.v1.DeviceConnection
+	0,  // 1: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
+	9,  // 2: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
+	43, // 3: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
+	1,  // 4: mistgate.admin.v1.User.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	10, // 5: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	4,  // 6: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
+	2,  // 7: mistgate.admin.v1.ListUsersRequest.filter:type_name -> mistgate.admin.v1.UserFilter
+	3,  // 8: mistgate.admin.v1.ListUsersRequest.sort:type_name -> mistgate.admin.v1.UserSort
+	11, // 9: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
+	13, // 10: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
+	5,  // 11: mistgate.admin.v1.Device.kind:type_name -> mistgate.admin.v1.DeviceKind
+	44, // 12: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	11, // 13: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
+	16, // 14: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
+	17, // 15: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
+	18, // 16: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
+	20, // 17: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
+	19, // 18: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
+	22, // 19: mistgate.admin.v1.GetUserResponse.blocked_devices:type_name -> mistgate.admin.v1.BlockedDevice
+	1,  // 20: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	9,  // 21: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	10, // 22: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	11, // 23: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
+	1,  // 24: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
+	9,  // 25: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	10, // 26: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	11, // 27: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
+	27, // 28: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
+	28, // 29: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
+	28, // 30: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
+	11, // 31: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
+	11, // 32: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
+	11, // 33: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
+	11, // 34: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	11, // 35: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	12, // 36: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
+	15, // 37: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
+	23, // 38: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
+	25, // 39: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
+	29, // 40: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
+	31, // 41: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
+	33, // 42: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
+	35, // 43: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
+	37, // 44: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
+	39, // 45: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
+	41, // 46: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
+	6,  // 47: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
+	14, // 48: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
+	21, // 49: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
+	24, // 50: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
+	26, // 51: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
+	30, // 52: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
+	32, // 53: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
+	34, // 54: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
+	36, // 55: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
+	38, // 56: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
+	40, // 57: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
+	42, // 58: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
+	8,  // 59: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
+	48, // [48:60] is the sub-list for method output_type
+	36, // [36:48] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_user_proto_init() }
@@ -3385,14 +3673,14 @@ func file_mistgate_admin_v1_user_proto_init() {
 	}
 	file_mistgate_admin_v1_common_proto_init()
 	file_mistgate_admin_v1_profile_proto_init()
-	file_mistgate_admin_v1_user_proto_msgTypes[16].OneofWrappers = []any{}
+	file_mistgate_admin_v1_user_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_user_proto_rawDesc), len(file_mistgate_admin_v1_user_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   34,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

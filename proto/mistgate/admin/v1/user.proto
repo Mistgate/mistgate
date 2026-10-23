@@ -44,6 +44,42 @@ service UserService {
   rpc DeleteUsers(DeleteUsersRequest) returns (DeleteUsersResponse);
   // "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
   rpc GetSubscriptionLink(GetSubscriptionLinkRequest) returns (GetSubscriptionLinkResponse);
+  // What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
+  // LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
+  // address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
+  rpc GetUserConnection(GetUserConnectionRequest) returns (GetUserConnectionResponse);
+}
+
+message GetUserConnectionRequest {
+  string user_id = 1;
+  // Hours back from now, 1 to 48 (the retention). 0 means 24; more is cut to 48.
+  uint32 hours = 2;
+}
+
+// One device of the person on one inbound of a node, summed over the window. Rows without any counter are not sent.
+message DeviceConnection {
+  string device_id = 1;
+  string node_id = 2;
+  string node_name = 3;
+  string inbound_id = 4;
+  string profile_name = 5;
+  string protocol = 6;
+  uint32 connects = 7;
+  uint32 rejects = 8;
+  uint32 drops = 9;
+  uint32 stalls = 10;
+  uint64 online_s = 11 [jstype = JS_NUMBER];
+  // Start of the newest hour with a counter.
+  int64 last_hour_unix = 12 [jstype = JS_NUMBER];
+}
+
+message GetUserConnectionResponse {
+  int64 since_unix = 1 [jstype = JS_NUMBER];
+  int64 now_unix = 2 [jstype = JS_NUMBER];
+  // Device, then node name, then profile name.
+  repeated DeviceConnection rows = 3;
+  // Nodes the person can use whose agent does not send connection counters: nothing from them is in rows.
+  repeated string nodes_without_counters = 4;
 }
 
 enum UserStatus {

@@ -60,6 +60,9 @@ const (
 	// UserServiceGetSubscriptionLinkProcedure is the fully-qualified name of the UserService's
 	// GetSubscriptionLink RPC.
 	UserServiceGetSubscriptionLinkProcedure = "/mistgate.admin.v1.UserService/GetSubscriptionLink"
+	// UserServiceGetUserConnectionProcedure is the fully-qualified name of the UserService's
+	// GetUserConnection RPC.
+	UserServiceGetUserConnectionProcedure = "/mistgate.admin.v1.UserService/GetUserConnection"
 )
 
 // UserServiceClient is a client for the mistgate.admin.v1.UserService service.
@@ -86,6 +89,10 @@ type UserServiceClient interface {
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
 	// "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
 	GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error)
+	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
+	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
+	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
+	GetUserConnection(context.Context, *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error)
 }
 
 // NewUserServiceClient constructs a client for the mistgate.admin.v1.UserService service. By
@@ -165,6 +172,12 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("GetSubscriptionLink")),
 			connect.WithClientOptions(opts...),
 		),
+		getUserConnection: connect.NewClient[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse](
+			httpClient,
+			baseURL+UserServiceGetUserConnectionProcedure,
+			connect.WithSchema(userServiceMethods.ByName("GetUserConnection")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -181,6 +194,7 @@ type userServiceClient struct {
 	unblockDevice       *connect.Client[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse]
 	deleteUsers         *connect.Client[v1.DeleteUsersRequest, v1.DeleteUsersResponse]
 	getSubscriptionLink *connect.Client[v1.GetSubscriptionLinkRequest, v1.GetSubscriptionLinkResponse]
+	getUserConnection   *connect.Client[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse]
 }
 
 // ListUsers calls mistgate.admin.v1.UserService.ListUsers.
@@ -238,6 +252,11 @@ func (c *userServiceClient) GetSubscriptionLink(ctx context.Context, req *connec
 	return c.getSubscriptionLink.CallUnary(ctx, req)
 }
 
+// GetUserConnection calls mistgate.admin.v1.UserService.GetUserConnection.
+func (c *userServiceClient) GetUserConnection(ctx context.Context, req *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {
+	return c.getUserConnection.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the mistgate.admin.v1.UserService service.
 type UserServiceHandler interface {
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
@@ -262,6 +281,10 @@ type UserServiceHandler interface {
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
 	// "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
 	GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error)
+	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
+	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
+	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
+	GetUserConnection(context.Context, *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -337,6 +360,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("GetSubscriptionLink")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceGetUserConnectionHandler := connect.NewUnaryHandler(
+		UserServiceGetUserConnectionProcedure,
+		svc.GetUserConnection,
+		connect.WithSchema(userServiceMethods.ByName("GetUserConnection")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceListUsersProcedure:
@@ -361,6 +390,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceDeleteUsersHandler.ServeHTTP(w, r)
 		case UserServiceGetSubscriptionLinkProcedure:
 			userServiceGetSubscriptionLinkHandler.ServeHTTP(w, r)
+		case UserServiceGetUserConnectionProcedure:
+			userServiceGetUserConnectionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -412,4 +443,8 @@ func (UnimplementedUserServiceHandler) DeleteUsers(context.Context, *connect.Req
 
 func (UnimplementedUserServiceHandler) GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetSubscriptionLink is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetUserConnection(context.Context, *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetUserConnection is not implemented"))
 }

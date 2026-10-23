@@ -551,7 +551,8 @@ message Hello {
   // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
   // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
-  // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE").
+  // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
+  // LinkCounters).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -626,6 +627,45 @@ message StatsBatch {
   bool coalesced = 7;
   // Node-level WARP health; absent when the node has no WarpSpec. Newest batch wins (coalescing keeps the last).
   WarpHealth warp = 8;
+  // Connection counters since the previous batch (agents with "links/1"); see LinkCounters. Rows with every counter zero
+  // are not sent. A coalescer adds rows of the same cred_id and inbound_id field by field.
+  repeated LinkCounters links = 9;
+}
+
+// CONNECTION COUNTERS. What a node saw of connection attempts, per credential of an inbound, so the panel can tell "the app
+// never reaches the node" from "the node refuses the key", "it connects and drops at once" and "it works". Counters, never
+// addresses: the client's address is not sent (Session.remote_ip is reserved), and no row says when a single connection
+// happened. The engines count on connection and handshake events only, never per data chunk.
+//
+// cred_id "" is the inbound itself: what cannot be put on a credential (an unknown key, the handshake totals). The event
+// counters (connects, rejects, drops, stalls, unknown_keys) leave in the next batch; the volume counters (online_s, hellos,
+// handshakes) are added up and leave in the first batch after a 10-minute boundary of UTC (:00, :10, ...). A restart of the
+// agent loses at most those 10 minutes of volume counters. What an engine cannot know stays zero:
+//   - hysteria2: every counter. hellos counts QUIC ClientHellos (not resumed TLS sessions), handshakes the auth requests
+//     that followed (accepted or not); drops are idle timeouts of a connection younger than 60 s or under 64 KiB.
+//   - awg: connects (a peer's handshake moved after it was offline), stalls (initiations arrive, no handshake completes:
+//     the answer does not reach the client) and unknown_keys (initiations of a key the interface does not hold; kernel
+//     backend and userspace). WireGuard drops anything else silently: no rejects, drops, hellos or handshakes.
+//   - vless: none yet (a later version of this feature).
+message LinkCounters {
+  // "" = the inbound itself.
+  string cred_id = 1;
+  string inbound_id = 2;
+  // Connections that were accepted (a new session).
+  uint32 connects = 3;
+  // The key is known to the node but refused: its term ended or it was removed.
+  uint32 rejects = 4;
+  // Accepted, then frozen or cut almost at once.
+  uint32 drops = 5;
+  // A handshake was started and never completed.
+  uint32 stalls = 6;
+  // Seconds online, from the agent's session snapshots.
+  uint32 online_s = 7;
+  // Only on the inbound row: attempts with a key the node does not know.
+  uint32 unknown_keys = 8;
+  // Only on the inbound row: handshakes started and handshakes that reached authentication.
+  uint32 hellos = 9;
+  uint32 handshakes = 10;
 }
 
 // Directions are from the END USER's point of view, not the server-remote view used inside the
