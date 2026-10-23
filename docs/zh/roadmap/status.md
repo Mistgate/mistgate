@@ -3,23 +3,20 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.51`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.52`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.51
+  meta: v0.1.0 – v0.1.52
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.51
+      release: v0.1.52
       current: true
       points:
-        - "**kl!ck 报告。** 使用 kl!ck 应用的人可以把其服务器检查结果发送到面板：从自己的家庭和移动网络看到的 TSPU 冻结、TCP 被封或无法连接。这是**可达性 → 来源**中的新来源，默认关闭；它保存网络信息和结论 7 天，从不保存此人的地址。参见 [kl!ck 报告](../operations/reachability.md#klck-报告)。"
-        - "**节点不再丢失命令的应答**：即使与面板的保持连接在命令之后立即关闭（请更新节点 Agent）。"
-        - "**Cloudflare 版：启用 WARP。** 面板通过 Worker 自身的 fetch 注册 WARP 账户，而不再直接拒绝。在两个版本中，注册被拒绝时都会显示 Cloudflare 的返回结果（「Cloudflare 拒绝了注册（HTTP 429）」），而不是「出了点问题」。参见[启用 WARP](../guide/warp.md#启用-warp注册)。"
-        - "**手动更新命令会在节点不再需要时自动收起。**"
+        - "**MCP：`klick_reports`。** 智能体可使用任意配置文件的令牌读取 kl!ck 报告：每个节点的报告数、冻结、TCP 封锁和失败，并按运营商和地区统计。开启或关闭该来源仍只有所有者可以操作。参见 [MCP](../reference/mcp.md)。"
     - title: 协议配置
       section: profiles
       points:
@@ -53,7 +50,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.51`�
       points:
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
         - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
-        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点、比对 antifilter 封锁名单，并从你在俄罗斯的节点运行 TSPU 探测；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
+        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点、比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
@@ -79,7 +76,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.51`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.51
+  meta: v0.1.34 – v0.1.52
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS

@@ -3,23 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.51`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.52`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.51
+  meta: v0.1.0 – v0.1.52
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.51
+      release: v0.1.52
       current: true
       points:
-        - "**kl!ck reports.** People who use the kl!ck app can send its server check to the panel: a TSPU freeze, blocked TCP or no connection, from their own home and mobile networks. A new source in **Reachability → Sources**, off by default; it stores the network and the verdicts for 7 days, never the person's address. See [kl!ck reports](../operations/reachability.md#klck-reports)."
-        - "**A node no longer loses the answer to a command** when its held connection to the panel ends right after the command (update the node agents)."
-        - "**Cloudflare edition: Enable WARP.** The panel registers the WARP account through the Worker's own fetch instead of refusing. A refused registration, on either edition, now says what Cloudflare answered (\"Cloudflare refused the registration (HTTP 429)\") instead of \"Something went wrong\". See [Enable WARP](../guide/warp.md#enable-warp-register)."
-        - "**The manual update commands close** once the node no longer needs them."
+        - "**MCP: `klick_reports`.** An agent reads the kl!ck reports with a token of any profile: per node the reports, freezes, TCP blocks and failures, by operator and by region. Switching the source stays the owner's. See [MCP](../reference/mcp.md)."
     - title: Profiles
       section: profiles
       points:
@@ -53,7 +50,7 @@ Mistgate is in **beta**; the current release is `v0.1.51`. It runs in production
       points:
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
         - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
-        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, the antifilter block lists and a TSPU probe from your own node in Russia, each switched on separately and off by default, with an alert when a node is unreachable from the country."
+        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, the antifilter block lists a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country."
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
@@ -79,7 +76,7 @@ Mistgate is in **beta**; the current release is `v0.1.51`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.51
+  meta: v0.1.34 – v0.1.52
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
