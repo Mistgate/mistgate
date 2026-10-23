@@ -28,9 +28,10 @@ type fakeBackend struct {
 	devs  map[string]*fakeDev
 	calls []string // "create:mgawg51842", "destroy:...", "peers:mgawg51842:-01,+02,~03", "mtu:..."
 
-	createErr error
-	peersErr  error
-	unknown   uint32
+	createErr    error
+	peersErr     error
+	unknown      uint32
+	unknownTakes int
 }
 
 type fakeDev struct {
@@ -157,9 +158,16 @@ func (f *fakeBackend) Close() error {
 func (f *fakeBackend) TakeUnknownPeers(string) uint32 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.unknownTakes++
 	n := f.unknown
 	f.unknown = 0
 	return n
+}
+
+func (f *fakeBackend) unknownReadCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.unknownTakes
 }
 
 // ---- test helpers on the fake ----

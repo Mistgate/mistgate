@@ -15,6 +15,7 @@ package hysteria2
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -62,19 +63,21 @@ func bindHost() string {
 }
 
 type eng struct {
-	env            engine.Env
-	log            *slog.Logger
-	now            func() time.Time
-	out            func(name string) (engine.Egress, error)
-	users          *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
-	torrentEnabled atomic.Bool
-	torrentVersion uint64 // guards inbound generations under mu so toggles replace existing outbound flows
+	env             engine.Env
+	log             *slog.Logger
+	now             func() time.Time
+	out             func(name string) (engine.Egress, error)
+	quicIdleTimeout time.Duration       // test seam; zero keeps the Hysteria default
+	users           *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
+	torrentEnabled  atomic.Bool
+	torrentVersion  uint64 // guards inbound generations under mu so toggles replace existing outbound flows
 
-	mu        sync.Mutex // guards everything below; never taken on the data path
-	inbounds  map[string]*inbound
-	tcpClaims map[uint16]string
-	retired   []*credState // dropped credentials with counters not yet reported
-	closed    bool
+	mu              sync.Mutex // guards everything below; never taken on the data path
+	inbounds        map[string]*inbound
+	tcpClaims       map[uint16]string
+	retired         []*credState // dropped credentials with counters not yet reported
+	retiredInbounds []*inbound   // dropped listeners whose inbound-level counters have not been reported
+	closed          bool
 }
 
 var _ engine.Engine = (*eng)(nil)
@@ -158,6 +161,9 @@ type inbound struct {
 	certHeld        bool
 	smu             sync.Mutex // guards sessions
 	sessions        map[string]session
+	unknownKeys     atomic.Uint32
+	hellos          atomic.Uint32
+	handshakes      atomic.Uint32
 	mu              sync.Mutex // guards the fields below
 	state           plugin.RunState
 	requestMu       sync.Mutex
@@ -309,8 +315,11 @@ func (in *inbound) start(ctx context.Context) error {
 	}
 
 	masq := in.masqHandler()
-	srv, err := server.NewServer(&server.Config{
-		TLSConfig:             server.TLSConfig{GetCertificate: cert.GetCertificate},
+	serverCfg := &server.Config{
+		TLSConfig: server.TLSConfig{GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			in.hellos.Add(1)
+			return cert.GetCertificate(hello)
+		}},
 		Conn:                  conn,
 		RequestHook:           &sniff.Sniffer{}, // all ports, default 4 s timeout; client IPs are replaced by sniffed domains
 		Outbound:              outbound{e: egr, in: in},
@@ -322,7 +331,11 @@ func (in *inbound) start(ctx context.Context) error {
 		EventLogger:           in,
 		TrafficLogger:         in,
 		MasqHandler:           masq,
-	})
+	}
+	if in.e.quicIdleTimeout > 0 {
+		serverCfg.QUICConfig.MaxIdleTimeout = in.e.quicIdleTimeout
+	}
+	srv, err := server.NewServer(serverCfg)
 	if err != nil {
 		conn.Close() // NewServer only closes it on some failures
 		return err
@@ -493,6 +506,7 @@ func (e *eng) Remove(ctx context.Context, inboundID string) error {
 func (e *eng) drop(in *inbound) {
 	in.stop(true)
 	e.users.Sync(in.spec.ID, nil)
+	e.retiredInbounds = append(e.retiredInbounds, in)
 	for _, cs := range in.idx.Load().byID {
 		cs.removed.Store(true)
 		e.retired = append(e.retired, cs)
@@ -506,14 +520,22 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 	var out engine.Collected
 	flush := func(cs *credState) {
 		up, down := cs.up.Swap(0), cs.down.Swap(0)
+		cs.flushed.Add(up + down)
 		if up != 0 || down != 0 {
 			out.Traffic = append(out.Traffic, plugin.UserTraffic{CredID: cs.id, InboundID: cs.inboundID, Up: up, Down: down})
+		}
+	}
+	links := func(stat plugin.LinkStat) {
+		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.Hellos|stat.Handshakes != 0 {
+			out.Links = append(out.Links, stat)
 		}
 	}
 	for _, in := range e.sortedInbounds() {
 		for _, cs := range in.idx.Load().byID {
 			flush(cs)
+			links(cs.takeLinkStats())
 		}
+		links(in.takeLinkStats())
 		in.smu.Lock()
 		for _, s := range in.sessions {
 			// A removed credential's connection is about to die at its next packet; do not show it online.
@@ -526,11 +548,16 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 	kept := e.retired[:0]
 	for _, cs := range e.retired {
 		flush(cs)
+		links(cs.takeLinkStats())
 		if cs.inflight.Load() > 0 { // a callback is still in the rate-limit wait: its bytes come with the next Collect
 			kept = append(kept, cs)
 		}
 	}
 	e.retired = kept
+	for _, in := range e.retiredInbounds {
+		links(in.takeLinkStats())
+	}
+	e.retiredInbounds = nil
 	sort.Slice(out.Traffic, func(i, j int) bool {
 		a, b := out.Traffic[i], out.Traffic[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
@@ -538,6 +565,10 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 	sort.Slice(out.Sessions, func(i, j int) bool {
 		a, b := out.Sessions[i], out.Sessions[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && (a.CredID < b.CredID || (a.CredID == b.CredID && a.Since.Before(b.Since))))
+	})
+	sort.Slice(out.Links, func(i, j int) bool {
+		a, b := out.Links[i], out.Links[j]
+		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
 	})
 	return out, nil
 }

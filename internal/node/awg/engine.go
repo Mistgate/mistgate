@@ -120,7 +120,12 @@ var _ engine.Engine = (*Engine)(nil)
 
 type trafficKey struct{ inbound, cred string }
 
-type counters struct{ rx, tx uint64 }
+type counters struct {
+	rx, tx uint64
+	hs     time.Time
+	online bool
+	seen   bool
+}
 
 // inbound is one interface.
 type inbound struct {
@@ -136,10 +141,11 @@ type inbound struct {
 	prev   map[[32]byte]counters  // last absolute counters seen, per peer
 	timers map[[32]byte]*time.Timer
 
-	state    plugin.RunState
-	detail   string
-	since    time.Time
-	restarts uint32
+	state            plugin.RunState
+	detail           string
+	since            time.Time
+	restarts         uint32
+	unknownForHealth uint32 // copied from the single TakeUnknownPeers read in Collect
 }
 
 // Protocol implements engine.Engine.
@@ -387,22 +393,42 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 		if !in.up {
 			continue
 		}
+		var unknown uint32
+		if source, ok := e.backend.(unknownPeerSource); ok {
+			unknown = source.TakeUnknownPeers(in.cfg.name)
+			in.unknownForHealth += unknown
+		}
+		if unknown != 0 {
+			out.Links = append(out.Links, plugin.LinkStat{InboundID: in.spec.ID, UnknownKeys: unknown})
+		}
 		st, err := e.stats(ctx, in.cfg.name)
 		if err != nil {
 			e.log.Warn("awg stats failed", "inbound", in.spec.ID, "err", err)
 			continue
 		}
+		links := make(map[string]*plugin.LinkStat)
 		for _, h := range st {
 			w := in.peers[h.PublicKey]
 			if w == nil {
 				continue // not ours: a peer we did not add
 			}
 			p := in.prev[h.PublicKey]
+			if p.seen {
+				if !p.online && h.LastHS.After(p.hs) {
+					linkStatFor(links, in.spec.ID, w.credID).Connects++
+				}
+				if h.RxBytes > p.rx && handshakeOlderThan(h.LastHS, now) {
+					linkStatFor(links, in.spec.ID, w.credID).Stalls++
+				}
+			}
 			e.addTraffic(in.spec.ID, w.credID, deltaOf(p.rx, h.RxBytes), deltaOf(p.tx, h.TxBytes))
-			in.prev[h.PublicKey] = counters{h.RxBytes, h.TxBytes}
+			in.prev[h.PublicKey] = counters{rx: h.RxBytes, tx: h.TxBytes, hs: h.LastHS, online: online(h, now), seen: true}
 			if online(h, now) {
 				out.Sessions = append(out.Sessions, plugin.Session{CredID: w.credID, InboundID: in.spec.ID, Since: h.LastHS})
 			}
+		}
+		for _, stat := range links {
+			out.Links = append(out.Links, *stat)
 		}
 	}
 	for _, t := range e.retired {
@@ -417,7 +443,20 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 		a, b := out.Sessions[i], out.Sessions[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
 	})
+	sort.Slice(out.Links, func(i, j int) bool {
+		a, b := out.Links[i], out.Links[j]
+		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
+	})
 	return out, nil
+}
+
+func linkStatFor(byCred map[string]*plugin.LinkStat, inboundID, credID string) *plugin.LinkStat {
+	stat := byCred[credID]
+	if stat == nil {
+		stat = &plugin.LinkStat{CredID: credID, InboundID: inboundID}
+		byCred[credID] = stat
+	}
+	return stat
 }
 
 // Kick closes the sessions of these credentials: the peer is removed and put back after a second if its
@@ -561,7 +600,7 @@ type InboundHealth struct {
 	PeersHandshaken     uint32 // completed a handshake at least once
 	PeersOnline         uint32 // last handshake younger than 190 s
 	NewestHandshakeUnix int64
-	UnknownPeerEvents   uint32 // kernel only: initiations from unknown keys since the previous call
+	UnknownPeerEvents   uint32 // initiations from unknown keys since the previous health report
 }
 
 // HealthReporter is what the agent asserts on the engine to fill InboundHealth.awg.
@@ -597,9 +636,8 @@ func (e *Engine) AwgHealth() []InboundHealth {
 				}
 			}
 		}
-		if u, ok := e.backend.(unknownPeerSource); ok {
-			h.UnknownPeerEvents = u.TakeUnknownPeers(in.cfg.name)
-		}
+		h.UnknownPeerEvents = in.unknownForHealth
+		in.unknownForHealth = 0
 		out = append(out, h)
 	}
 	return out
@@ -643,6 +681,10 @@ func deltaOf(prev, cur uint64) uint64 {
 
 func online(h awgcfg.PeerStat, now time.Time) bool {
 	return !h.LastHS.IsZero() && now.Sub(h.LastHS) < onlineWindow
+}
+
+func handshakeOlderThan(hs, now time.Time) bool {
+	return hs.IsZero() || now.Sub(hs) > 180*time.Second
 }
 
 func samePrefixes(a, b []netip.Prefix) bool {

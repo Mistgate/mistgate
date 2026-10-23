@@ -39,10 +39,16 @@ type awgBackend interface {
 	Close() error
 }
 
-// unknownPeerSource is implemented by the kernel backend: handshake initiations from unknown keys since the last
-// call (multicast group "auth"). Optional; userspace has no equivalent.
+// unknownPeerSource reports handshake initiations from unknown keys since the last call (kernel multicast group
+// "auth", or the pinned userspace log template).
 type unknownPeerSource interface {
 	TakeUnknownPeers(name string) uint32
+}
+
+const unknownInitiationLogFormat = "Received invalid initiation message from %s"
+
+func isUnknownInitiationLog(format string) bool {
+	return format == unknownInitiationLogFormat
 }
 
 // peerBatch is the largest number of peers in one SetPeers call (one netlink attribute holds 64 KiB).

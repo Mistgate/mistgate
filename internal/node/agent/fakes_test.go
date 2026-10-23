@@ -39,6 +39,7 @@ type fakeEngine struct {
 	upEach, downEach uint64
 	emittedUp        uint64 // total handed out by Collect
 	emittedDown      uint64
+	collectQueue     []engine.Collected
 }
 
 type fakeInbound struct {
@@ -88,6 +89,11 @@ func (e *fakeEngine) Remove(_ context.Context, id string) error {
 func (e *fakeEngine) Collect(context.Context) (engine.Collected, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if len(e.collectQueue) != 0 {
+		c := e.collectQueue[0]
+		e.collectQueue = e.collectQueue[1:]
+		return c, nil
+	}
 	var c engine.Collected
 	if e.emit {
 		ids := make([]string, 0, len(e.in))
