@@ -39,6 +39,7 @@ type FleetStatsIn struct {
 	Now              time.Time
 	HourStart        int64 // bucket hour (multiple of 3600), already clamped by the caller
 	Traffic          []FleetTraffic
+	Links            []FleetLink // connection counters (agent.proto LinkCounters), stored in the same hour bucket
 	Sessions         []FleetSessionRef
 	Certs            []FleetInboundCert
 	// Live builds the session projection inside each guarded attempt. It must not mutate captured state.
@@ -52,8 +53,8 @@ type FleetCredRef struct{ UserID, DeviceID, Protocol string }
 type FleetStatsOut struct {
 	Duplicate bool                    // seq already committed: nothing was written
 	Refs      map[string]FleetCredRef // every credential of the batch that resolved
-	Skipped   int                     // deltas dropped: unknown credential, or inbound not on this node
-	Probe     int                     // deltas of the health probe system credential, ignored on purpose (not an anomaly)
+	Skipped   int                     // deltas and link rows dropped: unknown credential, or inbound not on this node
+	Probe     int                     // deltas and link rows of the health probe system credential, ignored on purpose (not an anomaly)
 	Users     []string                // users whose used_bytes grew (for the access module's status recompute)
 }
 
@@ -104,7 +105,8 @@ type fleetDeviceTouchWrite struct {
 }
 
 // IngestStats commits one StatsBatch in one read batch and one guarded write batch together with node.last_seq
-// (agent.proto "RELIABLE MESSAGES"): traffic buckets and hourly peaks, user usage, inbound certificates, and device touches.
+// (agent.proto "RELIABLE MESSAGES"): traffic buckets and hourly peaks, user usage, inbound certificates, device touches, and
+// the connection counters.
 // seq == 0 (not a reliable message) skips the dedup and the counter update.
 func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut, error) {
 	type bucketKey struct{ user, protocol string }
@@ -129,6 +131,12 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			if !seenCreds[se.CredID] {
 				seenCreds[se.CredID] = true
 				credIDs = append(credIDs, se.CredID)
+			}
+		}
+		for _, l := range in.Links {
+			if l.CredID != "" && !seenCreds[l.CredID] {
+				seenCreds[l.CredID] = true
+				credIDs = append(credIDs, l.CredID)
 			}
 		}
 
@@ -220,6 +228,36 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			if ref.DeviceID != "" {
 				perDevice[ref.DeviceID] = satAdd(perDevice[ref.DeviceID], satAdd(up, down))
 			}
+		}
+
+		// Connection counters: the same filter as the traffic (the key resolves and is of the inbound's protocol, probe keys are
+		// ignored), and a row of the inbound itself (cred "") only for an inbound of this node.
+		linkRows := make([][]any, 0, len(in.Links))
+		for _, l := range in.Links {
+			if l.zero() {
+				continue
+			}
+			user := ""
+			if l.CredID == "" {
+				if _, ok := onNode[l.InboundID]; !ok {
+					out.Skipped++
+					continue
+				}
+			} else {
+				ref, ok := creds[l.CredID]
+				if !ok && probes[l.CredID] {
+					out.Probe++
+					continue
+				}
+				if !ok || onNode[l.InboundID] != ref.Protocol {
+					out.Skipped++
+					continue
+				}
+				user = ref.UserID
+			}
+			linkRows = append(linkRows, []any{l.CredID, l.InboundID, user, min(l.Connects, maxLinkCount), min(l.Rejects, maxLinkCount),
+				min(l.Drops, maxLinkCount), min(l.Stalls, maxLinkCount), min(l.OnlineS, maxLinkCount), min(l.UnknownKeys, maxLinkCount),
+				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount)})
 		}
 
 		// Peaks: distinct users / devices per protocol in this snapshot.
@@ -327,7 +365,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			seenAt := touchAtByDevice[id]
 			touchWrites = append(touchWrites, fleetDeviceTouchWrite{DeviceID: id, LastSeenAt: seenAt, NotAfter: seenAt})
 		}
-		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, deviceWrites, certWrites, touchWrites, live)
+		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, deviceWrites, certWrites, touchWrites, linkRows, live)
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +379,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 
 func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets []fleetStatsBucketWrite,
 	hours []fleetStatsHourWrite, users []fleetStatsUserWrite, devices []fleetStatsDeviceWrite, certs []fleetInboundCertWrite,
-	touches []fleetDeviceTouchWrite, live FleetLive) ([]Stmt, error) {
+	touches []fleetDeviceTouchWrite, links [][]any, live FleetLive) ([]Stmt, error) {
 	bucketJSON, err := json.Marshal(buckets)
 	if err != nil {
 		return nil, err
@@ -363,6 +401,10 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 		return nil, err
 	}
 	touchStmt, err := deviceTouchStmt(touches)
+	if err != nil {
+		return nil, err
+	}
+	linkStmt, err := linkHourStmt(in.NodeID, in.HourStart, links)
 	if err != nil {
 		return nil, err
 	}
@@ -403,6 +445,7 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 			WHERE device.id = json_extract(change.value, '$.device_id')`, Args: []any{string(deviceJSON)}},
 		certStmt,
 		touchStmt,
+		linkStmt,
 		liveStmt,
 		commitSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now),
 	}, nil

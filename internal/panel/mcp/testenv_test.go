@@ -819,6 +819,45 @@ func (w *world) GetClientProbe(context.Context, *connect.Request[adminv1.GetClie
 	}), nil
 }
 
+// connWindow is the window the fake connection counters echo: since = now - hours (24 when empty), so a test sees what the tool sent.
+func connWindow(hours uint32) (since, now int64) {
+	if hours == 0 {
+		hours = 24
+	}
+	return 1700000000 - int64(min(hours, 48))*3600, 1700000000
+}
+
+// GetUserConnection: usr_alice has two rows (one profile name carries a token: the panel's text is cleaned like any other), and two
+// nodes, one of them one the panel no longer has, whose agents send no counters.
+func (w *world) GetUserConnection(_ context.Context, r *connect.Request[adminv1.GetUserConnectionRequest]) (*connect.Response[adminv1.GetUserConnectionResponse], error) {
+	if _, ok := w.users[r.Msg.GetUserId()]; !ok {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
+	}
+	since, now := connWindow(r.Msg.GetHours())
+	return connect.NewResponse(&adminv1.GetUserConnectionResponse{SinceUnix: since, NowUnix: now,
+		Rows: []*adminv1.DeviceConnection{
+			{DeviceId: "dev_phone", NodeId: nodeA, NodeName: "de1", InboundId: "inb_1", ProfileName: "Fast", Protocol: "hysteria2",
+				Connects: 4, Rejects: 1, Drops: 2, Stalls: 3, OnlineS: 7200, LastHourUnix: 1699999200},
+			{DeviceId: "dev_phone", NodeId: nodeA, NodeName: "de1", InboundId: "inb_2", ProfileName: "Home " + canaryTK, Protocol: "awg", Stalls: 6},
+		},
+		NodesWithoutCounters: []string{nodeB, "nod_gone"}}), nil
+}
+
+// GetNodeConnections: nodeA lists links/1 and has two inbounds, nodeB does not.
+func (w *world) GetNodeConnections(_ context.Context, r *connect.Request[adminv1.GetNodeConnectionsRequest]) (*connect.Response[adminv1.GetNodeConnectionsResponse], error) {
+	since, now := connWindow(r.Msg.GetHours())
+	out := &adminv1.GetNodeConnectionsResponse{SinceUnix: since, NowUnix: now}
+	if r.Msg.GetNodeId() == nodeA {
+		out.Supported = true
+		out.Inbounds = []*adminv1.InboundConnections{
+			{InboundId: "inb_1", ProfileId: "prf_1", ProfileName: "Fast", Protocol: "hysteria2", Connects: 40, Drops: 2, OnlineS: 9000,
+				UnknownKeys: 5, Hellos: 100, Handshakes: 20, KeysTried: 9},
+			{InboundId: "inb_2", ProfileId: "prf_2", ProfileName: "Home " + canaryTK, Protocol: "awg", Stalls: 12, KeysStalled: 4, KeysTried: 4},
+		}
+	}
+	return connect.NewResponse(out), nil
+}
+
 // api builds the fake admin API handler: the generated services behind fakeAuth.requireSession.
 func (w *world) api(a *fakeAuth) http.Handler {
 	mux := http.NewServeMux()

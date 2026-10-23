@@ -22,8 +22,9 @@ const (
 // guardedStats is a StatsBatch after the sanity checks.
 type guardedStats struct {
 	traffic  []store.FleetTraffic
-	rejected int    // deltas dropped
-	reason   string // why, for the event; "" when nothing was dropped
+	links    []store.FleetLink // connection counters, at most maxStatsDeltas rows
+	rejected int               // deltas dropped
+	reason   string            // why, for the event; "" when nothing was dropped
 }
 
 // guardStats checks the numbers of a batch before they reach used_bytes. A node is trusted with its own
@@ -44,12 +45,13 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	}
 	budget := satMul(rate, uint64(elapsed/time.Second))
 
+	links := f.guardLinks(st)
 	if len(st.Traffic) > maxStatsDeltas {
-		return guardedStats{rejected: len(st.Traffic), reason: "too_many_deltas"}
+		return guardedStats{links: links, rejected: len(st.Traffic), reason: "too_many_deltas"}
 	}
 	type key struct{ cred, inbound string }
 	at := map[key]int{}
-	var out guardedStats
+	out := guardedStats{links: links}
 	for _, d := range st.Traffic {
 		k := key{d.CredId, d.InboundId}
 		i, dup := at[k]
@@ -74,7 +76,24 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	}
 	out.traffic = kept
 	if total > budget {
-		return guardedStats{rejected: len(st.Traffic), reason: "batch_over_limit"}
+		return guardedStats{links: links, rejected: len(st.Traffic), reason: "batch_over_limit"}
+	}
+	return out
+}
+
+// guardLinks takes the connection counters of a batch (agent.proto LinkCounters). They are counts of events, not bytes, so no
+// budget applies; only the number of rows is bounded (the same cap as the traffic deltas) and the rest is dropped with a warning.
+// The store checks every row against the node's inbounds and the credentials it resolves.
+func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
+	rows := st.Links
+	if len(rows) > maxStatsDeltas {
+		f.log.Warn("connection counters over the row limit, the rest dropped", "rows", len(rows), "limit", maxStatsDeltas)
+		rows = rows[:maxStatsDeltas]
+	}
+	out := make([]store.FleetLink, 0, len(rows))
+	for _, l := range rows {
+		out = append(out, store.FleetLink{CredID: l.CredId, InboundID: l.InboundId, Connects: l.Connects, Rejects: l.Rejects,
+			Drops: l.Drops, Stalls: l.Stalls, OnlineS: l.OnlineS, UnknownKeys: l.UnknownKeys, Hellos: l.Hellos, Handshakes: l.Handshakes})
 	}
 	return out
 }

@@ -1206,6 +1206,104 @@ func klickReportsView(r *adminv1.GetClientProbeResponse, nodes []*adminv1.Node, 
 	return v
 }
 
+// UserConnectionV is the user_connection result: a person's connection counters per device, node and inbound over the window.
+type UserConnectionV struct {
+	SinceUnix            int64          `json:"since_unix"`
+	NowUnix              int64          `json:"now_unix"`
+	Rows                 []deviceConnV  `json:"rows"`
+	NodesWithoutCounters []nodeWithoutV `json:"nodes_without_counters"`
+	Truncated            bool           `json:"truncated,omitempty"`
+}
+
+type deviceConnV struct {
+	DeviceID     string `json:"device_id"`
+	NodeID       string `json:"node_id"`
+	NodeName     string `json:"node_name"`
+	InboundID    string `json:"inbound_id"`
+	Profile      string `json:"profile"`
+	Protocol     string `json:"protocol"`
+	Connects     uint32 `json:"connects"`
+	Rejects      uint32 `json:"rejects"`
+	Drops        uint32 `json:"drops"`
+	Stalls       uint32 `json:"stalls"`
+	OnlineS      uint64 `json:"online_s"`
+	LastHourUnix int64  `json:"last_hour_unix"`
+}
+
+type nodeWithoutV struct {
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name,omitempty"`
+}
+
+func (v *UserConnectionV) shrink() bool {
+	v.Truncated = true
+	return cut(&v.Rows)
+}
+
+// userConnectionView projects GetUserConnection; the nodes of nodes_without_counters get their names from the node list.
+func userConnectionView(r *adminv1.GetUserConnectionResponse, nodes []*adminv1.Node) *UserConnectionV {
+	v := &UserConnectionV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Rows: []deviceConnV{}, NodesWithoutCounters: []nodeWithoutV{}}
+	for _, d := range r.GetRows() {
+		v.Rows = append(v.Rows, deviceConnV{DeviceID: clean(d.GetDeviceId(), 80), NodeID: clean(d.GetNodeId(), 80), NodeName: nm(d.GetNodeName()),
+			InboundID: clean(d.GetInboundId(), 80), Profile: nm(d.GetProfileName()), Protocol: clean(d.GetProtocol(), 40),
+			Connects: d.GetConnects(), Rejects: d.GetRejects(), Drops: d.GetDrops(), Stalls: d.GetStalls(), OnlineS: d.GetOnlineS(),
+			LastHourUnix: d.GetLastHourUnix()})
+	}
+	names := map[string]string{}
+	for _, n := range nodes {
+		names[n.GetId()] = n.GetName()
+	}
+	for _, id := range r.GetNodesWithoutCounters() {
+		v.NodesWithoutCounters = append(v.NodesWithoutCounters, nodeWithoutV{NodeID: clean(id, 80), NodeName: nm(names[id])})
+	}
+	return v
+}
+
+// NodeConnectionsV is the node_connections result: a node's connection counters per inbound over the window.
+type NodeConnectionsV struct {
+	NodeID    string         `json:"node_id"`
+	NodeName  string         `json:"node_name"`
+	Supported bool           `json:"supported"`
+	SinceUnix int64          `json:"since_unix"`
+	NowUnix   int64          `json:"now_unix"`
+	Inbounds  []inboundConnV `json:"inbounds"`
+	Truncated bool           `json:"truncated,omitempty"`
+}
+
+type inboundConnV struct {
+	InboundID   string `json:"inbound_id"`
+	ProfileID   string `json:"profile_id"`
+	Profile     string `json:"profile"`
+	Protocol    string `json:"protocol"`
+	Connects    uint32 `json:"connects"`
+	Rejects     uint32 `json:"rejects"`
+	Drops       uint32 `json:"drops"`
+	Stalls      uint32 `json:"stalls"`
+	OnlineS     uint64 `json:"online_s"`
+	UnknownKeys uint32 `json:"unknown_keys"`
+	Hellos      uint32 `json:"hellos"`
+	Handshakes  uint32 `json:"handshakes"`
+	KeysStalled uint32 `json:"keys_stalled"`
+	KeysTried   uint32 `json:"keys_tried"`
+}
+
+func (v *NodeConnectionsV) shrink() bool {
+	v.Truncated = true
+	return cut(&v.Inbounds)
+}
+
+func nodeConnectionsView(r *adminv1.GetNodeConnectionsResponse, id, name string) *NodeConnectionsV {
+	v := &NodeConnectionsV{NodeID: clean(id, 80), NodeName: nm(name), Supported: r.GetSupported(), SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(),
+		Inbounds: []inboundConnV{}}
+	for _, i := range r.GetInbounds() {
+		v.Inbounds = append(v.Inbounds, inboundConnV{InboundID: clean(i.GetInboundId(), 80), ProfileID: clean(i.GetProfileId(), 80),
+			Profile: nm(i.GetProfileName()), Protocol: clean(i.GetProtocol(), 40), Connects: i.GetConnects(), Rejects: i.GetRejects(),
+			Drops: i.GetDrops(), Stalls: i.GetStalls(), OnlineS: i.GetOnlineS(), UnknownKeys: i.GetUnknownKeys(), Hellos: i.GetHellos(),
+			Handshakes: i.GetHandshakes(), KeysStalled: i.GetKeysStalled(), KeysTried: i.GetKeysTried()})
+	}
+	return v
+}
+
 // ChecksV is the checks_results result: the node x profile matrix, one cell per column in the order of columns.
 // All times are measured on the panel's server, not on a person's device.
 type ChecksV struct {

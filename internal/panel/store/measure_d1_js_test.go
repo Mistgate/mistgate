@@ -186,7 +186,7 @@ func TestD1BatchShapes(t *testing.T) {
 		got  d1Shape
 		want []int
 	}{
-		"NodeHello": {hello, []int{5}}, "IngestStats": {stats, []int{4, 9}}, "NodeApplied": {applied, []int{3}}, "RenewCert": {renew, []int{4}},
+		"NodeHello": {hello, []int{5}}, "IngestStats": {stats, []int{4, 10}}, "NodeApplied": {applied, []int{3}}, "RenewCert": {renew, []int{4}},
 	} {
 		if fmt.Sprint(c.got.BatchSizes) != fmt.Sprint(c.want) {
 			t.Errorf("%s batches = %v, want %v", name, c.got.BatchSizes, c.want)
@@ -286,6 +286,9 @@ func TestD1IngestStatsAtEdgeCap(t *testing.T) {
 	in := f.statsIn(users, sessions, live)
 	for i := range in.Traffic {
 		in.Traffic[i].Up, in.Traffic[i].Down = 123_456_789, 987_654_321
+		// a counter row per key at the clamp (7 digits each, the longest a row gets; the guard admits as many rows as deltas)
+		in.Links = append(in.Links, FleetLink{CredID: in.Traffic[i].CredID, InboundID: in.Traffic[i].InboundID, Connects: 1 << 30, Rejects: 1 << 30,
+			Drops: 1 << 30, Stalls: 1 << 30, OnlineS: 1 << 30, UnknownKeys: 1 << 30, Hellos: 1 << 30, Handshakes: 1 << 30})
 	}
 	before := memSys()
 	var err error

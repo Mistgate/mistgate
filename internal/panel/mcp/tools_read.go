@@ -121,6 +121,19 @@ type checksArg struct {
 	Node string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every node"`
 }
 
+type userConnectionArg struct {
+	UserID string `json:"user_id"`
+	Hours  int    `json:"hours,omitempty" jsonschema:"window in hours back from now, 1 to 48; empty = 24"`
+}
+
+type nodeConnectionsArg struct {
+	Node  string `json:"node" jsonschema:"node id or exact name"`
+	Hours int    `json:"hours,omitempty" jsonschema:"window in hours back from now, 1 to 48; empty = 24"`
+}
+
+// linkHours is the window argument as the RPCs take it (0 = their default; they cut the rest to 48).
+func linkHours(h int) uint32 { return uint32(min(max(h, 0), 48)) }
+
 type auditArg struct {
 	Source   string `json:"source,omitempty" jsonschema:"panel, bot, mcp or api"`
 	Actor    string `json:"actor,omitempty" jsonschema:"keep entries whose actor id or name contains this (applied to the fetched page)"`
@@ -371,6 +384,37 @@ func readTools() []toolDef {
 					return nil, apiError(err)
 				}
 				return klickReportsView(r.Msg, nodes.Msg.GetNodes(), want), nil
+			}),
+
+		readTool("user_connection", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.UserServiceGetUserConnectionProcedure),
+			"What the nodes saw of one person's connections over the last hours (24 by default, up to 48), per device, node and inbound: connects (accepted connections), rejects (the key is known but refused: its term ended or it was removed), drops (accepted, then frozen or cut almost at once), stalls (a handshake was started and never completed: packets reach the node and the answer does not reach the client), online_s (seconds online) and last_hour_unix (start of the newest hour with a counter). Only rows with a counter; counts only, no address and no time of a single connection. nodes_without_counters names the nodes the person can use whose agent is too old to send counters: nothing from them is in rows, so an empty rows list does not mean the person did not try. What an engine cannot know stays zero (AmneziaWG sees no rejects or drops).",
+			func(c *call, in userConnectionArg) (any, error) {
+				if err := validID("user_id", in.UserID); err != nil {
+					return nil, err
+				}
+				nodes, err := c.cl.Node.ListNodes(c.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))
+				if err != nil {
+					return nil, apiError(err)
+				}
+				r, err := c.cl.User.GetUserConnection(c.ctx, connect.NewRequest(&adminv1.GetUserConnectionRequest{UserId: in.UserID, Hours: linkHours(in.Hours)}))
+				if err != nil {
+					return nil, apiError(err)
+				}
+				return userConnectionView(r.Msg, nodes.Msg.GetNodes()), nil
+			}),
+
+		readTool("node_connections", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeConnectionsProcedure),
+			"What a node saw of connection attempts over the last hours (24 by default, up to 48), per inbound, all its keys together: connects, rejects (a known key that is refused), drops (accepted, then frozen or cut almost at once), stalls (handshakes started and never completed), online_s, unknown_keys (attempts with a key the node does not know), hellos and handshakes (handshakes started, and those that reached authentication: hellos well above handshakes means the handshake is cut on the way, for example by a DPI box), keys_stalled and keys_tried (keys with a stall, and keys that tried at all). supported false: the node's agent does not send connection counters, so inbounds is empty. Counts only, no address. What an engine cannot know stays zero.",
+			func(c *call, in nodeConnectionsArg) (any, error) {
+				id, name, err := c.nodeRef(in.Node)
+				if err != nil {
+					return nil, err
+				}
+				r, err := c.cl.Node.GetNodeConnections(c.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: id, Hours: linkHours(in.Hours)}))
+				if err != nil {
+					return nil, apiError(err)
+				}
+				return nodeConnectionsView(r.Msg, id, name), nil
 			}),
 
 		readTool("audit_search", ProfileAdmin, procs(adminv1connect.AuthServiceListAuditProcedure),
