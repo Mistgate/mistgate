@@ -3,21 +3,20 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.53`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.54`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.53
+  meta: v0.1.0 – v0.1.54
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.53
+      release: v0.1.54
       current: true
       points:
-        - "**连接计数。** 节点现在按密钥统计连接尝试的情况：连接次数、连接后立即断开（TSPU 冻结就是这样）、被拒绝的密钥、始终未完成的握手、在线时长和未知密钥。用户页面按设备显示最近 24 小时的数据，节点的协议配置页在每个协议配置下方显示。支持 Hysteria2 和 AmneziaWG；只有计数，没有地址；保留 48 小时。请更新节点 Agent 以开始统计。参见[节点](../guide/nodes.md#协议配置)。"
-        - "**MCP：`node_connections` 和 `user_connection`**，为使用任意配置文件令牌的 AI 智能体提供相同的计数。参见 [MCP](../reference/mcp.md)。"
+        - "**连接计数不再包含面板自身的检查。** 节点协议配置下方的握手数不再包含面板的客户端视角检测，因此无人使用的协议配置不会显示握手。只需更新面板，无需更新 Agent。参见[节点](../guide/nodes.md#协议配置)。"
     - title: 协议配置
       section: profiles
       points:
@@ -50,6 +49,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.53`�
       section: health
       points:
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
+        - "来自节点的[连接计数](../guide/nodes.md#协议配置)：连接次数、连接后立即断开、被拒绝的密钥、未完成的握手、在线时长和未知密钥，在用户页面按设备显示，在节点上按协议配置显示。支持 Hysteria2 和 AmneziaWG；只有计数，保留 48 小时。"
         - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
         - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点、比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
@@ -77,7 +77,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.53`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.53
+  meta: v0.1.34 – v0.1.54
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
