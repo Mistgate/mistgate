@@ -704,6 +704,54 @@ func TestEndHeldSessionWritesWhatIsQueued(t *testing.T) {
 	}
 }
 
+// stuckTransport is a stream the panel stopped reading: Send blocks until the session is cancelled.
+type stuckTransport struct {
+	ctx context.Context
+	s   *session
+}
+
+func (t *stuckTransport) Context() context.Context { return t.ctx }
+func (t *stuckTransport) Send(*agentv1.ConnectRequest) error {
+	<-t.ctx.Done()
+	return t.ctx.Err()
+}
+func (t *stuckTransport) Receive() (*agentv1.ConnectResponse, error) {
+	<-t.ctx.Done()
+	return nil, t.ctx.Err()
+}
+func (t *stuckTransport) CloseSend() error { close(t.s.recv); return nil }
+func (t *stuckTransport) Close() error     { return nil }
+
+// A held session still ends when its writer is stuck in Send with the queue full: the flush and the drain wait for that
+// writer, and only the cancel frees it, so the cancel must not wait for them for longer than their bound.
+func TestEndHeldSessionEndsWhenTheWriterIsStuck(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a := &Agent{log: slog.New(slog.NewTextHandler(&lockedLogBuffer{}, nil)), linkBusyWait: time.Millisecond, heldFlush: 20 * time.Millisecond}
+	tr := &stuckTransport{ctx: ctx}
+	s := &session{a: a, ctx: ctx, cancel: cancel, stream: tr, ctl: make(chan ctlMsg, 1), wake: make(chan struct{}, 1), recv: make(chan struct{})}
+	tr.s = s
+	go s.writer()
+	s.send(cmdResult(&agentv1.CommandResult{RequestId: "one"})) // the writer takes it and blocks in Send
+	eventually(t, func() bool { return len(s.ctl) == 0 }, "the writer took the first answer")
+	s.send(cmdResult(&agentv1.CommandResult{RequestId: "two"})) // fills the queue: the flush marker cannot be queued
+
+	var expired atomic.Bool
+	ended := make(chan struct{})
+	go func() {
+		a.endHeldSession(s, time.Millisecond, &expired)
+		close(ended)
+	}()
+	select {
+	case <-ended:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the held session never ended: its cancel waited for a writer stuck in Send")
+	}
+	if !expired.Load() || ctx.Err() == nil {
+		t.Fatalf("the session was not ended: expired=%v ctx=%v", expired.Load(), ctx.Err())
+	}
+}
+
 // A session that lived long resets the reconnect delay even when the loop goes on without waiting (here: the end of a
 // held session), so the next real failure waits the minimum, not what an earlier outage had grown the delay to.
 func TestAgentLongHeldSessionResetsBackoffDelay(t *testing.T) {

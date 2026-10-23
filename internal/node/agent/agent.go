@@ -197,6 +197,7 @@ type Agent struct {
 	commitSettle time.Duration // connected this long before a new build may commit, default 10 s
 	linkHoldFor  time.Duration // 0 = defaultLinkHold: how long the link is left alone after a failed attempt
 	linkBusyWait time.Duration // 0 = linkBusyRecheck: how long the end of a held session is put off while it has work in flight
+	heldFlush    time.Duration // 0 = heldFlushWait: how long the end of a held session waits for each of its flush and drain
 	resetAfter   time.Duration // 0 = 1 min: a session that lived this long resets the reconnect delay
 
 	linkPingEvery   time.Duration // 0 = NodeSettings.keepalive_interval_s (20 s): how often the link is pinged
@@ -270,9 +271,23 @@ func (a *Agent) endHeldSession(s *session, wait time.Duration, expired *atomic.B
 		a.log.Info("agent link hold over; retrying the link")
 		expired.Store(true)
 		// The last operation's answer is queued by the operation as it ends, which is what made the session idle: it
-		// has to be written, and to leave the transport, before the context is cancelled.
-		s.flush(heldFlushWait)
-		s.drain(heldFlushWait)
+		// has to be written, and to leave the transport, before the context is cancelled. A writer stuck in Send (the panel
+		// stopped reading) holds the queue and the send lock, so the cancel comes after both waits at most, written or not:
+		// it is also what unblocks that writer.
+		wait := a.heldFlush
+		if wait == 0 {
+			wait = heldFlushWait
+		}
+		ended := make(chan struct{})
+		go func() {
+			defer close(ended)
+			s.flush(wait)
+			s.drain(wait)
+		}()
+		select {
+		case <-ended:
+		case <-time.After(2 * wait):
+		}
 		s.cancel()
 		return
 	}
