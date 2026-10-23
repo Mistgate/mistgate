@@ -1463,7 +1463,8 @@ type LinkCounters struct {
 	InboundId string `protobuf:"bytes,2,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
 	// Connections that were accepted (a new session).
 	Connects uint32 `protobuf:"varint,3,opt,name=connects,proto3" json:"connects,omitempty"`
-	// The key is known to the node but refused: its term ended or it was removed.
+	// The key is known to the node but refused: its term ended. A key the node no longer holds (removed, rotated, its person
+	// disabled) is unknown to it and counts in the inbound row's unknown_keys.
 	Rejects uint32 `protobuf:"varint,4,opt,name=rejects,proto3" json:"rejects,omitempty"`
 	// Accepted, then frozen or cut almost at once.
 	Drops uint32 `protobuf:"varint,5,opt,name=drops,proto3" json:"drops,omitempty"`

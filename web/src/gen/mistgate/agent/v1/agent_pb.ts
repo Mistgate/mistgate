@@ -594,7 +594,8 @@ export type LinkCounters = Message<"mistgate.agent.v1.LinkCounters"> & {
   connects: number;
 
   /**
-   * The key is known to the node but refused: its term ended or it was removed.
+   * The key is known to the node but refused: its term ended. A key the node no longer holds (removed, rotated, its person
+   * disabled) is unknown to it and counts in the inbound row's unknown_keys.
    *
    * @generated from field: uint32 rejects = 4;
    */

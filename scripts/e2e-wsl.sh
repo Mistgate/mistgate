@@ -1178,6 +1178,21 @@ wait_for 40 "a new client to work after enabling" try_again || die "after re-ena
 pass "re-enabled user: a fresh client connects and downloads again (after $(($(date +%s) - T_ON)) s)"
 stop_pid "$AGAIN_CLIENT"
 
+# ================================================================ 6b. connection counters (agent links/1)
+step "6b. connection counters: the node counted the connections and the refused key"
+node_conn() { api NodeService/GetNodeConnections "{\"nodeId\":\"$NODE_ID\",\"hours\":1}"; }
+h2_sum() { node_conn | jq -r --arg f "$1" '[.inbounds[]? | select(.protocol == "hysteria2") | (.[$f] // 0 | tonumber)] | add // 0'; }
+counts_in() { [ "$(h2_sum connects)" -ge 2 ] && [ "$(h2_sum unknownKeys)" -ge 1 ]; }
+node_conn | jq -e '.supported == true' >/dev/null || die "GetNodeConnections: the agent does not report links/1"
+wait_for 40 "Hysteria2 connects >= 2 and unknown keys >= 1" counts_in \
+  || die "GetNodeConnections: connects $(h2_sum connects), unknownKeys $(h2_sum unknownKeys) (want >= 2 and >= 1)"
+USER_CONN=$(api UserService/GetUserConnection "{\"userId\":\"$USER_ID\",\"hours\":1}")
+jq -e '[.rows[]? | select(.protocol == "hysteria2") | (.connects // 0 | tonumber)] | add // 0 | . >= 1' <<<"$USER_CONN" >/dev/null \
+  || die "GetUserConnection: no Hysteria2 connects for the user"
+jq -e '(.nodesWithoutCounters // []) | length == 0' <<<"$USER_CONN" >/dev/null || die "GetUserConnection: the node is listed as not counting"
+grep -Eq '"(remote|addr|ip)"' <<<"$(node_conn)$USER_CONN" && die "a connection counter answer carries an address field"
+pass "connection counters: Hysteria2 connects $(h2_sum connects), unknown keys $(h2_sum unknownKeys) (the disabled user's attempt), the user's own rows, no address"
+
 # ================================================================ 7. masquerade
 step "7. masquerade: HTTPS on TCP and HTTP/3 on the QUIC port show the decoy"
 if [ -n "$TCP_MASQ" ]; then

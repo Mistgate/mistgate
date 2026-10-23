@@ -653,7 +653,8 @@ message LinkCounters {
   string inbound_id = 2;
   // Connections that were accepted (a new session).
   uint32 connects = 3;
-  // The key is known to the node but refused: its term ended or it was removed.
+  // The key is known to the node but refused: its term ended. A key the node no longer holds (removed, rotated, its person
+  // disabled) is unknown to it and counts in the inbound row's unknown_keys.
   uint32 rejects = 4;
   // Accepted, then frozen or cut almost at once.
   uint32 drops = 5;

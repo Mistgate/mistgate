@@ -1237,7 +1237,7 @@ type nodeWithoutV struct {
 
 func (v *UserConnectionV) shrink() bool {
 	v.Truncated = true
-	return cut(&v.Rows)
+	return cut(&v.Rows) || cut(&v.NodesWithoutCounters)
 }
 
 // userConnectionView projects GetUserConnection; the nodes of nodes_without_counters get their names from the node list.
