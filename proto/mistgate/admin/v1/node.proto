@@ -449,6 +449,8 @@ message InboundConnections {
   uint32 stalls = 8;
   uint64 online_s = 9 [jstype = JS_NUMBER];
   uint32 unknown_keys = 10;
+  // Hysteria2: handshakes started and those that reached authentication, without the panel's own synthetic checks (the health
+  // probe key's handshakes are taken off; at the window's edges by a check or two).
   uint32 hellos = 11;
   uint32 handshakes = 12;
   // Keys that had a stall, and keys that tried at all (a connect or a stall), in the window.

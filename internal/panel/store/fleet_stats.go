@@ -230,8 +230,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			}
 		}
 
-		// Connection counters: the same filter as the traffic (the key resolves and is of the inbound's protocol, probe keys are
-		// ignored), and a row of the inbound itself (cred "") only for an inbound of this node.
+		// Connection counters: the same filter as the traffic (the key resolves and is of the inbound's protocol), and a row of the
+		// inbound itself (cred "") only for an inbound of this node. A probe key's row is not stored: its connects and rejects (one
+		// per handshake that reached authentication) go to the inbound row as probe_handshakes, which the reads take off the
+		// inbound's hellos and handshakes (migration 00077).
 		linkRows := make([][]any, 0, len(in.Links))
 		for _, l := range in.Links {
 			if l.zero() {
@@ -247,6 +249,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				ref, ok := creds[l.CredID]
 				if !ok && probes[l.CredID] {
 					out.Probe++
+					if _, on := onNode[l.InboundID]; on && l.Connects|l.Rejects != 0 {
+						probe := min(uint64(l.Connects)+uint64(l.Rejects), maxLinkCount)
+						linkRows = append(linkRows, []any{"", l.InboundID, "", 0, 0, 0, 0, 0, 0, 0, 0, probe})
+					}
 					continue
 				}
 				if !ok || onNode[l.InboundID] != ref.Protocol {
@@ -257,7 +263,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			}
 			linkRows = append(linkRows, []any{l.CredID, l.InboundID, user, min(l.Connects, maxLinkCount), min(l.Rejects, maxLinkCount),
 				min(l.Drops, maxLinkCount), min(l.Stalls, maxLinkCount), min(l.OnlineS, maxLinkCount), min(l.UnknownKeys, maxLinkCount),
-				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount)})
+				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount), 0})
 		}
 
 		// Peaks: distinct users / devices per protocol in this snapshot.

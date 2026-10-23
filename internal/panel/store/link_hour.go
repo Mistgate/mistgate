@@ -25,7 +25,8 @@ func (l FleetLink) zero() bool {
 }
 
 // linkHourStmt adds the rows to the hour's bucket in one statement. The rows go as one JSON argument of positional arrays
-// ([cred, inbound, user, connects, rejects, drops, stalls, online_s, unknown_keys, hellos, handshakes]): D1 binds at most 100 values.
+// ([cred, inbound, user, connects, rejects, drops, stalls, online_s, unknown_keys, hellos, handshakes, probe_handshakes]): D1 binds at
+// most 100 values.
 // With no rows it still runs (an empty array), so the batch has the same shape on every call.
 func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
 	if rows == nil {
@@ -37,19 +38,20 @@ func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
 	}
 	return Stmt{Query: `
 		INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, connects, rejects, drops, stalls, online_s,
-			unknown_keys, hellos, handshakes)
+			unknown_keys, hellos, handshakes, probe_handshakes)
 		SELECT ?2, ?3, json_extract(l.value, '$[1]'), json_extract(l.value, '$[0]'), json_extract(l.value, '$[2]'),
 			CAST(json_extract(l.value, '$[3]') AS INTEGER), CAST(json_extract(l.value, '$[4]') AS INTEGER),
 			CAST(json_extract(l.value, '$[5]') AS INTEGER), CAST(json_extract(l.value, '$[6]') AS INTEGER),
 			CAST(json_extract(l.value, '$[7]') AS INTEGER), CAST(json_extract(l.value, '$[8]') AS INTEGER),
-			CAST(json_extract(l.value, '$[9]') AS INTEGER), CAST(json_extract(l.value, '$[10]') AS INTEGER)
+			CAST(json_extract(l.value, '$[9]') AS INTEGER), CAST(json_extract(l.value, '$[10]') AS INTEGER),
+			CAST(json_extract(l.value, '$[11]') AS INTEGER)
 		FROM json_each(?1) AS l
 		WHERE 1
 		ON CONFLICT (node_id, hour_start, inbound_id, cred_id) DO UPDATE SET
 			connects = connects + excluded.connects, rejects = rejects + excluded.rejects, drops = drops + excluded.drops,
 			stalls = stalls + excluded.stalls, online_s = online_s + excluded.online_s,
 			unknown_keys = unknown_keys + excluded.unknown_keys, hellos = hellos + excluded.hellos,
-			handshakes = handshakes + excluded.handshakes`,
+			handshakes = handshakes + excluded.handshakes, probe_handshakes = probe_handshakes + excluded.probe_handshakes`,
 		Args: []any{string(encoded), nodeID, hourStart}}, nil
 }
 
@@ -76,14 +78,17 @@ type LinkInboundSums struct {
 }
 
 // NodeLinkSums reads the counters of a node's inbounds over the hour buckets that touch [since, now], one row per inbound that
-// has any. It is one read (a per-key subquery folds the keys).
+// has any. It is one read (a per-key subquery folds the keys). The handshakes of the panel's own checks (probe_handshakes) are
+// taken off hellos and handshakes; the agent flushes those every 10 minutes and the probe's connects at once, so the window's
+// edges may be off by a check or two, and the difference stops at zero.
 func (s *Store) NodeLinkSums(ctx context.Context, nodeID string, since time.Time) ([]LinkInboundSums, error) {
 	rows, err := s.R.QueryContext(ctx, `
-		SELECT inbound_id, SUM(connects), SUM(rejects), SUM(drops), SUM(stalls), SUM(online_s), SUM(unknown_keys), SUM(hellos),
-			SUM(handshakes), SUM(cred_id <> '' AND stalls > 0), SUM(cred_id <> '' AND connects + stalls > 0)
+		SELECT inbound_id, SUM(connects), SUM(rejects), SUM(drops), SUM(stalls), SUM(online_s), SUM(unknown_keys),
+			MAX(0, SUM(hellos) - SUM(probe)), MAX(0, SUM(handshakes) - SUM(probe)),
+			SUM(cred_id <> '' AND stalls > 0), SUM(cred_id <> '' AND connects + stalls > 0)
 		FROM (SELECT inbound_id, cred_id, SUM(connects) AS connects, SUM(rejects) AS rejects, SUM(drops) AS drops,
 				SUM(stalls) AS stalls, SUM(online_s) AS online_s, SUM(unknown_keys) AS unknown_keys, SUM(hellos) AS hellos,
-				SUM(handshakes) AS handshakes
+				SUM(handshakes) AS handshakes, SUM(probe_handshakes) AS probe
 			FROM link_hour WHERE node_id = ? AND hour_start >= ? GROUP BY inbound_id, cred_id)
 		GROUP BY inbound_id ORDER BY inbound_id`, nodeID, linkHourOf(since))
 	if err != nil {

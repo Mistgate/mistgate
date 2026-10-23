@@ -2758,8 +2758,10 @@ type InboundConnections struct {
 	Stalls      uint32                 `protobuf:"varint,8,opt,name=stalls,proto3" json:"stalls,omitempty"`
 	OnlineS     uint64                 `protobuf:"varint,9,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
 	UnknownKeys uint32                 `protobuf:"varint,10,opt,name=unknown_keys,json=unknownKeys,proto3" json:"unknown_keys,omitempty"`
-	Hellos      uint32                 `protobuf:"varint,11,opt,name=hellos,proto3" json:"hellos,omitempty"`
-	Handshakes  uint32                 `protobuf:"varint,12,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	// Hysteria2: handshakes started and those that reached authentication, without the panel's own synthetic checks (the health
+	// probe key's handshakes are taken off; at the window's edges by a check or two).
+	Hellos     uint32 `protobuf:"varint,11,opt,name=hellos,proto3" json:"hellos,omitempty"`
+	Handshakes uint32 `protobuf:"varint,12,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
 	// Keys that had a stall, and keys that tried at all (a connect or a stall), in the window.
 	KeysStalled   uint32 `protobuf:"varint,13,opt,name=keys_stalled,json=keysStalled,proto3" json:"keys_stalled,omitempty"`
 	KeysTried     uint32 `protobuf:"varint,14,opt,name=keys_tried,json=keysTried,proto3" json:"keys_tried,omitempty"`

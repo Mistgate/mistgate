@@ -1438,6 +1438,9 @@ export type InboundConnections = Message<"mistgate.admin.v1.InboundConnections">
   unknownKeys: number;
 
   /**
+   * Hysteria2: handshakes started and those that reached authentication, without the panel's own synthetic checks (the health
+   * probe key's handshakes are taken off; at the window's edges by a check or two).
+   *
    * @generated from field: uint32 hellos = 11;
    */
   hellos: number;
