@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -96,8 +95,8 @@ func set(words ...string) map[string]bool {
 }
 
 // Parse reads and checks a report body: one JSON object of version 1 with no unknown field, every value in its range and
-// every word one the contract knows. Text is trimmed and the country upper-cased; host and type lower-cased. The error names
-// the first field that is wrong (it carries no value from the body).
+// every word one the contract knows. The operator and region become plain text (see plain), the country is upper-cased, host
+// and type lower-cased. The error names the first field that is wrong (it carries no value from the body).
 func Parse(body []byte) (Report, error) {
 	var r Report
 	dec := json.NewDecoder(bytes.NewReader(body))
@@ -116,12 +115,8 @@ func (r *Report) check() error {
 		return errors.New("v")
 	}
 	n := &r.Network
-	n.Operator, n.Region, n.Country = strings.TrimSpace(n.Operator), strings.TrimSpace(n.Region), strings.ToUpper(strings.TrimSpace(n.Country))
+	n.Operator, n.Region, n.Country = plain(n.Operator), plain(n.Region), strings.ToUpper(strings.TrimSpace(n.Country))
 	switch {
-	case !text(n.Operator):
-		return errors.New("network.operator")
-	case !text(n.Region):
-		return errors.New("network.region")
 	case n.Country != "" && !(len(n.Country) == 2 && 'A' <= n.Country[0] && n.Country[0] <= 'Z' && 'A' <= n.Country[1] && n.Country[1] <= 'Z'):
 		return errors.New("network.country")
 	case n.Type != "" && !networkTypes[n.Type]:
@@ -165,17 +160,34 @@ func (s *Server) check() string {
 	return ""
 }
 
-// text is free text of the network: short, no control characters or line breaks.
-func text(s string) bool {
-	if !utf8.ValidString(s) || utf8.RuneCountInString(s) > maxText {
-		return false
-	}
+// plain is free text of the network as it is stored: letters of any script, digits, single spaces and . , - ' ( ) & / + "
+// only, cut to maxText characters. Anything else goes (control and format characters, ':', '@', brackets, markup), so no
+// link, address, markup or code reaches the admins and the AI agents that read the names (MCP klick_reports), and a report
+// is not refused for an odd character in its operator's name.
+func plain(s string) string {
+	var b strings.Builder
+	n, space := 0, false
 	for _, c := range s {
-		if !unicode.IsGraphic(c) {
-			return false
+		switch {
+		case n == maxText:
+			return b.String()
+		case unicode.IsSpace(c):
+			space = n > 0
+			continue
+		case !unicode.IsLetter(c) && !unicode.IsMark(c) && !unicode.IsDigit(c) && !strings.ContainsRune(".,-'()&/+\"", c):
+			continue
 		}
+		if space {
+			if n+1 == maxText {
+				break
+			}
+			b.WriteByte(' ')
+			n, space = n+1, false
+		}
+		b.WriteRune(c)
+		n++
 	}
-	return true
+	return b.String()
 }
 
 // word is a protocol type: lower-case letters, digits and dashes.

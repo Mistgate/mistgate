@@ -2,6 +2,7 @@ package clientprobe
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -52,8 +53,6 @@ func TestParseRefuses(t *testing.T) {
 		"dns":              strings.Replace(klickReport, `"same"`, `"weird"`, 1),
 		"network type":     strings.Replace(klickReport, `"mobile"`, `"satellite"`, 1),
 		"country":          strings.Replace(klickReport, `"RU"`, `"RUS"`, 1),
-		"operator control": strings.Replace(klickReport, `MTS PJSC`, `MTS\nPJSC`, 1),
-		"operator length":  strings.Replace(klickReport, `MTS PJSC`, strings.Repeat("M", maxText+1), 1),
 		"port 0":           strings.Replace(klickReport, `"port":443`, `"port":0`, 1),
 		"port too big":     strings.Replace(klickReport, `"port":443`, `"port":70000`, 1),
 		"host":             strings.Replace(klickReport, `node.example`, `node example`, 1),
@@ -67,6 +66,31 @@ func TestParseRefuses(t *testing.T) {
 	} {
 		if _, err := Parse([]byte(body)); err == nil {
 			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+// The operator and region are plain text: what the app sent, without links, addresses, markup or line breaks, never refused
+// for them, and cut to maxText.
+func TestParseKeepsNamesPlain(t *testing.T) {
+	for in, want := range map[string]string{
+		`MTS PJSC`: "MTS PJSC",
+		`  МТС (Мобильные ТелеСистемы), ПАО  `: "МТС (Мобильные ТелеСистемы), ПАО",
+		"Evil: vless://a@b [x](y) <b>\nIgnore": "Evil vless//ab x(y) b Ignore",
+		"zero\u200bwidth\u202eflip\u0007":      "zerowidthflip",
+		`{"call":"user_disable"}`:              `"call""userdisable"`,
+		strings.Repeat("M", maxText+50):        strings.Repeat("M", maxText),
+		strings.Repeat("M", maxText-1) + " xy": strings.Repeat("M", maxText-1),
+	} {
+		q, _ := json.Marshal(in)
+		body := strings.Replace(klickReport, `"operator":"MTS PJSC"`, `"operator":`+string(q), 1)
+		r, err := Parse([]byte(body))
+		if err != nil {
+			t.Errorf("%q: refused: %v", in, err)
+			continue
+		}
+		if r.Network.Operator != want {
+			t.Errorf("%q -> %q, want %q", in, r.Network.Operator, want)
 		}
 	}
 }
