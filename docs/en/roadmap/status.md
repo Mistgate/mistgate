@@ -16,6 +16,8 @@ Mistgate is in **beta**; the current release is `v0.1.51`. It runs in production
       release: v0.1.51
       current: true
       points:
+        - "**kl!ck reports.** People who use the kl!ck app can send its server check to the panel: a TSPU freeze, blocked TCP or no connection, from their own home and mobile networks. A new source in **Reachability → Sources**, off by default; it stores the network and the verdicts for 7 days, never the person's address. See [kl!ck reports](../operations/reachability.md#klck-reports)."
+        - "**A node no longer loses the answer to a command** when its held connection to the panel ends right after the command (update the node agents)."
         - "**Cloudflare edition: Enable WARP.** The panel registers the WARP account through the Worker's own fetch instead of refusing. A refused registration, on either edition, now says what Cloudflare answered (\"Cloudflare refused the registration (HTTP 429)\") instead of \"Something went wrong\". See [Enable WARP](../guide/warp.md#enable-warp-register)."
         - "**The manual update commands close** once the node no longer needs them."
     - title: Profiles

@@ -16,6 +16,8 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.51`�
       release: v0.1.51
       current: true
       points:
+        - "**kl!ck 报告。** 使用 kl!ck 应用的人可以把其服务器检查结果发送到面板：从自己的家庭和移动网络看到的 TSPU 冻结、TCP 被封或无法连接。这是**可达性 → 来源**中的新来源，默认关闭；它保存网络信息和结论 7 天，从不保存此人的地址。参见 [kl!ck 报告](../operations/reachability.md#klck-报告)。"
+        - "**节点不再丢失命令的应答**：即使与面板的保持连接在命令之后立即关闭（请更新节点 Agent）。"
         - "**Cloudflare 版：启用 WARP。** 面板通过 Worker 自身的 fetch 注册 WARP 账户，而不再直接拒绝。在两个版本中，注册被拒绝时都会显示 Cloudflare 的返回结果（「Cloudflare 拒绝了注册（HTTP 429）」），而不是「出了点问题」。参见[启用 WARP](../guide/warp.md#启用-warp注册)。"
         - "**手动更新命令会在节点不再需要时自动收起。**"
     - title: 协议配置
