@@ -22,7 +22,7 @@ import (
 
 // ProbeStore keeps the reports of the kl!ck probe (clientprobe); *store.Store implements it.
 type ProbeStore interface {
-	InsertClientProbeReport(ctx context.Context, report string, at time.Time, n store.ClientProbeNetwork, rows []store.ClientProbeResult) error
+	InsertClientProbeReport(ctx context.Context, report string, at time.Time, n store.ClientProbeNetwork, rows []store.ClientProbeResult) (int64, error)
 }
 
 // probeBucket is one report per subscription in clientprobe.Every; a second right away is let through, for an app that sent
@@ -94,9 +94,14 @@ func (h *handler) serveProbe(w http.ResponseWriter, r *http.Request, token, clie
 		return
 	}
 	rows := clientprobe.Results(rep, serversOf(v))
-	if err := h.cfg.ProbeReports.InsertClientProbeReport(ctx, clientprobe.NewID(), now, clientprobe.NetworkOf(rep), rows); err != nil {
+	stored, err := h.cfg.ProbeReports.InsertClientProbeReport(ctx, clientprobe.NewID(), now, clientprobe.NetworkOf(rep), rows)
+	if err != nil {
 		h.cfg.Log.Error("store a kl!ck report", "err", err) // no token, no address
 		jsonError(w, http.StatusInternalServerError, "internal", "")
+		return
+	}
+	if stored == 0 && len(rows) > 0 { // switched off since the check above (the cache is a minute old at most)
+		jsonError(w, http.StatusForbidden, "probe_off", "")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"accepted": len(rows)})

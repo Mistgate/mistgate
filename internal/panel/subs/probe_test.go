@@ -182,6 +182,22 @@ func TestProbeReportAccepted(t *testing.T) {
 	if err != nil || len(counts) != 1 || counts[0].Reports != 1 || counts[0].Freeze != 1 || counts[0].OK != 0 || counts[0].Operator != "MTS PJSC" {
 		t.Errorf("counts %+v (%v): one report, one freeze, not ok", counts, err)
 	}
+
+	// Disconnect in another process while this one still has the switch on in its cache: the statement itself refuses the
+	// rows, and the app hears probe_off rather than "accepted"
+	if err := r.st.SetSettings(r.ctx, map[string]string{store.SettingClientProbe: "0"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.st.DeleteClientProbeReports(r.ctx); err != nil {
+		t.Fatal(err)
+	}
+	_, tok2 := r.newUser("carol", nil)
+	if rec := r.post(tok2, "application/json", report(servers, "ok")); rec.Code != 403 || !strings.Contains(rec.Body.String(), `"probe_off"`) {
+		t.Errorf("switched off behind the cache: %d %q", rec.Code, rec.Body.String())
+	}
+	if n, _, err := r.st.ClientProbeTotals(r.ctx, time.Time{}); err != nil || n != 0 {
+		t.Errorf("%d reports stored after Disconnect (%v)", n, err)
+	}
 }
 
 // assertNoAddress looks through every text of every table: the address a report came from is stored nowhere.

@@ -13,23 +13,37 @@ func clientProbeStoreProof(t *testing.T, st *Store) {
 	ctx := context.Background()
 	base := time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
 	mts := ClientProbeNetwork{DirectChecked: true, ASN: 8359, Operator: "MTS PJSC", Country: "RU", Region: "Moscow", NetworkType: "mobile"}
+	// the statement checks the switch itself: off (absent, then "0"), nothing is stored
+	for _, v := range []string{"", "0"} {
+		if v != "" {
+			if err := st.SetSettings(ctx, map[string]string{SettingClientProbe: v}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if n, err := st.InsertClientProbeReport(ctx, "off", base, mts, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "ok"}}); err != nil || n != 0 {
+			t.Fatalf("switch %q: stored %d, %v", v, n, err)
+		}
+	}
+	if err := st.SetSettings(ctx, map[string]string{SettingClientProbe: "1"}); err != nil {
+		t.Fatal(err)
+	}
 	// report a: vless froze and hysteria2 passed on de1 (one report, one freeze, not ok), nl1 passed
-	if err := st.InsertClientProbeReport(ctx, "a", base, mts, []ClientProbeResult{
+	if n, err := st.InsertClientProbeReport(ctx, "a", base, mts, []ClientProbeResult{
 		{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "freeze", DetailJSON: `{"flaky":false,"dl_bytes":10985,"dl_stalled":true}`},
 		{NodeID: "nod_de1", Kind: "hysteria2", Port: 443, Verdict: "ok"},
 		{NodeID: "nod_nl1", Kind: "vless", Port: 443, Verdict: "ok"},
-	}); err != nil {
-		t.Fatal(err)
+	}); err != nil || n != 3 {
+		t.Fatalf("report a: stored %d, %v", n, err)
 	}
 	// report b from the same network: de1 all ok; report c from an unknown network an hour later: de1 tcp_blocked
-	if err := st.InsertClientProbeReport(ctx, "b", base.Add(time.Minute), mts, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "ok"}}); err != nil {
+	if _, err := st.InsertClientProbeReport(ctx, "b", base.Add(time.Minute), mts, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "ok"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.InsertClientProbeReport(ctx, "c", base.Add(time.Hour), ClientProbeNetwork{}, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "tcp_blocked"}}); err != nil {
+	if _, err := st.InsertClientProbeReport(ctx, "c", base.Add(time.Hour), ClientProbeNetwork{}, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "tcp_blocked"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.InsertClientProbeReport(ctx, "empty", base, mts, nil); err != nil {
-		t.Fatal(err)
+	if n, err := st.InsertClientProbeReport(ctx, "empty", base, mts, nil); err != nil || n != 0 {
+		t.Fatalf("empty report: stored %d, %v", n, err)
 	}
 
 	var detail string

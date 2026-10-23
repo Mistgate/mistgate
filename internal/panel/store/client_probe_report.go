@@ -23,10 +23,12 @@ type ClientProbeResult struct {
 	Port                              uint16
 }
 
-// InsertClientProbeReport stores one report in one statement (its rows go as one JSON argument: D1 binds at most 100 values).
-func (s *Store) InsertClientProbeReport(ctx context.Context, report string, at time.Time, n ClientProbeNetwork, rows []ClientProbeResult) error {
+// InsertClientProbeReport stores one report in one statement (its rows go as one JSON argument: D1 binds at most 100 values)
+// and returns how many rows it stored. The statement itself checks the switch (SettingClientProbe): a report that passed the
+// check of the handler while Disconnect switched the source off and deleted the reports stores nothing (0).
+func (s *Store) InsertClientProbeReport(ctx context.Context, report string, at time.Time, n ClientProbeNetwork, rows []ClientProbeResult) (int64, error) {
 	if len(rows) == 0 {
-		return nil
+		return 0, nil
 	}
 	type row struct {
 		N string `json:"n"`
@@ -45,14 +47,19 @@ func (s *Store) InsertClientProbeReport(ctx context.Context, report string, at t
 	}
 	b, err := json.Marshal(in)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	_, err = s.W.ExecContext(ctx, `INSERT OR IGNORE INTO client_probe_report
+	res, err := s.W.ExecContext(ctx, `INSERT OR IGNORE INTO client_probe_report
 		(report, at, node_id, kind, port, verdict, detail_json, vpn, direct_checked, asn, operator, country, region, net_type)
 		SELECT ?, ?, json_extract(value, '$.n'), json_extract(value, '$.k'), json_extract(value, '$.p'), json_extract(value, '$.v'),
-			json_extract(value, '$.d'), ?, ?, ?, ?, ?, ?, ? FROM json_each(?)`,
-		report, unix(at), boolInt(n.VPN), boolInt(n.DirectChecked), int64(n.ASN), n.Operator, n.Country, n.Region, n.NetworkType, string(b))
-	return err
+			json_extract(value, '$.d'), ?, ?, ?, ?, ?, ?, ? FROM json_each(?)
+		WHERE EXISTS (SELECT 1 FROM setting WHERE k = ? AND v = '1')`,
+		report, unix(at), boolInt(n.VPN), boolInt(n.DirectChecked), int64(n.ASN), n.Operator, n.Country, n.Region, n.NetworkType, string(b),
+		SettingClientProbe)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // ClientProbeCount is what the reports since a time say of one node from one network (one AS, operator, country and region).

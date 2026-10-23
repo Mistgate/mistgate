@@ -128,8 +128,8 @@ func TestSwitchAndDisconnect(t *testing.T) {
 		t.Fatalf("switch on: %v %v, step-ups %d, invalidated %d", up, err, steps, invalidated)
 	}
 	n := store.ClientProbeNetwork{ASN: 8359, Operator: "MTS PJSC", Country: "RU"}
-	if err := st.InsertClientProbeReport(context.Background(), NewID(), now.Add(-time.Minute), n, []store.ClientProbeResult{{NodeID: "nod_1", Kind: "vless", Port: 443, Verdict: "freeze"}}); err != nil {
-		t.Fatal(err)
+	if stored, err := st.InsertClientProbeReport(context.Background(), NewID(), now.Add(-time.Minute), n, []store.ClientProbeResult{{NodeID: "nod_1", Kind: "vless", Port: 443, Verdict: "freeze"}}); err != nil || stored != 1 {
+		t.Fatalf("stored %d, %v", stored, err)
 	}
 	got, err := r.GetClientProbe(owner, connect.NewRequest(&adminv1.GetClientProbeRequest{}))
 	if err != nil || got.Msg.Settings.Reports != 1 || len(got.Msg.Nodes) != 1 || got.Msg.Nodes[0].Tally.Freeze != 1 {

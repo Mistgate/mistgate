@@ -11,8 +11,8 @@ package mistgate.admin.v1;
 // THE WIRE (fixed by the app). The subscription answer carries "Probe-Report: 1" while this source is on (the newest report
 // version the panel takes); without the header the app sends nothing and shows no switch. The app POSTs JSON to the
 // subscription link + "/probe" (https only, the query dropped): the token in the path is the only authentication, no device
-// id. At most once in 10 minutes per subscription (the panel answers 429 + Retry-After when it comes sooner), through the VPN
-// when it is on. Answers: 200 {"accepted":N} (N = server results that matched a node of the person's subscription), 403
+// id. The app sends at most one in 10 minutes, through the VPN when it is on; the panel takes two at once and then one in
+// 10 minutes per subscription (429 + Retry-After when it comes sooner). Answers: 200 {"accepted":N} (N = server results that matched a node of the person's subscription), 403
 // {"error":"probe_off"} (this source is off), 429, anything else is "not sent". An unknown or rotated link gets what an unknown
 // subscription link gets (the decoy).
 //
