@@ -3,20 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.52`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.53`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.52
+  meta: v0.1.0 – v0.1.53
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.52
+      release: v0.1.53
       current: true
       points:
-        - "**MCP: `klick_reports`.** An agent reads the kl!ck reports with a token of any profile: per node the reports, freezes, TCP blocks and failures, by operator and by region. Switching the source stays the owner's. See [MCP](../reference/mcp.md)."
+        - "**Connection counters.** Nodes now count what happens to connection attempts, per key: connections, drops right after connecting (what a TSPU freeze looks like), refused keys, handshakes that never complete, time online, and unknown keys. A person's page shows them per device for the last 24 hours, the node's Profiles tab shows them under each profile. Hysteria2 and AmneziaWG; counts only, no address; kept 48 hours. Update the node agents to start counting. See [Nodes](../guide/nodes.md#profiles)."
+        - "**MCP: `node_connections` and `user_connection`**, the same counters for an AI agent with a token of any profile. See [MCP](../reference/mcp.md)."
     - title: Profiles
       section: profiles
       points:
@@ -76,7 +77,7 @@ Mistgate is in **beta**; the current release is `v0.1.52`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.52
+  meta: v0.1.34 – v0.1.53
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
