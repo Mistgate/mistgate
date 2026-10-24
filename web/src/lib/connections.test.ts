@@ -10,12 +10,12 @@ const t = Object.assign((key: string, vars?: Record<string, string | number>) =>
 const fmt = makeFmt("en", t);
 const inbound = (over: Partial<InboundConn>): InboundConn => ({
   inboundId: "inb_1", profileId: "prf_1", profileName: "HY2", protocol: "hysteria2", connects: 0, rejects: 0, drops: 0, stalls: 0, onlineS: 0,
-  unknownKeys: 0, hellos: 0, handshakes: 0, keysStalled: 0, keysTried: 0, ...over,
+  unknownKeys: 0, hellos: 0, handshakes: 0, keysStalled: 0, keysTried: 0, unsupported: [], hours: [], clients: [], ...over,
 });
 
 describe("connection counters in words", () => {
   it("names a device's counts, trouble flagged", () => {
-    const parts = deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2", connects: 1, rejects: 2, drops: 0, stalls: 3, onlineS: 120, lastHourUnix: 0 });
+    const parts = deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2", connects: 1, rejects: 2, drops: 0, stalls: 3, onlineS: 120, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [] });
     expect(parts).toEqual([
       { text: "1 connection" },
       { text: "key refused: 2", warn: true },

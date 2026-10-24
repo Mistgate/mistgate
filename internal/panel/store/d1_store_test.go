@@ -1864,8 +1864,8 @@ func TestD1LinkHourStorage(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	if calls.queries != 1 || calls.batches != 0 {
-		t.Fatalf("FleetNodeLinkSums: %d D1 queries, %d batches; want one query", calls.queries, calls.batches)
+	if calls.queries != 1 || calls.batches != 0 || len(sums) == 0 {
+		t.Fatalf("FleetNodeLinkSums: %d D1 queries, %d batches, %d rows; want one query and rows", calls.queries, calls.batches, len(sums))
 	}
 }
 
