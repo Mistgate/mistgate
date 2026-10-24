@@ -1344,8 +1344,8 @@ type StatsBatch struct {
 	// Connection counters since the previous batch (agents with "links/1"); see LinkCounters. Rows with every counter zero
 	// are not sent. A coalescer adds rows of the same cred_id and inbound_id field by field.
 	Links []*LinkCounters `protobuf:"bytes,9,rep,name=links,proto3" json:"links,omitempty"`
-	// The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, the last of them
-	// the overflow entry when more kinds came. A coalescer adds the counts of entries with the same key.
+	// The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, one of them the
+	// overflow entry when more kinds came; ordered by first_unix. A coalescer adds the counts of entries with the same key.
 	Journal       []*JournalEntry `protobuf:"bytes,10,rep,name=journal,proto3" json:"journal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -547,8 +547,8 @@ export type StatsBatch = Message<"mistgate.agent.v1.StatsBatch"> & {
   links: LinkCounters[];
 
   /**
-   * The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, the last of them
-   * the overflow entry when more kinds came. A coalescer adds the counts of entries with the same key.
+   * The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, one of them the
+   * overflow entry when more kinds came; ordered by first_unix. A coalescer adds the counts of entries with the same key.
    *
    * @generated from field: repeated mistgate.agent.v1.JournalEntry journal = 10;
    */

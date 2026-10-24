@@ -630,8 +630,8 @@ message StatsBatch {
   // Connection counters since the previous batch (agents with "links/1"); see LinkCounters. Rows with every counter zero
   // are not sent. A coalescer adds rows of the same cred_id and inbound_id field by field.
   repeated LinkCounters links = 9;
-  // The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, the last of them
-  // the overflow entry when more kinds came. A coalescer adds the counts of entries with the same key.
+  // The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, one of them the
+  // overflow entry when more kinds came; ordered by first_unix. A coalescer adds the counts of entries with the same key.
   repeated JournalEntry journal = 10;
 }
 
