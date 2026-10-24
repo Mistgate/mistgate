@@ -40,6 +40,8 @@ const (
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
 	capLinkCounts = "links/1"
+	// capJournal sends the node's deduplicated WARN+ records in StatsBatch.journal.
+	capJournal = "journal/1"
 	// capUserRateLimit: the engines that shape traffic per credential also share a bucket per person
 	// (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
 	capUserRateLimit = "user-rate-limit/1"
@@ -134,7 +136,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts}
+	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capJournal}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
 	}

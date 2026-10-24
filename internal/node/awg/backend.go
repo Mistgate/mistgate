@@ -2,6 +2,7 @@ package awg
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mistgate/mistgate/internal/node/awg/awgcfg"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -49,6 +50,12 @@ const unknownInitiationLogFormat = "Received invalid initiation message from %s"
 
 func isUnknownInitiationLog(format string) bool {
 	return format == unknownInitiationLogFormat
+}
+
+// userspaceErrorLogMessage keeps the live log's formatted text and returns the template for the private journal.
+func userspaceErrorLogMessage(format string, args ...any) (message, template string) {
+	template = "amneziawg-go: " + format
+	return fmt.Sprintf(template, args...), template
 }
 
 // peerBatch is the largest number of peers in one SetPeers call (one netlink attribute holds 64 KiB).

@@ -34,3 +34,13 @@ func TestUnknownInitiationLogFormatMatchesPinnedAmneziawg(t *testing.T) {
 		t.Fatalf("pinned amneziawg-go %s no longer logs %q using the expected format", moduleVersion, unknownInitiationLogFormat)
 	}
 }
+
+func TestUserspaceErrorLogMessageKeepsTemplateAndFormatsLiveText(t *testing.T) {
+	message, template := userspaceErrorLogMessage("send to %s failed: %v", "203.0.113.7:51820", "closed")
+	if want := "amneziawg-go: send to %s failed: %v"; template != want {
+		t.Fatalf("template = %q, want %q", template, want)
+	}
+	if want := "amneziawg-go: send to 203.0.113.7:51820 failed: closed"; message != want {
+		t.Fatalf("message = %q, want %q", message, want)
+	}
+}

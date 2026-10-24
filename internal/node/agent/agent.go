@@ -105,6 +105,7 @@ type Agent struct {
 	startedAt time.Time
 	log       *slog.Logger
 	ring      *logRing
+	journal   *journal
 	host      hostctl.Host
 	meta      Meta
 	id        atomic.Pointer[identity]
@@ -346,10 +347,11 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		inner = cfg.Log.Handler()
 	}
 	ring := newLogRing()
+	journal := newJournal()
 	a := &Agent{
-		cfg: cfg, startedAt: time.Now(), ring: ring, host: host, meta: id.meta,
+		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, host: host, meta: id.meta,
 		decoySite:     site,
-		log:           slog.New(&ringHandler{ring: ring, inner: inner}),
+		log:           slog.New(&ringHandler{ring: ring, journal: journal, inner: inner}),
 		engines:       map[string]engine.Engine{},
 		torrentEvents: map[string]time.Time{},
 		torrentUTPSyn: map[string]*torrentUTPSynWindow{},
