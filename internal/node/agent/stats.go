@@ -18,7 +18,10 @@ type linkCounterKey struct {
 }
 
 type linkCounterVolume struct {
-	onlineS, hellos, handshakes uint32
+	onlineS, hellos, handshakes  uint32
+	accepted, hellosForeign      uint32
+	rttSamples                   uint32
+	rttMSSum, pktsSent, pktsLost uint64
 }
 
 // collectLoop produces one StatsBatch per stats interval, even when it is empty (it doubles as the
@@ -109,20 +112,29 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 	}
 	for _, stat := range stats {
 		key := linkCounterKey{credID: stat.CredID, inboundID: stat.InboundID}
-		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys != 0 {
+		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.ClientCloses|stat.Freezes|stat.Quiet != 0 {
 			row := rowFor(key)
 			row.Connects += stat.Connects
 			row.Rejects += stat.Rejects
 			row.Drops += stat.Drops
 			row.Stalls += stat.Stalls
 			row.UnknownKeys += stat.UnknownKeys
+			row.ClientCloses += stat.ClientCloses
+			row.Freezes += stat.Freezes
+			row.Quiet += stat.Quiet
 		}
-		if stat.Hellos|stat.Handshakes != 0 {
+		if stat.Hellos|stat.Handshakes|stat.Accepted|stat.HellosForeign|stat.RTTSamples != 0 || stat.RTTMSSum|stat.PktsSent|stat.PktsLost != 0 {
 			a.linkCounterMu.Lock()
 			a.ensureLinkVolumesLocked()
 			volume := a.linkVolumes[key]
 			volume.hellos += stat.Hellos
 			volume.handshakes += stat.Handshakes
+			volume.accepted += stat.Accepted
+			volume.hellosForeign += stat.HellosForeign
+			volume.rttMSSum += stat.RTTMSSum
+			volume.rttSamples += stat.RTTSamples
+			volume.pktsSent += stat.PktsSent
+			volume.pktsLost += stat.PktsLost
 			a.linkVolumes[key] = volume
 			a.linkCounterMu.Unlock()
 		}
@@ -161,13 +173,19 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 	if end.After(start) && end.UTC().Truncate(window).After(start.UTC().Truncate(window)) {
 		a.linkCounterMu.Lock()
 		for key, volume := range a.linkVolumes {
-			if volume.onlineS|volume.hellos|volume.handshakes == 0 {
+			if volume.onlineS|volume.hellos|volume.handshakes|volume.accepted|volume.hellosForeign|volume.rttSamples == 0 && volume.rttMSSum|volume.pktsSent|volume.pktsLost == 0 {
 				continue
 			}
 			row := rowFor(key)
 			row.OnlineS += volume.onlineS
 			row.Hellos += volume.hellos
 			row.Handshakes += volume.handshakes
+			row.Accepted += volume.accepted
+			row.HellosForeign += volume.hellosForeign
+			row.RttMsSum += volume.rttMSSum
+			row.RttSamples += volume.rttSamples
+			row.PktsSent += volume.pktsSent
+			row.PktsLost += volume.pktsLost
 			delete(a.linkVolumes, key)
 		}
 		a.linkCounterMu.Unlock()
@@ -175,7 +193,7 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 
 	keys := make([]linkCounterKey, 0, len(rows))
 	for key, row := range rows {
-		if row.Connects|row.Rejects|row.Drops|row.Stalls|row.OnlineS|row.UnknownKeys|row.Hellos|row.Handshakes != 0 {
+		if row.Connects|row.Rejects|row.Drops|row.Stalls|row.OnlineS|row.UnknownKeys|row.Hellos|row.Handshakes|row.ClientCloses|row.Freezes|row.Quiet|row.Accepted|row.HellosForeign|row.RttSamples != 0 || row.RttMsSum|row.PktsSent|row.PktsLost != 0 {
 			keys = append(keys, key)
 		}
 	}

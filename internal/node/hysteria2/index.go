@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -27,20 +26,27 @@ type credState struct {
 	hash      [32]byte // sha256(auth token); immutable (a changed token makes a new credState)
 	owner     atomic.Pointer[credIdentity]
 
-	validUntil atomic.Int64                      // unix seconds, 0 = never
-	limit      atomic.Pointer[ratelimit.Limiter] // the device limit: this credential's own bucket
-	person     atomic.Pointer[ratelimit.Limiter] // the person limit: the bucket of the whole user on this node (ratelimit.Registry)
-	up, down   atomic.Uint64                     // user's view: core tx = up, core rx = down
-	flushed    atomic.Uint64                     // bytes reported by Collect; used only to classify idle drops
-	conns      atomic.Int32                      // open QUIC connections
-	connects   atomic.Uint32
-	rejects    atomic.Uint32
-	drops      atomic.Uint32
-	kicks      atomic.Int32 // connections still to be closed at their next packet (see takeKick)
-	kickUntil  atomic.Int64 // unix nano; unused kick tokens expire
-	lastKill   atomic.Int64 // unix nano of the last token taken
-	removed    atomic.Bool  // dropped from the index; its sessions are dying
-	inflight   atomic.Int32 // LogTraffic callbacks running; a retired state is kept until they end
+	validUntil   atomic.Int64                      // unix seconds, 0 = never
+	limit        atomic.Pointer[ratelimit.Limiter] // the device limit: this credential's own bucket
+	person       atomic.Pointer[ratelimit.Limiter] // the person limit: the bucket of the whole user on this node (ratelimit.Registry)
+	up, down     atomic.Uint64                     // user's view: core tx = up, core rx = down
+	flushed      atomic.Uint64                     // bytes reported by Collect; used only to classify idle drops
+	conns        atomic.Int32                      // open QUIC connections
+	connects     atomic.Uint32
+	rejects      atomic.Uint32
+	drops        atomic.Uint32
+	clientCloses atomic.Uint32
+	freezes      atomic.Uint32
+	quiet        atomic.Uint32
+	rttMSSum     atomic.Uint64
+	rttSamples   atomic.Uint32
+	pktsSent     atomic.Uint64
+	pktsLost     atomic.Uint64
+	kicks        atomic.Int32 // connections still to be closed at their next packet (see takeKick)
+	kickUntil    atomic.Int64 // unix nano; unused kick tokens expire
+	lastKill     atomic.Int64 // unix nano of the last token taken
+	removed      atomic.Bool  // dropped from the index; its sessions are dying
+	inflight     atomic.Int32 // LogTraffic callbacks running; a retired state is kept until they end
 }
 
 type credIdentity struct{ userID string }
@@ -235,13 +241,16 @@ func (cs *credState) clampKicks(open int32) {
 	}
 }
 
-// Sessions come from EventLogger.Connect/Disconnect, which carry the remote address and fire once per
-// QUIC connection; TrafficLogger.LogOnlineState has no address and is not needed.
-
+// Sessions are keyed by the QUIC connection because its address can move during port hopping or NAT rebinding.
+// The old EventLogger methods below retain address-keyed state only for compatibility with an unpatched core.
 type session struct {
-	cs         *credState
-	since      time.Time
-	startBytes uint64
+	cs                 *credState
+	since              time.Time
+	conn               *quic.Conn
+	startBytes         uint64
+	last               quic.ConnectionStats
+	silencePacketsRecv uint64
+	silencePacketsSent uint64
 }
 
 func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
@@ -249,63 +258,134 @@ func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
 	if cs == nil {
 		return
 	}
-	s := session{cs: cs, since: in.e.now(), startBytes: cs.bytesMoved()}
-	in.smu.Lock()
-	in.sessions[addr.String()] = s
-	in.smu.Unlock()
+	s := &session{cs: cs, since: in.e.now(), startBytes: cs.bytesMoved()}
 	cs.conns.Add(1)
 	cs.connects.Add(1)
+	in.smu.Lock()
+	if in.legacySessions == nil {
+		in.legacySessions = make(map[string]*session)
+	}
+	in.legacySessions[addr.String()] = s
+	in.smu.Unlock()
 }
 
 func (in *inbound) Disconnect(addr net.Addr, id string, err error) {
 	in.smu.Lock()
-	key := addr.String()
-	s, ok := in.sessions[key]
+	s, ok := in.legacySessions[addr.String()]
 	if !ok || s.cs.id != id {
-		// The core reports Connect with the address at authentication and Disconnect with the connection's address at
-		// close; with the path manager off (port hopping) quic-go moves that address to whatever the client sends from
-		// next. A miss is such a moved connection: take this credential's session from the same IP, else its oldest.
-		key, s, ok = in.movedSession(id, addr)
+		ok = false
 	}
 	if ok {
-		delete(in.sessions, key)
+		delete(in.legacySessions, addr.String())
 	}
 	in.smu.Unlock()
 	if ok {
-		var idleTimeout *quic.IdleTimeoutError
-		if errors.As(err, &idleTimeout) {
-			moved := s.cs.bytesMoved()
-			if moved < s.startBytes || moved-s.startBytes < 64<<10 || in.e.now().Sub(s.since) < 60*time.Second {
-				s.cs.drops.Add(1)
-			}
-		}
-		s.cs.clampKicks(s.cs.conns.Add(-1))
+		in.endSession(s, err)
 	}
 }
 
-// movedSession finds the session of credential id whose connection now speaks from addr. Caller holds smu.
-// ponytail: a scan of the inbound's sessions on a missed disconnect; key the map by connection if a core hook ever gives one.
-func (in *inbound) movedSession(id string, addr net.Addr) (string, session, bool) {
-	ip := ""
-	if ap, err := netip.ParseAddrPort(addr.String()); err == nil {
-		ip = ap.Addr().Unmap().String()
+func (in *inbound) Accepted(*quic.Conn) { in.accepted.Add(1) }
+
+func (in *inbound) ConnConnect(conn *quic.Conn, id string, _ uint64) {
+	cs := in.idx.Load().byID[id]
+	if cs == nil || conn == nil {
+		return
 	}
-	var best string
-	var bestS session
-	bestSameIP := false
-	for k, s := range in.sessions {
-		if s.cs.id != id {
-			continue
-		}
-		sameIP := false
-		if ap, err := netip.ParseAddrPort(k); err == nil && ip != "" {
-			sameIP = ap.Addr().Unmap().String() == ip
-		}
-		if best == "" || (sameIP && !bestSameIP) || (sameIP == bestSameIP && s.since.Before(bestS.since)) {
-			best, bestS, bestSameIP = k, s, sameIP
+	stats := conn.ConnectionStats()
+	s := &session{
+		cs: cs, since: in.e.now(), conn: conn, startBytes: stats.BytesSent + stats.BytesReceived,
+		last: stats, silencePacketsRecv: stats.PacketsReceived, silencePacketsSent: stats.PacketsSent,
+	}
+	cs.conns.Add(1)
+	cs.connects.Add(1)
+	in.smu.Lock()
+	if in.sessions == nil {
+		in.sessions = make(map[*quic.Conn]*session)
+	}
+	in.sessions[conn] = s
+	in.smu.Unlock()
+}
+
+func (in *inbound) ConnDisconnect(conn *quic.Conn, _ string, err error) {
+	in.smu.Lock()
+	s, ok := in.sessions[conn]
+	if ok {
+		delete(in.sessions, conn)
+	}
+	in.smu.Unlock()
+	if ok {
+		in.endSession(s, err)
+	}
+}
+
+// sample adds packet and RTT deltas for one open connection. PacketsLost can decrease when quic-go later learns that a
+// declared-lost packet arrived, so a decrease resets the baseline without subtracting from accumulated volume.
+func (s *session) sample() {
+	if s.conn == nil {
+		return
+	}
+	current := s.conn.ConnectionStats()
+	addConnectionDelta(s.cs, s.last, current)
+	if current.PacketsReceived != s.last.PacketsReceived {
+		// This is the latest snapshot with this receive count. Sends since it are evidence of a frozen return path.
+		s.silencePacketsRecv = current.PacketsReceived
+		s.silencePacketsSent = current.PacketsSent
+	}
+	s.last = current
+}
+
+func addConnectionDelta(cs *credState, previous, current quic.ConnectionStats) {
+	if current.PacketsSent > previous.PacketsSent {
+		cs.pktsSent.Add(current.PacketsSent - previous.PacketsSent)
+	}
+	if current.PacketsLost > previous.PacketsLost {
+		cs.pktsLost.Add(current.PacketsLost - previous.PacketsLost)
+	}
+	if (current.BytesSent > previous.BytesSent || current.BytesReceived > previous.BytesReceived) && current.PacketsReceived >= 10 {
+		if rttMS := current.SmoothedRTT.Milliseconds(); rttMS > 0 {
+			cs.rttSamples.Add(1)
+			cs.rttMSSum.Add(uint64(rttMS))
 		}
 	}
-	return best, bestS, best != ""
+}
+
+func (in *inbound) endSession(s *session, err error) {
+	cs := s.cs
+	var stats quic.ConnectionStats
+	if s.conn != nil {
+		stats = s.conn.ConnectionStats()
+		addConnectionDelta(cs, s.last, stats)
+	}
+	var idleTimeout *quic.IdleTimeoutError
+	if errors.As(err, &idleTimeout) {
+		if isFreezeAtClose(stats, s.last, s.silencePacketsRecv, s.silencePacketsSent) && s.conn != nil {
+			cs.freezes.Add(1)
+		} else {
+			cs.quiet.Add(1)
+		}
+		moved := cs.bytesMoved()
+		if s.conn != nil {
+			moved = stats.BytesSent + stats.BytesReceived
+		}
+		if moved < s.startBytes || moved-s.startBytes < 64<<10 || in.e.now().Sub(s.since) < 60*time.Second {
+			cs.drops.Add(1)
+		}
+	} else if isClientClose(err) {
+		cs.clientCloses.Add(1)
+	}
+	cs.clampKicks(cs.conns.Add(-1))
+}
+
+func isFreezeAtClose(current, last quic.ConnectionStats, silencePacketsRecv, silencePacketsSent uint64) bool {
+	return current.PacketsReceived == last.PacketsReceived && current.PacketsReceived == silencePacketsRecv && current.PacketsSent > silencePacketsSent
+}
+
+func isClientClose(err error) bool {
+	if err == nil {
+		return true
+	}
+	var appErr *quic.ApplicationError
+	return errors.As(err, &appErr) && appErr.Remote
 }
 
 func (cs *credState) bytesMoved() uint64 {
@@ -315,6 +395,7 @@ func (cs *credState) bytesMoved() uint64 {
 func (in *inbound) takeLinkStats() plugin.LinkStat {
 	return plugin.LinkStat{
 		InboundID: in.spec.ID, UnknownKeys: in.unknownKeys.Swap(0), Hellos: in.hellos.Swap(0), Handshakes: in.handshakes.Swap(0),
+		Accepted: in.accepted.Swap(0), HellosForeign: in.hellosForeign.Swap(0),
 	}
 }
 
@@ -322,6 +403,9 @@ func (cs *credState) takeLinkStats() plugin.LinkStat {
 	return plugin.LinkStat{
 		CredID: cs.id, InboundID: cs.inboundID,
 		Connects: cs.connects.Swap(0), Rejects: cs.rejects.Swap(0), Drops: cs.drops.Swap(0),
+		ClientCloses: cs.clientCloses.Swap(0), Freezes: cs.freezes.Swap(0), Quiet: cs.quiet.Swap(0),
+		RTTMSSum: cs.rttMSSum.Swap(0), RTTSamples: cs.rttSamples.Swap(0),
+		PktsSent: cs.pktsSent.Swap(0), PktsLost: cs.pktsLost.Swap(0),
 	}
 }
 
