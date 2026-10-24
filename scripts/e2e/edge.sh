@@ -723,6 +723,9 @@ PY
   grep -q 'desired state applied' "$WORK/node.log" || die "the agent never logged an applied desired state"
   pass "node ONLINE over the link (node_live session $GEN1), inbound ACTIVE on UDP $HY2 after the desired state came over the link, nft hop rule $HOP_FROM-$HOP_TO installed"
 
+  step "2a. node journal over the link: a profile on a busy port fails to start, and the journal shows why without an address"
+  journal_check 1
+
   step "2b. doctor: the agent's report is stored, RunDoctor goes through Remote.Ask"
   doctor_json() { api HealthService/GetDoctor "{\"nodeId\":\"$NODE_ID\"}"; }
   doctor_ready() { doctor_json | jq -e '.nodes[0] | .agentSupported and .hasReport and (.items | length) >= 10'; }

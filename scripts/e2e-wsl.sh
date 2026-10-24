@@ -339,6 +339,33 @@ inbounds_active() { # <count>: exactly that many inbounds, all ACTIVE
   api NodeService/GetNode "{\"nodeId\":\"$NODE_ID\"}" | jq -e --argjson n "$1" '(.inbounds | length) == $n and all(.inbounds[]; .state == "INBOUND_STATE_ACTIVE")'
 }
 user_json() { api UserService/GetUser "{\"userId\":\"$USER_ID\"}"; }
+# journal_check <inbounds before>: a Hysteria2 profile on a UDP port another process holds fails to start; within a stats
+# interval the node journal (GetNodeJournal) holds the error under that inbound, the node sends its journal, and the whole
+# answer carries no IPv4 address but the unspecified and loopback ones the node binds to. Both editions (edge.sh calls it).
+journal_check() {
+  local busy holder prof inb answer entry
+  busy=$(free_port udp)
+  python3 -c 'import socket, sys, time; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("0.0.0.0", int(sys.argv[1]))); time.sleep(900)' "$busy" &
+  holder=$!
+  prof=$(api ProfileService/CreateProfile "$(jq -nc --arg s "$(jq -c --argjson p "$busy" '.port = $p | .hop = {from: 0, to: 0}' <<<"$SETTINGS")" \
+    '{protocol:"hysteria2", name:"e2e-busy", settingsJson:$s}')" | jq -r .profile.id)
+  inb=$(api ProfileService/CreateInbound "{\"profileId\":\"$prof\",\"nodeId\":\"$NODE_ID\"}" | jq -r .inbound.id)
+  journal_json() { api NodeService/GetNodeJournal "{\"nodeId\":\"$NODE_ID\",\"hours\":1,\"minLevel\":\"EVENT_SEVERITY_ERROR\"}"; }
+  journal_has() { journal_json | jq -e --arg i "$inb" '[.entries[]? | select(.inboundId == $i)] | length >= 1' >/dev/null; }
+  wait_for 60 "the busy port's start error in the node journal" journal_has \
+    || { kill "$holder"; die "GetNodeJournal: no entry for the inbound on the busy port: $(journal_json | jq -c '[.entries[]? | {source, message, inboundId}]')"; }
+  answer=$(journal_json)
+  jq -e '(.nodesWithoutJournal // []) | length == 0' <<<"$answer" >/dev/null || die "GetNodeJournal lists the node as not sending its journal"
+  if grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' <<<"$answer" | grep -vqE '^(0\.0\.0\.0|127\.)'; then
+    die "the node journal carries an address: $(grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' <<<"$answer" | sort -u | tr '\n' ' ')"
+  fi
+  entry=$(jq -c --arg i "$inb" '[.entries[] | select(.inboundId == $i)][0] | {source, message, profileName, count, err: .attrs.err}' <<<"$answer")
+  api ProfileService/DeleteInbound "{\"inboundId\":\"$inb\"}" >/dev/null || die "DeleteInbound of the busy-port inbound failed"
+  api ProfileService/DeleteProfile "{\"profileId\":\"$prof\"}" >/dev/null || die "DeleteProfile of the busy-port profile failed"
+  kill "$holder"
+  wait_for 60 "the other inbounds ACTIVE again" inbounds_active "$1" || die "the inbounds did not settle after the busy-port one went"
+  pass "node journal: the start error on busy UDP $busy is there under its inbound, no client address ($entry)"
+}
 used_bytes() { user_json | jq -r '(.user.usedBytes // 0) | tonumber'; }
 used_ge() { [ "$(used_bytes)" -ge "$1" ]; }
 panel_up() { curl -sf -m 3 -o /dev/null "$ADMIN/api/mistgate.admin.v1.AuthService/GetLoginInfo" -H 'Content-Type: application/json' -d '{}'; }
@@ -1192,6 +1219,9 @@ jq -e '[.rows[]? | select(.protocol == "hysteria2") | (.connects // 0 | tonumber
 jq -e '(.nodesWithoutCounters // []) | length == 0' <<<"$USER_CONN" >/dev/null || die "GetUserConnection: the node is listed as not counting"
 grep -Eq '"(remote|addr|ip)"' <<<"$(node_conn)$USER_CONN" && die "a connection counter answer carries an address field"
 pass "connection counters: Hysteria2 connects $(h2_sum connects), unknown keys $(h2_sum unknownKeys) (the disabled user's attempt), the user's own rows, no address"
+
+step "6c. node journal: a profile on a busy port fails to start, and the journal shows why without an address"
+journal_check 2
 
 # ================================================================ 7. masquerade
 step "7. masquerade: HTTPS on TCP and HTTP/3 on the QUIC port show the decoy"
