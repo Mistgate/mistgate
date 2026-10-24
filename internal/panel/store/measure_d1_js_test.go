@@ -286,9 +286,11 @@ func TestD1IngestStatsAtEdgeCap(t *testing.T) {
 	in := f.statsIn(users, sessions, live)
 	for i := range in.Traffic {
 		in.Traffic[i].Up, in.Traffic[i].Down = 123_456_789, 987_654_321
-		// a counter row per key at the clamp (7 digits each, the longest a row gets; the guard admits as many rows as deltas)
+		// a counter row per key at both clamps, including the wide quality totals; the guard admits as many rows as deltas
 		in.Links = append(in.Links, FleetLink{CredID: in.Traffic[i].CredID, InboundID: in.Traffic[i].InboundID, Connects: 1 << 30, Rejects: 1 << 30,
-			Drops: 1 << 30, Stalls: 1 << 30, OnlineS: 1 << 30, UnknownKeys: 1 << 30, Hellos: 1 << 30, Handshakes: 1 << 30})
+			Drops: 1 << 30, Stalls: 1 << 30, OnlineS: 1 << 30, UnknownKeys: 1 << 30, Hellos: 1 << 30, Handshakes: 1 << 30,
+			ClientCloses: 1 << 30, Freezes: 1 << 30, Quiet: 1 << 30, Accepted: 1 << 30, HellosForeign: 1 << 30,
+			RttMSSum: ^uint64(0), RttSamples: 1 << 30, PktsSent: ^uint64(0), PktsLost: ^uint64(0)})
 	}
 	journalValue := strings.Repeat("界", 160)
 	for i := range maxNodeJournalRows {

@@ -25,10 +25,14 @@ func linksBatch(links ...*agentv1.LinkCounters) *agentv1.ConnectRequest {
 
 // connectLinks connects an agent that lists links/1 and confirms the full state.
 func connectLinks(a *agent, instance string) *conn {
+	return connectLinksWithCaps(a, instance, capLinks)
+}
+
+func connectLinksWithCaps(a *agent, instance string, capabilities ...string) *conn {
 	a.e.t.Helper()
 	c := a.open()
 	h := hello(instance, 0, "")
-	h.GetHello().Capabilities = []string{capLinks}
+	h.GetHello().Capabilities = capabilities
 	c.send(0, h)
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 	ds := c.desired()
@@ -92,7 +96,8 @@ func TestStatsLinksAreStoredAndRead(t *testing.T) {
 		hy.KeysStalled != 1 || hy.KeysTried != 2 {
 		t.Errorf("hysteria inbound = %+v", hy)
 	}
-	if len(hy.Unsupported) != 0 || len(hy.Clients) != 1 || hy.Clients[0].Client != "Happ/3.4.2" || hy.Clients[0].Platform != "android" ||
+	if !equalStrings(hy.Unsupported, connectiondiag.UnsupportedCountersForNode("hysteria2", []string{capLinks})) ||
+		len(hy.Clients) != 1 || hy.Clients[0].Client != "Happ/3.4.2" || hy.Clients[0].Platform != "android" ||
 		hy.Clients[0].Devices != 2 || hy.Clients[0].Connects != 4 {
 		t.Errorf("Hysteria2 clients/unsupported = %+v / %v", hy.Clients, hy.Unsupported)
 	}
@@ -143,6 +148,42 @@ func TestStatsLinksAreStoredAndRead(t *testing.T) {
 	}
 }
 
+func TestStatsLinks2QualityIsStoredAndRead(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	ids := e.fixture(a.nodeID)
+	e.exec(`UPDATE profile SET protocol = 'hysteria2' WHERE id = 'prf_1'`)
+	e.exec(`UPDATE device_credential SET protocol = 'hysteria2' WHERE id = 'crd_alice_hy'`)
+	e.exec(`UPDATE device SET platform = 'android', client = 'Happ/3.4.2' WHERE id = 'dev_alice'`)
+	c := connectLinksWithCaps(a, "inst2", capLinks, connectiondiag.Links2Capability)
+	c.send(1, linksBatch(
+		&agentv1.LinkCounters{CredId: "crd_alice_hy", InboundId: ids.i1, Connects: 3, ClientCloses: 1, Freezes: 2, Quiet: 3,
+			RttMsSum: 1500, RttSamples: 3, PktsSent: 1000, PktsLost: 10},
+		&agentv1.LinkCounters{InboundId: ids.i1, Hellos: 30, Handshakes: 20, Accepted: 9, HellosForeign: 4},
+	))
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
+
+	node := nodeService{e.f}
+	resp, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID, ByHour: true}))
+	if err != nil || !resp.Msg.Supported || len(resp.Msg.Inbounds) != 2 {
+		t.Fatalf("GetNodeConnections with links/2 = %+v, %v", resp, err)
+	}
+	hy := resp.Msg.Inbounds[0]
+	if len(hy.Unsupported) != 0 || hy.ClientCloses != 1 || hy.Freezes != 2 || hy.Quiet != 3 || hy.Accepted != 9 || hy.HellosForeign != 4 ||
+		hy.RttMs != 500 || hy.LossPermille != 10 || hy.RttSamples != 3 || hy.PktsSent != 1000 || len(hy.Hours) != 1 ||
+		hy.Hours[0].ClientCloses != 1 || hy.Hours[0].Freezes != 2 || hy.Hours[0].Accepted != 9 || hy.Hours[0].HellosForeign != 4 ||
+		hy.Hours[0].RttMs != 500 || hy.Hours[0].LossPermille != 10 || hy.Hours[0].RttSamples != 3 || hy.Hours[0].PktsSent != 1000 ||
+		len(hy.Clients) != 1 || hy.Clients[0].Freezes != 2 || hy.Clients[0].Quiet != 3 || hy.Clients[0].RttMs != 500 || hy.Clients[0].LossPermille != 10 {
+		t.Errorf("Hysteria2 links/2 result = %+v", hy)
+	}
+
+	fleet, err := node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{}))
+	if err != nil || len(fleet.Msg.Nodes) == 0 || fleet.Msg.Nodes[0].Inbounds[0].Accepted != 9 || fleet.Msg.Nodes[0].Inbounds[0].RttMs != 500 ||
+		fleet.Msg.Nodes[0].Inbounds[0].LossPermille != 10 || len(fleet.Msg.Nodes[0].Inbounds[0].Unsupported) != 0 {
+		t.Errorf("GetFleetConnections links/2 = %+v, %v", fleet, err)
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -160,10 +201,13 @@ func TestGuardStatsLimitsLinkRows(t *testing.T) {
 	f := &Fleet{log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	links := make([]*agentv1.LinkCounters, maxStatsDeltas+3)
 	for i := range links {
-		links[i] = &agentv1.LinkCounters{CredId: fmt.Sprintf("crd_%d", i), InboundId: "inb_cap", Connects: 1}
+		links[i] = &agentv1.LinkCounters{CredId: fmt.Sprintf("crd_%d", i), InboundId: "inb_cap", Connects: 1,
+			ClientCloses: 2, Freezes: 3, Quiet: 4, Accepted: 5, HellosForeign: 6, RttMsSum: 7, RttSamples: 8, PktsSent: 9, PktsLost: 10}
 	}
 	g := f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000, IntervalEndUnix: 1_010, Links: links})
-	if len(g.links) != maxStatsDeltas || g.rejected != 0 || g.links[maxStatsDeltas-1].CredID != fmt.Sprintf("crd_%d", maxStatsDeltas-1) {
+	if len(g.links) != maxStatsDeltas || g.rejected != 0 || g.links[maxStatsDeltas-1].CredID != fmt.Sprintf("crd_%d", maxStatsDeltas-1) ||
+		g.links[0].ClientCloses != 2 || g.links[0].Freezes != 3 || g.links[0].Quiet != 4 || g.links[0].Accepted != 5 ||
+		g.links[0].HellosForeign != 6 || g.links[0].RttMSSum != 7 || g.links[0].RttSamples != 8 || g.links[0].PktsSent != 9 || g.links[0].PktsLost != 10 {
 		t.Fatalf("%d rows in, %d kept, rejected %d; want the first %d kept", len(links), len(g.links), g.rejected, maxStatsDeltas)
 	}
 	// a batch whose traffic is refused still gets its counters in

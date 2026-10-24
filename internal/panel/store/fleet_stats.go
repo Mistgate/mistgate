@@ -264,7 +264,8 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 					out.Probe++
 					if _, on := onNode[l.InboundID]; on && l.Connects|l.Rejects != 0 {
 						probe := min(uint64(l.Connects)+uint64(l.Rejects), maxLinkCount)
-						linkRows = append(linkRows, []any{"", l.InboundID, "", 0, 0, 0, 0, 0, 0, 0, 0, probe})
+						linkRows = append(linkRows, []any{"", l.InboundID, "", 0, 0, 0, 0, 0, 0, 0, 0, probe,
+							0, 0, 0, 0, 0, 0, 0, 0, 0})
 					}
 					continue
 				}
@@ -276,7 +277,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			}
 			linkRows = append(linkRows, []any{l.CredID, l.InboundID, user, min(l.Connects, maxLinkCount), min(l.Rejects, maxLinkCount),
 				min(l.Drops, maxLinkCount), min(l.Stalls, maxLinkCount), min(l.OnlineS, maxLinkCount), min(l.UnknownKeys, maxLinkCount),
-				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount), 0})
+				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount), 0, min(l.ClientCloses, maxLinkCount),
+				min(l.Freezes, maxLinkCount), min(l.Quiet, maxLinkCount), min(l.Accepted, maxLinkCount),
+				min(l.HellosForeign, maxLinkCount), min(l.RttMSSum, maxLinkSum), min(l.RttSamples, maxLinkCount),
+				min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum)})
 		}
 
 		// Peaks: distinct users / devices per protocol in this snapshot.

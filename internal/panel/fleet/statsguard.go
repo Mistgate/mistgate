@@ -142,7 +142,9 @@ func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 	out := make([]store.FleetLink, 0, len(rows))
 	for _, l := range rows {
 		out = append(out, store.FleetLink{CredID: l.CredId, InboundID: l.InboundId, Connects: l.Connects, Rejects: l.Rejects,
-			Drops: l.Drops, Stalls: l.Stalls, OnlineS: l.OnlineS, UnknownKeys: l.UnknownKeys, Hellos: l.Hellos, Handshakes: l.Handshakes})
+			Drops: l.Drops, Stalls: l.Stalls, OnlineS: l.OnlineS, UnknownKeys: l.UnknownKeys, Hellos: l.Hellos, Handshakes: l.Handshakes,
+			ClientCloses: l.ClientCloses, Freezes: l.Freezes, Quiet: l.Quiet, Accepted: l.Accepted, HellosForeign: l.HellosForeign,
+			RttMSSum: l.RttMsSum, RttSamples: l.RttSamples, PktsSent: l.PktsSent, PktsLost: l.PktsLost})
 	}
 	return out
 }

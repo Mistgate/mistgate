@@ -1251,6 +1251,13 @@ type deviceConnV struct {
 	Client       string      `json:"client"`
 	Kind         string      `json:"kind"`
 	Hours        []linkHourV `json:"hours,omitempty"`
+	ClientCloses uint32      `json:"client_closes,omitempty"`
+	Freezes      uint32      `json:"freezes,omitempty"`
+	Quiet        uint32      `json:"quiet,omitempty"`
+	RttMs        *uint32     `json:"rtt_ms,omitempty"`
+	LossPermille *uint32     `json:"loss_permille,omitempty"`
+	RttSamples   uint32      `json:"rtt_samples,omitempty"`
+	PktsSent     uint64      `json:"pkts_sent,omitempty"`
 }
 
 type nodeWithoutV struct {
@@ -1275,7 +1282,10 @@ func userConnectionView(r *adminv1.GetUserConnectionResponse, nodes []*adminv1.N
 		dv := deviceConnV{DeviceID: clean(d.GetDeviceId(), 80), NodeID: clean(d.GetNodeId(), 80), NodeName: nm(d.GetNodeName()),
 			InboundID: clean(d.GetInboundId(), 80), Profile: nm(d.GetProfileName()), Protocol: clean(d.GetProtocol(), 40),
 			Connects: d.GetConnects(), Rejects: d.GetRejects(), Drops: d.GetDrops(), Stalls: d.GetStalls(), OnlineS: d.GetOnlineS(),
-			LastHourUnix: d.GetLastHourUnix(), Platform: clean(d.GetPlatform(), 40), Client: clean(d.GetClient(), 80), Kind: clean(d.GetKind(), 40), Hours: []linkHourV{}}
+			LastHourUnix: d.GetLastHourUnix(), Platform: clean(d.GetPlatform(), 40), Client: clean(d.GetClient(), 80), Kind: clean(d.GetKind(), 40),
+			Hours: []linkHourV{}, ClientCloses: d.GetClientCloses(), Freezes: d.GetFreezes(), Quiet: d.GetQuiet(),
+			RttMs: metricWhen(d.GetRttMs(), d.GetRttSamples() > 0), LossPermille: metricWhen(d.GetLossPermille(), d.GetPktsSent() > 0),
+			RttSamples: d.GetRttSamples(), PktsSent: d.GetPktsSent()}
 		for _, h := range d.GetHours() {
 			dv.Hours = append(dv.Hours, linkHourView(h))
 		}
@@ -1303,47 +1313,69 @@ type NodeConnectionsV struct {
 }
 
 type inboundConnV struct {
-	InboundID   string        `json:"inbound_id"`
-	ProfileID   string        `json:"profile_id"`
-	Profile     string        `json:"profile"`
-	Protocol    string        `json:"protocol"`
-	Connects    uint32        `json:"connects"`
-	Rejects     uint32        `json:"rejects"`
-	Drops       uint32        `json:"drops"`
-	Stalls      uint32        `json:"stalls"`
-	OnlineS     uint64        `json:"online_s"`
-	UnknownKeys uint32        `json:"unknown_keys"`
-	Hellos      uint32        `json:"hellos"`
-	Handshakes  uint32        `json:"handshakes"`
-	KeysStalled uint32        `json:"keys_stalled"`
-	KeysTried   uint32        `json:"keys_tried"`
-	Unsupported []string      `json:"unsupported,omitempty"`
-	Hours       []linkHourV   `json:"hours,omitempty"`
-	Clients     []clientConnV `json:"clients,omitempty"`
-	AWG         *awgPacketsV  `json:"awg,omitempty"`
+	InboundID     string        `json:"inbound_id"`
+	ProfileID     string        `json:"profile_id"`
+	Profile       string        `json:"profile"`
+	Protocol      string        `json:"protocol"`
+	Connects      uint32        `json:"connects"`
+	Rejects       uint32        `json:"rejects"`
+	Drops         uint32        `json:"drops"`
+	Stalls        uint32        `json:"stalls"`
+	OnlineS       uint64        `json:"online_s"`
+	UnknownKeys   uint32        `json:"unknown_keys"`
+	Hellos        uint32        `json:"hellos"`
+	Handshakes    uint32        `json:"handshakes"`
+	KeysStalled   uint32        `json:"keys_stalled"`
+	KeysTried     uint32        `json:"keys_tried"`
+	Unsupported   []string      `json:"unsupported,omitempty"`
+	Hours         []linkHourV   `json:"hours,omitempty"`
+	Clients       []clientConnV `json:"clients,omitempty"`
+	AWG           *awgPacketsV  `json:"awg,omitempty"`
+	ClientCloses  uint32        `json:"client_closes,omitempty"`
+	Freezes       uint32        `json:"freezes,omitempty"`
+	Quiet         uint32        `json:"quiet,omitempty"`
+	Accepted      uint32        `json:"accepted,omitempty"`
+	HellosForeign uint32        `json:"hellos_foreign,omitempty"`
+	RttMs         *uint32       `json:"rtt_ms,omitempty"`
+	LossPermille  *uint32       `json:"loss_permille,omitempty"`
+	RttSamples    uint32        `json:"rtt_samples,omitempty"`
+	PktsSent      uint64        `json:"pkts_sent,omitempty"`
 }
 
 type linkHourV struct {
-	HourUnix    int64  `json:"hour_unix"`
-	Connects    uint32 `json:"connects,omitempty"`
-	Rejects     uint32 `json:"rejects,omitempty"`
-	Drops       uint32 `json:"drops,omitempty"`
-	Stalls      uint32 `json:"stalls,omitempty"`
-	OnlineS     uint64 `json:"online_s,omitempty"`
-	UnknownKeys uint32 `json:"unknown_keys,omitempty"`
-	Hellos      uint32 `json:"hellos,omitempty"`
-	Handshakes  uint32 `json:"handshakes,omitempty"`
+	HourUnix      int64   `json:"hour_unix"`
+	Connects      uint32  `json:"connects,omitempty"`
+	Rejects       uint32  `json:"rejects,omitempty"`
+	Drops         uint32  `json:"drops,omitempty"`
+	Stalls        uint32  `json:"stalls,omitempty"`
+	OnlineS       uint64  `json:"online_s,omitempty"`
+	UnknownKeys   uint32  `json:"unknown_keys,omitempty"`
+	Hellos        uint32  `json:"hellos,omitempty"`
+	Handshakes    uint32  `json:"handshakes,omitempty"`
+	ClientCloses  uint32  `json:"client_closes,omitempty"`
+	Freezes       uint32  `json:"freezes,omitempty"`
+	Quiet         uint32  `json:"quiet,omitempty"`
+	Accepted      uint32  `json:"accepted,omitempty"`
+	HellosForeign uint32  `json:"hellos_foreign,omitempty"`
+	RttMs         *uint32 `json:"rtt_ms,omitempty"`
+	LossPermille  *uint32 `json:"loss_permille,omitempty"`
+	RttSamples    uint32  `json:"rtt_samples,omitempty"`
+	PktsSent      uint64  `json:"pkts_sent,omitempty"`
 }
 
 type clientConnV struct {
-	Client   string `json:"client"`
-	Platform string `json:"platform"`
-	Devices  uint32 `json:"devices"`
-	Connects uint32 `json:"connects"`
-	Rejects  uint32 `json:"rejects"`
-	Drops    uint32 `json:"drops"`
-	Stalls   uint32 `json:"stalls"`
-	OnlineS  uint64 `json:"online_s"`
+	Client       string `json:"client"`
+	Platform     string `json:"platform"`
+	Devices      uint32 `json:"devices"`
+	Connects     uint32 `json:"connects"`
+	Rejects      uint32 `json:"rejects"`
+	Drops        uint32 `json:"drops"`
+	Stalls       uint32 `json:"stalls"`
+	OnlineS      uint64 `json:"online_s"`
+	Freezes      uint32 `json:"freezes,omitempty"`
+	Quiet        uint32 `json:"quiet,omitempty"`
+	RttMs        uint32 `json:"rtt_ms,omitempty"`
+	LossPermille uint32 `json:"loss_permille,omitempty"`
 }
 
 type awgPacketsV struct {
@@ -1355,7 +1387,17 @@ type awgPacketsV struct {
 
 func linkHourView(h *adminv1.LinkHour) linkHourV {
 	return linkHourV{HourUnix: h.GetHourStartUnix(), Connects: h.GetConnects(), Rejects: h.GetRejects(), Drops: h.GetDrops(),
-		Stalls: h.GetStalls(), OnlineS: h.GetOnlineS(), UnknownKeys: h.GetUnknownKeys(), Hellos: h.GetHellos(), Handshakes: h.GetHandshakes()}
+		Stalls: h.GetStalls(), OnlineS: h.GetOnlineS(), UnknownKeys: h.GetUnknownKeys(), Hellos: h.GetHellos(), Handshakes: h.GetHandshakes(),
+		ClientCloses: h.GetClientCloses(), Freezes: h.GetFreezes(), Quiet: h.GetQuiet(), Accepted: h.GetAccepted(),
+		HellosForeign: h.GetHellosForeign(), RttMs: metricWhen(h.GetRttMs(), h.GetRttSamples() > 0),
+		LossPermille: metricWhen(h.GetLossPermille(), h.GetPktsSent() > 0), RttSamples: h.GetRttSamples(), PktsSent: h.GetPktsSent()}
+}
+
+func metricWhen(value uint32, available bool) *uint32 {
+	if !available {
+		return nil
+	}
+	return &value
 }
 
 func inboundConnectionsView(i *adminv1.InboundConnections) inboundConnV {
@@ -1363,13 +1405,16 @@ func inboundConnectionsView(i *adminv1.InboundConnections) inboundConnV {
 		Protocol: clean(i.GetProtocol(), 40), Connects: i.GetConnects(), Rejects: i.GetRejects(), Drops: i.GetDrops(), Stalls: i.GetStalls(),
 		OnlineS: i.GetOnlineS(), UnknownKeys: i.GetUnknownKeys(), Hellos: i.GetHellos(), Handshakes: i.GetHandshakes(),
 		KeysStalled: i.GetKeysStalled(), KeysTried: i.GetKeysTried(), Unsupported: append([]string(nil), i.GetUnsupported()...),
-		Hours: []linkHourV{}, Clients: []clientConnV{}}
+		Hours: []linkHourV{}, Clients: []clientConnV{}, ClientCloses: i.GetClientCloses(), Freezes: i.GetFreezes(), Quiet: i.GetQuiet(),
+		Accepted: i.GetAccepted(), HellosForeign: i.GetHellosForeign(), RttMs: metricWhen(i.GetRttMs(), i.GetRttSamples() > 0),
+		LossPermille: metricWhen(i.GetLossPermille(), i.GetPktsSent() > 0), RttSamples: i.GetRttSamples(), PktsSent: i.GetPktsSent()}
 	for _, h := range i.GetHours() {
 		v.Hours = append(v.Hours, linkHourView(h))
 	}
 	for _, c := range i.GetClients() {
 		v.Clients = append(v.Clients, clientConnV{Client: clean(c.GetClient(), 80), Platform: clean(c.GetPlatform(), 40), Devices: c.GetDevices(),
-			Connects: c.GetConnects(), Rejects: c.GetRejects(), Drops: c.GetDrops(), Stalls: c.GetStalls(), OnlineS: c.GetOnlineS()})
+			Connects: c.GetConnects(), Rejects: c.GetRejects(), Drops: c.GetDrops(), Stalls: c.GetStalls(), OnlineS: c.GetOnlineS(),
+			Freezes: c.GetFreezes(), Quiet: c.GetQuiet(), RttMs: c.GetRttMs(), LossPermille: c.GetLossPermille()})
 	}
 	if a := i.GetAwg(); a != nil {
 		v.AWG = &awgPacketsV{UDPRxPackets: a.GetUdpRxPackets(), ReportedUnix: a.GetReportedUnix(), Backend: clean(a.GetBackend(), 32), PeersOnline: a.GetPeersOnline()}
