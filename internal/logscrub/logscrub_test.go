@@ -28,11 +28,27 @@ func TestAddrs(t *testing.T) {
 		{"mac aa:bb:cc:dd:ee:ff, sha256:deadbeef", "mac aa:bb:cc:dd:ee:ff, sha256:deadbeef"},
 		{"cert for vpn.example.com expires", "cert for vpn.example.com expires"},
 		{"version 1.2.3.4567 ok", "version 1.2.3.4567 ok"},
+		{"build 10.2.3.4.5 and 1234.5.6.7", "build 10.2.3.4.5 and 1234.5.6.7"},
+		// glued to letters, or with a port netip refuses: still an address
+		{"remote203.0.113.7x said no", "remote<ip>x said no"},
+		{"peer 203.0.113.7:99999 and 198.51.100.2:123456 gone", "peer <ip>:port and <ip>:port gone"},
 		{"no dots or colons", "no dots or colons"},
 		{"", ""},
 	} {
 		if got := Addrs(c.in); got != c.want {
 			t.Errorf("Addrs(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestHosts(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"failed to dial destination.example.com:443: timeout", "failed to dial <host>:443: timeout"},
+		{"proxy/vless/inbound: invalid request from xn--d1acufc.xn--p1ai", "proxy/vless/inbound: invalid request from <host>"},
+		{"app/dns: v1.26 ok, no name here", "app/dns: v1.26 ok, no name here"},
+	} {
+		if got := Hosts(c.in); got != c.want {
+			t.Errorf("Hosts(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

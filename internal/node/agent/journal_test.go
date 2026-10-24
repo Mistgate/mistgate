@@ -116,6 +116,24 @@ func TestJournalUsesTemplateScrubsAndLimitsAttributes(t *testing.T) {
 	if _, ok := row.Attrs["msg_template"]; ok {
 		t.Error("msg_template must not be sent as a journal attribute")
 	}
+
+	// xray's text may name a destination: names go too, and only there
+	j.note(logRecord{at: time.Unix(101, 0), level: pb.Severity_SEVERITY_WARNING, source: "xray",
+		msg: "core: failed to dial destination.example.com", attrs: map[string]string{"err": "lookup visit.example.org"}})
+	j.note(logRecord{at: time.Unix(101, 0), level: pb.Severity_SEVERITY_WARNING, source: "agent",
+		msg: "certificate for vpn.example.com renews", attrs: map[string]string{}})
+	for _, r := range j.take(0) {
+		switch r.Source {
+		case "xray":
+			if r.Message != "core: failed to dial <host>" || r.Attrs["err"] != "lookup <host>" {
+				t.Errorf("xray entry = %q %v", r.Message, r.Attrs)
+			}
+		case "agent":
+			if r.Message != "certificate for vpn.example.com renews" {
+				t.Errorf("agent entry lost its name: %q", r.Message)
+			}
+		}
+	}
 }
 
 func TestJournalMessageClipIsByteBoundedAndUtf8Safe(t *testing.T) {

@@ -60,19 +60,30 @@ func nodeJournalStmt(nodeID string, hourStart int64, entries []FleetJournal, sec
 		if entry.Level != 2 && entry.Level != 3 {
 			continue
 		}
-		message := logscrub.Clip(scrubJournalText(entry.Message, secrets), 256)
-		source := logscrub.Clip(entry.Source, 32)
+		source := logscrub.Clip(scrubJournalText(entry.Source, secrets), 32)
+		clean := func(s string) string {
+			s = scrubJournalText(s, secrets)
+			if source == "xray" { // its text may name a destination
+				s = logscrub.Hosts(s)
+			}
+			return s
+		}
+		message := logscrub.Clip(clean(logscrub.Clip(entry.Message, 1024)), 256)
 		inboundID := logscrub.Clip(entry.InboundID, 64)
 		attrs := make(map[string]string, len(entry.Attrs))
 		for key, value := range entry.Attrs {
-			attrs[key] = logscrub.ClipRunes(scrubJournalText(value, secrets), 160)
+			attrs[key] = logscrub.ClipRunes(clean(logscrub.ClipRunes(value, 640)), 160)
 		}
-		attrsJSON, err := json.Marshal(attrs)
+		attrsJSON, err := plainJSON(attrs)
 		if err != nil {
 			return Stmt{}, err
 		}
-		keyMaterial := strconv.FormatInt(int64(entry.Level), 10) + "|" + source + "|" + message + "|" + inboundID + "|" + attrs["code"]
-		sum := sha256.Sum256([]byte(keyMaterial))
+		// the fields as a JSON array, so no separator in a field can join two different records
+		keyMaterial, err := json.Marshal([]any{entry.Level, source, message, inboundID, attrs["code"]})
+		if err != nil {
+			return Stmt{}, err
+		}
+		sum := sha256.Sum256(keyMaterial)
 		count := entry.Count
 		if count == 0 {
 			count = 1
@@ -82,7 +93,7 @@ func nodeJournalStmt(nodeID string, hourStart int64, entries []FleetJournal, sec
 			firstAt, lastAt = lastAt, firstAt
 		}
 		rows = append(rows, []any{hex.EncodeToString(sum[:])[:32], entry.Level, source, message, inboundID,
-			string(attrsJSON), int64(count), firstAt, lastAt})
+			attrsJSON, int64(count), firstAt, lastAt})
 	}
 	encoded, err := json.Marshal(rows)
 	if err != nil {
@@ -119,6 +130,17 @@ func nodeJournalStmt(nodeID string, hourStart int64, entries []FleetJournal, sec
 // minJournalSecret: a shorter secret (a hand-picked SNI label such as "www") would cut ordinary words out of every message.
 // The generated ones are 16 (agent SNI label) and 24 (path prefixes) characters.
 const minJournalSecret = 8
+
+// plainJSON is json.Marshal without HTML escaping: attrs_json keeps "<ip>" as it is, so a search finds it.
+func plainJSON(v any) (string, error) {
+	var b strings.Builder
+	e := json.NewEncoder(&b)
+	e.SetEscapeHTML(false)
+	if err := e.Encode(v); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(b.String()), nil
+}
 
 // scrubJournalText is the panel's second privacy pass. Path prefixes are secret too; matching is case insensitive because an
 // SNI is a DNS name, and replacing a path prefix case insensitively is safe even though routing itself is case sensitive.

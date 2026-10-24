@@ -68,7 +68,7 @@ export function JournalTab({ nodeId }: { nodeId: string }) {
       </div>
       <div className={cx("overflow-hidden rounded-[14px] border border-line bg-surface", q.isPlaceholderData && "opacity-60")}>
         {entries.map((e) => (
-          <Row key={`${e.nodeId}/${e.hourStartUnix}/${e.source}/${e.message}/${e.inboundId}/${e.attrs.code ?? ""}`} e={e} />
+          <Row key={`${e.nodeId}/${e.hourStartUnix}/${e.level}/${e.source}/${e.message}/${e.inboundId}/${e.attrs.code ?? ""}`} e={e} />
         ))}
         {entries.length === 0 && <p className="px-3.5 py-3 text-muted">{t("journal.empty")}</p>}
       </div>

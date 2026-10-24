@@ -2,7 +2,6 @@ package fleet
 
 import (
 	"math"
-	"sort"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -85,7 +84,10 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	return out
 }
 
-const maxJournalEntries = 64
+const (
+	maxJournalEntries = 64
+	journalSkew       = 300 // seconds a journal time may lie outside its batch's interval
+)
 
 // guardJournal bounds the node-provided journal before it reaches the store. Attribute keys are sorted before the cap so Go map
 // iteration cannot change which attributes are kept.
@@ -102,32 +104,27 @@ func (f *Fleet) guardJournal(st *agentv1.StatsBatch) []store.FleetJournal {
 		if entry == nil || (entry.GetLevel() != agentv1.Severity_SEVERITY_WARNING && entry.GetLevel() != agentv1.Severity_SEVERITY_ERROR) {
 			continue
 		}
-		attrs := make(map[string]string, min(len(entry.GetAttrs()), 8))
-		keys := make([]string, 0, len(entry.GetAttrs()))
-		for key := range entry.GetAttrs() {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, originalKey := range keys {
-			key := logscrub.ClipRunes(originalKey, 32)
-			if key == "" || len(attrs) == 8 {
-				continue
+		// the agent's allow-list again, looked up rather than iterated: a node's own keys are never sorted or kept
+		attrs := make(map[string]string, 8)
+		for _, key := range logscrub.JournalAttrs {
+			if v, ok := entry.GetAttrs()[key]; ok && len(attrs) < 8 {
+				attrs[key] = logscrub.ClipRunes(v, 640) // the store cleans, then cuts to 160
 			}
-			if _, exists := attrs[key]; exists {
-				continue
-			}
-			attrs[key] = logscrub.ClipRunes(entry.GetAttrs()[originalKey], 160)
 		}
+		// the times stay within the batch's interval (and a little clock skew), so no node can sort itself first
 		firstAt, lastAt := entry.GetFirstUnix(), entry.GetLastUnix()
 		if firstAt > lastAt {
 			firstAt, lastAt = lastAt, firstAt
+		}
+		if lo, hi := st.GetIntervalStartUnix()-journalSkew, st.GetIntervalEndUnix()+journalSkew; st.GetIntervalEndUnix() > 0 {
+			firstAt, lastAt = min(max(firstAt, lo), hi), min(max(lastAt, lo), hi)
 		}
 		count := entry.GetCount()
 		if count == 0 {
 			count = 1
 		}
 		out = append(out, store.FleetJournal{Level: int32(entry.GetLevel()), Source: logscrub.Clip(entry.GetSource(), 32),
-			Message: logscrub.Clip(entry.GetMessage(), 256), InboundID: logscrub.Clip(entry.GetInboundId(), 64), Attrs: attrs,
+			Message: logscrub.Clip(entry.GetMessage(), 1024), InboundID: logscrub.Clip(entry.GetInboundId(), 64), Attrs: attrs,
 			Count: count, FirstAt: firstAt, LastAt: lastAt})
 	}
 	return out

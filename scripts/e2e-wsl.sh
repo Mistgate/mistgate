@@ -345,24 +345,30 @@ user_json() { api UserService/GetUser "{\"userId\":\"$USER_ID\"}"; }
 journal_check() {
   local busy holder prof inb answer entry
   busy=$(free_port udp)
-  python3 -c 'import socket, sys, time; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("0.0.0.0", int(sys.argv[1]))); time.sleep(900)' "$busy" &
-  holder=$!
+  spawn python3 -c 'import socket, sys, time; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("0.0.0.0", int(sys.argv[1]))); time.sleep(900)' "$busy"
+  holder=$LAST_PID
+  port_held() { ss -Hlun "sport = :$busy" | grep -q .; }
+  wait_for 10 "the holder bound UDP $busy" port_held || die "the holder never bound UDP $busy"
   prof=$(api ProfileService/CreateProfile "$(jq -nc --arg s "$(jq -c --argjson p "$busy" '.port = $p | .hop = {from: 0, to: 0}' <<<"$SETTINGS")" \
     '{protocol:"hysteria2", name:"e2e-busy", settingsJson:$s}')" | jq -r .profile.id)
   inb=$(api ProfileService/CreateInbound "{\"profileId\":\"$prof\",\"nodeId\":\"$NODE_ID\"}" | jq -r .inbound.id)
   journal_json() { api NodeService/GetNodeJournal "{\"nodeId\":\"$NODE_ID\",\"hours\":1,\"minLevel\":\"EVENT_SEVERITY_ERROR\"}"; }
   journal_has() { journal_json | jq -e --arg i "$inb" '[.entries[]? | select(.inboundId == $i)] | length >= 1' >/dev/null; }
   wait_for 60 "the busy port's start error in the node journal" journal_has \
-    || { kill "$holder"; die "GetNodeJournal: no entry for the inbound on the busy port: $(journal_json | jq -c '[.entries[]? | {source, message, inboundId}]')"; }
+    || die "GetNodeJournal: no entry for the inbound on the busy port: $(journal_json | jq -c '[.entries[]? | {source, message, inboundId}]')"
   answer=$(journal_json)
   jq -e '(.nodesWithoutJournal // []) | length == 0' <<<"$answer" >/dev/null || die "GetNodeJournal lists the node as not sending its journal"
   if grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' <<<"$answer" | grep -vqE '^(0\.0\.0\.0|127\.)'; then
     die "the node journal carries an address: $(grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' <<<"$answer" | sort -u | tr '\n' ' ')"
   fi
+  # an IPv6 address (a double colon, or seven colons) other than :: and ::1
+  if grep -oE '[0-9A-Fa-f]{0,4}(:[0-9A-Fa-f]{0,4}){2,7}' <<<"$answer" | grep -E '::|(:[0-9A-Fa-f]{1,4}){7}' | grep -vqE '^::1?$'; then
+    die "the node journal carries an IPv6 address: $(grep -oE '[0-9A-Fa-f]{0,4}(:[0-9A-Fa-f]{0,4}){2,7}' <<<"$answer" | sort -u | tr '\n' ' ')"
+  fi
   entry=$(jq -c --arg i "$inb" '[.entries[] | select(.inboundId == $i)][0] | {source, message, profileName, count, err: .attrs.err}' <<<"$answer")
   api ProfileService/DeleteInbound "{\"inboundId\":\"$inb\"}" >/dev/null || die "DeleteInbound of the busy-port inbound failed"
   api ProfileService/DeleteProfile "{\"profileId\":\"$prof\"}" >/dev/null || die "DeleteProfile of the busy-port profile failed"
-  kill "$holder"
+  stop_pid "$holder"
   wait_for 60 "the other inbounds ACTIVE again" inbounds_active "$1" || die "the inbounds did not settle after the busy-port one went"
   pass "node journal: the start error on busy UDP $busy is there under its inbound, no client address ($entry)"
 }

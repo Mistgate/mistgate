@@ -14,11 +14,6 @@ const (
 	journalMaxKinds   = journalMaxEntries - 1 // keep one slot for the overflow summary
 )
 
-var journalAttributeKeys = [...]string{
-	"inbound", "protocol", "profile", "port", "state", "reason", "code", "backend", "mode", "version",
-	"kernel", "iface", "check", "fix", "count", "err", "error",
-}
-
 type journalKey struct {
 	level     pb.Severity
 	source    string
@@ -59,10 +54,10 @@ func (j *journal) note(rec logRecord) {
 	if template, ok := rec.attrs["msg_template"]; ok {
 		message = template
 	}
-	message = logscrub.Clip(logscrub.Addrs(message), 256)
+	message = logscrub.Clip(scrub(rec.source, logscrub.Clip(message, 1024)), 256) // cut first: the scrub is a regexp pass
 
 	attrs := make(map[string]string, 8)
-	for _, key := range journalAttributeKeys {
+	for _, key := range logscrub.JournalAttrs {
 		if len(attrs) == 8 {
 			break
 		}
@@ -70,7 +65,7 @@ func (j *journal) note(rec logRecord) {
 		if !ok {
 			continue
 		}
-		attrs[key] = logscrub.ClipRunes(logscrub.Addrs(value), 160)
+		attrs[key] = logscrub.ClipRunes(scrub(rec.source, logscrub.ClipRunes(value, 640)), 160)
 	}
 	if len(attrs) == 0 {
 		attrs = nil
@@ -162,6 +157,15 @@ func (j *journal) take(offset time.Duration) []*pb.JournalEntry {
 		})
 	}
 	return out
+}
+
+// scrub cuts addresses, and for xray also names: its text may name a destination.
+func scrub(source, s string) string {
+	s = logscrub.Addrs(s)
+	if source == "xray" {
+		s = logscrub.Hosts(s)
+	}
+	return s
 }
 
 func journalKeyLess(a, b journalKey) bool {
