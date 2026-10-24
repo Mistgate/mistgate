@@ -185,3 +185,6 @@ require (
 	mvdan.cc/xurls/v2 v2.6.0 // indirect
 	pluginrpc.com/pluginrpc v0.5.0 // indirect
 )
+
+// The Hysteria core with a hook for the QUIC connection behind Connect and Disconnect (third_party/hysteria-core/MISTGATE.md).
+replace github.com/apernet/hysteria/core/v2 => ./third_party/hysteria-core

@@ -50,8 +50,6 @@ github.com/andybalholm/brotli v1.2.3 h1:8H1qwOkl2LPfjf3YezB90JnCliZb6SInJ/OJkEbA
 github.com/andybalholm/brotli v1.2.3/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
-github.com/apernet/hysteria/core/v2 v2.12.3 h1:nYSZwGTwHXGezl+pO/lpqPYdsmog/RNoiE/zpAQi9tk=
-github.com/apernet/hysteria/core/v2 v2.12.3/go.mod h1:ov87Lw+2KWvr5Jqa/S718HiyWkmNHyjkmdwk+xIG2fg=
 github.com/apernet/hysteria/extras/v2 v2.12.3 h1:EtbSKBmcWc18AR6KqGMYHUwzztu5CxA/jbcAq4asOYg=
 github.com/apernet/hysteria/extras/v2 v2.12.3/go.mod h1:Qnk6jti6C7F+DsoTBGnv5C8zR2p+jdogxEE1KQXVf4k=
 github.com/apernet/quic-go v0.62.1-0.20260912175848-73339f7edbb9 h1:IpePaGNz34fn9X8bUbm+jHBYcQKV90TbrbujQK61Txo=
