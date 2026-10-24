@@ -1217,6 +1217,8 @@ node_conn() { api NodeService/GetNodeConnections "{\"nodeId\":\"$NODE_ID\",\"hou
 h2_sum() { node_conn | jq -r --arg f "$1" '[.inbounds[]? | select(.protocol == "hysteria2") | (.[$f] // 0 | tonumber)] | add // 0'; }
 counts_in() { [ "$(h2_sum connects)" -ge 2 ] && [ "$(h2_sum unknownKeys)" -ge 1 ]; }
 node_conn | jq -e '.supported == true' >/dev/null || die "GetNodeConnections: the agent does not report links/1"
+node_conn | jq -e '[.inbounds[]? | select(.protocol == "hysteria2") | (.unsupported // []) | index("freezes")] | all(. == null)' >/dev/null \
+  || die "GetNodeConnections: Hysteria2 inbounds list freezes as unsupported (the agent does not report links/2)"
 wait_for 40 "Hysteria2 connects >= 2 and unknown keys >= 1" counts_in \
   || die "GetNodeConnections: connects $(h2_sum connects), unknownKeys $(h2_sum unknownKeys) (want >= 2 and >= 1)"
 USER_CONN=$(api UserService/GetUserConnection "{\"userId\":\"$USER_ID\",\"hours\":1}")
