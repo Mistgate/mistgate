@@ -142,7 +142,7 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 | 备份 | 不支持加密备份和恢复。Cloudflare 自带的 D1 恢复功能（Time Travel）可以恢复数据库，但尚未与面板一起测试。妥善保管密钥文件。 |
 | MCP 和 API 令牌 | 不提供 MCP 服务器。已有令牌会显示在列表中，也可以吊销；不能创建新令牌。 |
 | 隧道检测 | 面板目前不会从客户端视角检测服务器的隧道。 |
-| 节点日志 | 不显示节点 Agent 的实时日志。 |
+| 节点日志 | 不显示节点 Agent 的实时日志；其警告和错误见节点的[运行记录](../guide/nodes.md#运行记录)。 |
 | 更新面板 | 不支持自更新：需再次运行命令更新（见下文）。 |
 | 自有伪装站点 | 节点无法使用**自有站点**伪装内容：此版本不保存上传的站点包。 |
 | TSPU 探测 | 国家视角检测的 [TSPU 探测](../operations/reachability.md#tspu-探测)不运行：一次运行需要几分钟，而此版本的定时任务只有几秒。卡片会说明它不可用。Globalping 和封锁名单可用。 |

@@ -124,7 +124,16 @@ A live tail of the agent and its engines, relayed by the panel. The last 200 lin
 - **Pause** freezes the screen while new lines keep arriving; **Resume** shows them.
 - **Download** saves what was received as `<node>-agent.log`.
 
-The tab works while the agent is connected (**Healthy** or **No traffic**). If the link drops, it reconnects every 5 seconds. Only the owner can read the logs: they contain client addresses.
+The tab works while the agent is connected (**Healthy** or **No traffic**). If the link drops, it reconnects every 5 seconds. Only the owner can read the logs: they contain client addresses. Every admin can read the [Journal](#journal).
+
+### Journal
+
+The node's warnings and errors, saved by the panel for 7 days: what the agent and its engines (Hysteria2, VLESS, AmneziaWG, xray, WARP) wrote at the **Warn** and **Error** levels. Each row is one kind of record in one hour: the time of the latest, the level, the source, the profile when the record names one, how many times it came (**×12**), the message and its details. Client addresses are cut out on the node and again in the panel, so every admin can read the journal; the message is the template the engine logs, without the values of a single connection.
+
+- **24 hours** or **7 days**; **Warnings and errors** or **Errors only**.
+- **Search the journal** looks in the messages and the details on the panel, across all the rows of the period. At most 200 rows are shown, newest first; when there are more, the tab says so.
+
+A node whose agent does not send the journal yet says so: update the agent. On the Cloudflare edition, where the live tail is not available, the **Logs** tab leads here. The same journal is in MCP as `node_journal`.
 
 ### Events
 

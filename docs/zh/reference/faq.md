@@ -44,7 +44,7 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 
 ## 面板可以不使用服务器，直接运行在 Cloudflare Workers 上吗？
 
-可以作为预览版使用：`mistgate edge deploy` 会将面板部署到 Cloudflare 账户中的六个 Worker 和一个 D1 数据库。它需要 Workers Paid 计划和 Cloudflare DNS 中的域名。告警、Telegram 和节点更新均可使用；备份、MCP、隧道检测、节点日志以及从管理后台更新面板本身暂不支持。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。
+可以作为预览版使用：`mistgate edge deploy` 会将面板部署到 Cloudflare 账户中的六个 Worker 和一个 D1 数据库。它需要 Workers Paid 计划和 Cloudflare DNS 中的域名。告警、Telegram 和节点更新均可使用；备份、MCP、隧道检测、节点实时日志（已保存的运行记录可用）以及从管理后台更新面板本身暂不支持。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。
 
 ## 可以从其他面板迁移吗？
 

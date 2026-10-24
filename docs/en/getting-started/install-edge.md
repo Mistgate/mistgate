@@ -142,7 +142,7 @@ The admin shows "Not available in the Cloudflare edition yet" in the places belo
 | Backups | No encrypted backups and no restore. Cloudflare's own D1 recovery (Time Travel) can restore the database, but it has not been tried with the panel. Keep the key file. |
 | MCP and API tokens | The MCP server is not served. Tokens you already have are listed and can be revoked; new ones cannot be created. |
 | Tunnel checks | The panel does not run client-eye checks of the servers' tunnels. |
-| Node logs | The live log of a node's agent is not shown. |
+| Node logs | The live log of a node's agent is not shown; its warnings and errors are in the node's [Journal](../guide/nodes.md#journal). |
 | Updating the panel | There is no self-update: update by running the command again (below). |
 | Own decoy site | A node cannot get the **Own site** decoy: this edition does not store uploaded bundles. |
 | TSPU probe | The [TSPU probe](../operations/reachability.md#tspu-probe) of the country check does not run: a run takes minutes and the scheduled jobs of this edition have seconds. The card says it is unavailable. Globalping and the block lists work. |
