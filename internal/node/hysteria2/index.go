@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -256,11 +257,19 @@ func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
 	cs.connects.Add(1)
 }
 
-func (in *inbound) Disconnect(addr net.Addr, _ string, err error) {
+func (in *inbound) Disconnect(addr net.Addr, id string, err error) {
 	in.smu.Lock()
 	key := addr.String()
 	s, ok := in.sessions[key]
-	delete(in.sessions, key)
+	if !ok || s.cs.id != id {
+		// The core reports Connect with the address at authentication and Disconnect with the connection's address at
+		// close; with the path manager off (port hopping) quic-go moves that address to whatever the client sends from
+		// next. A miss is such a moved connection: take this credential's session from the same IP, else its oldest.
+		key, s, ok = in.movedSession(id, addr)
+	}
+	if ok {
+		delete(in.sessions, key)
+	}
 	in.smu.Unlock()
 	if ok {
 		var idleTimeout *quic.IdleTimeoutError
@@ -272,6 +281,31 @@ func (in *inbound) Disconnect(addr net.Addr, _ string, err error) {
 		}
 		s.cs.clampKicks(s.cs.conns.Add(-1))
 	}
+}
+
+// movedSession finds the session of credential id whose connection now speaks from addr. Caller holds smu.
+// ponytail: a scan of the inbound's sessions on a missed disconnect; key the map by connection if a core hook ever gives one.
+func (in *inbound) movedSession(id string, addr net.Addr) (string, session, bool) {
+	ip := ""
+	if ap, err := netip.ParseAddrPort(addr.String()); err == nil {
+		ip = ap.Addr().Unmap().String()
+	}
+	var best string
+	var bestS session
+	bestSameIP := false
+	for k, s := range in.sessions {
+		if s.cs.id != id {
+			continue
+		}
+		sameIP := false
+		if ap, err := netip.ParseAddrPort(k); err == nil && ip != "" {
+			sameIP = ap.Addr().Unmap().String() == ip
+		}
+		if best == "" || (sameIP && !bestSameIP) || (sameIP == bestSameIP && s.since.Before(bestS.since)) {
+			best, bestS, bestSameIP = k, s, sameIP
+		}
+	}
+	return best, bestS, best != ""
 }
 
 func (cs *credState) bytesMoved() uint64 {
