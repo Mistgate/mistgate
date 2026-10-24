@@ -17,7 +17,8 @@ func TestGetUserConnection(t *testing.T) {
 	p2 := e.profile("hy2 8443", "")
 	in2 := e.inbound(p2.Id, "nod_nl1")
 	g := e.group("both", f.profile, p2.Id)
-	e.sql(`UPDATE node SET agent_caps = 'links/1 awg/1' WHERE id = 'nod_de1'`)
+	e.sql(`UPDATE node SET agent_caps = 'links/1 links/2 awg/1' WHERE id = 'nod_de1'`)
+	e.sql(`UPDATE profile SET protocol = 'hysteria2' WHERE id = ?`, f.profile)
 
 	alice := e.user("alice", g, nil).User
 	bob := e.user("bob", g, nil).User
@@ -25,6 +26,7 @@ func TestGetUserConnection(t *testing.T) {
 	if err := e.st.R.QueryRow(`SELECT id, device_id FROM device_credential WHERE user_id = ? ORDER BY id LIMIT 1`, alice.Id).Scan(&cred, &device); err != nil {
 		t.Fatal(err)
 	}
+	e.sql(`UPDATE device_credential SET protocol = 'hysteria2' WHERE id = ?`, cred)
 	e.sql(`UPDATE device SET platform = 'android', client = 'Happ/3.4.2', kind = 'link' WHERE id = ?`, device)
 	hour := e.clock.Unix() / 3600 * 3600
 	row := func(node, inbound, credID, user string, at int64, counters string) {
@@ -36,6 +38,9 @@ func TestGetUserConnection(t *testing.T) {
 	row("nod_de1", f.inbound, cred, alice.Id, hour-3600, cols)
 	row("nod_nl1", in2.Id, cred, alice.Id, hour-2*3600, cols)
 	row("nod_de1", f.inbound, cred, alice.Id, hour-30*3600, cols) // outside the default window
+	e.sql(`UPDATE link_hour SET client_closes = 2, freezes = 3, quiet = 4, accepted = 9, hellos_foreign = 7,
+		rtt_ms_sum = 1500, rtt_samples = 3, pkts_sent = 500, pkts_lost = 5
+		WHERE node_id = 'nod_de1' AND hour_start = ? AND inbound_id = ? AND cred_id = ?`, hour, f.inbound, cred)
 	e.sql(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, hellos) VALUES ('nod_de1', ?, ?, 'crd_ghost', ?, 4)`, hour, f.inbound, alice.Id)
 	e.sql(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, hellos) VALUES ('nod_de1', ?, ?, ?, ?, 4)`, hour-5*3600, f.inbound, cred, alice.Id) // no counter a person has: not the newest hour
 
@@ -53,10 +58,12 @@ func TestGetUserConnection(t *testing.T) {
 	de, nl := m.Rows[0], m.Rows[1]
 	if de.DeviceId != device || de.NodeId != "nod_de1" || de.NodeName != "de1" || de.InboundId != f.inbound || de.Protocol != "hysteria2" ||
 		de.Connects != 2 || de.Rejects != 2 || de.Drops != 2 || de.Stalls != 2 || de.OnlineS != 2 || de.LastHourUnix != hour ||
-		de.Platform != "android" || de.Client != "Happ/3.4.2" || de.Kind != "link" || len(de.Hours) != 0 {
+		de.Platform != "android" || de.Client != "Happ/3.4.2" || de.Kind != "link" || de.ClientCloses != 2 || de.Freezes != 3 ||
+		de.Quiet != 4 || de.RttMs != 500 || de.LossPermille != 10 || de.RttSamples != 3 || de.PktsSent != 500 || len(de.Hours) != 0 {
 		t.Errorf("de1 row = %+v", de)
 	}
-	if nl.NodeName != "nl1" || nl.InboundId != in2.Id || nl.Connects != 1 || nl.LastHourUnix != hour-2*3600 {
+	if nl.NodeName != "nl1" || nl.InboundId != in2.Id || nl.Connects != 1 || nl.LastHourUnix != hour-2*3600 ||
+		nl.ClientCloses != 0 || nl.Freezes != 0 || nl.Quiet != 0 || nl.RttMs != 0 || nl.LossPermille != 0 || nl.RttSamples != 0 || nl.PktsSent != 0 {
 		t.Errorf("nl1 row = %+v", nl)
 	}
 	if len(m.NodesWithoutCounters) != 1 || m.NodesWithoutCounters[0] != "nod_nl1" {
@@ -68,7 +75,10 @@ func TestGetUserConnection(t *testing.T) {
 	byHour, err := e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: alice.Id, Hours: 24, ByHour: true}))
 	if err != nil || len(byHour.Msg.Rows) != 2 || len(byHour.Msg.Rows[0].Hours) != 2 ||
 		byHour.Msg.Rows[0].Hours[0].HourStartUnix != hour-3600 || byHour.Msg.Rows[0].Hours[1].HourStartUnix != hour ||
-		byHour.Msg.Rows[0].Hours[0].Connects != 1 || byHour.Msg.Rows[0].Hours[1].Connects != 1 {
+		byHour.Msg.Rows[0].Hours[0].Connects != 1 || byHour.Msg.Rows[0].Hours[1].Connects != 1 ||
+		byHour.Msg.Rows[0].Hours[1].Accepted != 9 || byHour.Msg.Rows[0].Hours[1].HellosForeign != 7 ||
+		byHour.Msg.Rows[0].Hours[1].RttMs != 500 || byHour.Msg.Rows[0].Hours[1].LossPermille != 10 ||
+		byHour.Msg.Rows[0].Hours[1].RttSamples != 3 || byHour.Msg.Rows[0].Hours[1].PktsSent != 500 {
 		t.Errorf("by_hour response = %+v, %v", byHour, err)
 	}
 	if resp, err = e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: bob.Id})); err != nil || len(resp.Msg.Rows) != 0 || len(resp.Msg.NodesWithoutCounters) != 1 {

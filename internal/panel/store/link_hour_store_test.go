@@ -80,8 +80,10 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	out := ingest(hour,
 		FleetLink{CredID: "crd_lh_awg", InboundID: "inb_lh_awg", Connects: 2, Stalls: 1, OnlineS: 100},
 		FleetLink{CredID: "crd_lh_awg", InboundID: "inb_lh_awg", Connects: 1},
-		FleetLink{CredID: "crd_lh_hy2", InboundID: "inb_lh_hy2", Connects: 3, Drops: 1},
-		FleetLink{InboundID: "inb_lh_awg", UnknownKeys: 5, Hellos: 10, Handshakes: 4},
+		FleetLink{CredID: "crd_lh_hy2", InboundID: "inb_lh_hy2", Connects: 3, Drops: 1, ClientCloses: 2, Freezes: 3, Quiet: 4,
+			RttMSSum: 1500, RttSamples: 3, PktsSent: 500, PktsLost: 5},
+		FleetLink{InboundID: "inb_lh_awg", UnknownKeys: 5, Hellos: 10, Handshakes: 4, Accepted: 9, HellosForeign: 7},
+		FleetLink{InboundID: "inb_lh_hy2", Accepted: 10, HellosForeign: 2},
 		FleetLink{CredID: "crd_lh_other", InboundID: "inb_lh_awg", Rejects: 7},
 		FleetLink{CredID: "crd_lh_awg", InboundID: "inb_lh_b", Connects: 9},
 		FleetLink{CredID: "crd_lh_hy2", InboundID: "inb_lh_awg", Connects: 9},
@@ -102,8 +104,8 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 
 	// rows: the four keys/inbound rows of the first hour, the next-hour key and inbound row, and the older key. Node B is ingested below.
 	var rows int
-	if err := st.R.QueryRowContext(ctx, `SELECT COUNT(*) FROM link_hour`).Scan(&rows); err != nil || rows != 7 {
-		t.Fatalf("rows %d, %v, want 7", rows, err)
+	if err := st.R.QueryRowContext(ctx, `SELECT COUNT(*) FROM link_hour`).Scan(&rows); err != nil || rows != 8 {
+		t.Fatalf("rows %d, %v, want 8", rows, err)
 	}
 	var probe int64
 	if err := st.R.QueryRowContext(ctx, `SELECT probe_handshakes FROM link_hour WHERE cred_id = '' AND inbound_id = 'inb_lh_awg' AND hour_start = ?`, hour).Scan(&probe); err != nil || probe != 3 {
@@ -118,25 +120,34 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	}
 
 	// a counter is clamped, so a row stays short enough for the largest batch to fit one D1 value
-	ingest(hour-10*3600, FleetLink{CredID: "crd_lh_other", InboundID: "inb_lh_awg", OnlineS: 1<<32 - 1})
+	ingest(hour-10*3600, FleetLink{CredID: "crd_lh_other", InboundID: "inb_lh_awg", OnlineS: 1<<32 - 1,
+		ClientCloses: 1<<32 - 1, RttMSSum: ^uint64(0), RttSamples: 1<<32 - 1, PktsSent: ^uint64(0), PktsLost: ^uint64(0)})
 	var online int64
 	if err := st.R.QueryRowContext(ctx, `SELECT online_s FROM link_hour WHERE hour_start = ?`, hour-10*3600).Scan(&online); err != nil || online != maxLinkCount {
 		t.Errorf("a clamped counter = %d, %v, want %d", online, err, maxLinkCount)
 	}
+	var closeCount, rttSum, packetsSent, packetsLost int64
+	if err := st.R.QueryRowContext(ctx, `SELECT client_closes, rtt_ms_sum, pkts_sent, pkts_lost FROM link_hour WHERE hour_start = ?`, hour-10*3600).
+		Scan(&closeCount, &rttSum, &packetsSent, &packetsLost); err != nil || closeCount != maxLinkCount || rttSum != maxLinkSum ||
+		packetsSent != maxLinkSum || packetsLost != maxLinkSum {
+		t.Errorf("clamped new counters = %d/%d/%d/%d, %v, want %d/%d/%d/%d", closeCount, rttSum, packetsSent, packetsLost,
+			err, maxLinkCount, maxLinkSum, maxLinkSum, maxLinkSum)
+	}
 	if _, err := st.W.ExecContext(ctx, `DELETE FROM link_hour WHERE hour_start = ?`, hour-10*3600); err != nil {
 		t.Fatal(err)
 	}
-	// the node's inbounds, from the hour of base on: the probe's five handshakes are off the inbound's hellos and handshakes (the
-	// handshakes stop at zero), and nothing else of the probe shows
+	// the node's inbounds, from the hour of base on: the five probe handshakes in this window are taken off accepted, hellos and
+	// handshakes (the differences stop at zero); the next-hour check can make the aggregate accepted count low by two.
 	sums, err := st.NodeLinkSums(ctx, "nod_lh_a", base)
 	if err != nil || len(sums) != 2 {
 		t.Fatalf("NodeLinkSums = %+v, %v", sums, err)
 	}
 	if want := (LinkInboundSums{InboundID: "inb_lh_awg", Connects: 4, Rejects: 9, Stalls: 1, OnlineS: 100, UnknownKeys: 5, Hellos: 5,
-		KeysStalled: 1, KeysTried: 1}); sums[0] != want {
+		Accepted: 4, HellosForeign: 7, KeysStalled: 1, KeysTried: 1}); sums[0] != want {
 		t.Errorf("awg inbound = %+v, want %+v", sums[0], want)
 	}
-	if want := (LinkInboundSums{InboundID: "inb_lh_hy2", Connects: 3, Drops: 1, KeysTried: 1}); sums[1] != want {
+	if want := (LinkInboundSums{InboundID: "inb_lh_hy2", Connects: 3, Drops: 1, ClientCloses: 2, Freezes: 3, Quiet: 4,
+		Accepted: 10, HellosForeign: 2, RttMSSum: 1500, RttSamples: 3, PktsSent: 500, PktsLost: 5, KeysTried: 1}); sums[1] != want {
 		t.Errorf("hysteria2 inbound = %+v, want %+v", sums[1], want)
 	}
 	if sums, err = st.NodeLinkSums(ctx, "nod_lh_a", base.Add(time.Hour)); err != nil || len(sums) != 1 ||
@@ -168,9 +179,18 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	}
 	awgReport := reports[0]
 	if awgReport.Totals.InboundID != "inb_lh_awg" || len(awgReport.Hours) != 2 || awgReport.Hours[0].HourStart != hour ||
-		awgReport.Hours[0].Hellos != 7 || awgReport.Hours[0].Handshakes != 1 || awgReport.Hours[1].HourStart != hour+3600 || awgReport.Hours[1].Rejects != 2 ||
+		awgReport.Hours[0].Hellos != 7 || awgReport.Hours[0].Handshakes != 1 || awgReport.Hours[0].Accepted != 6 ||
+		awgReport.Hours[0].HellosForeign != 7 || awgReport.Hours[1].HourStart != hour+3600 || awgReport.Hours[1].Rejects != 2 ||
 		awgReport.Hours[1].Hellos != 0 || awgReport.Hours[1].Handshakes != 0 {
 		t.Errorf("node AWG hours = %+v", awgReport.Hours)
+	}
+	hy2Report := reports[1]
+	if hy2Report.Totals.Accepted != 10 || hy2Report.Totals.HellosForeign != 2 || hy2Report.Totals.RttMSSum != 1500 ||
+		hy2Report.Totals.RttSamples != 3 || hy2Report.Totals.PktsSent != 500 || hy2Report.Totals.PktsLost != 5 ||
+		len(hy2Report.Clients) != 1 || hy2Report.Clients[0].Freezes != 3 || hy2Report.Clients[0].Quiet != 4 ||
+		hy2Report.Clients[0].RttMSSum != 1500 || hy2Report.Clients[0].RttSamples != 3 || hy2Report.Clients[0].PktsSent != 500 ||
+		hy2Report.Clients[0].PktsLost != 5 || len(hy2Report.Hours) != 1 || hy2Report.Hours[0].RttSamples != 3 {
+		t.Errorf("node Hysteria2 quality report = %+v", hy2Report)
 	}
 	if len(awgReport.Clients) != 2 || awgReport.Clients[0] != (LinkClientSums{Client: "Happ/3.4.2", Platform: "android", Devices: 1, Connects: 4, Rejects: 2, Stalls: 1, OnlineS: 100}) ||
 		awgReport.Clients[1] != (LinkClientSums{Client: "AmneziaVPN/4.5", Platform: "windows", Devices: 1, Rejects: 7}) {
@@ -182,7 +202,8 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	}
 	fleetSums, err := st.FleetNodeLinkSums(ctx, base)
 	if err != nil || len(fleetSums) != 3 || fleetSums[0].NodeID != "nod_lh_a" || fleetSums[0].InboundID != "inb_lh_awg" ||
-		fleetSums[0].Connects != 4 || fleetSums[2].NodeID != "nod_lh_b" || fleetSums[2].Connects != 9 {
+		fleetSums[0].Connects != 4 || fleetSums[0].Accepted != 4 || fleetSums[0].HellosForeign != 7 ||
+		fleetSums[2].NodeID != "nod_lh_b" || fleetSums[2].Connects != 9 {
 		t.Errorf("fleet link sums = %+v, %v", fleetSums, err)
 	}
 
@@ -193,7 +214,8 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	}
 	if want := (UserLink{DeviceID: "dev_usr_lh", NodeID: "nod_lh_a", NodeName: "de1", InboundID: "inb_lh_hy2", ProfileName: "Fast", Protocol: "hysteria2",
 		Platform: "android", Client: "Happ/3.4.2", Kind: "link",
-		Connects: 3, Drops: 1, LastHour: time.Unix(hour, 0)}); !sameLink(links[0], want) {
+		Connects: 3, Drops: 1, ClientCloses: 2, Freezes: 3, Quiet: 4, RttMSSum: 1500, RttSamples: 3, PktsSent: 500, PktsLost: 5,
+		LastHour: time.Unix(hour, 0)}); !sameLink(links[0], want) {
 		t.Errorf("first row = %+v, want %+v", links[0], want)
 	}
 	if want := (UserLink{DeviceID: "dev_usr_lh", NodeID: "nod_lh_a", NodeName: "de1", InboundID: "inb_lh_awg", ProfileName: "Home AWG", Protocol: "awg",
@@ -202,7 +224,9 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 		t.Errorf("second row = %+v, want %+v", links[1], want)
 	}
 	links, err = st.UserLinksByHour(ctx, "usr_lh", base, true)
-	if err != nil || len(links) != 2 || len(links[1].Hours) != 2 || links[1].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 4, Stalls: 1, OnlineS: 100}) ||
+	if err != nil || len(links) != 2 || len(links[0].Hours) != 1 || links[0].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 3, Drops: 1,
+		ClientCloses: 2, Freezes: 3, Quiet: 4, RttMSSum: 1500, RttSamples: 3, PktsSent: 500, PktsLost: 5}) ||
+		len(links[1].Hours) != 2 || links[1].Hours[0] != (LinkHourSums{HourStart: hour, Connects: 4, Stalls: 1, OnlineS: 100}) ||
 		links[1].Hours[1] != (LinkHourSums{HourStart: hour + 3600, Rejects: 2}) {
 		t.Errorf("user by_hour = %+v, %v", links, err)
 	}
@@ -217,8 +241,8 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 	if n, err := st.PruneLinkHours(ctx, base); err != nil || n != 1 {
 		t.Errorf("pruned %d, %v, want the one row of three hours earlier", n, err)
 	}
-	if n, err := st.PruneLinkHours(ctx, base.Add(time.Hour)); err != nil || n != 5 {
-		t.Errorf("pruned %d, %v, want the five rows of the first hour", n, err)
+	if n, err := st.PruneLinkHours(ctx, base.Add(time.Hour)); err != nil || n != 6 {
+		t.Errorf("pruned %d, %v, want the six rows of the first hour", n, err)
 	}
 	if err := st.R.QueryRowContext(ctx, `SELECT COUNT(*) FROM link_hour`).Scan(&rows); err != nil || rows != 2 {
 		t.Errorf("rows after the retention %d, %v, want 2", rows, err)
@@ -259,5 +283,7 @@ func sameLink(a, b UserLink) bool {
 	return a.DeviceID == b.DeviceID && a.NodeID == b.NodeID && a.NodeName == b.NodeName && a.InboundID == b.InboundID &&
 		a.ProfileName == b.ProfileName && a.Protocol == b.Protocol && a.Platform == b.Platform && a.Client == b.Client && a.Kind == b.Kind &&
 		a.Connects == b.Connects && a.Rejects == b.Rejects && a.Drops == b.Drops && a.Stalls == b.Stalls && a.OnlineS == b.OnlineS &&
+		a.ClientCloses == b.ClientCloses && a.Freezes == b.Freezes && a.Quiet == b.Quiet && a.Accepted == b.Accepted && a.HellosForeign == b.HellosForeign &&
+		a.RttMSSum == b.RttMSSum && a.RttSamples == b.RttSamples && a.PktsSent == b.PktsSent && a.PktsLost == b.PktsLost &&
 		a.LastHour.Equal(b.LastHour)
 }

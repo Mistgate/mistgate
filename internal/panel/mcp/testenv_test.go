@@ -24,6 +24,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -836,9 +837,11 @@ func (w *world) GetUserConnection(_ context.Context, r *connect.Request[adminv1.
 	}
 	since, now := connWindow(r.Msg.GetHours())
 	row := &adminv1.DeviceConnection{DeviceId: "dev_phone", NodeId: nodeA, NodeName: "de1", InboundId: "inb_1", ProfileName: "Fast", Protocol: "hysteria2",
-		Connects: 4, Rejects: 1, Drops: 2, Stalls: 3, OnlineS: 7200, LastHourUnix: 1699999200, Platform: "android", Client: "Happ/3.4.2", Kind: "link"}
+		Connects: 4, Rejects: 1, Drops: 2, Stalls: 3, OnlineS: 7200, LastHourUnix: 1699999200, Platform: "android", Client: "Happ/3.4.2", Kind: "link",
+		ClientCloses: 1, Freezes: 2, Quiet: 3, RttMs: 500, LossPermille: 10, RttSamples: 3, PktsSent: 1000}
 	if r.Msg.GetByHour() {
-		row.Hours = []*adminv1.LinkHour{{HourStartUnix: 1699995600, Connects: 2}, {HourStartUnix: 1699999200, Drops: 2, OnlineS: 10}}
+		row.Hours = []*adminv1.LinkHour{{HourStartUnix: 1699995600, Connects: 2}, {HourStartUnix: 1699999200, Drops: 2, OnlineS: 10,
+			ClientCloses: 1, Freezes: 2, Quiet: 3, Accepted: 5, HellosForeign: 4, RttMs: 500, LossPermille: 10, RttSamples: 3, PktsSent: 1000}}
 	}
 	return connect.NewResponse(&adminv1.GetUserConnectionResponse{SinceUnix: since, NowUnix: now,
 		Rows: []*adminv1.DeviceConnection{
@@ -856,13 +859,17 @@ func (w *world) GetNodeConnections(_ context.Context, r *connect.Request[adminv1
 		out.Supported = true
 		hy := &adminv1.InboundConnections{InboundId: "inb_1", ProfileId: "prf_1", ProfileName: "Fast", Protocol: "hysteria2", Connects: 40, Drops: 2, OnlineS: 9000,
 			UnknownKeys: 5, Hellos: 100, Handshakes: 20, KeysTried: 9,
-			Unsupported: []string{}, Clients: []*adminv1.ClientConnections{{Client: "Happ/3.4.2", Platform: "android", Devices: 2, Connects: 40}},
+			Unsupported: []string{}, ClientCloses: 1, Freezes: 2, Quiet: 3, Accepted: 9, HellosForeign: 4,
+			RttMs: 500, LossPermille: 10, RttSamples: 3, PktsSent: 1000,
+			Clients: []*adminv1.ClientConnections{{Client: "Happ/3.4.2", Platform: "android", Devices: 2, Connects: 40,
+				Freezes: 2, Quiet: 3, RttMs: 500, LossPermille: 10}},
 		}
 		awg := &adminv1.InboundConnections{InboundId: "inb_2", ProfileId: "prf_2", ProfileName: "Home " + canaryTK, Protocol: "awg",
-			Stalls: 12, KeysStalled: 4, KeysTried: 4, Unsupported: []string{"rejects", "drops", "hellos", "handshakes"},
+			Stalls: 12, KeysStalled: 4, KeysTried: 4, Unsupported: connectiondiag.UnsupportedCounters("awg"),
 			Awg: &adminv1.AwgPackets{UdpRxPackets: 12345, ReportedUnix: 1699999900, Backend: "userspace", PeersOnline: 3}}
 		if r.Msg.GetByHour() {
-			hy.Hours = []*adminv1.LinkHour{{HourStartUnix: 1699995600, Connects: 10}, {HourStartUnix: 1699999200, Connects: 30, Drops: 2}}
+			hy.Hours = []*adminv1.LinkHour{{HourStartUnix: 1699995600, Connects: 10, RttMs: 100, LossPermille: 20, RttSamples: 1, PktsSent: 50},
+				{HourStartUnix: 1699999200, Connects: 30, Drops: 2}}
 		}
 		out.Inbounds = []*adminv1.InboundConnections{hy, awg}
 	}
@@ -876,7 +883,7 @@ func (w *world) GetFleetConnections(_ context.Context, r *connect.Request[adminv
 			{InboundId: "inb_1", ProfileId: "prf_1", ProfileName: "Fast", Protocol: "hysteria2", Connects: 40,
 				Unsupported: []string{}, Clients: []*adminv1.ClientConnections{}, Hours: []*adminv1.LinkHour{}},
 			{InboundId: "inb_2", ProfileId: "prf_2", ProfileName: "Home", Protocol: "awg", Stalls: 12,
-				Unsupported: []string{"rejects", "drops", "hellos", "handshakes"}, Awg: &adminv1.AwgPackets{UdpRxPackets: 12345, Backend: "userspace", PeersOnline: 3}},
+				Unsupported: connectiondiag.UnsupportedCounters("awg"), Awg: &adminv1.AwgPackets{UdpRxPackets: 12345, Backend: "userspace", PeersOnline: 3}},
 		}},
 		{NodeId: nodeB, NodeName: "nl1", CountryCode: "NL", Supported: false, Inbounds: []*adminv1.InboundConnections{}},
 	}}), nil

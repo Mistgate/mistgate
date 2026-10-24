@@ -19,7 +19,10 @@ func TestConnectionToolsContent(t *testing.T) {
 	if r := u.Rows[0]; r.DeviceID != "dev_phone" || r.NodeName != "de1" || r.Profile != "Fast" || r.Protocol != "hysteria2" ||
 		r.Connects != 4 || r.Rejects != 1 || r.Drops != 2 || r.Stalls != 3 || r.OnlineS != 7200 || r.LastHourUnix != 1699999200 ||
 		r.Platform != "android" || r.Client != "Happ/3.4.2" || r.Kind != "link" || len(r.Hours) != 2 ||
-		r.Hours[0].HourUnix >= r.Hours[1].HourUnix || r.Hours[0].Connects != 2 || r.Hours[1].Drops != 2 {
+		r.ClientCloses != 1 || r.Freezes != 2 || r.Quiet != 3 || r.RttMs == nil || *r.RttMs != 500 || r.LossPermille == nil || *r.LossPermille != 10 ||
+		r.RttSamples != 3 || r.PktsSent != 1000 || r.Hours[0].HourUnix >= r.Hours[1].HourUnix || r.Hours[0].Connects != 2 || r.Hours[1].Drops != 2 ||
+		r.Hours[0].RttMs != nil || r.Hours[0].LossPermille != nil || r.Hours[1].RttMs == nil || *r.Hours[1].RttMs != 500 ||
+		r.Hours[1].LossPermille == nil || *r.Hours[1].LossPermille != 10 || r.Hours[1].Accepted != 5 || r.Hours[1].HellosForeign != 4 {
 		t.Errorf("row: %+v", r)
 	}
 	if strings.Contains(u.Rows[1].Profile, canaryTK) {
@@ -46,11 +49,16 @@ func TestConnectionToolsContent(t *testing.T) {
 	if i := n.Inbounds[0]; i.InboundID != "inb_1" || i.Profile != "Fast" || i.Connects != 40 || i.Drops != 2 || i.OnlineS != 9000 ||
 		i.UnknownKeys != 5 || i.Hellos != 100 || i.Handshakes != 20 || i.KeysTried != 9 || len(i.Hours) != 2 ||
 		i.Hours[0].HourUnix >= i.Hours[1].HourUnix || i.Hours[0].Connects != 10 || i.Hours[1].Drops != 2 || len(i.Clients) != 1 ||
-		i.Clients[0].Client != "Happ/3.4.2" || i.Clients[0].Platform != "android" || i.Clients[0].Devices != 2 {
+		i.ClientCloses != 1 || i.Freezes != 2 || i.Quiet != 3 || i.Accepted != 9 || i.HellosForeign != 4 || i.RttMs == nil || *i.RttMs != 500 ||
+		i.LossPermille == nil || *i.LossPermille != 10 || i.RttSamples != 3 || i.PktsSent != 1000 || i.Hours[0].RttMs == nil ||
+		*i.Hours[0].RttMs != 100 || i.Hours[1].RttMs != nil || i.Hours[1].LossPermille != nil ||
+		i.Clients[0].Client != "Happ/3.4.2" || i.Clients[0].Platform != "android" || i.Clients[0].Devices != 2 ||
+		i.Clients[0].Freezes != 2 || i.Clients[0].Quiet != 3 || i.Clients[0].RttMs != 500 || i.Clients[0].LossPermille != 10 {
 		t.Errorf("hysteria2 inbound: %+v", i)
 	}
 	if i := n.Inbounds[1]; i.Stalls != 12 || i.KeysStalled != 4 || strings.Contains(i.Profile, canaryTK) ||
-		strings.Join(i.Unsupported, ",") != "rejects,drops,hellos,handshakes" || i.AWG == nil || i.AWG.UDPRxPackets != 12345 ||
+		!strings.Contains(strings.Join(i.Unsupported, ","), "client_closes") || !strings.Contains(strings.Join(i.Unsupported, ","), "pkts_sent") ||
+		i.AWG == nil || i.AWG.UDPRxPackets != 12345 ||
 		i.AWG.Backend != "userspace" || i.AWG.PeersOnline != 3 {
 		t.Errorf("awg inbound: %+v", i)
 	}

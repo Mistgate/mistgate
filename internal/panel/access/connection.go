@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -39,11 +40,13 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 	}
 	resp := &adminv1.GetUserConnectionResponse{SinceUnix: since.Unix(), NowUnix: now.Unix()}
 	seen := map[string]bool{}
+	links2ByNode := map[string]bool{}
 	for _, f := range full {
 		if seen[f.Node.ID] || !s.usable(f, g, u) {
 			continue
 		}
 		seen[f.Node.ID] = true
+		links2ByNode[f.Node.ID] = slices.Contains(f.Node.AgentCaps, connectiondiag.Links2Capability)
 		if !slices.Contains(f.Node.AgentCaps, capLinks) {
 			resp.NodesWithoutCounters = append(resp.NodesWithoutCounters, f.Node.ID)
 		}
@@ -54,21 +57,36 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 		return nil, s.internal("connection counters", err)
 	}
 	for _, r := range rows {
-		resp.Rows = append(resp.Rows, &adminv1.DeviceConnection{
+		hasLinks2 := connectiondiag.SupportsHysteria2Links2(r.Protocol, links2ByNode[r.NodeID])
+		msg := &adminv1.DeviceConnection{
 			DeviceId: r.DeviceID, NodeId: r.NodeID, NodeName: r.NodeName, InboundId: r.InboundID, ProfileName: r.ProfileName,
 			Protocol: r.Protocol, Connects: clamp32(r.Connects), Rejects: clamp32(r.Rejects), Drops: clamp32(r.Drops),
 			Stalls: clamp32(r.Stalls), OnlineS: r.OnlineS, LastHourUnix: r.LastHour.Unix(), Platform: r.Platform,
-			Client: r.Client, Kind: store.DeviceKindName(r.Kind), Hours: userLinkHours(r.Hours),
-		})
+			Client: r.Client, Kind: store.DeviceKindName(r.Kind), Hours: userLinkHours(r.Hours, hasLinks2),
+		}
+		if hasLinks2 {
+			msg.ClientCloses, msg.Freezes, msg.Quiet = clamp32(r.ClientCloses), clamp32(r.Freezes), clamp32(r.Quiet)
+			msg.RttMs = connectiondiag.AverageRTTMS(r.RttMSSum, r.RttSamples)
+			msg.LossPermille = connectiondiag.LossPermille(r.PktsLost, r.PktsSent)
+			msg.RttSamples, msg.PktsSent = clamp32(r.RttSamples), r.PktsSent
+		}
+		resp.Rows = append(resp.Rows, msg)
 	}
 	return connect.NewResponse(resp), nil
 }
 
-func userLinkHours(hours []store.LinkHourSums) []*adminv1.LinkHour {
+func userLinkHours(hours []store.LinkHourSums, links2 bool) []*adminv1.LinkHour {
 	out := make([]*adminv1.LinkHour, 0, len(hours))
 	for _, h := range hours {
-		out = append(out, &adminv1.LinkHour{HourStartUnix: h.HourStart, Connects: clamp32(h.Connects), Rejects: clamp32(h.Rejects),
-			Drops: clamp32(h.Drops), Stalls: clamp32(h.Stalls), OnlineS: h.OnlineS})
+		msg := &adminv1.LinkHour{HourStartUnix: h.HourStart, Connects: clamp32(h.Connects), Rejects: clamp32(h.Rejects),
+			Drops: clamp32(h.Drops), Stalls: clamp32(h.Stalls), OnlineS: h.OnlineS}
+		if links2 {
+			msg.ClientCloses, msg.Freezes, msg.Quiet = clamp32(h.ClientCloses), clamp32(h.Freezes), clamp32(h.Quiet)
+			msg.Accepted, msg.HellosForeign = clamp32(h.Accepted), clamp32(h.HellosForeign)
+			msg.RttMs, msg.LossPermille = connectiondiag.AverageRTTMS(h.RttMSSum, h.RttSamples), connectiondiag.LossPermille(h.PktsLost, h.PktsSent)
+			msg.RttSamples, msg.PktsSent = clamp32(h.RttSamples), h.PktsSent
+		}
+		out = append(out, msg)
 	}
 	return out
 }
