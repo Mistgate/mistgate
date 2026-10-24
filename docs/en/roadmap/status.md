@@ -3,21 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.55`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.56`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.55
+  meta: v0.1.0 – v0.1.56
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.55
+      release: v0.1.56
       current: true
       points:
-        - "**Node journal.** The warnings and errors of every node's agent and engines, kept 7 days: the node's Journal tab (on the Cloudflare edition the Logs tab leads there) and `node_journal` in MCP. Client addresses are cut out on the node and again in the panel, so every admin can read it. Update the node agents. See [Nodes](../guide/nodes.md#journal)."
-        - "**Hysteria2 sessions end when the client's address moves.** With port hopping a connection's address changes on the way; the node now ends such a session anyway, so drops are counted and nobody stays online after leaving. Update the node agents."
+        - "**Connection diagnostics for an AI agent.** MCP `fleet_connections` shows every node's profiles in one call; `node_connections` and `user_connection` look back up to 7 days, hour by hour on request, name the device's app and version, split a profile by app, say which counters a protocol does not count, and for AmneziaWG show the packets reaching the port. The descriptions say what each counter can and cannot tell: a short drop is not a block by itself. See [MCP](../reference/mcp.md)."
+        - "**Connection counters are kept 7 days** instead of 48 hours."
+        - "**kl!ck is named on a person's devices** (instead of mihomo) once the app sends its own token, from its next release; kl!ck reports are also split by kind of server, with the median latency and the stalled downloads."
     - title: Profiles
       section: profiles
       points:
@@ -79,7 +80,7 @@ Mistgate is in **beta**; the current release is `v0.1.55`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.55
+  meta: v0.1.34 – v0.1.56
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
