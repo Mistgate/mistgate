@@ -32,6 +32,7 @@ import (
 	"github.com/apernet/hysteria/extras/v2/correctnet"
 	"github.com/apernet/hysteria/extras/v2/obfs"
 	"github.com/apernet/hysteria/extras/v2/sniff"
+	quic "github.com/apernet/quic-go"
 
 	agentpb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/decoy"
@@ -68,6 +69,7 @@ type eng struct {
 	now             func() time.Time
 	out             func(name string) (engine.Egress, error)
 	quicIdleTimeout time.Duration       // test seam; zero keeps the Hysteria default
+	testCongestion  string              // test seam; empty keeps the production congestion controller
 	users           *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
 	torrentEnabled  atomic.Bool
 	torrentVersion  uint64 // guards inbound generations under mu so toggles replace existing outbound flows
@@ -160,10 +162,13 @@ type inbound struct {
 	cert            engine.Cert
 	certHeld        bool
 	smu             sync.Mutex // guards sessions
-	sessions        map[string]session
+	sessions        map[*quic.Conn]*session
+	legacySessions  map[string]*session
 	unknownKeys     atomic.Uint32
 	hellos          atomic.Uint32
 	handshakes      atomic.Uint32
+	accepted        atomic.Uint32
+	hellosForeign   atomic.Uint32
 	mu              sync.Mutex // guards the fields below
 	state           plugin.RunState
 	requestMu       sync.Mutex
@@ -174,6 +179,8 @@ type inbound struct {
 	stopping        bool
 	everServe       bool // a listener was started at some point for this incarnation
 }
+
+var _ server.ConnEventLogger = (*inbound)(nil)
 
 func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin.UserCred) (engine.ApplyReport, error) {
 	cfg, err := parseSpec(spec)
@@ -207,7 +214,7 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 	// New inbound, changed spec, or a retry of one that failed: (re)build it.
 	in := &inbound{
 		e: e, spec: spec, specHash: sh, torrentVersion: e.torrentVersion, cfg: cfg, creds: creds,
-		sessions: map[string]session{}, state: plugin.RunStarting, since: e.now(),
+		sessions: map[*quic.Conn]*session{}, legacySessions: map[string]*session{}, state: plugin.RunStarting, since: e.now(),
 	}
 	in.ctx, in.cancel = context.WithCancel(context.Background())
 	in.idx.Store(ix)
@@ -315,15 +322,22 @@ func (in *inbound) start(ctx context.Context) error {
 	}
 
 	masq := in.masqHandler()
+	congestionType := in.e.testCongestion
+	if congestionType == "" {
+		congestionType = "bbr"
+	}
 	serverCfg := &server.Config{
 		TLSConfig: server.TLSConfig{GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			in.hellos.Add(1)
+			if isForeignServerName(hello.ServerName, in.spec.TLS.ServerName) {
+				in.hellosForeign.Add(1)
+			}
 			return cert.GetCertificate(hello)
 		}},
 		Conn:                  conn,
 		RequestHook:           &sniff.Sniffer{}, // all ports, default 4 s timeout; client IPs are replaced by sniffed domains
 		Outbound:              outbound{e: egr, in: in},
-		CongestionConfig:      server.CongestionConfig{Type: "bbr", BBRProfile: cfg.bbrProfile},
+		CongestionConfig:      server.CongestionConfig{Type: congestionType, BBRProfile: cfg.bbrProfile},
 		BandwidthConfig:       server.BandwidthConfig{MaxTx: cfg.maxTx, MaxRx: cfg.maxRx},
 		IgnoreClientBandwidth: cfg.ignoreBW,
 		DisableUDP:            !cfg.udp,
@@ -377,6 +391,11 @@ func (in *inbound) start(ctx context.Context) error {
 	}
 	in.setState(plugin.RunRunning, detail)
 	return nil
+}
+
+func isForeignServerName(got, want string) bool {
+	want = strings.TrimSuffix(want, ".")
+	return want != "" && !strings.EqualFold(strings.TrimSuffix(got, "."), want)
 }
 
 // tcpMasqOwner is the id of another inbound of this engine already serving the HTTPS decoy on TCP port, "" when none
@@ -526,30 +545,35 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 		}
 	}
 	links := func(stat plugin.LinkStat) {
-		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.Hellos|stat.Handshakes != 0 {
+		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.Hellos|stat.Handshakes|stat.ClientCloses|stat.Freezes|stat.Quiet|stat.Accepted|stat.HellosForeign|stat.RTTSamples != 0 || stat.RTTMSSum|stat.PktsSent|stat.PktsLost != 0 {
 			out.Links = append(out.Links, stat)
 		}
 	}
 	for _, in := range e.sortedInbounds() {
-		for _, cs := range in.idx.Load().byID {
-			flush(cs)
-			links(cs.takeLinkStats())
-		}
-		links(in.takeLinkStats())
 		in.smu.Lock()
 		for _, s := range in.sessions {
-			// A removed credential's connection is about to die at its next packet; do not show it online.
+			s.sample()
+			if !s.cs.removed.Load() {
+				out.Sessions = append(out.Sessions, plugin.Session{CredID: s.cs.id, InboundID: in.spec.ID, Since: s.since})
+			}
+		}
+		for _, s := range in.legacySessions {
 			if !s.cs.removed.Load() {
 				out.Sessions = append(out.Sessions, plugin.Session{CredID: s.cs.id, InboundID: in.spec.ID, Since: s.since})
 			}
 		}
 		in.smu.Unlock()
+		for _, cs := range in.idx.Load().byID {
+			flush(cs)
+			links(cs.takeLinkStats())
+		}
+		links(in.takeLinkStats())
 	}
 	kept := e.retired[:0]
 	for _, cs := range e.retired {
 		flush(cs)
 		links(cs.takeLinkStats())
-		if cs.inflight.Load() > 0 { // a callback is still in the rate-limit wait: its bytes come with the next Collect
+		if cs.inflight.Load() > 0 || cs.conns.Load() > 0 { // callbacks or open sessions can still add counters
 			kept = append(kept, cs)
 		}
 	}

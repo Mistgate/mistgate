@@ -39,7 +39,8 @@ const (
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
-	capLinkCounts = "links/1"
+	// links/2 adds Hysteria2 connection endings, RTT, and packet counters to StatsBatch.links.
+	capLinkCounts = "links/2"
 	// capJournal sends the node's deduplicated WARN+ records in StatsBatch.journal.
 	capJournal = "journal/1"
 	// capUserRateLimit: the engines that shape traffic per credential also share a bucket per person
