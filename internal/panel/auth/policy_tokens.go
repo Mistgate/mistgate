@@ -56,6 +56,8 @@ var tokenProcedures = map[string]int{
 	// What the nodes saw of connection attempts (agent.proto LinkCounters): counts per key and inbound, no address.
 	adminv1connect.NodeServiceGetNodeConnectionsProcedure: TokenAccessDirect,
 	adminv1connect.UserServiceGetUserConnectionProcedure:  TokenAccessDirect,
+	// The nodes' saved journal (agent.proto JournalEntry): warnings and errors, addresses cut on the node and in the panel.
+	adminv1connect.NodeServiceGetNodeJournalProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,

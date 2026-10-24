@@ -2745,6 +2745,322 @@ func (x *GetNodeConnectionsRequest) GetHours() uint32 {
 	return 0
 }
 
+type GetNodeJournalRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "" = every node that is not retired.
+	NodeId string `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// Hours back from now, 1 to 168 (the retention). 0 means 24; more is cut to 168.
+	Hours uint32 `protobuf:"varint,2,opt,name=hours,proto3" json:"hours,omitempty"`
+	// WARNING (also for UNSPECIFIED and INFO) or ERROR.
+	MinLevel EventSeverity `protobuf:"varint,3,opt,name=min_level,json=minLevel,proto3,enum=mistgate.admin.v1.EventSeverity" json:"min_level,omitempty"`
+	// "agent", "hysteria2", "vless", "awg", "xray", ... "" = all.
+	Source string `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	// "" = all; else only this inbound's entries.
+	InboundId string `protobuf:"bytes,5,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
+	// Case-insensitive substring of the message or of an attribute value; at most 100 characters. "" = all.
+	Query string `protobuf:"bytes,6,opt,name=query,proto3" json:"query,omitempty"`
+	// At most 200; 0 means 100.
+	Limit         uint32 `protobuf:"varint,7,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNodeJournalRequest) Reset() {
+	*x = GetNodeJournalRequest{}
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNodeJournalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNodeJournalRequest) ProtoMessage() {}
+
+func (x *GetNodeJournalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNodeJournalRequest.ProtoReflect.Descriptor instead.
+func (*GetNodeJournalRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetNodeJournalRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *GetNodeJournalRequest) GetHours() uint32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+func (x *GetNodeJournalRequest) GetMinLevel() EventSeverity {
+	if x != nil {
+		return x.MinLevel
+	}
+	return EventSeverity_EVENT_SEVERITY_UNSPECIFIED
+}
+
+func (x *GetNodeJournalRequest) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *GetNodeJournalRequest) GetInboundId() string {
+	if x != nil {
+		return x.InboundId
+	}
+	return ""
+}
+
+func (x *GetNodeJournalRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *GetNodeJournalRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+// One kind of record of one node in one hour.
+type NodeJournalEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName      string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	HourStartUnix int64                  `protobuf:"varint,3,opt,name=hour_start_unix,json=hourStartUnix,proto3" json:"hour_start_unix,omitempty"`
+	// WARNING or ERROR.
+	Level  EventSeverity `protobuf:"varint,4,opt,name=level,proto3,enum=mistgate.admin.v1.EventSeverity" json:"level,omitempty"`
+	Source string        `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	// The template of the record, addresses replaced by "<ip>" or "<ip>:port".
+	Message string `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	// "" when the record names no inbound.
+	InboundId string `protobuf:"bytes,7,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
+	// The inbound's profile name; "" when there is no inbound or it was removed.
+	ProfileName string `protobuf:"bytes,8,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
+	// The allow-listed attributes of the first record of the hour (agent.proto JournalEntry), cleaned like message.
+	Attrs         map[string]string `protobuf:"bytes,9,rep,name=attrs,proto3" json:"attrs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Count         uint32            `protobuf:"varint,10,opt,name=count,proto3" json:"count,omitempty"`
+	FirstUnix     int64             `protobuf:"varint,11,opt,name=first_unix,json=firstUnix,proto3" json:"first_unix,omitempty"`
+	LastUnix      int64             `protobuf:"varint,12,opt,name=last_unix,json=lastUnix,proto3" json:"last_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeJournalEntry) Reset() {
+	*x = NodeJournalEntry{}
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeJournalEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeJournalEntry) ProtoMessage() {}
+
+func (x *NodeJournalEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeJournalEntry.ProtoReflect.Descriptor instead.
+func (*NodeJournalEntry) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *NodeJournalEntry) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeJournalEntry) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *NodeJournalEntry) GetHourStartUnix() int64 {
+	if x != nil {
+		return x.HourStartUnix
+	}
+	return 0
+}
+
+func (x *NodeJournalEntry) GetLevel() EventSeverity {
+	if x != nil {
+		return x.Level
+	}
+	return EventSeverity_EVENT_SEVERITY_UNSPECIFIED
+}
+
+func (x *NodeJournalEntry) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *NodeJournalEntry) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *NodeJournalEntry) GetInboundId() string {
+	if x != nil {
+		return x.InboundId
+	}
+	return ""
+}
+
+func (x *NodeJournalEntry) GetProfileName() string {
+	if x != nil {
+		return x.ProfileName
+	}
+	return ""
+}
+
+func (x *NodeJournalEntry) GetAttrs() map[string]string {
+	if x != nil {
+		return x.Attrs
+	}
+	return nil
+}
+
+func (x *NodeJournalEntry) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *NodeJournalEntry) GetFirstUnix() int64 {
+	if x != nil {
+		return x.FirstUnix
+	}
+	return 0
+}
+
+func (x *NodeJournalEntry) GetLastUnix() int64 {
+	if x != nil {
+		return x.LastUnix
+	}
+	return 0
+}
+
+type GetNodeJournalResponse struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SinceUnix int64                  `protobuf:"varint,1,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
+	NowUnix   int64                  `protobuf:"varint,2,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
+	// Newest last_unix first, then node name.
+	Entries []*NodeJournalEntry `protobuf:"bytes,3,rep,name=entries,proto3" json:"entries,omitempty"`
+	// More entries matched than limit.
+	Truncated bool `protobuf:"varint,4,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// The nodes in scope (not retired) whose agent does not send the journal (it does not list "journal/1").
+	NodesWithoutJournal []string `protobuf:"bytes,5,rep,name=nodes_without_journal,json=nodesWithoutJournal,proto3" json:"nodes_without_journal,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *GetNodeJournalResponse) Reset() {
+	*x = GetNodeJournalResponse{}
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNodeJournalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNodeJournalResponse) ProtoMessage() {}
+
+func (x *GetNodeJournalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNodeJournalResponse.ProtoReflect.Descriptor instead.
+func (*GetNodeJournalResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetNodeJournalResponse) GetSinceUnix() int64 {
+	if x != nil {
+		return x.SinceUnix
+	}
+	return 0
+}
+
+func (x *GetNodeJournalResponse) GetNowUnix() int64 {
+	if x != nil {
+		return x.NowUnix
+	}
+	return 0
+}
+
+func (x *GetNodeJournalResponse) GetEntries() []*NodeJournalEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *GetNodeJournalResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+func (x *GetNodeJournalResponse) GetNodesWithoutJournal() []string {
+	if x != nil {
+		return x.NodesWithoutJournal
+	}
+	return nil
+}
+
 // One inbound of the node: its counters summed over its keys and its own row, in the window.
 type InboundConnections struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
@@ -2771,7 +3087,7 @@ type InboundConnections struct {
 
 func (x *InboundConnections) Reset() {
 	*x = InboundConnections{}
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2783,7 +3099,7 @@ func (x *InboundConnections) String() string {
 func (*InboundConnections) ProtoMessage() {}
 
 func (x *InboundConnections) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2796,7 +3112,7 @@ func (x *InboundConnections) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboundConnections.ProtoReflect.Descriptor instead.
 func (*InboundConnections) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *InboundConnections) GetInboundId() string {
@@ -2911,7 +3227,7 @@ type GetNodeConnectionsResponse struct {
 
 func (x *GetNodeConnectionsResponse) Reset() {
 	*x = GetNodeConnectionsResponse{}
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2923,7 +3239,7 @@ func (x *GetNodeConnectionsResponse) String() string {
 func (*GetNodeConnectionsResponse) ProtoMessage() {}
 
 func (x *GetNodeConnectionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2936,7 +3252,7 @@ func (x *GetNodeConnectionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodeConnectionsResponse.ProtoReflect.Descriptor instead.
 func (*GetNodeConnectionsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{34}
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetNodeConnectionsResponse) GetSupported() bool {
@@ -2982,7 +3298,7 @@ type StreamLogsRequest struct {
 
 func (x *StreamLogsRequest) Reset() {
 	*x = StreamLogsRequest{}
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2994,7 +3310,7 @@ func (x *StreamLogsRequest) String() string {
 func (*StreamLogsRequest) ProtoMessage() {}
 
 func (x *StreamLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3007,7 +3323,7 @@ func (x *StreamLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamLogsRequest.ProtoReflect.Descriptor instead.
 func (*StreamLogsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{35}
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *StreamLogsRequest) GetNodeId() string {
@@ -3057,7 +3373,7 @@ type LogLine struct {
 
 func (x *LogLine) Reset() {
 	*x = LogLine{}
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3069,7 +3385,7 @@ func (x *LogLine) String() string {
 func (*LogLine) ProtoMessage() {}
 
 func (x *LogLine) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3082,7 +3398,7 @@ func (x *LogLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogLine.ProtoReflect.Descriptor instead.
 func (*LogLine) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{36}
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *LogLine) GetTimeUnixMs() int64 {
@@ -3125,7 +3441,7 @@ type StreamLogsResponse struct {
 
 func (x *StreamLogsResponse) Reset() {
 	*x = StreamLogsResponse{}
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[37]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3137,7 +3453,7 @@ func (x *StreamLogsResponse) String() string {
 func (*StreamLogsResponse) ProtoMessage() {}
 
 func (x *StreamLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_node_proto_msgTypes[37]
+	mi := &file_mistgate_admin_v1_node_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3150,7 +3466,7 @@ func (x *StreamLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamLogsResponse.ProtoReflect.Descriptor instead.
 func (*StreamLogsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{37}
+	return file_mistgate_admin_v1_node_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *StreamLogsResponse) GetLines() []*LogLine {
@@ -3185,7 +3501,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xfc\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xfc\n" +
 	"\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -3419,7 +3735,43 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x0eagent_notified\x18\x01 \x01(\bR\ragentNotified\"J\n" +
 	"\x19GetNodeConnectionsRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x14\n" +
-	"\x05hours\x18\x02 \x01(\rR\x05hours\"\xb1\x03\n" +
+	"\x05hours\x18\x02 \x01(\rR\x05hours\"\xe8\x01\n" +
+	"\x15GetNodeJournalRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x14\n" +
+	"\x05hours\x18\x02 \x01(\rR\x05hours\x12=\n" +
+	"\tmin_level\x18\x03 \x01(\x0e2 .mistgate.admin.v1.EventSeverityR\bminLevel\x12\x16\n" +
+	"\x06source\x18\x04 \x01(\tR\x06source\x12\x1d\n" +
+	"\n" +
+	"inbound_id\x18\x05 \x01(\tR\tinboundId\x12\x14\n" +
+	"\x05query\x18\x06 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\a \x01(\rR\x05limit\"\xfa\x03\n" +
+	"\x10NodeJournalEntry\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12*\n" +
+	"\x0fhour_start_unix\x18\x03 \x01(\x03B\x020\x02R\rhourStartUnix\x126\n" +
+	"\x05level\x18\x04 \x01(\x0e2 .mistgate.admin.v1.EventSeverityR\x05level\x12\x16\n" +
+	"\x06source\x18\x05 \x01(\tR\x06source\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\x12\x1d\n" +
+	"\n" +
+	"inbound_id\x18\a \x01(\tR\tinboundId\x12!\n" +
+	"\fprofile_name\x18\b \x01(\tR\vprofileName\x12D\n" +
+	"\x05attrs\x18\t \x03(\v2..mistgate.admin.v1.NodeJournalEntry.AttrsEntryR\x05attrs\x12\x14\n" +
+	"\x05count\x18\n" +
+	" \x01(\rR\x05count\x12!\n" +
+	"\n" +
+	"first_unix\x18\v \x01(\x03B\x020\x02R\tfirstUnix\x12\x1f\n" +
+	"\tlast_unix\x18\f \x01(\x03B\x020\x02R\blastUnix\x1a8\n" +
+	"\n" +
+	"AttrsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xeb\x01\n" +
+	"\x16GetNodeJournalResponse\x12!\n" +
+	"\n" +
+	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +
+	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x12=\n" +
+	"\aentries\x18\x03 \x03(\v2#.mistgate.admin.v1.NodeJournalEntryR\aentries\x12\x1c\n" +
+	"\ttruncated\x18\x04 \x01(\bR\ttruncated\x122\n" +
+	"\x15nodes_without_journal\x18\x05 \x03(\tR\x13nodesWithoutJournal\"\xb1\x03\n" +
 	"\x12InboundConnections\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1d\n" +
@@ -3481,7 +3833,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eLOG_LEVEL_INFO\x10\x01\x12\x15\n" +
 	"\x11LOG_LEVEL_WARNING\x10\x02\x12\x13\n" +
-	"\x0fLOG_LEVEL_ERROR\x10\x032\x90\v\n" +
+	"\x0fLOG_LEVEL_ERROR\x10\x032\xf7\v\n" +
 	"\vNodeService\x12V\n" +
 	"\tListNodes\x12#.mistgate.admin.v1.ListNodesRequest\x1a$.mistgate.admin.v1.ListNodesResponse\x12P\n" +
 	"\aGetNode\x12!.mistgate.admin.v1.GetNodeRequest\x1a\".mistgate.admin.v1.GetNodeResponse\x12k\n" +
@@ -3500,7 +3852,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"RetireNode\x12$.mistgate.admin.v1.RetireNodeRequest\x1a%.mistgate.admin.v1.RetireNodeResponse\x12[\n" +
 	"\n" +
 	"StreamLogs\x12$.mistgate.admin.v1.StreamLogsRequest\x1a%.mistgate.admin.v1.StreamLogsResponse0\x01\x12q\n" +
-	"\x12GetNodeConnections\x12,.mistgate.admin.v1.GetNodeConnectionsRequest\x1a-.mistgate.admin.v1.GetNodeConnectionsResponseB\xc4\x01\n" +
+	"\x12GetNodeConnections\x12,.mistgate.admin.v1.GetNodeConnectionsRequest\x1a-.mistgate.admin.v1.GetNodeConnectionsResponse\x12e\n" +
+	"\x0eGetNodeJournal\x12(.mistgate.admin.v1.GetNodeJournalRequest\x1a).mistgate.admin.v1.GetNodeJournalResponseB\xc4\x01\n" +
 	"\x15com.mistgate.admin.v1B\tNodeProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -3516,7 +3869,7 @@ func file_mistgate_admin_v1_node_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_node_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_mistgate_admin_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_mistgate_admin_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_mistgate_admin_v1_node_proto_goTypes = []any{
 	(AwgPrepareState)(0),               // 0: mistgate.admin.v1.AwgPrepareState
 	(PrepareAwgOutcome)(0),             // 1: mistgate.admin.v1.PrepareAwgOutcome
@@ -3554,36 +3907,41 @@ var file_mistgate_admin_v1_node_proto_goTypes = []any{
 	(*RetireNodeRequest)(nil),          // 33: mistgate.admin.v1.RetireNodeRequest
 	(*RetireNodeResponse)(nil),         // 34: mistgate.admin.v1.RetireNodeResponse
 	(*GetNodeConnectionsRequest)(nil),  // 35: mistgate.admin.v1.GetNodeConnectionsRequest
-	(*InboundConnections)(nil),         // 36: mistgate.admin.v1.InboundConnections
-	(*GetNodeConnectionsResponse)(nil), // 37: mistgate.admin.v1.GetNodeConnectionsResponse
-	(*StreamLogsRequest)(nil),          // 38: mistgate.admin.v1.StreamLogsRequest
-	(*LogLine)(nil),                    // 39: mistgate.admin.v1.LogLine
-	(*StreamLogsResponse)(nil),         // 40: mistgate.admin.v1.StreamLogsResponse
-	(NodeStatus)(0),                    // 41: mistgate.admin.v1.NodeStatus
-	(*StatusReason)(nil),               // 42: mistgate.admin.v1.StatusReason
-	(*ProtocolCount)(nil),              // 43: mistgate.admin.v1.ProtocolCount
-	(*WarpSummary)(nil),                // 44: mistgate.admin.v1.WarpSummary
-	(*Inbound)(nil),                    // 45: mistgate.admin.v1.Inbound
-	(*PortCheck)(nil),                  // 46: mistgate.admin.v1.PortCheck
-	(*TcpCheck)(nil),                   // 47: mistgate.admin.v1.TcpCheck
+	(*GetNodeJournalRequest)(nil),      // 36: mistgate.admin.v1.GetNodeJournalRequest
+	(*NodeJournalEntry)(nil),           // 37: mistgate.admin.v1.NodeJournalEntry
+	(*GetNodeJournalResponse)(nil),     // 38: mistgate.admin.v1.GetNodeJournalResponse
+	(*InboundConnections)(nil),         // 39: mistgate.admin.v1.InboundConnections
+	(*GetNodeConnectionsResponse)(nil), // 40: mistgate.admin.v1.GetNodeConnectionsResponse
+	(*StreamLogsRequest)(nil),          // 41: mistgate.admin.v1.StreamLogsRequest
+	(*LogLine)(nil),                    // 42: mistgate.admin.v1.LogLine
+	(*StreamLogsResponse)(nil),         // 43: mistgate.admin.v1.StreamLogsResponse
+	nil,                                // 44: mistgate.admin.v1.NodeJournalEntry.AttrsEntry
+	(NodeStatus)(0),                    // 45: mistgate.admin.v1.NodeStatus
+	(*StatusReason)(nil),               // 46: mistgate.admin.v1.StatusReason
+	(*ProtocolCount)(nil),              // 47: mistgate.admin.v1.ProtocolCount
+	(*WarpSummary)(nil),                // 48: mistgate.admin.v1.WarpSummary
+	(*Inbound)(nil),                    // 49: mistgate.admin.v1.Inbound
+	(*PortCheck)(nil),                  // 50: mistgate.admin.v1.PortCheck
+	(*TcpCheck)(nil),                   // 51: mistgate.admin.v1.TcpCheck
+	(EventSeverity)(0),                 // 52: mistgate.admin.v1.EventSeverity
 }
 var file_mistgate_admin_v1_node_proto_depIdxs = []int32{
-	41, // 0: mistgate.admin.v1.Node.status:type_name -> mistgate.admin.v1.NodeStatus
-	42, // 1: mistgate.admin.v1.Node.reason:type_name -> mistgate.admin.v1.StatusReason
-	43, // 2: mistgate.admin.v1.Node.online:type_name -> mistgate.admin.v1.ProtocolCount
-	44, // 3: mistgate.admin.v1.Node.warp:type_name -> mistgate.admin.v1.WarpSummary
+	45, // 0: mistgate.admin.v1.Node.status:type_name -> mistgate.admin.v1.NodeStatus
+	46, // 1: mistgate.admin.v1.Node.reason:type_name -> mistgate.admin.v1.StatusReason
+	47, // 2: mistgate.admin.v1.Node.online:type_name -> mistgate.admin.v1.ProtocolCount
+	48, // 3: mistgate.admin.v1.Node.warp:type_name -> mistgate.admin.v1.WarpSummary
 	4,  // 4: mistgate.admin.v1.Node.awg_prepare:type_name -> mistgate.admin.v1.AwgPrepare
 	0,  // 5: mistgate.admin.v1.AwgPrepare.state:type_name -> mistgate.admin.v1.AwgPrepareState
 	3,  // 6: mistgate.admin.v1.ListNodesResponse.nodes:type_name -> mistgate.admin.v1.Node
 	3,  // 7: mistgate.admin.v1.GetNodeResponse.node:type_name -> mistgate.admin.v1.Node
 	8,  // 8: mistgate.admin.v1.GetNodeResponse.metrics:type_name -> mistgate.admin.v1.NodeMetrics
 	9,  // 9: mistgate.admin.v1.GetNodeResponse.facts:type_name -> mistgate.admin.v1.NodeFacts
-	45, // 10: mistgate.admin.v1.GetNodeResponse.inbounds:type_name -> mistgate.admin.v1.Inbound
+	49, // 10: mistgate.admin.v1.GetNodeResponse.inbounds:type_name -> mistgate.admin.v1.Inbound
 	11, // 11: mistgate.admin.v1.GetNodeResponse.online_users:type_name -> mistgate.admin.v1.OnlineUser
 	12, // 12: mistgate.admin.v1.GetNodeResponse.top_today:type_name -> mistgate.admin.v1.TopUser
 	10, // 13: mistgate.admin.v1.GetNodeResponse.timeouts:type_name -> mistgate.admin.v1.NodeTimeouts
-	46, // 14: mistgate.admin.v1.GetNodeResponse.port_checks:type_name -> mistgate.admin.v1.PortCheck
-	47, // 15: mistgate.admin.v1.GetNodeResponse.tcp_checks:type_name -> mistgate.admin.v1.TcpCheck
+	50, // 14: mistgate.admin.v1.GetNodeResponse.port_checks:type_name -> mistgate.admin.v1.PortCheck
+	51, // 15: mistgate.admin.v1.GetNodeResponse.tcp_checks:type_name -> mistgate.admin.v1.TcpCheck
 	3,  // 16: mistgate.admin.v1.CreateEnrollmentResponse.node:type_name -> mistgate.admin.v1.Node
 	17, // 17: mistgate.admin.v1.UpdateNodeRequest.dns_resolvers:type_name -> mistgate.admin.v1.DnsResolvers
 	10, // 18: mistgate.admin.v1.UpdateNodeRequest.timeouts:type_name -> mistgate.admin.v1.NodeTimeouts
@@ -3593,45 +3951,51 @@ var file_mistgate_admin_v1_node_proto_depIdxs = []int32{
 	3,  // 22: mistgate.admin.v1.SetNodesDecoyModeResponse.nodes:type_name -> mistgate.admin.v1.Node
 	1,  // 23: mistgate.admin.v1.PrepareAwgKernelResponse.outcome:type_name -> mistgate.admin.v1.PrepareAwgOutcome
 	3,  // 24: mistgate.admin.v1.PrepareAwgKernelResponse.node:type_name -> mistgate.admin.v1.Node
-	46, // 25: mistgate.admin.v1.CheckPortsResponse.ports:type_name -> mistgate.admin.v1.PortCheck
-	47, // 26: mistgate.admin.v1.CheckPortsResponse.tcp:type_name -> mistgate.admin.v1.TcpCheck
-	36, // 27: mistgate.admin.v1.GetNodeConnectionsResponse.inbounds:type_name -> mistgate.admin.v1.InboundConnections
-	2,  // 28: mistgate.admin.v1.StreamLogsRequest.min_level:type_name -> mistgate.admin.v1.LogLevel
-	2,  // 29: mistgate.admin.v1.LogLine.level:type_name -> mistgate.admin.v1.LogLevel
-	39, // 30: mistgate.admin.v1.StreamLogsResponse.lines:type_name -> mistgate.admin.v1.LogLine
-	5,  // 31: mistgate.admin.v1.NodeService.ListNodes:input_type -> mistgate.admin.v1.ListNodesRequest
-	7,  // 32: mistgate.admin.v1.NodeService.GetNode:input_type -> mistgate.admin.v1.GetNodeRequest
-	14, // 33: mistgate.admin.v1.NodeService.CreateEnrollment:input_type -> mistgate.admin.v1.CreateEnrollmentRequest
-	16, // 34: mistgate.admin.v1.NodeService.UpdateNode:input_type -> mistgate.admin.v1.UpdateNodeRequest
-	19, // 35: mistgate.admin.v1.NodeService.SetNodeDecoyMode:input_type -> mistgate.admin.v1.SetNodeDecoyModeRequest
-	21, // 36: mistgate.admin.v1.NodeService.UploadNodeDecoy:input_type -> mistgate.admin.v1.UploadNodeDecoyRequest
-	23, // 37: mistgate.admin.v1.NodeService.SetNodesDecoyMode:input_type -> mistgate.admin.v1.SetNodesDecoyModeRequest
-	25, // 38: mistgate.admin.v1.NodeService.RestartInbounds:input_type -> mistgate.admin.v1.RestartInboundsRequest
-	27, // 39: mistgate.admin.v1.NodeService.PrepareAwgKernel:input_type -> mistgate.admin.v1.PrepareAwgKernelRequest
-	29, // 40: mistgate.admin.v1.NodeService.MeasureBandwidth:input_type -> mistgate.admin.v1.MeasureBandwidthRequest
-	31, // 41: mistgate.admin.v1.NodeService.CheckPorts:input_type -> mistgate.admin.v1.CheckPortsRequest
-	33, // 42: mistgate.admin.v1.NodeService.RetireNode:input_type -> mistgate.admin.v1.RetireNodeRequest
-	38, // 43: mistgate.admin.v1.NodeService.StreamLogs:input_type -> mistgate.admin.v1.StreamLogsRequest
-	35, // 44: mistgate.admin.v1.NodeService.GetNodeConnections:input_type -> mistgate.admin.v1.GetNodeConnectionsRequest
-	6,  // 45: mistgate.admin.v1.NodeService.ListNodes:output_type -> mistgate.admin.v1.ListNodesResponse
-	13, // 46: mistgate.admin.v1.NodeService.GetNode:output_type -> mistgate.admin.v1.GetNodeResponse
-	15, // 47: mistgate.admin.v1.NodeService.CreateEnrollment:output_type -> mistgate.admin.v1.CreateEnrollmentResponse
-	18, // 48: mistgate.admin.v1.NodeService.UpdateNode:output_type -> mistgate.admin.v1.UpdateNodeResponse
-	20, // 49: mistgate.admin.v1.NodeService.SetNodeDecoyMode:output_type -> mistgate.admin.v1.SetNodeDecoyModeResponse
-	22, // 50: mistgate.admin.v1.NodeService.UploadNodeDecoy:output_type -> mistgate.admin.v1.UploadNodeDecoyResponse
-	24, // 51: mistgate.admin.v1.NodeService.SetNodesDecoyMode:output_type -> mistgate.admin.v1.SetNodesDecoyModeResponse
-	26, // 52: mistgate.admin.v1.NodeService.RestartInbounds:output_type -> mistgate.admin.v1.RestartInboundsResponse
-	28, // 53: mistgate.admin.v1.NodeService.PrepareAwgKernel:output_type -> mistgate.admin.v1.PrepareAwgKernelResponse
-	30, // 54: mistgate.admin.v1.NodeService.MeasureBandwidth:output_type -> mistgate.admin.v1.MeasureBandwidthResponse
-	32, // 55: mistgate.admin.v1.NodeService.CheckPorts:output_type -> mistgate.admin.v1.CheckPortsResponse
-	34, // 56: mistgate.admin.v1.NodeService.RetireNode:output_type -> mistgate.admin.v1.RetireNodeResponse
-	40, // 57: mistgate.admin.v1.NodeService.StreamLogs:output_type -> mistgate.admin.v1.StreamLogsResponse
-	37, // 58: mistgate.admin.v1.NodeService.GetNodeConnections:output_type -> mistgate.admin.v1.GetNodeConnectionsResponse
-	45, // [45:59] is the sub-list for method output_type
-	31, // [31:45] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	50, // 25: mistgate.admin.v1.CheckPortsResponse.ports:type_name -> mistgate.admin.v1.PortCheck
+	51, // 26: mistgate.admin.v1.CheckPortsResponse.tcp:type_name -> mistgate.admin.v1.TcpCheck
+	52, // 27: mistgate.admin.v1.GetNodeJournalRequest.min_level:type_name -> mistgate.admin.v1.EventSeverity
+	52, // 28: mistgate.admin.v1.NodeJournalEntry.level:type_name -> mistgate.admin.v1.EventSeverity
+	44, // 29: mistgate.admin.v1.NodeJournalEntry.attrs:type_name -> mistgate.admin.v1.NodeJournalEntry.AttrsEntry
+	37, // 30: mistgate.admin.v1.GetNodeJournalResponse.entries:type_name -> mistgate.admin.v1.NodeJournalEntry
+	39, // 31: mistgate.admin.v1.GetNodeConnectionsResponse.inbounds:type_name -> mistgate.admin.v1.InboundConnections
+	2,  // 32: mistgate.admin.v1.StreamLogsRequest.min_level:type_name -> mistgate.admin.v1.LogLevel
+	2,  // 33: mistgate.admin.v1.LogLine.level:type_name -> mistgate.admin.v1.LogLevel
+	42, // 34: mistgate.admin.v1.StreamLogsResponse.lines:type_name -> mistgate.admin.v1.LogLine
+	5,  // 35: mistgate.admin.v1.NodeService.ListNodes:input_type -> mistgate.admin.v1.ListNodesRequest
+	7,  // 36: mistgate.admin.v1.NodeService.GetNode:input_type -> mistgate.admin.v1.GetNodeRequest
+	14, // 37: mistgate.admin.v1.NodeService.CreateEnrollment:input_type -> mistgate.admin.v1.CreateEnrollmentRequest
+	16, // 38: mistgate.admin.v1.NodeService.UpdateNode:input_type -> mistgate.admin.v1.UpdateNodeRequest
+	19, // 39: mistgate.admin.v1.NodeService.SetNodeDecoyMode:input_type -> mistgate.admin.v1.SetNodeDecoyModeRequest
+	21, // 40: mistgate.admin.v1.NodeService.UploadNodeDecoy:input_type -> mistgate.admin.v1.UploadNodeDecoyRequest
+	23, // 41: mistgate.admin.v1.NodeService.SetNodesDecoyMode:input_type -> mistgate.admin.v1.SetNodesDecoyModeRequest
+	25, // 42: mistgate.admin.v1.NodeService.RestartInbounds:input_type -> mistgate.admin.v1.RestartInboundsRequest
+	27, // 43: mistgate.admin.v1.NodeService.PrepareAwgKernel:input_type -> mistgate.admin.v1.PrepareAwgKernelRequest
+	29, // 44: mistgate.admin.v1.NodeService.MeasureBandwidth:input_type -> mistgate.admin.v1.MeasureBandwidthRequest
+	31, // 45: mistgate.admin.v1.NodeService.CheckPorts:input_type -> mistgate.admin.v1.CheckPortsRequest
+	33, // 46: mistgate.admin.v1.NodeService.RetireNode:input_type -> mistgate.admin.v1.RetireNodeRequest
+	41, // 47: mistgate.admin.v1.NodeService.StreamLogs:input_type -> mistgate.admin.v1.StreamLogsRequest
+	35, // 48: mistgate.admin.v1.NodeService.GetNodeConnections:input_type -> mistgate.admin.v1.GetNodeConnectionsRequest
+	36, // 49: mistgate.admin.v1.NodeService.GetNodeJournal:input_type -> mistgate.admin.v1.GetNodeJournalRequest
+	6,  // 50: mistgate.admin.v1.NodeService.ListNodes:output_type -> mistgate.admin.v1.ListNodesResponse
+	13, // 51: mistgate.admin.v1.NodeService.GetNode:output_type -> mistgate.admin.v1.GetNodeResponse
+	15, // 52: mistgate.admin.v1.NodeService.CreateEnrollment:output_type -> mistgate.admin.v1.CreateEnrollmentResponse
+	18, // 53: mistgate.admin.v1.NodeService.UpdateNode:output_type -> mistgate.admin.v1.UpdateNodeResponse
+	20, // 54: mistgate.admin.v1.NodeService.SetNodeDecoyMode:output_type -> mistgate.admin.v1.SetNodeDecoyModeResponse
+	22, // 55: mistgate.admin.v1.NodeService.UploadNodeDecoy:output_type -> mistgate.admin.v1.UploadNodeDecoyResponse
+	24, // 56: mistgate.admin.v1.NodeService.SetNodesDecoyMode:output_type -> mistgate.admin.v1.SetNodesDecoyModeResponse
+	26, // 57: mistgate.admin.v1.NodeService.RestartInbounds:output_type -> mistgate.admin.v1.RestartInboundsResponse
+	28, // 58: mistgate.admin.v1.NodeService.PrepareAwgKernel:output_type -> mistgate.admin.v1.PrepareAwgKernelResponse
+	30, // 59: mistgate.admin.v1.NodeService.MeasureBandwidth:output_type -> mistgate.admin.v1.MeasureBandwidthResponse
+	32, // 60: mistgate.admin.v1.NodeService.CheckPorts:output_type -> mistgate.admin.v1.CheckPortsResponse
+	34, // 61: mistgate.admin.v1.NodeService.RetireNode:output_type -> mistgate.admin.v1.RetireNodeResponse
+	43, // 62: mistgate.admin.v1.NodeService.StreamLogs:output_type -> mistgate.admin.v1.StreamLogsResponse
+	40, // 63: mistgate.admin.v1.NodeService.GetNodeConnections:output_type -> mistgate.admin.v1.GetNodeConnectionsResponse
+	38, // 64: mistgate.admin.v1.NodeService.GetNodeJournal:output_type -> mistgate.admin.v1.GetNodeJournalResponse
+	50, // [50:65] is the sub-list for method output_type
+	35, // [35:50] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_node_proto_init() }
@@ -3640,6 +4004,7 @@ func file_mistgate_admin_v1_node_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_common_proto_init()
+	file_mistgate_admin_v1_fleet_proto_init()
 	file_mistgate_admin_v1_node_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3647,7 +4012,7 @@ func file_mistgate_admin_v1_node_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_node_proto_rawDesc), len(file_mistgate_admin_v1_node_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   38,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

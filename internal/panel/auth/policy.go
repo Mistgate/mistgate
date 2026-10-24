@@ -55,6 +55,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.NodeServiceListNodesProcedure:          levelRead,
 	adminv1connect.NodeServiceGetNodeProcedure:            levelRead,
 	adminv1connect.NodeServiceGetNodeConnectionsProcedure: levelRead,  // counts only, no address
+	adminv1connect.NodeServiceGetNodeJournalProcedure:     levelRead,  // addresses cut on the node and in the panel
 	adminv1connect.NodeServiceUpdateNodeProcedure:         levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from): owner only
 	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:   levelOwner,
 	adminv1connect.NodeServiceUploadNodeDecoyProcedure:    levelOwner,

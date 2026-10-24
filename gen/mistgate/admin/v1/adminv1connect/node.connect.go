@@ -69,6 +69,9 @@ const (
 	// NodeServiceGetNodeConnectionsProcedure is the fully-qualified name of the NodeService's
 	// GetNodeConnections RPC.
 	NodeServiceGetNodeConnectionsProcedure = "/mistgate.admin.v1.NodeService/GetNodeConnections"
+	// NodeServiceGetNodeJournalProcedure is the fully-qualified name of the NodeService's
+	// GetNodeJournal RPC.
+	NodeServiceGetNodeJournalProcedure = "/mistgate.admin.v1.NodeService/GetNodeJournal"
 )
 
 // NodeServiceClient is a client for the mistgate.admin.v1.NodeService service.
@@ -119,6 +122,10 @@ type NodeServiceClient interface {
 	// LinkCounters): attempts, refusals, early drops, handshakes that do not complete, unknown keys. Counts only, no
 	// address. A read: every role and API tokens (the MCP tool node_connections).
 	GetNodeConnections(context.Context, *connect.Request[v1.GetNodeConnectionsRequest]) (*connect.Response[v1.GetNodeConnectionsResponse], error)
+	// The saved journal of the nodes' agents and engines (agents with "journal/1", agent.proto JournalEntry): their warnings
+	// and errors, grouped per hour, kept 7 days. Addresses are cut on the node and again in the panel. A read: every role and
+	// API tokens (the MCP tool node_journal); the live tail (StreamLogs) stays the owner's.
+	GetNodeJournal(context.Context, *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error)
 }
 
 // NewNodeServiceClient constructs a client for the mistgate.admin.v1.NodeService service. By
@@ -216,6 +223,12 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("GetNodeConnections")),
 			connect.WithClientOptions(opts...),
 		),
+		getNodeJournal: connect.NewClient[v1.GetNodeJournalRequest, v1.GetNodeJournalResponse](
+			httpClient,
+			baseURL+NodeServiceGetNodeJournalProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("GetNodeJournal")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -235,6 +248,7 @@ type nodeServiceClient struct {
 	retireNode         *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
 	streamLogs         *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
 	getNodeConnections *connect.Client[v1.GetNodeConnectionsRequest, v1.GetNodeConnectionsResponse]
+	getNodeJournal     *connect.Client[v1.GetNodeJournalRequest, v1.GetNodeJournalResponse]
 }
 
 // ListNodes calls mistgate.admin.v1.NodeService.ListNodes.
@@ -307,6 +321,11 @@ func (c *nodeServiceClient) GetNodeConnections(ctx context.Context, req *connect
 	return c.getNodeConnections.CallUnary(ctx, req)
 }
 
+// GetNodeJournal calls mistgate.admin.v1.NodeService.GetNodeJournal.
+func (c *nodeServiceClient) GetNodeJournal(ctx context.Context, req *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error) {
+	return c.getNodeJournal.CallUnary(ctx, req)
+}
+
 // NodeServiceHandler is an implementation of the mistgate.admin.v1.NodeService service.
 type NodeServiceHandler interface {
 	// All nodes. The fleet is at most ~50 nodes, so no pagination; filtering by country, status and
@@ -355,6 +374,10 @@ type NodeServiceHandler interface {
 	// LinkCounters): attempts, refusals, early drops, handshakes that do not complete, unknown keys. Counts only, no
 	// address. A read: every role and API tokens (the MCP tool node_connections).
 	GetNodeConnections(context.Context, *connect.Request[v1.GetNodeConnectionsRequest]) (*connect.Response[v1.GetNodeConnectionsResponse], error)
+	// The saved journal of the nodes' agents and engines (agents with "journal/1", agent.proto JournalEntry): their warnings
+	// and errors, grouped per hour, kept 7 days. Addresses are cut on the node and again in the panel. A read: every role and
+	// API tokens (the MCP tool node_journal); the live tail (StreamLogs) stays the owner's.
+	GetNodeJournal(context.Context, *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error)
 }
 
 // NewNodeServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -448,6 +471,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("GetNodeConnections")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceGetNodeJournalHandler := connect.NewUnaryHandler(
+		NodeServiceGetNodeJournalProcedure,
+		svc.GetNodeJournal,
+		connect.WithSchema(nodeServiceMethods.ByName("GetNodeJournal")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.NodeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case NodeServiceListNodesProcedure:
@@ -478,6 +507,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceStreamLogsHandler.ServeHTTP(w, r)
 		case NodeServiceGetNodeConnectionsProcedure:
 			nodeServiceGetNodeConnectionsHandler.ServeHTTP(w, r)
+		case NodeServiceGetNodeJournalProcedure:
+			nodeServiceGetNodeJournalHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -541,4 +572,8 @@ func (UnimplementedNodeServiceHandler) StreamLogs(context.Context, *connect.Requ
 
 func (UnimplementedNodeServiceHandler) GetNodeConnections(context.Context, *connect.Request[v1.GetNodeConnectionsRequest]) (*connect.Response[v1.GetNodeConnectionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetNodeConnections is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) GetNodeJournal(context.Context, *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetNodeJournal is not implemented"))
 }

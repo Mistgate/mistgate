@@ -223,6 +223,12 @@
   },
   {
     "type": "index",
+    "name": "node_journal_hour",
+    "tbl_name": "node_journal",
+    "sql": "CREATE INDEX node_journal_hour ON node_journal (hour_start)"
+  },
+  {
+    "type": "index",
     "name": "node_live_name",
     "tbl_name": "node",
     "sql": "CREATE UNIQUE INDEX node_live_name ON node (name COLLATE NOCASE) WHERE state \u003c\u003e 'retired'"
@@ -562,6 +568,12 @@
     "name": "node_inbound_stats_tombstone",
     "tbl_name": "node_inbound_stats_tombstone",
     "sql": "CREATE TABLE node_inbound_stats_tombstone ( node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, inbound_id TEXT NOT NULL, protocol TEXT NOT NULL, PRIMARY KEY (node_id, inbound_id) ) STRICT, WITHOUT ROWID"
+  },
+  {
+    "type": "table",
+    "name": "node_journal",
+    "tbl_name": "node_journal",
+    "sql": "CREATE TABLE node_journal ( node_id TEXT NOT NULL, hour_start INTEGER NOT NULL, key TEXT NOT NULL, level INTEGER NOT NULL CHECK (level IN (2, 3)), source TEXT NOT NULL, message TEXT NOT NULL, inbound_id TEXT NOT NULL DEFAULT '', attrs_json TEXT NOT NULL DEFAULT '{}', count INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, PRIMARY KEY (node_id, hour_start, key) ) STRICT"
   },
   {
     "type": "table",

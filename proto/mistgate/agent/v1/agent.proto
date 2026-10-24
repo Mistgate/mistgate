@@ -552,7 +552,7 @@ message Hello {
   // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
-  // LinkCounters).
+  // LinkCounters), and "journal/1" (StatsBatch.journal; see JournalEntry).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -630,6 +630,36 @@ message StatsBatch {
   // Connection counters since the previous batch (agents with "links/1"); see LinkCounters. Rows with every counter zero
   // are not sent. A coalescer adds rows of the same cred_id and inbound_id field by field.
   repeated LinkCounters links = 9;
+  // The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, the last of them
+  // the overflow entry when more kinds came. A coalescer adds the counts of entries with the same key.
+  repeated JournalEntry journal = 10;
+}
+
+// NODE JOURNAL. The warnings and errors of the agent and its engines, kept by the panel (7 days) so an admin can read what
+// went wrong without the live tail, which carries client addresses and is the owner's alone. It is the same slog stream as
+// the live tail, at WARNING and above, cleaned on the node:
+//   - message is the record's template, never text formatted with client data: an engine that formats a message (the
+//     amneziawg-go logger) passes the template in the attribute "msg_template", which replaces the message here and is not
+//     sent as an attribute. Addresses that still occur in it become "<ip>" or "<ip>:port" (IPv4, IPv6, [v6]:port, zones);
+//     names, versions and times stay. At most 256 bytes.
+//   - attrs keeps only these keys: inbound, protocol, profile, port, state, reason, code, backend, mode, version, kernel,
+//     iface, check, fix, count, err, error; at most 8, each value cleaned the same way and at most 160 characters.
+//   - inbound_id is the record's "inbound" attribute when it names an inbound.
+// Records with the same level, source, message, inbound_id and attrs["code"] in one batch interval are one entry with a
+// count and the first and last time; after 64 kinds the rest are counted in one entry of source "agent" and message
+// "journal_overflow" (count = records left out). The panel cleans addresses again and replaces the node's own secret names.
+message JournalEntry {
+  // WARNING or ERROR.
+  Severity level = 1;
+  // "agent", "hysteria2", "vless", "awg", "xray", ...: the record's "source" attribute.
+  string source = 2;
+  string message = 3;
+  string inbound_id = 4;
+  map<string, string> attrs = 5;
+  uint32 count = 6;
+  // Corrected agent time of the first and the last record in the batch interval.
+  int64 first_unix = 7;
+  int64 last_unix = 8;
 }
 
 // CONNECTION COUNTERS. What a node saw of connection attempts, per credential of an inbound, so the panel can tell "the app

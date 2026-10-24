@@ -3,6 +3,7 @@ syntax = "proto3";
 package mistgate.admin.v1;
 
 import "mistgate/admin/v1/common.proto";
+import "mistgate/admin/v1/fleet.proto";
 
 // Nodes screen, node detail screen, and adding a node by running an install command.
 // SSH provisioning (wizard, pre-checks, install log, uninstall) is not here yet and will get its own service.
@@ -53,6 +54,10 @@ service NodeService {
   // LinkCounters): attempts, refusals, early drops, handshakes that do not complete, unknown keys. Counts only, no
   // address. A read: every role and API tokens (the MCP tool node_connections).
   rpc GetNodeConnections(GetNodeConnectionsRequest) returns (GetNodeConnectionsResponse);
+  // The saved journal of the nodes' agents and engines (agents with "journal/1", agent.proto JournalEntry): their warnings
+  // and errors, grouped per hour, kept 7 days. Addresses are cut on the node and again in the panel. A read: every role and
+  // API tokens (the MCP tool node_journal); the live tail (StreamLogs) stays the owner's.
+  rpc GetNodeJournal(GetNodeJournalRequest) returns (GetNodeJournalResponse);
 }
 
 // One row of the nodes table / one card.
@@ -435,6 +440,55 @@ message GetNodeConnectionsRequest {
   string node_id = 1;
   // Hours back from now, 1 to 48 (the retention). 0 means 24; more is cut to 48.
   uint32 hours = 2;
+}
+
+message GetNodeJournalRequest {
+  // "" = every node that is not retired.
+  string node_id = 1;
+  // Hours back from now, 1 to 168 (the retention). 0 means 24; more is cut to 168.
+  uint32 hours = 2;
+  // WARNING (also for UNSPECIFIED and INFO) or ERROR.
+  EventSeverity min_level = 3;
+  // "agent", "hysteria2", "vless", "awg", "xray", ... "" = all.
+  string source = 4;
+  // "" = all; else only this inbound's entries.
+  string inbound_id = 5;
+  // Case-insensitive substring of the message or of an attribute value; at most 100 characters. "" = all.
+  string query = 6;
+  // At most 200; 0 means 100.
+  uint32 limit = 7;
+}
+
+// One kind of record of one node in one hour.
+message NodeJournalEntry {
+  string node_id = 1;
+  string node_name = 2;
+  int64 hour_start_unix = 3 [jstype = JS_NUMBER];
+  // WARNING or ERROR.
+  EventSeverity level = 4;
+  string source = 5;
+  // The template of the record, addresses replaced by "<ip>" or "<ip>:port".
+  string message = 6;
+  // "" when the record names no inbound.
+  string inbound_id = 7;
+  // The inbound's profile name; "" when there is no inbound or it was removed.
+  string profile_name = 8;
+  // The allow-listed attributes of the first record of the hour (agent.proto JournalEntry), cleaned like message.
+  map<string, string> attrs = 9;
+  uint32 count = 10;
+  int64 first_unix = 11 [jstype = JS_NUMBER];
+  int64 last_unix = 12 [jstype = JS_NUMBER];
+}
+
+message GetNodeJournalResponse {
+  int64 since_unix = 1 [jstype = JS_NUMBER];
+  int64 now_unix = 2 [jstype = JS_NUMBER];
+  // Newest last_unix first, then node name.
+  repeated NodeJournalEntry entries = 3;
+  // More entries matched than limit.
+  bool truncated = 4;
+  // The nodes in scope (not retired) whose agent does not send the journal (it does not list "journal/1").
+  repeated string nodes_without_journal = 5;
 }
 
 // One inbound of the node: its counters summed over its keys and its own row, in the window.
