@@ -268,7 +268,7 @@ describe("Node logs on the edge", () => {
     await mount(<LogsTab data={data} onJournal={onJournal} />);
     expect(text()).toContain("Its warnings and errors are kept in the journal.");
     expect(buttons()).toEqual(["Open the journal"]);
-    await act(async () => void [...document.querySelectorAll("button")][0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => void [...document.querySelectorAll("button")][0]?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onJournal).toHaveBeenCalledOnce();
   });
 
