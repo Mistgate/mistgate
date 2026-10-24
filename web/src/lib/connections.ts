@@ -32,12 +32,32 @@ export const nodeConnectionsQuery = (nodeId: string) =>
 /** One fact of a line: its words, and whether it is trouble (shown in the warning colour). */
 export type Part = { text: string; warn?: boolean };
 
-/** A device on one profile of a node: connections, early drops, refusals, handshakes that never completed, time online. */
+type Quality = { freezes: number; rttMs: number; rttSamples: number; lossPermille: number; pktsSent: number };
+
+/**
+ * What a links/2 agent knows of how Hysteria2 connections went: frozen paths (the signal of a block), the average RTT and the
+ * loss. Loss is trouble from 5 % over at least a thousand packets.
+ */
+function qualityParts(t: T, x: Quality): Part[] {
+  const parts: Part[] = [];
+  if (x.freezes) parts.push({ text: t("conn.freezes", { n: x.freezes }), warn: true });
+  if (x.rttSamples > 0) parts.push({ text: t("conn.rtt", { ms: x.rttMs }) });
+  if (x.pktsSent >= 1000) parts.push({ text: t("conn.loss", { pct: (x.lossPermille / 10).toFixed(1) }), warn: x.lossPermille >= 50 });
+  return parts;
+}
+
+/**
+ * A device on one profile of a node: connections, early drops, refusals, handshakes that never completed, time online, and
+ * with a links/2 agent frozen paths, RTT and loss. Where the agent tells frozen paths apart, an early drop is no longer
+ * trouble by itself: most are short checks of the app.
+ */
 export function deviceConnParts(t: T, fmt: Fmt, x: DeviceConn): Part[] {
+  const links2 = x.freezes + x.quiet + x.clientCloses + x.rttSamples > 0;
   const parts: Part[] = [{ text: t.n("conn.connects", x.connects) }];
-  if (x.drops) parts.push({ text: t("conn.drops", { n: x.drops }), warn: true });
+  if (x.drops) parts.push({ text: t("conn.drops", { n: x.drops }), warn: !links2 });
   if (x.rejects) parts.push({ text: t("conn.rejects", { n: x.rejects }), warn: true });
   if (x.stalls) parts.push({ text: t("conn.stalls", { n: x.stalls }), warn: true });
+  parts.push(...qualityParts(t, x));
   if (x.onlineS) parts.push({ text: t("conn.online", { time: fmt.duration(x.onlineS) }) });
   return parts;
 }
@@ -48,12 +68,15 @@ export function deviceConnParts(t: T, fmt: Fmt, x: DeviceConn): Part[] {
  * handshake never completed out of those that tried. Unknown keys are context, not trouble: scanners send them too.
  */
 export function inboundConnParts(t: T, fmt: Fmt, x: InboundConn): Part[] {
+  const links2 = x.protocol === "hysteria2" && !x.unsupported.includes("freezes");
   const parts: Part[] = [];
   if (x.connects) parts.push({ text: t.n("conn.connects", x.connects) });
-  if (x.drops) parts.push({ text: t("conn.drops", { n: x.drops }), warn: true });
+  if (x.drops) parts.push({ text: t("conn.drops", { n: x.drops }), warn: !links2 });
   if (x.rejects) parts.push({ text: t("conn.rejects", { n: x.rejects }), warn: true });
+  if (links2) parts.push(...qualityParts(t, x));
   if (x.hellos > 0) {
-    const failed = Math.max(0, x.hellos - x.handshakes);
+    // with links/2 the handshakes that never completed are known apart from scanners and from pings that never authenticate
+    const failed = links2 ? Math.max(0, x.hellos - x.hellosForeign - x.accepted) : Math.max(0, x.hellos - x.handshakes);
     const pct = Math.round((100 * failed) / x.hellos);
     if (failed > 0) parts.push({ text: t("conn.hellos", { pct, n: x.hellos }), warn: x.hellos >= 10 && pct >= 50 });
   }

@@ -10,12 +10,15 @@ const t = Object.assign((key: string, vars?: Record<string, string | number>) =>
 const fmt = makeFmt("en", t);
 const inbound = (over: Partial<InboundConn>): InboundConn => ({
   inboundId: "inb_1", profileId: "prf_1", profileName: "HY2", protocol: "hysteria2", connects: 0, rejects: 0, drops: 0, stalls: 0, onlineS: 0,
-  unknownKeys: 0, hellos: 0, handshakes: 0, keysStalled: 0, keysTried: 0, unsupported: [], hours: [], clients: [], ...over,
+  unknownKeys: 0, hellos: 0, handshakes: 0, keysStalled: 0, keysTried: 0, hours: [], clients: [], clientCloses: 0, freezes: 0, quiet: 0,
+  accepted: 0, hellosForeign: 0, rttMs: 0, lossPermille: 0, rttSamples: 0, pktsSent: 0,
+  unsupported: ["client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille"], // an agent before links/2
+  ...over,
 });
 
 describe("connection counters in words", () => {
   it("names a device's counts, trouble flagged", () => {
-    const parts = deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2", connects: 1, rejects: 2, drops: 0, stalls: 3, onlineS: 120, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [] });
+    const parts = deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2", connects: 1, rejects: 2, drops: 0, stalls: 3, onlineS: 120, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [], clientCloses: 0, freezes: 0, quiet: 0, rttMs: 0, lossPermille: 0, rttSamples: 0, pktsSent: 0 });
     expect(parts).toEqual([
       { text: "1 connection" },
       { text: "key refused: 2", warn: true },
@@ -32,6 +35,27 @@ describe("connection counters in words", () => {
     // few handshakes, or most complete: said, but not trouble
     expect(inboundConnParts(t, fmt, inbound({ hellos: 6, handshakes: 1 }))[0]).toEqual({ text: "83% of 6 handshakes did not complete", warn: false });
     expect(inboundConnParts(t, fmt, inbound({ hellos: 20, handshakes: 20 }))).toEqual([]);
+  });
+
+  it("with a links/2 agent: frozen paths are the trouble, early drops are not, and RTT and loss are said", () => {
+    const x = inbound({ unsupported: [], connects: 20, drops: 12, freezes: 3, rttMs: 85, rttSamples: 40, lossPermille: 62, pktsSent: 5000,
+      hellos: 30, hellosForeign: 4, accepted: 20, handshakes: 20 });
+    expect(inboundConnParts(t, fmt, x)).toEqual([
+      { text: "20 connections" },
+      { text: "dropped at once: 12", warn: false },
+      { text: "froze: 3", warn: true },
+      { text: "RTT 85 ms" },
+      { text: "loss 6.2%", warn: true },
+      // 30 hellos, 4 for another name, 20 completed: 6 never completed
+      { text: "20% of 30 handshakes did not complete", warn: false },
+    ]);
+    expect(deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2",
+      connects: 5, rejects: 0, drops: 4, stalls: 0, onlineS: 0, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [],
+      clientCloses: 0, freezes: 0, quiet: 4, rttMs: 40, lossPermille: 3, rttSamples: 2, pktsSent: 300 })).toEqual([
+      { text: "5 connections" },
+      { text: "dropped at once: 4", warn: false },
+      { text: "RTT 40 ms" },
+    ]);
   });
 
   it("counts AmneziaWG devices whose handshake never completed, and unknown keys as context", () => {
