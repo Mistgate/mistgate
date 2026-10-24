@@ -813,7 +813,8 @@ func (w *world) GetClientProbe(context.Context, *connect.Request[adminv1.GetClie
 		Nodes: []*adminv1.ClientProbeNode{
 			{NodeId: nodeA, Tally: tally(5, 2, 3),
 				Operators: []*adminv1.ClientProbeGroup{{Name: "MTS PJSC", Tally: tally(4, 1, 3)}, {Name: "Evil " + canaryTK, Tally: tally(1, 1, 0)}},
-				Regions:   []*adminv1.ClientProbeGroup{{Name: "RU · Moscow", Tally: tally(5, 2, 3)}}},
+				Regions:   []*adminv1.ClientProbeGroup{{Name: "RU · Moscow", Tally: tally(5, 2, 3)}},
+				Kinds:     []*adminv1.ClientProbeKind{{Kind: "vless", Tally: tally(4, 2, 2), MedianDelayMs: 125, DlChecked: 3, DlStalled: 1}}},
 			{NodeId: "nod_other", Tally: tally(1, 1, 0)},
 		},
 	}), nil
@@ -824,7 +825,7 @@ func connWindow(hours uint32) (since, now int64) {
 	if hours == 0 {
 		hours = 24
 	}
-	return 1700000000 - int64(min(hours, 48))*3600, 1700000000
+	return 1700000000 - int64(min(hours, 168))*3600, 1700000000
 }
 
 // GetUserConnection: usr_alice has two rows (one profile name carries a token: the panel's text is cleaned like any other), and two
@@ -834,10 +835,14 @@ func (w *world) GetUserConnection(_ context.Context, r *connect.Request[adminv1.
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
 	}
 	since, now := connWindow(r.Msg.GetHours())
+	row := &adminv1.DeviceConnection{DeviceId: "dev_phone", NodeId: nodeA, NodeName: "de1", InboundId: "inb_1", ProfileName: "Fast", Protocol: "hysteria2",
+		Connects: 4, Rejects: 1, Drops: 2, Stalls: 3, OnlineS: 7200, LastHourUnix: 1699999200, Platform: "android", Client: "Happ/3.4.2", Kind: "link"}
+	if r.Msg.GetByHour() {
+		row.Hours = []*adminv1.LinkHour{{HourStartUnix: 1699995600, Connects: 2}, {HourStartUnix: 1699999200, Drops: 2, OnlineS: 10}}
+	}
 	return connect.NewResponse(&adminv1.GetUserConnectionResponse{SinceUnix: since, NowUnix: now,
 		Rows: []*adminv1.DeviceConnection{
-			{DeviceId: "dev_phone", NodeId: nodeA, NodeName: "de1", InboundId: "inb_1", ProfileName: "Fast", Protocol: "hysteria2",
-				Connects: 4, Rejects: 1, Drops: 2, Stalls: 3, OnlineS: 7200, LastHourUnix: 1699999200},
+			row,
 			{DeviceId: "dev_phone", NodeId: nodeA, NodeName: "de1", InboundId: "inb_2", ProfileName: "Home " + canaryTK, Protocol: "awg", Stalls: 6},
 		},
 		NodesWithoutCounters: []string{nodeB, "nod_gone"}}), nil
@@ -849,13 +854,32 @@ func (w *world) GetNodeConnections(_ context.Context, r *connect.Request[adminv1
 	out := &adminv1.GetNodeConnectionsResponse{SinceUnix: since, NowUnix: now}
 	if r.Msg.GetNodeId() == nodeA {
 		out.Supported = true
-		out.Inbounds = []*adminv1.InboundConnections{
-			{InboundId: "inb_1", ProfileId: "prf_1", ProfileName: "Fast", Protocol: "hysteria2", Connects: 40, Drops: 2, OnlineS: 9000,
-				UnknownKeys: 5, Hellos: 100, Handshakes: 20, KeysTried: 9},
-			{InboundId: "inb_2", ProfileId: "prf_2", ProfileName: "Home " + canaryTK, Protocol: "awg", Stalls: 12, KeysStalled: 4, KeysTried: 4},
+		hy := &adminv1.InboundConnections{InboundId: "inb_1", ProfileId: "prf_1", ProfileName: "Fast", Protocol: "hysteria2", Connects: 40, Drops: 2, OnlineS: 9000,
+			UnknownKeys: 5, Hellos: 100, Handshakes: 20, KeysTried: 9,
+			Unsupported: []string{}, Clients: []*adminv1.ClientConnections{{Client: "Happ/3.4.2", Platform: "android", Devices: 2, Connects: 40}},
 		}
+		awg := &adminv1.InboundConnections{InboundId: "inb_2", ProfileId: "prf_2", ProfileName: "Home " + canaryTK, Protocol: "awg",
+			Stalls: 12, KeysStalled: 4, KeysTried: 4, Unsupported: []string{"rejects", "drops", "hellos", "handshakes"},
+			Awg: &adminv1.AwgPackets{UdpRxPackets: 12345, ReportedUnix: 1699999900, Backend: "userspace", PeersOnline: 3}}
+		if r.Msg.GetByHour() {
+			hy.Hours = []*adminv1.LinkHour{{HourStartUnix: 1699995600, Connects: 10}, {HourStartUnix: 1699999200, Connects: 30, Drops: 2}}
+		}
+		out.Inbounds = []*adminv1.InboundConnections{hy, awg}
 	}
 	return connect.NewResponse(out), nil
+}
+
+func (w *world) GetFleetConnections(_ context.Context, r *connect.Request[adminv1.GetFleetConnectionsRequest]) (*connect.Response[adminv1.GetFleetConnectionsResponse], error) {
+	since, now := connWindow(r.Msg.GetHours())
+	return connect.NewResponse(&adminv1.GetFleetConnectionsResponse{SinceUnix: since, NowUnix: now, Nodes: []*adminv1.NodeConnections{
+		{NodeId: nodeA, NodeName: "de1", CountryCode: "DE", Supported: true, Inbounds: []*adminv1.InboundConnections{
+			{InboundId: "inb_1", ProfileId: "prf_1", ProfileName: "Fast", Protocol: "hysteria2", Connects: 40,
+				Unsupported: []string{}, Clients: []*adminv1.ClientConnections{}, Hours: []*adminv1.LinkHour{}},
+			{InboundId: "inb_2", ProfileId: "prf_2", ProfileName: "Home", Protocol: "awg", Stalls: 12,
+				Unsupported: []string{"rejects", "drops", "hellos", "handshakes"}, Awg: &adminv1.AwgPackets{UdpRxPackets: 12345, Backend: "userspace", PeersOnline: 3}},
+		}},
+		{NodeId: nodeB, NodeName: "nl1", CountryCode: "NL", Supported: false, Inbounds: []*adminv1.InboundConnections{}},
+	}}), nil
 }
 
 // GetNodeJournal: nodeA sends a warning and an error, while nodeB has no journal/1 capability.

@@ -111,47 +111,21 @@ func (s *Store) NodeLinkSums(ctx context.Context, nodeID string, since time.Time
 // hour with a counter.
 type UserLink struct {
 	DeviceID, NodeID, NodeName, InboundID, ProfileName, Protocol string
+	Platform, Client, Kind                                       string
 	Connects, Rejects, Drops, Stalls, OnlineS                    uint64
 	LastHour                                                     time.Time
+	Hours                                                        []LinkHourSums
 }
 
 // UserLinks reads a person's counters over the hour buckets that touch [since, now], per device, node and inbound, the ones with a
 // counter only; device, then node name, then profile name. The device comes from the credential; an inbound or node that no longer
 // exists has no row.
 func (s *Store) UserLinks(ctx context.Context, userID string, since time.Time) ([]UserLink, error) {
-	rows, err := s.R.QueryContext(ctx, `
-		SELECT dc.device_id, l.node_id, n.name, l.inbound_id, p.name, p.protocol, SUM(l.connects), SUM(l.rejects), SUM(l.drops),
-			SUM(l.stalls), SUM(l.online_s),
-			MAX(CASE WHEN l.connects + l.rejects + l.drops + l.stalls + l.online_s > 0 THEN l.hour_start END)
-		FROM link_hour l
-		JOIN device_credential dc ON dc.id = l.cred_id
-		JOIN node n ON n.id = l.node_id
-		JOIN inbound i ON i.id = l.inbound_id
-		JOIN profile p ON p.id = i.profile_id
-		WHERE l.user_id = ? AND l.user_id <> '' AND l.hour_start >= ? AND l.cred_id <> ''
-		GROUP BY dc.device_id, l.node_id, l.inbound_id
-		HAVING SUM(l.connects + l.rejects + l.drops + l.stalls + l.online_s) > 0
-		ORDER BY dc.device_id, n.name, p.name, l.inbound_id`, userID, linkHourOf(since))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []UserLink
-	for rows.Next() {
-		var r UserLink
-		var last int64
-		if err := rows.Scan(&r.DeviceID, &r.NodeID, &r.NodeName, &r.InboundID, &r.ProfileName, &r.Protocol, &r.Connects, &r.Rejects,
-			&r.Drops, &r.Stalls, &r.OnlineS, &last); err != nil {
-			return nil, err
-		}
-		r.LastHour = fromUnix(last)
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return s.UserLinksByHour(ctx, userID, since, false)
 }
 
 // LinkKeepHours is how long link_hour rows live, and the most a connection RPC may look back.
-const LinkKeepHours = 48
+const LinkKeepHours = 168
 
 // LinkWindowHours is the window of a connection RPC in hours: 0 means 24, and more than the retention is cut to it.
 func LinkWindowHours(requested uint32) int {

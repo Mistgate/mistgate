@@ -29,14 +29,14 @@ func clientProbeStoreProof(t *testing.T, st *Store) {
 	}
 	// report a: vless froze and hysteria2 passed on de1 (one report, one freeze, not ok), nl1 passed
 	if n, err := st.InsertClientProbeReport(ctx, "a", base, mts, []ClientProbeResult{
-		{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "freeze", DetailJSON: `{"flaky":false,"dl_bytes":10985,"dl_stalled":true}`},
+		{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "freeze", DetailJSON: `{"flaky":false,"dl_bytes":10985,"dl_stalled":true,"delay_ms":100}`},
 		{NodeID: "nod_de1", Kind: "hysteria2", Port: 443, Verdict: "ok"},
 		{NodeID: "nod_nl1", Kind: "vless", Port: 443, Verdict: "ok"},
 	}); err != nil || n != 3 {
 		t.Fatalf("report a: stored %d, %v", n, err)
 	}
 	// report b from the same network: de1 all ok; report c from an unknown network an hour later: de1 tcp_blocked
-	if _, err := st.InsertClientProbeReport(ctx, "b", base.Add(time.Minute), mts, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "ok"}}); err != nil {
+	if _, err := st.InsertClientProbeReport(ctx, "b", base.Add(time.Minute), mts, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "ok", DetailJSON: `{"dl_stalled":false,"delay_ms":140}`}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.InsertClientProbeReport(ctx, "c", base.Add(time.Hour), ClientProbeNetwork{}, []ClientProbeResult{{NodeID: "nod_de1", Kind: "vless", Port: 443, Verdict: "tcp_blocked"}}); err != nil {
@@ -48,7 +48,7 @@ func clientProbeStoreProof(t *testing.T, st *Store) {
 
 	var detail string
 	if err := st.R.QueryRowContext(ctx, `SELECT detail_json FROM client_probe_report WHERE report = 'a' AND kind = 'vless' AND node_id = 'nod_de1'`).Scan(&detail); err != nil ||
-		detail != `{"flaky":false,"dl_bytes":10985,"dl_stalled":true}` {
+		detail != `{"flaky":false,"dl_bytes":10985,"dl_stalled":true,"delay_ms":100}` {
 		t.Fatalf("detail %q, %v", detail, err)
 	}
 	if err := st.R.QueryRowContext(ctx, `SELECT detail_json FROM client_probe_report WHERE report = 'a' AND kind = 'hysteria2'`).Scan(&detail); err != nil || detail != "{}" {
@@ -69,6 +69,20 @@ func clientProbeStoreProof(t *testing.T, st *Store) {
 	}
 	if nl.NodeID != "nod_nl1" || nl.Reports != 1 || nl.OK != 1 {
 		t.Errorf("nl1: %+v", nl)
+	}
+	kinds, err := st.ClientProbeKindCounts(ctx, base.Add(-time.Hour))
+	if err != nil || len(kinds) != 3 {
+		t.Fatalf("kind counts %+v, %v", kinds, err)
+	}
+	var vless ClientProbeKindCount
+	for _, kind := range kinds {
+		if kind.NodeID == "nod_de1" && kind.Kind == "vless" {
+			vless = kind
+		}
+	}
+	if vless.Reports != 3 || vless.OK != 1 || vless.Freeze != 1 || vless.TCPBlocked != 1 || vless.DLChecked != 2 || vless.DLStalled != 1 ||
+		len(vless.DelaySamples) != 2 || vless.DelaySamples[0] != 100 || vless.DelaySamples[1] != 140 {
+		t.Errorf("vless kind counts: %+v", vless)
 	}
 	if n, last, err := st.ClientProbeTotals(ctx, base.Add(-time.Hour)); err != nil || n != 3 || !last.Equal(base.Add(time.Hour)) {
 		t.Errorf("totals %d %v %v", n, last, err)

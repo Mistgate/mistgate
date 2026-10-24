@@ -1819,7 +1819,54 @@ func TestD1ClientProbeReportsStorage(t *testing.T) {
 }
 
 func TestD1LinkHourStorage(t *testing.T) {
-	linkHourStoreProof(t, openD1Store(t))
+	st := openD1Store(t)
+	linkHourStoreProof(t, st)
+	ctx := context.Background()
+	since := time.Date(2026, 10, 23, 12, 20, 0, 0, time.UTC)
+	var report []NodeLinkReport
+	calls := countD1Queries(t, js.Global().Get("__d1"), "NodeLinkReports", func() {
+		var err error
+		report, err = st.NodeLinkReports(ctx, "nod_lh_a", since, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if calls.queries != 1 || calls.batches != 0 || len(report) == 0 {
+		t.Fatalf("NodeLinkReports: %d D1 queries, %d batches, %d inbounds; want one query and rows", calls.queries, calls.batches, len(report))
+	}
+	var userLinks []UserLink
+	calls = countD1Queries(t, js.Global().Get("__d1"), "UserLinksByHour", func() {
+		var err error
+		userLinks, err = st.UserLinksByHour(ctx, "usr_lh", since, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if calls.queries != 1 || calls.batches != 0 || len(userLinks) == 0 {
+		t.Fatalf("UserLinksByHour: %d D1 queries, %d batches, %d rows; want one query and rows", calls.queries, calls.batches, len(userLinks))
+	}
+	var nodes []FleetConnectionNode
+	calls = countD1Queries(t, js.Global().Get("__d1"), "FleetConnectionNodes", func() {
+		var err error
+		nodes, err = st.FleetConnectionNodes(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if calls.queries != 1 || calls.batches != 0 || len(nodes) != 2 {
+		t.Fatalf("FleetConnectionNodes: %d D1 queries, %d batches, %d nodes; want one query and two nodes", calls.queries, calls.batches, len(nodes))
+	}
+	var sums []FleetNodeLinkSum
+	calls = countD1Queries(t, js.Global().Get("__d1"), "FleetNodeLinkSums", func() {
+		var err error
+		sums, err = st.FleetNodeLinkSums(ctx, since)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if calls.queries != 1 || calls.batches != 0 {
+		t.Fatalf("FleetNodeLinkSums: %d D1 queries, %d batches; want one query", calls.queries, calls.batches)
+	}
 }
 
 func TestD1NodeJournalStorage(t *testing.T) {

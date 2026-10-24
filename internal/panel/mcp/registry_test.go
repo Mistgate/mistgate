@@ -98,9 +98,35 @@ func TestRegistryShape(t *testing.T) {
 	}
 }
 
+func TestConnectionDescriptionsExplainLimits(t *testing.T) {
+	want := map[string][]string{
+		"user_connection":   {"not by themselves evidence of blocking", "first 60 seconds", "64 kib", "10-second", "idle tail", "their zero values mean nothing"},
+		"node_connections":  {"not by themselves evidence of blocking", "first 60 seconds", "64 kib", "10-second", "resumed tls sessions", "their zero values mean nothing"},
+		"fleet_connections": {"not by themselves evidence of blocking", "first 60 seconds", "64 kib", "10-second", "resumed tls sessions", "their zero values mean nothing"},
+	}
+	for name, phrases := range want {
+		var description string
+		for _, td := range registry {
+			if td.name == name {
+				description = td.description()
+				break
+			}
+		}
+		if description == "" {
+			t.Errorf("missing %s tool", name)
+			continue
+		}
+		for _, phrase := range phrases {
+			if !strings.Contains(strings.ToLower(description), phrase) {
+				t.Errorf("%s description misses %q", name, phrase)
+			}
+		}
+	}
+}
+
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 21, ProfileOperator: 39, ProfileAdmin: 69}
+	want := map[Profile]int{ProfileReadonly: 22, ProfileOperator: 40, ProfileAdmin: 70}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)

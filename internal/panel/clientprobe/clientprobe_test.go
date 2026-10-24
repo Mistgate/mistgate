@@ -125,6 +125,20 @@ func TestNodesFoldTheCounts(t *testing.T) {
 	}
 }
 
+func TestKindsFoldMedianAndLimit(t *testing.T) {
+	counts := []store.ClientProbeKindCount{
+		{NodeID: "nod_1", Kind: "vless", Reports: 9, Freeze: 2, OK: 7, DLChecked: 4, DLStalled: 1, DelaySamples: []uint32{90, 140}},
+	}
+	for i := 0; i < 8; i++ {
+		counts = append(counts, store.ClientProbeKindCount{NodeID: "nod_1", Kind: string(rune('a' + i)), Reports: 8 - i})
+	}
+	got := Kinds(counts)["nod_1"]
+	if len(got) != maxGroups || got[0].Kind != "vless" || got[0].MedianDelayMs != 115 || got[0].DlChecked != 4 || got[0].DlStalled != 1 ||
+		got[0].Tally.Reports != 9 || got[0].Tally.Freeze != 2 || got[0].Tally.Ok != 7 {
+		t.Fatalf("kinds: %+v", got)
+	}
+}
+
 func TestSwitchAndDisconnect(t *testing.T) {
 	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
@@ -159,11 +173,13 @@ func TestSwitchAndDisconnect(t *testing.T) {
 		t.Fatalf("switch on: %v %v, step-ups %d, invalidated %d", up, err, steps, invalidated)
 	}
 	n := store.ClientProbeNetwork{ASN: 8359, Operator: "MTS PJSC", Country: "RU"}
-	if stored, err := st.InsertClientProbeReport(context.Background(), NewID(), now.Add(-time.Minute), n, []store.ClientProbeResult{{NodeID: "nod_1", Kind: "vless", Port: 443, Verdict: "freeze"}}); err != nil || stored != 1 {
+	if stored, err := st.InsertClientProbeReport(context.Background(), NewID(), now.Add(-time.Minute), n, []store.ClientProbeResult{{NodeID: "nod_1", Kind: "vless", Port: 443, Verdict: "freeze", DetailJSON: `{"delay_ms":140,"dl_stalled":true}`}}); err != nil || stored != 1 {
 		t.Fatalf("stored %d, %v", stored, err)
 	}
 	got, err := r.GetClientProbe(owner, connect.NewRequest(&adminv1.GetClientProbeRequest{}))
-	if err != nil || got.Msg.Settings.Reports != 1 || len(got.Msg.Nodes) != 1 || got.Msg.Nodes[0].Tally.Freeze != 1 {
+	if err != nil || got.Msg.Settings.Reports != 1 || len(got.Msg.Nodes) != 1 || got.Msg.Nodes[0].Tally.Freeze != 1 || len(got.Msg.Nodes[0].Kinds) != 1 ||
+		got.Msg.Nodes[0].Kinds[0].Kind != "vless" || got.Msg.Nodes[0].Kinds[0].Tally.Freeze != 1 || got.Msg.Nodes[0].Kinds[0].MedianDelayMs != 140 ||
+		got.Msg.Nodes[0].Kinds[0].DlChecked != 1 || got.Msg.Nodes[0].Kinds[0].DlStalled != 1 {
 		t.Fatalf("get: %v %v", got, err)
 	}
 	if _, err := r.DisconnectClientProbe(owner, connect.NewRequest(&adminv1.DisconnectClientProbeRequest{})); err != nil || steps != 2 {

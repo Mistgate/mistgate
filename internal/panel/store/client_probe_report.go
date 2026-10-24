@@ -73,6 +73,15 @@ type ClientProbeCount struct {
 	Last                                       time.Time
 }
 
+// ClientProbeKindCount is one node and server kind's report tally and download/delay samples over a window.
+type ClientProbeKindCount struct {
+	NodeID, Kind                               string
+	Reports, OK, Freeze, TCPBlocked, Handshake int
+	NoAnswer, DLChecked, DLStalled             int
+	Last                                       time.Time
+	DelaySamples                               []uint32
+}
+
 // ClientProbeCounts reads the counts since a time, by node and network.
 func (s *Store) ClientProbeCounts(ctx context.Context, since time.Time) ([]ClientProbeCount, error) {
 	rows, err := s.R.QueryContext(ctx, `WITH per AS (
@@ -94,6 +103,61 @@ func (s *Store) ClientProbeCounts(ctx context.Context, since time.Time) ([]Clien
 			return nil, err
 		}
 		c.ASN, c.Last = uint32(asn), fromUnix(at)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// ClientProbeKindCounts reads one tally per node and kind, plus the measured delay samples needed for a median.
+func (s *Store) ClientProbeKindCounts(ctx context.Context, since time.Time) ([]ClientProbeKindCount, error) {
+	rows, err := s.R.QueryContext(ctx, `WITH per AS (
+			SELECT node_id, report, kind, MAX(at) AS at, MIN(verdict = 'ok') AS ok,
+				MAX(verdict = 'freeze') AS freeze, MAX(verdict = 'tcp_blocked') AS tcp,
+				MAX(verdict = 'handshake_failed') AS hs, MAX(verdict = 'no_answer') AS na
+			FROM client_probe_report WHERE at >= ? GROUP BY node_id, report, kind
+		), tally AS (
+			SELECT node_id, kind, COUNT(*) AS reports, SUM(ok) AS ok, SUM(freeze) AS freeze,
+				SUM(tcp) AS tcp, SUM(hs) AS hs, SUM(na) AS na, MAX(at) AS last_at
+			FROM per GROUP BY node_id, kind
+		), details AS (
+			SELECT node_id, kind,
+				COALESCE(SUM(json_type(detail_json, '$.dl_stalled') IN ('true', 'false')), 0) AS dl_checked,
+				COALESCE(SUM(json_type(detail_json, '$.dl_stalled') = 'true'), 0) AS dl_stalled,
+				json_group_array(CASE WHEN json_type(detail_json, '$.delay_ms') = 'integer'
+					THEN json_extract(detail_json, '$.delay_ms') END) AS delays
+			FROM client_probe_report WHERE at >= ? GROUP BY node_id, kind
+		)
+		SELECT t.node_id, t.kind, t.reports, t.ok, t.freeze, t.tcp, t.hs, t.na, t.last_at,
+			d.dl_checked, d.dl_stalled, COALESCE(d.delays, '[]')
+		FROM tally t JOIN details d USING (node_id, kind) ORDER BY t.node_id, t.reports DESC, t.kind`, unix(since), unix(since))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ClientProbeKindCount
+	for rows.Next() {
+		var c ClientProbeKindCount
+		var last int64
+		var delays string
+		if err := rows.Scan(&c.NodeID, &c.Kind, &c.Reports, &c.OK, &c.Freeze, &c.TCPBlocked, &c.Handshake, &c.NoAnswer,
+			&last, &c.DLChecked, &c.DLStalled, &delays); err != nil {
+			return nil, err
+		}
+		var samples []json.RawMessage
+		if err := json.Unmarshal([]byte(delays), &samples); err != nil {
+			return nil, err
+		}
+		for _, sample := range samples {
+			if string(sample) == "null" {
+				continue
+			}
+			var value uint32
+			if err := json.Unmarshal(sample, &value); err != nil {
+				return nil, err
+			}
+			c.DelaySamples = append(c.DelaySamples, value)
+		}
+		c.Last = fromUnix(last)
 		out = append(out, c)
 	}
 	return out, rows.Err()

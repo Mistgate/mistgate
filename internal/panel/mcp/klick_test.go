@@ -16,8 +16,11 @@ func TestKlickReportsContent(t *testing.T) {
 		t.Fatalf("view: %+v", v)
 	}
 	n := v.Nodes[0]
-	if n.NodeID != nodeA || n.NodeName != "de1" || n.Reports != 5 || n.Freeze != 3 || n.OK != 2 || len(n.Operators) != 2 || len(n.Regions) != 1 {
+	if n.NodeID != nodeA || n.NodeName != "de1" || n.Reports != 5 || n.Freeze != 3 || n.OK != 2 || len(n.Operators) != 2 || len(n.Regions) != 1 || len(n.Kinds) != 1 {
 		t.Errorf("node: %+v", n)
+	}
+	if k := n.Kinds[0]; k.Kind != "vless" || k.Reports != 4 || k.OK != 2 || k.Freeze != 2 || k.MedianDelayMS != 125 || k.DLChecked != 3 || k.DLStalled != 1 {
+		t.Errorf("kind: %+v", k)
 	}
 	if n.Operators[0].Name != "MTS PJSC" || n.Operators[0].Freeze != 3 || n.Regions[0].Name != "RU · Moscow" {
 		t.Errorf("groups: %+v %+v", n.Operators, n.Regions)

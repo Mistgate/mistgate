@@ -1167,10 +1167,24 @@ type klickNodeV struct {
 	klickTallyV
 	Operators []klickGroupV `json:"operators"`
 	Regions   []klickGroupV `json:"regions"`
+	Kinds     []klickKindV  `json:"kinds"`
+}
+
+type klickKindV struct {
+	Kind string `json:"kind"`
+	klickTallyV
+	MedianDelayMS uint32 `json:"median_delay_ms"`
+	DLChecked     uint32 `json:"dl_checked"`
+	DLStalled     uint32 `json:"dl_stalled"`
 }
 
 func (v *KlickReportsV) shrink() bool {
 	v.Truncated = true
+	for i := range v.Nodes {
+		if cut(&v.Nodes[i].Kinds) || cut(&v.Nodes[i].Operators) || cut(&v.Nodes[i].Regions) {
+			return true
+		}
+	}
 	return cut(&v.Nodes)
 }
 
@@ -1200,8 +1214,13 @@ func klickReportsView(r *adminv1.GetClientProbeResponse, nodes []*adminv1.Node, 
 		if node != "" && n.GetNodeId() != node {
 			continue
 		}
-		v.Nodes = append(v.Nodes, klickNodeV{NodeID: clean(n.GetNodeId(), 80), NodeName: nm(names[n.GetNodeId()]), klickTallyV: klickTally(n.GetTally()),
-			Operators: klickGroups(n.GetOperators()), Regions: klickGroups(n.GetRegions())})
+		nv := klickNodeV{NodeID: clean(n.GetNodeId(), 80), NodeName: nm(names[n.GetNodeId()]), klickTallyV: klickTally(n.GetTally()),
+			Operators: klickGroups(n.GetOperators()), Regions: klickGroups(n.GetRegions()), Kinds: []klickKindV{}}
+		for _, k := range n.GetKinds() {
+			nv.Kinds = append(nv.Kinds, klickKindV{Kind: clean(k.GetKind(), 40), klickTallyV: klickTally(k.GetTally()),
+				MedianDelayMS: k.GetMedianDelayMs(), DLChecked: k.GetDlChecked(), DLStalled: k.GetDlStalled()})
+		}
+		v.Nodes = append(v.Nodes, nv)
 	}
 	return v
 }
@@ -1216,18 +1235,22 @@ type UserConnectionV struct {
 }
 
 type deviceConnV struct {
-	DeviceID     string `json:"device_id"`
-	NodeID       string `json:"node_id"`
-	NodeName     string `json:"node_name"`
-	InboundID    string `json:"inbound_id"`
-	Profile      string `json:"profile"`
-	Protocol     string `json:"protocol"`
-	Connects     uint32 `json:"connects"`
-	Rejects      uint32 `json:"rejects"`
-	Drops        uint32 `json:"drops"`
-	Stalls       uint32 `json:"stalls"`
-	OnlineS      uint64 `json:"online_s"`
-	LastHourUnix int64  `json:"last_hour_unix"`
+	DeviceID     string      `json:"device_id"`
+	NodeID       string      `json:"node_id"`
+	NodeName     string      `json:"node_name"`
+	InboundID    string      `json:"inbound_id"`
+	Profile      string      `json:"profile"`
+	Protocol     string      `json:"protocol"`
+	Connects     uint32      `json:"connects"`
+	Rejects      uint32      `json:"rejects"`
+	Drops        uint32      `json:"drops"`
+	Stalls       uint32      `json:"stalls"`
+	OnlineS      uint64      `json:"online_s"`
+	LastHourUnix int64       `json:"last_hour_unix"`
+	Platform     string      `json:"platform"`
+	Client       string      `json:"client"`
+	Kind         string      `json:"kind"`
+	Hours        []linkHourV `json:"hours,omitempty"`
 }
 
 type nodeWithoutV struct {
@@ -1237,6 +1260,11 @@ type nodeWithoutV struct {
 
 func (v *UserConnectionV) shrink() bool {
 	v.Truncated = true
+	for i := range v.Rows {
+		if cut(&v.Rows[i].Hours) {
+			return true
+		}
+	}
 	return cut(&v.Rows) || cut(&v.NodesWithoutCounters)
 }
 
@@ -1244,10 +1272,14 @@ func (v *UserConnectionV) shrink() bool {
 func userConnectionView(r *adminv1.GetUserConnectionResponse, nodes []*adminv1.Node) *UserConnectionV {
 	v := &UserConnectionV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Rows: []deviceConnV{}, NodesWithoutCounters: []nodeWithoutV{}}
 	for _, d := range r.GetRows() {
-		v.Rows = append(v.Rows, deviceConnV{DeviceID: clean(d.GetDeviceId(), 80), NodeID: clean(d.GetNodeId(), 80), NodeName: nm(d.GetNodeName()),
+		dv := deviceConnV{DeviceID: clean(d.GetDeviceId(), 80), NodeID: clean(d.GetNodeId(), 80), NodeName: nm(d.GetNodeName()),
 			InboundID: clean(d.GetInboundId(), 80), Profile: nm(d.GetProfileName()), Protocol: clean(d.GetProtocol(), 40),
 			Connects: d.GetConnects(), Rejects: d.GetRejects(), Drops: d.GetDrops(), Stalls: d.GetStalls(), OnlineS: d.GetOnlineS(),
-			LastHourUnix: d.GetLastHourUnix()})
+			LastHourUnix: d.GetLastHourUnix(), Platform: clean(d.GetPlatform(), 40), Client: clean(d.GetClient(), 80), Kind: clean(d.GetKind(), 40), Hours: []linkHourV{}}
+		for _, h := range d.GetHours() {
+			dv.Hours = append(dv.Hours, linkHourView(h))
+		}
+		v.Rows = append(v.Rows, dv)
 	}
 	names := map[string]string{}
 	for _, n := range nodes {
@@ -1271,24 +1303,87 @@ type NodeConnectionsV struct {
 }
 
 type inboundConnV struct {
-	InboundID   string `json:"inbound_id"`
-	ProfileID   string `json:"profile_id"`
-	Profile     string `json:"profile"`
-	Protocol    string `json:"protocol"`
-	Connects    uint32 `json:"connects"`
-	Rejects     uint32 `json:"rejects"`
-	Drops       uint32 `json:"drops"`
-	Stalls      uint32 `json:"stalls"`
-	OnlineS     uint64 `json:"online_s"`
-	UnknownKeys uint32 `json:"unknown_keys"`
-	Hellos      uint32 `json:"hellos"`
-	Handshakes  uint32 `json:"handshakes"`
-	KeysStalled uint32 `json:"keys_stalled"`
-	KeysTried   uint32 `json:"keys_tried"`
+	InboundID   string        `json:"inbound_id"`
+	ProfileID   string        `json:"profile_id"`
+	Profile     string        `json:"profile"`
+	Protocol    string        `json:"protocol"`
+	Connects    uint32        `json:"connects"`
+	Rejects     uint32        `json:"rejects"`
+	Drops       uint32        `json:"drops"`
+	Stalls      uint32        `json:"stalls"`
+	OnlineS     uint64        `json:"online_s"`
+	UnknownKeys uint32        `json:"unknown_keys"`
+	Hellos      uint32        `json:"hellos"`
+	Handshakes  uint32        `json:"handshakes"`
+	KeysStalled uint32        `json:"keys_stalled"`
+	KeysTried   uint32        `json:"keys_tried"`
+	Unsupported []string      `json:"unsupported,omitempty"`
+	Hours       []linkHourV   `json:"hours,omitempty"`
+	Clients     []clientConnV `json:"clients,omitempty"`
+	AWG         *awgPacketsV  `json:"awg,omitempty"`
+}
+
+type linkHourV struct {
+	HourUnix    int64  `json:"hour_unix"`
+	Connects    uint32 `json:"connects,omitempty"`
+	Rejects     uint32 `json:"rejects,omitempty"`
+	Drops       uint32 `json:"drops,omitempty"`
+	Stalls      uint32 `json:"stalls,omitempty"`
+	OnlineS     uint64 `json:"online_s,omitempty"`
+	UnknownKeys uint32 `json:"unknown_keys,omitempty"`
+	Hellos      uint32 `json:"hellos,omitempty"`
+	Handshakes  uint32 `json:"handshakes,omitempty"`
+}
+
+type clientConnV struct {
+	Client   string `json:"client"`
+	Platform string `json:"platform"`
+	Devices  uint32 `json:"devices"`
+	Connects uint32 `json:"connects"`
+	Rejects  uint32 `json:"rejects"`
+	Drops    uint32 `json:"drops"`
+	Stalls   uint32 `json:"stalls"`
+	OnlineS  uint64 `json:"online_s"`
+}
+
+type awgPacketsV struct {
+	UDPRxPackets uint64 `json:"udp_rx_packets"`
+	ReportedUnix int64  `json:"reported_unix"`
+	Backend      string `json:"backend"`
+	PeersOnline  uint32 `json:"peers_online"`
+}
+
+func linkHourView(h *adminv1.LinkHour) linkHourV {
+	return linkHourV{HourUnix: h.GetHourStartUnix(), Connects: h.GetConnects(), Rejects: h.GetRejects(), Drops: h.GetDrops(),
+		Stalls: h.GetStalls(), OnlineS: h.GetOnlineS(), UnknownKeys: h.GetUnknownKeys(), Hellos: h.GetHellos(), Handshakes: h.GetHandshakes()}
+}
+
+func inboundConnectionsView(i *adminv1.InboundConnections) inboundConnV {
+	v := inboundConnV{InboundID: clean(i.GetInboundId(), 80), ProfileID: clean(i.GetProfileId(), 80), Profile: nm(i.GetProfileName()),
+		Protocol: clean(i.GetProtocol(), 40), Connects: i.GetConnects(), Rejects: i.GetRejects(), Drops: i.GetDrops(), Stalls: i.GetStalls(),
+		OnlineS: i.GetOnlineS(), UnknownKeys: i.GetUnknownKeys(), Hellos: i.GetHellos(), Handshakes: i.GetHandshakes(),
+		KeysStalled: i.GetKeysStalled(), KeysTried: i.GetKeysTried(), Unsupported: append([]string(nil), i.GetUnsupported()...),
+		Hours: []linkHourV{}, Clients: []clientConnV{}}
+	for _, h := range i.GetHours() {
+		v.Hours = append(v.Hours, linkHourView(h))
+	}
+	for _, c := range i.GetClients() {
+		v.Clients = append(v.Clients, clientConnV{Client: clean(c.GetClient(), 80), Platform: clean(c.GetPlatform(), 40), Devices: c.GetDevices(),
+			Connects: c.GetConnects(), Rejects: c.GetRejects(), Drops: c.GetDrops(), Stalls: c.GetStalls(), OnlineS: c.GetOnlineS()})
+	}
+	if a := i.GetAwg(); a != nil {
+		v.AWG = &awgPacketsV{UDPRxPackets: a.GetUdpRxPackets(), ReportedUnix: a.GetReportedUnix(), Backend: clean(a.GetBackend(), 32), PeersOnline: a.GetPeersOnline()}
+	}
+	return v
 }
 
 func (v *NodeConnectionsV) shrink() bool {
 	v.Truncated = true
+	for i := range v.Inbounds {
+		if cut(&v.Inbounds[i].Hours) || cut(&v.Inbounds[i].Clients) {
+			return true
+		}
+	}
 	return cut(&v.Inbounds)
 }
 
@@ -1296,10 +1391,46 @@ func nodeConnectionsView(r *adminv1.GetNodeConnectionsResponse, id, name string)
 	v := &NodeConnectionsV{NodeID: clean(id, 80), NodeName: nm(name), Supported: r.GetSupported(), SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(),
 		Inbounds: []inboundConnV{}}
 	for _, i := range r.GetInbounds() {
-		v.Inbounds = append(v.Inbounds, inboundConnV{InboundID: clean(i.GetInboundId(), 80), ProfileID: clean(i.GetProfileId(), 80),
-			Profile: nm(i.GetProfileName()), Protocol: clean(i.GetProtocol(), 40), Connects: i.GetConnects(), Rejects: i.GetRejects(),
-			Drops: i.GetDrops(), Stalls: i.GetStalls(), OnlineS: i.GetOnlineS(), UnknownKeys: i.GetUnknownKeys(), Hellos: i.GetHellos(),
-			Handshakes: i.GetHandshakes(), KeysStalled: i.GetKeysStalled(), KeysTried: i.GetKeysTried()})
+		v.Inbounds = append(v.Inbounds, inboundConnectionsView(i))
+	}
+	return v
+}
+
+// FleetConnectionsV is the all-node connection-counter summary.
+type FleetConnectionsV struct {
+	SinceUnix int64            `json:"since_unix"`
+	NowUnix   int64            `json:"now_unix"`
+	Nodes     []fleetNodeConnV `json:"nodes"`
+	Truncated bool             `json:"truncated,omitempty"`
+}
+
+type fleetNodeConnV struct {
+	NodeID      string         `json:"node_id"`
+	NodeName    string         `json:"node_name"`
+	CountryCode string         `json:"country_code"`
+	Supported   bool           `json:"supported"`
+	Inbounds    []inboundConnV `json:"inbounds"`
+}
+
+func (v *FleetConnectionsV) shrink() bool {
+	v.Truncated = true
+	for i := range v.Nodes {
+		if cut(&v.Nodes[i].Inbounds) {
+			return true
+		}
+	}
+	return cut(&v.Nodes)
+}
+
+func fleetConnectionsView(r *adminv1.GetFleetConnectionsResponse) *FleetConnectionsV {
+	v := &FleetConnectionsV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Nodes: []fleetNodeConnV{}}
+	for _, n := range r.GetNodes() {
+		nv := fleetNodeConnV{NodeID: clean(n.GetNodeId(), 80), NodeName: nm(n.GetNodeName()), CountryCode: clean(n.GetCountryCode(), 8),
+			Supported: n.GetSupported(), Inbounds: []inboundConnV{}}
+		for _, i := range n.GetInbounds() {
+			nv.Inbounds = append(nv.Inbounds, inboundConnectionsView(i))
+		}
+		v.Nodes = append(v.Nodes, nv)
 	}
 	return v
 }

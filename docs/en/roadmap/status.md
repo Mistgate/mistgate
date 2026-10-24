@@ -50,7 +50,7 @@ Mistgate is in **beta**; the current release is `v0.1.55`. It runs in production
       section: health
       points:
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
-        - "[Connection counters](../guide/nodes.md#profiles) from the nodes: connections, drops right after connecting, refused keys, handshakes that never complete, time online and unknown keys, per device on a person's page and per profile on the node. Hysteria2 and AmneziaWG; counts only, kept 48 hours."
+        - "[Connection counters](../guide/nodes.md#profiles) from the nodes: connections, drops right after connecting, refused keys, handshakes that never complete, time online and unknown keys, per device on a person's page and per profile on the node. Hysteria2 and AmneziaWG event counters, plus VLESS session time; counts only, kept 7 days (168 hours)."
         - "The [node journal](../guide/nodes.md#journal): the warnings and errors of each node's agent and engines for 7 days, without client addresses, for every admin and in MCP."
         - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
         - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, the antifilter block lists a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country."

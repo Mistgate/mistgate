@@ -118,6 +118,15 @@ func (r rpc) GetClientProbe(ctx context.Context, _ *connect.Request[adminv1.GetC
 			return nil, errInternal
 		}
 		out.Nodes = Nodes(counts)
+		kinds, err := s.cfg.Store.ClientProbeKindCounts(ctx, now.Add(-Keep))
+		if err != nil {
+			s.cfg.Log.Error("clientprobe: read the kind counts", "err", err)
+			return nil, errInternal
+		}
+		byNode := Kinds(kinds)
+		for _, node := range out.Nodes {
+			node.Kinds = byNode[node.NodeId]
+		}
 	}
 	return connect.NewResponse(out), nil
 }
@@ -206,6 +215,40 @@ func Nodes(counts []store.ClientProbeCount) []*adminv1.ClientProbeNode {
 		n.Operators, n.Regions = groups(ops[n.NodeId]), groups(regions[n.NodeId])
 	}
 	return out
+}
+
+// Kinds folds the report rows by node and server kind, with the median measured delay and download checks. At most maxGroups
+// kinds are returned per node, most reports first.
+func Kinds(counts []store.ClientProbeKindCount) map[string][]*adminv1.ClientProbeKind {
+	grouped := map[string][]*adminv1.ClientProbeKind{}
+	for _, c := range counts {
+		kind := &adminv1.ClientProbeKind{Kind: c.Kind, Tally: &adminv1.ClientProbeTally{
+			Reports: uint32(c.Reports), Ok: uint32(c.OK), Freeze: uint32(c.Freeze), TcpBlocked: uint32(c.TCPBlocked),
+			HandshakeFailed: uint32(c.Handshake), NoAnswer: uint32(c.NoAnswer), LastUnix: c.Last.Unix(),
+		}, MedianDelayMs: medianDelay(c.DelaySamples), DlChecked: uint32(c.DLChecked), DlStalled: uint32(c.DLStalled)}
+		grouped[c.NodeID] = append(grouped[c.NodeID], kind)
+	}
+	for nodeID, kinds := range grouped {
+		slices.SortFunc(kinds, func(a, b *adminv1.ClientProbeKind) int {
+			return cmp.Or(cmp.Compare(b.GetTally().GetReports(), a.GetTally().GetReports()), strings.Compare(a.GetKind(), b.GetKind()))
+		})
+		if len(kinds) > maxGroups {
+			grouped[nodeID] = kinds[:maxGroups]
+		}
+	}
+	return grouped
+}
+
+func medianDelay(samples []uint32) uint32 {
+	if len(samples) == 0 {
+		return 0
+	}
+	slices.Sort(samples)
+	mid := len(samples) / 2
+	if len(samples)%2 == 1 {
+		return samples[mid]
+	}
+	return samples[mid-1] + (samples[mid]-samples[mid-1])/2
 }
 
 func tallyOf(m map[string]*adminv1.ClientProbeTally, name string) *adminv1.ClientProbeTally {

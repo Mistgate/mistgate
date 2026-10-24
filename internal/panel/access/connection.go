@@ -49,7 +49,7 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 		}
 	}
 	slices.Sort(resp.NodesWithoutCounters)
-	rows, err := s.st.UserLinks(ctx, u.ID, since)
+	rows, err := s.st.UserLinksByHour(ctx, u.ID, since, req.Msg.ByHour)
 	if err != nil {
 		return nil, s.internal("connection counters", err)
 	}
@@ -57,10 +57,20 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 		resp.Rows = append(resp.Rows, &adminv1.DeviceConnection{
 			DeviceId: r.DeviceID, NodeId: r.NodeID, NodeName: r.NodeName, InboundId: r.InboundID, ProfileName: r.ProfileName,
 			Protocol: r.Protocol, Connects: clamp32(r.Connects), Rejects: clamp32(r.Rejects), Drops: clamp32(r.Drops),
-			Stalls: clamp32(r.Stalls), OnlineS: r.OnlineS, LastHourUnix: r.LastHour.Unix(),
+			Stalls: clamp32(r.Stalls), OnlineS: r.OnlineS, LastHourUnix: r.LastHour.Unix(), Platform: r.Platform,
+			Client: r.Client, Kind: store.DeviceKindName(r.Kind), Hours: userLinkHours(r.Hours),
 		})
 	}
 	return connect.NewResponse(resp), nil
+}
+
+func userLinkHours(hours []store.LinkHourSums) []*adminv1.LinkHour {
+	out := make([]*adminv1.LinkHour, 0, len(hours))
+	for _, h := range hours {
+		out = append(out, &adminv1.LinkHour{HourStartUnix: h.HourStart, Connects: clamp32(h.Connects), Rejects: clamp32(h.Rejects),
+			Drops: clamp32(h.Drops), Stalls: clamp32(h.Stalls), OnlineS: h.OnlineS})
+	}
+	return out
 }
 
 // clamp32 fits a window sum into a uint32 field.

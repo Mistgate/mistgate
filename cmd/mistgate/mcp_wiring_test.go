@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 21 || b != 39 || c != 69 {
+	if a, b, c := count(ro), count(op), count(ad); a != 22 || b != 40 || c != 70 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -330,11 +330,14 @@ func TestMCPEndToEnd(t *testing.T) {
 	if out := ok(ro, "node_connections", map[string]any{"node": "de1"}); !strings.Contains(out, `"supported":false`) || !strings.Contains(out, `"inbounds":[]`) {
 		t.Errorf("node_connections: %s", out)
 	}
+	if out := ok(ro, "fleet_connections", map[string]any{"hours": 168}); !strings.Contains(out, `"nodes":[`) || !strings.Contains(out, `"node_name":"de1"`) || !strings.Contains(out, `"supported":false`) {
+		t.Errorf("fleet_connections: %s", out)
+	}
 	journal := decodeJSON[mcp.NodeJournalV](t, ok(ro, "node_journal", map[string]any{"node": "de1"}))
 	if len(journal.Entries) != 0 || len(journal.NodesWithoutJournal) != 1 || journal.NodesWithoutJournal[0] == "" {
 		t.Errorf("node_journal through the real services: %+v", journal)
 	}
-	if out := ok(ro, "user_connection", map[string]any{"user_id": ids[0], "hours": 48}); !strings.Contains(out, `"rows":[]`) || !strings.Contains(out, `"nodes_without_counters":[]`) {
+	if out := ok(ro, "user_connection", map[string]any{"user_id": ids[0], "hours": 168, "by_hour": true}); !strings.Contains(out, `"rows":[]`) || !strings.Contains(out, `"nodes_without_counters":[]`) {
 		t.Errorf("user_connection: %s", out)
 	}
 	if out, isErr := tool(ro, "user_connection", map[string]any{"user_id": "usr_missing"}); !isErr || !strings.Contains(out, "not found") {
@@ -457,7 +460,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 21 {
+	if n := count(ps); n != 22 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {

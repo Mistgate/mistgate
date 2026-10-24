@@ -11,6 +11,8 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // linksBatch is a stats batch that carries connection counters (agent.proto LinkCounters) and nothing else.
@@ -42,6 +44,12 @@ func TestStatsLinksAreStoredAndRead(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("nodea")
 	ids := e.fixture(a.nodeID)
+	// Use the production protocol names in this test so it also covers per-protocol unsupported counters.
+	e.exec(`UPDATE profile SET protocol = CASE id WHEN 'prf_1' THEN 'hysteria2' WHEN 'prf_2' THEN 'awg' END WHERE id IN ('prf_1', 'prf_2')`)
+	e.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_vless', 'vless', 'VLESS', '{}', 1, unixepoch(), unixepoch())`)
+	e.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES ('inb_vless', 'prf_vless', ?, 1, unixepoch(), unixepoch())`, a.nodeID)
+	e.exec(`UPDATE device_credential SET protocol = CASE protocol WHEN 'fakehy' THEN 'hysteria2' WHEN 'fakewg' THEN 'awg' END WHERE protocol IN ('fakehy', 'fakewg')`)
+	e.exec(`UPDATE device SET platform = 'android', client = 'Happ/3.4.2' WHERE id IN ('dev_alice', 'dev_erin')`)
 	c := connectLinks(a, "inst1")
 	node := nodeService{e.f}
 
@@ -63,24 +71,55 @@ func TestStatsLinksAreStoredAndRead(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM link_hour WHERE inbound_id = ? OR node_id <> ?`, ids.i3, a.nodeID); n != 0 {
 		t.Errorf("%d rows of the other node's inbound or the wrong node", n)
 	}
+	health, err := protojson.Marshal(&agentv1.AwgHealth{Backend: "userspace", UdpRxPackets: 12345, PeersOnline: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.SetInboundAwgHealth(e.ctx, a.nodeID, ids.i2, string(health), e.f.now()); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID}))
-	if err != nil || !resp.Msg.Supported || len(resp.Msg.Inbounds) != 2 {
+	if err != nil || !resp.Msg.Supported || len(resp.Msg.Inbounds) != 3 {
 		t.Fatalf("GetNodeConnections = %+v, %v", resp, err)
 	}
 	if got := resp.Msg.NowUnix - resp.Msg.SinceUnix; got != 24*3600 {
 		t.Errorf("default window = %d s, want 24 h", got)
 	}
 	hy, wg := resp.Msg.Inbounds[0], resp.Msg.Inbounds[1]
-	if hy.InboundId != ids.i1 || hy.ProfileId != "prf_1" || hy.ProfileName != "p1" || hy.Protocol != "fakehy" ||
+	if hy.InboundId != ids.i1 || hy.ProfileId != "prf_1" || hy.ProfileName != "p1" || hy.Protocol != "hysteria2" ||
 		hy.Connects != 4 || hy.Drops != 1 || hy.Stalls != 3 || hy.OnlineS != 610 || hy.UnknownKeys != 4 || hy.Hellos != 20 || hy.Handshakes != 9 ||
 		hy.KeysStalled != 1 || hy.KeysTried != 2 {
 		t.Errorf("hysteria inbound = %+v", hy)
 	}
-	if wg.InboundId != ids.i2 || wg.Protocol != "fakewg" || wg.Rejects != 5 || wg.Connects != 0 || wg.KeysTried != 0 {
+	if len(hy.Unsupported) != 0 || len(hy.Clients) != 1 || hy.Clients[0].Client != "Happ/3.4.2" || hy.Clients[0].Platform != "android" ||
+		hy.Clients[0].Devices != 2 || hy.Clients[0].Connects != 4 {
+		t.Errorf("Hysteria2 clients/unsupported = %+v / %v", hy.Clients, hy.Unsupported)
+	}
+	if wg.InboundId != ids.i2 || wg.Protocol != "awg" || wg.Rejects != 5 || wg.Connects != 0 || wg.KeysTried != 0 ||
+		!equalStrings(wg.Unsupported, connectiondiag.UnsupportedCounters("awg")) || wg.Awg == nil || wg.Awg.UdpRxPackets != 12345 ||
+		wg.Awg.Backend != "userspace" || wg.Awg.PeersOnline != 2 {
 		t.Errorf("wg inbound = %+v", wg)
 	}
-	for hours, want := range map[uint32]int64{1: 3600, 0: 24 * 3600, 48: 48 * 3600, 5000: 48 * 3600} {
+	if len(wg.Clients) != 1 || wg.Clients[0].Devices != 1 || wg.Clients[0].Rejects != 5 {
+		t.Errorf("AWG clients = %+v", wg.Clients)
+	}
+	vless := resp.Msg.Inbounds[2]
+	if vless.InboundId != "inb_vless" || vless.Protocol != "vless" || vless.OnlineS != 0 ||
+		!equalStrings(vless.Unsupported, connectiondiag.UnsupportedCounters("vless")) {
+		t.Errorf("VLESS unsupported = %+v", vless)
+	}
+	byHour, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID, ByHour: true}))
+	if err != nil || len(byHour.Msg.Inbounds) != 3 || len(byHour.Msg.Inbounds[0].Hours) == 0 {
+		t.Fatalf("GetNodeConnections by_hour = %+v, %v", byHour, err)
+	}
+	for i, h := range byHour.Msg.Inbounds[0].Hours {
+		if h.Connects+h.Rejects+h.Drops+h.Stalls+h.UnknownKeys+h.Hellos+h.Handshakes == 0 || (i > 0 && byHour.Msg.Inbounds[0].Hours[i-1].HourStartUnix >= h.HourStartUnix) {
+			t.Errorf("hour row is zero or not ascending: %+v", byHour.Msg.Inbounds[0].Hours)
+			break
+		}
+	}
+	for hours, want := range map[uint32]int64{1: 3600, 0: 24 * 3600, 48: 48 * 3600, 168: 168 * 3600, 5000: 168 * 3600} {
 		r, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID, Hours: hours}))
 		if err != nil || r.Msg.NowUnix-r.Msg.SinceUnix != want {
 			t.Errorf("hours %d: window %v, %v, want %d s", hours, r, err, want)
@@ -92,9 +131,28 @@ func TestStatsLinksAreStoredAndRead(t *testing.T) {
 	if err != nil || resp.Msg.Supported || len(resp.Msg.Inbounds) != 0 || resp.Msg.NowUnix == 0 {
 		t.Errorf("a node without links/1 = %+v, %v", resp, err)
 	}
+	fleet, err := node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{Hours: 168}))
+	if err != nil || len(fleet.Msg.Nodes) != 2 || fleet.Msg.Nodes[0].NodeName != "nodea" || !fleet.Msg.Nodes[0].Supported ||
+		len(fleet.Msg.Nodes[0].Inbounds) != 3 || fleet.Msg.Nodes[0].Inbounds[1].Awg == nil ||
+		fleet.Msg.Nodes[0].Inbounds[1].Awg.GetUdpRxPackets() != 12345 || len(fleet.Msg.Nodes[0].Inbounds[1].Clients) != 0 ||
+		len(fleet.Msg.Nodes[0].Inbounds[1].Hours) != 0 || fleet.Msg.Nodes[1].Supported || len(fleet.Msg.Nodes[1].Inbounds) != 0 {
+		t.Errorf("GetFleetConnections = %+v, %v", fleet, err)
+	}
 	if _, err = node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: "nod_missing"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("an unknown node: %v, want NotFound", err)
 	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // guardLinks keeps at most maxStatsDeltas rows; the traffic limits do not touch the counters.

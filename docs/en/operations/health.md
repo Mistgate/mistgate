@@ -232,7 +232,7 @@ An alert that fires again within an hour of closing reopens with its original id
 
 These alerts are derived from user, device and hourly peak data the panel already stores. The alerts about a person (`access_ended`, `user_connection`, `device_limit`, `torrent`) are listed on the **People** tab of Health and in the **Connection** block of the user's page, not among the node alerts, and they do not count in the alert badge; `users_impacted` is about a node and stays with the node alerts.
 
-The **Connection** block of a person's page also shows what the nodes counted of their connections in the last 24 hours, per device and profile: connections, drops right after connecting, refused keys, handshakes that did not complete and time online. A device that appears nowhere did not reach any node. Nodes whose agent does not count connections yet are named under it. Counts only, never an address; kept 48 hours. The same is in MCP as `user_connection` and `node_connections`.
+The **Connection** block of a person's page also shows what the nodes counted of their connections in the last 24 hours, per device and profile: connections, drops right after connecting, refused keys, handshakes that did not complete and time online. A device that appears nowhere did not reach any node. Nodes whose agent does not count connections yet are named under it. Counts only, never an address; kept 7 days (168 hours). The same is in MCP as `user_connection` and `node_connections`.
 
 The reason under a traffic alert names the likely cause:
 

@@ -33,9 +33,9 @@ func TestSweepAppliesRetention(t *testing.T) {
 	e.s.NodeReturned(e.ctx, "de1", now.Add(-100*day-time.Minute), now.Add(-100*day))
 	e.s.NodeReturned(e.ctx, "de1", now.Add(-day-time.Minute), now.Add(-day))
 
-	// connection counters: the hour bucket of 47 h ago stays, the one that ended before the 48 h cut goes
+	// connection counters: the hour bucket of 167 h ago stays, the one that ended before the 168 h cut goes
 	hour := now.Unix() / 3600 * 3600
-	for _, at := range []int64{hour - 47*3600, hour - 50*3600} {
+	for _, at := range []int64{hour - 167*3600, hour - 169*3600} {
 		e.exec(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, connects) VALUES ('de1', ?, 'inb_x', '', 1)`, at)
 	}
 	for _, at := range []int64{hour - 167*3600, hour - 169*3600} {

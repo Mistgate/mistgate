@@ -16,8 +16,8 @@ import (
 const (
 	retentionEvery = time.Hour
 	eventBatch     = 2000
-	deviceKeep     = 90 * 24 * time.Hour // how long a revoked device (not a blocked one) stays as a row
-	linkKeep       = 48 * time.Hour      // connection counters (link_hour), the most GetUserConnection and GetNodeConnections read
+	deviceKeep     = 90 * 24 * time.Hour                            // how long a revoked device (not a blocked one) stays as a row
+	linkKeep       = time.Duration(store.LinkKeepHours) * time.Hour // connection counters and their longest RPC window
 )
 
 func (s *Service) runRetention(ctx context.Context) {
@@ -77,7 +77,7 @@ func (s *Service) sweep(ctx context.Context) {
 	} else if n > 0 {
 		s.log.Info("health: pruned kl!ck reports", "count", n)
 	}
-	// The connection counters (link_hour) are hour buckets; the window the RPCs read is 48 hours.
+	// The connection counters (link_hour) are hour buckets; retain them for the maximum RPC window.
 	if n, err := s.st.PruneLinkHours(ctx, now.Add(-linkKeep)); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune connection counters", "err", err)
 	} else if n > 0 {

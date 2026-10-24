@@ -25,6 +25,7 @@ func TestGetUserConnection(t *testing.T) {
 	if err := e.st.R.QueryRow(`SELECT id, device_id FROM device_credential WHERE user_id = ? ORDER BY id LIMIT 1`, alice.Id).Scan(&cred, &device); err != nil {
 		t.Fatal(err)
 	}
+	e.sql(`UPDATE device SET platform = 'android', client = 'Happ/3.4.2', kind = 'link' WHERE id = ?`, device)
 	hour := e.clock.Unix() / 3600 * 3600
 	row := func(node, inbound, credID, user string, at int64, counters string) {
 		e.sql(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, `+counters+`) VALUES (?, ?, ?, ?, ?, 1, 1, 1, 1, 1)`,
@@ -51,7 +52,8 @@ func TestGetUserConnection(t *testing.T) {
 	}
 	de, nl := m.Rows[0], m.Rows[1]
 	if de.DeviceId != device || de.NodeId != "nod_de1" || de.NodeName != "de1" || de.InboundId != f.inbound || de.Protocol != "hysteria2" ||
-		de.Connects != 2 || de.Rejects != 2 || de.Drops != 2 || de.Stalls != 2 || de.OnlineS != 2 || de.LastHourUnix != hour {
+		de.Connects != 2 || de.Rejects != 2 || de.Drops != 2 || de.Stalls != 2 || de.OnlineS != 2 || de.LastHourUnix != hour ||
+		de.Platform != "android" || de.Client != "Happ/3.4.2" || de.Kind != "link" || len(de.Hours) != 0 {
 		t.Errorf("de1 row = %+v", de)
 	}
 	if nl.NodeName != "nl1" || nl.InboundId != in2.Id || nl.Connects != 1 || nl.LastHourUnix != hour-2*3600 {
@@ -60,8 +62,14 @@ func TestGetUserConnection(t *testing.T) {
 	if len(m.NodesWithoutCounters) != 1 || m.NodesWithoutCounters[0] != "nod_nl1" {
 		t.Errorf("nodes without counters = %v, want [nod_nl1] (the ids)", m.NodesWithoutCounters)
 	}
-	if resp, err = e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: alice.Id, Hours: 48})); err != nil || resp.Msg.Rows[0].Connects != 3 {
-		t.Errorf("48 hours = %+v, %v, want the older hour counted", resp, err)
+	if resp, err = e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: alice.Id, Hours: 168})); err != nil || resp.Msg.Rows[0].Connects != 3 {
+		t.Errorf("168 hours = %+v, %v, want the older hour counted", resp, err)
+	}
+	byHour, err := e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: alice.Id, Hours: 24, ByHour: true}))
+	if err != nil || len(byHour.Msg.Rows) != 2 || len(byHour.Msg.Rows[0].Hours) != 2 ||
+		byHour.Msg.Rows[0].Hours[0].HourStartUnix != hour-3600 || byHour.Msg.Rows[0].Hours[1].HourStartUnix != hour ||
+		byHour.Msg.Rows[0].Hours[0].Connects != 1 || byHour.Msg.Rows[0].Hours[1].Connects != 1 {
+		t.Errorf("by_hour response = %+v, %v", byHour, err)
 	}
 	if resp, err = e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: bob.Id})); err != nil || len(resp.Msg.Rows) != 0 || len(resp.Msg.NodesWithoutCounters) != 1 {
 		t.Errorf("a person without counters = %+v, %v", resp, err)
