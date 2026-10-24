@@ -1,6 +1,7 @@
 package health
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -37,12 +38,20 @@ func TestSweepAppliesRetention(t *testing.T) {
 	for _, at := range []int64{hour - 47*3600, hour - 50*3600} {
 		e.exec(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, connects) VALUES ('de1', ?, 'inb_x', '', 1)`, at)
 	}
+	for _, at := range []int64{hour - 167*3600, hour - 169*3600} {
+		e.exec(`INSERT INTO node_journal (node_id, hour_start, key, level, source, message, inbound_id, attrs_json, count, first_at, last_at)
+			VALUES ('de1', ?, ?, 2, 'agent', 'warning', '', '{}', 1, ?, ?)`, at, fmt.Sprint(at), at, at)
+	}
 
 	e.s.sweep(e.ctx)
 
 	var links int
 	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM link_hour`).Scan(&links); err != nil || links != 1 {
 		t.Fatalf("connection counters left: %d %v", links, err)
+	}
+	var journal int
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM node_journal`).Scan(&journal); err != nil || journal != 1 {
+		t.Fatalf("node journal rows left: %d %v", journal, err)
 	}
 	rows, _ := e.st.SamplesSince(e.ctx, time.Unix(0, 0))
 	if len(rows) != 1 || rows[0].Status != int(cFail) {

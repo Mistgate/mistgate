@@ -491,7 +491,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	var projectionEnd int64
 	projectionBuilt := false
 	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Session: tr.state.OwnerGeneration,
-		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic, Links: g.links}
+		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic, Links: g.links, Journal: g.journal, JournalSecrets: c.f.cfg.JournalSecrets}
 	in.Live = func(refs map[string]store.FleetCredRef) store.FleetLive {
 		live, end, tooLarge := buildFleetLive(projectionState, st, g.traffic, now, refs)
 		projectionEnd, projectionBuilt = end, true

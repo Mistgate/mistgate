@@ -2,9 +2,11 @@ package fleet
 
 import (
 	"math"
+	"sort"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/logscrub"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -23,8 +25,9 @@ const (
 type guardedStats struct {
 	traffic  []store.FleetTraffic
 	links    []store.FleetLink // connection counters, at most maxStatsDeltas rows
-	rejected int               // deltas dropped
-	reason   string            // why, for the event; "" when nothing was dropped
+	journal  []store.FleetJournal
+	rejected int    // deltas dropped
+	reason   string // why, for the event; "" when nothing was dropped
 }
 
 // guardStats checks the numbers of a batch before they reach used_bytes. A node is trusted with its own
@@ -46,12 +49,13 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	budget := satMul(rate, uint64(elapsed/time.Second))
 
 	links := f.guardLinks(st)
+	journal := f.guardJournal(st)
 	if len(st.Traffic) > maxStatsDeltas {
-		return guardedStats{links: links, rejected: len(st.Traffic), reason: "too_many_deltas"}
+		return guardedStats{links: links, journal: journal, rejected: len(st.Traffic), reason: "too_many_deltas"}
 	}
 	type key struct{ cred, inbound string }
 	at := map[key]int{}
-	out := guardedStats{links: links}
+	out := guardedStats{links: links, journal: journal}
 	for _, d := range st.Traffic {
 		k := key{d.CredId, d.InboundId}
 		i, dup := at[k]
@@ -76,7 +80,55 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	}
 	out.traffic = kept
 	if total > budget {
-		return guardedStats{links: links, rejected: len(st.Traffic), reason: "batch_over_limit"}
+		return guardedStats{links: links, journal: journal, rejected: len(st.Traffic), reason: "batch_over_limit"}
+	}
+	return out
+}
+
+const maxJournalEntries = 64
+
+// guardJournal bounds the node-provided journal before it reaches the store. Attribute keys are sorted before the cap so Go map
+// iteration cannot change which attributes are kept.
+func (f *Fleet) guardJournal(st *agentv1.StatsBatch) []store.FleetJournal {
+	entries := st.GetJournal()
+	if len(entries) > maxJournalEntries && f.log != nil {
+		f.log.Warn("node journal over the row limit, the rest dropped", "rows", len(entries), "limit", maxJournalEntries)
+	}
+	if len(entries) > maxJournalEntries {
+		entries = entries[:maxJournalEntries]
+	}
+	out := make([]store.FleetJournal, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil || (entry.GetLevel() != agentv1.Severity_SEVERITY_WARNING && entry.GetLevel() != agentv1.Severity_SEVERITY_ERROR) {
+			continue
+		}
+		attrs := make(map[string]string, min(len(entry.GetAttrs()), 8))
+		keys := make([]string, 0, len(entry.GetAttrs()))
+		for key := range entry.GetAttrs() {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, originalKey := range keys {
+			key := logscrub.ClipRunes(originalKey, 32)
+			if key == "" || len(attrs) == 8 {
+				continue
+			}
+			if _, exists := attrs[key]; exists {
+				continue
+			}
+			attrs[key] = logscrub.ClipRunes(entry.GetAttrs()[originalKey], 160)
+		}
+		firstAt, lastAt := entry.GetFirstUnix(), entry.GetLastUnix()
+		if firstAt > lastAt {
+			firstAt, lastAt = lastAt, firstAt
+		}
+		count := entry.GetCount()
+		if count == 0 {
+			count = 1
+		}
+		out = append(out, store.FleetJournal{Level: int32(entry.GetLevel()), Source: logscrub.Clip(entry.GetSource(), 32),
+			Message: logscrub.Clip(entry.GetMessage(), 256), InboundID: logscrub.Clip(entry.GetInboundId(), 64), Attrs: attrs,
+			Count: count, FirstAt: firstAt, LastAt: lastAt})
 	}
 	return out
 }

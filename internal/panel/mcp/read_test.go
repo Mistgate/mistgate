@@ -46,6 +46,8 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"user_connection", map[string]any{"user_id": "usr_alice"}},
 		{"node_connections", map[string]any{"node": "de1"}},
 		{"node_connections", map[string]any{"node": "nl1"}},
+		{"node_journal", map[string]any{}},
+		{"node_journal", map[string]any{"node": "de1", "query": "failed"}},
 		{"audit_search", map[string]any{}},
 		{"updates_status", map[string]any{}},
 	}

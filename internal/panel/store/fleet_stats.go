@@ -40,6 +40,8 @@ type FleetStatsIn struct {
 	HourStart        int64 // bucket hour (multiple of 3600), already clamped by the caller
 	Traffic          []FleetTraffic
 	Links            []FleetLink // connection counters (agent.proto LinkCounters), stored in the same hour bucket
+	Journal          []FleetJournal
+	JournalSecrets   []string // this panel's secret names and path prefixes, removed before the journal is stored
 	Sessions         []FleetSessionRef
 	Certs            []FleetInboundCert
 	// Live builds the session projection inside each guarded attempt. It must not mutate captured state.
@@ -183,6 +185,17 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		}, `SELECT cred_id FROM health_probe_cred WHERE cred_id IN (SELECT value FROM json_each(?))`, jsonStrings(credIDs))
 		if err := r.run(ctx, s); err != nil {
 			return nil, err
+		}
+		// An agent may only attach a journal record to one of this node's inbounds. Keep the record, but remove a
+		// foreign or stale inbound id so it cannot be used to attribute a message to another node.
+		if len(in.Journal) > 0 {
+			journal := append([]FleetJournal(nil), in.Journal...)
+			for i := range journal {
+				if _, ok := onNode[journal[i].InboundID]; journal[i].InboundID != "" && !ok {
+					journal[i].InboundID = ""
+				}
+			}
+			in.Journal = journal
 		}
 		lastForInstance := last
 		if instance != in.Instance {
@@ -414,6 +427,10 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 	if err != nil {
 		return nil, err
 	}
+	journalStmt, err := nodeJournalStmt(in.NodeID, in.HourStart, in.Journal, in.JournalSecrets)
+	if err != nil {
+		return nil, err
+	}
 	liveStmt, err := nodeLiveStatsStmt(in.NodeID, in.Session, live)
 	if err != nil {
 		return nil, err
@@ -452,6 +469,7 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 		certStmt,
 		touchStmt,
 		linkStmt,
+		journalStmt,
 		liveStmt,
 		commitSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now),
 	}, nil
