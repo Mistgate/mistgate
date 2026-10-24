@@ -23,7 +23,7 @@ func TestGetUserConnection(t *testing.T) {
 	alice := e.user("alice", g, nil).User
 	bob := e.user("bob", g, nil).User
 	var cred, device string
-	if err := e.st.R.QueryRow(`SELECT id, device_id FROM device_credential WHERE user_id = ? ORDER BY id LIMIT 1`, alice.Id).Scan(&cred, &device); err != nil {
+	if err := e.st.R.QueryRow(`SELECT id, device_id FROM device_credential WHERE user_id = ? ORDER BY protocol = 'hysteria2' DESC, id LIMIT 1`, alice.Id).Scan(&cred, &device); err != nil {
 		t.Fatal(err)
 	}
 	e.sql(`UPDATE device_credential SET protocol = 'hysteria2' WHERE id = ?`, cred)

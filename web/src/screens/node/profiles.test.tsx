@@ -499,7 +499,8 @@ describe("the profiles list by protocol", () => {
     getNodeConnections.mockResolvedValue({
       supported: true, sinceUnix: 0n, nowUnix: 0n,
       inbounds: [
-        { inboundId: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", connects: 12, rejects: 0, drops: 3, stalls: 0, onlineS: 0n, unknownKeys: 4, hellos: 40, handshakes: 10, keysStalled: 0, keysTried: 0 },
+        { inboundId: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", connects: 12, rejects: 0, drops: 3, stalls: 0, onlineS: 0n, unknownKeys: 4, hellos: 40, handshakes: 10, keysStalled: 0, keysTried: 0,
+          unsupported: ["client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille"] }, // an agent before links/2
       ],
     });
     await mount(data({ inbounds: [hy, awg] }));
