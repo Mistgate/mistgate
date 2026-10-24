@@ -21,9 +21,9 @@ type FleetLink struct {
 // bytes for one value (TestD1IngestStatsAtEdgeCap).
 const maxLinkCount = 1 << 20
 
-// maxLinkSum bounds a batch's wide counters (RTT milliseconds and packet totals). One trillion is far above a real 10-second
-// interval while leaving room for many batches to add within SQLite's signed 64-bit integer range.
-const maxLinkSum = 1 << 40
+// maxLinkSum clamps the wide fields of a row of one batch (rtt_ms_sum, pkts_sent, pkts_lost): about four billion, far above
+// what one key moves in a batch, and low enough that 168 hours of the largest batches cannot overflow an int64 SUM.
+const maxLinkSum = 1 << 32
 
 // zero reports a row with no counter at all (the agent does not send one; it is not stored).
 func (l FleetLink) zero() bool {

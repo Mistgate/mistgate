@@ -16,7 +16,7 @@ var (
 		"vless": {"connects", "rejects", "drops", "stalls", "unknown_keys", "hellos", "handshakes", "keys_stalled", "keys_tried",
 			"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"},
 	}
-	hysteria2WithoutLinks2 = []string{"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille"}
+	hysteria2WithoutLinks2 = []string{"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"}
 )
 
 // UnsupportedCounters returns protocol-level counters this protocol does not report. A fresh slice keeps callers from mutating
@@ -47,5 +47,5 @@ func SupportsHysteria2Links2(protocol string, supportsLinks2 bool) bool {
 
 // UnsupportedDescription is the common note used by MCP descriptions and tests.
 func UnsupportedDescription() string {
-	return "unsupported names counters the current protocol or agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: every connection counter except online_s; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms and loss_permille)."
+	return "unsupported names counters the current protocol or agent does not report; their zero values mean nothing (AWG: rejects, drops, hellos, handshakes and all links/2 fields; VLESS: every connection counter except online_s; Hysteria2 without links/2: client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms, loss_permille, rtt_samples and pkts_sent)."
 }

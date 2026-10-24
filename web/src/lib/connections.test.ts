@@ -12,7 +12,7 @@ const inbound = (over: Partial<InboundConn>): InboundConn => ({
   inboundId: "inb_1", profileId: "prf_1", profileName: "HY2", protocol: "hysteria2", connects: 0, rejects: 0, drops: 0, stalls: 0, onlineS: 0,
   unknownKeys: 0, hellos: 0, handshakes: 0, keysStalled: 0, keysTried: 0, hours: [], clients: [], clientCloses: 0, freezes: 0, quiet: 0,
   accepted: 0, hellosForeign: 0, rttMs: 0, lossPermille: 0, rttSamples: 0, pktsSent: 0,
-  unsupported: ["client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille"], // an agent before links/2
+  unsupported: ["client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"], // an agent before links/2
   ...over,
 });
 
@@ -46,8 +46,8 @@ describe("connection counters in words", () => {
       { text: "froze: 3", warn: true },
       { text: "RTT 85 ms" },
       { text: "loss 6.2%", warn: true },
-      // 30 hellos, 4 for another name, 20 completed: 6 never completed
-      { text: "20% of 30 handshakes did not complete", warn: false },
+      // 30 hellos, 20 completed: 10 never completed
+      { text: "33% of 30 handshakes did not complete", warn: false },
     ]);
     expect(deviceConnParts(t, fmt, { deviceId: "d", nodeId: "n", nodeName: "de", inboundId: "i", profileName: "HY2", protocol: "hysteria2",
       connects: 5, rejects: 0, drops: 4, stalls: 0, onlineS: 0, lastHourUnix: 0, platform: "", client: "", kind: "", hours: [],

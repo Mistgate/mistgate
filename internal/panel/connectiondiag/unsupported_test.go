@@ -11,7 +11,7 @@ func TestUnsupportedCounters(t *testing.T) {
 			"rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"},
 		"vless": {"connects", "rejects", "drops", "stalls", "unknown_keys", "hellos", "handshakes", "keys_stalled", "keys_tried",
 			"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"},
-		"hysteria2": {"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille"},
+		"hysteria2": {"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"},
 	} {
 		if got := UnsupportedCounters(protocol); !slices.Equal(got, want) {
 			t.Errorf("%s unsupported = %v, want %v", protocol, got, want)

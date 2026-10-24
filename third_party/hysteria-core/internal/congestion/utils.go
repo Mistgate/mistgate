@@ -37,7 +37,11 @@ func NormalizeBBRProfile(profile string) (string, error) {
 }
 
 func UseBBR(conn *quic.Conn, profile bbr.Profile) {
-	setCounting(conn, bbr.NewBbrSender(
+	useBBR(conn, profile, false)
+}
+
+func useBBR(conn *quic.Conn, profile bbr.Profile, count bool) {
+	set(conn, count, bbr.NewBbrSender(
 		bbr.DefaultClock{},
 		seedPacketSize(conn.InitialPacketSize(), bbr.GetInitialPacketSize(conn.RemoteAddr())),
 		profile,
@@ -61,7 +65,20 @@ func seedPacketSize(quicSize, byAddr congestion.ByteCount) congestion.ByteCount 
 }
 
 func UseBrutal(conn *quic.Conn, tx uint64, disableLossCompensation bool) {
-	setCounting(conn, brutal.NewBrutalSender(tx, disableLossCompensation))
+	set(conn, false, brutal.NewBrutalSender(tx, disableLossCompensation))
+}
+
+// UseConfiguredCounting and UseBrutalCounting are the server's (a Mistgate patch, see MISTGATE.md): they also count the lost
+// packets of the connection for LostPackets, which the server forgets when the connection ends. A client uses the plain
+// ones: nothing would forget its connections.
+func UseConfiguredCounting(conn *quic.Conn, congestionType, bbrProfile string) {
+	if congestionType != TypeReno {
+		useBBR(conn, bbr.Profile(bbrProfile), true)
+	}
+}
+
+func UseBrutalCounting(conn *quic.Conn, tx uint64, disableLossCompensation bool) {
+	set(conn, true, brutal.NewBrutalSender(tx, disableLossCompensation))
 }
 
 // Mistgate patch (see MISTGATE.md): quic-go counts lost packets into ConnectionStats.PacketsLost only in its own congestion
@@ -81,7 +98,11 @@ func (l lossCounting) OnCongestionEvent(number congestion.PacketNumber, lostByte
 
 var losses sync.Map // *quic.Conn -> *atomic.Uint64
 
-func setCounting(conn *quic.Conn, cc congestion.CongestionControlEx) {
+func set(conn *quic.Conn, count bool, cc congestion.CongestionControlEx) {
+	if !count {
+		conn.SetCongestionControl(cc)
+		return
+	}
 	lost := &atomic.Uint64{}
 	losses.Store(conn, lost)
 	conn.SetCongestionControl(lossCounting{cc, lost})

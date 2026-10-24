@@ -532,11 +532,13 @@ message GetNodeJournalResponse {
 // Hysteria2 with agents that list "links/2" (agent.proto LinkCounters), from the QUIC connection itself:
 //   - client_closes: connections the client closed itself.
 //   - freezes: idle timeouts after the node had kept sending and nothing came back: the path froze (how a TSPU freeze looks)
-//     or the client vanished mid-transfer. The signal of a block, unlike drops.
+//     or the client vanished mid-transfer. What tells a freeze from an app check, unlike drops. It needs a stats snapshot
+//     in the silence: the idle timeout (30 s) is longer than the stats interval (10 s).
 //   - quiet: idle timeouts in which neither side had anything to send: the client went away without closing (app checks,
 //     auto-select, a phone asleep). Harmless.
-//   - accepted: QUIC handshakes that completed; hellos - hellos_foreign - accepted never completed (a cut path or an app
-//     that gave up), accepted - handshakes never asked to authenticate (pings).
+//   - accepted: QUIC handshakes that completed; hellos - accepted never completed (a cut path, an app that gave up, or a
+//     scanner: hellos_foreign tells how many hellos were for another name), accepted - handshakes never asked to
+//     authenticate (pings).
 //   - hellos_foreign: ClientHellos for another server name (scanners).
 //   - rtt_ms (average smoothed RTT of connections that moved data, over rtt_samples samples) and loss_permille (packets
 //     the node declared lost per thousand it sent, over pkts_sent): how fast and clean the path was.
@@ -561,7 +563,7 @@ message InboundConnections {
   // The counters this protocol, or this node's agent, does not count (their zero means nothing): awg "rejects", "drops",
   // "hellos", "handshakes" and every links/2 counter; vless every counter until its agent counts them; hysteria2 on an
   // agent without "links/2" the links/2 counters (client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms,
-  // loss_permille).
+  // loss_permille, rtt_samples, pkts_sent).
   repeated string unsupported = 15;
   // With by_hour: the hours of the window that have a counter, oldest first.
   repeated LinkHour hours = 16;

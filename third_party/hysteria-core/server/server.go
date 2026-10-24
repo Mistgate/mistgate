@@ -190,7 +190,7 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.authID = id
 			if h.config.IgnoreClientBandwidth {
 				// Ignore client bandwidth and use the configured congestion controller.
-				congestion.UseConfigured(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
+				congestion.UseConfiguredCounting(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
 				actualTx = 0
 			} else {
 				// actualTx = min(serverTx, clientRx)
@@ -200,10 +200,10 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					actualTx = h.config.BandwidthConfig.MaxTx
 				}
 				if actualTx > 0 {
-					congestion.UseBrutal(h.conn, actualTx, h.config.BandwidthConfig.DisableLossCompensation)
+					congestion.UseBrutalCounting(h.conn, actualTx, h.config.BandwidthConfig.DisableLossCompensation)
 				} else {
 					// Client doesn't know its own bandwidth, use the configured congestion controller.
-					congestion.UseConfigured(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
+					congestion.UseConfiguredCounting(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
 				}
 			}
 			// Auth OK, send response

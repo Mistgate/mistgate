@@ -35,7 +35,7 @@ export type Part = { text: string; warn?: boolean };
 type Quality = { freezes: number; rttMs: number; rttSamples: number; lossPermille: number; pktsSent: number };
 
 /**
- * What a links/2 agent knows of how Hysteria2 connections went: frozen paths (the signal of a block), the average RTT and the
+ * What a links/2 agent knows of how Hysteria2 connections went: frozen paths (what tells a freeze from an app check), the average RTT and the
  * loss. Loss is trouble from 5 % over at least a thousand packets.
  */
 function qualityParts(t: T, x: Quality): Part[] {
@@ -75,8 +75,8 @@ export function inboundConnParts(t: T, fmt: Fmt, x: InboundConn): Part[] {
   if (x.rejects) parts.push({ text: t("conn.rejects", { n: x.rejects }), warn: true });
   if (links2) parts.push(...qualityParts(t, x));
   if (x.hellos > 0) {
-    // with links/2 the handshakes that never completed are known apart from scanners and from pings that never authenticate
-    const failed = links2 ? Math.max(0, x.hellos - x.hellosForeign - x.accepted) : Math.max(0, x.hellos - x.handshakes);
+    // with links/2 the handshakes that never completed are known apart from pings that never authenticate
+    const failed = links2 ? Math.max(0, x.hellos - x.accepted) : Math.max(0, x.hellos - x.handshakes);
     const pct = Math.round((100 * failed) / x.hellos);
     if (failed > 0) parts.push({ text: t("conn.hellos", { pct, n: x.hellos }), warn: x.hellos >= 10 && pct >= 50 });
   }

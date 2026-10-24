@@ -141,6 +141,9 @@ func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 	}
 	out := make([]store.FleetLink, 0, len(rows))
 	for _, l := range rows {
+		if len(l.CredId) > 64 || len(l.InboundId) > 64 { // ids are 30 characters; a longer one only swells the D1 arguments
+			continue
+		}
 		out = append(out, store.FleetLink{CredID: l.CredId, InboundID: l.InboundId, Connects: l.Connects, Rejects: l.Rejects,
 			Drops: l.Drops, Stalls: l.Stalls, OnlineS: l.OnlineS, UnknownKeys: l.UnknownKeys, Hellos: l.Hellos, Handshakes: l.Handshakes,
 			ClientCloses: l.ClientCloses, Freezes: l.Freezes, Quiet: l.Quiet, Accepted: l.Accepted, HellosForeign: l.HellosForeign,

@@ -25,8 +25,9 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 	if !slices.Contains(a.capabilities(), "ws-link/1") {
 		t.Fatal("Hello.capabilities does not advertise ws-link/1")
 	}
-	if !slices.Contains(a.capabilities(), "links/2") {
-		t.Fatal("Hello.capabilities does not advertise links/2")
+	// links/2 adds to links/1, which a panel checks for the counters at all: both are listed
+	if !slices.Contains(a.capabilities(), "links/1") || !slices.Contains(a.capabilities(), "links/2") {
+		t.Fatalf("Hello.capabilities = %v, want links/1 and links/2", a.capabilities())
 	}
 }
 
