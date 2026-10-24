@@ -77,14 +77,14 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 			}
 		},
 		Errorf: func(f string, a ...any) {
-			msg := "amneziawg-go: " + fmt.Sprintf(f, a...)
+			msg, template := userspaceErrorLogMessage(f, a...)
 			// A server learns a device's address only when the device writes first: after every restart, replies
 			// queued for a device that has not reconnected yet log this until it does. Expected, not an error.
 			if strings.Contains(msg, "no known endpoint for peer") {
 				u.log.Debug(msg)
 				return
 			}
-			u.log.Error(msg)
+			u.log.Error(msg, "msg_template", template)
 		},
 	}
 	dev := device.NewDevice(tdev, conn.NewDefaultBind(), logger)

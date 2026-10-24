@@ -55,14 +55,14 @@ func TestXrayLogHandlerDropsSessionsAndNoiseAndRedactsAddresses(t *testing.T) {
 	var output bytes.Buffer
 	installXrayLogging(slog.New(slog.NewTextHandler(&output, nil)))
 	handler := xrayLogHandler{}
-	handler.Handle(&xlog.GeneralMessage{Severity: xlog.Severity_Warning, Content: "[1799322037] account 66ad4540-b58c-4ad2-9926-ea63445a9b57 is rejected from 203.0.113.10"})
+	handler.Handle(&xlog.GeneralMessage{Severity: xlog.Severity_Warning, Content: "[1799322037] account 66ad4540-b58c-4ad2-9926-ea63445a9b57 is rejected from 203.0.113.10 for destination.example.com"})
 	handler.Handle(&xlog.GeneralMessage{Severity: xlog.Severity_Warning, Content: "account 66ad4540-b58c-4ad2-9926-ea63445a9b57 failed from 203.0.113.10 via [2001:db8::10]:443"})
 	handler.Handle(&xlog.GeneralMessage{Severity: xlog.Severity_Warning, Content: "core: Xray 1.8.25 started"})
 	handler.Handle(&xlog.GeneralMessage{Severity: xlog.Severity_Error, Content: "failed to serve HTTP for XHTTP > accept tcp 127.0.0.1:443: use of closed network connection"})
 	handler.Handle(&xlog.GeneralMessage{Severity: xlog.Severity_Warning, Content: "safe warning"})
 
 	got := output.String()
-	for _, sensitive := range []string{"1799322037", "66ad4540-b58c-4ad2-9926-ea63445a9b57", "203.0.113.10", "2001:db8::10", "127.0.0.1", "core: Xray", "failed to serve HTTP for XHTTP"} {
+	for _, sensitive := range []string{"1799322037", "66ad4540-b58c-4ad2-9926-ea63445a9b57", "203.0.113.10", "2001:db8::10", "127.0.0.1", "destination.example.com", "core: Xray", "failed to serve HTTP for XHTTP"} {
 		if strings.Contains(got, sensitive) {
 			t.Errorf("Xray log retained %q: %s", sensitive, got)
 		}

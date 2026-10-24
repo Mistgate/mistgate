@@ -91,6 +91,9 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 		RamUsedBytes: m.RAMUsed, RamTotalBytes: m.RAMTotal, DiskUsedBytes: m.DiskUsed, DiskTotalBytes: m.DiskTotal,
 		NetRxBps: m.NetRxBps, NetTxBps: m.NetTxBps, UptimeS: m.UptimeS,
 	}
+	if a.journal != nil {
+		b.Journal = a.journal.take(off)
+	}
 	return b
 }
 

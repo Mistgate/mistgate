@@ -99,10 +99,11 @@ func (r *logRing) takeDropped(f *follower) uint32 {
 // ringHandler tees every record into the ring and forwards it to the real handler. Records of Info and
 // above always reach the ring, even when the real handler is quieter, so the panel can read them.
 type ringHandler struct {
-	ring  *logRing
-	inner slog.Handler
-	attrs []slog.Attr // with the group prefix already applied
-	group string
+	ring    *logRing
+	journal *journal
+	inner   slog.Handler
+	attrs   []slog.Attr // with the group prefix already applied
+	group   string
 }
 
 func (h *ringHandler) Enabled(ctx context.Context, l slog.Level) bool {
@@ -134,6 +135,9 @@ func (h *ringHandler) Handle(ctx context.Context, r slog.Record) error {
 		return true
 	})
 	h.ring.add(rec)
+	if h.journal != nil && rec.level >= pb.Severity_SEVERITY_WARNING {
+		h.journal.note(rec)
+	}
 	if h.inner.Enabled(ctx, r.Level) {
 		return h.inner.Handle(ctx, r)
 	}
