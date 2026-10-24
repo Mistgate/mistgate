@@ -14,7 +14,7 @@
 
 - Сбор статистики агента: `internal/node/agent/stats.go:40` (`buildBatch`), снимок сессий каждые 10 с; объединения батчей в outbox нет.
 - Логи движков уже идут через агента (`Env.Log = a.log.With("source", proto)`), кольцо на 5000 записей и тройник — `internal/node/agent/logring.go:112`. Живой хвост — только владельцу (`policy.go`: «node logs carry client addresses»); на edge стрима логов нет вообще — сохраняемый журнал станет там единственным видом логов.
-- Приём: `internal/panel/store/fleet_stats.go` — read-пачка 4 statement, write-пачка 9; форма закреплена `measure_d1_js_test.go:189` (`{4, 9}`). Шаг статистики = 2 вызова D1 (`edge/bridge/link_js_test.go`). Минута 17 cron: 25 (`edge/bridge/cron_js_test.go`) / 30 (`bridge.cjs`). Лимит edge `maxStatsDeltas = 10 000`.
+- Приём: `internal/panel/store/fleet_stats.go` — read-пачка остаётся в 4 statement. Исходная форма до `link_hour` была 4/9 (`measure_d1_js_test.go:189`); текущая ветка уже включает `link_hour` (4/10), а `node_journal` добавляет ещё один write statement (4/11). Шаг статистики остаётся 2 вызова D1 (`edge/bridge/link_js_test.go`). Для минуты 17 cron исходные 25/30 стали 26/31 после `link_hour` и станут 27/32 с ретенцией журнала. Лимит edge `maxStatsDeltas = 10 000`.
 - Алерты: сигналы одной пачкой (`store/health_signals.go`), варианты людей — `health/users.go`, базовая линия по `node_traffic_hour`, сверка — `health/eval.go`. Info в Telegram не уходит.
 
 ## 2. Где брать сигналы
@@ -127,6 +127,8 @@ CREATE INDEX node_journal_hour ON node_journal (hour_start);
 | Statement `IngestStats` (read/write) | 4/9 | 4/10 (журнал), 4/11 (счётчики) |
 | Минута 17 cron | 25 / 30 | 26 / 31 |
 | `HealthSignals` | 1 пачка | 1 пачка, +2 statement |
+
+Числа в колонке «После» сохраняют первоначальный порядок фаз (сначала журнал, затем счётчики). В текущей ветке `link_hour` уже включён: непосредственно перед добавлением журнала форма `IngestStats` была `{4, 10}`, после него — `{4, 11}`; cron минуты 17 — `26/31` и `27/32` соответственно.
 
 ## 5. Журнал ошибок нод
 

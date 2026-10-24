@@ -74,12 +74,15 @@ func TestProxyEndToEnd(t *testing.T) {
 	p := startProxy(t, base, writeTokenFile(t, string(rune(0xFEFF))+secret+"\r\nignored second line\n"))
 
 	names := toolNames(t, p.sess)
-	if len(names) != 38 {
+	if len(names) != 39 {
 		t.Errorf("%d tools through the proxy: %v", len(names), names)
 	}
 	out := mustOK(t, p.sess, "user_get", map[string]any{"user_id": "usr_alice"})
 	if !strings.Contains(out, "usr_alice") {
 		t.Errorf("read: %s", out)
+	}
+	if out := mustOK(t, p.sess, "node_journal", map[string]any{"node": "de1"}); !strings.Contains(out, `"entries"`) {
+		t.Errorf("node_journal through the proxy: %s", out)
 	}
 	plan := decode[PlanOut](t, mustOK(t, p.sess, "user_enable_plan", map[string]any{"user_ids": []string{"usr_alice"}}))
 	ap := decode[ApplyOut](t, mustOK(t, p.sess, "user_enable_apply", map[string]any{"confirm_token": plan.ConfirmToken}))

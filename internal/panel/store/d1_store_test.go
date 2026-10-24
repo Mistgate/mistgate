@@ -1822,6 +1822,10 @@ func TestD1LinkHourStorage(t *testing.T) {
 	linkHourStoreProof(t, openD1Store(t))
 }
 
+func TestD1NodeJournalStorage(t *testing.T) {
+	nodeJournalStoreProof(t, openD1Store(t))
+}
+
 // The DNS of the link apps on D1 (migration 00069): the offer and a person's pick are written, read back in the one batch of the
 // subscription's DNS read, removed by the reset with the picks per node, and taken away with a deleted preset.
 func TestD1LinkDNS(t *testing.T) {

@@ -53,3 +53,39 @@ func TestConnectionToolsContent(t *testing.T) {
 		t.Errorf("a node without counters: %+v", old)
 	}
 }
+
+func TestNodeJournalToolContent(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+
+	warning := decode[NodeJournalV](t, mustOK(t, s, "node_journal", map[string]any{
+		"node": "de1", "hours": 6, "min_level": "warning", "source": "awg", "query": "HANDSHAKE", "limit": 5,
+	}))
+	if warning.NowUnix-warning.SinceUnix != 6*3600 || len(warning.Entries) != 1 {
+		t.Fatalf("warning result: %+v", warning)
+	}
+	if warning.NodesWithoutJournal == nil {
+		t.Error("nodes_without_journal is null for a single-node result; want an empty list")
+	}
+	if entry := warning.Entries[0]; entry.NodeID != nodeA || entry.NodeName != "de1" || entry.ProfileName != "Fast" ||
+		entry.Level != "warning" || entry.Source != "awg" || entry.Count != 2 || entry.Attrs["code"] != "stall" {
+		t.Errorf("warning entry: %+v", entry)
+	}
+
+	errorEntry := decode[NodeJournalV](t, mustOK(t, s, "node_journal", map[string]any{
+		"node": nodeA, "min_level": "error", "query": "auth%_failed",
+	}))
+	if len(errorEntry.Entries) != 1 || errorEntry.Entries[0].Level != "error" || errorEntry.Entries[0].Attrs["detail"] != "auth%_failed" {
+		t.Errorf("ERROR/attribute search: %+v", errorEntry)
+	}
+
+	all := decode[NodeJournalV](t, mustOK(t, s, "node_journal", map[string]any{"hours": 999, "limit": 1}))
+	if all.NowUnix-all.SinceUnix != 168*3600 || len(all.Entries) != 1 || !all.Truncated ||
+		len(all.NodesWithoutJournal) != 1 || all.NodesWithoutJournal[0] != nodeB {
+		t.Errorf("all-node, capped, truncated result: %+v", all)
+	}
+	if out := mustFail(t, s, "node_journal", map[string]any{"query": strings.Repeat("x", 101)}); !strings.Contains(out, "query too long") {
+		t.Errorf("long query: %s", out)
+	}
+}

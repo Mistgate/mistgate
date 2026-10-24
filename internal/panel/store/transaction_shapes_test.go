@@ -76,7 +76,7 @@ var transactionShape2 = map[string]string{
 	"fleet_node.go:NodeDisconnected":               "The matching live session guards last-seen/disconnect time and row deletion in one fixed batch.",
 	"fleet_node.go:RetireNode":                     "A node-state guard precedes retirement, certificate/token changes, provisioning cancellation, and retained-key deletion.",
 	"fleet_stats.go:IngestEvent":                   "One batch conditionally inserts the event and advances the node sequence, distinguishing duplicates from missing nodes.",
-	"fleet_stats.go:IngestStats":                   "Credential and node lookups run in one read batch; a ten-statement guarded write batch (with the connection counters) also updates the session-matched live projection.",
+	"fleet_stats.go:IngestStats":                   "Credential and node lookups run in one read batch; an eleven-statement guarded write batch (with connection counters and the node journal) also updates the session-matched live projection.",
 	"health.go:InsertProbeCredIdx":                 "A guarded batch retries when the inbound credential or candidate peer allocation changed.",
 	"mcpplan.go:BeginApply":                        "A status and hash compare-and-swap lets only one apply proceed.",
 	"mcpplan.go:CreateMCPPlan":                     "SQL guards per-token and panel-wide capacity in the atomic insert batch.",

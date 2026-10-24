@@ -186,7 +186,7 @@ func TestD1BatchShapes(t *testing.T) {
 		got  d1Shape
 		want []int
 	}{
-		"NodeHello": {hello, []int{5}}, "IngestStats": {stats, []int{4, 10}}, "NodeApplied": {applied, []int{3}}, "RenewCert": {renew, []int{4}},
+		"NodeHello": {hello, []int{5}}, "IngestStats": {stats, []int{4, 11}}, "NodeApplied": {applied, []int{3}}, "RenewCert": {renew, []int{4}},
 	} {
 		if fmt.Sprint(c.got.BatchSizes) != fmt.Sprint(c.want) {
 			t.Errorf("%s batches = %v, want %v", name, c.got.BatchSizes, c.want)
@@ -289,6 +289,15 @@ func TestD1IngestStatsAtEdgeCap(t *testing.T) {
 		// a counter row per key at the clamp (7 digits each, the longest a row gets; the guard admits as many rows as deltas)
 		in.Links = append(in.Links, FleetLink{CredID: in.Traffic[i].CredID, InboundID: in.Traffic[i].InboundID, Connects: 1 << 30, Rejects: 1 << 30,
 			Drops: 1 << 30, Stalls: 1 << 30, OnlineS: 1 << 30, UnknownKeys: 1 << 30, Hellos: 1 << 30, Handshakes: 1 << 30})
+	}
+	journalValue := strings.Repeat("界", 160)
+	for i := range maxNodeJournalRows {
+		attrs := map[string]string{"code": fmt.Sprintf("journal-%02d", i)}
+		for n := 1; n < 8; n++ {
+			attrs[fmt.Sprintf("attr-%02d", n)] = journalValue
+		}
+		in.Journal = append(in.Journal, FleetJournal{Level: 2, Source: strings.Repeat("s", 32), Message: strings.Repeat("界", 85),
+			Attrs: attrs, Count: 1, FirstAt: f.now.Unix() - 1, LastAt: f.now.Unix()})
 	}
 	before := memSys()
 	var err error

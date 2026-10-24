@@ -401,8 +401,8 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	if before != 1211 {
 		t.Fatalf("legacy batch statement count = %d, want 1211", before)
 	}
-	if len(stmts) != 10 {
-		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 10 after",
+	if len(stmts) != 11 {
+		t.Fatalf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d, want 11 after",
 			users, sessions, certificates, before, len(stmts))
 	}
 	t.Logf("IngestStats statements for %d users, %d sessions, and %d certificates: before=%d after=%d",

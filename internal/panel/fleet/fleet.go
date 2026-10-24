@@ -62,6 +62,8 @@ type Config struct {
 	// LinkURL is the base link-only agents are given (wss://host/<secret-prefix>/): the install command of an edge panel
 	// (Remote set) carries it instead of PanelAddr and the agent SNI. Empty = no link install command.
 	LinkURL string
+	// JournalSecrets are this panel's secret SNI and path prefixes; the journal writer scrubs them from node-provided text.
+	JournalSecrets []string
 	// LinkServed reports whether the signed WebSocket agent link is mounted on the public listener.
 	LinkServed bool
 	// Remote sends admin requests through the edge edition's node link. Nil uses the VPS stream adapter.

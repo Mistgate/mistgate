@@ -3,6 +3,8 @@ package health
 import (
 	"context"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // Retention (see also the 00002 schema comments): raw check rounds live 25 h after the finished days
@@ -80,6 +82,11 @@ func (s *Service) sweep(ctx context.Context) {
 		s.log.Warn("health: prune connection counters", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned connection counters", "count", n)
+	}
+	if n, err := s.st.PruneNodeJournal(ctx, now.Add(-time.Duration(store.NodeJournalKeepHours)*time.Hour)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune node journal", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned node journal", "count", n)
 	}
 	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
 	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {

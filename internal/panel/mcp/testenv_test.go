@@ -858,6 +858,65 @@ func (w *world) GetNodeConnections(_ context.Context, r *connect.Request[adminv1
 	return connect.NewResponse(out), nil
 }
 
+// GetNodeJournal: nodeA sends a warning and an error, while nodeB has no journal/1 capability.
+func (w *world) GetNodeJournal(_ context.Context, r *connect.Request[adminv1.GetNodeJournalRequest]) (*connect.Response[adminv1.GetNodeJournalResponse], error) {
+	hours := r.Msg.GetHours()
+	if hours == 0 {
+		hours = 24
+	}
+	if hours > 168 {
+		hours = 168
+	}
+	now := int64(1700000000)
+	minLevel := r.Msg.GetMinLevel()
+	if minLevel < adminv1.EventSeverity_EVENT_SEVERITY_WARNING {
+		minLevel = adminv1.EventSeverity_EVENT_SEVERITY_WARNING
+	}
+	entries := []*adminv1.NodeJournalEntry{
+		{NodeId: nodeA, NodeName: "de1", HourStartUnix: 1699999200, Level: adminv1.EventSeverity_EVENT_SEVERITY_WARNING,
+			Source: "awg", Message: "handshake failed", InboundId: "inb_1", ProfileName: "Fast", Attrs: map[string]string{"code": "stall"},
+			Count: 2, FirstUnix: now - 20, LastUnix: now - 10},
+		{NodeId: nodeA, NodeName: "de1", HourStartUnix: 1699999200, Level: adminv1.EventSeverity_EVENT_SEVERITY_ERROR,
+			Source: "xray", Message: "AUTH%_FAILED", InboundId: "inb_1", ProfileName: "Fast", Attrs: map[string]string{"code": "auth_failed", "detail": "auth%_failed"},
+			Count: 1, FirstUnix: now - 8, LastUnix: now - 2},
+	}
+	query := strings.ToLower(r.Msg.GetQuery())
+	filtered := make([]*adminv1.NodeJournalEntry, 0, len(entries))
+	for _, entry := range entries {
+		if r.Msg.GetNodeId() != "" && entry.GetNodeId() != r.Msg.GetNodeId() || entry.GetLevel() < minLevel {
+			continue
+		}
+		if r.Msg.GetSource() != "" && entry.GetSource() != r.Msg.GetSource() ||
+			r.Msg.GetInboundId() != "" && entry.GetInboundId() != r.Msg.GetInboundId() {
+			continue
+		}
+		if query != "" {
+			attrs, _ := json.Marshal(entry.GetAttrs())
+			if !strings.Contains(strings.ToLower(entry.GetMessage()), query) && !strings.Contains(strings.ToLower(string(attrs)), query) {
+				continue
+			}
+		}
+		filtered = append(filtered, entry)
+	}
+	limit := r.Msg.GetLimit()
+	if limit == 0 {
+		limit = 100
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	truncated := uint32(len(filtered)) > limit
+	if truncated {
+		filtered = filtered[:limit]
+	}
+	without := []string{}
+	if r.Msg.GetNodeId() == "" || r.Msg.GetNodeId() == nodeB {
+		without = append(without, nodeB)
+	}
+	return connect.NewResponse(&adminv1.GetNodeJournalResponse{SinceUnix: now - int64(hours)*3600, NowUnix: now, Entries: filtered,
+		Truncated: truncated, NodesWithoutJournal: without}), nil
+}
+
 // api builds the fake admin API handler: the generated services behind fakeAuth.requireSession.
 func (w *world) api(a *fakeAuth) http.Handler {
 	mux := http.NewServeMux()

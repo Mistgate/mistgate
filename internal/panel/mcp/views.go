@@ -1304,6 +1304,49 @@ func nodeConnectionsView(r *adminv1.GetNodeConnectionsResponse, id, name string)
 	return v
 }
 
+// NodeJournalV is the node_journal result: saved warning and error records, ordered newest first.
+type NodeJournalV struct {
+	SinceUnix           int64               `json:"since_unix"`
+	NowUnix             int64               `json:"now_unix"`
+	Entries             []nodeJournalEntryV `json:"entries"`
+	Truncated           bool                `json:"truncated,omitempty"`
+	NodesWithoutJournal []string            `json:"nodes_without_journal"`
+}
+
+type nodeJournalEntryV struct {
+	NodeID      string            `json:"node_id"`
+	NodeName    string            `json:"node_name"`
+	HourStart   int64             `json:"hour_start_unix"`
+	Level       string            `json:"level"`
+	Source      string            `json:"source"`
+	Message     string            `json:"message"`
+	InboundID   string            `json:"inbound_id"`
+	ProfileName string            `json:"profile_name"`
+	Attrs       map[string]string `json:"attrs"`
+	Count       uint32            `json:"count"`
+	FirstUnix   int64             `json:"first_unix"`
+	LastUnix    int64             `json:"last_unix"`
+}
+
+func (v *NodeJournalV) shrink() bool {
+	v.Truncated = true
+	return cut(&v.Entries) || cut(&v.NodesWithoutJournal)
+}
+
+func nodeJournalView(r *adminv1.GetNodeJournalResponse) *NodeJournalV {
+	v := &NodeJournalV{SinceUnix: r.GetSinceUnix(), NowUnix: r.GetNowUnix(), Entries: []nodeJournalEntryV{},
+		NodesWithoutJournal: append([]string{}, r.GetNodesWithoutJournal()...), Truncated: r.GetTruncated()}
+	for _, entry := range r.GetEntries() {
+		v.Entries = append(v.Entries, nodeJournalEntryV{
+			NodeID: clean(entry.GetNodeId(), 80), NodeName: nm(entry.GetNodeName()), HourStart: entry.GetHourStartUnix(),
+			Level: enumName("EVENT_SEVERITY_", entry.GetLevel().String()), Source: clean(entry.GetSource(), 32),
+			Message: clean(entry.GetMessage(), 256), InboundID: clean(entry.GetInboundId(), 64), ProfileName: nm(entry.GetProfileName()),
+			Attrs: cleanMap(entry.GetAttrs(), 160), Count: entry.GetCount(), FirstUnix: entry.GetFirstUnix(), LastUnix: entry.GetLastUnix(),
+		})
+	}
+	return v
+}
+
 // ChecksV is the checks_results result: the node x profile matrix, one cell per column in the order of columns.
 // All times are measured on the panel's server, not on a person's device.
 type ChecksV struct {
