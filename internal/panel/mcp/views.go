@@ -1261,7 +1261,7 @@ type nodeWithoutV struct {
 func (v *UserConnectionV) shrink() bool {
 	v.Truncated = true
 	for i := range v.Rows {
-		if cut(&v.Rows[i].Hours) {
+		if cutOld(&v.Rows[i].Hours) {
 			return true
 		}
 	}
@@ -1380,7 +1380,7 @@ func inboundConnectionsView(i *adminv1.InboundConnections) inboundConnV {
 func (v *NodeConnectionsV) shrink() bool {
 	v.Truncated = true
 	for i := range v.Inbounds {
-		if cut(&v.Inbounds[i].Hours) || cut(&v.Inbounds[i].Clients) {
+		if cutOld(&v.Inbounds[i].Hours) || cut(&v.Inbounds[i].Clients) {
 			return true
 		}
 	}

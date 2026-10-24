@@ -73,8 +73,9 @@ message DeviceConnection {
   uint64 online_s = 11 [jstype = JS_NUMBER];
   // Start of the newest hour with a counter.
   int64 last_hour_unix = 12 [jstype = JS_NUMBER];
-  // The device as the panel knows it (Device.platform and .client; kind is the DeviceKind name without its prefix, such as
-  // "link" or "key"), so an app or a version that fails everywhere stands out. "" when the device is gone.
+  // The device as the panel knows it now (Device.platform and .client from its last subscription fetch, not the app of each
+  // hour; kind is the DeviceKind name without its prefix, such as "link" or "key"), so an app or a version that fails
+  // everywhere stands out. "" when the device is gone.
   string platform = 13;
   string client = 14;
   string kind = 15;

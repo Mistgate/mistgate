@@ -68,7 +68,7 @@ func (s *Store) NodeLinkReports(ctx context.Context, nodeID string, since time.T
 			GROUP BY inbound_id, client, platform
 			HAVING SUM(connects) + SUM(rejects) + SUM(drops) + SUM(stalls) + SUM(online_s) > 0
 		), ranked_clients AS (
-			SELECT *, ROW_NUMBER() OVER (PARTITION BY inbound_id ORDER BY connects DESC, client, platform) AS rank
+			SELECT *, ROW_NUMBER() OVER (PARTITION BY inbound_id ORDER BY connects + rejects + drops + stalls DESC, client, platform) AS rank
 			FROM client_totals
 		)
 		SELECT 0 AS row_type, t.inbound_id, 0 AS hour_start, '' AS client, '' AS platform, 0 AS devices,

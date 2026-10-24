@@ -116,8 +116,9 @@ export type DeviceConnection = Message<"mistgate.admin.v1.DeviceConnection"> & {
   lastHourUnix: bigint;
 
   /**
-   * The device as the panel knows it (Device.platform and .client; kind is the DeviceKind name without its prefix, such as
-   * "link" or "key"), so an app or a version that fails everywhere stands out. "" when the device is gone.
+   * The device as the panel knows it now (Device.platform and .client from its last subscription fetch, not the app of each
+   * hour; kind is the DeviceKind name without its prefix, such as "link" or "key"), so an app or a version that fails
+   * everywhere stands out. "" when the device is gone.
    *
    * @generated from field: string platform = 13;
    */

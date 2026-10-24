@@ -3289,8 +3289,8 @@ type InboundConnections struct {
 	Unsupported []string `protobuf:"bytes,15,rep,name=unsupported,proto3" json:"unsupported,omitempty"`
 	// With by_hour: the hours of the window that have a counter, oldest first.
 	Hours []*LinkHour `protobuf:"bytes,16,rep,name=hours,proto3" json:"hours,omitempty"`
-	// The window by the devices' apps (Device.client and .platform), most connects first, at most 8; keys whose device is
-	// gone are not in it.
+	// The window by the devices' current app label (Device.client and .platform), most activity first (connects, rejects,
+	// drops and stalls together, so a failing app is not pushed out), at most 8; keys whose device is gone are not in it.
 	Clients []*ClientConnections `protobuf:"bytes,17,rep,name=clients,proto3" json:"clients,omitempty"`
 	// AmneziaWG inbounds only: what the node's last health report says of its UDP port.
 	Awg           *AwgPackets `protobuf:"bytes,18,opt,name=awg,proto3" json:"awg,omitempty"`

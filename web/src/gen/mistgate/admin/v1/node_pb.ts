@@ -1773,8 +1773,8 @@ export type InboundConnections = Message<"mistgate.admin.v1.InboundConnections">
   hours: LinkHour[];
 
   /**
-   * The window by the devices' apps (Device.client and .platform), most connects first, at most 8; keys whose device is
-   * gone are not in it.
+   * The window by the devices' current app label (Device.client and .platform), most activity first (connects, rejects,
+   * drops and stalls together, so a failing app is not pushed out), at most 8; keys whose device is gone are not in it.
    *
    * @generated from field: repeated mistgate.admin.v1.ClientConnections clients = 17;
    */

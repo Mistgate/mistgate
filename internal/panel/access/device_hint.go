@@ -107,19 +107,44 @@ func cleanHeader(s string, max int) string {
 // clientOf is the app of a User-Agent: its first token, name and version only ("Happ/3.4.2"; Happ 6 sends
 // "Happ/6.0.0/ios/2609301456616", whose platform and build the device row has or does not need), at most 40 characters.
 func clientOf(ua string) string {
-	ua = strings.TrimSpace(ua)
+	fields := strings.Fields(ua) // any Unicode space, a no-break one too
 	// kl!ck asks as its core ("mihomo/1.19.33 klick/0.5.1") so every panel serves it the mihomo format; its own token names it.
-	for _, tok := range strings.Fields(ua) {
-		if name, version, ok := strings.Cut(tok, "/"); ok && strings.EqualFold(name, "klick") {
-			return cleanHeader("kl!ck/"+version, 40)
+	for _, tok := range fields {
+		if name, version, ok := strings.Cut(tok, "/"); ok && strings.EqualFold(name, "klick") && versionLike(version) {
+			return "kl!ck/" + version
 		}
 	}
-	if i := strings.IndexAny(ua, " \t"); i >= 0 {
-		ua = ua[:i]
+	if len(fields) == 0 {
+		return ""
+	}
+	// the characters of an app name and version only: a User-Agent cannot carry a sentence into the device row or an agent's view
+	ua = cleanHeader(fields[0], 200) // control characters go, as in every header
+	for i := 0; i < len(ua); i++ {
+		if c := ua[i]; !(asciiAlnum(c) || strings.IndexByte("._+-/!", c) >= 0) {
+			ua = ua[:i]
+			break
+		}
 	}
 	if name, rest, ok := strings.Cut(ua, "/"); ok {
 		version, _, _ := strings.Cut(rest, "/")
 		ua = name + "/" + version
 	}
 	return cleanHeader(ua, 40)
+}
+
+// versionLike: "0.5.1", "1.2.3-beta.1": a digit first, then letters, digits, dots, dashes and pluses, at most 24.
+func versionLike(v string) bool {
+	if v == "" || len(v) > 24 || v[0] < '0' || v[0] > '9' {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		if c := v[i]; !(asciiAlnum(c) || c == '.' || c == '-' || c == '+') {
+			return false
+		}
+	}
+	return true
+}
+
+func asciiAlnum(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }

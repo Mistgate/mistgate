@@ -452,8 +452,9 @@ type DeviceConnection struct {
 	OnlineS     uint64                 `protobuf:"varint,11,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
 	// Start of the newest hour with a counter.
 	LastHourUnix int64 `protobuf:"varint,12,opt,name=last_hour_unix,json=lastHourUnix,proto3" json:"last_hour_unix,omitempty"`
-	// The device as the panel knows it (Device.platform and .client; kind is the DeviceKind name without its prefix, such as
-	// "link" or "key"), so an app or a version that fails everywhere stands out. "" when the device is gone.
+	// The device as the panel knows it now (Device.platform and .client from its last subscription fetch, not the app of each
+	// hour; kind is the DeviceKind name without its prefix, such as "link" or "key"), so an app or a version that fails
+	// everywhere stands out. "" when the device is gone.
 	Platform string `protobuf:"bytes,13,opt,name=platform,proto3" json:"platform,omitempty"`
 	Client   string `protobuf:"bytes,14,opt,name=client,proto3" json:"client,omitempty"`
 	Kind     string `protobuf:"bytes,15,opt,name=kind,proto3" json:"kind,omitempty"`

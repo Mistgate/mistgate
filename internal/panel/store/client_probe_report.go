@@ -123,8 +123,8 @@ func (s *Store) ClientProbeKindCounts(ctx context.Context, since time.Time) ([]C
 			SELECT node_id, kind,
 				COALESCE(SUM(json_type(detail_json, '$.dl_stalled') IN ('true', 'false')), 0) AS dl_checked,
 				COALESCE(SUM(json_type(detail_json, '$.dl_stalled') = 'true'), 0) AS dl_stalled,
-				json_group_array(CASE WHEN json_type(detail_json, '$.delay_ms') = 'integer'
-					THEN json_extract(detail_json, '$.delay_ms') END) AS delays
+				json_group_array(json_extract(detail_json, '$.delay_ms'))
+					FILTER (WHERE json_type(detail_json, '$.delay_ms') = 'integer') AS delays
 			FROM client_probe_report WHERE at >= ? GROUP BY node_id, kind
 		)
 		SELECT t.node_id, t.kind, t.reports, t.ok, t.freeze, t.tcp, t.hs, t.na, t.last_at,

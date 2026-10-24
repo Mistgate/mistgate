@@ -89,6 +89,15 @@ func enumName(prefix, s string) string {
 	return strings.ToLower(strings.TrimPrefix(s, prefix))
 }
 
+// cutOld halves an oldest-first list from its start, so the newest half stays (hour buckets); false when nothing is left to cut.
+func cutOld[T any](s *[]T) bool {
+	if n := len(*s); n > 1 {
+		*s = (*s)[n-n/2:]
+		return true
+	}
+	return false
+}
+
 // cut halves a list (keeps at least one element); false when there is nothing left to cut.
 func cut[T any](s *[]T) bool {
 	if n := len(*s); n > 1 {
