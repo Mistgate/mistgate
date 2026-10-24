@@ -552,7 +552,8 @@ message Hello {
   // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
-  // LinkCounters), and "journal/1" (StatsBatch.journal; see JournalEntry).
+  // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
+  // JournalEntry).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -697,6 +698,30 @@ message LinkCounters {
   // Only on the inbound row: handshakes started and handshakes that reached authentication.
   uint32 hellos = 9;
   uint32 handshakes = 10;
+
+  // links/2, hysteria2 only: how connections ended and how they went, from the QUIC connection itself (the engine gets it
+  // through the patched core, third_party/hysteria-core). Event counters leave in the next batch, volume counters with
+  // online_s at the 10-minute boundary.
+  // Event: a connection the client closed itself (a CONNECTION_CLOSE without an error, or one of its application).
+  uint32 client_closes = 11;
+  // Event: an idle timeout after the node had kept sending and nothing came back: the path froze (how a TSPU freeze
+  // looks) or the client vanished in the middle of a transfer. Any age of the connection.
+  uint32 freezes = 12;
+  // Event: an idle timeout in which neither side had anything to send: the client went away without closing (an app
+  // check, auto-select, a phone asleep). Any age of the connection.
+  uint32 quiet = 13;
+  // Volume, inbound row only: QUIC connections whose handshake completed (before authentication). hellos - accepted is
+  // the handshakes that never completed; accepted - handshakes the connections that never asked to authenticate.
+  uint32 accepted = 14;
+  // Volume, inbound row only: ClientHellos whose server name is not the inbound's (scanners); they are counted in hellos too.
+  uint32 hellos_foreign = 15;
+  // Volume: the smoothed RTT of the key's connections in milliseconds, one sample per connection per stats interval in
+  // which it moved data, and how many samples.
+  uint64 rtt_ms_sum = 16;
+  uint32 rtt_samples = 17;
+  // Volume: QUIC packets the node sent on the key's connections, and those it declared lost.
+  uint64 pkts_sent = 18;
+  uint64 pkts_lost = 19;
 }
 
 // Directions are from the END USER's point of view, not the server-remote view used inside the

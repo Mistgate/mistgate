@@ -1019,9 +1019,19 @@ type LinkHour struct {
 	Stalls        uint32                 `protobuf:"varint,5,opt,name=stalls,proto3" json:"stalls,omitempty"`
 	OnlineS       uint64                 `protobuf:"varint,6,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
 	// Inbound rows only.
-	UnknownKeys   uint32 `protobuf:"varint,7,opt,name=unknown_keys,json=unknownKeys,proto3" json:"unknown_keys,omitempty"`
-	Hellos        uint32 `protobuf:"varint,8,opt,name=hellos,proto3" json:"hellos,omitempty"`
-	Handshakes    uint32 `protobuf:"varint,9,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	UnknownKeys uint32 `protobuf:"varint,7,opt,name=unknown_keys,json=unknownKeys,proto3" json:"unknown_keys,omitempty"`
+	Hellos      uint32 `protobuf:"varint,8,opt,name=hellos,proto3" json:"hellos,omitempty"`
+	Handshakes  uint32 `protobuf:"varint,9,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	// Hysteria2 with agents that list "links/2" (see InboundConnections).
+	ClientCloses  uint32 `protobuf:"varint,10,opt,name=client_closes,json=clientCloses,proto3" json:"client_closes,omitempty"`
+	Freezes       uint32 `protobuf:"varint,11,opt,name=freezes,proto3" json:"freezes,omitempty"`
+	Quiet         uint32 `protobuf:"varint,12,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	Accepted      uint32 `protobuf:"varint,13,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	HellosForeign uint32 `protobuf:"varint,14,opt,name=hellos_foreign,json=hellosForeign,proto3" json:"hellos_foreign,omitempty"`
+	RttMs         uint32 `protobuf:"varint,15,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	LossPermille  uint32 `protobuf:"varint,16,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
+	RttSamples    uint32 `protobuf:"varint,17,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
+	PktsSent      uint64 `protobuf:"varint,18,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1119,6 +1129,69 @@ func (x *LinkHour) GetHandshakes() uint32 {
 	return 0
 }
 
+func (x *LinkHour) GetClientCloses() uint32 {
+	if x != nil {
+		return x.ClientCloses
+	}
+	return 0
+}
+
+func (x *LinkHour) GetFreezes() uint32 {
+	if x != nil {
+		return x.Freezes
+	}
+	return 0
+}
+
+func (x *LinkHour) GetQuiet() uint32 {
+	if x != nil {
+		return x.Quiet
+	}
+	return 0
+}
+
+func (x *LinkHour) GetAccepted() uint32 {
+	if x != nil {
+		return x.Accepted
+	}
+	return 0
+}
+
+func (x *LinkHour) GetHellosForeign() uint32 {
+	if x != nil {
+		return x.HellosForeign
+	}
+	return 0
+}
+
+func (x *LinkHour) GetRttMs() uint32 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *LinkHour) GetLossPermille() uint32 {
+	if x != nil {
+		return x.LossPermille
+	}
+	return 0
+}
+
+func (x *LinkHour) GetRttSamples() uint32 {
+	if x != nil {
+		return x.RttSamples
+	}
+	return 0
+}
+
+func (x *LinkHour) GetPktsSent() uint64 {
+	if x != nil {
+		return x.PktsSent
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -1186,7 +1259,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\averdict\x18\x05 \x01(\tR\averdict\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x16\n" +
 	"\x06sender\x18\a \x01(\tR\x06sender\x12%\n" +
-	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\x94\x02\n" +
+	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\xaa\x04\n" +
 	"\bLinkHour\x12*\n" +
 	"\x0fhour_start_unix\x18\x01 \x01(\x03B\x020\x02R\rhourStartUnix\x12\x1a\n" +
 	"\bconnects\x18\x02 \x01(\rR\bconnects\x12\x18\n" +
@@ -1198,7 +1271,18 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x06hellos\x18\b \x01(\rR\x06hellos\x12\x1e\n" +
 	"\n" +
 	"handshakes\x18\t \x01(\rR\n" +
-	"handshakes*\xd5\x01\n" +
+	"handshakes\x12#\n" +
+	"\rclient_closes\x18\n" +
+	" \x01(\rR\fclientCloses\x12\x18\n" +
+	"\afreezes\x18\v \x01(\rR\afreezes\x12\x14\n" +
+	"\x05quiet\x18\f \x01(\rR\x05quiet\x12\x1a\n" +
+	"\baccepted\x18\r \x01(\rR\baccepted\x12%\n" +
+	"\x0ehellos_foreign\x18\x0e \x01(\rR\rhellosForeign\x12\x15\n" +
+	"\x06rtt_ms\x18\x0f \x01(\rR\x05rttMs\x12#\n" +
+	"\rloss_permille\x18\x10 \x01(\rR\flossPermille\x12\x1f\n" +
+	"\vrtt_samples\x18\x11 \x01(\rR\n" +
+	"rttSamples\x12\x1f\n" +
+	"\tpkts_sent\x18\x12 \x01(\x04B\x020\x02R\bpktsSent*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +

@@ -459,7 +459,15 @@ type DeviceConnection struct {
 	Client   string `protobuf:"bytes,14,opt,name=client,proto3" json:"client,omitempty"`
 	Kind     string `protobuf:"bytes,15,opt,name=kind,proto3" json:"kind,omitempty"`
 	// With by_hour: the hours of the window that have a counter, oldest first.
-	Hours         []*LinkHour `protobuf:"bytes,16,rep,name=hours,proto3" json:"hours,omitempty"`
+	Hours []*LinkHour `protobuf:"bytes,16,rep,name=hours,proto3" json:"hours,omitempty"`
+	// Hysteria2 with agents that list "links/2"; what they mean is under InboundConnections (node.proto).
+	ClientCloses  uint32 `protobuf:"varint,17,opt,name=client_closes,json=clientCloses,proto3" json:"client_closes,omitempty"`
+	Freezes       uint32 `protobuf:"varint,18,opt,name=freezes,proto3" json:"freezes,omitempty"`
+	Quiet         uint32 `protobuf:"varint,19,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	RttMs         uint32 `protobuf:"varint,20,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	LossPermille  uint32 `protobuf:"varint,21,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
+	RttSamples    uint32 `protobuf:"varint,22,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
+	PktsSent      uint64 `protobuf:"varint,23,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -604,6 +612,55 @@ func (x *DeviceConnection) GetHours() []*LinkHour {
 		return x.Hours
 	}
 	return nil
+}
+
+func (x *DeviceConnection) GetClientCloses() uint32 {
+	if x != nil {
+		return x.ClientCloses
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetFreezes() uint32 {
+	if x != nil {
+		return x.Freezes
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetQuiet() uint32 {
+	if x != nil {
+		return x.Quiet
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetRttMs() uint32 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetLossPermille() uint32 {
+	if x != nil {
+		return x.LossPermille
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetRttSamples() uint32 {
+	if x != nil {
+		return x.RttSamples
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetPktsSent() uint64 {
+	if x != nil {
+		return x.PktsSent
+	}
+	return 0
 }
 
 type GetUserConnectionResponse struct {
@@ -3268,7 +3325,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x18GetUserConnectionRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05hours\x18\x02 \x01(\rR\x05hours\x12\x17\n" +
-	"\aby_hour\x18\x03 \x01(\bR\x06byHour\"\xeb\x03\n" +
+	"\aby_hour\x18\x03 \x01(\bR\x06byHour\"\xbe\x05\n" +
 	"\x10DeviceConnection\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
@@ -3287,7 +3344,15 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\bplatform\x18\r \x01(\tR\bplatform\x12\x16\n" +
 	"\x06client\x18\x0e \x01(\tR\x06client\x12\x12\n" +
 	"\x04kind\x18\x0f \x01(\tR\x04kind\x121\n" +
-	"\x05hours\x18\x10 \x03(\v2\x1b.mistgate.admin.v1.LinkHourR\x05hours\"\xcc\x01\n" +
+	"\x05hours\x18\x10 \x03(\v2\x1b.mistgate.admin.v1.LinkHourR\x05hours\x12#\n" +
+	"\rclient_closes\x18\x11 \x01(\rR\fclientCloses\x12\x18\n" +
+	"\afreezes\x18\x12 \x01(\rR\afreezes\x12\x14\n" +
+	"\x05quiet\x18\x13 \x01(\rR\x05quiet\x12\x15\n" +
+	"\x06rtt_ms\x18\x14 \x01(\rR\x05rttMs\x12#\n" +
+	"\rloss_permille\x18\x15 \x01(\rR\flossPermille\x12\x1f\n" +
+	"\vrtt_samples\x18\x16 \x01(\rR\n" +
+	"rttSamples\x12\x1f\n" +
+	"\tpkts_sent\x18\x17 \x01(\x04B\x020\x02R\bpktsSent\"\xcc\x01\n" +
 	"\x19GetUserConnectionResponse\x12!\n" +
 	"\n" +
 	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +

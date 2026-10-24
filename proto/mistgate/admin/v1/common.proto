@@ -200,4 +200,14 @@ message LinkHour {
   uint32 unknown_keys = 7;
   uint32 hellos = 8;
   uint32 handshakes = 9;
+  // Hysteria2 with agents that list "links/2" (see InboundConnections).
+  uint32 client_closes = 10;
+  uint32 freezes = 11;
+  uint32 quiet = 12;
+  uint32 accepted = 13;
+  uint32 hellos_foreign = 14;
+  uint32 rtt_ms = 15;
+  uint32 loss_permille = 16;
+  uint32 rtt_samples = 17;
+  uint64 pkts_sent = 18 [jstype = JS_NUMBER];
 }

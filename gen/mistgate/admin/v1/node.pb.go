@@ -3265,6 +3265,18 @@ func (x *GetNodeJournalResponse) GetNodesWithoutJournal() []string {
 //   - unknown_keys: attempts with a key the node does not hold (scanners too, and removed or rotated keys).
 //   - hellos, handshakes (Hysteria2): QUIC ClientHellos and the authentications that followed; hellos include scanners and
 //     apps that ping with a handshake, and miss resumed TLS sessions.
+//
+// Hysteria2 with agents that list "links/2" (agent.proto LinkCounters), from the QUIC connection itself:
+//   - client_closes: connections the client closed itself.
+//   - freezes: idle timeouts after the node had kept sending and nothing came back: the path froze (how a TSPU freeze looks)
+//     or the client vanished mid-transfer. The signal of a block, unlike drops.
+//   - quiet: idle timeouts in which neither side had anything to send: the client went away without closing (app checks,
+//     auto-select, a phone asleep). Harmless.
+//   - accepted: QUIC handshakes that completed; hellos - hellos_foreign - accepted never completed (a cut path or an app
+//     that gave up), accepted - handshakes never asked to authenticate (pings).
+//   - hellos_foreign: ClientHellos for another server name (scanners).
+//   - rtt_ms (average smoothed RTT of connections that moved data, over rtt_samples samples) and loss_permille (packets
+//     the node declared lost per thousand it sent, over pkts_sent): how fast and clean the path was.
 type InboundConnections struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	InboundId   string                 `protobuf:"bytes,1,opt,name=inbound_id,json=inboundId,proto3" json:"inbound_id,omitempty"`
@@ -3284,8 +3296,10 @@ type InboundConnections struct {
 	// Keys that had a stall, and keys that tried at all (a connect or a stall), in the window.
 	KeysStalled uint32 `protobuf:"varint,13,opt,name=keys_stalled,json=keysStalled,proto3" json:"keys_stalled,omitempty"`
 	KeysTried   uint32 `protobuf:"varint,14,opt,name=keys_tried,json=keysTried,proto3" json:"keys_tried,omitempty"`
-	// The counters this protocol does not count (their zero means nothing): awg "rejects", "drops", "hellos",
-	// "handshakes"; vless every counter until its agent counts them.
+	// The counters this protocol, or this node's agent, does not count (their zero means nothing): awg "rejects", "drops",
+	// "hellos", "handshakes" and every links/2 counter; vless every counter until its agent counts them; hysteria2 on an
+	// agent without "links/2" the links/2 counters (client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms,
+	// loss_permille).
 	Unsupported []string `protobuf:"bytes,15,rep,name=unsupported,proto3" json:"unsupported,omitempty"`
 	// With by_hour: the hours of the window that have a counter, oldest first.
 	Hours []*LinkHour `protobuf:"bytes,16,rep,name=hours,proto3" json:"hours,omitempty"`
@@ -3294,6 +3308,15 @@ type InboundConnections struct {
 	Clients []*ClientConnections `protobuf:"bytes,17,rep,name=clients,proto3" json:"clients,omitempty"`
 	// AmneziaWG inbounds only: what the node's last health report says of its UDP port.
 	Awg           *AwgPackets `protobuf:"bytes,18,opt,name=awg,proto3" json:"awg,omitempty"`
+	ClientCloses  uint32      `protobuf:"varint,19,opt,name=client_closes,json=clientCloses,proto3" json:"client_closes,omitempty"`
+	Freezes       uint32      `protobuf:"varint,20,opt,name=freezes,proto3" json:"freezes,omitempty"`
+	Quiet         uint32      `protobuf:"varint,21,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	Accepted      uint32      `protobuf:"varint,22,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	HellosForeign uint32      `protobuf:"varint,23,opt,name=hellos_foreign,json=hellosForeign,proto3" json:"hellos_foreign,omitempty"`
+	RttMs         uint32      `protobuf:"varint,24,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	LossPermille  uint32      `protobuf:"varint,25,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
+	RttSamples    uint32      `protobuf:"varint,26,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
+	PktsSent      uint64      `protobuf:"varint,27,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3454,6 +3477,69 @@ func (x *InboundConnections) GetAwg() *AwgPackets {
 	return nil
 }
 
+func (x *InboundConnections) GetClientCloses() uint32 {
+	if x != nil {
+		return x.ClientCloses
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetFreezes() uint32 {
+	if x != nil {
+		return x.Freezes
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetQuiet() uint32 {
+	if x != nil {
+		return x.Quiet
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetAccepted() uint32 {
+	if x != nil {
+		return x.Accepted
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetHellosForeign() uint32 {
+	if x != nil {
+		return x.HellosForeign
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetRttMs() uint32 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetLossPermille() uint32 {
+	if x != nil {
+		return x.LossPermille
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetRttSamples() uint32 {
+	if x != nil {
+		return x.RttSamples
+	}
+	return 0
+}
+
+func (x *InboundConnections) GetPktsSent() uint64 {
+	if x != nil {
+		return x.PktsSent
+	}
+	return 0
+}
+
 type ClientConnections struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// As the device reported it ("Happ/6.1.0"); "" unknown.
@@ -3465,6 +3551,10 @@ type ClientConnections struct {
 	Drops         uint32 `protobuf:"varint,6,opt,name=drops,proto3" json:"drops,omitempty"`
 	Stalls        uint32 `protobuf:"varint,7,opt,name=stalls,proto3" json:"stalls,omitempty"`
 	OnlineS       uint64 `protobuf:"varint,8,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
+	Freezes       uint32 `protobuf:"varint,9,opt,name=freezes,proto3" json:"freezes,omitempty"`
+	Quiet         uint32 `protobuf:"varint,10,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	RttMs         uint32 `protobuf:"varint,11,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	LossPermille  uint32 `protobuf:"varint,12,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3551,6 +3641,34 @@ func (x *ClientConnections) GetStalls() uint32 {
 func (x *ClientConnections) GetOnlineS() uint64 {
 	if x != nil {
 		return x.OnlineS
+	}
+	return 0
+}
+
+func (x *ClientConnections) GetFreezes() uint32 {
+	if x != nil {
+		return x.Freezes
+	}
+	return 0
+}
+
+func (x *ClientConnections) GetQuiet() uint32 {
+	if x != nil {
+		return x.Quiet
+	}
+	return 0
+}
+
+func (x *ClientConnections) GetRttMs() uint32 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *ClientConnections) GetLossPermille() uint32 {
+	if x != nil {
+		return x.LossPermille
 	}
 	return 0
 }
@@ -4199,7 +4317,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x12=\n" +
 	"\aentries\x18\x03 \x03(\v2#.mistgate.admin.v1.NodeJournalEntryR\aentries\x12\x1c\n" +
 	"\ttruncated\x18\x04 \x01(\bR\ttruncated\x122\n" +
-	"\x15nodes_without_journal\x18\x05 \x03(\tR\x13nodesWithoutJournal\"\xf7\x04\n" +
+	"\x15nodes_without_journal\x18\x05 \x03(\tR\x13nodesWithoutJournal\"\x8d\a\n" +
 	"\x12InboundConnections\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1d\n" +
@@ -4224,7 +4342,17 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\vunsupported\x18\x0f \x03(\tR\vunsupported\x121\n" +
 	"\x05hours\x18\x10 \x03(\v2\x1b.mistgate.admin.v1.LinkHourR\x05hours\x12>\n" +
 	"\aclients\x18\x11 \x03(\v2$.mistgate.admin.v1.ClientConnectionsR\aclients\x12/\n" +
-	"\x03awg\x18\x12 \x01(\v2\x1d.mistgate.admin.v1.AwgPacketsR\x03awg\"\xe4\x01\n" +
+	"\x03awg\x18\x12 \x01(\v2\x1d.mistgate.admin.v1.AwgPacketsR\x03awg\x12#\n" +
+	"\rclient_closes\x18\x13 \x01(\rR\fclientCloses\x12\x18\n" +
+	"\afreezes\x18\x14 \x01(\rR\afreezes\x12\x14\n" +
+	"\x05quiet\x18\x15 \x01(\rR\x05quiet\x12\x1a\n" +
+	"\baccepted\x18\x16 \x01(\rR\baccepted\x12%\n" +
+	"\x0ehellos_foreign\x18\x17 \x01(\rR\rhellosForeign\x12\x15\n" +
+	"\x06rtt_ms\x18\x18 \x01(\rR\x05rttMs\x12#\n" +
+	"\rloss_permille\x18\x19 \x01(\rR\flossPermille\x12\x1f\n" +
+	"\vrtt_samples\x18\x1a \x01(\rR\n" +
+	"rttSamples\x12\x1f\n" +
+	"\tpkts_sent\x18\x1b \x01(\x04B\x020\x02R\bpktsSent\"\xd0\x02\n" +
 	"\x11ClientConnections\x12\x16\n" +
 	"\x06client\x18\x01 \x01(\tR\x06client\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x18\n" +
@@ -4233,7 +4361,12 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\arejects\x18\x05 \x01(\rR\arejects\x12\x14\n" +
 	"\x05drops\x18\x06 \x01(\rR\x05drops\x12\x16\n" +
 	"\x06stalls\x18\a \x01(\rR\x06stalls\x12\x1d\n" +
-	"\bonline_s\x18\b \x01(\x04B\x020\x02R\aonlineS\"\x9c\x01\n" +
+	"\bonline_s\x18\b \x01(\x04B\x020\x02R\aonlineS\x12\x18\n" +
+	"\afreezes\x18\t \x01(\rR\afreezes\x12\x14\n" +
+	"\x05quiet\x18\n" +
+	" \x01(\rR\x05quiet\x12\x15\n" +
+	"\x06rtt_ms\x18\v \x01(\rR\x05rttMs\x12#\n" +
+	"\rloss_permille\x18\f \x01(\rR\flossPermille\"\x9c\x01\n" +
 	"\n" +
 	"AwgPackets\x12(\n" +
 	"\x0eudp_rx_packets\x18\x01 \x01(\x04B\x020\x02R\fudpRxPackets\x12'\n" +

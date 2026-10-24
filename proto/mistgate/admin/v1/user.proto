@@ -81,6 +81,14 @@ message DeviceConnection {
   string kind = 15;
   // With by_hour: the hours of the window that have a counter, oldest first.
   repeated LinkHour hours = 16;
+  // Hysteria2 with agents that list "links/2"; what they mean is under InboundConnections (node.proto).
+  uint32 client_closes = 17;
+  uint32 freezes = 18;
+  uint32 quiet = 19;
+  uint32 rtt_ms = 20;
+  uint32 loss_permille = 21;
+  uint32 rtt_samples = 22;
+  uint64 pkts_sent = 23 [jstype = JS_NUMBER];
 }
 
 message GetUserConnectionResponse {

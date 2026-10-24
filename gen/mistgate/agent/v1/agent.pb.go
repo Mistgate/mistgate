@@ -907,7 +907,8 @@ type Hello struct {
 	// UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
 	// "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
 	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
-	// LinkCounters), and "journal/1" (StatsBatch.journal; see JournalEntry).
+	// LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
+	// JournalEntry).
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -1602,8 +1603,31 @@ type LinkCounters struct {
 	// Only on the inbound row: attempts with a key the node does not know.
 	UnknownKeys uint32 `protobuf:"varint,8,opt,name=unknown_keys,json=unknownKeys,proto3" json:"unknown_keys,omitempty"`
 	// Only on the inbound row: handshakes started and handshakes that reached authentication.
-	Hellos        uint32 `protobuf:"varint,9,opt,name=hellos,proto3" json:"hellos,omitempty"`
-	Handshakes    uint32 `protobuf:"varint,10,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	Hellos     uint32 `protobuf:"varint,9,opt,name=hellos,proto3" json:"hellos,omitempty"`
+	Handshakes uint32 `protobuf:"varint,10,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	// links/2, hysteria2 only: how connections ended and how they went, from the QUIC connection itself (the engine gets it
+	// through the patched core, third_party/hysteria-core). Event counters leave in the next batch, volume counters with
+	// online_s at the 10-minute boundary.
+	// Event: a connection the client closed itself (a CONNECTION_CLOSE without an error, or one of its application).
+	ClientCloses uint32 `protobuf:"varint,11,opt,name=client_closes,json=clientCloses,proto3" json:"client_closes,omitempty"`
+	// Event: an idle timeout after the node had kept sending and nothing came back: the path froze (how a TSPU freeze
+	// looks) or the client vanished in the middle of a transfer. Any age of the connection.
+	Freezes uint32 `protobuf:"varint,12,opt,name=freezes,proto3" json:"freezes,omitempty"`
+	// Event: an idle timeout in which neither side had anything to send: the client went away without closing (an app
+	// check, auto-select, a phone asleep). Any age of the connection.
+	Quiet uint32 `protobuf:"varint,13,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	// Volume, inbound row only: QUIC connections whose handshake completed (before authentication). hellos - accepted is
+	// the handshakes that never completed; accepted - handshakes the connections that never asked to authenticate.
+	Accepted uint32 `protobuf:"varint,14,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	// Volume, inbound row only: ClientHellos whose server name is not the inbound's (scanners); they are counted in hellos too.
+	HellosForeign uint32 `protobuf:"varint,15,opt,name=hellos_foreign,json=hellosForeign,proto3" json:"hellos_foreign,omitempty"`
+	// Volume: the smoothed RTT of the key's connections in milliseconds, one sample per connection per stats interval in
+	// which it moved data, and how many samples.
+	RttMsSum   uint64 `protobuf:"varint,16,opt,name=rtt_ms_sum,json=rttMsSum,proto3" json:"rtt_ms_sum,omitempty"`
+	RttSamples uint32 `protobuf:"varint,17,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
+	// Volume: QUIC packets the node sent on the key's connections, and those it declared lost.
+	PktsSent      uint64 `protobuf:"varint,18,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
+	PktsLost      uint64 `protobuf:"varint,19,opt,name=pkts_lost,json=pktsLost,proto3" json:"pkts_lost,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1704,6 +1728,69 @@ func (x *LinkCounters) GetHellos() uint32 {
 func (x *LinkCounters) GetHandshakes() uint32 {
 	if x != nil {
 		return x.Handshakes
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetClientCloses() uint32 {
+	if x != nil {
+		return x.ClientCloses
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetFreezes() uint32 {
+	if x != nil {
+		return x.Freezes
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetQuiet() uint32 {
+	if x != nil {
+		return x.Quiet
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetAccepted() uint32 {
+	if x != nil {
+		return x.Accepted
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHellosForeign() uint32 {
+	if x != nil {
+		return x.HellosForeign
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetRttMsSum() uint64 {
+	if x != nil {
+		return x.RttMsSum
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetRttSamples() uint32 {
+	if x != nil {
+		return x.RttSamples
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetPktsSent() uint64 {
+	if x != nil {
+		return x.PktsSent
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetPktsLost() uint64 {
+	if x != nil {
+		return x.PktsLost
 	}
 	return 0
 }
@@ -6284,7 +6371,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"AttrsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb1\x04\n" +
 	"\fLinkCounters\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +
@@ -6299,7 +6386,18 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"handshakes\x18\n" +
 	" \x01(\rR\n" +
-	"handshakes\"\x80\x01\n" +
+	"handshakes\x12#\n" +
+	"\rclient_closes\x18\v \x01(\rR\fclientCloses\x12\x18\n" +
+	"\afreezes\x18\f \x01(\rR\afreezes\x12\x14\n" +
+	"\x05quiet\x18\r \x01(\rR\x05quiet\x12\x1a\n" +
+	"\baccepted\x18\x0e \x01(\rR\baccepted\x12%\n" +
+	"\x0ehellos_foreign\x18\x0f \x01(\rR\rhellosForeign\x12\x1c\n" +
+	"\n" +
+	"rtt_ms_sum\x18\x10 \x01(\x04R\brttMsSum\x12\x1f\n" +
+	"\vrtt_samples\x18\x11 \x01(\rR\n" +
+	"rttSamples\x12\x1b\n" +
+	"\tpkts_sent\x18\x12 \x01(\x04R\bpktsSent\x12\x1b\n" +
+	"\tpkts_lost\x18\x13 \x01(\x04R\bpktsLost\"\x80\x01\n" +
 	"\fTrafficDelta\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +
