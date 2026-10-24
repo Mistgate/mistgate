@@ -108,6 +108,12 @@ func cleanHeader(s string, max int) string {
 // "Happ/6.0.0/ios/2609301456616", whose platform and build the device row has or does not need), at most 40 characters.
 func clientOf(ua string) string {
 	ua = strings.TrimSpace(ua)
+	// kl!ck asks as its core ("mihomo/1.19.33 klick/0.5.1") so every panel serves it the mihomo format; its own token names it.
+	for _, tok := range strings.Fields(ua) {
+		if name, version, ok := strings.Cut(tok, "/"); ok && strings.EqualFold(name, "klick") {
+			return cleanHeader("kl!ck/"+version, 40)
+		}
+	}
 	if i := strings.IndexAny(ua, " \t"); i >= 0 {
 		ua = ua[:i]
 	}
