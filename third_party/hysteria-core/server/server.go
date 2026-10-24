@@ -122,6 +122,7 @@ func (s *serverImpl) Close() error {
 }
 
 func (s *serverImpl) handleClient(conn *quic.Conn) {
+	defer congestion.Forget(conn) // after ConnDisconnect, which may still read LostPackets
 	cel, _ := s.config.EventLogger.(ConnEventLogger)
 	if cel != nil {
 		cel.Accepted(conn)

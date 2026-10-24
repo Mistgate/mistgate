@@ -237,6 +237,16 @@ type EventLogger interface {
 	UDPError(addr net.Addr, id string, sessionID uint32, err error)
 }
 
+// LostPackets is the number of packets declared lost on conn (a Mistgate patch, see MISTGATE.md): quic-go's
+// ConnectionStats.PacketsLost counts them only under quic-go's own congestion controller, not under BBR or Brutal.
+// Valid until the server is done with the connection (after ConnDisconnect).
+func LostPackets(conn *quic.Conn) uint64 {
+	if n, ok := congestion.LostPackets(conn); ok {
+		return n
+	}
+	return conn.ConnectionStats().PacketsLost
+}
+
 // ConnEventLogger is an optional extension of EventLogger (a Mistgate patch, see MISTGATE.md at the module root): when
 // the EventLogger also implements it, the server hands over the QUIC connection itself. A caller needs it for statistics
 // of one connection (RTT, loss, packets sent and received) and to tell its connections apart: the address of a
