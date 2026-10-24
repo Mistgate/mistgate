@@ -363,10 +363,17 @@ func TestAcceptedForeignSNIClientCloseAndKick(t *testing.T) {
 	}
 }
 
+// BBR (the default) replaces quic-go's controller, whose own PacketsLost would stay at zero; the patched core counts the losses
+// under it (server.LostPackets), and quic-go does under Reno.
 func TestConnectionStatsIncludeRTTAndLoss(t *testing.T) {
+	for _, cc := range []string{"", "reno"} {
+		t.Run("congestion="+cc, func(t *testing.T) { connectionStatsRTTAndLoss(t, cc) })
+	}
+}
+
+func connectionStatsRTTAndLoss(t *testing.T, congestion string) {
 	r := newRig(t, "")
-	// quic-go 0.62 updates ConnectionStats.PacketsLost in its built-in Reno sender; the configured Hysteria BBR sender does not.
-	r.e.(*eng).testCongestion = "reno"
+	r.e.(*eng).testCongestion = congestion
 	r.apply(cred("stats"))
 	proxy := newTestUDPProxy(t, r.udpPort)
 	proxy.delayNanos.Store(int64(50 * time.Millisecond))

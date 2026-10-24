@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/apernet/hysteria/core/v2/server"
 	quic "github.com/apernet/quic-go"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -291,7 +292,7 @@ func (in *inbound) ConnConnect(conn *quic.Conn, id string, _ uint64) {
 	if cs == nil || conn == nil {
 		return
 	}
-	stats := conn.ConnectionStats()
+	stats := connStats(conn)
 	s := &session{
 		cs: cs, since: in.e.now(), conn: conn, startBytes: stats.BytesSent + stats.BytesReceived,
 		last: stats, silencePacketsRecv: stats.PacketsReceived, silencePacketsSent: stats.PacketsSent,
@@ -324,7 +325,7 @@ func (s *session) sample() {
 	if s.conn == nil {
 		return
 	}
-	current := s.conn.ConnectionStats()
+	current := connStats(s.conn)
 	addConnectionDelta(s.cs, s.last, current)
 	if current.PacketsReceived != s.last.PacketsReceived {
 		// This is the latest snapshot with this receive count. Sends since it are evidence of a frozen return path.
@@ -332,6 +333,14 @@ func (s *session) sample() {
 		s.silencePacketsSent = current.PacketsSent
 	}
 	s.last = current
+}
+
+// connStats is the connection's statistics with the lost packets as the patched core counts them: quic-go's own PacketsLost
+// stays zero under Hysteria's BBR and Brutal (third_party/hysteria-core/MISTGATE.md).
+func connStats(conn *quic.Conn) quic.ConnectionStats {
+	st := conn.ConnectionStats()
+	st.PacketsLost = server.LostPackets(conn)
+	return st
 }
 
 func addConnectionDelta(cs *credState, previous, current quic.ConnectionStats) {
@@ -353,7 +362,7 @@ func (in *inbound) endSession(s *session, err error) {
 	cs := s.cs
 	var stats quic.ConnectionStats
 	if s.conn != nil {
-		stats = s.conn.ConnectionStats()
+		stats = connStats(s.conn)
 		addConnectionDelta(cs, s.last, stats)
 	}
 	var idleTimeout *quic.IdleTimeoutError
