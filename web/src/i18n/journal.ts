@@ -1,0 +1,55 @@
+// The node's saved journal (lib/journal.ts): its tab on the node page, and the way to it from the Logs tab on the Cloudflare
+// edition. English is the source of truth: `ru` and `zh` are type-checked against it. The admin speaks «ты».
+export const en = {
+  "node.tab.journal": "Journal",
+  "journal.intro": "Warnings and errors of the node's agent and engines, grouped by hour and kept 7 days. Client addresses are cut out on the node.",
+  "journal.period": "Period",
+  "journal.day": "24 hours",
+  "journal.week": "7 days",
+  "journal.level": "Level",
+  "journal.all": "Warnings and errors",
+  "journal.errors": "Errors only",
+  "journal.search": "Search the journal",
+  "journal.empty": "No warnings or errors in this period.",
+  "journal.truncated": "Only the newest {n} are shown: shorten the period or search.",
+  "journal.unsupported": "This node's agent does not send its journal yet: update the agent.",
+  "journal.times": "×{n}",
+  "journal.edgeHint": "This edition does not relay the node's live log. Its warnings and errors are kept in the journal.",
+  "journal.open": "Open the journal",
+};
+
+export const ru: Record<keyof typeof en, string> = {
+  "node.tab.journal": "Журнал",
+  "journal.intro": "Предупреждения и ошибки агента ноды и её движков, по часам, хранятся 7 дней. Адреса клиентов вырезаются ещё на ноде.",
+  "journal.period": "Период",
+  "journal.day": "24 часа",
+  "journal.week": "7 дней",
+  "journal.level": "Уровень",
+  "journal.all": "Предупреждения и ошибки",
+  "journal.errors": "Только ошибки",
+  "journal.search": "Поиск в журнале",
+  "journal.empty": "За этот период нет ни предупреждений, ни ошибок.",
+  "journal.truncated": "Показаны только {n} самых свежих: сократи период или уточни поиск.",
+  "journal.unsupported": "Агент этой ноды ещё не присылает журнал: обнови агент.",
+  "journal.times": "×{n}",
+  "journal.edgeHint": "Эта редакция не передаёт живой лог ноды. Её предупреждения и ошибки сохраняются в журнале.",
+  "journal.open": "Открыть журнал",
+};
+
+export const zh: Record<keyof typeof en, string> = {
+  "node.tab.journal": "运行记录",
+  "journal.intro": "节点 Agent 及其引擎的警告和错误，按小时汇总，保留 7 天。客户端地址在节点上即被移除。",
+  "journal.period": "时间范围",
+  "journal.day": "24 小时",
+  "journal.week": "7 天",
+  "journal.level": "级别",
+  "journal.all": "警告和错误",
+  "journal.errors": "仅错误",
+  "journal.search": "搜索运行记录",
+  "journal.empty": "此时间范围内没有警告或错误。",
+  "journal.truncated": "仅显示最新的 {n} 条：请缩短时间范围或细化搜索。",
+  "journal.unsupported": "该节点的 Agent 尚不发送运行记录：请更新 Agent。",
+  "journal.times": "×{n}",
+  "journal.edgeHint": "此版本不转发节点的实时日志。节点的警告和错误保存在运行记录中。",
+  "journal.open": "打开运行记录",
+};

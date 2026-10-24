@@ -37,7 +37,7 @@ function sleep(ms: number, signal: AbortSignal) {
  * arrive first, then new ones as they are written; if the link drops the stream is retried every 5 s while
  * the node is online, and the lines already on screen stay.
  */
-export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
+export function LogsTab({ data, onJournal }: { data: Plain<GetNodeResponse>; onJournal?: () => void }) {
   const t = useT();
   const fmt = useFmt();
   const toast = useToast();
@@ -94,7 +94,17 @@ export function LogsTab({ data }: { data: Plain<GetNodeResponse> }) {
     if (el && shown.length > 0 && stick.current && !frozen) el.scrollTop = el.scrollHeight;
   }, [shown, frozen]);
 
-  if (off) return <EditionNotice feature="agent_logs" />;
+  if (off)
+    return (
+      <EditionNotice feature="agent_logs">
+        <p>{t("journal.edgeHint")}</p>
+        {onJournal && (
+          <Button variant="secondary" size="md" className="mt-2" onClick={onJournal}>
+            {t("journal.open")}
+          </Button>
+        )}
+      </EditionNotice>
+    );
 
   function download() {
     const text = lines

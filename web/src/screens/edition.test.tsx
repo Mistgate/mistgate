@@ -263,6 +263,15 @@ describe("Node logs on the edge", () => {
     expect(buttons()).toEqual([]);
   });
 
+  it("leads to the saved journal, which the edge has", async () => {
+    const onJournal = vi.fn();
+    await mount(<LogsTab data={data} onJournal={onJournal} />);
+    expect(text()).toContain("Its warnings and errors are kept in the journal.");
+    expect(buttons()).toEqual(["Open the journal"]);
+    await act(async () => void [...document.querySelectorAll("button")][0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onJournal).toHaveBeenCalledOnce();
+  });
+
   it("opens the stream on the VPS", async () => {
     edition = "vps";
     await mount(<LogsTab data={data} />);

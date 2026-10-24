@@ -26,6 +26,7 @@ import { warpKind, warpWord } from "@/lib/warp";
 import { StateBanner } from "./banner";
 import { NodeDoctorTab } from "./doctor";
 import { EventsTab } from "./events";
+import { JournalTab } from "./journal";
 import { LogsTab } from "./logs";
 import { OverviewTab } from "./overview";
 import { ProfilesTab } from "./profiles";
@@ -137,7 +138,8 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
       content: <ProfilesTab data={data} addProfile={search.add} onAddClosed={() => search.add && setTab("profiles")} />,
     },
     { value: "users", label: t("node.tab.users"), content: <UsersTab data={data} /> },
-    { value: "logs", label: t("node.tab.logs"), content: tab === "logs" ? <LogsTab data={data} /> : null },
+    { value: "logs", label: t("node.tab.logs"), content: tab === "logs" ? <LogsTab data={data} onJournal={() => setTab("journal")} /> : null },
+    { value: "journal", label: t("node.tab.journal"), content: tab === "journal" ? <JournalTab nodeId={node.id} /> : null },
     { value: "events", label: t("node.tab.events"), content: tab === "events" ? <EventsTab nodeId={node.id} /> : null },
     {
       value: "doctor",

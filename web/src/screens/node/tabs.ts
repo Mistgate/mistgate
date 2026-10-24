@@ -1,6 +1,6 @@
 import { validatePaging } from "@/lib/paging";
 
-export const nodeTabs = ["overview", "profiles", "users", "logs", "events", "doctor", "settings"] as const;
+export const nodeTabs = ["overview", "profiles", "users", "logs", "journal", "events", "doctor", "settings"] as const;
 export type NodeTab = (typeof nodeTabs)[number];
 
 /**
