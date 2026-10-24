@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/client_probe.proto.
  */
 export const file_mistgate_admin_v1_client_probe: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9jbGllbnRfcHJvYmUucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIk4KE0NsaWVudFByb2JlU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBIPCgdyZXBvcnRzGAIgASgNEhUKCWxhc3RfdW5peBgDIAEoA0ICMAIimAEKEENsaWVudFByb2JlVGFsbHkSDwoHcmVwb3J0cxgBIAEoDRIKCgJvaxgCIAEoDRIOCgZmcmVlemUYAyABKA0SEwoLdGNwX2Jsb2NrZWQYBCABKA0SGAoQaGFuZHNoYWtlX2ZhaWxlZBgFIAEoDRIRCglub19hbnN3ZXIYBiABKA0SFQoJbGFzdF91bml4GAcgASgDQgIwAiJUChBDbGllbnRQcm9iZUdyb3VwEgwKBG5hbWUYASABKAkSMgoFdGFsbHkYAiABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRQcm9iZVRhbGx5IsQBCg9DbGllbnRQcm9iZU5vZGUSDwoHbm9kZV9pZBgBIAEoCRIyCgV0YWxseRgCIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudFByb2JlVGFsbHkSNgoJb3BlcmF0b3JzGAMgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVHcm91cBI0CgdyZWdpb25zGAQgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVHcm91cCIXChVHZXRDbGllbnRQcm9iZVJlcXVlc3QimwEKFkdldENsaWVudFByb2JlUmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRQcm9iZVNldHRpbmdzEjEKBW5vZGVzGAIgAygLMiIubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVOb2RlEhQKCG5vd191bml4GAMgASgDQgIwAiI8ChhVcGRhdGVDbGllbnRQcm9iZVJlcXVlc3QSFAoHZW5hYmxlZBgBIAEoCEgAiAEBQgoKCF9lbmFibGVkIlUKGVVwZGF0ZUNsaWVudFByb2JlUmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRQcm9iZVNldHRpbmdzIh4KHERpc2Nvbm5lY3RDbGllbnRQcm9iZVJlcXVlc3QiWQodRGlzY29ubmVjdENsaWVudFByb2JlUmVzcG9uc2USOAoIc2V0dGluZ3MYASABKAsyJi5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRQcm9iZVNldHRpbmdzMucCChJDbGllbnRQcm9iZVNlcnZpY2USZQoOR2V0Q2xpZW50UHJvYmUSKC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDbGllbnRQcm9iZVJlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRDbGllbnRQcm9iZVJlc3BvbnNlEm4KEVVwZGF0ZUNsaWVudFByb2JlEisubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlQ2xpZW50UHJvYmVSZXF1ZXN0GiwubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlQ2xpZW50UHJvYmVSZXNwb25zZRJ6ChVEaXNjb25uZWN0Q2xpZW50UHJvYmUSLy5taXN0Z2F0ZS5hZG1pbi52MS5EaXNjb25uZWN0Q2xpZW50UHJvYmVSZXF1ZXN0GjAubWlzdGdhdGUuYWRtaW4udjEuRGlzY29ubmVjdENsaWVudFByb2JlUmVzcG9uc2VCywEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIQQ2xpZW50UHJvYmVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z");
+  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9jbGllbnRfcHJvYmUucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIk4KE0NsaWVudFByb2JlU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBIPCgdyZXBvcnRzGAIgASgNEhUKCWxhc3RfdW5peBgDIAEoA0ICMAIimAEKEENsaWVudFByb2JlVGFsbHkSDwoHcmVwb3J0cxgBIAEoDRIKCgJvaxgCIAEoDRIOCgZmcmVlemUYAyABKA0SEwoLdGNwX2Jsb2NrZWQYBCABKA0SGAoQaGFuZHNoYWtlX2ZhaWxlZBgFIAEoDRIRCglub19hbnN3ZXIYBiABKA0SFQoJbGFzdF91bml4GAcgASgDQgIwAiJUChBDbGllbnRQcm9iZUdyb3VwEgwKBG5hbWUYASABKAkSMgoFdGFsbHkYAiABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRQcm9iZVRhbGx5IvcBCg9DbGllbnRQcm9iZU5vZGUSDwoHbm9kZV9pZBgBIAEoCRIyCgV0YWxseRgCIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudFByb2JlVGFsbHkSNgoJb3BlcmF0b3JzGAMgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVHcm91cBI0CgdyZWdpb25zGAQgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVHcm91cBIxCgVraW5kcxgFIAMoCzIiLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudFByb2JlS2luZCKUAQoPQ2xpZW50UHJvYmVLaW5kEgwKBGtpbmQYASABKAkSMgoFdGFsbHkYAiABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5DbGllbnRQcm9iZVRhbGx5EhcKD21lZGlhbl9kZWxheV9tcxgDIAEoDRISCgpkbF9jaGVja2VkGAQgASgNEhIKCmRsX3N0YWxsZWQYBSABKA0iFwoVR2V0Q2xpZW50UHJvYmVSZXF1ZXN0IpsBChZHZXRDbGllbnRQcm9iZVJlc3BvbnNlEjgKCHNldHRpbmdzGAEgASgLMiYubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVTZXR0aW5ncxIxCgVub2RlcxgCIAMoCzIiLm1pc3RnYXRlLmFkbWluLnYxLkNsaWVudFByb2JlTm9kZRIUCghub3dfdW5peBgDIAEoA0ICMAIiPAoYVXBkYXRlQ2xpZW50UHJvYmVSZXF1ZXN0EhQKB2VuYWJsZWQYASABKAhIAIgBAUIKCghfZW5hYmxlZCJVChlVcGRhdGVDbGllbnRQcm9iZVJlc3BvbnNlEjgKCHNldHRpbmdzGAEgASgLMiYubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVTZXR0aW5ncyIeChxEaXNjb25uZWN0Q2xpZW50UHJvYmVSZXF1ZXN0IlkKHURpc2Nvbm5lY3RDbGllbnRQcm9iZVJlc3BvbnNlEjgKCHNldHRpbmdzGAEgASgLMiYubWlzdGdhdGUuYWRtaW4udjEuQ2xpZW50UHJvYmVTZXR0aW5nczLnAgoSQ2xpZW50UHJvYmVTZXJ2aWNlEmUKDkdldENsaWVudFByb2JlEigubWlzdGdhdGUuYWRtaW4udjEuR2V0Q2xpZW50UHJvYmVSZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuR2V0Q2xpZW50UHJvYmVSZXNwb25zZRJuChFVcGRhdGVDbGllbnRQcm9iZRIrLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNsaWVudFByb2JlUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUNsaWVudFByb2JlUmVzcG9uc2USegoVRGlzY29ubmVjdENsaWVudFByb2JlEi8ubWlzdGdhdGUuYWRtaW4udjEuRGlzY29ubmVjdENsaWVudFByb2JlUmVxdWVzdBowLm1pc3RnYXRlLmFkbWluLnYxLkRpc2Nvbm5lY3RDbGllbnRQcm9iZVJlc3BvbnNlQssBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCEENsaWVudFByb2JlUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message mistgate.admin.v1.ClientProbeSettings
@@ -146,6 +146,13 @@ export type ClientProbeNode = Message<"mistgate.admin.v1.ClientProbeNode"> & {
    * @generated from field: repeated mistgate.admin.v1.ClientProbeGroup regions = 4;
    */
   regions: ClientProbeGroup[];
+
+  /**
+   * By the kind of server the app checked (its stored kind: "hysteria2", "vless", "awg", ...), most reports first.
+   *
+   * @generated from field: repeated mistgate.admin.v1.ClientProbeKind kinds = 5;
+   */
+  kinds: ClientProbeKind[];
 };
 
 /**
@@ -154,6 +161,49 @@ export type ClientProbeNode = Message<"mistgate.admin.v1.ClientProbeNode"> & {
  */
 export const ClientProbeNodeSchema: GenMessage<ClientProbeNode> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_client_probe, 3);
+
+/**
+ * One kind of server of a node in the reports.
+ *
+ * @generated from message mistgate.admin.v1.ClientProbeKind
+ */
+export type ClientProbeKind = Message<"mistgate.admin.v1.ClientProbeKind"> & {
+  /**
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: mistgate.admin.v1.ClientProbeTally tally = 2;
+   */
+  tally?: ClientProbeTally | undefined;
+
+  /**
+   * Median of the latency the app measured (reports that have one); 0 when none has.
+   *
+   * @generated from field: uint32 median_delay_ms = 3;
+   */
+  medianDelayMs: number;
+
+  /**
+   * Reports with a download test, and those whose download stalled.
+   *
+   * @generated from field: uint32 dl_checked = 4;
+   */
+  dlChecked: number;
+
+  /**
+   * @generated from field: uint32 dl_stalled = 5;
+   */
+  dlStalled: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ClientProbeKind.
+ * Use `create(ClientProbeKindSchema)` to create a new message.
+ */
+export const ClientProbeKindSchema: GenMessage<ClientProbeKind> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_client_probe, 4);
 
 /**
  * @generated from message mistgate.admin.v1.GetClientProbeRequest
@@ -166,7 +216,7 @@ export type GetClientProbeRequest = Message<"mistgate.admin.v1.GetClientProbeReq
  * Use `create(GetClientProbeRequestSchema)` to create a new message.
  */
 export const GetClientProbeRequestSchema: GenMessage<GetClientProbeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_probe, 4);
+  messageDesc(file_mistgate_admin_v1_client_probe, 5);
 
 /**
  * @generated from message mistgate.admin.v1.GetClientProbeResponse
@@ -195,7 +245,7 @@ export type GetClientProbeResponse = Message<"mistgate.admin.v1.GetClientProbeRe
  * Use `create(GetClientProbeResponseSchema)` to create a new message.
  */
 export const GetClientProbeResponseSchema: GenMessage<GetClientProbeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_probe, 5);
+  messageDesc(file_mistgate_admin_v1_client_probe, 6);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateClientProbeRequest
@@ -212,7 +262,7 @@ export type UpdateClientProbeRequest = Message<"mistgate.admin.v1.UpdateClientPr
  * Use `create(UpdateClientProbeRequestSchema)` to create a new message.
  */
 export const UpdateClientProbeRequestSchema: GenMessage<UpdateClientProbeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_probe, 6);
+  messageDesc(file_mistgate_admin_v1_client_probe, 7);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateClientProbeResponse
@@ -229,7 +279,7 @@ export type UpdateClientProbeResponse = Message<"mistgate.admin.v1.UpdateClientP
  * Use `create(UpdateClientProbeResponseSchema)` to create a new message.
  */
 export const UpdateClientProbeResponseSchema: GenMessage<UpdateClientProbeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_probe, 7);
+  messageDesc(file_mistgate_admin_v1_client_probe, 8);
 
 /**
  * @generated from message mistgate.admin.v1.DisconnectClientProbeRequest
@@ -242,7 +292,7 @@ export type DisconnectClientProbeRequest = Message<"mistgate.admin.v1.Disconnect
  * Use `create(DisconnectClientProbeRequestSchema)` to create a new message.
  */
 export const DisconnectClientProbeRequestSchema: GenMessage<DisconnectClientProbeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_probe, 8);
+  messageDesc(file_mistgate_admin_v1_client_probe, 9);
 
 /**
  * @generated from message mistgate.admin.v1.DisconnectClientProbeResponse
@@ -259,7 +309,7 @@ export type DisconnectClientProbeResponse = Message<"mistgate.admin.v1.Disconnec
  * Use `create(DisconnectClientProbeResponseSchema)` to create a new message.
  */
 export const DisconnectClientProbeResponseSchema: GenMessage<DisconnectClientProbeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_client_probe, 9);
+  messageDesc(file_mistgate_admin_v1_client_probe, 10);
 
 /**
  * kl!ck reports: what the people who use the kl!ck VPN app see of the servers from their own networks. kl!ck has a local probe

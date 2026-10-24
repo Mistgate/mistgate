@@ -71,6 +71,19 @@ message ClientProbeNode {
   // Most reports first; at most 8 of each.
   repeated ClientProbeGroup operators = 3;
   repeated ClientProbeGroup regions = 4;
+  // By the kind of server the app checked (its stored kind: "hysteria2", "vless", "awg", ...), most reports first.
+  repeated ClientProbeKind kinds = 5;
+}
+
+// One kind of server of a node in the reports.
+message ClientProbeKind {
+  string kind = 1;
+  ClientProbeTally tally = 2;
+  // Median of the latency the app measured (reports that have one); 0 when none has.
+  uint32 median_delay_ms = 3;
+  // Reports with a download test, and those whose download stalled.
+  uint32 dl_checked = 4;
+  uint32 dl_stalled = 5;
 }
 
 message GetClientProbeRequest {}

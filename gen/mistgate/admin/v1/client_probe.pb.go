@@ -238,8 +238,10 @@ type ClientProbeNode struct {
 	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Tally  *ClientProbeTally      `protobuf:"bytes,2,opt,name=tally,proto3" json:"tally,omitempty"`
 	// Most reports first; at most 8 of each.
-	Operators     []*ClientProbeGroup `protobuf:"bytes,3,rep,name=operators,proto3" json:"operators,omitempty"`
-	Regions       []*ClientProbeGroup `protobuf:"bytes,4,rep,name=regions,proto3" json:"regions,omitempty"`
+	Operators []*ClientProbeGroup `protobuf:"bytes,3,rep,name=operators,proto3" json:"operators,omitempty"`
+	Regions   []*ClientProbeGroup `protobuf:"bytes,4,rep,name=regions,proto3" json:"regions,omitempty"`
+	// By the kind of server the app checked (its stored kind: "hysteria2", "vless", "awg", ...), most reports first.
+	Kinds         []*ClientProbeKind `protobuf:"bytes,5,rep,name=kinds,proto3" json:"kinds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -302,6 +304,92 @@ func (x *ClientProbeNode) GetRegions() []*ClientProbeGroup {
 	return nil
 }
 
+func (x *ClientProbeNode) GetKinds() []*ClientProbeKind {
+	if x != nil {
+		return x.Kinds
+	}
+	return nil
+}
+
+// One kind of server of a node in the reports.
+type ClientProbeKind struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Kind  string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Tally *ClientProbeTally      `protobuf:"bytes,2,opt,name=tally,proto3" json:"tally,omitempty"`
+	// Median of the latency the app measured (reports that have one); 0 when none has.
+	MedianDelayMs uint32 `protobuf:"varint,3,opt,name=median_delay_ms,json=medianDelayMs,proto3" json:"median_delay_ms,omitempty"`
+	// Reports with a download test, and those whose download stalled.
+	DlChecked     uint32 `protobuf:"varint,4,opt,name=dl_checked,json=dlChecked,proto3" json:"dl_checked,omitempty"`
+	DlStalled     uint32 `protobuf:"varint,5,opt,name=dl_stalled,json=dlStalled,proto3" json:"dl_stalled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClientProbeKind) Reset() {
+	*x = ClientProbeKind{}
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientProbeKind) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientProbeKind) ProtoMessage() {}
+
+func (x *ClientProbeKind) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientProbeKind.ProtoReflect.Descriptor instead.
+func (*ClientProbeKind) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ClientProbeKind) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ClientProbeKind) GetTally() *ClientProbeTally {
+	if x != nil {
+		return x.Tally
+	}
+	return nil
+}
+
+func (x *ClientProbeKind) GetMedianDelayMs() uint32 {
+	if x != nil {
+		return x.MedianDelayMs
+	}
+	return 0
+}
+
+func (x *ClientProbeKind) GetDlChecked() uint32 {
+	if x != nil {
+		return x.DlChecked
+	}
+	return 0
+}
+
+func (x *ClientProbeKind) GetDlStalled() uint32 {
+	if x != nil {
+		return x.DlStalled
+	}
+	return 0
+}
+
 type GetClientProbeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -310,7 +398,7 @@ type GetClientProbeRequest struct {
 
 func (x *GetClientProbeRequest) Reset() {
 	*x = GetClientProbeRequest{}
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -322,7 +410,7 @@ func (x *GetClientProbeRequest) String() string {
 func (*GetClientProbeRequest) ProtoMessage() {}
 
 func (x *GetClientProbeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -335,7 +423,7 @@ func (x *GetClientProbeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClientProbeRequest.ProtoReflect.Descriptor instead.
 func (*GetClientProbeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{5}
 }
 
 type GetClientProbeResponse struct {
@@ -350,7 +438,7 @@ type GetClientProbeResponse struct {
 
 func (x *GetClientProbeResponse) Reset() {
 	*x = GetClientProbeResponse{}
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -362,7 +450,7 @@ func (x *GetClientProbeResponse) String() string {
 func (*GetClientProbeResponse) ProtoMessage() {}
 
 func (x *GetClientProbeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -375,7 +463,7 @@ func (x *GetClientProbeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClientProbeResponse.ProtoReflect.Descriptor instead.
 func (*GetClientProbeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetClientProbeResponse) GetSettings() *ClientProbeSettings {
@@ -408,7 +496,7 @@ type UpdateClientProbeRequest struct {
 
 func (x *UpdateClientProbeRequest) Reset() {
 	*x = UpdateClientProbeRequest{}
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -420,7 +508,7 @@ func (x *UpdateClientProbeRequest) String() string {
 func (*UpdateClientProbeRequest) ProtoMessage() {}
 
 func (x *UpdateClientProbeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -433,7 +521,7 @@ func (x *UpdateClientProbeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateClientProbeRequest.ProtoReflect.Descriptor instead.
 func (*UpdateClientProbeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateClientProbeRequest) GetEnabled() bool {
@@ -452,7 +540,7 @@ type UpdateClientProbeResponse struct {
 
 func (x *UpdateClientProbeResponse) Reset() {
 	*x = UpdateClientProbeResponse{}
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -464,7 +552,7 @@ func (x *UpdateClientProbeResponse) String() string {
 func (*UpdateClientProbeResponse) ProtoMessage() {}
 
 func (x *UpdateClientProbeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -477,7 +565,7 @@ func (x *UpdateClientProbeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateClientProbeResponse.ProtoReflect.Descriptor instead.
 func (*UpdateClientProbeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateClientProbeResponse) GetSettings() *ClientProbeSettings {
@@ -495,7 +583,7 @@ type DisconnectClientProbeRequest struct {
 
 func (x *DisconnectClientProbeRequest) Reset() {
 	*x = DisconnectClientProbeRequest{}
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +595,7 @@ func (x *DisconnectClientProbeRequest) String() string {
 func (*DisconnectClientProbeRequest) ProtoMessage() {}
 
 func (x *DisconnectClientProbeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,7 +608,7 @@ func (x *DisconnectClientProbeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectClientProbeRequest.ProtoReflect.Descriptor instead.
 func (*DisconnectClientProbeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{9}
 }
 
 type DisconnectClientProbeResponse struct {
@@ -532,7 +620,7 @@ type DisconnectClientProbeResponse struct {
 
 func (x *DisconnectClientProbeResponse) Reset() {
 	*x = DisconnectClientProbeResponse{}
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -544,7 +632,7 @@ func (x *DisconnectClientProbeResponse) String() string {
 func (*DisconnectClientProbeResponse) ProtoMessage() {}
 
 func (x *DisconnectClientProbeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_client_probe_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -557,7 +645,7 @@ func (x *DisconnectClientProbeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectClientProbeResponse.ProtoReflect.Descriptor instead.
 func (*DisconnectClientProbeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_client_probe_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DisconnectClientProbeResponse) GetSettings() *ClientProbeSettings {
@@ -587,12 +675,21 @@ const file_mistgate_admin_v1_client_probe_proto_rawDesc = "" +
 	"\tlast_unix\x18\a \x01(\x03B\x020\x02R\blastUnix\"a\n" +
 	"\x10ClientProbeGroup\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
-	"\x05tally\x18\x02 \x01(\v2#.mistgate.admin.v1.ClientProbeTallyR\x05tally\"\xe7\x01\n" +
+	"\x05tally\x18\x02 \x01(\v2#.mistgate.admin.v1.ClientProbeTallyR\x05tally\"\xa1\x02\n" +
 	"\x0fClientProbeNode\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x129\n" +
 	"\x05tally\x18\x02 \x01(\v2#.mistgate.admin.v1.ClientProbeTallyR\x05tally\x12A\n" +
 	"\toperators\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientProbeGroupR\toperators\x12=\n" +
-	"\aregions\x18\x04 \x03(\v2#.mistgate.admin.v1.ClientProbeGroupR\aregions\"\x17\n" +
+	"\aregions\x18\x04 \x03(\v2#.mistgate.admin.v1.ClientProbeGroupR\aregions\x128\n" +
+	"\x05kinds\x18\x05 \x03(\v2\".mistgate.admin.v1.ClientProbeKindR\x05kinds\"\xc6\x01\n" +
+	"\x0fClientProbeKind\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x129\n" +
+	"\x05tally\x18\x02 \x01(\v2#.mistgate.admin.v1.ClientProbeTallyR\x05tally\x12&\n" +
+	"\x0fmedian_delay_ms\x18\x03 \x01(\rR\rmedianDelayMs\x12\x1d\n" +
+	"\n" +
+	"dl_checked\x18\x04 \x01(\rR\tdlChecked\x12\x1d\n" +
+	"\n" +
+	"dl_stalled\x18\x05 \x01(\rR\tdlStalled\"\x17\n" +
 	"\x15GetClientProbeRequest\"\xb5\x01\n" +
 	"\x16GetClientProbeResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.mistgate.admin.v1.ClientProbeSettingsR\bsettings\x128\n" +
@@ -625,39 +722,42 @@ func file_mistgate_admin_v1_client_probe_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_client_probe_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_client_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_mistgate_admin_v1_client_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_mistgate_admin_v1_client_probe_proto_goTypes = []any{
 	(*ClientProbeSettings)(nil),           // 0: mistgate.admin.v1.ClientProbeSettings
 	(*ClientProbeTally)(nil),              // 1: mistgate.admin.v1.ClientProbeTally
 	(*ClientProbeGroup)(nil),              // 2: mistgate.admin.v1.ClientProbeGroup
 	(*ClientProbeNode)(nil),               // 3: mistgate.admin.v1.ClientProbeNode
-	(*GetClientProbeRequest)(nil),         // 4: mistgate.admin.v1.GetClientProbeRequest
-	(*GetClientProbeResponse)(nil),        // 5: mistgate.admin.v1.GetClientProbeResponse
-	(*UpdateClientProbeRequest)(nil),      // 6: mistgate.admin.v1.UpdateClientProbeRequest
-	(*UpdateClientProbeResponse)(nil),     // 7: mistgate.admin.v1.UpdateClientProbeResponse
-	(*DisconnectClientProbeRequest)(nil),  // 8: mistgate.admin.v1.DisconnectClientProbeRequest
-	(*DisconnectClientProbeResponse)(nil), // 9: mistgate.admin.v1.DisconnectClientProbeResponse
+	(*ClientProbeKind)(nil),               // 4: mistgate.admin.v1.ClientProbeKind
+	(*GetClientProbeRequest)(nil),         // 5: mistgate.admin.v1.GetClientProbeRequest
+	(*GetClientProbeResponse)(nil),        // 6: mistgate.admin.v1.GetClientProbeResponse
+	(*UpdateClientProbeRequest)(nil),      // 7: mistgate.admin.v1.UpdateClientProbeRequest
+	(*UpdateClientProbeResponse)(nil),     // 8: mistgate.admin.v1.UpdateClientProbeResponse
+	(*DisconnectClientProbeRequest)(nil),  // 9: mistgate.admin.v1.DisconnectClientProbeRequest
+	(*DisconnectClientProbeResponse)(nil), // 10: mistgate.admin.v1.DisconnectClientProbeResponse
 }
 var file_mistgate_admin_v1_client_probe_proto_depIdxs = []int32{
 	1,  // 0: mistgate.admin.v1.ClientProbeGroup.tally:type_name -> mistgate.admin.v1.ClientProbeTally
 	1,  // 1: mistgate.admin.v1.ClientProbeNode.tally:type_name -> mistgate.admin.v1.ClientProbeTally
 	2,  // 2: mistgate.admin.v1.ClientProbeNode.operators:type_name -> mistgate.admin.v1.ClientProbeGroup
 	2,  // 3: mistgate.admin.v1.ClientProbeNode.regions:type_name -> mistgate.admin.v1.ClientProbeGroup
-	0,  // 4: mistgate.admin.v1.GetClientProbeResponse.settings:type_name -> mistgate.admin.v1.ClientProbeSettings
-	3,  // 5: mistgate.admin.v1.GetClientProbeResponse.nodes:type_name -> mistgate.admin.v1.ClientProbeNode
-	0,  // 6: mistgate.admin.v1.UpdateClientProbeResponse.settings:type_name -> mistgate.admin.v1.ClientProbeSettings
-	0,  // 7: mistgate.admin.v1.DisconnectClientProbeResponse.settings:type_name -> mistgate.admin.v1.ClientProbeSettings
-	4,  // 8: mistgate.admin.v1.ClientProbeService.GetClientProbe:input_type -> mistgate.admin.v1.GetClientProbeRequest
-	6,  // 9: mistgate.admin.v1.ClientProbeService.UpdateClientProbe:input_type -> mistgate.admin.v1.UpdateClientProbeRequest
-	8,  // 10: mistgate.admin.v1.ClientProbeService.DisconnectClientProbe:input_type -> mistgate.admin.v1.DisconnectClientProbeRequest
-	5,  // 11: mistgate.admin.v1.ClientProbeService.GetClientProbe:output_type -> mistgate.admin.v1.GetClientProbeResponse
-	7,  // 12: mistgate.admin.v1.ClientProbeService.UpdateClientProbe:output_type -> mistgate.admin.v1.UpdateClientProbeResponse
-	9,  // 13: mistgate.admin.v1.ClientProbeService.DisconnectClientProbe:output_type -> mistgate.admin.v1.DisconnectClientProbeResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	4,  // 4: mistgate.admin.v1.ClientProbeNode.kinds:type_name -> mistgate.admin.v1.ClientProbeKind
+	1,  // 5: mistgate.admin.v1.ClientProbeKind.tally:type_name -> mistgate.admin.v1.ClientProbeTally
+	0,  // 6: mistgate.admin.v1.GetClientProbeResponse.settings:type_name -> mistgate.admin.v1.ClientProbeSettings
+	3,  // 7: mistgate.admin.v1.GetClientProbeResponse.nodes:type_name -> mistgate.admin.v1.ClientProbeNode
+	0,  // 8: mistgate.admin.v1.UpdateClientProbeResponse.settings:type_name -> mistgate.admin.v1.ClientProbeSettings
+	0,  // 9: mistgate.admin.v1.DisconnectClientProbeResponse.settings:type_name -> mistgate.admin.v1.ClientProbeSettings
+	5,  // 10: mistgate.admin.v1.ClientProbeService.GetClientProbe:input_type -> mistgate.admin.v1.GetClientProbeRequest
+	7,  // 11: mistgate.admin.v1.ClientProbeService.UpdateClientProbe:input_type -> mistgate.admin.v1.UpdateClientProbeRequest
+	9,  // 12: mistgate.admin.v1.ClientProbeService.DisconnectClientProbe:input_type -> mistgate.admin.v1.DisconnectClientProbeRequest
+	6,  // 13: mistgate.admin.v1.ClientProbeService.GetClientProbe:output_type -> mistgate.admin.v1.GetClientProbeResponse
+	8,  // 14: mistgate.admin.v1.ClientProbeService.UpdateClientProbe:output_type -> mistgate.admin.v1.UpdateClientProbeResponse
+	10, // 15: mistgate.admin.v1.ClientProbeService.DisconnectClientProbe:output_type -> mistgate.admin.v1.DisconnectClientProbeResponse
+	13, // [13:16] is the sub-list for method output_type
+	10, // [10:13] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_client_probe_proto_init() }
@@ -665,14 +765,14 @@ func file_mistgate_admin_v1_client_probe_proto_init() {
 	if File_mistgate_admin_v1_client_probe_proto != nil {
 		return
 	}
-	file_mistgate_admin_v1_client_probe_proto_msgTypes[6].OneofWrappers = []any{}
+	file_mistgate_admin_v1_client_probe_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_client_probe_proto_rawDesc), len(file_mistgate_admin_v1_client_probe_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

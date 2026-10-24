@@ -58,6 +58,9 @@ service NodeService {
   // and errors, grouped per hour, kept 7 days. Addresses are cut on the node and again in the panel. A read: every role and
   // API tokens (the MCP tool node_journal); the live tail (StreamLogs) stays the owner's.
   rpc GetNodeJournal(GetNodeJournalRequest) returns (GetNodeJournalResponse);
+  // GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
+  // and API tokens.
+  rpc GetFleetConnections(GetFleetConnectionsRequest) returns (GetFleetConnectionsResponse);
 }
 
 // One row of the nodes table / one card.
@@ -438,8 +441,31 @@ message RetireNodeResponse {
 
 message GetNodeConnectionsRequest {
   string node_id = 1;
-  // Hours back from now, 1 to 48 (the retention). 0 means 24; more is cut to 48.
+  // Hours back from now, 1 to 168 (the retention). 0 means 24; more is cut to 168.
   uint32 hours = 2;
+  // Also each inbound hour by hour (InboundConnections.hours).
+  bool by_hour = 3;
+}
+
+message GetFleetConnectionsRequest {
+  // Hours back from now, 1 to 168. 0 means 24; more is cut to 168.
+  uint32 hours = 1;
+}
+
+// One node of GetFleetConnections: GetNodeConnections without hours and clients.
+message NodeConnections {
+  string node_id = 1;
+  string node_name = 2;
+  string country_code = 3;
+  bool supported = 4;
+  repeated InboundConnections inbounds = 5;
+}
+
+message GetFleetConnectionsResponse {
+  int64 since_unix = 1 [jstype = JS_NUMBER];
+  int64 now_unix = 2 [jstype = JS_NUMBER];
+  // Every node that is not retired, by name.
+  repeated NodeConnections nodes = 3;
 }
 
 message GetNodeJournalRequest {
@@ -491,7 +517,18 @@ message GetNodeJournalResponse {
   repeated string nodes_without_journal = 5;
 }
 
-// One inbound of the node: its counters summed over its keys and its own row, in the window.
+// One inbound of the node: its counters summed over its keys and its own row, in the window. What the counters can and
+// cannot say (none of them is a block by itself):
+//   - connects: accepted connections. Port hopping and short test connections make many for one person.
+//   - rejects: a known key refused because its term ended.
+//   - drops (Hysteria2): an idle timeout of a connection younger than 60 s or under 64 KiB. A TSPU freeze looks like this,
+//     and so does a short test connection of an app (a server check, auto-select): only together with other signals.
+//   - stalls (AmneziaWG): 10-second rounds in which the device's initiations reached the node and no handshake completed:
+//     the node's answer does not reach the device, or the device cannot read it.
+//   - online_s: seconds with an open session, including the idle tail of short sessions.
+//   - unknown_keys: attempts with a key the node does not hold (scanners too, and removed or rotated keys).
+//   - hellos, handshakes (Hysteria2): QUIC ClientHellos and the authentications that followed; hellos include scanners and
+//     apps that ping with a handshake, and miss resumed TLS sessions.
 message InboundConnections {
   string inbound_id = 1;
   string profile_id = 2;
@@ -510,6 +547,39 @@ message InboundConnections {
   // Keys that had a stall, and keys that tried at all (a connect or a stall), in the window.
   uint32 keys_stalled = 13;
   uint32 keys_tried = 14;
+  // The counters this protocol does not count (their zero means nothing): awg "rejects", "drops", "hellos",
+  // "handshakes"; vless every counter until its agent counts them.
+  repeated string unsupported = 15;
+  // With by_hour: the hours of the window that have a counter, oldest first.
+  repeated LinkHour hours = 16;
+  // The window by the devices' apps (Device.client and .platform), most connects first, at most 8; keys whose device is
+  // gone are not in it.
+  repeated ClientConnections clients = 17;
+  // AmneziaWG inbounds only: what the node's last health report says of its UDP port.
+  AwgPackets awg = 18;
+}
+
+message ClientConnections {
+  // As the device reported it ("Happ/6.1.0"); "" unknown.
+  string client = 1;
+  string platform = 2;
+  uint32 devices = 3;
+  uint32 connects = 4;
+  uint32 rejects = 5;
+  uint32 drops = 6;
+  uint32 stalls = 7;
+  uint64 online_s = 8 [jstype = JS_NUMBER];
+}
+
+message AwgPackets {
+  // Packets that reached the inbound's UDP port since the counter started (the node's nft counter of the port): it grows
+  // while anything, a device or a scanner, sends to the port, also when no handshake follows. Compare two reads.
+  uint64 udp_rx_packets = 1 [jstype = JS_NUMBER];
+  int64 reported_unix = 2 [jstype = JS_NUMBER];
+  // "kernel" or "userspace".
+  string backend = 3;
+  // Peers with a handshake in the last 3 minutes.
+  uint32 peers_online = 4;
 }
 
 message GetNodeConnectionsResponse {

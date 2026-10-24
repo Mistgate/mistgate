@@ -52,8 +52,10 @@ service UserService {
 
 message GetUserConnectionRequest {
   string user_id = 1;
-  // Hours back from now, 1 to 48 (the retention). 0 means 24; more is cut to 48.
+  // Hours back from now, 1 to 168 (the retention). 0 means 24; more is cut to 168.
   uint32 hours = 2;
+  // Also each row hour by hour (DeviceConnection.hours).
+  bool by_hour = 3;
 }
 
 // One device of the person on one inbound of a node, summed over the window. Rows without any counter are not sent.
@@ -71,6 +73,13 @@ message DeviceConnection {
   uint64 online_s = 11 [jstype = JS_NUMBER];
   // Start of the newest hour with a counter.
   int64 last_hour_unix = 12 [jstype = JS_NUMBER];
+  // The device as the panel knows it (Device.platform and .client; kind is the DeviceKind name without its prefix, such as
+  // "link" or "key"), so an app or a version that fails everywhere stands out. "" when the device is gone.
+  string platform = 13;
+  string client = 14;
+  string kind = 15;
+  // With by_hour: the hours of the window that have a counter, oldest first.
+  repeated LinkHour hours = 16;
 }
 
 message GetUserConnectionResponse {

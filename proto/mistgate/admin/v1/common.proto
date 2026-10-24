@@ -185,3 +185,19 @@ message TcpCheck {
   string sender = 7;
   int64 checked_unix = 8 [jstype = JS_NUMBER];
 }
+
+// One hour of connection counters (agent.proto LinkCounters) summed over a bucket: a device on an inbound
+// (UserService.GetUserConnection) or an inbound with all its keys (NodeService.GetNodeConnections). What each counter
+// means is under InboundConnections (node.proto).
+message LinkHour {
+  int64 hour_start_unix = 1 [jstype = JS_NUMBER];
+  uint32 connects = 2;
+  uint32 rejects = 3;
+  uint32 drops = 4;
+  uint32 stalls = 5;
+  uint64 online_s = 6 [jstype = JS_NUMBER];
+  // Inbound rows only.
+  uint32 unknown_keys = 7;
+  uint32 hellos = 8;
+  uint32 handshakes = 9;
+}

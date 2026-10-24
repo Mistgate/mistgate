@@ -54,8 +54,9 @@ var tokenProcedures = map[string]int{
 	// The kl!ck reports per node, operator and region: counts and the names the app saw, no address or person.
 	adminv1connect.ClientProbeServiceGetClientProbeProcedure: TokenAccessDirect,
 	// What the nodes saw of connection attempts (agent.proto LinkCounters): counts per key and inbound, no address.
-	adminv1connect.NodeServiceGetNodeConnectionsProcedure: TokenAccessDirect,
-	adminv1connect.UserServiceGetUserConnectionProcedure:  TokenAccessDirect,
+	adminv1connect.NodeServiceGetNodeConnectionsProcedure:  TokenAccessDirect,
+	adminv1connect.UserServiceGetUserConnectionProcedure:   TokenAccessDirect,
+	adminv1connect.NodeServiceGetFleetConnectionsProcedure: TokenAccessDirect,
 	// The nodes' saved journal (agent.proto JournalEntry): warnings and errors, addresses cut on the node and in the panel.
 	adminv1connect.NodeServiceGetNodeJournalProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).

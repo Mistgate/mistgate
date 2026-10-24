@@ -72,6 +72,9 @@ const (
 	// NodeServiceGetNodeJournalProcedure is the fully-qualified name of the NodeService's
 	// GetNodeJournal RPC.
 	NodeServiceGetNodeJournalProcedure = "/mistgate.admin.v1.NodeService/GetNodeJournal"
+	// NodeServiceGetFleetConnectionsProcedure is the fully-qualified name of the NodeService's
+	// GetFleetConnections RPC.
+	NodeServiceGetFleetConnectionsProcedure = "/mistgate.admin.v1.NodeService/GetFleetConnections"
 )
 
 // NodeServiceClient is a client for the mistgate.admin.v1.NodeService service.
@@ -126,6 +129,9 @@ type NodeServiceClient interface {
 	// and errors, grouped per hour, kept 7 days. Addresses are cut on the node and again in the panel. A read: every role and
 	// API tokens (the MCP tool node_journal); the live tail (StreamLogs) stays the owner's.
 	GetNodeJournal(context.Context, *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error)
+	// GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
+	// and API tokens.
+	GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error)
 }
 
 // NewNodeServiceClient constructs a client for the mistgate.admin.v1.NodeService service. By
@@ -229,26 +235,33 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("GetNodeJournal")),
 			connect.WithClientOptions(opts...),
 		),
+		getFleetConnections: connect.NewClient[v1.GetFleetConnectionsRequest, v1.GetFleetConnectionsResponse](
+			httpClient,
+			baseURL+NodeServiceGetFleetConnectionsProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("GetFleetConnections")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // nodeServiceClient implements NodeServiceClient.
 type nodeServiceClient struct {
-	listNodes          *connect.Client[v1.ListNodesRequest, v1.ListNodesResponse]
-	getNode            *connect.Client[v1.GetNodeRequest, v1.GetNodeResponse]
-	createEnrollment   *connect.Client[v1.CreateEnrollmentRequest, v1.CreateEnrollmentResponse]
-	updateNode         *connect.Client[v1.UpdateNodeRequest, v1.UpdateNodeResponse]
-	setNodeDecoyMode   *connect.Client[v1.SetNodeDecoyModeRequest, v1.SetNodeDecoyModeResponse]
-	uploadNodeDecoy    *connect.Client[v1.UploadNodeDecoyRequest, v1.UploadNodeDecoyResponse]
-	setNodesDecoyMode  *connect.Client[v1.SetNodesDecoyModeRequest, v1.SetNodesDecoyModeResponse]
-	restartInbounds    *connect.Client[v1.RestartInboundsRequest, v1.RestartInboundsResponse]
-	prepareAwgKernel   *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
-	measureBandwidth   *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
-	checkPorts         *connect.Client[v1.CheckPortsRequest, v1.CheckPortsResponse]
-	retireNode         *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
-	streamLogs         *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
-	getNodeConnections *connect.Client[v1.GetNodeConnectionsRequest, v1.GetNodeConnectionsResponse]
-	getNodeJournal     *connect.Client[v1.GetNodeJournalRequest, v1.GetNodeJournalResponse]
+	listNodes           *connect.Client[v1.ListNodesRequest, v1.ListNodesResponse]
+	getNode             *connect.Client[v1.GetNodeRequest, v1.GetNodeResponse]
+	createEnrollment    *connect.Client[v1.CreateEnrollmentRequest, v1.CreateEnrollmentResponse]
+	updateNode          *connect.Client[v1.UpdateNodeRequest, v1.UpdateNodeResponse]
+	setNodeDecoyMode    *connect.Client[v1.SetNodeDecoyModeRequest, v1.SetNodeDecoyModeResponse]
+	uploadNodeDecoy     *connect.Client[v1.UploadNodeDecoyRequest, v1.UploadNodeDecoyResponse]
+	setNodesDecoyMode   *connect.Client[v1.SetNodesDecoyModeRequest, v1.SetNodesDecoyModeResponse]
+	restartInbounds     *connect.Client[v1.RestartInboundsRequest, v1.RestartInboundsResponse]
+	prepareAwgKernel    *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
+	measureBandwidth    *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
+	checkPorts          *connect.Client[v1.CheckPortsRequest, v1.CheckPortsResponse]
+	retireNode          *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
+	streamLogs          *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
+	getNodeConnections  *connect.Client[v1.GetNodeConnectionsRequest, v1.GetNodeConnectionsResponse]
+	getNodeJournal      *connect.Client[v1.GetNodeJournalRequest, v1.GetNodeJournalResponse]
+	getFleetConnections *connect.Client[v1.GetFleetConnectionsRequest, v1.GetFleetConnectionsResponse]
 }
 
 // ListNodes calls mistgate.admin.v1.NodeService.ListNodes.
@@ -326,6 +339,11 @@ func (c *nodeServiceClient) GetNodeJournal(ctx context.Context, req *connect.Req
 	return c.getNodeJournal.CallUnary(ctx, req)
 }
 
+// GetFleetConnections calls mistgate.admin.v1.NodeService.GetFleetConnections.
+func (c *nodeServiceClient) GetFleetConnections(ctx context.Context, req *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error) {
+	return c.getFleetConnections.CallUnary(ctx, req)
+}
+
 // NodeServiceHandler is an implementation of the mistgate.admin.v1.NodeService service.
 type NodeServiceHandler interface {
 	// All nodes. The fleet is at most ~50 nodes, so no pagination; filtering by country, status and
@@ -378,6 +396,9 @@ type NodeServiceHandler interface {
 	// and errors, grouped per hour, kept 7 days. Addresses are cut on the node and again in the panel. A read: every role and
 	// API tokens (the MCP tool node_journal); the live tail (StreamLogs) stays the owner's.
 	GetNodeJournal(context.Context, *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error)
+	// GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
+	// and API tokens.
+	GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error)
 }
 
 // NewNodeServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -477,6 +498,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("GetNodeJournal")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceGetFleetConnectionsHandler := connect.NewUnaryHandler(
+		NodeServiceGetFleetConnectionsProcedure,
+		svc.GetFleetConnections,
+		connect.WithSchema(nodeServiceMethods.ByName("GetFleetConnections")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.NodeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case NodeServiceListNodesProcedure:
@@ -509,6 +536,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceGetNodeConnectionsHandler.ServeHTTP(w, r)
 		case NodeServiceGetNodeJournalProcedure:
 			nodeServiceGetNodeJournalHandler.ServeHTTP(w, r)
+		case NodeServiceGetFleetConnectionsProcedure:
+			nodeServiceGetFleetConnectionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -576,4 +605,8 @@ func (UnimplementedNodeServiceHandler) GetNodeConnections(context.Context, *conn
 
 func (UnimplementedNodeServiceHandler) GetNodeJournal(context.Context, *connect.Request[v1.GetNodeJournalRequest]) (*connect.Response[v1.GetNodeJournalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetNodeJournal is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetFleetConnections is not implemented"))
 }

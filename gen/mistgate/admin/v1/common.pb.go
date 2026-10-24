@@ -1007,6 +1007,118 @@ func (x *TcpCheck) GetCheckedUnix() int64 {
 	return 0
 }
 
+// One hour of connection counters (agent.proto LinkCounters) summed over a bucket: a device on an inbound
+// (UserService.GetUserConnection) or an inbound with all its keys (NodeService.GetNodeConnections). What each counter
+// means is under InboundConnections (node.proto).
+type LinkHour struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HourStartUnix int64                  `protobuf:"varint,1,opt,name=hour_start_unix,json=hourStartUnix,proto3" json:"hour_start_unix,omitempty"`
+	Connects      uint32                 `protobuf:"varint,2,opt,name=connects,proto3" json:"connects,omitempty"`
+	Rejects       uint32                 `protobuf:"varint,3,opt,name=rejects,proto3" json:"rejects,omitempty"`
+	Drops         uint32                 `protobuf:"varint,4,opt,name=drops,proto3" json:"drops,omitempty"`
+	Stalls        uint32                 `protobuf:"varint,5,opt,name=stalls,proto3" json:"stalls,omitempty"`
+	OnlineS       uint64                 `protobuf:"varint,6,opt,name=online_s,json=onlineS,proto3" json:"online_s,omitempty"`
+	// Inbound rows only.
+	UnknownKeys   uint32 `protobuf:"varint,7,opt,name=unknown_keys,json=unknownKeys,proto3" json:"unknown_keys,omitempty"`
+	Hellos        uint32 `protobuf:"varint,8,opt,name=hellos,proto3" json:"hellos,omitempty"`
+	Handshakes    uint32 `protobuf:"varint,9,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkHour) Reset() {
+	*x = LinkHour{}
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkHour) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkHour) ProtoMessage() {}
+
+func (x *LinkHour) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkHour.ProtoReflect.Descriptor instead.
+func (*LinkHour) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *LinkHour) GetHourStartUnix() int64 {
+	if x != nil {
+		return x.HourStartUnix
+	}
+	return 0
+}
+
+func (x *LinkHour) GetConnects() uint32 {
+	if x != nil {
+		return x.Connects
+	}
+	return 0
+}
+
+func (x *LinkHour) GetRejects() uint32 {
+	if x != nil {
+		return x.Rejects
+	}
+	return 0
+}
+
+func (x *LinkHour) GetDrops() uint32 {
+	if x != nil {
+		return x.Drops
+	}
+	return 0
+}
+
+func (x *LinkHour) GetStalls() uint32 {
+	if x != nil {
+		return x.Stalls
+	}
+	return 0
+}
+
+func (x *LinkHour) GetOnlineS() uint64 {
+	if x != nil {
+		return x.OnlineS
+	}
+	return 0
+}
+
+func (x *LinkHour) GetUnknownKeys() uint32 {
+	if x != nil {
+		return x.UnknownKeys
+	}
+	return 0
+}
+
+func (x *LinkHour) GetHellos() uint32 {
+	if x != nil {
+		return x.Hellos
+	}
+	return 0
+}
+
+func (x *LinkHour) GetHandshakes() uint32 {
+	if x != nil {
+		return x.Handshakes
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -1074,7 +1186,19 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\averdict\x18\x05 \x01(\tR\averdict\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x16\n" +
 	"\x06sender\x18\a \x01(\tR\x06sender\x12%\n" +
-	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix*\xd5\x01\n" +
+	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\x94\x02\n" +
+	"\bLinkHour\x12*\n" +
+	"\x0fhour_start_unix\x18\x01 \x01(\x03B\x020\x02R\rhourStartUnix\x12\x1a\n" +
+	"\bconnects\x18\x02 \x01(\rR\bconnects\x12\x18\n" +
+	"\arejects\x18\x03 \x01(\rR\arejects\x12\x14\n" +
+	"\x05drops\x18\x04 \x01(\rR\x05drops\x12\x16\n" +
+	"\x06stalls\x18\x05 \x01(\rR\x06stalls\x12\x1d\n" +
+	"\bonline_s\x18\x06 \x01(\x04B\x020\x02R\aonlineS\x12!\n" +
+	"\funknown_keys\x18\a \x01(\rR\vunknownKeys\x12\x16\n" +
+	"\x06hellos\x18\b \x01(\rR\x06hellos\x12\x1e\n" +
+	"\n" +
+	"handshakes\x18\t \x01(\rR\n" +
+	"handshakes*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -1124,7 +1248,7 @@ func file_mistgate_admin_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(NodeStatus)(0),          // 0: mistgate.admin.v1.NodeStatus
 	(App)(0),                 // 1: mistgate.admin.v1.App
@@ -1138,10 +1262,11 @@ var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(*WarpSummary)(nil),      // 9: mistgate.admin.v1.WarpSummary
 	(*PortCheck)(nil),        // 10: mistgate.admin.v1.PortCheck
 	(*TcpCheck)(nil),         // 11: mistgate.admin.v1.TcpCheck
-	nil,                      // 12: mistgate.admin.v1.StatusReason.ParamsEntry
+	(*LinkHour)(nil),         // 12: mistgate.admin.v1.LinkHour
+	nil,                      // 13: mistgate.admin.v1.StatusReason.ParamsEntry
 }
 var file_mistgate_admin_v1_common_proto_depIdxs = []int32{
-	12, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
+	13, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
 	2,  // 1: mistgate.admin.v1.Inbound.state:type_name -> mistgate.admin.v1.InboundState
 	8,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
 	3,  // 3: mistgate.admin.v1.WarpSummary.state:type_name -> mistgate.admin.v1.WarpState
@@ -1164,7 +1289,7 @@ func file_mistgate_admin_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_common_proto_rawDesc), len(file_mistgate_admin_v1_common_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

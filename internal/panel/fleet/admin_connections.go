@@ -59,3 +59,8 @@ func (s nodeService) GetNodeConnections(ctx context.Context, req *connect.Reques
 
 // clamp32 fits a window sum into a uint32 field (48 hours of uint32 batches can in theory pass it).
 func clamp32(n uint64) uint32 { return uint32(min(n, math.MaxUint32)) }
+
+// GetFleetConnections: GetNodeConnections of every node that is not retired, in one read. A read; no address.
+func (s nodeService) GetFleetConnections(context.Context, *connect.Request[adminv1.GetFleetConnectionsRequest]) (*connect.Response[adminv1.GetFleetConnectionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("fleet connections are not implemented yet"))
+}
