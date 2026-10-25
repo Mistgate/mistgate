@@ -100,7 +100,7 @@ In the **Only count** mode nothing is refused, so this strip is not shown. A per
 
 ### Traffic
 
-The used traffic of the current period against the quota, the reset period ("resets every week") and when the next reset comes, in your time, a chart of the last 14 days, and the traffic per node and protocol.
+The used traffic of the current period against the quota, the reset period ("resets every week") and when the next reset comes, in your time, a chart of the last 14 days, and the traffic per node and protocol: the five biggest rows, **Show all** for the rest.
 
 ### Devices
 
