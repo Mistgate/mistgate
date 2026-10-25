@@ -3,20 +3,20 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.59`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.60`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.59
+  meta: v0.1.0 – v0.1.60
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.59
+      release: v0.1.60
       current: true
       points:
-        - "**Hysteria2 连接不再多等一秒。** 节点和面板不再为 ECN 标记 QUIC 数据包：在会丢弃此类数据包的路径上，每个新的 Hysteria2 连接都要多等一秒甚至更久，面板的检测则表现为连接所有远程节点都很慢。请更新面板和节点 Agent。在环境变量中设置 `QUIC_GO_DISABLE_ECN=0` 可保持 ECN 开启。"
+        - "**检测会统计面板服务器的丢包。** Hysteria2 检测会记录其自身 QUIC 客户端发送和丢失的数据包，「面板服务器丢失 UDP」提示现在会把每个节点的 Hysteria2 和 AmneziaWG 检测与到同一节点的 VLESS 比较：慢一秒或更多是丢包，而不是节点的问题。提示还会给出面板 Hysteria2 客户端的丢包比例。MCP 中同样可用。参见[运行状况](../operations/health.md#面板服务器丢失-udp-时)。"
     - title: 协议配置
       section: profiles
       points:
@@ -78,7 +78,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.59`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.59
+  meta: v0.1.34 – v0.1.60
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS

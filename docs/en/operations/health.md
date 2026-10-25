@@ -95,15 +95,17 @@ Hover a cell, or move to it with Tab, to see the response and connect medians of
 
 ### When the panel's server loses UDP
 
-Some hosters drop bursts of inbound UDP. A Hysteria2 or AmneziaWG check from the panel's server then waits for a handshake retry: about 2.5 s for QUIC and 5 s for WireGuard. Connect times of several seconds on these profiles, while VLESS on the same nodes connects quickly, point at the panel's network, not at the nodes.
+Some hosters drop bursts of UDP. A Hysteria2 or AmneziaWG check from the panel's server then pays for every lost packet with a retry timer: a second or more for QUIC and for TCP inside an AmneziaWG tunnel, 5 s for a WireGuard handshake. When these checks take a second or more longer than VLESS to the same nodes, the panel's network is the cause, not the nodes.
 
-The panel then says so above the matrix, names the nodes and gives the share of slow UDP rounds. It shows the notice when, over the last hour:
+The Hysteria2 check also counts what its own QUIC client lost: the packets it sent and declared lost in each round, and the same over the last hour (MCP `checks_results`: `udp_sent`, `udp_lost`, `udp_sent_hour`, `udp_lost_hour`).
 
-- at least 20% of a node's Hysteria2 and AmneziaWG rounds (and at least 3 of them) took 2 s or more to connect;
-- under 5% of the VLESS rounds did;
-- with no VLESS profile at all, at least two nodes match the first rule.
+The panel then says so above the matrix, names the nodes, and gives the share of slow UDP rounds and how many packets its Hysteria2 client lost. It shows the notice when, over the last hour:
 
-People are not affected: they connect to the nodes directly. The checks still pass, and no alert opens because of it. If the notice keeps coming back, ask the hoster of the panel's server about inbound UDP filtering or rate limits, or move the panel to another server.
+- at least 20% of a node's Hysteria2 and AmneziaWG rounds (and at least 3 of them) took 600 ms or more longer than the median of the VLESS rounds to the same node, from the start of the dial to the first answer;
+- under 5% of the VLESS rounds took 2 s or more to connect (otherwise the panel's whole network is slow, not only UDP);
+- a node without a VLESS profile counts when its UDP rounds took 2 s or more to connect, and only together with another such node.
+
+People are not affected: they connect to the nodes directly. The checks still pass, and no alert opens because of it. If the notice keeps coming back, ask the hoster of the panel's server about UDP filtering or rate limits, or move the panel to another server.
 
 ### What green means
 
