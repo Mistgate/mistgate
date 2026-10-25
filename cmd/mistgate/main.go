@@ -34,6 +34,7 @@ func main() {
 		os.Exit(2)
 	}
 	privateUmask()
+	quicNoECN()
 	var err error
 	switch os.Args[1] {
 	case "serve":
@@ -67,6 +68,15 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mistgate:", err)
 		os.Exit(1)
+	}
+}
+
+// quicNoECN switches off ECN in quic-go (the Hysteria2 client of the health checks) unless the operator set
+// QUIC_GO_DISABLE_ECN: on a path that drops ECT(0)-marked UDP each check waited a second or more for quic-go's ECN test
+// to give up, a wait the people's apps (mihomo turns ECN off) never have. The node turns it off too (cmd/mistgate-node).
+func quicNoECN() {
+	if _, set := os.LookupEnv("QUIC_GO_DISABLE_ECN"); !set {
+		_ = os.Setenv("QUIC_GO_DISABLE_ECN", "1")
 	}
 }
 

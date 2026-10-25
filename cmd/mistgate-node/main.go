@@ -27,7 +27,19 @@ Both enroll and run take --state-dir (default /var/lib/mistgate-node); give them
 // enrolled (or was retired) does not restart-loop.
 const exitNotEnrolled = 78
 
-func main() { os.Exit(dispatch(os.Args[1:])) }
+func main() {
+	quicNoECN()
+	os.Exit(dispatch(os.Args[1:]))
+}
+
+// quicNoECN switches off ECN in quic-go (the Hysteria2 server) unless the operator set QUIC_GO_DISABLE_ECN. quic-go
+// marks the first ten 1-RTT packets of every connection ECT(0); a network that drops such UDP holds each new connection
+// for seconds, until the ECN test gives up. Hysteria's BBR and Brutal do not use ECN, and mihomo turns it off by default.
+func quicNoECN() {
+	if _, set := os.LookupEnv("QUIC_GO_DISABLE_ECN"); !set {
+		_ = os.Setenv("QUIC_GO_DISABLE_ECN", "1")
+	}
+}
 
 func dispatch(args []string) int {
 	if len(args) == 0 {
