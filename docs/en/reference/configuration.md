@@ -100,6 +100,7 @@ The hidden **`mistgate panel-update-helper`** takes `--fetch-latest` (required),
 | `MISTGATE_HEALTH_BLIP_WINDOW` | `mistgate serve` | A Go duration that shortens the health module's blip window. A hook for the end-to-end tests; leave it unset. |
 | `MISTGATE_UNIT_GEN` | `mistgate-node run` | The generation of the systemd unit, written into the unit by `mistgate-node install`. Do not set it yourself. |
 | `GOMEMLIMIT` | `mistgate-node run` | The Go memory limit, written into the unit by `install` (about 60% of RAM). |
+| `QUIC_GO_DISABLE_ECN` | the panel and `mistgate-node` | Unset, both set it to `1` at start: quic-go then does not mark Hysteria2 packets for ECN. On a path that drops ECN-marked UDP, a marked connection waits a second or more before its first exchanges get through. Set `0` to keep ECN on. |
 | `MISTGATE_PANEL` | the Vite dev server | Development only: where `pnpm dev` proxies the admin API (default `http://127.0.0.1:8081`). Not the same as the agent's `MISTGATE_PANEL` below. |
 
 ## Node agent: `mistgate-node`

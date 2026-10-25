@@ -100,6 +100,7 @@ setup 在各种模式下生成的值：
 | `MISTGATE_HEALTH_BLIP_WINDOW` | `mistgate serve` | Go 时长，用于缩短运行状况模块的闪断时间窗口。供端到端测试使用；请勿设置。 |
 | `MISTGATE_UNIT_GEN` | `mistgate-node run` | systemd 单元的版本，由 `mistgate-node install` 写入单元。不要自行设置。 |
 | `GOMEMLIMIT` | `mistgate-node run` | Go 内存限制，由 `install` 写入单元（约为 RAM 的 60%）。 |
+| `QUIC_GO_DISABLE_ECN` | 面板和 `mistgate-node` | 未设置时，两者在启动时都会将其设为 `1`：quic-go 不再为 Hysteria2 数据包做 ECN 标记。在会丢弃带 ECN 标记 UDP 的路径上，带标记的连接要等一秒甚至更久，最初的数据交换才能通过。设为 `0` 可保持 ECN 开启。 |
 | `MISTGATE_PANEL` | Vite 开发服务器 | 仅供开发使用：`pnpm dev` 代理管理 API 的目标地址（默认 `http://127.0.0.1:8081`）。与下文 Agent 使用的 `MISTGATE_PANEL` 不同。 |
 
 ## 节点 Agent：`mistgate-node`

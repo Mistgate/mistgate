@@ -100,6 +100,7 @@ description: Все флаги mistgate serve и mistgate setup с переме�
 | `MISTGATE_HEALTH_BLIP_WINDOW` | `mistgate serve` | Длительность в формате Go, которая сокращает окно «хостер моргнул» в модуле здоровья. Нужна для сквозных тестов; не задавайте её. |
 | `MISTGATE_UNIT_GEN` | `mistgate-node run` | Поколение юнита systemd; его пишет в юнит `mistgate-node install`. Сами не задавайте. |
 | `GOMEMLIMIT` | `mistgate-node run` | Лимит памяти Go; его пишет в юнит `install` (около 60% RAM). |
+| `QUIC_GO_DISABLE_ECN` | панель и `mistgate-node` | Если не задана, оба при старте ставят `1`: quic-go тогда не помечает пакеты Hysteria2 для ECN. На пути, который выбрасывает помеченный ECN UDP, помеченное соединение ждёт секунду и больше, пока не пройдут первые обмены. `0` оставляет ECN включённым. |
 | `MISTGATE_PANEL` | dev-сервер Vite | Только для разработки: куда `pnpm dev` проксирует API админки (по умолчанию `http://127.0.0.1:8081`). Не путать с одноимённой переменной агента ниже. |
 
 ## Агент ноды: `mistgate-node`
