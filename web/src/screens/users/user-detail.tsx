@@ -10,6 +10,7 @@ import { Card, DangerZone, PageTitle, SectionLabel } from "@/components/ui/bits"
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { StatusDot, kindTextClass } from "@/components/ui/status";
@@ -20,6 +21,7 @@ import { dns, users } from "@/lib/api";
 import { deviceConnParts, userConnectionQuery, type Part, type UserConnection } from "@/lib/connections";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
+import { clampPage } from "@/lib/paging";
 import { useFmt, type Fmt } from "@/lib/format";
 import { useT } from "@/i18n";
 import { alertIsAbout, alertTitle, alertWhy, alertsQuery, severityKind, severityWord, useCan } from "@/lib/health";
@@ -225,7 +227,6 @@ function UserDetail({ data }: { data: DetailN }) {
 
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">
-          <ConnectionPanel userId={user.id} devices={data.devices} nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id} />
           <TrafficPanel data={data} fmt={fmt} />
           <DevicesPanel
             user={user}
@@ -254,6 +255,9 @@ function UserDetail({ data }: { data: DetailN }) {
           </DangerZone>
         </div>
       </div>
+
+      {/* last and full width: the counts run long, and the cards above are what the owner changes */}
+      <ConnectionPanel userId={user.id} devices={data.devices} nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id} />
 
       <LinkModal target={linkOpen ? linkTargetOf(user, group) : null} onClose={() => setLinkOpen(false)} />
       <GroupEditModal group={group} open={groupOpen} onOpenChange={setGroupOpen} />
@@ -466,11 +470,15 @@ export function ConnectionPanel({ userId, devices = [], nodeName = (id) => id }:
   );
 }
 
+const connPageSize = 6;
+
 /** What the nodes counted of the person's connections: a line per device and profile, trouble in the warning colour. */
 function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserConnection; devices: Device[]; nodeName: (id: string) => string; separated: boolean }) {
   const t = useT();
   const tx = useTx();
   const fmt = useFmt();
+  const [wanted, setPage] = useState(1);
+  const page = clampPage(wanted, conn.rows.length, connPageSize);
   const name = (id: string) => {
     const d = devices.find((x) => x.id === id);
     if (!d) return t("conn.deviceGone");
@@ -484,7 +492,7 @@ function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserCo
       {conn.rows.length === 0 && missing.length === 0 && <p className="text-[13px] text-muted">{t("conn.none")}</p>}
       {conn.rows.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">
-          {conn.rows.map((r) => (
+          {conn.rows.slice((page - 1) * connPageSize, page * connPageSize).map((r) => (
             <li key={`${r.deviceId}/${r.inboundId}`} data-testid="conn-row" className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[13px]">
                 <b className="font-bold">{name(r.deviceId)}</b>
@@ -496,6 +504,7 @@ function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserCo
           ))}
         </ul>
       )}
+      <Pagination total={conn.rows.length} page={page} size={connPageSize} onPage={setPage} label={t("conn.title")} className="pb-0" />
       {missing.length > 0 && <p className="text-xs leading-normal text-pretty text-muted">{t("conn.oldAgents", { nodes: missing.join(", ") })}</p>}
     </div>
   );
@@ -565,6 +574,8 @@ const resetKey = {
   [QuotaReset.ROLLING_MONTH]: "users.reset.rolling",
 } as const;
 
+const trafficRows = 5; // the biggest node × protocol rows; the rest behind "Show all"
+
 export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
   const t = useTx();
   const user = data.user!;
@@ -574,6 +585,9 @@ export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
   const tone = pct > 1 ? "bg-danger" : pct >= 0.8 ? "bg-warn" : "bg-accent";
   const days = data.dailyTraffic;
   const max = Math.max(0, ...days.map((x) => x.bytes));
+  const [allNodes, setAllNodes] = useState(false);
+  const folds = data.nodeTraffic.length > trafficRows + 1; // one more row is not worth a button
+  const nodeRows = folds && !allNodes ? data.nodeTraffic.slice(0, trafficRows) : data.nodeTraffic;
 
   return (
     <Panel title={t("users.traffic")} icon="traffic" tone="sky" aside={<span className="text-xs text-muted">{t(resetKey[user.quotaReset])}</span>}>
@@ -601,8 +615,8 @@ export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
       </div>
       {data.nodeTraffic.length > 0 && (
         <div className="flex flex-col">
-          {data.nodeTraffic.map((r) => (
-            <div key={r.nodeId + r.protocol} className="flex h-[34px] items-center gap-2.5 border-t border-line text-[13px]">
+          {nodeRows.map((r) => (
+            <div key={r.nodeId + r.protocol} data-testid="traffic-row" className="flex h-[34px] items-center gap-2.5 border-t border-line text-[13px]">
               <Link to="/nodes/$id" params={{ id: r.nodeId }} className="min-w-10 font-bold hover:text-accent-text hover:underline">
                 {r.nodeName}
               </Link>
@@ -610,6 +624,16 @@ export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
               <span className="font-mono text-xs">{fmt.bytes(r.bytes)}</span>
             </div>
           ))}
+          {folds && (
+            <button
+              type="button"
+              aria-expanded={allNodes}
+              onClick={() => setAllNodes(!allNodes)}
+              className="-ml-2 h-8 w-fit cursor-pointer rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+            >
+              {allNodes ? t("users.trafficLess") : t("users.trafficAll", { n: data.nodeTraffic.length })}
+            </button>
+          )}
         </div>
       )}
     </Panel>

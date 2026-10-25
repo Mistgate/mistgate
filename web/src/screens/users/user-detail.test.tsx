@@ -254,6 +254,40 @@ describe("the user card", () => {
     expect(text()).not.toContain("Connection");
   });
 
+  it("puts the Connection block last and pages its counts six at a time", async () => {
+    getUserConnection.mockResolvedValue({
+      sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],
+      rows: Array.from({ length: 8 }, (_, i) => ({
+        deviceId: "dev_k", nodeId: "nod_1", nodeName: `n${i}`, inboundId: `inb_${i}`, profileName: "AWG 3.1", protocol: "awg", connects: 1, rejects: 0, drops: 0, stalls: 0, onlineS: 60n, lastHourUnix: NOW - 3600,
+      })),
+    });
+    await mount();
+    const counts = document.querySelector("[data-testid=conn-counts]")!;
+    const danger = [...document.querySelectorAll("section")].at(-1)!; // the danger zone closes the right column
+    expect(danger.compareDocumentPosition(counts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // below every card of the page
+    const shown = () => [...document.querySelectorAll("[data-testid=conn-row]")].map((r) => r.textContent?.match(/n\d/)?.[0]);
+    expect(shown()).toEqual(["n0", "n1", "n2", "n3", "n4", "n5"]);
+    expect(text()).toContain("Showing 1–6 of 8");
+    await click(document.querySelector("[aria-label='Next page']"));
+    expect(shown()).toEqual(["n6", "n7"]);
+  });
+
+  it("folds the traffic per node and protocol after five rows", async () => {
+    const nodeTraffic = Array.from({ length: 8 }, (_, i) => ({ nodeId: `nod_${i}`, nodeName: `t${i}`, protocol: "hysteria2", bytes: BigInt(1000 - i) }));
+    await mount(1, [], [], { ...detail, nodeTraffic });
+    const rows = () => document.querySelectorAll("[data-testid=traffic-row]").length;
+    expect(rows()).toBe(5);
+    await click(button("Show all 8"));
+    expect(rows()).toBe(8);
+    await click(button("Show less"));
+    expect(rows()).toBe(5);
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(1, [], [], { ...detail, nodeTraffic: nodeTraffic.slice(0, 6) }); // one more row is shown, not folded
+    expect(rows()).toBe(6);
+    expect(button("Show all 6")).toBeUndefined();
+  });
+
   it("saves a separate public name while the account name stays unchanged", async () => {
     await mount();
     const field = document.querySelector<HTMLInputElement>('input[aria-label="Name shown on the subscription page"]')!;
