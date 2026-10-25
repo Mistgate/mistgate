@@ -34,8 +34,8 @@ const toneCls: Record<string, string> = {
 
 /**
  * "The panel's server loses UDP" (GetChecksResponse.udp_loss): the UDP checks of some nodes keep paying for lost packets
- * against VLESS to the same nodes, with what the panel's Hysteria2 client lost; the panel's own network, people are not
- * affected. Calm and grey, it is not a problem of the nodes.
+ * against VLESS to the same nodes, with the Hysteria2 packets lost both ways (the panel's client on the way there, the
+ * nodes on the way back); the panel's own network, people are not affected. Calm and grey, it is not a problem of the nodes.
  */
 export function UdpLossNotice({ data }: { data: Checks }) {
   const t = useT();
@@ -49,7 +49,10 @@ export function UdpLossNotice({ data }: { data: Checks }) {
     protocols: listOf(fmt.locale, udp),
     to: t.n("hl.udp.to", nodes.length, { nodes: listOf(fmt.locale, nodes) }),
     share: loss.sharePercent,
-    lost: loss.lostPermille > 0 ? t("hl.udp.lost", { pct: (loss.lostPermille / 10).toFixed(1) }) : "",
+    lost:
+      loss.lostPermille + loss.nodeLostPermille > 0
+        ? t("hl.udp.lost", { client: (loss.lostPermille / 10).toFixed(1), node: (loss.nodeLostPermille / 10).toFixed(1) })
+        : "",
   });
   return (
     <Notice tone="quiet">

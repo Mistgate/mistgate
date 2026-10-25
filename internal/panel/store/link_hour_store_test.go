@@ -119,6 +119,17 @@ func linkHourStoreProof(t *testing.T, st *Store) {
 		t.Fatalf("user of the inbound row %q, %v", user, err)
 	}
 
+	// the probe key's packets (a volume flush: no connect in it) go to the inbound row, and ProbePackets sums them per inbound
+	// over the hour buckets of the window; the probe handshakes of the hour stay as they were
+	ingest(hour, FleetLink{CredID: "crd_lh_probe", InboundID: "inb_lh_awg", PktsSent: 50, PktsLost: 4})
+	ingest(hour+3600, FleetLink{CredID: "crd_lh_probe", InboundID: "inb_lh_awg", PktsSent: 30, PktsLost: 1})
+	if pp, err := st.ProbePackets(ctx, time.Unix(hour+60, 0)); err != nil || pp["inb_lh_awg"] != [2]uint64{80, 5} || len(pp) != 1 {
+		t.Fatalf("probe packets %v, %v, want inb_lh_awg 80/5 only", pp, err)
+	}
+	if err := st.R.QueryRowContext(ctx, `SELECT probe_handshakes FROM link_hour WHERE cred_id = '' AND inbound_id = 'inb_lh_awg' AND hour_start = ?`, hour).Scan(&probe); err != nil || probe != 3 {
+		t.Fatalf("probe handshakes of the hour after a packet flush %d, %v, want 3", probe, err)
+	}
+
 	// a counter is clamped, so a row stays short enough for the largest batch to fit one D1 value
 	ingest(hour-10*3600, FleetLink{CredID: "crd_lh_other", InboundID: "inb_lh_awg", OnlineS: 1<<32 - 1,
 		ClientCloses: 1<<32 - 1, RttMSSum: ^uint64(0), RttSamples: 1<<32 - 1, PktsSent: ^uint64(0), PktsLost: ^uint64(0)})

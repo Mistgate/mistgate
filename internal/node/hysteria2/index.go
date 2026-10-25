@@ -297,6 +297,8 @@ func (in *inbound) ConnConnect(conn *quic.Conn, id string, _ uint64) {
 		cs: cs, since: in.e.now(), conn: conn, startBytes: stats.BytesSent + stats.BytesReceived,
 		last: stats, silencePacketsRecv: stats.PacketsReceived, silencePacketsSent: stats.PacketsSent,
 	}
+	// the handshake and the authentication are this key's too: their packets, and the ones lost on the way
+	addConnectionDelta(cs, quic.ConnectionStats{}, stats)
 	cs.conns.Add(1)
 	cs.connects.Add(1)
 	in.smu.Lock()

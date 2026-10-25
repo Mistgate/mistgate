@@ -893,9 +893,9 @@ type CheckResult struct {
 	// while the tunnel is up. Measured on the panel's server. 0 = not measured (the connection was not reused, the
 	// request failed, or the round is from before this field).
 	ResponseMs uint32 `protobuf:"varint,9,opt,name=response_ms,json=responseMs,proto3" json:"response_ms,omitempty"`
-	// Hysteria2 only: the packets the panel's own QUIC client sent during the round and declared lost (what the panel's
-	// server lost on its way to the node and back, both directions as the client sees them). 0 for the other protocols and
-	// for rounds from before these fields.
+	// Hysteria2 only: the packets the panel's own QUIC client sent during the round, the handshake included, and declared
+	// lost: the way from the panel's server to the node (the way back is the node's count, CheckCell.node_lost_hour). 0 for
+	// the other protocols and for rounds from before these fields.
 	UdpSent       uint32 `protobuf:"varint,10,opt,name=udp_sent,json=udpSent,proto3" json:"udp_sent,omitempty"`
 	UdpLost       uint32 `protobuf:"varint,11,opt,name=udp_lost,json=udpLost,proto3" json:"udp_lost,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1102,8 +1102,13 @@ type CheckCell struct {
 	// it are left out; 0 = no data. Measured on the panel's server.
 	ConnectHourMs uint32 `protobuf:"varint,8,opt,name=connect_hour_ms,json=connectHourMs,proto3" json:"connect_hour_ms,omitempty"`
 	// Hysteria2 only: CheckResult.udp_sent and udp_lost summed over the last hour of rounds whose tunnel came up.
-	UdpSentHour   uint32 `protobuf:"varint,9,opt,name=udp_sent_hour,json=udpSentHour,proto3" json:"udp_sent_hour,omitempty"`
-	UdpLostHour   uint32 `protobuf:"varint,10,opt,name=udp_lost_hour,json=udpLostHour,proto3" json:"udp_lost_hour,omitempty"`
+	UdpSentHour uint32 `protobuf:"varint,9,opt,name=udp_sent_hour,json=udpSentHour,proto3" json:"udp_sent_hour,omitempty"`
+	UdpLostHour uint32 `protobuf:"varint,10,opt,name=udp_lost_hour,json=udpLostHour,proto3" json:"udp_lost_hour,omitempty"`
+	// Hysteria2 only: the packets the node sent to the panel's check and declared lost, the way back, from the node's own
+	// counters for the check's key (agents with "links/2") over the hour buckets that touch the last hour. The agent flushes
+	// them every 10 minutes, so the newest are missing for up to that long. 0 = none counted.
+	NodeSentHour  uint32 `protobuf:"varint,11,opt,name=node_sent_hour,json=nodeSentHour,proto3" json:"node_sent_hour,omitempty"`
+	NodeLostHour  uint32 `protobuf:"varint,12,opt,name=node_lost_hour,json=nodeLostHour,proto3" json:"node_lost_hour,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1204,6 +1209,20 @@ func (x *CheckCell) GetUdpSentHour() uint32 {
 func (x *CheckCell) GetUdpLostHour() uint32 {
 	if x != nil {
 		return x.UdpLostHour
+	}
+	return 0
+}
+
+func (x *CheckCell) GetNodeSentHour() uint32 {
+	if x != nil {
+		return x.NodeSentHour
+	}
+	return 0
+}
+
+func (x *CheckCell) GetNodeLostHour() uint32 {
+	if x != nil {
+		return x.NodeLostHour
 	}
 	return 0
 }
@@ -1804,10 +1823,13 @@ type UdpLossNotice struct {
 	// Share of slow UDP rounds across the listed nodes, 0-100.
 	SharePercent uint32 `protobuf:"varint,2,opt,name=share_percent,json=sharePercent,proto3" json:"share_percent,omitempty"`
 	// Packets the panel's Hysteria2 client declared lost, per thousand sent, over the listed nodes' rounds of the last hour;
-	// 0 when it lost none or there were no Hysteria2 rounds.
-	LostPermille  uint32 `protobuf:"varint,3,opt,name=lost_permille,json=lostPermille,proto3" json:"lost_permille,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// 0 when it lost none or there were no Hysteria2 rounds. The way from the panel to the nodes.
+	LostPermille uint32 `protobuf:"varint,3,opt,name=lost_permille,json=lostPermille,proto3" json:"lost_permille,omitempty"`
+	// The same for the way back: what the listed nodes declared lost of what they sent to the panel's Hysteria2 check
+	// (CheckCell.node_lost_hour over node_sent_hour). 0 when none or not counted.
+	NodeLostPermille uint32 `protobuf:"varint,4,opt,name=node_lost_permille,json=nodeLostPermille,proto3" json:"node_lost_permille,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UdpLossNotice) Reset() {
@@ -1857,6 +1879,13 @@ func (x *UdpLossNotice) GetSharePercent() uint32 {
 func (x *UdpLossNotice) GetLostPermille() uint32 {
 	if x != nil {
 		return x.LostPermille
+	}
+	return 0
+}
+
+func (x *UdpLossNotice) GetNodeLostPermille() uint32 {
+	if x != nil {
+		return x.NodeLostPermille
 	}
 	return 0
 }
@@ -2960,7 +2989,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x02ok\x18\x02 \x01(\rR\x02ok\x12\x16\n" +
 	"\x06failed\x18\x03 \x01(\rR\x06failed\x12\x1d\n" +
 	"\n" +
-	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\"\x97\x03\n" +
+	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\"\xe3\x03\n" +
 	"\tCheckCell\x12\x1a\n" +
 	"\bdeployed\x18\x01 \x01(\bR\bdeployed\x12\x1d\n" +
 	"\n" +
@@ -2974,7 +3003,9 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x0fconnect_hour_ms\x18\b \x01(\rR\rconnectHourMs\x12\"\n" +
 	"\rudp_sent_hour\x18\t \x01(\rR\vudpSentHour\x12\"\n" +
 	"\rudp_lost_hour\x18\n" +
-	" \x01(\rR\vudpLostHour\"\xd7\x01\n" +
+	" \x01(\rR\vudpLostHour\x12$\n" +
+	"\x0enode_sent_hour\x18\v \x01(\rR\fnodeSentHour\x12$\n" +
+	"\x0enode_lost_hour\x18\f \x01(\rR\fnodeLostHour\"\xd7\x01\n" +
 	"\bCheckRow\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12!\n" +
@@ -3031,11 +3062,12 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x0ftspu_vantage_id\x18\x11 \x01(\tR\rtspuVantageId\x12*\n" +
 	"\x11tspu_vantage_name\x18\x12 \x01(\tR\x0ftspuVantageName\x12$\n" +
 	"\ftspu_at_unix\x18\x13 \x01(\x03B\x020\x02R\n" +
-	"tspuAtUnix\"t\n" +
+	"tspuAtUnix\"\xa2\x01\n" +
 	"\rUdpLossNotice\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12#\n" +
 	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\x12#\n" +
-	"\rlost_permille\x18\x03 \x01(\rR\flostPermille\".\n" +
+	"\rlost_permille\x18\x03 \x01(\rR\flostPermille\x12,\n" +
+	"\x12node_lost_permille\x18\x04 \x01(\rR\x10nodeLostPermille\".\n" +
 	"\x13RunChecksNowRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"N\n" +
 	"\x14RunChecksNowResponse\x12\x1c\n" +

@@ -35,6 +35,7 @@ type testUDPProxy struct {
 	lossEvery   atomic.Uint64
 	upPackets   atomic.Uint64
 	upLossEvery atomic.Uint64
+	upDropAt    atomic.Uint64 // drop only the client-to-server datagram with this number (1 = the first)
 	delayNanos  atomic.Int64
 	delayed     chan delayedPacket // the delayed server-to-client datagrams, in order
 }
@@ -103,7 +104,8 @@ func (p *testUDPProxy) readClient() {
 		if p.dropUp.Load() || upstream == nil {
 			continue
 		}
-		if every := p.upLossEvery.Load(); every > 0 && p.upPackets.Add(1)%every == 0 {
+		seq := p.upPackets.Add(1)
+		if every := p.upLossEvery.Load(); every > 0 && seq%every == 0 || p.upDropAt.Load() == seq {
 			continue
 		}
 		_, _ = upstream.Write(buf[:n])
@@ -519,6 +521,48 @@ func TestClientCountsItsLostPackets(t *testing.T) {
 	if st.PacketsSent == 0 || st.PacketsLost == 0 || st.PacketsLost*2 > st.PacketsSent { // see TestConnectionStatsIncludeRTTAndLoss
 		t.Fatalf("client packet counters look wrong for 5%% proxy loss: sent=%d lost=%d", st.PacketsSent, st.PacketsLost)
 	}
+}
+
+// A packet lost in the handshake counts too: quic-go's own controller counts it before the replacement takes over at the
+// authentication, and the patched core adds that count. The client's first Initial; on the node, every second datagram
+// until the client is in (quic-go drops the Initial and Handshake keys with what is still in flight, so only the losses
+// it declared before count: the 1-RTT ones of the start always are).
+func TestHandshakeLossesCount(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("hs"))
+	up := newTestUDPProxy(t, r.udpPort)
+	up.upDropAt.Store(1)
+	c := dialProxyClient(t, up, "hs", serverName, nil, 10*time.Second)
+	if st := c.(interface{ ConnectionStats() quic.ConnectionStats }).ConnectionStats(); st.PacketsLost == 0 {
+		t.Fatalf("the client lost its first Initial but counts %d lost of %d sent", st.PacketsLost, st.PacketsSent)
+	}
+	_ = c.Close()
+
+	// which datagrams carry what varies, and losses quic-go drops with the keys never count: up to three connections
+	var got plugin.LinkStat
+	for _, every := range []uint64{2, 3, 2} {
+		down := newTestUDPProxy(t, r.udpPort)
+		down.lossEvery.Store(every)
+		c = dialProxyClient(t, down, "hs", serverName, nil, 10*time.Second)
+		down.lossEvery.Store(0)
+		if err := echoOnce(c, r.echo, []byte("after the handshake")); err != nil { // the acknowledgements that declare the losses
+			t.Fatal(err)
+		}
+		_ = c.Close()
+		before := got.PktsSent
+		eventually(t, "the connection's packets", func() bool {
+			for _, stat := range r.collect().Links {
+				if stat.CredID == "crd_hs" {
+					addLinkTotal(&got, stat)
+				}
+			}
+			return got.PktsSent > before
+		})
+		if got.PktsLost > 0 {
+			return
+		}
+	}
+	t.Fatalf("the node lost every second or third datagram of three handshakes but counts %d lost of %d sent", got.PktsLost, got.PktsSent)
 }
 
 func TestConnectionIdentitySurvivesProxySourcePortChange(t *testing.T) {

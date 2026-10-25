@@ -34,7 +34,8 @@ func (l FleetLink) zero() bool {
 
 // linkHourStmt adds the rows to the hour's bucket in one statement. The rows go as two JSON arguments of positional arrays
 // ([cred, inbound, user, connects, rejects, drops, stalls, online_s, unknown_keys, hellos, handshakes, probe_handshakes,
-// client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms_sum, rtt_samples, pkts_sent, pkts_lost]): D1 binds at most 100
+// client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms_sum, rtt_samples, pkts_sent, pkts_lost, probe_pkts_sent,
+// probe_pkts_lost]): D1 binds at most 100
 // values. Splitting the rows keeps each bound value under D1's 2,000,000-byte limit at the 10,000-row edge cap.
 // With no rows it still runs (an empty array), so the batch has the same shape on every call.
 func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
@@ -53,7 +54,7 @@ func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
 	return Stmt{Query: `
 		INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, connects, rejects, drops, stalls, online_s,
 			unknown_keys, hellos, handshakes, probe_handshakes, client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms_sum,
-			rtt_samples, pkts_sent, pkts_lost)
+			rtt_samples, pkts_sent, pkts_lost, probe_pkts_sent, probe_pkts_lost)
 		SELECT ?3, ?4, json_extract(l.value, '$[1]'), json_extract(l.value, '$[0]'), json_extract(l.value, '$[2]'),
 			CAST(json_extract(l.value, '$[3]') AS INTEGER), CAST(json_extract(l.value, '$[4]') AS INTEGER),
 			CAST(json_extract(l.value, '$[5]') AS INTEGER), CAST(json_extract(l.value, '$[6]') AS INTEGER),
@@ -63,7 +64,8 @@ func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
 			CAST(json_extract(l.value, '$[13]') AS INTEGER), CAST(json_extract(l.value, '$[14]') AS INTEGER),
 			CAST(json_extract(l.value, '$[15]') AS INTEGER), CAST(json_extract(l.value, '$[16]') AS INTEGER),
 			CAST(json_extract(l.value, '$[17]') AS INTEGER), CAST(json_extract(l.value, '$[18]') AS INTEGER),
-			CAST(json_extract(l.value, '$[19]') AS INTEGER), CAST(json_extract(l.value, '$[20]') AS INTEGER)
+			CAST(json_extract(l.value, '$[19]') AS INTEGER), CAST(json_extract(l.value, '$[20]') AS INTEGER),
+			CAST(json_extract(l.value, '$[21]') AS INTEGER), CAST(json_extract(l.value, '$[22]') AS INTEGER)
 		FROM (SELECT value FROM json_each(?1) UNION ALL SELECT value FROM json_each(?2)) AS l
 		WHERE 1
 		ON CONFLICT (node_id, hour_start, inbound_id, cred_id) DO UPDATE SET
@@ -74,12 +76,35 @@ func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
 			client_closes = client_closes + excluded.client_closes, freezes = freezes + excluded.freezes,
 			quiet = quiet + excluded.quiet, accepted = accepted + excluded.accepted, hellos_foreign = hellos_foreign + excluded.hellos_foreign,
 			rtt_ms_sum = rtt_ms_sum + excluded.rtt_ms_sum, rtt_samples = rtt_samples + excluded.rtt_samples,
-			pkts_sent = pkts_sent + excluded.pkts_sent, pkts_lost = pkts_lost + excluded.pkts_lost`,
+			pkts_sent = pkts_sent + excluded.pkts_sent, pkts_lost = pkts_lost + excluded.pkts_lost,
+			probe_pkts_sent = probe_pkts_sent + excluded.probe_pkts_sent, probe_pkts_lost = probe_pkts_lost + excluded.probe_pkts_lost`,
 		Args: []any{string(first), string(second), nodeID, hourStart}}, nil
 }
 
 // linkHourOf is the first hour bucket a window of the given start touches: the hour that holds since.
 func linkHourOf(since time.Time) int64 { return unix(since) / 3600 * 3600 }
+
+// ProbePackets is, per inbound, the packets its node sent to the panel's health check and declared lost (probe_pkts_sent and
+// probe_pkts_lost) over the hour buckets that touch [since, now]. Agents flush them every 10 minutes, so the newest are missing
+// for up to that long. Inbounds without any are left out.
+func (s *Store) ProbePackets(ctx context.Context, since time.Time) (map[string][2]uint64, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT inbound_id, SUM(probe_pkts_sent), SUM(probe_pkts_lost) FROM link_hour
+		WHERE cred_id = '' AND hour_start >= ? GROUP BY inbound_id HAVING SUM(probe_pkts_sent) > 0`, linkHourOf(since))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][2]uint64{}
+	for rows.Next() {
+		var id string
+		var sent, lost int64
+		if err := rows.Scan(&id, &sent, &lost); err != nil {
+			return nil, err
+		}
+		out[id] = [2]uint64{uint64(max(sent, 0)), uint64(max(lost, 0))}
+	}
+	return out, rows.Err()
+}
 
 // PruneLinkHours deletes the hour buckets that end before the cut (the bucket holding the cut stays whole) and returns how many
 // rows went.

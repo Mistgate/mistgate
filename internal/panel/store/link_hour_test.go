@@ -27,6 +27,7 @@ func TestLinkHourD1PayloadAtEdgeCap(t *testing.T) {
 		row = append(row, uint32(maxLinkCount))
 	}
 	row = append(row, uint64(maxLinkSum), uint32(maxLinkCount), uint64(maxLinkSum), uint64(maxLinkSum))
+	row = append(row, uint64(maxLinkSum), uint64(maxLinkSum)) // probe_pkts_sent, probe_pkts_lost
 	rows := make([][]any, rowsAtCap)
 	for i := range rows {
 		rows[i] = row

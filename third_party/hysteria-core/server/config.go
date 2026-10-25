@@ -238,13 +238,15 @@ type EventLogger interface {
 }
 
 // LostPackets is the number of packets declared lost on conn (a Mistgate patch, see MISTGATE.md): quic-go's
-// ConnectionStats.PacketsLost counts them only under quic-go's own congestion controller, not under BBR or Brutal.
+// ConnectionStats.PacketsLost counts them only under quic-go's own congestion controller, which runs the handshake and the
+// authentication and stops counting when the server swaps in BBR or Brutal; the replacement's losses are counted apart.
 // Valid until the server is done with the connection (after ConnDisconnect).
 func LostPackets(conn *quic.Conn) uint64 {
-	if n, ok := congestion.LostPackets(conn); ok {
-		return n
+	n := conn.ConnectionStats().PacketsLost
+	if m, ok := congestion.LostPackets(conn); ok {
+		n += m
 	}
-	return conn.ConnectionStats().PacketsLost
+	return n
 }
 
 // ConnEventLogger is an optional extension of EventLogger (a Mistgate patch, see MISTGATE.md at the module root): when

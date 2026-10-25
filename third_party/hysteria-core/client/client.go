@@ -246,11 +246,12 @@ func (c *clientImpl) Close() error {
 }
 
 // ConnectionStats is the statistics of the client's QUIC connection, with the packets lost under BBR and Brutal counted
-// too (a Mistgate patch, see MISTGATE.md). Read it before Close.
+// too (a Mistgate patch, see MISTGATE.md): quic-go's own count covers the handshake and the authentication, the
+// replacement's what came after. Read it before Close.
 func (c *clientImpl) ConnectionStats() quic.ConnectionStats {
 	st := c.conn.ConnectionStats()
 	if n, ok := congestion.LostPackets(c.conn); ok {
-		st.PacketsLost = n
+		st.PacketsLost += n
 	}
 	return st
 }

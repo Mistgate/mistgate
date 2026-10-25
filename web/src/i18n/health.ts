@@ -136,7 +136,7 @@ export const en = {
   "hl.udp.body":
     "{protocols} checks {to} often take a second or more longer than VLESS to the same node ({share}% in the last hour){lost}. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
   "hl.udp.to": "to {nodes}",
-  "hl.udp.lost": "; the panel's Hysteria2 client lost {pct}% of its packets",
+  "hl.udp.lost": "; lost Hysteria2 packets: {client}% on the way to the nodes, {node}% on the way back",
 
   // ---- doctor
   "hl.doctor.sum": "Items checked: {items} · nodes: {nodes} · found: {n}",
@@ -659,7 +659,7 @@ export const ru: typeof en = {
   "hl.udp.body":
     "проверки {protocols} {to} часто идут на секунду и больше дольше, чем VLESS до той же ноды ({share} % за час){lost}. Людей это не касается: они подключаются к нодам напрямую. Если так постоянно, напиши хостеру сервера панели.",
   "hl.udp.to": "к ноде {nodes}|к нодам {nodes}|к нодам {nodes}",
-  "hl.udp.lost": "; клиент Hysteria2 панели потерял {pct} % пакетов",
+  "hl.udp.lost": "; потери пакетов Hysteria2: {client} % по дороге к нодам, {node} % обратно",
 
   // ---- doctor
   "hl.doctor.sum": "Проверено пунктов: {items} · нод: {nodes} · найдено: {n}",
@@ -1173,7 +1173,7 @@ export const zh: typeof en = {
   "hl.udp.title": "面板服务器丢失 UDP：",
   "hl.udp.body": "{to} 的 {protocols} 检测经常比到同一节点的 VLESS 慢一秒甚至更多（近 1 小时 {share}%）{lost}。用户不受影响：他们直接连接节点。如果一直如此，请联系面板服务器的服务商。",
   "hl.udp.to": "到节点 {nodes}",
-  "hl.udp.lost": "；面板的 Hysteria2 客户端丢失了 {pct}% 的数据包",
+  "hl.udp.lost": "；Hysteria2 丢包：去往节点 {client}%，返回 {node}%",
 
   "hl.doctor.sum": "已检查项目：{items} · 节点：{nodes} · 发现问题：{n}",
   "hl.doctor.allGreen": "所有检查项均正常",

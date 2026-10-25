@@ -256,9 +256,9 @@ message CheckResult {
   // while the tunnel is up. Measured on the panel's server. 0 = not measured (the connection was not reused, the
   // request failed, or the round is from before this field).
   uint32 response_ms = 9;
-  // Hysteria2 only: the packets the panel's own QUIC client sent during the round and declared lost (what the panel's
-  // server lost on its way to the node and back, both directions as the client sees them). 0 for the other protocols and
-  // for rounds from before these fields.
+  // Hysteria2 only: the packets the panel's own QUIC client sent during the round, the handshake included, and declared
+  // lost: the way from the panel's server to the node (the way back is the node's count, CheckCell.node_lost_hour). 0 for
+  // the other protocols and for rounds from before these fields.
   uint32 udp_sent = 10;
   uint32 udp_lost = 11;
 }
@@ -296,6 +296,11 @@ message CheckCell {
   // Hysteria2 only: CheckResult.udp_sent and udp_lost summed over the last hour of rounds whose tunnel came up.
   uint32 udp_sent_hour = 9;
   uint32 udp_lost_hour = 10;
+  // Hysteria2 only: the packets the node sent to the panel's check and declared lost, the way back, from the node's own
+  // counters for the check's key (agents with "links/2") over the hour buckets that touch the last hour. The agent flushes
+  // them every 10 minutes, so the newest are missing for up to that long. 0 = none counted.
+  uint32 node_sent_hour = 11;
+  uint32 node_lost_hour = 12;
 }
 
 message CheckRow {
@@ -424,8 +429,11 @@ message UdpLossNotice {
   // Share of slow UDP rounds across the listed nodes, 0-100.
   uint32 share_percent = 2;
   // Packets the panel's Hysteria2 client declared lost, per thousand sent, over the listed nodes' rounds of the last hour;
-  // 0 when it lost none or there were no Hysteria2 rounds.
+  // 0 when it lost none or there were no Hysteria2 rounds. The way from the panel to the nodes.
   uint32 lost_permille = 3;
+  // The same for the way back: what the listed nodes declared lost of what they sent to the panel's Hysteria2 check
+  // (CheckCell.node_lost_hour over node_sent_hour). 0 when none or not counted.
+  uint32 node_lost_permille = 4;
 }
 
 message RunChecksNowRequest {

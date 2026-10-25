@@ -246,7 +246,8 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		// Connection counters: the same filter as the traffic (the key resolves and is of the inbound's protocol), and a row of the
 		// inbound itself (cred "") only for an inbound of this node. A probe key's row is not stored: its connects and rejects (one
 		// per handshake that reached authentication) go to the inbound row as probe_handshakes, which the reads take off the
-		// inbound's hellos and handshakes (migration 00077).
+		// inbound's hellos and handshakes (migration 00077), and the packets the node sent to the check and lost go there as
+		// probe_pkts_sent and probe_pkts_lost (00081).
 		linkRows := make([][]any, 0, len(in.Links))
 		for _, l := range in.Links {
 			if l.zero() {
@@ -262,10 +263,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				ref, ok := creds[l.CredID]
 				if !ok && probes[l.CredID] {
 					out.Probe++
-					if _, on := onNode[l.InboundID]; on && l.Connects|l.Rejects != 0 {
+					if _, on := onNode[l.InboundID]; on && (l.Connects|l.Rejects != 0 || l.PktsSent|l.PktsLost != 0) {
 						probe := min(uint64(l.Connects)+uint64(l.Rejects), maxLinkCount)
 						linkRows = append(linkRows, []any{"", l.InboundID, "", 0, 0, 0, 0, 0, 0, 0, 0, probe,
-							0, 0, 0, 0, 0, 0, 0, 0, 0})
+							0, 0, 0, 0, 0, 0, 0, 0, 0, min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum)})
 					}
 					continue
 				}
@@ -280,7 +281,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount), 0, min(l.ClientCloses, maxLinkCount),
 				min(l.Freezes, maxLinkCount), min(l.Quiet, maxLinkCount), min(l.Accepted, maxLinkCount),
 				min(l.HellosForeign, maxLinkCount), min(l.RttMSSum, maxLinkSum), min(l.RttSamples, maxLinkCount),
-				min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum)})
+				min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum), 0, 0})
 		}
 
 		// Peaks: distinct users / devices per protocol in this snapshot.

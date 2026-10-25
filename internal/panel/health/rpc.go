@@ -305,11 +305,12 @@ const (
 type okRound struct{ connect, latency uint32 }
 
 // protoRounds are the last hour's OK rounds of one inbound, with the packets the panel's QUIC client sent and lost in the
-// rounds whose tunnel came up (Hysteria2; 0 otherwise).
+// rounds whose tunnel came up, and what the node sent to the check and lost (Hysteria2; 0 otherwise).
 type protoRounds struct {
-	nodeID, protocol string
-	rounds           []okRound
-	udpSent, udpLost uint64
+	nodeID, protocol   string
+	rounds             []okRound
+	udpSent, udpLost   uint64
+	nodeSent, nodeLost uint64
 }
 
 // udpLossNotice says that the panel's server loses UDP on its way to some nodes: their UDP probes keep paying for lost
@@ -334,9 +335,10 @@ func udpLossNotice(rounds []protoRounds) *adminv1.UdpLossNotice {
 		return nil
 	}
 	type count struct {
-		total, slow int
-		sent, lost  uint64
-		base        bool // judged against the node's VLESS
+		total, slow        int
+		sent, lost         uint64
+		nodeSent, nodeLost uint64
+		base               bool // judged against the node's VLESS
 	}
 	perNode := map[string]*count{}
 	var order []string
@@ -358,6 +360,7 @@ func udpLossNotice(rounds []protoRounds) *adminv1.UdpLossNotice {
 			}
 		}
 		c.sent, c.lost = c.sent+r.udpSent, c.lost+r.udpLost
+		c.nodeSent, c.nodeLost = c.nodeSent+r.nodeSent, c.nodeLost+r.nodeLost
 	}
 	flagged := func(c *count) bool { return c.total >= udpLossMinRounds && c.slow*100 >= udpLossNodeShare*c.total }
 	var withoutBase int
@@ -368,7 +371,7 @@ func udpLossNotice(rounds []protoRounds) *adminv1.UdpLossNotice {
 	}
 	var ids []string
 	var total, slow int
-	var sent, lost uint64
+	var sent, lost, nodeSent, nodeLost uint64
 	for _, id := range order {
 		c := perNode[id]
 		if !flagged(c) || !c.base && withoutBase < udpLossNodesWithoutTCP {
@@ -376,15 +379,22 @@ func udpLossNotice(rounds []protoRounds) *adminv1.UdpLossNotice {
 		}
 		ids = append(ids, id)
 		total, slow, sent, lost = total+c.total, slow+c.slow, sent+c.sent, lost+c.lost
+		nodeSent, nodeLost = nodeSent+c.nodeSent, nodeLost+c.nodeLost
 	}
 	if len(ids) == 0 {
 		return nil
 	}
 	n := &adminv1.UdpLossNotice{NodeIds: ids, SharePercent: uint32((slow*100 + total/2) / total)}
-	if sent > 0 {
-		n.LostPermille = uint32(min((lost*1000+sent/2)/sent, 1000))
-	}
+	n.LostPermille, n.NodeLostPermille = permille(lost, sent), permille(nodeLost, nodeSent)
 	return n
+}
+
+// permille is lost per thousand sent, rounded; 0 without anything sent.
+func permille(lost, sent uint64) uint32 {
+	if sent == 0 {
+		return 0
+	}
+	return uint32(min((lost*1000+sent/2)/sent, 1000))
 }
 
 func resultMsg(r Result) *adminv1.CheckResult {
@@ -421,6 +431,10 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 	samples, err := s.st.SamplesSince(ctx, time.Unix(first, 0))
 	if err != nil {
 		return nil, s.internal("check samples", err)
+	}
+	probePkts, err := s.st.ProbePackets(ctx, now.Add(-time.Hour)) // the way back of the Hysteria2 checks, the nodes' count
+	if err != nil {
+		return nil, s.internal("check packets", err)
 	}
 	type acc struct {
 		ok, failed int
@@ -503,9 +517,11 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 			cell.LatencyHourMs = median(hourLat[t.in.ID])
 			cell.ConnectHourMs = median(hourConn[t.in.ID])
 			cell.ResponseHourMs = median(hourResp[t.in.ID])
-			u := hourUDP[t.in.ID]
+			u, back := hourUDP[t.in.ID], probePkts[t.in.ID]
 			cell.UdpSentHour, cell.UdpLostHour = uint32(min(u[0], math.MaxUint32)), uint32(min(u[1], math.MaxUint32))
-			udpRounds = append(udpRounds, protoRounds{nodeID: n.ID, protocol: t.in.Protocol, rounds: hourOK[t.in.ID], udpSent: u[0], udpLost: u[1]})
+			cell.NodeSentHour, cell.NodeLostHour = uint32(min(back[0], math.MaxUint32)), uint32(min(back[1], math.MaxUint32))
+			udpRounds = append(udpRounds, protoRounds{nodeID: n.ID, protocol: t.in.Protocol, rounds: hourOK[t.in.ID], udpSent: u[0], udpLost: u[1],
+				nodeSent: back[0], nodeLost: back[1]})
 			c := s.cellOf(ctx, t.in.ID)
 			cell.FailStreak = uint32(c.streak)
 			if why := s.skipReason(t, live[t.node.ID]); why != "" {

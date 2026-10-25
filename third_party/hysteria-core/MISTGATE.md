@@ -10,7 +10,8 @@ A copy of `github.com/apernet/hysteria/core/v2` **v2.12.3** (MIT, `LICENSE.md`),
 - `internal/congestion/utils.go`, `server/config.go`, `server/server.go`: `server.LostPackets(conn)` (the server sets its
   controllers with `UseConfiguredCounting` and `UseBrutalCounting`). quic-go counts lost packets into
   `ConnectionStats.PacketsLost` only in its own congestion controller; BBR and Brutal are wrapped in a counter of
-  `OnCongestionEvent` (called once per lost packet whatever the controller), dropped when `handleClient` ends.
+  `OnCongestionEvent` (called once per lost packet whatever the controller), dropped when `handleClient` ends. quic-go's
+  own count, which covers the handshake and the authentication, stays and is added.
 - `client/client.go`: the client sets the counting controllers too, `ConnectionStats()` on the client returns the QUIC
   statistics with these lost packets, and `Close` drops the connection's counter (the panel's health checks report what
   their client lost).

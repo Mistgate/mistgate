@@ -109,7 +109,7 @@ func set(conn *quic.Conn, count bool, cc congestion.CongestionControlEx) {
 }
 
 // LostPackets is the number of packets declared lost on conn while a replacement controller runs; false when quic-go's own
-// controller runs, whose ConnectionStats.PacketsLost counts them.
+// controller runs, whose ConnectionStats.PacketsLost counts them (and keeps what it counted before the replacement).
 func LostPackets(conn *quic.Conn) (uint64, bool) {
 	if v, ok := losses.Load(conn); ok {
 		return v.(*atomic.Uint64).Load(), true
