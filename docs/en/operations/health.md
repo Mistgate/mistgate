@@ -97,9 +97,9 @@ Hover a cell, or move to it with Tab, to see the response and connect medians of
 
 Some hosters drop bursts of UDP. A Hysteria2 or AmneziaWG check from the panel's server then pays for every lost packet with a retry timer: a second or more for QUIC and for TCP inside an AmneziaWG tunnel, 5 s for a WireGuard handshake. When these checks take a second or more longer than VLESS to the same nodes, the panel's network is the cause, not the nodes.
 
-The Hysteria2 check also counts what its own QUIC client lost: the packets it sent and declared lost in each round, and the same over the last hour (MCP `checks_results`: `udp_sent`, `udp_lost`, `udp_sent_hour`, `udp_lost_hour`).
+The Hysteria2 check also counts the packets lost both ways. On the way to the node, its own QUIC client counts what it sent and declared lost in each round, the handshake included, and the same over the last hour (MCP `checks_results`: `udp_sent`, `udp_lost`, `udp_sent_hour`, `udp_lost_hour`). On the way back, the node counts what it sent to the check and lost, under the check's own key (`node_sent_hour`, `node_lost_hour`; nodes flush these every 10 minutes). A packet still in flight when QUIC drops its handshake keys is never declared lost, so a loss in the very first exchange can go uncounted.
 
-The panel then says so above the matrix, names the nodes, and gives the share of slow UDP rounds and how many packets its Hysteria2 client lost. It shows the notice when, over the last hour:
+The panel then says so above the matrix, names the nodes, and gives the share of slow UDP rounds and the Hysteria2 packets lost on the way to the nodes and on the way back. It shows the notice when, over the last hour:
 
 - at least 20% of a node's Hysteria2 and AmneziaWG rounds (and at least 3 of them) took 600 ms or more longer than the median of the VLESS rounds to the same node, from the start of the dial to the first answer;
 - under 5% of the VLESS rounds took 2 s or more to connect (otherwise the panel's whole network is slow, not only UDP);

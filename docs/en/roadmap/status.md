@@ -3,20 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.60`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.61`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.60
+  meta: v0.1.0 – v0.1.61
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.60
+      release: v0.1.61
       current: true
       points:
-        - "**The checks count what the panel's server loses.** The Hysteria2 check records the packets its own QUIC client sent and lost, and the notice about the panel's server losing UDP now compares each node's Hysteria2 and AmneziaWG checks with VLESS to the same node: a second or more slower is a lost packet, not the node. It says how many packets the panel's Hysteria2 client lost. In MCP too. See [Health](../operations/health.md#when-the-panels-server-loses-udp)."
+        - "**The checks count lost Hysteria2 packets both ways.** On the way to the node the panel's QUIC client now counts the handshake too; on the way back the node's own count for the check's key is shown, in the checks and in the notice about the panel's server losing UDP. The nodes count the packets of a connection's handshake as well. In MCP too. Update the panel and the node agents. See [Health](../operations/health.md#when-the-panels-server-loses-udp)."
     - title: Profiles
       section: profiles
       points:
@@ -78,7 +78,7 @@ Mistgate is in **beta**; the current release is `v0.1.60`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.60
+  meta: v0.1.34 – v0.1.61
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
