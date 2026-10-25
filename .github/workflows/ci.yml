@@ -13,8 +13,8 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
-      # fleet alone takes 6-10 min under -race on a hosted runner; the default 10 min timeout cut it once
-      - run: go test -race -count=1 -timeout 20m ./internal/panel/fleet/ ./internal/node/agent/
+      # fleet takes 12-20 min under -race on a hosted runner (700-1200 s on the same code, by runner), so 20 min cut it twice
+      - run: go test -race -count=1 -timeout 35m ./internal/panel/fleet/ ./internal/node/agent/
   edge-store:
     runs-on: ubuntu-24.04
     steps:
