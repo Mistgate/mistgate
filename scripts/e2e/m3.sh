@@ -29,7 +29,9 @@ mk_ns() {
   NS_SEQ=$((NS_SEQ + 1))
   spawn unshare -n sleep 100000
   pid=$LAST_PID
-  wait_for 5 "namespace $name" nsenter -t "$pid" -n true || die "could not enter the namespace $name"
+  # until unshare has run, the pid is still in this namespace (and nsenter into it works): what follows would set up
+  # this namespace, and a client started later would find a bare one (lo down: "network is unreachable")
+  wait_for 5 "namespace $name" own_netns "$pid" || die "the namespace $name did not start"
   ip link add "mg3v$NS_SEQ" type veth peer name "mg3w$NS_SEQ"
   ip link set "mg3w$NS_SEQ" netns "$pid"
   ip addr add "$base.1/30" dev "mg3v$NS_SEQ"
@@ -42,6 +44,7 @@ mk_ns() {
   printf -v "${name}_IP" %s "$base.2"
 }
 cns() { local pid=$1; shift; nsenter -t "$pid" -n -- "$@"; } # run a command in a namespace made by mk_ns
+own_netns() { local n; n=$(readlink "/proc/$1/ns/net") && [ "$n" != "$(readlink /proc/$$/ns/net)" ]; }
 
 # ---------------------------------------------------------------- the fake internet
 

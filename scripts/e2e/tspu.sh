@@ -72,13 +72,15 @@ ip link set lo up
 
 spawn() { "$@" & LAST_PID=$!; PIDS+=("$LAST_PID"); disown "$LAST_PID"; }
 declare -A NSPID
+own_netns() { local n; n=$(readlink "/proc/$1/ns/net" 2>/dev/null) && [ "$n" != "$(readlink /proc/$$/ns/net)" ]; }
 mk() {
   local name=$1
   spawn unshare -n sleep 100000
   NSPID[$name]=$LAST_PID
+  # until unshare has run, the pid is still in this namespace (and nsenter into it works): wait for one of its own
   local i
-  for ((i = 0; i < 50; i++)); do nsenter -t "${NSPID[$name]}" -n true 2>/dev/null && break; sleep 0.1; done
-  nsenter -t "${NSPID[$name]}" -n true || die "namespace $name did not start"
+  for ((i = 0; i < 50; i++)); do own_netns "${NSPID[$name]}" && break; sleep 0.1; done
+  own_netns "${NSPID[$name]}" || die "namespace $name did not start"
   nsenter -t "${NSPID[$name]}" -n -- ip link set lo up
   nsenter -t "${NSPID[$name]}" -n -- sysctl -qw net.ipv4.ip_forward=1
 }
