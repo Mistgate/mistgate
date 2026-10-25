@@ -15,6 +15,7 @@ import (
 
 	"github.com/apernet/hysteria/core/v2/client"
 	"github.com/apernet/hysteria/extras/v2/obfs"
+	"github.com/apernet/quic-go"
 
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	panelhy2 "github.com/mistgate/mistgate/internal/panel/protocols/hysteria2"
@@ -107,6 +108,15 @@ func (h hy2Tunnel) DialContext(_ context.Context, _, addr string) (net.Conn, err
 	return h.c.TCP(addr)
 }
 func (h hy2Tunnel) Close() error { return h.c.Close() }
+
+// UDPStats is what the round's QUIC connection sent and declared lost (the patched core counts losses under BBR too).
+func (h hy2Tunnel) UDPStats() (sent, lost uint64) {
+	if s, ok := h.c.(interface{ ConnectionStats() quic.ConnectionStats }); ok {
+		st := s.ConnectionStats()
+		return st.PacketsSent, st.PacketsLost
+	}
+	return 0, 0
+}
 
 // obfsFactory gives the client a UDP socket wrapped in the profile's obfuscation.
 type obfsFactory struct {

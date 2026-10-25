@@ -869,8 +869,9 @@ type CheckResult struct {
 	AtUnix int64                  `protobuf:"varint,2,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
 	// The cold time of the round: from the start of the dial to the first response byte of the generate_204 probe,
 	// milliseconds. It is measured on the panel's server, not on a person's device, and includes the tunnel handshake,
-	// a fresh TCP + TLS connection to the probe host through the tunnel, and the request. A lost UDP packet of the
-	// handshake adds a whole retry timer (about 2.5 s for QUIC, 5 s for WireGuard). 0 when the tunnel did not come up.
+	// a fresh TCP + TLS connection to the probe host through the tunnel, and the request. Lost UDP packets add retry timers
+	// (a second or more for QUIC and for TCP inside an AWG tunnel, 5 s for a WireGuard handshake). 0 when the tunnel did not
+	// come up.
 	LatencyMs uint32 `protobuf:"varint,3,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`
 	// Exit IP and ISO 3166-1 alpha-2 country as seen by https://www.cloudflare.com/cdn-cgi/trace ("ip=", "loc=");
 	// empty when that probe failed.
@@ -891,7 +892,12 @@ type CheckResult struct {
 	// One more generate_204 request on the HTTPS connection that the first one opened, right after it: what a person feels
 	// while the tunnel is up. Measured on the panel's server. 0 = not measured (the connection was not reused, the
 	// request failed, or the round is from before this field).
-	ResponseMs    uint32 `protobuf:"varint,9,opt,name=response_ms,json=responseMs,proto3" json:"response_ms,omitempty"`
+	ResponseMs uint32 `protobuf:"varint,9,opt,name=response_ms,json=responseMs,proto3" json:"response_ms,omitempty"`
+	// Hysteria2 only: the packets the panel's own QUIC client sent during the round and declared lost (what the panel's
+	// server lost on its way to the node and back, both directions as the client sees them). 0 for the other protocols and
+	// for rounds from before these fields.
+	UdpSent       uint32 `protobuf:"varint,10,opt,name=udp_sent,json=udpSent,proto3" json:"udp_sent,omitempty"`
+	UdpLost       uint32 `protobuf:"varint,11,opt,name=udp_lost,json=udpLost,proto3" json:"udp_lost,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -989,6 +995,20 @@ func (x *CheckResult) GetResponseMs() uint32 {
 	return 0
 }
 
+func (x *CheckResult) GetUdpSent() uint32 {
+	if x != nil {
+		return x.UdpSent
+	}
+	return 0
+}
+
+func (x *CheckResult) GetUdpLost() uint32 {
+	if x != nil {
+		return x.UdpLost
+	}
+	return 0
+}
+
 // Half-hour bucket of one cell. start is aligned to :00 or :30 UTC.
 type CheckBucket struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
@@ -1081,6 +1101,9 @@ type CheckCell struct {
 	// Median of connect_ms (the time to open the tunnel and the first connection) over the last hour, ms; rounds without
 	// it are left out; 0 = no data. Measured on the panel's server.
 	ConnectHourMs uint32 `protobuf:"varint,8,opt,name=connect_hour_ms,json=connectHourMs,proto3" json:"connect_hour_ms,omitempty"`
+	// Hysteria2 only: CheckResult.udp_sent and udp_lost summed over the last hour of rounds whose tunnel came up.
+	UdpSentHour   uint32 `protobuf:"varint,9,opt,name=udp_sent_hour,json=udpSentHour,proto3" json:"udp_sent_hour,omitempty"`
+	UdpLostHour   uint32 `protobuf:"varint,10,opt,name=udp_lost_hour,json=udpLostHour,proto3" json:"udp_lost_hour,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1167,6 +1190,20 @@ func (x *CheckCell) GetResponseHourMs() uint32 {
 func (x *CheckCell) GetConnectHourMs() uint32 {
 	if x != nil {
 		return x.ConnectHourMs
+	}
+	return 0
+}
+
+func (x *CheckCell) GetUdpSentHour() uint32 {
+	if x != nil {
+		return x.UdpSentHour
+	}
+	return 0
+}
+
+func (x *CheckCell) GetUdpLostHour() uint32 {
+	if x != nil {
+		return x.UdpLostHour
 	}
 	return 0
 }
@@ -1754,13 +1791,21 @@ func (x *CountryCheck) GetTspuAtUnix() int64 {
 	return 0
 }
 
-// The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
-// (vless) were not: at least 20 % of the node's UDP rounds had connect_ms of 2000 or more.
+// The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds, judged against the panel's TCP
+// probe (vless) of the same node: a UDP round is slow when its latency_ms is 600 ms or more above the median latency_ms of
+// that node's VLESS rounds, which is what a lost packet costs (a QUIC or TCP retry timer) and what jitter never does. A
+// node needs at least 3 UDP rounds, and is listed when 20 % of them or more were slow. A node without VLESS rounds is
+// judged by the old rule (connect_ms of 2000 or more) and is listed only when another such node is too. Not shown while
+// the panel's TCP probes are slow themselves (5 % of VLESS rounds or more with connect_ms of 2000 or more): then the
+// panel's own network is the problem, not UDP.
 type UdpLossNotice struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	NodeIds []string               `protobuf:"bytes,1,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
 	// Share of slow UDP rounds across the listed nodes, 0-100.
-	SharePercent  uint32 `protobuf:"varint,2,opt,name=share_percent,json=sharePercent,proto3" json:"share_percent,omitempty"`
+	SharePercent uint32 `protobuf:"varint,2,opt,name=share_percent,json=sharePercent,proto3" json:"share_percent,omitempty"`
+	// Packets the panel's Hysteria2 client declared lost, per thousand sent, over the listed nodes' rounds of the last hour;
+	// 0 when it lost none or there were no Hysteria2 rounds.
+	LostPermille  uint32 `protobuf:"varint,3,opt,name=lost_permille,json=lostPermille,proto3" json:"lost_permille,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1805,6 +1850,13 @@ func (x *UdpLossNotice) GetNodeIds() []string {
 func (x *UdpLossNotice) GetSharePercent() uint32 {
 	if x != nil {
 		return x.SharePercent
+	}
+	return 0
+}
+
+func (x *UdpLossNotice) GetLostPermille() uint32 {
+	if x != nil {
+		return x.LostPermille
 	}
 	return 0
 }
@@ -2884,7 +2936,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12!\n" +
 	"\fprofile_name\x18\x02 \x01(\tR\vprofileName\x12\x1a\n" +
-	"\bprotocol\x18\x03 \x01(\tR\bprotocol\"\xbf\x02\n" +
+	"\bprotocol\x18\x03 \x01(\tR\bprotocol\"\xf5\x02\n" +
 	"\vCheckResult\x126\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x1e.mistgate.admin.v1.CheckStatusR\x06status\x12\x1b\n" +
 	"\aat_unix\x18\x02 \x01(\x03B\x020\x02R\x06atUnix\x12\x1d\n" +
@@ -2898,14 +2950,17 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\n" +
 	"connect_ms\x18\b \x01(\rR\tconnectMs\x12\x1f\n" +
 	"\vresponse_ms\x18\t \x01(\rR\n" +
-	"responseMs\"w\n" +
+	"responseMs\x12\x19\n" +
+	"\budp_sent\x18\n" +
+	" \x01(\rR\audpSent\x12\x19\n" +
+	"\budp_lost\x18\v \x01(\rR\audpLost\"w\n" +
 	"\vCheckBucket\x12!\n" +
 	"\n" +
 	"start_unix\x18\x01 \x01(\x03B\x020\x02R\tstartUnix\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\rR\x02ok\x12\x16\n" +
 	"\x06failed\x18\x03 \x01(\rR\x06failed\x12\x1d\n" +
 	"\n" +
-	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\"\xcf\x02\n" +
+	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\"\x97\x03\n" +
 	"\tCheckCell\x12\x1a\n" +
 	"\bdeployed\x18\x01 \x01(\bR\bdeployed\x12\x1d\n" +
 	"\n" +
@@ -2916,7 +2971,10 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\ahistory\x18\x05 \x03(\v2\x1e.mistgate.admin.v1.CheckBucketR\ahistory\x12&\n" +
 	"\x0flatency_hour_ms\x18\x06 \x01(\rR\rlatencyHourMs\x12(\n" +
 	"\x10response_hour_ms\x18\a \x01(\rR\x0eresponseHourMs\x12&\n" +
-	"\x0fconnect_hour_ms\x18\b \x01(\rR\rconnectHourMs\"\xd7\x01\n" +
+	"\x0fconnect_hour_ms\x18\b \x01(\rR\rconnectHourMs\x12\"\n" +
+	"\rudp_sent_hour\x18\t \x01(\rR\vudpSentHour\x12\"\n" +
+	"\rudp_lost_hour\x18\n" +
+	" \x01(\rR\vudpLostHour\"\xd7\x01\n" +
 	"\bCheckRow\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12!\n" +
@@ -2973,10 +3031,11 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x0ftspu_vantage_id\x18\x11 \x01(\tR\rtspuVantageId\x12*\n" +
 	"\x11tspu_vantage_name\x18\x12 \x01(\tR\x0ftspuVantageName\x12$\n" +
 	"\ftspu_at_unix\x18\x13 \x01(\x03B\x020\x02R\n" +
-	"tspuAtUnix\"O\n" +
+	"tspuAtUnix\"t\n" +
 	"\rUdpLossNotice\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12#\n" +
-	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\".\n" +
+	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\x12#\n" +
+	"\rlost_permille\x18\x03 \x01(\rR\flostPermille\".\n" +
 	"\x13RunChecksNowRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"N\n" +
 	"\x14RunChecksNowResponse\x12\x1c\n" +

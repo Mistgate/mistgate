@@ -70,7 +70,7 @@ const udp = {
     { ...checks.rows[1]!, cells: [...checks.rows[1]!.cells, ok(70, 300)] },
     { ...checks.rows[2]!, cells: [...checks.rows[2]!.cells, ok(90, 2000)] },
   ],
-  udpLoss: { nodeIds: ["nod_1", "nod_3"], sharePercent: 38 },
+  udpLoss: { nodeIds: ["nod_1", "nod_3"], sharePercent: 38, lostPermille: 31 },
 };
 
 async function mount(data: object = checks) {
@@ -108,16 +108,16 @@ describe("the checks matrix", () => {
 
   it("names the nodes of the UDP-loss notice above the matrix, and shows none without it", async () => {
     await mount(udp);
-    const notice = [...document.querySelectorAll("[role=status]")].find((n) => n.textContent?.includes("inbound UDP"));
+    const notice = [...document.querySelectorAll("[role=status]")].find((n) => n.textContent?.includes("loses UDP"));
     expect(notice?.textContent).toBe(
-      "The panel's server loses inbound UDP: Hysteria2 connections to de1 and nl1 often wait for a handshake retry (38% in the last hour), while VLESS is fine. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
+      "The panel's server loses UDP: Hysteria2 checks to de1 and nl1 often take a second or more longer than VLESS to the same node (38% in the last hour); the panel's Hysteria2 client lost 3.1% of its packets. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
     );
     // above the matrix, not in a corner
     expect(notice!.compareDocumentPosition(cellButton("de1, hy2 · 443 · Salamander")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     act(() => root?.unmount());
     host?.remove();
     await mount();
-    expect(document.body.textContent).not.toContain("inbound UDP");
+    expect(document.body.textContent).not.toContain("loses UDP");
   });
 
   it("puts a slow connect on a second line from 2 s on, keeps the cell calm, and explains the mark", async () => {

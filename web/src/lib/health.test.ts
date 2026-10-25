@@ -95,8 +95,8 @@ const item = (over: Partial<DoctorItem> = {}): DoctorItem => ({
   ...over,
 });
 
-const cell =(over: Partial<CheckCell> = {}): CheckCell => ({ deployed: true, inboundId: "inb_1", failStreak: 0, history: [], latencyHourMs: 0, responseHourMs: 0, connectHourMs: 0, ...over });
-const at = (status: CheckStatus, latencyMs = 0, errorCode = "") => ({ status, atUnix: 1, latencyMs, exitIp: "", exitCountry: "", errorCode, errorDetail: "", connectMs: 0, responseMs: 0 });
+const cell =(over: Partial<CheckCell> = {}): CheckCell => ({ deployed: true, inboundId: "inb_1", failStreak: 0, history: [], latencyHourMs: 0, responseHourMs: 0, connectHourMs: 0, udpSentHour: 0, udpLostHour: 0, ...over });
+const at = (status: CheckStatus, latencyMs = 0, errorCode = "") => ({ status, atUnix: 1, latencyMs, exitIp: "", exitCountry: "", errorCode, errorDetail: "", connectMs: 0, responseMs: 0, udpSent: 0, udpLost: 0 });
 
 describe("lookup", () => {
   it("fills the placeholders of a known key", () => {
@@ -339,7 +339,7 @@ describe("listOf", () => {
 
 describe("the check texts", () => {
   it("exist in English, Russian and Chinese", () => {
-    const keys = ["hl.legend.ms", "hl.legend.slow", "hl.cell.connect", "hl.tip.response", "hl.tip.responseLast", "hl.tip.cold", "hl.tip.connect", "hl.tip.last", "hl.tip.day", "hl.tip.where", "hl.udp.title", "hl.udp.body", "hl.udp.to", "hl.udp.tcpOk", "hl.hist.sub", "hl.hist.bar"] as const;
+    const keys = ["hl.legend.ms", "hl.legend.slow", "hl.cell.connect", "hl.tip.response", "hl.tip.responseLast", "hl.tip.cold", "hl.tip.connect", "hl.tip.last", "hl.tip.day", "hl.tip.where", "hl.udp.title", "hl.udp.body", "hl.udp.to", "hl.udp.lost", "hl.hist.sub", "hl.hist.bar"] as const;
     for (const key of keys) {
       expect(en[key], key).toMatch(/[a-z]/i);
       expect(ru[key], key).toMatch(/[а-яё]/i);

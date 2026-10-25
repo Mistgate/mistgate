@@ -132,11 +132,11 @@ export const en = {
   "hl.tip.last": "Last round {time}: response {response}, connect {connect}",
   "hl.tip.day": "24 h: {ok} ok, {failed} failed",
   "hl.tip.where": "Measured from the panel's server",
-  "hl.udp.title": "The panel's server loses inbound UDP:",
+  "hl.udp.title": "The panel's server loses UDP:",
   "hl.udp.body":
-    "{protocols} connections {to} often wait for a handshake retry ({share}% in the last hour){tcp}. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
+    "{protocols} checks {to} often take a second or more longer than VLESS to the same node ({share}% in the last hour){lost}. People are not affected: they connect to the nodes directly. If this keeps happening, contact the hoster of the panel's server.",
   "hl.udp.to": "to {nodes}",
-  "hl.udp.tcpOk": ", while VLESS is fine",
+  "hl.udp.lost": "; the panel's Hysteria2 client lost {pct}% of its packets",
 
   // ---- doctor
   "hl.doctor.sum": "Items checked: {items} · nodes: {nodes} · found: {n}",
@@ -655,11 +655,11 @@ export const ru: typeof en = {
   "hl.tip.last": "Последний круг {time}: ответ {response}, подключение {connect}",
   "hl.tip.day": "За 24 ч: {ok} успешно, {failed} с ошибкой",
   "hl.tip.where": "Замерено с сервера панели",
-  "hl.udp.title": "Сервер панели теряет входящий UDP:",
+  "hl.udp.title": "Сервер панели теряет UDP:",
   "hl.udp.body":
-    "подключения по {protocols} {to} часто ждут повтора рукопожатия ({share} % за час){tcp}. Людей это не касается: они подключаются к нодам напрямую. Если так постоянно, напиши хостеру сервера панели.",
+    "проверки {protocols} {to} часто идут на секунду и больше дольше, чем VLESS до той же ноды ({share} % за час){lost}. Людей это не касается: они подключаются к нодам напрямую. Если так постоянно, напиши хостеру сервера панели.",
   "hl.udp.to": "к ноде {nodes}|к нодам {nodes}|к нодам {nodes}",
-  "hl.udp.tcpOk": ", а VLESS в порядке",
+  "hl.udp.lost": "; клиент Hysteria2 панели потерял {pct} % пакетов",
 
   // ---- doctor
   "hl.doctor.sum": "Проверено пунктов: {items} · нод: {nodes} · найдено: {n}",
@@ -1170,10 +1170,10 @@ export const zh: typeof en = {
   "hl.tip.last": "最近一轮 {time}：响应 {response}，连接 {connect}",
   "hl.tip.day": "24 小时：{ok} 次正常，{failed} 次失败",
   "hl.tip.where": "在面板服务器上测得",
-  "hl.udp.title": "面板服务器丢失入站 UDP：",
-  "hl.udp.body": "{to} 的 {protocols} 连接经常要等待握手重试（近 1 小时 {share}%）{tcp}。用户不受影响：他们直接连接节点。如果一直如此，请联系面板服务器的服务商。",
+  "hl.udp.title": "面板服务器丢失 UDP：",
+  "hl.udp.body": "{to} 的 {protocols} 检测经常比到同一节点的 VLESS 慢一秒甚至更多（近 1 小时 {share}%）{lost}。用户不受影响：他们直接连接节点。如果一直如此，请联系面板服务器的服务商。",
   "hl.udp.to": "到节点 {nodes}",
-  "hl.udp.tcpOk": "，VLESS 正常",
+  "hl.udp.lost": "；面板的 Hysteria2 客户端丢失了 {pct}% 的数据包",
 
   "hl.doctor.sum": "已检查项目：{items} · 节点：{nodes} · 发现问题：{n}",
   "hl.doctor.allGreen": "所有检查项均正常",

@@ -987,12 +987,18 @@ type checkV struct {
 	ResponseMs     uint32 `json:"response_ms,omitempty"`
 	ResponseHourMs uint32 `json:"response_hour_ms,omitempty"`
 	ConnectHourMs  uint32 `json:"connect_hour_ms,omitempty"`
-	ExitCtry       string `json:"exit_country,omitempty"`
-	ErrorCode      string `json:"error_code,omitempty"`
-	ErrorInfo      string `json:"error_detail,omitempty"`
-	FailStreak     uint32 `json:"fail_streak,omitempty"`
-	OK24h          uint32 `json:"ok_24h"`
-	Failed24h      uint32 `json:"failed_24h"`
+	// Hysteria2: the packets the panel's own QUIC client sent and declared lost, in the last round and summed over the last
+	// hour (the panel's server path to the node, not a person's).
+	UDPSent     uint32 `json:"udp_sent,omitempty"`
+	UDPLost     uint32 `json:"udp_lost,omitempty"`
+	UDPSentHour uint32 `json:"udp_sent_hour,omitempty"`
+	UDPLostHour uint32 `json:"udp_lost_hour,omitempty"`
+	ExitCtry    string `json:"exit_country,omitempty"`
+	ErrorCode   string `json:"error_code,omitempty"`
+	ErrorInfo   string `json:"error_detail,omitempty"`
+	FailStreak  uint32 `json:"fail_streak,omitempty"`
+	OK24h       uint32 `json:"ok_24h"`
+	Failed24h   uint32 `json:"failed_24h"`
 }
 
 type checkRowV struct {
@@ -1134,6 +1140,8 @@ type checkColV struct {
 type udpLossV struct {
 	Nodes        []string `json:"nodes"`
 	SharePercent uint32   `json:"share_percent"`
+	// Packets the panel's Hysteria2 client lost per thousand sent over the listed nodes' rounds of the last hour.
+	LostPermille uint32 `json:"lost_permille,omitempty"`
 }
 
 // KlickReportsV is the klick_reports result: the switch of the kl!ck reports and, while it is on, what they say per node.
@@ -1559,11 +1567,13 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 		rv := checkRowV{NodeID: row.GetNodeId(), NodeName: nm(row.GetNodeName()), NodeStatus: nodeStatus(row.GetNodeStatus()), Cells: []checkV{},
 			Country: countryCheckView(country[row.GetNodeId()])}
 		for _, c := range row.GetCells() {
-			cv := checkV{Deployed: c.GetDeployed(), FailStreak: c.GetFailStreak(), ResponseHourMs: c.GetResponseHourMs(), ConnectHourMs: c.GetConnectHourMs()}
+			cv := checkV{Deployed: c.GetDeployed(), FailStreak: c.GetFailStreak(), ResponseHourMs: c.GetResponseHourMs(), ConnectHourMs: c.GetConnectHourMs(),
+				UDPSentHour: c.GetUdpSentHour(), UDPLostHour: c.GetUdpLostHour()}
 			if l := c.GetLast(); l != nil {
 				cv.Status = enumName("CHECK_STATUS_", l.GetStatus().String())
 				cv.AtUnix, cv.LatencyMs, cv.ExitCtry = l.GetAtUnix(), l.GetLatencyMs(), clean(l.GetExitCountry(), 8)
 				cv.ConnectMs, cv.ResponseMs = l.GetConnectMs(), l.GetResponseMs()
+				cv.UDPSent, cv.UDPLost = l.GetUdpSent(), l.GetUdpLost()
 				cv.ErrorCode, cv.ErrorInfo = clean(l.GetErrorCode(), 60), clean(l.GetErrorDetail(), 200)
 			}
 			for _, b := range c.GetHistory() {
@@ -1579,7 +1589,7 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 		for _, row := range r.GetRows() {
 			names[row.GetNodeId()] = nm(row.GetNodeName())
 		}
-		uv := &udpLossV{Nodes: []string{}, SharePercent: u.GetSharePercent()}
+		uv := &udpLossV{Nodes: []string{}, SharePercent: u.GetSharePercent(), LostPermille: u.GetLostPermille()}
 		for _, id := range u.GetNodeIds() {
 			if n := names[id]; n != "" {
 				uv.Nodes = append(uv.Nodes, n)

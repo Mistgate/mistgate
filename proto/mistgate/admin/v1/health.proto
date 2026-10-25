@@ -232,8 +232,9 @@ message CheckResult {
   int64 at_unix = 2 [jstype = JS_NUMBER];
   // The cold time of the round: from the start of the dial to the first response byte of the generate_204 probe,
   // milliseconds. It is measured on the panel's server, not on a person's device, and includes the tunnel handshake,
-  // a fresh TCP + TLS connection to the probe host through the tunnel, and the request. A lost UDP packet of the
-  // handshake adds a whole retry timer (about 2.5 s for QUIC, 5 s for WireGuard). 0 when the tunnel did not come up.
+  // a fresh TCP + TLS connection to the probe host through the tunnel, and the request. Lost UDP packets add retry timers
+  // (a second or more for QUIC and for TCP inside an AWG tunnel, 5 s for a WireGuard handshake). 0 when the tunnel did not
+  // come up.
   uint32 latency_ms = 3;
   // Exit IP and ISO 3166-1 alpha-2 country as seen by https://www.cloudflare.com/cdn-cgi/trace ("ip=", "loc=");
   // empty when that probe failed.
@@ -255,6 +256,11 @@ message CheckResult {
   // while the tunnel is up. Measured on the panel's server. 0 = not measured (the connection was not reused, the
   // request failed, or the round is from before this field).
   uint32 response_ms = 9;
+  // Hysteria2 only: the packets the panel's own QUIC client sent during the round and declared lost (what the panel's
+  // server lost on its way to the node and back, both directions as the client sees them). 0 for the other protocols and
+  // for rounds from before these fields.
+  uint32 udp_sent = 10;
+  uint32 udp_lost = 11;
 }
 
 // Half-hour bucket of one cell. start is aligned to :00 or :30 UTC.
@@ -287,6 +293,9 @@ message CheckCell {
   // Median of connect_ms (the time to open the tunnel and the first connection) over the last hour, ms; rounds without
   // it are left out; 0 = no data. Measured on the panel's server.
   uint32 connect_hour_ms = 8;
+  // Hysteria2 only: CheckResult.udp_sent and udp_lost summed over the last hour of rounds whose tunnel came up.
+  uint32 udp_sent_hour = 9;
+  uint32 udp_lost_hour = 10;
 }
 
 message CheckRow {
@@ -403,12 +412,20 @@ message CountryCheck {
   int64 tspu_at_unix = 19 [jstype = JS_NUMBER];
 }
 
-// The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds while the panel's TCP probes
-// (vless) were not: at least 20 % of the node's UDP rounds had connect_ms of 2000 or more.
+// The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds, judged against the panel's TCP
+// probe (vless) of the same node: a UDP round is slow when its latency_ms is 600 ms or more above the median latency_ms of
+// that node's VLESS rounds, which is what a lost packet costs (a QUIC or TCP retry timer) and what jitter never does. A
+// node needs at least 3 UDP rounds, and is listed when 20 % of them or more were slow. A node without VLESS rounds is
+// judged by the old rule (connect_ms of 2000 or more) and is listed only when another such node is too. Not shown while
+// the panel's TCP probes are slow themselves (5 % of VLESS rounds or more with connect_ms of 2000 or more): then the
+// panel's own network is the problem, not UDP.
 message UdpLossNotice {
   repeated string node_ids = 1;
   // Share of slow UDP rounds across the listed nodes, 0-100.
   uint32 share_percent = 2;
+  // Packets the panel's Hysteria2 client declared lost, per thousand sent, over the listed nodes' rounds of the last hour;
+  // 0 when it lost none or there were no Hysteria2 rounds.
+  uint32 lost_permille = 3;
 }
 
 message RunChecksNowRequest {

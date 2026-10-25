@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/netip"
@@ -73,6 +74,7 @@ type Result struct {
 	LatencyMS              uint32 // the cold time of the round: dial start to the first generate_204 response
 	ConnectMS              uint32 // dial start to the first connection through the tunnel being open; 0 = not measured
 	ResponseMS             uint32 // one more generate_204 on that connection; 0 = not measured or the connection was not reused
+	UDPSent, UDPLost       uint32 // packets the panel's own QUIC client sent and declared lost in the round (Hysteria2; 0 = none)
 	ExitIP, ExitCountry    string
 	ErrorCode, ErrorDetail string
 }
@@ -81,7 +83,8 @@ func (r Result) failed() bool { return r.Status == adminv1.CheckStatus_CHECK_STA
 
 func (r Result) sample(inboundID string) store.CheckSample {
 	return store.CheckSample{InboundID: inboundID, At: r.At, Status: int(r.Status), LatencyMS: r.LatencyMS, ConnectMS: r.ConnectMS,
-		ResponseMS: r.ResponseMS, ExitIP: r.ExitIP, ExitCountry: r.ExitCountry, ErrorCode: r.ErrorCode, ErrorDetail: r.ErrorDetail}
+		ResponseMS: r.ResponseMS, UDPSent: r.UDPSent, UDPLost: r.UDPLost, ExitIP: r.ExitIP, ExitCountry: r.ExitCountry,
+		ErrorCode: r.ErrorCode, ErrorDetail: r.ErrorDetail}
 }
 
 // classify names a dial error. Anything that is not clearly a certificate, credential or refusal problem is a
@@ -234,6 +237,10 @@ func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, star
 	if res.Status != adminv1.CheckStatus_CHECK_STATUS_OK && len(bad) > 0 {
 		res.ErrorCode, res.ErrorDetail = bad[0].Code, bad[0].Detail
 	}
+	if u, ok := tn.(udpStatser); ok {
+		sent, lost := u.UDPStats()
+		res.UDPSent, res.UDPLost = uint32(min(sent, math.MaxUint32)), uint32(min(lost, math.MaxUint32))
+	}
 	return res
 }
 
@@ -318,4 +325,10 @@ type requestErrorClassifier interface {
 // REALITY/TLS) was up, or the zero time when it is not known; connect_ms then runs to that moment.
 type connectReporter interface {
 	ConnectedAt() time.Time
+}
+
+// udpStatser is implemented by a tunnel that knows what its own UDP connection sent and declared lost during the round
+// (Hysteria2: the QUIC client's statistics, read before the tunnel closes).
+type udpStatser interface {
+	UDPStats() (sent, lost uint64)
 }

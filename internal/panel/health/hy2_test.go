@@ -176,6 +176,10 @@ func TestCheckerAgainstARealEngine(t *testing.T) {
 			if res.ConnectMS == 0 || res.ConnectMS > res.LatencyMS || res.ResponseMS == 0 {
 				t.Fatalf("connect %d ms, response %d ms, latency %d ms", res.ConnectMS, res.ResponseMS, res.LatencyMS)
 			}
+			// the round's QUIC packets: sent, and nothing lost on loopback
+			if res.UDPSent == 0 || res.UDPLost > res.UDPSent {
+				t.Fatalf("udp sent %d lost %d", res.UDPSent, res.UDPLost)
+			}
 			if res.ErrorDetail != "" && !strings.Contains(res.ErrorDetail, "differs") {
 				t.Fatalf("detail %q", res.ErrorDetail)
 			}

@@ -150,7 +150,7 @@ func (c *clientImpl) connect() (*HandshakeInfo, error) {
 	if authResp.RxAuto {
 		// Server asks client to use bandwidth detection,
 		// ignore local bandwidth config and use the configured congestion controller.
-		congestion.UseConfigured(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
+		congestion.UseConfiguredCounting(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
 	} else {
 		// actualTx = min(serverRx, clientTx)
 		actualTx = authResp.Rx
@@ -159,10 +159,10 @@ func (c *clientImpl) connect() (*HandshakeInfo, error) {
 			actualTx = c.config.BandwidthConfig.MaxTx
 		}
 		if actualTx > 0 {
-			congestion.UseBrutal(conn, actualTx, c.config.BandwidthConfig.DisableLossCompensation)
+			congestion.UseBrutalCounting(conn, actualTx, c.config.BandwidthConfig.DisableLossCompensation)
 		} else {
 			// We don't know our own bandwidth either, use the configured congestion controller.
-			congestion.UseConfigured(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
+			congestion.UseConfiguredCounting(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
 		}
 	}
 	_ = resp.Body.Close()
@@ -241,7 +241,18 @@ func (c *clientImpl) Close() error {
 	_ = c.conn.CloseWithError(closeErrCodeOK, "")
 	_ = c.tr.Close()
 	_ = c.pktConn.Close()
+	congestion.Forget(c.conn)
 	return nil
+}
+
+// ConnectionStats is the statistics of the client's QUIC connection, with the packets lost under BBR and Brutal counted
+// too (a Mistgate patch, see MISTGATE.md). Read it before Close.
+func (c *clientImpl) ConnectionStats() quic.ConnectionStats {
+	st := c.conn.ConnectionStats()
+	if n, ok := congestion.LostPackets(c.conn); ok {
+		st.PacketsLost = n
+	}
+	return st
 }
 
 var nonPermanentErrors = []error{
