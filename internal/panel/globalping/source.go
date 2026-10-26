@@ -4,28 +4,27 @@ import (
 	"context"
 	"errors"
 	"math"
+	"math/rand/v2"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/health"
 )
 
-// The Globalping implementation of health.CountrySource. One round, as the API's own client guidelines describe it:
-//
-//  1. a control measurement (TCP 443 to a site that is never blocked in the country) from home and mobile networks
-//     (tag eyeball-network) of the country, limit = probes. Its id names the probes of the round.
-//  2. if fewer than two of those probes reached the control, once more from any network of the country.
-//  3. every other measurement passes that id as "locations", so every node is seen by the same probes: an ICMP ping of the
-//     node's address and a TCP ping of each of its ports.
-//  4. all of them are polled together: a short wait, then GET by id, until none is in progress or the round's time is up.
-//
-// No measurement ever targets anything but the control site, the nodes' addresses given by the caller and their names.
+// The Globalping implementation of health.CountrySource. When a round asks for named networks, it reads GET /v1/probes
+// and pins up to probes-1 home or mobile probes by ASN and city in the control request. A generic country location uses
+// the remaining budget; if listing fails, the control request uses one generic country location. If fewer than two
+// home or mobile probes reach the control, it retries across any network in the country. The control measurement's id
+// selects the same probes for each node's ICMP test and TCP tests of its ports. All measurements are polled together
+// until they finish or the round's deadline expires. Requests target only the control site and caller-provided nodes.
 
 const (
 	pingPackets  = 3
 	defaultPoll  = 500 * time.Millisecond // the guideline: wait 500 ms after a response, then ask again
 	maxRateWait  = 10 * time.Second       // a 429 on a read: wait at most this and ask again
 	defaultReset = 5 * time.Minute        // a 429 on a create that does not say when
+	probesWait   = 10 * time.Second
 	minEyeball   = 2
 )
 
@@ -35,11 +34,12 @@ var (
 )
 
 type source struct {
-	svc   *Service
-	c     *client
-	limit int
-	poll  time.Duration
-	gen   uint64
+	svc          *Service
+	c            *client
+	limit        int
+	poll         time.Duration
+	gen          uint64
+	probeTimeout time.Duration // test override; zero uses probesWait
 }
 
 func (s *source) Name() string     { return "globalping" }
@@ -59,23 +59,26 @@ func (s *source) Measure(ctx context.Context, r health.CountryRound) (health.Cou
 }
 
 func (s *source) measure(ctx context.Context, r health.CountryRound) (health.CountryObserved, error) {
-	id, ctl, err := s.control(ctx, r, true)
+	plan := s.controlPlan(ctx, r)
+	obs := health.CountryObserved{NoProbe: plan.noProbe, Asked: plan.asked}
+	id, ctl, err := s.control(ctx, r, true, plan)
 	if err == nil && countValid(ctl) < minEyeball {
 		err = errNoEyeball
 	}
 	eyeball := !errors.Is(err, errNoEyeball)
 	if !eyeball {
-		id, ctl, err = s.control(ctx, r, false)
+		id, ctl, err = s.control(ctx, r, false, plan)
 	}
 	if err != nil {
-		return health.CountryObserved{}, err
+		return obs, err
 	}
-	obs := health.CountryObserved{Eyeball: eyeball}
+	obs.Eyeball = eyeball
 	probes := make([]health.ObservedProbe, len(ctl.Results))
 	for i, it := range ctl.Results {
 		_, ok, _ := pingResult(it.Result)
 		probes[i] = health.ObservedProbe{Network: it.Probe.Network, ASN: it.Probe.ASN, City: it.Probe.City,
-			Online: it.Result.Status != "offline", ControlOK: ok, Nodes: map[string]health.ObservedNode{}}
+			Eyeball: slices.Contains(it.Probe.Tags, "eyeball-network"), Online: it.Result.Status != "offline", ControlOK: ok,
+			Nodes: map[string]health.ObservedNode{}}
 	}
 	obs.Probes = probes
 	if countValid(ctl) < minEyeball { // nothing to compare with: do not spend the node measurements
@@ -88,6 +91,11 @@ func (s *source) measure(ctx context.Context, r health.CountryRound) (health.Cou
 	}
 	jobs := map[string]job{}
 	var ids []string
+	expected := make(map[string]int, len(r.Targets))
+	completed := make([]map[string]int, len(probes))
+	for i := range completed {
+		completed[i] = map[string]int{}
+	}
 	add := func(req measurementRequest, j job) error {
 		c, err := s.create(ctx, req)
 		if err != nil {
@@ -98,6 +106,7 @@ func (s *source) measure(ctx context.Context, r health.CountryRound) (health.Cou
 		return nil
 	}
 	for _, t := range r.Targets {
+		expected[t.Key] = 1 + len(t.Ports)
 		if err := add(measurementRequest{Type: "ping", Target: t.IP, Locations: id, MeasurementOptions: pingOptions{Packets: pingPackets}}, job{key: t.Key, kind: "icmp"}); err != nil {
 			return obs, err
 		}
@@ -128,25 +137,110 @@ func (s *source) measure(ctx context.Context, r health.CountryRound) (health.Cou
 			case "icmp":
 				answered, ok, ms := pingResult(it.Result)
 				n.Answered, n.ICMPOK, n.ICMPMs = answered, ok, ms
+				if answered {
+					completed[i][j.key]++
+				}
 			case "tcp":
 				answered, ok, ms := pingResult(it.Result)
 				n.Answered = answered || n.Answered
 				n.TCP = append(n.TCP, health.ObservedPort{Port: j.port, OK: ok, MS: ms})
+				if answered {
+					completed[i][j.key]++
+				}
 			}
 			probes[i].Nodes[j.key] = n
+		}
+	}
+	for i := range probes {
+		for key, node := range probes[i].Nodes {
+			node.Complete = expected[key] > 0 && completed[i][key] == expected[key]
+			probes[i].Nodes[key] = node
 		}
 	}
 	return obs, nil
 }
 
+type controlPlan struct {
+	picks   []location
+	noProbe []string
+	asked   []string
+	planned bool
+}
+
+func (s *source) controlPlan(ctx context.Context, r health.CountryRound) controlPlan {
+	if len(r.Want) == 0 {
+		return controlPlan{}
+	}
+	timeout := s.probeTimeout
+	if timeout <= 0 {
+		timeout = probesWait
+	}
+	probesCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	probes, err := s.c.probes(probesCtx)
+	if err != nil {
+		s.svc.log.Warn("globalping: probe list", "err", err)
+		return controlPlan{} // listing probes is best-effort; the generic country location remains the fallback
+	}
+
+	byASN := make(map[uint32][]listedProbe)
+	for _, probe := range probes {
+		if probe.Location.Country == r.Country && slices.Contains(probe.Tags, "eyeball-network") {
+			byASN[probe.Location.ASN] = append(byASN[probe.Location.ASN], probe)
+		}
+	}
+
+	plan := controlPlan{planned: true}
+	used := map[string]bool{}
+	maxPicks := max(r.Probes-1, 0)
+	for _, want := range r.Want {
+		var matches []listedProbe
+		for _, asn := range want.ASNs {
+			for _, probe := range byASN[asn] {
+				if want.City == "" || probe.Location.City == want.City {
+					matches = append(matches, probe)
+				}
+			}
+		}
+		if len(matches) == 0 {
+			if want.City == "" && want.Name != "" {
+				plan.noProbe = append(plan.noProbe, want.Name)
+			}
+			continue
+		}
+		if len(plan.picks) >= maxPicks || used[want.Name] {
+			continue
+		}
+		probe := matches[rand.IntN(len(matches))]
+		plan.picks = append(plan.picks, location{Country: r.Country, ASN: probe.Location.ASN, City: probe.Location.City,
+			Tags: []string{"eyeball-network"}, Limit: 1})
+		if want.Name != "" {
+			plan.asked = append(plan.asked, want.Name)
+		}
+		used[want.Name] = true
+	}
+	return plan
+}
+
 // control runs the control measurement and waits for it. eyeball restricts the probes to home and mobile networks;
 // errNoEyeball says there were too few of them to start with.
-func (s *source) control(ctx context.Context, r health.CountryRound, eyeball bool) (string, measurement, error) {
-	loc := location{Country: r.Country, Limit: r.Probes}
-	if eyeball {
-		loc.Tags = []string{"eyeball-network"}
+func (s *source) control(ctx context.Context, r health.CountryRound, eyeball bool, plan controlPlan) (string, measurement, error) {
+	var locations []location
+	if plan.planned {
+		locations = slices.Clone(plan.picks)
+		generic := location{Country: r.Country, Limit: r.Probes - len(plan.picks)}
+		if eyeball {
+			generic.Tags = []string{"eyeball-network"}
+		}
+		locations = append(locations, generic)
+	} else {
+		loc := location{Country: r.Country, Limit: r.Probes}
+		if eyeball {
+			loc.Tags = []string{"eyeball-network"}
+		}
+		locations = []location{loc}
 	}
-	c, err := s.create(ctx, measurementRequest{Type: "ping", Target: r.ControlHost, Locations: []location{loc},
+	c, err := s.create(ctx, measurementRequest{Type: "ping", Target: r.ControlHost, Locations: locations,
 		MeasurementOptions: pingOptions{Protocol: "TCP", Port: r.ControlPort, Packets: pingPackets}})
 	var ae *apiError
 	switch {

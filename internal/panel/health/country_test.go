@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,11 +18,13 @@ import (
 
 // fakeCountrySource answers a round from a table: per node key a mode (ok, tcp_blocked, blocked, few) and nothing else.
 type fakeCountrySource struct {
-	mu     sync.Mutex
-	limit  int
-	mode   map[string]string
-	err    error
-	rounds []CountryRound
+	mu      sync.Mutex
+	limit   int
+	mode    map[string]string
+	err     error
+	noProbe []string
+	asked   []string
+	rounds  []CountryRound
 }
 
 func (f *fakeCountrySource) Name() string     { return "fake" }
@@ -34,9 +37,12 @@ func (f *fakeCountrySource) Measure(_ context.Context, r CountryRound) (CountryO
 	if f.err != nil {
 		return CountryObserved{}, f.err
 	}
-	obs := CountryObserved{Eyeball: true}
-	for i, name := range []string{"Rostelecom", "ER-Telecom", "Beeline"} {
-		p := ObservedProbe{Network: name, ASN: uint32(12000 + i), City: "Moscow", Online: true, ControlOK: true, Nodes: map[string]ObservedNode{}}
+	obs := CountryObserved{Eyeball: true, NoProbe: slices.Clone(f.noProbe), Asked: f.asked}
+	for i, probe := range []struct {
+		name string
+		asn  uint32
+	}{{"Rostelecom", 12389}, {"ER-Telecom", 51570}, {"Beeline", 3216}} {
+		p := ObservedProbe{Network: probe.name, ASN: probe.asn, City: "Moscow", Eyeball: true, Online: true, ControlOK: true, Nodes: map[string]ObservedNode{}}
 		for _, t := range r.Targets {
 			n := ObservedNode{Answered: true}
 			switch f.mode[t.Key] {
@@ -58,6 +64,7 @@ func (f *fakeCountrySource) Measure(_ context.Context, r CountryRound) (CountryO
 				p.ControlOK = i == 0
 				n.ICMPOK = true
 			}
+			n.Complete = true
 			p.Nodes[t.Key] = n
 		}
 		obs.Probes = append(obs.Probes, p)
@@ -75,6 +82,12 @@ func (f *fakeCountrySource) calls() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.rounds)
+}
+
+func (f *fakeCountrySource) roundsSnapshot() []CountryRound {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]CountryRound(nil), f.rounds...)
 }
 
 // countryEnv is an environment with the country check on, a fake source and the Resolve of a name table.
@@ -280,6 +293,84 @@ func TestCountryTickTargetsAndSchedule(t *testing.T) {
 	c.clock.Advance(-10 * time.Minute)
 	if c.tick() {
 		t.Fatal("a round ran before its interval")
+	}
+}
+
+func TestCountryTickRecordsOperatorWantsAndSkipsUnlistedCountries(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	if !c.tick() {
+		t.Fatal("the RU round did not run")
+	}
+	rounds := c.src.roundsSnapshot()
+	if len(rounds) != 1 {
+		t.Fatalf("rounds = %d, want 1", len(rounds))
+	}
+	var got []string
+	for _, want := range rounds[0].Want {
+		got = append(got, want.Name)
+	}
+	want := []string{"MTS", "Beeline", "MegaFon", "Rostelecom", "T2", "ER-Telecom"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("first round wants = %v, want table order %v", got, want)
+	}
+
+	c.cfg.Country = "DE"
+	if !c.tick() {
+		t.Fatal("the DE round did not run")
+	}
+	rounds = c.src.roundsSnapshot()
+	if len(rounds) != 2 || rounds[1].Country != "DE" || len(rounds[1].Want) != 0 {
+		t.Fatalf("unlisted country round = %+v, want no operator wants", rounds[1])
+	}
+}
+
+func TestAskedOperatorWithoutAnAnswerDoesNotStayFirst(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.src.asked = []string{"MTS"}
+	for i := range 4 {
+		if !c.tick() {
+			t.Fatal("no round")
+		}
+		if i == 0 {
+			c.src.mu.Lock()
+			c.src.asked = nil
+			c.src.mu.Unlock()
+		}
+	}
+	for i, r := range c.src.roundsSnapshot() {
+		if len(r.Want) == 0 {
+			t.Fatalf("round %d has no operator wants", i+1)
+		}
+		if i > 0 && r.Want[0].Name == "MTS" {
+			t.Fatalf("round %d starts with MTS after its pin was asked but unanswered", i+1)
+		}
+	}
+}
+
+func TestCountryOperatorRotationFallsBackToTableOrderOnStoreError(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.src.asked = []string{"MTS"}
+	c.src.mu.Lock()
+	c.src.mode = map[string]string{}
+	c.src.mu.Unlock()
+	if !c.tick() {
+		t.Fatal("no round")
+	}
+	ok := c.s.countryRoundWants(c.ctx, "RU")
+	ctx, cancel := context.WithCancel(c.ctx)
+	cancel()
+	failed := c.s.countryRoundWants(ctx, "RU")
+	if ok[0].Name == failed[0].Name {
+		t.Fatalf("a working read and a failed read give the same order (%s first)", ok[0].Name)
+	}
+	if ok[0].Name == "MTS" {
+		t.Fatal("a successful read did not count the unanswered MTS pin")
+	}
+	if failed[0].Name != "MTS" {
+		t.Fatalf("failed read order starts with %s, want table order", failed[0].Name)
 	}
 }
 
@@ -489,6 +580,7 @@ func TestGetChecksCarriesTheCountryCheck(t *testing.T) {
 	c := newCountryEnv(t)
 	c.onlineNode("de1", "203.0.113.10")
 	c.onlineNode("nl1", "203.0.113.20")
+	c.src.noProbe = []string{"MegaFon", "T2"}
 	c.src.set("nl1", "tcp_blocked")
 	c.tick()
 	r, err := rpc{c.s}.GetChecks(c.ctx, connect.NewRequest(&adminv1.GetChecksRequest{}))
@@ -503,7 +595,7 @@ func TestGetChecksCarriesTheCountryCheck(t *testing.T) {
 		t.Fatalf("country checks = %+v", r.Msg.CountryChecks)
 	}
 	nl := got["nl1"]
-	if nl.Country != "RU" || !nl.Eyeball || len(nl.Probes) != 3 || !nl.Probes[0].Valid || !nl.Probes[0].IcmpOk || nl.Probes[0].Network != "Rostelecom" ||
+	if nl.Country != "RU" || !nl.Eyeball || !slices.Equal(nl.NoProbe, []string{"MegaFon", "T2"}) || len(nl.Probes) != 3 || !nl.Probes[0].Eyeball || !nl.Probes[0].Valid || !nl.Probes[0].IcmpOk || nl.Probes[0].Network != "Rostelecom" ||
 		len(nl.Probes[0].Tcp) != 1 || nl.Probes[0].Tcp[0].Port != 443 || nl.Probes[0].Tcp[0].Ok {
 		t.Fatalf("nl1 = %+v", nl)
 	}

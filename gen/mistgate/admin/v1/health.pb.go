@@ -1522,7 +1522,9 @@ type CountryProbe struct {
 	IcmpMs  uint32        `protobuf:"varint,5,opt,name=icmp_ms,json=icmpMs,proto3" json:"icmp_ms,omitempty"`
 	Tcp     []*PortResult `protobuf:"bytes,6,rep,name=tcp,proto3" json:"tcp,omitempty"`
 	// False: thrown away for this round (it failed the control site, or went offline); its answers are shown but not counted.
-	Valid         bool `protobuf:"varint,7,opt,name=valid,proto3" json:"valid,omitempty"`
+	Valid bool `protobuf:"varint,7,opt,name=valid,proto3" json:"valid,omitempty"`
+	// Home or mobile network, from this probe's assigned Globalping tags.
+	Eyeball       bool `protobuf:"varint,9,opt,name=eyeball,proto3" json:"eyeball,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1606,6 +1608,13 @@ func (x *CountryProbe) GetValid() bool {
 	return false
 }
 
+func (x *CountryProbe) GetEyeball() bool {
+	if x != nil {
+		return x.Eyeball
+	}
+	return false
+}
+
 type CountryCheck struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
@@ -1643,8 +1652,10 @@ type CountryCheck struct {
 	TspuVantageId   string      `protobuf:"bytes,17,opt,name=tspu_vantage_id,json=tspuVantageId,proto3" json:"tspu_vantage_id,omitempty"`
 	TspuVantageName string      `protobuf:"bytes,18,opt,name=tspu_vantage_name,json=tspuVantageName,proto3" json:"tspu_vantage_name,omitempty"`
 	TspuAtUnix      int64       `protobuf:"varint,19,opt,name=tspu_at_unix,json=tspuAtUnix,proto3" json:"tspu_at_unix,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Named operators with no matching online home or mobile probe in the latest Globalping round.
+	NoProbe       []string `protobuf:"bytes,20,rep,name=no_probe,json=noProbe,proto3" json:"no_probe,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CountryCheck) Reset() {
@@ -1808,6 +1819,13 @@ func (x *CountryCheck) GetTspuAtUnix() int64 {
 		return x.TspuAtUnix
 	}
 	return 0
+}
+
+func (x *CountryCheck) GetNoProbe() []string {
+	if x != nil {
+		return x.NoProbe
+	}
+	return nil
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds, judged against the panel's TCP
@@ -3028,7 +3046,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"PortResult\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x0e\n" +
-	"\x02ms\x18\x03 \x01(\rR\x02ms\"\xc7\x01\n" +
+	"\x02ms\x18\x03 \x01(\rR\x02ms\"\xe1\x01\n" +
 	"\fCountryProbe\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x10\n" +
 	"\x03asn\x18\x02 \x01(\rR\x03asn\x12\x12\n" +
@@ -3036,7 +3054,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\aicmp_ok\x18\x04 \x01(\bR\x06icmpOk\x12\x17\n" +
 	"\aicmp_ms\x18\x05 \x01(\rR\x06icmpMs\x12/\n" +
 	"\x03tcp\x18\x06 \x03(\v2\x1d.mistgate.admin.v1.PortResultR\x03tcp\x12\x14\n" +
-	"\x05valid\x18\a \x01(\bR\x05valid\"\x86\x06\n" +
+	"\x05valid\x18\a \x01(\bR\x05valid\x12\x18\n" +
+	"\aeyeball\x18\t \x01(\bR\aeyeball\"\xa1\x06\n" +
 	"\fCountryCheck\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
 	"\acountry\x18\x02 \x01(\tR\acountry\x12;\n" +
@@ -3062,7 +3081,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x0ftspu_vantage_id\x18\x11 \x01(\tR\rtspuVantageId\x12*\n" +
 	"\x11tspu_vantage_name\x18\x12 \x01(\tR\x0ftspuVantageName\x12$\n" +
 	"\ftspu_at_unix\x18\x13 \x01(\x03B\x020\x02R\n" +
-	"tspuAtUnix\"\xa2\x01\n" +
+	"tspuAtUnix\x12\x19\n" +
+	"\bno_probe\x18\x14 \x03(\tR\anoProbe\"\xa2\x01\n" +
 	"\rUdpLossNotice\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12#\n" +
 	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\x12#\n" +

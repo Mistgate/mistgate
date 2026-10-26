@@ -103,12 +103,15 @@ type countryDetail struct {
 	Reason  string               `json:"reason,omitempty"`
 	Eyeball bool                 `json:"eyeball,omitempty"`
 	Ports   []uint16             `json:"ports,omitempty"` // the TCP ports that were tried
+	NoProbe []string             `json:"no_probe,omitempty"`
+	Asked   []string             `json:"asked,omitempty"`
 }
 
 type countryProbeDetail struct {
 	Network string              `json:"network"`
 	ASN     uint32              `json:"asn,omitempty"`
 	City    string              `json:"city,omitempty"`
+	Eyeball bool                `json:"eyeball,omitempty"`
 	Valid   bool                `json:"valid"`
 	ICMPOK  bool                `json:"icmp_ok"`
 	ICMPMs  uint32              `json:"icmp_ms,omitempty"`
@@ -132,6 +135,7 @@ func countryJudge(t CountryTarget, obs CountryObserved) (verdict string, d count
 		o, has := p.Nodes[t.Key]
 		pd := countryProbeDetail{Network: p.Network, ASN: p.ASN, City: p.City, Valid: p.Online && p.ControlOK && has && o.Answered,
 			ICMPOK: o.ICMPOK, ICMPMs: o.ICMPMs}
+		pd.Eyeball = p.Eyeball
 		anyTCP := false
 		for _, tp := range o.TCP {
 			pd.TCP = append(pd.TCP, countryPortDetail{Port: tp.Port, OK: tp.OK, MS: tp.MS})
@@ -319,7 +323,8 @@ func (s *Service) CountryTick(ctx context.Context) bool {
 	if s.cfg.RoundLease != nil && !s.cfg.RoundLease(ctx, "country-round", max(s.cfg.CountryRoundTimeout, countryRoundTime)) {
 		return false
 	}
-	s.countryRound(ctx, cc, src, nodes, probes, now)
+	wants := s.countryRoundWants(ctx, cc.Country)
+	s.countryRound(ctx, cc, src, nodes, probes, now, wants)
 	return true
 }
 
@@ -333,7 +338,7 @@ func (s *Service) countryNoteStretch(chosen, effective time.Duration) {
 	s.countryStretched = stretched
 }
 
-func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src CountrySource, nodes []countryNode, probes int, now time.Time) {
+func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src CountrySource, nodes []countryNode, probes int, now time.Time, wants []CountryWant) {
 	timeout := s.cfg.CountryRoundTimeout
 	if timeout <= 0 {
 		timeout = countryRoundTime
@@ -341,18 +346,18 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 	rctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	round := CountryRound{Country: cc.Country, Probes: probes}
+	round := CountryRound{Country: cc.Country, Probes: probes, Want: wants}
 	round.ControlHost, round.ControlPort = countryControl(cc.Country)
 	var rows []store.CountryCheck
-	unknown := func(n countryNode, reason string) {
-		b, _ := json.Marshal(countryDetail{Reason: reason, Ports: n.ports})
+	unknown := func(n countryNode, reason string, asked []string) {
+		b, _ := json.Marshal(countryDetail{Reason: reason, Ports: n.ports, Asked: asked})
 		rows = append(rows, store.CountryCheck{NodeID: n.node.ID, At: now, Country: cc.Country, Verdict: verdictUnknown, Detail: string(b)})
 	}
 	targets := map[string]countryNode{}
 	for _, n := range nodes {
 		ip, ok := s.countryAddress(rctx, n.node)
 		if !ok {
-			unknown(n, "no_ipv4")
+			unknown(n, "no_ipv4", nil)
 			continue
 		}
 		round.Targets = append(round.Targets, CountryTarget{Key: n.node.ID, IP: ip, Ports: n.ports})
@@ -366,11 +371,13 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 		if err != nil {
 			reason := s.countryFailure(ctx, src, err, now)
 			for _, t := range round.Targets {
-				unknown(targets[t.Key], reason)
+				unknown(targets[t.Key], reason, obs.Asked)
 			}
 		} else {
 			for _, t := range round.Targets {
 				verdict, d := countryJudge(t, obs)
+				d.NoProbe = obs.NoProbe
+				d.Asked = obs.Asked
 				b, _ := json.Marshal(d)
 				rows = append(rows, store.CountryCheck{NodeID: t.Key, At: now, Country: cc.Country, Verdict: verdict, Detail: string(b)})
 			}
@@ -412,9 +419,10 @@ var countryVerdictProto = map[string]adminv1.CountryVerdict{
 func countryCheckMsg(r store.CountryCheck) *adminv1.CountryCheck {
 	var d countryDetail
 	_ = json.Unmarshal([]byte(r.Detail), &d)
-	m := &adminv1.CountryCheck{NodeId: r.NodeID, Country: r.Country, Verdict: countryVerdictProto[r.Verdict], AtUnix: r.At.Unix(), Reason: d.Reason, Eyeball: d.Eyeball}
+	m := &adminv1.CountryCheck{NodeId: r.NodeID, Country: r.Country, Verdict: countryVerdictProto[r.Verdict], AtUnix: r.At.Unix(), Reason: d.Reason, Eyeball: d.Eyeball,
+		NoProbe: d.NoProbe}
 	for _, p := range d.Probes {
-		pm := &adminv1.CountryProbe{Network: p.Network, Asn: p.ASN, City: p.City, IcmpOk: p.ICMPOK, IcmpMs: p.ICMPMs, Valid: p.Valid}
+		pm := &adminv1.CountryProbe{Network: p.Network, Asn: p.ASN, City: p.City, IcmpOk: p.ICMPOK, IcmpMs: p.ICMPMs, Valid: p.Valid, Eyeball: p.Eyeball}
 		for _, t := range p.TCP {
 			pm.Tcp = append(pm.Tcp, &adminv1.PortResult{Port: uint32(t.Port), Ok: t.OK, Ms: t.MS})
 		}

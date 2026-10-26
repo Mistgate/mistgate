@@ -377,6 +377,8 @@ message CountryProbe {
   repeated PortResult tcp = 6;
   // False: thrown away for this round (it failed the control site, or went offline); its answers are shown but not counted.
   bool valid = 7;
+  // Home or mobile network, from this probe's assigned Globalping tags.
+  bool eyeball = 9;
 }
 
 message CountryCheck {
@@ -415,6 +417,8 @@ message CountryCheck {
   string tspu_vantage_id = 17;
   string tspu_vantage_name = 18;
   int64 tspu_at_unix = 19 [jstype = JS_NUMBER];
+  // Named operators with no matching online home or mobile probe in the latest Globalping round.
+  repeated string no_probe = 20;
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds, judged against the panel's TCP

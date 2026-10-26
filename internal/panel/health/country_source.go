@@ -35,10 +35,19 @@ type CountryRound struct {
 	Country string
 	// Probes is the number of probes per measurement the budget allows (2 or 3).
 	Probes int
+	// Want asks a source for named networks first; City pins a probe when set. Empty means the generic country selection.
+	Want []CountryWant
 	// Control is a site that is never blocked in the country: a probe that cannot open TCP Port of Host is not counted.
 	ControlHost string
 	ControlPort uint16
 	Targets     []CountryTarget
+}
+
+// CountryWant is a named network to ask during a round. A want with an empty City can match any of its ASNs.
+type CountryWant struct {
+	Name string
+	ASNs []uint32
+	City string
 }
 
 // CountryTarget is one node. IP is its IPv4 address (the only address that is measured).
@@ -53,6 +62,8 @@ type CountryObserved struct {
 	// Eyeball: the probes are home or mobile networks (false: any network, too few of them were online).
 	Eyeball bool
 	Probes  []ObservedProbe
+	NoProbe []string // named operators without a matching online home or mobile probe
+	Asked   []string // operators pinned in the control request, whether or not their probes answered
 }
 
 // ObservedProbe is one probe of the round.
@@ -60,6 +71,8 @@ type ObservedProbe struct {
 	Network string
 	ASN     uint32
 	City    string
+	// Eyeball is derived from this probe's tags, including in a fallback round with mixed probe types.
+	Eyeball bool
 	// Online: the probe took part in the round at all (not offline).
 	Online bool
 	// ControlOK: it opened TCP to the control site.
@@ -72,6 +85,8 @@ type ObservedProbe struct {
 type ObservedNode struct {
 	// Answered: the probe returned a result for this target (it was not offline or broken in the middle of the round).
 	Answered bool
+	// Complete: the probe answered the ICMP test and every TCP port test for this target.
+	Complete bool
 	ICMPOK   bool
 	ICMPMs   uint32
 	TCP      []ObservedPort

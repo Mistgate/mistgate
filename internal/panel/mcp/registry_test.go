@@ -100,6 +100,7 @@ func TestRegistryShape(t *testing.T) {
 
 func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 	want := map[string][]string{
+		"checks_results":    {"per-probe eyeball tag", "no_probe"},
 		"user_connection":   {"cannot distinguish a freeze", "first 60 seconds", "64 kib", "10-second", "idle tail", "freezes", "quiet", "accepted", "hellos_foreign", "inbound-only", "rtt_samples", "pkts_sent", "no unsupported list"},
 		"node_connections":  {"cannot distinguish a freeze", "first 60 seconds", "64 kib", "10-second", "resumed tls sessions", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_samples", "pkts_sent", "their zero values mean nothing"},
 		"fleet_connections": {"cannot distinguish a freeze", "first 60 seconds", "64 kib", "10-second", "resumed tls sessions", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_samples", "pkts_sent", "unsupported zero counters mean nothing"},

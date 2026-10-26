@@ -6,11 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // fakeGlobalping is a Globalping API on a local server. The tests never reach the real one. Its probes are a fixed list;
@@ -30,19 +32,35 @@ type fakeGlobalping struct {
 	tcp      map[string]bool // "address:port" -> connects
 	control  string          // host of the control site
 	failNode map[int]string  // probe index -> status the node measurements get instead ("offline", "failed")
+	failTCP  map[int]bool    // probe index -> the TCP test fails inside the probe
 
 	rateLimited bool // POST answers 429
 	keepRunning bool // GETs never finish
+	keepNodeTCP bool // TCP node measurements stay in progress until the round deadline
 	token       string
 	limitsCode  int
+	probesCode  int
+	probesDelay time.Duration
 }
 
 type fakeProbe struct {
+	Country       string
 	Network, City string
 	ASN           uint32
 	Eyeball       bool
+	Tags          []string
 	ControlOK     bool
 	Offline       bool
+}
+
+func (p fakeProbe) tags() []string {
+	if p.Tags != nil {
+		return append([]string(nil), p.Tags...)
+	}
+	if p.Eyeball {
+		return []string{"eyeball-network"}
+	}
+	return []string{"datacenter-network"}
 }
 
 type recorded struct {
@@ -60,10 +78,10 @@ func newFakeGlobalping(t *testing.T) *fakeGlobalping {
 	f := &fakeGlobalping{t: t, defs: map[string]*fakeDef{}, icmp: map[string]bool{}, tcp: map[string]bool{},
 		control: "ya.ru", failNode: map[int]string{}, limitsCode: 200,
 		probes: []fakeProbe{
-			{Network: "Rostelecom", City: "Moscow", ASN: 12389, Eyeball: true, ControlOK: true},
-			{Network: "ER-Telecom", City: "Perm", ASN: 9049, Eyeball: true, ControlOK: true},
-			{Network: "Beeline", City: "Kazan", ASN: 3216, Eyeball: true, ControlOK: true},
-			{Network: "Selectel", City: "Saint Petersburg", ASN: 49505, Eyeball: false, ControlOK: true},
+			{Country: "RU", Network: "Rostelecom", City: "Moscow", ASN: 12389, Eyeball: true, ControlOK: true},
+			{Country: "RU", Network: "ER-Telecom", City: "Perm", ASN: 9049, Eyeball: true, ControlOK: true},
+			{Country: "RU", Network: "Beeline", City: "Kazan", ASN: 3216, Eyeball: true, ControlOK: true},
+			{Country: "RU", Network: "Selectel", City: "Saint Petersburg", ASN: 49505, Eyeball: false, ControlOK: true},
 		}}
 	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.srv.Close)
@@ -110,6 +128,8 @@ func (f *fakeGlobalping) serve(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && r.URL.Path == "/v1/measurements":
 		f.create(w, b)
+	case r.Method == http.MethodGet && r.URL.Path == "/v1/probes":
+		f.probeList(w, r)
 	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/measurements/"):
 		f.get(w, strings.TrimPrefix(r.URL.Path, "/v1/measurements/"))
 	case r.Method == http.MethodGet && r.URL.Path == "/v1/limits":
@@ -117,6 +137,31 @@ func (f *fakeGlobalping) serve(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (f *fakeGlobalping) probeList(w http.ResponseWriter, r *http.Request) {
+	if f.probesDelay > 0 {
+		timer := time.NewTimer(f.probesDelay)
+		defer timer.Stop()
+		select {
+		case <-r.Context().Done():
+			return
+		case <-timer.C:
+		}
+	}
+	if f.probesCode != 0 && f.probesCode != http.StatusOK {
+		w.WriteHeader(f.probesCode)
+		fmt.Fprint(w, `{"error":{"type":"unavailable","message":"nope"}}`)
+		return
+	}
+	probes := make([]map[string]any, 0, len(f.probes))
+	for _, p := range f.probes {
+		probes = append(probes, map[string]any{
+			"location": map[string]any{"country": p.Country, "asn": p.ASN, "city": p.City, "network": p.Network},
+			"tags":     p.tags(),
+		})
+	}
+	_ = json.NewEncoder(w).Encode(probes)
 }
 
 func (f *fakeGlobalping) limits(w http.ResponseWriter, r *http.Request) {
@@ -157,12 +202,29 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 		}
 		idx = prev.probes
 	case []any:
-		l := loc[0].(map[string]any)
-		limit := int(l["limit"].(float64))
-		tagged := l["tags"] != nil
-		for i, p := range f.probes {
-			if len(idx) < limit && (!tagged || p.Eyeball) {
-				idx = append(idx, i)
+		picked := map[int]bool{}
+		for _, raw := range loc {
+			l, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			limit := 1
+			if n, ok := l["limit"].(float64); ok {
+				limit = max(int(n), 0)
+			}
+			matched := 0
+			for i, p := range f.probes {
+				if matched == limit {
+					break
+				}
+				if !fakeProbeMatches(p, l) {
+					continue
+				}
+				matched++
+				if !picked[i] {
+					picked[i] = true
+					idx = append(idx, i)
+				}
 			}
 		}
 		if len(idx) == 0 {
@@ -178,6 +240,28 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 	fmt.Fprintf(w, `{"id":%q,"probesCount":%d}`, id, len(idx))
 }
 
+func fakeProbeMatches(p fakeProbe, loc map[string]any) bool {
+	if country, ok := loc["country"].(string); ok && p.Country != country {
+		return false
+	}
+	if asn, ok := loc["asn"].(float64); ok && p.ASN != uint32(asn) {
+		return false
+	}
+	if city, ok := loc["city"].(string); ok && p.City != city {
+		return false
+	}
+	if tags, ok := loc["tags"].([]any); ok {
+		probeTags := p.tags()
+		for _, raw := range tags {
+			tag, ok := raw.(string)
+			if !ok || !slices.Contains(probeTags, tag) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (f *fakeGlobalping) get(w http.ResponseWriter, id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -186,7 +270,7 @@ func (f *fakeGlobalping) get(w http.ResponseWriter, id string) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if !d.started || f.keepRunning { // the first read of every measurement finds it still running
+	if !d.started || f.keepRunning || (f.keepNodeTCP && fakeNodeTCP(d, f.control)) { // the first read of every measurement finds it still running
 		d.started = true
 		fmt.Fprintf(w, `{"id":%q,"status":"in-progress","probesCount":%d,"results":[]}`, id, len(d.probes))
 		return
@@ -195,12 +279,18 @@ func (f *fakeGlobalping) get(w http.ResponseWriter, id string) {
 	for _, i := range d.probes {
 		p := f.probes[i]
 		results = append(results, map[string]any{
-			"probe":  map[string]any{"city": p.City, "asn": p.ASN, "network": p.Network, "country": "RU", "tags": []string{"eyeball-network"}},
+			"probe":  map[string]any{"city": p.City, "asn": p.ASN, "network": p.Network, "country": p.Country, "tags": p.tags()},
 			"result": f.result(i, d),
 		})
 	}
 	b, _ := json.Marshal(map[string]any{"id": id, "status": "finished", "probesCount": len(d.probes), "results": results})
 	w.Write(b)
+}
+
+func fakeNodeTCP(d *fakeDef, control string) bool {
+	target, _ := d.body["target"].(string)
+	opts, _ := d.body["measurementOptions"].(map[string]any)
+	return target != control && opts["protocol"] == "TCP"
 }
 
 func (f *fakeGlobalping) result(i int, d *fakeDef) map[string]any {
@@ -212,6 +302,9 @@ func (f *fakeGlobalping) result(i int, d *fakeDef) map[string]any {
 		return map[string]any{"status": "offline", "rawOutput": ""}
 	}
 	if !isControl {
+		if f.failTCP[i] && opts["protocol"] == "TCP" {
+			return map[string]any{"status": "failed", "failureSource": "internal", "rawOutput": ""}
+		}
 		switch f.failNode[i] {
 		case "offline":
 			return map[string]any{"status": "offline", "rawOutput": ""}

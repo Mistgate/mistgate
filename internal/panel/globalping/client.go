@@ -15,8 +15,8 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
-// A small client of the Globalping API (https://api.globalping.io/v1/spec.yaml). It speaks to three endpoints: POST
-// /v1/measurements, GET /v1/measurements/{id} and GET /v1/limits. The token, when there is one, only ever goes into the
+// A small client of the Globalping API (https://api.globalping.io/v1/spec.yaml). It speaks to POST /v1/measurements, GET
+// /v1/measurements/{id}, GET /v1/limits and GET /v1/probes. The token, when there is one, only ever goes into the
 // Authorization header of those calls; it is a vault.Redacted so that no log line or error can print it.
 
 const (
@@ -24,6 +24,8 @@ const (
 	DefaultBaseURL = "https://api.globalping.io"
 	userAgent      = "mistgate-panel (+https://github.com/mistgate/mistgate)"
 	maxBody        = 4 << 20 // a measurement of a few probes is a few KB; this is a ceiling
+	// maxProbesBody caps the response size of the full probe list.
+	maxProbesBody = 16 << 20
 )
 
 // apiError is an answer that was not a success. Only the error type of Globalping's body is kept, never its text.
@@ -49,6 +51,10 @@ type client struct {
 
 // do sends one request and decodes a 2xx JSON body into out (nil = ignore it). Any other status is an *apiError.
 func (c *client) do(ctx context.Context, method, path string, body, out any) (http.Header, error) {
+	return c.doLimit(ctx, method, path, body, out, maxBody)
+}
+
+func (c *client) doLimit(ctx context.Context, method, path string, body, out any, limit int64) (http.Header, error) {
 	var rd io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -77,8 +83,11 @@ func (c *client) do(ctx context.Context, method, path string, body, out any) (ht
 		return nil, errors.New("globalping: request failed") // net/http puts the URL into its error: say nothing of it
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
+		return nil, errors.New("globalping: unreadable answer")
+	}
+	if int64(len(data)) > limit {
 		return nil, errors.New("globalping: unreadable answer")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -112,6 +121,8 @@ func (c *client) do(ctx context.Context, method, path string, body, out any) (ht
 
 type location struct {
 	Country string   `json:"country,omitempty"`
+	ASN     uint32   `json:"asn,omitempty"`
+	City    string   `json:"city,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
 	Limit   int      `json:"limit,omitempty"`
 }
@@ -140,6 +151,15 @@ type probeInfo struct {
 	ASN     uint32   `json:"asn"`
 	Network string   `json:"network"`
 	Tags    []string `json:"tags"`
+}
+
+type listedProbe struct {
+	Location struct {
+		Country string `json:"country"`
+		City    string `json:"city"`
+		ASN     uint32 `json:"asn"`
+	} `json:"location"`
+	Tags []string `json:"tags"`
 }
 
 type testResult struct {
@@ -175,6 +195,12 @@ func (c *client) create(ctx context.Context, r measurementRequest) (created, err
 func (c *client) get(ctx context.Context, id string) (measurement, error) {
 	var out measurement
 	_, err := c.do(ctx, http.MethodGet, "/v1/measurements/"+id, nil, &out)
+	return out, err
+}
+
+func (c *client) probes(ctx context.Context) ([]listedProbe, error) {
+	var out []listedProbe
+	_, err := c.doLimit(ctx, http.MethodGet, "/v1/probes", nil, &out, maxProbesBody)
 	return out, err
 }
 

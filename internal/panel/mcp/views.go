@@ -1024,6 +1024,7 @@ type countryProbeV struct {
 	Network string         `json:"network"`
 	ASN     uint32         `json:"asn,omitempty"`
 	City    string         `json:"city,omitempty"`
+	Eyeball bool           `json:"eyeball,omitempty"`
 	ICMPOK  bool           `json:"icmp_ok"`
 	ICMPMs  uint32         `json:"icmp_ms,omitempty"`
 	TCP     []countryPortV `json:"tcp,omitempty"`
@@ -1034,11 +1035,12 @@ type countryProbeV struct {
 // is in a public block list: in the registry, not proven dropped) or unknown (reason says why a live round was not enough).
 // Network names come from a third party and are shown as data.
 type countryCheckV struct {
-	Country string `json:"country"`
-	Verdict string `json:"verdict"`
-	AtUnix  int64  `json:"at_unix"`
-	Reason  string `json:"reason,omitempty"`
-	Eyeball bool   `json:"eyeball,omitempty"` // the probes are home or mobile networks
+	Country string   `json:"country"`
+	Verdict string   `json:"verdict"`
+	AtUnix  int64    `json:"at_unix"`
+	Reason  string   `json:"reason,omitempty"`
+	Eyeball bool     `json:"eyeball,omitempty"`  // the probes are home or mobile networks
+	NoProbe []string `json:"no_probe,omitempty"` // named operators without a matching online home or mobile probe
 	// Confidence: eyeball or dc_only (a live check), listed (a block list only); absent when there is nothing to say.
 	Confidence string `json:"confidence,omitempty"`
 	// ListedBy: the block lists that hold the node's address (antifilter_ipsum, antifilter_community). CDNProvider and
@@ -1106,6 +1108,9 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 	v := &countryCheckV{Country: clean(c.GetCountry(), 8), Verdict: enumName("COUNTRY_VERDICT_", c.GetVerdict().String()), AtUnix: c.GetAtUnix(),
 		Reason: clean(c.GetReason(), 40), Eyeball: c.GetEyeball(), Confidence: clean(c.GetConfidence(), 16),
 		CDNProvider: nm(c.GetCdnProvider()), CDNRegion: nm(c.GetCdnRegion()), Probes: []countryProbeV{}}
+	for _, name := range c.GetNoProbe() {
+		v.NoProbe = append(v.NoProbe, clean(name, 40))
+	}
 	for _, l := range c.GetListedBy() {
 		v.ListedBy = append(v.ListedBy, clean(l, 40))
 	}
@@ -1123,7 +1128,7 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 		}
 	}
 	for _, p := range c.GetProbes() {
-		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
+		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), Eyeball: p.GetEyeball(), ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
 		for _, t := range p.GetTcp() {
 			pv.TCP = append(pv.TCP, countryPortV{Port: t.GetPort(), OK: t.GetOk(), Ms: t.GetMs()})
 		}

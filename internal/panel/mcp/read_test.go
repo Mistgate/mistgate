@@ -82,7 +82,8 @@ func TestChecksResultsContent(t *testing.T) {
 	}
 	cc := v.Rows[0].Country
 	if cc == nil || cc.Verdict != "tcp_blocked" || cc.Country != "RU" || !cc.Eyeball || len(cc.Probes) != 2 || cc.Probes[0].Network != "Rostelecom" ||
-		!cc.Probes[0].ICMPOK || cc.Probes[0].TCP[0].Port != 443 || cc.Probes[0].TCP[0].OK || cc.Probes[1].Valid {
+		!cc.Probes[0].Eyeball || !cc.Probes[0].ICMPOK || cc.Probes[0].TCP[0].Port != 443 || cc.Probes[0].TCP[0].OK || cc.Probes[1].Valid ||
+		!reflect.DeepEqual(cc.NoProbe, []string{"MegaFon", "T2"}) {
 		t.Errorf("country_check: %+v", cc)
 	}
 	// the block lists ride next to the live round: which lists hold the address and the hosting range it is in

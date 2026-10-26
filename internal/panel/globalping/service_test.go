@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -108,6 +111,314 @@ func jsonOf(t *testing.T, s string) map[string]any {
 		t.Fatalf("%q: %v", s, err)
 	}
 	return m
+}
+
+func TestFakeGlobalpingProbeListAndLocationFilters(t *testing.T) {
+	f := newFakeGlobalping(t)
+	f.probes = []fakeProbe{
+		{Country: "RU", Network: "Example ISP", City: "Tomsk", ASN: 64496, Tags: []string{"eyeball-network"}, ControlOK: true},
+		{Country: "RU", Network: "Vimpelcom", City: "Ufa", ASN: 3216, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Vimpelcom", City: "Moscow", ASN: 3216, Eyeball: true, ControlOK: true},
+		{Country: "DE", Network: "Vimpelcom", City: "Ufa", ASN: 3216, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Datacenter", City: "Ufa", ASN: 3216, Tags: []string{"datacenter-network"}, ControlOK: true},
+	}
+	c := &client{hc: f.client(), base: f.srv.URL}
+	probes, err := c.probes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(probes) != len(f.probes) || probes[0].Location.Country != "RU" || probes[0].Location.ASN != 64496 || probes[0].Location.City != "Tomsk" ||
+		!slices.Contains(probes[0].Tags, "eyeball-network") {
+		t.Fatalf("probe list = %+v", probes)
+	}
+
+	created, err := c.create(context.Background(), measurementRequest{Type: "ping", Target: "example.invalid", Locations: []location{
+		{Country: "RU", ASN: 3216, City: "Ufa", Tags: []string{"eyeball-network"}, Limit: 1},
+		{Country: "RU", ASN: 3216, Tags: []string{"eyeball-network"}, Limit: 2},
+		{Country: "DE", ASN: 65000, Limit: 1}, // no match is skipped
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.defs[created.ID].probes; !slices.Equal(got, []int{1, 2}) {
+		t.Fatalf("picked probes = %v, want location matches [1 2] with Set dedupe", got)
+	}
+	_, err = c.create(context.Background(), measurementRequest{Type: "ping", Target: "example.invalid", Locations: []location{
+		{Country: "RU", ASN: 3216, City: "Missing city", Tags: []string{"eyeball-network"}, Limit: 1},
+		{Country: "DE", ASN: 65000, Limit: 1},
+	}})
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusUnprocessableEntity {
+		t.Fatalf("all-empty locations error = %v, want 422", err)
+	}
+}
+
+func TestControlLocationLimitsStayWithinBudgetWithFourOnlineOperators(t *testing.T) {
+	e := newEnv(t)
+	e.enable("")
+	e.fake.probes = []fakeProbe{
+		{Country: "RU", Network: "MTS", City: "Exampleville", ASN: 8359, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Beeline", City: "Sampletown", ASN: 3216, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Rostelecom", City: "Teston", ASN: 12389, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "ER-Telecom", City: "Example City", ASN: 51570, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Example ISP", City: "Example Borough", ASN: 64496, Eyeball: true, ControlOK: true},
+	}
+	r := round(health.CountryTarget{Key: "de1", IP: "203.0.113.10"})
+	r.Want = []health.CountryWant{
+		{Name: "MTS", ASNs: []uint32{8359}},
+		{Name: "Beeline", ASNs: []uint32{3216}},
+		{Name: "MegaFon", ASNs: []uint32{31133}},
+		{Name: "Rostelecom", ASNs: []uint32{12389}},
+		{Name: "T2", ASNs: []uint32{15378}},
+		{Name: "ER-Telecom", ASNs: []uint32{51570}},
+	}
+	if _, err := e.source().Measure(context.Background(), r); err != nil {
+		t.Fatal(err)
+	}
+	locations := jsonOf(t, e.fake.posts()[0].Body)["locations"].([]any)
+	total := 0
+	for _, raw := range locations {
+		loc := raw.(map[string]any)
+		limit := 1
+		if n, ok := loc["limit"].(float64); ok {
+			limit = int(n)
+		}
+		total += limit
+	}
+	if total != r.Probes || len(locations) != 3 {
+		t.Fatalf("control location limits sum to %d across %d locations; want budget %d across two pins and one generic location", total, len(locations), r.Probes)
+	}
+}
+
+func TestControlPlanSkipsDataCenterAndForeignOperatorProbes(t *testing.T) {
+	e := newEnv(t)
+	e.enable("")
+	e.fake.probes = []fakeProbe{
+		{Country: "RU", Network: "MTS", City: "Exampleville", ASN: 8359, Tags: []string{"datacenter-network"}, ControlOK: true},
+		{Country: "KZ", Network: "MTS", City: "Sampletown", ASN: 8359, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Example ISP", City: "Example Borough", ASN: 64496, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Example ISP Two", City: "Teston", ASN: 64497, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Example ISP Three", City: "Example City", ASN: 64498, Eyeball: true, ControlOK: true},
+	}
+	r := round(health.CountryTarget{Key: "de1", IP: "203.0.113.10"})
+	r.Want = []health.CountryWant{{Name: "MTS", ASNs: []uint32{8359}}}
+	obs, err := e.source().Measure(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	locations := jsonOf(t, e.fake.posts()[0].Body)["locations"].([]any)
+	if len(locations) != 1 || len(obs.NoProbe) != 1 || obs.NoProbe[0] != "MTS" {
+		t.Fatalf("locations = %v, no_probe = %v; want only the generic location and MTS in no_probe", locations, obs.NoProbe)
+	}
+}
+
+func TestNamedControlLocationsAndNoProbe(t *testing.T) {
+	e := newEnv(t)
+	e.enable("")
+	f := e.fake
+	f.probes = []fakeProbe{
+		{Country: "RU", Network: "Example ISP", City: "Tomsk", ASN: 64496, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Beeline", City: "Ufa", ASN: 3216, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Rostelecom", City: "Kostroma", ASN: 12389, Eyeball: true, ControlOK: true},
+		{Country: "RU", Network: "Example DC", City: "Moscow", ASN: 49505, ControlOK: true},
+	}
+	r := round(health.CountryTarget{Key: "de1", IP: "203.0.113.10", Ports: []uint16{443}})
+	r.Want = []health.CountryWant{
+		{Name: "MTS", ASNs: []uint32{8359}},
+		{Name: "Beeline", ASNs: []uint32{3216}},
+		{Name: "MegaFon", ASNs: []uint32{31133}},
+		{Name: "Rostelecom", ASNs: []uint32{12389}},
+		{Name: "T2", ASNs: []uint32{15378}},
+		{Name: "ER-Telecom", ASNs: []uint32{51570}},
+	}
+	obs, err := e.source().Measure(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"MTS", "MegaFon", "T2", "ER-Telecom"}; !slices.Equal(obs.NoProbe, want) {
+		t.Fatalf("no_probe = %v, want %v", obs.NoProbe, want)
+	}
+	posts := f.posts()
+	if len(posts) < 2 {
+		t.Fatalf("measurements = %d, want a control and node measurement", len(posts))
+	}
+	locations := jsonOf(t, posts[0].Body)["locations"].([]any)
+	if len(locations) != 3 {
+		t.Fatalf("control locations = %v, want two named picks and one generic", locations)
+	}
+	var total int
+	for _, raw := range locations {
+		loc := raw.(map[string]any)
+		total += int(loc["limit"].(float64))
+	}
+	if total != r.Probes {
+		t.Fatalf("sum of control location limits = %d, want round budget %d", total, r.Probes)
+	}
+	first, second, generic := locations[0].(map[string]any), locations[1].(map[string]any), locations[2].(map[string]any)
+	if first["asn"] != float64(3216) || first["city"] != "Ufa" || first["limit"] != float64(1) ||
+		second["asn"] != float64(12389) || second["city"] != "Kostroma" || second["limit"] != float64(1) ||
+		generic["country"] != "RU" || generic["limit"] != float64(1) || !slices.Contains(generic["tags"].([]any), "eyeball-network") {
+		t.Fatalf("control locations = %v", locations)
+	}
+	if len(obs.Probes) != 3 {
+		t.Fatalf("control selected %d probes, want named probes plus the generic probe", len(obs.Probes))
+	}
+}
+
+func TestProbeListFailureFallsBackToGenericCountryLocation(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*testEnv, *source)
+	}{
+		{name: "500", setup: func(e *testEnv, _ *source) { e.fake.probesCode = http.StatusInternalServerError }},
+		{name: "timeout", setup: func(e *testEnv, s *source) {
+			e.fake.probesDelay = 2 * time.Second
+			s.probeTimeout = time.Second
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.enable(secretToken)
+			src := e.source().(*source)
+			tc.setup(e, src)
+			r := round(health.CountryTarget{Key: "de1", IP: "203.0.113.10"})
+			r.Want = []health.CountryWant{{Name: "MTS", ASNs: []uint32{8359}}}
+			obs, err := src.Measure(context.Background(), r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(obs.NoProbe) != 0 {
+				t.Fatalf("no_probe after listing failure = %v, want empty", obs.NoProbe)
+			}
+			var probesRequests int
+			for _, req := range e.fake.requests() {
+				if req.Method == http.MethodGet && req.Path == "/v1/probes" {
+					probesRequests++
+				}
+			}
+			if probesRequests != 1 {
+				t.Fatalf("GET /v1/probes count = %d, want 1", probesRequests)
+			}
+			locations := jsonOf(t, e.fake.posts()[0].Body)["locations"].([]any)
+			if len(locations) != 1 {
+				t.Fatalf("fallback control locations = %v, want one generic location", locations)
+			}
+			loc := locations[0].(map[string]any)
+			if loc["country"] != "RU" || loc["limit"] != float64(r.Probes) || !slices.Contains(loc["tags"].([]any), "eyeball-network") {
+				t.Fatalf("fallback control location = %v", loc)
+			}
+			log := e.logs.String()
+			if count := strings.Count(log, `msg="globalping: probe list"`); count != 1 {
+				t.Fatalf("probe-list warning count = %d, want 1:\n%s", count, log)
+			}
+			if strings.Contains(log, e.fake.srv.URL) || strings.Contains(log, secretToken) {
+				t.Fatalf("probe-list warning contains a URL or token:\n%s", log)
+			}
+		})
+	}
+}
+
+func TestListedOperatorCountsAsAskedWhenProbeIsNotSelectedAtK2(t *testing.T) {
+	e := newEnv(t)
+	e.enable("")
+	f := e.fake
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/probes" {
+			list := []map[string]any{{"location": map[string]any{"country": "RU", "asn": 8359, "city": "Exampleville", "network": "MTS"}, "tags": []string{"eyeball-network"}}}
+			for _, p := range f.probes {
+				list = append(list, map[string]any{"location": map[string]any{"country": p.Country, "asn": p.ASN, "city": p.City, "network": p.Network}, "tags": p.tags()})
+			}
+			_ = json.NewEncoder(w).Encode(list)
+			return
+		}
+		f.serve(w, r)
+	}))
+	defer srv.Close()
+	src := e.source().(*source)
+	src.c = &client{hc: srv.Client(), base: srv.URL}
+	src.poll = time.Millisecond
+	r := round(health.CountryTarget{Key: "de1", IP: "203.0.113.10"})
+	r.Probes = 2
+	r.Want = []health.CountryWant{{Name: "MTS", ASNs: []uint32{8359}}}
+	obs, err := src.Measure(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs.Probes) >= r.Probes {
+		t.Fatalf("selected probes = %d, want the listed but unavailable MTS pin to leave the round below K=2", len(obs.Probes))
+	}
+	if len(obs.Asked) != 1 || obs.Asked[0] != "MTS" {
+		t.Fatalf("asked = %v, want MTS even though its probe was not selected", obs.Asked)
+	}
+}
+
+func TestEmptyWantDoesNotRequestProbeList(t *testing.T) {
+	e := newEnv(t)
+	e.enable("")
+	if _, err := e.source().Measure(context.Background(), round(health.CountryTarget{Key: "de1", IP: "203.0.113.10"})); err != nil {
+		t.Fatal(err)
+	}
+	for _, req := range e.fake.requests() {
+		if req.Method == http.MethodGet && req.Path == "/v1/probes" {
+			t.Fatal("GET /v1/probes ran with an empty Want")
+		}
+	}
+	posts := e.fake.posts()
+	if len(posts) < 2 {
+		t.Fatalf("measurements = %d, want control plus node", len(posts))
+	}
+	locations := jsonOf(t, posts[0].Body)["locations"].([]any)
+	if len(locations) != 1 {
+		t.Fatalf("control locations = %v, want one generic country location", locations)
+	}
+	loc := locations[0].(map[string]any)
+	if loc["country"] != "RU" || loc["limit"] != float64(3) || !slices.Contains(loc["tags"].([]any), "eyeball-network") ||
+		loc["asn"] != nil || loc["city"] != nil {
+		t.Fatalf("empty-Want control location = %v", loc)
+	}
+}
+
+func TestProbeEyeballTagsAndCompleteMeasurements(t *testing.T) {
+	e := newEnv(t)
+	e.enable("")
+	f := e.fake
+	f.probes[0].Eyeball = false
+	f.probes[0].Tags = []string{"eyeball-network"}
+	f.icmp["203.0.113.10"], f.tcp["203.0.113.10:443"] = true, true
+	r := round(health.CountryTarget{Key: "de1", IP: "203.0.113.10", Ports: []uint16{443}})
+	obs, err := e.source().Measure(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs.Probes) == 0 || !obs.Probes[0].Eyeball || !obs.Probes[0].Nodes["de1"].Complete {
+		t.Fatalf("probe tags or completed tests = %+v", obs.Probes)
+	}
+
+	e = newEnv(t)
+	e.enable("")
+	e.fake.failTCP = map[int]bool{0: true}
+	obs, err = e.source().Measure(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !obs.Probes[0].Nodes["de1"].Answered || obs.Probes[0].Nodes["de1"].Complete {
+		t.Fatalf("a TCP failure inside the probe was counted complete: %+v", obs.Probes[0].Nodes["de1"])
+	}
+
+	e = newEnv(t)
+	e.enable("")
+	e.fake.keepNodeTCP = true
+	src := e.source().(*source)
+	src.poll = time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	obs, err = src.Measure(ctx, r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !obs.Probes[0].Nodes["de1"].Answered || obs.Probes[0].Nodes["de1"].Complete {
+		t.Fatalf("a missing TCP measurement was counted complete: %+v", obs.Probes[0].Nodes["de1"])
+	}
 }
 
 func TestOffByDefault(t *testing.T) {

@@ -627,12 +627,13 @@ func (w *world) GetChecks(context.Context, *connect.Request[adminv1.GetChecksReq
 		UdpLoss: &adminv1.UdpLossNotice{NodeIds: []string{nodeA}, SharePercent: 40},
 		TspuRun: &adminv1.TspuProbeRun{Status: "ok", AtUnix: 1700000400, NodeId: nodeA, DpiHop: 4, BlockedRef: "31.13.72.36", NodesChecked: 2},
 		CountryChecks: []*adminv1.CountryCheck{{NodeId: nodeA, Country: "RU", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED, AtUnix: 1700000500, Eyeball: true,
+			NoProbe:    []string{"MegaFon", "T2"},
 			Confidence: "eyeball", ListedBy: []string{"antifilter_ipsum"}, CdnProvider: "ExampleHost", CdnRegion: "eu",
 			Sources: []string{"globalping", "tspu"}, GlobalpingVerdict: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED, TspuVerdict: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED,
 			DpiHop: 4, TspuVantageId: "nod_probe1", TspuVantageName: "probe1", TspuAtUnix: 1700000400,
 			TspuPorts: []*adminv1.TspuPort{{Port: 443, Verdict: "blocked"}, {Port: 8443, Verdict: "open"}},
 			Probes: []*adminv1.CountryProbe{
-				{Network: "Rostelecom", Asn: 12389, City: "Moscow", IcmpOk: true, IcmpMs: 23, Valid: true, Tcp: []*adminv1.PortResult{{Port: 443}}},
+				{Network: "Rostelecom", Asn: 12389, City: "Moscow", Eyeball: true, IcmpOk: true, IcmpMs: 23, Valid: true, Tcp: []*adminv1.PortResult{{Port: 443}}},
 				{Network: "Beeline", Valid: false},
 			}}},
 	}), nil

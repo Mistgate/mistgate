@@ -581,6 +581,7 @@ describe("reachability from a country", () => {
     icmpMs,
     tcp: tcp.map(([port, ok]) => ({ port, ok, ms: ok ? 40 : 0 })),
     valid,
+    eyeball: true,
   });
   const check = (over: Partial<CountryCheck> = {}): CountryCheck => ({
     nodeId: "nod_1",
@@ -590,6 +591,7 @@ describe("reachability from a country", () => {
     eyeball: true,
     reason: "",
     confidence: "eyeball",
+    noProbe: [],
     listedBy: [],
     cdnProvider: "",
     cdnRegion: "",
