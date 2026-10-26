@@ -147,6 +147,21 @@ func TestSeverityFloorAndSilentResolutions(t *testing.T) {
 	}
 }
 
+func TestSupersededPartialCountryAlertIsSilent(t *testing.T) {
+	e := newEnv(t)
+	a := alert("country_blocked", "de1", 2)
+	a.Subject = "partial"
+	a.Resolution = "superseded"
+	e.svc.AlertTransition(a, true)
+
+	e.svc.mu.Lock()
+	pending := len(e.svc.pending)
+	e.svc.mu.Unlock()
+	if pending != 0 {
+		t.Fatalf("superseded partial alert queued %d Telegram messages", pending)
+	}
+}
+
 // Every role gets health alerts; the owner's business (a backup, a release, a waiting plan) is the owner's only.
 func TestAudienceFollowsTheRole(t *testing.T) {
 	e := newEnv(t, func(c *Config) { c.AdminURL = "https://panel.example/abc/" })

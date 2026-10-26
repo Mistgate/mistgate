@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"net/netip"
 	"slices"
@@ -628,11 +629,12 @@ func countryBad(verdict string) bool {
 	return verdict == verdictTCPBlocked || verdict == verdictBlocked
 }
 
-// addCountryConds derives COUNTRY_BLOCKED from the stored rounds of the live sources (Globalping, the probe node): it opens after
-// two rounds in a row with a bad combined verdict and closes after two with OK. Unknown rounds are skipped, as if they had not
-// happened; anything in between keeps the alert as it is (held), open or closed. A round is one measurement of either source,
-// combined with the newest of the other (countryEvents). A block list never counts. While a node is not connected an open alert
-// is held and nothing new is raised; with every live source switched off the alerts are let go.
+// addCountryConds derives COUNTRY_BLOCKED from the stored rounds of the live sources (Globalping, the probe node): the full
+// alert opens after two rounds in a row with a bad combined verdict and closes after two with OK or partial. The partial alert
+// uses the per-ASN observations in the already-read Globalping rounds. Unknown rounds are skipped; anything in between keeps
+// the full alert as it is (held), open or closed. A round is one measurement of either source, combined with the newest of the
+// other (countryEvents). A block list never counts. While a node is not connected both alerts are held; with every live source
+// switched off the alerts are let go.
 func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[string]store.NodeLiveRow, activeKeys map[key]bool, d *derived, add func(cond)) {
 	_, _, liveOn := s.countryConfig(ctx)
 	tspu := s.tspuState(ctx)
@@ -672,20 +674,132 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 	}
 	for _, n := range sn.nodes {
 		k := key{kCountryBlocked, n.ID, ""}
+		partialKey := key{kCountryBlocked, n.ID, "partial"}
 		if n.State != "active" || !live[n.ID].Connected {
 			d.holdKeys[k] = true
+			d.holdKeys[partialKey] = true
 			continue
 		}
 		seen := countryEvents(byNode[n.ID], tspuByNode[n.ID], tspu.MaxAge)
 		seen = seen[:min(len(seen), countryAlertRounds)]
-		switch {
-		case len(seen) == countryAlertRounds && countryBad(seen[0].combined.Verdict) && countryBad(seen[1].combined.Verdict):
+		if len(seen) == countryAlertRounds && countryBad(seen[0].combined.Verdict) && countryBad(seen[1].combined.Verdict) {
 			add(countryCond(n, seen[0]))
-		case len(seen) == countryAlertRounds && countryClear(seen[0].combined.Verdict) && countryClear(seen[1].combined.Verdict):
-		default:
+			d.superseded[partialKey] = true
+			continue
+		}
+		if len(seen) != countryAlertRounds || !countryClear(seen[0].combined.Verdict) || !countryClear(seen[1].combined.Verdict) {
 			d.holdKeys[k] = true
+			if activeKeys[k] { // the full alert is held open: it still explains the node
+				d.superseded[partialKey] = true
+				continue
+			}
+		}
+		if activeKeys[partialKey] && len(byNode[n.ID]) > 0 && byNode[n.ID][0].Verdict == verdictUnknown {
+			d.holdKeys[partialKey] = true // a Globalping outage is not evidence that the partial block cleared
+		}
+		if c, ok := countryPartialCond(n, byNode[n.ID]); ok {
+			add(c)
 		}
 	}
+}
+
+type countryASNObservationKind uint8
+
+const (
+	countryASNReach countryASNObservationKind = iota + 1
+	countryASNDark
+)
+
+type countryASNObservation struct {
+	kind  countryASNObservationKind
+	probe countryProbeDetail
+}
+
+type countryASNRound struct {
+	dark    bool
+	reached bool
+	probe   countryProbeDetail
+}
+
+// countryASNObservations derives one observation per ASN and Globalping round, newest first. The rows are already read by the
+// evaluator, newest first; skip unknown rounds and stop at the first country change before deriving any per-probe signals.
+func countryASNObservations(rounds []store.CountryCheck) map[uint32][]countryASNObservation {
+	observations := map[uint32][]countryASNObservation{}
+	if len(rounds) == 0 {
+		return observations
+	}
+	country := rounds[0].Country
+	for _, round := range rounds {
+		if round.Country != country {
+			break
+		}
+		if round.Verdict == verdictUnknown {
+			continue
+		}
+		var detail countryDetail
+		_ = json.Unmarshal([]byte(round.Detail), &detail)
+		byASN := map[uint32]countryASNRound{}
+		for _, probe := range detail.Probes {
+			if probe.ASN == 0 {
+				continue
+			}
+			state := byASN[probe.ASN]
+			if countryProbeReached(detail, probe) {
+				state.reached = true
+			}
+			if probe.Valid && probe.Dark && round.Verdict == verdictPartial && !state.dark { // a full block is no evidence of a partial one
+				state.dark, state.probe = true, probe
+			}
+			byASN[probe.ASN] = state
+		}
+		for asn, state := range byASN {
+			switch {
+			case state.reached:
+				observations[asn] = append(observations[asn], countryASNObservation{kind: countryASNReach})
+			case state.dark:
+				observations[asn] = append(observations[asn], countryASNObservation{kind: countryASNDark, probe: state.probe})
+			}
+		}
+	}
+	return observations
+}
+
+// countryProbeReached matches the carrier used by countryJudge: TCP for a node with ports, ICMP otherwise.
+func countryProbeReached(detail countryDetail, probe countryProbeDetail) bool {
+	if !probe.Valid || !probe.Eyeball { // a data-centre probe in a fallback round says nothing about the home network
+		return false
+	}
+	if len(detail.Ports) == 0 {
+		return probe.ICMPOK
+	}
+	for _, tcp := range probe.TCP {
+		if tcp.OK {
+			return true
+		}
+	}
+	return false
+}
+
+// countryPartialCond opens when at least one ASN's two newest observations are both dark. A skipped ASN is no observation, so
+// a re-ask rotation does not erase its D, D evidence. The newest dark probe supplies the name and city shown in the alert.
+func countryPartialCond(n store.NodeRow, rounds []store.CountryCheck) (cond, bool) {
+	observations := countryASNObservations(rounds)
+	var networks []string
+	for asn, seen := range observations {
+		if len(seen) < countryAlertRounds || seen[0].kind != countryASNDark || seen[1].kind != countryASNDark {
+			continue
+		}
+		p := seen[0].probe
+		networks = append(networks, fmt.Sprintf("%s (AS%d, %s)", p.Network, asn, p.City))
+	}
+	if len(networks) == 0 {
+		return cond{}, false
+	}
+	sort.Strings(networks)
+	return cond{key: key{kCountryBlocked, n.ID, "partial"}, severity: sevWarning,
+		why: "health.alert.country_blocked.why.partial",
+		params: map[string]string{"node": n.Name, "country": rounds[0].Country, "verdict": verdictPartial,
+			"confidence": "eyeball", "sources": "globalping", "networks": strings.Join(networks, ", ")}}, true
 }
 
 // countryClear: a round that closes a full-block alert. partial counts: other networks reach the node.
@@ -835,7 +949,7 @@ func (s *Service) ReconcileCountry(ctx context.Context) {
 			activeKeys[key{a.Kind, a.NodeID, a.Subject}] = true
 		}
 	}
-	d := &derived{conds: map[key]cond{}, nodes: map[string]bool{}, holdKeys: map[key]bool{}}
+	d := &derived{conds: map[key]cond{}, nodes: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}}
 	for _, n := range sn.nodes {
 		d.nodes[n.ID] = true
 	}

@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/netip"
 	"slices"
@@ -575,6 +576,472 @@ func TestCountryAlertLifecycle(t *testing.T) {
 	if _, err := c.st.MuteAlert(c.ctx, a.ID, c.clock.Now().Add(time.Hour)); err != nil {
 		t.Fatalf("mute: %v", err)
 	}
+}
+
+func insertCountryAlertRound(t *testing.T, c *countryEnv, node, verdict string, at time.Time, probes ...countryProbeDetail) {
+	t.Helper()
+	detail, err := json.Marshal(countryDetail{Probes: probes, Eyeball: true, Ports: []uint16{443, 8443}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.st.InsertCountryChecks(c.ctx, []store.CountryCheck{{NodeID: node, At: at, Country: "RU", Verdict: verdict, Detail: string(detail)}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func partialAlertProbes(mts, dark, reached bool) []countryProbeDetail {
+	probes := []countryProbeDetail{
+		{Network: "Beeline", ASN: 3216, City: "Moscow", Eyeball: true, Valid: true, ICMPOK: true,
+			TCP: []countryPortDetail{{Port: 443, OK: true}, {Port: 8443, OK: true}}},
+		{Network: "Rostelecom", ASN: 12389, City: "Kostroma", Eyeball: true, Valid: true, ICMPOK: true,
+			TCP: []countryPortDetail{{Port: 443, OK: true}, {Port: 8443, OK: true}}},
+	}
+	if mts {
+		probes = append(probes, countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true,
+			Dark: dark, ICMPOK: reached,
+			TCP: []countryPortDetail{{Port: 443, OK: reached}, {Port: 8443, OK: reached}}})
+	}
+	return probes
+}
+
+func partialAlertEnv(t *testing.T) *countryEnv {
+	t.Helper()
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.onlineNode("nl1", "203.0.113.20")
+	return c
+}
+
+func countryAlertHistory(t *testing.T, c *countryEnv) []store.HealthAlert {
+	t.Helper()
+	rows, err := c.st.AlertHistory(c.ctx, c.clock.Now().Add(-30*24*time.Hour), "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
+}
+
+func TestCountryASNObservationsSkipUnknownAndUseTheVerdictCarrier(t *testing.T) {
+	detail := func(ports []uint16, probes ...countryProbeDetail) string {
+		t.Helper()
+		b, err := json.Marshal(countryDetail{Ports: ports, Probes: probes})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	darkMTS := countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, Dark: true,
+		TCP: []countryPortDetail{{Port: 443}}}
+	rows := []store.CountryCheck{
+		{Country: "RU", Verdict: verdictPartial, Detail: detail([]uint16{443},
+			countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, Dark: true, TCP: []countryPortDetail{{Port: 443}}},
+			countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, TCP: []countryPortDetail{{Port: 443, OK: true}}},
+			countryProbeDetail{Network: "Beeline", ASN: 3216, City: "Moscow", Dark: true, TCP: []countryPortDetail{{Port: 443, OK: true}}})},
+		{Country: "RU", Verdict: verdictUnknown, Detail: detail([]uint16{443},
+			countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true,
+				TCP: []countryPortDetail{{Port: 443, OK: true}}})},
+		{Country: "RU", Verdict: verdictPartial, Detail: detail([]uint16{443}, darkMTS)},
+		{Country: "BY", Verdict: verdictPartial, Detail: detail([]uint16{443}, darkMTS)},
+	}
+	observations := countryASNObservations(rows)
+	got := observations[8359]
+	if len(got) != 2 || got[0].kind != countryASNReach || got[1].kind != countryASNDark {
+		t.Fatalf("MTS observations = %+v, want newest R then D (ignoring unknown and the older country)", got)
+	}
+	if _, ok := observations[3216]; ok {
+		t.Fatal("an invalid TCP result produced an ASN observation")
+	}
+	icmpOnly := countryASNObservations([]store.CountryCheck{{Country: "RU", Verdict: verdictPartial,
+		Detail: detail(nil, countryProbeDetail{Network: "MTS", ASN: 8359, Eyeball: true, Valid: true, ICMPOK: true})}})
+	if got := icmpOnly[8359]; len(got) != 1 || got[0].kind != countryASNReach {
+		t.Fatalf("ICMP-only observation = %+v, want R", got)
+	}
+}
+
+func TestPartialCountryAlertNeedsTwoDarkObservations(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base, partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Minute), partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+	a := c.active()["country_blocked/de1/partial"]
+	if a.Subject != "partial" || a.Severity != sevWarning || a.WhyKey != "health.alert.country_blocked.why.partial" {
+		t.Fatalf("partial alert = %+v", a)
+	}
+	for key, want := range map[string]string{
+		"verdict": "partial", "confidence": "eyeball", "sources": "globalping", "networks": "MTS (AS8359, Novosibirsk)",
+	} {
+		if got := a.Params[key]; got != want {
+			t.Errorf("partial alert param %s = %q, want %q", key, got, want)
+		}
+	}
+}
+
+func TestPartialCountryAlertSkipsAbsentRoundsAndClosesOnReach(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base, partialAlertProbes(true, true, false)...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Minute), partialAlertProbes(false, false, false)...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(2*time.Minute), partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(3*time.Minute), partialAlertProbes(true, false, true)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+	for _, a := range countryAlertHistory(t, c) {
+		if a.Kind == kCountryBlocked && a.NodeID == "de1" && a.Subject == "partial" {
+			if a.Resolution != "cleared" {
+				t.Fatalf("partial alert resolution = %q, want cleared", a.Resolution)
+			}
+			return
+		}
+	}
+	t.Fatal("the resolved partial alert was not in history")
+}
+
+func TestPartialCountryAlertTouchesChangedNetworkSetSilently(t *testing.T) {
+	c := partialAlertEnv(t)
+	var transitions []Transition
+	c.s.cfg.OnTransition = func(tr Transition) {
+		if tr.Alert.Kind == kCountryBlocked {
+			transitions = append(transitions, tr)
+		}
+	}
+	base := c.clock.Now().Add(-time.Hour)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base, partialAlertProbes(true, true, false)...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Minute), partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	opened := c.active()["country_blocked/de1/partial"]
+	if opened.ID == "" || len(transitions) != 1 || transitions[0].Resolved {
+		t.Fatalf("partial alert open transition = %+v, active = %+v", transitions, opened)
+	}
+
+	beelineDark := countryProbeDetail{Network: "Beeline", ASN: 3216, City: "Moscow", Eyeball: true, Valid: true, Dark: true,
+		TCP: []countryPortDetail{{Port: 443}, {Port: 8443}}}
+	for i := 2; i < 4; i++ {
+		probes := []countryProbeDetail{
+			beelineDark,
+			{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, Dark: true,
+				TCP: []countryPortDetail{{Port: 443}, {Port: 8443}}},
+			{Network: "Rostelecom", ASN: 12389, City: "Kostroma", Eyeball: true, Valid: true, ICMPOK: true,
+				TCP: []countryPortDetail{{Port: 443, OK: true}, {Port: 8443, OK: true}}},
+		}
+		insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Duration(i)*time.Minute), probes...)
+	}
+	c.s.ReconcileCountry(c.ctx)
+	updated := c.active()["country_blocked/de1/partial"]
+	if updated.ID != opened.ID || updated.Params["networks"] != "Beeline (AS3216, Moscow), MTS (AS8359, Novosibirsk)" {
+		t.Fatalf("updated partial alert = %+v, want same row with the sorted network set", updated)
+	}
+	if len(transitions) != 1 {
+		t.Fatalf("network set update emitted another transition: %+v", transitions)
+	}
+}
+
+func TestFullBlockSupersedesPartialAlert(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base, partialAlertProbes(true, true, false)...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Minute), partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+
+	blocked := reviewBlockedProbes()
+	insertCountryAlertRound(t, c, "de1", verdictBlocked, base.Add(2*time.Minute), blocked...)
+	insertCountryAlertRound(t, c, "de1", verdictBlocked, base.Add(3*time.Minute), blocked...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+	for _, a := range countryAlertHistory(t, c) {
+		if a.Kind == kCountryBlocked && a.NodeID == "de1" && a.Subject == "partial" {
+			if a.Resolution != "superseded" {
+				t.Fatalf("partial alert resolution = %q, want superseded", a.Resolution)
+			}
+			return
+		}
+	}
+	t.Fatal("the superseded partial alert was not in history")
+}
+
+func TestPartialRoundsCloseFullBlockAndOpenPartialAlert(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	blocked := []countryProbeDetail{
+		{Network: "NorthLink", ASN: 64520, City: "Example City", Eyeball: true, Valid: true, Dark: true,
+			TCP: []countryPortDetail{{Port: 443}, {Port: 8443}}},
+		{Network: "WestFiber", ASN: 64521, City: "Sample Town", Eyeball: true, Valid: true, Dark: true,
+			TCP: []countryPortDetail{{Port: 443}, {Port: 8443}}},
+		{Network: "LakeNet", ASN: 64522, City: "Test Harbor", Eyeball: true, Valid: true, Dark: true,
+			TCP: []countryPortDetail{{Port: 443}, {Port: 8443}}},
+	}
+	insertCountryAlertRound(t, c, "de1", verdictBlocked, base, blocked...)
+	insertCountryAlertRound(t, c, "de1", verdictBlocked, base.Add(time.Minute), blocked...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", true)
+
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(2*time.Minute), partialAlertProbes(true, true, false)...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(3*time.Minute), partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", false)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+	for _, a := range countryAlertHistory(t, c) {
+		if a.Kind == kCountryBlocked && a.NodeID == "de1" && a.Subject == "" {
+			if a.Resolution != "cleared" {
+				t.Fatalf("full alert resolution = %q, want cleared", a.Resolution)
+			}
+			return
+		}
+	}
+	t.Fatal("the resolved full-block alert was not in history")
+}
+
+func TestDisconnectedNodeHoldsFullAndPartialCountryAlerts(t *testing.T) {
+	c := partialAlertEnv(t)
+	now := c.clock.Now()
+	base := now.Add(-time.Hour)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base, partialAlertProbes(true, true, false)...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Minute), partialAlertProbes(true, true, false)...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+	if _, _, err := c.st.OpenAlert(c.ctx, store.HealthAlert{Kind: kCountryBlocked, Severity: sevWarning, NodeID: "de1",
+		TitleKey: "health.alert.country_blocked.title", WhyKey: "health.alert.country_blocked.why.blocked"}, time.Hour, now); err != nil {
+		t.Fatal(err)
+	}
+	c.fl.set("de1", liveState{up: false, caps: []string{capDoctor}, lastSeen: now})
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+}
+
+type reviewCountryProbe struct {
+	network string
+	asn     uint32
+	city    string
+}
+
+var reviewCountryProbes = []reviewCountryProbe{
+	{network: "NorthLink", asn: 64520, city: "Example City"},
+	{network: "WestFiber", asn: 64521, city: "Sample Town"},
+	{network: "LakeNet", asn: 64522, city: "Test Harbor"},
+}
+
+func reviewDarkProbe(p reviewCountryProbe) countryProbeDetail {
+	return countryProbeDetail{Network: p.network, ASN: p.asn, City: p.city, Eyeball: true, Valid: true, Dark: true,
+		TCP: []countryPortDetail{{Port: 443}, {Port: 8443}}}
+}
+
+func reviewReachProbe(p reviewCountryProbe) countryProbeDetail {
+	return countryProbeDetail{Network: p.network, ASN: p.asn, City: p.city, Eyeball: true, Valid: true, ICMPOK: true,
+		TCP: []countryPortDetail{{Port: 443, OK: true}, {Port: 8443, OK: true}}}
+}
+
+func reviewPartialProbes(darkIndex int, darkICMPOK bool) []countryProbeDetail {
+	probes := make([]countryProbeDetail, 0, len(reviewCountryProbes))
+	for i, p := range reviewCountryProbes {
+		if i == darkIndex {
+			dark := reviewDarkProbe(p)
+			dark.ICMPOK = darkICMPOK
+			probes = append(probes, dark)
+			continue
+		}
+		probes = append(probes, reviewReachProbe(p))
+	}
+	return probes
+}
+
+func reviewBlockedProbes() []countryProbeDetail {
+	probes := make([]countryProbeDetail, 0, len(reviewCountryProbes))
+	for _, p := range reviewCountryProbes {
+		probes = append(probes, reviewDarkProbe(p))
+	}
+	return probes
+}
+
+func TestCountryPartialNotOpenedByTheFirstRecoveryRound(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-2 * time.Hour)
+	blocked := reviewBlockedProbes()
+	for i := 0; i < 4; i++ {
+		insertCountryAlertRound(t, c, "de1", verdictBlocked, base.Add(time.Duration(i)*15*time.Minute), blocked...)
+		c.s.ReconcileCountry(c.ctx)
+	}
+	mustHave(t, c, "country_blocked/de1/", true)
+
+	firstRecovery := []countryProbeDetail{
+		reviewReachProbe(reviewCountryProbes[0]),
+		reviewReachProbe(reviewCountryProbes[1]),
+		reviewReachProbe(reviewCountryProbe{network: "PineNet", asn: 64523, city: "New Sample"}),
+	}
+	insertCountryAlertRound(t, c, "de1", verdictOK, base.Add(time.Hour), firstRecovery...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+}
+
+func TestCountryPartialIgnoresDarkProbesOfBlockedRounds(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	blocked := reviewBlockedProbes()
+	insertCountryAlertRound(t, c, "de1", verdictBlocked, base, blocked...)
+	insertCountryAlertRound(t, c, "de1", verdictBlocked, base.Add(time.Minute), blocked...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", true)
+
+	ok := []countryProbeDetail{
+		reviewReachProbe(reviewCountryProbe{network: "PineNet", asn: 64523, city: "New Sample"}),
+		reviewReachProbe(reviewCountryProbe{network: "RiverNet", asn: 64524, city: "Quiet Valley"}),
+		reviewReachProbe(reviewCountryProbe{network: "HillFiber", asn: 64525, city: "Plain Ridge"}),
+	}
+	insertCountryAlertRound(t, c, "de1", verdictOK, base.Add(2*time.Minute), ok...)
+	insertCountryAlertRound(t, c, "de1", verdictOK, base.Add(3*time.Minute), ok...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/", false)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+}
+
+func TestCountryPartialSupersededWhileTheFullAlertIsHeld(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.onlineNode("nl1", "203.0.113.20")
+	c.tick()
+	c.src.set("de1", "blocked")
+	c.tick()
+	c.tick()
+	mustHave(t, c, "country_blocked/de1/", true)
+
+	c.src.set("de1", "dark:0")
+	c.tick()
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+}
+
+func TestCountryPartialNotReopenedByOlderRowsWhileFullHeld(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.onlineNode("nl1", "203.0.113.20")
+	c.src.set("de1", "dark:0")
+	c.tick()
+	c.tick()
+	mustHave(t, c, "country_blocked/de1/partial", true)
+
+	c.src.set("de1", "blocked")
+	c.tick()
+	c.tick()
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+
+	c.src.set("de1", "dark:0")
+	c.tick()
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+	c.tick()
+	mustHave(t, c, "country_blocked/de1/", false)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+}
+
+func TestCountryAlternatingBlockedAndPartialKeepsOneAlert(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.onlineNode("nl1", "203.0.113.20")
+	c.src.set("de1", "blocked")
+	c.tick()
+	c.tick()
+	for i := 0; i < 4; i++ {
+		if i%2 == 0 {
+			c.src.set("de1", "dark:0")
+		} else {
+			c.src.set("de1", "blocked")
+		}
+		c.tick()
+	}
+	mustHave(t, c, "country_blocked/de1/", true)
+	mustHave(t, c, "country_blocked/de1/partial", false)
+}
+
+func TestPartialAlertDoesNotReopenAfterOneDarkFollowingReach(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	for i, darkIndex := range []int{0, 0, 1, 0} { // D, D, R, D for NorthLink; WestFiber supplies the intervening partial verdict.
+		insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Duration(i)*time.Minute), reviewPartialProbes(darkIndex, false)...)
+		c.s.ReconcileCountry(c.ctx)
+		if i == 1 {
+			mustHave(t, c, "country_blocked/de1/partial", true)
+		}
+	}
+	mustHave(t, c, "country_blocked/de1/partial", false)
+}
+
+func TestPartialAlertUsesTCPInsteadOfICMPWhenPortsExist(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	for i := 0; i < 2; i++ {
+		insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Duration(i)*time.Minute), reviewPartialProbes(0, true)...)
+	}
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+}
+
+func TestPartialAlertNamesNewestDarkProbeNetworkAndCity(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	first := reviewPartialProbes(0, false)
+	newest := reviewPartialProbes(0, false)
+	newest[0].Network = "HarborFiber"
+	newest[0].City = "New Sample"
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base, first...)
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Minute), newest...)
+	c.s.ReconcileCountry(c.ctx)
+	a := c.active()["country_blocked/de1/partial"]
+	if a.ID == "" || a.Params["networks"] != "HarborFiber (AS64520, New Sample)" {
+		t.Fatalf("partial alert networks = %q, want the newest D probe", a.Params["networks"])
+	}
+}
+
+func TestPartialAlertIgnoresDataCenterReachForSameASN(t *testing.T) {
+	c := partialAlertEnv(t)
+	base := c.clock.Now().Add(-time.Hour)
+	for i := 0; i < 2; i++ {
+		insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Duration(i)*time.Minute), reviewPartialProbes(0, false)...)
+	}
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+
+	latest := reviewPartialProbes(1, false)
+	latest[0] = countryProbeDetail{Network: "MetroDatacenter", ASN: reviewCountryProbes[0].asn, City: "Example DC",
+		Valid: true, ICMPOK: true, TCP: []countryPortDetail{{Port: 443, OK: true}, {Port: 8443, OK: true}}}
+	insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(2*time.Minute), latest...)
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+}
+
+func TestPartialAlertHoldsWhileNewestGlobalpingRoundIsUnknown(t *testing.T) {
+	c := partialAlertEnv(t)
+	now := c.clock.Now()
+	base := now.Add(-4 * time.Hour)
+	for i := 0; i < 2; i++ {
+		insertCountryAlertRound(t, c, "de1", verdictPartial, base.Add(time.Duration(i)*15*time.Minute), reviewPartialProbes(0, false)...)
+	}
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
+
+	unknownStart := now.Add(-150 * time.Minute)
+	for i := 0; i < countryRecent; i++ {
+		insertCountryAlertRound(t, c, "de1", verdictUnknown, unknownStart.Add(time.Duration(i)*15*time.Minute))
+	}
+	rows, err := c.st.RecentCountryChecks(c.ctx, 1, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Verdict != verdictUnknown {
+		t.Fatalf("newest Globalping row = %+v, want unknown", rows)
+	}
+	c.s.ReconcileCountry(c.ctx)
+	mustHave(t, c, "country_blocked/de1/partial", true)
 }
 
 // Switching the integration off stops the scheduler and lets the alert go; the stored rounds stay but the API hides them.

@@ -234,6 +234,13 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("An app was turned away at the device limit", "Приложению отказали: лимит устройств", "有应用因设备数上限被拒绝")
 	case "country_blocked":
 		c := data(access.CountryName(p["country"], string(l)), 60)
+		if a.Subject == "partial" {
+			ru := "Нода недоступна из части сетей страны: " + c
+			if g, ok := ruFromCountry[p["country"]]; ok {
+				ru = "Нода недоступна из части сетей " + g
+			}
+			return l.pick("Node is unreachable from some networks in "+c, ru, "节点在"+c+"的部分网络中无法连接")
+		}
 		ru := "Нода недоступна из страны: " + c // the names are nominative; the countries on offer have their genitive
 		if g, ok := ruFromCountry[p["country"]]; ok {
 			ru = "Нода недоступна из " + g
@@ -332,6 +339,9 @@ func alertReason(l L, a store.HealthAlert) string {
 	case "port_lossy":
 		return portLossReason(l, p)
 	case "country_blocked":
+		if a.Subject == "partial" {
+			return countryPartialReason(l, p)
+		}
 		return countryBlockedReason(l, p)
 	case "users_impacted":
 		protocol := a.Subject
@@ -383,6 +393,20 @@ func countryBlockedReason(l L, p map[string]string) string {
 	default:
 		line = l.pick("Neither ICMP nor TCP gets through"+where+".", "Не проходят ни ICMP, ни TCP"+where+".", "ICMP 和 TCP 都无法通过"+where+"。")
 	}
+	return countrySeenBy(l, p, line)
+}
+
+func countryPartialReason(l L, p map[string]string) string {
+	nets := data(p["networks"], 160)
+	line := l.pick("Probes on "+nets+" get nothing from it while they reach your other nodes; other networks reach it.",
+		"Зонды в сетях "+nets+" не получают от неё ответа, хотя до других ваших нод доходят; из других сетей она видна.",
+		"位于"+nets+"的探测点收不到它的任何响应，但能到达您的其他节点；其他网络可以连接它。")
+	return countrySeenBy(l, p, line)
+}
+
+func countrySeenBy(l L, p map[string]string, line string) string {
+	sources := strings.Split(p["sources"], ",")
+	has := func(name string) bool { return slices.Contains(sources, name) }
 	var seen []string
 	if has("globalping") {
 		seen = append(seen, l.pick("Globalping", "Globalping", "Globalping"))

@@ -460,6 +460,41 @@ func TestCountryBlockedAlertTextsAreLocalized(t *testing.T) {
 	}
 }
 
+func TestPartialCountryBlockedAlertTextsAreLocalized(t *testing.T) {
+	a := store.HealthAlert{Kind: "country_blocked", Severity: 2, NodeID: "de1", Subject: "partial",
+		TitleKey: "health.alert.country_blocked.title", WhyKey: "health.alert.country_blocked.why.partial",
+		Params: map[string]string{"node": "de1", "country": "RU", "verdict": "partial", "confidence": "eyeball",
+			"sources": "globalping", "networks": "MTS (AS8359, Novosibirsk)"}}
+	for _, tc := range []struct {
+		lang   L
+		title  string
+		reason string
+		seen   string
+	}{
+		{"en", "Node is unreachable from some networks in Russia",
+			"Probes on MTS (AS8359, Novosibirsk) get nothing from it while they reach your other nodes; other networks reach it.",
+			"Seen by: Globalping."},
+		{"ru", "Нода недоступна из части сетей России",
+			"Зонды в сетях MTS (AS8359, Novosibirsk) не получают от неё ответа, хотя до других ваших нод доходят; из других сетей она видна.",
+			"Видели: Globalping."},
+		{"zh", "节点在俄罗斯的部分网络中无法连接",
+			"位于MTS (AS8359, Novosibirsk)的探测点收不到它的任何响应，但能到达您的其他节点；其他网络可以连接它。",
+			"发现方：Globalping。"},
+	} {
+		if got := alertTitle(tc.lang, a); got != tc.title {
+			t.Errorf("%s title = %q, want %q", tc.lang, got, tc.title)
+		}
+		reason := alertReason(tc.lang, a)
+		if !strings.HasPrefix(reason, tc.reason) || !strings.Contains(reason, tc.seen) {
+			t.Errorf("%s reason = %q, want prefix %q and source %q", tc.lang, reason, tc.reason, tc.seen)
+		}
+	}
+	a.Params["country"] = "DE"
+	if got, want := alertTitle("ru", a), "Нода недоступна из части сетей страны: Германия"; got != want {
+		t.Errorf("Russian fallback title = %q, want %q", got, want)
+	}
+}
+
 // The alert says which sources saw the block: the probe node alone (a data-centre view of TCP only), Globalping with it, and a
 // disagreement between the two.
 func TestCountryBlockedAlertNamesTheSources(t *testing.T) {
