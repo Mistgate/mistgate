@@ -424,7 +424,16 @@ export type CountryLook = {
   lists: string[];
   /** Where the verdict comes from: Globalping from home and mobile networks or data centers, the TSPU probe, both, or the block lists only. */
   via: string;
+  /**
+   * A partial block in full, for the lines under its verdict where there is room and no hover (a node's card, the phone): the
+   * networks that do not see the node, the probes that reach it, the operators the round had no probe for, the round's age.
+   * Null on any other verdict, and on a partial row that names no dark network.
+   */
+  breakdown: { dark: BreakdownNet[]; seen: BreakdownNet[]; noProbe: string; at: string } | null;
 };
+
+/** A network of the breakdown: "MTS" and "AS8359 · Novosibirsk", with the time of its answer when it reached the node. */
+export type BreakdownNet = { name: string; tag: string };
 
 /**
  * A probe for the tooltip: "Rostelecom, Moscow" and "ICMP 42 ms · TCP 443, 8443 ✕" (ports that differ get a mark each). On a
@@ -449,6 +458,11 @@ function probeOf(t: T, p: CountryProbe, partial: boolean): CountryLook["probes"]
 function networkOf(p: CountryProbe): string {
   const tag = [p.asn ? `AS${p.asn}` : "", p.city].filter(Boolean).join(", ");
   return tag ? `${p.network || "?"} (${tag})` : p.network || "?";
+}
+
+/** "MTS" and "AS8359 · Novosibirsk · 41 ms" (ms: the TCP connect, else the ping, when the probe got one; the unit never wraps alone). */
+function breakdownNet(t: T, p: CountryProbe, ms: number): BreakdownNet {
+  return { name: p.network || "?", tag: [p.asn ? `AS${p.asn}` : "", p.city, ms > 0 ? `${ms}\u00a0${t("hl.ms")}` : ""].filter(Boolean).join(" · ") };
 }
 
 const viaKeys: Record<string, MessageKey> = { eyeball: "cr.tip.eyeball", dc_only: "cr.tip.dc", listed: "cr.tip.listsOnly" };
@@ -507,6 +521,17 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
       conflict,
       dark,
       noProbe: c.noProbe.length ? t("cr.tip.noProbe", { networks: c.noProbe.join(t("cr.tip.sep")) }) : "",
+      breakdown: darkProbes.length
+        ? {
+            // one line per dark network; every valid probe that reached the node (the verdict's carrier: TCP when the node has ports)
+            dark: [...new Map(darkProbes.map((p) => breakdownNet(t, p, 0)).map((n) => [`${n.name}|${n.tag}`, n])).values()],
+            seen: c.probes
+              .filter((p) => p.valid && !p.dark && (p.tcp.length ? p.tcp.some((x) => x.ok) : p.icmpOk))
+              .map((p) => breakdownNet(t, p, p.tcp.find((x) => x.ok)?.ms || (p.icmpOk ? p.icmpMs : 0))),
+            noProbe: c.noProbe.length ? t("cr.part.noProbe", { networks: c.noProbe.join(t("cr.tip.sep")) }) : "",
+            at: t("cr.tip.at", { time: fmt.ago(c.atUnix) }),
+          }
+        : null,
       probes: c.probes.map((p) => probeOf(t, p, partial)),
       at: live ? t("cr.tip.at", { time: fmt.stamp(c.atUnix) }) : "",
       gpNone: live && !fromGp && fromTspu && c.reason ? t("cr.tip.gpNone", { reason: countryReason(t, c.reason) || c.reason }) : "",

@@ -296,10 +296,28 @@ describe("a block on some networks", () => {
     expect(events.map((e) => e.textContent)).toEqual([expect.stringContaining("de1blocked on some networks · opened 3 h ago")]);
   });
 
+  it("offers its breakdown behind a disclosure across the row, closed until asked, on that node only", async () => {
+    await mount();
+    expect(document.querySelectorAll("[data-testid=reach-breakdown]")).toHaveLength(1);
+    const more = row("de1").querySelector<HTMLDetailsElement>("details[data-testid=reach-breakdown]")!;
+    expect(more.className).toContain("xl:col-span-3");
+    expect(more.open).toBe(false);
+    expect(more.querySelector("summary")?.textContent).toBe("Networks in detail");
+    act(() => more.querySelector("summary")!.click());
+    expect(more.open).toBe(true);
+    const lists = [...more.querySelectorAll("ul")];
+    expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it"]);
+    expect([...more.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["✕MTS AS8359 · Novosibirsk", "✓Beeline AS3216 · Moscow · 44\u00a0ms"]);
+    expect(more.textContent).toContain("Not checked this round: MegaFon, T2");
+    // fi1 is TCP blocked: no breakdown
+    expect(row("fi1").querySelector("[data-testid=reach-breakdown]")).toBeNull();
+  });
+
   it("speaks Russian", async () => {
     act(() => setLang("ru"));
     await mount();
     expect(tally()).toMatchObject({ partial: "1недоступны из части сетей", warn: "1TCP режут" });
+    expect(row("de1").querySelector("summary")?.textContent).toBe("Подробнее по сетям");
     expect(words(row("de1").querySelector("[role=img][tabindex='0']"))).toBe("часть сетей");
     expect(document.querySelector("[data-testid=reach-event]")?.textContent).toContain("de1недоступна из части сетей");
     expect(segs("de1", "globalping")[1]?.getAttribute("aria-label")).toMatch(/^недоступна из части сетей, /);

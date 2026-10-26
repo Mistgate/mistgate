@@ -125,6 +125,14 @@ export const en = {
   "cr.tip.dark": "Blocked on some networks: {networks}",
   "cr.tip.darkProbe": "{line} (reaches your other nodes, not this one)",
   "cr.tip.noProbe": "No home/mobile probe this round: {networks}",
+  // the breakdown of a partial block under its verdict (a node's card, the phone) and on the Reachability row
+  "cr.part.dark": "Cannot reach the node",
+  "cr.part.seen": "Reach it",
+  "cr.part.noProbe": "Not checked this round: {networks}",
+  "cr.part.hint": "A profile behind a CDN may help people on these networks.",
+  "cr.part.guide": "Guide: VLESS behind a CDN",
+  "cr.part.guideUrl": "https://mistgate.app/guide/vless/#vless-behind-a-cdn",
+  "rc.part.more": "Networks in detail",
 
   // ---- shared by the source cards
   "cr.state.off": "Off",
@@ -377,6 +385,13 @@ export const ru: Record<keyof typeof en, string> = {
   "cr.tip.dark": "Недоступна из части сетей: {networks}",
   "cr.tip.darkProbe": "{line} (до других нод доходит, до этой нет)",
   "cr.tip.noProbe": "В этом круге нет домашнего или мобильного зонда: {networks}",
+  "cr.part.dark": "Не видят ноду",
+  "cr.part.seen": "Видят",
+  "cr.part.noProbe": "Не проверены в этом круге: {networks}",
+  "cr.part.hint": "Людям в этих сетях может помочь профиль через CDN.",
+  "cr.part.guide": "Руководство: VLESS за CDN",
+  "cr.part.guideUrl": "https://mistgate.app/ru/guide/vless/#vless-за-cdn",
+  "rc.part.more": "Подробнее по сетям",
 
   "cr.state.off": "Выключено",
   "cr.state.on": "Включено",
@@ -625,6 +640,13 @@ export const zh: Record<keyof typeof en, string> = {
   "cr.tip.dark": "部分网络无法连接：{networks}",
   "cr.tip.darkProbe": "{line}（能到达你的其他节点，但到不了这个节点）",
   "cr.tip.noProbe": "本轮没有家庭或移动网络的探测点：{networks}",
+  "cr.part.dark": "无法连接节点",
+  "cr.part.seen": "可以访问",
+  "cr.part.noProbe": "本轮未检测：{networks}",
+  "cr.part.hint": "这些网络中的用户可以改用经 CDN 连接的协议配置。",
+  "cr.part.guide": "指南：VLESS 经 CDN 连接",
+  "cr.part.guideUrl": "https://mistgate.app/zh/guide/vless/#vless-经-cdn-连接",
+  "rc.part.more": "各网络详情",
 
   "cr.state.off": "已关闭",
   "cr.state.on": "已开启",

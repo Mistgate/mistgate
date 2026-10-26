@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactElement } from "react";
+import { useId, type ReactElement } from "react";
 import { Icon } from "@/components/ui/icons";
 import { StatusDot, StatusGlyph } from "@/components/ui/status";
 import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
-import { countryIn, countryLook, type CountryCheck, type CountryLook } from "@/lib/health";
+import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type CountryLook } from "@/lib/health";
 
 // What one country makes of a node (GetChecksResponse.country_checks): what Globalping's probes inside it saw, what the TSPU
 // probe (one of the owner's nodes there) saw and what the block lists say of its address, as a column of the Health matrix, a
@@ -211,7 +211,8 @@ export function CountryPill({ check, node, code }: { check: CountryCheck | undef
 
 /**
  * The same verdict as a row (a node's card on the phone, the node page): its words are what a screen reader reads on focus,
- * and the quiet line says what the tooltip would, for a phone that has no hover.
+ * and the quiet line says what the tooltip would, for a phone that has no hover. A block on some networks has its breakdown
+ * under the row instead of the line, in the same tinted box but outside the tooltip's trigger.
  */
 export function CountryRow({ check, code }: { check: CountryCheck | undefined; code: string }) {
   const t = useT();
@@ -219,11 +220,12 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
   const title = useCountryTitle(code);
   const look = check ? countryLook(t, fmt, check) : null;
   const kind: Kind = look?.kind ?? "none";
+  const breakdown = look?.breakdown;
   const row = (
     <div
       tabIndex={look ? 0 : undefined}
       data-testid="country-row"
-      className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-[13px]", rowCls[kind])}
+      className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-[13px]", !breakdown && rowCls[kind])}
     >
       <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
         <CountryMark kind={kind} />
@@ -236,8 +238,62 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
         {look?.label ?? t("hl.cell.none")}
         {look?.alsoListed && <ListedGlyph />}
       </span>
-      <span className="min-w-0 flex-[2_1_160px] text-[11px] leading-snug text-muted">{look ? look.line : t("cr.v.notYet")}</span>
+      {!breakdown && <span className="min-w-0 flex-[2_1_160px] text-[11px] leading-snug text-muted">{look ? look.line : t("cr.v.notYet")}</span>}
     </div>
   );
-  return look ? <CountryTip look={look}>{row}</CountryTip> : row;
+  const tipped = look ? <CountryTip look={look}>{row}</CountryTip> : row;
+  if (!breakdown) return tipped;
+  return (
+    <div className={cx("flex min-w-0 flex-col rounded-field", rowCls[kind])}>
+      {tipped}
+      <PartialBreakdown breakdown={breakdown} className="mx-3 border-t border-[color-mix(in_oklch,var(--c)_35%,var(--border))] pt-2.5 pb-3" />
+    </div>
+  );
+}
+
+/**
+ * A block on some networks in full: the networks that do not see the node (✕), the probes that reach it (✓, with their time),
+ * each a list under its own label; the operators the round could not ask; what may help; the round's age. The names come
+ * from Globalping and stay text.
+ */
+export function PartialBreakdown({ breakdown, className }: { breakdown: NonNullable<CountryLook["breakdown"]>; className?: string }) {
+  const t = useT();
+  return (
+    <div data-testid="partial-breakdown" className={cx("flex min-w-0 flex-col gap-2.5 text-[13px]", className)}>
+      <NetList label={t("cr.part.dark")} nets={breakdown.dark} reached={false} />
+      {breakdown.seen.length > 0 && <NetList label={t("cr.part.seen")} nets={breakdown.seen} reached />}
+      {breakdown.noProbe && <p className="text-xs leading-snug text-muted">{breakdown.noProbe}</p>}
+      <p className="text-xs leading-snug text-pretty">
+        {t("cr.part.hint")}{" "}
+        <a href={t("cr.part.guideUrl")} target="_blank" rel="noopener noreferrer" className="font-bold text-accent-text underline decoration-dotted underline-offset-2">
+          {t("cr.part.guide")}
+        </a>
+      </p>
+      <p className="text-[11px] text-muted">{breakdown.at}</p>
+    </div>
+  );
+}
+
+/** One group of the breakdown: its label, then a line per network with its mark, its name and its AS, city and time muted. */
+function NetList({ label, nets, reached }: { label: string; nets: readonly BreakdownNet[]; reached: boolean }) {
+  const id = useId();
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span id={id} className="text-xs font-bold">
+        {label}
+      </span>
+      <ul aria-labelledby={id} className="flex flex-col gap-0.5">
+        {nets.map((n, i) => (
+          <li key={i} className="grid grid-cols-[14px_minmax(0,1fr)] items-baseline gap-x-1.5">
+            <span aria-hidden className={cx("text-center text-xs font-extrabold tone-text", reached ? "tone-ok" : "tone-bad")}>
+              {reached ? "✓" : "✕"}
+            </span>
+            <span className="min-w-0 break-words">
+              <span className="font-semibold">{n.name}</span> <span className="font-mono text-[11px] text-muted">{n.tag}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }

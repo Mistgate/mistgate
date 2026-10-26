@@ -7,9 +7,9 @@ import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import type { CountryCheck } from "@/lib/health";
+import { countryLook, type CountryCheck } from "@/lib/health";
 import { laneNow, midnights, reachSources, segmentsOf, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
-import { CountryMark, CountryPill } from "@/screens/health/country";
+import { CountryMark, CountryPill, PartialBreakdown } from "@/screens/health/country";
 
 // The nodes of the Reachability page: a row per node with its verdict now (the pill of the Health column, with its tooltip), then
 // a line per source: its word for the node now and its week as a thin lane of verdicts. A source that is off stays in place,
@@ -118,10 +118,25 @@ export function NodesTable({
                 </span>
               </div>
             </div>
+            <RowBreakdown check={checks.get(n.id)} />
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+/** A block on some networks: its breakdown behind a disclosure under the row, across all the columns; nothing on any other verdict. */
+function RowBreakdown({ check }: { check: CountryCheck | undefined }) {
+  const t = useT();
+  const fmt = useFmt();
+  const breakdown = check?.verdict === CountryVerdict.PARTIAL ? countryLook(t, fmt, check).breakdown : null;
+  if (!breakdown) return null;
+  return (
+    <details data-testid="reach-breakdown" className="xl:col-span-3">
+      <summary className="w-fit cursor-pointer text-xs font-semibold text-muted hover:text-fg">{t("rc.part.more")}</summary>
+      <PartialBreakdown breakdown={breakdown} className="mt-2 max-w-xl rounded-field tone-warn tint px-3 py-2.5" />
+    </details>
   );
 }
 

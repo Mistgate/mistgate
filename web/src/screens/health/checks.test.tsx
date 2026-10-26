@@ -384,12 +384,39 @@ describe("a block on some networks in the country column", () => {
     expect(tip).not.toContain("reaches your other nodes");
   });
 
-  it("gives the phone card the networks in words, where there is no hover", async () => {
+  it("breaks it down under the phone card's row, where there is no hover: who does not see the node, who does, what may help", async () => {
     await mount(some);
     const rows = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")];
-    expect(rows[0]?.textContent).toBe("From Russiasome networksBlocked on some networks: MTS (AS8359, Novosibirsk) · 4 min ago");
-    expect(rows[0]?.className).toContain("tone-warn");
-    expect(rows[2]?.textContent).toBe("×From RussiaunreachableMTS, Beeline · 4 min ago");
+    expect(rows[0]?.textContent).toBe("From Russiasome networks");
+    // one tinted box: the row (the tooltip's trigger) on top, the breakdown under it and outside the trigger
+    const box = rows[0]!.parentElement!;
+    expect(box.className).toContain("tone-warn");
+    const breakdown = box.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
+    expect(rows[0]!.contains(breakdown)).toBe(false);
+    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(1); // the desktop cell stays compact
+    // two lists, each named by its label
+    const lists = [...breakdown.querySelectorAll("ul")];
+    expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it"]);
+    expect(lists.map((ul) => [...ul.querySelectorAll("li")].map((li) => li.textContent))).toEqual([["✕MTS AS8359 · Novosibirsk"], ["✓Beeline AS3216 · Moscow · 40\u00a0ms"]]);
+    for (const mark of breakdown.querySelectorAll("li > span:first-child")) expect(mark.getAttribute("aria-hidden")).toBe("true");
+    expect(breakdown.textContent).toContain("Not checked this round: MegaFon, T2");
+    expect(breakdown.textContent).toContain("A profile behind a CDN may help people on these networks.");
+    const guide = breakdown.querySelector("a")!;
+    expect([guide.textContent, guide.getAttribute("href"), guide.getAttribute("target"), guide.getAttribute("rel")]).toEqual([
+      "Guide: VLESS behind a CDN",
+      "https://mistgate.app/guide/vless/#vless-behind-a-cdn",
+      "_blank",
+      "noopener noreferrer",
+    ]);
+    expect(breakdown.lastElementChild?.textContent).toBe("Last round: 4 min ago");
+  });
+
+  it("does not break a full block down: its row keeps the quiet line", async () => {
+    await mount(some);
+    const cut = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")][2]!;
+    expect(cut.textContent).toBe("×From RussiaunreachableMTS, Beeline · 4 min ago");
+    expect(cut.className).toContain("tone-bad");
+    expect(cut.parentElement!.querySelector("[data-testid=partial-breakdown]")).toBeNull();
   });
 
   it("shows it on the node page as well", async () => {
@@ -401,9 +428,15 @@ describe("a block on some networks in the country column", () => {
     await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_2" /></QueryClientProvider>));
     for (let i = 0; i < 4; i++) await settle();
     const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("From Russiasome networksBlocked on some networks: MTS (AS8359, Novosibirsk) · 4 min ago");
+    expect(row.textContent).toBe("From Russiasome networks");
     expect(row.querySelector("svg circle")).not.toBeNull();
     expect(row.tabIndex).toBe(0);
+    const breakdown = row.parentElement!.querySelector("[data-testid=partial-breakdown]")!;
+    expect([...breakdown.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["✕MTS AS8359 · Novosibirsk", "✓Beeline AS3216 · Moscow · 40\u00a0ms"]);
+    // the row's tooltip still opens on focus
+    await act(async () => row.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    expect(document.body.textContent).toContain("MTS, Novosibirsk (reaches your other nodes, not this one)");
   });
 
   it("speaks Russian and Chinese", async () => {
@@ -411,11 +444,19 @@ describe("a block on some networks in the country column", () => {
     await mount(some);
     expect(countryCell("de1")?.textContent).toBe("часть сетейMTS");
     expect(countryCell("de1")?.getAttribute("aria-label")).toBe("de1, Из России: Доступна из России, но не из всех сетей · Недоступна из части сетей: MTS (AS8359, Novosibirsk)");
+    const ruB = document.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
+    expect([...ruB.querySelectorAll("ul")].map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Не видят ноду", "Видят"]);
+    expect(ruB.querySelector("li")?.textContent).toBe("✕MTS AS8359 · Novosibirsk");
+    for (const l of ["Не проверены в этом круге: MegaFon, T2", "Людям в этих сетях может помочь профиль через CDN.", "Последний круг: 4 мин назад"]) expect(ruB.textContent).toContain(l);
+    expect([ruB.querySelector("a")?.textContent, ruB.querySelector("a")?.getAttribute("href")]).toEqual(["Руководство: VLESS за CDN", "https://mistgate.app/ru/guide/vless/#vless-за-cdn"]);
     act(() => root?.unmount());
     host?.remove();
     act(() => setLang("zh"));
     await mount(some);
     expect(countryCell("de1")?.textContent).toBe("部分网络MTS");
+    const zhB = document.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
+    expect(document.getElementById(zhB.querySelector("ul")!.getAttribute("aria-labelledby")!)?.textContent).toBe("无法连接节点");
+    expect(zhB.querySelector("a")?.getAttribute("href")).toBe("https://mistgate.app/zh/guide/vless/#vless-经-cdn-连接");
   });
 });
 

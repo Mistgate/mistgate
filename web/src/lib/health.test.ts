@@ -778,6 +778,37 @@ describe("reachability from a country", () => {
     );
   });
 
+  it("breaks a partial block down: the networks that do not see the node, the probes that do with their time, who was not asked", () => {
+    expect(countryLook(tPlural, fmt, some).breakdown).toEqual({
+      dark: [{ name: "MTS", tag: "AS8359 · Novosibirsk" }],
+      seen: [{ name: "Beeline", tag: "AS3216 · Moscow · 40\u00a0ms" }],
+      noProbe: "Not checked this round: MegaFon, T2",
+      at: "Last round: 4 min ago",
+    });
+    // a dark network once; one without a city; a probe that did not count is in neither list; a node without TCP ports: the ping
+    const b = countryLook(tPlural, fmt, {
+      ...some,
+      noProbe: [],
+      probes: [
+        dark("MTS", 8359, "Novosibirsk"),
+        dark("MTS", 8359, "Novosibirsk"),
+        dark("Beeline", 3216, ""),
+        { ...dark("Rostelecom", 12389, "Kazan"), valid: false },
+        { ...probe("Beeline", "Kazan", 47, []), asn: 3216 },
+        { ...probe("MegaFon", "Omsk", 50, [], false), asn: 31133 },
+      ],
+    }).breakdown!;
+    expect(b.dark).toEqual([
+      { name: "MTS", tag: "AS8359 · Novosibirsk" },
+      { name: "Beeline", tag: "AS3216" },
+    ]);
+    expect(b.seen).toEqual([{ name: "Beeline", tag: "AS3216 · Kazan · 47\u00a0ms" }]);
+    expect(b.noProbe).toBe("");
+    const ruB = countryLook(tRuPlural, fmtRu, some).breakdown!;
+    expect([ruB.seen[0]!.tag, ruB.noProbe, ruB.at]).toEqual(["AS3216 · Moscow · 40\u00a0мс", "Не проверены в этом круге: MegaFon, T2", "Последний круг: 4 мин назад"]);
+    expect(countryLook(tZhPlural, fmtZh, some).breakdown!.noProbe).toBe("本轮未检测：MegaFon、T2");
+  });
+
   it("does not call a full block a block on some networks, though every probe of it is stored dark", () => {
     const l = countryLook(tPlural, fmt, check({ verdict: CountryVerdict.BLOCKED, probes: [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")] }));
     expect([l.kind, l.head, l.dark, l.note]).toEqual(["bad", "Neither ICMP nor TCP gets through", "", ""]);
@@ -787,6 +818,8 @@ describe("reachability from a country", () => {
     ]);
     expect(l.line).toBe("MTS, Beeline · 4 min ago");
     expect(l.state).not.toContain("some networks");
+    expect(l.breakdown).toBeNull();
+    expect(countryLook(tPlural, fmt, check()).breakdown).toBeNull();
   });
 
   it("says which named operators had no probe on any verdict, and nothing when every one had", () => {
