@@ -1025,14 +1025,16 @@ type countryProbeV struct {
 	ASN     uint32         `json:"asn,omitempty"`
 	City    string         `json:"city,omitempty"`
 	Eyeball bool           `json:"eyeball,omitempty"`
+	Dark    bool           `json:"dark,omitempty"`
 	ICMPOK  bool           `json:"icmp_ok"`
 	ICMPMs  uint32         `json:"icmp_ms,omitempty"`
 	TCP     []countryPortV `json:"tcp,omitempty"`
 	Valid   bool           `json:"valid"` // false: it failed the control site or went offline; shown, not counted
 }
 
-// countryCheckV: verdict is ok, tcp_blocked (ICMP passes, TCP is cut), blocked, listed (no live check, but the node's address
-// is in a public block list: in the registry, not proven dropped) or unknown (reason says why a live round was not enough).
+// countryCheckV: verdict is ok, partial (some home networks get nothing from the node; dark marks their probes),
+// tcp_blocked (ICMP passes, TCP is cut), blocked, listed (no live check, but the node's address is in a public block list:
+// in the registry, not proven dropped) or unknown (reason says why a live round was not enough).
 // Network names come from a third party and are shown as data.
 type countryCheckV struct {
 	Country string   `json:"country"`
@@ -1128,7 +1130,8 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 		}
 	}
 	for _, p := range c.GetProbes() {
-		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), Eyeball: p.GetEyeball(), ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
+		pv := countryProbeV{Network: nm(p.GetNetwork()), ASN: p.GetAsn(), City: nm(p.GetCity()), Eyeball: p.GetEyeball(), Dark: p.GetDark(),
+			ICMPOK: p.GetIcmpOk(), ICMPMs: p.GetIcmpMs(), Valid: p.GetValid()}
 		for _, t := range p.GetTcp() {
 			pv.TCP = append(pv.TCP, countryPortV{Port: t.GetPort(), OK: t.GetOk(), Ms: t.GetMs()})
 		}

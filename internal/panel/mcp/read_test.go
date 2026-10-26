@@ -103,6 +103,17 @@ func TestChecksResultsContent(t *testing.T) {
 	}
 }
 
+func TestCountryCheckViewCarriesPartialAndDark(t *testing.T) {
+	got := countryCheckView(&adminv1.CountryCheck{
+		Country: "RU",
+		Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_PARTIAL,
+		Probes:  []*adminv1.CountryProbe{{Network: "MTS", Valid: true, Eyeball: true, Dark: true}},
+	})
+	if got == nil || got.Verdict != "partial" || len(got.Probes) != 1 || !got.Probes[0].Dark {
+		t.Fatalf("country check view = %+v, want partial with a dark probe", got)
+	}
+}
+
 // The tspu_probe view says why a no_dpi_hop could not place the TSPU, and omits the field when it is not known.
 func TestTspuRunViewReason(t *testing.T) {
 	r := &adminv1.TspuProbeRun{Status: "no_dpi_hop", AtUnix: 1700000400, NodeId: nodeA, Reason: "refs_pass"}

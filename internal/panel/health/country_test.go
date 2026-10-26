@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/netip"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,7 +18,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-// fakeCountrySource answers a round from a table: per node key a mode (ok, tcp_blocked, blocked, few) and nothing else.
+// fakeCountrySource answers a round from a table: per node key a mode (ok, tcp_blocked, blocked, few, dark:N) and nothing else.
 type fakeCountrySource struct {
 	mu      sync.Mutex
 	limit   int
@@ -45,7 +47,15 @@ func (f *fakeCountrySource) Measure(_ context.Context, r CountryRound) (CountryO
 		p := ObservedProbe{Network: probe.name, ASN: probe.asn, City: "Moscow", Eyeball: true, Online: true, ControlOK: true, Nodes: map[string]ObservedNode{}}
 		for _, t := range r.Targets {
 			n := ObservedNode{Answered: true}
-			switch f.mode[t.Key] {
+			mode := f.mode[t.Key]
+			if strings.HasPrefix(mode, "dark:") {
+				if mode == "dark:"+strconv.Itoa(i) {
+					mode = "dark"
+				} else {
+					mode = "ok"
+				}
+			}
+			switch mode {
 			case "", "ok":
 				n.ICMPOK, n.ICMPMs = true, 30
 				for _, port := range t.Ports {
@@ -60,6 +70,7 @@ func (f *fakeCountrySource) Measure(_ context.Context, r CountryRound) (CountryO
 				for _, port := range t.Ports {
 					n.TCP = append(n.TCP, ObservedPort{Port: port})
 				}
+			case "dark": // this probe gets no response from this node but may reach another target
 			case "few": // only one probe is usable
 				p.ControlOK = i == 0
 				n.ICMPOK = true
@@ -191,7 +202,7 @@ func TestCountryJudgeVerdicts(t *testing.T) {
 		{"icmp-only node answers on a third", icmpTarget, []ObservedProbe{probe(true, true), probe(true, false), probe(true, false)}, "unknown", "mixed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			verdict, d := countryJudge(tc.target, CountryObserved{Eyeball: true, Probes: tc.probes})
+			verdict, d := countryJudge(tc.target, CountryObserved{Eyeball: true, Probes: tc.probes}, nil)
 			if verdict != tc.want || d.Reason != tc.reason {
 				t.Fatalf("verdict %q reason %q, want %q %q", verdict, d.Reason, tc.want, tc.reason)
 			}
@@ -204,8 +215,75 @@ func TestCountryJudgeVerdicts(t *testing.T) {
 	// a probe that went offline in the middle of the round, and one whose test broke, do not count
 	offline := ObservedProbe{Network: "net", Online: false, ControlOK: true, Nodes: map[string]ObservedNode{"n": {Answered: true}}}
 	broken := ObservedProbe{Network: "net", Online: true, ControlOK: true, Nodes: map[string]ObservedNode{"n": {}}}
-	if v, _ := countryJudge(tcpTarget, CountryObserved{Probes: []ObservedProbe{probe(true, true, true), offline, broken}}); v != "unknown" {
+	if v, _ := countryJudge(tcpTarget, CountryObserved{Probes: []ObservedProbe{probe(true, true, true), offline, broken}}, nil); v != "unknown" {
 		t.Errorf("an offline and a broken probe counted: %q", v)
+	}
+}
+
+func TestCountryJudgePartialRules(t *testing.T) {
+	tcpTarget := CountryTarget{Key: "de1", Ports: []uint16{443}}
+	icmpTarget := CountryTarget{Key: "de1"}
+	probe := func(target CountryTarget, name string, asn uint32, city string, eyeball, icmp, tcp, complete, control bool) ObservedProbe {
+		n := ObservedNode{Answered: true, Complete: complete, ICMPOK: icmp}
+		for _, port := range target.Ports {
+			n.TCP = append(n.TCP, ObservedPort{Port: port, OK: tcp})
+		}
+		return ObservedProbe{Network: name, ASN: asn, City: city, Eyeball: eyeball, Online: true, ControlOK: control,
+			Nodes: map[string]ObservedNode{"de1": n}}
+	}
+	dark := func(target CountryTarget, name string, asn uint32, city string) ObservedProbe {
+		return probe(target, name, asn, city, true, false, false, true, true)
+	}
+	good := func(target CountryTarget, name string, asn uint32, city string) ObservedProbe {
+		return probe(target, name, asn, city, true, true, true, true, true)
+	}
+	blockedTCP := func(target CountryTarget, name string, asn uint32, city string) ObservedProbe {
+		return probe(target, name, asn, city, true, true, false, true, true)
+	}
+	incomplete := probe(tcpTarget, "MTS", 8359, "Novosibirsk", true, false, false, false, true)
+	incomplete.Nodes["de1"] = ObservedNode{Answered: true}
+	type testCase struct {
+		name    string
+		target  CountryTarget
+		probes  []ObservedProbe
+		reached []bool
+		want    string
+		reason  string
+		dark    []bool
+		prepass bool
+	}
+	cases := []testCase{
+		{name: "incident MTS probe is dark", target: tcpTarget, probes: []ObservedProbe{dark(tcpTarget, "MTS", 8359, "Novosibirsk"), good(tcpTarget, "Beeline", 3216, "Ufa"), good(tcpTarget, "Rostelecom", 12389, "Kostroma")}, reached: []bool{true, false, false}, want: "partial", dark: []bool{true, false, false}},
+		{name: "a non-eyeball probe is not dark", target: tcpTarget, probes: []ObservedProbe{probe(tcpTarget, "MTS", 8359, "Novosibirsk", false, false, false, true, true), good(tcpTarget, "Beeline", 3216, "Ufa"), good(tcpTarget, "Rostelecom", 12389, "Kostroma")}, reached: []bool{true, false, false}, want: "ok", dark: []bool{false, false, false}},
+		{name: "a probe that reached no other target is not dark", target: tcpTarget, probes: []ObservedProbe{dark(tcpTarget, "MTS", 8359, "Novosibirsk"), good(tcpTarget, "Beeline", 3216, "Ufa"), good(tcpTarget, "Rostelecom", 12389, "Kostroma")}, want: "ok", dark: []bool{false, false, false}},
+		{name: "single-node round has no other reach", target: tcpTarget, probes: []ObservedProbe{dark(tcpTarget, "MTS", 8359, "Novosibirsk"), good(tcpTarget, "Beeline", 3216, "Ufa"), good(tcpTarget, "Rostelecom", 12389, "Kostroma")}, want: "ok", dark: []bool{false, false, false}, prepass: true},
+		{name: "an incomplete TCP test is not dark", target: tcpTarget, probes: []ObservedProbe{incomplete, good(tcpTarget, "Beeline", 3216, "Ufa"), good(tcpTarget, "Rostelecom", 12389, "Kostroma")}, reached: []bool{true, false, false}, want: "ok", dark: []bool{false, false, false}},
+		{name: "one reach and two dark probes replace mixed", target: tcpTarget, probes: []ObservedProbe{dark(tcpTarget, "MTS", 8359, "Novosibirsk"), dark(tcpTarget, "Beeline", 3216, "Ufa"), good(tcpTarget, "Rostelecom", 12389, "Kostroma")}, reached: []bool{true, true, false}, want: "partial", dark: []bool{true, true, false}},
+		{name: "tcp blocked stays tcp blocked", target: tcpTarget, probes: []ObservedProbe{blockedTCP(tcpTarget, "MTS", 8359, "Novosibirsk"), blockedTCP(tcpTarget, "Beeline", 3216, "Ufa"), dark(tcpTarget, "Rostelecom", 12389, "Kostroma")}, reached: []bool{false, false, true}, want: "tcp_blocked", dark: []bool{false, false, true}},
+		{name: "blocked stays blocked without a reach to this node", target: tcpTarget, probes: []ObservedProbe{dark(tcpTarget, "MTS", 8359, "Novosibirsk"), dark(tcpTarget, "Beeline", 3216, "Ufa"), dark(tcpTarget, "Rostelecom", 12389, "Kostroma")}, reached: []bool{true, true, true}, want: "blocked", dark: []bool{true, true, true}},
+		{name: "too few probes stays unknown", target: tcpTarget, probes: []ObservedProbe{dark(tcpTarget, "MTS", 8359, "Novosibirsk"), probe(tcpTarget, "Beeline", 3216, "Ufa", true, true, true, true, false)}, reached: []bool{true, false}, want: "unknown", reason: "too_few_probes", dark: []bool{true, false}},
+		{name: "ICMP-only node can be partial", target: icmpTarget, probes: []ObservedProbe{dark(icmpTarget, "MTS", 8359, "Novosibirsk"), probe(icmpTarget, "Beeline", 3216, "Ufa", true, true, false, true, true), probe(icmpTarget, "Rostelecom", 12389, "Kostroma", true, true, false, true, true)}, reached: []bool{true, false, false}, want: "partial", dark: []bool{true, false, false}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			obs := CountryObserved{Eyeball: true, Probes: tc.probes}
+			reached := tc.reached
+			if tc.prepass {
+				reached = countryReached(obs, []CountryTarget{tc.target}, len(tc.target.Ports) == 0)
+			}
+			got, detail := countryJudge(tc.target, obs, reached)
+			if got != tc.want || detail.Reason != tc.reason {
+				t.Fatalf("countryJudge() = %q (%q), want %q (%q)", got, detail.Reason, tc.want, tc.reason)
+			}
+			if len(detail.Probes) != len(tc.dark) {
+				t.Fatalf("detail has %d probes, want %d", len(detail.Probes), len(tc.dark))
+			}
+			for i, wantDark := range tc.dark {
+				if detail.Probes[i].Dark != wantDark {
+					t.Errorf("probe %d (%s) dark = %t, want %t", i, detail.Probes[i].Network, detail.Probes[i].Dark, wantDark)
+				}
+			}
+		})
 	}
 }
 
@@ -613,5 +691,30 @@ func TestGetChecksCarriesTheCountryCheck(t *testing.T) {
 	// the alert kind has its proto name
 	if kindProto[kCountryBlocked] != adminv1.AlertKind_ALERT_KIND_COUNTRY_BLOCKED {
 		t.Fatal("kindProto")
+	}
+}
+
+func TestGetChecksAndHistoryExposePartialAndDark(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	c.onlineNode("nl1", "203.0.113.20")
+	c.src.set("de1", "dark:0")
+	if !c.tick() {
+		t.Fatal("the country round did not run")
+	}
+	r, err := rpc{c.s}.GetChecks(c.ctx, connect.NewRequest(&adminv1.GetChecksRequest{NodeId: "de1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Msg.CountryChecks) != 1 {
+		t.Fatalf("country checks = %+v, want one node", r.Msg.CountryChecks)
+	}
+	check := r.Msg.CountryChecks[0]
+	if check.Verdict != adminv1.CountryVerdict_COUNTRY_VERDICT_PARTIAL || len(check.Probes) != 3 || !check.Probes[0].Dark || check.Probes[1].Dark || check.Probes[2].Dark {
+		t.Fatalf("GetChecks country check = %+v, want PARTIAL with only probe 0 dark", check)
+	}
+	_, lanes := c.history()
+	if !slices.Contains(lanes, "de1 globalping partial@0 until=0") {
+		t.Fatalf("history lanes = %q, want a PARTIAL point for de1", lanes)
 	}
 }

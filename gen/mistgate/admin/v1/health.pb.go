@@ -295,6 +295,9 @@ const (
 	// No live observation from inside the country, but the node's address (or its subnet) is in a public block list
 	// (blocklist.proto). A context signal: in the registry, not proven dropped. Never opens an alert.
 	CountryVerdict_COUNTRY_VERDICT_LISTED CountryVerdict = 5
+	// A valid home or mobile probe, after completing every test, got no ICMP and no TCP from this node while it reached another
+	// node of the round, and another valid probe reaches this node.
+	CountryVerdict_COUNTRY_VERDICT_PARTIAL CountryVerdict = 6
 )
 
 // Enum value maps for CountryVerdict.
@@ -306,6 +309,7 @@ var (
 		3: "COUNTRY_VERDICT_BLOCKED",
 		4: "COUNTRY_VERDICT_UNKNOWN",
 		5: "COUNTRY_VERDICT_LISTED",
+		6: "COUNTRY_VERDICT_PARTIAL",
 	}
 	CountryVerdict_value = map[string]int32{
 		"COUNTRY_VERDICT_UNSPECIFIED": 0,
@@ -314,6 +318,7 @@ var (
 		"COUNTRY_VERDICT_BLOCKED":     3,
 		"COUNTRY_VERDICT_UNKNOWN":     4,
 		"COUNTRY_VERDICT_LISTED":      5,
+		"COUNTRY_VERDICT_PARTIAL":     6,
 	}
 )
 
@@ -1523,6 +1528,8 @@ type CountryProbe struct {
 	Tcp     []*PortResult `protobuf:"bytes,6,rep,name=tcp,proto3" json:"tcp,omitempty"`
 	// False: thrown away for this round (it failed the control site, or went offline); its answers are shown but not counted.
 	Valid bool `protobuf:"varint,7,opt,name=valid,proto3" json:"valid,omitempty"`
+	// It got no answer from this node despite completing every test, but reached another node in the same round.
+	Dark bool `protobuf:"varint,8,opt,name=dark,proto3" json:"dark,omitempty"`
 	// Home or mobile network, from this probe's assigned Globalping tags.
 	Eyeball       bool `protobuf:"varint,9,opt,name=eyeball,proto3" json:"eyeball,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1604,6 +1611,13 @@ func (x *CountryProbe) GetTcp() []*PortResult {
 func (x *CountryProbe) GetValid() bool {
 	if x != nil {
 		return x.Valid
+	}
+	return false
+}
+
+func (x *CountryProbe) GetDark() bool {
+	if x != nil {
+		return x.Dark
 	}
 	return false
 }
@@ -3046,7 +3060,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"PortResult\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x0e\n" +
-	"\x02ms\x18\x03 \x01(\rR\x02ms\"\xe1\x01\n" +
+	"\x02ms\x18\x03 \x01(\rR\x02ms\"\xf5\x01\n" +
 	"\fCountryProbe\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x10\n" +
 	"\x03asn\x18\x02 \x01(\rR\x03asn\x12\x12\n" +
@@ -3054,7 +3068,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\aicmp_ok\x18\x04 \x01(\bR\x06icmpOk\x12\x17\n" +
 	"\aicmp_ms\x18\x05 \x01(\rR\x06icmpMs\x12/\n" +
 	"\x03tcp\x18\x06 \x03(\v2\x1d.mistgate.admin.v1.PortResultR\x03tcp\x12\x14\n" +
-	"\x05valid\x18\a \x01(\bR\x05valid\x12\x18\n" +
+	"\x05valid\x18\a \x01(\bR\x05valid\x12\x12\n" +
+	"\x04dark\x18\b \x01(\bR\x04dark\x12\x18\n" +
 	"\aeyeball\x18\t \x01(\bR\aeyeball\"\xa1\x06\n" +
 	"\fCountryCheck\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
@@ -3212,14 +3227,15 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +
 	"\x15CHECK_STATUS_DEGRADED\x10\x02\x12\x17\n" +
 	"\x13CHECK_STATUS_FAILED\x10\x03\x12\x18\n" +
-	"\x14CHECK_STATUS_SKIPPED\x10\x04*\xc0\x01\n" +
+	"\x14CHECK_STATUS_SKIPPED\x10\x04*\xdd\x01\n" +
 	"\x0eCountryVerdict\x12\x1f\n" +
 	"\x1bCOUNTRY_VERDICT_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12COUNTRY_VERDICT_OK\x10\x01\x12\x1f\n" +
 	"\x1bCOUNTRY_VERDICT_TCP_BLOCKED\x10\x02\x12\x1b\n" +
 	"\x17COUNTRY_VERDICT_BLOCKED\x10\x03\x12\x1b\n" +
 	"\x17COUNTRY_VERDICT_UNKNOWN\x10\x04\x12\x1a\n" +
-	"\x16COUNTRY_VERDICT_LISTED\x10\x05*\x8b\x01\n" +
+	"\x16COUNTRY_VERDICT_LISTED\x10\x05\x12\x1b\n" +
+	"\x17COUNTRY_VERDICT_PARTIAL\x10\x06*\x8b\x01\n" +
 	"\fDoctorStatus\x12\x1d\n" +
 	"\x19DOCTOR_STATUS_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DOCTOR_STATUS_OK\x10\x01\x12\x16\n" +

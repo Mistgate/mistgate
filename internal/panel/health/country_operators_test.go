@@ -83,6 +83,38 @@ func TestCountryWantsNeverAskedThenOldest(t *testing.T) {
 	}
 }
 
+func TestCountryWantsReaskNewestDarkProbesFirst(t *testing.T) {
+	base := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	row := func(country string, at time.Time, detail string) store.CountryCheck {
+		return store.CountryCheck{Country: country, At: at, Verdict: "partial", Detail: detail}
+	}
+	rows := []store.CountryCheck{
+		row("RU", base, `{"probes":[{"network":"MTS","asn":8359,"city":"Novosibirsk","dark":true,"valid":true,"eyeball":true}]}`),
+		row("RU", base, `{"probes":[{"network":"MTS","asn":8359,"city":"Novosibirsk","dark":true,"valid":true,"eyeball":true}]}`),
+		row("RU", base.Add(-15*time.Minute), `{"probes":[{"network":"Beeline","asn":3216,"city":"Ufa","dark":true,"valid":true,"eyeball":true}]}`),
+		row("DE", base.Add(time.Minute), `{"probes":[{"network":"Other","asn":3216,"city":"Ufa","dark":true,"valid":true,"eyeball":true}]}`),
+	}
+	wants := countryWants("RU", rows)
+	if len(wants) == 0 {
+		t.Fatal("no wants")
+	}
+	if wants[0].Name != "MTS" || wants[0].City != "Novosibirsk" || len(wants[0].ASNs) != 1 || wants[0].ASNs[0] != 8359 {
+		t.Fatalf("first want = %+v, want newest MTS probe pinned to AS8359 in Novosibirsk", wants[0])
+	}
+	pinned := 0
+	for _, want := range wants {
+		if want.City == "Novosibirsk" {
+			pinned++
+		}
+		if want.Name == "Beeline" && want.City == "Ufa" {
+			t.Fatal("a dark probe from an older round was re-asked ahead of the newest round")
+		}
+	}
+	if pinned != 1 {
+		t.Fatalf("newest pinned MTS probe appears %d times, want once", pinned)
+	}
+}
+
 func TestCountryRoundWantsStoreErrorUsesTableOrder(t *testing.T) {
 	c := newCountryEnv(t)
 	ctx, cancel := context.WithCancel(c.ctx)

@@ -358,6 +358,9 @@ enum CountryVerdict {
   // No live observation from inside the country, but the node's address (or its subnet) is in a public block list
   // (blocklist.proto). A context signal: in the registry, not proven dropped. Never opens an alert.
   COUNTRY_VERDICT_LISTED = 5;
+  // A valid home or mobile probe, after completing every test, got no ICMP and no TCP from this node while it reached another
+  // node of the round, and another valid probe reaches this node.
+  COUNTRY_VERDICT_PARTIAL = 6;
 }
 
 message PortResult {
@@ -377,6 +380,8 @@ message CountryProbe {
   repeated PortResult tcp = 6;
   // False: thrown away for this round (it failed the control site, or went offline); its answers are shown but not counted.
   bool valid = 7;
+  // It got no answer from this node despite completing every test, but reached another node in the same round.
+  bool dark = 8;
   // Home or mobile network, from this probe's assigned Globalping tags.
   bool eyeball = 9;
 }

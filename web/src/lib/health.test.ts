@@ -581,6 +581,7 @@ describe("reachability from a country", () => {
     icmpMs,
     tcp: tcp.map(([port, ok]) => ({ port, ok, ms: ok ? 40 : 0 })),
     valid,
+    dark: false,
     eyeball: true,
   });
   const check = (over: Partial<CountryCheck> = {}): CountryCheck => ({

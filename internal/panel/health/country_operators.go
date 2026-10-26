@@ -81,9 +81,20 @@ func countryWants(country string, rows []store.CountryCheck) []CountryWant {
 	if len(operators) == 0 {
 		return nil
 	}
+	var newest time.Time
+	for _, row := range rows {
+		if row.Country == country && row.Verdict != verdictUnknown && row.At.After(newest) {
+			newest = row.At
+		}
+	}
 
 	asked := make([]bool, len(operators))
 	lastAsked := make([]time.Time, len(operators))
+	var suspects []CountryWant
+	seenSuspects := map[struct {
+		asn  uint32
+		city string
+	}]bool{}
 	for _, row := range rows {
 		if row.Country != country || row.Detail == "" {
 			continue
@@ -112,6 +123,23 @@ func countryWants(country string, rows []store.CountryCheck) []CountryWant {
 					markAsked(i)
 				}
 			}
+			if row.Verdict == verdictPartial && row.At.Equal(newest) && probe.Dark && probe.Valid && probe.Eyeball && probe.ASN != 0 {
+				key := struct {
+					asn  uint32
+					city string
+				}{probe.ASN, probe.City}
+				if !seenSuspects[key] {
+					name := probe.Network // the table's name when the ASN is an operator's, so the source dedupes and counts it as asked
+					for _, operator := range operators {
+						if slices.Contains(operator.ASNs, probe.ASN) {
+							name = operator.Name
+							break
+						}
+					}
+					suspects = append(suspects, CountryWant{Name: name, ASNs: []uint32{probe.ASN}, City: probe.City})
+					seenSuspects[key] = true
+				}
+			}
 		}
 	}
 
@@ -130,7 +158,8 @@ func countryWants(country string, rows []store.CountryCheck) []CountryWant {
 		return a < b
 	})
 
-	wants := make([]CountryWant, 0, len(order))
+	wants := make([]CountryWant, 0, len(suspects)+len(order))
+	wants = append(wants, suspects...)
 	for _, i := range order {
 		wants = append(wants, CountryWant{Name: operators[i].Name, ASNs: slices.Clone(operators[i].ASNs)})
 	}

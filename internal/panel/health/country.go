@@ -27,6 +27,7 @@ const (
 	kCountryBlocked = "country_blocked"
 
 	verdictOK         = "ok"
+	verdictPartial    = "partial"
 	verdictTCPBlocked = "tcp_blocked"
 	verdictBlocked    = "blocked"
 	verdictUnknown    = "unknown"
@@ -113,6 +114,7 @@ type countryProbeDetail struct {
 	City    string              `json:"city,omitempty"`
 	Eyeball bool                `json:"eyeball,omitempty"`
 	Valid   bool                `json:"valid"`
+	Dark    bool                `json:"dark,omitempty"`
 	ICMPOK  bool                `json:"icmp_ok"`
 	ICMPMs  uint32              `json:"icmp_ms,omitempty"`
 	TCP     []countryPortDetail `json:"tcp,omitempty"`
@@ -127,11 +129,12 @@ type countryPortDetail struct {
 // countryJudge turns what the probes saw of one target into a verdict. Only valid probes count: online, through the control
 // site, and answered for this target. At least two of them, or the verdict is unknown. With TCP ports, TCP carries the
 // verdict (a probe's TCP counts when any port connects); an ICMP-only node is judged by ICMP. A split picture, for example
-// TCP on a third of the probes, says nothing and is unknown rather than a false alarm.
-func countryJudge(t CountryTarget, obs CountryObserved) (verdict string, d countryDetail) {
+// TCP on a third of the probes, says nothing and is unknown rather than a false alarm. An otherwise-ok or mixed picture is
+// partial when a complete eyeball probe misses this target but reaches another target in the round, and another probe reaches it.
+func countryJudge(t CountryTarget, obs CountryObserved, reached []bool) (verdict string, d countryDetail) {
 	d.Eyeball, d.Ports = obs.Eyeball, t.Ports
-	var valid, icmpN, tcpN int
-	for _, p := range obs.Probes {
+	var valid, icmpN, tcpN, reachN, darkN int
+	for i, p := range obs.Probes {
 		o, has := p.Nodes[t.Key]
 		pd := countryProbeDetail{Network: p.Network, ASN: p.ASN, City: p.City, Valid: p.Online && p.ControlOK && has && o.Answered,
 			ICMPOK: o.ICMPOK, ICMPMs: o.ICMPMs}
@@ -141,6 +144,7 @@ func countryJudge(t CountryTarget, obs CountryObserved) (verdict string, d count
 			pd.TCP = append(pd.TCP, countryPortDetail{Port: tp.Port, OK: tp.OK, MS: tp.MS})
 			anyTCP = anyTCP || tp.OK
 		}
+		pd.Dark = pd.Valid && p.Eyeball && o.Complete && !o.ICMPOK && !anyTCP && i < len(reached) && reached[i]
 		if pd.Valid {
 			valid++
 			if o.ICMPOK {
@@ -148,6 +152,12 @@ func countryJudge(t CountryTarget, obs CountryObserved) (verdict string, d count
 			}
 			if anyTCP {
 				tcpN++
+			}
+			if (len(t.Ports) > 0 && anyTCP) || (len(t.Ports) == 0 && o.ICMPOK) {
+				reachN++
+			}
+			if pd.Dark {
+				darkN++
 			}
 		}
 		d.Probes = append(d.Probes, pd)
@@ -159,14 +169,48 @@ func countryJudge(t CountryTarget, obs CountryObserved) (verdict string, d count
 	half := func(n int) bool { return n*2 >= valid }
 	switch hasTCP := len(t.Ports) > 0; {
 	case hasTCP && half(tcpN), !hasTCP && half(icmpN):
-		return verdictOK, d
+		verdict = verdictOK
 	case hasTCP && tcpN == 0 && half(icmpN):
-		return verdictTCPBlocked, d
+		verdict = verdictTCPBlocked
 	case icmpN == 0 && tcpN == 0:
-		return verdictBlocked, d
+		verdict = verdictBlocked
+	default:
+		d.Reason = "mixed"
+		verdict = verdictUnknown
 	}
-	d.Reason = "mixed"
-	return verdictUnknown, d
+	if (verdict == verdictOK || d.Reason == "mixed") && darkN > 0 && reachN > 0 {
+		d.Reason = ""
+		return verdictPartial, d
+	}
+	return verdict, d
+}
+
+// countryReached records whether each probe got an ICMP or TCP response from any target in this round. A probe that did not
+// reach the current target can then be called dark only when it reached a different target.
+func countryReached(obs CountryObserved, targets []CountryTarget, icmpOnly bool) []bool {
+	reached := make([]bool, len(obs.Probes))
+	for i, p := range obs.Probes {
+		for _, target := range targets {
+			n, ok := p.Nodes[target.Key]
+			if !ok {
+				continue
+			}
+			if n.ICMPOK {
+				reached[i] = true
+				break
+			}
+			for _, tcp := range n.TCP {
+				if tcp.OK && !icmpOnly {
+					reached[i] = true
+					break
+				}
+			}
+			if reached[i] {
+				break
+			}
+		}
+	}
+	return reached
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -374,8 +418,13 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 				unknown(targets[t.Key], reason, obs.Asked)
 			}
 		} else {
+			reachedAny, reachedICMP := countryReached(obs, round.Targets, false), countryReached(obs, round.Targets, true)
 			for _, t := range round.Targets {
-				verdict, d := countryJudge(t, obs)
+				reached := reachedAny
+				if len(t.Ports) == 0 { // an ICMP-only node: the probe must have pinged another node
+					reached = reachedICMP
+				}
+				verdict, d := countryJudge(t, obs, reached)
 				d.NoProbe = obs.NoProbe
 				d.Asked = obs.Asked
 				b, _ := json.Marshal(d)
@@ -410,8 +459,9 @@ func (s *Service) countryFailure(ctx context.Context, src CountrySource, err err
 // Views
 
 var countryVerdictProto = map[string]adminv1.CountryVerdict{
-	verdictOK: adminv1.CountryVerdict_COUNTRY_VERDICT_OK, verdictTCPBlocked: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED,
-	verdictBlocked: adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED, verdictUnknown: adminv1.CountryVerdict_COUNTRY_VERDICT_UNKNOWN,
+	verdictOK: adminv1.CountryVerdict_COUNTRY_VERDICT_OK, verdictPartial: adminv1.CountryVerdict_COUNTRY_VERDICT_PARTIAL,
+	verdictTCPBlocked: adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED,
+	verdictBlocked:    adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED, verdictUnknown: adminv1.CountryVerdict_COUNTRY_VERDICT_UNKNOWN,
 	verdictListed: adminv1.CountryVerdict_COUNTRY_VERDICT_LISTED,
 }
 
@@ -422,7 +472,8 @@ func countryCheckMsg(r store.CountryCheck) *adminv1.CountryCheck {
 	m := &adminv1.CountryCheck{NodeId: r.NodeID, Country: r.Country, Verdict: countryVerdictProto[r.Verdict], AtUnix: r.At.Unix(), Reason: d.Reason, Eyeball: d.Eyeball,
 		NoProbe: d.NoProbe}
 	for _, p := range d.Probes {
-		pm := &adminv1.CountryProbe{Network: p.Network, Asn: p.ASN, City: p.City, IcmpOk: p.ICMPOK, IcmpMs: p.ICMPMs, Valid: p.Valid, Eyeball: p.Eyeball}
+		pm := &adminv1.CountryProbe{Network: p.Network, Asn: p.ASN, City: p.City, IcmpOk: p.ICMPOK, IcmpMs: p.ICMPMs,
+			Valid: p.Valid, Eyeball: p.Eyeball, Dark: p.Dark}
 		for _, t := range p.TCP {
 			pm.Tcp = append(pm.Tcp, &adminv1.PortResult{Port: uint32(t.Port), Ok: t.OK, Ms: t.MS})
 		}
@@ -630,12 +681,15 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 		switch {
 		case len(seen) == countryAlertRounds && countryBad(seen[0].combined.Verdict) && countryBad(seen[1].combined.Verdict):
 			add(countryCond(n, seen[0]))
-		case len(seen) == countryAlertRounds && seen[0].combined.Verdict == verdictOK && seen[1].combined.Verdict == verdictOK:
+		case len(seen) == countryAlertRounds && countryClear(seen[0].combined.Verdict) && countryClear(seen[1].combined.Verdict):
 		default:
 			d.holdKeys[k] = true
 		}
 	}
 }
+
+// countryClear: a round that closes a full-block alert. partial counts: other networks reach the node.
+func countryClear(v string) bool { return v == verdictOK || v == verdictPartial }
 
 // tspuRound is a stored row of the probe node with its verdict on the shared scale and its ports.
 type tspuRound struct {

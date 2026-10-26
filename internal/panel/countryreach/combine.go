@@ -12,7 +12,9 @@ const (
 
 // The verdicts and confidences of a combined country check, as stored by the sources and sent to the screens in lower case.
 const (
-	VerdictOK         = "ok"
+	VerdictOK = "ok"
+	// VerdictPartial means some networks cannot reach the node. The TSPU's per-port "partial" is folded separately below.
+	VerdictPartial    = "partial"
 	VerdictTCPBlocked = "tcp_blocked"
 	VerdictBlocked    = "blocked"
 	VerdictListed     = "listed"
@@ -62,11 +64,13 @@ type Combined struct {
 	CDNRegion           string
 }
 
-func isLive(v string) bool { return v == VerdictOK || v == VerdictTCPBlocked || v == VerdictBlocked }
+func isLive(v string) bool {
+	return v == VerdictOK || v == VerdictPartial || v == VerdictTCPBlocked || v == VerdictBlocked
+}
 
-// worse is the more serious of two live verdicts: blocked > tcp_blocked > ok.
+// worse is the more serious of two live verdicts: blocked > tcp_blocked > partial > ok.
 func worse(a, b string) string {
-	rank := map[string]int{VerdictOK: 0, VerdictTCPBlocked: 1, VerdictBlocked: 2}
+	rank := map[string]int{VerdictOK: 0, VerdictPartial: 1, VerdictTCPBlocked: 2, VerdictBlocked: 3}
 	if rank[b] > rank[a] {
 		return b
 	}
@@ -139,7 +143,7 @@ func TSPUVerdict(stored string, ports []TSPUPort) string {
 // integration is off); tspu is the newest verdict of the probe node (nil: none, too old, or the source is off); list is the
 // newest block-list check (nil: none, or off).
 //
-//   - Live verdicts (ok, tcp_blocked, blocked) win over the lists, which only add detail (listed_by, the CDN range).
+//   - Live verdicts (ok, partial, tcp_blocked, blocked) win over the lists, which only add detail (listed_by, the CDN range).
 //   - One live source: its verdict, with "eyeball" (Globalping on home or mobile networks) or "dc_only" (Globalping from data
 //     centres; the probe node, always) as the confidence.
 //   - Both agree: that verdict, "eyeball" when Globalping saw it from eyeball networks (that outranks the data-centre view),
@@ -159,7 +163,16 @@ func Combine(live *Live, tspu *TSPU, list *Listing) Combined {
 		c.Verdict, c.Sources = live.Verdict, []string{SourceGlobalping, SourceTSPU}
 		switch {
 		case live.Verdict != tspu.Verdict:
-			c.Verdict, c.Confidence = worse(live.Verdict, tspu.Verdict), ConfidenceConflict
+			if (live.Verdict == VerdictPartial && tspu.Verdict == VerdictOK) || (live.Verdict == VerdictOK && tspu.Verdict == VerdictPartial) {
+				c.Verdict = VerdictPartial
+				if live.Eyeball {
+					c.Confidence = ConfidenceEyeball
+				} else {
+					c.Confidence = ConfidenceDCOnly
+				}
+			} else {
+				c.Verdict, c.Confidence = worse(live.Verdict, tspu.Verdict), ConfidenceConflict
+			}
 		case live.Eyeball:
 			c.Confidence = ConfidenceEyeball
 		default:

@@ -91,12 +91,33 @@ func TestCombine(t *testing.T) {
 // A conflict shows the worse verdict whichever source holds it.
 func TestWorse(t *testing.T) {
 	for _, c := range []struct{ a, b, want string }{
+		{VerdictOK, VerdictPartial, VerdictPartial}, {VerdictPartial, VerdictOK, VerdictPartial},
 		{VerdictOK, VerdictTCPBlocked, VerdictTCPBlocked}, {VerdictTCPBlocked, VerdictOK, VerdictTCPBlocked},
 		{VerdictTCPBlocked, VerdictBlocked, VerdictBlocked}, {VerdictBlocked, VerdictOK, VerdictBlocked}, {VerdictOK, VerdictOK, VerdictOK},
 	} {
 		if got := worse(c.a, c.b); got != c.want {
 			t.Errorf("worse(%s, %s) = %s, want %s", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+func TestCombinePartial(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		live       *Live
+		tspu       *TSPU
+		verdict    string
+		confidence string
+	}{
+		{"partial and ok", &Live{Verdict: VerdictPartial, Eyeball: true}, &TSPU{Verdict: VerdictOK}, VerdictPartial, ConfidenceEyeball},
+		{"partial and tcp blocked", &Live{Verdict: VerdictPartial, Eyeball: true}, &TSPU{Verdict: VerdictTCPBlocked}, VerdictTCPBlocked, ConfidenceConflict},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Combine(tc.live, tc.tspu, nil)
+			if got.Verdict != tc.verdict || got.Confidence != tc.confidence {
+				t.Fatalf("Combine() = %+v, want verdict %q confidence %q", got, tc.verdict, tc.confidence)
+			}
+		})
 	}
 }
 

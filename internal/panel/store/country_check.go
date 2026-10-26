@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// CountryCheck is one round of the country check for one node (migration 00066). Verdict is ok | tcp_blocked | blocked |
-// unknown; Detail is the JSON the health module writes and reads (per probe network, ASN, city and answers).
+// CountryCheck is one round of the country check for one node (migration 00066). Verdict is ok | partial | tcp_blocked |
+// blocked | unknown; Detail is the JSON the health module writes and reads (per probe network, ASN, city and answers).
 type CountryCheck struct {
 	NodeID, Country, Verdict, Detail string
 	At                               time.Time
