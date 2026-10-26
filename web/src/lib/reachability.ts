@@ -26,11 +26,13 @@ export const historyQuery = queryOptions({
   refetchInterval: 60_000,
 });
 
-/** The look of a verdict, as the Health column draws it: quiet tick, "!", "×", the list mark, a grey dot. */
+/** The look of a verdict, as the Health column draws it: quiet tick, the half disc, "!", "×", the list mark, a grey dot. */
 export function verdictKind(v: CountryVerdict): CountryLook["kind"] {
   switch (v) {
     case CountryVerdict.OK:
       return "ok";
+    case CountryVerdict.PARTIAL:
+      return "partial";
     case CountryVerdict.TCP_BLOCKED:
       return "warn";
     case CountryVerdict.BLOCKED:
@@ -84,7 +86,7 @@ export type Tally = Record<CountryLook["kind"], number>;
 
 /** Nodes per combined verdict; a node without a row has no data. */
 export function tallyOf(nodeIds: readonly string[], verdictOf: (id: string) => CountryVerdict | undefined): Tally {
-  const out: Tally = { ok: 0, warn: 0, bad: 0, listed: 0, unknown: 0 };
+  const out: Tally = { ok: 0, partial: 0, warn: 0, bad: 0, listed: 0, unknown: 0 };
   for (const id of nodeIds) out[verdictKind(verdictOf(id) ?? CountryVerdict.UNKNOWN)]++;
   return out;
 }

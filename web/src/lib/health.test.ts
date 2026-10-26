@@ -478,6 +478,8 @@ describe("the server's vocabulary is covered", () => {
     "health.alert.country_blocked.why.tspu",
     "health.alert.country_blocked.why.conflict.tcp_blocked",
     "health.alert.country_blocked.why.conflict.blocked",
+    "health.alert.country_blocked.title.partial",
+    "health.alert.country_blocked.why.partial",
     "hl.res.accepted",
     "hl.res.superseded",
     "hl.fix.err.unknown_fix",
@@ -648,15 +650,15 @@ describe("reachability from a country", () => {
   it("fills the tooltip: each probe with its network and city, ICMP and TCP per port, the time, how the probes were picked", () => {
     const l = countryLook(tPlural, fmt, tcpCut);
     expect(l.probes).toEqual([
-      { where: "Rostelecom, Moscow", result: "ICMP 51 ms · TCP 443, 8443 ✕", counted: true },
-      { where: "Beeline", result: "ICMP 55 ms · TCP 443, 8443 ✕", counted: true },
+      { where: "Rostelecom, Moscow", result: "ICMP 51 ms · TCP 443, 8443 ✕", counted: true, dark: false },
+      { where: "Beeline", result: "ICMP 55 ms · TCP 443, 8443 ✕", counted: true, dark: false },
       // ports that differ get a mark each; a probe thrown away for the round is shown, and says so
-      { where: "MegaFon, Kazan (not counted)", result: "ICMP ✕ · TCP 443 ✓, 8443 ✕", counted: false },
+      { where: "MegaFon, Kazan (not counted)", result: "ICMP ✕ · TCP 443 ✓, 8443 ✕", counted: false, dark: false },
     ]);
     expect(l.at).toBe(`Last round: ${fmt.stamp(roundAt)}`);
     expect(l.via).toBe("Checked via Globalping from home and mobile networks");
     // a node without TCP ports has ICMP alone; probes from any network are said to be data centers
-    expect(countryLook(tPlural, fmt, cut).probes[1]).toEqual({ where: "MTS, Omsk", result: "ICMP ✕", counted: true });
+    expect(countryLook(tPlural, fmt, cut).probes[1]).toEqual({ where: "MTS, Omsk", result: "ICMP ✕", counted: true, dark: false });
     expect(countryLook(tPlural, fmt, none).via).toBe("Checked via Globalping from data centers");
     expect(countryLook(tRuPlural, fmtRu, none).via).toBe("Проверено через Globalping из датацентров");
     expect(countryLook(tRuPlural, fmtRu, check()).via).toBe("Проверено через Globalping из домашних и мобильных сетей");
@@ -731,6 +733,89 @@ describe("reachability from a country", () => {
     expect(countryLook(tPlural, fmt, check({ confidence: "dc_only", eyeball: false })).via).toBe("Checked via Globalping from data centers");
   });
 
+  // a block on some networks: MTS gets nothing from the node while it reaches the others, Beeline reaches it
+  const dark = (network: string, asn: number, city: string) => ({ ...probe(network, city, 0, [[443, false], [8443, false]]), asn, dark: true });
+  const some = check({
+    verdict: CountryVerdict.PARTIAL,
+    probes: [dark("MTS", 8359, "Novosibirsk"), { ...probe("Beeline", "Moscow", 44, [[443, true], [8443, true]]), asn: 3216 }],
+    noProbe: ["MegaFon", "T2"],
+  });
+
+  it("says PARTIAL apart from TCP blocked: its own kind and word, the networks that get nothing, the operators nobody asked", () => {
+    const l = countryLook(tPlural, fmt, some);
+    expect([l.kind, l.label, l.note, l.head]).toEqual(["partial", "some networks", "MTS", "Reachable from Russia, but not from every network"]);
+    expect(l.dark).toBe("Blocked on some networks: MTS (AS8359, Novosibirsk)");
+    expect(l.state).toBe("Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk)");
+    expect(l.noProbe).toBe("No home/mobile probe this round: MegaFon, T2");
+    // the dark probe says what it means; the one that reached the node is a plain row
+    expect(l.probes).toEqual([
+      { where: "MTS, Novosibirsk (reaches your other nodes, not this one)", result: "ICMP ✕ · TCP 443, 8443 ✕", counted: true, dark: true },
+      { where: "Beeline, Moscow", result: "ICMP 44 ms · TCP 443, 8443 ✓", counted: true, dark: false },
+    ]);
+    // the phone's line names the networks in full instead of every network asked
+    expect(l.line).toBe("Blocked on some networks: MTS (AS8359, Novosibirsk) · 4 min ago");
+    expect(l.via).toBe("Checked via Globalping from home and mobile networks");
+  });
+
+  it("names each dark network once, with its AS and city when it has them, and skips a probe that did not count", () => {
+    const l = countryLook(tPlural, fmt, {
+      ...some,
+      probes: [
+        dark("MTS", 8359, "Novosibirsk"),
+        dark("MTS", 8359, "Novosibirsk"),
+        dark("Beeline", 3216, ""),
+        { ...dark("Rostelecom", 12389, "Kazan"), valid: false },
+        probe("Beeline", "Moscow", 44, [[443, true]]),
+      ],
+    });
+    expect(l.dark).toBe("Blocked on some networks: MTS (AS8359, Novosibirsk), Beeline (AS3216)");
+    expect(l.note).toBe("MTS, Beeline");
+    expect(l.probes.map((p) => p.dark)).toEqual([true, true, true, false, false]);
+    expect(l.probes[3]!.where).toBe("Rostelecom, Kazan (not counted)");
+    // names from a third party stay text: nothing in them is read as markup or as a placeholder
+    expect(countryLook(tPlural, fmt, { ...some, probes: [dark("<b>MTS</b> {country}", 8359, "Novosibirsk")] }).dark).toBe(
+      "Blocked on some networks: <b>MTS</b> {country} (AS8359, Novosibirsk)",
+    );
+  });
+
+  it("does not call a full block a block on some networks, though every probe of it is stored dark", () => {
+    const l = countryLook(tPlural, fmt, check({ verdict: CountryVerdict.BLOCKED, probes: [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")] }));
+    expect([l.kind, l.head, l.dark, l.note]).toEqual(["bad", "Neither ICMP nor TCP gets through", "", ""]);
+    expect(l.probes.map((p) => [p.where, p.dark])).toEqual([
+      ["MTS, Omsk", false],
+      ["Beeline, Moscow", false],
+    ]);
+    expect(l.line).toBe("MTS, Beeline · 4 min ago");
+    expect(l.state).not.toContain("some networks");
+  });
+
+  it("says which named operators had no probe on any verdict, and nothing when every one had", () => {
+    expect(countryLook(tPlural, fmt, check({ noProbe: ["MegaFon"] })).noProbe).toBe("No home/mobile probe this round: MegaFon");
+    expect(countryLook(tPlural, fmt, check()).noProbe).toBe("");
+    // two sources that disagree word a partial Globalping verdict in full
+    const mixed = { ...some, confidence: "conflict", sources: ["globalping", "tspu"], globalpingVerdict: CountryVerdict.PARTIAL, tspuVerdict: CountryVerdict.OK };
+    expect(countryLook(tPlural, fmt, mixed).conflict).toBe("Globalping: blocked on some networks · probe: reachable");
+  });
+
+  it("says PARTIAL in Russian and Chinese", () => {
+    const ruL = countryLook(tRuPlural, fmtRu, some);
+    expect([ruL.label, ruL.head, ruL.dark, ruL.noProbe]).toEqual([
+      "часть сетей",
+      "Доступна из России, но не из всех сетей",
+      "Недоступна из части сетей: MTS (AS8359, Novosibirsk)",
+      "В этом круге нет домашнего или мобильного зонда: MegaFon, T2",
+    ]);
+    expect(ruL.probes[0]!.where).toBe("MTS, Novosibirsk (до других нод доходит, до этой нет)");
+    const zhL = countryLook(tZhPlural, fmtZh, some);
+    expect([zhL.label, zhL.head, zhL.dark, zhL.noProbe]).toEqual([
+      "部分网络",
+      "从俄罗斯可以访问，但并非所有网络都能访问",
+      "部分网络无法连接：MTS (AS8359, Novosibirsk)",
+      "本轮没有家庭或移动网络的探测点：MegaFon、T2",
+    ]);
+    expect(zhL.probes[0]!.where).toBe("MTS, Novosibirsk（能到达你的其他节点，但到不了这个节点）");
+  });
+
   it("makes a column only when there are checks, named by the country of the newest round", () => {
     expect(countryColumn(undefined)).toBeNull();
     expect(countryColumn([])).toBeNull();
@@ -771,6 +856,32 @@ describe("reachability from a country", () => {
       "Зонды внутри России (MTS) совсем не достают до ноды: нет ответа ни на ping, ни по TCP. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
     );
     expect(alertWhy(tZhPlural, fmtZh, blocked)).toBe("俄罗斯境内的探测点（MTS）完全无法到达节点：ping 和 TCP 都没有响应。连续两次检测都是如此。连续两次正常后，告警会关闭。");
+  });
+
+  it("words the partial alert by its subject: some networks in the title, the dark networks as the server named them", () => {
+    const partial = alert({
+      kind: AlertKind.COUNTRY_BLOCKED,
+      nodeName: "de1",
+      subject: "partial",
+      titleKey: "health.alert.country_blocked.title",
+      whyKey: "health.alert.country_blocked.why.partial",
+      params: { node: "de1", country: "RU", verdict: "partial", confidence: "eyeball", sources: "globalping", networks: "MTS (AS8359, Novosibirsk)" },
+    });
+    expect(alertTitle(tPlural, partial)).toBe("Unreachable from some networks in Russia");
+    expect(alertTitle(tRuPlural, partial)).toBe("Недоступна из части сетей России");
+    expect(alertTitle(tZhPlural, partial)).toBe("从俄罗斯的部分网络无法连接");
+    expect(alertWhy(tPlural, fmt, partial)).toBe(
+      "Home or mobile probes on MTS (AS8359, Novosibirsk) get no answer from this node, though they reach your other nodes; other networks in Russia reach it. Two checks in a row saw it. It closes once these networks reach the node again.",
+    );
+    expect(alertWhy(tRuPlural, fmtRu, partial)).toBe(
+      "Домашние и мобильные зонды в сетях MTS (AS8359, Novosibirsk) не получают ответа от этой ноды, хотя до других твоих нод доходят; из остальных сетей России она доступна. Так показали две проверки подряд. Алерт закроется, когда эти сети снова увидят ноду.",
+    );
+    expect(alertWhy(tZhPlural, fmtZh, partial)).toBe(
+      "位于 MTS (AS8359, Novosibirsk) 的家庭或移动网络探测点收不到这个节点的任何响应，但能到达你的其他节点；俄罗斯境内的其他网络可以访问它。连续两次检测都是如此。这些网络重新能访问节点后，告警会关闭。",
+    );
+    // the full block keeps its own title; the network names stay text
+    expect(alertTitle(tRuPlural, { ...partial, subject: "" })).toBe("Недоступна из России");
+    expect(alertWhy(tPlural, fmt, { ...partial, params: { ...partial.params, networks: "<i>MTS</i> {country}" } })).toContain("probes on <i>MTS</i> {country} get no answer");
   });
 
   it("names the alert in an approval, where there is no country to fill in", () => {

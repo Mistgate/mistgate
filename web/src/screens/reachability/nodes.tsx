@@ -20,16 +20,22 @@ export type NodeRow = { id: string; name: string; countryCode: string };
 
 const sourceKey: Record<ReachSource, MessageKey> = { globalping: "rc.src.globalping", lists: "rc.src.lists", tspu: "rc.src.tspu" };
 
-/** What one source calls a verdict: the lists say "listed" or "not listed", the live sources what they saw. */
-function verdictWord(t: T, source: ReachSource, v: CountryVerdict): string {
+/**
+ * What one source calls a verdict: the lists say "listed" or "not listed", the live sources what they saw. `short`: the narrow
+ * column of the word now, where a block on some networks is "some networks" beside its half disc.
+ */
+function verdictWord(t: T, source: ReachSource, v: CountryVerdict, short = false): string {
   if (source === "lists") return v === CountryVerdict.LISTED ? t("cr.v.listed") : t("rc.st.notListed");
+  if (v === CountryVerdict.PARTIAL) return t(short ? "cr.v.partial" : "cr.v.partialLong");
   return v === CountryVerdict.OK ? t("cr.v.ok") : v === CountryVerdict.TCP_BLOCKED ? t("cr.v.tcp") : v === CountryVerdict.BLOCKED ? t("cr.v.blocked") : t("cr.v.unknown");
 }
 
-// A lane's colours: OK a soft mint, the blocks their full status colour, "listed" the warn colour striped (on record, not seen),
-// no data a grey. The empty track under them is the time nobody looked.
+// A lane's colours: OK a soft mint, the blocks their full status colour, a block on some networks split (the warn colour over
+// the mint: blocked on some, reachable on the rest), "listed" the warn colour striped (on record, not seen), no data a grey. The
+// empty track under them is the time nobody looked.
 const segCls: Record<ReturnType<typeof verdictKind>, string> = {
   ok: "tone-ok bg-(--c)/40",
+  partial: "tone-warn bg-[linear-gradient(var(--c)_50%,color-mix(in_oklch,var(--accent-mint)_40%,transparent)_50%)]",
   warn: "tone-warn bg-(--c)",
   bad: "tone-bad bg-(--c)",
   listed: "tone-warn bg-(--c)/15 bg-[repeating-linear-gradient(-45deg,color-mix(in_oklch,var(--c)_55%,transparent)_0_2px,transparent_2px_6px)]",
@@ -38,6 +44,7 @@ const segCls: Record<ReturnType<typeof verdictKind>, string> = {
 
 const textCls: Record<ReturnType<typeof verdictKind>, string> = {
   ok: "text-muted",
+  partial: "tone-warn tone-text",
   warn: "tone-warn tone-text",
   bad: "tone-bad tone-text",
   listed: "tone-warn tone-text",
@@ -153,7 +160,7 @@ function SourceLine({ source, on, lane, probe, since, now }: { source: ReachSour
         ) : v != null ? (
           <>
             <CountryMark kind={kind} />
-            <span className="truncate">{verdictWord(t, source, v)}</span>
+            <span className="truncate">{verdictWord(t, source, v, true)}</span>
           </>
         ) : probe ? (
           t("rc.st.probeNode")

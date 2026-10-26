@@ -308,6 +308,10 @@ export const en = {
   "health.alert.device_limit.why":
     "{user_name} is at the device limit ({used} of {limit}) and an app asking for a new place was turned away. They can remove an old device on their page, or you can raise the limit. It closes after a day without a refusal.",
   "health.alert.country_blocked.title": "Unreachable from {country}",
+  // subject "partial": some home or mobile networks get nothing from the node, the others reach it
+  "health.alert.country_blocked.title.partial": "Unreachable from some networks in {country}",
+  "health.alert.country_blocked.why.partial":
+    "Home or mobile probes on {networks} get no answer from this node, though they reach your other nodes; other networks in {country} reach it. Two checks in a row saw it. It closes once these networks reach the node again.",
   "health.alert.country_blocked.why.tcp_blocked":
     "Probes inside {country} ({networks}) reach the node’s address, but TCP to {ports} does not connect: the connection requests are dropped on the way. Two checks in a row saw it. It closes after two clean checks.",
   "health.alert.country_blocked.why.blocked":
@@ -827,6 +831,9 @@ export const ru: typeof en = {
   "health.alert.device_limit.why":
     "У {user_name} заняты все места для устройств ({used} из {limit}), и приложению, которое просило новое место, отказали. Человек может удалить старое устройство на своей странице, или можно поднять лимит. Алерт закроется после суток без отказов.",
   "health.alert.country_blocked.title": "Недоступна из {country}",
+  "health.alert.country_blocked.title.partial": "Недоступна из части сетей {country}",
+  "health.alert.country_blocked.why.partial":
+    "Домашние и мобильные зонды в сетях {networks} не получают ответа от этой ноды, хотя до других твоих нод доходят; из остальных сетей {country} она доступна. Так показали две проверки подряд. Алерт закроется, когда эти сети снова увидят ноду.",
   "health.alert.country_blocked.why.tcp_blocked":
     "Зонды внутри {country} ({networks}) достают до адреса ноды, но TCP на {ports} не соединяется: запросы на соединение режут по дороге. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
   "health.alert.country_blocked.why.blocked":
@@ -1312,6 +1319,9 @@ export const zh: typeof en = {
   "health.alert.device_limit.title": "有应用因设备数上限被拒绝",
   "health.alert.device_limit.why": "{user_name} 的设备数已达上限（{used} / {limit}），有应用申请新名额，被拒绝了。本人可以在自己的页面删除旧设备，你也可以提高上限。满一天没有新的拒绝后，告警会关闭。",
   "health.alert.country_blocked.title": "从{country}无法连接",
+  "health.alert.country_blocked.title.partial": "从{country}的部分网络无法连接",
+  "health.alert.country_blocked.why.partial":
+    "位于 {networks} 的家庭或移动网络探测点收不到这个节点的任何响应，但能到达你的其他节点；{country}境内的其他网络可以访问它。连续两次检测都是如此。这些网络重新能访问节点后，告警会关闭。",
   "health.alert.country_blocked.why.tcp_blocked": "{country}境内的探测点（{networks}）能到达节点地址，但 TCP {ports} 连不上：连接请求在途中被丢弃。连续两次检测都是如此。连续两次正常后，告警会关闭。",
   "health.alert.country_blocked.why.blocked": "{country}境内的探测点（{networks}）完全无法到达节点：ping 和 TCP 都没有响应。连续两次检测都是如此。连续两次正常后，告警会关闭。",
   "health.alert.country_blocked.why.tspu":

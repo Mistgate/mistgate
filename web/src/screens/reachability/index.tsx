@@ -86,31 +86,32 @@ export function ReachabilityScreen() {
 
 const tallyKinds: { kind: CountryLook["kind"]; key: MessageKey; cls: string }[] = [
   { kind: "ok", key: "rc.sum.ok", cls: "border border-line bg-surface" },
+  { kind: "partial", key: "rc.sum.partial", cls: "tone-warn tint tone-text" },
   { kind: "warn", key: "rc.sum.warn", cls: "tone-warn tint tone-text" },
   { kind: "bad", key: "rc.sum.bad", cls: "tone-bad tint tone-text" },
   { kind: "listed", key: "rc.sum.listed", cls: "tone-warn tint tint-dashed tone-text" },
   { kind: "unknown", key: "rc.sum.unknown", cls: "border border-dashed border-line bg-surface text-muted" },
 ];
 
-/** Nodes per verdict now, in the colours and glyphs of the Health column; a kind nobody is in stays quiet. */
+/** Nodes per verdict now, in the colours and glyphs of the Health column; a kind nobody is in stays quiet. Two, three or six to a row. */
 function Summary({ tally }: { tally: Tally }) {
   const t = useT();
   return (
-    <ul aria-label={t("rc.sum.title")} className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+    <ul aria-label={t("rc.sum.title")} className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
       {tallyKinds.map(({ kind, key, cls }) => {
         const n = tally[kind];
         return (
           <li
             key={kind}
             data-kind={kind}
-            className={cx("flex min-w-0 flex-col gap-1 rounded-card px-3 py-2.5 max-sm:last:col-span-2", n > 0 ? cls : "border border-line bg-surface text-faint")}
+            className={cx("flex min-w-0 flex-col gap-1 rounded-card px-3 py-2.5", n > 0 ? cls : "border border-line bg-surface text-faint")}
           >
             <span className={cx("font-mono text-[22px] leading-none font-extrabold tracking-[-0.03em]", n > 0 && kind === "ok" && "text-fg")}>{n}</span>
             <span className={cx("flex min-w-0 items-center gap-1.5 text-xs font-bold", n > 0 && (kind === "ok" || kind === "unknown") && "text-muted")}>
               <span className={cx("flex", n === 0 && "opacity-50")}>
                 <CountryMark kind={kind} />
               </span>
-              <span className="truncate">{t(key)}</span>
+              <span className="min-w-0 leading-tight">{t(key)}</span>
             </span>
           </li>
         );
@@ -138,8 +139,8 @@ function AllOff({ owner }: { owner: boolean }) {
   );
 }
 
-/** The alert's verdict in a word: "TCP blocked" or "unreachable". */
-const eventVerdict: Record<string, MessageKey> = { tcp_blocked: "cr.v.tcp", blocked: "cr.v.blocked" };
+/** The alert's verdict in a word: "blocked on some networks", "TCP blocked" or "unreachable". */
+const eventVerdict: Record<string, MessageKey> = { partial: "cr.v.partialLong", tcp_blocked: "cr.v.tcp", blocked: "cr.v.blocked" };
 
 /** The country_blocked alerts of the week, open and closed, newest first; each leads to its row on Health → Alerts. */
 function Events({ code }: { code: string }) {

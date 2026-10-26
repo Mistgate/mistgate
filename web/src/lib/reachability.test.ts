@@ -46,6 +46,7 @@ describe("the lanes of the week", () => {
   it("say what the source says now: the last verdict while the lane reaches now", () => {
     expect(laneNow(lane([[since, CountryVerdict.OK], [now - H, CountryVerdict.TCP_BLOCKED]]), now)).toBe(CountryVerdict.TCP_BLOCKED);
     expect(laneNow(lane([[since, CountryVerdict.LISTED]], now - 30), now)).toBe(CountryVerdict.LISTED);
+    expect(laneNow(lane([[since, CountryVerdict.OK], [now - H, CountryVerdict.PARTIAL]]), now)).toBe(CountryVerdict.PARTIAL);
   });
 
   it("mark every local midnight inside the window", () => {
@@ -63,8 +64,14 @@ describe("the lanes of the week", () => {
 describe("the summary", () => {
   it("counts nodes by the look of their verdict; a node without a row has no data", () => {
     const verdicts: Record<string, CountryVerdict> = { de1: CountryVerdict.OK, fi1: CountryVerdict.TCP_BLOCKED, nl1: CountryVerdict.OK, se1: CountryVerdict.LISTED, x1: CountryVerdict.BLOCKED };
-    expect(tallyOf(["de1", "fi1", "nl1", "se1", "x1", "new1"], (id) => verdicts[id])).toEqual({ ok: 2, warn: 1, bad: 1, listed: 1, unknown: 1 });
-    expect(tallyOf([], () => undefined)).toEqual({ ok: 0, warn: 0, bad: 0, listed: 0, unknown: 0 });
+    expect(tallyOf(["de1", "fi1", "nl1", "se1", "x1", "new1"], (id) => verdicts[id])).toEqual({ ok: 2, partial: 0, warn: 1, bad: 1, listed: 1, unknown: 1 });
+    expect(tallyOf([], () => undefined)).toEqual({ ok: 0, partial: 0, warn: 0, bad: 0, listed: 0, unknown: 0 });
     expect([CountryVerdict.UNSPECIFIED, CountryVerdict.UNKNOWN].map(verdictKind)).toEqual(["unknown", "unknown"]);
+  });
+
+  it("counts a block on some networks apart from TCP blocked and from reachable", () => {
+    expect(verdictKind(CountryVerdict.PARTIAL)).toBe("partial");
+    const verdicts: Record<string, CountryVerdict> = { de1: CountryVerdict.PARTIAL, fi1: CountryVerdict.TCP_BLOCKED, nl1: CountryVerdict.OK, se1: CountryVerdict.PARTIAL };
+    expect(tallyOf(["de1", "fi1", "nl1", "se1"], (id) => verdicts[id])).toEqual({ ok: 1, partial: 2, warn: 1, bad: 0, listed: 0, unknown: 0 });
   });
 });

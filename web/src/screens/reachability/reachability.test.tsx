@@ -80,7 +80,7 @@ function history(sources: string[]) {
 
 const check = (nodeId: string, verdict: CountryVerdict, over: Record<string, unknown> = {}) => ({
   nodeId, country: "RU", verdict, atUnix: NOW - 260, probes: [], reason: "", eyeball: true, confidence: "eyeball", listedBy: [], cdnProvider: "", cdnRegion: "",
-  sources: ["globalping"], globalpingVerdict: verdict, tspuVerdict: CountryVerdict.UNSPECIFIED, tspuPorts: [], dpiHop: 0, tspuVantageId: "", tspuVantageName: "", tspuAtUnix: 0,
+  sources: ["globalping"], globalpingVerdict: verdict, tspuVerdict: CountryVerdict.UNSPECIFIED, tspuPorts: [], dpiHop: 0, tspuVantageId: "", tspuVantageName: "", tspuAtUnix: 0, noProbe: [],
   ...over,
 });
 const countryChecks = [
@@ -155,7 +155,7 @@ describe("the Reachability page with every source on", () => {
 
   it("counts the nodes by their verdict now, in the colours of Health", async () => {
     await mount();
-    expect(tally()).toEqual({ ok: "3reachable", warn: "1TCP blocked", bad: "0unreachable", listed: "1listed", unknown: "0no data" });
+    expect(tally()).toEqual({ ok: "3reachable", partial: "0blocked on some networks", warn: "1TCP blocked", bad: "0unreachable", listed: "1listed", unknown: "0no data" });
     const warn = document.querySelector("[data-kind=warn]")!;
     expect(warn.className).toContain("tone-warn");
     expect(document.querySelector("[data-kind=bad]")!.className).not.toContain("tone-bad"); // nobody there: quiet
@@ -240,6 +240,72 @@ describe("the lanes", () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------------
+// A block on some networks (PARTIAL): de1 is dark on MTS while Beeline reaches it, and MegaFon and T2 had no probe
+
+describe("a block on some networks", () => {
+  const PARTIAL = CountryVerdict.PARTIAL;
+  const gp = (network: string, asn: number, city: string, reached: boolean) => ({
+    network, asn, city, icmpOk: reached, icmpMs: reached ? 44 : 0, tcp: [{ port: 443, ok: reached, ms: reached ? 44 : 0 }], valid: true, dark: !reached, eyeball: true,
+  });
+  beforeEach(() => {
+    const h = history(["globalping", "lists", "tspu"]);
+    getHistory.mockResolvedValue({
+      ...h,
+      nodes: h.nodes.map((n) => (n.nodeId === "nod_de1" ? { ...n, lanes: n.lanes.map((l) => (l.source === "globalping" ? lane("globalping", pts([SINCE + 300, OK], [NOW - 5 * H, PARTIAL])) : l)) } : n)),
+    });
+    getChecks.mockResolvedValue({
+      nowUnix: NOW, intervalS: 300, columns: [], rows: [], tspuRun: { status: "ok", atUnix: NOW - 700, nodeId: "nod_probe1" },
+      countryChecks: countryChecks.map((c) => (c.nodeId === "nod_de1" ? check("nod_de1", PARTIAL, { probes: [gp("MTS", 8359, "Novosibirsk", false), gp("Beeline", 3216, "Moscow", true)], noProbe: ["MegaFon", "T2"] }) : c)),
+    });
+    listAlerts.mockResolvedValue({ nowUnix: NOW, active: [{ ...alert("alt_de1", "de1", "partial", NOW - 3 * H), subject: "partial" }], history: [] });
+  });
+
+  it("counts it apart from TCP blocked: the warn colour with a half disc, not the “!”", async () => {
+    await mount();
+    expect(tally()).toEqual({ ok: "2reachable", partial: "1blocked on some networks", warn: "1TCP blocked", bad: "0unreachable", listed: "1listed", unknown: "0no data" });
+    const partial = document.querySelector("[data-kind=partial]")!;
+    expect(partial.className).toContain("tone-warn");
+    expect(partial.querySelector("svg circle")).not.toBeNull();
+    expect(partial.textContent).not.toContain("!");
+    expect(document.querySelector("[data-kind=warn]")!.textContent).toContain("!");
+  });
+
+  it("names the networks in the pill, its tooltip on keyboard focus, and the source's word now", async () => {
+    await mount();
+    const pill = row("de1").querySelector<HTMLElement>("[role=img][tabindex='0']")!;
+    expect(pill.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk)");
+    expect(pill.className).toContain("tone-warn");
+    expect(words(pill)).toBe("some networks");
+    expect(words(pill.parentElement)).toBe("some networksMTS"); // the dark networks under the pill
+    expect(words(line("de1", "globalping").children[1])).toBe("some networks");
+    expect(line("de1", "globalping").children[1]?.className).toContain("tone-warn");
+    await act(async () => pill.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    for (const l of ["Blocked on some networks: MTS (AS8359, Novosibirsk)", "MTS, Novosibirsk (reaches your other nodes, not this one)", "Beeline, Moscow", "No home/mobile probe this round: MegaFon, T2"])
+      expect(text()).toContain(l);
+  });
+
+  it("splits its lane segment, which says the verdict in full, and names it in the recent events", async () => {
+    await mount();
+    const gpLane = segs("de1", "globalping");
+    expect(gpLane.map((s) => s.getAttribute("aria-label")?.split(",")[0])).toEqual(["reachable", "blocked on some networks"]);
+    expect([...line("de1", "globalping").querySelectorAll("[data-verdict]")].map((s) => s.getAttribute("data-verdict"))).toEqual(["ok", "partial"]);
+    expect(line("de1", "globalping").querySelector("[data-verdict=partial]")?.className).toContain("linear-gradient");
+    const events = [...document.querySelectorAll("[data-testid=reach-event]")];
+    expect(events.map((e) => e.textContent)).toEqual([expect.stringContaining("de1blocked on some networks · opened 3 h ago")]);
+  });
+
+  it("speaks Russian", async () => {
+    act(() => setLang("ru"));
+    await mount();
+    expect(tally()).toMatchObject({ partial: "1недоступны из части сетей", warn: "1TCP режут" });
+    expect(words(row("de1").querySelector("[role=img][tabindex='0']"))).toBe("часть сетей");
+    expect(document.querySelector("[data-testid=reach-event]")?.textContent).toContain("de1недоступна из части сетей");
+    expect(segs("de1", "globalping")[1]?.getAttribute("aria-label")).toMatch(/^недоступна из части сетей, /);
+  });
+});
+
 describe("the Reachability page with the sources off", () => {
   it("says every source is off and leads the owner to them; no counts, no nodes, the alerts of the week stay", async () => {
     getHistory.mockResolvedValue(history([]));
@@ -287,8 +353,11 @@ describe("the Reachability page with the sources off", () => {
 describe("the Reachability page on a phone (375 px)", () => {
   it("turns each row into a card: the verdict next to the name on top, then the source lines with their lanes stacked under them", async () => {
     await mount();
-    expect(document.querySelector("ul[aria-label='Nodes by verdict']")?.className).toContain("grid-cols-2");
-    expect(document.querySelector("[data-kind=unknown]")?.className).toContain("max-sm:last:col-span-2");
+    // six kinds: two to a row on a phone, three on a tablet, all six on the wide screen; none spans a row
+    const sum = document.querySelector("ul[aria-label='Nodes by verdict']")!;
+    expect(sum.className).toContain("grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6");
+    expect([...sum.children].map((li) => li.getAttribute("data-kind"))).toEqual(["ok", "partial", "warn", "bad", "listed", "unknown"]);
+    for (const li of sum.children) expect(li.className).not.toContain("col-span");
     const card = row("nl1");
     expect(card.className).toMatch(/(^| )flex flex-col/);
     expect(card.className).toContain("xl:grid");

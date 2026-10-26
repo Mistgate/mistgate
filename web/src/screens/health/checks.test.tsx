@@ -166,6 +166,8 @@ const probe = (network: string, city: string, icmpMs: number, ports: [number, bo
   icmpMs,
   tcp: ports.map(([port, open]) => ({ port, ok: open, ms: open ? 40 : 0 })),
   valid,
+  dark: false,
+  eyeball: true,
 });
 // every field of CountryCheck, as the client gets them: the sources and the TSPU probe's detail are empty unless a case sets them
 const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof probe>[], over: object = {}) => ({
@@ -188,6 +190,7 @@ const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof pr
   tspuVantageId: "",
   tspuVantageName: "",
   tspuAtUnix: 0,
+  noProbe: [] as string[],
   ...over,
 });
 const countryChecks = [
@@ -323,6 +326,96 @@ describe("the country row on the node page", () => {
     host?.remove();
     await mountNode({ ...own, countryChecks: [] });
     expect(document.querySelector("[data-testid=country-row]")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// A block on some networks (PARTIAL) in the same column: de1 is dark on MTS, nl1 fully blocked with every probe stored dark
+
+const dark = (network: string, asn: number, city: string) => ({ ...probe(network, city, 0, [[443, false]]), asn, dark: true });
+const some = {
+  ...four,
+  countryChecks: [
+    verdict("nod_1", CountryVerdict.PARTIAL, [dark("MTS", 8359, "Novosibirsk"), { ...probe("Beeline", "Moscow", 44, [[443, true]]), asn: 3216 }], { confidence: "eyeball", noProbe: ["MegaFon", "T2"] }),
+    countryChecks[1]!,
+    verdict("nod_3", CountryVerdict.BLOCKED, [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")], { confidence: "eyeball" }),
+  ],
+};
+
+describe("a block on some networks in the country column", () => {
+  afterEach(() => act(() => setLang("en")));
+
+  it("shows PARTIAL in the warn tone with its own glyph and word, the dark networks under it", async () => {
+    await mount(some);
+    const partial = countryCell("de1")!;
+    expect(partial.textContent).toBe("some networksMTS");
+    expect(partial.className).toContain("tone-warn");
+    expect(partial.querySelector("svg circle")).not.toBeNull(); // the half disc, not TCP blocked's "!"
+    expect(countryCell("de2")!.textContent).toBe("!TCP blockedICMP passes");
+    expect(partial.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk)");
+  });
+
+  it("opens the tooltip on keyboard focus: the networks that get nothing, the dark probe marked, the operators nobody asked", async () => {
+    await mount(some);
+    await act(async () => countryCell("de1")!.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    const text = document.body.textContent ?? "";
+    for (const line of [
+      "Reachable from Russia, but not from every network",
+      "Blocked on some networks: MTS (AS8359, Novosibirsk)",
+      "MTS, Novosibirsk (reaches your other nodes, not this one)",
+      "Beeline, Moscow",
+      "No home/mobile probe this round: MegaFon, T2",
+    ])
+      expect(text).toContain(line);
+  });
+
+  it("does not say “some networks” on a full block, though every probe of it is dark", async () => {
+    await mount(some);
+    const cut = countryCell("nl1")!;
+    expect(cut.textContent).toBe("×unreachable");
+    expect(cut.getAttribute("aria-label")).not.toContain("some networks");
+    await act(async () => cut.focus());
+    for (let i = 0; i < 3; i++) await settle();
+    // the tooltip alone: de1's phone row says it, rightly, further down the page
+    const tip = document.querySelector('[class*="max-w-[280px]"]')?.textContent ?? "";
+    expect(tip).toContain("Neither ICMP nor TCP gets through");
+    expect(tip).not.toContain("Blocked on some networks");
+    expect(tip).not.toContain("reaches your other nodes");
+  });
+
+  it("gives the phone card the networks in words, where there is no hover", async () => {
+    await mount(some);
+    const rows = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")];
+    expect(rows[0]?.textContent).toBe("From Russiasome networksBlocked on some networks: MTS (AS8359, Novosibirsk) · 4 min ago");
+    expect(rows[0]?.className).toContain("tone-warn");
+    expect(rows[2]?.textContent).toBe("×From RussiaunreachableMTS, Beeline · 4 min ago");
+  });
+
+  it("shows it on the node page as well", async () => {
+    getChecks.mockResolvedValue({ ...checks, rows: [checks.rows[1]!], countryChecks: [{ ...some.countryChecks[0]!, nodeId: "nod_2" }] });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_2" /></QueryClientProvider>));
+    for (let i = 0; i < 4; i++) await settle();
+    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
+    expect(row.textContent).toBe("From Russiasome networksBlocked on some networks: MTS (AS8359, Novosibirsk) · 4 min ago");
+    expect(row.querySelector("svg circle")).not.toBeNull();
+    expect(row.tabIndex).toBe(0);
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    await mount(some);
+    expect(countryCell("de1")?.textContent).toBe("часть сетейMTS");
+    expect(countryCell("de1")?.getAttribute("aria-label")).toBe("de1, Из России: Доступна из России, но не из всех сетей · Недоступна из части сетей: MTS (AS8359, Novosibirsk)");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    await mount(some);
+    expect(countryCell("de1")?.textContent).toBe("部分网络MTS");
   });
 });
 

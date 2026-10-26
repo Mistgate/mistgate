@@ -110,7 +110,10 @@ export function alertTitle(t: T, a: Alert): string {
   if (a.kind === AlertKind.NODE_DOWN && a.subject === "panel_link") key += ".panel_link"; // fleet-wide, no node to name
   if (a.kind === AlertKind.HOST_BLIP && a.subject === "flapping") key += ".flapping"; // the quiet blip records keep "Host blip"
   if ((a.kind === AlertKind.DOCTOR_WARN || a.kind === AlertKind.DOCTOR_FAIL) && params.check) params.check_title = checkTitle(t, params.check);
-  if (a.kind === AlertKind.COUNTRY_BLOCKED) params.country = countryIn(t, params.country ?? "");
+  if (a.kind === AlertKind.COUNTRY_BLOCKED) {
+    params.country = countryIn(t, params.country ?? "");
+    if (a.subject === "partial") key += ".partial"; // some networks only: its own key next to the full block's (subject "")
+  }
   return lookup(t, key, params) ?? a.titleKey;
 }
 
@@ -384,11 +387,14 @@ export function countryReason(t: T, code: string): string {
 }
 
 export type CountryLook = {
-  /** OK and UNKNOWN stay quiet: only the two blocks and a node in a block list take the problem colours. */
-  kind: "ok" | "warn" | "bad" | "listed" | "unknown";
-  /** What the cell says: "reachable", "TCP blocked", "unreachable", "listed", "no data". */
+  /** OK and UNKNOWN stay quiet: only the blocks (on some networks, of TCP, of everything) and a node in a block list take the problem colours. */
+  kind: "ok" | "partial" | "warn" | "bad" | "listed" | "unknown";
+  /** What the cell says: "reachable", "some networks", "TCP blocked", "unreachable", "listed", "no data". */
   label: string;
-  /** The cell's small second line: "ICMP passes" (Globalping saw TCP blocked), "sources disagree", or the TSPU probe's name for a block it alone saw. */
+  /**
+   * The cell's small second line: "ICMP passes" (Globalping saw TCP blocked), "sources disagree", the networks a partial block
+   * cuts off, or the TSPU probe's name for a block it alone saw.
+   */
   note: string;
   /** The verdict in a sentence: the tooltip's first line. */
   head: string;
@@ -400,8 +406,15 @@ export type CountryLook = {
   line: string;
   /** Two live sources that disagree: what each said ("Globalping: reachable · probe: TCP blocked"); empty when they do not. */
   conflict: string;
-  /** The tooltip under the verdict: each Globalping probe (where it is, what it got, whether it counted) and the round's time; empty without a round. */
-  probes: { where: string; result: string; counted: boolean }[];
+  /** A partial block: "Blocked on some networks: MTS (AS8359, Novosibirsk)". Empty on any other verdict: a full block marks every probe dark. */
+  dark: string;
+  /** Named operators the round found no home or mobile probe for: "No home/mobile probe this round: MegaFon, T2". */
+  noProbe: string;
+  /**
+   * The tooltip under the verdict: each Globalping probe (where it is, what it got, whether it counted, whether it is one of the
+   * networks a partial block cuts off) and the round's time; empty without a round.
+   */
+  probes: { where: string; result: string; counted: boolean; dark: boolean }[];
   at: string;
   /** A Globalping round without a verdict while the TSPU probe decided: why the round said nothing. */
   gpNone: string;
@@ -413,21 +426,44 @@ export type CountryLook = {
   via: string;
 };
 
-/** A probe for the tooltip: "Rostelecom, Moscow" and "ICMP 42 ms · TCP 443, 8443 ✕" (ports that differ get a mark each). */
-function probeOf(t: T, p: CountryProbe): CountryLook["probes"][number] {
+/**
+ * A probe for the tooltip: "Rostelecom, Moscow" and "ICMP 42 ms · TCP 443, 8443 ✕" (ports that differ get a mark each). On a
+ * partial block a dark probe says that it reaches the other nodes and not this one.
+ */
+function probeOf(t: T, p: CountryProbe, partial: boolean): CountryLook["probes"][number] {
   const icmp = `ICMP ${p.icmpOk ? (p.icmpMs > 0 ? `${p.icmpMs} ${t("hl.ms")}` : "✓") : "✕"}`;
   const mark = (ok: boolean) => (ok ? "✓" : "✕");
   const same = p.tcp.every((x) => x.ok === p.tcp[0]?.ok);
   const ports = same ? `${p.tcp.map((x) => x.port).join(", ")} ${mark(!!p.tcp[0]?.ok)}` : p.tcp.map((x) => `${x.port} ${mark(x.ok)}`).join(", ");
   const where = [p.network, p.city].filter(Boolean).join(", ") || "?";
-  return { where: p.valid ? where : t("cr.tip.skipped", { line: where }), result: p.tcp.length ? `${icmp} · TCP ${ports}` : icmp, counted: p.valid };
+  const dark = partial && p.valid && p.dark;
+  return {
+    where: !p.valid ? t("cr.tip.skipped", { line: where }) : dark ? t("cr.tip.darkProbe", { line: where }) : where,
+    result: p.tcp.length ? `${icmp} · TCP ${ports}` : icmp,
+    counted: p.valid,
+    dark,
+  };
+}
+
+/** A probe's network as the partial alert names it: "MTS (AS8359, Novosibirsk)". The names come from Globalping: text, never markup. */
+function networkOf(p: CountryProbe): string {
+  const tag = [p.asn ? `AS${p.asn}` : "", p.city].filter(Boolean).join(", ");
+  return tag ? `${p.network || "?"} (${tag})` : p.network || "?";
 }
 
 const viaKeys: Record<string, MessageKey> = { eyeball: "cr.tip.eyeball", dc_only: "cr.tip.dc", listed: "cr.tip.listsOnly" };
 
 /** A verdict of one source in a word, for "Globalping: reachable · probe: TCP blocked". */
 const verdictWord = (t: T, v: CountryVerdict) =>
-  v === CountryVerdict.OK ? t("cr.v.ok") : v === CountryVerdict.TCP_BLOCKED ? t("cr.v.tcp") : v === CountryVerdict.BLOCKED ? t("cr.v.blocked") : t("cr.v.unknown");
+  v === CountryVerdict.OK
+    ? t("cr.v.ok")
+    : v === CountryVerdict.PARTIAL
+      ? t("cr.v.partialLong")
+      : v === CountryVerdict.TCP_BLOCKED
+        ? t("cr.v.tcp")
+        : v === CountryVerdict.BLOCKED
+          ? t("cr.v.blocked")
+          : t("cr.v.unknown");
 
 export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   const live = isLive(c);
@@ -440,7 +476,12 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   const listed = c.listedBy.length > 0;
   const cdn = cdnOf(t, c);
   const names = c.listedBy.map((l) => listName(t, l));
-  const networks = fromGp ? [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ") : "";
+  // a partial block names the networks that get nothing from the node; a full block marks every probe dark, so only PARTIAL does
+  const partial = c.verdict === CountryVerdict.PARTIAL;
+  const darkProbes = partial ? c.probes.filter((p) => p.valid && p.dark) : [];
+  const dark = darkProbes.length ? t("cr.tip.dark", { networks: [...new Set(darkProbes.map(networkOf))].join(t("cr.tip.sep")) }) : "";
+  const darkNames = [...new Set(darkProbes.map((p) => p.network).filter(Boolean))].join(", ");
+  const networks = dark || (fromGp ? [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ") : "");
   const ports = tspuPortsText(t, c.tspuPorts);
   const vantage = c.tspuVantageName || c.tspuVantageId;
   const ago = fmt.ago(c.atUnix);
@@ -453,17 +494,20 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
     : [icmp ? t("cr.icmpPasses") : "", networks, tspuOnly ? ports : "", fromTspu ? t("cr.line.probe", { node: vantage }) : ""];
   const lineOf = (...first: string[]) => [...first, cdn, ago].filter(Boolean).join(" · ");
   const look = (kind: CountryLook["kind"], label: string, head: string, line: string): CountryLook => {
-    const note = conflict ? t("cr.note.conflict") : icmp ? t("cr.icmpPasses") : tspuOnly && kind !== "ok" ? t("tp.title") : "";
+    const note = conflict ? t("cr.note.conflict") : icmp ? t("cr.icmpPasses") : partial ? darkNames : tspuOnly && kind !== "ok" ? t("tp.title") : "";
     return {
       kind,
       label,
       note,
       head,
-      state: [head, conflict ? `${t("cr.tip.conflict")} · ${conflict}` : icmp ? "" : note, listed && kind !== "listed" ? t("cr.line.listed") : ""].filter(Boolean).join(" · "),
+      // a partial block reads its networks out in full, where the cell shows only their names
+      state: [head, conflict ? `${t("cr.tip.conflict")} · ${conflict}` : icmp ? "" : dark || note, listed && kind !== "listed" ? t("cr.line.listed") : ""].filter(Boolean).join(" · "),
       alsoListed: listed && kind !== "listed",
       line,
       conflict,
-      probes: c.probes.map((p) => probeOf(t, p)),
+      dark,
+      noProbe: c.noProbe.length ? t("cr.tip.noProbe", { networks: c.noProbe.join(t("cr.tip.sep")) }) : "",
+      probes: c.probes.map((p) => probeOf(t, p, partial)),
       at: live ? t("cr.tip.at", { time: fmt.stamp(c.atUnix) }) : "",
       gpNone: live && !fromGp && fromTspu && c.reason ? t("cr.tip.gpNone", { reason: countryReason(t, c.reason) || c.reason }) : "",
       tspu: probed
@@ -496,6 +540,8 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   switch (c.verdict) {
     case CountryVerdict.OK:
       return look("ok", t("cr.v.ok"), t("cr.tip.ok", { country: countryIn(t, c.country) }), lineOf(...seen, inList));
+    case CountryVerdict.PARTIAL:
+      return look("partial", t("cr.v.partial"), t("cr.tip.partial", { country: countryIn(t, c.country) }), lineOf(...seen, inList));
     case CountryVerdict.TCP_BLOCKED:
       return look("warn", t("cr.v.tcp"), t(icmp ? "cr.tip.tcp" : "cr.tip.tcpOnly"), lineOf(...seen, inList));
     case CountryVerdict.BLOCKED:
