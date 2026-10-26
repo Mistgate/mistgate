@@ -178,6 +178,7 @@ func main() {
 | `UserService.ListUsers`, `UserService.GetUser` | 是 | 是 | 是 |
 | `GroupService.ListGroups` | 是 | 是 | 是 |
 | `ProfileService.ListProfiles`, `ProfileService.GetProfile`（密钥已遮蔽） | 是 | 是 | 是 |
+| `ProfileService.ListProtocols`, `ProfileService.PreviewProfile` | 是 | 是 | 是 |
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | 是 | 是 | 是 |
 | `UpdateService.GetUpdates` | 是 | 是 | 是 |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | 否 | 是 | 是 |
@@ -190,14 +191,15 @@ func main() {
 | `ProvisioningService.GetSSHFingerprint` | 否 | 否 | 仅在 MCP 服务器制定 `node_install` 计划时可用 |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 | `SubscriptionService.UpdateSubscriptionSettings`（用户页面的一个应用） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
+| `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 
-以下操作对所有令牌都不可用：删除用户、获取订阅链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；更改协议配置、分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
+以下操作对所有令牌都不可用：删除用户、获取订阅链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
 
 ## 需要所有者批准的变更
 
 令牌不能通过再次验证。需要再次验证或会更改节点运行内容的方法都不能由令牌直接调用；通过普通 API 调用时会返回 403 和消息 `this needs the owner's approval; it is not available over the API`。
 
-这些方法只能通过持有管理员令牌的 [MCP 服务器](mcp.md)调用（用户页面的应用列表从操作员权限级别起即可调用）：智能体先制定变更计划，所有者在**集成 → 待你审批**中查看并批准计划（所有者需要自行再次验证），之后智能体才会执行该计划中的方法。每次使用时，系统都会在数据库中检查审批，只允许调用计划中的方法。计划会在创建 10 分钟后过期。
+这些方法只能通过持有管理员令牌的 [MCP 服务器](mcp.md)调用（用户页面的应用列表从操作员权限级别起即可调用）：智能体先制定变更计划，所有者在**集成 → 待你审批**中查看并批准计划（所有者需要自行再次验证），之后智能体会通过一次 apply 完成计划所需的调用。系统会在每次调用时检查审批；授权仅允许调用该计划列出的方法。计划会在创建 10 分钟后过期。
 
 ## 限制
 

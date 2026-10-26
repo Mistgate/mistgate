@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -699,6 +700,10 @@ func TestApprovedGrant(t *testing.T) {
 	if got := try(pRegisterWarp, secret, mcp(warpPlan.ID)); got != 200 || e.seen.stepUpErr != nil {
 		t.Errorf("the approved WARP re-registration grant: status=%d step-up=%v", got, e.seen.stepUpErr)
 	}
+	updatePlan := e.planFor(tok, "profile_update", true, "applying")
+	if got := try(adminv1connect.ProfileServiceDeleteInboundProcedure, secret, mcp(updatePlan.ID)); got != 403 {
+		t.Errorf("a profile_update grant opened DeleteInbound: %d", got)
+	}
 	// ... and nothing else: not another procedure that needs approval, not a closed one
 	for _, path := range []string{pApplyFix, adminv1connect.UpdateServiceRollbackNodeProcedure, adminv1connect.UpdateServiceCancelRolloutProcedure, pDeleteUsers, adminv1connect.WarpServiceDeleteWarpProcedure, pRegisterWarp} {
 		if got := try(path, secret, mcp(p.ID)); got != 403 {
@@ -831,6 +836,25 @@ func TestPlanningGrantOpensOnlyTheDryRun(t *testing.T) {
 	if got := e.code(pApplyFix, op, callOpts{ctx: planning, body: applyFixBody(t, true, "application/json")}); got != 403 {
 		t.Errorf("operator under planning: %d", got)
 	}
+	for _, tc := range []struct {
+		path string
+		ok   string
+		no   string
+	}{
+		{adminv1connect.ProfileServiceCreateInboundProcedure, `{"validateOnly":true}`, `{"validateOnly":false}`},
+		{adminv1connect.ProfileServiceUpdateProfileProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
+		{adminv1connect.GroupServiceUpdateGroupProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
+	} {
+		e.seen.calls = 0
+		body := []byte(tc.ok)
+		if got := e.code(tc.path, ad, callOpts{ctx: planning, body: body, contentType: "application/json"}); got != 200 || e.seen.calls != 1 || !bytes.Equal(e.seen.body, body) {
+			t.Errorf("planning dry run %s: status=%d calls=%d body=%s", tc.path, got, e.seen.calls, e.seen.body)
+		}
+		e.seen.calls = 0
+		if got := e.code(tc.path, ad, callOpts{ctx: planning, body: []byte(tc.no), contentType: "application/json"}); got != 403 || e.seen.calls != 0 {
+			t.Errorf("planning with false dry-run flag %s: status=%d calls=%d", tc.path, got, e.seen.calls)
+		}
+	}
 	// planning does not pass step-up either
 	e.seen.stepUpErr = nil
 	e.code(pApplyFix, ad, callOpts{ctx: planning, body: applyFixBody(t, true, "application/json")})
@@ -886,8 +910,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 14 {
-		t.Errorf("%d procedures need approval, want 14: %v", len(approved), approved)
+	if len(approved) != 20 {
+		t.Errorf("%d procedures need approval, want 20: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
@@ -896,15 +920,37 @@ func TestTokenAllowList(t *testing.T) {
 		t.Errorf("GetWarp token access = %d, %v; want MCP planning only", got, ok)
 	}
 	// every grant is for a procedure that is on the list as approved
-	for tool, path := range grantProcedures {
-		if !approved[path] {
-			t.Errorf("tool %s may open %s, which is not an approved procedure", tool, path)
+	wantProfileGrants := map[string][]string{
+		"profile_create": {
+			adminv1connect.ProfileServiceCreateProfileProcedure,
+			adminv1connect.ProfileServiceCreateInboundProcedure,
+			adminv1connect.ProfileServiceDeleteInboundProcedure,
+			adminv1connect.ProfileServiceDeleteProfileProcedure,
+			adminv1connect.GroupServiceUpdateGroupProcedure,
+		},
+		"profile_update": {adminv1connect.ProfileServiceUpdateProfileProcedure},
+		"profile_deploy": {
+			adminv1connect.ProfileServiceCreateInboundProcedure,
+			adminv1connect.ProfileServiceDeleteInboundProcedure,
+			adminv1connect.GroupServiceUpdateGroupProcedure,
+		},
+	}
+	for tool, want := range wantProfileGrants {
+		if got := grantProcedures[tool]; !slices.Equal(got, want) {
+			t.Errorf("%s grant procedures = %v, want %v", tool, got, want)
+		}
+	}
+	for tool, paths := range grantProcedures {
+		for _, path := range paths {
+			if !approved[path] {
+				t.Errorf("tool %s may open %s, which is not an approved procedure", tool, path)
+			}
 		}
 	}
 	for path := range approved {
 		found := false
-		for _, p := range grantProcedures {
-			found = found || p == path
+		for _, paths := range grantProcedures {
+			found = found || slices.Contains(paths, path)
 		}
 		if !found {
 			t.Errorf("%s needs approval but no tool can be granted it", path)
@@ -925,17 +971,9 @@ func TestTokenAllowList(t *testing.T) {
 		adminv1connect.NodeServiceRestartInboundsProcedure,
 		adminv1connect.NodeServicePrepareAwgKernelProcedure, // installs packages on the node: never through a token or MCP
 		adminv1connect.NodeServiceMeasureBandwidthProcedure, // makes the node push up to 1 GB: owner only, never through a token or MCP
-		adminv1connect.ProfileServiceListProtocolsProcedure,
-		adminv1connect.ProfileServicePreviewProfileProcedure,
-		adminv1connect.ProfileServiceCreateProfileProcedure,
-		adminv1connect.ProfileServiceUpdateProfileProcedure,
-		adminv1connect.ProfileServiceDeleteProfileProcedure,
-		adminv1connect.ProfileServiceCreateInboundProcedure,
 		adminv1connect.ProfileServiceUpdateInboundProcedure,
-		adminv1connect.ProfileServiceDeleteInboundProcedure,
 		adminv1connect.ProfileServiceTwinProfileProcedure,
 		adminv1connect.GroupServiceCreateGroupProcedure,
-		adminv1connect.GroupServiceUpdateGroupProcedure,
 		adminv1connect.GroupServiceDeleteGroupProcedure,
 		adminv1connect.UpdateServiceRescanBundleProcedure,
 		adminv1connect.InstanceServiceGetInstanceProcedure,
@@ -991,6 +1029,27 @@ func TestTokenAllowList(t *testing.T) {
 	// authenticator enrollment, login captcha, and sensitive infrastructure operations.
 	if len(stepUpProcedures) != 42 {
 		t.Errorf("%d step-up procedures, want 42", len(stepUpProcedures))
+	}
+}
+
+func TestProfileMutationsRequireAnApprovedGrantOverAPI(t *testing.T) {
+	e := newTokenEnv(t)
+	_, admin := e.mkToken("ad", store.ProfileAdmin, 600)
+	_, operator := e.mkToken("op", store.ProfileOperator, 600)
+	for _, path := range []string{
+		adminv1connect.ProfileServiceCreateProfileProcedure,
+		adminv1connect.ProfileServiceUpdateProfileProcedure,
+		adminv1connect.ProfileServiceDeleteProfileProcedure,
+		adminv1connect.ProfileServiceCreateInboundProcedure,
+		adminv1connect.ProfileServiceDeleteInboundProcedure,
+		adminv1connect.GroupServiceUpdateGroupProcedure,
+	} {
+		if got := e.code(path, admin); got != http.StatusForbidden {
+			t.Errorf("admin token called %s over /api: %d", path, got)
+		}
+	}
+	if got := e.code(adminv1connect.GroupServiceUpdateGroupProcedure, operator); got != http.StatusForbidden {
+		t.Errorf("operator token called UpdateGroup over /api: %d", got)
 	}
 }
 

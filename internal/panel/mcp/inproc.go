@@ -49,6 +49,7 @@ type clients struct {
 	Health       adminv1connect.HealthServiceClient
 	User         adminv1connect.UserServiceClient
 	Group        adminv1connect.GroupServiceClient
+	Profile      adminv1connect.ProfileServiceClient
 	Subs         adminv1connect.SubscriptionServiceClient
 	Update       adminv1connect.UpdateServiceClient
 	Auth         adminv1connect.AuthServiceClient
@@ -66,6 +67,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Health:       adminv1connect.NewHealthServiceClient(hc, base),
 		User:         adminv1connect.NewUserServiceClient(hc, base),
 		Group:        adminv1connect.NewGroupServiceClient(hc, base),
+		Profile:      adminv1connect.NewProfileServiceClient(hc, base),
 		Subs:         adminv1connect.NewSubscriptionServiceClient(hc, base),
 		Update:       adminv1connect.NewUpdateServiceClient(hc, base),
 		Auth:         adminv1connect.NewAuthServiceClient(hc, base),

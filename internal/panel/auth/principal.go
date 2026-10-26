@@ -73,9 +73,9 @@ func WithChannel(ctx context.Context, c Channel) context.Context {
 	return context.WithValue(ctx, channelKey{}, c)
 }
 
-// WithPlanning lets a TokenAccessApproved procedure through for a call that changes nothing: the dry run of a
-// node fix, made when the agent asks for the plan. The MCP layer uses it only around HealthService.ApplyFix with
-// dry_run = true. It does not open step-up, and it counts only on the MCP channel.
+// WithPlanning lets a TokenAccessApproved procedure through only when its request flag guarantees no change:
+// ApplyFix and UpdateProfile dry runs, CreateInbound validation, and UpdateGroup dry runs. The MCP layer uses it
+// while making plans. It does not open step-up, and it counts only on the MCP channel.
 func WithPlanning(ctx context.Context) context.Context {
 	return context.WithValue(ctx, planningKey{}, true)
 }
@@ -90,8 +90,8 @@ type approvedGrant struct {
 // WithApprovedStepUp returns ctx holding the grant of plan planID. The grant lets a TokenAccessApproved
 // procedure through and makes RequireStepUp return nil, but only while the plan, read from the database on every
 // use, is applying, belongs to the calling token, needs approval and carries a recorded human decision, and only
-// for the procedure its tool is made for (grantProcedures). It therefore dies the moment the apply finishes. The
-// MCP layer derives it for exactly one procedure call per apply.
+// for the procedures its tool is allowed to call (grantProcedures). It therefore dies the moment the apply finishes.
+// The MCP layer derives it only while that apply is running.
 func (s *Service) WithApprovedStepUp(ctx context.Context, planID string) context.Context {
 	return context.WithValue(ctx, grantKey{}, approvedGrant{s: s, planID: planID})
 }
@@ -110,14 +110,7 @@ func (s *Service) grantAllows(ctx context.Context, tokenID, procedure string) bo
 		plan.DecidedBy == "" || plan.DecidedAt.IsZero() {
 		return false
 	}
-	return slices.Contains(grantProcedureList(plan.Tool), procedure)
-}
-
-func grantProcedureList(tool string) []string {
-	if p, ok := grantProcedures[tool]; ok {
-		return []string{p}
-	}
-	return nil
+	return slices.Contains(grantProcedures[plan.Tool], procedure)
 }
 
 // planningAllows reports whether ctx is an MCP planning call (WithPlanning on the MCP channel).

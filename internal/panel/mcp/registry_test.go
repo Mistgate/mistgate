@@ -98,6 +98,48 @@ func TestRegistryShape(t *testing.T) {
 	}
 }
 
+func TestProfileRegistryEntries(t *testing.T) {
+	want := map[string]struct {
+		min     Profile
+		phrases []string
+	}{
+		"protocols_list":       {min: ProfileReadonly, phrases: []string{"protocol plugins", "settings schemas", "secret fields", "default settings"}},
+		"profiles_list":        {min: ProfileReadonly, phrases: []string{"profile", "warnings", "subscription formats", "groups"}},
+		"profile_get":          {min: ProfileReadonly, phrases: []string{"masked settings", "node names", "override ports", "enabled state"}},
+		"profile_create_plan":  {min: ProfileAdmin, phrases: []string{"create a protocol profile", "validates settings", "lossy-port override", planNotice}},
+		"profile_create_apply": {min: ProfileAdmin, phrases: []string{"executes the plan made by profile_create_plan", "confirm_token"}},
+		"profile_update_plan":  {min: ProfileAdmin, phrases: []string{"update a profile name or settings", "impact estimate", "devices need a reissue", planNotice}},
+		"profile_update_apply": {min: ProfileAdmin, phrases: []string{"executes the plan made by profile_update_plan", "confirm_token"}},
+		"profile_deploy_plan":  {min: ProfileAdmin, phrases: []string{"add or remove a profile", "counts users affected by removals", planNotice}},
+		"profile_deploy_apply": {min: ProfileAdmin, phrases: []string{"executes the plan made by profile_deploy_plan", "confirm_token"}},
+	}
+	got := map[string]toolDef{}
+	for _, td := range registry {
+		if strings.HasPrefix(td.name, "profile_") || td.name == "protocols_list" || td.name == "profiles_list" {
+			got[td.name] = td
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("registered %d profile tools, want %d", len(got), len(want))
+	}
+	for name, check := range want {
+		td, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if td.min != check.min {
+			t.Errorf("%s minimum profile = %s, want %s", name, td.min, check.min)
+		}
+		desc := strings.ToLower(td.description())
+		for _, phrase := range check.phrases {
+			if !strings.Contains(desc, strings.ToLower(phrase)) {
+				t.Errorf("%s description misses %q", name, phrase)
+			}
+		}
+	}
+}
+
 func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 	want := map[string][]string{
 		"checks_results":    {"per-probe eyeball tag", "no_probe", "partial (some home or mobile networks get nothing from the node"},
@@ -127,7 +169,7 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 22, ProfileOperator: 40, ProfileAdmin: 70}
+	want := map[Profile]int{ProfileReadonly: 25, ProfileOperator: 43, ProfileAdmin: 79}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)

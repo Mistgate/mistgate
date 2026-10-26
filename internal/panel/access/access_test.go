@@ -852,6 +852,65 @@ func TestProfileSecretsAndUpdate(t *testing.T) {
 	wantCode(t, err, connect.CodeNotFound)
 }
 
+func TestGetProfileIncludesEffectiveInboundPlacement(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	p := e.profile("main", "")
+	in := e.inbound(p.Id, "nod_de1")
+
+	updated := must(e.s.UpdateInbound(e.ctx, req(&adminv1.UpdateInboundRequest{
+		InboundId: in.Id, PortOverride: new(uint32(8443)), TlsServerNameOverride: new("vpn.example.com"),
+	}))).Msg.Inbound
+	if updated.Port != 8443 || updated.PortOverride != 8443 || updated.TlsServerName != "vpn.example.com" ||
+		updated.TlsServerNameOverride != "vpn.example.com" || !updated.Enabled {
+		t.Fatalf("updated inbound = %+v", updated)
+	}
+
+	got := must(e.s.GetProfile(e.ctx, req(&adminv1.GetProfileRequest{ProfileId: p.Id}))).Msg
+	if len(got.Inbounds) != 1 {
+		t.Fatalf("profile inbounds = %+v", got.Inbounds)
+	}
+	in = got.Inbounds[0]
+	if in.NodeId != "nod_de1" || in.NodeName != "de1" || in.Port != 8443 || in.PortOverride != 8443 ||
+		in.TlsServerName != "vpn.example.com" || in.TlsServerNameOverride != "vpn.example.com" || !in.Enabled ||
+		in.State != adminv1.InboundState_INBOUND_STATE_PENDING {
+		t.Errorf("profile inbound projection = %+v", in)
+	}
+
+	must(e.s.UpdateInbound(e.ctx, req(&adminv1.UpdateInboundRequest{InboundId: in.Id, Enabled: new(false)})))
+	disabled := must(e.s.GetProfile(e.ctx, req(&adminv1.GetProfileRequest{ProfileId: p.Id}))).Msg.Inbounds[0]
+	if disabled.Enabled || disabled.State != adminv1.InboundState_INBOUND_STATE_DISABLED {
+		t.Errorf("disabled inbound projection = %+v", disabled)
+	}
+}
+
+func TestUpdateProfileSettingsDocumentPreservesOmittedFields(t *testing.T) {
+	e := newEnv(t)
+	p := e.profile("main", `{"up_mbps":100}`)
+	got := must(e.s.GetProfile(e.ctx, req(&adminv1.GetProfileRequest{ProfileId: p.Id}))).Msg
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(got.SettingsJson), &settings); err != nil {
+		t.Fatal(err)
+	}
+	delete(settings, "up_mbps")
+	full, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := string(full)
+	must(e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{
+		ProfileId: p.Id, ExpectedVersion: got.Profile.Version, SettingsJson: &input,
+	})))
+	after := must(e.s.GetProfile(e.ctx, req(&adminv1.GetProfileRequest{ProfileId: p.Id}))).Msg
+	var stored map[string]any
+	if err := json.Unmarshal([]byte(after.SettingsJson), &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored["up_mbps"] != float64(100) {
+		t.Errorf("omitted stored field changed: %s", after.SettingsJson)
+	}
+}
+
 func asConnect(err error, target **connect.Error) bool {
 	ce, ok := err.(*connect.Error)
 	if ok {

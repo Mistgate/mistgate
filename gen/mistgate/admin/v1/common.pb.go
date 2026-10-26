@@ -457,7 +457,13 @@ type Inbound struct {
 	Awg *AwgInboundStatus `protobuf:"bytes,13,opt,name=awg,proto3" json:"awg,omitempty"`
 	// Where the inbound's traffic leaves the node: "direct" | "warp" (the profile's egress; empty when the plugin cannot
 	// build the inbound).
-	Egress        string `protobuf:"bytes,14,opt,name=egress,proto3" json:"egress,omitempty"`
+	Egress string `protobuf:"bytes,14,opt,name=egress,proto3" json:"egress,omitempty"`
+	// The configured override, or 0 when the profile port is used.
+	PortOverride uint32 `protobuf:"varint,15,opt,name=port_override,json=portOverride,proto3" json:"port_override,omitempty"`
+	// The configured server-name override, or empty when the profile/node default is used.
+	TlsServerNameOverride string `protobuf:"bytes,16,opt,name=tls_server_name_override,json=tlsServerNameOverride,proto3" json:"tls_server_name_override,omitempty"`
+	// Whether this inbound is enabled in the desired state.
+	Enabled       bool `protobuf:"varint,17,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -588,6 +594,27 @@ func (x *Inbound) GetEgress() string {
 		return x.Egress
 	}
 	return ""
+}
+
+func (x *Inbound) GetPortOverride() uint32 {
+	if x != nil {
+		return x.PortOverride
+	}
+	return 0
+}
+
+func (x *Inbound) GetTlsServerNameOverride() string {
+	if x != nil {
+		return x.TlsServerNameOverride
+	}
+	return ""
+}
+
+func (x *Inbound) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).
@@ -1205,7 +1232,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
 	"\rProtocolCount\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x14\n" +
-	"\x05users\x18\x02 \x01(\rR\x05users\"\xe9\x03\n" +
+	"\x05users\x18\x02 \x01(\rR\x05users\"\xe1\x04\n" +
 	"\aInbound\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1223,7 +1250,10 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x0fcert_pin_sha256\x18\v \x01(\tR\rcertPinSha256\x121\n" +
 	"\x13cert_not_after_unix\x18\f \x01(\x03B\x020\x02R\x10certNotAfterUnix\x125\n" +
 	"\x03awg\x18\r \x01(\v2#.mistgate.admin.v1.AwgInboundStatusR\x03awg\x12\x16\n" +
-	"\x06egress\x18\x0e \x01(\tR\x06egress\"\x8f\x03\n" +
+	"\x06egress\x18\x0e \x01(\tR\x06egress\x12#\n" +
+	"\rport_override\x18\x0f \x01(\rR\fportOverride\x127\n" +
+	"\x18tls_server_name_override\x18\x10 \x01(\tR\x15tlsServerNameOverride\x12\x18\n" +
+	"\aenabled\x18\x11 \x01(\bR\aenabled\"\x8f\x03\n" +
 	"\x10AwgInboundStatus\x12\x18\n" +
 	"\abackend\x18\x01 \x01(\tR\abackend\x12'\n" +
 	"\x0fbackend_version\x18\x02 \x01(\tR\x0ebackendVersion\x12\x19\n" +

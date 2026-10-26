@@ -15,18 +15,21 @@ import (
 // password, a WARP key). Every field, at any depth, of every response a token can reach (Direct and Approved) whose name
 // looks like one is either listed here with the reason it is safe, or the test fails: a new one needs a deliberate line.
 func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
-	looksSecret := regexp.MustCompile(`(^|_)(url|uri|link|password|passwd|secret|private|psk|conf|config|vpn|token|key|settings)(_|$)`)
+	looksSecret := regexp.MustCompile(`(^|_)(url|uri|link|password|passwd|secret|private|psk|conf|config|vpn|token|key|preview|settings)(_|$)`)
 	i18nKey := regexp.MustCompile(`^(title|why|error|pause)_key$`) // a message key the UI translates
 	safe := map[protoreflect.FullName]string{
-		"mistgate.admin.v1.CreateUserResponse.subscription_url": "left empty for a token (UserService.CreateUser; TestMCPEndToEnd calls it with one)",
-		"mistgate.admin.v1.CreateUserResponse.page_password":    "left empty for a token, like subscription_url",
-		"mistgate.admin.v1.GetProfileResponse.settings_json":    "x-secret values are masked (protocols.MaskSecrets)",
-		"mistgate.admin.v1.ListUsersResponse.next_page_token":   "a page cursor (a user name)",
-		"mistgate.admin.v1.PanelBuild.has_release_key":          "a bool",
-		"mistgate.admin.v1.PanelBuild.release_key_fingerprint":  "the fingerprint of the public release key",
-		"mistgate.admin.v1.PanelUpdate.url":                     "a public link to the official GitHub release",
-		"mistgate.admin.v1.ReleaseNote.url":                     "a public link to the official GitHub release",
-		"mistgate.admin.v1.NodeServerAccess.password_generated": "a bool: whether the panel generated the saved password",
+		"mistgate.admin.v1.ProtocolInfo.settings_schema_json":     "a protocol schema, not settings values",
+		"mistgate.admin.v1.ProtocolInfo.default_settings_json":    "defaults with x-secret values masked",
+		"mistgate.admin.v1.CreateUserResponse.subscription_url":   "left empty for a token (UserService.CreateUser; TestMCPEndToEnd calls it with one)",
+		"mistgate.admin.v1.CreateUserResponse.page_password":      "left empty for a token, like subscription_url",
+		"mistgate.admin.v1.GetProfileResponse.settings_json":      "x-secret values are masked (protocols.MaskSecrets)",
+		"mistgate.admin.v1.PreviewProfileResponse.client_preview": "preview secrets are masked by the protocol renderer",
+		"mistgate.admin.v1.ListUsersResponse.next_page_token":     "a page cursor (a user name)",
+		"mistgate.admin.v1.PanelBuild.has_release_key":            "a bool",
+		"mistgate.admin.v1.PanelBuild.release_key_fingerprint":    "the fingerprint of the public release key",
+		"mistgate.admin.v1.PanelUpdate.url":                       "a public link to the official GitHub release",
+		"mistgate.admin.v1.ReleaseNote.url":                       "a public link to the official GitHub release",
+		"mistgate.admin.v1.NodeServerAccess.password_generated":   "a bool: whether the panel generated the saved password",
 		// The subscription page every user sees (SubscriptionService.Get/UpdateSubscriptionSettings): names, texts and public
 		// app links, no user's link or password.
 		"mistgate.admin.v1.GetSubscriptionSettingsResponse.settings":          "the shared page's settings, checked field by field below",

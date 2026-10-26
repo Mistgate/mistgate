@@ -177,9 +177,11 @@ args = ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "
 
 | 智能体可自行执行 | 需要你在**集成 → 待你审批**中批准 |
 |:--|:--|
-| 所有读取操作；创建和修改用户；启用用户；一次停用或重置最多 3 个用户的流量；移除设备；静默告警 | 通过 SSH 安装节点、更改节点 SSH 密码、诊断修复、更新、定时更新或回滚节点、暂停、继续或取消滚动更新、设置更新时区、在用户页面添加、修改或移除应用，以及一次停用或重置超过 3 个用户 |
+| 所有读取操作；创建和修改用户；启用用户；一次停用或重置最多 3 个用户的流量；移除设备；静默告警 | 通过 SSH 安装节点、更改节点 SSH 密码、诊断修复、更新、定时更新或回滚节点、暂停、继续或取消滚动更新、设置更新时区、在用户页面添加、修改或移除应用、所有协议配置变更，以及一次停用或重置超过 3 个用户 |
 
 拥有操作员或更高级别权限的智能体还可以维护订阅页面的应用列表（`subscription_settings_get`、`subscription_app_upsert_plan`、`subscription_app_remove_plan`）：每项更改都需要等待你审批，审批卡片会完整显示每个字段。下方提示词包含了将 Mistgate 推荐给 Windows 和 macOS 用户的应用 [kl!ck](../guide/client-apps.md#klck) 添加到页面的步骤。
+
+管理员令牌还可以读取协议设置结构和配置状态，并通过计划与执行来创建、更新和部署协议配置。每项协议配置变更都需要你在管理后台审批。分组必须预先存在；MCP 不会创建分组。`x-secret` 值会被遮蔽；要保留原值请使用 `"••••"`，要生成新值请使用 `"$generate"`，不得传入明文秘密。
 
 点击**批准**后，需要再次使用通行密钥或身份验证器验证码确认。对于节点安装，审批卡片还会显示面板读取的 SHA-256 主机密钥指纹和密钥类型：将它与可信副本（服务商控制台中的信息）比较，勾选确认框并在那里输入服务器 SSH 密码。面板会将密码密封保存到这份计划；智能体执行时只会携带确认令牌，因此密码不会经过智能体或其模型服务商。计划创建 10 分钟后过期。
 
@@ -187,11 +189,12 @@ args = ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "
 
 ### 4. 提示词
 
-MCP 工具无法创建协议配置或分组，也不能将协议配置部署到节点，因此提示词会让你在管理后台完成这一步。
+MCP 工具可以创建、更新和部署协议配置，但不能创建分组。提示词会先检查分组；如果分组不存在，会请你在管理后台创建。
 
 ```text
 You are operating my Mistgate VPN panel through its MCP server (tools such as fleet_status,
-node_install_plan, user_create_plan). Read the server's instructions first. Reference:
+protocols_list, profiles_list, profile_create_plan, node_install_plan and user_create_plan).
+Read the server's instructions first. Reference:
 https://mistgate.app/reference/mcp/
 
 == Fill in ==
@@ -203,6 +206,7 @@ NODE_ADDRESS:  de1.example.com    # 客户端连接的域名或 IP
 COUNTRY:       DE                 # 两个字母，可选
 PROVIDER:      Example Hosting    # 可选
 GROUP:         Everyone           # 新用户所属分组
+PROFILE_NAME:  Main               # 安装节点后要创建的协议配置名称
 USERS:         Alice, Bob         # 要创建的用户
 LANGUAGE:      English            # 与我交流时使用的语言
 
@@ -235,14 +239,17 @@ LANGUAGE:      English            # 与我交流时使用的语言
    installs in the background, usually within two minutes. Watch node_get NODE_NAME until
    the node is connected. If it is not connected after 5 minutes, tell me to open the
    install manager at <admin URL>nodes/install and read the job's error.
-4. Ask me to create a profile in the admin, because the MCP tools cannot: Profiles -> New
-   profile; Hysteria2 for subscription apps (a Let's Encrypt certificate needs NODE_ADDRESS
-   to be a domain whose A record points at the node; for an IP choose the self-signed
-   certificate) or AmneziaWG for AmneziaVPN; under "Right after it is created" keep
-   NODE_NAME ticked in "Put it on nodes" and GROUP in "Add it to groups"; press Create
-   profile. Then check with node_get that the profile runs on NODE_NAME, and with
-   groups_list that GROUP has it.
-5. groups_list to find the id of GROUP. For each name in USERS: user_create_plan with the
+4. Call protocols_list and groups_list. If GROUP does not exist, ask me to create it in
+   the admin. Choose a protocol from protocols_list (Hysteria2 for subscription apps needs
+   NODE_ADDRESS to be a domain whose A record points at the node for a Let's Encrypt
+   certificate; for an IP choose self-signed; choose AmneziaWG for AmneziaVPN). Use
+   profile_create_plan with PROFILE_NAME, the protocol id, NODE_NAME's node id and GROUP's
+   group id. Follow the schema/defaults for settings; for x-secret values use only "••••"
+   to keep them or "$generate" to generate, never a literal secret. Show me the facts and
+   wait for my "yes", then wait for me to approve the plan in the admin. Call
+   profile_create_apply with only confirm_token. Check with profile_get and
+   groups_list that the profile is on NODE_NAME and available to GROUP.
+ 5. Use groups_list to find the id of GROUP. For each name in USERS: user_create_plan with the
    name and group_id (keep the defaults unless I say otherwise), show it, apply after my
    "yes". The subscription link is not returned to you: tell me to copy it from the user's
    page in the admin.

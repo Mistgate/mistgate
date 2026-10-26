@@ -98,6 +98,9 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `node_doctor` | Read only | The last stored doctor report of a node or of every node, with fix ids. From the Operator profile up it also takes `refresh: true`: the node runs its checks now (it only reads the host; waits up to 30 s). |
 | `users_search` | Read only | Users by part of the name, `filter` (`online`, `expiring`, `over_quota`) or `group_id`; paged with `page_token`. |
 | `groups_list` | Read only | Groups with their profile ids, user count and DNS preset. |
+| `protocols_list` | Read only | Protocol plugins, client apps, a compact settings schema (including critical and secret fields), and default settings. Secret defaults are masked. |
+| `profiles_list` | Read only | Profile summaries with protocol, deployment and user counts, warnings, subscription formats, version, and the groups that give access. |
+| `profile_get` | Read only | One profile's summary and masked settings; inbounds with node ids and names, effective and override ports and server names, enabled state and state; groups that give access. Takes `profile_id`. |
 | `user_get` | Read only | One user: limits (including both speed limits), status, devices, profiles (each with the subscription formats that carry it), node access. No subscription link, no keys. |
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
 | `user_devices` | Read only | Devices with kind, platform, model, OS version, app, traffic, last seen, online and on which nodes, a short fingerprint of the device ID, and for AmneziaWG the profile and tunnel address; the blocked devices apart. Never a key or a config. |
@@ -134,6 +137,9 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `alert_mute` | Operator | `alert_id`, `duration_s` (at most 604800; 0 unmutes) | no |
 | `subscription_app_upsert` | Operator | `platform` (`ios`, `android`, `windows`, `macos`, `linux`) and `name` say which app; for a change only the fields that change, for a new app at least `kind`: `kind` (`happ` takes the subscription link, `amnezia` an AmneziaWG key), `download_url`, `add_link_template` (placeholders `{url}`, `{url_enc}`, `{name_enc}`), `description` (at most 80 characters), `recommended` | always |
 | `subscription_app_remove` | Operator | `platform`, `name` | always |
+| `profile_create` | Admin | Plan: `protocol`, `name`, optional JSON `settings` (missing fields use protocol defaults), `node_ids`, existing `group_ids`, `port_overrides` (node id to port), `allow_lossy_port`; apply: `confirm_token` only. For `x-secret` settings, omit the field, use `"••••"` to keep its value, or use `"$generate"`; never pass a literal secret | always |
+| `profile_update` | Admin | Plan: `profile_id`, optional `name`, RFC 7386 `settings_patch` (omitted secret fields keep their stored value; null values within the patch are rejected), `allow_lossy_port`; apply: `confirm_token` only. Secret fields follow the same omit, `"••••"`, or `"$generate"` rule | always |
+| `profile_deploy` | Admin | Plan: `profile_id`, `add_node_ids`, `remove_node_ids`, existing `add_group_ids` and `remove_group_ids`, optional `port_overrides` and `allow_lossy_port`; apply: `confirm_token` only | always |
 | `node_fix` | Admin | `node`, `fix_id` from the doctor report, `params` if the item lists any | always |
 | `node_decoy` | Admin | `node`, `mode` (`builtin`, `panel`, `own`), `bundle_base64` (base64 ZIP or TAR up to 2 MiB, required for `own`) | always |
 | `warp_restart` | Admin | `node` id or exact name; the plan lists profiles using WARP egress that may blink for a few seconds; apply takes only `confirm_token` | no |
@@ -188,9 +194,11 @@ A plan needs the owner when one of these applies (the `danger` list):
 | Code | Meaning | Tools |
 |---|---|---|
 | `step_up` | The operation itself asks for a fresh confirmation in the admin. | the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `update_timezone`, `node_install`, `node_server_password_rotate` |
-| `fleet` | It changes what runs on the nodes. | `node_fix`, `node_decoy`, the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `node_install`, `node_server_password_rotate` |
+| `fleet` | It changes what runs on the nodes or removes access from users. | `node_fix`, `node_decoy`, the rollout tools, `node_rollback`, `node_update_schedule` and its cancel, `node_install`, `node_server_password_rotate`; all profile creation, update and deployment plans |
 | `bulk` | It touches more than 3 users at once. | `user_disable`, `user_reset_traffic` |
 | `user_page` | Every user sees it on their subscription page. | `subscription_app_upsert`, `subscription_app_remove` |
+
+Profile plans validate settings and node additions before storing a plan. Every profile change waits for owner approval in the admin. `profile_update` and `profile_deploy` use the profile version read by the plan; if it changes before apply, apply fails with `changed_since_plan`. Deployment merges group links with their current state at each step and reports completed steps if a later step fails. A failed `profile_create` rolls back the new profile and inbounds; deleting the profile also removes its group links. Secret values never appear in profile reads, plan facts, stored plan arguments or audit entries.
 
 ### Where the owner approves
 

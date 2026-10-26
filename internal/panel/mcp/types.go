@@ -51,9 +51,9 @@ type Auth interface {
 	Principal(ctx context.Context) (Principal, bool)
 	// WithChannel marks an in-process call as the MCP layer's own: audited as mcp:<id>, not rate limited a second time.
 	WithChannel(ctx context.Context) context.Context
-	// WithPlanning lets a token-approved procedure through for a call that changes nothing (the dry run of node_fix).
+	// WithPlanning lets a token-approved procedure through for a request whose procedure-specific flag guarantees no change.
 	WithPlanning(ctx context.Context) context.Context
-	// WithApprovedStepUp lets one token-approved procedure through, and its step-up check, while plan planID is
+	// WithApprovedStepUp lets only procedures listed on planID through, with their step-up checks, while the plan is
 	// applying, belongs to the calling token and has the owner's recorded approval. Checked in the database on every use.
 	WithApprovedStepUp(ctx context.Context, planID string) context.Context
 }

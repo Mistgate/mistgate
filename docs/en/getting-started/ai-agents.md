@@ -177,9 +177,11 @@ The proxy reads the token only from the file, never prints it, refuses plain `ht
 
 | The agent does it alone | Waits for your approval in **Integrations → Waiting for you** |
 |:--|:--|
-| Every read; creating and changing users; enabling users; disabling users or resetting their traffic for up to 3 users at once; removing a device; muting an alert | Installing a node over SSH, changing a node's SSH password, a doctor fix, updating, scheduling or rolling back a node, pausing, resuming or cancelling a rollout, the update time zone, adding, changing or removing an app on the user page, and disabling or resetting more than 3 users |
+| Every read; creating and changing users; enabling users; disabling users or resetting their traffic for up to 3 users at once; removing a device; muting an alert | Installing a node over SSH, changing a node's SSH password, a doctor fix, updating, scheduling or rolling back a node, pausing, resuming or cancelling a rollout, the update time zone, adding, changing or removing an app on the user page, every profile change, and disabling or resetting more than 3 users |
 
 An agent with Operator access or higher can also keep the subscription page's app list (`subscription_settings_get`, `subscription_app_upsert_plan`, `subscription_app_remove_plan`): every such change waits for your approval, and the card shows each field in full. The prompt below includes the step that puts [kl!ck](../guide/client-apps.md#klck), the app Mistgate recommends on Windows and macOS, on the page.
+
+An Admin token can read protocol schemas and profile state, then create, update or deploy profiles through plan/apply tools. Every profile change waits for your approval in the admin. A group must already exist; MCP does not create groups. Profile plans mask `x-secret` values; when setting one, use `"••••"` to keep the current value or `"$generate"` to request a generated value, and never send a literal secret.
 
 **Approve** asks for your passkey or authenticator code once more. For a node installation the approval card also shows the SHA-256 host key fingerprint the panel read and its key type: compare it with a trusted copy (your provider's console), tick the confirmation and type the server's SSH password there. The panel keeps the password sealed to that one plan; the agent's apply carries only the confirm token, so the password never passes through the agent or its model provider. Plans expire 10 minutes after they are made.
 
@@ -187,11 +189,12 @@ The agent never gets subscription links, device keys or configurations, page pas
 
 ### 4. The prompt
 
-The MCP tools cannot create profiles or groups or put a profile on a node, so the prompt asks you to do that one step in the admin.
+The MCP tools can create, update and deploy profiles but cannot create groups. The prompt checks for the requested group first and asks you to create it in the admin if it is missing.
 
 ```text
 You are operating my Mistgate VPN panel through its MCP server (tools such as fleet_status,
-node_install_plan, user_create_plan). Read the server's instructions first. Reference:
+protocols_list, profiles_list, profile_create_plan, node_install_plan and user_create_plan).
+Read the server's instructions first. Reference:
 https://mistgate.app/reference/mcp/
 
 == Fill in ==
@@ -203,6 +206,7 @@ NODE_ADDRESS:  de1.example.com    # domain or IP that clients connect to
 COUNTRY:       DE                 # two letters, optional
 PROVIDER:      Example Hosting    # optional
 GROUP:         Everyone           # the group for the new users
+PROFILE_NAME:  Main               # the profile to create after installing the node
 USERS:         Alice, Bob         # people to create
 LANGUAGE:      English            # the language you talk to me in
 
@@ -235,14 +239,17 @@ LANGUAGE:      English            # the language you talk to me in
    installs in the background, usually within two minutes. Watch node_get NODE_NAME until
    the node is connected. If it is not connected after 5 minutes, tell me to open the
    install manager at <admin URL>nodes/install and read the job's error.
-4. Ask me to create a profile in the admin, because the MCP tools cannot: Profiles -> New
-   profile; Hysteria2 for subscription apps (a Let's Encrypt certificate needs NODE_ADDRESS
-   to be a domain whose A record points at the node; for an IP choose the self-signed
-   certificate) or AmneziaWG for AmneziaVPN; under "Right after it is created" keep
-   NODE_NAME ticked in "Put it on nodes" and GROUP in "Add it to groups"; press Create
-   profile. Then check with node_get that the profile runs on NODE_NAME, and with
-   groups_list that GROUP has it.
-5. groups_list to find the id of GROUP. For each name in USERS: user_create_plan with the
+4. Call protocols_list and groups_list. If GROUP does not exist, ask me to create it in
+   the admin. Choose a protocol from protocols_list (Hysteria2 for subscription apps needs
+   NODE_ADDRESS to be a domain whose A record points at the node for a Let's Encrypt
+   certificate; for an IP choose self-signed; choose AmneziaWG for AmneziaVPN). Use
+   profile_create_plan with PROFILE_NAME, the protocol id, NODE_NAME's node id and GROUP's
+   group id. Use the schema/defaults for settings; for x-secret values use only "••••" to
+   keep them or "$generate" to generate, never a literal secret. Show me the facts and
+   wait for my "yes", then wait for me to approve the plan in the admin. Call
+   profile_create_apply with only confirm_token. Check with profile_get and
+   groups_list that the profile is on NODE_NAME and available to GROUP.
+5. Use groups_list to find the id of GROUP. For each name in USERS: user_create_plan with the
    name and group_id (keep the defaults unless I say otherwise), show it, apply after my
    "yes". The subscription link is not returned to you: tell me to copy it from the user's
    page in the admin.

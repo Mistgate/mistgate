@@ -35,7 +35,7 @@ const (
 	tokenBurst      = 30          // most requests a token may make at once
 	gateEvery       = time.Minute // successful reads of a token are audited, and last_used_* written, this often
 	maxGateEntries  = 4096        // size at which the gates forget what is older than gateEvery
-	maxPlanningBody = 1 << 20     // the dry-run check reads at most this much of an ApplyFix request
+	maxPlanningBody = 1 << 20     // the planning check reads at most this much of a request
 	auditPathLen    = 200         // audit rows clip the procedure path (it comes from the caller)
 )
 
@@ -246,17 +246,20 @@ func (s *Service) tokenDenied(r *http.Request, tok store.APIToken, path string) 
 	if s.grantAllows(ctx, tok.ID, path) {
 		return ""
 	}
-	// The dry run of a node fix changes nothing: a planning grant opens ApplyFix, but only when the request
-	// itself says dry_run, so a mistake in the MCP layer cannot perform a fix nobody approved.
-	if path == adminv1connect.HealthServiceApplyFixProcedure && planningAllows(ctx) && planningDryRun(r) {
+	// Planning opens only requests whose procedure-specific flag guarantees no change.
+	if planningAllows(ctx) && planningDryRun(r) {
 		return ""
 	}
 	return msgApproval
 }
 
-// planningDryRun reports whether r is an ApplyFix request with dry_run set, and puts the body back for the
-// handler. Anything it cannot read as such (compressed, another content type, too large) is not a dry run.
+// planningDryRun reports whether r is a request whose procedure-specific flag guarantees no change, and puts the body
+// back for the handler. Anything it cannot read as such (compressed, another content type, too large) is not a dry run.
 func planningDryRun(r *http.Request) bool {
+	m := planningRequest(r.URL.Path)
+	if m == nil {
+		return false
+	}
 	if enc := r.Header.Get("Content-Encoding"); enc != "" && enc != "identity" {
 		return false
 	}
@@ -266,16 +269,43 @@ func planningDryRun(r *http.Request) bool {
 		return false
 	}
 	mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	var m adminv1.ApplyFixRequest
 	switch mt {
 	case "application/proto":
-		err = proto.Unmarshal(body, &m)
+		err = proto.Unmarshal(body, m)
 	case "application/json":
-		err = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, &m)
+		err = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, m)
 	default:
 		return false
 	}
-	return err == nil && m.DryRun
+	if err != nil {
+		return false
+	}
+	switch m := m.(type) {
+	case *adminv1.ApplyFixRequest:
+		return m.GetDryRun()
+	case *adminv1.UpdateProfileRequest:
+		return m.GetDryRun()
+	case *adminv1.CreateInboundRequest:
+		return m.GetValidateOnly()
+	case *adminv1.UpdateGroupRequest:
+		return m.GetDryRun()
+	}
+	return false
+}
+
+func planningRequest(path string) proto.Message {
+	switch path {
+	case adminv1connect.HealthServiceApplyFixProcedure:
+		return &adminv1.ApplyFixRequest{}
+	case adminv1connect.ProfileServiceUpdateProfileProcedure:
+		return &adminv1.UpdateProfileRequest{}
+	case adminv1connect.ProfileServiceCreateInboundProcedure:
+		return &adminv1.CreateInboundRequest{}
+	case adminv1connect.GroupServiceUpdateGroupProcedure:
+		return &adminv1.UpdateGroupRequest{}
+	default:
+		return nil
+	}
 }
 
 // serveToken is RequireSession for a request with a Bearer header.

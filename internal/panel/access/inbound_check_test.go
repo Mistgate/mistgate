@@ -116,6 +116,32 @@ func TestInboundCheckBeforeTheClick(t *testing.T) {
 	wantCoded(t, err, connect.CodeAlreadyExists, "port_taken", map[string]string{"port": "443", "profile": "main", "free": "4443"})
 }
 
+func TestDraftInboundCheckForNewProfileIsReadOnly(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	profiles := e.count(`SELECT count(*) FROM profile`)
+	inbounds := e.count(`SELECT count(*) FROM inbound`)
+	events := e.count(`SELECT count(*) FROM event`)
+	e.resetNotify()
+
+	resp := must(e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{
+		Protocol: "hysteria2", SettingsJson: `{"port":8443}`, NodeId: "nod_de1", PortOverride: 9443, ValidateOnly: true,
+	}))).Msg
+	if resp.Inbound.GetProfileId() == "" || !strings.HasPrefix(resp.Inbound.GetProfileId(), "prf_preview_") ||
+		resp.Inbound.GetNodeId() != "nod_de1" || resp.Inbound.GetNodeName() != "de1" || resp.Inbound.GetPort() != 9443 {
+		t.Fatalf("draft inbound validation result = %+v", resp.Inbound)
+	}
+	if e.count(`SELECT count(*) FROM profile`) != profiles || e.count(`SELECT count(*) FROM inbound`) != inbounds ||
+		e.count(`SELECT count(*) FROM event`) != events || e.notify.n.Load() != 0 {
+		t.Fatal("validating a draft profile wrote state, emitted an event, or notified nodes")
+	}
+
+	_, err := e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{NodeId: "nod_de1", ValidateOnly: true}))
+	wantCode(t, err, connect.CodeInvalidArgument)
+	_, err = e.s.CreateInbound(e.ctx, req(&adminv1.CreateInboundRequest{Protocol: "hysteria2", NodeId: "nod_de1"}))
+	wantCode(t, err, connect.CodeInvalidArgument)
+}
+
 // "Change the port" of an inbound: a check of the inbound as it is answers with a port to move to, and a check of a change
 // refuses what the real change would refuse, writing nothing.
 func TestInboundUpdateCheck(t *testing.T) {

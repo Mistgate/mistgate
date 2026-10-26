@@ -116,7 +116,8 @@ type planned struct {
 	InnerRef string   // node_fix: the dry run's own plan id, never shown to the agent
 	// Params, when set, are the arguments as the plan resolved them (a node name became its id, "every outdated node" became
 	// the list the owner sees); they are what gets stored and applied. Nil: the arguments as given.
-	Params any
+	Params      any
+	AuditParams map[string]any
 }
 
 // PlanOut is the result of a _plan tool.
@@ -159,17 +160,18 @@ type applyIn struct {
 	ConfirmToken string `json:"confirm_token" jsonschema:"the confirm_token returned by the matching _plan tool"`
 }
 
-// changeSpec describes one change: its plan step, which reads and validates, and its apply step, which makes exactly one
-// call that changes something.
+// changeSpec describes one change: its plan step, which reads and validates, and its apply step, which carries out the
+// change through one or more bounded calls.
 type changeSpec[P any] struct {
-	name    string
-	min     Profile
-	procs   []string
-	desc    string
-	danger  bool // may need the owner (a danger rule can fire)
-	maxArgs int  // optional larger validated payload for a bounded upload
-	plan    func(c *call, p P) (*planned, error)
-	apply   func(c *call, p P, pl Plan) (done, error)
+	name        string
+	min         Profile
+	procs       []string
+	desc        string
+	danger      bool // may need the owner (a danger rule can fire)
+	maxArgs     int  // optional larger validated payload for a bounded upload
+	plan        func(c *call, p P) (*planned, error)
+	apply       func(c *call, p P, pl Plan) (done, error)
+	applyStored func(c *call, pl Plan) (done, error)
 }
 
 // change builds the two tools of a change.
@@ -223,6 +225,9 @@ func change[P any, PP reasoned[P]](s changeSpec[P]) []toolDef {
 					}
 					defer c.done()
 					out, err := e.apply(c, s.name, in.ConfirmToken, func(c *call, pl Plan) (done, error) {
+						if s.applyStored != nil {
+							return s.applyStored(c, pl)
+						}
 						var p P
 						if err := strictJSON([]byte(pl.ParamsJSON), &p); err != nil {
 							return done{}, failure("plan_unreadable", "the stored plan is unreadable: make a new plan")
@@ -291,7 +296,11 @@ func (e *env) createPlan(c *call, tool string, params []byte, reason string, pl 
 		e.cfg.Log.Error("mcp: store plan", "err", err)
 		return nil, errors.New("could not store the plan")
 	}
-	e.audit(c, "mcp_plan", map[string]any{"plan_id": p.ID, "tool": tool, "needs_approval": needs, "danger": danger}, "ok")
+	auditParams := map[string]any{"plan_id": p.ID, "tool": tool, "needs_approval": needs, "danger": danger}
+	if pl.AuditParams != nil {
+		auditParams["params"] = pl.AuditParams
+	}
+	e.audit(c, "mcp_plan", auditParams, "ok")
 	out := &PlanOut{
 		PlanID: p.ID, Summary: pl.Summary, Facts: facts, NeedsApproval: needs, Danger: pl.Danger,
 		ExpiresInS: int(planTTL / time.Second), ConfirmToken: confirm,
@@ -341,7 +350,7 @@ func stateError(p Plan, now time.Time) error {
 	return errUnknownConfirm
 }
 
-// apply runs the plan behind a confirm token. run makes the one procedure call.
+// apply runs the plan behind a confirm token.
 func (e *env) apply(c *call, tool, confirm string, run func(c *call, pl Plan) (done, error)) (*ApplyOut, error) {
 	if len(confirm) > 100 || !strings.HasPrefix(confirm, "cf_") {
 		return nil, errUnknownConfirm
@@ -381,7 +390,7 @@ func (e *env) apply(c *call, tool, confirm string, run func(c *call, pl Plan) (d
 	}
 	rc := *c
 	if started.NeedsApproval {
-		// The owner's approval is what lets a step-up procedure run for this one call; the grant dies with the apply.
+		// Owner approval lets only the plan's listed procedures run during this apply; the grant dies with the apply.
 		rc.ctx = e.cfg.Auth.WithApprovedStepUp(c.ctx, started.ID)
 	}
 	res, runErr := run(&rc, started)
@@ -389,7 +398,8 @@ func (e *env) apply(c *call, tool, confirm string, run func(c *call, pl Plan) (d
 	if runErr != nil {
 		msg, out := clean(runErr.Error(), maxError), outcomeOfError(runErr)
 		if errors.Is(runErr, context.DeadlineExceeded) || errors.Is(c.ctx.Err(), context.DeadlineExceeded) {
-			msg, out = "timeout, outcome unknown: check before retrying", Outcome{Code: "timeout"}
+			msg = "timeout, outcome unknown: check before retrying"
+			out.Code = "timeout"
 		}
 		if ferr := e.cfg.Plans.FinishApply(fctx, started.ID, false, "", msg, out.Code, out.paramsJSON(), e.now()); ferr != nil {
 			e.cfg.Log.Error("mcp: finish apply", "err", ferr)

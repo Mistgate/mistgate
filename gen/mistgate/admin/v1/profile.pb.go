@@ -1280,8 +1280,12 @@ type CreateInboundRequest struct {
 	ValidateOnly bool `protobuf:"varint,5,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
 	// Add although the port lost UDP packets in the delivery check ("add anyway"); the choice is audited.
 	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// With an empty profile_id, validate_only must be true and these fields describe a new profile that is not stored.
+	// This lets the add-profile plan run the same per-node checks without creating a temporary profile.
+	Protocol      string `protobuf:"bytes,7,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	SettingsJson  string `protobuf:"bytes,8,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateInboundRequest) Reset() {
@@ -1354,6 +1358,20 @@ func (x *CreateInboundRequest) GetAllowLossyPort() bool {
 		return x.AllowLossyPort
 	}
 	return false
+}
+
+func (x *CreateInboundRequest) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+func (x *CreateInboundRequest) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
+	}
+	return ""
 }
 
 type CreateInboundResponse struct {
@@ -2015,7 +2033,7 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x06params\x18\x04 \x03(\v2(.mistgate.admin.v1.ScoreItem.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfb\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbc\x02\n" +
 	"\x14CreateInboundRequest\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x17\n" +
@@ -2023,7 +2041,9 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\rport_override\x18\x03 \x01(\rR\fportOverride\x127\n" +
 	"\x18tls_server_name_override\x18\x04 \x01(\tR\x15tlsServerNameOverride\x12#\n" +
 	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\x12(\n" +
-	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPort\"\xa7\x01\n" +
+	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPort\x12\x1a\n" +
+	"\bprotocol\x18\a \x01(\tR\bprotocol\x12#\n" +
+	"\rsettings_json\x18\b \x01(\tR\fsettingsJson\"\xa7\x01\n" +
 	"\x15CreateInboundResponse\x124\n" +
 	"\ainbound\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.InboundR\ainbound\x12;\n" +
 	"\bwarnings\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x1b\n" +

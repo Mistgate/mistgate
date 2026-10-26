@@ -20,8 +20,8 @@ import (
 )
 
 // The change tools. The plan step reads what it needs to describe the change in the panel's own
-// words (never an agent-supplied description) and applies the danger rules; the apply step makes exactly one call that
-// changes something. A summary never embeds untrusted text: names go in the facts, marked untrusted.
+// words (never an agent-supplied description) and applies the danger rules; apply calls only procedures allow-listed
+// for its approved grant. A summary never embeds untrusted text: names go in the facts, marked untrusted.
 
 const (
 	dangerStepUp = "step_up" // the operation itself asks for a step-up

@@ -98,6 +98,9 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 |
 | `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
+| `protocols_list` | 只读 | 协议插件、客户端应用、精简设置结构（包括关键字段和敏感字段）以及默认设置。敏感默认值会被遮蔽。 |
+| `profiles_list` | 只读 | 协议配置摘要，包括协议、节点数和用户数、警告、订阅格式、版本以及授予访问权限的分组。 |
+| `profile_get` | 只读 | 单个协议配置的摘要和已遮蔽敏感字段的设置；入站包含节点 ID 和名称、生效及覆盖后的端口和服务器名称、启用状态和运行状态；还包括授予访问权限的分组。参数为 `profile_id`。 |
 | `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
@@ -134,6 +137,9 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `alert_mute` | 操作员 | `alert_id`、`duration_s`（最多 604800；0 表示取消静默） | 否 |
 | `subscription_app_upsert` | 操作员 | `platform`（`ios`、`android`、`windows`、`macos`、`linux`）和 `name` 用于指定应用；更改现有应用时只传入变更字段；新应用至少要传入 `kind`：`kind`（`happ` 接收订阅链接，`amnezia` 接收 AmneziaWG 密钥）、`download_url`、`add_link_template`（占位符 `{url}`、`{url_enc}`、`{name_enc}`）、`description`（最多 80 个字符）、`recommended` | 始终 |
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
+| `profile_create` | 管理员 | 计划：`protocol`、`name`、可选 JSON `settings`（缺少的字段使用协议默认值）、`node_ids`、现有 `group_ids`、`port_overrides`（节点 ID 到端口）、`allow_lossy_port`；执行：仅 `confirm_token`。对于标记为 `x-secret` 的敏感字段，省略该字段、使用 `"••••"` 保留原值，或使用 `"$generate"`；不得传入明文值 | 始终 |
+| `profile_update` | 管理员 | 计划：`profile_id`、可选 `name`、RFC 7386 JSON Merge Patch `settings_patch`（省略的敏感字段会保留原值；拒绝补丁中的 `null` 值）、`allow_lossy_port`；执行：仅 `confirm_token`。敏感字段遵循相同规则：省略、`"••••"` 或 `"$generate"` | 始终 |
+| `profile_deploy` | 管理员 | 计划：`profile_id`、`add_node_ids`、`remove_node_ids`、现有 `add_group_ids`、`remove_group_ids`，可选 `port_overrides` 和 `allow_lossy_port`；执行：仅 `confirm_token` | 始终 |
 | `node_fix` | 管理员 | `node`、诊断报告中的 `fix_id`；检查项列出参数时还需提供 `params` | 始终 |
 | `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR；`own` 模式下必需） | 始终 |
 | `warp_restart` | 管理员 | `node` ID 或精确名称；计划会列出使用 WARP 出口且可能中断几秒的协议配置；执行时只接收 `confirm_token` | 否 |
@@ -188,9 +194,11 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | 代码 | 含义 | 工具 |
 |---|---|---|
 | `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate` |
-| `fleet` | 会更改节点上运行的内容。 | `node_fix`、`node_decoy`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate` |
+| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
 | `user_page` | 所有用户都会在订阅页面上看到此变更。 | `subscription_app_upsert`、`subscription_app_remove` |
+
+计划会在保存前验证设置和新增节点。每项协议配置变更都需要所有者在管理后台审批。`profile_update` 和 `profile_deploy` 使用创建计划时读取的配置版本；执行前版本如有变化，会返回 `changed_since_plan`。部署时会将分组关联与其当前状态合并；后续步骤失败时，响应会报告已完成的步骤。`profile_create` 失败时会回滚新建配置和入站；删除配置时也会一并移除分组关联。敏感值不会出现在配置读取结果、计划事实、存储的计划参数或审计记录中。
 
 ### 所有者在哪里审批
 

@@ -247,6 +247,10 @@ message CreateInboundRequest {
   bool validate_only = 5;
   // Add although the port lost UDP packets in the delivery check ("add anyway"); the choice is audited.
   bool allow_lossy_port = 6;
+  // With an empty profile_id, validate_only must be true and these fields describe a new profile that is not stored.
+  // This lets the add-profile plan run the same per-node checks without creating a temporary profile.
+  string protocol = 7;
+  string settings_json = 8;
 }
 
 message CreateInboundResponse {

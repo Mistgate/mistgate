@@ -144,7 +144,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.61`�
 - 如果节点 Agent 没有报告所需能力，客户端视角检测会跳过 VLESS。v0.1.34 之前的 Agent 没有 VLESS 引擎；TLS 协议配置还需要 `vless-tls/1`（v0.1.36 或更高版本）。
 - **检测端口**只从一个位置检测：集群中的另一节点或面板主机。对于 VLESS 端口，它会使用预期名称执行 TLS 握手，不会执行 REALITY 握手。
 - SSH 安装只支持密码登录（包括 keyboard-interactive），不支持密钥登录。此类服务器请使用[手动安装](../getting-started/add-node.md)。
-- API 令牌和 MCP 无法创建协议配置或分组，也无法将协议配置部署到节点；这些操作由所有者在管理后台执行。
+- MCP 现在可以在所有者批准后创建、修改协议配置，并将其部署到节点和分组。分组需要预先在管理后台创建。
 - 备份只能保存到 Cloudflare R2；恢复时必须离线运行 `mistgate backup restore` 命令，并指定新的数据目录。
 - 面板不会创建 Cloudflare 账户、存储桶或令牌；你需要提供一个仅限存储桶且具有读取、写入和删除权限的令牌。
 - Cloudflare 版仍处于预览阶段，尚未在真实 Cloudflare 账户上试过，也尚未提供部分功能（参见[列表](../getting-started/install-edge.md#此版本中尚不可用的功能)），也无法在 Cloudflare 版和 VPS 面板之间迁移集群。

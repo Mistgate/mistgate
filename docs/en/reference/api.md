@@ -178,6 +178,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `UserService.ListUsers`, `UserService.GetUser` | yes | yes | yes |
 | `GroupService.ListGroups` | yes | yes | yes |
 | `ProfileService.ListProfiles`, `ProfileService.GetProfile` (secrets masked) | yes | yes | yes |
+| `ProfileService.ListProtocols`, `ProfileService.PreviewProfile` | yes | yes | yes |
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | yes | yes | yes |
 | `UpdateService.GetUpdates` | yes | yes | yes |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | no | yes | yes |
@@ -190,14 +191,15 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `ProvisioningService.GetSSHFingerprint` | no | no | only while the MCP server makes a `node_install` plan |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |
 | `SubscriptionService.UpdateSubscriptionSettings` (one app of the user page) | no | only through an approved MCP plan | only through an approved MCP plan |
+| `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | no | no | only through an approved MCP plan |
 
-Closed to every token: deleting users, the subscription link, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), every change to profiles, groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
+Closed to every token: deleting users, the subscription link, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), creating groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
 
 ## Changes that need the owner
 
 A token never passes step-up. Procedures that need a step-up, or that change what runs on the nodes, are never callable with a token directly; over the plain API they answer 403 "this needs the owner's approval; it is not available over the API".
 
-They are reachable only through the [MCP server](mcp.md) with an Admin token (the user page's app list from the Operator profile up): the agent plans the change, the owner reads the plan in **Integrations → Waiting for you** and approves it (with a step-up of their own), and only then does the agent's apply make that one call. The approval is checked in the database on every use and opens only the procedure of that plan. A plan expires 10 minutes after it was made.
+They are reachable only through the [MCP server](mcp.md) with an Admin token (the user page's app list from the Operator profile up): the agent plans the change, the owner reads the plan in **Integrations → Waiting for you** and approves it (with a step-up of their own), and only then does the agent's apply carry out the approved plan. The approval is checked in the database on every call, and the grant allows only the procedures listed on that plan. A plan expires 10 minutes after it was made.
 
 ## Limits
 

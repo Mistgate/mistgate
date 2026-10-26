@@ -38,8 +38,11 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UserServiceListUsersProcedure:                       TokenAccessDirect,
 	adminv1connect.UserServiceGetUserProcedure:                         TokenAccessDirect,
 	adminv1connect.GroupServiceListGroupsProcedure:                     TokenAccessDirect,
+	adminv1connect.GroupServiceUpdateGroupProcedure:                    TokenAccessApproved,
+	adminv1connect.ProfileServiceListProtocolsProcedure:                TokenAccessDirect,
 	adminv1connect.ProfileServiceListProfilesProcedure:                 TokenAccessDirect,
 	adminv1connect.ProfileServiceGetProfileProcedure:                   TokenAccessDirect,
+	adminv1connect.ProfileServicePreviewProfileProcedure:               TokenAccessDirect,
 	adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure: TokenAccessDirect, // the shared page: names, texts, public app links
 	adminv1connect.SubscriptionServiceListClientsProcedure:             TokenAccessDirect,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:           TokenAccessDirect,
@@ -72,8 +75,13 @@ var tokenProcedures = map[string]int{
 	adminv1connect.NodeServiceCheckPortsProcedure:       TokenAccessDirect,
 	// Owner level (the admin profile): the audit log, which names admins, tokens and addresses.
 	adminv1connect.AuthServiceListAuditProcedure: TokenAccessDirect,
-	// Only through the owner's approval (or, for the fix's dry run, a planning grant): see Service.WithApprovedStepUp.
+	// Only through the owner's approval; no-change planning requests may also use WithPlanning. See Service.WithApprovedStepUp.
 	adminv1connect.HealthServiceApplyFixProcedure:                       TokenAccessApproved,
+	adminv1connect.ProfileServiceCreateProfileProcedure:                 TokenAccessApproved,
+	adminv1connect.ProfileServiceUpdateProfileProcedure:                 TokenAccessApproved,
+	adminv1connect.ProfileServiceDeleteProfileProcedure:                 TokenAccessApproved,
+	adminv1connect.ProfileServiceCreateInboundProcedure:                 TokenAccessApproved,
+	adminv1connect.ProfileServiceDeleteInboundProcedure:                 TokenAccessApproved,
 	adminv1connect.UpdateServiceStartRolloutProcedure:                   TokenAccessApproved,
 	adminv1connect.UpdateServicePauseRolloutProcedure:                   TokenAccessApproved,
 	adminv1connect.UpdateServiceResumeRolloutProcedure:                  TokenAccessApproved,
@@ -140,22 +148,35 @@ var stepUpProcedures = map[string]bool{
 // grantProcedures says which procedures the approved plan of an MCP tool may open with its grant: the grant of
 // a node_fix plan cannot start a rollout. A tool that is not listed gets no grant at all. The keys are the tool
 // names without the _plan / _apply suffix, as stored in mcp_plan.tool.
-var grantProcedures = map[string]string{
-	"warp_reregister":             adminv1connect.WarpServiceRegisterWarpProcedure,
-	"node_decoy":                  adminv1connect.NodeServiceSetNodeDecoyModeProcedure,
-	"node_fix":                    adminv1connect.HealthServiceApplyFixProcedure,
-	"rollout_start":               adminv1connect.UpdateServiceStartRolloutProcedure,
-	"rollout_pause":               adminv1connect.UpdateServicePauseRolloutProcedure,
-	"rollout_resume":              adminv1connect.UpdateServiceResumeRolloutProcedure,
-	"rollout_cancel":              adminv1connect.UpdateServiceCancelRolloutProcedure,
-	"node_rollback":               adminv1connect.UpdateServiceRollbackNodeProcedure,
-	"node_update_schedule":        adminv1connect.UpdateServiceScheduleNodeUpdateProcedure,
-	"node_update_schedule_cancel": adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure,
-	"update_timezone":             adminv1connect.UpdateServiceSetUpdateTimezoneProcedure,
-	NodeInstallTool:               adminv1connect.ProvisioningServiceStartNodeProvisionProcedure,
-	"node_server_password_rotate": adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure,
-	"subscription_app_upsert":     adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure,
-	"subscription_app_remove":     adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure,
+var grantProcedures = map[string][]string{
+	"warp_reregister":             {adminv1connect.WarpServiceRegisterWarpProcedure},
+	"node_decoy":                  {adminv1connect.NodeServiceSetNodeDecoyModeProcedure},
+	"node_fix":                    {adminv1connect.HealthServiceApplyFixProcedure},
+	"rollout_start":               {adminv1connect.UpdateServiceStartRolloutProcedure},
+	"rollout_pause":               {adminv1connect.UpdateServicePauseRolloutProcedure},
+	"rollout_resume":              {adminv1connect.UpdateServiceResumeRolloutProcedure},
+	"rollout_cancel":              {adminv1connect.UpdateServiceCancelRolloutProcedure},
+	"node_rollback":               {adminv1connect.UpdateServiceRollbackNodeProcedure},
+	"node_update_schedule":        {adminv1connect.UpdateServiceScheduleNodeUpdateProcedure},
+	"node_update_schedule_cancel": {adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure},
+	"update_timezone":             {adminv1connect.UpdateServiceSetUpdateTimezoneProcedure},
+	NodeInstallTool:               {adminv1connect.ProvisioningServiceStartNodeProvisionProcedure},
+	"node_server_password_rotate": {adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure},
+	"subscription_app_upsert":     {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_app_remove":     {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"profile_create": {
+		adminv1connect.ProfileServiceCreateProfileProcedure,
+		adminv1connect.ProfileServiceCreateInboundProcedure,
+		adminv1connect.ProfileServiceDeleteInboundProcedure,
+		adminv1connect.ProfileServiceDeleteProfileProcedure,
+		adminv1connect.GroupServiceUpdateGroupProcedure,
+	},
+	"profile_update": {adminv1connect.ProfileServiceUpdateProfileProcedure},
+	"profile_deploy": {
+		adminv1connect.ProfileServiceCreateInboundProcedure,
+		adminv1connect.ProfileServiceDeleteInboundProcedure,
+		adminv1connect.GroupServiceUpdateGroupProcedure,
+	},
 }
 
 // tokenProcedureRoles is narrower than the signed-in admin policy: the MCP projection for GetWarp omits its node

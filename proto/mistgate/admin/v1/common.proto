@@ -90,6 +90,12 @@ message Inbound {
   // Where the inbound's traffic leaves the node: "direct" | "warp" (the profile's egress; empty when the plugin cannot
   // build the inbound).
   string egress = 14;
+  // The configured override, or 0 when the profile port is used.
+  uint32 port_override = 15;
+  // The configured server-name override, or empty when the profile/node default is used.
+  string tls_server_name_override = 16;
+  // Whether this inbound is enabled in the desired state.
+  bool enabled = 17;
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).

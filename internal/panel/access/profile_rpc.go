@@ -602,6 +602,7 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 		Id: f.Inbound.ID, ProfileId: f.Profile.ID, ProfileName: f.Profile.Name, Protocol: f.Profile.Protocol,
 		NodeId: f.Node.ID, NodeName: f.Node.Name, State: inboundStates[f.Inbound.State], LastError: f.Inbound.LastError,
 		CertPinSha256: f.Inbound.CertPinSHA256, Port: uint32(f.Inbound.PortOverride), TlsServerName: f.Inbound.TLSServerNameOverride,
+		PortOverride: uint32(f.Inbound.PortOverride), TlsServerNameOverride: f.Inbound.TLSServerNameOverride, Enabled: f.Inbound.Enabled,
 	}
 	if !f.Inbound.CertNotAfter.IsZero() {
 		out.CertNotAfterUnix = f.Inbound.CertNotAfter.Unix()
@@ -946,10 +947,47 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 		ID: store.NewID("inb_"), ProfileID: m.ProfileId, NodeID: m.NodeId, PortOverride: port, TLSServerNameOverride: sni,
 		Enabled: true, SpecVersion: 1, State: "pending", CreatedAt: s.now(),
 	}}
-	if f.Profile, err = a.Profile(ctx, m.ProfileId); errors.Is(err, store.ErrNotFound) {
-		return nil, notFound("profile")
-	} else if err != nil {
-		return nil, s.internal("get profile", err)
+	var proto protocols.Protocol
+	var merged json.RawMessage
+	if m.ProfileId == "" {
+		if !m.ValidateOnly || m.Protocol == "" {
+			return nil, invalid("profile_id is required unless validating a new profile")
+		}
+		proto, err = s.protocol(m.Protocol)
+		if err != nil {
+			return nil, err
+		}
+		var fieldErrs []protocols.FieldError
+		if merged, fieldErrs, err = s.resolveSettings(proto, m.SettingsJson, nil, false); err != nil {
+			return nil, err
+		}
+		if len(fieldErrs) > 0 {
+			return nil, fieldErrors(fieldErrs)
+		}
+		if proto.ID() == awg.ID && awgNetworkAllocationNeeded(m.SettingsJson) {
+			merged, err = s.checkAWGNetworks(ctx, "", merged, m.SettingsJson, nil)
+			if err != nil {
+				return nil, err
+			}
+		}
+		f.Profile = store.AccessProfile{ID: store.NewID("prf_preview_"), Name: "new profile", Protocol: proto.ID(), Version: 1}
+		f.Inbound.ProfileID = f.Profile.ID
+	} else {
+		if m.Protocol != "" || m.SettingsJson != "" {
+			return nil, invalid("protocol and settings_json are only allowed when validating a new profile")
+		}
+		if f.Profile, err = a.Profile(ctx, m.ProfileId); errors.Is(err, store.ErrNotFound) {
+			return nil, notFound("profile")
+		} else if err != nil {
+			return nil, s.internal("get profile", err)
+		}
+		if merged, err = s.mergedSettings(f.Profile); err != nil {
+			return nil, s.internal("open profile secrets", err)
+		}
+		proto, err = s.protocol(f.Profile.Protocol)
+		if err != nil {
+			return nil, s.internal("profile protocol", err)
+		}
 	}
 	if f.Node, err = a.Node(ctx, m.NodeId); errors.Is(err, store.ErrNotFound) {
 		return nil, notFound("node")
@@ -958,14 +996,6 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	if f.Node.State != "pending" && f.Node.State != "active" {
 		return nil, coded(connect.CodeFailedPrecondition, "node_retired")
-	}
-	merged, err := s.mergedSettings(f.Profile)
-	if err != nil {
-		return nil, s.internal("open profile secrets", err)
-	}
-	proto, err := s.protocol(f.Profile.Protocol)
-	if err != nil {
-		return nil, s.internal("profile protocol", err)
 	}
 	others, here, err := s.nodeInbounds(ctx, f.Node.ID, "")
 	if err != nil {
