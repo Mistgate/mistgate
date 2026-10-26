@@ -208,6 +208,79 @@ const createFacts = approval({
   ],
 });
 
+// the protocol profile tools (internal/panel/mcp/tools_profiles.go), facts as the panel writes them
+const changed = (key: string, from: string, to: string) => fact(key, `${from} -> ${to}`, "change", { from, to }, true, ["from", "to"]);
+const profileApprovals = [
+  approval({
+    id: "pln_p1",
+    tool: "profile_create",
+    facts: [
+      fact("profile_name", "Main · 443", "", {}, true),
+      fact("profile_summary", "VLESS · REALITY · XHTTP · 443", "", {}, true),
+      fact("format", "base64_uris: full"),
+      fact("format", "mihomo_yaml: full"),
+      fact("format", "xray_json: full"),
+      fact("format", "singbox_json: xhttp"),
+      fact("node", "de1", "", {}, true),
+      fact("port", "443"),
+      fact("warnings", "none"),
+      fact("node", "nl1", "", {}, true),
+      fact("port", "8443"),
+      fact("warnings", "port_lossy"),
+      fact("group", "Main", "", {}, true),
+      fact("users", "12"),
+    ],
+    danger: ["fleet"],
+    reason: "a VLESS profile for the Main group on de1 and nl1",
+  }),
+  approval({
+    id: "pln_p2",
+    tool: "profile_update",
+    facts: [
+      changed("name", "Main · 443", "Main · 8443"),
+      changed("setting:/port", "443", "8443"),
+      fact("setting:/reality/private_key", "masked secret -> generated secret"),
+      fact("inbounds_restarted", "2"),
+      fact("users_online", "5"),
+      fact("devices_need_reissue", "0"),
+      fact("critical_field", "/port"),
+      fact("critical_field", "/reality/private_key"),
+    ],
+    danger: ["fleet"],
+    reason: "move the profile off port 443, alice reports drops there",
+  }),
+  approval({
+    id: "pln_p3",
+    tool: "profile_deploy",
+    facts: [
+      fact("user_count", "14"),
+      fact("add_node", "nl1", "", {}, true),
+      fact("port", "443"),
+      fact("warnings", "none"),
+      fact("remove_node", "de1", "", {}, true),
+      fact("remove_group", "Main", "", {}, true),
+      fact("users_losing_server", "3"),
+    ],
+    danger: ["fleet"],
+    reason: "de1 is being retired",
+  }),
+];
+
+const profileQueues = profileApprovals.map((a) => ({ tool: a.tool, data: { awaiting: 1, nowUnix: now, receivedMs: Date.now(), approvals: [a] } as unknown as Approvals }));
+
+/** ?only=approvals: one approval card per profile tool, for their screenshots. */
+export function ProfileApprovalsKit() {
+  return (
+    <>
+      {profileQueues.map(({ tool, data }) => (
+        <Demo key={tool} id={`demo-ap-${tool}`} title={`Integrations → ${tool}`}>
+          <ApprovalQueue data={data} />
+        </Demo>
+      ))}
+    </>
+  );
+}
+
 export function SettingsDemos() {
   const [modal, setModal] = useState<"change" | "rebind" | "add" | null>(null);
   const [palette, setPalette] = useState(false);

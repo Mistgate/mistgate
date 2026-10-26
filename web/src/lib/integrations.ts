@@ -169,8 +169,9 @@ const lookup = (t: T, key: string, vars?: Record<string, string | number>) => (h
 
 /** The title of an MCP tool ("approval.tool.<tool>"); an unknown tool shows its code. */
 export const toolTitle = (t: T, tool: string) => lookup(t, `approval.tool.${tool}`) ?? tool;
-/** The label of a fact ("approval.fact.<key>"). */
-export const factLabel = (t: T, key: string) => lookup(t, `approval.fact.${key}`) ?? key;
+/** The label of a fact ("approval.fact.<key>"); a profile settings field comes as "setting:<JSON pointer>". */
+export const factLabel = (t: T, key: string) =>
+  key.startsWith("setting:") ? t("approval.fact.setting", { path: key.slice(8) }) : (lookup(t, `approval.fact.${key}`) ?? key);
 /** The note of a danger code ("approval.danger.<code>"). */
 export const dangerText = (t: T, code: string) => lookup(t, `approval.danger.${code}`) ?? code;
 
@@ -184,9 +185,31 @@ const knownValues: Record<string, MessageKey> = {
   pause: "approval.value.pause",
   resume: "approval.value.resume",
   cancel: "approval.value.cancel",
+  "masked secret -> generated secret": "approval.value.secret_generated",
+  "secret field changed": "approval.value.secret_changed",
 };
 
 const yesNo = (t: T, v: string) => (v === "true" ? t("int.ap.yes") : v === "false" ? t("int.ap.no") : v);
+
+// a profile's subscription formats, as the panel names them ("singbox_json: xhttp"), by the profiles screen's short names
+const formatKey: Record<string, MessageKey> = {
+  base64_uris: "profiles.fmt.base64",
+  mihomo_yaml: "profiles.fmt.mihomo",
+  xray_json: "subs.fmt.xray",
+  singbox_json: "profiles.fmt.singbox",
+};
+
+/** "mihomo_yaml: full", "singbox_json: xhttp" (the reason it drops the profile), "base64_uris: unavailable". */
+function formatText(t: T, value: string): string {
+  const m = /^(\w+): (\w+)$/.exec(value);
+  if (!m) return value;
+  const id = m[1]!;
+  const status = m[2]!;
+  const format = formatKey[id] ? t(formatKey[id]) : id;
+  if (status === "full") return t("approval.value.format.yes", { format });
+  if (status === "unavailable") return t("approval.value.format.no", { format });
+  return t("approval.value.format.noWhy", { format, why: lookup(t, `profiles.fmt.why.${status}`) ?? status });
+}
 
 /** What a fact says, in the UI language where the panel's own wording is known. */
 export function factText(t: T, f: Pick<Fact, "key" | "value" | "untrusted">): string {
@@ -196,6 +219,9 @@ export function factText(t: T, f: Pick<Fact, "key" | "value" | "untrusted">): st
     const m = /^(\d+) of (\d+) nodes finished$/.exec(f.value);
     if (m) return t("approval.value.progress", { done: m[1]!, total: m[2]! });
   }
+  if (f.key === "format") return formatText(t, f.value);
+  // an inbound's warning codes, joined: "none", or "port_lossy, warp_missing"
+  if (f.key === "warnings") return f.value === "none" ? t("approval.value.none") : f.value.split(", ").map((c) => lookup(t, `approval.value.warn.${c}`) ?? c).join("; ");
   const key = knownValues[f.value];
   return key ? t(key) : f.value;
 }
@@ -267,15 +293,15 @@ function withPlates(template: string, vars: Record<string, string>, data: readon
  * stays on a plate of its own, inside the words or instead of them; an unknown code reads as the panel wrote it.
  */
 export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untrusted" | "code" | "params" | "untrustedParams">): Piece[] {
-  if (f.untrusted) return [{ data: f.value }];
   const p = f.params ?? {};
+  // sides from data (an app's link, a profile's name or setting): each on a plate of its own, every side when the whole fact is data
+  if (f.code === "change" && f.untrustedParams?.length) return withPlates("{from} → {to}", p, f.untrusted ? ["from", "to"] : f.untrustedParams);
+  if (f.untrusted) return [{ data: f.value }];
   const num = (k: string) => Number(p[k] ?? 0);
   switch (f.code ?? "") {
     case "":
       return [factText(t, f)];
     case "change":
-      // both sides from data (an app's link or description): each on a plate of its own
-      if (f.untrustedParams?.length) return withPlates("{from} → {to}", p, f.untrustedParams);
       return [`${changeSide(t, fmt, f.key, p.from ?? "")} → ${changeSide(t, fmt, f.key, p.to ?? "")}`];
     case "quota":
       return [num("bytes") === 0 ? t("approval.value.unlimited") : `${fmt.bytes(num("bytes"))}, ${changeSide(t, fmt, "quota_reset", p.reset ?? "")}`];

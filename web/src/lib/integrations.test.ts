@@ -146,6 +146,22 @@ describe("words of an approval", () => {
     expect(factLabel(t, "batch_size")).toBe("batch_size");
     expect(Object.keys(en).filter((k) => /^approval\.(fact\.batch_size|value\.canary|value\.default)$/.test(k))).toEqual([]);
   });
+  // internal/panel/mcp/tools_profiles.go: everything profile_create, profile_update and profile_deploy send by key
+  it("has words for every key of the profile tools, in every language", () => {
+    const facts = [
+      "profile_name", "profile_summary", "format", "node", "port", "warnings", "group", "users", "name", "inbounds_restarted", "users_online", "devices_need_reissue",
+      "critical_field", "user_count", "add_node", "remove_node", "add_group", "remove_group", "users_losing_server",
+    ];
+    const keys = [
+      ...["profile_create", "profile_update", "profile_deploy"].map((k) => `approval.tool.${k}`),
+      ...facts.map((k) => `approval.fact.${k}`),
+      "approval.danger.fleet",
+      ...["profile_created", "profile_updated", "profile_deployed"].map((k) => `approval.outcome.${k}`),
+      ...["profile_deploy_failed", "changed_since_plan", "plan_unreadable"].map((k) => `approval.fail.${k}`),
+    ];
+    for (const k of keys) for (const lang of langs) expect(dictionaries[lang][k as keyof typeof ru], `${lang} ${k}`).toBeTruthy();
+    expect(factLabel(t, "setting:/obfs/type")).toBe("Setting /obfs/type");
+  });
   it("knows the three danger codes", () => {
     for (const c of ["step_up", "fleet", "bulk"]) expect(dangerText(t, c)).not.toBe(c);
     expect(dangerText(t, "x")).toBe("x");
@@ -206,6 +222,24 @@ describe("coded facts and outcomes, in Russian", () => {
     expect(said(fact("fix", "restart_inbound"))).toBe("Перезапустить профиль"); // no profile named: the doctor's label
     expect(factWords(tr, fmt, { key: "node", value: "pause", untrusted: true, code: "", params: {}, untrustedParams: [] })).toEqual([{ data: "pause" }]);
     expect(said(fact("effect", "brand_new_code"))).toBe("the panel's English"); // an unknown code reads as the panel wrote it
+  });
+
+  it("reads a profile plan's formats, warnings and secrets, and what came of it", () => {
+    const plain = (key: string, value: string) => said({ key, value, untrusted: false, code: "", params: {}, untrustedParams: [] });
+    expect(plain("format", "mihomo_yaml: full")).toBe("Mihomo: да");
+    expect(plain("format", "singbox_json: xhttp")).toBe("sing-box: нет (XHTTP)");
+    expect(plain("format", "base64_uris: unavailable")).toBe("Список: нет");
+    expect(plain("format", "new_format: full")).toBe("new_format: да");
+    expect(plain("warnings", "none")).toBe("нет");
+    expect(plain("warnings", "port_lossy, brand_new")).toBe("порт теряет UDP-пакеты; brand_new");
+    expect(plain("setting:/password", "masked secret -> generated secret")).toBe("Секрет сгенерируется заново.");
+    expect(factLabel(tr, "setting:/port")).toBe("Настройка /port");
+    // the profile tools mark the whole change as data: our arrow, a plate for each side, never the panel's "->"
+    const change = { key: "setting:/port", value: "443 -> 8443", untrusted: true, code: "change", params: { from: "443", to: "8443" }, untrustedParams: ["from"] };
+    expect(factWords(tr, fmt, change)).toEqual([{ data: "443" }, " → ", { data: "8443" }]);
+    const out = (state: ApprovalState, outcomeCode: string, outcomeParams: Record<string, string> = {}) => outcomeText(tr, fmt, { state, outcomeCode, outcomeParams });
+    expect(out(ApprovalState.APPLIED, "profile_deployed", { added_nodes: "1", removed_nodes: "1" })).toBe("Ноды и группы профиля изменены");
+    expect(out(ApprovalState.FAILED, "profile_deploy_failed", { step: "remove_node", completed_steps: "2" })).toBe("Ошибка: шаг не прошёл, предыдущие шаги остались применены");
   });
 
   it("words what came of a decision, and leaves an unknown outcome to the panel's own line", () => {

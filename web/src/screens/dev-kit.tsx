@@ -47,7 +47,7 @@ import { DevicesPanel } from "@/screens/users/user-detail";
 import { dnsPresetsQuery } from "@/screens/subscriptions/queries";
 import type { ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
 import { FleetKit } from "./dev-kit-fleet";
-import { SettingsDemos } from "./dev-kit-settings";
+import { ProfileApprovalsKit, SettingsDemos } from "./dev-kit-settings";
 import { PolishKit } from "./dev-kit-polish";
 import { DnsLinkKit } from "./dev-kit-dns";
 import { EdgeKit } from "./dev-kit-edge";
@@ -285,8 +285,10 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|edge|node|health|users|subs: one kit alone, for its screenshots
-  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit }[new URLSearchParams(location.search).get("only") ?? ""];
+  // ?only=dns|edge|node|health|users|subs|approvals: one kit alone, for its screenshots
+  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit }[
+    new URLSearchParams(location.search).get("only") ?? ""
+  ];
   if (only) {
     const Kit = only;
     return (
