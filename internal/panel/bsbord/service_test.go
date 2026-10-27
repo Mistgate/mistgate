@@ -971,3 +971,52 @@ func TestSkippedResponseTargetsAndExecutorDPIOffItemsAreRecorded(t *testing.T) {
 		t.Fatalf("skipped response details = %+v, %v", rows, err)
 	}
 }
+
+// Any save on the card lifts a hold the owner can fix (cap, key, plan, balance): a save that fixes nothing gets the hold back on
+// the next tick, after a free preview. A server's rate-limit hold is never lifted by a setting.
+func TestOwnerChangeLiftsAFixableHold(t *testing.T) {
+	e := newTestEnv(t)
+	e.fake.setPreviewCost(51)
+	e.configure(true, []string{testUnit}, 50)
+	e.svc.Tick(e.ctx)
+	if st, _ := e.svc.load(e.ctx); st.LastStatus != "cap_reached" || !st.HoldUntil.After(e.now) {
+		t.Fatalf("setup: %+v", st)
+	}
+	interval := uint32(120)
+	if _, err := (rpc{e.svc}).UpdateBsbord(ownerContext(), connect.NewRequest(&adminv1.UpdateBsbordRequest{IntervalMin: &interval})); err != nil {
+		t.Fatal(err)
+	}
+	e.svc.Tick(e.ctx)
+	if st, _ := e.svc.load(e.ctx); st.LastStatus != "cap_reached" || !st.HoldUntil.After(e.now) {
+		t.Fatalf("a save that fixes nothing must hold again on the next tick: %+v", st)
+	}
+	capCredits := uint64(100)
+	if _, err := (rpc{e.svc}).UpdateBsbord(ownerContext(), connect.NewRequest(&adminv1.UpdateBsbordRequest{CapCredits: &capCredits})); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := e.svc.load(e.ctx)
+	if st.LastStatus != "idle" || !st.HoldUntil.IsZero() {
+		t.Fatalf("raising the cap kept the hold: %+v", st)
+	}
+	e.svc.Tick(e.ctx)
+	var paid int
+	for _, r := range e.fake.snapshot() {
+		if r.Path == "/v1/probe" {
+			paid++
+		}
+	}
+	if paid != 1 {
+		t.Fatalf("after raising the cap the next tick paid %d rounds, want 1", paid)
+	}
+
+	if err := e.svc.saveState(e.ctx, settings{LastStatus: "rate_limited", HoldUntil: e.now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	capCredits = 200
+	if _, err := (rpc{e.svc}).UpdateBsbord(ownerContext(), connect.NewRequest(&adminv1.UpdateBsbordRequest{CapCredits: &capCredits})); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := e.svc.load(e.ctx); st.LastStatus != "rate_limited" || !st.HoldUntil.After(e.now) {
+		t.Fatalf("a setting lifted the server's rate-limit hold: %+v", st)
+	}
+}

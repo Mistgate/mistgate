@@ -1053,8 +1053,14 @@ func (r rpc) UpdateBsbord(ctx context.Context, req *connect.Request[adminv1.Upda
 		updated.LastStatus = "cancelled"
 		updated.LastRun = s.now()
 	}
+	// A hold the owner can fix (the cap, the key, the plan, the balance) ends with any save here, as the card says: the next tick
+	// tries again (a free preview first) and holds anew if nothing was fixed. A server's retry_after is not lifted.
+	liftHold := !cancelPending && ownerFixableHold(st.LastStatus) && st.HoldUntil.After(s.now())
+	if liftHold {
+		updated.HoldUntil, updated.LastStatus = time.Time{}, "idle"
+	}
 	var saveErr error
-	if cancelPending {
+	if cancelPending || liftHold {
 		saveErr = s.saveConfigAndState(ctx, updated)
 	} else {
 		saveErr = s.saveConfig(ctx, updated)
@@ -1492,4 +1498,14 @@ func skippedRows(skipped []skippedNode, details []string, at time.Time) []store.
 		rows = append(rows, store.ExtCheck{NodeID: n.NodeID, Source: Source, At: at, Verdict: countryreach.VerdictUnknown, DetailJSON: string(b)})
 	}
 	return rows
+}
+
+// ownerFixableHold names the holds that last until the owner changes something: the monthly cap, a refused key, the plan, the
+// balance.
+func ownerFixableHold(status string) bool {
+	switch status {
+	case "cap_reached", "unauthorized", "tier_too_low", "no_balance":
+		return true
+	}
+	return false
 }
