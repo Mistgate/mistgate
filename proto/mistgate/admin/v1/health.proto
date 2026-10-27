@@ -424,6 +424,10 @@ message CountryCheck {
   int64 tspu_at_unix = 19 [jstype = JS_NUMBER];
   // Named operators with no matching online home or mobile probe in the latest Globalping round.
   repeated string no_probe = 20;
+  // Per-network, per-unit and per-probe observations from each fresh source row.
+  repeated CountryVantage vantages = 21;
+  // Each source's own latest fresh verdict, including rows that do not count toward the combined result.
+  repeated SourceVerdict source_verdicts = 22;
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds, judged against the panel's TCP
@@ -597,4 +601,29 @@ message UnacceptDoctorItemRequest {
 
 message UnacceptDoctorItemResponse {
   NodeDoctor doctor = 1;
+}
+
+// One network, unit or city from a source's newest fresh row. Names are third-party labels, never addresses.
+message CountryVantage {
+  string source = 1;
+  string key = 2;
+  string network = 3;
+  string region = 4;
+  string asn = 5;
+  string kind = 6;
+  // reach, dark, whitelist or uncertain.
+  string state = 7;
+  int64 at_unix = 8 [jstype = JS_NUMBER];
+  uint32 dpi_hop = 9;
+  bool icmp_ok = 10;
+  bool tcp_ok = 11;
+}
+
+// One source's newest fresh verdict, including unknown when that source ran without a usable result.
+message SourceVerdict {
+  string source = 1;
+  CountryVerdict verdict = 2;
+  bool eyeball = 3;
+  int64 at_unix = 4 [jstype = JS_NUMBER];
+  string reason = 5;
 }

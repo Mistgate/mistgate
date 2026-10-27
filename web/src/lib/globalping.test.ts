@@ -12,7 +12,7 @@ const tOf = (dict: Record<string, string>) => Object.assign((key: string, vars?:
 const t = tOf(en);
 
 const probe = { network: "Rostelecom", asn: 1, city: "Moscow", icmpOk: true, icmpMs: 42, tcp: [], valid: true, dark: false, eyeball: true };
-const round = (atUnix: number, verdict = CountryVerdict.OK, reason = ""): CountryCheck => ({ nodeId: "nod_1", country: "RU", verdict, atUnix, probes: reason ? [] : [probe], reason, eyeball: true, confidence: "", listedBy: [], cdnProvider: "", cdnRegion: "", sources: [], globalpingVerdict: CountryVerdict.UNSPECIFIED, tspuVerdict: CountryVerdict.UNSPECIFIED, tspuPorts: [], dpiHop: 0, tspuVantageId: "", tspuVantageName: "", tspuAtUnix: 0, noProbe: [] });
+const round = (atUnix: number, verdict = CountryVerdict.OK, reason = ""): CountryCheck => ({ nodeId: "nod_1", country: "RU", verdict, atUnix, probes: reason ? [] : [probe], reason, eyeball: true, confidence: "", listedBy: [], cdnProvider: "", cdnRegion: "", sources: [], globalpingVerdict: CountryVerdict.UNSPECIFIED, tspuVerdict: CountryVerdict.UNSPECIFIED, tspuPorts: [], dpiHop: 0, tspuVantageId: "", tspuVantageName: "", tspuAtUnix: 0, noProbe: [], vantages: [], sourceVerdicts: [] });
 const limits: GlobalpingTest = { reachable: true, tokenUsed: true, limit: 500, remaining: 412, resetS: 1800, credits: 0 };
 const on = { enabled: true };
 

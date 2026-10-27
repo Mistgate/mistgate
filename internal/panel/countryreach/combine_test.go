@@ -3,88 +3,178 @@ package countryreach
 import (
 	"slices"
 	"testing"
+	"time"
 )
 
-// TestCombine walks every Globalping state against every state of the TSPU probe, and each of those pairs against a list hit, a
-// list miss and no list.
+// TestCombine covers the source-list rules, including the path-carrier exception and source ordering.
 func TestCombine(t *testing.T) {
+	at := time.Unix(1700000000, 0)
 	hit := &Listing{ListedBy: []string{"antifilter_ipsum"}, CDNProvider: "ExampleHost", CDNRegion: "eu"}
-	miss := &Listing{CDNProvider: "ExampleHost"} // checked, not listed, but in a hosting range
-	lists := []struct {
-		name string
-		l    *Listing
-	}{{"hit", hit}, {"miss", miss}, {"none", nil}}
-
-	gp := map[string]*Live{
-		"gp-none": nil, "gp-unknown": {Verdict: VerdictUnknown, Eyeball: true},
-		"gp-ok-eye": {Verdict: VerdictOK, Eyeball: true}, "gp-ok-dc": {Verdict: VerdictOK},
-		"gp-tcp-eye": {Verdict: VerdictTCPBlocked, Eyeball: true}, "gp-tcp-dc": {Verdict: VerdictTCPBlocked},
-		"gp-blocked-eye": {Verdict: VerdictBlocked, Eyeball: true}, "gp-blocked-dc": {Verdict: VerdictBlocked},
-	}
-	tspu := map[string]*TSPU{
-		"tspu-none": nil, "tspu-unknown": {Verdict: VerdictUnknown}, "tspu-ok": {Verdict: VerdictOK}, "tspu-tcp": {Verdict: VerdictTCPBlocked},
-	}
-	type want struct {
-		verdict, confidence string
-		sources             []string
-	}
-	g, ts := []string{SourceGlobalping}, []string{SourceTSPU}
-	both := []string{SourceGlobalping, SourceTSPU}
-	// the answer for the live sources alone ("lists" is filled in below: it depends on the list)
-	none := want{}
 	cases := []struct {
-		gp, tspu string
-		want
+		name       string
+		live       []Live
+		list       *Listing
+		verdict    string
+		confidence string
+		sources    []string
 	}{
-		// no Globalping verdict (none, or an unknown round): the probe node alone, or nothing
-		{"gp-none", "tspu-none", none}, {"gp-none", "tspu-unknown", none}, {"gp-none", "tspu-ok", want{VerdictOK, ConfidenceDCOnly, ts}}, {"gp-none", "tspu-tcp", want{VerdictTCPBlocked, ConfidenceDCOnly, ts}},
-		{"gp-unknown", "tspu-none", none}, {"gp-unknown", "tspu-unknown", none}, {"gp-unknown", "tspu-ok", want{VerdictOK, ConfidenceDCOnly, ts}}, {"gp-unknown", "tspu-tcp", want{VerdictTCPBlocked, ConfidenceDCOnly, ts}},
-		// Globalping alone (the probe node has nothing or is unknown): its own confidence
-		{"gp-ok-eye", "tspu-none", want{VerdictOK, ConfidenceEyeball, g}}, {"gp-ok-eye", "tspu-unknown", want{VerdictOK, ConfidenceEyeball, g}},
-		{"gp-ok-dc", "tspu-none", want{VerdictOK, ConfidenceDCOnly, g}}, {"gp-ok-dc", "tspu-unknown", want{VerdictOK, ConfidenceDCOnly, g}},
-		{"gp-tcp-eye", "tspu-none", want{VerdictTCPBlocked, ConfidenceEyeball, g}}, {"gp-tcp-eye", "tspu-unknown", want{VerdictTCPBlocked, ConfidenceEyeball, g}},
-		{"gp-tcp-dc", "tspu-none", want{VerdictTCPBlocked, ConfidenceDCOnly, g}}, {"gp-tcp-dc", "tspu-unknown", want{VerdictTCPBlocked, ConfidenceDCOnly, g}},
-		{"gp-blocked-eye", "tspu-none", want{VerdictBlocked, ConfidenceEyeball, g}}, {"gp-blocked-eye", "tspu-unknown", want{VerdictBlocked, ConfidenceEyeball, g}},
-		{"gp-blocked-dc", "tspu-none", want{VerdictBlocked, ConfidenceDCOnly, g}}, {"gp-blocked-dc", "tspu-unknown", want{VerdictBlocked, ConfidenceDCOnly, g}},
-		// both live and they agree: the eyeball view outranks the data-centre one
-		{"gp-ok-eye", "tspu-ok", want{VerdictOK, ConfidenceEyeball, both}}, {"gp-ok-dc", "tspu-ok", want{VerdictOK, ConfidenceDCOnly, both}},
-		{"gp-tcp-eye", "tspu-tcp", want{VerdictTCPBlocked, ConfidenceEyeball, both}}, {"gp-tcp-dc", "tspu-tcp", want{VerdictTCPBlocked, ConfidenceDCOnly, both}},
-		// both live and they differ: the worse verdict, flagged as a conflict (whatever the confidence of either)
-		{"gp-ok-eye", "tspu-tcp", want{VerdictTCPBlocked, ConfidenceConflict, both}}, {"gp-ok-dc", "tspu-tcp", want{VerdictTCPBlocked, ConfidenceConflict, both}},
-		{"gp-tcp-eye", "tspu-ok", want{VerdictTCPBlocked, ConfidenceConflict, both}}, {"gp-tcp-dc", "tspu-ok", want{VerdictTCPBlocked, ConfidenceConflict, both}},
-		{"gp-blocked-eye", "tspu-ok", want{VerdictBlocked, ConfidenceConflict, both}}, {"gp-blocked-dc", "tspu-ok", want{VerdictBlocked, ConfidenceConflict, both}},
-		{"gp-blocked-eye", "tspu-tcp", want{VerdictBlocked, ConfidenceConflict, both}}, {"gp-blocked-dc", "tspu-tcp", want{VerdictBlocked, ConfidenceConflict, both}},
+		{"GP, cheburcheck and bsbord", []Live{
+			{Source: SourceBsbord, Verdict: VerdictPartial, Eyeball: true, At: at},
+			{Source: SourceCheburcheck, Verdict: VerdictOK, Eyeball: true, Path: true, At: at},
+			{Source: SourceGlobalping, Verdict: VerdictOK, At: at},
+		}, nil, VerdictPartial, ConfidenceEyeball, []string{SourceGlobalping, SourceCheburcheck, SourceBsbord}},
+		{"GP ok and narrow bsbord block", []Live{{Source: SourceGlobalping, Verdict: VerdictOK}, {Source: SourceBsbord, Verdict: VerdictBlocked, Eyeball: true}}, nil,
+			VerdictPartial, ConfidenceEyeball, []string{SourceGlobalping, SourceBsbord}},
+		{"bsbord full block alone", []Live{{Source: SourceBsbord, Verdict: VerdictBlocked, Eyeball: true}}, nil,
+			VerdictBlocked, ConfidenceEyeball, []string{SourceBsbord}},
+		{"GP block and path reach", []Live{{Source: SourceCheburcheck, Verdict: VerdictOK, Eyeball: true, Path: true}, {Source: SourceGlobalping, Verdict: VerdictBlocked}}, nil,
+			VerdictBlocked, ConfidenceConflict, []string{SourceGlobalping, SourceCheburcheck}},
+		{"GP block and bsbord reach", []Live{{Source: SourceGlobalping, Verdict: VerdictBlocked, Eyeball: true}, {Source: SourceBsbord, Verdict: VerdictOK, Eyeball: true}}, nil,
+			VerdictPartial, ConfidenceEyeball, []string{SourceGlobalping, SourceBsbord}},
+		{"GP tcp block and TSPU reach", []Live{{Source: SourceTSPU, Verdict: VerdictOK, Path: true}, {Source: SourceGlobalping, Verdict: VerdictTCPBlocked}}, nil,
+			VerdictTCPBlocked, ConfidenceConflict, []string{SourceGlobalping, SourceTSPU}},
+		{"GP reach and TSPU tcp block", []Live{{Source: SourceTSPU, Verdict: VerdictTCPBlocked, Path: true}, {Source: SourceGlobalping, Verdict: VerdictOK}}, nil,
+			VerdictPartial, ConfidenceDCOnly, []string{SourceGlobalping, SourceTSPU}},
+		{"GP reach and cheburcheck tcp block", []Live{{Source: SourceCheburcheck, Verdict: VerdictTCPBlocked, Eyeball: true, Path: true}, {Source: SourceGlobalping, Verdict: VerdictOK}}, nil,
+			VerdictPartial, ConfidenceEyeball, []string{SourceGlobalping, SourceCheburcheck}},
+		{"two path-only tcp blocks", []Live{{Source: SourceCheburcheck, Verdict: VerdictTCPBlocked, Eyeball: true, Path: true}, {Source: SourceTSPU, Verdict: VerdictTCPBlocked, Path: true}}, nil,
+			VerdictTCPBlocked, ConfidenceEyeball, []string{SourceTSPU, SourceCheburcheck}},
+		{"all sources ok", []Live{{Source: SourceBsbord, Verdict: VerdictOK, Eyeball: true}, {Source: SourceGlobalping, Verdict: VerdictOK}}, nil,
+			VerdictOK, ConfidenceEyeball, []string{SourceGlobalping, SourceBsbord}},
+		{"unknown rows do not count", []Live{{Source: SourceBsbord, Verdict: VerdictUnknown}}, nil,
+			VerdictUnknown, "", nil},
+		{"unknown rows with list hit", []Live{{Source: SourceBsbord, Verdict: VerdictUnknown}}, hit,
+			VerdictListed, ConfidenceListed, []string{SourceLists}},
 	}
-	if len(cases) != len(gp)*len(tspu) {
-		t.Fatalf("%d cases for %d x %d combinations", len(cases), len(gp), len(tspu))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Combine(tc.live, tc.list)
+			if got.Verdict != tc.verdict || got.Confidence != tc.confidence || !slices.Equal(got.Sources, tc.sources) {
+				t.Fatalf("Combine() = %+v, want verdict %q confidence %q sources %v", got, tc.verdict, tc.confidence, tc.sources)
+			}
+			if len(tc.live) == 3 && (got.SourceVerdicts[0].Source != SourceGlobalping || got.SourceVerdicts[1].Source != SourceCheburcheck || got.SourceVerdicts[2].Source != SourceBsbord) {
+				t.Errorf("source verdict order = %+v", got.SourceVerdicts)
+			}
+			if tc.list != nil && (got.CDNProvider != tc.list.CDNProvider || got.CDNRegion != tc.list.CDNRegion || !slices.Equal(got.ListedBy, tc.list.ListedBy)) {
+				t.Errorf("list detail lost: %+v", got)
+			}
+		})
 	}
-	seen := map[string]bool{}
-	for _, c := range cases {
-		if seen[c.gp+"/"+c.tspu] {
-			t.Fatalf("%s x %s twice", c.gp, c.tspu)
+}
+
+// TestCombineGlobalpingTSPULists checks the complete Globalping x TSPU x lists table; the three changed pairings are explicit below.
+func TestCombineGlobalpingTSPULists(t *testing.T) {
+	type oldLive struct {
+		verdict string
+		eyeball bool
+	}
+	type oldTSPU struct{ verdict string }
+	type listCase struct {
+		name string
+		row  *Listing
+	}
+	hit := &Listing{ListedBy: []string{"antifilter_ipsum"}, CDNProvider: "ExampleHost", CDNRegion: "eu"}
+	miss := &Listing{CDNProvider: "ExampleHost", CDNRegion: "eu"}
+	lists := []listCase{{"hit", hit}, {"miss", miss}, {"none", nil}}
+	gps := []*oldLive{nil}
+	for _, verdict := range []string{VerdictUnknown, VerdictOK, VerdictPartial, VerdictTCPBlocked, VerdictBlocked} {
+		gps = append(gps, &oldLive{verdict, true}, &oldLive{verdict, false})
+	}
+	tspus := []*oldTSPU{nil, {VerdictUnknown}, {VerdictOK}, {VerdictTCPBlocked}}
+
+	legacy := func(g *oldLive, ts *oldTSPU, list *Listing) Combined {
+		var c Combined
+		if list != nil {
+			c.ListedBy, c.CDNProvider, c.CDNRegion = list.ListedBy, list.CDNProvider, list.CDNRegion
 		}
-		seen[c.gp+"/"+c.tspu] = true
-		for _, l := range lists {
-			name := c.gp + " x " + c.tspu + " x list " + l.name
-			got := Combine(gp[c.gp], tspu[c.tspu], l.l)
-			w := c.want
-			if w.verdict == "" { // no live verdict: the lists decide
-				w = want{VerdictUnknown, "", nil}
-				if l.l == hit {
-					w = want{VerdictListed, ConfidenceListed, []string{SourceLists}}
+		gpLive, tspuLive := g != nil && isLive(g.verdict), ts != nil && isLive(ts.verdict)
+		switch {
+		case gpLive && tspuLive:
+			c.Verdict, c.Sources = g.verdict, []string{SourceGlobalping, SourceTSPU}
+			switch {
+			case g.verdict != ts.verdict:
+				if (g.verdict == VerdictPartial && ts.verdict == VerdictOK) || (g.verdict == VerdictOK && ts.verdict == VerdictPartial) {
+					c.Verdict = VerdictPartial
+					if g.eyeball {
+						c.Confidence = ConfidenceEyeball
+					} else {
+						c.Confidence = ConfidenceDCOnly
+					}
+				} else {
+					c.Verdict, c.Confidence = worse(g.verdict, ts.verdict), ConfidenceConflict
+				}
+			case g.eyeball:
+				c.Confidence = ConfidenceEyeball
+			default:
+				c.Confidence = ConfidenceDCOnly
+			}
+		case gpLive:
+			c.Verdict, c.Confidence, c.Sources = g.verdict, ConfidenceDCOnly, []string{SourceGlobalping}
+			if g.eyeball {
+				c.Confidence = ConfidenceEyeball
+			}
+		case tspuLive:
+			c.Verdict, c.Confidence, c.Sources = ts.verdict, ConfidenceDCOnly, []string{SourceTSPU}
+		case list != nil && len(list.ListedBy) > 0:
+			c.Verdict, c.Confidence, c.Sources = VerdictListed, ConfidenceListed, []string{SourceLists}
+		default:
+			c.Verdict = VerdictUnknown
+		}
+		return c
+	}
+
+	for _, gp := range gps {
+		for _, tspu := range tspus {
+			for _, list := range lists {
+				var live []Live
+				if gp != nil {
+					live = append(live, Live{Source: SourceGlobalping, Verdict: gp.verdict, Eyeball: gp.eyeball})
+				}
+				if tspu != nil {
+					live = append(live, Live{Source: SourceTSPU, Verdict: tspu.verdict, Path: true})
+				}
+				want := legacy(gp, tspu, list.row)
+				if gp != nil && tspu != nil && tspu.verdict == VerdictTCPBlocked {
+					switch gp.verdict {
+					case VerdictOK:
+						want.Verdict, want.Confidence = VerdictPartial, ConfidenceDCOnly
+					case VerdictPartial:
+						want.Verdict, want.Confidence = VerdictPartial, ConfidenceDCOnly
+						if gp.eyeball {
+							want.Confidence = ConfidenceEyeball
+						}
+					case VerdictBlocked:
+						want.Verdict, want.Confidence = VerdictBlocked, ConfidenceDCOnly
+						if gp.eyeball {
+							want.Confidence = ConfidenceEyeball
+						}
+					}
+				}
+				got := Combine(live, list.row)
+				name := "none"
+				if gp != nil {
+					name = gp.verdict + "/eye=" + map[bool]string{true: "true", false: "false"}[gp.eyeball]
+				}
+				tsName := "none"
+				if tspu != nil {
+					tsName = tspu.verdict
+				}
+				if got.Verdict != want.Verdict || got.Confidence != want.Confidence || !slices.Equal(got.Sources, want.Sources) ||
+					!slices.Equal(got.ListedBy, want.ListedBy) || got.CDNProvider != want.CDNProvider || got.CDNRegion != want.CDNRegion {
+					t.Errorf("GP %s + TSPU %s + list %s: got %+v, want %+v", name, tsName, list.name, got, want)
 				}
 			}
-			if got.Verdict != w.verdict || got.Confidence != w.confidence || !slices.Equal(got.Sources, w.sources) {
-				t.Errorf("%s: got %+v, want %+v", name, got, w)
-			}
-			// the list detail comes along with any verdict as long as the lists were checked, and from nowhere otherwise
-			if l.l != nil && (got.CDNProvider != l.l.CDNProvider || got.CDNRegion != l.l.CDNRegion || !slices.Equal(got.ListedBy, l.l.ListedBy)) {
-				t.Errorf("%s: list detail lost: %+v", name, got)
-			}
-			if l.l == nil && (got.CDNProvider != "" || got.ListedBy != nil) {
-				t.Errorf("%s: detail from nowhere: %+v", name, got)
-			}
 		}
+	}
+}
+
+func TestPartialConfidenceUsesDarkSourcesOnly(t *testing.T) {
+	got := Combine([]Live{
+		{Source: SourceGlobalping, Verdict: VerdictOK, Eyeball: true},
+		{Source: SourceTSPU, Verdict: VerdictTCPBlocked, Path: true},
+	}, nil)
+	if got.Verdict != VerdictPartial || got.Confidence != ConfidenceDCOnly {
+		t.Fatalf("Combine() = %s/%s, want partial/dc_only", got.Verdict, got.Confidence)
 	}
 }
 
@@ -98,26 +188,6 @@ func TestWorse(t *testing.T) {
 		if got := worse(c.a, c.b); got != c.want {
 			t.Errorf("worse(%s, %s) = %s, want %s", c.a, c.b, got, c.want)
 		}
-	}
-}
-
-func TestCombinePartial(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		live       *Live
-		tspu       *TSPU
-		verdict    string
-		confidence string
-	}{
-		{"partial and ok", &Live{Verdict: VerdictPartial, Eyeball: true}, &TSPU{Verdict: VerdictOK}, VerdictPartial, ConfidenceEyeball},
-		{"partial and tcp blocked", &Live{Verdict: VerdictPartial, Eyeball: true}, &TSPU{Verdict: VerdictTCPBlocked}, VerdictTCPBlocked, ConfidenceConflict},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := Combine(tc.live, tc.tspu, nil)
-			if got.Verdict != tc.verdict || got.Confidence != tc.confidence {
-				t.Fatalf("Combine() = %+v, want verdict %q confidence %q", got, tc.verdict, tc.confidence)
-			}
-		})
 	}
 }
 

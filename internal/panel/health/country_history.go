@@ -16,7 +16,8 @@ const tspuHistoryRows = 7*24*60 + 1
 // CountryHistory is what CountryReachabilityService.GetReachabilityHistory shows: for every source that is on (the same test
 // GetChecks makes), what it said of each node since `since`, as a lane of verdicts where consecutive equal ones are one point.
 // Globalping's lane holds the rounds of the selected country; the block lists' lane is LISTED or OK; the TSPU probe's lane holds
-// the runs of the current probe node, mapped as Combine maps them. Sources come in the order globalping, lists, tspu; nodes by id.
+// the runs of the current probe node; external sources each add a lane. Sources keep the existing order, then external sources;
+// nodes are by id.
 func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources []string, nodes []*adminv1.NodeReachabilityHistory, err error) {
 	now := s.now()
 	type key struct{ node, source string }
@@ -35,7 +36,45 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 		}
 		for _, r := range rows {
 			k := key{r.NodeID, countryreach.SourceGlobalping}
-			raw[k], until[k] = append(raw[k], point{r.At, r.Verdict}), now
+			raw[k] = append(raw[k], point{r.At, r.Verdict})
+		}
+		latest, err := s.st.RecentCountryChecks(ctx, 2)
+		if err != nil {
+			return nil, nil, err
+		}
+		maxAges := countryRoundMaxAges(cc.Interval, latest)
+		seen := map[string]bool{}
+		for _, r := range latest {
+			if seen[r.NodeID] {
+				continue
+			}
+			seen[r.NodeID] = true
+			if r.Country != cc.Country {
+				continue
+			}
+			end := r.At.Add(maxAges[r.NodeID])
+			if end.After(now) {
+				end = now
+			}
+			until[key{r.NodeID, countryreach.SourceGlobalping}] = end
+		}
+		// The latest stored round can belong to another node or a country selected after this lane's last point. Keep a
+		// per-lane freshness endpoint from its newest country-specific verdict change in those cases.
+		for k, points := range raw {
+			if k.source != countryreach.SourceGlobalping || len(points) == 0 {
+				continue
+			}
+			age := maxAges[k.node]
+			if age == 0 {
+				age = countryMaxAge(cc.Interval, time.Time{}, time.Time{})
+			}
+			end := points[len(points)-1].at.Add(age)
+			if end.After(now) {
+				end = now
+			}
+			if end.After(until[k]) {
+				until[k] = end
+			}
 		}
 	}
 	if s.cfg.Lists != nil && s.cfg.Lists(ctx) {
@@ -73,6 +112,38 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 			if end.After(until[k]) {
 				until[k] = end
 			}
+		}
+	}
+	activeExternal := s.activeExternalStates(ctx)
+	for _, state := range activeExternal {
+		sources = append(sources, state.Source)
+	}
+	if len(activeExternal) > 0 {
+		maxAge := make(map[string]time.Duration, len(activeExternal))
+		for _, state := range activeExternal {
+			maxAge[state.Source] = state.MaxAge
+		}
+		rows, err := s.st.ExtVerdictChanges(ctx, since)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, r := range rows {
+			if _, ok := maxAge[r.Source]; !ok {
+				continue
+			}
+			k := key{r.NodeID, r.Source}
+			raw[k] = append(raw[k], point{r.At, r.Verdict})
+		}
+		latest, err := s.st.RecentExtChecks(ctx, 1, slices.Sorted(maps.Keys(maxAge))...)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, r := range latest {
+			end := r.At.Add(maxAge[r.Source])
+			if end.After(now) {
+				end = now
+			}
+			until[key{r.NodeID, r.Source}] = end
 		}
 	}
 

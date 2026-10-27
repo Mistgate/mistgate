@@ -114,6 +114,20 @@ func TestCountryCheckViewCarriesPartialAndDark(t *testing.T) {
 	}
 }
 
+func TestCountryCheckViewCarriesExternalVantagesAndSourceVerdicts(t *testing.T) {
+	got := countryCheckView(&adminv1.CountryCheck{
+		Vantages: []*adminv1.CountryVantage{{Source: "cheburcheck", Key: "probe\x01:17", Network: "MTS\u202e", Region: "Crimea\nISP", Asn: "AS8359",
+			Kind: "mobile", State: "dark", AtUnix: 1700000000, DpiHop: 5, IcmpOk: true}},
+		SourceVerdicts: []*adminv1.SourceVerdict{{Source: "bsbord", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED, Reason: "refs_pass", Eyeball: true, AtUnix: 1700000100}},
+	})
+	if got == nil || len(got.Vantages) != 1 || got.Vantages[0].Key != "probe :17" || got.Vantages[0].Network != "MTS" || got.Vantages[0].Region != "Crimea ISP" ||
+		got.Vantages[0].State != "dark" || got.Vantages[0].DPIHop != 5 || !got.Vantages[0].ICMPOK ||
+		len(got.SourceVerdicts) != 1 || got.SourceVerdicts[0].Source != "bsbord" || got.SourceVerdicts[0].Verdict != "blocked" ||
+		got.SourceVerdicts[0].Reason != "refs_pass" || !got.SourceVerdicts[0].Eyeball {
+		t.Fatalf("external country check view = %+v", got)
+	}
+}
+
 // The tspu_probe view says why a no_dpi_hop could not place the TSPU, and omits the field when it is not known.
 func TestTspuRunViewReason(t *testing.T) {
 	r := &adminv1.TspuProbeRun{Status: "no_dpi_hop", AtUnix: 1700000400, NodeId: nodeA, Reason: "refs_pass"}

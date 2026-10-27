@@ -118,6 +118,8 @@ type Config struct {
 	// read and how old a row may be, read on every use. When it is, the probe node's verdicts join the live round in the combined
 	// verdict (countryreach.Combine) and in the COUNTRY_BLOCKED alert. nil: it is off.
 	TSPU func(context.Context) TSPUState
+	// External says which external source rows are enabled and how long their newest row stays fresh. nil is no external source.
+	External func(context.Context) []ExternalState
 	// Resolve looks a node's name up on the panel's side, for the country check. Default: the system resolver (DNS over
 	// HTTPS on the Cloudflare edition, which has none).
 	Resolve func(ctx context.Context, host string) ([]netip.Addr, error)
@@ -130,6 +132,13 @@ type Config struct {
 	OnTransition func(Transition)
 	Log          *slog.Logger
 	Now          func() time.Time // the clock (tests)
+}
+
+// ExternalState configures one external source for the combined country verdict.
+type ExternalState struct {
+	Source string
+	On     bool
+	MaxAge time.Duration
 }
 
 // Transition is one alert changing state, for the notification hook.

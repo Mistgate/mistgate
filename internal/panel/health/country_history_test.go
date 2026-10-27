@@ -1,12 +1,15 @@
 package health
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -108,7 +111,7 @@ func TestCountryHistoryCompactsEachSource(t *testing.T) {
 	want := []string{
 		"de1 globalping ok@150 until=0",
 		"de1 lists ok@150 until=0",
-		"nl1 globalping ok@160,tcp_blocked@96,ok@72,unknown@10,ok@9 until=0",
+		"nl1 globalping ok@160,tcp_blocked@96,ok@72,unknown@10,ok@9 until=6",
 		"nl1 tspu tcp_blocked@50,ok@30 until=24",
 		"se1 lists ok@150,listed@144 until=0",
 	}
@@ -118,7 +121,7 @@ func TestCountryHistoryCompactsEachSource(t *testing.T) {
 
 	// another country: Globalping's lane starts over (nothing yet), the lists and the probe stay
 	c.cfg.Country = "KZ"
-	if _, lanes := c.history(); !slices.Contains(lanes, "nl1 globalping blocked@90 until=0") || slices.Contains(lanes, "de1 globalping ok@150 until=0") {
+	if _, lanes := c.history(); !slices.Contains(lanes, "nl1 globalping blocked@90 until=87") || slices.Contains(lanes, "de1 globalping ok@150 until=0") {
 		t.Fatalf("KZ lanes: %q", lanes)
 	}
 }
@@ -160,4 +163,55 @@ func TestCountryHistoryKeepsTheFullTSPUWindow(t *testing.T) {
 		}
 	}
 	t.Fatal("no TSPU lane for de1")
+}
+
+func TestCountryHistoryAddsExternalLanesAndUsesNewestRowForUntil(t *testing.T) {
+	c := newCountryEnv(t)
+	now := c.clock.Now()
+	c.s.cfg.External = func(context.Context) []ExternalState {
+		return []ExternalState{
+			{Source: countryreach.SourceCheburcheck, On: true, MaxAge: 9 * time.Hour},
+			{Source: countryreach.SourceCheburcheckOwn, On: true, MaxAge: 3 * time.Hour},
+			{Source: countryreach.SourceBsbord, On: true, MaxAge: 18 * time.Hour},
+		}
+	}
+	rows := []store.ExtCheck{
+		{NodeID: "de1", Source: countryreach.SourceCheburcheck, At: now.Add(-2 * time.Hour), Verdict: verdictOK},
+		{NodeID: "de1", Source: countryreach.SourceCheburcheck, At: now.Add(-time.Hour), Verdict: verdictOK}, // same verdict still refreshes the lane
+		{NodeID: "de1", Source: countryreach.SourceCheburcheck, At: now.Add(-20 * time.Minute), Verdict: verdictTCPBlocked},
+		{NodeID: "se1", Source: countryreach.SourceBsbord, At: now.Add(-20 * time.Hour), Verdict: verdictBlocked},
+		{NodeID: "se1", Source: countryreach.SourceBsbord, At: now.Add(-time.Hour), Verdict: verdictBlocked}, // unchanged but recent
+		{NodeID: "nl1", Source: countryreach.SourceCheburcheckOwn, At: now.Add(-4 * time.Hour), Verdict: verdictUnknown},
+	}
+	if err := c.st.InsertExtChecks(c.ctx, rows); err != nil {
+		t.Fatal(err)
+	}
+	sources, nodes, err := c.s.CountryHistory(c.ctx, now.Add(-7*24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{countryreach.SourceCheburcheck, countryreach.SourceCheburcheckOwn, countryreach.SourceBsbord} {
+		if !slices.Contains(sources, source) {
+			t.Errorf("history sources %v lack %s", sources, source)
+		}
+	}
+	lanes := map[string]*adminv1.ReachabilityLane{}
+	for _, node := range nodes {
+		for _, lane := range node.GetLanes() {
+			lanes[node.GetNodeId()+"/"+lane.GetSource()] = lane
+		}
+	}
+	cheb := lanes["de1/"+countryreach.SourceCheburcheck]
+	if cheb == nil || len(cheb.GetPoints()) != 2 || cheb.GetPoints()[0].GetVerdict() != adminv1.CountryVerdict_COUNTRY_VERDICT_OK ||
+		cheb.GetPoints()[1].GetVerdict() != adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED || cheb.GetUntilUnix() != now.Unix() {
+		t.Errorf("cheburcheck lane = %+v", cheb)
+	}
+	bsbord := lanes["se1/"+countryreach.SourceBsbord]
+	if bsbord == nil || len(bsbord.GetPoints()) != 1 || bsbord.GetUntilUnix() != now.Unix() {
+		t.Errorf("bsbord lane should use its newest unchanged row for freshness: %+v", bsbord)
+	}
+	own := lanes["nl1/"+countryreach.SourceCheburcheckOwn]
+	if own == nil || own.GetUntilUnix() != now.Add(-time.Hour).Unix() {
+		t.Errorf("expired own-probe lane = %+v", own)
+	}
 }

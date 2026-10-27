@@ -1032,7 +1032,29 @@ type countryProbeV struct {
 	Valid   bool           `json:"valid"` // false: it failed the control site or went offline; shown, not counted
 }
 
-// countryCheckV: verdict is ok, partial (some home networks get nothing from the node; dark marks their probes),
+type countryVantageV struct {
+	Source  string `json:"source"`
+	Key     string `json:"key"`
+	Network string `json:"network,omitempty"`
+	Region  string `json:"region,omitempty"`
+	ASN     string `json:"asn,omitempty"`
+	Kind    string `json:"kind,omitempty"`
+	State   string `json:"state"`
+	AtUnix  int64  `json:"at_unix"`
+	DPIHop  uint32 `json:"dpi_hop,omitempty"`
+	ICMPOK  bool   `json:"icmp_ok,omitempty"`
+	TCPOK   bool   `json:"tcp_ok,omitempty"`
+}
+
+type sourceVerdictV struct {
+	Source  string `json:"source"`
+	Verdict string `json:"verdict"`
+	Reason  string `json:"reason,omitempty"`
+	Eyeball bool   `json:"eyeball,omitempty"`
+	AtUnix  int64  `json:"at_unix"`
+}
+
+// countryCheckV: verdict is ok, partial (some vantages are dark while others reach the node; dark marks those observations),
 // tcp_blocked (ICMP passes, TCP is cut), blocked, listed (no live check, but the node's address is in a public block list:
 // in the registry, not proven dropped) or unknown (reason says why a live round was not enough).
 // Network names come from a third party and are shown as data.
@@ -1050,14 +1072,18 @@ type countryCheckV struct {
 	ListedBy    []string `json:"listed_by,omitempty"`
 	CDNProvider string   `json:"cdn_provider,omitempty"`
 	CDNRegion   string   `json:"cdn_region,omitempty"`
-	// Sources: which sources the verdict rests on (globalping, tspu, lists). With both live sources, a Confidence of conflict
-	// means they disagree and the worse verdict is shown; GlobalpingVerdict and TSPUVerdict are what each said on its own.
+	// Sources: globalping, tspu, cheburcheck, cheburcheck_own, bsbord, bsbord_tunnel, bsbord_geo, or lists when a list hit alone
+	// says listed. Conflict means an end-to-end block against a path-only reach; the end-to-end block stays the verdict. Partial
+	// can come from dark observations at any source.
 	Sources           []string `json:"sources,omitempty"`
 	GlobalpingVerdict string   `json:"globalping_verdict,omitempty"`
 	TSPUVerdict       string   `json:"tspu_verdict,omitempty"`
 	// TSPU is the probe node's view of this node, when that source is on and has a recent run for it.
 	TSPU   *countryTSPUV   `json:"tspu,omitempty"`
 	Probes []countryProbeV `json:"probes"`
+	// Vantages are the newest fresh observations from each enabled source; source_verdicts includes each fresh verdict, time and reason.
+	Vantages       []countryVantageV `json:"vantages"`
+	SourceVerdicts []sourceVerdictV  `json:"source_verdicts"`
 }
 
 // countryTSPUV: what a node of the fleet inside the country saw with TCP SYNs of a limited TTL. A data-centre view, so its
@@ -1109,7 +1135,8 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 	}
 	v := &countryCheckV{Country: clean(c.GetCountry(), 8), Verdict: enumName("COUNTRY_VERDICT_", c.GetVerdict().String()), AtUnix: c.GetAtUnix(),
 		Reason: clean(c.GetReason(), 40), Eyeball: c.GetEyeball(), Confidence: clean(c.GetConfidence(), 16),
-		CDNProvider: nm(c.GetCdnProvider()), CDNRegion: nm(c.GetCdnRegion()), Probes: []countryProbeV{}}
+		CDNProvider: nm(c.GetCdnProvider()), CDNRegion: nm(c.GetCdnRegion()), Probes: []countryProbeV{},
+		Vantages: []countryVantageV{}, SourceVerdicts: []sourceVerdictV{}}
 	for _, name := range c.GetNoProbe() {
 		v.NoProbe = append(v.NoProbe, clean(name, 40))
 	}
@@ -1136,6 +1163,15 @@ func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
 			pv.TCP = append(pv.TCP, countryPortV{Port: t.GetPort(), OK: t.GetOk(), Ms: t.GetMs()})
 		}
 		v.Probes = append(v.Probes, pv)
+	}
+	for _, x := range c.GetVantages() {
+		v.Vantages = append(v.Vantages, countryVantageV{Source: clean(x.GetSource(), 20), Key: nm(x.GetKey()), Network: nm(x.GetNetwork()),
+			Region: nm(x.GetRegion()), ASN: clean(x.GetAsn(), 32), Kind: clean(x.GetKind(), 16), State: clean(x.GetState(), 16),
+			AtUnix: x.GetAtUnix(), DPIHop: x.GetDpiHop(), ICMPOK: x.GetIcmpOk(), TCPOK: x.GetTcpOk()})
+	}
+	for _, x := range c.GetSourceVerdicts() {
+		v.SourceVerdicts = append(v.SourceVerdicts, sourceVerdictV{Source: clean(x.GetSource(), 20),
+			Verdict: enumName("COUNTRY_VERDICT_", x.GetVerdict().String()), Reason: clean(x.GetReason(), 80), Eyeball: x.GetEyeball(), AtUnix: x.GetAtUnix()})
 	}
 	return v
 }

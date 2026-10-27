@@ -595,6 +595,8 @@ describe("reachability from a country", () => {
     reason: "",
     confidence: "eyeball",
     noProbe: [],
+    vantages: [],
+    sourceVerdicts: [],
     listedBy: [],
     cdnProvider: "",
     cdnRegion: "",

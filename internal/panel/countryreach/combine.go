@@ -1,6 +1,11 @@
 package countryreach
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"slices"
+	"strings"
+	"time"
+)
 
 // BlocklistCountry is the one country the block lists cover (they are Russian). With another country selected the block-list
 // source is "not available for this country" and does nothing. TSPUCountry is the same for the TSPU probe (its references are
@@ -25,25 +30,38 @@ const (
 	ConfidenceEyeball = "eyeball"
 	ConfidenceDCOnly  = "dc_only"
 	ConfidenceListed  = "listed"
-	// ConfidenceConflict: two live sources disagree; the worse verdict is shown so that nothing is silently dropped.
+	// ConfidenceConflict: a path-only reach disagrees with an end-to-end block.
 	ConfidenceConflict = "conflict"
 
 	// The sources, as CountryCheck.sources and the alert's "sources" param name them.
-	SourceGlobalping = "globalping"
-	SourceTSPU       = "tspu"
-	SourceLists      = "lists"
+	SourceGlobalping     = "globalping"
+	SourceTSPU           = "tspu"
+	SourceLists          = "lists"
+	SourceCheburcheck    = "cheburcheck"
+	SourceCheburcheckOwn = "cheburcheck_own"
+	SourceBsbord         = "bsbord"
+	SourceBsbordTunnel   = "bsbord_tunnel"
+	SourceBsbordGeo      = "bsbord_geo"
 )
 
-// Live is the newest round of a live source (Globalping): its verdict and whether the probes were eyeball networks.
+// Live is the newest row from one source. Path means it can show the path past the TSPU, but cannot prove that the node
+// answered; Eyeball means the observation came from a home or mobile network.
 type Live struct {
+	Source  string
 	Verdict string
+	Reason  string
 	Eyeball bool
+	Path    bool
+	At      time.Time
 }
 
-// TSPU is what the probe node in the country said of a node: ok, tcp_blocked or unknown (TSPUVerdict maps the stored one). It is
-// always a datacentre view.
-type TSPU struct {
+// SourceVerdict is the source's newest fresh observation, including an unknown result.
+type SourceVerdict struct {
+	Source  string
 	Verdict string
+	Reason  string
+	Eyeball bool
+	At      time.Time
 }
 
 // Listing is what the block lists say of one node. ListedBy names the lists that hold the address; CDNProvider and CDNRegion
@@ -54,11 +72,12 @@ type Listing struct {
 	CDNRegion   string
 }
 
-// Combined is the verdict a node shows. Sources are the sources the verdict rests on, in the order globalping, tspu (or "lists"
-// alone for a listed verdict; empty for unknown).
+// Combined is the verdict a node shows. Sources contains live sources in the fixed source order (or "lists" alone for a listed
+// verdict); SourceVerdicts keeps each input verdict, including unknown rows.
 type Combined struct {
 	Verdict, Confidence string
 	Sources             []string
+	SourceVerdicts      []SourceVerdict
 	ListedBy            []string
 	CDNProvider         string
 	CDNRegion           string
@@ -66,6 +85,51 @@ type Combined struct {
 
 func isLive(v string) bool {
 	return v == VerdictOK || v == VerdictPartial || v == VerdictTCPBlocked || v == VerdictBlocked
+}
+
+func isReach(v string) bool { return v == VerdictOK || v == VerdictPartial }
+
+func isDark(v string) bool {
+	return v == VerdictPartial || v == VerdictTCPBlocked || v == VerdictBlocked
+}
+
+func isFull(v string) bool { return v == VerdictTCPBlocked || v == VerdictBlocked }
+
+func sourceRank(source string) int {
+	switch source {
+	case SourceGlobalping:
+		return 0
+	case SourceTSPU:
+		return 1
+	case SourceCheburcheck:
+		return 2
+	case SourceCheburcheckOwn:
+		return 3
+	case SourceBsbord:
+		return 4
+	case SourceBsbordTunnel:
+		return 5
+	case SourceBsbordGeo:
+		return 6
+	case SourceLists:
+		return 7
+	default:
+		return 8
+	}
+}
+
+// CompareSources compares source names in the fixed country-check order.
+func CompareSources(a, b string) int {
+	if ar, br := sourceRank(a), sourceRank(b); ar != br {
+		return ar - br
+	}
+	return strings.Compare(a, b)
+}
+
+func orderedLive(live []Live) []Live {
+	out := slices.Clone(live)
+	slices.SortStableFunc(out, func(a, b Live) int { return CompareSources(a.Source, b.Source) })
+	return out
 }
 
 // worse is the more serious of two live verdicts: blocked > tcp_blocked > partial > ok.
@@ -139,56 +203,74 @@ func TSPUVerdict(stored string, ports []TSPUPort) string {
 	return VerdictUnknown
 }
 
-// Combine merges the sources of the country check for one node. live is the newest Globalping round (nil: none, or the
-// integration is off); tspu is the newest verdict of the probe node (nil: none, too old, or the source is off); list is the
-// newest block-list check (nil: none, or off).
-//
-//   - Live verdicts (ok, partial, tcp_blocked, blocked) win over the lists, which only add detail (listed_by, the CDN range).
-//   - One live source: its verdict, with "eyeball" (Globalping on home or mobile networks) or "dc_only" (Globalping from data
-//     centres; the probe node, always) as the confidence.
-//   - Both agree: that verdict, "eyeball" when Globalping saw it from eyeball networks (that outranks the data-centre view),
-//     else "dc_only". Both live and different: the worse verdict, with the confidence "conflict".
-//   - Without a live verdict, a list hit gives "listed" (confidence "listed"); anything else is "unknown": a list that does not
-//     hold the address proves nothing about reachability.
+// Combine merges every fresh source row for a node. The caller leaves stale rows and sources that are off out of live; unknown
+// rows are kept for source_verdicts but do not affect the combined result. A path carrier can show that the TSPU lets a SYN
+// through, but cannot prove that the node answers.
 //
 // Only live verdicts ever open an alert (health, addCountryConds); a listed one never does.
-func Combine(live *Live, tspu *TSPU, list *Listing) Combined {
+func Combine(live []Live, list *Listing) Combined {
 	var c Combined
 	if list != nil {
 		c.ListedBy, c.CDNProvider, c.CDNRegion = list.ListedBy, list.CDNProvider, list.CDNRegion
 	}
-	g, t := live != nil && isLive(live.Verdict), tspu != nil && isLive(tspu.Verdict)
+	ordered := orderedLive(live)
+	var reached, dark []Live
+	var nonPathFull string
+	for _, row := range ordered {
+		if row.Source != "" {
+			c.SourceVerdicts = append(c.SourceVerdicts, SourceVerdict{Source: row.Source, Verdict: row.Verdict, Reason: row.Reason, Eyeball: row.Eyeball, At: row.At})
+		}
+		if !isLive(row.Verdict) {
+			continue
+		}
+		if row.Source != "" && (len(c.Sources) == 0 || c.Sources[len(c.Sources)-1] != row.Source) {
+			c.Sources = append(c.Sources, row.Source)
+		}
+		if isReach(row.Verdict) {
+			reached = append(reached, row)
+		}
+		if isDark(row.Verdict) {
+			dark = append(dark, row)
+		}
+		if !row.Path && isFull(row.Verdict) {
+			nonPathFull = worse(nonPathFull, row.Verdict)
+		}
+	}
 	switch {
-	case g && t:
-		c.Verdict, c.Sources = live.Verdict, []string{SourceGlobalping, SourceTSPU}
-		switch {
-		case live.Verdict != tspu.Verdict:
-			if (live.Verdict == VerdictPartial && tspu.Verdict == VerdictOK) || (live.Verdict == VerdictOK && tspu.Verdict == VerdictPartial) {
-				c.Verdict = VerdictPartial
-				if live.Eyeball {
-					c.Confidence = ConfidenceEyeball
-				} else {
-					c.Confidence = ConfidenceDCOnly
-				}
-			} else {
-				c.Verdict, c.Confidence = worse(live.Verdict, tspu.Verdict), ConfidenceConflict
-			}
-		case live.Eyeball:
-			c.Confidence = ConfidenceEyeball
-		default:
-			c.Confidence = ConfidenceDCOnly
-		}
-	case g:
-		c.Verdict, c.Confidence, c.Sources = live.Verdict, ConfidenceDCOnly, []string{SourceGlobalping}
-		if live.Eyeball {
-			c.Confidence = ConfidenceEyeball
-		}
-	case t:
-		c.Verdict, c.Confidence, c.Sources = tspu.Verdict, ConfidenceDCOnly, []string{SourceTSPU}
-	case len(c.ListedBy) > 0:
+	case len(reached)+len(dark) == 0 && len(c.Sources) == 0 && len(c.ListedBy) > 0:
 		c.Verdict, c.Confidence, c.Sources = VerdictListed, ConfidenceListed, []string{SourceLists}
-	default:
+	case len(reached)+len(dark) == 0:
 		c.Verdict = VerdictUnknown
+	case len(dark) == 0:
+		c.Verdict, c.Confidence = VerdictOK, confidenceFor(ordered, false)
+	case len(reached) == 0:
+		c.Verdict = VerdictTCPBlocked
+		for _, row := range ordered {
+			if isLive(row.Verdict) && !row.Path && row.Verdict == VerdictBlocked {
+				c.Verdict = VerdictBlocked
+				break
+			}
+		}
+		c.Confidence = confidenceFor(ordered, false)
+	default:
+		allReachPath := true
+		for _, row := range reached {
+			allReachPath = allReachPath && row.Path
+		}
+		if nonPathFull != "" && allReachPath {
+			c.Verdict, c.Confidence = nonPathFull, ConfidenceConflict
+		} else {
+			c.Verdict, c.Confidence = VerdictPartial, confidenceFor(dark, true)
+		}
 	}
 	return c
+}
+
+func confidenceFor(rows []Live, darkOnly bool) string {
+	for _, row := range rows {
+		if isLive(row.Verdict) && (!darkOnly || isDark(row.Verdict)) && row.Eyeball {
+			return ConfidenceEyeball
+		}
+	}
+	return ConfidenceDCOnly
 }

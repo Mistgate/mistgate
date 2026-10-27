@@ -49,6 +49,7 @@ func (c *countryEnv) noView() {
 
 var (
 	cvOK      = adminv1.CountryVerdict_COUNTRY_VERDICT_OK
+	cvPartial = adminv1.CountryVerdict_COUNTRY_VERDICT_PARTIAL
 	cvTCP     = adminv1.CountryVerdict_COUNTRY_VERDICT_TCP_BLOCKED
 	cvBlocked = adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED
 	cvUnknown = adminv1.CountryVerdict_COUNTRY_VERDICT_UNKNOWN
@@ -123,7 +124,7 @@ func TestCountryChecksCombineTheTSPUProbeWithGlobalping(t *testing.T) {
 	}{
 		{"both blocked", "tcp_blocked", "blocked", cvTCP, "eyeball", []string{"globalping", "tspu"}, cvTCP},
 		{"both ok", "ok", "open", cvOK, "eyeball", []string{"globalping", "tspu"}, cvOK},
-		{"eyeball ok, probe node blocked", "ok", "blocked", cvTCP, "conflict", []string{"globalping", "tspu"}, cvOK},
+		{"eyeball ok, probe node blocked", "ok", "blocked", cvPartial, "dc_only", []string{"globalping", "tspu"}, cvOK},
 		{"eyeball blocked, probe node ok", "tcp_blocked", "open", cvTCP, "conflict", []string{"globalping", "tspu"}, cvTCP},
 		{"eyeball blocked hard, probe node ok", "blocked", "open", cvBlocked, "conflict", []string{"globalping", "tspu"}, cvBlocked},
 		{"globalping cannot say", "few", "blocked", cvTCP, "dc_only", []string{"tspu"}, cvUnknown},
@@ -175,9 +176,27 @@ func TestGetChecksCarriesTheTSPURun(t *testing.T) {
 	}
 	c.tspuOn()
 	c.putTSPU("de1", "open", tport{Port: 443, Verdict: "open"})
+	if err := c.st.InsertCountryChecks(c.ctx, []store.CountryCheck{{NodeID: "de1", At: c.clock.Now(), Country: "RU", Verdict: verdictTCPBlocked,
+		Detail: `{"eyeball":true,"ports":[443],"probes":[{"network":"NetA","valid":true,"icmp_ok":true,"tcp":[{"port":443,"ok":false}]}]}`}}); err != nil {
+		t.Fatal(err)
+	}
 	r, err = rpc{c.s}.GetChecks(c.ctx, connect.NewRequest(&adminv1.GetChecksRequest{}))
 	if err != nil || r.Msg.TspuRun == nil || r.Msg.TspuRun.Status != "ok" || r.Msg.TspuRun.DpiHop != 4 || r.Msg.TspuRun.BlockedRef != "31.13.72.36" {
 		t.Fatalf("run = %v, %v", r.Msg.TspuRun, err)
+	}
+	checks := r.Msg.GetCountryChecks()
+	if len(checks) != 1 {
+		t.Errorf("GetChecks country rows = %+v, want one", checks)
+	} else {
+		var gp *adminv1.CountryVantage
+		for _, v := range checks[0].GetVantages() {
+			if v.GetSource() == countryreach.SourceGlobalping {
+				gp = v
+			}
+		}
+		if gp == nil || gp.GetState() != countryreach.VantageStateUncertain || !gp.GetIcmpOk() || gp.GetTcpOk() {
+			t.Errorf("GetChecks Globalping TCP-node vantage = %+v, want uncertain with only ICMP ok", gp)
+		}
 	}
 }
 
