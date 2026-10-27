@@ -72,6 +72,11 @@ func (s *Service) sweep(ctx context.Context) {
 	} else if n > 0 {
 		s.log.Info("health: pruned TSPU checks", "count", n)
 	}
+	if n, err := s.st.PruneExtChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune external checks", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned external checks", "count", n)
+	}
 	if n, err := s.st.PruneClientProbeReports(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune kl!ck reports", "err", err)
 	} else if n > 0 {

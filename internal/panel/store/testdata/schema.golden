@@ -67,6 +67,12 @@
   },
   {
     "type": "index",
+    "name": "country_ext_check_at",
+    "tbl_name": "country_ext_check",
+    "sql": "CREATE INDEX country_ext_check_at ON country_ext_check (at)"
+  },
+  {
+    "type": "index",
     "name": "country_tspu_check_at",
     "tbl_name": "country_tspu_check",
     "sql": "CREATE INDEX country_tspu_check_at ON country_tspu_check (at)"
@@ -418,6 +424,12 @@
     "name": "country_check",
     "tbl_name": "country_check",
     "sql": "CREATE TABLE country_check ( node_id TEXT NOT NULL, at INTEGER NOT NULL, country TEXT NOT NULL, verdict TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(detail_json)), PRIMARY KEY (node_id, at) ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "country_ext_check",
+    "tbl_name": "country_ext_check",
+    "sql": "CREATE TABLE country_ext_check ( node_id TEXT NOT NULL, source TEXT NOT NULL, at INTEGER NOT NULL, verdict TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(detail_json)), PRIMARY KEY (node_id, source, at) ) STRICT"
   },
   {
     "type": "table",

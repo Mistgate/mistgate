@@ -175,3 +175,25 @@ func TestCountryRetentionPrunesTSPUChecks(t *testing.T) {
 		t.Fatalf("rows left = %d, %v", left, err)
 	}
 }
+
+// The same sweep removes external-source rows after the same 7 days.
+func TestCountryRetentionPrunesExtChecks(t *testing.T) {
+	c := newCountryEnv(t)
+	c.onlineNode("de1", "203.0.113.10")
+	now := c.clock.Now()
+	if err := c.st.InsertExtChecks(c.ctx, []store.ExtCheck{
+		{NodeID: "de1", Source: "cheburcheck", At: now.Add(-8 * 24 * time.Hour), Verdict: "tcp_blocked"},
+		{NodeID: "de1", Source: "cheburcheck", At: now.Add(-24 * time.Hour), Verdict: "ok"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	c.s.sweep(c.ctx)
+	rows, err := c.st.RecentExtChecks(c.ctx, 10)
+	if err != nil || len(rows) != 1 || rows[0].Verdict != "ok" || !rows[0].At.Equal(now.Add(-24*time.Hour).Truncate(time.Second)) {
+		t.Fatalf("after the sweep: %+v, %v", rows, err)
+	}
+	var left int
+	if err := c.st.R.QueryRowContext(c.ctx, `SELECT count(*) FROM country_ext_check`).Scan(&left); err != nil || left != 1 {
+		t.Fatalf("rows left = %d, %v", left, err)
+	}
+}
