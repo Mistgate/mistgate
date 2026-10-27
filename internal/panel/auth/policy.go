@@ -139,6 +139,11 @@ var procedureLevels = map[string]level{
 	adminv1connect.GlobalpingServiceUpdateGlobalpingProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.GlobalpingServiceDisconnectGlobalpingProcedure: levelOwner, // also needs a step-up
 	adminv1connect.GlobalpingServiceTestGlobalpingProcedure:       levelOwner,
+	// Cheburcheck sends node IPv4 addresses to a third party; all controls are owner-only, and settings changes need a step-up.
+	adminv1connect.CheburcheckServiceGetCheburcheckProcedure:        levelOwner,
+	adminv1connect.CheburcheckServiceUpdateCheburcheckProcedure:     levelOwner, // also needs a step-up
+	adminv1connect.CheburcheckServiceDisconnectCheburcheckProcedure: levelOwner, // also needs a step-up
+	adminv1connect.CheburcheckServiceTestCheburcheckProcedure:       levelOwner,
 	// BlocklistService: the block-list source of the country check. It sends nothing anywhere (the lists are downloaded, no
 	// address goes out), but it is an integration like the other, so all of it is the owner's; changing it also needs a step-up
 	// (the handlers). Not open to tokens (policy_tokens.go).

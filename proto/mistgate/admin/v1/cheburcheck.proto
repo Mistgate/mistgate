@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Cheburcheck (cheburcheck.ru): volunteer probes test whether a SYN to a node's IPv4 address on port 443 passes the
+// TSPU box. It does not connect to the node's configured ports and an "ok" result only proves that a router behind the
+// box answered. The panel sends node IPv4 addresses to the site, which stores each query with the caller IP and User-Agent.
+// The User-Agent identifies Mistgate. TestCheburcheck only reads the site's public status and sends no address.
+//
+// OFF IS THE DEFAULT. Public probes are enabled by default after the owner turns the integration on. An optional own-probe
+// token is a write-only credential for one reporter; it is sealed in the panel vault and sent only as the probe query's
+// `token` parameter. It is never returned or included in audit records.
+service CheburcheckService {
+  // The settings and the last source status. No secrets.
+  rpc GetCheburcheck(GetCheburcheckRequest) returns (GetCheburcheckResponse);
+  // Changes the settings. Owner only; needs a step-up.
+  rpc UpdateCheburcheck(UpdateCheburcheckRequest) returns (UpdateCheburcheckResponse);
+  // One harmless GET /api/v1/status. It never sends a node address or the stored token.
+  rpc TestCheburcheck(TestCheburcheckRequest) returns (TestCheburcheckResponse);
+  // Switches the source off, forgets the own-probe token and deletes its stored rows. Owner only; needs a step-up.
+  rpc DisconnectCheburcheck(DisconnectCheburcheckRequest) returns (DisconnectCheburcheckResponse);
+}
+
+message CheburcheckSettings {
+  // Default false. When false, no site request is made.
+  bool enabled = 1;
+  // Public volunteer probes; default true. The source stays off unless enabled is true.
+  bool public_enabled = 2;
+  // An own-probe token is stored. The token itself is never returned.
+  bool has_token = 3;
+  // Public probe interval in minutes; default and minimum 180.
+  uint32 interval_min = 4;
+  // Own-probe interval in minutes; default 60, minimum 30.
+  uint32 own_interval_min = 5;
+  // Last source status, including ip_probes_off or token_unknown when applicable.
+  string status = 6;
+  // A retry hold, as a Unix timestamp; zero when no hold is active.
+  int64 hold_until_unix = 7;
+  // The time of the most recent stored row; zero when there has not been one.
+  int64 last_run_unix = 8;
+  // The newest stored source verdict, if any.
+  string last_verdict = 9;
+  // "country" when the shared country is not Russia; otherwise empty.
+  string unavailable = 10;
+  // True after the site rejects the stored own-probe token. Supplying a new token clears this flag.
+  bool token_unknown = 11;
+}
+
+message GetCheburcheckRequest {}
+message GetCheburcheckResponse { CheburcheckSettings settings = 1; }
+
+message UpdateCheburcheckRequest {
+  optional bool enabled = 1;
+  optional bool public_enabled = 2;
+  // A cheburprobe credential; at most 256 characters, no spaces; write-only. "" removes it.
+  optional string token = 3;
+  optional uint32 interval_min = 4;
+  optional uint32 own_interval_min = 5;
+}
+message UpdateCheburcheckResponse { CheburcheckSettings settings = 1; }
+
+message TestCheburcheckRequest {}
+message TestCheburcheckResponse {
+  bool reachable = 1;
+  string version = 2;
+  string last_update = 3;
+  uint64 domain_count = 4;
+  uint64 v4_count = 5;
+}
+
+message DisconnectCheburcheckRequest {}
+message DisconnectCheburcheckResponse { CheburcheckSettings settings = 1; }

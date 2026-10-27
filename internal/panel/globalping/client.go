@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/panel/httpheaders"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
@@ -22,7 +23,6 @@ import (
 const (
 	// DefaultBaseURL is Globalping's API.
 	DefaultBaseURL = "https://api.globalping.io"
-	userAgent      = "mistgate-panel (+https://github.com/mistgate/mistgate)"
 	maxBody        = 4 << 20 // a measurement of a few probes is a few KB; this is a ceiling
 	// maxProbesBody caps the response size of the full probe list.
 	maxProbesBody = 16 << 20
@@ -67,7 +67,7 @@ func (c *client) doLimit(ctx context.Context, method, path string, body, out any
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", httpheaders.MistgateUserAgent)
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")

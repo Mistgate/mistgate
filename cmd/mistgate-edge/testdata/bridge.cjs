@@ -1177,8 +1177,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      21,
-      "a normal cron tick costs 21 D1 calls: 6 for the sweeps and the country settings, one read of the active rollout for the updates job, one Telegram pending-code check and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
+      22,
+      "a normal cron tick costs 22 D1 calls: 6 for the sweeps and the country settings, one read of the active rollout for the updates job, one Telegram pending-code check, one cheburcheck settings read while off, and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
     );
 
     liveProjectionQueries = 0;

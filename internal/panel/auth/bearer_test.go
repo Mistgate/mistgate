@@ -1027,8 +1027,8 @@ func TestTokenAllowList(t *testing.T) {
 	}
 	// Step-up procedures include the protected handlers, credential reveal/rotation, password changes,
 	// authenticator enrollment, login captcha, and sensitive infrastructure operations.
-	if len(stepUpProcedures) != 42 {
-		t.Errorf("%d step-up procedures, want 42", len(stepUpProcedures))
+	if len(stepUpProcedures) != 44 {
+		t.Errorf("%d step-up procedures, want 44", len(stepUpProcedures))
 	}
 }
 

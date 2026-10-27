@@ -12,6 +12,12 @@ type ExtCheck struct {
 	At                                  time.Time
 }
 
+// ExtCheckTime is the newest result time for one node and source, without loading its detail JSON.
+type ExtCheckTime struct {
+	NodeID, Source string
+	At             time.Time
+}
+
 // InsertExtChecks stores one set of rows in one statement. A row for the same node, source and second is replaced.
 func (s *Store) InsertExtChecks(ctx context.Context, rows []ExtCheck) error {
 	if len(rows) == 0 {
@@ -59,6 +65,36 @@ func (s *Store) RecentExtChecks(ctx context.Context, perNodeSource int, sources 
 		}
 		c.At = fromUnix(at)
 		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// RecentExtCheckTimes reads only the newest result time for every node and source, optionally limited to sources.
+func (s *Store) RecentExtCheckTimes(ctx context.Context, sources ...string) ([]ExtCheckTime, error) {
+	q := `SELECT node_id, source, at FROM (
+			SELECT node_id, source, at,
+				ROW_NUMBER() OVER (PARTITION BY node_id, source ORDER BY at DESC) AS rank
+			FROM country_ext_check`
+	var args []any
+	if len(sources) > 0 {
+		q += ` WHERE source IN (SELECT value FROM json_each(?))`
+		args = append(args, jsonStrings(sources))
+	}
+	q += `) WHERE rank = 1 ORDER BY node_id, source`
+	rows, err := s.R.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ExtCheckTime
+	for rows.Next() {
+		var check ExtCheckTime
+		var at int64
+		if err := rows.Scan(&check.NodeID, &check.Source, &at); err != nil {
+			return nil, err
+		}
+		check.At = fromUnix(at)
+		out = append(out, check)
 	}
 	return out, rows.Err()
 }

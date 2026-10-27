@@ -16,6 +16,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/backup"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
+	"github.com/mistgate/mistgate/internal/panel/cheburcheck"
 	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
 	"github.com/mistgate/mistgate/internal/panel/health"
@@ -149,6 +150,7 @@ type Panel struct {
 	Health         *health.Service
 	Blocklist      *blocklist.Service
 	CountryProbe   *countryprobe.Service
+	Cheburcheck    *cheburcheck.Service
 	Update         *update.Service
 	Warp           *warp.Service
 	Provision      *nodeprovision.Service
@@ -165,17 +167,18 @@ type Panel struct {
 
 // jobServices are the services the background jobs of the VPS edition run (see backgroundJobs).
 type jobServices struct {
-	fleet     *fleet.Fleet
-	access    *access.Service
-	health    *health.Service
-	blocklist *blocklist.Service
-	probe     *countryprobe.Service
-	update    *update.Service
-	backup    *backup.Service
-	telegram  *telegram.Service
-	provision *nodeprovision.Service
-	store     *store.Store
-	log       *slog.Logger
+	fleet       *fleet.Fleet
+	access      *access.Service
+	health      *health.Service
+	blocklist   *blocklist.Service
+	probe       *countryprobe.Service
+	cheburcheck *cheburcheck.Service
+	update      *update.Service
+	backup      *backup.Service
+	telegram    *telegram.Service
+	provision   *nodeprovision.Service
+	store       *store.Store
+	log         *slog.Logger
 }
 
 // backupResult is backup.Config.OnResult: a failed backup is announced once, the next one that works resolves it.

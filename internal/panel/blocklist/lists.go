@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/panel/httpheaders"
 )
 
 // The public lists (plan 2.1). All of them are fetched from the panel with a conditional request and parsed here; a node's
@@ -26,8 +28,6 @@ const (
 	CommunityURL = "https://community.antifilter.download/list/community.lst"
 	// CDNURL is the ranges of CDN and hosting providers, "provider,cidr,region" with a header line. Context only.
 	CDNURL = "https://raw.githubusercontent.com/123jjck/cdn-ip-ranges/refs/heads/main/all/all.csv"
-
-	userAgent = "mistgate-panel (+https://github.com/mistgate/mistgate)"
 
 	// Size caps: about three times what the lists weigh today (ipsum 314 KiB, community 14 KiB, CDN 670 KiB). A larger answer is
 	// refused and the copy in memory is kept.
@@ -281,7 +281,7 @@ func (l *list) refresh(ctx context.Context, hc *http.Client, now time.Time) (use
 			errs = append(errs, rerr)
 			continue
 		}
-		req.Header.Set("User-Agent", userAgent)
+		req.Header.Set("User-Agent", httpheaders.MistgateUserAgent)
 		if l.loaded && l.url == u {
 			if l.etag != "" {
 				req.Header.Set("If-None-Match", l.etag)

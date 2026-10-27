@@ -17,6 +17,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
+	"github.com/mistgate/mistgate/internal/panel/cheburcheck"
 	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/dns"
@@ -178,6 +179,7 @@ type core struct {
 	acc     *access.Service
 	cr      *countryreach.Service
 	gp      *globalping.Service
+	cc      *cheburcheck.Service
 	bl      *blocklist.Service
 	cp      *countryprobe.Service
 	hl      *health.Service
@@ -251,6 +253,17 @@ func wireCore(c Config) (*core, error) {
 		return hl.CountryHistory(ctx, since)
 	})
 	k.gp, err = globalping.New(globalping.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: k.cr.Country,
+		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }})
+	if err != nil {
+		return nil, err
+	}
+	var callLease func(context.Context, string, time.Duration) bool
+	if edge {
+		callLease = EdgeRoundLease(st, log)
+	}
+	k.cc, err = cheburcheck.New(cheburcheck.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Edge: edge,
+		Log: log, Now: c.Clock, RoundLease: callLease,
+		Address:  func(ctx context.Context, n store.NodeRow) (netip.Addr, bool) { return hl.NodeIPv4(ctx, n) },
 		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }})
 	if err != nil {
 		return nil, err
@@ -358,7 +371,7 @@ func wireCore(c Config) (*core, error) {
 // panel is the Panel of the services the core holds; a role adds what it serves.
 func (k *core) panel() *Panel {
 	return &Panel{
-		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
+		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Cheburcheck: k.cc, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
 	}
 }

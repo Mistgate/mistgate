@@ -21,13 +21,14 @@ const (
 )
 
 var edgeTickJobs = map[string]string{
-	"access":    "user status sweep every tick",
-	"fleet":     "node-down sweep every tick and desired-state safety net every 10 minutes",
-	"health":    "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
-	"blocklist": "the block-list check of the country check, when one is due (one setting read while it is off)",
-	"provision": "wakes the Provisioner every tick while an install is queued, running or being cancelled",
-	"telegram":  "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
-	"updates":   "advances the edge node rollout and scheduled update state machines",
+	"access":      "user status sweep every tick",
+	"fleet":       "node-down sweep every tick and desired-state safety net every 10 minutes",
+	"health":      "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
+	"blocklist":   "the block-list check of the country check, when one is due (one setting read while it is off)",
+	"cheburcheck": "one due cheburcheck source and node per tick; off means no site request",
+	"provision":   "wakes the Provisioner every tick while an install is queued, running or being cancelled",
+	"telegram":    "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
+	"updates":     "advances the edge node rollout and scheduled update state machines",
 }
 
 // edgeDeferred describes background-job functions that stay VPS-only; a job can also have an edge phase above.
@@ -121,7 +122,6 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 		p.Fleet.StateChanged()
 	}
 	if p.Telegram != nil {
-		// The poll is last: it may long-poll for up to 25 s, and it must not delay what is already queued.
 		run("telegram watcher", func(ctx context.Context) error {
 			p.Telegram.WatchTick(ctx, now)
 			return nil
@@ -130,6 +130,14 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 			p.Telegram.FlushNow(ctx)
 			return nil
 		})
+	}
+	if p.Cheburcheck != nil {
+		runFor("cheburcheck", 40*time.Second, func(ctx context.Context) error {
+			return p.Cheburcheck.Tick(ctx)
+		})
+	}
+	if p.Telegram != nil {
+		// The link poll is last: it may long-poll for up to 25 s, and it must not delay what is already queued.
 		runFor("telegram link poll", 40*time.Second, func(ctx context.Context) error {
 			return p.Telegram.PollPendingLinkCode(ctx)
 		})

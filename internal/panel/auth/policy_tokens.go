@@ -132,6 +132,8 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.TelegramServiceBeginTelegramLinkProcedure:            true,
 	adminv1connect.GlobalpingServiceUpdateGlobalpingProcedure:           true,
 	adminv1connect.GlobalpingServiceDisconnectGlobalpingProcedure:       true,
+	adminv1connect.CheburcheckServiceUpdateCheburcheckProcedure:         true,
+	adminv1connect.CheburcheckServiceDisconnectCheburcheckProcedure:     true,
 	adminv1connect.BlocklistServiceUpdateBlocklistProcedure:             true,
 	adminv1connect.BlocklistServiceDisconnectBlocklistProcedure:         true,
 	adminv1connect.TspuProbeServiceUpdateTspuProbeProcedure:             true,
