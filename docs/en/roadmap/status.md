@@ -3,21 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.62`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.63`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.62
+  meta: v0.1.0 – v0.1.63
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.62
+      release: v0.1.63
       current: true
       points:
-        - "**Blocked on some networks.** The country check asks the big Russian operators by name, in turns, and a node that some home networks cannot reach while others can is now \"some networks\" instead of ok, with its own alert and Telegram message. The panel names the networks that see the node and those that do not. See [Reachability](../operations/reachability.md)."
-        - "**Profiles through MCP.** An agent can create a profile with its nodes and groups, change it, and move it between nodes and groups; every such change waits for the owner's approval in the panel. See [MCP](../reference/mcp.md)."
+        - "**Two more country-check sources.** cheburcheck (free volunteer probes inside Russia, your own probe too) and bsbord (paid mobile SIM probes, Crimea included, with a monthly cap) join Globalping, the TSPU probe and the lists in one verdict, one breakdown and one set of alerts. Off by default. See [Reachability](../operations/reachability.md#cheburcheck)."
     - title: Profiles
       section: profiles
       points:
@@ -79,7 +78,7 @@ Mistgate is in **beta**; the current release is `v0.1.62`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.62
+  meta: v0.1.34 – v0.1.63
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
