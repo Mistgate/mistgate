@@ -42,6 +42,7 @@ API описан в `proto/mistgate/admin/v1/`. Сгенерированный �
 | `BackupService` | `backup.proto` | Зашифрованные бэкапы панели |
 | `TelegramService` | `telegram.proto` | Telegram-бот и чат каждого админа (только владелец и вошедшие админы; закрыт для токенов API и MCP) |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API-токены и одобрения владельца |
+| `CheburcheckService`, `BsbordService` | `cheburcheck.proto`, `bsbord.proto` | Источники cheburcheck и bsbord [проверки из страны](../operations/reachability.md): настройки, статус и проверка, а у bsbord ещё список единиц и запрос цены (только владелец; изменение и отключение источника и запрос цены требуют повторного подтверждения; закрыт для токенов API и MCP) |
 
 Справочник по каждому полю — комментарии в proto-файлах. Соглашения (`common.proto`):
 

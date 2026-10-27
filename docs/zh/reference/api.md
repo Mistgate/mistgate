@@ -42,6 +42,7 @@ API 定义位于 `proto/mistgate/admin/v1/`。生成的代码也在仓库中：G
 | `BackupService` | `backup.proto` | 面板加密备份 |
 | `TelegramService` | `telegram.proto` | Telegram 机器人和各管理员的聊天（仅所有者和已登录的管理员可用；API 令牌和 MCP 无法访问） |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API 令牌和所有者审批 |
+| `CheburcheckService`, `BsbordService` | `cheburcheck.proto`, `bsbord.proto` | [国家视角检测](../operations/reachability.md)的 cheburcheck 和 bsbord 来源：设置、状态和测试，bsbord 另有单元列表和价格查询（仅所有者；更改或断开来源以及价格查询需要再次验证；API 令牌和 MCP 无法访问） |
 
 proto 文件中的注释是各字段的参考说明。约定（`common.proto`）：
 

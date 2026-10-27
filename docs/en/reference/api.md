@@ -42,6 +42,7 @@ The API is defined in `proto/mistgate/admin/v1/`. Generated code is in the repos
 | `BackupService` | `backup.proto` | Encrypted panel backups |
 | `TelegramService` | `telegram.proto` | The Telegram bot and each admin's chat (owner and signed-in admins only; closed to API tokens and MCP) |
 | `ApiTokenService`, `ApprovalService` | `integrations.proto` | API tokens and the owner's approvals |
+| `CheburcheckService`, `BsbordService` | `cheburcheck.proto`, `bsbord.proto` | The cheburcheck and bsbord sources of the [country check](../operations/reachability.md): settings, status and test, and for bsbord the unit list and the price check (owner only; changing or disconnecting a source, and the price check, need a step-up; closed to API tokens and MCP) |
 
 The comments in the proto files are the reference for every field. Conventions (`common.proto`):
 
