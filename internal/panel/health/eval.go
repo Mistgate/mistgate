@@ -489,11 +489,14 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 	}
 	addPortLossyConds(sn, portChecks, add)
 	activeKeys := make(map[key]bool, len(active))
+	activeAlerts := make(map[key]store.HealthAlert, len(active))
 	for _, alert := range active {
-		activeKeys[key{alert.Kind, alert.NodeID, alert.Subject}] = true
+		k := key{alert.Kind, alert.NodeID, alert.Subject}
+		activeKeys[k] = true
+		activeAlerts[k] = alert
 	}
 	userConds(now, sn, signals, activeKeys, d, add)
-	s.addCountryConds(ctx, sn, live, activeKeys, d, add)
+	s.addCountryConds(ctx, sn, live, activeAlerts, d, add)
 	return d
 }
 

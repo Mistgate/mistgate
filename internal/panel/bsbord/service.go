@@ -324,11 +324,19 @@ func (s *Service) stop() {
 // State is the settings-only view of this source for health.Config.External: one batched settings read, no network. It is read on
 // every checks, history and evaluator pass.
 func (s *Service) State(ctx context.Context) health.ExternalState {
-	kv, err := s.cfg.Store.SettingValues(ctx, []string{settingEnabled, settingInterval, settingCountry})
+	kv, err := s.cfg.Store.SettingValues(ctx, StateKeys())
 	if err != nil {
 		s.log.Warn("bsbord: read source state")
 		return health.ExternalState{Source: Source}
 	}
+	return StateFrom(kv)
+}
+
+// StateKeys are the settings State reads; StateFrom builds it from their values.
+func StateKeys() []string { return []string{settingEnabled, settingInterval, settingCountry} }
+
+// StateFrom is State from the values of StateKeys.
+func StateFrom(kv map[string]string) health.ExternalState {
 	country := strings.ToUpper(strings.TrimSpace(kv[settingCountry]))
 	if country == "" {
 		country = countryreach.DefaultCountry

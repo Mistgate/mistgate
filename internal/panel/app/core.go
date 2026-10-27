@@ -307,12 +307,18 @@ func wireCore(c Config) (*core, error) {
 	hcfg := health.Config{Edge: edge, Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
 		Country: k.gp.Country,
 		Lists:   k.bl.Active,
+		// One read for both external sources: the evaluator asks on every pass, also while both are off.
 		External: func(ctx context.Context) []health.ExternalState {
+			kv, err := st.SettingValues(ctx, append(cheburcheck.StateKeys(), bsbord.StateKeys()...))
+			if err != nil {
+				log.Warn("health: read the external sources", "err", err)
+				return nil
+			}
 			var out []health.ExternalState
-			for _, s := range k.cc.State(ctx).Sources() {
+			for _, s := range cheburcheck.StateFrom(kv).Sources() {
 				out = append(out, health.ExternalState(s))
 			}
-			return append(out, k.bs.State(ctx))
+			return append(out, bsbord.StateFrom(kv))
 		},
 		TSPU: func(ctx context.Context) health.TSPUState {
 			st := k.cp.State(ctx)

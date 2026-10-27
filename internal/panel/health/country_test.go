@@ -621,7 +621,8 @@ func countryAlertHistory(t *testing.T, c *countryEnv) []store.HealthAlert {
 	return rows
 }
 
-func TestCountryASNObservationsSkipUnknownAndUseTheVerdictCarrier(t *testing.T) {
+func TestCountryObservationsSkipUnknownAndUseTheVerdictCarrier(t *testing.T) {
+	t0 := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 	detail := func(ports []uint16, probes ...countryProbeDetail) string {
 		t.Helper()
 		b, err := json.Marshal(countryDetail{Ports: ports, Probes: probes})
@@ -633,27 +634,34 @@ func TestCountryASNObservationsSkipUnknownAndUseTheVerdictCarrier(t *testing.T) 
 	darkMTS := countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, Dark: true,
 		TCP: []countryPortDetail{{Port: 443}}}
 	rows := []store.CountryCheck{
-		{Country: "RU", Verdict: verdictPartial, Detail: detail([]uint16{443},
+		{NodeID: "de1", At: t0, Country: "RU", Verdict: verdictPartial, Detail: detail([]uint16{443},
 			countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, Dark: true, TCP: []countryPortDetail{{Port: 443}}},
 			countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true, TCP: []countryPortDetail{{Port: 443, OK: true}}},
 			countryProbeDetail{Network: "Beeline", ASN: 3216, City: "Moscow", Dark: true, TCP: []countryPortDetail{{Port: 443, OK: true}}})},
-		{Country: "RU", Verdict: verdictUnknown, Detail: detail([]uint16{443},
+		{NodeID: "de1", At: t0.Add(-time.Minute), Country: "RU", Verdict: verdictUnknown, Detail: detail([]uint16{443},
 			countryProbeDetail{Network: "MTS", ASN: 8359, City: "Novosibirsk", Eyeball: true, Valid: true,
 				TCP: []countryPortDetail{{Port: 443, OK: true}}})},
-		{Country: "RU", Verdict: verdictPartial, Detail: detail([]uint16{443}, darkMTS)},
-		{Country: "BY", Verdict: verdictPartial, Detail: detail([]uint16{443}, darkMTS)},
+		{NodeID: "de1", At: t0.Add(-2 * time.Minute), Country: "RU", Verdict: verdictPartial, Detail: detail([]uint16{443}, darkMTS)},
+		{NodeID: "de1", At: t0.Add(-3 * time.Minute), Country: "BY", Verdict: verdictPartial, Detail: detail([]uint16{443}, darkMTS)},
 	}
-	observations := countryASNObservations(rows)
-	got := observations[8359]
-	if len(got) != 2 || got[0].kind != countryASNReach || got[1].kind != countryASNDark {
+	var signals []countryAlertSignal
+	for _, row := range rows {
+		signals = append(signals, countryGlobalpingSignal(row, time.Hour))
+	}
+	events := countryEvents(signals, "de1")
+	observations := countryObservations(events, signals)
+	got := observations["globalping|AS8359"]
+	if len(got) != 2 || got[0].kind != countryObservationReach || got[1].kind != countryObservationDark {
 		t.Fatalf("MTS observations = %+v, want newest R then D (ignoring unknown and the older country)", got)
 	}
-	if _, ok := observations[3216]; ok {
+	if _, ok := observations["globalping|AS3216"]; ok {
 		t.Fatal("an invalid TCP result produced an ASN observation")
 	}
-	icmpOnly := countryASNObservations([]store.CountryCheck{{Country: "RU", Verdict: verdictPartial,
-		Detail: detail(nil, countryProbeDetail{Network: "MTS", ASN: 8359, Eyeball: true, Valid: true, ICMPOK: true})}})
-	if got := icmpOnly[8359]; len(got) != 1 || got[0].kind != countryASNReach {
+	icmpOnlySignal := countryGlobalpingSignal(store.CountryCheck{NodeID: "de1", At: t0, Country: "RU", Verdict: verdictPartial,
+		Detail: detail(nil, countryProbeDetail{Network: "MTS", ASN: 8359, Eyeball: true, Valid: true, ICMPOK: true})}, time.Hour)
+	icmpOnlySignals := []countryAlertSignal{icmpOnlySignal}
+	icmpOnly := countryObservations(countryEvents(icmpOnlySignals, "de1"), icmpOnlySignals)
+	if got := icmpOnly["globalping|AS8359"]; len(got) != 1 || got[0].kind != countryObservationReach {
 		t.Fatalf("ICMP-only observation = %+v, want R", got)
 	}
 }

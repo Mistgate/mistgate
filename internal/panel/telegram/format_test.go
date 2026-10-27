@@ -472,13 +472,13 @@ func TestPartialCountryBlockedAlertTextsAreLocalized(t *testing.T) {
 		seen   string
 	}{
 		{"en", "Node is unreachable from some networks in Russia",
-			"Probes on MTS (AS8359, Novosibirsk) get nothing from it while they reach your other nodes; other networks reach it.",
+			"Probes on MTS (AS8359, Novosibirsk) get nothing from it while they reach your other nodes.",
 			"Seen by: Globalping."},
 		{"ru", "Нода недоступна из части сетей России",
-			"Зонды в сетях MTS (AS8359, Novosibirsk) не получают от неё ответа, хотя до других ваших нод доходят; из других сетей она видна.",
+			"Зонды в сетях MTS (AS8359, Novosibirsk) не получают от неё ответов, хотя доходят до других ваших нод.",
 			"Видели: Globalping."},
 		{"zh", "节点在俄罗斯的部分网络中无法连接",
-			"位于MTS (AS8359, Novosibirsk)的探测点收不到它的任何响应，但能到达您的其他节点；其他网络可以连接它。",
+			"位于MTS (AS8359, Novosibirsk)的探测点收不到它的响应，但能到达您的其他节点。",
 			"发现方：Globalping。"},
 	} {
 		if got := alertTitle(tc.lang, a); got != tc.title {
@@ -492,6 +492,23 @@ func TestPartialCountryBlockedAlertTextsAreLocalized(t *testing.T) {
 	a.Params["country"] = "DE"
 	if got, want := alertTitle("ru", a), "Нода недоступна из части сетей страны: Германия"; got != want {
 		t.Errorf("Russian fallback title = %q, want %q", got, want)
+	}
+}
+
+func TestPartialCountryBlockedAlertIncludesMixedSourceNetworks(t *testing.T) {
+	a := store.HealthAlert{Kind: "country_blocked", Severity: 2, NodeID: "de1", Subject: "partial",
+		TitleKey: "health.alert.country_blocked.title", WhyKey: "health.alert.country_blocked.why.partial",
+		Params: map[string]string{"node": "de1", "country": "RU", "verdict": "partial", "confidence": "eyeball",
+			"sources": "globalping,bsbord", "networks": "Rostelecom (AS12389, Moscow), MTS <x> (Crimea, bsbord)"}}
+	for _, lang := range []L{"en", "ru", "zh"} {
+		got := alertReason(lang, a)
+		if !strings.Contains(got, "Rostelecom (AS12389, Moscow)") || !strings.Contains(got, "MTS &lt;x&gt; (Crimea, bsbord)") ||
+			strings.Contains(got, "MTS <x>") || !strings.Contains(got, "bsbord") {
+			t.Errorf("%s mixed-source partial reason = %q", lang, got)
+		}
+	}
+	if got := alertReason("en", a); !strings.Contains(got, "Seen by: Globalping, bsbord.") {
+		t.Errorf("English mixed-source labels = %q", got)
 	}
 }
 
@@ -530,6 +547,34 @@ func TestCountryBlockedAlertNamesTheSources(t *testing.T) {
 	}
 	if got := alertOpened("en", tspuOnly, "nl1", ""); strings.Contains(got, "ICMP") {
 		t.Errorf("the probe node tests TCP only, but the text mentions ICMP: %q", got)
+	}
+}
+
+// Only Globalping tells ICMP from TCP, and only a probe node alone is a data-centre view: sources that cannot say either keep
+// the text to what they saw.
+func TestCountryBlockedTCPTextClaimsOnlyWhatTheSourcesSaw(t *testing.T) {
+	for _, tc := range []struct {
+		sources, networks string
+		icmp, dc          bool
+	}{
+		{"cheburcheck", "Rostelecom (AS12389, Moscow, cheburcheck)", false, false},
+		{"tspu,cheburcheck", "probe1 (tspu), Rostelecom (AS12389, Moscow, cheburcheck)", false, false},
+		{"bsbord", "MTS (Crimea, bsbord)", false, false},
+		{"globalping,cheburcheck", "Rostelecom", true, false},
+		{"", "Rostelecom", true, false}, // an alert from before the source list is a Globalping one
+	} {
+		a := store.HealthAlert{Kind: "country_blocked", Severity: 2, NodeID: "de1", TitleKey: "health.alert.country_blocked.title",
+			WhyKey: "health.alert.country_blocked.why.tcp_blocked", Params: map[string]string{"node": "de1", "country": "RU",
+				"verdict": "tcp_blocked", "confidence": "eyeball", "sources": tc.sources, "networks": tc.networks, "ports": "443"}}
+		for _, lang := range []L{"en", "ru", "zh"} {
+			got := alertReason(lang, a)
+			if icmp := strings.Contains(got, "ICMP"); icmp != tc.icmp {
+				t.Errorf("sources %q (%s): ICMP mentioned = %v, want %v: %q", tc.sources, lang, icmp, tc.icmp, got)
+			}
+			if dc := strings.Contains(got, "data-centre") || strings.Contains(got, "дата-центр") || strings.Contains(got, "机房"); dc != tc.dc {
+				t.Errorf("sources %q (%s): data-centre wording = %v, want %v: %q", tc.sources, lang, dc, tc.dc, got)
+			}
+		}
 	}
 }
 

@@ -368,18 +368,17 @@ func alertReason(l L, a store.HealthAlert) string {
 var ruFromCountry = map[string]string{"RU": "России", "BY": "Беларуси", "KZ": "Казахстана", "CN": "Китая", "IR": "Ирана", "TR": "Турции"}
 
 // countryBlockedReason is the sentence of a COUNTRY_BLOCKED alert: what fails and from where, then which sources saw it. The
-// sources ("globalping", "tspu", comma separated) and the confidence ("conflict" when two live sources disagree) come from the
-// alert; an older alert has none and gets the Globalping wording.
+// source names and confidence come from the alert; an older alert has none and gets the Globalping wording.
 func countryBlockedReason(l L, p map[string]string) string {
 	sources := strings.Split(p["sources"], ",")
 	has := func(name string) bool { return slices.Contains(sources, name) }
 	where := ""
-	if nets := data(p["networks"], 160); nets != "" && (has("globalping") || p["sources"] == "") {
+	if nets := data(p["networks"], 160); nets != "" {
 		where = l.pick(" ("+nets+")", " ("+nets+")", "（"+nets+"）")
 	}
 	var line string
 	switch {
-	case has("tspu") && !has("globalping"):
+	case p["sources"] == "tspu":
 		// the probe node alone: it sees only TCP, and only from a data centre
 		ports := ""
 		if v := data(p["ports"], 60); v != "" {
@@ -388,8 +387,10 @@ func countryBlockedReason(l L, p map[string]string) string {
 		line = l.pick("TCP"+ports+" is being cut, seen from your probe node in the country (a data-centre view).",
 			"TCP"+ports+" режут, это видно с вашей ноды-зонда в стране (взгляд из дата-центра).",
 			"TCP"+ports+" 被阻断，由您在该国的探测节点发现（机房视角）。")
-	case p["verdict"] == "tcp_blocked":
+	case p["verdict"] == "tcp_blocked" && (has("globalping") || p["sources"] == ""): // only Globalping tells ICMP from TCP
 		line = l.pick("TCP is being cut"+where+". ICMP passes.", "TCP режут"+where+". ICMP проходит.", "TCP 被阻断"+where+"，ICMP 仍可通过。")
+	case p["verdict"] == "tcp_blocked":
+		line = l.pick("TCP is being cut"+where+".", "TCP режут"+where+".", "TCP 被阻断"+where+"。")
 	default:
 		line = l.pick("Neither ICMP nor TCP gets through"+where+".", "Не проходят ни ICMP, ни TCP"+where+".", "ICMP 和 TCP 都无法通过"+where+"。")
 	}
@@ -398,9 +399,9 @@ func countryBlockedReason(l L, p map[string]string) string {
 
 func countryPartialReason(l L, p map[string]string) string {
 	nets := data(p["networks"], 160)
-	line := l.pick("Probes on "+nets+" get nothing from it while they reach your other nodes; other networks reach it.",
-		"Зонды в сетях "+nets+" не получают от неё ответа, хотя до других ваших нод доходят; из других сетей она видна.",
-		"位于"+nets+"的探测点收不到它的任何响应，但能到达您的其他节点；其他网络可以连接它。")
+	line := l.pick("Probes on "+nets+" get nothing from it while they reach your other nodes.",
+		"Зонды в сетях "+nets+" не получают от неё ответов, хотя доходят до других ваших нод.",
+		"位于"+nets+"的探测点收不到它的响应，但能到达您的其他节点。")
 	return countrySeenBy(l, p, line)
 }
 
@@ -413,6 +414,23 @@ func countrySeenBy(l L, p map[string]string, line string) string {
 	}
 	if has("tspu") {
 		seen = append(seen, l.pick("the TSPU probe on your node", "зонд ТСПУ на вашей ноде", "您节点上的 TSPU 探测"))
+	}
+	for _, source := range []string{"cheburcheck", "cheburcheck_own", "bsbord", "bsbord_tunnel", "bsbord_geo"} {
+		if !has(source) {
+			continue
+		}
+		switch source {
+		case "cheburcheck":
+			seen = append(seen, l.pick("cheburcheck", "cheburcheck", "cheburcheck"))
+		case "cheburcheck_own":
+			seen = append(seen, l.pick("your cheburcheck probe", "ваш зонд cheburcheck", "您的 cheburcheck 探测点"))
+		case "bsbord":
+			seen = append(seen, l.pick("bsbord", "bsbord", "bsbord"))
+		case "bsbord_tunnel":
+			seen = append(seen, l.pick("bsbord tunnel checks", "проверки туннелей bsbord", "bsbord 隧道检查"))
+		case "bsbord_geo":
+			seen = append(seen, l.pick("bsbord GEO", "bsbord GEO", "bsbord GEO"))
+		}
 	}
 	if len(seen) == 0 {
 		return line

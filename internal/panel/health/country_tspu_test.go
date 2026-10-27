@@ -270,9 +270,9 @@ func TestCountryAlertIgnoresATSPURunThatIsTooOld(t *testing.T) {
 	}
 }
 
-// Globalping says ok, the probe node says blocked: the worse verdict is shown as a conflict, and a conflict that two rounds in a
-// row show opens the alert (better a false alarm than a miss); it closes after two rounds in which they agree on ok.
-func TestCountryAlertOnAConflict(t *testing.T) {
+// Globalping reach plus the path-only TSPU block combines to partial. The TSPU event cannot turn Globalping's own reach into a
+// full-block event, so repeated Globalping ok rounds do not open the full alert.
+func TestCountryAlertDoesNotCountTSPUBlockAgainstGlobalpingReach(t *testing.T) {
 	c := newCountryEnv(t)
 	c.onlineNode("de1", "203.0.113.10")
 	c.tspuOn()
@@ -282,23 +282,14 @@ func TestCountryAlertOnAConflict(t *testing.T) {
 	mustHave(t, c, k, false)
 	c.putTSPU("de1", "blocked", tport{Port: 443, Verdict: "blocked"})
 	c.evaluate()
-	mustHave(t, c, k, false) // one round in conflict, after an ok one
-	c.tick()                 // a Globalping round in the same second as the run is the same round
 	mustHave(t, c, k, false)
-	c.tick() // the next Globalping round: ok against the run's blocked
-	mustHave(t, c, k, true)
-	a := c.active()[k]
-	for key, val := range map[string]string{"verdict": "tcp_blocked", "confidence": "conflict", "sources": "globalping,tspu", "networks": "Beeline, ER-Telecom, Rostelecom", "ports": "443"} {
-		if a.Params[key] != val {
-			t.Errorf("param %s = %q, want %q", key, a.Params[key], val)
-		}
+	c.tick()
+	mustHave(t, c, k, false)
+	c.tick()
+	mustHave(t, c, k, false)
+	if view := c.view("de1"); view.Verdict != cvPartial || view.Confidence != "dc_only" || !slices.Equal(view.Sources, []string{"globalping", "tspu"}) {
+		t.Fatalf("reach plus a path-only block = %+v, want partial/dc_only", view)
 	}
-	// the probe node's next run is ok as well: two rounds in which both agree close it
-	c.putTSPU("de1", "open", tport{Port: 443, Verdict: "open"})
-	c.tick()
-	mustHave(t, c, k, true) // one ok round after the conflicts: held
-	c.tick()
-	mustHave(t, c, k, false)
 }
 
 // One measurement of the probe node is one round, however many Globalping rounds without a verdict follow it.
@@ -354,46 +345,72 @@ func TestCountryAlertHeldWhileTheNodeIsOffline(t *testing.T) {
 	mustHave(t, c, "country_blocked/de1/", true)
 }
 
-// The pure part: the rounds of a node, newest first, each combined with what the other source said at that moment.
+// Every source row is a separate event, combined with the newest fresh row from every other source at that time.
 func TestCountryEvents(t *testing.T) {
 	t0 := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	round := func(ago time.Duration, verdict string) store.CountryCheck {
 		return store.CountryCheck{NodeID: "de1", At: t0.Add(-ago), Country: "RU", Verdict: verdict, Detail: mustJSON(countryDetail{Eyeball: true})}
 	}
 	run := func(ago time.Duration, stored string, port tport) tspuRound {
-		return tspuRounds([]store.TSPUCheck{{NodeID: "de1", At: t0.Add(-ago), Verdict: stored, DetailJSON: mustJSON([]tport{port})}})[0]
+		return tspuRounds([]store.TSPUCheck{{NodeID: "de1", Vantage: "probe1", At: t0.Add(-ago), Verdict: stored, DetailJSON: mustJSON([]tport{port})}})[0]
 	}
 	rounds := []store.CountryCheck{round(10*time.Minute, "ok"), round(25*time.Minute, "unknown"), round(40*time.Minute, "tcp_blocked")}
 	tspu := []tspuRound{run(30*time.Minute, "blocked", tport{Port: 443, Verdict: "blocked"}), run(5*time.Hour, "open", tport{Port: 443, Verdict: "open"})}
+	var signals []countryAlertSignal
+	for _, r := range rounds {
+		signals = append(signals, countryGlobalpingSignal(r, 4*time.Hour))
+	}
+	for _, r := range tspu {
+		signals = append(signals, countryTSPUSignal(r, 4*time.Hour, r.row.Vantage))
+	}
 	type ev struct {
 		ago                 time.Duration
+		source, own         string
 		verdict, confidence string
-		round, tspu         bool
+		bad, clear          bool
 	}
 	var have []ev
-	for _, e := range countryEvents(rounds, tspu, 4*time.Hour) {
-		have = append(have, ev{t0.Sub(e.at), e.combined.Verdict, e.combined.Confidence, e.round != nil, e.tspu != nil})
+	for _, e := range countryEvents(signals, "de1") {
+		have = append(have, ev{t0.Sub(e.at), e.signal.source, e.signal.verdict, e.combined.Verdict, e.combined.Confidence, e.bad(), e.clear()})
 	}
-	// The unknown Globalping round is not a round. Each other measurement is, combined with the newest of the other source at
-	// that moment, the probe node's run only while it is no older than maxAge (4 h).
+	// GP ok plus the path-only TSPU block is partial. The old unknown GP row shadows older GP state at later event times.
 	want := []ev{
-		{10 * time.Minute, "tcp_blocked", "conflict", true, true}, // Globalping ok against the probe node's blocked run of 30 minutes ago
-		{30 * time.Minute, "tcp_blocked", "eyeball", true, true},  // the run, with the Globalping round then in force (40 minutes ago): they agree
-		{40 * time.Minute, "tcp_blocked", "eyeball", true, false}, // the round alone: the only run before it is 4 h 20 min old
-		{5 * time.Hour, "ok", "dc_only", false, true},             // the oldest run alone
+		{10 * time.Minute, "globalping", "ok", "partial", "dc_only", false, true},
+		{30 * time.Minute, "tspu", "tcp_blocked", "tcp_blocked", "eyeball", true, false},
+		{40 * time.Minute, "globalping", "tcp_blocked", "tcp_blocked", "eyeball", true, false},
+		{5 * time.Hour, "tspu", "ok", "ok", "dc_only", false, true},
 	}
 	if !slices.Equal(have, want) {
 		t.Fatalf("events: got %+v, want %+v", have, want)
 	}
-	// a change of country starts the Globalping history over
+	// A change of country starts the Globalping history over.
 	other := round(50*time.Minute, "blocked")
 	other.Country = "BY"
-	if got := countryEvents(append(slices.Clone(rounds), other), nil, time.Hour); len(got) != 2 {
+	withOtherCountry := append(slices.Clone(signals[:3]), countryGlobalpingSignal(other, time.Hour))
+	if got := countryEvents(withOtherCountry, "de1"); len(got) != 2 {
 		t.Errorf("rounds of another country counted: %d events, want 2", len(got))
 	}
-	if got := countryEvents(nil, nil, time.Hour); len(got) != 0 {
+	if got := countryEvents(nil, "de1"); len(got) != 0 {
 		t.Errorf("events from nothing: %v", got)
 	}
 }
 
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+// Globalping ok everywhere; the probe node cannot reach de1 but reaches nl1 in the same run, twice. The partial alert names
+// the probe node, not its id.
+func TestTSPUPartialAlertNamesTheProbeNode(t *testing.T) {
+	c := partialAlertEnv(t)
+	c.tspuOn()
+	c.exec(`UPDATE node SET name = 'fra-probe' WHERE id = 'probe1'`)
+	for range 2 {
+		c.tick()
+		c.putTSPU("de1", "blocked", tport{Port: 443, Verdict: "blocked"})
+		c.putTSPU("nl1", "open", tport{Port: 443, Verdict: "open"})
+		c.evaluate()
+	}
+	alert, ok := c.active()["country_blocked/de1/partial"]
+	if !ok || alert.Params["networks"] != "fra-probe (tspu)" || alert.Params["sources"] != countryreach.SourceTSPU {
+		t.Fatalf("partial alert = %v (open %v), want the probe node's name", alert.Params, ok)
+	}
+}

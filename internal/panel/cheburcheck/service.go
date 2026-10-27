@@ -161,12 +161,24 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 func (s *Service) client() *client { return &client{hc: s.cfg.HTTPClient, base: s.cfg.BaseURL} }
 
 func (s *Service) load(ctx context.Context) (settings, error) {
-	keys := []string{settingEnabled, settingPublic, settingToken, settingInterval, settingOwnInterval, settingHoldUntil,
-		settingBackoff, settingStatus, settingTokenUnknown, settingCountry}
-	kv, err := s.cfg.Store.SettingValues(ctx, keys)
+	kv, err := s.cfg.Store.SettingValues(ctx, StateKeys())
 	if err != nil {
 		return settings{}, err
 	}
+	return parseSettings(kv), nil
+}
+
+// StateKeys are the settings this source reads; StateFrom builds State from their values, so the panel can read them in
+// one call with another source's.
+func StateKeys() []string {
+	return []string{settingEnabled, settingPublic, settingToken, settingInterval, settingOwnInterval, settingHoldUntil,
+		settingBackoff, settingStatus, settingTokenUnknown, settingCountry}
+}
+
+// StateFrom is State from the values of StateKeys.
+func StateFrom(kv map[string]string) State { return (*Service)(nil).sourceState(parseSettings(kv)) }
+
+func parseSettings(kv map[string]string) settings {
 	st := settings{enabled: kv[settingEnabled] == "1", public: kv[settingPublic] != "0", intervalMin: defaultIntervalMin,
 		ownIntervalMin: defaultOwnIntervalMin, country: countryreach.DefaultCountry, backoffMin: defaultBackoffMin, status: kv[settingStatus],
 		tokenUnknown: kv[settingTokenUnknown] == "1"}
@@ -188,7 +200,7 @@ func (s *Service) load(ctx context.Context) (settings, error) {
 	if n, err := strconv.Atoi(kv[settingBackoff]); err == nil && n >= 2 && n <= 30 {
 		st.backoffMin = n
 	}
-	return st, nil
+	return st
 }
 
 func (s *Service) sourceState(st settings) State {
