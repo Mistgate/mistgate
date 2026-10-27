@@ -17,16 +17,18 @@ mkdir -p "$out"
 entries=(
   # The program with every role: no longer in the release bundle (the five entries below are), it is what the Node tests and the e2e
   # bridge run, and the size the roles split. 42 MiB: about 3 MB above its size after the October 2026 diet, so a regression like
-  # the 7.9 MB template one fails here.
-  "mistgate-edge:42"
+  # the 7.9 MB template one fails here. 45 MiB since the external reachability sources (cheburcheck, bsbord): every role's code.
+  "mistgate-edge:45"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.
   "mistgate-edge-link:30"
   # Scheduled work: wireCore, so Telegram, updates and WARP are in it for the work that will move here. Measured 25.1 MiB.
   "mistgate-edge-jobs:28"
-  # The admin API and the SPA: the largest role, every admin service. Measured 37.6 MiB.
-  "mistgate-edge-admin:40"
+  # The admin API and the SPA: the largest role, every admin service. Measured 37.6 MiB; 40.1 MiB with the external reachability
+  # sources (cheburcheck, bsbord), whose owner RPCs (settings, sealed keys, the paid-check preview) need the admin's step-up and
+  # cannot live in jobs, where their ticks run.
+  "mistgate-edge-admin:43"
   # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB.
   "mistgate-edge-provision:32"
 )
