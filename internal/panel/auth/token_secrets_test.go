@@ -25,6 +25,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.GetProfileResponse.settings_json":      "x-secret values are masked (protocols.MaskSecrets)",
 		"mistgate.admin.v1.PreviewProfileResponse.client_preview": "preview secrets are masked by the protocol renderer",
 		"mistgate.admin.v1.ListUsersResponse.next_page_token":     "a page cursor (a user name)",
+		"mistgate.admin.v1.CountryVantage.key":                    "a vantage's name: an AS number, a probe node id or an operator unit",
 		"mistgate.admin.v1.PanelBuild.has_release_key":            "a bool",
 		"mistgate.admin.v1.PanelBuild.release_key_fingerprint":    "the fingerprint of the public release key",
 		"mistgate.admin.v1.PanelUpdate.url":                       "a public link to the official GitHub release",
