@@ -1423,10 +1423,14 @@ func rowsForResult(result probeResponse, p *pending, now time.Time) []store.ExtC
 	for _, target := range p.Targets {
 		observed := result.ByTarget[target.Target]
 		byOp := observed.ByOperator
+		pings := false
+		for _, leg := range byOp {
+			pings = pings || leg.OK && leg.ICMP != nil && leg.ICMP.OK
+		}
 		for _, nodeID := range target.NodeIDs {
 			vantages := make([]countryreach.Vantage, 0, len(byOp))
 			for _, key := range slices.Sorted(maps.Keys(byOp)) {
-				vantages = append(vantages, mapLeg(key, byOp[key]))
+				vantages = append(vantages, mapLeg(key, byOp[key], pings))
 			}
 			verdict, reason := countryreach.JudgeVantages(vantages, 1, countryreach.VerdictBlocked)
 			b, _ := json.Marshal(countryreach.ExtDetail{Reason: reason, Vantages: vantages, Skipped: rowSkipped(result, p), Cost: cost})
@@ -1437,8 +1441,9 @@ func rowsForResult(result probeResponse, p *pending, now time.Time) []store.ExtC
 	return rows
 }
 
-func mapLeg(key string, leg probeLeg) countryreach.Vantage {
-	v := countryreach.Vantage{Key: key, Network: cleanText(leg.Operator, 64), Region: cleanText(leg.Region, 64), Kind: countryreach.VantageKindMobile,
+// mapLeg turns one unit's result into a vantage. pings says whether any unit of the round got an ICMP answer from the target.
+func mapLeg(key string, leg probeLeg, pings bool) countryreach.Vantage {
+	v := countryreach.Vantage{Key: key, Network: operatorName(leg.Operator), Region: regionName(leg.Region), Kind: countryreach.VantageKindMobile,
 		TCPOK: leg.TCP != nil && leg.TCP.OK, ICMPOK: leg.ICMP != nil && leg.ICMP.OK, TLS: leg.TCPIsTLS, State: countryreach.VantageStateUncertain}
 	if !leg.OK || leg.DNSFail || leg.Error != nil && strings.TrimSpace(*leg.Error) != "" || leg.ICMP == nil || leg.TCP == nil {
 		return v
@@ -1454,12 +1459,39 @@ func mapLeg(key string, leg probeLeg) countryreach.Vantage {
 	if leg.DPI != "off" {
 		return v
 	}
-	if v.ICMPOK || v.TCPOK {
+	// A TLS-checked TCP leg validates the certificate, which a REALITY port never passes, so its failure says nothing about
+	// reach: such a unit is dark only when the target answers pings to other units and not to it.
+	switch {
+	case v.ICMPOK || v.TCPOK:
 		v.State = countryreach.VantageStateReach
-	} else {
+	case !leg.TCPIsTLS || pings:
 		v.State = countryreach.VantageStateDark
 	}
 	return v
+}
+
+var operatorNames = map[string]string{
+	"mts": "MTS", "beeline": "Beeline", "megafon": "MegaFon", "tele2": "T2", "t2": "T2", "yota": "Yota", "rtk": "Rostelecom",
+	"t-mobile": "T-Mobile", "sberm": "SberMobile", "miranda": "Miranda", "volna": "Volna", "winmobile": "Win Mobile",
+}
+
+// operatorName is a unit's operator as people know it; bsbord sends a code (mts, winmobile).
+func operatorName(code string) string {
+	if name, ok := operatorNames[strings.ToLower(strings.TrimSpace(code))]; ok {
+		return name
+	}
+	return cleanText(code, 64)
+}
+
+// regionName spells Crimea and Kaliningrad as names; bsbord sends them as КРЫМ and KGD. Federal districts (ЦФО) stay as sent.
+func regionName(region string) string {
+	switch strings.ToUpper(strings.TrimSpace(region)) {
+	case "КРЫМ", "KRYM":
+		return "Крым"
+	case "KGD":
+		return "Калининград"
+	}
+	return cleanText(region, 64)
 }
 
 func rowSkipped(result probeResponse, p *pending) []string {

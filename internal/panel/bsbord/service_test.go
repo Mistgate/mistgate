@@ -871,7 +871,7 @@ func TestRowsUseEverySortedResponseUnitAndClassifyVantages(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := mapLeg("unit", tt.leg).State; got != tt.want {
+			if got := mapLeg("unit", tt.leg, false).State; got != tt.want {
 				t.Fatalf("mapLeg state = %q, want %q", got, tt.want)
 			}
 		})
@@ -893,6 +893,47 @@ func TestRowsUseEverySortedResponseUnitAndClassifyVantages(t *testing.T) {
 				t.Fatalf("rows = %+v, want %s", rows, tt.want)
 			}
 		})
+	}
+}
+
+// A TLS-checked TCP leg fails on any REALITY port; it is dark only when other units get pings from the node and it does not.
+func TestTLSCheckedTCPFailureIsNoBlock(t *testing.T) {
+	tlsDark := probeLeg{OK: true, DPI: "off", TCPIsTLS: true, ICMP: &probeCell{}, TCP: &probeCell{}}
+	tlsPing := probeLeg{OK: true, DPI: "off", TCPIsTLS: true, ICMP: &probeCell{OK: true}, TCP: &probeCell{}}
+	plainDark := probeLeg{OK: true, DPI: "off", ICMP: &probeCell{}, TCP: &probeCell{}}
+	plainTCP := probeLeg{OK: true, DPI: "off", ICMP: &probeCell{}, TCP: &probeCell{OK: true}}
+	at := time.Now().UTC()
+	p := &pending{RoundAt: at.Unix(), Targets: []targetRef{{Target: "203.0.113.10:443", NodeIDs: []string{"de1"}}}}
+	for _, tt := range []struct {
+		name  string
+		legs  map[string]probeLeg
+		state string
+		want  string
+	}{
+		{"pings elsewhere", map[string]probeLeg{"mts|крым|off": tlsDark, "volna|крым|off": tlsPing}, countryreach.VantageStateDark, countryreach.VerdictPartial},
+		{"no pings anywhere", map[string]probeLeg{"mts|крым|off": tlsDark, "volna|крым|off": plainTCP}, countryreach.VantageStateUncertain, countryreach.VerdictOK},
+		{"plain TCP fails too", map[string]probeLeg{"mts|крым|off": plainDark, "volna|крым|off": plainTCP}, countryreach.VantageStateDark, countryreach.VerdictPartial},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rows := rowsForResult(probeResponse{Outcome: "done", ByTarget: map[string]probeTargetResult{p.Targets[0].Target: {ByOperator: tt.legs}}}, p, at)
+			var detail countryreach.ExtDetail
+			if len(rows) != 1 || json.Unmarshal([]byte(rows[0].DetailJSON), &detail) != nil || len(detail.Vantages) != 2 {
+				t.Fatalf("rows = %+v", rows)
+			}
+			if got := detail.Vantages[0].State; got != tt.state || rows[0].Verdict != tt.want {
+				t.Fatalf("mts state = %q verdict = %q, want %q %q", got, rows[0].Verdict, tt.state, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnitNamesAreSpelledOut(t *testing.T) {
+	v := mapLeg("winmobile|крым|off", probeLeg{OK: true, Operator: "winmobile", Region: "КРЫМ", DPI: "off", ICMP: &probeCell{OK: true}, TCP: &probeCell{}}, true)
+	if v.Network != "Win Mobile" || v.Region != "Крым" {
+		t.Fatalf("names = %q %q", v.Network, v.Region)
+	}
+	if v := mapLeg("x", probeLeg{Operator: "newop", Region: "ЦФО"}, false); v.Network != "newop" || v.Region != "ЦФО" {
+		t.Fatalf("unknown names = %q %q", v.Network, v.Region)
 	}
 }
 
