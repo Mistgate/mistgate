@@ -8,17 +8,24 @@ import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
 import { countryLook, type CountryCheck } from "@/lib/health";
-import { laneNow, midnights, reachSources, segmentsOf, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
+import { laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
 import { CountryMark, CountryPill, PartialBreakdown } from "@/screens/health/country";
 
 // The nodes of the Reachability page: a row per node with its verdict now (the pill of the Health column, with its tooltip), then
-// a line per source: its word for the node now and its week as a thin lane of verdicts. A source that is off stays in place,
-// dimmed, so the rows keep their shape. Below 1280 px (the sidebar takes its part) a row is a card: the verdict on top, the
+// a line per source: its word for the node now and its week as a thin lane of verdicts. Globalping, the lists and the probe stay
+// in place while off, dimmed, so the rows keep their shape; cheburcheck and bsbord have a line while they are on. Below 1280 px (the sidebar takes its part) a row is a card: the verdict on top, the
 // source lines under it, each lane on a line of its own on a phone.
 
 export type NodeRow = { id: string; name: string; countryCode: string };
 
-const sourceKey: Record<ReachSource, MessageKey> = { globalping: "rc.src.globalping", lists: "rc.src.lists", tspu: "rc.src.tspu" };
+const sourceKey: Record<ReachSource, MessageKey> = {
+  globalping: "rc.src.globalping",
+  lists: "rc.src.lists",
+  tspu: "rc.src.tspu",
+  cheburcheck: "rc.src.cheburcheck",
+  cheburcheck_own: "rc.src.cheburcheck_own",
+  bsbord: "rc.src.bsbord",
+};
 
 /**
  * What one source calls a verdict: the lists say "listed" or "not listed", the live sources what they saw. `short`: the narrow
@@ -53,7 +60,7 @@ const textCls: Record<ReturnType<typeof verdictKind>, string> = {
 
 // The columns: node, verdict, then the source lines (name, word, lane). The header uses the same, so the lanes line up with the days.
 const rowCols = "xl:grid xl:grid-cols-[minmax(84px,128px)_minmax(120px,168px)_minmax(0,1fr)] xl:gap-x-4";
-const lineCols = "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 md:grid-cols-[72px_120px_minmax(0,1fr)]";
+const lineCols = "grid grid-cols-[88px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 md:grid-cols-[88px_120px_minmax(0,1fr)]";
 
 export function NodesTable({
   nodes,
@@ -106,7 +113,7 @@ export function NodesTable({
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              {reachSources.map((src) => (
+              {shownSources(sources).map((src) => (
                 <SourceLine key={src} source={src} on={sources.includes(src)} lane={lanes.get(n.id)?.get(src)} probe={src === "tspu" && n.id === probeNode} since={since} now={now} />
               ))}
               <div aria-hidden className={cx(lineCols, "text-[10px] text-faint xl:hidden")}>
@@ -126,16 +133,16 @@ export function NodesTable({
   );
 }
 
-/** A block on some networks: its breakdown behind a disclosure under the row, across all the columns; nothing on any other verdict. */
+/** A verdict with networks that do not see the node: every source's networks behind a disclosure under the row, across all the columns. */
 function RowBreakdown({ check }: { check: CountryCheck | undefined }) {
   const t = useT();
   const fmt = useFmt();
-  const breakdown = check?.verdict === CountryVerdict.PARTIAL ? countryLook(t, fmt, check).breakdown : null;
-  if (!breakdown) return null;
+  const look = check ? countryLook(t, fmt, check) : null;
+  if (!look?.breakdown) return null;
   return (
     <details data-testid="reach-breakdown" className="xl:col-span-3">
       <summary className="w-fit cursor-pointer text-xs font-semibold text-muted hover:text-fg">{t("rc.part.more")}</summary>
-      <PartialBreakdown breakdown={breakdown} className="mt-2 max-w-xl rounded-field tone-warn tint px-3 py-2.5" />
+      <PartialBreakdown breakdown={look.breakdown} className={cx("mt-2 max-w-xl rounded-field tint px-3 py-2.5", look.kind === "bad" ? "tone-bad" : "tone-warn")} />
     </details>
   );
 }

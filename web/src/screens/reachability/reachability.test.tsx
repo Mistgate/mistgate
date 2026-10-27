@@ -25,6 +25,15 @@ vi.mock("@/lib/api", () => ({
   blocklist: { getBlocklist: () => Promise.resolve({ settings: { enabled: true, available: true, checkedUnix: 0, listsUnix: 0 } }) },
   tspuProbe: { getTspuProbe: () => Promise.resolve({ settings: { enabled: true, available: true, unavailableReason: "", probeNodeId: "nod_probe1", intervalMin: 120, nodes: [] } }) },
   clientProbe: { getClientProbe: () => Promise.resolve({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 }) },
+  cheburcheck: {
+    getCheburcheck: () =>
+      Promise.resolve({ settings: { enabled: true, publicEnabled: true, hasToken: false, intervalMin: 180, ownIntervalMin: 60, status: "", holdUntilUnix: 0, lastRunUnix: 0, lastVerdict: "", unavailable: "", tokenUnknown: false } }),
+  },
+  bsbord: {
+    getBsbord: () =>
+      Promise.resolve({ settings: { enabled: true, hasKey: true, intervalMin: 1440, capCredits: 10000, units: ["mts|krym|off"], spendMonth: "", spentCredits: 0, reservedCredits: 0, lastStatus: "", lastRunUnix: 0, holdUntilUnix: 0, pending: false } }),
+    listBsbordUnits: () => Promise.resolve({ units: [], nUnits: 0, nProbeable: 0 }),
+  },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   isUnauthenticated: () => false,
   webauthnSupported: () => false,
@@ -78,9 +87,13 @@ function history(sources: string[]) {
   return { country: "RU", sources, sinceUnix: SINCE, nowUnix: NOW, nodes: sources.length ? nodes : [] };
 }
 
+const vantage = (source: string, key: string, state: string, over: Record<string, unknown> = {}) => ({
+  source, key, network: key, region: "", asn: "", kind: "unknown", state, atUnix: NOW - 260, dpiHop: 0, icmpOk: state === "reach", tcpOk: state === "reach", ...over,
+});
 const check = (nodeId: string, verdict: CountryVerdict, over: Record<string, unknown> = {}) => ({
   nodeId, country: "RU", verdict, atUnix: NOW - 260, probes: [], reason: "", eyeball: true, confidence: "eyeball", listedBy: [], cdnProvider: "", cdnRegion: "",
   sources: ["globalping"], globalpingVerdict: verdict, tspuVerdict: CountryVerdict.UNSPECIFIED, tspuPorts: [], dpiHop: 0, tspuVantageId: "", tspuVantageName: "", tspuAtUnix: 0, noProbe: [],
+  vantages: [], sourceVerdicts: [],
   ...over,
 });
 const countryChecks = [
@@ -196,10 +209,10 @@ describe("the Reachability page with every source on", () => {
     expect(events[1]?.textContent).toContain("lasted 16 h");
   });
 
-  it("ends with the four source cards for the owner", async () => {
+  it("ends with the six source cards for the owner", async () => {
     await mount();
     expect(document.querySelector("#sources h2")?.textContent).toBe("Sources");
-    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "kl!ck users"]);
+    expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
   });
 });
 
@@ -256,7 +269,15 @@ describe("a block on some networks", () => {
     });
     getChecks.mockResolvedValue({
       nowUnix: NOW, intervalS: 300, columns: [], rows: [], tspuRun: { status: "ok", atUnix: NOW - 700, nodeId: "nod_probe1" },
-      countryChecks: countryChecks.map((c) => (c.nodeId === "nod_de1" ? check("nod_de1", PARTIAL, { probes: [gp("MTS", 8359, "Novosibirsk", false), gp("Beeline", 3216, "Moscow", true)], noProbe: ["MegaFon", "T2"] }) : c)),
+      countryChecks: countryChecks.map((c) =>
+        c.nodeId === "nod_de1"
+          ? check("nod_de1", PARTIAL, {
+              probes: [gp("MTS", 8359, "Novosibirsk", false), gp("Beeline", 3216, "Moscow", true)],
+              noProbe: ["MegaFon", "T2"],
+              vantages: [vantage("globalping", "AS8359", "dark", { network: "MTS", asn: "8359", region: "Novosibirsk" }), vantage("globalping", "AS3216", "reach", { network: "Beeline", asn: "3216", region: "Moscow" })],
+            })
+          : c,
+      ),
     });
     listAlerts.mockResolvedValue({ nowUnix: NOW, active: [{ ...alert("alt_de1", "de1", "partial", NOW - 3 * H), subject: "partial" }], history: [] });
   });
@@ -307,9 +328,11 @@ describe("a block on some networks", () => {
     expect(more.open).toBe(true);
     const lists = [...more.querySelectorAll("ul")];
     expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it"]);
-    expect([...more.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["✕MTS AS8359 · Novosibirsk", "✓Beeline AS3216 · Moscow · 44\u00a0ms"]);
+    expect([...more.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✓Beeline AS3216 · Moscow · Globalping"]);
     expect(more.textContent).toContain("Not checked this round: MegaFon, T2");
-    // fi1 is TCP blocked: no breakdown
+    // the box takes the verdict's tone
+    expect(more.querySelector("[data-testid=partial-breakdown]")?.className).toContain("tone-warn");
+    // fi1 is TCP blocked with nothing dark named: no breakdown
     expect(row("fi1").querySelector("[data-testid=reach-breakdown]")).toBeNull();
   });
 
@@ -324,6 +347,92 @@ describe("a block on some networks", () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------------
+// cheburcheck and bsbord: their lines while they are on, the breakdown across sources, and a network that reaches no node
+
+describe("the external sources", () => {
+  const PARTIAL = CountryVerdict.PARTIAL;
+  const BLOCKED = CountryVerdict.BLOCKED;
+  const crimea = (state: string) => vantage("bsbord", "mts|krym|off", state, { network: "MTS", region: "КРЫМ", kind: "mobile", atUnix: NOW - 3 * H });
+  const volna = vantage("bsbord", "volna|krym|on", "whitelist", { network: "Volna", region: "КРЫМ", kind: "mobile", atUnix: NOW - 3 * H });
+  const rostelecom = vantage("cheburcheck", "probe:7", "reach", { network: "Rostelecom", asn: "12389", region: "Moscow", atUnix: NOW - 2 * H });
+  beforeEach(() => {
+    const h = history(["globalping", "lists", "tspu"]);
+    const ext = (nodeId: string) =>
+      nodeId === "nod_de1" ? [lane("cheburcheck", pts([SINCE + 3 * H, OK])), lane("bsbord", pts([SINCE + 6 * H, OK], [NOW - 27 * H, PARTIAL]))] : nodeId === "nod_nl1" ? [lane("bsbord", pts([NOW - 27 * H, BLOCKED]))] : [];
+    getHistory.mockResolvedValue({ ...h, sources: ["globalping", "lists", "tspu", "cheburcheck", "bsbord"], nodes: h.nodes.map((n) => ({ ...n, lanes: [...n.lanes, ...ext(n.nodeId)] })) });
+    getChecks.mockResolvedValue({
+      nowUnix: NOW, intervalS: 300, columns: [], rows: [], tspuRun: { status: "ok", atUnix: NOW - 700, nodeId: "nod_probe1" },
+      countryChecks: countryChecks.map((c) =>
+        c.nodeId === "nod_de1"
+          ? check("nod_de1", PARTIAL, {
+              sources: ["globalping", "cheburcheck", "bsbord"],
+              vantages: [vantage("globalping", "AS3216", "reach", { network: "Beeline", asn: "3216", region: "Moscow" }), rostelecom, crimea("dark"), volna],
+              sourceVerdicts: [
+                { source: "globalping", verdict: OK, eyeball: true, atUnix: NOW - 260, reason: "" },
+                { source: "cheburcheck", verdict: OK, eyeball: true, atUnix: NOW - 2 * H, reason: "" },
+                { source: "bsbord", verdict: BLOCKED, eyeball: true, atUnix: NOW - 3 * H, reason: "" },
+              ],
+            })
+          : c.nodeId === "nod_nl1"
+            ? { ...c, vantages: [vantage("globalping", "AS3216", "reach", { network: "Beeline" }), crimea("dark")] }
+            : c,
+      ),
+    });
+  });
+
+  it("give each node a line for cheburcheck and bsbord while they are on, with the word now and the week; the own probe has none", async () => {
+    await mount();
+    expect(["globalping", "lists", "tspu", "cheburcheck", "bsbord"].map((s) => line("de1", s).firstElementChild?.textContent)).toEqual(["Globalping", "Lists", "Probe", "cheburcheck", "bsbord"]);
+    expect(row("de1").querySelector("[data-testid=line-cheburcheck_own]")).toBeNull();
+    expect(words(line("de1", "bsbord").children[1])).toBe("some networks");
+    expect([...line("de1", "bsbord").querySelectorAll("[data-verdict]")].map((s) => s.getAttribute("data-verdict"))).toEqual(["ok", "partial"]);
+    expect(segs("de1", "cheburcheck").map((s) => s.getAttribute("aria-label")?.split(",")[0])).toEqual(["reachable"]);
+    expect(line("de1", "bsbord").querySelector("[role=group]")?.getAttribute("aria-label")).toBe("bsbord, last 7 days");
+    expect(words(line("nl1", "bsbord").children[1])).toBe("unreachable");
+    // a node bsbord has nothing on yet: a dash, no segment
+    expect(line("fi1", "bsbord").children[1]?.textContent).toBe("—");
+    expect(segs("fi1", "bsbord")).toHaveLength(0);
+  });
+
+  it("break a verdict down across every source, the white-list unit apart", async () => {
+    await mount();
+    const more = row("de1").querySelector<HTMLDetailsElement>("details[data-testid=reach-breakdown]")!;
+    act(() => more.querySelector("summary")!.click());
+    const lists = [...more.querySelectorAll("ul")];
+    expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it", "White list on (cuts every foreign address)"]);
+    expect(lists.map((ul) => [...ul.querySelectorAll("li")].map((li) => li.textContent))).toEqual([
+      ["✕MTS КРЫМ · mobile · bsbord"],
+      ["✓Beeline AS3216 · Moscow · Globalping", "✓Rostelecom AS12389 · Moscow · cheburcheck"],
+      ["○Volna КРЫМ · mobile · bsbord"],
+    ]);
+    expect(more.textContent).toContain("Checked: Globalping 4 min ago · cheburcheck 2 h ago · bsbord 3 h ago");
+  });
+
+  it("say which network reaches none of the nodes, the case no alert covers", async () => {
+    await mount();
+    const lines = [...document.querySelectorAll("[data-testid=dark-everywhere]")];
+    expect(lines.map((l) => l.textContent)).toEqual(["✕MTS (КРЫМ) reaches none of your nodes · bsbord"]);
+    const box = lines[0]!.closest("section")!;
+    expect(box.getAttribute("aria-label")).toBe("Networks that reach none of your nodes");
+    expect(box.textContent).toContain("No alert covers this: the network cuts every node alike.");
+    // it sits under the counts, before the nodes
+    expect(box.previousElementSibling?.getAttribute("aria-label")).toBe("Nodes by verdict");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("ru"));
+    await mount();
+    expect(document.querySelector("[data-testid=dark-everywhere]")?.textContent).toBe("✕MTS (КРЫМ) не достаёт ни до одной твоей ноды · bsbord");
+    expect(line("de1", "bsbord").firstElementChild?.textContent).toBe("bsbord");
+  });
+
+  it("say nothing of the kind while every network reaches some node", async () => {
+    getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks });
+    await mount();
+    expect(document.querySelector("[data-testid=dark-everywhere]")).toBeNull();
+  });
+});
+
 describe("the Reachability page with the sources off", () => {
   it("says every source is off and leads the owner to them; no counts, no nodes, the alerts of the week stay", async () => {
     getHistory.mockResolvedValue(history([]));
@@ -331,12 +440,12 @@ describe("the Reachability page with the sources off", () => {
     await mount();
     const off = document.querySelector("[data-testid=all-off]")!;
     expect(off.textContent).toContain("Every source is off");
-    expect(off.textContent).toContain("Switch one on below: Globalping, the block lists or the TSPU probe.");
+    expect(off.textContent).toContain("Switch one on below: Globalping, the block lists, the TSPU probe, cheburcheck or bsbord.");
     expect([...off.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["To the sources"]);
     expect(document.querySelector("[data-kind]")).toBeNull();
     expect(rows()).toHaveLength(0);
     expect(document.querySelectorAll("[data-testid=reach-event]")).toHaveLength(2);
-    expect(document.querySelectorAll("#sources h3")).toHaveLength(4);
+    expect(document.querySelectorAll("#sources h3")).toHaveLength(6);
   });
 
   it("dims a source that is off and leaves its lanes empty, while the others draw", async () => {

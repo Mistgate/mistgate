@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
-import { laneNow, midnights, segmentsOf, tallyOf, verdictKind, type Lane } from "./reachability";
+import type { CountryCheck } from "./health";
+import { darkEverywhere, laneNow, midnights, segmentsOf, shownSources, tallyOf, verdictKind, type Lane } from "./reachability";
 
 const H = 3600;
 const now = 1_760_500_000;
@@ -73,5 +74,52 @@ describe("the summary", () => {
     expect(verdictKind(CountryVerdict.PARTIAL)).toBe("partial");
     const verdicts: Record<string, CountryVerdict> = { de1: CountryVerdict.PARTIAL, fi1: CountryVerdict.TCP_BLOCKED, nl1: CountryVerdict.OK, se1: CountryVerdict.PARTIAL };
     expect(tallyOf(["de1", "fi1", "nl1", "se1"], (id) => verdicts[id])).toEqual({ ok: 1, partial: 2, warn: 1, bad: 0, listed: 0, unknown: 0 });
+  });
+});
+
+describe("the source lines", () => {
+  it("keep Globalping, the lists and the probe in place while off, and add cheburcheck and bsbord only while they are on", () => {
+    expect(shownSources([])).toEqual(["globalping", "lists", "tspu"]);
+    expect(shownSources(["globalping", "bsbord"])).toEqual(["globalping", "lists", "tspu", "bsbord"]);
+    expect(shownSources(["cheburcheck_own", "tspu", "cheburcheck", "bsbord"])).toEqual(["globalping", "lists", "tspu", "cheburcheck", "cheburcheck_own", "bsbord"]);
+  });
+});
+
+describe("a network that reaches none of the nodes", () => {
+  type Vantage = CountryCheck["vantages"][number];
+  const v = (source: string, key: string, state: string, over: Partial<Vantage> = {}): Vantage => ({
+    source, key, network: key, region: "", asn: "", kind: "", state, atUnix: now, dpiHop: 0, icmpOk: false, tcpOk: false, ...over,
+  });
+  const crimea = (state: string) => v("bsbord", "mts|krym|off", state, { network: "MTS", region: "КРЫМ" });
+  const node = (...vantages: Vantage[]) => ({ vantages }) as CountryCheck;
+
+  it("is named when one vantage is dark for every node its source looked at, while something reaches them", () => {
+    const fleet = [
+      node(crimea("dark"), v("bsbord", "volna|krym|off", "reach", { network: "Volna", region: "КРЫМ" }), v("globalping", "AS8359", "reach")),
+      node(crimea("dark"), v("bsbord", "volna|krym|off", "reach", { network: "Volna", region: "КРЫМ" })),
+      node(crimea("dark"), v("cheburcheck", "probe:7", "dark", { network: "Rostelecom", asn: "12389", region: "Moscow" })),
+    ];
+    expect(darkEverywhere(fleet)).toEqual([{ source: "bsbord", name: "MTS (КРЫМ)" }]);
+    // the same network twice in one row counts once
+    expect(darkEverywhere([node(crimea("dark"), crimea("dark"), v("globalping", "AS1", "reach")), node(crimea("dark"))])).toEqual([{ source: "bsbord", name: "MTS (КРЫМ)" }]);
+  });
+
+  it("says nothing when the vantage reaches one node, when one node is all there is, or when nothing reaches any node", () => {
+    expect(darkEverywhere([node(crimea("dark"), v("globalping", "AS1", "reach")), node(crimea("reach"))])).toEqual([]);
+    expect(darkEverywhere([node(crimea("dark"), v("globalping", "AS1", "reach"))])).toEqual([]);
+    // a full block of the whole fleet: the full alerts cover it, a list of every network would only repeat it
+    expect(darkEverywhere([node(crimea("dark"), v("globalping", "AS1", "dark")), node(crimea("dark"), v("globalping", "AS1", "dark"))])).toEqual([]);
+    // a white list cuts every node alike by design: it is never "dark"
+    expect(darkEverywhere([node(crimea("whitelist"), v("globalping", "AS1", "reach")), node(crimea("whitelist"))])).toEqual([]);
+    expect(darkEverywhere([])).toEqual([]);
+  });
+
+  it("orders by source, then by name, and counts a node without the source's vantages out (bsbord skips a node with no TCP port)", () => {
+    const gp = (state: string) => v("globalping", "AS8359", state, { network: "MTS", asn: "8359", region: "Omsk" });
+    const fleet = [node(crimea("dark"), gp("dark"), v("tspu", "nod_probe1", "reach")), node(crimea("dark"), gp("dark")), node(v("tspu", "nod_probe1", "reach"), gp("dark"))];
+    expect(darkEverywhere(fleet)).toEqual([
+      { source: "globalping", name: "MTS (AS8359, Omsk)" },
+      { source: "bsbord", name: "MTS (КРЫМ)" },
+    ]);
   });
 });

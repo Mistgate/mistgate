@@ -24,7 +24,31 @@ const disconnectTspuProbe = vi.fn();
 const getClientProbe = vi.fn();
 const updateClientProbe = vi.fn();
 const disconnectClientProbe = vi.fn();
+const getCheburcheck = vi.fn();
+const updateCheburcheck = vi.fn();
+const testCheburcheck = vi.fn();
+const disconnectCheburcheck = vi.fn();
+const getBsbord = vi.fn();
+const updateBsbord = vi.fn();
+const testBsbord = vi.fn();
+const listBsbordUnits = vi.fn();
+const previewBsbord = vi.fn();
+const disconnectBsbord = vi.fn();
 vi.mock("@/lib/api", () => ({
+  cheburcheck: {
+    getCheburcheck: (...a: unknown[]) => getCheburcheck(...a),
+    updateCheburcheck: (...a: unknown[]) => updateCheburcheck(...a),
+    testCheburcheck: (...a: unknown[]) => testCheburcheck(...a),
+    disconnectCheburcheck: (...a: unknown[]) => disconnectCheburcheck(...a),
+  },
+  bsbord: {
+    getBsbord: (...a: unknown[]) => getBsbord(...a),
+    updateBsbord: (...a: unknown[]) => updateBsbord(...a),
+    testBsbord: (...a: unknown[]) => testBsbord(...a),
+    listBsbordUnits: (...a: unknown[]) => listBsbordUnits(...a),
+    previewBsbord: (...a: unknown[]) => previewBsbord(...a),
+    disconnectBsbord: (...a: unknown[]) => disconnectBsbord(...a),
+  },
   clientProbe: {
     getClientProbe: (...a: unknown[]) => getClientProbe(...a),
     updateClientProbe: (...a: unknown[]) => updateClientProbe(...a),
@@ -71,6 +95,9 @@ beforeEach(() => {
   getBlocklist.mockResolvedValue({ settings: lists() });
   getTspuProbe.mockResolvedValue({ settings: tspu() });
   getClientProbe.mockResolvedValue({ settings: { enabled: false, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 });
+  getCheburcheck.mockResolvedValue({ settings: chebur() });
+  getBsbord.mockResolvedValue({ settings: bsb() });
+  listBsbordUnits.mockResolvedValue({ units: [], nUnits: 0, nProbeable: 0 });
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -79,11 +106,19 @@ afterEach(() => {
   act(() => setLang("en"));
   for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks, getBlocklist, updateBlocklist, testBlocklist, disconnectBlocklist]) m.mockReset();
   for (const m of [getTspuProbe, updateTspuProbe, testTspuProbe, disconnectTspuProbe, getClientProbe, updateClientProbe, disconnectClientProbe]) m.mockReset();
+  for (const m of [getCheburcheck, updateCheburcheck, testCheburcheck, disconnectCheburcheck]) m.mockReset();
+  for (const m of [getBsbord, updateBsbord, testBsbord, listBsbordUnits, previewBsbord, disconnectBsbord]) m.mockReset();
 });
 
 const settings = (over: Record<string, unknown> = {}) => ({ enabled: false, intervalMin: 15, hasToken: false, ...over });
 const lists = (over: Record<string, unknown> = {}) => ({ enabled: false, available: true, checkedUnix: 0, listsUnix: 0, ...over });
 const tspu = (over: Record<string, unknown> = {}) => ({ enabled: false, available: true, unavailableReason: "", probeNodeId: "", intervalMin: 120, nodes: [], ...over });
+const chebur = (over: Record<string, unknown> = {}) => ({
+  enabled: false, publicEnabled: true, hasToken: false, intervalMin: 180, ownIntervalMin: 60, status: "", holdUntilUnix: 0, lastRunUnix: 0, lastVerdict: "", unavailable: "", tokenUnknown: false, ...over,
+});
+const bsb = (over: Record<string, unknown> = {}) => ({
+  enabled: false, hasKey: false, intervalMin: 1440, capCredits: 10000, units: [], spendMonth: "", spentCredits: 0, reservedCredits: 0, lastStatus: "", lastRunUnix: 0, holdUntilUnix: 0, pending: false, ...over,
+});
 
 async function mount(first: object) {
   getGlobalping.mockResolvedValue({ settings: first });
@@ -135,7 +170,7 @@ describe("the Globalping card", () => {
     expect(document.querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("false");
     expect(button("Test")).toBeUndefined();
     expect(button("Disconnect")).toBeUndefined();
-    expect(document.querySelector("input[type=password]")).toBeNull();
+    expect(section("Globalping")!.querySelector("input[type=password]")).toBeNull();
     expect(text()).toContain("Node addresses go to Globalping and its volunteer probes.");
     expect(getChecks).not.toHaveBeenCalled(); // off asks for no rounds either
   });
@@ -148,7 +183,7 @@ describe("the Globalping card", () => {
     expect(updateGlobalping).toHaveBeenCalledWith({ enabled: true });
     expect(state()?.dataset.state).toBe("untested");
     expect(state()?.textContent).toBe("On · not tested yet");
-    expect(document.querySelector("input[type=password]")).not.toBeNull();
+    expect(section("Globalping")!.querySelector("input[type=password]")).not.toBeNull();
     expect(button("Test")).toBeDefined();
   });
 
@@ -168,11 +203,11 @@ describe("the Globalping card", () => {
     await click(button("Save token"));
     expect(text()).toContain("This does not look like a Globalping token.");
     expect(updateGlobalping).not.toHaveBeenCalled();
-    await type(document.querySelector("input[type=password]"), " gp-token-0123456789 ");
+    await type(section("Globalping")!.querySelector("input[type=password]"), " gp-token-0123456789 ");
     await click(button("Save token"));
     expect(updateGlobalping).toHaveBeenCalledWith({ token: "gp-token-0123456789" });
     expect(document.querySelector("[data-testid=gp-token]")?.textContent).toBe("set");
-    expect(document.querySelector("input[type=password]")).toBeNull();
+    expect(section("Globalping")!.querySelector("input[type=password]")).toBeNull();
     expect(document.body.innerHTML).not.toContain("gp-token-0123456789");
   });
 
@@ -261,7 +296,7 @@ describe("the block-list card", () => {
   it("sits next to the Globalping card in the group, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
     await mount(settings());
     const grid = card()?.parentElement;
-    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "kl!ck users"]);
+    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
     expect(listsState()?.dataset.state).toBe("off");
     expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
     expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");
@@ -667,5 +702,328 @@ describe("the kl!ck card", () => {
     const ru = "Пользователи kl!ck";
     expect(klickState(ru)?.textContent).toBe("Работает · 6 отчётов за 7 дней · последний 5 мин назад");
     expect(card(ru)?.textContent).toContain("Операторы: MTS PJSC (4): заморозка 3; неизвестно (1): в порядке");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// cheburcheck and bsbord: consent first, then the step-up; write-only secrets; the price before the first paid round
+
+const section = (title: string) => [...document.querySelectorAll("section")].find((x) => x.querySelector("h3")?.textContent === title);
+const stateOf = (title: string) => section(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+const buttonIn = (el: Element | null | undefined, label: string) => [...(el?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
+const nowS = () => Math.floor(Date.now() / 1000);
+
+describe("the cheburcheck card", () => {
+  const ccState = () => stateOf("cheburcheck");
+  const cc = () => section("cheburcheck");
+
+  it("is off by default and says what switching it on would send, to whom, and that Test sends no address", async () => {
+    await mount(settings());
+    expect(ccState()?.textContent).toBe("Off · Nothing runs and nothing is sent.");
+    const sw = cc()?.querySelector("[role=switch]");
+    expect([sw?.getAttribute("aria-checked"), sw?.getAttribute("aria-label")]).toEqual(["false", "Use cheburcheck"]);
+    expect(cc()?.textContent).toContain("Node IPv4 addresses go to cheburcheck.ru, which keeps every query with the panel’s IP and User-Agent (it names Mistgate). Test sends no address.");
+    expect(buttonIn(cc(), "Test")).toBeUndefined();
+  });
+
+  it("asks for consent before switching on: the address, the site keeping it with the IP and User-Agent; Cancel sends nothing", async () => {
+    updateCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true }) });
+    await mount(settings());
+    await click(cc()?.querySelector("[role=switch]"));
+    expect(dialog()?.textContent).toContain("Switch cheburcheck on?");
+    for (const l of ["sends each node’s IPv4 address to cheburcheck.ru", "keeps every query with the caller’s IP and User-Agent", "names Mistgate", "a shared Cloudflare address"])
+      expect(dialog()?.textContent).toContain(l);
+    await click(buttonIn(dialog(), "Cancel"));
+    expect(updateCheburcheck).not.toHaveBeenCalled();
+    await click(cc()?.querySelector("[role=switch]"));
+    await click(buttonIn(dialog(), "Switch on"));
+    expect(updateCheburcheck).toHaveBeenCalledWith({ enabled: true });
+    expect(ccState()?.textContent).toBe("On · no run yet: the first one comes within minutes");
+    // on: the public probes, their interval, the own-probe token
+    expect(cc()?.querySelector("[aria-label='Use the public probes']")?.getAttribute("aria-checked")).toBe("true");
+    expect(cc()?.querySelector("[aria-label='How often']")?.textContent).toContain("every 3 h");
+    expect(cc()?.querySelector("input[type=password]")).not.toBeNull();
+    // off asks nothing
+    updateCheburcheck.mockResolvedValue({ settings: chebur() });
+    await click(cc()?.querySelector("[aria-label='Use cheburcheck']"));
+    expect(updateCheburcheck).toHaveBeenLastCalledWith({ enabled: false });
+    expect(dialog()).toBeNull();
+  });
+
+  it("shows the last run and what it said, switches the public probes, and tests without sending an address", async () => {
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, lastRunUnix: nowS() - 2 * 3600, lastVerdict: "partial" }) });
+    updateCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, publicEnabled: false, lastRunUnix: nowS() - 2 * 3600 }) });
+    testCheburcheck.mockResolvedValue({ reachable: true, version: "1.4", lastUpdate: "", domainCount: 0, v4Count: 0 });
+    await mount(settings());
+    expect(ccState()?.textContent).toBe("Works · last run 2 h ago · said: blocked on some networks");
+    await click(cc()?.querySelector("[aria-label='Use the public probes']"));
+    expect(updateCheburcheck).toHaveBeenCalledWith({ publicEnabled: false });
+    expect(cc()?.querySelector("[aria-label='How often']")).toBeNull(); // no public interval while they are off
+    await click(buttonIn(cc(), "Test"));
+    expect(testCheburcheck).toHaveBeenCalledWith({});
+    expect(ccState()?.textContent).toBe("Works · the site answers; the test sent no address");
+  });
+
+  it("says what the site answered: an unknown token, address checks paused until a time, another country", async () => {
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, hasToken: true, status: "token_unknown", tokenUnknown: true }) });
+    await mount(settings());
+    expect(ccState()?.dataset.state).toBe("status-token_unknown");
+    expect(ccState()?.textContent).toBe("The site does not know the probe token · own-probe runs stopped: save a new token");
+    act(() => root?.unmount());
+    host?.remove();
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, status: "ip_probes_off", holdUntilUnix: nowS() + 6 * 3600 }) });
+    await mount(settings());
+    expect(ccState()?.textContent).toMatch(/^The site paused address checks · next try /);
+    act(() => root?.unmount());
+    host?.remove();
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, unavailable: "country" }) });
+    await mount(settings());
+    expect(ccState()?.textContent).toBe("Not available · only for Russia; nothing is sent");
+    expect(buttonIn(cc(), "Test")).toBeUndefined();
+    expect(cc()?.querySelector("input[type=password]")).toBeNull();
+  });
+
+  it("removes a stored token, sets the own probe's interval, and disconnects after asking", async () => {
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, hasToken: true }) });
+    updateCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true }) });
+    disconnectCheburcheck.mockResolvedValue({ settings: chebur() });
+    await mount(settings());
+    expect(cc()?.querySelector("[aria-label='Own probe, how often']")?.textContent).toContain("every 1 h");
+    await click(buttonIn(cc(), "Remove"));
+    expect(updateCheburcheck).toHaveBeenCalledWith({ token: "" });
+    await click(buttonIn(cc(), "Disconnect"));
+    expect(dialog()?.textContent).toContain("the own-probe token and every stored result are deleted");
+    await click(buttonIn(dialog(), "Disconnect"));
+    expect(disconnectCheburcheck).toHaveBeenCalledWith({});
+    expect(ccState()?.dataset.state).toBe("off");
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    await mount(settings());
+    expect(stateOf("cheburcheck")?.textContent).toBe("Выключено · Ничего не запускается и никуда не отправляется.");
+    await click(cc()?.querySelector("[role=switch]"));
+    expect(dialog()?.textContent).toContain("Включить cheburcheck?");
+    expect(dialog()?.textContent).toContain("Сайт хранит каждый запрос с IP и User-Agent отправителя");
+    await click(buttonIn(dialog(), "Отмена"));
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    await mount(settings());
+    expect(cc()?.textContent).toContain("「测试」不发送任何地址。");
+  });
+});
+
+describe("the bsbord card", () => {
+  const bb = () => section("bsbord");
+  const bbState = () => stateOf("bsbord");
+  const unit = (opKey: string, operator: string, region: string, regionCode: string, dpi = "off", over: Record<string, unknown> = {}) => ({
+    opKey, operator, name: "", region, regionCode, dpi, channelState: "ok", probeable: true, selected: regionCode === "krym", ...over,
+  });
+  const units = [
+    unit("mts|msk|off", "MTS", "Москва", "msk"),
+    unit("megafon|msk|on", "MegaFon", "Москва", "msk", "on"),
+    unit("megafon|msk|off", "MegaFon", "Москва", "msk"),
+    unit("beeline|msk|off", "Beeline", "Москва", "msk", "off", { probeable: false }),
+    unit("mts|krym|off", "MTS", "Крым", "krym"),
+    unit("mts|krym|on", "MTS", "Крым", "krym", "on"),
+    unit("volna|krym|off", "Volna", "Крым", "krym"),
+  ];
+  const ready = (over: Record<string, unknown> = {}) => bsb({ hasKey: true, units: ["mts|krym|off", "volna|krym|off"], ...over });
+  const preview = (over: Record<string, unknown> = {}) => ({ costCredits: 160, monthlyCredits: 4800, targetCount: 3, unitCount: 4, capReached: false, ...over });
+
+  it("says only for Russia, without a switch, when the server says so", async () => {
+    getBsbord.mockRejectedValue(new ConnectError("bsbord_country_unavailable", Code.Unavailable));
+    await mount(settings());
+    expect(bbState()?.textContent).toBe("Not available · only for Russia; nothing is sent");
+    expect(bb()?.querySelector("[role=switch]")).toBeNull();
+    expect(getBsbord).toHaveBeenCalledTimes(1); // an answer, not a dropped connection: not asked again
+  });
+
+  it("waits for the key and the units before it can be switched on, and says so", async () => {
+    await mount(settings());
+    expect(bbState()?.textContent).toBe("Off · save the key and pick units, then switch it on");
+    expect(bb()?.querySelector("[role=switch]")?.hasAttribute("data-disabled")).toBe(true);
+    expect(bb()?.textContent).toContain("Node IP:port go to bsbord. Each round is paid; the key is your bsbord account. Test sends no address.");
+    await click(buttonIn(bb(), "Save key"));
+    expect(bb()?.textContent).toContain("This does not look like a bsbord key (bsk_live_…).");
+    expect(updateBsbord).not.toHaveBeenCalled();
+    expect(listBsbordUnits).not.toHaveBeenCalled(); // no key, no list
+  });
+
+  it("lists the units by district, Crimea first and picked by default, the white list marked; presets add, Save sends the keys", async () => {
+    getBsbord.mockResolvedValue({ settings: bsb({ hasKey: true }) });
+    listBsbordUnits.mockResolvedValue({ units, nUnits: 7, nProbeable: 6 });
+    updateBsbord.mockResolvedValue({ settings: bsb({ hasKey: true, units: ["megafon|msk|off", "mts|krym|off", "mts|krym|on", "mts|msk|off"] }) });
+    await mount(settings());
+    const picker = bb()!.querySelector("details")!;
+    expect(picker.open).toBe(true); // nothing saved yet: open
+    expect(picker.querySelector("summary")?.textContent).toBe("Units3 picked");
+    const district = (name: string) => [...picker.querySelectorAll("details")].find((d) => d.querySelector("summary span")?.textContent === name)!;
+    expect([...picker.querySelectorAll(":scope details summary span:first-child")].map((x) => x.textContent)).toEqual(["Крым", "Москва"]);
+    const box = (opKey: string) => {
+      const u = units.find((x) => x.opKey === opKey)!;
+      return [...district(u.region).querySelectorAll("label")].find((l) => l.textContent?.startsWith(u.operator) && (u.dpi === "on") === l.textContent.includes("white list"))!;
+    };
+    expect(box("mts|krym|on").textContent).toBe("MTSwhite list");
+    expect(box("beeline|msk|off").querySelector("input")!.disabled).toBe(true);
+    expect(box("beeline|msk|off").textContent).toBe("Beelinecannot probe now");
+    // one per operator in Moscow: each operator's first unit there without the white list, the one that cannot probe left out
+    await click(buttonIn(district("Москва"), "One per operator"));
+    await click(box("volna|krym|off").querySelector("input"));
+    expect(picker.querySelector("summary")?.textContent).toBe("Units4 picked");
+    await click(buttonIn(picker, "Save units"));
+    expect(updateBsbord).toHaveBeenCalledWith({ units: { opKeys: ["megafon|msk|off", "mts|krym|off", "mts|krym|on", "mts|msk|off"] } });
+    // the Crimea preset puts the Crimean units back
+    await click(box("mts|krym|off").querySelector("input"));
+    await click(buttonIn(picker, "All of Crimea"));
+    expect(box("mts|krym|off").querySelector("input")!.checked).toBe(true);
+    expect(box("volna|krym|off").querySelector("input")!.checked).toBe(true);
+  });
+
+  it("keeps a monthly cap in roubles, 100 ₽ by default, and saves it in kopecks", async () => {
+    getBsbord.mockResolvedValue({ settings: ready() });
+    updateBsbord.mockResolvedValue({ settings: ready({ capCredits: 25050 }) });
+    await mount(settings());
+    const cap = bb()!.querySelector<HTMLInputElement>("input[inputmode=decimal]")!;
+    expect(cap.value).toBe("100");
+    expect(buttonIn(bb(), "Save cap")?.disabled).toBe(true);
+    await type(cap, "0");
+    expect(bb()?.textContent).toContain("The cap is from 1 to 10,000,000 ₽.");
+    await type(cap, "250,5");
+    await click(buttonIn(bb(), "Save cap"));
+    expect(updateBsbord).toHaveBeenCalledWith({ capCredits: 25050n });
+  });
+
+  it("switches on only after the consent and the price: what goes to bsbord, that it is paid, what a round and a month cost", async () => {
+    getBsbord.mockResolvedValue({ settings: ready() });
+    previewBsbord.mockResolvedValue(preview());
+    updateBsbord.mockResolvedValue({ settings: ready({ enabled: true }) });
+    await mount(settings());
+    await click(bb()?.querySelector("[role=switch]"));
+    const d = dialog()!;
+    expect(d.textContent).toContain("Switch bsbord on?");
+    for (const l of ["each node’s IP address and one TCP port to bsbord", "paid from your bsbord balance, up to the monthly cap", "The key is your bsbord account"]) expect(d.textContent).toContain(l);
+    expect(d.textContent).toContain("Asking the price is free, but it already sends the node addresses to bsbord.");
+    // no way to switch on before the price
+    expect(buttonIn(d, "Switch on")).toBeUndefined();
+    expect(previewBsbord).not.toHaveBeenCalled();
+    await click(buttonIn(d, "Check the price"));
+    expect(previewBsbord).toHaveBeenCalledWith({});
+    expect(dialog()?.querySelector("[data-testid=bsbord-price]")?.textContent).toBe("A round costs 1.60\u00a0₽: 3 nodes × 4 units · about 48\u00a0₽ a month, every 24 h");
+    expect(dialog()?.textContent).not.toContain("more than the monthly cap");
+    expect(updateBsbord).not.toHaveBeenCalled();
+    await click(buttonIn(dialog(), "Switch on"));
+    expect(updateBsbord).toHaveBeenCalledWith({ enabled: true });
+    expect(bbState()?.textContent).toBe("On · no round yet: the first one comes within a minute");
+    // the price stays on the card
+    expect(bb()?.querySelector("[data-testid=bsbord-price]")).not.toBeNull();
+  });
+
+  it("warns before switching on when a month would pass the cap, and says why the price failed", async () => {
+    getBsbord.mockResolvedValue({ settings: ready() });
+    previewBsbord.mockRejectedValueOnce(new ConnectError("bsbord_no_targets", Code.FailedPrecondition)).mockResolvedValue(preview({ monthlyCredits: 48000 }));
+    await mount(settings());
+    await click(bb()?.querySelector("[role=switch]"));
+    await click(buttonIn(dialog(), "Check the price"));
+    expect(dialog()?.textContent).toContain("No node has an IPv4 address and a TCP port to check.");
+    expect(buttonIn(dialog(), "Switch on")).toBeUndefined();
+    await click(buttonIn(dialog(), "Check the price"));
+    expect(dialog()?.textContent).toContain("That is more than the monthly cap of 100\u00a0₽: rounds stop for the month once the spend reaches it.");
+    await click(buttonIn(dialog(), "Cancel"));
+    expect(updateBsbord).not.toHaveBeenCalled();
+  });
+
+  it("shows the month's spend against the cap, and stops at the cap in words", async () => {
+    const hold = nowS() + 4 * 86400;
+    getBsbord.mockResolvedValue({ settings: ready({ enabled: true, spendMonth: "2026-10", spentCredits: 10000, lastStatus: "cap_reached", lastRunUnix: nowS() - 3600, holdUntilUnix: hold }) });
+    await mount(settings());
+    expect(bbState()?.dataset.state).toBe("status-cap_reached");
+    expect(bbState()?.textContent).toMatch(/^Monthly cap reached · rounds resume next month or when you raise the cap · next try .+ · last round 1 h ago$/);
+    const spend = bb()!.querySelector("[data-testid=bsbord-spend]")!;
+    expect(spend.textContent).toBe("This month100\u00a0₽ of 100\u00a0₽ · 0\u00a0₽ left");
+    const meter = spend.querySelector("[role=meter]")!;
+    expect(["aria-valuenow", "aria-valuemax", "aria-valuetext"].map((a) => meter.getAttribute(a))).toEqual(["10000", "10000", "100\u00a0₽ of 100\u00a0₽"]);
+    expect(meter.firstElementChild?.className).toContain("tone-bad");
+  });
+
+  it("puts every status in plain words, holds back what a round under way reserves, and shows the balance from Test", async () => {
+    const words: [string, string][] = [
+      ["pending", "A round is under way · bsbord can take a few minutes to answer"],
+      ["no_balance", "The bsbord balance is empty · top it up at bsbord"],
+      ["tier_too_low", "Your bsbord plan does not allow this · change the plan, then save any setting here"],
+      ["lost", "A paid round got no answer · the panel gave up after 23 hours; its cost stays counted"],
+      ["unauthorized", "bsbord refused the key · save a new key"],
+      ["no_targets", "No node to check · a node needs an IPv4 address and a TCP port"],
+    ];
+    for (const [status, line] of words) {
+      // a hold "until never" (a refused key, a plan too low) has no time to show
+      getBsbord.mockResolvedValue({ settings: ready({ enabled: true, lastStatus: status, holdUntilUnix: status === "unauthorized" ? 2 ** 62 : 0, reservedCredits: status === "pending" ? 160 : 0 }) });
+      await mount(settings());
+      expect(bbState()?.textContent, status).toBe(line);
+      act(() => root?.unmount());
+      host?.remove();
+    }
+    getBsbord.mockResolvedValue({ settings: ready({ enabled: true, lastStatus: "pending", reservedCredits: 160, spentCredits: 2340 }) });
+    testBsbord.mockResolvedValue({ reachable: true, tier: "pro", balanceCredits: 47340, bonusCredits: 5000, balanceTotal: 52340, nUnits: 400, nProbeable: 312, minIntervalSec: 60, apiVersion: "1" });
+    await mount(settings());
+    await click(buttonIn(bb(), "Test"));
+    expect(testBsbord).toHaveBeenCalledWith({});
+    expect(bbState()?.textContent).toBe("Works · balance 523.40\u00a0₽ · bonus 50\u00a0₽ · plan pro · 312 units can probe");
+    expect(bb()?.querySelector("[data-testid=bsbord-spend]")?.textContent).toBe(
+      "This month23.40\u00a0₽ of 100\u00a0₽ · 75\u00a0₽ left1.60\u00a0₽ held for a round under way · balance 523.40\u00a0₽ · bonus 50\u00a0₽",
+    );
+  });
+
+  it("disconnects after asking: the key and the units go, the month's spend stays", async () => {
+    getBsbord.mockResolvedValue({ settings: ready({ enabled: true }) });
+    disconnectBsbord.mockResolvedValue({ settings: bsb() });
+    await mount(settings());
+    await click(buttonIn(bb(), "Disconnect"));
+    expect(dialog()?.textContent).toContain("the key and the units are deleted");
+    expect(dialog()?.textContent).toContain("This month’s spend stays counted.");
+    await click(buttonIn(dialog(), "Disconnect"));
+    expect(disconnectBsbord).toHaveBeenCalledWith({});
+    expect(bbState()?.textContent).toBe("Off · save the key and pick units, then switch it on");
+  });
+
+  it("speaks Russian and Chinese", async () => {
+    act(() => setLang("ru"));
+    getBsbord.mockResolvedValue({ settings: ready({ enabled: true, spentCredits: 2340, lastStatus: "cap_reached" }) });
+    await mount(settings());
+    expect(stateOf("bsbord")?.textContent).toBe("Месячный лимит исчерпан · круги продолжатся в следующем месяце или когда поднимешь лимит");
+    expect(bb()?.querySelector("[data-testid=bsbord-spend]")?.textContent).toBe("В этом месяце23,40\u00a0₽ из 100\u00a0₽ · осталось 76,60\u00a0₽");
+    act(() => root?.unmount());
+    host?.remove();
+    act(() => setLang("zh"));
+    getBsbord.mockResolvedValue({ settings: ready() });
+    previewBsbord.mockResolvedValue(preview());
+    await mount(settings());
+    await click(bb()?.querySelector("[role=switch]"));
+    expect(dialog()?.textContent).toContain("开启 bsbord？");
+    await click(buttonIn(dialog(), "查看价格"));
+    expect(dialog()?.querySelector("[data-testid=bsbord-price]")?.textContent).toBe("每轮 1.60\u00a0₽：3 个节点 × 4 个单元 · 按每 24 小时计，每月约 48\u00a0₽");
+  });
+});
+
+describe("the secrets of the source cards", () => {
+  it("never come back into the page: the bsbord key and the cheburcheck token go up once, and the cards say only “set”", async () => {
+    const key = "bsk_live_TEST0123456789abcdef";
+    const token = "cheburprobe-TEST-0123456789";
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true }) });
+    updateBsbord.mockResolvedValue({ settings: bsb({ hasKey: true }) });
+    updateCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, hasToken: true }) });
+    await mount(settings());
+    await type(section("bsbord")!.querySelector("input[type=password]"), ` ${key} `);
+    await click(buttonIn(section("bsbord"), "Save key"));
+    await type(section("cheburcheck")!.querySelector("input[type=password]"), token);
+    await click(buttonIn(section("cheburcheck"), "Save token"));
+    expect(updateBsbord).toHaveBeenCalledWith({ key });
+    expect(updateCheburcheck).toHaveBeenCalledWith({ token });
+    expect([...document.querySelectorAll("[data-testid=bb-key], [data-testid=cc-token]")].map((x) => x.textContent)).toEqual(["set", "set"]);
+    const page = document.body.innerHTML + [...document.querySelectorAll("input")].map((i) => i.value).join("|");
+    expect(page).not.toContain(key);
+    expect(page).not.toContain(token);
+    expect(page).not.toContain("TEST0123456789");
   });
 });

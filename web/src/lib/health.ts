@@ -340,6 +340,26 @@ export function cellLook(t: T, fmt: Fmt, cell: CheckCell, nodeStatus: NodeStatus
 
 export type CountryCheck = Plain<CountryCheckMsg>;
 type CountryProbe = CountryCheck["probes"][number];
+export type Vantage = CountryCheck["vantages"][number];
+
+/** The live sources in the server's order (CountryCheck.sources); the breakdown, the tooltip and the summary keep it. */
+const sourceOrder = ["globalping", "tspu", "cheburcheck", "cheburcheck_own", "bsbord"];
+export const sourceRank = (s: string) => sourceOrder.indexOf(s) + 1 || sourceOrder.length + 1;
+/** The sources that are not Globalping, the TSPU probe or the lists: their rows name themselves in the tooltip. */
+const externalSources = ["cheburcheck", "cheburcheck_own", "bsbord"];
+
+/** A source by its name ("TSPU probe"); a source this page does not know stays its code. */
+export function sourceName(t: T, source: string): string {
+  const key = `cr.src.${source}`;
+  return hasKey(key) ? t(key) : source;
+}
+
+/** A vantage as the alerts name it: "MTS (AS8359, Novosibirsk)", "MTS (КРЫМ)". The names come from the sources: text, never markup. */
+export function vantageName(v: Pick<Vantage, "network" | "key" | "asn" | "region">): string {
+  const tag = [v.asn ? `AS${v.asn}` : "", v.region].filter(Boolean).join(", ");
+  const name = v.network || v.key || "?";
+  return tag ? `${name} (${tag})` : name;
+}
 
 /** A row with a Globalping round (it has probes, or a reason why it has none); a row of the TSPU probe or the lists alone has neither. */
 export const isLive = (c: Pick<CountryCheck, "probes" | "reason">) => c.probes.length > 0 || c.reason !== "";
@@ -406,6 +426,8 @@ export type CountryLook = {
   line: string;
   /** Two live sources that disagree: what each said ("Globalping: reachable · probe: TCP blocked"); empty when they do not. */
   conflict: string;
+  /** What each live source said on its own, with its reason and age: "bsbord: no data, the node has no TCP port to test · 3 h ago". */
+  said: string[];
   /** A partial block: "Blocked on some networks: MTS (AS8359, Novosibirsk)". Empty on any other verdict: a full block marks every probe dark. */
   dark: string;
   /** Named operators the round found no home or mobile probe for: "No home/mobile probe this round: MegaFon, T2". */
@@ -425,14 +447,14 @@ export type CountryLook = {
   /** Where the verdict comes from: Globalping from home and mobile networks or data centers, the TSPU probe, both, or the block lists only. */
   via: string;
   /**
-   * A partial block in full, for the lines under its verdict where there is room and no hover (a node's card, the phone): the
-   * networks that do not see the node, the probes that reach it, the operators the round had no probe for, the round's age.
-   * Null on any other verdict, and on a partial row that names no dark network.
+   * Every source's networks, units and probes in full, for the lines under a verdict that has dark ones, where there is room
+   * and no hover (a node's card, the phone, the Reachability row): those that do not see the node, those that do, those under a
+   * white list, those without a clear answer; the operators Globalping had no probe for; each source's age. Null without a dark one.
    */
-  breakdown: { dark: BreakdownNet[]; seen: BreakdownNet[]; noProbe: string; at: string } | null;
+  breakdown: { dark: BreakdownNet[]; seen: BreakdownNet[]; white: BreakdownNet[]; unsure: BreakdownNet[]; noProbe: string; at: string } | null;
 };
 
-/** A network of the breakdown: "MTS" and "AS8359 · Novosibirsk", with the time of its answer when it reached the node. */
+/** A network of the breakdown: "MTS" and "AS8359 · Novosibirsk · Globalping"; "×3" when several probes of a source share it. */
 export type BreakdownNet = { name: string; tag: string };
 
 /**
@@ -454,15 +476,24 @@ function probeOf(t: T, p: CountryProbe, partial: boolean): CountryLook["probes"]
   };
 }
 
-/** A probe's network as the partial alert names it: "MTS (AS8359, Novosibirsk)". The names come from Globalping: text, never markup. */
-function networkOf(p: CountryProbe): string {
-  const tag = [p.asn ? `AS${p.asn}` : "", p.city].filter(Boolean).join(", ");
-  return tag ? `${p.network || "?"} (${tag})` : p.network || "?";
-}
-
-/** "MTS" and "AS8359 · Novosibirsk · 41 ms" (ms: the TCP connect, else the ping, when the probe got one; the unit never wraps alone). */
-function breakdownNet(t: T, p: CountryProbe, ms: number): BreakdownNet {
-  return { name: p.network || "?", tag: [p.asn ? `AS${p.asn}` : "", p.city, ms > 0 ? `${ms}\u00a0${t("hl.ms")}` : ""].filter(Boolean).join(" · ") };
+/**
+ * The vantages of one state as lines: by source (the server's order), then region, then network; the same network of one
+ * source once, "×3" when several probes share it. "MTS" and "AS8359 · Novosibirsk · mobile · bsbord".
+ */
+function breakdownNets(t: T, vs: readonly Vantage[], locale: string): BreakdownNet[] {
+  const lines = new Map<string, { v: Vantage; net: BreakdownNet; n: number }>();
+  for (const v of vs) {
+    const kind = v.kind && hasKey(`cr.kind.${v.kind}`) ? t(`cr.kind.${v.kind}` as MessageKey) : "";
+    const net = { name: v.network || v.key || "?", tag: [v.asn ? `AS${v.asn}` : "", v.region, kind, sourceName(t, v.source)].filter(Boolean).join(" · ") };
+    const k = `${net.name}|${net.tag}`;
+    const seen = lines.get(k);
+    if (seen) seen.n++;
+    else lines.set(k, { v, net, n: 1 });
+  }
+  const cmp = (a: string, b: string) => a.localeCompare(b, locale);
+  return [...lines.values()]
+    .sort((a, b) => sourceRank(a.v.source) - sourceRank(b.v.source) || cmp(a.v.region, b.v.region) || cmp(a.net.name, b.net.name))
+    .map(({ net, n }) => (n > 1 ? { ...net, tag: `${net.tag} · ×${n}` } : net));
 }
 
 const viaKeys: Record<string, MessageKey> = { eyeball: "cr.tip.eyeball", dc_only: "cr.tip.dc", listed: "cr.tip.listsOnly" };
@@ -485,16 +516,38 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
   // the sources the verdict rests on; a row from before the server named them is Globalping's when it has a round
   const fromGp = c.sources.includes("globalping") || (c.sources.length === 0 && live);
   const fromTspu = c.sources.includes("tspu");
-  const conflict = c.confidence === "conflict" ? t("cr.tip.said", { gp: verdictWord(t, c.globalpingVerdict), tspu: verdictWord(t, c.tspuVerdict) }) : "";
+  const said1 = (s: CountryCheck["sourceVerdicts"][number]) => t("cr.tip.src", { source: sourceName(t, s.source), verdict: verdictWord(t, s.verdict) });
+  // two sources that disagree say what each saw; a row from before the server sent every source's verdict has Globalping and the probe only
+  const conflict =
+    c.confidence !== "conflict"
+      ? ""
+      : c.sourceVerdicts.length
+        ? c.sourceVerdicts.filter((s) => s.verdict !== CountryVerdict.UNKNOWN).map(said1).join(" · ")
+        : t("cr.tip.said", { gp: verdictWord(t, c.globalpingVerdict), tspu: verdictWord(t, c.tspuVerdict) });
+  // what each live source said on its own, why it had no verdict, and when
+  const said = c.sourceVerdicts.map((s) => {
+    const why = s.reason ? countryReason(t, s.reason) || s.reason : "";
+    const head = why ? t("cr.tip.srcWhy", { source: sourceName(t, s.source), verdict: verdictWord(t, s.verdict), reason: why }) : said1(s);
+    return s.atUnix ? `${head} · ${fmt.ago(s.atUnix)}` : head;
+  });
   const reason = live ? countryReason(t, c.reason) : probed ? t("cr.reason.tspu") : "";
   const listed = c.listedBy.length > 0;
   const cdn = cdnOf(t, c);
   const names = c.listedBy.map((l) => listName(t, l));
-  // a partial block names the networks that get nothing from the node; a full block marks every probe dark, so only PARTIAL does
+  // a partial block names the networks that get nothing from the node; a full block makes every vantage dark, so only PARTIAL does
   const partial = c.verdict === CountryVerdict.PARTIAL;
-  const darkProbes = partial ? c.probes.filter((p) => p.valid && p.dark) : [];
-  const dark = darkProbes.length ? t("cr.tip.dark", { networks: [...new Set(darkProbes.map(networkOf))].join(t("cr.tip.sep")) }) : "";
-  const darkNames = [...new Set(darkProbes.map((p) => p.network).filter(Boolean))].join(", ");
+  const darkAll = c.vantages.filter((v) => v.state === "dark");
+  const darkNamed = partial ? darkAll : [];
+  const dark = darkNamed.length ? t("cr.tip.dark", { networks: [...new Set(darkNamed.map(vantageName))].join(t("cr.tip.sep")) }) : "";
+  const darkNames = [...new Set(darkNamed.map((v) => v.network).filter(Boolean))].join(", ");
+  const of = (state: string) => breakdownNets(t, c.vantages.filter((v) => v.state === state), fmt.locale);
+  // each source's age once: its vantages come from one row
+  const ages = new Map<string, number>();
+  for (const v of c.vantages) ages.set(v.source, Math.max(ages.get(v.source) ?? 0, v.atUnix));
+  const checked = [...ages]
+    .sort(([a], [b]) => sourceRank(a) - sourceRank(b))
+    .map(([s, at]) => t("cr.part.when", { source: sourceName(t, s), ago: fmt.ago(at) }))
+    .join(" · ");
   const networks = dark || (fromGp ? [...new Set(c.probes.filter((p) => p.valid && p.network).map((p) => p.network))].join(", ") : "");
   const ports = tspuPortsText(t, c.tspuPorts);
   const vantage = c.tspuVantageName || c.tspuVantageId;
@@ -521,15 +574,15 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
       conflict,
       dark,
       noProbe: c.noProbe.length ? t("cr.tip.noProbe", { networks: c.noProbe.join(t("cr.tip.sep")) }) : "",
-      breakdown: darkProbes.length
+      said,
+      breakdown: darkAll.length
         ? {
-            // one line per dark network; every valid probe that reached the node (the verdict's carrier: TCP when the node has ports)
-            dark: [...new Map(darkProbes.map((p) => breakdownNet(t, p, 0)).map((n) => [`${n.name}|${n.tag}`, n])).values()],
-            seen: c.probes
-              .filter((p) => p.valid && !p.dark && (p.tcp.length ? p.tcp.some((x) => x.ok) : p.icmpOk))
-              .map((p) => breakdownNet(t, p, p.tcp.find((x) => x.ok)?.ms || (p.icmpOk ? p.icmpMs : 0))),
+            dark: of("dark"),
+            seen: of("reach"),
+            white: of("whitelist"),
+            unsure: of("uncertain"),
             noProbe: c.noProbe.length ? t("cr.part.noProbe", { networks: c.noProbe.join(t("cr.tip.sep")) }) : "",
-            at: t("cr.tip.at", { time: fmt.ago(c.atUnix) }),
+            at: t("cr.part.at", { list: checked }),
           }
         : null,
       probes: c.probes.map((p) => probeOf(t, p, partial)),
@@ -548,8 +601,9 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
         capital(cdn),
         live || probed ? "" : t("cr.tip.listsAt", { time: fmt.stamp(c.atUnix) }),
       ].filter(Boolean),
-      via:
-        fromGp && fromTspu
+      via: c.sources.some((s) => externalSources.includes(s))
+        ? t("cr.tip.via", { sources: listOf(fmt.locale, c.sources.filter((s) => s !== "lists").map((s) => sourceName(t, s))) })
+        : fromGp && fromTspu
           ? t("cr.tip.both", { gp: t(c.eyeball ? "cr.tip.gpHome" : "cr.tip.gpDc") })
           : fromTspu
             ? t("cr.tip.tspu")

@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import type { GetReachabilityHistoryResponse } from "@/gen/mistgate/admin/v1/country_reachability_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { countryReach } from "./api";
-import type { CountryLook } from "./health";
+import { sourceRank, vantageName, type CountryCheck, type CountryLook } from "./health";
 import { plain, type Plain } from "./plain";
 
 // The Reachability page (screens/reachability): the week of each source per node (CountryReachabilityService.
@@ -13,8 +13,11 @@ export type ReachHistory = Plain<GetReachabilityHistoryResponse>;
 export type Lane = ReachHistory["nodes"][number]["lanes"][number];
 
 /** The sources in the order of the page (and of the server's `sources`). */
-export const reachSources = ["globalping", "lists", "tspu"] as const;
+export const reachSources = ["globalping", "lists", "tspu", "cheburcheck", "cheburcheck_own", "bsbord"] as const;
 export type ReachSource = (typeof reachSources)[number];
+
+/** The lines of a node: the first three always (dimmed while off, so the rows keep their shape), an external source while it is on. */
+export const shownSources = (on: readonly string[]): ReachSource[] => reachSources.filter((s, i) => i < 3 || on.includes(s));
 
 /**
  * Seven days back. Keyed under ["health", "checks"]: whatever refreshes the checks (a source switched or tested, the country
@@ -89,4 +92,34 @@ export function tallyOf(nodeIds: readonly string[], verdictOf: (id: string) => C
   const out: Tally = { ok: 0, partial: 0, warn: 0, bad: 0, listed: 0, unknown: 0 };
   for (const id of nodeIds) out[verdictKind(verdictOf(id) ?? CountryVerdict.UNKNOWN)]++;
   return out;
+}
+
+export type DarkEverywhere = { source: string; name: string };
+
+/**
+ * The vantages that are dark for every node their source looked at, two nodes or more, while at least one of those nodes is
+ * reached from somewhere: an operator that cuts the whole fleet alike. No alert covers it (the partial alert needs the network to
+ * reach another node, the full one needs every network dark), so the page says it. By source, then name.
+ */
+export function darkEverywhere(checks: readonly CountryCheck[]): DarkEverywhere[] {
+  const nodes = new Map<string, number>(); // source -> nodes it has vantages on
+  const reached = new Map<string, number>(); // source -> of those, nodes some vantage reaches
+  const dark = new Map<string, DarkEverywhere & { n: number }>(); // source|key -> nodes it is dark on
+  for (const c of checks) {
+    const reach = c.vantages.some((v) => v.state === "reach");
+    for (const s of new Set(c.vantages.map((v) => v.source))) {
+      nodes.set(s, (nodes.get(s) ?? 0) + 1);
+      if (reach) reached.set(s, (reached.get(s) ?? 0) + 1);
+    }
+    const once = new Map(c.vantages.filter((v) => v.state === "dark").map((v) => [`${v.source}|${v.key}`, v]));
+    for (const [k, v] of once) {
+      const d = dark.get(k) ?? { source: v.source, name: vantageName(v), n: 0 };
+      d.n++;
+      dark.set(k, d);
+    }
+  }
+  return [...dark.values()]
+    .filter((d) => d.n >= 2 && d.n === nodes.get(d.source) && (reached.get(d.source) ?? 0) > 0)
+    .sort((a, b) => sourceRank(a.source) - sourceRank(b.source) || a.name.localeCompare(b.name))
+    .map(({ source, name }) => ({ source, name }));
 }

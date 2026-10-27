@@ -735,12 +735,30 @@ describe("reachability from a country", () => {
     expect(countryLook(tPlural, fmt, check({ confidence: "dc_only", eyeball: false })).via).toBe("Checked via Globalping from data centers");
   });
 
-  // a block on some networks: MTS gets nothing from the node while it reaches the others, Beeline reaches it
+  // a block on some networks: MTS gets nothing from the node while it reaches the others, Beeline reaches it. The probes are
+  // Globalping's round (the tooltip); the vantages are what every source saw (the server builds Globalping's from the same probes)
   const dark = (network: string, asn: number, city: string) => ({ ...probe(network, city, 0, [[443, false], [8443, false]]), asn, dark: true });
+  type Vantage = CountryCheck["vantages"][number];
+  const vantage = (source: string, network: string, state: string, over: Partial<Vantage> = {}): Vantage => ({
+    source,
+    key: `${source}:${network}`,
+    network,
+    region: "",
+    asn: "",
+    kind: source === "bsbord" ? "mobile" : "unknown",
+    state,
+    atUnix: roundAt,
+    dpiHop: 0,
+    icmpOk: state === "reach",
+    tcpOk: state === "reach",
+    ...over,
+  });
+  const gpDark = (network: string, asn: string, region: string) => vantage("globalping", network, "dark", { key: `AS${asn}`, asn, region });
   const some = check({
     verdict: CountryVerdict.PARTIAL,
     probes: [dark("MTS", 8359, "Novosibirsk"), { ...probe("Beeline", "Moscow", 44, [[443, true], [8443, true]]), asn: 3216 }],
     noProbe: ["MegaFon", "T2"],
+    vantages: [gpDark("MTS", "8359", "Novosibirsk"), vantage("globalping", "Beeline", "reach", { asn: "3216", region: "Moscow" })],
   });
 
   it("says PARTIAL apart from TCP blocked: its own kind and word, the networks that get nothing, the operators nobody asked", () => {
@@ -759,60 +777,81 @@ describe("reachability from a country", () => {
     expect(l.via).toBe("Checked via Globalping from home and mobile networks");
   });
 
-  it("names each dark network once, with its AS and city when it has them, and skips a probe that did not count", () => {
+  it("names each dark network once, from every source, with its AS and region when it has them", () => {
     const l = countryLook(tPlural, fmt, {
       ...some,
-      probes: [
-        dark("MTS", 8359, "Novosibirsk"),
-        dark("MTS", 8359, "Novosibirsk"),
-        dark("Beeline", 3216, ""),
-        { ...dark("Rostelecom", 12389, "Kazan"), valid: false },
-        probe("Beeline", "Moscow", 44, [[443, true]]),
+      vantages: [
+        gpDark("MTS", "8359", "Novosibirsk"),
+        gpDark("MTS", "8359", "Novosibirsk"),
+        gpDark("Beeline", "3216", ""),
+        vantage("globalping", "Rostelecom", "uncertain", { asn: "12389", region: "Kazan" }),
+        vantage("bsbord", "MTS", "dark", { region: "КРЫМ" }),
+        vantage("globalping", "Beeline", "reach", { asn: "3216", region: "Moscow" }),
       ],
     });
-    expect(l.dark).toBe("Blocked on some networks: MTS (AS8359, Novosibirsk), Beeline (AS3216)");
+    expect(l.dark).toBe("Blocked on some networks: MTS (AS8359, Novosibirsk), Beeline (AS3216), MTS (КРЫМ)");
     expect(l.note).toBe("MTS, Beeline");
-    expect(l.probes.map((p) => p.dark)).toEqual([true, true, true, false, false]);
-    expect(l.probes[3]!.where).toBe("Rostelecom, Kazan (not counted)");
     // names from a third party stay text: nothing in them is read as markup or as a placeholder
-    expect(countryLook(tPlural, fmt, { ...some, probes: [dark("<b>MTS</b> {country}", 8359, "Novosibirsk")] }).dark).toBe(
+    expect(countryLook(tPlural, fmt, { ...some, vantages: [gpDark("<b>MTS</b> {country}", "8359", "Novosibirsk")] }).dark).toBe(
       "Blocked on some networks: <b>MTS</b> {country} (AS8359, Novosibirsk)",
     );
   });
 
-  it("breaks a partial block down: the networks that do not see the node, the probes that do with their time, who was not asked", () => {
+  it("breaks a verdict with dark vantages down: who does not see the node, who does, under a white list, unclear, each with its source", () => {
     expect(countryLook(tPlural, fmt, some).breakdown).toEqual({
-      dark: [{ name: "MTS", tag: "AS8359 · Novosibirsk" }],
-      seen: [{ name: "Beeline", tag: "AS3216 · Moscow · 40\u00a0ms" }],
+      dark: [{ name: "MTS", tag: "AS8359 · Novosibirsk · Globalping" }],
+      seen: [{ name: "Beeline", tag: "AS3216 · Moscow · Globalping" }],
+      white: [],
+      unsure: [],
       noProbe: "Not checked this round: MegaFon, T2",
-      at: "Last round: 4 min ago",
+      at: "Checked: Globalping 4 min ago",
     });
-    // a dark network once; one without a city; a probe that did not count is in neither list; a node without TCP ports: the ping
+    // by source (the server's order), then region, then name; one network of a source once with its count; the kind when known
     const b = countryLook(tPlural, fmt, {
       ...some,
       noProbe: [],
-      probes: [
-        dark("MTS", 8359, "Novosibirsk"),
-        dark("MTS", 8359, "Novosibirsk"),
-        dark("Beeline", 3216, ""),
-        { ...dark("Rostelecom", 12389, "Kazan"), valid: false },
-        { ...probe("Beeline", "Kazan", 47, []), asn: 3216 },
-        { ...probe("MegaFon", "Omsk", 50, [], false), asn: 31133 },
+      vantages: [
+        vantage("bsbord", "MTS", "dark", { region: "КРЫМ", atUnix: roundAt - 3 * 3600 }),
+        vantage("bsbord", "Volna", "whitelist", { region: "КРЫМ", atUnix: roundAt - 3 * 3600 }),
+        gpDark("MTS", "8359", "Novosibirsk"),
+        gpDark("MTS", "8359", "Novosibirsk"),
+        gpDark("Beeline", "3216", ""),
+        vantage("globalping", "Rostelecom", "uncertain", { asn: "12389", region: "Kazan" }),
+        vantage("globalping", "Beeline", "reach", { asn: "3216", region: "Kazan" }),
+        vantage("cheburcheck", "Rostelecom", "reach", { key: "probe:7", asn: "12389", region: "Moscow", atUnix: roundAt - 2 * 3600 }),
+        vantage("tspu", "probe1", "reach", { key: "nod_probe1", kind: "dc" }),
       ],
     }).breakdown!;
     expect(b.dark).toEqual([
-      { name: "MTS", tag: "AS8359 · Novosibirsk" },
-      { name: "Beeline", tag: "AS3216" },
+      { name: "Beeline", tag: "AS3216 · Globalping" },
+      { name: "MTS", tag: "AS8359 · Novosibirsk · Globalping · ×2" },
+      { name: "MTS", tag: "КРЫМ · mobile · bsbord" },
     ]);
-    expect(b.seen).toEqual([{ name: "Beeline", tag: "AS3216 · Kazan · 47\u00a0ms" }]);
-    expect(b.noProbe).toBe("");
+    expect(b.seen).toEqual([
+      { name: "Beeline", tag: "AS3216 · Kazan · Globalping" },
+      { name: "probe1", tag: "data center · TSPU probe" },
+      { name: "Rostelecom", tag: "AS12389 · Moscow · cheburcheck" },
+    ]);
+    expect(b.white).toEqual([{ name: "Volna", tag: "КРЫМ · mobile · bsbord" }]);
+    expect(b.unsure).toEqual([{ name: "Rostelecom", tag: "AS12389 · Kazan · Globalping" }]);
+    expect([b.noProbe, b.at]).toEqual(["", "Checked: Globalping 4 min ago · TSPU probe 4 min ago · cheburcheck 2 h ago · bsbord 3 h ago"]);
     const ruB = countryLook(tRuPlural, fmtRu, some).breakdown!;
-    expect([ruB.seen[0]!.tag, ruB.noProbe, ruB.at]).toEqual(["AS3216 · Moscow · 40\u00a0мс", "Не проверены в этом круге: MegaFon, T2", "Последний круг: 4 мин назад"]);
+    expect([ruB.seen[0]!.tag, ruB.noProbe, ruB.at]).toEqual(["AS3216 · Moscow · Globalping", "Не проверены в этом круге: MegaFon, T2", "Проверено: Globalping 4 мин назад"]);
     expect(countryLook(tZhPlural, fmtZh, some).breakdown!.noProbe).toBe("本轮未检测：MegaFon、T2");
+    // a white-list unit that reaches the node is a plain reach; one without a dark vantage has no breakdown at all
+    expect(countryLook(tPlural, fmt, check({ vantages: [vantage("bsbord", "MTS", "reach", { region: "КРЫМ" })] })).breakdown).toBeNull();
   });
 
-  it("does not call a full block a block on some networks, though every probe of it is stored dark", () => {
-    const l = countryLook(tPlural, fmt, check({ verdict: CountryVerdict.BLOCKED, probes: [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")] }));
+  it("does not call a full block a block on some networks, but still breaks it down", () => {
+    const l = countryLook(
+      tPlural,
+      fmt,
+      check({
+        verdict: CountryVerdict.BLOCKED,
+        probes: [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")],
+        vantages: [gpDark("MTS", "8359", "Omsk"), gpDark("Beeline", "3216", "Moscow")],
+      }),
+    );
     expect([l.kind, l.head, l.dark, l.note]).toEqual(["bad", "Neither ICMP nor TCP gets through", "", ""]);
     expect(l.probes.map((p) => [p.where, p.dark])).toEqual([
       ["MTS, Omsk", false],
@@ -820,7 +859,8 @@ describe("reachability from a country", () => {
     ]);
     expect(l.line).toBe("MTS, Beeline · 4 min ago");
     expect(l.state).not.toContain("some networks");
-    expect(l.breakdown).toBeNull();
+    expect(l.breakdown!.dark.map((n) => n.name)).toEqual(["Beeline", "MTS"]);
+    expect(l.breakdown!.seen).toEqual([]);
     expect(countryLook(tPlural, fmt, check()).breakdown).toBeNull();
   });
 
@@ -830,6 +870,37 @@ describe("reachability from a country", () => {
     // two sources that disagree word a partial Globalping verdict in full
     const mixed = { ...some, confidence: "conflict", sources: ["globalping", "tspu"], globalpingVerdict: CountryVerdict.PARTIAL, tspuVerdict: CountryVerdict.OK };
     expect(countryLook(tPlural, fmt, mixed).conflict).toBe("Globalping: blocked on some networks · probe: reachable");
+  });
+
+  it("lists what every source said with its reason and age, words a conflict from them, and names them all as where it comes from", () => {
+    const said = (source: string, verdict: CountryVerdict, ago: number, reason = "", eyeball = true) => ({ source, verdict, eyeball, atUnix: roundAt - ago, reason });
+    const c = check({
+      verdict: CountryVerdict.BLOCKED,
+      confidence: "conflict",
+      sources: ["globalping", "cheburcheck", "bsbord"],
+      sourceVerdicts: [
+        said("globalping", CountryVerdict.BLOCKED, 0),
+        said("cheburcheck", CountryVerdict.OK, 2 * 3600),
+        said("bsbord", CountryVerdict.UNKNOWN, 3 * 3600, "no_tcp_port"),
+      ],
+    });
+    const l = countryLook(tPlural, fmt, c);
+    expect(l.said).toEqual([
+      "Globalping: unreachable · 4 min ago",
+      "cheburcheck: reachable · 2 h ago",
+      "bsbord: no data, the node has no TCP port to test · 3 h ago",
+    ]);
+    // the source that had nothing to say is not part of the disagreement
+    expect(l.conflict).toBe("Globalping: unreachable · cheburcheck: reachable");
+    expect(l.via).toBe("Checked by Globalping, cheburcheck, and bsbord");
+    // a reason this page does not know stays its code; Russian and Chinese
+    expect(countryLook(tPlural, fmt, check({ sourceVerdicts: [said("bsbord", CountryVerdict.UNKNOWN, 0, "brand_new")] })).said).toEqual([
+      "bsbord: no data, brand_new · 4 min ago",
+    ]);
+    expect(countryLook(tRuPlural, fmtRu, c).said[2]).toBe("bsbord: нет данных, у ноды нет TCP-порта для проверки · 3 ч назад");
+    expect(countryLook(tZhPlural, fmtZh, c).via).toBe("检测来源：Globalping、cheburcheck 和 bsbord");
+    // a row of Globalping and the probe only keeps their words and says nothing of the others
+    expect(countryLook(tPlural, fmt, check()).said).toEqual([]);
   });
 
   it("says PARTIAL in Russian and Chinese", () => {

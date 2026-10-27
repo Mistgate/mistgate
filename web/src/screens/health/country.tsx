@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useId, type ReactElement } from "react";
+import { useId, useState, type ReactElement } from "react";
 import { Icon } from "@/components/ui/icons";
 import { StatusDot, StatusGlyph } from "@/components/ui/status";
 import { Tip } from "@/components/ui/tooltip";
@@ -13,9 +13,9 @@ import { countryIn, countryLook, type BreakdownNet, type CountryCheck, type Coun
 // row of a node's card on the phone and on its page. OK stays quiet and "no data" grey; the blocks take a problem colour (a
 // block on some networks the warn colour with a half disc, apart from the "!" of TCP blocked), and a node in a block list that
 // nobody checked live the warn colour drawn dashed: on record, not seen. Each carries a glyph as well, so the state never rests
-// on colour alone. Two sources that disagree say so under the verdict. The tooltip names the probes with their ICMP and TCP
-// answers (and the networks a partial block cuts off), the probe node with its ports, the times, the lists, and where the
-// verdict comes from.
+// on colour alone. Two sources that disagree say so under the verdict. The tooltip says what each source (Globalping, the TSPU
+// probe, cheburcheck, bsbord) said with its reason and age, names the Globalping probes with their ICMP and TCP answers (and the
+// networks a partial block cuts off), the probe node with its ports, the times, the lists, and where the verdict comes from.
 
 type Kind = CountryLook["kind"] | "none";
 
@@ -78,9 +78,9 @@ export function CountryMark({ kind }: { kind: Kind }) {
 }
 
 /**
- * The verdict; two sources that disagree, and what each said; each Globalping probe on two lines (where, then what it got; one
- * that did not count is greyed) and the round's time; the probe node with its ports and the run's time; what the lists add;
- * where it comes from.
+ * The verdict; what each source said (in the warn colour when they disagree); each Globalping probe on two lines (where, then
+ * what it got; one that did not count is greyed) and the round's time; the probe node with its ports and the run's time; what
+ * the lists add; where it comes from.
  */
 function CountryTip({ look, children }: { look: CountryLook; children: ReactElement }) {
   const t = useT();
@@ -90,7 +90,14 @@ function CountryTip({ look, children }: { look: CountryLook; children: ReactElem
       {look.conflict && (
         <span className="flex flex-col">
           <span className="tone-warn tone-text">{t("cr.tip.conflict")}</span>
-          <span className="font-medium">{look.conflict}</span>
+          {look.said.length === 0 && <span className="font-medium">{look.conflict}</span>}
+        </span>
+      )}
+      {look.said.length > 0 && (
+        <span className="flex flex-col font-medium">
+          {look.said.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
         </span>
       )}
       {look.dark && <span className="tone-warn tone-text">{look.dark}</span>}
@@ -252,16 +259,18 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
 }
 
 /**
- * A block on some networks in full: the networks that do not see the node (✕), the probes that reach it (✓, with their time),
- * each a list under its own label; the operators the round could not ask; what may help; the round's age. The names come
- * from Globalping and stay text.
+ * Every source's networks under a verdict that has dark ones: those that do not see the node (✕), those that reach it (✓),
+ * those under a white list (○), those without a clear answer (?), each a list under its own label with the source in every
+ * line; the operators the round could not ask; what may help; each source's age. The names come from the sources and stay text.
  */
 export function PartialBreakdown({ breakdown, className }: { breakdown: NonNullable<CountryLook["breakdown"]>; className?: string }) {
   const t = useT();
   return (
     <div data-testid="partial-breakdown" className={cx("flex min-w-0 flex-col gap-2.5 text-[13px]", className)}>
-      <NetList label={t("cr.part.dark")} nets={breakdown.dark} reached={false} />
-      {breakdown.seen.length > 0 && <NetList label={t("cr.part.seen")} nets={breakdown.seen} reached />}
+      <NetList label={t("cr.part.dark")} nets={breakdown.dark} mark="dark" />
+      {breakdown.seen.length > 0 && <NetList label={t("cr.part.seen")} nets={breakdown.seen} mark="seen" />}
+      {breakdown.white.length > 0 && <NetList label={t("cr.part.white")} nets={breakdown.white} mark="white" />}
+      {breakdown.unsure.length > 0 && <NetList label={t("cr.part.unsure")} nets={breakdown.unsure} mark="unsure" />}
       {breakdown.noProbe && <p className="text-xs leading-snug text-muted">{breakdown.noProbe}</p>}
       <p className="text-xs leading-snug text-pretty">
         {t("cr.part.hint")}{" "}
@@ -274,19 +283,34 @@ export function PartialBreakdown({ breakdown, className }: { breakdown: NonNulla
   );
 }
 
-/** One group of the breakdown: its label, then a line per network with its mark, its name and its AS, city and time muted. */
-function NetList({ label, nets, reached }: { label: string; nets: readonly BreakdownNet[]; reached: boolean }) {
+const marks = {
+  dark: ["✕", "tone-bad tone-text"],
+  seen: ["✓", "tone-ok tone-text"],
+  white: ["○", "text-muted"],
+  unsure: ["?", "text-muted"],
+} as const;
+
+/** A list longer than this shows its first lines and "and 27 more"; the button opens the rest. */
+const SHORT = 6;
+
+/** One group of the breakdown: its label, then a line per network with its mark, its name and its AS, region, kind and source muted. */
+function NetList({ label, nets, mark }: { label: string; nets: readonly BreakdownNet[]; mark: keyof typeof marks }) {
+  const t = useT();
   const id = useId();
+  const [open, setOpen] = useState(false);
+  const cut = !open && nets.length > SHORT + 1;
+  const shown = cut ? nets.slice(0, SHORT) : nets;
+  const [glyph, cls] = marks[mark];
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span id={id} className="text-xs font-bold">
         {label}
       </span>
-      <ul aria-labelledby={id} className="flex flex-col gap-0.5">
-        {nets.map((n, i) => (
+      <ul id={`${id}-list`} aria-labelledby={id} className="flex flex-col gap-0.5">
+        {shown.map((n, i) => (
           <li key={i} className="grid grid-cols-[14px_minmax(0,1fr)] items-baseline gap-x-1.5">
-            <span aria-hidden className={cx("text-center text-xs font-extrabold tone-text", reached ? "tone-ok" : "tone-bad")}>
-              {reached ? "✓" : "✕"}
+            <span aria-hidden className={cx("text-center text-xs font-extrabold", cls)}>
+              {glyph}
             </span>
             <span className="min-w-0 break-words">
               <span className="font-semibold">{n.name}</span> <span className="font-mono text-[11px] text-muted">{n.tag}</span>
@@ -294,6 +318,17 @@ function NetList({ label, nets, reached }: { label: string; nets: readonly Break
           </li>
         ))}
       </ul>
+      {nets.length > SHORT + 1 && (
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`${id}-list`}
+          onClick={() => setOpen(!open)}
+          className="ml-5 w-fit rounded-sm text-xs font-semibold text-muted underline decoration-dotted underline-offset-2 hover:text-fg"
+        >
+          {open ? t("cr.part.fewer") : t("cr.part.more", { n: nets.length - SHORT })}
+        </button>
+      )}
     </div>
   );
 }

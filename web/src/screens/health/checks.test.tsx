@@ -191,6 +191,8 @@ const verdict = (nodeId: string, v: CountryVerdict, probes: ReturnType<typeof pr
   tspuVantageName: "",
   tspuAtUnix: 0,
   noProbe: [] as string[],
+  vantages: [] as object[],
+  sourceVerdicts: [] as object[],
   ...over,
 });
 const countryChecks = [
@@ -330,42 +332,83 @@ describe("the country row on the node page", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// A block on some networks (PARTIAL) in the same column: de1 is dark on MTS, nl1 fully blocked with every probe stored dark
+// A block on some networks (PARTIAL) in the same column: de1 is dark on MTS for Globalping and on MTS in Crimea for bsbord, seen by
+// Beeline and nine cheburcheck probes, with a Crimean unit under the white list; nl1 fully blocked with every probe stored dark
 
 const dark = (network: string, asn: number, city: string) => ({ ...probe(network, city, 0, [[443, false]]), asn, dark: true });
+const vantage = (source: string, network: string, state: string, over: object = {}) => ({
+  source,
+  key: `${source}:${network}`,
+  network,
+  region: "",
+  asn: "",
+  kind: source === "bsbord" ? "mobile" : "unknown",
+  state,
+  atUnix: at,
+  dpiHop: 0,
+  icmpOk: state === "reach",
+  tcpOk: state === "reach",
+  ...over,
+});
+const cities = ["Moscow", "Kazan", "Omsk", "Perm", "Tula", "Tver", "Ufa", "Samara", "Sochi"];
+const someVantages = [
+  vantage("globalping", "MTS", "dark", { key: "AS8359", asn: "8359", region: "Novosibirsk" }),
+  vantage("globalping", "Beeline", "reach", { key: "AS3216", asn: "3216", region: "Moscow" }),
+  ...cities.map((region, i) => vantage("cheburcheck", "Rostelecom", "reach", { key: `probe:${i}`, asn: "12389", region, atUnix: at - 2 * 3600 })),
+  vantage("bsbord", "MTS", "dark", { key: "mts|krym|off", region: "КРЫМ", atUnix: at - 3 * 3600 }),
+  vantage("bsbord", "Volna", "whitelist", { key: "volna|krym|on", region: "КРЫМ", atUnix: at - 3 * 3600 }),
+];
+const said = (source: string, v: CountryVerdict, ago: number) => ({ source, verdict: v, eyeball: true, atUnix: at - ago, reason: "" });
 const some = {
   ...four,
   countryChecks: [
-    verdict("nod_1", CountryVerdict.PARTIAL, [dark("MTS", 8359, "Novosibirsk"), { ...probe("Beeline", "Moscow", 44, [[443, true]]), asn: 3216 }], { confidence: "eyeball", noProbe: ["MegaFon", "T2"] }),
+    verdict("nod_1", CountryVerdict.PARTIAL, [dark("MTS", 8359, "Novosibirsk"), { ...probe("Beeline", "Moscow", 44, [[443, true]]), asn: 3216 }], {
+      confidence: "eyeball",
+      noProbe: ["MegaFon", "T2"],
+      sources: ["globalping", "cheburcheck", "bsbord"],
+      vantages: someVantages,
+      sourceVerdicts: [said("globalping", CountryVerdict.PARTIAL, 0), said("cheburcheck", CountryVerdict.OK, 2 * 3600), said("bsbord", CountryVerdict.BLOCKED, 3 * 3600)],
+    }),
     countryChecks[1]!,
-    verdict("nod_3", CountryVerdict.BLOCKED, [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")], { confidence: "eyeball" }),
+    verdict("nod_3", CountryVerdict.BLOCKED, [dark("MTS", 8359, "Omsk"), dark("Beeline", 3216, "Moscow")], {
+      confidence: "eyeball",
+      vantages: [vantage("globalping", "MTS", "dark", { asn: "8359", region: "Omsk" }), vantage("globalping", "Beeline", "dark", { asn: "3216", region: "Moscow" })],
+    }),
   ],
 };
+const items = (ul: Element) => [...ul.querySelectorAll("li")].map((li) => li.textContent);
+const labelOf = (ul: Element) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent;
 
 describe("a block on some networks in the country column", () => {
   afterEach(() => act(() => setLang("en")));
 
-  it("shows PARTIAL in the warn tone with its own glyph and word, the dark networks under it", async () => {
+  it("shows PARTIAL in the warn tone with its own glyph and word, the dark networks of every source under it", async () => {
     await mount(some);
     const partial = countryCell("de1")!;
     expect(partial.textContent).toBe("some networksMTS");
     expect(partial.className).toContain("tone-warn");
     expect(partial.querySelector("svg circle")).not.toBeNull(); // the half disc, not TCP blocked's "!"
     expect(countryCell("de2")!.textContent).toBe("!TCP blockedICMP passes");
-    expect(partial.getAttribute("aria-label")).toBe("de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk)");
+    expect(partial.getAttribute("aria-label")).toBe(
+      "de1, From Russia: Reachable from Russia, but not from every network · Blocked on some networks: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
+    );
   });
 
-  it("opens the tooltip on keyboard focus: the networks that get nothing, the dark probe marked, the operators nobody asked", async () => {
+  it("opens the tooltip on keyboard focus: what each source said and when, the networks that get nothing, the dark probe, who was not asked", async () => {
     await mount(some);
     await act(async () => countryCell("de1")!.focus());
     for (let i = 0; i < 3; i++) await settle();
     const text = document.body.textContent ?? "";
     for (const line of [
       "Reachable from Russia, but not from every network",
-      "Blocked on some networks: MTS (AS8359, Novosibirsk)",
+      "Globalping: blocked on some networks · 4 min ago",
+      "cheburcheck: reachable · 2 h ago",
+      "bsbord: unreachable · 3 h ago",
+      "Blocked on some networks: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
       "MTS, Novosibirsk (reaches your other nodes, not this one)",
       "Beeline, Moscow",
       "No home/mobile probe this round: MegaFon, T2",
+      "Checked by Globalping, cheburcheck, and bsbord",
     ])
       expect(text).toContain(line);
   });
@@ -384,7 +427,7 @@ describe("a block on some networks in the country column", () => {
     expect(tip).not.toContain("reaches your other nodes");
   });
 
-  it("breaks it down under the phone card's row, where there is no hover: who does not see the node, who does, what may help", async () => {
+  it("breaks it down under the phone card's row, every source in its group: who does not see the node, who does, the white list", async () => {
     await mount(some);
     const rows = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")];
     expect(rows[0]?.textContent).toBe("From Russiasome networks");
@@ -393,12 +436,27 @@ describe("a block on some networks in the country column", () => {
     expect(box.className).toContain("tone-warn");
     const breakdown = box.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
     expect(rows[0]!.contains(breakdown)).toBe(false);
-    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(1); // the desktop cell stays compact
-    // two lists, each named by its label
+    // de1 and the full block of nl1; the desktop cells stay compact
+    expect(document.querySelectorAll("[data-testid=partial-breakdown]")).toHaveLength(2);
     const lists = [...breakdown.querySelectorAll("ul")];
-    expect(lists.map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Cannot reach the node", "Reach it"]);
-    expect(lists.map((ul) => [...ul.querySelectorAll("li")].map((li) => li.textContent))).toEqual([["✕MTS AS8359 · Novosibirsk"], ["✓Beeline AS3216 · Moscow · 40\u00a0ms"]]);
+    expect(lists.map(labelOf)).toEqual(["Cannot reach the node", "Reach it", "White list on (cuts every foreign address)"]);
+    expect(items(lists[0]!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
+    expect(items(lists[2]!)).toEqual(["○Volna КРЫМ · mobile · bsbord"]);
     for (const mark of breakdown.querySelectorAll("li > span:first-child")) expect(mark.getAttribute("aria-hidden")).toBe("true");
+    // ten that reach it: six and "and 4 more", a button that says what it opens
+    expect(items(lists[1]!)).toEqual([
+      "✓Beeline AS3216 · Moscow · Globalping",
+      "✓Rostelecom AS12389 · Kazan · cheburcheck",
+      "✓Rostelecom AS12389 · Moscow · cheburcheck",
+      "✓Rostelecom AS12389 · Omsk · cheburcheck",
+      "✓Rostelecom AS12389 · Perm · cheburcheck",
+      "✓Rostelecom AS12389 · Samara · cheburcheck",
+    ]);
+    const more = breakdown.querySelector<HTMLButtonElement>("button")!;
+    expect([more.textContent, more.getAttribute("aria-expanded"), more.getAttribute("aria-controls")]).toEqual(["and 4 more", "false", lists[1]!.id]);
+    await act(async () => more.click());
+    expect(items(lists[1]!)).toHaveLength(10);
+    expect([more.textContent, more.getAttribute("aria-expanded")]).toEqual(["Show fewer", "true"]);
     expect(breakdown.textContent).toContain("Not checked this round: MegaFon, T2");
     expect(breakdown.textContent).toContain("A profile behind a CDN may help people on these networks.");
     const guide = breakdown.querySelector("a")!;
@@ -408,15 +466,19 @@ describe("a block on some networks in the country column", () => {
       "_blank",
       "noopener noreferrer",
     ]);
-    expect(breakdown.lastElementChild?.textContent).toBe("Last round: 4 min ago");
+    expect(breakdown.lastElementChild?.textContent).toBe("Checked: Globalping 4 min ago · cheburcheck 2 h ago · bsbord 3 h ago");
   });
 
-  it("does not break a full block down: its row keeps the quiet line", async () => {
+  it("breaks a full block down as well, in its own tone, instead of the quiet line", async () => {
     await mount(some);
     const cut = [...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")][2]!;
-    expect(cut.textContent).toBe("×From RussiaunreachableMTS, Beeline · 4 min ago");
-    expect(cut.className).toContain("tone-bad");
-    expect(cut.parentElement!.querySelector("[data-testid=partial-breakdown]")).toBeNull();
+    expect(cut.textContent).toBe("×From Russiaunreachable");
+    expect(cut.parentElement!.className).toContain("tone-bad");
+    const breakdown = cut.parentElement!.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
+    expect([...breakdown.querySelectorAll("ul")].map(labelOf)).toEqual(["Cannot reach the node"]);
+    expect(items(breakdown.querySelector("ul")!)).toEqual(["✕Beeline AS3216 · Moscow · Globalping", "✕MTS AS8359 · Omsk · Globalping"]);
+    // a row with nothing dark keeps its quiet line
+    expect([...document.querySelectorAll<HTMLElement>("[data-testid=country-row]")][1]!.parentElement!.querySelector("[data-testid=partial-breakdown]")).toBeNull();
   });
 
   it("shows it on the node page as well", async () => {
@@ -432,7 +494,7 @@ describe("a block on some networks in the country column", () => {
     expect(row.querySelector("svg circle")).not.toBeNull();
     expect(row.tabIndex).toBe(0);
     const breakdown = row.parentElement!.querySelector("[data-testid=partial-breakdown]")!;
-    expect([...breakdown.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["✕MTS AS8359 · Novosibirsk", "✓Beeline AS3216 · Moscow · 40\u00a0ms"]);
+    expect(items(breakdown.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
     // the row's tooltip still opens on focus
     await act(async () => row.focus());
     for (let i = 0; i < 3; i++) await settle();
@@ -443,11 +505,15 @@ describe("a block on some networks in the country column", () => {
     act(() => setLang("ru"));
     await mount(some);
     expect(countryCell("de1")?.textContent).toBe("часть сетейMTS");
-    expect(countryCell("de1")?.getAttribute("aria-label")).toBe("de1, Из России: Доступна из России, но не из всех сетей · Недоступна из части сетей: MTS (AS8359, Novosibirsk)");
+    expect(countryCell("de1")?.getAttribute("aria-label")).toBe(
+      "de1, Из России: Доступна из России, но не из всех сетей · Недоступна из части сетей: MTS (AS8359, Novosibirsk), MTS (КРЫМ)",
+    );
     const ruB = document.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
-    expect([...ruB.querySelectorAll("ul")].map((ul) => document.getElementById(ul.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Не видят ноду", "Видят"]);
-    expect(ruB.querySelector("li")?.textContent).toBe("✕MTS AS8359 · Novosibirsk");
-    for (const l of ["Не проверены в этом круге: MegaFon, T2", "Людям в этих сетях может помочь профиль через CDN.", "Последний круг: 4 мин назад"]) expect(ruB.textContent).toContain(l);
+    expect([...ruB.querySelectorAll("ul")].map(labelOf)).toEqual(["Не видят ноду", "Видят", "Белый список (режет все зарубежные адреса)"]);
+    expect(items(ruB.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · мобильная · bsbord"]);
+    expect(ruB.querySelector("button")?.textContent).toBe("и ещё 4");
+    for (const l of ["Не проверены в этом круге: MegaFon, T2", "Людям в этих сетях может помочь профиль через CDN.", "Проверено: Globalping 4 мин назад · cheburcheck 2 ч назад · bsbord 3 ч назад"])
+      expect(ruB.textContent).toContain(l);
     expect([ruB.querySelector("a")?.textContent, ruB.querySelector("a")?.getAttribute("href")]).toEqual(["Руководство: VLESS за CDN", "https://mistgate.app/ru/guide/vless/#vless-за-cdn"]);
     act(() => root?.unmount());
     host?.remove();
@@ -455,7 +521,9 @@ describe("a block on some networks in the country column", () => {
     await mount(some);
     expect(countryCell("de1")?.textContent).toBe("部分网络MTS");
     const zhB = document.querySelector<HTMLElement>("[data-testid=partial-breakdown]")!;
-    expect(document.getElementById(zhB.querySelector("ul")!.getAttribute("aria-labelledby")!)?.textContent).toBe("无法连接节点");
+    expect(labelOf(zhB.querySelector("ul")!)).toBe("无法连接节点");
+    expect(zhB.querySelector("button")?.textContent).toBe("还有 4 个");
+    expect(zhB.textContent).toContain("白名单模式（所有境外地址均被切断）");
     expect(zhB.querySelector("a")?.getAttribute("href")).toBe("https://mistgate.app/zh/guide/vless/#vless-经-cdn-连接");
   });
 });

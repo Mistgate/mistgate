@@ -12,9 +12,9 @@ import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { countryQuery } from "@/lib/globalping";
-import { alertsQuery, checksQuery, countryIn, severityKind, type Alert, type CountryLook } from "@/lib/health";
+import { alertsQuery, checksQuery, countryIn, severityKind, sourceName, type Alert, type CountryCheck, type CountryLook } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
-import { historyQuery, tallyOf, type Lane, type Tally } from "@/lib/reachability";
+import { darkEverywhere, historyQuery, tallyOf, type DarkEverywhere, type Lane, type Tally } from "@/lib/reachability";
 import { useIsOwner } from "@/lib/updates";
 import { CountryMark } from "@/screens/health/country";
 import { NodesTable, type NodeRow } from "./nodes";
@@ -65,6 +65,7 @@ export function ReachabilityScreen() {
       ) : (
         <>
           <Summary tally={tallyOf(nodes.map((n) => n.id), (id) => byNode.get(id)?.verdict)} />
+          <DarkEverywhereLines rows={darkEverywhere(nodes.map((n) => byNode.get(n.id)).filter((c): c is CountryCheck => !!c))} />
           <NodesTable nodes={nodes} checks={byNode} lanes={lanes} sources={sources} probeNode={checks.data?.tspuRun?.nodeId ?? ""} country={code} since={h.sinceUnix} now={h.nowUnix} />
         </>
       )}
@@ -117,6 +118,33 @@ function Summary({ tally }: { tally: Tally }) {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * A network that reaches none of the nodes ("MTS (КРЫМ) reaches none of your nodes", with the source): an operator that cuts the
+ * whole fleet alike, which no alert covers. Nothing when there is none.
+ */
+function DarkEverywhereLines({ rows }: { rows: readonly DarkEverywhere[] }) {
+  const t = useT();
+  if (rows.length === 0) return null;
+  return (
+    <section aria-label={t("rc.darkAll.title")} className="flex flex-col gap-1.5 rounded-card tone-warn tint px-3.5 py-2.5 text-[13px]">
+      <ul className="flex flex-col gap-1">
+        {rows.map((r) => (
+          <li key={`${r.source}|${r.name}`} data-testid="dark-everywhere" className="flex items-baseline gap-2">
+            <span aria-hidden className="tone-bad tone-text text-xs font-extrabold">
+              ✕
+            </span>
+            <span className="min-w-0 text-pretty">
+              <b className="font-bold">{t("rc.darkAll", { network: r.name })}</b>
+              <span className="text-muted"> · {sourceName(t, r.source)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="pl-5 text-xs text-muted">{t("rc.darkAll.hint")}</p>
+    </section>
   );
 }
 
