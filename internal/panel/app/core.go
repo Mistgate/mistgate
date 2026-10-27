@@ -295,9 +295,15 @@ func wireCore(c Config) (*core, error) {
 	// Health: the synthetic checker, alerts, the node doctor and retention. The fleet hands it doctor reports and
 	// returning nodes; it gives the fleet the node status and the alert badge.
 	hcfg := health.Config{Edge: edge, Log: log, BlipWindow: c.HealthBlipWindow, CheckPorts: fl.CheckPortsAsSystem, CheckPortsUDP: fl.CheckPortsAsSystemUDP,
-		Country:  k.gp.Country,
-		Lists:    k.bl.Active,
-		External: func(context.Context) []health.ExternalState { return nil },
+		Country: k.gp.Country,
+		Lists:   k.bl.Active,
+		External: func(ctx context.Context) []health.ExternalState {
+			var out []health.ExternalState
+			for _, s := range k.cc.State(ctx).Sources() {
+				out = append(out, health.ExternalState(s))
+			}
+			return out
+		},
 		TSPU: func(ctx context.Context) health.TSPUState {
 			st := k.cp.State(ctx)
 			return health.TSPUState(st)
