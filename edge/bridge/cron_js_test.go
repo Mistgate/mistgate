@@ -132,10 +132,11 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	awaitCronPromise(t, waitUntil)
 	counts := binding.Call("__endQueryCount")
 	ended = true
-	// Telegram and updates each add one read, the empty-owner watcher adds one, and cheburcheck reads its settings once while off.
+	// Telegram and updates each add one read, the empty-owner watcher adds one, and cheburcheck and bsbord each read their settings
+	// once while off.
 	// The rest is the four sweeps, two country settings and eight evaluator calls on an empty fleet.
-	if got := counts.Get("sequentialQueries").Int(); got != 18 {
-		t.Fatalf("cron used %d sequential D1 calls, want 18 (6 tick + updates read + Telegram code check + empty-owner watcher + one cheburcheck settings read + 8 evaluator on an empty fleet)", got)
+	if got := counts.Get("sequentialQueries").Int(); got != 19 {
+		t.Fatalf("cron used %d sequential D1 calls, want 19 (6 tick + updates read + Telegram code check + empty-owner watcher + one cheburcheck and one bsbord settings read + 8 evaluator on an empty fleet)", got)
 	}
 	if got := remote.pokeCount(); got != 1 {
 		t.Fatalf("minute 10 remote fan-outs = %d, want 1", got)
@@ -163,8 +164,8 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	// The nodes are still warm in the isolate and the empty summary is unchanged, so the evaluator pass is six calls: its lease,
 	// the signal batch, the active alerts, the interval setting, the update rollout and the country settings. Telegram's pending
 	// code check adds one read on every tick. The updates job adds the active rollout read, and its history prune at minute 17.
-	if got := retentionCounts.Get("sequentialQueries").Int(); got != 29 {
-		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 29 (5 tick + 2 updates + Telegram code check + one cheburcheck settings read + 14 retention + 6 evaluator)", got)
+	if got := retentionCounts.Get("sequentialQueries").Int(); got != 30 {
+		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 30 (5 tick + 2 updates + Telegram code check + one cheburcheck and one bsbord settings read + 14 retention + 6 evaluator)", got)
 	}
 	// Three batches: the node-down sweep's live read (every tick), the evaluator's signal batch and the daily rollup; the
 	// prunes are single statements.

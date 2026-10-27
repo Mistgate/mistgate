@@ -545,13 +545,13 @@ async function assertProvisioner(bytes, forwardPanel, adminCookie, initOptions, 
   };
   await insertJob("prv_done", "failed");
   // 6 for the sweeps and settings, one read of the active rollout for the updates job, one Telegram pending-code check, one
-  // cheburcheck settings read while off and 10 for a warm evaluator pass (see "cron tick" below); nothing in an install wakes more.
-  assert.equal((await tick(3)).queries.sequentialQueries, 19);
+  // cheburcheck and one bsbord settings read while off and 10 for a warm evaluator pass (see "cron tick" below); nothing in an install wakes more.
+  assert.equal((await tick(3)).queries.sequentialQueries, 20);
   assert.equal(provisionKicks, 0, "a finished install wakes nothing");
   for (const [i, state] of ["queued", "running", "cancel_requested"].entries()) {
     await globalThis.__d1.prepare("DELETE FROM node_provision_job WHERE id = 'prv_open'").run();
     await insertJob("prv_open", state);
-    assert.equal((await tick(3)).queries.sequentialQueries, 19, "waking costs no query beyond the look");
+    assert.equal((await tick(3)).queries.sequentialQueries, 20, "waking costs no query beyond the look");
     assert.equal(provisionKicks, i + 1, `a ${state} install wakes the Provisioner`);
   }
   await globalThis.__d1.prepare("DELETE FROM node_provision_job").run();
@@ -1177,8 +1177,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(normalCronQueries)}`);
     assert.equal(
       normalCronQueries.sequentialQueries,
-      22,
-      "a normal cron tick costs 22 D1 calls: 6 for the sweeps and the country settings, one read of the active rollout for the updates job, one Telegram pending-code check, one cheburcheck settings read while off, and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
+      23,
+      "a normal cron tick costs 23 D1 calls: 6 for the sweeps and the country settings, one read of the active rollout for the updates job, one Telegram pending-code check, one cheburcheck and one bsbord settings read while off, and 13 for the isolate's first evaluator pass: its lease, nodes, inbounds, live nodes, doctor results and acceptances, the signal batch, port checks, active alerts, the interval setting, the update rollout, the country settings and the node-summary write",
     );
 
     liveProjectionQueries = 0;
@@ -1193,8 +1193,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(cronQueries)}`);
     assert.equal(
       cronQueries.sequentialQueries,
-      21,
-      "one minute 10 cron tick costs 21 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, one read of the active rollout for the updates job, one Telegram pending-code check, one Telegram bot check for the watcher, one cheburcheck settings read while off, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
+      22,
+      "one minute 10 cron tick costs 22 D1 calls: the 7 of the sweeps, the country settings and the fan-out live read, one read of the active rollout for the updates job, one Telegram pending-code check, one Telegram bot check for the watcher, one cheburcheck and one bsbord settings read while off, plus 10 for a warm evaluator pass (no nodes or inbounds read again, no summary write)",
     );
     assert.equal(liveProjectionQueries, 3, "the node-down sweep, the evaluator and the ten-minute safety net each read live nodes once");
     assert.equal(nodePokeCalls, 1, "the ten-minute safety net performs one remote fan-out");
@@ -1209,8 +1209,8 @@ async function run() {
     console.log(`D1 query count ${JSON.stringify(retentionQueries)}`);
     assert.equal(
       retentionQueries.sequentialQueries,
-      34,
-      "a minute 17 cron tick costs 34 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, one cheburcheck settings read while off, 14 for retention (eight of them prune statements), 10 for a warm evaluator pass, and 2 for the updates job (the active rollout read and its history prune)",
+      35,
+      "a minute 17 cron tick costs 35 D1 calls: 6 for the sweeps and settings, one Telegram pending-code check, one cheburcheck and one bsbord settings read while off, 14 for retention (eight of them prune statements), 10 for a warm evaluator pass, and 2 for the updates job (the active rollout read and its history prune)",
     );
 
     // The Overview is polled every 10 seconds. The health summary of every node is one settings row, read once: more connected

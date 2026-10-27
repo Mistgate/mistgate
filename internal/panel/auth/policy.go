@@ -144,6 +144,14 @@ var procedureLevels = map[string]level{
 	adminv1connect.CheburcheckServiceUpdateCheburcheckProcedure:     levelOwner, // also needs a step-up
 	adminv1connect.CheburcheckServiceDisconnectCheburcheckProcedure: levelOwner, // also needs a step-up
 	adminv1connect.CheburcheckServiceTestCheburcheckProcedure:       levelOwner,
+	// Bsbord is a paid source that sends node addresses to a third party. It is owner-only; changing or disconnecting it
+	// needs the handlers' step-up. None of its procedures are available to tokens.
+	adminv1connect.BsbordServiceGetBsbordProcedure:        levelOwner,
+	adminv1connect.BsbordServiceUpdateBsbordProcedure:     levelOwner, // also needs a step-up
+	adminv1connect.BsbordServiceTestBsbordProcedure:       levelOwner,
+	adminv1connect.BsbordServiceListBsbordUnitsProcedure:  levelOwner,
+	adminv1connect.BsbordServicePreviewBsbordProcedure:    levelOwner,
+	adminv1connect.BsbordServiceDisconnectBsbordProcedure: levelOwner, // also needs a step-up
 	// BlocklistService: the block-list source of the country check. It sends nothing anywhere (the lists are downloaded, no
 	// address goes out), but it is an integration like the other, so all of it is the owner's; changing it also needs a step-up
 	// (the handlers). Not open to tokens (policy_tokens.go).

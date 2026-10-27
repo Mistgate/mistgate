@@ -17,6 +17,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
+	"github.com/mistgate/mistgate/internal/panel/bsbord"
 	"github.com/mistgate/mistgate/internal/panel/cheburcheck"
 	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
@@ -180,6 +181,7 @@ type core struct {
 	cr      *countryreach.Service
 	gp      *globalping.Service
 	cc      *cheburcheck.Service
+	bs      *bsbord.Service
 	bl      *blocklist.Service
 	cp      *countryprobe.Service
 	hl      *health.Service
@@ -268,6 +270,14 @@ func wireCore(c Config) (*core, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Bsbord, the paid mobile-operator source: the online nodes' addresses and TLS ports are read the way the health module reads
+	// them, hence the late binding to hl.
+	k.bs, err = bsbord.New(bsbord.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: k.cr.Country,
+		Targets:  func(ctx context.Context) ([]health.CountryTarget, error) { return hl.CountryTargets(ctx) },
+		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }, Edge: edge, RoundLease: callLease})
+	if err != nil {
+		return nil, err
+	}
 	// Block lists, the second source of the country check: the panel downloads the public lists and compares its nodes' addresses
 	// with them, so no address leaves it. Off until the owner switches it on; Russia only. A node's address is read the way the
 	// health module reads it (the panel resolves a name itself), hence the late binding to hl.
@@ -302,7 +312,7 @@ func wireCore(c Config) (*core, error) {
 			for _, s := range k.cc.State(ctx).Sources() {
 				out = append(out, health.ExternalState(s))
 			}
-			return out
+			return append(out, k.bs.State(ctx))
 		},
 		TSPU: func(ctx context.Context) health.TSPUState {
 			st := k.cp.State(ctx)
@@ -377,7 +387,7 @@ func wireCore(c Config) (*core, error) {
 // panel is the Panel of the services the core holds; a role adds what it serves.
 func (k *core) panel() *Panel {
 	return &Panel{
-		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Cheburcheck: k.cc, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
+		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Cheburcheck: k.cc, Bsbord: k.bs, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
 	}
 }

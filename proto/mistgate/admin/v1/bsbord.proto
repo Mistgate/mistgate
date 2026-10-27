@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+// Bsbord is a paid source for the country reachability check. It tests each selected node from selected mobile operator units
+// (one operator, region and white-list mode per unit). Enabling it sends node IPv4:port targets to bsbord and spends credits.
+// The integration is off by default; enabling it requires a fresh step-up. TestBsbord sends no node addresses.
+//
+// The API key is sealed in the panel vault and is write-only. It never appears in settings, results, errors, logs or audit data.
+// Paid probe calls are previewed against the same body before each POST, capped by the owner's monthly credit limit, and use
+// a stored Idempotency-Key so a timeout or restart cannot create a second charge.
+service BsbordService {
+  // Settings and this month's spend. No secrets or pending request details.
+  rpc GetBsbord(GetBsbordRequest) returns (GetBsbordResponse);
+  // Changes settings; absent fields stay. Owner only; needs step-up.
+  rpc UpdateBsbord(UpdateBsbordRequest) returns (UpdateBsbordResponse);
+  // Verifies the key with GET /v1/account and lists probeable units. Sends no node addresses and makes no paid request.
+  rpc TestBsbord(TestBsbordRequest) returns (TestBsbordResponse);
+  // Lists current probeable operator units. The saved units are marked selected; the initial default preset is Crimea.
+  rpc ListBsbordUnits(ListBsbordUnitsRequest) returns (ListBsbordUnitsResponse);
+  // Previews the configured reachability round. This sends node addresses, so it is available only after the owner enabled
+  // the integration and confirmed its consent text.
+  rpc PreviewBsbord(PreviewBsbordRequest) returns (PreviewBsbordResponse);
+  // Switches the integration off, cancels a pending request when possible, and forgets the API key and unit selection.
+  rpc DisconnectBsbord(DisconnectBsbordRequest) returns (DisconnectBsbordResponse);
+}
+
+message BsbordSettings {
+  bool enabled = 1;
+  bool has_key = 2;
+  // Minutes between runs; default 1440, range 60..1440.
+  uint32 interval_min = 3;
+  // Monthly cap; credits are kopecks. Default 10000 credits (100 RUB).
+  uint64 cap_credits = 4;
+  // Explicit operator-unit keys. An empty selection is never sent to the API.
+  repeated string units = 5;
+  string spend_month = 6;
+  uint64 spent_credits = 7;
+  uint64 reserved_credits = 8;
+  string last_status = 9;
+  int64 last_run_unix = 10 [jstype = JS_NUMBER];
+  int64 hold_until_unix = 11 [jstype = JS_NUMBER];
+  bool pending = 12;
+}
+
+message GetBsbordRequest {}
+message GetBsbordResponse { BsbordSettings settings = 1; }
+
+message BsbordUnitSelection { repeated string op_keys = 1; }
+message UpdateBsbordRequest {
+  optional bool enabled = 1;
+  // bsk_live_ key, at most 256 characters, no spaces; write-only. "" removes it.
+  optional string key = 2;
+  optional uint32 interval_min = 3;
+  optional uint64 cap_credits = 4;
+  // Present means replace the selection, including with an empty selection.
+  BsbordUnitSelection units = 5;
+}
+message UpdateBsbordResponse { BsbordSettings settings = 1; }
+
+message TestBsbordRequest {}
+message TestBsbordResponse {
+  bool reachable = 1;
+  string tier = 2;
+  uint64 balance_credits = 3;
+  uint64 bonus_credits = 4;
+  uint64 balance_total = 5;
+  uint32 n_units = 6;
+  uint32 n_probeable = 7;
+  uint32 min_interval_sec = 8;
+  string api_version = 9;
+}
+
+message ListBsbordUnitsRequest {}
+message ListBsbordUnitsResponse {
+  repeated BsbordUnit units = 1;
+  uint32 n_units = 2;
+  uint32 n_probeable = 3;
+}
+message BsbordUnit {
+  string op_key = 1;
+  string operator = 2;
+  string name = 3;
+  string region = 4;
+  string region_code = 5;
+  string dpi = 6;
+  string channel_state = 7;
+  bool probeable = 8;
+  bool selected = 9;
+}
+
+message PreviewBsbordRequest {}
+message PreviewBsbordResponse {
+  uint64 cost_credits = 1;
+  uint64 monthly_credits = 2;
+  uint32 target_count = 3;
+  uint32 unit_count = 4;
+  bool cap_reached = 5;
+}
+
+message DisconnectBsbordRequest {}
+message DisconnectBsbordResponse { BsbordSettings settings = 1; }

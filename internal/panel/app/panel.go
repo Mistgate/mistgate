@@ -16,6 +16,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/backup"
 	"github.com/mistgate/mistgate/internal/panel/blocklist"
+	"github.com/mistgate/mistgate/internal/panel/bsbord"
 	"github.com/mistgate/mistgate/internal/panel/cheburcheck"
 	"github.com/mistgate/mistgate/internal/panel/countryprobe"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
@@ -151,6 +152,7 @@ type Panel struct {
 	Blocklist      *blocklist.Service
 	CountryProbe   *countryprobe.Service
 	Cheburcheck    *cheburcheck.Service
+	Bsbord         *bsbord.Service
 	Update         *update.Service
 	Warp           *warp.Service
 	Provision      *nodeprovision.Service
@@ -173,6 +175,7 @@ type jobServices struct {
 	blocklist   *blocklist.Service
 	probe       *countryprobe.Service
 	cheburcheck *cheburcheck.Service
+	bsbord      *bsbord.Service
 	update      *update.Service
 	backup      *backup.Service
 	telegram    *telegram.Service

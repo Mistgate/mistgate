@@ -65,8 +65,9 @@ func countryControl(country string) (string, uint16) {
 
 // countryNode is an online node that takes part in a round.
 type countryNode struct {
-	node  store.NodeRow
-	ports []uint16
+	node      store.NodeRow
+	ports     []uint16
+	preferred uint16 // the TLS endpoint a paid source tests: see countryPreferredPort
 }
 
 // countryCost is the tests of one round with k probes: the control, then per node one ICMP and one per TCP port, each run by
@@ -265,6 +266,52 @@ func countryPorts(ts []*target) []uint16 {
 	return ports[:min(len(ports), countryMaxPorts)]
 }
 
+// countryPreferredPort is the TCP port of a TLS endpoint a paid source should test: the VLESS REALITY port or the Hysteria2
+// decoy site (the lowest of them). 0: the node has none, and the source falls back to 443, then the lowest port.
+func countryPreferredPort(ts []*target) uint16 {
+	ports := countryPorts(ts)
+	var tls []uint16
+	for _, t := range ts {
+		if !t.in.Enabled || t.err != nil || t.in.State != "active" {
+			continue
+		}
+		var p uint16
+		switch {
+		case t.in.Protocol == "hysteria2":
+			p = hy2DecoyPort(t)
+		case t.in.Protocol == "vless" && t.spec.Listen.Network == "tcp":
+			var settings struct {
+				Security string `json:"security"`
+			}
+			if json.Unmarshal(t.settings, &settings) == nil && strings.EqualFold(settings.Security, "reality") {
+				p = t.spec.Listen.Port
+			}
+		}
+		if slices.Contains(ports, p) {
+			tls = append(tls, p)
+		}
+	}
+	if len(tls) == 0 {
+		return 0
+	}
+	return slices.Min(tls)
+}
+
+// CountryTargets are the online nodes as a paid external source tests them: the IPv4 (empty when the node has none, so the
+// source can say so), the TCP ports and the preferred one.
+func (s *Service) CountryTargets(ctx context.Context) ([]CountryTarget, error) {
+	nodes, err := s.countryNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]CountryTarget, 0, len(nodes))
+	for _, n := range nodes {
+		ip, _ := s.countryAddress(ctx, n.node)
+		out = append(out, CountryTarget{Key: n.node.ID, IP: ip, Ports: n.ports, PreferredPort: n.preferred})
+	}
+	return out, nil
+}
+
 // countryNodes are the nodes the panel sees online: not retired, agent connected.
 func (s *Service) countryNodes(ctx context.Context) ([]countryNode, error) {
 	sn, err := s.snapshot(ctx)
@@ -281,7 +328,7 @@ func (s *Service) countryNodes(ctx context.Context) ([]countryNode, error) {
 		if n.State != "active" || !live[n.ID].Connected {
 			continue
 		}
-		out = append(out, countryNode{node: n, ports: countryPorts(sn.byNode[n.ID])})
+		out = append(out, countryNode{node: n, ports: countryPorts(sn.byNode[n.ID]), preferred: countryPreferredPort(sn.byNode[n.ID])})
 	}
 	return out, nil
 }

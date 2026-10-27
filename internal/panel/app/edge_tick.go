@@ -26,6 +26,7 @@ var edgeTickJobs = map[string]string{
 	"health":      "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
 	"blocklist":   "the block-list check of the country check, when one is due (one setting read while it is off)",
 	"cheburcheck": "one due cheburcheck source and node per tick; off means no site request",
+	"bsbord":      "one previewed, capped mobile reachability request when a round is due; off means no site request",
 	"provision":   "wakes the Provisioner every tick while an install is queued, running or being cancelled",
 	"telegram":    "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
 	"updates":     "advances the edge node rollout and scheduled update state machines",
@@ -134,6 +135,12 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 	if p.Cheburcheck != nil {
 		runFor("cheburcheck", 40*time.Second, func(ctx context.Context) error {
 			return p.Cheburcheck.Tick(ctx)
+		})
+	}
+	if p.Bsbord != nil {
+		runFor("bsbord reach", 45*time.Second, func(ctx context.Context) error {
+			p.Bsbord.Tick(ctx)
+			return nil
 		})
 	}
 	if p.Telegram != nil {

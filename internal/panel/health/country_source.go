@@ -52,9 +52,10 @@ type CountryWant struct {
 
 // CountryTarget is one node. IP is its IPv4 address (the only address that is measured).
 type CountryTarget struct {
-	Key   string
-	IP    string
-	Ports []uint16 // TCP ports; none = ICMP only
+	Key           string
+	IP            string
+	Ports         []uint16 // TCP ports; none = ICMP only
+	PreferredPort uint16   // the TLS endpoint a paid source tests, one of Ports; 0 = none, fall back to 443 then the lowest
 }
 
 // CountryObserved is what the source saw.

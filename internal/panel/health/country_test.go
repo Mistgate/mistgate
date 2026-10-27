@@ -1185,3 +1185,39 @@ func TestGetChecksAndHistoryExposePartialAndDark(t *testing.T) {
 		t.Fatalf("history lanes = %q, want a PARTIAL point for de1", lanes)
 	}
 }
+
+func TestCountryTargetsCarryTheTLSPortOfOnlineNodes(t *testing.T) {
+	c := newCountryEnv(t)
+	c.node("reality", "hoster-reality", true)
+	c.vlessInbound("reality", 2053)
+	c.names["reality.example.com"] = []netip.Addr{netip.MustParseAddr("203.0.113.40")}
+	c.node("cdn", "hoster-cdn", true)
+	c.vlessCDNInbound("cdn", 8443) // TLS in front of a CDN is no REALITY endpoint: no preferred port
+	c.names["cdn.example.com"] = []netip.Addr{netip.MustParseAddr("203.0.113.41")}
+	c.node("v6", "hoster-v6", true)
+	c.vlessInbound("v6", 443)
+	c.names["v6.example.com"] = []netip.Addr{netip.MustParseAddr("2001:db8::1")}
+	c.node("down", "hoster-down", false) // offline: not a target
+	c.vlessInbound("down", 443)
+
+	got, err := c.s.CountryTargets(c.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := map[string]CountryTarget{}
+	for _, tg := range got {
+		byKey[tg.Key] = tg
+	}
+	if len(byKey) != 3 {
+		t.Fatalf("targets = %+v, want the three online nodes", got)
+	}
+	if r := byKey["reality"]; r.IP != "203.0.113.40" || r.PreferredPort != 2053 || len(r.Ports) != 1 {
+		t.Errorf("reality = %+v, want its IPv4 and 2053 preferred", r)
+	}
+	if cdn := byKey["cdn"]; cdn.IP != "203.0.113.41" || cdn.PreferredPort != 0 || len(cdn.Ports) != 1 {
+		t.Errorf("cdn = %+v, want no preferred port", cdn)
+	}
+	if v6 := byKey["v6"]; v6.IP != "" || v6.PreferredPort != 443 {
+		t.Errorf("v6 = %+v, want an empty IP the source reports as no_ipv4", v6)
+	}
+}
