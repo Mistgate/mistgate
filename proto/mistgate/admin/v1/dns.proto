@@ -57,7 +57,9 @@ enum DnsTransport {
 // is computed by the server (built-ins: fixed; custom: the category of its first catalog server); UNSPECIFIED = "own".
 enum DnsCategory {
   DNS_CATEGORY_UNSPECIFIED = 0;
-  DNS_CATEGORY_RUSSIA = 1;
+  // Built for the people of one country (the country field says which): resolves that country's sites from inside it.
+  // Was DNS_CATEGORY_RUSSIA; same number, so stored and binary values keep their meaning.
+  DNS_CATEGORY_REGIONAL = 1;
   DNS_CATEGORY_REGULAR = 2;
   DNS_CATEGORY_NO_ADS = 3;
   DNS_CATEGORY_FAMILY = 4;
@@ -106,6 +108,8 @@ message DnsProviderVariant {
   string doh_url = 10;
   string note_ru = 11;
   string note_en = 12;
+  // ISO 3166-1 alpha-2 country of a DNS_CATEGORY_REGIONAL variant ("RU", "CN"); empty for the others.
+  string country = 13;
 }
 
 message DnsProvider {
@@ -125,9 +129,12 @@ message ClientDnsSupport {
 
 // Domains ending in one of the suffixes resolve through these servers instead of the preset's main ones.
 message DnsSplitRule {
-  // ".ru", "gosuslugi.ru", ".рф" (IDN is normalised to punycode by the server).
+  // ".ru", "gosuslugi.ru", ".рф" (IDN is normalised to punycode by the server). A rule needs suffixes or geo (or both).
   repeated string suffixes = 1;
   repeated DnsServer servers = 2;
+  // Whole-country site lists by code: "cn". The domains of the country's geosite list and the addresses of its geoip list
+  // resolve through the rule's servers and go direct, like the suffixes. An unknown code is INVALID_ARGUMENT.
+  repeated string geo = 3;
 }
 
 message DnsPreset {
@@ -151,6 +158,8 @@ message DnsPreset {
   DnsTransport preferred_transport = 11;
   // Computed, see DnsCategory.
   DnsCategory category = 12;
+  // Computed: the country of a regional preset (ISO 3166-1 alpha-2), empty otherwise.
+  string country = 13;
 }
 
 message ListDnsPresetsRequest {}

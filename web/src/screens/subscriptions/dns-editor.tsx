@@ -17,9 +17,12 @@ import { ConfirmModal, SettingRow, SwitchRow } from "@/screens/users/ui";
 import {
   appResults,
   catalogOf,
-  categoryKey,
+  chipLabel,
+  chipOf,
+  cleanServers,
+  cleanSplit,
   dnsAddrKey,
-  dnsCategories,
+  dnsChips,
   dnsKindKey,
   dnsKinds,
   dnsTransports,
@@ -59,9 +62,6 @@ const draftOf = (p?: Preset): Draft =>
       }
     : { name: "", description: "", servers: [], split: [], ipv4Only: false, splitDirect: false, transport: DnsTransport.PLAIN };
 
-// a catalog server goes by its id alone; the panel fills in the addresses
-const cleanServers = (l: DnsServerN[]) => l.map((s) => (s.providerVariant ? { providerVariant: s.providerVariant } : { kind: s.kind, address: s.address.trim() }));
-
 /** The editor of one preset (or a new one) in a modal: basics, servers, split rules, options; the bar at the bottom stays in view. */
 export function PresetEditor({ open, preset, data, t, fallback, onClose }: { open: boolean; preset?: Preset; data: DnsData; t: Tx; fallback: string; onClose: () => void }) {
   const toast = useToast();
@@ -84,7 +84,7 @@ export function PresetEditor({ open, preset, data, t, fallback, onClose }: { ope
     splitDirect: d.splitDirect,
     preferredTransport: d.transport,
     servers: cleanServers(d.servers),
-    split: d.split.map((r) => ({ suffixes: r.suffixes, servers: cleanServers(r.servers) })),
+    split: cleanSplit(d.split),
   });
 
   const save = useMutation({
@@ -188,7 +188,7 @@ export function PresetEditor({ open, preset, data, t, fallback, onClose }: { ope
             <ServerList scope={t("subs.dns.splitRule", { n: i + 1 })} servers={r.servers} t={t} providers={data.providers} catalog={catalog} onChange={(servers) => setRule(i, { servers })} />
           </div>
         ))}
-        <button type="button" className="self-start text-xs font-bold text-accent-text" onClick={() => setD({ ...d, split: [...d.split, { suffixes: [], servers: [] }] })}>
+        <button type="button" className="self-start text-xs font-bold text-accent-text" onClick={() => setD({ ...d, split: [...d.split, { suffixes: [], geo: [], servers: [] }] })}>
           + {t("subs.dns.addSplit")}
         </button>
       </Section>
@@ -324,12 +324,11 @@ function CatalogPicker({ providers, have, t, onPick, onClose }: { providers: Pro
           <Icon name="x" size={14} />
         </IconButton>
       </div>
-      {dnsCategories.map((c) => {
-        const items = providers.flatMap((provider) => provider.variants.filter((variant) => variant.category === c).map((variant) => ({ provider, variant })));
-        if (items.length === 0) return null;
+      {dnsChips(providers.flatMap((provider) => provider.variants)).map((c) => {
+        const items = providers.flatMap((provider) => provider.variants.filter((variant) => chipOf(variant) === c).map((variant) => ({ provider, variant })));
         return (
           <div key={c} className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold">{t(categoryKey[c])}</span>
+            <span className="text-xs font-bold">{chipLabel(c, t)}</span>
             <div className="flex flex-wrap gap-1.5">
               {items.map((e) => {
                 const has = have.has(e.variant.id);

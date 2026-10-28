@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { DnsCategory } from "@/gen/mistgate/admin/v1/dns_pb";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
@@ -14,7 +13,7 @@ import { useTx, type Key, type Tx } from "@/screens/users/t";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { customChip, PresetGlyph, Pill, ServerChip, transportChipIcon, UsersChip } from "./dns-parts";
 import { PresetEditor } from "./dns-editor";
-import { catalogOf, categoryKey, describePreset, dnsCategories, dnsKindKey, presetName, presetSubtitle, transportKey, variantLabel, variantNote, type Catalog, type Preset } from "./model";
+import { catalogOf, chipLabel, chipOf, describePreset, dnsChips, dnsKindKey, presetName, presetSubtitle, transportKey, variantLabel, variantNote, type Catalog, type Preset } from "./model";
 import { dnsPresetsQuery, useSaveSettings } from "./queries";
 import { Lead } from "./ui";
 
@@ -42,11 +41,11 @@ export function DnsTab() {
   const current = pick && pick !== "new" ? presets.find((p) => p.id === pick) : undefined;
   const fallback = presets.map((p) => (p.isDefault ? presetName(p, t.lang) : "")).find(Boolean) ?? "";
 
-  // a chip for every category that has presets, in the fixed order; "Own" only while somebody has made one
-  const count = (c: DnsCategory) => presets.filter((p) => p.category === c).length;
-  const chips = [...dnsCategories, DnsCategory.UNSPECIFIED].filter((c) => count(c) > 0);
-  const shownCat = chips.some((c) => String(c) === cat) ? cat : ALL; // the chosen category emptied under us: back to all
-  const shown = shownCat === ALL ? presets : presets.filter((p) => String(p.category) === shownCat);
+  // a chip for every category that has presets, in the fixed order (a regional one for each country); "Own" only while somebody has made one
+  const count = (c: string) => presets.filter((p) => chipOf(p) === c).length;
+  const chips = dnsChips(presets);
+  const shownCat = chips.includes(cat) ? cat : ALL; // the chosen category emptied under us: back to all
+  const shown = shownCat === ALL ? presets : presets.filter((p) => chipOf(p) === shownCat);
 
   return (
     <div className="flex flex-col gap-4">
@@ -71,10 +70,10 @@ export function DnsTab() {
           options={[
             { value: ALL, label: t("subs.dns.cat.all") },
             ...chips.map((c) => ({
-              value: String(c),
+              value: c,
               label: (
                 <>
-                  {t(categoryKey[c])}
+                  {chipLabel(c, t)}
                   <span className="font-mono text-[11px] text-faint">{count(c)}</span>
                 </>
               ),

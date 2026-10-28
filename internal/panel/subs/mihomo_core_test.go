@@ -66,6 +66,7 @@ func TestMihomoCoreAcceptsTheProfiles(t *testing.T) {
 	}{
 		{"no dns section", "Example VPN", nil},
 		{"russia split, plain", "Example VPN", ruSplit()},
+		{"china: country lists as rule providers", "Example VPN", cnSplit()},
 		{"a title with a space, unicode and a percent", "Моя сеть 50%", ruSplit()},
 		{"DoH", "Example", &dns.Preset{Name: "doh", Transport: dns.KindDoH, Servers: []dns.Server{{Variant: "adguard/default"}, {Variant: "cloudflare/standard"}}}},
 		{"DoT", "Example", &dns.Preset{Name: "dot", Transport: dns.KindDoT, Servers: []dns.Server{{Variant: "quad9/standard"}}}},
@@ -83,6 +84,15 @@ func TestMihomoCoreAcceptsTheProfiles(t *testing.T) {
 			}
 			MihomoCheck(t, b)
 		})
+	}
+
+	// The country lists: the core takes the providers without fetching them (an empty home, no network needed to parse), and it
+	// does look the names up: a rule or a nameserver-policy key that names a provider the profile lacks is refused.
+	cn, _ := mihomoProfile{title: "T", lines: all[:1], names: names[:1], preset: cnSplit()}.build()
+	for _, tc := range []struct{ from, to string }{{"RULE-SET,geosite-cn,DIRECT", "RULE-SET,geosite-xx,DIRECT"}, {"rule-set:geosite-cn", "rule-set:geosite-xx"}} {
+		if ok, out := mihomoTest(t, []byte(strings.Replace(string(cn), tc.from, tc.to, 1))); ok {
+			t.Errorf("a profile that names a missing rule provider (%s) was accepted: %s", tc.to, out)
+		}
 	}
 
 	// The check is a real one: the core refuses what it does not understand.

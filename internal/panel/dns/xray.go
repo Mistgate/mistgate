@@ -28,12 +28,18 @@ type XrayDNS struct {
 	// Direct are the suffix bodies (lower-case punycode, no leading dot) whose traffic goes direct; they are exactly
 	// the suffixes of the split servers.
 	Direct []string
+	// DirectGeo are the lists (geo.go) whose sites and addresses go direct: "geosite:cn" joins the domain rule, "geoip:cn" is
+	// a rule of its own (an ip rule; the config's domainStrategy AsIs keeps it to connections made to an address).
+	DirectGeo []XrayGeo
 	// DirectIPs are the addresses of the split resolvers: the routing rule for XrayDNSTag sends them direct (the
 	// main resolvers' traffic goes through the proxy).
 	DirectIPs []string
 	// Notes (English) say what of the preset an Xray config cannot carry.
 	Notes []string
 }
+
+// XrayGeo is one country list as Xray names it.
+type XrayGeo struct{ Site, IP string }
 
 // XraySection is the JSON of the "dns" key.
 type XraySection struct {
@@ -63,12 +69,17 @@ func (p Preset) XrayDNS() (XrayDNS, error) {
 		out.Section.Servers = append(out.Section.Servers, out.server(e, nil, false))
 	}
 	for _, sp := range split {
-		if len(sp.Suffixes) == 0 {
+		if len(sp.Suffixes) == 0 && len(sp.Geo) == 0 {
 			continue
 		}
 		domains := make([]string, len(sp.Suffixes))
 		for i, b := range sp.Suffixes {
 			domains[i] = "domain:" + b
+		}
+		for _, code := range sp.Geo {
+			g := XrayGeo{Site: "geosite:" + geoLists[code].Site, IP: "geoip:" + geoLists[code].IP}
+			domains = append(domains, g.Site)
+			out.DirectGeo = append(out.DirectGeo, g)
 		}
 		for _, e := range sp.Endpoints {
 			out.Section.Servers = append(out.Section.Servers, out.server(e, domains, true))

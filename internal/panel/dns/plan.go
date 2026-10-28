@@ -12,6 +12,8 @@ type SplitPlan struct {
 	// Suffixes are the bodies (lower-case punycode, no leading dot) not claimed by an earlier rule: the first rule
 	// that names a suffix wins, like Happ's DirectSites. May be empty when every suffix was claimed earlier.
 	Suffixes []string
+	// Geo are the codes of the country lists (geo.go) not claimed by an earlier rule, first rule wins as with suffixes.
+	Geo []string
 }
 
 // ClientPlan is what a client can carry of a preset, before it is written in the client's syntax: the main
@@ -33,7 +35,7 @@ func (p Preset) ClientPlan(c Client) (main []Endpoint, split []SplitPlan, notes 
 	if !p.SplitDirect {
 		return main, nil, notes, nil
 	}
-	var claimed []string
+	var claimed, claimedGeo []string
 	for i, r := range p.Split {
 		eps, enotes := p.planEndpoints(c, r.Servers)
 		notes = append(notes, enotes...)
@@ -53,6 +55,17 @@ func (p Preset) ClientPlan(c Client) (main []Endpoint, split []SplitPlan, notes 
 			}
 			claimed = append(claimed, body)
 			sp.Suffixes = append(sp.Suffixes, body)
+		}
+		for _, code := range r.Geo {
+			if _, ok := geoLists[code]; !ok {
+				notes = append(notes, fmt.Sprintf("country list %q skipped: unknown", code))
+				continue
+			}
+			if slices.Contains(claimedGeo, code) {
+				continue
+			}
+			claimedGeo = append(claimedGeo, code)
+			sp.Geo = append(sp.Geo, code)
 		}
 		split = append(split, sp)
 	}

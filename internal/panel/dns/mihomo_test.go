@@ -205,8 +205,11 @@ func TestMihomoDNSBuiltins(t *testing.T) {
 				t.Errorf("%s: %q", row.ID, s)
 			}
 		}
-		if (len(d.Policy) > 0) != (row.ID == "dns_builtin_ru_split") || len(d.Policy) != len(d.Direct) {
+		if (len(d.Policy) > 0) != (row.ID == "dns_builtin_ru_split" || row.ID == "dns_builtin_cn_split") || (row.ID != "dns_builtin_cn_split" && len(d.Policy) != len(d.Direct)) {
 			t.Errorf("%s: policy %v direct %v", row.ID, d.Policy, d.Direct)
+		}
+		if (len(d.Providers) > 0) != (row.ID == "dns_builtin_cn_split") {
+			t.Errorf("%s: providers %v", row.ID, d.Providers)
 		}
 	}
 	// The stock Russia preset: ten suffixes go to Yandex, directly.

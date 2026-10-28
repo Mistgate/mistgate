@@ -145,6 +145,7 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 var builtinNames = map[string]struct{ ru, en, zh string }{
 	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连"},
 	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN"},
+	"dns_builtin_cn_split":   {"Китай: китайские сайты напрямую", "China: Chinese sites direct", "中国：国内网站直连"},
 	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"},
 	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告"},
 	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容"},
@@ -182,6 +183,7 @@ func (p Preset) NameIn(lang string) string {
 var builtinDescriptions = map[string]struct{ en, zh string }{
 	"dns_builtin_ru_split":   {"Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN"},
 	"dns_builtin_ru_proxied": {"Everything through the VPN, Russian sites via a Russian node", "全部走 VPN，俄罗斯网站经由俄罗斯节点"},
+	"dns_builtin_cn_split":   {"Chinese sites direct, everything else through the VPN", "国内网站直连，其余走 VPN"},
 	"dns_builtin_standard":   {"Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google"},
 	"dns_builtin_adblock":    {"AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器"},
 	"dns_builtin_family":     {"AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站"},

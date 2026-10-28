@@ -37,9 +37,11 @@ type Server struct {
 	Variant string `json:"variant,omitempty"`
 }
 
-// SplitRule sends domains ending in one of Suffixes to Servers instead of the preset's main ones.
+// SplitRule sends domains ending in one of Suffixes, and the sites of the countries in Geo, to Servers instead of the
+// preset's main ones. A rule has suffixes or geo codes (see geo.go), or both.
 type SplitRule struct {
 	Suffixes []string `json:"suffixes"`
+	Geo      []string `json:"geo,omitempty"`
 	Servers  []Server `json:"servers"`
 }
 
@@ -268,7 +270,7 @@ func normSplit(in []SplitRule) ([]SplitRule, error) {
 	out := make([]SplitRule, 0, len(in))
 	for i, r := range in {
 		what := fmt.Sprintf("split rule %d", i+1)
-		var sfx []string
+		sfx := []string{}
 		seen := map[string]bool{}
 		for _, s := range r.Suffixes {
 			n, err := NormalizeSuffix(s)
@@ -280,8 +282,12 @@ func normSplit(in []SplitRule) ([]SplitRule, error) {
 				sfx = append(sfx, n)
 			}
 		}
-		if len(sfx) == 0 {
-			return nil, bad("%s: add at least one domain suffix", what)
+		geo, err := normGeo(r.Geo)
+		if err != nil {
+			return nil, bad("%s: %v", what, err)
+		}
+		if len(sfx) == 0 && len(geo) == 0 {
+			return nil, bad("%s: add at least one domain suffix or country list", what)
 		}
 		if len(sfx) > MaxSuffixesPerRule {
 			return nil, bad("%s: at most %d suffixes", what, MaxSuffixesPerRule)
@@ -290,7 +296,7 @@ func normSplit(in []SplitRule) ([]SplitRule, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, SplitRule{Suffixes: sfx, Servers: srv})
+		out = append(out, SplitRule{Suffixes: sfx, Geo: geo, Servers: srv})
 	}
 	return out, nil
 }

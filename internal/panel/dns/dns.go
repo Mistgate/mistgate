@@ -388,8 +388,8 @@ func transportFromProto(t adminv1.DnsTransport) Kind {
 
 func categoryToProto(c Category) adminv1.DnsCategory {
 	switch c {
-	case CategoryRussia:
-		return adminv1.DnsCategory_DNS_CATEGORY_RUSSIA
+	case CategoryRegional:
+		return adminv1.DnsCategory_DNS_CATEGORY_REGIONAL
 	case CategoryRegular:
 		return adminv1.DnsCategory_DNS_CATEGORY_REGULAR
 	case CategoryNoAds:
@@ -402,37 +402,49 @@ func categoryToProto(c Category) adminv1.DnsCategory {
 	return adminv1.DnsCategory_DNS_CATEGORY_UNSPECIFIED
 }
 
-// builtinCategory groups the built-in presets in the UI. Everything else takes the category of its first
-// catalog server, or none.
-var builtinCategory = map[string]Category{
-	"dns_builtin_ru_split":   CategoryRussia,
-	"dns_builtin_ru_proxied": CategoryRussia,
-	"dns_builtin_yandex":     CategoryRussia,
-	"dns_builtin_standard":   CategoryRegular,
-	"dns_builtin_adblock":    CategoryNoAds,
-	"dns_builtin_family":     CategoryFamily,
-	"dns_builtin_quad9":      CategorySecurity,
+// presetGroup is where a preset is listed: its category and, for a regional one, its country.
+type presetGroup struct {
+	Category Category
+	Country  string
 }
 
-// CategoryOf is the category a preset is listed under.
-func CategoryOf(p Preset) Category {
+// builtinCategory groups the built-in presets in the UI. Everything else takes the category (and country) of its first
+// catalog server, or none.
+var builtinCategory = map[string]presetGroup{
+	"dns_builtin_ru_split":   {CategoryRegional, "RU"},
+	"dns_builtin_ru_proxied": {CategoryRegional, "RU"},
+	"dns_builtin_yandex":     {CategoryRegional, "RU"},
+	"dns_builtin_cn_split":   {CategoryRegional, "CN"},
+	"dns_builtin_standard":   {Category: CategoryRegular},
+	"dns_builtin_adblock":    {Category: CategoryNoAds},
+	"dns_builtin_family":     {Category: CategoryFamily},
+	"dns_builtin_quad9":      {Category: CategorySecurity},
+}
+
+func groupOf(p Preset) presetGroup {
 	if p.Builtin {
-		if c, ok := builtinCategory[p.ID]; ok {
-			return c
+		if g, ok := builtinCategory[p.ID]; ok {
+			return g
 		}
 	}
 	for _, s := range p.Servers {
 		if v, _, ok := LookupVariant(s.Variant); ok {
-			return v.Category
+			return presetGroup{v.Category, v.Country}
 		}
 	}
-	return ""
+	return presetGroup{}
 }
+
+// CategoryOf is the category a preset is listed under.
+func CategoryOf(p Preset) Category { return groupOf(p).Category }
+
+// CountryOf is the country of a regional preset ("RU", "CN"), "" for the others.
+func CountryOf(p Preset) string { return groupOf(p).Country }
 
 func splitFromProto(in []*adminv1.DnsSplitRule) []SplitRule {
 	out := make([]SplitRule, len(in))
 	for i, r := range in {
-		out[i] = SplitRule{Suffixes: r.GetSuffixes(), Servers: serversFromProto(r.GetServers())}
+		out[i] = SplitRule{Suffixes: r.GetSuffixes(), Geo: r.GetGeo(), Servers: serversFromProto(r.GetServers())}
 	}
 	return out
 }
@@ -440,13 +452,13 @@ func splitFromProto(in []*adminv1.DnsSplitRule) []SplitRule {
 func presetProto(p Preset, users int, isDefault bool) *adminv1.DnsPreset {
 	out := &adminv1.DnsPreset{
 		Id: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, Ipv4Only: p.IPv4Only, SplitDirect: p.SplitDirect,
-		UserCount: uint32(users), IsDefault: isDefault, PreferredTransport: transportToProto(p.Transport), Category: categoryToProto(CategoryOf(p)),
+		UserCount: uint32(users), IsDefault: isDefault, PreferredTransport: transportToProto(p.Transport), Category: categoryToProto(CategoryOf(p)), Country: CountryOf(p),
 	}
 	for _, s := range p.Servers {
 		out.Servers = append(out.Servers, serverToProto(s))
 	}
 	for _, r := range p.Split {
-		pr := &adminv1.DnsSplitRule{Suffixes: r.Suffixes}
+		pr := &adminv1.DnsSplitRule{Suffixes: r.Suffixes, Geo: r.Geo}
 		for _, s := range r.Servers {
 			pr.Servers = append(pr.Servers, serverToProto(s))
 		}
@@ -499,7 +511,7 @@ func catalogProto() []*adminv1.DnsProvider {
 		pp := &adminv1.DnsProvider{Id: p.ID, Name: p.Name}
 		for _, v := range p.Variants {
 			pp.Variants = append(pp.Variants, &adminv1.DnsProviderVariant{
-				Id: v.ID, NameRu: v.NameRU, NameEn: v.NameEN, Category: categoryToProto(v.Category),
+				Id: v.ID, NameRu: v.NameRU, NameEn: v.NameEN, Category: categoryToProto(v.Category), Country: v.Country,
 				Ipv4: v.IPv4, Ipv6: v.IPv6, Plain: !v.NoPlain, DotHost: v.DoTHost, DotPort: uint32(v.DoTPort), DohUrl: v.DoHURL,
 				NoteRu: v.NoteRU, NoteEn: v.NoteEN,
 			})

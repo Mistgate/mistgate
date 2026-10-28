@@ -64,16 +64,18 @@ type singboxSelector struct {
 }
 
 type singboxRoute struct {
-	Rules                 []singboxRule `json:"rules,omitempty"`
-	Final                 string        `json:"final"`
-	AutoDetectInterface   bool          `json:"auto_detect_interface"`
-	DefaultDomainResolver string        `json:"default_domain_resolver,omitempty"`
+	Rules                 []singboxRule        `json:"rules,omitempty"`
+	RuleSet               []dns.SingboxRuleSet `json:"rule_set,omitempty"`
+	Final                 string               `json:"final"`
+	AutoDetectInterface   bool                 `json:"auto_detect_interface"`
+	DefaultDomainResolver string               `json:"default_domain_resolver,omitempty"`
 }
 
 type singboxRule struct {
 	Protocol     string   `json:"protocol,omitempty"`
 	IPIsPrivate  bool     `json:"ip_is_private,omitempty"`
 	DomainSuffix []string `json:"domain_suffix,omitempty"`
+	RuleSet      []string `json:"rule_set,omitempty"`
 	Action       string   `json:"action"`
 	Outbound     string   `json:"outbound,omitempty"`
 }
@@ -159,6 +161,10 @@ func (p singboxProfile) build() ([]byte, error) {
 		cfg.DNS = &d.Section
 		if len(d.Direct) > 0 {
 			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{DomainSuffix: d.Direct, Action: "route", Outbound: singboxDirectTag})
+		}
+		if len(d.DirectSets) > 0 {
+			cfg.Route.RuleSet = d.RuleSets
+			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{RuleSet: d.DirectSets, Action: "route", Outbound: singboxDirectTag})
 		}
 	} else {
 		cfg.DNS = &dns.SingboxSection{

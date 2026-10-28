@@ -67,6 +67,15 @@ func ruSplit() *dns.Preset {
 	}
 }
 
+// cnSplit is the built-in "China: Chinese sites direct": a geo rule and no suffix.
+func cnSplit() *dns.Preset {
+	return &dns.Preset{
+		Name: "cn", Transport: dns.KindPlain, SplitDirect: true,
+		Servers: []dns.Server{{Variant: "cloudflare/standard"}, {Variant: "google/standard"}},
+		Split:   []dns.SplitRule{{Suffixes: []string{}, Geo: []string{"cn"}, Servers: []dns.Server{{Variant: "alidns/standard"}, {Variant: "dnspod/standard"}}}},
+	}
+}
+
 type profileDoc struct {
 	Proxies []map[string]any `yaml:"proxies"`
 	Groups  []struct {
@@ -76,6 +85,8 @@ type profileDoc struct {
 	} `yaml:"proxy-groups"`
 	DNS   map[string]any `yaml:"dns"`
 	Rules []string       `yaml:"rules"`
+	// RuleProviders are the country lists of a geo rule (absent without one).
+	RuleProviders map[string]map[string]any `yaml:"rule-providers"`
 }
 
 func parseProfile(t *testing.T, b []byte) profileDoc {
@@ -117,6 +128,46 @@ func TestMihomoProfileGolden(t *testing.T) {
 	ns := d.DNS["nameserver"].([]any)
 	if ns[0] != "1.1.1.1#Example%20VPN" {
 		t.Errorf("nameserver = %v", ns)
+	}
+}
+
+// The Chinese preset: two rule providers downloaded through the group, the geosite one in nameserver-policy, and the two RULE-SET
+// rules before the final one. The Russian profile above has none of it.
+func TestMihomoProfileGoldenChina(t *testing.T) {
+	p := mihomoProfile{
+		title:  "Example VPN",
+		lines:  []string{fixture(t, hy2Line), fixture(t, awgLine)},
+		names:  []string{"\U0001F1E9\U0001F1EA de1 · hy2", "\U0001F1E9\U0001F1EA de1 · awg"},
+		preset: cnSplit(),
+	}
+	b, err := p.build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	golden(t, "mihomo_profile_cn.yaml", string(b))
+	d := parseProfile(t, b)
+	if len(d.RuleProviders) != 2 {
+		t.Fatalf("rule-providers = %v", d.RuleProviders)
+	}
+	site, ip := d.RuleProviders["geosite-cn"], d.RuleProviders["geoip-cn"]
+	if site["behavior"] != "domain" || ip["behavior"] != "ipcidr" || site["format"] != "mrs" || ip["format"] != "mrs" || site["type"] != "http" ||
+		site["proxy"] != "Example VPN" || ip["proxy"] != "Example VPN" || site["interval"] != 86400 {
+		t.Errorf("providers = %v", d.RuleProviders)
+	}
+	if _, has := site["path"]; has {
+		t.Error("a provider path is left to the core (its safe-path rule applies to a path of ours)")
+	}
+	want := []string{"RULE-SET,geosite-cn,DIRECT", "RULE-SET,geoip-cn,DIRECT,no-resolve", "MATCH,Example VPN"}
+	if strings.Join(d.Rules, "|") != strings.Join(want, "|") {
+		t.Errorf("rules = %v", d.Rules)
+	}
+	pol := d.DNS["nameserver-policy"].(map[string]any)
+	if len(pol) != 1 || len(pol["rule-set:geosite-cn"].([]any)) != 3 {
+		t.Errorf("nameserver-policy = %v", pol)
+	}
+	// the Russian profile has no rule-providers key at all
+	if rp, err := (mihomoProfile{title: "T", lines: p.lines, names: p.names, preset: ruSplit()}).build(); err != nil || strings.Contains(string(rp), "rule-providers") {
+		t.Errorf("ru profile: %v", err)
 	}
 }
 

@@ -122,7 +122,7 @@ func TestSeed(t *testing.T) {
 	}
 	// grouped by category: Russia, regular, no ads, family, security
 	want := []string{
-		"dns_builtin_ru_split", "dns_builtin_ru_proxied", "dns_builtin_yandex",
+		"dns_builtin_ru_split", "dns_builtin_ru_proxied", "dns_builtin_yandex", "dns_builtin_cn_split",
 		"dns_builtin_standard", "dns_builtin_cloudflare", "dns_builtin_google", "dns_builtin_dnssb",
 		"dns_builtin_adblock",
 		"dns_builtin_family", "dns_builtin_cloudflare_family", "dns_builtin_yandex_family", "dns_builtin_opendns_family",
@@ -132,8 +132,9 @@ func TestSeed(t *testing.T) {
 		t.Fatalf("ids = %v, want %v", ids, want)
 	}
 	wantCat := map[string]adminv1.DnsCategory{
-		"dns_builtin_ru_split": adminv1.DnsCategory_DNS_CATEGORY_RUSSIA, "dns_builtin_ru_proxied": adminv1.DnsCategory_DNS_CATEGORY_RUSSIA,
-		"dns_builtin_yandex": adminv1.DnsCategory_DNS_CATEGORY_RUSSIA, "dns_builtin_standard": adminv1.DnsCategory_DNS_CATEGORY_REGULAR,
+		"dns_builtin_ru_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_ru_proxied": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
+		"dns_builtin_yandex": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_cn_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
+		"dns_builtin_standard":   adminv1.DnsCategory_DNS_CATEGORY_REGULAR,
 		"dns_builtin_cloudflare": adminv1.DnsCategory_DNS_CATEGORY_REGULAR, "dns_builtin_google": adminv1.DnsCategory_DNS_CATEGORY_REGULAR,
 		"dns_builtin_dnssb": adminv1.DnsCategory_DNS_CATEGORY_REGULAR, "dns_builtin_adblock": adminv1.DnsCategory_DNS_CATEGORY_NO_ADS,
 		"dns_builtin_family": adminv1.DnsCategory_DNS_CATEGORY_FAMILY, "dns_builtin_cloudflare_family": adminv1.DnsCategory_DNS_CATEGORY_FAMILY,
@@ -141,9 +142,13 @@ func TestSeed(t *testing.T) {
 		"dns_builtin_quad9": adminv1.DnsCategory_DNS_CATEGORY_SECURITY, "dns_builtin_cloudflare_security": adminv1.DnsCategory_DNS_CATEGORY_SECURITY,
 		"dns_builtin_yandex_safe": adminv1.DnsCategory_DNS_CATEGORY_SECURITY,
 	}
+	wantCountry := map[string]string{"dns_builtin_ru_split": "RU", "dns_builtin_ru_proxied": "RU", "dns_builtin_yandex": "RU", "dns_builtin_cn_split": "CN"}
 	for _, p := range r.Msg.Presets {
 		if p.Category != wantCat[p.Id] {
 			t.Errorf("preset %s category = %v, want %v", p.Id, p.Category, wantCat[p.Id])
+		}
+		if p.Country != wantCountry[p.Id] {
+			t.Errorf("preset %s country = %q, want %q", p.Id, p.Country, wantCountry[p.Id])
 		}
 		if p.PreferredTransport != adminv1.DnsTransport_DNS_TRANSPORT_PLAIN {
 			t.Errorf("preset %s preferred transport = %v, want plain", p.Id, p.PreferredTransport)
@@ -166,9 +171,9 @@ func TestSeed(t *testing.T) {
 			t.Errorf("ru split has no suffix %s: %v", s, ru.Split[0].Suffixes)
 		}
 	}
-	// only the Russia split goes direct; the proxied Russia preset has no split at all
+	// only the Russia and China splits go direct; the proxied Russia preset has no split at all
 	for id, p := range e.list() {
-		if p.SplitDirect != (id == "dns_builtin_ru_split") {
+		if p.SplitDirect != (id == "dns_builtin_ru_split" || id == "dns_builtin_cn_split") {
 			t.Errorf("preset %s split_direct=%v", id, p.SplitDirect)
 		}
 	}
@@ -211,7 +216,7 @@ func TestCRUD(t *testing.T) {
 	}
 	// the list order: built-ins first, then custom by name
 	r, _ := e.s.ListDnsPresets(ctx, connect.NewRequest(&adminv1.ListDnsPresetsRequest{}))
-	if n := len(r.Msg.Presets); n != 16 || r.Msg.Presets[15].Id != p.Id {
+	if n := len(r.Msg.Presets); n != 17 || r.Msg.Presets[16].Id != p.Id {
 		t.Fatalf("list = %d presets", n)
 	}
 	_, err = e.s.UpdateDnsPreset(ctx, connect.NewRequest(&adminv1.UpdateDnsPresetRequest{Id: "dns_nope", Name: "x", Servers: []*adminv1.DnsServer{plain("1.1.1.1")}}))

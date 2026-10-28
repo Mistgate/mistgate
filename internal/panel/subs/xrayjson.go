@@ -194,12 +194,20 @@ func xrayRules(d *dns.XrayDNS) []xrayRule {
 			xrayRule{Type: "field", Port: "53", OutboundTag: xrayDNSOutTag})
 	}
 	rules = append(rules, xrayRule{Type: "field", IP: xrayPrivate, OutboundTag: xrayDirectTag})
-	if d != nil && len(d.Direct) > 0 {
+	if d != nil && (len(d.Direct) > 0 || len(d.DirectGeo) > 0) {
 		domains := make([]string, len(d.Direct))
 		for i, s := range d.Direct {
 			domains[i] = "domain:" + s
 		}
+		var ips []string
+		for _, g := range d.DirectGeo {
+			domains = append(domains, g.Site)
+			ips = append(ips, g.IP)
+		}
 		rules = append(rules, xrayRule{Type: "field", Domain: domains, OutboundTag: xrayDirectTag})
+		if len(ips) > 0 {
+			rules = append(rules, xrayRule{Type: "field", IP: ips, OutboundTag: xrayDirectTag})
+		}
 	}
 	return append(rules, xrayRule{Type: "field", Network: "tcp,udp", OutboundTag: xrayProxyTag})
 }

@@ -139,18 +139,20 @@ type DnsCategory int32
 
 const (
 	DnsCategory_DNS_CATEGORY_UNSPECIFIED DnsCategory = 0
-	DnsCategory_DNS_CATEGORY_RUSSIA      DnsCategory = 1
-	DnsCategory_DNS_CATEGORY_REGULAR     DnsCategory = 2
-	DnsCategory_DNS_CATEGORY_NO_ADS      DnsCategory = 3
-	DnsCategory_DNS_CATEGORY_FAMILY      DnsCategory = 4
-	DnsCategory_DNS_CATEGORY_SECURITY    DnsCategory = 5
+	// Built for the people of one country (the country field says which): resolves that country's sites from inside it.
+	// Was DNS_CATEGORY_RUSSIA; same number, so stored and binary values keep their meaning.
+	DnsCategory_DNS_CATEGORY_REGIONAL DnsCategory = 1
+	DnsCategory_DNS_CATEGORY_REGULAR  DnsCategory = 2
+	DnsCategory_DNS_CATEGORY_NO_ADS   DnsCategory = 3
+	DnsCategory_DNS_CATEGORY_FAMILY   DnsCategory = 4
+	DnsCategory_DNS_CATEGORY_SECURITY DnsCategory = 5
 )
 
 // Enum value maps for DnsCategory.
 var (
 	DnsCategory_name = map[int32]string{
 		0: "DNS_CATEGORY_UNSPECIFIED",
-		1: "DNS_CATEGORY_RUSSIA",
+		1: "DNS_CATEGORY_REGIONAL",
 		2: "DNS_CATEGORY_REGULAR",
 		3: "DNS_CATEGORY_NO_ADS",
 		4: "DNS_CATEGORY_FAMILY",
@@ -158,7 +160,7 @@ var (
 	}
 	DnsCategory_value = map[string]int32{
 		"DNS_CATEGORY_UNSPECIFIED": 0,
-		"DNS_CATEGORY_RUSSIA":      1,
+		"DNS_CATEGORY_REGIONAL":    1,
 		"DNS_CATEGORY_REGULAR":     2,
 		"DNS_CATEGORY_NO_ADS":      3,
 		"DNS_CATEGORY_FAMILY":      4,
@@ -336,9 +338,11 @@ type DnsProviderVariant struct {
 	DotHost string `protobuf:"bytes,8,opt,name=dot_host,json=dotHost,proto3" json:"dot_host,omitempty"`
 	DotPort uint32 `protobuf:"varint,9,opt,name=dot_port,json=dotPort,proto3" json:"dot_port,omitempty"`
 	// DoH URL; empty = none known.
-	DohUrl        string `protobuf:"bytes,10,opt,name=doh_url,json=dohUrl,proto3" json:"doh_url,omitempty"`
-	NoteRu        string `protobuf:"bytes,11,opt,name=note_ru,json=noteRu,proto3" json:"note_ru,omitempty"`
-	NoteEn        string `protobuf:"bytes,12,opt,name=note_en,json=noteEn,proto3" json:"note_en,omitempty"`
+	DohUrl string `protobuf:"bytes,10,opt,name=doh_url,json=dohUrl,proto3" json:"doh_url,omitempty"`
+	NoteRu string `protobuf:"bytes,11,opt,name=note_ru,json=noteRu,proto3" json:"note_ru,omitempty"`
+	NoteEn string `protobuf:"bytes,12,opt,name=note_en,json=noteEn,proto3" json:"note_en,omitempty"`
+	// ISO 3166-1 alpha-2 country of a DNS_CATEGORY_REGIONAL variant ("RU", "CN"); empty for the others.
+	Country       string `protobuf:"bytes,13,opt,name=country,proto3" json:"country,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -453,6 +457,13 @@ func (x *DnsProviderVariant) GetNoteRu() string {
 func (x *DnsProviderVariant) GetNoteEn() string {
 	if x != nil {
 		return x.NoteEn
+	}
+	return ""
+}
+
+func (x *DnsProviderVariant) GetCountry() string {
+	if x != nil {
+		return x.Country
 	}
 	return ""
 }
@@ -583,9 +594,12 @@ func (x *ClientDnsSupport) GetIpv6() bool {
 // Domains ending in one of the suffixes resolve through these servers instead of the preset's main ones.
 type DnsSplitRule struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// ".ru", "gosuslugi.ru", ".рф" (IDN is normalised to punycode by the server).
-	Suffixes      []string     `protobuf:"bytes,1,rep,name=suffixes,proto3" json:"suffixes,omitempty"`
-	Servers       []*DnsServer `protobuf:"bytes,2,rep,name=servers,proto3" json:"servers,omitempty"`
+	// ".ru", "gosuslugi.ru", ".рф" (IDN is normalised to punycode by the server). A rule needs suffixes or geo (or both).
+	Suffixes []string     `protobuf:"bytes,1,rep,name=suffixes,proto3" json:"suffixes,omitempty"`
+	Servers  []*DnsServer `protobuf:"bytes,2,rep,name=servers,proto3" json:"servers,omitempty"`
+	// Whole-country site lists by code: "cn". The domains of the country's geosite list and the addresses of its geoip list
+	// resolve through the rule's servers and go direct, like the suffixes. An unknown code is INVALID_ARGUMENT.
+	Geo           []string `protobuf:"bytes,3,rep,name=geo,proto3" json:"geo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -634,6 +648,13 @@ func (x *DnsSplitRule) GetServers() []*DnsServer {
 	return nil
 }
 
+func (x *DnsSplitRule) GetGeo() []string {
+	if x != nil {
+		return x.Geo
+	}
+	return nil
+}
+
 type DnsPreset struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -655,7 +676,9 @@ type DnsPreset struct {
 	// The transport every app gets if it can carry it (catalog servers only; custom addresses keep their own kind).
 	PreferredTransport DnsTransport `protobuf:"varint,11,opt,name=preferred_transport,json=preferredTransport,proto3,enum=mistgate.admin.v1.DnsTransport" json:"preferred_transport,omitempty"`
 	// Computed, see DnsCategory.
-	Category      DnsCategory `protobuf:"varint,12,opt,name=category,proto3,enum=mistgate.admin.v1.DnsCategory" json:"category,omitempty"`
+	Category DnsCategory `protobuf:"varint,12,opt,name=category,proto3,enum=mistgate.admin.v1.DnsCategory" json:"category,omitempty"`
+	// Computed: the country of a regional preset (ISO 3166-1 alpha-2), empty otherwise.
+	Country       string `protobuf:"bytes,13,opt,name=country,proto3" json:"country,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -772,6 +795,13 @@ func (x *DnsPreset) GetCategory() DnsCategory {
 		return x.Category
 	}
 	return DnsCategory_DNS_CATEGORY_UNSPECIFIED
+}
+
+func (x *DnsPreset) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
 }
 
 type ListDnsPresetsRequest struct {
@@ -1789,7 +1819,7 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\tDnsServer\x124\n" +
 	"\x04kind\x18\x01 \x01(\x0e2 .mistgate.admin.v1.DnsServerKindR\x04kind\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12)\n" +
-	"\x10provider_variant\x18\x03 \x01(\tR\x0fproviderVariant\"\xd1\x02\n" +
+	"\x10provider_variant\x18\x03 \x01(\tR\x0fproviderVariant\"\xeb\x02\n" +
 	"\x12DnsProviderVariant\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aname_ru\x18\x02 \x01(\tR\x06nameRu\x12\x17\n" +
@@ -1803,7 +1833,8 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\adoh_url\x18\n" +
 	" \x01(\tR\x06dohUrl\x12\x17\n" +
 	"\anote_ru\x18\v \x01(\tR\x06noteRu\x12\x17\n" +
-	"\anote_en\x18\f \x01(\tR\x06noteEn\"t\n" +
+	"\anote_en\x18\f \x01(\tR\x06noteEn\x12\x18\n" +
+	"\acountry\x18\r \x01(\tR\acountry\"t\n" +
 	"\vDnsProvider\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12A\n" +
@@ -1813,10 +1844,11 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\n" +
 	"transports\x18\x02 \x03(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\n" +
 	"transports\x12\x12\n" +
-	"\x04ipv6\x18\x03 \x01(\bR\x04ipv6\"b\n" +
+	"\x04ipv6\x18\x03 \x01(\bR\x04ipv6\"t\n" +
 	"\fDnsSplitRule\x12\x1a\n" +
 	"\bsuffixes\x18\x01 \x03(\tR\bsuffixes\x126\n" +
-	"\aservers\x18\x02 \x03(\v2\x1c.mistgate.admin.v1.DnsServerR\aservers\"\xe6\x03\n" +
+	"\aservers\x18\x02 \x03(\v2\x1c.mistgate.admin.v1.DnsServerR\aservers\x12\x10\n" +
+	"\x03geo\x18\x03 \x03(\tR\x03geo\"\x80\x04\n" +
 	"\tDnsPreset\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1832,7 +1864,8 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\fsplit_direct\x18\n" +
 	" \x01(\bR\vsplitDirect\x12P\n" +
 	"\x13preferred_transport\x18\v \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12:\n" +
-	"\bcategory\x18\f \x01(\x0e2\x1e.mistgate.admin.v1.DnsCategoryR\bcategory\"\x17\n" +
+	"\bcategory\x18\f \x01(\x0e2\x1e.mistgate.admin.v1.DnsCategoryR\bcategory\x12\x18\n" +
+	"\acountry\x18\r \x01(\tR\acountry\"\x17\n" +
 	"\x15ListDnsPresetsRequest\"\xda\x01\n" +
 	"\x16ListDnsPresetsResponse\x126\n" +
 	"\apresets\x18\x01 \x03(\v2\x1c.mistgate.admin.v1.DnsPresetR\apresets\x12<\n" +
@@ -1905,10 +1938,10 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x19DNS_TRANSPORT_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13DNS_TRANSPORT_PLAIN\x10\x01\x12\x15\n" +
 	"\x11DNS_TRANSPORT_DOT\x10\x02\x12\x15\n" +
-	"\x11DNS_TRANSPORT_DOH\x10\x03*\xab\x01\n" +
+	"\x11DNS_TRANSPORT_DOH\x10\x03*\xad\x01\n" +
 	"\vDnsCategory\x12\x1c\n" +
-	"\x18DNS_CATEGORY_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13DNS_CATEGORY_RUSSIA\x10\x01\x12\x18\n" +
+	"\x18DNS_CATEGORY_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15DNS_CATEGORY_REGIONAL\x10\x01\x12\x18\n" +
 	"\x14DNS_CATEGORY_REGULAR\x10\x02\x12\x17\n" +
 	"\x13DNS_CATEGORY_NO_ADS\x10\x03\x12\x17\n" +
 	"\x13DNS_CATEGORY_FAMILY\x10\x04\x12\x19\n" +

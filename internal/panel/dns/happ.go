@@ -46,9 +46,13 @@ import (
 //     carry the preset name. Name is constant so that a changed preset overwrites the profile instead of
 //     adding another one.
 //
+// A country list of a split rule (geo.go) becomes "geosite:<name>" in DirectSites and "geoip:<name>" in DirectIp, the
+// syntax of the docs' own China example; the app ships the geo files, so Geoipurl/Geositeurl are not written. Only a
+// preset with a geo rule uses these entries.
+//
 // UNVERIFIED (not stated in the docs, taken from Xray conventions and common profiles): the "domain:" prefix
 // in DirectSites, that GlobalProxy "true" means "everything through the tunnel except the rules", and that
-// Geoipurl/Geositeurl may be omitted. Nothing here uses geosite:/geoip: entries, so no geo files are needed.
+// Geoipurl/Geositeurl may be omitted.
 // Standard padded base64 is used, as in Happ's own examples. The code was not run against a real Happ client.
 
 // HappProfileName is the Name of the generated routing profile.
@@ -113,7 +117,7 @@ func happBuild(p Preset) (happProfile, []string, error) {
 		notes = append(notes, fmt.Sprintf("%d fallback resolver(s) dropped: Happ takes one resolver", n))
 	}
 	domestic := remote
-	var direct []string
+	var direct, directIP []string
 	if len(p.Split) > 0 && !p.SplitDirect {
 		notes = append(notes, "split ignored (SplitDirect off)")
 	}
@@ -135,6 +139,19 @@ func happBuild(p Preset) (happProfile, []string, error) {
 						direct = append(direct, e)
 					}
 				}
+				for _, code := range r.Geo {
+					l, ok := geoLists[code]
+					if !ok {
+						notes = append(notes, fmt.Sprintf("country list %q skipped: unknown", code))
+						continue
+					}
+					if e := "geosite:" + l.Site; !slices.Contains(direct, e) {
+						direct = append(direct, e)
+					}
+					if e := "geoip:" + l.IP; !slices.Contains(directIP, e) {
+						directIP = append(directIP, e)
+					}
+				}
 			}
 		}
 		if used {
@@ -147,11 +164,14 @@ func happBuild(p Preset) (happProfile, []string, error) {
 	if direct == nil {
 		direct = []string{}
 	}
+	if directIP == nil {
+		directIP = []string{}
+	}
 	return happProfile{
 		Name: HappProfileName, GlobalProxy: "true",
 		RemoteDNSType: remote.typ, RemoteDNSDomain: remote.domain, RemoteDNSIP: remote.ip,
 		DomesticDNSType: domestic.typ, DomesticDNSDom: domestic.domain, DomesticDNSIP: domestic.ip,
-		DnsHosts: hosts, DirectSites: direct, DirectIp: []string{}, ProxySites: []string{}, ProxyIp: []string{},
+		DnsHosts: hosts, DirectSites: direct, DirectIp: directIP, ProxySites: []string{}, ProxyIp: []string{},
 		BlockSites: []string{}, BlockIp: []string{}, DomainStrategy: "IPIfNonMatch", FakeDNS: "false",
 	}, notes, nil
 }

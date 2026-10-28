@@ -339,7 +339,7 @@ const builtins: DnsPreset[] = [
   stock("dns_builtin_standard", "regular", ["Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"], ["Cloudflare и Google для всего", "Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google"]),
   stock("dns_builtin_adblock", "no_ads", ["AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告"], ["AdGuard DNS: без рекламы и трекеров", "AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器"]),
   stock("dns_builtin_family", "family", ["AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容"], ["AdGuard Family: без рекламы и сайтов для взрослых", "AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站"]),
-  stock("dns_builtin_ru_split", "russia", ["Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连"], ["Российские сайты напрямую, остальное через VPN", "Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN"]),
+  stock("dns_builtin_ru_split", "regional", ["Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连"], ["Российские сайты напрямую, остальное через VPN", "Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN"]),
 ];
 const keyDns = (): ServerEntry["dns"] => ({ choice: "", effective: "dns_builtin_standard", options: ["dns_builtin_standard", "dns_builtin_adblock", "dns_builtin_family"], default: "dns_builtin_standard", keys_to_refresh: [] });
 const de1: ServerEntry = {

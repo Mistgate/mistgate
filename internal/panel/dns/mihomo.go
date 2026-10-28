@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"fmt"
 	"net/netip"
 	"net/url"
 	"slices"
@@ -17,6 +18,10 @@ import (
 //   - nameserver-policy: the split rules' suffixes -> the split rule's servers, WITHOUT "#group" (they are queried
 //     directly), and only when the preset's SplitDirect is on (the same switch as Happ: only then do the split's domains
 //     bypass the VPN; off = the split is ignored). The same suffixes become DOMAIN-SUFFIX,<s>,DIRECT rules.
+//   - a country list of a split rule (geo.go) is two rule providers (mrs, downloaded through the tunnel group), a
+//     nameserver-policy entry "rule-set:geosite-<name>" and two RULE-SET rules to DIRECT, the geoip one with no-resolve
+//     (a domain is not looked up to be checked against it). Not GEOSITE,<name>: the core fetches geosite.dat itself at start,
+//     with no way to say through what, and from a censored network that does not work.
 //   - default-nameserver: plain addresses that resolve the NAMES of the DoH/DoT servers (the bootstrap IPv4 addresses
 //     the catalog knows for them).
 //   - proxy-server-nameserver: plain main servers (the names of our own nodes are resolved without the tunnel, which
@@ -33,9 +38,29 @@ type MihomoDNS struct {
 	// Direct are the suffix bodies (lower-case punycode, no leading dot) whose traffic goes DIRECT; they are exactly
 	// the suffixes of Policy.
 	Direct []string
+	// Providers are the rule providers of the country lists, and the RULE-SET rules to DIRECT that go with them, in order.
+	Providers []MihomoProvider
 	// Notes (English) say what of the preset a Mihomo profile cannot carry.
 	Notes []string
 }
+
+// MihomoProvider is one rule provider of a country list: a key of rule-providers.
+type MihomoProvider struct {
+	Name     string // "geosite-cn": the key of rule-providers and the name RULE-SET refers to
+	Behavior string // "domain" or "ipcidr"
+	URL      string
+}
+
+// Rule is the rule line that sends the provider's traffic DIRECT. The address list is matched without a lookup.
+func (p MihomoProvider) Rule() string {
+	if p.Behavior == "ipcidr" {
+		return "RULE-SET," + p.Name + ",DIRECT,no-resolve"
+	}
+	return "RULE-SET," + p.Name + ",DIRECT"
+}
+
+// MihomoProviderInterval is how often a provider is refreshed, in seconds.
+const MihomoProviderInterval = 86400
 
 // MihomoPolicy is one nameserver-policy entry: Domain is "+.<suffix>" (the suffix and its subdomains).
 type MihomoPolicy struct {
@@ -71,6 +96,13 @@ func (p Preset) MihomoDNS(group string) (MihomoDNS, error) {
 		for _, body := range sp.Suffixes {
 			out.Direct = append(out.Direct, body)
 			out.Policy = append(out.Policy, MihomoPolicy{Domain: "+." + body, Servers: servers})
+		}
+		for _, code := range sp.Geo {
+			site, ip := geositeTag(code), geoipTag(code)
+			out.Policy = append(out.Policy, MihomoPolicy{Domain: "rule-set:" + site, Servers: servers})
+			out.Providers = append(out.Providers,
+				MihomoProvider{Name: site, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, geoLists[code].Site)},
+				MihomoProvider{Name: ip, Behavior: "ipcidr", URL: fmt.Sprintf(mihomoGeoipURL, geoLists[code].IP)})
 		}
 	}
 	if len(out.ProxyServerNameserver) == 0 {

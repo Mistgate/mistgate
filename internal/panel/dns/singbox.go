@@ -19,6 +19,10 @@ import (
 //     first endpoint of the rule, queried directly (no detour). Only with SplitDirect on.
 //   - a DoH/DoT resolver is written as its IPv4 address plus tls.server_name (the host name), so that it needs no
 //     lookup of its own. The assembler also needs "local" (the system resolver) for route.default_domain_resolver.
+//   - a country list of a split rule (geo.go) is two remote binary rule sets (route.rule_set), a DNS rule {rule_set: the
+//     geosite one} to the split resolver and a route rule {rule_set: both} to direct. No download_detour: sing-box 1.14
+//     deprecates it, and without it the implicit client downloads through the default outbound (route.final, the selector),
+//     that is through the tunnel. The geoip set decides only connections made to an address.
 //   - strategy ipv4_only: no AAAA answers, like Mihomo's ipv6: false.
 
 // Tags of the servers in the block that the rest of the profile refers to.
@@ -33,8 +37,20 @@ type SingboxDNS struct {
 	// Direct are the suffix bodies (lower-case punycode, no leading dot) whose traffic goes direct; they are exactly
 	// the suffixes of the DNS rules.
 	Direct []string
+	// RuleSets are the remote rule sets of the country lists (route.rule_set); DirectSets the tags of both lists of each, which
+	// the route rule sends direct.
+	RuleSets   []SingboxRuleSet
+	DirectSets []string
 	// Notes (English) say what of the preset a sing-box profile cannot carry.
 	Notes []string
+}
+
+// SingboxRuleSet is one entry of route.rule_set: a remote binary list.
+type SingboxRuleSet struct {
+	Type   string `json:"type"`
+	Tag    string `json:"tag"`
+	Format string `json:"format"`
+	URL    string `json:"url"`
 }
 
 // SingboxSection is the JSON of the "dns" key.
@@ -63,7 +79,8 @@ type SingboxServerTLS struct {
 
 // SingboxDNSRule sends the queries of some suffixes to one server.
 type SingboxDNSRule struct {
-	DomainSuffix []string `json:"domain_suffix"`
+	DomainSuffix []string `json:"domain_suffix,omitempty"`
+	RuleSet      []string `json:"rule_set,omitempty"`
 	Action       string   `json:"action"`
 	Server       string   `json:"server"`
 }
@@ -81,17 +98,30 @@ func (p Preset) SingboxDNS(group string) (SingboxDNS, error) {
 	if n := len(main) - 1; n > 0 {
 		out.Notes = append(out.Notes, fmt.Sprintf("%d fallback resolver(s) dropped: sing-box takes one main resolver", n))
 	}
+	splits := 0
 	for _, sp := range split {
-		if len(sp.Suffixes) == 0 {
+		if len(sp.Suffixes) == 0 && len(sp.Geo) == 0 {
 			continue
 		}
-		tag := fmt.Sprintf("split-%d", len(out.Section.Rules)+1)
+		splits++
+		tag := fmt.Sprintf("split-%d", splits)
 		out.Section.Servers = append(out.Section.Servers, singboxServer(sp.Endpoints[0], tag, ""))
 		if n := len(sp.Endpoints) - 1; n > 0 {
 			out.Notes = append(out.Notes, fmt.Sprintf("split rule %d: %d fallback resolver(s) dropped: sing-box takes one resolver per rule", sp.Rule+1, n))
 		}
-		out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{DomainSuffix: sp.Suffixes, Action: "route", Server: tag})
-		out.Direct = append(out.Direct, sp.Suffixes...)
+		// Suffixes and rule sets are separate rules: the fields of one sing-box rule must all match, they are not alternatives.
+		if len(sp.Suffixes) > 0 {
+			out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{DomainSuffix: sp.Suffixes, Action: "route", Server: tag})
+			out.Direct = append(out.Direct, sp.Suffixes...)
+		}
+		for _, code := range sp.Geo {
+			site, ip := geositeTag(code), geoipTag(code)
+			out.RuleSets = append(out.RuleSets,
+				SingboxRuleSet{Type: "remote", Tag: site, Format: "binary", URL: fmt.Sprintf(singboxGeositeURL, geoLists[code].Site)},
+				SingboxRuleSet{Type: "remote", Tag: ip, Format: "binary", URL: fmt.Sprintf(singboxGeoipURL, geoLists[code].IP)})
+			out.DirectSets = append(out.DirectSets, site, ip)
+			out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{RuleSet: []string{site}, Action: "route", Server: tag})
+		}
 	}
 	out.Section.Servers = append(out.Section.Servers, SingboxServer{Type: "local", Tag: SingboxLocalTag})
 	return out, nil

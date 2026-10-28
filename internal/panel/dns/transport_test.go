@@ -183,7 +183,7 @@ func TestHappRoutingByPreference(t *testing.T) {
 // The catalog is data written by hand: every entry must pass the validation a custom server goes through, ids must
 // be unique and agree with their provider, and every variant must be reachable by at least one transport.
 func TestCatalog(t *testing.T) {
-	cats := map[Category]bool{CategoryRussia: true, CategoryRegular: true, CategoryNoAds: true, CategoryFamily: true, CategorySecurity: true}
+	cats := map[Category]bool{CategoryRegional: true, CategoryRegular: true, CategoryNoAds: true, CategoryFamily: true, CategorySecurity: true}
 	seen := map[string]bool{}
 	for _, p := range Catalog() {
 		if p.ID == "" || p.Name == "" || len(p.Variants) == 0 {

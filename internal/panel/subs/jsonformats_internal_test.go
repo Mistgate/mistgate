@@ -49,6 +49,7 @@ var docPresets = []struct {
 	{"standard", &dns.Preset{Name: "std", Transport: dns.KindPlain, Servers: []dns.Server{{Variant: "cloudflare/standard"}, {Variant: "google/standard"}}}},
 	{"ru_split", ruSplit()},
 	{"ru_split_off", func() *dns.Preset { p := ruSplit(); p.SplitDirect = false; return p }()},
+	{"cn_split", cnSplit()},
 	{"doh_adblock", &dns.Preset{Name: "doh", Transport: dns.KindDoH, Servers: []dns.Server{{Variant: "adguard/default"}}}},
 	{"no_usable_server", &dns.Preset{Name: "none", Transport: dns.KindPlain}},
 	{"no_dns", nil},
@@ -197,7 +198,21 @@ func checkXrayDoc(t *testing.T, b []byte, servers int, preset *dns.Preset) {
 		if last["outboundTag"] != "proxy" || last["network"] != "tcp,udp" {
 			t.Errorf("config %d: last rule %v", i, last)
 		}
-		if d != nil && len(d.Direct) > 0 {
+		if d != nil && len(d.DirectGeo) > 0 {
+			// geosite joins the direct domain rule (after the suffixes), geoip is an ip rule of its own right after it
+			var domains, ips []any
+			for _, r := range rules {
+				if x := r.(map[string]any)["domain"]; x != nil {
+					domains = x.([]any)
+				}
+				if x := r.(map[string]any)["ip"]; x != nil && r.(map[string]any)["outboundTag"] == "direct" && slices.Contains(x.([]any), any(d.DirectGeo[0].IP)) {
+					ips = x.([]any)
+				}
+			}
+			if len(domains) != len(d.Direct)+len(d.DirectGeo) || domains[len(domains)-1] != d.DirectGeo[len(d.DirectGeo)-1].Site || len(ips) != len(d.DirectGeo) || ips[0] != d.DirectGeo[0].IP {
+				t.Errorf("config %d: direct domains %v ips %v, want %v %v", i, domains, ips, d.Direct, d.DirectGeo)
+			}
+		} else if d != nil && len(d.Direct) > 0 {
 			var domains []any
 			for _, r := range rules {
 				if x := r.(map[string]any)["domain"]; x != nil {
@@ -387,8 +402,26 @@ func checkSingboxDoc(t *testing.T, b []byte, names []string, preset *dns.Preset)
 		t.Errorf("dns = %v", dnsM)
 	}
 	direct := len(rules) > 3
-	if direct != (len(d.Direct) > 0) {
-		t.Errorf("direct rule present %v for the split %v", direct, d.Direct)
+	if direct != (len(d.Direct) > 0 || len(d.DirectSets) > 0) {
+		t.Errorf("direct rule present %v for the split %v and sets %v", direct, d.Direct, d.DirectSets)
+	}
+	// the sets a rule names are defined, once each, by a remote binary rule set
+	sets := map[string]bool{}
+	defs, _ := route["rule_set"].([]any)
+	if (len(defs) > 0) != (len(d.DirectSets) > 0) {
+		t.Errorf("route.rule_set = %v for the sets %v", defs, d.DirectSets)
+	}
+	for _, rs := range defs {
+		o := rs.(map[string]any)
+		if o["type"] != "remote" || o["format"] != "binary" || o["download_detour"] != nil || o["url"] == "" || sets[o["tag"].(string)] {
+			t.Errorf("rule set = %v", o)
+		}
+		sets[o["tag"].(string)] = true
+	}
+	for _, tag := range d.DirectSets {
+		if !sets[tag] {
+			t.Errorf("route names the rule set %s, which is not defined (%v)", tag, sets)
+		}
 	}
 }
 

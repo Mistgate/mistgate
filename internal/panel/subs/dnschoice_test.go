@@ -175,7 +175,7 @@ func TestServersOnThePage(t *testing.T) {
 		byID[obj(p)["id"].(string)] = obj(p)
 	}
 	if len(byID) != 5 || byID["dns_builtin_adblock"]["name"] != "AdGuard: no ads" || byID["dns_builtin_adblock"]["description"] != "AdGuard DNS: no ads, no trackers" ||
-		byID["dns_builtin_adblock"]["category"] != "no_ads" || byID["dns_builtin_family"]["category"] != "family" || byID["dns_builtin_yandex"]["category"] != "russia" ||
+		byID["dns_builtin_adblock"]["category"] != "no_ads" || byID["dns_builtin_family"]["category"] != "family" || byID["dns_builtin_yandex"]["category"] != "regional" ||
 		byID["dns_builtin_standard"]["category"] != "regular" || byID["dns_builtin_ru_split"]["name"] != "Russia: .ru direct" {
 		t.Errorf("dns_presets = %v", d["dns_presets"])
 	}

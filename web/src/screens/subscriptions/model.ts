@@ -1,7 +1,7 @@
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport, type ClientDnsSupport, type DnsPreset, type DnsProvider } from "@/gen/mistgate/admin/v1/dns_pb";
 import { Platform, SubFormat, type SubscriptionSettings } from "@/gen/mistgate/admin/v1/subscription_pb";
-import type { Key } from "@/screens/users/t";
+import type { Key, Tx } from "@/screens/users/t";
 import type { Plain } from "@/lib/plain";
 
 // Plain shapes of what the screens edit (64-bit free, no protobuf bookkeeping): see lib/plain.ts.
@@ -67,15 +67,44 @@ export const dnsAddrKey: Partial<Record<DnsServerKind, Key>> = {
 export const dnsKinds = [DnsServerKind.PLAIN, DnsServerKind.DOH, DnsServerKind.DOT] as const;
 
 /** The categories of the DNS tab in the order of the chips; UNSPECIFIED is a preset of the admin's own. */
-export const dnsCategories = [DnsCategory.RUSSIA, DnsCategory.REGULAR, DnsCategory.NO_ADS, DnsCategory.FAMILY, DnsCategory.SECURITY] as const;
+export const dnsCategories = [DnsCategory.REGIONAL, DnsCategory.REGULAR, DnsCategory.NO_ADS, DnsCategory.FAMILY, DnsCategory.SECURITY] as const;
 export const categoryKey: Record<DnsCategory, Key> = {
   [DnsCategory.UNSPECIFIED]: "subs.dns.cat.own",
-  [DnsCategory.RUSSIA]: "subs.dns.cat.russia",
+  [DnsCategory.REGIONAL]: "subs.dns.cat.regional",
   [DnsCategory.REGULAR]: "subs.dns.cat.regular",
   [DnsCategory.NO_ADS]: "subs.dns.cat.noAds",
   [DnsCategory.FAMILY]: "subs.dns.cat.family",
   [DnsCategory.SECURITY]: "subs.dns.cat.security",
 };
+
+// A regional preset or catalog variant is filed under its country: one chip each ("1:CN"), Russia and China first.
+const countryKey: Record<string, Key> = { RU: "subs.dns.cat.russia", CN: "subs.dns.cat.china" };
+const countryOrder = Object.keys(countryKey);
+/** The chip a preset or a catalog variant is filed under: its category, and for a regional one its country. */
+export const chipOf = (x: { category: DnsCategory; country: string }): string => (x.category === DnsCategory.REGIONAL ? `${x.category}:${x.country}` : String(x.category));
+/** The chips that some of the items are filed under, in display order: the regional countries, the other categories, then "own". */
+export function dnsChips(items: readonly { category: DnsCategory; country: string }[]): string[] {
+  const have = new Set(items.map(chipOf));
+  const regional = [...have].filter((c) => c.startsWith(`${DnsCategory.REGIONAL}:`)).sort((a, b) => {
+    const ia = countryOrder.indexOf(a.split(":")[1]!);
+    const ib = countryOrder.indexOf(b.split(":")[1]!);
+    return (ia < 0 ? countryOrder.length : ia) - (ib < 0 ? countryOrder.length : ib) || a.localeCompare(b);
+  });
+  const rest = [...dnsCategories.filter((c) => c !== DnsCategory.REGIONAL), DnsCategory.UNSPECIFIED].map(String).filter((c) => have.has(c));
+  return [...regional, ...rest];
+}
+/** The text of a chip: the country of a regional one (a country the panel has no word for is named by the browser), else the category. */
+export function chipLabel(chip: string, t: Tx): string {
+  const [cat = "", country = ""] = chip.split(":");
+  if (Number(cat) !== DnsCategory.REGIONAL) return t(categoryKey[Number(cat) as DnsCategory]);
+  const key = countryKey[country];
+  if (key) return t(key);
+  try {
+    return (country && new Intl.DisplayNames([t.locale], { type: "region" }).of(country)) || t(categoryKey[DnsCategory.REGIONAL]);
+  } catch {
+    return country || t(categoryKey[DnsCategory.REGIONAL]);
+  }
+}
 
 /** The switch of a preset, left to right. */
 export const dnsTransports = [DnsTransport.PLAIN, DnsTransport.DOT, DnsTransport.DOH] as const;
@@ -329,12 +358,18 @@ export function serverProblem(kind: DnsServerKind, address: string): Key | null 
 const serverBad = (s: ServerLike) => !s.providerVariant && (s.address.trim() === "" || (s.kind !== undefined && serverProblem(s.kind, s.address) !== null));
 
 /** The problem with a preset draft, as a message key, or null when it can be saved. */
-export function presetProblem(p: { name: string; servers: readonly ServerLike[]; split: readonly { suffixes: readonly string[]; servers: readonly ServerLike[] }[] }): Key | null {
+export function presetProblem(p: { name: string; servers: readonly ServerLike[]; split: readonly { suffixes: readonly string[]; geo?: readonly string[]; servers: readonly ServerLike[] }[] }): Key | null {
   if (p.name.trim() === "") return "subs.dns.needName";
   if (p.servers.length === 0 || p.servers.some(serverBad)) return "subs.dns.needServer";
-  if (p.split.some((r) => r.suffixes.length === 0 || r.servers.length === 0 || r.servers.some(serverBad))) return "subs.dns.needSuffix";
+  // a rule needs suffixes or country lists (or both), and a server
+  if (p.split.some((r) => (r.suffixes.length === 0 && (r.geo ?? []).length === 0) || r.servers.length === 0 || r.servers.some(serverBad))) return "subs.dns.needSuffix";
   return null;
 }
+
+// a catalog server goes by its id alone; the panel fills in the addresses
+export const cleanServers = (l: readonly DnsServerN[]) => l.map((s) => (s.providerVariant ? { providerVariant: s.providerVariant } : { kind: s.kind, address: s.address.trim() }));
+/** The split rules as the panel takes them: every field of a rule is sent back, the country lists as much as the suffixes. */
+export const cleanSplit = (split: readonly SplitRuleN[]) => split.map((r) => ({ suffixes: r.suffixes, geo: r.geo, servers: cleanServers(r.servers) }));
 
 export const emptyServer = (): DnsServerN => ({ kind: DnsServerKind.PLAIN, address: "", providerVariant: "" });
 export const variantServer = (id: string): DnsServerN => ({ kind: DnsServerKind.UNSPECIFIED, address: "", providerVariant: id });
@@ -408,6 +443,7 @@ export type PresetLook = { glyph: "map" | "globe" | "shieldOff" | "family" | "bu
 const looks: Record<string, PresetLook> = {
   dns_builtin_ru_split: { glyph: "map", tone: "sky" },
   dns_builtin_ru_proxied: { glyph: "map", tone: "lavender" },
+  dns_builtin_cn_split: { glyph: "map", tone: "mint" },
   dns_builtin_standard: { glyph: "globe", tone: "mint" },
   dns_builtin_adblock: { glyph: "shieldOff", tone: "sand" },
   dns_builtin_family: { glyph: "family", tone: "sage" },
@@ -417,7 +453,7 @@ const looks: Record<string, PresetLook> = {
   dns_builtin_yandex_safe: { glyph: "letter", tone: "rose" },
 };
 const categoryLooks: Partial<Record<DnsCategory, PresetLook>> = {
-  [DnsCategory.RUSSIA]: { glyph: "map", tone: "sky" },
+  [DnsCategory.REGIONAL]: { glyph: "map", tone: "sky" },
   [DnsCategory.REGULAR]: { glyph: "globe", tone: "mint" },
   [DnsCategory.NO_ADS]: { glyph: "shieldOff", tone: "sand" },
   [DnsCategory.FAMILY]: { glyph: "family", tone: "sage" },
@@ -432,6 +468,7 @@ export const presetLook = (p: { id: string; category?: DnsCategory }): PresetLoo
 const builtinNames: Record<string, { ru: string; en: string; zh: string }> = {
   dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连" },
   dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN" },
+  dns_builtin_cn_split: { ru: "Китай: китайские сайты напрямую", en: "China: Chinese sites direct", zh: "中国：国内网站直连" },
   dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google", zh: "Cloudflare + Google" },
   dns_builtin_adblock: { ru: "AdGuard: без рекламы", en: "AdGuard: no ads", zh: "AdGuard：无广告" },
   dns_builtin_family: { ru: "AdGuard Family: без рекламы и 18+", en: "AdGuard Family: no ads, no 18+", zh: "AdGuard Family：无广告和成人内容" },
@@ -495,7 +532,9 @@ export function presetSubtitle(
   const parts = [...new Set(p.servers.map((s) => providerName(s, catalog)))];
   const pref = p.preferredTransport ?? DnsTransport.PLAIN;
   if (transport && pref !== DnsTransport.PLAIN && pref !== DnsTransport.UNSPECIFIED && p.servers.some((s) => s.providerVariant)) parts.push(transport(pref));
-  const first = p.split.find((r) => r.suffixes.length > 0)?.suffixes[0];
-  if (p.splitDirect && first) parts.push(direct(unicodeSuffix(first)));
+  // the first thing that goes direct: a suffix, else (a rule of country lists only) the country code
+  const rule = p.split.find((r) => r.suffixes.length > 0 || r.geo.length > 0);
+  const first = rule?.suffixes[0] !== undefined ? unicodeSuffix(rule.suffixes[0]) : rule?.geo[0]?.toUpperCase();
+  if (p.splitDirect && first) parts.push(direct(first));
   return parts.join(" · ");
 }

@@ -4,7 +4,7 @@ import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { zh } from "@/i18n/zh";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, cutAnnounce, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipLabel, chipOf, cleanSplit, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -118,6 +118,11 @@ describe("presetProblem", () => {
     expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [], servers: [server] }] })).toBe("subs.dns.needSuffix");
     expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [".ru"], servers: [] }] })).toBe("subs.dns.needSuffix");
     expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [".ru"], servers: [server] }] })).toBeNull();
+    // a rule of country lists needs no suffix, but still a server
+    expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [], geo: ["cn"], servers: [server] }] })).toBeNull();
+    expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [".ru"], geo: ["cn"], servers: [server] }] })).toBeNull();
+    expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [], geo: ["cn"], servers: [] }] })).toBe("subs.dns.needSuffix");
+    expect(presetProblem({ name: "a", servers: [server], split: [{ suffixes: [], geo: [], servers: [server] }] })).toBe("subs.dns.needSuffix");
   });
   it("takes a catalog server without an address", () => {
     const v = { kind: DnsServerKind.UNSPECIFIED, address: "", providerVariant: "cloudflare/family" };
@@ -221,15 +226,20 @@ describe("presetSubtitle", () => {
     expect(presetSubtitle({ servers: [plain("94.140.14.14"), plain("94.140.15.15"), { kind: DnsServerKind.DOH, address: "https://dns.adguard-dns.com/dns-query", providerVariant: "" }], split: [], splitDirect: false }, direct)).toBe("AdGuard");
   });
   it("adds what goes direct", () => {
-    const split = [{ suffixes: [".ru", ".su"], servers: [plain("77.88.8.8")] }];
+    const split = [{ suffixes: [".ru", ".su"], geo: [], servers: [plain("77.88.8.8")] }];
     expect(presetSubtitle({ servers: [plain("1.1.1.1"), plain("8.8.8.8")], split, splitDirect: true }, direct)).toBe("Cloudflare · Google · .ru direct");
     expect(presetSubtitle({ servers: [plain("1.1.1.1"), plain("8.8.8.8")], split, splitDirect: false }, direct)).toBe("Cloudflare · Google");
+  });
+  it("says a country when the split is only country lists", () => {
+    const split = [{ suffixes: [], geo: ["cn"], servers: [plain("223.5.5.5")] }];
+    expect(presetSubtitle({ servers: [plain("1.1.1.1"), plain("8.8.8.8")], split, splitDirect: true }, direct)).toBe("Cloudflare · Google · CN direct");
+    expect(presetSubtitle({ servers: [plain("1.1.1.1")], split, splitDirect: false }, direct)).toBe("Cloudflare");
   });
 });
 
 // a two-provider catalog, as ListDnsPresets would hand it over
 const variant = (id: string, over: Partial<Provider["variants"][number]> = {}) => ({
-  id, nameRu: "Обычный", nameEn: "Standard", category: DnsCategory.REGULAR, ipv4: ["1.1.1.1"], ipv6: [], plain: true, dotHost: "h.example", dotPort: 853, dohUrl: "https://h.example/dns-query", noteRu: "", noteEn: "", ...over,
+  id, nameRu: "Обычный", nameEn: "Standard", category: DnsCategory.REGULAR, country: "", ipv4: ["1.1.1.1"], ipv6: [], plain: true, dotHost: "h.example", dotPort: 853, dohUrl: "https://h.example/dns-query", noteRu: "", noteEn: "", ...over,
 });
 const providers: Provider[] = [
   { id: "cloudflare", name: "Cloudflare", variants: [variant("cloudflare/standard"), variant("cloudflare/family", { category: DnsCategory.FAMILY })] },
@@ -312,8 +322,44 @@ describe("the subtitle and the look of a catalog preset", () => {
   });
   it("takes the glyph of the category unless the preset has its own", () => {
     expect(presetLook({ id: "dns_builtin_cloudflare_family", category: DnsCategory.FAMILY }).glyph).toBe("family");
-    expect(presetLook({ id: "dns_builtin_ru_split", category: DnsCategory.RUSSIA }).tone).toBe("sky");
+    expect(presetLook({ id: "dns_builtin_ru_split", category: DnsCategory.REGIONAL }).tone).toBe("sky");
+    expect(presetLook({ id: "dns_custom", category: DnsCategory.REGIONAL }).glyph).toBe("map");
     expect(presetLook({ id: "dns_x", category: DnsCategory.UNSPECIFIED })).toEqual({ glyph: "server", tone: "muted" });
+  });
+});
+
+describe("the editor keeps the country lists of a split rule", () => {
+  const server = { kind: DnsServerKind.PLAIN, address: " 223.5.5.5 ", providerVariant: "" };
+  it("sends geo back with the suffixes and the cleaned servers", () => {
+    expect(cleanSplit([{ suffixes: [".cn"], geo: ["cn"], servers: [server, variantServer("dnspod/standard")] }])).toEqual([
+      { suffixes: [".cn"], geo: ["cn"], servers: [{ kind: DnsServerKind.PLAIN, address: "223.5.5.5" }, { providerVariant: "dnspod/standard" }] },
+    ]);
+    // the built-in China rule: no suffix, one country list
+    expect(cleanSplit([{ suffixes: [], geo: ["cn"], servers: [variantServer("alidns/standard")] }])).toEqual([{ suffixes: [], geo: ["cn"], servers: [{ providerVariant: "alidns/standard" }] }]);
+    expect(cleanSplit([{ suffixes: [".ru"], geo: [], servers: [variantServer("yandex/basic")] }])[0]!.geo).toEqual([]);
+  });
+});
+
+describe("DNS chips", () => {
+  const t = Object.assign((k: string) => ({ "subs.dns.cat.russia": "Russia", "subs.dns.cat.china": "China", "subs.dns.cat.regular": "Regular", "subs.dns.cat.own": "Own", "subs.dns.cat.regional": "Regional" })[k] ?? k, { locale: "en" }) as unknown as Parameters<typeof chipLabel>[1];
+  const item = (category: DnsCategory, country = "") => ({ category, country });
+  it("files a regional preset under its country and puts Russia and China first", () => {
+    const chips = dnsChips([item(DnsCategory.REGULAR), item(DnsCategory.REGIONAL, "CN"), item(DnsCategory.UNSPECIFIED), item(DnsCategory.REGIONAL, "RU"), item(DnsCategory.REGIONAL, "CN"), item(DnsCategory.REGIONAL, "IR")]);
+    expect(chips).toEqual([chipOf(item(DnsCategory.REGIONAL, "RU")), chipOf(item(DnsCategory.REGIONAL, "CN")), chipOf(item(DnsCategory.REGIONAL, "IR")), String(DnsCategory.REGULAR), String(DnsCategory.UNSPECIFIED)]);
+    expect(chips.map((c) => chipLabel(c, t))).toEqual(["Russia", "China", "Iran", "Regular", "Own"]);
+  });
+  it("has no chip for what nobody is filed under", () => {
+    expect(dnsChips([])).toEqual([]);
+    expect(dnsChips([item(DnsCategory.FAMILY)])).toEqual([String(DnsCategory.FAMILY)]);
+  });
+  it("names the country in the three languages and a stock China preset in all of them", () => {
+    for (const dict of [en, ru, zh] as Record<string, string>[]) {
+      expect(dict["subs.dns.cat.china"]).toBeTruthy();
+      expect(dict["subs.dns.cat.regional"]).toBeTruthy();
+    }
+    expect(presetName({ id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую" }, "en")).toBe("China: Chinese sites direct");
+    expect(presetName({ id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую" }, "zh")).toBe("中国：国内网站直连");
+    expect(presetName({ id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую" }, "ru")).toBe("Китай: китайские сайты напрямую");
   });
 });
 

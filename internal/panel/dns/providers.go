@@ -14,7 +14,7 @@ const CatalogVersion = "2026-09-30"
 type Category string
 
 const (
-	CategoryRussia   Category = "russia"   // built for resolving Russian sites from inside Russia
+	CategoryRegional Category = "regional" // built for resolving one country's sites from inside it (Variant.Country says which)
 	CategoryRegular  Category = "regular"  // no filtering
 	CategoryNoAds    Category = "no_ads"   // blocks ads and trackers
 	CategoryFamily   Category = "family"   // blocks adult content (and malware)
@@ -27,6 +27,7 @@ type Variant struct {
 	ID             string // "provider/variant"
 	NameRU, NameEN string
 	Category       Category
+	Country        string // ISO 3166-1 alpha-2 of a regional variant ("RU", "CN"); empty for the others
 	IPv4, IPv6     []string
 	NoPlain        bool   // the addresses do not answer plain DNS (they only bootstrap DoT/DoH)
 	DoTHost        string // empty: no DoT endpoint
@@ -60,6 +61,11 @@ type Provider struct {
 //	             (HTTP 200, application/dns-message) from this machine on 2026-09-30. UNVERIFIED: a DoT host name (third-party
 //	             sources disagree) and IPv6 addresses, so neither is listed.
 //	DNS.SB       https://dns.sb/guide/, https://dns.sb/dot/ (dot.sb:853), https://dns.sb/doh/ (https://doh.dns.sb/dns-query)
+//	AliDNS       https://alibabacloud.com/help/dns/what-is-alibaba-cloud-public-dns  (223.5.5.5, 223.6.6.6, 2400:3200::1,
+//	             2400:3200:baba::1; read 2026-10-28). A DoH URL (dns.alidns.com) and a DoT host are known only from third-party
+//	             pages: not listed until a live query confirms them, like OpenDNS above.
+//	DNSPod       https://docs.dnspod.com/public-dns/public-dns-introduction/  (119.29.29.29; read 2026-10-28). Its IPv6 address,
+//	             DoH and DoT names are third-party only: not listed.
 //
 // The Cloudflare DoH note below (blocked from Russia since 08.2026) is the owner's report, not something I could check.
 var catalog = []Provider{
@@ -107,7 +113,7 @@ var catalog = []Provider{
 			NoteRU: "Ничего не блокирует.", NoteEN: "Blocks nothing."},
 	}},
 	{ID: "yandex", Name: "Яндекс", Variants: []Variant{
-		{ID: "yandex/basic", NameRU: "Базовый", NameEN: "Basic", Category: CategoryRussia,
+		{ID: "yandex/basic", NameRU: "Базовый", NameEN: "Basic", Category: CategoryRegional, Country: "RU",
 			IPv4: []string{"77.88.8.8", "77.88.8.1"}, IPv6: []string{"2a02:6b8::feed:ff", "2a02:6b8:0:1::feed:ff"},
 			DoTHost: "common.dot.dns.yandex.net", DoTPort: 853, DoHURL: "https://common.dot.dns.yandex.net/dns-query",
 			NoteRU: "Российские сайты открываются надёжнее. DoH и DoT из России работают.",
@@ -122,6 +128,18 @@ var catalog = []Provider{
 			DoTHost: "family.dot.dns.yandex.net", DoTPort: 853, DoHURL: "https://family.dot.dns.yandex.net/dns-query",
 			NoteRU: "Блокирует контент для взрослых и вредоносные сайты. DoH и DoT из России работают.",
 			NoteEN: "Blocks adult content and malware. DoH and DoT work from Russia."},
+	}},
+	{ID: "alidns", Name: "AliDNS", Variants: []Variant{
+		{ID: "alidns/standard", NameRU: "Обычный", NameEN: "Standard", Category: CategoryRegional, Country: "CN",
+			IPv4: []string{"223.5.5.5", "223.6.6.6"}, IPv6: []string{"2400:3200::1", "2400:3200:baba::1"},
+			NoteRU: "Китайские сайты открываются надёжнее. Только обычный DNS, без DoH и DoT.",
+			NoteEN: "Chinese sites resolve more reliably. Plain DNS only, no DoH or DoT."},
+	}},
+	{ID: "dnspod", Name: "DNSPod", Variants: []Variant{
+		{ID: "dnspod/standard", NameRU: "Обычный", NameEN: "Standard", Category: CategoryRegional, Country: "CN",
+			IPv4:   []string{"119.29.29.29"},
+			NoteRU: "Китайские сайты открываются надёжнее. Только обычный DNS, без DoH и DoT.",
+			NoteEN: "Chinese sites resolve more reliably. Plain DNS only, no DoH or DoT."},
 	}},
 	{ID: "mullvad", Name: "Mullvad", Variants: []Variant{
 		{ID: "mullvad/standard", NameRU: "Обычный", NameEN: "Standard", Category: CategoryRegular, NoPlain: true,

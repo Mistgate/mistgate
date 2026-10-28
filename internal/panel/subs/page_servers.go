@@ -79,7 +79,7 @@ type pageDNSPreset struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
-	Category     string            `json:"category"` // "russia" | "regular" | "no_ads" | "family" | "security" | "" (the owner's own)
+	Category     string            `json:"category"` // "regional" | "regular" | "no_ads" | "family" | "security" | "" (the owner's own)
 	Names        map[string]string `json:"names,omitempty"`
 	Descriptions map[string]string `json:"descriptions,omitempty"`
 }
