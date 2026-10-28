@@ -97,6 +97,27 @@ func TestCreateRelayDefaultsAndLists(t *testing.T) {
 	wantMsg(t, errOf2(f.create(f.server.Id, "nod_nl1", 0)), "failed_precondition: node_retired")
 }
 
+func TestListRelaysIncludesMonitorAndCounters(t *testing.T) {
+	f := newRelayFix(t)
+	r := must(f.create(f.server.Id, "nod_fi1", 0))
+	monitor := store.RelayMonitorCheck{AtUnix: f.clock.Unix(), OK: false, Stage: "freeze", Code: "freeze", ResponseMS: 23, FailStreak: 2}
+	if err := f.st.SetRelayMonitorCheck(f.ctx, r.Id, monitor); err != nil {
+		t.Fatal(err)
+	}
+	f.sql(`UPDATE relay SET enabled = 1 WHERE id = ?`, r.Id)
+	counters := store.RelayCounters{Bytes: 65536, Packets: 42, CountedUnix: f.clock.Unix()}
+	if err := f.st.SetRelayCounters(f.ctx, "nod_fi1", []store.RelayCounterUpdate{{RelayID: r.Id, Network: "udp", Port: 443, RelayCounters: counters}}); err != nil {
+		t.Fatal(err)
+	}
+
+	got := must(f.s.ListRelays(f.ctx, req(&adminv1.ListRelaysRequest{}))).Msg.Relays
+	if len(got) != 1 || got[0].Monitor == nil || got[0].Monitor.AtUnix != monitor.AtUnix || got[0].Monitor.Ok ||
+		got[0].Monitor.Stage != "freeze" || got[0].Monitor.Code != "freeze" || got[0].Monitor.ResponseMs != 23 || got[0].Monitor.FailStreak != 2 ||
+		got[0].Bytes != counters.Bytes || got[0].Packets != counters.Packets || got[0].CountedUnix != counters.CountedUnix || got[0].Check != nil {
+		t.Fatalf("ListRelays did not expose relay monitoring: %+v", got)
+	}
+}
+
 func errOf2(_ *adminv1.Relay, err error) error { return err }
 
 // The port rules run both ways: a relay cannot take a port a profile or a relay of the entry holds (hop range included),

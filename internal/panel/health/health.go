@@ -42,6 +42,8 @@ type Fleet interface {
 	RunDoctor(ctx context.Context, nodeID string, checks []string, wait time.Duration) (*agentv1.DoctorReport, error)
 	// ApplyFix sends a fix (or its dry run) and waits for the CommandResult; same preconditions.
 	ApplyFix(ctx context.Context, nodeID, fixID string, dryRun bool, params map[string]string) (*agentv1.CommandResult, error)
+	// CheckRelay performs the bounded leg/path diagnosis that refines the stage of a failed client-eye relay check.
+	CheckRelay(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
 	// OnlineByInbound counts the open sessions of every inbound of the connected nodes (the restart dialogs say how
 	// many connections drop).
 	OnlineByInbound(ctx context.Context) map[string]int
@@ -53,9 +55,10 @@ func (s *Service) liveNode(ctx context.Context, nodeID string) (store.NodeLiveRo
 
 // Timing of the module. Everything a test needs to shorten is a Config field; these are the defaults.
 const (
-	defaultInterval = 300 * time.Second // health.check_interval_s
-	minInterval     = 60 * time.Second
-	intervalSetting = "health.check_interval_s"
+	defaultInterval         = 300 * time.Second // health.check_interval_s
+	minInterval             = 60 * time.Second
+	intervalSetting         = "health.check_interval_s"
+	defaultRelayDownloadURL = "https://speed.cloudflare.com/__down?bytes=65536"
 
 	evalEvery     = 10 * time.Second // the evaluator also runs after every round and every doctor report
 	reopenWindow  = time.Hour        // a resolved alert that fires again within this re-opens
@@ -78,8 +81,10 @@ type Config struct {
 	// Dialers maps a protocol plugin id to its tunnel client. Default: hysteria2, awg and vless. A protocol without one is
 	// SKIPPED (client_unsupported).
 	Dialers map[string]Dialer
-	// Probe URLs of the two probes; hostnames go into the tunnel unresolved. Defaults: gstatic's generate_204 and Cloudflare's trace.
+	// Probe URLs of the client-eye checks; hostnames go into the tunnel unresolved. A relay also downloads the bounded
+	// ProbeDownloadURL body to detect transfers that stall after the handshake.
 	Probe204URL, ProbeTraceURL string
+	ProbeDownloadURL           string
 	// ProbeTLS is the TLS configuration of the probes (tests with their own CA). Default: system roots.
 	ProbeTLS *tls.Config
 
@@ -217,6 +222,9 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 	}
 	if cfg.ProbeTraceURL == "" {
 		cfg.ProbeTraceURL = "https://www.cloudflare.com/cdn-cgi/trace"
+	}
+	if cfg.ProbeDownloadURL == "" {
+		cfg.ProbeDownloadURL = defaultRelayDownloadURL
 	}
 	for p, d := range map[*time.Duration]time.Duration{
 		&cfg.HandshakeTimeout: 8 * time.Second, &cfg.ProbeTimeout: 10 * time.Second, &cfg.RetryDelay: 15 * time.Second,

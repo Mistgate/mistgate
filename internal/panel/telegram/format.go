@@ -208,6 +208,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 			return l.pick("A profile fails the check", "Профиль не проходит проверку", "协议配置未通过客户端视角检测")
 		}
 		return l.pick("Profile “"+data(p["profile"], 40)+"” fails the check", "Профиль «"+data(p["profile"], 40)+"» не проходит проверку", "「"+data(p["profile"], 40)+"」未通过客户端视角检测")
+	case "relay_down":
+		return l.pick("Relay via “"+data(p["relay"], 40)+"” is down", "Ретрансляция через «"+data(p["relay"], 40)+"» не работает", "通过「"+data(p["relay"], 40)+"」的中继不可用")
 	case "doctor_warn", "doctor_fail":
 		return doctorTitle(l, p["check"])
 	case "state_drift":
@@ -297,6 +299,29 @@ func alertReason(l L, a store.HealthAlert) string {
 			parts = append(parts, l.pick("port ", "порт ", "端口 ")+data(p["port"], 6))
 		}
 		return strings.Join(parts, " · ")
+	case "relay_down":
+		var reason string
+		switch p["stage"] {
+		case "leg":
+			reason = l.pick("the entry cannot reach the exit server", "входная нода не достаёт до сервера выхода", "入口节点无法连接出口服务器")
+		case "entry":
+			reason = l.pick("the forwarded port is not reachable through the entry", "через входную ноду не удаётся достичь проброшенного порта", "无法通过入口节点连接转发端口")
+		case "freeze":
+			reason = l.pick("the 64 KB transfer through the relay stalls", "передача 64 КБ через ретрансляцию замирает", "经中继传输 64 KB 数据时停滞")
+		default:
+			reason = l.pick("the full path through the relay fails", "полный путь через ретрансляцию не работает", "经中继的完整链路检测失败")
+		}
+		to := data(p["exit"], 40)
+		if p["exit_profile"] != "" {
+			to += " · " + data(p["exit_profile"], 40)
+		}
+		if p["port"] != "" {
+			to += l.pick(" · port ", " · порт ", " · 端口 ") + data(p["port"], 6)
+		}
+		if to != "" {
+			reason += l.gap() + l.pick("Exit: ", "Выход: ", "出口：") + to
+		}
+		return upperFirst(reason) + l.stop()
 	case "doctor_warn", "doctor_fail":
 		if text, ok := doctorDetail(l, p); ok {
 			return text

@@ -138,14 +138,22 @@ type target struct {
 	spec     plugin.InboundSpec // valid when err == nil and the inbound is enabled
 	settings json.RawMessage    // merged profile settings (secrets in place)
 	err      error              // the spec could not be built
+	relay    *relayTargetInfo
+}
+
+type relayTargetInfo struct {
+	link     store.RelayLink
+	entry    store.NodeRow
+	exitPort uint16
 }
 
 // snapshot is every inbound of every non-retired node at one moment.
 type snapshot struct {
-	at      int64 // unix nanoseconds
-	nodes   []store.NodeRow
-	byNode  map[string][]*target // in inbound id order
-	targets map[string]*target   // by inbound id
+	at           int64 // unix nanoseconds
+	nodes        []store.NodeRow
+	byNode       map[string][]*target // in inbound id order
+	targets      map[string]*target   // by inbound id
+	relayTargets map[string]*target   // by "relay:" + relay id
 }
 
 // snapshot returns the target list, rebuilt when it is older than SnapshotTTL. The evaluator, the scheduler and
@@ -161,8 +169,10 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	sn := &snapshot{at: now.UnixNano(), nodes: nodes, byNode: map[string][]*target{}, targets: map[string]*target{}}
+	sn := &snapshot{at: now.UnixNano(), nodes: nodes, byNode: map[string][]*target{}, targets: map[string]*target{}, relayTargets: map[string]*target{}}
+	nodesByID := make(map[string]store.NodeRow, len(nodes))
 	for _, n := range nodes {
+		nodesByID[n.ID] = n
 		rows, err := s.st.FleetInbounds(ctx, n.ID, false)
 		if err != nil {
 			return nil, err
@@ -175,6 +185,21 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 			sn.byNode[n.ID] = append(sn.byNode[n.ID], t)
 			sn.targets[r.ID] = t
 		}
+	}
+	links, err := s.st.RelayLinks(ctx, store.RelayFilter{EnabledOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	for _, link := range links {
+		exit := sn.targets[link.InboundID]
+		entry, entryOK := nodesByID[link.ViaNodeID]
+		if exit == nil || exit.err != nil || !exit.in.Enabled || !entryOK || entry.Address == "" {
+			continue
+		}
+		t := *exit
+		t.relay = &relayTargetInfo{link: link, entry: entry, exitPort: exit.spec.Listen.Port}
+		t.spec.Listen.Port = link.Port
+		sn.relayTargets[relayTargetID(link.ID)] = &t
 	}
 	s.snap = sn
 	return sn, nil

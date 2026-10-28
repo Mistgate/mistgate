@@ -253,7 +253,7 @@ func relayCheckMsg(c store.RelayCheck, nameOf func(string) string) *adminv1.Rela
 // relayCheckOf is the message of the relay's latest check (nil before the first), naming the sending nodes.
 func (s *Service) relayCheckOf(ctx context.Context, l store.RelayLink) *adminv1.RelayCheck {
 	c, ok := l.Check()
-	if !ok {
+	if !ok || c.At == 0 {
 		return nil
 	}
 	names := map[string]string{}

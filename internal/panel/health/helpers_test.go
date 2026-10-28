@@ -53,13 +53,15 @@ type fixCall struct {
 
 // fakeFleet is the fleet as the health module sees it.
 type fakeFleet struct {
-	mu       sync.Mutex
-	live     map[string]liveState
-	liveErr  error
-	doctor   func(ctx context.Context, node string, checks []string) (*agentv1.DoctorReport, error)
-	fix      func(c fixCall) (*agentv1.CommandResult, error)
-	fixCalls []fixCall
-	online   map[string]int
+	mu         sync.Mutex
+	live       map[string]liveState
+	liveErr    error
+	doctor     func(ctx context.Context, node string, checks []string) (*agentv1.DoctorReport, error)
+	fix        func(c fixCall) (*agentv1.CommandResult, error)
+	fixCalls   []fixCall
+	relayCheck func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
+	relayCalls []string
+	online     map[string]int
 }
 
 func (f *fakeFleet) OnlineByInbound(context.Context) map[string]int {
@@ -143,6 +145,17 @@ func (f *fakeFleet) ApplyFix(_ context.Context, node, fix string, dry bool, para
 		return &agentv1.CommandResult{Ok: true}, nil
 	}
 	return f.fix(c)
+}
+
+func (f *fakeFleet) CheckRelay(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error) {
+	f.mu.Lock()
+	f.relayCalls = append(f.relayCalls, relayID)
+	check := f.relayCheck
+	f.mu.Unlock()
+	if check == nil {
+		return store.RelayCheck{}, nil
+	}
+	return check(ctx, relayID, stages...)
 }
 
 var errTooOld = errString("agent too old")

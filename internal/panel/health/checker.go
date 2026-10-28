@@ -4,6 +4,7 @@ import (
 	"context"
 	"hash/fnv"
 	"math/rand/v2"
+	"strings"
 	"sync"
 	"time"
 
@@ -147,12 +148,25 @@ func (s *Service) scheduleDue(ctx context.Context) {
 	s.schedMu.Lock()
 	defer s.schedMu.Unlock()
 	for id := range s.sched {
-		if t := sn.targets[id]; t == nil || s.skipReason(t, live[t.node.ID]) != "" {
+		if t := scheduledTarget(sn, id); t == nil || s.scheduledSkipReason(t, live) != "" {
 			delete(s.sched, id) // gone, or not probed now: it gets a fresh first run when it is probed again
 		}
 	}
 	for id, t := range sn.targets {
-		if s.skipReason(t, live[t.node.ID]) != "" {
+		if s.scheduledSkipReason(t, live) != "" {
+			continue
+		}
+		sc := s.sched[id]
+		if sc == nil {
+			sc = &schedule{next: now.Add(time.Duration(rand.Float64() * float64(min(firstRunSpan, s.interval(ctx)))))}
+			s.sched[id] = sc
+		}
+		if !sc.running && !sc.queued && !now.Before(sc.next) {
+			s.enqueueLocked(id, sc)
+		}
+	}
+	for id, t := range sn.relayTargets {
+		if s.scheduledSkipReason(t, live) != "" {
 			continue
 		}
 		sc := s.sched[id]
@@ -208,6 +222,9 @@ func (s *Service) runRound(ctx context.Context, id string) {
 
 // round does the attempt and its retry. ok is false when nothing was measured (skipped).
 func (s *Service) round(ctx context.Context, id string) (Result, bool) {
+	if strings.HasPrefix(id, relayTargetPrefix) {
+		return s.roundRelay(ctx, id)
+	}
 	s.invalidateSnapshot() // the node and the inbound must be as they are now
 	sn, err := s.snapshot(ctx)
 	if err != nil {

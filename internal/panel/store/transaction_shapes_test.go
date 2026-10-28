@@ -36,6 +36,7 @@ var transactionShape1 = map[string]string{
 	"node_dns.go:ResetUserNodeChoices":             "Deletes a person's picks per node and for the link apps in one fixed batch.",
 	"port_check.go:PutTCPChecks":                   "Deletes a node's TCP check rows and inserts the new ones in one fixed batch.",
 	"relay.go:RelaysApplied":                       "The reported forwards of one entry update their rows (switched-on relays of that node only) in one fixed batch.",
+	"relay_check.go:SetRelayCounters":              "Updates each enabled relay owned by the reporting entry in one fixed batch.",
 	"provision.go:FinishCancelledNodeProvisionJob": "The cancellation event and guarded state transition run in one fixed batch.",
 	"provision.go:RequeueNodeProvisionJobs":        "Set-based event inserts and state updates requeue interrupted jobs in one fixed batch.",
 	"provision.go:createNodeProvisionJob":          "The job insert and optional queued event run in one fixed batch.",

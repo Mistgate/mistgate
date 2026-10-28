@@ -287,6 +287,35 @@ func relayStoreProof(t *testing.T, st *Store) {
 	if got, _ := mustRelay(t, st, "rly_a").Check(); got != chk {
 		t.Errorf("a port change rewrote the check: %+v", got)
 	}
+	monitor := RelayMonitorCheck{AtUnix: 1003, OK: false, Stage: "freeze", Code: "freeze", ResponseMS: 17, FailStreak: 2,
+		TargetKey: "target-a", AutoCheckAt: 1003, AutoCheckTargetKey: "target-a"}
+	if err := st.SetRelayMonitorCheck(ctx, "rly_a", monitor); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := mustRelay(t, st, "rly_a").Check()
+	if !ok || got.Monitor == nil || *got.Monitor != monitor || got.Leg != chk.Leg || got.Path != chk.Path {
+		t.Fatalf("monitor writer changed the leg/path check: %+v", got)
+	}
+	chk.Leg.At = 1004
+	if err := st.SetRelayCheck(ctx, "rly_a", chk); err != nil {
+		t.Fatal(err)
+	}
+	got, ok = mustRelay(t, st, "rly_a").Check()
+	if !ok || got.Monitor == nil || *got.Monitor != monitor || got.Leg != chk.Leg || got.Path != chk.Path {
+		t.Fatalf("leg/path writer changed the monitor: %+v", got)
+	}
+	enabled = true
+	if err := st.UpdateRelay(ctx, "rly_a", RelayPatch{Enabled: &enabled}, at); err != nil {
+		t.Fatal(err)
+	}
+	counters := RelayCounters{Bytes: 65536, Packets: 42, CountedUnix: 1005}
+	if err := st.SetRelayCounters(ctx, "nod_fi1", []RelayCounterUpdate{{RelayID: "rly_a", Network: "udp", Port: 8444, RelayCounters: counters}}); err != nil {
+		t.Fatal(err)
+	}
+	got, ok = mustRelay(t, st, "rly_a").Check()
+	if !ok || got.Counters == nil || *got.Counters != counters || got.Monitor == nil || *got.Monitor != monitor || got.Leg != chk.Leg || got.Path != chk.Path {
+		t.Fatalf("counter writer changed another check_json member: %+v", got)
+	}
 
 	// The server goes: its relays go with it (the foreign key).
 	relayExec(t, st, `DELETE FROM inbound WHERE id = 'inb_de1_vl'`)

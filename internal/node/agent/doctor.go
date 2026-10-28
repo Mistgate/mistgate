@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	mrand "math/rand/v2"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -274,6 +276,74 @@ func reportMsg(requestID string, rep *doctor.Report, errText string) *pb.Connect
 	return &pb.ConnectRequest{Message: &pb.ConnectRequest_DoctorReport{DoctorReport: m}}
 }
 
+func (a *Agent) doctorReportMsg(ctx context.Context, requestID string, rep *doctor.Report, errText string) *pb.ConnectRequest {
+	if rep == nil {
+		return reportMsg(requestID, nil, errText)
+	}
+	counters := relayCounterResults(ctx, a.doctorRun, a.snapshotModel().relays, a.now())
+	if len(counters) == 0 {
+		return reportMsg(requestID, rep, errText)
+	}
+	copy := *rep
+	copy.Results = append(append([]doctor.Result(nil), rep.Results...), counters...)
+	return reportMsg(requestID, &copy, errText)
+}
+
+type relayNftCounter struct {
+	Family  string `json:"family"`
+	Table   string `json:"table"`
+	Name    string `json:"name"`
+	Packets uint64 `json:"packets"`
+	Bytes   uint64 `json:"bytes"`
+}
+
+type relayNftDocument struct {
+	Nftables []struct {
+		Counter *relayNftCounter `json:"counter"`
+	} `json:"nftables"`
+}
+
+// relayCounterResults reads only the agent-owned relay table through the doctor's existing command runner. Each forward is a
+// separate DoctorResult with id "relay"; the panel treats these as counter reports, not doctor warnings.
+func relayCounterResults(ctx context.Context, run func(context.Context, string, ...string) ([]byte, error), forwards []plugin.RelayForward, now time.Time) []doctor.Result {
+	if run == nil || len(forwards) == 0 {
+		return nil
+	}
+	out, err := run(ctx, "nft", "-j", "list", "counters", "table", "inet", hostctl.NftRelayTable)
+	if err != nil {
+		return nil
+	}
+	var doc relayNftDocument
+	if json.Unmarshal(out, &doc) != nil {
+		return nil
+	}
+	counts := make(map[string]relayNftCounter, len(doc.Nftables))
+	for _, item := range doc.Nftables {
+		if c := item.Counter; c != nil && c.Family == "inet" && c.Table == hostctl.NftRelayTable {
+			counts[c.Name] = *c
+		}
+	}
+	items := append([]plugin.RelayForward(nil), forwards...)
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	results := make([]doctor.Result, 0, len(items))
+	seen := map[string]bool{}
+	for _, f := range items {
+		if f.ID == "" || (f.Network != "tcp" && f.Network != "udp") || f.Port == 0 {
+			continue
+		}
+		name := f.Network + "_" + strconv.FormatUint(uint64(f.Port), 10)
+		counter, ok := counts[name]
+		if !ok || seen[name] {
+			continue
+		}
+		seen[name] = true
+		results = append(results, doctor.Result{ID: "relay", Status: doctor.OK, Measured: now,
+			Params: map[string]string{"relay": f.ID, "network": f.Network, "port": strconv.FormatUint(uint64(f.Port), 10),
+				"bytes": strconv.FormatUint(counter.Bytes, 10), "packets": strconv.FormatUint(counter.Packets, 10)}})
+	}
+	return results
+}
+
 // clientIPv6SettingsChanged schedules just the IPv6 check. A one-bit pending flag coalesces repeated setting changes,
 // and Run's busy response is retried once a second so a settings change during the periodic report is not lost.
 func (a *Agent) clientIPv6SettingsChanged(s *session) {
@@ -310,7 +380,7 @@ func (a *Agent) startClientIPv6Doctor(s *session) {
 				a.clientIPv6DoctorPending.Store(true)
 				return
 			}
-			s.send(reportMsg("", rep, ""))
+			s.send(a.doctorReportMsg(s.ctx, "", rep, ""))
 		}
 	})
 }
@@ -323,7 +393,7 @@ func (a *Agent) runDoctor(s *session, r *pb.RunDoctor) {
 		s.send(reportMsg(r.RequestId, nil, "busy")) // ErrBusy is the only error Run returns
 		return
 	}
-	s.send(reportMsg(r.RequestId, rep, ""))
+	s.send(a.doctorReportMsg(s.ctx, r.RequestId, rep, ""))
 }
 
 // applyFix answers an ApplyFix with one CommandResult and, after a real successful fix, sends a partial
@@ -357,7 +427,7 @@ func (a *Agent) applyFix(s *session, r *pb.ApplyFix) {
 	for try := 0; try < recheckTries; try++ {
 		rep, err := a.doc.Run(s.ctx, doctor.RecheckIDs(r.FixId))
 		if err == nil {
-			s.send(reportMsg("", rep, ""))
+			s.send(a.doctorReportMsg(s.ctx, "", rep, ""))
 			return
 		}
 		sleepCtx(s.ctx, time.Second) // a periodic run is in progress
@@ -387,7 +457,7 @@ func (a *Agent) doctorSchedule(s *session) {
 		if rep, err := a.doc.Run(s.ctx, nil); err == nil { // busy: a RunDoctor is on, it reports by itself
 			w, f := statusCount(rep)
 			a.log.Debug("doctor report", "warn", w, "fail", f, "took", rep.Duration.Round(time.Millisecond))
-			s.send(reportMsg("", rep, ""))
+			s.send(a.doctorReportMsg(s.ctx, "", rep, ""))
 		}
 		wait = every + time.Duration((mrand.Float64()*2-1)*float64(span))
 	}

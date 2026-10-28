@@ -28,7 +28,7 @@ func TestChineseTelegramMessagesAreTranslated(t *testing.T) {
 	if got := L("zh").pick("English", "Russian", "中文"); got != "中文" {
 		t.Errorf("Chinese text = %q, want the Chinese variant", got)
 	}
-	for _, kind := range []string{"node_down", "no_traffic", "check_failed", "state_drift", "cert_expiry", "update_failed", "quota",
+	for _, kind := range []string{"node_down", "no_traffic", "check_failed", "relay_down", "state_drift", "cert_expiry", "update_failed", "quota",
 		"subscription_shared_suspect", "access_ended", "user_connection", "users_impacted", "torrent", "port_lossy", "device_limit", "country_blocked"} {
 		a := store.HealthAlert{Kind: kind, Params: map[string]string{"profile": "HY2"}}
 		zh, en := alertTitle("zh", a), alertTitle("en", a)
@@ -41,6 +41,28 @@ func TestChineseTelegramMessagesAreTranslated(t *testing.T) {
 	}
 	if got := alertTitle("zh", store.HealthAlert{Kind: "check_failed", Params: map[string]string{"profile": "HY2"}}); got != "「HY2」未通过客户端视角检测" {
 		t.Errorf("Chinese check_failed title = %q", got)
+	}
+}
+
+func TestRelayDownTelegramTextIsLocalized(t *testing.T) {
+	a := store.HealthAlert{Kind: "relay_down", Subject: "rly_test", WhyKey: "health.alert.relay_down.why.freeze",
+		Params: map[string]string{"relay": "fi1", "exit": "de1", "exit_profile": "files", "port": "8443", "stage": "freeze"}}
+	wantTitle := "Relay via “fi1” is down"
+	wantReason := "The 64 KB transfer through the relay stalls Exit: de1 · files · port 8443."
+	if got := alertTitle("en", a); got != wantTitle {
+		t.Errorf("English title = %q, want %q", got, wantTitle)
+	}
+	if got := alertReason("en", a); got != wantReason {
+		t.Errorf("English reason = %q, want %q", got, wantReason)
+	}
+	for _, lang := range []L{"ru", "zh"} {
+		title, reason := alertTitle(lang, a), alertReason(lang, a)
+		if title == wantTitle || reason == wantReason || title == "" || reason == "" {
+			t.Errorf("%s relay text was not translated: %q / %q", lang, title, reason)
+		}
+		if lang == "zh" && (!hasHan(title) || !hasHan(reason)) {
+			t.Errorf("Chinese relay text has no Han characters: %q / %q", title, reason)
+		}
 	}
 }
 

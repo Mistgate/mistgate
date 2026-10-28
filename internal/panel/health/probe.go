@@ -23,6 +23,9 @@ import (
 // roundBudget bounds one attempt: 8 s handshake, two 10 s probes and the short request on the open connection would be
 // 31 s (the limit is 25 s).
 const roundBudget = 25 * time.Second
+const relayAttemptBudget = 45 * time.Second
+
+const relayDownloadBytes = 64 << 10
 
 // reuseTimeout bounds the extra generate_204 request on the already open connection: it needs one round trip, so
 // a slow tunnel must not eat the time of the trace probe after it.
@@ -117,9 +120,17 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 		return Result{}, true
 	}
 	start := s.now()
-	rctx, cancel := context.WithTimeout(ctx, min(s.cfg.HandshakeTimeout+2*s.cfg.ProbeTimeout+reuseTimeout, roundBudget))
+	requests, budget := 2, roundBudget
+	if t.relay != nil {
+		requests, budget = 3, relayAttemptBudget // generate_204, trace and the bounded transfer
+	}
+	rctx, cancel := context.WithTimeout(ctx, min(s.cfg.HandshakeTimeout+time.Duration(requests)*s.cfg.ProbeTimeout+reuseTimeout, budget))
 	defer cancel()
-	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: t.node, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
+	dialNode := t.node
+	if t.relay != nil {
+		dialNode = t.relay.entry
+	}
+	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
 		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout})
 	if err != nil {
 		var pe *ProbeError
@@ -130,7 +141,11 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 		return Result{Status: adminv1.CheckStatus_CHECK_STATUS_FAILED, At: s.now(), ErrorCode: code, ErrorDetail: detail}, false
 	}
 	defer tn.Close()
-	return s.probe(rctx, tn, t.node, start), false
+	downloadURL := ""
+	if t.relay != nil {
+		downloadURL = s.cfg.ProbeDownloadURL
+	}
+	return s.probeWithDownload(rctx, tn, t.node, start, downloadURL), false
 }
 
 // probe runs the probes through an open tunnel, all measured on the panel's server: generate_204 (latency, from
@@ -139,6 +154,10 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 // connect_ms is the time from start to the first successful dial through the tunnel; see connectReporter for a
 // tunnel whose dial returns before the node is reached.
 func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, start time.Time) Result {
+	return s.probeWithDownload(ctx, tn, node, start, "")
+}
+
+func (s *Service) probeWithDownload(ctx context.Context, tn Tunnel, node store.NodeRow, start time.Time, downloadURL string) Result {
 	var connectNS atomic.Int64 // nanoseconds from start to the first successful dial; 0 = none yet
 	var dials atomic.Int32     // dials started, to see whether a request reused a connection
 	tr := &http.Transport{
@@ -237,11 +256,36 @@ func (s *Service) probe(ctx context.Context, tn Tunnel, node store.NodeRow, star
 	if res.Status != adminv1.CheckStatus_CHECK_STATUS_OK && len(bad) > 0 {
 		res.ErrorCode, res.ErrorDetail = bad[0].Code, bad[0].Detail
 	}
+	if downloadURL != "" && ok204 && okTrace {
+		if code, detail := relayDownloadProbe(ctx, hc, downloadURL); code != "" {
+			res.Status = adminv1.CheckStatus_CHECK_STATUS_FAILED
+			res.ErrorCode, res.ErrorDetail = code, detail
+		}
+	}
 	if u, ok := tn.(udpStatser); ok {
 		sent, lost := u.UDPStats()
 		res.UDPSent, res.UDPLost = uint32(min(sent, math.MaxUint32)), uint32(min(lost, math.MaxUint32))
 	}
 	return res
+}
+
+// relayDownloadProbe reads 64 KiB through the forward. A response that starts and then stops is a freeze, even though
+// the handshake, generate_204 and trace requests all succeeded.
+func relayDownloadProbe(ctx context.Context, hc *http.Client, url string) (string, string) {
+	resp, err := getProbe(ctx, hc, url, false)
+	if err != nil {
+		return "exit_unreachable", "download: " + probeErrText(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return "http_status", fmt.Sprintf("download answered %d", resp.StatusCode)
+	}
+	n, err := io.CopyN(io.Discard, resp.Body, relayDownloadBytes)
+	resp.Body.Close()
+	if err != nil {
+		return "freeze", fmt.Sprintf("download stopped after %d KB", n/1024)
+	}
+	return "", ""
 }
 
 // reusedProbe is one more GET of u, right after a first one that left its connection open. It returns the time of the

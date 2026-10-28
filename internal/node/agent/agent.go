@@ -155,9 +155,10 @@ type Agent struct {
 	linkVolumes   map[linkCounterKey]linkCounterVolume
 	linkWindow    time.Duration // test seam; zero selects the production ten-minute window
 
-	doc      *doctor.Doctor
-	hostRing doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
-	certNA   atomic.Pointer[map[string]time.Time] // certificate expiry per inbound at the last apply
+	doc       *doctor.Doctor
+	doctorRun func(context.Context, string, ...string) ([]byte, error)
+	hostRing  doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
+	certNA    atomic.Pointer[map[string]time.Time] // certificate expiry per inbound at the last apply
 
 	mu           sync.Mutex
 	model        *model // applied desired state; replaced wholesale, never mutated once stored
@@ -398,7 +399,9 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		a.protocols = append(a.protocols, proto)
 	}
 	sort.Strings(a.protocols)
-	a.doc = doctor.New(a.doctorEnv())
+	doctorEnv := a.doctorEnv()
+	a.doc = doctor.New(doctorEnv)
+	a.doctorRun = doctorEnv.Run
 	return a, nil
 }
 

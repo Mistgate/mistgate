@@ -39,6 +39,7 @@ const (
 	kTorrent        = "torrent"
 	kPortLossy      = "port_lossy"
 	kDeviceLimit    = "device_limit"
+	kRelayDown      = "relay_down"
 )
 
 var kindProto = map[string]adminv1.AlertKind{
@@ -55,6 +56,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	kPortLossy:      adminv1.AlertKind_ALERT_KIND_PORT_LOSSY,
 	kDeviceLimit:    adminv1.AlertKind_ALERT_KIND_DEVICE_LIMIT,
 	kCountryBlocked: adminv1.AlertKind_ALERT_KIND_COUNTRY_BLOCKED,
+	kRelayDown:      adminv1.AlertKind_ALERT_KIND_RELAY_DOWN,
 }
 
 const (
@@ -111,6 +113,9 @@ type derived struct {
 }
 
 func (d *derived) holds(a store.HealthAlert) bool {
+	if a.Kind == kRelayDown && d.superseded[key{a.Kind, a.NodeID, a.Subject}] {
+		return false
+	}
 	if d.holdKeys[key{a.Kind, a.NodeID, a.Subject}] {
 		return true
 	}
@@ -190,6 +195,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 	var rows []store.DoctorRow
 	var accepts []store.DoctorAccept
 	var portChecks []store.PortCheck
+	var relayLinks []store.RelayLink
 	needFleetData := len(sn.nodes) > 0 || !s.cfg.Edge
 	if needFleetData {
 		liveRows, err = s.fl.Live(ctx)
@@ -219,6 +225,11 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 			s.log.Warn("health: evaluate", "err", err)
 			return
 		}
+		relayLinks, err = s.st.RelayLinks(ctx, store.RelayFilter{EnabledOnly: true})
+		if err != nil {
+			s.log.Warn("health: evaluate relays", "err", err)
+			return
+		}
 	}
 	active, err := s.st.ActiveAlerts(ctx)
 	if err != nil {
@@ -226,6 +237,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 		return
 	}
 	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, active)
+	s.addRelayDownConds(ctx, now, sn, relayLinks, active, d)
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
 	s.nhMu.Unlock()

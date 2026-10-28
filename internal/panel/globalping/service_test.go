@@ -865,6 +865,9 @@ func (liveFleet) RunDoctor(context.Context, string, []string, time.Duration) (*a
 func (liveFleet) ApplyFix(context.Context, string, string, bool, map[string]string) (*agentv1.CommandResult, error) {
 	return nil, errors.New("not used")
 }
+func (liveFleet) CheckRelay(context.Context, string, ...string) (store.RelayCheck, error) {
+	return store.RelayCheck{}, errors.New("not used")
+}
 func (liveFleet) OnlineByInbound(context.Context) map[string]int { return nil }
 
 func TestSwitchingItOffStopsTheScheduler(t *testing.T) {

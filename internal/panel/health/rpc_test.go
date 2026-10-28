@@ -111,6 +111,7 @@ func TestNewAlertKindsUseTheirProtoNames(t *testing.T) {
 		{kUserConnection, adminv1.AlertKind_ALERT_KIND_USER_CONNECTION},
 		{kUsersImpacted, adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED},
 		{kPortLossy, adminv1.AlertKind_ALERT_KIND_PORT_LOSSY},
+		{kRelayDown, adminv1.AlertKind_ALERT_KIND_RELAY_DOWN},
 	} {
 		if got := kindProto[tc.stored]; got != tc.proto {
 			t.Errorf("kindProto[%q] = %s, want %s", tc.stored, got, tc.proto)

@@ -71,6 +71,15 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 	if !l.AppliedAt.IsZero() {
 		out.AppliedUnix = l.AppliedAt.Unix()
 	}
+	if check, ok := l.Check(); ok {
+		if monitor := check.Monitor; monitor != nil {
+			out.Monitor = &adminv1.RelayMonitor{AtUnix: monitor.AtUnix, Ok: monitor.OK, Stage: monitor.Stage, Code: monitor.Code,
+				ResponseMs: monitor.ResponseMS, FailStreak: monitor.FailStreak}
+		}
+		if counters := check.Counters; counters != nil {
+			out.Bytes, out.Packets, out.CountedUnix = counters.Bytes, counters.Packets, counters.CountedUnix
+		}
+	}
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
 			out.ExitPort = uint32(spec.Listen.Port)

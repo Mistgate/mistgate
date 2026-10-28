@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"slices"
+	"strconv"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -50,7 +51,29 @@ func (s *Service) DoctorReport(ctx context.Context, nodeID string, r *agentv1.Do
 	now := s.now()
 	seen := map[string]int{}
 	var rows []store.DoctorRow
+	var relayCounters []store.RelayCounterUpdate
 	for _, x := range r.Results {
+		if x.Id != "relay" || x.Status != agentv1.DoctorStatus_DOCTOR_STATUS_OK || !checkIDRe.MatchString(x.Params["relay"]) ||
+			(x.Params["network"] != "tcp" && x.Params["network"] != "udp") {
+			continue
+		}
+		port, portErr := strconv.ParseUint(x.Params["port"], 10, 16)
+		bytes, byteErr := strconv.ParseUint(x.Params["bytes"], 10, 64)
+		packets, packetErr := strconv.ParseUint(x.Params["packets"], 10, 64)
+		if portErr == nil && port > 0 && byteErr == nil && packetErr == nil {
+			countedUnix := now.Unix()
+			if x.MeasuredUnix > 0 && x.MeasuredUnix <= now.Add(5*time.Minute).Unix() {
+				countedUnix = x.MeasuredUnix
+			}
+			relayCounters = append(relayCounters, store.RelayCounterUpdate{RelayID: x.Params["relay"], Network: x.Params["network"], Port: uint16(port), RelayCounters: store.RelayCounters{
+				Bytes: bytes, Packets: packets, CountedUnix: countedUnix,
+			}})
+		}
+	}
+	for _, x := range r.Results {
+		if x.Id == "relay" {
+			continue
+		}
 		if len(rows) == maxDoctorResults {
 			break
 		}
@@ -87,6 +110,11 @@ func (s *Service) DoctorReport(ctx context.Context, nodeID string, r *agentv1.Do
 		}
 		seen[x.Id] = len(rows)
 		rows = append(rows, row)
+	}
+	if len(relayCounters) > 0 {
+		if err := s.st.SetRelayCounters(ctx, nodeID, relayCounters); err != nil {
+			s.log.Warn("health: store relay counters", "node", nodeID, "err", err)
+		}
 	}
 	if len(rows) == 0 {
 		return
