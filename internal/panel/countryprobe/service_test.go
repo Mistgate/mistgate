@@ -827,6 +827,45 @@ func TestEachReferenceFailsOncePerRun(t *testing.T) {
 	})
 }
 
+func TestRunsRotateBatchStartWhenBudgetFitsOneBatch(t *testing.T) {
+	e := newEnv(t)
+	e.setNodes(func([]Node) []Node {
+		nodes := []Node{{ID: "probe1", Name: "probe1", Address: "198.51.100.1", CountryCode: "RU", Caps: []string{Capability}, Online: true, Ports: []uint16{443}}}
+		for i := range 17 {
+			id := "target" + strconv.Itoa(i)
+			nodes = append(nodes, Node{ID: id, Name: id, Address: "192.0.2." + strconv.Itoa(10+i), Online: true, Ports: []uint16{443}})
+		}
+		return nodes
+	})
+	// The fake lets one batch finish, then reports the run budget expiring on the next batch.
+	e.ff.script = func(n int, c call) (fleet.CountryProbeResult, error) {
+		if n%2 == 1 {
+			return fleet.CountryProbeResult{}, context.DeadlineExceeded
+		}
+		return openAll(c), nil
+	}
+	e.enable()
+	probe, nodes := e.nodes[0], slices.Clone(e.nodes)
+	for range 3 {
+		st, err := e.svc.load(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.svc.execute(context.Background(), e.svc.generation(), st, probe, nodes); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows := e.rows()
+	if len(rows) != 17 {
+		t.Fatalf("successful target checks = %d, want all 17 across the three budget-limited runs", len(rows))
+	}
+	for i := range 17 {
+		if _, ok := rows["target"+strconv.Itoa(i)]; !ok {
+			t.Errorf("target%d was not checked successfully", i)
+		}
+	}
+}
+
 func TestDisconnectDeletesTheRowsAndTheSettings(t *testing.T) {
 	e := newEnv(t)
 	e.enable()

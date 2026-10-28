@@ -571,6 +571,39 @@ func TestAutoReregister(t *testing.T) {
 	}
 }
 
+func TestAutoReregisterLimitPersistsAcrossRestart(t *testing.T) {
+	e := newEnv(t)
+	node := e.addNode("de1")
+	if _, err := e.register(node); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.rpc().UpdateWarpRegistrationParams(e.ctx, connect.NewRequest(&adminv1.UpdateWarpRegistrationParamsRequest{
+		Params: &adminv1.WarpRegistrationParams{AutoReregister: true}})); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.s.NeedsAttention(e.ctx, node, "revoked"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := e.s.AutoReregister(e.ctx, node); err != nil || !ok {
+		t.Fatalf("first auto-registration: ok=%v err=%v", ok, err)
+	}
+
+	old := e.s
+	restarted, err := New(e.st, old.v, old.fl, old.cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.s = restarted
+	e.now = e.now.Add(30 * time.Minute)
+	if err := e.s.NeedsAttention(e.ctx, node, "revoked"); err != nil {
+		t.Fatal(err)
+	}
+	before := e.cf.count("POST")
+	if ok, err := e.s.AutoReregister(e.ctx, node); err != nil || ok || e.cf.count("POST") != before {
+		t.Fatalf("attempt within the hour after restart: ok=%v err=%v POST count=%d, want no new registration", ok, err, e.cf.count("POST"))
+	}
+}
+
 func TestAutoReregisterHonorsCallerDeadline(t *testing.T) {
 	e := newEnv(t)
 	node := e.addNode("de1")

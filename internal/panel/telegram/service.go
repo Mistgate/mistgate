@@ -95,14 +95,15 @@ type Service struct {
 	log   *slog.Logger
 	now   func() time.Time
 
-	mu       sync.Mutex
-	pending  []item
-	open     map[string]bool      // health alerts announced as open and not yet resolved
-	seenIP   map[string]time.Time // admin id + address -> last sign-in seen from it
-	lastTest map[string]time.Time // admin id -> last test message
-	botErr   string               // how the last conversation with Telegram went ("" = fine)
-	sources  Sources
-	pollStop context.CancelFunc // ends the poll in flight when the bot changes
+	mu         sync.Mutex
+	pending    []item
+	announcing map[string]struct{}  // watcher notices queued or being delivered
+	open       map[string]bool      // health alerts announced as open and not yet resolved
+	seenIP     map[string]time.Time // admin id + address -> last sign-in seen from it
+	lastTest   map[string]time.Time // admin id -> last test message
+	botErr     string               // how the last conversation with Telegram went ("" = fine)
+	sources    Sources
+	pollStop   context.CancelFunc // ends the poll in flight when the bot changes
 	// pollFrom0: the next poll starts from the beginning (another bot: update ids are per bot).
 	pollFrom0 bool
 	notify    chan struct{} // an item was queued
@@ -111,8 +112,17 @@ type Service struct {
 
 // item is a line of news waiting for the next message: who gets it and how it reads in a language.
 type item struct {
-	to   func(store.TelegramLinkRow) bool
-	text func(l L, brand string) string
+	to            func(store.TelegramLinkRow) bool
+	text          func(l L, brand string) string
+	noticeKey     string
+	noticeVersion string
+}
+
+func (it item) noticeID() string {
+	if it.noticeKey == "" {
+		return ""
+	}
+	return it.noticeKey + "\x00" + it.noticeVersion
 }
 
 // Audiences. What a role receives: health alerts reach every admin (every role may read them in the admin); everything
@@ -159,7 +169,7 @@ func New(cfg Config) (*Service, error) {
 	}
 	return &Service{
 		st: cfg.Store, vault: cfg.Vault, api: &apiClient{base: strings.TrimRight(cfg.APIBase, "/"), hc: cfg.HTTPClient}, cfg: cfg, log: cfg.Log, now: cfg.Now,
-		open: map[string]bool{}, seenIP: map[string]time.Time{}, lastTest: map[string]time.Time{},
+		announcing: map[string]struct{}{}, open: map[string]bool{}, seenIP: map[string]time.Time{}, lastTest: map[string]time.Time{},
 		notify: make(chan struct{}, 1), wake: make(chan struct{}, 1),
 	}, nil
 }
@@ -509,6 +519,9 @@ func (s *Service) nodeName(ctx context.Context, id string) string {
 func (s *Service) enqueue(it item) {
 	s.mu.Lock()
 	if len(s.pending) >= maxPending {
+		if id := s.pending[0].noticeID(); id != "" {
+			delete(s.announcing, id)
+		}
 		s.pending = s.pending[1:]
 	}
 	s.pending = append(s.pending, it)
@@ -518,6 +531,44 @@ func (s *Service) enqueue(it item) {
 	default:
 	}
 	s.flushAfterResponse() // the edge has no send loop; a no-op on the VPS
+}
+
+func (s *Service) enqueueNotice(key, version string, it item) {
+	it.noticeKey, it.noticeVersion = key, version
+	id := it.noticeID()
+	s.mu.Lock()
+	if _, exists := s.announcing[id]; exists {
+		s.mu.Unlock()
+		return
+	}
+	s.announcing[id] = struct{}{}
+	s.mu.Unlock()
+	s.enqueue(it)
+}
+
+func (s *Service) noticeDelivered(ctx context.Context, it item) {
+	if id := it.noticeID(); id != "" {
+		if err := s.st.SetSettings(context.WithoutCancel(ctx), map[string]string{it.noticeKey: it.noticeVersion}); err != nil {
+			s.log.Warn("telegram: remember announced version", "err", err)
+		}
+		s.mu.Lock()
+		delete(s.announcing, id)
+		s.mu.Unlock()
+	}
+}
+
+func (s *Service) finishNotices(items []item, retained map[string]struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, it := range items {
+		id := it.noticeID()
+		if id == "" {
+			continue
+		}
+		if _, queued := retained[id]; !queued {
+			delete(s.announcing, id)
+		}
+	}
 }
 
 // AlertTransition is health.Config.OnTransition: an alert opened (or re-opened) or ended. An alert already announced as open
@@ -630,8 +681,8 @@ func (s *Service) sleepPlain(ctx context.Context, d time.Duration) bool {
 	return s.wait(ctx, d, nil)
 }
 
-// canSend is whether a message for this audience would reach anybody (a bot and an enabled chat). The watcher marks a
-// version as told only when it could be.
+// canSend is whether a message for this audience would reach anybody (a bot and an enabled chat). The watcher checks this
+// before it reads the update sources.
 func (s *Service) canSend(ctx context.Context, to func(store.TelegramLinkRow) bool) bool {
 	if _, err := s.st.TelegramBot(ctx); err != nil {
 		return false
@@ -663,21 +714,14 @@ func (s *Service) watch(ctx context.Context) {
 		v, err := s.st.Setting(ctx, key)
 		return err == nil && v == version
 	}
-	mark := func(key, version string) {
-		if err := s.st.SetSettings(ctx, map[string]string{key: version}); err != nil && ctx.Err() == nil {
-			s.log.Warn("telegram: remember announced version", "err", err)
-		}
-	}
 	if src.PanelRelease != nil {
 		if v, ok := src.PanelRelease(); ok && v != "" && !told(notifiedRel, v) {
-			s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return releaseText(l, v, adminURL) }})
-			mark(notifiedRel, v)
+			s.enqueueNotice(notifiedRel, v, item{to: ownerOnly, text: func(l L, _ string) string { return releaseText(l, v, adminURL) }})
 		}
 	}
 	if src.OutdatedAgents != nil {
 		if v, nodes := src.OutdatedAgents(ctx); v != "" && len(nodes) > 0 && !told(notifiedAgent, v) {
-			s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return agentsOutdatedText(l, v, nodes, adminURL) }})
-			mark(notifiedAgent, v)
+			s.enqueueNotice(notifiedAgent, v, item{to: ownerOnly, text: func(l L, _ string) string { return agentsOutdatedText(l, v, nodes, adminURL) }})
 		}
 	}
 }
@@ -741,17 +785,21 @@ func (s *Service) flush(ctx context.Context) {
 	}
 	tok, ok := s.token(ctx)
 	if !ok {
+		var retained map[string]struct{}
 		if ctx.Err() != nil {
-			s.requeueUndelivered(items, nil, nil)
+			retained = s.requeueUndelivered(items, nil, nil)
 		}
+		s.finishNotices(items, retained)
 		return
 	}
 	links, err := s.st.TelegramLinks(ctx)
 	if err != nil {
 		s.log.Warn("telegram: read links", "err", err)
+		var retained map[string]struct{}
 		if ctx.Err() != nil {
-			s.requeueUndelivered(items, nil, nil)
+			retained = s.requeueUndelivered(items, nil, nil)
 		}
+		s.finishNotices(items, retained)
 		return
 	}
 	l, brand := s.panel(ctx)
@@ -764,7 +812,8 @@ func (s *Service) flush(ctx context.Context) {
 	}
 	for _, link := range links {
 		if ctx.Err() != nil {
-			s.requeueUndelivered(items, links, finished)
+			retained := s.requeueUndelivered(items, links, finished)
+			s.finishNotices(items, retained)
 			return
 		}
 		if !link.Enabled {
@@ -792,13 +841,15 @@ func (s *Service) flush(ctx context.Context) {
 		}
 		for _, msg := range chunk(lines) {
 			if ctx.Err() != nil {
-				s.requeueUndelivered(items, links, finished)
+				retained := s.requeueUndelivered(items, links, finished)
+				s.finishNotices(items, retained)
 				return
 			}
 			result := s.deliver(ctx, tok, link.ChatID, msg.text)
 			switch result {
 			case deliveryCanceled:
-				s.requeueUndelivered(items, links, finished)
+				retained := s.requeueUndelivered(items, links, finished)
+				s.finishNotices(items, retained)
 				return
 			case deliveryGaveUp:
 				if s.cfg.Edge {
@@ -807,17 +858,23 @@ func (s *Service) flush(ctx context.Context) {
 			}
 			for _, lineIndex := range msg.lineIndexes {
 				for _, itemIndex := range lineItems[lineIndex] {
+					if result == deliverySent {
+						s.noticeDelivered(ctx, items[itemIndex])
+					}
 					markFinished(itemIndex, link.AdminID)
 				}
 			}
 		}
 	}
+	var retained map[string]struct{}
 	if s.cfg.Edge {
-		s.requeueUndelivered(items, links, finished)
+		retained = s.requeueUndelivered(items, links, finished)
 	}
+	s.finishNotices(items, retained)
 }
 
-func (s *Service) requeueUndelivered(items []item, links []store.TelegramLinkRow, finished []map[string]struct{}) {
+func (s *Service) requeueUndelivered(items []item, links []store.TelegramLinkRow, finished []map[string]struct{}) map[string]struct{} {
+	retained := map[string]struct{}{}
 	var remaining []item
 	for i, it := range items {
 		if links == nil {
@@ -847,7 +904,7 @@ func (s *Service) requeueUndelivered(items []item, links []store.TelegramLinkRow
 		remaining = append(remaining, it)
 	}
 	if len(remaining) == 0 {
-		return
+		return retained
 	}
 	s.mu.Lock()
 	pending := make([]item, 0, len(remaining)+len(s.pending))
@@ -855,6 +912,12 @@ func (s *Service) requeueUndelivered(items []item, links []store.TelegramLinkRow
 	pending = append(pending, s.pending...)
 	s.pending = pending
 	s.mu.Unlock()
+	for _, it := range remaining {
+		if id := it.noticeID(); id != "" {
+			retained[id] = struct{}{}
+		}
+	}
+	return retained
 }
 
 // chunk joins lines into messages that fit Telegram's limit (a line is never split; one too long is cut).

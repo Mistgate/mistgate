@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -96,9 +97,8 @@ type Service struct {
 	log *slog.Logger
 	now func() time.Time
 
-	mu       sync.Mutex           // serialises every change of an account, and therefore every call to Cloudflare
-	lastReg  time.Time            // when the last registration call ended (mu)
-	lastAuto map[string]time.Time // node id -> last AutoReregister attempt (mu)
+	mu      sync.Mutex // serialises every change of an account, and therefore every call to Cloudflare
+	lastReg time.Time  // when the last registration call ended (mu)
 }
 
 // New builds the module. fl may be nil.
@@ -153,7 +153,7 @@ func New(st *store.Store, v *vault.Vault, fl Fleet, cfg Config) (*Service, error
 			}
 		}
 	}
-	return &Service{st: st, v: v, fl: fl, cfg: cfg, log: cfg.Log, now: cfg.Now, lastAuto: map[string]time.Time{}}, nil
+	return &Service{st: st, v: v, fl: fl, cfg: cfg, log: cfg.Log, now: cfg.Now}, nil
 }
 
 func randDuration(max time.Duration) time.Duration {
@@ -699,7 +699,20 @@ func (s *Service) AutoReregister(ctx context.Context, nodeID string) (bool, erro
 	if !p.AutoReregister {
 		return false, nil
 	}
-	if last := s.lastAuto[nodeID]; !last.IsZero() && s.now().Sub(last) < time.Hour {
+	key := "warp.auto_reregister." + nodeID
+	var last time.Time
+	raw, err := s.st.Setting(ctx, key)
+	if err == nil {
+		ns, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil {
+			return false, s.internal("read auto-registration limit", parseErr)
+		}
+		last = time.Unix(0, ns)
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return false, s.internal("read auto-registration limit", err)
+	}
+	now := s.now()
+	if !last.IsZero() && now.Sub(last) < time.Hour {
 		return false, nil
 	}
 	a, err := s.st.WarpAccount(ctx, nodeID)
@@ -711,7 +724,10 @@ func (s *Service) AutoReregister(ctx context.Context, nodeID string) (bool, erro
 		return false, err
 	}
 	old, _ := s.open(a)
-	s.lastAuto[nodeID] = s.now()
+	attemptAt := s.now()
+	if err := s.st.SetSettings(ctx, map[string]string{key: strconv.FormatInt(attemptAt.UnixNano(), 10)}); err != nil {
+		return false, s.internal("save auto-registration limit", err)
+	}
 	row, x, err := s.registerWith(ctx, n, p, TOSURL, "auto")
 	if err != nil {
 		return false, err

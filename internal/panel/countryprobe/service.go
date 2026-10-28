@@ -153,13 +153,14 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 // lastRun is the status of the newest run, kept in a setting (JSON) so that it is the same on every process and survives a
 // restart. At is unix seconds.
 type lastRun struct {
-	Status  string `json:"status"`
-	At      int64  `json:"at"`
-	Node    string `json:"node"`
-	DPIHop  int    `json:"dpi_hop,omitempty"`
-	Ref     string `json:"ref,omitempty"`
-	Checked int    `json:"checked,omitempty"`
-	Detail  string `json:"detail,omitempty"`
+	Status      string `json:"status"`
+	At          int64  `json:"at"`
+	Node        string `json:"node"`
+	DPIHop      int    `json:"dpi_hop,omitempty"`
+	Ref         string `json:"ref,omitempty"`
+	Checked     int    `json:"checked,omitempty"`
+	Detail      string `json:"detail,omitempty"`
+	BatchCursor int    `json:"batch_cursor,omitempty"`
 	// Reason is why a no_dpi_hop could not place the TSPU (RunRefsPass, RunNoHops); "" when unknown.
 	Reason string `json:"reason,omitempty"`
 }
@@ -431,7 +432,18 @@ func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe No
 		}
 	}
 	out.run.Status = StatusOK
-	for _, batch := range batches(targetsOf(probe, nodes)) {
+	batchList := batches(targetsOf(probe, nodes))
+	start := 0
+	if len(batchList) > 0 {
+		start = st.last.BatchCursor
+		if start < 0 {
+			start = 0
+		}
+		start %= len(batchList)
+		out.run.BatchCursor = (start + 1) % len(batchList)
+	}
+	for i := range batchList {
+		batch := batchList[(start+i)%len(batchList)]
 		res, err := s.ask(ctx, probe.ID, refs, w, batch)
 		if ctx.Err() != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return outcome{}, errSwitchedOff

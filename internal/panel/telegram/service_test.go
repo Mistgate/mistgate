@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -442,6 +443,42 @@ func TestReleaseAndOutdatedAgentsOncePerVersion(t *testing.T) {
 	version = "v0.4.0"
 	e.svc.watch(ctx)
 	e.quiet(2, 120*time.Millisecond)
+}
+
+func TestReleaseNoticeRetriesAfterFailedDelivery(t *testing.T) {
+	e := newEnv(t, func(c *Config) { c.RetryMax = 1 })
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 1)
+	version := "v0.2.0"
+	e.svc.SetSources(Sources{PanelRelease: func() (string, bool) { return version, true }})
+	e.tg.mu.Lock()
+	e.tg.sendPlan = append(e.tg.sendPlan, planned{status: http.StatusInternalServerError})
+	e.tg.mu.Unlock()
+	e.run()
+
+	ctx := context.Background()
+	e.svc.watch(ctx)
+	waitFor(t, "the failed send attempt", func() bool {
+		return e.tg.count("sendMessage") == 1 && e.svc.botError() == "unreachable"
+	})
+	if len(e.tg.sentTo(1)) != 0 {
+		t.Fatal("failed release notice was delivered")
+	}
+	if _, err := e.st.Setting(ctx, notifiedRel); err == nil {
+		t.Fatal("failed release notice was marked announced")
+	}
+
+	e.svc.watch(ctx)
+	waitFor(t, "the retried release notice", func() bool { return len(e.tg.sentTo(1)) == 1 })
+	if got, err := e.st.Setting(ctx, notifiedRel); err != nil || got != version {
+		t.Fatalf("announced release = %q, %v", got, err)
+	}
+	e.svc.watch(ctx)
+	e.quiet(1, 120*time.Millisecond)
+	if got := e.tg.count("sendMessage"); got != 2 {
+		t.Fatalf("send attempts = %d, want one failed and one successful attempt", got)
+	}
 }
 
 // A waiting plan names the tool and the token, never its arguments, and carries the link only when the address is known.

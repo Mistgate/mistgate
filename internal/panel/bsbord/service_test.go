@@ -426,6 +426,38 @@ func TestCapStopsBeforePaidPost(t *testing.T) {
 	}
 }
 
+func TestInvalidPreviewCostsDoNotMakePaidPost(t *testing.T) {
+	for _, cost := range []int64{0, -1, 1<<63 - 1} {
+		t.Run(strconv.FormatInt(cost, 10), func(t *testing.T) {
+			e := newTestEnv(t)
+			e.fake.setPreviewCost(cost)
+			e.configure(true, []string{testUnit}, 50)
+			st, err := e.svc.load(e.ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			st.Spend = spend{Month: e.now.UTC().Format("2006-01"), Credits: 10}
+			if err := e.svc.saveConfigAndState(e.ctx, st); err != nil {
+				t.Fatal(err)
+			}
+			e.svc.Tick(e.ctx)
+
+			var previews, paid int
+			for _, r := range e.fake.snapshot() {
+				switch r.Path {
+				case "/v1/probe/preview":
+					previews++
+				case "/v1/probe":
+					paid++
+				}
+			}
+			if previews != 1 || paid != 0 {
+				t.Fatalf("preview requests = %d, paid requests = %d", previews, paid)
+			}
+		})
+	}
+}
+
 func TestProbeErrorsApplyRetryAndHoldPolicies(t *testing.T) {
 	tests := []struct {
 		name    string

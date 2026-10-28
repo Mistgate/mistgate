@@ -477,12 +477,17 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 		if !s.tickCurrent(ctx, currentKey) {
 			return
 		}
+		if preview.CostCredits <= 0 || preview.CostCredits > MaxCapCredits {
+			s.handleFailure(ctx, st, errors.New("bsbord: invalid preview cost"), now, false, currentKey)
+			return
+		}
 		reserve = max(reserve, preview.CostCredits)
 		spent := st.Spend.Credits
 		if st.Spend.Month != now.UTC().Format("2006-01") {
 			spent = 0
 		}
-		if spent+reserve > st.CapCredits {
+		spent = max(int64(0), spent)
+		if spent > st.CapCredits || reserve > st.CapCredits-spent {
 			st.LastStatus = "cap_reached"
 			st.HoldUntil = firstOfNextMonth(now)
 			st.Pending = nil
