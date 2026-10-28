@@ -127,7 +127,7 @@ test("the GitHub button carries the star count baked in at build time (MG_STARS 
   for (const [page, label] of [["index.html", "Mistgate on GitHub, 1234 stars"], ["ru/index.html", "Mistgate на GitHub, звёзд: 1234"], ["zh/getting-started/overview/index.html", "GitHub 上的 Mistgate，1234 个星标"]]) {
     const button = /<a class="ib gh"[\s\S]*?<\/a>/.exec(read(page))?.[0] ?? "";
     assert.ok(button.includes(`aria-label="${label}"`), `${page}: ${button.slice(0, 160)}`);
-    assert.match(button, /<span class="gh__stars"><svg[^>]*>[\s\S]*?<span class="gh__n">1\.2k<\/span>/, page);
+    assert.match(button, /<span class="gh__stars"><span class="gh__n">1\.2k<\/span><svg[^>]*>/, page);
   }
   assert.match(read("_headers"), /connect-src 'self' https:\/\/api\.github\.com;/, "the browser may refresh the count");
 });

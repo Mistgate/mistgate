@@ -73,9 +73,9 @@ const wordmark = '<span class="wordmark">mist<span>gate</span></span>';
 /** The star count on the GitHub button: 999, then 1k, 1.2k, 12.3k. app.js gets this same function (build.mjs inlines it). */
 export const formatStars = (n) => (n > 999 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
 
-/** The GitHub button: the mark, then a star and the count baked in at build time (none: hidden until app.js fetches one). */
+/** The GitHub button: the mark, then the count baked in and a star at build time (none: hidden until app.js fetches one). */
 function githubButton(t, stars) {
-  return `<a class="ib gh" href="${GITHUB}" rel="noopener" aria-label="${esc(stars ? t.stars.replace("{n}", stars) : t.github)}" data-stars-label="${esc(t.stars)}">${GH}<span class="gh__stars"${stars ? "" : " hidden"}>${icon("star", 14)}<span class="gh__n">${stars ? formatStars(stars) : ""}</span></span></a>`;
+  return `<a class="ib gh" href="${GITHUB}" rel="noopener" aria-label="${esc(stars ? t.stars.replace("{n}", stars) : t.github)}" data-stars-label="${esc(t.stars)}">${GH}<span class="gh__stars"${stars ? "" : " hidden"}><span class="gh__n">${stars ? formatStars(stars) : ""}</span>${icon("star", 14)}</span></a>`;
 }
 
 function head({ lang, t, title, description, canonical, alternates, assets, noindex, home }) {
