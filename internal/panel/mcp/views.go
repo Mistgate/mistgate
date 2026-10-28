@@ -1084,6 +1084,10 @@ type countryCheckV struct {
 	// Vantages are the newest fresh observations from each enabled source; source_verdicts includes each fresh verdict, time and reason.
 	Vantages       []countryVantageV `json:"vantages"`
 	SourceVerdicts []sourceVerdictV  `json:"source_verdicts"`
+	// IPv6 is the same node measured over its IPv6 address by Globalping, in the same shape (never nested further). Absent while
+	// the IPv6 checks are off. A node that is not measured is unknown with a reason: no_ipv6, ipv6_broken, agent_old,
+	// not_checked or no_probes.
+	IPv6 *countryCheckV `json:"ipv6,omitempty"`
 }
 
 // countryTSPUV: what a node of the fleet inside the country saw with TCP SYNs of a limited TTL. A data-centre view, so its
@@ -1130,6 +1134,14 @@ func tspuRunView(r *adminv1.TspuProbeRun, names map[string]string) *tspuRunV {
 }
 
 func countryCheckView(c *adminv1.CountryCheck) *countryCheckV {
+	v := countryCheckBody(c)
+	if v != nil {
+		v.IPv6 = countryCheckBody(c.GetIpv6())
+	}
+	return v
+}
+
+func countryCheckBody(c *adminv1.CountryCheck) *countryCheckV {
 	if c == nil {
 		return nil
 	}

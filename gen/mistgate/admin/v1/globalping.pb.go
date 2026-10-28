@@ -29,7 +29,11 @@ type GlobalpingSettings struct {
 	// down from three to two, and then the rounds come less often than this.
 	IntervalMin uint32 `protobuf:"varint,2,opt,name=interval_min,json=intervalMin,proto3" json:"interval_min,omitempty"`
 	// A token is stored. The token itself is never returned.
-	HasToken      bool `protobuf:"varint,3,opt,name=has_token,json=hasToken,proto3" json:"has_token,omitempty"`
+	HasToken bool `protobuf:"varint,3,opt,name=has_token,json=hasToken,proto3" json:"has_token,omitempty"`
+	// Also check the nodes that have working IPv6 by their IPv6 address, in a round of its own with a control site reached over
+	// IPv6 (probes without IPv6 do not count). Default true. Each such node adds about the same number of tests as over IPv4,
+	// so without a token the rounds come a little less often; false keeps the IPv4 checks as they were.
+	Ipv6          bool `protobuf:"varint,4,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -81,6 +85,13 @@ func (x *GlobalpingSettings) GetIntervalMin() uint32 {
 func (x *GlobalpingSettings) GetHasToken() bool {
 	if x != nil {
 		return x.HasToken
+	}
+	return false
+}
+
+func (x *GlobalpingSettings) GetIpv6() bool {
+	if x != nil {
+		return x.Ipv6
 	}
 	return false
 }
@@ -171,6 +182,7 @@ type UpdateGlobalpingRequest struct {
 	IntervalMin *uint32                `protobuf:"varint,2,opt,name=interval_min,json=intervalMin,proto3,oneof" json:"interval_min,omitempty"`
 	// A token from https://dash.globalping.io/tokens, at most 256 characters, no spaces; write-only. "" removes it.
 	Token         *string `protobuf:"bytes,3,opt,name=token,proto3,oneof" json:"token,omitempty"`
+	Ipv6          *bool   `protobuf:"varint,4,opt,name=ipv6,proto3,oneof" json:"ipv6,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -224,6 +236,13 @@ func (x *UpdateGlobalpingRequest) GetToken() string {
 		return *x.Token
 	}
 	return ""
+}
+
+func (x *UpdateGlobalpingRequest) GetIpv6() bool {
+	if x != nil && x.Ipv6 != nil {
+		return *x.Ipv6
+	}
+	return false
 }
 
 type UpdateGlobalpingResponse struct {
@@ -478,22 +497,25 @@ var File_mistgate_admin_v1_globalping_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_globalping_proto_rawDesc = "" +
 	"\n" +
-	"\"mistgate/admin/v1/globalping.proto\x12\x11mistgate.admin.v1\"n\n" +
+	"\"mistgate/admin/v1/globalping.proto\x12\x11mistgate.admin.v1\"\x82\x01\n" +
 	"\x12GlobalpingSettings\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12!\n" +
 	"\finterval_min\x18\x02 \x01(\rR\vintervalMin\x12\x1b\n" +
-	"\thas_token\x18\x03 \x01(\bR\bhasToken\"\x16\n" +
+	"\thas_token\x18\x03 \x01(\bR\bhasToken\x12\x12\n" +
+	"\x04ipv6\x18\x04 \x01(\bR\x04ipv6\"\x16\n" +
 	"\x14GetGlobalpingRequest\"Z\n" +
 	"\x15GetGlobalpingResponse\x12A\n" +
-	"\bsettings\x18\x01 \x01(\v2%.mistgate.admin.v1.GlobalpingSettingsR\bsettings\"\xa2\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2%.mistgate.admin.v1.GlobalpingSettingsR\bsettings\"\xc4\x01\n" +
 	"\x17UpdateGlobalpingRequest\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01\x12&\n" +
 	"\finterval_min\x18\x02 \x01(\rH\x01R\vintervalMin\x88\x01\x01\x12\x19\n" +
-	"\x05token\x18\x03 \x01(\tH\x02R\x05token\x88\x01\x01B\n" +
+	"\x05token\x18\x03 \x01(\tH\x02R\x05token\x88\x01\x01\x12\x17\n" +
+	"\x04ipv6\x18\x04 \x01(\bH\x03R\x04ipv6\x88\x01\x01B\n" +
 	"\n" +
 	"\b_enabledB\x0f\n" +
 	"\r_interval_minB\b\n" +
-	"\x06_token\"]\n" +
+	"\x06_tokenB\a\n" +
+	"\x05_ipv6\"]\n" +
 	"\x18UpdateGlobalpingResponse\x12A\n" +
 	"\bsettings\x18\x01 \x01(\v2%.mistgate.admin.v1.GlobalpingSettingsR\bsettings\"\x17\n" +
 	"\x15TestGlobalpingRequest\"\xbc\x01\n" +

@@ -18,6 +18,8 @@ type CountryConfig struct {
 	Country string
 	// Interval between rounds, at least ten minutes.
 	Interval time.Duration
+	// IPv6: also measure the nodes with working IPv6 by their IPv6 address, in rounds of their own (CountryRound.Family 6).
+	IPv6 bool
 }
 
 // CountrySource measures from inside a country.
@@ -33,6 +35,10 @@ type CountrySource interface {
 // CountryRound is one round to measure.
 type CountryRound struct {
 	Country string
+	// Family is the address family of the round: 0 and 4 are IPv4 (a target's IP is an IPv4 address), 6 is IPv6 (IPv6 literals).
+	// An IPv6 round has no Want, and its control site is a name that has an IPv6 address: the source must reach it over IPv6,
+	// so that a probe without IPv6 is not counted against a node.
+	Family int
 	// Probes is the number of probes per measurement the budget allows (2 or 3).
 	Probes int
 	// Want asks a source for named networks first; City pins a probe when set. Empty means the generic country selection.
@@ -50,7 +56,7 @@ type CountryWant struct {
 	City string
 }
 
-// CountryTarget is one node. IP is its IPv4 address (the only address that is measured).
+// CountryTarget is one node. IP is its address of the round's family (the only address that is measured).
 type CountryTarget struct {
 	Key           string
 	IP            string
@@ -104,6 +110,10 @@ type ObservedPort struct {
 type CountryLimitError struct{ Reset time.Duration }
 
 func (e *CountryLimitError) Error() string { return "country check source: rate limit, retry later" }
+
+// ErrCountryNoProbes is what a source returns when it has no probe that can run the round at all: for an IPv6 round, no probe
+// of the country has IPv6. The round stores unknown rows with the reason "no_probes".
+var ErrCountryNoProbes = errors.New("country check source: no probes")
 
 // ErrCountryStopped is what a source returns when the owner switched it off in the middle of a round. The round ends and
 // stores nothing.

@@ -131,6 +131,9 @@ type pingOptions struct {
 	Protocol string `json:"protocol,omitempty"`
 	Port     uint16 `json:"port,omitempty"`
 	Packets  int    `json:"packets,omitempty"`
+	// IPVersion (4 or 6) is only allowed when the target is a hostname: it picks the address family of the lookup, and with 6
+	// only the probes that have IPv6. With an IP literal as the target the API refuses it and takes the literal's family.
+	IPVersion int `json:"ipVersion,omitempty"`
 }
 
 // measurementRequest: Locations is either []location or the id (string) of an earlier measurement whose probes are reused.

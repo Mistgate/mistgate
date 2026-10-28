@@ -31,6 +31,7 @@ import (
 const (
 	settingEnabled  = "globalping.enabled" // "1" or "0"; absent = off
 	settingInterval = "globalping.interval_min"
+	settingIPv6     = "globalping.ipv6"  // "0" or "1"; absent = on
 	settingToken    = "globalping.token" // base64 of the vault-sealed token
 	tokenAAD        = "setting/globalping.token"
 
@@ -113,15 +114,16 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 type settings struct {
 	Enabled     bool
 	IntervalMin int
+	IPv6        bool
 	sealed      []byte // the sealed token; nil = none
 }
 
 func (s *Service) load(ctx context.Context) (settings, error) {
-	kv, err := s.cfg.Store.SettingValues(ctx, []string{settingEnabled, settingInterval, settingToken})
+	kv, err := s.cfg.Store.SettingValues(ctx, []string{settingEnabled, settingInterval, settingIPv6, settingToken})
 	if err != nil {
 		return settings{}, err
 	}
-	st := settings{Enabled: kv[settingEnabled] == "1", IntervalMin: defaultInterval}
+	st := settings{Enabled: kv[settingEnabled] == "1", IntervalMin: defaultInterval, IPv6: kv[settingIPv6] != "0"}
 	if n, err := strconv.Atoi(kv[settingInterval]); err == nil && n >= minInterval && n <= maxInterval {
 		st.IntervalMin = n
 	}
@@ -134,7 +136,7 @@ func (s *Service) load(ctx context.Context) (settings, error) {
 }
 
 func (st settings) proto() *adminv1.GlobalpingSettings {
-	return &adminv1.GlobalpingSettings{Enabled: st.Enabled, IntervalMin: uint32(st.IntervalMin), HasToken: len(st.sealed) > 0}
+	return &adminv1.GlobalpingSettings{Enabled: st.Enabled, IntervalMin: uint32(st.IntervalMin), HasToken: len(st.sealed) > 0, Ipv6: st.IPv6}
 }
 
 // token opens the stored token. A token that cannot be opened (another master key) counts as none.
@@ -162,7 +164,7 @@ func (s *Service) Country(ctx context.Context) (health.CountryConfig, health.Cou
 		s.log.Warn("globalping: read settings", "err", err)
 		return health.CountryConfig{}, nil
 	}
-	cc := health.CountryConfig{Enabled: st.Enabled, Country: "RU", Interval: time.Duration(st.IntervalMin) * time.Minute}
+	cc := health.CountryConfig{Enabled: st.Enabled, Country: "RU", Interval: time.Duration(st.IntervalMin) * time.Minute, IPv6: st.IPv6}
 	if !st.Enabled {
 		return cc, nil // off costs one read: the shared country is not looked up
 	}
@@ -270,6 +272,12 @@ func (r rpc) UpdateGlobalping(ctx context.Context, req *connect.Request[adminv1.
 				return nil, fail(connect.CodeInvalidArgument, "token_invalid")
 			}
 			kv[settingToken] = base64.StdEncoding.EncodeToString(s.cfg.Vault.Seal([]byte(t.Reveal()), tokenAAD))
+		}
+	}
+	if m.Ipv6 != nil {
+		kv[settingIPv6] = "0"
+		if *m.Ipv6 {
+			kv[settingIPv6] = "1"
 		}
 	}
 	if m.Enabled != nil {

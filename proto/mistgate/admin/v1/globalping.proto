@@ -7,7 +7,8 @@ package mistgate.admin.v1;
 // to notice a block that the panel's own server cannot see. Conventions: common.proto.
 //
 // IT SENDS NODE ADDRESSES TO A THIRD PARTY. That is why it is off until the owner switches it on: with it on, every
-// round tells Globalping the IPv4 address of each online node (and nothing else about it). The panel never sends an
+// round tells Globalping the IPv4 address of each online node (and nothing else about it); with `ipv6` on, which is the
+// default once the integration is on, also the IPv6 address of every node whose IPv6 works. The panel never sends an
 // address anywhere else, and TestGlobalping sends none at all.
 //
 // THE COUNTRY is not a setting of this integration: it is shared by every source of the country check and lives in
@@ -48,6 +49,10 @@ message GlobalpingSettings {
   uint32 interval_min = 2;
   // A token is stored. The token itself is never returned.
   bool has_token = 3;
+  // Also check the nodes that have working IPv6 by their IPv6 address, in a round of its own with a control site reached over
+  // IPv6 (probes without IPv6 do not count). Default true. Each such node adds about the same number of tests as over IPv4,
+  // so without a token the rounds come a little less often; false keeps the IPv4 checks as they were.
+  bool ipv6 = 4;
 }
 
 message GetGlobalpingRequest {}
@@ -58,6 +63,7 @@ message UpdateGlobalpingRequest {
   optional uint32 interval_min = 2;
   // A token from https://dash.globalping.io/tokens, at most 256 characters, no spaces; write-only. "" removes it.
   optional string token = 3;
+  optional bool ipv6 = 4;
 }
 message UpdateGlobalpingResponse { GlobalpingSettings settings = 1; }
 

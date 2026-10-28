@@ -1672,8 +1672,15 @@ type CountryCheck struct {
 	Vantages []*CountryVantage `protobuf:"bytes,21,rep,name=vantages,proto3" json:"vantages,omitempty"`
 	// Each source's own latest fresh verdict, including rows that do not count toward the combined result.
 	SourceVerdicts []*SourceVerdict `protobuf:"bytes,22,rep,name=source_verdicts,json=sourceVerdicts,proto3" json:"source_verdicts,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The same node over IPv6, measured by Globalping from the same country (every other field above is IPv4 and does not change
+	// with it). Present only while the IPv6 checks of Globalping are on (GlobalpingSettings.ipv6). A node that is not measured
+	// over IPv6 has verdict UNKNOWN and a reason: "no_ipv6" (no global IPv6 address), "ipv6_broken" (it has an address, but
+	// outbound IPv6 does not work at the hoster), "agent_old" (the node agent predates the IPv6 facts), "not_checked" (no report
+	// or no round yet), "no_probes" (Globalping has no IPv6 probes in the country), plus the failures of any round
+	// ("rate_limited", "source_error", "timeout", "too_few_probes"). Never nested further.
+	Ipv6          *CountryCheck `protobuf:"bytes,23,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CountryCheck) Reset() {
@@ -1856,6 +1863,13 @@ func (x *CountryCheck) GetVantages() []*CountryVantage {
 func (x *CountryCheck) GetSourceVerdicts() []*SourceVerdict {
 	if x != nil {
 		return x.SourceVerdicts
+	}
+	return nil
+}
+
+func (x *CountryCheck) GetIpv6() *CountryCheck {
+	if x != nil {
+		return x.Ipv6
 	}
 	return nil
 }
@@ -3291,7 +3305,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x03tcp\x18\x06 \x03(\v2\x1d.mistgate.admin.v1.PortResultR\x03tcp\x12\x14\n" +
 	"\x05valid\x18\a \x01(\bR\x05valid\x12\x12\n" +
 	"\x04dark\x18\b \x01(\bR\x04dark\x12\x18\n" +
-	"\aeyeball\x18\t \x01(\bR\aeyeball\"\xab\a\n" +
+	"\aeyeball\x18\t \x01(\bR\aeyeball\"\xe0\a\n" +
 	"\fCountryCheck\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
 	"\acountry\x18\x02 \x01(\tR\acountry\x12;\n" +
@@ -3320,7 +3334,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"tspuAtUnix\x12\x19\n" +
 	"\bno_probe\x18\x14 \x03(\tR\anoProbe\x12=\n" +
 	"\bvantages\x18\x15 \x03(\v2!.mistgate.admin.v1.CountryVantageR\bvantages\x12I\n" +
-	"\x0fsource_verdicts\x18\x16 \x03(\v2 .mistgate.admin.v1.SourceVerdictR\x0esourceVerdicts\"\xa2\x01\n" +
+	"\x0fsource_verdicts\x18\x16 \x03(\v2 .mistgate.admin.v1.SourceVerdictR\x0esourceVerdicts\x123\n" +
+	"\x04ipv6\x18\x17 \x01(\v2\x1f.mistgate.admin.v1.CountryCheckR\x04ipv6\"\xa2\x01\n" +
 	"\rUdpLossNotice\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12#\n" +
 	"\rshare_percent\x18\x02 \x01(\rR\fsharePercent\x12#\n" +
@@ -3584,43 +3599,44 @@ var file_mistgate_admin_v1_health_proto_depIdxs = []int32{
 	45, // 21: mistgate.admin.v1.CountryCheck.tspu_ports:type_name -> mistgate.admin.v1.TspuPort
 	36, // 22: mistgate.admin.v1.CountryCheck.vantages:type_name -> mistgate.admin.v1.CountryVantage
 	37, // 23: mistgate.admin.v1.CountryCheck.source_verdicts:type_name -> mistgate.admin.v1.SourceVerdict
-	4,  // 24: mistgate.admin.v1.DoctorItem.status:type_name -> mistgate.admin.v1.DoctorStatus
-	39, // 25: mistgate.admin.v1.DoctorItem.params:type_name -> mistgate.admin.v1.DoctorItem.ParamsEntry
-	43, // 26: mistgate.admin.v1.NodeDoctor.node_status:type_name -> mistgate.admin.v1.NodeStatus
-	23, // 27: mistgate.admin.v1.NodeDoctor.items:type_name -> mistgate.admin.v1.DoctorItem
-	24, // 28: mistgate.admin.v1.GetDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
-	24, // 29: mistgate.admin.v1.RunDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
-	40, // 30: mistgate.admin.v1.FixPlan.params:type_name -> mistgate.admin.v1.FixPlan.ParamsEntry
-	41, // 31: mistgate.admin.v1.ApplyFixRequest.params:type_name -> mistgate.admin.v1.ApplyFixRequest.ParamsEntry
-	29, // 32: mistgate.admin.v1.ApplyFixResponse.plan:type_name -> mistgate.admin.v1.FixPlan
-	42, // 33: mistgate.admin.v1.ApplyFixResponse.result_params:type_name -> mistgate.admin.v1.ApplyFixResponse.ResultParamsEntry
-	24, // 34: mistgate.admin.v1.ApplyFixResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
-	24, // 35: mistgate.admin.v1.AcceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
-	24, // 36: mistgate.admin.v1.UnacceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
-	3,  // 37: mistgate.admin.v1.SourceVerdict.verdict:type_name -> mistgate.admin.v1.CountryVerdict
-	6,  // 38: mistgate.admin.v1.HealthService.ListAlerts:input_type -> mistgate.admin.v1.ListAlertsRequest
-	8,  // 39: mistgate.admin.v1.HealthService.MuteAlert:input_type -> mistgate.admin.v1.MuteAlertRequest
-	15, // 40: mistgate.admin.v1.HealthService.GetChecks:input_type -> mistgate.admin.v1.GetChecksRequest
-	21, // 41: mistgate.admin.v1.HealthService.RunChecksNow:input_type -> mistgate.admin.v1.RunChecksNowRequest
-	25, // 42: mistgate.admin.v1.HealthService.GetDoctor:input_type -> mistgate.admin.v1.GetDoctorRequest
-	27, // 43: mistgate.admin.v1.HealthService.RunDoctor:input_type -> mistgate.admin.v1.RunDoctorRequest
-	30, // 44: mistgate.admin.v1.HealthService.ApplyFix:input_type -> mistgate.admin.v1.ApplyFixRequest
-	32, // 45: mistgate.admin.v1.HealthService.AcceptDoctorItem:input_type -> mistgate.admin.v1.AcceptDoctorItemRequest
-	34, // 46: mistgate.admin.v1.HealthService.UnacceptDoctorItem:input_type -> mistgate.admin.v1.UnacceptDoctorItemRequest
-	7,  // 47: mistgate.admin.v1.HealthService.ListAlerts:output_type -> mistgate.admin.v1.ListAlertsResponse
-	9,  // 48: mistgate.admin.v1.HealthService.MuteAlert:output_type -> mistgate.admin.v1.MuteAlertResponse
-	16, // 49: mistgate.admin.v1.HealthService.GetChecks:output_type -> mistgate.admin.v1.GetChecksResponse
-	22, // 50: mistgate.admin.v1.HealthService.RunChecksNow:output_type -> mistgate.admin.v1.RunChecksNowResponse
-	26, // 51: mistgate.admin.v1.HealthService.GetDoctor:output_type -> mistgate.admin.v1.GetDoctorResponse
-	28, // 52: mistgate.admin.v1.HealthService.RunDoctor:output_type -> mistgate.admin.v1.RunDoctorResponse
-	31, // 53: mistgate.admin.v1.HealthService.ApplyFix:output_type -> mistgate.admin.v1.ApplyFixResponse
-	33, // 54: mistgate.admin.v1.HealthService.AcceptDoctorItem:output_type -> mistgate.admin.v1.AcceptDoctorItemResponse
-	35, // 55: mistgate.admin.v1.HealthService.UnacceptDoctorItem:output_type -> mistgate.admin.v1.UnacceptDoctorItemResponse
-	47, // [47:56] is the sub-list for method output_type
-	38, // [38:47] is the sub-list for method input_type
-	38, // [38:38] is the sub-list for extension type_name
-	38, // [38:38] is the sub-list for extension extendee
-	0,  // [0:38] is the sub-list for field type_name
+	19, // 24: mistgate.admin.v1.CountryCheck.ipv6:type_name -> mistgate.admin.v1.CountryCheck
+	4,  // 25: mistgate.admin.v1.DoctorItem.status:type_name -> mistgate.admin.v1.DoctorStatus
+	39, // 26: mistgate.admin.v1.DoctorItem.params:type_name -> mistgate.admin.v1.DoctorItem.ParamsEntry
+	43, // 27: mistgate.admin.v1.NodeDoctor.node_status:type_name -> mistgate.admin.v1.NodeStatus
+	23, // 28: mistgate.admin.v1.NodeDoctor.items:type_name -> mistgate.admin.v1.DoctorItem
+	24, // 29: mistgate.admin.v1.GetDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
+	24, // 30: mistgate.admin.v1.RunDoctorResponse.nodes:type_name -> mistgate.admin.v1.NodeDoctor
+	40, // 31: mistgate.admin.v1.FixPlan.params:type_name -> mistgate.admin.v1.FixPlan.ParamsEntry
+	41, // 32: mistgate.admin.v1.ApplyFixRequest.params:type_name -> mistgate.admin.v1.ApplyFixRequest.ParamsEntry
+	29, // 33: mistgate.admin.v1.ApplyFixResponse.plan:type_name -> mistgate.admin.v1.FixPlan
+	42, // 34: mistgate.admin.v1.ApplyFixResponse.result_params:type_name -> mistgate.admin.v1.ApplyFixResponse.ResultParamsEntry
+	24, // 35: mistgate.admin.v1.ApplyFixResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
+	24, // 36: mistgate.admin.v1.AcceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
+	24, // 37: mistgate.admin.v1.UnacceptDoctorItemResponse.doctor:type_name -> mistgate.admin.v1.NodeDoctor
+	3,  // 38: mistgate.admin.v1.SourceVerdict.verdict:type_name -> mistgate.admin.v1.CountryVerdict
+	6,  // 39: mistgate.admin.v1.HealthService.ListAlerts:input_type -> mistgate.admin.v1.ListAlertsRequest
+	8,  // 40: mistgate.admin.v1.HealthService.MuteAlert:input_type -> mistgate.admin.v1.MuteAlertRequest
+	15, // 41: mistgate.admin.v1.HealthService.GetChecks:input_type -> mistgate.admin.v1.GetChecksRequest
+	21, // 42: mistgate.admin.v1.HealthService.RunChecksNow:input_type -> mistgate.admin.v1.RunChecksNowRequest
+	25, // 43: mistgate.admin.v1.HealthService.GetDoctor:input_type -> mistgate.admin.v1.GetDoctorRequest
+	27, // 44: mistgate.admin.v1.HealthService.RunDoctor:input_type -> mistgate.admin.v1.RunDoctorRequest
+	30, // 45: mistgate.admin.v1.HealthService.ApplyFix:input_type -> mistgate.admin.v1.ApplyFixRequest
+	32, // 46: mistgate.admin.v1.HealthService.AcceptDoctorItem:input_type -> mistgate.admin.v1.AcceptDoctorItemRequest
+	34, // 47: mistgate.admin.v1.HealthService.UnacceptDoctorItem:input_type -> mistgate.admin.v1.UnacceptDoctorItemRequest
+	7,  // 48: mistgate.admin.v1.HealthService.ListAlerts:output_type -> mistgate.admin.v1.ListAlertsResponse
+	9,  // 49: mistgate.admin.v1.HealthService.MuteAlert:output_type -> mistgate.admin.v1.MuteAlertResponse
+	16, // 50: mistgate.admin.v1.HealthService.GetChecks:output_type -> mistgate.admin.v1.GetChecksResponse
+	22, // 51: mistgate.admin.v1.HealthService.RunChecksNow:output_type -> mistgate.admin.v1.RunChecksNowResponse
+	26, // 52: mistgate.admin.v1.HealthService.GetDoctor:output_type -> mistgate.admin.v1.GetDoctorResponse
+	28, // 53: mistgate.admin.v1.HealthService.RunDoctor:output_type -> mistgate.admin.v1.RunDoctorResponse
+	31, // 54: mistgate.admin.v1.HealthService.ApplyFix:output_type -> mistgate.admin.v1.ApplyFixResponse
+	33, // 55: mistgate.admin.v1.HealthService.AcceptDoctorItem:output_type -> mistgate.admin.v1.AcceptDoctorItemResponse
+	35, // 56: mistgate.admin.v1.HealthService.UnacceptDoctorItem:output_type -> mistgate.admin.v1.UnacceptDoctorItemResponse
+	48, // [48:57] is the sub-list for method output_type
+	39, // [39:48] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_health_proto_init() }

@@ -18,6 +18,12 @@ import (
 // home or mobile probes reach the control, it retries across any network in the country. The control measurement's id
 // selects the same probes for each node's ICMP test and TCP tests of its ports. All measurements are polled together
 // until they finish or the round's deadline expires. Requests target only the control site and caller-provided nodes.
+//
+// An IPv6 round (Family 6) is a round of its own. Its control is a hostname measured with ipVersion 6, so only probes that have
+// IPv6 take part and a probe that cannot open the control site over IPv6 is not counted; the control of an IPv4 round must not be
+// reused (a measurement id repeats its probes without looking at their IPv6, and a probe without IPv6 would read as blocked).
+// The nodes are IPv6 literals, which take no ipVersion, and use the id of the IPv6 control. The probe list is not read: it does not
+// say which probes have IPv6, so the operators are not pinned and the control takes generic eyeball probes, then any network.
 
 const (
 	pingPackets  = 3
@@ -32,6 +38,8 @@ var (
 	errSwitchedOff = health.ErrCountryStopped
 	errNoEyeball   = errors.New("not enough home or mobile probes")
 )
+
+const familyV6 = 6 // CountryRound.Family of an IPv6 round
 
 type source struct {
 	svc          *Service
@@ -168,7 +176,7 @@ type controlPlan struct {
 }
 
 func (s *source) controlPlan(ctx context.Context, r health.CountryRound) controlPlan {
-	if len(r.Want) == 0 {
+	if len(r.Want) == 0 || r.Family == familyV6 {
 		return controlPlan{}
 	}
 	timeout := s.probeTimeout
@@ -240,12 +248,17 @@ func (s *source) control(ctx context.Context, r health.CountryRound, eyeball boo
 		}
 		locations = []location{loc}
 	}
-	c, err := s.create(ctx, measurementRequest{Type: "ping", Target: r.ControlHost, Locations: locations,
-		MeasurementOptions: pingOptions{Protocol: "TCP", Port: r.ControlPort, Packets: pingPackets}})
+	opts := pingOptions{Protocol: "TCP", Port: r.ControlPort, Packets: pingPackets}
+	if r.Family == familyV6 {
+		opts.IPVersion = 6
+	}
+	c, err := s.create(ctx, measurementRequest{Type: "ping", Target: r.ControlHost, Locations: locations, MeasurementOptions: opts})
 	var ae *apiError
 	switch {
 	case eyeball && errors.As(err, &ae) && ae.Status == http.StatusUnprocessableEntity:
 		return "", measurement{}, errNoEyeball // no_probes_found
+	case r.Family == familyV6 && errors.As(err, &ae) && ae.Status == http.StatusUnprocessableEntity:
+		return "", measurement{}, health.ErrCountryNoProbes // no_probes_found on any network: none of the country's probes has IPv6
 	case err != nil:
 		return "", measurement{}, err
 	case eyeball && c.ProbesCount < minEyeball:

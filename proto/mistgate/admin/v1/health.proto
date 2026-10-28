@@ -428,6 +428,13 @@ message CountryCheck {
   repeated CountryVantage vantages = 21;
   // Each source's own latest fresh verdict, including rows that do not count toward the combined result.
   repeated SourceVerdict source_verdicts = 22;
+  // The same node over IPv6, measured by Globalping from the same country (every other field above is IPv4 and does not change
+  // with it). Present only while the IPv6 checks of Globalping are on (GlobalpingSettings.ipv6). A node that is not measured
+  // over IPv6 has verdict UNKNOWN and a reason: "no_ipv6" (no global IPv6 address), "ipv6_broken" (it has an address, but
+  // outbound IPv6 does not work at the hoster), "agent_old" (the node agent predates the IPv6 facts), "not_checked" (no report
+  // or no round yet), "no_probes" (Globalping has no IPv6 probes in the country), plus the failures of any round
+  // ("rate_limited", "source_error", "timeout", "too_few_probes"). Never nested further.
+  CountryCheck ipv6 = 23;
 }
 
 // The nodes whose UDP probes (hysteria2, awg) were slow over the last hour of OK rounds, judged against the panel's TCP

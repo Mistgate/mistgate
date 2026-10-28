@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -51,6 +52,7 @@ type fakeProbe struct {
 	Tags          []string
 	ControlOK     bool
 	Offline       bool
+	NoIPv6        bool // the probe has no IPv6: a location selection for IPv6 never picks it, and it cannot connect over IPv6
 }
 
 func (p fakeProbe) tags() []string {
@@ -72,6 +74,7 @@ type fakeDef struct {
 	body    map[string]any
 	probes  []int // indexes into fake.probes
 	started bool  // the first GET has been answered "in-progress"
+	v6      bool  // ipVersion 6, or an IPv6 literal as the target
 }
 
 func newFakeGlobalping(t *testing.T) *fakeGlobalping {
@@ -191,6 +194,17 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	// like the real API: ipVersion is for a hostname only, and an IPv6 literal measures over IPv6 by itself
+	target, _ := req["target"].(string)
+	opts, _ := req["measurementOptions"].(map[string]any)
+	version, hasVersion := opts["ipVersion"]
+	addr, err := netip.ParseAddr(target)
+	if hasVersion && err == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":{"type":"validation_error","message":"ipVersion is only allowed for a hostname"}}`)
+		return
+	}
+	v6 := version == float64(6) || (err == nil && addr.Is6())
 	var idx []int
 	switch loc := req["locations"].(type) {
 	case string: // the probes of an earlier measurement, in its order
@@ -217,7 +231,7 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 				if matched == limit {
 					break
 				}
-				if !fakeProbeMatches(p, l) {
+				if !fakeProbeMatches(p, l) || (v6 && p.NoIPv6) { // a request by locations is filtered for IPv6, a repeat by id is not
 					continue
 				}
 				matched++
@@ -235,7 +249,7 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 	}
 	f.next++
 	id := "m" + strconv.Itoa(f.next)
-	f.defs[id] = &fakeDef{body: req, probes: idx}
+	f.defs[id] = &fakeDef{body: req, probes: idx, v6: v6}
 	w.WriteHeader(http.StatusAccepted)
 	fmt.Fprintf(w, `{"id":%q,"probesCount":%d}`, id, len(idx))
 }
@@ -314,6 +328,7 @@ func (f *fakeGlobalping) result(i int, d *fakeDef) map[string]any {
 	}
 	ok := false
 	switch {
+	case d.v6 && p.NoIPv6: // nothing is reachable over IPv6 from here, not even the control site
 	case isControl:
 		ok = p.ControlOK
 	case opts["protocol"] == "TCP":

@@ -98,6 +98,12 @@ func TestChecksResultsContent(t *testing.T) {
 		cc.TSPU.Ports[0] != (tspuPortV{Port: 443, Verdict: "blocked"}) || cc.TSPU.Ports[1].Verdict != "open" {
 		t.Errorf("country_check tspu: %+v", cc.TSPU)
 	}
+	// the same node over IPv6 rides next to it, in the same shape; none of the fields above is its
+	if v6 := cc.IPv6; v6 == nil || v6.Verdict != "ok" || v6.Country != "RU" || v6.AtUnix != 1700000520 || v6.Confidence != "eyeball" || len(v6.Probes) != 1 ||
+		v6.Probes[0].Network != "ER-Telecom" || !v6.Probes[0].ICMPOK || len(v6.Probes[0].TCP) != 1 || !v6.Probes[0].TCP[0].OK || v6.IPv6 != nil ||
+		len(v6.Sources) != 1 || v6.Sources[0] != "globalping" {
+		t.Errorf("country_check.ipv6: %+v", cc.IPv6)
+	}
 	if r := v.TSPUProbe; r == nil || r.Status != "ok" || r.ProbeNode != "de1" || r.DPIHop != 4 || r.BlockedRef != "31.13.72.36" || r.NodesChecked != 2 || r.AtUnix != 1700000400 {
 		t.Errorf("tspu_probe run: %+v", v.TSPUProbe)
 	}
@@ -400,4 +406,25 @@ func TestProfilesShowTheirFormats(t *testing.T) {
 	}
 	check("user_get", decode[UserGetV](t, mustOK(t, s, "user_get", map[string]any{"user_id": "usr_alice"})).Profiles)
 	check("subscription_preview", decode[SubscriptionPreviewV](t, mustOK(t, s, "subscription_preview", map[string]any{"user_id": "usr_alice"})).Profiles)
+}
+
+// A node over IPv6 that was not measured is unknown with a reason; without the nested message the field is absent, so that the
+// IPv4 view reads as before.
+func TestCountryCheckViewIPv6Shape(t *testing.T) {
+	got := countryCheckView(&adminv1.CountryCheck{
+		Country: "RU", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED,
+		Ipv6: &adminv1.CountryCheck{Country: "RU", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_UNKNOWN, Reason: "ipv6_broken",
+			Ipv6: &adminv1.CountryCheck{Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_OK}},
+	})
+	if got == nil || got.Verdict != "blocked" || got.IPv6 == nil || got.IPv6.Verdict != "unknown" || got.IPv6.Reason != "ipv6_broken" || got.IPv6.IPv6 != nil {
+		t.Fatalf("view = %+v, want blocked with an unknown IPv6 (never nested further)", got)
+	}
+	b, err := json.Marshal(got)
+	if err != nil || !strings.Contains(string(b), `"ipv6":{"country":"RU","verdict":"unknown","at_unix":0,"reason":"ipv6_broken"`) {
+		t.Fatalf("json = %s, %v", b, err)
+	}
+	plain, _ := json.Marshal(countryCheckView(&adminv1.CountryCheck{Country: "RU", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_OK}))
+	if strings.Contains(string(plain), "ipv6") {
+		t.Fatalf("a view without IPv6 data mentions it: %s", plain)
+	}
 }

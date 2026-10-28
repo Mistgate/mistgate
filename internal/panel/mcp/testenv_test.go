@@ -954,7 +954,11 @@ func (w *world) GetChecks(context.Context, *connect.Request[adminv1.GetChecksReq
 			Probes: []*adminv1.CountryProbe{
 				{Network: "Rostelecom", Asn: 12389, City: "Moscow", Eyeball: true, IcmpOk: true, IcmpMs: 23, Valid: true, Tcp: []*adminv1.PortResult{{Port: 443}}},
 				{Network: "Beeline", Valid: false},
-			}}},
+			},
+			Ipv6: &adminv1.CountryCheck{NodeId: nodeA, Country: "RU", Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_OK, AtUnix: 1700000520, Eyeball: true,
+				Confidence: "eyeball", Sources: []string{"globalping"}, GlobalpingVerdict: adminv1.CountryVerdict_COUNTRY_VERDICT_OK,
+				Probes: []*adminv1.CountryProbe{{Network: "ER-Telecom", Asn: 9049, City: "Perm", Eyeball: true, IcmpOk: true, IcmpMs: 31, Valid: true,
+					Tcp: []*adminv1.PortResult{{Port: 443, Ok: true, Ms: 33}}}}}}},
 	}), nil
 }
 

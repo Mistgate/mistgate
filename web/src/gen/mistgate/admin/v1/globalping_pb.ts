@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/globalping.proto.
  */
 export const file_mistgate_admin_v1_globalping: GenFile = /*@__PURE__*/
-  fileDesc("CiJtaXN0Z2F0ZS9hZG1pbi92MS9nbG9iYWxwaW5nLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSJOChJHbG9iYWxwaW5nU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBIUCgxpbnRlcnZhbF9taW4YAiABKA0SEQoJaGFzX3Rva2VuGAMgASgIIhYKFEdldEdsb2JhbHBpbmdSZXF1ZXN0IlAKFUdldEdsb2JhbHBpbmdSZXNwb25zZRI3CghzZXR0aW5ncxgBIAEoCzIlLm1pc3RnYXRlLmFkbWluLnYxLkdsb2JhbHBpbmdTZXR0aW5ncyKFAQoXVXBkYXRlR2xvYmFscGluZ1JlcXVlc3QSFAoHZW5hYmxlZBgBIAEoCEgAiAEBEhkKDGludGVydmFsX21pbhgCIAEoDUgBiAEBEhIKBXRva2VuGAMgASgJSAKIAQFCCgoIX2VuYWJsZWRCDwoNX2ludGVydmFsX21pbkIICgZfdG9rZW4iUwoYVXBkYXRlR2xvYmFscGluZ1Jlc3BvbnNlEjcKCHNldHRpbmdzGAEgASgLMiUubWlzdGdhdGUuYWRtaW4udjEuR2xvYmFscGluZ1NldHRpbmdzIhcKFVRlc3RHbG9iYWxwaW5nUmVxdWVzdCKDAQoWVGVzdEdsb2JhbHBpbmdSZXNwb25zZRIRCglyZWFjaGFibGUYASABKAgSEgoKdG9rZW5fdXNlZBgCIAEoCBINCgVsaW1pdBgDIAEoDRIRCglyZW1haW5pbmcYBCABKA0SDwoHcmVzZXRfcxgFIAEoDRIPCgdjcmVkaXRzGAYgASgNIh0KG0Rpc2Nvbm5lY3RHbG9iYWxwaW5nUmVxdWVzdCJXChxEaXNjb25uZWN0R2xvYmFscGluZ1Jlc3BvbnNlEjcKCHNldHRpbmdzGAEgASgLMiUubWlzdGdhdGUuYWRtaW4udjEuR2xvYmFscGluZ1NldHRpbmdzMsQDChFHbG9iYWxwaW5nU2VydmljZRJiCg1HZXRHbG9iYWxwaW5nEicubWlzdGdhdGUuYWRtaW4udjEuR2V0R2xvYmFscGluZ1JlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRHbG9iYWxwaW5nUmVzcG9uc2USawoQVXBkYXRlR2xvYmFscGluZxIqLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUdsb2JhbHBpbmdSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlR2xvYmFscGluZ1Jlc3BvbnNlEmUKDlRlc3RHbG9iYWxwaW5nEigubWlzdGdhdGUuYWRtaW4udjEuVGVzdEdsb2JhbHBpbmdSZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuVGVzdEdsb2JhbHBpbmdSZXNwb25zZRJ3ChREaXNjb25uZWN0R2xvYmFscGluZxIuLm1pc3RnYXRlLmFkbWluLnYxLkRpc2Nvbm5lY3RHbG9iYWxwaW5nUmVxdWVzdBovLm1pc3RnYXRlLmFkbWluLnYxLkRpc2Nvbm5lY3RHbG9iYWxwaW5nUmVzcG9uc2VCygEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIPR2xvYmFscGluZ1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
+  fileDesc("CiJtaXN0Z2F0ZS9hZG1pbi92MS9nbG9iYWxwaW5nLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSJcChJHbG9iYWxwaW5nU2V0dGluZ3MSDwoHZW5hYmxlZBgBIAEoCBIUCgxpbnRlcnZhbF9taW4YAiABKA0SEQoJaGFzX3Rva2VuGAMgASgIEgwKBGlwdjYYBCABKAgiFgoUR2V0R2xvYmFscGluZ1JlcXVlc3QiUAoVR2V0R2xvYmFscGluZ1Jlc3BvbnNlEjcKCHNldHRpbmdzGAEgASgLMiUubWlzdGdhdGUuYWRtaW4udjEuR2xvYmFscGluZ1NldHRpbmdzIqEBChdVcGRhdGVHbG9iYWxwaW5nUmVxdWVzdBIUCgdlbmFibGVkGAEgASgISACIAQESGQoMaW50ZXJ2YWxfbWluGAIgASgNSAGIAQESEgoFdG9rZW4YAyABKAlIAogBARIRCgRpcHY2GAQgASgISAOIAQFCCgoIX2VuYWJsZWRCDwoNX2ludGVydmFsX21pbkIICgZfdG9rZW5CBwoFX2lwdjYiUwoYVXBkYXRlR2xvYmFscGluZ1Jlc3BvbnNlEjcKCHNldHRpbmdzGAEgASgLMiUubWlzdGdhdGUuYWRtaW4udjEuR2xvYmFscGluZ1NldHRpbmdzIhcKFVRlc3RHbG9iYWxwaW5nUmVxdWVzdCKDAQoWVGVzdEdsb2JhbHBpbmdSZXNwb25zZRIRCglyZWFjaGFibGUYASABKAgSEgoKdG9rZW5fdXNlZBgCIAEoCBINCgVsaW1pdBgDIAEoDRIRCglyZW1haW5pbmcYBCABKA0SDwoHcmVzZXRfcxgFIAEoDRIPCgdjcmVkaXRzGAYgASgNIh0KG0Rpc2Nvbm5lY3RHbG9iYWxwaW5nUmVxdWVzdCJXChxEaXNjb25uZWN0R2xvYmFscGluZ1Jlc3BvbnNlEjcKCHNldHRpbmdzGAEgASgLMiUubWlzdGdhdGUuYWRtaW4udjEuR2xvYmFscGluZ1NldHRpbmdzMsQDChFHbG9iYWxwaW5nU2VydmljZRJiCg1HZXRHbG9iYWxwaW5nEicubWlzdGdhdGUuYWRtaW4udjEuR2V0R2xvYmFscGluZ1JlcXVlc3QaKC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRHbG9iYWxwaW5nUmVzcG9uc2USawoQVXBkYXRlR2xvYmFscGluZxIqLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUdsb2JhbHBpbmdSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlR2xvYmFscGluZ1Jlc3BvbnNlEmUKDlRlc3RHbG9iYWxwaW5nEigubWlzdGdhdGUuYWRtaW4udjEuVGVzdEdsb2JhbHBpbmdSZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuVGVzdEdsb2JhbHBpbmdSZXNwb25zZRJ3ChREaXNjb25uZWN0R2xvYmFscGluZxIuLm1pc3RnYXRlLmFkbWluLnYxLkRpc2Nvbm5lY3RHbG9iYWxwaW5nUmVxdWVzdBovLm1pc3RnYXRlLmFkbWluLnYxLkRpc2Nvbm5lY3RHbG9iYWxwaW5nUmVzcG9uc2VCygEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIPR2xvYmFscGluZ1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
 
 /**
  * @generated from message mistgate.admin.v1.GlobalpingSettings
@@ -37,6 +37,15 @@ export type GlobalpingSettings = Message<"mistgate.admin.v1.GlobalpingSettings">
    * @generated from field: bool has_token = 3;
    */
   hasToken: boolean;
+
+  /**
+   * Also check the nodes that have working IPv6 by their IPv6 address, in a round of its own with a control site reached over
+   * IPv6 (probes without IPv6 do not count). Default true. Each such node adds about the same number of tests as over IPv4,
+   * so without a token the rounds come a little less often; false keeps the IPv4 checks as they were.
+   *
+   * @generated from field: bool ipv6 = 4;
+   */
+  ipv6: boolean;
 };
 
 /**
@@ -96,6 +105,11 @@ export type UpdateGlobalpingRequest = Message<"mistgate.admin.v1.UpdateGlobalpin
    * @generated from field: optional string token = 3;
    */
   token?: string | undefined;
+
+  /**
+   * @generated from field: optional bool ipv6 = 4;
+   */
+  ipv6?: boolean | undefined;
 };
 
 /**
@@ -221,7 +235,8 @@ export const DisconnectGlobalpingResponseSchema: GenMessage<DisconnectGlobalping
  * to notice a block that the panel's own server cannot see. Conventions: common.proto.
  *
  * IT SENDS NODE ADDRESSES TO A THIRD PARTY. That is why it is off until the owner switches it on: with it on, every
- * round tells Globalping the IPv4 address of each online node (and nothing else about it). The panel never sends an
+ * round tells Globalping the IPv4 address of each online node (and nothing else about it); with `ipv6` on, which is the
+ * default once the integration is on, also the IPv6 address of every node whose IPv6 works. The panel never sends an
  * address anywhere else, and TestGlobalping sends none at all.
  *
  * THE COUNTRY is not a setting of this integration: it is shared by every source of the country check and lives in
