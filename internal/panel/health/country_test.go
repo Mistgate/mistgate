@@ -160,7 +160,7 @@ func (c *countryEnv) tick() bool {
 
 func (c *countryEnv) verdicts(node string) []string {
 	c.t.Helper()
-	rows, err := c.st.RecentCountryChecks(c.ctx, 20, node)
+	rows, err := c.st.RecentCountryChecks(c.ctx, 4, 20, node)
 	if err != nil {
 		c.t.Fatal(err)
 	}
@@ -464,7 +464,7 @@ func TestCountryRateLimitHoldsTheNextRound(t *testing.T) {
 	if len(v) != 1 || v[0] != "unknown" {
 		t.Fatalf("rate-limited round stored %v, want unknown", v)
 	}
-	rows, _ := c.st.RecentCountryChecks(c.ctx, 1, "de1")
+	rows, _ := c.st.RecentCountryChecks(c.ctx, 4, 1, "de1")
 	if m := countryCheckMsg(rows[0]); m.Reason != "rate_limited" {
 		t.Fatalf("reason = %q", m.Reason)
 	}
@@ -489,7 +489,7 @@ func TestCountrySourceFailureAndTimeoutAreUnknown(t *testing.T) {
 	c.tick()
 	c.src.err = context.DeadlineExceeded
 	c.tick()
-	rows, _ := c.st.RecentCountryChecks(c.ctx, 5, "de1")
+	rows, _ := c.st.RecentCountryChecks(c.ctx, 4, 5, "de1")
 	if len(rows) != 2 || countryCheckMsg(rows[0]).Reason != "timeout" || countryCheckMsg(rows[1]).Reason != "source_error" {
 		t.Fatalf("rows = %+v", rows)
 	}
@@ -1041,7 +1041,7 @@ func TestPartialAlertHoldsWhileNewestGlobalpingRoundIsUnknown(t *testing.T) {
 	for i := 0; i < countryRecent; i++ {
 		insertCountryAlertRound(t, c, "de1", verdictUnknown, unknownStart.Add(time.Duration(i)*15*time.Minute))
 	}
-	rows, err := c.st.RecentCountryChecks(c.ctx, 1, "de1")
+	rows, err := c.st.RecentCountryChecks(c.ctx, 4, 1, "de1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1115,7 +1115,7 @@ func TestCountryRetention(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.s.Retention(c.ctx)
-	if rows, _ := c.st.RecentCountryChecks(c.ctx, 10); len(rows) != 1 || !rows[0].At.Equal(now.Add(-6*24*time.Hour).Truncate(time.Second)) {
+	if rows, _ := c.st.RecentCountryChecks(c.ctx, 4, 10); len(rows) != 1 || !rows[0].At.Equal(now.Add(-6*24*time.Hour).Truncate(time.Second)) {
 		t.Fatalf("after the sweep: %+v, want only the 6-day-old round", rows)
 	}
 }

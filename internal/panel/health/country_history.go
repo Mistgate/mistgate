@@ -30,7 +30,7 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 
 	if cc, _, on := s.countryConfig(ctx); on {
 		sources = append(sources, countryreach.SourceGlobalping)
-		rows, err := s.st.CountryVerdictChanges(ctx, cc.Country, since)
+		rows, err := s.st.CountryVerdictChanges(ctx, cc.Country, familyV4, since)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -38,7 +38,7 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 			k := key{r.NodeID, countryreach.SourceGlobalping}
 			raw[k] = append(raw[k], point{r.At, r.Verdict})
 		}
-		latest, err := s.st.RecentCountryChecks(ctx, 2)
+		latest, err := s.st.RecentCountryChecks(ctx, familyV4, 2)
 		if err != nil {
 			return nil, nil, err
 		}

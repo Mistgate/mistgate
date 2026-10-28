@@ -171,7 +171,7 @@ func (s *Service) countryRoundWants(ctx context.Context, country string) []Count
 	if len(tableOrder) == 0 {
 		return nil
 	}
-	rows, err := s.st.RecentCountryChecks(ctx, countryRecent)
+	rows, err := s.st.RecentCountryChecks(ctx, familyV4, countryRecent)
 	if err != nil {
 		s.log.Warn("health: country check operator rotation", "err", err)
 		return tableOrder

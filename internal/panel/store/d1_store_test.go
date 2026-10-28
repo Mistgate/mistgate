@@ -1806,6 +1806,10 @@ func TestD1CountryChecksStorage(t *testing.T) {
 	countryCheckStoreProof(t, openD1Store(t))
 }
 
+func TestD1CountryCheckFamilies(t *testing.T) {
+	countryCheckFamilyProof(t, openD1Store(t))
+}
+
 func TestD1BlocklistChecksStorage(t *testing.T) {
 	blocklistCheckStoreProof(t, openD1Store(t))
 }

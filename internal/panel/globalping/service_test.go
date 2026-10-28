@@ -895,7 +895,7 @@ func TestSwitchingItOffStopsTheScheduler(t *testing.T) {
 	if started == 0 {
 		t.Fatal("the round made no request")
 	}
-	if rows, _ := e.st.RecentCountryChecks(ctx, 5, "de1"); len(rows) != 1 || rows[0].Verdict != "ok" {
+	if rows, _ := e.st.RecentCountryChecks(ctx, 4, 5, "de1"); len(rows) != 1 || rows[0].Verdict != "ok" {
 		t.Fatalf("rows = %+v", rows)
 	}
 
@@ -914,7 +914,7 @@ func TestSwitchingItOffStopsTheScheduler(t *testing.T) {
 		t.Fatalf("%d requests reached the server after it was switched off", e.fake.count()-started)
 	}
 	// what was stored stays for the retention, but the API reports the check as off
-	if rows, _ := e.st.RecentCountryChecks(ctx, 5, "de1"); len(rows) != 1 {
+	if rows, _ := e.st.RecentCountryChecks(ctx, 4, 5, "de1"); len(rows) != 1 {
 		t.Fatalf("stored rounds = %+v, want them kept", rows)
 	}
 

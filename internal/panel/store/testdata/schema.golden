@@ -423,7 +423,7 @@
     "type": "table",
     "name": "country_check",
     "tbl_name": "country_check",
-    "sql": "CREATE TABLE country_check ( node_id TEXT NOT NULL, at INTEGER NOT NULL, country TEXT NOT NULL, verdict TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(detail_json)), PRIMARY KEY (node_id, at) ) STRICT"
+    "sql": "CREATE TABLE \"country_check\" ( node_id TEXT NOT NULL, country TEXT NOT NULL, family INTEGER NOT NULL DEFAULT 4 CHECK (family IN (4, 6)), at INTEGER NOT NULL, verdict TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(detail_json)), PRIMARY KEY (node_id, country, family, at) ) STRICT"
   },
   {
     "type": "table",

@@ -13,7 +13,7 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	t.Helper()
 	ctx := context.Background()
 	base := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	if at, err := st.LastCountryCheckAt(ctx); err != nil || !at.IsZero() {
+	if at, err := st.LastCountryCheckAt(ctx, 4); err != nil || !at.IsZero() {
 		t.Fatalf("LastCountryCheckAt on an empty table = %v, %v", at, err)
 	}
 	var rows []CountryCheck
@@ -29,7 +29,7 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	if err := st.InsertCountryChecks(ctx, []CountryCheck{{NodeID: "nod_nl1", At: base, Country: "RU", Verdict: "unknown"}}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := st.RecentCountryChecks(ctx, 2)
+	got, err := st.RecentCountryChecks(ctx, 4, 2)
 	if err != nil || len(got) != 4 {
 		t.Fatalf("RecentCountryChecks(2) = %+v, %v", got, err)
 	}
@@ -39,18 +39,18 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	if got[2].NodeID != "nod_nl1" || got[2].Verdict != "blocked" || got[3].Detail != "{}" {
 		t.Fatalf("second node: %+v", got)
 	}
-	one, err := st.RecentCountryChecks(ctx, 10, "nod_nl1")
+	one, err := st.RecentCountryChecks(ctx, 4, 10, "nod_nl1")
 	if err != nil || len(one) != 4 || one[3].Verdict != "unknown" {
 		t.Fatalf("RecentCountryChecks for one node = %+v, %v", one, err)
 	}
-	if at, err := st.LastCountryCheckAt(ctx); err != nil || !at.Equal(base.Add(3*time.Minute)) {
+	if at, err := st.LastCountryCheckAt(ctx, 4); err != nil || !at.Equal(base.Add(3*time.Minute)) {
 		t.Fatalf("LastCountryCheckAt = %v, %v", at, err)
 	}
 	n, err := st.PruneCountryChecks(ctx, base.Add(2*time.Minute))
 	if err != nil || n != 4 {
 		t.Fatalf("PruneCountryChecks = %d, %v, want 4 rows older than the cut", n, err)
 	}
-	left, err := st.RecentCountryChecks(ctx, 10)
+	left, err := st.RecentCountryChecks(ctx, 4, 10)
 	if err != nil || len(left) != 4 {
 		t.Fatalf("after the prune: %+v, %v", left, err)
 	}
@@ -69,7 +69,7 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	changes, err := st.CountryVerdictChanges(ctx, "RU", base)
+	changes, err := st.CountryVerdictChanges(ctx, "RU", 4, base)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	if !slices.Equal(got2, want) {
 		t.Fatalf("CountryVerdictChanges(RU) = %q, want %q", got2, want)
 	}
-	if kz, err := st.CountryVerdictChanges(ctx, "KZ", base); err != nil || len(kz) != 1 || kz[0].Verdict != "blocked" {
+	if kz, err := st.CountryVerdictChanges(ctx, "KZ", 4, base); err != nil || len(kz) != 1 || kz[0].Verdict != "blocked" {
 		t.Fatalf("CountryVerdictChanges(KZ) = %+v, %v", kz, err)
 	}
 }

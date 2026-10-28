@@ -45,6 +45,7 @@ const (
 	countryMaxInterval = 24 * time.Hour
 	countryRoundTime   = 60 * time.Second // the whole round, controls and polling included
 	countryHoldSetting = "health.country_check.hold_until"
+	familyV4           = 4 // the address family every country-check row and read uses; IPv6 rows come with a later step
 )
 
 // countryControls is the site every probe must reach, per country: big, domestic and never blocked there. Other countries
@@ -403,7 +404,7 @@ func (s *Service) CountryTick(ctx context.Context) bool {
 	probes, every, _ := countryPlan(nodes, cc.Interval, src.HourlyLimit())
 	s.countryNoteStretch(cc.Interval, every)
 	now := s.now()
-	last, err := s.st.LastCountryCheckAt(ctx)
+	last, err := s.st.LastCountryCheckAt(ctx, familyV4)
 	if err != nil {
 		s.log.Warn("health: country check last round", "err", err)
 		return false
@@ -443,7 +444,7 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 	var rows []store.CountryCheck
 	unknown := func(n countryNode, reason string, asked []string) {
 		b, _ := json.Marshal(countryDetail{Reason: reason, Ports: n.ports, Asked: asked})
-		rows = append(rows, store.CountryCheck{NodeID: n.node.ID, At: now, Country: cc.Country, Verdict: verdictUnknown, Detail: string(b)})
+		rows = append(rows, store.CountryCheck{NodeID: n.node.ID, At: now, Country: cc.Country, Family: familyV4, Verdict: verdictUnknown, Detail: string(b)})
 	}
 	targets := map[string]countryNode{}
 	for _, n := range nodes {
@@ -476,7 +477,7 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 				d.NoProbe = obs.NoProbe
 				d.Asked = obs.Asked
 				b, _ := json.Marshal(d)
-				rows = append(rows, store.CountryCheck{NodeID: t.Key, At: now, Country: cc.Country, Verdict: verdict, Detail: string(b)})
+				rows = append(rows, store.CountryCheck{NodeID: t.Key, At: now, Country: cc.Country, Family: familyV4, Verdict: verdict, Detail: string(b)})
 			}
 		}
 	}
@@ -704,7 +705,7 @@ func (s *Service) countryChecks(ctx context.Context, nodeID string) ([]*adminv1.
 	byTSPU := map[string]tspuRound{}
 	byExt := map[string]map[string]store.ExtCheck{}
 	if liveOn {
-		rounds, err := s.st.RecentCountryChecks(ctx, 2, ids...)
+		rounds, err := s.st.RecentCountryChecks(ctx, familyV4, 2, ids...)
 		if err != nil {
 			return nil, err
 		}
@@ -877,7 +878,7 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 
 	byNode := map[string][]store.CountryCheck{}
 	if liveOn {
-		rows, err := s.st.RecentCountryChecks(ctx, countryRecent)
+		rows, err := s.st.RecentCountryChecks(ctx, familyV4, countryRecent)
 		if err != nil {
 			s.log.Warn("health: country check rounds", "err", err)
 			hold()
