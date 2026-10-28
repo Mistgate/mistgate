@@ -50,7 +50,7 @@ Not there yet: a Telegram bot beyond alerts, and the Cloudflare Workers edition 
 
 Hysteria2 and VLESS can share a node, TCP 443 included. Not every app format carries every profile: see [what works where](docs/en/guide/subscriptions.md#what-works-where).
 
-Not supported: VMess, Trojan, Shadowsocks, TUIC and plain WireGuard.
+Not supported yet: VMess, Trojan, Shadowsocks, TUIC and plain WireGuard. More protocols are planned; each new one plugs into the same subscription link through the contract below.
 
 A protocol is two halves compiled into the binaries. On the panel, one Go interface: a JSON Schema for its settings (the admin builds the form from it), validation, the spec a node runs, credential issuing, and its piece of each subscription format. On the node, an engine that runs the spec, swaps credentials without a restart and reports traffic and health. A new protocol goes only to agents that announce it, so older agents keep working. See [the protocol plugin contract](docs/en/reference/architecture.md#the-protocol-plugin-contract).
 

@@ -50,7 +50,7 @@
 
 Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443。并非每种订阅格式都能承载每种协议配置：见[各格式支持哪些协议配置](docs/zh/guide/subscriptions.md#各格式支持哪些协议配置)。
 
-不支持：VMess、Trojan、Shadowsocks、TUIC 和普通 WireGuard。
+暂不支持：VMess、Trojan、Shadowsocks、TUIC 和普通 WireGuard。我们计划加入更多协议，每个新协议都通过下面的统一接口接入同一个订阅链接。
 
 一个协议分为两半，都编译进二进制文件。面板这一半是一个 Go 接口：设置的 JSON Schema（管理后台据此生成表单）、校验、交给节点运行的服务器配置、设备凭据的签发，以及它在每种订阅格式中的那一部分。节点这一半是一个引擎：运行这份配置，无需重启即可替换凭据，并上报流量和运行状况。新协议只会下发给声明支持它的 Agent，所以旧版 Agent 照常工作。详见[协议插件契约](docs/zh/reference/architecture.md#协议插件契约)。
 
