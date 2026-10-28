@@ -9,8 +9,8 @@
 //     (or an explicit Kick token, or an expired term) makes the next packet of that connection fail.
 //   - Traffic: per-credential atomic counters, reported from the user's side (core tx = up, core rx = down).
 //   - Masquerade: the decoy over HTTP/3 (core MasqHandler) and HTTPS on TCP (masq.go).
-//   - Egress: Env.Egress (internal/node/egress), with the sniffing RequestHook on so sniffed domains replace
-//     client-side IPs and are resolved by the node.
+//   - Egress: Env.Egress (internal/node/egress), with an IP-preserving sniffing RequestHook; explicit domain
+//     destinations are resolved by the node.
 package hysteria2
 
 import (
@@ -31,7 +31,6 @@ import (
 	"github.com/apernet/hysteria/core/v2/server"
 	"github.com/apernet/hysteria/extras/v2/correctnet"
 	"github.com/apernet/hysteria/extras/v2/obfs"
-	"github.com/apernet/hysteria/extras/v2/sniff"
 	quic "github.com/apernet/quic-go"
 
 	agentpb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -335,7 +334,7 @@ func (in *inbound) start(ctx context.Context) error {
 			return cert.GetCertificate(hello)
 		}},
 		Conn:                  conn,
-		RequestHook:           &sniff.Sniffer{}, // all ports, default 4 s timeout; client IPs are replaced by sniffed domains
+		RequestHook:           newRouteOnlyRequestHook(), // sniff all ports; keep a client-selected IP as the destination
 		Outbound:              outbound{e: egr, in: in},
 		CongestionConfig:      server.CongestionConfig{Type: congestionType, BBRProfile: cfg.bbrProfile},
 		BandwidthConfig:       server.BandwidthConfig{MaxTx: cfg.maxTx, MaxRx: cfg.maxRx},

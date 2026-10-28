@@ -44,6 +44,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 const testPublicKey = "E59WjnvZcQMu7tR7_BgyhycuEdBS-CtKxfImRCdAvFM"
@@ -97,6 +98,10 @@ func (b *lockedLogBuffer) String() string {
 }
 
 func newRuntimeFixture(t *testing.T, useRealEgress bool) *runtimeFixture {
+	return newRuntimeFixtureWithDNS(t, useRealEgress, nil)
+}
+
+func newRuntimeFixtureWithDNS(t *testing.T, useRealEgress bool, resolvers func() []string) *runtimeFixture {
 	t.Helper()
 	oldBindIP := BindIP
 	BindIP = net.ParseIP("127.0.0.1")
@@ -118,7 +123,16 @@ func newRuntimeFixture(t *testing.T, useRealEgress bool) *runtimeFixture {
 	logs := &lockedLogBuffer{}
 	logger := slog.New(slog.NewTextHandler(logs, nil))
 	env := engine.Env{Log: logger}
-	if useRealEgress {
+	if resolvers != nil {
+		env.DNS = resolvers
+		direct := egress.New(resolvers, egress.AllowPrivate())
+		env.Egress = func(name string) (engine.Egress, error) {
+			if name != "" && name != "direct" {
+				return nil, fmt.Errorf("egress %q is not available", name)
+			}
+			return direct, nil
+		}
+	} else if useRealEgress {
 		direct := egress.New(nil)
 		env.Egress = func(name string) (engine.Egress, error) {
 			if name != "" && name != "direct" {
@@ -199,6 +213,115 @@ func startEchoServer(t *testing.T) net.Listener {
 		}
 	}()
 	return listener
+}
+
+func fakeNodeDNS(t *testing.T, zone map[string]string) string {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = pc.Close() })
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			n, from, err := pc.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			var req dnsmessage.Message
+			if req.Unpack(buf[:n]) != nil || len(req.Questions) != 1 {
+				continue
+			}
+			q := req.Questions[0]
+			resp := dnsmessage.Message{
+				Header:    dnsmessage.Header{ID: req.ID, Response: true, Authoritative: true, RecursionAvailable: true},
+				Questions: req.Questions,
+			}
+			if ip, ok := zone[q.Name.String()]; ok && q.Type == dnsmessage.TypeA {
+				resp.Answers = []dnsmessage.Resource{{
+					Header: dnsmessage.ResourceHeader{Name: q.Name, Type: dnsmessage.TypeA, Class: dnsmessage.ClassINET, TTL: 60},
+					Body:   &dnsmessage.AResource{A: [4]byte(net.ParseIP(ip).To4())},
+				}}
+			} else if !ok {
+				resp.Header.RCode = dnsmessage.RCodeNameError
+			}
+			out, _ := resp.Pack()
+			_, _ = pc.WriteTo(out, from)
+		}
+	}()
+	return pc.LocalAddr().String()
+}
+
+func startTCPDestinationPair(t *testing.T, serve func(string, net.Conn)) string {
+	t.Helper()
+	a, err := net.Listen("tcp", "127.0.0.2:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := strconv.Itoa(a.Addr().(*net.TCPAddr).Port)
+	b, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
+	if err != nil {
+		_ = a.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = a.Close()
+		_ = b.Close()
+	})
+	for _, target := range []struct {
+		name string
+		ln   net.Listener
+	}{{"A", a}, {"B", b}} {
+		go func(name string, ln net.Listener) {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				go serve(name, conn)
+			}
+		}(target.name, target.ln)
+	}
+	return a.Addr().String()
+}
+
+type tlsDestinationProbe struct {
+	listener   string
+	serverName string
+}
+
+func startTLSDestinationPair(t *testing.T) (string, <-chan tlsDestinationProbe) {
+	t.Helper()
+	probes := make(chan tlsDestinationProbe, 4)
+	addr := startTCPDestinationPair(t, func(listener string, conn net.Conn) {
+		defer conn.Close()
+		srv := tls.Server(conn, &tls.Config{GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			probes <- tlsDestinationProbe{listener: listener, serverName: hello.ServerName}
+			return nil, errors.New("client hello captured")
+		}})
+		_ = srv.Handshake()
+	})
+	return addr, probes
+}
+
+func sendTLSClientHello(t *testing.T, conn net.Conn, serverName string) {
+	t.Helper()
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+	client := tls.Client(conn, &tls.Config{ServerName: serverName, InsecureSkipVerify: true})
+	_ = client.Handshake()
+	_ = client.Close()
+}
+
+func waitTLSClientHello(t *testing.T, probes <-chan tlsDestinationProbe) tlsDestinationProbe {
+	t.Helper()
+	select {
+	case got := <-probes:
+		return got
+	case <-time.After(5 * time.Second):
+		t.Fatal("destination did not receive a TLS ClientHello")
+		return tlsDestinationProbe{}
+	}
 }
 
 type xrayClient struct {
@@ -332,18 +455,28 @@ func (c *xrayClient) dial(t *testing.T, target string) net.Conn {
 		_ = conn.Close()
 		t.Fatal(err)
 	}
-	ip := net.ParseIP(host).To4()
-	if ip == nil {
-		_ = conn.Close()
-		t.Fatalf("test destination is not IPv4: %q", target)
-	}
 	port, err := strconv.ParseUint(portText, 10, 16)
 	if err != nil {
 		_ = conn.Close()
 		t.Fatal(err)
 	}
-	request := []byte{5, 1, 0, 1}
-	request = append(request, ip...)
+	request := []byte{5, 1, 0}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip4 := ip.To4(); ip4 != nil {
+			request = append(request, 1)
+			request = append(request, ip4...)
+		} else {
+			request = append(request, 4)
+			request = append(request, ip.To16()...)
+		}
+	} else {
+		if len(host) > 255 {
+			_ = conn.Close()
+			t.Fatalf("test destination domain is too long: %q", host)
+		}
+		request = append(request, 3, byte(len(host)))
+		request = append(request, host...)
+	}
 	request = append(request, byte(port>>8), byte(port))
 	if _, err := conn.Write(request); err != nil {
 		_ = conn.Close()
@@ -414,6 +547,48 @@ func payload(n int) []byte {
 		b[i] = byte((i % 251) + 1)
 	}
 	return b
+}
+
+func TestSniffedTLSNameDoesNotReplaceVLESSLiteralIPDestination(t *testing.T) {
+	dns := fakeNodeDNS(t, map[string]string{"www.google.com.": "127.0.0.1"})
+	resolvers := func() []string { return []string{dns} }
+	f := newRuntimeFixtureWithDNS(t, false, resolvers)
+	spec := f.spec("node-a", "tcp")
+	cred := testCredential("sniff", "66ad4540-b58c-4ad2-9926-ea63445a9b57")
+	if _, err := f.engine.Apply(context.Background(), spec, []plugin.UserCred{cred}); err != nil {
+		t.Fatal(err)
+	}
+	addr, probes := startTLSDestinationPair(t)
+	client := newXrayClient(t, spec.Listen.Port, "tcp", cred.CredID, stringID(cred))
+	conn := client.dial(t, addr)
+	defer conn.Close()
+	sendTLSClientHello(t, conn, "www.google.com")
+	if got := waitTLSClientHello(t, probes); got.listener != "A" || got.serverName != "www.google.com" {
+		t.Fatalf("TLS ClientHello reached listener %s with SNI %q, want A with www.google.com", got.listener, got.serverName)
+	}
+}
+
+func TestVLESSDomainDestinationUsesNodeDNS(t *testing.T) {
+	dns := fakeNodeDNS(t, map[string]string{"www.google.com.": "127.0.0.1"})
+	resolvers := func() []string { return []string{dns} }
+	f := newRuntimeFixtureWithDNS(t, false, resolvers)
+	spec := f.spec("node-a", "tcp")
+	cred := testCredential("domain", "66ad4540-b58c-4ad2-9926-ea63445a9b57")
+	if _, err := f.engine.Apply(context.Background(), spec, []plugin.UserCred{cred}); err != nil {
+		t.Fatal(err)
+	}
+	addr, probes := startTLSDestinationPair(t)
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := newXrayClient(t, spec.Listen.Port, "tcp", cred.CredID, stringID(cred))
+	conn := client.dial(t, net.JoinHostPort("www.google.com", port))
+	defer conn.Close()
+	sendTLSClientHello(t, conn, "www.google.com")
+	if got := waitTLSClientHello(t, probes); got.listener != "B" || got.serverName != "www.google.com" {
+		t.Fatalf("domain destination reached listener %s with SNI %q, want fake-DNS listener B", got.listener, got.serverName)
+	}
 }
 
 func TestXrayClientTrafficCountersAndObserved(t *testing.T) {

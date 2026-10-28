@@ -112,6 +112,10 @@ TCP 443 is also where a Hysteria2 profile serves its web site. A VLESS profile w
 
 Two profiles cannot listen on the same TCP port of a node. A TCP port and a UDP port with the same number do not clash.
 
+## How the node handles destinations
+
+VLESS keeps HTTP, TLS and QUIC sniffing enabled for routing and traffic attribution. If the app asks for a literal IP, the node keeps that IP as the destination even if a sniffed HTTP Host, TLS SNI or QUIC name differs. If the app asks for a domain, the node resolves that name with this node's DNS resolvers; WARP egress uses the same node-side DNS. See [DNS](dns.md) and [WARP](warp.md).
+
 ## What the apps receive
 
 Four formats carry VLESS (the two below, Xray JSON and sing-box JSON); which one an app gets is decided by the rules on [Subscriptions](subscriptions.md). VLESS rides the same switch as Hysteria2, the link-app switch of **Apps in the subscription**: a person who gets Hysteria2 servers gets the VLESS servers of their group too.

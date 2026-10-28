@@ -67,7 +67,7 @@ func buildCoreConfig(spec plugin.InboundSpec, cfg settings, creds *credentialInd
 	receiver := &proxyman.ReceiverConfig{
 		StreamSettings: stream,
 		SniffingSettings: &proxyman.SniffingConfig{
-			Enabled: true, DestinationOverride: []string{"http", "tls", "quic"},
+			Enabled: true, RouteOnly: true, DestinationOverride: []string{"http", "tls", "quic"},
 		},
 	}
 	if cfg.security == "tls" {

@@ -64,8 +64,8 @@ The domain, the certificate and how they interact with the node address are desc
 
 ## How the node handles the traffic
 
-- **Sniffing.** The node reads the destination name from the first bytes of a connection (the HTTP Host or the TLS server name) and uses that name instead of the IP the app sent. The app's own DNS answer is not trusted, so a poisoned or blocked lookup on the person's side does not matter.
-- **Per-node DNS.** The node resolves those names itself, with the node's **DNS resolvers for this node** setting; the default is the server's own resolver. IPv4 is preferred; IPv6 is used for a name without an A record. A WARP exit resolves the same way. See [Nodes](nodes.md) and [DNS](dns.md).
+- **Sniffing.** The node reads the first bytes for HTTP Host or TLS SNI. Sniffing remains enabled; request attribution and torrent blocking continue to work. If the app asks for a literal IP, the node keeps that IP as the destination; a sniffed name never replaces it.
+- **Per-node DNS.** When the app asks for a domain, the node resolves it with the node's **DNS resolvers for this node** setting; the default is the server's own resolver. The app's DNS answer is not used for a domain request. IPv4 is preferred; IPv6 is used for a name without an A record. A WARP exit resolves the same way. See [Nodes](nodes.md) and [DNS](dns.md).
 - **Closed destinations.** A user cannot reach private networks, loopback, link-local and cloud metadata addresses, or any address of the node itself through the tunnel.
 - **Users.** Adding, removing or disabling a person changes only the node's list of tokens: nobody else is disconnected. A removed or expired person is cut off at their next packet.
 - **Torrents.** With the node's **Block recognized BitTorrent traffic** on, the node closes an outbound connection or drops a UDP datagram it recognizes as BitTorrent. Changing that setting restarts the node's Hysteria2 profiles. See [Torrent protection](torrent-protection.md).

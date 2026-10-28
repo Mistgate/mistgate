@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -109,6 +110,88 @@ func tcpEcho(t *testing.T) string {
 	return ln.Addr().String()
 }
 
+func startTCPDestinationPair(t *testing.T, serve func(string, net.Conn)) string {
+	t.Helper()
+	a, err := net.Listen("tcp", "127.0.0.2:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := strconv.Itoa(a.Addr().(*net.TCPAddr).Port)
+	b, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
+	if err != nil {
+		_ = a.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = a.Close()
+		_ = b.Close()
+	})
+	for _, target := range []struct {
+		name string
+		ln   net.Listener
+	}{{"A", a}, {"B", b}} {
+		go func(name string, ln net.Listener) {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				go serve(name, conn)
+			}
+		}(target.name, target.ln)
+	}
+	return a.Addr().String()
+}
+
+type tlsDestination struct {
+	listener   string
+	serverName string
+}
+
+func startTLSDestinationPair(t *testing.T) (string, <-chan tlsDestination) {
+	t.Helper()
+	probes := make(chan tlsDestination, 4)
+	addr := startTCPDestinationPair(t, func(listener string, conn net.Conn) {
+		defer conn.Close()
+		srv := tls.Server(conn, &tls.Config{GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			probes <- tlsDestination{listener: listener, serverName: hello.ServerName}
+			return nil, errors.New("client hello captured")
+		}})
+		_ = srv.Handshake()
+	})
+	return addr, probes
+}
+
+func sendTLSClientHello(t *testing.T, conn net.Conn, serverName string) {
+	t.Helper()
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+	client := tls.Client(conn, &tls.Config{ServerName: serverName, InsecureSkipVerify: true})
+	_ = client.Handshake()
+	_ = client.Close()
+}
+
+func waitTLSClientHello(t *testing.T, probes <-chan tlsDestination) tlsDestination {
+	t.Helper()
+	select {
+	case got := <-probes:
+		return got
+	case <-time.After(5 * time.Second):
+		t.Fatal("destination did not receive a TLS ClientHello")
+		return tlsDestination{}
+	}
+}
+
+func waitDestination(t *testing.T, destinations <-chan string) string {
+	t.Helper()
+	select {
+	case got := <-destinations:
+		return got
+	case <-time.After(5 * time.Second):
+		t.Fatal("no destination accepted the TCP connection")
+		return ""
+	}
+}
+
 func udpEcho(t *testing.T) string {
 	t.Helper()
 	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
@@ -185,6 +268,7 @@ func cred(id string, mods ...func(*plugin.UserCred)) plugin.UserCred {
 type rig struct {
 	t       *testing.T
 	e       engine.Engine
+	events  chan engine.Event
 	udpPort int
 	tcpPort int
 	echo    string
@@ -206,18 +290,25 @@ func newRig(t *testing.T, settingsJSON string) *rig {
 	return newRigWithLogger(t, settingsJSON, nil)
 }
 
-func newRigWithLogger(t *testing.T, settingsJSON string, logger *slog.Logger) *rig {
+func newRigWithLogger(t *testing.T, settingsJSON string, logger *slog.Logger, egressOptions ...egress.Option) *rig {
 	t.Helper()
-	r := &rig{t: t, echo: tcpEcho(t), udpPort: freeUDPPort(t), tcpPort: freeTCPPort(t)}
-	dns := fakeDNS(t, map[string]string{"app.example.test.": "127.0.0.1"})
+	r := &rig{t: t, events: make(chan engine.Event, 32), echo: tcpEcho(t), udpPort: freeUDPPort(t), tcpPort: freeTCPPort(t)}
+	dns := fakeDNS(t, map[string]string{"app.example.test.": "127.0.0.1", "www.google.com.": "127.0.0.1"})
 	resolvers := func() []string { return []string{dns} }
-	direct := egress.New(resolvers, egress.AllowPrivate())
+	options := append([]egress.Option{egress.AllowPrivate()}, egressOptions...)
+	direct := egress.New(resolvers, options...)
 	e, err := New(engine.Env{
 		Log:    logger,
 		Certs:  certs.New(t.TempDir()),
 		Egress: func(string) (engine.Egress, error) { return direct, nil },
 		DNS:    resolvers,
 		Now:    r.now,
+		Event: func(event engine.Event) {
+			select {
+			case r.events <- event:
+			default:
+			}
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -738,22 +829,138 @@ func (f obfsFactory) New(net.Addr) (net.PacketConn, error) {
 	return obfs.WrapPacketConnSalamander(pc, []byte(f.pw))
 }
 
-func TestSniffedDomainIsResolvedByTheNode(t *testing.T) {
+func TestLiteralIPHTTPHostDoesNotReplaceDestination(t *testing.T) {
 	r := newRig(t, "")
 	r.apply(cred("a"))
 	c := r.mustDial("a")
-	_, echoPort, _ := net.SplitHostPort(r.echo)
-
-	// The client asks for an unroutable IP (TEST-NET-1) but the HTTP request names app.example.test. The
-	// sniffer swaps the IP for the name and the node's resolver (the fake DNS) sends it to the echo server.
-	req := "GET / HTTP/1.1\r\nHost: app.example.test\r\n\r\n"
-	conn, err := c.TCP("192.0.2.1:" + echoPort)
+	arrivals := make(chan string, 4)
+	aAddr := startTCPDestinationPair(t, func(name string, conn net.Conn) {
+		arrivals <- name
+		defer conn.Close()
+		_, _ = io.Copy(conn, conn)
+	})
+	_, port, err := net.SplitHostPort(aAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientAddr := net.JoinHostPort("127.0.0.2", port)
+	// Fake node DNS sends www.google.com to listener B. The HTTP Host is only a sniffing hint; the app asked for A by IP.
+	req := "GET / HTTP/1.1\r\nHost: www.google.com\r\n\r\n"
+	conn, err := c.TCP(clientAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Close()
 	if err := exchange(conn, []byte(req)); err != nil {
-		t.Fatalf("sniffed domain was not used: %v", err)
+		t.Fatalf("HTTP request was not forwarded: %v", err)
+	}
+	if got := waitDestination(t, arrivals); got != "A" {
+		t.Fatalf("HTTP Host redirected the literal-IP request to listener %s, want A", got)
+	}
+}
+
+func TestLiteralIPTLSClientHelloKeepsDestination(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	c := r.mustDial("a")
+	addr, probes := startTLSDestinationPair(t)
+	conn, err := c.TCP(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	sendTLSClientHello(t, conn, "www.google.com")
+	if got := waitTLSClientHello(t, probes); got.listener != "A" || got.serverName != "www.google.com" {
+		t.Fatalf("TLS ClientHello reached listener %s with SNI %q, want A with www.google.com", got.listener, got.serverName)
+	}
+}
+
+func TestDomainDestinationUsesNodeDNS(t *testing.T) {
+	r := newRig(t, "")
+	r.apply(cred("a"))
+	c := r.mustDial("a")
+	addr, probes := startTLSDestinationPair(t)
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := c.TCP(net.JoinHostPort("www.google.com", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	sendTLSClientHello(t, conn, "www.google.com")
+	if got := waitTLSClientHello(t, probes); got.listener != "B" || got.serverName != "www.google.com" {
+		t.Fatalf("domain destination reached listener %s with SNI %q, want fake-DNS listener B", got.listener, got.serverName)
+	}
+}
+
+func TestIPv6LiteralIsBlockedWhenIPv6ForClientsIsOff(t *testing.T) {
+	r := newRigWithLogger(t, "", nil, egress.IPv4OnlyWhen(func() bool { return true }))
+	r.apply(cred("a"))
+	c := r.mustDial("a")
+	addr, probes := startTLSDestinationPair(t)
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := c.TCP(net.JoinHostPort("2001:db8::1", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	sendTLSClientHello(t, conn, "www.google.com")
+	select {
+	case got := <-probes:
+		t.Fatalf("IPv6 literal was replaced by SNI and reached listener %s", got.listener)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func TestTorrentGuardAttributionUsesRestoredIPDestination(t *testing.T) {
+	r := newRig(t, "")
+	en := r.e.(*eng)
+	if !en.NodeSettings(context.Background(), &agentpb.NodeSettings{TorrentBlockerEnabled: true}) {
+		t.Fatal("enabling torrent blocking must apply to the next inbound")
+	}
+	r.apply(cred("a"))
+	c := r.mustDial("a")
+	arrivals := make(chan string, 4)
+	backendData := make(chan []byte, 4)
+	addr := startTCPDestinationPair(t, func(name string, conn net.Conn) {
+		arrivals <- name
+		data, _ := io.ReadAll(conn)
+		backendData <- data
+		_ = conn.Close()
+	})
+	conn, err := c.TCP(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	_, _ = conn.Write([]byte("\x13BitTorrent protocol"))
+	if got := waitDestination(t, arrivals); got != "A" {
+		t.Fatalf("torrent handshake reached listener %s, want original IP listener A", got)
+	}
+	deadline := time.After(5 * time.Second)
+	var event engine.Event
+	for event.Code != "torrent_attempt" {
+		select {
+		case event = <-r.events:
+		case <-deadline:
+			t.Fatal("torrent guard did not report the handshake")
+		}
+	}
+	if event.Params["user_id"] != "usr_a" || event.Params["protocol"] != "tcp" {
+		t.Fatalf("torrent event attribution = %+v, want user usr_a and TCP", event.Params)
+	}
+	select {
+	case data := <-backendData:
+		if len(data) != 0 {
+			t.Fatalf("torrent handshake reached the destination: %q", data)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("torrent guard did not close the blocked destination connection")
 	}
 }
 

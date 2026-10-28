@@ -75,6 +75,26 @@ func TestTLSCoreConfigUsesUnixWithoutReality(t *testing.T) {
 	}
 }
 
+func TestSniffingUsesRouteOnly(t *testing.T) {
+	spec := settingsSpec("tcp", "reality")
+	cfg, err := parseSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coreConfig := buildCoreConfig(spec, cfg, nil, nil, "")
+	message, err := coreConfig.Inbound[0].ReceiverSettings.GetInstance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiver := message.(*proxyman.ReceiverConfig)
+	if receiver.SniffingSettings == nil || !receiver.SniffingSettings.Enabled || !receiver.SniffingSettings.RouteOnly {
+		t.Fatalf("sniffing settings must stay enabled and route-only: %+v", receiver.SniffingSettings)
+	}
+	if !reflect.DeepEqual(receiver.SniffingSettings.DestinationOverride, []string{"http", "tls", "quic"}) {
+		t.Fatalf("sniffing protocols = %v, want HTTP, TLS and QUIC", receiver.SniffingSettings.DestinationOverride)
+	}
+}
+
 func tlsSettingsSpec(transport, mode, cdnHost string) plugin.InboundSpec {
 	wsPath := ""
 	if transport == "ws" {

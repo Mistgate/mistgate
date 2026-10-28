@@ -112,6 +112,10 @@ TCP 443 也用于 Hysteria2 协议配置提供网站。同一节点上的 VLESS 
 
 节点上的两个协议配置不能监听同一 TCP 端口。TCP 和 UDP 使用相同编号的端口不会冲突。
 
+## 节点如何处理目标地址
+
+VLESS 仍会分析 HTTP、TLS 和 QUIC，以用于路由和流量归属。如果应用请求的是 IP 地址，节点会保留该 IP 作为目标，即使 HTTP Host、TLS SNI 或 QUIC 中的域名不同。如果应用请求域名，节点会通过此节点的 DNS 服务器解析；WARP 出口也使用节点 DNS。请参阅[DNS](dns.md)和 [WARP](warp.md)。
+
 ## 应用收到的内容
 
 VLESS 有四种格式（下面的两种，以及 Xray JSON 和 sing-box JSON）；应用会收到哪种格式，由[订阅](subscriptions.md)中的规则决定。VLESS 与 Hysteria2 共用**订阅中的应用**开关：能获得 Hysteria2 服务器的用户也会获得其分组中的 VLESS 服务器。
