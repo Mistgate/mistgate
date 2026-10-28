@@ -4,10 +4,8 @@
 
 <h1>Mistgate</h1>
 
-<h3>为身边的人搭一个自己的 VPN，不必时时盯着服务器。</h3>
-
-<p>适合家人、朋友、社群或小团队。<br>
-在你自己的服务器上运行 Hysteria2、AmneziaWG 和 VLESS REALITY：在浏览器里添加服务器，给每个人一个链接，出了故障你最先知道。</p>
+<p>一个自托管面板，用来管理你自己的几台 VPN 服务器，以及和你一起用它们的人。<br>
+支持 Hysteria2、VLESS 和 AmneziaWG。两个 Go 二进制文件，SQLite 加 systemd。</p>
 
 <p>
 <img alt="状态：测试版" src="https://img.shields.io/badge/status-beta-f2c46b">
@@ -17,9 +15,9 @@
 <a href="go.mod"><img alt="Go 版本" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/zh/"><b>文档</b></a> · <a href="#快速开始"><b>安装</b></a> · <a href="#截图"><b>截图</b></a> · <a href="#与其他面板的对比"><b>对比</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a></p>
+<p><a href="https://mistgate.app/zh/"><b>文档</b></a> · <a href="#快速开始"><b>安装</b></a> · <a href="#协议"><b>协议</b></a> · <a href="#稳定性如何"><b>稳定性如何</b></a> · <a href="#与其他面板的对比"><b>对比</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a></p>
 
-<p><sub><b>测试版。</b>Mistgate 已在生产环境中运行，但在 1.0 之前仍会有不完善之处，API、已存储的设置和节点协议也可能变化。<a href="https://mistgate.app/zh/roadmap/status/">状态和路线图</a></sub></p>
+<p><sub><b>测试版。</b>1.0 之前仍会有变化。<a href="https://mistgate.app/zh/roadmap/status/">状态和路线图</a></sub></p>
 
 </div>
 
@@ -29,29 +27,55 @@
   <img alt="Mistgate 管理后台：节点及其运行状况和吞吐量、一个未解决的问题和最近的事件" src="docs/images/readme/overview-dark-zh.webp" width="100%">
 </picture>
 
-## 为什么用 Mistgate
+## 功能
 
-Mistgate 面向为别人运行 VPN 的人：家人、朋友、社群或小团队。你安装一个面板，向其中添加服务器，再给每个人发一个链接。之后由面板负责保持服务器配置正确，并持续检测它们。
+面板装在一台服务器上，你的 VPN 服务器作为节点加进来。每个人拿到一个订阅链接，应用会自动获取他可以用的所有服务器。面板负责让节点保持正确配置，并持续检测它们。
 
-**一个链接，多种协议。**
-基于 Clash/Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）可以从同一个链接获取 Hysteria2、VLESS 和 AmneziaWG 服务器：用户的网络封锁了其中一种协议时，另一种已经在应用里了。Happ 获取 Hysteria2 和 VLESS 服务器；AmneziaVPN 则在用户页面上为每台设备获取一个密钥。[客户端应用](https://mistgate.app/zh/guide/client-apps/)
+- 在浏览器里用 IP 和 root 密码添加节点。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent。也可以用一条一次性命令安装。[添加节点](docs/zh/getting-started/add-node.md)
+- 每人一个链接。基于 Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）从中获取全部三种协议，Happ 获取 Hysteria2 和 VLESS，AmneziaVPN 则在用户页面上为每台设备取一个密钥。[客户端应用](docs/zh/guide/client-apps.md)
+- 面板每 5 分钟像应用一样连接一次每台服务器。每个节点上的诊断运行 17 项主机检查，并提供六种修复，只有你确认后才会执行。告警显示在管理后台，也会发到 Telegram。[运行状况](docs/zh/operations/health.md)
+- 不需要 Docker，也不需要数据库服务器。在 1 vCPU / 1 GB 的服务器上，面板空闲时占用 16–20 MiB 内存。[基准测试](docs/zh/reference/benchmarks.md)里也写了 Mistgate 较慢的地方。
+- 陌生人打开面板地址只会看到伪装站点；管理后台位于私密路径或私密主机名之后。
+- 内置 MCP 服务器：AI 智能体可以读取集群状态并规划修改，有风险的操作要等你在管理后台批准。[MCP](docs/zh/reference/mcp.md)
 
-**VLESS REALITY，藏在真实网站之后。**
-VLESS 可以通过 TCP 运行（搭配 XHTTP，或搭配 RAW 和 Vision），也可以通过 TLS 运行（搭配 XHTTP 或 WebSocket），可以直连，也可以放在 CDN 之后，在限制 UDP 的网络上同样可用。非客户端访问者看到的是一个真实的网站：默认是节点自己的站点，使用它自己的 Let’s Encrypt 证书，也可以是你指定的其他站点。Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443 端口。节点页面上的**检测端口**会从另一台节点检测某个 TCP 端口能否连到 Mistgate 本身。[VLESS REALITY](https://mistgate.app/zh/guide/vless/) · [在同一节点上运行 VLESS 和 Hysteria2](https://mistgate.app/zh/guide/vless-and-hysteria2/)
+目前还没有的：Telegram 机器人只能发告警；Cloudflare Workers 版仍是[预览版](docs/zh/getting-started/install-edge.md)。部分默认值偏向俄罗斯用户（都可以在设置里修改），可选的[可达性检测](docs/zh/operations/reachability.md)默认从俄罗斯视角检测，其中大部分来源也只适用于俄罗斯。
 
-**在浏览器里添加服务器。**
-输入它的 IP 和 root 密码。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口、安装已签名的 Agent，并等待它连接。节点会自行获取 Let’s Encrypt 证书，**启用 WARP** 则让它获得一个 Cloudflare 出口。[通过 SSH 安装节点](https://mistgate.app/zh/getting-started/ssh-install/)
+## 协议
 
-**你最先知道。**
-面板每 5 分钟像应用那样连接一次每台服务器，并通过隧道加载一个测试页面。每个节点上的诊断会运行 17 项主机检查（磁盘、日志、DNS 解析、时钟、端口、BBR），并提供六种修复，只有你确认后才会执行。告警发送到 Telegram。你也可以让面板检查节点能否从俄罗斯访问：通过 Globalping 在俄罗斯境内的探测点、比对公开的封锁名单，以及从你自己在俄罗斯境内的节点检测。每个来源默认都关闭。[运行状况](https://mistgate.app/zh/operations/health/) · [可达性](https://mistgate.app/zh/operations/reachability/)
+| 协议 | 节点上的实现 | 可以设置什么 |
+|:--|:--|:--|
+| [Hysteria2](docs/zh/guide/hysteria2.md) | 官方 Hysteria2 内核 | UDP（QUIC）。Salamander 混淆（Gecko 为实验性）、端口跳跃、Let's Encrypt 证书或固定指纹的自签名证书。 |
+| [VLESS](docs/zh/guide/vless.md) | xray-core | REALITY 搭配 XHTTP 或 TCP（RAW + Vision）；TLS 搭配 XHTTP 或 WebSocket，可以直连，也可以放在 CDN 之后。 |
+| [AmneziaWG](docs/zh/guide/amneziawg.md) | 用户态的 amneziawg-go，或内核模块 | 3.1 版（默认）和 2.0 版，每台设备一个独立密钥。不提供 1.5 和 1.0。 |
 
-**轻量且隐蔽。**
-两个静态 Go 二进制文件，一个是面板，一个是节点 Agent。使用 SQLite 和 systemd：无需 Docker，也无需数据库服务器。在一台小型测试服务器（1 vCPU / 1 GB）上，面板单独空闲时占用 16–20 MiB 私有内存（3x-ui 为 68–74，PasarGuard 为 262–265，Remnawave 为 426–454）；面板、节点和数据库一起运行在一台 2 vCPU / 2 GB 的服务器上，共占用 57 MiB（同样三者为 74、297 和 761）。在这项测试中，添加和删除用户、重启面板都没有断开任何连接，而 3x-ui 在用户变化时会重启其内核。陌生人打开面板地址只会看到一个伪装站点；管理后台位于私密路径或私密主机名之后。发布版本可复现构建，并在离线环境中签名，节点只安装已签名的构建。BT 下载拦截会在节点上拦截明文 BitTorrent；相关事件只记录匹配到的内容和目标端口，不会有任何地址离开节点。[安全](https://mistgate.app/zh/operations/security/) · [发布版本和签名](https://mistgate.app/zh/operations/releases/) · [基准测试，包括 Mistgate 较慢的地方](https://mistgate.app/zh/reference/benchmarks/)
+Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443。并非每种订阅格式都能承载每种协议配置：见[各格式支持哪些协议配置](docs/zh/guide/subscriptions.md#各格式支持哪些协议配置)。
 
-**让 AI 智能体帮忙。**
-面板内置 MCP 服务器。Claude Code、Codex 或其他智能体可以读取集群状态，并通过「计划 → 执行」来修改它。安装节点、诊断修复或更换服务器密码，都要等你在管理后台批准后才会执行。智能体永远拿不到订阅链接、设备密钥或密码。[AI 智能体指南](https://mistgate.app/zh/getting-started/ai-agents/) · [MCP](https://mistgate.app/zh/reference/mcp/)
+不支持：VMess、Trojan、Shadowsocks、TUIC 和普通 WireGuard。
 
-> **即将推出，尚未包含在任何发布版本中：** 可管理集群和用户的完整 Telegram 机器人。在 Cloudflare Workers 上运行的 Cloudflare 版面板自 v0.1.36 起已包含在发布版本中（自 v0.1.41 起为六个 Worker），作为[预览版](https://mistgate.app/zh/getting-started/install-edge/)提供，尚未在真实的 Cloudflare 账户上运行过。
+一个协议分为两半，都编译进二进制文件。面板这一半是一个 Go 接口：设置的 JSON Schema（管理后台据此生成表单）、校验、交给节点运行的服务器配置、设备凭据的签发，以及它在每种订阅格式中的那一部分。节点这一半是一个引擎：运行这份配置，无需重启即可替换凭据，并上报流量和运行状况。新协议只会下发给声明支持它的 Agent，所以旧版 Agent 照常工作。详见[协议插件契约](docs/zh/reference/architecture.md#协议插件契约)。
+
+## 稳定性如何
+
+还是测试版，而且很新：v0.1.0 的标签打于 2026-10-03，v0.1.63（2026-10-27）已是第 64 个标签。1.0 之前，API、已存储的设置和节点协议仍可能变化。发布版本目前还没有经过从旧版本升级的自动化测试，这是 [1.0 的条件](docs/zh/roadmap/status.md)之一。
+
+我自己就用它管理六台服务器，给家人和朋友用。
+
+隧道不依赖面板：面板停机时，节点继续按最后一次应用的配置提供服务；增删用户不会重启服务器；旧版 Agent 可以配合新版面板工作。在[基准测试](docs/zh/reference/benchmarks.md)中，增删用户和重启面板都没有断开任何连接。
+
+检查：
+
+- 每次 push 和 pull request 都运行 CI（[ci.yml](.github/workflows/ci.yml)）：Go 测试和 vet、面板与 Agent 会话的竞态检测、`govulncheck`、管理后台的 lint 和测试、文档构建，以及在 Debian 和 Ubuntu 上测试安装脚本。
+- 端到端测试（[scripts/e2e-wsl.sh](scripts/e2e-wsl.sh)）：真实的面板和节点，配合真实的 Hysteria2、AmneziaWG、Xray、mihomo 和 sing-box 客户端，还覆盖 Agent 更新、回滚和通过 SSH 安装。每次发布前在 WSL 或虚拟机里手动运行，不在 CI 中。
+- GitHub Actions 把每个标签构建成草稿版本。我在存有离线发布密钥的机器上从标签重新构建，只签名逐字节一致的二进制文件；节点和面板只安装已签名的构建。[发布版本和签名](docs/zh/operations/releases.md)
+
+更新（[更新](docs/zh/operations/updates.md)）：
+
+- 节点不会自行更新。滚动更新先更新一个金丝雀节点，给它 5 分钟通过健康检查，然后每批一到两个节点继续。没有通过的节点会换回之前的构建，滚动更新随之暂停。
+- 新构建 5 分钟内没有连上，或启动时反复崩溃，Agent 也会自己回滚。任何节点都可以手动回滚。
+- 面板只有在你确认后才会更新自己。它会先备份数据；新版本撑不过 45 秒，就恢复旧的二进制文件和数据。
+- 即便如此，也请为 `/var/lib/mistgate` 做[加密备份](docs/zh/operations/backups.md)。
+
+Mistgate 是借助 AI 编码智能体开发的。它们写的代码由我审阅，合并什么、发布什么由我决定；上面这些检查对它们的代码和对其他人的代码一视同仁。借助智能体完成的提交带有 `Co-Authored-By` 行，智能体在这个仓库里遵守的规则写在 [AGENTS.md](AGENTS.md) 中。
 
 ## 截图
 
@@ -76,61 +100,53 @@ VLESS 可以通过 TCP 运行（搭配 XHTTP，或搭配 RAW 和 Vision），也
 curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
 ```
 
-安装程序会验证已签名的面板清单，运行 setup，并通过 systemd 启动 Mistgate。它会打印管理后台地址和一个 30 分钟后过期的一次性初始设置链接，不会修改防火墙规则。加上 `--yes` 可以非交互运行，加上 `--dry-run` 则只验证发布版本，不改动服务器。手动安装和其他选项见[安装面板](https://mistgate.app/zh/getting-started/install-panel/)。
+安装程序会验证已签名的面板清单，通过 systemd 启动 Mistgate，并打印管理后台地址和一次性初始设置链接（30 分钟内有效）。它不会改动防火墙。`--yes` 跳过所有提问，`--dry-run` 只验证发布版本；手动安装和其他选项见[安装面板](docs/zh/getting-started/install-panel.md)。
 
 然后：
 
 1. 打开初始设置链接并创建所有者：使用通行密钥，或使用密码加身份验证器验证码。
-2. 在**节点 → 添加节点**中添加服务器，可以通过 SSH，也可以用一条一次性命令（[添加节点](https://mistgate.app/zh/getting-started/add-node/)）。
-3. 按照[首批用户](https://mistgate.app/zh/getting-started/first-users/)操作。[安装面板](https://mistgate.app/zh/getting-started/install-panel/)还介绍了手动安装、隐藏的管理后台、你自己的证书和你自己的伪装站点。
+2. 在**节点 → 添加节点**中添加服务器，可以通过 SSH，也可以用一条一次性命令（[添加节点](docs/zh/getting-started/add-node.md)）。
+3. 添加用户：[首批用户](docs/zh/getting-started/first-users.md)。
 
-**也可以让 AI 智能体来安装。** Claude Code、Codex CLI，或任何能在你的电脑上运行 `ssh` 的智能体，都可以完成上面的步骤：从 [AI 智能体指南](https://mistgate.app/zh/getting-started/ai-agents/#使用-ai-智能体安装-mistgate)复制安装提示词。它每次改动前都会先询问，所有者账户由你自己创建。
+能运行 `ssh` 的 AI 智能体可以按 [AI 智能体指南](docs/zh/getting-started/ai-agents.md#使用-ai-智能体安装-mistgate)里的提示词完成这些步骤；所有者账户仍由你自己创建。
 
 ## 与其他面板的对比
 
 | | Mistgate | 3x-ui | Remnawave | Hiddify | PasarGuard | s-ui |
 |:--|:--|:--|:--|:--|:--|:--|
-| 无需 Docker 即可运行 | ✅ | ✅ | ❌ | ✅ | 部分 | ✅ |
+| 无需 Docker 即可运行 | 是 | 是 | 否 | 是 | 部分 | 是 |
 | 数据库 | SQLite | SQLite 或 PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite、MySQL、MariaDB 或 PostgreSQL | SQLite |
 | 面板空闲时占用 RAM | 16–20 MiB¹ | 68–74 MiB¹ | 426–454 MiB¹ | 未测量 | 262–265 MiB¹ | 未测量 |
-| 一行命令安装 | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
-| 在面板中添加节点（SSH） | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
-| Hysteria2 | ✅ | ✅ | 部分 | ✅ | ✅ | ✅ |
-| AmneziaWG | ✅ 2.0 和 3.1 | ✅ 3.1 | ? | ? | ? | ? |
-| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
-| VMess、Trojan、Shadowsocks | ❌ | ✅ | 部分 | ✅ | ✅ | ✅ |
-| Xray JSON 或 sing-box 订阅 | ✅ 两者都有 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | sing-box | sing-box |
-| 健康检查和告警 | ✅ 客户端视角检测，带修复的诊断，从国家视角检测（Globalping、封锁名单、TSPU 探测） | ✅ 隧道监控（需手动开启） | ✅ 状态、Prometheus | 部分 | 部分 | ? |
-| Telegram 机器人 | 仅告警，完整机器人即将推出 | ✅ | 部分 | ✅ | ✅ | ? |
-| HWID 设备限制 | ✅ | ✅ | ✅ | ? | ✅ | ? |
-| 面向 AI 智能体的内置 MCP 服务器 | ✅ | ? | ❌ | ? | ? | ? |
+| 在面板中添加节点（SSH） | 是 | 否 | 否 | 否 | 否 | ? |
+| Hysteria2 | 是 | 是 | 部分 | 是 | 是 | 是 |
+| VLESS REALITY | 是 | 是 | 是 | 是 | 是 | ? |
+| AmneziaWG | 2.0 和 3.1 | 3.1 | ? | ? | ? | ? |
+| VMess、Trojan、Shadowsocks | 否 | 是 | 部分 | 是 | 是 | 是 |
+| Xray JSON 或 sing-box 订阅 | 两者都有 | Xray JSON | 两者都有 | 两者都有 | sing-box | sing-box |
+| 健康检查和告警 | 客户端视角检测、节点诊断、从国家视角检测可达性 | 隧道监控（需手动开启） | 状态、Prometheus | 部分 | 部分 | ? |
+| Telegram 机器人 | 仅告警 | 是 | 部分 | 是 | 是 | ? |
+| 面向 AI 智能体的内置 MCP 服务器 | 是 | ? | 否 | ? | ? | ? |
 
-¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](https://mistgate.app/zh/reference/benchmarks/)。「?」表示该项目自己的 README 和文档中没有说明。
+¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](docs/zh/reference/benchmarks.md)。「?」表示该项目自己的 README 和文档中没有说明。
 
-在协议覆盖范围、社区规模和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09）见[与其他面板的对比](https://mistgate.app/zh/reference/comparison/)。
-
-## 状态和路线图
-
-Mistgate 处于测试阶段。[最新发布版本](https://github.com/Mistgate/mistgate/releases/latest)已在生产环境中运行。在 1.0 之前，API、已存储的设置和节点协议仍可能变化。适用于 amd64 和 arm64 的 Linux 二进制文件在 [GitHub Releases](https://github.com/Mistgate/mistgate/releases/latest) 上提供。
-
-下一步：先在真实账户上运行 Cloudflare Workers 版（[预览版](https://mistgate.app/zh/getting-started/install-edge/)），并让它具备与 VPS 版相同的功能；再往后是面向集群和用户的 Telegram 机器人。部分默认值偏向俄罗斯用户（俄罗斯节点默认使用 Yandex DNS、诊断所用的检测域名、DNS 分流预设），这些都可以在设置中修改。详情和已知限制见[状态和路线图](https://mistgate.app/zh/roadmap/status/)。
+在协议覆盖范围、社区规模和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09）见[与其他面板的对比](docs/zh/reference/comparison.md)。
 
 ## 文档
 
-全部内容都在 [mistgate.app](https://mistgate.app/zh/)，相同的页面也在 [`docs/`](docs/README.md) 中。可以从这里开始：
+全部内容在 [mistgate.app](https://mistgate.app/zh/) 和 [`docs/`](docs/README.md) 中。可以从这里开始：
 
-- [概览](https://mistgate.app/zh/getting-started/overview/)和[要求](https://mistgate.app/zh/getting-started/requirements/)
-- [安装面板](https://mistgate.app/zh/getting-started/install-panel/)、[通过 SSH 安装节点](https://mistgate.app/zh/getting-started/ssh-install/)、[首批用户](https://mistgate.app/zh/getting-started/first-users/)
-- [运行状况](https://mistgate.app/zh/operations/health/)、[更新](https://mistgate.app/zh/operations/updates/)、[面板加密备份](https://mistgate.app/zh/operations/backups/)、[故障排查](https://mistgate.app/zh/operations/troubleshooting/)
-- [CLI](https://mistgate.app/zh/reference/cli/)、[API](https://mistgate.app/zh/reference/api/)、[MCP](https://mistgate.app/zh/reference/mcp/)、[架构](https://mistgate.app/zh/reference/architecture/)
+- [概览](docs/zh/getting-started/overview.md)和[要求](docs/zh/getting-started/requirements.md)
+- [安装面板](docs/zh/getting-started/install-panel.md)、[通过 SSH 安装节点](docs/zh/getting-started/ssh-install.md)、[首批用户](docs/zh/getting-started/first-users.md)
+- [运行状况](docs/zh/operations/health.md)、[更新](docs/zh/operations/updates.md)、[面板加密备份](docs/zh/operations/backups.md)、[故障排查](docs/zh/operations/troubleshooting.md)
+- [CLI](docs/zh/reference/cli.md)、[API](docs/zh/reference/api.md)、[MCP](docs/zh/reference/mcp.md)、[架构](docs/zh/reference/architecture.md)
 
 ## 参与开发
 
-欢迎提交缺陷报告、修复和文档改进。[CONTRIBUTING.md](CONTRIBUTING.md)（英文）介绍了构建方法、代码结构、CI 运行的检查和约定。编码智能体请先阅读 [`AGENTS.md`](AGENTS.md)；[AI 智能体指南](https://mistgate.app/zh/getting-started/ai-agents/#使用编码智能体参与开发)中有一段现成的提示词，可用于参与开发。
+欢迎提交缺陷报告、修复和文档改进。[CONTRIBUTING.md](CONTRIBUTING.md)（英文）介绍了构建方法、代码结构、CI 运行的检查和约定。编码智能体请先阅读 [`AGENTS.md`](AGENTS.md)；[AI 智能体指南](docs/zh/getting-started/ai-agents.md#使用编码智能体参与开发)中有一段现成的提示词，可用于参与开发。
 
 ## 安全
 
-请私下报告漏洞，见 [SECURITY.md](SECURITY.md)。请备份面板的数据目录（`/var/lib/mistgate`）：其中保存着数据库、主密钥和节点所信任的 CA。[加密备份](https://mistgate.app/zh/operations/backups/)到 Cloudflare R2 可以按计划自动完成这件事。
+请私下报告漏洞，见 [SECURITY.md](SECURITY.md)。请备份面板的数据目录（`/var/lib/mistgate`）：其中保存着数据库、主密钥和节点所信任的 CA。
 
 ## 许可证
 
