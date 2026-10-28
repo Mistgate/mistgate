@@ -239,6 +239,7 @@ function UserDetail({ data }: { data: DetailN }) {
             autoAdd={addDevice}
             onAutoAddDone={() => void navigate({ to: "/users/$id", params: { id: user.id }, search: {}, replace: true } as never)}
           />
+          <ConnectionPanel userId={user.id} devices={data.devices} nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id} />
         </div>
         <div className="flex min-w-0 flex-col gap-3.5">
           <SubscriptionNamePanel user={user} actions={actions} />
@@ -255,9 +256,6 @@ function UserDetail({ data }: { data: DetailN }) {
           </DangerZone>
         </div>
       </div>
-
-      {/* last and full width: the counts run long, and the cards above are what the owner changes */}
-      <ConnectionPanel userId={user.id} devices={data.devices} nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id} />
 
       <LinkModal target={linkOpen ? linkTargetOf(user, group) : null} onClose={() => setLinkOpen(false)} />
       <GroupEditModal group={group} open={groupOpen} onOpenChange={setGroupOpen} />
@@ -510,14 +508,20 @@ function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserCo
   );
 }
 
-/** The facts of a counter line, joined by middle dots; trouble in the warning colour. */
+/**
+ * The facts of a counter line, joined by middle dots; trouble in the warning colour. In a narrow column the line breaks only
+ * after a dot: a fact ("задержка 182 мс") stays whole and no line starts with the dot.
+ */
 export function PartsLine({ parts }: { parts: Part[] }) {
   return (
     <p className="text-xs leading-normal text-pretty text-muted">
       {parts.map((p, i) => (
         <span key={i}>
-          {i > 0 && " · "}
-          <span className={cx(p.warn && "font-semibold text-warn-text")}>{p.text}</span>
+          {i > 0 && " "}
+          <span className="whitespace-nowrap">
+            <span className={cx(p.warn && "font-semibold text-warn-text")}>{p.text}</span>
+            {i < parts.length - 1 && " ·"}
+          </span>
         </span>
       ))}
     </p>

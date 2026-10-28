@@ -254,7 +254,7 @@ describe("the user card", () => {
     expect(text()).not.toContain("Connection");
   });
 
-  it("puts the Connection block last and pages its counts six at a time", async () => {
+  it("puts the Connection block at the foot of the left column, under the devices, and pages its counts six at a time", async () => {
     getUserConnection.mockResolvedValue({
       sinceUnix: NOW - 86_400, nowUnix: NOW, nodesWithoutCounters: [],
       rows: Array.from({ length: 8 }, (_, i) => ({
@@ -263,8 +263,10 @@ describe("the user card", () => {
     });
     await mount();
     const counts = document.querySelector("[data-testid=conn-counts]")!;
-    const danger = [...document.querySelectorAll("section")].at(-1)!; // the danger zone closes the right column
-    expect(danger.compareDocumentPosition(counts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // below every card of the page
+    const column = [...document.querySelectorAll(".grid > div")].find((c) => c.contains(counts))!; // one of the page's two columns
+    expect(column).toBe(column.parentElement!.firstElementChild); // the left one
+    expect(column.lastElementChild!.contains(counts)).toBe(true); // at its foot
+    expect(column.lastElementChild!.previousElementSibling!.textContent).toContain("Devices"); // right under the devices
     const shown = () => [...document.querySelectorAll("[data-testid=conn-row]")].map((r) => r.textContent?.match(/n\d/)?.[0]);
     expect(shown()).toEqual(["n0", "n1", "n2", "n3", "n4", "n5"]);
     expect(text()).toContain("Showing 1–6 of 8");

@@ -41,9 +41,9 @@ function subtitle(t: T, d?: Updates): string {
 }
 
 /**
- * Updates, in the order of what needs you: where the fleet stands and the one button that moves it (with the signed
- * release bundle at its foot), the rollout in progress or the last one, this panel's own update, then every node with one
- * main action per row.
+ * Updates, in the order they are done: this panel's own update first (the panel is updated before the nodes), then where
+ * the fleet stands and the one button that moves it (with the signed release bundle at its foot), the rollout in progress
+ * or the last one, then every node with one main action per row.
  */
 export function UpdatesScreen() {
   const t = useT();
@@ -92,6 +92,7 @@ export function UpdatesScreen() {
   return (
     <div className="flex flex-col gap-3.5">
       {header}
+      <PanelBar data={d} owner={isOwner} actions={actions} />
       <EditionNotice feature="agent_updates" />
       <HeroCard
         data={d}
@@ -102,7 +103,6 @@ export function UpdatesScreen() {
       />
       {/* a rollout in progress sits right under the hero; the last finished one is history, after the nodes */}
       {activeRollout && <RolloutCard rollout={activeRollout} />}
-      <PanelBar data={d} owner={isOwner} actions={actions} />
       <NodeTable
         nodes={d.nodes}
         data={d}

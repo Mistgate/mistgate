@@ -10,6 +10,8 @@ import { UpdateToast } from "./update-toast";
 
 const getUpdates = vi.fn();
 let pathname = "/nodes";
+let staleAgainst = ""; // the version this tab is stale against (lib/stale.ts), "" while it is current
+vi.mock("@/lib/stale", () => ({ useStaleVersion: () => staleAgainst }));
 vi.mock("@/lib/api", () => ({
   updates: { getUpdates: (...a: unknown[]) => getUpdates(...a) },
   auth: { me: () => Promise.resolve({}) },
@@ -35,6 +37,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   pathname = "/nodes";
+  staleAgainst = "";
   localStorage.clear();
 });
 afterEach(() => {
@@ -119,6 +122,13 @@ describe("the update notice", () => {
   it("is not shown on the Updates page, which says it itself", async () => {
     pathname = "/updates";
     await mount(status(release("v0.1.18")));
+    expect(text()).toBe("");
+    expect(getUpdates).not.toHaveBeenCalled();
+  });
+
+  it("steps aside while the tab is stale: the reload notice has the corner, and what this tab would say comes from old code", async () => {
+    staleAgainst = "v0.1.18";
+    await mount(status(release("v0.1.18"), { nodes: [node("de1", NodeUpdateState.OUTDATED)] }));
     expect(text()).toBe("");
     expect(getUpdates).not.toHaveBeenCalled();
   });

@@ -125,7 +125,7 @@ function BundleDetails({ data, hideError }: { data: Updates; hideError?: boolean
 }
 
 /**
- * The foot of the top card: whether the panel trusts the release bundle (the signature check) with its version and dates
+ * The foot of the fleet card: whether the panel trusts the release bundle (the signature check) with its version and dates
  * in one line, "Read the folder again" for the owner, and the details folded away. A bundle that is missing or not trusted
  * opens by itself: that is where its reason and the steps to fix it are.
  */

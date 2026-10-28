@@ -139,7 +139,7 @@ function RolloutBar({ rollout }: { rollout: Rollout }) {
 }
 
 /**
- * The top card: where the fleet stands against the release ("2 of 4 nodes on v0.1.24"), the one button that moves it (update
+ * The fleet card (under the panel's own line): where the fleet stands against the release ("2 of 4 nodes on v0.1.24"), the one button that moves it (update
  * the rest, canary first; or pause / resume / cancel while a rollout runs) and, at its foot, the signed release bundle the
  * update comes from, its details folded away.
  */
