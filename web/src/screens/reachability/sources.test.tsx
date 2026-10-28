@@ -82,6 +82,10 @@ vi.mock("@/lib/api", () => ({
   isUnauthenticated: () => false,
   webauthnSupported: () => false,
 }));
+// the open source is `?source=` in the URL: navigate stores the new search and draws the page again, as the router would
+let search: Record<string, unknown> = {};
+const navigate = vi.fn();
+vi.mock("@tanstack/react-router", () => ({ useSearch: () => search, useNavigate: () => navigate }));
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -103,6 +107,8 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
+  search = {};
+  navigate.mockReset();
   act(() => setLang("en"));
   for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks, getBlocklist, updateBlocklist, testBlocklist, disconnectBlocklist]) m.mockReset();
   for (const m of [getTspuProbe, updateTspuProbe, testTspuProbe, disconnectTspuProbe, getClientProbe, updateClientProbe, disconnectClientProbe]) m.mockReset();
@@ -126,14 +132,19 @@ async function mount(first: object) {
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await act(async () =>
+  const draw = () =>
     root!.render(
       <QueryClientProvider client={qc}>
         <CountryPicker />
         <SourceCards />
       </QueryClientProvider>,
-    ),
-  );
+    );
+  // called from a click, inside its act()
+  navigate.mockImplementation((to: { search: Record<string, unknown> }) => {
+    search = to.search;
+    draw();
+  });
+  await act(async () => draw());
   for (let i = 0; i < 3; i++) await settle();
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
@@ -153,12 +164,118 @@ function type(input: Element | null, value: string) {
   });
 }
 
+const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+const tab = (name: string) => tabs().find((x) => x.textContent?.startsWith(name));
+/** The titles of the sources shown: one, the open one; the others stay mounted and hidden. */
+const shown = () => [...document.querySelectorAll<HTMLElement>("[role=tabpanel]")].filter((p) => !p.hidden).map((p) => p.querySelector("h3")?.textContent);
+const keyDown = (k: string) => act(async () => void document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })));
+
 describe("the sources", () => {
   it("read the shared country from its own service for the picker, and start with the Globalping card", async () => {
     await mount(settings());
     expect(getCountryReachability).toHaveBeenCalledTimes(1);
     expect(document.querySelector("[aria-label=Country]")?.textContent).toContain("Russia");
-    expect(text()).toContain("Globalping");
+    // every source is off: Globalping opens
+    expect(shown()).toEqual(["Globalping"]);
+    expect(tab("Globalping")?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("list the six in one place, each with what it is, where it looks from and its state in a word; the first one that is on opens", async () => {
+    getBlocklist.mockResolvedValue({ settings: lists({ enabled: true, checkedUnix: Math.floor(Date.now() / 1000) - 2 * 3600 }) });
+    getTspuProbe.mockResolvedValue({ settings: tspu({ enabled: true }) });
+    getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, hasToken: true, status: "token_unknown", tokenUnknown: true }) });
+    await mount(settings());
+    expect(tabs().map((x) => x.querySelector("span + span")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
+    expect(document.querySelector("[role=tablist]")?.getAttribute("aria-label")).toBe("Sources");
+    expect(shown()).toEqual(["Block lists"]);
+    expect(tabs().map((x) => x.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false", "false", "false"]);
+    // the row says what the source's own state line says, in a word and a few more
+    // (the pill's glyph comes first: – off, × error, ~ waiting; a tick is drawn, not written)
+    expect(tab("Globalping")?.textContent).toBe("Globalping–OffFree · volunteer probesany country");
+    expect(tab("Block lists")?.textContent).toBe("Block listsWorksFree · registry lists, on the panelRussia onlycompared 2 h ago");
+    expect(tab("TSPU probe")?.textContent).toBe("TSPU probe~Needs setupFree · your own node in RussiaRussia onlypick a probe node; nothing runs until then");
+    expect(tab("cheburcheck")?.textContent).toBe("cheburcheck×ErrorFree · cheburcheck.ru probesRussia onlyThe site does not know the probe token");
+    expect(tab("bsbord")?.textContent).toContain("Paid · mobile SIM probes");
+    // nothing in a row switches a source: the switch is the open source's own
+    expect(document.querySelector("[role=tablist] [role=switch]")).toBeNull();
+  });
+
+  it("open the source in the URL, put the one clicked there, and show only that one", async () => {
+    search = { source: "bsbord" };
+    await mount(settings({ enabled: true }));
+    expect(shown()).toEqual(["bsbord"]);
+    await click(tab("cheburcheck"));
+    expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { source: "cheburcheck" }, replace: true, resetScroll: false });
+    expect(shown()).toEqual(["cheburcheck"]);
+    expect(tab("cheburcheck")?.getAttribute("aria-selected")).toBe("true");
+    expect(tab("cheburcheck")?.getAttribute("aria-controls")).toBe(document.querySelector("[role=tabpanel]:not([hidden])")?.id);
+  });
+
+  it("keep what a source was doing while another one is looked at", async () => {
+    testGlobalping.mockResolvedValue({ reachable: true, tokenUsed: false, limit: 250, remaining: 200, resetS: 1800, credits: 0 });
+    await mount(settings({ enabled: true }));
+    await click(button("Test"));
+    await click(tab("bsbord"));
+    expect(shown()).toEqual(["bsbord"]);
+    await click(tab("Globalping"));
+    expect(state()?.textContent).toBe("Works · 200 of 250 tests left this hour");
+    expect(tab("Globalping")?.textContent).toContain("Works");
+    expect(tab("Globalping")?.textContent).toContain("200 of 250 tests left this hour");
+  });
+
+  it("walk the list with the arrows, Home and End as one Tab stop; Enter and Space are the row's own click", async () => {
+    await mount(settings());
+    expect(tabs().map((x) => x.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
+    act(() => tabs()[0]!.focus());
+    const steps: [string, string][] = [
+      ["ArrowDown", "Block lists"],
+      ["ArrowRight", "TSPU probe"],
+      ["ArrowUp", "Block lists"],
+      ["End", "kl!ck users"],
+      ["ArrowDown", "Globalping"],
+      ["ArrowLeft", "kl!ck users"],
+      ["Home", "Globalping"],
+      ["ArrowDown", "Block lists"],
+    ];
+    for (const [k, name] of steps) {
+      await keyDown(k);
+      expect([k, document.activeElement]).toEqual([k, tab(name)]);
+    }
+    // moving opens nothing
+    expect(navigate).not.toHaveBeenCalled();
+    expect(shown()).toEqual(["Globalping"]);
+    await click(document.activeElement);
+    expect(shown()).toEqual(["Block lists"]);
+    expect(tabs().map((x) => x.tabIndex)).toEqual([-1, 0, -1, -1, -1, -1]);
+  });
+
+  it("on a phone take turns: a tap opens the source and its way back, which returns to the row left", async () => {
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: true }) });
+    const scroll = (Element.prototype.scrollIntoView = vi.fn());
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    try {
+      await mount(settings());
+      await click(tab("bsbord"));
+      // pushed: the phone's own back button closes the source
+      expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { source: "bsbord" }, replace: false, resetScroll: false });
+      expect(document.activeElement?.textContent).toBe("All sources");
+      expect(scroll).toHaveBeenCalled();
+      await click(document.activeElement);
+      expect(back).toHaveBeenCalledTimes(1);
+      act(() => root?.unmount());
+      host?.remove();
+      // opened from a link: there is no list of ours to go back to, so the way back replaces the source with it
+      search = { source: "lists" };
+      await mount(settings());
+      await click(button("All sources"));
+      expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: {}, replace: true, resetScroll: false });
+      expect(document.activeElement).toBe(tab("Block lists"));
+      expect(back).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      back.mockRestore();
+    }
   });
 });
 
@@ -308,10 +425,9 @@ describe("the block-list card", () => {
   const at = Math.floor(Date.now() / 1000) - 240;
   const listsAt = Math.floor(new Date(2026, 9, 14, 18, 5).getTime() / 1000);
 
-  it("sits next to the Globalping card in the group, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
+  it("comes after the Globalping card, off by default: nothing downloaded, nothing to test, the privacy line", async () => {
     await mount(settings());
-    const grid = card()?.parentElement;
-    expect([...grid!.children].map((c) => c.querySelector("h3")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
+    expect([...document.querySelectorAll("[role=tabpanel] h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
     expect(listsState()?.dataset.state).toBe("off");
     expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
     expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");

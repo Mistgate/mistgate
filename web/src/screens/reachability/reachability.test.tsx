@@ -44,6 +44,9 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  // the open source of the Sources section (sources.test.tsx walks it)
+  useSearch: () => ({}),
+  useNavigate: () => () => undefined,
 }));
 
 beforeAll(() => {
@@ -209,10 +212,19 @@ describe("the Reachability page with every source on", () => {
     expect(events[1]?.textContent).toContain("lasted 16 h");
   });
 
-  it("ends with the six source cards for the owner", async () => {
+  it("ends with the six sources for the owner, the first one that is on open, and leads to its parts from the header", async () => {
     await mount();
     expect(document.querySelector("#sources h2")?.textContent).toBe("Sources");
     expect([...document.querySelectorAll("#sources h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users"]);
+    expect([...document.querySelectorAll("#sources [role=tabpanel]:not([hidden]) h3")].map((h) => h.textContent)).toEqual(["Globalping"]);
+    const nav = document.querySelector("nav[aria-label='On this page']");
+    expect([...nav!.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Nodes", "#reach-nodes"],
+      ["Events", "#reach-events"],
+      ["Sources", "#sources"],
+    ]);
+    // each one leads to a section that takes the focus
+    for (const id of ["reach-nodes", "reach-events", "sources"]) expect(document.getElementById(id)?.closest("section")?.tabIndex).toBe(-1);
   });
 });
 

@@ -88,7 +88,7 @@ export function NodesTable({
 }) {
   const t = useT();
   return (
-    <section aria-labelledby="reach-nodes" className="flex flex-col rounded-card-lg border border-line bg-surface px-4 pt-3.5 pb-1.5">
+    <section aria-labelledby="reach-nodes" tabIndex={-1} className="flex scroll-mt-20 flex-col rounded-card-lg border border-line bg-surface px-4 pt-3.5 pb-1.5 outline-none">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pb-3">
         <SectionLabel as="h2" icon="server" tone="sky">
           <span id="reach-nodes">{t("rc.nodes.title")}</span>

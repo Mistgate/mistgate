@@ -19,6 +19,7 @@ import { validateSort, type SortSearch } from "@/screens/users/sort";
 import { goToSignIn, meQuery, queryClient, setSignedOutHandler } from "@/lib/session";
 import { validateHealthSearch } from "@/screens/health/tabs";
 import { validateNodeSearch } from "@/screens/node/tabs";
+import { validateReachSearch } from "@/screens/reachability/search";
 import { validateSubsSearch } from "@/screens/subscriptions/tabs";
 
 // Every screen is its own chunk: the first paint only needs the router, the session check and the
@@ -200,6 +201,8 @@ const health = createRoute({
 const reachability = createRoute({
   getParentRoute: () => app,
   path: "/reachability",
+  // the source open in the Sources section, so a reload or a link keeps it
+  validateSearch: validateReachSearch,
   component: lazyRouteComponent(() => import("@/screens/reachability"), "ReachabilityScreen"),
 });
 

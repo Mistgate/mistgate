@@ -58,6 +58,7 @@ export function ReachabilityScreen() {
           <PageTitle>{t("nav.reachability")}</PageTitle>
           <span className="text-xs text-muted">{code ? t("rc.sub", { country: countryIn(t, code) }) : " "}</span>
         </div>
+        <PageNav nodes={!!h && sources.length > 0} />
         {owner && <CountryPicker />}
       </div>
 
@@ -78,7 +79,7 @@ export function ReachabilityScreen() {
 
       <Events code={code} />
 
-      <section id="sources" aria-labelledby="reach-sources" className="flex scroll-mt-20 flex-col gap-3 pt-1.5">
+      <section id="sources" aria-labelledby="reach-sources" tabIndex={-1} className="flex scroll-mt-20 flex-col gap-3 pt-1.5 outline-none">
         <div className="flex flex-col gap-1">
           <h2 id="reach-sources" className="text-[15px] font-extrabold tracking-[-0.02em]">
             {t("rc.sources")}
@@ -180,11 +181,42 @@ function AllOff({ owner }: { owner: boolean }) {
       </div>
       <p className="max-w-2xl text-[13px] leading-normal text-pretty text-muted">{owner ? t("rc.off.owner") : t("rc.off.other")}</p>
       {owner && (
-        <Button variant="secondary" size="sm" onClick={() => document.getElementById("sources")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+        <Button variant="secondary" size="sm" onClick={() => jump("sources")}>
           {t("rc.off.go")}
         </Button>
       )}
     </section>
+  );
+}
+
+/** To a part of the page, with the focus: on a big fleet the sources sit far below the nodes. */
+function jump(id: string) {
+  const to = document.getElementById(id)?.closest("section");
+  to?.scrollIntoView({ behavior: "smooth", block: "start" });
+  to?.focus({ preventScroll: true });
+}
+
+/** The page's own links in its header: the nodes (when there are), the events, the sources. The summary is right under it. */
+function PageNav({ nodes }: { nodes: boolean }) {
+  const t = useT();
+  const links: [string, string][] = [...(nodes ? [["reach-nodes", t("rc.nodes.title")] as [string, string]] : []), ["reach-events", t("rc.nav.events")], ["sources", t("rc.sources")]];
+  return (
+    <nav aria-label={t("rc.nav")} className="flex flex-wrap items-center gap-0.5">
+      {links.map(([id, label]) => (
+        <a
+          key={id}
+          href={`#${id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            jump(id);
+          }}
+          className="flex h-8 items-center gap-1 rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+        >
+          <Icon name="arrowDown" size={12} aria-hidden />
+          {label}
+        </a>
+      ))}
+    </nav>
   );
 }
 
@@ -204,7 +236,7 @@ function Events({ code }: { code: string }) {
     ...q.data.history.filter((a) => mine(a) && a.resolvedAtUnix >= now - WEEK),
   ].slice(0, 8);
   return (
-    <section aria-labelledby="reach-events" className="flex flex-col rounded-card-lg border border-line bg-surface px-4 pt-3.5 pb-1.5">
+    <section aria-labelledby="reach-events" tabIndex={-1} className="flex scroll-mt-20 flex-col rounded-card-lg border border-line bg-surface px-4 pt-3.5 pb-1.5 outline-none">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pb-2.5">
         <SectionLabel as="h2" icon="bell" tone="rose">
           <span id="reach-events">{t("rc.ev.title")}</span>

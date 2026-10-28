@@ -1,15 +1,16 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { isStepUpCancelled } from "@/components/step-up";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
-import { Icon, type IconName } from "@/components/ui/icons";
+import { Icon, IconChip, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Select } from "@/components/ui/select";
-import { StatusDot, type StatusKind } from "@/components/ui/status";
+import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -86,7 +87,7 @@ import {
   type TspuTest,
 } from "@/lib/tspu";
 import { CountryMark } from "@/screens/health/country";
-import { card } from "@/screens/integrations/parts";
+import { isSourceId, sourceIds, type SourceId } from "./search";
 
 type Actions = ReturnType<typeof useGlobalpingActions>;
 type ListsActions = ReturnType<typeof useBlocklistActions>;
@@ -94,21 +95,196 @@ type TspuActions = ReturnType<typeof useTspuActions>;
 type CheburActions = ReturnType<typeof useCheburcheckActions>;
 type BsbordActions = ReturnType<typeof useBsbordActions>;
 
+/** Each source in the list: its icon, its name, what it is in a few words, and whether it looks from Russia only. */
+const meta: Record<SourceId, { icon: IconName; title: MessageKey; what: MessageKey; ruOnly: boolean; Card: () => ReactNode }> = {
+  globalping: { icon: "globe", title: "gp.title", what: "src.what.globalping", ruOnly: false, Card: GlobalpingCard },
+  lists: { icon: "list", title: "bl.title", what: "src.what.lists", ruOnly: true, Card: BlocklistCard },
+  tspu: { icon: "network", title: "tp.title", what: "src.what.tspu", ruOnly: true, Card: TspuCard },
+  cheburcheck: { icon: "pulse", title: "cc.title", what: "src.what.cheburcheck", ruOnly: true, Card: CheburcheckCard },
+  bsbord: { icon: "phone", title: "bb.title", what: "src.what.bsbord", ruOnly: true, Card: BsbordCard },
+  klick: { icon: "people", title: "kc.title", what: "src.what.klick", ruOnly: false, Card: KlickCard },
+};
+
+/** What a source's state line says. The line reports it up, so the row of the list and the open source never disagree. */
+type Look = { state: string; kind: StatusKind; word: string; detail: string };
+const ReportLook = createContext<((look: Look) => void) | null>(null);
+
+/** Narrower than this the list and the open source take turns (sm-ish; the list strip starts here). */
+const phone = () => !!window.matchMedia?.("(max-width: 719.98px)").matches;
+
 /**
- * The sources of the Reachability page: a card per source (Globalping, the block lists, the TSPU probe, cheburcheck, bsbord, the
- * reports of kl!ck users), two to a row on a wide screen. Owner only, like the services behind them; the country they all look from is the
- * picker in the page's header (the kl!ck reports come from wherever the people are, and say where).
+ * The sources of the Reachability page as a list and the open one: Globalping, the block lists, the TSPU probe, cheburcheck,
+ * bsbord, the reports of kl!ck users. A wide screen shows the list on the left (it stays in view) and the source on the right; a
+ * mid one puts the list on top as tiles; a phone shows the list, and a tap opens the source with a way back. The open source is
+ * `?source=` in the URL; without it, the first one that is on, else Globalping. Every source stays mounted, only the open one is
+ * shown: a key half typed, a test under way and its answer survive a look at another. Owner only, like the services behind them;
+ * the country they all look from is the picker in the page's header (the kl!ck reports come from wherever the people are).
  */
 export function SourceCards() {
+  const t = useT();
+  const navigate = useNavigate();
+  const asked = (useSearch({ strict: false }) as { source?: unknown }).source;
+  const chosen = isSourceId(asked) ? asked : undefined;
+
+  // the first source that is on, once every one has answered; then it stays, so switching it off does not move the page
+  const on = [
+    useQuery({ ...globalpingQuery, select: (s) => s.enabled }),
+    useQuery({ ...blocklistQuery, select: (s) => s.enabled }),
+    useQuery({ ...tspuQuery, select: (s) => s.enabled }),
+    useQuery({ ...cheburcheckQuery, select: (s) => s.enabled }),
+    useQuery({ ...bsbordQuery, select: (s) => s.enabled }),
+    useQuery({ ...clientProbeQuery, select: (p) => !!p.settings?.enabled }),
+  ];
+  const [first, setFirst] = useState<SourceId | null>(null);
+  if (first === null && on.every((q) => !q.isPending)) setFirst(sourceIds.find((_, i) => on[i]!.data) ?? "globalping");
+  const open = chosen ?? first;
+
+  const [looks, setLooks] = useState<Partial<Record<SourceId, Look>>>({});
+  const reporters = useMemo(
+    () => Object.fromEntries(sourceIds.map((id) => [id, (look: Look) => setLooks((all) => ({ ...all, [id]: look }))])) as Record<SourceId, (look: Look) => void>,
+    [],
+  );
+
+  // a phone takes turns: opening moves the focus to the way back, going back (the link or the browser's) to the row left
+  const tapped = useRef(false);
+  const shown = useRef(chosen);
+  useEffect(() => {
+    const was = shown.current;
+    shown.current = chosen;
+    if (was === chosen || !phone()) return;
+    const target = chosen ? document.getElementById("src-back") : was && document.getElementById(`src-tab-${was}`);
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: chosen ? "start" : "nearest" });
+  }, [chosen]);
+
+  const pick = (id: SourceId) => {
+    tapped.current = phone();
+    // a phone pushes, so its back button closes the source; a wide screen only swaps what is shown
+    void navigate({ to: "/reachability", search: { source: id }, replace: !tapped.current, resetScroll: false });
+  };
+  const back = () => {
+    if (tapped.current) window.history.back();
+    else void navigate({ to: "/reachability", search: {}, replace: true, resetScroll: false });
+    tapped.current = false;
+  };
+
+  // arrows (and Home, End) walk the list, Enter or Space opens: the list is one stop for Tab
+  const walk = (e: KeyboardEvent<HTMLDivElement>) => {
+    const tabs = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=tab]")];
+    const i = tabs.indexOf(document.activeElement as HTMLElement);
+    const to = ({ ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[e.key];
+    if (i < 0 || to === undefined) return;
+    e.preventDefault();
+    tabs[(to + tabs.length) % tabs.length]!.focus();
+  };
+
   return (
-    <div className="grid items-start gap-3.5 xl:grid-cols-2">
-      <GlobalpingCard />
-      <BlocklistCard />
-      <TspuCard />
-      <CheburcheckCard />
-      <BsbordCard />
-      <KlickCard />
+    <div className="grid gap-3.5 lg:grid-cols-[336px_minmax(0,1fr)]">
+      <div
+        role="tablist"
+        aria-label={t("rc.sources")}
+        aria-orientation="vertical"
+        onKeyDown={walk}
+        className={cx(
+          "flex flex-col gap-1 self-start rounded-card-lg border border-line bg-surface p-1.5 min-[720px]:max-lg:grid min-[720px]:max-lg:grid-cols-2 lg:sticky lg:top-[72px]",
+          chosen && "max-[720px]:hidden",
+        )}
+      >
+        {sourceIds.map((id) => (
+          <SourceRow key={id} id={id} look={looks[id]} selected={id === open} tabbable={id === (open ?? sourceIds[0])} onPick={() => pick(id)} />
+        ))}
+      </div>
+      <div className={cx("flex min-w-0 flex-col gap-2.5", !chosen && "max-[720px]:hidden")}>
+        <button
+          id="src-back"
+          type="button"
+          onClick={back}
+          className="flex h-9 scroll-mt-20 items-center gap-1.5 self-start rounded-ctl pr-3 pl-1.5 text-[13px] font-bold text-muted transition-colors hover:bg-surface-2 hover:text-fg min-[720px]:hidden"
+        >
+          <Icon name="back" size={16} aria-hidden />
+          {t("src.back")}
+        </button>
+        {open === null && <Pending />}
+        {sourceIds.map((id) => {
+          const { Card } = meta[id];
+          return (
+            <div key={id} role="tabpanel" id={`src-panel-${id}`} aria-labelledby={`src-tab-${id}`} hidden={id !== open} className="flex-1">
+              <ReportLook.Provider value={reporters[id]}>
+                <Card />
+              </ReportLook.Provider>
+            </div>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+/** The list's word for a state, short enough for a row: works, off, an error, needs setup; and a few words on why or when. */
+function chipOf(t: T, look: Look): { kind: StatusKind; word: string; note: string } {
+  const head = look.detail.split(" · ")[0] ?? "";
+  // a state line says "Does not work · why" or names its status itself ("The site asked to slow down · …"): the row takes the why
+  const why = [t("cr.state.works"), t("cr.state.fails"), t("cr.state.on"), t("cr.testing")].includes(look.word) ? head : look.word;
+  switch (look.kind) {
+    case "ok":
+      return { kind: "ok", word: t("cr.state.works"), note: head };
+    case "off":
+      return { kind: "off", word: look.word, note: "" };
+    case "bad":
+      return { kind: "bad", word: t("src.chip.error"), note: why };
+    case "warn":
+      return { kind: "warn", word: t("status.warn"), note: why };
+    case "busy":
+      return { kind: "busy", word: t("src.chip.busy"), note: why };
+    case "blip":
+      return look.state === "noNode" ? { kind: "blip", word: t("src.chip.setup"), note: head } : { kind: "blip", word: t("cr.state.on"), note: why };
+  }
+}
+
+/** "Russia only" or "any country": the sources that need Russia say so before anyone opens them. */
+function Coverage({ ruOnly }: { ruOnly: boolean }) {
+  const t = useT();
+  return (
+    <span className="inline-flex h-[18px] flex-none items-center rounded-[6px] bg-surface-2 px-1.5 text-[10px] font-bold whitespace-nowrap text-muted">
+      {t(ruOnly ? "src.cover.ru" : "src.cover.any")}
+    </span>
+  );
+}
+
+/**
+ * A row of the list: the icon, the name and the state's word on the first line, what the source is under it, then where it
+ * looks from and the state's few words. All rows are alike in height; on a mid screen a row is a tile (icon, name, word).
+ */
+function SourceRow({ id, look, selected, tabbable, onPick }: { id: SourceId; look?: Look; selected: boolean; tabbable: boolean; onPick: () => void }) {
+  const t = useT();
+  const m = meta[id];
+  const chip = look && chipOf(t, look);
+  const tile = "min-[720px]:max-lg:hidden";
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={`src-tab-${id}`}
+      aria-selected={selected}
+      aria-controls={`src-panel-${id}`}
+      tabIndex={tabbable ? 0 : -1}
+      onClick={onPick}
+      className="grid w-full min-w-0 scroll-mt-20 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-card px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2 min-[720px]:aria-selected:bg-surface-2 min-[720px]:aria-selected:shadow-[inset_0_0_0_1px_var(--accent-line)] min-[720px]:max-lg:gap-x-2.5 min-[720px]:max-lg:px-2.5"
+    >
+      <IconChip icon={m.icon} tone="mint" size={30} className="row-span-3 self-start rounded-[9px] min-[720px]:max-lg:row-span-2" />
+      <span className="truncate text-[13px] font-bold">{t(m.title)}</span>
+      {/* the word's place is kept while the source loads: no row grows when it arrives */}
+      <span className="flex h-[22px] items-center justify-self-end min-[720px]:max-lg:col-start-2 min-[720px]:max-lg:row-start-2 min-[720px]:max-lg:justify-self-start">
+        {chip && <StatusPill sm kind={chip.kind} label={chip.word} />}
+      </span>
+      <span className={cx("col-span-2 truncate text-xs text-muted", tile)}>{t(m.what)}</span>
+      <span className={cx("col-span-2 flex min-w-0 items-center gap-2", tile)}>
+        <Coverage ruOnly={m.ruOnly} />
+        <span className="ml-auto truncate text-[11px] text-muted" title={chip?.note || undefined}>
+          {chip?.note}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -147,22 +323,24 @@ export function GlobalpingCard() {
   const act = useGlobalpingActions();
   const s = q.data;
   return (
-    <section className={card}>
-      <CardHead icon="globe" title={t("gp.title")} sub={t("gp.sub")}>
-        {s && (
+    <Detail
+      id="globalping"
+      sub={t("gp.sub")}
+      control={
+        s && (
           <Switch
             checked={s.enabled}
             disabled={act.update.isPending || act.disconnect.isPending}
             onCheckedChange={(on) => act.update.mutate({ enabled: on })}
             aria-label={t("gp.switch")}
           />
-        )}
-      </CardHead>
-      {q.isPending && <Pending compact />}
-      {q.isError && !s && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+        )
+      }
+    >
+      <Loading q={q} />
       {/* switched off and on again, the card starts over: the last test said nothing about the new state */}
       {s && <Body key={String(s.enabled)} s={s} act={act} />}
-    </section>
+    </Detail>
   );
 }
 
@@ -184,9 +362,11 @@ function Body({ s, act }: { s: GlobalpingSettings; act: Actions }) {
 
   return (
     <>
-      <GlobalpingState state={state} />
+      <Block flush>
+        <GlobalpingState state={state} />
+      </Block>
       {s.enabled && (
-        <div className="flex flex-col gap-3 border-t border-line pt-3">
+        <Block title={t("src.block.connection")}>
           <SecretField
             label={t("gp.token")}
             hint={t("gp.token.hint")}
@@ -198,29 +378,28 @@ function Body({ s, act }: { s: GlobalpingSettings; act: Actions }) {
             saveLabel={t("gp.token.save")}
             onSave={(token, done) => act.update.mutate({ token }, { onSuccess: done })}
           />
+        </Block>
+      )}
+      {s.enabled && (
+        <Block title={t("src.block.checks")}>
           <IntervalField current={s.intervalMin || 15} options={intervalOptions} onPick={(m) => act.update.mutate({ intervalMin: m })} />
           {/* IPv6: a round of its own with its own control site, for the nodes whose IPv6 works; it takes more of the hour */}
-          <div className="flex flex-col gap-1">
-            <SettingRow label={t("gp.ipv6")} width="flex">
-              <Switch checked={s.ipv6} disabled={act.update.isPending} onCheckedChange={(v) => act.update.mutate({ ipv6: v })} aria-label={t("gp.ipv6")} />
-            </SettingRow>
-            <p className="max-w-xl text-xs leading-normal text-pretty text-muted">{t("gp.ipv6.hint")}</p>
-          </div>
-        </div>
+          <SettingRow label={t("gp.ipv6")} hint={t("gp.ipv6.hint")} width="flex">
+            <Switch checked={s.ipv6} disabled={act.update.isPending} onCheckedChange={(v) => act.update.mutate({ ipv6: v })} aria-label={t("gp.ipv6")} />
+          </SettingRow>
+        </Block>
       )}
+      <Privacy>{t("gp.privacy")}</Privacy>
       {(s.enabled || s.hasToken) && (
-        <div className="flex flex-wrap gap-2">
+        <ActionBar>
           {s.enabled && (
-            <Button variant="secondary" size="sm" disabled={act.test.isPending} onClick={test}>
+            <Button variant="secondary" size="md" disabled={act.test.isPending} onClick={test}>
               {act.test.isPending ? t("cr.testing") : t("cr.test")}
             </Button>
           )}
-          <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
-            {t("cr.disconnect")}
-          </Button>
-        </div>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
       )}
-      <Privacy>{t("gp.privacy")}</Privacy>
       {disconnecting && (
         <ConfirmDisconnect
           title={t("gp.disconnect.title")}
@@ -234,28 +413,80 @@ function Body({ s, act }: { s: GlobalpingSettings; act: Actions }) {
   );
 }
 
-/** The parts every source card shares: its title and what it does, with the switch on the right. */
-function CardHead({ icon, title, sub, children }: { icon: IconName; title: string; sub: string; children: ReactNode }) {
+/**
+ * The open source: its header (icon, name, where it looks from, what it does, the on/off switch), then its blocks. The switch
+ * lives here and only here: on asks for consent and setup on some sources, and a switch inside a row of the list would fight
+ * the row's own click and the arrow keys. The panel is as tall as the list at least; a short source leaves the room at its end.
+ */
+function Detail({ id, sub, control, children }: { id: SourceId; sub: string; control?: ReactNode; children: ReactNode }) {
+  const t = useT();
+  const m = meta[id];
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-0.5">
-        <SectionLabel as="h3" icon={icon} tone="mint">
-          {title}
-        </SectionLabel>
-        <span className="text-xs leading-normal text-pretty text-muted">{sub}</span>
+    <section className="@container flex h-full min-w-0 flex-col rounded-card-lg border border-line bg-surface">
+      <div className="flex items-start gap-3 px-4 pt-4 pb-3 md:px-5 md:pt-5">
+        <IconChip icon={m.icon} tone="mint" size={36} className="rounded-[10px]" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-h-6 flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h3 className="text-base leading-tight font-extrabold tracking-[-0.02em]">{t(m.title)}</h3>
+            <Coverage ruOnly={m.ruOnly} />
+          </div>
+          <p className="max-w-2xl text-xs leading-normal text-pretty text-muted">{sub}</p>
+        </div>
+        {control && <span className="flex h-6 items-center">{control}</span>}
       </div>
+      {children}
+    </section>
+  );
+}
+
+/** A block of the open source under a small heading (Connection, Checks, Budget); `flush` is the state right under the header. */
+function Block({ title, flush, className, children }: { title?: string; flush?: boolean; className?: string; children: ReactNode }) {
+  return (
+    <div className={cx("flex flex-col gap-3 px-4 md:px-5", flush ? "pb-4" : "border-t border-line py-4", className)}>
+      {title && <SectionLabel as="h4">{title}</SectionLabel>}
       {children}
     </div>
   );
 }
 
-/** What leaves the panel with the source on: the card's last line, in every state. */
+/** The source is loading, or could not be read: in the place of its state. */
+function Loading({ q }: { q: { isPending: boolean; isError: boolean; data: unknown; error: Error | null; refetch: () => unknown } }) {
+  if (q.isPending)
+    return (
+      <Block flush>
+        <Pending compact />
+      </Block>
+    );
+  if (q.isError && !q.data)
+    return (
+      <Block flush>
+        <QueryError compact error={q.error} onRetry={() => void q.refetch()} />
+      </Block>
+    );
+  return null;
+}
+
+/** What leaves the panel with the source on, in every state. */
 function Privacy({ children }: { children: string }) {
+  const t = useT();
   return (
-    <p className="flex items-start gap-1.5 text-xs leading-normal text-pretty text-muted">
-      <Icon name="info" size={13} aria-hidden className="mt-px flex-none" />
-      {children}
-    </p>
+    <Block title={t("src.block.sent")}>
+      <p className="max-w-2xl text-[13px] leading-normal text-pretty text-muted">{children}</p>
+    </Block>
+  );
+}
+
+/** The source's last row: Test (and the like) on the left, Disconnect apart on the right. */
+function ActionBar({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 md:px-5">{children}</div>;
+}
+
+function Disconnect({ onClick }: { onClick: () => void }) {
+  const t = useT();
+  return (
+    <Button variant="ghostDanger" size="md" className="ml-auto" onClick={onClick}>
+      {t("cr.disconnect")}
+    </Button>
   );
 }
 
@@ -309,8 +540,13 @@ function ConfirmOn(p: { title: string; body: string; busy: boolean; onClose: () 
   );
 }
 
-/** One line: a dot, the state in a word, the detail. data-state names the state for the tests. */
+/** One line: a dot, the state in a word, the detail. data-state names the state for the tests. It also tells the list. */
 function StateLine({ state, kind, word, detail }: { state: string; kind: StatusKind; word: string; detail: string }) {
+  const report = useContext(ReportLook);
+  // before the paint: the row and the line change in the same frame
+  useLayoutEffect(() => {
+    report?.({ state, kind, word, detail });
+  }, [report, state, kind, word, detail]);
   return (
     <div role="status" data-state={state} className="flex items-start gap-2.5 rounded-field border border-line bg-canvas px-3 py-2.5 text-[13px] leading-snug">
       <span className="mt-[5px] flex">
@@ -383,59 +619,72 @@ function SecretField(p: {
 
   if (p.has && !editing)
     return (
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-field border border-line bg-canvas px-3 py-2.5">
-        <span className="text-[13px] font-bold">{p.label}</span>
-        <span data-testid={p.testId} className="tone-ok tone-text text-xs font-semibold">
-          {t("gp.token.set")}
-        </span>
-        <span className="ml-auto flex gap-2">
+      <SettingRow label={p.label}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span data-testid={p.testId} className="tone-ok tone-text mr-1 inline-flex items-center gap-1.5 text-[13px] font-semibold">
+            <Icon name="check" size={14} aria-hidden />
+            {t("gp.token.set")}
+          </span>
+          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            {t("gp.token.replace")}
+          </Button>
           {p.onRemove && (
             <Button variant="ghostDanger" size="sm" disabled={p.busy} onClick={p.onRemove}>
               {t("cc.token.remove")}
             </Button>
           )}
-          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-            {t("gp.token.replace")}
-          </Button>
-        </span>
-      </div>
+        </div>
+      </SettingRow>
     );
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <TextField
-        label={p.label}
-        hint={p.hint}
-        error={tried && !p.valid(value) ? p.invalid : undefined}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        type="password"
-        autoComplete="off"
-        spellCheck={false}
-        mono
-      />
-      <div className="flex flex-wrap justify-end gap-2">
-        {p.has && (
-          <Button variant="ghost" size="md" disabled={p.busy} onClick={stop}>
-            {t("common.cancel")}
+    <SettingRow label={p.label} top width="basis-full @min-[540px]:w-full">
+      <form onSubmit={submit} noValidate className="flex flex-wrap items-start gap-2">
+        <TextField
+          aria-label={p.label}
+          hint={p.hint}
+          error={tried && !p.valid(value) ? p.invalid : undefined}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          mono
+          className="min-w-[200px] flex-1"
+        />
+        <span className="mt-1 flex gap-2">
+          <Button type="submit" variant="secondary" size="md" disabled={p.busy}>
+            {p.busy && value ? t("gp.token.saving") : p.saveLabel}
           </Button>
-        )}
-        <Button type="submit" variant="secondary" size="md" disabled={p.busy}>
-          {p.busy && value ? t("gp.token.saving") : p.saveLabel}
-        </Button>
-      </div>
-    </form>
+          {p.has && (
+            <Button variant="ghost" size="md" disabled={p.busy} onClick={stop}>
+              {t("common.cancel")}
+            </Button>
+          )}
+        </span>
+      </form>
+    </SettingRow>
   );
 }
 
-/** A setting of a source card: its name on the left, the control on the right; on a phone they wrap. */
-function SettingRow({ label, width, children }: { label: string; width: string; children: ReactNode }) {
+/**
+ * A setting of a source: on a wide panel its name sits in a column of its own and the control starts at one line for all; the hint
+ * goes under the control. On a narrow one the name is on the left of a short control (a wide one wraps under it). `top` is for a
+ * tall control (a field): the name lines up with its first line, not its middle.
+ */
+function SettingRow({ label, hint, top, width, children }: { label: string; hint?: string; top?: boolean; width?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-      <span aria-hidden className="text-[13px] font-bold">
+    <div
+      className={cx(
+        "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 @min-[540px]:grid @min-[540px]:grid-cols-[176px_minmax(0,1fr)] @min-[540px]:gap-x-6",
+        top && "@min-[540px]:items-start",
+      )}
+    >
+      <span aria-hidden className={cx("text-[13px] leading-snug font-bold", top && "@min-[540px]:pt-3")}>
         {label}
       </span>
-      <div className={width}>{children}</div>
+      <div className={cx("min-w-0 @min-[540px]:justify-self-start", width)}>{children}</div>
+      {hint && <p className="max-w-xl basis-full text-xs leading-normal text-pretty text-muted @min-[540px]:col-start-2 @min-[540px]:-mt-1">{hint}</p>}
     </div>
   );
 }
@@ -449,7 +698,7 @@ function IntervalField({ current, options, onPick, label }: { current: number; o
   const minutes = options.includes(current) ? options : [...options, current].sort((a, b) => a - b);
   const name = label ?? t("cr.interval");
   return (
-    <SettingRow label={name} width="w-[170px]">
+    <SettingRow label={name} width="w-[200px]">
       <Select
         compact
         aria-label={name}
@@ -471,22 +720,24 @@ export function BlocklistCard() {
   const act = useBlocklistActions();
   const s = q.data;
   return (
-    <section className={card}>
-      <CardHead icon="list" title={t("bl.title")} sub={t("bl.sub")}>
-        {s && (
+    <Detail
+      id="lists"
+      sub={t("bl.sub")}
+      control={
+        s && (
           <Switch
             checked={s.enabled}
             disabled={act.update.isPending || act.disconnect.isPending}
             onCheckedChange={(on) => act.update.mutate({ enabled: on })}
             aria-label={t("bl.switch")}
           />
-        )}
-      </CardHead>
-      {q.isPending && <Pending compact />}
-      {q.isError && !s && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+        )
+      }
+    >
+      <Loading q={q} />
       {/* switched off and on again, the card starts over, as the Globalping card does */}
       {s && <ListsBody key={String(s.enabled)} s={s} act={act} />}
-    </section>
+    </Detail>
   );
 }
 
@@ -505,21 +756,21 @@ function ListsBody({ s, act }: { s: BlocklistSettings; act: ListsActions }) {
 
   return (
     <>
-      <ListsStateLine state={state} />
+      <Block flush>
+        <ListsStateLine state={state} />
+      </Block>
+      <Privacy>{t("bl.privacy")}</Privacy>
       {s.enabled && (
-        <div className="flex flex-wrap gap-2">
+        <ActionBar>
           {/* another country than Russia: there is nothing to test */}
           {s.available && (
-            <Button variant="secondary" size="sm" disabled={act.test.isPending} onClick={test}>
+            <Button variant="secondary" size="md" disabled={act.test.isPending} onClick={test}>
               {act.test.isPending ? t("cr.testing") : t("cr.test")}
             </Button>
           )}
-          <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
-            {t("cr.disconnect")}
-          </Button>
-        </div>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
       )}
-      <Privacy>{t("bl.privacy")}</Privacy>
       {disconnecting && (
         <ConfirmDisconnect
           title={t("bl.disconnect.title")}
@@ -575,22 +826,25 @@ export function TspuCard() {
   const act = useTspuActions();
   const s = q.data;
   return (
-    <section className={card}>
-      <CardHead icon="network" title={t("tp.title")} sub={t("tp.sub")}>
-        {s && s.unavailableReason !== "edition" && (
+    <Detail
+      id="tspu"
+      sub={t("tp.sub")}
+      control={
+        s &&
+        s.unavailableReason !== "edition" && (
           <Switch
             checked={s.enabled}
             disabled={act.update.isPending || act.disconnect.isPending}
             onCheckedChange={(on) => act.update.mutate({ enabled: on })}
             aria-label={t("tp.switch")}
           />
-        )}
-      </CardHead>
-      {q.isPending && <Pending compact />}
-      {q.isError && !s && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+        )
+      }
+    >
+      <Loading q={q} />
       {/* switched off and on again, the card starts over, as the other cards do */}
       {s && <TspuBody key={String(s.enabled)} s={s} act={act} />}
-    </section>
+    </Detail>
   );
 }
 
@@ -615,10 +869,12 @@ function TspuBody({ s, act }: { s: TspuSettings; act: TspuActions }) {
 
   return (
     <>
-      <TspuStateLine state={state} />
-      {state.kind === "run" && state.nodes && state.nodes.length > 0 && <NodeResults nodes={state.nodes} />}
+      <Block flush>
+        <TspuStateLine state={state} />
+        {state.kind === "run" && state.nodes && state.nodes.length > 0 && <NodeResults nodes={state.nodes} />}
+      </Block>
       {ready && (
-        <div className="flex flex-col gap-3 border-t border-line pt-3">
+        <Block title={t("src.block.checks")}>
           <SettingRow label={t("tp.node")} width="w-[200px]">
             <Select
               compact
@@ -629,21 +885,19 @@ function TspuBody({ s, act }: { s: TspuSettings; act: TspuActions }) {
             />
           </SettingRow>
           <IntervalField current={s.intervalMin || tspuDefaultInterval} options={tspuIntervals} onPick={(m) => act.update.mutate({ intervalMin: m })} />
-        </div>
+        </Block>
       )}
+      <Privacy>{t("tp.privacy")}</Privacy>
       {(s.enabled || s.probeNodeId !== "") && (
-        <div className="flex flex-wrap gap-2">
+        <ActionBar>
           {ready && s.probeNodeId && (
-            <Button variant="secondary" size="sm" disabled={act.test.isPending} onClick={test}>
+            <Button variant="secondary" size="md" disabled={act.test.isPending} onClick={test}>
               {act.test.isPending ? t("cr.testing") : t("cr.test")}
             </Button>
           )}
-          <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
-            {t("cr.disconnect")}
-          </Button>
-        </div>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
       )}
-      <Privacy>{t("tp.privacy")}</Privacy>
       {disconnecting && (
         <ConfirmDisconnect
           title={t("tp.disconnect.title")}
@@ -724,9 +978,11 @@ export function CheburcheckCard() {
   const [asking, setAsking] = useState(false);
   const s = q.data;
   return (
-    <section className={card}>
-      <CardHead icon="pulse" title={t("cc.title")} sub={t("cc.sub")}>
-        {s && (
+    <Detail
+      id="cheburcheck"
+      sub={t("cc.sub")}
+      control={
+        s && (
           <Switch
             checked={s.enabled}
             disabled={act.update.isPending || act.disconnect.isPending}
@@ -734,10 +990,10 @@ export function CheburcheckCard() {
             onCheckedChange={(on) => (on ? setAsking(true) : act.update.mutate({ enabled: false }))}
             aria-label={t("cc.switch")}
           />
-        )}
-      </CardHead>
-      {q.isPending && <Pending compact />}
-      {q.isError && !s && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+        )
+      }
+    >
+      <Loading q={q} />
       {/* switched off and on again, the card starts over, as the other cards do */}
       {s && <CheburBody key={String(s.enabled)} s={s} act={act} />}
       {asking && (
@@ -749,7 +1005,7 @@ export function CheburcheckCard() {
           onConfirm={() => act.update.mutate({ enabled: true }, { onSuccess: () => setAsking(false) })}
         />
       )}
-    </section>
+    </Detail>
   );
 }
 
@@ -771,15 +1027,11 @@ function CheburBody({ s, act }: { s: CheburcheckSettings; act: CheburActions }) 
 
   return (
     <>
-      <CheburStateLine state={state} />
+      <Block flush>
+        <CheburStateLine state={state} />
+      </Block>
       {ready && (
-        <div className="flex flex-col gap-3 border-t border-line pt-3">
-          <SettingRow label={t("cc.public")} width="flex">
-            <Switch checked={s.publicEnabled} disabled={busy} onCheckedChange={(v) => act.update.mutate({ publicEnabled: v })} aria-label={t("cc.public.switch")} />
-          </SettingRow>
-          {s.publicEnabled && (
-            <IntervalField current={s.intervalMin || publicIntervals[0]} options={publicIntervals} onPick={(m) => act.update.mutate({ intervalMin: m })} />
-          )}
+        <Block title={t("src.block.connection")}>
           <SecretField
             label={t("cc.token")}
             hint={t("cc.token.hint")}
@@ -792,6 +1044,16 @@ function CheburBody({ s, act }: { s: CheburcheckSettings; act: CheburActions }) 
             onSave={(token, done) => act.update.mutate({ token }, { onSuccess: done })}
             onRemove={() => act.update.mutate({ token: "" })}
           />
+        </Block>
+      )}
+      {ready && (
+        <Block title={t("src.block.checks")}>
+          <SettingRow label={t("cc.public")} width="flex">
+            <Switch checked={s.publicEnabled} disabled={busy} onCheckedChange={(v) => act.update.mutate({ publicEnabled: v })} aria-label={t("cc.public.switch")} />
+          </SettingRow>
+          {s.publicEnabled && (
+            <IntervalField current={s.intervalMin || publicIntervals[0]} options={publicIntervals} onPick={(m) => act.update.mutate({ intervalMin: m })} />
+          )}
           {s.hasToken && (
             <IntervalField
               label={t("cc.ownInterval")}
@@ -800,21 +1062,19 @@ function CheburBody({ s, act }: { s: CheburcheckSettings; act: CheburActions }) 
               onPick={(m) => act.update.mutate({ ownIntervalMin: m })}
             />
           )}
-        </div>
+        </Block>
       )}
+      <Privacy>{t("cc.privacy")}</Privacy>
       {(s.enabled || s.hasToken) && (
-        <div className="flex flex-wrap gap-2">
+        <ActionBar>
           {ready && (
-            <Button variant="secondary" size="sm" disabled={act.test.isPending} onClick={test}>
+            <Button variant="secondary" size="md" disabled={act.test.isPending} onClick={test}>
               {act.test.isPending ? t("cr.testing") : t("cr.test")}
             </Button>
           )}
-          <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
-            {t("cr.disconnect")}
-          </Button>
-        </div>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
       )}
-      <Privacy>{t("cc.privacy")}</Privacy>
       {disconnecting && (
         <ConfirmDisconnect
           title={t("cc.disconnect.title")}
@@ -882,9 +1142,11 @@ export function BsbordCard() {
   const s = q.data;
   const away = !s && q.isError && isCountryOff(q.error);
   return (
-    <section className={card}>
-      <CardHead icon="phone" title={t("bb.title")} sub={t("bb.sub")}>
-        {s && (
+    <Detail
+      id="bsbord"
+      sub={t("bb.sub")}
+      control={
+        s && (
           <Switch
             checked={s.enabled}
             // the server takes "on" only with a key and units: until then the switch waits, and the state line says why
@@ -892,19 +1154,22 @@ export function BsbordCard() {
             onCheckedChange={(on) => (on ? setAsking(true) : act.update.mutate({ enabled: false }))}
             aria-label={t("bb.switch")}
           />
-        )}
-      </CardHead>
-      {q.isPending && <Pending compact />}
-      {away && (
+        )
+      }
+    >
+      {away ? (
         <>
-          <StateLine state="unavailable" kind="off" word={t("cr.state.unavailable")} detail={t("bb.state.onlyRU")} />
+          <Block flush>
+            <StateLine state="unavailable" kind="off" word={t("cr.state.unavailable")} detail={t("bb.state.onlyRU")} />
+          </Block>
           <Privacy>{t("bb.privacy")}</Privacy>
         </>
+      ) : (
+        <Loading q={q} />
       )}
-      {q.isError && !s && !away && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
       {s && <BsbordBody key={String(s.enabled)} s={s} act={act} price={price} setPrice={setPrice} />}
       {asking && s && <BsbordConsent s={s} act={act} price={price} setPrice={setPrice} onClose={() => setAsking(false)} />}
-    </section>
+    </Detail>
   );
 }
 
@@ -999,17 +1264,11 @@ function BsbordBody({ s, act, price, setPrice }: { s: BsbordSettings; act: Bsbor
 
   return (
     <>
-      <BsbordStateLine state={state} />
-      {s.enabled && <Spend s={s} test={outcome && "ok" in outcome ? outcome.ok : undefined} />}
-      {s.enabled && (
-        <div className="flex flex-col items-start gap-2">
-          {price && <PriceLine s={s} price={price} />}
-          <Button variant="secondary" size="sm" disabled={act.preview.isPending} onClick={ask}>
-            {act.preview.isPending ? t("bb.price.checking") : t("bb.price.check")}
-          </Button>
-        </div>
-      )}
-      <div className="flex flex-col gap-3 border-t border-line pt-3">
+      <Block flush>
+        <BsbordStateLine state={state} />
+        {s.enabled && <Spend s={s} test={outcome && "ok" in outcome ? outcome.ok : undefined} />}
+      </Block>
+      <Block title={t("src.block.connection")}>
         <SecretField
           label={t("bb.key")}
           hint={t("bb.key.hint")}
@@ -1021,27 +1280,37 @@ function BsbordBody({ s, act, price, setPrice }: { s: BsbordSettings; act: Bsbor
           saveLabel={t("bb.key.save")}
           onSave={(key, done) => act.update.mutate({ key }, { onSuccess: done })}
         />
-        {s.hasKey && (
-          <>
-            <UnitPicker s={s} busy={busy} onSave={(units, done) => change({ units }, done)} />
-            <IntervalField current={s.intervalMin || bsbordDefaultInterval} options={bsbordIntervals} onPick={(m) => change({ intervalMin: m })} />
-            <CapField s={s} busy={busy} onSave={(capCredits) => act.update.mutate({ capCredits })} />
-          </>
-        )}
-      </div>
+        {s.hasKey && <UnitPicker s={s} busy={busy} onSave={(units, done) => change({ units }, done)} />}
+      </Block>
+      {s.hasKey && (
+        <Block title={t("src.block.checks")}>
+          <IntervalField current={s.intervalMin || bsbordDefaultInterval} options={bsbordIntervals} onPick={(m) => change({ intervalMin: m })} />
+        </Block>
+      )}
+      {s.hasKey && (
+        <Block title={t("src.block.budget")}>
+          <CapField s={s} busy={busy} onSave={(capCredits) => act.update.mutate({ capCredits })} />
+          {s.enabled && (
+            <SettingRow label={t("bb.price")} width="flex flex-col items-start gap-2">
+              {price && <PriceLine s={s} price={price} />}
+              <Button variant="secondary" size="sm" disabled={act.preview.isPending} onClick={ask}>
+                {act.preview.isPending ? t("bb.price.checking") : t("bb.price.check")}
+              </Button>
+            </SettingRow>
+          )}
+        </Block>
+      )}
+      <Privacy>{t("bb.privacy")}</Privacy>
       {(s.enabled || s.hasKey) && (
-        <div className="flex flex-wrap gap-2">
+        <ActionBar>
           {s.hasKey && (
-            <Button variant="secondary" size="sm" disabled={act.test.isPending} onClick={test}>
+            <Button variant="secondary" size="md" disabled={act.test.isPending} onClick={test}>
               {act.test.isPending ? t("cr.testing") : t("cr.test")}
             </Button>
           )}
-          <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
-            {t("cr.disconnect")}
-          </Button>
-        </div>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
       )}
-      <Privacy>{t("bb.privacy")}</Privacy>
       {disconnecting && (
         <ConfirmDisconnect
           title={t("bb.disconnect.title")}
@@ -1240,23 +1509,23 @@ function CapField({ s, busy, onSave }: { s: BsbordSettings; busy: boolean; onSav
   }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <TextField
-        label={t("bb.cap")}
-        hint={t("bb.cap.hint")}
-        error={valid ? undefined : t("bb.err.cap")}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        inputMode="decimal"
-        autoComplete="off"
-        mono
-      />
-      <div className="flex justify-end">
-        <Button type="submit" variant="secondary" size="md" disabled={busy || !valid || credits === s.capCredits}>
+    <SettingRow label={t("bb.cap")} hint={t("bb.cap.hint")} top width="basis-full @min-[540px]:w-full">
+      <form onSubmit={submit} noValidate className="flex flex-wrap items-start gap-2">
+        <TextField
+          aria-label={t("bb.cap")}
+          error={valid ? undefined : t("bb.err.cap")}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          inputMode="decimal"
+          autoComplete="off"
+          mono
+          className="w-[160px] @min-[540px]:w-[200px]"
+        />
+        <Button type="submit" variant="secondary" size="md" className="mt-1" disabled={busy || !valid || credits === s.capCredits}>
           {t("bb.cap.save")}
         </Button>
-      </div>
-    </form>
+      </form>
+    </SettingRow>
   );
 }
 
@@ -1273,33 +1542,33 @@ export function KlickCard() {
   const p = q.data;
   const on = !!p?.settings?.enabled;
   return (
-    <section className={card}>
-      <CardHead icon="people" title={t("kc.title")} sub={t("kc.sub")}>
-        {p && (
+    <Detail
+      id="klick"
+      sub={t("kc.sub")}
+      control={
+        p && (
           <Switch
             checked={on}
             disabled={act.update.isPending || act.disconnect.isPending}
             onCheckedChange={(v) => act.update.mutate({ enabled: v })}
             aria-label={t("kc.switch")}
           />
-        )}
-      </CardHead>
-      {q.isPending && <Pending compact />}
-      {q.isError && !p && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
+        )
+      }
+    >
+      <Loading q={q} />
       {p && (
-        <>
+        <Block flush>
           <KlickStateLine p={p} />
           {on && p.nodes.length > 0 && <KlickNodes nodes={p.nodes} />}
-          {on && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="ghostDanger" size="sm" onClick={() => setDisconnecting(true)}>
-                {t("cr.disconnect")}
-              </Button>
-            </div>
-          )}
-        </>
+        </Block>
       )}
       <Privacy>{t("kc.privacy")}</Privacy>
+      {p && on && (
+        <ActionBar>
+          <Disconnect onClick={() => setDisconnecting(true)} />
+        </ActionBar>
+      )}
       {disconnecting && (
         <ConfirmDisconnect
           title={t("kc.disconnect.title")}
@@ -1309,7 +1578,7 @@ export function KlickCard() {
           onConfirm={() => act.disconnect.mutate(undefined, { onSuccess: () => setDisconnecting(false) })}
         />
       )}
-    </section>
+    </Detail>
   );
 }
 
