@@ -17,8 +17,9 @@ const tspuHistoryRows = 7*24*60 + 1
 // GetChecks makes), what it said of each node since `since`, as a lane of verdicts where consecutive equal ones are one point.
 // Globalping's lane holds the rounds of the selected country; the block lists' lane is LISTED or OK; the TSPU probe's lane holds
 // the runs of the current probe node; external sources each add a lane. Sources keep the existing order, then external sources;
-// nodes are by id.
-func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources []string, nodes []*adminv1.NodeReachabilityHistory, err error) {
+// nodes are by id. The family is familyV4 or familyV6: IPv6 is measured by Globalping alone, so its history is that one lane,
+// and it is empty while Globalping's IPv6 checks are off; the lists, the TSPU probe and the external sources are IPv4.
+func (s *Service) CountryHistory(ctx context.Context, since time.Time, family int) (sources []string, nodes []*adminv1.NodeReachabilityHistory, err error) {
 	now := s.now()
 	type key struct{ node, source string }
 	type point struct {
@@ -28,9 +29,9 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 	raw := map[key][]point{}
 	until := map[key]time.Time{}
 
-	if cc, _, on := s.countryConfig(ctx); on {
+	if cc, _, on := s.countryConfig(ctx); on && (family == familyV4 || cc.IPv6) {
 		sources = append(sources, countryreach.SourceGlobalping)
-		rows, err := s.st.CountryVerdictChanges(ctx, cc.Country, familyV4, since)
+		rows, err := s.st.CountryVerdictChanges(ctx, cc.Country, family, since)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -38,7 +39,7 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 			k := key{r.NodeID, countryreach.SourceGlobalping}
 			raw[k] = append(raw[k], point{r.At, r.Verdict})
 		}
-		latest, err := s.st.RecentCountryChecks(ctx, familyV4, 2)
+		latest, err := s.st.RecentCountryChecks(ctx, family, 2)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -77,7 +78,7 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 			}
 		}
 	}
-	if s.cfg.Lists != nil && s.cfg.Lists(ctx) {
+	if family == familyV4 && s.cfg.Lists != nil && s.cfg.Lists(ctx) {
 		sources = append(sources, countryreach.SourceLists)
 		rows, err := s.st.BlocklistHistory(ctx, since)
 		if err != nil {
@@ -92,7 +93,7 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 			raw[k], until[k] = append(raw[k], point{r.At, v}), now
 		}
 	}
-	if t := s.tspuState(ctx); t.On {
+	if t := s.tspuState(ctx); family == familyV4 && t.On {
 		sources = append(sources, countryreach.SourceTSPU)
 		rows, err := s.st.TSPUHistorySince(ctx, t.Vantage, since, tspuHistoryRows)
 		if err != nil {
@@ -114,7 +115,10 @@ func (s *Service) CountryHistory(ctx context.Context, since time.Time) (sources 
 			}
 		}
 	}
-	activeExternal := s.activeExternalStates(ctx)
+	var activeExternal []ExternalState
+	if family == familyV4 {
+		activeExternal = s.activeExternalStates(ctx)
+	}
 	for _, state := range activeExternal {
 		sources = append(sources, state.Source)
 	}

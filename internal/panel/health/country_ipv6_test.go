@@ -293,11 +293,11 @@ func TestIPv6RoundsLeaveTheIPv4OutcomeAlone(t *testing.T) {
 			c.clock.Advance(16 * time.Minute)
 			out += fmt.Sprintf("step %d: de1 %v nl1 %v\n", i, c.verdicts("de1"), c.verdicts("nl1"))
 			for _, a := range c.active() {
-				out += fmt.Sprintf("  active %s/%s/%s sev %d params %v opened %v\n", a.Kind, a.NodeID, a.Subject, a.Severity, a.Params, a.OpenedAt.Unix())
+				out += fmt.Sprintf("  active %s/%s/%s sev %d params %v opened %v\n", a.Kind, a.NodeID, a.Subject, a.Severity, withoutIPv6(a.Params), a.OpenedAt.Unix())
 			}
 		}
 		for _, a := range c.env.history() {
-			out += fmt.Sprintf("  history %s/%s/%s sev %d params %v opened %v resolved %v\n", a.Kind, a.NodeID, a.Subject, a.Severity, a.Params, a.OpenedAt.Unix(), a.ResolvedAt.Unix())
+			out += fmt.Sprintf("  history %s/%s/%s sev %d params %v opened %v resolved %v\n", a.Kind, a.NodeID, a.Subject, a.Severity, withoutIPv6(a.Params), a.OpenedAt.Unix(), a.ResolvedAt.Unix())
 		}
 		if ipv6 {
 			if rows := c.rows(familyV6, "de1"); len(rows) == 0 {

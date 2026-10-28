@@ -238,7 +238,11 @@ func (x *UpdateCountryReachabilityResponse) GetSettings() *CountryReachability {
 type GetReachabilityHistoryRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Days back from now, 1 to 7. 0 means 7; more is cut to 7, the retention of the sources.
-	Days          uint32 `protobuf:"varint,1,opt,name=days,proto3" json:"days,omitempty"`
+	Days uint32 `protobuf:"varint,1,opt,name=days,proto3" json:"days,omitempty"`
+	// The address family of the rounds the lanes show: 0 and 4 are IPv4 (every source), 6 is IPv6 (the Globalping lane alone: it is
+	// the only source that measures IPv6, and it has none while Globalping's IPv6 checks are off). Any other value is
+	// INVALID_ARGUMENT.
+	Family        uint32 `protobuf:"varint,2,opt,name=family,proto3" json:"family,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -276,6 +280,13 @@ func (*GetReachabilityHistoryRequest) Descriptor() ([]byte, []int) {
 func (x *GetReachabilityHistoryRequest) GetDays() uint32 {
 	if x != nil {
 		return x.Days
+	}
+	return 0
+}
+
+func (x *GetReachabilityHistoryRequest) GetFamily() uint32 {
+	if x != nil {
+		return x.Family
 	}
 	return 0
 }
@@ -461,7 +472,9 @@ type GetReachabilityHistoryResponse struct {
 	SinceUnix int64    `protobuf:"varint,3,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
 	NowUnix   int64    `protobuf:"varint,4,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
 	// Every node a source that is on measured in the window, by node id.
-	Nodes         []*NodeReachabilityHistory `protobuf:"bytes,5,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Nodes []*NodeReachabilityHistory `protobuf:"bytes,5,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	// The family of the request: 4 or 6.
+	Family        uint32 `protobuf:"varint,6,opt,name=family,proto3" json:"family,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -531,6 +544,13 @@ func (x *GetReachabilityHistoryResponse) GetNodes() []*NodeReachabilityHistory {
 	return nil
 }
 
+func (x *GetReachabilityHistoryResponse) GetFamily() uint32 {
+	if x != nil {
+		return x.Family
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_country_reachability_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_country_reachability_proto_rawDesc = "" +
@@ -544,9 +564,10 @@ const file_mistgate_admin_v1_country_reachability_proto_rawDesc = "" +
 	" UpdateCountryReachabilityRequest\x12\x18\n" +
 	"\acountry\x18\x01 \x01(\tR\acountry\"g\n" +
 	"!UpdateCountryReachabilityResponse\x12B\n" +
-	"\bsettings\x18\x01 \x01(\v2&.mistgate.admin.v1.CountryReachabilityR\bsettings\"3\n" +
+	"\bsettings\x18\x01 \x01(\v2&.mistgate.admin.v1.CountryReachabilityR\bsettings\"K\n" +
 	"\x1dGetReachabilityHistoryRequest\x12\x12\n" +
-	"\x04days\x18\x01 \x01(\rR\x04days\"m\n" +
+	"\x04days\x18\x01 \x01(\rR\x04days\x12\x16\n" +
+	"\x06family\x18\x02 \x01(\rR\x06family\"m\n" +
 	"\x11ReachabilityPoint\x12\x1b\n" +
 	"\aat_unix\x18\x01 \x01(\x03B\x020\x02R\x06atUnix\x12;\n" +
 	"\averdict\x18\x02 \x01(\x0e2!.mistgate.admin.v1.CountryVerdictR\averdict\"\x8b\x01\n" +
@@ -557,14 +578,15 @@ const file_mistgate_admin_v1_country_reachability_proto_rawDesc = "" +
 	"until_unix\x18\x03 \x01(\x03B\x020\x02R\tuntilUnix\"m\n" +
 	"\x17NodeReachabilityHistory\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x129\n" +
-	"\x05lanes\x18\x02 \x03(\v2#.mistgate.admin.v1.ReachabilityLaneR\x05lanes\"\xd8\x01\n" +
+	"\x05lanes\x18\x02 \x03(\v2#.mistgate.admin.v1.ReachabilityLaneR\x05lanes\"\xf0\x01\n" +
 	"\x1eGetReachabilityHistoryResponse\x12\x18\n" +
 	"\acountry\x18\x01 \x01(\tR\acountry\x12\x18\n" +
 	"\asources\x18\x02 \x03(\tR\asources\x12!\n" +
 	"\n" +
 	"since_unix\x18\x03 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +
 	"\bnow_unix\x18\x04 \x01(\x03B\x020\x02R\anowUnix\x12@\n" +
-	"\x05nodes\x18\x05 \x03(\v2*.mistgate.admin.v1.NodeReachabilityHistoryR\x05nodes2\xa3\x03\n" +
+	"\x05nodes\x18\x05 \x03(\v2*.mistgate.admin.v1.NodeReachabilityHistoryR\x05nodes\x12\x16\n" +
+	"\x06family\x18\x06 \x01(\rR\x06family2\xa3\x03\n" +
 	"\x1aCountryReachabilityService\x12}\n" +
 	"\x16GetCountryReachability\x120.mistgate.admin.v1.GetCountryReachabilityRequest\x1a1.mistgate.admin.v1.GetCountryReachabilityResponse\x12\x86\x01\n" +
 	"\x19UpdateCountryReachability\x123.mistgate.admin.v1.UpdateCountryReachabilityRequest\x1a4.mistgate.admin.v1.UpdateCountryReachabilityResponse\x12}\n" +

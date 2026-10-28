@@ -175,6 +175,9 @@ type Service struct {
 
 	countryMu        sync.Mutex // one country round at a time
 	countryStretched bool       // the stretched interval was logged
+	// entry6 says whether a node's IPv6 entry for clients is on (step 7 of the IPv6 plan sets it); nil: no node has one, so no
+	// IPv6 country alert is ever opened.
+	entry6 func(store.NodeRow) bool
 
 	evalMu sync.Mutex // serialises evaluate
 	kick   chan struct{}

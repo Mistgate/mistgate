@@ -95,7 +95,7 @@ func TestGetReachabilityHistory(t *testing.T) {
 	t.Cleanup(func() { st.Close() })
 	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	var asked time.Time
-	s := New(st, nil, func() time.Time { return now }, func(_ context.Context, since time.Time) ([]string, []*adminv1.NodeReachabilityHistory, error) {
+	s := New(st, nil, func() time.Time { return now }, func(_ context.Context, since time.Time, _ int) ([]string, []*adminv1.NodeReachabilityHistory, error) {
 		asked = since
 		return []string{"lists"}, []*adminv1.NodeReachabilityHistory{{NodeId: "nod_se1"}}, nil
 	})
@@ -120,5 +120,30 @@ func TestGetReachabilityHistory(t *testing.T) {
 	r, err := rpc{New(st, nil, nil, nil)}.GetReachabilityHistory(ownerCtx(), connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{}))
 	if err != nil || len(r.Msg.Sources) != 0 || len(r.Msg.Nodes) != 0 || r.Msg.Country != "RU" {
 		t.Fatalf("no history: %+v, %v", r, err)
+	}
+}
+
+// The family of the history: 0 is IPv4, 4 and 6 are passed to the health module and echoed, anything else is refused.
+func TestGetReachabilityHistoryFamily(t *testing.T) {
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	var asked int
+	s := New(st, nil, nil, func(_ context.Context, _ time.Time, family int) ([]string, []*adminv1.NodeReachabilityHistory, error) {
+		asked = family
+		return nil, nil, nil
+	})
+	for _, tc := range []struct{ in, want uint32 }{{0, 4}, {4, 4}, {6, 6}} {
+		r, err := rpc{s}.GetReachabilityHistory(ownerCtx(), connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{Family: tc.in}))
+		if err != nil || asked != int(tc.want) || r.Msg.Family != tc.want {
+			t.Errorf("family %d: asked %d, answered %+v, %v", tc.in, asked, r, err)
+		}
+	}
+	for _, bad := range []uint32{1, 5, 46} {
+		if _, err := (rpc{s}).GetReachabilityHistory(ownerCtx(), connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{Family: bad})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("family %d: %v", bad, err)
+		}
 	}
 }

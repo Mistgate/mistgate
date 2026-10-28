@@ -46,8 +46,8 @@ const (
 	countryMaxInterval = 24 * time.Hour
 	countryRoundTime   = 60 * time.Second // the whole round, controls and polling included
 	countryHoldSetting = "health.country_check.hold_until"
-	familyV4           = 4 // the address families of country-check rows: the alerts, the history and every other read use IPv4 only
-	familyV6           = 6 // for now; IPv6 rows are measured by Globalping alone and read by the nested CountryCheck.ipv6
+	familyV4           = 4 // the address families of country-check rows. IPv6 rows are measured by Globalping alone; they are read by the
+	familyV6           = 6 // nested CountryCheck.ipv6, the IPv6 history and the IPv6 alert of a node with the IPv6 entry
 )
 
 // countryControls is the site every probe must reach, per country: big, domestic and never blocked there. Other countries
@@ -702,6 +702,24 @@ func countryIPv6Msg(nodeID, country string, r *store.CountryCheck, fresh bool) *
 	return m
 }
 
+// countryIPv6Word is what the newest IPv6 round says of a node, for the IPv4 alert's ipv6 parameter: open (the node answers
+// there), partial (some networks only), blocked (TCP or everything is cut), unknown (no round, an old one, or a node without
+// IPv6; the reason is on CountryCheck.ipv6). It is the verdict countryIPv6Msg shows, from the same row.
+func countryIPv6Word(r *store.CountryCheck, fresh bool) string {
+	if r == nil || !fresh {
+		return "unknown"
+	}
+	switch r.Verdict {
+	case verdictOK:
+		return "open"
+	case verdictPartial:
+		return verdictPartial
+	case verdictTCPBlocked, verdictBlocked:
+		return verdictBlocked
+	}
+	return "unknown"
+}
+
 // combineCountry sets the verdict and source list on m from every fresh live row and the optional block-list check.
 func combineCountry(m *adminv1.CountryCheck, live []countryreach.Live, b *store.BlocklistCheck) {
 	var list *countryreach.Listing
@@ -1048,7 +1066,9 @@ func countryBad(verdict string) bool {
 // Partial observations are keyed by source and network. Unknown rows shadow older source state but do not create events; a
 // disagreement is neutral and holds the full alert. Each source event combines with the newest fresh row from every other source
 // (countryEvents). A block list never counts. While a node is disconnected both alerts are held; with all sources off they are
-// let go.
+// let go. The IPv6 rounds (Globalping alone) do the same for a node that has the IPv6 entry for clients (ipv6Entry), under the
+// keys "ipv6" and "ipv6/partial"; for every other node they only put the ipv6 parameter on its IPv4 alert (countryIPv6Word),
+// which refreshes the alert without announcing it again (reconcile: TouchAlert).
 func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[string]store.NodeLiveRow, activeAlerts map[key]store.HealthAlert, d *derived, add func(cond)) {
 	cc, _, liveOn := s.countryConfig(ctx)
 	tspu := s.tspuState(ctx)
@@ -1074,6 +1094,22 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 		}
 		for _, r := range rows {
 			byNode[r.NodeID] = append(byNode[r.NodeID], r)
+		}
+	}
+	// The IPv6 rounds (Globalping alone). A read that fails costs only the IPv6 side: the IPv6 alerts are held and the IPv4
+	// alerts carry no IPv6 verdict this time.
+	ipv6On := liveOn && cc.IPv6
+	byNode6 := map[string][]store.CountryCheck{}
+	v6Failed := false
+	var rows6 []store.CountryCheck
+	if ipv6On {
+		var err error
+		if rows6, err = s.st.RecentCountryChecks(ctx, familyV6, countryRecent); err != nil {
+			s.log.Warn("health: country check IPv6 rounds", "err", err)
+			v6Failed = true
+		}
+		for _, r := range rows6 {
+			byNode6[r.NodeID] = append(byNode6[r.NodeID], r)
 		}
 	}
 	tspuByNode := map[string][]tspuRound{}
@@ -1131,37 +1167,118 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 		signals = append(signals, countryExternalSignal(r, externalBySource[r.Source]))
 	}
 
+	ages6 := countryRoundMaxAges(cc.Interval, rows6)
+	now := s.now()
 	for _, n := range sn.nodes {
-		k := key{kCountryBlocked, n.ID, ""}
-		partialKey := key{kCountryBlocked, n.ID, "partial"}
-		if n.State != "active" || !live[n.ID].Connected {
-			d.holdKeys[k] = true
-			d.holdKeys[partialKey] = true
-			continue
+		var ipv6Word string // what the IPv6 rounds say of a node that has no IPv6 alert of its own: a parameter of its IPv4 alert
+		entry := ipv6On && s.ipv6Entry(n)
+		if ipv6On && !entry {
+			ipv6Word = "unknown"
+			if rounds := byNode6[n.ID]; len(rounds) > 0 && !v6Failed {
+				r := rounds[0]
+				ipv6Word = countryIPv6Word(&r, r.Country == cc.Country && now.Sub(r.At) <= ages6[n.ID])
+			}
 		}
-		events := countryEvents(signals, n.ID)
-		counted := countryCountedEvents(events)
-		seen := counted[:min(len(counted), countryAlertRounds)]
-		if len(seen) == countryAlertRounds && seen[0].bad() && seen[1].bad() {
-			add(countryCond(n, seen[0]))
+		s.countryNodeConds(n, live[n.ID].Connected, signals, activeAlerts, d, add, countryFamilyAlerts{family: familyV4, ipv6: ipv6Word})
+		if ipv6On {
+			// An IPv6 alert exists only for a node whose IPv6 entry for clients is on: the people on it depend on it. Without
+			// the entry the keys are let go, as those of a source that is off.
+			var signals6 []countryAlertSignal
+			if entry {
+				rounds := byNode6[n.ID]
+				for _, r := range rounds {
+					if r.Country != rounds[0].Country { // a country change starts the history over
+						break
+					}
+					signals6 = append(signals6, countryGlobalpingSignal(r, ages6[n.ID]))
+				}
+			}
+			s.countryNodeConds(n, live[n.ID].Connected, signals6, activeAlerts, d, add, countryFamilyAlerts{family: familyV6, off: !entry, hold: v6Failed})
+		}
+	}
+}
+
+// ipv6Entry says whether a node's IPv6 entry for clients is on, which is what gives its IPv6 country alert a reason to exist.
+// The entry is step 7 of the IPv6 plan; until it exists no node has one.
+func (s *Service) ipv6Entry(n store.NodeRow) bool {
+	return s.entry6 != nil && s.entry6(n)
+}
+
+// countryFamilyAlerts is one address family's side of the COUNTRY_BLOCKED alerts of a node.
+type countryFamilyAlerts struct {
+	family int
+	ipv6   string // familyV4: the IPv6 verdict word for the alert's parameter, "" for none
+	off    bool   // familyV6: the node has no IPv6 alert to keep (its keys are let go)
+	hold   bool   // familyV6: the rounds could not be read (its keys are held)
+}
+
+// subjects are the alert subjects of the family: the IPv4 ones are the original "" and "partial", so alerts that are open
+// when this ships stay the same alerts; the IPv6 ones are "ipv6" and "ipv6/partial" and the alert carries family=6.
+func (f countryFamilyAlerts) subjects() (full, partial string) {
+	if f.family == familyV6 {
+		return "ipv6", "ipv6/partial"
+	}
+	return "", "partial"
+}
+
+func (f countryFamilyAlerts) decorate(c cond) cond {
+	params := maps.Clone(c.params)
+	switch {
+	case f.family == familyV6:
+		params["family"] = "6"
+	case f.ipv6 != "":
+		params["ipv6"] = f.ipv6
+	}
+	c.params = params
+	c.key.subject = f.subject(c.key.subject)
+	return c
+}
+
+// subject maps an IPv4 subject to the family's.
+func (f countryFamilyAlerts) subject(v4 string) string {
+	full, partial := f.subjects()
+	if v4 == "partial" {
+		return partial
+	}
+	return full
+}
+
+// countryNodeConds is the COUNTRY_BLOCKED logic of one node and one address family over the signals of that family (see
+// addCountryConds). Nothing of it depends on the family but the keys, the signals and the parameters.
+func (s *Service) countryNodeConds(n store.NodeRow, connected bool, signals []countryAlertSignal, activeAlerts map[key]store.HealthAlert, d *derived, add func(cond), f countryFamilyAlerts) {
+	full, partial := f.subjects()
+	k := key{kCountryBlocked, n.ID, full}
+	partialKey := key{kCountryBlocked, n.ID, partial}
+	if f.off {
+		return
+	}
+	if n.State != "active" || !connected || f.hold {
+		d.holdKeys[k] = true
+		d.holdKeys[partialKey] = true
+		return
+	}
+	events := countryEvents(signals, n.ID)
+	counted := countryCountedEvents(events)
+	seen := counted[:min(len(counted), countryAlertRounds)]
+	if len(seen) == countryAlertRounds && seen[0].bad() && seen[1].bad() {
+		add(f.decorate(countryCond(n, seen[0])))
+		d.superseded[partialKey] = true
+		return
+	}
+	if len(seen) != countryAlertRounds || !seen[0].clear() || !seen[1].clear() {
+		d.holdKeys[k] = true
+		if _, ok := activeAlerts[k]; ok { // the full alert is held open: it still explains the node
 			d.superseded[partialKey] = true
-			continue
+			return
 		}
-		if len(seen) != countryAlertRounds || !seen[0].clear() || !seen[1].clear() {
-			d.holdKeys[k] = true
-			if _, ok := activeAlerts[k]; ok { // the full alert is held open: it still explains the node
-				d.superseded[partialKey] = true
-				continue
-			}
+	}
+	if alert, ok := activeAlerts[partialKey]; ok {
+		if countryPartialHeld(signals, n.ID, alert.Params["sources"]) {
+			d.holdKeys[partialKey] = true
 		}
-		if alert, ok := activeAlerts[partialKey]; ok {
-			if countryPartialHeld(signals, n.ID, alert.Params["sources"]) {
-				d.holdKeys[partialKey] = true
-			}
-		}
-		if c, ok := countryPartialCond(n, events, signals); ok {
-			add(c)
-		}
+	}
+	if c, ok := countryPartialCond(n, events, signals); ok {
+		add(f.decorate(c))
 	}
 }
 

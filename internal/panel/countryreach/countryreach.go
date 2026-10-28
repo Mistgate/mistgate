@@ -31,9 +31,9 @@ var countryRe = regexp.MustCompile(`^[A-Za-z]{2}$`)
 // HistoryDays is the longest history GetReachabilityHistory returns: the sources keep their results for 7 days.
 const HistoryDays = 7
 
-// History reads what the sources that are on said of each node since a time (health.Service.CountryHistory, which knows which
-// sources are on; this service is built before it).
-type History func(ctx context.Context, since time.Time) (sources []string, nodes []*adminv1.NodeReachabilityHistory, err error)
+// History reads what the sources that are on said of each node since a time, in one address family (4 or 6;
+// health.Service.CountryHistory, which knows which sources are on; this service is built before it).
+type History func(ctx context.Context, since time.Time, family int) (sources []string, nodes []*adminv1.NodeReachabilityHistory, err error)
 
 // Service is the country setting and its admin API.
 type Service struct {
@@ -121,12 +121,20 @@ func (r rpc) GetReachabilityHistory(ctx context.Context, req *connect.Request[ad
 	if days == 0 || days > HistoryDays {
 		days = HistoryDays
 	}
+	family := int(req.Msg.Family)
+	switch family {
+	case 0:
+		family = 4
+	case 4, 6:
+	default:
+		return nil, fail(connect.CodeInvalidArgument, "family: 4 or 6")
+	}
 	now := s.now()
 	since := now.Add(-time.Duration(days) * 24 * time.Hour)
-	out := &adminv1.GetReachabilityHistoryResponse{Country: s.Country(ctx), SinceUnix: since.Unix(), NowUnix: now.Unix()}
+	out := &adminv1.GetReachabilityHistoryResponse{Country: s.Country(ctx), SinceUnix: since.Unix(), NowUnix: now.Unix(), Family: uint32(family)}
 	if s.history != nil {
 		var err error
-		if out.Sources, out.Nodes, err = s.history(ctx, since); err != nil {
+		if out.Sources, out.Nodes, err = s.history(ctx, since, family); err != nil {
 			s.log.Error("countryreach: read the history", "err", err)
 			return nil, fail(connect.CodeInternal, "internal error")
 		}

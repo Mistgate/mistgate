@@ -17,7 +17,7 @@ import (
 func (c *countryEnv) history() (sources []string, lanes []string) {
 	c.t.Helper()
 	now := c.clock.Now()
-	sources, nodes, err := c.s.CountryHistory(c.ctx, now.Add(-7*24*time.Hour))
+	sources, nodes, err := c.s.CountryHistory(c.ctx, now.Add(-7*24*time.Hour), familyV4)
 	if err != nil {
 		c.t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestCountryHistoryKeepsTheFullTSPUWindow(t *testing.T) {
 	if err := c.st.InsertTSPUChecks(c.ctx, rows); err != nil {
 		t.Fatal(err)
 	}
-	_, nodes, err := c.s.CountryHistory(c.ctx, start)
+	_, nodes, err := c.s.CountryHistory(c.ctx, start, familyV4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestCountryHistoryAddsExternalLanesAndUsesNewestRowForUntil(t *testing.T) {
 	if err := c.st.InsertExtChecks(c.ctx, rows); err != nil {
 		t.Fatal(err)
 	}
-	sources, nodes, err := c.s.CountryHistory(c.ctx, now.Add(-7*24*time.Hour))
+	sources, nodes, err := c.s.CountryHistory(c.ctx, now.Add(-7*24*time.Hour), familyV4)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -38,6 +38,10 @@ message UpdateCountryReachabilityResponse { CountryReachability settings = 1; }
 message GetReachabilityHistoryRequest {
   // Days back from now, 1 to 7. 0 means 7; more is cut to 7, the retention of the sources.
   uint32 days = 1;
+  // The address family of the rounds the lanes show: 0 and 4 are IPv4 (every source), 6 is IPv6 (the Globalping lane alone: it is
+  // the only source that measures IPv6, and it has none while Globalping's IPv6 checks are off). Any other value is
+  // INVALID_ARGUMENT.
+  uint32 family = 2;
 }
 
 // A verdict from at_unix on, until the next point of the lane (the last one until the lane's until_unix).
@@ -73,4 +77,6 @@ message GetReachabilityHistoryResponse {
   int64 now_unix = 4 [jstype = JS_NUMBER];
   // Every node a source that is on measured in the window, by node id.
   repeated NodeReachabilityHistory nodes = 5;
+  // The family of the request: 4 or 6.
+  uint32 family = 6;
 }

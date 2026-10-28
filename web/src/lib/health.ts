@@ -112,7 +112,8 @@ export function alertTitle(t: T, a: Alert): string {
   if ((a.kind === AlertKind.DOCTOR_WARN || a.kind === AlertKind.DOCTOR_FAIL) && params.check) params.check_title = checkTitle(t, params.check);
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     params.country = countryIn(t, params.country ?? "");
-    if (a.subject === "partial") key += ".partial"; // some networks only: its own key next to the full block's (subject "")
+    // some networks only: its own key next to the full block's (subject ""). The IPv6 alert's subjects are "ipv6" and "ipv6/partial".
+    if (a.subject === "partial" || a.subject.endsWith("/partial")) key += ".partial";
   }
   return lookup(t, key, params) ?? a.titleKey;
 }

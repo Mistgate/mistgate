@@ -990,6 +990,20 @@ describe("reachability from a country", () => {
     expect(alertWhy(tPlural, fmt, { ...partial, params: { ...partial.params, networks: "<i>MTS</i> {country}" } })).toContain("probes on <i>MTS</i> {country} get no answer");
   });
 
+  it("reads the IPv6 alert's subjects like the IPv4 ones: \"ipv6/partial\" is the partial alert, \"ipv6\" the full one", () => {
+    const base = {
+      kind: AlertKind.COUNTRY_BLOCKED,
+      nodeName: "de1",
+      titleKey: "health.alert.country_blocked.title",
+      whyKey: "health.alert.country_blocked.why.partial",
+      params: { node: "de1", country: "RU", verdict: "partial", confidence: "eyeball", sources: "globalping", networks: "MTS (AS8359, Novosibirsk)", family: "6" },
+    };
+    expect(alertTitle(tPlural, alert({ ...base, subject: "ipv6/partial" }))).toBe("Unreachable from some networks in Russia");
+    expect(alertTitle(tPlural, alert({ ...base, subject: "ipv6" }))).toBe("Unreachable from Russia");
+    expect(alertTitle(tPlural, alert({ ...base, subject: "partial" }))).toBe("Unreachable from some networks in Russia");
+    expect(alertTitle(tPlural, alert({ ...base, subject: "" }))).toBe("Unreachable from Russia");
+  });
+
   it("names the alert in an approval, where there is no country to fill in", () => {
     const fact = { key: "alert", value: "", untrusted: false, code: "alert", params: { kind: "country_blocked", severity: "warning" }, untrustedParams: [] };
     expect(factWords(tPlural, fmt, fact)).toEqual(["A node is unreachable from the chosen country · Warning"]);

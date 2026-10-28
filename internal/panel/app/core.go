@@ -251,8 +251,8 @@ func wireCore(c Config) (*core, error) {
 	// Globalping, an integration of its own: off until the owner switches it on. The country check of the health module
 	// measures through it and does nothing while it is off. The country it looks from is the shared one of countryreach.
 	// Its history is read by the health module, which knows which sources are on: late binding to hl.
-	k.cr = countryreach.New(st, log, c.Clock, func(ctx context.Context, since time.Time) ([]string, []*adminv1.NodeReachabilityHistory, error) {
-		return hl.CountryHistory(ctx, since)
+	k.cr = countryreach.New(st, log, c.Clock, func(ctx context.Context, since time.Time, family int) ([]string, []*adminv1.NodeReachabilityHistory, error) {
+		return hl.CountryHistory(ctx, since, family)
 	})
 	k.gp, err = globalping.New(globalping.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: k.cr.Country,
 		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }})

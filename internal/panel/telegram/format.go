@@ -234,18 +234,22 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("An app was turned away at the device limit", "Приложению отказали: лимит устройств", "有应用因设备数上限被拒绝")
 	case "country_blocked":
 		c := data(access.CountryName(p["country"], string(l)), 60)
-		if a.Subject == "partial" {
+		v6 := ""
+		if p["family"] == "6" { // the alert of the node's IPv6 entry: see health.countryFamilyAlerts
+			v6 = " (IPv6)"
+		}
+		if countryPartial(a) {
 			ru := "Нода недоступна из части сетей страны: " + c
 			if g, ok := ruFromCountry[p["country"]]; ok {
 				ru = "Нода недоступна из части сетей " + g
 			}
-			return l.pick("Node is unreachable from some networks in "+c, ru, "节点在"+c+"的部分网络中无法连接")
+			return l.pick("Node is unreachable from some networks in "+c, ru, "节点在"+c+"的部分网络中无法连接") + v6
 		}
 		ru := "Нода недоступна из страны: " + c // the names are nominative; the countries on offer have their genitive
 		if g, ok := ruFromCountry[p["country"]]; ok {
 			ru = "Нода недоступна из " + g
 		}
-		return l.pick("Node is unreachable from "+c, ru, "节点从"+c+"无法连接")
+		return l.pick("Node is unreachable from "+c, ru, "节点从"+c+"无法连接") + v6
 	}
 	return data(strings.ReplaceAll(a.Kind, "_", " "), 40)
 }
@@ -339,10 +343,14 @@ func alertReason(l L, a store.HealthAlert) string {
 	case "port_lossy":
 		return portLossReason(l, p)
 	case "country_blocked":
-		if a.Subject == "partial" {
-			return countryPartialReason(l, p)
+		reason := countryBlockedReason(l, p)
+		if countryPartial(a) {
+			reason = countryPartialReason(l, p)
 		}
-		return countryBlockedReason(l, p)
+		if p["ipv6"] == "open" { // the IPv4 alert of a node the IPv6 rounds reach: a hint, not a message of its own
+			reason += "\n" + l.pick("Reachable over IPv6.", "По IPv6 доступна.", "通过 IPv6 可以访问。")
+		}
+		return reason
 	case "users_impacted":
 		protocol := a.Subject
 		switch protocol {
@@ -362,6 +370,11 @@ func alertReason(l L, a store.HealthAlert) string {
 			protocol+" 的在线用户：现在 "+data(p["now"], 8)+" 人，此时段通常约 "+data(p["usual"], 8)+" 人，而节点在线。这看起来是用户侧网络封锁。")
 	}
 	return ""
+}
+
+// countryPartial: the alert is about some networks only. The IPv4 subject is "partial", the IPv6 one "ipv6/partial".
+func countryPartial(a store.HealthAlert) bool {
+	return a.Subject == "partial" || strings.HasSuffix(a.Subject, "/partial")
 }
 
 // ruFromCountry is a country after Russian "из" (genitive), for the countries the check offers (web/src/i18n/country.ts).
