@@ -165,7 +165,7 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 	if s.snap != nil && now.UnixNano()-s.snap.at < int64(s.cfg.SnapshotTTL) && now.UnixNano() >= s.snap.at {
 		return s.snap, nil
 	}
-	nodes, err := s.st.Nodes(ctx, false)
+	nodes, links, err := s.st.NodesWithRelayLinks(ctx) // one batched read: relays add no D1 call
 	if err != nil {
 		return nil, err
 	}
@@ -185,10 +185,6 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 			sn.byNode[n.ID] = append(sn.byNode[n.ID], t)
 			sn.targets[r.ID] = t
 		}
-	}
-	links, err := s.st.RelayLinks(ctx, store.RelayFilter{EnabledOnly: true})
-	if err != nil {
-		return nil, err
 	}
 	for _, link := range links {
 		exit := sn.targets[link.InboundID]

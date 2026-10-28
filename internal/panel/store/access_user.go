@@ -809,7 +809,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
-		r.add(appendRows(&relays, scanRelayLink), relayLinkQuery+` WHERE r.enabled = 1 ORDER BY r.created_at, r.id`)
+		r.add(appendRows(&relays, scanRelayLink), relayEnabledQuery)
 	}
 	r.add(appendRows(&liveNodes, scanSubscriptionNodeLive), `SELECT n.id AS node_id,
 		l.node_id AS live_node_id, coalesce(l.sample_at, 0) AS sample_at, coalesce(l.rx_bps, 0) AS rx_bps,

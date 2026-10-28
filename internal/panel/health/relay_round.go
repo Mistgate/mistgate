@@ -177,7 +177,7 @@ func (s *Service) addRelayDownConds(ctx context.Context, now time.Time, sn *snap
 		activeKeys[key{alert.Kind, alert.NodeID, alert.Subject}] = true
 	}
 	add := func(c cond) { d.conds[c.key] = c }
-	staleAfter := 2*s.interval(ctx) + time.Minute
+	staleAfter := d.staleAfter
 	for _, link := range links {
 		k := key{kRelayDown, link.ViaNodeID, link.ID}
 		entryDown := key{kNodeDown, link.ViaNodeID, ""}

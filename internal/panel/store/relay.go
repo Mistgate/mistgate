@@ -96,6 +96,22 @@ func scanRelay(r rowScanner, extra ...any) (Relay, error) {
 	return v, nil
 }
 
+// relayEnabledQuery is the relays that are on, with both ends, oldest first.
+const relayEnabledQuery = relayLinkQuery + ` WHERE r.enabled = 1 ORDER BY r.created_at, r.id`
+
+// NodesWithRelayLinks reads the non-retired nodes and the enabled relays in one batch: one D1 call, whatever the relay count.
+func (s *Store) NodesWithRelayLinks(ctx context.Context) ([]NodeRow, []RelayLink, error) {
+	var nodes []NodeRow
+	var links []RelayLink
+	var r reads
+	r.add(appendRows(&nodes, scanNode), `SELECT `+nodeCols+` FROM node WHERE state <> 'retired' ORDER BY name COLLATE NOCASE`)
+	r.add(appendRows(&links, scanRelayLink), relayEnabledQuery)
+	if err := r.run(ctx, s); err != nil {
+		return nil, nil, err
+	}
+	return nodes, links, nil
+}
+
 // RelayLinks lists the relays the filter selects with both ends, oldest first.
 func (s *Store) RelayLinks(ctx context.Context, f RelayFilter) ([]RelayLink, error) {
 	var where []string

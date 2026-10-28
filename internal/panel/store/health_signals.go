@@ -63,6 +63,8 @@ type HealthSignalBatch struct {
 	// DeviceLimits are the people refused at their device limit; the sightings TRACK writes are history only and are not here.
 	DeviceLimits []HealthDeviceLimitSignal
 	NodeFlaps    []HealthNodeFlapSignal
+	// RelayLinks are the enabled relays with their latest client-eye result; read here so the evaluator costs no extra D1 call.
+	RelayLinks []RelayLink
 }
 
 func scanHealthUserSignal(r rowScanner) (HealthUserSignal, error) {
@@ -173,7 +175,7 @@ const healthDeviceLimitSQL = `
 	WHERE code = 'device_limit_reached' AND ts >= ? AND json_extract(params_json, '$.refused') = '1'
 	GROUP BY 1`
 
-// HealthSignals reads the user, AWG, hourly fleet, torrent, device-limit and node-flap inputs in one read batch.
+// HealthSignals reads the user, AWG, hourly fleet, torrent, device-limit, node-flap and relay inputs in one read batch.
 func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalBatch, error) {
 	var out HealthSignalBatch
 	currentHour := now.UTC().Truncate(time.Hour).Unix()
@@ -207,6 +209,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 	reads.add(appendRows(&out.Torrents, scanHealthTorrent), healthTorrentSQL, now.Add(-24*time.Hour).Unix())
 	reads.add(appendRows(&out.DeviceLimits, scanHealthDeviceLimit), healthDeviceLimitSQL, now.Add(-24*time.Hour).Unix())
 	reads.add(appendRows(&out.NodeFlaps, scanHealthNodeFlap), healthNodeFlapSQL, now.Add(-time.Hour).Unix())
+	reads.add(appendRows(&out.RelayLinks, scanRelayLink), relayEnabledQuery)
 	if err := reads.run(ctx, s); err != nil {
 		return HealthSignalBatch{}, err
 	}

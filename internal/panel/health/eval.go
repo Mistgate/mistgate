@@ -109,6 +109,7 @@ type derived struct {
 	holdKeys   map[key]bool    // an alert cannot be judged yet: its comparison window is warming up, or the check result behind it is stale
 	superseded map[key]bool    // an open alert is explained by a more specific current check alert
 	guard      bool            // the panel's own network is suspect: no per-node synthetic alert is raised
+	staleAfter time.Duration   // how old a check result may be and still count (the interval setting is read once per pass)
 	health     map[string]nodeHealth
 }
 
@@ -195,7 +196,6 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 	var rows []store.DoctorRow
 	var accepts []store.DoctorAccept
 	var portChecks []store.PortCheck
-	var relayLinks []store.RelayLink
 	needFleetData := len(sn.nodes) > 0 || !s.cfg.Edge
 	if needFleetData {
 		liveRows, err = s.fl.Live(ctx)
@@ -225,11 +225,6 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 			s.log.Warn("health: evaluate", "err", err)
 			return
 		}
-		relayLinks, err = s.st.RelayLinks(ctx, store.RelayFilter{EnabledOnly: true})
-		if err != nil {
-			s.log.Warn("health: evaluate relays", "err", err)
-			return
-		}
 	}
 	active, err := s.st.ActiveAlerts(ctx)
 	if err != nil {
@@ -237,7 +232,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 		return
 	}
 	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, active)
-	s.addRelayDownConds(ctx, now, sn, relayLinks, active, d)
+	s.addRelayDownConds(ctx, now, sn, signals.RelayLinks, active, d)
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
 	s.nhMu.Unlock()
@@ -286,6 +281,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 	add := func(c cond) { d.conds[c.key] = c }
 	grace := !s.cfg.Edge && now.Sub(s.startedAt) < s.cfg.StartGrace
 	staleAfter := 2*s.interval(ctx) + time.Minute
+	d.staleAfter = staleAfter
 
 	byNode := map[string][]probed{}
 	var connected []store.NodeRow
