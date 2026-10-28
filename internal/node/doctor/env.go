@@ -48,6 +48,8 @@ type Env struct {
 	Now      func() time.Time
 	// Dial is a TCP connect attempt that is closed at once.
 	Dial func(ctx context.Context, network, addr string) error
+	// LocalAddr is the source address the kernel picks for a connection to addr: a UDP connect that sends nothing.
+	LocalAddr func(ctx context.Context, network, addr string) (string, error)
 	// Lookup resolves host with the host's own resolver; LookupVia asks one server ("ip:port") directly.
 	Lookup    func(ctx context.Context, host string) error
 	LookupVia func(ctx context.Context, server, host string) error
@@ -209,6 +211,9 @@ func (e *Env) defaults() {
 	if e.Dial == nil {
 		e.Dial = func(context.Context, string, string) error { return errors.New("no dialer") }
 	}
+	if e.LocalAddr == nil {
+		e.LocalAddr = func(context.Context, string, string) (string, error) { return "", errors.New("no dialer") }
+	}
 	if e.Lookup == nil {
 		e.Lookup = func(context.Context, string) error { return errors.New("no resolver") }
 	}
@@ -292,6 +297,7 @@ func DefaultEnv() Env {
 		Run:        execRun,
 		LookPath:   exec.LookPath,
 		Dial:       dialOnce,
+		LocalAddr:  localAddr,
 		Lookup:     lookupHost,
 		LookupVia:  lookupVia,
 		ServedCert: servedCert,
@@ -353,6 +359,17 @@ func dialOnce(ctx context.Context, network, addr string) error {
 		return err
 	}
 	return c.Close()
+}
+
+func localAddr(ctx context.Context, network, addr string) (string, error) {
+	var d net.Dialer
+	c, err := d.DialContext(ctx, network, addr)
+	if err != nil {
+		return "", err
+	}
+	defer c.Close()
+	h, _, err := net.SplitHostPort(c.LocalAddr().String())
+	return h, err
 }
 
 // lookupHost uses the process resolver, which follows the host's resolv.conf (and nsswitch when built with cgo).

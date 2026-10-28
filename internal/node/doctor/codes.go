@@ -23,7 +23,10 @@ const (
 	// resolver: domains, failed_count, failed, median_ms
 	CodeResolverOK     = "resolver.ok"
 	CodeResolverFailed = "resolver.failed"
-	// ipv6: ipv6 (yes | no), connect (ok | failed), warp_inbounds, client_ipv6 (off), suggest (client_ipv6_off)
+	// ipv6: ipv6 (yes | no), connect (ok | failed), warp_inbounds, client_ipv6 (off), suggest (client_ipv6_off);
+	// with a global address also iface (interface of the main-table ::/0 route; never mg*, wg*, awg* or other tunnels),
+	// addrs (its stable global addresses "addr/plen", comma-separated, at most 4) and src (the kernel's source address
+	// for an outbound IPv6 connection); each is omitted when unknown
 	CodeIPv6None      = "ipv6.none"
 	CodeIPv6NoneWarp  = "ipv6.none_warp"
 	CodeIPv6OK        = "ipv6.ok"

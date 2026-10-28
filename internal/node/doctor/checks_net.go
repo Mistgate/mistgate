@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -181,6 +182,7 @@ func checkIPv6(ctx context.Context, e *Env) Result {
 		}
 		return r
 	}
+	uplink := ipv6Uplink(ctx, e)
 	var wg sync.WaitGroup
 	ok := make([]bool, len(ipv6Probes))
 	for i, a := range ipv6Probes {
@@ -195,16 +197,117 @@ func checkIPv6(ctx context.Context, e *Env) Result {
 	wg.Wait()
 	for _, v := range ok {
 		if v {
-			return Result{Status: OK, Code: CodeIPv6OK, Params: p("ipv6", "yes", "connect", "ok"), Detail: "global IPv6 address, outbound connect works"}
+			return Result{Status: OK, Code: CodeIPv6OK, Params: uplink.with(p("ipv6", "yes", "connect", "ok")), Detail: "global IPv6 address, outbound connect works"}
 		}
 	}
 	if e.Settings().ClientIPv6Disabled {
-		return Result{Status: OK, Code: CodeIPv6ClientOff, Params: p("ipv6", "yes", "connect", "failed", "client_ipv6", "off"),
+		return Result{Status: OK, Code: CodeIPv6ClientOff, Params: uplink.with(p("ipv6", "yes", "connect", "failed", "client_ipv6", "off")),
 			Detail: "outbound IPv6 fails, IPv6 for clients is off: clients use IPv4"}
 	}
 	return Result{Status: Warn, Code: CodeIPv6Stalls,
 		Detail: "global IPv6 address but an outbound IPv6 connect fails; clients that get AAAA answers will stall",
-		Params: p("ipv6", "yes", "connect", "failed", "suggest", "client_ipv6_off")}
+		Params: uplink.with(p("ipv6", "yes", "connect", "failed", "suggest", "client_ipv6_off"))}
+}
+
+// ipv6Src is the address the kernel picks as the source of an outbound IPv6 connection (the panel reads it as the
+// node's IPv6 address): a UDP connect to a public resolver, which sends nothing.
+const ipv6Src = "[2001:4860:4860::8888]:53"
+
+// uplink6 is what the ipv6 check says about the main IPv6 uplink. Zero value = nothing to say.
+type uplink6 struct{ iface, addrs, src string }
+
+func (u uplink6) with(m map[string]string) map[string]string {
+	for k, v := range map[string]string{"iface": u.iface, "addrs": u.addrs, "src": u.src} {
+		if v != "" {
+			m[k] = v
+		}
+	}
+	return m
+}
+
+// maxUplinkAddrs caps the addrs param.
+const maxUplinkAddrs = 4
+
+func ipv6Uplink(ctx context.Context, e *Env) uplink6 {
+	var u uplink6
+	if s, err := e.read("/proc/net/ipv6_route"); err == nil {
+		u.iface = ipv6DefaultIface(s)
+	}
+	if u.iface != "" {
+		if s, err := e.read("/proc/net/if_inet6"); err == nil {
+			u.addrs = csv(firstN(stableInet6(s, u.iface), maxUplinkAddrs))
+		}
+	}
+	cctx, cancel := context.WithTimeout(ctx, ipv6Timeout)
+	defer cancel()
+	if a, err := e.LocalAddr(cctx, "udp6", ipv6Src); err == nil {
+		if ip, err := netip.ParseAddr(a); err == nil && ip.IsGlobalUnicast() && !ip.IsPrivate() {
+			u.src = ip.String()
+		}
+	}
+	return u
+}
+
+// tunnelIfacePrefixes name interfaces that never carry the uplink: the agent's own links (mgwarp, mgawg*), other
+// VPN, bridge and container devices.
+var tunnelIfacePrefixes = []string{"lo", "mg", "wg", "awg", "tun", "tap", "ppp", "sit", "ip6tnl", "ip6gre", "gre", "tailscale", "zt", "docker", "br-", "veth", "virbr"}
+
+// ipv6DefaultIface returns the interface of the IPv6 default route (::/0) from /proc/net/ipv6_route: the lowest
+// metric among the routes that are up and not rejecting, on an interface that is not a tunnel. "" = none.
+// Columns: dest dest_len src src_len next_hop metric refcnt use flags iface (hex).
+func ipv6DefaultIface(s string) string {
+	best, bestMetric := "", uint64(0)
+	for _, line := range strings.Split(s, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 10 || f[0] != "00000000000000000000000000000000" || f[1] != "00" || isTunnelIface(f[9]) {
+			continue
+		}
+		flags, err := strconv.ParseUint(f[8], 16, 32)
+		if err != nil || flags&0x0001 == 0 || flags&0x0200 != 0 { // RTF_UP, RTF_REJECT
+			continue
+		}
+		m, _ := strconv.ParseUint(f[5], 16, 32)
+		if best == "" || m < bestMetric {
+			best, bestMetric = f[9], m
+		}
+	}
+	return best
+}
+
+func isTunnelIface(name string) bool {
+	for _, pre := range tunnelIfacePrefixes {
+		if strings.HasPrefix(name, pre) {
+			return true
+		}
+	}
+	return false
+}
+
+// stableInet6 lists the global addresses of one interface as "addr/plen", sorted: not ULA, link-local, temporary
+// (0x01), DAD-failed (0x08), deprecated (0x20) or tentative (0x40).
+func stableInet6(s, iface string) []string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 6 || len(f[0]) != 32 || f[3] != "00" || f[5] != iface {
+			continue
+		}
+		if fl, err := strconv.ParseUint(f[4], 16, 32); err != nil || fl&0x69 != 0 {
+			continue
+		}
+		plen, err := strconv.ParseUint(f[2], 16, 8)
+		raw, derr := hex.DecodeString(f[0])
+		if err != nil || derr != nil || plen > 128 {
+			continue
+		}
+		ip := netip.AddrFrom16([16]byte(raw))
+		if !ip.IsGlobalUnicast() || ip.IsPrivate() {
+			continue
+		}
+		out = append(out, ip.String()+"/"+strconv.FormatUint(plen, 10))
+	}
+	sort.Strings(out)
+	return out
 }
 
 // hasGlobalInet6 reads /proc/net/if_inet6 ("<32 hex> ifindex prefixlen scope flags name"): scope 00 is global;

@@ -165,7 +165,12 @@ package mistgate.agent.v1;
 //     dstate_tasks      tasks stuck in uninterruptible sleep (D) + TTM/QXL lines in dmesg (hint "qxl_ttm")
 //     time_sync         NTP synchronisation and offset against the panel clock
 //     resolver          the host resolver answers the control domains (+ gosuslugi.ru on RU nodes)
-//     ipv6              IPv6 present and working; WARP egress without IPv6 needs ForceIPv4
+//     ipv6              IPv6 present and working; WARP egress without IPv6 needs ForceIPv4. Params: ipv6, connect and, with a
+//                       global address on the host, iface (interface of the ::/0 route in the main table; WARP, AmneziaWG
+//                       and other tunnel interfaces are never picked), addrs (the stable global addresses of that interface as
+//                       "addr/plen", comma-separated, at most 4: no ULA, temporary, deprecated or tentative ones) and src (the
+//                       source address the kernel picks for an outbound IPv6 connection); a param that is not known is left
+//                       out, and an older agent sends none of the three
 //     foreign_vpn       leftovers of other VPN stacks: x-ui, xray, remnanode, amnezia containers, old wg interfaces
 //     foreign_nft       nftables tables/rules that are not ours (nat/redirect in particular)
 //     port_conflicts    inbound ports (and hop ranges) held by a process that is not us
