@@ -140,6 +140,67 @@ func TestResolveCustomServers(t *testing.T) {
 	}
 }
 
+func TestResolveIPv4OnlyCustomServers(t *testing.T) {
+	servers := []Server{
+		{Kind: KindPlain, Address: "[2001:db8::53]:5353"},
+		{Kind: KindPlain, Address: "192.0.2.53:5353"},
+		{Kind: KindDoH, Address: "https://[2001:db8::54]/dns-query"},
+		{Kind: KindDoH, Address: "https://192.0.2.54/dns-query"},
+		{Kind: KindDoT, Address: "2001:db8::55"},
+		{Kind: KindDoT, Address: "192.0.2.55"},
+	}
+	p := Preset{Name: "ipv4-only", Transport: KindPlain, IPv4Only: true, Servers: servers}
+	got, notes := p.EndpointsFor(ClientMihomo)
+	if want := []string{"plain:192.0.2.53:5353", "doh:https://192.0.2.54/dns-query", "dot:192.0.2.55"}; !slices.Equal(line(got), want) {
+		t.Errorf("IPv4-only endpoints = %v, want %v", line(got), want)
+	}
+	if want := []string{
+		"server [2001:db8::53]:5353 skipped: ipv4_only",
+		"server https://[2001:db8::54]/dns-query skipped: ipv4_only",
+		"server 2001:db8::55 skipped: ipv4_only",
+	}; !slices.Equal(notes, want) {
+		t.Errorf("IPv4-only notes = %v, want %v", notes, want)
+	}
+	for _, e := range got {
+		for _, ip := range e.IPs {
+			if !isIPv4(ip) {
+				t.Errorf("IPv4-only endpoint contains bootstrap %q: %+v", ip, e)
+			}
+		}
+	}
+
+	p.IPv4Only = false
+	got, notes = p.EndpointsFor(ClientMihomo)
+	if want := []string{
+		"plain:[2001:db8::53]:5353", "plain:192.0.2.53:5353",
+		"doh:https://[2001:db8::54]/dns-query", "doh:https://192.0.2.54/dns-query",
+		"dot:2001:db8::55", "dot:192.0.2.55",
+	}; !slices.Equal(line(got), want) || len(notes) != 0 {
+		t.Errorf("non-IPv4-only endpoints = %v, notes %v; want %v", line(got), notes, want)
+	}
+	if len(got) == len(servers) && (!slices.Equal(got[2].IPs, []string{"2001:db8::54"}) || !slices.Equal(got[4].IPs, []string{"2001:db8::55"})) {
+		t.Errorf("non-IPv4-only IPv6 bootstraps changed: DoH %v, DoT %v", got[2].IPs, got[4].IPs)
+	}
+}
+
+func TestIPv4OnlyFiltersCustomBootstrapIPs(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ips  []string
+		want []string
+	}{
+		{name: "IPv4 and IPv6", ips: []string{"192.0.2.56", "2001:db8::56"}, want: []string{"192.0.2.56"}},
+		{name: "IPv6 only", ips: []string{"2001:db8::56"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, keep := ipv4OnlyEndpoint(Endpoint{Kind: KindDoT, Address: "dns.example.com", IPs: tc.ips})
+			if !keep || !slices.Equal(e.IPs, tc.want) {
+				t.Errorf("filtered endpoint = %+v, keep %v; want IPs %v", e, keep, tc.want)
+			}
+		})
+	}
+}
+
 // The preset helpers feed Resolve with the preset's own transport, split rules included.
 func TestPresetEndpointsFor(t *testing.T) {
 	p := Preset{Name: "x", Transport: KindDoH, Servers: variantServers("cloudflare/standard"), SplitDirect: true,

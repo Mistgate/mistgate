@@ -123,6 +123,49 @@ func customEndpoint(s Server) Endpoint {
 	return e
 }
 
+// ipv4OnlyEndpoint drops an IPv6 resolver and removes IPv6 bootstrap addresses from an endpoint.
+func ipv4OnlyEndpoint(e Endpoint) (Endpoint, bool) {
+	if e.Kind == KindPlain {
+		a, err := netip.ParseAddr(e.Address)
+		if err != nil {
+			if ap, err := netip.ParseAddrPort(e.Address); err == nil {
+				a = ap.Addr()
+			} else {
+				return e, true
+			}
+		}
+		return e, !a.Is6()
+	}
+	if e.Kind != KindDoH && e.Kind != KindDoT {
+		return e, true
+	}
+
+	host := ""
+	if e.Kind == KindDoH {
+		u, err := url.Parse(e.Address)
+		if err == nil {
+			host = u.Hostname()
+		}
+	} else {
+		host = e.Address
+		if ap, err := netip.ParseAddrPort(host); err == nil {
+			if ap.Addr().Is6() {
+				return e, false
+			}
+		} else if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+	}
+	if a, err := netip.ParseAddr(host); err == nil && a.Is6() {
+		return e, false
+	}
+	e.IPs = slices.DeleteFunc(e.IPs, func(ip string) bool {
+		a, err := netip.ParseAddr(ip)
+		return err == nil && a.Is6()
+	})
+	return e, true
+}
+
 // hostIPs are the addresses of a DoH/DoT host: the host itself when it is an IP literal, else what the catalog
 // knows about that host name (so a hand-typed "https://dns.adguard-dns.com/dns-query" still gets a bootstrap IP).
 func hostIPs(k Kind, host string) []string {
@@ -219,10 +262,18 @@ func Resolve(c Client, pref Kind, servers []Server, ipv4Only bool) (out []Endpoi
 				notes = append(notes, fmt.Sprintf("server %s skipped: %s", s.Address, why))
 				continue
 			}
-			if e.Kind == KindPlain && ipv4Only {
-				if a, err := netip.ParseAddr(e.Address); err == nil && a.Is6() {
+			if ipv4Only {
+				var keep bool
+				e, keep = ipv4OnlyEndpoint(e)
+				if !keep {
 					notes = append(notes, fmt.Sprintf("server %s skipped: ipv4_only", s.Address))
 					continue
+				}
+				if e.Kind != KindPlain {
+					if why := c.reject(e); why != "" {
+						notes = append(notes, fmt.Sprintf("server %s skipped: %s", s.Address, why))
+						continue
+					}
 				}
 			}
 			g = []Endpoint{e}
