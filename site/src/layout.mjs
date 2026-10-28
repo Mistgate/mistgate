@@ -8,7 +8,7 @@ export const T = {
     hreflang: "en", htmlLang: "en", ogLocale: "en_US", name: "English", short: "EN", docs: "Docs", home: "Home", siteTitle: "Mistgate docs",
     skip: "Skip to content", menu: "Menu", closeMenu: "Close menu", navLabel: "Documentation", crumbs: "Breadcrumb",
     search: "Search docs", searchLabel: "Search the documentation", searchEmpty: "Nothing found. Try another word.", searchClose: "Close search", searchIn: "in",
-    onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub",
+    onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub", stars: "Mistgate on GitHub, {n} stars",
     language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet", roadmap: "Roadmap phases",
     license: "Released under AGPL-3.0", other: "Other",
     inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", reachability: "Reachability", updates: "Updates", integrations: "Integrations", settings: "Settings" },
@@ -18,7 +18,7 @@ export const T = {
     hreflang: "ru", htmlLang: "ru", ogLocale: "ru_RU", name: "Русский", short: "RU", docs: "Документация", home: "Главная", siteTitle: "Документация Mistgate",
     skip: "К содержимому", menu: "Меню", closeMenu: "Закрыть меню", navLabel: "Документация", crumbs: "Навигация по разделам",
     search: "Поиск по документации", searchLabel: "Поиск по документации", searchEmpty: "Ничего не нашлось. Попробуйте другое слово.", searchClose: "Закрыть поиск", searchIn: "в",
-    onPage: "На этой странице", prev: "Назад", next: "Дальше", edit: "Править страницу на GitHub", theme: "Сменить тему", github: "Mistgate на GitHub",
+    onPage: "На этой странице", prev: "Назад", next: "Дальше", edit: "Править страницу на GitHub", theme: "Сменить тему", github: "Mistgate на GitHub", stars: "Mistgate на GitHub, звёзд: {n}",
     language: "Язык", copy: "Копировать", copied: "Скопировано", table: "Таблица", plain: "Текст", diagram: "Схема", permalink: "Ссылка на раздел", pending: "Эта страница ещё не написана", roadmap: "Этапы плана",
     license: "Лицензия AGPL-3.0", other: "Прочее",
     inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", reachability: "Доступность", updates: "Обновления", integrations: "Интеграции", settings: "Настройки" },
@@ -28,7 +28,7 @@ export const T = {
     hreflang: "zh-Hans", htmlLang: "zh-CN", ogLocale: "zh_CN", name: "简体中文", short: "中文", docs: "文档", home: "首页", siteTitle: "Mistgate 文档",
     skip: "跳到正文", menu: "菜单", closeMenu: "关闭菜单", navLabel: "文档", crumbs: "面包屑导航",
     search: "搜索文档", searchLabel: "搜索文档", searchEmpty: "没有找到结果。换个词试试。", searchClose: "关闭搜索", searchIn: "位于",
-    onPage: "本页内容", prev: "上一页", next: "下一页", edit: "在 GitHub 上编辑此页", theme: "切换主题", github: "GitHub 上的 Mistgate",
+    onPage: "本页内容", prev: "上一页", next: "下一页", edit: "在 GitHub 上编辑此页", theme: "切换主题", github: "GitHub 上的 Mistgate", stars: "GitHub 上的 Mistgate，{n} 个星标",
     language: "语言", copy: "复制", copied: "已复制", table: "表格", plain: "文本", diagram: "示意图", permalink: "链接到此小节", pending: "此页尚未撰写", roadmap: "路线图阶段",
     license: "基于 AGPL-3.0 发布", other: "其他",
     inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", reachability: "可达性", updates: "更新", integrations: "集成", settings: "设置" },
@@ -69,6 +69,14 @@ export function pageStyle(key) {
 }
 
 const wordmark = '<span class="wordmark">mist<span>gate</span></span>';
+
+/** The star count on the GitHub button: 999, then 1k, 1.2k, 12.3k. app.js gets this same function (build.mjs inlines it). */
+export const formatStars = (n) => (n > 999 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
+
+/** The GitHub button: the mark, then a star and the count baked in at build time (none: hidden until app.js fetches one). */
+function githubButton(t, stars) {
+  return `<a class="ib gh" href="${GITHUB}" rel="noopener" aria-label="${esc(stars ? t.stars.replace("{n}", stars) : t.github)}" data-stars-label="${esc(t.stars)}">${GH}<span class="gh__stars"${stars ? "" : " hidden"}>${icon("star", 14)}<span class="gh__n">${stars ? formatStars(stars) : ""}</span></span></a>`;
+}
 
 function head({ lang, t, title, description, canonical, alternates, assets, noindex, home }) {
   const fonts = (lang === "ru" ? ["onest-cyrillic", "onest-latin"] : ["onest-latin"]).map((f) => `<link rel="preload" href="/fonts/${f}.woff2" as="font" type="font/woff2" crossorigin>`).join("\n");
@@ -111,7 +119,7 @@ export function langMenu({ lang, t, langLinks }) {
 <ul class="lang__panel">${langLinks.map(item).join("")}</ul></details>`;
 }
 
-function header({ lang, t, langLinks }) {
+function header({ lang, t, langLinks, stars }) {
   return `<header class="top"><div class="top__in">
 <a class="ib menu-btn" href="#nav" data-menu aria-controls="nav" aria-label="${esc(t.menu)}">${icon("menu", 20)}</a>
 <a class="brand" href="${pageUrl(lang, "index")}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="32" height="32" alt="">${wordmark}</a>
@@ -120,7 +128,7 @@ function header({ lang, t, langLinks }) {
 <button class="search-btn js-only" type="button" data-search-open aria-label="${esc(t.search)}" aria-keyshortcuts="Control+K Meta+K /">${icon("search", 16)}<span class="search-btn__t">${esc(t.search)}</span><span class="kbds"><kbd data-mod>Ctrl</kbd><kbd>K</kbd></span></button>
 ${langMenu({ lang, t, langLinks })}
 <button class="ib js-only hide-xs" type="button" data-theme-toggle aria-label="${esc(t.theme)}"><span class="theme-ico theme-ico--sun">${icon("sun", 18)}</span><span class="theme-ico theme-ico--moon">${icon("moon", 18)}</span></button>
-<a class="ib hide-s" href="${GITHUB}" aria-label="${esc(t.github)}" rel="noopener">${GH}</a>
+${githubButton(t, stars)}
 </div></header>`;
 }
 
@@ -157,7 +165,7 @@ function searchDialog(t, lang) {
 const bodyData = (t) => esc(JSON.stringify({ copy: t.copy, copied: t.copied, inn: t.searchIn }));
 
 export function renderDoc(ctx) {
-  const { lang, t, page, nav, assets, langLinks, alternates, prev, next, crumbGroup } = ctx;
+  const { lang, t, page, nav, assets, langLinks, alternates, prev, next, crumbGroup, stars } = ctx;
   const isHome = page.key === "index";
   const st = pageStyle(page.key);
   const toc = page.headings.filter((h) => h.level <= 3 && h.toc !== false);
@@ -177,7 +185,7 @@ ${head({ lang, t, title: page.title, description: isHome ? home.description : pa
 </head>
 <body class="mg" data-t="${bodyData(t)}"${st.tone ? ` data-tone="${st.tone}"` : ""}>
 <a class="skip" href="#content">${esc(t.skip)}</a>
-${header({ lang, t, langLinks })}
+${header({ lang, t, langLinks, stars })}
 <div class="shell">
 ${sidebar({ lang, t, nav, current: page.key })}
 <main class="main" id="content" tabindex="-1">

@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import test, { after, before } from "node:test";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { formatStars } from "../src/layout.mjs";
 
 const site = dirname(dirname(fileURLToPath(import.meta.url)));
 const find = vm.runInNewContext(`${readFileSync(join(site, "src/assets/find.js"), "utf8")}\nfind`);
@@ -41,7 +42,7 @@ before(() => {
   const zh = (p, text) => { const f = join(root, "docs/zh", p); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, text); };
   zh("index.md", "---\ntitle: Mistgate 文档\ndescription: 自托管 VPN 面板的文档。\n---\n\n欢迎。\n\n## 所有页面\n\n### 入门\n\n- [概览](getting-started/overview.md): 简介\n- [添加节点](getting-started/add-node.md): 尚未翻译\n");
   zh("getting-started/overview.md", "---\ntitle: 概览\ndescription: Mistgate 是什么，适合谁用，各部分如何配合。\n---\n\n## 两个程序\n\n节点是运行在每台 VPN 服务器上的代理。详见[添加节点](add-node.md)。\n\n> **注意：** 这是占位文字。\n");
-  build = spawnSync(process.execPath, ["build.mjs"], { cwd: site, env: { ...process.env, MG_DOCS: join(root, "docs"), MG_DIST: out }, encoding: "utf8" });
+  build = spawnSync(process.execPath, ["build.mjs"], { cwd: site, env: { ...process.env, MG_DOCS: join(root, "docs"), MG_DIST: out, MG_STARS: "1234" }, encoding: "utf8" });
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -118,4 +119,15 @@ test("the shipped script has the matcher inlined and closes the language menu", 
   assert.match(js, /normalize\("NFKC"\)/);
   assert.match(js, /details\.lang/);
   assert.match(js, /isComposing/);
+  assert.match(js, /const formatStars = /, "the star count is formatted by the same function as at build time");
+});
+
+test("the GitHub button carries the star count baked in at build time (MG_STARS here: no network), in each language", () => {
+  assert.deepEqual([999, 1000, 1234, 12345].map(formatStars), ["999", "1k", "1.2k", "12.3k"]);
+  for (const [page, label] of [["index.html", "Mistgate on GitHub, 1234 stars"], ["ru/index.html", "Mistgate на GitHub, звёзд: 1234"], ["zh/getting-started/overview/index.html", "GitHub 上的 Mistgate，1234 个星标"]]) {
+    const button = /<a class="ib gh"[\s\S]*?<\/a>/.exec(read(page))?.[0] ?? "";
+    assert.ok(button.includes(`aria-label="${label}"`), `${page}: ${button.slice(0, 160)}`);
+    assert.match(button, /<span class="gh__stars"><svg[^>]*>[\s\S]*?<span class="gh__n">1\.2k<\/span>/, page);
+  }
+  assert.match(read("_headers"), /connect-src 'self' https:\/\/api\.github\.com;/, "the browser may refresh the count");
 });

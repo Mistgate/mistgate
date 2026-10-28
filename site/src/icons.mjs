@@ -22,8 +22,9 @@ const panel = parseIcons(readFileSync(SRC, "utf8"));
 /** Section icons and tones of the panel's sidebar: overview, nodes, users, profiles, subscriptions, health, reachability, updates, integrations, settings. */
 export const NAV = panel.nav;
 
-// the few the panel does not draw (theme toggle, drawer button)
+// the few the panel does not draw (theme toggle, drawer button, the star count on the GitHub button)
 const EXTRA = {
+  star: "M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z",
   menu: "M4 7h16M4 12h16M4 17h16",
   sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4",
   moon: "M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z",

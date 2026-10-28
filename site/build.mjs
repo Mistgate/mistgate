@@ -6,8 +6,8 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { createHl, createRenderer, parseNav } from "./src/markdown.mjs";
-import { T, renderDoc, render404, THEME_INIT } from "./src/layout.mjs";
-import { SITE, LANGS, COMPLETE, pageUrl } from "./src/urls.mjs";
+import { T, renderDoc, render404, THEME_INIT, formatStars } from "./src/layout.mjs";
+import { SITE, GITHUB, LANGS, COMPLETE, pageUrl } from "./src/urls.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // MG_DOCS / MG_DIST point the build at another docs tree / output (the test builds a fixture that way)
@@ -28,7 +28,7 @@ mkdirSync(DIST, { recursive: true });
 // ---- static assets ----
 const css = readFileSync(join(SRC, "assets", "style.css"), "utf8");
 const find = readFileSync(join(SRC, "assets", "find.js"), "utf8").replace(/^\/\/.*\n/gm, "").trimEnd(); // the matcher, without its comments
-const js = readFileSync(join(SRC, "assets", "app.js"), "utf8").replace("/*@find*/", () => find);
+const js = readFileSync(join(SRC, "assets", "app.js"), "utf8").replace("/*@find*/", () => find).replace("/*@formatStars*/", () => `const formatStars = ${formatStars};`);
 const assets = { css: hashed("style", "css", css), js: hashed("app", "js", js) };
 out(assets.css, css);
 out(assets.js, js);
@@ -62,6 +62,12 @@ function readPage(lang, file) {
   if (!fm.description) warn(`${lang}/${key}.md: no description in front matter`);
   return { lang, key, url: pageUrl(lang, key), title: String(fm.title ?? key), description: String(fm.description ?? ""), body: m ? raw.slice(m[0].length) : raw };
 }
+
+// the star count on the GitHub button, if GitHub answers within 5 s (an offline build has none; app.js refreshes it anyway).
+// MG_STARS sets it instead, "" for none: the tests build without the network.
+const stars = "MG_STARS" in process.env ? Number(process.env.MG_STARS) || null
+  : await fetch(GITHUB.replace("//github.com/", "//api.github.com/repos/"), { headers: { "user-agent": "mistgate-docs-build" }, signal: AbortSignal.timeout(5000) })
+    .then((r) => (r.ok ? r.json() : {})).then((j) => (Number.isInteger(j.stargazers_count) ? j.stargazers_count : null)).catch(() => null);
 
 const highlight = await createHl();
 const site = {}; // lang -> {pages: Map, nav: [...], seq: [...]}
@@ -120,7 +126,7 @@ for (const lang of Object.keys(site)) {
     if (site.en?.pages.has(page.key)) alternates.push({ lang: "x-default", url: pageUrl("en", page.key) });
     const crumbGroup = nav.find((g) => g.items.some((x) => x.key === page.key))?.title;
     const html = renderDoc({
-      lang, t, page, nav, assets, prev: seq[i - 1], next: seq[i + 1], crumbGroup, alternates, langLinks,
+      lang, t, page, nav, assets, prev: seq[i - 1], next: seq[i + 1], crumbGroup, alternates, langLinks, stars,
     });
     out(page.url.slice(1) + "index.html", html);
     written.set(page.url, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])));
@@ -154,7 +160,7 @@ out("_headers", `/*
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-${initHash}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-${initHash}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
@@ -188,7 +194,7 @@ for (const f of files) {
 
 // ---- report ----
 const nPages = urls.length;
-console.log(`built ${nPages} pages (${Object.entries(site).map(([l, s]) => `${l}: ${s.pages.size}`).join(", ")}) -> dist/ , ${files.size} files`);
+console.log(`built ${nPages} pages (${Object.entries(site).map(([l, s]) => `${l}: ${s.pages.size}`).join(", ")}) -> dist/ , ${files.size} files, GitHub stars: ${stars ?? "none"}`);
 const uniq = [...new Set(warnings)];
 if (uniq.length) console.log(`\n${uniq.length} warning(s):\n` + uniq.map((w) => "  - " + w).join("\n"));
 if (broken.length) { console.log(`\n${broken.length} BROKEN internal link(s):\n` + [...new Set(broken)].map((b) => "  ! " + b).join("\n")); process.exitCode = 1; }

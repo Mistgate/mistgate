@@ -57,6 +57,21 @@
     byId.forEach((_, id) => { const h = d.getElementById(id); if (h) io.observe(h); });
   }
 
+  // the star count on the GitHub button: the build baked one in; ask GitHub at most once an hour, keep the baked one on any error
+  const gh = $("[data-stars-label]");
+  if (gh) {
+    /*@formatStars*/
+    const show = (n) => { $(".gh__n", gh).textContent = formatStars(n); $(".gh__stars", gh).hidden = false; gh.setAttribute("aria-label", gh.dataset.starsLabel.replace("{n}", n)); };
+    let cached;
+    try { const c = JSON.parse(localStorage.getItem("mg-stars")); if (Date.now() - c.t < 36e5 && Number.isInteger(c.n)) cached = c.n; } catch {}
+    if (cached !== undefined) show(cached);
+    else fetch(gh.href.replace("//github.com/", "//api.github.com/repos/")).then((r) => r.json()).then(({ stargazers_count: n }) => {
+      if (!Number.isInteger(n)) return;
+      show(n);
+      try { localStorage.setItem("mg-stars", JSON.stringify({ n, t: Date.now() })); } catch {}
+    }).catch(() => {});
+  }
+
   // search: titles, descriptions, headings and names in code (flags, variables, tools), index fetched on first use
   const dlg = $("#search");
   if (!dlg || !dlg.showModal) return;
