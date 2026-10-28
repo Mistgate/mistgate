@@ -457,11 +457,15 @@ func TestReleaseNoticeRetriesAfterFailedDelivery(t *testing.T) {
 	e.tg.mu.Unlock()
 	e.run()
 
+	// The poll loop may clear the bot error at any time, so wait for the attempt and for the notice to leave the queue.
+	pending := func() bool {
+		e.svc.mu.Lock()
+		defer e.svc.mu.Unlock()
+		return len(e.svc.announcing) > 0
+	}
 	ctx := context.Background()
 	e.svc.watch(ctx)
-	waitFor(t, "the failed send attempt", func() bool {
-		return e.tg.count("sendMessage") == 1 && e.svc.botError() == "unreachable"
-	})
+	waitFor(t, "the failed send attempt", func() bool { return e.tg.count("sendMessage") == 1 && !pending() })
 	if len(e.tg.sentTo(1)) != 0 {
 		t.Fatal("failed release notice was delivered")
 	}
@@ -471,9 +475,10 @@ func TestReleaseNoticeRetriesAfterFailedDelivery(t *testing.T) {
 
 	e.svc.watch(ctx)
 	waitFor(t, "the retried release notice", func() bool { return len(e.tg.sentTo(1)) == 1 })
-	if got, err := e.st.Setting(ctx, notifiedRel); err != nil || got != version {
-		t.Fatalf("announced release = %q, %v", got, err)
-	}
+	waitFor(t, "the release remembered as announced", func() bool {
+		got, err := e.st.Setting(ctx, notifiedRel)
+		return err == nil && got == version && !pending()
+	})
 	e.svc.watch(ctx)
 	e.quiet(1, 120*time.Millisecond)
 	if got := e.tg.count("sendMessage"); got != 2 {
