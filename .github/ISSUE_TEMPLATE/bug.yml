@@ -1,0 +1,61 @@
+name: Bug / Ошибка / 问题
+description: Something does not work as the docs say. / Что-то работает не так, как написано. / 某个功能与文档描述不符。
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in any language: English, Русский, 中文 are all fine.
+        Пишите на любом языке. · 可以用任何语言填写，中文也可以。
+
+        **Do not paste** subscription links, keys, passwords, the admin address or server IPs. Replace them with `xxx`.
+        **Не вставляйте** ссылки подписок, ключи, пароли, адрес админки и IP серверов: замените на `xxx`.
+        **请勿粘贴**订阅链接、密钥、密码、管理后台地址或服务器 IP，用 `xxx` 代替。
+
+        A question about setup rather than a bug? Ask in [Discussions](https://github.com/Mistgate/mistgate/discussions/categories/q-a).
+  - type: input
+    id: version
+    attributes:
+      label: Version / Версия / 版本
+      description: "Admin → Updates, or `mistgate version` on the panel server."
+      placeholder: v0.1.63
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where / Где / 在哪里
+      multiple: true
+      options:
+        - Panel install / Установка панели / 安装面板
+        - Adding a node / Добавление ноды / 添加节点
+        - Hysteria2
+        - VLESS REALITY
+        - VLESS TLS / CDN
+        - AmneziaWG
+        - WARP
+        - Subscription or client app / Подписка или приложение / 订阅或客户端
+        - Health checks and alerts / Проверки и тревоги / 健康检查与告警
+        - Admin UI / Интерфейс админки / 管理界面
+        - Other / Другое / 其他
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client app and platform / Приложение и платформа / 客户端与平台
+      description: Only if the problem is on a device. / Если проблема на устройстве. / 仅当问题出在设备上时填写。
+      placeholder: Clash Verge Rev 2.x, Windows 11
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / Что случилось / 发生了什么
+      description: What you did, what you expected, what you saw. / Что делали, что ждали, что получили. / 你做了什么，期望什么，实际看到什么。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Логи / 日志
+      description: "`journalctl -u mistgate --since '1 hour ago'` on the panel, `journalctl -u mistgate-node --since '1 hour ago'` on a node."
+      render: text

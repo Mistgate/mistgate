@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question / Вопрос / 提问
+    url: https://github.com/Mistgate/mistgate/discussions/categories/q-a
+    about: How to set something up. / Как что-то настроить. / 如何配置。
+  - name: Security issue / Уязвимость / 安全漏洞
+    url: https://github.com/Mistgate/mistgate/security/advisories/new
+    about: Report privately, not in a public issue. / Сообщите приватно. / 请私下报告，不要公开提交。
+  - name: Docs / Документация / 文档
+    url: https://mistgate.app/
+    about: Install, nodes, protocols, troubleshooting.

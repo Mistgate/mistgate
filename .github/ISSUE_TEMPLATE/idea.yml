@@ -1,0 +1,24 @@
+name: Idea / Идея / 建议
+description: Something Mistgate should do. / Чего не хватает. / 希望 Mistgate 增加的功能。
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in any language: English, Русский, 中文 are all fine.
+        Пишите на любом языке. · 可以用任何语言填写，中文也可以。
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do / Какую задачу решаете / 你想解决什么问题
+      description: The situation, not the solution yet. / Опишите ситуацию, решение потом. / 先描述场景，再谈方案。
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work / Как это могло бы работать / 可以怎么实现
+  - type: textarea
+    id: now
+    attributes:
+      label: What you do now instead / Как обходитесь сейчас / 现在怎么解决
