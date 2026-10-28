@@ -169,7 +169,7 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 
 func TestToolsPerProfile(t *testing.T) {
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 25, ProfileOperator: 43, ProfileAdmin: 79}
+	want := map[Profile]int{ProfileReadonly: 27, ProfileOperator: 45, ProfileAdmin: 84}
 	got := map[Profile][]string{}
 	for p, n := range want {
 		_, secret := e.token(p)

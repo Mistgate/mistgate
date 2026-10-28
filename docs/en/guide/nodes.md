@@ -111,6 +111,8 @@ Each row has:
 
 **Add profile** opens the dialog that puts a profile on this node: see [Profiles](profiles.md). When the panel has no profile at all, the dialog offers to create a Hysteria2 profile on port 443 (or the first free port) and put it on the node in one go, with **Set up by hand** as the other way.
 
+**Relays.** On a node that can forward, the Profiles tab also has a **Relays** block: the ports of this node that pass a server of another node on, unchanged, for people whose network blocks that node. See [Relays through an entry node](relays.md).
+
 ### Users
 
 - **On this node now**: who is connected, with the device model, the protocol and the current download speed.
@@ -247,6 +249,7 @@ Change **Name** and save. The name shows in the panel, in the file names of Amne
 - users stop getting the node in their subscription; their links stay the same;
 - the node's certificate is revoked and its agent is told to stop; the files on the server stay;
 - the node's record stays in the audit log, with its traffic history.
+- the node's [relays](relays.md), as entry or as exit, are removed.
 
 To confirm, type the node name. After that the node disappears from the list; its page, if you open it, says "This node is retired". A retired agent cannot connect again. Only the owner can retire a node.
 

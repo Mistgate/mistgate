@@ -179,8 +179,8 @@ var procedureLevels = map[string]level{
 	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure:    levelRead,
 
 	// RelayService: the ports a node forwards, unchanged, to servers on other nodes. Where people can come in is the owner's
-	// call, like profiles and inbounds; the entry node sees who connects. All of it is the owner's, and not open to tokens
-	// (policy_tokens.go).
+	// call, like profiles and inbounds; the entry node sees who connects. All of it is the owner's. Tokens reach it only through
+	// the MCP tools (policy_tokens.go): the reads and the check in-process, the changes through the owner's approval.
 	adminv1connect.RelayServiceListRelaysProcedure:          levelOwner,
 	adminv1connect.RelayServiceCreateRelayProcedure:         levelOwner,
 	adminv1connect.RelayServiceUpdateRelayProcedure:         levelOwner,

@@ -56,6 +56,7 @@ type clients struct {
 	Provisioning adminv1connect.ProvisioningServiceClient
 	Warp         adminv1connect.WarpServiceClient
 	ClientProbe  adminv1connect.ClientProbeServiceClient
+	Relay        adminv1connect.RelayServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -74,6 +75,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Provisioning: adminv1connect.NewProvisioningServiceClient(hc, base),
 		Warp:         adminv1connect.NewWarpServiceClient(hc, base),
 		ClientProbe:  adminv1connect.NewClientProbeServiceClient(hc, base),
+		Relay:        adminv1connect.NewRelayServiceClient(hc, base),
 	}
 }
 

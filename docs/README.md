@@ -29,7 +29,7 @@ The full page list, in reading order, is in [en/index.md](en/index.md), [ru/inde
 
 **I run a fleet.**
 
-- [Nodes](en/guide/nodes.md) ([ru](ru/guide/nodes.md), [zh](zh/guide/nodes.md)), [Profiles](en/guide/profiles.md) ([ru](ru/guide/profiles.md), [zh](zh/guide/profiles.md)), [Users and groups](en/guide/users-and-groups.md) ([ru](ru/guide/users-and-groups.md), [zh](zh/guide/users-and-groups.md)), [Subscriptions](en/guide/subscriptions.md) ([ru](ru/guide/subscriptions.md), [zh](zh/guide/subscriptions.md)).
+- [Nodes](en/guide/nodes.md) ([ru](ru/guide/nodes.md), [zh](zh/guide/nodes.md)), [Profiles](en/guide/profiles.md) ([ru](ru/guide/profiles.md), [zh](zh/guide/profiles.md)), [Users and groups](en/guide/users-and-groups.md) ([ru](ru/guide/users-and-groups.md), [zh](zh/guide/users-and-groups.md)), [Subscriptions](en/guide/subscriptions.md) ([ru](ru/guide/subscriptions.md), [zh](zh/guide/subscriptions.md)), [Relays through an entry node](en/guide/relays.md) ([ru](ru/guide/relays.md), [zh](zh/guide/relays.md)).
 - [Health](en/operations/health.md) ([ru](ru/operations/health.md), [zh](zh/operations/health.md)), [Updates](en/operations/updates.md) ([ru](ru/operations/updates.md), [zh](zh/operations/updates.md)), [Torrent protection](en/guide/torrent-protection.md) ([ru](ru/guide/torrent-protection.md), [zh](zh/guide/torrent-protection.md)), [Troubleshooting](en/operations/troubleshooting.md) ([ru](ru/operations/troubleshooting.md), [zh](zh/operations/troubleshooting.md)).
 
 **I integrate an agent or a script.**

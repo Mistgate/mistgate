@@ -16,9 +16,9 @@ const (
 	// TokenAccessApproved: only with a grant in the context (WithPlanning for a call that changes nothing,
 	// WithApprovedStepUp for the owner's approved plan), which only the MCP layer can create. Never over /api.
 	TokenAccessApproved = 2
-	// TokenAccessPlanning: only for an in-process MCP call carrying WithPlanning on the MCP channel. It changes nothing,
-	// but the raw response is not a free tool for a script (for example, GetSSHFingerprint probes a host and GetWarp
-	// contains node network details). Never over /api.
+	// TokenAccessPlanning: only for an in-process MCP call carrying WithPlanning on the MCP channel. It changes nothing
+	// that matters (CheckRelay stores its own result), but the raw response is not a free tool for a script (for example,
+	// GetSSHFingerprint probes a host and GetWarp contains node network details). Never over /api.
 	TokenAccessPlanning = 3
 )
 
@@ -75,6 +75,16 @@ var tokenProcedures = map[string]int{
 	adminv1connect.NodeServiceCheckPortsProcedure:       TokenAccessDirect,
 	// Owner level (the admin profile): the audit log, which names admins, tokens and addresses.
 	adminv1connect.AuthServiceListAuditProcedure: TokenAccessDirect,
+	// Relays (relay.proto), through the MCP tools relays_list, relay_candidates, relay_check and relay_plan/apply only. The reads
+	// and the check are MCP-only because the raw response names the exit's address (Relay.to_ip, RelayCheck.to); the check also
+	// stores its result in the relay, changes no switch and sends nothing but test packets between the owner's nodes. The
+	// changes go through the owner's approval.
+	adminv1connect.RelayServiceListRelaysProcedure:          TokenAccessPlanning,
+	adminv1connect.RelayServiceListRelayCandidatesProcedure: TokenAccessPlanning,
+	adminv1connect.RelayServiceCheckRelayProcedure:          TokenAccessPlanning,
+	adminv1connect.RelayServiceCreateRelayProcedure:         TokenAccessApproved,
+	adminv1connect.RelayServiceUpdateRelayProcedure:         TokenAccessApproved,
+	adminv1connect.RelayServiceDeleteRelayProcedure:         TokenAccessApproved,
 	// Only through the owner's approval; no-change planning requests may also use WithPlanning. See Service.WithApprovedStepUp.
 	adminv1connect.HealthServiceApplyFixProcedure:                       TokenAccessApproved,
 	adminv1connect.ProfileServiceCreateProfileProcedure:                 TokenAccessApproved,
@@ -166,8 +176,13 @@ var grantProcedures = map[string][]string{
 	"update_timezone":             {adminv1connect.UpdateServiceSetUpdateTimezoneProcedure},
 	NodeInstallTool:               {adminv1connect.ProvisioningServiceStartNodeProvisionProcedure},
 	"node_server_password_rotate": {adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure},
-	"subscription_app_upsert":     {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
-	"subscription_app_remove":     {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"relay": {
+		adminv1connect.RelayServiceCreateRelayProcedure,
+		adminv1connect.RelayServiceUpdateRelayProcedure,
+		adminv1connect.RelayServiceDeleteRelayProcedure,
+	},
+	"subscription_app_upsert": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_app_remove": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
 	"profile_create": {
 		adminv1connect.ProfileServiceCreateProfileProcedure,
 		adminv1connect.ProfileServiceCreateInboundProcedure,
@@ -188,6 +203,9 @@ var grantProcedures = map[string][]string{
 // to readonly panel sessions.
 var tokenProcedureRoles = map[string]string{
 	adminv1connect.WarpServiceGetWarpProcedure: store.RoleReadonly,
+	// The relay reads: the MCP views leave out the exit's address, so a readonly token may ask for them.
+	adminv1connect.RelayServiceListRelaysProcedure:          store.RoleReadonly,
+	adminv1connect.RelayServiceListRelayCandidatesProcedure: store.RoleReadonly,
 }
 
 // TokenProcedureRole is the minimum profile role for a token to call a procedure. It may be narrower than

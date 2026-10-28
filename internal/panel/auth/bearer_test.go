@@ -914,8 +914,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 20 {
-		t.Errorf("%d procedures need approval, want 20: %v", len(approved), approved)
+	if len(approved) != 23 {
+		t.Errorf("%d procedures need approval, want 23: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
@@ -938,6 +938,11 @@ func TestTokenAllowList(t *testing.T) {
 			adminv1connect.ProfileServiceDeleteInboundProcedure,
 			adminv1connect.GroupServiceUpdateGroupProcedure,
 		},
+	}
+	wantProfileGrants["relay"] = []string{
+		adminv1connect.RelayServiceCreateRelayProcedure,
+		adminv1connect.RelayServiceUpdateRelayProcedure,
+		adminv1connect.RelayServiceDeleteRelayProcedure,
 	}
 	for tool, want := range wantProfileGrants {
 		if got := grantProcedures[tool]; !slices.Equal(got, want) {

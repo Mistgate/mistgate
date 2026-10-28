@@ -46,6 +46,7 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 - [同一节点上的 VLESS 与 Hysteria2](guide/vless-and-hysteria2.md)：分别由什么监听端口、VLESS 占用 TCP 443 时 Hysteria2 站点和 Let’s Encrypt 会发生什么，以及如何让少数用户试用 VLESS。
 - [AmneziaWG](guide/amneziawg.md)：AmneziaWG 2.0 和 3.1 协议配置、用户态或内核模块、设备和密钥。
 - [WARP](guide/warp.md)：通过 Cloudflare WARP 转发协议配置的流量。
+- [经入口节点中转](guide/relays.md)：中转何时能帮到网络封锁了节点的用户、它解决不了什么、入口能看到什么，以及如何添加。
 - [用户和分组](guide/users-and-groups.md)：用户、分组、设备、流量限制和有效期。
 - [订阅](guide/subscriptions.md)：每人一个链接，以及每个应用会获得哪种格式。
 - [客户端应用](guide/client-apps.md)：各平台使用哪些应用、每个应用会收到什么、一键添加链接、kl!ck，以及如何在管理后台和通过 MCP 设置应用。

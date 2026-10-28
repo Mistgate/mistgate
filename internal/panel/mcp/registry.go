@@ -54,7 +54,7 @@ func (t toolDef) description() string {
 
 // registry is every tool; a name may appear twice with different minimum profiles (node_doctor has a refresh argument only
 // for operators): a server takes the highest entry its profile reaches.
-var registry = slices.Concat(readTools(), changeTools(), nodeProvisionTools(), subscriptionTools(), profileTools())
+var registry = slices.Concat(readTools(), changeTools(), nodeProvisionTools(), subscriptionTools(), profileTools(), relayTools())
 
 // toolsFor lists the tools a profile sees, by name.
 func toolsFor(p Profile) []toolDef {
@@ -164,6 +164,11 @@ func marshal(v any) ([]byte, error) {
 
 // readTool builds the entry of a read tool: no side effects, one result.
 func readTool[In any](name string, min Profile, procs []string, desc string, h func(c *call, in In) (any, error)) toolDef {
+	return readToolWithin(readTimeout, name, min, procs, desc, h)
+}
+
+// readToolWithin is readTool for a read that waits for the nodes longer than a stored read does (a check).
+func readToolWithin[In any](timeout time.Duration, name string, min Profile, procs []string, desc string, h func(c *call, in In) (any, error)) toolDef {
 	return toolDef{
 		name: name, min: min, procs: procs, free: true, desc: desc,
 		add: func(s *mcp.Server, e *env, desc string) {
@@ -171,7 +176,7 @@ func readTool[In any](name string, min Profile, procs []string, desc string, h f
 				Name: name, Description: desc,
 				Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)},
 			}, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, any, error) {
-				c, err := e.begin(ctx, req, readTimeout)
+				c, err := e.begin(ctx, req, timeout)
 				if err != nil {
 					return nil, nil, err
 				}

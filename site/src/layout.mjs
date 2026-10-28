@@ -49,7 +49,7 @@ export const THEME_INIT = `try{var t=localStorage.getItem("mg-theme");if(t==="li
 export const PAGE_SECTION = {
   "getting-started/overview": "overview",
   "getting-started/requirements": "nodes", "getting-started/add-node": "nodes", "getting-started/ssh-install": "nodes",
-  "guide/nodes": "nodes", "guide/warp": "nodes", "guide/torrent-protection": "nodes",
+  "guide/nodes": "nodes", "guide/warp": "nodes", "guide/torrent-protection": "nodes", "guide/relays": "nodes",
   "getting-started/first-users": "users", "guide/users-and-groups": "users",
   "guide/profiles": "profiles", "guide/hysteria2": "profiles", "guide/amneziawg": "profiles",
   "guide/subscriptions": "subscriptions", "guide/client-apps": "subscriptions", "guide/user-page": "subscriptions", "guide/dns": "subscriptions",
