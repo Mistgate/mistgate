@@ -70,11 +70,14 @@ func renderRemarks(servers []access.SubServer, template, lang string, limitHapp,
 		if limitHapp {
 			n = strings.ReplaceAll(n, "%", "％") // U+FF05, see the load suffix below
 		}
-		suffix := ""
+		suffix := markText(s.Mark, lang) // a twin through a relay: " · via RU"
 		if load && s.LoadPercent != nil {
 			// U+FF05, not "%": Happ decodes the name a second time, and a bare "%" makes that fail, so Happ drops the
 			// whole name and lists the server by its address. The fullwidth sign looks the same and survives it.
-			suffix = " · " + strconv.Itoa(*s.LoadPercent) + "％"
+			pct := " · " + strconv.Itoa(*s.LoadPercent) + "％"
+			if s.Mark == "" || fitsHapp(n, suffix+pct, s.Profile) { // the label outranks the load where both do not fit
+				suffix += pct
+			}
 		}
 		name := namedRemark(n, suffix, s.Profile, limitHapp)
 		for k := 2; taken[name]; k++ {
@@ -127,6 +130,35 @@ func namedRemark(base, suffix, profile string, limitHapp bool) string {
 		return base + suffix
 	}
 	return fitHappRemark(base, suffix, profile)
+}
+
+// markText is the label a server carries after its name, in the subscription's language: " · via RU" (ru "через", zh "经");
+// "" for a server without a mark. A mark that is not a known one is left out.
+func markText(mark, lang string) string {
+	cc, ok := strings.CutPrefix(mark, access.MarkVia)
+	if !ok {
+		return ""
+	}
+	word := "via"
+	switch lang {
+	case "ru":
+		word = "через"
+	case "zh":
+		word = "经"
+	}
+	if cc == "" {
+		return " · " + word
+	}
+	return " · " + word + " " + cc
+}
+
+// fitsHapp: base and suffix go into Happ's title as they are, or once the profile name is shortened.
+func fitsHapp(base, suffix, profile string) bool {
+	if utf16Length(base)+utf16Length(suffix) <= happRemarkMaxUTF16 {
+		return true
+	}
+	compact := compactProfile(profile)
+	return compact != profile && utf16Length(strings.ReplaceAll(base, profile, compact))+utf16Length(suffix) <= happRemarkMaxUTF16
 }
 
 func fitHappRemark(base, suffix, profile string) string {

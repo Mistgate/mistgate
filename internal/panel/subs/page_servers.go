@@ -39,6 +39,9 @@ type pageConn struct {
 	ProfileID string `json:"profile_id,omitempty"`
 	// MihomoOnly: a link that only the Mihomo apps (kl!ck, Clash Verge, FlClash) can use; Happ and the other link-list apps do not get it.
 	MihomoOnly bool `json:"mihomo_only,omitempty"`
+	// Relay: a twin of the server through a relay of an entry node, whose country code Via is ("" if it has none).
+	Relay bool   `json:"relay,omitempty"`
+	Via   string `json:"via,omitempty"`
 }
 
 // pageNodeDNS is the DNS of one server: what the person picked ("" = nothing), what applies, what the owner offers (in
@@ -112,7 +115,7 @@ func pageServers(v access.SubView, set *adminv1.SubscriptionSettings, lang strin
 			p.Load = &l
 		}
 		for _, c := range n.Conns {
-			pc := pageConn{Way: c.Way, Exit: c.Exit, ProfileID: c.ProfileID, MihomoOnly: c.MihomoOnly}
+			pc := pageConn{Way: c.Way, Exit: c.Exit, ProfileID: c.ProfileID, MihomoOnly: c.MihomoOnly, Relay: c.Relay, Via: c.Via}
 			if c.Way == "link" && !c.MihomoOnly && c.Server < len(appNames) {
 				pc.AppName = appNames[c.Server]
 				p.AppNames = append(p.AppNames, pc.AppName)

@@ -13,7 +13,7 @@ func relayFixture(t *testing.T, st *Store) {
 	t.Helper()
 	for _, q := range []string{
 		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_de1', 'de1', '192.0.2.10', 'active', 1)`,
-		`INSERT INTO node (id, name, address, state, created_at, agent_caps) VALUES ('nod_fi1', 'fi1', '198.51.100.20', 'active', 1, 'relay-forward/1')`,
+		`INSERT INTO node (id, name, address, country_code, bandwidth_mbps, state, created_at, agent_caps) VALUES ('nod_fi1', 'fi1', '198.51.100.20', 'FI', 500, 'active', 1, 'relay-forward/1')`,
 		`INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_nl1', 'nl1', '192.0.2.30', 'active', 1)`,
 		`INSERT INTO profile (id, protocol, name, settings_json, created_at, updated_at) VALUES ('prf_hy', 'hysteria2', 'hy', '{}', 1, 1)`,
 		`INSERT INTO profile (id, protocol, name, settings_json, created_at, updated_at) VALUES ('prf_hy2', 'hysteria2', 'hy2', '{}', 1, 1)`,
@@ -59,8 +59,35 @@ func relayStoreProof(t *testing.T, st *Store) {
 	}
 	if l.Enabled || l.State != "pending" || l.Port != 8443 || l.Network != "udp" || l.CheckJSON != "{}" || !l.CreatedAt.Equal(now) ||
 		l.ExitNodeID != "nod_de1" || l.ExitNodeName != "de1" || l.ViaNodeName != "fi1" || l.ProfileName != "hy" || l.Protocol != "hysteria2" ||
-		len(l.ViaNodeCaps) != 1 || l.ViaNodeCaps[0] != "relay-forward/1" || !l.Live() || !l.AppliedAt.IsZero() {
+		len(l.ViaNodeCaps) != 1 || l.ViaNodeCaps[0] != "relay-forward/1" || !l.Live() || !l.AppliedAt.IsZero() ||
+		l.ViaNodeAddress != "198.51.100.20" || l.ViaNodeCountry != "FI" || l.ViaNodeBandwidthMbps != 500 {
 		t.Fatalf("a new relay: %+v", l)
+	}
+	// The subscription reads the relays that are on, with their entry, in the batch of its other rows (for an active person).
+	relayExec(t, st, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_a', 'a', 1)`)
+	subRelays := func(active bool) []RelayLink {
+		t.Helper()
+		d, err := st.Access().SubscriptionData(ctx, "usr_none", "grp_a", now, active, now, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d.Relays
+	}
+	if got := subRelays(true); len(got) != 0 {
+		t.Fatalf("a relay that is off in the subscription's data: %+v", got)
+	}
+	enabled := true
+	if err := st.UpdateRelay(ctx, "rly_a", RelayPatch{Enabled: &enabled}, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := subRelays(true); len(got) != 1 || got[0].ID != "rly_a" || got[0].ViaNodeAddress != "198.51.100.20" || got[0].ViaNodeCountry != "FI" || got[0].ViaNodeBandwidthMbps != 500 || got[0].ExitNodeID != "nod_de1" {
+		t.Fatalf("the relay that is on: %+v", got)
+	}
+	if got := subRelays(false); len(got) != 0 {
+		t.Fatalf("a person without access reads relays: %+v", got)
+	}
+	if err := st.UpdateRelay(ctx, "rly_a", RelayPatch{Enabled: new(false)}, now); err != nil {
+		t.Fatal(err)
 	}
 
 	// The same server through the same entry, and the same network and port on one entry, are refused.

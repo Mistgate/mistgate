@@ -620,6 +620,9 @@ type SubscriptionData struct {
 	Group     AccessGroup
 	Inbounds  []AccessInboundFull
 	LiveNodes []NodeLiveRow
+	// Relays are the relays that are switched on, with both ends (a person's twin servers follow them, access.relayUsable); read
+	// for an active user only.
+	Relays []RelayLink
 	// OnlineDevices maps each device of the user that has a session on a connected node to those nodes (node order).
 	OnlineDevices map[string][]string
 }
@@ -778,6 +781,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var groupProfileIDs []string
 	var inbounds []AccessInboundFull
 	var liveNodes []NodeLiveRow
+	var relays []RelayLink
 	var online []onlineDevice
 	r := reads{}
 	r.add(oneRow(&traffic, scanSubscriptionTraffic), `SELECT coalesce(sum(bytes_up), 0) AS bytes_up, coalesce(sum(bytes_down), 0) AS bytes_down FROM traffic_bucket WHERE user_id = ? AND hour_start >= ?`, userID, unix(since))
@@ -805,6 +809,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
+		r.add(appendRows(&relays, scanRelayLink), relayLinkQuery+` WHERE r.enabled = 1 ORDER BY r.created_at, r.id`)
 	}
 	r.add(appendRows(&liveNodes, scanSubscriptionNodeLive), `SELECT n.id AS node_id,
 		l.node_id AS live_node_id, coalesce(l.sample_at, 0) AS sample_at, coalesce(l.rx_bps, 0) AS rx_bps,
@@ -822,7 +827,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	}
 	snapshot := linkDeviceSnapshotOf(deviceRows)
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
+		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
 		LinkMode: LinkModeOf(mode), Blocked: blocked > 0}
 	if len(online) > 0 {
 		out.OnlineDevices = make(map[string][]string, len(online))

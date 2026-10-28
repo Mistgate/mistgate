@@ -115,6 +115,9 @@ func serversOf(v access.SubView) clientprobe.Match {
 	}
 	nodes := map[key]string{}
 	for _, s := range v.Servers {
+		if s.Mark != "" {
+			continue // a twin carries its exit's node id but dials the entry: the entry's address is not the exit's
+		}
 		if host, port, ok := serverAddress(s.URI); ok && s.NodeID != "" {
 			if _, dup := nodes[key{host, port}]; !dup {
 				nodes[key{host, port}] = s.NodeID

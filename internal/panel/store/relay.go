@@ -45,6 +45,9 @@ type RelayLink struct {
 	// The entry node.
 	ViaNodeName, ViaNodeState string
 	ViaNodeCaps               []string
+	// What a person's subscription needs of the entry: where to connect, its country (the label of the twin) and its capacity.
+	ViaNodeAddress, ViaNodeCountry string
+	ViaNodeBandwidthMbps           int
 }
 
 // InboundLive is the part of "an inbound is usable" that is not about a person: it is on and not failed, on an enrolled
@@ -66,11 +69,15 @@ type RelayFilter struct {
 	EnabledOnly bool
 }
 
-const relayCols = `r.id, r.inbound_id, r.via_node_id, r.network, r.port, r.enabled, r.state, r.last_error, r.to_ip, r.applied_at,
-	r.check_json, r.created_at, r.updated_at`
+// The columns of a relay whose names the joined tables share are aliased: a batched read (D1) answers by column name.
+const relayCols = `r.id AS relay_id, r.inbound_id, r.via_node_id, r.network, r.port, r.enabled AS relay_enabled, r.state AS relay_state,
+	r.last_error, r.to_ip, r.applied_at, r.check_json, r.created_at, r.updated_at`
 
 const relayLinkQuery = `SELECT ` + relayCols + `,
-		x.id, x.name, x.state, i.enabled, i.state, p.id, p.name, p.protocol, e.name, e.state, e.agent_caps
+		x.id AS exit_node_id, x.name AS exit_node_name, x.state AS exit_node_state, i.enabled AS inbound_enabled, i.state AS inbound_state,
+		p.id AS profile_id, p.name AS profile_name, p.protocol, e.name AS via_node_name, e.state AS via_node_state,
+		e.agent_caps AS via_node_caps, e.address AS via_node_address, e.country_code AS via_node_country,
+		e.bandwidth_mbps AS via_node_bandwidth_mbps
 	FROM relay r
 	JOIN inbound i ON i.id = r.inbound_id
 	JOIN profile p ON p.id = i.profile_id
@@ -119,16 +126,29 @@ func (s *Store) RelayLinks(ctx context.Context, f RelayFilter) ([]RelayLink, err
 	defer rows.Close()
 	var out []RelayLink
 	for rows.Next() {
-		var l RelayLink
-		var caps string
-		if l.Relay, err = scanRelay(rows, &l.ExitNodeID, &l.ExitNodeName, &l.ExitNodeState, &l.ExitEnabled, &l.ExitState,
-			&l.ProfileID, &l.ProfileName, &l.Protocol, &l.ViaNodeName, &l.ViaNodeState, &caps); err != nil {
+		l, err := scanRelayLink(rows)
+		if err != nil {
 			return nil, err
 		}
-		l.ViaNodeCaps = strings.Fields(caps)
 		out = append(out, l)
 	}
 	return out, rows.Err()
+}
+
+// scanRelayLink scans a row of relayLinkQuery.
+func scanRelayLink(r rowScanner) (RelayLink, error) {
+	var l RelayLink
+	var caps string
+	var address, country sql.NullString
+	var bandwidth sql.NullInt64
+	var err error
+	if l.Relay, err = scanRelay(r, &l.ExitNodeID, &l.ExitNodeName, &l.ExitNodeState, &l.ExitEnabled, &l.ExitState,
+		&l.ProfileID, &l.ProfileName, &l.Protocol, &l.ViaNodeName, &l.ViaNodeState, &caps, &address, &country, &bandwidth); err != nil {
+		return RelayLink{}, err
+	}
+	l.ViaNodeCaps = strings.Fields(caps)
+	l.ViaNodeAddress, l.ViaNodeCountry, l.ViaNodeBandwidthMbps = address.String, country.String, int(bandwidth.Int64)
+	return l, nil
 }
 
 // RelayLink returns one relay with both ends, or ErrNotFound.

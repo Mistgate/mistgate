@@ -482,3 +482,62 @@ func TestChooseMatchesTheAdmin(t *testing.T) {
 		t.Errorf("v2rayNG on the defaults = %d %v", rule, f)
 	}
 }
+
+// A twin through a relay carries the entry's country after its name, in the language of the subscription; the title limit of
+// Happ keeps the label before the profile name and the load.
+func TestRemarksOfATwinThroughARelay(t *testing.T) {
+	exit := srv("de1", "DE", "Hysteria2")
+	twin := exit
+	twin.Mark = access.ViaMark("fi")
+	for lang, want := range map[string]string{
+		"en": "\U0001F1E9\U0001F1EA DE · Hysteria2 · via FI",
+		"ru": "\U0001F1E9\U0001F1EA DE · Hysteria2 · через FI",
+		"zh": "\U0001F1E9\U0001F1EA DE · Hysteria2 · 经 FI",
+	} {
+		got := remarks([]access.SubServer{exit, twin}, "", lang)
+		if got[0] != "\U0001F1E9\U0001F1EA DE · Hysteria2" || got[1] != want {
+			t.Errorf("%s: names %q, want the exit's own and %q", lang, got, want)
+		}
+	}
+	// An entry without a country is "via" alone; a mark nobody knows is left out.
+	bare, odd := exit, exit
+	bare.Mark, odd.Mark = access.ViaMark(""), "x"
+	if got := remarks([]access.SubServer{bare}, "", "en")[0]; got != "\U0001F1E9\U0001F1EA DE · Hysteria2 · via" {
+		t.Errorf("no entry country: %q", got)
+	}
+	if got := remarks([]access.SubServer{odd}, "", "en")[0]; got != "\U0001F1E9\U0001F1EA DE · Hysteria2" {
+		t.Errorf("unknown mark: %q", got)
+	}
+	// Two twins through entries of one country are told apart by the number, in creation order, after the exit.
+	if got := remarks([]access.SubServer{exit, twin, twin}, "", "en"); got[1] != "\U0001F1E9\U0001F1EA DE · Hysteria2 · via FI" || got[2] != got[1]+" 2" {
+		t.Errorf("two twins: %q", got)
+	}
+}
+
+func TestHappNameOfATwinStaysInTheLimitAndKeepsItsLabel(t *testing.T) {
+	load := 74
+	long := srv("de1", "DE", "Hysteria2 premium")
+	long.Mark, long.LoadPercent = access.ViaMark("FI"), &load
+	short := srv("de1", "DE", "VLESS")
+	short.Mark, short.LoadPercent = access.ViaMark("FI"), &load
+	for _, lang := range []string{"en", "ru", "zh"} {
+		for _, s := range []access.SubServer{long, short} {
+			got := happRemarks([]access.SubServer{s}, "", lang, true)[0]
+			label := markText(s.Mark, lang)
+			if n := len(utf16.Encode([]rune(got))); n > 30 || !strings.Contains(got, label) {
+				t.Errorf("%s: %q is %d units or lost %q", lang, got, n, label)
+			}
+		}
+	}
+	// There is room for both: the profile name is shortened first, then the load stays.
+	if got := happRemarks([]access.SubServer{long}, "", "en", true)[0]; got != "\U0001F1E9\U0001F1EA DE · HY2 premium · via FI" {
+		t.Errorf("en, long profile: %q", got)
+	}
+	if got := happRemarks([]access.SubServer{short}, "", "en", true)[0]; got != "\U0001F1E9\U0001F1EA DE · VLESS · via FI · 74％" {
+		t.Errorf("en, short profile: %q", got)
+	}
+	// Not both: the label outranks the load.
+	if got := happRemarks([]access.SubServer{short}, "", "ru", true)[0]; strings.Contains(got, "％") || !strings.HasSuffix(got, " · через FI") {
+		t.Errorf("ru: %q", got)
+	}
+}

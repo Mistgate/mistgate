@@ -105,6 +105,10 @@ type SubConn struct {
 	Server    int    // a link: the index into SubView.Servers (unused when MihomoOnly)
 	// MihomoOnly: a link that only the Mihomo apps can use (Gecko). The URI list has no server for it, so Server means nothing.
 	MihomoOnly bool
+	// Via: the link goes through a relay of this entry node (its country code, "" if it has none); Via is only set on a twin.
+	Via string
+	// Relay: this link is a twin (a relay's server), whatever the entry's country.
+	Relay bool
 }
 
 // SubServer is one Lines entry with the facts the remark (server name) is built from.
@@ -126,6 +130,17 @@ type SubServer struct {
 	// It is nil when capacity is unknown or the node has no fresh sample. The rates themselves stay out of the view:
 	// whatever reaches a user must not tell when the other person on a node streams.
 	LoadPercent *int
+	// Mark labels a server that is not the exit's own: a twin through a relay (ViaMark). The name builder writes it after the
+	// server's name in the language of the subscription; "" for an ordinary server.
+	Mark string
+}
+
+// MarkVia is the prefix of SubServer.Mark of a relay's twin; the rest is the country code of the entry node.
+const MarkVia = "via:"
+
+// ViaMark is SubServer.Mark of a twin that goes through an entry node of this country ("" when it has none).
+func ViaMark(entryCountry string) string {
+	return MarkVia + strings.ToUpper(strings.TrimSpace(entryCountry))
 }
 
 // SubDevice is one device of the user as the public page lists it.
@@ -431,6 +446,13 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			capacityMbps[f.Node.ID] = f.Node.BandwidthMbps
 		}
 	}
+	relaysOf := s.subRelays(data.Relays, full, g, u)
+	for _, rs := range relaysOf { // a twin's load is the larger of its entry's and its exit's
+		for _, l := range rs {
+			networkNodeIDs = append(networkNodeIDs, l.ViaNodeID)
+			capacityMbps[l.ViaNodeID] = l.ViaNodeBandwidthMbps
+		}
+	}
 	networkUsage := CurrentNetworkUtilization(networkNodeIDs, capacityMbps, liveByNode, now)
 	var nd *nodeDNS // read on first use: only the page and the AmneziaWG proxies of a Mihomo profile need it
 	dnsOf := func() *nodeDNS {
@@ -525,12 +547,37 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 				n := nodeOf(f)
 				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, Server: len(v.Servers) - 1})
 			}
+			// The twins of the server, right after it: the same server through each relay of it that is usable for the person.
+			for _, l := range relaysOf[f.Inbound.ID] {
+				if relayUnsupported(f.Profile.Protocol, spec) != "" {
+					break
+				}
+				twin := srv
+				twin.Mark = ViaMark(l.ViaNodeCountry)
+				twin.LoadPercent = maxPercent(srv.LoadPercent, networkUsage[l.ViaNodeID].LoadPercent)
+				tin := twinInput(in, f, spec, l)
+				if opt.Name != nil {
+					tin.DisplayName = opt.Name(twin)
+				}
+				if tf, ok := proto.Render(tin); ok {
+					twin.URI = string(tf.Data)
+					v.Lines = append(v.Lines, twin.URI)
+					v.Servers = append(v.Servers, twin)
+					n := nodeOf(f)
+					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, Server: len(v.Servers) - 1, Via: strings.ToUpper(strings.TrimSpace(l.ViaNodeCountry)), Relay: true})
+				}
+			}
 		} else if format == plugin.FormatURIList && !protocols.IsPerDevice(proto) {
 			// The URI list leaves out what only the Mihomo apps can use (Gecko), but it is still the person's server: the page lists it.
 			in.Format = plugin.FormatMihomo
 			if _, ok := proto.Render(in); ok {
 				n := nodeOf(f)
 				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
+				for _, l := range relaysOf[f.Inbound.ID] { // its twins are Mihomo-only as well
+					if relayUnsupported(f.Profile.Protocol, spec) == "" {
+						n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, Via: strings.ToUpper(strings.TrimSpace(l.ViaNodeCountry)), Relay: true})
+					}
+				}
 			}
 		}
 	}
@@ -554,6 +601,39 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	}
 	s.nodeDNSData(ctx, &v, n, awgDevs)
 	return v, nil
+}
+
+// subRelays are the relays that give the person a twin server, by the exit's inbound: the ones relayUsable accepts, in the
+// order of the relays. The caller drops the ones the protocol cannot carry (relayUnsupported).
+func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) map[string][]store.RelayLink {
+	var out map[string][]store.RelayLink
+	for _, l := range relays {
+		i := slices.IndexFunc(full, func(f store.AccessInboundFull) bool { return f.Inbound.ID == l.InboundID })
+		if i < 0 || l.ViaNodeAddress == "" || !s.relayUsable(l, full[i], g, u) {
+			continue
+		}
+		if out == nil {
+			out = map[string][]store.RelayLink{}
+		}
+		out[l.InboundID] = append(out[l.InboundID], l)
+	}
+	return out
+}
+
+// twinInput is the render input of the exit's server through the relay l: the exit's own protocol settings, SNI, keys, pin and
+// credential, with the entry node's address and the port it forwards. The forward is one port, so the twin has no hop range.
+func twinInput(in protocols.RenderInput, f store.AccessInboundFull, spec plugin.InboundSpec, l store.RelayLink) protocols.RenderInput {
+	spec.Listen.Port, spec.Listen.HopFrom, spec.Listen.HopTo = l.Port, 0, 0
+	in.Inbound = inboundView(protocols.NodeView{ID: f.Node.ID, Name: f.Node.Name, Address: l.ViaNodeAddress, CountryCode: f.Node.CountryCode}, spec, f.Inbound.CertPinSHA256)
+	return in
+}
+
+// maxPercent is the larger of two load percentages; nil is unknown, so the other one stands.
+func maxPercent(a, b *int) *int {
+	if a == nil || b != nil && *b > *a {
+		return b
+	}
+	return a
 }
 
 // requestDevice is the device a subscription request is served from, with its live credentials. hash is the one it is looked

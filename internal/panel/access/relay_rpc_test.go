@@ -291,7 +291,7 @@ func TestConcurrentCreateRelay(t *testing.T) {
 // one of their nodes. It is the user-free part (Live) that decides what the entry forwards.
 func TestRelayUsableRule(t *testing.T) {
 	e := newEnv(t)
-	link := store.RelayLink{Relay: store.Relay{Enabled: true, ViaNodeID: "nod_fi1",
+	link := store.RelayLink{Relay: store.Relay{Enabled: true, State: "active", ViaNodeID: "nod_fi1",
 		CheckJSON: `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`},
 		ExitEnabled: true, ExitState: "active", ExitNodeState: "active", ViaNodeState: "active"}
 	exit := store.AccessInboundFull{
@@ -307,6 +307,9 @@ func TestRelayUsableRule(t *testing.T) {
 	for name, mutate := range map[string]func(*store.RelayLink, *store.AccessInboundFull, *store.AccessGroup, *store.AccessUser){
 		"relay off": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
 			l.Enabled = false
+		},
+		"forward not installed": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
+			l.State = "failed"
 		},
 		"path not proven": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
 			l.CheckJSON = `{"at":1,"leg":{"status":"ok"},"path":{"status":"skipped","code":"off"},"ok":true}`
