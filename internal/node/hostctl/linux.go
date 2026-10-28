@@ -65,6 +65,9 @@ type linuxHost struct {
 	tun   tunnelState
 	links func() error
 
+	// The relay table (relay_linux.go).
+	rly relayState
+
 	// Torrent guard owns a separate nft table and one fail-open NFQUEUE runtime.
 	torrentMu     sync.Mutex
 	torrent       *torrentlinux.Runtime
@@ -378,6 +381,7 @@ func (h *linuxHost) Cleanup(ctx context.Context) error {
 	errs := []error{h.SetTorrentGuard(ctx, nil, nil), h.cleanupTunnels(ctx), h.CleanupUDPCount(ctx)} // owned tables and links
 	errs = append(errs, h.SyncInboundPorts(ctx, nil, nil))                                           // only UFW rules with Mistgate's exact ownership tags
 	errs = append(errs, h.removeProvisionUFWRules(ctx))                                              // and the 80/443 rules the SSH install tagged
+	errs = append(errs, h.cleanupRelays(ctx))                                                        // the relay table
 	script, _ := RenderRuleset(nil, nil)
 	h.fw.Lock()
 	h.hops, h.sshPorts = nil, nil

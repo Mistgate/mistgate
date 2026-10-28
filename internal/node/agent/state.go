@@ -24,6 +24,8 @@ type model struct {
 	// warp is the node-level WARP configuration; nil = this node has no WARP, Enabled=false = paused. It is replaced
 	// as a whole and never mutated once stored (agent.proto "AWG AND WARP").
 	warp *plugin.WarpSpec
+	// relays are the forwarded ports of the node (agent.proto "RELAY FORWARDS"), sorted by id; nil = none. Replaced as a whole.
+	relays []plugin.RelayForward
 }
 
 type inbound struct {
@@ -43,7 +45,7 @@ func rejectf(format string, a ...any) error {
 func newModel() *model { return &model{inbounds: map[string]*inbound{}} }
 
 func (m *model) clone() *model {
-	c := &model{revision: m.revision, settings: m.settings, warp: m.warp, inbounds: make(map[string]*inbound, len(m.inbounds))}
+	c := &model{revision: m.revision, settings: m.settings, warp: m.warp, relays: m.relays, inbounds: make(map[string]*inbound, len(m.inbounds))}
 	for id, in := range m.inbounds {
 		ci := &inbound{spec: in.spec, creds: make(map[string]plugin.UserCred, len(in.creds))}
 		for k, v := range in.creds {
@@ -83,6 +85,16 @@ func merge(cur *model, ds *pb.DesiredState, known func(protocol string) bool) (*
 		next.warp = w
 	} else if full {
 		next.warp = nil
+	}
+	// Relay forwards: the same rule. Presence (an empty list too) replaces the list, absence in a delta keeps it.
+	if ds.Relays != nil {
+		rs, err := relaysFromPB(ds.Relays)
+		if err != nil {
+			return nil, err
+		}
+		next.relays = rs
+	} else if full {
+		next.relays = nil
 	}
 	for _, id := range ds.RemovedInboundIds {
 		delete(next.inbounds, id)
@@ -240,7 +252,7 @@ func (m *model) ids() []string {
 
 // snapshot turns the model into a full DesiredState (the persisted form).
 func (m *model) snapshot() *pb.DesiredState {
-	ds := &pb.DesiredState{Revision: m.revision, Settings: m.settings, StateHash: m.hash(), Warp: warpToPB(m.warp)}
+	ds := &pb.DesiredState{Revision: m.revision, Settings: m.settings, StateHash: m.hash(), Warp: warpToPB(m.warp), Relays: relaysToPB(m.relays)}
 	for _, id := range m.ids() {
 		in := m.inbounds[id]
 		is := &pb.InboundState{InboundId: id, Spec: specToPB(in.spec), CredsReplace: true}

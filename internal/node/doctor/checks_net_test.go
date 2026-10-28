@@ -278,6 +278,10 @@ func TestForeignNft(t *testing.T) {
 	udpCheck := `{"table":{"family":"inet","name":"mistgate_udpcheck","handle":6}},
 {"chain":{"family":"inet","table":"mistgate_udpcheck","name":"pre","handle":1,"type":"filter","hook":"prerouting","prio":-500,"policy":"accept"}},
 {"rule":{"family":"inet","table":"mistgate_udpcheck","chain":"pre","handle":2,"expr":[{"match":{"op":"==","left":{"payload":{"protocol":"udp","field":"dport"}},"right":443}},{"drop":null}]}}`
+	// A relay forward on 443/udp (a DNAT in a nat chain): it would be a hit on our own inbound if the table were foreign.
+	relayTable := `{"table":{"family":"inet","name":"mistgate_relay","handle":7}},
+{"chain":{"family":"inet","table":"mistgate_relay","name":"pre","handle":1,"type":"nat","hook":"prerouting","prio":-100,"policy":"accept"}},
+{"rule":{"family":"inet","table":"mistgate_relay","chain":"pre","handle":2,"expr":[{"match":{"op":"==","left":{"payload":{"protocol":"udp","field":"dport"}},"right":443}},{"dnat":{"family":"ip","addr":"192.0.2.10","port":8443}}]}}`
 	docker := `{"table":{"family":"ip","name":"nat","handle":2}},
 {"chain":{"family":"ip","table":"nat","name":"PREROUTING","handle":1,"type":"nat","hook":"prerouting","prio":-100,"policy":"accept"}}`
 	hy := func(match string) string {
@@ -297,6 +301,7 @@ func TestForeignNft(t *testing.T) {
 	}{
 		{"only ours", nftDocument(nftOurs), OK, CodeNftClean},
 		{"udp delivery check is ours", nftDocument(nftOurs, udpCheck), OK, CodeNftClean},
+		{"relay forwards are ours", nftDocument(nftOurs, relayTable), OK, CodeNftClean},
 		{"a filter table that does not touch our ports", nftDocument(nftOurs, f2b), OK, CodeNftFound},
 		{"a nat table without rules is only a note", nftDocument(nftOurs, docker), Warn, CodeNftNat},
 		{"forgotten redirect inside our hop range", nftDocument(nftOurs, hy(udp(`{"range":[25000,26000]}`))), Fail, CodeNftHits},

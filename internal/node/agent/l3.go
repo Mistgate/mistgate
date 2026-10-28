@@ -155,6 +155,9 @@ func (a *Agent) capabilities() []string {
 	if a.cfg.Warp != nil {
 		caps = append(caps, capWarp)
 	}
+	if rh, ok := a.host.(hostctl.RelayHost); ok && rh.RelaySupported() {
+		caps = append(caps, plugin.CapRelayForward)
+	}
 	if hostctl.TorrentGuardSupported() {
 		caps = append(caps, capTorrentGuard)
 	}

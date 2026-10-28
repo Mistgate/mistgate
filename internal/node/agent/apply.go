@@ -38,6 +38,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		res.Status = pb.ApplyStatus_APPLY_STATUS_APPLIED
 		res.StateHash = a.observedHash(cur)
 		res.Inbounds = a.cachedResults(cur)
+		res.Relays = a.relay.results
 		return done()
 	}
 
@@ -68,6 +69,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	a.persistModel(next, false)
 	res.Status = applyStatus(results)
 	res.Inbounds = results
+	res.Relays = a.relay.results
 	res.StateHash = a.observedHash(next)
 	if ds.BaseRevision == 0 { // deltas are frequent; only a full apply is an event worth reporting
 		added, removed, changed, users := diffModels(cur, next)
@@ -127,14 +129,18 @@ func diffModels(cur, next *model) (added, removed, changed, creds int) {
 // the others. force lists inbounds that must be applied even if unchanged (restart).
 func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]bool) []*pb.InboundResult {
 	prev := a.snapshotModel()
-	nextTCP := tcpPortClaims(next)
-	claimedTCP := mergeTCPPortClaims(tcpPortClaims(prev), nextTCP)
+	prevRelayClaims := a.relay.claims
 	// The host side of the L3 protocols comes first (l3.go): WARP, then the routes and the firewall of the tunnel
 	// interfaces, then the engines that create those interfaces. An inbound that depends on a step that failed is
 	// blocked (a.blocked) instead of started.
 	a.engineSettings(ctx, next)
 	a.syncWarp(ctx, next)
 	a.syncTunnels(ctx, next)
+	// The forwards come before the engines too: a TCP port a forward holds is a claim like an inbound's, so a decoy site
+	// gives it up while the forward is installed and keeps it when the forward failed.
+	a.syncRelays(ctx, next)
+	nextTCP := withRelayClaims(tcpPortClaims(next), a.relay.claims)
+	claimedTCP := mergeTCPPortClaims(withRelayClaims(tcpPortClaims(prev), prevRelayClaims), nextTCP)
 	for _, id := range prev.ids() {
 		old := prev.inbounds[id]
 		if n := next.inbounds[id]; n != nil && n.spec.Protocol == old.spec.Protocol {
@@ -538,7 +544,7 @@ func (a *Agent) observedHash(m *model) string {
 			all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 		}
 	}
-	return statehash.StateWarp(all, m.warp)
+	return statehash.StateRelays(all, m.warp, m.relays)
 }
 
 func withExpired(held []plugin.UserCred, in *inbound, now time.Time) []plugin.UserCred {
@@ -568,5 +574,5 @@ func (m *model) hash() string {
 		in := m.inbounds[id]
 		all = append(all, statehash.Inbound{Spec: in.spec, Creds: in.sortedCreds()})
 	}
-	return statehash.StateWarp(all, m.warp)
+	return statehash.StateRelays(all, m.warp, m.relays)
 }

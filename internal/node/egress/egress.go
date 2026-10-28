@@ -390,3 +390,23 @@ func lookupVia(servers []string, host string) ([]net.IPAddr, error) {
 	}
 	return nil, lastErr
 }
+
+// LookupIPv4 resolves the A record of host with the given resolvers, the way the engines resolve (servers in order, the system
+// resolver when there are none). An IPv4 literal is returned as it is. For callers outside the engines that must not follow AAAA.
+func LookupIPv4(servers []string, host string) (netip.Addr, error) {
+	if a, err := netip.ParseAddr(host); err == nil {
+		if a = a.Unmap(); a.Is4() {
+			return a, nil
+		}
+		return netip.Addr{}, fmt.Errorf("%s is not an IPv4 address", host)
+	}
+	v4, _, err := (&resolver{servers: func() []string { return servers }, cache: map[string]cacheEntry{}}).lookup(host)
+	if err != nil {
+		return netip.Addr{}, err
+	}
+	a, ok := netip.AddrFromSlice(v4)
+	if !ok {
+		return netip.Addr{}, fmt.Errorf("%s has no A record", host)
+	}
+	return a.Unmap(), nil
+}

@@ -233,3 +233,19 @@ func TestVetAllowsPublic(t *testing.T) {
 		}
 	}
 }
+
+func TestLookupIPv4(t *testing.T) {
+	dnsAddr, _ := fakeDNS(t, map[string]string{"exit.example.test.": "192.0.2.7"})
+	if a, err := LookupIPv4([]string{dnsAddr}, "exit.example.test"); err != nil || a.String() != "192.0.2.7" {
+		t.Fatalf("by name: %v %v", a, err)
+	}
+	if a, err := LookupIPv4(nil, "203.0.113.9"); err != nil || a.String() != "203.0.113.9" {
+		t.Fatalf("literal: %v %v", a, err)
+	}
+	if _, err := LookupIPv4(nil, "2001:db8::1"); err == nil {
+		t.Fatal("an IPv6 literal is not an A record")
+	}
+	if _, err := LookupIPv4([]string{dnsAddr}, "nope.example.test"); err == nil {
+		t.Fatal("NXDOMAIN must be an error")
+	}
+}

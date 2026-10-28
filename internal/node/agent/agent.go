@@ -186,7 +186,8 @@ type Agent struct {
 	tunUsed, warpRouted bool
 	torrentGuardErr     string
 	torrentGuardActive  bool
-	hostFirewallErr     string // Last reported host-firewall sync failure; worker-owned.
+	hostFirewallErr     string       // Last reported host-firewall sync failure; worker-owned.
+	relay               relayRuntime // relay forwards (relay.go); worker-owned
 
 	// Timing knobs; tests shorten them.
 	statsEvery   time.Duration // 0 = NodeSettings.stats_interval_s
