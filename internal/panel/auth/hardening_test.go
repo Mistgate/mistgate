@@ -493,6 +493,8 @@ func TestRolePolicyIsEnforcedBySessionMiddleware(t *testing.T) {
 		{adminv1connect.RelayServiceCreateRelayProcedure, 200, 403, 403},
 		{adminv1connect.RelayServiceUpdateRelayProcedure, 200, 403, 403},
 		{adminv1connect.RelayServiceDeleteRelayProcedure, 200, 403, 403},
+		{adminv1connect.RelayServiceCheckRelayProcedure, 200, 403, 403},
+		{adminv1connect.RelayServiceListRelayCandidatesProcedure, 200, 403, 403},
 		{adminv1connect.InstanceServiceUpdateInstanceProcedure, 200, 403, 403},
 		{adminv1connect.AuthServiceListAuditProcedure, 200, 403, 403},
 		{adminv1connect.AuthServiceUpdateSecuritySettingsProcedure, 200, 403, 403},

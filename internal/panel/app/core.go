@@ -119,7 +119,7 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 
 // accessConfig is the access service's configuration, the same in every role.
 func (b base) accessConfig(fl *fleet.Fleet) access.Config {
-	return access.Config{SubscriptionBaseURL: b.subBase, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts}
+	return access.Config{SubscriptionBaseURL: b.subBase, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay}
 }
 
 // usageRecompute is fleet.Config.OnUsage: a quota overrun takes effect right after the stats batch that crossed it.
@@ -335,6 +335,7 @@ func wireCore(c Config) (*core, error) {
 	}
 	hl = health.New(st, vlt, b.reg, fl, hcfg)
 	k.hl = hl
+	acc.SetRelayHints(hl.RelayHints) // the candidates of a relay carry what the country check and the TSPU probe know
 	fl.SetHealth(hl)
 
 	// Node-agent updates: the signed bundle in <data-dir>/dist, its distribution through the agent endpoint and

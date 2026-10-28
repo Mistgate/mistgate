@@ -13,6 +13,7 @@ func TestRelayProceduresAreOwnerOnlyAndClosedToTokens(t *testing.T) {
 	for _, path := range []string{
 		adminv1connect.RelayServiceListRelaysProcedure, adminv1connect.RelayServiceCreateRelayProcedure,
 		adminv1connect.RelayServiceUpdateRelayProcedure, adminv1connect.RelayServiceDeleteRelayProcedure,
+		adminv1connect.RelayServiceCheckRelayProcedure, adminv1connect.RelayServiceListRelayCandidatesProcedure,
 	} {
 		if got := ProcedureRole(path); got != store.RoleOwner {
 			t.Errorf("%s: ProcedureRole = %q, want owner", path, got)

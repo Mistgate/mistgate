@@ -59,6 +59,9 @@ type Config struct {
 	AfterResponse       AfterResponseRunner
 	// CheckPorts runs the fleet UDP delivery check; nil disables save-time checks.
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
+	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath;
+	// none = both), the result stored in the relay and returned. nil: relays cannot be checked, so none is switched on.
+	CheckRelay func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
 }
 
 // Service implements ProfileService, UserService, GroupService, DeviceService, AwgService and RelayService (adminv1connect
@@ -90,6 +93,12 @@ type Service struct {
 	// of the relay table keep several panels apart. relayGate decides whether a relay may be switched on.
 	relayMu   sync.Mutex
 	relayGate func(context.Context, store.RelayLink) error
+	// relaySettleFn follows the switch on (relaySettle); relayWait and relayPoll are how long it waits for the entry's report
+	// and how often it looks; relayHints is the source of the candidates' hints (SetRelayHints).
+	relaySettleFn func(context.Context, store.RelayLink) error
+	relayWait     time.Duration
+	relayPoll     time.Duration
+	relayHints    func(ctx context.Context, entryID string, nodeIDs []string) (map[string]*adminv1.RelayCountryHint, map[string]*adminv1.RelayReachHint)
 
 	secretPtrs   map[string][]string // protocol id -> x-secret pointers
 	criticalPtrs map[string][]string // protocol id -> x-critical pointers
@@ -112,8 +121,9 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, notify StateN
 		afterResponse: cfg.AfterResponse,
 		dns:           dns.New(st),
 		secretPtrs:    map[string][]string{}, criticalPtrs: map[string][]string{},
-		relayGate: relayUnchecked,
+		relayWait: relayApplyWait, relayPoll: 250 * time.Millisecond,
 	}
+	s.relayGate, s.relaySettleFn = s.relayCheckGate, s.relaySettle
 	if s.afterResponse == nil {
 		s.afterResponse = func(work func()) { go work() }
 	}

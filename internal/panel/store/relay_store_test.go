@@ -34,6 +34,15 @@ func relayExec(t *testing.T, st *Store, q string, args ...any) {
 	}
 }
 
+func mustRelay(t *testing.T, st *Store, id string) RelayLink {
+	t.Helper()
+	l, err := st.RelayLink(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return l
+}
+
 // relayStoreProof runs on SQLite and on D1 (see relay_test.go and d1_store_test.go).
 func relayStoreProof(t *testing.T, st *Store) {
 	t.Helper()
@@ -208,6 +217,48 @@ func relayStoreProof(t *testing.T, st *Store) {
 	}
 	if err := st.DeleteRelay(ctx, "rly_b"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleting twice: %v", err)
+	}
+
+	// The latest check is stored whole, read back as it was, and is the relay's alone; a stage that passed is "proven" only with
+	// both stages.
+	if _, ok := mustRelay(t, st, "rly_a").Check(); ok {
+		t.Fatal("a relay never checked has a check")
+	}
+	chk := RelayCheck{At: 1000, Network: "udp", Port: 8443, To: "192.0.2.10:443",
+		Leg: RelayStage{Status: "ok", Sender: "nod_fi1", Verdict: "ok", Sent: 300, Got: 300, At: 1000}, Path: RelayStage{Status: "skipped", Code: "off", At: 1000}}
+	chk.Settle()
+	if err := st.SetRelayCheck(ctx, "rly_a", chk); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := mustRelay(t, st, "rly_a").Check(); !ok || got != chk || !got.OK || got.Stage != "" || got.Verified() || mustRelay(t, st, "rly_a").Proven() {
+		t.Fatalf("stored check = %+v ok=%v", got, ok)
+	}
+	chk.Path = RelayStage{Status: "ok", Sender: "nod_nl1", Verdict: "ok", Sent: 300, Got: 300, At: 1001}
+	chk.Settle()
+	if err := st.SetRelayCheck(ctx, "rly_a", chk); err != nil {
+		t.Fatal(err)
+	}
+	if l := mustRelay(t, st, "rly_a"); !l.Proven() {
+		t.Fatalf("both stages passed, but not proven: %s", l.CheckJSON)
+	}
+	chk.Path = RelayStage{Status: "fail", Code: "broken", At: 1002}
+	chk.Settle()
+	if chk.OK || chk.Stage != "path" || chk.Verified() {
+		t.Fatalf("settled = %+v", chk)
+	}
+	if err := st.SetRelayCheck(ctx, "rly_nope", chk); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("a check of a relay that is not there: %v", err)
+	}
+	// A move or a switch does not touch the check (the access module clears the path itself).
+	if err := st.SetRelayCheck(ctx, "rly_a", chk); err != nil {
+		t.Fatal(err)
+	}
+	p := uint16(8444)
+	if err := st.UpdateRelay(ctx, "rly_a", RelayPatch{Port: &p}, at); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := mustRelay(t, st, "rly_a").Check(); got != chk {
+		t.Errorf("a port change rewrote the check: %+v", got)
 	}
 
 	// The server goes: its relays go with it (the foreign key).

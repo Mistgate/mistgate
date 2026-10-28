@@ -28,18 +28,11 @@ func relayLabel(r store.RelayLink) string { return "relay to " + r.ExitNodeName 
 // relayPortOK: the ports an entry may forward are the ones the agent accepts (agent.proto): 443 or 1024 and above.
 func relayPortOK(p uint32) bool { return p == 443 || (p >= 1024 && p <= 65535) }
 
-// relayUnchecked is the gate of a relay until the panel can check the path: nothing passes. TODO(relay step 4): replace it
-// with CheckRelay's verdict (the leg entry -> exit from the entry's agent, then the path from outside through the entry),
-// so that UpdateRelay(enabled = true) switches on only a relay whose check passed, and a failed one stays off with the stage.
-func relayUnchecked(context.Context, store.RelayLink) error {
-	return coded(connect.CodeFailedPrecondition, "relay_unchecked")
-}
-
-// SetRelayGateForTest replaces the gate that lets a relay be switched on (nil restores the real one). Call it before the
-// service takes requests.
+// SetRelayGateForTest replaces the gate that lets a relay be switched on (nil restores the real one, relay_check.go). Call it
+// before the service takes requests.
 func (s *Service) SetRelayGateForTest(gate func(context.Context, store.RelayLink) error) {
 	if gate == nil {
-		gate = relayUnchecked
+		gate = s.relayCheckGate
 	}
 	s.relayGate = gate
 }
@@ -49,12 +42,13 @@ func (s *Service) RelayHandler() (string, http.Handler) {
 	return adminv1connect.NewRelayServiceHandler(s, handlerOpts...)
 }
 
-// relayUsable is the rule for a person's entry of a server: the relay is switched on, the exit's server is usable for the
-// person (usable: group, node, app) and live, and the entry node is live and one of the person's nodes. The twin entries of
-// the subscription follow it (a later step); the entry node's own forward follows only the part that is not about a
-// person (store.RelayLink.Live).
+// relayUsable is the rule for a person's entry of a server: the relay is switched on and proven (its path from outside was seen
+// to work, store.RelayLink.Proven: a relay that failed its check is off, and one that is still being checked is on but not yet
+// proven), the exit's server is usable for the person (usable: group, node, app) and live, and the entry node is live and one
+// of the person's nodes. The twin entries of the subscription follow it (a later step); the entry node's own forward follows
+// only the part that is not about a person (store.RelayLink.Live).
 func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return l.Enabled && l.Live() && l.ViaNodeState == "active" && s.usable(exit, g, u) &&
+	return l.Enabled && l.Proven() && l.Live() && l.ViaNodeState == "active" && s.usable(exit, g, u) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
 }
 
@@ -71,6 +65,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 		ViaNodeId: l.ViaNodeID, ViaNodeName: l.ViaNodeName, Network: l.Network, Port: uint32(l.Port),
 		Enabled: l.Enabled, State: inboundStates[l.State], LastError: l.LastError, ToIp: l.ToIP, ExitLive: l.Live(),
 		AgentSupported: slices.Contains(l.ViaNodeCaps, plugin.CapRelayForward), CreatedUnix: l.CreatedAt.Unix(),
+		Check: s.relayCheckOf(ctx, l),
 	}
 	if !l.AppliedAt.IsZero() {
 		out.AppliedUnix = l.AppliedAt.Unix()
@@ -130,6 +125,9 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	spec, err := s.buildSpec(f, merged)
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
+	}
+	if why := relayUnsupported(f.Profile.Protocol, spec); why != "" {
+		return nil, coded(connect.CodeFailedPrecondition, "relay_unsupported", "reason", why)
 	}
 	if existing, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: f.Inbound.ID, ViaNodeID: entry.ID}); err != nil {
 		return nil, s.internal("list relays", err)
@@ -218,7 +216,11 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 			if !relayAgentOK(entry) {
 				return nil, coded(connect.CodeFailedPrecondition, "agent_old", "node", entry.Name)
 			}
-			if err := s.relayGate(ctx, link); err != nil {
+			gated := link
+			if patch.Port != nil {
+				gated.Port = *patch.Port
+			}
+			if err := s.relayGate(ctx, gated); err != nil {
 				return nil, err
 			}
 		}
@@ -229,29 +231,45 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 		return connect.NewResponse(&adminv1.UpdateRelayResponse{Relay: s.relayMsg(ctx, link)}), nil
 	}
 
-	s.relayMu.Lock()
-	defer s.relayMu.Unlock()
-	if patch.Port != nil {
-		others, _, err := s.nodeInbounds(ctx, link.ViaNodeID, link.ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := portRefusal(link.Protocol, link.ViaNodeName, plugin.Listen{Network: link.Network, Port: *patch.Port}, others, nil, s.now()); err != nil {
-			return nil, err
-		}
-	}
-	if err := s.st.UpdateRelay(ctx, link.ID, patch, s.now()); err != nil {
-		port := link.Port
+	if err := func() error {
+		s.relayMu.Lock() // not held while the entry is waited for (relaySettle)
+		defer s.relayMu.Unlock()
 		if patch.Port != nil {
-			port = *patch.Port
+			others, _, err := s.nodeInbounds(ctx, link.ViaNodeID, link.ID)
+			if err != nil {
+				return err
+			}
+			if err := portRefusal(link.Protocol, link.ViaNodeName, plugin.Listen{Network: link.Network, Port: *patch.Port}, others, nil, s.now()); err != nil {
+				return err
+			}
 		}
-		return nil, s.relayStoreError(err, link.ViaNodeName, link.ExitNodeName, port, "update relay")
+		s.clearRelayPath(ctx, link.ID) // a new forward is unproven until its path check passes
+		if err := s.st.UpdateRelay(ctx, link.ID, patch, s.now()); err != nil {
+			port := link.Port
+			if patch.Port != nil {
+				port = *patch.Port
+			}
+			return s.relayStoreError(err, link.ViaNodeName, link.ExitNodeName, port, "update relay")
+		}
+		s.audit(ctx, actor(ctx), "relay.update", params)
+		s.notify.StateChanged() // the entry's desired state carries the forward only while it is switched on
+		return nil
+	}(); err != nil {
+		return nil, err
 	}
-	s.audit(ctx, actor(ctx), "relay.update", params)
-	s.notify.StateChanged() // the entry's desired state carries the forward only while it is switched on
 	next, err := s.st.RelayLink(ctx, link.ID)
 	if err != nil {
 		return nil, s.internal("read relay", err)
+	}
+	// A relay that is on after this change (switched on now, or moved to another port) has a new forward nobody has reached
+	// from outside: wait for the entry to install it and check the path, or switch the relay off again.
+	if next.Enabled && (patch.Enabled != nil || patch.Port != nil) {
+		if err := s.relaySettleFn(ctx, next); err != nil {
+			return nil, err
+		}
+		if next, err = s.st.RelayLink(ctx, link.ID); err != nil {
+			return nil, s.internal("read relay", err)
+		}
 	}
 	return connect.NewResponse(&adminv1.UpdateRelayResponse{Relay: s.relayMsg(ctx, next)}), nil
 }

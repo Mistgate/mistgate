@@ -9,10 +9,15 @@ import "mistgate/admin/v1/common.proto";
 // sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
 //
 // Everything here is owner-only (a helper and an API token get PERMISSION_DENIED; tokens are not offered these
-// procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete.
+// procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
 //
-// A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), which waits for the panel's check of the
-// path (a later step: until then UpdateRelay(enabled = true) is refused with FAILED_PRECONDITION "relay_unchecked").
+// A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), and only after CheckRelay: the leg check
+// (the entry reaches the exit's server) must have passed less than 15 minutes ago, for the relay's present target (the
+// exit's address and server port); otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked",
+// "relay_check_stale" or "relay_check_failed". Switching on then installs the forward and checks the path from outside
+// through the entry (so does moving a relay that is on to another port); if that fails the relay is switched off again and
+// UpdateRelay answers "relay_check_failed" (stage, code). A relay that is on has passed both stages, so it is on only when
+// it works from outside.
 // The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
 // failed, on an enrolled node) and the entry's agent lists "relay-forward/1".
 //
@@ -22,7 +27,9 @@ import "mistgate/admin/v1/common.proto";
 // "same_node" (the entry holds the server itself). ALREADY_EXISTS: "relay_exists" (the entry already forwards this server),
 // "port_taken" (a profile or a relay of the entry holds that network and port, hop ranges included; the message carries a
 // free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's agent lacks "relay-forward/1"),
-// "relay_unchecked" (the path was not checked yet), "no_clean_port" (the entry has no free port to offer).
+// "relay_unchecked" (no check yet), "relay_check_stale" (older than 15 minutes, or the target changed since),
+// "relay_check_failed" (stage and code say where), "relay_unsupported" (reason: "cdn", "acme_ip" or "awg": a server the
+// entry cannot pass on), "no_clean_port" (the entry has no free port to offer).
 service RelayService {
   // The relays, oldest first. node_id, when set, keeps those that have this node at either end.
   rpc ListRelays(ListRelaysRequest) returns (ListRelaysResponse);
@@ -32,6 +39,14 @@ service RelayService {
   // Switches a relay on or off, or moves it to another port on the entry.
   rpc UpdateRelay(UpdateRelayRequest) returns (UpdateRelayResponse);
   rpc DeleteRelay(DeleteRelayRequest) returns (DeleteRelayResponse);
+  // Checks a relay, one at a time per exit (the same lock as the port check): the leg from the entry to the exit's
+  // server, then, when the relay is on and the entry reported the forward, the path from a third node (never the entry
+  // or the exit; the panel only when no node can) to the entry's port. Stores the result in the relay and returns it. It
+  // changes no switch.
+  rpc CheckRelay(CheckRelayRequest) returns (CheckRelayResponse);
+  // The servers of other nodes the entry could pass on, with what the panel knows about reaching them. Missing data is
+  // "no_data", never a guess.
+  rpc ListRelayCandidates(ListRelayCandidatesRequest) returns (ListRelayCandidatesResponse);
 }
 
 message Relay {
@@ -65,6 +80,111 @@ message Relay {
   // The entry's agent lists "relay-forward/1", so it can take the forward.
   bool agent_supported = 19;
   int64 created_unix = 20;
+  // The latest CheckRelay (or the check made on switching on); absent before the first.
+  RelayCheck check = 21;
+}
+
+// One stage of a check.
+message RelayStage {
+  // "ok", "fail", "skipped" or "" (did not run).
+  string status = 1;
+  // Why it failed, or was skipped. Failed: "node_offline", "agent_too_old", "exit_offline", "no_sender", "no_route", "busy",
+  // "failed", "refused" and "timeout" (a TCP port that answers nothing), "other" (a TCP port that answers, but not
+  // Mistgate), "lossy" and "broken" (UDP counted at the exit: 70-95 % and under 70 % of the packets), "unverifiable" (the
+  // server has no name to probe it by), "same_host" (only the panel could send and it runs on the entry or the exit),
+  // "spec" (the server's settings do not build), "apply_failed" and "apply_timeout" (the entry did not install the
+  // forward), "switched_off" (someone switched the relay off while it was waited for). Skipped: "off" (the relay is not switched on, so there is no forward to reach), "leg_failed".
+  string code = 2;
+  // The node that sent the probe (its id), or "panel".
+  string sender_id = 3;
+  string sender_name = 4;
+  // TCP: "ours", "other", "refused" or "timeout"; UDP: "ok", "lossy" or "broken".
+  string verdict = 5;
+  // UDP only: packets sent and counted by the exit.
+  uint32 sent = 6;
+  uint32 got = 7;
+  int64 at_unix = 8;
+}
+
+// What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
+// packets counted (UDP) or the server's identity proven (TCP) at the exit.
+message RelayCheck {
+  int64 at_unix = 1;
+  string network = 2;
+  // The entry's port the path was checked on, and the exit's address:port the check was made for (a change of the target
+  // makes the leg stale).
+  uint32 port = 3;
+  string to = 4;
+  RelayStage leg = 5;
+  RelayStage path = 6;
+  // No stage that ran failed, and the leg ran.
+  bool ok = 7;
+  // The first stage that failed: "leg", "path", or "".
+  string stage = 8;
+  // Both stages ran and passed: the relay works from outside.
+  bool verified = 9;
+}
+
+message CheckRelayRequest {
+  string id = 1;
+}
+
+message CheckRelayResponse {
+  Relay relay = 1;
+}
+
+// The panel's knowledge about the exit's country check, from the whole country-check machinery (Globalping, the TSPU
+// probe, the lists). "no_data" when it has none.
+message RelayCountryHint {
+  // "ok", "partial", "blocked" (also tcp_blocked), "listed" or "no_data".
+  string verdict = 1;
+  // Networks that see the exit dark (the vantages with state dark), sorted.
+  repeated string dark = 2;
+  int64 at_unix = 3;
+}
+
+// Does the entry reach the exit? Known only when the TSPU probe ran from this entry node.
+message RelayReachHint {
+  // "reach", "partial", "blocked" or "no_data".
+  string verdict = 1;
+  // "tspu_row": the probe's row for the exit from this entry. "refs_pass": the probe found no TSPU on this entry's path
+  // (a blocked reference answers), so nothing is cut here. "" with no_data.
+  string source = 2;
+  int64 at_unix = 3;
+}
+
+message RelayCandidate {
+  string inbound_id = 1;
+  string node_id = 2;
+  string node_name = 3;
+  string profile_id = 4;
+  string profile_name = 5;
+  string protocol = 6;
+  string network = 7;
+  // The server's port on the exit.
+  uint32 port = 8;
+  // Empty: it can be relayed. Else why not: "cdn" (people connect to the CDN), "acme_ip" (the certificate names the exit's
+  // IP address), "awg" (not yet), "build_failed" (the server's settings do not build).
+  string unsupported = 9;
+  // The server has a hop range; a relay passes the one port only.
+  bool hop = 10;
+  // This entry already forwards this server.
+  string relay_id = 11;
+  RelayCountryHint country = 12;
+  RelayReachHint reach = 13;
+}
+
+message ListRelayCandidatesRequest {
+  string via_node_id = 1;
+}
+
+message ListRelayCandidatesResponse {
+  // Those that can be relayed first; among them the exits the country check or the probe says are cut come first.
+  repeated RelayCandidate candidates = 1;
+  // The entry's agent lists "relay-forward/1".
+  bool agent_supported = 2;
+  // The entry's own country check: do people see the entry? Compare its dark list with the exit's.
+  RelayCountryHint entry_country = 3;
 }
 
 message ListRelaysRequest {

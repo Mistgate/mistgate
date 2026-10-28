@@ -61,6 +61,17 @@ type portSender struct {
 	panel bool
 }
 
+// portDial says where a UDP run sends. A check of a node's own ports dials the node's address and counts at the node the ports
+// it sent to (dialOf). Anything else names its own dial host: the relay path sends to the entry's address and forwarded port
+// and counts at the exit, and the IPv6 check dials the node's IPv6 literal. The host is a parameter all the way down
+// (sendPortCheck, probeTCPTargets); never change NodeRow.Address for it, the node's specs are built from that.
+type portDial struct {
+	Host  string
+	Ports []uint16 // the destination ports there; nil = the counted ports (the same numbers)
+}
+
+func dialOf(target store.NodeRow) portDial { return portDial{Host: target.Address} }
+
 type udpPortSettings struct {
 	Port uint16 `json:"port"`
 	Hop  struct {
@@ -305,7 +316,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	}
 	var result portCheckOutcome
 	for i, sender := range senders {
-		result = f.runPortCheckAttempt(ctx, target, targetLive, sender, ports)
+		result = f.runPortCheckAttempt(ctx, target, targetLive, sender, dialOf(target), ports)
 		if result.errorCode != "inconclusive" || i != 0 || len(senders) < 2 {
 			break
 		}
@@ -425,7 +436,9 @@ func udpPortUsed(port uint16, settings []udpPortSettings) bool {
 	return false
 }
 
-func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, targetLive store.NodeLiveRow, sender portSender, ports []uint16) portCheckOutcome {
+// runPortCheckAttempt is one UDP delivery run: the target arms its counter on ports, the sender sends to dial.Host (on dial.Ports,
+// or on ports), the target stops and reports. Its rows name the dial host as their address.
+func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, targetLive store.NodeLiveRow, sender portSender, dial portDial, ports []uint16) portCheckOutcome {
 	var tag [8]byte
 	if _, err := rand.Read(tag[:]); err != nil {
 		f.log.Warn("make UDP port check tag", "node", target.ID, "err", err)
@@ -447,7 +460,11 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 		return portCheckOutcome{sender: portSenderID(sender), errorCode: portCommandError(armed)}
 	}
 
-	family, sent, sendErrCode := f.sendPortCheck(ctx, target, sender, ports, tag)
+	sendPorts := dial.Ports
+	if sendPorts == nil {
+		sendPorts = ports
+	}
+	family, sent, sendErrCode := f.sendPortCheck(ctx, dial.Host, sender, sendPorts, tag)
 	if sendErrCode == "" {
 		if err := f.settlePortCheck(ctx); err != nil {
 			sendErrCode = "failed"
@@ -491,7 +508,7 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 		if verdict == "ok" {
 			conclusive = true
 		}
-		checks = append(checks, store.PortCheck{NodeID: target.ID, Port: port, Address: target.Address,
+		checks = append(checks, store.PortCheck{NodeID: target.ID, Port: port, Address: dial.Host,
 			Sent: uint32(sent), Got: uint32(got), Verdict: verdict, Sender: portSenderID(sender), CheckedAt: checkedAt})
 	}
 	if !conclusive {
@@ -517,7 +534,7 @@ func relativeLoss(checks []store.PortCheck) {
 	}
 }
 
-func (f *Fleet) sendPortCheck(ctx context.Context, target store.NodeRow, sender portSender, ports []uint16, tag [8]byte) (string, int, string) {
+func (f *Fleet) sendPortCheck(ctx context.Context, host string, sender portSender, ports []uint16, tag [8]byte) (string, int, string) {
 	if sender.panel {
 		select {
 		case panelUDPSlots <- struct{}{}:
@@ -529,7 +546,7 @@ func (f *Fleet) sendPortCheck(ctx context.Context, target store.NodeRow, sender 
 		if send == nil {
 			send = defaultSendUDP
 		}
-		family, sent, err := send(ctx, target.Address, ports, tag, udpCheckSendCount, udpCheckPPS, udpCheckSize)
+		family, sent, err := send(ctx, host, ports, tag, udpCheckSendCount, udpCheckPPS, udpCheckSize)
 		if err != nil {
 			return family, sent, udpSendErrorCode(err)
 		}
@@ -537,7 +554,7 @@ func (f *Fleet) sendPortCheck(ctx context.Context, target store.NodeRow, sender 
 	}
 	result, err := f.commandWithLive(ctx, sender.node.ID, udpCheckWait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UdpSend{UdpSend: &agentv1.UdpSend{
-			RequestId: reqID, Host: target.Address, Ports: uint32Ports(ports), Tag: tag[:],
+			RequestId: reqID, Host: host, Ports: uint32Ports(ports), Tag: tag[:],
 			Count: udpCheckSendCount, Pps: udpCheckPPS, Size: udpCheckSize,
 		}}}
 	}, &sender.live)

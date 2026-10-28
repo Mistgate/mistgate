@@ -44,6 +44,11 @@ const (
 	// RelayServiceDeleteRelayProcedure is the fully-qualified name of the RelayService's DeleteRelay
 	// RPC.
 	RelayServiceDeleteRelayProcedure = "/mistgate.admin.v1.RelayService/DeleteRelay"
+	// RelayServiceCheckRelayProcedure is the fully-qualified name of the RelayService's CheckRelay RPC.
+	RelayServiceCheckRelayProcedure = "/mistgate.admin.v1.RelayService/CheckRelay"
+	// RelayServiceListRelayCandidatesProcedure is the fully-qualified name of the RelayService's
+	// ListRelayCandidates RPC.
+	RelayServiceListRelayCandidatesProcedure = "/mistgate.admin.v1.RelayService/ListRelayCandidates"
 )
 
 // RelayServiceClient is a client for the mistgate.admin.v1.RelayService service.
@@ -56,6 +61,14 @@ type RelayServiceClient interface {
 	// Switches a relay on or off, or moves it to another port on the entry.
 	UpdateRelay(context.Context, *connect.Request[v1.UpdateRelayRequest]) (*connect.Response[v1.UpdateRelayResponse], error)
 	DeleteRelay(context.Context, *connect.Request[v1.DeleteRelayRequest]) (*connect.Response[v1.DeleteRelayResponse], error)
+	// Checks a relay, one at a time per exit (the same lock as the port check): the leg from the entry to the exit's
+	// server, then, when the relay is on and the entry reported the forward, the path from a third node (never the entry
+	// or the exit; the panel only when no node can) to the entry's port. Stores the result in the relay and returns it. It
+	// changes no switch.
+	CheckRelay(context.Context, *connect.Request[v1.CheckRelayRequest]) (*connect.Response[v1.CheckRelayResponse], error)
+	// The servers of other nodes the entry could pass on, with what the panel knows about reaching them. Missing data is
+	// "no_data", never a guess.
+	ListRelayCandidates(context.Context, *connect.Request[v1.ListRelayCandidatesRequest]) (*connect.Response[v1.ListRelayCandidatesResponse], error)
 }
 
 // NewRelayServiceClient constructs a client for the mistgate.admin.v1.RelayService service. By
@@ -93,15 +106,29 @@ func NewRelayServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(relayServiceMethods.ByName("DeleteRelay")),
 			connect.WithClientOptions(opts...),
 		),
+		checkRelay: connect.NewClient[v1.CheckRelayRequest, v1.CheckRelayResponse](
+			httpClient,
+			baseURL+RelayServiceCheckRelayProcedure,
+			connect.WithSchema(relayServiceMethods.ByName("CheckRelay")),
+			connect.WithClientOptions(opts...),
+		),
+		listRelayCandidates: connect.NewClient[v1.ListRelayCandidatesRequest, v1.ListRelayCandidatesResponse](
+			httpClient,
+			baseURL+RelayServiceListRelayCandidatesProcedure,
+			connect.WithSchema(relayServiceMethods.ByName("ListRelayCandidates")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // relayServiceClient implements RelayServiceClient.
 type relayServiceClient struct {
-	listRelays  *connect.Client[v1.ListRelaysRequest, v1.ListRelaysResponse]
-	createRelay *connect.Client[v1.CreateRelayRequest, v1.CreateRelayResponse]
-	updateRelay *connect.Client[v1.UpdateRelayRequest, v1.UpdateRelayResponse]
-	deleteRelay *connect.Client[v1.DeleteRelayRequest, v1.DeleteRelayResponse]
+	listRelays          *connect.Client[v1.ListRelaysRequest, v1.ListRelaysResponse]
+	createRelay         *connect.Client[v1.CreateRelayRequest, v1.CreateRelayResponse]
+	updateRelay         *connect.Client[v1.UpdateRelayRequest, v1.UpdateRelayResponse]
+	deleteRelay         *connect.Client[v1.DeleteRelayRequest, v1.DeleteRelayResponse]
+	checkRelay          *connect.Client[v1.CheckRelayRequest, v1.CheckRelayResponse]
+	listRelayCandidates *connect.Client[v1.ListRelayCandidatesRequest, v1.ListRelayCandidatesResponse]
 }
 
 // ListRelays calls mistgate.admin.v1.RelayService.ListRelays.
@@ -124,6 +151,16 @@ func (c *relayServiceClient) DeleteRelay(ctx context.Context, req *connect.Reque
 	return c.deleteRelay.CallUnary(ctx, req)
 }
 
+// CheckRelay calls mistgate.admin.v1.RelayService.CheckRelay.
+func (c *relayServiceClient) CheckRelay(ctx context.Context, req *connect.Request[v1.CheckRelayRequest]) (*connect.Response[v1.CheckRelayResponse], error) {
+	return c.checkRelay.CallUnary(ctx, req)
+}
+
+// ListRelayCandidates calls mistgate.admin.v1.RelayService.ListRelayCandidates.
+func (c *relayServiceClient) ListRelayCandidates(ctx context.Context, req *connect.Request[v1.ListRelayCandidatesRequest]) (*connect.Response[v1.ListRelayCandidatesResponse], error) {
+	return c.listRelayCandidates.CallUnary(ctx, req)
+}
+
 // RelayServiceHandler is an implementation of the mistgate.admin.v1.RelayService service.
 type RelayServiceHandler interface {
 	// The relays, oldest first. node_id, when set, keeps those that have this node at either end.
@@ -134,6 +171,14 @@ type RelayServiceHandler interface {
 	// Switches a relay on or off, or moves it to another port on the entry.
 	UpdateRelay(context.Context, *connect.Request[v1.UpdateRelayRequest]) (*connect.Response[v1.UpdateRelayResponse], error)
 	DeleteRelay(context.Context, *connect.Request[v1.DeleteRelayRequest]) (*connect.Response[v1.DeleteRelayResponse], error)
+	// Checks a relay, one at a time per exit (the same lock as the port check): the leg from the entry to the exit's
+	// server, then, when the relay is on and the entry reported the forward, the path from a third node (never the entry
+	// or the exit; the panel only when no node can) to the entry's port. Stores the result in the relay and returns it. It
+	// changes no switch.
+	CheckRelay(context.Context, *connect.Request[v1.CheckRelayRequest]) (*connect.Response[v1.CheckRelayResponse], error)
+	// The servers of other nodes the entry could pass on, with what the panel knows about reaching them. Missing data is
+	// "no_data", never a guess.
+	ListRelayCandidates(context.Context, *connect.Request[v1.ListRelayCandidatesRequest]) (*connect.Response[v1.ListRelayCandidatesResponse], error)
 }
 
 // NewRelayServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -167,6 +212,18 @@ func NewRelayServiceHandler(svc RelayServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(relayServiceMethods.ByName("DeleteRelay")),
 		connect.WithHandlerOptions(opts...),
 	)
+	relayServiceCheckRelayHandler := connect.NewUnaryHandler(
+		RelayServiceCheckRelayProcedure,
+		svc.CheckRelay,
+		connect.WithSchema(relayServiceMethods.ByName("CheckRelay")),
+		connect.WithHandlerOptions(opts...),
+	)
+	relayServiceListRelayCandidatesHandler := connect.NewUnaryHandler(
+		RelayServiceListRelayCandidatesProcedure,
+		svc.ListRelayCandidates,
+		connect.WithSchema(relayServiceMethods.ByName("ListRelayCandidates")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.RelayService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RelayServiceListRelaysProcedure:
@@ -177,6 +234,10 @@ func NewRelayServiceHandler(svc RelayServiceHandler, opts ...connect.HandlerOpti
 			relayServiceUpdateRelayHandler.ServeHTTP(w, r)
 		case RelayServiceDeleteRelayProcedure:
 			relayServiceDeleteRelayHandler.ServeHTTP(w, r)
+		case RelayServiceCheckRelayProcedure:
+			relayServiceCheckRelayHandler.ServeHTTP(w, r)
+		case RelayServiceListRelayCandidatesProcedure:
+			relayServiceListRelayCandidatesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -200,4 +261,12 @@ func (UnimplementedRelayServiceHandler) UpdateRelay(context.Context, *connect.Re
 
 func (UnimplementedRelayServiceHandler) DeleteRelay(context.Context, *connect.Request[v1.DeleteRelayRequest]) (*connect.Response[v1.DeleteRelayResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.RelayService.DeleteRelay is not implemented"))
+}
+
+func (UnimplementedRelayServiceHandler) CheckRelay(context.Context, *connect.Request[v1.CheckRelayRequest]) (*connect.Response[v1.CheckRelayResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.RelayService.CheckRelay is not implemented"))
+}
+
+func (UnimplementedRelayServiceHandler) ListRelayCandidates(context.Context, *connect.Request[v1.ListRelayCandidatesRequest]) (*connect.Response[v1.ListRelayCandidatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.RelayService.ListRelayCandidates is not implemented"))
 }

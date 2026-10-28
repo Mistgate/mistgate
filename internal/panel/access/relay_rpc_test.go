@@ -173,7 +173,7 @@ func TestRelayPortsAndProfilesKeepApart(t *testing.T) {
 
 func errOf3[T any](_ *T, err error) error { return err }
 
-// A relay is switched on only through the gate; the real gate admits nothing until the panel can check the path.
+// A relay is switched on only through the gate; the real gate admits nothing without a fresh passing check (relay_check_test.go).
 func TestRelaySwitchGate(t *testing.T) {
 	f := newRelayFix(t)
 	r := must(f.create(f.server.Id, "nod_fi1", 0))
@@ -189,6 +189,7 @@ func TestRelaySwitchGate(t *testing.T) {
 	}
 
 	f.s.SetRelayGateForTest(allowRelays)
+	f.s.SetRelaySettleForTest(func(context.Context, store.RelayLink) error { return nil }) // the real gate and settle: relay_check_test.go
 	got := must(f.update(&adminv1.UpdateRelayRequest{Id: r.Id, Enabled: &on}))
 	if !got.Enabled || got.State != adminv1.InboundState_INBOUND_STATE_PENDING {
 		t.Fatalf("switched on: %+v", got)
@@ -290,7 +291,8 @@ func TestConcurrentCreateRelay(t *testing.T) {
 // one of their nodes. It is the user-free part (Live) that decides what the entry forwards.
 func TestRelayUsableRule(t *testing.T) {
 	e := newEnv(t)
-	link := store.RelayLink{Relay: store.Relay{Enabled: true, ViaNodeID: "nod_fi1"},
+	link := store.RelayLink{Relay: store.Relay{Enabled: true, ViaNodeID: "nod_fi1",
+		CheckJSON: `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`},
 		ExitEnabled: true, ExitState: "active", ExitNodeState: "active", ViaNodeState: "active"}
 	exit := store.AccessInboundFull{
 		Inbound: store.AccessInbound{Enabled: true, State: "active"},
@@ -305,6 +307,15 @@ func TestRelayUsableRule(t *testing.T) {
 	for name, mutate := range map[string]func(*store.RelayLink, *store.AccessInboundFull, *store.AccessGroup, *store.AccessUser){
 		"relay off": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
 			l.Enabled = false
+		},
+		"path not proven": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
+			l.CheckJSON = `{"at":1,"leg":{"status":"ok"},"path":{"status":"skipped","code":"off"},"ok":true}`
+		},
+		"path failed": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
+			l.CheckJSON = `{"at":1,"leg":{"status":"ok"},"path":{"status":"fail","code":"broken"},"ok":false}`
+		},
+		"never checked": func(l *store.RelayLink, _ *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
+			l.CheckJSON = `{}`
 		},
 		"server off": func(l *store.RelayLink, f *store.AccessInboundFull, _ *store.AccessGroup, _ *store.AccessUser) {
 			l.ExitEnabled, f.Inbound.Enabled = false, false

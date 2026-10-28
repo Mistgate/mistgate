@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/relay.proto.
  */
 export const file_mistgate_admin_v1_relay: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiqwMKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDIiQKEUxpc3RSZWxheXNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiPgoSTGlzdFJlbGF5c1Jlc3BvbnNlEigKBnJlbGF5cxgBIAMoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IksKEkNyZWF0ZVJlbGF5UmVxdWVzdBISCgppbmJvdW5kX2lkGAEgASgJEhMKC3ZpYV9ub2RlX2lkGAIgASgJEgwKBHBvcnQYAyABKA0iPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Il4KElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBQgoKCF9lbmFibGVkQgcKBV9wb3J0Ij4KE1VwZGF0ZVJlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSIgChJEZWxldGVSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiFQoTRGVsZXRlUmVsYXlSZXNwb25zZTKDAwoMUmVsYXlTZXJ2aWNlElkKCkxpc3RSZWxheXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXNwb25zZRJcCgtDcmVhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVzcG9uc2USXAoLVXBkYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlc3BvbnNlElwKC0RlbGV0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgpSZWxheVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_common]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEi2QMKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjayKPAQoKUmVsYXlTdGFnZRIOCgZzdGF0dXMYASABKAkSDAoEY29kZRgCIAEoCRIRCglzZW5kZXJfaWQYAyABKAkSEwoLc2VuZGVyX25hbWUYBCABKAkSDwoHdmVyZGljdBgFIAEoCRIMCgRzZW50GAYgASgNEgsKA2dvdBgHIAEoDRIPCgdhdF91bml4GAggASgDIs4BCgpSZWxheUNoZWNrEg8KB2F0X3VuaXgYASABKAMSDwoHbmV0d29yaxgCIAEoCRIMCgRwb3J0GAMgASgNEgoKAnRvGAQgASgJEioKA2xlZxgFIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USKwoEcGF0aBgGIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USCgoCb2sYByABKAgSDQoFc3RhZ2UYCCABKAkSEAoIdmVyaWZpZWQYCSABKAgiHwoRQ2hlY2tSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiPQoSQ2hlY2tSZWxheVJlc3BvbnNlEicKBXJlbGF5GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiQgoQUmVsYXlDb3VudHJ5SGludBIPCgd2ZXJkaWN0GAEgASgJEgwKBGRhcmsYAiADKAkSDwoHYXRfdW5peBgDIAEoAyJCCg5SZWxheVJlYWNoSGludBIPCgd2ZXJkaWN0GAEgASgJEg4KBnNvdXJjZRgCIAEoCRIPCgdhdF91bml4GAMgASgDIr8CCg5SZWxheUNhbmRpZGF0ZRISCgppbmJvdW5kX2lkGAEgASgJEg8KB25vZGVfaWQYAiABKAkSEQoJbm9kZV9uYW1lGAMgASgJEhIKCnByb2ZpbGVfaWQYBCABKAkSFAoMcHJvZmlsZV9uYW1lGAUgASgJEhAKCHByb3RvY29sGAYgASgJEg8KB25ldHdvcmsYByABKAkSDAoEcG9ydBgIIAEoDRITCgt1bnN1cHBvcnRlZBgJIAEoCRILCgNob3AYCiABKAgSEAoIcmVsYXlfaWQYCyABKAkSNAoHY291bnRyeRgMIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q291bnRyeUhpbnQSMAoFcmVhY2gYDSABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVJlYWNoSGludCIxChpMaXN0UmVsYXlDYW5kaWRhdGVzUmVxdWVzdBITCgt2aWFfbm9kZV9pZBgBIAEoCSKpAQobTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlEjUKCmNhbmRpZGF0ZXMYASADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNhbmRpZGF0ZRIXCg9hZ2VudF9zdXBwb3J0ZWQYAiABKAgSOgoNZW50cnlfY291bnRyeRgDIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q291bnRyeUhpbnQiJAoRTGlzdFJlbGF5c1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSI+ChJMaXN0UmVsYXlzUmVzcG9uc2USKAoGcmVsYXlzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiSwoSQ3JlYXRlUmVsYXlSZXF1ZXN0EhIKCmluYm91bmRfaWQYASABKAkSEwoLdmlhX25vZGVfaWQYAiABKAkSDAoEcG9ydBgDIAEoDSI+ChNDcmVhdGVSZWxheVJlc3BvbnNlEicKBXJlbGF5GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiXgoSVXBkYXRlUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJEhQKB2VuYWJsZWQYAiABKAhIAIgBARIRCgRwb3J0GAMgASgNSAGIAQFCCgoIX2VuYWJsZWRCBwoFX3BvcnQiPgoTVXBkYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IiAKEkRlbGV0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCSIVChNEZWxldGVSZWxheVJlc3BvbnNlMtQECgxSZWxheVNlcnZpY2USWQoKTGlzdFJlbGF5cxIkLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5c1Jlc3BvbnNlElwKC0NyZWF0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlUmVsYXlSZXNwb25zZRJcCgtVcGRhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVJlbGF5UmVzcG9uc2USXAoLRGVsZXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVSZWxheVJlc3BvbnNlElkKCkNoZWNrUmVsYXkSJC5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUmVsYXlSZXNwb25zZRJ0ChNMaXN0UmVsYXlDYW5kaWRhdGVzEi0ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QaLi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlDYW5kaWRhdGVzUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIKUmVsYXlQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Relay
@@ -135,6 +135,13 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
    * @generated from field: int64 created_unix = 20;
    */
   createdUnix: bigint;
+
+  /**
+   * The latest CheckRelay (or the check made on switching on); absent before the first.
+   *
+   * @generated from field: mistgate.admin.v1.RelayCheck check = 21;
+   */
+  check?: RelayCheck | undefined;
 };
 
 /**
@@ -143,6 +150,382 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
  */
 export const RelaySchema: GenMessage<Relay> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_relay, 0);
+
+/**
+ * One stage of a check.
+ *
+ * @generated from message mistgate.admin.v1.RelayStage
+ */
+export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
+  /**
+   * "ok", "fail", "skipped" or "" (did not run).
+   *
+   * @generated from field: string status = 1;
+   */
+  status: string;
+
+  /**
+   * Why it failed, or was skipped. Failed: "node_offline", "agent_too_old", "exit_offline", "no_sender", "no_route", "busy",
+   * "failed", "refused" and "timeout" (a TCP port that answers nothing), "other" (a TCP port that answers, but not
+   * Mistgate), "lossy" and "broken" (UDP counted at the exit: 70-95 % and under 70 % of the packets), "unverifiable" (the
+   * server has no name to probe it by), "same_host" (only the panel could send and it runs on the entry or the exit),
+   * "spec" (the server's settings do not build), "apply_failed" and "apply_timeout" (the entry did not install the
+   * forward), "switched_off" (someone switched the relay off while it was waited for). Skipped: "off" (the relay is not switched on, so there is no forward to reach), "leg_failed".
+   *
+   * @generated from field: string code = 2;
+   */
+  code: string;
+
+  /**
+   * The node that sent the probe (its id), or "panel".
+   *
+   * @generated from field: string sender_id = 3;
+   */
+  senderId: string;
+
+  /**
+   * @generated from field: string sender_name = 4;
+   */
+  senderName: string;
+
+  /**
+   * TCP: "ours", "other", "refused" or "timeout"; UDP: "ok", "lossy" or "broken".
+   *
+   * @generated from field: string verdict = 5;
+   */
+  verdict: string;
+
+  /**
+   * UDP only: packets sent and counted by the exit.
+   *
+   * @generated from field: uint32 sent = 6;
+   */
+  sent: number;
+
+  /**
+   * @generated from field: uint32 got = 7;
+   */
+  got: number;
+
+  /**
+   * @generated from field: int64 at_unix = 8;
+   */
+  atUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayStage.
+ * Use `create(RelayStageSchema)` to create a new message.
+ */
+export const RelayStageSchema: GenMessage<RelayStage> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 1);
+
+/**
+ * What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
+ * packets counted (UDP) or the server's identity proven (TCP) at the exit.
+ *
+ * @generated from message mistgate.admin.v1.RelayCheck
+ */
+export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
+  /**
+   * @generated from field: int64 at_unix = 1;
+   */
+  atUnix: bigint;
+
+  /**
+   * @generated from field: string network = 2;
+   */
+  network: string;
+
+  /**
+   * The entry's port the path was checked on, and the exit's address:port the check was made for (a change of the target
+   * makes the leg stale).
+   *
+   * @generated from field: uint32 port = 3;
+   */
+  port: number;
+
+  /**
+   * @generated from field: string to = 4;
+   */
+  to: string;
+
+  /**
+   * @generated from field: mistgate.admin.v1.RelayStage leg = 5;
+   */
+  leg?: RelayStage | undefined;
+
+  /**
+   * @generated from field: mistgate.admin.v1.RelayStage path = 6;
+   */
+  path?: RelayStage | undefined;
+
+  /**
+   * No stage that ran failed, and the leg ran.
+   *
+   * @generated from field: bool ok = 7;
+   */
+  ok: boolean;
+
+  /**
+   * The first stage that failed: "leg", "path", or "".
+   *
+   * @generated from field: string stage = 8;
+   */
+  stage: string;
+
+  /**
+   * Both stages ran and passed: the relay works from outside.
+   *
+   * @generated from field: bool verified = 9;
+   */
+  verified: boolean;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayCheck.
+ * Use `create(RelayCheckSchema)` to create a new message.
+ */
+export const RelayCheckSchema: GenMessage<RelayCheck> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 2);
+
+/**
+ * @generated from message mistgate.admin.v1.CheckRelayRequest
+ */
+export type CheckRelayRequest = Message<"mistgate.admin.v1.CheckRelayRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.CheckRelayRequest.
+ * Use `create(CheckRelayRequestSchema)` to create a new message.
+ */
+export const CheckRelayRequestSchema: GenMessage<CheckRelayRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 3);
+
+/**
+ * @generated from message mistgate.admin.v1.CheckRelayResponse
+ */
+export type CheckRelayResponse = Message<"mistgate.admin.v1.CheckRelayResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.Relay relay = 1;
+   */
+  relay?: Relay | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.CheckRelayResponse.
+ * Use `create(CheckRelayResponseSchema)` to create a new message.
+ */
+export const CheckRelayResponseSchema: GenMessage<CheckRelayResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 4);
+
+/**
+ * The panel's knowledge about the exit's country check, from the whole country-check machinery (Globalping, the TSPU
+ * probe, the lists). "no_data" when it has none.
+ *
+ * @generated from message mistgate.admin.v1.RelayCountryHint
+ */
+export type RelayCountryHint = Message<"mistgate.admin.v1.RelayCountryHint"> & {
+  /**
+   * "ok", "partial", "blocked" (also tcp_blocked), "listed" or "no_data".
+   *
+   * @generated from field: string verdict = 1;
+   */
+  verdict: string;
+
+  /**
+   * Networks that see the exit dark (the vantages with state dark), sorted.
+   *
+   * @generated from field: repeated string dark = 2;
+   */
+  dark: string[];
+
+  /**
+   * @generated from field: int64 at_unix = 3;
+   */
+  atUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayCountryHint.
+ * Use `create(RelayCountryHintSchema)` to create a new message.
+ */
+export const RelayCountryHintSchema: GenMessage<RelayCountryHint> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 5);
+
+/**
+ * Does the entry reach the exit? Known only when the TSPU probe ran from this entry node.
+ *
+ * @generated from message mistgate.admin.v1.RelayReachHint
+ */
+export type RelayReachHint = Message<"mistgate.admin.v1.RelayReachHint"> & {
+  /**
+   * "reach", "partial", "blocked" or "no_data".
+   *
+   * @generated from field: string verdict = 1;
+   */
+  verdict: string;
+
+  /**
+   * "tspu_row": the probe's row for the exit from this entry. "refs_pass": the probe found no TSPU on this entry's path
+   * (a blocked reference answers), so nothing is cut here. "" with no_data.
+   *
+   * @generated from field: string source = 2;
+   */
+  source: string;
+
+  /**
+   * @generated from field: int64 at_unix = 3;
+   */
+  atUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayReachHint.
+ * Use `create(RelayReachHintSchema)` to create a new message.
+ */
+export const RelayReachHintSchema: GenMessage<RelayReachHint> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 6);
+
+/**
+ * @generated from message mistgate.admin.v1.RelayCandidate
+ */
+export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
+  /**
+   * @generated from field: string inbound_id = 1;
+   */
+  inboundId: string;
+
+  /**
+   * @generated from field: string node_id = 2;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 3;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: string profile_id = 4;
+   */
+  profileId: string;
+
+  /**
+   * @generated from field: string profile_name = 5;
+   */
+  profileName: string;
+
+  /**
+   * @generated from field: string protocol = 6;
+   */
+  protocol: string;
+
+  /**
+   * @generated from field: string network = 7;
+   */
+  network: string;
+
+  /**
+   * The server's port on the exit.
+   *
+   * @generated from field: uint32 port = 8;
+   */
+  port: number;
+
+  /**
+   * Empty: it can be relayed. Else why not: "cdn" (people connect to the CDN), "acme_ip" (the certificate names the exit's
+   * IP address), "awg" (not yet), "build_failed" (the server's settings do not build).
+   *
+   * @generated from field: string unsupported = 9;
+   */
+  unsupported: string;
+
+  /**
+   * The server has a hop range; a relay passes the one port only.
+   *
+   * @generated from field: bool hop = 10;
+   */
+  hop: boolean;
+
+  /**
+   * This entry already forwards this server.
+   *
+   * @generated from field: string relay_id = 11;
+   */
+  relayId: string;
+
+  /**
+   * @generated from field: mistgate.admin.v1.RelayCountryHint country = 12;
+   */
+  country?: RelayCountryHint | undefined;
+
+  /**
+   * @generated from field: mistgate.admin.v1.RelayReachHint reach = 13;
+   */
+  reach?: RelayReachHint | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayCandidate.
+ * Use `create(RelayCandidateSchema)` to create a new message.
+ */
+export const RelayCandidateSchema: GenMessage<RelayCandidate> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 7);
+
+/**
+ * @generated from message mistgate.admin.v1.ListRelayCandidatesRequest
+ */
+export type ListRelayCandidatesRequest = Message<"mistgate.admin.v1.ListRelayCandidatesRequest"> & {
+  /**
+   * @generated from field: string via_node_id = 1;
+   */
+  viaNodeId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListRelayCandidatesRequest.
+ * Use `create(ListRelayCandidatesRequestSchema)` to create a new message.
+ */
+export const ListRelayCandidatesRequestSchema: GenMessage<ListRelayCandidatesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 8);
+
+/**
+ * @generated from message mistgate.admin.v1.ListRelayCandidatesResponse
+ */
+export type ListRelayCandidatesResponse = Message<"mistgate.admin.v1.ListRelayCandidatesResponse"> & {
+  /**
+   * Those that can be relayed first; among them the exits the country check or the probe says are cut come first.
+   *
+   * @generated from field: repeated mistgate.admin.v1.RelayCandidate candidates = 1;
+   */
+  candidates: RelayCandidate[];
+
+  /**
+   * The entry's agent lists "relay-forward/1".
+   *
+   * @generated from field: bool agent_supported = 2;
+   */
+  agentSupported: boolean;
+
+  /**
+   * The entry's own country check: do people see the entry? Compare its dark list with the exit's.
+   *
+   * @generated from field: mistgate.admin.v1.RelayCountryHint entry_country = 3;
+   */
+  entryCountry?: RelayCountryHint | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListRelayCandidatesResponse.
+ * Use `create(ListRelayCandidatesResponseSchema)` to create a new message.
+ */
+export const ListRelayCandidatesResponseSchema: GenMessage<ListRelayCandidatesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 9);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysRequest
@@ -159,7 +542,7 @@ export type ListRelaysRequest = Message<"mistgate.admin.v1.ListRelaysRequest"> &
  * Use `create(ListRelaysRequestSchema)` to create a new message.
  */
 export const ListRelaysRequestSchema: GenMessage<ListRelaysRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 1);
+  messageDesc(file_mistgate_admin_v1_relay, 10);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysResponse
@@ -176,7 +559,7 @@ export type ListRelaysResponse = Message<"mistgate.admin.v1.ListRelaysResponse">
  * Use `create(ListRelaysResponseSchema)` to create a new message.
  */
 export const ListRelaysResponseSchema: GenMessage<ListRelaysResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 2);
+  messageDesc(file_mistgate_admin_v1_relay, 11);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayRequest
@@ -205,7 +588,7 @@ export type CreateRelayRequest = Message<"mistgate.admin.v1.CreateRelayRequest">
  * Use `create(CreateRelayRequestSchema)` to create a new message.
  */
 export const CreateRelayRequestSchema: GenMessage<CreateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 3);
+  messageDesc(file_mistgate_admin_v1_relay, 12);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayResponse
@@ -222,7 +605,7 @@ export type CreateRelayResponse = Message<"mistgate.admin.v1.CreateRelayResponse
  * Use `create(CreateRelayResponseSchema)` to create a new message.
  */
 export const CreateRelayResponseSchema: GenMessage<CreateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 4);
+  messageDesc(file_mistgate_admin_v1_relay, 13);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayRequest
@@ -249,7 +632,7 @@ export type UpdateRelayRequest = Message<"mistgate.admin.v1.UpdateRelayRequest">
  * Use `create(UpdateRelayRequestSchema)` to create a new message.
  */
 export const UpdateRelayRequestSchema: GenMessage<UpdateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 5);
+  messageDesc(file_mistgate_admin_v1_relay, 14);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayResponse
@@ -266,7 +649,7 @@ export type UpdateRelayResponse = Message<"mistgate.admin.v1.UpdateRelayResponse
  * Use `create(UpdateRelayResponseSchema)` to create a new message.
  */
 export const UpdateRelayResponseSchema: GenMessage<UpdateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 6);
+  messageDesc(file_mistgate_admin_v1_relay, 15);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayRequest
@@ -283,7 +666,7 @@ export type DeleteRelayRequest = Message<"mistgate.admin.v1.DeleteRelayRequest">
  * Use `create(DeleteRelayRequestSchema)` to create a new message.
  */
 export const DeleteRelayRequestSchema: GenMessage<DeleteRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 7);
+  messageDesc(file_mistgate_admin_v1_relay, 16);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayResponse
@@ -296,7 +679,7 @@ export type DeleteRelayResponse = Message<"mistgate.admin.v1.DeleteRelayResponse
  * Use `create(DeleteRelayResponseSchema)` to create a new message.
  */
 export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 8);
+  messageDesc(file_mistgate_admin_v1_relay, 17);
 
 /**
  * Relays: a port of one node (the entry) that passes the encrypted traffic of a server on another node (the exit) on,
@@ -304,10 +687,15 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
  *
  * Everything here is owner-only (a helper and an API token get PERMISSION_DENIED; tokens are not offered these
- * procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete.
+ * procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
  *
- * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), which waits for the panel's check of the
- * path (a later step: until then UpdateRelay(enabled = true) is refused with FAILED_PRECONDITION "relay_unchecked").
+ * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), and only after CheckRelay: the leg check
+ * (the entry reaches the exit's server) must have passed less than 15 minutes ago, for the relay's present target (the
+ * exit's address and server port); otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked",
+ * "relay_check_stale" or "relay_check_failed". Switching on then installs the forward and checks the path from outside
+ * through the entry (so does moving a relay that is on to another port); if that fails the relay is switched off again and
+ * UpdateRelay answers "relay_check_failed" (stage, code). A relay that is on has passed both stages, so it is on only when
+ * it works from outside.
  * The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
  * failed, on an enrolled node) and the entry's agent lists "relay-forward/1".
  *
@@ -317,7 +705,9 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * "same_node" (the entry holds the server itself). ALREADY_EXISTS: "relay_exists" (the entry already forwards this server),
  * "port_taken" (a profile or a relay of the entry holds that network and port, hop ranges included; the message carries a
  * free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's agent lacks "relay-forward/1"),
- * "relay_unchecked" (the path was not checked yet), "no_clean_port" (the entry has no free port to offer).
+ * "relay_unchecked" (no check yet), "relay_check_stale" (older than 15 minutes, or the target changed since),
+ * "relay_check_failed" (stage and code say where), "relay_unsupported" (reason: "cdn", "acme_ip" or "awg": a server the
+ * entry cannot pass on), "no_clean_port" (the entry has no free port to offer).
  *
  * @generated from service mistgate.admin.v1.RelayService
  */
@@ -360,6 +750,30 @@ export const RelayService: GenService<{
     methodKind: "unary";
     input: typeof DeleteRelayRequestSchema;
     output: typeof DeleteRelayResponseSchema;
+  },
+  /**
+   * Checks a relay, one at a time per exit (the same lock as the port check): the leg from the entry to the exit's
+   * server, then, when the relay is on and the entry reported the forward, the path from a third node (never the entry
+   * or the exit; the panel only when no node can) to the entry's port. Stores the result in the relay and returns it. It
+   * changes no switch.
+   *
+   * @generated from rpc mistgate.admin.v1.RelayService.CheckRelay
+   */
+  checkRelay: {
+    methodKind: "unary";
+    input: typeof CheckRelayRequestSchema;
+    output: typeof CheckRelayResponseSchema;
+  },
+  /**
+   * The servers of other nodes the entry could pass on, with what the panel knows about reaching them. Missing data is
+   * "no_data", never a guess.
+   *
+   * @generated from rpc mistgate.admin.v1.RelayService.ListRelayCandidates
+   */
+  listRelayCandidates: {
+    methodKind: "unary";
+    input: typeof ListRelayCandidatesRequestSchema;
+    output: typeof ListRelayCandidatesResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_relay, 0);

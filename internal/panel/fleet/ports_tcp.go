@@ -283,7 +283,7 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		// made its GET and used the mark up, so the second probes the TLS ports only and port 80 reads "failed".
 		for i, candidate := range senders {
 			sender = candidate
-			verdicts, errorCode = f.probeTCPTargets(ctx, target, sender, probed, token[:], answer[:])
+			verdicts, errorCode = f.probeTCPTargets(ctx, target.Address, sender, probed, token[:], answer[:])
 			if errorCode == "" || i == len(senders)-1 {
 				break
 			}
@@ -398,9 +398,10 @@ func (f *Fleet) armTCPMark(ctx context.Context, target store.NodeRow, live store
 	}
 }
 
-// probeTCPTargets has one sender probe the targets and returns the verdict of each port, or an error code of the same
-// words as the UDP part (busy, no_route, failed).
-func (f *Fleet) probeTCPTargets(ctx context.Context, target store.NodeRow, sender portSender, targets []tcpTarget, token, answer []byte) (map[uint16]string, string) {
+// probeTCPTargets has one sender probe the targets on host (the node's address for a port check, another host for a relay's path or
+// the IPv6 check: portDial) and returns the verdict of each port, or an error code of the same words as the UDP part (busy,
+// no_route, failed).
+func (f *Fleet) probeTCPTargets(ctx context.Context, host string, sender portSender, targets []tcpTarget, token, answer []byte) (map[uint16]string, string) {
 	probes := make([]tcpcheck.Target, len(targets))
 	wire := make([]*agentv1.TcpTarget, len(targets))
 	for i, t := range targets {
@@ -416,7 +417,7 @@ func (f *Fleet) probeTCPTargets(ctx context.Context, target store.NodeRow, sende
 		if probe == nil {
 			probe = defaultProbeTCP
 		}
-		_, verdicts, err := probe(ctx, target.Address, probes)
+		_, verdicts, err := probe(ctx, host, probes)
 		if err != nil {
 			return nil, tcpProbeErrorCode(err)
 		}
@@ -424,7 +425,7 @@ func (f *Fleet) probeTCPTargets(ctx context.Context, target store.NodeRow, sende
 	}
 	result, err := f.commandWithLive(ctx, sender.node.ID, tcpProbeWait, func(reqID string) *agentv1.ConnectResponse {
 		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_TcpProbe{TcpProbe: &agentv1.TcpProbe{
-			RequestId: reqID, Host: target.Address, Targets: wire,
+			RequestId: reqID, Host: host, Targets: wire,
 		}}}
 	}, &sender.live)
 	if err != nil {

@@ -134,7 +134,7 @@ func TestPanelWiring(t *testing.T) {
 	if err := st.CreateSession(ctx, store.Session{TokenHash: hsum[:], AdminID: "adm_h", CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
-	for _, method := range []string{"ListRelays", "CreateRelay", "UpdateRelay", "DeleteRelay"} {
+	for _, method := range []string{"ListRelays", "CreateRelay", "UpdateRelay", "DeleteRelay", "CheckRelay", "ListRelayCandidates"} {
 		req, _ := http.NewRequest("POST", admin.URL+"/api/mistgate.admin.v1.RelayService/"+method, strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: helperToken})
