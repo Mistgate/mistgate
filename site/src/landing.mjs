@@ -1,6 +1,8 @@
-// The home page: who Mistgate is for and what it does, how it fits together (D1), why it is worth a look, how to
-// start, and the docs by admin section. The copy follows README.md / README.ru.md; facts and numbers come from the
-// docs (benchmarks, comparison). docs/<lang>/index.md stays the sidebar's source and the docs' start page on GitHub.
+// The home page: what Mistgate is and does, how it fits together (D1), the protocols, how stable it is, how to start,
+// how it compares, and the docs by admin section. The copy follows README.md / README.ru.md / README.zh.md in their
+// plain voice: the same facts, no claim the README or the docs do not make. docs/<lang>/index.md stays the sidebar's
+// source and the docs' start page on GitHub.
+// Copy may hold `code`, **bold** and [text](page-key#anchor) or [text](https://...) links.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,38 +14,71 @@ const DOCS = process.env.MG_DOCS ? join(process.env.MG_DOCS, "/") : fileURLToPat
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // `code` in copy -> <code>
 const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+// the columns of the comparison, as in the README's table
+const PANELS = ["Mistgate", "3x-ui", "Remnawave", "Hiddify", "PasarGuard", "s-ui"];
+const CI = `${GITHUB}/blob/main/.github/workflows/ci.yml`, E2E = `${GITHUB}/blob/main/scripts/e2e-wsl.sh`;
 
 export const LANDING = {
   en: {
-    meta: "Mistgate is a self-hosted VPN panel for family, friends, a community or a small team: Hysteria2, VLESS REALITY and AmneziaWG on your own servers, one link per person, every server checked the way an app sees it.",
+    meta: "Mistgate is a self-hosted panel for a small VPN: a few servers of your own and the people you share them with. Hysteria2, VLESS and AmneziaWG; two Go binaries, SQLite and systemd.",
     eyebrow: "Beta · self-hosted · open source · AGPL-3.0",
-    h1: "Your own VPN for your people, without babysitting servers.",
-    lead: "For family, friends, a community or a small team. Install one panel, add your servers from the browser and send each person one link. Mistgate keeps the servers configured and checks them the way an app does, so you hear about an outage first.",
+    h1: "A self-hosted panel for a small VPN",
+    lead: "For a few servers of your own and the people you share them with. You put the panel on one server and add your VPN servers to it as nodes. Each person gets one subscription link, and their app picks up every server they may use.",
     install: "Install the panel", how: "How it works",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker"],
     shotAlt: "The Mistgate admin: nodes with their health and throughput, an open problem and recent events",
+    doesH: "What it does",
+    does: [
+      ["nodes", "Nodes from the browser", "Add a node with its IP and root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld and installs the signed agent. A one-time install command works too.", "getting-started/add-node"],
+      ["subscriptions", "One link per person", "Mihomo apps (kl!ck, FlClash, Clash Verge Rev) get all three protocols from it, Happ gets Hysteria2 and VLESS, and AmneziaVPN takes a key per device from the person's page.", "guide/client-apps"],
+      ["health", "Checks and alerts", "Every 5 minutes the panel connects to every server the way an app does. A doctor on each node runs 17 host checks and offers six fixes that run only after you confirm. Alerts go to the admin and to Telegram.", "operations/health"],
+      ["memory", "Two Go binaries", "No Docker, no database server: SQLite and systemd. The panel idles at 16–20 MiB of memory on a 1 vCPU / 1 GB server.", "reference/benchmarks"],
+      ["mask", "A decoy site", "Strangers who open the panel's address see a decoy site; the admin is behind a secret path or host name.", "guide/decoy-site"],
+      ["integrations", "MCP for AI agents", "A built-in MCP server lets an AI agent read the fleet and plan changes; risky ones wait for your approval in the admin.", "reference/mcp"],
+    ],
+    notYet: "Not there yet: a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](getting-started/install-edge). Some defaults lean towards users in Russia (all are settings), and the optional [reachability check](operations/reachability) looks from Russia by default; most of its sources work only there.",
     fitH: "How it fits together",
     fitP: "Two programs: the panel and an agent on every server. A person's app talks to the panel only to fetch its link; VPN traffic goes straight to the node.",
     fitAlt: "How Mistgate fits together: you use the admin, a person's app fetches its link from the panel, VPN traffic goes from the app to the node and out to the internet, and the node keeps one connection to the panel",
-    whyH: "Why Mistgate",
-    why: [
-      ["subscriptions", "One link, several protocols", "Apps on the Mihomo core get Hysteria2, VLESS and AmneziaWG from the same link: when one protocol is blocked on someone's network, the other is already in their app.", "guide/client-apps"],
-      ["nodes", "Servers added from the browser", "Type the IP and the root password. The panel pins the host key, checks the server, opens the ports, installs the signed agent and waits for it to connect.", "getting-started/ssh-install"],
-      ["health", "You find out first", "Every 5 minutes the panel connects to each server the way an app does. A doctor on every node runs 17 host checks, and alerts go to Telegram.", "operations/health"],
-      ["settings", "Light and hidden", "Two static Go binaries and SQLite, no Docker. The panel idles at 16–20 MiB, and a stranger who opens its address sees a decoy site.", "operations/security"],
+    protoH: "Protocols",
+    protos: [
+      ["Hysteria2", "UDP (QUIC) on the official Hysteria2 core. Salamander obfuscation, port hopping, a Let's Encrypt or a pinned self-signed certificate.", "guide/hysteria2"],
+      ["VLESS", "On xray-core. REALITY over XHTTP or TCP (RAW + Vision); TLS over XHTTP or WebSocket, direct or behind a CDN.", "guide/vless"],
+      ["AmneziaWG", "Versions 3.1 (the default) and 2.0, a separate key per device. amneziawg-go in userspace, or the kernel module.", "guide/amneziawg"],
     ],
-    more: "More",
+    protoP: "Hysteria2 and VLESS can share a node, TCP 443 included. Not supported yet: VMess, Trojan, Shadowsocks, TUIC and plain WireGuard. More protocols are planned; each plugs into the same subscription link through [the protocol plugin contract](reference/architecture#the-protocol-plugin-contract).",
+    stableH: "Is it stable?",
+    stableP: "It is beta, and young: v0.1.0 was tagged on 2026-10-03. The maintainer runs it on their own six servers for family and friends.",
+    stable: [
+      ["code", "CI", `Every push and pull request: Go tests and vet, the race detector on the panel-agent session, \`govulncheck\`, the admin's lint and tests, the docs build, the installer on Debian and Ubuntu. [ci.yml](${CI})`],
+      ["pulse", "End-to-end run", `Before every release: a real panel and node with real Hysteria2, AmneziaWG, Xray, mihomo and sing-box clients, plus agent updates, rollbacks and an install over SSH. By hand in WSL or a VM, not in CI. [e2e-wsl.sh](${E2E})`],
+      ["key", "Signed builds", "GitHub Actions builds each tag as a draft. The maintainer rebuilds it from the tag on a machine with the offline release key and signs only binaries that match byte for byte; the panel and nodes install only signed builds.", "operations/releases"],
+      ["updates", "Updates with rollback", "Nodes never update on their own. A rollout starts with one canary node and a 5-minute health gate; a node that fails gets its previous build back and the rollout pauses. The panel updates itself only when you confirm, and restores the old build if the new one does not stay up.", "operations/updates"],
+    ],
+    ai: "Mistgate is written with AI coding agents: the maintainer reviews what they write and decides what is merged and released, and their code goes through the same checks as anyone's.",
+    cmpH: "Compared with other panels",
+    yn: { yes: "yes", no: "no", part: "partial" },
+    cmp: [
+      ["Runs without Docker", "✅", "✅", "❌", "✅", "🟡 partial", "✅"],
+      ["Panel RAM, idle¹", "16–20 MiB", "68–74 MiB", "426–454 MiB", "not measured", "262–265 MiB", "not measured"],
+      ["Add a node from the panel (SSH)", "✅", "❌", "❌", "❌", "❌", "?"],
+      ["Hysteria2", "✅", "✅", "🟡 partial", "✅", "✅", "✅"],
+      ["AmneziaWG", "✅ 2.0 and 3.1", "✅ 3.1", "?", "?", "?", "?"],
+      ["VMess, Trojan, Shadowsocks", "❌", "✅", "🟡 partial", "✅", "✅", "✅"],
+      ["Telegram bot", "🟡 alerts only", "✅", "🟡 partial", "✅", "✅", "?"],
+    ],
+    cmpNote: "¹ Private memory of the whole panel group, idle, no node attached, on a 1 vCPU / 1 GB test server; for 3x-ui it includes its Xray core and fail2ban. “?” means the project's own README and docs do not say. Others are ahead in protocol breadth, community size and full Telegram bots.",
     proof: [
-      ["gauge", "Benchmarks", "On a 1 vCPU / 1 GB server the panel idles at 16–20 MiB; 3x-ui at 68–74, PasarGuard at 262–265, Remnawave at 426–454. The method, the versions, and where Mistgate is slower.", "reference/benchmarks"],
-      ["layers", "Comparison with other panels", "Mistgate next to 3x-ui, Marzban, PasarGuard, Remnawave, Hiddify Manager and s-ui, with sources, including where the others are ahead.", "reference/comparison"],
+      ["gauge", "Benchmarks", "Memory, CPU, disk, start time and subscription load next to 3x-ui, Remnawave and PasarGuard on the same small server. The method, the versions, and where Mistgate is slower.", "reference/benchmarks"],
+      ["layers", "The full table", "Seven panels with sources, checked on 2026-10-09, and where the others are ahead.", "reference/comparison"],
     ],
     startH: "Quick start",
     startP: "From an empty Linux server to the first person with a working link.",
     steps: [
-      ["Install the panel", "The signed binary from the latest release, `mistgate setup` and a systemd unit. Or give the install prompt to an AI agent.", ["getting-started/install-panel", "getting-started/ai-agents"]],
+      ["Install the panel", "One command on a fresh Linux server: the installer verifies the signed panel manifest, starts Mistgate under systemd and prints a one-time setup link. Or give the install prompt to an AI agent.", ["getting-started/install-panel", "getting-started/ai-agents"]],
       ["Add a node", "**Nodes → Add node** installs the agent over SSH, or gives you a one-time command to run on the server yourself.", ["getting-started/ssh-install", "getting-started/add-node"]],
       ["Give people their links", "Put a profile on the node, create a user and send them the link.", ["getting-started/first-users"]],
-      ["Make it safe to rely on", "Link Telegram for alerts, check the security settings and set up encrypted backups before others depend on it.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
+      ["Alerts, security, backups", "Link Telegram for alerts, check the security settings and set up encrypted backups before others depend on it.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
     ],
     secH: "The docs by admin section",
     secP: "Each section of the admin and the pages about it.",
@@ -66,35 +101,65 @@ export const LANDING = {
     statusLink: "Status and roadmap",
   },
   ru: {
-    meta: "Mistgate — панель для своего VPN для семьи, друзей, сообщества или небольшой команды: Hysteria2, VLESS REALITY и AmneziaWG на ваших серверах, одна ссылка на человека, каждый сервер проверяется так же, как его видит приложение.",
+    meta: "Mistgate — панель для своего небольшого VPN: несколько своих серверов и люди, с которыми вы ими делитесь. Hysteria2, VLESS и AmneziaWG; два бинарника на Go, SQLite и systemd.",
     eyebrow: "Бета · на своих серверах · открытый код · AGPL-3.0",
-    h1: "Свой VPN для своих людей — без возни с серверами.",
-    lead: "Для семьи, друзей, сообщества или небольшой команды. Вы ставите одну панель, добавляете серверы из браузера и отправляете каждому человеку одну ссылку. Mistgate держит серверы настроенными и проверяет их так же, как приложение, поэтому о сбое вы узнаёте первыми.",
+    h1: "Панель для своего небольшого VPN",
+    lead: "Для нескольких своих серверов и людей, с которыми вы ими делитесь. Панель ставится на один сервер, а VPN-серверы добавляются в неё как ноды. Каждый человек получает одну ссылку-подписку, и приложение само подтягивает все положенные ему серверы.",
     install: "Установить панель", how: "Как это устроено",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, без Docker"],
     shotAlt: "Админка Mistgate: ноды с их состоянием и скоростью, открытая проблема и последние события",
+    doesH: "Что умеет",
+    does: [
+      ["nodes", "Ноды из браузера", "Ноду добавляют по IP и паролю root. Панель запоминает SSH-ключ сервера, проверяет его, открывает порты во включённом UFW или firewalld и ставит подписанный агент. Можно и одноразовой командой.", "getting-started/add-node"],
+      ["subscriptions", "Одна ссылка на человека", "Приложения на ядре Mihomo (kl!ck, FlClash, Clash Verge Rev) получают по ней все три протокола, Happ — Hysteria2 и VLESS, а AmneziaVPN берёт ключ на каждое устройство со страницы человека.", "guide/client-apps"],
+      ["health", "Проверки и алерты", "Каждые 5 минут панель подключается к каждому серверу, как приложение. Доктор на каждой ноде делает 17 проверок хоста и предлагает шесть исправлений; без вашего подтверждения ни одно не запускается. Алерты видны в админке и приходят в Telegram.", "operations/health"],
+      ["memory", "Два бинарника на Go", "Без Docker и без сервера БД: SQLite и systemd. В простое панель занимает 16–20 МиБ памяти на сервере с 1 vCPU и 1 ГБ.", "reference/benchmarks"],
+      ["mask", "Сайт-ширма", "Посторонний по адресу панели видит сайт-ширму; админка — за секретным путём или именем хоста.", "guide/decoy-site"],
+      ["integrations", "MCP для ИИ-агентов", "Встроенный MCP-сервер: ИИ-агент читает флот и планирует изменения, а рискованные ждут вашего одобрения в админке.", "reference/mcp"],
+    ],
+    notYet: "Чего пока нет: Telegram-бот только присылает алерты, а версия для Cloudflare Workers — [предварительная](getting-started/install-edge). Часть настроек по умолчанию рассчитана на пользователей в России (их можно поменять), а необязательная [проверка доступности](operations/reachability) по умолчанию смотрит из России, и большинство её источников работают только там.",
     fitH: "Как это устроено",
     fitP: "Две программы: панель и агент на каждом сервере. С панелью приложение человека говорит, только когда забирает ссылку; VPN-трафик идёт прямо на ноду.",
     fitAlt: "Как устроен Mistgate: вы работаете в админке, приложение человека забирает ссылку у панели, VPN-трафик идёт от приложения на ноду и в интернет, а нода держит одно соединение с панелью",
-    whyH: "Зачем Mistgate",
-    why: [
-      ["subscriptions", "Одна ссылка, несколько протоколов", "Приложения на ядре Mihomo получают по одной ссылке Hysteria2, VLESS и AmneziaWG: если в сети у человека заблокируют один протокол, второй уже есть в приложении.", "guide/client-apps"],
-      ["nodes", "Серверы добавляются из браузера", "Введите IP и пароль root. Панель запомнит SSH-ключ сервера, проверит его, откроет порты, поставит подписанный агент и дождётся, пока он подключится.", "getting-started/ssh-install"],
-      ["health", "Вы узнаёте первым", "Каждые 5 минут панель подключается к каждому серверу так же, как приложение. Доктор на каждой ноде делает 17 проверок хоста, предупреждения приходят в Telegram.", "operations/health"],
-      ["settings", "Лёгкая и незаметная", "Два статических бинарника на Go и SQLite, без Docker. Панель в простое занимает 16–20 МиБ, а посторонний по её адресу видит сайт-ширму.", "operations/security"],
+    protoH: "Протоколы",
+    protos: [
+      ["Hysteria2", "UDP (QUIC) на официальном ядре Hysteria2. Обфускация Salamander, port hopping, сертификат Let's Encrypt или закреплённый самоподписанный.", "guide/hysteria2"],
+      ["VLESS", "На xray-core. REALITY поверх XHTTP или TCP (RAW + Vision); TLS поверх XHTTP или WebSocket, напрямую или за CDN.", "guide/vless"],
+      ["AmneziaWG", "Версии 3.1 (по умолчанию) и 2.0, отдельный ключ на каждое устройство. amneziawg-go в userspace или модуль ядра.", "guide/amneziawg"],
     ],
-    more: "Подробнее",
+    protoP: "Hysteria2 и VLESS уживаются на одной ноде, даже на общем TCP 443. Пока не поддерживаются: VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard. Новые протоколы будут; каждый подключается к той же ссылке подписки через [контракт протокольного плагина](reference/architecture#контракт-протокольного-плагина).",
+    stableH: "Насколько это стабильно",
+    stableP: "Это бета, и проект молодой: тег v0.1.0 поставлен 3 октября 2026 года. Автор держит на Mistgate шесть своих серверов для семьи и друзей.",
+    stable: [
+      ["code", "CI", `На каждый push и pull request: тесты и vet на Go, race-детектор на сессии панели с агентом, \`govulncheck\`, линт и тесты админки, сборка документации, установщик на Debian и Ubuntu. [ci.yml](${CI})`],
+      ["pulse", "Сквозной прогон", `Перед каждым релизом: настоящие панель, нода и клиенты Hysteria2, AmneziaWG, Xray, mihomo и sing-box, плюс обновление агента, откаты и установка по SSH. Вручную в WSL или на виртуалке, не в CI. [e2e-wsl.sh](${E2E})`],
+      ["key", "Подписанные сборки", "GitHub Actions собирает каждый тег в черновик релиза. Автор пересобирает его из тега на машине с офлайн-ключом релизов и подписывает только бинарники, совпавшие байт в байт; панель и ноды ставят только подписанные сборки.", "operations/releases"],
+      ["updates", "Обновления с откатом", "Ноды сами не обновляются. Раскатка начинается с одной ноды-канарейки и 5 минут проверки; нода, не прошедшая её, получает прежнюю сборку, а раскатка встаёт на паузу. Панель обновляет себя только с вашего подтверждения и возвращает старую версию, если новая не удержалась.", "operations/updates"],
+    ],
+    ai: "Mistgate пишется с помощью ИИ-агентов: автор читает то, что они пишут, и решает, что попадёт в main и в релиз, а проверки для их кода те же, что для любого другого.",
+    cmpH: "Сравнение с другими панелями",
+    yn: { yes: "да", no: "нет", part: "частично" },
+    cmp: [
+      ["Работает без Docker", "✅", "✅", "❌", "✅", "🟡 частично", "✅"],
+      ["Память панели в простое¹", "16–20 МиБ", "68–74 МиБ", "426–454 МиБ", "не измеряли", "262–265 МиБ", "не измеряли"],
+      ["Добавить ноду из панели (SSH)", "✅", "❌", "❌", "❌", "❌", "?"],
+      ["Hysteria2", "✅", "✅", "🟡 частично", "✅", "✅", "✅"],
+      ["AmneziaWG", "✅ 2.0 и 3.1", "✅ 3.1", "?", "?", "?", "?"],
+      ["VMess, Trojan, Shadowsocks", "❌", "✅", "🟡 частично", "✅", "✅", "✅"],
+      ["Telegram-бот", "🟡 только алерты", "✅", "🟡 частично", "✅", "✅", "?"],
+    ],
+    cmpNote: "¹ Приватная память всей группы панели в простое, без подключённой ноды, на тестовом сервере с 1 vCPU и 1 ГБ; у 3x-ui в группе есть его ядро Xray и fail2ban. «?» значит, что в README и документации проекта об этом не сказано. Другие панели впереди по числу протоколов, размеру сообщества и полноценным Telegram-ботам.",
     proof: [
-      ["gauge", "Бенчмарки", "На сервере с 1 vCPU и 1 ГБ панель в простое занимает 16–20 МиБ; 3x-ui — 68–74, PasarGuard — 262–265, Remnawave — 426–454. Метод, версии и где Mistgate медленнее.", "reference/benchmarks"],
-      ["layers", "Сравнение с другими панелями", "Mistgate рядом с 3x-ui, Marzban, PasarGuard, Remnawave, Hiddify Manager и s-ui, с источниками и с тем, в чём другие впереди.", "reference/comparison"],
+      ["gauge", "Бенчмарки", "Память, процессор, диск, время старта и нагрузка на подписки рядом с 3x-ui, Remnawave и PasarGuard на одном небольшом сервере. Методика, версии и где Mistgate медленнее.", "reference/benchmarks"],
+      ["layers", "Полная таблица", "Семь панелей с источниками, проверено 9 октября 2026 года, и в чём другие впереди.", "reference/comparison"],
     ],
     startH: "Быстрый старт",
     startP: "От пустого Linux-сервера до первого человека с рабочей ссылкой.",
     steps: [
-      ["Установите панель", "Подписанный бинарник из последнего релиза, `mistgate setup` и unit для systemd. Или отдайте промпт установки ИИ-агенту.", ["getting-started/install-panel", "getting-started/ai-agents"]],
+      ["Установите панель", "Одна команда на чистом Linux-сервере: установщик проверит подписанный манифест панели, запустит Mistgate под systemd и напечатает одноразовую ссылку настройки. Или отдайте промпт установки ИИ-агенту.", ["getting-started/install-panel", "getting-started/ai-agents"]],
       ["Добавьте ноду", "**Ноды → Добавить ноду**: панель поставит агент по SSH или выдаст одноразовую команду, которую вы запустите на сервере сами.", ["getting-started/ssh-install", "getting-started/add-node"]],
       ["Раздайте ссылки", "Поставьте профиль на ноду, создайте пользователя и отправьте ему ссылку.", ["getting-started/first-users"]],
-      ["Подготовьте к работе", "Подключите Telegram для алертов, проверьте настройки безопасности и настройте зашифрованные бэкапы, прежде чем на панель начнут полагаться другие.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
+      ["Алерты, безопасность, бэкапы", "Подключите Telegram для алертов, проверьте настройки безопасности и настройте зашифрованные бэкапы, прежде чем на панель начнут полагаться другие.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
     ],
     secH: "Документация по разделам админки",
     secP: "Каждый раздел админки и страницы о нём.",
@@ -117,35 +182,65 @@ export const LANDING = {
     statusLink: "Статус и план развития",
   },
   zh: {
-    meta: "Mistgate 是面向家人、朋友、社群或小团队的自托管 VPN 面板：在你自己的服务器上运行 Hysteria2、VLESS REALITY 和 AmneziaWG，每人一个链接，并像应用那样检测每台服务器。",
+    meta: "Mistgate 是一个自托管面板，用来管理你自己的几台 VPN 服务器，以及和你一起用它们的人。支持 Hysteria2、VLESS 和 AmneziaWG；两个 Go 二进制文件，SQLite 加 systemd。",
     eyebrow: "测试版 · 自托管 · 开源 · AGPL-3.0",
-    h1: "为身边的人​搭一个自己的 VPN，​不必时时盯着服务器。", // ​: the only places the headline may wrap
-    lead: "适合家人、朋友、社群或小团队。安装一个面板，在浏览器里添加你的服务器，再给每个人发一个链接。Mistgate 负责保持服务器配置正确，并像应用那样检测它们，所以出了故障你会最先知道。",
+    h1: "自托管的小型 VPN 面板",
+    lead: "用来管理你自己的几台服务器，以及和你一起用它们的人。面板装在一台服务器上，你的 VPN 服务器作为节点加进来。每个人拿到一个订阅链接，应用会自动获取他可以用的所有服务器。",
     install: "安装面板", how: "工作原理",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite，无需 Docker"],
     shotAlt: "Mistgate 管理后台：节点及其运行状况和吞吐量、一个未解决的问题和最近的事件",
+    doesH: "功能",
+    does: [
+      ["nodes", "在浏览器里添加节点", "输入 IP 和 root 密码即可添加。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent。也可以用一条一次性命令安装。", "getting-started/add-node"],
+      ["subscriptions", "每人一个链接", "基于 Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）从中获取全部三种协议，Happ 获取 Hysteria2 和 VLESS，AmneziaVPN 则在用户页面上为每台设备取一个密钥。", "guide/client-apps"],
+      ["health", "检测和告警", "面板每 5 分钟像应用一样连接一次每台服务器。每个节点上的诊断运行 17 项主机检查，并提供六种修复，只有你确认后才会执行。告警显示在管理后台，也会发到 Telegram。", "operations/health"],
+      ["memory", "两个 Go 二进制文件", "不需要 Docker，也不需要数据库服务器：SQLite 加 systemd。在 1 vCPU / 1 GB 的服务器上，面板空闲时占用 16–20 MiB 内存。", "reference/benchmarks"],
+      ["mask", "伪装站点", "陌生人打开面板地址只会看到伪装站点；管理后台位于私密路径或私密主机名之后。", "guide/decoy-site"],
+      ["integrations", "面向 AI 智能体的 MCP", "内置 MCP 服务器：AI 智能体可以读取集群状态并规划修改，有风险的操作要等你在管理后台批准。", "reference/mcp"],
+    ],
+    notYet: "目前还没有的：Telegram 机器人只能发告警；Cloudflare Workers 版仍是[预览版](getting-started/install-edge)。部分默认值偏向俄罗斯用户（都可以在设置里修改），可选的[可达性检测](operations/reachability)默认从俄罗斯视角检测，其中大部分来源也只适用于俄罗斯。",
     fitH: "各部分如何配合",
     fitP: "两个程序：面板，以及每台服务器上的 Agent。用户的应用只在获取链接时访问面板；VPN 流量直接发往节点。",
     fitAlt: "Mistgate 的组成：你使用管理后台，用户的应用从面板获取自己的链接，VPN 流量从应用经节点送往互联网，节点与面板保持一条连接",
-    whyH: "为什么用 Mistgate",
-    why: [
-      ["subscriptions", "一个链接，多种协议", "基于 Mihomo 内核的应用可以从同一个链接获取 Hysteria2、VLESS 和 AmneziaWG：用户的网络封锁了其中一种协议时，另一种已经在应用里了。", "guide/client-apps"],
-      ["nodes", "在浏览器里添加服务器", "输入 IP 和 root 密码。面板会固定主机密钥、检查服务器、开放端口、安装已签名的 Agent，并等待它连接。", "getting-started/ssh-install"],
-      ["health", "你最先知道", "面板每 5 分钟像应用那样连接一次每台服务器。每个节点上的诊断会运行 17 项主机检查，告警发送到 Telegram。", "operations/health"],
-      ["settings", "轻量且隐蔽", "两个静态 Go 二进制文件加 SQLite，无需 Docker。面板空闲时占用 16–20 MiB，陌生人打开它的地址只会看到一个伪装站点。", "operations/security"],
+    protoH: "协议",
+    protos: [
+      ["Hysteria2", "基于官方 Hysteria2 内核，走 UDP（QUIC）。支持 Salamander 混淆、端口跳跃，以及 Let's Encrypt 证书或固定指纹的自签名证书。", "guide/hysteria2"],
+      ["VLESS", "基于 xray-core。REALITY 搭配 XHTTP 或 TCP（RAW + Vision）；TLS 搭配 XHTTP 或 WebSocket，可以直连，也可以放在 CDN 之后。", "guide/vless"],
+      ["AmneziaWG", "支持 3.1 版（默认）和 2.0 版，每台设备一个独立密钥。节点上使用用户态的 amneziawg-go 或内核模块。", "guide/amneziawg"],
     ],
-    more: "更多",
+    protoP: "Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443。暂不支持：VMess、Trojan、Shadowsocks、TUIC 和普通 WireGuard。我们计划加入更多协议，每个新协议都通过[协议插件契约](reference/architecture#协议插件契约)接入同一个订阅链接。",
+    stableH: "稳定性如何",
+    stableP: "还是测试版，而且很新：v0.1.0 的标签打于 2026-10-03。维护者自己就用它管理六台服务器，给家人和朋友用。",
+    stable: [
+      ["code", "CI", `每次 push 和 pull request 都会运行：Go 测试和 vet、面板与 Agent 会话的竞态检测、\`govulncheck\`、管理后台的 lint 和测试、文档构建，以及在 Debian 和 Ubuntu 上测试安装脚本。[ci.yml](${CI})`],
+      ["pulse", "端到端测试", `每次发布前运行：真实的面板和节点，配合真实的 Hysteria2、AmneziaWG、Xray、mihomo 和 sing-box 客户端，还覆盖 Agent 更新、回滚和通过 SSH 安装。在 WSL 或虚拟机里手动运行，不在 CI 中。[e2e-wsl.sh](${E2E})`],
+      ["key", "签名构建", "GitHub Actions 把每个标签构建成草稿版本。维护者在存有离线发布密钥的机器上从标签重新构建，只签名逐字节一致的二进制文件；面板和节点只安装已签名的构建。", "operations/releases"],
+      ["updates", "可回滚的更新", "节点不会自行更新。滚动更新先从一个金丝雀节点开始，给它 5 分钟通过健康检查；没通过的节点会换回之前的构建，滚动更新随之暂停。面板只有在你确认后才会更新自己，新版本撑不住时会恢复旧版本。", "operations/updates"],
+    ],
+    ai: "Mistgate 是借助 AI 编码智能体开发的：它们写的代码由维护者审阅，合并什么、发布什么由维护者决定，上面这些检查对它们的代码和对其他人的代码一视同仁。",
+    cmpH: "与其他面板的对比",
+    yn: { yes: "是", no: "否", part: "部分" },
+    cmp: [
+      ["无需 Docker 即可运行", "✅", "✅", "❌", "✅", "🟡 部分", "✅"],
+      ["面板空闲时占用 RAM¹", "16–20 MiB", "68–74 MiB", "426–454 MiB", "未测量", "262–265 MiB", "未测量"],
+      ["在面板中添加节点（SSH）", "✅", "❌", "❌", "❌", "❌", "?"],
+      ["Hysteria2", "✅", "✅", "🟡 部分", "✅", "✅", "✅"],
+      ["AmneziaWG", "✅ 2.0 和 3.1", "✅ 3.1", "?", "?", "?", "?"],
+      ["VMess、Trojan、Shadowsocks", "❌", "✅", "🟡 部分", "✅", "✅", "✅"],
+      ["Telegram 机器人", "🟡 仅告警", "✅", "🟡 部分", "✅", "✅", "?"],
+    ],
+    cmpNote: "¹ 整个面板进程组空闲时的私有内存，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得；3x-ui 的数字包含它的 Xray 内核和 fail2ban。「?」表示该项目自己的 README 和文档中没有说明。在协议覆盖范围、社区规模和功能完整的 Telegram 机器人方面，其他面板更领先。",
     proof: [
-      ["gauge", "基准测试", "在 1 vCPU / 1 GB 的服务器上，面板空闲时占用 16–20 MiB；3x-ui 为 68–74，PasarGuard 为 262–265，Remnawave 为 426–454。包含测试方法、版本，以及 Mistgate 较慢的地方。", "reference/benchmarks"],
-      ["layers", "与其他面板的对比", "把 Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Manager 和 s-ui 放在一起比较，附来源，也包括其他面板领先的地方。", "reference/comparison"],
+      ["gauge", "基准测试", "在同一台小型服务器上，与 3x-ui、Remnawave 和 PasarGuard 对比内存、CPU、磁盘、启动时间和订阅负载。包含测试方法、版本，以及 Mistgate 较慢的地方。", "reference/benchmarks"],
+      ["layers", "完整对照表", "七个面板逐项对比并附来源，核对于 2026-10-09，也写明了其他面板领先的地方。", "reference/comparison"],
     ],
     startH: "快速开始",
     startP: "从一台空的 Linux 服务器，到第一个人拿到可用的链接。",
     steps: [
-      ["安装面板", "使用最新发布版本中已签名的二进制文件，运行 `mistgate setup` 并配置 systemd 服务单元。也可以把安装提示词交给 AI 智能体。", ["getting-started/install-panel", "getting-started/ai-agents"]],
+      ["安装面板", "在一台全新的 Linux 服务器上运行一条命令：安装程序会验证已签名的面板清单，通过 systemd 启动 Mistgate，并打印一次性初始设置链接。也可以把安装提示词交给 AI 智能体。", ["getting-started/install-panel", "getting-started/ai-agents"]],
       ["添加节点", "**节点 → 添加节点**会通过 SSH 安装 Agent，或者给出一条一次性命令，由你自己在服务器上运行。", ["getting-started/ssh-install", "getting-started/add-node"]],
       ["把链接发给用户", "在节点上部署协议配置，创建用户，再把链接发给对方。", ["getting-started/first-users"]],
-      ["让它值得依赖", "在别人开始依赖它之前，绑定 Telegram 接收告警，检查安全设置，并设置好加密备份。", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
+      ["告警、安全和备份", "在别人开始依赖它之前，绑定 Telegram 接收告警，检查安全设置，并设置好加密备份。", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
     ],
     secH: "按管理后台分区浏览文档",
     secP: "管理后台的每个分区，以及与之对应的页面。",
@@ -180,8 +275,21 @@ export function renderLanding({ lang, t, nav, section, langNames = [] }) {
   const shotLang = existsSync(`${DOCS}images/readme/overview-light-${lang}.webp`) && existsSync(`${DOCS}images/readme/overview-dark-${lang}.webp`) ? lang : "en";
   const fitLang = existsSync(`${DOCS}${lang}/diagrams/how-it-fits.svg`) ? lang : "en";
   const title = (key) => pages.get(key)?.title ?? key;
-  const chip = (id, size = 26) => `<span class="id-chip" data-tone="${NAV[id].tone}" style="width:${size}px;height:${size}px">${icon(`nav-${id}`, Math.round(size * 0.6))}</span>`;
+  // an admin section's icon in its tone, or any other icon in lavender
+  const chip = (id, size = 26) => `<span class="id-chip" data-tone="${NAV[id]?.tone ?? "lavender"}" style="width:${size}px;height:${size}px">${icon(NAV[id] ? `nav-${id}` : id, Math.round(size * 0.6))}</span>`;
   const bold = (s) => rich(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  // [text](key#anchor): the page in this language; one not translated yet is the English page, without the anchor
+  const fmt = (s) => bold(s).replace(/\[([^\]]+)\]\(([^)\s#]+)(#[^)\s]+)?\)/g, (_, text, to, frag = "") =>
+    /^https:/.test(to) ? `<a href="${to}${frag}" rel="noopener">${text}</a>` : `<a href="${url(to)}${pages.has(to) ? frag : ""}">${text}</a>`);
+  // icon, heading, text and the page it links to (by its title); Chinese puts no space after its full stop
+  const list = (items) => `<ul class="why">${items.map(([id, h, p, key]) => `<li>${chip(id, 30)}<div><h3>${esc(h)}</h3><p>${fmt(p)}${key ? `${lang === "zh" ? "" : " "}<a href="${url(key)}">${esc(title(key))}</a>` : ""}</p></div></li>`).join("")}</ul>`;
+  // a comparison cell as the README writes it: ✅ ❌ 🟡 and an optional word become the docs' yes / no / partial pill
+  const cell = (c) => {
+    const m = /^(✅|❌|🟡)\s*(.*)$/u.exec(c);
+    if (!m) return esc(c);
+    const kind = { "✅": "yes", "❌": "no", "🟡": "part" }[m[1]];
+    return `<span class="yn yn--${kind}"><span class="yn__g" aria-hidden="true"></span>${esc(m[2] || L.yn[kind])}</span>`;
+  };
 
   const hero = `<section class="hero">
 <svg class="hero__arch" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M30 260V150a120 120 0 0 1 240 0v110" style="stroke:var(--surface-2)" stroke-width="1.5"/><path d="M70 260V160a80 80 0 0 1 160 0v100" style="stroke:var(--border)" stroke-width="1.5"/><path d="M110 260V170a40 40 0 0 1 80 0v90" style="stroke:var(--accent-line)" stroke-width="1.5"/><path d="M0 214c40-14 80 14 120 0s80-14 120 0 40 10 60 4" style="stroke:var(--border)" stroke-width="1.5" stroke-linecap="round"/><path d="M24 238c40-12 70 12 110 0s80-12 120 0" style="stroke:var(--surface-2)" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -193,12 +301,23 @@ export function renderLanding({ lang, t, nav, section, langNames = [] }) {
 <figure class="shot"><img class="shot__light" src="/img/overview-light-${shotLang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"><img class="shot__dark" src="/img/overview-dark-${shotLang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"></figure>
 </section>`;
 
+  const does = `<section class="home-sec" aria-labelledby="does"><h2 id="does">${esc(L.doesH)}</h2>
+${list(L.does)}<p class="home-p">${fmt(L.notYet)}</p></section>`;
+
   const fit = `<section class="home-sec" aria-labelledby="fit"><h2 id="fit">${esc(L.fitH)}</h2><p class="home-p">${esc(L.fitP)}</p>
 <figure class="diagram diagram--svg" tabindex="0">${inlineSvg(`${DOCS}${fitLang}/diagrams/how-it-fits.svg`, L.fitAlt)}</figure></section>`;
 
-  const why = `<section class="home-sec" aria-labelledby="why"><h2 id="why">${esc(L.whyH)}</h2>
-<ul class="why">${L.why.map(([id, h, p, key]) => `<li>${chip(id, 30)}<div><h3>${esc(h)}</h3><p>${esc(p)} <a href="${url(key)}">${esc(L.more)}<span class="sr">: ${esc(title(key))}</span></a></p></div></li>`).join("")}</ul>
-<div class="proof">${L.proof.map(([ico, h, p, key]) => `<a class="proof__card" href="${url(key)}"><span class="id-chip" data-tone="lavender" style="width:30px;height:30px">${icon(ico, 18)}</span><span class="proof__t">${esc(h)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div></section>`;
+  const protocols = `<section class="home-sec" aria-labelledby="protocols"><h2 id="protocols">${esc(L.protoH)}</h2>
+<div class="proof proof--3">${L.protos.map(([name, p, key]) => `<a class="proof__card" href="${url(key)}"><span class="proof__t">${esc(name)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div>
+<p class="home-p">${fmt(L.protoP)}</p></section>`;
+
+  const stable = `<section class="home-sec" aria-labelledby="stable"><h2 id="stable">${esc(L.stableH)}</h2><p class="home-p">${esc(L.stableP)}</p>
+${list(L.stable)}<p class="home-p">${esc(L.ai)}</p></section>`;
+
+  const compare = `<section class="home-sec" aria-labelledby="compare"><h2 id="compare">${esc(L.cmpH)}</h2>
+<div class="cmp" role="region" tabindex="0" aria-labelledby="compare"><table><thead><tr><th></th>${PANELS.map((p) => `<th>${p}</th>`).join("")}</tr></thead><tbody>${L.cmp.map(([h, ...cells]) => `<tr><td>${esc(h)}</td>${cells.map((c) => `<td>${cell(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+<p class="home-p">${esc(L.cmpNote)}</p>
+<div class="proof">${L.proof.map(([ico, h, p, key]) => `<a class="proof__card" href="${url(key)}">${chip(ico, 30)}<span class="proof__t">${esc(h)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div></section>`;
 
   const start = `<section class="home-sec" aria-labelledby="start"><h2 id="start">${esc(L.startH)}</h2><p class="home-p">${esc(L.startP)}</p>
 <ol class="steps">${L.steps.map(([h, p, keys]) => `<li><h3>${esc(h)}</h3><p>${bold(p)}</p><p class="steps__links">${keys.map((k) => `<a href="${url(k)}">${esc(title(k))}${icon("chevronRight", 12)}</a>`).join("")}</p></li>`).join("")}</ol></section>`;
@@ -212,5 +331,5 @@ export function renderLanding({ lang, t, nav, section, langNames = [] }) {
 <ul class="sec-cards">${first.length ? card(`<h3><span class="id-chip" data-tone="lavender" style="width:26px;height:26px">${icon("bolt", 16)}</span><span>${esc(L.first)}</span></h3>`, L.firstDesc, first) : ""}${[...bySection].filter(([, items]) => items.length).map(([id, items]) => card(`<h3>${chip(id)}<span>${esc(t.sections[id])}</span></h3>`, L.desc[id], items)).join("")}${rest.length ? card(`<h3><span class="id-chip id-chip--plain" style="width:26px;height:26px">${icon("text", 16)}</span><span>${esc(L.reference)}</span></h3>`, L.refDesc, rest) : ""}</ul>
 <p class="home-status">${esc(L.status)} <a href="${url("roadmap/status")}">${esc(L.statusLink)}</a></p></section>`;
 
-  return { hero, body: fit + why + start + sections, description: L.meta };
+  return { hero, body: does + fit + protocols + stable + start + compare + sections, description: L.meta };
 }
