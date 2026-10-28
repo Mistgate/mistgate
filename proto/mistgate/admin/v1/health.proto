@@ -133,6 +133,12 @@ enum AlertKind {
   // ports tried. Opens after 2 consecutive rounds with a bad verdict and closes after 2 rounds with OK; UNKNOWN rounds
   // neither open nor close it. Muting works like for any other kind.
   ALERT_KIND_COUNTRY_BLOCKED = 18;
+  // A relay (a server forwarded through an entry node) does not work end to end in the client-eye rounds. WARNING.
+  // node_id = the entry node, subject = the relay id, params{relay, exit, exit_profile, port, stage}: stage is "leg" (the
+  // entry does not reach the exit), "entry" (the forward is not installed), "path" (nothing comes through) or "freeze"
+  // (a transfer stalls after the first kilobytes). Opens after the usual failure streak, is superseded while the exit's
+  // own check alert or the entry's node_down is open, and closes on recovery.
+  ALERT_KIND_RELAY_DOWN = 19;
 }
 
 message Alert {

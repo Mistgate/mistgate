@@ -8,8 +8,8 @@ import "mistgate/admin/v1/common.proto";
 // unchanged (agent.proto "RELAY FORWARDS"). People whose network blocks the exit reach it through the entry; the entry
 // sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
 //
-// Everything here is owner-only (a helper and an API token get PERMISSION_DENIED; tokens are not offered these
-// procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
+// Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
+// read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
 //
 // A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), and only after CheckRelay: the leg check
 // (the entry reaches the exit's server) must have passed less than 15 minutes ago, for the relay's present target (the
@@ -82,6 +82,28 @@ message Relay {
   int64 created_unix = 20;
   // The latest CheckRelay (or the check made on switching on); absent before the first.
   RelayCheck check = 21;
+  // The latest client-eye round through the forward; absent before the first.
+  RelayMonitor monitor = 22;
+  // What went to the exit through the forward since the entry's agent installed it (its nft counter), and when the
+  // agent read it. Zero with counted_unix 0 when the agent does not report counters.
+  uint64 bytes = 23;
+  uint64 packets = 24;
+  int64 counted_unix = 25;
+}
+
+// A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
+// moves enough data (at least 64 KB) to see a transfer that stalls after the first kilobytes.
+message RelayMonitor {
+  int64 at_unix = 1;
+  bool ok = 2;
+  // The stage that failed: "leg", "entry", "path", "freeze", or "" when ok.
+  string stage = 3;
+  // Why, in the codes of RelayStage where they apply.
+  string code = 4;
+  // A request through the forward, as response_ms of the client-eye checks.
+  uint32 response_ms = 5;
+  // Consecutive failed rounds.
+  uint32 fail_streak = 6;
 }
 
 // One stage of a check.

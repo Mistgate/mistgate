@@ -145,6 +145,12 @@ const (
 	// ports tried. Opens after 2 consecutive rounds with a bad verdict and closes after 2 rounds with OK; UNKNOWN rounds
 	// neither open nor close it. Muting works like for any other kind.
 	AlertKind_ALERT_KIND_COUNTRY_BLOCKED AlertKind = 18
+	// A relay (a server forwarded through an entry node) does not work end to end in the client-eye rounds. WARNING.
+	// node_id = the entry node, subject = the relay id, params{relay, exit, exit_profile, port, stage}: stage is "leg" (the
+	// entry does not reach the exit), "entry" (the forward is not installed), "path" (nothing comes through) or "freeze"
+	// (a transfer stalls after the first kilobytes). Opens after the usual failure streak, is superseded while the exit's
+	// own check alert or the entry's node_down is open, and closes on recovery.
+	AlertKind_ALERT_KIND_RELAY_DOWN AlertKind = 19
 )
 
 // Enum value maps for AlertKind.
@@ -169,6 +175,7 @@ var (
 		16: "ALERT_KIND_PORT_LOSSY",
 		17: "ALERT_KIND_DEVICE_LIMIT",
 		18: "ALERT_KIND_COUNTRY_BLOCKED",
+		19: "ALERT_KIND_RELAY_DOWN",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -190,6 +197,7 @@ var (
 		"ALERT_KIND_PORT_LOSSY":                  16,
 		"ALERT_KIND_DEVICE_LIMIT":                17,
 		"ALERT_KIND_COUNTRY_BLOCKED":             18,
+		"ALERT_KIND_RELAY_DOWN":                  19,
 	}
 )
 
@@ -3457,7 +3465,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xaf\x04\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xca\x04\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -3478,7 +3486,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x12ALERT_KIND_TORRENT\x10\x0f\x12\x19\n" +
 	"\x15ALERT_KIND_PORT_LOSSY\x10\x10\x12\x1b\n" +
 	"\x17ALERT_KIND_DEVICE_LIMIT\x10\x11\x12\x1e\n" +
-	"\x1aALERT_KIND_COUNTRY_BLOCKED\x10\x12*\x8e\x01\n" +
+	"\x1aALERT_KIND_COUNTRY_BLOCKED\x10\x12\x12\x19\n" +
+	"\x15ALERT_KIND_RELAY_DOWN\x10\x13*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

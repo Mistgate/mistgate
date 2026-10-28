@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/relay.proto.
  */
 export const file_mistgate_admin_v1_relay: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEi2QMKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjayKPAQoKUmVsYXlTdGFnZRIOCgZzdGF0dXMYASABKAkSDAoEY29kZRgCIAEoCRIRCglzZW5kZXJfaWQYAyABKAkSEwoLc2VuZGVyX25hbWUYBCABKAkSDwoHdmVyZGljdBgFIAEoCRIMCgRzZW50GAYgASgNEgsKA2dvdBgHIAEoDRIPCgdhdF91bml4GAggASgDIs4BCgpSZWxheUNoZWNrEg8KB2F0X3VuaXgYASABKAMSDwoHbmV0d29yaxgCIAEoCRIMCgRwb3J0GAMgASgNEgoKAnRvGAQgASgJEioKA2xlZxgFIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USKwoEcGF0aBgGIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5U3RhZ2USCgoCb2sYByABKAgSDQoFc3RhZ2UYCCABKAkSEAoIdmVyaWZpZWQYCSABKAgiHwoRQ2hlY2tSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiPQoSQ2hlY2tSZWxheVJlc3BvbnNlEicKBXJlbGF5GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiQgoQUmVsYXlDb3VudHJ5SGludBIPCgd2ZXJkaWN0GAEgASgJEgwKBGRhcmsYAiADKAkSDwoHYXRfdW5peBgDIAEoAyJCCg5SZWxheVJlYWNoSGludBIPCgd2ZXJkaWN0GAEgASgJEg4KBnNvdXJjZRgCIAEoCRIPCgdhdF91bml4GAMgASgDIr8CCg5SZWxheUNhbmRpZGF0ZRISCgppbmJvdW5kX2lkGAEgASgJEg8KB25vZGVfaWQYAiABKAkSEQoJbm9kZV9uYW1lGAMgASgJEhIKCnByb2ZpbGVfaWQYBCABKAkSFAoMcHJvZmlsZV9uYW1lGAUgASgJEhAKCHByb3RvY29sGAYgASgJEg8KB25ldHdvcmsYByABKAkSDAoEcG9ydBgIIAEoDRITCgt1bnN1cHBvcnRlZBgJIAEoCRILCgNob3AYCiABKAgSEAoIcmVsYXlfaWQYCyABKAkSNAoHY291bnRyeRgMIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q291bnRyeUhpbnQSMAoFcmVhY2gYDSABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVJlYWNoSGludCIxChpMaXN0UmVsYXlDYW5kaWRhdGVzUmVxdWVzdBITCgt2aWFfbm9kZV9pZBgBIAEoCSKpAQobTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlEjUKCmNhbmRpZGF0ZXMYASADKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNhbmRpZGF0ZRIXCg9hZ2VudF9zdXBwb3J0ZWQYAiABKAgSOgoNZW50cnlfY291bnRyeRgDIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Q291bnRyeUhpbnQiJAoRTGlzdFJlbGF5c1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSI+ChJMaXN0UmVsYXlzUmVzcG9uc2USKAoGcmVsYXlzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiSwoSQ3JlYXRlUmVsYXlSZXF1ZXN0EhIKCmluYm91bmRfaWQYASABKAkSEwoLdmlhX25vZGVfaWQYAiABKAkSDAoEcG9ydBgDIAEoDSI+ChNDcmVhdGVSZWxheVJlc3BvbnNlEicKBXJlbGF5GAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuUmVsYXkiXgoSVXBkYXRlUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJEhQKB2VuYWJsZWQYAiABKAhIAIgBARIRCgRwb3J0GAMgASgNSAGIAQFCCgoIX2VuYWJsZWRCBwoFX3BvcnQiPgoTVXBkYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IiAKEkRlbGV0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCSIVChNEZWxldGVSZWxheVJlc3BvbnNlMtQECgxSZWxheVNlcnZpY2USWQoKTGlzdFJlbGF5cxIkLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5c1Jlc3BvbnNlElwKC0NyZWF0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlUmVsYXlSZXNwb25zZRJcCgtVcGRhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVJlbGF5UmVzcG9uc2USXAoLRGVsZXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5EZWxldGVSZWxheVJlc3BvbnNlElkKCkNoZWNrUmVsYXkSJC5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkNoZWNrUmVsYXlSZXNwb25zZRJ0ChNMaXN0UmVsYXlDYW5kaWRhdGVzEi0ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QaLi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlDYW5kaWRhdGVzUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIKUmVsYXlQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9yZWxheS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiwQQKBVJlbGF5EgoKAmlkGAEgASgJEhIKCmluYm91bmRfaWQYAiABKAkSFAoMZXhpdF9ub2RlX2lkGAMgASgJEhYKDmV4aXRfbm9kZV9uYW1lGAQgASgJEhIKCnByb2ZpbGVfaWQYBSABKAkSFAoMcHJvZmlsZV9uYW1lGAYgASgJEhAKCHByb3RvY29sGAcgASgJEhMKC3ZpYV9ub2RlX2lkGAggASgJEhUKDXZpYV9ub2RlX25hbWUYCSABKAkSDwoHbmV0d29yaxgKIAEoCRIMCgRwb3J0GAsgASgNEhEKCWV4aXRfcG9ydBgMIAEoDRIPCgdlbmFibGVkGA0gASgIEi4KBXN0YXRlGA4gASgOMh8ubWlzdGdhdGUuYWRtaW4udjEuSW5ib3VuZFN0YXRlEhIKCmxhc3RfZXJyb3IYDyABKAkSDQoFdG9faXAYECABKAkSFAoMYXBwbGllZF91bml4GBEgASgDEhEKCWV4aXRfbGl2ZRgSIAEoCBIXCg9hZ2VudF9zdXBwb3J0ZWQYEyABKAgSFAoMY3JlYXRlZF91bml4GBQgASgDEiwKBWNoZWNrGBUgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDaGVjaxIwCgdtb25pdG9yGBYgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlNb25pdG9yEg0KBWJ5dGVzGBcgASgEEg8KB3BhY2tldHMYGCABKAQSFAoMY291bnRlZF91bml4GBkgASgDInIKDFJlbGF5TW9uaXRvchIPCgdhdF91bml4GAEgASgDEgoKAm9rGAIgASgIEg0KBXN0YWdlGAMgASgJEgwKBGNvZGUYBCABKAkSEwoLcmVzcG9uc2VfbXMYBSABKA0SEwoLZmFpbF9zdHJlYWsYBiABKA0ijwEKClJlbGF5U3RhZ2USDgoGc3RhdHVzGAEgASgJEgwKBGNvZGUYAiABKAkSEQoJc2VuZGVyX2lkGAMgASgJEhMKC3NlbmRlcl9uYW1lGAQgASgJEg8KB3ZlcmRpY3QYBSABKAkSDAoEc2VudBgGIAEoDRILCgNnb3QYByABKA0SDwoHYXRfdW5peBgIIAEoAyLOAQoKUmVsYXlDaGVjaxIPCgdhdF91bml4GAEgASgDEg8KB25ldHdvcmsYAiABKAkSDAoEcG9ydBgDIAEoDRIKCgJ0bxgEIAEoCRIqCgNsZWcYBSABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlEisKBHBhdGgYBiABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheVN0YWdlEgoKAm9rGAcgASgIEg0KBXN0YWdlGAggASgJEhAKCHZlcmlmaWVkGAkgASgIIh8KEUNoZWNrUmVsYXlSZXF1ZXN0EgoKAmlkGAEgASgJIj0KEkNoZWNrUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IkIKEFJlbGF5Q291bnRyeUhpbnQSDwoHdmVyZGljdBgBIAEoCRIMCgRkYXJrGAIgAygJEg8KB2F0X3VuaXgYAyABKAMiQgoOUmVsYXlSZWFjaEhpbnQSDwoHdmVyZGljdBgBIAEoCRIOCgZzb3VyY2UYAiABKAkSDwoHYXRfdW5peBgDIAEoAyK/AgoOUmVsYXlDYW5kaWRhdGUSEgoKaW5ib3VuZF9pZBgBIAEoCRIPCgdub2RlX2lkGAIgASgJEhEKCW5vZGVfbmFtZRgDIAEoCRISCgpwcm9maWxlX2lkGAQgASgJEhQKDHByb2ZpbGVfbmFtZRgFIAEoCRIQCghwcm90b2NvbBgGIAEoCRIPCgduZXR3b3JrGAcgASgJEgwKBHBvcnQYCCABKA0SEwoLdW5zdXBwb3J0ZWQYCSABKAkSCwoDaG9wGAogASgIEhAKCHJlbGF5X2lkGAsgASgJEjQKB2NvdW50cnkYDCABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50EjAKBXJlYWNoGA0gASgLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlSZWFjaEhpbnQiMQoaTGlzdFJlbGF5Q2FuZGlkYXRlc1JlcXVlc3QSEwoLdmlhX25vZGVfaWQYASABKAkiqQEKG0xpc3RSZWxheUNhbmRpZGF0ZXNSZXNwb25zZRI1CgpjYW5kaWRhdGVzGAEgAygLMiEubWlzdGdhdGUuYWRtaW4udjEuUmVsYXlDYW5kaWRhdGUSFwoPYWdlbnRfc3VwcG9ydGVkGAIgASgIEjoKDWVudHJ5X2NvdW50cnkYAyABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheUNvdW50cnlIaW50IiQKEUxpc3RSZWxheXNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiPgoSTGlzdFJlbGF5c1Jlc3BvbnNlEigKBnJlbGF5cxgBIAMoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5IksKEkNyZWF0ZVJlbGF5UmVxdWVzdBISCgppbmJvdW5kX2lkGAEgASgJEhMKC3ZpYV9ub2RlX2lkGAIgASgJEgwKBHBvcnQYAyABKA0iPgoTQ3JlYXRlUmVsYXlSZXNwb25zZRInCgVyZWxheRgBIAEoCzIYLm1pc3RnYXRlLmFkbWluLnYxLlJlbGF5Il4KElVwZGF0ZVJlbGF5UmVxdWVzdBIKCgJpZBgBIAEoCRIUCgdlbmFibGVkGAIgASgISACIAQESEQoEcG9ydBgDIAEoDUgBiAEBQgoKCF9lbmFibGVkQgcKBV9wb3J0Ij4KE1VwZGF0ZVJlbGF5UmVzcG9uc2USJwoFcmVsYXkYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5SZWxheSIgChJEZWxldGVSZWxheVJlcXVlc3QSCgoCaWQYASABKAkiFQoTRGVsZXRlUmVsYXlSZXNwb25zZTLUBAoMUmVsYXlTZXJ2aWNlElkKCkxpc3RSZWxheXMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0UmVsYXlzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheXNSZXNwb25zZRJcCgtDcmVhdGVSZWxheRIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVJlbGF5UmVzcG9uc2USXAoLVXBkYXRlUmVsYXkSJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVSZWxheVJlc3BvbnNlElwKC0RlbGV0ZVJlbGF5EiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlUmVsYXlSZXNwb25zZRJZCgpDaGVja1JlbGF5EiQubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tSZWxheVJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1JlbGF5UmVzcG9uc2USdAoTTGlzdFJlbGF5Q2FuZGlkYXRlcxItLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RSZWxheUNhbmRpZGF0ZXNSZXF1ZXN0Gi4ubWlzdGdhdGUuYWRtaW4udjEuTGlzdFJlbGF5Q2FuZGlkYXRlc1Jlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCClJlbGF5UHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Relay
@@ -142,6 +142,31 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
    * @generated from field: mistgate.admin.v1.RelayCheck check = 21;
    */
   check?: RelayCheck | undefined;
+
+  /**
+   * The latest client-eye round through the forward; absent before the first.
+   *
+   * @generated from field: mistgate.admin.v1.RelayMonitor monitor = 22;
+   */
+  monitor?: RelayMonitor | undefined;
+
+  /**
+   * What went to the exit through the forward since the entry's agent installed it (its nft counter), and when the
+   * agent read it. Zero with counted_unix 0 when the agent does not report counters.
+   *
+   * @generated from field: uint64 bytes = 23;
+   */
+  bytes: bigint;
+
+  /**
+   * @generated from field: uint64 packets = 24;
+   */
+  packets: bigint;
+
+  /**
+   * @generated from field: int64 counted_unix = 25;
+   */
+  countedUnix: bigint;
 };
 
 /**
@@ -150,6 +175,59 @@ export type Relay = Message<"mistgate.admin.v1.Relay"> & {
  */
 export const RelaySchema: GenMessage<Relay> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_relay, 0);
+
+/**
+ * A client-eye round through a relay: the panel's checker connects to the entry's forwarded port as an app would and
+ * moves enough data (at least 64 KB) to see a transfer that stalls after the first kilobytes.
+ *
+ * @generated from message mistgate.admin.v1.RelayMonitor
+ */
+export type RelayMonitor = Message<"mistgate.admin.v1.RelayMonitor"> & {
+  /**
+   * @generated from field: int64 at_unix = 1;
+   */
+  atUnix: bigint;
+
+  /**
+   * @generated from field: bool ok = 2;
+   */
+  ok: boolean;
+
+  /**
+   * The stage that failed: "leg", "entry", "path", "freeze", or "" when ok.
+   *
+   * @generated from field: string stage = 3;
+   */
+  stage: string;
+
+  /**
+   * Why, in the codes of RelayStage where they apply.
+   *
+   * @generated from field: string code = 4;
+   */
+  code: string;
+
+  /**
+   * A request through the forward, as response_ms of the client-eye checks.
+   *
+   * @generated from field: uint32 response_ms = 5;
+   */
+  responseMs: number;
+
+  /**
+   * Consecutive failed rounds.
+   *
+   * @generated from field: uint32 fail_streak = 6;
+   */
+  failStreak: number;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RelayMonitor.
+ * Use `create(RelayMonitorSchema)` to create a new message.
+ */
+export const RelayMonitorSchema: GenMessage<RelayMonitor> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_relay, 1);
 
 /**
  * One stage of a check.
@@ -218,7 +296,7 @@ export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
  * Use `create(RelayStageSchema)` to create a new message.
  */
 export const RelayStageSchema: GenMessage<RelayStage> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 1);
+  messageDesc(file_mistgate_admin_v1_relay, 2);
 
 /**
  * What a check found. leg: the entry node to the exit's server. path: a third node to the entry's forwarded port, the
@@ -287,7 +365,7 @@ export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
  * Use `create(RelayCheckSchema)` to create a new message.
  */
 export const RelayCheckSchema: GenMessage<RelayCheck> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 2);
+  messageDesc(file_mistgate_admin_v1_relay, 3);
 
 /**
  * @generated from message mistgate.admin.v1.CheckRelayRequest
@@ -304,7 +382,7 @@ export type CheckRelayRequest = Message<"mistgate.admin.v1.CheckRelayRequest"> &
  * Use `create(CheckRelayRequestSchema)` to create a new message.
  */
 export const CheckRelayRequestSchema: GenMessage<CheckRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 3);
+  messageDesc(file_mistgate_admin_v1_relay, 4);
 
 /**
  * @generated from message mistgate.admin.v1.CheckRelayResponse
@@ -321,7 +399,7 @@ export type CheckRelayResponse = Message<"mistgate.admin.v1.CheckRelayResponse">
  * Use `create(CheckRelayResponseSchema)` to create a new message.
  */
 export const CheckRelayResponseSchema: GenMessage<CheckRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 4);
+  messageDesc(file_mistgate_admin_v1_relay, 5);
 
 /**
  * The panel's knowledge about the exit's country check, from the whole country-check machinery (Globalping, the TSPU
@@ -355,7 +433,7 @@ export type RelayCountryHint = Message<"mistgate.admin.v1.RelayCountryHint"> & {
  * Use `create(RelayCountryHintSchema)` to create a new message.
  */
 export const RelayCountryHintSchema: GenMessage<RelayCountryHint> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 5);
+  messageDesc(file_mistgate_admin_v1_relay, 6);
 
 /**
  * Does the entry reach the exit? Known only when the TSPU probe ran from this entry node.
@@ -389,7 +467,7 @@ export type RelayReachHint = Message<"mistgate.admin.v1.RelayReachHint"> & {
  * Use `create(RelayReachHintSchema)` to create a new message.
  */
 export const RelayReachHintSchema: GenMessage<RelayReachHint> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 6);
+  messageDesc(file_mistgate_admin_v1_relay, 7);
 
 /**
  * @generated from message mistgate.admin.v1.RelayCandidate
@@ -475,7 +553,7 @@ export type RelayCandidate = Message<"mistgate.admin.v1.RelayCandidate"> & {
  * Use `create(RelayCandidateSchema)` to create a new message.
  */
 export const RelayCandidateSchema: GenMessage<RelayCandidate> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 7);
+  messageDesc(file_mistgate_admin_v1_relay, 8);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelayCandidatesRequest
@@ -492,7 +570,7 @@ export type ListRelayCandidatesRequest = Message<"mistgate.admin.v1.ListRelayCan
  * Use `create(ListRelayCandidatesRequestSchema)` to create a new message.
  */
 export const ListRelayCandidatesRequestSchema: GenMessage<ListRelayCandidatesRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 8);
+  messageDesc(file_mistgate_admin_v1_relay, 9);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelayCandidatesResponse
@@ -525,7 +603,7 @@ export type ListRelayCandidatesResponse = Message<"mistgate.admin.v1.ListRelayCa
  * Use `create(ListRelayCandidatesResponseSchema)` to create a new message.
  */
 export const ListRelayCandidatesResponseSchema: GenMessage<ListRelayCandidatesResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 9);
+  messageDesc(file_mistgate_admin_v1_relay, 10);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysRequest
@@ -542,7 +620,7 @@ export type ListRelaysRequest = Message<"mistgate.admin.v1.ListRelaysRequest"> &
  * Use `create(ListRelaysRequestSchema)` to create a new message.
  */
 export const ListRelaysRequestSchema: GenMessage<ListRelaysRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 10);
+  messageDesc(file_mistgate_admin_v1_relay, 11);
 
 /**
  * @generated from message mistgate.admin.v1.ListRelaysResponse
@@ -559,7 +637,7 @@ export type ListRelaysResponse = Message<"mistgate.admin.v1.ListRelaysResponse">
  * Use `create(ListRelaysResponseSchema)` to create a new message.
  */
 export const ListRelaysResponseSchema: GenMessage<ListRelaysResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 11);
+  messageDesc(file_mistgate_admin_v1_relay, 12);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayRequest
@@ -588,7 +666,7 @@ export type CreateRelayRequest = Message<"mistgate.admin.v1.CreateRelayRequest">
  * Use `create(CreateRelayRequestSchema)` to create a new message.
  */
 export const CreateRelayRequestSchema: GenMessage<CreateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 12);
+  messageDesc(file_mistgate_admin_v1_relay, 13);
 
 /**
  * @generated from message mistgate.admin.v1.CreateRelayResponse
@@ -605,7 +683,7 @@ export type CreateRelayResponse = Message<"mistgate.admin.v1.CreateRelayResponse
  * Use `create(CreateRelayResponseSchema)` to create a new message.
  */
 export const CreateRelayResponseSchema: GenMessage<CreateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 13);
+  messageDesc(file_mistgate_admin_v1_relay, 14);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayRequest
@@ -632,7 +710,7 @@ export type UpdateRelayRequest = Message<"mistgate.admin.v1.UpdateRelayRequest">
  * Use `create(UpdateRelayRequestSchema)` to create a new message.
  */
 export const UpdateRelayRequestSchema: GenMessage<UpdateRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 14);
+  messageDesc(file_mistgate_admin_v1_relay, 15);
 
 /**
  * @generated from message mistgate.admin.v1.UpdateRelayResponse
@@ -649,7 +727,7 @@ export type UpdateRelayResponse = Message<"mistgate.admin.v1.UpdateRelayResponse
  * Use `create(UpdateRelayResponseSchema)` to create a new message.
  */
 export const UpdateRelayResponseSchema: GenMessage<UpdateRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 15);
+  messageDesc(file_mistgate_admin_v1_relay, 16);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayRequest
@@ -666,7 +744,7 @@ export type DeleteRelayRequest = Message<"mistgate.admin.v1.DeleteRelayRequest">
  * Use `create(DeleteRelayRequestSchema)` to create a new message.
  */
 export const DeleteRelayRequestSchema: GenMessage<DeleteRelayRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 16);
+  messageDesc(file_mistgate_admin_v1_relay, 17);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteRelayResponse
@@ -679,15 +757,15 @@ export type DeleteRelayResponse = Message<"mistgate.admin.v1.DeleteRelayResponse
  * Use `create(DeleteRelayResponseSchema)` to create a new message.
  */
 export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_relay, 17);
+  messageDesc(file_mistgate_admin_v1_relay, 18);
 
 /**
  * Relays: a port of one node (the entry) that passes the encrypted traffic of a server on another node (the exit) on,
  * unchanged (agent.proto "RELAY FORWARDS"). People whose network blocks the exit reach it through the entry; the entry
  * sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
  *
- * Everything here is owner-only (a helper and an API token get PERMISSION_DENIED; tokens are not offered these
- * procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
+ * Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
+ * read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
  *
  * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), and only after CheckRelay: the leg check
  * (the entry reaches the exit's server) must have passed less than 15 minutes ago, for the relay's present target (the
