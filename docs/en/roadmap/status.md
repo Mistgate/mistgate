@@ -115,7 +115,7 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
       text: "A DNS preset with which the apps drop ad and tracker domains themselves, by the community list category-ads-all, without a third-party DNS."
     - title: Decoys that look like an ordinary self-hosted service
       section: settings
-      text: "Built-in decoy sites in the style of a status page, a file share or a service's sign-in page, different on every installation so that probers cannot recognise them; a sign-in there always fails and keeps nothing."
+      text: "Built-in decoy sites in the style of a status page, a file share or a service's sign-in page, different on every installation, down to the 404, 429 and robots.txt answers, so that probers cannot recognise them; a sign-in there always fails and keeps nothing."
     - title: The Cloudflare edition on a real account
       icon: globe
       tag: Preview
@@ -130,6 +130,12 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
         - "client-eye tunnel checks;"
         - "node and panel updates from the admin;"
         - "live node logs, an Own site decoy for a node, and WARP registration."
+    - title: Install from cloud-init
+      section: settings
+      text: "An unattended install of the panel and of a node from a cloud server's user-data, with ready examples for common clouds."
+    - title: The doctor checks security updates
+      section: health
+      text: "A doctor item that warns when the server's automatic security updates are off, with a fix that turns them on."
 - status: later
   title: Later
   lead: Planned, but not next in the queue.
