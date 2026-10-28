@@ -205,20 +205,45 @@ func TestEdgeBundleRealBuildIsReproducible(t *testing.T) {
 		t.Skip("node is not installed")
 	}
 	_, key := newKeyFile(t)
-	hashes := make([]string, 2)
+	// The builds read this checkout, which can change under them: a merge landing in it while they run (a minute or two
+	// under load) makes the second build compile other sources. So a pair is compared only if the checkout, as git sees
+	// it, is the same after the pair as before it; otherwise the pair is built again.
+	checkout := func() string {
+		var state []string
+		for _, args := range [][]string{{"rev-parse", "HEAD"}, {"--no-optional-locks", "status", "--porcelain"}, {"--no-optional-locks", "diff", "HEAD"}} {
+			out, err := gitOut(root, args...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state = append(state, out)
+		}
+		return strings.Join(state, "\n")
+	}
+	var hashes []string
 	var tarball []byte
-	for i := range hashes {
-		out := filepath.Join(t.TempDir(), release.EdgeBundleName)
-		if err := goBuildEdge(root, "v0.0.1", testCommitTime, key, out); err != nil {
-			t.Fatal(err)
+	for pair := 1; ; pair++ {
+		before := checkout()
+		hashes = make([]string, 2)
+		for i := range hashes {
+			out := filepath.Join(t.TempDir(), release.EdgeBundleName)
+			if err := goBuildEdge(root, "v0.0.1", testCommitTime, key, out); err != nil {
+				t.Fatal(err)
+			}
+			_, hashes[i], err = release.HashFile(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tarball, err = os.ReadFile(out); err != nil {
+				t.Fatal(err)
+			}
 		}
-		_, hashes[i], err = release.HashFile(out)
-		if err != nil {
-			t.Fatal(err)
+		if checkout() == before {
+			break
 		}
-		if tarball, err = os.ReadFile(out); err != nil {
-			t.Fatal(err)
+		if pair == 3 {
+			t.Fatal("the checkout changed during each of three pairs of builds")
 		}
+		t.Log("the checkout changed during the builds: building the pair again")
 	}
 	if hashes[0] != hashes[1] {
 		t.Fatalf("two builds of the edge bundle differ: %s %s", hashes[0], hashes[1])
