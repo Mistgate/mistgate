@@ -86,6 +86,7 @@ const core: CoreMessages = {
   "stale.reload": "刷新",
   "stale.expand": "显示刷新提示",
   "header.source": "源代码",
+  "header.star": "在 GitHub 上标星",
   "more.theme": "深色主题",
   "more.language": "语言",
 

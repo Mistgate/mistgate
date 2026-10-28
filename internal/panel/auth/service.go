@@ -91,6 +91,7 @@ type Service struct {
 	tsURL       string       // Turnstile siteverify endpoint
 	tsClient    *http.Client // and the client that calls it
 	hook        atomic.Pointer[func(Event)]
+	sourceStars atomic.Pointer[func() (int, bool)]
 	eventRunner func(func()) // see SetEventRunner
 	edge        atomic.Bool  // the Cloudflare edge edition (SetEdge): Me says so, and MCP tokens cannot be made
 

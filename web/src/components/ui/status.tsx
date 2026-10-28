@@ -44,11 +44,14 @@ export function StatusPill({
   kind,
   label,
   sm,
+  bar,
   glyphOnly,
 }: {
   kind: StatusKind;
   label?: string;
   sm?: boolean;
+  /** As tall as the other controls of the top bar (h-bar), with their radius. */
+  bar?: boolean;
   /** Just the round glyph in a 20px pill (the fleet health strip); the surrounding text says the rest. */
   glyphOnly?: boolean;
 }) {
@@ -60,8 +63,8 @@ export function StatusPill({
       role={glyphOnly ? "img" : undefined}
       aria-label={glyphOnly ? t(word) : undefined}
       className={cx(
-        `tone-${kind} pill inline-flex flex-none items-center gap-1.5 rounded-xl font-bold whitespace-nowrap leading-none`,
-        glyphOnly ? "h-5 px-0.5" : sm ? "h-[22px] pr-2 pl-1 text-[11px]" : "h-[26px] pr-2.5 pl-1.5 text-xs",
+        `tone-${kind} pill inline-flex flex-none items-center gap-1.5 font-bold whitespace-nowrap leading-none`,
+        glyphOnly ? "h-5 rounded-xl px-0.5" : bar ? "h-bar rounded-ctl pr-3 pl-2 text-xs" : sm ? "h-[22px] rounded-xl pr-2 pl-1 text-[11px]" : "h-[26px] rounded-xl pr-2.5 pl-1.5 text-xs",
       )}
     >
       <StatusGlyph kind={kind} />

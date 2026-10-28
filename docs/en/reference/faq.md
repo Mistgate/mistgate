@@ -58,7 +58,7 @@ Yes. Every release on [GitHub Releases](https://github.com/Mistgate/mistgate/rel
 
 Mistgate is licensed under the GNU Affero General Public License v3.0 only. Running it, unmodified, for yourself and your users needs nothing special. If you modify the panel and let others use your version over a network, section 13 of the license asks you to offer them the source code of your version.
 
-The admin shows a **Source code** link next to the version. By default it points to the project's repository; a fork points it at its own with `serve --source-url <url>` (or `MISTGATE_SOURCE_URL`). An empty value hides the link. This is a summary, not legal advice: the `LICENSE` file in the repository is what counts.
+The admin shows a **Source code** link next to the version. By default it points to the project's repository; a fork points it at its own with `serve --source-url <url>` (or `MISTGATE_SOURCE_URL`). An empty value hides the link. The GitHub button in the top bar opens the same address and, for a github.com repository, shows its star count: the panel reads it at most once an hour, the browser never contacts GitHub, and the Cloudflare edition shows the button without a count. This is a summary, not legal advice: the `LICENSE` file in the repository is what counts.
 
 ## Where do I report bugs and vulnerabilities?
 

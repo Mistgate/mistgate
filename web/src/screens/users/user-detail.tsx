@@ -210,7 +210,8 @@ function UserDetail({ data }: { data: DetailN }) {
             {appsText(user, t)} · <GroupChip id={user.groupId} name={user.groupName} color={user.groupColor} /> · {term}
           </span>
         </div>
-        <div className="flex w-full flex-wrap gap-1.5 md:w-auto">
+        {/* beside the name only from lg: at 768–1023 px it would squeeze the name under the buttons */}
+        <div className="flex w-full flex-wrap gap-1.5 lg:w-auto">
           <Button variant={disabled ? "ghost" : "ghostDanger"} onClick={() => void actions.setEnabled(disabled)}>
             {t(disabled ? "users.enable" : "users.disable")}
           </Button>

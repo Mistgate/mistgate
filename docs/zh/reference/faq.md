@@ -58,7 +58,7 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 
 Mistgate 仅依据 GNU Affero General Public License v3.0 授权。未修改软件并供自己和用户使用时，无需特别处理。如果你修改面板并让其他人通过网络使用你的版本，许可证第 13 节要求你向他们提供该版本的源代码。
 
-管理后台会在版本旁显示**源代码**链接。默认指向项目仓库；派生版本（fork）可通过 `serve --source-url <url>`（或 `MISTGATE_SOURCE_URL`）将其指向自己的仓库。设为空可隐藏链接。本段仅为摘要，不构成法律意见；以仓库中的 `LICENSE` 文件为准。
+管理后台会在版本旁显示**源代码**链接。默认指向项目仓库；派生版本（fork）可通过 `serve --source-url <url>`（或 `MISTGATE_SOURCE_URL`）将其指向自己的仓库。设为空可隐藏链接。顶栏的 GitHub 按钮指向同一地址；如果是 github.com 上的仓库，还会显示星标数：由面板每小时最多读取一次，浏览器不会访问 GitHub，Cloudflare 版本只显示按钮、不显示数字。本段仅为摘要，不构成法律意见；以仓库中的 `LICENSE` 文件为准。
 
 ## 在哪里报告错误和漏洞？
 

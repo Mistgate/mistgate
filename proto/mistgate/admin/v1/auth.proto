@@ -237,6 +237,10 @@ message MeResponse {
   string edition = 5;
   // Stable feature IDs that are not available in this edition.
   repeated string unavailable = 6;
+  // The star count of the source_url repository on GitHub, read by the panel (never by the browser) at most once an
+  // hour. Unset when unknown: source_url is not a github.com repository, the count has not been read yet, or this
+  // edition does not read it (the Cloudflare edge).
+  optional uint32 source_stars = 7;
 }
 
 message Admin {

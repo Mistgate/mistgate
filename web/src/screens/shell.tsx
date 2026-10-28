@@ -12,6 +12,7 @@ import { UpdateToast } from "@/components/update-toast";
 import { Avatar, Kbd } from "@/components/ui/bits";
 import { Icon, NavIcon } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status";
+import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
@@ -211,19 +212,69 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
       <button
         type="button"
         onClick={onSearch}
-        className="flex h-9 max-w-[420px] flex-1 items-center gap-2 rounded-ctl border border-line bg-surface pr-1.5 pl-3 text-[13px] text-muted"
+        className="flex h-bar max-w-[420px] min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-ctl border border-line bg-surface pr-1.5 pl-3 text-[13px] text-muted outline-none transition-colors duration-200 hover:bg-surface-2 focus-visible:border-accent"
       >
         <Icon name="search" size={15} />
         <span className="flex-1 truncate text-left">{t("header.search")}</span>
-        <Kbd keys={paletteKeys} />
+        {/* the box gives way to the other controls on a narrow screen: the shortcut goes first */}
+        <span className="hidden lg:contents">
+          <Kbd keys={paletteKeys} />
+        </span>
       </button>
       <div className="flex-1" />
       <Link to={health.to} className="flex">
-        <StatusPill kind={health.kind} label={health.label} />
+        <StatusPill kind={health.kind} label={health.label} bar />
       </Link>
+      <GitHubButton />
       <LangToggle />
       <ThemeToggle />
     </header>
+  );
+}
+
+/** A star count as GitHub shows it: 823, 1.2k, 3.4M (rounded down, never more than there is). */
+export function compactStars(n: number): string {
+  const one = (x: number) => (Math.floor(x * 10) / 10).toFixed(1).replace(/\.0$/, "");
+  return n < 1000 ? String(n) : n < 1e6 ? `${one(n / 1e3)}k` : `${one(n / 1e6)}M`;
+}
+
+/**
+ * The panel's source repository as a top-bar button: the GitHub mark, then the star count and an outline star. The link
+ * is the one of the version line (serve --source-url) and the button is gone without it. The count is read by the panel
+ * (Me.source_stars), never by the browser; without one (not read yet, not a GitHub repository, the edge) the mark stands
+ * alone, as it does in the phone header.
+ */
+export function GitHubButton({ iconOnly }: { iconOnly?: boolean }) {
+  const t = useT();
+  const { data } = useSuspenseQuery(meQuery);
+  if (!data.sourceUrl) return null;
+  const stars = iconOnly ? undefined : data.sourceStars;
+  const label = t("header.star");
+  return (
+    <Tip label={label}>
+      <a
+        href={data.sourceUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={stars === undefined ? label : `${label}: ${stars}`}
+        className={cx(
+          "inline-flex h-bar flex-none items-center gap-1.5 rounded-ctl border border-line bg-surface text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent",
+          stars === undefined ? "w-bar justify-center" : "px-2.5",
+        )}
+      >
+        <svg aria-hidden width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="flex-none">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+        </svg>
+        {stars !== undefined && (
+          <>
+            <span className="font-mono tabular-nums">{compactStars(stars)}</span>
+            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="flex-none">
+              <path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6-5.38-2.83-5.38 2.83 1.03-6L3.3 9.6l6-.9z" />
+            </svg>
+          </>
+        )}
+      </a>
+    </Tip>
   );
 }
 
@@ -236,13 +287,14 @@ function MobileHeader({ onSearch }: { onSearch: () => void }) {
       <Wordmark size={16} />
       <div className="flex-1" />
       <Link to={health.to} aria-label={health.label} className="flex">
-        <StatusPill kind={health.kind} label={health.short} sm />
+        <StatusPill kind={health.kind} label={health.short} bar />
       </Link>
+      <GitHubButton iconOnly />
       <button
         type="button"
         onClick={onSearch}
         aria-label={t("header.search")}
-        className="grid size-9 place-items-center rounded-ctl border border-line bg-surface"
+        className="grid size-bar flex-none place-items-center rounded-ctl border border-line bg-surface"
       >
         <Icon name="search" />
       </button>

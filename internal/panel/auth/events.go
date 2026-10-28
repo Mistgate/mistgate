@@ -33,6 +33,18 @@ type Event struct {
 // CreateApiToken refuses (MCP is not served there). The app sets it once while building.
 func (s *Service) SetEdge(edge bool) { s.edge.Store(edge) }
 
+// SetSourceStars installs the source repository's cached star count for Me. nil removes it.
+func (s *Service) SetSourceStars(fn func() (int, bool)) {
+	if fn == nil {
+		s.sourceStars.Store(nil)
+		return
+	}
+	s.sourceStars.Store(&fn)
+}
+
+// SourceURL returns the source code URL configured for this panel.
+func (s *Service) SourceURL() string { return s.sourceURL }
+
 // RecoveryEnabled is true on the Cloudflare edition, where the one-time recovery token is offered by the Worker.
 func (s *Service) RecoveryEnabled() bool { return s.edge.Load() }
 

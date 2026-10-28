@@ -27,6 +27,7 @@ const stripes: Record<string, Stripes> = {
   IE: { v: ["#169b62", "#fff", "#ff883e"] },
   RO: { v: ["#002b7f", "#fcd116", "#ce1126"] },
   BE: { v: ["#000", "#fdda24", "#ef3340"] },
+  IR: { h: ["#239f40", "#fff", "#da0000"] },
 };
 
 const W = 30;
@@ -60,7 +61,22 @@ const cross = (field: string, outer: string, inner?: string) => (
   </>
 );
 
+/** The points of a five-pointed star around (x, y), the outer radius r, tip up. */
+const star = (x: number, y: number, r: number) =>
+  Array.from({ length: 10 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const d = i % 2 ? r * 0.382 : r;
+    return `${(x + d * Math.cos(a)).toFixed(2)},${(y + d * Math.sin(a)).toFixed(2)}`;
+  }).join(" ");
+
 const special: Record<string, ReactNode> = {
+  // the big star only: the four small ones are under a pixel at chip size
+  CN: (
+    <>
+      <rect width={W} height={H} fill="#ee1c25" />
+      <polygon points={star(7, 7, 4.6)} fill="#ffde00" />
+    </>
+  ),
   FI: cross("#fff", "#003580"),
   SE: cross("#006aa7", "#fecc02"),
   DK: cross("#c8102e", "#fff"),

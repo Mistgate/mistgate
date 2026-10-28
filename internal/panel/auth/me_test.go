@@ -32,6 +32,34 @@ func TestMeSourceURL(t *testing.T) {
 	}
 }
 
+func TestMeSourceStars(t *testing.T) {
+	_, st, _ := newTestService(t)
+	s, err := New(st, Config{RPID: "localhost", Origins: []string{"http://localhost:8081"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.WithValue(context.Background(), adminKey{}, store.Admin{ID: "adm_1", Role: store.RoleOwner})
+	me := func() *adminv1.MeResponse {
+		t.Helper()
+		r, err := s.Me(ctx, connect.NewRequest(&adminv1.MeRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.Msg
+	}
+	if got := me().SourceStars; got != nil {
+		t.Fatalf("default source_stars = %d, want unset", *got)
+	}
+	s.SetSourceStars(func() (int, bool) { return 823, true })
+	if got := me().SourceStars; got == nil || *got != 823 {
+		t.Fatalf("source_stars = %v, want 823", got)
+	}
+	s.SetSourceStars(func() (int, bool) { return 823, false })
+	if got := me().SourceStars; got != nil {
+		t.Fatalf("source_stars after unknown result = %d, want unset", *got)
+	}
+}
+
 // Me names the edition and, on the edge, the features it lacks; the VPS lists none.
 func TestMeEdition(t *testing.T) {
 	_, st, _ := newTestService(t)

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { DnsCategory } from "@/gen/mistgate/admin/v1/dns_pb";
 import { useMemo, useState } from "react";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,9 @@ import { errorText } from "@/lib/errors";
 import { DnsDelivery } from "@/screens/users/dns-select";
 import { useTx, type Key, type Tx } from "@/screens/users/t";
 import { Pending, QueryError } from "@/components/ui/query-error";
-import { customChip, PresetGlyph, Pill, ServerChip, transportChipIcon, UsersChip } from "./dns-parts";
+import { ChipText, CountryPill, customChip, PresetGlyph, Pill, ServerChip, transportChipIcon, UsersChip } from "./dns-parts";
 import { PresetEditor } from "./dns-editor";
-import { catalogOf, chipLabel, chipOf, describePreset, dnsChips, dnsKindKey, presetName, presetSubtitle, transportKey, variantLabel, variantNote, type Catalog, type Preset } from "./model";
+import { catalogOf, chipOf, countryName, describePreset, dnsChips, dnsKindKey, presetName, presetSubtitle, transportKey, variantLabel, variantNote, type Catalog, type Preset } from "./model";
 import { dnsPresetsQuery, useSaveSettings } from "./queries";
 import { Lead } from "./ui";
 
@@ -73,7 +74,7 @@ export function DnsTab() {
               value: c,
               label: (
                 <>
-                  {chipLabel(c, t)}
+                  <ChipText chip={c} t={t} />
                   <span className="font-mono text-[11px] text-faint">{count(c)}</span>
                 </>
               ),
@@ -163,7 +164,7 @@ function DefaultCard({ presets, catalog, t }: { presets: Preset[]; catalog: Cata
 
 /** What is inside a preset, one line: "Cloudflare · Google · DoH · .ru direct". */
 export const subtitleOf = (p: Preset, t: Tx, catalog: Catalog) =>
-  presetSubtitle(p, (s) => t("subs.dns.sub.direct", { s }), catalog, (tr) => t(transportKey[tr]));
+  presetSubtitle(p, (s) => t("subs.dns.sub.direct", { s }), catalog, (tr) => t(transportKey[tr]), (c) => countryName(c, t));
 
 function PresetCard({ p, t, catalog, onOpen }: { p: Preset; t: Tx; catalog: Catalog; onOpen: () => void }) {
   const text = describePreset(p.description, t.lang);
@@ -207,6 +208,7 @@ function PresetCard({ p, t, catalog, onOpen }: { p: Preset; t: Tx; catalog: Cata
       <span className="mt-auto flex items-center gap-1.5">
         {p.builtin && <Pill>{t("subs.dns.builtin")}</Pill>}
         {p.splitDirect && <Pill icon="map">{t("subs.dns.directTag")}</Pill>}
+        {p.category === DnsCategory.REGIONAL && p.country && <CountryPill code={p.country} t={t} />}
         <span className="flex-1" />
         <UsersChip count={p.userCount} label={p.userCount > 0 ? t.n("subs.dns.users", p.userCount) : t("subs.dns.usersNone")} />
       </span>

@@ -39,14 +39,14 @@ A split rule is a list of suffixes (type one and press Enter: `.ru`, `gosuslugi.
 
 **Split domains go direct, bypassing the VPN** decides what the split means:
 
-- **On**: the sites of the split rules are resolved by the split servers and opened without the VPN. This is for people inside Russia, whose local sites work better, or only work, from a local address.
+- **On**: the sites of the split rules are resolved by the split servers and opened without the VPN. This is for people whose local sites work better, or only work, from a local address: inside Russia or China, for example.
 - **Off**: everything goes through the tunnel. Apps that cannot keep a split inside the tunnel (Happ, Mihomo) then ignore the split and ask the main servers for every domain.
 
 ### Country lists
 
 Next to suffixes (or instead of them) a split rule can name a whole country by a code: `cn` is China, the sites of the country's geosite list and the addresses of its geoip list, thousands of domains that no hand-made list of suffixes would hold. The panel also knows `ir` (Iran), but no built-in preset uses it. A rule needs suffixes or a country list; an unknown code is refused ("unknown country list"). The built-in **China: Chinese sites direct** is such a rule.
 
-The editor keeps the country lists of a rule when it saves the preset, but does not edit them yet, so a rule that has only country lists shows no suffixes. Start from the built-in preset, or set `geo` in a split rule through the API (`DnsService`).
+In the editor, **All sites of a country** under a rule's suffixes switches a country on. For now it offers **China** only: the one with a built-in preset and resolvers checked from inside the country. A rule that already names another code (set through the API, `DnsService`) shows it too, so it can be turned off. A rule with a country and no suffixes is complete: its suffix field just stays empty.
 
 With **Split domains go direct, bypassing the VPN** on, the country's sites are asked at the rule's servers and open directly. The address lists decide only connections made to an address: a domain is never looked up just to be checked against them. What each app does:
 

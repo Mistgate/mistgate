@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { DnsServerKind, DnsTransport, type DnsCategory } from "@/gen/mistgate/admin/v1/dns_pb";
+import { Flag } from "@/components/ui/flag";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { cx } from "@/lib/cx";
-import { presetLook, shortAddress, type DnsServerN } from "./model";
+import type { Tx } from "@/screens/users/t";
+import { chipCountry, chipLabel, countryName, presetLook, shortAddress, type DnsServerN } from "./model";
 
 /** The square glyph of a preset: a pastel tile that hints at what the preset is for (map, globe, shield, family…). */
 export function PresetGlyph({ preset, size = 40, className }: { preset: { id: string; category?: DnsCategory }; size?: number; className?: string }) {
@@ -20,6 +22,27 @@ export function PresetGlyph({ preset, size = 40, className }: { preset: { id: st
     <span aria-hidden className={cx("grid flex-none place-items-center rounded-xl", tone === "muted" && "bg-surface-2 text-muted", className)} style={style}>
       {glyph === "letter" ? <span className="text-[19px] leading-none font-extrabold">Я</span> : <Icon name={glyph as IconName} size={Math.round(size * 0.5)} />}
     </span>
+  );
+}
+
+/** The text of a category chip, a regional one with its country's flag in front. */
+export function ChipText({ chip, t }: { chip: string; t: Tx }) {
+  const country = chipCountry(chip);
+  return (
+    <>
+      {country && <Flag code={country} size={11} />}
+      {chipLabel(chip, t)}
+    </>
+  );
+}
+
+/** The country of a regional preset as a pill: its flag and its name. */
+export function CountryPill({ code, t }: { code: string; t: Tx }) {
+  return (
+    <Pill>
+      <Flag code={code} size={9} />
+      {countryName(code, t)}
+    </Pill>
   );
 }
 

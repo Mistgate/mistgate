@@ -4,7 +4,7 @@ import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { zh } from "@/i18n/zh";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipLabel, chipOf, cleanSplit, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipCountry, chipLabel, chipOf, cleanSplit, countryName, geoChoices, toggleGeo, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -382,5 +382,47 @@ describe("format labels", () => {
     expect(ru["subs.fmt.who.singbox"].split("|")).toHaveLength(3); // one, few, many
     expect(en["subs.fmt.who.singbox"].split("|")).toHaveLength(2);
     for (const k of keys) expect(zh[k], k).not.toMatch(/您|["“”]/); // the glossary: 你 or nothing, quotes are 「」
+  });
+});
+
+describe("the country lists of a split rule in the editor", () => {
+  const server = { kind: DnsServerKind.PLAIN, address: "223.5.5.5", providerVariant: "" };
+  it("offers China, and any other code a rule already holds so it can be turned off", () => {
+    expect(geoChoices([])).toEqual(["cn"]);
+    expect(geoChoices(["cn"])).toEqual(["cn"]);
+    expect(geoChoices(["ir"])).toEqual(["cn", "ir"]);
+  });
+  it("switches a country on and off without touching the others, and comes back to the same list", () => {
+    expect(toggleGeo([], "cn")).toEqual(["cn"]);
+    expect(toggleGeo(["ir", "cn"], "cn")).toEqual(["ir"]);
+    const stored = ["ir", "cn"];
+    expect(toggleGeo(toggleGeo(stored, "cn"), "cn")).toEqual(stored);
+    // the round trip is what the panel gets back: geo next to the suffixes
+    expect(cleanSplit([{ suffixes: [], geo: toggleGeo(toggleGeo(["cn"], "cn"), "cn"), servers: [server] }])[0]!.geo).toEqual(["cn"]);
+  });
+  it("takes a rule of a country alone, and asks for a suffix or a country again when the country is switched off", () => {
+    const rule = { suffixes: [], geo: toggleGeo([], "cn"), servers: [server] };
+    expect(presetProblem({ name: "a", servers: [server], split: [rule] })).toBeNull();
+    expect(presetProblem({ name: "a", servers: [server], split: [{ ...rule, geo: toggleGeo(rule.geo, "cn") }] })).toBe("subs.dns.needSuffix");
+  });
+  it("names a country in the UI language and the code when there is no name", () => {
+    const tr = (locale: string) => Object.assign((k: string) => ({ "subs.dns.cat.china": "Китай" })[k] ?? k, { locale }) as unknown as Parameters<typeof countryName>[1];
+    expect(countryName("cn", tr("ru"))).toBe("Китай");
+    expect(countryName("ir", tr("en"))).toBe("Iran");
+    expect(countryName("x1", tr("en"))).toBe("X1"); // not a region code at all: Intl throws, the code stays
+    expect(chipCountry(chipOf({ category: DnsCategory.REGIONAL, country: "CN" }))).toBe("CN");
+    expect(chipCountry(chipOf({ category: DnsCategory.REGULAR, country: "" }))).toBe("");
+  });
+  it("says the country by name in a subtitle when given a namer", () => {
+    const split = [{ suffixes: [], geo: ["cn"], servers: [server] }];
+    expect(presetSubtitle({ servers: [server], split, splitDirect: true }, (s) => `${s} direct`, undefined, undefined, () => "China")).toBe("223.5.5.5 · China direct");
+  });
+  it("has the editor's texts in the three languages, and the direct hint is for any country", () => {
+    for (const dict of [en, ru, zh] as Record<string, string>[]) {
+      expect(dict["subs.dns.geo"]).toBeTruthy();
+      expect(dict["subs.dns.geoHint"]).toMatch(/geosite/);
+    }
+    expect(ru["subs.dns.directHint" as keyof typeof ru]).not.toMatch(/России/);
+    expect(en["subs.dns.directHint" as keyof typeof en]).not.toMatch(/Russia/);
   });
 });

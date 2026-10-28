@@ -620,6 +620,12 @@ func (s *Service) Me(ctx context.Context, _ *connect.Request[adminv1.MeRequest])
 		Admin: toProtoAdmin(admin), Version: buildinfo.Version, SourceUrl: s.sourceURL,
 		Edition: edition.Name(edge), Unavailable: edition.Unavailable(edge),
 	}
+	if sourceStars := s.sourceStars.Load(); sourceStars != nil {
+		if stars, ok := (*sourceStars)(); ok && stars >= 0 {
+			sourceStars := uint32(stars)
+			resp.SourceStars = &sourceStars
+		}
+	}
 	if sess, ok := sessionFrom(ctx); ok {
 		if until := s.stepUpUntil(sess); !until.IsZero() {
 			resp.StepUpUntilUnix = until.Unix()

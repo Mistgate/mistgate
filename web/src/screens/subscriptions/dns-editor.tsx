@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import { DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
 import { DangerZone, SectionLabel } from "@/components/ui/bits";
+import { Flag } from "@/components/ui/flag";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
@@ -12,25 +13,28 @@ import { useToast } from "@/components/ui/toast";
 import { dns } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
+import { PillToggle } from "@/screens/users/groups";
 import type { Key, Tx } from "@/screens/users/t";
 import { ConfirmModal, SettingRow, SwitchRow } from "@/screens/users/ui";
 import {
   appResults,
   catalogOf,
-  chipLabel,
   chipOf,
   cleanServers,
   cleanSplit,
+  countryName,
   dnsAddrKey,
   dnsChips,
   dnsKindKey,
   dnsKinds,
   dnsTransports,
   emptyServer,
+  geoChoices,
   parseSuffixes,
   presetName,
   presetProblem,
   serverProblem,
+  toggleGeo,
   transportKey,
   unicodeSuffix,
   variantLabel,
@@ -43,6 +47,7 @@ import {
   type Provider,
   type SplitRuleN,
 } from "./model";
+import { ChipText } from "./dns-parts";
 import { useSaveSettings } from "./queries";
 import { FieldBlock, inputCls } from "./ui";
 
@@ -184,6 +189,7 @@ export function PresetEditor({ open, preset, data, t, fallback, onClose }: { ope
             </div>
             <span className="text-xs font-bold">{t("subs.dns.suffixes")}</span>
             <SuffixChips label={t("subs.dns.splitRule", { n: i + 1 })} suffixes={r.suffixes} t={t} onChange={(suffixes) => setRule(i, { suffixes })} />
+            <GeoToggles scope={t("subs.dns.splitRule", { n: i + 1 })} geo={r.geo} t={t} onChange={(geo) => setRule(i, { geo })} />
             <span className="text-xs font-bold">{t("subs.dns.splitServers")}</span>
             <ServerList scope={t("subs.dns.splitRule", { n: i + 1 })} servers={r.servers} t={t} providers={data.providers} catalog={catalog} onChange={(servers) => setRule(i, { servers })} />
           </div>
@@ -328,7 +334,9 @@ function CatalogPicker({ providers, have, t, onPick, onClose }: { providers: Pro
         const items = providers.flatMap((provider) => provider.variants.filter((variant) => chipOf(variant) === c).map((variant) => ({ provider, variant })));
         return (
           <div key={c} className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold">{chipLabel(c, t)}</span>
+            <span className="flex items-center gap-1.5 text-xs font-bold">
+              <ChipText chip={c} t={t} />
+            </span>
             <div className="flex flex-wrap gap-1.5">
               {items.map((e) => {
                 const has = have.has(e.variant.id);
@@ -437,6 +445,28 @@ function ServerList({ servers, t, onChange, scope, providers, catalog }: { serve
           + {t("subs.dns.addCustom")}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** "All sites of a country: [China]": the country lists of a rule as on/off pills, and what the apps do with them. */
+function GeoToggles({ geo, t, onChange, scope }: { geo: string[]; t: Tx; onChange: (geo: string[]) => void; scope: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div role="group" aria-label={`${scope} · ${t("subs.dns.geo")}`} className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        <span className="text-xs font-bold">{t("subs.dns.geo")}</span>
+        {geoChoices(geo).map((c) => {
+          const on = geo.includes(c);
+          return (
+            <PillToggle key={c} on={on} onClick={() => onChange(toggleGeo(geo, c))}>
+              {on && <Icon name="check" size={12} strokeWidth={3} />}
+              <Flag code={c} size={12} />
+              {countryName(c, t)}
+            </PillToggle>
+          );
+        })}
+      </div>
+      <span className="text-[11px] leading-snug text-muted">{t("subs.dns.geoHint")}</span>
     </div>
   );
 }

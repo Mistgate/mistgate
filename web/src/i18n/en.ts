@@ -91,6 +91,7 @@ const core = {
   "stale.reload": "Reload",
   "stale.expand": "Show the reload notice",
   "header.source": "Source code",
+  "header.star": "Star on GitHub",
   "more.theme": "Dark theme",
   "more.language": "Language",
 

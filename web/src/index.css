@@ -96,6 +96,9 @@
   /* the node grid goes from 3 to 5 columns here (5 need ~1000px of content width) */
   --breakpoint-wide: 68.75rem;
 
+  /* one height for every control of the top bar (search, fleet pill, GitHub, language, theme): h-bar, size-bar */
+  --spacing-bar: 2.25rem;
+
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.3, 1.5, 0.5, 1);
   --ease-spring-strong: cubic-bezier(0.3, 1.6, 0.5, 1);

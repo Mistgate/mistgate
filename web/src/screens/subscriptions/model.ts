@@ -93,18 +93,36 @@ export function dnsChips(items: readonly { category: DnsCategory; country: strin
   const rest = [...dnsCategories.filter((c) => c !== DnsCategory.REGIONAL), DnsCategory.UNSPECIFIED].map(String).filter((c) => have.has(c));
   return [...regional, ...rest];
 }
-/** The text of a chip: the country of a regional one (a country the panel has no word for is named by the browser), else the category. */
-export function chipLabel(chip: string, t: Tx): string {
-  const [cat = "", country = ""] = chip.split(":");
-  if (Number(cat) !== DnsCategory.REGIONAL) return t(categoryKey[Number(cat) as DnsCategory]);
-  const key = countryKey[country];
+/** The country of a regional chip ("CN"), "" for any other chip. */
+export const chipCountry = (chip: string): string => (chip.startsWith(`${DnsCategory.REGIONAL}:`) ? chip.slice(chip.indexOf(":") + 1) : "");
+/** A country by its code ("cn", "IR") in the UI language: the panel's own word for Russia and China, else the browser's, else the code. */
+export function countryName(code: string, t: Tx): string {
+  const c = code.toUpperCase();
+  const key = countryKey[c];
   if (key) return t(key);
   try {
-    return (country && new Intl.DisplayNames([t.locale], { type: "region" }).of(country)) || t(categoryKey[DnsCategory.REGIONAL]);
+    return new Intl.DisplayNames([t.locale], { type: "region" }).of(c) || c;
   } catch {
-    return country || t(categoryKey[DnsCategory.REGIONAL]);
+    return c;
   }
 }
+/** The text of a chip: the country of a regional one, else the category. */
+export function chipLabel(chip: string, t: Tx): string {
+  const country = chipCountry(chip);
+  if (country) return countryName(country, t);
+  const cat = Number(chip.split(":")[0]) as DnsCategory;
+  return t(categoryKey[cat] ?? categoryKey[DnsCategory.REGIONAL]);
+}
+
+/**
+ * The country lists the split-rule editor offers: China only, the one with a built-in preset and resolvers checked from
+ * inside the country. The panel knows "ir" too (internal/panel/dns/geo.go); a rule that already holds it, or any other
+ * code, shows it as well so it can be seen and turned off.
+ */
+const geoOffered = ["cn"];
+export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have])];
+/** The country lists of a rule with `code` switched on (added at the end) or off; the others keep their order. */
+export const toggleGeo = (geo: readonly string[], code: string): string[] => (geo.includes(code) ? geo.filter((g) => g !== code) : [...geo, code]);
 
 /** The switch of a preset, left to right. */
 export const dnsTransports = [DnsTransport.PLAIN, DnsTransport.DOT, DnsTransport.DOH] as const;
@@ -157,6 +175,8 @@ const variantNamesZh: Record<string, string> = {
   "mullvad/base": "广告与恶意网站",
   "opendns/familyshield": "FamilyShield",
   "dnssb/standard": "标准",
+  "alidns/standard": "标准",
+  "dnspod/standard": "标准",
 };
 // The catalog's notes are Russian and English only; this is the Chinese for each variant.
 const variantNotesZh: Record<string, string> = {
@@ -176,6 +196,8 @@ const variantNotesZh: Record<string, string> = {
   "mullvad/base": "拦截广告、跟踪器和恶意网站。仅支持 DoH/DoT。该服务将于 2026-11-02 停止运营。",
   "opendns/familyshield": "拦截成人内容。没有 DoT：主机名尚未确认。",
   "dnssb/standard": "不记录日志，支持 DNSSEC，不过滤。",
+  "alidns/standard": "国内网站解析更稳定。仅支持普通 DNS，不支持 DoH 和 DoT。",
+  "dnspod/standard": "国内网站解析更稳定。仅支持普通 DNS，不支持 DoH 和 DoT。",
 };
 export const variantNote = (v: Variant, lang: string) => (lang === "ru" ? v.noteRu : lang === "zh" ? (variantNotesZh[v.id] ?? v.noteEn) : v.noteEn);
 
@@ -521,20 +543,22 @@ export function providerName(s: DnsServerN, catalog?: Catalog): string {
 /**
  * The line that says what a preset holds: its main resolvers by provider, the transport when it is not plain and some
  * server is from the catalog, then what goes direct ("Cloudflare · Google · DoH · .ru direct"). `direct` turns the first
- * split suffix into that phrase in the UI language; `transport` names DoT/DoH.
+ * split suffix into that phrase in the UI language; `transport` names DoT/DoH; `country` names a country list ("China"),
+ * which is otherwise shown by its code.
  */
 export function presetSubtitle(
   p: { servers: readonly DnsServerN[]; split: readonly SplitRuleN[]; splitDirect: boolean; preferredTransport?: DnsTransport },
   direct: (suffix: string) => string,
   catalog?: Catalog,
   transport?: (t: DnsTransport) => string,
+  country: (code: string) => string = (c) => c.toUpperCase(),
 ): string {
   const parts = [...new Set(p.servers.map((s) => providerName(s, catalog)))];
   const pref = p.preferredTransport ?? DnsTransport.PLAIN;
   if (transport && pref !== DnsTransport.PLAIN && pref !== DnsTransport.UNSPECIFIED && p.servers.some((s) => s.providerVariant)) parts.push(transport(pref));
   // the first thing that goes direct: a suffix, else (a rule of country lists only) the country code
   const rule = p.split.find((r) => r.suffixes.length > 0 || r.geo.length > 0);
-  const first = rule?.suffixes[0] !== undefined ? unicodeSuffix(rule.suffixes[0]) : rule?.geo[0]?.toUpperCase();
+  const first = rule?.suffixes[0] !== undefined ? unicodeSuffix(rule.suffixes[0]) : rule?.geo[0] && country(rule.geo[0]);
   if (p.splitDirect && first) parts.push(direct(first));
   return parts.join(" · ");
 }

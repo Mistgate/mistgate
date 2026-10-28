@@ -85,6 +85,7 @@ const core: CoreMessages = {
   "stale.reload": "Перезагрузить",
   "stale.expand": "Показать напоминание о перезагрузке",
   "header.source": "Исходный код",
+  "header.star": "Поставить звезду на GitHub",
   "more.theme": "Тёмная тема",
   "more.language": "Язык",
 

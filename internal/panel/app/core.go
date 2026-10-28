@@ -357,6 +357,13 @@ func wireCore(c Config) (*core, error) {
 		ServiceUnit: c.UpdateService, Enabled: update.PanelUpdateHostSupported(),
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})
+	if !onEdge {
+		stars := update.NewRepoStars(authSvc.SourceURL(), log)
+		if stars != nil {
+			authSvc.SetSourceStars(stars.Stars)
+			k.c.BackgroundStarters = append(k.c.BackgroundStarters, BackgroundJob{Name: "repo-stars", Run: stars.Run})
+		}
+	}
 	var nodeBundleSource update.NodeBundleSource
 	if len(relKey) > 0 && c.DataDir != "" && !onEdge {
 		nodeBundleSource = update.NewGitHubNodeBundleSource(update.GitHubNodeBundleConfig{

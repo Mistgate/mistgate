@@ -1227,7 +1227,11 @@ type MeResponse struct {
 	// Edition this panel runs: "vps" or "edge".
 	Edition string `protobuf:"bytes,5,opt,name=edition,proto3" json:"edition,omitempty"`
 	// Stable feature IDs that are not available in this edition.
-	Unavailable   []string `protobuf:"bytes,6,rep,name=unavailable,proto3" json:"unavailable,omitempty"`
+	Unavailable []string `protobuf:"bytes,6,rep,name=unavailable,proto3" json:"unavailable,omitempty"`
+	// The star count of the source_url repository on GitHub, read by the panel (never by the browser) at most once an
+	// hour. Unset when unknown: source_url is not a github.com repository, the count has not been read yet, or this
+	// edition does not read it (the Cloudflare edge).
+	SourceStars   *uint32 `protobuf:"varint,7,opt,name=source_stars,json=sourceStars,proto3,oneof" json:"source_stars,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1302,6 +1306,13 @@ func (x *MeResponse) GetUnavailable() []string {
 		return x.Unavailable
 	}
 	return nil
+}
+
+func (x *MeResponse) GetSourceStars() uint32 {
+	if x != nil && x.SourceStars != nil {
+		return *x.SourceStars
+	}
+	return 0
 }
 
 type Admin struct {
@@ -3302,7 +3313,7 @@ const file_mistgate_admin_v1_auth_proto_rawDesc = "" +
 	"\x04totp\x18\x02 \x01(\bR\x04totp\"\x0f\n" +
 	"\rLogoutRequest\"\x10\n" +
 	"\x0eLogoutResponse\"\v\n" +
-	"\tMeRequest\"\xe2\x01\n" +
+	"\tMeRequest\"\x9b\x02\n" +
 	"\n" +
 	"MeResponse\x12.\n" +
 	"\x05admin\x18\x01 \x01(\v2\x18.mistgate.admin.v1.AdminR\x05admin\x12\x18\n" +
@@ -3311,7 +3322,9 @@ const file_mistgate_admin_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"source_url\x18\x04 \x01(\tR\tsourceUrl\x12\x18\n" +
 	"\aedition\x18\x05 \x01(\tR\aedition\x12 \n" +
-	"\vunavailable\x18\x06 \x03(\tR\vunavailable\"g\n" +
+	"\vunavailable\x18\x06 \x03(\tR\vunavailable\x12&\n" +
+	"\fsource_stars\x18\a \x01(\rH\x00R\vsourceStars\x88\x01\x01B\x0f\n" +
+	"\r_source_stars\"g\n" +
 	"\x05Admin\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12+\n" +
@@ -3635,6 +3648,7 @@ func file_mistgate_admin_v1_auth_proto_init() {
 	if File_mistgate_admin_v1_auth_proto != nil {
 		return
 	}
+	file_mistgate_admin_v1_auth_proto_msgTypes[17].OneofWrappers = []any{}
 	file_mistgate_admin_v1_auth_proto_msgTypes[48].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

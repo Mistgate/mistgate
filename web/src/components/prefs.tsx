@@ -18,8 +18,8 @@ export function LangToggle({ className }: { className?: string }) {
       <BaseSelect.Trigger
         aria-label={t("common.labeled", { label: t("header.language"), value: langNames[lang] })}
         className={cx(
-          // 40px where a finger taps, 36px (as the other top-bar buttons) from md up
-          "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pr-2 pl-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-9",
+          // 40px where a finger taps, the top-bar height (h-bar, 36px) from md up
+          "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pr-2 pl-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-bar",
           className,
         )}
       >
@@ -54,7 +54,11 @@ export function LangToggle({ className }: { className?: string }) {
   );
 }
 
-/** 50x28 switch: a round knob that turns into a moon in the dark theme. */
+/**
+ * The theme switch: a track as tall as the language menu beside it (40px where a finger taps, h-bar from md up) with the
+ * radius of the other controls, and a knob whose sun turns into a moon in the dark theme. Hover and focus change colours
+ * only, never the size.
+ */
 export function ThemeToggle() {
   const t = useT();
   const dark = useTheme() === "dark";
@@ -63,16 +67,16 @@ export function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       aria-label={t(dark ? "header.theme.toLight" : "header.theme.toDark")}
-      className="relative h-7 w-[50px] flex-none rounded-[14px] border border-line bg-surface p-0 transition-colors duration-500"
+      className="relative h-10 w-[66px] flex-none cursor-pointer rounded-ctl border border-line bg-surface p-0 outline-none transition-colors duration-500 hover:bg-surface-2 focus-visible:border-accent md:h-bar md:w-[60px]"
     >
       <span
         aria-hidden
-        className={`absolute top-0.5 left-0.5 grid size-[22px] place-items-center rounded-full bg-accent transition-[transform,background-color] duration-[550ms] ease-spring ${
-          dark ? "translate-x-[22px] rotate-0" : "rotate-180"
+        className={`absolute top-[3px] left-[3px] grid size-8 place-items-center rounded-[8px] bg-accent transition-[transform,background-color] duration-[550ms] ease-spring md:size-7 ${
+          dark ? "translate-x-[26px] rotate-0 md:translate-x-6" : "rotate-180"
         }`}
       >
         <span
-          className={`size-2.5 rounded-full transition-all duration-[450ms] ${
+          className={`size-3 rounded-full transition-all duration-[450ms] ${
             dark
               ? "bg-transparent shadow-[inset_-3px_-2px_0_0_#0c0c0e]"
               : "bg-[#0c0c0e] shadow-[0_0_0_2px_color-mix(in_oklch,#0c0c0e_25%,transparent)]"
