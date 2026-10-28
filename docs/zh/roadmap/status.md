@@ -101,6 +101,21 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.64`�
   title: 下一步
   lead: 队列中的下一批计划。
   cards:
+    - title: 通过入口节点中转
+      section: nodes
+      text: "某些网络无法直接访问的服务器，也会通过你的另一个节点提供：入口只转发加密流量，面板在用户拿到之前检查路径，之后持续监测。"
+    - title: IPv6：用于检测，也作为入口
+      section: health
+      text: "通过 IPv6 检测可达性（已在最新版本中），然后为节点 IPv4 被封的网络提供 IPv6 入口，并可一键更换 IPv6 地址。"
+    - title: 你的用户在哪里
+      section: settings
+      text: "首次设置和设置中的地区：DNS 预设、直连列表、推荐应用和可达性检测都跟随你选择的国家。第一个是中国：「国内网站直连」已在最新版本中。"
+    - title: 在设备上拦截广告和跟踪器
+      section: subscriptions
+      text: "一个 DNS 预设，让应用按社区列表 category-ads-all 自行丢弃广告和跟踪域名，无需第三方 DNS。"
+    - title: 看起来像普通自托管服务的伪装站
+      section: settings
+      text: "内置的伪装站：状态页、文件分享或某个服务的登录页样式，每个安装都不同，扫描器无法识别；在那里登录总是失败，也不会保存任何内容。"
     - title: 在真实账户上运行 Cloudflare 版
       icon: globe
       tag: 预览版
@@ -119,6 +134,15 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.64`�
   title: 以后
   lead: 已计划，但尚未进入下一批队列。
   cards:
+    - title: 社区维护的路由列表
+      section: subscriptions
+      text: "由社区维护的现成规则集（俄罗斯：完整的本地网站直连列表，以及移动网络白名单模式），会自动更新。"
+    - title: 分流规则中可用任意 geosite 和 geoip 类别
+      section: subscriptions
+      text: "分流规则编辑器会提示列表中的所有类别，而不只是国家。"
+    - title: 更多协议
+      section: profiles
+      text: "候选：TUIC、NaiveProxy、MASQUE 和 MTProto（Telegram 代理）。每个都通过协议接口接入同一个订阅链接。"
     - title: 提供更多功能的 Telegram 机器人
       section: integrations
       text: "目前机器人只发送告警并关联管理员聊天。未来计划：通过 Telegram 管理集群，并为用户提供机器人。参见 [Telegram 告警](../operations/telegram-alerts.md)。"

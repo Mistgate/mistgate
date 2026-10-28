@@ -101,6 +101,21 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
   title: Next
   lead: The next items in the queue.
   cards:
+    - title: Relays through an entry node
+      section: nodes
+      text: "A server that some networks cannot reach directly is offered through another of your nodes as well: the entry only forwards the encrypted traffic, the panel checks the path before people get it and watches it afterwards."
+    - title: IPv6 for reachability and as a way in
+      section: health
+      text: "Reachability checks over IPv6 (in the latest release), then an IPv6 entry for people whose network blocks a node's IPv4, and a new IPv6 address in one click."
+    - title: Where your people are
+      section: settings
+      text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China is the first: Chinese sites direct is in the latest release."
+    - title: Ads and trackers blocked on the device
+      section: subscriptions
+      text: "A DNS preset with which the apps drop ad and tracker domains themselves, by the community list category-ads-all, without a third-party DNS."
+    - title: Decoys that look like an ordinary self-hosted service
+      section: settings
+      text: "Built-in decoy sites in the style of a status page, a file share or a service's sign-in page, different on every installation so that probers cannot recognise them; a sign-in there always fails and keeps nothing."
     - title: The Cloudflare edition on a real account
       icon: globe
       tag: Preview
@@ -119,6 +134,15 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
   title: Later
   lead: Planned, but not next in the queue.
   cards:
+    - title: Community routing lists
+      section: subscriptions
+      text: "Ready rule sets maintained by the community (for Russia: a full list of local sites for \"direct\", and a mode for mobile whitelists), updated by themselves."
+    - title: Any geosite or geoip category in a split rule
+      section: subscriptions
+      text: "The split-rule editor suggests every category of the lists, not only countries."
+    - title: More protocols
+      section: profiles
+      text: "Candidates: TUIC, NaiveProxy, MASQUE and MTProto (a Telegram proxy). Each plugs into the same subscription link through the protocol contract."
     - title: A Telegram bot beyond alerts
       section: integrations
       text: "Today the bot only sends alerts and links an admin's chat. Later: running the fleet from Telegram, and a bot for users. See [Telegram alerts](../operations/telegram-alerts.md)."
