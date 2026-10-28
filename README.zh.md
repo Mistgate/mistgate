@@ -114,18 +114,18 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 
 | | Mistgate | 3x-ui | Remnawave | Hiddify | PasarGuard | s-ui |
 |:--|:--|:--|:--|:--|:--|:--|
-| 无需 Docker 即可运行 | 是 | 是 | 否 | 是 | 部分 | 是 |
+| 无需 Docker 即可运行 | ✅ | ✅ | ❌ | ✅ | 🟡 部分 | ✅ |
 | 数据库 | SQLite | SQLite 或 PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite、MySQL、MariaDB 或 PostgreSQL | SQLite |
 | 面板空闲时占用 RAM | 16–20 MiB¹ | 68–74 MiB¹ | 426–454 MiB¹ | 未测量 | 262–265 MiB¹ | 未测量 |
-| 在面板中添加节点（SSH） | 是 | 否 | 否 | 否 | 否 | ? |
-| Hysteria2 | 是 | 是 | 部分 | 是 | 是 | 是 |
-| VLESS REALITY | 是 | 是 | 是 | 是 | 是 | ? |
-| AmneziaWG | 2.0 和 3.1 | 3.1 | ? | ? | ? | ? |
-| VMess、Trojan、Shadowsocks | 否 | 是 | 部分 | 是 | 是 | 是 |
-| Xray JSON 或 sing-box 订阅 | 两者都有 | Xray JSON | 两者都有 | 两者都有 | sing-box | sing-box |
-| 健康检查和告警 | 客户端视角检测、节点诊断、从国家视角检测可达性 | 隧道监控（需手动开启） | 状态、Prometheus | 部分 | 部分 | ? |
-| Telegram 机器人 | 仅告警 | 是 | 部分 | 是 | 是 | ? |
-| 面向 AI 智能体的内置 MCP 服务器 | 是 | ? | 否 | ? | ? | ? |
+| 在面板中添加节点（SSH） | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
+| Hysteria2 | ✅ | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
+| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| AmneziaWG | ✅ 2.0 和 3.1 | ✅ 3.1 | ? | ? | ? | ? |
+| VMess、Trojan、Shadowsocks | ❌ | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
+| Xray JSON 或 sing-box 订阅 | ✅ 两者都有 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | sing-box | sing-box |
+| 健康检查和告警 | ✅ 客户端视角检测、节点诊断、从国家视角检测可达性 | ✅ 隧道监控（需手动开启） | ✅ 状态、Prometheus | 🟡 部分 | 🟡 部分 | ? |
+| Telegram 机器人 | 🟡 仅告警 | ✅ | 🟡 部分 | ✅ | ✅ | ? |
+| 面向 AI 智能体的内置 MCP 服务器 | ✅ | ? | ❌ | ? | ? | ? |
 
 ¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](docs/zh/reference/benchmarks.md)。「?」表示该项目自己的 README 和文档中没有说明。
 

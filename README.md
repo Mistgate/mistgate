@@ -114,18 +114,18 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 
 | | Mistgate | 3x-ui | Remnawave | Hiddify | PasarGuard | s-ui |
 |:--|:--|:--|:--|:--|:--|:--|
-| Runs without Docker | yes | yes | no | yes | partial | yes |
+| Runs without Docker | ✅ | ✅ | ❌ | ✅ | 🟡 partial | ✅ |
 | Database | SQLite | SQLite or PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB or PostgreSQL | SQLite |
 | Panel RAM, idle | 16-20 MiB¹ | 68-74 MiB¹ | 426-454 MiB¹ | not measured | 262-265 MiB¹ | not measured |
-| Add a node from the panel (SSH) | yes | no | no | no | no | ? |
-| Hysteria2 | yes | yes | partial | yes | yes | yes |
-| VLESS REALITY | yes | yes | yes | yes | yes | ? |
-| AmneziaWG | 2.0 and 3.1 | 3.1 | ? | ? | ? | ? |
-| VMess, Trojan, Shadowsocks | no | yes | partial | yes | yes | yes |
-| Xray JSON or sing-box subscriptions | both | Xray JSON | both | both | sing-box | sing-box |
-| Health checks and alerts | client-eye checks, node doctor, reachability from a country | tunnel monitor (opt-in) | status, Prometheus | partial | partial | ? |
-| Telegram bot | alerts only | yes | partial | yes | yes | ? |
-| Built-in MCP server for AI agents | yes | ? | no | ? | ? | ? |
+| Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
+| Hysteria2 | ✅ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
+| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ? | ? | ? | ? |
+| VMess, Trojan, Shadowsocks | ❌ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
+| Xray JSON or sing-box subscriptions | ✅ both | Xray JSON | ✅ both | ✅ both | sing-box | sing-box |
+| Health checks and alerts | ✅ client-eye checks, node doctor, reachability from a country | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | 🟡 partial | 🟡 partial | ? |
+| Telegram bot | 🟡 alerts only | ✅ | 🟡 partial | ✅ | ✅ | ? |
+| Built-in MCP server for AI agents | ✅ | ? | ❌ | ? | ? | ? |
 
 ¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say.
 
