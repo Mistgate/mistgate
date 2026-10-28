@@ -87,11 +87,12 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 			u.log.Error(msg, "msg_template", template)
 		},
 	}
-	dev := device.NewDevice(tdev, conn.NewDefaultBind(), logger)
 	// IpcSet is not atomic, and the port is bound by Up (IpcSet only remembers it while the device is down), so a
 	// busy port is reported here and not swallowed by the TUN event reader.
-	if err := dev.IpcSet(awguapi.DeviceSet(d.Version, d.PrivateKey, d.Port, d.Obf)); err != nil {
-		dev.Close()
+	dev, err := newConfiguredDevice(tdev, conn.NewDefaultBind(), logger, func(dev *device.Device) error {
+		return dev.IpcSet(awguapi.DeviceSet(d.Version, d.PrivateKey, d.Port, d.Obf))
+	})
+	if err != nil {
 		return fmt.Errorf("configure %s: %w", name, err)
 	}
 	if err := dev.Up(); err != nil {
@@ -109,6 +110,50 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 	u.devs[name] = dev // u.mu is held since the top of Create
 	u.unknown[name] = unknown
 	return nil
+}
+
+// gatedTUN keeps the TUN reader of amneziawg-go from reading before the device is configured. RoutineReadFromTUN,
+// started by NewDevice, loads the S4 padding and only then blocks in Read, so the first batch after the start would
+// go out with the padding of an unconfigured device (0) and the peer would drop it (upstream PR #184, still open).
+// The gate holds the first Read until ready is closed and then returns "no packets", so the reader loops and loads
+// the padding again. Only that one reader goroutine calls Read, hence the plain bool.
+type gatedTUN struct {
+	tun.Device
+	ready    chan struct{} // closed once the device is configured
+	done     chan struct{} // closed by Close: frees a reader still waiting
+	once     sync.Once
+	released bool
+}
+
+func (g *gatedTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
+	if !g.released {
+		select {
+		case <-g.ready:
+			g.released = true
+			return 0, nil
+		case <-g.done:
+			return 0, os.ErrClosed
+		}
+	}
+	return g.Device.Read(bufs, sizes, offset)
+}
+
+func (g *gatedTUN) Close() error {
+	g.once.Do(func() { close(g.done) })
+	return g.Device.Close()
+}
+
+// newConfiguredDevice creates the device and applies configure before the TUN reader may read. On an error the
+// device (and the TUN) is closed.
+func newConfiguredDevice(tdev tun.Device, bind conn.Bind, logger *device.Logger, configure func(*device.Device) error) (*device.Device, error) {
+	g := &gatedTUN{Device: tdev, ready: make(chan struct{}), done: make(chan struct{})}
+	dev := device.NewDevice(g, bind, logger)
+	if err := configure(dev); err != nil {
+		dev.Close()
+		return nil, err
+	}
+	close(g.ready)
+	return dev, nil
 }
 
 func (u *userspace) dev(name string) (*device.Device, error) {
