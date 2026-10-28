@@ -6,7 +6,9 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -205,4 +207,65 @@ func TestUpdateRejectsBadValuesAtomically(t *testing.T) {
 	if _, err := Update(ctx, st, Patch{BrandHead: sp("Туман"), BrandTail: sp("врата")}); err != nil {
 		t.Errorf("unicode brand: %v", err)
 	}
+}
+
+func TestConcurrentUpdatesPreserveUnpatchedFields(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	tx, err := st.W.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	waits := st.W.Stats().WaitCount
+
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var ready sync.WaitGroup
+	ready.Add(2)
+	for _, p := range []Patch{{BrandHead: sp("Concurrent")}, {Accent: sp("#123456")}} {
+		go func(p Patch) {
+			ready.Done()
+			<-start
+			_, err := Update(ctx, st, p)
+			errs <- err
+		}(p)
+	}
+	ready.Wait()
+	close(start)
+	waitForWriteWaiters(t, st, waits+1)
+	time.Sleep(25 * time.Millisecond)
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		select {
+		case err := <-errs:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("concurrent updates did not finish")
+		}
+	}
+
+	got, err := Load(ctx, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.BrandHead != "Concurrent" || got.Accent != "#123456" {
+		t.Fatalf("concurrent patches lost a field: %+v", got)
+	}
+}
+
+func waitForWriteWaiters(t *testing.T, st *store.Store, want int64) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if st.W.Stats().WaitCount >= want {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("writer wait count did not reach %d", want)
 }

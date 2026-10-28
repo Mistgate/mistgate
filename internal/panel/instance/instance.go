@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -99,10 +100,14 @@ type Patch struct {
 }
 
 var accentRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+var updateMu sync.Mutex
 
 // Update validates the patch, applies it on top of the stored settings, saves the
 // result and returns it. A rejected patch changes nothing.
 func Update(ctx context.Context, st *store.Store, p Patch) (Settings, error) {
+	updateMu.Lock()
+	defer updateMu.Unlock()
+
 	s, err := Load(ctx, st)
 	if err != nil {
 		return s, err

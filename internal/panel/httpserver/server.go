@@ -334,7 +334,7 @@ func newServer(cfg Config, st *store.Store, clientIP func(*http.Request) netip.A
 		return nil, errors.New("AgentLinkPrefix must be a separate secret path prefix of at least 16 characters")
 	}
 	cfg.AdminHost = strings.ToLower(strings.TrimSuffix(cfg.AdminHost, "."))
-	s := &Server{cfg: cfg, st: st, decoy: newDecoy(cfg.DecoyDir), dist: cfg.Dist, clientIP: clientIP, withIP: withIP}
+	s := &Server{cfg: cfg, st: st, decoy: newDecoy(cfg.DecoyDir, cfg.Log), dist: cfg.Dist, clientIP: clientIP, withIP: withIP}
 	s.pubLim = cfg.Limits.limiter(cfg.Limits.Public, Rate{PerSecond: 10, Burst: 60})
 	s.adminLim = cfg.Limits.limiter(cfg.Limits.Admin, Rate{PerSecond: 30, Burst: 200}) // a page load and its polling
 	s.agentLim = cfg.Limits.limiter(cfg.Limits.Agent, Rate{PerSecond: 5, Burst: 30})

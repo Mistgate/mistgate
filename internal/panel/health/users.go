@@ -276,9 +276,6 @@ func addUsersImpacted(now time.Time, sn *snapshot, hours []store.HealthNodeHourS
 
 		usual := usuals[pair]
 		if usual < userImpactMinUsual {
-			if active {
-				d.holdKeys[alertKey] = true
-			}
 			continue
 		}
 		fleetTypical := fleetUsual[pair.protocol]

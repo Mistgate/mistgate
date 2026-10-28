@@ -3,8 +3,10 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -63,19 +65,72 @@ type decoy struct {
 	dir fs.FS // nil means built-in
 }
 
+type emptyFS struct{}
+
+func (emptyFS) Open(name string) (fs.File, error) {
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+}
+
+type rootedFS struct{ dir string }
+
+func (r rootedFS) Open(name string) (fs.File, error) {
+	root, err := os.OpenRoot(r.dir)
+	if err != nil {
+		return nil, err
+	}
+	f, err := root.FS().Open(name)
+	if err != nil {
+		root.Close()
+		return nil, err
+	}
+	return &rootedFile{File: f, root: root}, nil
+}
+
+type rootedFile struct {
+	fs.File
+	root *os.Root
+}
+
+// Seek keeps the file an io.ReadSeeker, so serveFile streams it instead of reading it whole into memory.
+func (f *rootedFile) Seek(offset int64, whence int) (int64, error) {
+	s, ok := f.File.(io.Seeker)
+	if !ok {
+		return 0, errors.ErrUnsupported
+	}
+	return s.Seek(offset, whence)
+}
+
+func (f *rootedFile) Close() error {
+	if err := f.File.Close(); err != nil {
+		f.root.Close()
+		return err
+	}
+	return f.root.Close()
+}
+
 // NewDecoy returns the handler for a secret mount (the subscription endpoint) to answer with whatever is
 // not its own: the same 404 the public listener gives every unknown path, for any path and method. It is
 // not the decoy site itself: a mount sees its prefix stripped, so the site's "/" page would answer the
 // bare prefix with 200 and tell a guessed prefix from a wrong one.
 func NewDecoy(dir string) http.Handler {
-	return http.HandlerFunc(newDecoy(dir).notFound)
+	return http.HandlerFunc(newDecoy(dir, nil).notFound)
 }
 
-func newDecoy(dir string) *decoy {
+func newDecoy(dir string, log *slog.Logger) *decoy {
 	if dir == "" {
 		return &decoy{}
 	}
-	return &decoy{dir: os.DirFS(dir)}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		if log != nil {
+			log.Warn("open decoy directory", "err", err)
+		}
+		return &decoy{dir: emptyFS{}}
+	}
+	if err := root.Close(); err != nil && log != nil {
+		log.Warn("close decoy directory root", "err", err)
+	}
+	return &decoy{dir: rootedFS{dir}}
 }
 
 func (d *decoy) ServeHTTP(w http.ResponseWriter, r *http.Request) {

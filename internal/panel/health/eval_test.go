@@ -485,7 +485,7 @@ func TestUsersImpactedWaitsForMinuteTwentyAndUsualBaseline(t *testing.T) {
 	}
 }
 
-func TestUsersImpactedHoldsWhenMedianFallsBelowMinimum(t *testing.T) {
+func TestUsersImpactedResolvesWhenMedianFallsBelowMinimum(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "provider", true)
 	e.inbound("de1", 443)
@@ -504,9 +504,18 @@ func TestUsersImpactedHoldsWhenMedianFallsBelowMinimum(t *testing.T) {
 	seedImpactHours(e, "de1", "hysteria2", nightHour, 0, 2)
 	e.clock.Advance(nightHour.Add(20 * time.Minute).Sub(e.clock.Now()))
 	e.evaluate()
-	if got := e.active()[alertKey]; got.ID != opened.ID {
-		t.Fatalf("active users_impacted alert did not hold below the usual minimum: %+v", got)
+	if got := e.active()[alertKey]; got.ID != "" {
+		t.Fatalf("users_impacted alert stayed active below the usual minimum: %+v", got)
 	}
+	for _, alert := range e.history() {
+		if alert.ID == opened.ID {
+			if alert.ResolvedAt.IsZero() || alert.Resolution != "cleared" {
+				t.Fatalf("users_impacted alert did not resolve as cleared: %+v", alert)
+			}
+			return
+		}
+	}
+	t.Fatalf("resolved users_impacted alert %q is missing from history", opened.ID)
 }
 
 func TestUsersImpactedWaitsAfterNodeReconnect(t *testing.T) {
