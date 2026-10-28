@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -14,10 +15,10 @@ import { bestDelivered, lossPct, reasonShort, reasonText, renewalOf, renewalText
 import { plain, type Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
 
-// "Ports" under the profiles of a node (design/udp-port-check.md §6.6, design/vless.md §7.4): what the delivery check found
+// "Ports" in the Direct way in of a node (design/udp-port-check.md §6.6, design/vless.md §7.4): what the delivery check found
 // for each UDP port and each TCP port (does a connection reach Mistgate), when and from where, which profile listens there,
-// one line on whether the certificates renew, and the button that runs the check (about 8 seconds). It sits with the
-// profiles because a port is a profile's: the row names the profile, the profile card names the port.
+// one line on whether the certificates renew, and the button that runs the check (about 8 seconds). It answers "do people
+// get through to the node", so it lives with the ways in; the row names the profile, the profile row has the port's dot.
 
 type Check = Plain<GetNodeResponse>["portChecks"][number];
 type TcpCheck = Plain<GetNodeResponse>["tcpChecks"][number];
@@ -67,31 +68,62 @@ function Progress({ label }: { label: string }) {
   );
 }
 
-export function Ports({ data }: { data: Plain<GetNodeResponse> }) {
-  const t = useT();
-  const fmt = useFmt();
+/** The port check of a node: one run at a time, its answer kept for the lines under the rows. */
+export function usePortCheck(nodeId: string) {
   const qc = useQueryClient();
-  const node = data.node!;
-  const role = useQuery(meQuery).data?.admin?.role;
-  const may = role === Role.OWNER || role === Role.HELPER;
-  const linked = agentLinked(node.status);
-  const run = useMutation({
-    mutationFn: async () => plain(await nodesApi.checkPorts({ nodeId: node.id })),
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["node", node.id] }),
+  return useMutation({
+    mutationFn: async () => plain(await nodesApi.checkPorts({ nodeId })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["node", nodeId] }),
   });
+}
+export type PortCheck = ReturnType<typeof usePortCheck>;
 
+/** "Check ports", for those who may run it (owner, helper); off while the agent is not on the line. */
+export function CheckPortsButton({ data, run, primary }: { data: Plain<GetNodeResponse>; run: PortCheck; primary?: boolean }) {
+  const t = useT();
+  const role = useQuery(meQuery).data?.admin?.role;
+  const linked = agentLinked(data.node!.status);
+  if (role !== Role.OWNER && role !== Role.HELPER) return null;
+  return (
+    <span title={linked ? undefined : t("ports.offline")} className="flex">
+      <Button variant={primary ? "primary" : "secondary"} size="md" disabled={run.isPending || !linked} onClick={() => run.mutate()}>
+        {run.isPending ? t("ports.checking") : t("ports.check")}
+      </Button>
+    </span>
+  );
+}
+
+/**
+ * The rows the port check shows: the UDP ports (those of the UDP profiles first, a profile port never checked among them
+ * once anything was), then the TCP ports. The Direct lane counts them, so the list and its count never disagree.
+ */
+export function portRows(data: Pick<Plain<GetNodeResponse>, "node" | "inbounds" | "portChecks" | "tcpChecks">) {
   const stored = data.portChecks ?? [];
   const tcp = [...(data.tcpChecks ?? [])].sort((a, b) => a.port - b.port);
-  const renewal = renewalOf(tcp);
-  const profilesOn = (port: number) => data.inbounds.filter((i) => i.port === port).map((i) => i.profileName);
+  // the UDP rows: the profiles that listen on UDP (VLESS is TCP: its ports are the TCP rows)
+  const udpInbounds = data.inbounds.filter((i) => i.protocol !== "vless");
+  const profilesOn = (port: number) => udpInbounds.filter((i) => i.port === port).map((i) => i.profileName);
   // the ports of the profiles come first (the stored ones, then any that were never checked), then the others
   const unchecked: Check[] = [];
   if (stored.length > 0) {
-    for (const port of new Set(data.inbounds.map((i) => i.port))) {
-      if (port > 0 && !stored.some((c) => c.port === port)) unchecked.push({ nodeId: node.id, port, verdict: "", sent: 0, got: 0, checkedUnix: 0, badUnix: 0, sender: "", reason: "" });
+    for (const port of new Set(udpInbounds.map((i) => i.port))) {
+      if (port > 0 && !stored.some((c) => c.port === port)) unchecked.push({ nodeId: data.node!.id, port, verdict: "", sent: 0, got: 0, checkedUnix: 0, badUnix: 0, sender: "", reason: "" });
     }
   }
-  const rows = [...stored, ...unchecked].sort((a, b) => Number(profilesOn(b.port).length > 0) - Number(profilesOn(a.port).length > 0) || a.port - b.port);
+  const udp = [...stored, ...unchecked].sort((a, b) => Number(profilesOn(b.port).length > 0) - Number(profilesOn(a.port).length > 0) || a.port - b.port);
+  return { udp, tcp, profilesOn };
+}
+
+/** The rows of the port check and what its last run said. */
+export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCheck }) {
+  const t = useT();
+  const fmt = useFmt();
+  const node = data.node!;
+  const linked = agentLinked(node.status);
+
+  const { udp: rows, tcp, profilesOn } = portRows(data);
+  const stored = data.portChecks ?? [];
+  const renewal = renewalOf(tcp);
 
   const result = run.data;
   // a run whose TCP part could not probe anything stores nothing, so its reason would otherwise go unsaid
@@ -102,19 +134,7 @@ export function Ports({ data }: { data: Plain<GetNodeResponse> }) {
   const counts = result?.errorCode && (result.errorCode === "inconclusive" || result.errorCode === "same_host") ? result.ports.map((p) => `${p.port}: ${p.got}/${p.sent}`).join(" · ") : "";
 
   return (
-    <section aria-labelledby="ports-title" className="mt-2 flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 id="ports-title" className="min-w-0 flex-1 text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
-          {t("ports.title")}
-        </h2>
-        {may && (
-          <span title={linked ? undefined : t("ports.offline")} className="flex">
-            <Button variant="secondary" size="sm" disabled={run.isPending || !linked} onClick={() => run.mutate()}>
-              {run.isPending ? t("ports.checking") : t("ports.check")}
-            </Button>
-          </span>
-        )}
-      </div>
+    <div data-testid="ports" className="flex flex-col gap-2.5">
       <p className="text-xs leading-snug text-pretty text-muted">{run.isPending ? t("ports.checkingNote") : !linked ? t("ports.offline") : stored.length + tcp.length === 0 ? t("ports.never") : t("ports.intro")}</p>
       {run.isPending && <Progress label={t("ports.checking")} />}
       {why && !run.isPending && (
@@ -148,7 +168,15 @@ export function Ports({ data }: { data: Plain<GetNodeResponse> }) {
                   {/* a port that lost packets once and is clean now is still avoided for 30 days: say when */}
                   {c.verdict === "ok" && c.badUnix > 0 && <span className="block text-warn-text">{t("ports.row.cleanNow", { when: fmt.ago(c.badUnix) })}</span>}
                 </span>
-                <span className="min-w-0 text-xs break-words">{profiles.length > 0 ? profiles.join(", ") : <span className="text-muted">{t("ports.row.noProfile")}</span>}</span>
+                <span className="min-w-0 text-xs break-words">
+                  {profiles.length > 0 ? (
+                    <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "profiles" }} className="hover:text-accent-text hover:underline">
+                      {profiles.join(", ")}
+                    </Link>
+                  ) : (
+                    <span className="text-muted">{t("ports.row.noProfile")}</span>
+                  )}
+                </span>
               </li>
             );
           })}
@@ -158,7 +186,7 @@ export function Ports({ data }: { data: Plain<GetNodeResponse> }) {
         </ul>
       )}
       {renewal && (renewal.kind === "risk" ? <Notice>{renewalText(t, renewal)}</Notice> : <RenewalLine text={renewalText(t, renewal)} />)}
-    </section>
+    </div>
   );
 }
 

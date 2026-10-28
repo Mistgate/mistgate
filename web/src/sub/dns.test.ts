@@ -93,6 +93,23 @@ describe("the servers", () => {
     expect(normalize({ servers: [{ id: "a", label: "x", connections: [{ way: "link", mihomo_only: true }, { way: "link" }] }] }).servers.map((s) => s.connections.map((c) => c.mihomo_only === true))).toEqual([[true, false]]);
   });
 
+  it("a twin through a relay node reads as 'через RU' on its server's card, with its name in the apps; the fields survive reading the data", () => {
+    const byName = (el: HTMLElement, n: string) => cards(el).find((x) => text(x.querySelector(".srv-name")).startsWith(n))!;
+    const ru = page("relay");
+    const nl = byName(ru, "Нидерланды");
+    expect([...nl.querySelectorAll(".chips .chip")].map(text)).toEqual(["по ссылке", "ключ", "через RU"]);
+    expect(nl.querySelector(".chip.lav")?.getAttribute("title")).toBe(dict.ru.viaHint("RU"));
+    expect(text(nl.querySelector(".srv-app"))).toContain("NL · Hysteria2 · через RU");
+    expect(byName(ru, "Германия").querySelector(".chip.lav")).toBeNull(); // no relay: no chip
+    const en = view(data("relay"), state("android", { returning: true }, "en"), actions());
+    expect(text(byName(en, "Netherlands").querySelector(".chip.lav"))).toBe("via RU");
+    // an entry without a country still says it goes another way
+    const anon = page("relay", undefined, (d) => (d.servers[0]!.connections.at(-1)!.via = ""));
+    expect(text(byName(anon, "Нидерланды").querySelector(".chip.lav"))).toBe("через ретрансляцию");
+    const read = normalize({ servers: [{ id: "a", label: "x", connections: [{ way: "link", relay: true, via: " ru " }, { way: "link", via: "RU" }] }] }).servers[0]!.connections;
+    expect(read.map((c) => [c.relay, c.via])).toEqual([[true, "RU"], [false, ""]]);
+  });
+
   it("a busy server suggests the calmest other one; when every server is busy it says to wait", () => {
     expect(text(page("first").querySelector(".note[role=status]"))).toBe("Сервер Германия сильно загружен. Если соединение медленное, попробуйте Нидерланды.");
     const all = page("first", state("android"), (d) => d.servers.forEach((s) => (s.load = s.online ? "high" : null)));

@@ -41,13 +41,27 @@ Accounting stays on the exit: traffic, quotas, speed limits, devices and [torren
 ## Add a relay
 
 1. Update the entry node's agent if **Updates** says so: older agents cannot forward ("Update the node agent to add relays"). The server's firewall must allow forwarded traffic; if it drops it (`FORWARD` policy `DROP`, as UFW and Docker set by default) the relay stays down and the card says so.
-2. Open the entry node → the **Relays** block → **Add relay…**.
-3. Pick the exit node. The list puts first the nodes the country check sees as blocked or partly blocked, with the networks where they are dark.
-4. Tick the servers to relay. Each has a port on the entry (**auto** is the exit's port if free, else a free one). A server that cannot be relayed is grey with the reason.
-5. **Check and turn on** runs both checks and switches the relay on. **Only check** runs the leg and adds the relay switched off; turn it on from the block's menu within 15 minutes, or check again (switching on needs a leg check that passed less than 15 minutes ago).
-6. The row shows *Works, checked 3 min ago*, or *Not turned on* with the stage: `leg` (the entry cannot reach the exit's server: a block, a route, the exit's firewall), `path` (the port on the entry is not reachable from outside: the entry's firewall or hoster, or `FORWARD` dropped). **Check now** repeats the checks; **Turn off** and **Remove** stop the forward on the entry.
+2. Open the node people cannot reach: **Nodes** → that node → **Ways in** → **Add a way in…**. When the node is dark, the dialog starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same."
+3. Choose **Through another node**: "People connect to a node their network sees; it passes their traffic to de1 unchanged." The best choice is hinted ("Good fit: msk1, seen from MTS"). **IPv6 entry** is greyed out for now, with the reason.
+4. Pick the entry (**Through which node**). **Good fits: seen from MTS** come first, then **Other nodes**; each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches de1. A node that already passes servers of de1 says "Already passes on 2 servers of de1".
+5. Tick the servers to relay. Each has a port on the entry (**auto** is the exit's port if free, else a free one). A server that cannot be relayed is grey with the reason.
+6. **Check and turn on** runs both checks and switches the relay on. **Only check** runs the leg and adds the relay switched off; turn it on with **Turn on** in its row within 15 minutes, or check again (switching on needs a leg check that passed less than 15 minutes ago). The dialog shows the progress and the result per server; **Back** returns to the choice of the node.
+7. The row shows *Works, checked 3 min ago*, or *Not turned on* with the stage: `leg` (the entry cannot reach the exit's server: a block, a route, the exit's firewall), `path` (the port on the entry is not reachable from outside: the entry's firewall or hoster, or `FORWARD` dropped). **Check now** repeats the checks; **Turn off** and **Remove** stop the forward on the entry.
 
-The exit node's page says *Also reachable through …*. Removing a profile from a node, or retiring a node, also removes the relays that depend on it; the dialog says how many.
+You can start from the entry as well: the entry node → **Ways in** → the group **Reached through msk1** → **Relay another node…**. It is the same dialog, with the servers of every node instead of one.
+
+On the exit node, each relay is a lane **Through msk1** on the **Ways in** tab; on the entry node it is a row in the group **Reached through msk1** ("→ DE de1"). Removing a profile from a node, or retiring a node, also removes the relays that depend on it; the dialog says how many.
+
+## Supervision
+
+Every relay that is on joins the client-eye check rounds as a target of its own: the panel connects through the entry's forwarded port with the exit's profile and credentials, as an app would, and reads 64 KB through it, so a transfer that starts and then stops counts as a freeze.
+
+- The relay row shows the last round: "Through the relay: works, 182 ms, 4 min ago", or the stage that failed.
+- It also shows the bytes and packets that went through the forward since the entry's agent installed it, and when the agent read them. Older agents without counters show nothing.
+- After two failed rounds in a row a `relay_down` alert opens on [Health](../operations/health.md): "Relay de1 via msk1 is down". It names the stage in words: `leg`, the entry does not reach the exit; `entry`, the forward on the entry is not installed; `path`, nothing comes through from outside through the entry; `freeze`, the transfer stalls after the first kilobytes. The alert's **Open the way in** button opens the exit node's **Ways in** tab on that lane.
+- The alert gives way while the exit's own check alert or a `node_down` of either node is open, and closes when the relay works again. Telegram sends it too.
+
+The panel's own checks run from the panel's server, outside the entry's country, so they catch a broken leg or a stall on the panel's path, not a freeze that the TSPU applies to people inside the country; for that, look at the bsbord and kl!ck reports on [Reachability](../operations/reachability.md).
 
 ## The second server in subscriptions
 

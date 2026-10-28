@@ -16,6 +16,8 @@ import { ru as decoyRu } from "./decoy";
 import { ru as countryRu } from "./country";
 import { ru as connectionsRu } from "./connections";
 import { ru as journalRu } from "./journal";
+import { ru as relayRu } from "./relay";
+import { ru as waysRu } from "./ways";
 
 // Typed against the English shape: a missing or extra key fails `pnpm typecheck`. The admin UI speaks «ты».
 const core: CoreMessages = {
@@ -273,4 +275,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Сайт этой ноды или другой сайт",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...countryRu, ...connectionsRu, ...journalRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu };

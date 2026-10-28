@@ -47,6 +47,15 @@ export const errorCodes = [
   "panel_too_large",
   "panel_no_index",
   "panel_invalid",
+  // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay
+  "relay_exists",
+  "same_node",
+  "agent_old",
+  "relay_unsupported",
+  "relay_unchecked",
+  "relay_check_stale",
+  "relay_check_failed",
+  "check_unavailable",
 ] as const;
 
 /**
@@ -71,12 +80,34 @@ function editionVars(t: T, vars: Record<string, string>): Record<string, string>
   return { ...vars, feature: (editionFeatures as readonly string[]).includes(id) ? t(`edition.feature.${id as EditionFeature}`) : id };
 }
 
+/** The words of a relay refusal's values: why a server cannot be relayed, which stage of the check failed. */
+function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
+  const reason = vars.reason ?? "";
+  const worded = ["cdn", "acme_ip", "awg", "build_failed"].includes(reason);
+  return {
+    ...vars,
+    reason: worded ? t(`relay.unsupported.${reason as "cdn"}`) : reason,
+    stage: vars.stage === "path" ? t("relay.stageName.path") : t("relay.stageName.leg"),
+  };
+}
+
 /** Our sentence for a message whose code is listed, else undefined. */
 function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
   if (!errorCodes.includes(code)) return undefined;
   const vars = errorVars(c.rawMessage);
-  const filled = code === "port_lossy" ? lossyVars(t, vars) : code === "unavailable_in_edition" ? editionVars(t, vars) : code.startsWith("decoy_bundle_") ? { path: "?", ...vars } : vars;
+  // a relay holds the port: the panel names it "relay" or "relay to <exit>", not a profile
+  if (code === "port_taken" && /^relay($| )/.test(vars.profile ?? "")) return t("err.port_taken_relay", vars);
+  const filled =
+    code === "port_lossy"
+      ? lossyVars(t, vars)
+      : code === "unavailable_in_edition"
+        ? editionVars(t, vars)
+        : code.startsWith("decoy_bundle_")
+          ? { path: "?", ...vars }
+          : code.startsWith("relay_")
+            ? relayVars(t, vars)
+            : vars;
   return t(`err.${code}`, filled);
 }
 

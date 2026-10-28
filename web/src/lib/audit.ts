@@ -49,6 +49,10 @@ const keys: Record<string, MessageKey> = {
   inbound_add: "audit.inbound_add",
   inbound_update: "audit.inbound_update",
   inbound_remove: "audit.inbound_remove",
+  "relay.create": "audit.relay.create",
+  "relay.update": "audit.relay.update",
+  "relay.delete": "audit.relay.delete",
+  "relay.check": "audit.relay.check",
   preset_create: "audit.preset_create",
   preset_update: "audit.preset_update",
   preset_delete: "audit.preset_delete",
@@ -147,6 +151,15 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
       return p.count === "1" ? variant("one") : { key: base, worded: false };
     case "inbound_update":
       return p.enabled === "false" ? variant("off") : { key: base, worded: false };
+    case "relay.update":
+      // switched off by its own failed check (relay_check.go relaySettle), by the owner, switched on, or moved
+      if (p.reason === "check_failed") return variant("auto");
+      if (p.enabled !== undefined) return variant(p.enabled === "true" ? "on" : "off");
+      return p.port ? variant("port") : { key: base, worded: false };
+    case "relay.delete":
+      return p.reason && p.reason !== "admin" ? variant("gone") : { key: base, worded: false };
+    case "relay.check":
+      return p.ok === "false" ? variant("fail") : p.verified === "true" ? variant("verified") : { key: base, worded: false };
     case "preset_default":
       return p.name ? { key: base, worded: false } : variant("builtin");
     case "node_dns_options":

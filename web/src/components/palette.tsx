@@ -81,6 +81,13 @@ export const places: readonly Place[] = [
  */
 const nodeTabs = [
   { id: "people", label: "node.onlineHere", words: "пользователи люди онлайн users people online 用户 在线", search: {}, hash: "people" },
+  {
+    id: "ways",
+    label: "node.tab.ways",
+    words: "входы вход ретрансляция ретрансляции обход обойти мост маршрут ways way in entry relay relays bypass bridge route 入口 中转 绕过 线路",
+    search: { tab: "ways" },
+  },
+  { id: "ports", label: "ports.title", words: "порты порт ports port 端口", search: { tab: "ways", way: "direct" } },
   { id: "profiles", label: "node.tab.profiles", words: "профили profiles 协议配置 协议", search: { tab: "profiles" } },
   { id: "exit", label: "node.tab.exit", words: "выход warp ipv6 dns днс торрент exit egress torrent 出口 种子", search: { tab: "exit" } },
   { id: "history", label: "node.tab.history", words: "история события history events 历史 事件", search: { tab: "history" } },
@@ -149,12 +156,15 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
         meta: st.word(n),
         run: go({ to: "/nodes/$id", params: { id: n.id } }),
       }));
-    // "de1 журнал": a tab of a node, when the query names both
+    // "de1 журнал": a tab of a node, when the query names both; a ways word alone ("обход", "relay") offers the ways in of
+    // the first nodes, the other tabs need the node's name (else "settings" would bury the Settings section)
     const words = q.split(/\s+/).filter(Boolean);
-    const nodeTab = words.length > 1 ? nodeTabs.find((x) => words.some((w) => placeMatches({ label: x.label, words: x.words }, w))) : undefined;
+    const ways = nodeTabs.find((x) => x.id === "ways")!;
+    const waysAlone = words.length === 1 && words[0]!.length >= 3 && placeMatches({ label: ways.label, words: ways.words }, words[0]!);
+    const nodeTab = words.length > 1 ? nodeTabs.find((x) => words.some((w) => placeMatches({ label: x.label, words: x.words }, w))) : waysAlone ? ways : undefined;
     const rest = nodeTab ? words.filter((w) => !placeMatches({ label: nodeTab.label, words: nodeTab.words }, w)) : [];
     const tabItems: Item[] =
-      nodeTab && rest.length > 0
+      nodeTab && (rest.length > 0 || waysAlone)
         ? nodeList
             .filter((n) => rest.every((w) => n.name.toLowerCase().includes(w)))
             .slice(0, 4)

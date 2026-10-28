@@ -13,7 +13,7 @@ import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { AddInbound } from "@/screens/node/add-inbound";
 import { ProfilesTab } from "@/screens/node/profiles";
-import { Ports } from "@/screens/node/ports";
+import { CheckPortsButton, Ports as PortRows, usePortCheck } from "@/screens/node/ports";
 import { DeployDialog } from "@/screens/profiles/deploy";
 import { TwinPanel, twinPlanKey } from "@/screens/profiles/twin";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
@@ -103,6 +103,19 @@ const warn = (code: string, params: Record<string, string>) => ({ code, params }
 let checkCode = "";
 
 /** Dev only: the calls of these demos answered here. Arms on a click, so another demo's fake does not leave it half-working. */
+/** The ports as the Direct way in shows them: the rows, and the button of its action bar under them. */
+function Ports({ data }: { data: never }) {
+  const run = usePortCheck((data as { node: { id: string } }).node.id);
+  return (
+    <div className="flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
+      <PortRows data={data} run={run} />
+      <div className="flex">
+        <CheckPortsButton data={data} run={run} />
+      </div>
+    </div>
+  );
+}
+
 function fakePorts() {
   const p = profilesApi as unknown as Record<string, unknown>;
   p.createInbound = async (r: { nodeId: string; portOverride: number; validateOnly?: boolean; allowLossyPort?: boolean }) => {

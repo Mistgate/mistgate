@@ -31,6 +31,7 @@ import { OverviewTab } from "./overview";
 import { ProfilesTab } from "./profiles";
 import { ServerTab } from "./server";
 import type { HistoryView, NodeSearch, NodeTab } from "./tabs";
+import { useWays, WaysTab } from "./ways";
 
 export function NodeScreen() {
   const t = useT();
@@ -121,9 +122,12 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
   const restartOff = !agentLinked(node.status) ? t("node.restartOffline") : data.inbounds.length === 0 ? t("node.restartNoProfiles") : "";
   const failed = data.inbounds.filter((i) => i.state === InboundState.FAILED).length;
   const issues = doctor.data?.nodes.find((n) => n.nodeId === node.id)?.items.filter(isIssue).length ?? 0;
+  const ways = useWays(data);
 
   const all: TabItem[] = [
-    { value: "overview", label: t("node.tab.overview"), content: <OverviewTab data={data} /> },
+    { value: "overview", label: t("node.tab.overview"), content: <OverviewTab data={data} ways={ways} /> },
+    // the badge counts the ways broken on our side; a block by a country is an alert and the lane's colour, not a count
+    { value: "ways", label: t("node.tab.ways"), badge: ways.badge, content: search.tab === "ways" ? <WaysTab data={data} ways={ways} /> : null },
     {
       value: "profiles",
       label: t("node.tab.profiles"),
@@ -182,30 +186,40 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
             <WarpChip node={node} />
             <LoadChip data={data} />
           </div>
-          <p className="text-xs text-pretty text-muted">
-            {[node.location || fmt.country(node.countryCode), node.provider].filter(Boolean).join(" · ")}
-            {(node.location || node.countryCode || node.provider) && " · "}
-            <span className="font-mono">{node.address}</span>
-            {node.agentVersion && (
-              <>
-                {" · "}
-                {t("node.agent")} <span className="font-mono">{node.agentVersion}</span>
-              </>
-            )}
-            {older && (
-              <>
-                {" · "}
-                <Link to="/updates" className="font-semibold text-warn-text underline decoration-dotted underline-offset-2">
-                  {t("up.node.outdated")}
-                </Link>
-              </>
-            )}
+          {/* each piece keeps together; a piece that starts a line has its "·" clipped, so no line starts or ends with one */}
+          <p className="overflow-hidden text-xs text-muted">
+            <span className="-ml-3.5 flex flex-wrap">
+              {[
+                node.location || fmt.country(node.countryCode),
+                node.provider,
+                <span key="address" className="font-mono">
+                  {node.address}
+                </span>,
+                node.agentVersion && (
+                  <span key="agent">
+                    {t("node.agent")} <span className="font-mono">{node.agentVersion}</span>
+                  </span>
+                ),
+                older && (
+                  <Link key="outdated" to="/updates" className="font-semibold text-warn-text underline decoration-dotted underline-offset-2">
+                    {t("up.node.outdated")}
+                  </Link>
+                ),
+              ]
+                .filter(Boolean)
+                .map((piece, i) => (
+                  <span key={i} className="whitespace-nowrap before:inline-block before:w-3.5 before:text-center before:content-['·']">
+                    {piece}
+                  </span>
+                ))}
+            </span>
           </p>
         </div>
-        {!retired && <div className="flex gap-2 max-md:hidden">{actions}</div>}
+        {!retired && <div className="flex gap-2 max-lg:hidden">{actions}</div>}
       </div>
+      {/* below 1024 px the buttons take a row of their own under the meta line, as on the phone */}
       {!retired && (
-        <div className="flex flex-col gap-1.5 md:hidden">
+        <div className="flex flex-col gap-1.5 lg:hidden">
           <div className="flex gap-2">{actions}</div>
           {restartOff && <p className="text-xs text-muted">{restartOff}</p>}
         </div>

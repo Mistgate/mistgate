@@ -257,6 +257,7 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 		port = strconv.Itoa(int(a.Port))
 	}
 	facts := []Fact{
+		{Key: "action", Value: relayCreate},
 		{Key: "entry", Value: nm(name), Untrusted: true},
 		{Key: "exit", Value: nm(cand.GetNodeName()), Untrusted: true},
 		{Key: "server", Value: nm(cand.GetProfileName()) + " (" + clean(cand.GetProtocol(), 40) + ", " + clean(cand.GetNetwork(), 8) + " " + strconv.Itoa(int(cand.GetPort())) + ")", Untrusted: true},
@@ -318,6 +319,7 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 		return nil, errors.New("no such relay")
 	}
 	facts := []Fact{
+		{Key: "action", Value: a.Action},
 		{Key: "entry", Value: nm(r.GetViaNodeName()), Untrusted: true},
 		{Key: "exit", Value: nm(r.GetExitNodeName()), Untrusted: true},
 		{Key: "server", Value: nm(r.GetProfileName()) + " (" + clean(r.GetProtocol(), 40) + ", " + clean(r.GetNetwork(), 8) + " " + strconv.Itoa(int(r.GetExitPort())) + ")", Untrusted: true},

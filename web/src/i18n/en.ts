@@ -18,6 +18,8 @@ import { en as decoyEn } from "./decoy";
 import { en as countryEn } from "./country";
 import { en as connectionsEn } from "./connections";
 import { en as journalEn } from "./journal";
+import { en as relayEn } from "./relay";
+import { en as waysEn } from "./ways";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
@@ -283,7 +285,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...countryEn, ...connectionsEn, ...journalEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

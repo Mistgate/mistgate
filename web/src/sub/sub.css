@@ -280,7 +280,7 @@ a { color: inherit; }
 
 /* chips: the tone names the way, not the state */
 .chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 9px; font-size: 13px; font-weight: 600; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
-.chip.sky { background: var(--tone-sky-bg); color: var(--tone-sky); } .chip.mint { background: var(--tone-mint-bg); color: var(--tone-mint); }
+.chip.sky { background: var(--tone-sky-bg); color: var(--tone-sky); } .chip.mint { background: var(--tone-mint-bg); color: var(--tone-mint); } .chip.lav { background: var(--tone-lav-bg); color: var(--tone-lav); }
 .chip.warp { background: var(--tone-warp-bg); color: var(--tone-warp); box-shadow: inset 0 0 0 1px color-mix(in oklch, #f38020 30%, transparent); font-weight: 700; letter-spacing: 0.03em; }
 .chip.sm { height: 22px; font-size: 12px; padding: 0 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }

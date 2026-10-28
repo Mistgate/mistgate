@@ -124,6 +124,11 @@ describe("the palette", () => {
       ["de1 настройки", "de1 · Server", { search: { tab: "server" } }],
       ["de1 ssh", "de1 · Server", { search: { tab: "server" } }],
       ["de1 пользователи", "de1 · On this node now", { search: {}, hash: "people" }],
+      ["de1 входы", "de1 · Ways in", { search: { tab: "ways" } }],
+      ["de1 ретрансляция", "de1 · Ways in", { search: { tab: "ways" } }],
+      ["de1 relay", "de1 · Ways in", { search: { tab: "ways" } }],
+      ["de1 порты", "de1 · Ports", { search: { tab: "ways", way: "direct" } }],
+      ["обход", "de1 · Ways in", { search: { tab: "ways" } }],
     ] as const) {
       navigate.mockReset();
       await mount();

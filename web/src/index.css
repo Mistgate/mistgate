@@ -295,6 +295,16 @@
 .screen-enter {
   animation: mg-ui-in 0.45s var(--ease-out-soft) both;
 }
+/* the line of a node's ways in draws itself from people down to the node, once */
+@keyframes mg-ways-draw {
+  from {
+    transform: scaleY(0);
+  }
+}
+.ways-draw {
+  transform-origin: top;
+  animation: mg-ways-draw 0.3s var(--ease-out-soft) both;
+}
 .pop-in {
   animation: mg-ui-pop 0.4s both;
 }

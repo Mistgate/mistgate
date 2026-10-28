@@ -164,6 +164,6 @@ A server whose node address is not a plain host name or IP address gets no link 
 ## Limits today
 
 - The panel's client-eye check tests VLESS with the same resolved client settings used by subscriptions, including the handshake and tunnel. See [Health](../operations/health.md).
-- **Check ports** on the node page shows whether a TCP connection reaches Mistgate from one other node, see [Nodes](nodes.md). It is one vantage point and does not run a full REALITY handshake. To see what a client sees, test from another network (`nc -vz de1.example.com 8443`), or by connecting from a phone.
+- **Check ports** on the node's **Ways in** tab (**Direct**) shows whether a TCP connection reaches Mistgate from one other node, see [Nodes](nodes.md). It is one vantage point and does not run a full REALITY handshake. To see what a client sees, test from another network (`nc -vz de1.example.com 8443`), or by connecting from a phone.
 - sing-box JSON carries VLESS over TCP (RAW + Vision) and WebSocket only, not XHTTP; Xray JSON and Mihomo YAML carry all of them. See [what works where](subscriptions.md#what-works-where).
 - VLESS behind a CDN is not tested against a real CDN yet, see [VLESS behind a CDN](#vless-behind-a-cdn).

@@ -288,6 +288,93 @@ function withPlates(template: string, vars: Record<string, string>, data: readon
   return out;
 }
 
+// relay_plan (internal/panel/mcp/tools_relay.go): the panel's own English sentences, matched exactly and one after another (an
+// effect is two of them joined); a value that is not made of them reads as it came.
+const relaySentences: [string, MessageKey][] = [
+  ["The entry node only sees who connects and how much, never contents or keys; accounting, limits and credentials stay on the exit.", "approval.value.relay.entryNote"],
+  [
+    'Once it is on, everyone who may use that server and may use the entry node gets a second server marked "via" and the entry\'s country in their subscription at its next refresh (every 12 hours by default); the servers they already use do not change.',
+    "approval.value.relay.onNote",
+  ],
+  ['At their next subscription refresh the second server marked "via" leaves the subscriptions; anyone using it has to pick another server.', "approval.value.relay.offNote"],
+  ['People who use the second server marked "via" need their subscription refreshed to get the new port.', "approval.value.relay.portNote"],
+  ["A relay that is on installs the new forward and the path is checked from outside; if that fails the relay is switched off.", "approval.value.relay.portOnNote"],
+  [
+    "after it is made the entry tries the exit's server (leg), then the relay is switched on and a third node reaches the exit through the entry (path); if either fails the relay stays switched off",
+    "approval.value.relay.checks",
+  ],
+  ["the server has a hop range; the relay passes its one port only", "approval.value.relay.hop"],
+];
+
+function relaySentencesText(t: T, value: string): string | null {
+  const out: string[] = [];
+  let rest = value.trim();
+  while (rest) {
+    const hit = relaySentences.find(([sentence]) => rest.startsWith(sentence));
+    if (!hit) return null;
+    out.push(t(hit[1]));
+    rest = rest.slice(hit[0].length).trim();
+  }
+  return out.length > 0 ? out.join(" ") : null;
+}
+
+/** "leg ok", "path fail (timeout)", "leg did not run": a stage of the relay's last check. */
+function relayStage(t: T, text: string): string {
+  const m = /^(?:leg|path) (?:(did not run)|(ok|fail|skipped)(?: \((.+)\))?)$/.exec(text);
+  if (!m) return text;
+  if (m[1]) return t("approval.value.relay.stage.none");
+  const word = t(`approval.value.relay.stage.${m[2] as "ok"}`);
+  return m[2] === "fail" && m[3] ? `${word} (${m[3]})` : word;
+}
+
+/** The facts of relay_plan in the UI language; null for any other fact, or a value the panel did not word this way. */
+function relayWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untrusted">): Piece[] | null {
+  const v = f.value;
+  switch (f.key) {
+    case "exit_seen_from_inside":
+    case "entry_seen_from_inside": {
+      // the verdict is the panel's word; the networks come from the probes, so they stay on a plate of their own
+      const m = /^(ok|partial|blocked|listed|no_data)(?:, dark for (.+))?$/.exec(v);
+      if (!m) return null;
+      const verdict = t(`approval.value.relay.country.${m[1] as "ok"}`);
+      return m[2] ? withPlates(t("approval.value.relay.dark", { verdict, networks: "{networks}" }), { networks: m[2] }, ["networks"]) : [verdict];
+    }
+  }
+  if (f.untrusted) return null;
+  switch (f.key) {
+    case "action":
+      return hasKey(`approval.value.action.${v}`) ? [t(`approval.value.action.${v}` as MessageKey)] : null;
+    case "switched_on":
+      return [yesNo(t, v)];
+    case "entry_port": {
+      const auto = /^chosen by the panel: the exit's port (\d+) when it is free on the entry, else a free one$/.exec(v);
+      if (auto) return [t("approval.value.relay.portAuto", { port: auto[1]! })];
+      const move = /^(\d+) -> (\d+)$/.exec(v);
+      return move ? [`${move[1]} → ${move[2]}`] : null;
+    }
+    case "entry_reaches_exit": {
+      const m = /^(reach|partial|blocked|no_data)(?: \((\w*)\))?$/.exec(v);
+      if (!m) return null;
+      const key = m[1] === "reach" ? (m[2] === "refs_pass" ? "refs" : "tspu") : m[1];
+      return [t(`approval.value.relay.reach.${key as "tspu"}`)];
+    }
+    case "last_check": {
+      if (v === "never checked") return [t("approval.value.relay.neverChecked")];
+      const m = /^(\d{4}-\d\d-\d\d \d\d:\d\d) UTC: (leg .+), (path .+)$/.exec(v);
+      const unix = m ? Date.parse(`${m[1]!.replace(" ", "T")}Z`) / 1000 : NaN;
+      if (!m || Number.isNaN(unix)) return null;
+      return [t("approval.value.relay.lastCheck", { time: fmt.dateTime(unix), leg: relayStage(t, m[2]!), path: relayStage(t, m[3]!) })];
+    }
+    case "checks":
+    case "warning":
+    case "effect": {
+      const text = relaySentencesText(t, v);
+      return text ? [text] : null;
+    }
+  }
+  return null;
+}
+
 /**
  * A fact in the UI language. A coded fact (ApprovalFact.code, its values in params) is worded here; a value from data
  * stays on a plate of its own, inside the words or instead of them; an unknown code reads as the panel wrote it.
@@ -296,6 +383,8 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
   const p = f.params ?? {};
   // sides from data (an app's link, a profile's name or setting): each on a plate of its own, every side when the whole fact is data
   if (f.code === "change" && f.untrustedParams?.length) return withPlates("{from} → {to}", p, f.untrusted ? ["from", "to"] : f.untrustedParams);
+  const relay = relayWords(t, fmt, f);
+  if (relay) return relay;
   if (f.untrusted) return [{ data: f.value }];
   const num = (k: string) => Number(p[k] ?? 0);
   switch (f.code ?? "") {

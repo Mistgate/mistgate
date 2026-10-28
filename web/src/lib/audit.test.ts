@@ -108,6 +108,18 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["mcp_apply", { plan_id: "pln_1", tool: "user_enable", result: "applied" }],
   ["mcp_apply", { plan_id: "pln_1", tool: "user_enable", result: "failed: x" }, "fail"],
   ["call", { procedure: "/mistgate.admin.v1.UserService/ListUsers", status: 200 }],
+  // relays (internal/panel/access/relay_rpc.go, relay_check.go; fleet/admin_node.go on retire)
+  ["relay.create", { relay: "rly_1", via: "msk1", exit: "de1", inbound: "inb_1", network: "tcp", port: 8443 }],
+  ["relay.update", { relay: "rly_1", via: "msk1", exit: "de1", enabled: true }],
+  ["relay.update", { relay: "rly_1", via: "msk1", exit: "de1", enabled: false }],
+  ["relay.update", { relay: "rly_1", via: "msk1", exit: "de1", port: 9443 }],
+  ["relay.update", { relay: "rly_1", via: "msk1", exit: "de1", enabled: false, reason: "check_failed", stage: "path", code: "timeout" }],
+  ["relay.delete", { relay: "rly_1", via: "msk1", exit: "de1", reason: "admin" }],
+  ["relay.delete", { relay: "rly_1", via: "msk1", exit: "de1", reason: "node_retired" }],
+  ["relay.delete", { relay: "rly_1", via: "msk1", exit: "de1", reason: "inbound_removed" }],
+  ["relay.check", { relay: "rly_1", via: "msk1", exit: "de1", ok: true, verified: false, stage: "", leg: "ok", leg_code: "", path: "skipped", path_code: "off" }],
+  ["relay.check", { relay: "rly_1", via: "msk1", exit: "de1", ok: true, verified: true, stage: "", leg: "ok", leg_code: "", path: "ok", path_code: "" }],
+  ["relay.check", { relay: "rly_1", via: "msk1", exit: "de1", ok: false, verified: false, stage: "leg", leg: "fail", leg_code: "timeout", path: "skipped", path_code: "leg_failed" }],
 ];
 
 const describe2 = (t: never, action: string, params: Record<string, unknown>, result = "ok") => describeAudit(t, { action, paramsJson: JSON.stringify(params), result });
@@ -145,6 +157,19 @@ describe("audit dictionary", () => {
     expect(describe2(tEn, "page_dns_choice", { user: "Marina", node: "de1", preset: "" })).toBe("Marina went back to the default DNS for the server de1");
     expect(describe2(tEn, "node_dns_options", { node_name: "de1", presets: 0 })).toBe("stopped offering a choice of DNS on the node de1");
     expect(describe2(tEn, "reset_login", { login: "owner", created: true })).toBe("gave an admin the password login “owner” on the panel server");
+  });
+  it("tells a relay switched on, off, moved, switched off by its own check, removed by hand or with its node, and how a check went", () => {
+    const r = { relay: "rly_1", via: "msk1", exit: "de1" };
+    expect(describe2(tRu, "relay.create", { ...r, port: 8443 })).toBe("добавил(а) ретрансляцию msk1 → de1 на порту 8443");
+    expect(describe2(tRu, "relay.update", { ...r, enabled: true })).toBe("включил(а) ретрансляцию msk1 → de1");
+    expect(describe2(tRu, "relay.update", { ...r, enabled: false })).toBe("выключил(а) ретрансляцию msk1 → de1");
+    expect(describe2(tRu, "relay.update", { ...r, enabled: false, reason: "check_failed" })).toBe("ретрансляция msk1 → de1 выключилась: проверка не прошла");
+    expect(describe2(tEn, "relay.update", { ...r, port: 9443 })).toBe("moved the relay msk1 → de1 to port 9443");
+    expect(describe2(tRu, "relay.delete", { ...r, reason: "admin" })).toBe("удалил(а) ретрансляцию msk1 → de1");
+    expect(describe2(tRu, "relay.delete", { ...r, reason: "node_retired" })).toBe("ретрансляция msk1 → de1 удалена вместе с сервером или нодой");
+    expect(describe2(tEn, "relay.check", { ...r, ok: true, verified: true })).toBe("checked the relay msk1 → de1: it works");
+    expect(describe2(tEn, "relay.check", { ...r, ok: true, verified: false })).toBe("checked the relay msk1 → de1");
+    expect(describe2(tRu, "relay.check", { ...r, ok: false, verified: false })).toBe("проверил(а) ретрансляцию msk1 → de1: проверка не прошла");
   });
   it("says what failed in the UI language, after the sentence, when the sentence itself does not", () => {
     expect(describe2(tRu, "mcp_apply", { tool: "user_enable" }, "fail")).toBe("выполнил(а) запланированное изменение: Включить пользователей — не удалось");

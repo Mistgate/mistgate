@@ -8,9 +8,13 @@ import { useFmt } from "@/lib/format";
 import { NodeChecks } from "./checks";
 import { NodeAlerts, NodeTraffic } from "./overview-parts";
 import { OnlineNow, TopToday } from "./users";
+import { WaysStrip, type WaysModel } from "./ways";
 
-/** Gauges (CPU with softirq, RAM, disk, network), traffic, then alerts and checks beside who is on the node and the top of the day. */
-export function OverviewTab({ data }: { data: Plain<GetNodeResponse> }) {
+/**
+ * Gauges (CPU with softirq, RAM, disk, network), traffic, the ways in on one line, then alerts and checks beside who is on
+ * the node and the top of the day.
+ */
+export function OverviewTab({ data, ways }: { data: Plain<GetNodeResponse>; ways?: WaysModel }) {
   const t = useT();
   const fmt = useFmt();
   const m = data.metrics;
@@ -85,6 +89,7 @@ export function OverviewTab({ data }: { data: Plain<GetNodeResponse> }) {
         <p className="-mt-1 text-xs text-muted">{offline && node.lastSeenUnix > 0 ? t("node.m.offline", { time: fmt.stamp(node.lastSeenUnix) }) : t("node.m.none")}</p>
       )}
       <NodeTraffic nodeId={node.id} />
+      {ways && node.status !== NodeStatus.RETIRED && <WaysStrip data={data} w={ways} />}
 
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">

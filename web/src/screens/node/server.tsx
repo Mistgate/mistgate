@@ -20,13 +20,14 @@ import { countryCodes } from "@/lib/countries";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { meQuery } from "@/lib/session";
-import { useOlderNodes } from "@/lib/updates";
+import { useIsOwner, useOlderNodes } from "@/lib/updates";
 import { CodeBlock } from "@/screens/integrations/parts";
 import { Panel, SettingRow } from "@/screens/users/ui";
 import { AwgBackendCard } from "./awg-backend";
 import { BandwidthMeasure } from "./bandwidth-measure";
 import { DecoyCard } from "./decoy";
 import { useNodeForm, useSaveNode } from "./node-form";
+import { useRelaysOf } from "./relays";
 import { SSHAccessCard, useServerAccess } from "./ssh-access";
 
 // Defaults the panel uses when a timeout is 0 (node.proto, NodeTimeouts).
@@ -335,6 +336,8 @@ function RetireModal({ nodeId, name, onClose, onUnreached }: { nodeId: string; n
   const navigate = useNavigate();
   const [typed, setTyped] = useState("");
   const generatedPassword = useServerAccess(nodeId).data?.passwordGenerated ?? false;
+  // the relays with this node at either end go with it (relay.proto)
+  const relays = useRelaysOf(nodeId, useIsOwner()).length;
   const retire = useMutation({
     mutationFn: () => nodesApi.retireNode({ nodeId, confirmName: typed.trim() }),
     onSuccess: (r) => {
@@ -367,12 +370,12 @@ function RetireModal({ nodeId, name, onClose, onUnreached }: { nodeId: string; n
       }
     >
       <ul className="flex flex-col gap-2">
-        {(["node.retireList1", "node.retireList2", "node.retireList3"] as const).map((k) => (
-          <li key={k} className="flex gap-2 text-[13px] leading-snug">
+        {[...(["node.retireList1", "node.retireList2", "node.retireList3"] as const).map((k) => t(k)), ...(relays > 0 ? [t.n("relay.retireAlso", relays)] : [])].map((text) => (
+          <li key={text} className="flex gap-2 text-[13px] leading-snug">
             <span aria-hidden className="font-extrabold text-danger">
               ·
             </span>
-            <span className="text-pretty">{t(k)}</span>
+            <span className="text-pretty">{text}</span>
           </li>
         ))}
       </ul>

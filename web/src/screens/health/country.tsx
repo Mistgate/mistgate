@@ -252,7 +252,7 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
         {look?.label ?? t("hl.cell.none")}
         {look?.alsoListed && <ListedGlyph />}
       </span>
-      {!breakdown && <span className="min-w-0 flex-[2_1_160px] text-[11px] leading-snug text-muted">{look ? look.line : t("cr.v.notYet")}</span>}
+      {!breakdown && <span className="min-w-0 flex-[2_1_160px] text-[11px] leading-snug text-muted">{look ? <AgeLast line={look.line} /> : t("cr.v.notYet")}</span>}
     </div>
   );
   const tipped = look ? <CountryTip look={look}>{row}</CountryTip> : row;
@@ -262,6 +262,26 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
       {tipped}
       <PartialBreakdown breakdown={breakdown} className="mx-3 border-t border-[color-mix(in_oklch,var(--c)_35%,var(--border))] pt-2.5 pb-3" />
     </div>
+  );
+}
+
+/**
+ * A row's quiet line, its last piece (when it was checked) kept on one line with the word before it: "…MegaFon, / MTS · 7
+ * min ago", so a line never starts with the "·" nor splits the time.
+ */
+function AgeLast({ line }: { line: string }) {
+  const parts = line.split(" · ");
+  const age = parts.pop() ?? "";
+  const head = parts.join(" · ");
+  const cut = head.lastIndexOf(" ");
+  if (!head) return <span className="whitespace-nowrap">{age}</span>;
+  return (
+    <>
+      {cut > 0 && `${head.slice(0, cut)} `}
+      <span className="whitespace-nowrap">
+        {head.slice(cut + 1)} · {age}
+      </span>
+    </>
   );
 }
 

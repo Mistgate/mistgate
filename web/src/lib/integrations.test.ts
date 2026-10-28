@@ -24,6 +24,7 @@ import {
   validName,
   type Token,
 } from "./integrations";
+import { relayFacts } from "@/test/relay-plan";
 
 const t = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(en[key], vars), {
   n: (key: keyof typeof en, n: number, vars?: Record<string, string | number>) => fill(pickForm(en[key], n, "en"), { n, ...vars }),
@@ -269,5 +270,54 @@ describe("failed calls", () => {
     expect(callErrorText(new ConnectError("no such approval", Code.NotFound), t)).toBe(en["int.err.gone"]);
     expect(callErrorText(new ConnectError("this approval is not waiting any more", Code.FailedPrecondition), t)).toBe(en["int.err.notWaiting"]);
     expect(callErrorText(new ConnectError("nope", Code.PermissionDenied), t)).toBe(en["err.permissionDenied"]);
+  });
+});
+
+describe("relay_plan on the approval card, in Russian", () => {
+  const tr = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(ru[key], vars), {
+    n: (key: keyof typeof en, n: number, vars?: Record<string, string | number>) => fill(pickForm(ru[key], n, "ru"), { n, ...vars }),
+  }) as T;
+  const fmt = makeFmt("ru", tr);
+  const said = (f: { key: string; value: string; untrusted: boolean }) => factWords(tr, fmt, { code: "", params: {}, untrustedParams: [], ...f }).map((p) => (typeof p === "string" ? p : `[${p.data}]`)).join("");
+
+  it("names the tool and every fact the plan writes", () => {
+    expect(toolTitle(tr, "relay")).toBe("Изменить ретрансляцию");
+    for (const f of [...relayFacts.create, ...relayFacts.move, { key: "action" }]) expect(factLabel(tr, f.key), f.key).not.toBe(f.key);
+  });
+
+  it("words the panel's sentences and verdicts; names from data stay on plates, the networks too", () => {
+    const [entry, , server, port, exitSeen, entrySeen, reach, warning, checks, effect] = relayFacts.create;
+    expect(said(entry!)).toBe("[msk1]");
+    expect(said(server!)).toBe("[VLESS · XHTTP (vless, tcp 2053)]");
+    expect(said(port!)).toBe("выберет панель: 2053, как на выходе, если он свободен на входе, иначе свободный");
+    expect(said(exitSeen!)).toBe("частично заблокирован; не виден из [MTS, Tele2]");
+    expect(said(entrySeen!)).toBe("доступен");
+    expect(said(reach!)).toBe("да (проверка ТСПУ)");
+    expect(said({ key: "entry_reaches_exit", value: "reach (refs_pass)", untrusted: false })).toBe("на пути входа ТСПУ не видно");
+    expect(said({ key: "entry_reaches_exit", value: "no_data", untrusted: false })).toBe("нет данных проверки");
+    expect(said(warning!)).toBe(ru["approval.value.relay.hop"]);
+    expect(said(checks!)).toBe(ru["approval.value.relay.checks"]);
+    expect(said(effect!)).toBe(`${ru["approval.value.relay.entryNote"]} ${ru["approval.value.relay.onNote"]}`);
+  });
+
+  it("words a change of a relay: the port moved, switched on, the last check, the effect; an action when the plan names one", () => {
+    const [port, on, last, effect] = relayFacts.move;
+    expect(said(port!)).toBe("8443 → 9443");
+    expect(said(on!)).toBe(ru["int.ap.yes"]);
+    expect(said(last!)).toBe(`${fmt.dateTime(Date.parse("2026-10-28T20:05Z") / 1000)}: от входа до выхода — проходит; снаружи через вход — не проходит (timeout)`);
+    expect(said({ key: "last_check", value: "never checked", untrusted: false })).toBe("ещё не проверялась");
+    expect(said(effect!)).toBe(`${ru["approval.value.relay.portNote"]} ${ru["approval.value.relay.portOnNote"]}`);
+    expect(said({ key: "action", value: "create", untrusted: false })).toBe("Создать и включить, если проверки пройдут");
+    expect(said({ key: "action", value: "delete", untrusted: false })).toBe("Удалить");
+  });
+
+  it("reads anything it does not know as the panel wrote it, and never words a value from data", () => {
+    expect(said({ key: "effect", value: "Something new the panel says.", untrusted: false })).toBe("Something new the panel says.");
+    const longer = "the server has a hop range; the relay passes its one port only and more";
+    expect(said({ key: "warning", value: longer, untrusted: false })).toBe(longer);
+    expect(said({ key: "exit_seen_from_inside", value: "weird text", untrusted: true })).toBe("[weird text]");
+    expect(said({ key: "entry_port", value: "8443 -> 9443", untrusted: true })).toBe("[8443 -> 9443]");
+    expect(outcomeText(tr, fmt, { state: ApprovalState.APPLIED, outcomeCode: "relay_created", outcomeParams: {} })).toBe("Ретрансляция создана и включена");
+    expect(outcomeText(tr, fmt, { state: ApprovalState.FAILED, outcomeCode: "relay_check_failed", outcomeParams: { stage: "leg", code: "timeout" } })).toContain("проверка ретрансляции не прошла");
   });
 });

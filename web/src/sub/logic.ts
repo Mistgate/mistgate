@@ -103,6 +103,8 @@ const conn = (c: Record<string, unknown>): ServerConn => ({
   app_name: str(c.app_name),
   profile_id: str(c.profile_id),
   mihomo_only: c.mihomo_only === true,
+  relay: c.relay === true,
+  via: c.relay === true ? str(c.via).trim().toUpperCase() : "",
 });
 
 /** The DNS part of one server; null when the server has no choice. */

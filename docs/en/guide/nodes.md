@@ -74,12 +74,13 @@ The command of the "Unreachable" banner, to run on the node over SSH:
 systemctl restart mistgate-node && journalctl -u mistgate-node -n 50 --no-pager
 ```
 
-The page has six tabs, each answering one question: **Overview** (is all well?), **Profiles** (what runs here?), **Exit** (where does people's traffic leave?), **History** (what happened?), **Doctor** (what is wrong on the host?) and **Server** (what is this machine?). The **Profiles** tab shows how many profiles failed to start, the **Doctor** tab how many items need attention. A retired node keeps **Overview**, **History** and **Server**. Links and bookmarks made for the tabs of earlier versions (**Users**, **Logs**, **Journal**, **Events**, **Settings**) open the place those moved to.
+The page has seven tabs, each answering one question: **Overview** (is all well?), **Ways in** (how do people reach this node?), **Profiles** (what runs here?), **Exit** (where does people's traffic leave?), **History** (what happened?), **Doctor** (what is wrong on the host?) and **Server** (what is this machine?). The **Ways in** tab carries a red badge with the number of lanes broken on our side (a relay that is down, a port that does not answer); a block by a country does not count, that is an alert and the amber colour of the lane. The **Profiles** tab shows how many profiles failed to start, the **Doctor** tab how many items need attention. A retired node keeps **Overview**, **History** and **Server**. Links and bookmarks made for the tabs of earlier versions (**Users**, **Logs**, **Journal**, **Events**, **Settings**) open the place those moved to.
 
 ### Overview
 
 - **CPU**, **RAM**, **DISK**, **NETWORK**: the latest readings. The CPU bar shows the softirq part (network interrupts) in a second colour, with the vCPU count and the load. Readings arrive a few seconds after the agent connects; an offline node keeps its last readings and says since when it is offline.
 - **Traffic · 24 h**: hourly traffic through the node.
+- **Ways in**: a one-line strip with a chip per lane; a chip opens that lane on the **Ways in** tab, and **All ways in ›** opens the tab.
 - **Alerts**: the open alerts of this node, with the same buttons as on the Health page, and the last three that closed. **All alerts** opens the Health page. The card is hidden when there was nothing.
 - **Client-eye checks**: one row per profile with its latency and exit IP, or why it fails. A click on a row opens its 24-hour history. **Check now** starts a round for this node.
 - **On this node now**: how many people are connected, per protocol, and who they are, with the device model, the protocol and the current download speed. Six people show; **All N** opens the rest in place.
@@ -87,33 +88,26 @@ The page has six tabs, each answering one question: **Overview** (is all well?),
 
 The checks, alerts and the doctor are described in [Health](../operations/health.md).
 
-### Profiles
+### Ways in
 
-Every profile on the node is a row. The name links to the profile; under it is the protocol.
+This tab shows every way people reach the node as one "metro line". On top is a chip **People · Russia** (the country of the [country check](../operations/reachability.md)), under it a vertical line with one branch per lane, and at the bottom the node itself. The lanes:
 
-For Hysteria2 the row shows:
+- **Direct**: the node's own address and the number of ports, with a line under it: "From Russia: all networks", "Dark on MTS, Tele2", "Does not open from Russia" or "From Russia: no data".
+- **Through msk1**: one lane per entry node that relays this node, with the number of servers and a line saying whether people reach the entry on the networks where this node is dark ("msk1 is seen from MTS"). Only the owner sees these lanes.
+- **IPv6 entry**: shown only when the server has IPv6. It is switched off and says "soon": the IPv6 entry is not in Mistgate yet. Its detail says why: the server's IPv6 works, or IPv6 does not work at the hoster.
+- **Add a way in…**: a dashed row, for the owner only. When Direct is dark on some networks it turns amber: "Dark on MTS — add a way around". With no other ways yet it says: "If people's network does not see this node, give them another way in: through another node or over IPv6."
 
-- **Port**: the UDP port on this node;
-- **Domain (SNI)**: the server name in the certificate;
-- **Certificate**: the expiry date (amber with less than 14 days left, red with less than 3), **self-signed, pinned**, or **none: the profile is not running**.
+On an **entry** node, below the line, the group **Reached through msk1** has one row per exit ("→ DE de1 · 2 servers"), then **Relay another node…** and a footer: relayed traffic crosses the server twice, so it counts twice in the server's traffic and load.
 
-For AmneziaWG the row shows **Port**, **Backend** (kernel or userspace, with its version), **Egress** (**Direct** or **WARP**) and **Devices** ("5 · 2 online"), and a status line with the last handshake.
+Each lane has a ring: green, works and every network sees it; half amber, works but part of the country does not see it; red, down or blocked; grey and hollow, off. A click on a lane opens its detail on the right; on a phone the list and the detail take turns, and **‹ All ways in** goes back. The open lane is kept in the address (`?tab=ways&way=direct`, `ipv6`, `via:<entry id>` or `out:<exit id>`), so a link or a reload opens it again; without it the first lane with a problem opens, else **Direct**. The arrow keys, **Home** and **End** walk the list. The old link `?tab=profiles#ports` opens **Ways in** → **Direct**.
 
-Under each profile a **24 h** line says what the node counted of connection attempts on it: connections, **dropped at once** (accepted, then frozen or cut within seconds: what the TSPU's freeze looks like), **key refused** (the key's term ended; a removed or rotated key is unknown to the node and counts among the unknown keys), for Hysteria2 the share of started handshakes that never authenticated (the panel's own checks are left out), for AmneziaWG how many devices never completed a handshake, and unknown keys (scanners send them too). With an agent from v0.1.57, Hysteria2 profiles also say how many connections **froze** (the node kept sending and nothing came back: how a TSPU freeze looks), the average **RTT** and the **loss**; early drops are then not marked as trouble, because most are short checks of the app. Counts only, never an address. A node whose agent does not count connections yet says so once above the profiles: update the agent.
+#### Direct
 
-On the right is the state: **Running**, **Starting**, **Failed to start** or **Off**. A profile that failed shows the cause in words and the agent's own error text under it. When the cause is clear, a button fixes it: **Change port** (the dialog opens on a free port), **Set the domain**, or **Open WARP**.
+"People connect to 203.0.113.7." Under it come the [Ports](#ports) block, then **Is de1 seen from Russia**: the country check row and, when the block is partial, the breakdown by network. Buttons: **Check ports** and a link **Profiles ›**. With no profiles it says "No profiles: people have nothing to open." and offers **Add profile**. While the country check has nothing on the node it says "The country check has nothing on this node yet." and, for the owner, links **Sources on Reachability**.
 
-Each row has:
+#### Ports
 
-- **Edit**: the port and the **Domain (SNI)** for this node only, and the **Enabled** switch. A profile switched off stays on the node but leaves the subscriptions.
-- **Restart**: restarts only this profile. Its connections drop for a couple of seconds.
-- **Remove**: takes the profile off the node. The dialog says who notices: the users who lose the node at their next subscription update, or, for AmneziaWG, the devices that stop working. Their keys work again if you put the profile back on the same node.
-
-**Add profile** opens the dialog that puts a profile on this node: see [Profiles](profiles.md). When the panel has no profile at all, the dialog offers to create a Hysteria2 profile on port 443 (or the first free port) and put it on the node in one go, with **Set up by hand** as the other way.
-
-### Ports
-
-The **Ports** block sits on the **Profiles** tab, under the profiles. **Check ports** runs two checks from one connected fleet node (or the panel host when available): UDP delivery and TCP reach. Each row shows the port, the verdict, when and from where it was checked, and the profile that listens there.
+The **Ports** block sits in the **Direct** lane of the **Ways in** tab (it used to be on the **Profiles** tab). **Check ports** runs two checks from one connected fleet node (or the panel host when available): UDP delivery and TCP reach. Each row shows the port, the verdict, when and from where it was checked, and the profile that listens there.
 
 **UDP.** The check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering. Use it as one vantage point when investigating UDP reachability.
 
@@ -138,6 +132,56 @@ Under the rows, one line says whether the node's Let's Encrypt certificates rene
 There is no line for a node without an ACME certificate name, or when port 80 could not be probed. The same port 80 result decides the certificate sentence in the warning you get when a VLESS profile pauses a Hysteria2 site: [VLESS and Hysteria2 on one node](vless-and-hysteria2.md).
 
 On VPS installations, the panel repeats the check every six hours for each online node with the `udpcheck` capability and an enabled inbound. It immediately confirms a lossy or broken result with one more check; the alert follows the latest verdict. The TCP rows are refreshed by the same scheduled run; they raise no alert of their own.
+
+#### Through another node
+
+The lane **Through msk1** says: "People connect to msk1; it passes their traffic to de1 unchanged. The keys stay the same." The block **Servers** holds the relay rows: the profile, the port on the entry, where it forwards to, the state, the two checks (see [Relays](relays.md#how-it-works)), the buttons **Turn on**, **Turn off**, **Check now** and **Remove**, and the supervision line ([Supervision](relays.md#supervision)). Next comes **Is msk1 seen from Russia**. Buttons: **Check all**, **Add server…** and a link **Open msk1 ›**.
+
+On the entry node the lane **→ de1** is the same: the relay rows for that exit, **Check all**, **Add server…** and **Open de1 ›**.
+
+#### IPv6 entry
+
+"An extra way in for people whose network blocks this node's IPv4 address. Not the same as the IPv6 exit for people's traffic." (see [Exit](#exit)). The lane is not available yet, and its detail says so and says why: the server's IPv6 works, or IPv6 does not work at the hoster. When Globalping's IPv6 rounds are on, it also shows whether the node is seen over IPv6 from the country ([IPv6](../operations/reachability.md#ipv6)).
+
+#### Add a way in
+
+For the owner. **Add a way in…** opens the dialog "A new way in to de1" (`?tab=ways&add=1`):
+
+1. When the node is dark it starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same." Choose **Through another node** ("People connect to a node their network sees; it passes their traffic to de1 unchanged.", with the best hint: "Good fit: msk1, seen from MTS") or **IPv6 entry** (greyed out, with the reason for now).
+2. **Through which node**: **Good fits: seen from MTS** come first, then **Other nodes**. Each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches this node. A node that already relays servers of this one says "Already passes on 2 servers of de1".
+3. The relay dialog, limited to this node's servers: tick the servers, the port on the entry (auto), **Only check** or **Check and turn on**, then the progress and the result per server. **Back** returns to step 2.
+
+The mechanism is still called a **relay** in the dialogs and in [Relays](relays.md); "way in" is what you look for on the node's page.
+
+#### Who sees what
+
+The owner sees every lane. A helper sees **Direct** and **IPv6 entry**, read-only: no relay lanes and no **Add a way in…**.
+
+### Profiles
+
+Every profile on the node is a row. The name links to the profile; under it is the protocol.
+
+For Hysteria2 the row shows:
+
+- **Port**: the UDP port on this node;
+- **Domain (SNI)**: the server name in the certificate;
+- **Certificate**: the expiry date (amber with less than 14 days left, red with less than 3), **self-signed, pinned**, or **none: the profile is not running**.
+
+For AmneziaWG the row shows **Port**, **Backend** (kernel or userspace, with its version), **Egress** (**Direct** or **WARP**) and **Devices** ("5 · 2 online"), and a status line with the last handshake.
+
+The **Port** cell of each profile has a small dot with the last port check: works, loses packets or does not answer. It links to **Ways in** → **Direct**, where the [Ports](#ports) block and **Check ports** are.
+
+Under each profile a **24 h** line says what the node counted of connection attempts on it: connections, **dropped at once** (accepted, then frozen or cut within seconds: what the TSPU's freeze looks like), **key refused** (the key's term ended; a removed or rotated key is unknown to the node and counts among the unknown keys), for Hysteria2 the share of started handshakes that never authenticated (the panel's own checks are left out), for AmneziaWG how many devices never completed a handshake, and unknown keys (scanners send them too). With an agent from v0.1.57, Hysteria2 profiles also say how many connections **froze** (the node kept sending and nothing came back: how a TSPU freeze looks), the average **RTT** and the **loss**; early drops are then not marked as trouble, because most are short checks of the app. Counts only, never an address. A node whose agent does not count connections yet says so once above the profiles: update the agent.
+
+On the right is the state: **Running**, **Starting**, **Failed to start** or **Off**. A profile that failed shows the cause in words and the agent's own error text under it. When the cause is clear, a button fixes it: **Change port** (the dialog opens on a free port), **Set the domain**, or **Open WARP**.
+
+Each row has:
+
+- **Edit**: the port and the **Domain (SNI)** for this node only, and the **Enabled** switch. A profile switched off stays on the node but leaves the subscriptions.
+- **Restart**: restarts only this profile. Its connections drop for a couple of seconds.
+- **Remove**: takes the profile off the node. The dialog says who notices: the users who lose the node at their next subscription update, or, for AmneziaWG, the devices that stop working. Their keys work again if you put the profile back on the same node. If relays pass the profile's servers, the dialog also says how many go with it.
+
+**Add profile** opens the dialog that puts a profile on this node: see [Profiles](profiles.md). When the panel has no profile at all, the dialog offers to create a Hysteria2 profile on port 443 (or the first free port) and put it on the node in one go, with **Set up by hand** as the other way.
 
 ### Exit
 
@@ -283,4 +327,4 @@ The paths are the defaults of `mistgate-node install`; if you installed with oth
 
 ## Who can do what
 
-Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).
+Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on and building the AmneziaWG kernel module are for the owner only; so are relays and **Add a way in…** (see [Ways in](#ways-in)). See [Security](../operations/security.md).

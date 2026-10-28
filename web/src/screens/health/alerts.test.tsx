@@ -18,7 +18,11 @@ const updateNode = vi.fn();
 let role = Role.OWNER;
 vi.mock("@/lib/api", () => ({
   health: { muteAlert: (...a: unknown[]) => muteAlert(...a), acceptDoctorItem: (...a: unknown[]) => acceptDoctorItem(...a), applyFix: vi.fn() },
-  nodes: { restartInbounds: (...a: unknown[]) => restartInbounds(...a), updateNode: (...a: unknown[]) => updateNode(...a) },
+  nodes: {
+    restartInbounds: (...a: unknown[]) => restartInbounds(...a),
+    updateNode: (...a: unknown[]) => updateNode(...a),
+    listNodes: () => Promise.resolve({ nodes: [{ id: "nod_msk1", name: "msk1" }, { id: "nod_de1", name: "de1" }] }),
+  },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   fleet: {},
   users: {},
@@ -27,8 +31,8 @@ vi.mock("@/lib/api", () => ({
 }));
 // no router in the test: a link is an anchor that says where it goes
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, params, search, hash, className }: { children?: ReactNode; to: string; params?: { id: string }; search?: { tab: string }; hash?: string; className?: string }) => (
-    <a href={`${to.replace("$id", params?.id ?? "")}${search ? `?tab=${search.tab}` : ""}${hash ? `#${hash}` : ""}`} className={className}>
+  Link: ({ children, to, params, search, hash, className }: { children?: ReactNode; to: string; params?: { id: string }; search?: { tab: string; way?: string }; hash?: string; className?: string }) => (
+    <a href={`${to.replace("$id", params?.id ?? "")}${search ? `?tab=${search.tab}` : ""}${search?.way ? `&way=${search.way}` : ""}${hash ? `#${hash}` : ""}`} className={className}>
       {children}
     </a>
   ),
@@ -210,6 +214,21 @@ describe("an alert that is fixed elsewhere", () => {
   it("the whole of UDP cut: says so with the ports, no port advice", async () => {
     await mount(alert({ kind: AlertKind.NO_TRAFFIC, subject: "", whyKey: "health.alert.no_traffic.why.udp_all_blocked", params: { failed: "2", total: "2", ports: "443, 8443" } }));
     expect(text()).toContain("Every port times out (443, 8443): the hoster seems to cut incoming UDP altogether.");
+  });
+
+  it("a relay that is down names both nodes and the stage, and opens the exit's way in through this entry", async () => {
+    const down = (stage: string) =>
+      alert({ kind: AlertKind.RELAY_DOWN, nodeId: "nod_msk1", nodeName: "msk1", subject: "rly_1", titleKey: "health.alert.relay_down.title", whyKey: `health.alert.relay_down.why.${stage}`, params: { relay: "msk1", exit: "de1", exit_profile: "VLESS · TCP", port: "8443", stage } });
+    await mount(down("freeze"));
+    expect(text()).toContain("Relay de1 via msk1 is down");
+    expect(text()).toContain("A transfer through msk1 on port 8443 stalls after the first kilobytes.");
+    const open = link("Open the way in")!;
+    expect(open.getAttribute("href")).toBe("/nodes/nod_de1?tab=ways&way=via:nod_msk1");
+    expect(open.className).toContain("bg-accent");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(down("leg"));
+    expect(text()).toContain("msk1 does not reach de1: the server VLESS · TCP gets nothing from it.");
   });
 
   it("a dead WARP exit opens the WARP card", async () => {

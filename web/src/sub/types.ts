@@ -43,6 +43,9 @@ export type ServerConn = {
   profile_id: string;
   /** A link only the Mihomo apps (kl!ck, Clash Verge, FlClash) can use: Happ and the other link-list apps do not get it. */
   mihomo_only?: boolean;
+  /** A twin of the server through a relay node; `via` is that node's country code ("" when it has none). */
+  relay?: boolean;
+  via?: string;
 };
 /** The DNS choice of one server: what the person picked ("" = nothing), what applies, what the owner allows. */
 export type ServerDns = {

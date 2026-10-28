@@ -5,7 +5,7 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { Icon, IconChip } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, Notice } from "@/components/ui/notice";
-import { StatusPill, type StatusKind } from "@/components/ui/status";
+import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -26,13 +26,15 @@ import { portNotes, withNotes } from "@/lib/port-check";
 import { agentLinked } from "@/lib/node-status";
 import { protocolName } from "@/lib/series";
 import { useNow } from "@/lib/time";
+import { useIsOwner } from "@/lib/updates";
 import { profileListQuery } from "@/screens/users/rpc";
 import { PartsLine } from "@/screens/users/user-detail";
 import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
-import { Ports } from "./ports";
+import { tcpPill, verdictPill } from "./ports";
+import { alsoRemovesText, useRelaysOf } from "./relays";
 
 export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }> = {
   [InboundState.UNSPECIFIED]: { kind: "off", word: "node.inbound.off" },
@@ -42,7 +44,7 @@ export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }
   [InboundState.DISABLED]: { kind: "off", word: "node.inbound.off" },
 };
 
-type Cell = { label: string; value: string; mono?: boolean; title?: string; tone?: "warn" | "bad" };
+type Cell = { label: string; value: string; mono?: boolean; title?: string; tone?: "warn" | "bad"; dot?: { kind: StatusKind; label: string } };
 
 /** The certificate cell: its date, amber under 14 days left and red under 3; "none" for a profile that is not running. */
 function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
@@ -61,8 +63,8 @@ function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
  * WireGuard-family one's devices and backend (the backend's version is its tooltip). Always four, so the columns of
  * every row line up. Anything that is not AmneziaWG reads as TLS.
  */
-function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell[] {
-  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${i.protocol === "vless" ? "tcp" : "udp"}/${i.port}` : "", mono: true };
+function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number, dot?: Cell["dot"]): Cell[] {
+  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${i.protocol === "vless" ? "tcp" : "udp"}/${i.port}` : "", mono: true, dot };
   const egress: Cell = { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" };
   if (i.protocol === "awg") {
     const a = i.awg;
@@ -80,6 +82,17 @@ const toneText = { warn: "text-warn-text", bad: "text-danger-text" } as const;
 
 // The last column fits the longest pill ("Не запустился").
 const gridClass = "md:grid-cols-[minmax(0,1.4fr)_92px_minmax(0,0.7fr)_minmax(0,1.3fr)_minmax(0,1fr)_124px]";
+
+/** The last port check of a profile's port, as a dot: its verdict on hover and to a screen reader, the check a click away. */
+function PortDot({ nodeId, dot }: { nodeId: string; dot: NonNullable<Cell["dot"]> }) {
+  const t = useT();
+  const label = t("ways.portDot", { verdict: dot.label });
+  return (
+    <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "ways", way: "direct" }} aria-label={label} title={label} className="flex size-4 flex-none items-center justify-center rounded-full hover:bg-surface-2">
+      <StatusDot kind={dot.kind} />
+    </Link>
+  );
+}
 
 /** The process that holds a profile's port, by inbound id, as the node's doctor saw it ("caddy(812)" -> "caddy"). */
 export function usePortHolders(nodeId: string, enabled = true): Record<string, string> {
@@ -126,6 +139,8 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   // what the node counted of connection attempts per profile (lib/connections.ts); nothing while it cannot be read
   const conn = useQuery({ ...nodeConnectionsQuery(node.id), enabled: data.inbounds.length > 0 && node.status !== NodeStatus.RETIRED }).data;
   const connOf = new Map((conn?.inbounds ?? []).map((x) => [x.inboundId, x]));
+  // relays are the owner's (RelayService): removing a server says which relays go with it
+  const owner = useIsOwner();
 
   const add = (
     <Button variant="primary" size="md" onClick={() => setAdding(true)}>
@@ -157,7 +172,10 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
 
       {data.inbounds.map((i) => {
         const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
-        const cs = cells(t, fmt, i, now);
+        // the last port check of this profile's port: a dot that leads to it in the ways in
+        const tcp = i.protocol === "vless";
+        const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
+        const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
         const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
         const fix: ReactNode =
           kind === "port" ? (
@@ -190,8 +208,9 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                 <div key={c.label} className="min-w-0 max-md:hidden">
                   <div className="flex min-w-0 flex-col gap-[3px]">
                     <span className="text-[11px] text-muted">{c.label}</span>
-                    <span title={c.title} className={cx(c.mono ? "font-mono text-[13px] break-all" : "text-xs font-semibold break-words", c.tone && toneText[c.tone])}>
+                    <span title={c.title} className={cx("flex min-w-0 items-center gap-1.5", c.mono ? "font-mono text-[13px] break-all" : "text-xs font-semibold break-words", c.tone && toneText[c.tone])}>
                       {c.value || "—"}
+                      {c.dot && <PortDot nodeId={node.id} dot={c.dot} />}
                     </span>
                   </div>
                 </div>
@@ -205,7 +224,10 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
               {cs.map((c) => (
                 <div key={c.label} className="flex min-w-0 gap-1.5">
                   <dt className="text-muted">{c.label}</dt>
-                  <dd className={cx("min-w-0 font-semibold", c.mono ? "font-mono break-all" : "break-words", c.tone && toneText[c.tone])}>{c.value || "—"}</dd>
+                  <dd className={cx("flex min-w-0 items-center gap-1.5 font-semibold", c.mono ? "font-mono break-all" : "break-words", c.tone && toneText[c.tone])}>
+                    {c.value || "—"}
+                    {c.dot && <PortDot nodeId={node.id} dot={c.dot} />}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -230,14 +252,11 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
         );
       })}
 
-      {/* the UDP delivery check of the ports above: with profiles on the node, or results from before */}
-      {node.status !== NodeStatus.RETIRED && (data.inbounds.length > 0 || (data.portChecks?.length ?? 0) > 0 || (data.tcpChecks?.length ?? 0) > 0) && <Ports data={data} />}
-
       <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />
       {editing && (
         <EditInbound key={editing.inbound.id} inbound={editing.inbound} focus={editing.focus} nodeId={node.id} nodeAddress={node.address} onClose={() => setEditing(null)} />
       )}
-      {removing && <RemoveInbound key={removing.id} inbound={removing} nodeId={node.id} nodeName={node.name} onClose={() => setRemoving(null)} />}
+      {removing && <RemoveInbound key={removing.id} inbound={removing} nodeId={node.id} nodeName={node.name} owner={owner} onClose={() => setRemoving(null)} />}
       {restarting && <RestartInbound key={restarting.id} inbound={restarting} nodeId={node.id} nodeName={node.name} onClose={() => setRestarting(null)} />}
     </div>
   );
@@ -386,13 +405,15 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   );
 }
 
-function RemoveInbound({ inbound, nodeId, nodeName, onClose }: { inbound: Plain<Inbound>; nodeId: string; nodeName: string; onClose: () => void }) {
+function RemoveInbound({ inbound, nodeId, nodeName, owner, onClose }: { inbound: Plain<Inbound>; nodeId: string; nodeName: string; owner: boolean; onClose: () => void }) {
   const t = useT();
   const toast = useToast();
   const refresh = useInboundRefresh(nodeId);
   const list = useQuery(profileListQuery);
   const users = list.data?.find((p) => p.id === inbound.profileId)?.userCount ?? 0;
   const devices = inbound.awg?.peers ?? 0;
+  // the relays that pass this server on go with it (relay.proto)
+  const also = alsoRemovesText(t, useRelaysOf(nodeId, owner).filter((r) => r.inboundId === inbound.id));
   const remove = useMutation({
     mutationFn: () => profilesApi.deleteInbound({ inboundId: inbound.id }),
     onSuccess: () => {
@@ -416,7 +437,7 @@ function RemoveInbound({ inbound, nodeId, nodeName, onClose }: { inbound: Plain<
       open
       onOpenChange={(o) => !o && onClose()}
       title={t("node.profiles.removeTitle", { profile: inbound.profileName, node: nodeName })}
-      description={list.isPending && inbound.protocol !== "awg" ? t("common.loading") : impact}
+      description={list.isPending && inbound.protocol !== "awg" ? t("common.loading") : also ? `${impact} ${also}` : impact}
       footer={
         <>
           <Button variant="ghost" size="md" onClick={onClose}>

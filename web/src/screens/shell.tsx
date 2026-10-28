@@ -209,17 +209,25 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
   const health = useFleetHealth();
   return (
     <header className="sticky top-0 z-10 hidden h-14 items-center gap-3 border-b border-line bg-canvas px-5 md:flex">
+      {/* the whole placeholder and the shortcut fit beside the other controls from 1280 px; narrower, the search is the
+          icon button of the phone, as tall as its neighbours, rather than a box that cuts its own words */}
       <button
         type="button"
         onClick={onSearch}
-        className="flex h-bar max-w-[420px] min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-ctl border border-line bg-surface pr-1.5 pl-3 text-[13px] text-muted outline-none transition-colors duration-200 hover:bg-surface-2 focus-visible:border-accent"
+        className="hidden h-bar max-w-[420px] min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-ctl border border-line bg-surface pr-1.5 pl-3 text-[13px] text-muted outline-none transition-colors duration-200 hover:bg-surface-2 focus-visible:border-accent xl:flex"
       >
         <Icon name="search" size={15} />
         <span className="flex-1 truncate text-left">{t("header.search")}</span>
-        {/* the box gives way to the other controls on a narrow screen: the shortcut goes first */}
-        <span className="hidden lg:contents">
-          <Kbd keys={paletteKeys} />
-        </span>
+        <Kbd keys={paletteKeys} />
+      </button>
+      <button
+        type="button"
+        onClick={onSearch}
+        aria-label={t("header.search")}
+        title={t("header.search")}
+        className="grid size-bar flex-none place-items-center rounded-ctl border border-line bg-surface text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg xl:hidden"
+      >
+        <Icon name="search" />
       </button>
       <div className="flex-1" />
       <Link to={health.to} className="flex">

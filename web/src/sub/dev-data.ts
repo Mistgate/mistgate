@@ -314,6 +314,15 @@ export const cases: Record<string, MgData> = {
   "dns-off": { ...returning, dns: { ...dnsOn, enabled: false, endpoint: "" } },
   // server variants: no load level, a key-only server, one that is down
   variants: { ...returning, servers: [fra, ams, ber, mow, hel] },
+  // a server that also comes through a relay node in Russia (its twin, "· через RU")
+  relay: {
+    ...returning,
+    servers: [
+      { ...ams, app_names: [...ams.app_names, "NL · Hysteria2 · через RU"], connections: [...ams.connections, { way: "link", exit: "direct", app_name: "NL · Hysteria2 · через RU", profile_id: "", relay: true, via: "RU" }] },
+      fra,
+      hel,
+    ],
+  },
   long: {
     ...base,
     title: "Мой очень длинный VPN для друзей и семьи",

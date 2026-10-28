@@ -26,6 +26,21 @@ describe("the panel's refusal codes", () => {
     expect(errorVars("device_limit: 5/5").detail).toBe("5/5"); // the older "code: detail" keeps its detail
   });
 
+  it("word the relay refusals: a port a relay holds, a server that cannot be relayed, a check that is missing, old or failed", () => {
+    expect(say("port_taken: free=8444&node=msk1&port=8443&profile=relay+to+de1", Code.AlreadyExists, "ru")).toBe("Порт 8443 на msk1 уже занят ретрансляцией.");
+    expect(say("port_taken: node=msk1&port=8443&profile=relay", Code.AlreadyExists)).toBe("Port 8443 on msk1 is already taken by a relay.");
+    expect(say("port_taken: node=msk1&port=443&profile=hy2", Code.AlreadyExists)).toBe("Port 443 on msk1 is already taken by the profile “hy2”."); // a profile stays a profile
+    expect(say("relay_unsupported: reason=cdn", Code.FailedPrecondition, "ru")).toBe("Этот сервер нельзя пустить через ретрансляцию. Идёт через CDN: люди подключаются к CDN, а не к ноде.");
+    expect(say("relay_unsupported: reason=acme_ip", Code.FailedPrecondition)).toBe("This server cannot go through a relay. Its certificate is for the node’s IP; apps would reject it on another address.");
+    expect(say("relay_unchecked", Code.FailedPrecondition, "ru")).toBe(ru["err.relay_unchecked"]);
+    expect(say("relay_check_stale", Code.FailedPrecondition)).toBe(en["err.relay_check_stale"]);
+    expect(say("relay_check_failed: code=timeout&stage=path", Code.FailedPrecondition, "ru")).toBe("Ретрансляция не прошла проверку (снаружи через вход). Почему — на странице ноды входа.");
+    expect(say("relay_check_failed: code=refused&stage=leg", Code.FailedPrecondition)).toBe("The relay did not pass its check (from the entry to the exit). The entry node’s page says why.");
+    expect(say("relay_exists: exit=de1&node=msk1", Code.AlreadyExists, "ru")).toBe("msk1 уже ретранслирует этот сервер de1.");
+    expect(say("agent_old: node=msk1", Code.FailedPrecondition)).toBe("The agent of msk1 is too old for relays. Update it on the Updates page.");
+    expect(say("same_node: node=de1", Code.InvalidArgument, "ru")).toBe("Сервер стоит на самой de1: ретранслировать можно только сервер другой ноды.");
+  });
+
   it("name the feature an edition cannot run, in the page's language", () => {
     const refused = "unavailable_in_edition: feature=backups"; // internal/panel/edition.Refuse
     expect(say(refused, Code.FailedPrecondition)).toBe("Not available in the Cloudflare edition yet: Backups.");

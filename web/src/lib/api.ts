@@ -19,6 +19,7 @@ import { ApiTokenService, ApprovalService } from "@/gen/mistgate/admin/v1/integr
 import { NodeService } from "@/gen/mistgate/admin/v1/node_pb";
 import { ProfileService } from "@/gen/mistgate/admin/v1/profile_pb";
 import { ProvisioningService } from "@/gen/mistgate/admin/v1/provisioning_pb";
+import { RelayService } from "@/gen/mistgate/admin/v1/relay_pb";
 import { SubscriptionService } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { TelegramService } from "@/gen/mistgate/admin/v1/telegram_pb";
 import { TspuProbeService } from "@/gen/mistgate/admin/v1/tspu_probe_pb";
@@ -65,6 +66,8 @@ export const tspuProbe = createClient(TspuProbeService, transport);
 export const clientProbe = createClient(ClientProbeService, transport);
 export const cheburcheck = createClient(CheburcheckService, transport);
 export const bsbord = createClient(BsbordService, transport);
+// CheckRelay and switching a relay on wait for probes and for the entry to install the forward (up to ~40 s): no deadline here either.
+export const relays = createClient(RelayService, transport);
 
 export type RecoveryLoginResult = {
   adminDisplayName: string;

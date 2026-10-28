@@ -1,15 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { en } from "@/i18n/en";
 import { reasons } from "@/lib/port-check";
-import { Ports } from "./ports";
+import { CheckPortsButton, Ports, usePortCheck } from "./ports";
+
+/** The block as the Direct way in shows it: the button in its action bar, the rows above. */
+function Block({ data }: { data: never }) {
+  const run = usePortCheck((data as { node: { id: string } }).node.id);
+  return (
+    <>
+      <CheckPortsButton data={data} run={run} />
+      <Ports data={data} run={run} />
+    </>
+  );
+}
 
 const checkPorts = vi.fn();
 let role = Role.OWNER;
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
+}));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   nodes: { checkPorts: (...a: unknown[]) => checkPorts(...a) },
@@ -46,7 +60,7 @@ async function mount(d: never) {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <Ports data={d} />
+        <Block data={d} />
       </QueryClientProvider>,
     ),
   );
@@ -63,7 +77,7 @@ const rows = () => [...document.querySelectorAll("li")].map((li) => li.textConte
 describe("the stored results", () => {
   it("says it was never checked, and offers the check", async () => {
     await mount(data());
-    expect(text()).toContain("Ports");
+    // the title is the Direct way in's block heading (ways.tsx)
     expect(text()).toContain(en["ports.never"]);
     expect(rows()).toEqual([]);
     expect(button("Check ports")).toBeDefined();

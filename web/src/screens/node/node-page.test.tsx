@@ -259,9 +259,9 @@ describe("the header", () => {
 describe("the tabs", () => {
   const tabs = () => [...document.querySelectorAll("[role=tab]")].map((x) => x.textContent);
 
-  it("answer the owner's questions in order: overview, profiles, exit, history, doctor, server", async () => {
+  it("answer the owner's questions in order: overview, ways in, profiles, exit, history, doctor, server", async () => {
     await mount(data());
-    expect(tabs()).toEqual(["Overview", "Profiles", "Exit", "History", "Doctor", "Server"]);
+    expect(tabs()).toEqual(["Overview", "Ways in", "Profiles", "Exit", "History", "Doctor", "Server"]);
   });
 
   it("leave a retired node what it was, what happened and its server", async () => {

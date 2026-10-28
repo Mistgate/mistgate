@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { relayFacts } from "@/test/relay-plan";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -396,6 +397,29 @@ describe("the Integrations screen: approvals", () => {
     await mount(tokens([]), inbox(Array.from({ length: 25 }, (_, i) => done(i + 1))));
     expect(text()).toContain("Showing 21–25 of 25");
     expect(text()).toContain("done 25");
+  });
+
+  it("words a relay plan: the tool, every fact it writes, and keeps names and networks on plates", async () => {
+    await mount(tokens([]), inbox([approval({ tool: "relay", facts: relayFacts.create })]));
+    expect(text()).toContain("Change a relay");
+    const rows = [...document.querySelectorAll("dl > div")].map((d) => [d.querySelector("dt")?.textContent, d.querySelector("dd")?.textContent]);
+    expect(rows.map(([k]) => k)).toEqual([
+      "Entry node",
+      "Exit node",
+      "Server on the exit",
+      "Port on the entry",
+      "The exit from inside the country",
+      "The entry from inside the country",
+      "The entry reaches the exit",
+      "Note",
+      "Checks",
+      "What happens",
+    ]);
+    expect(rows[3]![1]).toBe("chosen by the panel: 2053, the exit’s port, when it is free on the entry, else a free one");
+    expect(rows[4]![1]).toBe("partly blocked; dark for “MTS, Tele2”");
+    expect(rows[6]![1]).toBe("yes (TSPU check)");
+    // nothing reads as a raw key or as the panel's own English
+    expect(text()).not.toMatch(/approval\.[a-z]|entry_port|tspu_row|dark for MTS|after it is made|in their subscription at its next refresh/);
   });
 
   it("words the coded facts, keeps a profile's name on a plate inside the sentence, and words the outcomes", async () => {

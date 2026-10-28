@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AlertKind } from "@/gen/mistgate/admin/v1/health_pb";
@@ -22,6 +22,7 @@ import { alertFix, alertIpv6, alertTitle, alertWhy, isPeopleAlert, muteChoices, 
 import { useIsPhone } from "@/lib/media";
 import { clampPage, usePaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
+import { nodesQuery } from "@/lib/queries";
 import { useAcceptDoctor } from "./doctor-parts";
 import { FixControl, type FixFlow } from "./fix";
 
@@ -196,6 +197,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
             {t("hl.alerts.openUser")}
           </Link>
         )}
+        {a.kind === AlertKind.RELAY_DOWN && a.nodeId && <RelayWayLink a={a} primary={goMain} />}
         {a.kind === AlertKind.UPDATE_FAILED && (
           <Link to="/updates" className={buttonClass("secondary", "md")}>
             {t("up.alert.open")}
@@ -412,5 +414,25 @@ function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
       })}
       <Pagination total={rows.length} page={page} size={paging.size} sizes={historySizes} onPage={paging.setPage} onSize={paging.setSize} label={t("hl.alerts.history")} />
     </section>
+  );
+}
+
+/**
+ * A relay_down alert's way to the fix: the exit's Ways in, on the lane through this entry (the alert's node). The alert
+ * names the exit, and node names are unique; without the list yet, the entry's own ways in.
+ */
+function RelayWayLink({ a, primary }: { a: Alert; primary: boolean }) {
+  const t = useT();
+  const name = (a.params.exit ?? "").toLowerCase();
+  const exit = useQuery(nodesQuery).data?.nodes.find((n) => n.name.toLowerCase() === name);
+  return (
+    <Link
+      to="/nodes/$id"
+      params={{ id: exit?.id ?? a.nodeId }}
+      search={exit ? { tab: "ways", way: `via:${a.nodeId}` } : { tab: "ways" }}
+      className={buttonClass(primary ? "primary" : "secondary", "md")}
+    >
+      {t("hl.alerts.openWay")}
+    </Link>
   );
 }

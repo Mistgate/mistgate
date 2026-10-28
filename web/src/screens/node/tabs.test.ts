@@ -3,10 +3,18 @@ import { upgradeNodeLink, validateNodeSearch } from "./tabs";
 
 describe("validateNodeSearch", () => {
   it("keeps a known tab other than the first", () => {
-    for (const tab of ["profiles", "exit", "history", "doctor", "server"]) expect(validateNodeSearch({ tab })).toEqual({ tab });
+    for (const tab of ["ways", "profiles", "exit", "history", "doctor", "server"]) expect(validateNodeSearch({ tab })).toEqual({ tab });
     expect(validateNodeSearch({ tab: "overview" })).toEqual({});
     expect(validateNodeSearch({ tab: "nope" })).toEqual({});
-    expect(validateNodeSearch({ tab: "ways" })).toEqual({}); // not yet a tab
+  });
+
+  it("keeps the open way and the new-way dialog only on the ways tab", () => {
+    expect(validateNodeSearch({ tab: "ways", way: "via:nod_msk1" })).toEqual({ tab: "ways", way: "via:nod_msk1" });
+    expect(validateNodeSearch({ tab: "ways", way: "direct", add: "1" })).toEqual({ tab: "ways", way: "direct", add: "1" });
+    expect(validateNodeSearch({ tab: "ways", add: 1 })).toEqual({ tab: "ways", add: "1" });
+    expect(validateNodeSearch({ tab: "ways", add: "via:nod_msk1" })).toEqual({ tab: "ways", add: "via:nod_msk1" });
+    expect(validateNodeSearch({ tab: "ways", way: "sideways", add: "prf_1" })).toEqual({ tab: "ways" });
+    expect(validateNodeSearch({ tab: "exit", way: "direct" })).toEqual({ tab: "exit" });
   });
 
   it("keeps the profile to add only on the profiles tab", () => {
@@ -42,12 +50,14 @@ describe("upgradeNodeLink", () => {
       [{ tab: "journal" }, "", { search: { tab: "history", view: "journal" }, hash: "" }],
       [{ tab: "events" }, "", { search: { tab: "history" }, hash: "" }],
       [{ tab: "events", before: 420, size: 25 }, "", { search: { tab: "history", before: 420, size: 25 }, hash: "" }],
+      [{ tab: "profiles" }, "ports", { search: { tab: "ways", way: "direct" }, hash: "" }],
+      [{ tab: "profiles" }, "relays", { search: { tab: "ways" }, hash: "" }],
     ];
     for (const [search, hash, want] of cases) expect(upgradeNodeLink(search, hash), JSON.stringify(search) + hash).toEqual(want);
   });
 
   it("leaves the new links and the bare page alone", () => {
-    for (const s of [{}, { tab: "profiles", add: "prf_1" }, { tab: "exit" }, { tab: "history", view: "journal" }, { tab: "server" }, { tab: "nope" }])
+    for (const s of [{}, { tab: "profiles", add: "prf_1" }, { tab: "profiles" }, { tab: "ways", way: "direct" }, { tab: "exit" }, { tab: "history", view: "journal" }, { tab: "server" }, { tab: "nope" }])
       expect(upgradeNodeLink(s, ""), JSON.stringify(s)).toBeUndefined();
     expect(upgradeNodeLink({ tab: "exit" }, "warp")).toBeUndefined();
   });

@@ -2,8 +2,9 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { isStepUpCancelled } from "@/components/step-up";
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ActionBar, Block } from "@/components/ui/bits";
+import { BackButton, DetailCard, useTurns, walkTabs } from "@/components/ui/master-detail";
 import { Button } from "@/components/ui/button";
 import { Icon, IconChip, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -109,9 +110,6 @@ const meta: Record<SourceId, { icon: IconName; title: MessageKey; what: MessageK
 type Look = { state: string; kind: StatusKind; word: string; detail: string };
 const ReportLook = createContext<((look: Look) => void) | null>(null);
 
-/** Narrower than this the list and the open source take turns (sm-ish; the list strip starts here). */
-const phone = () => !!window.matchMedia?.("(max-width: 719.98px)").matches;
-
 /**
  * The sources of the Reachability page as a list and the open one: Globalping, the block lists, the TSPU probe, cheburcheck,
  * bsbord, the reports of kl!ck users. A wide screen shows the list on the left (it stays in view) and the source on the right; a
@@ -146,37 +144,13 @@ export function SourceCards() {
   );
 
   // a phone takes turns: opening moves the focus to the way back, going back (the link or the browser's) to the row left
-  const tapped = useRef(false);
-  const shown = useRef(chosen);
-  useEffect(() => {
-    const was = shown.current;
-    shown.current = chosen;
-    if (was === chosen || !phone()) return;
-    const target = chosen ? document.getElementById("src-back") : was && document.getElementById(`src-tab-${was}`);
-    target?.focus({ preventScroll: true });
-    target?.scrollIntoView({ block: chosen ? "start" : "nearest" });
-  }, [chosen]);
-
-  const pick = (id: SourceId) => {
-    tapped.current = phone();
-    // a phone pushes, so its back button closes the source; a wide screen only swaps what is shown
-    void navigate({ to: "/reachability", search: { source: id }, replace: !tapped.current, resetScroll: false });
-  };
-  const back = () => {
-    if (tapped.current) window.history.back();
-    else void navigate({ to: "/reachability", search: {}, replace: true, resetScroll: false });
-    tapped.current = false;
-  };
-
-  // arrows (and Home, End) walk the list, Enter or Space opens: the list is one stop for Tab
-  const walk = (e: KeyboardEvent<HTMLDivElement>) => {
-    const tabs = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=tab]")];
-    const i = tabs.indexOf(document.activeElement as HTMLElement);
-    const to = ({ ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[e.key];
-    if (i < 0 || to === undefined) return;
-    e.preventDefault();
-    tabs[(to + tabs.length) % tabs.length]!.focus();
-  };
+  const { pick, back } = useTurns({
+    chosen,
+    backId: "src-back",
+    rowId: (id) => `src-tab-${id}`,
+    open: (id, replace) => void navigate({ to: "/reachability", search: { source: id }, replace, resetScroll: false }),
+    close: () => void navigate({ to: "/reachability", search: {}, replace: true, resetScroll: false }),
+  });
 
   return (
     <div className="grid gap-3.5 lg:grid-cols-[336px_minmax(0,1fr)]">
@@ -184,7 +158,7 @@ export function SourceCards() {
         role="tablist"
         aria-label={t("rc.sources")}
         aria-orientation="vertical"
-        onKeyDown={walk}
+        onKeyDown={walkTabs}
         className={cx(
           "flex flex-col gap-1 self-start rounded-card-lg border border-line bg-surface p-1.5 min-[720px]:max-lg:grid min-[720px]:max-lg:grid-cols-2 lg:sticky lg:top-[72px]",
           chosen && "max-[720px]:hidden",
@@ -195,15 +169,7 @@ export function SourceCards() {
         ))}
       </div>
       <div className={cx("flex min-w-0 flex-col gap-2.5", !chosen && "max-[720px]:hidden")}>
-        <button
-          id="src-back"
-          type="button"
-          onClick={back}
-          className="flex h-9 scroll-mt-20 items-center gap-1.5 self-start rounded-ctl pr-3 pl-1.5 text-[13px] font-bold text-muted transition-colors hover:bg-surface-2 hover:text-fg min-[720px]:hidden"
-        >
-          <Icon name="back" size={16} aria-hidden />
-          {t("src.back")}
-        </button>
+        <BackButton id="src-back" label={t("src.back")} onClick={back} />
         {open === null && <Pending />}
         {sourceIds.map((id) => {
           const { Card } = meta[id];
@@ -422,20 +388,9 @@ function Detail({ id, sub, control, children }: { id: SourceId; sub: string; con
   const t = useT();
   const m = meta[id];
   return (
-    <section className="@container flex h-full min-w-0 flex-col rounded-card-lg border border-line bg-surface">
-      <div className="flex items-start gap-3 px-4 pt-4 pb-3 md:px-5 md:pt-5">
-        <IconChip icon={m.icon} tone="mint" size={36} className="rounded-[10px]" />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex min-h-6 flex-wrap items-center gap-x-2.5 gap-y-1">
-            <h3 className="text-base leading-tight font-extrabold tracking-[-0.02em]">{t(m.title)}</h3>
-            <Coverage ruOnly={m.ruOnly} />
-          </div>
-          <p className="max-w-2xl text-xs leading-normal text-pretty text-muted">{sub}</p>
-        </div>
-        {control && <span className="flex h-6 items-center">{control}</span>}
-      </div>
+    <DetailCard icon={m.icon} title={t(m.title)} extra={<Coverage ruOnly={m.ruOnly} />} sub={sub} control={control}>
       {children}
-    </section>
+    </DetailCard>
   );
 }
 
