@@ -828,7 +828,7 @@ func (s *Service) usable(f store.AccessInboundFull, g store.AccessGroup, u store
 
 // liveInbound: the inbound is on and not failed, on an enrolled node (the part of usable that is not about the user).
 func liveInbound(f store.AccessInboundFull) bool {
-	return f.Inbound.Enabled && (f.Inbound.State == "pending" || f.Inbound.State == "active") && f.Node.State == "active"
+	return store.InboundLive(f.Inbound.Enabled, f.Inbound.State, f.Node.State)
 }
 
 // accessOf is what the user's page offers by app (User.access_happ / access_amnezia): SubView's AccessHapp and

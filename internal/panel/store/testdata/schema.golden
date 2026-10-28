@@ -289,6 +289,12 @@
   },
   {
     "type": "index",
+    "name": "relay_via",
+    "tbl_name": "relay",
+    "sql": "CREATE INDEX relay_via ON relay (via_node_id)"
+  },
+  {
+    "type": "index",
     "name": "session_admin",
     "tbl_name": "session",
     "sql": "CREATE INDEX session_admin ON session(admin_id)"
@@ -670,6 +676,12 @@
     "name": "recovery_token",
     "tbl_name": "recovery_token",
     "sql": "CREATE TABLE recovery_token ( hash BLOB PRIMARY KEY, expires_at INTEGER NOT NULL, used_at INTEGER ) STRICT, WITHOUT ROWID"
+  },
+  {
+    "type": "table",
+    "name": "relay",
+    "tbl_name": "relay",
+    "sql": "CREATE TABLE relay ( id TEXT PRIMARY KEY, inbound_id TEXT NOT NULL REFERENCES inbound (id) ON DELETE CASCADE, via_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, network TEXT NOT NULL CHECK (network IN ('tcp', 'udp')), port INTEGER NOT NULL CHECK (port = 443 OR port BETWEEN 1024 AND 65535), enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)), state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'active', 'failed')), last_error TEXT NOT NULL DEFAULT '', to_ip TEXT NOT NULL DEFAULT '', applied_at INTEGER NOT NULL DEFAULT 0, check_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(check_json)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE (inbound_id, via_node_id), UNIQUE (via_node_id, network, port) ) STRICT"
   },
   {
     "type": "table",

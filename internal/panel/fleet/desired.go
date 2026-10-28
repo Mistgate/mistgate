@@ -82,7 +82,10 @@ type inboundState struct {
 type nodeState struct {
 	in   map[string]*inboundState
 	warp *plugin.WarpSpec // the node's WARP configuration; nil = none
-	hash string           // statehash.StateWarp of the whole
+	// relays are the ports the node forwards to servers on other nodes, sorted by id; only for an agent that lists
+	// "relay-forward/1", and only switched-on relays whose server is usable (relayForwards).
+	relays []plugin.RelayForward
+	hash   string // statehash.StateRelays of the whole
 	// withheld are the inbounds the agent cannot take (an awg inbound for an agent without "awg/1"); the node page says why.
 	withheld []string
 }
@@ -94,6 +97,7 @@ type sentDigest struct {
 	In       map[string]sentInbound `json:"i,omitempty"`
 	Warp     string                 `json:"w,omitempty"`  // hash of the WarpSpec, "" = none
 	WarpOff  bool                   `json:"wo,omitempty"` // a WarpSpec with Enabled=false (RestartWarp's pause)
+	Relays   string                 `json:"rl,omitempty"` // relaysHash of the forwards, "" = none
 }
 
 type sentInbound struct {
@@ -141,8 +145,13 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 				return nil, err
 			}
 		}
+		if slices.Contains(caps, plugin.CapRelayForward) {
+			if st.relays, err = f.relayForwards(ctx, n); err != nil {
+				return nil, err
+			}
+		}
 	}
-	st.hash = statehash.StateWarp(st.list(), st.warp)
+	st.hash = statehash.StateRelays(st.list(), st.warp, st.relays)
 	return st, nil
 }
 
@@ -258,10 +267,19 @@ func warpHash(w *plugin.WarpSpec) string {
 	return shortHash(b)
 }
 
+// relaysHash tells two lists of forwards apart ("" = none, the hash of a list that was never sent).
+func relaysHash(rs []plugin.RelayForward) string {
+	if len(rs) == 0 {
+		return ""
+	}
+	b, _ := json.Marshal(rs)
+	return shortHash(b)
+}
+
 func sentDigestFor(s *nodeState, revision uint64) *sentDigest {
 	digest := &sentDigest{
 		Revision: revision, Hash: s.hash, In: make(map[string]sentInbound, len(s.in)),
-		Warp: warpHash(s.warp), WarpOff: s.warp != nil && !s.warp.Enabled,
+		Warp: warpHash(s.warp), WarpOff: s.warp != nil && !s.warp.Enabled, Relays: relaysHash(s.relays),
 	}
 	for id, inbound := range s.in {
 		sent := sentInbound{Spec: inbound.specHash}
@@ -388,6 +406,23 @@ func warpProto(w *plugin.WarpSpec) *agentv1.WarpSpec {
 	}
 	for _, p := range w.Ports {
 		out.Ports = append(out.Ports, uint32(p))
+	}
+	return out
+}
+
+// relaysProto is the wire form of the forwards: nil for none (a full state then carries no field at all, which is what an
+// agent without the feature sees); a delta that clears the list sends the empty wrapper (relayProtoAlways).
+func relaysProto(rs []plugin.RelayForward) *agentv1.RelayForwards {
+	if len(rs) == 0 {
+		return nil
+	}
+	return relayProtoAlways(rs)
+}
+
+func relayProtoAlways(rs []plugin.RelayForward) *agentv1.RelayForwards {
+	out := &agentv1.RelayForwards{Items: make([]*agentv1.RelayForward, 0, len(rs))}
+	for _, r := range rs {
+		out.Items = append(out.Items, &agentv1.RelayForward{RelayId: r.ID, Network: r.Network, Port: uint32(r.Port), ToHost: r.ToHost, ToPort: uint32(r.ToPort)})
 	}
 	return out
 }

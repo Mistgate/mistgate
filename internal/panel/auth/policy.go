@@ -178,6 +178,14 @@ var procedureLevels = map[string]level{
 	adminv1connect.CountryReachabilityServiceUpdateCountryReachabilityProcedure: levelOwner,
 	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure:    levelRead,
 
+	// RelayService: the ports a node forwards, unchanged, to servers on other nodes. Where people can come in is the owner's
+	// call, like profiles and inbounds; the entry node sees who connects. All of it is the owner's, and not open to tokens
+	// (policy_tokens.go).
+	adminv1connect.RelayServiceListRelaysProcedure:  levelOwner,
+	adminv1connect.RelayServiceCreateRelayProcedure: levelOwner,
+	adminv1connect.RelayServiceUpdateRelayProcedure: levelOwner,
+	adminv1connect.RelayServiceDeleteRelayProcedure: levelOwner,
+
 	// UpdateService: the page is readable by everyone; every change decides what code runs as root on all
 	// nodes (or on the panel itself), so it is owner-only and the handler also requires a fresh step-up
 	// (auth.Service.RequireStepUp, like passkey removal). Not relaxed for helpers.

@@ -1822,6 +1822,14 @@ func TestD1ExtChecksStorage(t *testing.T) {
 	extCheckStoreProof(t, openD1Store(t))
 }
 
+func TestD1RelaysStorage(t *testing.T) {
+	relayStoreProof(t, openD1Store(t))
+}
+
+func TestD1RelayRace(t *testing.T) {
+	relayRaceProof(t, openD1Store(t))
+}
+
 func TestD1ClientProbeReportsStorage(t *testing.T) {
 	clientProbeStoreProof(t, openD1Store(t))
 }

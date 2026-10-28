@@ -61,7 +61,7 @@ type Config struct {
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
 }
 
-// Service implements ProfileService, UserService, GroupService, DeviceService and AwgService (adminv1connect
+// Service implements ProfileService, UserService, GroupService, DeviceService, AwgService and RelayService (adminv1connect
 // handler interfaces).
 type Service struct {
 	st            *store.Store
@@ -86,6 +86,11 @@ type Service struct {
 	// and the write in one BEGIN IMMEDIATE transaction (or a unique index on the networks).
 	awgNets sync.Mutex
 
+	// relayMu makes "check the entry's ports, then write the relay" one step in this process (relay_rpc.go); the unique keys
+	// of the relay table keep several panels apart. relayGate decides whether a relay may be switched on.
+	relayMu   sync.Mutex
+	relayGate func(context.Context, store.RelayLink) error
+
 	secretPtrs   map[string][]string // protocol id -> x-secret pointers
 	criticalPtrs map[string][]string // protocol id -> x-critical pointers
 }
@@ -107,6 +112,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, notify StateN
 		afterResponse: cfg.AfterResponse,
 		dns:           dns.New(st),
 		secretPtrs:    map[string][]string{}, criticalPtrs: map[string][]string{},
+		relayGate: relayUnchecked,
 	}
 	if s.afterResponse == nil {
 		s.afterResponse = func(work func()) { go work() }

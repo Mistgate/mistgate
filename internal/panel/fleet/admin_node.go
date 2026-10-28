@@ -1013,6 +1013,10 @@ func (s nodeService) RetireNode(ctx context.Context, req *connect.Request[adminv
 	if err != nil {
 		return nil, internalErr(f.log.Error, "read node live projection", err)
 	}
+	relays, err := f.st.RelayLinks(ctx, store.RelayFilter{NodeID: n.ID}) // RetireNode deletes them, as the entry and as the exit
+	if err != nil {
+		return nil, internalErr(f.log.Error, "list relays of node", err)
+	}
 	switch err := f.st.RetireNode(ctx, n.ID, f.now().UTC()); {
 	case errors.Is(err, store.ErrNodeRetired):
 		return nil, errNodeRetired
@@ -1022,6 +1026,12 @@ func (s nodeService) RetireNode(ctx context.Context, req *connect.Request[adminv
 	notified := f.notifyRetire(ctx, n.ID, live)
 	f.event(ctx, 1, "node_retired", n.ID, map[string]string{"actor": f.cfg.Actor(ctx)})
 	f.audit(ctx, "node.retire", map[string]string{"node_id": n.ID, "name": n.Name})
+	for _, l := range relays {
+		f.audit(ctx, "relay.delete", map[string]string{"relay": l.ID, "via": l.ViaNodeName, "exit": l.ExitNodeName, "reason": "node_retired"})
+	}
+	if len(relays) > 0 {
+		f.StateChanged() // the other end of each loses the forward or the target
+	}
 	return connect.NewResponse(&adminv1.RetireNodeResponse{AgentNotified: notified}), nil
 }
 

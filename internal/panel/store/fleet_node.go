@@ -485,6 +485,8 @@ func (s *Store) RetireNode(ctx context.Context, id string, now time.Time) error 
 			WHERE node_id = ? AND state IN ('queued', 'running', 'cancel_requested')`, Args: []any{unix(now), id}},
 		// A retired node takes no inbounds any more: its parked AWG server keys are dead weight.
 		Stmt{Query: `DELETE FROM awg_retained_key WHERE node_id = ?`, Args: []any{id}},
+		// The node's relays go with it, as the entry and as the exit (the node row stays, so the foreign keys do not).
+		Stmt{Query: `DELETE FROM relay WHERE via_node_id = ?1 OR inbound_id IN (SELECT id FROM inbound WHERE node_id = ?1)`, Args: []any{id}},
 	)
 	if errors.Is(err, errGuard) {
 		current, readErr := s.Node(ctx, id)

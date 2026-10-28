@@ -343,6 +343,8 @@ type model struct {
 	rev  uint64
 	in   map[string]*modelInbound
 	warp *plugin.WarpSpec // the node-level WARP configuration the agent holds
+	// relays are the forwards the agent holds (DesiredState.relays)
+	relays []plugin.RelayForward
 }
 
 type modelInbound struct {
@@ -388,7 +390,7 @@ func credFromProto(c *agentv1.Credential) plugin.UserCred {
 // apply returns false for a delta whose base revision is not the model's (BASE_MISMATCH).
 func (m *model) apply(ds *agentv1.DesiredState) bool {
 	if ds.BaseRevision == 0 {
-		m.in, m.warp = map[string]*modelInbound{}, nil // a full state: anything not listed is gone, WARP included
+		m.in, m.warp, m.relays = map[string]*modelInbound{}, nil, nil // a full state: anything not listed is gone, WARP and forwards included
 	} else if ds.BaseRevision != m.rev {
 		return false
 	}
@@ -420,6 +422,12 @@ func (m *model) apply(ds *agentv1.DesiredState) bool {
 	if ds.Warp != nil { // present replaces the whole WARP configuration; absent in a delta keeps it
 		m.warp = warpFromProto(ds.Warp)
 	}
+	if ds.Relays != nil { // present replaces the whole list (an empty wrapper clears it); absent in a delta keeps it
+		m.relays = nil
+		for _, r := range ds.Relays.Items {
+			m.relays = append(m.relays, plugin.RelayForward{ID: r.RelayId, Network: r.Network, Port: uint16(r.Port), ToHost: r.ToHost, ToPort: uint16(r.ToPort)})
+		}
+	}
 	m.rev = ds.Revision
 	return true
 }
@@ -433,7 +441,7 @@ func (m *model) hash() string {
 		}
 		in = append(in, si)
 	}
-	return statehash.StateWarp(in, m.warp)
+	return statehash.StateRelays(in, m.warp, m.relays)
 }
 
 func (m *model) credIDs(inbound string) []string {

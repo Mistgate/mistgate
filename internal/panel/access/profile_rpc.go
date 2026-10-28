@@ -657,9 +657,10 @@ type nodeListen struct {
 	spec     plugin.InboundSpec
 }
 
-// nodeInbounds is what the checks need of a node's inbounds other than skip (the one being changed): the listener ports each
-// one takes, and which profiles are there. A neighbour whose spec does not build has no ports here: it is reported on
-// its own.
+// nodeInbounds is what the checks need of a node's inbounds other than skip (the one being changed; a relay's id also
+// works): the listener ports each one takes, and which profiles are there. A neighbour whose spec does not build has no
+// ports here: it is reported on its own. The ports the node forwards for its relays (relay_rpc.go) are neighbours too,
+// switched on or off, so that a new profile cannot take a forwarded port and a relay cannot take a profile's.
 func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listens []nodeListen, profiles map[string]bool, err error) {
 	others, err := s.st.Access().InboundsFull(ctx, nodeID)
 	if err != nil {
@@ -677,6 +678,16 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 		}
 		if os, err := s.buildSpec(o, merged); err == nil {
 			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen, spec: os})
+		}
+	}
+	forwards, err := s.st.RelayLinks(ctx, store.RelayFilter{ViaNodeID: nodeID})
+	if err != nil {
+		return nil, nil, s.internal("relays", err)
+	}
+	for _, r := range forwards {
+		if r.ID != skip {
+			listens = append(listens, nodeListen{profile: relayLabel(r), protocol: relayProtocol, enabled: r.Enabled,
+				l: plugin.Listen{Network: r.Network, Port: r.Port}})
 		}
 	}
 	return listens, profiles, nil
@@ -1229,12 +1240,17 @@ func (s *Service) DeleteInbound(ctx context.Context, req *connect.Request[adminv
 		}
 		return s.vault.Seal(state, store.RetainedKeyAAD(profileID, nodeID)), nil
 	}
+	relays, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: req.Msg.InboundId}) // they go with the server (foreign key)
+	if err != nil {
+		return nil, s.internal("list relays", err)
+	}
 	switch err := a.DeleteInbound(ctx, req.Msg.InboundId, s.now(), retain); {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, notFound("inbound")
 	case err != nil:
 		return nil, s.internal("delete inbound", err)
 	}
+	s.auditRelaysGone(ctx, relays, "inbound_removed")
 	if ierr == nil {
 		s.nodeEvent(ctx, "profile_removed", in.NodeID, in.ID, prof)
 		node, _ := a.Node(ctx, in.NodeID) // a retired node keeps its row and its name

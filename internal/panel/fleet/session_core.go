@@ -904,6 +904,7 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, tr.state.OwnerGeneration, tr.state.Drift, r.Revision, r.StateHash, in, now); err != nil {
 		c.f.log.Warn("record apply result", "node", tr.state.NodeID, "err", err)
 	}
+	c.relaysApplied(ctx, tr.state.NodeID, r, len(in) > 0, now)
 	return nil
 }
 
@@ -1028,11 +1029,15 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 	if full {
 		ds.Inbounds = fullInbounds(want)
 		ds.Warp = warpProto(want.warp)
+		ds.Relays = relaysProto(want.relays)
 	} else {
 		ds.BaseRevision = state.SentRevision
 		ds.Inbounds, ds.RemovedInboundIds = diffState(digest, want)
 		if digest.Warp != warpHash(want.warp) {
 			ds.Warp = warpProto(want.warp)
+		}
+		if digest.Relays != relaysHash(want.relays) {
+			ds.Relays = relayProtoAlways(want.relays) // presence replaces the list; the empty wrapper clears it
 		}
 	}
 	_, raw, err := marshalSentDigest(want, rev)

@@ -367,6 +367,10 @@ func TestBearerAllowListAndProfiles(t *testing.T) {
 		{adminv1connect.ApprovalServiceApproveProcedure, 403, 403, 403},
 		{adminv1connect.ApprovalServiceListApprovalsProcedure, 403, 403, 403},
 		{adminv1connect.UpdateServiceRescanBundleProcedure, 403, 403, 403},
+		{adminv1connect.RelayServiceListRelaysProcedure, 403, 403, 403},
+		{adminv1connect.RelayServiceCreateRelayProcedure, 403, 403, 403},
+		{adminv1connect.RelayServiceUpdateRelayProcedure, 403, 403, 403},
+		{adminv1connect.RelayServiceDeleteRelayProcedure, 403, 403, 403},
 		{"/mistgate.admin.v1.FutureService/Call", 403, 403, 403}, // not even a procedure that exists
 		// need the owner's approval: never over /api
 		{pApplyFix, 403, 403, 403},

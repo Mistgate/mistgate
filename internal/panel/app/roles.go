@@ -210,7 +210,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	for _, h := range []func() (string, http.Handler){
 		func() (string, http.Handler) { return k.fl.NodeHandler() },
 		func() (string, http.Handler) { return k.fl.FleetHandler() },
-		k.acc.ProfileHandler, k.acc.UserHandler, k.acc.GroupHandler, k.acc.DeviceHandler, k.acc.AwgHandler, subSvc.Handler, parts.dns.Handler,
+		k.acc.ProfileHandler, k.acc.UserHandler, k.acc.GroupHandler, k.acc.DeviceHandler, k.acc.AwgHandler, k.acc.RelayHandler, subSvc.Handler, parts.dns.Handler,
 		func() (string, http.Handler) { return k.wsv.Handler() },
 		func() (string, http.Handler) { return forwardProvision(forward, prov.Handler) },
 		func() (string, http.Handler) { return k.hl.Handler() },

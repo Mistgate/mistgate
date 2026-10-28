@@ -120,9 +120,32 @@ func TestPanelWiring(t *testing.T) {
 	}
 	// The AWG and WARP services: the generator of the editor, the WARP service (owner only: this admin is the owner), and the device
 	// service, whose methods want an argument, so it is enough that they are mounted (an unknown service answers 404).
-	for _, c := range [][2]string{{"AwgService", "ListMimicryPresets"}, {"WarpService", "GetWarpRegistrationParams"}} {
+	for _, c := range [][2]string{{"AwgService", "ListMimicryPresets"}, {"WarpService", "GetWarpRegistrationParams"}, {"RelayService", "ListRelays"}} {
 		if code, body := call(c[0], c[1], `{}`); code != 200 {
 			t.Errorf("%s/%s: %d %s", c[0], c[1], code, body)
+		}
+	}
+	// Relays are the owner's: a helper is refused by role.
+	const helperToken = "helper-session-token-for-the-wiring-test-0123456789"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_h', 'helper', 'helper', x'0102030406', ?)`, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	hsum := sha256.Sum256([]byte(helperToken))
+	if err := st.CreateSession(ctx, store.Session{TokenHash: hsum[:], AdminID: "adm_h", CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, method := range []string{"ListRelays", "CreateRelay", "UpdateRelay", "DeleteRelay"} {
+		req, _ := http.NewRequest("POST", admin.URL+"/api/mistgate.admin.v1.RelayService/"+method, strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: helperToken})
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden || !strings.Contains(string(body), "permission_denied") {
+			t.Errorf("a helper on RelayService/%s: %d %s", method, resp.StatusCode, body)
 		}
 	}
 	if code, _ := call("DeviceService", "RenameDevice", `{}`); code == 404 {

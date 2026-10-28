@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/common.proto";
+
+// Relays: a port of one node (the entry) that passes the encrypted traffic of a server on another node (the exit) on,
+// unchanged (agent.proto "RELAY FORWARDS"). People whose network blocks the exit reach it through the entry; the entry
+// sees addresses and amounts, never contents, and keeps no keys. Accounting, limits and the credentials stay on the exit.
+//
+// Everything here is owner-only (a helper and an API token get PERMISSION_DENIED; tokens are not offered these
+// procedures at all). Every change is an audit row: relay.create, relay.update, relay.delete.
+//
+// A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), which waits for the panel's check of the
+// path (a later step: until then UpdateRelay(enabled = true) is refused with FAILED_PRECONDITION "relay_unchecked").
+// The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
+// failed, on an enrolled node) and the entry's agent lists "relay-forward/1".
+//
+// A relay goes when its server is deleted, and when either node is retired.
+//
+// ERRORS. NOT_FOUND: the relay, the server or the node. INVALID_ARGUMENT: a port that is neither 443 nor 1024-65535,
+// "same_node" (the entry holds the server itself). ALREADY_EXISTS: "relay_exists" (the entry already forwards this server),
+// "port_taken" (a profile or a relay of the entry holds that network and port, hop ranges included; the message carries a
+// free port), "hop_taken". FAILED_PRECONDITION: "node_retired", "agent_old" (the entry's agent lacks "relay-forward/1"),
+// "relay_unchecked" (the path was not checked yet), "no_clean_port" (the entry has no free port to offer).
+service RelayService {
+  // The relays, oldest first. node_id, when set, keeps those that have this node at either end.
+  rpc ListRelays(ListRelaysRequest) returns (ListRelaysResponse);
+  // Makes a relay (switched off). port = 0 chooses: the port of the exit's server when it is free on the entry, else a
+  // free one.
+  rpc CreateRelay(CreateRelayRequest) returns (CreateRelayResponse);
+  // Switches a relay on or off, or moves it to another port on the entry.
+  rpc UpdateRelay(UpdateRelayRequest) returns (UpdateRelayResponse);
+  rpc DeleteRelay(DeleteRelayRequest) returns (DeleteRelayResponse);
+}
+
+message Relay {
+  string id = 1;
+  // The exit's server and the node it is on.
+  string inbound_id = 2;
+  string exit_node_id = 3;
+  string exit_node_name = 4;
+  string profile_id = 5;
+  string profile_name = 6;
+  string protocol = 7;
+  // The entry node.
+  string via_node_id = 8;
+  string via_node_name = 9;
+  // "tcp" | "udp": the network of the exit's server and of the forward.
+  string network = 10;
+  // The port on the entry node, and the port of the server on the exit (hop ranges are not forwarded).
+  uint32 port = 11;
+  uint32 exit_port = 12;
+  bool enabled = 13;
+  // What the entry's agent reported for the forward: PENDING (nothing since it was switched on), ACTIVE, FAILED
+  // (last_error says why: "refused: ...", "resolve: ...", "forward_drop", "unsupported_host", ...). A relay that is
+  // switched off is PENDING.
+  InboundState state = 14;
+  string last_error = 15;
+  // The address of the exit the entry forwards to (as the agent resolved it), empty before it reported.
+  string to_ip = 16;
+  int64 applied_unix = 17;
+  // The exit's server is usable now (on, not failed, on an enrolled node): the entry gets the forward only then.
+  bool exit_live = 18;
+  // The entry's agent lists "relay-forward/1", so it can take the forward.
+  bool agent_supported = 19;
+  int64 created_unix = 20;
+}
+
+message ListRelaysRequest {
+  string node_id = 1;
+}
+
+message ListRelaysResponse {
+  repeated Relay relays = 1;
+}
+
+message CreateRelayRequest {
+  // The exit's server (an inbound).
+  string inbound_id = 1;
+  string via_node_id = 2;
+  uint32 port = 3;
+}
+
+message CreateRelayResponse {
+  Relay relay = 1;
+}
+
+message UpdateRelayRequest {
+  string id = 1;
+  optional bool enabled = 2;
+  optional uint32 port = 3;
+}
+
+message UpdateRelayResponse {
+  Relay relay = 1;
+}
+
+message DeleteRelayRequest {
+  string id = 1;
+}
+
+message DeleteRelayResponse {}
