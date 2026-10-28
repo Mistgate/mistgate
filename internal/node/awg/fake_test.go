@@ -30,6 +30,8 @@ type fakeBackend struct {
 
 	createErr    error
 	peersErr     error
+	removeErrs   int // negative fails every peer removal; positive fails that many attempts
+	removeCalls  int
 	unknown      uint32
 	unknownTakes int
 }
@@ -71,6 +73,19 @@ func (f *fakeBackend) Create(_ context.Context, name string, d deviceConfig) err
 func (f *fakeBackend) SetPeers(_ context.Context, name string, replace bool, peers []awgcfg.Peer) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	hasRemove := false
+	for _, p := range peers {
+		if p.Remove {
+			hasRemove = true
+			f.removeCalls++
+		}
+	}
+	if hasRemove && (f.removeErrs < 0 || f.removeErrs > 0) {
+		if f.removeErrs > 0 {
+			f.removeErrs--
+		}
+		return errors.New("device busy")
+	}
 	if f.peersErr != nil {
 		return f.peersErr
 	}

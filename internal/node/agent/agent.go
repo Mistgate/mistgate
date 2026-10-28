@@ -159,8 +159,9 @@ type Agent struct {
 	hostRing doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
 	certNA   atomic.Pointer[map[string]time.Time] // certificate expiry per inbound at the last apply
 
-	mu    sync.Mutex
-	model *model // applied desired state; replaced wholesale, never mutated once stored
+	mu           sync.Mutex
+	model        *model // applied desired state; replaced wholesale, never mutated once stored
+	stateUnsaved bool   // guarded by mu; the current model has not been persisted successfully
 	// Inbounds whose last reconcile result carried an error. A blocked inbound has no engine entry, so Health alone
 	// cannot say it failed; the update's commit watch reads this too.
 	failedApply atomic.Pointer[[]string]
@@ -515,6 +516,8 @@ func (a *Agent) Run(ctx context.Context) error {
 
 // restore applies the persisted state so engines come back after a restart without the panel.
 func (a *Agent) restore(ctx context.Context) {
+	// If the agent restarts before an unsaved apply reaches disk, this restores the older state. On reconnect, a Hello
+	// state-hash mismatch makes the panel send a full correction.
 	m, err := loadState(a.cfg.StateDir, a.knows)
 	if err != nil {
 		a.log.Warn("persisted state ignored", "err", err)
@@ -546,6 +549,43 @@ func (a *Agent) setModel(m *model) {
 	a.mu.Lock()
 	a.model = m
 	a.mu.Unlock()
+}
+
+// persistModel saves the current model. A retry does nothing unless the last applied model is known to be unsaved.
+// Saving while holding mu keeps the persisted snapshot and stateUnsaved flag in step with model replacements.
+func (a *Agent) persistModel(m *model, retryOnly bool) {
+	a.mu.Lock()
+	if m == nil || a.model != m {
+		m = a.model
+	}
+	if retryOnly && !a.stateUnsaved {
+		a.mu.Unlock()
+		return
+	}
+	err := saveState(a.cfg.StateDir, m)
+	wasUnsaved := a.stateUnsaved
+	if err != nil {
+		a.stateUnsaved = true
+	} else {
+		a.stateUnsaved = false
+	}
+	a.mu.Unlock()
+
+	if err != nil {
+		if !wasUnsaved {
+			a.log.Error("could not persist the applied state", "err", err)
+		}
+		return
+	}
+	if wasUnsaved {
+		a.log.Info("applied state persisted", "revision", m.revision)
+	}
+}
+
+func (a *Agent) stateNeedsPersist() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.stateUnsaved
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1310,6 +1350,7 @@ func (a *Agent) handle(ctx context.Context, j job) {
 	case j.retire != nil:
 		a.retire(ctx, j)
 	case j.sweep:
+		a.persistModel(nil, true)
 		if m := a.snapshotModel(); m.revision != 0 {
 			a.reconcile(ctx, m, nil)
 		}

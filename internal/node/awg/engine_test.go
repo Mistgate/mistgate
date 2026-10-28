@@ -337,9 +337,8 @@ func TestRemovedPeerCountersAreFlushed(t *testing.T) {
 	}
 }
 
-// A removal the device refused leaves the peer on it: its bytes must be reported once, not flushed and then counted again
-// from zero.
-func TestFailedPeerRemovalDoesNotDoubleCount(t *testing.T) {
+// A removal that still fails after an individual retry rebuilds the interface and flushes the peer's final counters once.
+func TestFailedPeerRemovalRebuildsWithoutDoubleCounting(t *testing.T) {
 	e, fb, _ := newTestEngine(t)
 	ctx := context.Background()
 	s := spec(t, "inb1", 51842, nil)
@@ -350,13 +349,59 @@ func TestFailedPeerRemovalDoesNotDoubleCount(t *testing.T) {
 		t.Fatalf("first collect: %+v", c.Traffic)
 	}
 	setRx(150)
-	fb.peersErr = errors.New("device busy")
-	if _, err := e.Apply(ctx, s, []plugin.UserCred{cred("b", 0x0b, 6)}); err == nil { // a is dropped, the device refuses
-		t.Fatal("the failed removal was not reported")
+	fb.removeErrs = -1 // every removal fails; rebuilding can add b without the revoked peer
+	rep, err := e.Apply(ctx, s, []plugin.UserCred{cred("b", 0x0b, 6)})
+	if err != nil || !rep.Restarted {
+		t.Fatalf("failed removal should rebuild the interface: report=%+v err=%v", rep, err)
 	}
-	fb.peersErr = nil
+	if fb.hasPeer(p1, 0x0a) || !fb.hasPeer(p1, 0x0b) {
+		t.Fatal("the rebuilt interface must contain only the desired peer")
+	}
 	if c, _ := e.Collect(ctx); len(c.Traffic) != 1 || c.Traffic[0].CredID != "a" || c.Traffic[0].Up != 50 {
-		t.Fatalf("after the failed removal the peer's 50 new bytes must be counted once: %+v", c.Traffic)
+		t.Fatalf("rebuilding must report the peer's 50 final bytes once: %+v", c.Traffic)
+	}
+}
+
+func TestFailedPeerRemovalIsRetriedIndividually(t *testing.T) {
+	e, fb, _ := newTestEngine(t)
+	s := spec(t, "inb1", 51842, nil)
+	mustApply(t, e, s, cred("a", 0x0a, 5), cred("b", 0x0b, 6))
+	fb.take()
+	fb.mutate(p1, func(d *fakeDev) { d.peers[pk(0x0a)].rx = 30 })
+	fb.removeErrs = 1
+
+	if _, err := e.Apply(context.Background(), s, []plugin.UserCred{cred("b", 0x0b, 6)}); err == nil {
+		t.Fatal("the failed batched removal should still be reported")
+	}
+	if fb.removeCalls != 2 || fb.hasPeer(p1, 0x0a) {
+		t.Fatalf("removal attempts=%d, revoked peer present=%t", fb.removeCalls, fb.hasPeer(p1, 0x0a))
+	}
+	if got := fb.take(); !slices.Equal(got, []string{"peers:" + p1 + ":-0a"}) {
+		t.Fatalf("a successful individual retry should remove the peer without rebuilding: %v", got)
+	}
+	if c, _ := e.Collect(context.Background()); len(c.Traffic) != 1 || c.Traffic[0] != (plugin.UserTraffic{CredID: "a", InboundID: "inb1", Up: 30}) {
+		t.Fatalf("the removed peer's final counters should be delivered once: %+v", c.Traffic)
+	}
+	if _, err := e.Apply(context.Background(), s, []plugin.UserCred{cred("b", 0x0b, 6)}); err != nil {
+		t.Fatalf("retry after removing the peer: %v", err)
+	}
+}
+
+func TestAddOnlyFailureDoesNotRebuild(t *testing.T) {
+	e, fb, _ := newTestEngine(t)
+	s := spec(t, "inb1", 51842, nil)
+	mustApply(t, e, s, cred("a", 0x0a, 5))
+	fb.take()
+	fb.peersErr = errors.New("device busy")
+
+	if _, err := e.Apply(context.Background(), s, []plugin.UserCred{cred("a", 0x0a, 5), cred("b", 0x0b, 6)}); err == nil {
+		t.Fatal("add failure should be reported")
+	}
+	if got := fb.take(); len(got) != 0 {
+		t.Fatalf("an add-only failure must not rebuild the interface: %v", got)
+	}
+	if !fb.hasPeer(p1, 0x0a) || fb.hasPeer(p1, 0x0b) {
+		t.Fatal("the failed add should leave the existing peer and interface alone")
 	}
 }
 

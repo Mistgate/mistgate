@@ -212,13 +212,22 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 
 	// Same interface identity and still there: a users-only (or MTU-only) change, applied live.
 	if old != nil && old.up && old.state == plugin.RunRunning && old.cfg.identity == cfg.identity && e.backend.LinkUp(old.cfg.name) {
-		if err := e.updateLive(ctx, old, cfg, peers); err != nil {
+		rebuild, err := e.updateLive(ctx, old, cfg, peers)
+		restarted := false
+		if rebuild {
+			e.log.Warn("awg peer removal could not be confirmed; rebuilding the interface", "inbound", spec.ID, "err", err)
+			if rebuildErr := e.rebuildLive(ctx, old, spec, sh, creds, cfg, peers); rebuildErr != nil {
+				e.log.Error("awg interface rebuild failed", "inbound", spec.ID, "err", rebuildErr)
+				return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("awg inbound %q: rebuild after failed live update: %w", spec.ID, rebuildErr)
+			}
+			restarted = true
+		} else if err != nil {
 			e.log.Error("awg live update failed", "inbound", spec.ID, "err", err)
 			return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("awg inbound %q: %w", spec.ID, err)
 		}
 		old.spec, old.specHash, old.creds, old.cfg = spec, sh, creds, cfg
 		old.warnedMissing = false
-		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, nil
+		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Restarted: restarted}, nil
 	}
 
 	// New inbound, changed identity, or a retry of one that failed or lost its interface: (re)build it.
@@ -266,29 +275,114 @@ func (e *Engine) build(ctx context.Context, in *inbound, peers map[[32]byte]*wan
 	in.up = true
 	in.gen++
 	e.byIface[c.name] = in.spec.ID
-	return e.syncPeers(ctx, in, nil, peers)
+	_, err := e.syncPeers(ctx, in, nil, peers)
+	return err
 }
 
 // updateLive applies an MTU change and the credential diff to the running interface.
-func (e *Engine) updateLive(ctx context.Context, in *inbound, cfg nodeConfig, peers map[[32]byte]*wantPeer) error {
+func (e *Engine) updateLive(ctx context.Context, in *inbound, cfg nodeConfig, peers map[[32]byte]*wantPeer) (bool, error) {
 	if cfg.tunnel.MTU != in.cfg.tunnel.MTU {
 		if err := e.backend.SetMTU(ctx, cfg.name, int(cfg.tunnel.MTU)); err != nil {
-			return fmt.Errorf("set mtu: %w", err)
+			return e.recoverFailedUpdate(ctx, in, cfg.name, peers, nil, nil, fmt.Errorf("set mtu: %w", err))
 		}
 		in.cfg.tunnel.MTU = cfg.tunnel.MTU
 	}
 	have, err := e.stats(ctx, cfg.name)
 	if err != nil {
-		return fmt.Errorf("read peers: %w", err)
+		return e.recoverFailedUpdate(ctx, in, cfg.name, peers, nil, nil, fmt.Errorf("read peers: %w", err))
 	}
-	return e.syncPeers(ctx, in, have, peers)
+	flushed, err := e.syncPeers(ctx, in, have, peers)
+	if err != nil {
+		return e.recoverFailedUpdate(ctx, in, cfg.name, peers, have, flushed, err)
+	}
+	return false, nil
+}
+
+// recoverFailedUpdate retries every peer removal individually. If any undesired peer remains, or the engine cannot
+// verify that removals took effect, the caller rebuilds the interface from the desired peer set.
+func (e *Engine) recoverFailedUpdate(ctx context.Context, in *inbound, name string, want map[[32]byte]*wantPeer, have []awgcfg.PeerStat, flushed map[[32]byte]bool, cause error) (bool, error) {
+	seen := make(map[[32]byte]bool)
+	var remove [][32]byte
+	for _, h := range sortedStats(have) {
+		if want[h.PublicKey] == nil && !seen[h.PublicKey] {
+			seen[h.PublicKey] = true
+			remove = append(remove, h.PublicKey)
+		}
+	}
+	for _, key := range sortedKeys(in.peers) {
+		if want[key] == nil && !seen[key] {
+			seen[key] = true
+			remove = append(remove, key)
+		}
+	}
+	if len(remove) == 0 {
+		return false, cause
+	}
+	for _, key := range remove {
+		if err := e.backend.SetPeers(ctx, name, false, []awgcfg.Peer{{PublicKey: key, Remove: true}}); err != nil {
+			e.log.Warn("retry awg peer removal", "inbound", in.spec.ID, "err", err)
+		}
+	}
+
+	remaining, err := e.stats(ctx, name)
+	if err != nil {
+		return true, fmt.Errorf("%w; could not verify revoked peer removal: %v", cause, err)
+	}
+	for _, h := range remaining {
+		if seen[h.PublicKey] {
+			return true, cause
+		}
+	}
+	haveBy := make(map[[32]byte]awgcfg.PeerStat, len(have))
+	for _, h := range have {
+		haveBy[h.PublicKey] = h
+	}
+	for _, key := range remove {
+		if h, ok := haveBy[key]; ok && !flushed[key] {
+			e.flush(in, h)
+		}
+	}
+	return false, cause
+}
+
+// rebuildLive is the last resort when the backend still reports a peer that the desired state revoked.
+func (e *Engine) rebuildLive(ctx context.Context, in *inbound, spec plugin.InboundSpec, specHash string, creds []plugin.UserCred, cfg nodeConfig, peers map[[32]byte]*wantPeer) error {
+	restarts := in.restarts
+	if in.up {
+		restarts++
+	}
+	e.destroy(ctx, in)
+	if e.backend.LinkUp(cfg.name) {
+		if err := e.backend.Destroy(ctx, cfg.name); err != nil && e.backend.LinkUp(cfg.name) {
+			return fmt.Errorf("destroy interface with a revoked peer: %w", err)
+		}
+		if e.backend.LinkUp(cfg.name) {
+			return errors.New("interface with a revoked peer is still up")
+		}
+	}
+
+	in.spec, in.specHash, in.creds, in.cfg = spec, specHash, creds, cfg
+	in.warnedMissing = false
+	in.peers = map[[32]byte]*wantPeer{}
+	in.prev = map[[32]byte]counters{}
+	in.timers = map[[32]byte]*time.Timer{}
+	in.restarts = restarts
+	in.state, in.detail, in.since = plugin.RunStarting, "", e.now()
+	if err := e.build(ctx, in, peers); err != nil {
+		e.destroy(ctx, in)
+		in.state, in.detail, in.since = plugin.RunFailed, err.Error(), e.now()
+		return err
+	}
+	in.state, in.detail, in.since = plugin.RunRunning, "", e.now()
+	return nil
 }
 
 // syncPeers moves the device from `have` (what it reports) to `want`. Removals go first in the first batch(es),
 // then additions and updates; batches are at most peerBatch peers. The counters of a removed peer are queued after
 // its batch succeeded.
-func (e *Engine) syncPeers(ctx context.Context, in *inbound, have []awgcfg.PeerStat, want map[[32]byte]*wantPeer) error {
+func (e *Engine) syncPeers(ctx context.Context, in *inbound, have []awgcfg.PeerStat, want map[[32]byte]*wantPeer) (map[[32]byte]bool, error) {
 	haveBy := make(map[[32]byte]awgcfg.PeerStat, len(have))
+	flushed := make(map[[32]byte]bool)
 	for _, h := range have {
 		haveBy[h.PublicKey] = h
 	}
@@ -312,18 +406,19 @@ func (e *Engine) syncPeers(ctx context.Context, in *inbound, have []awgcfg.PeerS
 	for len(ops) > 0 {
 		n := min(len(ops), peerBatch)
 		if err := e.backend.SetPeers(ctx, in.cfg.name, false, ops[:n]); err != nil {
-			return fmt.Errorf("set peers: %w", err)
+			return flushed, fmt.Errorf("set peers: %w", err)
 		}
 		// Counters retire only once the device really dropped the peer; a refused removal keeps its baseline.
 		for _, op := range ops[:n] {
 			if op.Remove {
 				e.flush(in, haveBy[op.PublicKey])
+				flushed[op.PublicKey] = true
 			}
 		}
 		ops = ops[n:]
 	}
 	in.peers = want
-	return nil
+	return flushed, nil
 }
 
 // flush queues the counters a peer accumulated since the last Collect, before the peer leaves the device.

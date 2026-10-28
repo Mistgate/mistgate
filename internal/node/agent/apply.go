@@ -29,12 +29,12 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 		res.DurationMs = uint32(time.Since(start).Milliseconds())
 		return res
 	}
-
 	if ds.BaseRevision != 0 && ds.Revision < cur.revision {
 		a.log.Debug("old delta ignored", "revision", ds.Revision, "applied", cur.revision)
 		return nil
 	}
 	if ds.BaseRevision != 0 && ds.Revision == cur.revision { // re-delivery of what we already run
+		a.persistModel(cur, true)
 		res.Status = pb.ApplyStatus_APPLY_STATUS_APPLIED
 		res.StateHash = a.observedHash(cur)
 		res.Inbounds = a.cachedResults(cur)
@@ -65,16 +65,8 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 
 	results := a.reconcile(ctx, next, nil)
 	a.setModel(next)
-	if err := saveState(a.cfg.StateDir, next); err != nil {
-		a.log.Error("could not persist the applied state", "err", err)
-	}
-
-	res.Status = pb.ApplyStatus_APPLY_STATUS_APPLIED
-	for _, r := range results {
-		if r.Error != "" {
-			res.Status = pb.ApplyStatus_APPLY_STATUS_PARTIAL
-		}
-	}
+	a.persistModel(next, false)
+	res.Status = applyStatus(results)
 	res.Inbounds = results
 	res.StateHash = a.observedHash(next)
 	if ds.BaseRevision == 0 { // deltas are frequent; only a full apply is an event worth reporting
@@ -86,6 +78,15 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	}
 	a.log.Info("desired state applied", "revision", next.revision, "full", ds.BaseRevision == 0, "inbounds", len(results), "status", res.Status)
 	return done()
+}
+
+func applyStatus(results []*pb.InboundResult) pb.ApplyStatus {
+	for _, r := range results {
+		if r.Error != "" {
+			return pb.ApplyStatus_APPLY_STATUS_PARTIAL
+		}
+	}
+	return pb.ApplyStatus_APPLY_STATUS_APPLIED
 }
 
 // diffModels counts what a full apply changed against the state the agent held: inbounds added, removed, with another

@@ -515,6 +515,102 @@ func TestPartialApplyKeepsOtherInbounds(t *testing.T) {
 	}
 }
 
+func TestApplyReportsUnsavedStateAndPersistsRetry(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	first := h.a.applyDesired(context.Background(), fullState(1, inb("inb_1", 0, 0, cred("crd_a"))))
+	if first.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED {
+		t.Fatalf("initial apply status = %s, want APPLIED", first.Status)
+	}
+	blockedDir := filepath.Join(h.dir, "blocked")
+	if err := os.WriteFile(blockedDir, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.a.cfg.StateDir = blockedDir
+	delta := &pb.DesiredState{Revision: 2, BaseRevision: 1, Inbounds: []*pb.InboundState{inb("inb_1", 0, 0, cred("crd_b"))}}
+
+	unsaved := h.a.applyDesired(context.Background(), delta)
+	if unsaved.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED {
+		t.Fatalf("unsaved apply status = %s, want APPLIED", unsaved.Status)
+	}
+	if !h.a.stateNeedsPersist() || !slices.Contains(h.eng.credIDs("inb_1"), "crd_b") {
+		t.Fatal("the live state should remain applied and marked unsaved when persistence fails")
+	}
+	duplicate := h.a.applyDesired(context.Background(), delta)
+	if duplicate.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || !h.a.stateNeedsPersist() {
+		t.Fatalf("unsaved duplicate status/state = %s/%t, want APPLIED/true", duplicate.Status, h.a.stateNeedsPersist())
+	}
+	logCount := func(message string) int {
+		records, _ := h.a.ring.tail(ringSize, func(r logRecord) bool { return r.msg == message }, false)
+		return len(records)
+	}
+	if got := logCount("could not persist the applied state"); got != 1 {
+		t.Fatalf("persistence failure logs = %d, want one for the failure episode", got)
+	}
+
+	if err := os.Remove(blockedDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(blockedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	// The periodic sweep path queues persistence retry work on the same worker that applies state.
+	h.a.sweepEvery = 10 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	workerDone, sweepDone := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		h.a.worker(ctx)
+	}()
+	go func() {
+		defer close(sweepDone)
+		h.a.sweepLoop(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-workerDone
+		<-sweepDone
+	}()
+	var persisted *model
+	var loadErr error
+	eventually(t, func() bool {
+		if h.a.stateNeedsPersist() {
+			return false
+		}
+		persisted, loadErr = loadState(blockedDir, h.a.knows)
+		return loadErr == nil && persisted.revision == 2
+	}, "periodic persistence retry")
+	if loadErr != nil || len(persisted.inbounds["inb_1"].creds) != 1 || persisted.inbounds["inb_1"].creds["crd_b"].CredID != "crd_b" {
+		t.Fatalf("retry did not persist the newest state: err=%v state=%+v", loadErr, persisted)
+	}
+	if got := logCount("could not persist the applied state"); got != 1 {
+		t.Fatalf("persistence failure logs after retry = %d, want one", got)
+	}
+	if got := logCount("applied state persisted"); got != 1 {
+		t.Fatalf("persistence recovery logs = %d, want one", got)
+	}
+}
+
+func TestApplyKeepsPartialStatusWhenSaveFails(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	h.eng.mu.Lock()
+	h.eng.applyErr["inb_bad"] = errBoom
+	h.eng.mu.Unlock()
+	blockedDir := filepath.Join(h.dir, "blocked")
+	if err := os.WriteFile(blockedDir, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.a.cfg.StateDir = blockedDir
+
+	result := h.a.applyDesired(context.Background(), fullState(1,
+		inb("inb_good", 0, 0, cred("crd_good")),
+		inb("inb_bad", 0, 0, cred("crd_bad")),
+	))
+	if result.Status != pb.ApplyStatus_APPLY_STATUS_PARTIAL || !h.a.stateNeedsPersist() {
+		t.Fatalf("unsaved partial apply status/state = %s/%t, want PARTIAL/true", result.Status, h.a.stateNeedsPersist())
+	}
+}
+
 func TestUnchangedInboundsAreNotReapplied(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	h.waitConnected()
