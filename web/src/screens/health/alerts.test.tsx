@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
+import { setLang } from "@/i18n";
 import type { Alert } from "@/lib/health";
 import { AlertCard } from "./alerts";
 import { useFixFlow } from "./fix";
@@ -271,5 +272,43 @@ describe("a reopened alert", () => {
     await mount(alert({ firstSeenUnix: NOW - 3600, openedUnix: NOW - 120 }));
     expect(text()).toContain("for 2 min");
     expect(text()).not.toContain("for 1 h");
+  });
+});
+
+describe("a country alert and IPv6", () => {
+  const country = (params: Record<string, string>, over: Partial<Alert> = {}) =>
+    alert({ kind: AlertKind.COUNTRY_BLOCKED, subject: "", titleKey: "health.alert.country_blocked.title", whyKey: "", params: { country: "RU", verdict: "blocked", ...params }, ...over });
+  const open6 = () => document.querySelector("[data-testid=alert-v6-open]");
+
+  it("says that the node is reachable over IPv6 when the IPv6 rounds reach it", async () => {
+    await mount(country({ ipv6: "open" }));
+    expect(open6()?.textContent).toBe("Over IPv6 the node is reachable from there.");
+    expect(document.querySelector("h3")?.textContent).toBe("Unreachable from Russia");
+  });
+
+  it("says nothing of IPv6 when IPv6 is cut too or not known", async () => {
+    for (const ipv6 of ["blocked", "partial", "unknown"]) {
+      await mount(country({ ipv6 }));
+      expect(open6()).toBeNull();
+      expect(text()).not.toContain("IPv6");
+      act(() => root?.unmount());
+      host?.remove();
+    }
+  });
+
+  it("tags the IPv6 alert itself after its title", async () => {
+    await mount(country({ family: "6" }, { subject: "ipv6" }));
+    expect(document.querySelector("h3")?.textContent).toBe("Unreachable from RussiaIPv6");
+    expect(open6()).toBeNull();
+  });
+
+  it("speaks Russian", async () => {
+    act(() => setLang("ru"));
+    try {
+      await mount(country({ ipv6: "open" }, { subject: "partial", params: { country: "RU", verdict: "partial", networks: "MTS", ipv6: "open" } }));
+      expect(open6()?.textContent).toBe("По IPv6 нода оттуда доступна.");
+    } finally {
+      act(() => setLang("en"));
+    }
   });
 });

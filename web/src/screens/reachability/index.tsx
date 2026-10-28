@@ -14,8 +14,9 @@ import { useFmt } from "@/lib/format";
 import { countryQuery } from "@/lib/globalping";
 import { alertsQuery, checksQuery, countryIn, severityKind, sourceName, type Alert, type CountryCheck, type CountryLook } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
-import { darkEverywhere, historyQuery, tallyOf, type DarkEverywhere, type Lane, type Tally } from "@/lib/reachability";
+import { darkEverywhere, history6Query, historyQuery, ipv6Helps, tallyOf, type DarkEverywhere, type Lane, type Tally } from "@/lib/reachability";
 import { useIsOwner } from "@/lib/updates";
+import { Ipv6Tag } from "@/screens/health/alerts";
 import { CountryMark } from "@/screens/health/country";
 import { NodesTable, type NodeRow } from "./nodes";
 import { CountryPicker, SourceCards } from "./sources";
@@ -37,6 +38,9 @@ export function ReachabilityScreen() {
   const country = useQuery({ ...countryQuery, enabled: owner });
   const code = country.data?.country ?? history.data?.country ?? "";
   const h = history.data;
+  // the IPv6 week only while Globalping checks IPv6: then every row carries CountryCheck.ipv6
+  const v6On = (checks.data?.countryChecks ?? []).some((c) => c.ipv6);
+  const h6 = useQuery({ ...history6Query, enabled: v6On });
 
   const nodes: NodeRow[] = (nodesQ.data?.nodes ?? [])
     .filter((n) => n.status !== NodeStatus.PENDING && n.status !== NodeStatus.RETIRED)
@@ -44,6 +48,7 @@ export function ReachabilityScreen() {
     .map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode }));
   const byNode = new Map((checks.data?.countryChecks ?? []).map((c) => [c.nodeId, c]));
   const lanes = new Map((h?.nodes ?? []).map((n) => [n.nodeId, new Map<string, Lane>(n.lanes.map((l) => [l.source, l]))]));
+  const lanes6 = new Map((v6On ? (h6.data?.nodes ?? []) : []).flatMap((n) => n.lanes.filter((l) => l.source === "globalping").map((l) => [n.nodeId, l] as const)));
   const sources = h?.sources ?? [];
 
   return (
@@ -65,8 +70,9 @@ export function ReachabilityScreen() {
       ) : (
         <>
           <Summary tally={tallyOf(nodes.map((n) => n.id), (id) => byNode.get(id)?.verdict)} />
+          <Ipv6Helps n={nodes.filter((n) => ipv6Helps(byNode.get(n.id))).length} />
           <DarkEverywhereLines rows={darkEverywhere(nodes.map((n) => byNode.get(n.id)).filter((c): c is CountryCheck => !!c))} />
-          <NodesTable nodes={nodes} checks={byNode} lanes={lanes} sources={sources} probeNode={checks.data?.tspuRun?.nodeId ?? ""} country={code} since={h.sinceUnix} now={h.nowUnix} />
+          <NodesTable nodes={nodes} checks={byNode} lanes={lanes} lanes6={lanes6} sources={sources} probeNode={checks.data?.tspuRun?.nodeId ?? ""} country={code} since={h.sinceUnix} now={h.nowUnix} />
         </>
       )}
 
@@ -118,6 +124,21 @@ function Summary({ tally }: { tally: Tally }) {
         );
       })}
     </ul>
+  );
+}
+
+/** The nodes cut over IPv4 that IPv6 still reaches, under the IPv4 tally: one quiet line, nothing when there are none. */
+function Ipv6Helps({ n }: { n: number }) {
+  const t = useT();
+  if (n === 0) return null;
+  return (
+    <p data-testid="ipv6-helps" className="flex items-center gap-2 rounded-card border border-line bg-surface px-3.5 py-2.5 text-[13px]">
+      <span className="tone-ok tone-text flex">
+        <CountryMark kind="ok" />
+      </span>
+      <span className="font-mono text-[10px] font-bold text-muted">IPv6</span>
+      <span className="min-w-0 font-semibold text-pretty">{t("rc.sum.v6", { n })}</span>
+    </p>
   );
 }
 
@@ -213,6 +234,7 @@ function Events({ code }: { code: string }) {
             <span className="min-w-0 flex-1 text-pretty">
               <b className="mr-1.5 font-mono text-xs">{a.nodeName}</b>
               <span className={cx("font-semibold", !open && "text-muted")}>{verdict ? t(verdict) : a.params.verdict}</span>
+              <Ipv6Tag alert={a} className="ml-1.5 align-[1px]" />
               <span className="text-muted"> · {when}</span>
             </span>
             <span className="font-mono text-[11px] whitespace-nowrap text-muted max-sm:hidden">{fmt.stamp(open ? a.openedUnix || a.firstSeenUnix : a.resolvedAtUnix)}</span>

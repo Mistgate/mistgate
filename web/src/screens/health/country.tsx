@@ -187,16 +187,22 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
 
 /**
  * The verdict as a pill with the cell's second line under it (the Reachability page's table): the same colours, glyphs and
- * tooltip as the cell. A node with no row yet gets a dash.
+ * tooltip as the cell. A node with no row yet gets a dash. `tag`: the address family ("IPv4", "IPv6") while IPv6 is checked too.
  */
-export function CountryPill({ check, node, code }: { check: CountryCheck | undefined; node: string; code: string }) {
+export function CountryPill({ check, node, code, tag = "" }: { check: CountryCheck | undefined; node: string; code: string; tag?: string }) {
   const t = useT();
   const fmt = useFmt();
-  const title = useCountryTitle(code);
+  const title = [useCountryTitle(code), tag].filter(Boolean).join(" · ");
   const pill = "inline-flex h-[26px] w-fit max-w-full items-center gap-1.5 rounded-[13px] px-2.5 text-xs leading-none font-bold whitespace-nowrap";
+  const tagged = tag && (
+    <span aria-hidden className="font-mono text-[10px] font-bold opacity-70">
+      {tag}
+    </span>
+  );
   if (!check)
     return (
       <span className={cx(pill, cellCls.none)} title={t("cr.v.notYet")}>
+        {tagged}
         <span aria-hidden>{t("hl.cell.none")}</span>
         <span className="sr-only">{t("hl.cell.aria", { node, profile: title, state: t("cr.v.notYet") })}</span>
       </span>
@@ -206,6 +212,7 @@ export function CountryPill({ check, node, code }: { check: CountryCheck | undef
     <span className="flex min-w-0 flex-col items-start gap-1">
       <CountryTip look={look}>
         <span role="img" tabIndex={0} aria-label={t("hl.cell.aria", { node, profile: title, state: look.state })} className={cx(pill, cellCls[look.kind])}>
+          {tagged}
           <CountryMark kind={look.kind} />
           {look.label}
           {look.alsoListed && <ListedGlyph />}

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState, type FocusEvent, type KeyboardEvent } from "react";
+import { Fragment, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { SectionLabel } from "@/components/ui/bits";
 import { Tip } from "@/components/ui/tooltip";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
@@ -7,14 +7,16 @@ import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import { countryLook, type CountryCheck } from "@/lib/health";
-import { laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
+import { countryLook, ipv6Why, type CountryCheck } from "@/lib/health";
+import { ipv6State, laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
 import { CountryMark, CountryPill, PartialBreakdown } from "@/screens/health/country";
 
 // The nodes of the Reachability page: a row per node with its verdict now (the pill of the Health column, with its tooltip), then
 // a line per source: its word for the node now and its week as a thin lane of verdicts. Globalping, the lists and the probe stay
 // in place while off, dimmed, so the rows keep their shape; cheburcheck and bsbord have a line while they are on. Below 1280 px (the sidebar takes its part) a row is a card: the verdict on top, the
-// source lines under it, each lane on a line of its own on a phone.
+// source lines under it, each lane on a line of its own on a phone. While Globalping checks IPv6 as well, the verdict pill says
+// "IPv4" and an "IPv6" pill follows it, and Globalping's lane gets its IPv6 twin under it; a node without an IPv6 verdict gets
+// one quiet line there instead, with the reason (no IPv6 on the server, broken at the hoster, an old agent, no probes).
 
 export type NodeRow = { id: string; name: string; countryCode: string };
 
@@ -66,6 +68,7 @@ export function NodesTable({
   nodes,
   checks,
   lanes,
+  lanes6,
   sources,
   probeNode,
   country,
@@ -75,6 +78,8 @@ export function NodesTable({
   nodes: readonly NodeRow[];
   checks: ReadonlyMap<string, CountryCheck>;
   lanes: ReadonlyMap<string, ReadonlyMap<string, Lane>>;
+  /** Globalping's IPv6 lane of each node */
+  lanes6: ReadonlyMap<string, Lane>;
   sources: readonly string[];
   probeNode: string;
   country: string;
@@ -100,34 +105,43 @@ export function NodesTable({
         </div>
       </div>
       <ul aria-label={t("rc.nodes.title")} className="flex flex-col">
-        {nodes.map((n) => (
-          <li key={n.id} data-testid="reach-node" className={cx("flex flex-col gap-2.5 border-t border-line py-3", rowCols)}>
-            {/* a card: name and verdict on one line; the wide screen: each in its column */}
-            <div className="flex items-start justify-between gap-3 xl:contents">
-              <Link to="/nodes/$id" params={{ id: n.id }} className="flex min-w-0 items-center gap-2 pt-1 hover:text-accent-text xl:self-start">
-                <span className="w-5 flex-none font-mono text-[10px] font-bold text-muted">{n.countryCode}</span>
-                <span className="truncate font-mono text-[13px] font-bold">{n.name}</span>
-              </Link>
-              <div className="xl:self-start">
-                <CountryPill check={checks.get(n.id)} node={n.name} code={country} />
+        {nodes.map((n) => {
+          const c = checks.get(n.id);
+          const v6 = ipv6State(c?.ipv6, lanes6.get(n.id));
+          return (
+            <li key={n.id} data-testid="reach-node" className={cx("flex flex-col gap-2.5 border-t border-line py-3", rowCols)}>
+              {/* a card: the name, and the verdicts at the right under each other (IPv4 keeps its place in every row); the wide screen: each in its column */}
+              <div className="flex items-start justify-between gap-3 xl:contents">
+                <Link to="/nodes/$id" params={{ id: n.id }} className="flex min-w-0 items-center gap-2 pt-1 hover:text-accent-text xl:self-start">
+                  <span className="w-5 flex-none font-mono text-[10px] font-bold text-muted">{n.countryCode}</span>
+                  <span className="truncate font-mono text-[13px] font-bold">{n.name}</span>
+                </Link>
+                <div className="flex flex-none flex-col items-end gap-1.5 xl:items-start xl:self-start">
+                  <CountryPill check={c} node={n.name} code={country} tag={c?.ipv6 ? "IPv4" : ""} />
+                  {v6 === "data" && c?.ipv6 && <CountryPill check={c.ipv6} node={n.name} code={country} tag="IPv6" />}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {shownSources(sources).map((src) => (
-                <SourceLine key={src} source={src} on={sources.includes(src)} lane={lanes.get(n.id)?.get(src)} probe={src === "tspu" && n.id === probeNode} since={since} now={now} />
-              ))}
-              <div aria-hidden className={cx(lineCols, "text-[10px] text-faint xl:hidden")}>
-                <span className="max-md:hidden" />
-                <span className="max-md:hidden" />
-                <span className="col-span-2 flex justify-between md:col-span-1">
-                  <span>{t("rc.axis.ago")}</span>
-                  <span>{t("rc.axis.now")}</span>
-                </span>
+              <div className="flex flex-col gap-1.5">
+                {shownSources(sources).map((src) => (
+                  <Fragment key={src}>
+                    <SourceLine source={src} on={sources.includes(src)} lane={lanes.get(n.id)?.get(src)} probe={src === "tspu" && n.id === probeNode} since={since} now={now} />
+                    {src === "globalping" && v6 === "data" && <SourceLine source={src} v6 on lane={lanes6.get(n.id)} probe={false} since={since} now={now} />}
+                    {src === "globalping" && v6 === "reason" && c?.ipv6 && <Ipv6None check={c.ipv6} />}
+                  </Fragment>
+                ))}
+                <div aria-hidden className={cx(lineCols, "text-[10px] text-faint xl:hidden")}>
+                  <span className="max-md:hidden" />
+                  <span className="max-md:hidden" />
+                  <span className="col-span-2 flex justify-between md:col-span-1">
+                    <span>{t("rc.axis.ago")}</span>
+                    <span>{t("rc.axis.now")}</span>
+                  </span>
+                </div>
               </div>
-            </div>
-            <RowBreakdown check={checks.get(n.id)} />
-          </li>
-        ))}
+              <RowBreakdown check={c} />
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -168,14 +182,42 @@ function DayAxis({ since, now }: { since: number; now: number }) {
   );
 }
 
-/** One source of one node: its name, what it says now, and its week. Off, the line is dimmed and the lane is an empty dashed track. */
-function SourceLine({ source, on, lane, probe, since, now }: { source: ReachSource; on: boolean; lane: Lane | undefined; probe: boolean; since: number; now: number }) {
+/**
+ * The name of the IPv6 twin of Globalping's line, under it: "IPv6", indented, the source said to a screen reader. The quiet line
+ * of a node without an IPv6 verdict carries it too, so both sit where the lane would.
+ */
+function Ipv6Label() {
+  const t = useT();
+  return (
+    <span className="truncate pl-3 font-mono text-[11px] font-bold text-muted">
+      <span className="sr-only">{t("rc.src.globalping")} · </span>IPv6
+    </span>
+  );
+}
+
+/** A node Globalping does not check over IPv6: why, on one quiet line under Globalping's lane ("The server has no IPv6"). */
+function Ipv6None({ check }: { check: CountryCheck }) {
+  const t = useT();
+  return (
+    <div data-testid="line-ipv6-none" className={lineCols.replace("items-center", "items-baseline")}>
+      <Ipv6Label />
+      <span className="min-w-0 text-xs leading-snug text-pretty text-muted md:col-span-2">{ipv6Why(t, check)}</span>
+    </div>
+  );
+}
+
+/**
+ * One source of one node: its name, what it says now, and its week. Off, the line is dimmed and the lane is an empty dashed track.
+ * `v6`: Globalping's IPv6 lane, under its IPv4 one.
+ */
+function SourceLine(p: { source: ReachSource; v6?: boolean; on: boolean; lane: Lane | undefined; probe: boolean; since: number; now: number }) {
+  const { source, v6 = false, on, lane, probe, since, now } = p;
   const t = useT();
   const v = on ? laneNow(lane, now) : null;
   const kind = v == null ? "unknown" : verdictKind(v);
   return (
-    <div data-testid={`line-${source}`} data-on={on} className={cx(lineCols, !on && "opacity-55")}>
-      <span className="truncate text-xs font-semibold">{t(sourceKey[source])}</span>
+    <div data-testid={`line-${source}${v6 ? "6" : ""}`} data-on={on} className={cx(lineCols, !on && "opacity-55")}>
+      {v6 ? <Ipv6Label /> : <span className="truncate text-xs font-semibold">{t(sourceKey[source])}</span>}
       <span className={cx("flex min-w-0 items-center gap-1.5 text-xs font-bold", on ? textCls[kind] : "text-faint")}>
         {!on ? (
           t("rc.st.off")
@@ -191,7 +233,7 @@ function SourceLine({ source, on, lane, probe, since, now }: { source: ReachSour
         )}
       </span>
       <div className="col-span-2 md:col-span-1">
-        <LaneView source={source} on={on} lane={lane} since={since} now={now} />
+        <LaneView source={source} v6={v6} on={on} lane={lane} since={since} now={now} />
       </div>
     </div>
   );
@@ -207,7 +249,7 @@ function rangeOf(t: T, fmt: Fmt, s: Segment, now: number) {
  * Each segment is focusable and says its verdict and time in a tooltip; the arrows walk the lane, Tab leaves it (one stop, on
  * the newest segment).
  */
-export function LaneView({ source, on, lane, since, now }: { source: ReachSource; on: boolean; lane: Lane | undefined; since: number; now: number }) {
+export function LaneView({ source, v6 = false, on, lane, since, now }: { source: ReachSource; v6?: boolean; on: boolean; lane: Lane | undefined; since: number; now: number }) {
   const t = useT();
   const fmt = useFmt();
   const segs = on && lane ? segmentsOf(lane, since, now) : [];
@@ -228,7 +270,11 @@ export function LaneView({ source, on, lane, since, now }: { source: ReachSource
   };
 
   return (
-    <div role="group" aria-label={t("rc.lane", { source: t(sourceKey[source]) })} data-testid={`lane-${source}`} onKeyDown={onKeyDown} onFocus={onFocus} className="relative h-4">
+    <div
+      role="group"
+      aria-label={t("rc.lane", { source: v6 ? `${t(sourceKey[source])} · IPv6` : t(sourceKey[source]) })}
+      data-testid={`lane-${source}${v6 ? "6" : ""}`}
+      onKeyDown={onKeyDown} onFocus={onFocus} className="relative h-4">
       <div aria-hidden className={cx("absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full", on ? "bg-surface-2" : "border border-dashed border-line")}>
         {segs.map((s, i) => (
           <span key={i} data-verdict={verdictKind(s.verdict)} className={cx("absolute inset-y-0 min-w-[3px]", segCls[verdictKind(s.verdict)])} style={{ left: `${s.left}%`, width: `${s.width}%` }} />

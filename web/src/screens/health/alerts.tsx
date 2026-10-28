@@ -18,7 +18,7 @@ import { cx } from "@/lib/cx";
 import { quoteNames } from "@/lib/doctor-detail";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
-import { alertFix, alertTitle, alertWhy, isPeopleAlert, muteChoices, resolutionWord, restartConsequence, severityKind, severityWord, useCan, type Alert } from "@/lib/health";
+import { alertFix, alertIpv6, alertTitle, alertWhy, isPeopleAlert, muteChoices, resolutionWord, restartConsequence, severityKind, severityWord, useCan, type Alert } from "@/lib/health";
 import { useIsPhone } from "@/lib/media";
 import { clampPage, usePaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
@@ -52,6 +52,24 @@ export function useMute() {
         },
       },
     );
+}
+
+/**
+ * The IPv6 side of a country alert, after its title: "IPv6" on the IPv6 alert itself, "reachable over IPv6" on an IPv4 one whose
+ * node the IPv6 rounds reach. Nothing on any other alert.
+ */
+export function Ipv6Tag({ alert, className }: { alert: Alert; className?: string }) {
+  const t = useT();
+  const v6 = alertIpv6(alert);
+  if (v6 === "alert") return <Chip mono className={cx("text-fg", className)}>IPv6</Chip>;
+  if (v6 === "open")
+    return (
+      <Chip className={cx("tone-ok tone-text gap-1", className)}>
+        <Icon name="check" size={11} aria-hidden className="flex-none" />
+        {t("hl.alerts.v6open")}
+      </Chip>
+    );
+  return null;
 }
 
 /**
@@ -137,10 +155,19 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
         ) : (
           <Chip>{t("hl.alerts.fleetWide")}</Chip>
         )}
-        <h3 className="min-w-40 flex-1 text-sm font-bold">{alertTitle(t, a)}</h3>
+        <h3 className="min-w-40 flex-1 text-sm font-bold">
+          {alertTitle(t, a)}
+          {alertIpv6(a) === "alert" && <Ipv6Tag alert={a} className="ml-2 align-[1px]" />}
+        </h3>
         <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
       </div>
       {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
+      {alertIpv6(a) === "open" && (
+        <p data-testid="alert-v6-open" className="tone-ok tone-text flex items-center gap-1.5 text-[13px] font-semibold">
+          <Icon name="check" size={13} aria-hidden className="flex-none" />
+          {t("hl.alerts.v6openLong")}
+        </p>
+      )}
       {muted && <p className="font-mono text-[11px] text-faint">{t("hl.alerts.muted", { time: fmt.stamp(a.mutedUntilUnix) })}</p>}
       <div className="flex flex-wrap items-center gap-1.5">
         {target && <FixControl flow={flow} target={target} variant="primary" />}
@@ -353,6 +380,7 @@ function HistoryList({ rows, t, fmt }: { rows: Alert[]; t: T; fmt: Fmt }) {
           <span className="min-w-0">
             {h.nodeName && <b className="mr-1.5 font-mono text-xs">{h.nodeName}</b>}
             {alertTitle(t, h)}
+            <Ipv6Tag alert={h} className="ml-1.5 align-[1px]" />
             {lasted > 0 && <span className="ml-1.5 text-xs text-muted">· {t("hl.alerts.lasted", { duration: fmt.duration(lasted) })}</span>}
           </span>
         );

@@ -197,6 +197,21 @@ describe("the Globalping card", () => {
     expect(button("Disconnect")).toBeDefined();
   });
 
+  it("checks IPv6 too while on, says what that costs, and switches it through UpdateGlobalping", async () => {
+    const v6 = () => section("Globalping")!.querySelector("[role=switch][aria-label='Check over IPv6 too']");
+    await mount(settings());
+    expect(v6()).toBeNull(); // off: nothing to choose
+    act(() => root?.unmount());
+    host?.remove();
+    updateGlobalping.mockResolvedValue({ settings: settings({ enabled: true, ipv6: false }) });
+    await mount(settings({ enabled: true, ipv6: true }));
+    expect(v6()?.getAttribute("aria-checked")).toBe("true");
+    expect(text()).toContain("Nodes with working IPv6 are also checked by their IPv6 address, in a round of their own with its own control site.");
+    await click(v6());
+    expect(updateGlobalping).toHaveBeenCalledWith({ ipv6: false });
+    expect(v6()?.getAttribute("aria-checked")).toBe("false");
+  });
+
   it("shows only “set” for a stored token and sends a new one once, in the update and nowhere else", async () => {
     updateGlobalping.mockResolvedValue({ settings: settings({ enabled: true, hasToken: true }) });
     await mount(settings({ enabled: true }));

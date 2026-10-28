@@ -401,10 +401,23 @@ export function countryIn(t: T, code: string): string {
   return hasKey(key) ? t(key) : t("cr.in", { code });
 }
 
-/** Why a round has no verdict ("too few probes answered"); empty for a code the SPA does not know. */
-export function countryReason(t: T, code: string): string {
+/** Why a round has no verdict ("too few probes answered"); empty for a code the SPA does not know. `country`: for the IPv6 "no_probes". */
+export function countryReason(t: T, code: string, country = ""): string {
   const key = `cr.reason.${code}`;
-  return code && hasKey(key) ? t(key) : "";
+  return code && hasKey(key) ? t(key, { country: countryIn(t, country) }) : "";
+}
+
+/** Why a node has no IPv6 verdict, as a line of its own: "The server has no IPv6". */
+export const ipv6Why = (t: T, c: Pick<CountryCheck, "reason" | "country">) => capital(countryReason(t, c.reason || "not_checked", c.country) || c.reason);
+
+/**
+ * The IPv6 side of a COUNTRY_BLOCKED alert: "alert" for the IPv6 alert itself (family=6), "open" for an IPv4 one whose node the
+ * IPv6 rounds reach (ipv6=open). Null for anything else.
+ */
+export function alertIpv6(a: Pick<Alert, "kind" | "params">): "alert" | "open" | null {
+  if (a.kind !== AlertKind.COUNTRY_BLOCKED) return null;
+  if (a.params.family === "6") return "alert";
+  return a.params.ipv6 === "open" ? "open" : null;
 }
 
 export type CountryLook = {
@@ -531,7 +544,7 @@ export function countryLook(t: T, fmt: Fmt, c: CountryCheck): CountryLook {
     const head = why ? t("cr.tip.srcWhy", { source: sourceName(t, s.source), verdict: verdictWord(t, s.verdict), reason: why }) : said1(s);
     return s.atUnix ? `${head} · ${fmt.ago(s.atUnix)}` : head;
   });
-  const reason = live ? countryReason(t, c.reason) : probed ? t("cr.reason.tspu") : "";
+  const reason = live ? countryReason(t, c.reason, c.country) : probed ? t("cr.reason.tspu") : "";
   const listed = c.listedBy.length > 0;
   const cdn = cdnOf(t, c);
   const names = c.listedBy.map((l) => listName(t, l));

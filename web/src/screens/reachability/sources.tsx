@@ -199,6 +199,13 @@ function Body({ s, act }: { s: GlobalpingSettings; act: Actions }) {
             onSave={(token, done) => act.update.mutate({ token }, { onSuccess: done })}
           />
           <IntervalField current={s.intervalMin || 15} options={intervalOptions} onPick={(m) => act.update.mutate({ intervalMin: m })} />
+          {/* IPv6: a round of its own with its own control site, for the nodes whose IPv6 works; it takes more of the hour */}
+          <div className="flex flex-col gap-1">
+            <SettingRow label={t("gp.ipv6")} width="flex">
+              <Switch checked={s.ipv6} disabled={act.update.isPending} onCheckedChange={(v) => act.update.mutate({ ipv6: v })} aria-label={t("gp.ipv6")} />
+            </SettingRow>
+            <p className="max-w-xl text-xs leading-normal text-pretty text-muted">{t("gp.ipv6.hint")}</p>
+          </div>
         </div>
       )}
       {(s.enabled || s.hasToken) && (

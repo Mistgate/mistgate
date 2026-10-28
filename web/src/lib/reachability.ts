@@ -29,6 +29,26 @@ export const historyQuery = queryOptions({
   refetchInterval: 60_000,
 });
 
+/** The same week over IPv6: Globalping's lane alone, the only source that measures it; no nodes while its IPv6 checks are off. */
+export const history6Query = queryOptions({
+  queryKey: ["health", "checks", "history", 6],
+  queryFn: async ({ signal }) => plain(await countryReach.getReachabilityHistory({ days: 7, family: 6 }, { signal })),
+  refetchInterval: 60_000,
+});
+
+/**
+ * A node's IPv6 side on the page: "data" when IPv6 has a verdict now or somewhere in the week (its pill and lane), "reason"
+ * when it has none (one quiet line why), null while Globalping's IPv6 checks are off (no CountryCheck.ipv6).
+ */
+export function ipv6State(v6: CountryCheck | undefined, lane: Lane | undefined): "data" | "reason" | null {
+  const seen = (v6 && v6.verdict !== CountryVerdict.UNKNOWN) || lane?.points.some((p) => p.verdict !== CountryVerdict.UNKNOWN);
+  return seen ? "data" : v6 ? "reason" : null;
+}
+
+/** IPv4 cut (on some networks, TCP or all of it) while IPv6 gets through: the nodes an IPv6 entry would help. */
+export const ipv6Helps = (c: CountryCheck | undefined) =>
+  !!c && ["partial", "warn", "bad"].includes(verdictKind(c.verdict)) && c.ipv6?.verdict === CountryVerdict.OK;
+
 /** The look of a verdict, as the Health column draws it: quiet tick, the half disc, "!", "×", the list mark, a grey dot. */
 export function verdictKind(v: CountryVerdict): CountryLook["kind"] {
   switch (v) {

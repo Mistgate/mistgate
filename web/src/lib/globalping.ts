@@ -104,7 +104,7 @@ export function useGlobalpingActions() {
 
   // every change asks for a fresh step-up; only the fields that change are sent, the token in this one call and nowhere else
   const update = useMutation({
-    mutationFn: async (req: { enabled?: boolean; intervalMin?: number; token?: string }) => plain((await guard(() => globalping.updateGlobalping(req))).settings!),
+    mutationFn: async (req: { enabled?: boolean; intervalMin?: number; token?: string; ipv6?: boolean }) => plain((await guard(() => globalping.updateGlobalping(req))).settings!),
     onSuccess: (s, req) => {
       settle(s);
       toast(req.token !== undefined ? t("gp.token.saved") : req.enabled !== undefined ? t(s.enabled ? "gp.on" : "gp.off") : t("gp.saved"));

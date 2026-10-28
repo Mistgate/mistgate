@@ -517,3 +517,93 @@ describe("the Reachability page in Russian and Chinese", () => {
     expect(line("de1", "lists").children[1]?.textContent).toBe("不在名单中");
   });
 });
+
+describe("IPv6 on the Reachability page", () => {
+  // de1: no IPv6; fi1: IPv4 TCP blocked, IPv6 reachable; nl1: broken at the hoster; probe1: an old agent; se1: no IPv6 probes
+  // in the country, and a week of IPv6 rounds that never got a verdict
+  const v6 = (nodeId: string, verdict: CountryVerdict, reason = "") => check(nodeId, verdict, { reason, sources: reason ? [] : ["globalping"] });
+  const by: Record<string, ReturnType<typeof check>> = {
+    nod_de1: v6("nod_de1", CountryVerdict.UNKNOWN, "no_ipv6"),
+    nod_fi1: v6("nod_fi1", OK),
+    nod_nl1: v6("nod_nl1", CountryVerdict.UNKNOWN, "ipv6_broken"),
+    nod_probe1: v6("nod_probe1", CountryVerdict.UNKNOWN, "agent_old"),
+    nod_se1: v6("nod_se1", CountryVerdict.UNKNOWN, "no_probes"),
+  };
+  const week6 = {
+    country: "RU", sources: ["globalping"], sinceUnix: SINCE, nowUnix: NOW, family: 6,
+    nodes: [
+      { nodeId: "nod_fi1", lanes: [lane("globalping", pts([NOW - 50 * H, OK]))] },
+      { nodeId: "nod_se1", lanes: [lane("globalping", pts([NOW - 50 * H, CountryVerdict.UNKNOWN]))] },
+    ],
+  };
+  beforeEach(() => {
+    getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: countryChecks.map((c) => ({ ...c, ipv6: by[c.nodeId] })) });
+    getHistory.mockImplementation((req: { family?: number }) => Promise.resolve(req.family === 6 ? week6 : history(["globalping", "lists", "tspu"])));
+  });
+  const pills = (name: string) => [...row(name).querySelectorAll<HTMLElement>("[role=img][tabindex='0']")].filter((p) => p.closest("[data-testid^=line-]") === null);
+  const none = (name: string) => row(name).querySelector("[data-testid=line-ipv6-none]");
+
+  it("asks for the IPv6 week and puts an IPv6 pill after the IPv4 one, with its lane right under Globalping's", async () => {
+    await mount();
+    expect(getHistory).toHaveBeenCalledWith({ days: 7, family: 6 }, expect.anything());
+    expect(pills("fi1").map((p) => p.textContent)).toEqual(["IPv4!TCP blocked", "IPv6reachable"]);
+    expect(pills("fi1")[1]!.getAttribute("aria-label")).toBe("fi1, From Russia · IPv6: Reachable from Russia");
+    expect(line("fi1", "globalping").nextElementSibling).toBe(line("fi1", "globalping6"));
+    expect(words(line("fi1", "globalping6").children[1])).toBe("reachable");
+    expect(line("fi1", "globalping6").querySelector("[data-testid=lane-globalping6]")?.getAttribute("aria-label")).toBe("Globalping · IPv6, last 7 days");
+    expect(segs("fi1", "globalping6")).toHaveLength(1);
+    expect(none("fi1")).toBeNull();
+  });
+
+  it("gives a node without an IPv6 verdict one quiet line why, in Globalping's place, and only the IPv4 pill", async () => {
+    await mount();
+    const why = (name: string) => none(name)?.lastElementChild?.textContent;
+    expect(why("de1")).toBe("The server has no IPv6");
+    expect(why("nl1")).toBe("The server has an IPv6 address, but IPv6 does not work at the hoster");
+    expect(why("probe1")).toBe("The node agent is too old to report IPv6: update it");
+    // a week of rounds without a verdict is no data either
+    expect(why("se1")).toBe("Globalping has no IPv6 probes in Russia right now");
+    for (const name of ["de1", "nl1", "probe1", "se1"]) {
+      expect(pills(name).map((p) => p.textContent?.slice(0, 4))).toEqual(["IPv4"]);
+      expect(row(name).querySelector("[data-testid=line-globalping6]")).toBeNull();
+      expect(line(name, "globalping").nextElementSibling).toBe(none(name));
+    }
+  });
+
+  it("counts the nodes cut over IPv4 that IPv6 still reaches, under the IPv4 tally", async () => {
+    await mount();
+    expect(document.querySelector("[data-testid=ipv6-helps]")?.textContent).toContain("Cut over IPv4, open over IPv6: 1");
+    expect(tally().warn).toBe("1TCP blocked"); // the tally stays IPv4
+  });
+
+  it("tags the events: the IPv6 alert, and an IPv4 one whose node IPv6 reaches", async () => {
+    listAlerts.mockResolvedValue({
+      nowUnix: NOW,
+      active: [{ ...alert("alt_fi1", "fi1", "tcp_blocked", NOW - 29 * H), params: { verdict: "tcp_blocked", country: "RU", ipv6: "open" } }],
+      history: [{ ...alert("alt_v6", "de1", "blocked", NOW - 30 * H, NOW - 20 * H), subject: "ipv6", params: { verdict: "blocked", country: "RU", family: "6" } }],
+    });
+    await mount();
+    const events = [...document.querySelectorAll("[data-testid=reach-event]")].map((e) => words(e));
+    expect(events[0]).toContain("TCP blockedreachable over IPv6 · opened");
+    expect(events[1]).toContain("unreachableIPv6 · closed");
+  });
+
+  it("speaks Russian", async () => {
+    act(() => setLang("ru"));
+    await mount();
+    expect(none("de1")?.textContent).toBe("Globalping · IPv6На сервере нет IPv6"); // the source for a screen reader
+    expect(none("se1")?.lastElementChild?.textContent).toBe("У Globalping сейчас нет IPv6-зондов из России");
+    expect(document.querySelector("[data-testid=ipv6-helps]")?.textContent).toContain("По IPv4 режут, по IPv6 доступны: 1");
+  });
+});
+
+describe("the Reachability page while Globalping does not check IPv6", () => {
+  it("looks as before: no IPv6 week asked for, no family tags, no IPv6 lines", async () => {
+    await mount();
+    expect(getHistory.mock.calls.some(([req]) => (req as { family?: number }).family === 6)).toBe(false);
+    const table = document.querySelector("[aria-labelledby=reach-nodes]")?.textContent ?? "";
+    expect(table).toContain("de1");
+    expect(table).not.toMatch(/IPv[46]/);
+    expect(document.querySelector("[data-testid=line-ipv6-none], [data-testid=line-globalping6], [data-testid=ipv6-helps]")).toBeNull();
+  });
+});
