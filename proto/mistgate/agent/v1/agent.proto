@@ -110,6 +110,9 @@ package mistgate.agent.v1;
 //     warp_hash = hex(sha256(join("\x1f", enabled, private_key, peer_public_key, endpoint_v4, endpoint_v6,
 //                 join(",", ports), address_v4, address_v6, mtu, hex(reserved), backend)))
 //     (enabled "1"/"0", integers decimal, reserved lowercase hex, empty = "").
+//   - DesiredState.relays non-empty: one more line per forward AFTER the warp line, sorted among themselves:
+//     "relay" + "" + join("", relay_id, network, port, to_host, to_port) (decimal integers). An absent list and an
+//     empty list hash alike (no lines), so the hash of a node without forwards is what it was before they existed.
 //
 // COMMANDS
 //   Kick, RestartInbound, Retire, ApplyFix, PrepareAwgKernel, MeasureBandwidth, UdpCount, UdpSend, HttpMark and TcpProbe carry a request_id and get exactly one CommandResult. Removing a
@@ -316,6 +319,29 @@ package mistgate.agent.v1;
 //     mistgate-awg-prepare). After done and after failed the agent re-runs the checks kernel_headers and awg_backend.
 //     A run that ended while the agent was down is reported when it starts again; a run whose job stopped writing its
 //     status (the host rebooted, the unit was killed) ends as failed / interrupted.
+//
+// RELAY FORWARDS (additive, protocol api_version stays 1)
+//   A node can pass the encrypted traffic of a port straight on to a server on another node (an "entry" in front of an
+//   "exit"): the kernel rewrites the destination (nftables DNAT) and the source (masquerade), the entry never decrypts
+//   anything and keeps no keys. Accounting, limits and the credentials stay on the exit.
+//   - CAPABILITY GATE. An agent lists "relay-forward/1" when it can do this (a Linux host with nft). The panel puts
+//     DesiredState.relays into the desired state of a stream ONLY when it listed the string.
+//   - DesiredState.relays. Presence (even an empty RelayForwards) replaces the WHOLE list, in a delta too; absence in a
+//     delta means "unchanged"; absence in a full state (base_revision = 0) means "no forwards". The wrapper message
+//     exists so that a delta can say "none any more".
+//   - The agent resolves to_host itself (A records only, the node's resolvers) and again about every five minutes; it
+//     keeps the last address that worked when a lookup fails. A forward whose host never resolved is failed.
+//   - The agent refuses a forward (RelayResult.error "refused: <why>") whose port is not 443 or at least 1024, is an sshd
+//     port, is the port or hop range of one of its own inbounds, repeats the network and port of another forward, whose
+//     address is not a public unicast IPv4 or is its own, and every forward after the 64th. Other refusals are
+//     "resolve: <why>" (no address), "forward_drop" (a FORWARD chain of the host drops forwarded packets by default,
+//     UFW or Docker: nothing is installed, the port is not hijacked), "unsupported_host" (no nft here) and, when the kernel
+//     refuses, the host's own short words ("forwarding: ..." for IPv4 forwarding, "nft: ..." for the rules). A refusal or
+//     a resolve failure of one forward never stops the others, nor any inbound. The agent re-resolves and re-checks on its own
+//     (a sweep every 30 s); ApplyResult carries the state as of the last apply, later changes are for the doctor.
+//   - A forwarded TCP port is claimed like an inbound's: the decoy site of a Hysteria2 inbound gives up that port while
+//     the forward is installed and takes it back when it is not.
+//   - The list is part of the persisted state: a restarted agent installs it without the panel.
 //
 // BANDWIDTH TEST (additive, protocol api_version stays 1)
 //   The owner does not know a node's network capacity and a VPS's virtual NIC does not report the plan limit, so the
@@ -558,7 +584,7 @@ message Hello {
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry).
+  // JournalEntry), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -903,6 +929,19 @@ message ApplyResult {
   // Set for REJECTED / BASE_MISMATCH.
   string error = 5;
   uint32 duration_ms = 6;
+  // One per forward of the node's list, in relay_id order (see "RELAY FORWARDS"). Empty for an agent without
+  // "relay-forward/1" and for a node without forwards.
+  repeated RelayResult relays = 7;
+}
+
+message RelayResult {
+  string relay_id = 1;
+  // true: the forward is installed and passes packets.
+  bool ok = 2;
+  // When !ok: "refused: <why>" | "resolve: <why>" | "forward_drop" | "unsupported_host" | the host's own words ("forwarding: ...", "nft: ...").
+  string error = 3;
+  // The address the forward points at now (an IPv4 literal); empty when it never resolved.
+  string to_ip = 4;
 }
 
 message InboundResult {
@@ -1187,6 +1226,27 @@ message DesiredState {
   // Node-level WARP (see "AWG AND WARP"). Presence replaces the whole WARP configuration, also in a delta;
   // absence in a delta = unchanged; absence in a full state = no WARP. Sent only to agents with "warp/1".
   WarpSpec warp = 7;
+  // Ports this node forwards, unchanged, to a server on another node (see "RELAY FORWARDS"). Presence replaces the
+  // whole list, also in a delta; absence in a delta = unchanged; absence in a full state = none. Sent only to agents
+  // with "relay-forward/1".
+  RelayForwards relays = 8;
+}
+
+// A wrapper, so that a delta can tell an empty list from no list.
+message RelayForwards {
+  repeated RelayForward items = 1;
+}
+
+message RelayForward {
+  // Panel-assigned, [A-Za-z0-9_.-], at most 64 characters; unique within the list.
+  string relay_id = 1;
+  // "tcp" | "udp": the network of the exit's server.
+  string network = 2;
+  // The port this node listens on (443, or 1024 and above).
+  uint32 port = 3;
+  // The exit: an IPv4 literal or a name (the agent resolves it, A records only).
+  string to_host = 4;
+  uint32 to_port = 5;
 }
 
 message WarpSpec {

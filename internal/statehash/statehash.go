@@ -85,7 +85,18 @@ func State(in []Inbound) string { return StateWarp(in, nil) }
 // StateWarp is State plus the node-level WARP configuration. With warp == nil the result is State(in) byte for
 // byte; otherwise one extra line "warp" + "\x1f" + Warp(*warp) follows the sorted inbound lines (it is never
 // sorted among them: an inbound line has three fields, this one has two).
-func StateWarp(in []Inbound, warp *plugin.WarpSpec) string {
+func StateWarp(in []Inbound, warp *plugin.WarpSpec) string { return StateRelays(in, warp, nil) }
+
+// Relay is the hash line of one forward: "relay" + "\x1f" + join("\x1f", id, network, port, to_host, to_port).
+// It has six fields, so it can never be mistaken for an inbound line (three) or the warp line (two).
+func Relay(r plugin.RelayForward) string {
+	return strings.Join([]string{"relay", r.ID, r.Network, u(uint64(r.Port)), r.ToHost, u(uint64(r.ToPort))}, us)
+}
+
+// StateRelays is StateWarp plus the forwarded ports: one Relay line each, sorted among themselves, after the warp line.
+// An empty list adds nothing, so the result is StateWarp(in, warp) byte for byte, and a delta that clears the list and a
+// full state without one hash alike.
+func StateRelays(in []Inbound, warp *plugin.WarpSpec, relays []plugin.RelayForward) string {
 	lines := make([]string, len(in))
 	for i, x := range in {
 		lines[i] = x.Spec.ID + us + Spec(x.Spec) + us + Creds(x.Creds)
@@ -94,5 +105,11 @@ func StateWarp(in []Inbound, warp *plugin.WarpSpec) string {
 	if warp != nil {
 		lines = append(lines, "warp"+us+Warp(*warp))
 	}
+	rl := make([]string, len(relays))
+	for i, r := range relays {
+		rl[i] = Relay(r)
+	}
+	sort.Strings(rl)
+	lines = append(lines, rl...)
 	return hexSum(strings.Join(lines, "\n"))
 }

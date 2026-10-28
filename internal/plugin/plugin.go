@@ -50,6 +50,20 @@ type WarpSpec struct {
 	Backend       string // "auto" | "kernel" | "userspace"
 }
 
+// CapRelayForward is the Hello capability of an agent that can forward ports (DesiredState.relays, ApplyResult.relays).
+// The panel sends relays only to a stream that listed it.
+const CapRelayForward = "relay-forward/1"
+
+// RelayForward is one forwarded port of the node (agent.v1.RelayForward): connections to Port go, unchanged, to ToHost:ToPort.
+// ToHost is an IPv4 literal or a name the agent resolves.
+type RelayForward struct {
+	ID      string
+	Network string // "tcp" | "udp"
+	Port    uint16
+	ToHost  string
+	ToPort  uint16
+}
+
 // Listen is what the HOST layer needs. The engine binds Port only; the agent installs the hop DNAT.
 type Listen struct {
 	Network        string // "udp" | "tcp"

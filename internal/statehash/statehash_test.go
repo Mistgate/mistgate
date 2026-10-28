@@ -112,3 +112,60 @@ func TestWarpLineOnlyWhenPresent(t *testing.T) {
 		t.Fatal("warp on an empty node differs from an empty node")
 	}
 }
+
+func TestRelayLinesOnlyWhenPresent(t *testing.T) {
+	ins := []Inbound{goldenInbound(), awgInbound()}
+	w := plugin.WarpSpec{Enabled: true, PrivateKey: "k", PeerPublicKey: "p", EndpointV4: "203.0.113.10", Ports: []uint16{2408}, AddressV4: "172.16.0.2/32"}
+	// A node without forwards hashes exactly as before they existed, whether the list is nil or empty.
+	if StateRelays([]Inbound{goldenInbound()}, nil, nil) != goldenState || StateRelays([]Inbound{goldenInbound()}, nil, []plugin.RelayForward{}) != goldenState {
+		t.Fatal("no forwards must not change the golden state hash")
+	}
+	if StateRelays(nil, nil, nil) != goldenEmpty {
+		t.Fatal("empty state")
+	}
+	if StateRelays(ins, &w, nil) != StateWarp(ins, &w) || StateRelays(ins, nil, nil) != State(ins) {
+		t.Fatal("no forwards: StateRelays is StateWarp")
+	}
+
+	a := plugin.RelayForward{ID: "rly_a", Network: "tcp", Port: 8443, ToHost: "203.0.113.7", ToPort: 443}
+	b := plugin.RelayForward{ID: "rly_b", Network: "udp", Port: 443, ToHost: "exit.example.com", ToPort: 8443}
+	with := StateRelays(ins, &w, []plugin.RelayForward{a, b})
+	if with == StateWarp(ins, &w) {
+		t.Fatal("forwards must change the state hash")
+	}
+	if StateRelays(ins, &w, []plugin.RelayForward{b, a}) != with {
+		t.Fatal("the order of the forwards must not matter")
+	}
+	if StateRelays(ins, &w, []plugin.RelayForward{a}) == with {
+		t.Fatal("a second forward must count")
+	}
+	for name, mut := range map[string]func(*plugin.RelayForward){
+		"id":      func(r *plugin.RelayForward) { r.ID = "rly_z" },
+		"network": func(r *plugin.RelayForward) { r.Network = "udp" },
+		"port":    func(r *plugin.RelayForward) { r.Port = 8444 },
+		"to_host": func(r *plugin.RelayForward) { r.ToHost = "203.0.113.8" },
+		"to_port": func(r *plugin.RelayForward) { r.ToPort = 444 },
+	} {
+		c := a
+		mut(&c)
+		if StateRelays(ins, &w, []plugin.RelayForward{c, b}) == with {
+			t.Errorf("%s change does not move the hash", name)
+		}
+	}
+	// The line is the documented one, after the warp line.
+	if got, want := Relay(a), "relay\x1frly_a\x1ftcp\x1f8443\x1f203.0.113.7\x1f443"; got != want {
+		t.Errorf("Relay = %q, want %q", got, want)
+	}
+	if StateRelays(nil, nil, []plugin.RelayForward{a}) == goldenEmpty {
+		t.Fatal("a forward on an empty node differs from an empty node")
+	}
+}
+
+// The hash of one golden inbound plus one forward, fixed here so the panel and the agent cannot drift apart on the line.
+func TestGoldenRelayState(t *testing.T) {
+	r := plugin.RelayForward{ID: "rly_a", Network: "tcp", Port: 8443, ToHost: "203.0.113.7", ToPort: 443}
+	const want = "5396698f4c1454918c7061b761e59a4aa1a6d1204b5aeb70e6378c50ea6d9157"
+	if got := StateRelays([]Inbound{goldenInbound()}, nil, []plugin.RelayForward{r}); got != want {
+		t.Errorf("StateRelays = %s", got)
+	}
+}
