@@ -39,7 +39,7 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 
 ### 使用指南
 
-- [节点](guide/nodes.md)：节点设置、状态以及 Agent 在主机上的工作。
+- [节点](guide/nodes.md)：节点页面、状态以及 Agent 在主机上的工作。
 - [协议配置](guide/profiles.md)：协议配置是什么，以及它如何成为节点上的服务器。
 - [Hysteria2](guide/hysteria2.md)：Hysteria2 协议配置设置、证书和混淆。
 - [VLESS REALITY](guide/vless.md)：TCP 和 XHTTP 上的 VLESS 协议配置、何时选择它而不是 Hysteria2、如何选择 REALITY 目标、端口和应用。

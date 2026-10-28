@@ -7,7 +7,7 @@ Many hosters suspend a server after abuse complaints about BitTorrent downloads.
 
 ## Turn it on
 
-Open the node, **Settings**, tick **Block recognized BitTorrent traffic** and press **Save**. The owner and helpers can change it, like the other node settings.
+Open the node, go to the **Exit** tab, tick **Block recognized BitTorrent traffic** in the **People's traffic** card and press **Save**. The owner and helpers can change it, like the other settings of the node.
 
 - The node's agent must support it (a Linux agent that reports `torrentguard/1`). An older agent shows the switch greyed out with "Update this node agent to enable the setting"; see [Updates](../operations/updates.md). Turning it off always works.
 - Saving a change restarts the node's Hysteria2 profiles, so connections that are already open cannot keep the old policy. Their users reconnect within seconds. AmneziaWG profiles are not restarted.
@@ -54,7 +54,7 @@ The protection lowers the number of complaints; it does not guarantee that none 
 
 ## Events
 
-Every detected flow is still blocked. Strong matches (`tracker_connect`, `dht_query` and `tcp_handshake`) are reported at once as a `torrent_attempt` warning in the node's **Events**. A uTP SYN is weak evidence: one SYN never names a person. The agent reports it only after at least five detections to at least three destination ports for the same user and profile within 10 minutes. The five-minute event limit then applies.
+Every detected flow is still blocked. Strong matches (`tracker_connect`, `dht_query` and `tcp_handshake`) are reported at once as a `torrent_attempt` warning in the node's **History → Events**. A uTP SYN is weak evidence: one SYN never names a person. The agent reports it only after at least five detections to at least three destination ports for the same user and profile within 10 minutes. The five-minute event limit then applies.
 
 An event names the profile, transport (`tcp` or `udp`) and BitTorrent protocol. It names the user only when the node can tell reliably: on Hysteria2 the user who signed in, on AmneziaWG the device whose tunnel address belongs to exactly one user of that profile. Otherwise it says "an unknown user". Each event also says what the node matched (`evidence`) and the destination port (`dst_port`).
 
@@ -65,7 +65,7 @@ An event names the profile, transport (`tcp` or `udp`) and BitTorrent protocol. 
 | `utp_syn` | The start of a uTP connection. |
 | `tcp_handshake` | The BitTorrent handshake at the start of a TCP stream. |
 
-Only the destination port is kept. No address is kept: neither the client's address nor the destination address leaves the node. The events can be read on the node's **Events** tab and through the API and MCP (`events_search` with the code `torrent_attempt`).
+Only the destination port is kept. No address is kept: neither the client's address nor the destination address leaves the node. The events can be read in the node's **History → Events** and through the API and MCP (`events_search` with the code `torrent_attempt`).
 
 ## Alert and Telegram
 
@@ -73,6 +73,6 @@ A person who tries torrents gets one **Torrent attempts** alert on the **People*
 
 The alert is one per person, whatever the number of nodes. It stays open while attempts continue and closes after a day without any. Telegram tells it once when it opens, so a person gets at most one message a day; a continuing stream of attempts does not repeat it, and the close is silent. A person who is back after a quiet day is a new alert and a new message. The alert does not count in the alert badge. You can mute it like any other.
 
-Attempts the node cannot attribute to a user (an "unknown user" event) raise no alert in this version, and neither do users who are disabled or deleted. Events from older agents without `evidence` stay in the node's **Events** but do not raise a people alert.
+Attempts the node cannot attribute to a user (an "unknown user" event) raise no alert in this version, and neither do users who are disabled or deleted. Events from older agents without `evidence` stay in the node's **History → Events** but do not raise a people alert.
 
 If the AmneziaWG part cannot start on a node, for example because the kernel has no netfilter queue support, the node shows a `torrent_guard_degraded` warning event with the reason. AmneziaWG traffic on that node then passes uninspected; the Hysteria2 part works on its own.

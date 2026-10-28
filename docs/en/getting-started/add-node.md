@@ -117,16 +117,16 @@ Lines with `panel connection lost` carry the reason. Check also that the server 
 
 A node that is waiting for install has a **New install command** button on its page, on the Overview and in the first-run checklist. Use it when the command expired or was lost. A new command makes the older unused ones stop working.
 
-A node that was enrolled before (a lost certificate, a reinstalled server, a lost state directory) has the same button on its **Settings** tab, for every node that is not retired. Only the owner sees it. The node keeps its name, profiles and users; the old certificate stops working once the new agent connects. If the old state directory is still on the server, `enroll` refuses with `already enrolled; use --force to replace the identity`: add `--force` after `enroll`.
+A node that was enrolled before (a lost certificate, a reinstalled server, a lost state directory) has the same button on its **Server** tab, for every node that is not retired. Only the owner sees it. The node keeps its name, profiles and users; the old certificate stops working once the new agent connects. If the old state directory is still on the server, `enroll` refuses with `already enrolled; use --force to replace the identity`: add `--force` after `enroll`.
 
 ## Remove a node
 
-Open the node, **Settings → Danger zone → Retire from fleet**, and type the node's name to confirm. The panel then:
+Open the node, **Server → Danger zone → Retire from fleet**, and type the node's name to confirm. The panel then:
 
 - takes the node out of every user's access: users stop getting it in their subscription, their links stay the same;
 - revokes the node's certificate and cancels its unused install commands;
 - keeps the node's record and history in the panel and the audit log; its name becomes available for a later install;
-- keeps the saved SSH access of a node installed over SSH: you can still reveal the password under the retired node's **Settings → SSH access**, and only **Forget saved access** deletes it. If the panel generated that password (a rotation through MCP), the retire dialog warns you: reveal it and keep a copy.
+- keeps the saved SSH access of a node installed over SSH: you can still reveal the password under the retired node's **Server → SSH access**, and only **Forget saved access** deletes it. If the panel generated that password (a rotation through MCP), the retire dialog warns you: reveal it and keep a copy.
 
 If the agent is connected, it gets the order to retire and, on the server:
 

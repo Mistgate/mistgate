@@ -194,7 +194,7 @@ export function HeroCard({
                 </Button>
               )}
               {culprit && (
-                <Link to="/nodes/$id" params={{ id: culprit.nodeId }} search={{ tab: "events" }} className={buttonClass("secondary", "lg")}>
+                <Link to="/nodes/$id" params={{ id: culprit.nodeId }} search={{ tab: "history" }} className={buttonClass("secondary", "lg")}>
                   {t("up.openNode", { name: culprit.nodeName })}
                 </Link>
               )}

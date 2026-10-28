@@ -12,7 +12,7 @@ The admin knows three roles. Every request is checked against the role per proce
 | Role | May |
 |---|---|
 | Owner | Everything: nodes (add, install over SSH, retire, logs, saved SSH access), profiles and where they run, DNS presets and which of them a node offers to people, doctor fixes, node and panel updates, WARP, backups, API tokens and approvals, the audit log, security and brand settings. |
-| Helper | Day-to-day work: users (create, change, enable and disable, extend, reset traffic, delete, devices, the subscription link), groups, subscription settings, resetting the DNS a person picked on their page, node settings (except **IPv6 for clients**, which is the owner's) and restarting profiles on a node, muting alerts, Check now, running the doctor, accepting doctor warnings. |
+| Helper | Day-to-day work: users (create, change, enable and disable, extend, reset traffic, delete, devices, the subscription link), groups, subscription settings, resetting the DNS a person picked on their page, node settings (except **IPv6 exit**, which is the owner's) and restarting profiles on a node, muting alerts, Check now, running the doctor, accepting doctor warnings. |
 | Read-only | Reads: the overview, nodes, profiles (secrets masked), groups, DNS presets, subscription settings, users, events, alerts, checks, doctor reports, the Updates page. And their own account: passkeys, password, sessions. |
 
 > **Note:** Today the panel has one admin, the owner created at setup: adding a helper or a read-only admin is not possible yet. The roles already matter for [API tokens](../reference/api.md), whose profiles act as these roles.
@@ -110,7 +110,7 @@ Everything on the public listener that is not the admin, a subscription or the a
 
 ## Saved SSH access
 
-A node installed over SSH keeps its SSH login in the panel: the address, the port, the login, the password and the pinned host key. The password is encrypted with the master key. Only the owner sees it, under **SSH access** in the node's **Settings**. How to use it: "Saved SSH access" in [Install a node over SSH](../getting-started/ssh-install.md).
+A node installed over SSH keeps its SSH login in the panel: the address, the port, the login, the password and the pinned host key. The password is encrypted with the master key. Only the owner sees it, under **SSH access** on the node's **Server** tab. How to use it: "Saved SSH access" in [Install a node over SSH](../getting-started/ssh-install.md).
 
 - The panel sends the password only after the server shows the host key the owner confirmed. A changed key never gets it.
 - **Reveal password** needs step-up and is written to the audit log. No API read, MCP tool or log returns the password.

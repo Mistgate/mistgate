@@ -87,7 +87,7 @@ describe("warp_path in the doctor", () => {
     expect(text()).not.toContain("Manual action");
     expect(button("Check WARP / reconnect if down")).toBeDefined();
     const open = [...document.querySelectorAll("a")].find((a) => a.textContent === "Open WARP");
-    expect(open?.getAttribute("href")).toBe("/nodes/nod_1?tab=settings#warp");
+    expect(open?.getAttribute("href")).toBe("/nodes/nod_1?tab=exit#warp");
     await act(async () => void button("Check again")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(runDoctor).toHaveBeenCalledWith({ nodeId: "nod_1" });
   });

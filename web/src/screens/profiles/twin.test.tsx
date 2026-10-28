@@ -116,7 +116,7 @@ describe("the twin action", () => {
     const link = dialog.querySelector<HTMLAnchorElement>("a[href='/nodes/$id']")!;
     expect(link.textContent).toBe("fi1");
     expect(link.dataset.params).toBe(JSON.stringify({ id: "nod_2" }));
-    expect(link.dataset.search).toBe(JSON.stringify({ tab: "settings" }));
+    expect(link.dataset.search).toBe(JSON.stringify({ tab: "exit" }));
     expect(link.dataset.hash).toBe("warp");
   });
 
@@ -175,7 +175,7 @@ describe("the twin action", () => {
     await settle();
     expect(text()).toBe("No working WARP on: fi1. The profile does not start there until it has.");
     const link = host.querySelector<HTMLAnchorElement>("a")!;
-    expect([link.textContent, link.getAttribute("href"), link.dataset.params, link.dataset.search, link.dataset.hash]).toEqual(["fi1", "/nodes/$id", JSON.stringify({ id: "nod_2" }), JSON.stringify({ tab: "settings" }), "warp"]);
+    expect([link.textContent, link.getAttribute("href"), link.dataset.params, link.dataset.search, link.dataset.hash]).toEqual(["fi1", "/nodes/$id", JSON.stringify({ id: "nod_2" }), JSON.stringify({ tab: "exit" }), "warp"]);
   });
 
   it("is not offered to anyone but the owner, and waits for unsaved changes", async () => {

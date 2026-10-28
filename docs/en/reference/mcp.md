@@ -155,7 +155,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | Admin | `rollout_id` from `updates_status` | always |
 | `node_rollback` | Admin | `node` | always |
 | `node_install` | Admin | Plan: `host`, `port` (default 22), `username` (root or a user with passwordless sudo), node `name` (2 to 24 letters, digits or hyphens), `address`, optional `country_code`, `location`, `provider`; apply: `confirm_token` only. The plan reads only the server's public host key. The owner enters the SSH password and confirms the host key on the approval screen | always |
-| `node_server_password_rotate` | Admin | Plan: `node` id or the exact name of a live node (a retired node is refused); apply: `confirm_token` only. The panel generates the new password itself and never returns it; the owner can reveal it in the node's settings | always |
+| `node_server_password_rotate` | Admin | Plan: `node` id or the exact name of a live node (a retired node is refused); apply: `confirm_token` only. The panel generates the new password itself and never returns it; the owner can reveal it on the node's **Server** tab | always |
 
 `relay_apply` keeps the panel's own order for `create` and `enable`: it makes the relay (switched off), checks the leg, switches it on, and the panel then checks the path from outside. A relay that fails a check stays switched off and the apply fails with the stage (`leg` or `path`) and its code; moving the port of a relay that is on checks the path again and switches the relay off if it fails. The second server leaves or reaches subscriptions at their next refresh. See [Relays](../guide/relays.md).
 

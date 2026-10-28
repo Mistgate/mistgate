@@ -204,7 +204,7 @@ describe("adding a profile to a node", () => {
     await settle();
     await click(radio("Kernel module"));
     expect(text()).not.toContain("Run the command first"); // the command is not what this node needs
-    expect(text()).toContain("Prepare it first in the node’s settings");
+    expect(text()).toContain("Prepare it first on the node’s Server tab");
     await submit();
     await settle();
     expect(prepareAwgKernel).toHaveBeenCalledWith({ nodeId: "nod_1", confirm: false });

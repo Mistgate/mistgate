@@ -3,7 +3,7 @@ title: Troubleshooting
 description: Common problems by symptom, how each one shows in the panel, and what to do about it.
 ---
 
-Find the symptom, check how it shows in the panel, then follow the steps. Most answers start on the node's page: its banner, the **Profiles**, **Events**, **Logs** and **Doctor** tabs, and the [Health](health.md) page.
+Find the symptom, check how it shows in the panel, then follow the steps. Most answers start on the node's page: its banner, the **Profiles**, **History** and **Doctor** tabs, and the [Health](health.md) page.
 
 Commands on a node run as root. The agent's service is `mistgate-node`; its log is in the journal:
 
@@ -30,8 +30,8 @@ journalctl -u mistgate-node -n 100 --no-pager
 
 3. Check that the node can reach the panel: the agent always dials out, to the address in its install command (`--panel host:port`, port 443 by default). An outbound firewall on the node or an inbound one on the panel server blocks it.
 4. On the panel side, the agent endpoint needs TLS: the public listener must run with `--acme-domain` or `--tls-cert`, or the panel needs a separate `--agent-listen`. See [Configuration](../reference/configuration.md).
-5. If the log says the agent is not enrolled, or the node was retired, the agent exits and systemd does not restart it. Enroll it again with a **New install command** from the node's **Settings** tab. A retired node cannot be enrolled again: add the server as a new node.
-6. For a far or slow node, raise **Drop the agent connection after** and **Agent dial timeout** in the node's **Settings**.
+5. If the log says the agent is not enrolled, or the node was retired, the agent exits and systemd does not restart it. Enroll it again with a **New install command** from the node's **Server** tab. A retired node cannot be enrolled again: add the server as a new node.
+6. For a far or slow node, raise **Drop the agent connection after** and **Agent dial timeout** on the node's **Server** tab.
 
 A pending node whose command has expired needs a **New install command**; the old one never works again.
 
@@ -94,7 +94,7 @@ A port inside the port-hopping range of another profile, or held by Caddy or ano
 **What to check**
 
 1. The node's own resolver: the doctor's **Server resolver**. The check names are resolved by the node; if they fail, apply **Fix the resolver**.
-2. **DNS resolvers for this node** in the node's **Settings**: the resolvers your users' traffic uses. The default is the server's own resolver.
+2. **DNS resolvers for this node** on the node's **Exit** tab: the resolvers your users' traffic uses. The default is the server's own resolver.
 3. WARP: if only the profiles with WARP egress fail, see "WARP does not work".
 4. AmneziaWG: the doctor's **AmneziaWG backend** warns when the host firewall drops forwarded traffic (often a Docker installation on the same server).
 5. The doctor's **Foreign firewall rules** and **Leftovers of other VPNs**: a foreign nat or redirect rule can swallow the traffic.
@@ -112,7 +112,7 @@ Hysteria2 and AmneziaWG run over UDP, and some hosters drop UDP on some ports or
 - "“<profile>” does not answer on port N, while another profile of this node does: the hoster cuts UDP port N."
 - "Alive, but no traffic": "the hoster seems to cut this UDP port", or, on 443 or on several ports, "the hoster seems to cut incoming UDP altogether".
 - For AmneziaWG, the profile's status on the node's **Profiles** tab tells the two cases apart: "Not one packet reached the port: the hoster or a firewall blocks this UDP port", or "Packets arrive but no handshake completes: the obfuscation parameters on the node and in the config differ".
-- The node's **Events** show `host_firewall_sync_failed`: the server's own firewall does not let a profile's UDP port in.
+- The node's **History → Events** show `host_firewall_sync_failed`: the server's own firewall does not let a profile's UDP port in.
 
 **What to do**
 
@@ -145,7 +145,7 @@ If authenticator codes for the admin keep failing, check the clock of the panel 
 
 **How it shows**
 
-- The profile on the node: "AmneziaWG did not start on the node: see “AmneziaWG backend” in the node settings".
+- The profile on the node: "AmneziaWG did not start on the node: see “AmneziaWG backend” on the node's Server tab".
 - The doctor's **AmneziaWG backend** reports no working backend; **Kernel headers** lists what is missing for the module.
 
 **What to do**

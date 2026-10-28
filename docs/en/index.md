@@ -39,7 +39,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 
 ### Guide
 
-- [Nodes](guide/nodes.md): node settings, status and what the agent does on the host.
+- [Nodes](guide/nodes.md): the node page, its status and what the agent does on the host.
 - [Profiles](guide/profiles.md): what a profile is and how it becomes a server on a node.
 - [Hysteria2](guide/hysteria2.md): Hysteria2 profile settings, certificates and obfuscation.
 - [VLESS REALITY](guide/vless.md): VLESS profiles over TCP and XHTTP, when to choose them over Hysteria2, how to pick a REALITY target, ports and apps.

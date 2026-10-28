@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { isStepUpCancelled } from "@/components/step-up";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { SectionLabel } from "@/components/ui/bits";
+import { ActionBar, Block } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon, IconChip, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -439,16 +439,6 @@ function Detail({ id, sub, control, children }: { id: SourceId; sub: string; con
   );
 }
 
-/** A block of the open source under a small heading (Connection, Checks, Budget); `flush` is the state right under the header. */
-function Block({ title, flush, className, children }: { title?: string; flush?: boolean; className?: string; children: ReactNode }) {
-  return (
-    <div className={cx("flex flex-col gap-3 px-4 md:px-5", flush ? "pb-4" : "border-t border-line py-4", className)}>
-      {title && <SectionLabel as="h4">{title}</SectionLabel>}
-      {children}
-    </div>
-  );
-}
-
 /** The source is loading, or could not be read: in the place of its state. */
 function Loading({ q }: { q: { isPending: boolean; isError: boolean; data: unknown; error: Error | null; refetch: () => unknown } }) {
   if (q.isPending)
@@ -474,11 +464,6 @@ function Privacy({ children }: { children: string }) {
       <p className="max-w-2xl text-[13px] leading-normal text-pretty text-muted">{children}</p>
     </Block>
   );
-}
-
-/** The source's last row: Test (and the like) on the left, Disconnect apart on the right. */
-function ActionBar({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 md:px-5">{children}</div>;
 }
 
 function Disconnect({ onClick }: { onClick: () => void }) {

@@ -106,7 +106,7 @@ The node takes `.1`; every device gets the next free address of the profile. Whe
 
 ## The node's backend: userspace or kernel module
 
-A node runs AmneziaWG in one of two ways, one setting for all its AmneziaWG profiles. It is the **AmneziaWG backend** card in the node's **Settings**, and the first AmneziaWG profile put on a node asks the same question.
+A node runs AmneziaWG in one of two ways, one setting for all its AmneziaWG profiles. It is the **AmneziaWG backend** card on the node's **Server** tab, and the first AmneziaWG profile put on a node asks the same question.
 
 | Backend | What it is |
 |:--|:--|

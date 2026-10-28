@@ -68,7 +68,7 @@ The user's page has a **Subscription link** button. It shows the link and its QR
 
 What the person does:
 
-1. Opens the link in a browser on the phone or computer they want to connect. Their page shows instructions for that platform, the apps to install, a button that adds the subscription to the app, a QR code for another device, and their traffic and term. For servers whose network capacity you set in the node's settings, the page also shows how busy each server's channel is (Low, Medium, High).
+1. Opens the link in a browser on the phone or computer they want to connect. Their page shows instructions for that platform, the apps to install, a button that adds the subscription to the app, a QR code for another device, and their traffic and term. For servers whose network capacity you set on the node's **Server** tab, the page also shows how busy each server's channel is (Low, Medium, High).
 2. **Subscription app:** installs the app and adds the subscription with the button on the page, or by pasting the link into the app. The app fetches the server list and refreshes it from the same link later.
 3. **AmneziaVPN:** makes a key for the device on the same page, when **Devices on the page** is on in **Subscriptions → User page**, and imports it into AmneziaVPN. When it is off, you make the key in the admin and send it.
 

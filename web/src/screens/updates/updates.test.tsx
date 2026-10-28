@@ -498,7 +498,7 @@ describe("the Updates screen", () => {
     // first: look at the node (its events); "Resume" is there but not the main button
     const open = [...document.querySelectorAll("a")].find((a) => a.textContent === "Open de1")!;
     expect(open.dataset.params).toBe(JSON.stringify({ id: "nod_2" }));
-    expect(open.dataset.search).toBe(JSON.stringify({ tab: "events" }));
+    expect(open.dataset.search).toBe(JSON.stringify({ tab: "history" }));
     expect(button("Resume")!.className).not.toContain("bg-accent");
     // the node's name in the rollout steps leads to it too
     expect([...document.querySelectorAll("a")].some((a) => a.textContent === "de1" && a.dataset.params === JSON.stringify({ id: "nod_2" }))).toBe(true);

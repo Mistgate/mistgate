@@ -11,7 +11,7 @@ Without `--decoy-dir` the panel shows a built-in "Coming soon" page. Every insta
 
 ## Nodes: three options
 
-Every node serves a decoy site to anyone who is not a client: the Hysteria2 masquerade (HTTP/3 and the TCP site) and the VLESS REALITY site in `self` mode. Choose which site each node shows, in the node's settings or for several nodes at once on the Nodes page (select the nodes, then set the decoy site):
+Every node serves a decoy site to anyone who is not a client: the Hysteria2 masquerade (HTTP/3 and the TCP site) and the VLESS REALITY site in `self` mode. Choose which site each node shows, on the node's **Server** tab or for several nodes at once on the Nodes page (select the nodes, then set the decoy site):
 
 - **Built-in** keeps the fixed Mistgate page. Every installation ships the same page, so it is recognisable. Nodes that existed before the upgrade stay on it until you change them.
 - **Panel's site** copies the panel's `--decoy-dir` bundle to the node. Use it for one domain with subdomains: the subdomains are linked anyway (Certificate Transparency logs list them), and one company's site on its regional hosts looks natural. New nodes default to this option when the panel has a usable decoy directory.
@@ -21,7 +21,7 @@ Every node serves a decoy site to anyone who is not a client: the Hysteria2 masq
 
 The same rules apply to an uploaded Own bundle and to the panel's `--decoy-dir` when it is copied to nodes:
 
-- **Size:** at most **2 MiB** of files in total. The limit applies to **both** Own bundles and the panel's `--decoy-dir`. An Own upload is also limited to 2 MiB as an archive. A decoy directory over 2 MiB still works for the panel itself, but it is not offered to nodes: the node settings say the panel's site is too large, and the node keeps serving what it had. At most 4096 files.
+- **Size:** at most **2 MiB** of files in total. The limit applies to **both** Own bundles and the panel's `--decoy-dir`. An Own upload is also limited to 2 MiB as an archive. A decoy directory over 2 MiB still works for the panel itself, but it is not offered to nodes: the node's **Server** tab says the panel's site is too large, and the node keeps serving what it had. At most 4096 files.
 - **Format of an upload:** ZIP, TAR or TAR.GZ. Zip a folder as you normally would: a single wrapping folder is removed when it holds `index.html`.
 - **`index.html`** must be at the top of the site. `404.html` is used for every unknown address; without a `robots.txt` the built-in one is served.
 - **Static files only.** Symbolic links, devices and other non-files are refused, as are paths with `..`, absolute paths and names with a backslash or a colon. Dot-files and macOS `__MACOSX` entries are left out, as the panel hides them too. The executable bit is ignored: files are only ever served as data.
@@ -30,7 +30,7 @@ If a bundle is refused, the panel says why (no `index.html`, too large, an unsaf
 
 ### How a node gets its site
 
-The panel stores each bundle by its SHA-256 and sends a node only its own bundle, and only when the node does not already have it: an unchanged bundle is not sent again. The node checks the bundle again, saves it on disk and switches without restarting its listeners, so open connections and the Hysteria2 and VLESS ports are not interrupted. After a restart the node serves the saved site at once, before it reconnects to the panel. The node settings show the configured mode next to the mode and hash the node reports, and say why they differ: the node is offline, the change is on its way, an earlier push failed (the panel tries again every few minutes), or the panel's site is unavailable. A changed `--decoy-dir` reaches the connected nodes within about a minute.
+The panel stores each bundle by its SHA-256 and sends a node only its own bundle, and only when the node does not already have it: an unchanged bundle is not sent again. The node checks the bundle again, saves it on disk and switches without restarting its listeners, so open connections and the Hysteria2 and VLESS ports are not interrupted. After a restart the node serves the saved site at once, before it reconnects to the panel. The **Decoy site** card on the node's **Server** tab shows the configured mode next to the mode and hash the node reports, and say why they differ: the node is offline, the change is on its way, an earlier push failed (the panel tries again every few minutes), or the panel's site is unavailable. A changed `--decoy-dir` reaches the connected nodes within about a minute.
 
 A node whose agent is too old (it predates this feature) keeps the built-in page, and the panel shows "agent too old": update the node, then choose its site. The edge edition does not store Own bundles, so Own is unavailable there. Every change is recorded in the audit log.
 

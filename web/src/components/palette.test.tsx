@@ -111,7 +111,30 @@ describe("the palette", () => {
     await wait(250);
     expect(text()).toContain("de1 · Logs");
     await enter();
-    expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "n1" }, search: { tab: "logs" } });
+    expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "n1" }, search: { tab: "history", view: "logs" } });
+  });
+
+  it("finds the new tabs, the journal and the people of a node", async () => {
+    for (const [query, label, target] of [
+      ["de1 журнал", "de1 · Journal", { search: { tab: "history", view: "journal" } }],
+      ["de1 journal", "de1 · Journal", { search: { tab: "history", view: "journal" } }],
+      ["de1 события", "de1 · History", { search: { tab: "history" } }],
+      ["de1 warp", "de1 · Exit", { search: { tab: "exit" } }],
+      ["de1 ipv6", "de1 · Exit", { search: { tab: "exit" } }],
+      ["de1 настройки", "de1 · Server", { search: { tab: "server" } }],
+      ["de1 ssh", "de1 · Server", { search: { tab: "server" } }],
+      ["de1 пользователи", "de1 · On this node now", { search: {}, hash: "people" }],
+    ] as const) {
+      navigate.mockReset();
+      await mount();
+      await type(query);
+      await wait(250);
+      expect(text(), query).toContain(label);
+      await enter();
+      expect(navigate, query).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "n1" }, ...target });
+      act(() => root?.unmount());
+      host?.remove();
+    }
   });
 
   it("runs the actions: a new API token opens its form, sign out signs out", async () => {

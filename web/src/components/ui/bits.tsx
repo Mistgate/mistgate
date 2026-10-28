@@ -76,6 +76,24 @@ export function DangerZone({ title, children, className }: { title: ReactNode; c
   );
 }
 
+/**
+ * A block of a card under a small heading, a hairline above it (an open Reachability source, a node's forms); `flush` is
+ * the first one, right under the card's header.
+ */
+export function Block({ title, flush, className, children }: { title?: ReactNode; flush?: boolean; className?: string; children: ReactNode }) {
+  return (
+    <div className={cx("flex flex-col gap-3 px-4 md:px-5", flush ? "pb-4" : "border-t border-line py-4", className)}>
+      {title && <SectionLabel as="h4">{title}</SectionLabel>}
+      {children}
+    </div>
+  );
+}
+
+/** A card's last row of buttons: the main ones on the left, a destructive one (or Save) pushed right with `ml-auto`. */
+export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 md:px-5", className)}>{children}</div>;
+}
+
 // Solid pastel circles, the initial in near-black, cycling in this order.
 const avatarColors = [
   "var(--accent-lavender)",

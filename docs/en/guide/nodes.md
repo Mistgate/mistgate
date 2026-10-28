@@ -74,7 +74,7 @@ The command of the "Unreachable" banner, to run on the node over SSH:
 systemctl restart mistgate-node && journalctl -u mistgate-node -n 50 --no-pager
 ```
 
-The page has seven tabs: **Overview**, **Profiles**, **Users**, **Logs**, **Events**, **Doctor** and **Settings**. The **Profiles** tab shows how many profiles failed to start, the **Doctor** tab how many items need attention.
+The page has six tabs, each answering one question: **Overview** (is all well?), **Profiles** (what runs here?), **Exit** (where does people's traffic leave?), **History** (what happened?), **Doctor** (what is wrong on the host?) and **Server** (what is this machine?). The **Profiles** tab shows how many profiles failed to start, the **Doctor** tab how many items need attention. A retired node keeps **Overview**, **History** and **Server**. Links and bookmarks made for the tabs of earlier versions (**Users**, **Logs**, **Journal**, **Events**, **Settings**) open the place those moved to.
 
 ### Overview
 
@@ -82,8 +82,8 @@ The page has seven tabs: **Overview**, **Profiles**, **Users**, **Logs**, **Even
 - **Traffic · 24 h**: hourly traffic through the node.
 - **Alerts**: the open alerts of this node, with the same buttons as on the Health page, and the last three that closed. **All alerts** opens the Health page. The card is hidden when there was nothing.
 - **Client-eye checks**: one row per profile with its latency and exit IP, or why it fails. A click on a row opens its 24-hour history. **Check now** starts a round for this node.
-- **Online by protocol**: people connected now, per protocol.
-- **Host facts**: hostname, OS, kernel, architecture, CPUs, RAM, disk, virtualization, IPv6, boot time and the engine versions.
+- **On this node now**: how many people are connected, per protocol, and who they are, with the device model, the protocol and the current download speed. Six people show; **All N** opens the rest in place.
+- **Top today**: the people with the most traffic through this node since 00:00 UTC, five at first; **All 10** shows the ten.
 
 The checks, alerts and the doctor are described in [Health](../operations/health.md).
 
@@ -111,45 +111,9 @@ Each row has:
 
 **Add profile** opens the dialog that puts a profile on this node: see [Profiles](profiles.md). When the panel has no profile at all, the dialog offers to create a Hysteria2 profile on port 443 (or the first free port) and put it on the node in one go, with **Set up by hand** as the other way.
 
-**Relays.** On a node that can forward, the Profiles tab also has a **Relays** block: the ports of this node that pass a server of another node on, unchanged, for people whose network blocks that node. See [Relays through an entry node](relays.md).
-
-### Users
-
-- **On this node now**: who is connected, with the device model, the protocol and the current download speed.
-- **Top today**: the ten people with the most traffic through this node since 00:00 UTC.
-
-### Logs
-
-A live tail of the agent and its engines, relayed by the panel. The last 200 lines arrive first, then new lines as they are written; up to 1000 lines stay on screen.
-
-- **All**, **Info**, **Warn**, **Errors** filter by level; **Search the log** filters by text.
-- **Pause** freezes the screen while new lines keep arriving; **Resume** shows them.
-- **Download** saves what was received as `<node>-agent.log`.
-
-The tab works while the agent is connected (**Healthy** or **No traffic**). If the link drops, it reconnects every 5 seconds. Only the owner can read the logs: they contain client addresses. Every admin can read the [Journal](#journal).
-
-### Journal
-
-The node's warnings and errors, saved by the panel for 7 days: what the agent and its engines (Hysteria2, VLESS, AmneziaWG, xray, WARP) wrote at the **Warn** and **Error** levels. Each row is one kind of record in one hour: the time of the latest, the level, the source, the profile when the record names one, how many times it came (**×12**), the message and its details. Client addresses are cut out on the node and again in the panel, so every admin can read the journal; the message is the template the engine logs, without the values of a single connection.
-
-- **24 hours** or **7 days**; **Warnings and errors** or **Errors only**.
-- **Search the journal** looks in the messages and the details on the panel, across all the rows of the period. At most 200 rows are shown, newest first; when there are more, the tab says so.
-
-A node whose agent does not send the journal yet says so: update the agent. On the Cloudflare edition, where the live tail is not available, the **Logs** tab leads here. The same journal is in MCP as `node_journal`.
-
-### Events
-
-The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build, and recognized BitTorrent attempts. Related events are joined into one line. A torrent event includes the inbound and the protocol, never an address (neither the client's nor the destination); the panel adds a user's name only when the node can identify that user reliably.
-
-The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **Details** opens the raw events behind a line: the event code, the exact time, the source (**node agent**, **panel** or **admin action**) and the parameters. The log is paged: 50 events at a time (25 or 100 on request), newest first, **Older** goes back in time and **Newer** returns to the page you came from; the page is in the address, so a reload or a copied link keeps it. When a filter finds nothing on a page, **Search further** goes to the next, older one.
-
-### Doctor
-
-The node's own host checks, grouped into **Needs attention**, **Accepted as normal**, **All good** and **Not checked**, with the fixes the panel can apply and the manual steps for the rest. **Run again** asks the node for a fresh report. The first report comes about 30 seconds after the agent connects; an agent that is too old for the doctor gets a link to **Updates**. See [Health](../operations/health.md).
-
 ### Ports
 
-**Check ports** runs two checks from one connected fleet node (or the panel host when available): UDP delivery and TCP reach. Each row shows the port, the verdict, when and from where it was checked, and the profile that listens there.
+The **Ports** block sits on the **Profiles** tab, under the profiles. **Check ports** runs two checks from one connected fleet node (or the panel host when available): UDP delivery and TCP reach. Each row shows the port, the verdict, when and from where it was checked, and the profile that listens there.
 
 **UDP.** The check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering. Use it as one vantage point when investigating UDP reachability.
 
@@ -175,9 +139,68 @@ There is no line for a node without an ACME certificate name, or when port 80 co
 
 On VPS installations, the panel repeats the check every six hours for each online node with the `udpcheck` capability and an enabled inbound. It immediately confirms a lossy or broken result with one more check; the alert follows the latest verdict. The TCP rows are refreshed by the same scheduled run; they raise no alert of their own.
 
-### Settings
+### Exit
 
-The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access** card (a node installed over SSH), the **AmneziaWG backend** card, **New install command** (the owner only) and the **Danger zone**. WARP is described in [WARP](warp.md), the backend in [AmneziaWG](amneziawg.md). **New install command** is for a lost certificate or a reinstalled server: see [Add a node](../getting-started/add-node.md). The **SSH access** card shows the saved SSH server and login, and **Reveal password** shows the password after a fresh sign-in confirmation; how the password is kept and changed is in [Install a node over SSH](../getting-started/ssh-install.md).
+Where people's traffic leaves the node. Top to bottom: the WARP card, **People's traffic** and **DNS choice on the user page** (on a wide screen it stands on the right). WARP is described in [WARP](warp.md); the WARP chip in the node's header and every **Open WARP** in the panel lead to its card.
+
+**People's traffic** holds three settings with one **Save**, which sends only what changed; changing the torrent setting restarts the node's Hysteria2 profiles.
+
+**IPv6 exit** (**IPv6 for clients** in earlier versions) is on by default (the way every node worked before), and only the owner changes it. It decides whether people's traffic may leave the server over IPv6; it does not change how they connect to the node. Turn it off when the provider's IPv6 addresses are located in a different country than the node: an app picks IPv4 or IPv6 per site, so people would appear to come from two countries at random (over IPv4 the exit reads as the node's country, over IPv6 as the other one, and Google or YouTube then show the wrong region). With it off, the node answers client IPv6 that would leave through its own uplink with an ICMPv6 "administratively prohibited" instead of dropping it silently, so apps move to IPv4 at once instead of waiting for a timeout. A kernel without the nftables `reject` action cannot do that: the node then drops that IPv6 silently (apps may wait for a timeout; if even that rule is refused, IPv6 is not blocked at all) and writes a warning event, and the tunnels keep working. The agent retries every 10 minutes until `reject` works again, then records a recovery event.
+
+- **AmneziaWG.** The agent adds one reject rule to its own firewall table (`mistgate_awg`) and removes it when you turn the setting back on. The clients' configs do not change: their IPv6 address and the `::/0` route stay in the tunnel, so a person's real IPv6 never leaves outside the VPN. IPv6 addressed to the tunnel's own address is untouched. IPv6 DNS servers of a preset are rejected too, so the device moves on to the IPv4 ones.
+- **Hysteria2.** The node's direct outbound connects over IPv4 only, and a name that has only an IPv6 address does not open. Connections that are already open keep the address family they have; new ones go over IPv4. The node's own name resolving (**DNS resolvers for this node**) works as before.
+- **Exit through WARP is not touched.** Its exit is Cloudflare's, not the node's uplink, so the geolocation of the node's range does not matter there.
+
+The setting needs an agent that reports `client-ipv6/1`. An older agent shows the switch greyed out with "Update this node agent to turn this off", and the panel never sends it the setting; turning IPv6 back on always works. Each change is written to the audit log (`node.update` with `client_ipv6` on or off).
+
+**Block recognized BitTorrent traffic** is off by default. It blocks plaintext BitTorrent that the node's users start, on AmneziaWG in the kernel and on Hysteria2 in its engine, and writes a `torrent_attempt` event without any address. It needs an agent that supports it. See [Torrent protection](torrent-protection.md).
+
+**DNS resolvers for this node**: **Server's own resolver** (the default), **Yandex DNS** or **Cloudflare + Google**; a list of your own (up to 8 IP addresses, `ip:port` works too) shows as **Custom DNS** and is edited there. The node and its VPN engines resolve names with them, the names in its users' traffic included. With **Server's own resolver** the node uses whatever the server uses. For a node in Russia pick **Yandex DNS**, so Russian services such as gosuslugi.ru resolve reliably. They are not the DNS presets that apps receive, and the doctor checks the server's own resolver separately: see [DNS](dns.md).
+
+**DNS choice on the user page** is a separate block of the node, not to be confused with the resolvers above. Here the owner ticks the DNS presets that people may pick for this server on their page (the order is the order on the page) and marks one as the default for the node. Only the owner changes it, and the change is written to the audit log (`node_dns_options`). A node with no presets offered gives no choice. It matters only when **DNS choice on the page** is on in **Subscriptions** → **User page**, and it reaches AmneziaWG keys and the AmneziaWG proxies of a Mihomo profile; see [DNS](dns.md).
+
+### History
+
+What happened on the node, in three parts switched at the top of the tab: **Events**, **Journal** and **Logs**. The part is kept in the address, so a link or a reload opens it again.
+
+#### Events
+
+The history of the node, grouped by day: connected, went quiet, came back, profiles added, started, failed and restarted, settings applied, agent updates and rollbacks, certificate renewals, the AmneziaWG module build, and recognized BitTorrent attempts. Related events are joined into one line. A torrent event includes the inbound and the protocol, never an address (neither the client's nor the destination); the panel adds a user's name only when the node can identify that user reliably.
+
+The chips **All**, **Problems**, **Profiles** and **Agent** filter the list. **Details** opens the raw events behind a line: the event code, the exact time, the source (**node agent**, **panel** or **admin action**) and the parameters. The log is paged: 50 events at a time (25 or 100 on request), newest first, **Older** goes back in time and **Newer** returns to the page you came from; the page is in the address, so a reload or a copied link keeps it. When a filter finds nothing on a page, **Search further** goes to the next, older one.
+
+#### Journal
+
+The node's warnings and errors, saved by the panel for 7 days: what the agent and its engines (Hysteria2, VLESS, AmneziaWG, xray, WARP) wrote at the **Warn** and **Error** levels. Each row is one kind of record in one hour: the time of the latest, the level, the source, the profile when the record names one, how many times it came (**×12**), the message and its details. Client addresses are cut out on the node and again in the panel, so every admin can read the journal; the message is the template the engine logs, without the values of a single connection.
+
+- **24 hours** or **7 days**; **Warnings and errors** or **Errors only**.
+- **Search the journal** looks in the messages and the details on the panel, across all the rows of the period. At most 200 rows are shown, newest first; when there are more, the tab says so.
+
+A node whose agent does not send the journal yet says so: update the agent. On the Cloudflare edition, where the live tail is not available, **Logs** leads here. The same journal is in MCP as `node_journal`.
+
+#### Logs
+
+A live tail of the agent and its engines, relayed by the panel. The last 200 lines arrive first, then new lines as they are written; up to 1000 lines stay on screen.
+
+- **All**, **Info**, **Warn**, **Errors** filter by level; **Search the log** filters by text.
+- **Pause** freezes the screen while new lines keep arriving; **Resume** shows them.
+- **Download** saves what was received as `<node>-agent.log`.
+
+This part works while the agent is connected (**Healthy** or **No traffic**). If the link drops, it reconnects every 5 seconds. Only the owner can read the logs: they contain client addresses. Every admin can read the [Journal](#journal).
+
+### Doctor
+
+The node's own host checks, grouped into **Needs attention**, **Accepted as normal**, **All good** and **Not checked**, with the fixes the panel can apply and the manual steps for the rest. **Run again** asks the node for a fresh report. The first report comes about 30 seconds after the agent connects; an agent that is too old for the doctor gets a link to **Updates**. See [Health](../operations/health.md).
+
+### Server
+
+What this machine is. On a wide screen, two columns: on the left one form (**Node**, **Capacity** and **Agent link**) with one **Save** at its end, and the **Agent** card under it; on the right **SSH access** (a node installed over SSH), **Decoy site**, **AmneziaWG backend** and **Host**. The **Danger zone** comes last. On a narrow screen it is one column in the same order.
+
+- **Agent**: the version, **outdated agent** with a link to [Updates](../operations/updates.md) when it is behind, what an older agent cannot do (see [Agent version and drift](#agent-version-and-drift)), and **New install command** (the owner only) for a lost certificate or a reinstalled server: see [Add a node](../getting-started/add-node.md).
+- **SSH access** shows the saved SSH server and login, and **Reveal password** shows the password after a fresh sign-in confirmation; how the password is kept and changed is in [Install a node over SSH](../getting-started/ssh-install.md).
+- **Decoy site**: what the node shows to anyone who is not a client; see [Your own decoy site](decoy-site.md).
+- **AmneziaWG backend**: how the node runs AmneziaWG; see [AmneziaWG](amneziawg.md).
+- **Host**: hostname, OS, kernel, architecture, CPUs, RAM, disk, virtualization, IPv6, boot time and the engine versions, as the agent reported them.
 
 | Field | What it does |
 |:--|:--|
@@ -191,9 +214,8 @@ The tab holds, top to bottom, the WARP card, the node's fields, the **SSH access
 | **Drop the agent connection after** | 30–600 s, default 90. If the agent stays silent longer, the panel closes the connection. The node turns grey (**Host blip**) first; **Unreachable** comes after 10 minutes without contact. |
 | **Wait for a command result** | 10–900 s, default 120: how long the panel waits before a command counts as unanswered. |
 | **Agent dial timeout** | 5–120 s, default 15: how long the agent waits when it connects to the panel. |
-| **DNS resolvers for this node** | **Server's own resolver** (the default), **Yandex DNS** or **Cloudflare + Google**; a list of your own (up to 8 IP addresses, `ip:port` works too) shows as **Custom DNS** and is edited there. The node and its VPN engines resolve names with them, the names in its users' traffic included. With **Server's own resolver** the node uses whatever the server uses. For a node in Russia pick **Yandex DNS**, so Russian services such as gosuslugi.ru resolve reliably. |
 
-**Save** sends only what changed. Most settings take effect without a reconnect; changing the torrent setting restarts the node's Hysteria2 profiles.
+**Save** sends only what changed, and the form on **Exit** saves its own fields, so neither overwrites the other. Most settings take effect without a reconnect.
 
 #### Measuring the network capacity
 
@@ -222,20 +244,6 @@ Only the owner can measure (the API refuses tokens and MCP), and each measuremen
 
 A **new node** is measured once automatically: about 45 seconds after its agent connects for the first time after the installation, if **Network capacity** is still 0. That is the only value the panel writes by itself, and only when the field is 0; the result is in the node's events ("Network capacity measured at the first start") and in the audit log (`node.bandwidth_auto`). The panel stores the slower of the two directions, and only if the test measured the upload as well: if only the download answered (the test servers refused the upload), nothing is written and the node gets a warning event ("The first measurement got ... no upload figure"), because on a link that is faster down than up the download alone would overstate the capacity. Press **Measure** and type the number yourself. A node whose agent is too old, or whose test fails, is skipped without a message: press **Measure** yourself or type the number.
 
-**Block recognized BitTorrent traffic** is off by default. It blocks plaintext BitTorrent that the node's users start, on AmneziaWG in the kernel and on Hysteria2 in its engine, and writes a `torrent_attempt` event without any address. It needs an agent that supports it. See [Torrent protection](torrent-protection.md).
-
-**IPv6 for clients** is on by default (the way every node worked before), and only the owner changes it. Turn it off when the provider's IPv6 addresses are located in a different country than the node: an app picks IPv4 or IPv6 per site, so people would appear to come from two countries at random (over IPv4 the exit reads as the node's country, over IPv6 as the other one, and Google or YouTube then show the wrong region). With it off, the node answers client IPv6 that would leave through its own uplink with an ICMPv6 "administratively prohibited" instead of dropping it silently, so apps move to IPv4 at once instead of waiting for a timeout. A kernel without the nftables `reject` action cannot do that: the node then drops that IPv6 silently (apps may wait for a timeout; if even that rule is refused, IPv6 is not blocked at all) and writes a warning event, and the tunnels keep working. The agent retries every 10 minutes until `reject` works again, then records a recovery event.
-
-- **AmneziaWG.** The agent adds one reject rule to its own firewall table (`mistgate_awg`) and removes it when you turn the setting back on. The clients' configs do not change: their IPv6 address and the `::/0` route stay in the tunnel, so a person's real IPv6 never leaves outside the VPN. IPv6 addressed to the tunnel's own address is untouched. IPv6 DNS servers of a preset are rejected too, so the device moves on to the IPv4 ones.
-- **Hysteria2.** The node's direct outbound connects over IPv4 only, and a name that has only an IPv6 address does not open. Connections that are already open keep the address family they have; new ones go over IPv4. The node's own name resolving (**DNS resolvers for this node**) works as before.
-- **Exit through WARP is not touched.** Its exit is Cloudflare's, not the node's uplink, so the geolocation of the node's range does not matter there.
-
-The setting needs an agent that reports `client-ipv6/1`. An older agent shows the switch greyed out with "Update this node agent to turn this off", and the panel never sends it the setting; turning IPv6 back on always works. Each change is written to the audit log (`node.update` with `client_ipv6` on or off).
-
-**DNS resolvers for this node** are not the DNS presets that apps receive, and the doctor checks the server's own resolver separately: see [DNS](dns.md).
-
-**DNS choice on the user page** is a separate block of the node, not to be confused with the resolvers above. Here the owner ticks the DNS presets that people may pick for this server on their page (the order is the order on the page) and marks one as the default for the node. Only the owner changes it, and the change is written to the audit log (`node_dns_options`). A node with no presets offered gives no choice. It matters only when **DNS choice on the page** is on in **Subscriptions** → **User page**, and it reaches AmneziaWG keys and the AmneziaWG proxies of a Mihomo profile; see [DNS](dns.md).
-
 > **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the devices of the node's AmneziaWG profiles are marked outdated, and the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update.
 
 #### Renaming a node
@@ -249,7 +257,6 @@ Change **Name** and save. The name shows in the panel, in the file names of Amne
 - users stop getting the node in their subscription; their links stay the same;
 - the node's certificate is revoked and its agent is told to stop; the files on the server stay;
 - the node's record stays in the audit log, with its traffic history.
-- the node's [relays](relays.md), as entry or as exit, are removed.
 
 To confirm, type the node name. After that the node disappears from the list; its page, if you open it, says "This node is retired". A retired agent cannot connect again. Only the owner can retire a node.
 
@@ -270,10 +277,10 @@ The paths are the defaults of `mistgate-node install`; if you installed with oth
 ## Agent version and drift
 
 - **Outdated agent.** The panel knows the newest agent version it ships. A node that runs an older one is marked **outdated agent** in the list and in its header. Some features need a newer agent: the doctor, WARP, the automatic AmneziaWG module build. Update it from [Updates](../operations/updates.md).
-- **Capabilities.** An agent lists what it can do, and the panel sends a feature only to an agent that listed it. `user-rate-limit/1` means the agent can share one speed limit among a person's devices on the node (Hysteria2 and VLESS). A node whose agent lacks it holds each device to the smaller of the person's and the device's limits, and the **Settings** tab of the node says so: "The agent on this node cannot share a speed limit between a person's devices…". Update the agent to get the per-person limit. See [Users and groups](users-and-groups.md#limits).
+- **Capabilities.** An agent lists what it can do, and the panel sends a feature only to an agent that listed it. `user-rate-limit/1` means the agent can share one speed limit among a person's devices on the node (Hysteria2 and VLESS). A node whose agent lacks it holds each device to the smaller of the person's and the device's limits, and the **Agent** card on the node's **Server** tab says so: "The agent on this node cannot share a speed limit between a person's devices…". Update the agent to get the per-person limit. See [Users and groups](users-and-groups.md#limits).
 - **State drift.** The panel sends every node its full desired state and compares a hash of it with what the node applied. When they differ, the panel sends the state again (event "state drifted from the panel, resent"). If the node still applies a different state, it reads **Needs attention** with "the node's state differs from the panel's", and an alert opens. Restart the profiles; if it comes back, read the node's log.
 - **Clock skew.** When the server clock differs from the panel's, the node says so. A wrong clock breaks certificates and handshakes; turn on time sync on the server (`timedatectl set-ntp true`).
 
 ## Who can do what
 
-Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 for clients** off or on and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).
+Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on and building the AmneziaWG kernel module are for the owner only. See [Security](../operations/security.md).

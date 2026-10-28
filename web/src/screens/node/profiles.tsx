@@ -169,7 +169,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
               {t("node.profiles.setDomain")}
             </Button>
           ) : kind === "warp" ? (
-            <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "settings" }} hash="warp" className={buttonClass("primary", "sm")}>
+            <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "exit" }} hash="warp" className={buttonClass("primary", "sm")}>
               {t("warp.open")}
             </Link>
           ) : null;

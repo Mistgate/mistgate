@@ -18,7 +18,7 @@ import { validatePaging, type PagingSearch } from "@/lib/paging";
 import { validateSort, type SortSearch } from "@/screens/users/sort";
 import { goToSignIn, meQuery, queryClient, setSignedOutHandler } from "@/lib/session";
 import { validateHealthSearch } from "@/screens/health/tabs";
-import { validateNodeSearch } from "@/screens/node/tabs";
+import { upgradeNodeLink, validateNodeSearch } from "@/screens/node/tabs";
 import { validateReachSearch } from "@/screens/reachability/search";
 import { validateSubsSearch } from "@/screens/subscriptions/tabs";
 
@@ -122,6 +122,11 @@ const node = createRoute({
   getParentRoute: () => app,
   path: "/nodes/$id",
   validateSearch: validateNodeSearch,
+  // a link made for the old tabs (Settings, Users, Logs, Journal, Events) is replaced by the one for the new tab
+  beforeLoad: ({ location, params }) => {
+    const up = upgradeNodeLink(location.search as Record<string, unknown>, location.hash);
+    if (up) throw redirect({ to: "/nodes/$id", params, search: up.search, hash: up.hash || undefined, replace: true });
+  },
   component: lazyRouteComponent(() => import("@/screens/node"), "NodeScreen"),
 });
 

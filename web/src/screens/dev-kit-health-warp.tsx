@@ -15,13 +15,14 @@ import { useFixFlow } from "@/screens/health/fix";
 import { PeopleTab } from "@/screens/health/people";
 import { ConnectionPanel } from "@/screens/users/user-detail";
 import { NodeDoctorTab } from "@/screens/node/doctor";
-import { SettingsTab } from "@/screens/node/settings";
+import { ExitTab } from "@/screens/node/exit";
+import { ServerTab } from "@/screens/node/server";
 import { WarpCard } from "@/screens/node/warp";
 import { warpQuery } from "@/screens/node/warp-model";
 import { EgressNote } from "@/screens/profiles/egress-note";
 import { UpdatesScreen } from "@/screens/updates";
 
-// Development only (the dev kit): the WARP card, node settings, alerts, the doctor and Updates as the health-warp work left
+// Development only (the dev kit): the WARP card, node Exit and Server, alerts, the doctor and Updates as the health-warp work left
 // them, on private query caches filled with made-up data, so every state can be looked at without a panel. Each block
 // carries data-shot for the screenshot script.
 
@@ -480,14 +481,17 @@ export function HealthWarpKit() {
         </Mock>
       </Shot>
 
-      <Shot id="settings" title="Node settings: WARP first, the honest DNS, liveness and country fields">
+      <Shot id="settings" title="Node Exit and Server: WARP first, the honest DNS, liveness and country fields">
         <Mock
           fill={(c) => {
             c.setQueryData(warpQuery("nod_w_ok").queryKey, warp() as never);
             c.setQueryData(doctorQuery("nod_w_ok").queryKey, { nowUnix: NOW, nodes: [nodeDoctor({ nodeId: "nod_w_ok", items: [] })] } as never);
           }}
         >
-          <SettingsTab data={nodeData as never} />
+          <div className="flex flex-col gap-6">
+            <ExitTab data={nodeData as never} />
+            <ServerTab data={nodeData as never} />
+          </div>
         </Mock>
       </Shot>
 

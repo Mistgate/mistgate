@@ -281,7 +281,7 @@ function WarpPathActions({ nodeId, hasFix = false }: { nodeId: string; hasFix?: 
   const run = useRunDoctor(nodeId);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "settings" }} hash="warp" className={buttonClass(hasFix ? "secondary" : "primary", "sm")}>
+      <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "exit" }} hash="warp" className={buttonClass(hasFix ? "secondary" : "primary", "sm")}>
         {t("warp.open")}
       </Link>
       <Button variant="secondary" size="sm" onClick={() => run.mutate()} disabled={run.isPending}>

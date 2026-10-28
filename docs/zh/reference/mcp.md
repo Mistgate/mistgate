@@ -155,7 +155,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | 管理员 | `updates_status` 中的 `rollout_id` | 始终 |
 | `node_rollback` | 管理员 | `node` | 始终 |
 | `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面输入 SSH 密码并确认主机密钥 | 始终 |
-| `node_server_password_rotate` | 管理员 | 计划参数：运行中节点的 `node` ID 或精确名称（已退役的节点会被拒绝）；执行时只接收 `confirm_token`。面板自行生成新密码，绝不返回密码；所有者可在节点设置中查看 | 始终 |
+| `node_server_password_rotate` | 管理员 | 计划参数：运行中节点的 `node` ID 或精确名称（已退役的节点会被拒绝）；执行时只接收 `confirm_token`。面板自行生成新密码，绝不返回密码；所有者可在节点的**服务器**标签页中查看 | 始终 |
 
 对于 `create` 和 `enable`，`relay_apply` 遵循面板自己的顺序：先创建中转（关闭状态），检测链路，再开启，然后由面板从外部检测路径。检测未通过的中转保持关闭，执行失败并给出阶段（`leg` 或 `path`）及其代码；迁移已开启中转的端口会重新检测路径，失败则关闭中转。第二个服务器会在订阅下次刷新时出现或消失。请参阅[中转](../guide/relays.md)。
 

@@ -30,7 +30,7 @@ export function WarpMissing({ nodes, textKey = "warp.egress.missing" }: { nodes:
       {nodes.map((n, i) => (
         <Fragment key={n.id}>
           {i > 0 && ", "}
-          <Link to="/nodes/$id" params={{ id: n.id }} search={{ tab: "settings" }} hash="warp" title={t("warp.egress.nodeLink", { node: n.name })} className={linkClass}>
+          <Link to="/nodes/$id" params={{ id: n.id }} search={{ tab: "exit" }} hash="warp" title={t("warp.egress.nodeLink", { node: n.name })} className={linkClass}>
             {n.name}
           </Link>
         </Fragment>

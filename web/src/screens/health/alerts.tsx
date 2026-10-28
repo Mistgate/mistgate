@@ -187,7 +187,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
           </Link>
         )}
         {go === "warp" && (
-          <Link to="/nodes/$id" params={{ id: a.nodeId }} search={{ tab: "settings" }} hash="warp" className={buttonClass(goMain ? "primary" : "secondary", "md")}>
+          <Link to="/nodes/$id" params={{ id: a.nodeId }} search={{ tab: "exit" }} hash="warp" className={buttonClass(goMain ? "primary" : "secondary", "md")}>
             {t("warp.open")}
           </Link>
         )}

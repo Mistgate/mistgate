@@ -73,7 +73,7 @@ The install manager speaks English, Russian or Simplified Chinese: the admin's l
 
 After a successful installation the panel keeps the SSH login and password, encrypted with the master key, together with the pinned host key. No API read, MCP tool or log ever returns the password.
 
-- **See it.** The node's **Settings → SSH access** card shows the SSH server and login. **Reveal password** asks you to confirm your sign-in again and is written to the audit log.
+- **See it.** The node's **Server → SSH access** card shows the SSH server and login. **Reveal password** asks you to confirm your sign-in again and is written to the audit log.
 - **Change it.** In the install manager, the server access table takes a new password of at least 12 characters. Through MCP, `node_server_password_rotate` makes the panel generate one; the agent never sees it. Either way the panel first stores the new password as pending, changes it on the server with `chpasswd`, logs in again with it, and only then replaces the saved one.
 - **An interrupted change.** If the server could not confirm the new password, the next reveal or change first tries both. When the server cannot be reached to tell which one works, **Reveal password** shows "Current password (not verified)" and "New password from the interrupted change (not verified)": try the current one first. A new change waits until the server answers. If the server rejects both, reset the password through your provider's console.
 - **A password the panel generated.** Only the panel knows it, and the card says so. Reveal it and keep a copy before you retire the node.

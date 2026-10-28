@@ -18,8 +18,8 @@ import { useSignOut } from "@/lib/session";
 type Item = { id: string; tag: string; label: string; meta?: string; run: () => void };
 type Group = { title: MessageKey; items: Item[] };
 
-/** Where a place leads: a route of the router, with its params and search. */
-type Target = { to: string; params?: Record<string, string>; search?: Record<string, string> };
+/** Where a place leads: a route of the router, with its params, search and hash. */
+type Target = { to: string; params?: Record<string, string>; search?: Record<string, string>; hash?: string };
 /** A place of the panel: its name, where it sits (the section of a page or a tab), extra words to find it by, ru and en. */
 type Place = { id: string; label: MessageKey; crumb?: MessageKey; words: string; go: Target };
 
@@ -75,15 +75,25 @@ export const places: readonly Place[] = [
   tab("health", "doctor", "hl.tab.doctor", "доктор doctor 诊断 医生", false),
 ];
 
-/** The node page's tabs, each with the words that find it next to a node's name ("de1 логи"). */
+/**
+ * The node page's tabs and History's parts, each with the words that find it next to a node's name ("de1 журнал"), and
+ * where it opens. The people on the node live on its Overview.
+ */
 const nodeTabs = [
-  { id: "profiles", label: "node.tab.profiles", words: "профили profiles 协议配置 协议" },
-  { id: "users", label: "node.tab.users", words: "пользователи users 用户" },
-  { id: "logs", label: "node.tab.logs", words: "логи журнал logs log 日志" },
-  { id: "events", label: "node.tab.events", words: "события events 事件" },
-  { id: "doctor", label: "node.tab.doctor", words: "доктор doctor 诊断" },
-  { id: "settings", label: "node.tab.settings", words: "настройки settings warp 设置" },
-] as const satisfies readonly { id: string; label: MessageKey; words: string }[];
+  { id: "people", label: "node.onlineHere", words: "пользователи люди онлайн users people online 用户 在线", search: {}, hash: "people" },
+  { id: "profiles", label: "node.tab.profiles", words: "профили profiles 协议配置 协议", search: { tab: "profiles" } },
+  { id: "exit", label: "node.tab.exit", words: "выход warp ipv6 dns днс торрент exit egress torrent 出口 种子", search: { tab: "exit" } },
+  { id: "history", label: "node.tab.history", words: "история события history events 历史 事件", search: { tab: "history" } },
+  { id: "journal", label: "node.tab.journal", words: "журнал journal 运行记录", search: { tab: "history", view: "journal" } },
+  { id: "logs", label: "node.tab.logs", words: "логи logs log 日志", search: { tab: "history", view: "logs" } },
+  { id: "doctor", label: "node.tab.doctor", words: "доктор doctor 诊断", search: { tab: "doctor" } },
+  {
+    id: "server",
+    label: "node.tab.server",
+    words: "сервер настройки ssh пароль ширма агент хост канал settings server password decoy agent host capacity 服务器 设置 密码 伪装",
+    search: { tab: "server" },
+  },
+] as const satisfies readonly { id: string; label: MessageKey; words: string; search: Record<string, string>; hash?: string }[];
 
 /** Every word of the query is found in the place's names (every language) or its extra words. */
 export function placeMatches(p: Pick<Place, "label" | "crumb" | "words">, q: string): boolean {
@@ -139,7 +149,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
         meta: st.word(n),
         run: go({ to: "/nodes/$id", params: { id: n.id } }),
       }));
-    // "de1 логи": a tab of a node, when the query names both
+    // "de1 журнал": a tab of a node, when the query names both
     const words = q.split(/\s+/).filter(Boolean);
     const nodeTab = words.length > 1 ? nodeTabs.find((x) => words.some((w) => placeMatches({ label: x.label, words: x.words }, w))) : undefined;
     const rest = nodeTab ? words.filter((w) => !placeMatches({ label: nodeTab.label, words: nodeTab.words }, w)) : [];
@@ -153,7 +163,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
               tag: n.countryCode || "·",
               label: `${n.name} · ${t(nodeTab.label)}`,
               meta: t("nav.nodes"),
-              run: go({ to: "/nodes/$id", params: { id: n.id }, search: { tab: nodeTab.id } }),
+              run: go({ to: "/nodes/$id", params: { id: n.id }, search: nodeTab.search, ...("hash" in nodeTab ? { hash: nodeTab.hash } : {}) }),
             }))
         : [];
     // only users the server matched for exactly what is typed (the answer for an older word must not show)

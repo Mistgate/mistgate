@@ -147,7 +147,7 @@ The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 - **Speed per person** is the total of the person's devices on **one node**. A person connected to two nodes at once can get up to twice the limit, because the nodes do not coordinate. This is the former single speed limit: before devices had keys of their own, all the apps shared one credential, so it was already a limit per person.
 - **Speed per device** caps each device.
 - Both can be set. A byte passes both limits, so a device runs at the smaller of its own limit and what is left of the person's.
-- Sharing the person's limit needs an agent that reports `user-rate-limit/1`. A node with an older agent holds each device to the smaller of the two limits, and the **Settings** tab of the node says so until the agent is updated (see [Nodes](nodes.md#agent-version-and-drift)).
+- Sharing the person's limit needs an agent that reports `user-rate-limit/1`. A node with an older agent holds each device to the smaller of the two limits, and the Agent card on the node's **Server** tab says so until the agent is updated (see [Nodes](nodes.md#agent-version-and-drift)).
 
 ### Access
 

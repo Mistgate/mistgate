@@ -25,14 +25,12 @@ import { useOlderNodes } from "@/lib/updates";
 import { warpKind, warpWord } from "@/lib/warp";
 import { StateBanner } from "./banner";
 import { NodeDoctorTab } from "./doctor";
-import { EventsTab } from "./events";
-import { JournalTab } from "./journal";
-import { LogsTab } from "./logs";
+import { ExitTab } from "./exit";
+import { HistoryTab } from "./history";
 import { OverviewTab } from "./overview";
 import { ProfilesTab } from "./profiles";
-import { SettingsTab } from "./settings";
-import type { NodeTab } from "./tabs";
-import { UsersTab } from "./users";
+import { ServerTab } from "./server";
+import type { HistoryView, NodeSearch, NodeTab } from "./tabs";
 
 export function NodeScreen() {
   const t = useT();
@@ -67,7 +65,7 @@ function WarpChip({ node }: { node: NonNullable<Plain<GetNodeResponse>["node"]> 
     <Link
       to="/nodes/$id"
       params={{ id: node.id }}
-      search={{ tab: "settings" }}
+      search={{ tab: "exit" }}
       hash="warp"
       aria-label={t("node.warpChip", { state: t(warpWord[state]) })}
       title={t("node.warpChip", { state: t(warpWord[state]) })}
@@ -108,20 +106,15 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
   const fmt = useFmt();
   const st = useNodeStatus();
   const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as { tab?: NodeTab; add?: string };
-  const tab = search.tab ?? "overview";
+  const search = useSearch({ strict: false }) as NodeSearch;
   const node = data.node!;
   const kind = nodeKind(node);
   const older = useOlderNodes().has(node.id);
   const doctor = useQuery(doctorQuery(node.id));
   const [restart, setRestart] = useState(false);
-  const setTab = (next: string) =>
-    void navigate({
-      to: "/nodes/$id",
-      params: { id: node.id },
-      search: next === "overview" ? {} : { tab: next as NodeTab },
-      replace: true,
-    });
+  const go = (next: NodeSearch) => void navigate({ to: "/nodes/$id", params: { id: node.id }, search: next, replace: true });
+  const setTab = (next: string) => go(next === "overview" ? {} : { tab: next as NodeTab });
+  const setView = (view: HistoryView) => go(view === "events" ? { tab: "history" } : { tab: "history", view });
 
   const retired = node.status === NodeStatus.RETIRED;
   // the agent is on the line (also when traffic does not flow): restarting works then, and only then
@@ -129,7 +122,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
   const failed = data.inbounds.filter((i) => i.state === InboundState.FAILED).length;
   const issues = doctor.data?.nodes.find((n) => n.nodeId === node.id)?.items.filter(isIssue).length ?? 0;
 
-  const items: TabItem[] = [
+  const all: TabItem[] = [
     { value: "overview", label: t("node.tab.overview"), content: <OverviewTab data={data} /> },
     {
       value: "profiles",
@@ -137,18 +130,23 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
       badge: failed,
       content: <ProfilesTab data={data} addProfile={search.add} onAddClosed={() => search.add && setTab("profiles")} />,
     },
-    { value: "users", label: t("node.tab.users"), content: <UsersTab data={data} /> },
-    { value: "logs", label: t("node.tab.logs"), content: tab === "logs" ? <LogsTab data={data} onJournal={() => setTab("journal")} /> : null },
-    { value: "journal", label: t("node.tab.journal"), content: tab === "journal" ? <JournalTab nodeId={node.id} /> : null },
-    { value: "events", label: t("node.tab.events"), content: tab === "events" ? <EventsTab nodeId={node.id} /> : null },
+    { value: "exit", label: t("node.tab.exit"), content: <ExitTab data={data} /> },
+    {
+      value: "history",
+      label: t("node.tab.history"),
+      content: search.tab === "history" ? <HistoryTab data={data} view={search.view ?? "events"} onView={setView} /> : null,
+    },
     {
       value: "doctor",
       label: t("node.tab.doctor"),
       badge: issues,
-      content: tab === "doctor" ? <NodeDoctorTab nodeId={node.id} nodeName={node.name} /> : null,
+      content: search.tab === "doctor" ? <NodeDoctorTab nodeId={node.id} nodeName={node.name} /> : null,
     },
-    { value: "settings", label: t("node.tab.settings"), content: <SettingsTab data={data} /> },
+    { value: "server", label: t("node.tab.server"), content: <ServerTab data={data} /> },
   ];
+  // a retired node has nothing left to run or route: what it was, what happened, and the server (SSH access stays)
+  const items = retired ? all.filter((i) => i.value === "overview" || i.value === "history" || i.value === "server") : all;
+  const tab = items.some((i) => i.value === search.tab) ? search.tab! : "overview";
 
   const actions = (
     <>

@@ -10,7 +10,7 @@ By default a profile's traffic leaves a node from the node's own address. With W
 ![One node with three profiles: Hysteria2 with the Direct exit leaves from the node's address; a WARP copy of it and an AmneziaWG profile with the WARP exit leave through the node's one WARP account; without working WARP those carry no traffic](../diagrams/node-exits.svg)
 
 - **The exit is a profile setting.** **Exit** (in **Advanced** for Hysteria2 and VLESS, in **Basics** for AmneziaWG) is **Direct** or **WARP**.
-- **The account belongs to a node.** It is set up on the WARP card of the node: node → **Settings**, the first card. The WARP chip in the node's header leads there too.
+- **The account belongs to a node.** It is set up on the WARP card of the node: node → **Exit**, the first card. The WARP chip in the node's header leads there too.
 - **A profile with the WARP exit needs an account on every node it runs on.** The editor lists the nodes of the profile that have no working WARP, each a link to its WARP card.
 - **MCP tools.** `warp_status` reads the account and the node's last probes. With an Admin token, `warp_restart_plan` / `_apply` restart the tunnel; `warp_reregister_plan` / `_apply` replace the account after the owner approves the plan and sees the terms link.
 

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { SectionLabel } from "@/components/ui/bits";
 import type { IconName, Tone } from "@/components/ui/icons";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
@@ -6,13 +5,11 @@ import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
 import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
-import { protocolName } from "@/lib/series";
 import { NodeChecks } from "./checks";
 import { NodeAlerts, NodeTraffic } from "./overview-parts";
+import { OnlineNow, TopToday } from "./users";
 
-const cardCls = "flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4";
-
-/** Gauges (CPU with softirq, RAM, disk, network), people online per protocol and the host facts. */
+/** Gauges (CPU with softirq, RAM, disk, network), traffic, then alerts and checks beside who is on the node and the top of the day. */
 export function OverviewTab({ data }: { data: Plain<GetNodeResponse> }) {
   const t = useT();
   const fmt = useFmt();
@@ -62,34 +59,6 @@ export function OverviewTab({ data }: { data: Plain<GetNodeResponse> }) {
     },
   ];
 
-  const fact = (k: string, v: ReactNode) => ({ k, v });
-  const facts: { k: string; v: ReactNode }[] = f
-    ? [
-        fact(t("node.f.hostname"), f.hostname),
-        fact(t("node.f.os"), f.os),
-        fact(t("node.f.kernel"), f.kernel),
-        fact(t("node.f.arch"), f.arch),
-        fact(t("node.f.cpu"), f.cpuCount ? String(f.cpuCount) : ""),
-        fact(t("node.f.ram"), f.ramTotalBytes ? fmt.bytes(f.ramTotalBytes, 1024) : ""),
-        fact(t("node.f.disk"), f.diskTotalBytes ? fmt.bytes(f.diskTotalBytes, 1024) : ""),
-        fact(t("node.f.virt"), f.virt),
-        fact("IPv6", f.hasIpv6 ? t("common.yes") : t("common.no")),
-        fact(t("node.f.booted"), f.bootUnix ? fmt.dateTime(f.bootUnix) : ""),
-        fact(
-          t("node.f.engines"),
-          f.engines.length ? (
-            <span className="flex flex-col items-end gap-0.5">
-              {f.engines.map((e) => (
-                <span key={e}>{e}</span>
-              ))}
-            </span>
-          ) : (
-            ""
-          ),
-        ),
-      ]
-    : [];
-
   return (
     <div className="flex flex-col gap-3.5">
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
@@ -121,40 +90,11 @@ export function OverviewTab({ data }: { data: Plain<GetNodeResponse> }) {
         <div className="flex min-w-0 flex-col gap-3.5">
           <NodeAlerts nodeId={node.id} nodeName={node.name} />
           <NodeChecks nodeId={node.id} />
-          <section className={cardCls}>
-            <SectionLabel as="h2" icon="people" tone="mint">
-              {t("node.onlineBy")}
-            </SectionLabel>
-            <div className="flex flex-wrap gap-6">
-              {node.online.length === 0 && (
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-mono text-[22px] font-bold">0</span>
-                  <span className="text-xs text-muted">{offline ? t("node.onlineOffline") : t("node.onlineNone")}</span>
-                </div>
-              )}
-              {node.online.map((o) => (
-                <div key={o.protocol} className="flex flex-col gap-0.5">
-                  <span className="font-mono text-[22px] font-bold">{o.users}</span>
-                  <span className="text-xs text-muted">{protocolName(o.protocol)}</span>
-                </div>
-              ))}
-            </div>
-          </section>
         </div>
-        <section className="flex flex-col rounded-card-lg border border-line bg-surface px-4 pt-4 pb-1.5">
-          <SectionLabel as="h2" icon="info" tone="sand" className="pb-2">
-            {t("node.facts")}
-          </SectionLabel>
-          {facts.length === 0 && <p className="border-t border-line py-3 text-[13px] text-muted">{t("node.factsNone")}</p>}
-          {facts
-            .filter(({ v }) => v !== "")
-            .map(({ k, v }) => (
-              <div key={k} className="flex min-h-[38px] items-center gap-2.5 border-t border-line py-1.5 text-[13px]">
-                <span className="flex-1 text-muted">{k}</span>
-                <span className="min-w-0 text-right font-mono text-xs font-semibold break-all">{v}</span>
-              </div>
-            ))}
-        </section>
+        <div className="flex min-w-0 flex-col gap-3.5">
+          <OnlineNow data={data} />
+          <TopToday data={data} />
+        </div>
       </div>
     </div>
   );

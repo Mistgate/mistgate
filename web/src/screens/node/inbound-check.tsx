@@ -121,7 +121,7 @@ export function WarpWarnings({ check, nodeId, nodeName, onLeave }: { check: Inbo
     <Notice className="items-start">
       <span className="flex flex-col items-start gap-1.5">
         {t(state === "paused" ? "node.check.warp.paused" : state === "down" ? "node.check.warp.down" : "node.check.warp.none", { node })}
-        <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "settings" }} hash="warp" onClick={onLeave} className="font-bold underline decoration-dotted underline-offset-2">
+        <Link to="/nodes/$id" params={{ id: nodeId }} search={{ tab: "exit" }} hash="warp" onClick={onLeave} className="font-bold underline decoration-dotted underline-offset-2">
           {t(state === "none" || !state ? "node.check.warp.open" : "node.check.warp.goto", { node })}
         </Link>
       </span>

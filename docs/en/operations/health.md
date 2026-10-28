@@ -164,7 +164,7 @@ There are exactly seven fixes. They are compiled into the agent: the panel sends
 | Trim the journal | `journalctl --vacuum-size=200M --vacuum-time=7d` | System journal size, Disk space |
 | Restore the base settings | Writes Mistgate's sysctl file (`/etc/sysctl.d/90-mistgate.conf`: fq, BBR and UDP buffer maxima of at least 16 MiB) and journald drop-in (`/etc/systemd/journald.conf.d/90-mistgate.conf`: the 200 MB cap) again, and the SSH guard (a per-address rate limit on new SSH connections). | Base network settings |
 | Restart profile | Restarts one profile on the node, or every profile that failed to start. Connections through it drop for a couple of seconds and come back by themselves. | Ports in use, Certificates (self-signed) |
-| Fix the resolver | Points the host resolver at the node's **DNS resolvers for this node** (node settings) or, when that is the server's own resolver, at the default for the node's country: Yandex DNS (`77.88.8.8`, `77.88.8.1`) on nodes in Russia, `1.1.1.1` and `8.8.8.8` elsewhere. With systemd-resolved it writes a drop-in (`/etc/systemd/resolved.conf.d/90-mistgate.conf`); otherwise it rewrites `/etc/resolv.conf` and keeps the original as `/etc/resolv.conf.mistgate.bak`. | Server resolver |
+| Fix the resolver | Points the host resolver at the node's **DNS resolvers for this node** (the node's **Exit** tab) or, when that is the server's own resolver, at the default for the node's country: Yandex DNS (`77.88.8.8`, `77.88.8.1`) on nodes in Russia, `1.1.1.1` and `8.8.8.8` elsewhere. With systemd-resolved it writes a drop-in (`/etc/systemd/resolved.conf.d/90-mistgate.conf`); otherwise it rewrites `/etc/resolv.conf` and keeps the original as `/etc/resolv.conf.mistgate.bak`. | Server resolver |
 | Check WARP / reconnect if down | Runs the WARP checks again at once. Only when the tunnel is down, or this check takes it to its failure threshold, it rebuilds the configured tunnel and its routes with the same account; otherwise nothing changes. During a reconnect, profiles using WARP may briefly lose traffic. If the tunnel recovered before Apply, nothing is changed. | WARP exit |
 | Refresh the service | Runs the installed binary from a fixed transient systemd unit to write its compiled unit template, reload systemd and restart the agent. The node identity and state stay in place; connections can drop for a few seconds. | Unit generation; AmneziaWG backend when it reports `unit_outdated` |
 | Allow Mistgate forwarding | Adds tagged accepts at the start of each host `FORWARD` chain with policy `DROP`. They match only traffic that enters through a `mgawg*` tunnel (new connections from clients, except towards container bridges `docker*` and `br-*`), what leaves through `mgawg*` as part of a connection the client began (never a new connection towards a client; WARP-routed client traffic is covered the same way), and the DNAT flows to current Mistgate relay targets, both directions. Other traffic stays under the host firewall. The agent reasserts the rules during its sweep after firewall reloads and removes them on node retirement. | AmneziaWG backend when forwarded traffic is dropped |
@@ -293,7 +293,7 @@ Depending on what the alert says, its card offers:
 
 ### Events on the node page
 
-The node's **Events** tab and the Overview's event feed keep a timeline that answers "what happened last night":
+The node's **History → Events** and the Overview's event feed keep a timeline that answers "what happened last night":
 
 | Event | Written when |
 |---|---|

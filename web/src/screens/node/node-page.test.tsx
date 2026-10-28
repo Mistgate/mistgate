@@ -100,6 +100,8 @@ const data = (node: Record<string, unknown> = {}, over: Record<string, unknown> 
   ({
     node: { id: "nod_1", name: "de1", address: "de1.example.com", countryCode: "DE", status: NodeStatus.ONLINE, online: [], lastSeenUnix: 0, ...node },
     inbounds: [inbound()],
+    onlineUsers: [],
+    topToday: [],
     facts: undefined,
     metrics: undefined,
     enrollmentExpiresUnix: 0,
@@ -178,14 +180,14 @@ describe("the agent is on the line", () => {
     expect(restartInbounds).toHaveBeenCalledWith({ nodeId: "nod_1" });
   });
 
-  it("keeps the logs on the line while traffic does not flow", async () => {
+  it("keeps the logs (History → Logs) on the line while traffic does not flow", async () => {
     streamLogs.mockImplementation(() =>
       (async function* () {
         yield { lines: [{ timeUnixMs: 1_000, level: 1, source: "hysteria2", message: "client connected" }], eof: false, dropped: 0, error: "" };
         await new Promise(() => {}); // the tail stays open
       })(),
     );
-    search = { tab: "logs" };
+    search = { tab: "history", view: "logs" };
     await mount(data({ status: NodeStatus.NO_TRAFFIC }));
     expect(streamLogs).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "nod_1", follow: true }), expect.anything());
     expect(text()).toContain("Live stream");
@@ -250,6 +252,53 @@ describe("the header", () => {
     const chip = document.querySelector('a[href="/nodes/$id#warp"]');
     expect(chip?.textContent).toContain("WARP · Not working");
     expect(chip?.querySelector(".tone-bad")).not.toBeNull();
-    expect(chip?.getAttribute("data-search")).toBe(JSON.stringify({ tab: "settings" }));
+    expect(chip?.getAttribute("data-search")).toBe(JSON.stringify({ tab: "exit" }));
+  });
+});
+
+describe("the tabs", () => {
+  const tabs = () => [...document.querySelectorAll("[role=tab]")].map((x) => x.textContent);
+
+  it("answer the owner's questions in order: overview, profiles, exit, history, doctor, server", async () => {
+    await mount(data());
+    expect(tabs()).toEqual(["Overview", "Profiles", "Exit", "History", "Doctor", "Server"]);
+  });
+
+  it("leave a retired node what it was, what happened and its server", async () => {
+    search = { tab: "profiles" };
+    await mount(data({ status: NodeStatus.RETIRED }));
+    expect(tabs()).toEqual(["Overview", "History", "Server"]);
+    expect(document.querySelector("[aria-selected=true]")?.textContent).toBe("Overview"); // a tab it no longer has opens the overview
+  });
+
+  it("show the people on the node on the Overview, where the old Users tab leads", async () => {
+    await mount(
+      data(
+        { online: [{ protocol: "hysteria2", users: 2 }] },
+        {
+          onlineUsers: [
+            { userId: "u1", userName: "mila", protocol: "hysteria2", deviceModel: "Pixel 8", connectedAtUnix: 0, downBps: 2e6 },
+            { userId: "u2", userName: "timur", protocol: "hysteria2", deviceModel: "", connectedAtUnix: 0, downBps: 1e6 },
+          ],
+          topToday: [{ userId: "u1", userName: "mila", bytes: 2 ** 30 }],
+        },
+      ),
+    );
+    const people = document.getElementById("people");
+    expect(people?.textContent).toContain("On this node now");
+    expect(people?.textContent).toContain("mila");
+    expect(people?.textContent).toContain("timur");
+    expect(text()).toContain("Top today");
+  });
+
+  it("open History's parts from its switch, the events without a view", async () => {
+    search = { tab: "history", view: "journal" };
+    await mount(data());
+    const part = (label: string) => [...document.querySelectorAll("[role=radio]")].find((x) => x.textContent === label);
+    expect(part("Journal")?.getAttribute("aria-checked")).toBe("true");
+    await click(part("Events"));
+    expect(search).toEqual({ tab: "history" });
+    await click(part("Logs"));
+    expect(search).toEqual({ tab: "history", view: "logs" });
   });
 });

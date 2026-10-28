@@ -46,7 +46,7 @@ export function EventsCard({ events }: { events: readonly Plain<Event>[] }) {
           );
         if (e.nodeId)
           return (
-            <Link key={e.id} to="/nodes/$id" params={{ id: e.nodeId }} search={{ tab: "events" }} title={sentence} className={cls}>
+            <Link key={e.id} to="/nodes/$id" params={{ id: e.nodeId }} search={{ tab: "history" }} title={sentence} className={cls}>
               {row}
             </Link>
           );

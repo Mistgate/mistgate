@@ -10,7 +10,7 @@ description: 了解如何让协议配置的流量经 Cloudflare WARP 出口、�
 ![一个节点有三项协议配置：使用直连接口的 Hysteria2 从节点自身地址发出；Hysteria2 的 WARP 副本和使用 WARP 出口的 AmneziaWG 协议配置经节点的唯一 WARP 账户发出；WARP 无法正常工作时，这些协议配置都不传输流量](../diagrams/node-exits.svg)
 
 - **出口是协议配置的设置。** **出口**（Hysteria2 和 VLESS 的**高级**部分、AmneziaWG 的**基础**部分）可以设为**直连**或**WARP**。
-- **账户属于节点。** 在节点的 WARP 卡片中设置：节点 → **设置**，第一张卡片。节点页眉中的 WARP 标签也会链接到这里。
+- **账户属于节点。** 在节点的 WARP 卡片中设置：节点 → **出口**，第一张卡片。节点页眉中的 WARP 标签也会链接到这里。
 - **使用 WARP 出口的协议配置，在其运行的每个节点上都需要一个账户。** 编辑器会列出该协议配置中没有正常运行 WARP 的节点，每个节点都链接到其 WARP 卡片。
 - **MCP 工具。** `warp_status` 会读取账户和节点最近一次探测结果。使用 Admin 令牌时，`warp_restart_plan` / `_apply` 会重启隧道；所有者批准计划并查看服务条款链接后，`warp_reregister_plan` / `_apply` 会更换账户。
 

@@ -214,7 +214,7 @@ describe("an alert that is fixed elsewhere", () => {
 
   it("a dead WARP exit opens the WARP card", async () => {
     await mount(alert({ whyKey: "health.alert.check_failed.why.warp_path", params: { inbound: "inb_2", profile: "hy2 · WARP" }, actions: ["open_warp", "open_node", "mute"] }));
-    expect(link("Open WARP")?.getAttribute("href")).toBe("/nodes/nod_1?tab=settings#warp");
+    expect(link("Open WARP")?.getAttribute("href")).toBe("/nodes/nod_1?tab=exit#warp");
     expect(text()).not.toContain("ForceIPv4");
   });
 
