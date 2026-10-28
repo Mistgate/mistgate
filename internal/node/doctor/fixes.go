@@ -79,6 +79,8 @@ func (d *Doctor) ApplyWithRefreshAck(ctx context.Context, fixID string, dryRun b
 		return fixReconnectWarp(ctx, e, dryRun, params)
 	case FixRefreshUnit:
 		return fixRefreshUnit(ctx, e, dryRun, params, beforeRefresh)
+	case FixAllowForwarding:
+		return fixAllowForwarding(ctx, e, dryRun, params)
 	case FixSetResolver:
 		return fixResolver(ctx, e, dryRun, params)
 	default:
@@ -384,6 +386,44 @@ func fixResolver(ctx context.Context, e *Env, dry bool, params map[string]string
 		return failed(err)
 	}
 	return FixOutcome{OK: true, Affected: 1, Params: pm, Detail: fmt.Sprintf("resolver (%s) set to %s", plan.Mode, strings.Join(plan.After, ", "))}
+}
+
+// allow_forwarding inserts only Mistgate interface and current relay-flow accepts into host FORWARD chains that drop.
+// The approved state is retained by hostctl and is reasserted by the agent's regular sweep after firewall reloads.
+func fixAllowForwarding(ctx context.Context, e *Env, dry bool, params map[string]string) FixOutcome {
+	if !noParams(params) {
+		return FixOutcome{Err: ErrBadParams}
+	}
+	if e.ForwardFixer == nil {
+		return FixOutcome{Err: ErrUnsupportedHost}
+	}
+	plan, err := e.ForwardFixer.PlanForwardExceptions(ctx)
+	if errors.Is(err, hostctl.ErrUnsupported) {
+		return FixOutcome{Err: ErrUnsupportedHost}
+	}
+	if err != nil {
+		return failed(err)
+	}
+	if !plan.Needed {
+		return noop("Mistgate forwarding is already allowed; no firewall rule changed")
+	}
+	paramsOut := p("rules", strconv.Itoa(plan.AddRules), "remove_rules", strconv.Itoa(plan.RemoveRules),
+		"chains", strconv.Itoa(plan.DropChains), "relays", strconv.Itoa(plan.RelayForwards), "backend", plan.Backend)
+	if dry {
+		return FixOutcome{OK: true, Params: paramsOut, Detail: fmt.Sprintf(
+			"would add %d rules and remove %d stale Mistgate-only rules across %d drop-policy chain(s); matches cover new AWG client traffic, replies to it and %d current relay forward(s)",
+			plan.AddRules, plan.RemoveRules, plan.DropChains, plan.RelayForwards)}
+	}
+	affected, err := e.ForwardFixer.ApplyForwardExceptions(ctx)
+	if err != nil {
+		out := failed(err)
+		out.Params = paramsOut
+		return out
+	}
+	paramsOut["rules"] = strconv.FormatUint(uint64(affected), 10)
+	return FixOutcome{OK: true, Affected: affected, Params: paramsOut, Detail: fmt.Sprintf(
+		"reconciled %d Mistgate-only forwarding rule changes across %d drop-policy chain(s); unrelated forwarded traffic remains governed by the host firewall",
+		affected, plan.DropChains)}
 }
 
 func orNone(s []string) string {

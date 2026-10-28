@@ -191,9 +191,12 @@ package mistgate.agent.v1;
 //                       egress warp. Params: state/backend/colo, hint not_configured | no_backend | paused |
 //                       table_in_use | rule_pref_in_use | interface_in_use
 //     unit_generation   the generation of the hardened systemd unit running this agent; manual runs SKIP. Params: unit_gen, current
-//   FIX IDS (stable; all are safe: no data loss, no package install, no change to sshd or
-//   to firewall rules outside the agent's own nftables table, where apply_baseline puts the SSH guard back). The
-//   check that offers a fix puts its id into DoctorResult.fix_id.
+//   FIX IDS (stable; all avoid data loss and package installation). allow_forwarding is the only fix that edits
+//   a host-owned FORWARD chain: after owner confirmation, it inserts tagged ACCEPT rules only for new traffic from
+//   Mistgate AWG tunnels (not towards container bridges), replies to client-started connections, and current relay
+//   DNAT targets in both directions. The agent reasserts them during its sweep and Cleanup removes only
+//   the tagged rules. apply_baseline puts the SSH guard in the agent's own nftables table. The check that offers a
+//   fix puts its id into DoctorResult.fix_id.
 //     journald_vacuum   journalctl --vacuum-size=200M (+ --vacuum-time=7d)           offered by journald_size, disk_space
 //     apply_baseline    hostctl.ApplyBaseline: sysctl + journald drop-in + ssh guard  offered by net_baseline
 //     restart_inbound   restart one inbound (params{inbound_id}) or all failed ones   offered by port_conflicts, cert_expiry (self-signed only)
@@ -204,6 +207,8 @@ package mistgate.agent.v1;
 //     refresh_unit      run the installed signed binary from a fixed transient systemd unit to rewrite the unit from its compiled
 //                       template and restart the agent; the fix takes no params and is offered only with "unit-refresh/1"
 //                       from a systemd service. The CommandResult reaches the panel before that agent restart.
+//     allow_forwarding  insert Mistgate-only tagged accepts into host FORWARD chains with policy DROP; reasserted by
+//                       the agent sweep and removed by Cleanup. Offered by awg_backend for forward_drop.
 //
 // UPDATE (agent self-update; additive, protocol api_version stays 1)
 //   The panel hands the agent a release manifest signed by the owner's release key; the agent verifies it

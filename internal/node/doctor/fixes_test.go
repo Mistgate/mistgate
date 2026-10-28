@@ -35,10 +35,29 @@ func (f *fakeFixer) SetResolver(_ context.Context, s []string) error {
 	return f.setErr
 }
 
+type fakeForwardFixer struct {
+	plan      hostctl.ForwardExceptionPlan
+	planErr   error
+	applyErr  error
+	planCalls int
+	applies   int
+}
+
+func (f *fakeForwardFixer) PlanForwardExceptions(context.Context) (hostctl.ForwardExceptionPlan, error) {
+	f.planCalls++
+	return f.plan, f.planErr
+}
+
+func (f *fakeForwardFixer) ApplyForwardExceptions(context.Context) (uint32, error) {
+	f.applies++
+	return uint32(f.plan.AddRules + f.plan.RemoveRules), f.applyErr
+}
+
 // fixRig is a host that needs every fix, with recorders for everything that would change it.
 type fixRig struct {
 	f                 *fake
 	fx                *fakeFixer
+	forward           *fakeForwardFixer
 	baseline          int
 	restarts          []string
 	warpReconnections int
@@ -47,7 +66,11 @@ type fixRig struct {
 
 func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 	t.Helper()
-	r := &fixRig{f: newFake(t), fx: &fakeFixer{plan: hostctl.ResolverPlan{Mode: "resolv_conf", Before: []string{"10.0.0.1"}, After: []string{"1.1.1.1", "8.8.8.8"}}}}
+	r := &fixRig{
+		f:       newFake(t),
+		fx:      &fakeFixer{plan: hostctl.ResolverPlan{Mode: "resolv_conf", Before: []string{"10.0.0.1"}, After: []string{"1.1.1.1", "8.8.8.8"}}},
+		forward: &fakeForwardFixer{plan: hostctl.ForwardExceptionPlan{Needed: true, AddRules: 4, DropChains: 1}},
+	}
 	f := r.f
 	f.bin("journalctl")
 	f.putSized("/var/log/journal/m/system.journal", 400<<20)
@@ -58,6 +81,7 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 	mk := func(tweak ...func(*Env)) *Doctor {
 		return f.doctor(append([]func(*Env){func(e *Env) {
 			e.Fixer = r.fx
+			e.ForwardFixer = r.forward
 			e.ApplyBaseline = func(context.Context) error {
 				r.baseline++
 				f.put("/proc/sys/net/core/default_qdisc", "fq\n")
@@ -103,8 +127,8 @@ func TestDryRunChangesNothing(t *testing.T) {
 			t.Errorf("%s dry run found nothing to do on a host that needs it: %+v", fix, out)
 		}
 	}
-	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 {
-		t.Fatalf("a dry run acted: vacuum=%d set=%d baseline=%d restarts=%v warp_reconnects=%d", r.fx.vacuum, r.fx.set, r.baseline, r.restarts, r.warpReconnections)
+	if r.fx.vacuum != 0 || r.fx.set != 0 || r.baseline != 0 || len(r.restarts) != 0 || r.warpReconnections != 0 || r.forward.applies != 0 {
+		t.Fatalf("a dry run acted: vacuum=%d set=%d baseline=%d restarts=%v warp_reconnects=%d forward_applies=%d", r.fx.vacuum, r.fx.set, r.baseline, r.restarts, r.warpReconnections, r.forward.applies)
 	}
 	if after := snapshot(t, r.f.root); after != before {
 		t.Fatalf("a dry run changed the filesystem:\nbefore:\n%s\nafter:\n%s", before, after)
@@ -401,7 +425,7 @@ func TestApplyGuards(t *testing.T) {
 	if out := d.Apply(context.Background(), "rm -rf /", false, nil); out.Err != ErrUnknownFix {
 		t.Errorf("unknown fix: %+v", out)
 	}
-	if out := d.Apply(context.Background(), "enable_ntp", false, nil); out.Err != ErrUnknownFix { // not one of the four
+	if out := d.Apply(context.Background(), "enable_ntp", false, nil); out.Err != ErrUnknownFix { // not a compiled fix
 		t.Errorf("enable_ntp: %+v", out)
 	}
 	for _, fix := range []string{FixJournaldVacuum, FixApplyBaseline, FixSetResolver} {
@@ -426,6 +450,33 @@ func TestApplyGuards(t *testing.T) {
 	off := mk(func(e *Env) { e.Unsupported = "not a Linux host" })
 	if out := off.Apply(context.Background(), FixJournaldVacuum, false, nil); out.Err != ErrUnsupportedHost {
 		t.Errorf("unsupported host: %+v", out)
+	}
+}
+
+func TestApplyForwardingFixPlanAndConfirmation(t *testing.T) {
+	f := newFake(t)
+	fx := &fakeForwardFixer{plan: hostctl.ForwardExceptionPlan{
+		Needed: true, AddRules: 8, RemoveRules: 1, DropChains: 2, RelayForwards: 1, Backend: "iptables-nft + nft",
+	}}
+	d := f.doctor(func(e *Env) { e.ForwardFixer = fx })
+
+	plan := d.Apply(context.Background(), FixAllowForwarding, true, nil)
+	if !plan.OK || plan.Detail != "would add 8 rules and remove 1 stale Mistgate-only rules across 2 drop-policy chain(s); matches cover new AWG client traffic, replies to it and 1 current relay forward(s)" ||
+		plan.Params["backend"] != "iptables-nft + nft" || plan.Params["remove_rules"] != "1" || fx.applies != 0 {
+		t.Fatalf("dry run: %+v; applies=%d", plan, fx.applies)
+	}
+
+	out := d.Apply(context.Background(), FixAllowForwarding, false, nil)
+	if !out.OK || out.Affected != 9 || fx.applies != 1 || !strings.Contains(out.Detail, "unrelated forwarded traffic remains governed by the host firewall") {
+		t.Fatalf("apply: %+v; applies=%d", out, fx.applies)
+	}
+	if got := d.Apply(context.Background(), FixAllowForwarding, false, map[string]string{"wide": "1"}); got.Err != ErrBadParams {
+		t.Fatalf("parameters: %+v", got)
+	}
+
+	fx.plan.Needed = false
+	if got := d.Apply(context.Background(), FixAllowForwarding, true, nil); !got.OK || got.Params["noop"] != "1" {
+		t.Fatalf("no longer needed: %+v", got)
 	}
 }
 

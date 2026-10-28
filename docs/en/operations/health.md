@@ -157,7 +157,7 @@ A warning or problem opens an alert (see "Kinds of alerts" below). The certifica
 
 ### Fixes
 
-There are exactly six fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
+There are exactly seven fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
 
 | Button | What it does | Offered by |
 |---|---|---|
@@ -167,6 +167,7 @@ There are exactly six fixes. They are compiled into the agent: the panel sends o
 | Fix the resolver | Points the host resolver at the node's **DNS resolvers for this node** (node settings) or, when that is the server's own resolver, at the default for the node's country: Yandex DNS (`77.88.8.8`, `77.88.8.1`) on nodes in Russia, `1.1.1.1` and `8.8.8.8` elsewhere. With systemd-resolved it writes a drop-in (`/etc/systemd/resolved.conf.d/90-mistgate.conf`); otherwise it rewrites `/etc/resolv.conf` and keeps the original as `/etc/resolv.conf.mistgate.bak`. | Server resolver |
 | Check WARP / reconnect if down | Runs the WARP checks again at once. Only when the tunnel is down, or this check takes it to its failure threshold, it rebuilds the configured tunnel and its routes with the same account; otherwise nothing changes. During a reconnect, profiles using WARP may briefly lose traffic. If the tunnel recovered before Apply, nothing is changed. | WARP exit |
 | Refresh the service | Runs the installed binary from a fixed transient systemd unit to write its compiled unit template, reload systemd and restart the agent. The node identity and state stay in place; connections can drop for a few seconds. | Unit generation; AmneziaWG backend when it reports `unit_outdated` |
+| Allow Mistgate forwarding | Adds tagged accepts at the start of each host `FORWARD` chain with policy `DROP`. They match only traffic that enters through a `mgawg*` tunnel (new connections from clients, except towards container bridges `docker*` and `br-*`), what leaves through `mgawg*` as part of a connection the client began (never a new connection towards a client; WARP-routed client traffic is covered the same way), and the DNAT flows to current Mistgate relay targets, both directions. Other traffic stays under the host firewall. The agent reasserts the rules during its sweep after firewall reloads and removes them on node retirement. | AmneziaWG backend when forwarded traffic is dropped |
 
 A fix always takes two steps:
 

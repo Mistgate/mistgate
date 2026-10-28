@@ -968,14 +968,14 @@ func TestUnitGenerationSeverityTracksGuardAndTunUse(t *testing.T) {
 
 func TestDoctorFixIdsAreTheKnownOnes(t *testing.T) {
 	e := newEnv(t)
-	e.node("de1", "hetzner", true)
-	e.report("de1", false, res("disk_space", dWarn, "rm_rf_slash"), res("resolver", dWarn, "set_resolver"), res("ipv6", dOK, "set_resolver"), res("warp_path", dFail, "reconnect_warp"), res("unit_generation", dWarn, "refresh_unit"))
-	rows, _ := e.st.DoctorResults(e.ctx, "de1")
+	e.node("node_test", "test-provider", true)
+	e.report("node_test", false, res("disk_space", dWarn, "rm_rf_slash"), res("resolver", dWarn, "set_resolver"), res("ipv6", dOK, "set_resolver"), res("warp_path", dFail, "reconnect_warp"), res("unit_generation", dWarn, "refresh_unit"), res("awg_backend", dWarn, "allow_forwarding"))
+	rows, _ := e.st.DoctorResults(e.ctx, "node_test")
 	fixes := map[string]string{}
 	for _, r := range rows {
 		fixes[r.CheckID] = r.FixID
 	}
-	if fixes["disk_space"] != "" || fixes["resolver"] != "set_resolver" || fixes["ipv6"] != "" || fixes["warp_path"] != "reconnect_warp" || fixes["unit_generation"] != "refresh_unit" {
+	if fixes["disk_space"] != "" || fixes["resolver"] != "set_resolver" || fixes["ipv6"] != "" || fixes["warp_path"] != "reconnect_warp" || fixes["unit_generation"] != "refresh_unit" || fixes["awg_backend"] != "allow_forwarding" {
 		t.Fatalf("fix ids: %v", fixes)
 	}
 }

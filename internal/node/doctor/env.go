@@ -98,6 +98,7 @@ type Env struct {
 	ReconnectWarp  func(ctx context.Context) (bool, error)                            // true when a down tunnel was reconnected
 	RecheckWarp    func(ctx context.Context) (checked, thresholdDown bool, err error) // thresholdDown also covers a scheduled check that just crossed the threshold
 	Fixer          hostctl.Fixer                                                      // nil = journal/resolver fixes unsupported
+	ForwardFixer   hostctl.ForwardExceptionFixer                                      // nil = the narrow FORWARD exception fix is unsupported
 
 	// Set by Run: the previous result of a check.
 	Prev func(id string) (Result, bool)

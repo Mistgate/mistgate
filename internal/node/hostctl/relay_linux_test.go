@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// relayHost is testHost plus a fake /proc/sys for forwarding and a runner that answers the two looks at the FORWARD policy.
+// relayHost is testHost plus a fake /proc/sys for forwarding and a runner that answers the firewall snapshot commands.
 func relayHost(t *testing.T) (*linuxHost, *[]call, *string, *string) {
 	t.Helper()
 	h, calls := testHost(t)
@@ -23,7 +23,7 @@ func relayHost(t *testing.T) (*linuxHost, *[]call, *string, *string) {
 	h.run = func(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
 		joined := strings.Join(args, " ")
 		switch {
-		case name == "nft" && joined == "list ruleset":
+		case name == "nft" && joined == "-a list ruleset":
 			*calls = append(*calls, call{stdin, name, joined})
 			return []byte(*ruleset), nil
 		case name == "iptables" && joined == "-S FORWARD":

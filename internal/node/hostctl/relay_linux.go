@@ -3,27 +3,26 @@
 package hostctl
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net/netip"
 	"os/exec"
-	"regexp"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 )
 
 // relayState is what the host owner remembers about the relay table.
 type relayState struct {
-	mu        sync.Mutex
-	set       []Forward
-	local     []netip.Addr // the node's IPv4 addresses the installed table matches against
-	applied   bool         // set is what nft holds (an empty set means the table is gone)
-	checkedAt time.Time    // the last FORWARD policy look
-	now       func() time.Time
-	addrs     func() ([]netip.Addr, error) // nil = OwnIPv4s; a test seam
+	mu         sync.Mutex
+	set        []Forward
+	desired    []Forward // last validated request, retained while a drop policy keeps the live table closed
+	hasDesired bool
+	local      []netip.Addr // the node's IPv4 addresses the installed table matches against
+	applied    bool         // set is what nft holds (an empty set means the table is gone)
+	checkedAt  time.Time    // the last FORWARD policy look
+	now        func() time.Time
+	addrs      func() ([]netip.Addr, error) // nil = OwnIPv4s; a test seam
 }
 
 // relayRecheck is how often a node with forwards looks at the FORWARD policy again when nothing else changed: Docker or
@@ -41,6 +40,7 @@ func (h *linuxHost) SetRelays(ctx context.Context, fs []Forward) error {
 	st := &h.rly
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	st.desired, st.hasDesired = append([]Forward(nil), fs...), true
 	now := time.Now()
 	if st.now != nil {
 		now = st.now()
@@ -71,6 +71,10 @@ func (h *linuxHost) SetRelays(ctx context.Context, fs []Forward) error {
 		return err
 	}
 	if len(fs) > 0 {
+		if err := h.ReconcileForwardExceptions(ctx, fs, local); err != nil {
+			h.dropRelayTable(ctx)
+			return fmt.Errorf("forwarding exceptions: %w", err)
+		}
 		if why, drops := h.forwardDrop(ctx); drops {
 			h.dropRelayTable(ctx)
 			return fmt.Errorf("%w: %s", ErrForwardDrop, why)
@@ -80,6 +84,8 @@ func (h *linuxHost) SetRelays(ctx context.Context, fs []Forward) error {
 			h.dropRelayTable(ctx)
 			return fmt.Errorf("forwarding: %w", err)
 		}
+	} else if err := h.ReconcileForwardExceptions(ctx, nil, nil); err != nil {
+		return fmt.Errorf("forwarding exceptions: %w", err)
 	}
 	st.applied = false
 	if err := h.nft(ctx, script, len(fs) == 0); err != nil {
@@ -101,35 +107,6 @@ func (h *linuxHost) cleanupRelays(ctx context.Context) error {
 	script, _ := RenderRelays(nil, nil)
 	h.rly.mu.Lock()
 	defer h.rly.mu.Unlock()
-	h.rly.set, h.rly.local, h.rly.applied = nil, nil, false
+	h.rly.set, h.rly.desired, h.rly.local, h.rly.applied, h.rly.hasDesired = nil, nil, nil, false, false
 	return h.nft(ctx, script, true)
-}
-
-var (
-	nftTableRe = regexp.MustCompile(`^table\s+(\S+)\s+(\S+)\s*\{`)
-	nftHookRe  = regexp.MustCompile(`hook\s+forward\b.*\bpolicy\s+drop\b`)
-)
-
-// forwardDrop looks for a base chain on the forward hook with policy drop that is not one of our tables (Docker sets one,
-// UFW's default is one): a drop in another table's base chain cannot be overridden by an accept in ours. The same look as
-// internal/node/warp's, which hostctl cannot import. Neither tool answering counts as no drop.
-func (h *linuxHost) forwardDrop(ctx context.Context) (string, bool) {
-	if out, err := h.run(ctx, "", "nft", "list", "ruleset"); err == nil {
-		family, table := "", ""
-		sc := bufio.NewScanner(strings.NewReader(string(out)))
-		for sc.Scan() {
-			line := strings.TrimSpace(sc.Text())
-			if m := nftTableRe.FindStringSubmatch(line); m != nil {
-				family, table = m[1], m[2]
-				continue
-			}
-			if !OwnNftTable(family, table) && nftHookRe.MatchString(line) {
-				return "nft table " + table + " drops forwarded packets by default", true
-			}
-		}
-	}
-	if out, err := h.run(ctx, "", "iptables", "-S", "FORWARD"); err == nil && strings.Contains(string(out), "-P FORWARD DROP") {
-		return "iptables FORWARD policy is DROP", true
-	}
-	return "", false
 }

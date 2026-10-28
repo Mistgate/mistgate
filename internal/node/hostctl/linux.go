@@ -68,6 +68,11 @@ type linuxHost struct {
 	// The relay table (relay_linux.go).
 	rly relayState
 
+	// The confirmed doctor forwarding fix (forward_linux.go). Its desired state survives agent restarts and is reasserted
+	// by the normal sweep; rules themselves remain independently tagged in the firewall.
+	forwardStateFile string
+	forwardMu        sync.Mutex
+
 	// Torrent guard owns a separate nft table and one fail-open NFQUEUE runtime.
 	torrentMu     sync.Mutex
 	torrent       *torrentlinux.Runtime
@@ -103,6 +108,15 @@ func New(log *slog.Logger) Host {
 
 		resolvedFile:   defaultResolvedFile,
 		resolvConfFile: defaultResolvConfFile,
+	}
+}
+
+// SetStateDir stores the approved-forwarding marker beside the node's persistent state.
+func (h *linuxHost) SetStateDir(dir string) {
+	if dir != "" {
+		h.forwardMu.Lock()
+		h.forwardStateFile = filepath.Join(dir, forwardStateFileName)
+		h.forwardMu.Unlock()
 	}
 }
 
@@ -378,10 +392,10 @@ func (h *linuxHost) nft(ctx context.Context, script string, quiet bool) error {
 }
 
 func (h *linuxHost) Cleanup(ctx context.Context) error {
-	errs := []error{h.SetTorrentGuard(ctx, nil, nil), h.cleanupTunnels(ctx), h.CleanupUDPCount(ctx)} // owned tables and links
-	errs = append(errs, h.SyncInboundPorts(ctx, nil, nil))                                           // only UFW rules with Mistgate's exact ownership tags
-	errs = append(errs, h.removeProvisionUFWRules(ctx))                                              // and the 80/443 rules the SSH install tagged
-	errs = append(errs, h.cleanupRelays(ctx))                                                        // the relay table
+	errs := []error{h.cleanupForwardExceptions(ctx), h.SetTorrentGuard(ctx, nil, nil), h.cleanupTunnels(ctx), h.CleanupUDPCount(ctx)} // owned tables and links
+	errs = append(errs, h.SyncInboundPorts(ctx, nil, nil))                                                                            // only UFW rules with Mistgate's exact ownership tags
+	errs = append(errs, h.removeProvisionUFWRules(ctx))                                                                               // and the 80/443 rules the SSH install tagged
+	errs = append(errs, h.cleanupRelays(ctx))                                                                                         // the relay table
 	script, _ := RenderRuleset(nil, nil)
 	h.fw.Lock()
 	h.hops, h.sshPorts = nil, nil

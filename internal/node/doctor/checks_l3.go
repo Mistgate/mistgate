@@ -84,8 +84,18 @@ func checkAwgBackend(ctx context.Context, e *Env) Result {
 	if e.HostPath != nil {
 		for _, f := range e.HostPath(ctx) {
 			if f.ID == "forward_drop" { // forwarded client traffic is dropped before it reaches the internet
+				// The WARP preflight reports policy DROP without knowing about the owner's approved
+				// Mistgate-only exceptions. Hide that finding only after hostctl verifies that all
+				// required interface rules are still present in every drop-policy chain.
+				if e.ForwardFixer != nil {
+					plan, err := e.ForwardFixer.PlanForwardExceptions(ctx)
+					if err == nil && !plan.Needed {
+						continue
+					}
+				}
 				r.Status, r.Code = Warn, CodeAwgForwardDrop
 				r.Params["hint"] = "docker_forward_drop"
+				r.FixID = FixAllowForwarding
 				r.Detail = clip("forwarded traffic is dropped: "+f.Detail, 200)
 			}
 		}

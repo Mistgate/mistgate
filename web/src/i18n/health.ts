@@ -522,6 +522,8 @@ export const en = {
   "health.fix.reconnect_warp.plan": "Rerun the WARP checks now; reconnect the configured tunnel and reapply its routes only if it is down.",
   "health.fix.refresh_unit.label": "Refresh the service",
   "health.fix.refresh_unit.plan": "Rewrite the agent’s systemd unit from generation {unit_gen} to {target} using the template built into its own binary, then restart the agent. Connections on this node drop for a few seconds.",
+  "health.fix.allow_forwarding.label": "Allow Mistgate forwarding",
+  "health.fix.allow_forwarding.plan": "Add {rules} rules and remove {remove_rules} stale Mistgate-only rules across {chains} drop-policy chain(s). They match only new traffic from AWG clients (not towards container bridges), the replies of connections the clients began, and {relays} current relay forward(s); other traffic, including new connections towards clients, stays under the host firewall.",
 
   // ---- check errors (health.check.err.<code>)
   "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive)",
@@ -1045,6 +1047,8 @@ export const ru: typeof en = {
   "health.fix.reconnect_warp.plan": "Запустить проверку WARP сейчас; если туннель отключён, переподключить его и восстановить маршруты.",
   "health.fix.refresh_unit.label": "Обновить службу",
   "health.fix.refresh_unit.plan": "Переписать службу systemd агента с поколения {unit_gen} на {target} по шаблону, встроенному в его бинарник и перезапустить агента. Подключения на этой ноде прервутся на несколько секунд.",
+  "health.fix.allow_forwarding.label": "Разрешить пересылку трафика Mistgate",
+  "health.fix.allow_forwarding.plan": "Добавить {rules} правил и удалить {remove_rules} устаревших правил только для Mistgate в {chains} цепочках FORWARD с политикой DROP. Они пропускают только новый трафик клиентов AWG (не в контейнерные мосты), ответы на соединения, начатые клиентами, и {relays} текущих перенаправлений; остальной трафик, включая новые соединения к клиентам, по-прежнему фильтрует файрвол хоста.",
 
   // ---- check errors
   "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP)",
@@ -1512,6 +1516,8 @@ export const zh: typeof en = {
   "health.fix.reconnect_warp.plan": "立即重新运行 WARP 检测；仅当隧道断开时，才重新连接已配置的隧道并重新应用其路由。",
   "health.fix.refresh_unit.label": "刷新服务单元",
   "health.fix.refresh_unit.plan": "使用 Agent 自身二进制文件内置的模板，把 Agent 的 systemd 单元从第 {unit_gen} 版重写为第 {target} 版，然后重启 Agent。此节点上的连接会中断几秒。",
+  "health.fix.allow_forwarding.label": "允许 Mistgate 转发流量",
+  "health.fix.allow_forwarding.plan": "在 {chains} 条默认丢弃的 FORWARD 链中添加 {rules} 条规则，并删除 {remove_rules} 条过期的 Mistgate 专用规则。规则只匹配 AWG 客户端发起的新流量（不含去往容器网桥）、客户端已建立连接的返回流量和当前 {relays} 条中继转发；其他流量（包括指向客户端的新连接）仍由主机防火墙处理。",
 
   "health.check.err.timeout": "未在规定时间内应答：握手或首个请求没有完成（对 Hysteria2 和 AmneziaWG，这通常意味着 UDP 到不了）",
   "health.check.err.auth": "节点拒绝了面板的检测账户",

@@ -328,6 +328,9 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	if cfg.MaxPendingBytes <= 0 {
 		cfg.MaxPendingBytes = 32 << 20
 	}
+	if stateful, ok := host.(hostctl.StateDirSetter); ok {
+		stateful.SetStateDir(cfg.StateDir)
+	}
 	id, err := loadIdentity(cfg.StateDir)
 	if err != nil {
 		return nil, err
@@ -1354,6 +1357,11 @@ func (a *Agent) handle(ctx context.Context, j job) {
 	case j.retire != nil:
 		a.retire(ctx, j)
 	case j.sweep:
+		if forwardFix, ok := a.host.(hostctl.ForwardExceptionReassertor); ok {
+			if err := forwardFix.ReassertForwardExceptions(ctx); err != nil {
+				a.log.Warn("doctor forwarding exceptions could not be reasserted", "err", err)
+			}
+		}
 		a.persistModel(nil, true)
 		if m := a.snapshotModel(); m.revision != 0 {
 			a.reconcile(ctx, m, nil)

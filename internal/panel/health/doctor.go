@@ -21,7 +21,7 @@ const capDoctor = "doctor/1"
 const capUnitRefresh = unit.CapabilityRefresh
 
 // fixIDs are the fixes the agent has (agent.proto "FIX IDS"). A fix id anywhere else is ignored.
-var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit"}
+var fixIDs = []string{"journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding"}
 
 func knownFix(id string) string {
 	if slices.Contains(fixIDs, id) {

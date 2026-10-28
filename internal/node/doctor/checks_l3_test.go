@@ -3,6 +3,8 @@ package doctor
 import (
 	"context"
 	"testing"
+
+	"github.com/mistgate/mistgate/internal/node/hostctl"
 )
 
 func awgIn(state string) Inbound {
@@ -72,7 +74,7 @@ func TestAwgBackendCheck(t *testing.T) {
 		want(t, r, Fail, "")
 		param(t, r, "hint", "no_module")
 	})
-	t.Run("a FORWARD drop policy is a warning", func(t *testing.T) {
+	t.Run("a FORWARD drop policy offers the narrow fix", func(t *testing.T) {
 		f := newFake(t)
 		r := run(t, f.doctor(withInbounds(awgIn("running")), func(e *Env) {
 			e.AwgBackend = func() AwgBackend { return ok }
@@ -80,9 +82,25 @@ func TestAwgBackendCheck(t *testing.T) {
 				return []PathFinding{{ID: "forward_drop", Detail: "iptables FORWARD policy is DROP"}}
 			}
 		}), CheckAwgBackend)
-		want(t, r, Warn, "")
+		want(t, r, Warn, FixAllowForwarding)
 		param(t, r, "hint", "docker_forward_drop")
 		code(t, r, CodeAwgForwardDrop, "backend", "userspace")
+	})
+	t.Run("the FORWARD warning clears when the approved path is allowed", func(t *testing.T) {
+		f := newFake(t)
+		fixer := &fakeForwardFixer{plan: hostctl.ForwardExceptionPlan{Needed: false}}
+		r := run(t, f.doctor(withInbounds(awgIn("running")), func(e *Env) {
+			e.AwgBackend = func() AwgBackend { return ok }
+			e.HostPath = func(context.Context) []PathFinding {
+				return []PathFinding{{ID: "forward_drop", Detail: "iptables FORWARD policy is DROP"}}
+			}
+			e.ForwardFixer = fixer
+		}), CheckAwgBackend)
+		want(t, r, OK, "")
+		code(t, r, CodeAwgRunning, "backend", "userspace")
+		if fixer.planCalls != 1 {
+			t.Errorf("PlanForwardExceptions called %d times, want one verification", fixer.planCalls)
+		}
 	})
 }
 

@@ -1,6 +1,7 @@
 // Package hostctl is the agent's view of the machine it runs on: host facts for Hello, host metrics for
-// StatsBatch, and the only host state the agent owns: its own nftables table for
-// port-hop redirects and the SSH brute-force guard, the UDP delivery counter, the fail-open torrent queue, exact UDP/TCP inbound rules in an active UFW firewall,
+// StatsBatch, and the host state the agent owns: its nftables tables for port-hop redirects and the SSH brute-force
+// guard, the UDP delivery counter, the fail-open torrent queue, exact UDP/TCP inbound rules in an active UFW firewall,
+// and owner-approved tagged forwarding exceptions limited to Mistgate traffic in host FORWARD chains,
 // the fq + bbr, conntrack and UDP socket-buffer sysctl baseline and the journald size cap. The real implementation is
 // Linux-only behind a build tag; other OSes get a no-op stub so the whole repo still builds and vets.
 package hostctl
@@ -36,6 +37,7 @@ type Host interface {
 	SSHPorts() []uint16
 	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard, UDP delivery checks and torrent queue, tagged UFW inbound rules
 	// and the UFW rules the SSH install tagged with ProvisionUFWTag, sysctl and journald drop-ins,
+	// the owner-approved tagged forwarding exceptions,
 	// and the resolver fix of the doctor: resolved drop-in, resolv.conf restored from its backup; the tunnel table
 	// "mistgate_awg", the relay table "mistgate_relay" and every link named mgawg* or mgwarp). The WARP routing rules and routes are the WARP
 	// manager's (warp.Cleanup).
@@ -53,6 +55,32 @@ type Fixer interface {
 	// SetResolver points the host resolver at servers (IPs, optionally host:port where the mode allows it).
 	// The previous configuration is kept so Cleanup can restore it.
 	SetResolver(ctx context.Context, servers []string) error
+}
+
+// ForwardExceptionFixer plans and applies the doctor's explicit, narrow forwarding exception fix.
+type ForwardExceptionFixer interface {
+	PlanForwardExceptions(ctx context.Context) (ForwardExceptionPlan, error)
+	ApplyForwardExceptions(ctx context.Context) (uint32, error)
+}
+
+// ForwardExceptionReassertor restores a previously approved forwarding fix after a firewall reload.
+type ForwardExceptionReassertor interface {
+	ReassertForwardExceptions(ctx context.Context) error
+}
+
+// StateDirSetter lets the agent keep approved host fixes beside its persistent node state.
+type StateDirSetter interface {
+	SetStateDir(dir string)
+}
+
+// ForwardExceptionPlan is the read-only preview of the firewall rules the fix needs to add or remove.
+type ForwardExceptionPlan struct {
+	Needed        bool
+	AddRules      int
+	RemoveRules   int
+	DropChains    int
+	RelayForwards int
+	Backend       string
 }
 
 // ResolverPlan is the dry run of SetResolver.

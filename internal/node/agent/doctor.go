@@ -91,6 +91,9 @@ func (a *Agent) doctorEnv() doctor.Env {
 	if fx, ok := a.host.(hostctl.Fixer); ok {
 		e.Fixer = fx
 	}
+	if fx, ok := a.host.(hostctl.ForwardExceptionFixer); ok {
+		e.ForwardFixer = fx
+	}
 	if a.cfg.DoctorEnv != nil {
 		e = a.cfg.DoctorEnv(e)
 	}
@@ -423,6 +426,10 @@ func (a *Agent) applyFix(s *session, r *pb.ApplyFix) {
 	}
 	if !out.OK || r.DryRun {
 		return
+	}
+	if r.FixId == doctor.FixAllowForwarding {
+		// Restore relay table state promptly after the confirmed fix; the regular sweep remains the reload recovery path.
+		a.submit(s, job{sweep: true})
 	}
 	for try := 0; try < recheckTries; try++ {
 		rep, err := a.doc.Run(s.ctx, doctor.RecheckIDs(r.FixId))

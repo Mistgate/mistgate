@@ -34,3 +34,12 @@ func (stub) ResolverPlan(context.Context, []string) (ResolverPlan, error) {
 	return ResolverPlan{}, ErrUnsupported
 }
 func (stub) SetResolver(context.Context, []string) error { return ErrUnsupported }
+
+var _ ForwardExceptionFixer = stub{}
+
+func (stub) SetStateDir(string) {}
+func (stub) PlanForwardExceptions(context.Context) (ForwardExceptionPlan, error) {
+	return ForwardExceptionPlan{}, ErrUnsupported
+}
+func (stub) ApplyForwardExceptions(context.Context) (uint32, error) { return 0, ErrUnsupported }
+func (stub) ReassertForwardExceptions(context.Context) error        { return nil }
