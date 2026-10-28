@@ -3,20 +3,21 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.63`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.64`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.63
+  meta: v0.1.0 – v0.1.64
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.63
+      release: v0.1.64
       current: true
       points:
-        - "**国家检测新增两个来源。** cheburcheck（俄罗斯境内的免费志愿者探测点，也可以添加自己的探测点）和 bsbord（付费移动 SIM 探测点，包括克里米亚，设有每月上限）与 Globalping、TSPU 探测和封锁名单合成一个结论、一份明细和一套告警。默认关闭。参见[可达性](../operations/reachability.md#cheburcheck)。"
+        - "**中国：国内网站直连。** DNS 分流规则可以指定国家列表（geosite 和 geoip），新的内置预设让国内网站通过 AliDNS 和 DNSPod 直连，其余走隧道，支持 Mihomo、Xray JSON、sing-box 和 Happ。参见 [DNS](../guide/dns.md)。"
+        - "**代码审查后的修复**：即使内核第一次拒绝删除，已吊销的 AmneziaWG 密钥也会失效；磁盘已满时节点会重试保存状态；「用户消失」告警会关闭，等等。面板自身的更新现在是 **更新** 页面的第一张卡片。"
     - title: 协议配置
       section: profiles
       points:
@@ -44,7 +45,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.63`�
         - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 内核的应用提供 Mihomo YAML，为使用 Xray 和 sing-box 内核的应用提供 [Xray JSON 与 sing-box JSON](../guide/subscriptions.md#xray-json-与-sing-box-json)。"
         - "[订阅类应用的设备上限](../guide/subscriptions.md#订阅类应用的设备上限)有三种模式：**仅计数**、**限制**和**严格**。"
         - "[用户页面](../guide/user-page.md)：按平台提供说明、二维码、供 AmneziaVPN 使用的 `vpn://` 密钥，以及用户自己的设备；用户可以[重命名和删除](../guide/user-page.md#自助管理设备)这些设备，页面上还有复制链接的按钮。"
-        - "提供 [DNS 预设](../guide/dns.md)；用户可以在用户页面中为订阅类应用选择 DNS，并为密钥按服务器选择 DNS。"
+        - "提供 [DNS 预设](../guide/dns.md)，可用国家列表设置「直连」（中国：国内网站直连）；用户可以在用户页面中为订阅类应用选择 DNS，并为密钥按服务器选择 DNS。"
     - title: 运行状况
       section: health
       points:
@@ -52,7 +53,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.63`�
         - "来自节点的[连接计数](../guide/nodes.md#协议配置)：连接次数、连接后立即断开、被拒绝的密钥、未完成的握手、在线时长和未知密钥，在用户页面按设备显示，在节点上按协议配置显示。统计 Hysteria2 和 AmneziaWG 的事件计数，并统计 VLESS 会话时长；Hysteria2 还会记录连接如何结束（路径**冻结**、客户端**静默**或主动关闭）以及延迟和丢包；只有计数，保留 7 天（168 小时）。"
         - "[节点运行记录](../guide/nodes.md#运行记录)：每个节点 Agent 及其引擎 7 天内的警告和错误，不含客户端地址，所有管理员均可查看，也可通过 MCP 获取。"
         - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
-        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点、比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
+        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点，使用 cheburcheck 的志愿者探测点和 bsbord 的移动 SIM 探测点（包括克里米亚，设有每月上限），比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
@@ -78,7 +79,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.63`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.63
+  meta: v0.1.34 – v0.1.64
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS

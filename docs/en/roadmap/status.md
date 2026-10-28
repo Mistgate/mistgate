@@ -3,20 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.63`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.63
+  meta: v0.1.0 – v0.1.64
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.63
+      release: v0.1.64
       current: true
       points:
-        - "**Two more country-check sources.** cheburcheck (free volunteer probes inside Russia, your own probe too) and bsbord (paid mobile SIM probes, Crimea included, with a monthly cap) join Globalping, the TSPU probe and the lists in one verdict, one breakdown and one set of alerts. Off by default. See [Reachability](../operations/reachability.md#cheburcheck)."
+        - "**China: Chinese sites direct.** A DNS split rule can name a country's lists (geosite and geoip), and the new built-in preset sends Chinese sites direct through AliDNS and DNSPod and the rest through the tunnel, in Mihomo, Xray JSON, sing-box and Happ. See [DNS](../guide/dns.md)."
+        - "**Fixes from a code review**: a revoked AmneziaWG key now stops working even when the kernel refuses the first removal, the node retries saving its state on a full disk, the \"users gone\" alert closes, and more. The panel's own update is the first card on **Updates**."
     - title: Profiles
       section: profiles
       points:
@@ -44,7 +45,7 @@ Mistgate is in **beta**; the current release is `v0.1.63`. It runs in production
         - "One [subscription link](../guide/subscriptions.md) per person: a link list for Happ and similar apps, Mihomo YAML for apps on the mihomo core, [Xray JSON and sing-box JSON](../guide/subscriptions.md#xray-json-and-sing-box-json) for apps on those cores."
         - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
         - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
-        - "[DNS presets](../guide/dns.md); on the user page, a DNS choice for the link apps and one per server for the keys."
+        - "[DNS presets](../guide/dns.md), with country lists for \"direct\" (China: Chinese sites direct); on the user page, a DNS choice for the link apps and one per server for the keys."
     - title: Health
       section: health
       points:
@@ -52,7 +53,7 @@ Mistgate is in **beta**; the current release is `v0.1.63`. It runs in production
         - "[Connection counters](../guide/nodes.md#profiles) from the nodes: connections, drops right after connecting, refused keys, handshakes that never complete, time online and unknown keys, per device on a person's page and per profile on the node. Hysteria2 and AmneziaWG event counters, plus VLESS session time; for Hysteria2 also how connections end (a **frozen** path, a **quiet** client, a close), RTT and loss; counts only, kept 7 days (168 hours)."
         - "The [node journal](../guide/nodes.md#journal): the warnings and errors of each node's agent and engines for 7 days, without client addresses, for every admin and in MCP."
         - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
-        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, the antifilter block lists a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country."
+        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, cheburcheck's volunteer probes and bsbord's mobile SIM probes (Crimea included, with a monthly cap), the antifilter block lists, a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country."
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
@@ -78,7 +79,7 @@ Mistgate is in **beta**; the current release is `v0.1.63`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.63
+  meta: v0.1.34 – v0.1.64
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
