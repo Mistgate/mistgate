@@ -33,12 +33,14 @@ You put the panel on one server and add your VPN servers to it as nodes. Each pe
 
 - Add a node from the browser with its IP and root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld and installs the signed agent. A one-time install command works too. [Add a node](docs/en/getting-started/add-node.md)
 - One link per person. Mihomo apps (kl!ck, FlClash, Clash Verge Rev) get all three protocols from it, Happ gets Hysteria2 and VLESS, and AmneziaVPN takes a key per device from the person's page. [Client apps](docs/en/guide/client-apps.md)
-- Every 5 minutes the panel connects to every server the way an app does. A doctor on each node runs 17 host checks and offers six fixes that run only after you confirm. Alerts go to the admin and to Telegram. [Health](docs/en/operations/health.md)
+- Every 5 minutes the panel connects to every server the way an app does. A doctor on each node runs 17 host checks and offers seven fixes that run only after you confirm. Alerts go to the admin and to Telegram. [Health](docs/en/operations/health.md)
+- When some networks cannot reach a server, people get to it through another of your nodes, which only forwards the encrypted traffic. The panel checks the path before switching it on and watches it afterwards; the node page draws every way in as a line from the people to the server. [Relays](docs/en/guide/relays.md)
+- Optional checks of whether your servers open from inside a country, network by network: Globalping probes on home and mobile networks over IPv4 and IPv6, volunteer and SIM probes, block lists and a TSPU probe from your own node. Most sources work only in Russia. [Reachability](docs/en/operations/reachability.md)
 - No Docker, no database server. The panel idles at 16-20 MiB of memory on a 1 vCPU / 1 GB server. [Benchmarks](docs/en/reference/benchmarks.md), including where Mistgate is slower.
 - Strangers who open the panel's address see a decoy site; the admin is behind a secret path or host name.
 - A built-in MCP server lets an AI agent read the fleet and plan changes; risky ones wait for your approval in the admin. [MCP](docs/en/reference/mcp.md)
 
-Not there yet: a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](docs/en/getting-started/install-edge.md). Some defaults lean towards users in Russia (all are settings), and the optional [reachability check](docs/en/operations/reachability.md) looks from Russia by default; most of its sources work only there.
+Not there yet: a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](docs/en/getting-started/install-edge.md). Some defaults lean towards users in Russia; all of them are settings.
 
 ## Protocols
 

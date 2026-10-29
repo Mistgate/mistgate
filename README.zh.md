@@ -33,12 +33,14 @@
 
 - 在浏览器里用 IP 和 root 密码添加节点。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent。也可以用一条一次性命令安装。[添加节点](docs/zh/getting-started/add-node.md)
 - 每人一个链接。基于 Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）从中获取全部三种协议，Happ 获取 Hysteria2 和 VLESS，AmneziaVPN 则在用户页面上为每台设备取一个密钥。[客户端应用](docs/zh/guide/client-apps.md)
-- 面板每 5 分钟像应用一样连接一次每台服务器。每个节点上的诊断运行 17 项主机检查，并提供六种修复，只有你确认后才会执行。告警显示在管理后台，也会发到 Telegram。[运行状况](docs/zh/operations/health.md)
+- 面板每 5 分钟像应用一样连接一次每台服务器。每个节点上的诊断运行 17 项主机检查，并提供七种修复，只有你确认后才会执行。告警显示在管理后台，也会发到 Telegram。[运行状况](docs/zh/operations/health.md)
+- 某些网络无法访问某台服务器时，用户可以经由你的另一个节点连接，该节点只转发加密流量。面板在启用前检查路径，之后持续监测；节点页面把每个入口画成一条从用户到服务器的线路。[中转](docs/zh/guide/relays.md)
+- 可选的检测：按网络查看你的服务器在某国境内能否打开——Globalping 在家庭和移动网络中通过 IPv4 和 IPv6 的探测、志愿者和 SIM 探测点、封锁名单，以及从你自己节点发起的 TSPU 探测。大多数来源只在俄罗斯可用。[可达性](docs/zh/operations/reachability.md)
 - 不需要 Docker，也不需要数据库服务器。在 1 vCPU / 1 GB 的服务器上，面板空闲时占用 16–20 MiB 内存。[基准测试](docs/zh/reference/benchmarks.md)里也写了 Mistgate 较慢的地方。
 - 陌生人打开面板地址只会看到伪装站点；管理后台位于私密路径或私密主机名之后。
 - 内置 MCP 服务器：AI 智能体可以读取集群状态并规划修改，有风险的操作要等你在管理后台批准。[MCP](docs/zh/reference/mcp.md)
 
-目前还没有的：Telegram 机器人只能发告警；Cloudflare Workers 版仍是[预览版](docs/zh/getting-started/install-edge.md)。部分默认值偏向俄罗斯用户（都可以在设置里修改），可选的[可达性检测](docs/zh/operations/reachability.md)默认从俄罗斯视角检测，其中大部分来源也只适用于俄罗斯。
+目前还没有的：Telegram 机器人只能发告警；Cloudflare Workers 版仍是[预览版](docs/zh/getting-started/install-edge.md)。部分默认值偏向俄罗斯用户，都可以在设置里修改。
 
 ## 协议
 

@@ -3,21 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.65`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.64
+  meta: v0.1.0 – v0.1.65
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.64
+      release: v0.1.65
       current: true
       points:
-        - "**China: Chinese sites direct.** A DNS split rule can name a country's lists (geosite and geoip), and the new built-in preset sends Chinese sites direct through AliDNS and DNSPod and the rest through the tunnel, in Mihomo, Xray JSON, sing-box and Happ. See [DNS](../guide/dns.md)."
-        - "**Fixes from a code review**: a revoked AmneziaWG key now stops working even when the kernel refuses the first removal, the node retries saving its state on a full disk, the \"users gone\" alert closes, and more. The panel's own update is the first card on **Updates**."
+        - "**Relays through an entry node.** When some networks cannot reach a server, people get to it through another of your nodes, which only forwards the encrypted traffic. The panel checks the path before a relay is switched on, watches it every 5 minutes and alerts when it breaks; subscriptions get a \"… via RU\" copy of the server. See [Relays](../guide/relays.md)."
+        - "**Ways in** on the node page draws how people reach the node as a line, with **Add a way in…** for a node that some networks cannot open. See [Nodes](../guide/nodes.md)."
+        - "**Reachability over IPv6** through Globalping, a doctor fix for hosts whose firewall drops forwarded traffic, and on VLESS and Hysteria2 an IP the app asked for stays the destination. See [Reachability](../operations/reachability.md)."
     - title: Profiles
       section: profiles
       points:
@@ -34,6 +35,7 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
         - "[Check ports](../guide/nodes.md#ports): UDP delivery and a TCP connection to every port of the node from another node of the fleet."
         - "[Measuring the network capacity](../guide/nodes.md#measuring-the-network-capacity) of a node's link."
         - "[A decoy site per node](../guide/decoy-site.md#nodes-three-options): the built-in one, the panel's site or an archive of its own."
+        - "[Relays through an entry node](../guide/relays.md): checked before they are switched on, watched every 5 minutes, a copy of the server in subscriptions."
     - title: Users
       section: users
       points:
@@ -79,7 +81,7 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.64
+  meta: v0.1.34 – v0.1.65
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -97,13 +99,13 @@ Mistgate is in **beta**; the current release is `v0.1.64`. It runs in production
     - title: The country check in production
       section: health
       text: "Every source is off by default. Switch one on and watch the *From Russia* column before you rely on its alert: the Globalping probes are not the panel's own, and `listed` is a registry mark, not a measurement. See [Reachability](../operations/reachability.md)."
+    - title: Relays in production
+      section: nodes
+      text: "New in v0.1.65. The panel checks a relay from outside the country, so a freeze that only people inside see shows up in kl!ck reports and bsbord, not in the panel's own check. See [Relays](../guide/relays.md)."
 - status: next
   title: Next
   lead: The next items in the queue.
   cards:
-    - title: Relays through an entry node
-      section: nodes
-      text: "A server that some networks cannot reach directly is offered through another of your nodes as well: the entry only forwards the encrypted traffic, the panel checks the path before people get it and watches it afterwards."
     - title: IPv6 for reachability and as a way in
       section: health
       text: "Reachability checks over IPv6 (in the latest release), then an IPv6 entry for people whose network blocks a node's IPv4, and a new IPv6 address in one click."
