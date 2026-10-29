@@ -620,7 +620,7 @@ jq -nc --arg a "$REPO/internal/node/update/update.go" --arg b "$OVL/update.go" -
 node_build v3b 0.1.0-e2e-v3b "$B3B" "$KEY_A" -overlay "$OVL/overlay.json"
 # v1d (step 2e) is v1 that reports a wrong state hash, in the Hello and in every ApplyResult, as the builds with the split-peer
 # bug did. Built the same way: an overlay replaces apply.go, so the tree and the release builds carry no test switch.
-sed '/^func (a \*Agent) observedHash/,/^}/ s/return statehash.StateWarp(all, m.warp)/return "00drift" + statehash.StateWarp(all, m.warp)/' \
+sed '/^func (a \*Agent) observedHash/,/^}/ s/return statehash\./return "00drift" + statehash./' \
   "$REPO/internal/node/agent/apply.go" >"$OVL/apply.go"
 ! cmp -s "$OVL/apply.go" "$REPO/internal/node/agent/apply.go" || die "e2e overlay: the wrong-hash patch did not apply (observedHash changed?)"
 jq -nc --arg a "$REPO/internal/node/agent/apply.go" --arg b "$OVL/apply.go" '{Replace: {($a): $b}}' >"$OVL/drift.json"
