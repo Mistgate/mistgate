@@ -89,6 +89,10 @@ type Config struct {
 	// OnAwgPrepareFailed is called when a node reports that the build of its AmneziaWG kernel module failed (the Telegram
 	// alerts hang on it). at is the time the node gave; a replay of the same report carries the same value. Must not block.
 	OnAwgPrepareFailed func(nodeID, code string, at int64)
+	// GlobalpingTCP6 asks Globalping for a TCP ping of port on an IPv6 address from probes around the world, and says how many
+	// probes answered and how many of them connected. It is the last resort of CheckIPv6, when no node can send over IPv6. Nil, or an
+	// error, means Globalping is not there to ask.
+	GlobalpingTCP6 func(ctx context.Context, addr string, port uint16) (answered, connected int, err error)
 	// Actor returns the admin id for audit rows. Default: the signed-in admin from the auth interceptor.
 	Actor func(context.Context) string
 	Log   *slog.Logger
@@ -154,6 +158,7 @@ type Fleet struct {
 	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
 	probeTCP      func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
 	settleUDP     func(context.Context) error
+	panelIPv6     func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
 }
 
 // HasSession reports whether this process currently owns the node's agent stream.

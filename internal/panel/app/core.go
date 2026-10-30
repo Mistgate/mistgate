@@ -238,6 +238,10 @@ func wireCore(c Config) (*core, error) {
 	}
 	fcfg := b.fleetConfig(k.desired, b.usageRecompute(func() *access.Service { return acc }))
 	fcfg.OnAwgPrepareFailed = tg.AwgPrepareFailed
+	// the last resort of the IPv6 check of a node; Globalping is built after the fleet, hence the late binding
+	fcfg.GlobalpingTCP6 = func(ctx context.Context, addr string, port uint16) (int, int, error) {
+		return k.gp.ProbeTCP6(ctx, addr, port)
+	}
 	k.fl, err = fleet.New(st, vlt, b.reg, fcfg)
 	if err != nil {
 		return nil, err

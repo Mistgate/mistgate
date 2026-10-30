@@ -380,11 +380,11 @@ func (s *Service) countryAddress(ctx context.Context, n store.NodeRow) (string, 
 
 // The IPv6 state of a node, from its doctor's ipv6 check: whether it can be measured over IPv6 at all.
 const (
-	ipv6OK       = "ok"        // outbound IPv6 works, so the node has a working IPv6 uplink
-	ipv6None     = "none"      // no global IPv6 address
-	ipv6Broken   = "broken"    // an address, but outbound IPv6 fails (so does the inbound one): nothing to test
-	ipv6AgentOld = "agent_old" // IPv6 works, but the agent does not say which address
-	ipv6Unknown  = "unknown"   // the doctor has not reported yet
+	ipv6OK       = store.IPv6OK       // outbound IPv6 works, so the node has a working IPv6 uplink
+	ipv6None     = store.IPv6None     // no global IPv6 address
+	ipv6Broken   = store.IPv6Broken   // an address, but outbound IPv6 fails (so does the inbound one): nothing to test
+	ipv6AgentOld = store.IPv6AgentOld // IPv6 works, but the agent does not say which address
+	ipv6Unknown  = store.IPv6Unknown  // the doctor has not reported yet
 )
 
 // ipv6Reasons are the reasons of the unknown rows of the nodes that are not measured over IPv6 (CountryCheck.ipv6.reason).
@@ -395,39 +395,15 @@ var ipv6Reasons = map[string]string{ipv6None: "no_ipv6", ipv6Broken: "ipv6_broke
 type ipv6Facts struct{ state, src string }
 
 // usableIPv6 is s as a global unicast IPv6 address (not a unique-local, link-local or mapped IPv4 one).
-func usableIPv6(s string) (string, bool) {
-	a, ok := parseAddr(s)
-	if !ok || !a.Is6() || !a.IsGlobalUnicast() || a.IsPrivate() {
-		return "", false
-	}
-	return a.String(), true
-}
+func usableIPv6(s string) (string, bool) { return store.UsableIPv6(s) }
 
-// ipv6FactsOf reads the params of the doctor's ipv6 check (internal/node/doctor checkIPv6): ipv6=no|yes, connect=ok|failed,
-// and from agents that know the uplink src and addrs ("addr/plen,..."). nil = no report.
+// ipv6FactsOf reads the params of the doctor's ipv6 check (store.DoctorIPv6). nil = no report.
 func ipv6FactsOf(row *store.DoctorRow) ipv6Facts {
-	if row == nil {
-		return ipv6Facts{state: ipv6Unknown}
+	d := store.DoctorIPv6(row)
+	if d.State != ipv6OK {
+		return ipv6Facts{state: d.State}
 	}
-	p := row.Params
-	switch {
-	case p["ipv6"] == "no":
-		return ipv6Facts{state: ipv6None}
-	case p["ipv6"] == "yes" && p["connect"] == "failed":
-		return ipv6Facts{state: ipv6Broken}
-	case p["ipv6"] != "yes" || p["connect"] != "ok":
-		return ipv6Facts{state: ipv6Unknown}
-	}
-	f := ipv6Facts{state: ipv6OK}
-	if f.src, _ = usableIPv6(p["src"]); f.src == "" {
-		for _, x := range strings.Split(p["addrs"], ",") {
-			addr, _, _ := strings.Cut(strings.TrimSpace(x), "/")
-			if f.src, _ = usableIPv6(addr); f.src != "" {
-				break
-			}
-		}
-	}
-	return f
+	return ipv6Facts{state: ipv6OK, src: d.FirstAddr()}
 }
 
 // countryIPv6Facts reads the doctor's ipv6 check of every node into the nodes. A read that fails leaves them unknown.

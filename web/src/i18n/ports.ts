@@ -85,6 +85,7 @@ export const en = {
 
   // the audit trail
   "audit.node.ports_check": "checked UDP delivery on {node}: ports {ports}",
+  "audit.node.ipv6_check": "checked IPv6 address {address} of {node} from outside (passed: {pass})",
   "audit.port_lossy_override": "saved the port {port} on {node} although it loses UDP packets",
 };
 
@@ -161,6 +162,7 @@ export const ru: typeof en = {
   "event.port_lossy": "UDP до порта {port} профиля «{profile}» теряет {lost} % пакетов (проверка с {sender})",
 
   "audit.node.ports_check": "проверил(а) доставку UDP на {node}: порты {ports}",
+  "audit.node.ipv6_check": "проверил(а) снаружи IPv6-адрес {address} ноды {node} (прошёл: {pass})",
   "audit.port_lossy_override": "сохранил(а) порт {port} на {node}, хотя он теряет UDP-пакеты",
 };
 
@@ -237,5 +239,6 @@ export const zh: typeof en = {
   "event.port_lossy": "「{profile}」端口 {port} 的 UDP 丢包 {lost}%（由 {sender} 检测）",
 
   "audit.node.ports_check": "检测了 {node} 的 UDP 到达情况：端口 {ports}",
+  "audit.node.ipv6_check": "从外部检测了 {node} 的 IPv6 地址 {address}（通过：{pass}）",
   "audit.port_lossy_override": "在 {node} 上保存了端口 {port}，尽管它存在 UDP 丢包",
 };

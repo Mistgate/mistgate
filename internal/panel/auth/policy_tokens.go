@@ -73,6 +73,9 @@ var tokenProcedures = map[string]int{
 	adminv1connect.HealthServiceRunChecksNowProcedure:   TokenAccessDirect,
 	adminv1connect.HealthServiceRunDoctorProcedure:      TokenAccessDirect,
 	adminv1connect.NodeServiceCheckPortsProcedure:       TokenAccessDirect,
+	// The outside check of an IPv6 address of a node (node_ipv6_check): test packets between the owner's nodes. Narrowed to the admin
+	// profile by its level; MCP only, because the raw response carries the address that was checked.
+	adminv1connect.NodeServiceCheckIpv6Procedure: TokenAccessPlanning,
 	// Owner level (the admin profile): the audit log, which names admins, tokens and addresses.
 	adminv1connect.AuthServiceListAuditProcedure: TokenAccessDirect,
 	// Relays (relay.proto), through the MCP tools relays_list, relay_candidates, relay_check and relay_plan/apply only. The reads

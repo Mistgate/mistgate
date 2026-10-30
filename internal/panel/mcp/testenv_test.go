@@ -38,6 +38,7 @@ import (
 // free text that the scrubber has to catch.
 var (
 	canaryAddr         = "203.0.113.77"
+	canaryAddr6        = "2001:db8:cafe::77"
 	canaryPin          = "CANARYPINsha256AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	canaryPagePassword = "cnry-pw9x"
 	canarySubURL       = "https://sub.example.com/ZZsecretprefix1234567890/CANARYtoken0123456789abcdefghij"
@@ -46,7 +47,7 @@ var (
 	canaryKey          = "kJ8f2Lw0Zr5uPq1vXy3cNb7mHg4tDa6sEo9iUl2WxYk=" // a 44-character WireGuard-style key
 	canaryVless        = "vless://11111111-2222-3333-4444-555555555555@203.0.113.77:443?security=reality&pbk=CANARYPBK#x"
 	canaryPrivLine     = "PrivateKey = CANARYprivatekeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-	allCanaries        = []string{canaryAddr, canaryPin, "ZZsecretprefix", "CANARYtoken", canaryInner, canaryTK, canaryKey, "vless://", "CANARYPBK", "CANARYprivatekey"}
+	allCanaries        = []string{canaryAddr, canaryAddr6, canaryPin, "ZZsecretprefix", "CANARYtoken", canaryInner, canaryTK, canaryKey, "vless://", "CANARYPBK", "CANARYprivatekey"}
 )
 
 type fakeToken struct {
@@ -317,6 +318,8 @@ type world struct {
 	rotateReq         []*adminv1.RotateNodeServerPasswordRequest
 	installReq        []*adminv1.StartNodeProvisionRequest
 	checkPortsReq     []*adminv1.CheckPortsRequest
+	ipv6Reqs          []*adminv1.CheckIpv6Request
+	ipv6Err           error // CheckIpv6 answers with this
 	mu                sync.Mutex
 	log               []callRec
 	fixReqs           []*adminv1.ApplyFixRequest
@@ -539,6 +542,18 @@ func (w *world) CheckPorts(_ context.Context, r *connect.Request[adminv1.CheckPo
 		{Port: 80, Role: "acme", Reason: "agent_too_old", Sender: "sender-node", CheckedUnix: 1700003600},
 		{Port: 8443, Role: "site", Profile: "Main", Verdict: "other", Sender: "sender-node", CheckedUnix: 1700003600},
 	}}), nil
+}
+
+func (w *world) CheckIpv6(_ context.Context, r *connect.Request[adminv1.CheckIpv6Request]) (*connect.Response[adminv1.CheckIpv6Response], error) {
+	w.mu.Lock()
+	w.ipv6Reqs = append(w.ipv6Reqs, r.Msg)
+	err := w.ipv6Err
+	w.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.CheckIpv6Response{Address: canaryAddr6, Passed: true, Sender: "nl1", CheckedUnix: 1790842000,
+		Verdicts: []*adminv1.Ipv6PortVerdict{{Network: "tcp", Port: 443, Verdict: "ours"}, {Network: "udp", Port: 8443, Verdict: "ok"}}}), nil
 }
 
 func (w *world) GetWarp(_ context.Context, r *connect.Request[adminv1.GetWarpRequest]) (*connect.Response[adminv1.GetWarpResponse], error) {

@@ -62,6 +62,8 @@ const (
 	NodeServiceMeasureBandwidthProcedure = "/mistgate.admin.v1.NodeService/MeasureBandwidth"
 	// NodeServiceCheckPortsProcedure is the fully-qualified name of the NodeService's CheckPorts RPC.
 	NodeServiceCheckPortsProcedure = "/mistgate.admin.v1.NodeService/CheckPorts"
+	// NodeServiceCheckIpv6Procedure is the fully-qualified name of the NodeService's CheckIpv6 RPC.
+	NodeServiceCheckIpv6Procedure = "/mistgate.admin.v1.NodeService/CheckIpv6"
 	// NodeServiceRetireNodeProcedure is the fully-qualified name of the NodeService's RetireNode RPC.
 	NodeServiceRetireNodeProcedure = "/mistgate.admin.v1.NodeService/RetireNode"
 	// NodeServiceStreamLogsProcedure is the fully-qualified name of the NodeService's StreamLogs RPC.
@@ -115,6 +117,14 @@ type NodeServiceClient interface {
 	// ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
 	// GetNodeResponse.tcp_checks. Owner or helper; API tokens directly (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
 	CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error)
+	// Checks from outside that an IPv6 address of the node answers (agents with "udpcheck/1"; the packets are those of CheckPorts):
+	// the UDP delivery of the node's enabled UDP servers and the TLS identity of its TCP servers, sent to the address instead of the
+	// node's main one by another node whose IPv6 works (the panel itself last; Globalping connects to one TLS port when no
+	// node can). Nothing is changed or stored in port_check / tcp_check; the answer is audited as node.ipv6_check. The address has
+	// to be one the node's doctor lists as its uplink's (params addrs and src of the ipv6 check); FAILED_PRECONDITION with a reason
+	// (no_ipv6, ipv6_broken, agent_old, not_checked, main_is_ipv6) when the node has no such address to give, INVALID_ARGUMENT for any other address. Every "could
+	// not check" outcome is error_code, never an RPC error. Owner only; MCP node_ipv6_check.
+	CheckIpv6(context.Context, *connect.Request[v1.CheckIpv6Request]) (*connect.Response[v1.CheckIpv6Response], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
 	RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error)
@@ -211,6 +221,12 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("CheckPorts")),
 			connect.WithClientOptions(opts...),
 		),
+		checkIpv6: connect.NewClient[v1.CheckIpv6Request, v1.CheckIpv6Response](
+			httpClient,
+			baseURL+NodeServiceCheckIpv6Procedure,
+			connect.WithSchema(nodeServiceMethods.ByName("CheckIpv6")),
+			connect.WithClientOptions(opts...),
+		),
 		retireNode: connect.NewClient[v1.RetireNodeRequest, v1.RetireNodeResponse](
 			httpClient,
 			baseURL+NodeServiceRetireNodeProcedure,
@@ -257,6 +273,7 @@ type nodeServiceClient struct {
 	prepareAwgKernel    *connect.Client[v1.PrepareAwgKernelRequest, v1.PrepareAwgKernelResponse]
 	measureBandwidth    *connect.Client[v1.MeasureBandwidthRequest, v1.MeasureBandwidthResponse]
 	checkPorts          *connect.Client[v1.CheckPortsRequest, v1.CheckPortsResponse]
+	checkIpv6           *connect.Client[v1.CheckIpv6Request, v1.CheckIpv6Response]
 	retireNode          *connect.Client[v1.RetireNodeRequest, v1.RetireNodeResponse]
 	streamLogs          *connect.Client[v1.StreamLogsRequest, v1.StreamLogsResponse]
 	getNodeConnections  *connect.Client[v1.GetNodeConnectionsRequest, v1.GetNodeConnectionsResponse]
@@ -317,6 +334,11 @@ func (c *nodeServiceClient) MeasureBandwidth(ctx context.Context, req *connect.R
 // CheckPorts calls mistgate.admin.v1.NodeService.CheckPorts.
 func (c *nodeServiceClient) CheckPorts(ctx context.Context, req *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error) {
 	return c.checkPorts.CallUnary(ctx, req)
+}
+
+// CheckIpv6 calls mistgate.admin.v1.NodeService.CheckIpv6.
+func (c *nodeServiceClient) CheckIpv6(ctx context.Context, req *connect.Request[v1.CheckIpv6Request]) (*connect.Response[v1.CheckIpv6Response], error) {
+	return c.checkIpv6.CallUnary(ctx, req)
 }
 
 // RetireNode calls mistgate.admin.v1.NodeService.RetireNode.
@@ -382,6 +404,14 @@ type NodeServiceHandler interface {
 	// ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
 	// GetNodeResponse.tcp_checks. Owner or helper; API tokens directly (like RunDoctor). Every "could not check" outcome is error_code, never an RPC error.
 	CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error)
+	// Checks from outside that an IPv6 address of the node answers (agents with "udpcheck/1"; the packets are those of CheckPorts):
+	// the UDP delivery of the node's enabled UDP servers and the TLS identity of its TCP servers, sent to the address instead of the
+	// node's main one by another node whose IPv6 works (the panel itself last; Globalping connects to one TLS port when no
+	// node can). Nothing is changed or stored in port_check / tcp_check; the answer is audited as node.ipv6_check. The address has
+	// to be one the node's doctor lists as its uplink's (params addrs and src of the ipv6 check); FAILED_PRECONDITION with a reason
+	// (no_ipv6, ipv6_broken, agent_old, not_checked, main_is_ipv6) when the node has no such address to give, INVALID_ARGUMENT for any other address. Every "could
+	// not check" outcome is error_code, never an RPC error. Owner only; MCP node_ipv6_check.
+	CheckIpv6(context.Context, *connect.Request[v1.CheckIpv6Request]) (*connect.Response[v1.CheckIpv6Response], error)
 	// "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
 	// every user's access. The row stays (audit, traffic history) with status RETIRED.
 	RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error)
@@ -474,6 +504,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("CheckPorts")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceCheckIpv6Handler := connect.NewUnaryHandler(
+		NodeServiceCheckIpv6Procedure,
+		svc.CheckIpv6,
+		connect.WithSchema(nodeServiceMethods.ByName("CheckIpv6")),
+		connect.WithHandlerOptions(opts...),
+	)
 	nodeServiceRetireNodeHandler := connect.NewUnaryHandler(
 		NodeServiceRetireNodeProcedure,
 		svc.RetireNode,
@@ -528,6 +564,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceMeasureBandwidthHandler.ServeHTTP(w, r)
 		case NodeServiceCheckPortsProcedure:
 			nodeServiceCheckPortsHandler.ServeHTTP(w, r)
+		case NodeServiceCheckIpv6Procedure:
+			nodeServiceCheckIpv6Handler.ServeHTTP(w, r)
 		case NodeServiceRetireNodeProcedure:
 			nodeServiceRetireNodeHandler.ServeHTTP(w, r)
 		case NodeServiceStreamLogsProcedure:
@@ -589,6 +627,10 @@ func (UnimplementedNodeServiceHandler) MeasureBandwidth(context.Context, *connec
 
 func (UnimplementedNodeServiceHandler) CheckPorts(context.Context, *connect.Request[v1.CheckPortsRequest]) (*connect.Response[v1.CheckPortsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.CheckPorts is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) CheckIpv6(context.Context, *connect.Request[v1.CheckIpv6Request]) (*connect.Response[v1.CheckIpv6Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.CheckIpv6 is not implemented"))
 }
 
 func (UnimplementedNodeServiceHandler) RetireNode(context.Context, *connect.Request[v1.RetireNodeRequest]) (*connect.Response[v1.RetireNodeResponse], error) {

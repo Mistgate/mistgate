@@ -27,6 +27,7 @@ const keys: Record<string, MessageKey> = {
   "node.bandwidth_measure": "audit.node.bandwidth_measure",
   "node.bandwidth_auto": "audit.node.bandwidth_auto",
   "node.ports_check": "audit.node.ports_check",
+  "node.ipv6_check": "audit.node.ipv6_check",
   port_lossy_override: "audit.port_lossy_override",
   stepup: "audit.stepup",
   captcha: "audit.captcha",

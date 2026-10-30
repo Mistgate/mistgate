@@ -22,3 +22,6 @@ func defaultSendUDP(context.Context, string, []uint16, [8]byte, int, int, int) (
 func defaultProbeTCP(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error) {
 	return "", nil, errNoPanelSender
 }
+
+// panelHasIPv6: a Worker has no sockets (panelSendsUDP is false), so it never sends.
+func panelHasIPv6(context.Context) bool { return false }

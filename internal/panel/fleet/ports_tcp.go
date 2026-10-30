@@ -187,25 +187,10 @@ func hy2SitePort(spec plugin.InboundSpec) int {
 // runTCPCheck runs the TCP half for a node whose agent is connected. ran is false when there was nothing to do or nobody to
 // send, in which case the stored rows stay as they were. The rows come back whether or not they could be stored.
 func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPanel bool) (rows []store.TCPCheck, ran bool) {
-	inbounds, err := f.st.FleetInbounds(ctx, target.ID, false)
+	specs, pins, err := f.tcpSpecsOf(ctx, target)
 	if err != nil {
 		f.log.Warn("list inbounds for TCP port check", "node", target.ID, "err", err)
 		return nil, false
-	}
-	var specs []tcpSpec
-	pins := make(map[string]string)
-	for _, inbound := range inbounds {
-		if !inbound.Enabled {
-			continue
-		}
-		spec, err := f.buildSpec(target, inbound)
-		if err != nil {
-			continue
-		}
-		specs = append(specs, tcpSpec{Profile: inbound.ProfileName, Spec: spec})
-		if pin, ok := protocols.NormalizePin(inbound.CertPin); ok {
-			pins[inbound.ID] = pin
-		}
 	}
 	targets := tcpTargets(specs, pins)
 	if len(targets) == 0 {
@@ -321,6 +306,31 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		}
 	}
 	return rows, true
+}
+
+// tcpSpecsOf are the specs of the node's enabled inbounds as the panel builds them for the agent, with the certificate pins the
+// node reported (inbound id to pin).
+func (f *Fleet) tcpSpecsOf(ctx context.Context, target store.NodeRow) ([]tcpSpec, map[string]string, error) {
+	inbounds, err := f.st.FleetInbounds(ctx, target.ID, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	var specs []tcpSpec
+	pins := make(map[string]string)
+	for _, inbound := range inbounds {
+		if !inbound.Enabled {
+			continue
+		}
+		spec, err := f.buildSpec(target, inbound)
+		if err != nil {
+			continue
+		}
+		specs = append(specs, tcpSpec{Profile: inbound.ProfileName, Spec: spec})
+		if pin, ok := protocols.NormalizePin(inbound.CertPin); ok {
+			pins[inbound.ID] = pin
+		}
+	}
+	return specs, pins, nil
 }
 
 // withoutMark splits the HTTP-01 mark target off the list.
