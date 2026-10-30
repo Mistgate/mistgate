@@ -1806,6 +1806,10 @@ func TestD1CountryChecksStorage(t *testing.T) {
 	countryCheckStoreProof(t, openD1Store(t))
 }
 
+func TestD1IPv6Entry(t *testing.T) {
+	ipv6EntryProof(t, openD1Store(t))
+}
+
 func TestD1CountryCheckFamilies(t *testing.T) {
 	countryCheckFamilyProof(t, openD1Store(t))
 }

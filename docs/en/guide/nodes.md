@@ -94,7 +94,7 @@ This tab shows every way people reach the node as one "metro line". On top is a 
 
 - **Direct**: the node's own address and the number of ports, with a line under it: "From Russia: all networks", "Dark on MTS, Tele2", "Does not open from Russia" or "From Russia: no data".
 - **Through msk1**: one lane per entry node that relays this node, with the number of servers and a line saying whether people reach the entry on the networks where this node is dark ("msk1 is seen from MTS"). Only the owner sees these lanes.
-- **IPv6 entry**: shown only when the server has IPv6. It is switched off and says "soon": the IPv6 entry is not in Mistgate yet. Its detail says why: the server's IPv6 works, or IPv6 does not work at the hoster.
+- **IPv6 entry**: an extra server for people whose network blocks the node's IPv4 address; off until the owner turns it on (see [IPv6 entry](#ipv6-entry)). It is shown when the server has IPv6; when it cannot be turned on, the detail says why.
 - **Add a way in…**: a dashed row, for the owner only. When Direct is dark on some networks it turns amber: "Dark on MTS — add a way around". With no other ways yet it says: "If people's network does not see this node, give them another way in: through another node or over IPv6."
 
 On an **entry** node, below the line, the group **Reached through msk1** has one row per exit ("→ DE de1 · 2 servers"), then **Relay another node…** and a footer: relayed traffic crosses the server twice, so it counts twice in the server's traffic and load.
@@ -141,13 +141,29 @@ On the entry node the lane **→ de1** is the same: the relay rows for that exit
 
 #### IPv6 entry
 
-"An extra way in for people whose network blocks this node's IPv4 address. Not the same as the IPv6 exit for people's traffic." (see [Exit](#exit)). The lane is not available yet, and its detail says so and says why: the server's IPv6 works, or IPv6 does not work at the hoster. When Globalping's IPv6 rounds are on, it also shows whether the node is seen over IPv6 from the country ([IPv6](../operations/reachability.md#ipv6)).
+"An extra way in for people whose network blocks this node's IPv4 address. Not the same as the IPv6 exit for people's traffic." (see [Exit](#exit)).
+
+**What it does.** With the entry on, every person who may use the node gets one more server, "<name> · IPv6", next to each server of the node, in the list their app shows ("🇩🇪 DE · Hysteria2 · IPv6"). It connects to one of the server's own IPv6 addresses (by default the one the server uses for its outbound IPv6) and is otherwise the same server: the TLS name stays the node's domain, REALITY keeps its target and keys, a self-signed certificate keeps its pin, and the person's credentials do not change. Apps without IPv6 skip it. The main address, its DNS records and the certificates are not touched. People get the new servers at the next refresh of their subscription (every 12 hours by default, see [Subscriptions](subscriptions.md)). The servers of a [relay](relays.md) stay as they are and are not doubled for IPv6: the order is the node's server, its IPv6 server, then the relay's servers.
+
+**What it does not cover.** A server that people reach through a CDN (they connect to the CDN's address), a server whose certificate is issued for the node's IPv4 address, and the static AmneziaWG keys (`.conf` file and `vpn://` key): a key keeps the address it was issued with and does not update, so changing it would break it without a word. The Mihomo proxies of AmneziaWG refresh with the subscription and do get the IPv6 server (see [AmneziaWG](amneziawg.md#amneziawg-through-the-subscription)). AmneziaWG over IPv6 carries 20 bytes more of header per packet: a profile whose MTU is set tight for IPv4 may fragment there; the default of 1420 leaves room.
+
+**Who gets it.** Everyone who may use the node. The panel does not know the network of a person, and an app without IPv6 simply does not choose the server, so there is nothing to choose for.
+
+**When it is available.** The panel needs the node's [Doctor](#doctor) to report a working IPv6 uplink. When it cannot be turned on, the lane says why: `no_ipv6` (the server has no global IPv6 address), `ipv6_broken` (it has one, but outbound IPv6 does not work at the hoster, so no connection would come in either), `agent_old` (IPv6 works, but the node agent does not say which address the server uses: update it), `not_checked` (the doctor has not reported yet) or `main_is_ipv6` (the node's address is an IPv6 address already). The address is one of those the doctor lists for the server's uplink, by default the one it uses for outbound IPv6; there is no free text, because an address the host does not hold fails the check anyway.
+
+**Turning it on is checked first.** The panel sends the same packets as **Check ports** to the IPv6 address, from outside: UDP datagrams to each of the node's UDP servers (counted at the node) and a TLS handshake to each of its TCP servers, where the node's own certificate, pin or REALITY chain proves that it is this node that answered. Port 80 is left out: Let's Encrypt validates the main name over IPv4. The sender is another node of the fleet whose IPv6 works (two at most, in the order of **Check ports**); the panel sends itself only when no node can and it has IPv6 of its own and is not on the node's host. If no sender can run a part, Globalping (when it is on) connects to one TLS port from two probes anywhere: that shows that the address answers a connection, not that it is this node, and the result says *verified by Globalping*. When nobody can check, the entry is not turned on (`no_ipv6_verifier`): an address nobody could test is never passed. A passing check that is less than 10 minutes old is used; otherwise turning the entry on runs one. A port that does not answer as the node's own fails the check and nothing changes. The check writes nothing to the **Ports** results of the main address.
+
+**Turning it off** takes the servers out of the next subscription; people connected through one pick another server. It always works, also when the node's IPv6 has broken.
+
+**Alerts.** While the entry is on, the IPv6 rounds of Globalping measure the entry's address, and a block over IPv6 raises an alert of its own for the node (see [IPv6](../operations/reachability.md#ipv6)); without the entry IPv6 is information only.
+
+Only the owner can check or change the entry. The API refuses tokens; the MCP tools are `node_ipv6_check` (a read), and `node_ipv6_plan` / `node_ipv6_apply`, which wait for the owner's approval ([MCP](../reference/mcp.md)). The audit log records `node.ipv6_check` and `node.ipv6_entry` (on or off, with the address).
 
 #### Add a way in
 
 For the owner. **Add a way in…** opens the dialog "A new way in to de1" (`?tab=ways&add=1`):
 
-1. When the node is dark it starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same." Choose **Through another node** ("People connect to a node their network sees; it passes their traffic to de1 unchanged.", with the best hint: "Good fit: msk1, seen from MTS") or **IPv6 entry** (greyed out, with the reason for now).
+1. When the node is dark it starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same." Choose **Through another node** ("People connect to a node their network sees; it passes their traffic to de1 unchanged.", with the best hint: "Good fit: msk1, seen from MTS") or **IPv6 entry** (greyed out, with the reason, when the node cannot take one).
 2. **Through which node**: **Good fits: seen from MTS** come first, then **Other nodes**. Each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches this node. A node that already relays servers of this one says "Already passes on 2 servers of de1".
 3. The relay dialog, limited to this node's servers: tick the servers, the port on the entry (auto), **Only check** or **Check and turn on**, then the progress and the result per server. **Back** returns to step 2.
 
@@ -288,7 +304,7 @@ Only the owner can measure (the API refuses tokens and MCP), and each measuremen
 
 A **new node** is measured once automatically: about 45 seconds after its agent connects for the first time after the installation, if **Network capacity** is still 0. That is the only value the panel writes by itself, and only when the field is 0; the result is in the node's events ("Network capacity measured at the first start") and in the audit log (`node.bandwidth_auto`). The panel stores the slower of the two directions, and only if the test measured the upload as well: if only the download answered (the test servers refused the upload), nothing is written and the node gets a warning event ("The first measurement got ... no upload figure"), because on a link that is faster down than up the download alone would overstate the capacity. Press **Measure** and type the number yourself. A node whose agent is too old, or whose test fails, is skipped without a message: press **Measure** yourself or type the number.
 
-> **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the devices of the node's AmneziaWG profiles are marked outdated, and the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update.
+> **Note:** AmneziaVPN keys hold the node address they were issued with. After you change **Address**, the devices of the node's AmneziaWG profiles are marked outdated, and the people who connect with keys must import their key again (from their page or from the user card). Subscription apps get the new address at their next update. The [IPv6 entry](#ipv6-entry) never touches these keys.
 
 #### Renaming a node
 
@@ -327,4 +343,4 @@ The paths are the defaults of `mistgate-node install`; if you installed with oth
 
 ## Who can do what
 
-Every admin sees the nodes. The owner and helpers can change a node's settings (except its address) and restart its profiles. Moving a node to another address, installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on and building the AmneziaWG kernel module are for the owner only; so are relays and **Add a way in…** (see [Ways in](#ways-in)). See [Security](../operations/security.md).
+Every admin sees the nodes. The owner and helpers can change a node's settings (except its address) and restart its profiles. Moving a node to another address, installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on, checking and changing the **IPv6 entry** and building the AmneziaWG kernel module are for the owner only; so are relays and **Add a way in…** (see [Ways in](#ways-in)). See [Security](../operations/security.md).

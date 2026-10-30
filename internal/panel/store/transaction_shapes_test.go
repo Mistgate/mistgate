@@ -68,6 +68,7 @@ var transactionShape2 = map[string]string{
 	"authpw.go:RecordLoginFailure":                 "The upsert computes lockout state in SQL and returns the resulting row.",
 	"authpw.go:ResetPasswordLogin":                 "A credential guard precedes the plain credential, lock, session, and audit writes.",
 	"awg_prepare.go:awgPrepareTx":                  "The exact JSON and backend read by fn guard its update; stale decisions retry.",
+	"ipv6_entry.go:UpdateIPv6":                     "The exact entry and document read by fn guard its update; stale decisions retry.",
 	"dns.go:Delete":                                "A preset guard precedes preset deletion and clearing user and group references.",
 	"fleet_ca.go:CreateEnrollment":                 "Optional node creation, token replacement, and the current-node read share one batch guarded against missing or retired nodes.",
 	"fleet_ca.go:RenewCert":                        "A guard on the presenting certificate (valid for this node, node not retired) and the hourly certificate count precedes the insert and the two updates in one batch.",

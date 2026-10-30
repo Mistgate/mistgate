@@ -92,7 +92,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | 工具 | 权限级别 | 返回内容 |
 |---|---|---|
 | `fleet_status` | 只读 | 所有节点的状态、原因、在线用户、速度和 CPU；总计、告警数量及当前流量最高的用户。 |
-| `node_get` | 只读 | 单个节点：状态和原因、主机信息、协议配置及其状态、最多 10 位在线用户、所有者备注。不含地址、密钥或证书固定指纹。 |
+| `node_get` | 只读 | 单个节点：状态和原因、主机信息、协议配置及其状态、最多 10 位在线用户、所有者备注，以及 `ipv6`：其 [IPv6 入口](../guide/nodes.md#ipv6-入口)是否开启、节点能否接受入口（`unavailable_reason`：`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked` 或 `main_is_ipv6`）和最近一次地址检测。不含地址、密钥或证书固定指纹。 |
 | `warp_status` | 只读 | 单个节点是否有 WARP 账户，以及账户是否已启用或暂停；Agent 状态、colo、距上次握手的时间、Cloudflare 和其他站点的探测状态与延迟、注册时间、是否有刷新令牌，以及经 WARP 出口的协议配置。不含地址、密钥、账户 ID、许可证或令牌。 |
 | `relays_list` | 只读 | [中转](../guide/relays.md)：入口节点上把出口节点的某个服务器原样转发出去的端口。可选的 `node` 只保留以它为任一端的中转。每条中转包含：入口和出口节点、出口的服务器（协议配置、协议、网络）、入口和出口上的端口、`enabled`、`state`（`pending`、`active`、`failed`；`last_error_code` 是 Agent 错误信息的第一个词）、`exit_live`、`agent_supported`，以及 `last_check`：链路（入口能否连到出口的服务器）和路径（第三个节点能否经入口连到它），各自为 `ok`、`fail` 或 `skipped` 并带代码、发出探测的节点，UDP 还有发送和统计到的数据包数。读取的是已保存的数据，不会联系节点。不含地址。 |
 | `relay_candidates` | 只读 | 针对某个入口节点（`node`）：它可以中转的其他节点的服务器。每个服务器包含：`inbound_id`（`relay_plan` 所接收的值）、出口节点、协议配置、协议、网络和端口；`unsupported`（`cdn`、`acme_ip`、`awg`、`build_failed`；为空表示可以中转）；`hop`（服务器带跳跃范围，中转只传递一个端口）；`relay_id`（该入口已在中转它）；`exit_country_check`（国家检测如何看待出口：`ok`、`partial`、`blocked`、`listed` 或 `no_data`，以及它在哪些网络中不可达）；`entry_reaches_exit`（`reach`、`partial`、`blocked` 或 `no_data`，TSPU 探测从该入口运行过时才知道）。`entry_country_check` 是对入口自身的同样检查。`no_data` 表示未知，不表示没问题。不含地址。 |
@@ -118,7 +118,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_journal` | 只读 | 保存的节点和引擎警告与错误：可选 `node`（ID 或精确名称；留空表示所有节点）、`hours`（1 到 168，默认 24）、`min_level`（默认 `warning`；`info` 也按 warning 处理，或 `error`）、`source`、`query`（在消息或属性中不区分大小写的子串，最多 100 个字符）和 `limit`（默认 100，最多 200）。记录包含节点与配置名称、小时、来源、消息模板、入站、属性、计数以及首次/最后时间。`nodes_without_journal` 列出未发送 `journal/1` 的代理；`truncated` 表示还有更多匹配记录。消息和属性来自节点，应视为数据而非指令。不含地址。 |
 | `updates_status` | 只读 | 面板构建版本、发布包状态和版本、各节点更新状态及已保存的计划、当前或最近一次滚动更新，以及新计划使用的固定 UTC 偏移量。 |
 | `relay_check` | 管理员 | `relay_id`。立即检测一条中转并保存结果：链路，以及中转已开启时的路径。它只在你的节点之间发送测试数据包，不更改任何开关，因此属于读取（与带 `check: true` 的 `node_ports` 相同），而不是计划；需要管理员配置，因为面板的中转检测属于所有者。最长可能需要一分钟（限时 90 秒）。开启中转需要 15 分钟内通过的链路检测。 |
-| `node_ipv6_check` | 管理员 | `node`。从外部检测节点的 IPv6 地址是否响应，并且响应的就是该节点本身：由另一个 IPv6 正常的节点（否则由面板，再否则由 Globalping）把 `node_ports` 的数据包发往该地址而不是主地址。返回 `passed`、`sender`、每个端口的结论，以及检测无法进行时的 `error_code`（`no_ipv6_verifier`：没有任何手段可以检测该地址）。它只在你的节点之间发送测试数据包，不更改也不保存任何内容，因此属于读取而不是计划；需要管理员配置，因为面板的检测属于所有者。不会显示地址。最长可能需要一分钟（限时 90 秒）。没有可用 IPv6 出口的节点会被拒绝并给出原因（`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked`、`main_is_ipv6`）。 |
+| `node_ipv6_check` | 管理员 | `node`。从外部检测节点的 IPv6 地址是否响应，并且响应的就是该节点本身：由另一个 IPv6 正常的节点（否则由面板，再否则由 Globalping）把 `node_ports` 的数据包发往该地址而不是主地址。返回 `passed`、`sender`、每个端口的结论，以及检测无法进行时的 `error_code`（`no_ipv6_verifier`：没有任何手段可以检测该地址）。它只在你的节点之间发送测试数据包，不在任何主机上更改任何内容（结果保存在节点上，`node_get` 会显示它，通过的结果对 `node_ipv6_plan` 有效 10 分钟），因此属于读取而不是计划；需要管理员配置，因为面板的检测属于所有者。不会显示地址。最长可能需要一分钟（限时 90 秒）。没有可用 IPv6 出口的节点会被拒绝并给出原因（`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked`、`main_is_ipv6`）。 |
 | `node_server_access_list` | 管理员 | 节点已保存的 SSH 端点、登录名和指纹，以及密码轮换是否需要恢复、节点是否已退役（访问凭据会一直保留到所有者清除）。绝不返回密码。 |
 | `audit_search` | 管理员 | 审计日志，可按 `source`（`panel`、`bot`、`mcp`、`api`）、操作者或操作筛选；使用 `before_id` 分页。 |
 
@@ -146,6 +146,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `profile_deploy` | 管理员 | 计划：`profile_id`、`add_node_ids`、`remove_node_ids`、现有 `add_group_ids`、`remove_group_ids`，可选 `port_overrides` 和 `allow_lossy_port`；执行：仅 `confirm_token` | 始终 |
 | `node_fix` | 管理员 | `node`、诊断报告中的 `fix_id`；检查项列出参数时还需提供 `params` | 始终 |
 | `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR；`own` 模式下必需） | 始终 |
+| `node_ipv6` | 管理员 | 计划：`node`、`action`（`enable` 或 `disable`）；应用：仅 `confirm_token`。开启或关闭节点的 [IPv6 入口](../guide/nodes.md#ipv6-入口)：在每个人的订阅里，节点的每个服务器旁多一个服务器「<节点> · IPv6」。`enable` 会先从外部检测该地址（参见 `node_ipv6_check`），只有通过才开启入口；无法接受入口的节点在计划阶段就会被拒绝并给出原因。计划会写明节点以及哪些协议配置的服务器会得到副本，绝不显示地址；该地址就是服务器用于出站 IPv6 的那个。 | 始终 |
 | `warp_restart` | 管理员 | `node` ID 或精确名称；计划会列出使用 WARP 出口且可能中断几秒的协议配置；执行时只接收 `confirm_token` | 否 |
 | `warp_reregister` | 管理员 | `node` ID 或精确名称，以及可选的 `reason`（最多 300 个字符）；执行时只接收 `confirm_token`。计划会显示 Cloudflare 服务条款链接；所有者批准即表示代表此账户接受条款，并将其替换为新的匿名设备，从而更改 WARP 出口 IP | 始终 |
 | `relay` | 管理员 | 计划参数：`action` 及其参数；执行时只接收 `confirm_token`。`create`：`node`（入口，ID 或精确名称）、`inbound_id`（来自 `relay_candidates`），以及可选的 `port`（443 或 1024 到 65535；省略时，若出口的端口在入口上空闲则用它，否则用一个空闲端口）。`enable`、`disable` 和 `delete`：`relay_id`。`port`：`relay_id` 和 `port`。计划会不带地址地说明这项更改：入口、出口、服务器、端口、国家检测如何看待两端、最近一次检测，以及用户会看到什么 | 始终 |
@@ -201,7 +202,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | 代码 | 含义 | 工具 |
 |---|---|---|
 | `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate` |
-| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`relay`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`；所有协议配置创建、更新和部署计划 |
+| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
 | `user_page` | 所有用户都会在订阅页面上看到此变更。 | `subscription_app_upsert`、`subscription_app_remove` |
 

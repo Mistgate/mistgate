@@ -20,12 +20,17 @@ func TestNodeDecoyMigrationKeepsExistingNodesBuiltin(t *testing.T) {
 	if _, err := p.UpTo(ctx, 59); err != nil {
 		t.Fatalf("up to 59: %v", err)
 	}
-	n, err := s.Node(ctx, "nod_existing")
+	// read the columns themselves: Node() follows the newest schema, and later migrations add node columns
+	decoy := func() (mode, hash, agentMode, agentHash string, err error) {
+		err = s.R.QueryRowContext(ctx, `SELECT decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash FROM node WHERE id = 'nod_existing'`).Scan(&mode, &hash, &agentMode, &agentHash)
+		return
+	}
+	mode, hash, agentMode, agentHash, err := decoy()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n.DecoyMode != "builtin" || n.DecoyBundleHash != "" || n.DecoyAgentMode != "" || n.DecoyAgentHash != "" {
-		t.Fatalf("existing node decoy state = %+v", n)
+	if mode != "builtin" || hash != "" || agentMode != "" || agentHash != "" {
+		t.Fatalf("existing node decoy state = %q %q %q %q", mode, hash, agentMode, agentHash)
 	}
 
 	if _, err := p.DownTo(ctx, 58); err != nil {
@@ -34,8 +39,7 @@ func TestNodeDecoyMigrationKeepsExistingNodesBuiltin(t *testing.T) {
 	if _, err := p.UpTo(ctx, 59); err != nil {
 		t.Fatalf("up again: %v", err)
 	}
-	n, err = s.Node(ctx, "nod_existing")
-	if err != nil || n.DecoyMode != "builtin" {
-		t.Fatalf("node after migration rerun = %+v, %v", n, err)
+	if mode, _, _, _, err = decoy(); err != nil || mode != "builtin" {
+		t.Fatalf("node after migration rerun = %q, %v", mode, err)
 	}
 }

@@ -64,6 +64,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.NodeServiceRestartInboundsProcedure:     levelWrite,
 	adminv1connect.NodeServiceCheckPortsProcedure:          levelWrite,
 	adminv1connect.NodeServiceCheckIpv6Procedure:           levelOwner, // sends test packets to an address of the node; MCP only for tokens (policy_tokens.go)
+	adminv1connect.NodeServiceUpdateIpv6EntryProcedure:     levelOwner, // changes what every subscription of the node holds; only through the owner's approval for tokens
 	adminv1connect.NodeServicePrepareAwgKernelProcedure:    levelOwner, // installs packages on the node as root, like ApplyFix; closed to tokens (policy_tokens.go)
 	adminv1connect.NodeServiceMeasureBandwidthProcedure:    levelOwner, // makes the node push up to 1 GB through a public server; closed to tokens (policy_tokens.go)
 	adminv1connect.NodeServiceCreateEnrollmentProcedure:    levelOwner, // hands out the means to run an agent as a node

@@ -425,13 +425,17 @@ func (s *Service) countryIPv6Facts(ctx context.Context, nodes []countryNode) {
 
 // nodeIPv6 is the IPv6 address a node is measured on and its state. Only a node whose doctor says that outbound IPv6 works is
 // measured (state ok): an address that the host has but the hoster does not route would read as "blocked". The address is the
-// node's own when its Address is an IPv6 literal, else the uplink's src from the doctor. An agent that predates the IPv6
+// IPv6 entry's when it is on (it is the address people use), else the node's own when its Address is an IPv6 literal, else the
+// uplink's src from the doctor. An agent that predates the IPv6
 // facts names none: agent_old.
 // ponytail: the AAAA record of the node's name is not consulted - the panel's resolvers (system, DNS over HTTPS) ask for A
 // only, and a second lookup per node would burn the edge's subrequests; add it when an owner points an AAAA elsewhere.
 func nodeIPv6(n countryNode) (addr, state string) {
 	if n.ipv6.state != ipv6OK {
 		return "", cmp.Or(n.ipv6.state, ipv6Unknown)
+	}
+	if ip, ok := usableIPv6(n.node.IPv6Entry); ok { // the address people connect to
+		return ip, ipv6OK
 	}
 	if ip, ok := usableIPv6(n.node.Address); ok {
 		return ip, ipv6OK
@@ -1042,7 +1046,7 @@ func countryBad(verdict string) bool {
 // Partial observations are keyed by source and network. Unknown rows shadow older source state but do not create events; a
 // disagreement is neutral and holds the full alert. Each source event combines with the newest fresh row from every other source
 // (countryEvents). A block list never counts. While a node is disconnected both alerts are held; with all sources off they are
-// let go. The IPv6 rounds (Globalping alone) do the same for a node that has the IPv6 entry for clients (ipv6Entry), under the
+// let go. The IPv6 rounds (Globalping alone) do the same for a node that has the IPv6 entry (ipv6Entry), under the
 // keys "ipv6" and "ipv6/partial"; for every other node they only put the ipv6 parameter on its IPv4 alert (countryIPv6Word),
 // which refreshes the alert without announcing it again (reconcile: TouchAlert).
 func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[string]store.NodeLiveRow, activeAlerts map[key]store.HealthAlert, d *derived, add func(cond)) {
@@ -1147,17 +1151,24 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 	now := s.now()
 	for _, n := range sn.nodes {
 		var ipv6Word string // what the IPv6 rounds say of a node that has no IPv6 alert of its own: a parameter of its IPv4 alert
-		entry := ipv6On && s.ipv6Entry(n)
-		if ipv6On && !entry {
-			ipv6Word = "unknown"
+		entry := ipv6On && ipv6Entry(n)
+		if ipv6On {
+			word := "unknown"
 			if rounds := byNode6[n.ID]; len(rounds) > 0 && !v6Failed {
 				r := rounds[0]
-				ipv6Word = countryIPv6Word(&r, r.Country == cc.Country && now.Sub(r.At) <= ages6[n.ID])
+				word = countryIPv6Word(&r, r.Country == cc.Country && now.Sub(r.At) <= ages6[n.ID])
+			}
+			ipv6Word = word
+			if entry {
+				// the IPv6 alert speaks for IPv6 itself; the IPv4 one only says where people with IPv6 connect
+				if ipv6Word = ""; word == "open" {
+					ipv6Word = "entry"
+				}
 			}
 		}
 		s.countryNodeConds(n, live[n.ID].Connected, signals, activeAlerts, d, add, countryFamilyAlerts{family: familyV4, ipv6: ipv6Word})
 		if ipv6On {
-			// An IPv6 alert exists only for a node whose IPv6 entry for clients is on: the people on it depend on it. Without
+			// An IPv6 alert exists only for a node whose IPv6 entry is on: the people on it depend on it. Without
 			// the entry the keys are let go, as those of a source that is off.
 			var signals6 []countryAlertSignal
 			if entry {
@@ -1174,10 +1185,10 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 	}
 }
 
-// ipv6Entry says whether a node's IPv6 entry for clients is on, which is what gives its IPv6 country alert a reason to exist.
-// The entry is step 7 of the IPv6 plan; until it exists no node has one.
-func (s *Service) ipv6Entry(n store.NodeRow) bool {
-	return s.entry6 != nil && s.entry6(n)
+// ipv6Entry says whether a node's IPv6 entry is on, which is what gives its IPv6 country alert a reason to exist.
+func ipv6Entry(n store.NodeRow) bool {
+	_, ok := usableIPv6(n.IPv6Entry)
+	return ok
 }
 
 // countryFamilyAlerts is one address family's side of the COUNTRY_BLOCKED alerts of a node.

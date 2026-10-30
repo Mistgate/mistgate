@@ -188,6 +188,8 @@ Opening a config marks the device as having the current one: an **outdated** bad
 
 On a computer, import the file, not the key: with the key the MTU can be wrong and the connection may not work.
 
+Both keep the node address they were issued with, and only that: the node's [IPv6 entry](nodes.md#ipv6-entry) never changes them, because a key does not update itself and a new address would break it silently.
+
 The config carries `AllowedIPs = 0.0.0.0/0, ::/0` (everything through the tunnel) and two DNS servers. They are the first two plain IPv4 servers of the DNS that applies to the person on that node (their per-server choice when the owner allows it, else the DNS preset); when it has none, the built-in 1.1.1.1 and 8.8.8.8 are written and the window says so. AmneziaWG cannot split DNS: the main servers are used for every domain. The DNS is written into the key: after the person picks another DNS for a server on their page, the key itself stays the same, but they have to press **Get a new key** to get the new DNS (until then the device says "new key needed"). See [DNS](dns.md).
 
 ## The AmneziaVPN app
@@ -196,4 +198,4 @@ On a phone: open AmneziaVPN, tap "+", paste the key (or scan the QR code), tap "
 
 ## AmneziaWG through the subscription
 
-Apps on the mihomo core can carry AmneziaWG too. When a person has AmneziaVPN switched on and their app gets the Mihomo format, the subscription includes their AmneziaWG servers. A Mihomo app has no device identity, so all Mihomo apps of one person share one key per profile, made at the first fetch, and they count as the one subscription device in the limit. See [Subscriptions](subscriptions.md).
+Apps on the mihomo core can carry AmneziaWG too. When a person has AmneziaVPN switched on and their app gets the Mihomo format, the subscription includes their AmneziaWG servers. A Mihomo app has no device identity, so all Mihomo apps of one person share one key per profile, made at the first fetch, and they count as the one subscription device in the limit. When the node has an [IPv6 entry](nodes.md#ipv6-entry), the Mihomo subscription also carries an IPv6 proxy of each AmneziaWG server, listed right after it; the file and the key stay as they are. See [Subscriptions](subscriptions.md).

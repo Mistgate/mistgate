@@ -141,6 +141,17 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 
 The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has one proxy group with every server and a `dns:` section; Xray JSON has one config per server; sing-box JSON has one switch with every server. Each takes the person's DNS preset in its own form.
 
+## Extra servers: over IPv6 and through a relay
+
+Next to a server of a node, an app can list up to two more, marked by a label after the name. They are the same server, with the same keys, names and certificates; only the address the app connects to differs, and an app picks one by its name like any other.
+
+| Label | What it is | Added by |
+|:--|:--|:--|
+| ` · IPv6` (the same in every language) | The server at one of the node's IPv6 addresses, for people whose network blocks the node's IPv4 address. Apps without IPv6 skip it. In URIs the address is in brackets (`@[2001:db8::5]:443`); in the Mihomo, Xray JSON and sing-box formats it is bare, as those formats want it. | The node's [IPv6 entry](nodes.md#ipv6-entry) |
+| ` · via RU` (ru ` · через RU`, zh ` · 经 RU`) | The server through a relay of an entry node, with the entry's country. | A [relay](relays.md) |
+
+The order is the node's server, its IPv6 server, then the servers through its relays; a relay's server is never doubled for IPv6. Both appear for every person who may use the node (and the entry node, for a relay), at the next refresh of the app. A server behind a CDN, one with a certificate for the node's IPv4 address, and the static AmneziaWG keys get no IPv6 server. The load of an IPv6 server in Happ is the node's. Names are kept within Happ's 30 characters: the label stays, the profile name is shortened first.
+
 ## Names & texts
 
 | Setting | What it does |

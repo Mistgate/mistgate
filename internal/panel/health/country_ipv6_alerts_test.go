@@ -13,7 +13,18 @@ import (
 )
 
 // The IPv6 side of the alerts and the history (step 4 of the IPv6 plan): the verdict word of a node over IPv6, the ipv6
-// parameter of its IPv4 alert, the IPv6 alert of a node with the IPv6 entry for clients, and the history per family.
+// parameter of its IPv4 alert, the IPv6 alert of a node with the IPv6 entry, and the history per family.
+
+// entry turns the IPv6 entry of a node on (an address of the documentation range) or off.
+func (c *countryEnv) entry(node string, on bool) {
+	c.t.Helper()
+	addr := ""
+	if on {
+		addr = "2001:db8::10"
+	}
+	c.exec(`UPDATE node SET ipv6_entry = ? WHERE id = ?`, addr, node)
+	c.s.invalidateSnapshot()
+}
 
 // withoutIPv6 is an alert's parameters without the ipv6 one (the golden test of step 3 compares the rest).
 func withoutIPv6(params map[string]string) map[string]string {
@@ -162,14 +173,13 @@ func TestIPv4AlertHasNoIPv6ParameterWithTheChecksOff(t *testing.T) {
 	}
 }
 
-// The IPv6 alert exists only for a node with the IPv6 entry for clients. Until that entry exists (step 7) nothing sets it, so
-// no IPv6 alert opens whatever the IPv6 rounds say; once a node has it, the alert has its own keys and the IPv4 ones are not
-// touched.
+// The IPv6 alert exists only for a node with the IPv6 entry. Without it no IPv6 alert opens whatever the IPv6 rounds say; once a
+// node has it, the alert has its own keys and the IPv4 ones are not touched.
 func TestIPv6AlertOnlyForANodeWithTheEntry(t *testing.T) {
 	c := newIPv6Env(t)
 	seen := c.transitions()
-	if c.s.ipv6Entry(store.NodeRow{ID: "de1"}) {
-		t.Fatal("a node has an IPv6 entry before the feature exists")
+	if ipv6Entry(store.NodeRow{ID: "de1"}) || ipv6Entry(store.NodeRow{IPv6Entry: "203.0.113.5"}) || ipv6Entry(store.NodeRow{IPv6Entry: "fd00::1"}) {
+		t.Fatal("a node without an IPv6 address of its own has an IPv6 entry")
 	}
 	noCountryAlert := func() {
 		t.Helper()
@@ -190,7 +200,7 @@ func TestIPv6AlertOnlyForANodeWithTheEntry(t *testing.T) {
 	c.pair("de1", "ok", "ok")
 
 	// the entry is turned on for de1 only
-	c.s.entry6 = func(n store.NodeRow) bool { return n.ID == "de1" }
+	c.entry("de1", true)
 	c.pair("de1", "ok", "blocked")
 	mustHave(t, c, "country_blocked/de1/ipv6", false) // one round is not an alert, here too
 	c.pair("de1", "ok", "blocked")
@@ -226,7 +236,7 @@ func TestIPv6AlertOnlyForANodeWithTheEntry(t *testing.T) {
 	c.pair("de1", "blocked", "blocked")
 	c.pair("de1", "blocked", "blocked")
 	mustHave(t, c, "country_blocked/de1/ipv6", true)
-	c.s.entry6 = nil
+	c.entry("de1", false)
 	c.pair("de1", "blocked", "blocked")
 	mustHave(t, c, "country_blocked/de1/ipv6", false)
 	if v4 := c.active()["country_blocked/de1/"]; v4.Params["ipv6"] != "blocked" {
@@ -237,7 +247,7 @@ func TestIPv6AlertOnlyForANodeWithTheEntry(t *testing.T) {
 // The IPv6 alert is held while the node is offline, and with the IPv6 checks off it is let go.
 func TestIPv6AlertIsHeldOfflineAndReleasedWithTheSwitch(t *testing.T) {
 	c := newIPv6Env(t)
-	c.s.entry6 = func(n store.NodeRow) bool { return n.ID == "de1" }
+	c.entry("de1", true)
 	c.pair("de1", "ok", "blocked")
 	c.pair("de1", "ok", "blocked")
 	const k = "country_blocked/de1/ipv6"
@@ -258,7 +268,7 @@ func TestIPv6AlertIsHeldOfflineAndReleasedWithTheSwitch(t *testing.T) {
 // An IPv6 rounds' outage (no probes with IPv6) is unknown, not a block: it opens nothing and closes nothing.
 func TestIPv6AlertIgnoresUnknownRounds(t *testing.T) {
 	c := newIPv6Env(t)
-	c.s.entry6 = func(n store.NodeRow) bool { return n.ID == "de1" }
+	c.entry("de1", true)
 	c.pair("de1", "ok", "blocked")
 	c.pair("de1", "ok", "few")
 	c.pair("de1", "ok", "few")
@@ -362,5 +372,52 @@ func TestCountryHistoryPerFamily(t *testing.T) {
 	c.cfg.IPv6, c.cfg.Enabled = true, false
 	if sources, lanes := c.history6(); len(sources) != 0 || len(lanes) != 0 {
 		t.Fatalf("IPv6 history with Globalping off: %v %v", sources, lanes)
+	}
+}
+
+// A node with the entry: its IPv4 alert says where people with IPv6 connect (ipv6=entry) while the IPv6 rounds reach it, and
+// nothing about IPv6 otherwise (the IPv6 alert speaks for that). Updating the parameter is no new message.
+func TestIPv4AlertOfANodeWithTheEntryCarriesTheEntryWord(t *testing.T) {
+	c := newIPv6Env(t)
+	seen := c.transitions()
+	c.entry("de1", true)
+	c.pair("de1", "blocked", "ok")
+	c.pair("de1", "blocked", "ok")
+	a, ok := c.active()["country_blocked/de1/"]
+	if !ok || a.Params["ipv6"] != "entry" || a.Params["family"] != "" {
+		t.Fatalf("IPv4 alert = %+v", a)
+	}
+	// IPv6 gets cut as well: the IPv6 alert opens, the IPv4 one stops speaking of IPv6
+	c.pair("de1", "blocked", "blocked")
+	c.pair("de1", "blocked", "blocked")
+	mustHave(t, c, "country_blocked/de1/ipv6", true)
+	if a := c.active()["country_blocked/de1/"]; a.Params["ipv6"] != "" {
+		t.Errorf("IPv4 alert while IPv6 is cut: %v", a.Params)
+	}
+	n := 0
+	for _, tr := range *seen {
+		if tr.Alert.Subject == "" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d notifications for the IPv4 alert, want one: the ipv6 word changed twice", n)
+	}
+}
+
+// The round measures the address people use: the entry's, before the node's own and the uplink's.
+func TestNodeIPv6TakesTheEntryFirst(t *testing.T) {
+	n := countryNode{node: store.NodeRow{Address: "de1.example.com", IPv6Entry: "2001:db8::77"}, ipv6: ipv6Facts{state: ipv6OK, src: "2001:db8::10"}}
+	if addr, state := nodeIPv6(n); addr != "2001:db8::77" || state != ipv6OK {
+		t.Errorf("with the entry: %q %q", addr, state)
+	}
+	n.node.IPv6Entry = ""
+	if addr, _ := nodeIPv6(n); addr != "2001:db8::10" {
+		t.Errorf("without it: %q", addr)
+	}
+	// an IPv6 that does not work is not measured, whatever the entry says
+	n.node.IPv6Entry, n.ipv6.state = "2001:db8::77", ipv6Broken
+	if addr, state := nodeIPv6(n); addr != "" || state != ipv6Broken {
+		t.Errorf("broken: %q %q", addr, state)
 	}
 }

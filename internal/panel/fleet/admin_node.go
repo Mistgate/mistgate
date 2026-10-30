@@ -249,7 +249,7 @@ func capabilityPresent(caps []string, want string) bool {
 	return false
 }
 
-func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary) *adminv1.Node {
+func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor) *adminv1.Node {
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now, health)
 	out := &adminv1.Node{
@@ -263,6 +263,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	out.ClientIpv6Supported = capabilityPresent(caps, capClientIPv6)
 	out.UserRateLimitSupported = capabilityPresent(caps, capUserRateLimit)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
+	out.Ipv6 = ipv6Msg(n, d6)
 	if live.Connected {
 		out.Online = protocolCounts(onlineByProtocolView(view))
 		if m := view.Metrics; m != nil {
@@ -374,9 +375,10 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 	live := liveRowsByID(liveRows)
 	panelBundle, _ := f.panelDecoyBundle()
 	healthSummaries := f.healthSummaries(ctx)
+	d6 := f.ipv6Doctors(ctx)
 	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
 	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID]))
+		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID], d6[n.ID]))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -443,7 +445,7 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	}
 	view := decodeLiveView(live)
 	panelBundle, _ := f.panelDecoyBundle()
-	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID])
+	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -632,7 +634,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
-		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}), // pending: no checks yet
+		Node:           f.nodeMsg(ctx, n, nil, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}), // pending: no checks yet
 		InstallCommand: install,
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
@@ -956,7 +958,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	today, _ := f.todayBytesByNode(ctx, now)
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	panelBundle, _ := f.panelDecoyBundle()
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID])}), nil
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}), nil
 }
 
 // staleKeysOn marks the issued configs of every per-device (AmneziaWG) profile on the node stale: each one holds the

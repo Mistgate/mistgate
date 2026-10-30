@@ -28,6 +28,7 @@ const keys: Record<string, MessageKey> = {
   "node.bandwidth_auto": "audit.node.bandwidth_auto",
   "node.ports_check": "audit.node.ports_check",
   "node.ipv6_check": "audit.node.ipv6_check",
+  "node.ipv6_entry": "audit.node.ipv6_entry",
   port_lossy_override: "audit.port_lossy_override",
   stepup: "audit.stepup",
   captcha: "audit.captcha",
@@ -161,6 +162,10 @@ function sentenceKey(e: Pick<AuditEntry, "action" | "result">, p: Record<string,
       return p.reason && p.reason !== "admin" ? variant("gone") : { key: base, worded: false };
     case "relay.check":
       return p.ok === "false" ? variant("fail") : p.verified === "true" ? variant("verified") : { key: base, worded: false };
+    case "node.ipv6_check":
+      return p.pass === "false" ? variant("fail") : { key: base, worded: false };
+    case "node.ipv6_entry":
+      return p.action === "off" ? variant("off") : { key: base, worded: false };
     case "preset_default":
       return p.name ? { key: base, worded: false } : variant("builtin");
     case "node_dns_options":

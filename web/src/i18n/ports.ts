@@ -85,7 +85,10 @@ export const en = {
 
   // the audit trail
   "audit.node.ports_check": "checked UDP delivery on {node}: ports {ports}",
-  "audit.node.ipv6_check": "checked IPv6 address {address} of {node} from outside (passed: {pass})",
+  "audit.node.ipv6_check": "checked IPv6 address {address} of {node} from outside: it answers",
+  "audit.node.ipv6_check.fail": "checked IPv6 address {address} of {node} from outside: it does not answer as the node",
+  "audit.node.ipv6_entry": "turned on the IPv6 entry of {node} ({address})",
+  "audit.node.ipv6_entry.off": "turned off the IPv6 entry of {node}",
   "audit.port_lossy_override": "saved the port {port} on {node} although it loses UDP packets",
 };
 
@@ -162,7 +165,10 @@ export const ru: typeof en = {
   "event.port_lossy": "UDP до порта {port} профиля «{profile}» теряет {lost} % пакетов (проверка с {sender})",
 
   "audit.node.ports_check": "проверил(а) доставку UDP на {node}: порты {ports}",
-  "audit.node.ipv6_check": "проверил(а) снаружи IPv6-адрес {address} ноды {node} (прошёл: {pass})",
+  "audit.node.ipv6_check": "проверил(а) снаружи IPv6-адрес {address} ноды {node}: отвечает",
+  "audit.node.ipv6_check.fail": "проверил(а) снаружи IPv6-адрес {address} ноды {node}: не отвечает как нода",
+  "audit.node.ipv6_entry": "включил(а) вход по IPv6 на {node} ({address})",
+  "audit.node.ipv6_entry.off": "выключил(а) вход по IPv6 на {node}",
   "audit.port_lossy_override": "сохранил(а) порт {port} на {node}, хотя он теряет UDP-пакеты",
 };
 
@@ -239,6 +245,9 @@ export const zh: typeof en = {
   "event.port_lossy": "「{profile}」端口 {port} 的 UDP 丢包 {lost}%（由 {sender} 检测）",
 
   "audit.node.ports_check": "检测了 {node} 的 UDP 到达情况：端口 {ports}",
-  "audit.node.ipv6_check": "从外部检测了 {node} 的 IPv6 地址 {address}（通过：{pass}）",
+  "audit.node.ipv6_check": "从外部检测了 {node} 的 IPv6 地址 {address}：有响应",
+  "audit.node.ipv6_check.fail": "从外部检测了 {node} 的 IPv6 地址 {address}：响应的不是该节点",
+  "audit.node.ipv6_entry": "开启了 {node} 的 IPv6 入口（{address}）",
+  "audit.node.ipv6_entry.off": "关闭了 {node} 的 IPv6 入口",
   "audit.port_lossy_override": "在 {node} 上保存了端口 {port}，尽管它存在 UDP 丢包",
 };

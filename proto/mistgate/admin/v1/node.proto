@@ -47,11 +47,18 @@ service NodeService {
   // Checks from outside that an IPv6 address of the node answers (agents with "udpcheck/1"; the packets are those of CheckPorts):
   // the UDP delivery of the node's enabled UDP servers and the TLS identity of its TCP servers, sent to the address instead of the
   // node's main one by another node whose IPv6 works (the panel itself last; Globalping connects to one TLS port when no
-  // node can). Nothing is changed or stored in port_check / tcp_check; the answer is audited as node.ipv6_check. The address has
+  // node can). Nothing is changed on any host and port_check / tcp_check are not touched; the answer is kept in Node.ipv6.last_check (UpdateIpv6Entry uses a passing one for ten minutes) and audited as node.ipv6_check. The address has
   // to be one the node's doctor lists as its uplink's (params addrs and src of the ipv6 check); FAILED_PRECONDITION with a reason
   // (no_ipv6, ipv6_broken, agent_old, not_checked, main_is_ipv6) when the node has no such address to give, INVALID_ARGUMENT for any other address. Every "could
   // not check" outcome is error_code, never an RPC error. Owner only; MCP node_ipv6_check.
   rpc CheckIpv6(CheckIpv6Request) returns (CheckIpv6Response);
+  // Turns the node's IPv6 entry on or off (Node.ipv6; the feature is described at NodeIpv6). ENABLE adds the server
+  // "<node> · IPv6" next to each of the node's servers in everyone's subscription, at the next refresh of their apps; it needs a
+  // check of the address (CheckIpv6) that passed less than 10 minutes ago, and runs one itself when there is none. A check
+  // that does not pass changes nothing and is answered in error_code, like CheckIpv6's. DISABLE removes the servers again
+  // and always works. Both are idempotent: asking for what already is changes nothing and is not audited. Owner only; closed to
+  // API tokens; the MCP tool node_ipv6_plan / node_ipv6_apply goes through the owner's approval. Audited as node.ipv6_entry.
+  rpc UpdateIpv6Entry(UpdateIpv6EntryRequest) returns (UpdateIpv6EntryResponse);
   // "Retire from fleet": revoke the certificate, tell a connected agent to exit, remove the node from
   // every user's access. The row stays (audit, traffic history) with status RETIRED.
   rpc RetireNode(RetireNodeRequest) returns (RetireNodeResponse);
@@ -136,6 +143,38 @@ message Node {
   // The connected or last-seen agent lists "user-rate-limit/1", so it applies the per-person speed limit
   // (User.speed_limit_bps). False: this node holds people to the smaller of their two limits per device instead.
   bool user_rate_limit_supported = 34;
+  // The IPv6 entry of this node: unset only for a node message that was built without the doctor's view (never in the lists).
+  NodeIpv6 ipv6 = 35;
+}
+
+// The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",
+// next to each of the node's servers in every subscription that has the node; it connects to an IPv6 address of the node with
+// the same names, keys and certificates as the main one, and apps without IPv6 skip it. It is not the same as "IPv6 for
+// clients" (Node.client_ipv6), which decides whether people's traffic may leave the node over IPv6. Static AmneziaWG keys
+// (.conf, vpn://) are not part of it; the Mihomo proxies of AmneziaWG are.
+message NodeIpv6 {
+  // The address the "· IPv6" servers connect to. Empty = the entry is off.
+  string entry = 1;
+  // Whether the node can take the entry now: its host has IPv6 that works and the main address is not an IPv6 one already.
+  bool entry_supported = 2;
+  // Why not, when entry_supported is false: no_ipv6 (the host has no global IPv6 address), ipv6_broken (it has one but
+  // outbound IPv6 does not work, so nothing will come in either), agent_old (IPv6 works but the agent names no address),
+  // not_checked (the doctor has not reported yet) or main_is_ipv6 (the node's address is IPv6 already). Empty when supported.
+  string unavailable_reason = 3;
+  // The stable global addresses of the node's uplink, as its doctor reports them; the entry is chosen among these.
+  repeated Ipv6Address addresses = 4;
+  // The address the node uses for its own outbound IPv6: the default choice. Empty when the agent does not say.
+  string src = 5;
+  // The latest outside check of the entry's address (while the entry is on), else the latest of any address: when, by whom
+  // (sender), and the verdict of every port. Unset when the node was never checked.
+  CheckIpv6Response last_check = 6;
+  // Fields 7 to 15 are for changing the address of the entry (prefix, rotation state, the old address and until when).
+}
+
+message Ipv6Address {
+  string address = 1;
+  // The prefix length the host holds it with (64, or 128 for a single address).
+  uint32 prefix_len = 2;
 }
 
 enum AwgPrepareState {
@@ -465,6 +504,31 @@ message CheckIpv6Response {
   // The name of the node that sent the probes, "panel", or "globalping" (it only proves that a connection opens). Empty when none did.
   string sender = 5;
   int64 checked_unix = 6 [jstype = JS_NUMBER];
+}
+
+enum Ipv6EntryAction {
+  IPV6_ENTRY_ACTION_UNSPECIFIED = 0;
+  IPV6_ENTRY_ACTION_ENABLE = 1;
+  IPV6_ENTRY_ACTION_DISABLE = 2;
+  // 3 to 5 are for the steps of changing the address: ROTATE, CANCEL, DROP_OLD.
+}
+
+message UpdateIpv6EntryRequest {
+  string node_id = 1;
+  Ipv6EntryAction action = 2;
+  // ENABLE: one of the node's addresses (Node.ipv6.addresses); empty = the one the node uses for outbound IPv6. Turning the
+  // entry on for another address while it is on is FAILED_PRECONDITION "ipv6_entry_on": turn it off first.
+  string address = 3;
+}
+
+message UpdateIpv6EntryResponse {
+  // The node as it is now (unchanged when error_code is set).
+  Node node = 1;
+  // "" = done (or already so). Otherwise nothing changed: CheckIpv6Response.error_code's words when the check could not run, or
+  // check_failed when it ran and a port did not answer as the node's own.
+  string error_code = 2;
+  // The check ENABLE used (a fresh one, or the one it ran); unset for DISABLE.
+  CheckIpv6Response check = 3;
 }
 
 message RetireNodeRequest {

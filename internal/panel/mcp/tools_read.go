@@ -199,7 +199,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("node_get", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"One node: status and reason, host facts, inbounds with their state, up to 10 online users and the owner's notes. No addresses, keys or certificate pins.",
+			"One node: status and reason, host facts, inbounds with their state, up to 10 online users, the owner's notes and ipv6 (whether its IPv6 entry is on, whether the node can take one and why not, and the latest check of the address). No addresses, keys or certificate pins.",
 			func(c *call, in nodeArg) (any, error) {
 				id, _, err := c.nodeRef(in.Node)
 				if err != nil {

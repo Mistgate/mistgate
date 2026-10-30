@@ -42,6 +42,8 @@ type pageConn struct {
 	// Relay: a twin of the server through a relay of an entry node, whose country code Via is ("" if it has none).
 	Relay bool   `json:"relay,omitempty"`
 	Via   string `json:"via,omitempty"`
+	// IPv6: the server at the node's IPv6 entry, listed in the apps as "<name> · IPv6".
+	IPv6 bool `json:"ipv6,omitempty"`
 }
 
 // pageNodeDNS is the DNS of one server: what the person picked ("" = nothing), what applies, what the owner offers (in
@@ -115,7 +117,7 @@ func pageServers(v access.SubView, set *adminv1.SubscriptionSettings, lang strin
 			p.Load = &l
 		}
 		for _, c := range n.Conns {
-			pc := pageConn{Way: c.Way, Exit: c.Exit, ProfileID: c.ProfileID, MihomoOnly: c.MihomoOnly, Relay: c.Relay, Via: c.Via}
+			pc := pageConn{Way: c.Way, Exit: c.Exit, ProfileID: c.ProfileID, MihomoOnly: c.MihomoOnly, Relay: c.Relay, Via: c.Via, IPv6: c.IPv6}
 			if c.Way == "link" && !c.MihomoOnly && c.Server < len(appNames) {
 				pc.AppName = appNames[c.Server]
 				p.AppNames = append(p.AppNames, pc.AppName)

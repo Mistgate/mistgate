@@ -54,11 +54,21 @@ func (f *Fleet) CheckIPv6(ctx context.Context, nodeID, address string) (store.IP
 	return chk, nil
 }
 
+// ipv6Sender is who sent the probes of a half: the node's id and its name now, or "panel".
+type ipv6Sender struct{ id, name string }
+
+func senderRef(s portSender) ipv6Sender {
+	if s.panel {
+		return ipv6Sender{store.IPv6ByPanel, store.IPv6ByPanel}
+	}
+	return ipv6Sender{s.node.ID, s.node.Name}
+}
+
 // ipv6Run is the part of a check that the node's own senders do.
 type ipv6Run struct {
 	udp, tcp []store.IPv6Verdict
-	udpBy    string
-	tcpBy    string
+	udpBy    ipv6Sender
+	tcpBy    ipv6Sender
 	ranUDP   bool
 	ranTCP   bool
 	needUDP  bool
@@ -96,10 +106,11 @@ func (f *Fleet) checkIPv6(ctx context.Context, node store.NodeRow, chk *store.IP
 		return
 	}
 	if run != nil {
-		chk.By = run.tcpBy
-		if chk.By == "" {
-			chk.By = run.udpBy
+		by := run.tcpBy
+		if by.id == "" {
+			by = run.udpBy
 		}
+		chk.By, chk.Sender = by.id, by.name
 		chk.Verdicts = append(append(chk.Verdicts, run.tcp...), run.udp...)
 		chk.Pass = ipv6Passed(chk.Verdicts)
 		return
@@ -205,16 +216,16 @@ func (f *Fleet) panelMaySend(ctx context.Context, addr string) bool {
 
 // ipv6UDP is the UDP half: the first sender that runs it. An inconclusive run (no port delivered) is asked once more of the
 // next sender, as the port check does; its answer is "broken" for every port, which is a finding.
-func (f *Fleet) ipv6UDP(ctx context.Context, node store.NodeRow, targetLive store.NodeLiveRow, senders []portSender, addr string, ports []uint16) (verdicts []store.IPv6Verdict, by string, ran bool) {
+func (f *Fleet) ipv6UDP(ctx context.Context, node store.NodeRow, targetLive store.NodeLiveRow, senders []portSender, addr string, ports []uint16) (verdicts []store.IPv6Verdict, by ipv6Sender, ran bool) {
 	for i, sender := range senders {
 		out := f.runPortCheckAttempt(ctx, node, targetLive, sender, portDial{Host: addr}, ports)
 		if len(out.checks) == 0 || (out.errorCode != "" && out.errorCode != "inconclusive") {
 			if ctx.Err() != nil {
-				return nil, "", false
+				return nil, ipv6Sender{}, false
 			}
 			continue // busy, no route or a failed command: this sender did not run it
 		}
-		verdicts, by, ran = nil, portSenderID(sender), true
+		verdicts, by, ran = nil, senderRef(sender), true
 		for _, c := range out.checks {
 			verdicts = append(verdicts, store.IPv6Verdict{Net: "udp", Port: c.Port, Verdict: c.Verdict})
 		}
@@ -226,12 +237,12 @@ func (f *Fleet) ipv6UDP(ctx context.Context, node store.NodeRow, targetLive stor
 }
 
 // ipv6TCP is the TCP half: one sender probes every target; a sender that could not (busy, no route, failed) is replaced.
-func (f *Fleet) ipv6TCP(ctx context.Context, addr string, senders []portSender, targets []tcpTarget) (verdicts []store.IPv6Verdict, by string, ran bool) {
+func (f *Fleet) ipv6TCP(ctx context.Context, addr string, senders []portSender, targets []tcpTarget) (verdicts []store.IPv6Verdict, by ipv6Sender, ran bool) {
 	for _, sender := range senders {
 		got, code := f.probeTCPTargets(ctx, addr, sender, targets, nil, nil)
 		if code != "" {
 			if ctx.Err() != nil {
-				return nil, "", false
+				return nil, ipv6Sender{}, false
 			}
 			continue
 		}
@@ -242,9 +253,9 @@ func (f *Fleet) ipv6TCP(ctx context.Context, addr string, senders []portSender, 
 			}
 			verdicts = append(verdicts, store.IPv6Verdict{Net: "tcp", Port: t.Port, Verdict: v})
 		}
-		return verdicts, portSenderID(sender), true
+		return verdicts, senderRef(sender), true
 	}
-	return nil, "", false
+	return nil, ipv6Sender{}, false
 }
 
 // ipv6ByGlobalping is the last resort: one TLS port, two probes anywhere. A connection that opens says the address is
@@ -273,7 +284,7 @@ func (f *Fleet) ipv6ByGlobalping(ctx context.Context, chk *store.IPv6Check, tcp 
 	if connected > 0 {
 		verdict = "reachable"
 	}
-	chk.By = store.IPv6ByGlobalping
+	chk.By, chk.Sender = store.IPv6ByGlobalping, store.IPv6ByGlobalping
 	chk.Verdicts = []store.IPv6Verdict{{Net: "tcp", Port: port, Verdict: verdict}}
 	chk.Pass = connected > 0
 }

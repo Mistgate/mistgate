@@ -541,3 +541,39 @@ func TestHappNameOfATwinStaysInTheLimitAndKeepsItsLabel(t *testing.T) {
 		t.Errorf("ru: %q", got)
 	}
 }
+
+// The IPv6 twin of a server is told apart by " · IPv6" after its name, the same in every language, and keeps the Happ limit.
+func TestRemarksOfTheIPv6Twin(t *testing.T) {
+	server := srv("de1", "DE", "Hysteria2")
+	twin := server
+	twin.Mark = access.MarkIPv6
+	for _, lang := range []string{"en", "ru", "zh"} {
+		got := remarks([]access.SubServer{server, twin}, "", lang)
+		if got[0] != "\U0001F1E9\U0001F1EA DE · Hysteria2" || got[1] != "\U0001F1E9\U0001F1EA DE · Hysteria2 · IPv6" {
+			t.Errorf("%s: %q", lang, got)
+		}
+	}
+	// the number tells two of them apart, as for any name; the relay's twin is a name of its own
+	via := server
+	via.Mark = access.ViaMark("fi")
+	if got := remarks([]access.SubServer{server, twin, via, twin}, "", "en"); got[3] != got[1]+" 2" || got[2] != "\U0001F1E9\U0001F1EA DE · Hysteria2 · via FI" {
+		t.Errorf("names: %q", got)
+	}
+	// Happ: 30 units at most, the label before the profile's name and the load
+	load := 74
+	for _, profile := range []string{"Hysteria2 premium", "VLESS", "Hysteria2"} {
+		s := srv("de1", "DE", profile)
+		s.Mark, s.LoadPercent = access.MarkIPv6, &load
+		for _, lang := range []string{"en", "ru", "zh"} {
+			got := happRemarks([]access.SubServer{s}, "", lang, true)[0]
+			if n := len(utf16.Encode([]rune(got))); n > 30 || !strings.Contains(got, " · IPv6") {
+				t.Errorf("%s %s: %q is %d units or lost the label", lang, profile, got, n)
+			}
+		}
+	}
+	long := srv("de1", "DE", "Hysteria2 premium")
+	long.Mark = access.MarkIPv6
+	if got := happRemarks([]access.SubServer{long}, "", "en", false)[0]; got != "\U0001F1E9\U0001F1EA DE · HY2 premium · IPv6" {
+		t.Errorf("long profile: %q", got)
+	}
+}

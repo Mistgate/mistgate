@@ -135,6 +135,9 @@ func namedRemark(base, suffix, profile string, limitHapp bool) string {
 // markText is the label a server carries after its name, in the subscription's language: " · via RU" (ru "через", zh "经");
 // "" for a server without a mark. A mark that is not a known one is left out.
 func markText(mark, lang string) string {
+	if mark == access.MarkIPv6 {
+		return " · IPv6" // the same in every language
+	}
 	cc, ok := strings.CutPrefix(mark, access.MarkVia)
 	if !ok {
 		return ""

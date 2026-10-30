@@ -11,11 +11,13 @@ import (
 // for those whose network blocks the node's IPv4 address. The tools never show an address of a node, the IPv6 one included.
 //
 //   - node_ipv6_check sends test packets between the owner's nodes to the address the node itself uses for outbound IPv6. It
-//     changes nothing and writes nothing but the audit row, so it is a read like relay_check: no approval, the admin profile
-//     only because the panel's CheckIpv6 is the owner's.
+//     changes nothing on any host and keeps only its result with the node, so it is a read like relay_check: no approval, the
+//     admin profile only because the panel's CheckIpv6 is the owner's.
+//   - node_ipv6_plan / node_ipv6_apply turn the entry on or off: always the owner's approval, because it changes what every
+//     subscription of the node holds.
 
 func ipv6Tools() []toolDef {
-	return []toolDef{
+	return append([]toolDef{
 		readToolWithin(applyTimeout, "node_ipv6_check", ProfileAdmin, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceCheckIpv6Procedure),
 			"Check from outside that the node's IPv6 address answers, and that what answers is the node itself: another node whose IPv6 works (else the panel, else Globalping) "+
 				"sends the same test packets as node_ports to the address instead of the main one: UDP datagrams to each of the node's UDP servers (counted at the node) and a TLS handshake to each of its TCP servers. "+
@@ -34,7 +36,7 @@ func ipv6Tools() []toolDef {
 				}
 				return ipv6CheckView(id, name, r.Msg), nil
 			}),
-	}
+	}, change(nodeIPv6)...)
 }
 
 // Ipv6CheckV is node_ipv6_check: the verdict of every port, never an address.

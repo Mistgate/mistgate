@@ -76,6 +76,8 @@ var tokenProcedures = map[string]int{
 	// The outside check of an IPv6 address of a node (node_ipv6_check): test packets between the owner's nodes. Narrowed to the admin
 	// profile by its level; MCP only, because the raw response carries the address that was checked.
 	adminv1connect.NodeServiceCheckIpv6Procedure: TokenAccessPlanning,
+	// Turning the entry on or off changes what people's subscriptions hold: only through the owner's approval (node_ipv6_plan / apply).
+	adminv1connect.NodeServiceUpdateIpv6EntryProcedure: TokenAccessApproved,
 	// Owner level (the admin profile): the audit log, which names admins, tokens and addresses.
 	adminv1connect.AuthServiceListAuditProcedure: TokenAccessDirect,
 	// Relays (relay.proto), through the MCP tools relays_list, relay_candidates, relay_check and relay_plan/apply only. The reads
@@ -168,6 +170,7 @@ var stepUpProcedures = map[string]bool{
 var grantProcedures = map[string][]string{
 	"warp_reregister":             {adminv1connect.WarpServiceRegisterWarpProcedure},
 	"node_decoy":                  {adminv1connect.NodeServiceSetNodeDecoyModeProcedure},
+	"node_ipv6":                   {adminv1connect.NodeServiceUpdateIpv6EntryProcedure},
 	"node_fix":                    {adminv1connect.HealthServiceApplyFixProcedure},
 	"rollout_start":               {adminv1connect.UpdateServiceStartRolloutProcedure},
 	"rollout_pause":               {adminv1connect.UpdateServicePauseRolloutProcedure},

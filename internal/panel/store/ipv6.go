@@ -147,8 +147,10 @@ type IPv6Check struct {
 	At   int64  `json:"at"` // unix seconds
 	// By is the id of the node that sent the probes, IPv6ByPanel or IPv6ByGlobalping (which only proves that a connection
 	// opens, not that it reached this node). Empty when nothing could send.
-	By   string `json:"by,omitempty"`
-	Pass bool   `json:"pass"`
+	By string `json:"by,omitempty"`
+	// Sender is By as a person reads it: the name the node had then, "panel" or "globalping".
+	Sender string `json:"sender,omitempty"`
+	Pass   bool   `json:"pass"`
 	// Code says why a check did not run or could not be trusted: node_offline, agent_too_old, nothing_to_check,
 	// no_ipv6_verifier, failed. Empty when the ports were probed (a refusing port is in Verdicts, not here).
 	Code     string        `json:"code,omitempty"`

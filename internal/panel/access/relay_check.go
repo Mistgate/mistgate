@@ -225,20 +225,25 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 // not the exit's address; a certificate on the exit's IP address would not fit the entry's; the AmneziaWG key goes through a
 // relay only by a later step.
 func relayUnsupported(protocol string, spec plugin.InboundSpec) string {
-	var s struct {
-		CDN *struct {
-			Host string `json:"host"`
-		} `json:"cdn"`
-	}
 	switch {
 	case protocol == "awg":
 		return "awg"
 	case spec.TLS.Mode == plugin.TLSAcmeIP:
 		return "acme_ip"
-	case len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &s) == nil && s.CDN != nil && s.CDN.Host != "":
+	case serverCDN(spec):
 		return "cdn"
 	}
 	return ""
+}
+
+// serverCDN: the server is reached through a CDN host (settings.cdn.host), not the node's address.
+func serverCDN(spec plugin.InboundSpec) bool {
+	var s struct {
+		CDN *struct {
+			Host string `json:"host"`
+		} `json:"cdn"`
+	}
+	return len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &s) == nil && s.CDN != nil && s.CDN.Host != ""
 }
 
 func relayCheckMsg(c store.RelayCheck, nameOf func(string) string) *adminv1.RelayCheck {

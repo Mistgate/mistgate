@@ -76,6 +76,16 @@ describe("the event and the audit rows", () => {
     expect(describeAudit(t, { action: "node.ports_check", paramsJson: JSON.stringify({ node: "de1", ports: "443,8443" }) })).toBe("checked UDP delivery on de1: ports 443,8443");
     expect(describeAudit(t, { action: "port_lossy_override", paramsJson: JSON.stringify({ node: "de1", port: 8443 }) })).toBe("saved the port 8443 on de1 although it loses UDP packets");
   });
+  it("words the IPv6 entry: the check, and the entry on and off, in three languages", () => {
+    const check = (pass: string) => ({ action: "node.ipv6_check", paramsJson: JSON.stringify({ node: "de1", address: "2001:db8::5", pass }) });
+    expect(describeAudit(t, check("true"))).toBe("checked IPv6 address 2001:db8::5 of de1 from outside: it answers");
+    expect(describeAudit(t, check("false"))).toBe("checked IPv6 address 2001:db8::5 of de1 from outside: it does not answer as the node");
+    const entry = (action: string) => ({ action: "node.ipv6_entry", paramsJson: JSON.stringify({ node: "de1", action, address: "2001:db8::5" }) });
+    expect(describeAudit(t, entry("on"))).toBe("turned on the IPv6 entry of de1 (2001:db8::5)");
+    expect(describeAudit(t, entry("off"))).toBe("turned off the IPv6 entry of de1");
+    expect(describeAudit(tOf("ru"), entry("on"))).toBe("включил(а) вход по IPv6 на de1 (2001:db8::5)");
+    expect(describeAudit(tOf("zh"), entry("off"))).toBe("关闭了 de1 的 IPv6 入口");
+  });
 });
 
 describe("a VLESS profile on the Hysteria2 site's TCP port (hy2_decoy_paused)", () => {

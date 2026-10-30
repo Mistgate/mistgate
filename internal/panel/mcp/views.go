@@ -168,7 +168,10 @@ type NodeGetV struct {
 	OnlineUsers   []onlineUserV     `json:"online_users,omitempty"`
 	OnlineTotal   uint32            `json:"online_total"`
 	Notes         string            `json:"notes,omitempty"`
-	Truncated     bool              `json:"truncated,omitempty"`
+	// IPv6 is the node's IPv6 entry (an extra "· IPv6" server in the subscriptions): whether it is on, whether the node can take
+	// one, and the latest check of the address. Never the address.
+	IPv6      *ipv6EntryV `json:"ipv6,omitempty"`
+	Truncated bool        `json:"truncated,omitempty"`
 }
 
 func (v *NodeGetV) shrink() bool {
@@ -188,6 +191,9 @@ func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {
 	}
 	for _, p := range n.GetProtocols() {
 		v.Protocols = append(v.Protocols, clean(p, 40))
+	}
+	if x := n.GetIpv6(); x != nil {
+		v.IPv6 = ipv6EntryView(x)
 	}
 	if w := n.GetWarp(); w != nil && w.GetState() != adminv1.WarpState_WARP_STATE_UNSPECIFIED {
 		v.Warp = enumName("WARP_STATE_", w.GetState().String())

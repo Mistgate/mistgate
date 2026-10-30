@@ -109,6 +109,8 @@ type SubConn struct {
 	Via string
 	// Relay: this link is a twin (a relay's server), whatever the entry's country.
 	Relay bool
+	// IPv6: this link is the "· IPv6" twin of the node's server (the node's IPv6 entry).
+	IPv6 bool
 }
 
 // SubServer is one Lines entry with the facts the remark (server name) is built from.
@@ -130,10 +132,13 @@ type SubServer struct {
 	// It is nil when capacity is unknown or the node has no fresh sample. The rates themselves stay out of the view:
 	// whatever reaches a user must not tell when the other person on a node streams.
 	LoadPercent *int
-	// Mark labels a server that is not the exit's own: a twin through a relay (ViaMark). The name builder writes it after the
-	// server's name in the language of the subscription; "" for an ordinary server.
+	// Mark labels a server that is not the node's plain one: a twin through a relay (ViaMark) or the node's IPv6 entry (MarkIPv6).
+	// The name builder writes it after the server's name in the language of the subscription; "" for an ordinary server.
 	Mark string
 }
+
+// MarkIPv6 is SubServer.Mark of the twin that connects to the node's IPv6 entry.
+const MarkIPv6 = "ipv6"
 
 // MarkVia is the prefix of SubServer.Mark of a relay's twin; the rest is the country code of the entry node.
 const MarkVia = "via:"
@@ -547,6 +552,23 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 				n := nodeOf(f)
 				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, Server: len(v.Servers) - 1})
 			}
+			// The IPv6 twin of the server comes first: the node's own address over IPv6, then the twins through its relays (those
+			// are copies of the server itself, never of this twin, so a relay's twin is not doubled for IPv6).
+			if addr := ipv6EntryAddr(f.Node); addr != "" && ipv6Unsupported(spec) == "" {
+				twin := srv
+				twin.Mark = MarkIPv6
+				tin := ipv6Input(in, addr)
+				if opt.Name != nil {
+					tin.DisplayName = opt.Name(twin)
+				}
+				if tf, ok := proto.Render(tin); ok {
+					twin.URI = string(tf.Data)
+					v.Lines = append(v.Lines, twin.URI)
+					v.Servers = append(v.Servers, twin)
+					n := nodeOf(f)
+					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, Server: len(v.Servers) - 1, IPv6: true})
+				}
+			}
 			// The twins of the server, right after it: the same server through each relay of it that is usable for the person.
 			for _, l := range relaysOf[f.Inbound.ID] {
 				if relayUnsupported(f.Profile.Protocol, spec) != "" {
@@ -573,6 +595,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			if _, ok := proto.Render(in); ok {
 				n := nodeOf(f)
 				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
+				if ipv6EntryAddr(f.Node) != "" && ipv6Unsupported(spec) == "" { // its IPv6 twin is Mihomo-only as well
+					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, IPv6: true})
+				}
 				for _, l := range relaysOf[f.Inbound.ID] { // its twins are Mihomo-only as well
 					if relayUnsupported(f.Profile.Protocol, spec) == "" {
 						n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, Via: strings.ToUpper(strings.TrimSpace(l.ViaNodeCountry)), Relay: true})
@@ -618,6 +643,42 @@ func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInbound
 		out[l.InboundID] = append(out[l.InboundID], l)
 	}
 	return out
+}
+
+// ipv6EntryAddr is the address of the node's IPv6 entry when the node has one that can be used, else "": the entry has to be a global
+// IPv6 address, and a node whose own address is IPv6 already has nothing to add.
+func ipv6EntryAddr(n store.AccessNode) string {
+	addr, ok := store.UsableIPv6(n.IPv6Entry)
+	if !ok {
+		return ""
+	}
+	if _, main := store.UsableIPv6(n.Address); main {
+		return ""
+	}
+	return addr
+}
+
+// ipv6Unsupported says why a server has no IPv6 twin, "" when it has: people reach a CDN server through the CDN, not the node's
+// address, and a certificate issued for the node's IPv4 address does not fit its IPv6 one. Every other server keeps its names,
+// keys, REALITY target and certificate pin: they do not depend on the address that is dialled.
+func ipv6Unsupported(spec plugin.InboundSpec) string {
+	switch {
+	case spec.TLS.Mode == plugin.TLSAcmeIP:
+		return "acme_ip"
+	case serverCDN(spec):
+		return "cdn"
+	}
+	return ""
+}
+
+// ipv6Input is the render input of the server at the node's IPv6 entry: the same settings, SNI, keys and pin, only the address
+// the client connects to changes (an AmneziaWG proxy carries it as its endpoint).
+func ipv6Input(in protocols.RenderInput, addr string) protocols.RenderInput {
+	in.Inbound.Node.Address = addr
+	if in.NodeAddr != "" {
+		in.NodeAddr = addr
+	}
+	return in
 }
 
 // twinInput is the render input of the exit's server through the relay l: the exit's own protocol settings, SNI, keys, pin and

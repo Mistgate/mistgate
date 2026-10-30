@@ -1,0 +1,128 @@
+{
+  "log": {
+    "level": "warn"
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "final": "local",
+    "strategy": "ipv4_only"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "strict_route": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Example VPN",
+      "outbounds": [
+        "🇩🇪 DE · Hysteria2 premium",
+        "🇩🇪 DE · Hysteria2 premium · IPv6",
+        "🇩🇪 DE · Hysteria2 premium · via FI",
+        "direct"
+      ],
+      "default": "🇩🇪 DE · Hysteria2 premium"
+    },
+    {
+      "hop_interval": "30s",
+      "obfs": {
+        "type": "salamander",
+        "password": "golden-obfs-password"
+      },
+      "password": "<secret>",
+      "server": "de1.example.com",
+      "server_ports": [
+        "20000:30000"
+      ],
+      "tag": "🇩🇪 DE · Hysteria2 premium",
+      "tls": {
+        "enabled": true,
+        "server_name": "de1.example.com",
+        "alpn": [
+          "h3"
+        ]
+      },
+      "type": "hysteria2"
+    },
+    {
+      "hop_interval": "30s",
+      "obfs": {
+        "type": "salamander",
+        "password": "golden-obfs-password"
+      },
+      "password": "<secret>",
+      "server": "2001:db8::5",
+      "server_ports": [
+        "20000:30000"
+      ],
+      "tag": "🇩🇪 DE · Hysteria2 premium · IPv6",
+      "tls": {
+        "enabled": true,
+        "server_name": "de1.example.com",
+        "alpn": [
+          "h3"
+        ]
+      },
+      "type": "hysteria2"
+    },
+    {
+      "obfs": {
+        "type": "salamander",
+        "password": "golden-obfs-password"
+      },
+      "password": "<secret>",
+      "server": "fi1.example.com",
+      "server_port": 8443,
+      "tag": "🇩🇪 DE · Hysteria2 premium · via FI",
+      "tls": {
+        "enabled": true,
+        "server_name": "de1.example.com",
+        "alpn": [
+          "h3"
+        ]
+      },
+      "type": "hysteria2"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "direct"
+      }
+    ],
+    "final": "Example VPN",
+    "auto_detect_interface": true,
+    "default_domain_resolver": "local"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    }
+  }
+}

@@ -81,3 +81,17 @@ func TestCountryAlertSubjectsOfBothFamilies(t *testing.T) {
 		t.Errorf("legacy title %q", got)
 	}
 }
+
+// A node with the IPv6 entry says where people with IPv6 connect while the IPv6 rounds reach it.
+func TestCountryAlertSaysPeopleWithIPv6UseTheEntry(t *testing.T) {
+	for lang, line := range map[L]string{"en": "People with IPv6 connect through the IPv6 entry.", "ru": "Люди с IPv6 подключаются через вход по IPv6.", "zh": "有 IPv6 的人通过 IPv6 入口连接。"} {
+		without := alertReason(lang, countryAlert("", nil))
+		if got := alertReason(lang, countryAlert("", map[string]string{"ipv6": "entry"})); got != without+"\n"+line {
+			t.Errorf("%s: %q, want %q + the line", lang, got, without)
+		}
+		// the IPv6 alert of the same node is a message of its own, with no such line
+		if got := alertReason(lang, countryAlert("ipv6", map[string]string{"family": "6"})); strings.Contains(got, line) {
+			t.Errorf("%s: the IPv6 alert carries the line: %q", lang, got)
+		}
+	}
+}

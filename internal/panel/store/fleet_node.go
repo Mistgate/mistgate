@@ -57,6 +57,9 @@ type NodeRow struct {
 	BandwidthMbps int
 	// DecoyMode is the configured per-node site. DecoyBundleHash names the uploaded own bundle; agent fields come from Hello.
 	DecoyMode, DecoyBundleHash, DecoyAgentMode, DecoyAgentHash string
+	// IPv6Entry is the address of the IPv6 entry (migration 00086): the node's "· IPv6" server in subscriptions connects to it;
+	// "" = off. IPv6JSON is the document around it (IPv6State, ipv6_entry.go).
+	IPv6Entry, IPv6JSON string
 }
 
 const nodeCols = `id, name, address, country_code, location, provider, notes, dns_resolvers,
@@ -64,7 +67,7 @@ const nodeCols = `id, name, address, country_code, location, provider, notes, dn
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
 	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6,
-	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash`
+	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -81,7 +84,7 @@ func scanNode(r rowScanner) (NodeRow, error) {
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
 		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6,
-		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash)
+		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}

@@ -1,0 +1,269 @@
+[
+  {
+    "remarks": "🇩🇪 DE · Hysteria2 premium",
+    "log": {
+      "loglevel": "warning"
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "hysteria",
+        "settings": {
+          "version": 2,
+          "address": "de1.example.com",
+          "port": 4443
+        },
+        "streamSettings": {
+          "network": "hysteria",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "de1.example.com",
+            "alpn": [
+              "h3"
+            ]
+          },
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "<secret>"
+          },
+          "finalmask": {
+            "udp": [
+              {
+                "type": "salamander",
+                "settings": {
+                  "password": "golden-obfs-password"
+                }
+              }
+            ]
+          }
+        },
+        "tag": "proxy"
+      },
+      {
+        "tag": "direct",
+        "protocol": "freedom"
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "ip": [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16",
+            "fc00::/7",
+            "fe80::/10"
+          ],
+          "outboundTag": "direct"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  },
+  {
+    "remarks": "🇩🇪 DE · HY2 premium · IPv6",
+    "log": {
+      "loglevel": "warning"
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "hysteria",
+        "settings": {
+          "version": 2,
+          "address": "2001:db8::5",
+          "port": 4443
+        },
+        "streamSettings": {
+          "network": "hysteria",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "de1.example.com",
+            "alpn": [
+              "h3"
+            ]
+          },
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "<secret>"
+          },
+          "finalmask": {
+            "udp": [
+              {
+                "type": "salamander",
+                "settings": {
+                  "password": "golden-obfs-password"
+                }
+              }
+            ]
+          }
+        },
+        "tag": "proxy"
+      },
+      {
+        "tag": "direct",
+        "protocol": "freedom"
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "ip": [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16",
+            "fc00::/7",
+            "fe80::/10"
+          ],
+          "outboundTag": "direct"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  },
+  {
+    "remarks": "🇩🇪 DE · HY2 premium · via FI",
+    "log": {
+      "loglevel": "warning"
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "hysteria",
+        "settings": {
+          "version": 2,
+          "address": "fi1.example.com",
+          "port": 8443
+        },
+        "streamSettings": {
+          "network": "hysteria",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "de1.example.com",
+            "alpn": [
+              "h3"
+            ]
+          },
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "<secret>"
+          },
+          "finalmask": {
+            "udp": [
+              {
+                "type": "salamander",
+                "settings": {
+                  "password": "golden-obfs-password"
+                }
+              }
+            ]
+          }
+        },
+        "tag": "proxy"
+      },
+      {
+        "tag": "direct",
+        "protocol": "freedom"
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "ip": [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16",
+            "fc00::/7",
+            "fe80::/10"
+          ],
+          "outboundTag": "direct"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  }
+]

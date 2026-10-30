@@ -372,8 +372,11 @@ func alertReason(l L, a store.HealthAlert) string {
 		if countryPartial(a) {
 			reason = countryPartialReason(l, p)
 		}
-		if p["ipv6"] == "open" { // the IPv4 alert of a node the IPv6 rounds reach: a hint, not a message of its own
+		switch p["ipv6"] { // the IPv4 alert of a node the IPv6 rounds reach: a hint, not a message of its own
+		case "open":
 			reason += "\n" + l.pick("Reachable over IPv6.", "По IPv6 доступна.", "通过 IPv6 可以访问。")
+		case "entry": // it has the IPv6 entry and the IPv6 rounds reach it
+			reason += "\n" + l.pick("People with IPv6 connect through the IPv6 entry.", "Люди с IPv6 подключаются через вход по IPv6.", "有 IPv6 的人通过 IPv6 入口连接。")
 		}
 		return reason
 	case "users_impacted":

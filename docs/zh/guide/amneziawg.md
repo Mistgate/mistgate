@@ -188,6 +188,8 @@ mistgate-node awg prepare-kernel --verify-only   # 检查已存在的模块
 
 在电脑上应导入文件，而不是密钥：使用密钥时，MTU 可能不正确，连接也可能无法使用。
 
+两者都保留签发时的节点地址，且只保留这一个：节点的 [IPv6 入口](nodes.md#ipv6-入口)绝不会改动它们，因为密钥不会自行更新，而新地址会悄无声息地使其失效。
+
 配置包含 `AllowedIPs = 0.0.0.0/0, ::/0`（通过隧道传输所有流量）和两个 DNS 服务器。服务器取自此节点上适用于用户的 DNS 中最前面的两个普通 IPv4 服务器（所有者允许时为用户针对每个服务器的选择，否则为 DNS 预设）；没有此类服务器时，会写入内置的 1.1.1.1 和 8.8.8.8，并在窗口中说明。AmneziaWG 不支持 DNS 分流：所有域名查询都会使用主 DNS 服务器。DNS 会写入密钥：用户在服务器页面上选择其他 DNS 后，密钥本身不会更改，但必须点击**获取新密钥**才能使用新的 DNS（在此之前设备会提示「需要新密钥」）。请参阅 [DNS](dns.md)。
 
 ## AmneziaVPN 应用
@@ -196,4 +198,4 @@ mistgate-node awg prepare-kernel --verify-only   # 检查已存在的模块
 
 ## 通过订阅使用 AmneziaWG
 
-基于 mihomo 内核的应用也可以使用 AmneziaWG。用户启用了 AmneziaVPN，且其应用获取 Mihomo 格式时，订阅中会包含其 AmneziaWG 服务器。Mihomo 应用没有设备身份，因此同一用户的所有 Mihomo 应用会共用每个协议配置的一个密钥；密钥会在首次获取时生成，并在设备上限中计为一个订阅设备。请参阅[订阅](subscriptions.md)。
+基于 mihomo 内核的应用也可以使用 AmneziaWG。用户启用了 AmneziaVPN，且其应用获取 Mihomo 格式时，订阅中会包含其 AmneziaWG 服务器。Mihomo 应用没有设备身份，因此同一用户的所有 Mihomo 应用会共用每个协议配置的一个密钥；密钥会在首次获取时生成，并在设备上限中计为一个订阅设备。节点有 [IPv6 入口](nodes.md#ipv6-入口)时，Mihomo 订阅还会为每个 AmneziaWG 服务器附上一个 IPv6 代理，紧跟在它后面；文件和密钥保持不变。请参阅[订阅](subscriptions.md)。

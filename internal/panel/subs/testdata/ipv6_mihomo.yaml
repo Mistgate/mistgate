@@ -1,0 +1,45 @@
+proxies:
+  - name: "\U0001F1E9\U0001F1EA DE · Hysteria2 premium"
+    type: hysteria2
+    server: "de1.example.com"
+    port: 4443
+    ports: "20000-30000"
+    hop-interval: "30"
+    password: "<secret>"
+    obfs: salamander
+    obfs-password: "golden-obfs-password"
+    sni: "de1.example.com"
+    skip-cert-verify: false
+    alpn: [h3]
+  - name: "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · IPv6"
+    type: hysteria2
+    server: "2001:db8::5"
+    port: 4443
+    ports: "20000-30000"
+    hop-interval: "30"
+    password: "<secret>"
+    obfs: salamander
+    obfs-password: "golden-obfs-password"
+    sni: "de1.example.com"
+    skip-cert-verify: false
+    alpn: [h3]
+  - name: "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · via FI"
+    type: hysteria2
+    server: "fi1.example.com"
+    port: 8443
+    password: "<secret>"
+    obfs: salamander
+    obfs-password: "golden-obfs-password"
+    sni: "de1.example.com"
+    skip-cert-verify: false
+    alpn: [h3]
+proxy-groups:
+  - name: "Example VPN"
+    type: select
+    proxies:
+      - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium"
+      - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · IPv6"
+      - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · via FI"
+      - "DIRECT"
+rules:
+  - "MATCH,Example VPN"

@@ -79,21 +79,23 @@ type AccessNode struct {
 	State                                              string // pending | active | retired
 	LastSeenAt                                         time.Time
 	AgentCaps                                          []string
+	// IPv6Entry is the node's IPv6 entry (nodes.ipv6_entry): the address of its "· IPv6" server, "" = off.
+	IPv6Entry string
 }
 
 const accNodeCols = `n.id AS node_id, n.name AS node_name, n.address AS node_address, n.country_code AS node_country_code,
 	n.location AS node_location, n.provider AS node_provider, n.bandwidth_mbps AS node_bandwidth_mbps, n.state AS node_state,
-	n.last_seen_at AS node_last_seen_at, n.agent_caps AS node_agent_caps`
+	n.last_seen_at AS node_last_seen_at, n.agent_caps AS node_agent_caps, n.ipv6_entry AS node_ipv6_entry`
 
 func scanAccessNode(r rowScanner) (AccessNode, error) {
 	var n AccessNode
-	var id, name, address, country, location, provider, state, caps sql.NullString
+	var id, name, address, country, location, provider, state, caps, entry sql.NullString
 	var bandwidth sql.NullInt64
 	var seen int64
-	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state, &seen, &caps)
+	err := r.Scan(&id, &name, &address, &country, &location, &provider, &bandwidth, &state, &seen, &caps, &entry)
 	n.ID, n.Name, n.Address, n.CountryCode = id.String, name.String, address.String, country.String
 	n.Location, n.Provider, n.BandwidthMbps, n.State = location.String, provider.String, int(bandwidth.Int64), state.String
-	n.LastSeenAt = fleetTime(seen)
+	n.LastSeenAt, n.IPv6Entry = fleetTime(seen), entry.String
 	if caps.String != "" {
 		n.AgentCaps = strings.Fields(caps.String)
 	}

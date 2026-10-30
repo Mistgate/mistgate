@@ -320,6 +320,9 @@ type world struct {
 	checkPortsReq     []*adminv1.CheckPortsRequest
 	ipv6Reqs          []*adminv1.CheckIpv6Request
 	ipv6Err           error // CheckIpv6 answers with this
+	ipv6Node          map[string]*adminv1.NodeIpv6
+	ipv6Updates       []*adminv1.UpdateIpv6EntryRequest
+	ipv6UpdateCode    string // UpdateIpv6Entry answers with this error_code
 	mu                sync.Mutex
 	log               []callRec
 	fixReqs           []*adminv1.ApplyFixRequest
@@ -513,6 +516,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 		Node: &adminv1.Node{
 			Id: r.Msg.GetNodeId(), Name: name, Address: canaryAddr, CountryCode: "DE", Status: w.nodeStatuses[r.Msg.GetNodeId()],
 			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: true,
+			Ipv6: w.ipv6Of(r.Msg.GetNodeId()),
 		},
 		Metrics: &adminv1.NodeMetrics{CpuPct: 12, Load1: 0.5, RamUsedBytes: 1 << 30, RamTotalBytes: 2 << 30},
 		Facts:   &adminv1.NodeFacts{Hostname: "de1.example.com", Os: "linux"},
@@ -554,6 +558,31 @@ func (w *world) CheckIpv6(_ context.Context, r *connect.Request[adminv1.CheckIpv
 	}
 	return connect.NewResponse(&adminv1.CheckIpv6Response{Address: canaryAddr6, Passed: true, Sender: "nl1", CheckedUnix: 1790842000,
 		Verdicts: []*adminv1.Ipv6PortVerdict{{Network: "tcp", Port: 443, Verdict: "ours"}, {Network: "udp", Port: 8443, Verdict: "ok"}}}), nil
+}
+
+func (w *world) ipv6Of(id string) *adminv1.NodeIpv6 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.ipv6Node[id]
+}
+
+func (w *world) UpdateIpv6Entry(_ context.Context, r *connect.Request[adminv1.UpdateIpv6EntryRequest]) (*connect.Response[adminv1.UpdateIpv6EntryResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.ipv6Updates = append(w.ipv6Updates, r.Msg)
+	x := w.ipv6Node[r.Msg.GetNodeId()]
+	if x == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
+	}
+	if w.ipv6UpdateCode != "" {
+		return connect.NewResponse(&adminv1.UpdateIpv6EntryResponse{ErrorCode: w.ipv6UpdateCode, Node: &adminv1.Node{Id: r.Msg.GetNodeId(), Ipv6: x}}), nil
+	}
+	if r.Msg.GetAction() == adminv1.Ipv6EntryAction_IPV6_ENTRY_ACTION_ENABLE {
+		x.Entry = canaryAddr6
+	} else {
+		x.Entry = ""
+	}
+	return connect.NewResponse(&adminv1.UpdateIpv6EntryResponse{Node: &adminv1.Node{Id: r.Msg.GetNodeId(), Ipv6: x}}), nil
 }
 
 func (w *world) GetWarp(_ context.Context, r *connect.Request[adminv1.GetWarpRequest]) (*connect.Response[adminv1.GetWarpResponse], error) {

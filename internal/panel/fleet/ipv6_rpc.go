@@ -98,23 +98,11 @@ func (s nodeService) CheckIpv6(ctx context.Context, req *connect.Request[adminv1
 	case err != nil:
 		return nil, internalErr(f.log.Error, "check the node's IPv6 address", err)
 	}
-	names, err := f.nodeNames(ctx)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "check the node's IPv6 address", err)
+	// kept with the node: UpdateIpv6Entry takes a passing one for ten minutes, and the node's card shows when and by whom
+	if err := f.st.RecordIPv6Check(ctx, n.ID, chk); err != nil && !errors.Is(err, store.ErrNotFound) {
+		return nil, internalErr(f.log.Error, "keep the check of the node's IPv6 address", err)
 	}
-	return connect.NewResponse(ipv6CheckMsg(names, chk)), nil
-}
-
-// ipv6SenderName is the sender of a check as the admin reads it: a node's name, "panel" or "globalping".
-func ipv6SenderName(names map[string]string, by string) string {
-	switch by {
-	case "", store.IPv6ByPanel, store.IPv6ByGlobalping:
-		return by
-	}
-	if name := names[by]; name != "" {
-		return name
-	}
-	return "unknown"
+	return connect.NewResponse(ipv6CheckMsg(chk)), nil
 }
 
 func ipv6VerdictMsgs(v []store.IPv6Verdict) []*adminv1.Ipv6PortVerdict {
@@ -125,7 +113,7 @@ func ipv6VerdictMsgs(v []store.IPv6Verdict) []*adminv1.Ipv6PortVerdict {
 	return out
 }
 
-func ipv6CheckMsg(names map[string]string, c store.IPv6Check) *adminv1.CheckIpv6Response {
+func ipv6CheckMsg(c store.IPv6Check) *adminv1.CheckIpv6Response {
 	return &adminv1.CheckIpv6Response{Address: c.Addr, Passed: c.Pass, ErrorCode: c.Code, Verdicts: ipv6VerdictMsgs(c.Verdicts),
-		Sender: ipv6SenderName(names, c.By), CheckedUnix: c.At}
+		Sender: c.Sender, CheckedUnix: c.At}
 }
