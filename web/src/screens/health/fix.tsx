@@ -176,7 +176,7 @@ function FixDialog({ dlg, onClose, onConfirm }: { dlg: Dialog | null; onClose: (
           ) : (
             <>
               {sentence && <p className="text-sm leading-normal text-pretty">{sentence}</p>}
-              {plan.disruptive ? <Notice>{consequence}</Notice> : <p className="text-xs text-muted">{t("hl.fix.safe")}</p>}
+              {plan.disruptive ? <Notice>{consequence}</Notice> : <p className="text-xs text-muted">{t(d.target.fixId === "enable_security_updates" ? "hl.fix.securityUpdates" : "hl.fix.safe")}</p>}
               {plan.detail && sentence !== plan.detail && (
                 <details className="group text-xs">
                   <summary className="flex w-fit cursor-pointer list-none items-center gap-1 font-bold text-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden">

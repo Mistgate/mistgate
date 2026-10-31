@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	UnitName       = "mistgate-security-updates"
+	StatusFileName = "security-updates.json"
+
 	// JobTimeout bounds the complete background task.
 	JobTimeout = 20 * time.Minute
 	// LockWait bounds the initial wait for a package manager already using dpkg.

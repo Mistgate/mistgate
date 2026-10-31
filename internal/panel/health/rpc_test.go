@@ -430,6 +430,42 @@ func TestRefreshUnitPlanIsDisruptive(t *testing.T) {
 	}
 }
 
+func TestEnableSecurityUpdatesFixPlanAndApply(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.report("de1", false, res("security_updates", dWarn, "enable_security_updates", "off", "apt-daily.timer disabled"))
+	view, err := (rpc{e.s}).GetDoctor(e.ctx, req(&adminv1.GetDoctorRequest{NodeId: "de1"}))
+	if err != nil || len(view.Msg.Nodes) != 1 || len(view.Msg.Nodes[0].Items) != 1 || view.Msg.Nodes[0].Items[0].FixId != "enable_security_updates" {
+		t.Fatalf("security updates fix offer = %+v, %v", view, err)
+	}
+
+	params := map[string]string{"install": "1", "conf": "APT::Periodic::Unattended-Upgrade", "timers": "apt-daily.timer", "unmask": ""}
+	e.fl.fix = func(c fixCall) (*agentv1.CommandResult, error) {
+		if c.fix != "enable_security_updates" {
+			t.Fatalf("fix id = %q", c.fix)
+		}
+		if c.dry {
+			return &agentv1.CommandResult{Ok: true, Detail: "would enable unattended security updates", Params: params}, nil
+		}
+		e.s.DoctorReport(e.ctx, c.node, &agentv1.DoctorReport{Partial: true, Results: []*agentv1.DoctorResult{
+			res("security_updates", dWarn, "", "reason", "task is running"),
+		}})
+		return &agentv1.CommandResult{Ok: true, Affected: 1, Detail: "security updates enablement started"}, nil
+	}
+	r := rpc{e.s}
+	plan, err := r.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: "de1", FixId: "enable_security_updates", DryRun: true}))
+	if err != nil || plan.Msg.Plan == nil || plan.Msg.Plan.FixId != "enable_security_updates" ||
+		plan.Msg.Plan.TitleKey != "health.fix.enable_security_updates.plan" || plan.Msg.Plan.Disruptive ||
+		plan.Msg.Plan.Params["install"] != "1" || plan.Msg.Plan.Params["timers"] != "apt-daily.timer" {
+		t.Fatalf("security updates plan = %+v, %v", plan, err)
+	}
+	done, err := r.ApplyFix(e.ctx, req(&adminv1.ApplyFixRequest{NodeId: "de1", FixId: "enable_security_updates", PlanId: plan.Msg.PlanId}))
+	if err != nil || !done.Msg.Applied || done.Msg.Affected != 1 || len(e.fl.fixCalls) != 2 ||
+		e.fl.fixCalls[1].dry || e.fl.fixCalls[1].fix != "enable_security_updates" {
+		t.Fatalf("security updates apply = %+v, calls=%+v, err=%v", done, e.fl.fixCalls, err)
+	}
+}
+
 // A plan the node answers with "nothing to do" means the warning behind it is stale: the panel asks for a fresh report
 // so the alert does not wait for the next periodic run (the node re-checks by itself only after a real fix).
 func TestNoopPlanRerunsTheDoctor(t *testing.T) {

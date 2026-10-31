@@ -56,6 +56,7 @@ func (a *Agent) doctorEnv() doctor.Env {
 	e.UnitRefreshBusy = a.cfg.UnitRefreshBusy
 	e.UnitRefreshReserve = a.cfg.UnitRefreshReserve
 	e.LaunchUnitRefresh = a.cfg.UnitRefreshLauncher
+	e.LaunchSecurityUpdates = a.cfg.SecurityUpdatesLauncher
 	e.AgentStartedAt = a.startedAt
 	e.ApplyBaseline = a.host.ApplyBaseline
 	e.RestartInbound = a.doctorRestart

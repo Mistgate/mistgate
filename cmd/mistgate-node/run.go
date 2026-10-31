@@ -125,6 +125,7 @@ func newAgent(stateDir, linkURL string, log *slog.Logger) (*agent.Agent, error) 
 	cfg.UnitUnderSystemd, cfg.UnitSkipReason = refresh.underSystemd, refresh.reason
 	cfg.UnitRefreshBusy, cfg.UnitRefreshReserve, cfg.UnitRefreshLauncher = refresh.busy, refresh.reserve, refresh.launch
 	cfg.AwgPrepare = newAwgPrepare(stateDir)
+	cfg.SecurityUpdatesLauncher = newSecurityUpdatesLauncher(stateDir)
 	a, err := agent.New(cfg, engines, hostctl.New(log))
 	if err != nil {
 		return nil, err

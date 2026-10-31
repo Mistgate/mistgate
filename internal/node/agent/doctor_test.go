@@ -60,6 +60,20 @@ func resultIDs(r *pb.DoctorReport) string {
 	return strings.Join(ids, ",")
 }
 
+func TestDoctorEnvUsesConfiguredSecurityUpdatesLauncher(t *testing.T) {
+	launches := 0
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
+		c.SecurityUpdatesLauncher = func(context.Context) error { launches++; return nil }
+	}})
+	env := h.a.doctorEnv()
+	if env.LaunchSecurityUpdates == nil {
+		t.Fatal("doctor env has no security updates launcher")
+	}
+	if err := env.LaunchSecurityUpdates(context.Background()); err != nil || launches != 1 {
+		t.Fatalf("launcher call: err=%v launches=%d", err, launches)
+	}
+}
+
 func TestHelloAdvertisesTheDoctor(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	hello := <-h.panel.hellos

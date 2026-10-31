@@ -96,6 +96,8 @@ const samples: Record<string, Record<string, string>> = {
   "security_updates.on": {},
   "security_updates.not_installed": {},
   "security_updates.off": { off: 'APT::Periodic::Unattended-Upgrade "0"' },
+  "security_updates.enabling": {},
+  "security_updates.enable_failed": { reason: "the background task was interrupted before it finished" },
   "security_updates.not_apt": {},
   "security_updates.no_systemd": {},
   "skip.unsupported": { reason: "not a Linux host" },

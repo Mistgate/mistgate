@@ -4,7 +4,7 @@
 //
 //   - Read-only by default. A check only reads /proc, /sys, a few config files and runs read-only commands
 //     (systemctl list-*, nft list, timedatectl show, dmesg, journalctl -k). Only Apply changes anything, only
-//     for the seven compiled fix ids, never from a string the panel sends (params are validated), and a dry run
+//     for the eight compiled fix ids, never from a string the panel sends (params are validated), and a dry run
 //     changes nothing.
 //   - A check that cannot run here (container, no systemd, not root, not Linux) is SKIP with a reason, never
 //     a false OK.
@@ -77,13 +77,14 @@ const (
 
 // Fix ids (agent.proto "FIX IDS").
 const (
-	FixJournaldVacuum  = "journald_vacuum"
-	FixApplyBaseline   = "apply_baseline"
-	FixRestartInbound  = "restart_inbound"
-	FixSetResolver     = "set_resolver"
-	FixReconnectWarp   = "reconnect_warp"
-	FixRefreshUnit     = "refresh_unit"
-	FixAllowForwarding = "allow_forwarding"
+	FixJournaldVacuum        = "journald_vacuum"
+	FixApplyBaseline         = "apply_baseline"
+	FixRestartInbound        = "restart_inbound"
+	FixSetResolver           = "set_resolver"
+	FixReconnectWarp         = "reconnect_warp"
+	FixRefreshUnit           = "refresh_unit"
+	FixAllowForwarding       = "allow_forwarding"
+	FixEnableSecurityUpdates = "enable_security_updates"
 )
 
 // Result is one check's outcome; it becomes one DoctorResult.
@@ -152,18 +153,19 @@ func CheckIDs() []string {
 
 // FixIDs returns the fix ids.
 func FixIDs() []string {
-	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit, FixAllowForwarding}
+	return []string{FixJournaldVacuum, FixApplyBaseline, FixRestartInbound, FixSetResolver, FixReconnectWarp, FixRefreshUnit, FixAllowForwarding, FixEnableSecurityUpdates}
 }
 
 // fixChecks says which checks offer a fix; the agent re-runs them after the fix (agent.proto "ApplyFix"). A unit
 // refresh restarts the agent, so its next periodic report is the re-check; an immediate report would be stale.
 var fixChecks = map[string][]string{
-	FixJournaldVacuum:  {CheckJournaldSize, CheckDiskSpace},
-	FixApplyBaseline:   {CheckNetBaseline},
-	FixRestartInbound:  {CheckPortConflicts, CheckCertExpiry},
-	FixSetResolver:     {CheckResolver},
-	FixReconnectWarp:   {CheckWarpPath},
-	FixAllowForwarding: {CheckAwgBackend},
+	FixJournaldVacuum:        {CheckJournaldSize, CheckDiskSpace},
+	FixApplyBaseline:         {CheckNetBaseline},
+	FixRestartInbound:        {CheckPortConflicts, CheckCertExpiry},
+	FixSetResolver:           {CheckResolver},
+	FixReconnectWarp:         {CheckWarpPath},
+	FixAllowForwarding:       {CheckAwgBackend},
+	FixEnableSecurityUpdates: {CheckSecurityUpdates},
 }
 
 // RecheckIDs returns the checks to re-run after a fix, nil for an unknown fix id.

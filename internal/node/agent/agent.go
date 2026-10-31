@@ -86,6 +86,9 @@ type Config struct {
 	UnitRefreshBusy     func(context.Context) error
 	UnitRefreshReserve  func(context.Context) (release func(started bool), err error)
 	UnitRefreshLauncher func(context.Context, func()) error
+	// SecurityUpdatesLauncher starts the bounded apt configuration job in its own transient root systemd unit.
+	// Nil disables the fix on builds or hosts that cannot launch it.
+	SecurityUpdatesLauncher func(context.Context) error
 	// AwgPrepare builds the AmneziaWG kernel module on request (internal/node/awgprep). Nil = this agent does not list
 	// "awg-prepare/1", and the admin UI keeps showing the manual command.
 	AwgPrepare *awgprep.Controller

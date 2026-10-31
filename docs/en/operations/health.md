@@ -150,7 +150,7 @@ Each item has one of four states: **OK**, **Attention** (a warning), **Problem**
 | AmneziaWG backend (`awg_backend`) | Which backend runs AmneziaWG: the kernel module or userspace. Skipped without an AmneziaWG profile. | The host firewall drops forwarded traffic (often Docker) | No working backend: no `/dev/net/tun`, an outdated service file, or no module in kernel mode | Refresh the service when `unit_outdated` is reported and the agent offers the fix |
 | WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it, or the tunnel is up but its latest check failed | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Check WARP / reconnect if down, when the tunnel is down or its latest check failed |
 | Unit generation (`unit_generation`) | Whether the systemd unit running the agent matches this build. Skipped when the agent was started by hand. | The unit is older than this build | None | Refresh the service; the agent restarts and connections can drop for a few seconds |
-| Security updates (`security_updates`) | On Debian and Ubuntu, checks whether unattended-upgrades is installed, whether the effective APT::Periodic settings enable package-list updates and unattended upgrades, and whether both apt-daily timers are enabled. It only reads; it never runs an upgrade. On Debian, the package's default origin pattern can include stable point releases too. | The package is missing or a setting/timer is off | None | No automatic fix; the Doctor shows a manual command |
+| Security updates (`security_updates`) | On Debian and Ubuntu, checks whether unattended-upgrades is installed, whether the effective APT::Periodic settings enable package-list updates and unattended upgrades, and whether both apt-daily timers are enabled. It only reads; it never runs an upgrade. On Debian, the package's default origin pattern can include stable point releases too. | The package is missing or a setting/timer is off | None | Turn on security updates, with owner confirmation |
 
 A node without IPv6 that runs WARP is fine: WARP uses its IPv4 endpoint, and the admin shows the IPv6 item as OK.
 
@@ -158,7 +158,7 @@ A warning or problem opens an alert (see "Kinds of alerts" below). The certifica
 
 ### Fixes
 
-There are exactly seven fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). None of them installs packages or deletes data.
+There are exactly eight fixes. They are compiled into the agent: the panel sends only the fix id, and the agent checks the parameters (a profile must be one the node runs). `enable_security_updates` is the only fix that can install a package, and it requires owner confirmation. No fix deletes data.
 
 | Button | What it does | Offered by |
 |---|---|---|
@@ -169,6 +169,11 @@ There are exactly seven fixes. They are compiled into the agent: the panel sends
 | Check WARP / reconnect if down | Runs the WARP checks again at once. Only when the tunnel is down, or this check takes it to its failure threshold, it rebuilds the configured tunnel and its routes with the same account; otherwise nothing changes. During a reconnect, profiles using WARP may briefly lose traffic. If the tunnel recovered before Apply, nothing is changed. | WARP exit |
 | Refresh the service | Runs the installed binary from a fixed transient systemd unit to write its compiled unit template, reload systemd and restart the agent. The node identity and state stay in place; connections can drop for a few seconds. | Unit generation; AmneziaWG backend when it reports `unit_outdated` |
 | Allow Mistgate forwarding | Adds tagged accepts at the start of each host `FORWARD` chain with policy `DROP`. They match only traffic that enters through a `mgawg*` tunnel (new connections from clients, except towards container bridges `docker*` and `br-*`), what leaves through `mgawg*` as part of a connection the client began (never a new connection towards a client; WARP-routed client traffic is covered the same way), and the DNAT flows to current Mistgate relay targets, both directions. Other traffic stays under the host firewall. The agent reasserts the rules during its sweep after firewall reloads and removes them on node retirement. | AmneziaWG backend when forwarded traffic is dropped |
+| Turn on security updates | Runs the compiled `host enable-security-updates` helper in a separate transient root systemd unit. It installs unattended-upgrades from the node's existing apt sources if missing, writes only disabled APT::Periodic settings to `/etc/apt/apt.conf.d/99mistgate-security-updates`, and unmasks/enables the apt-daily timers. It never runs `apt-get upgrade` or `unattended-upgrade`, reboots, changes `Automatic-Reboot` or edits `50unattended-upgrades`. It can take up to 20 minutes while another apt process holds the lock. | Security updates |
+
+To undo this fix by hand, remove `/etc/apt/apt.conf.d/99mistgate-security-updates`. For each timer that was disabled before the fix, run `systemctl disable --now <timer>` (`apt-daily.timer` or `apt-daily-upgrade.timer`). If this fix installed unattended-upgrades, remove it with `apt-get remove unattended-upgrades`. The task's journal (`journalctl -u mistgate-security-updates`) records what it did.
+
+The job runs on after Apply: the re-check shows **Turning automatic security updates on…** while it works, and the result comes with the next scheduled doctor run (within 10 minutes) or with **Run again**. If the job fails, the item says why and offers the fix again.
 
 A fix always takes two steps:
 

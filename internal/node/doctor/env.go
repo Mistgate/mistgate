@@ -84,6 +84,9 @@ type Env struct {
 	// LaunchUnitRefresh queues the fixed transient refresh job. beforeLaunch sends the started result after systemd-run
 	// accepts the job and before the helper's ack file lets it restart this service.
 	LaunchUnitRefresh func(context.Context, func()) error
+	// LaunchSecurityUpdates starts the fixed transient root job that installs and enables unattended security updates.
+	// Nil means this agent cannot launch the job outside its service sandbox.
+	LaunchSecurityUpdates func(context.Context) error
 	// Warp is the WARP manager's view (warp_path check); nil = this build has no WARP manager.
 	Warp func(ctx context.Context) WarpInfo
 	// HostPath lists clashes of the host with the tunnel path (a routing table or rule preference another tool uses, a

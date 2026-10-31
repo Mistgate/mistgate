@@ -110,6 +110,8 @@ const (
 	CodeSecurityUpdatesOff          = "security_updates.off"
 	CodeSecurityUpdatesNotAPT       = "security_updates.not_apt"
 	CodeSecurityUpdatesNoSystemd    = "security_updates.no_systemd"
+	CodeSecurityUpdatesEnabling     = "security_updates.enabling"
+	CodeSecurityUpdatesEnableFailed = "security_updates.enable_failed"
 	// Any check: why it did not run. skip.unsupported has reason (English, from the host probe).
 	CodeSkipUnsupported = "skip.unsupported"
 	CodeSkipTimeout     = "skip.timeout"
@@ -135,5 +137,6 @@ var Codes = []string{
 	CodeWarpNoBackend, CodeWarpPausedUsed, CodeWarpPaused, CodeWarpDown, CodeWarpUnknown,
 	CodeUnitCurrent, CodeUnitOutdated, CodeUnitManual, CodeUnitOtherUnit, CodeUnitUnknown, CodeUnitRefreshFailed,
 	CodeSecurityUpdatesOn, CodeSecurityUpdatesNotInstalled, CodeSecurityUpdatesOff, CodeSecurityUpdatesNotAPT, CodeSecurityUpdatesNoSystemd,
+	CodeSecurityUpdatesEnabling, CodeSecurityUpdatesEnableFailed,
 	CodeSkipUnsupported, CodeSkipTimeout, CodeSkipInternal, CodeSkipUnknown,
 }

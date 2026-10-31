@@ -195,7 +195,8 @@ package mistgate.agent.v1;
 //                       table_in_use | rule_pref_in_use | interface_in_use
 //     unit_generation   the generation of the hardened systemd unit running this agent; manual runs SKIP. Params: unit_gen, current
 //     security_updates   unattended-upgrades, effective APT::Periodic settings and apt-daily timers on Debian/Ubuntu (WARN only; never FAIL)
-//   FIX IDS (stable; all avoid data loss and package installation). allow_forwarding is the only fix that edits
+//   FIX IDS (stable; all avoid data loss; only enable_security_updates installs a package, unattended-upgrades, after
+//   owner confirmation). allow_forwarding is the only fix that edits
 //   a host-owned FORWARD chain: after owner confirmation, it inserts tagged ACCEPT rules only for new traffic from
 //   Mistgate AWG tunnels (not towards container bridges), replies to client-started connections, and current relay
 //   DNAT targets in both directions. The agent reasserts them during its sweep and Cleanup removes only
@@ -213,6 +214,12 @@ package mistgate.agent.v1;
 //                       from a systemd service. The CommandResult reaches the panel before that agent restart.
 //     allow_forwarding  insert Mistgate-only tagged accepts into host FORWARD chains with policy DROP; reasserted by
 //                       the agent sweep and removed by Cleanup. Offered by awg_backend for forward_drop.
+//     enable_security_updates  start "mistgate-node host enable-security-updates" in the fixed transient root unit
+//                       mistgate-security-updates (systemd-run, no shell) and answer started=1 at once: it installs
+//                       unattended-upgrades if missing, sets the APT::Periodic switches that are off in
+//                       /etc/apt/apt.conf.d/99mistgate-security-updates and unmasks/enables the apt-daily timers; it never
+//                       upgrades, runs unattended-upgrade or reboots, and Cleanup leaves it all on. The check shows
+//                       enabling while the unit runs. Offered by security_updates.
 //
 // UPDATE (agent self-update; additive, protocol api_version stays 1)
 //   The panel hands the agent a release manifest signed by the owner's release key; the agent verifies it
