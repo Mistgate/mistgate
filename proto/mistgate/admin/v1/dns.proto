@@ -160,6 +160,9 @@ message DnsPreset {
   DnsCategory category = 12;
   // Computed: the country of a regional preset (ISO 3166-1 alpha-2), empty otherwise.
   string country = 13;
+  // The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
+  // Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
+  bool block_ads = 14;
 }
 
 message ListDnsPresetsRequest {}
@@ -185,6 +188,9 @@ message CreateDnsPresetRequest {
   bool split_direct = 6;
   // UNSPECIFIED = plain.
   DnsTransport preferred_transport = 7;
+  // The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
+  // Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
+  bool block_ads = 8;
 }
 
 message CreateDnsPresetResponse {
@@ -205,6 +211,10 @@ message UpdateDnsPresetRequest {
   bool split_direct = 7;
   // UNSPECIFIED keeps the stored value (clients that predate this field).
   DnsTransport preferred_transport = 8;
+  // The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
+  // Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
+  // Absent keeps the stored value (clients that predate this field).
+  optional bool block_ads = 9;
 }
 
 message UpdateDnsPresetResponse {

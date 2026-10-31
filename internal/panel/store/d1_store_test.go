@@ -1469,6 +1469,22 @@ func TestD1RewrittenDNSAndSettingsMethods(t *testing.T) {
 			t.Fatalf("group DNS reference = %v, %v", dns, err)
 		}
 	})
+	t.Run("DNSBlockAdsRoundTrip", func(t *testing.T) {
+		st := openD1Store(t)
+		id := "dns_block_ads"
+		if err := st.DNS().Create(ctx, DNSPreset{ID: id, Name: id, ServersJSON: `[]`, SplitJSON: `[]`, Transport: "plain", BlockAds: true, CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+		if p, err := st.DNS().Get(ctx, id); err != nil || !p.BlockAds {
+			t.Fatalf("after create: %+v %v", p, err)
+		}
+		if err := st.DNS().Update(ctx, DNSPreset{ID: id, Name: id, ServersJSON: `[]`, SplitJSON: `[]`, Transport: "plain", UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+		if p, err := st.DNS().Get(ctx, id); err != nil || p.BlockAds {
+			t.Fatalf("after update: %+v %v", p, err)
+		}
+	})
 	t.Run("SetNodeOptions", func(t *testing.T) {
 		st := openD1Store(t)
 		nodeID := "nod_options"

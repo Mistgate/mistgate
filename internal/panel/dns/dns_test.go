@@ -256,6 +256,55 @@ func TestCRUD(t *testing.T) {
 	}
 }
 
+// block_ads: Create stores it, Update without the field keeps it (a client that predates it), Update with the field sets it
+// either way, and the stored row decodes back into Preset.
+func TestBlockAds(t *testing.T) {
+	e := newEnv(t)
+	ctx := e.ctx
+	c, err := e.s.CreateDnsPreset(ctx, connect.NewRequest(&adminv1.CreateDnsPresetRequest{Name: "Ads", Servers: []*adminv1.DnsServer{plain("9.9.9.9")}, BlockAds: true}))
+	if err != nil || !c.Msg.Preset.BlockAds {
+		t.Fatalf("create: %v %v", c, err)
+	}
+	id := c.Msg.Preset.Id
+	update := func(block *bool) *adminv1.DnsPreset {
+		t.Helper()
+		u, err := e.s.UpdateDnsPreset(ctx, connect.NewRequest(&adminv1.UpdateDnsPresetRequest{Id: id, Name: "Ads", Servers: []*adminv1.DnsServer{plain("9.9.9.9")}, BlockAds: block}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u.Msg.Preset
+	}
+	if !update(nil).BlockAds {
+		t.Error("update without the field dropped block_ads")
+	}
+	f, tr := false, true
+	if update(&f).BlockAds {
+		t.Error("update with false kept block_ads")
+	}
+	if update(nil).BlockAds {
+		t.Error("update without the field turned block_ads on")
+	}
+	if !update(&tr).BlockAds || !e.list()[id].BlockAds {
+		t.Error("update with true did not set block_ads")
+	}
+	row, err := e.st.DNS().Get(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := fromRow(row)
+	if err != nil || !p.BlockAds {
+		t.Fatalf("fromRow: %+v %v", p, err)
+	}
+	if r, err := toRow(p); err != nil || !r.BlockAds {
+		t.Fatalf("toRow: %+v %v", r, err)
+	}
+	for id, b := range e.list() {
+		if b.Builtin && b.BlockAds {
+			t.Errorf("built-in %s has block_ads on", id)
+		}
+	}
+}
+
 func TestValidation(t *testing.T) {
 	ok := map[Server]string{
 		{Kind: KindPlain, Address: "77.88.8.8"}:                                "77.88.8.8",

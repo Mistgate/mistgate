@@ -31,7 +31,7 @@ const data: DnsData = { presets: [], providers: [], clientSupport: [] };
 const server = { kind: DnsServerKind.PLAIN, address: "223.5.5.5", providerVariant: "" };
 const presetWith = (split: Preset["split"]): Preset => ({
   id: "dns_custom_cn", name: "China split", description: "", builtin: false, servers: [{ ...server, address: "1.1.1.1" }], split,
-  ipv4Only: false, userCount: 0, isDefault: false, splitDirect: true, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGIONAL, country: "CN",
+  ipv4Only: false, userCount: 0, isDefault: false, splitDirect: true, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGIONAL, country: "CN", blockAds: false,
 });
 
 function Editor({ preset }: { preset: Preset }) {

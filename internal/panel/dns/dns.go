@@ -40,6 +40,9 @@ type Preset struct {
 	// SplitDirect: the split rules' domains bypass the VPN (Happ can only send a split resolver's domains
 	// direct). Off = clients that cannot keep the split proxied ignore it.
 	SplitDirect bool
+	// BlockAds: the apps drop the domains of the category-ads-all list themselves, before any other rule
+	// (Mihomo, Xray, sing-box, Happ; AmneziaWG keys and the link list have no rules).
+	BlockAds bool
 	// Transport is the preferred transport (plain, dot, doh); see Resolve. Never empty for a stored preset.
 	Transport Kind
 }
@@ -88,7 +91,7 @@ func (s *Service) Handler() (string, http.Handler) {
 }
 
 func fromRow(r store.DNSPreset) (Preset, error) {
-	p := Preset{ID: r.ID, Name: r.Name, Description: r.Description, Builtin: r.Builtin, IPv4Only: r.IPv4Only, SplitDirect: r.SplitDirect, Transport: Kind(r.Transport)}
+	p := Preset{ID: r.ID, Name: r.Name, Description: r.Description, Builtin: r.Builtin, IPv4Only: r.IPv4Only, SplitDirect: r.SplitDirect, BlockAds: r.BlockAds, Transport: Kind(r.Transport)}
 	if p.Transport == "" {
 		p.Transport = KindPlain
 	}
@@ -119,7 +122,7 @@ func toRow(p Preset) (store.DNSPreset, error) {
 	if p.Transport == "" {
 		p.Transport = KindPlain
 	}
-	return store.DNSPreset{ID: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, IPv4Only: p.IPv4Only, SplitDirect: p.SplitDirect,
+	return store.DNSPreset{ID: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, IPv4Only: p.IPv4Only, SplitDirect: p.SplitDirect, BlockAds: p.BlockAds,
 		Transport: string(p.Transport), ServersJSON: string(sv), SplitJSON: string(sp)}, nil
 }
 
@@ -451,7 +454,7 @@ func splitFromProto(in []*adminv1.DnsSplitRule) []SplitRule {
 
 func presetProto(p Preset, users int, isDefault bool) *adminv1.DnsPreset {
 	out := &adminv1.DnsPreset{
-		Id: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, Ipv4Only: p.IPv4Only, SplitDirect: p.SplitDirect,
+		Id: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, Ipv4Only: p.IPv4Only, SplitDirect: p.SplitDirect, BlockAds: p.BlockAds,
 		UserCount: uint32(users), IsDefault: isDefault, PreferredTransport: transportToProto(p.Transport), Category: categoryToProto(CategoryOf(p)), Country: CountryOf(p),
 	}
 	for _, s := range p.Servers {
@@ -586,7 +589,7 @@ func (s *Service) CreateDnsPreset(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, s.fail("create preset", err)
 	}
-	row, err := toRow(Preset{ID: store.NewID("dns_"), Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, Transport: transport})
+	row, err := toRow(Preset{ID: store.NewID("dns_"), Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, BlockAds: m.BlockAds, Transport: transport})
 	if err != nil {
 		return nil, s.internal("encode preset", err)
 	}
@@ -613,17 +616,23 @@ func (s *Service) UpdateDnsPreset(ctx context.Context, req *connect.Request[admi
 		return nil, s.fail("update preset", err)
 	}
 	transport := transportFromProto(m.PreferredTransport)
-	if transport == "" { // a client that predates the field: keep what is stored
+	blockAds := m.BlockAds != nil && *m.BlockAds
+	if transport == "" || m.BlockAds == nil { // a client that predates a field: keep what is stored
 		old, err := s.st.DNS().Get(ctx, m.Id)
 		if err != nil {
 			return nil, s.fail("update preset", err)
 		}
-		transport = Kind(old.Transport)
+		if transport == "" {
+			transport = Kind(old.Transport)
+		}
+		if m.BlockAds == nil {
+			blockAds = old.BlockAds
+		}
 	}
 	if transport, err = NormalizeTransport(transport); err != nil {
 		return nil, s.fail("update preset", err)
 	}
-	row, err := toRow(Preset{ID: m.Id, Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, Transport: transport})
+	row, err := toRow(Preset{ID: m.Id, Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, BlockAds: blockAds, Transport: transport})
 	if err != nil {
 		return nil, s.internal("encode preset", err)
 	}

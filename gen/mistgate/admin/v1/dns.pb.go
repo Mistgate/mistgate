@@ -678,7 +678,10 @@ type DnsPreset struct {
 	// Computed, see DnsCategory.
 	Category DnsCategory `protobuf:"varint,12,opt,name=category,proto3,enum=mistgate.admin.v1.DnsCategory" json:"category,omitempty"`
 	// Computed: the country of a regional preset (ISO 3166-1 alpha-2), empty otherwise.
-	Country       string `protobuf:"bytes,13,opt,name=country,proto3" json:"country,omitempty"`
+	Country string `protobuf:"bytes,13,opt,name=country,proto3" json:"country,omitempty"`
+	// The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
+	// Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
+	BlockAds      bool `protobuf:"varint,14,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -804,6 +807,13 @@ func (x *DnsPreset) GetCountry() string {
 	return ""
 }
 
+func (x *DnsPreset) GetBlockAds() bool {
+	if x != nil {
+		return x.BlockAds
+	}
+	return false
+}
+
 type ListDnsPresetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -916,8 +926,11 @@ type CreateDnsPresetRequest struct {
 	SplitDirect bool `protobuf:"varint,6,opt,name=split_direct,json=splitDirect,proto3" json:"split_direct,omitempty"`
 	// UNSPECIFIED = plain.
 	PreferredTransport DnsTransport `protobuf:"varint,7,opt,name=preferred_transport,json=preferredTransport,proto3,enum=mistgate.admin.v1.DnsTransport" json:"preferred_transport,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
+	// Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
+	BlockAds      bool `protobuf:"varint,8,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateDnsPresetRequest) Reset() {
@@ -999,6 +1012,13 @@ func (x *CreateDnsPresetRequest) GetPreferredTransport() DnsTransport {
 	return DnsTransport_DNS_TRANSPORT_UNSPECIFIED
 }
 
+func (x *CreateDnsPresetRequest) GetBlockAds() bool {
+	if x != nil {
+		return x.BlockAds
+	}
+	return false
+}
+
 type CreateDnsPresetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Preset        *DnsPreset             `protobuf:"bytes,1,opt,name=preset,proto3" json:"preset,omitempty"`
@@ -1058,8 +1078,12 @@ type UpdateDnsPresetRequest struct {
 	SplitDirect bool `protobuf:"varint,7,opt,name=split_direct,json=splitDirect,proto3" json:"split_direct,omitempty"`
 	// UNSPECIFIED keeps the stored value (clients that predate this field).
 	PreferredTransport DnsTransport `protobuf:"varint,8,opt,name=preferred_transport,json=preferredTransport,proto3,enum=mistgate.admin.v1.DnsTransport" json:"preferred_transport,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
+	// Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
+	// Absent keeps the stored value (clients that predate this field).
+	BlockAds      *bool `protobuf:"varint,9,opt,name=block_ads,json=blockAds,proto3,oneof" json:"block_ads,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateDnsPresetRequest) Reset() {
@@ -1146,6 +1170,13 @@ func (x *UpdateDnsPresetRequest) GetPreferredTransport() DnsTransport {
 		return x.PreferredTransport
 	}
 	return DnsTransport_DNS_TRANSPORT_UNSPECIFIED
+}
+
+func (x *UpdateDnsPresetRequest) GetBlockAds() bool {
+	if x != nil && x.BlockAds != nil {
+		return *x.BlockAds
+	}
+	return false
 }
 
 type UpdateDnsPresetResponse struct {
@@ -1848,7 +1879,7 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\fDnsSplitRule\x12\x1a\n" +
 	"\bsuffixes\x18\x01 \x03(\tR\bsuffixes\x126\n" +
 	"\aservers\x18\x02 \x03(\v2\x1c.mistgate.admin.v1.DnsServerR\aservers\x12\x10\n" +
-	"\x03geo\x18\x03 \x03(\tR\x03geo\"\x80\x04\n" +
+	"\x03geo\x18\x03 \x03(\tR\x03geo\"\x9d\x04\n" +
 	"\tDnsPreset\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1865,12 +1896,13 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	" \x01(\bR\vsplitDirect\x12P\n" +
 	"\x13preferred_transport\x18\v \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12:\n" +
 	"\bcategory\x18\f \x01(\x0e2\x1e.mistgate.admin.v1.DnsCategoryR\bcategory\x12\x18\n" +
-	"\acountry\x18\r \x01(\tR\acountry\"\x17\n" +
+	"\acountry\x18\r \x01(\tR\acountry\x12\x1b\n" +
+	"\tblock_ads\x18\x0e \x01(\bR\bblockAds\"\x17\n" +
 	"\x15ListDnsPresetsRequest\"\xda\x01\n" +
 	"\x16ListDnsPresetsResponse\x126\n" +
 	"\apresets\x18\x01 \x03(\v2\x1c.mistgate.admin.v1.DnsPresetR\apresets\x12<\n" +
 	"\tproviders\x18\x02 \x03(\v2\x1e.mistgate.admin.v1.DnsProviderR\tproviders\x12J\n" +
-	"\x0eclient_support\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientDnsSupportR\rclientSupport\"\xcf\x02\n" +
+	"\x0eclient_support\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientDnsSupportR\rclientSupport\"\xec\x02\n" +
 	"\x16CreateDnsPresetRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x126\n" +
@@ -1878,9 +1910,10 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x05split\x18\x04 \x03(\v2\x1f.mistgate.admin.v1.DnsSplitRuleR\x05split\x12\x1b\n" +
 	"\tipv4_only\x18\x05 \x01(\bR\bipv4Only\x12!\n" +
 	"\fsplit_direct\x18\x06 \x01(\bR\vsplitDirect\x12P\n" +
-	"\x13preferred_transport\x18\a \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\"O\n" +
+	"\x13preferred_transport\x18\a \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12\x1b\n" +
+	"\tblock_ads\x18\b \x01(\bR\bblockAds\"O\n" +
 	"\x17CreateDnsPresetResponse\x124\n" +
-	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"\xdf\x02\n" +
+	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"\x8f\x03\n" +
 	"\x16UpdateDnsPresetRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1889,7 +1922,10 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x05split\x18\x05 \x03(\v2\x1f.mistgate.admin.v1.DnsSplitRuleR\x05split\x12\x1b\n" +
 	"\tipv4_only\x18\x06 \x01(\bR\bipv4Only\x12!\n" +
 	"\fsplit_direct\x18\a \x01(\bR\vsplitDirect\x12P\n" +
-	"\x13preferred_transport\x18\b \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\"O\n" +
+	"\x13preferred_transport\x18\b \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12 \n" +
+	"\tblock_ads\x18\t \x01(\bH\x00R\bblockAds\x88\x01\x01B\f\n" +
+	"\n" +
+	"_block_ads\"O\n" +
 	"\x17UpdateDnsPresetResponse\x124\n" +
 	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"(\n" +
 	"\x16DeleteDnsPresetRequest\x12\x0e\n" +
@@ -2063,6 +2099,7 @@ func file_mistgate_admin_v1_dns_proto_init() {
 	if File_mistgate_admin_v1_dns_proto != nil {
 		return
 	}
+	file_mistgate_admin_v1_dns_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
