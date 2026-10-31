@@ -55,6 +55,7 @@ import { UsersKit } from "./dev-kit-users";
 import { SubsKit } from "./dev-kit-subs";
 import { DecoyKit } from "./dev-kit-decoy";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
+import { Ipv6Kit } from "./dev-kit-ipv6";
 import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
@@ -285,8 +286,8 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|edge|node|health|users|subs|approvals: one kit alone, for its screenshots
-  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit }[
+  // ?only=dns|edge|node|health|users|subs|approvals|ipv6: one kit alone, for its screenshots
+  const only = { dns: DnsLinkKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit }[
     new URLSearchParams(location.search).get("only") ?? ""
   ];
   if (only) {
