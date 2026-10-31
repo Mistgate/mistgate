@@ -27,6 +27,7 @@ const (
 	familyPair  = "94.140.14.15, 94.140.15.16"
 	// The panel's own names of the nodes are unlike anything else in the page data, so that a leak is found by a plain search.
 	de1Name, nl1Name = "inner-de1", "inner-nl1"
+	nodeNotes        = "Internal billing account: team@example.com"
 )
 
 type dnsRig struct {
@@ -41,7 +42,7 @@ type dnsRig struct {
 func newDNSRig(t *testing.T, mut func(*subs.Config)) *dnsRig {
 	t.Helper()
 	m := newM3Rig(t)
-	m.st.W.Exec(`UPDATE node SET name = ?, country_code = 'DE', location = 'Frankfurt', bandwidth_mbps = 100 WHERE id = 'nod_1'`, de1Name)
+	m.st.W.Exec(`UPDATE node SET name = ?, notes = ?, country_code = 'DE', location = 'Frankfurt', bandwidth_mbps = 100 WHERE id = 'nod_1'`, de1Name, nodeNotes)
 	now := time.Now().Unix()
 	m.st.W.Exec(`UPDATE node SET last_seen_at = ? WHERE id = 'nod_1'`, now)
 	m.st.W.Exec(`INSERT INTO node_live (node_id, session, sample_at, rx_bps, tx_bps, users, live_json)
@@ -140,8 +141,8 @@ func TestServersOnThePage(t *testing.T) {
 	if d["server_count"] != float64(2) {
 		t.Errorf("server_count = %v", d["server_count"])
 	}
-	// No node name, address, or sample rate as a JSON value, and no private rate fields.
-	for _, leak := range []string{de1Name, nl1Name, "de1.example.com", "nl1.example.com", "85000000"} {
+	// No node name, operator notes, address, or sample rate as a JSON value, and no private rate fields.
+	for _, leak := range []string{de1Name, nl1Name, nodeNotes, "de1.example.com", "nl1.example.com", "85000000"} {
 		if jsonHasExactScalar(d, leak) {
 			t.Errorf("the page data holds the value %q", leak)
 		}

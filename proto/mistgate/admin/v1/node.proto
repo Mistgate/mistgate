@@ -128,6 +128,8 @@ message Node {
   // The connected or last-seen agent lists "user-rate-limit/1", so it applies the per-person speed limit
   // (User.speed_limit_bps). False: this node holds people to the smaller of their two limits per device instead.
   bool user_rate_limit_supported = 34;
+  // Operator notes for the admin list. Not included in user pages or subscription names.
+  string notes = 35;
 }
 
 enum AwgPrepareState {

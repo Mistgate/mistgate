@@ -242,7 +242,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now, health)
 	out := &adminv1.Node{
-		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address,
+		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address, Notes: n.Notes,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, AgentVersion: n.AgentVersion,
 		LastSeenUnix: fleetUnix(live.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
