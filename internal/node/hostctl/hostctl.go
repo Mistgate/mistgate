@@ -38,7 +38,8 @@ type Host interface {
 	// Cleanup removes everything the agent installed (nft tables with hops, SSH guard, UDP delivery checks and torrent queue, tagged UFW inbound rules
 	// and the UFW rules the SSH install tagged with ProvisionUFWTag, sysctl and journald drop-ins,
 	// the owner-approved tagged forwarding exceptions,
-	// and the resolver fix of the doctor: resolved drop-in, resolv.conf restored from its backup; the tunnel table
+	// and the resolver fix of the doctor: resolved drop-in, resolv.conf restored from its backup; the IPv6 addresses of
+	// ipv6-owned.json (never an address the host had); the tunnel table
 	// "mistgate_awg", the relay table "mistgate_relay" and every link named mgawg* or mgwarp). The WARP routing rules and routes are the WARP
 	// manager's (warp.Cleanup).
 	// Live sysctl values are not reverted (the previous values are not recorded).

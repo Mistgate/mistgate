@@ -68,6 +68,9 @@ type linuxHost struct {
 	// The relay table (relay_linux.go).
 	rly relayState
 
+	// The IPv6 addresses of the panel on the uplink (ipv6addr.go); SetStateDir tells it where its file lives.
+	v6 *ipv6Owner
+
 	// The confirmed doctor forwarding fix (forward_linux.go). Its desired state survives agent restarts and is reasserted
 	// by the normal sweep; rules themselves remain independently tagged in the firewall.
 	forwardStateFile string
@@ -105,6 +108,7 @@ func New(log *slog.Logger) Host {
 		sshdConfDir:  "/etc/ssh",
 		ufwConf:      defaultUFWConf,
 		links:        deleteOwnLinks,
+		v6:           newIPv6Owner(rtnetlinkV6{}, ""),
 
 		resolvedFile:   defaultResolvedFile,
 		resolvConfFile: defaultResolvConfFile,
@@ -114,6 +118,11 @@ func New(log *slog.Logger) Host {
 // SetStateDir stores the approved-forwarding marker beside the node's persistent state.
 func (h *linuxHost) SetStateDir(dir string) {
 	if dir != "" {
+		if h.v6 != nil {
+			h.v6.mu.Lock()
+			h.v6.dir = dir
+			h.v6.mu.Unlock()
+		}
 		h.forwardMu.Lock()
 		h.forwardStateFile = filepath.Join(dir, forwardStateFileName)
 		h.forwardMu.Unlock()
@@ -414,6 +423,9 @@ func (h *linuxHost) Cleanup(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 	errs = append(errs, h.undoResolver(ctx)) // the resolver fix, if one was ever applied
+	if h.v6 != nil {
+		errs = append(errs, h.v6.Cleanup(ctx)) // the IPv6 addresses the agent added, never the host's own
+	}
 	return errors.Join(errs...)
 }
 
