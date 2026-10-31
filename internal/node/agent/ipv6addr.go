@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/doctor"
@@ -20,17 +19,9 @@ import (
 // only to an agent that has it.
 const capIPv6Addr = "ipv6-addr/1"
 
-// readdedEvery is how seldom the journal hears that an address was put back (a manager that removes it on every
-// reconfigure would otherwise fill it).
-const readdedEvery = time.Hour
-
 // ipv6AddrState is what the worker remembers of the last sync.
 type ipv6AddrState struct {
-	key       string // "addr=state,..." of the last sync: a change of it is a reason for a doctor report
-	readdedAt time.Time
-	// noSettings is the empty settings of a new agent: until the saved state, a HelloAck or a desired state has replaced
-	// it, nothing is known about the addresses, and nothing is removed because of that.
-	noSettings *pb.NodeSettings
+	key string // "addr=state,..." of the last sync: a change of it is a reason for a doctor report
 }
 
 // ownedIPv6Host is the host's part of this feature, nil when the host cannot do it.
@@ -53,12 +44,22 @@ func wantedIPv6(st *pb.NodeSettings) []netip.Addr {
 // syncOwnedIPv6 makes the host hold the addresses of the settings in force, on the worker goroutine: after a desired state,
 // at the start from the saved one, and in every sweep (a network manager that took an address away gets it back within 30 s).
 // With no list and nothing owned it only reads a file.
+//
+// Settings that do not say ipv6_addresses_managed (a panel that does not know the field, or settings not received yet) say
+// nothing about the addresses: the host then neither adds nor removes any and only puts back what its file names. An
+// empty list removes the agent's addresses only when the panel says it is the truth.
 func (a *Agent) syncOwnedIPv6(ctx context.Context) {
 	h := a.ownedIPv6Host()
-	if h == nil || a.settings.Load() == a.v6.noSettings {
+	if h == nil {
 		return
 	}
-	res, err := h.SyncOwnedIPv6(ctx, wantedIPv6(a.settings.Load()))
+	var res hostctl.OwnedIPv6Result
+	var err error
+	if st := a.settings.Load(); st.GetIpv6AddressesManaged() {
+		res, err = h.SyncOwnedIPv6(ctx, wantedIPv6(st))
+	} else {
+		res, err = h.KeepOwnedIPv6(ctx)
+	}
 	if err != nil {
 		a.log.Warn("ipv6 addresses not fully synced", "err", err)
 	}
@@ -74,8 +75,7 @@ func (a *Agent) syncOwnedIPv6(ctx context.Context) {
 	sort.Strings(parts)
 	a.ownedV6.Store(&states)
 	key := strings.Join(parts, ",")
-	if len(res.Readded) > 0 && a.now().Sub(a.v6.readdedAt) >= readdedEvery {
-		a.v6.readdedAt = a.now()
+	if res.ReaddedEvent { // the host keeps the time of the last one, so a restart does not reset the hour
 		a.event(pb.Severity_SEVERITY_WARNING, "ipv6_readded", "", map[string]string{"count": strconv.Itoa(len(res.Readded))})
 	}
 	if key != a.v6.key {
@@ -96,7 +96,7 @@ func (a *Agent) doctorOwnedIPv6() []doctor.OwnedAddr {
 // ipv6AddrSettingsChanged says whether a settings message changes the list of own addresses.
 func ipv6AddrSettingsChanged(old, next *pb.NodeSettings) bool {
 	a, b := old.GetIpv6Addresses(), next.GetIpv6Addresses()
-	if len(a) != len(b) {
+	if old.GetIpv6AddressesManaged() != next.GetIpv6AddressesManaged() || len(a) != len(b) {
 		return true
 	}
 	for i := range a {

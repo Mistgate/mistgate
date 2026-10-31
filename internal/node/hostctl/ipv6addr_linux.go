@@ -19,6 +19,11 @@ func (h *linuxHost) SyncOwnedIPv6(ctx context.Context, wanted []netip.Addr) (Own
 	return h.v6.Sync(ctx, wanted)
 }
 
+// KeepOwnedIPv6 puts back the addresses of ipv6-owned.json and changes nothing else.
+func (h *linuxHost) KeepOwnedIPv6(ctx context.Context) (OwnedIPv6Result, error) {
+	return h.v6.Keep(ctx)
+}
+
 // CleanupOwnedIPv6 removes every address of ipv6-owned.json.
 func (h *linuxHost) CleanupOwnedIPv6(ctx context.Context) error { return h.v6.Cleanup(ctx) }
 

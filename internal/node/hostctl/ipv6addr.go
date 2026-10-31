@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // The IPv6 addresses the agent holds on its uplink for the panel (agent.proto "IPV6 ADDRESSES"). The rules live here, free of
@@ -56,6 +57,9 @@ type OwnedIPv6Result struct {
 	States []OwnedIPv6State
 	// Readded are owned addresses that a network manager had removed and the sync put back.
 	Readded []netip.Addr
+	// ReaddedEvent says that the journal should hear of it: Readded is not empty and the last time it said so, kept in
+	// ipv6-owned.json, is over an hour ago (a manager that removes the address at every reconfigure would fill the journal).
+	ReaddedEvent bool
 }
 
 // OwnedIPv6Host is implemented by the Linux host owner. A caller type-asserts it (`h, ok := host.(hostctl.OwnedIPv6Host)`);
@@ -65,7 +69,11 @@ type OwnedIPv6Host interface {
 	// policy allows it), keeps what is there and removes what the agent added earlier and is no longer wanted. A nil list
 	// with nothing owned does not touch the kernel. Idempotent.
 	SyncOwnedIPv6(ctx context.Context, wanted []netip.Addr) (OwnedIPv6Result, error)
-	// CleanupOwnedIPv6 removes every address of ipv6-owned.json (retire, uninstall).
+	// KeepOwnedIPv6 is the sync for a panel that says nothing about the addresses: it adds none and removes none, and only
+	// puts back what ipv6-owned.json names.
+	KeepOwnedIPv6(ctx context.Context) (OwnedIPv6Result, error)
+	// CleanupOwnedIPv6 removes every address of ipv6-owned.json (retire, uninstall). The file goes only when all of them
+	// are gone; while one is not, it stays, so that a later cleanup can finish.
 	CleanupOwnedIPv6(ctx context.Context) error
 }
 
@@ -105,6 +113,9 @@ func NotUplink(name string) bool {
 	return false
 }
 
+// readdedEvery is how seldom a re-added address is worth an event.
+const readdedEvery = time.Hour
+
 type ownedEntry struct {
 	Addr  string `json:"addr"`
 	Iface string `json:"iface"`
@@ -112,27 +123,37 @@ type ownedEntry struct {
 
 type ownedFile struct {
 	Addrs []ownedEntry `json:"addrs"`
+	// DADFailed are addresses whose DAD failed: not tried again until the panel stops asking for them, restart or not.
+	DADFailed []string `json:"dad_failed,omitempty"`
+	// ReaddedAt is when the last ipv6_readded was due (unix seconds).
+	ReaddedAt int64 `json:"readded_at,omitempty"`
+}
+
+// ownedState is the file in memory.
+type ownedState struct {
+	addrs     map[netip.Addr]ownedEntry
+	failed    map[netip.Addr]bool
+	readdedAt int64
 }
 
 type ipv6Owner struct {
 	mu  sync.Mutex
 	nl  v6Netlink
 	dir string // state dir; "" = nowhere to keep the file, so nothing is added
-	// dadFailed are addresses whose DAD failed: not tried again until the panel stops asking for them.
-	dadFailed map[netip.Addr]bool
+	now func() time.Time
 }
 
 func newIPv6Owner(nl v6Netlink, dir string) *ipv6Owner {
-	return &ipv6Owner{nl: nl, dir: dir, dadFailed: map[netip.Addr]bool{}}
+	return &ipv6Owner{nl: nl, dir: dir, now: time.Now}
 }
 
 func (o *ipv6Owner) path() string { return filepath.Join(o.dir, OwnedIPv6File) }
 
-func (o *ipv6Owner) load() (map[netip.Addr]ownedEntry, error) {
-	out := map[netip.Addr]ownedEntry{}
+func (o *ipv6Owner) load() (*ownedState, error) {
+	st := &ownedState{addrs: map[netip.Addr]ownedEntry{}, failed: map[netip.Addr]bool{}}
 	b, err := os.ReadFile(o.path())
 	if errors.Is(err, os.ErrNotExist) {
-		return out, nil
+		return st, nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -143,25 +164,41 @@ func (o *ipv6Owner) load() (map[netip.Addr]ownedEntry, error) {
 	}
 	for _, e := range f.Addrs {
 		if a, err := netip.ParseAddr(e.Addr); err == nil {
-			out[a] = e
+			st.addrs[a] = e
 		}
 	}
-	return out, nil
+	for _, s := range f.DADFailed {
+		if a, err := netip.ParseAddr(s); err == nil {
+			st.failed[a] = true
+		}
+	}
+	st.readdedAt = f.ReaddedAt
+	return st, nil
 }
 
-// save writes the file (durably, atomically); no entries remove it.
-func (o *ipv6Owner) save(owned map[netip.Addr]ownedEntry) error {
-	if len(owned) == 0 {
+// empty: nothing is worth a file. The time of the last re-add counts for an hour, so that a restart cannot reset the limit.
+func (o *ipv6Owner) empty(st *ownedState) bool {
+	recent := st.readdedAt != 0 && o.now().Sub(time.Unix(st.readdedAt, 0)) < readdedEvery
+	return len(st.addrs) == 0 && len(st.failed) == 0 && !recent
+}
+
+// save writes the file (durably, atomically); a state with nothing in it removes the file.
+func (o *ipv6Owner) save(st *ownedState) error {
+	if o.empty(st) {
 		if err := os.Remove(o.path()); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 		return nil
 	}
-	f := ownedFile{}
-	for _, e := range owned {
+	f := ownedFile{ReaddedAt: st.readdedAt}
+	for _, e := range st.addrs {
 		f.Addrs = append(f.Addrs, e)
 	}
+	for a := range st.failed {
+		f.DADFailed = append(f.DADFailed, a.String())
+	}
 	sort.Slice(f.Addrs, func(i, j int) bool { return f.Addrs[i].Addr < f.Addrs[j].Addr }) // the same bytes for the same content
+	sort.Strings(f.DADFailed)
 	b, err := json.Marshal(f)
 	if err != nil {
 		return err
@@ -210,11 +247,32 @@ func policy(addr netip.Addr, anchors []netip.Addr) string {
 
 // Sync is SyncOwnedIPv6 (see OwnedIPv6Host).
 func (o *ipv6Owner) Sync(ctx context.Context, wanted []netip.Addr) (OwnedIPv6Result, error) {
+	return o.sync(ctx, wanted, true)
+}
+
+// Keep is KeepOwnedIPv6.
+func (o *ipv6Owner) Keep(ctx context.Context) (OwnedIPv6Result, error) {
+	return o.sync(ctx, nil, false)
+}
+
+// sync: managed = the wanted list is the truth (what is not in it goes); otherwise the wanted list is what the file names
+// and nothing is added or removed beyond that.
+func (o *ipv6Owner) sync(ctx context.Context, wanted []netip.Addr, managed bool) (OwnedIPv6Result, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	var res OwnedIPv6Result
 	if o.dir == "" {
 		return res, errors.New("no state directory for " + OwnedIPv6File)
+	}
+	st, err := o.load()
+	if err != nil {
+		return res, err
+	}
+	if !managed {
+		for a := range st.addrs {
+			wanted = append(wanted, a)
+		}
+		sort.Slice(wanted, func(i, j int) bool { return wanted[i].Less(wanted[j]) })
 	}
 	want := make([]netip.Addr, 0, len(wanted))
 	isWanted := map[netip.Addr]bool{}
@@ -224,37 +282,53 @@ func (o *ipv6Owner) Sync(ctx context.Context, wanted []netip.Addr) (OwnedIPv6Res
 			want = append(want, a)
 		}
 	}
-	for a := range o.dadFailed {
-		if !isWanted[a] {
-			delete(o.dadFailed, a)
-		}
-	}
-	owned, err := o.load()
-	if err != nil {
-		return res, err
-	}
-	if len(want) == 0 && len(owned) == 0 {
+	if len(want) == 0 && len(st.addrs) == 0 && len(st.failed) == 0 {
 		return res, nil
 	}
 	var errs []error
 
-	// What is no longer wanted (or sits on another interface than the uplink now) goes first: only what the file names.
+	if managed { // a failure the panel no longer asks about is forgotten, so that asking again is a new try
+		forgot := false
+		for a := range st.failed {
+			if !isWanted[a] {
+				delete(st.failed, a)
+				forgot = true
+			}
+		}
+		if forgot {
+			if err := o.save(st); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
 	iface, err := o.nl.DefaultIface()
 	if err != nil {
 		errs = append(errs, fmt.Errorf("uplink: %w", err))
 	}
-	for a, e := range owned {
-		if isWanted[a] && (iface == "" || e.Iface == iface) { // no default route right now (a reconfigure): leave it
-			continue
+	if managed {
+		// What is no longer wanted (or sits on another interface than the uplink now) goes first: only what the file names.
+		for a, e := range st.addrs {
+			if isWanted[a] && (iface == "" || e.Iface == iface) { // no default route right now (a reconfigure): leave it
+				continue
+			}
+			if err := o.nl.Del(e.Iface, a); err != nil {
+				errs = append(errs, fmt.Errorf("remove %s: %w", a, err))
+				continue
+			}
+			delete(st.addrs, a)
+			if err := o.save(st); err != nil {
+				errs = append(errs, err)
+			}
 		}
-		if err := o.nl.Del(e.Iface, a); err != nil {
-			errs = append(errs, fmt.Errorf("remove %s: %w", a, err))
-			continue
+	} else { // an address of the file on another interface is left alone: moving it would be a removal
+		kept := want[:0]
+		for _, a := range want {
+			if e := st.addrs[a]; iface == "" || e.Iface == iface {
+				kept = append(kept, a)
+			}
 		}
-		delete(owned, a)
-		if err := o.save(owned); err != nil {
-			errs = append(errs, err)
-		}
+		want = kept
 	}
 	if iface == "" || err != nil {
 		for _, a := range want {
@@ -274,117 +348,146 @@ func (o *ipv6Owner) Sync(ctx context.Context, wanted []netip.Addr) (OwnedIPv6Res
 	var anchors []netip.Addr
 	for _, h := range have {
 		present[h.Addr] = h
-		if _, ours := owned[h.Addr]; !ours && h.Flags&(ifaTemporary|ifaDeprecated|ifaTentative|ifaDADFailed) == 0 {
+		if _, ours := st.addrs[h.Addr]; !ours && h.Flags&(ifaTemporary|ifaDeprecated|ifaTentative|ifaDADFailed) == 0 {
 			anchors = append(anchors, h.Addr)
 		}
 	}
 
 	for _, a := range want {
-		st := OwnedIPv6State{Addr: a}
-		_, ours := owned[a]
+		out := OwnedIPv6State{Addr: a}
+		_, ours := st.addrs[a]
 		if h, ok := present[a]; ok {
 			switch {
 			case h.Flags&ifaDADFailed != 0:
-				st.State = IPv6AddrDADFailed
+				out.State = IPv6AddrDADFailed
 				if ours { // an address of ours that never became usable is taken away, and not tried again
-					o.dadFailed[a] = true
-					if err := o.drop(owned, iface, a); err != nil {
-						errs = append(errs, err)
+					if err := o.nl.Del(iface, a); err != nil {
+						errs = append(errs, fmt.Errorf("remove %s: %w", a, err))
+					} else {
+						delete(st.addrs, a)
+						st.failed[a] = true
+						if err := o.save(st); err != nil {
+							errs = append(errs, err)
+						}
 					}
 				}
 			case h.Flags&ifaTentative != 0:
-				st.State = IPv6AddrTentative
+				out.State = IPv6AddrTentative
 			default:
-				st.State = IPv6AddrOK
+				out.State = IPv6AddrOK
 			}
-			if ours && !h.deprecated() && st.State != IPv6AddrDADFailed { // somebody re-added it as a normal address
+			if ours && !h.deprecated() && out.State != IPv6AddrDADFailed { // somebody re-added it as a normal address
 				if err := o.nl.Add(iface, a, true); err != nil {
+					// Still there but not deprecated: it may be picked as a source. Never reported as ok.
+					out.State, out.Reason = IPv6AddrMissing, "could not deprecate it: "+err.Error()
+					if isPermission(err) {
+						out.State = IPv6AddrDenied
+					}
 					errs = append(errs, fmt.Errorf("deprecate %s: %w", a, err))
 				}
 			}
-			res.States = append(res.States, st)
+			res.States = append(res.States, out)
 			continue
 		}
-		if o.dadFailed[a] {
-			st.State = IPv6AddrDADFailed
-			res.States = append(res.States, st)
+		if st.failed[a] {
+			out.State = IPv6AddrDADFailed
+			res.States = append(res.States, out)
 			continue
 		}
 		if why := policy(a, anchors); why != "" {
-			st.State, st.Reason = IPv6AddrDenied, why
-			res.States = append(res.States, st)
+			out.State, out.Reason = IPv6AddrDenied, why
+			res.States = append(res.States, out)
 			continue
 		}
-		if len(owned) >= MaxOwnedIPv6 && !ours {
-			st.State, st.Reason = IPv6AddrDenied, fmt.Sprintf("more than %d own addresses", MaxOwnedIPv6)
-			res.States = append(res.States, st)
+		if len(st.addrs) >= MaxOwnedIPv6 && !ours {
+			out.State, out.Reason = IPv6AddrDenied, fmt.Sprintf("more than %d own addresses", MaxOwnedIPv6)
+			res.States = append(res.States, out)
 			continue
 		}
 		wasOwned := ours
-		owned[a] = ownedEntry{Addr: a.String(), Iface: iface}
-		if err := o.save(owned); err != nil { // no name on disk, no address on the host
-			delete(owned, a)
-			st.State, st.Reason = IPv6AddrMissing, err.Error()
-			res.States = append(res.States, st)
+		st.addrs[a] = ownedEntry{Addr: a.String(), Iface: iface}
+		if err := o.save(st); err != nil { // no name on disk, no address on the host
+			delete(st.addrs, a)
+			out.State, out.Reason = IPv6AddrMissing, err.Error()
+			res.States = append(res.States, out)
 			errs = append(errs, err)
 			continue
 		}
 		switch err := o.nl.Add(iface, a, false); {
 		case err == nil:
-			st.State = IPv6AddrTentative // DAD has only started; the next sweep tells
+			out.State = IPv6AddrTentative // DAD has only started; the next sweep tells
 			if wasOwned {
 				res.Readded = append(res.Readded, a)
 			}
 		case isPermission(err):
-			st.State, st.Reason = IPv6AddrDenied, "not allowed to change addresses: "+err.Error()
-			if derr := o.drop(owned, "", a); derr != nil {
+			out.State, out.Reason = IPv6AddrDenied, "not allowed to change addresses: "+err.Error()
+			if derr := o.drop(st, "", a); derr != nil {
 				errs = append(errs, derr)
 			}
 		case errors.Is(err, syscall.EEXIST): // it appeared since the listing: not ours
-			st.State, st.Reason = IPv6AddrOK, "appeared on its own"
-			if derr := o.drop(owned, "", a); derr != nil {
+			out.State, out.Reason = IPv6AddrOK, "appeared on its own"
+			if derr := o.drop(st, "", a); derr != nil {
 				errs = append(errs, derr)
 			}
 		default:
-			st.State, st.Reason = IPv6AddrMissing, err.Error()
+			out.State, out.Reason = IPv6AddrMissing, err.Error()
 			errs = append(errs, fmt.Errorf("add %s: %w", a, err))
 		}
-		res.States = append(res.States, st)
+		res.States = append(res.States, out)
+	}
+	if len(res.Readded) > 0 {
+		if now := o.now(); st.readdedAt == 0 || now.Sub(time.Unix(st.readdedAt, 0)) >= readdedEvery {
+			st.readdedAt = now.Unix()
+			res.ReaddedEvent = true
+			if err := o.save(st); err != nil {
+				errs = append(errs, err)
+			}
+		}
 	}
 	return res, errors.Join(errs...)
 }
 
 // drop removes an address of ours from the host (iface "" = it was never added) and then from the file.
-func (o *ipv6Owner) drop(owned map[netip.Addr]ownedEntry, iface string, a netip.Addr) error {
+func (o *ipv6Owner) drop(st *ownedState, iface string, a netip.Addr) error {
 	if iface != "" {
 		if err := o.nl.Del(iface, a); err != nil {
 			return fmt.Errorf("remove %s: %w", a, err)
 		}
 	}
-	delete(owned, a)
-	return o.save(owned)
+	delete(st.addrs, a)
+	return o.save(st)
 }
 
-// Cleanup is CleanupOwnedIPv6.
+// Cleanup is CleanupOwnedIPv6: every address of the file goes; the file goes with the last one, and stays while one is on
+// the host, so that a later cleanup (cleanup-net --ipv6-addresses) can finish.
 func (o *ipv6Owner) Cleanup(ctx context.Context) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.dir == "" {
 		return nil
 	}
-	owned, err := o.load()
-	if err != nil || len(owned) == 0 {
+	st, err := o.load()
+	if err != nil {
 		return err
 	}
+	if len(st.addrs) == 0 && len(st.failed) == 0 && st.readdedAt == 0 {
+		return nil
+	}
 	var errs []error
-	for a, e := range owned {
+	for a, e := range st.addrs {
 		if err := o.nl.Del(e.Iface, a); err != nil {
 			errs = append(errs, fmt.Errorf("remove %s: %w", a, err))
 			continue
 		}
-		delete(owned, a)
+		delete(st.addrs, a)
 	}
-	errs = append(errs, o.save(owned))
-	clear(o.dadFailed)
+	if len(errs) == 0 {
+		if err := os.Remove(o.path()); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, err)
+		}
+		return errors.Join(errs...)
+	}
+	st.failed, st.readdedAt = map[netip.Addr]bool{}, 0
+	errs = append(errs, o.save(st)) // what is left on the host stays named
 	return errors.Join(errs...)
 }

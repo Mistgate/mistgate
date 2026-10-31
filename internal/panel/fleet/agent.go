@@ -657,6 +657,9 @@ func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 		s.ClientIpv6Disabled = !n.ClientIPv6
 	}
 	if slices.Contains(caps, capIPv6Addr) {
+		// "managed" says the list is the truth, an empty one too; a settings message without it (an older panel) leaves the
+		// agent's addresses alone.
+		s.Ipv6AddressesManaged = true
 		s.Ipv6Addresses = ownedIPv6Addresses(n)
 	}
 	return s
@@ -664,7 +667,8 @@ func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 
 // ownedIPv6Addresses are the addresses the node's agent holds on its uplink (NodeSettings.ipv6_addresses). Nothing puts one
 // there yet: the state machine of the address change fills the list from n.IPv6() (ipv6_json), so for now the list is
-// always empty and no node changes. A variable so that the tests can stand in for that source.
+// always empty (an agent with the capability is told it manages an empty list, which removes only what it added itself).
+// A variable so that the tests can stand in for that source.
 var ownedIPv6Addresses = func(n store.NodeRow) []string { return nil }
 
 func settingsSig(s *agentv1.NodeSettings) string {
@@ -675,7 +679,7 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	if s.ClientIpv6Disabled {
 		sig += "|client-ipv6=off"
 	}
-	if len(s.Ipv6Addresses) > 0 { // absent for an agent without ipv6-addr/1 and while the list is empty: the signature stays what it was
+	if s.Ipv6AddressesManaged { // absent for an agent without ipv6-addr/1: its signature stays what it was
 		sig += "|ipv6-addr=" + strings.Join(s.Ipv6Addresses, ",")
 	}
 	return sig

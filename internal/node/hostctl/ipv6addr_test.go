@@ -10,16 +10,19 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 // fakeV6 is the kernel of one machine: an uplink de1 with a hoster address, and a log of what was asked.
 type fakeV6 struct {
-	iface   string
-	addrs   []v6Addr
-	calls   []string
-	addErr  error
-	fileDir string // when set, "add" asserts that the owned file already names the address
-	t       *testing.T
+	iface  string
+	addrs  []v6Addr
+	calls  []string
+	addErr error
+	// replaceErr fails an add that turns an address that is there into a deprecated one; delErr fails every removal.
+	replaceErr, delErr error
+	fileDir            string // when set, "add" asserts that the owned file already names the address
+	t                  *testing.T
 }
 
 func (f *fakeV6) DefaultIface() (string, error) { return f.iface, nil }
@@ -31,6 +34,9 @@ func (f *fakeV6) Addrs(iface string) ([]v6Addr, error) {
 }
 func (f *fakeV6) Add(iface string, a netip.Addr, replace bool) error {
 	f.calls = append(f.calls, "add "+a.String())
+	if replace && f.replaceErr != nil {
+		return f.replaceErr
+	}
 	if f.fileDir != "" {
 		b, _ := os.ReadFile(filepath.Join(f.fileDir, OwnedIPv6File))
 		var of ownedFile
@@ -57,6 +63,9 @@ func (f *fakeV6) Add(iface string, a netip.Addr, replace bool) error {
 }
 func (f *fakeV6) Del(iface string, a netip.Addr) error {
 	f.calls = append(f.calls, "del "+a.String())
+	if f.delErr != nil {
+		return f.delErr
+	}
 	for i := range f.addrs {
 		if f.addrs[i].Addr == a {
 			f.addrs = append(f.addrs[:i], f.addrs[i+1:]...)
@@ -116,7 +125,7 @@ func stateOf(r OwnedIPv6Result, a string) string {
 	return "absent"
 }
 
-func (o *ipv6Owner) ownedCount() int { m, _ := o.load(); return len(m) }
+func (o *ipv6Owner) ownedCount() int { st, _ := o.load(); return len(st.addrs) }
 
 func TestOwnedIPv6AddsDeprecated128AndIsIdempotent(t *testing.T) {
 	o, f, dir := newV6Test(t)
@@ -318,5 +327,146 @@ func TestOwnedIPv6BrokenFileChangesNothing(t *testing.T) {
 	}
 	if _, err := o.Sync(context.Background(), addrs(other)); err == nil || len(f.calls) != 0 {
 		t.Fatalf("err %v calls %v", err, f.calls)
+	}
+}
+
+// A panel that says nothing about the addresses (an older one) neither adds nor removes: the agent only puts back what the
+// file names, and a later managed sync with an empty list removes it.
+func TestOwnedIPv6KeepNeitherAddsNorRemoves(t *testing.T) {
+	o, f, _ := newV6Test(t)
+	ctx := context.Background()
+	_, _ = o.Sync(ctx, addrs(other, third))
+	f.calls = nil
+	r, err := o.Keep(ctx)
+	if err != nil || len(f.calls) != 0 || stateOf(r, other) != IPv6AddrTentative && stateOf(r, other) != IPv6AddrOK {
+		t.Fatalf("keep with everything there: %+v %v %v", r.States, err, f.calls)
+	}
+	f.addrs = f.addrs[:2] // a manager took both
+	r, err = o.Keep(ctx)
+	if err != nil || f.count("del") != 0 || f.count("add") != 2 || len(r.Readded) != 2 || !f.has(other) || !f.has(third) {
+		t.Fatalf("keep after a removal: %+v %v %v", r, err, f.calls)
+	}
+	if o.ownedCount() != 2 {
+		t.Fatal("keep changed what the file names")
+	}
+	// Nothing owned: keep never touches the kernel, and never asks for an address of its own accord.
+	o2, f2, _ := newV6Test(t)
+	if r, err := o2.Keep(ctx); err != nil || len(r.States) != 0 || len(f2.calls) != 0 {
+		t.Fatalf("keep with an empty file: %+v %v %v", r, err, f2.calls)
+	}
+	if _, err := o.Sync(ctx, nil); err != nil || f.has(other) || f.has(third) {
+		t.Fatalf("a managed empty list: %v %+v", err, f.addrs)
+	}
+}
+
+// The address stays on the host but is no longer deprecated: that is never reported as ok.
+func TestOwnedIPv6ReplaceFailureIsNotOK(t *testing.T) {
+	for _, c := range []struct {
+		err  error
+		want string
+	}{{syscall.EPERM, IPv6AddrDenied}, {errors.New("netlink: busy"), IPv6AddrMissing}} {
+		o, f, _ := newV6Test(t)
+		ctx := context.Background()
+		_, _ = o.Sync(ctx, addrs(other))
+		f.addrs[len(f.addrs)-1].Flags = 0
+		f.replaceErr = c.err
+		r, err := o.Sync(ctx, addrs(other))
+		if err == nil || stateOf(r, other) != c.want || !f.has(other) || o.ownedCount() != 1 {
+			t.Fatalf("%v: state %s want %s, err %v", c.err, stateOf(r, other), c.want, err)
+		}
+	}
+}
+
+// A removal that failed at retire leaves the file with what is still on the host, and a later cleanup (what
+// cleanup-net --ipv6-addresses runs, on a fresh owner) finishes the job and removes the file.
+func TestOwnedIPv6CleanupKeepsTheFileUntilTheHostIsClean(t *testing.T) {
+	o, f, dir := newV6Test(t)
+	ctx := context.Background()
+	_, _ = o.Sync(ctx, addrs(other, third))
+	f.delErr = errors.New("netlink: busy")
+	if err := o.Cleanup(ctx); err == nil {
+		t.Fatal("a failed removal was not reported")
+	}
+	if _, err := os.Stat(filepath.Join(dir, OwnedIPv6File)); err != nil || o.ownedCount() != 2 || !f.has(other) || !f.has(third) {
+		t.Fatalf("file after a failed cleanup: %v, owned %d", err, o.ownedCount())
+	}
+	f.delErr = nil
+	if err := newIPv6Owner(f, dir).Cleanup(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, OwnedIPv6File)); !errors.Is(err, os.ErrNotExist) || f.has(other) || f.has(third) || !f.has(hoster) {
+		t.Fatalf("after the second cleanup: %v %+v", err, f.addrs)
+	}
+}
+
+// A DAD failure outlives the agent: after a restart (a new owner on the same state directory) the address is not tried again,
+// and it is forgotten once the panel stops asking for it.
+func TestOwnedIPv6DADFailureSurvivesARestart(t *testing.T) {
+	o, f, dir := newV6Test(t)
+	ctx := context.Background()
+	_, _ = o.Sync(ctx, addrs(other))
+	f.addrs[len(f.addrs)-1].Flags |= ifaDADFailed
+	_, _ = o.Sync(ctx, addrs(other))
+	f.calls = nil
+	o2 := newIPv6Owner(f, dir) // the agent restarted
+	r, _ := o2.Sync(ctx, addrs(other))
+	if stateOf(r, other) != IPv6AddrDADFailed || f.count("add") != 0 {
+		t.Fatalf("tried again after a restart: %+v %v", r.States, f.calls)
+	}
+	if r, _ := o2.Keep(ctx); len(r.States) != 0 || f.count("add") != 0 {
+		t.Fatalf("keep tried it: %+v %v", r.States, f.calls)
+	}
+	_, _ = o2.Sync(ctx, nil)
+	if _, err := os.Stat(filepath.Join(dir, OwnedIPv6File)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the failure is remembered for an address nobody asks for: %v", err)
+	}
+	r, _ = newIPv6Owner(f, dir).Sync(ctx, addrs(other))
+	if stateOf(r, other) != IPv6AddrTentative {
+		t.Fatalf("asking again was not a new try: %+v", r.States)
+	}
+}
+
+// The journal hears of a re-added address at most once an hour, also across restarts: the time is in the file.
+func TestOwnedIPv6ReaddedEventLimitSurvivesARestart(t *testing.T) {
+	o, f, dir := newV6Test(t)
+	ctx := context.Background()
+	clock := time.Unix(1_700_000_000, 0)
+	o.now = func() time.Time { return clock }
+	_, _ = o.Sync(ctx, addrs(other))
+	lose := func(o *ipv6Owner) OwnedIPv6Result {
+		f.addrs = f.addrs[:2] // a manager takes the address
+		r, err := o.Sync(ctx, addrs(other))
+		if err != nil || len(r.Readded) != 1 {
+			t.Fatalf("%+v %v", r, err)
+		}
+		return r
+	}
+	if !lose(o).ReaddedEvent {
+		t.Fatal("the first re-add is silent")
+	}
+	for i, d := range []time.Duration{time.Minute, 30 * time.Minute} {
+		clock = clock.Add(d)
+		o = newIPv6Owner(f, dir) // restarted
+		o.now = func() time.Time { return clock }
+		if lose(o).ReaddedEvent {
+			t.Fatalf("round %d: the event came again within the hour", i)
+		}
+	}
+	clock = clock.Add(31 * time.Minute)
+	o = newIPv6Owner(f, dir)
+	o.now = func() time.Time { return clock }
+	if !lose(o).ReaddedEvent {
+		t.Fatal("no event an hour after the last one")
+	}
+	// With the address gone for good, the file still holds the time for the hour, then goes.
+	_, _ = o.Sync(ctx, nil)
+	if _, err := os.Stat(filepath.Join(dir, OwnedIPv6File)); err != nil {
+		t.Fatalf("the time of the last event was dropped at once: %v", err)
+	}
+	clock = clock.Add(2 * time.Hour)
+	_, _ = o.Sync(ctx, addrs(other))
+	_, _ = o.Sync(ctx, nil)
+	if _, err := os.Stat(filepath.Join(dir, OwnedIPv6File)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("an old time keeps the file: %v", err)
 	}
 }

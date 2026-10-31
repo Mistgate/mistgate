@@ -4660,11 +4660,16 @@ type NodeSettings struct {
 	// Read only by agents with "client-ipv6/1".
 	ClientIpv6Disabled bool `protobuf:"varint,9,opt,name=client_ipv6_disabled,json=clientIpv6Disabled,proto3" json:"client_ipv6_disabled,omitempty"`
 	// IPv6 addresses (IP literals, no prefix length, no brackets) the agent holds as /128 on the interface of its ::/0 route
-	// and keeps there (see "IPV6 ADDRESSES"). The list is the whole list (empty = none): an entry that is gone is removed from the host
-	// when the agent put it there. Read only by agents with "ipv6-addr/1"; the panel sends it only to them.
+	// and keeps there (see "IPV6 ADDRESSES"). With ipv6_addresses_managed the list is the whole list (empty = none): an entry
+	// that is gone is removed from the host when the agent put it there. Read only by agents with "ipv6-addr/1"; the panel
+	// sends it only to them.
 	Ipv6Addresses []string `protobuf:"bytes,10,rep,name=ipv6_addresses,json=ipv6Addresses,proto3" json:"ipv6_addresses,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// true = the panel knows the list: ipv6_addresses is the truth, also when empty. false (the default, and what a panel that
+	// predates the field sends) = say nothing about the addresses: the agent adds and removes none and keeps asserting the
+	// ones it already holds. The panel sets it together with the list, to agents with "ipv6-addr/1".
+	Ipv6AddressesManaged bool `protobuf:"varint,11,opt,name=ipv6_addresses_managed,json=ipv6AddressesManaged,proto3" json:"ipv6_addresses_managed,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *NodeSettings) Reset() {
@@ -4765,6 +4770,13 @@ func (x *NodeSettings) GetIpv6Addresses() []string {
 		return x.Ipv6Addresses
 	}
 	return nil
+}
+
+func (x *NodeSettings) GetIpv6AddressesManaged() bool {
+	if x != nil {
+		return x.Ipv6AddressesManaged
+	}
+	return false
 }
 
 type DesiredState struct {
@@ -6896,7 +6908,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"LinkAccept\x12\x1c\n" +
 	"\tsignature\x18\x01 \x01(\fR\tsignature\"!\n" +
 	"\x03Ack\x12\x1a\n" +
-	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xba\x03\n" +
+	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xf0\x03\n" +
 	"\fNodeSettings\x12(\n" +
 	"\x10stats_interval_s\x18\x01 \x01(\rR\x0estatsIntervalS\x120\n" +
 	"\x14keepalive_interval_s\x18\x02 \x01(\rR\x12keepaliveIntervalS\x12.\n" +
@@ -6909,7 +6921,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x17torrent_blocker_enabled\x18\b \x01(\bR\x15torrentBlockerEnabled\x120\n" +
 	"\x14client_ipv6_disabled\x18\t \x01(\bR\x12clientIpv6Disabled\x12%\n" +
 	"\x0eipv6_addresses\x18\n" +
-	" \x03(\tR\ripv6Addresses\"\x83\x03\n" +
+	" \x03(\tR\ripv6Addresses\x124\n" +
+	"\x16ipv6_addresses_managed\x18\v \x01(\bR\x14ipv6AddressesManaged\"\x83\x03\n" +
 	"\fDesiredState\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12#\n" +
 	"\rbase_revision\x18\x02 \x01(\x04R\fbaseRevision\x12\x1d\n" +

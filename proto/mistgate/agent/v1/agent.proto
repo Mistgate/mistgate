@@ -479,24 +479,31 @@ package mistgate.agent.v1;
 //   node, or a new one that replaces it. The panel decides which; the agent only keeps them and refuses what could break
 //   the host.
 //   - CAPABILITY GATE. An agent lists "ipv6-addr/1" when it can do this (Linux, with the netlink interface). The panel
-//     sends NodeSettings.ipv6_addresses, and counts it in the settings signature, ONLY to such an agent; to any other the
-//     field is absent, so the signature of an old agent does not move.
+//     sends NodeSettings.ipv6_addresses and ipv6_addresses_managed, and counts them in the settings signature, ONLY to such
+//     an agent; to any other the fields are absent, so the signature of an old agent does not move.
+//   - MANAGED. A settings message without ipv6_addresses_managed (an older panel, which does not know the field) says nothing
+//     about the addresses: an empty list there is not "remove them". The agent then neither adds nor removes anything, and
+//     goes on putting back what ipv6-owned.json names. Only a panel that sets ipv6_addresses_managed = true makes the list
+//     the whole truth, an empty one included.
 //   - WHAT THE AGENT DOES. The interface is the one of the ::/0 route in the main routing table (the doctor's iface). Each
 //     address is added as a /128 with IFA_F_NOPREFIXROUTE, preferred_lft 0 (deprecated: the kernel never picks it as the
 //     source of a new outgoing connection, so an entry address does not show up in egress) and valid_lft forever. Incoming
 //     connections and the replies to them work as with any address. Duplicate address detection runs as usual; an address
-//     whose DAD fails is removed and reported as dad_failed.
+//     whose DAD fails is removed and reported as dad_failed; that failure is kept in ipv6-owned.json, so a restart does not
+//     try the address again, until the panel stops asking for it.
 //   - OWNERSHIP. The agent writes ipv6-owned.json in its state dir BEFORE it adds an address, and removes only addresses that
 //     are in that file. An address that was on the host before the agent asked for it never becomes the agent's and is never
 //     removed (the host provider's addresses are never touched). A removed entry of ipv6_addresses is removed from the host
-//     at the next sweep; cleanup (uninstall, retire) removes everything in the file.
+//     at the next sweep; cleanup (uninstall, retire) removes everything in the file. While an address is still on the host
+//     the file stays, also when retire deletes the rest of the state directory, so "mistgate-node cleanup-net
+//     --ipv6-addresses" can finish the job.
 //   - REFUSAL (state denied). An address is refused unless it is a global unicast address, not ULA, inside the /64 of a
 //     stable address of that interface that is not itself one of ours, and at most 4 are held at once. An agent without
 //     the right to change addresses (a container) refuses all of them. A refusal is reported, never turned into another
 //     address.
 //   - PERSISTENCE. NodeSettings is saved with the desired state, so the addresses come back with the agent after a reboot
 //     without the panel, and every sweep (30 s) puts back one that a network manager removed (event ipv6_readded, at most
-//     once an hour).
+//     once an hour; the time of the last one is kept in ipv6-owned.json, so a restart does not reset it).
 //   - REPORT. After a change of the state of any of them the agent sends a partial DoctorReport with the ipv6 check, which
 //     carries the param owned.
 //
@@ -1250,9 +1257,14 @@ message NodeSettings {
   // Read only by agents with "client-ipv6/1".
   bool client_ipv6_disabled = 9;
   // IPv6 addresses (IP literals, no prefix length, no brackets) the agent holds as /128 on the interface of its ::/0 route
-  // and keeps there (see "IPV6 ADDRESSES"). The list is the whole list (empty = none): an entry that is gone is removed from the host
-  // when the agent put it there. Read only by agents with "ipv6-addr/1"; the panel sends it only to them.
+  // and keeps there (see "IPV6 ADDRESSES"). With ipv6_addresses_managed the list is the whole list (empty = none): an entry
+  // that is gone is removed from the host when the agent put it there. Read only by agents with "ipv6-addr/1"; the panel
+  // sends it only to them.
   repeated string ipv6_addresses = 10;
+  // true = the panel knows the list: ipv6_addresses is the truth, also when empty. false (the default, and what a panel that
+  // predates the field sends) = say nothing about the addresses: the agent adds and removes none and keeps asserting the
+  // ones it already holds. The panel sets it together with the list, to agents with "ipv6-addr/1".
+  bool ipv6_addresses_managed = 11;
 }
 
 message DesiredState {

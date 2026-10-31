@@ -381,7 +381,6 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	}
 	a.id.Store(id)
 	a.settings.Store(&pb.NodeSettings{})
-	a.v6.noSettings = a.settings.Load()
 
 	userLimits := ratelimit.NewRegistry() // one per agent: a person's hysteria2 and vless credentials share their bucket
 	for proto, f := range engines {
@@ -1502,6 +1501,9 @@ func wipeState(dir string) error {
 	}
 	var errs []error
 	for _, e := range entries {
+		if e.Name() == hostctl.OwnedIPv6File { // retire removed it with the last address; while one is left it names it
+			continue
+		}
 		if err := os.RemoveAll(filepath.Join(root, e.Name())); err != nil {
 			errs = append(errs, err)
 		}
