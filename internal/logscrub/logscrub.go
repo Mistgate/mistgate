@@ -41,7 +41,7 @@ func Addrs(s string) string {
 	last := 0
 	for _, m := range candidate.FindAllStringIndex(s, -1) {
 		i, j := m[0], m[1]
-		if dotted(s[i:j]) && (i > 0 && digitDot(s[i-1]) || j < len(s) && digitDot(s[j])) {
+		if dotted(s[i:j]) && (versionBefore(s, i) || versionAfter(s, j)) {
 			continue // four numbers inside a longer run of digits and dots: a version, not an address
 		}
 		b.WriteString(s[last:i])
@@ -60,7 +60,18 @@ func dotted(m string) bool {
 	return m[0] != '[' && strings.Count(m, ":") <= 1 && strings.Contains(m, ".")
 }
 
-func digitDot(c byte) bool { return c == '.' || '0' <= c && c <= '9' }
+func digit(c byte) bool { return '0' <= c && c <= '9' }
+
+// versionAfter: the match at s[:j] goes on as digits ("1.2.3.4567") or as one more dotted number ("10.2.3.4.5"). A dot that
+// ends a sentence ("from 203.0.113.7.") does not make the address a version.
+func versionAfter(s string, j int) bool {
+	return j < len(s) && (digit(s[j]) || s[j] == '.' && j+1 < len(s) && digit(s[j+1]))
+}
+
+// versionBefore is versionAfter for what precedes the match at s[i:].
+func versionBefore(s string, i int) bool {
+	return i > 0 && (digit(s[i-1]) || s[i-1] == '.' && i > 1 && digit(s[i-2]))
+}
 
 // host is a DNS name with a letter (or punycode) top-level label.
 var host = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:xn--[a-z0-9-]{1,59}|[a-z]{2,63})\b`)
