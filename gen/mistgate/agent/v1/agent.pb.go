@@ -417,14 +417,19 @@ func (DoctorStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type EnrollRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	EnrollmentToken string                 `protobuf:"bytes,1,opt,name=enrollment_token,json=enrollmentToken,proto3" json:"enrollment_token,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty when the token is proven (enrollment_key).
+	EnrollmentToken string `protobuf:"bytes,1,opt,name=enrollment_token,json=enrollmentToken,proto3" json:"enrollment_token,omitempty"`
 	// PKCS#10 certificate request, DER. Key: ECDSA P-256 (the panel rejects anything else).
-	CsrDer        []byte `protobuf:"bytes,2,opt,name=csr_der,json=csrDer,proto3" json:"csr_der,omitempty"`
-	AgentVersion  string `protobuf:"bytes,3,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
-	ApiVersion    uint32 `protobuf:"varint,4,opt,name=api_version,json=apiVersion,proto3" json:"api_version,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CsrDer       []byte `protobuf:"bytes,2,opt,name=csr_der,json=csrDer,proto3" json:"csr_der,omitempty"`
+	AgentVersion string `protobuf:"bytes,3,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
+	ApiVersion   uint32 `protobuf:"varint,4,opt,name=api_version,json=apiVersion,proto3" json:"api_version,omitempty"`
+	// A token with the "mg2_" prefix is not sent: the Ed25519 public key derived from it (agentlink.EnrollKey) and its
+	// signature over "mistgate-enroll/2\0" || csr_der stand for it.
+	EnrollmentKey       []byte `protobuf:"bytes,5,opt,name=enrollment_key,json=enrollmentKey,proto3" json:"enrollment_key,omitempty"`
+	EnrollmentSignature []byte `protobuf:"bytes,6,opt,name=enrollment_signature,json=enrollmentSignature,proto3" json:"enrollment_signature,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *EnrollRequest) Reset() {
@@ -483,6 +488,20 @@ func (x *EnrollRequest) GetApiVersion() uint32 {
 		return x.ApiVersion
 	}
 	return 0
+}
+
+func (x *EnrollRequest) GetEnrollmentKey() []byte {
+	if x != nil {
+		return x.EnrollmentKey
+	}
+	return nil
+}
+
+func (x *EnrollRequest) GetEnrollmentSignature() []byte {
+	if x != nil {
+		return x.EnrollmentSignature
+	}
+	return nil
 }
 
 type EnrollResponse struct {
@@ -6481,13 +6500,15 @@ var File_mistgate_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/agent/v1/agent.proto\x12\x11mistgate.agent.v1\"\x99\x01\n" +
+	"\x1dmistgate/agent/v1/agent.proto\x12\x11mistgate.agent.v1\"\xf3\x01\n" +
 	"\rEnrollRequest\x12)\n" +
 	"\x10enrollment_token\x18\x01 \x01(\tR\x0fenrollmentToken\x12\x17\n" +
 	"\acsr_der\x18\x02 \x01(\fR\x06csrDer\x12#\n" +
 	"\ragent_version\x18\x03 \x01(\tR\fagentVersion\x12\x1f\n" +
 	"\vapi_version\x18\x04 \x01(\rR\n" +
-	"apiVersion\"\xd0\x01\n" +
+	"apiVersion\x12%\n" +
+	"\x0eenrollment_key\x18\x05 \x01(\fR\renrollmentKey\x121\n" +
+	"\x14enrollment_signature\x18\x06 \x01(\fR\x13enrollmentSignature\"\xd0\x01\n" +
 	"\x0eEnrollResponse\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12'\n" +
 	"\x0fcertificate_pem\x18\x02 \x01(\tR\x0ecertificatePem\x12,\n" +

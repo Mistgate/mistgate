@@ -17,6 +17,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
+	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -73,6 +74,51 @@ func TestLinkEnrollRouteSharesEnrollOnBothEditions(t *testing.T) {
 				t.Errorf("after many failures: %v", last)
 			}
 		})
+	}
+}
+
+// A new token is proven, not sent: the proof enrols only the CSR it signs, and an older agent that sends the token in clear
+// still enrols with it.
+func TestEnrollProvenToken(t *testing.T) {
+	e := newCoreEnv(t)
+	cli := linkEnrollServer(t, e)
+	enroll := func(m *agentv1.EnrollRequest) error {
+		m.ApiVersion = APIVersion
+		_, err := cli.Enroll(e.ctx, connect.NewRequest(m))
+		return err
+	}
+
+	_, token, _ := e.createEnrollment("node-a", "de1.example.com")
+	if !agentlink.ProvesEnrollToken(token) {
+		t.Fatalf("new token %q is not a proven one", token)
+	}
+	_, csr := newCSR(t)
+	_, other := newCSR(t)
+	pub, sig := agentlink.SignEnroll(token, csr)
+	for name, m := range map[string]*agentv1.EnrollRequest{
+		"a proof for another CSR": {CsrDer: other, EnrollmentKey: pub, EnrollmentSignature: sig},
+		"a proof and the token":   {CsrDer: csr, EnrollmentKey: pub, EnrollmentSignature: sig, EnrollmentToken: token},
+		"a key without signature": {CsrDer: csr, EnrollmentKey: pub},
+		"another token's proof": func() *agentv1.EnrollRequest {
+			k, s := agentlink.SignEnroll(token+"x", csr)
+			return &agentv1.EnrollRequest{CsrDer: csr, EnrollmentKey: k, EnrollmentSignature: s}
+		}(),
+	} {
+		if err := enroll(m); code(err) != connect.CodeUnauthenticated {
+			t.Errorf("%s: %v, want Unauthenticated", name, err)
+		}
+	}
+	if err := enroll(&agentv1.EnrollRequest{CsrDer: csr, EnrollmentKey: pub, EnrollmentSignature: sig}); err != nil {
+		t.Fatalf("proven enrolment: %v", err)
+	}
+	if err := enroll(&agentv1.EnrollRequest{CsrDer: csr, EnrollmentKey: pub, EnrollmentSignature: sig}); err != nil {
+		t.Errorf("the same proof again (a retried request) is a replay of the same key: %v", err)
+	}
+
+	_, older, _ := e.createEnrollment("node-b", "de2.example.com")
+	_, csrB := newCSR(t)
+	if err := enroll(&agentv1.EnrollRequest{CsrDer: csrB, EnrollmentToken: older}); err != nil {
+		t.Errorf("an older agent that sends the new token: %v", err)
 	}
 }
 

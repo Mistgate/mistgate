@@ -1,19 +1,26 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentlink"
+	"google.golang.org/protobuf/proto"
 )
 
 // Step 5c: link-only agents (enrolled with --link-url). Design: design/cloudflare-edition/AGENT-LINK.md §6.2.
@@ -218,7 +225,7 @@ func TestEnrollLinkErrorDoesNotEchoTheSecretPrefix(t *testing.T) {
 	if err == nil {
 		t.Fatal("Enroll against a dead panel succeeded")
 	}
-	if strings.Contains(err.Error(), strings.Trim(r.prefix, "/")) || strings.Contains(err.Error(), "edge-link-enrollment-token") {
+	if strings.Contains(err.Error(), strings.Trim(r.prefix, "/")) || strings.Contains(err.Error(), edgeEnrollToken) {
 		t.Errorf("the error leaks the secret prefix or the token: %v", err)
 	}
 }
@@ -238,5 +245,35 @@ func TestRenewLoopRetriesSoonWhenThereIsNoSession(t *testing.T) {
 	<-done
 	if n := strings.Count(logs.String(), "certificate renewal failed"); n < 4 {
 		t.Errorf("renewal attempts without a session in 300 ms = %d, want several (retry every 20 ms, not every hour)", n)
+	}
+}
+
+// A proven token never crosses the link's public-PKI TLS: a host in the middle that answers the enrolment itself (here
+// with an error, before any CA pin can be checked) gets a signature over the agent's own CSR and nothing it could
+// enrol another key with.
+func TestEnrollLinkProvenTokenStaysOnTheNode(t *testing.T) {
+	var body []byte
+	mitm := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		http.Error(w, "nope", http.StatusServiceUnavailable)
+	}))
+	defer mitm.Close()
+	token := agentlink.EnrollTokenPrefix + strings.Repeat("a", 52)
+	pin := strings.Repeat("ab", 32)
+	_, err := Enroll(context.Background(), EnrollConfig{StateDir: t.TempDir(), CASHA256: pin, Token: token, httpClient: mitm.Client(),
+		LinkURL: "wss://" + strings.TrimPrefix(mitm.URL, "https://") + "/" + strings.Repeat("p", 24) + "/"})
+	if err == nil {
+		t.Fatal("enrolment against the stand-in succeeded")
+	}
+	var req pb.EnrollRequest
+	if proto.Unmarshal(body, &req) != nil {
+		t.Fatalf("the stand-in got no EnrollRequest: %q", body)
+	}
+	if bytes.Contains(body, []byte(token)) || bytes.Contains(body, []byte(strings.TrimPrefix(token, agentlink.EnrollTokenPrefix))) ||
+		req.EnrollmentToken != "" {
+		t.Error("the token crossed the wire")
+	}
+	if !agentlink.VerifyEnroll(req.EnrollmentKey, req.CsrDer, req.EnrollmentSignature) {
+		t.Error("the request does not prove the token")
 	}
 }
