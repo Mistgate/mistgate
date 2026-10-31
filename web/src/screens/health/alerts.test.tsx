@@ -8,7 +8,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang } from "@/i18n";
 import type { Alert } from "@/lib/health";
-import { AlertCard } from "./alerts";
+import { AlertCard, Ipv6Tag } from "./alerts";
 import { useFixFlow } from "./fix";
 
 const muteAlert = vi.fn();
@@ -16,12 +16,14 @@ const acceptDoctorItem = vi.fn();
 const restartInbounds = vi.fn();
 const updateNode = vi.fn();
 let role = Role.OWNER;
+/** Node.ipv6 of the alerts' node nod_1: it can take an entry, off */
+let node1V6: object = { entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "" };
 vi.mock("@/lib/api", () => ({
   health: { muteAlert: (...a: unknown[]) => muteAlert(...a), acceptDoctorItem: (...a: unknown[]) => acceptDoctorItem(...a), applyFix: vi.fn() },
   nodes: {
     restartInbounds: (...a: unknown[]) => restartInbounds(...a),
     updateNode: (...a: unknown[]) => updateNode(...a),
-    listNodes: () => Promise.resolve({ nodes: [{ id: "nod_msk1", name: "msk1" }, { id: "nod_de1", name: "de1" }] }),
+    listNodes: () => Promise.resolve({ nodes: [{ id: "nod_msk1", name: "msk1" }, { id: "nod_de1", name: "de1" }, { id: "nod_1", name: "de9", ipv6: node1V6 }] }),
   },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   fleet: {},
@@ -31,8 +33,11 @@ vi.mock("@/lib/api", () => ({
 }));
 // no router in the test: a link is an anchor that says where it goes
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, params, search, hash, className }: { children?: ReactNode; to: string; params?: { id: string }; search?: { tab: string; way?: string }; hash?: string; className?: string }) => (
-    <a href={`${to.replace("$id", params?.id ?? "")}${search ? `?tab=${search.tab}` : ""}${search?.way ? `&way=${search.way}` : ""}${hash ? `#${hash}` : ""}`} className={className}>
+  Link: ({ children, to, params, search, hash, className }: { children?: ReactNode; to: string; params?: { id: string }; search?: { tab: string; way?: string; add?: string }; hash?: string; className?: string }) => (
+    <a
+      href={`${to.replace("$id", params?.id ?? "")}${search ? `?tab=${search.tab}` : ""}${search?.way ? `&way=${search.way}` : ""}${search?.add ? `&add=${search.add}` : ""}${hash ? `#${hash}` : ""}`}
+      className={className}
+    >
       {children}
     </a>
   ),
@@ -329,5 +334,65 @@ describe("a country alert and IPv6", () => {
     } finally {
       act(() => setLang("en"));
     }
+  });
+
+  describe("and the IPv6 entry", () => {
+    const entry6 = () => document.querySelector("[data-testid=alert-v6-entry]");
+    const offOn = { entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "" };
+    afterEach(() => {
+      node1V6 = offOn;
+    });
+
+    it("offers the owner «Add IPv6 entry…» where IPv6 gets through, as the main action, into the entry's dialog", async () => {
+      await mount(country({ ipv6: "open" }));
+      const add = link("Add IPv6 entry…")!;
+      expect(add.getAttribute("href")).toBe("/nodes/nod_1?tab=ways&way=ipv6&add=ipv6");
+      expect(add.className).toContain("bg-accent");
+    });
+
+    it("offers nothing to a helper, nor for a node that cannot take an entry", async () => {
+      role = Role.HELPER;
+      await mount(country({ ipv6: "open" }));
+      expect(link("Add IPv6 entry…")).toBeUndefined();
+      act(() => root?.unmount());
+      host?.remove();
+      role = Role.OWNER;
+      node1V6 = { ...offOn, entrySupported: false, unavailableReason: "agent_old" };
+      await mount(country({ ipv6: "open" }));
+      expect(link("Add IPv6 entry…")).toBeUndefined();
+    });
+
+    it("with the entry on: people with IPv6 get through it, in the place of the IPv6 line, and nothing to add", async () => {
+      await mount(country({ ipv6: "entry" }));
+      expect(entry6()?.textContent).toBe("People with IPv6 connect through the IPv6 entry.");
+      expect(open6()).toBeNull();
+      expect(link("Add IPv6 entry…")).toBeUndefined();
+    });
+
+    it("speaks Russian and Chinese", async () => {
+      try {
+        act(() => setLang("ru"));
+        await mount(country({ ipv6: "entry" }));
+        expect(entry6()?.textContent).toBe("Люди с IPv6 подключаются через вход по IPv6.");
+        act(() => root?.unmount());
+        host?.remove();
+        act(() => setLang("zh"));
+        await mount(country({ ipv6: "entry" }));
+        expect(entry6()?.textContent).toBe("有 IPv6 的用户通过 IPv6 入口连接。");
+      } finally {
+        act(() => setLang("en"));
+      }
+    });
+  });
+});
+
+describe("the IPv6 tag", () => {
+  it("names the entry on an IPv4 alert of a node whose entry is on", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const a = alert({ kind: AlertKind.COUNTRY_BLOCKED, params: { country: "RU", verdict: "blocked", ipv6: "entry" } });
+    await act(async () => root!.render(<Ipv6Tag alert={a} />));
+    expect(host.textContent).toBe("IPv6 entry on");
   });
 });

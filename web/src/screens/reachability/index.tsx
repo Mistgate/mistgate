@@ -45,7 +45,7 @@ export function ReachabilityScreen() {
   const nodes: NodeRow[] = (nodesQ.data?.nodes ?? [])
     .filter((n) => n.status !== NodeStatus.PENDING && n.status !== NodeStatus.RETIRED)
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode }));
+    .map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode, ipv6: n.ipv6 }));
   const byNode = new Map((checks.data?.countryChecks ?? []).map((c) => [c.nodeId, c]));
   const lanes = new Map((h?.nodes ?? []).map((n) => [n.nodeId, new Map<string, Lane>(n.lanes.map((l) => [l.source, l]))]));
   const lanes6 = new Map((v6On ? (h6.data?.nodes ?? []) : []).flatMap((n) => n.lanes.filter((l) => l.source === "globalping").map((l) => [n.nodeId, l] as const)));
@@ -73,7 +73,7 @@ export function ReachabilityScreen() {
           <Summary tally={tallyOf(nodes.map((n) => n.id), (id) => byNode.get(id)?.verdict)} />
           <Ipv6Helps n={nodes.filter((n) => ipv6Helps(byNode.get(n.id))).length} />
           <DarkEverywhereLines rows={darkEverywhere(nodes.map((n) => byNode.get(n.id)).filter((c): c is CountryCheck => !!c))} />
-          <NodesTable nodes={nodes} checks={byNode} lanes={lanes} lanes6={lanes6} sources={sources} probeNode={checks.data?.tspuRun?.nodeId ?? ""} country={code} since={h.sinceUnix} now={h.nowUnix} />
+          <NodesTable nodes={nodes} checks={byNode} lanes={lanes} lanes6={lanes6} sources={sources} probeNode={checks.data?.tspuRun?.nodeId ?? ""} country={code} since={h.sinceUnix} now={h.nowUnix} owner={owner} />
         </>
       )}
 

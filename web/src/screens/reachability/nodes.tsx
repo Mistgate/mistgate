@@ -1,14 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import { Fragment, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { SectionLabel } from "@/components/ui/bits";
+import { buttonClass } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icons";
 import { Tip } from "@/components/ui/tooltip";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import { countryLook, ipv6Why, type CountryCheck } from "@/lib/health";
-import { ipv6State, laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
+import { countryIn, countryLook, ipv6Why, type CountryCheck } from "@/lib/health";
+import { ipv6Helps, ipv6State, laneNow, midnights, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource, type Segment } from "@/lib/reachability";
+import { entryOffered, type Ipv6Entry } from "@/lib/ways";
 import { CountryMark, CountryPill, PartialBreakdown } from "@/screens/health/country";
 
 // The nodes of the Reachability page: a row per node with its verdict now (the pill of the Health column, with its tooltip), then
@@ -16,9 +19,10 @@ import { CountryMark, CountryPill, PartialBreakdown } from "@/screens/health/cou
 // in place while off, dimmed, so the rows keep their shape; cheburcheck and bsbord have a line while they are on. Below 1280 px (the sidebar takes its part) a row is a card: the verdict on top, the
 // source lines under it, each lane on a line of its own on a phone. While Globalping checks IPv6 as well, the verdict pill says
 // "IPv4" and an "IPv6" pill follows it, and Globalping's lane gets its IPv6 twin under it; a node without an IPv6 verdict gets
-// one quiet line there instead, with the reason (no IPv6 on the server, broken at the hoster, an old agent, no probes).
+// one quiet line there instead, with the reason (no IPv6 on the server, broken at the hoster, an old agent, no probes). A node
+// cut over IPv4 that IPv6 still reaches, with its IPv6 entry off, says so under its lines, with the way to add the entry.
 
-export type NodeRow = { id: string; name: string; countryCode: string };
+export type NodeRow = { id: string; name: string; countryCode: string; ipv6?: Ipv6Entry };
 
 const sourceKey: Record<ReachSource, MessageKey> = {
   globalping: "rc.src.globalping",
@@ -74,6 +78,7 @@ export function NodesTable({
   country,
   since,
   now,
+  owner = false,
 }: {
   nodes: readonly NodeRow[];
   checks: ReadonlyMap<string, CountryCheck>;
@@ -85,6 +90,8 @@ export function NodesTable({
   country: string;
   since: number;
   now: number;
+  /** The owner adds an IPv6 entry from a row; everybody else reads the hint. */
+  owner?: boolean;
 }) {
   const t = useT();
   return (
@@ -138,12 +145,34 @@ export function NodesTable({
                   </span>
                 </div>
               </div>
+              {ipv6Helps(c) && n.ipv6 && !n.ipv6.entry && <EntryHint node={n} country={country} offer={owner && entryOffered(n.ipv6)} />}
               <RowBreakdown check={c} />
             </li>
           );
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * "IPv4 is blocked from Russia, IPv6 gets through." under a node whose IPv6 entry is off (ipv6 plan §2.6, §3.8), across all the
+ * columns; `offer`: with "Add IPv6 entry…", which opens the entry's dialog on the node's Ways in.
+ */
+function EntryHint({ node, country, offer }: { node: NodeRow; country: string; offer: boolean }) {
+  const t = useT();
+  return (
+    <div data-testid="reach-v6-hint" className="tone-ok tint flex flex-wrap items-center gap-x-3 gap-y-2 rounded-field px-3 py-2 xl:col-span-3">
+      <span className="tone-text flex min-w-0 flex-1 basis-56 items-start gap-1.5 text-xs leading-snug font-semibold text-pretty">
+        <Icon name="check" size={13} aria-hidden className="mt-px flex-none" />
+        {t("ways.ipv6.helps", { country: countryIn(t, country) })}
+      </span>
+      {offer && (
+        <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways", way: "ipv6", add: "ipv6" }} className={cx(buttonClass("secondary", "sm"), "max-sm:w-full")}>
+          {t("ways.ipv6.add")}
+        </Link>
+      )}
+    </div>
   );
 }
 

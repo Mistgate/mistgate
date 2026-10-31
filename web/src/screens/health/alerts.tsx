@@ -23,6 +23,7 @@ import { useIsPhone } from "@/lib/media";
 import { clampPage, usePaging } from "@/lib/paging";
 import { plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
+import { entryOffered } from "@/lib/ways";
 import { useAcceptDoctor } from "./doctor-parts";
 import { FixControl, type FixFlow } from "./fix";
 
@@ -57,17 +58,17 @@ export function useMute() {
 
 /**
  * The IPv6 side of a country alert, after its title: "IPv6" on the IPv6 alert itself, "reachable over IPv6" on an IPv4 one whose
- * node the IPv6 rounds reach. Nothing on any other alert.
+ * node the IPv6 rounds reach, "IPv6 entry on" on one whose node has its IPv6 entry on. Nothing on any other alert.
  */
 export function Ipv6Tag({ alert, className }: { alert: Alert; className?: string }) {
   const t = useT();
   const v6 = alertIpv6(alert);
   if (v6 === "alert") return <Chip mono className={cx("text-fg", className)}>IPv6</Chip>;
-  if (v6 === "open")
+  if (v6 === "open" || v6 === "entry")
     return (
       <Chip className={cx("tone-ok tone-text gap-1", className)}>
         <Icon name="check" size={11} aria-hidden className="flex-none" />
-        {t("hl.alerts.v6open")}
+        {t(v6 === "open" ? "hl.alerts.v6open" : "hl.alerts.v6entry")}
       </Chip>
     );
   return null;
@@ -127,6 +128,10 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
   // outbound IPv6 is broken on the node: the remedy is the node's "IPv6 for clients" setting, which only the owner changes
   const ipv6Off = Boolean(a.nodeId) && a.params.suggest === "client_ipv6_off" && can.fix;
   const [turningOff, setTurningOff] = useState(false);
+  // IPv4 is cut from the country while IPv6 gets through: the owner may add the node's IPv6 entry (ipv6 plan §3.8)
+  const v6 = alertIpv6(a);
+  const entryNode = useQuery({ ...nodesQuery, enabled: v6 === "open" && can.fix && !!a.nodeId }).data?.nodes.find((n) => n.id === a.nodeId);
+  const addEntry = v6 === "open" && can.fix && !!entryNode?.ipv6 && entryOffered(entryNode.ipv6);
   // the main action is the first one this role can take
   const goMain = !(target && can.fix) && !restart && !ipv6Off;
   // an alert about a person: their name stands where a node's would, and the button leads to their page
@@ -158,15 +163,15 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
         )}
         <h3 className="min-w-40 flex-1 text-sm font-bold">
           {alertTitle(t, a)}
-          {alertIpv6(a) === "alert" && <Ipv6Tag alert={a} className="ml-2 align-[1px]" />}
+          {v6 === "alert" && <Ipv6Tag alert={a} className="ml-2 align-[1px]" />}
         </h3>
         <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
       </div>
       {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
-      {alertIpv6(a) === "open" && (
-        <p data-testid="alert-v6-open" className="tone-ok tone-text flex items-center gap-1.5 text-[13px] font-semibold">
+      {(v6 === "open" || v6 === "entry") && (
+        <p data-testid={`alert-v6-${v6}`} className="tone-ok tone-text flex items-center gap-1.5 text-[13px] font-semibold">
           <Icon name="check" size={13} aria-hidden className="flex-none" />
-          {t("hl.alerts.v6openLong")}
+          {t(v6 === "open" ? "hl.alerts.v6openLong" : "hl.alerts.v6entryLong")}
         </p>
       )}
       {muted && <p className="font-mono text-[11px] text-faint">{t("hl.alerts.muted", { time: fmt.stamp(a.mutedUntilUnix) })}</p>}
@@ -181,6 +186,11 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false }: { alert: 
           <Button variant={(target && can.fix) || restart ? "secondary" : "primary"} size="md" onClick={() => setTurningOff(true)}>
             {t("hl.ipv6Off.button")}
           </Button>
+        )}
+        {addEntry && (
+          <Link to="/nodes/$id" params={{ id: a.nodeId }} search={{ tab: "ways", way: "ipv6", add: "ipv6" }} className={buttonClass(goMain ? "primary" : "secondary", "md")}>
+            {t("ways.ipv6.add")}
+          </Link>
         )}
         {go === "profiles" && (
           <Link to="/nodes/$id" params={{ id: a.nodeId }} search={{ tab: "profiles" }} className={buttonClass(goMain ? "primary" : "secondary", "md")}>

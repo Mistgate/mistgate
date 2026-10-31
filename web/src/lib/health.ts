@@ -412,12 +412,13 @@ export const ipv6Why = (t: T, c: Pick<CountryCheck, "reason" | "country">) => ca
 
 /**
  * The IPv6 side of a COUNTRY_BLOCKED alert: "alert" for the IPv6 alert itself (family=6), "open" for an IPv4 one whose node the
- * IPv6 rounds reach (ipv6=open). Null for anything else.
+ * IPv6 rounds reach (ipv6=open), "entry" for an IPv4 one whose node has its IPv6 entry on (ipv6=entry: people with IPv6 get
+ * through it). Null for anything else.
  */
-export function alertIpv6(a: Pick<Alert, "kind" | "params">): "alert" | "open" | null {
+export function alertIpv6(a: Pick<Alert, "kind" | "params">): "alert" | "open" | "entry" | null {
   if (a.kind !== AlertKind.COUNTRY_BLOCKED) return null;
   if (a.params.family === "6") return "alert";
-  return a.params.ipv6 === "open" ? "open" : null;
+  return a.params.ipv6 === "open" || a.params.ipv6 === "entry" ? a.params.ipv6 : null;
 }
 
 export type CountryLook = {

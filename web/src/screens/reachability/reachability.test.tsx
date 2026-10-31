@@ -19,7 +19,7 @@ vi.mock("@/lib/api", () => ({
     getReachabilityHistory: (...a: unknown[]) => getHistory(...a),
   },
   health: { getChecks: (...a: unknown[]) => getChecks(...a), listAlerts: (...a: unknown[]) => listAlerts(...a) },
-  nodes: { listNodes: () => Promise.resolve({ nodes: fleet }) },
+  nodes: { listNodes: () => Promise.resolve({ nodes: fleet.map((n) => ({ ...n, ipv6: fleetV6[n.id] })) }) },
   // the cards have their own tests (sources.test.tsx); here they only have to render
   globalping: { getGlobalping: () => Promise.resolve({ settings: { enabled: true, intervalMin: 15, hasToken: true } }) },
   blocklist: { getBlocklist: () => Promise.resolve({ settings: { enabled: true, available: true, checkedUnix: 0, listsUnix: 0 } }) },
@@ -39,8 +39,17 @@ vi.mock("@/lib/api", () => ({
   webauthnSupported: () => false,
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, hash, className, title, ...rest }: { children?: ReactNode; to: string; hash?: string; className?: string; title?: string; "data-testid"?: string }) => (
-    <a href={hash ? `${to}#${hash}` : to} className={className} title={title} data-testid={rest["data-testid"]}>
+  Link: ({
+    children,
+    to,
+    hash,
+    params,
+    search,
+    className,
+    title,
+    ...rest
+  }: { children?: ReactNode; to: string; hash?: string; params?: { id: string }; search?: Record<string, string>; className?: string; title?: string; "data-testid"?: string }) => (
+    <a href={`${to}${search ? `?${new URLSearchParams(search)}` : ""}${hash ? `#${hash}` : ""}`} data-id={params?.id} className={className} title={title} data-testid={rest["data-testid"]}>
       {children}
     </a>
   ),
@@ -59,6 +68,8 @@ const SINCE = NOW - 7 * 24 * H;
 const CUT = SINCE + 3 * 24 * H + 10 * H;
 
 const node = (id: string, name: string, countryCode: string, status = NodeStatus.ONLINE) => ({ id, name, countryCode, status });
+/** Node.ipv6 of the listed nodes, by id (none by default) */
+let fleetV6: Record<string, object> = {};
 const fleet = [
   node("nod_se1", "se1", "SE"),
   node("nod_de1", "de1", "DE"),
@@ -129,6 +140,7 @@ afterEach(() => {
   root = host = null;
   act(() => setLang("en"));
   for (const m of [getHistory, getChecks, listAlerts]) m.mockReset();
+  fleetV6 = {};
 });
 
 async function mount() {
@@ -600,9 +612,45 @@ describe("IPv6 on the Reachability page", () => {
     expect(events[1]).toContain("unreachableIPv6 · closed");
   });
 
+  describe("the hint for the IPv6 entry", () => {
+    const entry = (over: object = {}) => ({ entry: "", entrySupported: true, unavailableReason: "", addresses: [{ address: "2001:db8::5", prefixLen: 64 }], src: "2001:db8::5", ...over });
+    const hint = (name: string) => row(name).querySelector<HTMLElement>("[data-testid=reach-v6-hint]");
+
+    it("under a node cut over IPv4 that IPv6 reaches, with the entry off: the hint and, for the owner, the way to the entry's dialog", async () => {
+      fleetV6 = { nod_fi1: entry(), nod_de1: entry() };
+      await mount();
+      expect(hint("fi1")?.textContent).toBe("IPv4 is blocked from Russia, IPv6 gets through.Add IPv6 entry…");
+      const add = hint("fi1")!.querySelector("a")!;
+      expect(add.getAttribute("href")).toBe("/nodes/$id?tab=ways&way=ipv6&add=ipv6");
+      expect(add.dataset.id).toBe("nod_fi1");
+      // de1 is reachable over IPv4: nothing to say
+      expect(hint("de1")).toBeNull();
+    });
+
+    it("says it without a button to a helper, and to the owner of a node that cannot take an entry", async () => {
+      fleetV6 = { nod_fi1: entry({ entrySupported: false, unavailableReason: "agent_old" }) };
+      await mount();
+      expect(hint("fi1")?.textContent).toBe("IPv4 is blocked from Russia, IPv6 gets through.");
+      act(() => root?.unmount());
+      host?.remove();
+      role = Role.HELPER;
+      fleetV6 = { nod_fi1: entry() };
+      await mount();
+      expect(hint("fi1")?.querySelector("a")).toBeNull();
+    });
+
+    it("is gone once the entry is on", async () => {
+      fleetV6 = { nod_fi1: entry({ entry: "2001:db8::5" }) };
+      await mount();
+      expect(hint("fi1")).toBeNull();
+    });
+  });
+
   it("speaks Russian", async () => {
     act(() => setLang("ru"));
+    fleetV6 = { nod_fi1: { entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "" } };
     await mount();
+    expect(row("fi1").querySelector("[data-testid=reach-v6-hint]")?.textContent).toBe("Из России IPv4 заблокирован, а IPv6 проходит.Добавить вход по IPv6…");
     expect(none("de1")?.textContent).toBe("Globalping · IPv6На сервере нет IPv6"); // the source for a screen reader
     expect(none("se1")?.lastElementChild?.textContent).toBe("У Globalping сейчас нет IPv6-зондов из России");
     expect(document.querySelector("[data-testid=ipv6-helps]")?.textContent).toContain("По IPv4 режут, по IPv6 доступны: 1");
