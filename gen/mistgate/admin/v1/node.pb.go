@@ -309,7 +309,9 @@ type Node struct {
 	// (User.speed_limit_bps). False: this node holds people to the smaller of their two limits per device instead.
 	UserRateLimitSupported bool `protobuf:"varint,34,opt,name=user_rate_limit_supported,json=userRateLimitSupported,proto3" json:"user_rate_limit_supported,omitempty"`
 	// The IPv6 entry of this node: unset only for a node message that was built without the doctor's view (never in the lists).
-	Ipv6          *NodeIpv6 `protobuf:"bytes,35,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
+	Ipv6 *NodeIpv6 `protobuf:"bytes,35,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
+	// Operator notes for the admin list. Not included in user pages or subscription names.
+	Notes         string `protobuf:"bytes,36,opt,name=notes,proto3" json:"notes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -587,6 +589,13 @@ func (x *Node) GetIpv6() *NodeIpv6 {
 		return x.Ipv6
 	}
 	return nil
+}
+
+func (x *Node) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",
@@ -4595,7 +4604,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xad\v\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xc3\v\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -4637,7 +4646,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x10decoy_agent_mode\x18  \x01(\tR\x0edecoyAgentMode\x12,\n" +
 	"\x12decoy_agent_sha256\x18! \x01(\tR\x10decoyAgentSha256\x129\n" +
 	"\x19user_rate_limit_supported\x18\" \x01(\bR\x16userRateLimitSupported\x12/\n" +
-	"\x04ipv6\x18# \x01(\v2\x1b.mistgate.admin.v1.NodeIpv6R\x04ipv6\"\x8d\x02\n" +
+	"\x04ipv6\x18# \x01(\v2\x1b.mistgate.admin.v1.NodeIpv6R\x04ipv6\x12\x14\n" +
+	"\x05notes\x18$ \x01(\tR\x05notes\"\x8d\x02\n" +
 	"\bNodeIpv6\x12\x14\n" +
 	"\x05entry\x18\x01 \x01(\tR\x05entry\x12'\n" +
 	"\x0fentry_supported\x18\x02 \x01(\bR\x0eentrySupported\x12-\n" +
