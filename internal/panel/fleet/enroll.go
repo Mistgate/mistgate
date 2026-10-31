@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
@@ -12,14 +13,25 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 type enrollmentService struct{ f *Fleet }
 
+// hashToken is what the store keeps of an enrollment token: for a proven token (agentlink.ProvesEnrollToken) the hash
+// of its public key, which is all such an agent sends.
 func hashToken(token string) []byte {
+	if agentlink.ProvesEnrollToken(token) {
+		return enrollKeyHash(agentlink.EnrollKey(token).Public().(ed25519.PublicKey))
+	}
 	h := sha256.Sum256([]byte(token))
+	return h[:]
+}
+
+func enrollKeyHash(pub []byte) []byte {
+	h := sha256.Sum256(pub)
 	return h[:]
 }
 
@@ -47,8 +59,8 @@ func peerHost(req connect.AnyRequest) string {
 	return host
 }
 
-// Enroll exchanges a one-time token and a CSR for a node certificate. TLS is server-auth only here; the
-// token is the authentication.
+// Enroll exchanges a one-time token, or the proof of one, and a CSR for a node certificate. TLS is server-auth only here;
+// the token is the authentication.
 func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agentv1.EnrollRequest]) (*connect.Response[agentv1.EnrollResponse], error) {
 	f := s.f
 	now := f.now().UTC()
@@ -68,8 +80,17 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 		}
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("enrollment token unknown, expired or used"))
 	}
-	if m.EnrollmentToken == "" || len(m.EnrollmentToken) > 512 { // real tokens are 52 characters (randomToken)
+	var tokenHash []byte
+	switch {
+	case m.EnrollmentKey != nil || m.EnrollmentSignature != nil:
+		if m.EnrollmentToken != "" || !agentlink.VerifyEnroll(m.EnrollmentKey, m.CsrDer, m.EnrollmentSignature) {
+			return nil, deny()
+		}
+		tokenHash = enrollKeyHash(m.EnrollmentKey)
+	case m.EnrollmentToken == "" || len(m.EnrollmentToken) > 512: // real tokens are 56 characters (randomToken)
 		return nil, deny()
+	default:
+		tokenHash = hashToken(m.EnrollmentToken)
 	}
 	pub, err := parseCSR(m.CsrDer)
 	if err != nil {
@@ -81,7 +102,7 @@ func (s enrollmentService) Enroll(ctx context.Context, req *connect.Request[agen
 	}
 	keyHash := sha256.Sum256(keyDER)
 
-	res, err := f.st.Enroll(ctx, hashToken(m.EnrollmentToken), keyHash[:], now, func(nodeID string) (store.CertRow, error) {
+	res, err := f.st.Enroll(ctx, tokenHash, keyHash[:], now, func(nodeID string) (store.CertRow, error) {
 		return f.ca.issueNode(nodeID, pub, now)
 	})
 	switch {

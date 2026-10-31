@@ -28,6 +28,7 @@ import (
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
+	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 )
 
@@ -85,7 +86,8 @@ type EnrollConfig struct {
 	ResumePendingKey bool   // persist and reuse the CSR key if enrollment is interrupted
 	Timeout          time.Duration
 	// LinkURL (wss://host/<secret-prefix>/) enrols over the panel's public link route instead of the pinned mTLS
-	// endpoint: system-root TLS carries the token, the CA pin then vouches for the panel. Exclusive with Panel and SNI.
+	// endpoint: system-root TLS carries the token (a proven "mg2_" token only as a signature over the CSR), the CA pin
+	// then vouches for the panel. Exclusive with Panel and SNI.
 	LinkURL string
 
 	httpClient *http.Client // test seam for LinkURL; nil = system roots
@@ -158,10 +160,14 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 	defer client.CloseIdleConnections()
 	cctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
+	enrollReq := &pb.EnrollRequest{CsrDer: csr, AgentVersion: cfg.Version, ApiVersion: apiVersion}
+	if agentlink.ProvesEnrollToken(cfg.Token) {
+		enrollReq.EnrollmentKey, enrollReq.EnrollmentSignature = agentlink.SignEnroll(cfg.Token, csr)
+	} else {
+		enrollReq.EnrollmentToken = cfg.Token // an older panel's token: it has no key to prove
+	}
 	resp, err := agentv1connect.NewEnrollmentServiceClient(client, enrollBase, connect.WithReadMaxBytes(1<<20)).Enroll(cctx,
-		connect.NewRequest(&pb.EnrollRequest{
-			EnrollmentToken: cfg.Token, CsrDer: csr, AgentVersion: cfg.Version, ApiVersion: apiVersion,
-		}))
+		connect.NewRequest(enrollReq))
 	if err != nil {
 		var urlErr *url.Error
 		if cfg.LinkURL != "" && errors.As(err, &urlErr) {
@@ -171,8 +177,8 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 	}
 	m := resp.Msg
 
-	// The TLS chain already ended in a CA with the pinned fingerprint; require the CA we are about to
-	// store to be that very CA, and the leaf to be ours and to chain to it.
+	// Over mTLS the chain already ended in a CA with the pinned fingerprint; over the link it did not. Either way require
+	// the CA we are about to store to be the pinned one, and the leaf to be ours and to chain to it.
 	caCert, err := parseOneCert([]byte(m.CaCertificatePem))
 	if err != nil {
 		return Meta{}, fmt.Errorf("panel CA certificate: %w", err)

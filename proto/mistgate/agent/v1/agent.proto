@@ -506,11 +506,16 @@ service AgentService {
 // Enrollment
 
 message EnrollRequest {
+  // Empty when the token is proven (enrollment_key).
   string enrollment_token = 1;
   // PKCS#10 certificate request, DER. Key: ECDSA P-256 (the panel rejects anything else).
   bytes csr_der = 2;
   string agent_version = 3;
   uint32 api_version = 4;
+  // A token with the "mg2_" prefix is not sent: the Ed25519 public key derived from it (agentlink.EnrollKey) and its
+  // signature over "mistgate-enroll/2\0" || csr_der stand for it.
+  bytes enrollment_key = 5;
+  bytes enrollment_signature = 6;
 }
 
 message EnrollResponse {

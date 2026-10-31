@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
@@ -312,17 +313,20 @@ func (r *edgeRig) publicClient() *http.Client {
 	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: r.pool, ServerName: "127.0.0.1"}}}
 }
 
+// edgeEnrollToken is a proven token (agentlink.EnrollTokenPrefix), as the panel issues them.
+const edgeEnrollToken = "mg2_edgelinkenrollmenttoken"
+
 // enrol is `mistgate-node enroll --link-url …` with the seeded one-time token.
 func (r *edgeRig) enrol(pin string) (Meta, error) {
 	return Enroll(context.Background(), EnrollConfig{StateDir: r.stateDir, LinkURL: r.linkURL(), CASHA256: pin,
-		Token: "edge-link-enrollment-token", httpClient: r.publicClient()})
+		Token: edgeEnrollToken, httpClient: r.publicClient()})
 }
 
 // seed creates the node (one enrolment), one inbound and the user whose credential carries the traffic.
 func (r *edgeRig) seed() {
 	r.t.Helper()
 	ctx := context.Background()
-	tokenHash := sha256.Sum256([]byte("edge-link-enrollment-token"))
+	tokenHash := sha256.Sum256(agentlink.EnrollKey(edgeEnrollToken).Public().(ed25519.PublicKey)) // what the panel stores for a proven token
 	now := time.Now().UTC()
 	if _, err := r.st.CreateEnrollment(ctx, &store.NodeRow{ID: r.nodeID, Name: edgeNodeName, Address: "de1.example.com"}, "", tokenHash[:], "test", now, now.Add(time.Hour)); err != nil {
 		r.t.Fatal(err)
