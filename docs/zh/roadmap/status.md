@@ -3,21 +3,22 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.66`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.67`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.66
+  meta: v0.1.0 – v0.1.67
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.66
+      release: v0.1.67
       current: true
       points:
-        - "**IPv6 入口。** 对于网络封锁了节点 IPv4 地址的用户，节点可以在自己的某个 IPv6 地址上再提供一台服务器，所有订阅格式都支持；开启之前面板会从外部检测该地址。在这个版本中需通过 MCP 开启，管理后台中的卡片将在下一步提供。参见 [节点](../guide/nodes.md#ipv6-入口)。"
-        - "**安全审计后的修复。** 通过链路连接的节点注册时不再发送令牌，并且与新版面板之间的会话端到端加密；只有所有者可以更改节点地址；另有退出登录、通行密钥、备份和节点日志方面的小修复。参见 [安全](../operations/security.md#节点如何连接面板)。"
+        - "**管理后台中的 IPv6 入口。** 节点的**入口**标签页有它的卡片：选择服务器的一个 IPv6 地址，由面板从外部检测，然后开启或关闭入口；「可达性」和 IPv6 告警都会引导到这里。不再需要 MCP。参见 [节点](../guide/nodes.md#ipv6-入口)。"
+        - "**在设备上拦截广告和跟踪器。** DNS 预设可以让应用在其他规则之前自行丢弃社区列表 category-ads-all 中的域名；新的内置预设**设备端拦截广告**已开启此项。AmneziaWG 密钥和普通链接列表不会拦截任何内容。参见 [DNS](../guide/dns.md#广告和跟踪器)。"
+        - "**节点诊断中的安全更新。** 新的检查会在 Debian 或 Ubuntu 节点不会自动安装安全更新时发出警告；修复项**开启安全更新**会在所有者确认后，在后台安装 unattended-upgrades 并开启 apt 定时器；它本身不会升级软件包，也不会重启服务器。参见 [节点诊断](../operations/health.md#修复)。"
     - title: 协议配置
       section: profiles
       points:
@@ -35,7 +36,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.66`�
         - "[测量节点网络带宽](../guide/nodes.md#测量网络带宽)。"
         - "[每个节点的伪装站点](../guide/decoy-site.md#节点三种选项)：使用内置站点、面板站点或自己的站点压缩包。"
         - "[通过入口节点中转](../guide/relays.md)：启用前检查，每 5 分钟监测一次，订阅中提供该服务器的副本。"
-        - "[IPv6 入口](../guide/nodes.md#ipv6-入口)：节点的服务器使用其某个 IPv6 地址，开启前从外部检测（目前通过 MCP 开启）。"
+        - "[IPv6 入口](../guide/nodes.md#ipv6-入口)：节点的服务器使用其某个 IPv6 地址，开启前从外部检测。"
     - title: 用户
       section: users
       points:
@@ -47,14 +48,14 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.66`�
         - "每人一个[订阅链接](../guide/subscriptions.md)：为 Happ 等应用提供链接列表，为使用 mihomo 内核的应用提供 Mihomo YAML，为使用 Xray 和 sing-box 内核的应用提供 [Xray JSON 与 sing-box JSON](../guide/subscriptions.md#xray-json-与-sing-box-json)。"
         - "[订阅类应用的设备上限](../guide/subscriptions.md#订阅类应用的设备上限)有三种模式：**仅计数**、**限制**和**严格**。"
         - "[用户页面](../guide/user-page.md)：按平台提供说明、二维码、供 AmneziaVPN 使用的 `vpn://` 密钥，以及用户自己的设备；用户可以[重命名和删除](../guide/user-page.md#自助管理设备)这些设备，页面上还有复制链接的按钮。"
-        - "提供 [DNS 预设](../guide/dns.md)，可用国家列表设置「直连」（中国：国内网站直连）；用户可以在用户页面中为订阅类应用选择 DNS，并为密钥按服务器选择 DNS。"
+        - "提供 [DNS 预设](../guide/dns.md)，可用国家列表设置「直连」（中国：国内网站直连），以及[在应用中拦截广告](../guide/dns.md#广告和跟踪器)；用户可以在用户页面中为订阅类应用选择 DNS，并为密钥按服务器选择 DNS。"
     - title: 运行状况
       section: health
       points:
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
         - "来自节点的[连接计数](../guide/nodes.md#协议配置)：连接次数、连接后立即断开、被拒绝的密钥、未完成的握手、在线时长和未知密钥，在用户页面按设备显示，在节点上按协议配置显示。统计 Hysteria2 和 AmneziaWG 的事件计数，并统计 VLESS 会话时长；Hysteria2 还会记录连接如何结束（路径**冻结**、客户端**静默**或主动关闭）以及延迟和丢包；只有计数，保留 7 天（168 小时）。"
         - "[节点运行记录](../guide/nodes.md#运行记录)：每个节点 Agent 及其引擎 7 天内的警告和错误，不含客户端地址，所有管理员均可查看，也可通过 MCP 获取。"
-        - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元。"
+        - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元；以及 Debian 和 Ubuntu 上的**开启安全更新**。"
         - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点，使用 cheburcheck 的志愿者探测点和 bsbord 的移动 SIM 探测点（包括克里米亚，设有每月上限），比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
@@ -81,7 +82,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.66`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.66
+  meta: v0.1.34 – v0.1.67
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
@@ -104,20 +105,23 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.66`�
       text: "v0.1.65 新增。面板从境外检测中转，因此只有境内用户才会遇到的卡顿会出现在 kl!ck 报告和 bsbord 中，而不是面板自己的检测里。参见 [中转](../guide/relays.md)。"
     - title: 在生产环境中使用 IPv6 入口
       section: nodes
-      text: "v0.1.66 新增。目前需通过 MCP 开启，并且只适用于主机商那边 IPv6 正常的节点。境内用户能否经由它连接，会最先体现在 kl!ck 报告中。参见 [IPv6 入口](../guide/nodes.md#ipv6-入口)。"
+      text: "v0.1.66 新增，管理后台中的卡片自 v0.1.67 起提供。只适用于主机商那边 IPv6 正常的节点。境内用户能否经由它连接，会最先体现在 kl!ck 报告中。参见 [IPv6 入口](../guide/nodes.md#ipv6-入口)。"
+    - title: 在生产环境中使用设备端广告拦截
+      section: subscriptions
+      text: "v0.1.67 新增。Happ 使用它自带 geo 文件中的列表，默认来自 Loyalsoldier，其中约有 195,000 个域名：在 iPhone 上确认 Happ 使用该预设能正常运行后，再把它给更多人。参见 [广告和跟踪器](../guide/dns.md#广告和跟踪器)。"
+    - title: 在生产环境中使用安全更新修复
+      section: health
+      text: "v0.1.67 新增。它会在服务器上安装软件包：先在一个节点上使用，查看那里的诊断结果，再用于其他节点。参见 [修复](../operations/health.md#修复)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。
   cards:
     - title: IPv6：用于检测，也作为入口
       section: health
-      text: "通过 IPv6 检测可达性和 IPv6 入口（通过 MCP）已在最新版本中；接下来是管理后台中的入口卡片和一键更换 IPv6 地址。"
+      text: "通过 IPv6 检测可达性和带管理后台卡片的 IPv6 入口已在最新版本中；接下来是一键更换 IPv6 地址。"
     - title: 你的用户在哪里
       section: settings
       text: "首次设置和设置中的地区：DNS 预设、直连列表、推荐应用和可达性检测都跟随你选择的国家。第一个是中国：「国内网站直连」已在最新版本中。"
-    - title: 在设备上拦截广告和跟踪器
-      section: subscriptions
-      text: "一个 DNS 预设，让应用按社区列表 category-ads-all 自行丢弃广告和跟踪域名，无需第三方 DNS。"
     - title: 看起来像普通自托管服务的伪装站
       section: settings
       text: "内置的伪装站：状态页、文件分享或某个服务的登录页样式，每个安装都不同，包括 404、429 和 robots.txt 的响应，扫描器无法识别；在那里登录总是失败，也不会保存任何内容。"

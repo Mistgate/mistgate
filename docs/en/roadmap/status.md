@@ -3,21 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.66`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.67`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.66
+  meta: v0.1.0 – v0.1.67
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.66
+      release: v0.1.67
       current: true
       points:
-        - "**IPv6 entry.** A node can give people whose network blocks its IPv4 address one more server at one of its own IPv6 addresses, in every subscription format; the panel checks the address from outside before it is turned on. In this version it is turned on through MCP; its card in the admin comes next. See [Nodes](../guide/nodes.md#ipv6-entry)."
-        - "**Security fixes from an audit.** Nodes on the link enrol without sending their token and, with a current panel, encrypt their sessions end to end; only the owner moves a node to another address; and smaller fixes to sign-out, passkeys, backups and the node journal. See [Security](../operations/security.md#how-nodes-reach-the-panel)."
+        - "**The IPv6 entry in the admin.** The node's **Ways in** tab has its card: pick one of the server's IPv6 addresses, let the panel check it from outside, then turn the entry on or off; Reachability and the IPv6 alert lead to it. MCP is no longer needed. See [Nodes](../guide/nodes.md#ipv6-entry)."
+        - "**Ads and trackers blocked on the device.** A DNS preset can make the apps drop the domains of the community list category-ads-all themselves, before any other rule, and the new built-in preset **No ads on the device** has it on; AmneziaWG keys and plain link lists block nothing. See [DNS](../guide/dns.md#ads-and-trackers)."
+        - "**Security updates in the node doctor.** A new check warns when a Debian or Ubuntu node does not install security updates by itself, and the fix **Turn on security updates** installs unattended-upgrades and switches the apt timers on in the background, after the owner confirms; it never upgrades or reboots the server itself. See [Node doctor](../operations/health.md#fixes)."
     - title: Profiles
       section: profiles
       points:
@@ -35,7 +36,7 @@ Mistgate is in **beta**; the current release is `v0.1.66`. It runs in production
         - "[Measuring the network capacity](../guide/nodes.md#measuring-the-network-capacity) of a node's link."
         - "[A decoy site per node](../guide/decoy-site.md#nodes-three-options): the built-in one, the panel's site or an archive of its own."
         - "[Relays through an entry node](../guide/relays.md): checked before they are switched on, watched every 5 minutes, a copy of the server in subscriptions."
-        - "[IPv6 entry](../guide/nodes.md#ipv6-entry): the node's servers at one of its IPv6 addresses, checked from outside before they are turned on (through MCP for now)."
+        - "[IPv6 entry](../guide/nodes.md#ipv6-entry): the node's servers at one of its IPv6 addresses, checked from outside before they are turned on."
     - title: Users
       section: users
       points:
@@ -47,14 +48,14 @@ Mistgate is in **beta**; the current release is `v0.1.66`. It runs in production
         - "One [subscription link](../guide/subscriptions.md) per person: a link list for Happ and similar apps, Mihomo YAML for apps on the mihomo core, [Xray JSON and sing-box JSON](../guide/subscriptions.md#xray-json-and-sing-box-json) for apps on those cores."
         - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
         - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
-        - "[DNS presets](../guide/dns.md), with country lists for \"direct\" (China: Chinese sites direct); on the user page, a DNS choice for the link apps and one per server for the keys."
+        - "[DNS presets](../guide/dns.md), with country lists for \"direct\" (China: Chinese sites direct) and [ads blocked in the apps](../guide/dns.md#ads-and-trackers); on the user page, a DNS choice for the link apps and one per server for the keys."
     - title: Health
       section: health
       points:
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
         - "[Connection counters](../guide/nodes.md#profiles) from the nodes: connections, drops right after connecting, refused keys, handshakes that never complete, time online and unknown keys, per device on a person's page and per profile on the node. Hysteria2 and AmneziaWG event counters, plus VLESS session time; for Hysteria2 also how connections end (a **frozen** path, a **quiet** client, a close), RTT and loss; counts only, kept 7 days (168 hours)."
         - "The [node journal](../guide/nodes.md#journal): the warnings and errors of each node's agent and engines for 7 days, without client addresses, for every admin and in MCP."
-        - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin."
+        - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin, and **Turn on security updates** on Debian and Ubuntu."
         - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, cheburcheck's volunteer probes and bsbord's mobile SIM probes (Crimea included, with a monthly cap), the antifilter block lists, a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country."
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
@@ -81,7 +82,7 @@ Mistgate is in **beta**; the current release is `v0.1.66`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.66
+  meta: v0.1.34 – v0.1.67
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -104,20 +105,23 @@ Mistgate is in **beta**; the current release is `v0.1.66`. It runs in production
       text: "New in v0.1.65. The panel checks a relay from outside the country, so a freeze that only people inside see shows up in kl!ck reports and bsbord, not in the panel's own check. See [Relays](../guide/relays.md)."
     - title: IPv6 entry in production
       section: nodes
-      text: "New in v0.1.66. It is turned on through MCP for now, and only on a node whose IPv6 works at the hoster. Whether people inside a country actually get through over it shows first in kl!ck reports. See [IPv6 entry](../guide/nodes.md#ipv6-entry)."
+      text: "New in v0.1.66, with its card in the admin since v0.1.67. Only on a node whose IPv6 works at the hoster. Whether people inside a country actually get through over it shows first in kl!ck reports. See [IPv6 entry](../guide/nodes.md#ipv6-entry)."
+    - title: Ads blocked on the device in production
+      section: subscriptions
+      text: "New in v0.1.67. Happ takes the list from its own geo files, by default Loyalsoldier's, which adds about 195,000 domains: on an iPhone, check that Happ keeps running with the preset before you give it to many people. See [Ads and trackers](../guide/dns.md#ads-and-trackers)."
+    - title: The security updates fix in production
+      section: health
+      text: "New in v0.1.67. It installs a package on the server: try it on one node first and read the doctor's result there before you run it on the others. See [Fixes](../operations/health.md#fixes)."
 - status: next
   title: Next
   lead: The next items in the queue.
   cards:
     - title: IPv6 for reachability and as a way in
       section: health
-      text: "Reachability checks over IPv6 and the IPv6 entry (through MCP) are in the latest releases; next the entry's card in the admin and a new IPv6 address in one click."
+      text: "Reachability checks over IPv6 and the IPv6 entry with its card in the admin are in the latest releases; next a new IPv6 address in one click."
     - title: Where your people are
       section: settings
       text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China is the first: Chinese sites direct is in the latest release."
-    - title: Ads and trackers blocked on the device
-      section: subscriptions
-      text: "A DNS preset with which the apps drop ad and tracker domains themselves, by the community list category-ads-all, without a third-party DNS."
     - title: Decoys that look like an ordinary self-hosted service
       section: settings
       text: "Built-in decoy sites in the style of a status page, a file share or a service's sign-in page, different on every installation, down to the 404, 429 and robots.txt answers, so that probers cannot recognise them; a sign-in there always fails and keeps nothing."
