@@ -8,8 +8,14 @@ import (
 
 	"github.com/vishvananda/netlink"
 
+	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/node/warp"
 )
+
+// cleanupOwnedIPv6 removes the IPv6 addresses that ipv6-owned.json in the state directory names.
+func cleanupOwnedIPv6(ctx context.Context, stateDir string) error {
+	return hostctl.CleanupOwnedIPv6(ctx, stateDir)
+}
 
 // warpTraces says whether the WARP manager left anything on this host: the device, a rule at one of its preferences that
 // selects its table (the "oif" rule or a client-subnet rule), or its nft table. An orphaned "unreachable default" is always

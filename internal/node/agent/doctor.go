@@ -46,6 +46,7 @@ func (a *Agent) doctorEnv() doctor.Env {
 		return doctor.Settings{Country: st.CountryCode, Resolvers: st.DnsResolvers, ClientIPv6Disabled: st.GetClientIpv6Disabled()}
 	}
 	e.Inbounds = a.doctorInbounds
+	e.OwnedIPv6 = a.doctorOwnedIPv6
 	e.Samples = func(w time.Duration) []doctor.Sample { return a.hostRing.Since(a.now(), w) }
 	e.Offset = a.offsetNow
 	e.AgentCertNotAfter = func() time.Time { return a.id.Load().notAfter() }

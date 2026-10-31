@@ -156,7 +156,7 @@ systemctl restart systemd-journald
 
 If you applied the doctor's resolver fix on that node, remove `/etc/systemd/resolved.conf.d/90-mistgate.conf` and restart systemd-resolved, or put `/etc/resolv.conf` back from `/etc/resolv.conf.mistgate.bak` (when `/etc/resolv.conf.mistgate.bak.link` exists, the original was a symlink to the path written in it).
 
-`mistgate-node cleanup-net` can be run at any time. It removes the AmneziaWG and WARP interfaces, the WARP routes and rules and their nftables tables; the agent creates them again when it starts.
+`mistgate-node cleanup-net` can be run at any time. It removes the AmneziaWG and WARP interfaces, the WARP routes and rules and their nftables tables; the agent creates them again when it starts. It leaves the IPv6 addresses that the agent added to the server (the node's own addresses, named in `ipv6-owned.json` in the state directory) alone, so a restart or an update does not drop them; `mistgate-node cleanup-net --ipv6-addresses` removes those too, and never an address the host had. Retiring a node removes them as well.
 
 ## When enrollment fails
 

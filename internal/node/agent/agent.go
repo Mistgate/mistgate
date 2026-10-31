@@ -119,6 +119,9 @@ type Agent struct {
 	torrentEvents   map[string]time.Time
 	torrentUTPSyn   map[string]*torrentUTPSynWindow
 
+	ownedV6 atomic.Pointer[[]doctor.OwnedAddr] // the states of the last SyncOwnedIPv6 (the doctor reads them)
+	v6      ipv6AddrState                      // worker goroutine only
+
 	instanceID              string
 	out                     *outbox
 	jobs                    chan job
@@ -378,6 +381,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	}
 	a.id.Store(id)
 	a.settings.Store(&pb.NodeSettings{})
+	a.v6.noSettings = a.settings.Load()
 
 	userLimits := ratelimit.NewRegistry() // one per agent: a person's hysteria2 and vless credentials share their bucket
 	for proto, f := range engines {
@@ -536,6 +540,7 @@ func (a *Agent) restore(ctx context.Context) {
 	if m.settings != nil {
 		a.settings.Store(m.settings)
 	}
+	a.syncOwnedIPv6(ctx) // the addresses come back with the agent, without the panel
 	results := a.reconcile(ctx, m, nil)
 	a.setModel(m)
 	failed := 0
@@ -1025,7 +1030,8 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 	if ack.Settings != nil {
 		// A switch changed while the node was offline reaches it only here: the panel sends no desired state when the
 		// inbound hashes match, and the sweep is up to 30 s away. The tunnel firewall follows the switch at once.
-		changed := ack.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled()
+		changed := ack.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled() ||
+			ipv6AddrSettingsChanged(a.settings.Load(), ack.Settings) // the sweep that follows the connect puts the addresses right
 		a.settings.Store(ack.Settings)
 		if changed {
 			a.clientIPv6DoctorPending.Store(true)
@@ -1327,6 +1333,7 @@ func (a *Agent) handle(ctx context.Context, j job) {
 		clientIPv6Changed := j.ds.Settings != nil &&
 			j.ds.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled()
 		r := a.applyDesired(ctx, j.ds)
+		a.syncOwnedIPv6(ctx)
 		if r != nil {
 			reply(&pb.ConnectRequest{Message: &pb.ConnectRequest_ApplyResult{ApplyResult: r}})
 			if clientIPv6Changed && (r.Status == pb.ApplyStatus_APPLY_STATUS_APPLIED || r.Status == pb.ApplyStatus_APPLY_STATUS_PARTIAL) {
@@ -1363,6 +1370,7 @@ func (a *Agent) handle(ctx context.Context, j job) {
 				a.log.Warn("doctor forwarding exceptions could not be reasserted", "err", err)
 			}
 		}
+		a.syncOwnedIPv6(ctx)
 		a.persistModel(nil, true)
 		if m := a.snapshotModel(); m.revision != 0 {
 			a.reconcile(ctx, m, nil)

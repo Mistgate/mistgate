@@ -156,7 +156,7 @@ systemctl restart systemd-journald
 
 如果应用过诊断中的 DNS 解析器修复，删除 `/etc/systemd/resolved.conf.d/90-mistgate.conf` 并重启 systemd-resolved；或者使用 `/etc/resolv.conf.mistgate.bak` 还原 `/etc/resolv.conf`（如果存在 `/etc/resolv.conf.mistgate.bak.link`，原文件是指向其中所写路径的符号链接）。
 
-可以随时运行 `mistgate-node cleanup-net`。它会移除 AmneziaWG 和 WARP 接口、WARP 路由和规则，以及对应的 nftables 表；Agent 启动后会重新创建它们。
+可以随时运行 `mistgate-node cleanup-net`。它会移除 AmneziaWG 和 WARP 接口、WARP 路由和规则，以及对应的 nftables 表；Agent 启动后会重新创建它们。它不会动 Agent 添加到服务器上的 IPv6 地址（节点自己的地址，记录在状态目录的 `ipv6-owned.json` 中），因此重启或更新不会让它们消失；`mistgate-node cleanup-net --ipv6-addresses` 会一并移除它们，但绝不会移除主机原有的地址。退役节点同样会移除它们。
 
 ## 注册失败时
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -16,14 +17,28 @@ import (
 // needs no state and no panel, so the unit runs it from ExecStopPost after every stop: an orphaned "unreachable default"
 // in the WARP table would black-hole every socket still bound to the WARP device, and a kernel-backend interface
 // outlives its process. The agent re-creates all of it at its next start.
+//
+// The IPv6 addresses the agent holds for the panel are not part of that: they stay through a stop, a restart and an update,
+// or the node's IPv6 entry would drop out of reach each time. Only --ipv6-addresses removes them (a hand clean of the
+// server), and only the ones that ipv6-owned.json in the state directory names; the agent's retire does the same.
 func cmdCleanupNet(args []string) int {
-	if len(args) > 0 {
+	fs := flag.NewFlagSet("cleanup-net", flag.ContinueOnError)
+	ipv6 := fs.Bool("ipv6-addresses", false, "also remove the IPv6 addresses the agent added (those named in ipv6-owned.json), never the host's own")
+	stateDir := fs.String("state-dir", envOr("MISTGATE_NODE_STATE_DIR", defaultStateDir), "state directory (for --ipv6-addresses)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 0 {
 		fmt.Fprintln(os.Stderr, "cleanup-net takes no arguments")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if err := errors.Join(hostctl.CleanupTunnels(ctx), hostctl.CleanupUDPCount(ctx), cleanupWarp(ctx)); err != nil {
+	errs := []error{hostctl.CleanupTunnels(ctx), hostctl.CleanupUDPCount(ctx), cleanupWarp(ctx)}
+	if *ipv6 {
+		errs = append(errs, cleanupOwnedIPv6(ctx, *stateDir))
+	}
+	if err := errors.Join(errs...); err != nil {
 		fmt.Fprintln(os.Stderr, "cleanup-net:", err)
 		return 1
 	}

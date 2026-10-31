@@ -167,6 +167,9 @@ func (a *Agent) capabilities() []string {
 	if a.country.canProbe() {
 		caps = append(caps, capCountryProbe)
 	}
+	if a.ownedIPv6Host() != nil {
+		caps = append(caps, capIPv6Addr)
+	}
 	if a.cfg.UnitGen >= 3 {
 		caps = append(caps, capUnit3)
 	}

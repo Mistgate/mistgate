@@ -16,7 +16,8 @@ commands:
             the panel shows this command when you add a node)
   install   write a hardened systemd unit, enable and start it (root, Linux; -h for --state-dir, --bin, --no-start)
   run       run the agent in the foreground: what the systemd unit does, and the way to try it without systemd
-  cleanup-net  remove the tunnel interfaces, the WARP routes and the nft tables of the agent (what the unit runs after every stop)
+  cleanup-net  remove the tunnel interfaces, the WARP routes and the nft tables of the agent (what the unit runs after every stop);
+            --ipv6-addresses also removes the IPv6 addresses it added (a hand clean of the server)
   awg       awg prepare-kernel: install the AmneziaWG kernel module (root, explicit; the default userspace backend needs none)
   host      host enable-security-updates: enable unattended security updates (root, Linux; -h for details)
   version   print the version
