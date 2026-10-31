@@ -28,6 +28,7 @@ const (
 	maxEngines      = 32 // engines listed in one Hello
 	capTorrentGuard = "torrentguard/1"
 	capClientIPv6   = "client-ipv6/1" // NodeSettings.client_ipv6_disabled
+	capIPv6Addr     = "ipv6-addr/1"   // NodeSettings.ipv6_addresses
 	capWSLink       = "ws-link/1"
 	capDecoy        = "decoy/1"
 )
@@ -638,7 +639,7 @@ func runState(s agentv1.InboundRunState) string {
 	return "pending"
 }
 
-// nodeSettings is what the agent of a stream with these capabilities is told. The AWG, torrent blocker and client IPv6 settings
+// nodeSettings is what the agent of a stream with these capabilities is told. The AWG, torrent blocker, client IPv6 and own IPv6 address settings
 // are sent only to agents that advertise the capability, keeping old-agent settings signatures unchanged.
 // An empty resolver list stays empty: the node then uses the server's own resolver (some hosters allow only theirs);
 // country defaults are a preset the owner picks, never a silent substitute.
@@ -655,8 +656,16 @@ func nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 	if slices.Contains(caps, capClientIPv6) {
 		s.ClientIpv6Disabled = !n.ClientIPv6
 	}
+	if slices.Contains(caps, capIPv6Addr) {
+		s.Ipv6Addresses = ownedIPv6Addresses(n)
+	}
 	return s
 }
+
+// ownedIPv6Addresses are the addresses the node's agent holds on its uplink (NodeSettings.ipv6_addresses). Nothing puts one
+// there yet: the state machine of the address change fills the list from n.IPv6() (ipv6_json), so for now the list is
+// always empty and no node changes. A variable so that the tests can stand in for that source.
+var ownedIPv6Addresses = func(n store.NodeRow) []string { return nil }
 
 func settingsSig(s *agentv1.NodeSettings) string {
 	sig := fmt.Sprint(s.StatsIntervalS, s.KeepaliveIntervalS, s.KeepaliveTimeoutS, s.DialTimeoutS, s.DnsResolvers, s.CountryCode, s.AwgBackend)
@@ -665,6 +674,9 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	}
 	if s.ClientIpv6Disabled {
 		sig += "|client-ipv6=off"
+	}
+	if len(s.Ipv6Addresses) > 0 { // absent for an agent without ipv6-addr/1 and while the list is empty: the signature stays what it was
+		sig += "|ipv6-addr=" + strings.Join(s.Ipv6Addresses, ",")
 	}
 	return sig
 }
