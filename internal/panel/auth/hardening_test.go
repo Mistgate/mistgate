@@ -863,3 +863,62 @@ func TestSessionUserAgentIsClipped(t *testing.T) {
 		t.Errorf("ListSessions does not marshal: %v", err)
 	}
 }
+
+// Adding a passkey is bound to the session that passed the step-up and began it, like step-up and TOTP enrollment: a
+// ceremony id that leaks to another session of the same admin cannot be finished there, and the attempt burns it.
+func TestAddPasskeyCeremonyIsBoundToItsSession(t *testing.T) {
+	s, st, _ := newTestService(t)
+	admin, cookie, _ := passkeyAdmin(t, s, st)
+	other, err := s.newSession(context.Background(), admin.ID, "198.51.100.9", "other browser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attest := func(optionsJSON string) string {
+		t.Helper()
+		opts, err := virtualwebauthn.ParseAttestationOptions(optionsJSON)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dev, cred := virtualwebauthn.NewAuthenticator(), virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+		dev.Options.UserHandle = []byte(opts.UserID)
+		return virtualwebauthn.CreateAttestationResponse(virtualwebauthn.RelyingParty{Name: "Mistgate", ID: "localhost", Origin: "http://localhost:8081"}, dev, cred, *opts)
+	}
+	finish := func(sessionCookie, ceremonyID, credentialJSON string) error {
+		_, err := s.FinishAddPasskey(authed(t, s, sessionCookie), cookieReq(&adminv1.FinishAddPasskeyRequest{CeremonyId: ceremonyID, CredentialJson: credentialJSON}, sessionCookie))
+		return err
+	}
+	passkeys := func() int {
+		t.Helper()
+		pks, err := st.PasskeysByAdmin(context.Background(), admin.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(pks)
+	}
+
+	begin, err := s.BeginAddPasskey(authed(t, s, cookie), cookieReq(&adminv1.BeginAddPasskeyRequest{}, cookie))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cj := attest(begin.Msg.OptionsJson)
+	if err := finish(other.Value, begin.Msg.CeremonyId, cj); codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("another session of the same admin finished the ceremony: %v", err)
+	}
+	if err := finish(cookie, begin.Msg.CeremonyId, cj); codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("a ceremony tried from another session still worked: %v", err)
+	}
+	if n := passkeys(); n != 1 {
+		t.Fatalf("passkeys after refused finishes = %d, want 1", n)
+	}
+
+	begin, err = s.BeginAddPasskey(authed(t, s, cookie), cookieReq(&adminv1.BeginAddPasskeyRequest{}, cookie))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finish(cookie, begin.Msg.CeremonyId, attest(begin.Msg.OptionsJson)); err != nil {
+		t.Fatalf("the session that began it: %v", err)
+	}
+	if n := passkeys(); n != 2 {
+		t.Fatalf("passkeys after the finish = %d, want 2", n)
+	}
+}

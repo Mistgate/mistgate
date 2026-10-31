@@ -107,7 +107,7 @@ type ceremony struct {
 	kind      string // ceremonySetup, ceremonySetupPassword, ceremonyLogin or ceremonyAddPasskey
 	src       string // who started it (SourceKey), for the per-source cap
 	data      webauthn.SessionData
-	tokenHash []byte      // setup: the token the ceremony was started with
+	tokenHash []byte      // setup: the token the ceremony was started with; step-up, TOTP enrollment, add-passkey: the session's
 	admin     store.Admin // setup: the admin that will be created; add-passkey: the signed-in admin
 	name      string      // add-passkey: the label
 	login     string      // setup-password

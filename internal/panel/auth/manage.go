@@ -96,7 +96,8 @@ func (s *Service) BeginAddPasskey(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, errInternal(err)
 	}
-	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyAddPasskey, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, name: name})
+	// bound to this session, like step-up and TOTP enrollment: the step-up above was this session's
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyAddPasskey, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, name: name, tokenHash: currentHash(req)})
 	if err != nil {
 		return nil, ceremonyPutError(err)
 	}
@@ -109,8 +110,10 @@ func (s *Service) FinishAddPasskey(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
-	// another admin's ceremony is as good as unknown
-	c, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey, func(c *ceremony) bool { return c.admin.ID == admin.ID })
+	// another admin's ceremony, or one begun in another session of the same admin, is as good as unknown
+	c, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey, func(c *ceremony) bool {
+		return c.admin.ID == admin.ID && bytes.Equal(c.tokenHash, currentHash(req))
+	})
 	if errors.Is(err, errCeremonyGone) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
 	}
