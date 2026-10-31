@@ -3,22 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.65`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.66`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.65
+  meta: v0.1.0 – v0.1.66
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.65
+      release: v0.1.66
       current: true
       points:
-        - "**Relays through an entry node.** When some networks cannot reach a server, people get to it through another of your nodes, which only forwards the encrypted traffic. The panel checks the path before a relay is switched on, watches it every 5 minutes and alerts when it breaks; subscriptions get a \"… via RU\" copy of the server. See [Relays](../guide/relays.md)."
-        - "**Ways in** on the node page draws how people reach the node as a line, with **Add a way in…** for a node that some networks cannot open. See [Nodes](../guide/nodes.md)."
-        - "**Reachability over IPv6** through Globalping, a doctor fix for hosts whose firewall drops forwarded traffic, and on VLESS and Hysteria2 an IP the app asked for stays the destination. See [Reachability](../operations/reachability.md)."
+        - "**IPv6 entry.** A node can give people whose network blocks its IPv4 address one more server at one of its own IPv6 addresses, in every subscription format; the panel checks the address from outside before it is turned on. In this version it is turned on through MCP; its card in the admin comes next. See [Nodes](../guide/nodes.md#ipv6-entry)."
+        - "**Security fixes from an audit.** Nodes on the link enrol without sending their token and, with a current panel, encrypt their sessions end to end; only the owner moves a node to another address; and smaller fixes to sign-out, passkeys, backups and the node journal. See [Security](../operations/security.md#how-nodes-reach-the-panel)."
     - title: Profiles
       section: profiles
       points:
@@ -36,6 +35,7 @@ Mistgate is in **beta**; the current release is `v0.1.65`. It runs in production
         - "[Measuring the network capacity](../guide/nodes.md#measuring-the-network-capacity) of a node's link."
         - "[A decoy site per node](../guide/decoy-site.md#nodes-three-options): the built-in one, the panel's site or an archive of its own."
         - "[Relays through an entry node](../guide/relays.md): checked before they are switched on, watched every 5 minutes, a copy of the server in subscriptions."
+        - "[IPv6 entry](../guide/nodes.md#ipv6-entry): the node's servers at one of its IPv6 addresses, checked from outside before they are turned on (through MCP for now)."
     - title: Users
       section: users
       points:
@@ -81,7 +81,7 @@ Mistgate is in **beta**; the current release is `v0.1.65`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.65
+  meta: v0.1.34 – v0.1.66
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -102,13 +102,16 @@ Mistgate is in **beta**; the current release is `v0.1.65`. It runs in production
     - title: Relays in production
       section: nodes
       text: "New in v0.1.65. The panel checks a relay from outside the country, so a freeze that only people inside see shows up in kl!ck reports and bsbord, not in the panel's own check. See [Relays](../guide/relays.md)."
+    - title: IPv6 entry in production
+      section: nodes
+      text: "New in v0.1.66. It is turned on through MCP for now, and only on a node whose IPv6 works at the hoster. Whether people inside a country actually get through over it shows first in kl!ck reports. See [IPv6 entry](../guide/nodes.md#ipv6-entry)."
 - status: next
   title: Next
   lead: The next items in the queue.
   cards:
     - title: IPv6 for reachability and as a way in
       section: health
-      text: "Reachability checks over IPv6 (in the latest release), then an IPv6 entry for people whose network blocks a node's IPv4, and a new IPv6 address in one click."
+      text: "Reachability checks over IPv6 and the IPv6 entry (through MCP) are in the latest releases; next the entry's card in the admin and a new IPv6 address in one click."
     - title: Where your people are
       section: settings
       text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China is the first: Chinese sites direct is in the latest release."
