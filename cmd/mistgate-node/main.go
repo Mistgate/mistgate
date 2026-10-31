@@ -18,6 +18,7 @@ commands:
   run       run the agent in the foreground: what the systemd unit does, and the way to try it without systemd
   cleanup-net  remove the tunnel interfaces, the WARP routes and the nft tables of the agent (what the unit runs after every stop)
   awg       awg prepare-kernel: install the AmneziaWG kernel module (root, explicit; the default userspace backend needs none)
+  host      host enable-security-updates: enable unattended security updates (root, Linux; -h for details)
   version   print the version
 
 Both enroll and run take --state-dir (default /var/lib/mistgate-node); give them the same one.
@@ -64,6 +65,8 @@ func dispatch(args []string) int {
 		return cmdCleanupNet(args[1:])
 	case "awg":
 		return cmdAwg(args[1:])
+	case "host":
+		return cmdHost(args[1:])
 	case "run":
 		return cmdRun(args[1:])
 	case "help", "-h", "--help":

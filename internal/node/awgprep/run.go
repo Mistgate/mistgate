@@ -84,6 +84,9 @@ func lockBusy(out string) bool {
 	return false
 }
 
+// IsAptLockOutput reports whether apt or dpkg said that another package manager holds a lock.
+func IsAptLockOutput(out string) bool { return lockBusy(out) }
+
 // ctxFailure is the Failure of a run whose context ended, or nil while it is alive.
 func ctxFailure(ctx context.Context, limit time.Duration) *Failure {
 	switch {
