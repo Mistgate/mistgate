@@ -41,6 +41,28 @@ func TestSPAShellVersionAndCache(t *testing.T) {
 	}
 }
 
+// The admin prefix is a stored setting: whatever it holds stays inside the <base href> attribute, and New refuses a
+// prefix with characters a URL path cannot carry as is.
+func TestSPABaseIsEscapedAndPrefixCharset(t *testing.T) {
+	s := &Server{dist: fstest.MapFS{"index.html": {Data: []byte(`<!doctype html><html><head><base href="/"></head><body>app</body></html>`)}}}
+	rec := httptest.NewRecorder()
+	s.spa(`/k"><script>alert(1)</script>/`).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/login", nil))
+	body := rec.Body.String()
+	if strings.Contains(body, "<script>") || !strings.Contains(body, `<base href="/k&#34;&gt;&lt;script&gt;alert(1)&lt;/script&gt;/">`) {
+		t.Errorf("shell: %q", body)
+	}
+	for _, p := range []string{"/ab/", "/abcdefghijklmnopqrstuvwx/", "/nodes/install.v2/", "/a-b_c~d/"} {
+		if !validSecretPrefix(p) {
+			t.Errorf("validSecretPrefix(%q) = false", p)
+		}
+	}
+	for _, p := range []string{"/", "//", "k/", "/k", `/k"/`, "/k'/", "/<k>/", "/k`/", `/k\/`, "/k k/", "/k\t/", "/k\n/", "/k\x00/", "/k\x7f/"} {
+		if validSecretPrefix(p) {
+			t.Errorf("validSecretPrefix(%q) = true", p)
+		}
+	}
+}
+
 // Only a signed-in admin gets the version header; the public sign-in procedures and the 401 stay silent.
 func TestAPIVersionHeaderOnlyWhenSignedIn(t *testing.T) {
 	withBuildVersion(t, "1.2.3")

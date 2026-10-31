@@ -60,8 +60,8 @@ func (s *Server) spa(base string) http.Handler {
 			writeHTML(w, r, http.StatusOK, uiNotBuiltHTML)
 			return
 		}
-		if base != "/" {
-			index = bytes.Replace(index, []byte(`<base href="/">`), []byte(`<base href="`+base+`">`), 1)
+		if base != "/" { // escaped: the prefix is a stored setting, and a quote in it must not end the attribute
+			index = bytes.Replace(index, []byte(`<base href="/">`), []byte(`<base href="`+html.EscapeString(base)+`">`), 1)
 		}
 		if v := buildinfo.Version; v != "" {
 			index = bytes.Replace(index, []byte("<head>"), []byte(`<head><meta name="`+versionMeta+`" content="`+html.EscapeString(v)+`">`), 1)
