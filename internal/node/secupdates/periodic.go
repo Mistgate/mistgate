@@ -72,14 +72,40 @@ func (p Periodic) OffDetails() []string {
 	return details
 }
 
+// periodicKeys are the settings Mistgate's override file may hold, in the order it writes them.
+var periodicKeys = []string{"APT::Periodic::Enable", "APT::Periodic::Update-Package-Lists", "APT::Periodic::Unattended-Upgrade"}
+
 // ConfigForDisabled returns only the settings that need to be enabled in Mistgate's override file.
-func (p Periodic) ConfigForDisabled() string {
+func (p Periodic) ConfigForDisabled() string { return ConfigFor(p.DisabledKeys()) }
+
+// ConfigFor is the override file that switches the given settings on (each once, in a fixed order; unknown keys are
+// dropped).
+func ConfigFor(keys []string) string {
 	var b strings.Builder
 	b.WriteString("# Managed by mistgate-node enable-security-updates.\n")
-	for _, key := range p.DisabledKeys() {
-		fmt.Fprintf(&b, "%s \"1\";\n", key)
+	for _, key := range periodicKeys {
+		for _, k := range keys {
+			if k == key {
+				fmt.Fprintf(&b, "%s \"1\";\n", key)
+				break
+			}
+		}
 	}
 	return b.String()
+}
+
+// ManagedKeys are the settings an earlier run already switched on in the override file (body = its content). A new run
+// keeps them: without them the owner's lower-numbered "0" would count again.
+func ManagedKeys(body string) []string {
+	var keys []string
+	for _, line := range strings.Split(body, "\n") {
+		for _, key := range periodicKeys {
+			if strings.TrimSpace(line) == key+` "1";` {
+				keys = append(keys, key)
+			}
+		}
+	}
+	return keys
 }
 
 func periodicOff(value string) bool {

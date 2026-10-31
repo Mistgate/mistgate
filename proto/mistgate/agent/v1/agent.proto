@@ -217,9 +217,11 @@ package mistgate.agent.v1;
 //     enable_security_updates  start "mistgate-node host enable-security-updates" in the fixed transient root unit
 //                       mistgate-security-updates (systemd-run, no shell) and answer started=1 at once: it installs
 //                       unattended-upgrades if missing, sets the APT::Periodic switches that are off in
-//                       /etc/apt/apt.conf.d/99mistgate-security-updates and unmasks/enables the apt-daily timers; it never
-//                       upgrades, runs unattended-upgrade or reboots, and Cleanup leaves it all on. The check shows
-//                       enabling while the unit runs. Offered by security_updates.
+//                       /etc/apt/apt.conf.d/99mistgate-security-updates (keeping what an earlier run set there) and
+//                       unmasks, enables and starts the apt-daily timers on their schedule (stamps kept at now, so no
+//                       missed run fires); it never upgrades, runs unattended-upgrade or reboots, a started apt-get is
+//                       not cut by the job's deadline, and Cleanup leaves it all on. The check shows enabling while the
+//                       unit runs. Offered by security_updates, only by an agent that can launch the unit.
 //
 // UPDATE (agent self-update; additive, protocol api_version stays 1)
 //   The panel hands the agent a release manifest signed by the owner's release key; the agent verifies it

@@ -541,7 +541,7 @@ export const en = {
   "health.fix.allow_forwarding.label": "Allow Mistgate forwarding",
   "health.fix.allow_forwarding.plan": "Add {rules} rules and remove {remove_rules} stale Mistgate-only rules across {chains} drop-policy chain(s). They match only new traffic from AWG clients (not towards container bridges), the replies of connections the clients began, and {relays} current relay forward(s); other traffic, including new connections towards clients, stays under the host firewall.",
   "health.fix.enable_security_updates.label": "Turn on security updates",
-  "health.fix.enable_security_updates.plan": "In the background: install unattended-upgrades from the server's own apt sources if it is missing, set the APT::Periodic switches to \"1\" in /etc/apt/apt.conf.d/99mistgate-security-updates if they are off, and enable the apt-daily timers. No reboot; Automatic-Reboot is not touched. Up to 20 minutes if another apt is running.",
+  "health.fix.enable_security_updates.plan": "In the background: install unattended-upgrades from the server's own apt sources if it is missing, set the APT::Periodic switches to \"1\" in /etc/apt/apt.conf.d/99mistgate-security-updates if they are off, and enable and start the apt-daily timers on their usual schedule (updates install at the next daily run, not now). No reboot; Automatic-Reboot is not touched. Up to 20 minutes if another apt is running.",
 
   // ---- check errors (health.check.err.<code>)
   "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive)",
@@ -1084,7 +1084,7 @@ export const ru: typeof en = {
   "health.fix.allow_forwarding.label": "Разрешить пересылку трафика Mistgate",
   "health.fix.allow_forwarding.plan": "Добавить {rules} правил и удалить {remove_rules} устаревших правил только для Mistgate в {chains} цепочках FORWARD с политикой DROP. Они пропускают только новый трафик клиентов AWG (не в контейнерные мосты), ответы на соединения, начатые клиентами, и {relays} текущих перенаправлений; остальной трафик, включая новые соединения к клиентам, по-прежнему фильтрует файрвол хоста.",
   "health.fix.enable_security_updates.label": "Включить обновления безопасности",
-  "health.fix.enable_security_updates.plan": "В фоне: поставить unattended-upgrades из источников apt самого сервера, если его нет; выставить переключатели APT::Periodic в \"1\" в /etc/apt/apt.conf.d/99mistgate-security-updates, если они выключены; включить таймеры apt-daily. Без перезагрузки; Automatic-Reboot не трогаем. До 20 минут, если работает другой apt.",
+  "health.fix.enable_security_updates.plan": "В фоне: поставить unattended-upgrades из источников apt самого сервера, если его нет; выставить переключатели APT::Periodic в \"1\" в /etc/apt/apt.conf.d/99mistgate-security-updates, если они выключены; включить и запустить таймеры apt-daily по обычному расписанию (обновления поставятся при следующем ежедневном запуске, не сейчас). Без перезагрузки; Automatic-Reboot не трогаем. До 20 минут, если работает другой apt.",
 
   // ---- check errors
   "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP)",
@@ -1570,7 +1570,7 @@ export const zh: typeof en = {
   "health.fix.allow_forwarding.label": "允许 Mistgate 转发流量",
   "health.fix.allow_forwarding.plan": "在 {chains} 条默认丢弃的 FORWARD 链中添加 {rules} 条规则，并删除 {remove_rules} 条过期的 Mistgate 专用规则。规则只匹配 AWG 客户端发起的新流量（不含去往容器网桥）、客户端已建立连接的返回流量和当前 {relays} 条中继转发；其他流量（包括指向客户端的新连接）仍由主机防火墙处理。",
   "health.fix.enable_security_updates.label": "开启安全更新",
-  "health.fix.enable_security_updates.plan": "在后台执行：如未安装，则从服务器自己的 apt 源安装 unattended-upgrades；如已关闭，则在 /etc/apt/apt.conf.d/99mistgate-security-updates 中将 APT::Periodic 开关设为 \"1\"；启用 apt-daily 定时器。不会重启，不修改 Automatic-Reboot。若其他 apt 正在运行，最多需要 20 分钟。",
+  "health.fix.enable_security_updates.plan": "在后台执行：如未安装，则从服务器自己的 apt 源安装 unattended-upgrades；如已关闭，则在 /etc/apt/apt.conf.d/99mistgate-security-updates 中将 APT::Periodic 开关设为 \"1\"；启用并按原有计划启动 apt-daily 定时器（更新会在下一次每日运行时安装，而不是现在）。不会重启，不修改 Automatic-Reboot。若其他 apt 正在运行，最多需要 20 分钟。",
 
   "health.check.err.timeout": "未在规定时间内应答：握手或首个请求没有完成（对 Hysteria2 和 AmneziaWG，这通常意味着 UDP 到不了）",
   "health.check.err.auth": "节点拒绝了面板的检测账户",

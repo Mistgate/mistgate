@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"reflect"
 	"slices"
 	"strings"
@@ -139,8 +140,11 @@ func TestJobRetriesInstallAfterAptUpdateAndEnablesTimers(t *testing.T) {
 	runner.add(commandKey("apt-get", "update"), reply{output: "unavailable third-party index", err: errors.New("exit status 100")})
 	runner.add(aptConfigCommandKey(), reply{output: "E='1'; L='1'; U='1';"})
 	runner.add(commandKey("systemctl", "is-enabled", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "masked\nenabled\n", err: errors.New("one timer is masked")})
+	runner.add(commandKey("systemctl", "is-active", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "inactive\nactive\n", err: errors.New("one timer is inactive")})
 	runner.add(commandKey("systemctl", "unmask", "apt-daily.timer"), reply{})
-	runner.add(commandKey("systemctl", "enable", "--now", "apt-daily.timer"), reply{})
+	runner.add(commandKey("systemctl", "enable", "apt-daily.timer"), reply{})
+	runner.add(commandKey("touch", "-c", "/var/lib/systemd/timers/stamp-apt-daily.timer"), reply{})
+	runner.add(commandKey("systemctl", "start", "apt-daily.timer"), reply{})
 
 	sys := newFakeSys()
 	statusPath := t.TempDir() + "/security-updates.json"
@@ -149,7 +153,7 @@ func TestJobRetriesInstallAfterAptUpdateAndEnablesTimers(t *testing.T) {
 			t.Errorf("first command saw status %+v, want running", status)
 		}
 	}
-	err := (Job{StatusPath: statusPath, Run: runner.run, Sys: sys.sys()}).Do(context.Background())
+	err := (Job{StatusPath: statusPath, Run: runner.run, Sys: sys.sys(), ReadFile: noFile}).Do(context.Background())
 	if err != nil {
 		t.Fatalf("job failed: %v", err)
 	}
@@ -160,12 +164,18 @@ func TestJobRetriesInstallAfterAptUpdateAndEnablesTimers(t *testing.T) {
 	if got := runner.calls[1]; !reflect.DeepEqual(got, install) {
 		t.Fatalf("install args = %v, want %v", got, install)
 	}
-	if len(runner.calls) != 8 || runner.calls[2][0] != "apt-get" || runner.calls[2][1] != "update" {
+	if len(runner.calls) != 11 || runner.calls[2][0] != "apt-get" || runner.calls[2][1] != "update" {
 		t.Fatalf("retry sequence = %v", runner.calls)
 	}
-	if runner.calls[6][0] != "systemctl" || !slices.Equal(runner.calls[6][1:], []string{"unmask", "apt-daily.timer"}) ||
-		runner.calls[7][0] != "systemctl" || !slices.Equal(runner.calls[7][1:], []string{"enable", "--now", "apt-daily.timer"}) {
-		t.Fatalf("timer commands = %v", runner.calls[6:])
+	// unmask, enable without --now, the stamp kept at now (no missed run fires), then start: in that order
+	wantTimers := [][]string{
+		{"systemctl", "unmask", "apt-daily.timer"},
+		{"systemctl", "enable", "apt-daily.timer"},
+		{"touch", "-c", "/var/lib/systemd/timers/stamp-apt-daily.timer"},
+		{"systemctl", "start", "apt-daily.timer"},
+	}
+	if !reflect.DeepEqual(runner.calls[7:], wantTimers) {
+		t.Fatalf("timer commands = %v, want %v", runner.calls[7:], wantTimers)
 	}
 	if len(sys.writes) != 0 {
 		t.Fatalf("unexpected config writes: %v", sys.writes)
@@ -189,9 +199,10 @@ func TestJobWritesOnlyDisabledAPTSettingsAndFailsWhenOverridden(t *testing.T) {
 			runner.add(aptConfigCommandKey(), reply{output: "E='0'; L='0'; U='1';"}, reply{output: tc.second})
 			if tc.wantState == awgprep.StateDone {
 				runner.add(commandKey("systemctl", "is-enabled", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "enabled\nenabled\n"})
+				runner.add(commandKey("systemctl", "is-active", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "active\nactive\n"})
 			}
 			sys := newFakeSys()
-			err := (Job{Run: runner.run, Sys: sys.sys()}).Do(context.Background())
+			err := (Job{Run: runner.run, Sys: sys.sys(), ReadFile: noFile}).Do(context.Background())
 			if tc.wantCode == "" {
 				if err != nil {
 					t.Fatalf("job failed: %v", err)
@@ -231,5 +242,114 @@ func TestJobTimeoutWritesFailedStatus(t *testing.T) {
 	status := readStatus(t, statusPath)
 	if status.State != awgprep.StateFailed || status.Code != awgprep.CodeTimeout {
 		t.Fatalf("timeout status = %+v", status)
+	}
+}
+
+func noFile(string) ([]byte, error) { return nil, fs.ErrNotExist }
+
+// A second run keeps what the first one switched on: rewriting only the newly disabled key would let the owner's lower
+// "0" for the others count again (and the run would end as overridden).
+func TestJobKeepsTheSettingsAnEarlierRunSwitchedOn(t *testing.T) {
+	runner := newFakeRunner()
+	runner.add(commandKey("dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"), reply{output: "install ok installed"})
+	runner.add(aptConfigCommandKey(), reply{output: "E='0'; L='1'; U='1';"}, reply{output: "E='1'; L='1'; U='1';"})
+	runner.add(commandKey("systemctl", "is-enabled", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "enabled\nenabled\n"})
+	runner.add(commandKey("systemctl", "is-active", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "active\nactive\n"})
+	earlier := "# Managed by mistgate-node enable-security-updates.\nAPT::Periodic::Update-Package-Lists \"1\";\nAPT::Periodic::Unattended-Upgrade \"1\";\n"
+	read := func(path string) ([]byte, error) {
+		if path != ConfigPath {
+			t.Errorf("read %s, want only %s", path, ConfigPath)
+		}
+		return []byte(earlier), nil
+	}
+	sys := newFakeSys()
+	if err := (Job{Run: runner.run, Sys: sys.sys(), ReadFile: read}).Do(context.Background()); err != nil {
+		t.Fatalf("job failed: %v", err)
+	}
+	want := "# Managed by mistgate-node enable-security-updates.\n" +
+		"APT::Periodic::Enable \"1\";\n" +
+		"APT::Periodic::Update-Package-Lists \"1\";\n" +
+		"APT::Periodic::Unattended-Upgrade \"1\";\n"
+	if got := sys.writes[ConfigPath]; got != want {
+		t.Fatalf("config = %q, want %q", got, want)
+	}
+}
+
+// A timer that is enabled but stopped is started (enable is not needed), with its stamp kept at now first, so a missed
+// apt-daily-upgrade run does not install updates at once.
+func TestJobStartsAStoppedTimerOnItsSchedule(t *testing.T) {
+	runner := newFakeRunner()
+	runner.add(commandKey("dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"), reply{output: "install ok installed"})
+	runner.add(aptConfigCommandKey(), reply{output: "E='1'; L='1'; U='1';"})
+	runner.add(commandKey("systemctl", "is-enabled", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "enabled\nenabled\n"})
+	runner.add(commandKey("systemctl", "is-active", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "active\ninactive\n", err: errors.New("exit status 3")})
+	runner.add(commandKey("touch", "-c", "/var/lib/systemd/timers/stamp-apt-daily-upgrade.timer"), reply{})
+	runner.add(commandKey("systemctl", "start", "apt-daily-upgrade.timer"), reply{})
+	if err := (Job{Run: runner.run, Sys: newFakeSys().sys(), ReadFile: noFile}).Do(context.Background()); err != nil {
+		t.Fatalf("job failed: %v", err)
+	}
+	last := runner.calls[len(runner.calls)-2:]
+	if !reflect.DeepEqual(last, [][]string{{"touch", "-c", "/var/lib/systemd/timers/stamp-apt-daily-upgrade.timer"}, {"systemctl", "start", "apt-daily-upgrade.timer"}}) {
+		t.Fatalf("commands = %v", runner.calls)
+	}
+	for _, c := range runner.calls {
+		if c[0] == "systemctl" && c[1] == "enable" {
+			t.Fatalf("enabled an already enabled timer: %v", runner.calls)
+		}
+	}
+	assertNoUpgradeOrReboot(t, runner.calls)
+}
+
+// A failed stamp touch stops before the timers start: never a start that could fire a missed run.
+func TestJobDoesNotStartTimersWhenTheStampCannotBeKept(t *testing.T) {
+	runner := newFakeRunner()
+	runner.add(commandKey("dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"), reply{output: "install ok installed"})
+	runner.add(aptConfigCommandKey(), reply{output: "E='1'; L='1'; U='1';"})
+	runner.add(commandKey("systemctl", "is-enabled", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "disabled\ndisabled\n", err: errors.New("exit status 1")})
+	runner.add(commandKey("systemctl", "is-active", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{output: "inactive\ninactive\n", err: errors.New("exit status 3")})
+	runner.add(commandKey("systemctl", "enable", "apt-daily.timer", "apt-daily-upgrade.timer"), reply{})
+	runner.add(commandKey("touch", "-c", "/var/lib/systemd/timers/stamp-apt-daily.timer", "/var/lib/systemd/timers/stamp-apt-daily-upgrade.timer"), reply{output: "read-only file system", err: errors.New("exit status 1")})
+	err := (Job{Run: runner.run, Sys: newFakeSys().sys(), ReadFile: noFile}).Do(context.Background())
+	var failure *awgprep.Failure
+	if !errors.As(err, &failure) || failure.Code != awgprep.CodeStepFailed {
+		t.Fatalf("job error = %v, want step_failed", err)
+	}
+	for _, c := range runner.calls {
+		if c[0] == "systemctl" && c[1] == "start" {
+			t.Fatalf("started the timers without the stamps: %v", runner.calls)
+		}
+	}
+}
+
+// The task's deadline never cuts an apt-get install that has started (dpkg would be left half done); the steps after it
+// still end at the deadline.
+func TestJobDeadlineDoesNotCutARunningInstall(t *testing.T) {
+	statusPath := t.TempDir() + "/security-updates.json"
+	installCut := false
+	runner := func(ctx context.Context, _ io.Writer, _ string, cmd ...string) (string, error) {
+		switch {
+		case cmd[0] == "dpkg-query":
+			return "deinstall ok config-files", errors.New("not installed")
+		case cmd[0] == "apt-get" && slices.Contains(cmd, "install"):
+			select {
+			case <-ctx.Done():
+				installCut = true
+				return "", ctx.Err()
+			case <-time.After(150 * time.Millisecond): // past the task's deadline below
+				return "", nil
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		return "", errors.New("unexpected command")
+	}
+	err := (Job{StatusPath: statusPath, Timeout: 50 * time.Millisecond, Run: runner, Sys: newFakeSys().sys(), ReadFile: noFile}).Do(context.Background())
+	if installCut {
+		t.Fatal("the install was cancelled by the task's deadline")
+	}
+	var failure *awgprep.Failure
+	if !errors.As(err, &failure) || failure.Code != awgprep.CodeTimeout {
+		t.Fatalf("job error = %v, want timeout for the steps after the install", err)
 	}
 }

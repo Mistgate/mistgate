@@ -88,6 +88,7 @@ func newFixRig(t *testing.T) (*fixRig, func(...func(*Env)) *Doctor) {
 	f.cmd(securityPackageQuery, "deinstall ok config-files", nil)
 	f.cmd(securityAPTConfig, "E='0'; L='0'; U='0';", nil)
 	f.cmd(securityTimers, "masked\ndisabled\n", nil)
+	f.cmd(securityTimersActive, "inactive\ninactive\n", nil)
 	f.cmd(securityJobUnit, unitNotFound, nil) // what systemd says of a unit that never ran: the fix must start it
 	mk := func(tweak ...func(*Env)) *Doctor {
 		return f.doctor(append([]func(*Env){func(e *Env) {

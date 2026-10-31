@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -15,11 +16,15 @@ const (
 	UnitName       = "mistgate-security-updates"
 	StatusFileName = "security-updates.json"
 
-	// JobTimeout bounds the complete background task.
+	// JobTimeout bounds the task's waits and quick steps. An apt-get install that has started is never cut by it: dpkg
+	// killed in the middle of a transaction leaves the host half configured, so only the unit's RuntimeMaxSec (30
+	// minutes) stops a hung one.
 	JobTimeout = 20 * time.Minute
 	// LockWait bounds the initial wait for a package manager already using dpkg.
 	LockWait              = 10 * time.Minute
 	aptLockTimeoutSeconds = int(LockWait / time.Second)
+	// TimerStampDir is where systemd keeps the last run of a Persistent=true timer (stamp-<timer>).
+	TimerStampDir = "/var/lib/systemd/timers"
 )
 
 const CodeOverridden = "overridden"
@@ -35,6 +40,8 @@ type Job struct {
 	Run        awgprep.Runner
 	Sys        awgprep.Sys
 	Now        func() time.Time
+	// ReadFile reads Mistgate's override file from an earlier run. Nil = os.ReadFile.
+	ReadFile func(string) ([]byte, error)
 }
 
 // Do runs the bounded job and leaves the shared awgprep status format at StatusPath when requested.
@@ -70,6 +77,10 @@ func (j Job) Do(ctx context.Context) error {
 	if sys.Sleep == nil {
 		sys.Sleep = realSys.Sleep
 	}
+	readFile := j.ReadFile
+	if readFile == nil {
+		readFile = os.ReadFile
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
@@ -85,7 +96,7 @@ func (j Job) Do(ctx context.Context) error {
 		return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "could not write the security updates task status"}
 	}
 
-	err := runJob(ctx, out, run, sys, lockWait)
+	err := runJob(ctx, out, run, sys, readFile, lockWait)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			err = &awgprep.Failure{Code: awgprep.CodeTimeout, Detail: fmt.Sprintf("the security updates task did not finish within %d minutes", max(int(limit/time.Minute), 1))}
@@ -108,7 +119,7 @@ func (j Job) Do(ctx context.Context) error {
 	return nil
 }
 
-func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.Sys, lockWait time.Duration) error {
+func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.Sys, readFile func(string) ([]byte, error), lockWait time.Duration) error {
 	packageStatus, queryErr := run(ctx, out, "", "dpkg-query", "-W", "-f=${Status}", "unattended-upgrades")
 	installed := queryErr == nil && strings.TrimSpace(packageStatus) == "install ok installed"
 	if !installed {
@@ -117,14 +128,22 @@ func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.
 		if err := awgprep.WaitAptLock(ctx, out, steps, sys, lockWait); err != nil {
 			return err
 		}
-		installOutput, installErr := run(ctx, out, "", append([]string{"apt-get"}, installArgs...)...)
-		if installErr != nil {
+		// Once apt-get runs it may be inside a dpkg transaction: it is not cut by the task's deadline (see JobTimeout).
+		// It only starts while the deadline has not passed.
+		install := func() (string, error) {
+			if err := ctx.Err(); err != nil {
+				return "", err
+			}
+			return run(context.WithoutCancel(ctx), out, "", append([]string{"apt-get"}, installArgs...)...)
+		}
+		installOutput, installErr := install()
+		if installErr != nil && ctx.Err() == nil {
 			if awgprep.IsAptLockOutput(installOutput) {
 				return &awgprep.Failure{Code: awgprep.CodeAptLock, Detail: "another package manager prevented access to the package lock"}
 			}
 			fmt.Fprintln(out, "package install failed; refreshing apt package lists and retrying once")
 			_, _ = run(ctx, out, "", "apt-get", "update")
-			installOutput, installErr = run(ctx, out, "", append([]string{"apt-get"}, installArgs...)...)
+			installOutput, installErr = install()
 		}
 		if installErr != nil {
 			if awgprep.IsAptLockOutput(installOutput) {
@@ -138,11 +157,13 @@ func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.
 	if err != nil {
 		return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "could not read the effective APT::Periodic settings"}
 	}
-	if len(periodic.DisabledKeys()) > 0 {
+	if disabled := periodic.DisabledKeys(); len(disabled) > 0 {
 		if sys.WriteFile == nil {
 			return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "writing APT settings is unavailable"}
 		}
-		if err := sys.WriteFile(ConfigPath, periodic.ConfigForDisabled()); err != nil {
+		// What an earlier run of ours switched on stays in the file: it is why those settings read "1" now.
+		earlier, _ := readFile(ConfigPath)
+		if err := sys.WriteFile(ConfigPath, ConfigFor(append(ManagedKeys(string(earlier)), disabled...))); err != nil {
 			return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "writing Mistgate's APT settings failed"}
 		}
 		periodic, err = readPeriodic(ctx, out, run)
@@ -154,18 +175,20 @@ func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.
 		}
 	}
 
-	states, _ := readTimerStates(ctx, out, run)
-	var unmask, enable []string
+	enabledStates, _ := readTimerStates(ctx, out, run, "is-enabled")
+	activeStates, _ := readTimerStates(ctx, out, run, "is-active")
+	var unmask, enable, start, stamps []string
 	for i, timer := range aptDailyTimers {
-		state := "unknown"
-		if i < len(states) {
-			state = states[i]
-		}
-		if state == "masked" {
+		enabled, active := stateAt(enabledStates, i), stateAt(activeStates, i)
+		if enabled == "masked" {
 			unmask = append(unmask, timer)
 		}
-		if state != "enabled" {
+		if enabled != "enabled" {
 			enable = append(enable, timer)
+		}
+		if active != "active" {
+			start = append(start, timer)
+			stamps = append(stamps, TimerStampDir+"/stamp-"+timer)
 		}
 	}
 	if len(unmask) > 0 {
@@ -175,12 +198,32 @@ func runJob(ctx context.Context, out io.Writer, run awgprep.Runner, sys awgprep.
 		}
 	}
 	if len(enable) > 0 {
-		args := append([]string{"systemctl", "enable", "--now"}, enable...)
+		args := append([]string{"systemctl", "enable"}, enable...)
 		if _, err := run(ctx, out, "", args...); err != nil {
 			return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "enabling the apt-daily timers failed"}
 		}
 	}
+	if len(start) > 0 {
+		// The apt timers are Persistent=true: started again, a timer that ran before fires its missed run at once (systemd
+		// takes the last run from the stamp's mtime), and apt-daily-upgrade would install updates right now. A stamp
+		// set to now keeps the next run at its schedule, as for a timer that never ran (systemd writes that stamp
+		// itself); -c creates nothing.
+		if _, err := run(ctx, out, "", append([]string{"touch", "-c"}, stamps...)...); err != nil {
+			return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "could not keep the apt-daily timers on their schedule"}
+		}
+		args := append([]string{"systemctl", "start"}, start...)
+		if _, err := run(ctx, out, "", args...); err != nil {
+			return &awgprep.Failure{Code: awgprep.CodeStepFailed, Detail: "starting the apt-daily timers failed"}
+		}
+	}
 	return nil
+}
+
+func stateAt(states []string, i int) string {
+	if i < len(states) {
+		return states[i]
+	}
+	return "unknown"
 }
 
 func readPeriodic(ctx context.Context, out io.Writer, run awgprep.Runner) (Periodic, error) {
@@ -192,14 +235,15 @@ func readPeriodic(ctx context.Context, out io.Writer, run awgprep.Runner) (Perio
 	return ParsePeriodicShell(result), nil
 }
 
-func readTimerStates(ctx context.Context, out io.Writer, run awgprep.Runner) ([]string, error) {
-	args := append([]string{"systemctl", "is-enabled"}, aptDailyTimers...)
+// readTimerStates runs `systemctl is-enabled` or `systemctl is-active` on the apt timers: one state per timer, in order.
+func readTimerStates(ctx context.Context, out io.Writer, run awgprep.Runner, verb string) ([]string, error) {
+	args := append([]string{"systemctl", verb}, aptDailyTimers...)
 	result, err := run(ctx, out, "", args...)
 	states := strings.Fields(strings.TrimSpace(result))
 	for i := range states {
 		states[i] = strings.ToLower(states[i])
 	}
-	return states, err // systemctl returns nonzero when a timer is disabled or masked; its lines are still useful.
+	return states, err // systemctl returns nonzero when a timer is disabled, masked or inactive; its lines are still useful.
 }
 
 func installArgs() []string {

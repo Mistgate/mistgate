@@ -13,13 +13,27 @@ import (
 var aptDailyTimers = []string{"apt-daily.timer", "apt-daily-upgrade.timer"}
 
 type aptTimerState struct {
-	name  string
-	state string
+	name   string
+	state  string // systemctl is-enabled: enabled, disabled, masked, ...
+	active string // systemctl is-active: active, inactive, ...
+}
+
+// off says what keeps the timer from running, "" when it is enabled and running. A stopped timer that is enabled runs
+// again only after a reboot.
+func (t aptTimerState) off() string {
+	switch {
+	case t.state != "enabled":
+		return t.state
+	case t.active != "active":
+		return t.active
+	}
+	return ""
 }
 
 type securityUpdatesSnapshot struct {
 	supported bool
 	skip      Result
+	canFix    bool // this agent can launch the job (Env.LaunchSecurityUpdates): only then is the fix offered
 	installed bool
 	periodic  secupdates.Periodic
 	configErr error
@@ -73,7 +87,7 @@ func inspectSecurityUpdates(ctx context.Context, e *Env) securityUpdatesSnapshot
 		return securityUpdatesSnapshot{skip: skip(CodeSecurityUpdatesNoSystemd, "systemd is not PID 1: the apt timers cannot run here")}
 	}
 
-	s := securityUpdatesSnapshot{supported: true}
+	s := securityUpdatesSnapshot{supported: true, canFix: e.LaunchSecurityUpdates != nil}
 	if e.StateDir != "" {
 		s.status, s.hasStatus, _ = awgprep.ReadStatus(filepath.Join(e.StateDir, secupdates.StatusFileName))
 	}
@@ -85,8 +99,9 @@ func inspectSecurityUpdates(ctx context.Context, e *Env) securityUpdatesSnapshot
 
 	config, configErr := e.Run(ctx, secupdates.AptConfigCommand, strings.Fields(secupdates.AptPeriodicArgs)...)
 	s.periodic, s.configErr = secupdates.ParsePeriodicShell(string(config)), configErr
-	timerOutput, _ := e.Run(ctx, "systemctl", append([]string{"is-enabled"}, aptDailyTimers...)...)
-	s.timers = parseAptTimerStates(string(timerOutput))
+	enabled, _ := e.Run(ctx, "systemctl", append([]string{"is-enabled"}, aptDailyTimers...)...)
+	active, _ := e.Run(ctx, "systemctl", append([]string{"is-active"}, aptDailyTimers...)...)
+	s.timers = parseAptTimerStates(string(enabled), string(active))
 	return s
 }
 
@@ -101,27 +116,34 @@ func checkSecurityUpdatesResult(s securityUpdatesSnapshot) Result {
 	if s.jobRunning() {
 		return Result{Status: Warn, Code: CodeSecurityUpdatesEnabling, Detail: "turning automatic security updates on"}
 	}
-	if s.hasStatus && s.status.State == awgprep.StateRunning {
-		return securityUpdatesEnableFailed("the background task was interrupted before it finished")
+	fix := ""
+	if s.canFix {
+		fix = FixEnableSecurityUpdates
 	}
 	off := securityUpdatesOffDetails(s)
-	needsChanges := !s.installed || len(off) > 0
-	if s.hasStatus && s.status.State == awgprep.StateFailed && needsChanges {
-		reason := strings.TrimSpace(s.status.Reason)
-		if reason == "" {
-			reason = "the background task failed"
+	// What the host holds decides; the status file only explains a host that still needs changes (a job that stopped
+	// after its last step but before it wrote "done" leaves the updates on).
+	if needsChanges := !s.installed || len(off) > 0; needsChanges && s.hasStatus {
+		switch s.status.State {
+		case awgprep.StateRunning:
+			return securityUpdatesEnableFailed("the background task was interrupted before it finished", fix)
+		case awgprep.StateFailed:
+			reason := strings.TrimSpace(s.status.Reason)
+			if reason == "" {
+				reason = "the background task failed"
+			}
+			return securityUpdatesEnableFailed(reason, fix)
 		}
-		return securityUpdatesEnableFailed(reason)
 	}
 	if !s.installed {
 		return Result{Status: Warn, Code: CodeSecurityUpdatesNotInstalled,
 			Detail: "unattended-upgrades is not installed: security fixes arrive only when someone runs apt by hand",
-			FixID:  FixEnableSecurityUpdates}
+			FixID:  fix}
 	}
 	if len(off) > 0 {
 		return Result{Status: Warn, Code: CodeSecurityUpdatesOff,
 			Detail: "automatic updates are off: " + strings.Join(off, ", "),
-			Params: p("off", strings.Join(off, ", ")), FixID: FixEnableSecurityUpdates}
+			Params: p("off", strings.Join(off, ", ")), FixID: fix}
 	}
 	return Result{Status: OK, Code: CodeSecurityUpdatesOn, Detail: "automatic security updates are on"}
 }
@@ -132,28 +154,32 @@ func securityUpdatesOffDetails(s securityUpdatesSnapshot) []string {
 		off = append(off, "apt-config failed")
 	}
 	for _, timer := range s.timers {
-		if timer.state != "enabled" {
-			off = append(off, fmt.Sprintf("%s %s", timer.name, timer.state))
+		if why := timer.off(); why != "" {
+			off = append(off, fmt.Sprintf("%s %s", timer.name, why))
 		}
 	}
 	return off
 }
 
-func securityUpdatesEnableFailed(reason string) Result {
+func securityUpdatesEnableFailed(reason, fix string) Result {
 	reason = clip(strings.TrimSpace(reason), 150)
 	return Result{Status: Warn, Code: CodeSecurityUpdatesEnableFailed,
-		Detail: "turning updates on failed: " + reason, Params: p("reason", reason), FixID: FixEnableSecurityUpdates}
+		Detail: "turning updates on failed: " + reason, Params: p("reason", reason), FixID: fix}
 }
 
-func parseAptTimerStates(output string) []aptTimerState {
-	states := strings.Fields(strings.TrimSpace(output))
+// parseAptTimerStates pairs the lines of `systemctl is-enabled` and `systemctl is-active` (one per timer, in order) with
+// the timers; a missing line is "unknown".
+func parseAptTimerStates(enabled, active string) []aptTimerState {
+	es, as := strings.Fields(strings.TrimSpace(enabled)), strings.Fields(strings.TrimSpace(active))
+	at := func(states []string, i int) string {
+		if i < len(states) {
+			return strings.ToLower(states[i])
+		}
+		return "unknown"
+	}
 	timers := make([]aptTimerState, len(aptDailyTimers))
 	for i, name := range aptDailyTimers {
-		state := "unknown"
-		if i < len(states) {
-			state = strings.ToLower(states[i])
-		}
-		timers[i] = aptTimerState{name: name, state: state}
+		timers[i] = aptTimerState{name: name, state: at(es, i), active: at(as, i)}
 	}
 	return timers
 }

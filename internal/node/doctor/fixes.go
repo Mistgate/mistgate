@@ -141,7 +141,7 @@ func securityUpdatesPlan(s securityUpdatesSnapshot) (map[string]string, string, 
 	conf := strings.Join(s.periodic.DisabledKeys(), ",")
 	var timers, unmask []string
 	for _, timer := range s.timers {
-		if timer.state != "enabled" {
+		if timer.off() != "" { // not enabled, or enabled but stopped: the job enables and starts it
 			timers = append(timers, timer.name)
 		}
 		if timer.state == "masked" {
@@ -160,7 +160,7 @@ func securityUpdatesPlan(s securityUpdatesSnapshot) (map[string]string, string, 
 		changes = append(changes, "unmask "+strings.Join(unmask, ", "))
 	}
 	if len(timers) > 0 {
-		changes = append(changes, "enable "+strings.Join(timers, ", "))
+		changes = append(changes, "enable and start "+strings.Join(timers, ", ")+" on their schedule")
 	}
 	if len(changes) == 0 {
 		return nil, "", errors.New("no security updates change was found")
