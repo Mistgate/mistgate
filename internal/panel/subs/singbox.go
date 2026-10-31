@@ -159,11 +159,16 @@ func (p singboxProfile) build() ([]byte, error) {
 	}
 	if d != nil {
 		cfg.DNS = &d.Section
+		if len(d.BlockSets) > 0 { // right after ip_is_private, before everything that goes direct
+			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{RuleSet: d.BlockSets, Action: "reject"})
+		}
+		if len(d.RuleSets) > 0 {
+			cfg.Route.RuleSet = d.RuleSets
+		}
 		if len(d.Direct) > 0 {
 			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{DomainSuffix: d.Direct, Action: "route", Outbound: singboxDirectTag})
 		}
 		if len(d.DirectSets) > 0 {
-			cfg.Route.RuleSet = d.RuleSets
 			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{RuleSet: d.DirectSets, Action: "route", Outbound: singboxDirectTag})
 		}
 	} else {

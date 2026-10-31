@@ -32,6 +32,13 @@ var geoLists = map[string]geoList{
 	"ir": {Site: "category-ir", IP: "ir"},
 }
 
+// adsSite is the geosite list of ad and tracker domains that a preset with BlockAds makes the apps drop (v2fly/domain-list-community
+// data file, so the same URLs below serve it). The one place its name is written; adsTag is its rule set's name in Mihomo and sing-box.
+const (
+	adsSite = "category-ads-all"
+	adsTag  = "geosite-" + adsSite
+)
+
 // Where the rule-set files live. %s is the list name.
 const (
 	mihomoGeositeURL  = "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/%s.mrs"

@@ -22,6 +22,8 @@ import (
 //     nameserver-policy entry "rule-set:geosite-<name>" and two RULE-SET rules to DIRECT, the geoip one with no-resolve
 //     (a domain is not looked up to be checked against it). Not GEOSITE,<name>: the core fetches geosite.dat itself at start,
 //     with no way to say through what, and from a censored network that does not work.
+//   - BlockAds is one more rule provider (geosite-category-ads-all, same download as the country lists) and the first rule of
+//     the profile, RULE-SET,...,REJECT, ahead of the split and whatever the SplitDirect switch says.
 //   - default-nameserver: plain addresses that resolve the NAMES of the DoH/DoT servers (the bootstrap IPv4 addresses
 //     the catalog knows for them).
 //   - proxy-server-nameserver: plain main servers (the names of our own nodes are resolved without the tunnel, which
@@ -40,6 +42,9 @@ type MihomoDNS struct {
 	Direct []string
 	// Providers are the rule providers of the country lists, and the RULE-SET rules to DIRECT that go with them, in order.
 	Providers []MihomoProvider
+	// Block are the rule providers of the ad list (Preset.BlockAds) and the RULE-SET rules to REJECT that go with them. Their
+	// rules come before every other rule, whatever the split says.
+	Block []MihomoProvider
 	// Notes (English) say what of the preset a Mihomo profile cannot carry.
 	Notes []string
 }
@@ -52,11 +57,14 @@ type MihomoProvider struct {
 }
 
 // Rule is the rule line that sends the provider's traffic DIRECT. The address list is matched without a lookup.
-func (p MihomoProvider) Rule() string {
+func (p MihomoProvider) Rule() string { return p.RuleTo("DIRECT") }
+
+// RuleTo is the rule line that sends the provider's traffic to target (DIRECT, REJECT).
+func (p MihomoProvider) RuleTo(target string) string {
 	if p.Behavior == "ipcidr" {
-		return "RULE-SET," + p.Name + ",DIRECT,no-resolve"
+		return "RULE-SET," + p.Name + "," + target + ",no-resolve"
 	}
-	return "RULE-SET," + p.Name + ",DIRECT"
+	return "RULE-SET," + p.Name + "," + target
 }
 
 // MihomoProviderInterval is how often a provider is refreshed, in seconds.
@@ -104,6 +112,9 @@ func (p Preset) MihomoDNS(group string) (MihomoDNS, error) {
 				MihomoProvider{Name: site, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, geoLists[code].Site)},
 				MihomoProvider{Name: ip, Behavior: "ipcidr", URL: fmt.Sprintf(mihomoGeoipURL, geoLists[code].IP)})
 		}
+	}
+	if p.BlockAds {
+		out.Block = []MihomoProvider{{Name: adsTag, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, adsSite)}}
 	}
 	if len(out.ProxyServerNameserver) == 0 {
 		out.ProxyServerNameserver = []string{"system"}

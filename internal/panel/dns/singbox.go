@@ -23,6 +23,8 @@ import (
 //     geosite one} to the split resolver and a route rule {rule_set: both} to direct. No download_detour: sing-box 1.14
 //     deprecates it, and without it the implicit client downloads through the default outbound (route.final, the selector),
 //     that is through the tunnel. The geoip set decides only connections made to an address.
+//   - BlockAds is one more remote rule set, the first DNS rule ({rule_set, action predefined, rcode NXDOMAIN}) and a route rule
+//     {rule_set, action reject} that the assembler puts right after ip_is_private (sing-box 1.12+ has predefined).
 //   - strategy ipv4_only: no AAAA answers, like Mihomo's ipv6: false.
 
 // Tags of the servers in the block that the rest of the profile refers to.
@@ -41,6 +43,9 @@ type SingboxDNS struct {
 	// the route rule sends direct.
 	RuleSets   []SingboxRuleSet
 	DirectSets []string
+	// BlockSets are the tags of the ad list's rule set (Preset.BlockAds), whose first entry in RuleSets it is: the first DNS rule
+	// answers it NXDOMAIN and the route rule after ip_is_private rejects its connections.
+	BlockSets []string
 	// Notes (English) say what of the preset a sing-box profile cannot carry.
 	Notes []string
 }
@@ -82,7 +87,8 @@ type SingboxDNSRule struct {
 	DomainSuffix []string `json:"domain_suffix,omitempty"`
 	RuleSet      []string `json:"rule_set,omitempty"`
 	Action       string   `json:"action"`
-	Server       string   `json:"server"`
+	Server       string   `json:"server,omitempty"`
+	Rcode        string   `json:"rcode,omitempty"` // action predefined
 }
 
 // SingboxDNS renders the preset for a sing-box profile. group is the outbound (the selector) the main resolver's
@@ -97,6 +103,12 @@ func (p Preset) SingboxDNS(group string) (SingboxDNS, error) {
 	out.Section.Servers = append(out.Section.Servers, singboxServer(main[0], SingboxRemoteTag, group))
 	if n := len(main) - 1; n > 0 {
 		out.Notes = append(out.Notes, fmt.Sprintf("%d fallback resolver(s) dropped: sing-box takes one main resolver", n))
+	}
+	if p.BlockAds {
+		// predefined NXDOMAIN, not reject: sing-box turns a DNS reject into drop after 50 hits in 30 s, and the pages then wait out the timeout.
+		out.RuleSets = append(out.RuleSets, SingboxRuleSet{Type: "remote", Tag: adsTag, Format: "binary", URL: fmt.Sprintf(singboxGeositeURL, adsSite)})
+		out.BlockSets = []string{adsTag}
+		out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{RuleSet: out.BlockSets, Action: "predefined", Rcode: "NXDOMAIN"})
 	}
 	splits := 0
 	for _, sp := range split {

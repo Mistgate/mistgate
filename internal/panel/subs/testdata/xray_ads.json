@@ -1,0 +1,403 @@
+[
+  {
+    "remarks": "🇩🇪 DE · Hysteria2",
+    "log": {
+      "loglevel": "warning"
+    },
+    "dns": {
+      "tag": "dns-internal",
+      "queryStrategy": "UseIPv4",
+      "servers": [
+        {
+          "address": "1.1.1.1"
+        },
+        {
+          "address": "8.8.8.8"
+        },
+        {
+          "address": "1.0.0.1"
+        },
+        {
+          "address": "8.8.4.4"
+        }
+      ]
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "hysteria",
+        "settings": {
+          "version": 2,
+          "address": "de2.example.com",
+          "port": 443
+        },
+        "streamSettings": {
+          "network": "hysteria",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "de1.example.com",
+            "alpn": [
+              "h3"
+            ]
+          },
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "tok-DEVICE_secret_0123456789abcdefghijklmn"
+          },
+          "finalmask": {
+            "udp": [
+              {
+                "type": "salamander",
+                "settings": {
+                  "password": "gawrgura-pw"
+                }
+              }
+            ]
+          }
+        },
+        "tag": "proxy"
+      },
+      {
+        "tag": "direct",
+        "protocol": "freedom"
+      },
+      {
+        "tag": "dns-out",
+        "protocol": "dns"
+      },
+      {
+        "tag": "block",
+        "protocol": "blackhole"
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "inboundTag": [
+            "dns-internal"
+          ],
+          "outboundTag": "proxy"
+        },
+        {
+          "type": "field",
+          "port": "53",
+          "outboundTag": "dns-out"
+        },
+        {
+          "type": "field",
+          "domain": [
+            "geosite:category-ads-all"
+          ],
+          "outboundTag": "block"
+        },
+        {
+          "type": "field",
+          "ip": [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16",
+            "fc00::/7",
+            "fe80::/10"
+          ],
+          "outboundTag": "direct"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  },
+  {
+    "remarks": "🇩🇪 DE · VLESS",
+    "log": {
+      "loglevel": "warning"
+    },
+    "dns": {
+      "tag": "dns-internal",
+      "queryStrategy": "UseIPv4",
+      "servers": [
+        {
+          "address": "1.1.1.1"
+        },
+        {
+          "address": "8.8.8.8"
+        },
+        {
+          "address": "1.0.0.1"
+        },
+        {
+          "address": "8.8.4.4"
+        }
+      ]
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "de1.example.com",
+              "port": 443,
+              "users": [
+                {
+                  "id": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "xhttp",
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.example.org",
+            "fingerprint": "chrome",
+            "publicKey": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+            "shortId": "0f1e2d3c4b5a6978",
+            "spiderX": "/57999bb8"
+          },
+          "xhttpSettings": {
+            "path": "/q8x2kd7w",
+            "mode": "auto"
+          }
+        },
+        "tag": "proxy"
+      },
+      {
+        "tag": "direct",
+        "protocol": "freedom"
+      },
+      {
+        "tag": "dns-out",
+        "protocol": "dns"
+      },
+      {
+        "tag": "block",
+        "protocol": "blackhole"
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "inboundTag": [
+            "dns-internal"
+          ],
+          "outboundTag": "proxy"
+        },
+        {
+          "type": "field",
+          "port": "53",
+          "outboundTag": "dns-out"
+        },
+        {
+          "type": "field",
+          "domain": [
+            "geosite:category-ads-all"
+          ],
+          "outboundTag": "block"
+        },
+        {
+          "type": "field",
+          "ip": [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16",
+            "fc00::/7",
+            "fe80::/10"
+          ],
+          "outboundTag": "direct"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  },
+  {
+    "remarks": "🇳🇱 NL · VLESS WS",
+    "log": {
+      "loglevel": "warning"
+    },
+    "dns": {
+      "tag": "dns-internal",
+      "queryStrategy": "UseIPv4",
+      "servers": [
+        {
+          "address": "1.1.1.1"
+        },
+        {
+          "address": "8.8.8.8"
+        },
+        {
+          "address": "1.0.0.1"
+        },
+        {
+          "address": "8.8.4.4"
+        }
+      ]
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ],
+          "routeOnly": true
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "de1.example.com",
+              "port": 443,
+              "users": [
+                {
+                  "id": "8a3b5c2d-1e4f-4a6b-8c0d-123456789abc",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "ws",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "origin.example.com",
+            "fingerprint": "chrome",
+            "alpn": [
+              "http/1.1"
+            ]
+          },
+          "wsSettings": {
+            "path": "/ws"
+          }
+        },
+        "tag": "proxy"
+      },
+      {
+        "tag": "direct",
+        "protocol": "freedom"
+      },
+      {
+        "tag": "dns-out",
+        "protocol": "dns"
+      },
+      {
+        "tag": "block",
+        "protocol": "blackhole"
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "inboundTag": [
+            "dns-internal"
+          ],
+          "outboundTag": "proxy"
+        },
+        {
+          "type": "field",
+          "port": "53",
+          "outboundTag": "dns-out"
+        },
+        {
+          "type": "field",
+          "domain": [
+            "geosite:category-ads-all"
+          ],
+          "outboundTag": "block"
+        },
+        {
+          "type": "field",
+          "ip": [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16",
+            "fc00::/7",
+            "fe80::/10"
+          ],
+          "outboundTag": "direct"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "outboundTag": "proxy"
+        }
+      ]
+    }
+  }
+]

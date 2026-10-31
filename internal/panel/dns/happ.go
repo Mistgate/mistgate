@@ -161,6 +161,10 @@ func happBuild(p Preset) (happProfile, []string, error) {
 	if p.IPv4Only {
 		notes = append(notes, "ipv4_only ignored: Happ has no such setting")
 	}
+	block := []string{}
+	if p.BlockAds {
+		block = []string{"geosite:" + adsSite} // the app ships the geo files, like for DirectSites
+	}
 	if direct == nil {
 		direct = []string{}
 	}
@@ -172,7 +176,7 @@ func happBuild(p Preset) (happProfile, []string, error) {
 		RemoteDNSType: remote.typ, RemoteDNSDomain: remote.domain, RemoteDNSIP: remote.ip,
 		DomesticDNSType: domestic.typ, DomesticDNSDom: domestic.domain, DomesticDNSIP: domestic.ip,
 		DnsHosts: hosts, DirectSites: direct, DirectIp: directIP, ProxySites: []string{}, ProxyIp: []string{},
-		BlockSites: []string{}, BlockIp: []string{}, DomainStrategy: "IPIfNonMatch", FakeDNS: "false",
+		BlockSites: block, BlockIp: []string{}, DomainStrategy: "IPIfNonMatch", FakeDNS: "false",
 	}, notes, nil
 }
 

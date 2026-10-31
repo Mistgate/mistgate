@@ -50,6 +50,18 @@ func TestXrayCoreBuildsTheDocuments(t *testing.T) {
 			}
 		})
 	}
+	for _, c := range adsDocPresets { // geosite:category-ads-all is looked up in the data file too
+		t.Run(c.name, func(t *testing.T) {
+			geoAssets(t)
+			b, err := xrayProfile{lines: lines, names: jsonNames, preset: c.preset}.build()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := jsoncheck.XrayBuildArray(t, b); len(got) != len(lines) {
+				t.Errorf("%d configs", len(got))
+			}
+		})
+	}
 	for name, note := range noteSamples(testNow) {
 		t.Run("placeholder_"+name, func(t *testing.T) {
 			b, err := xrayProfile{note: note}.build()

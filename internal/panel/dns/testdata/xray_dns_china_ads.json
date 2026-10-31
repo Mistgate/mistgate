@@ -1,0 +1,57 @@
+{
+  "block": [
+    "geosite:category-ads-all"
+  ],
+  "direct": null,
+  "directGeo": [
+    {
+      "Site": "geosite:cn",
+      "IP": "geoip:cn"
+    }
+  ],
+  "directIPs": [
+    "223.5.5.5",
+    "119.29.29.29",
+    "223.6.6.6"
+  ],
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "1.1.1.1"
+      },
+      {
+        "address": "8.8.8.8"
+      },
+      {
+        "address": "1.0.0.1"
+      },
+      {
+        "address": "8.8.4.4"
+      },
+      {
+        "address": "223.5.5.5",
+        "domains": [
+          "geosite:cn"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "119.29.29.29",
+        "domains": [
+          "geosite:cn"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "223.6.6.6",
+        "domains": [
+          "geosite:cn"
+        ],
+        "skipFallback": true
+      }
+    ]
+  },
+  "notes": null
+}

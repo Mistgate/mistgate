@@ -27,6 +27,7 @@ const (
 	xrayProxyTag  = "proxy"
 	xrayDirectTag = "direct"
 	xrayDNSOutTag = "dns-out"
+	xrayBlockTag  = "block"
 )
 
 // xrayPrivate are the destinations that never go through the proxy; written out, not geoip:private, so that no geo file is needed.
@@ -150,6 +151,9 @@ func (p xrayProfile) build() ([]byte, error) {
 	outbounds := []json.RawMessage{nil, staticOutbound(xrayDirectTag, "freedom")}
 	if d != nil {
 		outbounds = append(outbounds, staticOutbound(xrayDNSOutTag, "dns"))
+		if len(d.Block) > 0 {
+			outbounds = append(outbounds, staticOutbound(xrayBlockTag, "blackhole"))
+		}
 	}
 	var configs []xrayConfig
 	for i, line := range p.lines {
@@ -182,7 +186,8 @@ func (p xrayProfile) build() ([]byte, error) {
 }
 
 // xrayRules is the routing of every config: the resolvers' own traffic (main ones through the proxy, the split ones direct),
-// the queries of the OS to the dns outbound, private addresses and the split suffixes direct, the rest through the proxy.
+// the queries of the OS to the dns outbound, the ad list to a blackhole, private addresses and the split suffixes direct, the rest
+// through the proxy.
 func xrayRules(d *dns.XrayDNS) []xrayRule {
 	var rules []xrayRule
 	if d != nil {
@@ -192,6 +197,9 @@ func xrayRules(d *dns.XrayDNS) []xrayRule {
 		rules = append(rules,
 			xrayRule{Type: "field", InboundTag: []string{dns.XrayDNSTag}, OutboundTag: xrayProxyTag},
 			xrayRule{Type: "field", Port: "53", OutboundTag: xrayDNSOutTag})
+		if len(d.Block) > 0 { // after the DNS rules (a resolver's own traffic is not a site), before private and direct
+			rules = append(rules, xrayRule{Type: "field", Domain: d.Block, OutboundTag: xrayBlockTag})
+		}
 	}
 	rules = append(rules, xrayRule{Type: "field", IP: xrayPrivate, OutboundTag: xrayDirectTag})
 	if d != nil && (len(d.Direct) > 0 || len(d.DirectGeo) > 0) {

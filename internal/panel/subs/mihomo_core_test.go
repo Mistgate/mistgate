@@ -67,6 +67,8 @@ func TestMihomoCoreAcceptsTheProfiles(t *testing.T) {
 		{"no dns section", "Example VPN", nil},
 		{"russia split, plain", "Example VPN", ruSplit()},
 		{"china: country lists as rule providers", "Example VPN", cnSplit()},
+		{"block ads: the ad list as the first rule", "Example VPN", adsDocPresets[0].preset},
+		{"block ads next to the country lists", "Example VPN", adsDocPresets[1].preset},
 		{"a title with a space, unicode and a percent", "Моя сеть 50%", ruSplit()},
 		{"DoH", "Example", &dns.Preset{Name: "doh", Transport: dns.KindDoH, Servers: []dns.Server{{Variant: "adguard/default"}, {Variant: "cloudflare/standard"}}}},
 		{"DoT", "Example", &dns.Preset{Name: "dot", Transport: dns.KindDoT, Servers: []dns.Server{{Variant: "quad9/standard"}}}},

@@ -1,0 +1,39 @@
+{
+  "block": [
+    {
+      "Name": "geosite-category-ads-all",
+      "Behavior": "domain",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-ads-all.mrs"
+    }
+  ],
+  "blockRules": [
+    "RULE-SET,geosite-category-ads-all,REJECT"
+  ],
+  "notes": null,
+  "policy": [
+    {
+      "Domain": "rule-set:geosite-cn",
+      "Servers": [
+        "223.5.5.5",
+        "119.29.29.29",
+        "223.6.6.6"
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "Name": "geosite-cn",
+      "Behavior": "domain",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/cn.mrs"
+    },
+    {
+      "Name": "geoip-cn",
+      "Behavior": "ipcidr",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/cn.mrs"
+    }
+  ],
+  "rules": [
+    "RULE-SET,geosite-cn,DIRECT",
+    "RULE-SET,geoip-cn,DIRECT,no-resolve"
+  ]
+}

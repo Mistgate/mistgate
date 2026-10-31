@@ -31,6 +31,9 @@ type XrayDNS struct {
 	// DirectGeo are the lists (geo.go) whose sites and addresses go direct: "geosite:cn" joins the domain rule, "geoip:cn" is
 	// a rule of its own (an ip rule; the config's domainStrategy AsIs keeps it to connections made to an address).
 	DirectGeo []XrayGeo
+	// Block are the lists whose domains the routing drops (Preset.BlockAds): "geosite:category-ads-all", sent to a blackhole
+	// outbound. The rule comes after the resolvers' and the OS's DNS rules and before private and direct.
+	Block []string
 	// DirectIPs are the addresses of the split resolvers: the routing rule for XrayDNSTag sends them direct (the
 	// main resolvers' traffic goes through the proxy).
 	DirectIPs []string
@@ -86,6 +89,9 @@ func (p Preset) XrayDNS() (XrayDNS, error) {
 			out.DirectIPs = appendUniq(out.DirectIPs, endpointIP(e))
 		}
 		out.Direct = append(out.Direct, sp.Suffixes...)
+	}
+	if p.BlockAds {
+		out.Block = []string{"geosite:" + adsSite}
 	}
 	return out, nil
 }

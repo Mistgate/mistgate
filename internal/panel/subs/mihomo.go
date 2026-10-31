@@ -148,7 +148,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 		set("name", quoted(group)).set("type", strNode("select")).set("proxies", quotedSeq(members)).n))
 
 	var direct []string
-	var providers []dns.MihomoProvider
+	var providers, block []dns.MihomoProvider
 	if p.preset != nil {
 		d, err := p.preset.MihomoDNS(group)
 		if err != nil {
@@ -159,13 +159,14 @@ func (p mihomoProfile) build() ([]byte, error) {
 			root.set("dns", dnsNode(d))
 			direct = d.Direct
 			providers = d.Providers
+			block = d.Block
 		}
 	}
-	if len(providers) > 0 {
+	if len(providers)+len(block) > 0 {
 		// The lists of a country (dns.SplitRule.Geo): downloaded through the group, so that they arrive where the sites they
 		// name are the point. The key "proxy" is the group's name, which groupName kept free of anything YAML or a rule line would read.
 		rp := newMap()
-		for _, pr := range providers {
+		for _, pr := range append(slices.Clone(block), providers...) {
 			rp.set(pr.Name, newMap().
 				set("type", strNode("http")).set("behavior", strNode(pr.Behavior)).set("format", strNode("mrs")).
 				set("interval", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(dns.MihomoProviderInterval)}).
@@ -174,6 +175,9 @@ func (p mihomoProfile) build() ([]byte, error) {
 		root.set("rule-providers", rp.n)
 	}
 	rules := seqNode()
+	for _, pr := range block { // first of all: the ad list is dropped whatever else matches
+		rules.Content = append(rules.Content, quoted(pr.RuleTo("REJECT")))
+	}
 	for _, s := range direct {
 		rules.Content = append(rules.Content, quoted("DOMAIN-SUFFIX,"+s+",DIRECT"))
 	}
