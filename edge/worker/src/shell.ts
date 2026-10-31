@@ -43,12 +43,43 @@ export function panelURL(raw: string): string {
   return url.href;
 }
 
+/**
+ * The most body any panel route reads (the agent's 4 MiB frame cap is the largest Go limit; a decoy upload is 3 MiB). A
+ * longer body is refused while it streams in, before the isolate holds it twice (JS, then Go).
+ */
+export const MAX_BODY_BYTES = 4 << 20;
+
+export class BodyTooLarge extends Error {
+  constructor() {
+    super("request body too large");
+  }
+}
+
+async function readBody(body: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of body) {
+    size += chunk.byteLength;
+    if (size > MAX_BODY_BYTES) throw new BodyTooLarge(); // leaving the loop cancels the stream
+    chunks.push(chunk);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out;
+}
+
+/** Throws BodyTooLarge for a body over MAX_BODY_BYTES. */
 export async function toFetchRequest(request: Request): Promise<FetchRequest> {
+  if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) throw new BodyTooLarge();
   return {
     method: request.method,
     url: panelURL(request.url),
     headers: Array.from(request.headers.entries()),
-    body: request.body === null ? null : new Uint8Array(await request.arrayBuffer()),
+    body: request.body === null ? null : await readBody(request.body),
   };
 }
 
