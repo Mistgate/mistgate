@@ -108,6 +108,15 @@ Everything on the public listener that is not the admin, a subscription or the a
 
 **Settings → Domains** shows the owner the admin address and the base of the subscription links. Both carry a secret part: do not publish them. Behind a reverse proxy, list it with `serve --trusted-proxy` so the panel sees the real client addresses (rate limits, sessions and the audit log depend on them). See [Configuration](../reference/configuration.md) for every flag.
 
+## How nodes reach the panel
+
+A node on a VPS connects over mutual TLS: it trusts only the panel's own CA, whose fingerprint is in the install command, and the panel trusts only the certificates it issued. A node on the link (the edge edition, or `--link-url`) talks over ordinary public TLS instead, which any certificate authority the server trusts can vouch for. Two things keep out a party in the middle that holds such a certificate:
+
+- The enrolment token is not sent. Tokens start with `mg2_`; the agent derives a key from the token and signs its certificate request with it, and the panel checks the signature. Whoever is in the middle learns nothing that would enrol a key of their own.
+- Once both ends have proven their keys, every message of the session is encrypted and authenticated with keys that only the node and the panel can derive. A changed, replayed or reordered message ends the session.
+
+Both need a current agent and a current panel. An older agent with a current panel, or the reverse, works as before without them. One limit remains: a party in the middle can still present itself to a current panel as an older agent and open a plain session in the node's name. It can then read the node's settings, but it cannot change what the node runs.
+
 ## Saved SSH access
 
 A node installed over SSH keeps its SSH login in the panel: the address, the port, the login, the password and the pinned host key. The password is encrypted with the master key. Only the owner sees it, under **SSH access** on the node's **Server** tab. How to use it: "Saved SSH access" in [Install a node over SSH](../getting-started/ssh-install.md).

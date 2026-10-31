@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1024,6 +1025,7 @@ func (o *linkObject) authenticate(s *linkSocket, auth []byte) {
 		serial   string
 		notAfter time.Time
 		frame    []byte
+		seal     []byte
 		ok       bool
 	}
 	att := s.att
@@ -1032,8 +1034,8 @@ func (o *linkObject) authenticate(s *linkSocket, auth []byte) {
 		if before != nil {
 			before(ctx, fleet.LinkIn{NodeID: o.id, Kind: emuAcceptKind})
 		}
-		serial, notAfter, frame, ok := o.e.fl.Load().LinkAccept(ctx, o.id, att.audience, att.nonce, auth)
-		return accept{serial, notAfter, frame, ok}, nil
+		serial, notAfter, frame, seal, ok := o.e.fl.Load().LinkAccept(ctx, o.id, att.audience, att.nonce, auth)
+		return accept{serial, notAfter, frame, seal, ok}, nil
 	})
 	if err != nil {
 		o.shut(s, 1011, "link error")
@@ -1055,7 +1057,7 @@ func (o *linkObject) authenticate(s *linkSocket, auth []byte) {
 	o.dropLive(false)
 	o.live = generation
 	o.send(s, res.frame)
-	o.run(s, emuEvent{kind: fleet.LinkOpen, at: o.nowMs(), generation: generation, certSerial: res.serial, certNotAfter: res.notAfter}, generation)
+	o.run(s, emuEvent{kind: fleet.LinkOpen, at: o.nowMs(), generation: generation, certSerial: res.serial, certNotAfter: res.notAfter, seal: res.seal}, generation)
 }
 
 type emuEvent struct {
@@ -1064,6 +1066,7 @@ type emuEvent struct {
 	generation   uint64
 	certSerial   string
 	certNotAfter time.Time
+	seal         []byte
 	frame        []byte
 	requestID    string
 	deadlineAt   int64
@@ -1099,6 +1102,29 @@ func emuOneof(m proto.Message) string {
 	return ""
 }
 
+// emuOpened opens the frames of a sealed session for the test log (the object itself never reads a frame), with the keys
+// and counters of a state: the agent's frame against the state before its step, the panel's against the state the step
+// returned, whose counter is already past the `sent` frames. Frames of a plain session, or that do not open, come back
+// as they are.
+func emuOpened(state string, fromAgent bool, sent int, frames [][]byte) [][]byte {
+	var st fleet.SessionState
+	if json.Unmarshal([]byte(state), &st) != nil || st.Seal == nil {
+		return frames
+	}
+	seq := st.SealUp
+	if !fromAgent {
+		seq = st.SealDown - uint64(sent)
+	}
+	out := make([][]byte, len(frames))
+	for i, f := range frames {
+		out[i] = f
+		if plain, err := agentlink.OpenFrame(st.Seal, fromAgent, seq+uint64(i), f); err == nil {
+			out[i] = plain
+		}
+	}
+	return out
+}
+
 func takeFault(faults map[fleet.LinkKind]int, kind fleet.LinkKind) bool {
 	if faults[kind] == 0 {
 		return false
@@ -1111,14 +1137,18 @@ func takeFault(faults map[fleet.LinkKind]int, kind fleet.LinkKind) bool {
 // first, then the frames go out. An error or a spent budget closes 1011, rejects the waiters and writes nothing.
 func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) (fleet.LinkOut, error) {
 	in := fleet.LinkIn{NodeID: o.id, State: o.state, Kind: ev.kind, At: time.UnixMilli(ev.at), Generation: ev.generation,
-		CertSerial: ev.certSerial, CertNotAfter: ev.certNotAfter, Frame: ev.frame, RequestID: ev.requestID, Record: ev.record}
+		CertSerial: ev.certSerial, CertNotAfter: ev.certNotAfter, Seal: ev.seal, Frame: ev.frame, RequestID: ev.requestID, Record: ev.record}
 	if ev.kind == fleet.LinkRequest {
 		in.DeadlineAt = time.UnixMilli(ev.deadlineAt)
 	}
-	step := emuStep{Gen: gen, Kind: ev.kind, Msg: emuMessage(ev.kind, ev.frame)}
+	shown := ev.frame
+	if ev.kind == fleet.LinkFrame {
+		shown = emuOpened(o.state, true, 0, [][]byte{ev.frame})[0]
+	}
+	step := emuStep{Gen: gen, Kind: ev.kind, Msg: emuMessage(ev.kind, shown)}
 	if ev.kind == fleet.LinkFrame {
 		var frame agentv1.ConnectRequest
-		if proto.Unmarshal(ev.frame, &frame) == nil {
+		if proto.Unmarshal(shown, &frame) == nil {
 			step.Result = frame.GetCommandResult()
 		}
 	}
@@ -1149,11 +1179,12 @@ func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) (fleet.LinkOut,
 		o.state = out.State
 	}
 	if s != nil {
-		for _, raw := range out.Frames {
+		shown := emuOpened(out.State, false, len(out.Frames), out.Frames)
+		for i, raw := range out.Frames {
 			// Logged before the write: the agent acts on a frame as soon as it reads it, and a test that has seen it act
 			// must find the frame in the log.
 			var m agentv1.ConnectResponse
-			if s.writable() && proto.Unmarshal(raw, &m) == nil {
+			if s.writable() && proto.Unmarshal(shown[i], &m) == nil {
 				o.logMu.Lock()
 				o.sentLog = append(o.sentLog, emuSent{Gen: gen, Frame: &m})
 				o.logMu.Unlock()

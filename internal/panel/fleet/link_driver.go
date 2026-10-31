@@ -8,6 +8,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/proto"
 )
@@ -42,6 +43,7 @@ type LinkIn struct {
 	Generation   uint64    // open: the generation the accepted LinkAuth stored = OwnerGeneration = node_live.session
 	CertSerial   string    // open: from LinkAccept
 	CertNotAfter time.Time // open
+	Seal         []byte    // open: the seal keys LinkAccept returned; nil = a plain session
 	Frame        []byte    // frame: one ConnectRequest; request: one ConnectResponse
 	RequestID    string    // request
 	DeadlineAt   time.Time // request: the caller's absolute deadline
@@ -106,7 +108,7 @@ func (f *Fleet) Link(ctx context.Context, in LinkIn) (LinkOut, error) {
 			return LinkOut{}, errors.New("link open needs a generation")
 		}
 		c.state = SessionState{Version: sessionStateVersion, NodeID: in.NodeID, OwnerGeneration: in.Generation,
-			PeerCertSerial: in.CertSerial, PeerCertNotAfter: in.CertNotAfter, Poison: state.Poison}
+			PeerCertSerial: in.CertSerial, PeerCertNotAfter: in.CertNotAfter, Poison: state.Poison, Seal: in.Seal}
 		if err := c.step(SessionEvent{Kind: EventOpen}); err != nil {
 			return LinkOut{}, err
 		}
@@ -172,6 +174,15 @@ type linkCall struct {
 // frame handles one frame of the agent: the first must be Hello, and an accepted Hello is followed by the first desired
 // state, after HelloAck (as runSession does on the VPS).
 func (c *linkCall) frame(raw []byte) error {
+	if c.state.Seal != nil {
+		plain, err := agentlink.OpenFrame(c.state.Seal, true, c.state.SealUp, raw)
+		if err != nil {
+			c.closeWith(CloseInvalidArgument, err.Error())
+			return nil
+		}
+		c.state.SealUp++
+		raw = plain
+	}
 	var msg agentv1.ConnectRequest
 	if err := proto.Unmarshal(raw, &msg); err != nil {
 		c.closeWith(CloseInvalidArgument, "invalid ConnectRequest frame")
@@ -261,6 +272,19 @@ func (c *linkCall) finish() (LinkOut, error) {
 	}
 	if c.out.Close != nil {
 		c.state.Preparing, c.state.PrepareDirty = false, false
+	}
+	if c.state.Seal != nil {
+		for i, frame := range c.out.Frames {
+			sealed, err := agentlink.SealFrame(c.state.Seal, false, c.state.SealDown, frame)
+			if err != nil {
+				return LinkOut{}, err
+			}
+			c.out.Frames[i] = sealed
+			c.state.SealDown++
+		}
+	}
+	if c.state.Disconnected {
+		c.state.Seal, c.state.SealUp, c.state.SealDown = nil, 0, 0 // the state outlives the session; its keys must not
 	}
 	raw, err := json.Marshal(c.state)
 	if err != nil {

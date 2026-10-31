@@ -128,6 +128,7 @@ type Agent struct {
 	linkAdvertised          atomic.Bool               // the last HelloAck advertised the signed link
 	linkRetryAt             atomic.Pointer[time.Time] // a link attempt failed before it was established: the link is not tried again before this
 	linkHTTPClient          *http.Client              // test seam; nil uses normal system-root TLS verification
+	linkPlain               bool                      // test seam: dial the link as an older agent that does not seal
 	offset                  atomic.Int64              // seconds: panel clock minus local clock, measured at Hello
 	skewed                  atomic.Bool
 	cur                     atomic.Pointer[session]

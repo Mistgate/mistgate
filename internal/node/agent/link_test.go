@@ -173,6 +173,9 @@ func TestAgentLinkSessionReconnectsAndResumesReliableSequence(t *testing.T) {
 	if current == nil {
 		t.Fatal("agent has no active WebSocket session")
 	}
+	if !linkSealed(current) {
+		t.Error("the link session with a current panel is not sealed")
+	}
 	current.cancel()
 	eventually(t, func() bool { return a.cur.Load() == nil }, "link session disconnected")
 	if hit := waitLinkHit(t, links); hit != 2 {
