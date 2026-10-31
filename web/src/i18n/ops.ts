@@ -620,6 +620,7 @@ export const en = {
   "node.awg.kernel.unchecked": "Not checked yet: the doctor looks at the kernel once the node has an AmneziaWG profile.",
 
   "node.settings.addressHint": "Changing it changes the address in every subscription.",
+  "node.settings.addressOwnerHint": "The address in every subscription. Only the owner can change it.",
   "node.settings.countryHint": "Matters for DNS: on nodes in Russia the doctor checks gosuslugi.ru and offers Yandex DNS.",
   "node.settings.location": "Location",
   "node.settings.provider": "Provider",
@@ -1643,6 +1644,7 @@ export const ru: typeof en = {
   "node.awg.kernel.unchecked": "Ещё не проверено: доктор смотрит ядро, когда на ноде появится профиль AmneziaWG.",
 
   "node.settings.addressHint": "Если поменять, изменится адрес во всех подписках.",
+  "node.settings.addressOwnerHint": "Адрес во всех подписках. Менять может только владелец.",
   "node.settings.countryHint": "Нужна для DNS: на нодах в России доктор проверяет госуслуги и предлагает Яндекс DNS.",
   "node.settings.location": "Место",
   "node.settings.provider": "Хостер",
@@ -2661,6 +2663,7 @@ export const zh: typeof en = {
   "node.awg.kernel.unchecked": "尚未检查：节点有 AmneziaWG 协议配置后，诊断才会检查内核。",
 
   "node.settings.addressHint": "更改后，所有订阅中的地址都会随之改变。",
+  "node.settings.addressOwnerHint": "所有订阅中使用的地址。仅所有者可以更改。",
   "node.settings.countryHint": "影响 DNS：对位于俄罗斯的节点，诊断会检查 gosuslugi.ru，并提供 Yandex DNS。",
   "node.settings.location": "位置",
   "node.settings.provider": "服务商",

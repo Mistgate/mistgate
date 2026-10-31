@@ -67,11 +67,21 @@ const (
 
 // validText: at most max characters (runes, like the admin's form fields count them), valid UTF-8, no control characters.
 func validText(s string, max int) bool {
+	return validTextWith(s, max, "")
+}
+
+// validNotes is validText for the node's notes, which may also hold line breaks and tabs. Those count toward the limit
+// like any other character: what is checked is what is stored.
+func validNotes(s string) bool {
+	return validTextWith(s, maxNodeNotes, "\n\r\t")
+}
+
+func validTextWith(s string, max int, allowed string) bool {
 	if !utf8.ValidString(s) || utf8.RuneCountInString(s) > max {
 		return false
 	}
 	for _, r := range s {
-		if r < 0x20 || r == 0x7f {
+		if (r < 0x20 || r == 0x7f) && !strings.ContainsRune(allowed, r) {
 			return false
 		}
 	}
@@ -812,7 +822,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			return nil, invalid("location and provider must be plain text up to 100 characters")
 		}
 	}
-	if m.Notes != nil && !validText(strings.NewReplacer("\n", "", "\r", "", "\t", "").Replace(*m.Notes), maxNodeNotes) {
+	if m.Notes != nil && !validNotes(*m.Notes) {
 		return nil, invalid("notes must be plain text up to 500 characters")
 	}
 	if m.DnsResolvers != nil {
@@ -899,8 +909,20 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	}
 	oldAddress := ""
 	if m.Address != nil {
-		if cur, err := f.st.Node(ctx, m.NodeId); err == nil { // a missing node is answered by the update
+		cur, err := f.st.Node(ctx, m.NodeId)
+		switch {
+		case errors.Is(err, store.ErrNotFound): // answered by the update
+		case err != nil:
+			return nil, internalErr(f.log.Error, "update node", err)
+		default:
 			oldAddress = cur.Address
+			// The address is where every subscription sends people and what the health checks of the panel dial: moving
+			// it is the owner's call. Sending the same address back (a form that saves all its fields) stays open.
+			if *m.Address != cur.Address {
+				if a, ok := auth.AdminFrom(ctx); !ok || a.Role != store.RoleOwner {
+					return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the owner can change the address of a node"))
+				}
+			}
 		}
 	}
 	live, err := f.liveRowsForNode(ctx, m.NodeId, true)
