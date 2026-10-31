@@ -420,6 +420,7 @@ var builtinCategory = map[string]presetGroup{
 	"dns_builtin_cn_split":   {CategoryRegional, "CN"},
 	"dns_builtin_standard":   {Category: CategoryRegular},
 	"dns_builtin_adblock":    {Category: CategoryNoAds},
+	"dns_builtin_ads_device": {Category: CategoryNoAds},
 	"dns_builtin_family":     {Category: CategoryFamily},
 	"dns_builtin_quad9":      {Category: CategorySecurity},
 }

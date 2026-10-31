@@ -160,6 +160,8 @@ var builtinNames = map[string]struct{ ru, en, zh string }{
 	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: без 18+", "OpenDNS FamilyShield: no 18+", "OpenDNS FamilyShield：无成人内容"},
 	"dns_builtin_cloudflare_security": {"Cloudflare Security: защита от вредоносных", "Cloudflare Security: malware blocking", "Cloudflare Security：拦截恶意网站"},
 	"dns_builtin_yandex_safe":         {"Яндекс безопасный: защита от вредоносных", "Yandex Safe: malware blocking", "Yandex Safe：拦截恶意网站"},
+	// 00088_dns_builtin_ads_device.sql
+	"dns_builtin_ads_device": {"Без рекламы на устройстве", "No ads on the device", "设备端拦截广告"},
 }
 
 // NameIn is the name of the preset in the language of the page.
@@ -198,6 +200,8 @@ var builtinDescriptions = map[string]struct{ en, zh string }{
 	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: no 18+ content", "OpenDNS FamilyShield：拦截成人内容"},
 	"dns_builtin_cloudflare_security": {"Cloudflare Security: blocks malware domains", "Cloudflare Security：拦截恶意域名"},
 	"dns_builtin_yandex_safe":         {"Yandex DNS, safe mode: no malware, no fraud sites", "Yandex DNS 安全模式：拦截恶意和诈骗网站"},
+	// 00088_dns_builtin_ads_device.sql
+	"dns_builtin_ads_device": {"The app drops ads and trackers by the category-ads-all list; Cloudflare and Google for DNS", "应用按 category-ads-all 列表自行拦截广告和跟踪器；DNS 使用 Cloudflare 和 Google"},
 }
 
 // DescriptionIn is the description in the language of the page. A built-in one is stored as "Russian\nEnglish" and is

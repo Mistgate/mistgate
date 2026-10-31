@@ -48,7 +48,7 @@ func TestDNSMigrationUpgradesExistingData(t *testing.T) {
 	if err := s.R.QueryRowContext(ctx, `SELECT u.name, coalesce(u.dns_preset_id, 'none') FROM user u WHERE id = 'usr_a'`).Scan(&name, &dns); err != nil || name != "old user" || dns != "none" {
 		t.Fatalf("user after upgrade: %q %q %v", name, dns, err)
 	}
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&n); err != nil || n != 16 {
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&n); err != nil || n != 17 {
 		t.Fatalf("built-in presets: %d %v", n, err)
 	}
 	d := s.DNS()
@@ -151,7 +151,7 @@ func TestDNSSplitDirectMigrationUpgradesFrom7(t *testing.T) {
 	wantOrder := []string{
 		"dns_builtin_ru_split", "dns_builtin_ru_proxied", "dns_builtin_yandex", "dns_builtin_cn_split",
 		"dns_builtin_standard", "dns_builtin_cloudflare", "dns_builtin_google", "dns_builtin_dnssb",
-		"dns_builtin_adblock",
+		"dns_builtin_adblock", "dns_builtin_ads_device",
 		"dns_builtin_family", "dns_builtin_cloudflare_family", "dns_builtin_yandex_family", "dns_builtin_opendns_family",
 		"dns_builtin_quad9", "dns_builtin_cloudflare_security", "dns_builtin_yandex_safe",
 		"dns_custom",
@@ -160,7 +160,7 @@ func TestDNSSplitDirectMigrationUpgradesFrom7(t *testing.T) {
 		t.Errorf("order = %v, want %v", order, wantOrder)
 	}
 	var builtins int
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 16 {
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 17 {
 		t.Errorf("built-ins: %d %v", builtins, err)
 	}
 
