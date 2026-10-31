@@ -922,7 +922,7 @@ type Hello struct {
 	// crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
 	// InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
 	// "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
-	// (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
+	// (NodeSettings.client_ipv6_disabled), "ipv6-addr/1" (NodeSettings.ipv6_addresses; see "IPV6 ADDRESSES"), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
 	// UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
 	// "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
 	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
@@ -4659,8 +4659,12 @@ type NodeSettings struct {
 	// Egress "warp" is not touched. Inverted so that the default (false, also what an old panel sends) keeps IPv6 on.
 	// Read only by agents with "client-ipv6/1".
 	ClientIpv6Disabled bool `protobuf:"varint,9,opt,name=client_ipv6_disabled,json=clientIpv6Disabled,proto3" json:"client_ipv6_disabled,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// IPv6 addresses (IP literals, no prefix length, no brackets) the agent holds as /128 on the interface of its ::/0 route
+	// and keeps there (see "IPV6 ADDRESSES"). The list is the whole list (empty = none): an entry that is gone is removed from the host
+	// when the agent put it there. Read only by agents with "ipv6-addr/1"; the panel sends it only to them.
+	Ipv6Addresses []string `protobuf:"bytes,10,rep,name=ipv6_addresses,json=ipv6Addresses,proto3" json:"ipv6_addresses,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NodeSettings) Reset() {
@@ -4754,6 +4758,13 @@ func (x *NodeSettings) GetClientIpv6Disabled() bool {
 		return x.ClientIpv6Disabled
 	}
 	return false
+}
+
+func (x *NodeSettings) GetIpv6Addresses() []string {
+	if x != nil {
+		return x.Ipv6Addresses
+	}
+	return nil
 }
 
 type DesiredState struct {
@@ -6885,7 +6896,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"LinkAccept\x12\x1c\n" +
 	"\tsignature\x18\x01 \x01(\fR\tsignature\"!\n" +
 	"\x03Ack\x12\x1a\n" +
-	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\x93\x03\n" +
+	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xba\x03\n" +
 	"\fNodeSettings\x12(\n" +
 	"\x10stats_interval_s\x18\x01 \x01(\rR\x0estatsIntervalS\x120\n" +
 	"\x14keepalive_interval_s\x18\x02 \x01(\rR\x12keepaliveIntervalS\x12.\n" +
@@ -6896,7 +6907,9 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\vawg_backend\x18\a \x01(\tR\n" +
 	"awgBackend\x126\n" +
 	"\x17torrent_blocker_enabled\x18\b \x01(\bR\x15torrentBlockerEnabled\x120\n" +
-	"\x14client_ipv6_disabled\x18\t \x01(\bR\x12clientIpv6Disabled\"\x83\x03\n" +
+	"\x14client_ipv6_disabled\x18\t \x01(\bR\x12clientIpv6Disabled\x12%\n" +
+	"\x0eipv6_addresses\x18\n" +
+	" \x03(\tR\ripv6Addresses\"\x83\x03\n" +
 	"\fDesiredState\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12#\n" +
 	"\rbase_revision\x18\x02 \x01(\x04R\fbaseRevision\x12\x1d\n" +

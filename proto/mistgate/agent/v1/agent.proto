@@ -173,7 +173,10 @@ package mistgate.agent.v1;
 //                       and other tunnel interfaces are never picked), addrs (the stable global addresses of that interface as
 //                       "addr/plen", comma-separated, at most 4: no ULA, temporary, deprecated or tentative ones) and src (the
 //                       source address the kernel picks for an outbound IPv6 connection); a param that is not known is left
-//                       out, and an older agent sends none of the three
+//                       out, and an older agent sends none of the three. An agent with "ipv6-addr/1" and a list in
+//                       NodeSettings.ipv6_addresses adds owned ("addr=state", comma-separated; state ok | missing | tentative |
+//                       dad_failed | denied; see "IPV6 ADDRESSES") and answers a missing or DAD-failed one with the codes
+//                       ipv6.owned_missing and ipv6.owned_dad_failed (warning)
 //     foreign_vpn       leftovers of other VPN stacks: x-ui, xray, remnanode, amnezia containers, old wg interfaces
 //     foreign_nft       nftables tables/rules that are not ours (nat/redirect in particular)
 //     port_conflicts    inbound ports (and hop ranges) held by a process that is not us
@@ -471,6 +474,32 @@ package mistgate.agent.v1;
 //   - The bucket is created with the first credential that carries a limit, changes its rate in place when the value
 //     changes, and goes away with the user's last such credential (or when its inbound is removed).
 //
+// IPV6 ADDRESSES (additive, protocol api_version stays 1)
+//   A node can hold IPv6 addresses of its own on the interface of its main uplink: the address of the "IPv6 entry" of a
+//   node, or a new one that replaces it. The panel decides which; the agent only keeps them and refuses what could break
+//   the host.
+//   - CAPABILITY GATE. An agent lists "ipv6-addr/1" when it can do this (Linux, with the netlink interface). The panel
+//     sends NodeSettings.ipv6_addresses, and counts it in the settings signature, ONLY to such an agent; to any other the
+//     field is absent, so the signature of an old agent does not move.
+//   - WHAT THE AGENT DOES. The interface is the one of the ::/0 route in the main routing table (the doctor's iface). Each
+//     address is added as a /128 with IFA_F_NOPREFIXROUTE, preferred_lft 0 (deprecated: the kernel never picks it as the
+//     source of a new outgoing connection, so an entry address does not show up in egress) and valid_lft forever. Incoming
+//     connections and the replies to them work as with any address. Duplicate address detection runs as usual; an address
+//     whose DAD fails is removed and reported as dad_failed.
+//   - OWNERSHIP. The agent writes ipv6-owned.json in its state dir BEFORE it adds an address, and removes only addresses that
+//     are in that file. An address that was on the host before the agent asked for it never becomes the agent's and is never
+//     removed (the host provider's addresses are never touched). A removed entry of ipv6_addresses is removed from the host
+//     at the next sweep; cleanup (uninstall, retire) removes everything in the file.
+//   - REFUSAL (state denied). An address is refused unless it is a global unicast address, not ULA, inside the /64 of a
+//     stable address of that interface that is not itself one of ours, and at most 4 are held at once. An agent without
+//     the right to change addresses (a container) refuses all of them. A refusal is reported, never turned into another
+//     address.
+//   - PERSISTENCE. NodeSettings is saved with the desired state, so the addresses come back with the agent after a reboot
+//     without the panel, and every sweep (30 s) puts back one that a network manager removed (event ipv6_readded, at most
+//     once an hour).
+//   - REPORT. After a change of the state of any of them the agent sends a partial DoctorReport with the ipv6 check, which
+//     carries the param owned.
+//
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
@@ -590,7 +619,7 @@ message Hello {
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
   // "AWG AND WARP"), "bandwidth/1" (MeasureBandwidth; see "BANDWIDTH TEST"), "client-ipv6/1"
-  // (NodeSettings.client_ipv6_disabled), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
+  // (NodeSettings.client_ipv6_disabled), "ipv6-addr/1" (NodeSettings.ipv6_addresses; see "IPV6 ADDRESSES"), "ws-link/1" (signed WebSocket link transport), "udpcheck/1" (UdpCount,
   // UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
@@ -1220,6 +1249,10 @@ message NodeSettings {
   // Egress "warp" is not touched. Inverted so that the default (false, also what an old panel sends) keeps IPv6 on.
   // Read only by agents with "client-ipv6/1".
   bool client_ipv6_disabled = 9;
+  // IPv6 addresses (IP literals, no prefix length, no brackets) the agent holds as /128 on the interface of its ::/0 route
+  // and keeps there (see "IPV6 ADDRESSES"). The list is the whole list (empty = none): an entry that is gone is removed from the host
+  // when the agent put it there. Read only by agents with "ipv6-addr/1"; the panel sends it only to them.
+  repeated string ipv6_addresses = 10;
 }
 
 message DesiredState {
