@@ -25,8 +25,8 @@ vi.mock("@/lib/api", () => ({
   auth: { me: () => Promise.resolve({}) },
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, className, title }: { children?: ReactNode; to: string; className?: string; title?: string }) => (
-    <a href={to} className={className} title={title}>
+  Link: ({ children, to, className, title, tabIndex }: { children?: ReactNode; to: string; className?: string; title?: string; tabIndex?: number }) => (
+    <a href={to} className={className} title={title} tabIndex={tabIndex}>
       {children}
     </a>
   ),
@@ -100,13 +100,22 @@ const click = async (el: Element | null | undefined) => {
 };
 
 describe("node notes", () => {
-  it("shows plain-text notes in the table and mobile cards, with the full text on their links", async () => {
+  it("shows plain-text notes in the table and mobile cards, with the full text only on the notes", async () => {
     const notes = "<b>Renew in March</b>\n备用节点";
     await mount([node("de1", { notes })]);
     const summaries = [...document.querySelectorAll("p")].filter((p) => p.textContent === notes);
     expect(summaries).toHaveLength(2);
     expect(summaries.every((p) => p.querySelector("b") === null)).toBe(true);
     expect([...document.querySelectorAll("a")].filter((a) => a.title === notes)).toHaveLength(2);
+    for (const summary of summaries) {
+      const link = summary.closest("a")!;
+      expect(link.title).toBe(notes);
+      expect(link.getAttribute("href")).toBe("/nodes/$id");
+      expect(link.tabIndex).toBe(-1); // the row link remains the single keyboard stop
+    }
+    const rowLinks = document.querySelectorAll("a.absolute");
+    expect(rowLinks).toHaveLength(2);
+    expect([...rowLinks].every((a) => !a.hasAttribute("title"))).toBe(true);
   });
 
   it("omits empty and whitespace-only notes", async () => {

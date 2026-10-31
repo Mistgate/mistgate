@@ -267,7 +267,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             key={n.id}
             className={cx("relative grid min-h-[60px] items-center gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
           >
-            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} title={n.notes?.trim() || undefined} className="absolute inset-0" />
+            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0" />
             {select && <Tick select={select} node={n} />}
             <div className="flex min-w-0 flex-col gap-1">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -276,7 +276,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               </div>
               <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
               {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
-              <NodeNotes notes={n.notes} />
+              <NodeNotes node={n} />
             </div>
             <span title={n.address} className="font-mono text-xs break-all text-muted">
               {n.address}
@@ -315,7 +315,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         );
         return (
           <div key={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
-            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} title={n.notes?.trim() || undefined} className="absolute inset-0 rounded-card" />
+            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               {select && <Tick select={select} node={n} />}
               <b className="min-w-0 break-all text-[15px]">{n.name}</b>
@@ -323,7 +323,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             </div>
             <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
             {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
-            <NodeNotes notes={n.notes} />
+            <NodeNotes node={n} />
             <div className="grid grid-cols-4 gap-2">
               {stat(String(onlineOf(n)), t("nodes.online"))}
               {stat(fmt.bytes(n.trafficTodayBytes), t("nodes.today"), t("nodes.todayHint"))}
@@ -346,7 +346,13 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
   );
 }
 
-function NodeNotes({ notes }: { notes: string }) {
-  if (!notes?.trim()) return null;
-  return <p className="line-clamp-2 whitespace-pre-line break-words text-xs text-muted">{notes.trim()}</p>;
+function NodeNotes({ node }: { node: Node }) {
+  const notes = node.notes?.trim();
+  if (!notes) return null;
+  // Above the row link: only the notes show this title, and clicking them still opens the node.
+  return (
+    <Link to="/nodes/$id" params={{ id: node.id }} title={notes} tabIndex={-1} className="relative z-10 block w-fit min-w-0 max-w-full">
+      <p className="line-clamp-2 whitespace-pre-line break-words text-xs text-muted">{notes}</p>
+    </Link>
+  );
 }
