@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
 import { fetchPanelRequest, scheduledPanel } from "../src/fetch";
 import { getPanel } from "../src/panel";
+import { MAX_BODY_BYTES } from "../src/shell";
 
 vi.mock("../src/panel", () => ({ getPanel: vi.fn() }));
 
@@ -183,5 +184,37 @@ describe("fetchPanelRequest streams a marked node update download", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("fetchPanelRequest refuses an oversized body before the panel sees it", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const answer = { status: 200, headers: [], body: new Uint8Array(), waitUntil: Promise.resolve() };
+  const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+  const streamOf = (sizes: number[]) =>
+    new ReadableStream<Uint8Array>({
+      start(c) {
+        for (const n of sizes) c.enqueue(new Uint8Array(n));
+        c.close();
+      },
+    });
+
+  it("by Content-Length, and while a body without one streams in", async () => {
+    const panel = { fetch: vi.fn().mockResolvedValue(answer) };
+    mockedGetPanel.mockResolvedValue(panel as unknown as Awaited<ReturnType<typeof getPanel>>);
+    const declared = new Request("https://example.com/x", { method: "POST", body: "a", headers: { "Content-Length": String(MAX_BODY_BYTES + 1) } });
+    expect((await fetchPanelRequest(declared, {} as Env, ctx)).status).toBe(413);
+    const streamed = new Request("https://example.com/x", { method: "POST", body: streamOf([MAX_BODY_BYTES, 1]), duplex: "half" } as RequestInit);
+    expect((await fetchPanelRequest(streamed, {} as Env, ctx)).status).toBe(413);
+    expect(panel.fetch).not.toHaveBeenCalled();
+  });
+
+  it("passes a body of exactly the cap whole", async () => {
+    const panel = { fetch: vi.fn().mockResolvedValue(answer) };
+    mockedGetPanel.mockResolvedValue(panel as unknown as Awaited<ReturnType<typeof getPanel>>);
+    const request = new Request("https://example.com/x", { method: "POST", body: streamOf([MAX_BODY_BYTES - 7, 7]), duplex: "half" } as RequestInit);
+    expect((await fetchPanelRequest(request, {} as Env, ctx)).status).toBe(200);
+    expect(panel.fetch.mock.calls[0]![0].body.byteLength).toBe(MAX_BODY_BYTES);
   });
 });

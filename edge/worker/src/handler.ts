@@ -1,6 +1,6 @@
 import type { PanelEnv } from "./env";
 import type { PanelApi } from "./runtime";
-import { forwardAsset, forwardLink, forwardProvision, keepAlive, panelURL, toFetchRequest, toResponse } from "./shell";
+import { BodyTooLarge, forwardAsset, forwardLink, forwardProvision, keepAlive, panelURL, toFetchRequest, toResponse } from "./shell";
 
 // The Worker's two entry points over a panel: an HTTP request and a cron tick. They do not know which wasm the panel is, so
 // the single script (src/fetch.ts) and every role script of the split edition (src/roles) share them.
@@ -17,7 +17,13 @@ export function fetchWith(getPanel: GetPanel) {
       return new Response("Service Unavailable", { status: 503, headers: { "Retry-After": "5" } });
     }
     try {
-      const fetchRequest = await toFetchRequest(request);
+      let fetchRequest;
+      try {
+        fetchRequest = await toFetchRequest(request);
+      } catch (error) {
+        if (error instanceof BodyTooLarge) return new Response("Payload Too Large", { status: 413 });
+        throw error;
+      }
       const answer = await keepAlive(ctx, panel.fetch(fetchRequest));
       ctx.waitUntil(answer.waitUntil);
       // The panel marks what another object serves: an agent link upgrade (the node's NodeLink), an SSH-install request
