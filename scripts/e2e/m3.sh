@@ -1591,6 +1591,38 @@ m3_json() {
   done
   pass "sing-box check accepts the profile as served with every version under test ($SB_VERSIONS)"
 
+  # ---- block_ads on the preset: the block is the first rule, and the cores still take the documents (the Xray run below
+  # keeps the documents fetched above: a real xray without geosite.dat would not start one with geosite:category-ads-all)
+  ads_preset() { # <true|false>
+    mutate DnsService/UpdateDnsPreset "$(jq -nc --arg id "$pre" --arg a "$WHOAMI" --argjson on "$1" '{id:$id, name:"e2e-fake-dns", description:"the resolver of the fake internet", servers:[{kind:"DNS_SERVER_KIND_PLAIN", address:$a}], ipv4Only:true, blockAds:$on}')" >/dev/null
+  }
+  ads_preset true || die "UpdateDnsPreset (blockAds on) failed"
+  local AF=$WORK/json-singbox-ads.json MF=$WORK/mihomo-ads.yaml mh ads_mh="mihomo not available"
+  ads_ready() {
+    jget sing-box 'v2rayNG/1.10.20' "$AF" "$WORK/json-singbox-ads.hdr" \
+      && jq -e '[.route.rules[] | select(.action == "reject" and ((.rule_set // []) | index("geosite-category-ads-all")) != null)] | length == 1' "$AF" >/dev/null
+  }
+  wait_for 60 "the sing-box profile with the ads block" ads_ready || die "sing-box: no reject rule for geosite-category-ads-all after blockAds: $(jq -c '.route.rules' "$AF" 2>&1 | head -c 300)"
+  jq -e '.dns.rules[0].action == "predefined" and (.dns.rules[0].rule_set | index("geosite-category-ads-all")) != null' "$AF" >/dev/null \
+    || die "sing-box: the ads block is not the first DNS rule: $(jq -c '.dns.rules[0]' "$AF" 2>&1 | head -c 200)"
+  for ver in $SB_VERSIONS; do
+    "$M3_CACHE/sing-box-$ver" check -c "$AF" >"$WORK/client-singbox-check.log" 2>&1 || { redact <"$WORK/client-singbox-check.log" | tail -n 5; die "sing-box $ver rejects the profile with the ads block"; }
+  done
+  if mh=$(mihomo_bin); then
+    curl -sk -m 15 -A 'mihomo/1.19.32' -o "$MF" "$j_url" || die "the Mihomo profile with the ads block did not download"
+    python3 - "$MF" <<'PY' || die "the Mihomo profile does not start with the ads block"
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1]))
+assert d["rules"][0] == "RULE-SET,geosite-category-ads-all,REJECT", d["rules"][:3]
+assert "geosite-category-ads-all" in (d.get("rule-providers") or {}), list(d.get("rule-providers") or {})
+PY
+    mkdir -p "$WORK/mha-test"
+    "$mh" -t -d "$WORK/mha-test" -f "$MF" >"$WORK/mihomo-ads-t.log" 2>&1 || { redact <"$WORK/mihomo-ads-t.log" | tail -n 5; die "mihomo -t rejects the profile with the ads block"; }
+    ads_mh="mihomo -t accepts the Mihomo profile, whose first rule rejects the list"
+  fi
+  ads_preset false || die "UpdateDnsPreset (blockAds off) failed"
+  pass "block_ads: sing-box gets the list as the first DNS rule (NXDOMAIN) and a reject route, and sing-box check accepts it ($SB_VERSIONS); $ads_mh"
+
   # ---- Xray: every element in a client of its own; the node (or the WARP address) is what the fake internet sees; DNS is intercepted
   local pin conf cp dns_ok dns_bad
   cns_listening() { [ -n "$(cns "$cli7_PID" ss -Hltn "sport = :$1")" ]; } # <port>
