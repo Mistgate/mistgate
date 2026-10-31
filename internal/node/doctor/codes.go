@@ -26,12 +26,16 @@ const (
 	// ipv6: ipv6 (yes | no), connect (ok | failed), warp_inbounds, client_ipv6 (off), suggest (client_ipv6_off);
 	// with a global address also iface (interface of the main-table ::/0 route; never mg*, wg*, awg* or other tunnels),
 	// addrs (its stable global addresses "addr/plen", comma-separated, at most 4) and src (the kernel's source address
-	// for an outbound IPv6 connection); each is omitted when unknown
-	CodeIPv6None      = "ipv6.none"
-	CodeIPv6NoneWarp  = "ipv6.none_warp"
-	CodeIPv6OK        = "ipv6.ok"
-	CodeIPv6Stalls    = "ipv6.connect_failed"
-	CodeIPv6ClientOff = "ipv6.client_off" // outbound IPv6 fails, but "IPv6 for clients" is off: clients use IPv4
+	// for an outbound IPv6 connection); each is omitted when unknown. An agent that holds addresses for the panel adds
+	// owned ("addr=state", comma-separated: ok | missing | tentative | dad_failed | denied); a DAD failure or a missing
+	// or denied one warns (owned_dad_failed, owned_missing) unless the result already warns
+	CodeIPv6None           = "ipv6.none"
+	CodeIPv6NoneWarp       = "ipv6.none_warp"
+	CodeIPv6OK             = "ipv6.ok"
+	CodeIPv6Stalls         = "ipv6.connect_failed"
+	CodeIPv6ClientOff      = "ipv6.client_off" // outbound IPv6 fails, but "IPv6 for clients" is off: clients use IPv4
+	CodeIPv6OwnedMissing   = "ipv6.owned_missing"
+	CodeIPv6OwnedDADFailed = "ipv6.owned_dad_failed"
 	// foreign_vpn: names, count, on_our_ports
 	CodeVPNNone  = "foreign_vpn.none"
 	CodeVPNFound = "foreign_vpn.found"
@@ -118,7 +122,7 @@ var Codes = []string{
 	CodeDiskUsage, CodeDiskUnreadable, CodeJournalSize, CodeJournalNone,
 	CodeDstateNone, CodeDstateStuck, CodeDstateLoadIdle, CodeDstateStuckLoad, CodeDstateNoProc, CodeDstateCut,
 	CodeTimeOffset, CodeResolverOK, CodeResolverFailed,
-	CodeIPv6None, CodeIPv6NoneWarp, CodeIPv6OK, CodeIPv6Stalls, CodeIPv6ClientOff,
+	CodeIPv6None, CodeIPv6NoneWarp, CodeIPv6OK, CodeIPv6Stalls, CodeIPv6ClientOff, CodeIPv6OwnedMissing, CodeIPv6OwnedDADFailed,
 	CodeVPNNone, CodeVPNFound, CodeVPNClash,
 	CodeNftClean, CodeNftFound, CodeNftNat, CodeNftHits, CodeNftNone, CodeNftError,
 	CodePortsOK, CodePortsNone, CodePortsHop, CodePortsTLS, CodePortsFailedBnd, CodePortsHeld, CodePortsNoTable,

@@ -34,6 +34,8 @@ const samples: Record<string, Record<string, string>> = {
   "ipv6.ok": { ipv6: "yes", connect: "ok" },
   "ipv6.connect_failed": { ipv6: "yes", connect: "failed" },
   "ipv6.client_off": { ipv6: "yes", connect: "failed", client_ipv6: "off" },
+  "ipv6.owned_missing": { ipv6: "yes", connect: "ok", owned: "2001:db8:1::beef=missing" },
+  "ipv6.owned_dad_failed": { ipv6: "yes", connect: "ok", owned: "2001:db8:1::beef=dad_failed" },
   "foreign_vpn.none": {},
   "foreign_vpn.found": { names: "unit:x-ui,docker:amnezia", count: "2" },
   "foreign_vpn.clash": { names: "proc:xray", count: "1", on_our_ports: "xray:udp/443" },

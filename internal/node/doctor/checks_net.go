@@ -162,7 +162,44 @@ func timedLookup(ctx context.Context, e *Env, host string) (time.Duration, error
 
 var ipv6Probes = []string{"[2606:4700:4700::1111]:443", "[2001:4860:4860::8888]:443"}
 
-func checkIPv6(ctx context.Context, e *Env) Result {
+func checkIPv6(ctx context.Context, e *Env) Result { return withOwnedIPv6(e, checkIPv6Uplink(ctx, e)) }
+
+// withOwnedIPv6 adds the addresses the agent holds for the panel (hostctl.OwnedIPv6Host) to the result: the param owned
+// ("addr=state", comma-separated, sorted by address). A DAD failure or an address that is not on the interface turns a
+// result that was fine into a warning; a result that already warns keeps its own code.
+func withOwnedIPv6(e *Env, r Result) Result {
+	if e.OwnedIPv6 == nil {
+		return r
+	}
+	owned := e.OwnedIPv6()
+	if len(owned) == 0 {
+		return r
+	}
+	sort.Slice(owned, func(i, j int) bool { return owned[i].Addr < owned[j].Addr })
+	var parts []string
+	var dad, missing bool
+	for _, o := range owned {
+		parts = append(parts, o.Addr+"="+o.State)
+		dad = dad || o.State == hostctl.IPv6AddrDADFailed
+		missing = missing || o.State == hostctl.IPv6AddrMissing || o.State == hostctl.IPv6AddrDenied
+	}
+	if r.Params == nil {
+		r.Params = map[string]string{}
+	}
+	r.Params["owned"] = csv(parts)
+	if r.Status != OK {
+		return r
+	}
+	switch {
+	case dad:
+		r.Status, r.Code, r.Detail = Warn, CodeIPv6OwnedDADFailed, "an IPv6 address of this node failed duplicate address detection and was removed"
+	case missing:
+		r.Status, r.Code, r.Detail = Warn, CodeIPv6OwnedMissing, "an IPv6 address of this node is not on the interface"
+	}
+	return r
+}
+
+func checkIPv6Uplink(ctx context.Context, e *Env) Result {
 	has := false
 	if s, err := e.read("/proc/net/if_inet6"); err == nil {
 		has = hasGlobalInet6(s)
@@ -248,10 +285,6 @@ func ipv6Uplink(ctx context.Context, e *Env) uplink6 {
 	return u
 }
 
-// tunnelIfacePrefixes name interfaces that never carry the uplink: the agent's own links (mgwarp, mgawg*), other
-// VPN, bridge and container devices.
-var tunnelIfacePrefixes = []string{"lo", "mg", "wg", "awg", "tun", "tap", "ppp", "sit", "ip6tnl", "ip6gre", "gre", "tailscale", "zt", "docker", "br-", "veth", "virbr"}
-
 // ipv6DefaultIface returns the interface of the IPv6 default route (::/0) from /proc/net/ipv6_route: the lowest
 // metric among the routes that are up and not rejecting, on an interface that is not a tunnel. "" = none.
 // Columns: dest dest_len src src_len next_hop metric refcnt use flags iface (hex).
@@ -259,7 +292,7 @@ func ipv6DefaultIface(s string) string {
 	best, bestMetric := "", uint64(0)
 	for _, line := range strings.Split(s, "\n") {
 		f := strings.Fields(line)
-		if len(f) < 10 || f[0] != "00000000000000000000000000000000" || f[1] != "00" || isTunnelIface(f[9]) {
+		if len(f) < 10 || f[0] != "00000000000000000000000000000000" || f[1] != "00" || hostctl.NotUplink(f[9]) {
 			continue
 		}
 		flags, err := strconv.ParseUint(f[8], 16, 32)
@@ -272,15 +305,6 @@ func ipv6DefaultIface(s string) string {
 		}
 	}
 	return best
-}
-
-func isTunnelIface(name string) bool {
-	for _, pre := range tunnelIfacePrefixes {
-		if strings.HasPrefix(name, pre) {
-			return true
-		}
-	}
-	return false
 }
 
 // stableInet6 lists the global addresses of one interface as "addr/plen", sorted: not ULA, link-local, temporary

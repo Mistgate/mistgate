@@ -61,6 +61,8 @@ type Env struct {
 	// Agent side.
 	Settings func() Settings
 	Inbounds func() []Inbound
+	// OwnedIPv6 are the addresses the agent holds for the panel with the state of each (hostctl.IPv6Addr*); nil = none.
+	OwnedIPv6 func() []OwnedAddr
 	// Samples returns the stats ring samples of the last window, oldest first.
 	Samples func(window time.Duration) []Sample
 	// Offset is the panel clock minus the local clock in seconds, measured at Hello.
@@ -120,6 +122,12 @@ type Settings struct {
 	Country            string   // ISO 3166-1 alpha-2, "" = unknown
 	Resolvers          []string // NodeSettings.dns_resolvers
 	ClientIPv6Disabled bool     // NodeSettings.client_ipv6_disabled
+}
+
+// OwnedAddr is one IPv6 address the agent holds for the panel (NodeSettings.ipv6_addresses).
+type OwnedAddr struct {
+	Addr  string
+	State string // hostctl.IPv6AddrOK, ...
 }
 
 // Inbound is one inbound as the doctor sees it.

@@ -101,3 +101,64 @@ func TestIPv6Uplink(t *testing.T) {
 		code(t, r, CodeIPv6Stalls, "connect", "failed", "iface", "", "addrs", "", "src", "")
 	})
 }
+
+// The addresses the agent holds for the panel show up as owned=addr=state; a DAD failure or an address that is not there
+// warns, a tentative one (DAD still running) does not, and a result that already warns keeps its own code.
+func TestIPv6Owned(t *testing.T) {
+	const zero = "00000000000000000000000000000000"
+	setup := func(f *fake) {
+		f.put("/proc/net/if_inet6", "20010db8000100000000000000000abc 02 40 00 80 eth0\n")
+		f.put("/proc/net/ipv6_route", zero+" 00 "+zero+" 00 fe800000000000000000000000000001 00000400 00000001 00000000 00450003 eth0\n")
+	}
+	withOwned := func(dial bool, owned ...OwnedAddr) func(*Env) {
+		return func(e *Env) {
+			e.Dial = func(context.Context, string, string) error {
+				if dial {
+					return nil
+				}
+				return errors.New("network unreachable")
+			}
+			e.LocalAddr = func(context.Context, string, string) (string, error) { return "2001:db8:1::abc", nil }
+			e.OwnedIPv6 = func() []OwnedAddr { return owned }
+		}
+	}
+	t.Run("all fine", func(t *testing.T) {
+		f := newFake(t)
+		setup(f)
+		r := run(t, f.doctor(withOwned(true, OwnedAddr{"2001:db8:1::cafe", "ok"}, OwnedAddr{"2001:db8:1::beef", "tentative"})), CheckIPv6)
+		want(t, r, OK, "")
+		code(t, r, CodeIPv6OK, "owned", "2001:db8:1::beef=tentative,2001:db8:1::cafe=ok")
+	})
+	t.Run("missing and denied", func(t *testing.T) {
+		for _, st := range []string{"missing", "denied"} {
+			f := newFake(t)
+			setup(f)
+			r := run(t, f.doctor(withOwned(true, OwnedAddr{"2001:db8:1::beef", st})), CheckIPv6)
+			want(t, r, Warn, "")
+			code(t, r, CodeIPv6OwnedMissing, "owned", "2001:db8:1::beef="+st, "iface", "eth0")
+		}
+	})
+	t.Run("dad failed wins over missing", func(t *testing.T) {
+		f := newFake(t)
+		setup(f)
+		r := run(t, f.doctor(withOwned(true, OwnedAddr{"2001:db8:1::a", "missing"}, OwnedAddr{"2001:db8:1::b", "dad_failed"})), CheckIPv6)
+		want(t, r, Warn, "")
+		code(t, r, CodeIPv6OwnedDADFailed, "owned", "2001:db8:1::a=missing,2001:db8:1::b=dad_failed")
+	})
+	t.Run("a warning that was there stays", func(t *testing.T) {
+		f := newFake(t)
+		setup(f)
+		r := run(t, f.doctor(withOwned(false, OwnedAddr{"2001:db8:1::beef", "missing"})), CheckIPv6)
+		want(t, r, Warn, "")
+		code(t, r, CodeIPv6Stalls, "owned", "2001:db8:1::beef=missing")
+	})
+	t.Run("nothing held, nothing said", func(t *testing.T) {
+		f := newFake(t)
+		setup(f)
+		r := run(t, f.doctor(withOwned(true)), CheckIPv6)
+		code(t, r, CodeIPv6OK, "iface", "eth0")
+		if _, ok := r.Params["owned"]; ok {
+			t.Fatalf("owned = %q", r.Params["owned"])
+		}
+	})
+}
