@@ -388,7 +388,9 @@ func parseAdminHost(raw string) (string, error) {
 }
 
 func validatePrefix(raw string, errInvalid error) (string, error) {
-	if len(raw) < 4 || !strings.HasPrefix(raw, "/") || !strings.HasSuffix(raw, "/") || strings.Contains(raw, "//") || strings.Contains(raw, "..") || strings.ContainsAny(raw, "?#") {
+	// nothing a URL path cannot carry as is either: the admin prefix ends up in the <base href> of the SPA
+	if len(raw) < 4 || !strings.HasPrefix(raw, "/") || !strings.HasSuffix(raw, "/") || strings.Contains(raw, "//") || strings.Contains(raw, "..") || strings.ContainsAny(raw, "?#\"'<>`\\") ||
+		strings.ContainsFunc(raw, func(r rune) bool { return r <= ' ' || r == 0x7f }) {
 		return "", errInvalid
 	}
 	return raw, nil

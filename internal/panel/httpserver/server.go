@@ -242,8 +242,11 @@ func liftWriteDeadline(w http.ResponseWriter) {
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 }
 
+// validSecretPrefix: "/" + something + "/", with nothing a URL path cannot carry as is (spaces, control characters,
+// quotes, angle brackets, backslashes). The admin prefix ends up in the <base href> of the SPA, escaped there too.
 func validSecretPrefix(p string) bool {
-	return len(p) >= 4 && strings.HasPrefix(p, "/") && strings.HasSuffix(p, "/")
+	return len(p) >= 4 && strings.HasPrefix(p, "/") && strings.HasSuffix(p, "/") &&
+		!strings.ContainsFunc(p, func(r rune) bool { return r <= ' ' || r == 0x7f || strings.ContainsRune("\"'<>`\\", r) })
 }
 
 // New validates cfg and builds the server. st is the panel database (instance settings,
