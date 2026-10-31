@@ -29,6 +29,11 @@ func TestAddrs(t *testing.T) {
 		{"cert for vpn.example.com expires", "cert for vpn.example.com expires"},
 		{"version 1.2.3.4567 ok", "version 1.2.3.4567 ok"},
 		{"build 10.2.3.4.5 and 1234.5.6.7", "build 10.2.3.4.5 and 1234.5.6.7"},
+		// a dot that ends a sentence (or a clause) is not one more number: the address goes
+		{"rejected handshake from 203.0.113.7.", "rejected handshake from <ip>."},
+		{"from 203.0.113.7. Retrying", "from <ip>. Retrying"},
+		{"peers 203.0.113.7.. 198.51.100.2.", "peers <ip>.. <ip>."},
+		{"see .203.0.113.7 here", "see .<ip> here"},
 		// glued to letters, or with a port netip refuses: still an address
 		{"remote203.0.113.7x said no", "remote<ip>x said no"},
 		{"peer 203.0.113.7:99999 and 198.51.100.2:123456 gone", "peer <ip>:port and <ip>:port gone"},
