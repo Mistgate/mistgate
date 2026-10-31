@@ -206,10 +206,13 @@ function PresetCard({ p, t, catalog, onOpen }: { p: Preset; t: Tx; catalog: Cata
         {more > 0 && <span className="inline-flex h-6 items-center rounded-ctl px-1.5 font-mono text-[11px] text-faint">+{more}</span>}
       </span>
       <span className="mt-auto flex items-center gap-1.5">
-        {p.builtin && <Pill>{t("subs.dns.builtin")}</Pill>}
-        {p.splitDirect && <Pill icon="map">{t("subs.dns.directTag")}</Pill>}
-        {p.category === DnsCategory.REGIONAL && p.country && <CountryPill code={p.country} t={t} />}
-        <span className="flex-1" />
+        {/* four badges do not fit a phone in Russian: they wrap, the people stay on the right */}
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {p.builtin && <Pill>{t("subs.dns.builtin")}</Pill>}
+          {p.blockAds && <Pill icon="shieldOff">{t("subs.dns.blockAdsTag")}</Pill>}
+          {p.splitDirect && <Pill icon="map">{t("subs.dns.directTag")}</Pill>}
+          {p.category === DnsCategory.REGIONAL && p.country && <CountryPill code={p.country} t={t} />}
+        </span>
         <UsersChip count={p.userCount} label={p.userCount > 0 ? t.n("subs.dns.users", p.userCount) : t("subs.dns.usersNone")} />
       </span>
     </button>

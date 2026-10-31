@@ -45,7 +45,10 @@ export function DnsOptionsCard({ nodeId }: { nodeId: string }) {
         {t("subs.dnsOpt.title")}
       </SectionLabel>
       <p className="text-[13px] leading-snug text-muted">{t("subs.dnsOpt.note")}</p>
-      <Notice>{t("subs.dnsOpt.warn")}</Notice>
+      <Notice>
+        {t("subs.dnsOpt.warn")}
+        {presets.data?.presets.some((p) => p.blockAds) && <span className="mt-1 block">{t("subs.dns.awgNoBlock")}</span>}
+      </Notice>
       {failed ? (
         <QueryError compact error={failed.error} onRetry={() => void failed.refetch()} />
       ) : !presets.data || !options.data ? (

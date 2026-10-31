@@ -51,7 +51,7 @@ import { ChipText } from "./dns-parts";
 import { useSaveSettings } from "./queries";
 import { FieldBlock, inputCls } from "./ui";
 
-type Draft = { name: string; description: string; servers: DnsServerN[]; split: SplitRuleN[]; ipv4Only: boolean; splitDirect: boolean; transport: DnsTransport };
+type Draft = { name: string; description: string; servers: DnsServerN[]; split: SplitRuleN[]; ipv4Only: boolean; splitDirect: boolean; blockAds: boolean; transport: DnsTransport };
 
 // The panel keeps split suffixes as punycode; the admin reads and types them as Unicode (".рф"), the panel converts back.
 const draftOf = (p?: Preset): Draft =>
@@ -63,9 +63,10 @@ const draftOf = (p?: Preset): Draft =>
         split: p.split.map((r) => ({ ...r, suffixes: r.suffixes.map(unicodeSuffix) })),
         ipv4Only: p.ipv4Only,
         splitDirect: p.splitDirect,
+        blockAds: p.blockAds,
         transport: p.preferredTransport === DnsTransport.UNSPECIFIED ? DnsTransport.PLAIN : p.preferredTransport,
       }
-    : { name: "", description: "", servers: [], split: [], ipv4Only: false, splitDirect: false, transport: DnsTransport.PLAIN };
+    : { name: "", description: "", servers: [], split: [], ipv4Only: false, splitDirect: false, blockAds: false, transport: DnsTransport.PLAIN };
 
 /** The editor of one preset (or a new one) in a modal: basics, servers, split rules, options; the bar at the bottom stays in view. */
 export function PresetEditor({ open, preset, data, t, fallback, onClose }: { open: boolean; preset?: Preset; data: DnsData; t: Tx; fallback: string; onClose: () => void }) {
@@ -87,6 +88,8 @@ export function PresetEditor({ open, preset, data, t, fallback, onClose }: { ope
     description: d.description.trim(),
     ipv4Only: d.ipv4Only,
     splitDirect: d.splitDirect,
+    // an update carries the flag only when it was changed here: absent, the panel keeps what is stored
+    blockAds: preset && d.blockAds === preset.blockAds ? undefined : d.blockAds,
     preferredTransport: d.transport,
     servers: cleanServers(d.servers),
     split: cleanSplit(d.split),
@@ -201,6 +204,7 @@ export function PresetEditor({ open, preset, data, t, fallback, onClose }: { ope
 
       <Section title={t("subs.dns.options")} icon="sliders" tone="sand">
         <div className="-my-1 flex flex-col">
+          <SwitchRow label={t("subs.dns.blockAds")} hint={t("subs.dns.blockAdsHint")} checked={d.blockAds} onCheckedChange={(on) => setD({ ...d, blockAds: on })} />
           <SwitchRow label={t("subs.dns.direct")} hint={t("subs.dns.directHint")} checked={d.splitDirect} onCheckedChange={(on) => setD({ ...d, splitDirect: on })} />
           <SwitchRow label={t("subs.dns.ipv4")} hint={t("subs.dns.ipv4Hint")} checked={d.ipv4Only} onCheckedChange={(on) => setD({ ...d, ipv4Only: on })} />
           {preset && !preset.isDefault && (

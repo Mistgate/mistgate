@@ -34,12 +34,12 @@ afterEach(() => {
   for (const m of [listDnsPresets, listNodeDnsOptions, setNodeDnsOptions, me]) m.mockReset();
 });
 
-const preset = (id: string, name: string) => ({ id, name, servers: [], split: [], splitDirect: false, isDefault: false });
+const preset = (id: string, name: string, blockAds = false) => ({ id, name, servers: [], split: [], splitDirect: false, isDefault: false, blockAds });
 const presets = [preset("dns_a", "Preset A"), preset("dns_b", "Preset B"), preset("dns_c", "Preset C")];
 
-async function mount(role: number, offered: { presetIds: string[]; defaultPresetId: string } | null = { presetIds: ["dns_b"], defaultPresetId: "" }) {
+async function mount(role: number, offered: { presetIds: string[]; defaultPresetId: string } | null = { presetIds: ["dns_b"], defaultPresetId: "" }, list = presets) {
   me.mockResolvedValue({ admin: { id: "adm_1", role } });
-  listDnsPresets.mockResolvedValue({ presets, providers: [], clientSupport: [] });
+  listDnsPresets.mockResolvedValue({ presets: list, providers: [], clientSupport: [] });
   listNodeDnsOptions.mockResolvedValue({
     nodes: [{ nodeId: "nod_2", presetIds: ["dns_c"], defaultPresetId: "dns_c" }, ...(offered ? [{ nodeId: "nod_1", ...offered }] : [])],
   });
@@ -76,6 +76,15 @@ describe("DNS choice on the user page (node)", () => {
     expect(text()).toContain("DNS choice on the user page");
     expect(text()).toContain(en["subs.dnsOpt.note"]);
     expect(text()).toContain("Happ, the Mihomo apps, Xray JSON and sing-box have one DNS for all nodes: offer it in Subscriptions → User page. Per node it works only for AmneziaWG keys.");
+  });
+
+  it("says that AmneziaWG keys do not block ads once a preset does", async () => {
+    await mount(1);
+    expect(text()).not.toContain(en["subs.dns.awgNoBlock"]);
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(1, undefined, [...presets, preset("dns_builtin_ads_device", "Без рекламы на устройстве", true)]);
+    expect(text()).toContain("AmneziaWG keys take only the resolvers: ads are not blocked there.");
   });
 
   it("sends the offered presets in the owner's order and the default, and reads only its own node", async () => {

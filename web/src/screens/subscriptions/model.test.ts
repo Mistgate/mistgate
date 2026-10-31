@@ -326,6 +326,19 @@ describe("the subtitle and the look of a catalog preset", () => {
     expect(presetLook({ id: "dns_custom", category: DnsCategory.REGIONAL }).glyph).toBe("map");
     expect(presetLook({ id: "dns_x", category: DnsCategory.UNSPECIFIED })).toEqual({ glyph: "server", tone: "muted" });
   });
+  it("names the built-in that blocks ads on the device in the three languages and gives it the no-ads glyph", () => {
+    const stock = { id: "dns_builtin_ads_device", name: "Без рекламы на устройстве" };
+    expect(presetName(stock, "ru")).toBe("Без рекламы на устройстве");
+    expect(presetName(stock, "en")).toBe("No ads on the device");
+    expect(presetName(stock, "zh")).toBe("设备端拦截广告");
+    expect(presetName({ ...stock, name: "Мой без рекламы" }, "en")).toBe("Мой без рекламы");
+    expect(presetLook({ id: stock.id, category: DnsCategory.NO_ADS }).glyph).toBe("shieldOff");
+    // it does not look like AdGuard next to it
+    expect(presetLook({ id: stock.id }).tone).not.toBe(presetLook({ id: "dns_builtin_adblock" }).tone);
+    for (const dict of [en, ru, zh] as Record<string, string>[]) {
+      for (const k of ["subs.dns.blockAds", "subs.dns.blockAdsHint", "subs.dns.blockAdsTag", "subs.dns.awgNoBlock"]) expect(dict[k]).toBeTruthy();
+    }
+  });
 });
 
 describe("the editor keeps the country lists of a split rule", () => {

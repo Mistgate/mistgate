@@ -468,6 +468,7 @@ const looks: Record<string, PresetLook> = {
   dns_builtin_cn_split: { glyph: "map", tone: "mint" },
   dns_builtin_standard: { glyph: "globe", tone: "mint" },
   dns_builtin_adblock: { glyph: "shieldOff", tone: "sand" },
+  dns_builtin_ads_device: { glyph: "shieldOff", tone: "lavender" },
   dns_builtin_family: { glyph: "family", tone: "sage" },
   dns_builtin_quad9: { glyph: "bugShield", tone: "rose" },
   dns_builtin_yandex: { glyph: "letter", tone: "sand" },
@@ -504,6 +505,7 @@ const builtinNames: Record<string, { ru: string; en: string; zh: string }> = {
   dns_builtin_opendns_family: { ru: "OpenDNS FamilyShield: без 18+", en: "OpenDNS FamilyShield: no 18+", zh: "OpenDNS FamilyShield：无成人内容" },
   dns_builtin_cloudflare_security: { ru: "Cloudflare Security: защита от вредоносных", en: "Cloudflare Security: malware blocking", zh: "Cloudflare Security：拦截恶意网站" },
   dns_builtin_yandex_safe: { ru: "Яндекс безопасный: защита от вредоносных", en: "Yandex Safe: malware blocking", zh: "Yandex Safe：拦截恶意网站" },
+  dns_builtin_ads_device: { ru: "Без рекламы на устройстве", en: "No ads on the device", zh: "设备端拦截广告" },
 };
 
 /** The name of a preset in the UI language (see builtinNames). */
