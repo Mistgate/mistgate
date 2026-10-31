@@ -70,3 +70,24 @@ func TestEdgeRefusesBackupRPCs(t *testing.T) {
 	for deadline := time.Now().Add(10 * time.Second); s.running.Load() && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 	}
 }
+
+// Backups are the owner's in a browser session: an API token and an MCP token (synthetic ids "token:" and "mcp:", with the
+// owner role of an admin-profile token) are refused even if the procedure allow-list ever let one through.
+func TestRequireOwnerRefusesTokensAndOthers(t *testing.T) {
+	for _, a := range []store.Admin{
+		{ID: "token:tok_1", Role: store.RoleOwner},
+		{ID: "mcp:tok_1", Role: store.RoleOwner},
+		{ID: "adm_h", Role: store.RoleHelper},
+		{ID: "adm_r", Role: store.RoleReadonly},
+	} {
+		if err := requireOwner(auth.WithAdmin(context.Background(), a)); connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Errorf("%+v: %v", a, err)
+		}
+	}
+	if err := requireOwner(context.Background()); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Errorf("no admin: %v", err)
+	}
+	if err := requireOwner(auth.WithAdmin(context.Background(), store.Admin{ID: "adm_o", Role: store.RoleOwner})); err != nil {
+		t.Errorf("the owner: %v", err)
+	}
+}

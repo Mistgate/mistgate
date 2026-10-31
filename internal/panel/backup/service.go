@@ -328,9 +328,11 @@ func (s *Service) requireOwnerStepUp(ctx context.Context) error {
 	return s.stepUp(ctx)
 }
 
+// requireOwner admits the owner in a browser session only: an API or MCP token never reaches backups, whatever its
+// profile, even if the procedure allow-list ever lets one through.
 func requireOwner(ctx context.Context) error {
 	admin, ok := auth.AdminFrom(ctx)
-	if !ok || admin.Role != store.RoleOwner || strings.HasPrefix(admin.ID, "token:") {
+	if !ok || admin.Role != store.RoleOwner || strings.HasPrefix(admin.ID, "token:") || strings.HasPrefix(admin.ID, "mcp:") || auth.PrincipalFrom(ctx).Token {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
 	}
 	return nil
