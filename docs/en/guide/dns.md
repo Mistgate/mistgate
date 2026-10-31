@@ -15,7 +15,7 @@ This is the DNS of the apps. The node has DNS settings of its own: see "Node DNS
 | **Servers** | The main resolvers, asked in this order: the first one that answers wins. Each is a server **From the catalog** or a **Custom server**. |
 | **How to ask** | The preferred transport: **Plain**, **DoT** or **DoH**. |
 | **Split rules** | Domains that end with given suffixes, or belong to a whole country, are asked on their own servers, not the main ones. |
-| **Options** | **Split domains go direct, bypassing the VPN** and **IPv4 only**. |
+| **Options** | **Block ads and trackers in the apps**, **Split domains go direct, bypassing the VPN** and **IPv4 only**. |
 
 ### Servers
 
@@ -64,6 +64,25 @@ Some apps (Hiddify and others) ignore the routing of a profile and use their own
 
 Ask for A records only, for tunnels where IPv6 does not work. Happ ignores this option.
 
+### Ads and trackers
+
+**Block ads and trackers in the apps** makes the apps drop the domains of the community list `category-ads-all` themselves, before any other rule: before the split, the direct sites and the tunnel. The DNS servers stay as they are, so the option works with any servers and any split. The panel keeps no list: each app gets it on its own.
+
+| App | What blocks and where the list comes from |
+|:--|:--|
+| Apps on the mihomo core | A rule provider with the list (an `mrs` file from the MetaCubeX rule lists), refreshed once a day and downloaded **through the VPN group**; the first rule of the profile rejects its domains. |
+| sing-box JSON | A remote rule set (an `.srs` file from the SagerNet lists), downloaded through the VPN. Its domains get an empty DNS answer and their connections are refused. |
+| Xray JSON | `geosite:category-ads-all` from the `geosite.dat` file the app carries; connections to its domains go nowhere. An app without the file, or without that code in it, cannot start the config at all, even when the preset has no split. |
+| Happ | `geosite:category-ads-all` among the blocked sites, from the app's own geo files. Happ applies the routing profile to the whole device, so the block also covers the person's other subscriptions in Happ. |
+| AmneziaVPN and AmneziaWG keys | Nothing: a key holds only the addresses of the resolvers. |
+| Other base64 apps (v2rayNG, Hiddify, Streisand, Shadowrocket) | Nothing: they get no rules from the panel. |
+
+The list is not the same everywhere. Mihomo and sing-box get about 900 domains. Xray and Happ use what their geo files hold: Happ's default files (Loyalsoldier) add a large block list of about 195 000 domains, so more is blocked there, and more by mistake.
+
+**What can break.** Some domains on the list do more than show ads: `googleadservices.com` (the ad links in Google search do not open), `doubleclick.net`, `google-analytics.com`, `app-measurement.com`, `adjust.com` (marketplace promo links that go through adjust do not open). There is no list of exceptions yet.
+
+**Turning it off for one person.** Give them a preset without the flag on the user card (**Access** → **DNS**): their own preset goes before the group's and the default. If people pick their DNS on the page, their own pick comes first: they pick another preset there, or you take this one out of the list. To turn it off for everyone, switch the flag off in the preset.
+
 ## The built-in presets
 
 Built-in presets exist on every install. They can be edited, not deleted.
@@ -77,15 +96,16 @@ Built-in presets exist on every install. They can be edited, not deleted.
 | Regular | **Cloudflare + Google** | Cloudflare and Google for everything. |
 | Regular | **Cloudflare: no filtering**, **Google: no filtering**, **DNS.SB: no filtering** | One provider, no filtering. |
 | No ads | **AdGuard: no ads** | Blocks ads and trackers. |
+| No ads | **No ads on the device** | The apps block ads and trackers themselves by the `category-ads-all` list (see "Ads and trackers"); Cloudflare and Google for DNS. Nobody is moved to it: give it to a person or a group, or make it the default. |
 | For kids | **AdGuard Family: no ads, no 18+**, **Cloudflare Family: no malware, no 18+**, **Yandex Family: no 18+**, **OpenDNS FamilyShield: no 18+** | Blocks adult content (and ads or malware, as the name says). |
 | Security | **Quad9: malware blocking**, **Cloudflare Security: malware blocking**, **Yandex Safe: malware blocking** | Blocks known malware and phishing domains. |
 
-**How to choose?** on the tab gives the short answer: people in Russia: **Russia: .ru direct**; people abroad: **Russia: all through VPN**; no ads: **AdGuard: no ads**. People inside China: **China: Chinese sites direct**.
+**How to choose?** on the tab gives the short answer: people in Russia: **Russia: .ru direct**; people abroad: **Russia: all through VPN**; no ads: **AdGuard: no ads**. People inside China: **China: Chinese sites direct**. No ads in the apps themselves, whatever the DNS servers: **No ads on the device**. **AdGuard: no ads** filters at the DNS server, so it works in AmneziaWG keys too; **No ads on the device** works with any servers and next to a split, but only in Mihomo, sing-box, Xray JSON and Happ.
 
 ## The DNS tab
 
 - **Default for everyone**: the preset of everyone who has no preset of their own, on the user or on the group.
-- **Presets**: one card per preset, with its badges (**built-in**, **default**, **direct** when its split goes direct) and the number of people it applies to. The chips **All**, **Russia**, **China**, **Regular**, **No ads**, **For kids**, **Security** and **Own** filter the cards.
+- **Presets**: one card per preset, with its badges (**built-in**, **default**, **direct** when its split goes direct, **no ads** when the apps block ads) and the number of people it applies to. The chips **All**, **Russia**, **China**, **Regular**, **No ads**, **For kids**, **Security** and **Own** filter the cards.
 - **New preset** opens the editor; a card opens its preset.
 
 In the editor, **Use as the default** → **Make default** makes the preset the default. **Danger zone** → **Delete preset** removes it: the people who used it switch to the default preset with their next subscription update. The default preset and the built-ins cannot be deleted. Leaving with unsaved changes asks first.
