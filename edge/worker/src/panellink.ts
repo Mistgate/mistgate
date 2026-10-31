@@ -18,7 +18,8 @@ import { detachWaitUntil, keepAlive, type WaitUntilOutput } from "./shell";
 
 /** What happened to the session; Go's step answers each one. `at` is the object's clock (Date.now()). */
 export type LinkEvent =
-  | { kind: "open"; at: number; generation: number; certSerial: string; certNotAfterUnix: number }
+  /** seal: what the accept returned, handed back as it is (absent = a plain session). */
+  | { kind: "open"; at: number; generation: number; certSerial: string; certNotAfterUnix: number; seal?: Uint8Array }
   | { kind: "frame"; at: number; frame: Uint8Array }
   | { kind: "alarm"; at: number }
   | { kind: "desired"; at: number }
@@ -53,7 +54,8 @@ export interface LinkChallenge {
   frame: Uint8Array;
 }
 
-export type LinkAccept = { ok: true; frame: Uint8Array; certSerial: string; certNotAfterUnix: number } | { ok: false };
+/** seal: the session's keys when the agent and the panel seal its frames; Go opens and seals them, the object only carries them to the open step. */
+export type LinkAccept = { ok: true; frame: Uint8Array; certSerial: string; certNotAfterUnix: number; seal?: Uint8Array } | { ok: false };
 
 /**
  * The entrypoint's methods over a panel that a subclass names. A class is made per script (panelLinkOf) because the panel

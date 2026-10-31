@@ -131,6 +131,17 @@ describe("NodeLink handshake", () => {
     }
   });
 
+  it("hands the seal keys of the accept to the open step as they are, and stores none of them itself", async () => {
+    const seal = new Uint8Array(64).fill(5);
+    const fake = script({ accept: () => ({ ok: true, frame: text("accept"), certSerial: "c1", certNotAfterUnix: 2_000_000_000, seal }) });
+    const id = newNode();
+    await login(id);
+    const opened = (steps(fake)[0]?.args as LinkStepIn).event as { kind: string; seal?: Uint8Array };
+    expect(opened.kind).toBe("open");
+    expect([...(opened.seal ?? [])]).toEqual([...seal]);
+    expect((await keysOf(id)).sort()).toEqual(["gen", "live", "state"]);
+  });
+
   it("completes the close handshake when the agent closes", async () => {
     const fake = script();
     const c = await login(newNode());

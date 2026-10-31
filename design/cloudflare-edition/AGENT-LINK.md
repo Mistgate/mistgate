@@ -388,8 +388,10 @@ Panel:
 Agent (`cmd/mistgate-node`, `internal/node/agent`):
 - `enroll --link-url wss://de1.example.com/<prefix>/ --ca-sha256 … (--token | --token-stdin)`; `--link-url` cannot be
   combined with `--panel` or `--sni`. The agent POSTs over public TLS (system roots), then runs the existing checks: the
-  returned CA's hash equals the pin, the leaf is ours and chains to it. Public TLS only protects the token; trust in the
-  panel comes from the pin and then from LinkAccept.
+  returned CA's hash equals the pin, the leaf is ours and chains to it. Trust in the panel comes from the pin and then
+  from LinkAccept. Since the audit of 2026-10-31 a token with the `mg2_` prefix (all the panel issues) is not sent: the
+  agent sends the Ed25519 public key derived from it and a signature over the CSR (`agentlink/enroll.go`), and the panel
+  stores SHA-256 of that key as the token hash, so an older agent that sends such a token in clear still enrols. See §6.7.
 - `Meta.Link` is saved as `"link"` in agent.json (Panel and SNI empty); `linkOnly := meta.Link != ""`.
 - A link-only agent always dials the link: no mTLS, no hold period, `linkAdvertised` ignored; it keeps the reconnect
   backoff on `errLinkNotEstablished` (no hot loop against a dead panel).
@@ -566,6 +568,25 @@ budgets are untouched.
      handler runs is kept.
 - ADR 0007: the driver is a second place that creates EventDesiredChanged and runs every preparation inline.
 - SSH provisioning builds the mTLS enrol command; the edge needs the link form (phase 3).
+
+### 6.7 Sealed sessions (audit 2026-10-31)
+
+The link runs over public-PKI TLS, so a party in the middle with a certificate the agent trusts for the link host could
+read and change session frames after the signed handshake. A current agent starts its LinkAuth nonce with the marker
+`mgseal01` (`agentlink.SealNonce`); a current panel then signs `SealedPanelDigest` instead of `PanelDigest`, and both
+ends derive two AES-256-GCM keys with HKDF-SHA256 over ECDH(node key, CA key) salted with both nonces
+(`agentlink.SealKeys`). Every frame after LinkAccept is sealed, its sequence number the GCM nonce, one key per direction.
+
+- Compatibility: an older panel signs the marked nonce with the plain digest and the agent stays plain; an older agent
+  sends no marker and the panel stays plain. The marker is in the nonce because every panel's signature covers it: it
+  cannot be stripped to make a current panel look old to a current agent.
+- Not covered: the agent's LinkAuth signature does not cover its nonce, so a party in the middle can swap in an unmarked
+  one and get a plain session from a current panel in the node's name (it reads desired state; the real agent's own
+  session fails). Refusing that needs the panel to know the node seals, which an agent rollback would break; not done.
+- VPS: `agentlink.Link` seals in `websocketSessionStream` and `websocketAgentTransport`. Edge: LinkAccept returns the
+  keys, NodeLink hands them to the open step untouched, and `Link` opens and seals frames with the keys and counters in
+  `SessionState` (`sk`, `su`, `sd`; dropped when the session closes). A lost state rolls the counters back and ends the
+  session (the reconnect recovers); on workerd no state write means no frames, so a counter is never reused on the wire.
 
 ## 7. Step 6 design: wiring the edge edition
 

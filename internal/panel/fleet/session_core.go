@@ -64,6 +64,11 @@ type SessionState struct {
 	Pending               map[string]PendingRequest `json:"pr,omitempty"`
 	L3                    l3MemoState               `json:"m,omitzero"`
 	Disconnected          bool                      `json:"z,omitempty"`
+	// Seal is a sealed session's keys (agentlink.SealKeys) and SealUp/SealDown the next frame number of the agent's and
+	// the panel's direction. Only the edge keeps them here (Link opens and seals); the VPS keeps them in agentlink.Link.
+	Seal     []byte `json:"sk,omitempty"`
+	SealUp   uint64 `json:"su,omitempty"`
+	SealDown uint64 `json:"sd,omitempty"`
 }
 
 // PoisonBatch identifies the last stats batch refused by the store.

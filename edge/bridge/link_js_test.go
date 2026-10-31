@@ -198,6 +198,20 @@ func TestStepFromJSValidatesAndConverts(t *testing.T) {
 		in.CertSerial != "0a1b" || in.CertNotAfter.Unix() != 1_800_000_000 || !in.At.Equal(time.UnixMilli(at)) || !gotUntil.Equal(time.UnixMilli(until)) {
 		t.Fatalf("open conversion = %+v, until %v", in, gotUntil)
 	}
+	if in.Seal != nil {
+		t.Fatal("an open without seal keys must be a plain session")
+	}
+	keys := make([]byte, 64)
+	keys[0] = 9
+	event.Set("seal", bytesToJS(keys))
+	if in, _, err = stepFromJS(makeStepArgs("node-a", "", true, until, event)); err != nil || string(in.Seal) != string(keys) {
+		t.Fatalf("open with seal keys = %+v, %v", in, err)
+	}
+	event.Set("seal", bytesToJS(keys[:32]))
+	if _, _, err := stepFromJS(makeStepArgs("node-a", "", true, until, event)); !errors.Is(err, errLinkArgs) {
+		t.Fatalf("short seal keys: %v, want errLinkArgs", err)
+	}
+	event.Delete("seal")
 
 	frame := []byte{0, 1, 255}
 	frameEvent := makeStepEvent("frame", at)

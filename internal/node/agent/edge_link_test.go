@@ -54,6 +54,7 @@ type edgeOpts struct {
 	backoff    time.Duration // the reconnect delay (min = max), 0 = 20 ms
 	noEnroll   bool          // the test enrols the agent itself
 	updateHTTP http.Handler  // optional link download route
+	plain      bool          // the agent dials as an older one that does not seal its session
 }
 
 type edgeRig struct {
@@ -308,6 +309,12 @@ func TestStoppingAgentCancelsLinkUpdateDownload(t *testing.T) {
 
 func (r *edgeRig) linkURL() string { return "wss://" + r.host + r.prefix }
 
+// linkSealed reports whether a session runs over a sealed link.
+func linkSealed(s *session) bool {
+	t, ok := s.stream.(*websocketAgentTransport)
+	return ok && t.link.Sealed()
+}
+
 // publicClient is a client of the Worker's public TLS: the test listener's certificate is its only root.
 func (r *edgeRig) publicClient() *http.Client {
 	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: r.pool, ServerName: "127.0.0.1"}}}
@@ -428,6 +435,7 @@ func (r *edgeRig) start(tune func(*Agent)) *edgeAgent {
 		stats = 20 * time.Millisecond
 	}
 	a.backoffMin, a.backoffMax, a.statsEvery, a.sweepEvery = backoff, backoff, stats, time.Hour
+	a.linkPlain = r.o.plain
 	if tune != nil {
 		tune(a)
 	}
@@ -686,6 +694,9 @@ func TestEdgeLinkSessionDesiredStatsAndAsk(t *testing.T) {
 	ag := r.start(nil)
 	eventually(t, func() bool { return ag.eng.has("inb_edge") && r.inboundState() == "active" }, "desired state applied over the emulated link")
 	eventually(t, func() bool { return r.session() == 1 }, "node_live.session is the generation of the first session")
+	if s := ag.a.cur.Load(); s == nil || !linkSealed(s) {
+		t.Error("the edge link session is not sealed")
+	}
 
 	sent := r.em.sent(r.nodeID)
 	if len(sent) < 2 || sent[0].Frame.GetHelloAck() == nil || sent[1].Frame.GetDesiredState() == nil {
@@ -790,10 +801,14 @@ func TestEdgeLinkQuotaChangePokesItsOwnNodeAfterStep(t *testing.T) {
 // state: on workerd no state write means no frames) ends in one full resend after the reconnect, and so does a step whose
 // state alone was lost (a harsher case the platform cannot produce). The agent converges each time.
 func TestEdgeLinkReconnectDeltaBaseAndStaleState(t *testing.T) {
-	// A quiet agent (no stats), so that the alarm the object armed is its liveness deadline and nothing else.
-	r := newEdgeRig(t, edgeOpts{backoff: time.Second, statsEvery: time.Hour})
+	// A quiet agent (no stats), so that the alarm the object armed is its liveness deadline and nothing else. It is an older,
+	// plain one: a lost state would also roll back a sealed session's frame counters, which ends that session instead.
+	r := newEdgeRig(t, edgeOpts{backoff: time.Second, statsEvery: time.Hour, plain: true})
 	ag := r.start(nil)
 	eventually(t, func() bool { return ag.eng.has("inb_edge") && r.session() == 1 }, "first session")
+	if s := ag.a.cur.Load(); s == nil || linkSealed(s) {
+		t.Fatal("an older agent's session must be plain, and work")
+	}
 	first := r.desiredFrames(1)
 	if len(first) != 1 {
 		t.Fatalf("desired states in generation 1 = %d", len(first))

@@ -25,7 +25,7 @@ type linkStepNode struct{}
 // which only holds the socket. Bytes cross as Uint8Array.
 //
 //	"challenge" {audience}                                        -> {nonce, frame}
-//	"accept"    {nodeId, audience, nonce, auth, until}             -> {ok: true, frame, certSerial, certNotAfterUnix} | {ok: false}
+//	"accept"    {nodeId, audience, nonce, auth, until}             -> {ok: true, frame, certSerial, certNotAfterUnix, seal?} | {ok: false}
 //	"step"      {nodeId, state, until, event}                      -> LinkOut plus waitUntil
 func linkFunc() js.Func {
 	return js.FuncOf(func(_ js.Value, args []js.Value) any {
@@ -73,13 +73,16 @@ func link(args []js.Value) (js.Value, error) {
 			return js.Undefined(), err
 		}
 		defer cancel()
-		serial, notAfter, frame, ok := current.fleet.LinkAccept(ctx, nodeID.String(), audience.String(), nonce, auth)
+		serial, notAfter, frame, seal, ok := current.fleet.LinkAccept(ctx, nodeID.String(), audience.String(), nonce, auth)
 		out := js.Global().Get("Object").New()
 		out.Set("ok", ok)
 		if ok {
 			out.Set("frame", bytesToJS(frame))
 			out.Set("certSerial", serial)
 			out.Set("certNotAfterUnix", notAfter.Unix())
+			if seal != nil {
+				out.Set("seal", bytesToJS(seal)) // the object hands it back on the open step
+			}
 		}
 		return out, nil
 	case "step":
@@ -134,9 +137,11 @@ func stepFromJS(value js.Value) (fleet.LinkIn, time.Time, error) {
 		generation, ok := safeGeneration(event.Get("generation"))
 		serial, notAfter := event.Get("certSerial"), event.Get("certNotAfterUnix")
 		notAfterUnix, notAfterErr := integerInt64(notAfter)
-		if !ok || serial.Type() != js.TypeString || notAfterErr != nil {
+		seal, sealErr := bytesFromJS(event.Get("seal")) // absent = a plain session
+		if !ok || serial.Type() != js.TypeString || notAfterErr != nil || sealErr != nil || (seal != nil && len(seal) != 64) {
 			return fleet.LinkIn{}, time.Time{}, errLinkArgs
 		}
+		out.Seal = seal
 		out.Generation = generation
 		out.CertSerial = serial.String()
 		out.CertNotAfter = time.Unix(notAfterUnix, 0)

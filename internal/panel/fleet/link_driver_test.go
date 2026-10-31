@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/statehash"
 	"google.golang.org/protobuf/proto"
 )
@@ -631,5 +633,51 @@ func TestLinkClosingCallReturnsTheChangedState(t *testing.T) {
 	}
 	if n := r.e.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'stats_dropped'`, r.nodeID); n != 1 {
 		t.Fatalf("stats_dropped events = %d, want 1", n)
+	}
+}
+
+// A sealed session on the edge: Link opens the agent's frames and seals its own with the keys the open step carried, a
+// frame changed on the way closes the session, and the keys do not outlive it in the stored state.
+func TestLinkSealedSession(t *testing.T) {
+	r := newLinkRig(t, "alice-sealed")
+	keys := bytes.Repeat([]byte{9}, 64)
+	sealed := func(seq uint64, msg *agentv1.ConnectRequest) []byte {
+		raw, _ := proto.Marshal(msg)
+		b, err := agentlink.SealFrame(keys, true, seq, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	opened := func(out LinkOut, first uint64) []*agentv1.ConnectResponse {
+		var frames []*agentv1.ConnectResponse
+		for i, raw := range out.Frames {
+			plain, err := agentlink.OpenFrame(keys, false, first+uint64(i), raw)
+			var m agentv1.ConnectResponse
+			if err != nil || proto.Unmarshal(plain, &m) != nil {
+				t.Fatalf("panel frame %d does not open: %v", i, err)
+			}
+			frames = append(frames, &m)
+		}
+		return frames
+	}
+
+	r.call(LinkIn{Kind: LinkOpen, Generation: 1, Seal: keys})
+	out := r.call(LinkIn{Kind: LinkFrame, Frame: sealed(0, hello("instance-sealed", 0, ""))})
+	if frames := opened(out, 0); len(frames) != 2 || frames[0].GetHelloAck() == nil || frames[1].GetDesiredState() == nil {
+		t.Fatalf("sealed hello answered %v; want HelloAck then DesiredState", frames)
+	}
+	if s := r.decoded(); s.SealUp != 1 || s.SealDown != 2 {
+		t.Fatalf("counters up %d down %d, want 1 and 2", s.SealUp, s.SealDown)
+	}
+
+	// The same frame again (a replay) does not open under the next number.
+	replay := r.call(LinkIn{Kind: LinkFrame, Frame: sealed(0, hello("instance-sealed", 0, ""))})
+	if replay.Close == nil || replay.Close.Code != 1008 || len(replay.Frames) != 0 {
+		t.Fatalf("replayed frame = %+v; want close 1008", replay)
+	}
+	r.call(LinkIn{Kind: LinkClosed})
+	if s := r.decoded(); s.Seal != nil || s.SealUp != 0 || s.SealDown != 0 {
+		t.Error("the closed session's keys are still in the stored state")
 	}
 }

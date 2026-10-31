@@ -328,7 +328,7 @@ export class NodeLink extends DurableObject<NodeLinkEnv> {
     await this.dropLive(false);
     this.kv.put("live", generation);
     send(ws, res.frame);
-    await this.run(ws, { kind: "open", at: Date.now(), generation, certSerial: res.certSerial, certNotAfterUnix: res.certNotAfterUnix });
+    await this.run(ws, { kind: "open", at: Date.now(), generation, certSerial: res.certSerial, certNotAfterUnix: res.certNotAfterUnix, seal: res.seal });
   }
 
   /**
