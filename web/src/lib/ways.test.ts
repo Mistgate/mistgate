@@ -3,7 +3,7 @@ import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CheckStatus, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import type { CountryCheck } from "./health";
 import type { RelayMsg } from "./relay";
-import { hintOf, ipv6FactOf, isWayId, lanesOf, relaysState, type WaysInput } from "./ways";
+import { entryOf, entryOffered, entryState, hintOf, ipv6FactOf, isWayId, lanesOf, relaysState, type Ipv6Entry, type WaysInput } from "./ways";
 
 const country = (verdict: CountryVerdict, dark: string[] = [], over: Partial<CountryCheck> = {}) =>
   ({ nodeId: "", verdict, atUnix: 100, probes: [], vantages: dark.map((network) => ({ network, key: "", state: "dark" })), ...over }) as unknown as CountryCheck;
@@ -99,6 +99,41 @@ describe("lanesOf", () => {
     expect(w.lanes.map((l) => l.id)).toEqual(["direct", "ipv6"]);
     expect(w.lanes[1]).toMatchObject({ state: "off", ring: "off", seen: "all" });
     expect(lanesOf(base({ ipv6: "broken" })).lanes[1]!.id).toBe("ipv6");
+  });
+
+  it("the IPv6 lane with the entry on works, and is down (a fault) while the server's IPv6 does not work", () => {
+    const lit = lanesOf(base({ ipv6: "ok", entry: "on", country: country(CountryVerdict.PARTIAL, ["MTS"], { ipv6: country(CountryVerdict.OK) }) }));
+    expect(lit.lanes[1]).toMatchObject({ id: "ipv6", state: "ok", ring: "ok", fault: false });
+    // the doctor may stop reporting, the entry still has its lane
+    const dark = lanesOf(base({ ipv6: "none", entry: "down" }));
+    expect(dark.lanes[1]).toMatchObject({ id: "ipv6", state: "bad", ring: "bad", fault: true });
+    expect(dark.badge).toBe(1);
+  });
+});
+
+describe("the IPv6 entry", () => {
+  const v6 = (over: Partial<Ipv6Entry>): Ipv6Entry => ({ entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "", ...over });
+
+  it("entryState: on, down while the uplink has no working IPv6, else off", () => {
+    expect(entryState(v6({}))).toBeUndefined();
+    expect(entryState(v6({ entry: "2001:db8::5" }))).toBe("on");
+    expect(entryState(v6({ entry: "2001:db8::5", entrySupported: false, unavailableReason: "ipv6_broken" }))).toBe("down");
+    expect(entryState(v6({ entry: "2001:db8::5", entrySupported: false, unavailableReason: "no_ipv6" }))).toBe("down");
+    // an old agent names no address, but the entry that is on still works
+    expect(entryState(v6({ entry: "2001:db8::5", entrySupported: false, unavailableReason: "agent_old" }))).toBe("on");
+  });
+
+  it("entryOffered only when the node takes one and it is off", () => {
+    expect(entryOffered(v6({}))).toBe(true);
+    expect(entryOffered(v6({ entry: "2001:db8::5" }))).toBe(false);
+    expect(entryOffered(v6({ entrySupported: false, unavailableReason: "main_is_ipv6" }))).toBe(false);
+  });
+
+  it("entryOf keeps the server's view, and words the doctor's fact when the node message has none", () => {
+    const sent = v6({ entry: "2001:db8::5" });
+    expect(entryOf(sent, "none")).toBe(sent);
+    expect(entryOf(undefined, "broken")).toMatchObject({ entrySupported: false, unavailableReason: "ipv6_broken" });
+    expect(entryOf(undefined, "unknown").unavailableReason).toBe("not_checked");
   });
 });
 

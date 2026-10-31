@@ -10,6 +10,7 @@ import { EmptyState, Notice } from "@/components/ui/notice";
 import { Pending } from "@/components/ui/query-error";
 import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -22,9 +23,11 @@ import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import { candidatesQuery, countryHint, isCut, reachHint, relaysQuery, seenHint, type CountryHint, type Hint } from "@/lib/relay";
 import { useNow } from "@/lib/time";
+import { ipv6Helps } from "@/lib/reachability";
 import { useIsOwner } from "@/lib/updates";
-import { hintOf, ipv6FactOf, lanesOf, type Ipv6Fact, type Lane, type Ring, type WayId, type Ways } from "@/lib/ways";
+import { entryOf, entryOffered, entryState, hintOf, ipv6FactOf, lanesOf, type Ipv6Entry, type Ipv6Fact, type Lane, type Ring, type WayId, type Ways } from "@/lib/ways";
 import { CountryRow } from "@/screens/health/country";
+import { EntryDialog, entryReason, EntryState, TurnOffDialog } from "./ipv6-entry";
 import { CheckPortsButton, portRows, Ports, usePortCheck } from "./ports";
 import { AddRelayDialog, ccChip, RelayRows, useAddRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
 import type { NodeSearch } from "./tabs";
@@ -32,7 +35,8 @@ import type { NodeSearch } from "./tabs";
 // The node page's "Ways in" tab (node-ia plan §3.4): every way people reach the node, drawn as one line from people down
 // to the node with a branch per way (straight to its address, through another node, over IPv6), and on an entry node the
 // nodes reached through it. A list and the open way, like Reachability's sources; `?way=` is the open one, `?add=` the
-// "New way in" dialog. The verdicts are lib/ways.ts's, the relay rows and dialog relays.tsx's.
+// "New way in" dialog ("ipv6": the IPv6 entry's). The verdicts are lib/ways.ts's, the relay rows and dialog relays.tsx's,
+// the IPv6 entry's card and dialog ipv6-entry.tsx's.
 
 type Data = Plain<GetNodeResponse>;
 
@@ -46,6 +50,8 @@ export type WaysModel = Ways & {
   country?: CountryCheck;
   countryOf: (nodeId: string) => CountryCheck | undefined;
   ipv6: Ipv6Fact;
+  /** The IPv6 entry (Node.ipv6): on, or whether and why the node can take one. */
+  v6: Ipv6Entry;
 };
 
 /** The lanes of a node with what they rest on: the node page computes them once, for the tab, its badge and the Overview. */
@@ -64,6 +70,7 @@ export function useWays(data: Data): WaysModel {
   const country = column?.byNode.get(node.id);
   const countryOf = (id: string) => fleetColumn?.byNode.get(id);
   const ipv6 = ipv6FactOf(doctor.data?.nodes.find((n) => n.nodeId === node.id)?.items);
+  const v6 = entryOf(node.ipv6, ipv6);
   const ways = lanesOf({
     node,
     inbounds: data.inbounds,
@@ -75,18 +82,18 @@ export function useWays(data: Data): WaysModel {
     countryOf,
     ipv6,
     hasIpv6: data.facts?.hasIpv6,
+    entry: entryState(v6),
   });
-  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6 };
+  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6, v6 };
 }
 
 // ---- words of a lane ----
 
 type Look = { kind: StatusKind; word: MessageKey };
 
-/** A lane's state in a word: what is ours to fix first, then how much of the country sees it. */
-function lookOf(l: Lane, offline: boolean): Look {
-  if (l.kind === "ipv6") return { kind: "off", word: "ways.pill.soon" };
-  if (offline && l.kind === "direct") return { kind: "off", word: "ways.pill.offline" };
+/** A lane's state in a word: what is ours to fix first, then how much of the country sees it. An IPv6 entry the node cannot take is "not available". */
+function lookOf(l: Lane, w: { offline: boolean; v6: Ipv6Entry }): Look {
+  if (w.offline && l.kind === "direct") return { kind: "off", word: "ways.pill.offline" };
   switch (l.state) {
     case "bad":
       return { kind: "bad", word: "ways.pill.down" };
@@ -95,7 +102,7 @@ function lookOf(l: Lane, offline: boolean): Look {
     case "busy":
       return { kind: "busy", word: "ways.pill.busy" };
     case "off":
-      return { kind: "off", word: l.kind === "direct" ? "ways.pill.noProfiles" : "ways.pill.off" };
+      return { kind: "off", word: l.kind === "direct" ? "ways.pill.noProfiles" : l.kind === "ipv6" && !w.v6.entrySupported ? "ways.pill.na" : "ways.pill.off" };
   }
   if (l.seen === "none") return { kind: "bad", word: "ways.pill.blocked" };
   if (l.seen === "part") return { kind: "warn", word: "ways.pill.notEverywhere" };
@@ -129,7 +136,10 @@ function seenLine(t: T, l: Lane, w: WaysModel): Hint | null {
   if (l.kind === "out") return null;
   if (l.kind === "direct" && w.offline) return { tone: "off", text: t("ways.offline") };
   if (l.kind === "ipv6") {
-    if (w.ipv6 === "broken") return { tone: "bad", text: t("ways.ipv6.broken") };
+    // an entry the node cannot take, or one that is on while the server's IPv6 is down: why, in the doctor's words
+    if (l.state === "bad" || (l.state === "off" && !w.v6.entrySupported)) {
+      return { tone: l.state === "bad" || w.v6.unavailableReason === "ipv6_broken" ? "bad" : "off", text: entryReason(t, w.v6.unavailableReason) };
+    }
     return w.country?.ipv6 ? seenWords(t, l.seen, l.dark, w.cc) : null;
   }
   if (l.kind === "via") {
@@ -181,7 +191,7 @@ const rowCls =
 function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysModel; data: Data; selected: boolean; tabbable: boolean; onPick: () => void }) {
   const t = useT();
   const ccOf = useCountryOf();
-  const look = lookOf(l, w.offline);
+  const look = lookOf(l, w);
   const seen = seenLine(t, l, w);
   const title = l.kind === "direct" ? t("ways.direct") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : l.kind === "ipv6" ? t("ways.ipv6") : l.peer!.name;
   const where =
@@ -192,8 +202,9 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
           ? `${data.node!.address} · ${t.n("ways.ports", portsOf(data))}`
           : data.node!.address
       : l.kind === "ipv6"
-        ? t("ways.soon")
+        ? w.v6.entry || t(w.v6.entrySupported ? "ways.ipv6.lane.off" : "ways.ipv6.lane.na")
         : t.n("ways.servers", l.relays.length);
+  const mono = (l.kind === "direct" && data.inbounds.length > 0) || (l.kind === "ipv6" && !!w.v6.entry);
   // a lane broken on our side says so in words next to the ring's colour (how much of the country sees it is the line
   // below); the rest is said to a screen reader
   const said = l.state === "bad" || l.state === "warn" || l.state === "busy" ? t(look.word) : "";
@@ -218,7 +229,7 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
         <Icon name="chevronRight" size={14} aria-hidden className="ml-auto flex-none text-muted md:hidden" />
       </span>
       <span className="truncate text-xs text-muted">
-        <span className={l.kind === "direct" && data.inbounds.length > 0 ? "font-mono text-[11px]" : undefined}>{where}</span>
+        <span className={mono ? "font-mono text-[11px]" : undefined}>{where}</span>
         {said && <span className={cx("font-semibold", toneText[look.kind])}> · {said}</span>}
       </span>
       {seen && <span className={cx("text-xs leading-snug text-pretty", seen.tone === "warn" ? "text-warn-text" : seen.tone === "bad" ? "text-danger-text" : "text-muted")}>{seen.text}</span>}
@@ -255,8 +266,8 @@ function Line({ data, w, open, onPick, onAdd, onRelayOther, className }: { data:
   const own = w.lanes[0]!;
   const dark = own.seen === "part" || own.seen === "none";
   const others = (useQuery({ ...nodesQuery, enabled: w.owner }).data?.nodes ?? []).some((n) => n.id !== node.id && n.status !== NodeStatus.RETIRED);
-  // the owner adds a way in when there is another node to go through, or IPv6 to come
-  const canAdd = w.owner && (others || w.ipv6 === "ok");
+  // the owner adds a way in when there is another node to go through, or an IPv6 entry to turn on
+  const canAdd = w.owner && (others || entryOffered(w.v6));
   const load = nodeLoad(data.metrics, node.bandwidthMbps, nowS);
   const row = (l: Lane) => <LaneRow key={l.id} l={l} w={w} data={data} selected={l.id === open} tabbable={l.id === open} onPick={() => onPick(l.id)} />;
   return (
@@ -348,7 +359,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
           {lane.kind === "direct" ? (
             <DirectDetail data={data} w={w} lane={lane} />
           ) : lane.kind === "ipv6" ? (
-            <Ipv6Detail data={data} w={w} lane={lane} />
+            <Ipv6Detail data={data} w={w} lane={lane} onAdd={() => go({ way: "ipv6", add: "ipv6" })} />
           ) : (
             <RelayDetail key={lane.id} data={data} w={w} lane={lane} />
           )}
@@ -360,6 +371,16 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
           w={w}
           start={search.add}
           onClose={(way) => go({ way: way ?? search.way })}
+          onIpv6={() => go({ way: "ipv6", add: "ipv6" })}
+        />
+      )}
+      {w.owner && (
+        <EntryDialog
+          open={search.add === "ipv6" && entryOffered(w.v6)}
+          onClose={() => go({ way: "ipv6" })}
+          node={node}
+          v6={w.v6}
+          awg={data.inbounds.some((i) => i.protocol === "awg")}
         />
       )}
       {w.owner && <AddRelayDialog open={relayOther} onOpenChange={setRelayOther} entry={{ id: node.id, name: node.name, cc: node.countryCode }} />}
@@ -374,7 +395,7 @@ const linkCls = "ml-auto flex items-center gap-1 text-[13px] font-bold text-acce
 function DirectDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) {
   const t = useT();
   const node = data.node!;
-  const look = lookOf(lane, w.offline);
+  const look = lookOf(lane, w);
   const run = usePortCheck(node.id);
   const none = data.inbounds.length === 0;
   return (
@@ -438,7 +459,7 @@ function RelayDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }
   const [adding, setAdding] = useState(false);
   const node = data.node!;
   const peer = lane.peer!;
-  const look = lookOf(lane, w.offline);
+  const look = lookOf(lane, w);
   const via = lane.kind === "via";
   // the entry of these relays and the exit they reach
   const entry: Entry = via ? { id: peer.id, name: peer.name, cc: ccOf(peer.id) } : { id: node.id, name: node.name, cc: node.countryCode };
@@ -480,22 +501,37 @@ function RelayDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }
   );
 }
 
-function Ipv6Detail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) {
+/** IPv4 where people are, for the IPv6 entry: cut while IPv6 gets through ("helps"), not cut ("ok"), or nothing to say. */
+const v4Note = (c?: CountryCheck): "helps" | "ok" | undefined => (ipv6Helps(c) ? "helps" : c?.verdict === CountryVerdict.OK ? "ok" : undefined);
+
+/** The IPv6 entry: its state, the last outside check, and for the owner the way to turn it on or off. */
+function Ipv6Detail({ data, w, lane, onAdd }: { data: Data; w: WaysModel; lane: Lane; onAdd: () => void }) {
   const t = useT();
-  const look = lookOf(lane, w.offline);
-  const fact: Record<Ipv6Fact, MessageKey> = { ok: "ways.ipv6.works", broken: "ways.ipv6.broken", none: "ways.ipv6.none", unknown: "ways.ipv6.unknown" };
+  const node = data.node!;
+  const look = lookOf(lane, w);
+  const [turningOff, setTurningOff] = useState(false);
+  const offered = entryOffered(w.v6);
   return (
     <DetailCard icon="network" tone="lavender" title={t("ways.ipv6")} sub={t("ways.ipv6.sub")} control={<StatusPill sm kind={look.kind} label={t(look.word)} />}>
       <Block flush title={t("ways.block.state")}>
-        <p className="flex items-start gap-2 text-[13px] leading-snug">
-          <span className="mt-[5px] flex">
-            <StatusDot kind={w.ipv6 === "ok" ? "ok" : w.ipv6 === "broken" ? "bad" : "off"} />
-          </span>
-          {t(fact[w.ipv6])}
-        </p>
-        <p className="text-xs leading-snug text-pretty text-muted">{t("ways.ipv6.later")}</p>
+        <EntryState node={node} v6={w.v6} v4={v4Note(w.country)} country={countryIn(t, w.cc)} />
       </Block>
-      {w.country?.ipv6 && <SeenBlock w={w} name={data.node!.name} check={w.country.ipv6} six />}
+      {w.country?.ipv6 && <SeenBlock w={w} name={node.name} check={w.country.ipv6} six />}
+      {w.owner && (offered || w.v6.entry) && (
+        <ActionBar>
+          {offered ? (
+            <Button variant="primary" size="md" onClick={onAdd}>
+              <Icon name="plus" size={14} />
+              {t("ways.ipv6.add")}
+            </Button>
+          ) : (
+            <Button variant="secondary" size="md" onClick={() => setTurningOff(true)}>
+              {t("ways.ipv6.turnOff")}
+            </Button>
+          )}
+        </ActionBar>
+      )}
+      {w.owner && <TurnOffDialog open={turningOff} onOpenChange={setTurningOff} node={node} />}
     </DetailCard>
   );
 }
@@ -506,12 +542,13 @@ type Pick = { node: { id: string; name: string; countryCode: string }; hint?: Co
 
 /**
  * "New way in" (§3.4): what kind of way, then through which node (the ones people see from the networks where this node is
- * dark first), then the relay dialog for this node's servers. `start` is ?add=: "1", or "via:<entry>" straight at step 3.
+ * dark first), then the relay dialog for this node's servers. `start` is ?add=: "1", or "via:<entry>" straight at step 3. The
+ * IPv6 entry is the other kind: picked, it hands over to the entry's own dialog (`onIpv6`).
  */
-function NewWayDialog({ data, w, start, onClose }: { data: Data; w: WaysModel; start?: string; onClose: (way?: WayId) => void }) {
+function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: WaysModel; start?: string; onClose: (way?: WayId) => void; onIpv6: () => void }) {
   const t = useT();
   const node = data.node!;
-  const open = !!start;
+  const open = start === "1" || !!start?.startsWith("via:");
   const ccOf = useCountryOf();
   const nodes = useQuery({ ...nodesQuery, enabled: open }).data?.nodes ?? [];
   const fleet = countryColumn(useQuery({ ...checksQuery(""), enabled: open }).data?.countryChecks);
@@ -571,10 +608,11 @@ function NewWayDialog({ data, w, start, onClose }: { data: Data; w: WaysModel; s
       : t("ways.new.introOk", { node: node.name })
     : t("ways.new.intro", { country: countryIn(t, w.cc), node: node.name, networks: darkText });
   const best = fits[0];
-  const ipv6Why: Record<Ipv6Fact, MessageKey> = { ok: "ways.ipv6.later", broken: "ways.ipv6.broken", none: "ways.ipv6.none", unknown: "ways.ipv6.unknown" };
+  const offered = entryOffered(w.v6);
 
-  // a way that can be taken is a button; one that cannot yet (IPv6) is plain text that says why: no hover, no focus
-  const option = (icon: IconName, tone: Tone, title: string, what: string, note: ReactNode, onPick?: () => void) => {
+  // a way that can be taken is a button; one that cannot (IPv6 already on, or the node cannot take it) is plain text that
+  // says why, with its state on the right: no hover, no focus
+  const option = (icon: IconName, tone: Tone, title: string, what: string, note: ReactNode, onPick?: () => void, pill?: Look) => {
     const inner = (
       <>
         <IconChip icon={icon} tone={tone} size={30} className={cx("mt-0.5 rounded-[9px]", !onPick && "opacity-50 grayscale")} />
@@ -583,7 +621,7 @@ function NewWayDialog({ data, w, start, onClose }: { data: Data; w: WaysModel; s
           <span className="text-xs leading-snug text-pretty text-muted">{what}</span>
           {note}
         </span>
-        {onPick ? <Icon name="chevronRight" size={16} className="mt-1 flex-none text-muted group-hover:text-fg" /> : <StatusPill sm kind="off" label={t("ways.pill.soon")} />}
+        {onPick ? <Icon name="chevronRight" size={16} className="mt-1 flex-none text-muted group-hover:text-fg" /> : pill && <StatusPill sm kind={pill.kind} label={t(pill.word)} />}
       </>
     );
     const cls = "flex w-full min-w-0 items-start gap-3 rounded-card border px-3.5 py-3 text-left";
@@ -651,7 +689,32 @@ function NewWayDialog({ data, w, start, onClose }: { data: Data; w: WaysModel; s
           ) : null,
           picks.length > 0 ? () => setStep("pick") : undefined,
         )}
-        {option("network", "lavender", t("ways.ipv6"), t("ways.new.ipv6What", { node: node.name }), <span className="text-xs text-muted">{t(ipv6Why[w.ipv6])}</span>)}
+        {option(
+          "network",
+          "lavender",
+          t("ways.ipv6"),
+          t("ways.new.ipv6What", { node: node.name }),
+          offered ? (
+            ipv6Helps(w.country) && (
+              <span className="tone-ok tone-text flex items-center gap-1.5 text-xs font-semibold">
+                <Icon name="check" size={13} className="flex-none" />
+                {t("ways.ipv6.helps", { country: countryIn(t, w.cc) })}
+              </span>
+            )
+          ) : (
+            <span className="text-xs leading-snug text-pretty text-muted [overflow-wrap:anywhere]">
+              {w.v6.entry ? t("ways.new.ipv6On", { addr: w.v6.entry }) : entryReason(t, w.v6.unavailableReason)}
+            </span>
+          ),
+          offered
+            ? () => {
+                setPicked(null);
+                setStep(null);
+                onIpv6();
+              }
+            : undefined,
+          w.v6.entry ? { kind: "ok", word: "ways.pill.on" } : { kind: "off", word: "ways.pill.na" },
+        )}
       </div>
     ) : at === "pick" ? (
       <div className="flex flex-col gap-3">
@@ -707,8 +770,7 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
   const node = data.node!;
   if (!w.ready) return null;
   const short = (l: Lane): string => {
-    const look = lookOf(l, w.offline);
-    if (l.kind === "ipv6") return t("ways.soon");
+    const look = lookOf(l, w);
     if (look.kind === "ok") return "";
     if (l.state === "ok" && l.seen === "part" && l.dark.length) return l.dark.join(", ");
     return t(look.word);
@@ -733,7 +795,7 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
           >
             <RingMark ring={l.ring} />
             {title}
-            {note && <span className={cx("font-semibold", toneText[lookOf(l, w.offline).kind])}>· {note}</span>}
+            {note && <span className={cx("font-semibold", toneText[lookOf(l, w).kind])}>· {note}</span>}
           </Link>
         );
       })}

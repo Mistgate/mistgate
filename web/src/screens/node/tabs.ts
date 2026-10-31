@@ -14,7 +14,7 @@ export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Excl
  * Search-param validation of /nodes/$id: only a known tab other than the first is kept in the URL. `add` (a profile id,
  * on the profiles tab) opens the add-profile dialog with that profile chosen: the profile page links here. On the ways
  * tab `way` is the open lane (direct, ipv6, via:<entry>, out:<exit>) and `add` the "New way in" dialog: "1", or
- * "via:<entry>" straight at that entry's servers. The history
+ * "via:<entry>" straight at that entry's servers, or "ipv6" the IPv6 entry's dialog (Reachability and the alerts link there). The history
  * tab keeps its part (`view`, the events without one) and, on the events, where their log is read from (`before`) and
  * the rows per page (`size`).
  */
@@ -27,7 +27,7 @@ export const validateNodeSearch = (s: Record<string, unknown>): NodeSearch => {
     return { tab, ...(before ? { before } : {}), ...(size ? { size } : {}) };
   }
   if (tab === "ways") {
-    const add = s.add === "1" || s.add === 1 ? "1" : typeof s.add === "string" && /^via:[\w-]+$/.test(s.add) ? s.add : undefined;
+    const add = s.add === "1" || s.add === 1 ? "1" : typeof s.add === "string" && (s.add === "ipv6" || /^via:[\w-]+$/.test(s.add)) ? s.add : undefined;
     return { tab, ...(isWayId(s.way) ? { way: s.way } : {}), ...(add ? { add } : {}) };
   }
   return tab === "profiles" && typeof s.add === "string" && s.add !== "" ? { tab, add: s.add } : { tab };

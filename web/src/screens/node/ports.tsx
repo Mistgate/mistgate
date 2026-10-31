@@ -54,8 +54,8 @@ export function tcpPill(t: T, verdict: string): { kind: StatusKind; label: strin
   }
 }
 
-/** A bar that fills in the time a run takes (about 8 s) and stops short of full until the answer comes. */
-function Progress({ label }: { label: string }) {
+/** A bar that fills in the time a run takes (`ms`, about 8 s for the ports) and stops short of full until the answer comes. */
+export function Progress({ label, ms = 8000 }: { label: string; ms?: number }) {
   const [started, setStarted] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setStarted(true));
@@ -63,7 +63,7 @@ function Progress({ label }: { label: string }) {
   }, []);
   return (
     <div role="progressbar" aria-label={label} className="h-1 overflow-hidden rounded-full bg-surface-2">
-      <div className="h-full rounded-full bg-accent transition-[width] duration-[8000ms] ease-linear motion-reduce:transition-none" style={{ width: started ? "92%" : "4%" }} />
+      <div className="h-full rounded-full bg-accent transition-[width] ease-linear motion-reduce:transition-none" style={{ width: started ? "92%" : "4%", transitionDuration: `${ms}ms` }} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import { Ipv6EntryAction } from "@/gen/mistgate/admin/v1/node_pb";
 import { en } from "@/i18n/en";
 import { useWays, WaysTab } from "./ways";
 
@@ -14,6 +15,8 @@ const listRelayCandidates = vi.fn();
 const createRelay = vi.fn();
 const checkRelay = vi.fn();
 const updateRelay = vi.fn();
+const checkIpv6 = vi.fn();
+const updateIpv6Entry = vi.fn();
 let role = Role.OWNER;
 let countryChecks: object[] = [];
 vi.mock("@/lib/api", () => ({
@@ -30,7 +33,12 @@ vi.mock("@/lib/api", () => ({
       Promise.resolve({ nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: countryChecks.filter((c) => !req.nodeId || (c as { nodeId: string }).nodeId === req.nodeId) }),
     getDoctor: () => Promise.resolve({ nowUnix: now, nodes: [{ nodeId: "nod_de1", items: [{ id: "ipv6", status: 1, params: { ipv6: "yes", connect: "ok" } }] }] }),
   },
-  nodes: { listNodes: () => Promise.resolve({ nodes }), checkPorts: vi.fn() },
+  nodes: {
+    listNodes: () => Promise.resolve({ nodes }),
+    checkPorts: vi.fn(),
+    checkIpv6: (...a: unknown[]) => checkIpv6(...a),
+    updateIpv6Entry: (...a: unknown[]) => updateIpv6Entry(...a),
+  },
   countryReach: { getCountryReachability: () => Promise.resolve({ settings: { country: "RU" } }) },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { updateIntervalHours: 12 }, effectiveTitle: "", serverSamples: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
@@ -74,9 +82,34 @@ const relay = (over: Record<string, unknown> = {}) => ({
 });
 const cand = (over: Record<string, unknown>) => ({ inboundId: "inb_x", nodeId: "nod_de1", nodeName: "de1", profileId: "prf_x", profileName: "VLESS · XHTTP", protocol: "vless", network: "tcp", port: 2053, unsupported: "", hop: false, relayId: "", country: { verdict: "partial", dark: ["MTS"], atUnix: now }, reach: { verdict: "reach", source: "tspu_row", atUnix: now }, ...over });
 
+// Node.ipv6 of a node that can take the entry: two addresses of its uplink, the second the one it sends from
+const v6 = (over: Record<string, unknown> = {}) => ({
+  entry: "",
+  entrySupported: true,
+  unavailableReason: "",
+  addresses: [
+    { address: "2001:db8::5", prefixLen: 64 },
+    { address: "2001:db8::7", prefixLen: 64 },
+  ],
+  src: "2001:db8::7",
+  ...over,
+});
+const passed = (over: Record<string, unknown> = {}) => ({
+  address: "2001:db8::7",
+  passed: true,
+  errorCode: "",
+  verdicts: [
+    { network: "tcp", port: 443, verdict: "ours" },
+    { network: "udp", port: 443, verdict: "ok" },
+  ],
+  sender: "fi1",
+  checkedUnix: now - 600,
+  ...over,
+});
+
 const de1 = (over: Record<string, unknown> = {}) =>
   ({
-    node: { id: "nod_de1", name: "de1", countryCode: "DE", address: "203.0.113.7", status: NodeStatus.ONLINE, bandwidthMbps: 0, ...over },
+    node: { id: "nod_de1", name: "de1", countryCode: "DE", address: "203.0.113.7", status: NodeStatus.ONLINE, bandwidthMbps: 0, ipv6: v6(), ...over },
     inbounds: [{ id: "inb_v", port: 443, state: InboundState.ACTIVE, protocol: "vless", profileName: "VLESS · TCP" }],
     portChecks: [],
     // the lane counts the rows of its port check: one checked TCP port here
@@ -102,7 +135,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [listRelays, listRelayCandidates, createRelay, checkRelay, updateRelay, navigate]) m.mockReset();
+  for (const m of [listRelays, listRelayCandidates, createRelay, checkRelay, updateRelay, checkIpv6, updateIpv6Entry, navigate]) m.mockReset();
   delete (window as { matchMedia?: unknown }).matchMedia;
 });
 
@@ -134,14 +167,14 @@ const click = (b: Element | undefined | null) => act(async () => void b?.dispatc
 const dialog = () => document.querySelector<HTMLElement>("[role=dialog]")!;
 
 describe("the line of a node dark on part of the country", () => {
-  it("draws direct (half seen), through msk1 (works, seen where de1 is dark) and IPv6 (soon); the add branch is amber and says why", async () => {
+  it("draws direct (half seen), through msk1 (works, seen where de1 is dark) and IPv6 (off); the add branch is amber and says why", async () => {
     await mount(de1());
     expect(lanes().map((l) => l.id)).toEqual(["way-tab-direct", "way-tab-via:nod_msk1", "way-tab-ipv6"]);
     expect(lanes().map((l) => l.dataset.ring)).toEqual(["half", "ok", "off"]);
     expect(lane("direct").textContent).toContain("203.0.113.7 · 1 port");
     expect(lane("direct").textContent).toContain("Dark on MTS");
     expect(lane("via:nod_msk1").textContent).toContain("People reach msk1 from MTS");
-    expect(lane("ipv6").textContent).toContain("soon");
+    expect(lane("ipv6").textContent).toBe("IPv6 entryOffoff");
     expect(text()).toContain("People · Russia");
     expect(text()).toContain("Dark on MTS — add a way around");
     // the first lane with a problem is open: direct, with the ports and the country row
@@ -190,12 +223,9 @@ describe("the New way in dialog", () => {
     expect(dialog().textContent).toContain("A new way in to de1");
     expect(dialog().textContent).toContain("From Russia, de1 does not open on MTS.");
     expect(dialog().textContent).toContain("Good fit: msk1, seen from MTS");
-    // the IPv6 entry is not there yet: text that says why, not a button, out of the Tab order
-    const off = dialog().querySelector<HTMLElement>("[data-testid=way-option-off]")!;
-    expect(off.getAttribute("aria-disabled")).toBe("true");
-    expect(off.tagName).toBe("DIV");
-    expect(off.textContent).toContain(en["ways.ipv6.later"]);
-    expect(off.querySelector("button, [tabindex]")).toBeNull();
+    // de1 can take an IPv6 entry: the option is a choice like the other
+    expect(dialog().querySelector("[data-testid=way-option-off]")).toBeNull();
+    expect([...dialog().querySelectorAll("button")].some((b) => b.textContent?.startsWith("IPv6 entry"))).toBe(true);
 
     await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("Through another node")));
     await settle();
@@ -262,5 +292,163 @@ describe("other nodes and roles", () => {
     expect(text()).not.toContain("Add a way in…");
     expect(listRelays).not.toHaveBeenCalled();
     expect(listRelayCandidates).not.toHaveBeenCalled();
+  });
+});
+
+describe("the IPv6 entry", () => {
+  const v6check = (over: Record<string, unknown> = {}) => ({ ...country("nod_de1", CountryVerdict.OK), ...over });
+  const withV6 = (v4: CountryVerdict, v6v: CountryVerdict) => ({ ...country("nod_de1", v4, v4 === CountryVerdict.OK ? [] : ["MTS"]), ipv6: v6check({ verdict: v6v, globalpingVerdict: v6v }) });
+  const radios = () => [...dialog().querySelectorAll<HTMLInputElement>("input[type=radio]")];
+
+  it("off: the card says where subscriptions connect, that IPv4 is cut where IPv6 gets through, and offers the entry to the owner", async () => {
+    countryChecks = [withV6(CountryVerdict.BLOCKED, CountryVerdict.OK)];
+    search = { tab: "ways", way: "ipv6" };
+    await mount(de1());
+    expect(panel().textContent).toContain("Off. Subscriptions connect to 203.0.113.7 only.");
+    expect(panel().textContent).toContain("IPv4 is blocked from Russia, IPv6 gets through.");
+    expect(panel().querySelector("[role=status], [role=img]")?.textContent ?? "").not.toContain("Not available");
+    await click(buttonIn(panel(), "Add IPv6 entry…"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { tab: "ways", way: "ipv6", add: "ipv6" } }));
+  });
+
+  it("off on a node every network sees: the entry would be a spare way in", async () => {
+    countryChecks = [withV6(CountryVerdict.OK, CountryVerdict.OK)];
+    search = { tab: "ways", way: "ipv6" };
+    await mount(de1());
+    expect(panel().textContent).toContain("IPv4 is not blocked from Russia now: this would be a spare way in.");
+  });
+
+  it("the dialog picks the address the server sends from, marks it, warns about static AmneziaWG keys, and turns the entry on", async () => {
+    search = { tab: "ways", way: "ipv6", add: "ipv6" };
+    const data = { ...(de1() as object), inbounds: [{ id: "inb_a", port: 51820, state: InboundState.ACTIVE, protocol: "awg", profileName: "AWG" }] } as never;
+    await mount(data);
+    expect(dialog().textContent).toContain("IPv6 entry on de1");
+    expect(dialog().textContent).toContain("People get one more server, “de1 · IPv6”, next to each of this node’s servers.");
+    expect(radios().map((r) => [r.value, r.checked])).toEqual([
+      ["2001:db8::5", false],
+      ["2001:db8::7", true],
+    ]);
+    expect(radios()[1]!.closest("label")!.textContent).toBe("2001:db8::7(the server’s address)");
+    expect(dialog().textContent).toContain("Static AmneziaWG keys (.conf, vpn://) get no IPv6 server: they keep connecting to 203.0.113.7.");
+
+    updateIpv6Entry.mockResolvedValue({ node: {}, errorCode: "", check: passed() });
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    expect(updateIpv6Entry).toHaveBeenCalledWith({ nodeId: "nod_de1", action: Ipv6EntryAction.ENABLE, address: "2001:db8::7" });
+    expect(text()).toContain("The IPv6 entry on de1 is on: 2001:db8::7");
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { tab: "ways", way: "ipv6" } }));
+  });
+
+  it("while the check runs the window says so and waits; a check that fails keeps the window with the ports and changes nothing", async () => {
+    search = { tab: "ways", way: "ipv6", add: "ipv6" };
+    await mount(de1());
+    await click(radios()[0]);
+    let answer: (v: unknown) => void = () => {};
+    updateIpv6Entry.mockReturnValue(new Promise((r) => (answer = r)));
+    await click(buttonIn(dialog(), "Check and turn on"));
+    await settle();
+    expect(dialog().querySelector("[data-testid=ipv6-checking]")?.textContent).toContain("Checking 2001:db8::5 from outside…");
+    expect(buttonIn(dialog(), "Only check")?.disabled).toBe(true);
+    expect(radios().every((r) => r.disabled)).toBe(true);
+
+    const verdicts = [
+      { network: "tcp", port: 443, verdict: "timeout" },
+      { network: "udp", port: 8443, verdict: "ok" },
+    ];
+    await act(async () => answer({ node: {}, errorCode: "check_failed", check: passed({ address: "2001:db8::5", passed: false, verdicts }) }));
+    await settle();
+    const result = dialog().querySelector<HTMLElement>("[data-testid=ipv6-check]")!;
+    expect(result.dataset.tone).toBe("bad");
+    expect(result.textContent).toContain("2001:db8::5 is not reachable from outside: tcp/443 no answer (filtered). Nothing changed.");
+    expect([...result.querySelectorAll("li")].map((l) => l.textContent)).toEqual(["tcp/443No answer (filtered)", "udp/8443OK"]);
+    expect(result.lastElementChild?.textContent).toBe("10 min ago · from fi1");
+    expect(updateIpv6Entry).toHaveBeenCalledWith({ nodeId: "nod_de1", action: Ipv6EntryAction.ENABLE, address: "2001:db8::5" });
+  });
+
+  it("Only check answers in the window: it passes, or nothing can check it", async () => {
+    search = { tab: "ways", way: "ipv6", add: "ipv6" };
+    await mount(de1());
+    checkIpv6.mockResolvedValueOnce(passed({ checkedUnix: now }));
+    await click(buttonIn(dialog(), "Only check"));
+    await settle();
+    expect(checkIpv6).toHaveBeenCalledWith({ nodeId: "nod_de1", address: "2001:db8::7" });
+    expect(updateIpv6Entry).not.toHaveBeenCalled();
+    expect(dialog().querySelector("[data-testid=ipv6-check]")?.textContent).toContain("2001:db8::7 answers from outside: checked just now from fi1.");
+
+    checkIpv6.mockResolvedValueOnce(passed({ passed: false, errorCode: "no_ipv6_verifier", verdicts: [], sender: "" }));
+    await click(buttonIn(dialog(), "Only check"));
+    await settle();
+    expect(dialog().querySelector("[data-testid=ipv6-check]")?.textContent).toBe(`2001:db8::7 was not checked. ${en["ways.ipv6.why.no_ipv6_verifier"]}10 min ago`);
+  });
+
+  it("on: the address, when and by whom it was checked (Globalping said as a weaker proof), and Turn off behind a confirmation", async () => {
+    search = { tab: "ways", way: "ipv6" };
+    await mount(de1({ ipv6: v6({ entry: "2001:db8::7", lastCheck: passed({ sender: "globalping", verdicts: [{ network: "tcp", port: 443, verdict: "reachable" }] }) }) }));
+    expect(lane("ipv6").dataset.ring).toBe("ok");
+    expect(lane("ipv6").textContent).toContain("2001:db8::7");
+    expect(panel().textContent).toContain("On: 2001:db8::7. Checked 10 min ago from Globalping. Subscriptions show “de1 · IPv6”.");
+    expect(panel().textContent).toContain(en["ways.ipv6.globalping"]);
+    expect(buttonIn(panel(), "Add IPv6 entry…")).toBeUndefined();
+
+    updateIpv6Entry.mockResolvedValue({ node: {}, errorCode: "" });
+    await click(buttonIn(panel(), "Turn off"));
+    expect(dialog().textContent).toContain("Turn off the IPv6 entry on de1?");
+    expect(dialog().textContent).toContain("“de1 · IPv6” leaves the subscriptions; apps drop it at their next refresh.");
+    await click(buttonIn(dialog(), "Turn off"));
+    await settle();
+    expect(updateIpv6Entry).toHaveBeenCalledWith({ nodeId: "nod_de1", action: Ipv6EntryAction.DISABLE });
+    expect(text()).toContain("The IPv6 entry on de1 is off");
+  });
+
+  it("on while the server's IPv6 is down: the lane is down and the card asks to turn it off", async () => {
+    search = { tab: "ways", way: "ipv6" };
+    await mount(de1({ ipv6: v6({ entry: "2001:db8::7", entrySupported: false, unavailableReason: "ipv6_broken" }) }));
+    expect(lane("ipv6").dataset.ring).toBe("bad");
+    expect(lane("ipv6").textContent).toContain("IPv6 does not work on this server at the hoster.");
+    expect(panel().textContent).toContain("On: 2001:db8::7. Subscriptions show “de1 · IPv6”.");
+    expect(panel().textContent).toContain("Turn the entry off until it works again.");
+    expect(buttonIn(panel(), "Turn off")).toBeDefined();
+  });
+
+  it("a node that cannot take one shows why, with no button, and the New way in dialog keeps the option greyed with the reason", async () => {
+    search = { tab: "ways", way: "ipv6" };
+    await mount(de1({ ipv6: v6({ entrySupported: false, unavailableReason: "agent_old" }) }));
+    expect(lane("ipv6").textContent).toContain("not available");
+    expect(panel().textContent).toContain("Update the node agent to use an IPv6 entry.");
+    expect(panel().textContent).toContain("Not available");
+    expect(buttonIn(panel(), "Add IPv6 entry…")).toBeUndefined();
+
+    search = { tab: "ways", add: "1" };
+    await act(async () => root!.render(ui(de1({ ipv6: v6({ entrySupported: false, unavailableReason: "agent_old" }) }))));
+    const off = dialog().querySelector<HTMLElement>("[data-testid=way-option-off]")!;
+    expect(off.tagName).toBe("DIV");
+    expect(off.textContent).toContain("Update the node agent to use an IPv6 entry.");
+    expect(off.textContent).toContain("Not available");
+    expect(off.querySelector("button, [tabindex]")).toBeNull();
+  });
+
+  it("an entry that is on is not offered again in the New way in dialog", async () => {
+    search = { tab: "ways", add: "1" };
+    await mount(de1({ ipv6: v6({ entry: "2001:db8::7" }) }));
+    const off = dialog().querySelector<HTMLElement>("[data-testid=way-option-off]")!;
+    expect(off.textContent).toContain("Already on: 2001:db8::7");
+    expect(off.textContent).toContain("On");
+  });
+
+  it("picking IPv6 in the New way in dialog hands over to the entry's dialog", async () => {
+    search = { tab: "ways", add: "1" };
+    await mount(de1());
+    await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("IPv6 entry")));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { tab: "ways", way: "ipv6", add: "ipv6" } }));
+  });
+
+  it("a helper sees the state and the last check, and nothing to press; ?add=ipv6 opens nothing", async () => {
+    role = Role.HELPER;
+    search = { tab: "ways", way: "ipv6", add: "ipv6" };
+    await mount(de1({ ipv6: v6({ lastCheck: passed({ passed: false, verdicts: [{ network: "udp", port: 443, verdict: "broken" }] }) }) }));
+    expect(panel().textContent).toContain("Off. Subscriptions connect to 203.0.113.7 only.");
+    expect(panel().textContent).toContain("2001:db8::7 is not reachable from outside: udp/443 packets do not arrive. Nothing changed.");
+    expect(panel().querySelectorAll("button")).toHaveLength(0);
+    expect(document.querySelector("[role=dialog]")).toBeNull();
   });
 });

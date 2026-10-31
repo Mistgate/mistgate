@@ -1,12 +1,14 @@
 import type { StatusKind } from "@/components/ui/status";
 import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CheckStatus, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import type { NodeIpv6 } from "@/gen/mistgate/admin/v1/node_pb";
 import type { CountryCheck } from "./health";
+import type { Plain } from "./plain";
 import { isCut, relayState, type CountryHint, type RelayMsg } from "./relay";
 
 // The ways people reach a node (the node page's "Ways in" tab): straight to its address, through another node (a relay),
-// over IPv6 (later), and, on an entry node, the nodes people reach through it. One lane per way, each with its own state
-// and whether people of the audience country see it. The verdicts are the ones Health and the relay dialog use
+// over IPv6 (the IPv6 entry), and, on an entry node, the nodes people reach through it. One lane per way, each with its own
+// state and whether people of the audience country see it. The verdicts are the ones Health and the relay dialog use
 // (countryLook, relayState, the server's relay hints): the lanes add no judgement of their own.
 
 export type WayId = "direct" | "ipv6" | `via:${string}` | `out:${string}`;
@@ -49,6 +51,8 @@ export type WaysInput = {
   countryOf?: (nodeId: string) => CountryCheck | undefined;
   ipv6?: Ipv6Fact;
   hasIpv6?: boolean;
+  /** The IPv6 entry: on, on while the server's IPv6 does not work (people get nothing through it), or off (undefined). */
+  entry?: "on" | "down";
 };
 
 export type Ways = {
@@ -152,8 +156,11 @@ export function lanesOf(w: WaysInput): Ways {
     lanes.push(lane({ id: `via:${g.id}`, kind: "via", state, seen, fault: g.relays.some((r) => relayState(r) === "failed"), peer: { id: g.id, name: g.name }, relays: g.relays, dark }));
   }
 
-  // the IPv6 entry is not built yet: a server with IPv6 shows the lane switched off, with why
-  if (w.ipv6 === "ok" || w.ipv6 === "broken" || w.hasIpv6) lanes.push(lane({ id: "ipv6", kind: "ipv6", state: "off", seen: seenOf(hintOf(w.country?.ipv6)), fault: false }));
+  // the IPv6 entry: a server with IPv6 (or an entry) has the lane, off until the owner turns it on
+  if (w.entry || w.ipv6 === "ok" || w.ipv6 === "broken" || w.hasIpv6) {
+    const state: StatusKind = w.entry === "on" ? "ok" : w.entry === "down" ? "bad" : "off";
+    lanes.push(lane({ id: "ipv6", kind: "ipv6", state, seen: seenOf(hintOf(w.country?.ipv6)), fault: w.entry === "down" }));
+  }
 
   const out = byPeer((w.relays ?? []).filter((r) => r.viaNodeId === w.node.id), (r) => [r.exitNodeId, r.exitNodeName]).map((g) =>
     lane({ id: `out:${g.id}`, kind: "out", state: relaysState(g.relays), seen: "unknown", fault: g.relays.some((r) => relayState(r) === "failed"), peer: { id: g.id, name: g.name }, relays: g.relays }),
@@ -171,6 +178,25 @@ export function ipv6FactOf(items: readonly { id: string; params: Record<string, 
   if (p?.ipv6 === "yes") return p.connect === "ok" ? "ok" : p.connect === "failed" ? "broken" : "unknown";
   return "unknown";
 }
+
+export type Ipv6Entry = Plain<NodeIpv6>;
+
+/**
+ * The node's IPv6 entry as the server sends it (Node.ipv6). A node message without it (built without the doctor's view)
+ * reads from the doctor's fact: nothing to offer, the reason the fact gives.
+ */
+export function entryOf(v6: Ipv6Entry | undefined, fact: Ipv6Fact): Ipv6Entry {
+  if (v6) return v6;
+  const reason = { ok: "", none: "no_ipv6", broken: "ipv6_broken", unknown: "not_checked" }[fact];
+  return { entry: "", entrySupported: false, unavailableReason: reason, addresses: [], src: "" };
+}
+
+/** The lane's word for the entry: on, on while the server's IPv6 does not work (people get nothing), or off. */
+export const entryState = (v6: Ipv6Entry): WaysInput["entry"] =>
+  !v6.entry ? undefined : v6.unavailableReason === "no_ipv6" || v6.unavailableReason === "ipv6_broken" ? "down" : "on";
+
+/** Whether the owner can turn the entry on now: the node takes one and it is off. */
+export const entryOffered = (v6: Ipv6Entry) => v6.entrySupported && !v6.entry;
 
 /** A ?way= value of the URL, kept only in its known shapes. */
 export const isWayId = (s: unknown): s is WayId => typeof s === "string" && (s === "direct" || s === "ipv6" || /^(via|out):[\w-]+$/.test(s));

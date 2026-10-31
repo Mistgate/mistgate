@@ -13,6 +13,8 @@ describe("validateNodeSearch", () => {
     expect(validateNodeSearch({ tab: "ways", way: "direct", add: "1" })).toEqual({ tab: "ways", way: "direct", add: "1" });
     expect(validateNodeSearch({ tab: "ways", add: 1 })).toEqual({ tab: "ways", add: "1" });
     expect(validateNodeSearch({ tab: "ways", add: "via:nod_msk1" })).toEqual({ tab: "ways", add: "via:nod_msk1" });
+    // the IPv6 entry's dialog: Reachability and the alerts link here
+    expect(validateNodeSearch({ tab: "ways", way: "ipv6", add: "ipv6" })).toEqual({ tab: "ways", way: "ipv6", add: "ipv6" });
     expect(validateNodeSearch({ tab: "ways", way: "sideways", add: "prf_1" })).toEqual({ tab: "ways" });
     expect(validateNodeSearch({ tab: "exit", way: "direct" })).toEqual({ tab: "exit" });
   });
