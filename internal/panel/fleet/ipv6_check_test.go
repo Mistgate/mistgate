@@ -213,6 +213,112 @@ func TestCheckIPv6TakesTheNextSenderWhenTheFirstHasNoRoute(t *testing.T) {
 	}
 }
 
+func TestCheckIPv6DoesNotUseGlobalpingWhenAHalfHadSenders(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		counterError string
+		sendError    string
+		tcp443       string
+		wantCode     string
+	}{
+		{name: "UDP no route, TCP says other", sendError: "no_route", tcp443: "other", wantCode: "no_route"},
+		{name: "UDP counter busy, TCP passes", counterError: "busy", tcp443: "ours", wantCode: "busy"},
+		{name: "UDP counter failed, TCP passes", counterError: "failed", tcp443: "ours", wantCode: "failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x, target, targetConn := ipv6Target(t)
+			_, senderConn := x.v6Peer("sender1")
+			var globalping atomic.Int32
+			x.f.cfg.GlobalpingTCP6 = func(context.Context, string, uint16) (int, int, error) {
+				globalping.Add(1)
+				return 2, 2, nil
+			}
+			ch := x.checkIPv6(target.nodeID, v6Entry)
+
+			arm := waitUDPCount(targetConn, false)
+			if tc.counterError != "" {
+				replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: false, Error: tc.counterError})
+			} else {
+				replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+				send := waitUDPSend(senderConn)
+				replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: false, Error: tc.sendError})
+				stop := waitUDPCount(targetConn, true)
+				replyPortStop(targetConn, stop, "6", map[uint16]uint64{}, map[uint16]uint64{})
+			}
+
+			probe := waitTCPProbe(senderConn)
+			replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{
+				"family": "6", "t443": tc.tcp443, "t8443": "ours",
+			}})
+			got := awaitIPv6(t, ch)
+			if got.Pass || got.Code != tc.wantCode || verdictOf(got, "tcp", 443) != tc.tcp443 || verdictOf(got, "tcp", 8443) != "ours" {
+				t.Fatalf("check = %+v, want code %s and both TCP verdicts", got, tc.wantCode)
+			}
+			if globalping.Load() != 0 {
+				t.Fatal("Globalping ran although the UDP half had a sender")
+			}
+		})
+	}
+}
+
+func TestCheckIPv6MissingHalfWithOtherSendersIsNoVerifier(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		caps        []string
+		udpRuns     bool
+		tcpRuns     bool
+		tcp443      string
+		wantNet     string
+		wantVerdict string
+	}{
+		{name: "no TCP sender", caps: []string{capUDPCheck}, udpRuns: true, wantNet: "udp", wantVerdict: "ok"},
+		{name: "no UDP sender, TCP says other", caps: []string{capTCPCheck}, tcpRuns: true, tcp443: "other", wantNet: "tcp", wantVerdict: "other"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x, target, targetConn := ipv6Target(t)
+			sender, senderConn := addPortCheckPeer(x, "sender1", "provider-b", "DE", tc.caps...)
+			x.doctorIPv6(sender.nodeID, v6Works("2001:db8:ffff::1/64"))
+			var globalping atomic.Int32
+			x.f.cfg.GlobalpingTCP6 = func(context.Context, string, uint16) (int, int, error) {
+				globalping.Add(1)
+				return 2, 2, nil
+			}
+			ch := x.checkIPv6(target.nodeID, v6Entry)
+			if tc.udpRuns {
+				driveUDP6(targetConn, senderConn, 300)
+			}
+			if tc.tcpRuns {
+				tcp443 := tc.tcp443
+				if tcp443 == "" {
+					tcp443 = "ours"
+				}
+				probe := waitTCPProbe(senderConn)
+				replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{
+					"family": "6", "t443": tcp443, "t8443": "ours",
+				}})
+			}
+			got := awaitIPv6(t, ch)
+			if got.Pass || got.Code != "no_ipv6_verifier" || verdictOf(got, tc.wantNet, 443) != tc.wantVerdict {
+				t.Fatalf("check = %+v, want no_ipv6_verifier and the %s verdict", got, tc.wantNet)
+			}
+			if globalping.Load() != 0 {
+				t.Fatal("Globalping ran although the other half had a sender")
+			}
+		})
+	}
+}
+
+func TestIPv6CheckTargetsSkipUnsupportedServers(t *testing.T) {
+	specs := []tcpSpec{
+		hy2Spec("ip", plugin.TLSAcmeIP, "node-a.example.com", ""),
+		hy2Spec("cdn", plugin.TLSSelfSigned, "node-a.example.com", `{"cdn":{"host":"cdn.example.com"}}`),
+	}
+	tcp, udp := ipv6CheckTargets(specs, nil)
+	if len(tcp) != 0 || len(udp) != 0 {
+		t.Fatalf("unsupported targets = TCP %+v, UDP %v", tcp, udp)
+	}
+}
+
 func TestCheckIPv6PanelWithoutIPv6IsNeverAPass(t *testing.T) {
 	x, target, targetConn := ipv6Target(t)
 	var sent atomic.Int32
@@ -354,6 +460,12 @@ func TestCheckIPv6NodeStatesGiveCodesNotErrors(t *testing.T) {
 	if got, err := x3.f.CheckIPv6(x3.ctx, target3.nodeID, v6Entry); err != nil || got.Code != "agent_too_old" {
 		t.Fatalf("agent without udpcheck/1: %+v, %v", got, err)
 	}
+	x4, target4 := hy2Node(t)
+	connectCaps(target4, "old-target")
+	x4.exec(`UPDATE profile SET settings_json = '{"port":443,"network":"udp","tls":"acme_ip","name":"node-a.example.com"}' WHERE id = 'prf_hy2'`)
+	if got, err := x4.f.CheckIPv6(x4.ctx, target4.nodeID, v6Entry); err != nil || got.Code != "nothing_to_check" {
+		t.Fatalf("only unsupported servers: %+v, %v", got, err)
+	}
 }
 
 // ---- the RPC ----
@@ -407,7 +519,10 @@ func TestCheckIpv6RPCIsOwnerOnlyAndNeedsTheNodesOwnAddress(t *testing.T) {
 		t.Errorf("an IPv4 address: %v, want INVALID_ARGUMENT", err)
 	}
 
-	// no address given: the one the node uses for outbound IPv6
+	// no address given: use the source only if it is stable; otherwise the first stable address
+	x.doctorIPv6(target.nodeID, map[string]string{
+		"ipv6": "yes", "connect": "ok", "iface": "eth0", "src": v6Other, "addrs": v6Entry + "/64",
+	})
 	done := make(chan *adminv1.CheckIpv6Response, 1)
 	go func() {
 		r, err := call(asOwner(x.ctx), "")

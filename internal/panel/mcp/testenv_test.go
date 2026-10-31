@@ -578,6 +578,16 @@ func (w *world) UpdateIpv6Entry(_ context.Context, r *connect.Request[adminv1.Up
 		return connect.NewResponse(&adminv1.UpdateIpv6EntryResponse{ErrorCode: w.ipv6UpdateCode, Node: &adminv1.Node{Id: r.Msg.GetNodeId(), Ipv6: x}}), nil
 	}
 	if r.Msg.GetAction() == adminv1.Ipv6EntryAction_IPV6_ENTRY_ACTION_ENABLE {
+		stable := false
+		for _, address := range x.GetAddresses() {
+			if address.GetAddress() == r.Msg.GetAddress() {
+				stable = true
+				break
+			}
+		}
+		if !stable {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("address: not an IPv6 address of this node"))
+		}
 		x.Entry = canaryAddr6
 	} else {
 		x.Entry = ""
@@ -1046,7 +1056,8 @@ func (w *world) ApplyFix(ctx context.Context, r *connect.Request[adminv1.ApplyFi
 
 func (w *world) ListAudit(context.Context, *connect.Request[adminv1.ListAuditRequest]) (*connect.Response[adminv1.ListAuditResponse], error) {
 	return connect.NewResponse(&adminv1.ListAuditResponse{Entries: []*adminv1.AuditEntry{
-		{Id: 7, TimeUnix: 1700000000, Source: adminv1.AuditSource_AUDIT_SOURCE_MCP, ActorId: "mcp:tok_x", Action: "mcp_plan", ParamsJson: `{"k":"` + canaryTK + `"}`, Ip: "198.51.100.5"},
+		{Id: 7, TimeUnix: 1700000000, Source: adminv1.AuditSource_AUDIT_SOURCE_MCP, ActorId: "mcp:tok_x", Action: "mcp_plan",
+			ParamsJson: `{"k":"` + canaryTK + `","address":"2001:db8::5","addr":"203.0.113.5","nested":{"address":"2001:db8::6","keep":"yes"}}`, Ip: "198.51.100.5"},
 	}}), nil
 }
 

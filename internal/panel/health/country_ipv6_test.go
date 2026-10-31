@@ -38,7 +38,7 @@ func TestNodeIPv6AddressAndState(t *testing.T) {
 		{"a unique-local src is no address to test", "de1.example.com", doctorIPv6("ipv6", "yes", "connect", "ok", "src", "fd00::5", "addrs", "fe80::1/64"), "", ipv6AgentOld},
 		{"an agent that predates the IPv6 facts names none", "de1.example.com", doctorIPv6("ipv6", "yes", "connect", "ok"), "", ipv6AgentOld},
 		{"an IPv6 literal Address is the address", "2001:db8::77", doctorIPv6("ipv6", "yes", "connect", "ok", "src", "2001:db8::10"), "2001:db8::77", ipv6OK},
-		{"an IPv4 literal Address leaves it to the doctor", "203.0.113.10", doctorIPv6("ipv6", "yes", "connect", "ok", "src", "2001:db8::10"), "2001:db8::10", ipv6OK},
+		{"an IPv4 literal Address leaves it to the doctor", "203.0.113.10", doctorIPv6("ipv6", "yes", "connect", "ok", "src", "2001:db8::10", "addrs", "2001:db8::10/64"), "2001:db8::10", ipv6OK},
 		{"an old agent with an IPv6 literal Address", "2001:db8::77", doctorIPv6("ipv6", "yes", "connect", "ok"), "2001:db8::77", ipv6OK},
 		{"no global IPv6", "de1.example.com", doctorIPv6("ipv6", "no"), "", ipv6None},
 		{"an address at the hoster that does not work", "de1.example.com", doctorIPv6("ipv6", "yes", "connect", "failed", "suggest", "client_ipv6_off", "src", "2001:db8::10"), "", ipv6Broken},
@@ -282,8 +282,8 @@ func TestIPv6RoundsLeaveTheIPv4OutcomeAlone(t *testing.T) {
 		c.cfg.IPv6 = ipv6
 		c.onlineNode("de1", "203.0.113.10")
 		c.onlineNode("nl1", "203.0.113.20")
-		c.report("de1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "src", "2001:db8::10"))
-		c.report("nl1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "src", "2001:db8::20"))
+		c.report("de1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "addrs", "2001:db8::10/64", "src", "2001:db8::10"))
+		c.report("nl1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "addrs", "2001:db8::20/64", "src", "2001:db8::20"))
 		var out string
 		for i, mode := range []string{"ok", "tcp_blocked", "tcp_blocked", "tcp_blocked", "ok", "ok"} {
 			c.src.set("de1", mode)

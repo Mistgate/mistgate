@@ -21,7 +21,7 @@ func ipv6Tools() []toolDef {
 		readToolWithin(applyTimeout, "node_ipv6_check", ProfileAdmin, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceCheckIpv6Procedure),
 			"Check from outside that the node's IPv6 address answers, and that what answers is the node itself: another node whose IPv6 works (else the panel, else Globalping) "+
 				"sends the same test packets as node_ports to the address instead of the main one: UDP datagrams to each of the node's UDP servers (counted at the node) and a TLS handshake to each of its TCP servers. "+
-				"It changes nothing on any host and stores nothing; it can take up to a minute. "+
+				"It changes nothing on any host and keeps the result with the node; it can take up to a minute. "+
 				"passed is true when every TCP port is ours (the connection reached this node) and every UDP port is ok. sender is the node that sent, panel, or globalping (it only proves a connection opens, not that it reached this node). "+
 				"error_code is set when the check could not run: node_offline, agent_too_old, nothing_to_check, no_ipv6_verifier (no other node has working IPv6 and Globalping cannot connect) or failed. "+
 				"A node that cannot take an IPv6 entry is refused with the reason: no_ipv6, ipv6_broken, agent_old, not_checked or main_is_ipv6. Never shows the address.",

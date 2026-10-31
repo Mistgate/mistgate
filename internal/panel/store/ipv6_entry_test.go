@@ -30,3 +30,14 @@ func TestIPv6StateKeepsTheNewestCheckPerAddressAndFewAddresses(t *testing.T) {
 		t.Errorf("round trip: %s != %s", back.JSON(), s.JSON())
 	}
 }
+
+func TestIPv6StateEnabledAtIsBackwardCompatible(t *testing.T) {
+	if got := ParseIPv6State(`{"checks":[]}`); got.EnabledAt != 0 {
+		t.Errorf("old state has enabled_at %d, want zero", got.EnabledAt)
+	}
+	s := IPv6State{EnabledAt: 1790842000}.With(IPv6Check{Addr: "2001:db8::5", At: 1790842001, Pass: true})
+	back := ParseIPv6State(s.JSON())
+	if back.EnabledAt != s.EnabledAt || len(back.Checks) != 1 || back.Checks[0].Addr != "2001:db8::5" {
+		t.Fatalf("state round trip = %+v", back)
+	}
+}

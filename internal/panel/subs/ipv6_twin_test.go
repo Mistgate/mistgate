@@ -1,6 +1,7 @@
 package subs_test
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -71,6 +72,100 @@ func TestIPv6TwinAndRelayTwinInEveryFormat(t *testing.T) {
 		}
 		goldenFile(t, c.file, got)
 	}
+}
+
+func TestMihomoAmneziaWGProxyGetsIPv6Twin(t *testing.T) {
+	m := newM3Rig(t)
+	if _, err := m.st.W.Exec(`UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_1'`); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := m.handler(nil)
+	_, tok := m.newUser("alice", nil)
+	rec := fetch(h, "/"+tok, mihomoUA)
+	if rec.Code != 200 {
+		t.Fatalf("Mihomo: %d %s", rec.Code, rec.Body.String())
+	}
+	p := parseYAML(t, rec.Body.Bytes())
+	var awg []map[string]any
+	for _, proxy := range p.Proxies {
+		if proxy["type"] == "wireguard" {
+			awg = append(awg, proxy)
+		}
+	}
+	if len(awg) != 2 || awg[0]["server"] != "de1.example.com" || awg[1]["server"] != "2001:db8::5" || !strings.Contains(awg[1]["name"].(string), "IPv6") {
+		t.Fatalf("AmneziaWG proxies = %+v, want the main server and its IPv6 twin", awg)
+	}
+	if awg[0]["private-key"] != awg[1]["private-key"] || awg[0]["ip"] != awg[1]["ip"] {
+		t.Errorf("the IPv6 twin changed the device key or tunnel address: %v / %v", awg[0], awg[1])
+	}
+	got := maskMihomoGenerated(maskMihomoCredentials(rec.Body.String(), p.Proxies))
+	goldenFile(t, "ipv6_awg_mihomo.yaml", got)
+}
+
+func maskMihomoCredentials(body string, values any) string {
+	switch v := values.(type) {
+	case map[string]any:
+		for key, value := range v {
+			if strings.Contains(key, "password") || key == "ip" || strings.Contains(key, "key") {
+				if secret, ok := value.(string); ok && secret != "" {
+					body = strings.ReplaceAll(body, secret, "<secret>")
+					continue
+				}
+			}
+			body = maskMihomoCredentials(body, value)
+		}
+	case []any:
+		for _, value := range v {
+			body = maskMihomoCredentials(body, value)
+		}
+	case []map[string]any:
+		for _, value := range v {
+			body = maskMihomoCredentials(body, value)
+		}
+	}
+	return body
+}
+
+func maskMihomoGenerated(body string) string {
+	lines := strings.Split(body, "\n")
+	inWireguard, inOptions := false, false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- name:") {
+			inWireguard, inOptions = false, false
+		}
+		if inWireguard && (strings.HasPrefix(trimmed, "port:") || strings.HasPrefix(trimmed, "persistent-keepalive:")) {
+			key, _, _ := strings.Cut(trimmed, ":")
+			lines[i] = strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " "))) + key + ": 0"
+		}
+		if inWireguard && strings.HasPrefix(trimmed, "amnezia-wg-option:") {
+			inOptions = true
+			continue
+		}
+		if inOptions {
+			indent := len(line) - len(strings.TrimLeft(line, " "))
+			if indent <= 4 {
+				inOptions = false
+			} else if key, _, ok := strings.Cut(trimmed, ":"); ok {
+				var value string
+				switch key {
+				case "jc", "jmin", "jmax", "s1", "s2", "s3", "s4":
+					value = "0"
+				case "i1", "i2", "i3", "i4", "i5":
+					value = `"<generated>"`
+				case "content-padding-addition", "rekey-after-time", "rekey-timeout", "reject-after-time", "keepalive-timeout", "max-handshake-attempts":
+					value = `"<generated>"`
+				}
+				if value != "" {
+					lines[i] = fmt.Sprintf("%s%s: %s", strings.Repeat(" ", indent), key, value)
+				}
+			}
+		}
+		if trimmed == "type: wireguard" {
+			inWireguard = true
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // Without the entry nothing changes for anybody: the golden of the relay's twin (relay_*.golden) is what answers.

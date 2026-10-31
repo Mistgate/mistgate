@@ -167,8 +167,8 @@ VPN 应用 [kl!ck](https://github.com/vbu00/klick)（Windows、macOS）带有一
   - `not_checked`：代理尚未上报，或尚未进行过 IPv6 轮次。
   - `no_probes`：Globalping 目前在该国没有支持 IPv6 的探测点。因其他原因（`rate_limited`、`source_error`、`timeout`、`too_few_probes`）失败的轮次也以同样方式显示。
 - **额度。** 对同样的节点，IPv6 轮次的消耗与 IPv4 轮次相同：（1 次对照 + 每个被检测节点 1 次 + 其 TCP 端口数）× 探测点数。六个节点、每个两个 TCP 端口，IPv4 每个探测点需要 19 次测试；其中两个节点有 IPv6，再加 7 次。两种轮次轮流进行，共用同一份[额度](#globalping)，所以没有令牌时轮次会稍稀一些。关闭 IPv6 即可让 IPv4 轮次保持原样。
-- **告警。** IPv4 的 `country_blocked` 告警带有参数 `ipv6`：`open`、`partial`、`blocked` 或 `unknown`，即最新一轮 IPv6 检测对该节点的结论。为 `open` 时，告警会加上「通过 IPv6，从那里可以访问该节点。」（Telegram 中为「通过 IPv6 可以访问。」）；参数变化不会发送新消息。针对 IPv6 本身的告警（主题 `ipv6` 和 `ipv6/partial`，参数 `family=6`，管理后台中带 *IPv6* 标签）只为 [IPv6 入口](../guide/nodes.md#ipv6-入口)已开启的节点发出：其上的用户依赖它。它们的打开和关闭方式与 IPv4 告警相同，需连续两轮。对其他任何节点，IPv6 只显示在本页和 `ipv6` 参数中。对带入口的节点，当 IPv6 检测轮次能访问到它时，其 IPv4 告警的 `ipv6` 参数为 `entry`，告警会加上「有 IPv6 的用户通过 IPv6 入口连接。」（Telegram 中同样如此）；否则由 IPv6 告警来说明 IPv6 的情况，参数为空。
+- **告警。** IPv4 的 `country_blocked` 告警带有参数 `ipv6`：`open`、`partial`、`blocked` 或 `unknown`，即最新一轮 IPv6 检测对该节点的结论。为 `open` 时，告警会加上「通过 IPv6，从那里可以访问该节点。」（Telegram 中为「通过 IPv6 可以访问。」）；参数变化不会发送新消息。针对 IPv6 本身的告警（主题 `ipv6` 和 `ipv6/partial`，参数 `family=6`，管理后台中带 *IPv6* 标签）只为 [IPv6 入口](../guide/nodes.md#ipv6-入口)已开启的节点发出：其上的用户依赖它。它们的打开和关闭方式与 IPv4 告警相同，需连续两轮。对其他任何节点，IPv6 只显示在本页和 `ipv6` 参数中。对带入口的节点，当 IPv6 检测轮次能访问到它时，其 IPv4 告警的 `ipv6` 参数为 `entry`，Telegram 消息会加上「有 IPv6 的用户通过 IPv6 入口连接。」；否则由 IPv6 告警来说明 IPv6 的情况，参数为空。
 - **有入口时的地址。** 节点的 IPv6 入口开启期间，IPv6 检测轮次会测量入口的地址，即用户连接的那个，先于节点自己的地址和上行地址。只有当节点的 Agent 报告出站 IPv6 可用时，才会测量该节点。
-- **IPv4 被封而 IPv6 通。** 节点的 IPv4 在该国家被封锁、而 IPv6 能通，这正是 [IPv6 入口](../guide/nodes.md#ipv6-入口)的适用情形：节点页面会提供它，开启之前先做入口自己的检测（从外部，由另一个节点发起）。不会自动开启任何东西。
+- **IPv4 被封而 IPv6 通。** 节点的 IPv4 在该国家被封锁、而 IPv6 能通，这正是 [IPv6 入口](../guide/nodes.md#ipv6-入口)的适用情形：目前它需通过 MCP 开启，开启之前先做入口自己的检测（从外部，由另一个节点发起）。不会自动开启任何东西。
 
 如果只有部分网络失去某个节点，可以经由这些网络能够访问的另一个节点，用[中转](../guide/relays.md)把该节点的服务器带给他们。中转的检测以及对话框里的提示会用到本页的结论和 TSPU 探测。

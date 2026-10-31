@@ -19,10 +19,12 @@ import (
 func (c *countryEnv) entry(node string, on bool) {
 	c.t.Helper()
 	addr := ""
+	state := store.IPv6State{}
 	if on {
 		addr = "2001:db8::10"
+		state.EnabledAt = c.clock.Now().Unix()
 	}
-	c.exec(`UPDATE node SET ipv6_entry = ? WHERE id = ?`, addr, node)
+	c.exec(`UPDATE node SET ipv6_entry = ?, ipv6_json = ? WHERE id = ?`, addr, state.JSON(), node)
 	c.s.invalidateSnapshot()
 }
 
@@ -98,7 +100,7 @@ func TestCountryIPv6WordFollowsTheRow(t *testing.T) {
 func TestIPv4AlertCarriesTheIPv6WordWithoutANewNotification(t *testing.T) {
 	c := newIPv6Env(t)
 	c.onlineNode("se1", "203.0.113.30") // a second node over IPv6: a dark probe is partial only if it reaches another node
-	c.report("se1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "src", "2001:db8::30"))
+	c.report("se1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "addrs", "2001:db8::30/64", "src", "2001:db8::30"))
 	seen := c.transitions()
 	const k = "country_blocked/de1/"
 
@@ -242,6 +244,23 @@ func TestIPv6AlertOnlyForANodeWithTheEntry(t *testing.T) {
 	if v4 := c.active()["country_blocked/de1/"]; v4.Params["ipv6"] != "blocked" {
 		t.Errorf("without an entry the IPv4 alert speaks of IPv6 again: %v", v4.Params)
 	}
+}
+
+func TestIPv6AlertIgnoresRoundsBeforeTheEntryWasEnabled(t *testing.T) {
+	c := newIPv6Env(t)
+	c.pair("de1", "ok", "blocked")
+	c.pair("de1", "ok", "blocked")
+	const key = "country_blocked/de1/ipv6"
+	mustHave(t, c, key, false)
+
+	c.entry("de1", true)
+	c.evaluate()
+	mustHave(t, c, key, false)
+
+	c.pair("de1", "ok", "blocked")
+	mustHave(t, c, key, false)
+	c.pair("de1", "ok", "blocked")
+	mustHave(t, c, key, true)
 }
 
 // The IPv6 alert is held while the node is offline, and with the IPv6 checks off it is let go.

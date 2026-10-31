@@ -47,6 +47,24 @@ type nodeIPv6Args struct {
 	Action string `json:"action" jsonschema:"enable or disable"`
 }
 
+type nodeIPv6StoredArgs struct {
+	Node    string `json:"node"`
+	Action  string `json:"action"`
+	Address string `json:"address,omitempty"`
+}
+
+func ipv6PlanAddress(x *adminv1.NodeIpv6) string {
+	for _, a := range x.GetAddresses() {
+		if a.GetAddress() == x.GetSrc() {
+			return a.GetAddress()
+		}
+	}
+	if len(x.GetAddresses()) > 0 {
+		return x.GetAddresses()[0].GetAddress()
+	}
+	return ""
+}
+
 var nodeIPv6 = changeSpec[nodeIPv6Args]{
 	name: "node_ipv6", min: ProfileAdmin, danger: true,
 	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure,
@@ -81,6 +99,9 @@ var nodeIPv6 = changeSpec[nodeIPv6Args]{
 			case !x.GetEntrySupported():
 				return nil, errors.New("the node cannot take an IPv6 entry: " + ipv6Reasons[clean(x.GetUnavailableReason(), 24)])
 			}
+			if ipv6PlanAddress(x) == "" {
+				return nil, errors.New("the panel did not give a stable IPv6 address")
+			}
 			var servers []string
 			for _, in := range r.Msg.GetInbounds() {
 				if in.GetState() != adminv1.InboundState_INBOUND_STATE_DISABLED {
@@ -102,14 +123,39 @@ var nodeIPv6 = changeSpec[nodeIPv6Args]{
 			effect = "At the next subscription refresh the \"· IPv6\" servers of the node leave everyone's subscription; anyone connected through one has to pick another server."
 		}
 		facts = append(facts, Fact{Key: "effect", Value: effect})
-		return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: nodeIPv6Args{Node: id, Action: a.Action}}, nil
+		stored := nodeIPv6StoredArgs{Node: id, Action: a.Action}
+		if a.Action == ipv6Enable {
+			stored.Address = ipv6PlanAddress(x)
+		}
+		return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet},
+			Params: stored}, nil
 	},
-	apply: func(c *call, a nodeIPv6Args, _ Plan) (done, error) {
+	applyStored: func(c *call, pl Plan) (done, error) {
+		var a nodeIPv6StoredArgs
+		if err := strictJSON([]byte(pl.ParamsJSON), &a); err != nil {
+			return done{}, failure("plan_unreadable", "the stored plan is unreadable: make a new plan")
+		}
+		if a.Action == ipv6Enable {
+			r, err := c.cl.Node.GetNode(c.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.Node}))
+			if err != nil {
+				return done{}, apiError(err)
+			}
+			stable := false
+			for _, address := range r.Msg.GetNode().GetIpv6().GetAddresses() {
+				if address.GetAddress() == a.Address {
+					stable = true
+					break
+				}
+			}
+			if a.Address == "" || !stable {
+				return done{}, failure("changed_since_plan", "the node's stable IPv6 address changed after the plan; make a new plan")
+			}
+		}
 		action := adminv1.Ipv6EntryAction_IPV6_ENTRY_ACTION_DISABLE
 		if a.Action == ipv6Enable {
 			action = adminv1.Ipv6EntryAction_IPV6_ENTRY_ACTION_ENABLE
 		}
-		r, err := c.cl.Node.UpdateIpv6Entry(c.ctx, connect.NewRequest(&adminv1.UpdateIpv6EntryRequest{NodeId: a.Node, Action: action}))
+		r, err := c.cl.Node.UpdateIpv6Entry(c.ctx, connect.NewRequest(&adminv1.UpdateIpv6EntryRequest{NodeId: a.Node, Action: action, Address: a.Address}))
 		if err != nil {
 			return done{}, apiError(err)
 		}
@@ -120,5 +166,8 @@ var nodeIPv6 = changeSpec[nodeIPv6Args]{
 			return doneWith("ipv6_entry_on", "The IPv6 entry is on: the address passed the check from outside. People get the \"· IPv6\" servers at their next subscription refresh.", "node", a.Node), nil
 		}
 		return doneWith("ipv6_entry_off", "The IPv6 entry is off: the \"· IPv6\" servers leave the subscriptions at their next refresh.", "node", a.Node), nil
+	},
+	apply: func(_ *call, _ nodeIPv6Args, _ Plan) (done, error) {
+		return done{}, failure("plan_unreadable", "the stored plan is unreadable: make a new plan")
 	},
 }

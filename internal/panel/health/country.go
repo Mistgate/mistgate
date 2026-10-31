@@ -1152,11 +1152,26 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 	for _, n := range sn.nodes {
 		var ipv6Word string // what the IPv6 rounds say of a node that has no IPv6 alert of its own: a parameter of its IPv4 alert
 		entry := ipv6On && ipv6Entry(n)
+		rounds6 := byNode6[n.ID]
+		if entry && n.IPv6().EnabledAt > 0 {
+			enabledAt := n.IPv6().EnabledAt
+			filtered := make([]store.CountryCheck, 0, len(rounds6))
+			for _, r := range rounds6 {
+				if r.At.Unix() >= enabledAt {
+					filtered = append(filtered, r)
+				}
+			}
+			rounds6 = filtered
+		}
+		age6 := ages6[n.ID]
+		if entry && n.IPv6().EnabledAt > 0 {
+			age6 = countryRoundMaxAges(cc.Interval, rounds6)[n.ID]
+		}
 		if ipv6On {
 			word := "unknown"
-			if rounds := byNode6[n.ID]; len(rounds) > 0 && !v6Failed {
-				r := rounds[0]
-				word = countryIPv6Word(&r, r.Country == cc.Country && now.Sub(r.At) <= ages6[n.ID])
+			if len(rounds6) > 0 && !v6Failed {
+				r := rounds6[0]
+				word = countryIPv6Word(&r, r.Country == cc.Country && now.Sub(r.At) <= age6)
 			}
 			ipv6Word = word
 			if entry {
@@ -1172,12 +1187,11 @@ func (s *Service) addCountryConds(ctx context.Context, sn *snapshot, live map[st
 			// the entry the keys are let go, as those of a source that is off.
 			var signals6 []countryAlertSignal
 			if entry {
-				rounds := byNode6[n.ID]
-				for _, r := range rounds {
-					if r.Country != rounds[0].Country { // a country change starts the history over
+				for _, r := range rounds6 {
+					if r.Country != rounds6[0].Country { // a country change starts the history over
 						break
 					}
-					signals6 = append(signals6, countryGlobalpingSignal(r, ages6[n.ID]))
+					signals6 = append(signals6, countryGlobalpingSignal(r, age6))
 				}
 			}
 			s.countryNodeConds(n, live[n.ID].Connected, signals6, activeAlerts, d, add, countryFamilyAlerts{family: familyV6, off: !entry, hold: v6Failed})

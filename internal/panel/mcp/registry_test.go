@@ -246,6 +246,24 @@ func TestProvisioningRevealIsNotAnMCPProcedure(t *testing.T) {
 	}
 }
 
+func TestNodeIPv6AddressIsHiddenFromThePlanInput(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	var properties map[string]any
+	for tool, err := range s.Tools(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tool.Name == "node_ipv6_plan" {
+			properties, _ = tool.InputSchema.(map[string]any)["properties"].(map[string]any)
+		}
+	}
+	if properties == nil || properties["address"] != nil {
+		t.Fatalf("the agent can choose or see the stored address: %v", properties)
+	}
+}
+
 // The doctor's refresh argument exists only for operators and admins.
 func TestNodeDoctorRefreshOnlyForOperators(t *testing.T) {
 	e := newTestEnv(t)

@@ -15,7 +15,7 @@ const (
 	IPv6None     = "none"      // no global IPv6 address
 	IPv6Broken   = "broken"    // an address, but outbound IPv6 fails (so does the inbound one)
 	IPv6Unknown  = "unknown"   // the doctor has not reported yet
-	IPv6AgentOld = "agent_old" // set by the readers: IPv6 works but the agent names no address (Src and Addrs are empty)
+	IPv6AgentOld = "agent_old" // set by the readers: IPv6 works but the agent names no stable address (Addrs is empty)
 )
 
 // IPv6Doctor is what the doctor's ipv6 check says of a node (internal/node/doctor checkIPv6).
@@ -66,25 +66,24 @@ func DoctorIPv6(row *DoctorRow) IPv6Doctor {
 	return d
 }
 
-// FirstAddr is the address the node is measured on when nothing better is known: Src, else the first stable address.
+// FirstAddr is the address the node is measured on when nothing better is known: Src if it is stable, else the first stable address.
 func (d IPv6Doctor) FirstAddr() string {
-	if d.Src != "" {
-		return d.Src
+	for _, p := range d.Addrs {
+		if p.Addr().String() == d.Src {
+			return d.Src
+		}
 	}
-	if len(d.Addrs) > 0 {
+	if len(d.Addrs) != 0 {
 		return d.Addrs[0].Addr().String()
 	}
 	return ""
 }
 
-// Has says whether the address is one the doctor listed (Src or one of Addrs).
+// Has says whether the address is one of the doctor's stable addresses.
 func (d IPv6Doctor) Has(addr string) bool {
 	a, ok := UsableIPv6(addr)
 	if !ok {
 		return false
-	}
-	if d.Src == a {
-		return true
 	}
 	for _, p := range d.Addrs {
 		if p.Addr().String() == a {

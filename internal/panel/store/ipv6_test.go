@@ -51,6 +51,14 @@ func TestDoctorIPv6ReadsTheStateAndTheUplink(t *testing.T) {
 	if got := d.FirstAddr(); got != "2001:db8::5" {
 		t.Errorf("FirstAddr = %q: src first", got)
 	}
+	temporarySrc := DoctorIPv6(row("ipv6", "yes", "connect", "ok", "src", "2001:db8::9",
+		"addrs", "2001:db8::5/64,2001:db8:0:1::7/128"))
+	if temporarySrc.Has(temporarySrc.Src) {
+		t.Error("Has accepted the outbound source that was not in the stable address list")
+	}
+	if got := temporarySrc.FirstAddr(); got != "2001:db8::5" {
+		t.Errorf("FirstAddr = %q, want first stable address because src is temporary", got)
+	}
 	if got := DoctorIPv6(row("ipv6", "yes", "connect", "ok", "addrs", "2001:db8::7/64")).FirstAddr(); got != "2001:db8::7" {
 		t.Errorf("FirstAddr without src = %q: the first stable address", got)
 	}

@@ -180,9 +180,17 @@ func TestEnableUsesAFreshCheckAndRunsAnotherWhenItIsOld(t *testing.T) {
 	if r.ErrorCode != "" || e.entry() != v6Entry || !r.Check.GetPassed() {
 		t.Fatalf("enable with a fresh check: %+v (entry %q)", r, e.entry())
 	}
+	enabled, err := e.st.Node(e.ctx, e.target.nodeID)
+	if err != nil || enabled.IPv6().EnabledAt != e.clock.now().Unix() {
+		t.Fatalf("enabled_at = %d, err %v", enabled.IPv6().EnabledAt, err)
+	}
 	assertNoPortCommands(t, e.targetConn, e.senderConn)
 	if _, err := e.call(store.RoleOwner, actDisable, ""); err != nil {
 		t.Fatal(err)
+	}
+	disabled, err := e.st.Node(e.ctx, e.target.nodeID)
+	if err != nil || disabled.IPv6().EnabledAt != 0 {
+		t.Fatalf("disabled enabled_at = %d, err %v", disabled.IPv6().EnabledAt, err)
 	}
 
 	// a check made nine minutes ago still counts, one made eleven minutes ago does not (the call checks again)

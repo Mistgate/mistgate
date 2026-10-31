@@ -96,15 +96,22 @@ func TestNodeGetShowsTheIPv6EntryWithoutTheAddress(t *testing.T) {
 
 func TestNodeIPv6EnableWaitsForTheOwnerThenTurnsTheEntryOn(t *testing.T) {
 	e := newTestEnv(t)
-	e.w.ipv6Node = map[string]*adminv1.NodeIpv6{nodeA: supportedIPv6()}
+	x := supportedIPv6()
+	x.Src = "2001:db8::99" // outbound source is temporary; the plan uses the first stable address instead
+	e.w.ipv6Node = map[string]*adminv1.NodeIpv6{nodeA: x}
 	_, secret := e.token(ProfileAdmin)
 	s := e.session(secret)
 
-	p := planOf(t, s, "node_ipv6", map[string]any{"node": "de1", "action": "enable", "reason": "people on one operator cannot reach de1"})
+	planJSON := mustOK(t, s, "node_ipv6_plan", map[string]any{"node": "de1", "action": "enable", "reason": "people on one operator cannot reach de1"})
+	if strings.Contains(planJSON, canaryAddr6) || strings.Contains(planJSON, x.Src) {
+		t.Fatalf("the plan response exposed a node address: %s", planJSON)
+	}
+	p := decode[PlanOut](t, planJSON)
 	if !p.NeedsApproval || len(p.Danger) != 1 || p.Danger[0] != dangerFleet {
 		t.Fatalf("plan: %+v", p)
 	}
-	if st := storedPlan(t, e, p.PlanID); st.Status != StatusAwaiting || st.Tool != "node_ipv6" {
+	st := storedPlan(t, e, p.PlanID)
+	if st.Status != StatusAwaiting || st.Tool != "node_ipv6" || !strings.Contains(st.ParamsJSON, canaryAddr6) {
 		t.Fatalf("stored plan: %+v", st)
 	}
 	if f := factOf(t, p, "node"); f.Value != "de1" || !f.Untrusted {
@@ -135,7 +142,7 @@ func TestNodeIPv6EnableWaitsForTheOwnerThenTurnsTheEntryOn(t *testing.T) {
 	if ap.Status != StatusApplied || !strings.Contains(ap.Result, "IPv6 entry is on") {
 		t.Fatalf("apply: %+v", ap)
 	}
-	if len(e.w.ipv6Updates) != 1 || e.w.ipv6Updates[0].GetNodeId() != nodeA || e.w.ipv6Updates[0].GetAction() != adminv1.Ipv6EntryAction_IPV6_ENTRY_ACTION_ENABLE || e.w.ipv6Updates[0].GetAddress() != "" {
+	if len(e.w.ipv6Updates) != 1 || e.w.ipv6Updates[0].GetNodeId() != nodeA || e.w.ipv6Updates[0].GetAction() != adminv1.Ipv6EntryAction_IPV6_ENTRY_ACTION_ENABLE || e.w.ipv6Updates[0].GetAddress() != canaryAddr6 {
 		t.Fatalf("UpdateIpv6Entry: %+v", e.w.ipv6Updates)
 	}
 	// the change goes out under the plan's grant, once
@@ -162,6 +169,26 @@ func TestNodeIPv6EnableWaitsForTheOwnerThenTurnsTheEntryOn(t *testing.T) {
 	}
 	if got := mustFail(t, s, "node_ipv6_plan", map[string]any{"node": "de1", "action": "disable"}); !strings.Contains(got, "already off") {
 		t.Errorf("disable while off: %q", got)
+	}
+}
+
+func TestNodeIPv6ApplyRefusesAnAddressThatStoppedBeingStable(t *testing.T) {
+	e := newTestEnv(t)
+	e.w.ipv6Node = map[string]*adminv1.NodeIpv6{nodeA: supportedIPv6()}
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	p := planOf(t, s, "node_ipv6", map[string]any{"node": "de1", "action": "enable"})
+	if err := e.plans.decide(p.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	e.w.mu.Lock()
+	e.w.ipv6Node[nodeA].Addresses = nil
+	e.w.mu.Unlock()
+	if got := applyError(t, s, "node_ipv6", p.ConfirmToken); !strings.Contains(got, "changed after the plan") {
+		t.Fatalf("apply after the address left the stable list: %q", got)
+	}
+	if len(e.w.ipv6Updates) != 0 || e.w.ipv6Node[nodeA].GetEntry() != "" {
+		t.Fatalf("entry update = %+v, entry %q", e.w.ipv6Updates, e.w.ipv6Node[nodeA].GetEntry())
 	}
 }
 

@@ -170,6 +170,8 @@ func (p tcpProto) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, e
 	switch s.TLS {
 	case "acme":
 		spec.TLS = plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: s.Name}
+	case "acme_ip":
+		spec.TLS = plugin.TLS{Mode: plugin.TLSAcmeIP, ServerName: s.Name}
 	case "self":
 		spec.TLS = plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: s.Name}
 	}

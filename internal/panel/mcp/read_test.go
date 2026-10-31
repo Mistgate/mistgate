@@ -67,6 +67,30 @@ func TestReadToolsLeakNothing(t *testing.T) {
 	}
 }
 
+func TestAuditSearchDropsNodeAddressesFromParams(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	v := decode[AuditV](t, mustOK(t, s, "audit_search", map[string]any{}))
+	if len(v.Entries) != 1 {
+		t.Fatalf("entries = %+v", v.Entries)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(v.Entries[0].Params), &params); err != nil {
+		t.Fatalf("params %q: %v", v.Entries[0].Params, err)
+	}
+	if _, ok := params["address"]; ok {
+		t.Errorf("address returned in params: %v", params)
+	}
+	if _, ok := params["addr"]; ok {
+		t.Errorf("addr returned in params: %v", params)
+	}
+	nested, _ := params["nested"].(map[string]any)
+	if _, ok := nested["address"]; ok || nested["keep"] != "yes" || params["k"] == nil {
+		t.Errorf("params after address removal = %v", params)
+	}
+}
+
 // checks_results splits the response time from the connect time and names the UDP loss of the panel's host.
 func TestChecksResultsContent(t *testing.T) {
 	e := newTestEnv(t)

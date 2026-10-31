@@ -18,6 +18,8 @@ const ipv6KeepChecks = 4
 // state, the address being retired and until when), so reading an older document needs no migration; a field that is absent
 // reads as its zero value.
 type IPv6State struct {
+	// EnabledAt is when the current entry was enabled (unix seconds). Older documents have no timestamp.
+	EnabledAt int64 `json:"enabled_at,omitempty"`
 	// Checks are the latest outside checks, one per address, newest first.
 	Checks []IPv6Check `json:"checks,omitempty"`
 }

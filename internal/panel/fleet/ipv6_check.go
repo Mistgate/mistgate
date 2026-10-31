@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
 	"github.com/mistgate/mistgate/internal/udpcheck"
@@ -29,9 +30,9 @@ var ErrIPv6Address = errors.New("fleet: not a global IPv6 address")
 //
 // Who sends: another node whose doctor says that outbound IPv6 works and that lists the capability, two at most per half, ordered
 // as the port check orders them; the panel itself only after those and only when it has IPv6 and is not on the node's host.
-// If no sender could run a half, Globalping may connect to one TLS port from two probes (IPv6Check.By = globalping): that proves
-// the address answers a connection, not that it is this node's, and the result says so by its By. Without any of these the check
-// is "no_ipv6_verifier": an address nobody could test is never passed.
+// Only when no needed half has any sender may Globalping connect to one TLS port from two probes (IPv6Check.By = globalping):
+// that proves the address answers a connection, not that it is this node's, and the result says so by its By. A sender that
+// cannot run or a missing half fails closed; an address nobody could test is never passed.
 //
 // The whole node-side run holds the node's port-check gate (acquirePortCheck): the node has one UDP counter table. Nothing is
 // written to port_check or tcp_check (those are the main address's); the check is returned and audited as node.ipv6_check.
@@ -66,13 +67,17 @@ func senderRef(s portSender) ipv6Sender {
 
 // ipv6Run is the part of a check that the node's own senders do.
 type ipv6Run struct {
-	udp, tcp []store.IPv6Verdict
-	udpBy    ipv6Sender
-	tcpBy    ipv6Sender
-	ranUDP   bool
-	ranTCP   bool
-	needUDP  bool
-	needTCP  bool
+	udp, tcp   []store.IPv6Verdict
+	udpBy      ipv6Sender
+	tcpBy      ipv6Sender
+	udpCode    string
+	tcpCode    string
+	udpSenders int
+	tcpSenders int
+	ranUDP     bool
+	ranTCP     bool
+	needUDP    bool
+	needTCP    bool
 }
 
 func (f *Fleet) checkIPv6(ctx context.Context, node store.NodeRow, chk *store.IPv6Check) {
@@ -82,13 +87,7 @@ func (f *Fleet) checkIPv6(ctx context.Context, node store.NodeRow, chk *store.IP
 		chk.Code = "failed"
 		return
 	}
-	var tcp []tcpTarget
-	for _, t := range tcpTargets(specs, pins) {
-		if t.Port != 80 {
-			tcp = append(tcp, t)
-		}
-	}
-	udp := ipv6UDPPorts(specs)
+	tcp, udp := ipv6CheckTargets(specs, pins)
 	if len(tcp) == 0 && len(udp) == 0 {
 		chk.Code = "nothing_to_check"
 		return
@@ -105,17 +104,61 @@ func (f *Fleet) checkIPv6(ctx context.Context, node store.NodeRow, chk *store.IP
 		chk.Code = code
 		return
 	}
-	if run != nil {
-		by := run.tcpBy
-		if by.id == "" {
-			by = run.udpBy
-		}
-		chk.By, chk.Sender = by.id, by.name
-		chk.Verdicts = append(append(chk.Verdicts, run.tcp...), run.udp...)
-		chk.Pass = ipv6Passed(chk.Verdicts)
+	if run == nil {
+		chk.Code = "failed"
 		return
 	}
-	f.ipv6ByGlobalping(ctx, chk, tcp)
+	chk.Verdicts = append(append(chk.Verdicts, run.tcp...), run.udp...)
+	by := run.tcpBy
+	if by.id == "" {
+		by = run.udpBy
+	}
+	chk.By, chk.Sender = by.id, by.name
+	if run.udpSenders == 0 && run.tcpSenders == 0 {
+		f.ipv6ByGlobalping(ctx, chk, tcp)
+		return
+	}
+	if code := run.failureCode(); code != "" {
+		chk.Code = code
+		return
+	}
+	chk.Pass = ipv6Passed(chk.Verdicts)
+}
+
+func ipv6CheckTargets(specs []tcpSpec, pins map[string]string) ([]tcpTarget, []uint16) {
+	var supported []tcpSpec
+	for _, s := range specs {
+		if protocols.IPv6Unsupported(s.Spec) == "" {
+			supported = append(supported, s)
+		}
+	}
+	var tcp []tcpTarget
+	for _, t := range tcpTargets(supported, pins) {
+		if t.Port != 80 {
+			tcp = append(tcp, t)
+		}
+	}
+	udp := ipv6UDPPorts(supported)
+	return tcp, udp
+}
+
+func (r *ipv6Run) failureCode() string {
+	if r.needUDP && r.udpSenders > 0 && !r.ranUDP {
+		if r.udpCode != "" {
+			return r.udpCode
+		}
+		return "failed"
+	}
+	if r.needTCP && r.tcpSenders > 0 && !r.ranTCP {
+		if r.tcpCode != "" {
+			return r.tcpCode
+		}
+		return "failed"
+	}
+	if (r.needUDP && r.udpSenders == 0) || (r.needTCP && r.tcpSenders == 0) {
+		return "no_ipv6_verifier"
+	}
+	return ""
 }
 
 // ipv6UDPPorts are the listen ports of the node's enabled UDP servers, at most udpcheck.MaxPorts, in order.
@@ -143,8 +186,8 @@ func ipv6Passed(v []store.IPv6Verdict) bool {
 	return len(v) > 0
 }
 
-// ipv6OnNodes runs the halves with the nodes (and last the panel) that can send over IPv6. run is nil, with an empty code, when
-// a half that was needed had no sender that ran it: the caller then falls back to Globalping. A code is final (the node is not
+// ipv6OnNodes runs the halves with the nodes (and last the panel) that can send over IPv6. It records which halves had senders
+// and which ran so the caller can preserve the verdicts of a half when the other did not run. A code is final (the node is not
 // there to be checked).
 func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string, tcp []tcpTarget, udp []uint16) (*ipv6Run, string) {
 	liveRows, err := f.Live(ctx)
@@ -188,13 +231,14 @@ func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string
 
 	run := &ipv6Run{needUDP: len(udp) > 0, needTCP: len(tcp) > 0}
 	if run.needUDP {
-		run.udp, run.udpBy, run.ranUDP = f.ipv6UDP(ctx, node, targetLive, senders(capUDPCheck), addr, udp)
+		available := senders(capUDPCheck)
+		run.udpSenders = len(available)
+		run.udp, run.udpBy, run.ranUDP, run.udpCode = f.ipv6UDP(ctx, node, targetLive, available, addr, udp)
 	}
 	if run.needTCP {
-		run.tcp, run.tcpBy, run.ranTCP = f.ipv6TCP(ctx, addr, senders(capTCPCheck), tcp)
-	}
-	if (run.needUDP && !run.ranUDP) || (run.needTCP && !run.ranTCP) {
-		return nil, ""
+		available := senders(capTCPCheck)
+		run.tcpSenders = len(available)
+		run.tcp, run.tcpBy, run.ranTCP, run.tcpCode = f.ipv6TCP(ctx, addr, available, tcp)
 	}
 	return run, ""
 }
@@ -216,12 +260,16 @@ func (f *Fleet) panelMaySend(ctx context.Context, addr string) bool {
 
 // ipv6UDP is the UDP half: the first sender that runs it. An inconclusive run (no port delivered) is asked once more of the
 // next sender, as the port check does; its answer is "broken" for every port, which is a finding.
-func (f *Fleet) ipv6UDP(ctx context.Context, node store.NodeRow, targetLive store.NodeLiveRow, senders []portSender, addr string, ports []uint16) (verdicts []store.IPv6Verdict, by ipv6Sender, ran bool) {
+func (f *Fleet) ipv6UDP(ctx context.Context, node store.NodeRow, targetLive store.NodeLiveRow, senders []portSender, addr string, ports []uint16) (verdicts []store.IPv6Verdict, by ipv6Sender, ran bool, code string) {
+	lastCode := "failed"
 	for i, sender := range senders {
 		out := f.runPortCheckAttempt(ctx, node, targetLive, sender, portDial{Host: addr}, ports)
 		if len(out.checks) == 0 || (out.errorCode != "" && out.errorCode != "inconclusive") {
+			if out.errorCode != "" && out.errorCode != "inconclusive" {
+				lastCode = out.errorCode
+			}
 			if ctx.Err() != nil {
-				return nil, ipv6Sender{}, false
+				return nil, ipv6Sender{}, false, "failed"
 			}
 			continue // busy, no route or a failed command: this sender did not run it
 		}
@@ -233,16 +281,24 @@ func (f *Fleet) ipv6UDP(ctx context.Context, node store.NodeRow, targetLive stor
 			break
 		}
 	}
-	return verdicts, by, ran
+	if len(senders) == 0 {
+		lastCode = ""
+	}
+	if ran {
+		lastCode = ""
+	}
+	return verdicts, by, ran, lastCode
 }
 
 // ipv6TCP is the TCP half: one sender probes every target; a sender that could not (busy, no route, failed) is replaced.
-func (f *Fleet) ipv6TCP(ctx context.Context, addr string, senders []portSender, targets []tcpTarget) (verdicts []store.IPv6Verdict, by ipv6Sender, ran bool) {
+func (f *Fleet) ipv6TCP(ctx context.Context, addr string, senders []portSender, targets []tcpTarget) (verdicts []store.IPv6Verdict, by ipv6Sender, ran bool, code string) {
+	lastCode := "failed"
 	for _, sender := range senders {
 		got, code := f.probeTCPTargets(ctx, addr, sender, targets, nil, nil)
 		if code != "" {
+			lastCode = code
 			if ctx.Err() != nil {
-				return nil, ipv6Sender{}, false
+				return nil, ipv6Sender{}, false, "failed"
 			}
 			continue
 		}
@@ -253,9 +309,12 @@ func (f *Fleet) ipv6TCP(ctx context.Context, addr string, senders []portSender, 
 			}
 			verdicts = append(verdicts, store.IPv6Verdict{Net: "tcp", Port: t.Port, Verdict: v})
 		}
-		return verdicts, senderRef(sender), true
+		return verdicts, senderRef(sender), true, ""
 	}
-	return nil, ipv6Sender{}, false
+	if len(senders) == 0 {
+		lastCode = ""
+	}
+	return nil, ipv6Sender{}, false, lastCode
 }
 
 // ipv6ByGlobalping is the last resort: one TLS port, two probes anywhere. A connection that opens says the address is

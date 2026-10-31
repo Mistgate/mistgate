@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import { en } from "@/i18n/en";
 import { useWays, WaysTab } from "./ways";
 
 const listRelays = vi.fn();
@@ -193,7 +194,7 @@ describe("the New way in dialog", () => {
     const off = dialog().querySelector<HTMLElement>("[data-testid=way-option-off]")!;
     expect(off.getAttribute("aria-disabled")).toBe("true");
     expect(off.tagName).toBe("DIV");
-    expect(off.textContent).toContain("The IPv6 entry is not in Mistgate yet: it comes in a later version.");
+    expect(off.textContent).toContain(en["ways.ipv6.later"]);
     expect(off.querySelector("button, [tabindex]")).toBeNull();
 
     await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.startsWith("Through another node")));

@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -523,7 +524,7 @@ func readTools() []toolDef {
 					v.Entries = append(v.Entries, auditV{
 						ID: e.GetId(), Time: e.GetTimeUnix(), Source: enumName("AUDIT_SOURCE_", e.GetSource().String()),
 						ActorID: clean(e.GetActorId(), 80), ActorName: nm(e.GetActorName()), Action: clean(e.GetAction(), 80),
-						Params: clean(e.GetParamsJson(), maxAuditParams), Result: clean(e.GetResult(), 60), IP: clean(e.GetIp(), 64),
+						Params: auditParamsWithoutAddresses(e.GetParamsJson()), Result: clean(e.GetResult(), 60), IP: clean(e.GetIp(), 64),
 					})
 				}
 				v.NextBeforeID = r.Msg.GetNextBeforeId()
@@ -540,6 +541,50 @@ func readTools() []toolDef {
 				return updatesView(r.Msg), nil
 			}),
 	}
+}
+
+func auditParamsWithoutAddresses(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	var params map[string]json.RawMessage
+	if json.Unmarshal([]byte(raw), &params) != nil || params == nil {
+		return "{}"
+	}
+	scrubbed, ok := scrubAuditJSON(json.RawMessage(raw))
+	if !ok {
+		return "{}"
+	}
+	return clean(string(scrubbed), maxAuditParams)
+}
+
+func scrubAuditJSON(raw json.RawMessage) (json.RawMessage, bool) {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) == nil && object != nil {
+		delete(object, "address")
+		delete(object, "addr")
+		for key, value := range object {
+			if nested, ok := scrubAuditJSON(value); ok {
+				object[key] = nested
+			}
+		}
+		b, err := json.Marshal(object)
+		return b, err == nil
+	}
+	var array []json.RawMessage
+	if json.Unmarshal(raw, &array) == nil && array != nil {
+		for i, value := range array {
+			if nested, ok := scrubAuditJSON(value); ok {
+				array[i] = nested
+			}
+		}
+		b, err := json.Marshal(array)
+		return b, err == nil
+	}
+	if !json.Valid(raw) {
+		return nil, false
+	}
+	return raw, true
 }
 
 func listLimit(n int) int {

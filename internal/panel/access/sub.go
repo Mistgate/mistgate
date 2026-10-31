@@ -554,7 +554,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			}
 			// The IPv6 twin of the server comes first: the node's own address over IPv6, then the twins through its relays (those
 			// are copies of the server itself, never of this twin, so a relay's twin is not doubled for IPv6).
-			if addr := ipv6EntryAddr(f.Node); addr != "" && ipv6Unsupported(spec) == "" {
+			if addr := ipv6EntryAddr(f.Node); addr != "" && protocols.IPv6Unsupported(spec) == "" {
 				twin := srv
 				twin.Mark = MarkIPv6
 				tin := ipv6Input(in, addr)
@@ -595,7 +595,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			if _, ok := proto.Render(in); ok {
 				n := nodeOf(f)
 				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
-				if ipv6EntryAddr(f.Node) != "" && ipv6Unsupported(spec) == "" { // its IPv6 twin is Mihomo-only as well
+				if ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "" { // its IPv6 twin is Mihomo-only as well
 					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, IPv6: true})
 				}
 				for _, l := range relaysOf[f.Inbound.ID] { // its twins are Mihomo-only as well
@@ -656,19 +656,6 @@ func ipv6EntryAddr(n store.AccessNode) string {
 		return ""
 	}
 	return addr
-}
-
-// ipv6Unsupported says why a server has no IPv6 twin, "" when it has: people reach a CDN server through the CDN, not the node's
-// address, and a certificate issued for the node's IPv4 address does not fit its IPv6 one. Every other server keeps its names,
-// keys, REALITY target and certificate pin: they do not depend on the address that is dialled.
-func ipv6Unsupported(spec plugin.InboundSpec) string {
-	switch {
-	case spec.TLS.Mode == plugin.TLSAcmeIP:
-		return "acme_ip"
-	case serverCDN(spec):
-		return "cdn"
-	}
-	return ""
 }
 
 // ipv6Input is the render input of the server at the node's IPv6 entry: the same settings, SNI, keys and pin, only the address

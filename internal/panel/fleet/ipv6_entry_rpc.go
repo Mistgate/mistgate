@@ -103,6 +103,7 @@ func (f *Fleet) enableIPv6Entry(ctx context.Context, m *adminv1.UpdateIpv6EntryR
 		}
 	}
 	errStale := errors.New("stale check")
+	enabledAt := f.now().Unix()
 	_, changed, err := f.st.UpdateIPv6(ctx, n.ID, func(cur store.IPv6Row) (store.IPv6Row, error) {
 		switch {
 		case cur.Entry == addr:
@@ -114,6 +115,7 @@ func (f *Fleet) enableIPv6Entry(ctx context.Context, m *adminv1.UpdateIpv6EntryR
 			return cur, errStale
 		}
 		cur.Entry = addr
+		cur.State.EnabledAt = enabledAt
 		return cur, nil
 	})
 	switch {
@@ -138,6 +140,7 @@ func (f *Fleet) disableIPv6Entry(ctx context.Context, m *adminv1.UpdateIpv6Entry
 	was := ""
 	_, changed, err := f.st.UpdateIPv6(ctx, m.NodeId, func(cur store.IPv6Row) (store.IPv6Row, error) {
 		was, cur.Entry = cur.Entry, ""
+		cur.State.EnabledAt = 0
 		return cur, nil
 	})
 	switch {

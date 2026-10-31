@@ -3,7 +3,6 @@ package access
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"net"
 	"slices"
@@ -15,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -230,20 +230,10 @@ func relayUnsupported(protocol string, spec plugin.InboundSpec) string {
 		return "awg"
 	case spec.TLS.Mode == plugin.TLSAcmeIP:
 		return "acme_ip"
-	case serverCDN(spec):
+	case protocols.ServerCDN(spec):
 		return "cdn"
 	}
 	return ""
-}
-
-// serverCDN: the server is reached through a CDN host (settings.cdn.host), not the node's address.
-func serverCDN(spec plugin.InboundSpec) bool {
-	var s struct {
-		CDN *struct {
-			Host string `json:"host"`
-		} `json:"cdn"`
-	}
-	return len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &s) == nil && s.CDN != nil && s.CDN.Host != ""
 }
 
 func relayCheckMsg(c store.RelayCheck, nameOf func(string) string) *adminv1.RelayCheck {

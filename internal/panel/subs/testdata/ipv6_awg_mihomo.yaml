@@ -1,0 +1,176 @@
+proxies:
+  - name: "p"
+    type: hysteria2
+    server: "de1.example.com"
+    port: 443
+    password: "<secret>"
+    obfs: salamander
+    obfs-password: "<secret>"
+    sni: "de1.example.com"
+    skip-cert-verify: false
+    alpn: [h3]
+  - name: "p · IPv6"
+    type: hysteria2
+    server: "2001:db8::5"
+    port: 443
+    password: "<secret>"
+    obfs: salamander
+    obfs-password: "<secret>"
+    sni: "de1.example.com"
+    skip-cert-verify: false
+    alpn: [h3]
+  - name: "awg31"
+    type: wireguard
+    server: "de1.example.com"
+    port: 0
+    ip: "<secret>"
+    ipv6: "fd66:66:0:1::2/128"
+    private-key: "<secret>"
+    public-key: "<secret>"
+    pre-shared-key: "<secret>"
+    allowed-ips:
+      - "0.0.0.0/0"
+      - "::/0"
+    udp: true
+    mtu: 1280
+    persistent-keepalive: 0
+    remote-dns-resolve: true
+    dns:
+      - "1.1.1.1"
+      - "8.8.8.8"
+    amnezia-wg-option:
+      version: 3
+      jc: 0
+      jmin: 0
+      jmax: 0
+      s1: 0
+      s2: 0
+      s3: 0
+      s4: 0
+      h1: "1"
+      h2: "2"
+      h3: "3"
+      h4: "4"
+      i1: "<generated>"
+      i2: "<generated>"
+      i3: "<generated>"
+      header-protection-key: "<secret>"
+      content-padding-addition: "<generated>"
+      rekey-after-time: "<generated>"
+      rekey-timeout: "<generated>"
+      reject-after-time: "<generated>"
+      keepalive-timeout: "<generated>"
+      max-handshake-attempts: "<generated>"
+      random-trailers: true
+      disable-cookies: true
+  - name: "awg31 · IPv6"
+    type: wireguard
+    server: "2001:db8::5"
+    port: 0
+    ip: "<secret>"
+    ipv6: "fd66:66:0:1::2/128"
+    private-key: "<secret>"
+    public-key: "<secret>"
+    pre-shared-key: "<secret>"
+    allowed-ips:
+      - "0.0.0.0/0"
+      - "::/0"
+    udp: true
+    mtu: 1280
+    persistent-keepalive: 0
+    remote-dns-resolve: true
+    dns:
+      - "1.1.1.1"
+      - "8.8.8.8"
+    amnezia-wg-option:
+      version: 3
+      jc: 0
+      jmin: 0
+      jmax: 0
+      s1: 0
+      s2: 0
+      s3: 0
+      s4: 0
+      h1: "1"
+      h2: "2"
+      h3: "3"
+      h4: "4"
+      i1: "<generated>"
+      i2: "<generated>"
+      i3: "<generated>"
+      header-protection-key: "<secret>"
+      content-padding-addition: "<generated>"
+      rekey-after-time: "<generated>"
+      rekey-timeout: "<generated>"
+      reject-after-time: "<generated>"
+      keepalive-timeout: "<generated>"
+      max-handshake-attempts: "<generated>"
+      random-trailers: true
+      disable-cookies: true
+proxy-groups:
+  - name: "Mistgate"
+    type: select
+    proxies:
+      - "p"
+      - "p · IPv6"
+      - "awg31"
+      - "awg31 · IPv6"
+      - "DIRECT"
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - "1.1.1.1#Mistgate"
+    - "8.8.8.8#Mistgate"
+    - "1.0.0.1#Mistgate"
+    - "8.8.4.4#Mistgate"
+  nameserver-policy:
+    "+.ru":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.su":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.xn--p1ai":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.yandex.com":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.yandex.net":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.yastatic.net":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.vk.com":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.userapi.com":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.sberbank.com":
+      - "77.88.8.8"
+      - "77.88.8.1"
+    "+.vtb.com":
+      - "77.88.8.8"
+      - "77.88.8.1"
+  proxy-server-nameserver:
+    - "1.1.1.1"
+    - "8.8.8.8"
+    - "1.0.0.1"
+    - "8.8.4.4"
+rules:
+  - "DOMAIN-SUFFIX,ru,DIRECT"
+  - "DOMAIN-SUFFIX,su,DIRECT"
+  - "DOMAIN-SUFFIX,xn--p1ai,DIRECT"
+  - "DOMAIN-SUFFIX,yandex.com,DIRECT"
+  - "DOMAIN-SUFFIX,yandex.net,DIRECT"
+  - "DOMAIN-SUFFIX,yastatic.net,DIRECT"
+  - "DOMAIN-SUFFIX,vk.com,DIRECT"
+  - "DOMAIN-SUFFIX,userapi.com,DIRECT"
+  - "DOMAIN-SUFFIX,sberbank.com,DIRECT"
+  - "DOMAIN-SUFFIX,vtb.com,DIRECT"
+  - "MATCH,Mistgate"
