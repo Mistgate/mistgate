@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,6 +150,64 @@ func TestSessionLifetimes(t *testing.T) {
 	st.R.QueryRow(`SELECT count(*) FROM session WHERE token_hash = ?`, []byte(cookie.Value)).Scan(&n)
 	if n != 0 {
 		t.Error("plaintext session token stored")
+	}
+}
+
+// Logout is public: a call without a session (none, or a forged cookie) must not write to the audit log, which is
+// never pruned, or anyone who reaches the admin could grow it at the request rate. A real logout is audited once.
+func TestLogoutAuditsOnlyARealSession(t *testing.T) {
+	s, st, _ := newTestService(t)
+	ctx := context.Background()
+	a := makeAdmin(t, s, st)
+	count := func() int {
+		t.Helper()
+		rows, err := st.ListAudit(ctx, "", 0, 500)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		for _, r := range rows {
+			if r.Action == "logout" {
+				n++
+			}
+		}
+		return n
+	}
+	logout := func(cookie string) {
+		t.Helper()
+		req := connect.NewRequest(&adminv1.LogoutRequest{})
+		if cookie != "" {
+			req.Header().Set("Cookie", CookieName+"="+cookie)
+		}
+		resp, err := s.Logout(ctx, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c := resp.Header().Get("Set-Cookie"); !strings.Contains(c, CookieName+"=") || !strings.Contains(c, "Max-Age=0") {
+			t.Errorf("logout did not clear the cookie: %q", c)
+		}
+	}
+	for range 50 {
+		logout("")
+		logout("forged-session-token")
+	}
+	if n := count(); n != 0 {
+		t.Fatalf("anonymous logouts wrote %d audit rows", n)
+	}
+	cookie, err := s.newSession(ctx, a.ID, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logout(cookie.Value)
+	if n := count(); n != 1 {
+		t.Fatalf("a real logout wrote %d audit rows, want 1", n)
+	}
+	if _, err := s.resolve(ctx, cookie.Value); err == nil {
+		t.Fatal("the session survived the logout")
+	}
+	logout(cookie.Value) // the cookie of a session that is gone: nothing more to audit
+	if n := count(); n != 1 {
+		t.Fatalf("a second logout with a dead cookie was audited: %d rows", n)
 	}
 }
 
