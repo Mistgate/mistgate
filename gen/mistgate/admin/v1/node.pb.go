@@ -259,8 +259,10 @@ type Node struct {
 	// The connected or last-seen agent lists "user-rate-limit/1", so it applies the per-person speed limit
 	// (User.speed_limit_bps). False: this node holds people to the smaller of their two limits per device instead.
 	UserRateLimitSupported bool `protobuf:"varint,34,opt,name=user_rate_limit_supported,json=userRateLimitSupported,proto3" json:"user_rate_limit_supported,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Operator notes for the admin list. Not included in user pages or subscription names.
+	Notes         string `protobuf:"bytes,35,opt,name=notes,proto3" json:"notes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Node) Reset() {
@@ -529,6 +531,13 @@ func (x *Node) GetUserRateLimitSupported() bool {
 		return x.UserRateLimitSupported
 	}
 	return false
+}
+
+func (x *Node) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
 }
 
 // The automatic preparation of the kernel module, as the panel last learned it from the node.
@@ -4035,8 +4044,7 @@ var File_mistgate_admin_v1_node_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\xfc\n" +
-	"\n" +
+	"\x1cmistgate/admin/v1/node.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1dmistgate/admin/v1/fleet.proto\"\x92\v\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -4077,7 +4085,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\x13decoy_own_available\x18\x1f \x01(\bR\x11decoyOwnAvailable\x12(\n" +
 	"\x10decoy_agent_mode\x18  \x01(\tR\x0edecoyAgentMode\x12,\n" +
 	"\x12decoy_agent_sha256\x18! \x01(\tR\x10decoyAgentSha256\x129\n" +
-	"\x19user_rate_limit_supported\x18\" \x01(\bR\x16userRateLimitSupported\"\xc0\x01\n" +
+	"\x19user_rate_limit_supported\x18\" \x01(\bR\x16userRateLimitSupported\x12\x14\n" +
+	"\x05notes\x18# \x01(\tR\x05notes\"\xc0\x01\n" +
 	"\n" +
 	"AwgPrepare\x12\x1c\n" +
 	"\tsupported\x18\x01 \x01(\bR\tsupported\x128\n" +

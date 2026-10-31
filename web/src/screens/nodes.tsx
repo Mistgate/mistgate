@@ -256,7 +256,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             key={n.id}
             className={cx("relative grid min-h-[60px] items-center gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
           >
-            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0" />
+            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} title={n.notes?.trim() || undefined} className="absolute inset-0" />
             {select && <Tick select={select} node={n} />}
             <div className="flex min-w-0 items-center gap-3">
               <StatusDot kind={kind} />
@@ -266,6 +266,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
                   <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
                 </span>
                 <SubLine s={s} className="line-clamp-2 text-xs" />
+                <NodeNotes notes={n.notes} />
               </div>
             </div>
             <span title={n.address} className="font-mono text-xs break-all text-muted">
@@ -307,7 +308,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         );
         return (
           <div key={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
-            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
+            <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} title={n.notes?.trim() || undefined} className="absolute inset-0 rounded-card" />
             <div className="flex items-center gap-2">
               {select && <Tick select={select} node={n} />}
               <span className="flex h-5 items-center rounded-md bg-surface-2 px-1.5 font-mono text-[10px] font-bold text-muted">{n.countryCode || "—"}</span>
@@ -318,6 +319,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
                 {st.word(n)}
               </span>
             </div>
+            <NodeNotes notes={n.notes} />
             <div className="grid grid-cols-4 gap-2">
               {stat(String(onlineOf(n)), t("nodes.online"))}
               {stat(fmt.bytes(n.trafficTodayBytes), t("nodes.today"), t("nodes.todayHint"))}
@@ -339,4 +341,9 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
       })}
     </div>
   );
+}
+
+function NodeNotes({ notes }: { notes: string }) {
+  if (!notes?.trim()) return null;
+  return <p className="line-clamp-2 whitespace-pre-line break-words text-xs text-muted">{notes.trim()}</p>;
 }

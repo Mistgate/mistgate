@@ -24,8 +24,8 @@ vi.mock("@/lib/api", () => ({
   auth: { me: () => Promise.resolve({}) },
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, className }: { children?: ReactNode; to: string; className?: string }) => (
-    <a href={to} className={className}>
+  Link: ({ children, to, className, title }: { children?: ReactNode; to: string; className?: string; title?: string }) => (
+    <a href={to} className={className} title={title}>
       {children}
     </a>
   ),
@@ -52,6 +52,7 @@ const node = (name: string, over: Record<string, unknown> = {}) => ({
   countryCode: "DE",
   location: "",
   provider: "",
+  notes: "",
   address: `${name}.example.com`,
   status: NodeStatus.ONLINE,
   protocols: ["hysteria2"],
@@ -96,6 +97,23 @@ const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   await settle();
 };
+
+describe("node notes", () => {
+  it("shows plain-text notes in the table and mobile cards, with the full text on their links", async () => {
+    const notes = "<b>Renew in March</b>\n备用节点";
+    await mount([node("de1", { notes })]);
+    const summaries = [...document.querySelectorAll("p")].filter((p) => p.textContent === notes);
+    expect(summaries).toHaveLength(2);
+    expect(summaries.every((p) => p.querySelector("b") === null)).toBe(true);
+    expect([...document.querySelectorAll("a")].filter((a) => a.title === notes)).toHaveLength(2);
+  });
+
+  it("omits empty and whitespace-only notes", async () => {
+    await mount([node("de1"), node("fi1", { notes: " \n\t " })]);
+    expect(document.querySelectorAll("p")).toHaveLength(0);
+    expect(document.querySelectorAll("a[title]")).toHaveLength(0);
+  });
+});
 
 describe("ticking nodes", () => {
   it("shows how many are ticked, and clears them", async () => {
