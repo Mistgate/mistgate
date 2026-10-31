@@ -405,6 +405,10 @@ describe("doctor", () => {
   });
   it("gives the steps by hand for the checks the panel cannot fix itself", () => {
     expect(manualSteps(item({ id: "time_sync", status: DoctorStatus.WARN }))).toEqual([{ text: "hl.manual.time_sync", command: "timedatectl set-ntp true" }]);
+    expect(manualSteps(item({ id: "security_updates", status: DoctorStatus.WARN }))).toEqual([{
+      text: "hl.manual.security_updates",
+      command: "apt-get install unattended-upgrades && dpkg-reconfigure -plow unattended-upgrades",
+    }]);
     const port = manualSteps(item({ id: "port_conflicts", status: DoctorStatus.FAIL, params: { network: "udp", port: "8443", inbound_id: "inb_1" } }));
     expect(port.map((s) => s.command)).toEqual(["ss -lupn 'sport = :8443'", undefined]);
     expect(port[1]!.open).toEqual({ tab: "profiles", label: "hl.manual.port_moveBtn" });
@@ -488,6 +492,7 @@ describe("the server's vocabulary is covered", () => {
     "hl.fix.err.unsupported_host",
     "hl.fix.err.busy",
     "hl.fix.err.unit_refresh_invalid",
+    "hl.manual.security_updates",
     "node.reason.no_traffic",
     "node.reason.doctor_fail",
   ];
@@ -516,6 +521,7 @@ describe("the server's vocabulary is covered", () => {
       awg_backend: ["backend", "version", "mode", "reason", "hint", "unit_gen"],
       warp_path: ["state", "backend", "colo", "hint", "error", "inbounds"],
       unit_generation: ["unit_gen", "current"],
+      security_updates: [],
     };
     // what itemParams makes from them (doctor-detail.ts): the profile names and the optional pieces of a sentence
     const derived = ["profile", "profiles", "profiles_part", "server_part", "via", "colo_part", "left"];

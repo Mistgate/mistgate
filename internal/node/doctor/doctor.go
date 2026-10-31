@@ -55,23 +55,24 @@ func (s Status) String() string {
 
 // Check ids, in the order a full report lists them (agent.proto "CHECK IDS"). Append only.
 const (
-	CheckDiskSpace      = "disk_space"
-	CheckJournaldSize   = "journald_size"
-	CheckDstateTasks    = "dstate_tasks"
-	CheckTimeSync       = "time_sync"
-	CheckResolver       = "resolver"
-	CheckIPv6           = "ipv6"
-	CheckForeignVPN     = "foreign_vpn"
-	CheckForeignNft     = "foreign_nft"
-	CheckPortConflicts  = "port_conflicts"
-	CheckNetBaseline    = "net_baseline"
-	CheckCertExpiry     = "cert_expiry"
-	CheckMemoryPressure = "memory_pressure"
-	CheckCPUSoftirq     = "cpu_softirq"
-	CheckKernelHeaders  = "kernel_headers"
-	CheckAwgBackend     = "awg_backend"
-	CheckWarpPath       = "warp_path"
-	CheckUnitGeneration = "unit_generation"
+	CheckDiskSpace       = "disk_space"
+	CheckJournaldSize    = "journald_size"
+	CheckDstateTasks     = "dstate_tasks"
+	CheckTimeSync        = "time_sync"
+	CheckResolver        = "resolver"
+	CheckIPv6            = "ipv6"
+	CheckForeignVPN      = "foreign_vpn"
+	CheckForeignNft      = "foreign_nft"
+	CheckPortConflicts   = "port_conflicts"
+	CheckNetBaseline     = "net_baseline"
+	CheckCertExpiry      = "cert_expiry"
+	CheckMemoryPressure  = "memory_pressure"
+	CheckCPUSoftirq      = "cpu_softirq"
+	CheckKernelHeaders   = "kernel_headers"
+	CheckAwgBackend      = "awg_backend"
+	CheckWarpPath        = "warp_path"
+	CheckUnitGeneration  = "unit_generation"
+	CheckSecurityUpdates = "security_updates"
 )
 
 // Fix ids (agent.proto "FIX IDS").
@@ -137,6 +138,7 @@ var checks = []check{
 	{CheckAwgBackend, checkAwgBackend},
 	{CheckWarpPath, checkWarpPath},
 	{CheckUnitGeneration, checkUnitGeneration},
+	{CheckSecurityUpdates, checkSecurityUpdates},
 }
 
 // CheckIDs returns every check id in report order.

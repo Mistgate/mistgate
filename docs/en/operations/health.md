@@ -117,7 +117,7 @@ Whether the nodes open from inside a country (Russia by default) is checked by G
 
 ## Node doctor
 
-Every node agent runs 17 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
+Every node agent runs 18 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
 
 ### When it runs
 
@@ -150,6 +150,7 @@ Each item has one of four states: **OK**, **Attention** (a warning), **Problem**
 | AmneziaWG backend (`awg_backend`) | Which backend runs AmneziaWG: the kernel module or userspace. Skipped without an AmneziaWG profile. | The host firewall drops forwarded traffic (often Docker) | No working backend: no `/dev/net/tun`, an outdated service file, or no module in kernel mode | Refresh the service when `unit_outdated` is reported and the agent offers the fix |
 | WARP exit (`warp_path`) | The node's WARP tunnel and its routes. Skipped when the node has no WARP account and no profile exits through WARP. | WARP is paused while profiles exit through it, or the tunnel is up but its latest check failed | Profiles exit through WARP but the node has no account, the host clashes with WARP's routing table, rule priority or interface name, no WireGuard backend, or WARP is down | Check WARP / reconnect if down, when the tunnel is down or its latest check failed |
 | Unit generation (`unit_generation`) | Whether the systemd unit running the agent matches this build. Skipped when the agent was started by hand. | The unit is older than this build | None | Refresh the service; the agent restarts and connections can drop for a few seconds |
+| Security updates (`security_updates`) | On Debian and Ubuntu, checks whether unattended-upgrades is installed, whether the effective APT::Periodic settings enable package-list updates and unattended upgrades, and whether both apt-daily timers are enabled. It only reads; it never runs an upgrade. On Debian, the package's default origin pattern can include stable point releases too. | The package is missing or a setting/timer is off | None | No automatic fix; the Doctor shows a manual command |
 
 A node without IPv6 that runs WARP is fine: WARP uses its IPv4 endpoint, and the admin shows the IPv6 item as OK.
 

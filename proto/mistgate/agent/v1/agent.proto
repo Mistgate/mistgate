@@ -191,6 +191,7 @@ package mistgate.agent.v1;
 //                       egress warp. Params: state/backend/colo, hint not_configured | no_backend | paused |
 //                       table_in_use | rule_pref_in_use | interface_in_use
 //     unit_generation   the generation of the hardened systemd unit running this agent; manual runs SKIP. Params: unit_gen, current
+//     security_updates   unattended-upgrades, effective APT::Periodic settings and apt-daily timers on Debian/Ubuntu (WARN only; never FAIL)
 //   FIX IDS (stable; all avoid data loss and package installation). allow_forwarding is the only fix that edits
 //   a host-owned FORWARD chain: after owner confirmation, it inserts tagged ACCEPT rules only for new traffic from
 //   Mistgate AWG tunnels (not towards container bridges), replies to client-started connections, and current relay

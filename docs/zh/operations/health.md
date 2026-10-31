@@ -117,7 +117,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 
 ## 节点诊断
 
-每个节点 Agent 都会运行 17 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
+每个节点 Agent 都会运行 18 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
 
 ### 运行时间
 
@@ -150,6 +150,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | AmneziaWG 后端（`awg_backend`） | 检查 AmneziaWG 使用的后端：内核模块或用户态。没有 AmneziaWG 协议配置时会跳过。 | 主机防火墙丢弃转发流量（Docker 中常见） | 没有可用后端：缺少 `/dev/net/tun`、服务文件过旧，或内核模式下缺少模块 | 报告 `unit_outdated` 且 Agent 提供修复时刷新服务单元 |
 | WARP 出口（`warp_path`） | 检查节点的 WARP 隧道及路由。节点没有 WARP 账户且没有协议配置经 WARP 出口时会跳过。 | 协议配置经 WARP 出口时，WARP 处于暂停状态；或隧道已建立，但最近一次检测失败 | 协议配置经 WARP 出口，但节点没有账户；主机与 WARP 的路由表、规则优先级或接口名称冲突；没有 WireGuard 后端；或 WARP 离线 | 隧道离线或最近一次检测失败时，检查 WARP；如果离线则重连 |
 | 单元版本（`unit_generation`） | 检查运行 Agent 的 systemd 单元是否与当前构建版本一致。Agent 手动启动时会跳过。 | 单元版本早于当前构建 | 无 | 刷新服务单元；Agent 会重启，连接可能中断几秒 |
+| 安全更新（`security_updates`） | 在 Debian 和 Ubuntu 上检查 unattended-upgrades 是否已安装、有效的 APT::Periodic 设置及两个 apt-daily 定时器。此项只读取状态；不会安装更新。Debian 的默认软件源规则也可能包含稳定版更新。 | 未安装软件包，或设置/定时器已关闭 | 无 | 无自动修复；诊断项会显示手动命令 |
 
 没有 IPv6 但运行 WARP 的节点没有问题：WARP 使用 IPv4 端点；管理后台会将 IPv6 项显示为正常。
 

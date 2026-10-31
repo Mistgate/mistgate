@@ -783,6 +783,8 @@ export function manualSteps(i: DoctorItem): ManualStep[] {
   switch (i.id) {
     case "time_sync":
       return [{ text: "hl.manual.time_sync", command: "timedatectl set-ntp true" }];
+    case "security_updates":
+      return [{ text: "hl.manual.security_updates", command: "apt-get install unattended-upgrades && dpkg-reconfigure -plow unattended-upgrades" }];
     case "port_conflicts": {
       const steps: ManualStep[] = [];
       const flags = p.network === "tcp" ? "-ltpn" : "-lupn";

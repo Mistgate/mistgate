@@ -172,6 +172,7 @@ export const en = {
   "hl.doctor.manual": "Manual",
   // "Manual ▾": the steps of a check the panel cannot fix itself
   "hl.manual.time_sync": "Turn on time sync on the server (as root):",
+  "hl.manual.security_updates": "Turn them on by hand (as root):",
   "hl.manual.port_who": "See what holds port {port}:",
   "hl.manual.port_move": "Or move the profile to a free port on this node.",
   "hl.manual.port_moveBtn": "Change the profile’s port",
@@ -337,6 +338,7 @@ export const en = {
   "doctor.disk_space.title": "Disk space",
   "doctor.journald_size.title": "System journal size",
   "doctor.unit_generation.title": "Agent service unit",
+  "doctor.security_updates.title": "Security updates",
   "doctor.dstate_tasks.title": "Hung processes",
   "doctor.time_sync.title": "Clock",
   "doctor.resolver.title": "Server resolver",
@@ -355,6 +357,8 @@ export const en = {
     "{mount} is {used_pct}% full, {free_mb} MB free. A full disk stops logs, certificate renewal and the agent itself. If the journal is the big part, the fix trims it; otherwise free the space by hand.",
   "health.doctor.journald_size.why":
     "The system journal takes {journal_mb} MB while the cap is {cap_mb} MB, so the cap is not working. Trimming it is safe and loses only old log lines.",
+  "health.doctor.security_updates.why":
+    "Without automatic security updates a fixed hole in OpenSSH, OpenSSL or the kernel stays open on this server until someone logs in and runs apt. unattended-upgrades installs security fixes once a day from the server's own apt sources and never reboots it by itself. If you update this server another way, mark this as normal.",
   "health.doctor.unit_generation.why":
     "The agent runs from a systemd unit that sets its sandbox, its memory limits and the guard that rolls back a self-update that keeps crashing. A unit of generation {unit_gen} lacks parts of it; refreshing writes generation {current} from the template built into the agent’s own binary.",
   "health.doctor.dstate_tasks.why":
@@ -450,6 +454,11 @@ export const en = {
   "doctor.detail.unit_generation.unknown": "Unit generation {unit_gen} is unknown to this agent",
   "doctor.detail.unit_generation.other_unit": "The agent runs from another systemd unit, not mistgate-node.service: the panel does not refresh it",
   "doctor.detail.unit_generation.refresh_failed": "Refreshing the unit from generation {from_gen} to {to_gen} failed: {reason}. The node runs on its previous unit",
+  "doctor.detail.security_updates.on": "Automatic security updates are on",
+  "doctor.detail.security_updates.not_installed": "unattended-upgrades is not installed: security fixes arrive only when someone runs apt by hand",
+  "doctor.detail.security_updates.off": "Automatic updates are off: {off}",
+  "doctor.detail.security_updates.not_apt": "Not a Debian or Ubuntu host: only apt is checked",
+  "doctor.detail.security_updates.no_systemd": "systemd is not PID 1: the apt timers cannot run here",
   "doctor.detail.warp_path.no_manager": "This build has no WARP manager",
   "doctor.detail.warp_path.unused": "WARP is not used on this node",
   "doctor.detail.warp_path.not_configured": "Profiles with WARP egress ({profiles}) cannot start: the node has no WARP account",
@@ -701,6 +710,7 @@ export const ru: typeof en = {
   "hl.doctor.status.skip": "Пропущено",
   "hl.doctor.manual": "Вручную",
   "hl.manual.time_sync": "Включи синхронизацию времени на сервере (от root):",
+  "hl.manual.security_updates": "Включить вручную (от root):",
   "hl.manual.port_who": "Посмотри, кто держит порт {port}:",
   "hl.manual.port_move": "Или перенеси профиль на свободный порт на этой ноде.",
   "hl.manual.port_moveBtn": "Сменить порт профиля",
@@ -862,6 +872,7 @@ export const ru: typeof en = {
   "doctor.disk_space.title": "Место на диске",
   "doctor.journald_size.title": "Размер журнала systemd",
   "doctor.unit_generation.title": "Служба агента",
+  "doctor.security_updates.title": "Обновления безопасности",
   "doctor.dstate_tasks.title": "Зависшие процессы",
   "doctor.time_sync.title": "Часы",
   "doctor.resolver.title": "Резолвер сервера",
@@ -880,6 +891,8 @@ export const ru: typeof en = {
     "{mount} заполнен на {used_pct}%, свободно {free_mb} МБ. Полный диск останавливает журналы, продление сертификатов и самого агента. Если большая часть занята журналом, исправление его сожмёт; иначе освободи место вручную.",
   "health.doctor.journald_size.why":
     "Журнал systemd занимает {journal_mb} МБ при лимите {cap_mb} МБ, то есть лимит не работает. Сжатие безопасно: теряются только старые строки логов.",
+  "health.doctor.security_updates.why":
+    "Без автоматических обновлений безопасности закрытая дыра в OpenSSH, OpenSSL или ядре остаётся открытой на этом сервере, пока кто-то не зайдёт и не запустит apt. unattended-upgrades раз в день ставит исправления безопасности из собственных источников apt сервера и сам сервер не перезагружает. Если сервер обновляется иначе, отметьте это как норму.",
   "health.doctor.unit_generation.why":
     "Агент работает из службы systemd: она задаёт его песочницу, лимиты памяти и защиту, которая откатывает самообновление, если новая версия раз за разом падает. В службе поколения {unit_gen} части этого нет; обновление пишет поколение {current} по шаблону, встроенному в бинарник самого агента.",
   "health.doctor.dstate_tasks.why":
@@ -975,6 +988,11 @@ export const ru: typeof en = {
   "doctor.detail.unit_generation.unknown": "Поколение службы {unit_gen} этому агенту неизвестно",
   "doctor.detail.unit_generation.other_unit": "Агент запущен из другой службы systemd, не mistgate-node.service: обновлять её панель не будет",
   "doctor.detail.unit_generation.refresh_failed": "Не удалось обновить службу с поколения {from_gen} до {to_gen}: {reason}. Нода работает на прежней службе",
+  "doctor.detail.security_updates.on": "Автоматические обновления безопасности включены",
+  "doctor.detail.security_updates.not_installed": "unattended-upgrades не установлен: исправления безопасности приходят, только если кто-то запустит apt вручную",
+  "doctor.detail.security_updates.off": "Автоматические обновления выключены: {off}",
+  "doctor.detail.security_updates.not_apt": "Не Debian и не Ubuntu: проверяется только apt",
+  "doctor.detail.security_updates.no_systemd": "systemd не PID 1: таймеры apt здесь не работают",
   "doctor.detail.warp_path.no_manager": "В этой сборке нет менеджера WARP",
   "doctor.detail.warp_path.unused": "WARP на этой ноде не используется",
   "doctor.detail.warp_path.not_configured": "Профили с выходом через WARP ({profiles}) не стартуют: у ноды нет аккаунта WARP",
@@ -1221,6 +1239,7 @@ export const zh: typeof en = {
   "hl.doctor.status.skip": "已跳过",
   "hl.doctor.manual": "手动处理",
   "hl.manual.time_sync": "在服务器上开启时间同步（以 root 身份）：",
+  "hl.manual.security_updates": "手动开启（以 root 身份）：",
   "hl.manual.port_who": "查看是谁占用了端口 {port}：",
   "hl.manual.port_move": "或者把协议配置换到此节点上的空闲端口。",
   "hl.manual.port_moveBtn": "更改协议配置的端口",
@@ -1351,6 +1370,7 @@ export const zh: typeof en = {
   "doctor.disk_space.title": "磁盘空间",
   "doctor.journald_size.title": "系统日志大小",
   "doctor.unit_generation.title": "Agent 服务单元",
+  "doctor.security_updates.title": "安全更新",
   "doctor.dstate_tasks.title": "挂起的进程",
   "doctor.time_sync.title": "时钟",
   "doctor.resolver.title": "服务器 DNS 解析",
@@ -1366,6 +1386,7 @@ export const zh: typeof en = {
 
   "health.doctor.disk_space.why": "{mount} 已用 {used_pct}%，剩余 {free_mb} MB。磁盘写满会使日志、证书续期和 Agent 本身停止工作。如果大头是日志，修复操作会清理它；否则请手动释放空间。",
   "health.doctor.journald_size.why": "系统日志占用 {journal_mb} MB，而上限是 {cap_mb} MB，说明上限没有生效。清理是安全的，只会丢失旧的日志行。",
+  "health.doctor.security_updates.why": "没有自动安全更新时，OpenSSH、OpenSSL 或内核中已修复的漏洞会一直留在这台服务器上，直到有人登录并运行 apt。unattended-upgrades 每天从服务器自己的 apt 源安装安全修复，不会自行重启服务器。如果这台服务器用其他方式更新，请将此项标记为正常。",
   "health.doctor.unit_generation.why": "Agent 通过一个 systemd 单元运行，该单元设定了沙箱、内存限制，以及在自更新反复崩溃时回滚的保护。第 {unit_gen} 版的单元缺少其中一部分；刷新会用 Agent 自身二进制文件内置的模板写入第 {current} 版。",
   "health.doctor.dstate_tasks.why": "挂起的进程：{stuck}（{tasks}），在等待硬件。这样的主机很快就会不再响应 SSH 和 apt。节点上无法修复：请在服务商控制面板中重启它。",
   "health.doctor.dstate_tasks.why.qxl_ttm": "内核日志显示 QXL/TTM 显卡驱动卡死（某些服务商的虚拟机上会出现）。它会阻塞 apt 和 SSH 登录。只有在服务商控制面板中重启才有用。",
@@ -1446,6 +1467,11 @@ export const zh: typeof en = {
   "doctor.detail.unit_generation.unknown": "此 Agent 无法识别第 {unit_gen} 版单元",
   "doctor.detail.unit_generation.other_unit": "Agent 运行在另一个 systemd 单元中，而不是 mistgate-node.service：面板不会刷新它",
   "doctor.detail.unit_generation.refresh_failed": "将单元从第 {from_gen} 版刷新到第 {to_gen} 版失败：{reason}。节点继续使用之前的单元",
+  "doctor.detail.security_updates.on": "自动安全更新已开启",
+  "doctor.detail.security_updates.not_installed": "未安装 unattended-upgrades：只有手动运行 apt 时才会安装安全修复",
+  "doctor.detail.security_updates.off": "自动更新已关闭：{off}",
+  "doctor.detail.security_updates.not_apt": "不是 Debian 或 Ubuntu 主机：仅检查 apt",
+  "doctor.detail.security_updates.no_systemd": "systemd 不是 PID 1：apt 定时器无法运行",
   "doctor.detail.warp_path.no_manager": "此构建不含 WARP 管理器",
   "doctor.detail.warp_path.unused": "此节点未使用 WARP",
   "doctor.detail.warp_path.not_configured": "使用 WARP 出口的协议配置（{profiles}）无法启动：节点没有 WARP 账户",
