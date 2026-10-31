@@ -161,7 +161,8 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
       </SectionLabel>
       <Block>
         <TextField icon="tag" tone="lavender" label={t("node.add.name")} value={f.name} onChange={(e) => set("name", e.target.value.toLowerCase())} mono maxLength={24} error={errors.name} autoCapitalize="off" spellCheck={false} disabled={retired} />
-        <TextField icon="network" tone="sky" label={t("node.add.address")} value={f.address} onChange={(e) => set("address", e.target.value)} mono maxLength={253} error={errors.address} hint={t("node.settings.addressHint")} autoCapitalize="off" spellCheck={false} disabled={retired} />
+        {/* moving a node is the owner's call; the API refuses a helper that changes it */}
+        <TextField icon="network" tone="sky" label={t("node.add.address")} value={f.address} onChange={(e) => set("address", e.target.value)} mono maxLength={253} error={errors.address} hint={t(owner ? "node.settings.addressHint" : "node.settings.addressOwnerHint")} autoCapitalize="off" spellCheck={false} disabled={retired || !owner} />
         <div className="grid gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <SectionLabel as="span" icon="globe" tone="sand">

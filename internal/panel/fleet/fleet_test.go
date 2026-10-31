@@ -1343,6 +1343,18 @@ func TestAdminNodeAndFleetViews(t *testing.T) {
 	if code(up(&adminv1.UpdateNodeRequest{DnsResolvers: &adminv1.DnsResolvers{Values: []string{"not an ip"}}})) != connect.CodeInvalidArgument {
 		t.Error("bad resolver accepted")
 	}
+	// Notes: line breaks and tabs are allowed and count toward the 500 characters like any other; other control
+	// characters are not.
+	for _, n := range []string{strings.Repeat("\n", 501), strings.Repeat("\t", 300) + strings.Repeat("x", 201), strings.Repeat("я", 501), "bell\a", "nul\x00", "del\x7f", "esc\x1b[2J"} {
+		if code(up(&adminv1.UpdateNodeRequest{Notes: &n})) != connect.CodeInvalidArgument {
+			t.Errorf("notes %q (%d bytes) accepted", n[:min(len(n), 16)], len(n))
+		}
+	}
+	for _, n := range []string{"line one\r\nline two\n\tindented", strings.Repeat("\n", 250) + strings.Repeat("я", 250), ""} {
+		if err := up(&adminv1.UpdateNodeRequest{Notes: &n}); err != nil {
+			t.Errorf("notes %q refused: %v", n[:min(len(n), 16)], err)
+		}
+	}
 	notes, loc := "hoster blocks udp", "Tallinn"
 	if err := up(&adminv1.UpdateNodeRequest{Notes: &notes, Location: &loc, DnsResolvers: &adminv1.DnsResolvers{Values: []string{"77.88.8.8", "1.1.1.1:53"}},
 		Timeouts: &adminv1.NodeTimeouts{LivenessTimeoutS: 200}}); err != nil {

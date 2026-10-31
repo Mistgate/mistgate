@@ -327,4 +327,4 @@ The paths are the defaults of `mistgate-node install`; if you installed with oth
 
 ## Who can do what
 
-Every admin sees the nodes. The owner and helpers can change a node's settings and restart its profiles. Installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on and building the AmneziaWG kernel module are for the owner only; so are relays and **Add a way in…** (see [Ways in](#ways-in)). See [Security](../operations/security.md).
+Every admin sees the nodes. The owner and helpers can change a node's settings (except its address) and restart its profiles. Moving a node to another address, installing nodes over SSH, making install commands, revealing and forgetting saved SSH access, retiring nodes, reading logs, putting profiles on nodes, turning **IPv6 exit** off or on and building the AmneziaWG kernel module are for the owner only; so are relays and **Add a way in…** (see [Ways in](#ways-in)). See [Security](../operations/security.md).

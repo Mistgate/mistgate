@@ -114,6 +114,23 @@ describe("a new install command", () => {
   });
 });
 
+describe("the node's address", () => {
+  const address = () => [...document.querySelectorAll("input")].find((i) => i.value === "de1.example.com");
+
+  it("is the owner's to change", async () => {
+    await mount(NodeStatus.ONLINE);
+    expect(address()?.disabled).toBe(false);
+    expect(text()).toContain(en["node.settings.addressHint"]);
+  });
+
+  it("is locked for a helper, whom the API refuses, and says why", async () => {
+    me.mockResolvedValue({ admin: { id: "adm_2", role: 2 } });
+    await mount(NodeStatus.ONLINE);
+    expect(address()?.disabled).toBe(true);
+    expect(text()).toContain(en["node.settings.addressOwnerHint"]);
+  });
+});
+
 describe("measuring the network capacity", () => {
   const field = () => document.querySelector<HTMLInputElement>('input[type="number"]')!;
   const measured = (over: Record<string, unknown> = {}) => ({ downMbps: 937, upMbps: 871, server: "speed.cloudflare.com", errorCode: "", seconds: 29, runs: 3, runsTotal: 3, runFailures: [], serverDetail: "", peopleDownMbps: 0, peopleUpMbps: 0, ...over });

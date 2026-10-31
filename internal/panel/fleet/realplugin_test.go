@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -10,8 +11,10 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // The desired state of a node built through the real Hysteria2 plugin: profile secrets split the way the
@@ -97,8 +100,9 @@ func TestAddressChangeMarksAWGKeysStale(t *testing.T) {
 		}
 		return n
 	}
+	owner := auth.WithAdmin(e.ctx, store.Admin{ID: "adm_1", Role: store.RoleOwner}) // moving a node is the owner's call
 	setAddress := func(addr string) {
-		if _, err := (nodeService{e.f}).UpdateNode(e.ctx, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: id, Address: &addr})); err != nil {
+		if _, err := (nodeService{e.f}).UpdateNode(owner, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: id, Address: &addr})); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -109,5 +113,61 @@ func TestAddressChangeMarksAWGKeysStale(t *testing.T) {
 	setAddress("203.0.113.7")
 	if a, h := epoch("prf_awg"), epoch("prf_hysteria2"); a != 1 || h != 0 {
 		t.Errorf("a new address: epochs awg %d hysteria2 %d, want 1 0", a, h)
+	}
+}
+
+// The address is where every subscription sends people and what the panel's health checks dial: only the owner moves
+// it. UpdateNode stays open to helpers for the rest, and the same address sent back is not a move.
+func TestAddressChangeIsOwnerOnly(t *testing.T) {
+	e := newEnvWith(t, builtin.Registry())
+	id, _, _ := e.createEnrollment("de1", "de1.example.com")
+	service := nodeService{e.f}
+	update := func(ctx context.Context, r *adminv1.UpdateNodeRequest) error {
+		r.NodeId = id
+		_, err := service.UpdateNode(ctx, connect.NewRequest(r))
+		return err
+	}
+	address := func() string {
+		t.Helper()
+		n, err := e.st.Node(e.ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n.Address
+	}
+	as := func(role string) context.Context {
+		return auth.WithAdmin(e.ctx, store.Admin{ID: "adm_1", Role: role})
+	}
+	for _, ctx := range []context.Context{as(store.RoleHelper), as(store.RoleReadonly), as(""), e.ctx} {
+		if err := update(ctx, &adminv1.UpdateNodeRequest{Address: ptr("127.0.0.1")}); code(err) != connect.CodePermissionDenied {
+			t.Fatalf("a non-owner moved the node: %v", err)
+		}
+		// a refused move refuses the whole call: the notes sent with it are not saved either
+		if err := update(ctx, &adminv1.UpdateNodeRequest{Address: ptr("203.0.113.9"), Notes: ptr("moved")}); code(err) != connect.CodePermissionDenied {
+			t.Fatalf("a non-owner moved the node along with notes: %v", err)
+		}
+	}
+	if got := address(); got != "de1.example.com" {
+		t.Fatalf("a refused call changed the address to %q", got)
+	}
+	if n, _ := e.st.Node(e.ctx, id); n.Notes != "" {
+		t.Fatalf("a refused call saved notes %q", n.Notes)
+	}
+	helper := as(store.RoleHelper)
+	if err := update(helper, &adminv1.UpdateNodeRequest{Address: ptr("de1.example.com"), Notes: ptr("hoster blocks udp")}); err != nil {
+		t.Fatalf("a helper sent the same address back with notes: %v", err)
+	}
+	if err := update(helper, &adminv1.UpdateNodeRequest{Notes: ptr("hoster blocks udp")}); err != nil {
+		t.Fatalf("a helper edits notes: %v", err)
+	}
+	if err := update(as(store.RoleOwner), &adminv1.UpdateNodeRequest{Address: ptr("203.0.113.7")}); err != nil {
+		t.Fatalf("the owner moved the node: %v", err)
+	}
+	if got := address(); got != "203.0.113.7" {
+		t.Fatalf("address after the owner's move: %q", got)
+	}
+	// A node that does not exist is not found, for anyone.
+	if _, err := service.UpdateNode(helper, connect.NewRequest(&adminv1.UpdateNodeRequest{NodeId: "nod_missing", Address: ptr("203.0.113.8")})); code(err) != connect.CodeNotFound {
+		t.Fatalf("a missing node: %v", err)
 	}
 }
