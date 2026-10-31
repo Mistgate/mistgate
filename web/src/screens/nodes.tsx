@@ -186,8 +186,8 @@ function Tick({ select, node, className }: { select: Select; node: Node; classNa
 }
 
 /**
- * The label under a node name; an outdated agent (the Updates module knows by build time, not by version text) turns
- * a healthy line amber and sends to the Updates screen, which says what to do.
+ * Details below the node heading; an outdated agent (the Updates module knows by build time, not by version text)
+ * adds an amber link to the Updates screen, which says what to do.
  */
 function useSub() {
   const t = useT();
@@ -198,7 +198,7 @@ function useSub() {
     if (kind === "ok" && older.has(n.id)) {
       return { text: `${t("nodes.agentOld")} ${n.agentVersion}`.trim(), cls: kindTextClass.warn, update: true };
     }
-    return { text: st.line(n), cls: kindTextClass[kind], update: false };
+    return { text: st.reason(n.reason), cls: kindTextClass[kind], update: false };
   };
 }
 
@@ -214,6 +214,18 @@ function SubLine({ s, className }: { s: { text: string; cls: string; update: boo
     <Link to="/updates" className={cx("relative z-10 w-fit underline decoration-dotted underline-offset-2", className, s.cls)}>
       {s.text}
     </Link>
+  );
+}
+
+/** Keep the status dot and its word together, independently of the height of the notes below. */
+function NodeStatusLabel({ node }: { node: Node }) {
+  const st = useNodeStatus();
+  const kind = nodeKind(node);
+  return (
+    <span className={cx("inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold whitespace-nowrap", kindTextClass[kind])}>
+      <StatusDot kind={kind} />
+      {st.word(node)}
+    </span>
   );
 }
 
@@ -249,7 +261,6 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         ))}
       </div>
       {rows.map((n) => {
-        const kind = nodeKind(n);
         const s = sub(n);
         return (
           <div
@@ -258,16 +269,14 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
           >
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} title={n.notes?.trim() || undefined} className="absolute inset-0" />
             {select && <Tick select={select} node={n} />}
-            <div className="flex min-w-0 items-center gap-3">
-              <StatusDot kind={kind} />
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="flex items-baseline gap-2">
-                  <b className="text-sm">{n.name}</b>
-                  <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
-                </span>
-                <SubLine s={s} className="line-clamp-2 text-xs" />
-                <NodeNotes notes={n.notes} />
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <b className="min-w-0 break-all text-sm">{n.name}</b>
+                <NodeStatusLabel node={n} />
               </div>
+              <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
+              {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
+              <NodeNotes notes={n.notes} />
             </div>
             <span title={n.address} className="font-mono text-xs break-all text-muted">
               {n.address}
@@ -293,12 +302,10 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
 
 function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select | undefined }) {
   const t = useT();
-  const st = useNodeStatus();
   const sub = useSub();
   return (
     <div className="flex flex-col gap-2 md:hidden">
       {rows.map((n, i) => {
-        const kind = nodeKind(n);
         const s = sub(n);
         const stat = (value: string, label: string, hint?: string) => (
           <div className="flex min-w-0 flex-col gap-0.5" title={hint}>
@@ -309,16 +316,13 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         return (
           <div key={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} title={n.notes?.trim() || undefined} className="absolute inset-0 rounded-card" />
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               {select && <Tick select={select} node={n} />}
-              <span className="flex h-5 items-center rounded-md bg-surface-2 px-1.5 font-mono text-[10px] font-bold text-muted">{n.countryCode || "—"}</span>
-              <b className="text-[15px]">{n.name}</b>
-              <span className="min-w-0 flex-1 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
-              <span className={cx("flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap", kindTextClass[kind])}>
-                <StatusDot kind={kind} />
-                {st.word(n)}
-              </span>
+              <b className="min-w-0 break-all text-[15px]">{n.name}</b>
+              <NodeStatusLabel node={n} />
             </div>
+            <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
+            {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
             <NodeNotes notes={n.notes} />
             <div className="grid grid-cols-4 gap-2">
               {stat(String(onlineOf(n)), t("nodes.online"))}
@@ -335,7 +339,6 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               <span className="flex-1" />
               <span className="min-w-0 text-right font-mono text-[11px] break-all text-muted">{n.address}</span>
             </div>
-            {(kind !== "ok" || s.update) && <SubLine s={s} className="text-xs text-pretty" />}
           </div>
         );
       })}

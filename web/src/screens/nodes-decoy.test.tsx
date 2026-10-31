@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { editionFeatures } from "@/i18n/edition";
 import { en } from "@/i18n/en";
 import { setLang } from "@/i18n";
@@ -70,13 +71,13 @@ const node = (name: string, over: Record<string, unknown> = {}) => ({
 });
 const withBundle = { decoyBundleSha256: "ab".repeat(32) };
 
-async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknown> = { admin: { id: "adm_1", role: Role.OWNER } }) {
+async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknown> = { admin: { id: "adm_1", role: Role.OWNER } }, updates: Record<string, unknown>[] = []) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   qc.setQueryData(meQuery.queryKey, me as never);
-  qc.setQueryData(updatesQuery.queryKey, { nodes: [] } as never);
+  qc.setQueryData(updatesQuery.queryKey, { nodes: updates } as never);
   qc.setQueryData(nodesQuery.queryKey, { nodes, expectedAgentVersion: "0.3.1" } as never);
   await act(async () =>
     root!.render(
@@ -112,6 +113,38 @@ describe("node notes", () => {
     await mount([node("de1"), node("fi1", { notes: " \n\t " })]);
     expect(document.querySelectorAll("p")).toHaveLength(0);
     expect(document.querySelectorAll("a[title]")).toHaveLength(0);
+  });
+});
+
+describe("node status and metadata", () => {
+  it("pairs the healthy word and dot with the name, without a duplicate status line", async () => {
+    await mount([node("de1", { notes: "Renew in March", provider: "examplehost" })]);
+    const names = [...document.querySelectorAll("b")].filter((b) => b.textContent === "de1");
+    expect(names).toHaveLength(2);
+    for (const name of names) {
+      const heading = name.parentElement!;
+      expect(heading.textContent).toContain(en["node.status.online"]);
+      expect(heading.querySelectorAll('[aria-hidden="true"]')).toHaveLength(1);
+      expect(heading.textContent).not.toContain("examplehost");
+      expect(heading.textContent).not.toContain("Renew in March");
+      expect(heading.parentElement!.textContent!.split(en["node.status.online"])).toHaveLength(2);
+    }
+  });
+
+  it("keeps diagnostic reasons without repeating the pending status", async () => {
+    await mount([node("de1", { status: NodeStatus.PENDING, reason: { code: "enrollment_expired", params: {} } })]);
+    expect(text().split(en["node.status.pending"])).toHaveLength(3);
+    expect(text().split(en["node.reason.enrollment_expired"])).toHaveLength(3);
+  });
+
+  it("keeps the separate update action for an outdated healthy node", async () => {
+    await mount([node("de1")], undefined, [{ nodeId: "nod_de1", state: NodeUpdateState.OUTDATED }]);
+    const updates = [...document.querySelectorAll('a[href="/updates"]')];
+    expect(updates).toHaveLength(2);
+    expect(updates.every((a) => a.textContent?.includes(en["nodes.agentOld"]) && a.textContent.includes("0.3.1"))).toBe(true);
+    for (const update of updates) {
+      expect(update.parentElement!.textContent!.split(en["node.status.online"])).toHaveLength(2);
+    }
   });
 });
 
