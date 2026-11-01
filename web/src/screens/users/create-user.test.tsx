@@ -82,7 +82,7 @@ describe("the new user form", () => {
     await mount([group({ id: "grp_f", name: "friends", amneziaNodes: 1 }), group()]);
     expect(document.querySelector("[role=combobox]")?.textContent).toContain("Все");
     expect(text()).toContain("Subscription (Happ) — 2 nodes");
-    expect(text()).toContain("AmneziaVPN keys — no: no AmneziaWG of the group runs on a node");
+    expect(text()).toContain("AmneziaVPN keys — no: no AmneziaWG of the group runs on an enabled node");
     // Happ on, AmneziaVPN off with the reason, "all nodes" on
     expect(switches()).toEqual(["true", "false", "true"]);
     expect(text()).toContain("Off: no AmneziaWG of the group runs on a node");
@@ -96,7 +96,7 @@ describe("the new user form", () => {
 
   it("says in red when the group gives nothing at all, and leaves Happ on", async () => {
     await mount([group({ happNodes: 0, amneziaNodes: 0 })]);
-    expect(text()).toContain("This person gets nothing yet: no profile of the group “Все” runs on a node.");
+    expect(text()).toContain("This person gets nothing yet: no enabled node has a profile from the group “Все”.");
     expect(document.querySelector("[role=alert]")).not.toBeNull();
     expect(switches().slice(0, 2)).toEqual(["true", "false"]);
   });
