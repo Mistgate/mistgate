@@ -11,6 +11,7 @@ A person gets a server when all of this holds:
 
 - the person is active (not disabled, not past their term, not over their quota);
 - the profile is in the person's group;
+- the node is enabled for the person's group (a group can leave nodes out);
 - the profile is on a node the person may use (all nodes, or the ones picked for them);
 - that profile on the node is switched on and running or starting;
 - one of the person's app switches allows the protocol.
@@ -194,7 +195,7 @@ A person can also delete and rename their own devices on their page, when **Devi
 
 ## The Groups tab
 
-A group is a set of profiles that its people get. Each group is a card: its name, how many people are in it (a link to the filtered list), its profiles in the two ways with the number of nodes where they run, and its DNS preset when it has one. **Edit** and **Delete** are on the card.
+A group is a set of profiles that its people get, and the nodes it leaves out. Each group is a card: its name, how many people are in it (a link to the filtered list), its profiles in the two ways with the number of nodes they run on for it, and its DNS preset when it has one. **Edit** and **Delete** are on the card.
 
 With no group at all, the tab offers **Create "Everyone" with all profiles** and **New group**.
 
@@ -202,6 +203,7 @@ With no group at all, the tab offers **Create "Everyone" with all profiles** and
 
 - **Name**, up to 64 characters.
 - **Profiles in the group**: every profile is ticked for a new group; untick what the group should not give.
+- **Nodes enabled for the group**: every node is on for a new group; turn one off to take it away from everyone in the group — its servers leave every subscription format and the devices' keys stop going to it. New nodes stay on. A node is switched off at once, without a confirmation: no key stops working, those people just stop reaching that node.
 - **More** → **DNS**: the group's preset; empty means the instance default.
 
 Editing a group changes access for everyone in it ("3 users are in this group; the change applies to all of them"). Taking a profile away from a group with people first shows what they lose, with the AmneziaVPN keys that stop working, and the button turns into "Take it away from 3 people".

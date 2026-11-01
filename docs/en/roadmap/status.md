@@ -3,22 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.67`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.68`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.67
+  meta: v0.1.0 – v0.1.68
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.67
+      release: v0.1.68
       current: true
       points:
-        - "**The IPv6 entry in the admin.** The node's **Ways in** tab has its card: pick one of the server's IPv6 addresses, let the panel check it from outside, then turn the entry on or off; Reachability and the IPv6 alert lead to it. MCP is no longer needed. See [Nodes](../guide/nodes.md#ipv6-entry)."
-        - "**Ads and trackers blocked on the device.** A DNS preset can make the apps drop the domains of the community list category-ads-all themselves, before any other rule, and the new built-in preset **No ads on the device** has it on; AmneziaWG keys and plain link lists block nothing. See [DNS](../guide/dns.md#ads-and-trackers)."
-        - "**Security updates in the node doctor.** A new check warns when a Debian or Ubuntu node does not install security updates by itself, and the fix **Turn on security updates** installs unattended-upgrades and switches the apt timers on in the background, after the owner confirms; it never upgrades or reboots the server itself. See [Node doctor](../operations/health.md#fixes)."
+        - "**Nodes per group.** A group now decides which nodes its people reach, not only which profiles they get: turn a node off in the group and its servers leave every subscription format of everyone in it, the devices' keys stop going to it, and relays through it are not offered. New nodes stay on. See [Users and groups](../guide/users-and-groups.md#the-groups-tab)."
     - title: Profiles
       section: profiles
       points:
@@ -40,7 +38,7 @@ Mistgate is in **beta**; the current release is `v0.1.67`. It runs in production
     - title: Users
       section: users
       points:
-        - "[Users and groups](../guide/users-and-groups.md): traffic quotas with periods, terms, [devices by device ID](../guide/users-and-groups.md#devices-and-the-device-limit) with a limit in three modes, speed per person and per device."
+        - "[Users and groups](../guide/users-and-groups.md): traffic quotas with periods, terms, [devices by device ID](../guide/users-and-groups.md#devices-and-the-device-limit) with a limit in three modes, speed per person and per device; a group also decides which nodes its people reach."
         - "The People tab sorted by any column, with device counts, and bulk actions on several users at once."
     - title: Subscriptions
       section: subscriptions
@@ -82,7 +80,7 @@ Mistgate is in **beta**; the current release is `v0.1.67`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.67
+  meta: v0.1.34 – v0.1.68
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -112,6 +110,9 @@ Mistgate is in **beta**; the current release is `v0.1.67`. It runs in production
     - title: The security updates fix in production
       section: health
       text: "New in v0.1.67. It installs a package on the server: try it on one node first and read the doctor's result there before you run it on the others. See [Fixes](../operations/health.md#fixes)."
+    - title: Nodes per group in production
+      section: users
+      text: "New in v0.1.68. Turning a node off for a group takes it away from everyone in it at once, even from a person who has that node ticked on their own card: a profile on it stops reaching them. See [Users and groups](../guide/users-and-groups.md#the-groups-tab)."
 - status: next
   title: Next
   lead: The next items in the queue.
