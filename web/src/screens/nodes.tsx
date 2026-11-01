@@ -30,7 +30,7 @@ import { DecoyBulk } from "./nodes-decoy";
 type StatusFilter = "all" | "problems" | "working";
 const all = "all";
 
-const onlineOf = (n: Node) => n.online.reduce((a, o) => a + o.users, 0);
+const onlineOf = (n: Node) => (Array.isArray(n.online) ? n.online : []).reduce((a, o) => a + o.users, 0);
 
 export function NodesScreen() {
   const t = useT();
@@ -93,7 +93,7 @@ export function NodesScreen() {
           <PageTitle>{t("nav.nodes")}</PageTitle>
           <span className="text-xs text-muted">
             {nodes.length > 0 &&
-              `${t.n("nodes.summary", nodes.length, { o: onlineTotal })}${problems ? ` · ${t.n("nodes.withProblems", problems)}` : ""}`}
+              `${t.n("nodes.summary", nodes.length, { o: onlineTotal })}${problems ? ` Â· ${t.n("nodes.withProblems", problems)}` : ""}`}
           </span>
         </div>
         <Button variant="primary" size="md" onClick={() => addNode()}>
@@ -263,7 +263,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="flex items-baseline gap-2">
                   <b className="text-sm">{n.name}</b>
-                  <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
+                  <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" Â· ")}</span>
                 </span>
                 <SubLine s={s} className="line-clamp-2 text-xs" />
               </div>
@@ -272,7 +272,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               {n.address}
             </span>
             <span title={n.protocols.map(protocolName).join(", ")} className="truncate font-mono text-xs text-muted">
-              {n.protocols.map(protocolShort).join(", ") || "—"}
+              {n.protocols.map(protocolShort).join(", ") || "â€”"}
             </span>
             <span className="text-right font-mono">{onlineOf(n)}</span>
             <span className="text-right font-mono">{fmt.bytes(n.trafficTodayBytes)}</span>
@@ -280,9 +280,9 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               <span className="h-1 w-11 overflow-hidden rounded-[2px] bg-surface-2">
                 <span className="block h-full bg-accent" style={{ width: `${n.hasMetrics ? Math.min(100, n.cpuPct) : 0}%` }} />
               </span>
-              <span className="w-8 text-right font-mono text-xs">{n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"}</span>
+              <span className="w-8 text-right font-mono text-xs">{n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "â€”"}</span>
             </div>
-            <span className="text-right font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"}</span>
+            <span className="text-right font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "â€”"}</span>
           </div>
         );
       })}
@@ -310,9 +310,9 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
             <div className="flex items-center gap-2">
               {select && <Tick select={select} node={n} />}
-              <span className="flex h-5 items-center rounded-md bg-surface-2 px-1.5 font-mono text-[10px] font-bold text-muted">{n.countryCode || "—"}</span>
+              <span className="flex h-5 items-center rounded-md bg-surface-2 px-1.5 font-mono text-[10px] font-bold text-muted">{n.countryCode || "â€”"}</span>
               <b className="text-[15px]">{n.name}</b>
-              <span className="min-w-0 flex-1 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" Â· ")}</span>
               <span className={cx("flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap", kindTextClass[kind])}>
                 <StatusDot kind={kind} />
                 {st.word(n)}
@@ -321,8 +321,8 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             <div className="grid grid-cols-4 gap-2">
               {stat(String(onlineOf(n)), t("nodes.online"))}
               {stat(fmt.bytes(n.trafficTodayBytes), t("nodes.today"), t("nodes.todayHint"))}
-              {stat(n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—", "CPU")}
-              {stat(n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—", t("nodes.uptime"))}
+              {stat(n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "â€”", "CPU")}
+              {stat(n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "â€”", t("nodes.uptime"))}
             </div>
             <div className="flex items-center gap-1.5">
               {n.protocols.map((p) => (

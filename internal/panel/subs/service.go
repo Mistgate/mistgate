@@ -235,7 +235,8 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 
 // clientNames are the display names of the client ids the plugins refer to.
 var clientNames = map[plugin.ClientID]string{
-	plugin.ClientHapp: "Happ", plugin.ClientAmnezia: "AmneziaVPN", plugin.ClientMihomo: "Mihomo / Clash Meta", plugin.ClientSingbox: "sing-box",
+	plugin.ClientHapp: "Happ", plugin.ClientAmnezia: "AmneziaVPN", plugin.ClientTelegram: "Telegram",
+	plugin.ClientMihomo: "Mihomo / Clash Meta", plugin.ClientSingbox: "sing-box",
 }
 
 // formatOf maps a plugin wire format to the serving format of the settings; 0 = not a serving format (yet).

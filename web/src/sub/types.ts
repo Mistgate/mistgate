@@ -163,7 +163,9 @@ export type MgData = {
   support_url: string;
   options: { show_announcement: boolean; show_support: boolean; show_qr: boolean };
   apps: AppEntry[];
-  access: { happ: boolean; amnezia: boolean };
+  access: { happ: boolean; amnezia: boolean; telegram?: boolean };
+  /** The tg://proxy links of the person, when Telegram is on; null when it is off. */
+  telegram?: { links: { node: string; profile: string; url: string }[] } | null;
   devices: Device[];
   /** Where a device of the link is removed and renamed (POST <it>/<id>/revoke, /rename); "" in the admin's preview and with self-service off. */
   devices_endpoint: string;

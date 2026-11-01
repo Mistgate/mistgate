@@ -137,12 +137,12 @@ func (a Access) DeleteProfile(ctx context.Context, id string, now time.Time) err
 type AccessBrief struct{ ID, Name string }
 
 // ProfileUsers lists users whose group contains the profile and whose app toggles allow it: happ and
-// amnezia say which toggles count (derived from the protocol's Clients()). Ordered by name.
-func (a Access) ProfileUsers(ctx context.Context, profileID string, happ, amnezia bool) ([]AccessBrief, error) {
+// amnezia/telegram say which toggles count (derived from the protocol's Clients()). Ordered by name.
+func (a Access) ProfileUsers(ctx context.Context, profileID string, happ, amnezia, telegram bool) ([]AccessBrief, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT u.id, u.name FROM user u JOIN user_group_profile gp ON gp.group_id = u.group_id
-		 WHERE gp.profile_id = ? AND ((? = 1 AND u.app_happ = 1) OR (? = 1 AND u.app_amnezia = 1))
-		 ORDER BY u.name`, profileID, accBool(happ), accBool(amnezia))
+		 WHERE gp.profile_id = ? AND ((? = 1 AND u.app_happ = 1) OR (? = 1 AND u.app_amnezia = 1) OR (? = 1 AND u.app_telegram = 1))
+		 ORDER BY u.name`, profileID, accBool(happ), accBool(amnezia), accBool(telegram))
 	if err != nil {
 		return nil, err
 	}

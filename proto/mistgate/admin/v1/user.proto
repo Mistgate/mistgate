@@ -6,7 +6,9 @@ import "mistgate/admin/v1/common.proto";
 import "mistgate/admin/v1/profile.proto";
 
 // Users screen, create-user modal, user detail. Product rules:
-//  - Every user gets BOTH apps by default. Two toggles (Happ, Amnezia), at least one on.
+//  - Every user gets Happ and Amnezia by default; Telegram is opt-in. Three toggles (Happ, Amnezia,
+//    Telegram); at least one of Happ and Amnezia stays on (the user table constraint; Telegram is
+//    additive in the first version).
 //  - Node selection per user: all nodes (automatic, includes nodes added later) or an explicit list.
 //  - Group, quota (+ reset period), term, device limit, optional speed limit.
 //  - "Via" = the apps the user really used recently (derived from traffic/sessions of the last 7 days),
@@ -45,6 +47,10 @@ service UserService {
   rpc DeleteUsers(DeleteUsersRequest) returns (DeleteUsersResponse);
   // "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
   rpc GetSubscriptionLink(GetSubscriptionLinkRequest) returns (GetSubscriptionLinkResponse);
+  // The tg://proxy links of this person's MTProto inbounds, one per node and profile. Issues the
+  // device credentials on first use, like a subscription fetch; empty when Telegram is off or no
+  // MTProto profile runs for the person.
+  rpc GetTelegramLinks(GetTelegramLinksRequest) returns (GetTelegramLinksResponse);
   // What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
   // LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
   // address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -154,6 +160,8 @@ enum UserSort {
 message AppToggles {
   bool happ = 1;
   bool amnezia = 2;
+  // Telegram clients receive tg://proxy links for the MTProto profiles of the user's groups.
+  bool telegram = 3;
 }
 
 message NodeSelection {
@@ -211,6 +219,8 @@ message User {
   string group_color = 29;
   // The DEVICE limit: no single device of the person goes faster than this. 0 = no separate device limit.
   uint64 device_speed_limit_bps = 30 [jstype = JS_NUMBER];
+  // The Telegram toggle and at least one usable MTProto inbound for the person.
+  bool access_telegram = 31;
 }
 
 enum DnsSource {
@@ -522,4 +532,21 @@ message GetSubscriptionLinkResponse {
   // The password of the user's page for this link (xxxx-xxxx), derived from the token: a new link is a new password.
   // Empty when the instance does not ask for one. Like the link, never shown to agents.
   string page_password = 2;
+}
+
+message GetTelegramLinksRequest {
+  string user_id = 1;
+}
+
+// One tg://proxy link of a person. The secret is in the URL: the UI must treat it like a password.
+message TelegramProxyLink {
+  string node_id = 1;
+  string node_name = 2;
+  string profile_id = 3;
+  string profile_name = 4;
+  string url = 5;
+}
+
+message GetTelegramLinksResponse {
+  repeated TelegramProxyLink links = 1;
 }

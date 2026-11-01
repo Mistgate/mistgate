@@ -151,6 +151,12 @@ const user = createRoute({
   component: lazyRouteComponent(() => import("@/screens/users"), "UserScreen"),
 });
 
+const telegramProxy = createRoute({
+  getParentRoute: () => app,
+  path: "/telegram",
+  component: lazyRouteComponent(() => import("@/screens/telegram"), "TelegramScreen"),
+});
+
 const profiles = createRoute({
   getParentRoute: () => app,
   path: "/profiles",
@@ -225,7 +231,7 @@ const integrations = createRoute({
   component: lazyRouteComponent(() => import("@/screens/integrations"), "IntegrationsScreen"),
 });
 
-const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "health", "reachability", "updates", "integrations", "settings"]);
+const built = new Set(["overview", "nodes", "users", "telegram", "profiles", "subscriptions", "health", "reachability", "updates", "integrations", "settings"]);
 const placeholderRoutes = sections
   .filter((s) => !built.has(s.id))
   .map((s) => createRoute({ getParentRoute: () => app, path: s.to, component: () => <SectionScreen id={s.id} /> }));
@@ -241,6 +247,7 @@ const routeTree = root.addChildren([
     node,
     users,
     user,
+    telegramProxy,
     profiles,
     profileNew,
     profile,

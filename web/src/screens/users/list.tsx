@@ -536,7 +536,7 @@ function UsageText({ use, t }: { use: ReturnType<typeof usage>; t: Tx }) {
  */
 function stateOf(u: User, group: Group | undefined, t: Tx): { active: boolean; kind: StatusKind; word: string; why?: string } {
   const s = shownStatus(u);
-  if (s === "active" && !u.accessHapp && !u.accessAmnezia) {
+  if (s === "active" && !u.accessHapp && !u.accessAmnezia && !u.accessTelegram) {
     const groupGivesNothing = !group || (group.happNodes === 0 && group.amneziaNodes === 0);
     return { active: false, kind: "warn", word: t("users.noAccess"), why: t(groupGivesNothing ? "users.noAccessGroup" : "users.noAccessApps") };
   }

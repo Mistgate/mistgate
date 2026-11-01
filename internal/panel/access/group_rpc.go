@@ -40,7 +40,7 @@ func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (
 		if !ok {
 			continue
 		}
-		h, a, _ := clientApps(proto)
+		h, a, _, _ := clientApps(proto)
 		hn[f.Node.ID] = hn[f.Node.ID] || h
 		an[f.Node.ID] = an[f.Node.ID] || a
 	}

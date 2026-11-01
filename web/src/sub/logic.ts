@@ -177,6 +177,16 @@ export function normalize(raw: unknown): MgData {
         endpoints: str(am.endpoints),
       }
     : null;
+  const tg = r.telegram && typeof r.telegram === "object" ? rec(r.telegram) : null;
+  const telegram = tg
+    ? {
+        links: list(tg.links).flatMap((l): { node: string; profile: string; url: string }[] => {
+          const x = rec(l);
+          const url = str(x.url);
+          return /^tg:/i.test(url) ? [{ node: str(x.node), profile: str(x.profile), url }] : [];
+        }),
+      }
+    : null;
   return {
     v: num(r.v) || 1,
     lang: isLang(r.lang) ? r.lang : "ru",
@@ -213,7 +223,8 @@ export function normalize(raw: unknown): MgData {
         ? [{ platform: a.platform as Platform, kind: a.kind as Kind, name: str(a.name), download_url: str(a.download_url), add_url: str(a.add_url), description: str(a.description).trim(), recommended: a.recommended === true }]
         : [],
     ),
-    access: { happ: acc.happ === true, amnezia: acc.amnezia === true },
+    access: { happ: acc.happ === true, amnezia: acc.amnezia === true, telegram: acc.telegram === true },
+    telegram,
     devices: list(r.devices).map(
       (d): Device => ({
         id: str(d.id),

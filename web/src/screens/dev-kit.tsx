@@ -53,6 +53,7 @@ import { DnsAdsKit, DnsLinkKit } from "./dev-kit-dns";
 import { EdgeKit } from "./dev-kit-edge";
 import { UsersKit } from "./dev-kit-users";
 import { SubsKit } from "./dev-kit-subs";
+import { TelegramKit } from "./dev-kit-telegram";
 import { DecoyKit } from "./dev-kit-decoy";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
 import { Ipv6Kit } from "./dev-kit-ipv6";
@@ -287,7 +288,7 @@ export default function DevKit() {
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
   // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6: one kit alone, for its screenshots
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit }[
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, telegram: TelegramKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit }[
     new URLSearchParams(location.search).get("only") ?? ""
   ];
   if (only) {
@@ -532,6 +533,7 @@ export default function DevKit() {
       <EdgeKit />
       <DecoyKit />
       <UsersKit />
+      <TelegramKit />
       <SubsKit />
 
       <LinkModal

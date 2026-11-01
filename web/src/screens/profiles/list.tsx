@@ -74,7 +74,7 @@ function Label({ children }: { children: string }) {
   return <span className="inline-flex h-[22px] items-center rounded-[7px] border border-warn-line bg-warn-soft px-1.5 text-[11px] font-bold text-warn-text">{children}</span>;
 }
 
-function ProfileCard({ p, t, protocol, inGroup }: { p: ProfileSummary; t: Tx; protocol?: { displayName: string; apps: App[] }; inGroup?: boolean }) {
+export function ProfileCard({ p, t, protocol, inGroup }: { p: ProfileSummary; t: Tx; protocol?: { displayName: string; apps: App[] }; inGroup?: boolean }) {
   // each protocol reads apart: VLESS sky, AmneziaWG lavender (the tones of the nodes and integrations sections), accent for
   // Hysteria2 (the other protocol Happ consumes)
   const tone = p.protocol === "vless" ? "sky" : p.protocol === "awg" ? "lavender" : undefined;

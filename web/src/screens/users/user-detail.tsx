@@ -946,9 +946,9 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
   };
   const selected = nodes.all ? allIds.length : nodes.ids.filter((id) => allIds.includes(id)).length;
 
-  const flipApp = (which: "happ" | "amnezia", on: boolean) => {
-    const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, [which]: on };
-    if (!apps.happ && !apps.amnezia) return; // at least one app stays on
+  const flipApp = (which: "happ" | "amnezia" | "telegram", on: boolean) => {
+    const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, [which]: on };
+    if (!apps.happ && !apps.amnezia) return; // at least one of the two link/key apps stays on
     void actions.update({ apps }).catch(() => {});
   };
 
@@ -1017,6 +1017,7 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
           <div className="flex flex-col border-t border-line pt-1">
             <SwitchRow label={linkApps} hint={t("users.happHint")} checked={!!user.apps?.happ} onCheckedChange={(on) => flipApp("happ", on)} />
             <SwitchRow label="AmneziaVPN" hint={t("users.awgHint")} checked={!!user.apps?.amnezia} onCheckedChange={(on) => flipApp("amnezia", on)} />
+            <SwitchRow label={t("tgproxy.toggle")} hint={t("users.telegramHint")} checked={!!user.apps?.telegram} onCheckedChange={(on) => flipApp("telegram", on)} />
           </div>
 
           <div className="flex flex-col border-t border-line pt-1">

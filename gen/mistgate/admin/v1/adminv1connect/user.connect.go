@@ -60,6 +60,9 @@ const (
 	// UserServiceGetSubscriptionLinkProcedure is the fully-qualified name of the UserService's
 	// GetSubscriptionLink RPC.
 	UserServiceGetSubscriptionLinkProcedure = "/mistgate.admin.v1.UserService/GetSubscriptionLink"
+	// UserServiceGetTelegramLinksProcedure is the fully-qualified name of the UserService's
+	// GetTelegramLinks RPC.
+	UserServiceGetTelegramLinksProcedure = "/mistgate.admin.v1.UserService/GetTelegramLinks"
 	// UserServiceGetUserConnectionProcedure is the fully-qualified name of the UserService's
 	// GetUserConnection RPC.
 	UserServiceGetUserConnectionProcedure = "/mistgate.admin.v1.UserService/GetUserConnection"
@@ -89,6 +92,10 @@ type UserServiceClient interface {
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
 	// "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
 	GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error)
+	// The tg://proxy links of this person's MTProto inbounds, one per node and profile. Issues the
+	// device credentials on first use, like a subscription fetch; empty when Telegram is off or no
+	// MTProto profile runs for the person.
+	GetTelegramLinks(context.Context, *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error)
 	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
 	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
 	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -172,6 +179,12 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("GetSubscriptionLink")),
 			connect.WithClientOptions(opts...),
 		),
+		getTelegramLinks: connect.NewClient[v1.GetTelegramLinksRequest, v1.GetTelegramLinksResponse](
+			httpClient,
+			baseURL+UserServiceGetTelegramLinksProcedure,
+			connect.WithSchema(userServiceMethods.ByName("GetTelegramLinks")),
+			connect.WithClientOptions(opts...),
+		),
 		getUserConnection: connect.NewClient[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse](
 			httpClient,
 			baseURL+UserServiceGetUserConnectionProcedure,
@@ -194,6 +207,7 @@ type userServiceClient struct {
 	unblockDevice       *connect.Client[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse]
 	deleteUsers         *connect.Client[v1.DeleteUsersRequest, v1.DeleteUsersResponse]
 	getSubscriptionLink *connect.Client[v1.GetSubscriptionLinkRequest, v1.GetSubscriptionLinkResponse]
+	getTelegramLinks    *connect.Client[v1.GetTelegramLinksRequest, v1.GetTelegramLinksResponse]
 	getUserConnection   *connect.Client[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse]
 }
 
@@ -252,6 +266,11 @@ func (c *userServiceClient) GetSubscriptionLink(ctx context.Context, req *connec
 	return c.getSubscriptionLink.CallUnary(ctx, req)
 }
 
+// GetTelegramLinks calls mistgate.admin.v1.UserService.GetTelegramLinks.
+func (c *userServiceClient) GetTelegramLinks(ctx context.Context, req *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error) {
+	return c.getTelegramLinks.CallUnary(ctx, req)
+}
+
 // GetUserConnection calls mistgate.admin.v1.UserService.GetUserConnection.
 func (c *userServiceClient) GetUserConnection(ctx context.Context, req *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {
 	return c.getUserConnection.CallUnary(ctx, req)
@@ -281,6 +300,10 @@ type UserServiceHandler interface {
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
 	// "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
 	GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error)
+	// The tg://proxy links of this person's MTProto inbounds, one per node and profile. Issues the
+	// device credentials on first use, like a subscription fetch; empty when Telegram is off or no
+	// MTProto profile runs for the person.
+	GetTelegramLinks(context.Context, *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error)
 	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
 	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
 	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -360,6 +383,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("GetSubscriptionLink")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceGetTelegramLinksHandler := connect.NewUnaryHandler(
+		UserServiceGetTelegramLinksProcedure,
+		svc.GetTelegramLinks,
+		connect.WithSchema(userServiceMethods.ByName("GetTelegramLinks")),
+		connect.WithHandlerOptions(opts...),
+	)
 	userServiceGetUserConnectionHandler := connect.NewUnaryHandler(
 		UserServiceGetUserConnectionProcedure,
 		svc.GetUserConnection,
@@ -390,6 +419,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceDeleteUsersHandler.ServeHTTP(w, r)
 		case UserServiceGetSubscriptionLinkProcedure:
 			userServiceGetSubscriptionLinkHandler.ServeHTTP(w, r)
+		case UserServiceGetTelegramLinksProcedure:
+			userServiceGetTelegramLinksHandler.ServeHTTP(w, r)
 		case UserServiceGetUserConnectionProcedure:
 			userServiceGetUserConnectionHandler.ServeHTTP(w, r)
 		default:
@@ -443,6 +474,10 @@ func (UnimplementedUserServiceHandler) DeleteUsers(context.Context, *connect.Req
 
 func (UnimplementedUserServiceHandler) GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetSubscriptionLink is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetTelegramLinks(context.Context, *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetTelegramLinks is not implemented"))
 }
 
 func (UnimplementedUserServiceHandler) GetUserConnection(context.Context, *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {

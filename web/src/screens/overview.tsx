@@ -88,7 +88,8 @@ function Fleet({ data, range, onRange, onboarding }: { data: OverviewResponse; r
   );
 }
 
-const onlineOf = (n: { online: { users: number }[] }) => n.online.reduce((a, o) => a + o.users, 0);
+const onlineList = (n: { online?: { protocol: string; users: number }[] }) => (Array.isArray(n.online) ? n.online : []);
+const onlineOf = (n: { online?: { protocol: string; users: number }[] }) => onlineList(n).reduce((a, o) => a + o.users, 0);
 
 /**
  * 5 columns on the desktop, problems first. A dashed "add" tile fills the last row. Past 10 nodes (past 4 on the
@@ -126,18 +127,18 @@ function NodeGrid({ cards }: { cards: NodeCard[] }) {
               <span className="font-mono text-[10px] font-bold text-faint">{n.countryCode}</span>
             </div>
             {/* the reason is what the owner has to read: up to three lines, and the whole of it on hover */}
-            <div className={cx("flex min-h-8 min-w-0 flex-1 items-start gap-[7px] text-xs leading-4 font-semibold", kindTextClass[kind])} title={`${st.word(n)} · ${line}`}>
+            <div className={cx("flex min-h-8 min-w-0 flex-1 items-start gap-[7px] text-xs leading-4 font-semibold", kindTextClass[kind])} title={`${st.word(n)} Â· ${line}`}>
               <span className="flex h-4 flex-none items-center">
                 <StatusDot kind={kind} />
               </span>
               <span className="line-clamp-3 min-w-0 text-pretty">{line}</span>
             </div>
-            {/* a narrow tile puts the speed on a line of its own, never "↓ 58" here and "Mbit/s" there */}
+            {/* a narrow tile puts the speed on a line of its own, never "â†“ 58" here and "Mbit/s" there */}
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-line pt-2.5 font-mono text-xs text-muted">
               <span className="whitespace-nowrap">
                 <b className="font-bold text-fg">{onlineOf(n)}</b> {t("ov.online")}
               </span>
-              <span className="whitespace-nowrap">↓ {fmt.mbit(n.downBps)}</span>
+              <span className="whitespace-nowrap">â†“ {fmt.mbit(n.downBps)}</span>
             </div>
           </Link>
         );
@@ -152,7 +153,7 @@ function NodeGrid({ cards }: { cards: NodeCard[] }) {
             <StatusDot kind={fold.kind} />
             {fold.problems ? t.n("ov.moreBad", fold.problems) : fold.pending ? t.n("ov.tail.pending", fold.pending) : t("ov.moreOk")}
           </span>
-          <span className="border-t border-line pt-2.5 text-xs font-bold text-accent-text">{t("ov.allNodes")} ›</span>
+          <span className="border-t border-line pt-2.5 text-xs font-bold text-accent-text">{t("ov.allNodes")} â€º</span>
         </Link>
       )}
       {addTile && (
@@ -189,7 +190,7 @@ function xLabels(s: Series, daily: boolean, t: T, lang: string): string[] {
 function whenLabel(s: Series, i: number, daily: boolean, lang: string): string {
   const x = s.times[i]!;
   if (daily) return new Date(x * 1000).toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" });
-  return `${hourLabel(x)}–${hourLabel(x + 3600)}`;
+  return `${hourLabel(x)}â€“${hourLabel(x + 3600)}`;
 }
 
 function TrafficChart({ data, range, onRange }: { data: OverviewResponse; range: "24h" | "7d"; onRange: (r: "24h" | "7d") => void }) {
@@ -216,7 +217,7 @@ function TrafficChart({ data, range, onRange }: { data: OverviewResponse; range:
   ];
   return (
     <ChartCard
-      title={`${t("ov.traffic")} · ${t(daily ? "ov.unitDay" : "ov.unitHour", { unit: unitName })}`}
+      title={`${t("ov.traffic")} Â· ${t(daily ? "ov.unitDay" : "ov.unitHour", { unit: unitName })}`}
       icon="traffic"
       iconTone="sky"
       control={
@@ -256,14 +257,14 @@ function OnlineChart({ data }: { data: OverviewResponse }) {
   const t = useT();
   const fmt = useFmt();
   // always the last 24 hours, whatever the traffic range says
-  const s = useMemo(() => tail(toSeries(data.online), 24), [data.online]);
+  const s = useMemo(() => tail(toSeries(Array.isArray(data.online) ? data.online : []), 24), [data.online]);
   const peak = Math.max(4, ...s.total);
   const step = Math.ceil(peak / 2);
   const max = step * 2;
 
   // "now" is live: the people counted on the node cards, per protocol
   const live: Record<string, number> = {};
-  for (const n of data.nodes) for (const o of n.online) live[o.protocol] = (live[o.protocol] ?? 0) + o.users;
+  for (const n of Array.isArray(data.nodes) ? data.nodes : []) for (const o of onlineList(n)) live[o.protocol] = (live[o.protocol] ?? 0) + o.users;
   const protocols = s.protocols.length > 0 ? s.protocols : Object.keys(live);
 
   const lines: ChartLine[] = [

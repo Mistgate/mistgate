@@ -16,6 +16,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 const (
@@ -114,7 +115,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		var via []adminv1.App
 		for _, pid := range viaProtos[u.ID] {
 			if p, ok := s.reg.Get(pid); ok {
-				_, _, apps := clientApps(p)
+				_, _, _, apps := clientApps(p)
 				for _, app := range apps {
 					if !slices.Contains(via, app) {
 						via = append(via, app)
@@ -130,7 +131,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		}
 		out[i] = &adminv1.User{
 			Id: u.ID, Name: u.Name, SubscriptionName: u.SubscriptionName, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
-			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia}, Via: via,
+			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram}, Via: via,
 			DevicesUsed: uint32(devs[u.ID]), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
@@ -140,7 +141,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
 		out[i].GroupColor = groups[u.GroupID].Color
-		out[i].AccessHapp, out[i].AccessAmnezia = s.accessOf(u, groups[u.GroupID], full)
+		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram = s.accessOf(u, groups[u.GroupID], full)
 		if isOnline {
 			out[i].CurrentNodeId, out[i].CurrentNodeName = cur, nodeName[cur]
 		}
@@ -180,10 +181,10 @@ func (s *Service) subscriptionURL(token string) (string, error) {
 // missingProtocols are the protocols the apps allow, a device gets one credential for, and that are not in have. A per-device
 // protocol (AWG) is not among them: its credentials are issued on request, bound to one profile (AddAWGDevice, and
 // lazily for the device of a Mihomo subscription).
-func (s *Service) missingProtocols(happ, amnezia bool, have map[string]bool) []protocols.Protocol {
+func (s *Service) missingProtocols(happ, amnezia, telegram bool, have map[string]bool) []protocols.Protocol {
 	var out []protocols.Protocol
 	for _, p := range s.reg.List() {
-		if !have[p.ID()] && !protocols.IsPerDevice(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia)...) {
+		if !have[p.ID()] && !protocols.IsPerDevice(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram)...) {
 			out = append(out, p)
 		}
 	}
@@ -191,10 +192,10 @@ func (s *Service) missingProtocols(happ, amnezia bool, have map[string]bool) []p
 }
 
 // newCreds issues a credential for every protocol missingProtocols names.
-func (s *Service) newCreds(userID, deviceID string, happ, amnezia bool, have map[string]bool) ([]store.AccessCred, error) {
+func (s *Service) newCreds(userID, deviceID string, happ, amnezia, telegram bool, have map[string]bool) ([]store.AccessCred, error) {
 	var out []store.AccessCred
 	now := s.now()
-	for _, p := range s.missingProtocols(happ, amnezia, have) {
+	for _, p := range s.missingProtocols(happ, amnezia, telegram, have) {
 		iss, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
 		if err != nil {
 			return nil, err
@@ -231,12 +232,12 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	if m.TermDays > 36500 {
 		return nil, invalid("term is too long")
 	}
-	happ, amnezia := true, true
+	happ, amnezia, telegram := true, true, false
 	if m.Apps != nil {
-		happ, amnezia = m.Apps.Happ, m.Apps.Amnezia
+		happ, amnezia, telegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
 	}
 	if !happ && !amnezia {
-		return nil, invalid("at least one app must be on")
+		return nil, invalid("at least one of Happ and Amnezia must be on")
 	}
 	all, nodeIDs, err := s.resolveNodes(ctx, m.Nodes)
 	if err != nil {
@@ -258,7 +259,7 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	id := store.NewID("usr_")
 	u := store.AccessUser{
 		ID: id, Name: name, GroupID: m.GroupId, Status: ComputeStatus(false, expires, m.QuotaBytes, 0, now),
-		AppHapp: happ, AppAmnezia: amnezia, AllNodes: all, NodeIDs: nodeIDs,
+		AppHapp: happ, AppAmnezia: amnezia, AppTelegram: telegram, AllNodes: all, NodeIDs: nodeIDs,
 		QuotaBytes: m.QuotaBytes, QuotaReset: reset, PeriodStart: PeriodStart(reset, now), ExpiresAt: expires,
 		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DeviceSpeedLimitBps: m.DeviceSpeedLimitBps, DNSPresetID: m.DnsPresetId,
 		SubTokenHash: hash, SubTokenEnc: s.vault.Seal([]byte(token), id), CreatedAt: now,
@@ -476,7 +477,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			if !slices.Contains(na.NodeProtocols, f.Profile.Protocol) {
 				na.NodeProtocols = append(na.NodeProtocols, f.Profile.Protocol)
 			}
-			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
+			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
 				na.Protocols = append(na.Protocols, f.Profile.Protocol)
 			}
 		}
@@ -560,9 +561,9 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		u.DeviceLimit = int(*m.DeviceLimit)
 	}
 	if m.Apps != nil {
-		u.AppHapp, u.AppAmnezia = m.Apps.Happ, m.Apps.Amnezia
+		u.AppHapp, u.AppAmnezia, u.AppTelegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
 		if !u.AppHapp && !u.AppAmnezia {
-			return nil, invalid("at least one app must be on")
+			return nil, invalid("at least one of Happ and Amnezia must be on")
 		}
 	}
 	if m.Nodes != nil {
@@ -606,7 +607,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		return nil, s.internal("update user", err)
 	}
 	// No credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
-	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia ||
+	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
 		u.DeviceSpeedLimitBps != old.DeviceSpeedLimitBps || !u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()
@@ -884,6 +885,38 @@ func (s *Service) GetSubscriptionLink(ctx context.Context, req *connect.Request[
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.GetSubscriptionLinkResponse{Url: url, PagePassword: pw}), nil
+}
+
+// GetTelegramLinks returns the tg://proxy links of one person's MTProto inbounds. It builds the
+// subscription view with touch=true, so the first call issues the device credentials the same way
+// a subscription fetch does; no page data is read.
+func (s *Service) GetTelegramLinks(ctx context.Context, req *connect.Request[adminv1.GetTelegramLinksRequest]) (*connect.Response[adminv1.GetTelegramLinksResponse], error) {
+	if req.Msg.UserId == "" {
+		return nil, invalid("user is required")
+	}
+	u, err := s.st.Access().User(ctx, req.Msg.UserId)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, notFound("user")
+	} else if err != nil {
+		return nil, s.internal("get user", err)
+	}
+	if !u.AppTelegram {
+		return connect.NewResponse(&adminv1.GetTelegramLinksResponse{}), nil
+	}
+	v, err := s.subView(ctx, u, true, SubOptions{Format: plugin.FormatURIList, NoPageData: true})
+	if err != nil {
+		return nil, s.internal("telegram links", err)
+	}
+	resp := &adminv1.GetTelegramLinksResponse{}
+	for _, srv := range v.Servers {
+		if srv.Protocol != "mtproto" || srv.URI == "" {
+			continue
+		}
+		resp.Links = append(resp.Links, &adminv1.TelegramProxyLink{
+			NodeId: srv.NodeID, NodeName: srv.Node, ProfileId: srv.ProfileID, ProfileName: srv.Profile, Url: srv.URI,
+		})
+	}
+	return connect.NewResponse(resp), nil
 }
 
 // pagePassword is the password of the page of a token, "" when the instance does not ask for one. It is computed

@@ -345,7 +345,7 @@ func (s *Service) mergedSettings(p store.AccessProfile) (json.RawMessage, error)
 }
 
 // appsOf lists the client apps a user has switched on.
-func appsOf(happ, amnezia bool) []plugin.ClientID {
+func appsOf(happ, amnezia, telegram bool) []plugin.ClientID {
 	var apps []plugin.ClientID
 	if happ {
 		apps = append(apps, plugin.ClientHapp)
@@ -353,13 +353,16 @@ func appsOf(happ, amnezia bool) []plugin.ClientID {
 	if amnezia {
 		apps = append(apps, plugin.ClientAmnezia)
 	}
+	if telegram {
+		apps = append(apps, plugin.ClientTelegram)
+	}
 	return apps
 }
 
 // allowed reports whether one of the user's enabled apps consumes the protocol.
-func (s *Service) allowed(protocol string, happ, amnezia bool) bool {
+func (s *Service) allowed(protocol string, happ, amnezia, telegram bool) bool {
 	p, ok := s.reg.Get(protocol)
-	return ok && protocols.AllowedForApps(p, appsOf(happ, amnezia)...)
+	return ok && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram)...)
 }
 
 func nodeView(n store.AccessNode) protocols.NodeView {

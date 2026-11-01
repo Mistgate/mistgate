@@ -49,6 +49,8 @@ enum App {
   APP_HAPP = 1;
   // AmneziaVPN / AmneziaWG apps.
   APP_AMNEZIA = 2;
+  // Telegram clients: MTProto proxy links (tg://proxy).
+  APP_TELEGRAM = 3;
 }
 
 // Online people on one protocol ("Online by protocol", "Hysteria2 n / AmneziaWG m").

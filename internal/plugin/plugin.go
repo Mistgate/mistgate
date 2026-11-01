@@ -153,10 +153,11 @@ type EngineHealth struct {
 type ClientID string
 
 const (
-	ClientHapp    ClientID = "happ"    // user toggle "Happ"
-	ClientAmnezia ClientID = "amnezia" // user toggle "Amnezia"
-	ClientMihomo  ClientID = "mihomo"
-	ClientSingbox ClientID = "singbox" // the official sing-box apps (SFA, SFI, SFM); no user toggle of their own
+	ClientHapp     ClientID = "happ"     // user toggle "Happ"
+	ClientAmnezia  ClientID = "amnezia"  // user toggle "Amnezia"
+	ClientTelegram ClientID = "telegram" // user toggle "Telegram": MTProto proxy links
+	ClientMihomo   ClientID = "mihomo"
+	ClientSingbox  ClientID = "singbox" // the official sing-box apps (SFA, SFI, SFM); no user toggle of their own
 )
 
 // ClientFormat is a subscription wire format.

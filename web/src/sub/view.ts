@@ -3,7 +3,7 @@ import { connectCard, qrSide } from "./connect";
 import { devicesSection } from "./devices";
 import { h, type Kid } from "./dom";
 import { dict, htmlLang, langNames, langs, langShort, type Dict } from "./i18n";
-import { staleCard } from "./amnezia";
+import { copyButton, staleCard } from "./amnezia";
 import { icon } from "./icons";
 import { fetchedUnix, fmtAgo, hero, isTelegram, safeUrl, stateText, type Hero } from "./logic";
 import { serversSection } from "./servers";
@@ -133,7 +133,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
     const hasConnect = connectNeeded(d);
     if (stale) children.push(stale);
     if (s.returning) {
-      children.push(...servers, ...devices);
+      children.push(...servers, ...telegramSection(c), ...devices);
     } else {
       if (hasConnect) {
         children.push(
@@ -141,7 +141,7 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
           h("div", { class: "cols" }, h("div", { class: "main" }, connectCard(c)), (qr || hasHelp) && h("aside", { class: "side only-w" }, qr, hasHelp && helpCard(c))),
         );
       }
-      children.push(...servers, ...devices);
+      children.push(...servers, ...telegramSection(c), ...devices);
     }
     if (hasHelp) children.push(h("div", { class: s.returning ? "" : "only-m" }, helpCard(c)));
   }
@@ -151,6 +151,35 @@ export function view(d: MgData, s: State, a: Actions): HTMLElement {
 
 /** There is something to connect with: a link or a key. */
 const connectNeeded = (d: MgData) => d.access.happ || (d.access.amnezia && d.amnezia !== null) || d.apps.length > 0;
+
+function telegramSection(c: Ctx): Kid[] {
+	const { d, t, a } = c;
+	if (!d.telegram) return [];
+	const links = d.telegram.links ?? [];
+	return [
+		h("div", { class: "shead" }, h("h2", { class: "h2" }, t.telegramT), h("p", { class: "hint sec-sub" }, t.telegramS)),
+		h(
+			"section",
+			{ class: "card tg-card", "aria-label": t.telegramT },
+			links.length === 0
+				? h("p", { class: "hint" }, t.telegramNoLinks)
+				: h(
+						"div",
+						{ class: "stack g8" },
+						...links.map((l, i) =>
+							h(
+								"div",
+								{ class: "tg-row" },
+								h("span", { class: "tile s36 sky", "aria-hidden": "true" }, icon("send")),
+								h("div", { class: "stack g6 grow" }, h("p", { class: "b" }, l.node), h("p", { class: "hint" }, l.profile)),
+								copyButton(a, { text: l.url, label: t.telegramCopy, done: t.copiedShort, toast: t.copied, cls: "tlink", key: `tg-copy-${i}` }),
+								safeUrl(l.url) && h("a", { class: "btn sec sm", href: safeUrl(l.url), target: "_blank", rel: "noopener noreferrer", "data-k": `tg-open-${i}` }, icon("send", 14), t.telegramOpen),
+							),
+						),
+					),
+		),
+	];
+}
 
 function helpCard({ t, support }: Ctx): HTMLElement | null {
   if (!support) return null;

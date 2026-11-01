@@ -1,0 +1,14 @@
+Mistgate includes a Go implementation of parts of the MTProto proxy protocol.
+Its protocol behaviour is derived from Telemt 3.5.16 (commit
+84e5b827a6619fb2e09ad3d09f253cdffe04bc2f), and the implementation is a
+modified, unofficial work: it is not Telemt and is not endorsed by the Telemt
+maintainers.
+
+Telemt is Copyright (c) 2026 Telemt and is distributed under the TELEMT LICENSE
+3.3. The license text is in third_party/telemt/LICENSE. The Go implementation
+changes the language, the concurrency model, the configuration surface and the
+management UI; the protocol details retained from Telemt are listed in
+design/adr/0010-mtproto-go-port.md.
+
+The names "Telemt" and "Mistgate" and their logos remain the property of their
+respective owners. No trademark rights are granted by the Telemt license.

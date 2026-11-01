@@ -734,9 +734,11 @@ func (x *GetUserConnectionResponse) GetNodesWithoutCounters() []string {
 }
 
 type AppToggles struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Happ          bool                   `protobuf:"varint,1,opt,name=happ,proto3" json:"happ,omitempty"`
-	Amnezia       bool                   `protobuf:"varint,2,opt,name=amnezia,proto3" json:"amnezia,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Happ    bool                   `protobuf:"varint,1,opt,name=happ,proto3" json:"happ,omitempty"`
+	Amnezia bool                   `protobuf:"varint,2,opt,name=amnezia,proto3" json:"amnezia,omitempty"`
+	// Telegram clients receive tg://proxy links for the MTProto profiles of the user's groups.
+	Telegram      bool `protobuf:"varint,3,opt,name=telegram,proto3" json:"telegram,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -781,6 +783,13 @@ func (x *AppToggles) GetHapp() bool {
 func (x *AppToggles) GetAmnezia() bool {
 	if x != nil {
 		return x.Amnezia
+	}
+	return false
+}
+
+func (x *AppToggles) GetTelegram() bool {
+	if x != nil {
+		return x.Telegram
 	}
 	return false
 }
@@ -878,7 +887,7 @@ type User struct {
 	EffectiveDnsPresetName string    `protobuf:"bytes,24,opt,name=effective_dns_preset_name,json=effectiveDnsPresetName,proto3" json:"effective_dns_preset_name,omitempty"`
 	DnsSource              DnsSource `protobuf:"varint,25,opt,name=dns_source,json=dnsSource,proto3,enum=mistgate.admin.v1.DnsSource" json:"dns_source,omitempty"`
 	// What the user's page offers, by app, as the subscription decides it: the app is switched on and the group gives
-	// it something on a node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
+	// it something on an enabled group node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
 	// the person gets nothing yet. The status does not cut them (a disabled user's page shows the status instead).
 	AccessHapp    bool `protobuf:"varint,26,opt,name=access_happ,json=accessHapp,proto3" json:"access_happ,omitempty"`
 	AccessAmnezia bool `protobuf:"varint,27,opt,name=access_amnezia,json=accessAmnezia,proto3" json:"access_amnezia,omitempty"`
@@ -888,8 +897,10 @@ type User struct {
 	GroupColor string `protobuf:"bytes,29,opt,name=group_color,json=groupColor,proto3" json:"group_color,omitempty"`
 	// The DEVICE limit: no single device of the person goes faster than this. 0 = no separate device limit.
 	DeviceSpeedLimitBps uint64 `protobuf:"varint,30,opt,name=device_speed_limit_bps,json=deviceSpeedLimitBps,proto3" json:"device_speed_limit_bps,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// The Telegram toggle and at least one usable MTProto inbound for the person.
+	AccessTelegram bool `protobuf:"varint,31,opt,name=access_telegram,json=accessTelegram,proto3" json:"access_telegram,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -1130,6 +1141,13 @@ func (x *User) GetDeviceSpeedLimitBps() uint64 {
 		return x.DeviceSpeedLimitBps
 	}
 	return 0
+}
+
+func (x *User) GetAccessTelegram() bool {
+	if x != nil {
+		return x.AccessTelegram
+	}
+	return false
 }
 
 type ListUsersRequest struct {
@@ -3317,6 +3335,171 @@ func (x *GetSubscriptionLinkResponse) GetPagePassword() string {
 	return ""
 }
 
+type GetTelegramLinksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTelegramLinksRequest) Reset() {
+	*x = GetTelegramLinksRequest{}
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTelegramLinksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTelegramLinksRequest) ProtoMessage() {}
+
+func (x *GetTelegramLinksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTelegramLinksRequest.ProtoReflect.Descriptor instead.
+func (*GetTelegramLinksRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *GetTelegramLinksRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+// One tg://proxy link of a person. The secret is in the URL: the UI must treat it like a password.
+type TelegramProxyLink struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName      string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	ProfileId     string                 `protobuf:"bytes,3,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ProfileName   string                 `protobuf:"bytes,4,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
+	Url           string                 `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TelegramProxyLink) Reset() {
+	*x = TelegramProxyLink{}
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TelegramProxyLink) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TelegramProxyLink) ProtoMessage() {}
+
+func (x *TelegramProxyLink) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TelegramProxyLink.ProtoReflect.Descriptor instead.
+func (*TelegramProxyLink) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *TelegramProxyLink) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *TelegramProxyLink) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *TelegramProxyLink) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *TelegramProxyLink) GetProfileName() string {
+	if x != nil {
+		return x.ProfileName
+	}
+	return ""
+}
+
+func (x *TelegramProxyLink) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type GetTelegramLinksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Links         []*TelegramProxyLink   `protobuf:"bytes,1,rep,name=links,proto3" json:"links,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTelegramLinksResponse) Reset() {
+	*x = GetTelegramLinksResponse{}
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTelegramLinksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTelegramLinksResponse) ProtoMessage() {}
+
+func (x *GetTelegramLinksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_user_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTelegramLinksResponse.ProtoReflect.Descriptor instead.
+func (*GetTelegramLinksResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetTelegramLinksResponse) GetLinks() []*TelegramProxyLink {
+	if x != nil {
+		return x.Links
+	}
+	return nil
+}
+
 var File_mistgate_admin_v1_user_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_user_proto_rawDesc = "" +
@@ -3358,14 +3541,16 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +
 	"\bnow_unix\x18\x02 \x01(\x03B\x020\x02R\anowUnix\x127\n" +
 	"\x04rows\x18\x03 \x03(\v2#.mistgate.admin.v1.DeviceConnectionR\x04rows\x124\n" +
-	"\x16nodes_without_counters\x18\x04 \x03(\tR\x14nodesWithoutCounters\":\n" +
+	"\x16nodes_without_counters\x18\x04 \x03(\tR\x14nodesWithoutCounters\"V\n" +
 	"\n" +
 	"AppToggles\x12\x12\n" +
 	"\x04happ\x18\x01 \x01(\bR\x04happ\x12\x18\n" +
-	"\aamnezia\x18\x02 \x01(\bR\aamnezia\"<\n" +
+	"\aamnezia\x18\x02 \x01(\bR\aamnezia\x12\x1a\n" +
+	"\btelegram\x18\x03 \x01(\bR\btelegram\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xdc\t\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\x85\n" +
+	"\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -3404,7 +3589,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x11subscription_name\x18\x1c \x01(\tR\x10subscriptionName\x12\x1f\n" +
 	"\vgroup_color\x18\x1d \x01(\tR\n" +
 	"groupColor\x127\n" +
-	"\x16device_speed_limit_bps\x18\x1e \x01(\x04B\x020\x02R\x13deviceSpeedLimitBps\"\x9f\x02\n" +
+	"\x16device_speed_limit_bps\x18\x1e \x01(\x04B\x020\x02R\x13deviceSpeedLimitBps\x12'\n" +
+	"\x0faccess_telegram\x18\x1f \x01(\bR\x0eaccessTelegram\"\x9f\x02\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -3592,7 +3778,18 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x06rotate\x18\x02 \x01(\bR\x06rotate\"T\n" +
 	"\x1bGetSubscriptionLinkResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12#\n" +
-	"\rpage_password\x18\x02 \x01(\tR\fpagePassword*\x8d\x01\n" +
+	"\rpage_password\x18\x02 \x01(\tR\fpagePassword\"2\n" +
+	"\x17GetTelegramLinksRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x9d\x01\n" +
+	"\x11TelegramProxyLink\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1d\n" +
+	"\n" +
+	"profile_id\x18\x03 \x01(\tR\tprofileId\x12!\n" +
+	"\fprofile_name\x18\x04 \x01(\tR\vprofileName\x12\x10\n" +
+	"\x03url\x18\x05 \x01(\tR\x03url\"V\n" +
+	"\x18GetTelegramLinksResponse\x12:\n" +
+	"\x05links\x18\x01 \x03(\v2$.mistgate.admin.v1.TelegramProxyLinkR\x05links*\x8d\x01\n" +
 	"\n" +
 	"UserStatus\x12\x1b\n" +
 	"\x17USER_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -3634,7 +3831,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x17DEVICE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10DEVICE_KIND_LINK\x10\x01\x12\x1b\n" +
 	"\x17DEVICE_KIND_LINK_SHARED\x10\x02\x12\x13\n" +
-	"\x0fDEVICE_KIND_KEY\x10\x032\xab\t\n" +
+	"\x0fDEVICE_KIND_KEY\x10\x032\x98\n" +
+	"\n" +
 	"\vUserService\x12V\n" +
 	"\tListUsers\x12#.mistgate.admin.v1.ListUsersRequest\x1a$.mistgate.admin.v1.ListUsersResponse\x12P\n" +
 	"\aGetUser\x12!.mistgate.admin.v1.GetUserRequest\x1a\".mistgate.admin.v1.GetUserResponse\x12Y\n" +
@@ -3648,7 +3846,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\fRevokeDevice\x12&.mistgate.admin.v1.RevokeDeviceRequest\x1a'.mistgate.admin.v1.RevokeDeviceResponse\x12b\n" +
 	"\rUnblockDevice\x12'.mistgate.admin.v1.UnblockDeviceRequest\x1a(.mistgate.admin.v1.UnblockDeviceResponse\x12\\\n" +
 	"\vDeleteUsers\x12%.mistgate.admin.v1.DeleteUsersRequest\x1a&.mistgate.admin.v1.DeleteUsersResponse\x12t\n" +
-	"\x13GetSubscriptionLink\x12-.mistgate.admin.v1.GetSubscriptionLinkRequest\x1a..mistgate.admin.v1.GetSubscriptionLinkResponse\x12n\n" +
+	"\x13GetSubscriptionLink\x12-.mistgate.admin.v1.GetSubscriptionLinkRequest\x1a..mistgate.admin.v1.GetSubscriptionLinkResponse\x12k\n" +
+	"\x10GetTelegramLinks\x12*.mistgate.admin.v1.GetTelegramLinksRequest\x1a+.mistgate.admin.v1.GetTelegramLinksResponse\x12n\n" +
 	"\x11GetUserConnection\x12+.mistgate.admin.v1.GetUserConnectionRequest\x1a,.mistgate.admin.v1.GetUserConnectionResponseB\xc4\x01\n" +
 	"\x15com.mistgate.admin.v1B\tUserProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
@@ -3665,7 +3864,7 @@ func file_mistgate_admin_v1_user_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(UserStatus)(0),                     // 0: mistgate.admin.v1.UserStatus
 	(QuotaReset)(0),                     // 1: mistgate.admin.v1.QuotaReset
@@ -3710,16 +3909,19 @@ var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(*DeleteUsersResponse)(nil),         // 40: mistgate.admin.v1.DeleteUsersResponse
 	(*GetSubscriptionLinkRequest)(nil),  // 41: mistgate.admin.v1.GetSubscriptionLinkRequest
 	(*GetSubscriptionLinkResponse)(nil), // 42: mistgate.admin.v1.GetSubscriptionLinkResponse
-	(*LinkHour)(nil),                    // 43: mistgate.admin.v1.LinkHour
-	(App)(0),                            // 44: mistgate.admin.v1.App
-	(*ProfileFormat)(nil),               // 45: mistgate.admin.v1.ProfileFormat
+	(*GetTelegramLinksRequest)(nil),     // 43: mistgate.admin.v1.GetTelegramLinksRequest
+	(*TelegramProxyLink)(nil),           // 44: mistgate.admin.v1.TelegramProxyLink
+	(*GetTelegramLinksResponse)(nil),    // 45: mistgate.admin.v1.GetTelegramLinksResponse
+	(*LinkHour)(nil),                    // 46: mistgate.admin.v1.LinkHour
+	(App)(0),                            // 47: mistgate.admin.v1.App
+	(*ProfileFormat)(nil),               // 48: mistgate.admin.v1.ProfileFormat
 }
 var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
-	43, // 0: mistgate.admin.v1.DeviceConnection.hours:type_name -> mistgate.admin.v1.LinkHour
+	46, // 0: mistgate.admin.v1.DeviceConnection.hours:type_name -> mistgate.admin.v1.LinkHour
 	7,  // 1: mistgate.admin.v1.GetUserConnectionResponse.rows:type_name -> mistgate.admin.v1.DeviceConnection
 	0,  // 2: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
 	9,  // 3: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
-	44, // 4: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
+	47, // 4: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
 	1,  // 5: mistgate.admin.v1.User.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
 	10, // 6: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
 	4,  // 7: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
@@ -3728,7 +3930,7 @@ var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	11, // 10: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
 	13, // 11: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
 	5,  // 12: mistgate.admin.v1.Device.kind:type_name -> mistgate.admin.v1.DeviceKind
-	45, // 13: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	48, // 13: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
 	11, // 14: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
 	16, // 15: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
 	17, // 16: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
@@ -3752,35 +3954,38 @@ var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
 	11, // 34: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
 	11, // 35: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
 	11, // 36: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	12, // 37: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
-	15, // 38: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
-	23, // 39: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
-	25, // 40: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
-	29, // 41: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
-	31, // 42: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
-	33, // 43: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
-	35, // 44: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
-	37, // 45: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
-	39, // 46: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
-	41, // 47: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
-	6,  // 48: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
-	14, // 49: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
-	21, // 50: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
-	24, // 51: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
-	26, // 52: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
-	30, // 53: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
-	32, // 54: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
-	34, // 55: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
-	36, // 56: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
-	38, // 57: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
-	40, // 58: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
-	42, // 59: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
-	8,  // 60: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
-	49, // [49:61] is the sub-list for method output_type
-	37, // [37:49] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	44, // 37: mistgate.admin.v1.GetTelegramLinksResponse.links:type_name -> mistgate.admin.v1.TelegramProxyLink
+	12, // 38: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
+	15, // 39: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
+	23, // 40: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
+	25, // 41: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
+	29, // 42: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
+	31, // 43: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
+	33, // 44: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
+	35, // 45: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
+	37, // 46: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
+	39, // 47: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
+	41, // 48: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
+	43, // 49: mistgate.admin.v1.UserService.GetTelegramLinks:input_type -> mistgate.admin.v1.GetTelegramLinksRequest
+	6,  // 50: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
+	14, // 51: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
+	21, // 52: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
+	24, // 53: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
+	26, // 54: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
+	30, // 55: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
+	32, // 56: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
+	34, // 57: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
+	36, // 58: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
+	38, // 59: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
+	40, // 60: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
+	42, // 61: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
+	45, // 62: mistgate.admin.v1.UserService.GetTelegramLinks:output_type -> mistgate.admin.v1.GetTelegramLinksResponse
+	8,  // 63: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
+	51, // [51:64] is the sub-list for method output_type
+	38, // [38:51] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_user_proto_init() }
@@ -3797,7 +4002,7 @@ func file_mistgate_admin_v1_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_user_proto_rawDesc), len(file_mistgate_admin_v1_user_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   37,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -75,7 +75,7 @@ export function OnlineNow({ data }: { data: Plain<GetNodeResponse> }) {
             <span className="text-xs text-muted">{offline ? t("node.onlineOffline") : t("node.onlineNone")}</span>
           </div>
         )}
-        {node.online.map((o) => (
+        {(Array.isArray(node.online) ? node.online : []).map((o) => (
           <div key={o.protocol} className="flex flex-col gap-0.5">
             <span className="font-mono text-[22px] leading-tight font-bold">{o.users}</span>
             <span className="text-xs text-muted">{protocolName(o.protocol)}</span>
@@ -83,7 +83,7 @@ export function OnlineNow({ data }: { data: Plain<GetNodeResponse> }) {
         ))}
       </div>
       {shown.map((u, i) => {
-        const detail = [...u.models, u.connections > 1 ? t.n("node.connections", u.connections) : ""].filter(Boolean).join(" · ");
+        const detail = [...u.models, u.connections > 1 ? t.n("node.connections", u.connections) : ""].filter(Boolean).join(" Â· ");
         return (
           <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className="flex min-h-9 items-center gap-2.5 border-t border-line pt-2.5">
             <Avatar name={u.userName} index={i} />
@@ -119,7 +119,7 @@ export function TopToday({ data }: { data: Plain<GetNodeResponse> }) {
       tone="sky"
       title={
         <>
-          {t("node.topToday")} <span className="font-medium tracking-normal normal-case">· {t("nodes.todayHint")}</span>
+          {t("node.topToday")} <span className="font-medium tracking-normal normal-case">Â· {t("nodes.todayHint")}</span>
         </>
       }
       total={data.topToday.length}

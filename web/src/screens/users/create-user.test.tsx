@@ -84,14 +84,14 @@ describe("the new user form", () => {
     expect(text()).toContain("Subscription (Happ) — 2 nodes");
     expect(text()).toContain("AmneziaVPN keys — no: no AmneziaWG of the group runs on an enabled node");
     // Happ on, AmneziaVPN off with the reason, "all nodes" on
-    expect(switches()).toEqual(["true", "false", "true"]);
+    expect(switches()).toEqual(["true", "false", "false", "true"]);
     expect(text()).toContain("Off: no AmneziaWG of the group runs on a node");
     expect(text()).not.toContain("gets nothing yet");
 
     await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");
     await click(button("Create"));
     await settle();
-    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "Marina", groupId: "grp_all", apps: { happ: true, amnezia: false } }));
+    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "Marina", groupId: "grp_all", apps: { happ: true, amnezia: false, telegram: false } }));
   });
 
   it("says in red when the group gives nothing at all, and leaves Happ on", async () => {
