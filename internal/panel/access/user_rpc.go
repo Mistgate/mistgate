@@ -476,7 +476,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			if !slices.Contains(na.NodeProtocols, f.Profile.Protocol) {
 				na.NodeProtocols = append(na.NodeProtocols, f.Profile.Protocol)
 			}
-			if inGroup[f.Profile.ID] && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
+			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
 				na.Protocols = append(na.Protocols, f.Profile.Protocol)
 			}
 		}

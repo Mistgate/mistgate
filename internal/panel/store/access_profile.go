@@ -429,13 +429,14 @@ func scanAccessInboundFull(r rowScanner) (AccessInboundFull, error) {
 	return AccessInboundFull{Inbound: inbound, Profile: profile, Node: node}, nil
 }
 
-// AccessGroup is an access group: a named set of profiles.
+// AccessGroup is an access group: a named set of profiles with an optional disabled-node set.
 type AccessGroup struct {
-	ID, Name    string
-	ProfileIDs  []string
-	UserCount   int
-	CreatedAt   time.Time
-	DNSPresetID string // "" = the instance default
+	ID, Name        string
+	ProfileIDs      []string
+	DisabledNodeIDs []string
+	UserCount       int
+	CreatedAt       time.Time
+	DNSPresetID     string // "" = the instance default
 	// Color is a tone of GroupTones, "" = none picked. CreateGroup fills in the least used tone when it is empty.
 	Color string
 }
@@ -472,6 +473,7 @@ func (a Access) CreateGroup(ctx context.Context, g AccessGroup) error {
 	}
 	stmts := []Stmt{insert}
 	stmts = append(stmts, accSetGroupProfileStmts(g.ID, g.ProfileIDs)...)
+	stmts = append(stmts, accSetGroupDisabledNodeStmts(g.ID, g.DisabledNodeIDs)...)
 	_, err := a.s.batch(ctx, stmts...)
 	switch {
 	case accIsUnique(err):
@@ -486,6 +488,14 @@ func accSetGroupProfileStmts(groupID string, profileIDs []string) []Stmt {
 	stmts := []Stmt{{Query: `DELETE FROM user_group_profile WHERE group_id = ?`, Args: []any{groupID}}}
 	for _, pid := range profileIDs {
 		stmts = append(stmts, Stmt{Query: `INSERT OR IGNORE INTO user_group_profile (group_id, profile_id) VALUES (?, ?)`, Args: []any{groupID, pid}})
+	}
+	return stmts
+}
+
+func accSetGroupDisabledNodeStmts(groupID string, nodeIDs []string) []Stmt {
+	stmts := []Stmt{{Query: `DELETE FROM user_group_disabled_node WHERE group_id = ?`, Args: []any{groupID}}}
+	for _, nodeID := range nodeIDs {
+		stmts = append(stmts, Stmt{Query: `INSERT OR IGNORE INTO user_group_disabled_node (group_id, node_id) VALUES (?, ?)`, Args: []any{groupID, nodeID}})
 	}
 	return stmts
 }
@@ -523,6 +533,7 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 			return nil, err
 		}
 		g.ProfileIDs = []string{}
+		g.DisabledNodeIDs = []string{}
 		idx[g.ID] = len(out)
 		out = append(out, g)
 	}
@@ -545,7 +556,27 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 			out[i].ProfileIDs = append(out[i].ProfileIDs, pid)
 		}
 	}
-	return out, prow.Err()
+	if err := prow.Err(); err != nil {
+		prow.Close()
+		return nil, err
+	}
+	prow.Close()
+	drows, err := a.s.R.QueryContext(ctx,
+		`SELECT group_id, node_id FROM user_group_disabled_node WHERE (? = '' OR group_id = ?) ORDER BY node_id`, id, id)
+	if err != nil {
+		return nil, err
+	}
+	defer drows.Close()
+	for drows.Next() {
+		var gid, nodeID string
+		if err := drows.Scan(&gid, &nodeID); err != nil {
+			return nil, err
+		}
+		if i, ok := idx[gid]; ok {
+			out[i].DisabledNodeIDs = append(out[i].DisabledNodeIDs, nodeID)
+		}
+	}
+	return out, drows.Err()
 }
 
 func scanAccessGroup(r rowScanner) (AccessGroup, error) {
@@ -566,6 +597,11 @@ func scanAccessGroup(r rowScanner) (AccessGroup, error) {
 
 // UpdateGroup renames a group, replaces its profile set and/or its DNS preset, sets its colour (nil = unchanged, "" = none).
 func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profileIDs *[]string, dnsPresetID, color *string) error {
+	return a.UpdateGroupWithDisabledNodes(ctx, id, name, profileIDs, dnsPresetID, color, nil)
+}
+
+// UpdateGroupWithDisabledNodes updates a group and optionally replaces its disabled node set.
+func (a Access) UpdateGroupWithDisabledNodes(ctx context.Context, id string, name *string, profileIDs *[]string, dnsPresetID, color *string, disabledNodeIDs *[]string) error {
 	stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM user_group WHERE id = ?)`, id)}
 	if name != nil {
 		stmts = append(stmts, Stmt{Query: `UPDATE user_group SET name = ? WHERE id = ?`, Args: []any{*name, id}})
@@ -578,6 +614,9 @@ func (a Access) UpdateGroup(ctx context.Context, id string, name *string, profil
 	}
 	if profileIDs != nil {
 		stmts = append(stmts, accSetGroupProfileStmts(id, *profileIDs)...)
+	}
+	if disabledNodeIDs != nil {
+		stmts = append(stmts, accSetGroupDisabledNodeStmts(id, *disabledNodeIDs)...)
 	}
 	_, err := a.s.batch(ctx, stmts...)
 	if errors.Is(err, errGuard) {

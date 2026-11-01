@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   groups: { listGroups: () => Promise.resolve({ groups: [] }), updateGroup: (...a: unknown[]) => updateGroup(...a), createGroup: vi.fn() },
   profiles: { listProfiles: (...a: unknown[]) => listProfiles(...a), listProtocols: () => Promise.resolve({ protocols: [] }) },
+  nodes: { listNodes: () => Promise.resolve({ nodes: [{ id: "nod_1", name: "de1" }] }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { apps: [] }, effectiveTitle: "" }) },
 }));
@@ -76,6 +77,16 @@ describe("editing a group from the user card", () => {
     expect(radios[4]!.getAttribute("aria-checked")).toBe("true");
     await click(button("Save"));
     expect(updateGroup).toHaveBeenCalledWith(expect.objectContaining({ groupId: "grp_1", color: "sky" }));
+  });
+
+  it("saves a node disabled for the group", async () => {
+    listProfiles.mockResolvedValue({ profiles: [{ id: "p1", name: "reality" }] });
+    updateGroup.mockResolvedValue({ group });
+    await mount(<GroupEditModal group={group} open onOpenChange={vi.fn()} />);
+    expect(button("de1")?.getAttribute("aria-pressed")).toBe("true");
+    await click(button("de1"));
+    await click(button("Save"));
+    expect(updateGroup).toHaveBeenCalledWith(expect.objectContaining({ disabledNodeIds: { values: ["nod_1"] } }));
   });
 });
 

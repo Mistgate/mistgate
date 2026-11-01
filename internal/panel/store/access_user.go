@@ -779,6 +779,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var blocked int
 	var group AccessGroup
 	var groupProfileIDs []string
+	var groupDisabledNodeIDs []string
 	var inbounds []AccessInboundFull
 	var liveNodes []NodeLiveRow
 	var relays []RelayLink
@@ -806,6 +807,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
 		r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, groupID)
+		r.add(appendRows(&groupDisabledNodeIDs, scanString), `SELECT node_id FROM user_group_disabled_node WHERE group_id = ? ORDER BY node_id`, groupID)
 		r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
@@ -837,6 +839,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	}
 	if active {
 		out.Group.ProfileIDs = groupProfileIDs
+		out.Group.DisabledNodeIDs = groupDisabledNodeIDs
 	}
 	return out, nil
 }
@@ -1009,8 +1012,8 @@ func (a Access) revokeDevice(ctx context.Context, id string, now time.Time, cond
 }
 
 // AccessDesiredCred is a live credential that may go to a node: its user is active, belongs to a group
-// with the inbound's profile and has the node selected. The caller still checks the app toggles against
-// the protocol's Clients().
+// with the inbound's profile, the node is enabled for the group, and the user selected the node or chose all nodes. The caller
+// still checks the app toggles against the protocol's Clients().
 type AccessDesiredCred struct {
 	InboundID, CredID, UserID, DeviceID, Protocol, DataJSON string
 	SpeedLimitBps                                           uint64 // the person's limit (user.speed_limit_bps)
@@ -1032,6 +1035,7 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 		      AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
 		 WHERE i.node_id = ? AND i.enabled = 1
+		   AND NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)
 		 ORDER BY i.id, c.id`, nodeID)
 	if err != nil {
 		return nil, err

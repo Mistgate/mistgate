@@ -544,6 +544,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	var userNodeIDs []string
 	var group AccessGroup
 	groupProfileIDs := []string{}
+	groupDisabledNodeIDs := []string{}
 	var inbounds []AccessInboundFull
 	r := reads{}
 	r.add(oneRow(&device, scanAWGDeviceProfile), `SELECT d.id AS device_id, d.user_id AS device_user_id, d.platform, d.model, d.os_version,
@@ -564,6 +565,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color
 			FROM user_group g WHERE g.id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?))`, deviceID)
 	r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?)) ORDER BY profile_id`, deviceID)
+	r.add(appendRows(&groupDisabledNodeIDs, scanString), `SELECT node_id FROM user_group_disabled_node WHERE group_id = (SELECT u.group_id FROM user u WHERE u.id = (SELECT user_id FROM device WHERE id = ?)) ORDER BY node_id`, deviceID)
 	r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' AND i.profile_id = (
@@ -575,6 +577,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 	}
 	user.NodeIDs = userNodeIDs
 	group.ProfileIDs = groupProfileIDs
+	group.DisabledNodeIDs = groupDisabledNodeIDs
 	return AccessAWGDeviceScope{Device: device.Device, User: user, Group: group, Profile: device.Profile, Inbounds: inbounds}, nil
 }
 

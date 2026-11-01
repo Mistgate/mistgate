@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { App } from "@/gen/mistgate/admin/v1/common_pb";
+import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
 import type { ProfileFormat } from "@/gen/mistgate/admin/v1/profile_pb";
@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/toast";
 import { groups as groupsApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
+import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { FormatDrops } from "@/screens/profiles/formats";
 import { presetName } from "@/screens/subscriptions/model";
@@ -402,7 +403,7 @@ export function ColorSwatches({ value, onChange }: { value: string; onChange: (t
   );
 }
 /**
- * A group's name and profiles (all of them for a new one, unless `initialProfiles`); `dns` adds the DNS preset under "More".
+ * A group's name, profiles, and available nodes; `dns` adds the DNS preset under "More".
  * With `group` it edits that group. Taking a profile away from a group with people asks first: the server's dry run names
  * what they lose (and the AmneziaVPN keys that stop working), and the red button does it.
  */
@@ -434,16 +435,25 @@ export function GroupForm({
   // null = not touched: a new group then gets the least used tone (the server decides, the swatches show it), an old one keeps its own
   const [color, setColor] = useState<string | null>(null);
   const all = useQuery(groupsQuery).data;
+  const nodeList = useQuery(nodesQuery);
+  const nodeItems = (nodeList.data?.nodes ?? [])
+    .filter((n) => n.status !== NodeStatus.RETIRED)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
   const shownColor = color ?? (group ? groupTone(group.id, group.color) : leastUsedTone(all ?? []));
   const inheritedDns = useInheritedDns();
   const ids = chosen ?? profiles.map((p) => p.id);
+  const [disabledNodeIds, setDisabledNodeIds] = useState<string[]>(group?.disabledNodeIds ?? []);
+  const originalDisabledNodeIds = group?.disabledNodeIds ?? [];
+  const disabledNodeIdsChanged =
+    disabledNodeIds.length !== originalDisabledNodeIds.length || disabledNodeIds.some((id) => !originalDisabledNodeIds.includes(id));
   const [error, setError] = useState<string | null>(null);
   const [impact, setImpact] = useState<AccessImpact | null>(null);
   const lost = group ? group.profileIds.filter((id) => !ids.includes(id)) : [];
   const save = useMutation({
     mutationFn: async (confirmed: boolean) => {
-      if (!group) return (await groupsApi.createGroup({ name: name.trim(), profileIds: ids, dnsPresetId: dnsPreset, ...(color !== null && { color }) })).group;
-      const req = { groupId: group.id, name: name.trim(), profileIds: { values: ids }, dnsPresetId: dnsPreset, ...(color !== null && color !== group.color && { color }) };
+      if (!group) return (await groupsApi.createGroup({ name: name.trim(), profileIds: ids, ...(disabledNodeIds.length > 0 && { disabledNodeIds }), dnsPresetId: dnsPreset, ...(color !== null && { color }) })).group;
+      const req = { groupId: group.id, name: name.trim(), profileIds: { values: ids }, ...(disabledNodeIdsChanged && { disabledNodeIds: { values: disabledNodeIds } }), dnsPresetId: dnsPreset, ...(color !== null && color !== group.color && { color }) };
       if (!confirmed && group.userCount > 0 && lost.length > 0) {
         const dry = await groupsApi.updateGroup({ ...req, dryRun: true });
         if (dry.impact && dry.impact.lost.length > 0) {
@@ -456,7 +466,7 @@ export function GroupForm({
     onSuccess: async (res) => {
       if (!res) return;
       // a group change reaches its users' cards, devices and subscription previews, and the profiles' "where it runs"
-      await Promise.all(["groups", "users", "subs", "profiles"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+      await Promise.all(["groups", "users", "subs", "profiles", "nodes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
       onCreated(res);
     },
     onError: (e) => setError(errorText(e, t)),
@@ -509,6 +519,33 @@ export function GroupForm({
                 }}
               >
                 {p.name}
+              </PillToggle>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <SectionLabel icon="server" tone="sky">
+          {t("users.groupNodes")}
+        </SectionLabel>
+        <p className="text-xs leading-normal text-muted">{t("users.groupNodesHint")}</p>
+        {nodeList.isPending ? null : nodeList.isError ? (
+          <QueryError error={nodeList.error} onRetry={() => void nodeList.refetch()} />
+        ) : nodeItems.length === 0 ? (
+          <p className="text-xs leading-normal text-muted">{t("users.groupNoNodes")}</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {nodeItems.map((n) => (
+              <PillToggle
+                key={n.id}
+                on={!disabledNodeIds.includes(n.id)}
+                onClick={() =>
+                  setDisabledNodeIds((current) =>
+                    current.includes(n.id) ? current.filter((id) => id !== n.id) : [...current, n.id],
+                  )
+                }
+              >
+                {n.name}
               </PillToggle>
             ))}
           </div>
@@ -582,7 +619,7 @@ function DeleteGroupModal({ group, groups, onClose }: { group: Group | null; gro
       setError(errorText(e, t));
       throw e;
     }
-    await Promise.all(["groups", "users", "subs", "profiles"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+    await Promise.all(["groups", "users", "subs", "profiles", "nodes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
     toast(people > 0 && to ? t("users.groupMovedDeleted", { name: g.name, to: to.name }) : t("users.groupDeleted", { name: g.name }));
   }
 

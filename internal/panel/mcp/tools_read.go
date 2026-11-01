@@ -292,7 +292,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("groups_list", ProfileReadonly, procs(adminv1connect.GroupServiceListGroupsProcedure),
-			"The user groups: id, name, the profile ids each group gives, the number of users and the group's DNS preset. Use a group id with users_search or user_create.",
+			"The user groups: id, name, profile ids, disabled node ids (when present), user count and DNS preset. If disabled_node_ids is absent or empty, all nodes are available. Use a group id with users_search or user_create.",
 			func(c *call, _ noArgs) (any, error) {
 				r, err := c.cl.Group.ListGroups(c.ctx, connect.NewRequest(&adminv1.ListGroupsRequest{}))
 				if err != nil {

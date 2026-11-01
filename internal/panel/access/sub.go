@@ -950,6 +950,7 @@ func (s *Service) SetTouchHookForTest(hook func(started bool)) { s.touchHookForT
 func (s *Service) usable(f store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
 	return liveInbound(f) &&
 		slices.Contains(g.ProfileIDs, f.Profile.ID) &&
+		!slices.Contains(g.DisabledNodeIDs, f.Node.ID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, f.Node.ID)) &&
 		s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia)
 }

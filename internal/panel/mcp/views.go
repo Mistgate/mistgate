@@ -565,11 +565,12 @@ func usersView(r *adminv1.ListUsersResponse) *UsersV {
 // groups_list
 
 type groupV struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	ProfileIDs []string `json:"profile_ids,omitempty"`
-	UserCount  uint32   `json:"user_count"`
-	DNSPreset  string   `json:"dns_preset_id,omitempty"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	ProfileIDs      []string `json:"profile_ids,omitempty"`
+	DisabledNodeIDs []string `json:"disabled_node_ids,omitempty"`
+	UserCount       uint32   `json:"user_count"`
+	DNSPreset       string   `json:"dns_preset_id,omitempty"`
 }
 
 // GroupsV is the groups_list result.
@@ -592,6 +593,12 @@ func groupsView(r *adminv1.ListGroupsResponse) *GroupsV {
 				break
 			}
 			gv.ProfileIDs = append(gv.ProfileIDs, clean(id, 60))
+		}
+		for i, id := range g.GetDisabledNodeIds() {
+			if i == maxIDs {
+				break
+			}
+			gv.DisabledNodeIDs = append(gv.DisabledNodeIDs, clean(id, 60))
 		}
 		v.Groups = append(v.Groups, gv)
 	}

@@ -14,7 +14,8 @@ import "mistgate/admin/v1/profile.proto";
 //
 // EFFECTIVE ACCESS (what the panel turns into desired state for a node):
 //   for every inbound I (profile P on node N) and every non-revoked device credential C of user U:
-//     U.status == ACTIVE  AND  P in U.group.profiles  AND  (U.all_nodes OR N in U.nodes)
+//     U.status == ACTIVE  AND  P in U.group.profiles  AND  N not in U.group.disabled_node_ids
+//     AND  (U.all_nodes OR N in U.nodes)
 //     AND  some enabled app of U consumes P.protocol (Protocol.Clients)  AND  I is enabled  ->  C goes to N.
 //   Changing any of these changes desired state and is pushed to the nodes at once.
 //
@@ -200,7 +201,7 @@ message User {
   string effective_dns_preset_name = 24;
   DnsSource dns_source = 25;
   // What the user's page offers, by app, as the subscription decides it: the app is switched on and the group gives
-  // it something on a node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
+  // it something on an enabled group node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
   // the person gets nothing yet. The status does not cut them (a disabled user's page shows the status instead).
   bool access_happ = 26;
   bool access_amnezia = 27;

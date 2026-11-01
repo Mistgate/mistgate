@@ -64,6 +64,32 @@ func TestGroupReach(t *testing.T) {
 	}
 }
 
+func TestGroupDisabledNodeControlsSubscriptionAndDesiredState(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	otherGroup := e.group("other", f.profile)
+	u := e.user("alice", f.group, nil).User
+	other := e.user("bob", otherGroup, nil).User
+	token := e.tokenOf(u.Id)
+	must(e.s.Subscription(e.ctx, token))
+	must(e.s.Subscription(e.ctx, e.tokenOf(other.Id)))
+	if !f.desiredCreds()[u.Id] || !f.desiredCreds()[other.Id] {
+		t.Fatal("both users should initially have credentials on the node")
+	}
+	e.resetNotify()
+	g := must(e.s.UpdateGroup(e.ctx, req(&adminv1.UpdateGroupRequest{GroupId: f.group, DisabledNodeIds: &adminv1.NodeIds{Values: []string{f.nodeID}}}))).Msg.Group
+	if g.HappNodes != 0 || e.notify.n.Load() == 0 || f.desiredCreds()[u.Id] || !f.desiredCreds()[other.Id] {
+		t.Fatalf("disabled node: group=%+v notified=%d desired=%v", g, e.notify.n.Load(), f.desiredCreds())
+	}
+	if v := must(e.s.Subscription(e.ctx, token)); v.AccessHapp {
+		t.Fatal("subscription still offers the disabled node")
+	}
+	must(e.s.UpdateGroup(e.ctx, req(&adminv1.UpdateGroupRequest{GroupId: f.group, DisabledNodeIds: &adminv1.NodeIds{}})))
+	if !f.desiredCreds()[u.Id] || !must(e.s.Subscription(e.ctx, token)).AccessHapp {
+		t.Fatal("reenabling the node should restore access")
+	}
+}
+
 func TestUserAccess(t *testing.T) {
 	m := newMixed(t)
 	e := m.e

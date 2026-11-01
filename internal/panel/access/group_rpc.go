@@ -23,7 +23,7 @@ func (s *Service) groupProtos(ctx context.Context, gs ...store.AccessGroup) ([]*
 	for i, g := range gs {
 		happ, amnezia := s.reachOf(g, full)
 		out[i] = &adminv1.Group{Id: g.ID, Name: g.Name, ProfileIds: g.ProfileIDs, UserCount: uint32(g.UserCount), DnsPresetId: g.DNSPresetID,
-			HappNodes: happ, AmneziaNodes: amnezia, Color: g.Color}
+			HappNodes: happ, AmneziaNodes: amnezia, Color: g.Color, DisabledNodeIds: g.DisabledNodeIDs}
 	}
 	return out, nil
 }
@@ -33,7 +33,7 @@ func (s *Service) groupProtos(ctx context.Context, gs ...store.AccessGroup) ([]*
 func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia uint32) {
 	hn, an := map[string]bool{}, map[string]bool{}
 	for _, f := range full {
-		if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) {
+		if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) || slices.Contains(g.DisabledNodeIDs, f.Node.ID) {
 			continue
 		}
 		proto, ok := s.reg.Get(f.Profile.Protocol)
@@ -108,7 +108,7 @@ func groupErr(s *Service, op string, err error) error {
 	case errors.Is(err, store.ErrAccessExists):
 		return coded(connect.CodeAlreadyExists, "name_taken")
 	case errors.Is(err, store.ErrNotFound):
-		return notFound("group or profile")
+		return notFound("group, profile or node")
 	}
 	return s.internal(op, err)
 }
@@ -125,7 +125,8 @@ func (s *Service) CreateGroup(ctx context.Context, req *connect.Request[adminv1.
 		return nil, err
 	}
 	g := store.AccessGroup{ID: store.NewID("grp_"), Name: name, ProfileIDs: slices.Compact(slices.Sorted(slices.Values(req.Msg.ProfileIds))),
-		CreatedAt: s.now(), DNSPresetID: req.Msg.DnsPresetId, Color: req.Msg.Color}
+		DisabledNodeIDs: slices.Compact(slices.Sorted(slices.Values(req.Msg.DisabledNodeIds))),
+		CreatedAt:       s.now(), DNSPresetID: req.Msg.DnsPresetId, Color: req.Msg.Color}
 	a := s.st.Access()
 	if err := a.CreateGroup(ctx, g); err != nil {
 		return nil, groupErr(s, "create group", err)
@@ -158,6 +159,11 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 		ids := slices.Compact(slices.Sorted(slices.Values(m.ProfileIds.Values)))
 		profiles = &ids
 	}
+	var disabledNodeIDs *[]string
+	if m.DisabledNodeIds != nil {
+		ids := slices.Compact(slices.Sorted(slices.Values(m.DisabledNodeIds.Values)))
+		disabledNodeIDs = &ids
+	}
 	if m.DnsPresetId != nil {
 		if err := s.checkDNSPreset(ctx, *m.DnsPresetId); err != nil {
 			return nil, err
@@ -186,16 +192,16 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 	}
 	got := before
 	if !m.DryRun {
-		if err := a.UpdateGroup(ctx, m.GroupId, name, profiles, m.DnsPresetId, m.Color); err != nil {
+		if err := a.UpdateGroupWithDisabledNodes(ctx, m.GroupId, name, profiles, m.DnsPresetId, m.Color, disabledNodeIDs); err != nil {
 			return nil, groupErr(s, "update group", err)
 		}
 		if got, err = a.Group(ctx, m.GroupId); err != nil {
 			return nil, s.internal("get group", err)
 		}
-		if !slices.Equal(before.ProfileIDs, got.ProfileIDs) && got.UserCount > 0 {
-			s.notify.StateChanged() // the users of the group gained or lost profiles
+		if got.UserCount > 0 && (!slices.Equal(before.ProfileIDs, got.ProfileIDs) || !slices.Equal(before.DisabledNodeIDs, got.DisabledNodeIDs)) {
+			s.notify.StateChanged() // the users of the group gained or lost access
 		}
-		s.audit(ctx, actor(ctx), "group_update", map[string]any{"group": got.ID, "name": got.Name})
+		s.audit(ctx, actor(ctx), "group_update", map[string]any{"group": got.ID, "name": got.Name, "disabled_nodes": got.DisabledNodeIDs})
 	}
 	out, err := s.groupProtos(ctx, got)
 	if err != nil {

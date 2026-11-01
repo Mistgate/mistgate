@@ -31,6 +31,7 @@ vi.mock("@/lib/api", async (orig) => ({
       }),
     listProtocols: () => Promise.resolve({ protocols: [{ id: "hysteria2", apps: [App.HAPP] }, { id: "awg", apps: [App.AMNEZIA] }] }),
   },
+  nodes: { listNodes: () => Promise.resolve({ nodes: [] }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { apps: [{ kind: App.HAPP, name: "Happ" }] }, effectiveTitle: "" }) },
@@ -95,7 +96,7 @@ describe("the Groups tab", () => {
     expect(people.dataset.search).toBe(JSON.stringify({ group: "grp_all" }));
     expect(text()).toContain("Subscription (Happ) · 2 nodes");
     // the AmneziaWG profile is in the group but runs on no node: said in the row, in warning colour
-    expect(text()).toContain("AmneziaVPN keys · no AmneziaWG of the group runs on a node");
+    expect(text()).toContain("AmneziaVPN keys · no AmneziaWG of the group runs on an enabled node");
     const profile = [...document.querySelectorAll<HTMLAnchorElement>("a")].find((a) => a.textContent === "AWG 3.1")!;
     expect(profile.getAttribute("href")).toBe("/profiles/$id");
     expect(profile.dataset.params).toBe(JSON.stringify({ id: "p_awg" }));

@@ -751,6 +751,12 @@
   },
   {
     "type": "table",
+    "name": "user_group_disabled_node",
+    "tbl_name": "user_group_disabled_node",
+    "sql": "CREATE TABLE user_group_disabled_node ( group_id TEXT NOT NULL REFERENCES user_group (id) ON DELETE CASCADE, node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, PRIMARY KEY (group_id, node_id) ) STRICT, WITHOUT ROWID"
+  },
+  {
+    "type": "table",
     "name": "user_group_profile",
     "tbl_name": "user_group_profile",
     "sql": "CREATE TABLE user_group_profile ( group_id TEXT NOT NULL REFERENCES user_group (id) ON DELETE CASCADE, profile_id TEXT NOT NULL REFERENCES profile (id) ON DELETE CASCADE, PRIMARY KEY (group_id, profile_id) ) STRICT, WITHOUT ROWID"

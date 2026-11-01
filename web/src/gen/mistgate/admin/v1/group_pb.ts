@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/group.proto.
  */
 export const file_mistgate_admin_v1_group: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9ncm91cC5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEimwEKBUdyb3VwEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLcHJvZmlsZV9pZHMYAyADKAkSEgoKdXNlcl9jb3VudBgEIAEoDRIVCg1kbnNfcHJlc2V0X2lkGAUgASgJEhIKCmhhcHBfbm9kZXMYBiABKA0SFQoNYW1uZXppYV9ub2RlcxgHIAEoDRINCgVjb2xvchgIIAEoCSITChFMaXN0R3JvdXBzUmVxdWVzdCI+ChJMaXN0R3JvdXBzUmVzcG9uc2USKAoGZ3JvdXBzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAiXQoSQ3JlYXRlR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcHJvZmlsZV9pZHMYAiADKAkSFQoNZG5zX3ByZXNldF9pZBgDIAEoCRINCgVjb2xvchgEIAEoCSI+ChNDcmVhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAi6AEKElVwZGF0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESNwoLcHJvZmlsZV9pZHMYAyABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Qcm9maWxlSWRzSAGIAQESGgoNZG5zX3ByZXNldF9pZBgEIAEoCUgCiAEBEg8KB2RyeV9ydW4YBSABKAgSEgoFY29sb3IYBiABKAlIA4gBAUIHCgVfbmFtZUIOCgxfcHJvZmlsZV9pZHNCEAoOX2Ruc19wcmVzZXRfaWRCCAoGX2NvbG9yIhwKClByb2ZpbGVJZHMSDgoGdmFsdWVzGAEgAygJIm8KE1VwZGF0ZUdyb3VwUmVzcG9uc2USJwoFZ3JvdXAYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5Hcm91cBIvCgZpbXBhY3QYAiABKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5BY2Nlc3NJbXBhY3QiPQoSRGVsZXRlR3JvdXBSZXF1ZXN0EhAKCGdyb3VwX2lkGAEgASgJEhUKDW1vdmVfdXNlcnNfdG8YAiABKAkiFQoTRGVsZXRlR3JvdXBSZXNwb25zZTKDAwoMR3JvdXBTZXJ2aWNlElkKCkxpc3RHcm91cHMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0R3JvdXBzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RHcm91cHNSZXNwb25zZRJcCgtDcmVhdGVHcm91cBIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVzcG9uc2USXAoLVXBkYXRlR3JvdXASJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlc3BvbnNlElwKC0RlbGV0ZUdyb3VwEiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQgpHcm91cFByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM", [file_mistgate_admin_v1_user]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9ncm91cC5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEitgEKBUdyb3VwEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLcHJvZmlsZV9pZHMYAyADKAkSEgoKdXNlcl9jb3VudBgEIAEoDRIVCg1kbnNfcHJlc2V0X2lkGAUgASgJEhIKCmhhcHBfbm9kZXMYBiABKA0SFQoNYW1uZXppYV9ub2RlcxgHIAEoDRINCgVjb2xvchgIIAEoCRIZChFkaXNhYmxlZF9ub2RlX2lkcxgJIAMoCSITChFMaXN0R3JvdXBzUmVxdWVzdCI+ChJMaXN0R3JvdXBzUmVzcG9uc2USKAoGZ3JvdXBzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAieAoSQ3JlYXRlR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcHJvZmlsZV9pZHMYAiADKAkSFQoNZG5zX3ByZXNldF9pZBgDIAEoCRINCgVjb2xvchgEIAEoCRIZChFkaXNhYmxlZF9ub2RlX2lkcxgFIAMoCSI+ChNDcmVhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAiugIKElVwZGF0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESNwoLcHJvZmlsZV9pZHMYAyABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Qcm9maWxlSWRzSAGIAQESGgoNZG5zX3ByZXNldF9pZBgEIAEoCUgCiAEBEg8KB2RyeV9ydW4YBSABKAgSEgoFY29sb3IYBiABKAlIA4gBARI6ChFkaXNhYmxlZF9ub2RlX2lkcxgHIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVJZHNIBIgBAUIHCgVfbmFtZUIOCgxfcHJvZmlsZV9pZHNCEAoOX2Ruc19wcmVzZXRfaWRCCAoGX2NvbG9yQhQKEl9kaXNhYmxlZF9ub2RlX2lkcyIcCgpQcm9maWxlSWRzEg4KBnZhbHVlcxgBIAMoCSIZCgdOb2RlSWRzEg4KBnZhbHVlcxgBIAMoCSJvChNVcGRhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXASLwoGaW1wYWN0GAIgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuQWNjZXNzSW1wYWN0Ij0KEkRlbGV0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIVCg1tb3ZlX3VzZXJzX3RvGAIgASgJIhUKE0RlbGV0ZUdyb3VwUmVzcG9uc2UygwMKDEdyb3VwU2VydmljZRJZCgpMaXN0R3JvdXBzEiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdEdyb3Vwc1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0R3JvdXBzUmVzcG9uc2USXAoLQ3JlYXRlR3JvdXASJS5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVHcm91cFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVHcm91cFJlc3BvbnNlElwKC1VwZGF0ZUdyb3VwEiUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlR3JvdXBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlR3JvdXBSZXNwb25zZRJcCgtEZWxldGVHcm91cBIlLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZUdyb3VwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZUdyb3VwUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIKR3JvdXBQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_user]);
 
 /**
  * @generated from message mistgate.admin.v1.Group
@@ -66,6 +66,13 @@ export type Group = Message<"mistgate.admin.v1.Group"> & {
    * @generated from field: string color = 8;
    */
   color: string;
+
+  /**
+   * Nodes that are disabled for users in this group. Empty = every node is available, including future nodes.
+   *
+   * @generated from field: repeated string disabled_node_ids = 9;
+   */
+  disabledNodeIds: string[];
 };
 
 /**
@@ -130,6 +137,11 @@ export type CreateGroupRequest = Message<"mistgate.admin.v1.CreateGroupRequest">
    * @generated from field: string color = 4;
    */
   color: string;
+
+  /**
+   * @generated from field: repeated string disabled_node_ids = 5;
+   */
+  disabledNodeIds: string[];
 };
 
 /**
@@ -197,6 +209,13 @@ export type UpdateGroupRequest = Message<"mistgate.admin.v1.UpdateGroupRequest">
    * @generated from field: optional string color = 6;
    */
   color?: string | undefined;
+
+  /**
+   * Presence = replace the group's disabled node set.
+   *
+   * @generated from field: optional mistgate.admin.v1.NodeIds disabled_node_ids = 7;
+   */
+  disabledNodeIds?: NodeIds | undefined;
 };
 
 /**
@@ -224,6 +243,23 @@ export const ProfileIdsSchema: GenMessage<ProfileIds> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_group, 6);
 
 /**
+ * @generated from message mistgate.admin.v1.NodeIds
+ */
+export type NodeIds = Message<"mistgate.admin.v1.NodeIds"> & {
+  /**
+   * @generated from field: repeated string values = 1;
+   */
+  values: string[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.NodeIds.
+ * Use `create(NodeIdsSchema)` to create a new message.
+ */
+export const NodeIdsSchema: GenMessage<NodeIds> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_group, 7);
+
+/**
  * @generated from message mistgate.admin.v1.UpdateGroupResponse
  */
 export type UpdateGroupResponse = Message<"mistgate.admin.v1.UpdateGroupResponse"> & {
@@ -247,7 +283,7 @@ export type UpdateGroupResponse = Message<"mistgate.admin.v1.UpdateGroupResponse
  * Use `create(UpdateGroupResponseSchema)` to create a new message.
  */
 export const UpdateGroupResponseSchema: GenMessage<UpdateGroupResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_group, 7);
+  messageDesc(file_mistgate_admin_v1_group, 8);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteGroupRequest
@@ -272,7 +308,7 @@ export type DeleteGroupRequest = Message<"mistgate.admin.v1.DeleteGroupRequest">
  * Use `create(DeleteGroupRequestSchema)` to create a new message.
  */
 export const DeleteGroupRequestSchema: GenMessage<DeleteGroupRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_group, 8);
+  messageDesc(file_mistgate_admin_v1_group, 9);
 
 /**
  * @generated from message mistgate.admin.v1.DeleteGroupResponse
@@ -285,10 +321,10 @@ export type DeleteGroupResponse = Message<"mistgate.admin.v1.DeleteGroupResponse
  * Use `create(DeleteGroupResponseSchema)` to create a new message.
  */
 export const DeleteGroupResponseSchema: GenMessage<DeleteGroupResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_group, 9);
+  messageDesc(file_mistgate_admin_v1_group, 10);
 
 /**
- * Access groups (a group is a set of profiles). The users screen has a
+ * Access groups (a group is a set of profiles, with optional nodes disabled for its users). The users screen has a
  * "Groups" tab for them; the create-user form and the user card pick one, and the profile page adds a profile to them.
  *
  * @generated from service mistgate.admin.v1.GroupService

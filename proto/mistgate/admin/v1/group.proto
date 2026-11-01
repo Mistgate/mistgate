@@ -4,7 +4,7 @@ package mistgate.admin.v1;
 
 import "mistgate/admin/v1/user.proto";
 
-// Access groups (a group is a set of profiles). The users screen has a
+// Access groups (a group is a set of profiles, with optional nodes disabled for its users). The users screen has a
 // "Groups" tab for them; the create-user form and the user card pick one, and the profile page adds a profile to them.
 service GroupService {
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
@@ -29,6 +29,8 @@ message Group {
   // The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
   // picked (the admin then derives one from the id).
   string color = 8;
+  // Nodes that are disabled for users in this group. Empty = every node is available, including future nodes.
+  repeated string disabled_node_ids = 9;
 }
 
 message ListGroupsRequest {}
@@ -43,6 +45,7 @@ message CreateGroupRequest {
   string dns_preset_id = 3;
   // A tone of the palette (Group.color); "" = the least used one among the groups so far.
   string color = 4;
+  repeated string disabled_node_ids = 5;
 }
 
 message CreateGroupResponse {
@@ -60,9 +63,15 @@ message UpdateGroupRequest {
   bool dry_run = 5;
   // Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
   optional string color = 6;
+  // Presence = replace the group's disabled node set.
+  optional NodeIds disabled_node_ids = 7;
 }
 
 message ProfileIds {
+  repeated string values = 1;
+}
+
+message NodeIds {
   repeated string values = 1;
 }
 

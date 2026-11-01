@@ -17,7 +17,7 @@ type NodeInbound struct {
 // Desired computes what a node should run: its enabled inbounds and, for each, the credentials allowed by
 // the effective-access rule written at the top of user.proto:
 //
-//	user ACTIVE AND profile in the user's group AND (all nodes OR node selected)
+//	user ACTIVE AND profile in the user's group AND node enabled for the group AND (all nodes OR node selected)
 //	AND one of the user's enabled apps consumes the protocol AND the inbound is enabled.
 //
 // The fleet module turns the result into the agent's DesiredState. An inbound whose settings cannot be

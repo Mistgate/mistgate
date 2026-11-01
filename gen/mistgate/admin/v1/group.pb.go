@@ -36,9 +36,11 @@ type Group struct {
 	AmneziaNodes uint32 `protobuf:"varint,7,opt,name=amnezia_nodes,json=amneziaNodes,proto3" json:"amnezia_nodes,omitempty"`
 	// The colour of the group's chip: a tone name of the admin's palette (lavender, sand, sage, rose, sky, mint), "" = none
 	// picked (the admin then derives one from the id).
-	Color         string `protobuf:"bytes,8,opt,name=color,proto3" json:"color,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Color string `protobuf:"bytes,8,opt,name=color,proto3" json:"color,omitempty"`
+	// Nodes that are disabled for users in this group. Empty = every node is available, including future nodes.
+	DisabledNodeIds []string `protobuf:"bytes,9,rep,name=disabled_node_ids,json=disabledNodeIds,proto3" json:"disabled_node_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Group) Reset() {
@@ -127,6 +129,13 @@ func (x *Group) GetColor() string {
 	return ""
 }
 
+func (x *Group) GetDisabledNodeIds() []string {
+	if x != nil {
+		return x.DisabledNodeIds
+	}
+	return nil
+}
+
 type ListGroupsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -213,9 +222,10 @@ type CreateGroupRequest struct {
 	ProfileIds  []string               `protobuf:"bytes,2,rep,name=profile_ids,json=profileIds,proto3" json:"profile_ids,omitempty"`
 	DnsPresetId string                 `protobuf:"bytes,3,opt,name=dns_preset_id,json=dnsPresetId,proto3" json:"dns_preset_id,omitempty"`
 	// A tone of the palette (Group.color); "" = the least used one among the groups so far.
-	Color         string `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Color           string   `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
+	DisabledNodeIds []string `protobuf:"bytes,5,rep,name=disabled_node_ids,json=disabledNodeIds,proto3" json:"disabled_node_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateGroupRequest) Reset() {
@@ -276,6 +286,13 @@ func (x *CreateGroupRequest) GetColor() string {
 	return ""
 }
 
+func (x *CreateGroupRequest) GetDisabledNodeIds() []string {
+	if x != nil {
+		return x.DisabledNodeIds
+	}
+	return nil
+}
+
 type CreateGroupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Group         *Group                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
@@ -331,9 +348,11 @@ type UpdateGroupRequest struct {
 	// Check the change and say what it does (UpdateGroupResponse.impact); nothing is written, the nodes hear nothing.
 	DryRun bool `protobuf:"varint,5,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
 	// Presence = set the colour (a tone of the palette, see Group.color; "" = none picked). INVALID_ARGUMENT for a name outside it.
-	Color         *string `protobuf:"bytes,6,opt,name=color,proto3,oneof" json:"color,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Color *string `protobuf:"bytes,6,opt,name=color,proto3,oneof" json:"color,omitempty"`
+	// Presence = replace the group's disabled node set.
+	DisabledNodeIds *NodeIds `protobuf:"bytes,7,opt,name=disabled_node_ids,json=disabledNodeIds,proto3,oneof" json:"disabled_node_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *UpdateGroupRequest) Reset() {
@@ -408,6 +427,13 @@ func (x *UpdateGroupRequest) GetColor() string {
 	return ""
 }
 
+func (x *UpdateGroupRequest) GetDisabledNodeIds() *NodeIds {
+	if x != nil {
+		return x.DisabledNodeIds
+	}
+	return nil
+}
+
 type ProfileIds struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Values        []string               `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
@@ -452,6 +478,50 @@ func (x *ProfileIds) GetValues() []string {
 	return nil
 }
 
+type NodeIds struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Values        []string               `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeIds) Reset() {
+	*x = NodeIds{}
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeIds) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeIds) ProtoMessage() {}
+
+func (x *NodeIds) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeIds.ProtoReflect.Descriptor instead.
+func (*NodeIds) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *NodeIds) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
 type UpdateGroupResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The group after the update; with dry_run, as it is now.
@@ -464,7 +534,7 @@ type UpdateGroupResponse struct {
 
 func (x *UpdateGroupResponse) Reset() {
 	*x = UpdateGroupResponse{}
-	mi := &file_mistgate_admin_v1_group_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -476,7 +546,7 @@ func (x *UpdateGroupResponse) String() string {
 func (*UpdateGroupResponse) ProtoMessage() {}
 
 func (x *UpdateGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_group_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -489,7 +559,7 @@ func (x *UpdateGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGroupResponse.ProtoReflect.Descriptor instead.
 func (*UpdateGroupResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateGroupResponse) GetGroup() *Group {
@@ -518,7 +588,7 @@ type DeleteGroupRequest struct {
 
 func (x *DeleteGroupRequest) Reset() {
 	*x = DeleteGroupRequest{}
-	mi := &file_mistgate_admin_v1_group_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +600,7 @@ func (x *DeleteGroupRequest) String() string {
 func (*DeleteGroupRequest) ProtoMessage() {}
 
 func (x *DeleteGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_group_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -543,7 +613,7 @@ func (x *DeleteGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteGroupRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DeleteGroupRequest) GetGroupId() string {
@@ -568,7 +638,7 @@ type DeleteGroupResponse struct {
 
 func (x *DeleteGroupResponse) Reset() {
 	*x = DeleteGroupResponse{}
-	mi := &file_mistgate_admin_v1_group_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +650,7 @@ func (x *DeleteGroupResponse) String() string {
 func (*DeleteGroupResponse) ProtoMessage() {}
 
 func (x *DeleteGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_group_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_group_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,14 +663,14 @@ func (x *DeleteGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteGroupResponse.ProtoReflect.Descriptor instead.
 func (*DeleteGroupResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_group_proto_rawDescGZIP(), []int{10}
 }
 
 var File_mistgate_admin_v1_group_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\xe9\x01\n" +
+	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\x95\x02\n" +
 	"\x05Group\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
@@ -612,18 +682,20 @@ const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\n" +
 	"happ_nodes\x18\x06 \x01(\rR\thappNodes\x12#\n" +
 	"\ramnezia_nodes\x18\a \x01(\rR\famneziaNodes\x12\x14\n" +
-	"\x05color\x18\b \x01(\tR\x05color\"\x13\n" +
+	"\x05color\x18\b \x01(\tR\x05color\x12*\n" +
+	"\x11disabled_node_ids\x18\t \x03(\tR\x0fdisabledNodeIds\"\x13\n" +
 	"\x11ListGroupsRequest\"F\n" +
 	"\x12ListGroupsResponse\x120\n" +
-	"\x06groups\x18\x01 \x03(\v2\x18.mistgate.admin.v1.GroupR\x06groups\"\x83\x01\n" +
+	"\x06groups\x18\x01 \x03(\v2\x18.mistgate.admin.v1.GroupR\x06groups\"\xaf\x01\n" +
 	"\x12CreateGroupRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
 	"\vprofile_ids\x18\x02 \x03(\tR\n" +
 	"profileIds\x12\"\n" +
 	"\rdns_preset_id\x18\x03 \x01(\tR\vdnsPresetId\x12\x14\n" +
-	"\x05color\x18\x04 \x01(\tR\x05color\"E\n" +
+	"\x05color\x18\x04 \x01(\tR\x05color\x12*\n" +
+	"\x11disabled_node_ids\x18\x05 \x03(\tR\x0fdisabledNodeIds\"E\n" +
 	"\x13CreateGroupResponse\x12.\n" +
-	"\x05group\x18\x01 \x01(\v2\x18.mistgate.admin.v1.GroupR\x05group\"\x9f\x02\n" +
+	"\x05group\x18\x01 \x01(\v2\x18.mistgate.admin.v1.GroupR\x05group\"\x82\x03\n" +
 	"\x12UpdateGroupRequest\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12C\n" +
@@ -631,13 +703,17 @@ const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"profileIds\x88\x01\x01\x12'\n" +
 	"\rdns_preset_id\x18\x04 \x01(\tH\x02R\vdnsPresetId\x88\x01\x01\x12\x17\n" +
 	"\adry_run\x18\x05 \x01(\bR\x06dryRun\x12\x19\n" +
-	"\x05color\x18\x06 \x01(\tH\x03R\x05color\x88\x01\x01B\a\n" +
+	"\x05color\x18\x06 \x01(\tH\x03R\x05color\x88\x01\x01\x12K\n" +
+	"\x11disabled_node_ids\x18\a \x01(\v2\x1a.mistgate.admin.v1.NodeIdsH\x04R\x0fdisabledNodeIds\x88\x01\x01B\a\n" +
 	"\x05_nameB\x0e\n" +
 	"\f_profile_idsB\x10\n" +
 	"\x0e_dns_preset_idB\b\n" +
-	"\x06_color\"$\n" +
+	"\x06_colorB\x14\n" +
+	"\x12_disabled_node_ids\"$\n" +
 	"\n" +
 	"ProfileIds\x12\x16\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\"!\n" +
+	"\aNodeIds\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\"~\n" +
 	"\x13UpdateGroupResponse\x12.\n" +
 	"\x05group\x18\x01 \x01(\v2\x18.mistgate.admin.v1.GroupR\x05group\x127\n" +
@@ -667,7 +743,7 @@ func file_mistgate_admin_v1_group_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_group_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_group_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_mistgate_admin_v1_group_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_mistgate_admin_v1_group_proto_goTypes = []any{
 	(*Group)(nil),               // 0: mistgate.admin.v1.Group
 	(*ListGroupsRequest)(nil),   // 1: mistgate.admin.v1.ListGroupsRequest
@@ -676,30 +752,32 @@ var file_mistgate_admin_v1_group_proto_goTypes = []any{
 	(*CreateGroupResponse)(nil), // 4: mistgate.admin.v1.CreateGroupResponse
 	(*UpdateGroupRequest)(nil),  // 5: mistgate.admin.v1.UpdateGroupRequest
 	(*ProfileIds)(nil),          // 6: mistgate.admin.v1.ProfileIds
-	(*UpdateGroupResponse)(nil), // 7: mistgate.admin.v1.UpdateGroupResponse
-	(*DeleteGroupRequest)(nil),  // 8: mistgate.admin.v1.DeleteGroupRequest
-	(*DeleteGroupResponse)(nil), // 9: mistgate.admin.v1.DeleteGroupResponse
-	(*AccessImpact)(nil),        // 10: mistgate.admin.v1.AccessImpact
+	(*NodeIds)(nil),             // 7: mistgate.admin.v1.NodeIds
+	(*UpdateGroupResponse)(nil), // 8: mistgate.admin.v1.UpdateGroupResponse
+	(*DeleteGroupRequest)(nil),  // 9: mistgate.admin.v1.DeleteGroupRequest
+	(*DeleteGroupResponse)(nil), // 10: mistgate.admin.v1.DeleteGroupResponse
+	(*AccessImpact)(nil),        // 11: mistgate.admin.v1.AccessImpact
 }
 var file_mistgate_admin_v1_group_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.ListGroupsResponse.groups:type_name -> mistgate.admin.v1.Group
 	0,  // 1: mistgate.admin.v1.CreateGroupResponse.group:type_name -> mistgate.admin.v1.Group
 	6,  // 2: mistgate.admin.v1.UpdateGroupRequest.profile_ids:type_name -> mistgate.admin.v1.ProfileIds
-	0,  // 3: mistgate.admin.v1.UpdateGroupResponse.group:type_name -> mistgate.admin.v1.Group
-	10, // 4: mistgate.admin.v1.UpdateGroupResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
-	1,  // 5: mistgate.admin.v1.GroupService.ListGroups:input_type -> mistgate.admin.v1.ListGroupsRequest
-	3,  // 6: mistgate.admin.v1.GroupService.CreateGroup:input_type -> mistgate.admin.v1.CreateGroupRequest
-	5,  // 7: mistgate.admin.v1.GroupService.UpdateGroup:input_type -> mistgate.admin.v1.UpdateGroupRequest
-	8,  // 8: mistgate.admin.v1.GroupService.DeleteGroup:input_type -> mistgate.admin.v1.DeleteGroupRequest
-	2,  // 9: mistgate.admin.v1.GroupService.ListGroups:output_type -> mistgate.admin.v1.ListGroupsResponse
-	4,  // 10: mistgate.admin.v1.GroupService.CreateGroup:output_type -> mistgate.admin.v1.CreateGroupResponse
-	7,  // 11: mistgate.admin.v1.GroupService.UpdateGroup:output_type -> mistgate.admin.v1.UpdateGroupResponse
-	9,  // 12: mistgate.admin.v1.GroupService.DeleteGroup:output_type -> mistgate.admin.v1.DeleteGroupResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	7,  // 3: mistgate.admin.v1.UpdateGroupRequest.disabled_node_ids:type_name -> mistgate.admin.v1.NodeIds
+	0,  // 4: mistgate.admin.v1.UpdateGroupResponse.group:type_name -> mistgate.admin.v1.Group
+	11, // 5: mistgate.admin.v1.UpdateGroupResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
+	1,  // 6: mistgate.admin.v1.GroupService.ListGroups:input_type -> mistgate.admin.v1.ListGroupsRequest
+	3,  // 7: mistgate.admin.v1.GroupService.CreateGroup:input_type -> mistgate.admin.v1.CreateGroupRequest
+	5,  // 8: mistgate.admin.v1.GroupService.UpdateGroup:input_type -> mistgate.admin.v1.UpdateGroupRequest
+	9,  // 9: mistgate.admin.v1.GroupService.DeleteGroup:input_type -> mistgate.admin.v1.DeleteGroupRequest
+	2,  // 10: mistgate.admin.v1.GroupService.ListGroups:output_type -> mistgate.admin.v1.ListGroupsResponse
+	4,  // 11: mistgate.admin.v1.GroupService.CreateGroup:output_type -> mistgate.admin.v1.CreateGroupResponse
+	8,  // 12: mistgate.admin.v1.GroupService.UpdateGroup:output_type -> mistgate.admin.v1.UpdateGroupResponse
+	10, // 13: mistgate.admin.v1.GroupService.DeleteGroup:output_type -> mistgate.admin.v1.DeleteGroupResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_group_proto_init() }
@@ -715,7 +793,7 @@ func file_mistgate_admin_v1_group_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_group_proto_rawDesc), len(file_mistgate_admin_v1_group_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
