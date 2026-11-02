@@ -135,6 +135,7 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     // "RU" and "443, 8443" as the sentence needs them: "from Russia", "ports 443 and 8443"
     params.country = countryIn(t, a.params.country ?? "");
+    params.networks = networksShort(t, a.params.networks ?? "");
     const ports = (a.params.ports ?? "").split(",").map((p) => p.trim()).filter(Boolean);
     params.ports = ports.length ? t.n("cr.alert.ports", ports.length, { ports: listOf(fmt.locale, ports) }) : "";
     // the server's key assumes Globalping's probes; the TSPU probe alone, and two sources that disagree, have their own
@@ -245,6 +246,107 @@ export const peopleOrder = (alerts: readonly Alert[]): Alert[] => alerts.filter(
 /** Alerts that count for the badge and the strip: not muted, not info. */
 export function isLoud(a: Alert, now: number): boolean {
   return a.severity >= AlertSeverity.WARNING && a.mutedUntilUnix <= now;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Alert groups: the Alerts tab shows one card per problem and one history row per event
+
+/** Kinds that come one per profile of a node (the subject is the inbound): their alerts on one node read as one problem. */
+const perProfile = new Set<AlertKind>([AlertKind.PORT_LOSSY, AlertKind.CHECK_FAILED]);
+const opened = (a: Alert) => a.openedUnix || a.firstSeenUnix;
+/** What tells two alerts of a kind apart beyond the node: the subject, except for the per-profile kinds (and their fleet-wide forms keep it). */
+const sameKey = (a: Alert) => `${a.kind}|${a.titleKey}|${perProfile.has(a.kind) && a.nodeId ? "" : a.subject}`;
+
+/** Live alerts, in the server's order: the per-profile ones of one node and kind become one group, every other alert is its own. */
+export function groupAlerts(alerts: readonly Alert[]): Alert[][] {
+  const groups = new Map<string, Alert[]>();
+  for (const a of alerts) {
+    const k = a.nodeId && perProfile.has(a.kind) ? `${a.nodeId}|${sameKey(a)}` : a.id;
+    const g = groups.get(k);
+    if (g) g.push(a);
+    else groups.set(k, [a]);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Closed episodes (newest first) by event: the same kind and title opened within a minute of the group's first, on any node
+ * or profile. Overlap alone does not join them, so two long unrelated episodes stay apart.
+ */
+export function groupHistory(rows: readonly Alert[]): Alert[][] {
+  const out: Alert[][] = [];
+  const last = new Map<string, Alert[]>();
+  for (const h of rows) {
+    const k = sameKey(h);
+    const g = last.get(k);
+    if (g && Math.abs(opened(h) - opened(g[0]!)) <= 60) g.push(h);
+    else {
+      const next = [h];
+      out.push(next);
+      last.set(k, next);
+    }
+  }
+  return out;
+}
+
+/** The worst severity of a group. */
+export const groupSeverity = (g: readonly Alert[]) => g.reduce((s, a) => Math.max(s, a.severity), AlertSeverity.UNSPECIFIED) as AlertSeverity;
+
+/** A group's title: its alerts' own when they all say the same, else the count (ports that lose packets, profiles that fail). */
+export function groupTitle(t: T, g: readonly Alert[]): string {
+  const titles = new Set(g.map((a) => alertTitle(t, a)));
+  const a = g[0]!;
+  if (titles.size === 1) return alertTitle(t, a);
+  if (a.kind === AlertKind.PORT_LOSSY) return t.n("hl.alerts.group.port_lossy", new Set(g.map((x) => x.params.port)).size);
+  if (a.kind === AlertKind.CHECK_FAILED) return t.n("hl.alerts.group.check_failed", titles.size);
+  return alertTitle(t, a);
+}
+
+/** The number a folded card shows by its title: the loss of the ports, how many networks get nothing. Empty for the rest. */
+export function groupFact(t: T, g: readonly Alert[]): string {
+  const a = g[0]!;
+  if (a.kind === AlertKind.PORT_LOSSY) {
+    const lost = Math.max(...g.map((x) => lossPct(Number(x.params.sent), Number(x.params.got))));
+    return t(g.length > 1 ? "hl.alerts.fact.lossUpTo" : "hl.alerts.fact.loss", { lost });
+  }
+  if (a.kind === AlertKind.COUNTRY_BLOCKED) {
+    const n = alertNetworks(a.params.networks ?? "").length;
+    return n > 1 ? t.n("hl.alerts.fact.nets", n) : "";
+  }
+  return "";
+}
+
+/**
+ * The networks of a country alert as the panel joins them ("MTS (AS8359, Moscow, bsbord), Tele2"): split at the commas
+ * outside the brackets, "AS8359 · Moscow · bsbord" as the tag.
+ */
+export function alertNetworks(s: string): BreakdownNet[] {
+  return s
+    .split(/,\s*(?![^(]*\))/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => {
+      const m = /^(.*?)\s*\((.*)\)$/.exec(x);
+      return m ? { name: m[1] || m[2]!, tag: m[1] ? m[2]!.split(/,\s*/).join(" · ") : "" } : { name: x, tag: "" };
+    });
+}
+
+/** The networks by operator, the one with most networks first: "Rostelecom" with its four. */
+export function networksByOperator(nets: readonly BreakdownNet[]): { name: string; nets: BreakdownNet[] }[] {
+  const by = new Map<string, BreakdownNet[]>();
+  for (const n of nets) by.set(n.name, [...(by.get(n.name) ?? []), n]);
+  return [...by].map(([name, list]) => ({ name, nets: list })).sort((a, b) => b.nets.length - a.nets.length || a.name.localeCompare(b.name));
+}
+
+/** More networks than a sentence holds: the list is cut to the three operators with most of them, "and N more" (the card lists them all). */
+export const NETS_INLINE = 4;
+export function networksShort(t: T, s: string): string {
+  const nets = alertNetworks(s);
+  if (nets.length <= NETS_INLINE) return s;
+  const top = networksByOperator(nets).slice(0, 3);
+  const rest = nets.length - top.reduce((n, o) => n + o.nets.length, 0);
+  const names = top.map((o) => o.name).join(", ");
+  return rest > 0 ? t("hl.nets.short", { names, n: rest }) : names;
 }
 
 // ---------------------------------------------------------------------------------------------------

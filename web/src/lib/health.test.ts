@@ -24,7 +24,15 @@ import {
   fixErrorText,
   fixLabel,
   fleetIssues,
+  alertNetworks,
+  groupAlerts,
   groupDoctor,
+  groupFact,
+  groupHistory,
+  groupSeverity,
+  groupTitle,
+  networksByOperator,
+  networksShort,
   hasKey,
   isIssue,
   isLoud,
@@ -1150,5 +1158,72 @@ describe("reachability from a country", () => {
     // both sources that agree keep Globalping's words: its probes saw it
     const agree = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.tcp_blocked", params: { ...params, confidence: "eyeball", verdict: "tcp_blocked" } });
     expect(alertWhy(tPlural, fmt, agree)).toMatch(/^Probes inside Russia \(Beeline, Rostelecom\) reach the node’s address/);
+  });
+});
+
+describe("alert groups", () => {
+  const lossy = (id: string, nodeId: string, port: string, got: string, opened = 1000) =>
+    alert({ id, kind: AlertKind.PORT_LOSSY, nodeId, nodeName: nodeId.slice(4), subject: `inb_${id}`, titleKey: "health.alert.port_lossy.title", openedUnix: opened, params: { port, profile: `p${port}`, sent: "300", got } });
+
+  it("puts the per-profile alerts of one node and kind on one card, in the server's order; every other alert stays its own", () => {
+    const down = alert({ id: "down", kind: AlertKind.NODE_DOWN, nodeId: "nod_nl1", titleKey: "health.alert.node_down.title" });
+    const blip = alert({ id: "blip", kind: AlertKind.HOST_BLIP, nodeId: "nod_nl1", titleKey: "health.alert.host_blip.title" });
+    const panel = alert({ id: "egress", nodeId: "", subject: "panel_egress" });
+    const probe = alert({ id: "probe", nodeId: "", subject: "probe_path" });
+    const groups = groupAlerts([down, lossy("a", "nod_nl1", "2083", "207"), blip, lossy("b", "nod_msk1", "443", "243"), lossy("c", "nod_nl1", "4443", "276"), panel, probe]);
+    expect(groups.map((g) => g.map((a) => a.id))).toEqual([["down"], ["a", "c"], ["blip"], ["b"], ["egress"], ["probe"]]);
+  });
+
+  it("titles a card of several by what they share, else by the count, and shows the worst loss", () => {
+    const three = [lossy("a", "nod_nl1", "2083", "207"), lossy("b", "nod_nl1", "33183", "264"), lossy("c", "nod_nl1", "4443", "276")];
+    expect(groupTitle(tPlural, three)).toBe("UDP loses packets on 3 ports");
+    expect(groupTitle(tRuPlural, three)).toBe("UDP теряет пакеты на 3 портах");
+    expect(groupFact(tPlural, three)).toBe("up to 31 % lost");
+    expect(groupFact(tPlural, three.slice(0, 1))).toBe("31 % lost");
+    // two profiles on one port say the same title
+    const same = [lossy("d", "nod_msk1", "443", "243"), lossy("e", "nod_msk1", "443", "249")];
+    expect(groupTitle(tPlural, same)).toBe("UDP to port 443 loses packets");
+    const failing = [alert({ id: "x", params: { profile: "VLESS" } }), alert({ id: "y", params: { profile: "Trojan" } })];
+    expect(groupTitle(tPlural, failing)).toBe("2 profiles fail the client-eye check");
+    expect(groupTitle(tRuPlural, failing)).toBe("2 профиля не проходят проверку глазами клиента");
+    expect(groupSeverity([alert(), alert({ severity: AlertSeverity.CRITICAL }), alert({ severity: AlertSeverity.INFO })])).toBe(AlertSeverity.CRITICAL);
+  });
+
+  it("joins the closed episodes of one event: the same kind and title opened within a minute, across nodes and ports", () => {
+    const closed = (id: string, nodeName: string, opened: number, over: Partial<Alert> = {}) =>
+      alert({ id, nodeId: `nod_${nodeName}`, nodeName, openedUnix: opened, resolvedAtUnix: opened + 360, resolution: "cleared", params: { profile: "MTProto · 443" }, ...over });
+    const blip = (id: string, nodeName: string, opened: number) => closed(id, nodeName, opened, { kind: AlertKind.HOST_BLIP, titleKey: "health.alert.host_blip.title", subject: "agent" });
+    const rows = [
+      closed("a", "sg1", 5033),
+      closed("b", "nl1", 5021),
+      closed("c", "fi1", 5009),
+      blip("d", "fi1", 5000), // another kind in the same minute: its own row
+      closed("e", "de1", 5000),
+      closed("f", "de1", 4000), // the same check an hour earlier: another event
+      alert({ id: "g", kind: AlertKind.DOCTOR_WARN, subject: "disk_space", titleKey: "health.alert.doctor_warn.title", openedUnix: 3990 }),
+      alert({ id: "h", kind: AlertKind.DOCTOR_WARN, subject: "time_sync", titleKey: "health.alert.doctor_warn.title", openedUnix: 3990 }), // another check
+    ];
+    expect(groupHistory(rows).map((g) => g.map((a) => a.id))).toEqual([["a", "b", "c", "e"], ["d"], ["f"], ["g"], ["h"]]);
+  });
+
+  it("reads the networks of a country alert, by operator, and cuts a long list in the sentence", () => {
+    const list = "Beeline (AS8402, Moscow, cheburcheck), MTS (AS8359, Kazan, bsbord), MTS (AS8359, Moscow), Rostelecom (AS12389, Moscow), Tele2, MTS (AS8359, Novosibirsk)";
+    const nets = alertNetworks(list);
+    expect(nets).toEqual([
+      { name: "Beeline", tag: "AS8402 · Moscow · cheburcheck" },
+      { name: "MTS", tag: "AS8359 · Kazan · bsbord" },
+      { name: "MTS", tag: "AS8359 · Moscow" },
+      { name: "Rostelecom", tag: "AS12389 · Moscow" },
+      { name: "Tele2", tag: "" },
+      { name: "MTS", tag: "AS8359 · Novosibirsk" },
+    ]);
+    expect(networksByOperator(nets).map((o) => [o.name, o.nets.length])).toEqual([["MTS", 3], ["Beeline", 1], ["Rostelecom", 1], ["Tele2", 1]]);
+    expect(networksShort(tPlural, list)).toBe("MTS, Beeline, Rostelecom and 1 more");
+    expect(networksShort(tRuPlural, list)).toBe("MTS, Beeline, Rostelecom и ещё 1");
+    // a short list stays as the server wrote it
+    expect(networksShort(tPlural, "MTS (AS8359, Novosibirsk), Tele2")).toBe("MTS (AS8359, Novosibirsk), Tele2");
+    const a = alert({ kind: AlertKind.COUNTRY_BLOCKED, subject: "partial", titleKey: "health.alert.country_blocked.title", whyKey: "health.alert.country_blocked.why.partial", params: { country: "RU", networks: list } });
+    expect(alertWhy(tPlural, fmt, a)).toMatch(/^Home or mobile probes on MTS, Beeline, Rostelecom and 1 more get no answer/);
+    expect(groupFact(tPlural, [a])).toBe("6 networks");
   });
 });

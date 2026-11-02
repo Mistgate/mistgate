@@ -12,7 +12,7 @@ import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { useT } from "@/i18n";
 import { fleet } from "@/lib/api";
 import { useCursorPaging } from "@/lib/paging";
-import { useFmt, type Fmt } from "@/lib/format";
+import { dayLabel, useFmt, type Fmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
 import { pollMs } from "@/lib/queries";
 import { byDay, buildLines, eventFilters, lineRows, type EventFilter, type EventLine, type NodeEvent } from "./event-model";
@@ -45,15 +45,6 @@ function lineMark(l: EventLine): { icon: IconName; tone: Tone } {
   if (c === "cert_renewed") return { icon: "lock", tone: "lavender" };
   if (c.startsWith("node_") || c === "host_rebooted" || c === "stats_stale" || c === "clock_skew") return { icon: "clock", tone: "sand" };
   return { icon: "info", tone: "sand" };
-}
-
-/** "Today", "Yesterday", else the date; the year only when it is not this one. */
-function dayLabel(t: ReturnType<typeof useT>, fmt: Fmt, unix: number, now = new Date()): string {
-  const d = new Date(unix * 1000);
-  const same = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  if (same(d, now)) return t("node.ev.today");
-  if (same(d, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) return t("node.ev.yesterday");
-  return d.toLocaleDateString(fmt.locale, { day: "numeric", month: "long", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
 
 const exact = (fmt: Fmt, unix: number) => new Date(unix * 1000).toLocaleString(fmt.locale, { dateStyle: "short", timeStyle: "medium" });

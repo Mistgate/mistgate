@@ -126,3 +126,11 @@ export function useFmt(): Fmt {
   const t = useT();
   return useMemo(() => makeFmt(lang, t), [lang, t]);
 }
+
+/** "Today", "Yesterday", else the date; the year only when it is not this one. */
+export function dayLabel(t: T, fmt: Pick<Fmt, "locale">, unix: number, now = new Date()): string {
+  const d = new Date(unix * 1000);
+  if (sameDay(d, now)) return t("node.ev.today");
+  if (sameDay(d, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) return t("node.ev.yesterday");
+  return d.toLocaleDateString(fmt.locale, { day: "numeric", month: "long", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+}

@@ -21,8 +21,6 @@ vi.mock("@/lib/api", () => ({
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  // the wide layout of the rows (the phone stacks them)
-  window.matchMedia = ((media: string) => ({ matches: false, media, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
 });
 
 let root: Root | null = null;
@@ -31,6 +29,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
+  history.replaceState(null, "", location.pathname);
 });
 
 const NOW = 2_000_000_000;
@@ -80,51 +79,35 @@ async function mount(count: number, url = "/", rows: Alert[] = Array.from({ leng
 }
 const text = () => document.body.textContent ?? "";
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-const byLabel = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
-const nav = () => document.querySelector("nav[aria-label]");
+const more = () => [...document.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Show "));
 
-describe("Health → Alerts → History, paged on the screen", () => {
-  it("cuts a long history into pages of twenty, newest first, with the count under the rows", async () => {
-    await mount(137);
-    expect(text()).toContain("node1");
-    expect(text()).toContain("node20");
-    expect(text()).not.toContain("node21");
-    expect(text()).toContain("Showing 1–20 of 137");
-    expect(nav()!.getAttribute("aria-label")).not.toBeNull();
+describe("Health → Alerts → History, twenty events at a time", () => {
+  it("shows the latest twenty events, newest first, then twenty more at a time", async () => {
+    await mount(45);
+    expect(text()).toContain("node1“");
+    expect(text()).toContain("node20“");
+    expect(text()).not.toContain("node21“");
+    expect(more()?.textContent).toBe("Show 20 more");
+    await click(more());
+    expect(text()).toContain("node40“");
+    expect(more()?.textContent).toBe("Show 5 more");
+    await click(more());
+    expect(text()).toContain("node45“");
+    expect(more()).toBeUndefined();
   });
 
-  it("leaves a short history alone: no pager", async () => {
+  it("leaves a short history alone: nothing more to show", async () => {
     await mount(20);
-    expect(text()).toContain("node20");
-    expect(nav()).toBeNull();
+    expect(text()).toContain("node20“");
+    expect(more()).toBeUndefined();
   });
 
-  it("opens on the page of the URL and keeps the position in it when the owner moves", async () => {
-    const router = await mount(137, "/?page=3");
-    expect(text()).toContain("Showing 41–60 of 137");
-    expect(text()).toContain("node41");
-    expect(text()).not.toContain("node40");
-    await click(byLabel("Next page"));
-    await settle();
-    expect((router.state.location.search as { page?: number }).page).toBe(4);
-    expect(text()).toContain("Showing 61–80 of 137");
-    await click(byLabel("Page 1"));
-    await settle();
-    expect((router.state.location.search as { page?: number }).page).toBeUndefined();
-    expect(text()).toContain("Showing 1–20 of 137");
-  });
-
-  it("steps back to the last page when the URL points past the end", async () => {
-    await mount(45, "/?page=40");
-    expect(text()).toContain("Showing 41–45 of 45");
-    expect(byLabel("Next page")!.disabled).toBe(true);
-  });
-
-  it("takes the size from the URL", async () => {
-    await mount(137, "/?size=50");
-    expect(text()).toContain("Showing 1–50 of 137");
-    expect(text()).toContain("node50");
-    expect(text()).not.toContain("node51");
+  it("shows enough of a long history to reach the row a link points at", async () => {
+    history.replaceState(null, "", `#alert-alt_57-${closed(57).resolvedAtUnix}`);
+    await mount(137);
+    expect(document.getElementById(`alert-alt_57-${closed(57).resolvedAtUnix}`)).toBeTruthy();
+    expect(text()).not.toContain("node58“");
+    expect(more()?.textContent).toBe("Show 20 more");
   });
 
   it("a reopened alert lasted since it opened again: the pause before it is not counted", async () => {

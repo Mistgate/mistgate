@@ -8,7 +8,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang } from "@/i18n";
 import type { Alert } from "@/lib/health";
-import { AlertCard, Ipv6Tag } from "./alerts";
+import { AlertCard, AlertsTab, Ipv6Tag } from "./alerts";
 import { useFixFlow } from "./fix";
 
 const muteAlert = vi.fn();
@@ -93,7 +93,17 @@ function Card({ a }: { a: Alert }) {
 async function settle() {
   for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
-async function mount(a: Alert) {
+function Tab({ active, history }: { active: Alert[]; history: Alert[] }) {
+  const flow = useFixFlow();
+  return (
+    <>
+      <AlertsTab active={active} history={history} now={NOW} flow={flow} />
+      {flow.modal}
+    </>
+  );
+}
+
+async function render(node: ReactNode) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -101,14 +111,14 @@ async function mount(a: Alert) {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <ToastProvider>
-          <Card a={a} />
-        </ToastProvider>
+        <ToastProvider>{node}</ToastProvider>
       </QueryClientProvider>,
     ),
   );
   await settle();
 }
+const mount = (a: Alert) => render(<Card a={a} />);
+const mountTab = (active: Alert[], history: Alert[] = []) => render(<Tab active={active} history={history} />);
 const text = () => document.body.textContent ?? "";
 const button = (label: string, scope: ParentNode = document) => [...scope.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const link = (label: string) => [...document.querySelectorAll("a")].find((a) => a.textContent === label);
@@ -213,7 +223,8 @@ describe("an alert that is fixed elsewhere", () => {
     expect(text()).not.toContain("443 usually helps");
     const open = link("Open the node’s profiles")!;
     expect(open.getAttribute("href")).toBe("/nodes/nod_1?tab=profiles");
-    expect(open.className).toContain("bg-accent");
+    // a place to go is not the fix itself: a secondary button, the primary is kept for a fix
+    expect(open.className).not.toContain("bg-accent");
   });
 
   it("the whole of UDP cut: says so with the ports, no port advice", async () => {
@@ -221,7 +232,7 @@ describe("an alert that is fixed elsewhere", () => {
     expect(text()).toContain("Every port times out (443, 8443): the hoster seems to cut incoming UDP altogether.");
   });
 
-  it("a relay that is down names both nodes and the stage, and opens the exit's way in through this entry", async () => {
+  it("a relay that is down names both nodes and the stage, and opens the exit's way in through this entry (a secondary button)", async () => {
     const down = (stage: string) =>
       alert({ kind: AlertKind.RELAY_DOWN, nodeId: "nod_msk1", nodeName: "msk1", subject: "rly_1", titleKey: "health.alert.relay_down.title", whyKey: `health.alert.relay_down.why.${stage}`, params: { relay: "msk1", exit: "de1", exit_profile: "VLESS · TCP", port: "8443", stage } });
     await mount(down("freeze"));
@@ -229,7 +240,7 @@ describe("an alert that is fixed elsewhere", () => {
     expect(text()).toContain("A transfer through msk1 on port 8443 stalls after the first kilobytes.");
     const open = link("Open the way in")!;
     expect(open.getAttribute("href")).toBe("/nodes/nod_de1?tab=ways&way=via:nod_msk1");
-    expect(open.className).toContain("bg-accent");
+    expect(open.className).not.toContain("bg-accent");
     act(() => root?.unmount());
     host?.remove();
     await mount(down("leg"));
@@ -394,5 +405,167 @@ describe("the IPv6 tag", () => {
     const a = alert({ kind: AlertKind.COUNTRY_BLOCKED, params: { country: "RU", verdict: "blocked", ipv6: "entry" } });
     await act(async () => root!.render(<Ipv6Tag alert={a} />));
     expect(host.textContent).toBe("IPv6 entry on");
+  });
+});
+
+describe("the Alerts tab", () => {
+  const lossy = (id: string, nodeName: string, port: string, got: string) =>
+    alert({
+      id,
+      kind: AlertKind.PORT_LOSSY,
+      nodeId: `nod_${nodeName}`,
+      nodeName,
+      subject: `inb_${id}`,
+      titleKey: "health.alert.port_lossy.title",
+      whyKey: "health.alert.port_lossy.why",
+      params: { port, profile: `Hysteria2 · ${port}`, sent: "300", got, sender: "be1" },
+      actions: ["open_profiles", "open_node", "mute"],
+    });
+  const nl1 = () => [lossy("a", "nl1", "2083", "207"), lossy("b", "nl1", "33183", "264"), lossy("c", "nl1", "4443", "276")];
+  const toggles = () => [...document.querySelectorAll<HTMLButtonElement>("[data-alert-toggle]")];
+  const expanded = (el: Element | undefined | null) => el?.getAttribute("aria-expanded");
+  afterEach(() => {
+    history.replaceState(null, "", location.pathname);
+  });
+
+  it("folds each card to one line and puts the ports of one node that lose packets on one card", async () => {
+    muteAlert.mockResolvedValue({ alert: { mutedUntilUnix: NOW + 3600 } });
+    await mountTab([...nl1(), lossy("d", "msk1", "443", "243")]);
+    expect(toggles()).toHaveLength(2);
+    const [card] = toggles();
+    expect(expanded(card)).toBe("false");
+    expect(card!.textContent).toContain("Warningnl1UDP loses packets on 3 ports");
+    expect(card!.textContent).toContain("up to 31 % lost");
+    expect(toggles()[1]!.textContent).toContain("msk1UDP to port 443 loses packets");
+    expect(text()).not.toContain("get lost on the way");
+    await click(card);
+    expect(expanded(card)).toBe("true");
+    expect(text()).toContain("The test packets to these ports get lost on the way.");
+    expect([...document.querySelectorAll("tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells].map((c) => c.textContent))).toEqual([
+      ["2083", "Hysteria2 · 2083", "31 %", "be1"],
+      ["33183", "Hysteria2 · 33183", "12 %", "be1"],
+      ["4443", "Hysteria2 · 4443", "8 %", "be1"],
+    ]);
+    // one place to change the ports, a secondary button; one "Mute" for the three
+    const open = [...document.querySelectorAll("a")].filter((a) => a.textContent === "Open the node’s profiles");
+    expect(open.map((a) => a.getAttribute("href"))).toEqual(["/nodes/nod_nl1?tab=profiles"]);
+    expect(document.querySelectorAll(".bg-accent")).toHaveLength(0);
+    await press(button("Mute"));
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent === "For 1 hour"));
+    expect(muteAlert.mock.calls.map((c) => c[0])).toEqual(["a", "b", "c"].map((alertId) => ({ alertId, durationS: 3600 })));
+    expect(text()).toContain("nl1: 3 alerts muted until");
+  });
+
+  it("opens a critical alert by itself and keeps the muted ones folded at the end", async () => {
+    muteAlert.mockResolvedValue({ alert: {} });
+    const down = alert({
+      id: "alt_down",
+      severity: AlertSeverity.CRITICAL,
+      kind: AlertKind.NODE_DOWN,
+      nodeName: "sg1",
+      subject: "agent",
+      titleKey: "health.alert.node_down.title",
+      whyKey: "health.alert.node_down.why",
+      params: { minutes: "14" },
+    });
+    const muted = alert({ id: "alt_m", mutedUntilUnix: NOW + 3600, whyKey: "health.alert.check_failed.why.timeout", params: { profile: "x", port: "443" } });
+    await mountTab([down, muted]);
+    expect(toggles()).toHaveLength(1);
+    expect(expanded(toggles()[0])).toBe("true");
+    expect(text()).toContain("The agent has not answered for 14 min");
+    const fold = document.querySelector("[data-muted-toggle]");
+    expect([fold?.textContent, expanded(fold)]).toEqual(["Muted · 1", "false"]);
+    await click(fold);
+    expect(toggles()[1]!.textContent).toContain("until");
+    expect(button("Unmute")).toBeUndefined(); // folded: one line until opened
+    await click(toggles()[1]);
+    await click(button("Unmute"));
+    expect(muteAlert).toHaveBeenCalledWith({ alertId: "alt_m", durationS: 0 });
+  });
+
+  it("names the first operators of a long network list and shows every network by operator on request", async () => {
+    const networks = "Beeline (AS3216, Moscow), MTS (AS8359, Kazan, bsbord), MTS (AS8359, Moscow), MegaFon (AS31133, Samara), Rostelecom (AS12389, Moscow), Tele2 (AS15378, Moscow)";
+    await mountTab([
+      alert({
+        id: "alt_c",
+        kind: AlertKind.COUNTRY_BLOCKED,
+        subject: "partial",
+        titleKey: "health.alert.country_blocked.title",
+        whyKey: "health.alert.country_blocked.why.partial",
+        params: { country: "RU", verdict: "partial", networks },
+      }),
+    ]);
+    expect(toggles()[0]!.textContent).toContain("Unreachable from some networks in Russia6 networks");
+    await click(toggles()[0]);
+    expect(text()).toContain("Home or mobile probes on MTS, Beeline, MegaFon and 2 more get no answer");
+    const all = document.querySelector("[data-nets-toggle]");
+    expect([all?.textContent, expanded(all)]).toEqual(["Show all 6", "false"]);
+    await click(all);
+    expect([...document.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["MTS", "Beeline", "MegaFon", "Rostelecom", "Tele2"]);
+    expect(document.querySelector("dd")?.textContent).toBe("AS8359 · Kazan · bsbordAS8359 · Moscow");
+  });
+
+  // a day of the real calendar: the day headers count from today
+  const noon = Math.floor(new Date().setHours(12, 0, 0, 0) / 1000);
+  const episode = (id: string, nodeName: string, dt: number) =>
+    alert({ id, nodeId: `nod_${nodeName}`, nodeName, openedUnix: noon - 360 + dt, resolvedAtUnix: noon + dt, resolution: "cleared", params: { profile: "MTProto · 443" }, actions: ["open_node"] });
+  const mtproto = () => [episode("a", "sg1", 33), episode("b", "nl1", 21), episode("c", "fi1", 9), episode("d", "de1", 0)];
+  const fixed = alert({
+    id: "alt_j",
+    kind: AlertKind.DOCTOR_WARN,
+    subject: "journald_size",
+    titleKey: "health.alert.doctor_warn.title",
+    params: { check: "journald_size" },
+    openedUnix: noon - 90_000,
+    resolvedAtUnix: noon - 86_400,
+    resolution: "fix_applied",
+  });
+
+  it("shows one history row per event under its day, its episodes under it, and how it ended as a glyph", async () => {
+    await mountTab([], [...mtproto(), fixed]);
+    expect([...document.querySelectorAll("section h3")].map((h) => h.textContent)).toEqual(["Today", "Yesterday"]);
+    const row = document.querySelector("[data-history-toggle]")!;
+    expect(row.textContent).toContain("Warningsg1nl1fi1de1“MTProto · 443” fails the client-eye checklasted 6 min");
+    expect([...document.querySelectorAll('[role="img"][aria-label]')].map((g) => g.getAttribute("aria-label"))).toEqual(["cleared by itself", "fixed"]);
+    // folded, every episode keeps its anchor for the links from Reachability
+    expect(expanded(row)).toBe("false");
+    expect(mtproto().every((e) => document.getElementById(`alert-${e.id}-${e.resolvedAtUnix}`))).toBe(true);
+    await click(row);
+    const episodes = [...document.getElementById(row.getAttribute("aria-controls")!)!.querySelectorAll("li")];
+    expect(episodes.map((li) => li.id)).toEqual(mtproto().map((e) => `alert-${e.id}-${e.resolvedAtUnix}`));
+    expect(episodes[0]!.textContent).not.toContain("MTProto"); // the row says it once
+  });
+
+  it("shows the latest 20 events and the rest on request", async () => {
+    const blips = Array.from({ length: 23 }, (_, i) =>
+      alert({
+        id: `alt_${i}`,
+        kind: AlertKind.HOST_BLIP,
+        subject: "agent",
+        titleKey: "health.alert.host_blip.title",
+        openedUnix: NOW - i * 3600 - 60,
+        resolvedAtUnix: NOW - i * 3600,
+        resolution: "node_returned",
+      }),
+    );
+    await mountTab([], blips);
+    expect(document.querySelectorAll("section li")).toHaveLength(20);
+    await click(button("Show 3 more"));
+    expect(document.querySelectorAll("section li")).toHaveLength(23);
+    expect(button("Show 3 more")).toBeUndefined();
+  });
+
+  it("opens the card and the history row that a link points at", async () => {
+    const b = mtproto()[1]!;
+    history.replaceState(null, "", `#alert-${b.id}-${b.resolvedAtUnix}`);
+    await mountTab(nl1(), mtproto());
+    expect(expanded(toggles()[0])).toBe("false");
+    expect(expanded(document.querySelector("[data-history-toggle]"))).toBe("true");
+    act(() => root?.unmount());
+    host?.remove();
+    history.replaceState(null, "", "#alert-c");
+    await mountTab(nl1());
+    expect(expanded(toggles()[0])).toBe("true");
+    expect(document.getElementById("alert-c")).toBeTruthy();
   });
 });
