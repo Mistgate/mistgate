@@ -295,11 +295,13 @@ The **History · 7 days** list says how each alert closed:
 | replaced by a bigger alert | `superseded` | A bigger alert says the same: "Alive, but no traffic" replaces the per-profile ones, a doctor problem replaces the warning of the same check, the doctor's WARP problem replaces the failing WARP profile, the fleet-wide alert replaces the per-node check alerts. |
 | accepted as normal | `accepted` | The owner accepted the doctor warning as normal for the node. |
 
-Closed alerts are kept for 90 days. The API returns up to 30 days of history, at most 200 alerts. A long history is paged under the list (20, 50 or 100 rows); the page number is kept in the address.
+Closed alerts are kept for 90 days. The API returns up to 30 days of history, at most 200 alerts. The list shows one row per event: alerts of one kind that opened within the same minute on several nodes or ports are one row with the node names, and a click shows each of them. Rows are grouped by day, how each one closed is an icon with its words in a tooltip, and the newest 20 rows are shown with **Show more** for the rest.
 
 ### Buttons on an alert
 
-Depending on what the alert says, its card offers:
+An alert folds to one line: its severity, the node, what is wrong, the key number (the worst loss, the number of networks) and how long it has lasted; a click opens it. Critical alerts start open. The UDP-loss and client-check alerts of one node share one card, with a table of their ports, profiles and losses and one **Mute** for all of them. A long list of networks reads as a short line, with every network, grouped by operator, behind **Show all**.
+
+A card has at most one primary button, and only when it is the fix. Depending on what the alert says, its card offers:
 
 - the doctor's fix (only while the doctor still offers it and the node is connected);
 - **Restart profile** or **Restart the profiles**, with the number of connections that drop;
@@ -313,7 +315,7 @@ Depending on what the alert says, its card offers:
 
 **Mute** offers: For 1 hour, Until morning (08:00), For a day, For 7 days. The longest mute is 7 days; **Unmute** ends it.
 
-- A muted alert stays on the list with "Muted until …". It is still evaluated and still closes by itself.
+- Muted alerts fold into their own **Muted** section after the live ones, each with "until …". They are still evaluated and still close by themselves.
 - It is not counted in the badges.
 - If its severity rises, the mute ends and the alert counts again.
 - Muting is written to the audit log.
