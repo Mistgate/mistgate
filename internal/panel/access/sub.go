@@ -359,8 +359,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		awgByID[d.ID] = d
 	}
 	for _, d := range devs {
-		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: subDeviceKind(d), OSVersion: d.OSVersion, Client: d.Client,
-			LastSeen: d.LastSeenAt, Online: d.Kind == store.DeviceKindLink && len(data.OnlineDevices[d.ID]) > 0}
+		kind := subDeviceKind(d)
+		sd := SubDevice{ID: d.ID, Platform: d.Platform, Model: d.Model, Kind: kind, OSVersion: d.OSVersion, Client: d.Client,
+			LastSeen: d.LastSeenAt, Online: (d.Kind == store.DeviceKindLink || kind == "telegram") && len(data.OnlineDevices[d.ID]) > 0}
 		for _, pid := range d.Protocols {
 			if p, ok := s.reg.Get(pid); ok {
 				if happ, amnezia, telegram, _ := clientApps(p); happ {

@@ -21,8 +21,9 @@ export type Device = {
   app: string;
   last_seen_unix: number;
   online: boolean;
-  /** "link": an app that reports a device ID; "shared": the one place of the apps that report none; "key": an AmneziaVPN key. */
-  kind: "link" | "shared" | "key";
+  /** "link": an app that reports a device ID; "shared": the one place of the apps that report none; "key": an AmneziaVPN key;
+   * "telegram": the Telegram proxy key. */
+  kind: "link" | "shared" | "key" | "telegram";
   /** The person may remove or rename it on this page (never the shared place, never in the admin's preview). */
   can_remove: boolean;
   can_rename: boolean;

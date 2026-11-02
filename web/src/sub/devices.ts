@@ -125,6 +125,12 @@ const menuItem = (key: string, ic: IconName, text: string, on: () => void, bad =
 
 // ---- rows of the link apps ----
 
+/** The Telegram proxy key: the admin issues it, so nothing to rename or remove here; only whether Telegram uses it. */
+function telegramRow(c: Ctx, x: Device): HTMLElement {
+  const { t } = c;
+  return h("div", { class: "dev", id: `amz-row-${x.id}` }, h("div", { class: "dev-top" }, tile("rose", "send", { size: 36 }), rowHead(c, x.id, t.telegramT, when(c, x.last_seen_unix, x.online, t.tgNever, t.tgSeen), "")));
+}
+
 /**
  * A device of an app that reports its ID: the name and one quiet line (online, or when it last updated); rename and remove in
  * "more". What the app said about itself ("iOS 18.1 · Happ 3.4.2") is one tap (or a hover) away, and stands in the question,
@@ -324,7 +330,7 @@ export function devicesSection(c: Ctx): Kid[] {
   if (inactive) rows.push(h("div", { class: "dev" }, note("", "shield", d.user.status === "disabled" ? t.devOffDisabled : t.devOff, { cls: "grow" })));
   // the devices: the one in use first, so a short list never hides it; the shared place, or STRICT's row; the keys
   const own = others.filter((x) => !isShared(x)).sort((x, y) => Number(y.online) - Number(x.online) || y.last_seen_unix - x.last_seen_unix);
-  const list: HTMLElement[] = own.map((x) => linkRow(c, x));
+  const list: HTMLElement[] = own.map((x) => (x.kind === "telegram" ? telegramRow(c, x) : linkRow(c, x)));
   if (shared || (d.access.happ && (strict || own.length === 0))) list.push(sharedRow(c, shared, strict));
   if (keys) list.push(...keys.devices.map((x) => keyRow(c, x, serve)));
   // a long list folds to three rows, so the page stays short; never when every place is taken (that is when an old one is looked for)

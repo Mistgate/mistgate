@@ -410,7 +410,9 @@ cases["dns-both-off"] = { ...dnsBoth, dns: linkDns([]) };
 const tgUrl = (host: string, port = 443) => `tg://proxy?server=${host}&port=${port}&secret=ee0123456789abcdef0123456789abcdef7777772e676f6f676c652e636f6d`;
 const tgFra = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", ipv6: false, relay: false, via: "", url: tgUrl("de1.example.com") };
 const tgLinks = [tgFra, { ...tgFra, ipv6: true, url: tgUrl("[2001:db8::7]") }, { ...tgFra, relay: true, via: "RU", url: tgUrl("198.51.100.20", 8443) }, { label: "Финляндия", country_code: "FI", place: "", ipv6: false, relay: false, via: "", url: tgUrl("fi1.example.com") }];
-cases.telegram = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: tgLinks } };
+// the person's Telegram key among the devices: issued by the admin, used by Telegram two hours ago
+const tgKey = { ...dev("tg1", "", "Telegram proxy", "telegram", 2 * hour, false, "telegram"), can_remove: false, can_rename: false };
+cases.telegram = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: tgLinks }, devices: [...returning.devices, tgKey] };
 // a first visit with Telegram on: the steps first, then the servers and the proxy
 cases["telegram-first"] = { ...base, access: { ...base.access, telegram: true }, telegram: { links: tgLinks.slice(0, 2) } };
 // Telegram is on, no MTProto profile runs yet

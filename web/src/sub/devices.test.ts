@@ -252,6 +252,30 @@ describe("the shared place, by the mode", () => {
   });
 });
 
+describe("the Telegram proxy key", () => {
+  const tg = (over: Partial<MgData["devices"][number]>) =>
+    data("hwid-track", (d) =>
+      d.devices.push({ ...d.devices.find((x) => x.kind === "link")!, id: "dev_tg", kind: "telegram", model: "Telegram proxy", app: "telegram", can_remove: false, can_rename: false, online: false, last_seen_unix: 0, ...over }),
+    );
+
+  // the list is long here: unfolded, so the key's row is on the page wherever it sorts
+  const open = { devicesOpen: true };
+
+  it("says when Telegram last used it, in its own words, with nothing to rename or remove", () => {
+    expect(line(row(page(tg({}), open), "dev_tg"))).toBe("ещё не подключался");
+    expect(line(row(page(tg({ online: true }), open), "dev_tg"))).toBe("в сети");
+    expect(line(row(page(tg({ last_seen_unix: Math.floor(Date.now() / 1000) - 9 * 86400 }), open), "dev_tg"))).toBe("подключался 9 дней назад");
+    const r = row(page(tg({}), open), "dev_tg");
+    expect(text(r.querySelector(".dev-n"))).toBe("Telegram-прокси");
+    expect(r.querySelector("button")).toBeNull();
+    expect(line(row(page(tg({}), open, "en"), "dev_tg"))).toBe("not connected yet");
+  });
+
+  it("keeps its kind through the page's own reading of the data", () => {
+    expect(normalize({ ...data("hwid-track"), devices: [{ id: "dev_tg", kind: "telegram", platform: "", model: "Telegram proxy", app: "telegram" }] }).devices[0]!.kind).toBe("telegram");
+  });
+});
+
 describe("every place taken", () => {
   const hint = (el: HTMLElement) => card(el).previousElementSibling!.querySelector(".sec-sub");
 
