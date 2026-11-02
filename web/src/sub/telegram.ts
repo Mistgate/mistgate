@@ -26,11 +26,12 @@ export function telegramSection(c: Ctx): Kid[] {
     h("div", { class: "shead" }, h("h2", { class: "h2" }, t.telegramT), h("p", { class: "hint sec-sub" }, ...how)),
     links.length === 0
       ? h("section", { class: "card tg-empty", "aria-label": t.telegramT }, h("p", { class: "hint" }, t.telegramNoLinks))
-      : h("div", { class: "srv-grid tg-grid" }, ...links.map((l, i) => card(c, l, i))),
+      : h("div", { class: "srv-grid tg-grid" }, ...links.map((l, i) => card(c, l, i, links.length === 1))),
   ];
 }
 
-function card(c: Ctx, l: TgLink, i: number): HTMLElement {
+/** One card; `only`: the person's one link, whose "Open in Telegram" is the page's main action (with several, none leads). */
+function card(c: Ctx, l: TgLink, i: number, only: boolean): HTMLElement {
   const { t, s, a } = c;
   const name = serverName(l, s.lang);
   const url = safeUrl(l.url);
@@ -54,7 +55,7 @@ function card(c: Ctx, l: TgLink, i: number): HTMLElement {
       h(
         "div",
         { class: "tg-acts" },
-        url && h("a", { class: "btn pri", href: url, "data-k": `tg-open-${i}` }, icon("send", 18), t.telegramOpen),
+        url && h("a", { class: only ? "btn pri" : "btn sec", href: url, "data-k": `tg-open-${i}` }, icon("send", 18), t.telegramOpen),
         copyButton(a, { text: l.url, label: t.telegramCopy, done: t.copiedShort, toast: t.copied, cls: "tlink", key: `tg-copy-${i}` }),
       ),
     ),

@@ -4,11 +4,12 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { DeviceKind, type GetTelegramLinksResponse, type ProfileRef, type TelegramProxyLink } from "@/gen/mistgate/admin/v1/user_pb";
 import { QrCode } from "@/components/qr-code";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
+import { Tip } from "@/components/ui/tooltip";
 import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorCode, errorText } from "@/lib/errors";
@@ -119,7 +120,7 @@ export function TelegramSection({
           {q.data.links.length === 0 && (
             <li className="border-t border-line py-2.5 text-xs leading-snug text-muted">
               {t("tgproxy.noLinks")}{" "}
-              <Link to="/profiles" search={{ protocol: "mtproto" } as never} className="font-bold whitespace-nowrap text-accent-text hover:underline">
+              <Link to="/profiles" search={{ protocol: "mtproto" } as never} className="font-medium whitespace-nowrap text-accent-text hover:underline">
                 {t("tgproxy.toProfiles")}
               </Link>
             </li>
@@ -148,14 +149,14 @@ function LinkRow({ l, cc, t }: { l: TelegramProxyLink; cc: string; t: Tx }) {
   return (
     <li className="flex flex-col border-t border-line first:border-t-0">
       <div className="flex min-h-[60px] items-center gap-3 py-2.5">
-        <span aria-hidden className="grid size-9 flex-none place-items-center rounded-[11px] bg-surface-2">
+        <span aria-hidden className="grid size-9 flex-none place-items-center rounded-chip bg-surface-2">
           <Flag code={cc} size={16} />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <b className="truncate text-[13px] leading-tight">{l.nodeName}</b>
             {marks.map((m) => (
-              <span key={m} className="flex-none rounded-md bg-surface-2 px-1.5 py-px text-[10px] font-extrabold text-muted">
+              <span key={m} className="flex-none rounded-md bg-surface-2 px-1.5 text-[11px] leading-4 font-medium text-muted">
                 {m}
               </span>
             ))}
@@ -163,10 +164,11 @@ function LinkRow({ l, cc, t }: { l: TelegramProxyLink; cc: string; t: Tx }) {
           <span className="truncate text-xs leading-snug text-muted">{l.profileName}</span>
         </div>
         <div className="flex flex-none items-center gap-1">
-          <a href={l.url} className={buttonClass("secondary", "sm")}>
-            <Icon name="plane" size={12} />
-            <span className="@max-[420px]:sr-only">{t("tgproxy.open")}</span>
-          </a>
+          <Tip label={t("tgproxy.open")}>
+            <a href={l.url} aria-label={t("tgproxy.open")} className="grid size-7 place-items-center rounded-lg text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg">
+              <Icon name="plane" size={15} />
+            </a>
+          </Tip>
           <IconButton variant="flat" aria-label={t("tgproxy.copy")} onClick={() => void copy()}>
             <Icon name="copy" size={15} />
           </IconButton>
@@ -178,7 +180,7 @@ function LinkRow({ l, cc, t }: { l: TelegramProxyLink; cc: string; t: Tx }) {
       {qr && (
         <div className="screen-enter flex flex-wrap items-center gap-x-4 gap-y-2 pb-3 pl-12">
           <QrCode value={l.url} label={t("tgproxy.qrLabel", { node: l.nodeName })} size={140} />
-          <p className="max-w-[260px] text-xs leading-snug text-pretty text-muted">{t("tgproxy.qrHint")}</p>
+          <p className="max-w-64 text-xs leading-snug text-pretty text-muted">{t("tgproxy.qrHint")}</p>
         </div>
       )}
     </li>

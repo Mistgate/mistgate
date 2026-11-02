@@ -194,17 +194,17 @@ export function ProfilesScreen() {
   );
 }
 
-/** A protocol choice's text and count, led by the protocol's small mark where there is room for it. */
+/** A protocol choice's text and count, led by the protocol's small mark in its colour (as in the rows) where there is room for it. */
 function SegText({ proto, text, n }: { proto?: string; text: string; n: number }) {
   return (
     <span className="flex items-center gap-1.5">
       {proto && (
-        <span className="hidden @min-[640px]:flex">
-          <IconChip icon={lookOf(proto).icon} tone={lookOf(proto).tone} size={16} className="rounded-[5px]" />
+        <span data-tone={lookOf(proto).tone} className="id-fg hidden @min-[640px]:flex">
+          <Icon name={lookOf(proto).icon} size={14} />
         </span>
       )}
       {text}
-      <span className="font-mono text-[11px] text-muted">{n}</span>
+      <span className="font-mono text-xs text-muted tabular-nums">{n}</span>
     </span>
   );
 }
@@ -237,18 +237,14 @@ function Cell({ lines, children }: { lines: Line[]; children: ReactNode }) {
   );
 }
 
-/** A small square with an icon in it: a setting of the profile (its words are in the cell's tooltip). */
-const Tile = ({ icon }: { icon: IconName }) => (
-  <span aria-hidden className="grid size-[22px] flex-none place-items-center rounded-[7px] bg-surface-2 text-fg/70">
-    <Icon name={icon} size={14} />
-  </span>
-);
+/** An icon for a setting of the profile (its words are in the cell's tooltip). */
+const Tile = ({ icon }: { icon: IconName }) => <Icon name={icon} size={16} aria-hidden className="flex-none text-muted" />;
 
 /** A number led by its icon: formats, nodes, people. */
 const Count = ({ icon, n, dim }: { icon: IconName; n: number; dim?: boolean }) => (
   <>
     <Icon name={icon} size={14} className={dim ? "text-faint" : "text-muted"} />
-    <b className={cx("font-mono text-[13px] font-bold", dim ? "text-muted" : "text-fg")}>{n}</b>
+    <span className={cx("font-mono text-[13px] font-medium tabular-nums", dim ? "text-muted" : "text-fg")}>{n}</span>
   </>
 );
 
@@ -375,7 +371,7 @@ export function ProfileRow({ p, t, protocol, groups }: { p: ProfileSummary; t: T
         <AppLink
           to="/profiles/$id"
           params={{ id: p.id }}
-          className="truncate text-sm leading-5 font-bold tracking-[-0.01em] after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent"
+          className="truncate text-sm leading-5 font-semibold after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent"
         >
           {p.name}
         </AppLink>
