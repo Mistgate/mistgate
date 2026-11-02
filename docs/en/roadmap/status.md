@@ -3,21 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.71`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.72`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.71
+  meta: v0.1.0 – v0.1.72
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.71
+      release: v0.1.72
       current: true
       points:
-        - "**A calmer Health page.** Alerts fold to one line and open on a click; the UDP-loss and check alerts of one node share one card with a table of their ports; a long list of networks becomes a short line with the full list one click away; a card has one primary button, the fix; muted alerts fold into their own section; History shows one row per event across nodes, by day, with **Show more**. See [Health](../operations/health.md#buttons-on-an-alert)."
-        - "**Profiles at a glance.** The profile page shows the protocol and its facts by the title, flags and places of its nodes, groups in their colours and each group's share of people; the new-profile cards and the profiles list are quieter. The person's own page says when Telegram last used the Telegram key."
+        - "**Persian and Turkish.** The admin and the person's own page speak Persian, right to left in the Vazirmatn font with dates in the Persian calendar, and Turkish; pick the language in the first-run setup, in **Settings → Interface** or from the switch in the top bar. Telegram messages, the node install page and these docs stay in English, Russian and Simplified Chinese. See [User page](../guide/user-page.md)."
     - title: Profiles
       section: profiles
       points:
@@ -77,12 +76,12 @@ Mistgate is in **beta**; the current release is `v0.1.71`. It runs in production
     - title: Settings
       section: settings
       points:
-        - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
+        - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese, the admin and the user page also in Persian and Turkish; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.71
+  meta: v0.1.34 – v0.1.72
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
