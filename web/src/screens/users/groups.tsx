@@ -581,7 +581,7 @@ export function GroupForm({
       {dns && (
         <details className="group" open={!!group?.dnsPresetId}>
           <summary className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-bold text-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden">
-            <Icon name="chevronRight" size={12} className="transition-transform duration-200 group-open:rotate-90" />
+            <Icon name="chevronRight" size={12} className="transition-transform duration-200 group-open:rotate-90 rtl:group-open:-rotate-90" />
             {t("users.groupMore")}
           </summary>
           <div className="flex flex-col gap-1.5 pt-2.5">

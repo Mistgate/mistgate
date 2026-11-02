@@ -57,7 +57,7 @@ export function McpCard() {
       <p className="text-xs leading-normal text-pretty text-muted">{t("int.mcp.lead")}</p>
       <div className="flex flex-col gap-1.5">
         <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("int.mcp.url")}</span>
-        <div className="flex items-center gap-2 rounded-field border border-line bg-canvas py-1.5 pr-1.5 pl-3">
+        <div className="flex items-center gap-2 rounded-field border border-line bg-canvas py-1.5 pe-1.5 ps-3">
           <span data-testid="mcp-url" className="min-w-0 flex-1 font-mono text-xs leading-snug break-all select-all">
             {mcp}
           </span>

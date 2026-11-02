@@ -44,8 +44,8 @@ export function Segmented<V extends string>({ value, onValueChange, options, var
       {variant === "thumb" && (
         <span
           aria-hidden
-          className="absolute top-[3px] bottom-[3px] left-[3px] rounded-[9px] border border-accent-line bg-surface-2 transition-transform duration-[450ms] ease-[cubic-bezier(0.3,1.4,0.5,1)]"
-          style={{ width: `calc((100% - 6px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
+          className="absolute top-[3px] bottom-[3px] inset-s-[3px] rounded-[9px] border border-accent-line bg-surface-2 transition-transform duration-[450ms] ease-[cubic-bezier(0.3,1.4,0.5,1)]"
+          style={{ width: `calc((100% - 6px) / ${options.length})`, transform: `translateX(calc(${index * 100}% * var(--x-dir)))` }}
         />
       )}
       {options.map((o) => (

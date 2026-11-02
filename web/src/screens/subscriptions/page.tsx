@@ -91,7 +91,7 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
           </Card>
 
           <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-            <button type="button" aria-expanded={appsOpen} onClick={() => setAppsOpen(!appsOpen)} className="flex w-full items-center gap-2.5 text-left">
+            <button type="button" aria-expanded={appsOpen} onClick={() => setAppsOpen(!appsOpen)} className="flex w-full items-center gap-2.5 text-start">
               <SectionLabel as="span" className="flex-1" icon="phone" tone="mint">
                 {t("subs.page.apps")}
               </SectionLabel>

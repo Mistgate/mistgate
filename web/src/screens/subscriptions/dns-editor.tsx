@@ -383,7 +383,7 @@ function ServerList({ servers, t, onChange, scope, providers, catalog }: { serve
           const v = catalog.get(s.providerVariant);
           const label = v ? variantLabel(v, t.lang) : t("subs.dns.variantGone", { id: s.providerVariant });
           return (
-            <div key={i} className="flex items-center gap-2.5 rounded-field bg-surface-2 py-1.5 pr-1.5 pl-3">
+            <div key={i} className="flex items-center gap-2.5 rounded-field bg-surface-2 py-1.5 pe-1.5 ps-3">
               <span className="flex min-w-0 flex-1 flex-col">
                 <b className={cx("truncate text-[13px] leading-snug", !v && "text-danger-text")}>{label}</b>
                 {v && <span className="truncate text-[11px] leading-snug text-muted">{variantNote(v.variant, t.lang)}</span>}
@@ -486,7 +486,7 @@ function SuffixChips({ suffixes, t, onChange, label }: { suffixes: string[]; t: 
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-field border border-line bg-canvas p-1.5 focus-within:border-accent">
       {suffixes.map((s) => (
-        <span key={s} className="inline-flex h-6 items-center gap-1 rounded-ctl bg-accent-soft pr-1 pl-2 font-mono text-[11px] font-bold text-fg">
+        <span key={s} className="inline-flex h-6 items-center gap-1 rounded-ctl bg-accent-soft pe-1 ps-2 font-mono text-[11px] font-bold text-fg">
           {s}
           <button type="button" aria-label={t("subs.dns.suffixRemove", { s })} className="flex size-4 items-center justify-center rounded text-muted hover:text-fg" onClick={() => onChange(suffixes.filter((x) => x !== s))}>
             <Icon name="x" size={10} />

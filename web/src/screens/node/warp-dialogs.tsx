@@ -112,7 +112,7 @@ export function RegisterWarpDialog({
           {error.text}
           {error.rateLimited && (
             <Button
-              className="ml-3"
+              className="ms-3"
               size="sm"
               onClick={() => {
                 onOpenChange(false);

@@ -18,7 +18,7 @@ export function ProfileChip({ profile }: { profile: TokenProfile }) {
 export function CodeBlock({ text, lang }: { text: string; lang: string }) {
   return (
     <div className="overflow-hidden rounded-field border border-line bg-canvas">
-      <div className="flex items-center justify-between gap-2 border-b border-line py-1.5 pr-1.5 pl-3">
+      <div className="flex items-center justify-between gap-2 border-b border-line py-1.5 pe-1.5 ps-3">
         <span className="font-mono text-[11px] text-muted">{lang}</span>
         <CopyButton value={text} />
       </div>

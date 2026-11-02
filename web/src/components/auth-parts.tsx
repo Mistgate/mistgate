@@ -14,7 +14,7 @@ import { cx } from "@/lib/cx";
 export function AuthFrame({ aside, children, viewKey }: { aside?: ReactNode; children: ReactNode; viewKey?: string }) {
   return (
     <div className="relative flex min-h-dvh flex-col items-center px-5 py-10 md:px-10">
-      <div className="absolute top-3 right-3 flex items-center gap-2 md:top-4 md:right-5">
+      <div className="absolute top-3 inset-e-3 flex items-center gap-2 md:top-4 md:inset-e-5">
         <LangToggle />
         <ThemeToggle />
       </div>

@@ -75,7 +75,7 @@ function TokenRow({ tok, now, onRevoke }: { tok: Token; now: number; onRevoke: (
         </span>
       </div>
       {/* the chip and the action wrap together, so a narrow row never strands the action alone */}
-      <div className="ml-auto flex flex-none items-center gap-3">
+      <div className="ms-auto flex flex-none items-center gap-3">
         <ProfileChip profile={tok.profile} />
         {state === "active" ? (
           <button type="button" onClick={onRevoke} aria-label={t("int.tok.revoke.aria", { name: tok.name })} className="text-xs font-bold text-danger-text">
@@ -102,7 +102,7 @@ function ProfilePicker({ value, onChange }: { value: TokenProfile; onChange: (p:
             <Radio.Root
               key={p}
               value={String(p)}
-              className="group flex cursor-pointer items-start gap-3 rounded-field border border-line bg-surface p-3 text-left transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft"
+              className="group flex cursor-pointer items-start gap-3 rounded-field border border-line bg-surface p-3 text-start transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft"
             >
               <span aria-hidden className="mt-0.5 grid size-4 flex-none place-items-center rounded-full border-[1.5px] border-faint group-data-checked:border-accent">
                 <Radio.Indicator className="size-2 rounded-full bg-accent" />

@@ -218,7 +218,7 @@ function DayAxis({ since, now }: { since: number; now: number }) {
 function Ipv6Label() {
   const t = useT();
   return (
-    <span className="truncate pl-3 font-mono text-[11px] font-bold text-muted">
+    <span className="truncate ps-3 font-mono text-[11px] font-bold text-muted">
       <span className="sr-only">{t("rc.src.globalping")} · </span>IPv6
     </span>
   );

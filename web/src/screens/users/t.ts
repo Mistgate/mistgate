@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { MessageKey } from "@/i18n/en";
-import { dictionaries as messages, localeOf, pickForm, useLang, type Lang } from "@/i18n";
+import { dictionaries as messages, dirOf, fill, intlLocaleOf, pickForm, useLang, type Lang } from "@/i18n";
 
 // `useT` plus two things the people screens need: `opt` (text for a key that may not exist: a protocol's schema
 // copy, see src/i18n/profiles.ts) and `lang` (date formats). Same call shape as `useT`, so it passes where a T is asked.
@@ -16,20 +16,18 @@ export type Tx = {
   /** Text for a key that may not exist: undefined when there is no entry. */
   opt: (key: string, vars?: Vars) => string | undefined;
   lang: Lang;
-  /** `lang` as an Intl locale ("zh" is "zh-CN"). */
+  /** `lang` as an Intl locale ("zh" is "zh-CN", Persian with Latin digits). */
   locale: string;
 };
-
-const fill = (text: string, vars?: Vars) =>
-  vars ? text.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? "")) : text;
 
 export function useTx(): Tx {
   const lang = useLang();
   return useMemo(() => {
     const dict = dictionaries[lang];
-    const t = (key: Key, vars?: Vars) => fill(dict[key] ?? key, vars);
-    const n = (key: Key, count: number, vars?: Vars) => fill(pickForm(dict[key] ?? key, count, lang), { n: count, ...vars });
-    const opt = (key: string, vars?: Vars) => (key in dict ? fill(dict[key]!, vars) : undefined);
-    return Object.assign(t, { n, opt, lang, locale: localeOf(lang) });
+    const rtl = dirOf(lang) === "rtl";
+    const t = (key: Key, vars?: Vars) => fill(dict[key] ?? key, vars, rtl);
+    const n = (key: Key, count: number, vars?: Vars) => fill(pickForm(dict[key] ?? key, count, lang), { n: count, ...vars }, rtl);
+    const opt = (key: string, vars?: Vars) => (key in dict ? fill(dict[key]!, vars, rtl) : undefined);
+    return Object.assign(t, { n, opt, lang, locale: intlLocaleOf(lang) });
   }, [lang]);
 }

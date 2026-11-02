@@ -266,7 +266,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
 
       <details className="group rounded-card bg-surface-2 px-3.5">
         <summary className="flex h-12 cursor-pointer items-center gap-2 text-[13px] font-bold select-none [&::-webkit-details-marker]:hidden">
-          <Icon name="chevronRight" size={14} className="text-muted transition-transform duration-200 group-open:rotate-90" />
+          <Icon name="chevronRight" size={14} className="text-muted transition-transform duration-200 group-open:rotate-90 rtl:group-open:-rotate-90" />
           {t("users.advanced")}
         </summary>
         <SpeedPair person={speed} device={devSpeed} onPerson={setSpeed} onDevice={setDevSpeed} />

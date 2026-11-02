@@ -254,7 +254,7 @@ export function DoctorRow({
 function ManualSteps({ steps, nodeId }: { steps: readonly ManualStep[]; nodeId: string }) {
   const t = useT();
   return (
-    <ol className="flex basis-full flex-col gap-2.5 rounded-field border border-line bg-canvas p-3 sm:ml-12">
+    <ol className="flex basis-full flex-col gap-2.5 rounded-field border border-line bg-canvas p-3 sm:ms-12">
       {steps.map((s) => (
         <li key={s.text} className="flex flex-col gap-1.5 text-xs leading-snug">
           <span className="text-pretty">{t(s.text, s.params)}</span>
@@ -310,7 +310,7 @@ export function DoctorCompact({ items, stale }: { items: readonly DoctorItem[]; 
             <CheckChip id={item.id} />
             <span className="min-w-0 text-[13px] leading-snug">
               <b>{itemTitle(t, item)}</b>
-              {fact && <span className="ml-2 text-xs break-words text-muted">{fact}</span>}
+              {fact && <span className="ms-2 text-xs break-words text-muted">{fact}</span>}
             </span>
           </li>
         );

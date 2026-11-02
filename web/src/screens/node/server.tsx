@@ -217,7 +217,7 @@ function NodeForm({ data, owner }: { data: Plain<GetNodeResponse>; owner: boolea
         })}
       </Block>
       <ActionBar>
-        <Button type="submit" variant="primary" size="md" className="ml-auto" disabled={!dirty || invalid || save.isPending}>
+        <Button type="submit" variant="primary" size="md" className="ms-auto" disabled={!dirty || invalid || save.isPending}>
           {t("common.save")}
         </Button>
       </ActionBar>
@@ -305,7 +305,7 @@ function HostPanel({ data }: { data: Plain<GetNodeResponse> }) {
           .map(({ k, v }, i) => (
             <div key={k} className={`flex min-h-[38px] items-center gap-2.5 py-1.5 text-[13px] ${i ? "border-t border-line" : ""}`}>
               <span className="flex-1 text-muted">{k}</span>
-              <span className="min-w-0 text-right font-mono text-xs font-semibold break-all">{v}</span>
+              <span className="min-w-0 text-end font-mono text-xs font-semibold break-all">{v}</span>
             </div>
           ))}
       </div>

@@ -46,3 +46,29 @@ export const zh: typeof en = {
   "edition.feature.tspu_probe": "国家可达性检测的 TSPU 探测",
   "edition.hint.mcp": "已有的令牌可以查看和吊销，暂时无法创建新令牌。",
 };
+
+export const fa: typeof en = {
+  "err.unavailable_in_edition": "هنوز در نسخهٔ Cloudflare در دسترس نیست: {feature}.",
+  "edition.feature.backups": "نسخه‌های پشتیبان",
+  "edition.feature.mcp": "MCP و توکن‌های API",
+  "edition.feature.health_checks": "بررسی تونل‌ها",
+  "edition.feature.agent_updates": "به‌روزرسانی نودها",
+  "edition.feature.agent_logs": "لاگ‌های نود",
+  "edition.feature.panel_update": "به‌روزرسانی پنل",
+  "edition.feature.decoy_own": "سایت پوششی اختصاصی",
+  "edition.feature.tspu_probe": "نقطهٔ سنجش TSPU در بررسی از داخل کشور",
+  "edition.hint.mcp": "توکن‌هایی که قبلاً صادر شده‌اند دیده و ابطال می‌شوند؛ ساختن توکن جدید هنوز ممکن نیست.",
+};
+
+export const tr: typeof en = {
+  "err.unavailable_in_edition": "Cloudflare sürümünde henüz yok: {feature}.",
+  "edition.feature.backups": "Yedekler",
+  "edition.feature.mcp": "MCP ve API token'ları",
+  "edition.feature.health_checks": "Tünel kontrolleri",
+  "edition.feature.agent_updates": "Düğümleri güncelleme",
+  "edition.feature.agent_logs": "Düğüm günlükleri",
+  "edition.feature.panel_update": "Paneli güncelleme",
+  "edition.feature.decoy_own": "Kendi kamuflaj sitesi",
+  "edition.feature.tspu_probe": "Ülke kontrolünün TSPU ölçüm noktası",
+  "edition.hint.mcp": "Daha önce verilmiş token'lar listelenir ve iptal edilebilir; yenileri henüz oluşturulamaz.",
+};

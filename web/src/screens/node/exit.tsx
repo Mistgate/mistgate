@@ -129,7 +129,7 @@ function TrafficForm({ data }: { data: Plain<GetNodeResponse> }) {
         </div>
       </div>
       <ActionBar>
-        <Button type="submit" variant="primary" size="md" className="ml-auto" disabled={!dirty || !!dnsError || save.isPending}>
+        <Button type="submit" variant="primary" size="md" className="ms-auto" disabled={!dirty || !!dnsError || save.isPending}>
           {t("common.save")}
         </Button>
       </ActionBar>

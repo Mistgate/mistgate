@@ -45,8 +45,13 @@ export function SettingsLayout() {
   const measure = useCallback(() => {
     const n = nav.current;
     if (!n) return;
-    const left = n.scrollLeft > 1;
-    const right = n.scrollLeft + n.clientWidth < n.scrollWidth - 1;
+    // scrollLeft runs from 0 down right to left: the hidden part at the start and at the end, then the sides they are on
+    const x = Math.abs(n.scrollLeft);
+    const atStart = x > 1;
+    const atEnd = x + n.clientWidth < n.scrollWidth - 1;
+    const rtl = getComputedStyle(n).direction === "rtl";
+    const left = rtl ? atEnd : atStart;
+    const right = rtl ? atStart : atEnd;
     setFade(left && right ? "both" : left ? "left" : right ? "right" : "none");
   }, []);
 
@@ -54,7 +59,11 @@ export function SettingsLayout() {
   useEffect(() => {
     const n = nav.current;
     const a = [...(n?.querySelectorAll<HTMLElement>("[data-page]") ?? [])].find((x) => x.dataset.page === section);
-    if (n && a && n.scrollWidth > n.clientWidth) n.scrollTo({ left: a.offsetLeft - (n.clientWidth - a.offsetWidth) / 2, behavior: "smooth" });
+    // only when it is off the strip; measured on screen, so it works right to left as well
+    const box = n?.getBoundingClientRect();
+    const tab = a?.getBoundingClientRect();
+    if (n && a && box && tab && (tab.left < box.left || tab.right > box.right))
+      n.scrollBy({ left: tab.left - box.left - (n.clientWidth - a.offsetWidth) / 2, behavior: "smooth" });
     measure();
   }, [section, measure]);
   useEffect(() => {

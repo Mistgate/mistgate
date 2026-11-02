@@ -70,6 +70,18 @@ describe("public/splash.js", () => {
     expect(splash()!.querySelector(".sp-fail button")!.textContent).toBe("Обновить");
   });
 
+  it("sets Persian right to left before the bundle, with its own words", () => {
+    localStorage.setItem("lang", "fa");
+    run();
+    expect(document.documentElement.lang).toBe("fa");
+    expect(document.documentElement.dir).toBe("rtl");
+    expect(splash()!.querySelector(".sp-sr")!.textContent).toBe("در حال بارگذاری…");
+    localStorage.setItem("lang", "tr");
+    run();
+    expect(document.documentElement.dir).toBe("ltr");
+    expect(splash()!.querySelector(".sp-fail button")!.textContent).toBe("Yenile");
+  });
+
   it("falls back to dark, English and the instance accent; a device's own accent beats the instance's", () => {
     localStorage.setItem("instance-accent", "#8ec8ea");
     run();

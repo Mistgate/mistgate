@@ -64,7 +64,7 @@ export function StatusPill({
       aria-label={glyphOnly ? t(word) : undefined}
       className={cx(
         `tone-${kind} pill inline-flex flex-none items-center gap-1.5 font-bold whitespace-nowrap leading-none`,
-        glyphOnly ? "h-5 rounded-xl px-0.5" : bar ? "h-bar rounded-ctl pr-3 pl-2 text-xs" : sm ? "h-[22px] rounded-xl pr-2 pl-1 text-[11px]" : "h-[26px] rounded-xl pr-2.5 pl-1.5 text-xs",
+        glyphOnly ? "h-5 rounded-xl px-0.5" : bar ? "h-bar rounded-ctl pe-3 ps-2 text-xs" : sm ? "h-[22px] rounded-xl pe-2 ps-1 text-[11px]" : "h-[26px] rounded-xl pe-2.5 ps-1.5 text-xs",
       )}
     >
       <StatusGlyph kind={kind} />

@@ -98,7 +98,7 @@ export function OnlineNow({ data }: { data: Plain<GetNodeResponse> }) {
                 </span>
               ))}
             </span>
-            <span className="w-[84px] text-right font-mono text-xs">{fmt.mbit(u.downBps)}</span>
+            <span className="w-[84px] text-end font-mono text-xs">{fmt.mbit(u.downBps)}</span>
           </Link>
         );
       })}

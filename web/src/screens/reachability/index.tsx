@@ -165,7 +165,7 @@ function DarkEverywhereLines({ rows }: { rows: readonly DarkEverywhere[] }) {
           </li>
         ))}
       </ul>
-      <p className="pl-5 text-xs text-muted">{t("rc.darkAll.hint")}</p>
+      <p className="ps-5 text-xs text-muted">{t("rc.darkAll.hint")}</p>
     </section>
   );
 }
@@ -242,7 +242,7 @@ function Events({ code }: { code: string }) {
           <span id="reach-events">{t("rc.ev.title")}</span>
         </SectionLabel>
         {code && <span className="text-xs text-muted">{t("rc.ev.sub", { country: countryIn(t, code) })}</span>}
-        <Link to="/health" className="ml-auto text-xs font-semibold text-muted hover:text-fg hover:underline">
+        <Link to="/health" className="ms-auto text-xs font-semibold text-muted hover:text-fg hover:underline">
           {t("rc.ev.all")}
         </Link>
       </div>
@@ -264,9 +264,9 @@ function Events({ code }: { code: string }) {
           >
             <StatusDot kind={open ? severityKind(a.severity) : "off"} />
             <span className="min-w-0 flex-1 text-pretty">
-              <b className="mr-1.5 font-mono text-xs">{a.nodeName}</b>
+              <b className="me-1.5 font-mono text-xs">{a.nodeName}</b>
               <span className={cx("font-semibold", !open && "text-muted")}>{verdict ? t(verdict) : a.params.verdict}</span>
-              <Ipv6Tag alert={a} className="ml-1.5 align-[1px]" />
+              <Ipv6Tag alert={a} className="ms-1.5 align-[1px]" />
               <span className="text-muted"> · {when}</span>
             </span>
             <span className="font-mono text-[11px] whitespace-nowrap text-muted max-sm:hidden">{fmt.stamp(open ? a.openedUnix || a.firstSeenUnix : a.resolvedAtUnix)}</span>

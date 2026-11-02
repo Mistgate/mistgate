@@ -92,6 +92,7 @@ export function Icon({ name, size = 16, ...rest }: { name: IconName; size?: numb
       strokeLinejoin="round"
       aria-hidden
       className="block flex-none"
+      data-flip={name === "back" || name === "chevronRight" || undefined}
       {...rest}
     >
       <path d={paths[name]} />

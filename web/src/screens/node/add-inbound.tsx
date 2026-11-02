@@ -327,11 +327,11 @@ function AcmeBlock({ vars, profile, nodeName, onEnter, onSelfSigned }: { vars: R
         <div className="flex flex-col items-start gap-1 pt-1">
           {/* a long profile name wraps instead of running out of the sheet */}
           {unused ? (
-            <Button variant="secondary" size="sm" className="h-auto! min-h-7 py-1 text-left whitespace-normal!" disabled={switchIt.isPending} onClick={() => switchIt.mutate()}>
+            <Button variant="secondary" size="sm" className="h-auto! min-h-7 py-1 text-start whitespace-normal!" disabled={switchIt.isPending} onClick={() => switchIt.mutate()}>
               {t("node.check.self.switch", { profile: profile.name })}
             </Button>
           ) : (
-            <Button variant="secondary" size="sm" className="h-auto! min-h-7 py-1 text-left whitespace-normal!" onClick={onSelfSigned}>
+            <Button variant="secondary" size="sm" className="h-auto! min-h-7 py-1 text-start whitespace-normal!" onClick={onSelfSigned}>
               {t("node.check.self.create", { node: nodeName })}
             </Button>
           )}

@@ -53,7 +53,7 @@ export function BackButton({ id, label, onClick }: { id: string; label: string; 
       id={id}
       type="button"
       onClick={onClick}
-      className="flex h-9 scroll-mt-20 items-center gap-1.5 self-start rounded-ctl pr-3 pl-1.5 text-[13px] font-bold text-muted transition-colors hover:bg-surface-2 hover:text-fg min-[720px]:hidden"
+      className="flex h-9 scroll-mt-20 items-center gap-1.5 self-start rounded-ctl pe-3 ps-1.5 text-[13px] font-bold text-muted transition-colors hover:bg-surface-2 hover:text-fg min-[720px]:hidden"
     >
       <Icon name="back" size={16} aria-hidden />
       {label}

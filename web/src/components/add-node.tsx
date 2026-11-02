@@ -303,7 +303,7 @@ export function InstallSteps({ issued, onClose }: { issued: Plain<CreateEnrollme
       <details className="group rounded-field border border-line px-3 py-2">
         <summary className="cursor-pointer list-none text-xs font-bold text-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden">
           <span className="inline-flex items-center gap-1.5">
-            <Icon name="chevronRight" size={12} className="transition-transform duration-200 group-open:rotate-90" />
+            <Icon name="chevronRight" size={12} className="transition-transform duration-200 group-open:rotate-90 rtl:group-open:-rotate-90" />
             {t("node.add.details")}
           </span>
         </summary>

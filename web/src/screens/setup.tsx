@@ -96,7 +96,7 @@ function LanguageStep({ onNext }: { onNext: () => void }) {
           <Radio.Root
             key={l}
             value={l}
-            className="flex h-14 cursor-pointer items-center gap-3 rounded-card border border-line bg-surface px-4 text-left transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft"
+            className="flex h-14 cursor-pointer items-center gap-3 rounded-card border border-line bg-surface px-4 text-start transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft"
           >
             <span className="w-6 font-mono text-xs font-bold text-muted">{langShort[l]}</span>
             <b className="flex-1 text-[15px]">{langNames[l]}</b>
@@ -272,7 +272,7 @@ function DoneStep({ onFirstNode, onLater }: { onFirstNode: () => void; onLater: 
       <button
         type="button"
         onClick={onFirstNode}
-        className="card-hover flex flex-col gap-1.5 rounded-card border border-accent-line bg-accent-soft p-4 text-left"
+        className="card-hover flex flex-col gap-1.5 rounded-card border border-accent-line bg-accent-soft p-4 text-start"
       >
         <b className="text-[15px]">{t("auth.setup.addFirst")} ›</b>
         <span className="text-[13px] leading-snug text-muted">{t("auth.setup.addFirstBody")}</span>

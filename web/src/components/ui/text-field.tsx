@@ -29,13 +29,14 @@ export function TextField({ label, hint, error, search, mono, className, icon, t
         </Field.Label>
       )}
       <div className="relative">
-        {search && <Icon name="search" className="pointer-events-none absolute top-3.5 left-3 text-muted" />}
+        {search && <Icon name="search" className="pointer-events-none absolute top-3.5 inset-s-3 text-muted" />}
         <Field.Control
           className={cx(
             "h-11 w-full rounded-field border border-line bg-surface text-sm text-fg outline-none transition-colors duration-200 focus:border-accent data-invalid:border-danger",
-            search ? "pr-3.5 pl-9 font-normal" : "px-3.5 font-medium",
+            search ? "pe-3.5 ps-9 font-normal" : "px-3.5 font-medium",
             mono && "font-mono",
           )}
+          dir={mono ? "ltr" : undefined}
           {...rest}
         />
       </div>

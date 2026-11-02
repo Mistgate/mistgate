@@ -199,10 +199,11 @@ export function ChartCard({
           ))}
         </ul>
       </div>
-      <div className="flex gap-2">
+      {/* the plot keeps time left to right in Persian too: its axis labels must sit under the svg's own coordinates */}
+      <div dir="ltr" className="flex gap-2">
         <div
           aria-hidden
-          className="-my-1.5 flex w-[34px] flex-none flex-col justify-between text-right font-mono text-[10px] text-faint"
+          className="-my-1.5 flex w-[34px] flex-none flex-col justify-between text-end font-mono text-[10px] text-faint"
           style={{ height }}
         >
           {yLabels.map((y, k) => (

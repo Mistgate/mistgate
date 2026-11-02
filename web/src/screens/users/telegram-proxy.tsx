@@ -178,7 +178,7 @@ function LinkRow({ l, cc, t }: { l: TelegramProxyLink; cc: string; t: Tx }) {
         </div>
       </div>
       {qr && (
-        <div className="screen-enter flex flex-wrap items-center gap-x-4 gap-y-2 pb-3 pl-12">
+        <div className="screen-enter flex flex-wrap items-center gap-x-4 gap-y-2 pb-3 ps-12">
           <QrCode value={l.url} label={t("tgproxy.qrLabel", { node: l.nodeName })} size={140} />
           <p className="max-w-64 text-xs leading-snug text-pretty text-muted">{t("tgproxy.qrHint")}</p>
         </div>

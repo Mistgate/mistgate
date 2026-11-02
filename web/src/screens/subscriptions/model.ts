@@ -154,10 +154,11 @@ export const catalogOf = (providers: readonly Provider[]): Catalog => new Map(pr
 
 /** "Cloudflare · Family": the provider and the variant in the UI language. */
 export function variantLabel(e: { provider: Provider; variant: Variant }, lang: string): string {
-  const name = lang === "ru" ? e.variant.nameRu : lang === "zh" ? (variantNamesZh[e.variant.id] ?? e.variant.nameEn) : e.variant.nameEn;
+  const name = lang === "ru" ? e.variant.nameRu : (variantNames[lang]?.[e.variant.id] ?? e.variant.nameEn);
   return `${e.provider.name} · ${name}`;
 }
-// The catalog (internal/panel/dns/providers.go) names its variants in Russian and English only; this is the Chinese for each.
+// The catalog (internal/panel/dns/providers.go) names its variants in Russian and English only; these are the other
+// languages of the admin.
 const variantNamesZh: Record<string, string> = {
   "cloudflare/standard": "标准",
   "cloudflare/security": "安全",
@@ -178,7 +179,48 @@ const variantNamesZh: Record<string, string> = {
   "alidns/standard": "标准",
   "dnspod/standard": "标准",
 };
-// The catalog's notes are Russian and English only; this is the Chinese for each variant.
+const variantNamesFa: Record<string, string> = {
+  "cloudflare/standard": "استاندارد",
+  "cloudflare/security": "امنیت",
+  "cloudflare/family": "خانواده",
+  "google/standard": "استاندارد",
+  "quad9/standard": "امنیت",
+  "adguard/default": "پیش‌فرض",
+  "adguard/family": "خانواده",
+  "adguard/unfiltered": "بدون فیلتر",
+  "yandex/basic": "پایه",
+  "yandex/safe": "امن",
+  "yandex/family": "خانواده",
+  "mullvad/standard": "استاندارد",
+  "mullvad/adblock": "بدون تبلیغ",
+  "mullvad/base": "تبلیغ و بدافزار",
+  "opendns/familyshield": "FamilyShield",
+  "dnssb/standard": "استاندارد",
+  "alidns/standard": "استاندارد",
+  "dnspod/standard": "استاندارد",
+};
+const variantNamesTr: Record<string, string> = {
+  "cloudflare/standard": "Standart",
+  "cloudflare/security": "Güvenlik",
+  "cloudflare/family": "Aile",
+  "google/standard": "Standart",
+  "quad9/standard": "Güvenlik",
+  "adguard/default": "Varsayılan",
+  "adguard/family": "Aile",
+  "adguard/unfiltered": "Filtresiz",
+  "yandex/basic": "Temel",
+  "yandex/safe": "Güvenli",
+  "yandex/family": "Aile",
+  "mullvad/standard": "Standart",
+  "mullvad/adblock": "Reklamsız",
+  "mullvad/base": "Reklam ve zararlı yazılım",
+  "opendns/familyshield": "FamilyShield",
+  "dnssb/standard": "Standart",
+  "alidns/standard": "Standart",
+  "dnspod/standard": "Standart",
+};
+const variantNames: Record<string, Record<string, string>> = { zh: variantNamesZh, fa: variantNamesFa, tr: variantNamesTr };
+// The catalog's notes are Russian and English only; these are the other languages of the admin.
 const variantNotesZh: Record<string, string> = {
   "cloudflare/standard": "速度快，不过滤。2026 年 8 月起，俄罗斯封锁了到 Cloudflare 的 DoH，在隧道内不受影响。",
   "cloudflare/security": "拦截恶意和钓鱼网站。2026 年 8 月起，俄罗斯封锁了 DoH。",
@@ -199,7 +241,48 @@ const variantNotesZh: Record<string, string> = {
   "alidns/standard": "国内网站解析更稳定。仅支持普通 DNS，不支持 DoH 和 DoT。",
   "dnspod/standard": "国内网站解析更稳定。仅支持普通 DNS，不支持 DoH 和 DoT。",
 };
-export const variantNote = (v: Variant, lang: string) => (lang === "ru" ? v.noteRu : lang === "zh" ? (variantNotesZh[v.id] ?? v.noteEn) : v.noteEn);
+const variantNotesFa: Record<string, string> = {
+  "cloudflare/standard": "سریع و بدون فیلتر. از اوت 2026 روسیه DoH به Cloudflare را مسدود کرده است؛ داخل تونل اثری ندارد.",
+  "cloudflare/security": "بدافزار و سایت‌های فیشینگ را مسدود می‌کند. از اوت 2026 روسیه DoH آن را مسدود کرده است.",
+  "cloudflare/family": "بدافزار و محتوای بزرگسالان را مسدود می‌کند. از اوت 2026 روسیه DoH آن را مسدود کرده است.",
+  "google/standard": "بدون فیلتر.",
+  "quad9/standard": "دامنه‌های شناخته‌شدهٔ بدافزار و فیشینگ را مسدود می‌کند.",
+  "adguard/default": "تبلیغ‌ها و ردیاب‌ها را مسدود می‌کند.",
+  "adguard/family": "تبلیغ‌ها، ردیاب‌ها و محتوای بزرگسالان را مسدود می‌کند.",
+  "adguard/unfiltered": "هیچ چیزی را مسدود نمی‌کند.",
+  "yandex/basic": "سایت‌های روسی را پایدارتر پیدا می‌کند. DoH و DoT در روسیه کار می‌کنند.",
+  "yandex/safe": "بدافزار و سایت‌های کلاه‌برداری را مسدود می‌کند. DoH و DoT در روسیه کار می‌کنند.",
+  "yandex/family": "محتوای بزرگسالان و بدافزار را مسدود می‌کند. DoH و DoT در روسیه کار می‌کنند.",
+  "mullvad/standard": "فقط DoH/DoT، بدون DNS معمولی. این سرویس از 2026-11-02 کار نمی‌کند.",
+  "mullvad/adblock": "تبلیغ‌ها و ردیاب‌ها را مسدود می‌کند. فقط DoH/DoT. این سرویس از 2026-11-02 کار نمی‌کند.",
+  "mullvad/base": "تبلیغ‌ها، ردیاب‌ها و بدافزار را مسدود می‌کند. فقط DoH/DoT. این سرویس از 2026-11-02 کار نمی‌کند.",
+  "opendns/familyshield": "محتوای بزرگسالان را مسدود می‌کند. DoT ندارد: نام میزبان آن هنوز تأیید نشده است.",
+  "dnssb/standard": "بدون لاگ، با DNSSEC و بدون فیلتر.",
+  "alidns/standard": "سایت‌های چینی را پایدارتر پیدا می‌کند. فقط DNS معمولی، بدون DoH و DoT.",
+  "dnspod/standard": "سایت‌های چینی را پایدارتر پیدا می‌کند. فقط DNS معمولی، بدون DoH و DoT.",
+};
+const variantNotesTr: Record<string, string> = {
+  "cloudflare/standard": "Hızlı, filtresiz. Ağustos 2026'dan beri Rusya Cloudflare'a giden DoH'yi engelliyor; tünelin içinde etkisi yok.",
+  "cloudflare/security": "Zararlı ve oltalama sitelerini engeller. Ağustos 2026'dan beri Rusya bunun DoH'sini engelliyor.",
+  "cloudflare/family": "Zararlı siteleri ve yetişkin içeriğini engeller. Ağustos 2026'dan beri Rusya bunun DoH'sini engelliyor.",
+  "google/standard": "Filtresiz.",
+  "quad9/standard": "Bilinen zararlı ve oltalama alan adlarını engeller.",
+  "adguard/default": "Reklamları ve izleyicileri engeller.",
+  "adguard/family": "Reklamları, izleyicileri ve yetişkin içeriğini engeller.",
+  "adguard/unfiltered": "Hiçbir şeyi engellemez.",
+  "yandex/basic": "Rus sitelerini daha kararlı çözümler. DoH ve DoT Rusya'da çalışır.",
+  "yandex/safe": "Zararlı ve dolandırıcı siteleri engeller. DoH ve DoT Rusya'da çalışır.",
+  "yandex/family": "Yetişkin içeriğini ve zararlı siteleri engeller. DoH ve DoT Rusya'da çalışır.",
+  "mullvad/standard": "Yalnızca DoH/DoT, düz DNS yok. Hizmet 2026-11-02 tarihinde kapanıyor.",
+  "mullvad/adblock": "Reklamları ve izleyicileri engeller. Yalnızca DoH/DoT. Hizmet 2026-11-02 tarihinde kapanıyor.",
+  "mullvad/base": "Reklamları, izleyicileri ve zararlı siteleri engeller. Yalnızca DoH/DoT. Hizmet 2026-11-02 tarihinde kapanıyor.",
+  "opendns/familyshield": "Yetişkin içeriğini engeller. DoT yok: sunucu adı henüz doğrulanmadı.",
+  "dnssb/standard": "Kayıt tutmaz, DNSSEC destekler, filtresiz.",
+  "alidns/standard": "Çin sitelerini daha kararlı çözümler. Yalnızca düz DNS; DoH ve DoT yok.",
+  "dnspod/standard": "Çin sitelerini daha kararlı çözümler. Yalnızca düz DNS; DoH ve DoT yok.",
+};
+const variantNotes: Record<string, Record<string, string>> = { zh: variantNotesZh, fa: variantNotesFa, tr: variantNotesTr };
+export const variantNote = (v: Variant, lang: string) => (lang === "ru" ? v.noteRu : (variantNotes[lang]?.[v.id] ?? v.noteEn));
 
 type ServerLike = { address: string; kind?: DnsServerKind; providerVariant?: string };
 
@@ -485,33 +568,34 @@ const categoryLooks: Partial<Record<DnsCategory, PresetLook>> = {
 /** The glyph of a preset: the first built-ins keep their own, the rest take the look of their category. */
 export const presetLook = (p: { id: string; category?: DnsCategory }): PresetLook => looks[p.id] ?? categoryLooks[p.category ?? DnsCategory.UNSPECIFIED] ?? { glyph: "server", tone: "muted" };
 
-// The built-in presets have one stored name (Russian). An English or Chinese UI shows these while the stored name is still
+// The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
 // the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
-// (internal/panel/dns/node.go builtinNames).
-const builtinNames: Record<string, { ru: string; en: string; zh: string }> = {
-  dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连" },
-  dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN" },
-  dns_builtin_cn_split: { ru: "Китай: китайские сайты напрямую", en: "China: Chinese sites direct", zh: "中国：国内网站直连" },
-  dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google", zh: "Cloudflare + Google" },
-  dns_builtin_adblock: { ru: "AdGuard: без рекламы", en: "AdGuard: no ads", zh: "AdGuard：无广告" },
-  dns_builtin_family: { ru: "AdGuard Family: без рекламы и 18+", en: "AdGuard Family: no ads, no 18+", zh: "AdGuard Family：无广告和成人内容" },
-  dns_builtin_quad9: { ru: "Quad9: защита от вредоносных", en: "Quad9: malware blocking", zh: "Quad9：拦截恶意网站" },
-  dns_builtin_yandex: { ru: "Яндекс DNS", en: "Yandex DNS", zh: "Yandex DNS" },
-  dns_builtin_cloudflare: { ru: "Cloudflare: без фильтров", en: "Cloudflare: no filtering", zh: "Cloudflare：无过滤" },
-  dns_builtin_google: { ru: "Google: без фильтров", en: "Google: no filtering", zh: "Google：无过滤" },
-  dns_builtin_dnssb: { ru: "DNS.SB: без фильтров", en: "DNS.SB: no filtering", zh: "DNS.SB：无过滤" },
-  dns_builtin_cloudflare_family: { ru: "Cloudflare Family: без вредоносных и 18+", en: "Cloudflare Family: no malware, no 18+", zh: "Cloudflare Family：无恶意网站和成人内容" },
-  dns_builtin_yandex_family: { ru: "Яндекс семейный: без 18+", en: "Yandex Family: no 18+", zh: "Yandex Family：无成人内容" },
-  dns_builtin_opendns_family: { ru: "OpenDNS FamilyShield: без 18+", en: "OpenDNS FamilyShield: no 18+", zh: "OpenDNS FamilyShield：无成人内容" },
-  dns_builtin_cloudflare_security: { ru: "Cloudflare Security: защита от вредоносных", en: "Cloudflare Security: malware blocking", zh: "Cloudflare Security：拦截恶意网站" },
-  dns_builtin_yandex_safe: { ru: "Яндекс безопасный: защита от вредоносных", en: "Yandex Safe: malware blocking", zh: "Yandex Safe：拦截恶意网站" },
-  dns_builtin_ads_device: { ru: "Без рекламы на устройстве", en: "No ads on the device", zh: "设备端拦截广告" },
+// (internal/panel/dns/node.go builtinNames). The Persian ".ru" starts with a left-to-right mark: a leading dot would
+// otherwise take the right-to-left side of the Persian around it.
+const builtinNames: Record<string, { ru: string; en: string; zh: string; fa: string; tr: string }> = {
+  dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连", fa: "روسیه: \u200E.ru مستقیم", tr: "Rusya: .ru doğrudan" },
+  dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN", fa: "روسیه: همه‌چیز از راه VPN", tr: "Rusya: her şey VPN üzerinden" },
+  dns_builtin_cn_split: { ru: "Китай: китайские сайты напрямую", en: "China: Chinese sites direct", zh: "中国：国内网站直连", fa: "چین: سایت‌های چینی مستقیم", tr: "Çin: Çin siteleri doğrudan" },
+  dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google", zh: "Cloudflare + Google", fa: "Cloudflare + Google", tr: "Cloudflare + Google" },
+  dns_builtin_adblock: { ru: "AdGuard: без рекламы", en: "AdGuard: no ads", zh: "AdGuard：无广告", fa: "AdGuard: بدون تبلیغ", tr: "AdGuard: reklamsız" },
+  dns_builtin_family: { ru: "AdGuard Family: без рекламы и 18+", en: "AdGuard Family: no ads, no 18+", zh: "AdGuard Family：无广告和成人内容", fa: "AdGuard Family: بدون تبلیغ و محتوای بزرگسالان", tr: "AdGuard Family: reklam ve +18 yok" },
+  dns_builtin_quad9: { ru: "Quad9: защита от вредоносных", en: "Quad9: malware blocking", zh: "Quad9：拦截恶意网站", fa: "Quad9: مسدودسازی بدافزار", tr: "Quad9: zararlı yazılım engeli" },
+  dns_builtin_yandex: { ru: "Яндекс DNS", en: "Yandex DNS", zh: "Yandex DNS", fa: "Yandex DNS", tr: "Yandex DNS" },
+  dns_builtin_cloudflare: { ru: "Cloudflare: без фильтров", en: "Cloudflare: no filtering", zh: "Cloudflare：无过滤", fa: "Cloudflare: بدون فیلتر", tr: "Cloudflare: filtresiz" },
+  dns_builtin_google: { ru: "Google: без фильтров", en: "Google: no filtering", zh: "Google：无过滤", fa: "Google: بدون فیلتر", tr: "Google: filtresiz" },
+  dns_builtin_dnssb: { ru: "DNS.SB: без фильтров", en: "DNS.SB: no filtering", zh: "DNS.SB：无过滤", fa: "DNS.SB: بدون فیلتر", tr: "DNS.SB: filtresiz" },
+  dns_builtin_cloudflare_family: { ru: "Cloudflare Family: без вредоносных и 18+", en: "Cloudflare Family: no malware, no 18+", zh: "Cloudflare Family：无恶意网站和成人内容", fa: "Cloudflare Family: بدون بدافزار و محتوای بزرگسالان", tr: "Cloudflare Family: zararlı ve +18 yok" },
+  dns_builtin_yandex_family: { ru: "Яндекс семейный: без 18+", en: "Yandex Family: no 18+", zh: "Yandex Family：无成人内容", fa: "Yandex Family: بدون محتوای بزرگسالان", tr: "Yandex Family: +18 yok" },
+  dns_builtin_opendns_family: { ru: "OpenDNS FamilyShield: без 18+", en: "OpenDNS FamilyShield: no 18+", zh: "OpenDNS FamilyShield：无成人内容", fa: "OpenDNS FamilyShield: بدون محتوای بزرگسالان", tr: "OpenDNS FamilyShield: +18 yok" },
+  dns_builtin_cloudflare_security: { ru: "Cloudflare Security: защита от вредоносных", en: "Cloudflare Security: malware blocking", zh: "Cloudflare Security：拦截恶意网站", fa: "Cloudflare Security: مسدودسازی بدافزار", tr: "Cloudflare Security: zararlı yazılım engeli" },
+  dns_builtin_yandex_safe: { ru: "Яндекс безопасный: защита от вредоносных", en: "Yandex Safe: malware blocking", zh: "Yandex Safe：拦截恶意网站", fa: "Yandex Safe: مسدودسازی بدافزار", tr: "Yandex Safe: zararlı yazılım engeli" },
+  dns_builtin_ads_device: { ru: "Без рекламы на устройстве", en: "No ads on the device", zh: "设备端拦截广告", fa: "مسدودسازی تبلیغ روی دستگاه", tr: "Cihazda reklam engeli" },
 };
 
 /** The name of a preset in the UI language (see builtinNames). */
 export function presetName(p: { id: string; name: string }, lang: string): string {
   const b = builtinNames[p.id];
-  return b && lang !== "ru" && p.name === b.ru ? (lang === "zh" ? b.zh : b.en) : p.name;
+  return b && lang !== "ru" && p.name === b.ru ? (lang === "zh" || lang === "fa" || lang === "tr" ? b[lang] : b.en) : p.name;
 }
 
 // Who runs a resolver, by address: what a person knows it by ("Cloudflare · Google"), not the IPs.

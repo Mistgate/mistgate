@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, type ButtonVariant } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
-import { useT } from "@/i18n";
+import { plainText, useT } from "@/i18n";
 
 /**
  * Copies `value` to the clipboard. The button says "Copied" for two seconds; if the browser refuses
@@ -28,7 +28,7 @@ export function CopyButton({
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(plainText(value));
       setDone(true);
       setTimeout(() => setDone(false), 2000);
     } catch {

@@ -161,15 +161,15 @@ export function EntryState({ node, v6, v4, country }: { node: Node; v6: Ipv6Entr
         </span>
         <span className="min-w-0 [overflow-wrap:anywhere]">{line}</span>
       </p>
-      {ofEntry && c.sender === "globalping" && <p className="pl-4 text-xs leading-snug text-pretty text-warn-text">{t("ways.ipv6.globalping")}</p>}
+      {ofEntry && c.sender === "globalping" && <p className="ps-4 text-xs leading-snug text-pretty text-warn-text">{t("ways.ipv6.globalping")}</p>}
       {down && <Notice tone="danger">{t("ways.ipv6.down", { node: node.name })}</Notice>}
       {v4line === "helps" && (
-        <p className="tone-ok tone-text flex items-start gap-1.5 pl-4 text-xs leading-snug font-semibold text-pretty">
+        <p className="tone-ok tone-text flex items-start gap-1.5 ps-4 text-xs leading-snug font-semibold text-pretty">
           <Icon name="check" size={13} aria-hidden className="mt-px flex-none" />
           {t("ways.ipv6.helps", { country })}
         </p>
       )}
-      {v4line === "ok" && <p className="pl-4 text-xs leading-snug text-pretty text-muted">{t("ways.ipv6.v4ok", { country })}</p>}
+      {v4line === "ok" && <p className="ps-4 text-xs leading-snug text-pretty text-muted">{t("ways.ipv6.v4ok", { country })}</p>}
       {c && !ofEntry && (v6.entrySupported || !!v6.entry) && <CheckResult check={c} />}
     </div>
   );

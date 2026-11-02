@@ -18,7 +18,7 @@ import { IconButton } from "./ui/icon-button";
 // The corner, the card and the pill are the admin's one notice style: stale-toast.tsx ("the panel was updated: reload") uses them too.
 
 /** Where a notice sits: bottom right on a desktop, full width above the dock on a phone. */
-export const toastCorner = "pointer-events-none fixed inset-x-4 bottom-[88px] z-20 flex justify-end md:inset-x-auto md:right-5 md:bottom-5";
+export const toastCorner = "pointer-events-none fixed inset-x-4 bottom-[88px] z-20 flex justify-end md:inset-x-auto md:inset-e-5 md:bottom-5";
 
 const pollMs = 3 * 60_000;
 const collapsedKey = "update-toast-collapsed";
@@ -143,7 +143,7 @@ export function ToastCard({ ref, label, icon, title, text, corner, onKeyDown, ch
           <p className="text-[13px] leading-snug text-pretty text-muted">{text}</p>
         </div>
         {/* 44px touch targets that sit in the corner without making the card taller */}
-        <div className="-mt-2.5 -mr-2.5 flex flex-none">{corner}</div>
+        <div className="-mt-2.5 -me-2.5 flex flex-none">{corner}</div>
       </div>
       {children}
     </section>
@@ -167,7 +167,7 @@ export function ToastPill({ ref, label, title, mark, onClick, children }: { ref:
       onClick={onClick}
       aria-label={label}
       title={title}
-      className="pop-in pointer-events-auto flex h-11 max-w-full items-center gap-2.5 rounded-full border border-accent-line bg-surface pr-4 pl-3.5 font-mono text-xs font-bold shadow-(--shadow-toast) transition-transform duration-200 ease-spring active:scale-[0.97]"
+      className="pop-in pointer-events-auto flex h-11 max-w-full items-center gap-2.5 rounded-full border border-accent-line bg-surface pe-4 ps-3.5 font-mono text-xs font-bold shadow-(--shadow-toast) transition-transform duration-200 ease-spring active:scale-[0.97]"
     >
       {mark}
       <span className="truncate">{children}</span>

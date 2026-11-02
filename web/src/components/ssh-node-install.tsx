@@ -145,7 +145,7 @@ function Steps({ current, labels, ariaLabel }: { current: Step; labels: string[]
             <li key={label} aria-current={active ? "step" : undefined} className="flex min-w-0 flex-col gap-2">
               <span className={done || active ? "h-1 rounded-full bg-accent" : "h-1 rounded-full bg-surface-2"} />
               <span className={active ? "truncate text-xs font-bold text-fg" : done ? "truncate text-xs font-semibold text-accent-text" : "truncate text-xs font-semibold text-muted"}>
-                <span className="mr-1.5 font-mono">{index + 1}</span>{label}
+                <span className="me-1.5 font-mono">{index + 1}</span>{label}
               </span>
             </li>
           );

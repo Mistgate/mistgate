@@ -244,7 +244,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                   {t("node.profiles.restart")}
                 </Button>
               )}
-              <Button variant="ghostDanger" size="sm" className="ml-auto" onClick={() => setRemoving(i)}>
+              <Button variant="ghostDanger" size="sm" className="ms-auto" onClick={() => setRemoving(i)}>
                 {t("node.profiles.remove")}
               </Button>
             </div>

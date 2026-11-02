@@ -115,19 +115,19 @@ export function ProtocolPicker({
               value={p.id}
               data-tone={look.tone}
               onDoubleClick={() => onContinue(p.id)}
-              className="group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-1 rounded-card-lg border border-line bg-surface p-4 text-left font-normal transition-colors duration-200 hover:border-accent-line data-checked:border-accent data-checked:bg-surface-2 @min-[480px]:flex @min-[480px]:flex-col @min-[480px]:items-stretch @min-[480px]:gap-0 @min-[480px]:p-5"
+              className="group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-1 rounded-card-lg border border-line bg-surface p-4 text-start font-normal transition-colors duration-200 hover:border-accent-line data-checked:border-accent data-checked:bg-surface-2 @min-[480px]:flex @min-[480px]:flex-col @min-[480px]:items-stretch @min-[480px]:gap-0 @min-[480px]:p-5"
             >
               {/* the selection mark keeps the corner: an empty ring, filled in the accent with a tick when chosen */}
               <span
                 aria-hidden
-                className="absolute top-4 right-4 grid size-5 place-items-center rounded-full border-[1.5px] border-faint text-on-accent transition-colors duration-200 group-data-checked:border-accent group-data-checked:bg-accent @min-[480px]:top-5 @min-[480px]:right-5"
+                className="absolute top-4 inset-e-4 grid size-5 place-items-center rounded-full border-[1.5px] border-faint text-on-accent transition-colors duration-200 group-data-checked:border-accent group-data-checked:bg-accent @min-[480px]:top-5 @min-[480px]:inset-e-5"
               >
                 <Icon name="check" size={12} className="opacity-0 group-data-checked:opacity-100" />
               </span>
               <span aria-hidden className="id-chip row-span-4 size-12 self-start rounded-xl">
                 <Icon name={look.icon} size={24} />
               </span>
-              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pr-8 @min-[480px]:mt-4 @min-[480px]:pr-0">
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pe-8 @min-[480px]:mt-4 @min-[480px]:pe-0">
                 <span className="text-lg leading-6 font-semibold @min-[480px]:text-xl">{p.displayName}</span>
                 <Badge id={p.id} t={t} className="@min-[480px]:hidden" />
               </span>
@@ -151,7 +151,7 @@ export function ProtocolPicker({
                     <Tip label={copy.apps.join(" · ")}>
                       <span className="flex items-center">
                         {copy.apps.map((a) => (
-                          <span key={a} aria-hidden className="-ml-1.5 grid size-6 place-items-center rounded-full border-2 border-surface bg-surface-2 text-[11px] font-semibold text-muted group-data-checked:border-surface-2 group-data-checked:bg-surface first:ml-0">
+                          <span key={a} aria-hidden className="-ms-1.5 grid size-6 place-items-center rounded-full border-2 border-surface bg-surface-2 text-[11px] font-semibold text-muted group-data-checked:border-surface-2 group-data-checked:bg-surface first:ms-0">
                             {monograms[a] ?? a.slice(0, 1).toUpperCase()}
                           </span>
                         ))}
@@ -169,7 +169,7 @@ export function ProtocolPicker({
         })}
       </RadioGroup>
 
-      <div className="sticky bottom-[84px] z-[3] flex items-center gap-3 rounded-card border border-accent-line bg-surface py-2 pr-2 pl-3 md:bottom-4">
+      <div className="sticky bottom-[84px] z-[3] flex items-center gap-3 rounded-card border border-accent-line bg-surface py-2 pe-2 ps-3 md:bottom-4">
         <IconChip icon={lookOf(chosen.id).icon} tone={lookOf(chosen.id).tone} size={28} className="rounded-lg" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold">{chosen.displayName}</span>

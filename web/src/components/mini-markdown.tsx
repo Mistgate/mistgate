@@ -167,8 +167,8 @@ export function MiniMarkdown({ text, className }: { text: string; className?: st
                     key={j}
                     className={
                       it.depth === 1
-                        ? "relative ml-5 pl-3.5 before:absolute before:top-[0.6em] before:left-0 before:h-px before:w-2 before:bg-faint"
-                        : "relative pl-3.5 before:absolute before:top-[0.55em] before:left-0 before:size-1 before:rounded-full before:bg-muted"
+                        ? "relative ms-5 ps-3.5 before:absolute before:top-[0.6em] before:inset-s-0 before:h-px before:w-2 before:bg-faint"
+                        : "relative ps-3.5 before:absolute before:top-[0.55em] before:inset-s-0 before:size-1 before:rounded-full before:bg-muted"
                     }
                   >
                     {renderInline(it.children)}

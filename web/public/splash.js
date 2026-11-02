@@ -16,14 +16,19 @@
   root.dataset.theme = pref("theme") === "light" ? "light" : "dark";
   var accent = pref("accent") || pref("instance-accent"); // the device's own pick wins over the instance default
   if (accent && /^#[0-9a-f]{6}$/i.test(accent)) root.style.setProperty("--accent", accent);
+  var langs = ["en", "ru", "zh", "fa", "tr"];
   var saved = pref("lang");
-  var lang = saved === "ru" || saved === "en" || saved === "zh" ? saved : /^ru/i.test(navigator.language || "") ? "ru" : /^zh/i.test(navigator.language || "") ? "zh" : "en";
+  var nav = (navigator.language || "").toLowerCase().split("-")[0];
+  var lang = langs.indexOf(saved) >= 0 ? saved : langs.indexOf(nav) >= 0 ? nav : "en";
   root.lang = lang === "zh" ? "zh-CN" : lang;
+  root.dir = lang === "fa" ? "rtl" : "ltr";
 
   var text = {
     ru: { load: "Загрузка…", fail: "Не удалось загрузить панель. Обновите страницу.", reload: "Обновить" },
     en: { load: "Loading…", fail: "Cannot load the panel. Reload the page.", reload: "Reload" },
     zh: { load: "正在加载…", fail: "无法加载面板。请刷新页面。", reload: "刷新" },
+    fa: { load: "در حال بارگذاری…", fail: "پنل بارگذاری نشد. صفحه را دوباره بارگذاری کن.", reload: "بارگذاری دوباره" },
+    tr: { load: "Yükleniyor…", fail: "Panel yüklenemedi. Sayfayı yenile.", reload: "Yenile" },
   }[lang];
 
   function fill() {

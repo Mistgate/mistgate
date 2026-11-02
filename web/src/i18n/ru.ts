@@ -29,6 +29,7 @@ const core: CoreMessages = {
   "common.undo": "Откатить",
   "common.quoted": "«{name}»",
   "common.labeled": "{label}: {value}",
+  "common.fromTo": "{from} → {to}",
 
   "pager.nav": "Страницы",
   "pager.range": "Показано {from}–{to} из {total}",

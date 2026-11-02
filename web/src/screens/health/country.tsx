@@ -142,7 +142,7 @@ export function CountryHead({ code }: { code: string }) {
     <Link
       to="/reachability"
       title={t("rc.open")}
-      className="ml-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-bold text-muted underline-offset-2 transition-colors hover:text-fg hover:underline"
+      className="ms-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-bold text-muted underline-offset-2 transition-colors hover:text-fg hover:underline"
     >
       <Icon name="globe" size={12} aria-hidden className="mb-px flex-none" />
       {title}
@@ -158,7 +158,7 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
   const t = useT();
   const fmt = useFmt();
   const title = useCountryTitle(code);
-  const box = "relative ml-2 box-border flex h-11 flex-col items-center justify-center rounded-[11px] px-1.5 text-center text-xs leading-tight font-bold";
+  const box = "relative ms-2 box-border flex h-11 flex-col items-center justify-center rounded-[11px] px-1.5 text-center text-xs leading-tight font-bold";
   if (!check)
     return (
       <span className={cx(box, cellCls.none)} title={t("cr.v.notYet")}>
@@ -176,7 +176,7 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
         </span>
         {look.note && <span className="max-w-full truncate text-[10px] font-semibold text-muted">{look.note}</span>}
         {look.alsoListed && (
-          <span data-testid="also-listed" className="absolute top-1 right-1 flex">
+          <span data-testid="also-listed" className="absolute top-1 inset-e-1 flex">
             <ListedGlyph />
           </span>
         )}
@@ -351,7 +351,7 @@ function NetList({ label, nets, mark }: { label: string; nets: readonly Breakdow
           aria-expanded={open}
           aria-controls={`${id}-list`}
           onClick={() => setOpen(!open)}
-          className="ml-5 w-fit rounded-sm text-xs font-semibold text-muted underline decoration-dotted underline-offset-2 hover:text-fg"
+          className="ms-5 w-fit rounded-sm text-xs font-semibold text-muted underline decoration-dotted underline-offset-2 hover:text-fg"
         >
           {open ? t("cr.part.fewer") : t("cr.part.more", { n: nets.length - SHORT })}
         </button>

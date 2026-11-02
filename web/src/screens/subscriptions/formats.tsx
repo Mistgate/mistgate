@@ -16,7 +16,7 @@ import { Lead } from "./ui";
  * have their own sentences (every other app, every browser).
  */
 export function whoByRules(t: Tx, f: SubFormat, rules: readonly Rule[]) {
-  const texts = rules.filter((r) => r.format === f).map((r) => (t.lang === "ru" ? `«${r.uaContains}»` : t.lang === "zh" ? `「${r.uaContains}」` : `“${r.uaContains}”`));
+  const texts = rules.filter((r) => r.format === f).map((r) => t("common.quoted", { name: r.uaContains }));
   if (texts.length === 0) return t("subs.fmt.who.decoy");
   const list = new Intl.ListFormat(t.locale, { type: "conjunction" }).format(texts);
   const official = f === SubFormat.SINGBOX_JSON && singboxAgents.every((ua) => rules[ruleFor(rules, ua)]?.format === f);
@@ -95,7 +95,7 @@ export function FormatsTab({ go }: { go: (tab: string) => void }) {
             <span className="text-xs text-muted">{t("subs.formatsHint")}</span>
           </div>
           <button type="button" onClick={() => go("rules")} className="text-xs font-bold text-accent-text">
-            {t("subs.fmt.rulesLink")} →
+            {t("subs.fmt.rulesLink")} <span aria-hidden className="inline-block rtl:-scale-x-100">→</span>
           </button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">

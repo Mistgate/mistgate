@@ -59,7 +59,7 @@ const indicator: Record<FrameStatus, ReactNode> = {
  */
 export function TurnstileFrame({ status, label, onClick }: { status: FrameStatus; label: string; onClick?: () => void }) {
   const t = useT();
-  const cls = "flex h-[65px] w-full items-center gap-3 rounded-[6px] border border-line bg-surface px-3.5 text-left select-none";
+  const cls = "flex h-[65px] w-full items-center gap-3 rounded-[6px] border border-line bg-surface px-3.5 text-start select-none";
   const body = (
     <>
       {indicator[status]}

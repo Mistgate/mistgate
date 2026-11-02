@@ -103,7 +103,7 @@ export function RecoverScreen() {
         <Notice title={t("auth.recover.onceTitle")}>{t("auth.recover.onceBody")}</Notice>
         <div className="flex flex-col gap-1.5 rounded-card border border-line bg-surface p-4">
           <b className="text-[15px]">{t("auth.recover.nextTitle")}</b>
-          <ol className="flex list-decimal flex-col gap-1 pl-5 text-[13px] leading-snug text-pretty text-muted">
+          <ol className="flex list-decimal flex-col gap-1 ps-5 text-[13px] leading-snug text-pretty text-muted">
             <li>{t("auth.recover.nextSignIn")}</li>
             <li>{t("auth.recover.nextPasskey")}</li>
           </ol>

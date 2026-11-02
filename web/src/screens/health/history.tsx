@@ -31,7 +31,7 @@ export function Bars({ cell }: { cell: CheckCell }) {
   const failed = bars.reduce((n, b) => n + b.bucket.failed, 0);
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex h-10 items-end gap-0.5" role="img" aria-label={t("common.labeled", { label: `${t("hl.hist.h24")} → ${t("hl.hist.now")}`, value: `${failed} ✕` })}>
+      <div dir="ltr" className="flex h-10 items-end gap-0.5" role="img" aria-label={t("common.labeled", { label: t("common.fromTo", { from: t("hl.hist.h24"), to: t("hl.hist.now") }), value: `${failed} ✕` })}>
         {bars.map((b, i) => (
           <span
             key={b.bucket.startUnix || i}
@@ -126,8 +126,8 @@ export function HistoryCard({
           </span>
           <span className="min-w-0 flex-1">
             <b>{checkError(t, last.errorCode)}</b>
-            {last.errorDetail && <span className="ml-2 font-mono text-[11px] break-words text-muted">{last.errorDetail}</span>}
-            {cell.failStreak > 1 && <span className="ml-2 text-muted">{t("hl.hist.streak", { n: cell.failStreak })}</span>}
+            {last.errorDetail && <span className="ms-2 font-mono text-[11px] break-words text-muted">{last.errorDetail}</span>}
+            {cell.failStreak > 1 && <span className="ms-2 text-muted">{t("hl.hist.streak", { n: cell.failStreak })}</span>}
           </span>
         </div>
       )}

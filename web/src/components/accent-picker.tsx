@@ -68,9 +68,11 @@ function HexField({ accent, onPick }: { accent: string; onPick: (hex: string) =>
   return (
     <label className="flex items-center gap-3">
       <span className="text-[13px] text-muted">{t("settings.accent.custom")}</span>
+      {/* "#b8acf2" is one left-to-right token, in Persian too */}
       <span
+        dir="ltr"
         className={cx(
-          "flex h-[38px] items-center gap-2 rounded-xl border bg-surface pr-1.5 pl-3 transition-colors duration-200 focus-within:border-accent",
+          "flex h-[38px] items-center gap-2 rounded-xl border bg-surface pe-1.5 ps-3 transition-colors duration-200 focus-within:border-accent",
           valid ? "border-line" : "border-danger",
         )}
       >

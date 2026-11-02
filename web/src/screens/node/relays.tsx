@@ -272,7 +272,7 @@ export function RelayRow({ r, side, cc, busy, note, nowS, onCheck, onOn, onOff, 
         <Button variant={checkFirst ? "primary" : "secondary"} size="sm" disabled={!!busy} onClick={onCheck}>
           {t("relay.check")}
         </Button>
-        <Button variant="ghostDanger" size="sm" className="ml-auto" disabled={!!busy} onClick={onRemove}>
+        <Button variant="ghostDanger" size="sm" className="ms-auto" disabled={!!busy} onClick={onRemove}>
           {t("relay.remove")}
         </Button>
       </div>
@@ -308,7 +308,7 @@ function Watch({ r, nowS }: { r: RelayMsg; nowS: number }) {
           </span>
         </p>
       )}
-      {r.countedUnix > 0 && <p className="pl-3.5 text-muted">{t("relay.bytes", { bytes: fmt.bytes(r.bytes), packets: fmt.num(r.packets, 0), ago: ago(r.countedUnix) })}</p>}
+      {r.countedUnix > 0 && <p className="ps-3.5 text-muted">{t("relay.bytes", { bytes: fmt.bytes(r.bytes), packets: fmt.num(r.packets, 0), ago: ago(r.countedUnix) })}</p>}
     </div>
   );
 }

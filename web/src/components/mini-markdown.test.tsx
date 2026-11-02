@@ -46,7 +46,7 @@ describe("MiniMarkdown", () => {
     expect(el.querySelector("li strong")?.textContent).toBe("user page");
     expect(el.querySelector("li code")?.textContent).toBe("eight");
     expect(el.querySelectorAll("li")[0]!.textContent).toContain("presets wrapped on a second line.");
-    expect(el.querySelectorAll("li")[1]!.className).toContain("ml-5"); // the second level
+    expect(el.querySelectorAll("li")[1]!.className).toContain("ms-5"); // the second level
     const a = el.querySelector("a")!;
     expect(a.getAttribute("href")).toBe("https://mistgate.app/zh/");
     expect(a.getAttribute("target")).toBe("_blank");

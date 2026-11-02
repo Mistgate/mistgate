@@ -129,7 +129,7 @@ export function AuditPage() {
                   <span className="min-w-0">{describeAudit(t, e)}</span>
                 </span>
                 <span className="truncate font-mono text-[11px] text-muted max-[1099px]:order-2">{e.ip}</span>
-                <span className="text-right font-mono text-[11px] text-muted max-[1099px]:order-1">{fmt.stamp(e.timeUnix)}</span>
+                <span className="text-end font-mono text-[11px] text-muted max-[1099px]:order-1">{fmt.stamp(e.timeUnix)}</span>
               </div>
             );
           })}

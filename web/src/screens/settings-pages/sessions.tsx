@@ -99,7 +99,7 @@ export function SessionsPage() {
             </div>
             <span className="font-mono text-xs text-muted">{s.ip}</span>
             {!s.current && (
-              <Button variant="ghostDanger" size="sm" className="ml-auto" disabled={end.isPending} onClick={() => end.mutate(s.id)}>
+              <Button variant="ghostDanger" size="sm" className="ms-auto" disabled={end.isPending} onClick={() => end.mutate(s.id)}>
                 {t("sess.end")}
               </Button>
             )}

@@ -122,7 +122,7 @@ export function WherePanel({
                         </Link>
                         {i.port > 0 && <span className="flex-none font-mono text-[11px] text-muted">:{i.port}</span>}
                         {n?.location && <span className="hidden min-w-0 truncate text-xs text-muted sm:inline">{n.location}</span>}
-                        <span className="ml-auto flex-none">
+                        <span className="ms-auto flex-none">
                           <StatusPill kind={s.kind} label={t(s.word)} sm />
                         </span>
                       </div>
@@ -147,7 +147,7 @@ export function WherePanel({
                           setEditId(g.id);
                           setEditOpen(true);
                         }}
-                        className="ml-auto flex-none text-xs font-bold text-muted transition-colors hover:text-fg"
+                        className="ms-auto flex-none text-xs font-bold text-muted transition-colors hover:text-fg"
                       >
                         {t("common.edit")}
                       </button>
@@ -172,7 +172,7 @@ export function WherePanel({
                       <span className="flex min-w-0 items-center gap-1.5">
                         <span className="min-w-0 truncate font-semibold">{g.name}</span>
                         <span className="flex-none text-muted">· {t.n("where.usersShort", g.userCount)}</span>
-                        <Icon name="chevronRight" size={12} className="ml-auto flex-none text-muted" />
+                        <Icon name="chevronRight" size={12} className="ms-auto flex-none text-muted" />
                       </span>
                       {/* the group's share of the people who get the profile, in the group's colour */}
                       <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-surface-2">
@@ -201,7 +201,7 @@ export function WherePanel({
 /** The verdict: a glyph in its status colour, a thin accent on the left, the words, and the fix right there. */
 function StatusLine({ kind, title, children, actions }: { kind: StatusKind; title: string; children?: ReactNode; actions?: ReactNode }) {
   return (
-    <section className={cx(`tone-${kind} screen-enter flex flex-wrap items-center gap-x-3 gap-y-2 rounded-field border border-line border-l-[3px] border-l-(color:--c) bg-surface-2 py-2.5 pr-2.5 pl-3`)}>
+    <section className={cx(`tone-${kind} screen-enter flex flex-wrap items-center gap-x-3 gap-y-2 rounded-field border border-line border-s-[3px] border-s-(color:--c) bg-surface-2 py-2.5 pe-2.5 ps-3`)}>
       <StatusPill kind={kind} glyphOnly />
       <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
         <h3 className="text-[13px] leading-snug font-extrabold">{title}</h3>
@@ -221,7 +221,7 @@ function Column({ icon, tone, title, count, add, children }: { icon: IconName; t
         <h3 className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{title}</h3>
         <span className="font-mono text-xs font-bold text-fg">{count}</span>
         {add && (
-          <IconButton variant="flat" aria-label={add.label} title={add.label} className="ml-auto" onClick={add.onClick}>
+          <IconButton variant="flat" aria-label={add.label} title={add.label} className="ms-auto" onClick={add.onClick}>
             <Icon name="plus" size={15} />
           </IconButton>
         )}
@@ -278,7 +278,7 @@ function GroupPicker({ open, onOpenChange, profile, groups }: { open: boolean; o
         ) : (
           <ul className="flex flex-col gap-1.5">
             {free.map((g) => (
-              <li key={g.id} className="flex min-h-11 items-center gap-2.5 rounded-field border border-line py-1.5 pr-1.5 pl-3">
+              <li key={g.id} className="flex min-h-11 items-center gap-2.5 rounded-field border border-line py-1.5 pe-1.5 ps-3">
                 <b className="min-w-0 flex-1 truncate text-[13px]">{g.name}</b>
                 <span className="font-mono text-[11px] text-muted">{t.n("where.usersN", g.userCount)}</span>
                 <Button variant="primary" size="sm" disabled={add.isPending} aria-label={t("common.labeled", { label: t("where.add"), value: g.name })} onClick={() => add.mutate(g)}>

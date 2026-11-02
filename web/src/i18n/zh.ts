@@ -30,6 +30,7 @@ const core: CoreMessages = {
   "common.undo": "撤销",
   "common.quoted": "「{name}」",
   "common.labeled": "{label}：{value}",
+  "common.fromTo": "{from} → {to}",
 
   "pager.nav": "分页",
   "pager.range": "显示第 {from}–{to} 条，共 {total} 条",

@@ -57,7 +57,7 @@ export function DnsTab() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <SectionLabel className="flex-1" icon="dns" tone="sky">
-            {t("subs.dns.presets")} <span className="ml-1 font-mono text-faint">{presets.length}</span>
+            {t("subs.dns.presets")} <span className="ms-1 font-mono text-faint">{presets.length}</span>
           </SectionLabel>
           <Button variant="secondary" onClick={() => show("new")}>
             <Icon name="plus" size={14} />
@@ -141,7 +141,7 @@ function DefaultCard({ presets, catalog, t }: { presets: Preset[]; catalog: Cata
         <span className="text-[11px] leading-snug text-muted">{t("subs.dns.defaultHint")}</span>
         <DnsDelivery />
       </div>
-      <div className="flex flex-col gap-2.5 md:border-l md:border-line md:pl-7">
+      <div className="flex flex-col gap-2.5 md:border-s md:border-line md:ps-7">
         <SectionLabel icon="info" tone="lavender">
           {t("subs.dns.howT")}
         </SectionLabel>
@@ -152,7 +152,7 @@ function DefaultCard({ presets, catalog, t }: { presets: Preset[]; catalog: Cata
                 <Icon name={h.icon} size={15} />
               </span>
               <span className="min-w-0 leading-snug">
-                <span className="text-muted">{t(h.who)}</span> <span aria-hidden className="text-faint">→</span> <b className="font-bold">{nameOf(h.id) ?? t(h.name)}</b>
+                <span className="text-muted">{t(h.who)}</span> <span aria-hidden className="inline-block text-faint rtl:-scale-x-100">→</span> <b className="font-bold">{nameOf(h.id) ?? t(h.name)}</b>
               </span>
             </li>
           ))}
@@ -175,7 +175,7 @@ function PresetCard({ p, t, catalog, onOpen }: { p: Preset; t: Tx; catalog: Cata
     <button
       type="button"
       onClick={onOpen}
-      className={cx("card-hover flex min-w-0 flex-col gap-3 rounded-card-lg border bg-surface p-4 text-left", p.isDefault ? "border-accent-line" : "border-line")}
+      className={cx("card-hover flex min-w-0 flex-col gap-3 rounded-card-lg border bg-surface p-4 text-start", p.isDefault ? "border-accent-line" : "border-line")}
     >
       <span className="flex items-start gap-3">
         <PresetGlyph preset={p} />

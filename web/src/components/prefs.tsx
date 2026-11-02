@@ -19,7 +19,7 @@ export function LangToggle({ className }: { className?: string }) {
         aria-label={t("common.labeled", { label: t("header.language"), value: langNames[lang] })}
         className={cx(
           // 40px where a finger taps, the top-bar height (h-bar, 36px) from md up
-          "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pr-2 pl-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-bar",
+          "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-ctl border border-line bg-surface pe-2 ps-2.5 text-xs font-bold text-muted outline-none transition-colors duration-200 hover:bg-surface-2 hover:text-fg focus-visible:border-accent data-popup-open:border-accent-line data-popup-open:text-fg md:h-bar",
           className,
         )}
       >
@@ -71,8 +71,8 @@ export function ThemeToggle() {
     >
       <span
         aria-hidden
-        className={`absolute top-[3px] left-[3px] grid size-8 place-items-center rounded-[8px] bg-accent transition-[transform,background-color] duration-[550ms] ease-spring md:size-7 ${
-          dark ? "translate-x-[26px] rotate-0 md:translate-x-6" : "rotate-180"
+        className={`absolute top-[3px] inset-s-[3px] grid size-8 place-items-center rounded-[8px] bg-accent transition-[transform,background-color] duration-[550ms] ease-spring md:size-7 ${
+          dark ? "translate-x-[26px] rotate-0 md:translate-x-6 rtl:-translate-x-[26px] md:rtl:-translate-x-6" : "rotate-180"
         }`}
       >
         <span

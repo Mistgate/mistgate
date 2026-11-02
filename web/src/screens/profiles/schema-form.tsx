@@ -66,7 +66,7 @@ export function SchemaForm({ protocol, groups, settings, base, problems, onChang
               type="button"
               aria-expanded={isOpen}
               onClick={() => setOpen({ ...open, [g.id]: !isOpen })}
-              className="flex h-12 w-full items-center gap-2.5 text-left"
+              className="flex h-12 w-full items-center gap-2.5 text-start"
             >
               <SectionLabel className="flex-1" icon={groupMark(g.id).icon} tone={groupMark(g.id).tone}>
                 {t.opt(`profiles.group.${g.id}`) ?? g.id}
@@ -137,7 +137,7 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
     case "number":
       control = (
         <>
-          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} onChange={(v) => onChange(f.path, v)} className="w-24 text-right" />
+          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} onChange={(v) => onChange(f.path, v)} className="w-24 text-end" />
           {unit && <span className="min-w-10 text-xs text-muted">{unit}</span>}
         </>
       );
@@ -335,7 +335,7 @@ function SecretField({ label, value, invalid, t, make, onChange }: { label: stri
   const eye = t(shown ? "profiles.secret.hide" : "profiles.secret.show");
   return (
     <div className="flex w-[300px] max-w-full flex-col gap-1">
-      <div className={cx("flex h-[38px] items-center gap-0.5 rounded-xl border bg-canvas pr-1 pl-3 transition-colors duration-200 focus-within:border-accent", invalid ? "border-danger" : "border-line")}>
+      <div className={cx("flex h-[38px] items-center gap-0.5 rounded-xl border bg-canvas pe-1 ps-3 transition-colors duration-200 focus-within:border-accent", invalid ? "border-danger" : "border-line")}>
         <input
           type={shown && !stored ? "text" : "password"}
           aria-label={label}

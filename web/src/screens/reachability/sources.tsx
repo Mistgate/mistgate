@@ -235,7 +235,7 @@ function SourceRow({ id, look, selected, tabbable, onPick }: { id: SourceId; loo
       aria-controls={`src-panel-${id}`}
       tabIndex={tabbable ? 0 : -1}
       onClick={onPick}
-      className="grid w-full min-w-0 scroll-mt-20 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-card px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2 min-[720px]:aria-selected:bg-surface-2 min-[720px]:aria-selected:shadow-[inset_0_0_0_1px_var(--accent-line)] min-[720px]:max-lg:gap-x-2.5 min-[720px]:max-lg:px-2.5"
+      className="grid w-full min-w-0 scroll-mt-20 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-card px-3 py-2.5 text-start transition-colors duration-200 hover:bg-surface-2 min-[720px]:aria-selected:bg-surface-2 min-[720px]:aria-selected:shadow-[inset_0_0_0_1px_var(--accent-line)] min-[720px]:max-lg:gap-x-2.5 min-[720px]:max-lg:px-2.5"
     >
       <IconChip icon={m.icon} tone="mint" size={30} className="row-span-3 self-start rounded-[9px] min-[720px]:max-lg:row-span-2" />
       <span className="truncate text-[13px] font-bold">{t(m.title)}</span>
@@ -246,7 +246,7 @@ function SourceRow({ id, look, selected, tabbable, onPick }: { id: SourceId; loo
       <span className={cx("col-span-2 truncate text-xs text-muted", tile)}>{t(m.what)}</span>
       <span className={cx("col-span-2 flex min-w-0 items-center gap-2", tile)}>
         <Coverage ruOnly={m.ruOnly} />
-        <span className="ml-auto truncate text-[11px] text-muted" title={chip?.note || undefined}>
+        <span className="ms-auto truncate text-[11px] text-muted" title={chip?.note || undefined}>
           {chip?.note}
         </span>
       </span>
@@ -424,7 +424,7 @@ function Privacy({ children }: { children: string }) {
 function Disconnect({ onClick }: { onClick: () => void }) {
   const t = useT();
   return (
-    <Button variant="ghostDanger" size="md" className="ml-auto" onClick={onClick}>
+    <Button variant="ghostDanger" size="md" className="ms-auto" onClick={onClick}>
       {t("cr.disconnect")}
     </Button>
   );
@@ -561,7 +561,7 @@ function SecretField(p: {
     return (
       <SettingRow label={p.label}>
         <div className="flex flex-wrap items-center gap-2">
-          <span data-testid={p.testId} className="tone-ok tone-text mr-1 inline-flex items-center gap-1.5 text-[13px] font-semibold">
+          <span data-testid={p.testId} className="tone-ok tone-text me-1 inline-flex items-center gap-1.5 text-[13px] font-semibold">
             <Icon name="check" size={14} aria-hidden />
             {t("gp.token.set")}
           </span>
@@ -898,7 +898,7 @@ function NodeResults({ nodes }: { nodes: TspuTest["nodes"] }) {
               <CountryMark kind={kind} />
               {t(key)}
             </span>
-            <span className="ml-auto font-mono text-[11px] text-muted">{tspuPortsText(t, n.ports)}</span>
+            <span className="ms-auto font-mono text-[11px] text-muted">{tspuPortsText(t, n.ports)}</span>
           </li>
         );
       })}
@@ -1354,7 +1354,7 @@ function UnitPicker({ s, busy, onSave }: { s: BsbordSettings; busy: boolean; onS
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] [&::-webkit-details-marker]:hidden">
         <span className="font-bold">{t("bb.units")}</span>
         <span className="text-xs text-muted">{t("bb.units.picked", { n: current.size })}</span>
-        <Icon name="chevronDown" size={14} aria-hidden className="ml-auto text-muted transition-transform group-open:rotate-180" />
+        <Icon name="chevronDown" size={14} aria-hidden className="ms-auto text-muted transition-transform group-open:rotate-180" />
       </summary>
       <div className="flex flex-col gap-2.5 border-t border-line px-3 py-2.5">
         <p className="text-xs leading-normal text-pretty text-muted">{t("bb.units.sub")}</p>
@@ -1374,7 +1374,7 @@ function UnitPicker({ s, busy, onSave }: { s: BsbordSettings; busy: boolean; onS
                     <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] [&::-webkit-details-marker]:hidden">
                       <span className="font-semibold">{d.name}</span>
                       <span className="text-xs text-muted">{t("bb.units.picked", { n: d.units.filter((u) => current.has(u.opKey)).length })}</span>
-                      <Icon name="chevronDown" size={14} aria-hidden className="ml-auto text-muted transition-transform group-open/d:rotate-180" />
+                      <Icon name="chevronDown" size={14} aria-hidden className="ms-auto text-muted transition-transform group-open/d:rotate-180" />
                     </summary>
                     <div className="flex flex-col items-start gap-1.5 px-3 pb-2.5">
                       {perOperatorPreset(d.units, d.code).length > 0 && (
@@ -1558,7 +1558,7 @@ function KlickNodes({ nodes }: { nodes: ClientProbeNode[] }) {
                 <CountryMark kind={kind} />
                 {trouble || t("kc.ok")}
               </span>
-              <span className="ml-auto font-mono text-[11px] text-muted">{[t.n("kc.reports", x.reports), fmt.ago(x.lastUnix)].join(" · ")}</span>
+              <span className="ms-auto font-mono text-[11px] text-muted">{[t.n("kc.reports", x.reports), fmt.ago(x.lastUnix)].join(" · ")}</span>
             </div>
             <GroupLine label={t("kc.operators")} groups={n.operators} />
             <GroupLine label={t("kc.regions")} groups={n.regions} />

@@ -261,7 +261,7 @@ function Account({ d, nodeId, retired, onDialog }: { d: WarpData; nodeId: string
         <details className="group text-xs">
           <summary className="flex w-fit cursor-pointer list-none items-center gap-1 font-bold text-muted select-none hover:text-fg [&::-webkit-details-marker]:hidden">
             {t("warp.details")}
-            <span aria-hidden className="transition-transform duration-200 group-open:rotate-90">›</span>
+            <span aria-hidden className="transition-transform duration-200 group-open:rotate-90 rtl:group-open:-rotate-90">›</span>
           </summary>
           <dl className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1.5">
             {details.map(([k, v]) => (
@@ -318,7 +318,7 @@ function Account({ d, nodeId, retired, onDialog }: { d: WarpData; nodeId: string
             {t("warp.resume")}
           </Button>
         )}
-        <Button variant="danger" size="sm" disabled={!!busy} onClick={() => onDialog("delete")} className="sm:ml-auto">
+        <Button variant="danger" size="sm" disabled={!!busy} onClick={() => onDialog("delete")} className="sm:ms-auto">
           {t("warp.delete")}
         </Button>
       </div>

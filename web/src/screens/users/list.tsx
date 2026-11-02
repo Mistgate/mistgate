@@ -29,6 +29,7 @@ import { LinkModal, linkTargetOf, type LinkTarget } from "./link-modal";
 import { usersPageN, type UserN as User } from "./model";
 import { AppLink, useGo } from "./nav";
 import { clickSort, firstDesc, sortIds, sortLabel, sortOf, type SortId, type SortSearch, type SortState } from "./sort";
+import { plainText } from "@/i18n";
 import { useTx, type Tx } from "./t";
 import { groupsQuery } from "./rpc";
 import { Check, useDebounced } from "./ui";
@@ -67,11 +68,11 @@ const columns: readonly { id: ColId; sort?: SortId; cls?: string; end?: boolean;
   { id: "via", cls: "hidden w-16 @min-[900px]:table-cell" },
   { id: "group", sort: "group", cls: "hidden w-28 @min-[700px]:table-cell" },
   { id: "devices", sort: "devices", cls: "hidden w-[72px] @min-[840px]:table-cell", end: true },
-  { id: "traffic", sort: "traffic", cls: "w-[172px] pl-6 @min-[900px]:w-[196px]", end: true },
+  { id: "traffic", sort: "traffic", cls: "w-[172px] ps-6 @min-[900px]:w-[196px]", end: true },
   { id: "term", sort: "expiry", cls: "hidden w-[68px] @min-[640px]:table-cell", end: true },
-  { id: "seen", sort: "seen", cls: "w-32 pr-4", end: true },
+  { id: "seen", sort: "seen", cls: "w-32 pe-4", end: true },
 ];
-const col = Object.fromEntries(columns.map((c) => [c.id, cx("px-2", c.cls, c.end && "text-right")])) as Record<ColId, string>;
+const col = Object.fromEntries(columns.map((c) => [c.id, cx("px-2", c.cls, c.end && "text-end")])) as Record<ColId, string>;
 
 type Search = { create?: boolean; group?: string; tab?: "groups" };
 
@@ -305,7 +306,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
           </div>
 
           {pickedList.length > 0 && (
-            <div className="screen-enter flex flex-wrap items-center gap-2 rounded-field border border-accent-line bg-accent-soft py-2 pr-2 pl-3.5">
+            <div className="screen-enter flex flex-wrap items-center gap-2 rounded-field border border-accent-line bg-accent-soft py-2 pe-2 ps-3.5">
               <b className="min-w-[120px] flex-1 text-[13px]">{t("users.selected", { n: pickedList.length })}</b>
               <Button disabled={busy} onClick={extend}>
                 {t("users.extend30")}
@@ -331,10 +332,10 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
               ) : (
                 <>
                   <Card lg className="hidden overflow-hidden @min-[600px]:block">
-                    <table className="w-full table-fixed text-left">
+                    <table className="w-full table-fixed text-start">
                       <thead>
                         <tr className="h-10 border-b border-line text-[11px] font-bold tracking-[0.06em] text-muted uppercase">
-                          <th scope="col" className="w-[42px] pr-2 pl-4">
+                          <th scope="col" className="w-[42px] pe-2 ps-4">
                             <Check checked={allOnPage} onCheckedChange={toggleAll} label={t("users.selectAll")} />
                           </th>
                           {columns.map((c) =>
@@ -385,7 +386,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
           // what the owner sends: the link, and the page password when the page asks for one; a link that gives
           // nothing yet is not copied: the window says why first
           if (!target.access.happ && !target.access.amnezia) return void toast(t("users.createdPlain", { name: u.name }));
-          navigator.clipboard.writeText(password ? t("users.shareText", { url, password }) : url).then(
+          navigator.clipboard.writeText(password ? plainText(t("users.shareText", { url, password })) : url).then(
             () => toast(t("users.created", { name: u.name })),
             () => toast(t("users.createdPlain", { name: u.name })),
           );
@@ -470,7 +471,7 @@ function SortTh({ id, order, onSort, label, end, icon, className }: { id: SortId
         className={cx(
           "transition-opacity duration-200",
           // beside an icon the arrow hangs off to the right, so the icon stays on the axis of the marks under it
-          icon && "absolute top-1/2 left-full ml-0.5 -translate-y-1/2",
+          icon && "absolute top-1/2 inset-s-full ms-0.5 -translate-y-1/2",
           active ? "opacity-100" : "opacity-0 group-hover/sort:opacity-40 group-focus-visible/sort:opacity-40",
         )}
       />
@@ -649,7 +650,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         u.status === UserStatus.DISABLED && "opacity-60",
       )}
     >
-      <td className="pr-2 pl-4">
+      <td className="pe-2 ps-4">
         <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
       </td>
       <td className={col.status}>
@@ -677,7 +678,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       <td className={col.traffic}>
         <span className="flex items-center gap-3">
           <UsageBar pct={use.pct} tone={use.tone} className={cx("w-10 min-w-4 @min-[900px]:w-16", u.quotaBytes <= 0 && "invisible")} />
-          <span className="ml-auto flex-none">
+          <span className="ms-auto flex-none">
             <UsageText use={use} t={t} />
           </span>
         </span>

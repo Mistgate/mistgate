@@ -109,7 +109,7 @@ export function RolloutCard({ rollout }: { rollout: Rollout }) {
             type="button"
             aria-expanded={open}
             onClick={() => setTouched(!open)}
-            className="-mr-1 flex h-7 items-center gap-1 rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+            className="-me-1 flex h-7 items-center gap-1 rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
           >
             {open ? t("up.ro.hide") : t("up.ro.show")}
             <Icon name="chevronRight" size={12} className={cx("block flex-none transition-transform duration-200", open ? "-rotate-90" : "rotate-90")} />

@@ -14,7 +14,7 @@ export function Switch({ className, ...rest }: Props) {
       )}
       {...rest}
     >
-      <BaseSwitch.Thumb className="absolute top-[3px] left-[3px] size-[18px] rounded-full bg-muted transition-[transform,background-color] duration-[400ms] ease-spring-strong data-checked:translate-x-4 data-checked:bg-on-accent" />
+      <BaseSwitch.Thumb className="absolute top-[3px] inset-s-[3px] size-[18px] rounded-full bg-muted transition-[transform,background-color] duration-[400ms] ease-spring-strong data-checked:translate-x-4 rtl:data-checked:-translate-x-4 data-checked:bg-on-accent" />
     </BaseSwitch.Root>
   );
 }

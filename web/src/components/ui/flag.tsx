@@ -177,7 +177,7 @@ const letters = (flag: string) => String.fromCharCode(...[...flag].map((ch) => c
 export function FlagText({ text, size = 14 }: { text: string; size?: number }) {
   return (
     <>
-      {text.split(pair).map((part, i) => (i % 2 === 1 ? <Flag key={i} code={letters(part)} size={size} className="mr-1 inline-block align-[-2px]" /> : part))}
+      {text.split(pair).map((part, i) => (i % 2 === 1 ? <Flag key={i} code={letters(part)} size={size} className="me-1 inline-block align-[-2px]" /> : part))}
     </>
   );
 }

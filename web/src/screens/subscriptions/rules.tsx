@@ -273,10 +273,10 @@ function RuleRow({ rule, i, total, hit, over, t, fmtOption, taken, onDragStart, 
         spellCheck={false}
         className="h-[30px] min-w-[120px] flex-1 rounded-lg border border-line bg-canvas px-2.5 font-mono text-xs text-fg outline-none transition-colors duration-200 focus:border-accent"
       />
-      <span aria-hidden className="hidden text-faint @min-[520px]:inline">→</span>
+      <span aria-hidden className="hidden text-faint @min-[520px]:inline-block rtl:-scale-x-100">→</span>
       {/* as wide as the add-rule select, so the longest format ("Список ссылок (base64)") stays on one line; in a narrow list
           it takes its own line under the text, from the text's left edge */}
-      <div className="order-last basis-full pl-[60px] @min-[520px]:order-none @min-[520px]:basis-[210px] @min-[520px]:pl-0">
+      <div className="order-last basis-full ps-[60px] @min-[520px]:order-none @min-[520px]:basis-[210px] @min-[520px]:ps-0">
         <Select
           compact
           aria-label={t("subs.rules.formatLabel", { n })}
@@ -285,7 +285,7 @@ function RuleRow({ rule, i, total, hit, over, t, fmtOption, taken, onDragStart, 
           options={ruleFormats.map((f) => ({ value: String(f), label: fmtOption(f) }))}
         />
       </div>
-      <span className="ml-auto flex flex-none gap-0.5">
+      <span className="ms-auto flex flex-none gap-0.5">
         <IconButton aria-label={t("subs.rules.up", { n })} variant="flat" disabled={i === 0} onClick={() => onMove(i, i - 1)}>
           <Icon name="arrowUp" size={14} />
         </IconButton>

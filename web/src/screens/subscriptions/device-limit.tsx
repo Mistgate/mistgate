@@ -77,7 +77,7 @@ export function DeviceLimitCard({ settings }: { settings: Settings }) {
             <Radio.Root
               key={m.value}
               value={String(m.value)}
-              className="group flex cursor-pointer items-start gap-3 rounded-field border border-line bg-surface p-3 text-left transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft data-disabled:cursor-default"
+              className="group flex cursor-pointer items-start gap-3 rounded-field border border-line bg-surface p-3 text-start transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft data-disabled:cursor-default"
             >
               <span aria-hidden className="mt-0.5 grid size-4 flex-none place-items-center rounded-full border-[1.5px] border-faint group-data-checked:border-accent">
                 <Radio.Indicator className="size-2 rounded-full bg-accent" />

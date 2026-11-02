@@ -30,7 +30,7 @@ export function FieldBlock({ label, hint, error, htmlFor, children, className }:
 export function SaveBar({ busy, canSave, onSave, onDiscard }: { busy: boolean; canSave: boolean; onSave: () => void; onDiscard: () => void }) {
   const t = useTx();
   return (
-    <div className="screen-enter sticky bottom-[84px] z-[3] flex flex-wrap items-center gap-2 rounded-card border border-accent-line bg-surface py-2 pr-2 pl-4 md:bottom-4">
+    <div className="screen-enter sticky bottom-[84px] z-[3] flex flex-wrap items-center gap-2 rounded-card border border-accent-line bg-surface py-2 pe-2 ps-4 md:bottom-4">
       <span className="min-w-[140px] flex-1 text-[13px] font-bold">{t("subs.dirty")}</span>
       <Button variant="ghost" onClick={onDiscard} disabled={busy}>
         {t("subs.discard")}

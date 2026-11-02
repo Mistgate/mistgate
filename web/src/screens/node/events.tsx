@@ -201,7 +201,7 @@ function Line({ line, first, open, onToggle }: { line: EventLine; first: boolean
         {toggle("flex-none rounded-ctl px-2 py-0.5 text-[11px] font-bold text-muted hover:text-fg max-sm:hidden")}
       </div>
       {open && (
-        <ul className="flex flex-col gap-1.5 rounded-field bg-surface-2 px-3 py-2.5 sm:ml-14">
+        <ul className="flex flex-col gap-1.5 rounded-field bg-surface-2 px-3 py-2.5 sm:ms-14">
           {rows.map((e) => (
             <RowDetail key={e.id} e={e} />
           ))}

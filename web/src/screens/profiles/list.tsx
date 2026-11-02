@@ -132,7 +132,7 @@ export function ProfilesScreen() {
         )}
         <span className="hidden flex-1 @min-[900px]:block" />
         <label className="relative flex min-w-[150px] flex-1 items-center @min-[900px]:w-[220px] @min-[900px]:flex-none">
-          <Icon name="search" size={14} className="pointer-events-none absolute left-3 text-muted" />
+          <Icon name="search" size={14} className="pointer-events-none absolute inset-s-3 text-muted" />
           <input
             type="search"
             aria-label={t("profiles.list.search")}
@@ -142,7 +142,7 @@ export function ProfilesScreen() {
               setQ(e.target.value);
               move({ q: e.target.value.trim() || undefined }, { replace: true });
             }}
-            className="h-9 w-full rounded-ctl border border-line bg-surface pr-3 pl-8 text-xs font-medium text-fg outline-none transition-colors duration-200 focus:border-accent"
+            className="h-9 w-full rounded-ctl border border-line bg-surface pe-3 ps-8 text-xs font-medium text-fg outline-none transition-colors duration-200 focus:border-accent"
           />
         </label>
         {states.length > 0 && (

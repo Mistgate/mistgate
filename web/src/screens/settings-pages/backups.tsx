@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import type { Backup, BackupSettings } from "@/gen/mistgate/admin/v1/backup_pb";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { useT } from "@/i18n";
+import { useFmt } from "@/lib/format";
 import type { MessageKey } from "@/i18n/en";
 import { backups } from "@/lib/api";
 import { useEdition } from "@/lib/edition";
@@ -78,7 +79,7 @@ function backupErrorKey(error: unknown): MessageKey | null {
   return codeKeys[ConnectError.from(error).rawMessage] ?? null;
 }
 
-function formatBytes(size: number) {
+function formatBytes(size: number, locale: string) {
   if (!Number.isFinite(size) || size < 0) return "—";
   if (size < 1024) return `${size} B`;
   const units = ["KiB", "MiB", "GiB", "TiB"];
@@ -88,11 +89,11 @@ function formatBytes(size: number) {
     value /= 1024;
     unit++;
   } while (value >= 1024 && unit < units.length - 1);
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[unit]}`;
+  return `${value.toLocaleString(locale, { maximumFractionDigits: 1 })} ${units[unit]}`;
 }
 
-function backupTime(unix: number) {
-  return unix > 0 ? new Date(unix * 1000).toLocaleString() : "—";
+function backupTime(unix: number, locale: string) {
+  return unix > 0 ? new Date(unix * 1000).toLocaleString(locale) : "—";
 }
 
 /** Settings -> Backups: owner-managed encrypted R2 backups and offline restore instructions. */
@@ -136,6 +137,7 @@ export function BackupsPage() {
 
 function BackupsForm({ stored }: { stored: Stored }) {
   const t = useT();
+  const { locale } = useFmt();
   const toast = useToast();
   const qc = useQueryClient();
   const guard = useStepUp();
@@ -332,7 +334,7 @@ function BackupsForm({ stored }: { stored: Stored }) {
         </form>
 
         <div className="grid gap-2 border-t border-line pt-3 text-xs text-muted sm:grid-cols-2">
-          <p>{t("set.backups.lastSuccess", { time: backupTime(stored.lastSuccessUnix) })}</p>
+          <p>{t("set.backups.lastSuccess", { time: backupTime(stored.lastSuccessUnix, locale) })}</p>
           <p>{t("set.backups.retentionStatus", { days: stored.retentionDays === 0 ? t("set.backups.retention.never") : t("set.backups.retention.days", { n: stored.retentionDays }) })}</p>
           {stored.lastErrorCode && <p className="text-danger-text sm:col-span-2">{t("set.backups.lastError", { code: stored.lastErrorCode })}</p>}
         </div>
@@ -368,11 +370,12 @@ function BackupsForm({ stored }: { stored: Stored }) {
 }
 
 function BackupRow({ item }: { item: BackupItem }) {
+  const { locale } = useFmt();
   return (
     <div className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
-        <span>{backupTime(item.createdUnix)}</span>
-        <span>{formatBytes(item.sizeBytes)}</span>
+        <span>{backupTime(item.createdUnix, locale)}</span>
+        <span>{formatBytes(item.sizeBytes, locale)}</span>
       </div>
       <CopyRow value={item.key} />
     </div>

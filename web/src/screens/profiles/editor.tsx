@@ -506,7 +506,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
                   {p}
                 </span>
               ))}
-            <span className={cx(profile && "ml-1")}>{nodes}</span>
+            <span className={cx(profile && "ms-1")}>{nodes}</span>
           </span>
         </div>
       </div>
@@ -514,7 +514,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
       {notice === "stale" && (
         <Notice tone="danger">
           {t("profiles.stale")}
-          <Button className="ml-3" size="sm" onClick={() => void qc.invalidateQueries({ queryKey: ["profiles"] })}>
+          <Button className="ms-3" size="sm" onClick={() => void qc.invalidateQueries({ queryKey: ["profiles"] })}>
             {t("profiles.reload")}
           </Button>
         </Notice>
@@ -598,7 +598,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
       </div>
 
       {(count > 0 || isNew) && (
-        <div className="screen-enter sticky bottom-[84px] z-[3] flex flex-wrap items-center gap-2 rounded-card border border-accent-line bg-surface py-2 pr-2 pl-4 md:bottom-4">
+        <div className="screen-enter sticky bottom-[84px] z-[3] flex flex-wrap items-center gap-2 rounded-card border border-accent-line bg-surface py-2 pe-2 ps-4 md:bottom-4">
           <span className="min-w-[140px] flex-1 text-[13px] font-bold">{count > 0 ? t("profiles.dirty", { n: count }) : info.displayName}</span>
           {count > 0 && (
             <Button variant="ghost" onClick={discard}>

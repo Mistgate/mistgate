@@ -88,7 +88,7 @@ function LoadChip({ data }: { data: Plain<GetNodeResponse> }) {
   return (
     <span
       title={t(data.node!.bandwidthMbps > 0 ? "node.loadHint" : "node.loadHintCpu")}
-      className="inline-flex h-[26px] flex-none items-center gap-2 rounded-xl border border-line bg-surface pr-2.5 pl-2 text-xs leading-none font-bold whitespace-nowrap"
+      className="inline-flex h-[26px] flex-none items-center gap-2 rounded-xl border border-line bg-surface pe-2.5 ps-2 text-xs leading-none font-bold whitespace-nowrap"
     >
       <span className="font-semibold text-muted">{t("node.load")}</span>
       <span aria-hidden className="flex gap-[3px]">
@@ -172,7 +172,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
         <Link
           to="/nodes"
           aria-label={t("node.back")}
-          className="inline-flex size-9 flex-none items-center justify-center rounded-ctl border border-line bg-surface text-fg transition-transform duration-200 hover:-translate-x-0.5"
+          className="inline-flex size-9 flex-none items-center justify-center rounded-ctl border border-line bg-surface text-fg transition-transform duration-200 hover:-translate-x-0.5 rtl:hover:translate-x-0.5"
         >
           <Icon name="back" />
         </Link>
@@ -188,7 +188,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
           </div>
           {/* each piece keeps together; a piece that starts a line has its "·" clipped, so no line starts or ends with one */}
           <p className="overflow-hidden text-xs text-muted">
-            <span className="-ml-3.5 flex flex-wrap">
+            <span className="-ms-3.5 flex flex-wrap">
               {[
                 node.location || fmt.country(node.countryCode),
                 node.provider,

@@ -53,3 +53,39 @@ export const zh: Record<keyof typeof en, string> = {
   "journal.edgeHint": "此版本不转发节点的实时日志。节点的警告和错误保存在运行记录中。",
   "journal.open": "打开运行记录",
 };
+
+export const fa: Record<keyof typeof en, string> = {
+  "node.tab.journal": "ژورنال",
+  "journal.intro": "اخطارها و خطاهای ایجنت نود و موتورهای آن، به‌تفکیک ساعت، 7 روز نگه داشته می‌شوند. آدرس کلاینت‌ها همان روی نود حذف می‌شوند.",
+  "journal.period": "بازه",
+  "journal.day": "24 ساعت",
+  "journal.week": "7 روز",
+  "journal.level": "سطح",
+  "journal.all": "اخطارها و خطاها",
+  "journal.errors": "فقط خطاها",
+  "journal.search": "جست‌وجو در ژورنال",
+  "journal.empty": "در این بازه نه اخطاری هست و نه خطایی.",
+  "journal.truncated": "فقط {n} مورد جدیدتر نمایش داده می‌شود: بازه را کوتاه‌تر کن یا جست‌وجو کن.",
+  "journal.unsupported": "ایجنت این نود هنوز ژورنالش را نمی‌فرستد: ایجنت را به‌روز کن.",
+  "journal.times": "×{n}",
+  "journal.edgeHint": "این نسخه لاگ زندهٔ نود را منتقل نمی‌کند. اخطارها و خطاهای آن در ژورنال نگه داشته می‌شوند.",
+  "journal.open": "باز کردن ژورنال",
+};
+
+export const tr: Record<keyof typeof en, string> = {
+  "node.tab.journal": "Kayıtlar",
+  "journal.intro": "Düğümün ajanının ve motorlarının uyarıları ile hataları, saat saat gruplanır ve 7 gün saklanır. İstemci adresleri düğümde silinir.",
+  "journal.period": "Dönem",
+  "journal.day": "24 saat",
+  "journal.week": "7 gün",
+  "journal.level": "Düzey",
+  "journal.all": "Uyarılar ve hatalar",
+  "journal.errors": "Yalnızca hatalar",
+  "journal.search": "Kayıtlarda ara",
+  "journal.empty": "Bu dönemde uyarı ya da hata yok.",
+  "journal.truncated": "Yalnızca en yeni {n} kayıt gösteriliyor: dönemi kısalt ya da ara.",
+  "journal.unsupported": "Bu düğümün ajanı kayıtlarını henüz göndermiyor: ajanı güncelle.",
+  "journal.times": "×{n}",
+  "journal.edgeHint": "Bu sürüm düğümün canlı günlüğünü aktarmaz. Düğümün uyarıları ve hataları kayıtlarda tutulur.",
+  "journal.open": "Kayıtları aç",
+};

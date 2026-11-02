@@ -499,7 +499,7 @@ function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserCo
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[13px]">
                 <b className="font-bold">{name(r.deviceId)}</b>
                 <span className="text-muted">{t("conn.where", { node: r.nodeName || r.nodeId, profile: r.profileName })}</span>
-                {r.lastHourUnix > 0 && <span className="ml-auto font-mono text-[11px] text-muted">{t("conn.last", { ago: fmt.ago(r.lastHourUnix) })}</span>}
+                {r.lastHourUnix > 0 && <span className="ms-auto font-mono text-[11px] text-muted">{t("conn.last", { ago: fmt.ago(r.lastHourUnix) })}</span>}
               </div>
               <PartsLine parts={deviceConnParts(t, fmt, r)} />
             </li>
@@ -637,7 +637,7 @@ export function TrafficPanel({ data, fmt }: { data: DetailN; fmt: Fmt }) {
               type="button"
               aria-expanded={allNodes}
               onClick={() => setAllNodes(!allNodes)}
-              className="-ml-2 h-8 w-fit cursor-pointer rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+              className="-ms-2 h-8 w-fit cursor-pointer rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
             >
               {allNodes ? t("users.trafficLess") : t("users.trafficAll", { n: data.nodeTraffic.length })}
             </button>
@@ -1001,7 +1001,7 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
 
   return (
     <Card lg className="flex min-w-0 flex-col gap-3 p-4">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center gap-2.5 text-left">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center gap-2.5 text-start">
         <SectionLabel as="span" className="flex-1" icon="key" tone="lavender">
           {t("users.access")}
         </SectionLabel>

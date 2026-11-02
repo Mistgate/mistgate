@@ -38,7 +38,7 @@ export function Select({ value, onValueChange, options, compact, className, ...r
     >
       <BaseSelect.Trigger
         className={cx(
-          "flex w-full items-center justify-between gap-3 border border-line bg-surface text-left font-medium text-fg outline-none transition-colors duration-200 focus-visible:border-accent data-popup-open:border-accent-line",
+          "flex w-full items-center justify-between gap-3 border border-line bg-surface text-start font-medium text-fg outline-none transition-colors duration-200 focus-visible:border-accent data-popup-open:border-accent-line",
           compact ? "h-9 rounded-ctl px-3 text-xs" : "h-11 rounded-field px-3.5 text-sm",
           className,
         )}

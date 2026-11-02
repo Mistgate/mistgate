@@ -353,7 +353,7 @@ function relayWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untrusted">
       const auto = /^chosen by the panel: the exit's port (\d+) when it is free on the entry, else a free one$/.exec(v);
       if (auto) return [t("approval.value.relay.portAuto", { port: auto[1]! })];
       const move = /^(\d+) -> (\d+)$/.exec(v);
-      return move ? [`${move[1]} → ${move[2]}`] : null;
+      return move ? [t("common.fromTo", { from: move[1]!, to: move[2]! })] : null;
     }
     case "entry_reaches_exit": {
       const m = /^(reach|partial|blocked|no_data)(?: \((\w*)\))?$/.exec(v);
@@ -385,7 +385,7 @@ function relayWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untrusted">
 export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untrusted" | "code" | "params" | "untrustedParams">): Piece[] {
   const p = f.params ?? {};
   // sides from data (an app's link, a profile's name or setting): each on a plate of its own, every side when the whole fact is data
-  if (f.code === "change" && f.untrustedParams?.length) return withPlates("{from} → {to}", p, f.untrusted ? ["from", "to"] : f.untrustedParams);
+  if (f.code === "change" && f.untrustedParams?.length) return withPlates(t("common.fromTo"), p, f.untrusted ? ["from", "to"] : f.untrustedParams);
   const relay = relayWords(t, fmt, f);
   if (relay) return relay;
   if (f.untrusted) return [{ data: f.value }];
@@ -394,7 +394,7 @@ export function factWords(t: T, fmt: Fmt, f: Pick<Fact, "key" | "value" | "untru
     case "":
       return [factText(t, f)];
     case "change":
-      return [`${changeSide(t, fmt, f.key, p.from ?? "")} → ${changeSide(t, fmt, f.key, p.to ?? "")}`];
+      return [t("common.fromTo", { from: changeSide(t, fmt, f.key, p.from ?? ""), to: changeSide(t, fmt, f.key, p.to ?? "") })];
     case "quota":
       return [num("bytes") === 0 ? t("approval.value.unlimited") : `${fmt.bytes(num("bytes"))}, ${changeSide(t, fmt, "quota_reset", p.reset ?? "")}`];
     case "never":

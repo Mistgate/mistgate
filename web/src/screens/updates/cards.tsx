@@ -50,7 +50,7 @@ function Fold({ open, onToggle, label, controls }: { open: boolean; onToggle: ()
       aria-expanded={open}
       aria-controls={controls}
       onClick={onToggle}
-      className="-mr-1 flex h-7 flex-none items-center gap-1 rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+      className="-me-1 flex h-7 flex-none items-center gap-1 rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
     >
       {label}
       <Icon name="chevronRight" size={12} className={cx("block flex-none transition-transform duration-200", open ? "-rotate-90" : "rotate-90")} />
@@ -365,14 +365,14 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
               ) : (
                 <span className="text-muted">{label}</span>
               )}
-              {update?.checkedUnix ? <span className="ml-2 text-xs text-faint">{t("up.panel.checkedAt", { ago: fmt.ago(update.checkedUnix) })}</span> : null}
+              {update?.checkedUnix ? <span className="ms-2 text-xs text-faint">{t("up.panel.checkedAt", { ago: fmt.ago(update.checkedUnix) })}</span> : null}
             </Row>
             {update?.built ? (
               <Row label={t("up.panel.sha")}>
                 <span className="font-mono text-xs" title={update.sha256}>
                   {shortHash(update.sha256)}
                 </span>
-                <span className="ml-2 text-xs text-muted">{fmt.dateTime(update.built)}</span>
+                <span className="ms-2 text-xs text-muted">{fmt.dateTime(update.built)}</span>
               </Row>
             ) : null}
             <Row label={t("up.panel.key")}>

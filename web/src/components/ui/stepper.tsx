@@ -42,7 +42,7 @@ export function Stepper({
       </output>
       <IconButton variant="roundAccent" aria-label={incrementLabel} disabled={incrementDisabled} onClick={onIncrement}>
         <span aria-hidden className="relative block size-2.5">
-          <span className="absolute top-1/2 left-0 h-0.5 w-full -translate-y-1/2 rounded-[1px] bg-on-accent" />
+          <span className="absolute top-1/2 inset-s-0 h-0.5 w-full -translate-y-1/2 rounded-[1px] bg-on-accent" />
           <span className="absolute top-0 left-1/2 h-full w-0.5 -translate-x-1/2 rounded-[1px] bg-on-accent" />
         </span>
       </IconButton>

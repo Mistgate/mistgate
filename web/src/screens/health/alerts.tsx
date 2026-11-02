@@ -157,7 +157,7 @@ function MutedAlerts({ groups, now, flow }: { groups: Alert[][]; now: number; fl
         aria-controls={id}
         data-muted-toggle
         onClick={() => setOpen(!open)}
-        className="group flex min-h-9 w-fit items-center gap-1.5 rounded-ctl pr-1.5 transition-colors"
+        className="group flex min-h-9 w-fit items-center gap-1.5 rounded-ctl pe-1.5 transition-colors"
       >
         <SectionLabel as="span" icon="bell" tone="lavender" className="group-hover:text-fg">
           {t("hl.alerts.mutedSection", { n: groups.flat().length })}
@@ -199,7 +199,7 @@ function FoldHead({ alerts, title, tag, open, onToggle, controls, now }: { alert
         aria-controls={controls}
         data-alert-toggle
         onClick={onToggle}
-        className="group flex min-h-12 w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[inherit] px-4 py-2.5 text-left"
+        className="group flex min-h-12 w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[inherit] px-4 py-2.5 text-start"
       >
         <span className={cx("flex w-[84px] flex-none items-center gap-[7px] text-xs font-bold", kindTextClass[kind])}>
           <StatusDot kind={kind} />
@@ -216,10 +216,10 @@ function FoldHead({ alerts, title, tag, open, onToggle, controls, now }: { alert
         <span className="order-last min-w-0 basis-full text-sm font-bold text-pretty @2xl:order-none @2xl:flex-1 @2xl:basis-0">
           {title}
           {tag}
-          {fact && <span className="ml-2 font-mono text-[11px] font-normal whitespace-nowrap text-muted @2xl:hidden">{fact}</span>}
+          {fact && <span className="ms-2 font-mono text-[11px] font-normal whitespace-nowrap text-muted @2xl:hidden">{fact}</span>}
         </span>
         {fact && <span className="font-mono text-[11px] whitespace-nowrap text-muted @max-2xl:hidden">{fact}</span>}
-        <span className="ml-auto font-mono text-[11px] whitespace-nowrap text-muted @2xl:ml-0">{when}</span>
+        <span className="ms-auto font-mono text-[11px] whitespace-nowrap text-muted @2xl:ms-0">{when}</span>
         <Icon name="chevronDown" size={14} aria-hidden className={cx("flex-none text-muted transition-transform duration-200 group-hover:text-fg", open && "rotate-180")} />
       </button>
     </h3>
@@ -247,7 +247,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false, fold = fals
       className={cx("flex scroll-mt-20 flex-col rounded-card-lg border bg-surface", !fold && "gap-2.5 p-4", cardBorder(kind === "bad"), !fold && muted && "opacity-75")}
     >
       {fold ? (
-        <FoldHead alerts={[a]} title={alertTitle(t, a)} tag={v6tag && <Ipv6Tag alert={a} className="ml-2 align-[1px]" />} open={open} onToggle={() => setOpen(!open)} controls={body} now={now} />
+        <FoldHead alerts={[a]} title={alertTitle(t, a)} tag={v6tag && <Ipv6Tag alert={a} className="ms-2 align-[1px]" />} open={open} onToggle={() => setOpen(!open)} controls={body} now={now} />
       ) : (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span className={cx("flex items-center gap-[7px] text-xs font-bold", kindTextClass[kind])}>
@@ -265,7 +265,7 @@ export function AlertCard({ alert: a, now, flow, onNodePage = false, fold = fals
           )}
           <h3 className="min-w-40 flex-1 text-sm font-bold">
             {alertTitle(t, a)}
-            {v6tag && <Ipv6Tag alert={a} className="ml-2 align-[1px]" />}
+            {v6tag && <Ipv6Tag alert={a} className="ms-2 align-[1px]" />}
           </h3>
           <span className="font-mono text-[11px] text-muted">{t("hl.alerts.since", { duration: fmt.duration(Math.max(0, now - (a.openedUnix || a.firstSeenUnix))) })}</span>
         </div>
@@ -393,13 +393,13 @@ function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert
 }
 
 /** A card's row of buttons; a quiet one that leads it starts in line with the text above (its padding pulled back). */
-const actionRow = "flex flex-wrap items-center gap-1.5 [&>.bg-transparent:first-child]:-ml-3.5";
+const actionRow = "flex flex-wrap items-center gap-1.5 [&>.bg-transparent:first-child]:-ms-3.5";
 
 /** "Mute ▾", or "Unmute" on a muted alert; pushed to the right end of its row of buttons. */
 function MuteControl({ muted, onMute }: { muted: boolean; onMute: (seconds: number) => void }) {
   const t = useT();
   return (
-    <span className="ml-auto flex">
+    <span className="ms-auto flex">
       {muted ? (
         <Button variant="ghost" size="md" onClick={() => onMute(0)}>
           {t("hl.alerts.unmute")}
@@ -479,11 +479,11 @@ function LossTable({ alerts }: { alerts: Alert[] }) {
   return (
     <div className="overflow-x-auto rounded-field border border-line">
       <table className="w-full text-[13px]">
-        <thead className="text-left text-[11px] text-muted">
+        <thead className="text-start text-[11px] text-muted">
           <tr className="border-b border-line">
             <th className={th}>{t("hl.alerts.col.port")}</th>
             <th className={th}>{t("hl.alerts.col.profile")}</th>
-            <th className={cx(th, "text-right")}>{t("hl.alerts.col.lost")}</th>
+            <th className={cx(th, "text-end")}>{t("hl.alerts.col.lost")}</th>
             <th className={th}>{t("hl.alerts.col.from")}</th>
           </tr>
         </thead>
@@ -492,7 +492,7 @@ function LossTable({ alerts }: { alerts: Alert[] }) {
             <tr key={a.id}>
               <td className="px-3 py-2 font-mono font-bold">{a.params.port}</td>
               <td className="px-3 py-2">{a.params.profile}</td>
-              <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-warn-text tabular-nums">{lossPct(Number(a.params.sent), Number(a.params.got))} %</td>
+              <td className="px-3 py-2 text-end font-mono whitespace-nowrap text-warn-text tabular-nums">{lossPct(Number(a.params.sent), Number(a.params.got))} %</td>
               <td className="px-3 py-2 text-muted">{senderLabel(t, a.params.sender ?? "")}</td>
             </tr>
           ))}
@@ -696,7 +696,7 @@ function HistoryList({ rows }: { rows: Alert[] }) {
       {more > 0 && (
         <div className="border-t border-line py-2">
           {/* the label lines up with the times of the rows */}
-          <Button variant="ghost" size="sm" className="-ml-[11px]" onClick={() => setCount(count + HISTORY_STEP)}>
+          <Button variant="ghost" size="sm" className="-ms-[11px]" onClick={() => setCount(count + HISTORY_STEP)}>
             {t("hl.alerts.more", { n: more })}
           </Button>
         </div>
@@ -769,14 +769,14 @@ function HistoryRow({ g }: { g: Alert[] }) {
         <NodeChips names={[...new Set(g.map((x) => x.nodeName).filter(Boolean))]} />
         <span className="min-w-0 @max-md:basis-full">
           {groupTitle(t, g)}
-          <Ipv6Tag alert={h} className="ml-1.5 align-[1px]" />
-          {longest > 0 && <span className="ml-2 text-xs whitespace-nowrap text-muted">{t("hl.alerts.lasted", { duration: fmt.duration(longest) })}</span>}
+          <Ipv6Tag alert={h} className="ms-1.5 align-[1px]" />
+          {longest > 0 && <span className="ms-2 text-xs whitespace-nowrap text-muted">{t("hl.alerts.lasted", { duration: fmt.duration(longest) })}</span>}
         </span>
       </span>
       {many && <Icon name="chevronDown" size={14} aria-hidden className={cx("mt-1 flex-none text-muted transition-transform duration-200 group-hover:text-fg", open && "rotate-180")} />}
     </>
   );
-  const cls = "group grid min-h-[42px] min-w-0 flex-1 grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-x-3 py-2.5 text-left text-[13px]";
+  const cls = "group grid min-h-[42px] min-w-0 flex-1 grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-x-3 py-2.5 text-start text-[13px]";
   return (
     <li id={many ? undefined : historyId(h)} className="scroll-mt-20 border-t border-line first:border-t-0">
       <div className="flex items-start gap-2">
@@ -795,7 +795,7 @@ function HistoryRow({ g }: { g: Alert[] }) {
       </div>
       {many &&
         (open ? (
-          <ul id={id} className="mb-2 ml-[52px] flex flex-col border-l border-line pl-3">
+          <ul id={id} className="mb-2 ms-[52px] flex flex-col border-s border-line ps-3">
             {g.map((x) => (
               <li key={historyId(x)} id={historyId(x)} className="flex scroll-mt-20 flex-wrap items-center gap-x-2 gap-y-0.5 py-1 text-xs">
                 {x.nodeName && (
@@ -805,7 +805,7 @@ function HistoryRow({ g }: { g: Alert[] }) {
                 )}
                 {!oneTitle && <span className="min-w-0">{alertTitle(t, x)}</span>}
                 <span className="text-muted">{[lasted(x) > 0 && t("hl.alerts.lasted", { duration: fmt.duration(lasted(x)) }), t(resolutionWord(x.resolution))].filter(Boolean).join(" · ")}</span>
-                <span className="ml-auto font-mono text-[11px] text-muted tabular-nums">{fmt.clock(x.resolvedAtUnix)}</span>
+                <span className="ms-auto font-mono text-[11px] text-muted tabular-nums">{fmt.clock(x.resolvedAtUnix)}</span>
               </li>
             ))}
           </ul>

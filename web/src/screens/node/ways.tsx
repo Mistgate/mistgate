@@ -175,8 +175,8 @@ function RingMark({ ring, className }: { ring: Ring; className?: string }) {
 
 // the geometry of the line, in the list's own coordinates: the trunk runs under the middle of the country chips (12 px in,
 // 30 wide), a branch leaves it for the ring, the words start after the ring
-const trunk = "pointer-events-none absolute left-[26px] z-[1] w-0.5 bg-faint";
-const branch = "absolute top-[19px] left-[28px] w-3 border-t-2";
+const trunk = "pointer-events-none absolute inset-s-[26px] z-[1] w-0.5 bg-faint";
+const branch = "absolute top-[19px] inset-s-[28px] w-3 border-t-2";
 const branchOf: Record<Ring, string> = {
   ok: "border-faint group-hover:border-accent",
   half: "border-faint group-hover:border-accent",
@@ -186,7 +186,7 @@ const branchOf: Record<Ring, string> = {
   off: "border-dotted border-faint group-hover:border-accent",
 };
 const rowCls =
-  "group relative grid w-full min-w-0 scroll-mt-20 gap-0.5 rounded-card py-2.5 pr-3 pl-[58px] text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent";
+  "group relative grid w-full min-w-0 scroll-mt-20 gap-0.5 rounded-card py-2.5 pe-3 ps-[58px] text-start transition-colors duration-200 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent";
 
 function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysModel; data: Data; selected: boolean; tabbable: boolean; onPick: () => void }) {
   const t = useT();
@@ -221,12 +221,12 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
       className={cx(rowCls, "md:aria-selected:bg-surface-2 md:aria-selected:shadow-[inset_0_0_0_1px_var(--accent-line)]")}
     >
       <span aria-hidden className={cx(branch, branchOf[l.ring])} />
-      <RingMark ring={l.ring} className={cx("absolute top-[15px] left-[40px]", selected && "md:outline-2 md:outline-offset-2 md:outline-accent")} />
+      <RingMark ring={l.ring} className={cx("absolute top-[15px] inset-s-[40px]", selected && "md:outline-2 md:outline-offset-2 md:outline-accent")} />
       <span className="flex min-w-0 items-center gap-2">
         <span className="truncate text-[13px] leading-5 font-bold">{title}</span>
         {l.peer && ccChip(ccOf(l.peer.id))}
         <span className="sr-only">{t(look.word)}</span>
-        <Icon name="chevronRight" size={14} aria-hidden className="ml-auto flex-none text-muted md:hidden" />
+        <Icon name="chevronRight" size={14} aria-hidden className="ms-auto flex-none text-muted md:hidden" />
       </span>
       <span className="truncate text-xs text-muted">
         <span className={mono ? "font-mono text-[11px]" : undefined}>{where}</span>
@@ -245,7 +245,7 @@ function AddRow({ label, note, amber, onClick }: { label: string; note?: string;
       <span
         aria-hidden
         className={cx(
-          "absolute top-[13px] left-[38px] flex size-3.5 items-center justify-center rounded-full border border-dashed",
+          "absolute top-[13px] inset-s-[38px] flex size-3.5 items-center justify-center rounded-full border border-dashed",
           amber ? "border-(color:--c) tone-text" : "border-faint group-hover:border-accent",
         )}
       >
@@ -390,7 +390,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
 
 // ---- the open lane ----
 
-const linkCls = "ml-auto flex items-center gap-1 text-[13px] font-bold text-accent-text hover:underline";
+const linkCls = "ms-auto flex items-center gap-1 text-[13px] font-bold text-accent-text hover:underline";
 
 function DirectDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) {
   const t = useT();
@@ -624,7 +624,7 @@ function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: Ways
         {onPick ? <Icon name="chevronRight" size={16} className="mt-1 flex-none text-muted group-hover:text-fg" /> : pill && <StatusPill sm kind={pill.kind} label={t(pill.word)} />}
       </>
     );
-    const cls = "flex w-full min-w-0 items-start gap-3 rounded-card border px-3.5 py-3 text-left";
+    const cls = "flex w-full min-w-0 items-start gap-3 rounded-card border px-3.5 py-3 text-start";
     return onPick ? (
       <button type="button" onClick={onPick} className={cx(cls, "group border-line transition-colors duration-200 hover:border-accent-line hover:bg-surface-2")}>
         {inner}
@@ -658,7 +658,7 @@ function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: Ways
           setPicked(p.node.id);
           setStep(null);
         }}
-        className="group flex w-full min-w-0 items-start gap-3 rounded-card border border-line px-3.5 py-2.5 text-left transition-colors duration-200 hover:border-accent-line hover:bg-surface-2"
+        className="group flex w-full min-w-0 items-start gap-3 rounded-card border border-line px-3.5 py-2.5 text-start transition-colors duration-200 hover:border-accent-line hover:bg-surface-2"
       >
         {ccChip(p.node.countryCode)}
         <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -777,7 +777,7 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
   };
   return (
     <section aria-label={t("node.tab.ways")} className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-card border border-line bg-surface px-4 py-3">
-      <SectionLabel as="h2" icon="share" tone="sky" className="mr-1">
+      <SectionLabel as="h2" icon="share" tone="sky" className="me-1">
         {t("node.tab.ways")}
       </SectionLabel>
       <span className="text-xs font-semibold text-muted">{t("ways.peopleShort")}</span>
@@ -801,7 +801,7 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
       })}
       <Icon name="chevronRight" size={14} className="text-faint" aria-hidden />
       <span className="font-mono text-xs font-bold">{node.name}</span>
-      <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways" }} className="ml-auto flex items-center gap-1 text-xs font-bold text-accent-text hover:underline">
+      <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "ways" }} className="ms-auto flex items-center gap-1 text-xs font-bold text-accent-text hover:underline">
         {t("ways.back")}
         <Icon name="chevronRight" size={13} />
       </Link>

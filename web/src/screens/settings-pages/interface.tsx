@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Segmented } from "@/components/ui/segmented";
+import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
@@ -45,12 +46,16 @@ export function InterfacePage() {
         </div>
         <div className={row}>
           <span className="flex-1 text-[13px] font-bold">{t("settings.language")}</span>
-          <Segmented
-            aria-label={t("settings.language")}
-            value={lang}
-            onValueChange={setLang}
-            options={langs.map((l) => ({ value: l, label: langNames[l] }))}
-          />
+          {/* five languages: a list, not a segmented row (it would not fit a phone) */}
+          <div className="w-40 flex-none">
+            <Select
+              compact
+              aria-label={t("settings.language")}
+              value={lang}
+              onValueChange={(v) => isLang(v) && setLang(v)}
+              options={langs.map((l) => ({ value: l, label: langNames[l] }))}
+            />
+          </div>
         </div>
         <div className={row}>
           <span className="flex-1 text-[13px] font-bold">{t("settings.theme")}</span>
@@ -208,12 +213,15 @@ function BrandForm({ stored }: { stored: Plain<Instance> }) {
             <span className="text-[13px] font-bold">{t("brand.language")}</span>
             <span className="text-xs text-muted">{t("brand.languageHint")}</span>
           </span>
-          <Segmented
-            aria-label={t("brand.language")}
-            value={language}
-            onValueChange={setLanguage}
-            options={langs.map((l) => ({ value: l, label: langNames[l] }))}
-          />
+          <div className="w-40 flex-none">
+            <Select
+              compact
+              aria-label={t("brand.language")}
+              value={language}
+              onValueChange={(v) => isLang(v) && setLanguage(v)}
+              options={langs.map((l) => ({ value: l, label: langNames[l] }))}
+            />
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-line pt-4">

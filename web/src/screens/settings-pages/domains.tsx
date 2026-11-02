@@ -11,7 +11,7 @@ import { meQuery } from "@/lib/session";
 /** A value to copy (an address, a command): mono text in a field-like row, "Copy" on the right. */
 export function CopyRow({ value }: { value: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-field border border-line bg-canvas py-1.5 pr-1.5 pl-3">
+    <div className="flex items-center gap-2 rounded-field border border-line bg-canvas py-1.5 pe-1.5 ps-3">
       {/* wraps at a space where it can ("reset-login" stays whole), anywhere only when it must (a long address) */}
       <span className="min-w-0 flex-1 font-mono text-xs leading-snug [overflow-wrap:anywhere] select-all">{value}</span>
       <CopyButton value={value} />

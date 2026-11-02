@@ -257,7 +257,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
           <Dialog.Popup className="flex h-fit max-h-full w-full max-w-[560px] flex-col gap-1 overflow-y-auto rounded-card-lg border border-line bg-surface p-2.5 shadow-(--shadow-toast) outline-none transition-[transform,opacity] duration-300 ease-out-soft data-ending-style:-translate-y-2 data-ending-style:opacity-0 data-starting-style:translate-y-2 data-starting-style:opacity-0">
             <Dialog.Title className="sr-only">{t("palette.title")}</Dialog.Title>
             <div className="relative">
-              <Icon name="search" className="pointer-events-none absolute top-3.5 left-3 text-muted" />
+              <Icon name="search" className="pointer-events-none absolute top-3.5 inset-s-3 text-muted" />
               <input
                 autoFocus
                 role="combobox"
@@ -272,7 +272,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
                 }}
                 onKeyDown={onKeyDown}
                 placeholder={t("palette.placeholder")}
-                className="h-11 w-full rounded-field border border-line bg-surface pr-3.5 pl-9 text-sm outline-none transition-colors duration-200 focus:border-accent"
+                className="h-11 w-full rounded-field border border-line bg-surface pe-3.5 ps-9 text-sm outline-none transition-colors duration-200 focus:border-accent"
               />
             </div>
             <div id={listId} role="listbox" className="flex flex-col">
@@ -292,7 +292,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
                         flat[current] === it && "bg-surface-2",
                       )}
                     >
-                      <span className="w-6 font-mono text-[11px] font-bold text-muted">{it.tag}</span>
+                      <span className={cx("w-6 font-mono text-[11px] font-bold text-muted", (it.tag === "→" || it.tag === "←") && "rtl:-scale-x-100")}>{it.tag}</span>
                       <span className="flex-1 truncate text-[13px] font-semibold">{it.label}</span>
                       {it.meta && <span className="text-xs text-muted">{it.meta}</span>}
                     </div>

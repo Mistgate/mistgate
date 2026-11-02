@@ -43,7 +43,7 @@ export function handTyped(prev: Settings, next: Settings): Settings {
 export type AwgAdvice = { warnings: readonly FieldError[]; score?: ObfuscationScore };
 
 const card =
-  "flex min-w-0 flex-col items-start gap-1 rounded-card border border-line bg-canvas px-3 py-2.5 text-left transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft data-disabled:opacity-60";
+  "flex min-w-0 flex-col items-start gap-1 rounded-card border border-line bg-canvas px-3 py-2.5 text-start transition-colors duration-200 data-checked:border-accent-line data-checked:bg-accent-soft data-disabled:opacity-60";
 
 /** What a look is: the web and file-transfer traffic it copies, the calls, name lookups, and so on. All one tone, the disguise's. */
 const presetIcons: Record<string, IconName> = {
@@ -92,7 +92,7 @@ function ScoreReasons({ score, t }: { score: ObfuscationScore; t: Tx }) {
       <span className="font-bold">{t("awg.score.base", { n: score.base, tier })}</span>
       {score.items.map((i) => (
         <span key={i.code + i.pointer} className="flex gap-2">
-          <b className={cx("w-7 flex-none text-right font-mono", i.delta > 0 ? "text-accent-text" : "text-warn-text")}>{i.delta > 0 ? `+${i.delta}` : `−${-i.delta}`}</b>
+          <b className={cx("w-7 flex-none text-end font-mono", i.delta > 0 ? "text-accent-text" : "text-warn-text")}>{i.delta > 0 ? `+${i.delta}` : `−${-i.delta}`}</b>
           <span>{t.opt(`awg.score.${i.code}`, i.params) ?? i.code}</span>
         </span>
       ))}

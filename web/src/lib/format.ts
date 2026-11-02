@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { localeOf, useLang, useT, type Lang, type T } from "@/i18n";
+import { dirOf, intlLocaleOf, useLang, useT, type Lang, type T } from "@/i18n";
 
 /** Scales a byte count to the largest unit that keeps the number below `base` (1000 for traffic, 1024 for RAM and disk). */
 export function scaleBytes(n: number, base: 1000 | 1024 = 1000): { value: number; unit: 0 | 1 | 2 | 3 | 4 } {
@@ -19,7 +19,7 @@ function numberFormat(lang: Lang, digits: number, fixed: boolean) {
   const key = `${lang}/${digits}/${fixed}`;
   let f = numberFormats.get(key);
   if (!f) {
-    f = new Intl.NumberFormat(localeOf(lang), { maximumFractionDigits: digits, minimumFractionDigits: fixed ? digits : 0 });
+    f = new Intl.NumberFormat(intlLocaleOf(lang), { maximumFractionDigits: digits, minimumFractionDigits: fixed ? digits : 0 });
     numberFormats.set(key, f);
   }
   return f;
@@ -27,7 +27,7 @@ function numberFormat(lang: Lang, digits: number, fixed: boolean) {
 
 /** Local time of day, 24 hours: "14:06". */
 function clockOf(unix: number, lang: Lang) {
-  return new Date(unix * 1000).toLocaleTimeString(localeOf(lang), { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(unix * 1000).toLocaleTimeString(intlLocaleOf(lang), { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 const sameDay = (a: Date, b: Date) =>
@@ -36,7 +36,7 @@ const sameDay = (a: Date, b: Date) =>
 /** "28 сент.": the year only when it is not this one ("28 сент. 2025 г."). */
 export function dayOf(unix: number, lang: Lang, now = new Date()) {
   const d = new Date(unix * 1000);
-  return d.toLocaleDateString(localeOf(lang), { day: "numeric", month: "short", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+  return d.toLocaleDateString(intlLocaleOf(lang), { day: "numeric", month: "short", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
 
 /** "28 сент., 18:15", the year as in dayOf. */
@@ -81,12 +81,14 @@ export type Fmt = ReturnType<typeof makeFmt>;
 
 export function makeFmt(lang: Lang, t: T) {
   const num = (v: number, digits = 1, fixed = false) => numberFormat(lang, digits, fixed).format(v);
+  // a size or a rate keeps its Latin unit after the number inside Persian too ("17 Mbit/s", not "Mbit/s 17"): a left-to-right isolate
+  const ltr = dirOf(lang) === "rtl" ? (s: string) => `\u2066${s}\u2069` : (s: string) => s;
   const bytes = (n: number, base: 1000 | 1024 = 1000, digits = 1) => {
     const { value, unit } = scaleBytes(n, base);
-    return `${num(value, unit === 0 ? 0 : digits)} ${t(unitKeys[unit])}`;
+    return ltr(`${num(value, unit === 0 ? 0 : digits)} ${t(unitKeys[unit])}`);
   };
   /** Bits per second as Mbit/s with the unit: "12,4 Мбит/с". */
-  const mbit = (bps: number) => `${num(bps / 1e6, bps >= 1e7 ? 0 : 1)} ${t("unit.mbit")}`;
+  const mbit = (bps: number) => ltr(`${num(bps / 1e6, bps >= 1e7 ? 0 : 1)} ${t("unit.mbit")}`);
   /** The bare number, for places where the unit sits elsewhere (node cards: "↓12,4"). */
   const mbitNum = (bps: number) => num(bps / 1e6, bps >= 1e7 ? 0 : 1);
   const ago = (unix: number, now = Date.now()) => agoOf(t, unix, Math.floor(now / 1000));
@@ -96,8 +98,8 @@ export function makeFmt(lang: Lang, t: T) {
   };
   return {
     lang,
-    /** The Intl locale of the UI language ("zh" is "zh-CN"): what toLocale*, Intl.* and localeCompare take. */
-    locale: localeOf(lang),
+    /** The Intl locale of the UI language ("zh" is "zh-CN", Persian with Latin digits): what toLocale*, Intl.* and localeCompare take. */
+    locale: intlLocaleOf(lang),
     num,
     bytes,
     mbit,
@@ -112,7 +114,7 @@ export function makeFmt(lang: Lang, t: T) {
     country: (code: string) => {
       if (!code) return "";
       try {
-        return new Intl.DisplayNames(localeOf(lang), { type: "region" }).of(code.toUpperCase()) ?? code;
+        return new Intl.DisplayNames(intlLocaleOf(lang), { type: "region" }).of(code.toUpperCase()) ?? code;
       } catch {
         return code;
       }

@@ -70,10 +70,10 @@ function ShellFrame() {
   }, []);
 
   return (
-    <div className="min-h-dvh md:pl-56">
+    <div className="min-h-dvh md:ps-56">
       <a
         href="#main"
-        className="sr-only z-50 rounded-ctl bg-accent px-3 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        className="sr-only z-50 rounded-ctl bg-accent px-3 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:top-2 focus:inset-s-2"
       >
         {t("nav.skip")}
       </a>
@@ -141,7 +141,7 @@ function Sidebar() {
   const counts: Partial<Record<SectionId, number>> = { nodes, users };
 
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-56 flex-col gap-0.5 border-r border-line px-2.5 py-3.5 md:flex">
+    <aside className="fixed inset-y-0 inset-s-0 hidden w-56 flex-col gap-0.5 border-e border-line px-2.5 py-3.5 md:flex">
       <Link to="/" className="mb-3 flex h-[34px] items-center px-2" aria-label={t("nav.overview")}>
         <Brand />
       </Link>
@@ -214,10 +214,10 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
       <button
         type="button"
         onClick={onSearch}
-        className="hidden h-bar max-w-[420px] min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-ctl border border-line bg-surface pr-1.5 pl-3 text-[13px] text-muted outline-none transition-colors duration-200 hover:bg-surface-2 focus-visible:border-accent xl:flex"
+        className="hidden h-bar max-w-[420px] min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-ctl border border-line bg-surface pe-1.5 ps-3 text-[13px] text-muted outline-none transition-colors duration-200 hover:bg-surface-2 focus-visible:border-accent xl:flex"
       >
         <Icon name="search" size={15} />
-        <span className="flex-1 truncate text-left">{t("header.search")}</span>
+        <span className="flex-1 truncate text-start">{t("header.search")}</span>
         <Kbd keys={paletteKeys} />
       </button>
       <button
@@ -335,7 +335,7 @@ function Dock() {
           <NavIcon name={s.id} size={20} />
           <span className="max-w-full truncate">{t(navKey(s.id))}</span>
           {s.id === "overview" && problems.n > 0 && (
-            <span aria-hidden className={cx("absolute top-1.5 right-3.5 size-[7px] rounded-full", problems.tone === "danger" ? "bg-danger" : "bg-warn")} />
+            <span aria-hidden className={cx("absolute top-1.5 inset-e-3.5 size-[7px] rounded-full", problems.tone === "danger" ? "bg-danger" : "bg-warn")} />
           )}
         </Link>
       ))}
@@ -343,7 +343,7 @@ function Dock() {
         <Dialog.Trigger data-status={moreActive ? "active" : undefined} className={tabCls}>
           <NavIcon name="more" size={20} />
           <span>{t("nav.more")}</span>
-          {approvals > 0 && <span aria-hidden className="absolute top-1.5 right-3.5 size-[7px] rounded-full bg-warn" />}
+          {approvals > 0 && <span aria-hidden className="absolute top-1.5 inset-e-3.5 size-[7px] rounded-full bg-warn" />}
         </Dialog.Trigger>
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-20 bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
@@ -391,7 +391,7 @@ function SignOutRow() {
       <button
         type="button"
         onClick={signOut}
-        className={cx("flex h-12 items-center px-3 text-left text-[15px] font-semibold text-danger-text")}
+        className={cx("flex h-12 items-center px-3 text-start text-[15px] font-semibold text-danger-text")}
       >
         {t("header.signOut")}
       </button>

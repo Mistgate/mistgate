@@ -5,7 +5,7 @@ import { cx } from "@/lib/cx";
 // square: back/search buttons (34, or 36 on the mobile header). close: round x that turns on hover.
 // round / roundAccent: the 26px - and + of the stepper.
 const variants = {
-  square: "size-[34px] rounded-ctl border border-line bg-surface text-fg hover:-translate-x-0.5",
+  square: "size-[34px] rounded-ctl border border-line bg-surface text-fg hover:-translate-x-0.5 rtl:hover:translate-x-0.5",
   close: "size-7 rounded-full bg-surface text-muted transition-transform duration-[250ms] ease-spring-strong hover:rotate-90",
   round: "size-[26px] rounded-full border border-line bg-surface-2 text-fg active:scale-[0.88]",
   roundAccent: "size-[26px] rounded-full bg-accent text-on-accent active:scale-[0.88]",

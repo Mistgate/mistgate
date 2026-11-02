@@ -135,7 +135,7 @@ function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs:
       {a.reason && (
         <figure className="flex flex-col gap-1">
           <figcaption className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("int.ap.reason")}</figcaption>
-          <blockquote className="border-l-2 border-line pl-3 text-[13px] leading-normal break-words whitespace-pre-wrap text-muted italic">{t("common.quoted", { name: a.reason })}</blockquote>
+          <blockquote className="border-s-2 border-line ps-3 text-[13px] leading-normal break-words whitespace-pre-wrap text-muted italic">{t("common.quoted", { name: a.reason })}</blockquote>
           <span className="text-[11px] text-faint">{t("int.ap.reason.note")}</span>
         </figure>
       )}

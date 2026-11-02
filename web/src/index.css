@@ -139,8 +139,8 @@
   --radius-sheet: 22px;
 
   /* The ideographs are in no web font: after the Latin faces come the system CJK ones (nothing is downloaded). */
-  --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", monospace;
+  --font-sans: "Onest", "Vazirmatn", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", "Vazirmatn", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", monospace;
 
 }
 
@@ -352,4 +352,49 @@
 }
 :lang(zh) [class*="tracking-[-"] {
   letter-spacing: 0;
+}
+
+/*
+ * Persian (<html lang="fa" dir="rtl">), set in Vazirmatn (fonts.css). Arabic script is cursive and tall: lines get the
+ * same extra air as Chinese, and no tracking at all (spacing letters apart breaks the joins).
+ */
+:lang(fa) body {
+  line-height: 1.6;
+}
+:lang(fa) .leading-snug {
+  line-height: 1.55;
+}
+:lang(fa) .leading-tight {
+  line-height: 1.4;
+}
+:lang(fa) [class*="tracking-"] {
+  letter-spacing: 0;
+}
+
+/*
+ * Right to left. The layout mirrors through logical utilities (ms-/ps-/inset-s-/text-start/border-s); what does not
+ * simply mirror is said here once, not at every call site:
+ * - the two horizontal glyphs (Icon "back" and "chevronRight") point the other way, unless a quarter turn makes them a
+ *   vertical fold (a disclosure that turns on open flips its turn with rtl:group-open:-rotate-90);
+ * - a mono value (an IP, a port, a key, a version, a path) takes its direction from its own first letter, so
+ *   "/dev/net/tun" or "203.0.113.7:443" reads left to right inside Persian, and a mono "5 روز" stays Persian;
+ * - code blocks are left to right whole.
+ */
+/* the sign of a sideways move, for motion measured in JS (the sliding thumb of components/ui/segmented.tsx) */
+:root,
+[dir="ltr"] {
+  --x-dir: 1;
+}
+[dir="rtl"] {
+  --x-dir: -1;
+}
+[dir="rtl"] svg[data-flip]:not([class~="rotate-90"], [class~="-rotate-90"]) {
+  scale: -1 1;
+}
+.font-mono:dir(rtl) {
+  unicode-bidi: plaintext;
+}
+[dir="rtl"] pre {
+  direction: ltr;
+  text-align: left;
 }

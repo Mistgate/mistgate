@@ -89,7 +89,7 @@ export function Block({ title, flush, className, children }: { title?: ReactNode
   );
 }
 
-/** A card's last row of buttons: the main ones on the left, a destructive one (or Save) pushed right with `ml-auto`. */
+/** A card's last row of buttons: the main ones at the start, a destructive one (or Save) pushed to the end with `ms-auto`. */
 export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 md:px-5", className)}>{children}</div>;
 }

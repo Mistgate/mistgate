@@ -34,6 +34,8 @@ const core = {
   "common.quoted": "“{name}”",
   // "label: value" where the label and the value are separate texts; the colon belongs to the language (full-width in Chinese)
   "common.labeled": "{label}: {value}",
+  // a change or a span, "before → after"; the arrow points the way the language reads
+  "common.fromTo": "{from} → {to}",
 
   // the pager at the bottom of a long list (components/ui/pagination.tsx)
   "pager.nav": "Pages",

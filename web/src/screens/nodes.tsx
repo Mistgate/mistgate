@@ -242,7 +242,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             key={h}
             // "today" is a UTC day, not the owner's: say so where it is read
             title={i === 4 ? t("nodes.todayHint") : undefined}
-            className={cx("whitespace-nowrap", i >= 3 && "text-right", i === 4 && "cursor-help underline decoration-faint decoration-dotted underline-offset-[3px]")}
+            className={cx("whitespace-nowrap", i >= 3 && "text-end", i === 4 && "cursor-help underline decoration-faint decoration-dotted underline-offset-[3px]")}
           >
             {h}
           </span>
@@ -274,15 +274,15 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
             <span title={n.protocols.map(protocolName).join(", ")} className="truncate font-mono text-xs text-muted">
               {n.protocols.map(protocolShort).join(", ") || "—"}
             </span>
-            <span className="text-right font-mono">{onlineOf(n)}</span>
-            <span className="text-right font-mono">{fmt.bytes(n.trafficTodayBytes)}</span>
+            <span className="text-end font-mono">{onlineOf(n)}</span>
+            <span className="text-end font-mono">{fmt.bytes(n.trafficTodayBytes)}</span>
             <div className="flex items-center justify-end gap-2">
               <span className="h-1 w-11 overflow-hidden rounded-[2px] bg-surface-2">
                 <span className="block h-full bg-accent" style={{ width: `${n.hasMetrics ? Math.min(100, n.cpuPct) : 0}%` }} />
               </span>
-              <span className="w-8 text-right font-mono text-xs">{n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"}</span>
+              <span className="w-8 text-end font-mono text-xs">{n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"}</span>
             </div>
-            <span className="text-right font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"}</span>
+            <span className="text-end font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"}</span>
           </div>
         );
       })}
@@ -331,7 +331,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
                 </span>
               ))}
               <span className="flex-1" />
-              <span className="min-w-0 text-right font-mono text-[11px] break-all text-muted">{n.address}</span>
+              <span className="min-w-0 text-end font-mono text-[11px] break-all text-muted">{n.address}</span>
             </div>
             {(kind !== "ok" || s.update) && <SubLine s={s} className="text-xs text-pretty" />}
           </div>

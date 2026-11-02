@@ -9,8 +9,12 @@ import type { Updates } from "@/lib/updates";
 
 export type ReleaseNote = Updates["agentNotes"][number];
 
-/** The notes in the interface language; a release without them in it falls back to English, then to whatever it has. */
-export const noteText = (n: Pick<ReleaseNote, Lang>, lang: Lang): string => n[lang] || n.en || n.ru || n.zh;
+/**
+ * The notes in the interface language; a release without them in it (releases carry English, Russian and Chinese) falls
+ * back to English, then to whatever it has.
+ */
+export const noteText = (n: Pick<ReleaseNote, "en" | "ru" | "zh">, lang: Lang): string =>
+  (lang === "en" || lang === "ru" || lang === "zh" ? n[lang] : "") || n.en || n.ru || n.zh;
 
 /** One release: its version (a link to the GitHub page), date, the security badge and the notes. `clamp` caps the height. */
 function Entry({ note, clamp }: { note: ReleaseNote; clamp?: boolean }) {
@@ -57,6 +61,7 @@ function Entry({ note, clamp }: { note: ReleaseNote; clamp?: boolean }) {
             key={text}
             ref={measure}
             id={id}
+            dir="auto"
             className={cx(
               "min-w-0 text-[13px] leading-normal text-pretty break-words text-fg",
               clamp && !open && "max-h-56 overflow-hidden",
@@ -71,7 +76,7 @@ function Entry({ note, clamp }: { note: ReleaseNote; clamp?: boolean }) {
               aria-expanded={open}
               aria-controls={id}
               onClick={() => setOpen(!open)}
-              className="-ml-2 h-7 w-fit cursor-pointer rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+              className="-ms-2 h-7 w-fit cursor-pointer rounded-ctl px-2 text-xs font-bold text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
             >
               {open ? t("up.notes.showLess") : t("up.notes.showAll")}
             </button>

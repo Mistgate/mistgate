@@ -16,6 +16,7 @@ import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries"
 import type { UserN } from "./model";
 import { ConfirmModal } from "./ui";
 import { QueryError } from "@/components/ui/query-error";
+import { plainText } from "@/i18n";
 import { useTx } from "./t";
 
 /**
@@ -138,7 +139,7 @@ function LinkBody({ target, initialUrl, initialPassword }: { target: LinkTarget;
 
   async function copy(text: string, what: Exclude<Copied, null>) {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(plainText(text));
       setCopied(what);
       setTimeout(() => setCopied(null), 2000);
     } catch {
@@ -151,7 +152,7 @@ function LinkBody({ target, initialUrl, initialPassword }: { target: LinkTarget;
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   async function share() {
     try {
-      await navigator.share({ text: message });
+      await navigator.share({ text: plainText(message) });
     } catch (e) {
       // closing the share sheet is not an error; anything else falls back to the clipboard
       if (!(e instanceof DOMException && e.name === "AbortError")) void copy(message, "both");
@@ -200,7 +201,7 @@ function LinkBody({ target, initialUrl, initialPassword }: { target: LinkTarget;
         <summary className="flex h-10 cursor-pointer items-center gap-2 rounded-xl px-3 text-[13px] font-bold text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
           <Icon name="info" size={14} />
           {t("users.howT")}
-          <Icon name="chevronRight" size={14} className="ml-auto transition-transform duration-200 group-open:rotate-90" />
+          <Icon name="chevronRight" size={14} className="ms-auto transition-transform duration-200 group-open:rotate-90 rtl:group-open:-rotate-90" />
         </summary>
         <ul className="flex flex-col gap-2.5 px-3 pt-0.5 pb-3">
           {password && <HowItem icon="lock" tone="lavender" text={t("users.howPw")} />}
@@ -215,7 +216,7 @@ function LinkBody({ target, initialUrl, initialPassword }: { target: LinkTarget;
             {t("users.openPage")}
           </a>
         )}
-        <Button variant="ghostDanger" className="ml-auto" disabled={!url || rotate.isPending} onClick={() => setAskRotate(true)}>
+        <Button variant="ghostDanger" className="ms-auto" disabled={!url || rotate.isPending} onClick={() => setAskRotate(true)}>
           <Icon name="refresh" size={14} />
           {t("users.rotate")}
         </Button>
@@ -264,7 +265,7 @@ function SelfService({ target }: { target: LinkTarget }) {
   if (!s.data) return null;
   const on = s.data.settings.userPage?.allowDeviceSelfService ?? true; // absent = on (settings older than the switch)
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface-2 py-2.5 pr-2.5 pl-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface-2 py-2.5 pe-2.5 ps-3">
       <IconChip icon="key" tone="sage" size={28} />
       <span className="min-w-0 flex-1 text-xs leading-snug">{t(on ? "users.selfOn" : "users.selfOff")}</span>
       {!on && (
@@ -299,9 +300,9 @@ function ValueRow({
   const t = useTx();
   const name = done ? t("users.copied") : copyLabel;
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-surface-2 py-2.5 pr-2.5 pl-3">
+    <div className="flex items-center gap-3 rounded-xl bg-surface-2 py-2.5 pe-2.5 ps-3">
       <IconChip icon={icon} tone={tone} size={28} />
-      <div className="flex min-w-0 flex-1 flex-col gap-1 text-left">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 text-start">
         <SectionLabel as="span">{label}</SectionLabel>
         {children}
       </div>

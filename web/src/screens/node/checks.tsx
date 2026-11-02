@@ -49,7 +49,7 @@ export function CheckRows({ row, columns, onRun, running }: { row: Plain<CheckRo
                 aria-expanded={on}
                 aria-label={t("hl.cell.aria", { node: row.nodeName, profile: col.profileName, state: look.state })}
                 onClick={() => setOpen(on ? null : col.profileId)}
-                className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-left text-[13px]", tint[kind], on && "outline-2 outline-offset-2 outline-accent")}
+                className={cx("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-field px-3 py-2.5 text-start text-[13px]", tint[kind], on && "outline-2 outline-offset-2 outline-accent")}
               >
                 <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
                   <StatusDot kind={kind} />

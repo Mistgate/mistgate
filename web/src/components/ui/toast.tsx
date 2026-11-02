@@ -69,9 +69,9 @@ function Current() {
             {error ? <span className="text-[13px] leading-none font-extrabold text-[#0c0c0e]">!</span> : <span className="-mt-0.5 h-2 w-1 rotate-45 border-r-2 border-b-2 border-[#0c0c0e]" />}
           </span>
           <Toast.Description className="min-w-0" />
-          <Toast.Action className="ml-1 flex-none font-extrabold underline" />
+          <Toast.Action className="ms-1 flex-none font-extrabold underline" />
           {error && (
-            <Toast.Close aria-label={t("common.close")} className="-mr-1.5 grid size-6 flex-none place-items-center rounded-full opacity-60 transition-opacity hover:opacity-100">
+            <Toast.Close aria-label={t("common.close")} className="-me-1.5 grid size-6 flex-none place-items-center rounded-full opacity-60 transition-opacity hover:opacity-100">
               <Icon name="x" size={12} />
             </Toast.Close>
           )}

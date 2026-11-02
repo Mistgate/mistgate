@@ -96,7 +96,7 @@ function BotSection({ status }: { status: TelegramStatus }) {
             @{bot.username}
           </span>
           <span className="text-xs text-muted">{t("tg.bot.set")}</span>
-          <span className="ml-auto flex flex-wrap gap-2">
+          <span className="ms-auto flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
               {t("tg.bot.replace")}
             </Button>
@@ -145,7 +145,7 @@ function CodeBox({ c, bot, onCancel, onAgain, busy }: { c: Code; bot: string; on
           </a>
           <div className="flex flex-col gap-1.5">
             <span className="text-xs text-muted">{t("tg.link.or", { bot })}</span>
-            <div className="flex items-center gap-2 rounded-field border border-line bg-surface py-1.5 pr-1.5 pl-3">
+            <div className="flex items-center gap-2 rounded-field border border-line bg-surface py-1.5 pe-1.5 ps-3">
               <code data-testid="tg-start" className="min-w-0 flex-1 font-mono text-[13px] font-semibold break-all select-all">
                 {start}
               </code>
@@ -240,7 +240,7 @@ function Linked({ links }: { links: TelegramLink[] }) {
           <li key={l.adminId} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-line py-2 text-[13px]">
             <b className="truncate">{l.adminName}</b>
             <span className="text-xs text-muted">{t(roleKey[l.role] ?? "tg.role.readonly")}</span>
-            <span className="ml-auto text-xs text-muted">{t(l.enabled ? "tg.others.on" : "tg.others.off")}</span>
+            <span className="ms-auto text-xs text-muted">{t(l.enabled ? "tg.others.on" : "tg.others.off")}</span>
           </li>
         ))}
       </ul>

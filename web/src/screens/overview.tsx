@@ -324,7 +324,7 @@ function TopCard({ data }: { data: OverviewResponse }) {
               <div className="h-full rounded-[2px] bg-accent" style={{ width: `${Math.max(3, Math.round((u.downBps / best) * 100))}%` }} />
             </div>
           </div>
-          <Link to="/nodes/$id" params={{ id: u.nodeId }} title={u.nodeName} className="w-14 truncate text-right font-mono text-[11px] text-muted transition-colors hover:text-fg">
+          <Link to="/nodes/$id" params={{ id: u.nodeId }} title={u.nodeName} className="w-14 truncate text-end font-mono text-[11px] text-muted transition-colors hover:text-fg">
             {u.nodeName}
           </Link>
         </div>

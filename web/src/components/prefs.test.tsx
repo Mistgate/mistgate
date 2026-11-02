@@ -36,13 +36,36 @@ describe("LangToggle", () => {
     });
     await settle();
     const rows = [...document.querySelectorAll<HTMLElement>("[role=option]")];
-    expect(rows.map((r) => r.textContent)).toEqual(["EnglishEN", "РусскийRU", "简体中文中文"]);
-    expect(rows.map((r) => r.getAttribute("lang"))).toEqual(["en", "ru", "zh-CN"]);
+    expect(rows.map((r) => r.textContent)).toEqual(["EnglishEN", "РусскийRU", "简体中文中文", "فارسیFA", "TürkçeTR"]);
+    expect(rows.map((r) => r.getAttribute("lang"))).toEqual(["en", "ru", "zh-CN", "fa", "tr"]);
 
     await act(async () => rows[2]!.click());
     await settle();
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(trigger.getAttribute("aria-label")).toBe("语言：简体中文");
     expect(trigger.textContent).toBe("中文");
+    expect(document.documentElement.dir).toBe("ltr");
+  });
+
+  it("Persian turns the page right to left; any other language turns it back", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => root!.render(<LangToggle />));
+    const trigger = host.querySelector<HTMLButtonElement>("button")!;
+    await act(async () => {
+      trigger.focus();
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    });
+    await settle();
+    await act(async () => [...document.querySelectorAll<HTMLElement>("[role=option]")][3]!.click());
+    await settle();
+    expect(document.documentElement.lang).toBe("fa");
+    expect(document.documentElement.dir).toBe("rtl");
+    expect(trigger.textContent).toBe("FA");
+    expect(localStorage.getItem("lang")).toBe("fa");
+    act(() => setLang("tr"));
+    expect(document.documentElement.lang).toBe("tr");
+    expect(document.documentElement.dir).toBe("ltr");
   });
 });

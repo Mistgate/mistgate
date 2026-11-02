@@ -337,7 +337,7 @@ export function BlockedList({ blocked, onChanged }: { blocked: BlockedN[]; onCha
 
   return (
     <section className="flex flex-col border-t border-line pt-1.5">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex min-h-9 items-center gap-1.5 text-left text-[11px] font-bold tracking-[0.06em] text-muted uppercase transition-colors hover:text-fg">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex min-h-9 items-center gap-1.5 text-start text-[11px] font-bold tracking-[0.06em] text-muted uppercase transition-colors hover:text-fg">
         <Icon name="chevronRight" size={13} className={cx("flex-none transition-transform duration-300 ease-spring", open && "rotate-90")} />
         {t("users.dev.blockedList", { n: blocked.length })}
       </button>
