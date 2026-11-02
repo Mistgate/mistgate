@@ -184,15 +184,18 @@ export function ProtocolPicker({
   );
 }
 
-/** Step 2's header: the chosen protocol, "Change" back to the choice (a new profile only), and what it is best for under them. */
-export function ChoiceStrip({ info, t, onChange }: { info: Proto; t: Tx; onChange?: () => void }) {
+/**
+ * Step 2's header: the chosen protocol, "Change" back to the choice (a new profile only), and what it is best for under them.
+ * `bare` leaves out the protocol's mark where the page's title already carries it (a saved profile).
+ */
+export function ChoiceStrip({ info, t, onChange, bare }: { info: Proto; t: Tx; onChange?: () => void; bare?: boolean }) {
   const look = lookOf(info.id);
   const copy = copyOf(info, t);
   const line = copy.best || copy.tagline;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        <IconChip icon={look.icon} tone={look.tone} size={36} className="rounded-ctl" />
+        {!bare && <IconChip icon={look.icon} tone={look.tone} size={36} className="rounded-ctl" />}
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-base leading-5 font-semibold">{info.displayName}</span>
           {look.badge === "experimental" && <Badge id={info.id} t={t} />}

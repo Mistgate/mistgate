@@ -7,7 +7,7 @@ import type { ProfileImpact, ProfileSummary, ProtocolInfo } from "@/gen/mistgate
 import { Avatar, Card, DangerZone, PageTitle } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { Icon } from "@/components/ui/icons";
+import { Icon, IconChip } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -34,7 +34,7 @@ import { DeployDialog, type DeployProfile } from "./deploy";
 import { EgressNote } from "./egress-note";
 import { FormatsLine } from "./formats";
 import { ChoiceStrip, ProtocolPicker } from "./pick";
-import { byProtocol, telegramOnly } from "./protocol-meta";
+import { byProtocol, lookOf, summaryParts, telegramOnly } from "./protocol-meta";
 import { SchemaForm, type Problem } from "./schema-form";
 import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
@@ -494,9 +494,20 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
         <IconButton aria-label={t("profiles.back")} onClick={onBack ?? (() => go("/profiles"))}>
           <Icon name="back" />
         </IconButton>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {/* a saved profile wears its protocol's mark by the title (the protocol card below then leaves it out) */}
+        {profile && <IconChip icon={lookOf(info.id).icon} tone={lookOf(info.id).tone} size={44} className="rounded-xl" />}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <PageTitle className="truncate">{initial.name || t("profiles.new")}</PageTitle>
-          <span className="text-xs text-muted">{nodes}</span>
+          {/* the profile at a glance: its facts as the list shows them, then where it runs */}
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
+            {profile &&
+              summaryParts(profile.summary).map((p) => (
+                <span key={p} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-fg/80">
+                  {p}
+                </span>
+              ))}
+            <span className={cx(profile && "ml-1")}>{nodes}</span>
+          </span>
         </div>
       </div>
 
@@ -534,7 +545,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">
           <Card lg className="flex flex-col gap-3 p-4">
-            <ChoiceStrip info={info} t={t} onChange={onChangeProtocol} />
+            <ChoiceStrip info={info} t={t} onChange={onChangeProtocol} bare={!!profile} />
             <div aria-hidden className="h-px bg-line" />
             <TextField
               icon="tag"

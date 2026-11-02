@@ -177,7 +177,8 @@ export function TwinPanel({ profile, egress, dirty }: { profile: ProfileSummary;
         <Icon name="copy" size={13} />
         {t(to === "warp" ? "twin.btn.warp" : "twin.btn.direct")}
       </Button>
-      <span className="min-w-0 flex-1 text-[11px] leading-snug text-muted">{t(dirty ? "twin.dirty" : to === "warp" ? "twin.hint.warp" : "twin.hint.direct")}</span>
+      {/* beside the button where it fits in a line or two, under it (full width) on a narrow screen */}
+      <span className="min-w-0 flex-1 basis-64 text-xs leading-snug text-muted">{t(dirty ? "twin.dirty" : to === "warp" ? "twin.hint.warp" : "twin.hint.direct")}</span>
 
       <ConfirmModal
         open={open}

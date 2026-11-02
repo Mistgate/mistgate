@@ -16,8 +16,11 @@ import { groups as groupsApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { meQuery } from "@/lib/session";
+import { Flag } from "@/components/ui/flag";
+import { nodesQuery } from "@/lib/queries";
 import { InboundErrorNote, states } from "@/screens/node/profiles";
-import { GroupEditModal, GroupLink, NewGroupModal } from "@/screens/users/groups";
+import { groupTone } from "@/screens/users/format";
+import { GroupChip, GroupEditModal, NewGroupModal } from "@/screens/users/groups";
 import { groupsQuery } from "@/screens/users/rpc";
 import { useTx } from "@/screens/users/t";
 import { Panel } from "@/screens/users/ui";
@@ -55,6 +58,8 @@ export function WherePanel({
 }) {
   const t = useTx();
   const groupList = useQuery(groupsQuery);
+  const nodeList = useQuery(nodesQuery);
+  const nodeOf = new Map((nodeList.data?.nodes ?? []).map((n) => [n.id, n]));
   const role = useQuery(meQuery).data?.admin?.role;
   const canGroups = role === Role.OWNER || role === Role.HELPER;
   const canNodes = role === Role.OWNER; // policy.go: an inbound is infrastructure, a group is day-to-day
@@ -107,13 +112,16 @@ export function WherePanel({
               ) : (
                 inbounds.map((i) => {
                   const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
+                  const n = nodeOf.get(i.nodeId);
                   return (
                     <li key={i.id} className="flex flex-col gap-1.5 py-1.5">
                       <div className="flex min-w-0 items-center gap-2">
+                        {n?.countryCode && <Flag code={n.countryCode} size={14} />}
                         <Link to="/nodes/$id" params={{ id: i.nodeId }} search={{ tab: "profiles" }} className="min-w-0 truncate text-[13px] font-bold text-accent-text hover:underline">
                           {i.nodeName}
                         </Link>
-                        {i.port > 0 && <span className="font-mono text-[11px] text-muted">:{i.port}</span>}
+                        {i.port > 0 && <span className="flex-none font-mono text-[11px] text-muted">:{i.port}</span>}
+                        {n?.location && <span className="hidden min-w-0 truncate text-xs text-muted sm:inline">{n.location}</span>}
                         <span className="ml-auto flex-none">
                           <StatusPill kind={s.kind} label={t(s.word)} sm />
                         </span>
@@ -131,7 +139,7 @@ export function WherePanel({
               ) : (
                 w.inGroups.map((g) => (
                   <li key={g.id} className="flex min-h-[34px] items-center gap-2 py-1">
-                    <GroupLink id={g.id} name={g.name} className="min-w-0 truncate text-[13px]" />
+                    <GroupChip id={g.id} name={g.name} color={g.color} className="min-w-0 truncate" />
                     {canGroups && (
                       <button
                         type="button"
@@ -159,11 +167,17 @@ export function WherePanel({
                       to="/users"
                       search={{ group: g.id }}
                       aria-label={t("where.usersOfGroup", { name: g.name })}
-                      className="-mx-1.5 flex min-h-[30px] items-center gap-1.5 rounded-lg px-1.5 text-[13px] transition-colors hover:bg-surface-2"
+                      className="-mx-1.5 flex flex-col gap-1.5 rounded-lg px-1.5 py-1.5 text-[13px] transition-colors hover:bg-surface-2"
                     >
-                      <span className="min-w-0 truncate font-semibold">{g.name}</span>
-                      <span className="flex-none text-muted">· {t.n("where.usersShort", g.userCount)}</span>
-                      <Icon name="chevronRight" size={12} className="ml-auto flex-none text-muted" />
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="min-w-0 truncate font-semibold">{g.name}</span>
+                        <span className="flex-none text-muted">· {t.n("where.usersShort", g.userCount)}</span>
+                        <Icon name="chevronRight" size={12} className="ml-auto flex-none text-muted" />
+                      </span>
+                      {/* the group's share of the people who get the profile, in the group's colour */}
+                      <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-surface-2">
+                        <span data-tone={groupTone(g.id, g.color)} className="block h-full rounded-full bg-(--t)" style={{ width: `${sum > 0 ? Math.max(4, Math.round((g.userCount / sum) * 100)) : 0}%` }} />
+                      </span>
                     </Link>
                   </li>
                 ))
