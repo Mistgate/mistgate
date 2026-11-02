@@ -104,7 +104,7 @@ function dnsRow(c: Ctx, s: ServerEntry): Kid[] {
               "div",
               { class: "dns-keys-row" },
               h("span", { class: "tile s36 mint", "aria-hidden": "true" }, icon("key")),
-              h("div", { class: "stack grow" }, h("p", { class: "b sm" }, x.label || t.devGeneric), x.platform && h("p", { class: "hint" }, t.platforms[x.platform as keyof typeof t.platforms] ?? "")),
+              h("div", { class: "stack grow" }, h("p", { class: "b sm" }, h("bdi", null, x.label || t.devGeneric)), x.platform && h("p", { class: "hint" }, t.platforms[x.platform as keyof typeof t.platforms] ?? "")),
               h("button", { class: "btn sec sm", type: "button", "data-k": `dns-renew-${s.id}-${x.id}`, disabled: st.amz.busy !== "", on: { click: () => a.amz.renew(x.id) } }, st.amz.busy === `renew:${x.id}` ? t.awgBusy : t.dnsRefresh),
             ),
           ),
@@ -138,7 +138,7 @@ function card(c: Ctx, s: ServerEntry): HTMLElement {
       "div",
       { class: "srv-top" },
       flag(c, s),
-      h("h3", { class: "srv-name" }, name.country, name.place && h("span", null, ` · ${name.place}`)),
+      h("h3", { class: "srv-name" }, name.country, name.place && h("span", null, " · ", h("bdi", null, name.place))),
       s.online ? h("span", { class: "state" }, dot("live"), t.up) : h("span", { class: "state mut" }, dot("off"), t.down),
     ),
     s.online && s.load && h("div", { class: "load" }, h("span", { class: "k" }, t.loadK), h("span", { class: `meter${s.load === "high" ? " hi" : ""}`, "aria-hidden": "true" }, ...[1, 2, 3].map((n) => h("i", { class: n <= fills[s.load!] ? "f" : "" }))), h("b", { class: s.load === "high" ? "warn-t" : "" }, t.loadLevel[s.load])),
@@ -214,7 +214,7 @@ export function serversSection(c: Ctx): Kid[] {
   if (all.length === 0) return [];
   const link = linkDnsCard(c);
   const linkName = !link && d.dns && d.access.happ && keyDnsServers(c).length > 0 ? dnsName(d, d.dns.link.effective, s.lang) : "";
-  const remark = linkName ? note("", "info", t.dnsLinkNote(linkName.replace(/\s+—\s+/, ", "), keyAppName(d, null))) : null;
+  const remark = linkName ? note("", "info", t.dnsLinkNote(linkName.replace(/\s+—\s+/, s.lang === "fa" ? "، " : ", "), keyAppName(d, null))) : null;
   return [h("div", { class: "shead" }, h("h2", { class: "h2" }, t.serversT), h("p", { class: "hint sec-sub" }, t.serversS)), link, remark, h("div", { class: "srv-grid" }, ...all.map((x) => card(c, x))), busyNote(c, all)].filter((x): x is HTMLElement => !!x);
 }
 

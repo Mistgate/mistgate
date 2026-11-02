@@ -112,6 +112,10 @@ func pageLang(r *http.Request, def string) string {
 			return "ru"
 		case strings.HasPrefix(tag, "en"):
 			return "en"
+		case strings.HasPrefix(tag, "fa"):
+			return "fa"
+		case strings.HasPrefix(tag, "tr"):
+			return "tr"
 		}
 	}
 	if def == "" {

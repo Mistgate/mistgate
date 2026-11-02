@@ -131,7 +131,7 @@ func TestCountryNamesAreTheLibrarys(t *testing.T) {
 	for a := 'A'; a <= 'Z'; a++ {
 		for b := 'A'; b <= 'Z'; b++ {
 			code := string([]rune{a, b})
-			for _, lang := range []string{"en", "ru", "zh"} {
+			for _, lang := range []string{"en", "ru", "zh", "fa", "tr"} {
 				if got, want := CountryName(code, lang), libraryName(code, lang); got != want {
 					t.Errorf("CountryName(%q, %q) = %q, the library says %q", code, lang, got, want)
 				}

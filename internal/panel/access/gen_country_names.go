@@ -1,7 +1,7 @@
 //go:build ignore
 
 // gen_country_names writes country_names.go: the names golang.org/x/text gives to the two-letter codes a node can carry,
-// in the three languages of the panel. Run it from this directory (go generate) after golang.org/x/text changes;
+// in the languages of the panel and the user page (instance.Languages). Run it from this directory (go generate) after golang.org/x/text changes;
 // TestCountryNamesAreTheLibrarys fails until you do.
 package main
 
@@ -31,11 +31,11 @@ func main() {
 			if err != nil || !r.IsCountry() {
 				continue
 			}
-			names := make([]string, 0, 3)
-			for _, lang := range []string{"en", "ru", "zh"} {
+			names := make([]string, 0, 5)
+			for _, lang := range []string{"en", "ru", "zh", "fa", "tr"} {
 				names = append(names, display.Regions(language.Make(lang)).Name(r))
 			}
-			fmt.Fprintf(&out, "\t{%q, %q, %q, %q},\n", code, names[0], names[1], names[2])
+			fmt.Fprintf(&out, "\t{%q, %q, %q, %q, %q, %q},\n", code, names[0], names[1], names[2], names[3], names[4])
 		}
 	}
 	out.WriteString("}\n")

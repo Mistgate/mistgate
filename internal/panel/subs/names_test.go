@@ -100,6 +100,12 @@ func TestSubscriptionPageLanguage(t *testing.T) {
 		{"ru-RU,zh-CN;q=0.8", "en", "ru"},
 		{"fr-FR", "zh", "zh"},
 		{"", "", "en"},
+		{"fa-IR,fa;q=0.9,en-US;q=0.8", "ru", "fa"},
+		{"fa", "en", "fa"},
+		{"tr-TR,tr;q=0.9,en-US;q=0.8", "ru", "tr"},
+		{"de-DE,tr;q=0.7", "en", "tr"},
+		{"ar-SA", "fa", "fa"}, // the owner's default (Persian) where the browser speaks none of the page's languages
+		{"ar-SA", "tr", "tr"},
 	} {
 		r := httptest.NewRequest("GET", "https://example.com/", nil)
 		r.Header.Set("Accept-Language", c.accept)
@@ -493,6 +499,8 @@ func TestRemarksOfATwinThroughARelay(t *testing.T) {
 		"en": "\U0001F1E9\U0001F1EA DE · Hysteria2 · via FI",
 		"ru": "\U0001F1E9\U0001F1EA DE · Hysteria2 · через FI",
 		"zh": "\U0001F1E9\U0001F1EA DE · Hysteria2 · 经 FI",
+		"fa": "\U0001F1E9\U0001F1EA DE · Hysteria2 · از طریق FI",
+		"tr": "\U0001F1E9\U0001F1EA DE · Hysteria2 · FI üzerinden",
 	} {
 		got := remarks([]access.SubServer{exit, twin}, "", lang)
 		if got[0] != "\U0001F1E9\U0001F1EA DE · Hysteria2" || got[1] != want {
@@ -520,7 +528,7 @@ func TestHappNameOfATwinStaysInTheLimitAndKeepsItsLabel(t *testing.T) {
 	long.Mark, long.LoadPercent = access.ViaMark("FI"), &load
 	short := srv("de1", "DE", "VLESS")
 	short.Mark, short.LoadPercent = access.ViaMark("FI"), &load
-	for _, lang := range []string{"en", "ru", "zh"} {
+	for _, lang := range []string{"en", "ru", "zh", "fa", "tr"} {
 		for _, s := range []access.SubServer{long, short} {
 			got := happRemarks([]access.SubServer{s}, "", lang, true)[0]
 			label := markText(s.Mark, lang)
@@ -547,7 +555,7 @@ func TestRemarksOfTheIPv6Twin(t *testing.T) {
 	server := srv("de1", "DE", "Hysteria2")
 	twin := server
 	twin.Mark = access.MarkIPv6
-	for _, lang := range []string{"en", "ru", "zh"} {
+	for _, lang := range []string{"en", "ru", "zh", "fa", "tr"} {
 		got := remarks([]access.SubServer{server, twin}, "", lang)
 		if got[0] != "\U0001F1E9\U0001F1EA DE · Hysteria2" || got[1] != "\U0001F1E9\U0001F1EA DE · Hysteria2 · IPv6" {
 			t.Errorf("%s: %q", lang, got)
@@ -564,7 +572,7 @@ func TestRemarksOfTheIPv6Twin(t *testing.T) {
 	for _, profile := range []string{"Hysteria2 premium", "VLESS", "Hysteria2"} {
 		s := srv("de1", "DE", profile)
 		s.Mark, s.LoadPercent = access.MarkIPv6, &load
-		for _, lang := range []string{"en", "ru", "zh"} {
+		for _, lang := range []string{"en", "ru", "zh", "fa", "tr"} {
 			got := happRemarks([]access.SubServer{s}, "", lang, true)[0]
 			if n := len(utf16.Encode([]rune(got))); n > 30 || !strings.Contains(got, " · IPv6") {
 				t.Errorf("%s %s: %q is %d units or lost the label", lang, profile, got, n)

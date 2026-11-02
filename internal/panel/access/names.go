@@ -14,7 +14,7 @@ import (
 
 // What a friend's apps and page call the things they get: a country, never the panel's node names (de1, nl1) or profile names.
 
-// CountryName is the localised name of a country code in lang ("ru", "en", "zh"; any other is English); the code itself
+// CountryName is the localised name of a country code in lang ("ru", "en", "zh", "fa", "tr"; any other is English); the code itself
 // when unknown.
 func CountryName(cc, lang string) string {
 	cc = strings.ToUpper(strings.TrimSpace(cc))
@@ -28,6 +28,10 @@ func CountryName(cc, lang string) string {
 		name = countryNames[i].ru
 	case "zh":
 		name = countryNames[i].zh
+	case "fa":
+		name = countryNames[i].fa
+	case "tr":
+		name = countryNames[i].tr
 	}
 	if name == "" {
 		return cc
@@ -35,8 +39,8 @@ func CountryName(cc, lang string) string {
 	return name
 }
 
-// countryNameRow is a country code and its names in English, Russian and Chinese (see country_names.go).
-type countryNameRow struct{ cc, en, ru, zh string }
+// countryNameRow is a country code and its names in English, Russian, Chinese, Persian and Turkish (see country_names.go).
+type countryNameRow struct{ cc, en, ru, zh, fa, tr string }
 
 //go:generate go run gen_country_names.go
 
@@ -82,6 +86,10 @@ func ServerLabeler(lang string) func(cc, location string) string {
 				name = "Сервер"
 			case "zh":
 				name = "服务器"
+			case "fa":
+				name = "سرور"
+			case "tr":
+				name = "Sunucu"
 			default:
 				name = "Server"
 			}

@@ -153,7 +153,7 @@ function addForm(c: AmzCtx): Kid[] {
         "div",
         { class: "fld" },
         h("div", { class: "fl-h" }, h("label", { for: "nd-n" }, t.awgName), h("span", { class: "hint" }, t.optional)),
-        h("input", { class: "inp", id: "nd-n", "data-k": "amz-label", type: "text", maxlength: 40, autocomplete: "off", placeholder: t.awgNamePh[f.platform as keyof typeof t.awgNamePh], value: f.label, on: { input: (e) => a.amz.form({ label: (e.target as HTMLInputElement).value }) } }),
+        h("input", { class: "inp", id: "nd-n", "data-k": "amz-label", type: "text", dir: "auto", maxlength: 40, autocomplete: "off", placeholder: t.awgNamePh[f.platform as keyof typeof t.awgNamePh], value: f.label, on: { input: (e) => a.amz.form({ label: (e.target as HTMLInputElement).value }) } }),
       ),
       choices.length > 1 &&
         chosen &&

@@ -8,6 +8,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -219,11 +220,16 @@ func pageDNSPresets(v access.SubView, lang string) []pageDNSPreset {
 	return out
 }
 
-// inPageLangs is a text in the page's three languages; nil when it is the same in all of them.
+// inPageLangs is a text in the page's languages (instance.Languages); nil when it is the same in all of them.
 func inPageLangs(in func(lang string) string) map[string]string {
-	ru, en, zh := in("ru"), in("en"), in("zh")
-	if ru == en && en == zh {
+	out := make(map[string]string, len(instance.Languages))
+	same := true
+	for _, l := range instance.Languages {
+		out[l] = in(l)
+		same = same && out[l] == out[instance.Languages[0]]
+	}
+	if same {
 		return nil
 	}
-	return map[string]string{"ru": ru, "en": en, "zh": zh}
+	return out
 }

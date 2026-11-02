@@ -43,8 +43,9 @@ const (
 	maxBrandPart = 24 // runes per wordmark part
 )
 
-// Languages are the supported UI languages.
-var Languages = []string{"en", "ru", "zh"}
+// Languages are the supported UI languages. Persian (fa) and Turkish (tr) are the user page's so far: the admin keeps its own
+// list (web/src/i18n) and shows a default it has no words for in the browser's language.
+var Languages = []string{"en", "ru", "zh", "fa", "tr"}
 
 // ErrInvalid wraps every validation failure, so callers can map it to INVALID_ARGUMENT.
 var ErrInvalid = errors.New("invalid instance setting")

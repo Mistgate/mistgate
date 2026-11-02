@@ -78,7 +78,7 @@ function renameRow(c: Ctx, id: string, tone: string, ico: IconName, word: string
         "div",
         { class: "fld grow" },
         h("label", { for: `ren-${id}` }, t.renameT),
-        h("input", { class: "inp", id: `ren-${id}`, "data-k": `amz-ren-${id}`, "data-autofocus": "", type: "text", maxlength: 40, autocomplete: "off", value, on: { input: (e) => a.amz.renameInput((e.target as HTMLInputElement).value) } }),
+        h("input", { class: "inp", id: `ren-${id}`, "data-k": `amz-ren-${id}`, "data-autofocus": "", type: "text", dir: "auto", maxlength: 40, autocomplete: "off", value, on: { input: (e) => a.amz.renameInput((e.target as HTMLInputElement).value) } }),
         h("p", { class: "hint", style: { "margin-top": "-2px" } }, t.renameH(word)),
       ),
     ),
@@ -104,7 +104,7 @@ function rowError(c: Ctx, id: string): HTMLElement | null {
  * as a tooltip after a moment, so nothing moves under it. Without details they are plain text.
  */
 function rowHead(c: Ctx, id: string, name: string, line: Kid[], details: string): HTMLElement {
-  if (!details) return h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `dev-n-${id}` }, name), h("p", { class: "dev-m" }, ...line));
+  if (!details) return h("div", { class: "dev-b" }, h("p", { class: "dev-n", id: `dev-n-${id}` }, h("bdi", null, name)), h("p", { class: "dev-m" }, ...line));
   const open = c.s.details === id;
   return h(
     "div",
@@ -113,7 +113,7 @@ function rowHead(c: Ctx, id: string, name: string, line: Kid[], details: string)
       "button",
       { class: "dev-body", type: "button", "data-k": `dev-body-${id}`, "aria-expanded": open, "aria-controls": `dev-det-${id}`, "aria-describedby": open ? false : `dev-tip-${id}`, on: { click: () => c.a.details(open ? null : id) } },
       // the chevron ends the quiet line: a long name never leaves it alone on a line of its own
-      h("span", { class: "dev-n", id: `dev-n-${id}` }, name),
+      h("span", { class: "dev-n", id: `dev-n-${id}` }, h("bdi", null, name)),
       h("span", { class: "dev-m" }, ...line, h("span", { class: "dev-chev", "aria-hidden": "true" }, icon("chev", 14))),
     ),
     !open && h("span", { class: "tip", role: "tooltip", id: `dev-tip-${id}` }, details),
@@ -258,7 +258,7 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): HTMLElement {
       h(
         "div",
         { class: "dev-b" },
-        h("p", { class: "dev-n" }, name),
+        h("p", { class: "dev-n" }, h("bdi", null, name)),
         h("p", { class: "dev-m" }, ...(word && word !== name ? [h("span", null, word), h("span", null, "·")] : []), ...when(c, x.last_handshake_unix, x.online, t.awgNever, t.awgHandshake)),
         stale && h("span", { class: "stag" }, dot("warn"), t.awgStale),
       ),

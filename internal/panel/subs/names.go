@@ -132,8 +132,8 @@ func namedRemark(base, suffix, profile string, limitHapp bool) string {
 	return fitHappRemark(base, suffix, profile)
 }
 
-// markText is the label a server carries after its name, in the subscription's language: " · via RU" (ru "через", zh "经");
-// "" for a server without a mark. A mark that is not a known one is left out.
+// markText is the label a server carries after its name, in the subscription's language: " · via RU" (ru "через", zh "经",
+// fa "از طریق", tr "RU üzerinden"); "" for a server without a mark. A mark that is not a known one is left out.
 func markText(mark, lang string) string {
 	if mark == access.MarkIPv6 {
 		return " · IPv6" // the same in every language
@@ -148,6 +148,13 @@ func markText(mark, lang string) string {
 		word = "через"
 	case "zh":
 		word = "经"
+	case "fa":
+		word = "از طریق"
+	case "tr":
+		if cc == "" {
+			return " · aktarma üzerinden"
+		}
+		return " · " + cc + " üzerinden" // Turkish puts the postposition after the country
 	}
 	if cc == "" {
 		return " · " + word
@@ -242,10 +249,15 @@ const (
 	placeholderProxy = "- name: \"off\"\n  type: hysteria2\n  server: \"0.0.0.0\"\n  port: 1\n  password: \"off\"\n"
 )
 
-var ruMonths = [...]string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
+var (
+	ruMonths = [...]string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
+	trMonths = [...]string{"Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"}
+	// the months of the Persian (Solar Hijri) calendar, as the page's Intl writes them
+	faMonths = [...]string{"فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"}
+)
 
-// dayText is a date the way the user page writes it: "29 сентября", "29 September", "9月29日"; the year only when it is not
-// this one.
+// dayText is a date the way the user page writes it: "29 сентября", "29 September", "9月29日", "29 Eylül", and in Persian the
+// Persian calendar with Latin digits, "7 مهر"; the year only when it is not this one (of that calendar).
 func dayText(t, now time.Time, lang string) string {
 	if lang == "zh" {
 		s := strconv.Itoa(int(t.Month())) + "月" + strconv.Itoa(t.Day()) + "日"
@@ -254,9 +266,20 @@ func dayText(t, now time.Time, lang string) string {
 		}
 		return s
 	}
+	if lang == "fa" {
+		y, m, d := persianDate(t)
+		s := strconv.Itoa(d) + " " + faMonths[m-1]
+		if thisYear, _, _ := persianDate(now); y != thisYear {
+			s += " " + strconv.Itoa(y)
+		}
+		return s
+	}
 	m := t.Month().String()
-	if lang == "ru" {
+	switch lang {
+	case "ru":
 		m = ruMonths[t.Month()-1]
+	case "tr":
+		m = trMonths[t.Month()-1]
 	}
 	s := strconv.Itoa(t.Day()) + " " + m
 	if t.Year() != now.Year() {
@@ -268,12 +291,16 @@ func dayText(t, now time.Time, lang string) string {
 // stateNote is what the subscription apps show a person whose subscription does not work, in the words of the user page and
 // the instance language; "" while it works.
 func stateNote(v access.SubView, lang string, now time.Time) string {
-	pick := func(ru, en, zh string) string {
+	pick := func(ru, en, zh, fa, tr string) string {
 		switch lang {
 		case "ru":
 			return ru
 		case "zh":
 			return zh
+		case "fa":
+			return fa
+		case "tr":
+			return tr
 		}
 		return en
 	}
@@ -283,16 +310,20 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 	switch v.Status {
 	case access.StatusExpired:
 		if v.Expires.IsZero() {
-			return pick("Подписка закончилась. Напишите — продлим", "Subscription ended. Message us to renew", "订阅已到期。联系我们即可续期")
+			return pick("Подписка закончилась. Напишите — продлим", "Subscription ended. Message us to renew", "订阅已到期。联系我们即可续期",
+				"اشتراک تمام شده. پیام بدهید تا تمدیدش کنیم", "Abonelik sona erdi. Uzatmak için bize yazın")
 		}
-		return fmt.Sprintf(pick("Подписка закончилась %s. Напишите — продлим", "Subscription ended on %s. Message us to renew", "订阅已于%s到期。联系我们即可续期"), dayText(v.Expires, now, lang))
+		return fmt.Sprintf(pick("Подписка закончилась %s. Напишите — продлим", "Subscription ended on %s. Message us to renew", "订阅已于%s到期。联系我们即可续期",
+			"اشتراک در %s تمام شد. پیام بدهید تا تمدیدش کنیم", "Abonelik %s tarihinde sona erdi. Uzatmak için bize yazın"), dayText(v.Expires, now, lang))
 	case access.StatusLimited:
 		if v.NextReset.IsZero() || v.QuotaReset == "" || v.QuotaReset == access.ResetNone {
-			return pick("Трафик закончился. Напишите — увеличим", "Traffic used up. Message us to raise the limit", "流量已用完。联系我们提高额度")
+			return pick("Трафик закончился. Напишите — увеличим", "Traffic used up. Message us to raise the limit", "流量已用完。联系我们提高额度",
+				"حجم تمام شده. پیام بدهید تا بیشترش کنیم", "Trafik bitti. Sınırı artırmak için bize yazın")
 		}
-		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s", "流量已用完，%s重置"), dayText(v.NextReset, now, lang))
+		return fmt.Sprintf(pick("Трафик закончился, обнулится %s", "Traffic used up, resets on %s", "流量已用完，%s重置",
+			"حجم تمام شده، %s دوباره شارژ می‌شود", "Trafik bitti, %s tarihinde sıfırlanır"), dayText(v.NextReset, now, lang))
 	case access.StatusDisabled:
-		return pick("Доступ приостановлен", "Access paused", "访问已暂停")
+		return pick("Доступ приостановлен", "Access paused", "访问已暂停", "دسترسی موقتاً قطع شده", "Erişim durduruldu")
 	}
 	return ""
 }
@@ -300,16 +331,43 @@ func stateNote(v access.SubView, lang string, now time.Time) string {
 // refusalNote words SubView.Refusal for the apps (at most announceMax characters, the announcement of Happ): the limit with the
 // numbers the person sees on the page, a device the owner turned off, an app that sends no device ID. kl!ck is named as the
 // app to take: it reports one and the page recommends it.
-func refusalNote(v access.SubView, pick func(ru, en, zh string) string) string {
+func refusalNote(v access.SubView, pick func(ru, en, zh, fa, tr string) string) string {
 	switch v.Refusal {
 	case access.RefusalDeviceLimit:
-		return fmt.Sprintf(pick("Лимит устройств: %d из %d. Удалите ненужное на странице подписки", "Device limit: %d of %d. Remove one you no longer use on the subscription page", "设备已达上限：%d / %d。请在订阅页面删除不再使用的设备"), v.DevicesUsed, v.DeviceLimit)
+		return fmt.Sprintf(pick("Лимит устройств: %d из %d. Удалите ненужное на странице подписки", "Device limit: %d of %d. Remove one you no longer use on the subscription page", "设备已达上限：%d / %d。请在订阅页面删除不再使用的设备",
+			"سقف دستگاه‌ها: %d از %d. دستگاهی را که لازم ندارید در صفحهٔ اشتراک حذف کنید", "Cihaz sınırı: %d / %d. Kullanmadığınız bir cihazı abonelik sayfasından kaldırın"), v.DevicesUsed, v.DeviceLimit)
 	case access.RefusalDeviceBlocked:
-		return pick("Это устройство отключено владельцем", "This device was turned off by the owner", "此设备已被所有者停用")
+		return pick("Это устройство отключено владельцем", "This device was turned off by the owner", "此设备已被所有者停用",
+			"مدیر این دستگاه را خاموش کرده است", "Bu cihaz yönetici tarafından kapatıldı")
 	case access.RefusalNoDeviceID:
-		return pick("Приложение не сообщает ID устройства. Включите HWID в настройках Happ или возьмите kl!ck", "This app does not report a device ID. Turn on HWID in the settings of Happ, or use kl!ck", "此应用未提供设备 ID。请在 Happ 设置中开启 HWID，或改用 kl!ck")
+		return pick("Приложение не сообщает ID устройства. Включите HWID в настройках Happ или возьмите kl!ck", "This app does not report a device ID. Turn on HWID in the settings of Happ, or use kl!ck", "此应用未提供设备 ID。请在 Happ 设置中开启 HWID，或改用 kl!ck",
+			"این برنامه شناسهٔ دستگاه را نمی‌فرستد. HWID را در تنظیمات Happ روشن کنید یا از kl!ck استفاده کنید", "Bu uygulama cihaz kimliği göndermiyor. Happ ayarlarında HWID'yi açın ya da kl!ck kullanın")
 	}
 	return ""
+}
+
+// persianDate is the date of the Persian (Solar Hijri) calendar on t's day: the arithmetic calendar of 33-year cycles that
+// ICU, and so the page's Intl, uses (it agrees with the astronomical one for this century).
+func persianDate(t time.Time) (year, month, day int) {
+	gy, gm, gd := t.Date()
+	before := [...]int{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334} // days of the year before each Gregorian month
+	gy2 := gy
+	if gm <= 2 {
+		gy2-- // this year's leap day is still ahead
+	}
+	days := 355666 + 365*gy + (gy2+4)/4 - (gy2+100)/100 + (gy2+400)/400 + gd + before[gm-1]
+	year = -1595 + 33*(days/12053)
+	days %= 12053
+	year += 4 * (days / 1461)
+	days %= 1461
+	if days > 365 {
+		year += (days - 1) / 365
+		days = (days - 1) % 365
+	}
+	if days < 186 {
+		return year, 1 + days/31, 1 + days%31
+	}
+	return year, 7 + (days-186)/30, 1 + (days-186)%30
 }
 
 // mihomoOnlyNote is what the link-list apps (Happ and the rest) show a person who has servers, none of which they can use:
@@ -326,6 +384,10 @@ func mihomoOnlyNote(v access.SubView, lang string) string {
 		return "Эти серверы работают только в kl!ck и других Mihomo-приложениях"
 	case "zh":
 		return "这些服务器仅限 kl!ck 和其他 Mihomo 应用"
+	case "fa":
+		return "این سرورها فقط در kl!ck و دیگر برنامه‌های Mihomo کار می‌کنند"
+	case "tr":
+		return "Bu sunucular yalnızca kl!ck ve diğer Mihomo uygulamalarında çalışır"
 	}
 	return "These servers work only in kl!ck and other Mihomo apps"
 }
@@ -339,6 +401,10 @@ func noServersNote(lang string) string {
 		return "Ваши серверы не работают в этом приложении. Какое подойдёт — на странице подписки"
 	case "zh":
 		return "这些服务器无法在此应用中使用。适用的应用请在订阅页面查看"
+	case "fa":
+		return "سرورهای شما در این برنامه کار نمی‌کنند. برنامهٔ مناسب در صفحهٔ اشتراک هست"
+	case "tr":
+		return "Sunucularınız bu uygulamada çalışmıyor. Hangi uygulamanın çalıştığı abonelik sayfasında"
 	}
 	return "Your servers do not work in this app. The subscription page shows which app does"
 }

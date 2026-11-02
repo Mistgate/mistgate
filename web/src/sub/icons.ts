@@ -46,6 +46,9 @@ const paths = {
 
 export type IconName = keyof typeof paths;
 
+/** The icons that point along the line: mirrored on a right-to-left page (sub.css .flip). */
+const flips: ReadonlySet<IconName> = new Set(["next", "back", "external", "send", "exit", "chat"]);
+
 /** The icon at `size` px (the grid is 24). The three dots are drawn heavier, as in the design. */
 export function icon(name: IconName, size = 18): SVGSVGElement {
   const svg = document.createElementNS(ns, "svg");
@@ -58,7 +61,7 @@ export function icon(name: IconName, size = 18): SVGSVGElement {
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("class", "i");
+  svg.setAttribute("class", flips.has(name) ? "i flip" : "i");
   for (const s of paths[name] as readonly Shape[]) {
     const el = document.createElementNS(ns, typeof s === "string" ? "path" : s[0]);
     if (typeof s === "string") el.setAttribute("d", s);

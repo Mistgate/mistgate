@@ -49,7 +49,8 @@ PersistentKeepalive = 25
 const cfg = (node: string, cc: string, stale = false) =>
   awgConfig({
     node_id: `nod_${node}`,
-    label: new Intl.DisplayNames(["ru"], { type: "region" }).of(cc) ?? cc,
+    // the server names keys in the instance's language; the sample follows the page's, so each page shows its own
+    label: new Intl.DisplayNames([document.documentElement.lang || "ru"], { type: "region" }).of(cc) ?? cc,
     country_code: cc,
     version: "3.1",
     conf: conf(node),

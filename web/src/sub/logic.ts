@@ -1,4 +1,4 @@
-import { dict, isLang, localeOf, type Dict } from "./i18n";
+import { dict, isLang, localeOf, ltr, type Dict } from "./i18n";
 import type { AddPane } from "./state";
 import type {
   AmneziaData,
@@ -584,7 +584,12 @@ export const isReturning = (d: MgData, marked: boolean): boolean => fetchedUnix(
 // --- numbers and dates -------------------------------------------------------------------------------------
 
 const locale = localeOf;
-const units: Record<Lang, string[]> = { ru: ["Б", "КБ", "МБ", "ГБ", "ТБ"], en: ["B", "KB", "MB", "GB", "TB"], zh: ["B", "KB", "MB", "GB", "TB"] };
+const latinUnits = ["B", "KB", "MB", "GB", "TB"];
+// Persian keeps the Latin units the apps show (and the Latin digits, localeOf), as one left-to-right piece: "100 GB" (qty)
+const units: Record<Lang, string[]> = { ru: ["Б", "КБ", "МБ", "ГБ", "ТБ"], en: latinUnits, zh: latinUnits, fa: latinUnits, tr: latinUnits };
+
+/** "100 GB": a number with its unit, kept in one left-to-right piece inside Persian text. */
+const qty = (n: string, unit: string, lang: Lang) => (lang === "fa" ? ltr(`${n} ${unit}`) : `${n} ${unit}`);
 
 export function fmtNum(n: number, lang: Lang): string {
   return new Intl.NumberFormat(locale(lang), { maximumFractionDigits: n < 1 ? 2 : n < 10 ? 1 : 0 }).format(n);
@@ -593,7 +598,9 @@ export function fmtNum(n: number, lang: Lang): string {
 
 export function fmtDate(unix: number, lang: Lang, now = Date.now() / 1000): string {
   const d = new Date(unix * 1000);
-  const sameYear = d.getFullYear() === new Date(now * 1000).getFullYear();
+  // the year of the page's calendar (the Persian one starts in March)
+  const year = new Intl.DateTimeFormat(locale(lang), { year: "numeric" });
+  const sameYear = year.format(d) === year.format(new Date(now * 1000));
   return new Intl.DateTimeFormat(locale(lang), { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }) }).format(d);
 }
 
@@ -650,11 +657,11 @@ export function hero(d: MgData, lang: Lang, now = Date.now() / 1000): Hero {
   const ref = u.quota_bytes || u.used_bytes;
   const i = Math.max(0, Math.min(units.ru.length - 1, Math.floor(Math.log(Math.max(ref, 1)) / Math.log(1024))));
   const unit = units[lang][i] ?? "";
-  const quota = u.quota_bytes ? `${fmtNum(u.quota_bytes / 1024 ** i, lang)} ${unit}` : "";
+  const quota = u.quota_bytes ? qty(fmtNum(u.quota_bytes / 1024 ** i, lang), unit, lang) : "";
   const pct = u.quota_bytes ? Math.min(100, (u.used_bytes / u.quota_bytes) * 100) : null;
   const low = u.status === "limited" || (active && pct !== null && pct >= lowTraffic);
   const resetDate = u.quota_reset !== "none" && u.next_reset_unix ? fmtDate(u.next_reset_unix, lang, now) : "";
-  const rest = u.quota_bytes ? `${fmtNum(Math.max(0, u.quota_bytes - u.used_bytes) / 1024 ** i, lang)} ${unit}` : "";
+  const rest = u.quota_bytes ? qty(fmtNum(Math.max(0, u.quota_bytes - u.used_bytes) / 1024 ** i, lang), unit, lang) : "";
 
   return {
     state: u.status,

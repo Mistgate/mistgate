@@ -1,7 +1,8 @@
-import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, DnsPreset, MgData, Platform, ServerEntry } from "./types";
+import { isLang } from "./i18n";
+import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, DnsPreset, Lang, MgData, Platform, ServerEntry } from "./types";
 
 // Sample mg-data for working on the page, one per state. Used ONLY by the dev server (vite.sub.config.ts injects it
-// in place of the <!--MG_DATA--> marker for `?case=<name>&lang=ru|en|zh`); it is not imported by the page and never
+// in place of the <!--MG_DATA--> marker for `?case=<name>&lang=ru|en|zh|fa|tr`); it is not imported by the page and never
 // ships in web/dist/sub.html. The shapes are what the server sends (subs/page.go, subs/devices.go): the link apps share
 // one device without platform or model, a device added without a name comes back as the page named it.
 //
@@ -334,21 +335,22 @@ export const cases: Record<string, MgData> = {
 };
 
 // ---- one DNS for the link apps, one per server for the keys (alice, servers de1 and nl1) ----
-// The built-in presets as the server sends them: the stock name and description in the three languages, and `name` /
+// The built-in presets as the server sends them: the stock name and description in the page's languages, and `name` /
 // `description` in the language of the browser (Accept-Language), which devPage puts in from `lang`.
-const stock = (id: string, category: string, name: [string, string, string], description: [string, string, string]): DnsPreset => ({
+type Five = [ru: string, en: string, zh: string, fa: string, tr: string];
+const stock = (id: string, category: string, name: Five, description: Five): DnsPreset => ({
   id,
   name: name[0],
   description: description[0],
   category,
-  names: { ru: name[0], en: name[1], zh: name[2] },
-  descriptions: { ru: description[0], en: description[1], zh: description[2] },
+  names: { ru: name[0], en: name[1], zh: name[2], fa: name[3], tr: name[4] },
+  descriptions: { ru: description[0], en: description[1], zh: description[2], fa: description[3], tr: description[4] },
 });
 const builtins: DnsPreset[] = [
-  stock("dns_builtin_standard", "regular", ["Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"], ["Cloudflare и Google для всего", "Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google"]),
-  stock("dns_builtin_adblock", "no_ads", ["AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告"], ["AdGuard DNS: без рекламы и трекеров", "AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器"]),
-  stock("dns_builtin_family", "family", ["AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容"], ["AdGuard Family: без рекламы и сайтов для взрослых", "AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站"]),
-  stock("dns_builtin_ru_split", "regional", ["Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连"], ["Российские сайты напрямую, остальное через VPN", "Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN"]),
+  stock("dns_builtin_standard", "regular", ["Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"], ["Cloudflare и Google для всего", "Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google", "Cloudflare و Google برای همه‌چیز", "Her şey için Cloudflare ve Google"]),
+  stock("dns_builtin_adblock", "no_ads", ["AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告", "AdGuard: بدون تبلیغات", "AdGuard: reklamsız"], ["AdGuard DNS: без рекламы и трекеров", "AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器", "AdGuard DNS: بدون تبلیغات و ردیاب", "AdGuard DNS: reklam yok, izleyici yok"]),
+  stock("dns_builtin_family", "family", ["AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容", "AdGuard Family: بدون تبلیغات و محتوای بزرگسالان", "AdGuard Family: reklamsız, 18+ yok"], ["AdGuard Family: без рекламы и сайтов для взрослых", "AdGuard Family: no ads, no adult sites", "AdGuard Family：无广告，无成人网站", "AdGuard Family: بدون تبلیغات و سایت‌های بزرگسالان", "AdGuard Family: reklam yok, yetişkin sitesi yok"]),
+  stock("dns_builtin_ru_split", "regional", ["Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连", "روسیه: سایت‌های روسی مستقیم", "Rusya: .ru doğrudan"], ["Российские сайты напрямую, остальное через VPN", "Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN", "سایت‌های روسی مستقیم، بقیه از طریق VPN", "Rus siteleri doğrudan, geri kalan her şey VPN üzerinden"]),
 ];
 const keyDns = (): ServerEntry["dns"] => ({ choice: "", effective: "dns_builtin_standard", options: ["dns_builtin_standard", "dns_builtin_adblock", "dns_builtin_family"], default: "dns_builtin_standard", keys_to_refresh: [] });
 const de1: ServerEntry = {
@@ -422,7 +424,47 @@ export function devPage(query: string): MgData {
   const p = new URLSearchParams(query);
   const c = cases[p.get("case") ?? ""] ?? base;
   const lang = p.get("lang");
-  const out: MgData = lang === "en" || lang === "zh" ? { ...c, lang } : c;
+  const out: MgData = isLang(lang) ? ownWords({ ...c, lang }) : c;
   // the server words the built-in presets in the language of the browser; the page may be switched to another one
   return { ...out, dns_presets: out.dns_presets.map((x) => (x.names ? { ...x, name: x.names[out.lang] ?? x.name, description: x.descriptions?.[out.lang] ?? x.description } : x)) };
+}
+
+// What the owner typed (places, the announcement, an app's description, their own DNS presets) is Russian in the cases above; the
+// other pages show it in the page's language, as an owner of such a page would write it. Dev only.
+const own: Record<string, Partial<Record<Lang, string>>> = {
+  "Франкфурт": { en: "Frankfurt", fa: "فرانکفورت", tr: "Frankfurt" },
+  "Германия · Франкфурт": { en: "Germany · Frankfurt", fa: "آلمان · فرانکفورت", tr: "Almanya · Frankfurt" },
+  "Берлин": { en: "Berlin", fa: "برلین", tr: "Berlin" },
+  "Германия · Берлин": { en: "Germany · Berlin", fa: "آلمان · برلین", tr: "Almanya · Berlin" },
+  "Москва": { en: "Moscow", fa: "مسکو", tr: "Moskova" },
+  "Россия · Москва": { en: "Russia · Moscow", fa: "روسیه · مسکو", tr: "Rusya · Moskova" },
+  "Нидерланды": { en: "Netherlands", fa: "هلند", tr: "Hollanda" },
+  "Финляндия": { en: "Finland", fa: "فنلاند", tr: "Finlandiya" },
+  "В субботу с 02:00 до 03:00 обновляю серверы — может моргнуть на пару минут.": {
+    en: "On Saturday from 02:00 to 03:00 I am updating the servers — the connection may drop for a couple of minutes.",
+    fa: "شنبه از ساعت 02:00 تا 03:00 سرورها را به‌روز می‌کنم — ممکن است اتصال چند دقیقه قطع و وصل شود.",
+    tr: "Cumartesi 02:00–03:00 arasında sunucuları güncelliyorum — bağlantı birkaç dakika kesilebilir.",
+  },
+  "Все ваши серверы в одном приложении, подписка обновляется сама": {
+    en: "All your servers in one app, the subscription updates itself",
+    fa: "همهٔ سرورهای شما در یک برنامه، اشتراک خودش به‌روز می‌شود",
+    tr: "Tüm sunucularınız tek uygulamada, abonelik kendiliğinden güncellenir",
+  },
+  "Несколько протоколов в одном приложении": { en: "Several protocols in one app", fa: "چند پروتکل در یک برنامه", tr: "Tek uygulamada birden çok protokol" },
+  "AdGuard — без рекламы": { en: "AdGuard — no ads", fa: "AdGuard — بدون تبلیغات", tr: "AdGuard — reklamsız" },
+  "Блокирует рекламу и трекеры": { en: "Blocks ads and trackers", fa: "تبلیغات و ردیاب‌ها را مسدود می‌کند", tr: "Reklamları ve izleyicileri engeller" },
+  "Обычный": { en: "Regular", fa: "معمولی", tr: "Standart" },
+  "Cloudflare и Google, без фильтров": { en: "Cloudflare and Google, no filtering", fa: "Cloudflare و Google، بدون فیلتر", tr: "Cloudflare ve Google, filtresiz" },
+  "Семейный": { en: "Family", fa: "خانوادگی", tr: "Aile" },
+  "Без рекламы и сайтов для взрослых": { en: "No ads, no adult sites", fa: "بدون تبلیغات و سایت‌های بزرگسالان", tr: "Reklam ve yetişkin sitesi yok" },
+  "Яндекс": { en: "Yandex", fa: "Yandex", tr: "Yandex" },
+  "российские сайты открываются надёжнее": { en: "Russian sites open more reliably", fa: "سایت‌های روسی مطمئن‌تر باز می‌شوند", tr: "Rus siteleri daha güvenilir açılır" },
+};
+function ownWords(d: MgData): MgData {
+  let json = JSON.stringify(d);
+  for (const [ru, to] of Object.entries(own)) {
+    const w = to[d.lang];
+    if (w) json = json.split(JSON.stringify(ru)).join(JSON.stringify(w));
+  }
+  return JSON.parse(json) as MgData;
 }

@@ -4,7 +4,7 @@ import { amzActions } from "./amz-actions";
 import * as api from "./api";
 import { dnsActions } from "./dns-actions";
 import { h } from "./dom";
-import { dict, htmlLang, isLang } from "./i18n";
+import { dict, dirOf, htmlLang, isLang } from "./i18n";
 import { icon } from "./icons";
 import { lockActions, lockView, type LockState } from "./lock";
 import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
@@ -108,6 +108,7 @@ function download(filename: string, text: string) {
 
 function setDocument(lang: Lang) {
   document.documentElement.lang = htmlLang(lang);
+  document.documentElement.dir = dirOf(lang);
   document.title = data.title.trim() || brandName(data);
 }
 

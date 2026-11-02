@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { cases } from "./dev-data";
-import { dict, isLang, langs } from "./i18n";
-import { asPlatform, asTheme, atDeviceLimit, awgConfig, awgDevice, describePreset, detectPlatform, fmtAgo, hero, isReturning, kinds, normalize, pickPlatform, safeAddUrl, safeUrl, stateText } from "./logic";
+import { dict, dirOf, htmlLang, isLang, langs } from "./i18n";
+import { asPlatform, asTheme, atDeviceLimit, awgConfig, awgDevice, describePreset, detectPlatform, fmtAgo, fmtDate, fmtNum, hero, isReturning, kinds, normalize, pickPlatform, safeAddUrl, safeUrl, stateText } from "./logic";
 import { actions, data, plain, state, text } from "./test-kit";
+import { readFileSync } from "node:fs";
 import { annKey, view } from "./view";
 
 const now = 1_800_000_000;
@@ -358,7 +359,7 @@ describe("view", () => {
     expect(annKey(d.announcement)).toBe(annKey(d.announcement));
   });
 
-  it("the language menu: the summary names the current language, a row per language (English, Русский, 简体中文), the current one checked", () => {
+  it("the language menu: the summary names the current language, a row per language (English, Русский, 简体中文, فارسی, Türkçe), the current one checked", () => {
     const a = actions();
     const el = view(data("first"), state("ios"), a);
     const menu = el.querySelector<HTMLDetailsElement>("details.lang-menu")!;
@@ -371,8 +372,10 @@ describe("view", () => {
       ["EnglishEN", "false", "en"],
       ["РусскийRU", "true", "ru"],
       ["简体中文中文", "false", "zh-CN"],
+      ["فارسیFA", "false", "fa"],
+      ["TürkçeTR", "false", "tr"],
     ]);
-    expect(rows.map((b) => b.querySelectorAll("svg").length)).toEqual([0, 1, 0]);
+    expect(rows.map((b) => b.querySelectorAll("svg").length)).toEqual([0, 1, 0, 0, 0]);
     rows[0]!.click();
     rows[1]!.click(); // already this one: nothing but closing
     expect(a.log).toEqual(["lang en"]);
@@ -417,5 +420,76 @@ describe("view", () => {
       const t = dict[lang];
       for (const s of [t.linkD, t.privacy, t.limit(3, 3, true), t.txt.expired("X").call, t.staleSteps("A").join(" "), t.dnsLinkNote("A", "B"), t.dnsDoneLink(12).join(" "), t.soon(3).join(" ")]) expect(s).not.toMatch(/ —/);
     }
+  });
+});
+
+describe("Persian and Turkish", () => {
+  const GB = 1024 ** 3;
+  const t0 = Date.UTC(2026, 11, 1, 12) / 1000; // 10 Azar 1405
+
+  it("Persian is read right to left, the others left to right", () => {
+    expect(langs.map((l) => [l, dirOf(l)])).toEqual([
+      ["en", "ltr"],
+      ["ru", "ltr"],
+      ["zh", "ltr"],
+      ["fa", "rtl"],
+      ["tr", "ltr"],
+    ]);
+    expect([htmlLang("fa"), htmlLang("tr")]).toEqual(["fa", "tr"]);
+    expect([normalize({ lang: "fa" }).lang, normalize({ lang: "tr" }).lang]).toEqual(["fa", "tr"]);
+  });
+
+  it("Persian dates are in the Persian calendar, with the Latin digits of the rest of the page; the year shows when it is another Persian year", () => {
+    expect(fmtDate(t0, "fa", t0)).toBe("10 آذر");
+    expect(fmtDate(Date.UTC(2027, 1, 10, 12) / 1000, "fa", t0)).toBe("21 بهمن"); // a new Gregorian year, still 1405
+    expect(fmtDate(Date.UTC(2027, 2, 25, 12) / 1000, "fa", t0)).toBe("5 فروردین 1406");
+    expect(fmtDate(Date.UTC(2026, 0, 15, 12) / 1000, "fa", t0)).toBe("25 دی 1404"); // the same Gregorian year, the Persian one before
+    expect(fmtNum(1.5, "fa")).toBe("1.5");
+    expect(fmtAgo(t0 - 3 * day, "fa", t0)).toBe("3 روز پیش");
+    expect(fmtDate(t0, "tr", t0)).toBe("1 Aralık");
+    expect(fmtNum(1.5, "tr")).toBe("1,5");
+  });
+
+  it("Persian keeps a number with its Latin unit, and a name from data, in their own direction", () => {
+    const h = hero(normalize({ user: { status: "active", used_bytes: 96 * GB, quota_bytes: 100 * GB, expires_unix: t0 + 40 * day } }), "fa", t0);
+    expect(h.usedOf).toBe("از \u2066100 GB\u2069"); // "100 GB" is one left-to-right piece
+    expect(h.left).toBe("\u20664 GB\u2069 باقی مانده");
+    expect(hero(normalize({ user: { status: "active", used_bytes: 96 * GB, quota_bytes: 100 * GB } }), "en", t0).usedOf).toBe("of 100 GB"); // no marks elsewhere
+    expect(dict.fa.hi("Alice (old)")).toBe("سلام، \u2068Alice (old)\u2069");
+    expect(dict.fa.removeT("Mum’s phone")).toBe("«\u2068Mum’s phone\u2069» حذف شود؟");
+    expect(dict.fa.qrHow("")).toContain("برنامه‌ای که با لینک کار می‌کند"); // no empty isolate stands for a missing name
+    // a name with a Persian letter is right to left even when it starts with a Latin brand: «AdGuard» stays first
+    expect(plain(dict.fa.dnsDefault("AdGuard: بدون تبلیغات"))).toBe("پیش‌فرض — \u2067AdGuard: بدون تبلیغات\u2069");
+  });
+
+  it("the Persian page: names from data in <bdi>, the icons that point along the line marked to turn round, nothing of the panel shown", () => {
+    const el = view(data("return"), state("ios", { returning: true }, "fa"), actions());
+    expect(text(el.querySelector(".hero .h1"))).toBe("سلام، \u2068Alice\u2069");
+    expect([...el.querySelectorAll(".dev-n bdi")].map((n) => n.textContent)).toEqual(expect.arrayContaining(["Pixel 7", "MacBook"]));
+    expect(el.querySelector(".srv-name span bdi")?.textContent).toBe("Франкфурт"); // the owner's place, as the owner wrote it
+    expect([...el.querySelectorAll(".srv-app .mono")].map((n) => n.textContent)).toContain("DE · Hysteria2"); // as the apps write it, left to right (sub.css)
+    expect(el.querySelectorAll("svg.flip").length).toBeGreaterThan(0);
+    expect([...el.querySelectorAll("svg.flip")].length).toBeLessThan(el.querySelectorAll("svg").length);
+  });
+
+  it("one stylesheet for both directions: no left or right, the right-to-left rules are there", () => {
+    const rules = readFileSync(`${process.cwd()}/src/sub/sub.css`, "utf8").replace(/\/\*[\s\S]*?\*\//g, ""); // vitest runs in web/
+    // the spinner's open side and the centred toast are the same either way
+    const physical = rules.match(/(?:margin|padding|border)-(?:left|right)\b(?!-color: transparent)|[\s;{](?:left|right)\s*:(?! 50%)|text-align:\s*(?:left|right)|float\s*:/g);
+    expect(physical).toBeNull();
+    expect(rules).toContain('[dir="rtl"] .i.flip { transform: scaleX(-1); }');
+    expect(rules).toContain('[dir="rtl"] :is(.mono, .inp.pw) { direction: ltr; unicode-bidi: isolate; }');
+    expect(rules).toMatch(/--sans: "Onest", "Vazirmatn",/);
+    expect(rules).toMatch(/:lang\(fa\) body \{ line-height: 1\.7; \}/);
+  });
+
+  it("the Turkish page renders in Turkish: the polite «siz», dates without a case ending", () => {
+    const el = view(data("return"), state("ios", { returning: true }, "tr"), actions());
+    expect(text(el.querySelector(".hero .h1"))).toBe("Merhaba, Alice");
+    expect(text(el.querySelector(".hero .pill"))).toBe("Etkin");
+    expect(text(el.querySelector(".hero"))).toMatch(/\d+ \S+ tarihine kadar/);
+    expect(text(el.querySelector("section[aria-label='Cihazlarım']"))).toContain("Cihaz ekle");
+    expect(plain(dict.tr.txt.limitedReset("1 Aralık", "month").body)).toBe("Bu ayki trafik bitti — VPN 1 Aralık tarihine kadar çalışmıyor.");
+    expect(plain(dict.tr.txt.limitedReset("1 Aralık", "none").body)).toBe("Trafik bitti — VPN 1 Aralık tarihine kadar çalışmıyor.");
   });
 });

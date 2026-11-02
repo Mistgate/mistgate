@@ -44,7 +44,7 @@ function card(c: Ctx, l: TgLink, i: number, only: boolean): HTMLElement {
       "div",
       { class: "srv-top" },
       flag(c, l),
-      h("h3", { class: "srv-name" }, name.country, name.place && h("span", null, ` · ${name.place}`)),
+      h("h3", { class: "srv-name" }, name.country, name.place && h("span", null, " · ", h("bdi", null, name.place))),
       l.ipv6 && h("span", { class: "chip sm sky" }, icon("globe", 13), "IPv6"),
       l.relay && h("span", { class: "chip sm lav", title: t.viaHint(l.via) }, icon("next", 13), t.chipVia(l.via)),
     ),

@@ -84,7 +84,7 @@ function appCard(c: Ctx, x: AppEntry, o: { chosen: boolean; big: boolean; many: 
     h(
       "span",
       { class: "app-b" },
-      h("span", { class: "app-n" }, x.name, o.many && x.recommended && h("span", { class: "badge" }, t.recommended)),
+      h("span", { class: "app-n" }, h("bdi", null, x.name), o.many && x.recommended && h("span", { class: "badge" }, t.recommended)),
       h("span", { class: "desc" }, desc),
     ),
     h("span", { class: `radio${o.chosen ? " on" : ""}` }, o.chosen && icon("check", 13)),
