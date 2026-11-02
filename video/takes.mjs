@@ -1,6 +1,6 @@
 // The takes: what happens on screen, in page time. Each take is one continuous shot of the real UI on the mocks of
 // mocks.mjs; the composition decides the camera, the speed and the captions. Buttons are found by the app's own words
-// in the take's language (i18n.mjs), so one script films en, ru and zh.
+// in the take's language (i18n.mjs), so one script films every language.
 import { sub, t } from "./i18n.mjs";
 import { person, world } from "./mocks.mjs";
 

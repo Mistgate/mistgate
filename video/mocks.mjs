@@ -17,8 +17,10 @@ const places = {
   en: { DE: "Frankfurt", FI: "Helsinki", NL: "Amsterdam", RU: "Moscow", SG: "" },
   ru: { DE: "Франкфурт", FI: "Хельсинки", NL: "Амстердам", RU: "Москва", SG: "" },
   zh: { DE: "法兰克福", FI: "赫尔辛基", NL: "阿姆斯特丹", RU: "莫斯科", SG: "" },
+  fa: { DE: "فرانکفورت", FI: "هلسینکی", NL: "آمستردام", RU: "مسکو", SG: "" },
+  tr: { DE: "Frankfurt", FI: "Helsinki", NL: "Amsterdam", RU: "Moskova", SG: "" },
 };
-const groupNames = { en: ["Friends", "Family"], ru: ["Друзья", "Семья"], zh: ["朋友", "家人"] };
+const groupNames = { en: ["Friends", "Family"], ru: ["Друзья", "Семья"], zh: ["朋友", "家人"], fa: ["دوستان", "خانواده"], tr: ["Arkadaşlar", "Aile"] };
 
 // [id, name, country, address, online users by protocol, down Mbit/s, cpu]
 const fleet = [

@@ -2,7 +2,7 @@
 
 Short films of the real admin and the person's page, running on invented data (`mocks.mjs`: nodes de1, fi1, nl1, msk1, sg1;
 people alice, bob, carol; documentation addresses and example.com names). Each video is a [HyperFrames](https://github.com/heygen-com/hyperframes)
-composition rendered to MP4 in English, Russian and Chinese.
+composition rendered to MP4 in English, Russian and Chinese; the hero also in Persian (right to left) and Turkish.
 
 | Video | File | What it shows |
 | --- | --- | --- |
@@ -42,6 +42,7 @@ pnpm --dir web exec vite --host 127.0.0.1 --port 5293 --strictPort
 ```sh
 cd video
 for lang in en ru zh; do for take in hero-admin link-admin health-admin tg-admin; do node record.mjs $take --lang $lang; done; done
+for lang in fa tr; do node record.mjs hero-admin --lang $lang; done
 ```
 
 Then stop it and start the person's page instead:
@@ -53,13 +54,14 @@ pnpm --dir web exec vite -c vite.sub.config.ts --host 127.0.0.1 --port 5294 --st
 ```sh
 cd video
 for lang in en ru zh; do for take in hero-phone link-phone tg-phone; do node record.mjs $take --lang $lang; done; done
+for lang in fa tr; do node record.mjs hero-phone --lang $lang; done
 ```
 
 Render and encode (the masters go to `video/out/`, the delivery files to `$VIDEO_OUT`, default `video/out/`):
 
 ```sh
 cd video
-node make.mjs hero en ru zh
+node make.mjs hero en ru zh fa tr
 node make.mjs link en ru zh
 node make.mjs health en ru zh
 node make.mjs telegram en ru zh
@@ -67,7 +69,9 @@ node make.mjs telegram en ru zh
 
 For each video and language this makes `<name>-<lang>.mp4` (H.264, yuv420p, faststart, two-pass under 8 MB),
 `<name>-<lang>.webp` (animated, looping, 1280 px wide or less, under 4 MB), `<name>-poster-<lang>.webp` (the payoff frame)
-and `<name>-sheet-<lang>.png` (12 frames).
+and `<name>-sheet-<lang>.png` (12 frames). The MP4s in `docs/images/video/` (the site's) are 1280×720, made from the master:
+`ffmpeg -i out/<name>-<lang>.master.mp4 -vf scale=1280:-2:flags=lanczos -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p -movflags +faststart -an ../docs/images/video/<name>-<lang>.mp4`;
+the WebP and the poster are copied there as they are.
 
 Stills of a composition without a render, to check a cut: `node stills.mjs hero.html en <dir> 3.5,12,24.4`.
 HyperFrames' own preview works too: `npx hyperframes preview`.
@@ -82,7 +86,7 @@ HyperFrames' own preview works too: `npx hyperframes preview`.
 | `VIDEO_OUT` | `video/out` | where the delivery files go |
 
 `make.mjs` runs HyperFrames with its telemetry, update check and installs switched off. HyperFrames is pinned in
-`package.json`; Onest (SIL OFL, `assets/fonts/`) and the mark (`assets/brand/`) are copies of the panel's own.
+`package.json`; Onest and Vazirmatn (SIL OFL, `assets/fonts/`) and the mark (`assets/brand/`) are copies of the panel's own.
 
 To change a video: the action is in `takes.mjs` (record again), the data in `mocks.mjs`, the speed, camera and captions
 in the video's HTML (render again).

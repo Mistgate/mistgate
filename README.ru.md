@@ -15,7 +15,7 @@ Hysteria2, VLESS и AmneziaWG. Два бинарника на Go, SQLite и syst
 <a href="go.mod"><img alt="Версия Go" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/ru/"><b>Документация</b></a> · <a href="#быстрый-старт"><b>Установка</b></a> · <a href="#протоколы"><b>Протоколы</b></a> · <a href="#насколько-это-стабильно"><b>Насколько это стабильно</b></a> · <a href="#сравнение-с-другими-панелями"><b>Сравнение</b></a> · <a href="README.md">English</a> · <a href="README.zh.md">简体中文</a></p>
+<p><a href="https://mistgate.app/ru/"><b>Документация</b></a> · <a href="#быстрый-старт"><b>Установка</b></a> · <a href="#протоколы"><b>Протоколы</b></a> · <a href="#насколько-это-стабильно"><b>Насколько это стабильно</b></a> · <a href="#сравнение-с-другими-панелями"><b>Сравнение</b></a> · <a href="README.md">English</a> · <a href="README.zh.md">简体中文</a> · <a href="README.fa.md">فارسی</a> · <a href="README.tr.md">Türkçe</a></p>
 
 <p><sub><b>Бета.</b> До 1.0 возможны изменения. <a href="https://mistgate.app/ru/roadmap/status/">Статус и план</a></sub></p>
 

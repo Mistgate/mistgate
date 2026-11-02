@@ -2,7 +2,7 @@
 <!-- The hero: a few servers of your own and the people you share them with. The real admin on invented data: the
      Overview, a new node sg1 installed over SSH from the browser, a profile put on it, and alice's page on her phone
      listing Singapore. Footage: `node record.mjs hero-admin --lang <l>` and `hero-phone` (see README.md). -->
-<html data-composition-variables='[{"id":"lang","type":"enum","label":"Language","default":"en","options":[{"value":"en","label":"English"},{"value":"ru","label":"Русский"},{"value":"zh","label":"中文"}]}]'>
+<html data-composition-variables='[{"id":"lang","type":"enum","label":"Language","default":"en","options":[{"value":"en","label":"English"},{"value":"ru","label":"Русский"},{"value":"zh","label":"中文"},{"value":"fa","label":"فارسی"},{"value":"tr","label":"Türkçe"}]}]'>
   <head>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="film.css" />
@@ -25,6 +25,8 @@
         en: ["A few servers of your own", "Add one over SSH, from the browser", "The panel checks it and installs the agent", "Add a profile to it", "alice gets Singapore on her page"],
         ru: ["Несколько своих серверов", "Добавьте ещё один по SSH прямо из браузера", "Панель проверит сервер и установит агент", "Добавьте на него профиль", "У alice на странице появился Сингапур"],
         zh: ["几台你自己的服务器", "在浏览器里通过 SSH 再添加一台", "面板检查服务器，然后安装 Agent", "给它添加协议配置", "alice 的页面上多了新加坡"],
+        fa: ["چند سرور شخصی خودتان", "یکی دیگر را از راه SSH در مرورگر اضافه کنید", "پنل سرور را بررسی و ایجنت را نصب می‌کند", "یک پروفایل به آن اضافه کنید", "سنگاپور به صفحهٔ alice اضافه شد"],
+        tr: ["Kendinize ait birkaç sunucu", "Tarayıcıdan SSH ile bir tane daha ekleyin", "Panel sunucuyu kontrol eder ve ajanı kurar", "Düğüme bir profil ekleyin", "alice'in sayfasına Singapur eklendi"],
       };
       Film.run({
         duration: DURATION,
@@ -33,6 +35,8 @@
           const A = tr["hero-admin"];
           const P = tr["hero-phone"];
           const m = A.marks;
+          // right to left (fa) the admin is mirrored, its menu on the right: the boxes drawn at fixed places mirror too
+          const mx = (x, w = 0) => (lang === "fa" ? 1600 - x - w : x);
           const r = A.rects;
           const click = (from) => A.clicks.find((c) => c >= from);
           const added = click(m.addProfile);
@@ -66,7 +70,7 @@
           const key = (t, f, d) => ({ t, d, ...f });
           const camera = [
             key(0, { cx: 800, cy: 500, vw: 2010 }, 0),
-            key(0.15, { cx: 900, cy: 360, vw: 1640 }, 2.3),
+            key(0.15, { cx: mx(900), cy: 360, vw: 1640 }, 2.3),
             key(T(m.modal) - 0.5, fit(r.dlgChoose, 110, 0, 0), 0.6),
             key(T(m.host) - 0.3, fit(r.dlgHost, 70, 0, 0), 0.5),
             key(T(m.key) - 0.25, fit(box(r.dlgKey.x, r.dlgKey.y, r.dlgKey.w, 440), 50, 0, 0), 0.5),
@@ -74,9 +78,9 @@
             key(T(m.preflight) - 0.2, fit(box(r.dlgCheck.x, r.dlgCheck.y, r.dlgCheck.w, 400), 40, 0, 0), 0.5),
             key(T(click(m.preflight)) - 0.35, fit(box(r.dlgCheck.x, r.dlgCheck.y + 360, r.dlgCheck.w, r.dlgCheck.h - 360), 40, 0, 0), 0.5),
             key(T(m.install) - 0.05, fit(r.dlgDone, 90, 0, 0), 0.5),
-            key(T(m.node) - 0.3, fit(box(288, 70, 1240, 330), 40, 0, 0), 0.6),
+            key(T(m.node) - 0.3, fit(box(mx(288, 1240), 70, 1240, 330), 40, 0, 0), 0.6),
             key(T(click(m.profilesTab)) + 0.1, fit(r.dlgAdd, 110, 0, 0), 0.55),
-            key(T(m.profileAdded) - 0.1, fit(box(288, 70, 1240, r.inbound.y + r.inbound.h - 40), 30, 0, 0), 0.6),
+            key(T(m.profileAdded) - 0.1, fit(box(mx(288, 1240), 70, 1240, r.inbound.y + r.inbound.h - 40), 30, 0, 0), 0.6),
             key(tP - 1.05, { cx: 800, cy: 520, vw: 1990 }, 0.9),
             key(tP + 0.05, fit(box(phoneAt.x, phoneAt.y, phoneAt.w, phoneAt.h), 36, 0, 0), 0.8),
             key(tP + 1.35, fit(box(phoneAt.x + sg.x, phoneAt.y + sg.y, sg.w, sg.h), 190, 0, 0), 1.4),
