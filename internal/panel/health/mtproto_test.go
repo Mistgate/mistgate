@@ -233,14 +233,9 @@ func assertMTProtoDialCode(t *testing.T, target Target, options DialOptions, wan
 	}
 }
 
+// readMTProtoRequest reads one abridged packet as a Telegram DC does after an obfuscated2 header: no 0xef byte (the tag
+// was in the header), the length in words, then an unencrypted message whose message_data_length matches its body.
 func readMTProtoRequest(c *mtprototest.DCConn) ([]byte, error) {
-	var marker [1]byte
-	if _, err := io.ReadFull(c, marker[:]); err != nil {
-		return nil, err
-	}
-	if marker[0] != 0xef {
-		return nil, errors.New("missing abridged marker")
-	}
 	var first [1]byte
 	if _, err := io.ReadFull(c, first[:]); err != nil {
 		return nil, err
@@ -257,13 +252,19 @@ func readMTProtoRequest(c *mtprototest.DCConn) ([]byte, error) {
 		return nil, errors.New("invalid request length")
 	}
 	msg := make([]byte, words*4)
-	_, err := io.ReadFull(c, msg)
-	return msg, err
+	if _, err := io.ReadFull(c, msg); err != nil {
+		return nil, err
+	}
+	if len(msg) < 20 || binary.LittleEndian.Uint32(msg[16:20]) != uint32(len(msg)-20) {
+		return nil, errors.New("message_data_length does not match the message")
+	}
+	return msg, nil
 }
 
 func responsePQ(request []byte) []byte {
 	msg := make([]byte, 76)
 	binary.LittleEndian.PutUint64(msg[8:16], uint64(time.Now().Unix())<<32)
+	binary.LittleEndian.PutUint32(msg[16:20], uint32(len(msg)-20))
 	binary.LittleEndian.PutUint32(msg[20:24], resPQ)
 	copy(msg[24:40], request[24:40])
 	copy(msg[40:56], []byte("server-nonce-123"))

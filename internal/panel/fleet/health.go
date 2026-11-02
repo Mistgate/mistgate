@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -121,6 +122,10 @@ func capabilities(h *agentv1.Hello) []string {
 			break
 		}
 		out = append(out, clip(c, 32))
+	}
+	// an agent with the MTProto engine can take an mtproto inbound; it does not list a string for it (capMTProto)
+	if slices.ContainsFunc(h.Engines, func(e *agentv1.EngineInfo) bool { return e.GetProtocol() == protocolMTProto }) && !slices.Contains(out, capMTProto) {
+		out = append(out, capMTProto)
 	}
 	return out
 }

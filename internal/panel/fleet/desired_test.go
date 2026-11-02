@@ -31,6 +31,7 @@ func TestRequiredProtocolCapability(t *testing.T) {
 		{name: "VLESS, the node's own site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"self"}}`)}, want: capVLESSSelf},
 		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: capVLESSTLS},
 		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
+		{name: "MTProto", spec: plugin.InboundSpec{Protocol: "mtproto"}, want: capMTProto},
 		{name: "Hysteria2", spec: plugin.InboundSpec{Protocol: "hysteria2"}},
 	}
 	for _, tt := range tests {
@@ -522,5 +523,46 @@ func TestVLESSSelfInboundIsWithheldFromAnAgentWithoutTheCapability(t *testing.T)
 		if !slices.Equal(held, tc.held) || !slices.Equal(st.withheld, tc.withheld) {
 			t.Errorf("%s: held %v withheld %v, want %v and %v", tc.name, held, st.withheld, tc.held, tc.withheld)
 		}
+	}
+}
+
+// An agent of v0.1.68 has no MTProto engine and rejects a state with an mtproto inbound whole, so every other change to
+// the node stalls: the inbound is withheld from it (agent_too_old on its row) while the rest goes out. An agent with the
+// engine gets it.
+func TestMTProtoInboundGoesOnlyToAnAgentWithTheEngine(t *testing.T) {
+	hy2 := plugin.InboundSpec{ID: "inb_hy2", Protocol: "hysteria2", Enabled: true}
+	mt := plugin.InboundSpec{ID: "inb_mt", Protocol: "mtproto", Enabled: true}
+	e := newEnv(t)
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: hy2}, {Spec: mt}}, nil
+	}
+	node := store.NodeRow{ID: "nod_1", State: "active"}
+	v68 := capabilities(&agentv1.Hello{Capabilities: []string{"doctor/1"}, Engines: []*agentv1.EngineInfo{{Protocol: "hysteria2"}}})
+	v69 := capabilities(&agentv1.Hello{Capabilities: []string{"doctor/1"}, Engines: []*agentv1.EngineInfo{{Protocol: "hysteria2"}, {Protocol: "mtproto"}}})
+	for _, tc := range []struct {
+		name     string
+		caps     []string
+		held     []string
+		withheld []string
+	}{
+		{"agent v0.1.68", v68, []string{"inb_hy2"}, []string{"inb_mt"}},
+		{"agent with the MTProto engine", v69, []string{"inb_hy2", "inb_mt"}, nil},
+	} {
+		st, err := e.f.buildState(context.Background(), node, tc.caps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var held []string
+		for id := range st.in {
+			held = append(held, id)
+		}
+		sort.Strings(held)
+		if !slices.Equal(held, tc.held) || !slices.Equal(st.withheld, tc.withheld) {
+			t.Errorf("%s: held %v withheld %v, want %v and %v", tc.name, held, st.withheld, tc.held, tc.withheld)
+		}
+	}
+	listed := capabilities(&agentv1.Hello{Capabilities: []string{capMTProto}, Engines: []*agentv1.EngineInfo{{Protocol: "mtproto"}}})
+	if !slices.Equal(listed, []string{capMTProto}) {
+		t.Errorf("an agent that lists mtproto/1 itself: %v", listed)
 	}
 }

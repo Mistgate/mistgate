@@ -31,15 +31,25 @@ const (
 	capWarp      = "warp/1"
 	// capUserRateLimit: the agent shares one bucket per person (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
 	capUserRateLimit = "user-rate-limit/1"
+	// capMTProto: the agent has the MTProto engine. No agent lists it: the panel derives it from Hello.engines (see
+	// capabilities), because the agents of v0.1.69 have the engine without the string, and v0.1.68 rejects the whole state
+	// for an mtproto inbound.
+	capMTProto = "mtproto/1"
 )
 
 // protocolAWG is the plugin id of AmneziaWG. An inbound that has a Tunnel is an L3 inbound whatever the protocol.
 const protocolAWG = "awg"
 
+// protocolMTProto is the plugin id of the Telegram proxy.
+const protocolMTProto = "mtproto"
+
 // requiredCap is the node capability required before the panel can send this inbound to the agent.
 func requiredCap(s plugin.InboundSpec) string {
 	if s.Protocol == protocolAWG || !s.Tunnel.IsZero() {
 		return capAWG
+	}
+	if s.Protocol == protocolMTProto {
+		return capMTProto
 	}
 	if s.Protocol == "vless" {
 		if vlessTLS(s) {
@@ -116,8 +126,9 @@ func (s *nodeState) ids() []string {
 
 // buildState computes the desired state of a node for an agent with these capabilities. A retired node has none. The
 // inbounds and their credentials come from Config.Desired (the access module owns the effective-access rule); the WarpSpec
-// from the WARP module. An awg inbound goes only to an agent that lists "awg/1" and the WarpSpec only to one that lists
-// "warp/1": an old agent would reject the unknown protocol, and the whole state with it.
+// from the WARP module. An awg inbound goes only to an agent that lists "awg/1", an mtproto inbound only to one with the
+// MTProto engine and the WarpSpec only to one that lists "warp/1": an old agent would reject the unknown protocol, and the
+// whole state with it.
 func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) (*nodeState, error) {
 	st := &nodeState{in: map[string]*inboundState{}}
 	if n.State != "retired" {

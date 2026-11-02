@@ -188,21 +188,22 @@ func reqPQMessage(nonce [16]byte) []byte {
 	var msg [40]byte
 	msgID := uint64(time.Now().Unix())<<32 | uint64(binary.LittleEndian.Uint32(nonce[:4])&^3)
 	binary.LittleEndian.PutUint64(msg[8:16], msgID)
+	binary.LittleEndian.PutUint32(msg[16:20], 20) // message_data_length: the constructor and the nonce
 	binary.LittleEndian.PutUint32(msg[20:24], reqPQMulti)
 	copy(msg[24:], nonce[:])
 	return msg[:]
 }
 
+// abridgedFrame is one abridged packet. Over obfuscated2 the abridged tag rides in the header (SendHeader), so the 0xef
+// byte that opens a plain abridged connection is not sent: a DC would read it as a length of 956 bytes and wait.
 func abridgedFrame(msg []byte) []byte {
 	words := len(msg) / 4
 	if len(msg)%4 != 0 {
 		return nil
 	}
-	out := []byte{0xef}
-	if words < 0x7f {
-		out = append(out, byte(words))
-	} else {
-		out = append(out, 0x7f, byte(words), byte(words>>8), byte(words>>16))
+	out := []byte{byte(words)}
+	if words >= 0x7f {
+		out = []byte{0x7f, byte(words), byte(words >> 8), byte(words >> 16)}
 	}
 	return append(out, msg...)
 }
