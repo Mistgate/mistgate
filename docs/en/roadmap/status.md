@@ -3,21 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.69`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.70`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.69
+  meta: v0.1.0 – v0.1.70
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: sparkle
-      release: v0.1.69
+      release: v0.1.70
       current: true
       points:
-        - "**The Telegram proxy (MTProto), experimental.** A node can now be a proxy for the Telegram app: Fake TLS that looks like an ordinary HTTPS site to anyone watching, the node's own domain or another site of your choice as the name in the handshake, and the decoy site for everyone without a key. Each person gets one Telegram key, made on request from their card; it does not count against the device limit, and the `tg://` links are on the person's own page, never in a VPN subscription. The panel checks the server the way Telegram connects. See [MTProto](../guide/mtproto.md)."
-        - "**Profiles** are a table with filters, and a new profile starts with a choice of protocol, then its form. See [Profiles](../guide/profiles.md)."
+        - "**Fixes for the Telegram proxy.** The health check of an MTProto server no longer times out on a working proxy, and an MTProto profile goes only to node agents that can run it, so a node with an older agent keeps taking every other change. See [MTProto](../guide/mtproto.md#add-a-profile)."
     - title: Profiles
       section: profiles
       points:
@@ -82,7 +81,7 @@ Mistgate is in **beta**; the current release is `v0.1.69`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.69
+  meta: v0.1.34 – v0.1.70
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production

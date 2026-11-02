@@ -63,6 +63,8 @@ The node's clock matters here. The handshake carries the client's time, and the 
 
 If a node has only an IP address and the profile uses **This node's name**, the node refuses it with the reason: enter a domain for the profile on that node, or choose **Another site**. The panel on the right shows the link a person would get, with the key hidden.
 
+A node runs MTProto with the node agent v0.1.69 or newer. The panel does not send the profile to an older agent: there the server shows as not started because the node's agent is too old, and everything else on the node keeps updating. Update the agent on the **Updates** page.
+
 ## Give Telegram to a person
 
 Telegram is a switch on the person, next to the subscription link and AmneziaVPN keys, in the user form and on the user card. It is off by default.

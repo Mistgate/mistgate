@@ -3,21 +3,20 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.69`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.70`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.69
+  meta: v0.1.0 – v0.1.70
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.69
+      release: v0.1.70
       current: true
       points:
-        - "**Telegram 代理（MTProto），实验性。** 节点现在可以作为 Telegram 应用的代理：Fake TLS 在旁观者看来就像普通的 HTTPS 站点，握手中的名称可以是节点自己的域名，也可以是你选择的其他网站，没有密钥的访问者看到的是伪装站点。每人一个 Telegram 密钥，在用户卡片上按需生成；它不计入设备上限，`tg://` 链接放在用户自己的页面上，绝不会进入 VPN 订阅。面板按 Telegram 的连接方式检测服务器。参见 [MTProto](../guide/mtproto.md)。"
-        - "**协议配置**列表改为带筛选的表格；新建协议配置时先选择协议，再填写表单。参见 [协议配置](../guide/profiles.md)。"
+        - "**Telegram 代理修复。** MTProto 服务器的运行状况检测不再在正常工作的代理上超时；MTProto 协议配置只下发给能够运行它的节点 Agent，因此 Agent 较旧的节点仍会接收其他所有更改。参见 [MTProto](../guide/mtproto.md#添加协议配置)。"
     - title: 协议配置
       section: profiles
       points:
@@ -82,7 +81,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.69`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.69
+  meta: v0.1.34 – v0.1.70
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
