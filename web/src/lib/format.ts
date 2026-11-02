@@ -33,10 +33,17 @@ function clockOf(unix: number, lang: Lang) {
 const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
+/** Whether two moments fall in the same year of the locale's calendar (the Persian year begins at Nowruz). */
+export const sameYear = (a: Date, b: Date, locale: string) => {
+  const year = new Intl.DateTimeFormat(locale, { year: "numeric" });
+  return year.format(a) === year.format(b);
+};
+
 /** "28 сент.": the year only when it is not this one ("28 сент. 2025 г."). */
 export function dayOf(unix: number, lang: Lang, now = new Date()) {
   const d = new Date(unix * 1000);
-  return d.toLocaleDateString(intlLocaleOf(lang), { day: "numeric", month: "short", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+  const locale = intlLocaleOf(lang);
+  return d.toLocaleDateString(locale, { day: "numeric", month: "short", ...(sameYear(d, now, locale) ? {} : { year: "numeric" }) });
 }
 
 /** "28 сент., 18:15", the year as in dayOf. */
@@ -134,5 +141,5 @@ export function dayLabel(t: T, fmt: Pick<Fmt, "locale">, unix: number, now = new
   const d = new Date(unix * 1000);
   if (sameDay(d, now)) return t("node.ev.today");
   if (sameDay(d, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) return t("node.ev.yesterday");
-  return d.toLocaleDateString(fmt.locale, { day: "numeric", month: "long", ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+  return d.toLocaleDateString(fmt.locale, { day: "numeric", month: "long", ...(sameYear(d, now, fmt.locale) ? {} : { year: "numeric" }) });
 }

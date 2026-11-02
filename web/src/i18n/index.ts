@@ -18,10 +18,10 @@ export const langShort: Record<Lang, string> = { ru: "RU", en: "EN", zh: "中文
 /** The <html lang> locale of a language: "zh" is written zh-CN (simplified, mainland), the others as they are. */
 export const localeOf = (lang: Lang): string => (lang === "zh" ? "zh-CN" : lang);
 /**
- * The locale Intl formats with. Persian keeps Latin digits and the Gregorian calendar: the counts, IPs, ports and
- * versions the copy carries are Latin text, so a date or a number formatted next to them is too.
+ * The locale Intl formats with. Persian keeps Latin digits (the counts, IPs, ports and versions the copy carries are
+ * Latin text, so a number formatted next to them is too) and the Persian calendar, as the person's page shows dates.
  */
-export const intlLocaleOf = (lang: Lang): string => (lang === "fa" ? "fa-u-nu-latn-ca-gregory" : localeOf(lang));
+export const intlLocaleOf = (lang: Lang): string => (lang === "fa" ? "fa-u-ca-persian-nu-latn" : localeOf(lang));
 /** Persian is written right to left; the page mirrors through logical (start/end) utilities. */
 export const dirOf = (lang: Lang): "rtl" | "ltr" => (lang === "fa" ? "rtl" : "ltr");
 

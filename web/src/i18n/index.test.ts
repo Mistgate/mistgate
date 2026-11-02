@@ -55,11 +55,11 @@ describe("languages", () => {
     expect(langs.map(dirOf)).toEqual(["ltr", "ltr", "ltr", "rtl", "ltr"]);
   });
 
-  it("format Persian with Latin digits and the Gregorian calendar, like the IPs and counts around them", () => {
+  it("format Persian with Latin digits, like the IPs and counts around them, and the Persian calendar, like the person's page", () => {
     const fa = intlLocaleOf("fa");
     expect(new Intl.NumberFormat(fa).format(1234.5)).toBe("1,234.5");
     const date = new Date(Date.UTC(2026, 10, 2, 12));
-    expect(date.toLocaleDateString(fa, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })).toBe("2 نوامبر 2026");
+    expect(date.toLocaleDateString(fa, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })).toBe("11 آبان 1405");
     expect(new Intl.NumberFormat(intlLocaleOf("tr")).format(1234.5)).toBe("1.234,5");
   });
 });

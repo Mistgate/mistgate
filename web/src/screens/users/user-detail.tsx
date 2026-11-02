@@ -22,7 +22,7 @@ import { deviceConnParts, userConnectionQuery, type Part, type UserConnection } 
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { clampPage } from "@/lib/paging";
-import { useFmt, type Fmt } from "@/lib/format";
+import { sameYear, useFmt, type Fmt } from "@/lib/format";
 import { useT } from "@/i18n";
 import { alertIsAbout, alertTitle, alertWhy, alertsQuery, severityKind, severityWord, useCan } from "@/lib/health";
 import { plain } from "@/lib/plain";
@@ -190,7 +190,7 @@ function UserDetail({ data }: { data: DetailN }) {
   const shown = shownStatus(user);
   const disabled = user.status === UserStatus.DISABLED;
   const d = daysLeft(user.expiresUnix, now);
-  const dateText = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long", ...(new Date(user.expiresUnix * 1000).getFullYear() !== new Date(now * 1000).getFullYear() && { year: "numeric" }) }).format(new Date(user.expiresUnix * 1000));
+  const dateText = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long", ...(!sameYear(new Date(user.expiresUnix * 1000), new Date(now * 1000), t.locale) && { year: "numeric" }) }).format(new Date(user.expiresUnix * 1000));
   const term = d === null ? t("users.never") : user.expiresUnix <= now ? t("users.status.expired") : `${t("users.until")} ${dateText} · ${t("users.days", { n: d })}`;
 
   return (
