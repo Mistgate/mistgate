@@ -366,7 +366,8 @@ tbody tr:hover td { background: color-mix(in oklch, var(--surface-2) 85%, var(--
 .hero__cta { display: flex; flex-wrap: wrap; gap: 8px; }
 .facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
 .shot { width: 100%; margin: 12px 0 0; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--surface); }
-.shot img { display: block; width: 100%; height: auto; }
+.shot img, .shot video { display: block; width: 100%; height: auto; }
+.shot--video { aspect-ratio: 16 / 9; background: #0d0d10; }
 .shot__dark { display: none !important; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme]) .shot__light { display: none !important; } :root:not([data-theme]) .shot__dark { display: block !important; } }
 :root[data-theme="dark"] .shot__light { display: none !important; }

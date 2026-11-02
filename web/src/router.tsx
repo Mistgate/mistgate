@@ -88,14 +88,6 @@ const devKit = import.meta.env.DEV
       component: lazyRouteComponent(() => import("@/screens/dev-kit")),
     })
   : null;
-// Development only: the animated hero of the README and the docs (src/demo), filmed from here.
-const devDemo = import.meta.env.DEV
-  ? createRoute({
-      getParentRoute: () => root,
-      path: "/dev-demo",
-      component: lazyRouteComponent(() => import("@/demo")),
-    })
-  : null;
 
 // Everything else needs a session; Me() decides.
 const app = createRoute({
@@ -254,7 +246,6 @@ const routeTree = root.addChildren([
   setup,
   recover,
   ...(devKit ? [devKit] : []),
-  ...(devDemo ? [devDemo] : []),
   app.addChildren([
     overview,
     nodes,

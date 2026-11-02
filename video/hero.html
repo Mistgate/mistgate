@@ -1,0 +1,109 @@
+<!doctype html>
+<!-- The hero: a few servers of your own and the people you share them with. The real admin on invented data: the
+     Overview, a new node sg1 installed over SSH from the browser, a profile put on it, and alice's page on her phone
+     listing Singapore. Footage: `node record.mjs hero-admin --lang <l>` and `hero-phone` (see README.md). -->
+<html data-composition-variables='[{"id":"lang","type":"enum","label":"Language","default":"en","options":[{"value":"en","label":"English"},{"value":"ru","label":"Русский"},{"value":"zh","label":"中文"}]}]'>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="film.css" />
+  </head>
+  <body>
+    <div id="root" data-composition-id="hero" data-start="0" data-duration="28.6" data-width="1920" data-height="1080" data-no-timeline>
+      <div id="stage"></div>
+      <div id="outro">
+        <div class="lockup">
+          <img src="assets/brand/mistgate-badge.svg" alt="" />
+          <div class="word">mist<b>gate</b></div>
+        </div>
+        <div class="url">mistgate.app</div>
+      </div>
+    </div>
+    <script src="film.js"></script>
+    <script>
+      const DURATION = 28.6;
+      const captions = {
+        en: ["A few servers of your own", "Add one over SSH, from the browser", "The panel checks it and installs the agent", "Add a profile to it", "alice gets Singapore on her page"],
+        ru: ["Несколько своих серверов", "Добавьте ещё один по SSH прямо из браузера", "Панель проверит сервер и установит агент", "Добавьте на него профиль", "У alice на странице появился Сингапур"],
+        zh: ["几台你自己的服务器", "在浏览器里通过 SSH 再添加一台", "面板检查服务器，然后安装 Agent", "给它添加协议配置", "alice 的页面上多了新加坡"],
+      };
+      Film.run({
+        duration: DURATION,
+        tracks: ["hero-admin", "hero-phone"],
+        build(lang, tr, { fit, timeOf }) {
+          const A = tr["hero-admin"];
+          const P = tr["hero-phone"];
+          const m = A.marks;
+          const r = A.rects;
+          const click = (from) => A.clicks.find((c) => c >= from);
+          const added = click(m.addProfile);
+          // the edit: [from frame, to frame, speed]; the slow parts of the page (typing, the install) play faster
+          const plan = [
+            [6, m.modal, 1.0],
+            [m.modal, m.host, 1.3],
+            [m.host, m.key, 1.5],
+            [m.key, m.preflight, 2.0],
+            [m.preflight, m.install, 3.0],
+            [m.install, m.installed, 7.0],
+            [m.installed, m.node, 1.4],
+            [m.node, m.profilesTab, 1.8],
+            [m.profilesTab, added + 6, 1.8],
+            [added + 6, m.healthy + 36, 1.4],
+          ];
+          let at = 0;
+          const admin = plan.map(([from, to, speed]) => {
+            const s = { at, from, to, speed };
+            at += (to - from) / 30 / speed;
+            return s;
+          });
+          const T = (f) => timeOf(admin, f);
+          const tP = at + 0.4; // the phone's footage starts here
+          // alice's phone rises in front of the right side of the (dimmed) admin window
+          const phoneAt = { x: 1130, y: 96, w: P.viewport.width, h: P.viewport.height };
+          const tIn = tP - 0.75;
+          const sg = P.rects.sg;
+          const tEnd = tP + 4.2; // the outro starts
+          const box = (x, y, w, h) => ({ x, y, w, h });
+          const key = (t, f, d) => ({ t, d, ...f });
+          const camera = [
+            key(0, { cx: 800, cy: 500, vw: 2010 }, 0),
+            key(0.15, { cx: 900, cy: 360, vw: 1640 }, 2.3),
+            key(T(m.modal) - 0.5, fit(r.dlgChoose, 110, 0, 0), 0.6),
+            key(T(m.host) - 0.3, fit(r.dlgHost, 70, 0, 0), 0.5),
+            key(T(m.key) - 0.25, fit(box(r.dlgKey.x, r.dlgKey.y, r.dlgKey.w, 440), 50, 0, 0), 0.5),
+            key(T(click(m.name + 40)) - 0.35, fit(box(r.dlgKey.x, r.dlgKey.y + 370, r.dlgKey.w, 500), 50, 0, 0), 0.6),
+            key(T(m.preflight) - 0.2, fit(box(r.dlgCheck.x, r.dlgCheck.y, r.dlgCheck.w, 400), 40, 0, 0), 0.5),
+            key(T(click(m.preflight)) - 0.35, fit(box(r.dlgCheck.x, r.dlgCheck.y + 360, r.dlgCheck.w, r.dlgCheck.h - 360), 40, 0, 0), 0.5),
+            key(T(m.install) - 0.05, fit(r.dlgDone, 90, 0, 0), 0.5),
+            key(T(m.node) - 0.3, fit(box(288, 70, 1240, 330), 40, 0, 0), 0.6),
+            key(T(click(m.profilesTab)) + 0.1, fit(r.dlgAdd, 110, 0, 0), 0.55),
+            key(T(m.profileAdded) - 0.1, fit(box(288, 70, 1240, r.inbound.y + r.inbound.h - 40), 30, 0, 0), 0.6),
+            key(tP - 1.05, { cx: 800, cy: 520, vw: 1990 }, 0.9),
+            key(tP + 0.05, fit(box(phoneAt.x, phoneAt.y, phoneAt.w, phoneAt.h), 36, 0, 0), 0.8),
+            key(tP + 1.35, fit(box(phoneAt.x + sg.x, phoneAt.y + sg.y, sg.w, sg.h), 190, 0, 0), 1.4),
+          ];
+          const c = captions[lang];
+          return {
+            loop: 0.5,
+            windows: [
+              { id: "admin", take: "hero-admin", kind: "window", x: 0, y: 0, w: 1600, h: 1000, segments: admin, cursor: true, opacity: (t) => 1 - 0.55 * Film.inOut(Film.clamp((t - tIn) / 0.7)) },
+              {
+                id: "phone", take: "hero-phone", kind: "phone", ...phoneAt, segments: [{ at: tP, from: 0, to: P.frames.length - 1, speed: 1 }],
+                opacity: (t) => (t >= tIn ? 1 : 0),
+                lift: (t) => 1050 * (1 - Film.outCubic(Film.clamp((t - tIn) / 0.85))),
+              },
+            ],
+            camera,
+            captions: [
+              { at: 0.35, end: T(m.modal) - 0.6, text: c[0] },
+              { at: T(m.modal) - 0.2, end: T(m.key) + 0.3, text: c[1] },
+              { at: T(m.preflight) + 0.1, end: T(m.installed) + 0.4, text: c[2] },
+              { at: T(m.node) + 0.6, end: T(m.profileAdded) + 1.0, text: c[3] },
+              { at: tP + 0.6, end: tEnd - 0.15, text: c[4] },
+            ],
+            outroAt: tEnd,
+          };
+        },
+      });
+    </script>
+  </body>
+</html>

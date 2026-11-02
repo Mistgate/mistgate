@@ -5,6 +5,8 @@ description: How the panel checks every profile as a real client, what the node 
 
 Mistgate watches the fleet from two sides. The panel connects to every profile on every node the way a client app does (client-eye checks), and the agent on every node checks its own host (the node doctor). Alerts are derived from both and from the state of the nodes. Everything is on the **Health** page, in the tabs **Alerts**, **Checks** and **Doctor**; the node page has its own **Doctor** tab and shows the checks of that node on its **Overview** tab.
 
+![Health: the folded alerts, the doctor's one-click fix and the check turning green](../../images/video/health-poster-en.webp)
+
 ## Client-eye checks
 
 ### How a check works

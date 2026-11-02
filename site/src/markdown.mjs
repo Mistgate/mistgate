@@ -12,6 +12,9 @@ import { parseRoadmap, roadmapTokens } from "./roadmap.mjs";
 const LANGS = ["sh", "yaml", "json", "ini", "toml", "javascript", "typescript", "go", "sql", "diff"];
 const ALIAS = { bash: "sh", shell: "sh", shellscript: "sh", zsh: "sh", console: "sh", yml: "yaml", js: "javascript", ts: "typescript", conf: "ini", text: "text", txt: "text", plain: "text", plaintext: "text", "": "text" };
 
+// the poster of a product video in the docs: images/video/<name>-poster-<lang>.webp
+const VIDEO_POSTER = /images\/video\/([a-z]+)-poster-([a-z]+)\.webp$/;
+
 export async function createHl() {
   const hl = await createHighlighter({ themes: ["github-light", "github-dark"], langs: LANGS });
   const known = new Set(LANGS);
@@ -73,10 +76,16 @@ export function createRenderer(lang, t, highlight) {
   md.renderer.rules.table_open = (tokens, idx, o, _env, self) => `<div class="table-wrap" role="region" tabindex="0" aria-label="${esc(t.table)}">${self.renderToken(tokens, idx, o)}`;
   md.renderer.rules.table_close = () => "</table></div>\n";
 
-  // ![alt](../diagrams/x.svg) on a line of its own: the SVG is inlined (see diagrams.mjs), alt becomes its name
+  // ![alt](../diagrams/x.svg) on a line of its own: the SVG is inlined (see diagrams.mjs), alt becomes its name;
+  // ![alt](../../images/video/<name>-poster-<lang>.webp): the video it is the poster of, played on the page
   const image = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, o, env, self) => {
     const tok = tokens[idx], src = tok.attrGet("src") ?? "";
+    const video = VIDEO_POSTER.exec(src);
+    if (video) {
+      const alt = self.renderInlineAsText(tok.children, o, env);
+      return `<figure class="shot shot--video"><video src="/video/${video[1]}-${video[2]}.mp4" poster="/video/${video[1]}-poster-${video[2]}.webp" width="1280" height="720" controls muted playsinline preload="none" aria-label="${esc(alt)}"></video></figure>`;
+    }
     if (!src.endsWith(".svg") || /^([a-z][a-z0-9+.-]*:|\/)/i.test(src)) return image(tokens, idx, o, env, self);
     const alt = self.renderInlineAsText(tok.children, o, env);
     if (!alt) env.warn(`diagram ${src} has no alt text`);
@@ -90,7 +99,7 @@ export function createRenderer(lang, t, highlight) {
   md.core.ruler.push("mg_figures", (state) => {
     state.tokens.forEach((tok, i) => {
       const ch = tok.type === "inline" && tok.children?.filter((c) => !(c.type === "text" && !c.content.trim()));
-      if (ch?.length === 1 && ch[0].type === "image" && /\.svg$/.test(ch[0].attrGet("src")) && state.tokens[i - 1].type === "paragraph_open") {
+      if (ch?.length === 1 && ch[0].type === "image" && (/\.svg$/.test(ch[0].attrGet("src")) || VIDEO_POSTER.test(ch[0].attrGet("src"))) && state.tokens[i - 1].type === "paragraph_open") {
         state.tokens[i - 1].hidden = state.tokens[i + 1].hidden = true;
       }
     });

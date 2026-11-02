@@ -33,10 +33,9 @@ const assets = { css: hashed("style", "css", css), js: hashed("app", "js", js) }
 out(assets.css, css);
 out(assets.js, js);
 for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f)) { mkdirSync(join(DIST, "fonts"), { recursive: true }); copyFileSync(join(BRAND, "fonts", f), join(DIST, "fonts", f)); }
-// the home page's demo, the README's own animation, light and dark
-const SHOTS = join(ROOT, "..", "docs", "images", "readme");
-const SHOT = /^demo-(light|dark)\.webp$/;
-for (const f of readdirSync(SHOTS)) if (SHOT.test(f)) { mkdirSync(join(DIST, "img"), { recursive: true }); copyFileSync(join(SHOTS, f), join(DIST, "img", f)); }
+// the product videos (docs/images/video): the MP4s and their posters, played by the home page and the docs pages
+const VIDEOS = join(ROOT, "..", "docs", "images", "video");
+for (const f of readdirSync(VIDEOS)) if (/^[a-z]+-(poster-)?[a-z]+\.(mp4|webp)$/.test(f) && (f.endsWith(".mp4") || f.includes("-poster-"))) { mkdirSync(join(DIST, "video"), { recursive: true }); copyFileSync(join(VIDEOS, f), join(DIST, "video", f)); }
 out("install.sh", readFileSync(INSTALLER));
 const badge = readFileSync(join(BRAND, "assets", "mistgate-badge.svg"));
 out("mistgate-badge.svg", badge);

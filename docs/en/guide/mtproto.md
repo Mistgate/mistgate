@@ -5,6 +5,8 @@ description: "The MTProto profile: a proxy for the Telegram app only, behind Fak
 
 MTProto is Telegram's own proxy protocol. A Mistgate MTProto profile makes every node it runs on a proxy server for the **Telegram app and nothing else**: the person taps a link, Telegram adds the proxy to its settings, and Telegram's traffic goes through the node. It is not a VPN: other apps do not use it, and no VPN app reads it. This page lists the settings of an MTProto profile and how a person gets the link; how a profile is made and put on nodes is on [Profiles](profiles.md).
 
+![The Telegram proxy: a new MTProto profile, its form and a person's Telegram links](../../images/video/telegram-poster-en.webp)
+
 > **Note:** MTProto is **experimental**. It is the first version of the protocol in Mistgate and has not been proven in the field yet; the panel marks it as experimental where you pick the protocol. Settings and behaviour may still change.
 
 ## When it helps, and its limits

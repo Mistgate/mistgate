@@ -5,6 +5,8 @@ description: "One link per person for every app: which format each app gets and 
 
 Every person has one subscription link. The same link gives a subscription app its list of servers, gives an app on the mihomo core a ready config, gives an app on the Xray or sing-box core a JSON config of its own, and gives a browser the person's own page. The **Subscriptions** section decides what each app gets and what people see. It has five tabs: **Apps & formats**, **Who gets what**, **Names & texts**, **User page** and **DNS**.
 
+![One link per person: a new user, their subscription link and their own page on a phone](../../images/video/link-poster-en.webp)
+
 ## The link
 
 A link looks like this:

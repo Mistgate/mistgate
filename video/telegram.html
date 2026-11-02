@@ -1,0 +1,94 @@
+<!doctype html>
+<!-- The Telegram proxy: a new MTProto profile, put on every node and into both groups as it is made, Fake TLS named
+     www.example.com; then alice's page lists her proxy links, each opened in Telegram with one tap. Footage:
+     `node record.mjs tg-admin --lang <l>` and `tg-phone` (see README.md). -->
+<html data-composition-variables='[{"id":"lang","type":"enum","label":"Language","default":"en","options":[{"value":"en","label":"English"},{"value":"ru","label":"Русский"},{"value":"zh","label":"中文"}]}]'>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="film.css" />
+  </head>
+  <body>
+    <div id="root" data-composition-id="telegram" data-start="0" data-duration="23.8" data-width="1920" data-height="1080" data-no-timeline>
+      <div id="stage"></div>
+      <div id="outro">
+        <div class="lockup">
+          <img src="assets/brand/mistgate-badge.svg" alt="" />
+          <div class="word">mist<b>gate</b></div>
+        </div>
+        <div class="url">mistgate.app</div>
+      </div>
+    </div>
+    <script src="film.js"></script>
+    <script>
+      const DURATION = 23.8;
+      const captions = {
+        en: ["A Telegram proxy is one more profile", "On every node and in both groups, right away", "Fake TLS: it looks like www.example.com", "Running on four nodes", "alice opens it in Telegram with one tap"],
+        ru: ["Telegram-прокси — ещё один профиль", "Сразу на всех нодах и в обеих группах", "Fake TLS: снаружи он выглядит как www.example.com", "Работает на четырёх нодах", "alice открывает его в Telegram одним нажатием"],
+        zh: ["Telegram 代理就是一个协议配置", "立即部署到所有节点，并加入两个分组", "Fake TLS：看起来就像 www.example.com", "已在四个节点上运行", "alice 一键在 Telegram 中打开"],
+      };
+      Film.run({
+        duration: DURATION,
+        tracks: ["tg-admin", "tg-phone"],
+        build(lang, tr, { fit, timeOf }) {
+          const A = tr["tg-admin"];
+          const P = tr["tg-phone"];
+          const m = A.marks;
+          const r = A.rects;
+          const pm = P.marks;
+          // the edit: [from frame, to frame, speed]
+          const plan = [
+            [0, m.cards, 1.2],
+            [m.cards, m.form, 1.25],
+            [m.form, m.tls, 1.0],
+            [m.tls, m.typed + 20, 1.3],
+            [m.typed + 20, m.deployed, 1.6],
+            [m.deployed, A.frames.length - 1, 1.0],
+          ];
+          let at = 0;
+          const admin = plan.map(([from, to, speed]) => {
+            const s = { at, from, to, speed };
+            at += (to - from) / 30 / speed;
+            return s;
+          });
+          const T = (f) => timeOf(admin, f);
+          // alice's phone rises in front of the dimmed admin at her Telegram proxy
+          const tP = at + 0.2;
+          const phoneSeg = [{ at: tP, from: 0, to: P.frames.length - 1, speed: 1.1 }];
+          const TP = (f) => timeOf(phoneSeg, f);
+          const tEnd = TP(P.frames.length - 1) - 0.2;
+          const phoneAt = { x: 1100, y: 96, w: P.viewport.width, h: P.viewport.height };
+          const tIn = tP - 0.75;
+          const box = (x, y, w, h) => ({ x, y, w, h });
+          const key = (t, f, d) => ({ t, d, ...f });
+          const phoneTop = fit(box(phoneAt.x - 10, phoneAt.y, phoneAt.w + 20, phoneAt.h * 0.62), 20);
+          const c = captions[lang];
+          return {
+            loop: 0.5,
+            outroAt: tEnd,
+            windows: [
+              { id: "admin", take: "tg-admin", kind: "window", x: 0, y: 0, w: 1600, h: 1000, segments: admin, cursor: true, opacity: (t) => 1 - 0.7 * Film.inOut(Film.clamp((t - tIn) / 0.7)) },
+              { id: "phone", take: "tg-phone", kind: "phone", ...phoneAt, segments: phoneSeg, opacity: (t) => (t >= tIn ? 1 : 0), lift: (t) => 1050 * (1 - Film.outCubic(Film.clamp((t - tIn) / 0.85))) },
+            ],
+            camera: [
+              key(0, { cx: 800, cy: 500, vw: 2000 }, 0),
+              key(0.1, fit(box(288, 20, 1233, 200), 30), 1.0),
+              key(T(m.cards) - 0.4, fit(r.cards, 40), 0.6),
+              key(T(m.form) - 0.3, fit(box(288, 140, 700, 500), 40), 0.6),
+              key(T(m.tls) - 0.3, fit(box(288, r.site.y - 20, 700, r.site.h + 20), 40), 0.6),
+              key(T(m.deployed) - 0.1, fit(box(288, 60, 1233, 500), 30), 0.7),
+              key(tP - 1.0, { cx: 800, cy: 520, vw: 1990 }, 0.9),
+              key(tP + 0.1, phoneTop, 0.9),
+            ],
+            captions: [
+              { at: 0.4, end: T(m.form) - 0.5, text: c[0] },
+              { at: T(m.form) - 0.2, end: T(m.tls) - 0.3, text: c[1] },
+              { at: T(m.tls) - 0.1, end: T(m.create) - 0.1, text: c[2] },
+              { at: T(m.deployed) + 0.2, end: tP - 0.6, text: c[3] },
+              { at: TP(pm.tg) - 0.6, end: tEnd - 0.1, text: c[4] },
+            ],
+          };
+        },
+      });
+    </script>
+  </body>
+</html>

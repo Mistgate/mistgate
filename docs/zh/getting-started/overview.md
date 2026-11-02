@@ -5,6 +5,8 @@ description: Mistgate 是什么、不是什么、适合谁使用，以及各部�
 
 Mistgate 是一个自托管面板，用于管理你在自己的服务器上运行的小型 VPN 集群。本页介绍它能做什么、不能做什么，以及其余文档所依据的基本概念。
 
+![Mistgate 演示：在浏览器中通过 SSH 添加节点，节点获得协议配置后上线，并立即出现在用户页面上](../../images/video/hero-poster-zh.webp)
+
 ## Mistgate 是什么
 
 - **两个程序，无需 Docker。** `mistgate` 是面板。`mistgate-node` 是运行在每台 VPN 服务器上的 Agent。两者都是适用于 Linux（amd64 和 arm64）的独立 Go 二进制文件。

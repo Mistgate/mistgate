@@ -184,7 +184,12 @@ export function rewriteBody(body, ctx) {
     prevQuote = quote;
     const ref = !kind && REFDEF.exec(out);
     if (ref) return ref[1] + target(ref[2]) + (ref[3] ?? "");
-    return mapInline(out, (s) => s.replace(LINK, (_m, bang, text, href, title) => `${bang}[${text}](${bang ? image(href) : target(href)}${title})`));
+    return mapInline(out, (s) => s.replace(LINK, (_m, bang, text, href, title) => {
+      const video = bang && /images\/video\/([a-z]+)-poster-([a-z]+)\.webp$/.exec(href);
+      // a video's poster opens the video on the site (the wiki plays no MP4 from the repository)
+      if (video) return `[![${text}](${image(href)}${title})](${SITE}/video/${video[1]}-${video[2]}.mp4)`;
+      return `${bang}[${text}](${bang ? image(href) : target(href)}${title})`;
+    }));
   });
   return lines.join("\n");
 }
@@ -257,10 +262,9 @@ export function buildWiki(sources) {
   };
   const startLinks = LANGS.filter((l) => start[l]).map((l) => `**${T[l].name}:** [${T[l].start}](${wikiHref(start[l].name)})`).join(" · ");
   const shown = LANGS.filter((l) => byLang[l].size); // en and ru always; zh once it has pages
-  const demo = (theme) => `${RAW}/main/docs/images/readme/demo-${theme}.webp`;
   files.set("Home.md", [
     `# ${[...new Set(shown.map((l) => T[l].heading))].join(" · ")}`, "",
-    `<picture><source media="(prefers-color-scheme: dark)" srcset="${demo("dark")}"><source media="(prefers-color-scheme: light)" srcset="${demo("light")}"><img alt="${DEMO_ALT}" src="${demo("dark")}" width="100%"></picture>`, "",
+    `<img alt="${DEMO_ALT}" src="${RAW}/main/docs/images/video/hero-en.webp" width="100%">`, "",
     ...shown.flatMap((l) => [T[l].intro, ""]),
     startLinks, "",
     `Website: [mistgate.app](${SITE}) · Repository: [Mistgate/mistgate](${GITHUB})${shown.slice(1).map((l) => ` · ${T[l].name}: [mistgate.app/${l}/](${SITE}/${l}/)`).join("")}`, "",

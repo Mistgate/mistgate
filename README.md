@@ -21,11 +21,7 @@ Hysteria2, VLESS and AmneziaWG. Two Go binaries, SQLite and systemd.</p>
 
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/demo-dark.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/demo-light.webp">
-  <img alt="A demo of the Mistgate admin: a new node is added, checked and comes online, and it appears on the person's page at once" src="docs/images/readme/demo-dark.webp" width="100%">
-</picture>
+<img alt="A Mistgate demo: a node is added over SSH from the browser, comes online with a profile and appears at once on a person's page" src="docs/images/video/hero-en.webp" width="100%">
 
 ## What it does
 

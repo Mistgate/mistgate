@@ -21,11 +21,7 @@
 
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/demo-dark.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/demo-light.webp">
-  <img alt="Mistgate 管理后台演示：添加新节点，经过检查后上线，并立即出现在用户页面上" src="docs/images/readme/demo-dark.webp" width="100%">
-</picture>
+<img alt="Mistgate 演示：在浏览器中通过 SSH 添加节点，节点获得协议配置后上线，并立即出现在用户页面上" src="docs/images/video/hero-zh.webp" width="100%">
 
 ## 功能
 

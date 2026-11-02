@@ -21,11 +21,7 @@ Hysteria2, VLESS и AmneziaWG. Два бинарника на Go, SQLite и syst
 
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/demo-dark.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/demo-light.webp">
-  <img alt="Демо админки Mistgate: новая нода добавляется, проверяется и выходит в строй и сразу появляется на странице человека" src="docs/images/readme/demo-dark.webp" width="100%">
-</picture>
+<img alt="Демо Mistgate: нода добавляется по SSH из браузера, получает профиль, выходит в строй и сразу появляется на странице человека" src="docs/images/video/hero-ru.webp" width="100%">
 
 ## Что умеет
 

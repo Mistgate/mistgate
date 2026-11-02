@@ -1,0 +1,93 @@
+<!doctype html>
+<!-- One link per person: a new person, carol, gets one link (with its QR code), and it opens her own page: one tap adds
+     every server to her app, a QR code takes the page to her next device, her servers and devices. Footage:
+     `node record.mjs link-admin --lang <l>` and `link-phone` (see README.md). -->
+<html data-composition-variables='[{"id":"lang","type":"enum","label":"Language","default":"en","options":[{"value":"en","label":"English"},{"value":"ru","label":"Русский"},{"value":"zh","label":"中文"}]}]'>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="film.css" />
+  </head>
+  <body>
+    <div id="root" data-composition-id="link" data-start="0" data-duration="21.8" data-width="1920" data-height="1080" data-no-timeline>
+      <div id="stage"></div>
+      <div id="outro">
+        <div class="lockup">
+          <img src="assets/brand/mistgate-badge.svg" alt="" />
+          <div class="word">mist<b>gate</b></div>
+        </div>
+        <div class="url">mistgate.app</div>
+      </div>
+    </div>
+    <script src="film.js"></script>
+    <script>
+      const DURATION = 21.8;
+      const captions = {
+        en: ["Add a person: just a name", "carol gets one link", "It opens her own page", "One tap adds all servers to her app", "A QR code for her next device", "Her servers and devices, in one place"],
+        ru: ["Новый человек — нужно только имя", "У carol одна ссылка", "Ссылка ведёт на её собственную страницу", "Одно нажатие добавит все серверы в приложение", "QR-код — для следующего устройства", "Её серверы и устройства — на одной странице"],
+        zh: ["添加一个人，只要名字", "carol 只有一个链接", "链接打开她自己的页面", "一键把所有服务器加入应用", "二维码用于下一台设备", "她的服务器和设备都在这一页"],
+      };
+      Film.run({
+        duration: DURATION,
+        tracks: ["link-admin", "link-phone"],
+        build(lang, tr, { fit, timeOf }) {
+          const A = tr["link-admin"];
+          const P = tr["link-phone"];
+          const m = A.marks;
+          const r = A.rects;
+          const pm = P.marks;
+          // the edit: [from frame, to frame, speed]
+          const plan = [
+            [0, m.form, 1.15],
+            [m.form, m.link, 1.35],
+            [m.link, m.open + 12, 1.0],
+          ];
+          let at = 0;
+          const admin = plan.map(([from, to, speed]) => {
+            const s = { at, from, to, speed };
+            at += (to - from) / 30 / speed;
+            return s;
+          });
+          const T = (f) => timeOf(admin, f);
+          const click = (from) => A.clicks.find((k) => k >= from);
+          // carol's phone rises in front of the dimmed admin; its footage plays a little faster than life
+          const tP = at + 0.2;
+          const phoneSeg = [{ at: tP, from: 0, to: P.frames.length - 1, speed: 1.1 }];
+          const TP = (f) => timeOf(phoneSeg, f);
+          const tEnd = TP(P.frames.length - 1) - 0.2;
+          const phoneAt = { x: 1100, y: 96, w: P.viewport.width, h: P.viewport.height };
+          const tIn = tP - 0.75;
+          const box = (x, y, w, h) => ({ x, y, w, h });
+          const key = (t, f, d) => ({ t, d, ...f });
+          // the phone's upper part, where the page brings each section
+          const phoneTop = fit(box(phoneAt.x - 10, phoneAt.y, phoneAt.w + 20, phoneAt.h * 0.62), 20);
+          const c = captions[lang];
+          return {
+            loop: 0.5,
+            outroAt: tEnd,
+            windows: [
+              { id: "admin", take: "link-admin", kind: "window", x: 0, y: 0, w: 1600, h: 1000, segments: admin, cursor: true, opacity: (t) => 1 - 0.7 * Film.inOut(Film.clamp((t - tIn) / 0.7)) },
+              { id: "phone", take: "link-phone", kind: "phone", ...phoneAt, segments: phoneSeg, taps: true, opacity: (t) => (t >= tIn ? 1 : 0), lift: (t) => 1050 * (1 - Film.outCubic(Film.clamp((t - tIn) / 0.85))) },
+            ],
+            camera: [
+              key(0, { cx: 800, cy: 500, vw: 2000 }, 0),
+              key(0.1, fit(box(140, 20, 1400, 420), 30), 1.0),
+              key(T(m.form) - 0.45, fit(box(r.dlgForm.x, r.dlgForm.y, r.dlgForm.w, 330), 40), 0.55),
+              key(T(click(m.form + 20)) - 0.3, fit(r.dlgForm, 30), 0.55),
+              key(T(m.link) - 0.35, fit(r.dlgLink, 40), 0.55),
+              key(tP - 1.0, { cx: 800, cy: 520, vw: 1990 }, 0.9),
+              key(tP + 0.1, phoneTop, 0.9),
+            ],
+            captions: [
+              { at: T(m.form) - 0.1, end: T(m.link) - 0.6, text: c[0] },
+              { at: T(m.link) - 0.2, end: tP - 0.6, text: c[1] },
+              { at: tP + 0.2, end: TP(pm.how) - 0.4, text: c[2] },
+              { at: TP(pm.how) - 0.2, end: TP(pm.qr) - 1.0, text: c[3] },
+              { at: TP(pm.qr) - 0.6, end: TP(pm.servers) - 0.3, text: c[4] },
+              { at: TP(pm.servers) - 0.1, end: tEnd - 0.1, text: c[5] },
+            ],
+          };
+        },
+      });
+    </script>
+  </body>
+</html>

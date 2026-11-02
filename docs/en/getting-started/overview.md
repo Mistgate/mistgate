@@ -5,6 +5,8 @@ description: What Mistgate is and is not, who it is for, and how its parts fit t
 
 Mistgate is a self-hosted panel for a small VPN fleet that you run on your own servers. This page explains what it does, what it does not do, and the concepts the rest of the documentation is built on.
 
+![A Mistgate demo: a node is added over SSH from the browser, comes online with a profile and appears at once on a person's page](../../images/video/hero-poster-en.webp)
+
 ## What Mistgate is
 
 - **Two programs, no Docker.** `mistgate` is the panel. `mistgate-node` is the agent that runs on every VPN server. Both are single Go binaries for Linux (amd64 and arm64).

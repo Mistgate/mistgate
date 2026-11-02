@@ -306,7 +306,7 @@ export function renderLanding({ lang, t, nav, section, langNames = [] }) {
 <p class="hero__lead">${esc(L.lead)}</p>
 <div class="hero__cta"><a class="btn btn--primary" href="${url("getting-started/install-panel")}">${esc(L.install)}${icon("chevronRight", 14)}</a><a class="btn btn--secondary" href="${url("getting-started/overview")}">${esc(L.how)}</a><a class="btn btn--secondary" href="${GITHUB}" rel="noopener">GitHub${icon("externalLink", 14)}</a></div>
 <ul class="facts">${[...L.facts, langNames.join(" · ")].filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
-<figure class="shot"><img class="shot__light" src="/img/demo-light.webp" width="1100" height="620" alt="${esc(L.demoAlt)}"><img class="shot__dark" src="/img/demo-dark.webp" width="1100" height="620" alt="${esc(L.demoAlt)}"></figure>
+<figure class="shot shot--video"><video src="/video/hero-${lang}.mp4" poster="/video/hero-poster-${lang}.webp" width="1280" height="720" autoplay muted loop playsinline preload="metadata" aria-label="${esc(L.demoAlt)}"></video></figure>
 </section>`;
 
   const does = `<section class="home-sec" aria-labelledby="does"><h2 id="does">${esc(L.doesH)}</h2>

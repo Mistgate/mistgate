@@ -1,0 +1,82 @@
+<!doctype html>
+<!-- Health: the open problems fold into one line each; one is opened (why it matters, the fix); the doctor's fix for de1's
+     oversized journal: the node says what it will do, one click applies it, the alert closes and the doctor is green.
+     Footage: `node record.mjs health-admin --lang <l>` (see README.md). -->
+<html data-composition-variables='[{"id":"lang","type":"enum","label":"Language","default":"en","options":[{"value":"en","label":"English"},{"value":"ru","label":"Русский"},{"value":"zh","label":"中文"}]}]'>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="film.css" />
+  </head>
+  <body>
+    <div id="root" data-composition-id="health" data-start="0" data-duration="20.4" data-width="1920" data-height="1080" data-no-timeline>
+      <div id="stage"></div>
+      <div id="outro">
+        <div class="lockup">
+          <img src="assets/brand/mistgate-badge.svg" alt="" />
+          <div class="word">mist<b>gate</b></div>
+        </div>
+        <div class="url">mistgate.app</div>
+      </div>
+    </div>
+    <script src="film.js"></script>
+    <script>
+      const DURATION = 20.4;
+      const captions = {
+        en: ["Problems fold into one line each", "Open one: why it matters and the fix", "One click: the node shows what it will do", "Fixed, and the check is green again"],
+        ru: ["Проблемы сворачиваются в одну строку", "Откройте любую: почему это важно и как исправить", "Один клик: нода покажет, что сделает", "Исправлено, проверка снова зелёная"],
+        zh: ["问题折叠成一行", "展开一条：原因和修复办法", "一键修复：节点先说明要做什么", "已修复，诊断重新变绿"],
+      };
+      Film.run({
+        duration: DURATION,
+        tracks: ["health-admin"],
+        build(lang, tr, { fit, timeOf }) {
+          const A = tr["health-admin"];
+          const m = A.marks;
+          const r = A.rects;
+          const plan = [
+            [0, m.nl1, 1.1],
+            [m.nl1, m.de1, 1.2],
+            [m.de1, m.plan, 1.2],
+            [m.plan, m.fixed, 1.3],
+            [m.fixed, m.doctor, 1.3],
+            [m.doctor, A.frames.length - 1, 1.0],
+          ];
+          let at = 0;
+          const admin = plan.map(([from, to, speed]) => {
+            const s = { at, from, to, speed };
+            at += (to - from) / 30 / speed;
+            return s;
+          });
+          const T = (f) => timeOf(admin, f);
+          const tEnd = at - 0.1;
+          const box = (x, y, w, h) => ({ x, y, w, h });
+          const key = (t, f, d) => ({ t, d, ...f });
+          // the camera keeps the left 1000 px of the list (state, node, what is wrong, the loss) and follows what opens
+          const list = (y, h) => fit(box(288, y, 1000, h), 30);
+          const c = captions[lang];
+          return {
+            loop: 0.5,
+            outroAt: tEnd,
+            windows: [{ id: "admin", take: "health-admin", kind: "window", x: 0, y: 0, w: 1600, h: 1000, segments: admin, cursor: true }],
+            camera: [
+              key(0, { cx: 800, cy: 500, vw: 2000 }, 0),
+              key(0.1, list(20, 380), 1.1),
+              key(T(m.nl1) - 0.35, list(150, 330), 0.6),
+              key(T(m.de1) - 0.35, list(70, 330), 0.6),
+              key(T(m.plan) - 0.4, fit(r.dlgPlan, 160), 0.55),
+              key(T(m.fixing) + 0.1, list(70, 330), 0.6),
+              key(T(m.after) - 0.6, list(330, 420), 0.7),
+              key(T(m.doctor) - 0.3, fit(box(288, 20, 760, 230), 40), 0.6),
+            ],
+            captions: [
+              { at: 0.4, end: T(m.de1) - 0.5, text: c[0] },
+              { at: T(m.de1) - 0.2, end: T(m.plan) - 0.5, text: c[1] },
+              { at: T(m.plan) - 0.2, end: T(m.fixed) - 0.2, text: c[2] },
+              { at: T(m.fixed) + 0.1, end: tEnd - 0.1, text: c[3] },
+            ],
+          };
+        },
+      });
+    </script>
+  </body>
+</html>

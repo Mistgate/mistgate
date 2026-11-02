@@ -5,6 +5,8 @@ description: "MTProto 协议配置：只供 Telegram 应用使用、位于 Fake 
 
 MTProto 是 Telegram 自己的代理协议。Mistgate 的 MTProto 协议配置会让它所在的每个节点成为**只服务于 Telegram 应用**的代理服务器：用户点一下链接，Telegram 就会把这个代理加入自己的设置，此后 Telegram 的流量经由节点转发。它不是 VPN：其他应用不会使用它，任何 VPN 应用也读不了它。本页列出 MTProto 协议配置的设置，以及用户如何拿到链接；协议配置如何创建并部署到节点，请参阅[协议配置](profiles.md)。
 
+![Telegram 代理：新建 MTProto 协议配置、填写表单，以及用户的 Telegram 链接](../../images/video/telegram-poster-zh.webp)
+
 > **注意：** MTProto 是**实验性**功能。这是 Mistgate 中该协议的第一个版本，尚未在实际环境中得到验证；面板在选择协议的位置会注明它是实验性的。设置和行为之后仍可能变化。
 
 ## 何时有用，以及它的局限
