@@ -26,7 +26,7 @@ export const LANDING = {
     lead: "For a few servers of your own and the people you share them with. You put the panel on one server and add your VPN servers to it as nodes. Each person gets one subscription link, and their app picks up every server they may use.",
     install: "Install the panel", how: "How it works",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker"],
-    shotAlt: "The Mistgate admin: nodes with their health and throughput, an open problem and recent events",
+    demoAlt: "A demo of the Mistgate admin: a new node is added, checked and comes online, and it appears on the person's page at once",
     doesH: "What it does",
     does: [
       ["nodes", "Nodes from the browser", "Add a node with its IP and root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld and installs the signed agent. A one-time install command works too.", "getting-started/add-node"],
@@ -110,7 +110,7 @@ export const LANDING = {
     lead: "Для нескольких своих серверов и людей, с которыми вы ими делитесь. Панель ставится на один сервер, а VPN-серверы добавляются в неё как ноды. Каждый человек получает одну ссылку-подписку, и приложение само подтягивает все положенные ему серверы.",
     install: "Установить панель", how: "Как это устроено",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, без Docker"],
-    shotAlt: "Админка Mistgate: ноды с их состоянием и скоростью, открытая проблема и последние события",
+    demoAlt: "Демо админки Mistgate: новая нода добавляется, проверяется и выходит в строй и сразу появляется на странице человека",
     doesH: "Что умеет",
     does: [
       ["nodes", "Ноды из браузера", "Ноду добавляют по IP и паролю root. Панель запоминает SSH-ключ сервера, проверяет его, открывает порты во включённом UFW или firewalld и ставит подписанный агент. Можно и одноразовой командой.", "getting-started/add-node"],
@@ -194,7 +194,7 @@ export const LANDING = {
     lead: "用来管理你自己的几台服务器，以及和你一起用它们的人。面板装在一台服务器上，你的 VPN 服务器作为节点加进来。每个人拿到一个订阅链接，应用会自动获取他可以用的所有服务器。",
     install: "安装面板", how: "工作原理",
     facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite，无需 Docker"],
-    shotAlt: "Mistgate 管理后台：节点及其运行状况和吞吐量、一个未解决的问题和最近的事件",
+    demoAlt: "Mistgate 管理后台演示：添加新节点，经过检查后上线，并立即出现在用户页面上",
     doesH: "功能",
     does: [
       ["nodes", "在浏览器里添加节点", "输入 IP 和 root 密码即可添加。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent。也可以用一条一次性命令安装。", "getting-started/add-node"],
@@ -281,7 +281,6 @@ export function renderLanding({ lang, t, nav, section, langNames = [] }) {
   // a page not translated yet (zh while it is being written) sends the reader to the English one instead of nowhere
   const url = (key) => pageUrl(pages.has(key) ? lang : "en", key);
   // the screenshot and the diagram of a language that has none yet are the English ones
-  const shotLang = existsSync(`${DOCS}images/readme/overview-light-${lang}.webp`) && existsSync(`${DOCS}images/readme/overview-dark-${lang}.webp`) ? lang : "en";
   const fitLang = existsSync(`${DOCS}${lang}/diagrams/how-it-fits.svg`) ? lang : "en";
   const title = (key) => pages.get(key)?.title ?? key;
   // an admin section's icon in its tone, or any other icon in lavender
@@ -307,7 +306,7 @@ export function renderLanding({ lang, t, nav, section, langNames = [] }) {
 <p class="hero__lead">${esc(L.lead)}</p>
 <div class="hero__cta"><a class="btn btn--primary" href="${url("getting-started/install-panel")}">${esc(L.install)}${icon("chevronRight", 14)}</a><a class="btn btn--secondary" href="${url("getting-started/overview")}">${esc(L.how)}</a><a class="btn btn--secondary" href="${GITHUB}" rel="noopener">GitHub${icon("externalLink", 14)}</a></div>
 <ul class="facts">${[...L.facts, langNames.join(" · ")].filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
-<figure class="shot"><img class="shot__light" src="/img/overview-light-${shotLang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"><img class="shot__dark" src="/img/overview-dark-${shotLang}.webp" width="1600" height="1000" alt="${esc(L.shotAlt)}"></figure>
+<figure class="shot"><img class="shot__light" src="/img/demo-light.webp" width="1100" height="620" alt="${esc(L.demoAlt)}"><img class="shot__dark" src="/img/demo-dark.webp" width="1100" height="620" alt="${esc(L.demoAlt)}"></figure>
 </section>`;
 
   const does = `<section class="home-sec" aria-labelledby="does"><h2 id="does">${esc(L.doesH)}</h2>

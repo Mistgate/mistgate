@@ -13,6 +13,7 @@ import { SITE, GITHUB, LANGS, COMPLETE, pageUrl, editUrl } from "./src/urls.mjs"
 
 const RAW = GITHUB.replace("github.com", "raw.githubusercontent.com");
 const RESERVED = new Set(["home", "_sidebar", "_footer"]);
+const DEMO_ALT = "A demo of the Mistgate admin: a new node is added, checked and comes online, and it appears on the person's page at once";
 
 const T = {
   en: {
@@ -256,8 +257,10 @@ export function buildWiki(sources) {
   };
   const startLinks = LANGS.filter((l) => start[l]).map((l) => `**${T[l].name}:** [${T[l].start}](${wikiHref(start[l].name)})`).join(" · ");
   const shown = LANGS.filter((l) => byLang[l].size); // en and ru always; zh once it has pages
+  const demo = (theme) => `${RAW}/main/docs/images/readme/demo-${theme}.webp`;
   files.set("Home.md", [
     `# ${[...new Set(shown.map((l) => T[l].heading))].join(" · ")}`, "",
+    `<picture><source media="(prefers-color-scheme: dark)" srcset="${demo("dark")}"><source media="(prefers-color-scheme: light)" srcset="${demo("light")}"><img alt="${DEMO_ALT}" src="${demo("dark")}" width="100%"></picture>`, "",
     ...shown.flatMap((l) => [T[l].intro, ""]),
     startLinks, "",
     `Website: [mistgate.app](${SITE}) · Repository: [Mistgate/mistgate](${GITHUB})${shown.slice(1).map((l) => ` · ${T[l].name}: [mistgate.app/${l}/](${SITE}/${l}/)`).join("")}`, "",

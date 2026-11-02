@@ -22,9 +22,9 @@ Hysteria2, VLESS и AmneziaWG. Два бинарника на Go, SQLite и syst
 </div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-ru.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-ru.webp">
-  <img alt="Админка Mistgate: шесть нод со статусом и нагрузкой, одна открытая проблема, последние события" src="docs/images/readme/overview-dark-ru.webp" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/demo-dark.webp">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/demo-light.webp">
+  <img alt="Демо админки Mistgate: новая нода добавляется, проверяется и выходит в строй и сразу появляется на странице человека" src="docs/images/readme/demo-dark.webp" width="100%">
 </picture>
 
 ## Что умеет
@@ -83,6 +83,9 @@ Mistgate пишется с помощью ИИ-агентов. Я читаю т�
 ## Скриншоты
 
 <table>
+<tr>
+<td colspan="2"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-ru.webp"><img alt="Админка Mistgate: шесть нод со статусом и нагрузкой, одна открытая проблема, последние события" src="docs/images/readme/overview-dark-ru.webp" width="100%"></picture><br><sub><b>Обзор.</b> Здоровье и нагрузка флота, открытые проблемы и последние события.</sub></td>
+</tr>
 <tr>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/node-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/node-light-ru.webp"><img alt="Страница ноды: статус, выход через WARP, CPU, память, диск и трафик за сутки" src="docs/images/readme/node-dark-ru.webp" width="100%"></picture><br><sub><b>Нода.</b> Статус, выход через WARP, нагрузка и трафик за сутки.</sub></td>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-ru.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-ru.webp"><img alt="Проверки глазами клиента: таблица нод и протоколов с задержкой через каждый туннель" src="docs/images/readme/health-dark-ru.webp" width="100%"></picture><br><sub><b>Проверки глазами клиента.</b> Каждый протокол на каждой ноде, задержка через туннель.</sub></td>

@@ -22,9 +22,9 @@
 </div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-zh.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-zh.webp">
-  <img alt="Mistgate 管理后台：节点及其运行状况和吞吐量、一个未解决的问题和最近的事件" src="docs/images/readme/overview-dark-zh.webp" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/demo-dark.webp">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/demo-light.webp">
+  <img alt="Mistgate 管理后台演示：添加新节点，经过检查后上线，并立即出现在用户页面上" src="docs/images/readme/demo-dark.webp" width="100%">
 </picture>
 
 ## 功能
@@ -83,6 +83,9 @@ Mistgate 是借助 AI 编码智能体开发的。它们写的代码由我审阅�
 ## 截图
 
 <table>
+<tr>
+<td colspan="2"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-zh.webp"><img alt="Mistgate 管理后台：节点及其运行状况和吞吐量、一个未解决的问题和最近的事件" src="docs/images/readme/overview-dark-zh.webp" width="100%"></picture><br><sub><b>概览。</b>节点群的运行状况和吞吐量、未解决的问题和最近的事件。</sub></td>
+</tr>
 <tr>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/node-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/node-light-zh.webp"><img alt="节点页面：状态、WARP 出口、CPU、RAM、磁盘和 24 小时流量" src="docs/images/readme/node-dark-zh.webp" width="100%"></picture><br><sub><b>节点。</b>状态、WARP 出口、负载和 24 小时流量。</sub></td>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-zh.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-zh.webp"><img alt="客户端视角检测：按协议列出各节点，并显示通过每条隧道的延迟" src="docs/images/readme/health-dark-zh.webp" width="100%"></picture><br><sub><b>客户端视角检测。</b>每个节点上的每种协议，以及通过隧道的延迟。</sub></td>

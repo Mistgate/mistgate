@@ -91,7 +91,7 @@ test("the zh home keeps the structure, links the pages that exist in zh and fall
   assert.match(html, /<h1 class="hero__h1">/);
   assert.match(html, /href="\/zh\/getting-started\/overview\/"/);
   assert.match(html, /href="\/getting-started\/install-panel\/"/, "install-panel is not translated yet: the English page");
-  assert.match(html, /img\/overview-light-en\.webp/, "no zh screenshot yet: the English one");
+  assert.match(html, /img\/demo-light\.webp/, "the home page plays the demo, the same in every language");
   assert.match(html, /English · Русский · 简体中文/);
   assert.doesNotMatch(read("index.html").slice(read("index.html").indexOf("<body")).replace(/<details class="lang">[\s\S]*?<\/details>/, ""), /\/zh\//, "the English home links zh only through the menu");
 });

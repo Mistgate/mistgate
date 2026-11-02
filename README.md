@@ -22,9 +22,9 @@ Hysteria2, VLESS and AmneziaWG. Two Go binaries, SQLite and systemd.</p>
 </div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-en.webp">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-en.webp">
-  <img alt="The Mistgate admin: six nodes with their health and throughput, one open problem, recent events" src="docs/images/readme/overview-dark-en.webp" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/demo-dark.webp">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/demo-light.webp">
+  <img alt="A demo of the Mistgate admin: a new node is added, checked and comes online, and it appears on the person's page at once" src="docs/images/readme/demo-dark.webp" width="100%">
 </picture>
 
 ## What it does
@@ -83,6 +83,9 @@ Mistgate is written with AI coding agents. I review what they write and decide w
 ## Screenshots
 
 <table>
+<tr>
+<td colspan="2"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-en.webp"><img alt="The Mistgate admin: six nodes with their health and throughput, one open problem, recent events" src="docs/images/readme/overview-dark-en.webp" width="100%"></picture><br><sub><b>The Overview.</b> The fleet's health and throughput, open problems and recent events.</sub></td>
+</tr>
 <tr>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/node-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/node-light-en.webp"><img alt="A node page: status, WARP exit, CPU, RAM, disk and 24 hours of traffic" src="docs/images/readme/node-dark-en.webp" width="100%"></picture><br><sub><b>A node.</b> Status, WARP exit, load and 24 hours of traffic.</sub></td>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="Client-eye checks: a table of nodes by protocols with the latency through each tunnel" src="docs/images/readme/health-dark-en.webp" width="100%"></picture><br><sub><b>Client-eye checks.</b> Every protocol on every node, latency through the tunnel.</sub></td>

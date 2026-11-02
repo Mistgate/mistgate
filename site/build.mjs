@@ -33,9 +33,9 @@ const assets = { css: hashed("style", "css", css), js: hashed("app", "js", js) }
 out(assets.css, css);
 out(assets.js, js);
 for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f)) { mkdirSync(join(DIST, "fonts"), { recursive: true }); copyFileSync(join(BRAND, "fonts", f), join(DIST, "fonts", f)); }
-// the admin screenshot on the home page: the README's own pictures, light and dark, per language
+// the home page's demo, the README's own animation, light and dark
 const SHOTS = join(ROOT, "..", "docs", "images", "readme");
-const SHOT = new RegExp(`^overview-(light|dark)-(${LANGS.join("|")})\\.webp$`);
+const SHOT = /^demo-(light|dark)\.webp$/;
 for (const f of readdirSync(SHOTS)) if (SHOT.test(f)) { mkdirSync(join(DIST, "img"), { recursive: true }); copyFileSync(join(SHOTS, f), join(DIST, "img", f)); }
 out("install.sh", readFileSync(INSTALLER));
 const badge = readFileSync(join(BRAND, "assets", "mistgate-badge.svg"));

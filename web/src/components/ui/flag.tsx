@@ -94,6 +94,19 @@ const special: Record<string, ReactNode> = {
       <circle cx={15} cy={10} r={6} fill="#bc002d" />
     </>
   ),
+  // the crescent and the five stars, the stars as dots: at chip size their points are under a pixel
+  SG: (
+    <>
+      <rect width={W} height={H / 2} fill="#ef3340" />
+      <rect y={H / 2} width={W} height={H / 2} fill="#fff" />
+      <circle cx={6.8} cy={5} r={4} fill="#fff" />
+      <circle cx={8.5} cy={5} r={3.4} fill="#ef3340" />
+      {[0, 1, 2, 3, 4].map((i) => {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+        return <circle key={i} cx={12.2 + 2.2 * Math.cos(a)} cy={5 + 2.2 * Math.sin(a)} r={0.8} fill="#fff" />;
+      })}
+    </>
+  ),
   KZ: (
     <>
       <rect width={W} height={H} fill="#00afca" />

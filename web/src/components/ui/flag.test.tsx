@@ -28,6 +28,7 @@ describe("Flag", () => {
     expect(hasFlag("de")).toBe(true);
     expect(hasFlag("cn")).toBe(true); // the China split preset and the country toggle of the DNS editor
     expect(hasFlag("IR")).toBe(true);
+    expect(hasFlag("sg")).toBe(true); // Singapore, a common hosting country
     expect(hasFlag("xx")).toBe(false);
     const el = mount(
       <>
