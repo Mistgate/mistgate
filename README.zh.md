@@ -49,6 +49,7 @@
 | [Hysteria2](docs/zh/guide/hysteria2.md) | 官方 Hysteria2 内核 | UDP（QUIC）。Salamander 混淆（Gecko 为实验性）、端口跳跃、Let's Encrypt 证书或固定指纹的自签名证书。 |
 | [VLESS](docs/zh/guide/vless.md) | xray-core | REALITY 搭配 XHTTP 或 TCP（RAW + Vision）；TLS 搭配 XHTTP 或 WebSocket，可以直连，也可以放在 CDN 之后。 |
 | [AmneziaWG](docs/zh/guide/amneziawg.md) | 用户态的 amneziawg-go，或内核模块 | 3.1 版（默认）和 2.0 版，每台设备一个独立密钥。不提供 1.5 和 1.0。 |
+| [MTProto](docs/zh/guide/mtproto.md) | Mistgate 自带的 MTProto 内核 | 实验性。只供 Telegram 应用使用的代理：Fake TLS，握手中使用节点自己的域名或另一个网站，每人一个密钥，其他人看到伪装站点。 |
 
 Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443。并非每种订阅格式都能承载每种协议配置：见[各格式支持哪些协议配置](docs/zh/guide/subscriptions.md#各格式支持哪些协议配置)。
 

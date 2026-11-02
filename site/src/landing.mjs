@@ -47,6 +47,7 @@ export const LANDING = {
       ["Hysteria2", "UDP (QUIC) on the official Hysteria2 core. Salamander obfuscation, port hopping, a Let's Encrypt or a pinned self-signed certificate.", "guide/hysteria2"],
       ["VLESS", "On xray-core. REALITY over XHTTP or TCP (RAW + Vision); TLS over XHTTP or WebSocket, direct or behind a CDN.", "guide/vless"],
       ["AmneziaWG", "Versions 3.1 (the default) and 2.0, a separate key per device. amneziawg-go in userspace, or the kernel module.", "guide/amneziawg"],
+      ["MTProto", "Experimental. A proxy for the Telegram app only, on Mistgate's own core: Fake TLS with the node's own domain or another site as the name, a key per person.", "guide/mtproto"],
     ],
     protoP: "Hysteria2 and VLESS can share a node, TCP 443 included. Not supported yet: VMess, Trojan, Shadowsocks, TUIC and plain WireGuard. More protocols are planned; each plugs into the same subscription link through [the protocol plugin contract](reference/architecture#the-protocol-plugin-contract).",
     stableH: "Is it stable?",
@@ -130,6 +131,7 @@ export const LANDING = {
       ["Hysteria2", "UDP (QUIC) на официальном ядре Hysteria2. Обфускация Salamander, port hopping, сертификат Let's Encrypt или закреплённый самоподписанный.", "guide/hysteria2"],
       ["VLESS", "На xray-core. REALITY поверх XHTTP или TCP (RAW + Vision); TLS поверх XHTTP или WebSocket, напрямую или за CDN.", "guide/vless"],
       ["AmneziaWG", "Версии 3.1 (по умолчанию) и 2.0, отдельный ключ на каждое устройство. amneziawg-go в userspace или модуль ядра.", "guide/amneziawg"],
+      ["MTProto", "Экспериментально. Прокси только для приложения Telegram на собственном ядре Mistgate: Fake TLS с доменом ноды или другим сайтом в рукопожатии, ключ на человека.", "guide/mtproto"],
     ],
     protoP: "Hysteria2 и VLESS уживаются на одной ноде, даже на общем TCP 443. Пока не поддерживаются: VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard. Новые протоколы будут; каждый подключается к той же ссылке подписки через [контракт протокольного плагина](reference/architecture#контракт-протокольного-плагина).",
     stableH: "Насколько это стабильно",
@@ -213,6 +215,7 @@ export const LANDING = {
       ["Hysteria2", "基于官方 Hysteria2 内核，走 UDP（QUIC）。支持 Salamander 混淆、端口跳跃，以及 Let's Encrypt 证书或固定指纹的自签名证书。", "guide/hysteria2"],
       ["VLESS", "基于 xray-core。REALITY 搭配 XHTTP 或 TCP（RAW + Vision）；TLS 搭配 XHTTP 或 WebSocket，可以直连，也可以放在 CDN 之后。", "guide/vless"],
       ["AmneziaWG", "支持 3.1 版（默认）和 2.0 版，每台设备一个独立密钥。节点上使用用户态的 amneziawg-go 或内核模块。", "guide/amneziawg"],
+      ["MTProto", "实验性。只供 Telegram 应用使用的代理，基于 Mistgate 自带的内核：Fake TLS，握手中使用节点自己的域名或另一个网站，每人一个密钥。", "guide/mtproto"],
     ],
     protoP: "Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443。暂不支持：VMess、Trojan、Shadowsocks、TUIC 和普通 WireGuard。我们计划加入更多协议，每个新协议都通过[协议插件契约](reference/architecture#协议插件契约)接入同一个订阅链接。",
     stableH: "稳定性如何",
@@ -314,7 +317,7 @@ ${list(L.does)}<p class="home-p">${fmt(L.notYet)}</p></section>`;
 <figure class="diagram diagram--svg" tabindex="0">${inlineSvg(`${DOCS}${fitLang}/diagrams/how-it-fits.svg`, L.fitAlt)}</figure></section>`;
 
   const protocols = `<section class="home-sec" aria-labelledby="protocols"><h2 id="protocols">${esc(L.protoH)}</h2>
-<div class="proof proof--3">${L.protos.map(([name, p, key]) => `<a class="proof__card" href="${url(key)}"><span class="proof__t">${esc(name)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div>
+<div class="proof proof--protos">${L.protos.map(([name, p, key]) => `<a class="proof__card" href="${url(key)}"><span class="proof__t">${esc(name)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div>
 <p class="home-p">${fmt(L.protoP)}</p></section>`;
 
   const stable = `<section class="home-sec" aria-labelledby="stable"><h2 id="stable">${esc(L.stableH)}</h2><p class="home-p">${esc(L.stableP)}</p>

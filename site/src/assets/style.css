@@ -394,8 +394,8 @@ tbody tr:hover td { background: color-mix(in oklch, var(--surface-2) 85%, var(--
 .proof__t { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
 .proof__t .ico { color: var(--muted); }
 .proof__p { grid-column: 1 / -1; font-size: 14px; line-height: 1.55; color: var(--muted); }
-/* protocols: three cards in a row; the comparison: a short table that scrolls sideways on a phone instead of becoming cards */
-.proof--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 22px 0 16px; }
+/* protocols: cards two by two (the base grid); the comparison: a short table that scrolls sideways on a phone instead of becoming cards */
+.proof--protos { margin: 22px 0 16px; }
 .cmp { margin: 22px 0 12px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); scrollbar-width: thin; }
 .cmp td:first-child { min-width: 11em; }
 .cmp td:not(:first-child) { white-space: nowrap; }

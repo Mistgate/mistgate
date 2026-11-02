@@ -3,20 +3,21 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.68`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.69`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.68
+  meta: v0.1.0 – v0.1.69
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: sparkle
-      release: v0.1.68
+      release: v0.1.69
       current: true
       points:
-        - "**分组可用节点。** 分组现在不仅决定成员获得哪些协议配置，还决定他们可以使用哪些节点：在分组中关闭某个节点后，该节点上的服务器会从组内所有用户的所有订阅格式中消失，设备密钥也不再下发到它，经由它的中转也不再提供。新节点保持启用。参见 [用户与分组](../guide/users-and-groups.md#分组标签页)。"
+        - "**Telegram 代理（MTProto），实验性。** 节点现在可以作为 Telegram 应用的代理：Fake TLS 在旁观者看来就像普通的 HTTPS 站点，握手中的名称可以是节点自己的域名，也可以是你选择的其他网站，没有密钥的访问者看到的是伪装站点。每人一个 Telegram 密钥，在用户卡片上按需生成；它不计入设备上限，`tg://` 链接放在用户自己的页面上，绝不会进入 VPN 订阅。面板按 Telegram 的连接方式检测服务器。参见 [MTProto](../guide/mtproto.md)。"
+        - "**协议配置**列表改为带筛选的表格；新建协议配置时先选择协议，再填写表单。参见 [协议配置](../guide/profiles.md)。"
     - title: 协议配置
       section: profiles
       points:
@@ -24,6 +25,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.68`�
         - "[AmneziaWG](../guide/amneziawg.md) 2.0 和 3.1，可运行于用户态或内核模块；每个节点可配置多个协议配置。"
         - "[VLESS](../guide/vless.md) 使用 xray-core：REALITY 可通过 XHTTP 或 TCP（RAW + Vision）运行，目标可以是节点自己的站点或其他站点；TLS 可通过 XHTTP 或 WebSocket 运行，支持直连或通过 CDN。"
         - "[同一节点上运行 VLESS 和 Hysteria2](../guide/vless-and-hysteria2.md)，包括 TCP 443。"
+        - "[MTProto](../guide/mtproto.md)，实验性：带 Fake TLS 的 Telegram 应用代理，每人一个密钥。"
     - title: 节点
       section: nodes
       points:
@@ -80,7 +82,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.68`�
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2、设置保留期限，并离线恢复。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.68
+  meta: v0.1.34 – v0.1.69
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
@@ -113,6 +115,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.68`�
     - title: 在生产环境中使用分组可用节点
       section: users
       text: "v0.1.68 新增。为分组关闭某个节点会立即对组内所有人生效，即使某人的用户卡片上也勾选了该节点，该节点上的协议配置也不再提供给他。参见 [用户与分组](../guide/users-and-groups.md#分组标签页)。"
+    - title: 在生产环境中使用 MTProto
+      section: profiles
+      text: "v0.1.69 新增，实验性。它尚未在真实封锁环境中验证过：先把链接给一两个人，确认 Telegram 能从他们的网络连上，再大范围分发。参见 [MTProto](../guide/mtproto.md)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。
@@ -158,7 +163,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.68`�
       text: "分流规则编辑器会提示列表中的所有类别，而不只是国家。"
     - title: 更多协议
       section: profiles
-      text: "候选：TUIC、NaiveProxy、MASQUE 和 MTProto（Telegram 代理）。每个都通过协议接口接入同一个订阅链接。"
+      text: "候选：TUIC、NaiveProxy 和 MASQUE。每个都通过协议接口接入同一个订阅链接。"
     - title: 提供更多功能的 Telegram 机器人
       section: integrations
       text: "目前机器人只发送告警并关联管理员聊天。未来计划：通过 Telegram 管理集群，并为用户提供机器人。参见 [Telegram 告警](../operations/telegram-alerts.md)。"

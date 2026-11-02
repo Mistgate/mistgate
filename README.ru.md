@@ -49,6 +49,7 @@ Hysteria2, VLESS и AmneziaWG. Два бинарника на Go, SQLite и syst
 | [Hysteria2](docs/ru/guide/hysteria2.md) | Официальное ядро Hysteria2 | UDP (QUIC). Обфускация Salamander (Gecko — экспериментально), port hopping, сертификат Let's Encrypt или закреплённый самоподписанный. |
 | [VLESS](docs/ru/guide/vless.md) | xray-core | REALITY поверх XHTTP или TCP (RAW + Vision); TLS поверх XHTTP или WebSocket, напрямую или за CDN. |
 | [AmneziaWG](docs/ru/guide/amneziawg.md) | amneziawg-go в userspace или модуль ядра | Версии 3.1 (по умолчанию) и 2.0, отдельный ключ на каждое устройство. Версий 1.5 и 1.0 нет. |
+| [MTProto](docs/ru/guide/mtproto.md) | Собственное ядро MTProto в Mistgate | Экспериментально. Прокси только для приложения Telegram: Fake TLS с доменом самой ноды или другим сайтом в рукопожатии, ключ на человека, остальным отвечает сайт-ширма. |
 
 Hysteria2 и VLESS уживаются на одной ноде, даже на общем TCP 443. Не каждый формат подписки передаёт любой профиль: [Что где работает](docs/ru/guide/subscriptions.md#что-где-работает).
 
