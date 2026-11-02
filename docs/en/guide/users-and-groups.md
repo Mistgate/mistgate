@@ -14,7 +14,7 @@ A person gets a server when all of this holds:
 - the node is enabled for the person's group (a group can leave nodes out);
 - the profile is on a node the person may use (all nodes, or the ones picked for them);
 - that profile on the node is switched on and running or starting;
-- one of the person's app switches allows the protocol.
+- one of the person's app switches allows the protocol (the **Telegram proxy** switch is the one for MTProto).
 
 Any change to these is pushed to the nodes at once.
 
@@ -30,7 +30,7 @@ Any change to these is pushed to the nodes at once.
 | Updates | The app refreshes the link by itself | A key is imported again by hand |
 | Switch on the user | the switch named after the link apps ("Happ", or the app names set in Subscriptions) | **AmneziaVPN** |
 
-Both are offered on the person's page side by side. At least one switch stays on. See [Subscriptions](subscriptions.md), [AmneziaWG](amneziawg.md) and [User page](user-page.md).
+Both are offered on the person's page side by side. At least one of the two switches stays on. A third switch, **Telegram proxy**, is separate: it adds a Telegram key and links on top of them (see [Telegram proxy](#telegram-proxy)). See [Subscriptions](subscriptions.md), [AmneziaWG](amneziawg.md), [MTProto](mtproto.md) and [User page](user-page.md).
 
 ## The People tab
 
@@ -77,7 +77,7 @@ The API also enables, deletes and resets the traffic of many users in one call. 
 | **Resets** | **Monthly** | **Daily**, **Weekly**, **Monthly** or **Never**. See [Quota periods](#quota-periods). |
 | **Term** | 30 days | Steps of 5 days; 0 means it never expires. Access pauses afterwards. |
 | **Devices** | 5 | 1–100: how many devices can connect. |
-| **Apps in the subscription** | what the group gives | The link-app switch and **AmneziaVPN**. Until you touch them, they follow the group: a way the group gives nothing for starts off, with the reason under it. |
+| **Apps in the subscription** | what the group gives | The link-app switch and **AmneziaVPN**. Until you touch them, they follow the group: a way the group gives nothing for starts off, with the reason under it. **Telegram proxy** is off by default and is not part of this choice: it is an addition, see [Telegram proxy](#telegram-proxy). |
 | **All nodes** | on | New nodes are added by themselves. Off: tick nodes; new nodes will not be added. |
 | **More** | folded | **DNS**: a preset of the user's own, inherited when empty (see [DNS](dns.md)). **Speed limits**: **Speed per person** and **Speed per device**, both unlimited by default (see [Limits](#limits)). |
 
@@ -109,6 +109,7 @@ The heading shows the devices in use against the limit ("3 of 5"): amber when it
 
 - **Apps on the link**: a row for every app that sends a device ID. The row shows the name (the model, or the name you gave it) and a quiet line: "online" with the servers it is connected to ("de1, nl1"), or how long ago the app fetched the link. Hover the row for the system and the app with their versions ("iOS 18.1 · Happ 3.4.2"); the **⋯** menu also shows since when, the traffic of the device over all time and its fingerprint. One device on two servers at once is a sign that its config was copied to another device; the row says so on hover.
 - **Apps without a device ID**: one row for every app on the link that does not send one (Hiddify, v2rayNG and the like, or Happ with HWID switched off). They share one place. In the **Strict** mode there is no such place and these apps cannot connect.
+- **Telegram proxy**: the person's Telegram key, when they have one. It takes no place in the limit; removing it revokes the key, as **Revoke** does.
 - **AmneziaVPN keys**: one row per device with its platform, profile and last connection; **Show key** and, in the menu, **Delete…**. **Add device** makes a new key. An **outdated** badge means the device needs its config again. See [AmneziaWG](amneziawg.md).
 - **Blocked (N)**: folded; see below.
 
@@ -121,6 +122,15 @@ The **⋯** menu of an app on the link:
 **Blocked (N)** lists the blocked devices. **Unblock** lets the device in again; it gets new keys at its next refresh of the subscription. The menu of the shared place has **Disconnect…**: the apps lose the connection now and connect again at their next refresh.
 
 **Delete** on an AmneziaVPN key disconnects the device and removes its key from every node.
+
+### Telegram proxy
+
+The switch **Telegram proxy** gives the person the [MTProto](mtproto.md) servers of their group, for the Telegram app only.
+
+- Turning it on makes the person's **Telegram key** at once, in the user form or on the card; turning it off revokes the key and its links. It cannot stand alone: at least one of the link apps and **AmneziaVPN** stays on.
+- The key is one secret for every MTProto server of the person. It appears among the devices as **Telegram proxy**, and it does **not** count against the device limit: it never takes a place and never fails for want of room.
+- The block **Telegram proxy** on the card shows the links (**Open in Telegram**, copy, a QR code) and has **Re-issue** and **Revoke**. Their effect is on [MTProto](mtproto.md#re-issue-and-revoke).
+- The links are not part of the subscription. The person finds them on their page ([User page](user-page.md#telegram-proxy)).
 
 ### Subscription page
 
@@ -155,7 +165,7 @@ The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 - **Group**: picking another group first asks the server what changes and shows it: "Alice loses: "AWG 3.1" (2 AmneziaVPN keys stop working)", "Gets: …". **Change group** confirms. An AmneziaVPN key belongs to one profile, so the keys of a lost profile stop working.
 - The group's profiles, in the two ways, each a link to its page.
 - **DNS**: the user's own preset, or empty for the group's or the default. The line under it says which applies and where it comes from.
-- The app switches.
+- The app switches, with **Telegram proxy**.
 - **All nodes**, or per-node checkboxes. A node where nothing fits the person is greyed out; "Hysteria2 only" marks a node with one protocol. A node's name opens its **Profiles** tab, where its own port and domain are set.
 
 ### Danger zone
@@ -174,6 +184,7 @@ A device is one place in the limit.
 - An app on the link that sends a device ID (HWID) is one device per ID. Which apps do: [Client apps](client-apps.md#which-apps-send-a-device-id).
 - All apps on the link that send no device ID share one place, **Apps without a device ID**.
 - Each AmneziaVPN key is one device.
+- The Telegram key is listed with the devices but is **not** one: it takes no place.
 
 ### How a device appears
 

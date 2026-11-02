@@ -64,6 +64,8 @@ message ProtocolInfo {
   string default_settings_json = 4;
   // Which user-facing app can consume the protocol (drives the user's Happ/Amnezia toggles).
   repeated App apps = 5;
+  // The protocol is new and not proven in the field (MTProto today): the list marks it, and the owner knows it may change.
+  bool experimental = 6;
 }
 
 message ListProtocolsRequest {}

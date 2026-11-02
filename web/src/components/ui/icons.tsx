@@ -69,6 +69,12 @@ const paths = {
   dns: "M4 6h16v5H4zM4 14h16v5H4zM8 8.5h.01M8 16.5h.01M12 8.5h4M12 16.5h4",
   sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z",
   video: "M3 6h12v12H3zM15 10l6-3v10l-6-3",
+  // the paper plane of Telegram (the MTProto proxy)
+  plane: "M21 3 3 10.5l5.5 2L10 20l3-5 5 4z",
+  // WARP (Cloudflare's exit) and a pinned (self-signed) certificate
+  cloud: "M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 9.1 4.5 4.5 0 0 0 7 18z",
+  pin: "M9 3h6l-1 6 3 3H7l3-3-1-6zM12 12v9",
+  qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z",
 } as const;
 
 export type IconName = keyof typeof paths;

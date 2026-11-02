@@ -21,17 +21,17 @@ func (s *Service) groupProtos(ctx context.Context, gs ...store.AccessGroup) ([]*
 	}
 	out := make([]*adminv1.Group, len(gs))
 	for i, g := range gs {
-		happ, amnezia := s.reachOf(g, full)
+		happ, amnezia, telegram := s.reachOf(g, full)
 		out[i] = &adminv1.Group{Id: g.ID, Name: g.Name, ProfileIds: g.ProfileIDs, UserCount: uint32(g.UserCount), DnsPresetId: g.DNSPresetID,
-			HappNodes: happ, AmneziaNodes: amnezia, Color: g.Color, DisabledNodeIds: g.DisabledNodeIDs}
+			HappNodes: happ, AmneziaNodes: amnezia, TelegramNodes: telegram, Color: g.Color, DisabledNodeIds: g.DisabledNodeIDs}
 	}
 	return out, nil
 }
 
 // reachOf counts the nodes where the group's profiles give something now, by the kind of app that takes them: the
 // subscription's rule (liveInbound) for a user with every node and both apps.
-func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia uint32) {
-	hn, an := map[string]bool{}, map[string]bool{}
+func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia, telegram uint32) {
+	hn, an, tn := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, f := range full {
 		if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) || slices.Contains(g.DisabledNodeIDs, f.Node.ID) {
 			continue
@@ -40,9 +40,10 @@ func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (
 		if !ok {
 			continue
 		}
-		h, a, _ := clientApps(proto)
+		h, a, tg, _ := clientApps(proto)
 		hn[f.Node.ID] = hn[f.Node.ID] || h
 		an[f.Node.ID] = an[f.Node.ID] || a
+		tn[f.Node.ID] = tn[f.Node.ID] || tg
 	}
 	for _, on := range hn {
 		if on {
@@ -54,7 +55,12 @@ func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (
 			amnezia++
 		}
 	}
-	return happ, amnezia
+	for _, on := range tn {
+		if on {
+			telegram++
+		}
+	}
+	return happ, amnezia, telegram
 }
 
 // impactOf says what moving people from the profile set `from` to `to` does: profiles lost and gained (in name

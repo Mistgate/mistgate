@@ -100,10 +100,10 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 |
 | `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
-| `protocols_list` | 只读 | 协议插件、客户端应用、精简设置结构（包括关键字段和敏感字段）以及默认设置。敏感默认值会被遮蔽。 |
+| `protocols_list` | 只读 | 协议插件、客户端应用、精简设置结构（包括关键字段和敏感字段）以及默认设置。敏感默认值会被遮蔽。对尚属新协议、还没有在实际环境中得到验证的协议（MTProto），会设置 `experimental`。 |
 | `profiles_list` | 只读 | 协议配置摘要，包括协议、节点数和用户数、警告、订阅格式、版本以及授予访问权限的分组。 |
 | `profile_get` | 只读 | 单个协议配置的摘要和已遮蔽敏感字段的设置；入站包含节点 ID 和名称、生效及覆盖后的端口和服务器名称、启用状态和运行状态；还包括授予访问权限的分组。参数为 `profile_id`。 |
-| `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
+| `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、三个应用开关（`app_happ`、`app_amnezia`、`app_telegram`）、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
 | `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置（每个都带有包含它的订阅格式）和节点。不返回订阅内容或链接。 |
@@ -132,7 +132,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 | 工具 | 权限级别 | 参数 | 需要所有者审批 |
 |---|---|---|---|
-| `user_create` | 操作员 | `name`（1 到 64 个字符，不区分大小写且唯一）、`group_id`，以及可选的 `quota_bytes`、`quota_reset`（`none`、`day`、`week`、`month`（默认值）、`rolling_month`）、`term_days`（最多 3650）、`device_limit`（最多 100）、`apps`（`happ`、`amnezia`）、`nodes`（`all` 或 `node_ids`）、`speed_limit_bps`（每人：其所有设备在同一节点上合计）、`device_speed_limit_bps`（每台设备）、`dns_preset_id` | 否 |
+| `user_create` | 操作员 | `name`（1 到 64 个字符，不区分大小写且唯一）、`group_id`，以及可选的 `quota_bytes`、`quota_reset`（`none`、`day`、`week`、`month`（默认值）、`rolling_month`）、`term_days`（最多 3650）、`device_limit`（最多 100）、`apps`（`happ`、`amnezia`、`telegram`）、`nodes`（`all` 或 `node_ids`）、`speed_limit_bps`（每人：其所有设备在同一节点上合计）、`device_speed_limit_bps`（每台设备）、`dns_preset_id` | 否 |
 | `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`；计划会同时写明两种限速：每人在单个节点上的限速和每台设备的限速） | 否 |
 | `user_disable` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `user_enable` | 操作员 | `user_ids`（1 到 50） | 否 |
@@ -166,6 +166,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 `rollout_start_plan` 会立即更新一个选定节点，不能启动全体节点更新。只能选择 Agent 支持自更新且版本早于发布包的节点（版本过旧、更新失败或已回滚）；已有滚动更新正在运行或暂停时，会拒绝执行。计划会固定到制定时受信任的签名发布包：执行前发布包发生变化时，执行会失败，需要重新制定计划。所有者批准后，`node_update_schedule_plan` 会为一个节点保存未来的更新计划；制定计划时节点可以离线，新计划会替换该节点的旧计划。保存的任务会固定到相应签名发布版本和 UTC 固定偏移量。到期时如果节点离线，面板最多等待两小时让节点重新连接，之后会将任务标记为错过，绝不会自行启动任务；若签名发布包发生变化，面板会保留任务并继续显示，不会替换为其他发布版本。使用 `node_update_schedule_cancel_plan` 可取消待执行任务。更改 `update_timezone` 只影响新计划；现有任务会保留已保存的时间点和偏移量。
 
 `subscription_app_upsert` 和 `subscription_app_remove` 会更改每位用户都能看到的页面上的一个应用，按平台和名称（不区分大小写）查找（同一平台上有两个应用同名时会拒绝执行：请在管理后台中更改）。新应用会添加到列表末尾。字段值的验证方式与保存**订阅 → 用户页面**时完全相同：下载链接必须是 http(s)；添加链接模板必须以应用自己的协议开头（`happ://add/{url}`、`myclient://add?url={url_enc}&name={name_enc}`），或使用 http(s)，不得使用 `javascript:`、`data:` 等协议；只能使用已知占位符；应用最多 30 个。此外，智能体提供的文本不能包含不可见格式字符。计划会读取并记住完整设置的状态；如果在执行前有人保存了订阅设置，执行会失败并返回「the subscription settings changed after the plan」，不会覆盖任何内容：请重新制定计划。在 `subscription_settings_get` 和智能体收到的计划副本中，链接查询字符串和较长的路径片段会显示为 `[redacted]`，与其他结果相同；所有者审批卡片会显示完整值。
+
+Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关之一。省略的字段保持用户原有的值，所以 `{"apps": {"telegram": true}}` 只更改 Telegram。开启会生成用户的 Telegram 密钥，关闭则吊销它；计划会把 Telegram 代理列在应用之中。`happ` 和 `amnezia` 中至少要保持开启一个：Telegram 是额外增加的。密钥本身没有对应的工具，也没有工具返回 `tg://proxy` 链接：重新签发或吊销密钥，以及读取链接，都由所有者在管理后台中完成（[MTProto](../guide/mtproto.md)）。
 
 ## 制定计划并执行
 
@@ -257,6 +259,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 ## 智能体永远无法获取的内容
 
 - 订阅链接和用户页面密码。
+- Telegram 代理密钥及其 `tg://proxy` 链接。
 - 设备密钥和配置、WARP 账户和密钥、协议配置密钥。
 - 服务器密码：无论是安装时使用的 SSH 密码，还是轮换后的密码。
 - 节点地址和证书固定指纹。例外是管理员令牌可通过 `node_server_access_list` 以及 `node_install` 和密码轮换计划查看已保存的 SSH 端点和登录名。

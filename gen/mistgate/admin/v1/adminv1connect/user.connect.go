@@ -60,6 +60,18 @@ const (
 	// UserServiceGetSubscriptionLinkProcedure is the fully-qualified name of the UserService's
 	// GetSubscriptionLink RPC.
 	UserServiceGetSubscriptionLinkProcedure = "/mistgate.admin.v1.UserService/GetSubscriptionLink"
+	// UserServiceGetTelegramLinksProcedure is the fully-qualified name of the UserService's
+	// GetTelegramLinks RPC.
+	UserServiceGetTelegramLinksProcedure = "/mistgate.admin.v1.UserService/GetTelegramLinks"
+	// UserServiceIssueTelegramKeyProcedure is the fully-qualified name of the UserService's
+	// IssueTelegramKey RPC.
+	UserServiceIssueTelegramKeyProcedure = "/mistgate.admin.v1.UserService/IssueTelegramKey"
+	// UserServiceRotateTelegramKeyProcedure is the fully-qualified name of the UserService's
+	// RotateTelegramKey RPC.
+	UserServiceRotateTelegramKeyProcedure = "/mistgate.admin.v1.UserService/RotateTelegramKey"
+	// UserServiceRevokeTelegramKeyProcedure is the fully-qualified name of the UserService's
+	// RevokeTelegramKey RPC.
+	UserServiceRevokeTelegramKeyProcedure = "/mistgate.admin.v1.UserService/RevokeTelegramKey"
 	// UserServiceGetUserConnectionProcedure is the fully-qualified name of the UserService's
 	// GetUserConnection RPC.
 	UserServiceGetUserConnectionProcedure = "/mistgate.admin.v1.UserService/GetUserConnection"
@@ -89,6 +101,21 @@ type UserServiceClient interface {
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
 	// "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
 	GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error)
+	// The Telegram proxy of one person: whether they hold a key and the tg://proxy links of their MTProto inbounds, one per
+	// node and profile. A read: it makes no device and no key and records no fetch. No links when Telegram is off, the
+	// person has no key, or no MTProto profile runs for them.
+	GetTelegramLinks(context.Context, *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error)
+	// Makes the person's Telegram key if they have none (the same answer when they have one). Telegram has to be on for them.
+	// The key is a device of the person (DEVICE_KIND_TELEGRAM_KEY, listed with their devices) but it does NOT count against
+	// their device limit, so this never fails for want of room. Turning Telegram on in CreateUser or UpdateUser makes the key
+	// the same way.
+	IssueTelegramKey(context.Context, *connect.Request[v1.IssueTelegramKeyRequest]) (*connect.Response[v1.IssueTelegramKeyResponse], error)
+	// Gives the key a new secret: every link made before stops working, the new links are in the answer. NOT_FOUND "key"
+	// when the person has none.
+	RotateTelegramKey(context.Context, *connect.Request[v1.RotateTelegramKeyRequest]) (*connect.Response[v1.RotateTelegramKeyResponse], error)
+	// Revokes the key and frees its place among the devices; the nodes drop the secret with the next desired state. Telegram
+	// stays on. Turning Telegram off or removing the key device (RevokeDevice) does the same.
+	RevokeTelegramKey(context.Context, *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error)
 	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
 	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
 	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -172,6 +199,30 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("GetSubscriptionLink")),
 			connect.WithClientOptions(opts...),
 		),
+		getTelegramLinks: connect.NewClient[v1.GetTelegramLinksRequest, v1.GetTelegramLinksResponse](
+			httpClient,
+			baseURL+UserServiceGetTelegramLinksProcedure,
+			connect.WithSchema(userServiceMethods.ByName("GetTelegramLinks")),
+			connect.WithClientOptions(opts...),
+		),
+		issueTelegramKey: connect.NewClient[v1.IssueTelegramKeyRequest, v1.IssueTelegramKeyResponse](
+			httpClient,
+			baseURL+UserServiceIssueTelegramKeyProcedure,
+			connect.WithSchema(userServiceMethods.ByName("IssueTelegramKey")),
+			connect.WithClientOptions(opts...),
+		),
+		rotateTelegramKey: connect.NewClient[v1.RotateTelegramKeyRequest, v1.RotateTelegramKeyResponse](
+			httpClient,
+			baseURL+UserServiceRotateTelegramKeyProcedure,
+			connect.WithSchema(userServiceMethods.ByName("RotateTelegramKey")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeTelegramKey: connect.NewClient[v1.RevokeTelegramKeyRequest, v1.RevokeTelegramKeyResponse](
+			httpClient,
+			baseURL+UserServiceRevokeTelegramKeyProcedure,
+			connect.WithSchema(userServiceMethods.ByName("RevokeTelegramKey")),
+			connect.WithClientOptions(opts...),
+		),
 		getUserConnection: connect.NewClient[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse](
 			httpClient,
 			baseURL+UserServiceGetUserConnectionProcedure,
@@ -194,6 +245,10 @@ type userServiceClient struct {
 	unblockDevice       *connect.Client[v1.UnblockDeviceRequest, v1.UnblockDeviceResponse]
 	deleteUsers         *connect.Client[v1.DeleteUsersRequest, v1.DeleteUsersResponse]
 	getSubscriptionLink *connect.Client[v1.GetSubscriptionLinkRequest, v1.GetSubscriptionLinkResponse]
+	getTelegramLinks    *connect.Client[v1.GetTelegramLinksRequest, v1.GetTelegramLinksResponse]
+	issueTelegramKey    *connect.Client[v1.IssueTelegramKeyRequest, v1.IssueTelegramKeyResponse]
+	rotateTelegramKey   *connect.Client[v1.RotateTelegramKeyRequest, v1.RotateTelegramKeyResponse]
+	revokeTelegramKey   *connect.Client[v1.RevokeTelegramKeyRequest, v1.RevokeTelegramKeyResponse]
 	getUserConnection   *connect.Client[v1.GetUserConnectionRequest, v1.GetUserConnectionResponse]
 }
 
@@ -252,6 +307,26 @@ func (c *userServiceClient) GetSubscriptionLink(ctx context.Context, req *connec
 	return c.getSubscriptionLink.CallUnary(ctx, req)
 }
 
+// GetTelegramLinks calls mistgate.admin.v1.UserService.GetTelegramLinks.
+func (c *userServiceClient) GetTelegramLinks(ctx context.Context, req *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error) {
+	return c.getTelegramLinks.CallUnary(ctx, req)
+}
+
+// IssueTelegramKey calls mistgate.admin.v1.UserService.IssueTelegramKey.
+func (c *userServiceClient) IssueTelegramKey(ctx context.Context, req *connect.Request[v1.IssueTelegramKeyRequest]) (*connect.Response[v1.IssueTelegramKeyResponse], error) {
+	return c.issueTelegramKey.CallUnary(ctx, req)
+}
+
+// RotateTelegramKey calls mistgate.admin.v1.UserService.RotateTelegramKey.
+func (c *userServiceClient) RotateTelegramKey(ctx context.Context, req *connect.Request[v1.RotateTelegramKeyRequest]) (*connect.Response[v1.RotateTelegramKeyResponse], error) {
+	return c.rotateTelegramKey.CallUnary(ctx, req)
+}
+
+// RevokeTelegramKey calls mistgate.admin.v1.UserService.RevokeTelegramKey.
+func (c *userServiceClient) RevokeTelegramKey(ctx context.Context, req *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error) {
+	return c.revokeTelegramKey.CallUnary(ctx, req)
+}
+
 // GetUserConnection calls mistgate.admin.v1.UserService.GetUserConnection.
 func (c *userServiceClient) GetUserConnection(ctx context.Context, req *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {
 	return c.getUserConnection.CallUnary(ctx, req)
@@ -281,6 +356,21 @@ type UserServiceHandler interface {
 	DeleteUsers(context.Context, *connect.Request[v1.DeleteUsersRequest]) (*connect.Response[v1.DeleteUsersResponse], error)
 	// "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
 	GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error)
+	// The Telegram proxy of one person: whether they hold a key and the tg://proxy links of their MTProto inbounds, one per
+	// node and profile. A read: it makes no device and no key and records no fetch. No links when Telegram is off, the
+	// person has no key, or no MTProto profile runs for them.
+	GetTelegramLinks(context.Context, *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error)
+	// Makes the person's Telegram key if they have none (the same answer when they have one). Telegram has to be on for them.
+	// The key is a device of the person (DEVICE_KIND_TELEGRAM_KEY, listed with their devices) but it does NOT count against
+	// their device limit, so this never fails for want of room. Turning Telegram on in CreateUser or UpdateUser makes the key
+	// the same way.
+	IssueTelegramKey(context.Context, *connect.Request[v1.IssueTelegramKeyRequest]) (*connect.Response[v1.IssueTelegramKeyResponse], error)
+	// Gives the key a new secret: every link made before stops working, the new links are in the answer. NOT_FOUND "key"
+	// when the person has none.
+	RotateTelegramKey(context.Context, *connect.Request[v1.RotateTelegramKeyRequest]) (*connect.Response[v1.RotateTelegramKeyResponse], error)
+	// Revokes the key and frees its place among the devices; the nodes drop the secret with the next desired state. Telegram
+	// stays on. Turning Telegram off or removing the key device (RevokeDevice) does the same.
+	RevokeTelegramKey(context.Context, *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error)
 	// What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
 	// LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
 	// address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -360,6 +450,30 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("GetSubscriptionLink")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceGetTelegramLinksHandler := connect.NewUnaryHandler(
+		UserServiceGetTelegramLinksProcedure,
+		svc.GetTelegramLinks,
+		connect.WithSchema(userServiceMethods.ByName("GetTelegramLinks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceIssueTelegramKeyHandler := connect.NewUnaryHandler(
+		UserServiceIssueTelegramKeyProcedure,
+		svc.IssueTelegramKey,
+		connect.WithSchema(userServiceMethods.ByName("IssueTelegramKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceRotateTelegramKeyHandler := connect.NewUnaryHandler(
+		UserServiceRotateTelegramKeyProcedure,
+		svc.RotateTelegramKey,
+		connect.WithSchema(userServiceMethods.ByName("RotateTelegramKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceRevokeTelegramKeyHandler := connect.NewUnaryHandler(
+		UserServiceRevokeTelegramKeyProcedure,
+		svc.RevokeTelegramKey,
+		connect.WithSchema(userServiceMethods.ByName("RevokeTelegramKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	userServiceGetUserConnectionHandler := connect.NewUnaryHandler(
 		UserServiceGetUserConnectionProcedure,
 		svc.GetUserConnection,
@@ -390,6 +504,14 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceDeleteUsersHandler.ServeHTTP(w, r)
 		case UserServiceGetSubscriptionLinkProcedure:
 			userServiceGetSubscriptionLinkHandler.ServeHTTP(w, r)
+		case UserServiceGetTelegramLinksProcedure:
+			userServiceGetTelegramLinksHandler.ServeHTTP(w, r)
+		case UserServiceIssueTelegramKeyProcedure:
+			userServiceIssueTelegramKeyHandler.ServeHTTP(w, r)
+		case UserServiceRotateTelegramKeyProcedure:
+			userServiceRotateTelegramKeyHandler.ServeHTTP(w, r)
+		case UserServiceRevokeTelegramKeyProcedure:
+			userServiceRevokeTelegramKeyHandler.ServeHTTP(w, r)
 		case UserServiceGetUserConnectionProcedure:
 			userServiceGetUserConnectionHandler.ServeHTTP(w, r)
 		default:
@@ -443,6 +565,22 @@ func (UnimplementedUserServiceHandler) DeleteUsers(context.Context, *connect.Req
 
 func (UnimplementedUserServiceHandler) GetSubscriptionLink(context.Context, *connect.Request[v1.GetSubscriptionLinkRequest]) (*connect.Response[v1.GetSubscriptionLinkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetSubscriptionLink is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetTelegramLinks(context.Context, *connect.Request[v1.GetTelegramLinksRequest]) (*connect.Response[v1.GetTelegramLinksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.GetTelegramLinks is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) IssueTelegramKey(context.Context, *connect.Request[v1.IssueTelegramKeyRequest]) (*connect.Response[v1.IssueTelegramKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.IssueTelegramKey is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) RotateTelegramKey(context.Context, *connect.Request[v1.RotateTelegramKeyRequest]) (*connect.Response[v1.RotateTelegramKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.RotateTelegramKey is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) RevokeTelegramKey(context.Context, *connect.Request[v1.RevokeTelegramKeyRequest]) (*connect.Response[v1.RevokeTelegramKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.UserService.RevokeTelegramKey is not implemented"))
 }
 
 func (UnimplementedUserServiceHandler) GetUserConnection(context.Context, *connect.Request[v1.GetUserConnectionRequest]) (*connect.Response[v1.GetUserConnectionResponse], error) {

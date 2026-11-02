@@ -70,6 +70,7 @@ For each relay that works, a person gets a **twin** of the exit's server right a
 - **Who gets it:** everyone who may use the exit's server and may use the entry node. There is no new setting; restrict it with the person's node choice.
 - **When:** at the subscription's next refresh (12 hours by default). A relay that is off or failed has no twin.
 - **What people see:** a second server to pick when the first does not connect. Nothing changes for the servers they already use.
+- **MTProto:** a relay passes an [MTProto](mtproto.md) server on as well. The twin is not in the subscription: it is one more link in the person's **Telegram proxy** block, marked **via RU**, with the same key and the same name in the handshake as the exit's.
 
 ## What it cannot pass on
 

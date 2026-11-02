@@ -18,8 +18,17 @@ Each person gets one subscription link, and each app gets the format it reads:
 
 - **Hysteria2 and VLESS**: a subscription app such as Happ (a list of URIs), or an app on the mihomo core, such as kl!ck, Clash Verge or FlClash (a Mihomo YAML profile). A browser that opens the link gets the person's page with instructions.
 - **AmneziaWG**: the AmneziaVPN app, with a key per device; kl!ck and the other apps on the mihomo core get it through the subscription.
+- **MTProto** (experimental): the Telegram app, with a `tg://proxy` link from the person's page; no subscription carries it.
 
 A Hysteria2 profile with a self-signed certificate is verified with the official Hysteria2 client and with Mihomo; Happ is not verified with it yet. Xray JSON and sing-box JSON are served too; sing-box cannot carry a self-signed Hysteria2 certificate or XHTTP ([what works where](../guide/subscriptions.md#what-works-where)). See [Subscriptions](../guide/subscriptions.md) and [Client apps](../guide/client-apps.md): kl!ck is the app Mistgate recommends on Windows and macOS.
+
+## Can Mistgate be a proxy for Telegram?
+
+Yes, as an experimental profile: [MTProto](../guide/mtproto.md). A node becomes a Telegram proxy with Fake TLS, and each person who has the **Telegram proxy** switch gets a key and `tg://proxy` links on their page. It serves the Telegram app only, not other apps, and the links are never put into a subscription. Telegram goes together with Happ or AmneziaVPN: a person cannot have the proxy alone.
+
+## Will the Telegram proxy work in Russia?
+
+It may not. MTProto proxies have been detected and blocked there in waves since spring 2026, so one can work for a while and then stop. The panel's checks run from outside the country: a green check shows that the node works, not that a network in Russia lets the proxy through. Test it with people on the networks that matter, and keep a VPN profile as the main way.
 
 ## How many users and nodes can it handle?
 

@@ -310,6 +310,14 @@ func termFact(days uint32) Fact {
 	return codedFact("term", plural(int(days), "day", "days"), "days", "n", strconv.Itoa(int(days)))
 }
 
+// appsFact is the apps of a new user: "default" when the request named none.
+func appsFact(named *appsArg, resolved appsOn) Fact {
+	if named == nil {
+		return codedFact("apps", "default", "default")
+	}
+	return codedFact("apps", resolved.text(), resolved.code())
+}
+
 func nodesFact(key string, n *nodesArg) Fact {
 	if w := n.word(); w != "all" {
 		return codedFact(key, n.text(), "some", "n", w)
@@ -363,9 +371,45 @@ func quotaReset(s string) (adminv1.QuotaReset, error) {
 	return 0, errors.New("quota_reset: none, day, week, month or rolling_month")
 }
 
+// appsArg names the apps to switch. A field left out keeps the user's current value (on a new user: Happ and AmneziaVPN on,
+// Telegram off), so turning one app on or off touches that app alone.
 type appsArg struct {
-	Happ    bool `json:"happ"`
-	Amnezia bool `json:"amnezia"`
+	Happ     *bool `json:"happ,omitempty" jsonschema:"the subscription link (Happ and the other link apps)"`
+	Amnezia  *bool `json:"amnezia,omitempty" jsonschema:"AmneziaVPN keys"`
+	Telegram *bool `json:"telegram,omitempty" jsonschema:"the Telegram proxy (MTProto): the person gets a key and tg:// links; switching it off revokes the key"`
+}
+
+// appsOn is the three toggles of a user, every one decided.
+type appsOn struct{ Happ, Amnezia, Telegram bool }
+
+// newUserApps is what a user gets when the apps are not named.
+var newUserApps = appsOn{Happ: true, Amnezia: true}
+
+func appsOf(u *adminv1.User) appsOn {
+	return appsOn{Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(), Telegram: u.GetApps().GetTelegram()}
+}
+
+// over is the toggles with the fields of a laid over base; a == nil is base.
+func (a *appsArg) over(base appsOn) appsOn {
+	if a == nil {
+		return base
+	}
+	if a.Happ != nil {
+		base.Happ = *a.Happ
+	}
+	if a.Amnezia != nil {
+		base.Amnezia = *a.Amnezia
+	}
+	if a.Telegram != nil {
+		base.Telegram = *a.Telegram
+	}
+	return base
+}
+
+// explicit is a with every toggle set to the value of o: what a plan stores, so that the apply does what the plan said whatever
+// the user looks like by then.
+func (o appsOn) explicit() *appsArg {
+	return &appsArg{Happ: &o.Happ, Amnezia: &o.Amnezia, Telegram: &o.Telegram}
 }
 
 type nodesArg struct {
@@ -373,11 +417,14 @@ type nodesArg struct {
 	NodeIDs []string `json:"node_ids,omitempty"`
 }
 
+// proto is the toggles to send; nil (the panel's default) when the apps were not named at all. On a change, give a plan's
+// explicit toggles.
 func (a *appsArg) proto() *adminv1.AppToggles {
 	if a == nil {
 		return nil
 	}
-	return &adminv1.AppToggles{Happ: a.Happ, Amnezia: a.Amnezia}
+	o := a.over(newUserApps)
+	return &adminv1.AppToggles{Happ: o.Happ, Amnezia: o.Amnezia, Telegram: o.Telegram}
 }
 
 func (n *nodesArg) proto() *adminv1.NodeSelection {
@@ -387,9 +434,10 @@ func (n *nodesArg) proto() *adminv1.NodeSelection {
 	return &adminv1.NodeSelection{All: n.All, NodeIds: n.NodeIDs}
 }
 
-func (a *appsArg) check() error {
-	if a != nil && !a.Happ && !a.Amnezia {
-		return errors.New("apps: at least one app must be on")
+// check refuses toggles with neither Happ nor AmneziaVPN on (Telegram is added to one of them, it cannot stand alone).
+func (o appsOn) check() error {
+	if !o.Happ && !o.Amnezia {
+		return errors.New("apps: at least one of happ and amnezia must be on (telegram comes in addition)")
 	}
 	return nil
 }
@@ -408,16 +456,20 @@ func (n *nodesArg) check() error {
 	return err
 }
 
-func (a *appsArg) text() string {
+func (o appsOn) text() string {
+	var s string
 	switch {
-	case a == nil:
-		return "default"
-	case a.Happ && a.Amnezia:
-		return "Subscription link and AmneziaVPN keys"
-	case a.Happ:
-		return "Subscription link only"
+	case o.Happ && o.Amnezia:
+		s = "Subscription link and AmneziaVPN keys"
+	case o.Happ:
+		s = "Subscription link only"
+	default:
+		s = "AmneziaVPN keys only"
 	}
-	return "AmneziaVPN keys only"
+	if o.Telegram {
+		s += " and the Telegram proxy"
+	}
+	return s
 }
 
 func (n *nodesArg) text() string {
@@ -428,17 +480,20 @@ func (n *nodesArg) text() string {
 	return plural(len(n.NodeIDs), "node", "nodes")
 }
 
-// code is the ways as the owner's UI words them: default, both, happ (the subscription link), amnezia (the keys).
-func (a *appsArg) code() string {
+// code is the ways as the owner's UI words them: both, happ (the subscription link), amnezia (the keys), each with
+// "+telegram" when the Telegram proxy is on.
+func (o appsOn) code() string {
+	c := "amnezia"
 	switch {
-	case a == nil:
-		return "default"
-	case a.Happ && a.Amnezia:
-		return "both"
-	case a.Happ:
-		return "happ"
+	case o.Happ && o.Amnezia:
+		c = "both"
+	case o.Happ:
+		c = "happ"
 	}
-	return "amnezia"
+	if o.Telegram {
+		c += "+telegram"
+	}
+	return c
 }
 
 // word is "all" or how many nodes.
@@ -467,7 +522,7 @@ type userCreateArgs struct {
 	QuotaReset    string    `json:"quota_reset,omitempty" jsonschema:"none, day, week, month (default) or rolling_month"`
 	TermDays      uint32    `json:"term_days,omitempty" jsonschema:"valid for this many days from now; 0 = never expires"`
 	DeviceLimit   uint32    `json:"device_limit,omitempty" jsonschema:"0 = the panel's default"`
-	Apps          *appsArg  `json:"apps,omitempty" jsonschema:"absent = both apps on"`
+	Apps          *appsArg  `json:"apps,omitempty" jsonschema:"absent = Happ and AmneziaVPN on, Telegram off; a field left out of it keeps that default"`
 	Nodes         *nodesArg `json:"nodes,omitempty" jsonschema:"absent = all nodes"`
 	SpeedLimitBps uint64    `json:"speed_limit_bps,omitempty" jsonschema:"per person: all the devices of the user together on one node (so two nodes at once can reach twice this); 0 = no limit"`
 	// DeviceSpeedLimitBps is the other limit: each device of the user alone. Both can be set; a device is held to the lower.
@@ -497,7 +552,8 @@ var userCreate = changeSpec[userCreateArgs]{
 				return nil, err
 			}
 		}
-		if err := a.Apps.check(); err != nil {
+		apps := a.Apps.over(newUserApps)
+		if err := apps.check(); err != nil {
 			return nil, err
 		}
 		if err := a.Nodes.check(); err != nil {
@@ -525,7 +581,7 @@ var userCreate = changeSpec[userCreateArgs]{
 			{Key: "name", Value: nm(a.Name), Untrusted: true},
 			quotaFact(a.QuotaBytes, reset),
 			termFact(a.TermDays),
-			codedFact("apps", a.Apps.text(), a.Apps.code()),
+			appsFact(a.Apps, apps),
 			nodesFact("nodes", a.Nodes),
 		}
 		if a.SpeedLimitBps > 0 || a.DeviceSpeedLimitBps > 0 {
@@ -594,7 +650,7 @@ func checkSubscriptionName(name string) error {
 var userUpdate = changeSpec[userUpdateArgs]{
 	name: "user_update", min: ProfileOperator,
 	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure),
-	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps, nodes, speed limit or DNS preset. Only the fields you give change.",
+	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too.",
 	plan: func(c *call, a userUpdateArgs) (*planned, error) {
 		cur, err := c.getUser(a.UserID)
 		if err != nil {
@@ -656,11 +712,13 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			n++
 		}
 		if a.Apps != nil {
-			if err := a.Apps.check(); err != nil {
+			was := appsOf(u)
+			now := a.Apps.over(was) // a field left out keeps the user's value
+			if err := now.check(); err != nil {
 				return nil, err
 			}
-			was := &appsArg{Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia()}
-			change("apps", was.text()+" -> "+a.Apps.text(), was.code(), a.Apps.code())
+			change("apps", was.text()+" -> "+now.text(), was.code(), now.code())
+			a.Apps = now.explicit()
 			n++
 		}
 		if a.Nodes != nil {
@@ -693,7 +751,7 @@ var userUpdate = changeSpec[userUpdateArgs]{
 		if n == 0 {
 			return nil, errors.New("nothing to change: give at least one field")
 		}
-		return &planned{Summary: "Change " + plural(n, "setting", "settings") + " of one user.", Facts: facts}, nil
+		return &planned{Summary: "Change " + plural(n, "setting", "settings") + " of one user.", Facts: facts, Params: a}, nil
 	},
 	apply: func(c *call, a userUpdateArgs, _ Plan) (done, error) {
 		req := &adminv1.UpdateUserRequest{

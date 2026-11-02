@@ -98,7 +98,7 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 		idx = 0
 		var used int
 		if err := a.s.R.QueryRowContext(ctx,
-			`SELECT count(*) FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive, add.Device.UserID).Scan(&used); err != nil {
+			accLimitDevices("?"), add.Device.UserID).Scan(&used); err != nil {
 			return nil, accMapErr(err)
 		}
 		if used >= add.Limit {
@@ -124,7 +124,7 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 		device.AWG, device.CreatedAt = true, now
 		cred.DeviceID, cred.UserID, cred.ProfileID, cred.ConfigEpoch, cred.CreatedAt = device.ID, device.UserID, add.ProfileID, epoch, now
 		guardSQL := `(
-			(SELECT count(*) FROM device d WHERE d.user_id = ?4 AND d.revoked_at IS NULL AND ` + accDeviceLive + `) < ?5
+			(` + accLimitDevices("?4") + `) < ?5
 			AND EXISTS (SELECT 1 FROM profile WHERE id = ?1 AND critical_epoch = ?6)
 			AND ?3 NOT IN (` + awgTakenSQL + `)
 		)`

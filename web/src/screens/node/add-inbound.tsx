@@ -130,7 +130,7 @@ function AddForm({
   // a Let's Encrypt profile on an IP node: the domain field is where it gets fixed, so the cursor goes there (unless the
   // admin is typing in another field)
   const acme = refused?.code === "acme_needs_domain";
-  const realityDomain = refused?.code === "reality_needs_domain";
+  const realityDomain = refused?.code === "reality_needs_domain" || refused?.code === "mtproto_needs_domain"; // a name for the node's own site / Fake TLS name
   if (realityDomain && domainFor !== chosen) setDomainFor(chosen);
   useEffect(() => {
     if (acme && chosen && !(document.activeElement instanceof HTMLInputElement)) document.getElementById(sniId)?.focus();
@@ -261,7 +261,7 @@ function AddForm({
           spellCheck={false}
         />
       )}
-      {realityDomain && <Notice tone="danger">{t("err.reality_needs_domain", refused.vars)}</Notice>}
+      {realityDomain && <Notice tone="danger">{t(refused.code === "mtproto_needs_domain" ? "err.mtproto_needs_domain" : "err.reality_needs_domain", refused.vars)}</Notice>}
       {acme && profile && <AcmeBlock vars={refused.vars} profile={profile} nodeName={node.name} onEnter={() => document.getElementById(sniId)?.focus()} onSelfSigned={onSelfSigned} />}
       {blocking && (
         <Notice tone="danger" className="items-start">

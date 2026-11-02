@@ -4,7 +4,7 @@ import { DnsSource } from "@/gen/mistgate/admin/v1/user_pb";
 import { Icon } from "@/components/ui/icons";
 import { Select } from "@/components/ui/select";
 import { catalogOf, presetName, presetSubtitle, transportKey } from "@/screens/subscriptions/model";
-import { dnsPresetsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
+import { dnsPresetsQuery, useLinkAppList } from "@/screens/subscriptions/queries";
 import { groupsQuery } from "./rpc";
 import { useTx, type Key, type Tx } from "./t";
 
@@ -35,11 +35,11 @@ export function useDnsLabel(): (id: string, name: string) => string {
 /** When a changed preset reaches each app: the line under every preset select (the default, a group's, a user's). */
 export function DnsDelivery() {
   const t = useTx();
-  const apps = useLinkAppNames();
+  const apps = useLinkAppList();
   return (
     <span className="flex items-start gap-1.5 text-[11px] leading-snug text-muted">
       <Icon name="clock" size={12} className="mt-px block flex-none" />
-      {t("subs.dns.delivery", { apps })}
+      {apps.length > 0 ? t("subs.dns.delivery", { apps: apps.join(", ") }) : t("subs.dns.deliveryPlain")}
     </span>
   );
 }

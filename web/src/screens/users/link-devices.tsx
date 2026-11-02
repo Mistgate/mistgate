@@ -2,7 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useState, type ReactNode } from "react";
 import { DeviceKind } from "@/gen/mistgate/admin/v1/user_pb";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { Icon, type IconName } from "@/components/ui/icons";
+import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { StatusDot } from "@/components/ui/status";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -18,15 +18,17 @@ import { ConfirmModal } from "./ui";
 
 /**
  * The person's devices by what they are: apps on the link with a device ID of their own, the one place the apps without a
- * device ID share, and AmneziaVPN keys. A device of an older panel has no kind: a key has its profile, the rest is the
+ * device ID share, AmneziaVPN keys, and the Telegram key (a device of its own kind, shown in the Telegram block). A device of an older panel has no kind: a key has its profile, the rest is the
  * shared place (before device IDs every app on the link was that one device).
  */
 export function splitDevices(devices: Device[]) {
   const isKey = (d: Device) => d.kind === DeviceKind.KEY || d.awgProfileId !== "";
+  const isTelegram = (d: Device) => d.kind === DeviceKind.TELEGRAM_KEY;
   return {
     link: devices.filter((d) => !isKey(d) && d.kind === DeviceKind.LINK),
-    shared: devices.filter((d) => !isKey(d) && d.kind !== DeviceKind.LINK),
+    shared: devices.filter((d) => !isKey(d) && !isTelegram(d) && d.kind !== DeviceKind.LINK),
     keys: devices.filter(isKey),
+    telegram: devices.filter(isTelegram),
   };
 }
 
@@ -38,9 +40,9 @@ export function platformGlyph(d: { platform: string; model: string; osVersion?: 
 
 /**
  * The tile in front of a device row, as on the person's page: a rounded square in the soft tint of the way (sky for the
- * link, mint for the keys) with the glyph in the tone's dark shade; grey for a blocked device.
+ * link, mint for the keys, rose for the Telegram key) with the glyph in the tone's dark shade; grey for a blocked device.
  */
-export function Tile({ icon, tone, muted }: { icon: IconName; tone: "sky" | "mint"; muted?: boolean }) {
+export function Tile({ icon, tone, muted }: { icon: IconName; tone: Tone; muted?: boolean }) {
   return (
     <span aria-hidden data-tone={muted ? undefined : tone} style={{ borderRadius: 11 }} className={cx("grid size-9 flex-none place-items-center", muted ? "bg-surface-2 text-faint" : "tone-chip")}>
       <Icon name={icon} size={18} />

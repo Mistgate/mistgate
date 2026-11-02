@@ -87,6 +87,7 @@ vi.mock("@/lib/api", async (orig) => ({
   awgApi: { listMimicryPresets: () => Promise.resolve({ presets: [], domains: [] }) },
 }));
 vi.mock("@tanstack/react-router", () => ({
+  useBlocker: () => ({ status: "idle" }),
   useParams: () => params,
   useSearch: () => search,
   useNavigate: () => navigate,
@@ -147,6 +148,10 @@ const portField = () => document.querySelector<HTMLInputElement>("input[aria-lab
 const pressed = (label: string) => button(label)?.getAttribute("aria-pressed");
 
 describe("a new profile", () => {
+  // the form is step 2 of a new profile: its protocol is in the URL (step 1 is new-profile.test.tsx)
+  beforeEach(() => {
+    search = { protocol: "hysteria2" };
+  });
   it("is named after the protocol and its port until the name is typed, and asks for a name rather than greying the button", async () => {
     await mount();
     expect(nameField().value).toBe("Hysteria2 · 443");
@@ -187,7 +192,7 @@ describe("a new profile", () => {
   });
 
   it("made from a node's page goes on that node and returns there", async () => {
-    search = { node: "nod_1" };
+    search = { node: "nod_1", protocol: "hysteria2" };
     createProfile.mockResolvedValue({ profile: { id: "prf_new", name: "Hysteria2 · 443", protocol: "hysteria2" } });
     createInbound.mockResolvedValue({ inbound: {} });
     await mount();
@@ -200,11 +205,11 @@ describe("a new profile", () => {
   });
 
   it("leaves default AmneziaWG networks unset so the server assigns a free pair", async () => {
+    search = { protocol: "awg" };
     createProfile.mockResolvedValue({ profile: { id: "prf_awg", name: "AmneziaWG · 10819", protocol: "awg" } });
     updateGroup.mockResolvedValue({});
     createInbound.mockResolvedValue({ inbound: {} });
     await mount();
-    await click(radio("AmneziaWG"));
     await settle();
     expect(document.querySelector<HTMLInputElement>('input[aria-label="Client network (IPv4)"]')?.value).toBe("");
     expect(document.querySelector<HTMLInputElement>('input[aria-label="Client network (IPv6)"]')?.value).toBe("");
@@ -219,12 +224,14 @@ describe("a new profile", () => {
 });
 
 describe("a new VLESS profile", () => {
+  beforeEach(() => {
+    search = { protocol: "vless" };
+  });
   const field = (label: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
   const openAdvanced = () => click(button("Advanced"));
 
   it("hides the XHTTP block when the transport is TCP, and brings it back for XHTTP", async () => {
     await mount();
-    await click(radio("VLESS"));
     await settle();
     await openAdvanced();
     expect(field("Path")).not.toBeNull();
@@ -243,10 +250,6 @@ describe("a new VLESS profile", () => {
     // the preview follows the form after a 350 ms pause
     const debounce = () => act(async () => void (await new Promise((r) => setTimeout(r, 400))));
     await mount();
-    expect(formats()).toBe("Link list · Mihomo · Xray JSON · sing-box");
-    await click(radio("VLESS"));
-    await debounce();
-    await settle();
     expect(formats()).toBe("Link list · Mihomo · Xray JSON not in sing-box: XHTTP");
     await click(radio("TCP (RAW + Vision)"));
     await debounce();
@@ -256,7 +259,6 @@ describe("a new VLESS profile", () => {
 
   it("shows the node's own site as the target at first, without the fields of another site, and brings them with the other segment", async () => {
     await mount();
-    await click(radio("VLESS"));
     await settle();
     expect(radio("This node’s site")?.getAttribute("aria-checked")).toBe("true");
     expect(radio("Another site")?.getAttribute("aria-checked")).toBe("false");
@@ -272,7 +274,6 @@ describe("a new VLESS profile", () => {
 
   it("says under port 443 what happens next to Hysteria2 for the node's own site, with the guide, and what it takes for another site", async () => {
     await mount();
-    await click(radio("VLESS"));
     await settle();
     const own = "On a node with Hysteria2 this profile takes TCP 443 from its site and shows the same site through REALITY. Nodes need a domain.";
     expect(text()).toContain(own);

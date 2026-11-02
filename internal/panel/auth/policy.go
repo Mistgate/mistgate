@@ -269,6 +269,10 @@ var procedureLevels = map[string]level{
 	adminv1connect.UserServiceUnblockDeviceProcedure:       levelWrite,
 	adminv1connect.UserServiceDeleteUsersProcedure:         levelWrite,
 	adminv1connect.UserServiceGetSubscriptionLinkProcedure: levelWrite, // the link is the user's credential
+	adminv1connect.UserServiceGetTelegramLinksProcedure:    levelWrite, // a tg:// link carries the proxy secret
+	adminv1connect.UserServiceIssueTelegramKeyProcedure:    levelWrite, // like the AmneziaVPN key calls: the key is a user credential
+	adminv1connect.UserServiceRotateTelegramKeyProcedure:   levelWrite,
+	adminv1connect.UserServiceRevokeTelegramKeyProcedure:   levelWrite,
 }
 
 // levelOf is the level a procedure path needs; unknown paths need the owner.

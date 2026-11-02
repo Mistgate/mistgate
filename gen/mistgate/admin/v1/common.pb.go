@@ -100,6 +100,8 @@ const (
 	App_APP_HAPP App = 1
 	// AmneziaVPN / AmneziaWG apps.
 	App_APP_AMNEZIA App = 2
+	// Telegram clients: MTProto proxy links (tg://proxy).
+	App_APP_TELEGRAM App = 3
 )
 
 // Enum value maps for App.
@@ -108,11 +110,13 @@ var (
 		0: "APP_UNSPECIFIED",
 		1: "APP_HAPP",
 		2: "APP_AMNEZIA",
+		3: "APP_TELEGRAM",
 	}
 	App_value = map[string]int32{
 		"APP_UNSPECIFIED": 0,
 		"APP_HAPP":        1,
 		"APP_AMNEZIA":     2,
+		"APP_TELEGRAM":    3,
 	}
 )
 
@@ -1322,11 +1326,12 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x10NODE_STATUS_BLIP\x10\x04\x12\x1a\n" +
 	"\x16NODE_STATUS_NO_TRAFFIC\x10\x05\x12\x18\n" +
 	"\x14NODE_STATUS_UPDATING\x10\x06\x12\x17\n" +
-	"\x13NODE_STATUS_RETIRED\x10\a*9\n" +
+	"\x13NODE_STATUS_RETIRED\x10\a*K\n" +
 	"\x03App\x12\x13\n" +
 	"\x0fAPP_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bAPP_HAPP\x10\x01\x12\x0f\n" +
-	"\vAPP_AMNEZIA\x10\x02*\x98\x01\n" +
+	"\vAPP_AMNEZIA\x10\x02\x12\x10\n" +
+	"\fAPP_TELEGRAM\x10\x03*\x98\x01\n" +
 	"\fInboundState\x12\x1d\n" +
 	"\x19INBOUND_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15INBOUND_STATE_PENDING\x10\x01\x12\x18\n" +

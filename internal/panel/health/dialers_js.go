@@ -20,3 +20,7 @@ func dialAWG(context.Context, Target, DialOptions) (Tunnel, error) {
 func dialVLESS(context.Context, Target, DialOptions) (Tunnel, error) {
 	return nil, errClientUnsupported
 }
+
+func dialMTProto(context.Context, Target, DialOptions) (Tunnel, error) {
+	return nil, errClientUnsupported
+}

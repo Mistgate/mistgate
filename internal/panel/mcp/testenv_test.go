@@ -741,6 +741,10 @@ func (w *world) ListProtocols(context.Context, *connect.Request[adminv1.ListProt
 		Id: "hysteria2", DisplayName: "Hysteria 2", Apps: []adminv1.App{adminv1.App_APP_HAPP},
 		SettingsSchemaJson:  `{"type":"object","properties":{"port":{"type":"integer","minimum":1,"maximum":65535,"default":443,"x-critical":true},"mode":{"type":"string","enum":["none","fast"],"default":"none"},"tls":{"type":"object","properties":{"server_name":{"type":"string","default":"example.com","x-critical":true},"password":{"type":"string","default":"` + canaryTK + `","x-secret":true}}}}}`,
 		DefaultSettingsJson: `{"port":443,"mode":"none","tls":{"server_name":"example.com","password":"` + canaryTK + `"}}`,
+	}, {
+		Id: "mtproto", DisplayName: "MTProto", Apps: []adminv1.App{adminv1.App_APP_TELEGRAM}, Experimental: true,
+		SettingsSchemaJson:  `{"type":"object","properties":{"port":{"type":"integer","minimum":1,"maximum":65535,"default":443}}}`,
+		DefaultSettingsJson: `{"port":443}`,
 	}}}), nil
 }
 

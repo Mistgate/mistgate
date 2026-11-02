@@ -241,6 +241,9 @@ const appsKey: Record<string, MessageKey> = {
   both: "approval.value.apps.both",
   happ: "approval.value.apps.happ",
   amnezia: "approval.value.apps.amnezia",
+  "both+telegram": "approval.value.apps.bothTg",
+  "happ+telegram": "approval.value.apps.happTg",
+  "amnezia+telegram": "approval.value.apps.amneziaTg",
 };
 
 /** One side of a "from -> to" change, by the field it belongs to; the raw value where there is no better word. */

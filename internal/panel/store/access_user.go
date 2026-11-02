@@ -14,7 +14,7 @@ type AccessUser struct {
 	ID, Name, SubscriptionName, GroupID, GroupName string
 	Disabled                                       bool
 	Status                                         string // active | disabled | expired | limited (derived, see access.ComputeStatus)
-	AppHapp, AppAmnezia                            bool
+	AppHapp, AppAmnezia, AppTelegram               bool
 	AllNodes                                       bool
 	QuotaBytes                                     uint64 // 0 = unlimited
 	QuotaReset                                     string // none | day | week | month | rolling_month
@@ -33,7 +33,7 @@ type AccessUser struct {
 	GroupDNSPresetID                               string   // the user's group's preset, read-only here ("" = none)
 }
 
-const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name AS group_name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.all_nodes,
+const accUserCols = `u.id, u.name, u.subscription_name, u.group_id, g.name AS group_name, u.disabled, u.status, u.app_happ, u.app_amnezia, u.app_telegram, u.all_nodes,
 	u.quota_bytes, u.quota_reset, u.period_start, u.used_bytes, u.expires_at, u.device_limit, u.speed_limit_bps, u.device_speed_limit_bps,
 	u.sub_token_hash, u.sub_token_enc, u.last_seen_at, u.last_node_id, u.created_at, u.dns_preset_id, g.dns_preset_id AS group_dns_preset_id`
 
@@ -41,15 +41,15 @@ const accUserFrom = ` FROM user u JOIN user_group g ON g.id = u.group_id `
 
 func scanAccessUser(r rowScanner) (AccessUser, error) {
 	var u AccessUser
-	var dis, happ, amn, all int
+	var dis, happ, amn, tgl, all int
 	var quota, used, speed, deviceSpeed, period, seen, created int64
 	var expires sql.NullInt64
 	var lastNode, dns, gdns sql.NullString
-	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &all,
+	err := r.Scan(&u.ID, &u.Name, &u.SubscriptionName, &u.GroupID, &u.GroupName, &dis, &u.Status, &happ, &amn, &tgl, &all,
 		&quota, &u.QuotaReset, &period, &used, &expires, &u.DeviceLimit, &speed, &deviceSpeed,
 		&u.SubTokenHash, &u.SubTokenEnc, &seen, &lastNode, &created, &dns, &gdns)
 	u.DNSPresetID, u.GroupDNSPresetID = dns.String, gdns.String
-	u.Disabled, u.AppHapp, u.AppAmnezia, u.AllNodes = dis == 1, happ == 1, amn == 1, all == 1
+	u.Disabled, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AllNodes = dis == 1, happ == 1, amn == 1, tgl == 1, all == 1
 	u.QuotaBytes, u.UsedBytes, u.SpeedLimitBps, u.DeviceSpeedLimitBps = uint64(quota), uint64(used), uint64(speed), uint64(deviceSpeed)
 	u.PeriodStart = fromUnix(period)
 	u.ExpiresAt = accTimeIfNonzero(expires)
@@ -82,7 +82,9 @@ type AccessDevice struct {
 	HWIDHash []byte
 	// AWG marks a device created by AddAWGDevice: a synthetic hwid_hash (AWGHwidHash) and first/last seen 0 =
 	// "never connected" until the fleet records a handshake.
-	AWG                                bool
+	AWG bool
+	// Key marks a Telegram key made by AddTelegramKey: kind key with a synthetic hwid_hash, like an AWG device, and no seen times.
+	Key                                bool
 	FirstSeenAt, LastSeenAt, CreatedAt time.Time
 	Protocols                          []string // protocols with a live credential
 }
@@ -99,10 +101,10 @@ type AccessCred struct {
 }
 
 func accInsertUserStmt(u AccessUser) Stmt {
-	return Stmt{Query: `INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, all_nodes, quota_bytes, quota_reset,
+	return Stmt{Query: `INSERT INTO user (id, name, subscription_name, group_id, disabled, status, app_happ, app_amnezia, app_telegram, all_nodes, quota_bytes, quota_reset,
 		   period_start, used_bytes, expires_at, device_limit, speed_limit_bps, device_speed_limit_bps, sub_token_hash, sub_token_enc, created_at, dns_preset_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		Args: []any{u.ID, u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AllNodes)),
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		Args: []any{u.ID, u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AllNodes)),
 			int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps),
 			u.SubTokenHash, u.SubTokenEnc, unix(u.CreatedAt), accNullStr(u.DNSPresetID)}}
 }
@@ -120,7 +122,7 @@ func accInsertDeviceStmt(d AccessDevice) Stmt {
 	kind := DeviceKindLink
 	seen := unix(d.CreatedAt)
 	switch {
-	case d.AWG:
+	case d.AWG || d.Key:
 		hwid, seen, kind = AWGHwidHash(d.ID), 0, DeviceKindKey
 	case len(d.HWIDHash) > 0:
 		hwid = d.HWIDHash
@@ -269,7 +271,7 @@ func (a Access) collectUsers(ctx context.Context, rows *sql.Rows) ([]AccessUser,
 	return out, nrows.Err()
 }
 
-// AccessUserQuery is a list request. Filter is "", "online", "expiring", "over_quota" or "over_device_limit".
+// AccessUserQuery is a list request. Filter is "", "online", "expiring", "over_quota", "over_device_limit" or "telegram".
 type AccessUserQuery struct {
 	Filter            string
 	Query             string
@@ -300,7 +302,7 @@ const (
 )
 
 // AccessUserCounts are the filter chip badges for one query, ignoring the filter itself.
-type AccessUserCounts struct{ All, Online, Expiring, OverQuota, DevicesUsed, DevicesOnline, OverDeviceLimit int }
+type AccessUserCounts struct{ All, Online, Expiring, OverQuota, DevicesUsed, DevicesOnline, OverDeviceLimit, Telegram int }
 
 // accOverDeviceLimit is the condition "the user has more live devices than the limit" over the device_counts join (dc): the
 // same count as devices_used. A limit of 0 is no limit, never over.
@@ -326,7 +328,7 @@ func accUserDeviceCountsCTE(base string) string {
 		 LEFT JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
 		 JOIN user u ON u.id = d.user_id
 		 JOIN user_group g ON g.id = u.group_id
-		 WHERE ` + base + ` AND d.revoked_at IS NULL
+		 WHERE ` + base + ` AND d.revoked_at IS NULL AND ` + accNotTelegramKey + `
 		 GROUP BY d.id
 	), device_counts AS (
 		SELECT user_id, count(*) AS devices_used,
@@ -426,10 +428,11 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 		   coalesce(sum(u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes), 0),
 		   coalesce(sum(coalesce(dc.devices_used, 0)), 0),
 		   coalesce(sum(coalesce(dc.devices_online, 0)), 0),
-		   coalesce(sum(`+accOverDeviceLimit+`), 0)`+accUserFrom+
+		   coalesce(sum(`+accOverDeviceLimit+`), 0),
+		   coalesce(sum(u.app_telegram = 1), 0)`+accUserFrom+
 			`LEFT JOIN device_counts dc ON dc.user_id = u.id WHERE `+base,
 		countArgs...).
-		Scan(&counts.All, &counts.Online, &counts.Expiring, &counts.OverQuota, &counts.DevicesUsed, &counts.DevicesOnline, &counts.OverDeviceLimit)
+		Scan(&counts.All, &counts.Online, &counts.Expiring, &counts.OverQuota, &counts.DevicesUsed, &counts.DevicesOnline, &counts.OverDeviceLimit, &counts.Telegram)
 	if err != nil {
 		return nil, false, counts, err
 	}
@@ -446,6 +449,8 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 		lconds += ` AND u.quota_bytes > 0 AND u.used_bytes >= u.quota_bytes`
 	case "over_device_limit":
 		lconds += ` AND ` + accOverDeviceLimit
+	case "telegram":
+		lconds += ` AND u.app_telegram = 1`
 	}
 	sort := q.Sort
 	if sort == AccessUserSortUnspecified {
@@ -485,11 +490,11 @@ func (a Access) ListUsers(ctx context.Context, q AccessUserQuery) ([]AccessUser,
 func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool) error {
 	stmts := []Stmt{
 		guard(`EXISTS (SELECT 1 FROM user WHERE id = ?)`, u.ID),
-		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, all_nodes = ?,
+		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, app_telegram = ?, all_nodes = ?,
 			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?, device_speed_limit_bps = ?,
 			   dns_preset_id = ?
 			 WHERE id = ?`,
-			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AllNodes)),
+			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AllNodes)),
 				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
 	}
 	if setNodes {
@@ -613,6 +618,9 @@ type SubscriptionData struct {
 	// none) and its live credentials. The zero value: there is none (yet).
 	Device      AccessDevice
 	DeviceCreds []AccessCred
+	// TelegramCred is the credential of the person's Telegram key (zero ID: they hold none). It is read for the links of the
+	// person's page, never for a request's device.
+	TelegramCred AccessCred
 	// LinkMode is the stored mode of the device limit (LinkModeTrack, LinkModeEnforce or LinkModeStrict), read in the same batch.
 	// Blocked: the owner blocked the HWID this request reports (always false for a request without one).
 	LinkMode  string
@@ -655,6 +663,16 @@ func scanSubscriptionTraffic(r rowScanner) (subscriptionTraffic, error) {
 		return subscriptionTraffic{}, err
 	}
 	return subscriptionTraffic{Up: uint64(up), Down: uint64(down)}, nil
+}
+
+func scanTelegramCred(r rowScanner) (AccessCred, error) {
+	c := AccessCred{Protocol: TelegramProtocol}
+	var created int64
+	if err := r.Scan(&c.ID, &c.DeviceID, &c.UserID, &c.SecretEnc, &c.DataJSON, &created); err != nil {
+		return AccessCred{}, err
+	}
+	c.CreatedAt = fromUnix(created)
+	return c, nil
 }
 
 func scanAccessDevice(r rowScanner) (AccessDevice, error) {
@@ -775,6 +793,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var devices []AccessDevice
 	var awgDevices []AccessAWGDevice
 	var deviceRows []linkDeviceCredRow
+	var telegram AccessCred
 	var mode string
 	var blocked int
 	var group AccessGroup
@@ -799,6 +818,9 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 			WHERE d.revoked_at IS NULL AND d.kind = 'key' AND d.user_id = ? ORDER BY d.created_at, d.id`, userID)
 	// Read without access too: a denied fetch still touches the device (access.subView).
 	r.add(appendRows(&deviceRows, scanLinkDeviceCredRow), linkDeviceCredsSQL, userID, hwidArg(hwidHash))
+	r.add(maybeOneRow(&telegram, scanTelegramCred), `SELECT c.id AS credential_id, c.device_id AS device_id, c.user_id AS user_id, c.secret_enc AS secret_enc, c.data_json AS data_json, c.created_at AS credential_created_at
+			FROM device_credential c JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL AND d.kind = 'key'
+			WHERE c.user_id = ? AND c.protocol = 'mtproto' AND c.revoked_at IS NULL`, userID)
 	r.add(oneRow(&mode, scanString), `SELECT coalesce((SELECT v FROM setting WHERE k = ?), '') AS mode`, SettingLinkDeviceLimit)
 	if len(hwidHash) > 0 {
 		r.add(oneRow(&blocked, scanCount), `SELECT count(*) AS n FROM device WHERE user_id = ? AND hwid_hash = ? AND blocked_at IS NOT NULL`, userID, hwidHash)
@@ -829,7 +851,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	}
 	snapshot := linkDeviceSnapshotOf(deviceRows)
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
+		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds, TelegramCred: telegram,
 		LinkMode: LinkModeOf(mode), Blocked: blocked > 0}
 	if len(online) > 0 {
 		out.OnlineDevices = make(map[string][]string, len(online))
@@ -870,7 +892,7 @@ func (a Access) UsersProtocolsSince(ctx context.Context, ids []string, since tim
 func (a Access) DeviceCounts(ctx context.Context, ids []string) (map[string]int, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.user_id, count(*) FROM device d
-		 WHERE d.revoked_at IS NULL AND `+accDeviceLive+` AND d.user_id IN (SELECT value FROM json_each(?)) GROUP BY d.user_id`, accJSON(ids))
+		 WHERE d.revoked_at IS NULL AND `+accLimitDevice+` AND d.user_id IN (SELECT value FROM json_each(?)) GROUP BY d.user_id`, accJSON(ids))
 	if err != nil {
 		return nil, err
 	}
@@ -1019,13 +1041,13 @@ type AccessDesiredCred struct {
 	SpeedLimitBps                                           uint64 // the person's limit (user.speed_limit_bps)
 	DeviceSpeedLimitBps                                     uint64 // one device's limit (user.device_speed_limit_bps)
 	ExpiresAt                                               time.Time
-	AppHapp, AppAmnezia                                     bool
+	AppHapp, AppAmnezia, AppTelegram                        bool
 }
 
 // DesiredCreds returns the candidate credentials of every enabled inbound of a node.
 func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia
+		`SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia, u.app_telegram
 		 FROM inbound i
 		 JOIN profile p ON p.id = i.profile_id
 		 JOIN user_group_profile gp ON gp.profile_id = p.id
@@ -1046,12 +1068,12 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 		var c AccessDesiredCred
 		var speed, deviceSpeed int64
 		var exp sql.NullInt64
-		var happ, amn int
-		if err := rows.Scan(&c.InboundID, &c.CredID, &c.UserID, &c.DeviceID, &c.Protocol, &c.DataJSON, &speed, &deviceSpeed, &exp, &happ, &amn); err != nil {
+		var happ, amn, tgl int
+		if err := rows.Scan(&c.InboundID, &c.CredID, &c.UserID, &c.DeviceID, &c.Protocol, &c.DataJSON, &speed, &deviceSpeed, &exp, &happ, &amn, &tgl); err != nil {
 			return nil, err
 		}
 		c.SpeedLimitBps, c.DeviceSpeedLimitBps = uint64(speed), uint64(deviceSpeed)
-		c.ExpiresAt, c.AppHapp, c.AppAmnezia = accTimeIfNonzero(exp), happ == 1, amn == 1
+		c.ExpiresAt, c.AppHapp, c.AppAmnezia, c.AppTelegram = accTimeIfNonzero(exp), happ == 1, amn == 1, tgl == 1
 		out = append(out, c)
 	}
 	return out, rows.Err()

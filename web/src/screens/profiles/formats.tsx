@@ -13,7 +13,7 @@ const nameKey: Partial<Record<SubFormat, Key>> = {
   [SubFormat.XRAY_JSON]: "subs.fmt.xray",
   [SubFormat.SINGBOX_JSON]: "profiles.fmt.singbox",
 };
-const nameOf = (f: SubFormat, t: Tx) => {
+export const nameOf = (f: SubFormat, t: Tx) => {
   const key = nameKey[f];
   return key ? t(key) : SubFormat[f];
 };
@@ -33,13 +33,18 @@ export function dropsOf(formats: readonly Format[]): { note: string; formats: Su
   return drops;
 }
 
+/** A drop in words: the formats' names ("sing-box"), the short mark ("not in sing-box: XHTTP") and the tooltip's sentence. */
+export function dropWords({ formats, note }: { formats: SubFormat[]; note: string }, t: Tx) {
+  const names = formats.map((f) => nameOf(f, t)).join(t("profiles.fmt.sep"));
+  return { names, text: t("profiles.fmt.drop", { formats: names, why: why(note, t) }), full: tip(note, t) };
+}
+
 /**
  * A drop, as a fact rather than an error: a yellow chip with "not in" and the short reason ("not in sing-box: XHTTP"), the
  * full sentence in a tooltip and in its accessible name.
  */
 function Drop({ formats, note, t }: { formats: SubFormat[]; note: string; t: Tx }) {
-  const text = t("profiles.fmt.drop", { formats: formats.map((f) => nameOf(f, t)).join(t("profiles.fmt.sep")), why: why(note, t) });
-  const full = tip(note, t);
+  const { text, full } = dropWords({ formats, note }, t);
   return (
     <Tip label={full}>
       <span
@@ -57,7 +62,7 @@ function Drop({ formats, note, t }: { formats: SubFormat[]; note: string; t: Tx 
  * AmneziaWG is in Mihomo and in the AmneziaVPN keys by design, never in the other formats: a fact of the protocol, not a drop
  * to notice. Such a profile gets no chip, only "AmneziaVPN keys" in the quiet line.
  */
-const keysOnly = (drops: { note: string }[]) => drops.length > 0 && drops.every((d) => d.note === "awg");
+export const keysOnly = (drops: { note: string }[]) => drops.length > 0 && drops.every((d) => d.note === "awg");
 
 /** Only the drops (the user card): nothing when the profile works in every format, goes by keys, or its formats are unknown. */
 export function FormatDrops({ formats, t }: { formats: readonly Format[]; t: Tx }) {

@@ -625,3 +625,12 @@ a { color: inherit; }
 :lang(zh) .h1 { line-height: 1.25; }
 :lang(zh) .h2 { line-height: 1.3; }
 :lang(zh) .h3 { line-height: 1.4; }
+
+/* The Telegram proxy: server-like cards; on a computer the QR code beside the button (one gap between everything, no padded rows) */
+.tg-grid { grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); }
+.tg .srv-name { flex: 0 1 auto; }
+.tg-body { display: flex; align-items: center; gap: 16px; margin-top: auto; }
+.tg-qr { width: 112px; padding: 8px; border-radius: 12px; }
+.tg-acts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; flex: 1; min-width: 0; }
+.tg-acts .btn { width: 100%; }
+.tg-empty { padding: 16px; }

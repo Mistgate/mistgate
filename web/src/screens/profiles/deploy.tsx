@@ -64,6 +64,7 @@ export function refusalOf(e: unknown, t: Tx, node: { name: string; address: stri
   }
   // the node's own site behind VLESS REALITY is Let's Encrypt too, and its other way out is another site, not a self-signed certificate
   if (code === "reality_needs_domain") return { kind: "domain", text: t("err.reality_needs_domain", { node: v.node || node.name, address: v.address || node.address }) };
+  if (code === "mtproto_needs_domain") return { kind: "domain", text: t("err.mtproto_needs_domain", { node: v.node || node.name, address: v.address || node.address }) };
   if (code === "already_on_node" || /already deployed on the node/.test(msg)) return { kind: "already", text: t("where.already") };
   if (/port override lies inside the hop range/.test(msg)) return { kind: "port", text: t("where.portPrompt", { node: node.name }) };
   return { kind: "other", text: codedError(e, t, "awg.err") };

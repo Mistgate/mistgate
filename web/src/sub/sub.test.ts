@@ -309,6 +309,44 @@ describe("view", () => {
     expect(el.querySelector(`.help a[href='${tg}']`)).not.toBeNull();
   });
 
+  it("lists a Telegram link by its label alone, never by a node or profile name", () => {
+    const d = normalize({
+      ...cases.first,
+      access: { happ: true, amnezia: false, telegram: true },
+      telegram: {
+        links: [
+          { label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", url: "tg://proxy?server=de1.example.com&port=443&secret=ee00", node: "fra-edge-07", profile: "private-profile" },
+          { label: "Germany · Frankfurt · IPv6", country_code: "DE", place: "Frankfurt", ipv6: true, url: "tg://proxy?server=2001%3Adb8%3A%3A5&port=443&secret=ee00" },
+          { label: "evil", url: "https://example.com/not-telegram" },
+        ],
+      },
+    });
+    const el = view(d, state("ios", {}, "en"), actions());
+    const cards = [...el.querySelectorAll(".srv.tg")];
+    expect(cards.map((c) => text(c.querySelector(".srv-name")))).toEqual(["Germany · Frankfurt", "Germany · Frankfurt"]);
+    expect(text(el)).not.toContain("fra-edge-07");
+    expect(text(el)).not.toContain("private-profile");
+  });
+
+  it("gives every Telegram link a card: the twin marked, Open in Telegram, a QR code for a computer, and one line on what happens", () => {
+    const url = "tg://proxy?server=198.51.100.20&port=8443&secret=ee00";
+    const d = normalize({
+      ...cases.first,
+      access: { happ: true, amnezia: false, telegram: true },
+      telegram: { links: [{ label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", relay: true, via: "RU", url }] },
+    });
+    const el = view(d, state("windows", {}, "en"), actions());
+    const card = el.querySelector(".srv.tg")!;
+    expect(text(card.querySelector(".srv-top .chip"))).toBe("via RU");
+    expect(card.querySelector<HTMLAnchorElement>(".btn.pri")!.getAttribute("href")).toBe(url);
+    expect(card.querySelector(".tg-qr svg")?.getAttribute("aria-label")).toBe("QR code of the Telegram proxy: Germany");
+    expect(text(el)).toContain("Telegram offers to connect the proxy.");
+    // on, but no MTProto profile runs yet
+    const none = view(normalize({ ...cases.first, access: { happ: true, amnezia: false, telegram: true }, telegram: { links: [] } }), state("windows", {}, "en"), actions());
+    expect(none.querySelector(".srv.tg")).toBeNull();
+    expect(text(none.querySelector(".tg-empty"))).toBe("The proxy is still being prepared — message the admin.");
+  });
+
   it("a closed announcement stays closed through redraws; a new text shows again", () => {
     const a = actions();
     const d = data("first");

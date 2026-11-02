@@ -106,6 +106,16 @@ type InboundInit struct {
 // skips it. hysteria2 does not implement it.
 type PerDevice interface{ PerDevice() bool }
 
+// Experimental is an optional interface. A plugin answering true is new and not proven in the field: the protocol list marks it
+// (ProtocolInfo.experimental). hysteria2, vless and awg do not implement it.
+type Experimental interface{ Experimental() bool }
+
+// IsExperimental reports whether p is marked as experimental.
+func IsExperimental(p Protocol) bool {
+	e, ok := p.(Experimental)
+	return ok && e.Experimental()
+}
+
 // ClientReq is the minimum version of one client app for a profile's settings.
 type ClientReq struct {
 	Client plugin.ClientID

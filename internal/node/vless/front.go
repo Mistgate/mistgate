@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/acme"
 
 	"github.com/mistgate/mistgate/internal/decoy"
+	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -269,41 +270,21 @@ func socketName(id string) string {
 	return hex.EncodeToString(sum[:12])
 }
 
-// siteCertificate is what the site presents. A TLS-ALPN-01 hello and, once a certificate has been issued for the name, every
-// hello go to the ACME entry (autocert returns the cached certificate and renews it in the background). Before the first
-// issuance a persisted self-signed certificate of the same name serves instead: autocert blocks a first handshake for
-// the whole issuance, and that wait would hold up every visitor.
-//
-// "Issued" is "Info reports a certificate": the leaf last handed out. It stays set after the leaf's expiry, on purpose: with
-// no visitor in months the reported leaf is old while the cache already holds the renewed one, and only the ACME entry
-// reads it.
-func siteCertificate(acmeCert, fallback engine.Cert) func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-		if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto {
-			return acmeCert.GetCertificate(hello)
-		}
-		if acmeCert.Info != nil && !acmeCert.Info().NotAfter.IsZero() {
-			return acmeCert.GetCertificate(hello)
-		}
-		return fallback.GetCertificate(hello)
-	}
-}
-
 // startSelfSite acquires the certificates of the inbound's name and starts the site. The returned Cert is the ACME one: its
 // Info is what Health reports (zero until issued). The self-signed fallback is not reported, or a 10-year certificate
 // would read as a healthy one before Let's Encrypt has answered.
 func (in *inbound) startSelfSite(ctx context.Context) (*site, engine.Cert, error) {
-	certs := in.e.env.Certs
-	if certs == nil {
+	src := in.e.env.Certs
+	if src == nil {
 		return nil, engine.Cert{}, errors.New("a REALITY target of this node's own site needs a certificate source")
 	}
 	tlsSpec := in.spec.TLS
-	acmeCert, err := certs.Acquire(ctx, in.spec.ID, tlsSpec)
+	acmeCert, err := src.Acquire(ctx, in.spec.ID, tlsSpec)
 	if err != nil {
 		return nil, engine.Cert{}, err
 	}
 	in.certHeld = true
-	fallback, err := certs.Acquire(ctx, in.spec.ID, plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: tlsSpec.ServerName})
+	fallback, err := src.Acquire(ctx, in.spec.ID, plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: tlsSpec.ServerName})
 	if err != nil {
 		return nil, engine.Cert{}, err
 	}
@@ -314,7 +295,7 @@ func (in *inbound) startSelfSite(ctx context.Context) (*site, engine.Cert, error
 	if h == nil {
 		h = decoy.Handler()
 	}
-	s, err := startSite(in.spec.ID, siteCertificate(acmeCert, fallback), h)
+	s, err := startSite(in.spec.ID, certs.SiteCertificate(acmeCert, fallback), h)
 	if err != nil {
 		return nil, engine.Cert{}, err
 	}

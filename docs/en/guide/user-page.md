@@ -20,9 +20,10 @@ From top to bottom:
    - **Your device**: the platform, detected from the browser (iPhone, Android, Windows, Mac, Linux) and switchable.
    - **With an app** (the names come from the apps list; only link apps are listed, never a key app): the app, then install it (with the store or download button and the card's description) and **Add to Happ**, the one-tap link from the app's template. "Won't open? Copy the link" sits right under it. "All your servers (4) appear in Happ — pick any". A QR code of the link, for connecting a phone, when **QR for a second device** is on. "Connected with the subscription" says when the apps on the link last fetched it. Opening the page does not update this time, and does not add a device; only an app fetch does.
    - **With a key**: install AmneziaVPN, **Add a device** (the key form opens), paste the key. When self-service is off the step says "Ask for a key".
-5. **My devices**: one list with the apps on the link and the person's keys, and one **Add a device** button for both ways (see [My devices](#my-devices)).
-6. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
-7. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
+5. **Telegram proxy**, when the owner switched Telegram on for the person, under the servers (see [Telegram proxy](#telegram-proxy)).
+6. **My devices**: one list with the apps on the link and the person's keys, and one **Add a device** button for both ways (see [My devices](#my-devices)).
+7. **Support**: "Something not working?" with a button to the support link, when **Support button** is on and a link is set.
+8. A line at the bottom: "This link is personal — don't share it. Works while the subscription is active."
 
 A platform with no app gets "There's no app for … — pick another device above". A person who gets nothing yet sees "The server is still being set up — message the admin."
 
@@ -74,6 +75,17 @@ The steps come from the apps list of the **User page** tab. For the chosen platf
 - the add button from the "add" link template, or "Copy link" with where to paste it ("In Happ: add a subscription → paste the link") when there is no template.
 
 For keys the page gives the AmneziaVPN steps: on a phone "Open AmneziaVPN", "Tap "+" and paste the key", "Tap "Continue""; on a computer "AmneziaVPN → "+" → "Connection settings file" → pick the downloaded file", with the warning to add the file, not the key. "Needs AmneziaVPN 5.0.1.5 or newer" names the oldest client for the key's protocol version.
+
+## Telegram proxy
+
+When the owner has switched **Telegram proxy** on for the person (see [Users and groups](users-and-groups.md#telegram-proxy)), the page has a block **Telegram proxy** with the line "Connect to Telegram through the proxy without a VPN app". It is for the Telegram app only and is independent of the steps above.
+
+- Each row is one [MTProto](mtproto.md) link, named by the server's country and place, like the other servers of the page, and never by the node's or the profile's name in the panel. A second link at the node's IPv6 address ends with **· IPv6**, and one through a relay with **· via RU** (the entry's country code, in the language of the page).
+- **Open in Telegram** opens the link in the Telegram app, which asks the person to confirm the proxy. **Copy link** copies it, to paste into a chat or into Telegram's proxy settings.
+- Before the owner has made the person's key, or while no MTProto server runs for them, the block says "The proxy is still being prepared — message the admin." A person with Telegram switched off has no block.
+- The person cannot re-issue or remove the key on the page. The owner does it in the admin.
+
+The links carry the person's key, so they are as private as the subscription link.
 
 ## My devices
 

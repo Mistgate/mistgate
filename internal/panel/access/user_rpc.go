@@ -79,6 +79,10 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 	if err != nil {
 		return nil, s.internal("device counts", err)
 	}
+	telegramKeys, err := a.TelegramKeyUsers(ctx, ids)
+	if err != nil {
+		return nil, s.internal("telegram keys", err)
+	}
 	viaProtos, err := a.UsersProtocolsSince(ctx, ids, s.now().Add(-viaWindow))
 	if err != nil {
 		return nil, s.internal("via", err)
@@ -114,7 +118,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		var via []adminv1.App
 		for _, pid := range viaProtos[u.ID] {
 			if p, ok := s.reg.Get(pid); ok {
-				_, _, apps := clientApps(p)
+				_, _, _, apps := clientApps(p)
 				for _, app := range apps {
 					if !slices.Contains(via, app) {
 						via = append(via, app)
@@ -130,7 +134,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		}
 		out[i] = &adminv1.User{
 			Id: u.ID, Name: u.Name, SubscriptionName: u.SubscriptionName, GroupId: u.GroupID, GroupName: u.GroupName, Status: statusProto[u.Status],
-			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia}, Via: via,
+			Apps: &adminv1.AppToggles{Happ: u.AppHapp, Amnezia: u.AppAmnezia, Telegram: u.AppTelegram}, Via: via,
 			DevicesUsed: uint32(devs[u.ID]), DeviceLimit: uint32(u.DeviceLimit),
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
@@ -140,7 +144,8 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
 		out[i].GroupColor = groups[u.GroupID].Color
-		out[i].AccessHapp, out[i].AccessAmnezia = s.accessOf(u, groups[u.GroupID], full)
+		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram = s.accessOf(u, groups[u.GroupID], full)
+		_, out[i].TelegramIssued = telegramKeys[u.ID]
 		if isOnline {
 			out[i].CurrentNodeId, out[i].CurrentNodeName = cur, nodeName[cur]
 		}
@@ -180,10 +185,11 @@ func (s *Service) subscriptionURL(token string) (string, error) {
 // missingProtocols are the protocols the apps allow, a device gets one credential for, and that are not in have. A per-device
 // protocol (AWG) is not among them: its credentials are issued on request, bound to one profile (AddAWGDevice, and
 // lazily for the device of a Mihomo subscription).
-func (s *Service) missingProtocols(happ, amnezia bool, have map[string]bool) []protocols.Protocol {
+func (s *Service) missingProtocols(happ, amnezia, telegram bool, have map[string]bool) []protocols.Protocol {
 	var out []protocols.Protocol
 	for _, p := range s.reg.List() {
-		if !have[p.ID()] && !protocols.IsPerDevice(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia)...) {
+		// A per-device protocol (AWG) is issued on request, and the Telegram key is the person's own: neither goes to a link device.
+		if !have[p.ID()] && !protocols.IsPerDevice(p) && !isTelegram(p) && protocols.AllowedForApps(p, appsOf(happ, amnezia, telegram)...) {
 			out = append(out, p)
 		}
 	}
@@ -191,10 +197,10 @@ func (s *Service) missingProtocols(happ, amnezia bool, have map[string]bool) []p
 }
 
 // newCreds issues a credential for every protocol missingProtocols names.
-func (s *Service) newCreds(userID, deviceID string, happ, amnezia bool, have map[string]bool) ([]store.AccessCred, error) {
+func (s *Service) newCreds(userID, deviceID string, happ, amnezia, telegram bool, have map[string]bool) ([]store.AccessCred, error) {
 	var out []store.AccessCred
 	now := s.now()
-	for _, p := range s.missingProtocols(happ, amnezia, have) {
+	for _, p := range s.missingProtocols(happ, amnezia, telegram, have) {
 		iss, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
 		if err != nil {
 			return nil, err
@@ -231,12 +237,12 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	if m.TermDays > 36500 {
 		return nil, invalid("term is too long")
 	}
-	happ, amnezia := true, true
+	happ, amnezia, telegram := true, true, false
 	if m.Apps != nil {
-		happ, amnezia = m.Apps.Happ, m.Apps.Amnezia
+		happ, amnezia, telegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
 	}
 	if !happ && !amnezia {
-		return nil, invalid("at least one app must be on")
+		return nil, invalid("at least one of Happ and Amnezia must be on")
 	}
 	all, nodeIDs, err := s.resolveNodes(ctx, m.Nodes)
 	if err != nil {
@@ -258,13 +264,21 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	id := store.NewID("usr_")
 	u := store.AccessUser{
 		ID: id, Name: name, GroupID: m.GroupId, Status: ComputeStatus(false, expires, m.QuotaBytes, 0, now),
-		AppHapp: happ, AppAmnezia: amnezia, AllNodes: all, NodeIDs: nodeIDs,
+		AppHapp: happ, AppAmnezia: amnezia, AppTelegram: telegram, AllNodes: all, NodeIDs: nodeIDs,
 		QuotaBytes: m.QuotaBytes, QuotaReset: reset, PeriodStart: PeriodStart(reset, now), ExpiresAt: expires,
 		DeviceLimit: limit, SpeedLimitBps: m.SpeedLimitBps, DeviceSpeedLimitBps: m.DeviceSpeedLimitBps, DNSPresetID: m.DnsPresetId,
 		SubTokenHash: hash, SubTokenEnc: s.vault.Seal([]byte(token), id), CreatedAt: now,
 	}
-	// No device yet: the first app that fetches the subscription makes its own, with its own credentials.
-	switch err := s.st.Access().CreateUser(ctx, u, store.AccessDevice{}, nil); {
+	// No link device yet: the first app that fetches the subscription makes its own, with its own credentials. The Telegram key
+	// is the person's own and is made with them.
+	var keyDev store.AccessDevice
+	var keyCreds []store.AccessCred
+	if telegram {
+		if keyDev, keyCreds, err = s.telegramKeyForNewUser(id, now); err != nil {
+			return nil, err
+		}
+	}
+	switch err := s.st.Access().CreateUser(ctx, u, keyDev, keyCreds); {
 	case errors.Is(err, store.ErrAccessExists):
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
 	case errors.Is(err, store.ErrNotFound):
@@ -328,6 +342,8 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 		q.Filter = "over_quota"
 	case adminv1.UserFilter_USER_FILTER_OVER_DEVICE_LIMIT:
 		q.Filter = "over_device_limit"
+	case adminv1.UserFilter_USER_FILTER_TELEGRAM:
+		q.Filter = "telegram"
 	default:
 		return nil, invalid("unknown filter")
 	}
@@ -355,7 +371,7 @@ func (s *Service) ListUsers(ctx context.Context, req *connect.Request[adminv1.Li
 	}
 	resp := &adminv1.ListUsersResponse{Counts: &adminv1.UserCounts{
 		All: uint32(counts.All), Online: uint32(counts.Online), Expiring: uint32(counts.Expiring), OverQuota: uint32(counts.OverQuota),
-		OverDeviceLimit: uint32(counts.OverDeviceLimit),
+		OverDeviceLimit: uint32(counts.OverDeviceLimit), Telegram: uint32(counts.Telegram),
 	}}
 	setListUserCountField(resp.Counts, "devices_used", 5, uint32(counts.DevicesUsed))
 	setListUserCountField(resp.Counts, "devices_online", 6, uint32(counts.DevicesOnline))
@@ -404,7 +420,10 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			continue
 		}
 		kind := adminv1.DeviceKind_DEVICE_KIND_LINK
-		if d.Implicit {
+		switch {
+		case d.Kind == store.DeviceKindKey: // not an AmneziaVPN key (those are above): the Telegram key
+			kind = adminv1.DeviceKind_DEVICE_KIND_TELEGRAM_KEY
+		case d.Implicit:
 			kind = adminv1.DeviceKind_DEVICE_KIND_LINK_SHARED
 		}
 		nodes := onlineDevices[d.ID]
@@ -476,7 +495,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			if !slices.Contains(na.NodeProtocols, f.Profile.Protocol) {
 				na.NodeProtocols = append(na.NodeProtocols, f.Profile.Protocol)
 			}
-			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
+			if inGroup[f.Profile.ID] && !slices.Contains(g.DisabledNodeIDs, n.ID) && s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
 				na.Protocols = append(na.Protocols, f.Profile.Protocol)
 			}
 		}
@@ -560,9 +579,9 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		u.DeviceLimit = int(*m.DeviceLimit)
 	}
 	if m.Apps != nil {
-		u.AppHapp, u.AppAmnezia = m.Apps.Happ, m.Apps.Amnezia
+		u.AppHapp, u.AppAmnezia, u.AppTelegram = m.Apps.Happ, m.Apps.Amnezia, m.Apps.Telegram
 		if !u.AppHapp && !u.AppAmnezia {
-			return nil, invalid("at least one app must be on")
+			return nil, invalid("at least one of Happ and Amnezia must be on")
 		}
 	}
 	if m.Nodes != nil {
@@ -597,6 +616,12 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		}
 		return connect.NewResponse(&adminv1.UpdateUserResponse{User: users[0], Impact: impact}), nil
 	}
+	if u.AppTelegram && !old.AppTelegram {
+		// Before the update, so that an update that fails leaves no person with Telegram on and no key.
+		if _, err := s.issueTelegramKey(ctx, actor(ctx), u); err != nil {
+			return nil, err
+		}
+	}
 	switch err := a.UpdateUser(ctx, u, setNodes); {
 	case errors.Is(err, store.ErrAccessExists):
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
@@ -605,8 +630,13 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	case err != nil:
 		return nil, s.internal("update user", err)
 	}
-	// No credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
-	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia ||
+	if !u.AppTelegram && old.AppTelegram {
+		if err := s.revokeTelegramKey(ctx, actor(ctx), u.ID); err != nil {
+			return nil, err
+		}
+	}
+	// No other credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
+	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
 		u.DeviceSpeedLimitBps != old.DeviceSpeedLimitBps || !u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()

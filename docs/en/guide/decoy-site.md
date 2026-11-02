@@ -11,7 +11,7 @@ Without `--decoy-dir` the panel shows a built-in "Coming soon" page. Every insta
 
 ## Nodes: three options
 
-Every node serves a decoy site to anyone who is not a client: the Hysteria2 masquerade (HTTP/3 and the TCP site) and the VLESS REALITY site in `self` mode. Choose which site each node shows, on the node's **Server** tab or for several nodes at once on the Nodes page (select the nodes, then set the decoy site):
+Every node serves a decoy site to anyone who is not a client: the Hysteria2 masquerade (HTTP/3 and the TCP site), the VLESS REALITY site in `self` mode, and the site that strangers meet on the port of an [MTProto](mtproto.md) profile that uses the node's own name. (An MTProto profile that names another site shows that real site instead, not yours.) Choose which site each node shows, on the node's **Server** tab or for several nodes at once on the Nodes page (select the nodes, then set the decoy site):
 
 - **Built-in** keeps the fixed Mistgate page. Every installation ships the same page, so it is recognisable. Nodes that existed before the upgrade stay on it until you change them.
 - **Panel's site** copies the panel's `--decoy-dir` bundle to the node. Use it for one domain with subdomains: the subdomains are linked anyway (Certificate Transparency logs list them), and one company's site on its regional hosts looks natural. New nodes default to this option when the panel has a usable decoy directory.

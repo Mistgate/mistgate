@@ -124,6 +124,6 @@ export function viaOf(u: User): { link: boolean; keys: boolean } {
 
 /** "Link + AmneziaVPN keys", "Subscription link" or "AmneziaVPN keys": the ways the admin switched on. */
 export function appsText(u: User, t: Tx): string {
-  if (u.apps?.happ && u.apps.amnezia) return t("users.appsBoth");
-  return u.apps?.amnezia ? t("users.appsAwg") : t("users.appsHapp");
+  const ways = u.apps?.happ && u.apps.amnezia ? t("users.appsBoth") : u.apps?.amnezia ? t("users.appsAwg") : t("users.appsHapp");
+  return u.apps?.telegram ? t("users.appsWithTg", { apps: ways }) : ways;
 }

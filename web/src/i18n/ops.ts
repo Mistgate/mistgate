@@ -42,6 +42,7 @@ export const en = {
   // a profile on a node (CreateInbound / UpdateInbound refusals, src/lib/errors.ts)
   "err.acme_needs_domain": "Let’s Encrypt issues certificates for domains only, and the address of {node} is the IP {address}. Enter a domain whose A record points to this IP, or use a self-signed certificate.",
   "err.reality_needs_domain": "This node’s site needs a Let’s Encrypt certificate, which is issued for domains only, and the address of {node} is the IP {address}. Enter a domain whose A record points to this IP, or use a profile whose REALITY target is another site.",
+  "err.mtproto_needs_domain": "The Fake TLS name of this profile is the node’s own, which needs a host name, and the address of {node} is the IP {address}. Enter a domain whose A record points to this IP, or choose “Another site” in the MTProto profile.",
   "err.port_taken": "Port {port} on {node} is already taken by the profile “{profile}”.",
   "err.hop_taken": "The hop range {from}–{to} of this profile overlaps the profile “{profile}” on {node}. Change the range in the profile.",
   "err.port_in_hop": "The port must be outside the profile’s hop range ({from}–{to}).",
@@ -1071,6 +1072,7 @@ export const ru: typeof en = {
   "err.notFound": "Не найдено. Возможно, это уже удалили: обнови страницу.",
   "err.acme_needs_domain": "Let's Encrypt выдаёт сертификат только на домен, а у {node} адрес — IP {address}. Впиши домен, у которого A-запись указывает на этот IP, или возьми самоподписанный сертификат.",
   "err.reality_needs_domain": "Сайту этой ноды нужен сертификат Let's Encrypt, а его выдают только на домен; у {node} же адрес — IP {address}. Впиши домен, у которого A-запись указывает на этот IP, или возьми профиль, где цель REALITY — другой сайт.",
+  "err.mtproto_needs_domain": "Имя Fake TLS у этого профиля — собственное имя ноды, а ему нужен домен; у {node} же адрес — IP {address}. Впиши домен, у которого A-запись указывает на этот IP, или выбери в профиле MTProto «Другой сайт».",
   "err.port_taken": "Порт {port} на {node} уже занят профилем «{profile}».",
   "err.hop_taken": "Диапазон прыжков {from}–{to} этого профиля пересекается с профилем «{profile}» на {node}. Поменяй диапазон в профиле.",
   "err.port_in_hop": "Порт должен быть вне диапазона прыжков профиля ({from}–{to}).",
@@ -2096,6 +2098,7 @@ export const zh: typeof en = {
   "err.notFound": "未找到。它可能已被移除，请刷新页面。",
   "err.acme_needs_domain": "Let’s Encrypt 只为域名签发证书，而 {node} 的地址是 IP {address}。请填写一个 A 记录指向此 IP 的域名，或使用自签名证书。",
   "err.reality_needs_domain": "本节点站点需要 Let’s Encrypt 证书，而它只为域名签发；{node} 的地址是 IP {address}。请填写一个 A 记录指向此 IP 的域名，或改用 REALITY 目标为其他站点的协议配置。",
+  "err.mtproto_needs_domain": "此配置的 Fake TLS 名称是节点自己的名称，需要主机名；而 {node} 的地址是 IP {address}。请填写一个 A 记录指向此 IP 的域名，或在 MTProto 配置中选择“其他站点”。",
   "err.port_taken": "{node} 上的端口 {port} 已被协议配置「{profile}」占用。",
   "err.hop_taken": "此协议配置的跳跃范围 {from}–{to} 与 {node} 上的协议配置「{profile}」重叠。请修改协议配置中的范围。",
   "err.port_in_hop": "端口必须在协议配置的跳跃范围（{from}–{to}）之外。",

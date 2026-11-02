@@ -1,15 +1,14 @@
 import { Code } from "@connectrpc/connect";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useBlocker, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Inbound } from "@/gen/mistgate/admin/v1/common_pb";
 import type { ProfileImpact, ProfileSummary, ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
-import { Avatar, Card, DangerZone, PageTitle, SectionLabel } from "@/components/ui/bits";
+import { Avatar, Card, DangerZone, PageTitle } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
 import { EmptyState, Notice } from "@/components/ui/notice";
-import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { groups as groupsApi, profiles } from "@/lib/api";
@@ -34,7 +33,10 @@ import { ConfLine } from "./conf-preview";
 import { DeployDialog, type DeployProfile } from "./deploy";
 import { EgressNote } from "./egress-note";
 import { FormatsLine } from "./formats";
+import { ChoiceStrip, ProtocolPicker } from "./pick";
+import { byProtocol, telegramOnly } from "./protocol-meta";
 import { SchemaForm, type Problem } from "./schema-form";
+import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
 import { WherePanel } from "./where";
 
@@ -47,6 +49,8 @@ function certOfSettings(protocol: string, settings: Settings): Pick<DeployProfil
     if (getAt(settings, ["security"]) === "tls") return { tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") };
     return { tlsMode: getAt(settings, ["reality", "target_kind"]) === "self" ? "acme_domain" : "", sni: "" };
   }
+  // MTProto: the node's own name in the Fake TLS handshake needs a host name, as the node's own site behind REALITY does
+  if (protocol === "mtproto") return { tlsMode: getAt(settings, ["fake_tls", "kind"]) === "site" ? "" : "acme_domain", sni: "" };
   return { tlsMode: String(getAt(settings, ["tls_mode"]) ?? ""), sni: String(getAt(settings, ["sni"]) ?? "") };
 }
 
@@ -56,22 +60,123 @@ export function ProfileEditorScreen() {
   return !id || id === "new" ? <NewProfile /> : <EditProfile id={id} />;
 }
 
+/** What was typed into a new profile's form, kept per protocol while the choice goes back and forth. */
+type Draft = { initial: { name: string; settingsJson: string }; settings: Settings; typed: string | null; dirty: boolean };
+
+/**
+ * /profiles/new in two steps, the URL saying which: without `?protocol=` the choice of a protocol (cards), with it that
+ * protocol's form, so a reload or a link lands on the same step. Going back to the choice keeps what was typed (each
+ * protocol its own draft); leaving with something typed asks first.
+ */
 function NewProfile() {
   const t = useTx();
+  const go = useGo();
+  const navigate = useNavigate();
   const protocols = useQuery(protocolsQuery);
   // "?node=<id>": made from that node's page; the profile goes on it and the editor returns there
-  const { node = "" } = useSearch({ strict: false }) as { node?: string };
-  const [choice, setChoice] = useState("");
+  const { node = "", protocol = "" } = useSearch({ strict: false }) as { node?: string; protocol?: string };
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [picked, setPicked] = useState("");
+  const [leaving, setLeaving] = useState(false);
+  // the open form says whether it holds something; the other protocols' drafts are here
+  const [typing, setTyping] = useState(false);
+  const holding = typing || Object.values(drafts).some((d) => d.dirty);
+  // any way out of /profiles/new (the sidebar, Back, a reload) asks first while something is typed; going between the two
+  // steps does not, nor leaving once the profile is made (or the owner said to leave). Refs: the router asks outside a render.
+  const held = useRef(false);
+  const done = useRef(false);
+  useEffect(() => {
+    held.current = holding;
+  }, [holding]);
+  const blocker = useBlocker({
+    shouldBlockFn: ({ current, next }) => held.current && !done.current && next.pathname !== current.pathname,
+    enableBeforeUnload: () => held.current && !done.current,
+    withResolver: true,
+  });
   if (protocols.isPending) return <Pending />;
   if (protocols.isError) return <QueryError error={protocols.error} onRetry={() => void protocols.refetch()} />;
-  const info = protocols.data.find((p) => p.id === choice) ?? protocols.data[0];
-  if (!info) return <EmptyState title={t("profiles.noSchema")} />;
-  return <NewEditor key={info.id} info={info} choices={protocols.data} onProtocol={setChoice} fromNode={node} />;
+  const list = [...protocols.data].sort((a, b) => byProtocol(a.id, b.id));
+  if (list.length === 0) return <EmptyState title={t("profiles.noSchema")} />;
+  const info = list.find((p) => p.id === protocol);
+
+  const step = (search: { protocol?: string }) => void navigate({ to: "/profiles/new", search: { ...(node && { node }), ...search } } as never);
+  const leave = () => (node ? void navigate({ to: "/nodes/$id", params: { id: node }, search: { tab: "profiles" } } as never) : go("/profiles"));
+  const back = () => (holding ? setLeaving(true) : leave());
+  const dirty = new Set(Object.keys(drafts).filter((id) => drafts[id]!.dirty));
+
+  return (
+    <>
+      {info ? (
+        <NewEditor
+          key={info.id}
+          info={info}
+          fromNode={node}
+          draft={drafts[info.id]}
+          onDraft={(d) => setDrafts((all) => ({ ...all, [info.id]: d }))}
+          onBack={back}
+          onDirty={setTyping}
+          onCreated={() => (done.current = true)}
+          onChangeProtocol={() => {
+            setPicked(info.id);
+            step({});
+          }}
+        />
+      ) : (
+        <ProtocolPicker
+          protocols={list}
+          value={picked || list[0]!.id}
+          onValue={setPicked}
+          onContinue={(id) => {
+            setPicked(id);
+            step({ protocol: id });
+          }}
+          onBack={back}
+          drafts={dirty}
+          t={t}
+        />
+      )}
+      <ConfirmModal
+        open={leaving || blocker.status === "blocked"}
+        onOpenChange={(o) => {
+          if (o) return;
+          setLeaving(false);
+          if (!done.current) blocker.reset?.();
+        }}
+        title={t("profiles.discard.title")}
+        description={t("profiles.discard.body")}
+        confirmLabel={t("profiles.discard.ok")}
+        danger
+        onConfirm={async () => {
+          done.current = true;
+          if (blocker.status === "blocked") blocker.proceed();
+          else leave();
+        }}
+      />
+    </>
+  );
 }
 
-/** A new profile starts from the plugin defaults with every secret already made here (visible, never empty). */
-function NewEditor({ info, choices, onProtocol, fromNode }: { info: ProtocolInfo; choices: ProtocolInfo[]; onProtocol: (id: string) => void; fromNode: string }) {
-  const initial = useMemo(() => {
+/** A new profile starts from the plugin defaults with every secret already made here (visible, never empty), or from its draft. */
+function NewEditor({
+  info,
+  fromNode,
+  draft,
+  onDraft,
+  onBack,
+  onDirty,
+  onCreated,
+  onChangeProtocol,
+}: {
+  info: ProtocolInfo;
+  fromNode: string;
+  draft?: Draft;
+  onDraft: (d: Draft) => void;
+  onBack: () => void;
+  onDirty: (dirty: boolean) => void;
+  onCreated: () => void;
+  onChangeProtocol: () => void;
+}) {
+  const fresh = useMemo(() => {
     const fields = allFields(parseSchema(info.settingsSchemaJson));
     const settings = withGeneratedSecrets(parseSettings(info.defaultSettingsJson), fields, makeSecret);
     // Let the server choose a free client network for every new AmneziaWG profile.
@@ -82,7 +187,21 @@ function NewEditor({ info, choices, onProtocol, fromNode }: { info: ProtocolInfo
     }
     return { name: "", settingsJson: JSON.stringify(settings) };
   }, [info.id, info.settingsSchemaJson, info.defaultSettingsJson]);
-  return <Editor info={info} initial={initial} choices={choices} onProtocol={onProtocol} fromNode={fromNode} />;
+  // a draft keeps its own defaults (the secrets made the first time), so what it changed still reads as changed
+  const initial = draft?.initial ?? fresh;
+  return (
+    <Editor
+      info={info}
+      initial={initial}
+      draft={draft}
+      onDraft={(d) => onDraft({ ...d, initial })}
+      onBack={onBack}
+      onDirty={onDirty}
+      onCreated={onCreated}
+      onChangeProtocol={onChangeProtocol}
+      fromNode={fromNode}
+    />
+  );
 }
 
 function EditProfile({ id }: { id: string }) {
@@ -132,14 +251,20 @@ type EditorProps = {
   initial: { name: string; settingsJson: string };
   profile?: ProfileSummary;
   inbounds?: Inbound[];
-  /** New profile: the protocols to choose from. */
-  choices?: ProtocolInfo[];
-  onProtocol?: (id: string) => void;
   /** New profile made from this node's page: it goes on that node, and the editor goes back there. */
   fromNode?: string;
+  /** New profile: what was typed before (going back to the choice and here again), and where it goes when the form does. */
+  draft?: { settings: Settings; typed: string | null };
+  onDraft?: (d: { settings: Settings; typed: string | null; dirty: boolean }) => void;
+  /** New profile: back to the choice of a protocol, and the header's back arrow. */
+  onChangeProtocol?: () => void;
+  onBack?: () => void;
+  /** New profile: whether the form holds something now, and that the profile is made (leaving then asks nothing). */
+  onDirty?: (dirty: boolean) => void;
+  onCreated?: () => void;
 };
 
-function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fromNode = "" }: EditorProps) {
+function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, onDraft, onChangeProtocol, onBack, onDirty, onCreated }: EditorProps) {
   const t = useTx();
   const toast = useToast();
   const go = useGo();
@@ -150,9 +275,9 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const groups = useMemo(() => parseSchema(info.settingsSchemaJson), [info.settingsSchemaJson]);
   const fields = useMemo(() => allFields(groups), [groups]);
   const base = useMemo(() => parseSettings(initial.settingsJson), [initial.settingsJson]);
-  const [settings, setSettings] = useState<Settings>(base);
+  const [settings, setSettings] = useState<Settings>(draft?.settings ?? base);
   // a new profile's name follows the port ("Hysteria2 · 443") until it is typed
-  const [typed, setTyped] = useState<string | null>(isNew ? null : initial.name);
+  const [typed, setTyped] = useState<string | null>(draft ? draft.typed : isNew ? null : initial.name);
   const name = typed ?? autoName(info, settings);
   const [nameError, setNameError] = useState(false);
   const [saveProblems, setSaveProblems] = useState<Problem[]>([]);
@@ -183,6 +308,22 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   const changed = changedFields(fields, settings, base);
   const nameChanged = !isNew && name !== initial.name;
   const count = changed.length + (nameChanged ? 1 : 0);
+  // a new profile's draft goes up when the form goes away (back to the choice, or Back), so it comes back as it was left
+  const dirty = isNew && (changed.length > 0 || !!typed);
+  useEffect(() => {
+    onDirty?.(dirty);
+  }, [onDirty, dirty]);
+  const latest = useRef({ settings, typed, dirty, onDraft });
+  useEffect(() => {
+    latest.current = { settings, typed, dirty, onDraft };
+  });
+  useEffect(
+    () => () => {
+      const l = latest.current;
+      l.onDraft?.({ settings: l.settings, typed: l.typed, dirty: l.dirty });
+    },
+    [],
+  );
   const titleOf = (key: string) => {
     const f = fields.find((x) => x.key === key);
     return f ? (t.opt(`profiles.f.${info.id}.${f.id}.title`) ?? f.title) : key;
@@ -212,6 +353,7 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   /** A new profile: made, then into the chosen groups (cheap, and they decide who gets it), then onto the chosen nodes. */
   async function create() {
     const res = await profiles.createProfile({ protocol: info.id, name: name.trim(), settingsJson });
+    onCreated?.();
     const p = res.profile!;
     const plan = after.plan;
     if (plan.groupsOn) {
@@ -286,8 +428,19 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   // to "another site" (vless-form.ts)
   const isVless = info.id === "vless";
   const vlessHiddenIds = useMemo<ReadonlySet<string>>(() => (isVless ? vlessHidden(fields, settings) : new Set()), [isVless, fields, settings]);
-  const hidden = isAwg ? awgHidden : isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : undefined;
+  // MTProto: the site is typed only for "another site"; under it, a note about what a network sees (mtproto-form.ts)
+  const isMtproto = info.id === "mtproto";
+  const mtprotoHiddenIds = useMemo<ReadonlySet<string>>(() => (isMtproto ? mtprotoHidden(fields, settings) : new Set()), [isMtproto, fields, settings]);
+  const hidden = isAwg ? awgHidden : isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : isMtproto && mtprotoHiddenIds.size > 0 ? mtprotoHiddenIds : undefined;
   const extra = (f: Field): ReactNode => {
+    if (isMtproto && f.id === "fake_tls.domain") {
+      return (
+        <span className="flex flex-col gap-1 text-[11px] leading-snug text-muted">
+          <span>{t("mtproto.siteWarn")}</span>
+          {mtprotoOn443(settings) && <span>{t("mtproto.site443Warn")}</span>}
+        </span>
+      );
+    }
     if (isNew && isAwg && (f.id === "subnet4" || f.id === "subnet6") && !getAt(settings, f.path)) {
       return <span className="text-[11px] leading-snug text-muted">{t("awg.subnet.auto")}</span>;
     }
@@ -328,13 +481,17 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
   // an empty name does not grey the button out: the click says what is missing, at the field
   const stale = useStaleVersion() !== ""; // the schema this form was drawn from is the old panel's: saving it could be refused or wrong
   const canSave = !busy && !stale && problems.length === 0 && (isNew || count > 0);
-  const nodes = profile ? `${profile.nodeCount} ${t.n("profiles.nodes", profile.nodeCount)} · ${profile.userCount} ${t.n("profiles.users", profile.userCount)}` : info.displayName;
+  const nodes = profile
+    ? `${profile.nodeCount} ${t.n("profiles.nodes", profile.nodeCount)} · ${profile.userCount} ${t.n("profiles.users", profile.userCount)}`
+    : onChangeProtocol
+      ? t("profiles.pick.step2")
+      : info.displayName;
   const certOf = fields.some((f) => f.id === "tls_mode" || f.id === "reality.target_kind") ? certOfSettings(info.id, base) : undefined;
 
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center gap-3">
-        <IconButton aria-label={t("profiles.back")} onClick={() => go("/profiles")}>
+        <IconButton aria-label={t("profiles.back")} onClick={onBack ?? (() => go("/profiles"))}>
           <Icon name="back" />
         </IconButton>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -377,14 +534,8 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
       <div className="grid items-start gap-3.5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-3.5">
           <Card lg className="flex flex-col gap-3 p-4">
-            {choices && choices.length > 1 && (
-              <div className="flex flex-col gap-1.5">
-                <SectionLabel icon="layers" tone="sky">
-                  {t("profiles.protocol")}
-                </SectionLabel>
-                <Segmented aria-label={t("profiles.protocol")} value={info.id} onValueChange={(v) => onProtocol?.(v)} options={choices.map((c) => ({ value: c.id, label: c.displayName }))} />
-              </div>
-            )}
+            <ChoiceStrip info={info} t={t} onChange={onChangeProtocol} />
+            <div aria-hidden className="h-px bg-line" />
             <TextField
               icon="tag"
               tone="lavender"
@@ -424,8 +575,9 @@ function Editor({ info, initial, profile, inbounds = [], choices, onProtocol, fr
             </div>
           )}
           <span className="text-xs leading-normal text-pretty text-muted">{t("profiles.previewHint")}</span>
-          {/* where the draft works, live: switching VLESS to XHTTP drops sing-box here (no formats while the draft has errors) */}
-          {!preview.isError && (preview.data?.formats.length ?? 0) > 0 && (
+          {/* where the draft works, live: switching VLESS to XHTTP drops sing-box here (no formats while the draft has errors);
+              a Telegram-only protocol (MTProto) reaches people by tg:// links, in none of the formats by design */}
+          {!preview.isError && !telegramOnly(info.apps) && (preview.data?.formats.length ?? 0) > 0 && (
             <div className="flex flex-col gap-1 border-t border-line pt-3">
               <span className="text-[13px] font-bold">{t("profiles.fmt.title")}</span>
               <FormatsLine formats={preview.data!.formats} t={t} />

@@ -9,7 +9,7 @@ Mistgate watches the fleet from two sides. The panel connects to every profile o
 
 ### How a check works
 
-For every profile on a node the panel opens a tunnel with a built-in client and, through that tunnel, requests two pages:
+For every profile on a node the panel opens a tunnel with a built-in client and, through that tunnel, requests two pages (an MTProto profile is the exception: see [MTProto](#mtproto)):
 
 | Request | What it proves |
 |---|---|
@@ -29,6 +29,8 @@ The client depends on the protocol:
 - **Hysteria2.** The official Hysteria2 client, running inside the panel. It dials the node's address and the profile's own port (not the port-hopping range, so a blocked hop range is not seen). It uses the profile's obfuscation (Salamander or Gecko) and the certificate rules of a real client: a self-signed certificate is pinned to the fingerprint the node reported, any other is checked against the profile's **Domain (SNI)**.
 - **AmneziaWG.** amneziawg-go inside the panel process on a user-space network stack: no network interface, no root, nothing added to the panel server's routes. It uses the same configuration a real device gets. Every round is a fresh device, so every round also tests the handshake. A node does not answer an unknown peer or a packet with the wrong obfuscation, so a missing handshake and a blocked UDP port look the same: both are reported as a timeout.
 - **VLESS.** Each attempt runs xray-core in a short-lived helper process and uses the same resolved client parameters as the subscription link. REALITY checks server authentication; TLS verifies the certificate chain for the profile's server name. A profile with a CDN override is dialed at the CDN host and port, using that host for SNI and HTTP Host; without a CDN, the check dials the node address and inbound port. TLS verification stays enabled for the CDN certificate, so a self-signed origin certificate behind the CDN is not presented to the panel. The check covers REALITY over TCP Vision or XHTTP, and TLS over XHTTP or WebSocket. A failed CDN path is reported as a `via_cdn` check failure with the CDN host; CDN inbounds do not count toward the node's critical all-checks-failed alert. Fleet keeps the inbound pending until the connected node reports its required capability: `vless/1` or `vless-self/1` for REALITY, and `vless-tls/1` for TLS. No client-eye check runs while the inbound is pending.
+
+- **MTProto.** A Fake TLS client of the panel's own, which asks Telegram instead of the two pages. See [MTProto](#mtproto).
 
 A protocol without a test client is shown as **not checked**.
 
@@ -92,6 +94,24 @@ All three numbers are measured on the panel's server, not on a person's device.
 | From scratch | From the start of the round to the first byte of the first answer: the handshake, a fresh TLS connection to the test site through the tunnel, and the request. The 24 h bars show this number. Older panels showed it in the cell. |
 
 Hover a cell, or move to it with Tab, to see the response and connect medians of the hour, the last round with its time, response and connect, and the passed and failed rounds of the last 24 hours. On the node page, the rows of **Client-eye checks** show the same.
+
+### MTProto
+
+A Telegram proxy is not a general tunnel, so its check asks Telegram instead of the two pages above. Each attempt, with the profile's hidden check key:
+
+1. connects over TCP to the profile's port on the node;
+2. completes the Fake TLS handshake with the profile's name, as Telegram does, and checks the node's answer;
+3. opens the obfuscated2 stream to Telegram's data centre 2 through the proxy, sends a first request (`req_pq_multi`) and checks that a valid `resPQ` answer comes back.
+
+It proves that the node accepts a client with a valid key, reaches Telegram, and that Telegram answers through the proxy. The cell shows the time of the whole attempt; there is no exit IP. It does not prove that a network inside a country that blocks MTProto lets the traffic through. The failures use the same codes:
+
+| Code | What it means for MTProto |
+|---|---|
+| `refused` | The TCP connection failed: nothing listens on the port, or a firewall is in the way |
+| `timeout` | A step did not answer in time: the connection, the Fake TLS handshake or Telegram's data centre |
+| `auth` | The node did not accept the check key and answered with its fallback site: the profile was just changed and the node has not applied it, or the node's clock is off |
+| `tls` | The answer to the Fake TLS hello was not a valid ServerHello |
+| `exit_unreachable` | The proxy accepted the client, but Telegram's data centre did not answer: the node cannot reach Telegram's addresses (a hoster filter, a route) |
 
 ### When the panel's server loses UDP
 

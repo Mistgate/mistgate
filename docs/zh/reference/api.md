@@ -166,6 +166,18 @@ func main() {
 
 对于其他语言，可使用 `buf generate` 和相应语言的 Connect 或 gRPC 插件，从 `proto/` 生成客户端。
 
+## Telegram 代理
+
+[MTProto](../guide/mtproto.md) 协议配置和用户的 Telegram 密钥使用 `ProfileService` 和 `UserService` 的以下部分：
+
+- `ProtocolInfo.experimental`（来自 `ProfileService.ListProtocols`）：对尚属新协议、还没有在实际环境中得到验证的协议为 true。MTProto 会设置它。
+- `AppToggles.telegram`，位于 `CreateUser` 和 `UpdateUser` 中，是用户的 Telegram 开关。开启会生成用户的密钥，关闭则吊销它。`happ` 和 `amnezia` 中至少要保持开启一个。
+- `ListUsers` 接受过滤器 `USER_FILTER_TELEGRAM`：Telegram 开关已开启的用户，不论其密钥或 MTProto 协议配置如何。列表中的每位用户带有 `access_telegram`（开关已开启且有可用的 MTProto 服务器）和 `telegram_issued`（已生成密钥）。
+- `GetTelegramLinks` 读取用户的代理：`has_key`、`key_device_id`、`key_issued_unix` 以及 `tg://proxy` 链接，每个节点和协议配置一条，其中 `ipv6`、`relay` 和 `via` 标出节点的 IPv6 副本和中转的副本。它不写入任何内容。链接带有用户的密钥，所以请像对待密码一样对待返回结果。
+- `IssueTelegramKey` 在用户没有密钥时生成密钥（需要开关已开启且用户未被停用；设备上限不适用），`RotateTelegramKey` 给它换一个新的密钥，使此前的所有链接失效（没有密钥时返回 `not_found` "key"），`RevokeTelegramKey` 吊销它并保持开关开启。每个调用都像 `GetTelegramLinks` 一样返回用户的代理。该密钥是用户的一台设备，类型为 `DEVICE_KIND_TELEGRAM_KEY`，`RevokeDevice` 也能移除它。
+
+这四个调用面向所有者和协作者，并对 API 令牌关闭，与其他返回凭据的调用一样。
+
 ## 令牌权限级别
 
 令牌权限级别对应管理后台角色：**只读**对应只读角色，**操作员**对应协作者，**管理员**对应所有者。除角色权限外，令牌还只能调用固定允许列表中的方法（`internal/panel/auth/policy_tokens.go`）；无论权限级别如何，其他方法都会被拒绝。允许列表中的方法均不会返回凭据。
@@ -194,7 +206,7 @@ func main() {
 | `SubscriptionService.UpdateSubscriptionSettings`（用户页面的一个应用） | 否 | 仅可通过已批准的 MCP 计划执行 | 仅可通过已批准的 MCP 计划执行 |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 
-以下操作对所有令牌都不可用：删除用户、获取订阅链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
+以下操作对所有令牌都不可用：删除用户、获取订阅链接、Telegram 代理密钥和链接、设备及其密钥、解除设备拉黑（`UserService.UnblockDevice`；令牌可以通过带 `block` 的 `RevokeDevice` 拉黑设备，但只有管理员能解除拉黑）；节点注册、设置、重启、日志和退役；准备 AmneziaWG 内核模块；管理员自己的 SSH 安装步骤（检查服务器、重试任务、显示或清除已保存的凭据）；创建分组、DNS 预设和订阅设置（通过已批准的计划更改用户页面的应用列表除外）；WARP、备份、面板更新和重新扫描发布包；品牌设置、令牌、审批；管理员自己的账户（通行密钥、密码、会话、再次验证）以及人机验证设置。
 
 ## 需要所有者批准的变更
 

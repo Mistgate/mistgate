@@ -22,6 +22,7 @@ export const errorCodes = [
   // a profile on a node (CreateInbound / UpdateInbound)
   "acme_needs_domain",
   "reality_needs_domain",
+  "mtproto_needs_domain",
   "port_taken",
   "hop_taken",
   "port_in_hop",

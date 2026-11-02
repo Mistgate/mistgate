@@ -406,6 +406,16 @@ cases["dns-link"] = { ...dnsBoth, access: { happ: true, amnezia: false }, amnezi
 // the owner offers nothing for the link apps: the note about the link apps stays, the keys keep their choice per server
 cases["dns-both-off"] = { ...dnsBoth, dns: linkDns([]) };
 
+// the Telegram proxy: one card per tg://proxy link, the twins of a server's link (its IPv6 entry, a relay in RU) marked
+const tgUrl = (host: string, port = 443) => `tg://proxy?server=${host}&port=${port}&secret=ee0123456789abcdef0123456789abcdef7777772e676f6f676c652e636f6d`;
+const tgFra = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", ipv6: false, relay: false, via: "", url: tgUrl("de1.example.com") };
+const tgLinks = [tgFra, { ...tgFra, ipv6: true, url: tgUrl("[2001:db8::7]") }, { ...tgFra, relay: true, via: "RU", url: tgUrl("198.51.100.20", 8443) }, { label: "Финляндия", country_code: "FI", place: "", ipv6: false, relay: false, via: "", url: tgUrl("fi1.example.com") }];
+cases.telegram = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: tgLinks } };
+// a first visit with Telegram on: the steps first, then the servers and the proxy
+cases["telegram-first"] = { ...base, access: { ...base.access, telegram: true }, telegram: { links: tgLinks.slice(0, 2) } };
+// Telegram is on, no MTProto profile runs yet
+cases["telegram-soon"] = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: [] } };
+
 export function devPage(query: string): MgData {
   const p = new URLSearchParams(query);
   const c = cases[p.get("case") ?? ""] ?? base;

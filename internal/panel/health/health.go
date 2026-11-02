@@ -78,8 +78,8 @@ const (
 type Config struct {
 	// Edge runs alert evaluation from EdgeTick and leaves one-off doctor actions to that evaluator in the jobs isolate.
 	Edge bool
-	// Dialers maps a protocol plugin id to its tunnel client. Default: hysteria2, awg and vless. A protocol without one is
-	// SKIPPED (client_unsupported).
+	// Dialers maps a protocol plugin id to its client probe. Default: hysteria2, awg, vless and mtproto. A protocol without
+	// one is SKIPPED (client_unsupported).
 	Dialers map[string]Dialer
 	// Probe URLs of the client-eye checks; hostnames go into the tunnel unresolved. A relay also downloads the bounded
 	// ProbeDownloadURL body to detect transfers that stall after the handshake.
@@ -212,7 +212,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 		cfg.Now = time.Now
 	}
 	if cfg.Dialers == nil {
-		cfg.Dialers = map[string]Dialer{"hysteria2": dialHysteria2, "awg": dialAWG, "vless": dialVLESS}
+		cfg.Dialers = map[string]Dialer{"hysteria2": dialHysteria2, "awg": dialAWG, "vless": dialVLESS, "mtproto": dialMTProto}
 	}
 	if cfg.Probe204URL == "" {
 		cfg.Probe204URL = "https://www.gstatic.com/generate_204"

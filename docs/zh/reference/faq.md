@@ -18,8 +18,17 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 
 - **Hysteria2 和 VLESS**：使用 Happ 等订阅类应用（获取 URI 列表），或使用基于 mihomo 内核的应用，例如 kl!ck、Clash Verge 或 FlClash（获取 Mihomo YAML 配置）。在浏览器中打开链接会进入该用户的页面，其中包含使用说明。
 - **AmneziaWG**：使用 AmneziaVPN 应用，每台设备单独使用密钥；kl!ck 和其他基于 mihomo 内核的应用通过订阅获取配置。
+- **MTProto**（实验性）：Telegram 应用，使用用户页面中的 `tg://proxy` 链接；没有任何订阅包含它。
 
 带有自签名证书的 Hysteria2 协议配置已使用官方 Hysteria2 客户端和 Mihomo 验证；尚未使用 Happ 验证。Xray JSON 和 sing-box JSON 格式也已提供；sing-box 不支持自签名的 Hysteria2 证书和 XHTTP（参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)）。参见[订阅](../guide/subscriptions.md)和[客户端应用](../guide/client-apps.md)：Mistgate 推荐在 Windows 和 macOS 上使用 kl!ck。
+
+## Mistgate 可以作为 Telegram 的代理吗？
+
+可以，作为实验性的协议配置提供：[MTProto](../guide/mtproto.md)。节点会成为使用 Fake TLS 的 Telegram 代理，开启了 **Telegram 代理**开关的每位用户都会在自己的页面上获得一个密钥和 `tg://proxy` 链接。它只服务于 Telegram 应用，不服务于其他应用，链接也绝不会写入订阅。Telegram 须与 Happ 或 AmneziaVPN 一起使用：用户不能只有代理。
+
+## Telegram 代理在俄罗斯能用吗？
+
+可能不能。自 2026 年春季起，MTProto 代理在俄罗斯一直被成批地检测并封锁，所以一个代理可能用一阵子就失效。面板的检测从境外发起：绿色检测结果只能说明节点在工作，不能说明俄罗斯的网络会放行该代理。请让处于相关网络的用户实际测试，并保留一个 VPN 协议配置作为主要手段。
 
 ## 可以管理多少用户和节点？
 

@@ -100,10 +100,10 @@ Read tools change nothing. Arguments are ids and plain words, never URLs: no too
 | `node_doctor` | Read only | The last stored doctor report of a node or of every node, with fix ids. From the Operator profile up it also takes `refresh: true`: the node runs its checks now (it only reads the host; waits up to 30 s). |
 | `users_search` | Read only | Users by part of the name, `filter` (`online`, `expiring`, `over_quota`) or `group_id`; paged with `page_token`. |
 | `groups_list` | Read only | Groups with their profile ids, user count and DNS preset. |
-| `protocols_list` | Read only | Protocol plugins, client apps, a compact settings schema (including critical and secret fields), and default settings. Secret defaults are masked. |
+| `protocols_list` | Read only | Protocol plugins, client apps, a compact settings schema (including critical and secret fields), and default settings. Secret defaults are masked. `experimental` is set on a protocol that is new and not proven in the field yet (MTProto). |
 | `profiles_list` | Read only | Profile summaries with protocol, deployment and user counts, warnings, subscription formats, version, and the groups that give access. |
 | `profile_get` | Read only | One profile's summary and masked settings; inbounds with node ids and names, effective and override ports and server names, enabled state and state; groups that give access. Takes `profile_id`. |
-| `user_get` | Read only | One user: limits (including both speed limits), status, devices, profiles (each with the subscription formats that carry it), node access. No subscription link, no keys. |
+| `user_get` | Read only | One user: limits (including both speed limits), status, the three app switches (`app_happ`, `app_amnezia`, `app_telegram`), devices, profiles (each with the subscription formats that carry it), node access. No subscription link, no keys. |
 | `user_traffic` | Read only | Used and quota, the last 14 days, the split per node and protocol. |
 | `user_devices` | Read only | Devices with kind, platform, model, OS version, app, traffic, last seen, online and on which nodes, a short fingerprint of the device ID, and for AmneziaWG the profile and tunnel address; the blocked devices apart. Never a key or a config. |
 | `subscription_preview` | Read only | Which format a client (a client id or a User-Agent) would get and which profiles (each with the subscription formats that carry it) and nodes the user's access gives. Not the subscription itself, and no link. |
@@ -132,7 +132,7 @@ Every change is a pair: `<tool>_plan` and `<tool>_apply`.
 
 | Tool | Profile | Arguments | Needs the owner |
 |---|---|---|---|
-| `user_create` | Operator | `name` (1 to 64 characters, unique ignoring case), `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month` (default), `rolling_month`), `term_days` (at most 3650), `device_limit` (at most 100), `apps` (`happ`, `amnezia`), `nodes` (`all` or `node_ids`), `speed_limit_bps` (per person: all their devices together on one node), `device_speed_limit_bps` (per device), `dns_preset_id` | no |
+| `user_create` | Operator | `name` (1 to 64 characters, unique ignoring case), `group_id`, and optionally `quota_bytes`, `quota_reset` (`none`, `day`, `week`, `month` (default), `rolling_month`), `term_days` (at most 3650), `device_limit` (at most 100), `apps` (`happ`, `amnezia`, `telegram`), `nodes` (`all` or `node_ids`), `speed_limit_bps` (per person: all their devices together on one node), `device_speed_limit_bps` (per device), `dns_preset_id` | no |
 | `user_update` | Operator | `user_id`, optionally `subscription_name` (at most 64 characters; empty uses `name`), and only the fields to change (as above, with `expires_unix` instead of `term_days`; the plan names both speed limits, per person on one node and per device) | no |
 | `user_disable` | Operator | `user_ids` (1 to 50) | when more than 3 users |
 | `user_enable` | Operator | `user_ids` (1 to 50) | no |
@@ -166,6 +166,8 @@ Every `_plan` also takes `reason`: the agent's own words, at most 300 characters
 `rollout_start_plan` updates one selected node now; it cannot start a fleet-wide update. It takes only a node whose agent can update itself and is older than the bundle (outdated, failed or rolled back), and it is refused while another rollout is running or paused. The plan is pinned to the signed bundle trusted when it was made: if the bundle changes before it is applied, the apply fails and a new plan is needed. `node_update_schedule_plan` saves a future update for one node after owner approval; the node may be offline when it is planned, and a new schedule replaces the node's previous one. The saved task is pinned to that signed release and fixed UTC offset. If the node is offline when due, the panel waits up to two hours for it to reconnect, then marks the task missed and never starts it by itself; if the signed bundle changes, the panel keeps the task visible and does not substitute a different release. Use `node_update_schedule_cancel_plan` to cancel a pending task. Changing `update_timezone` affects new schedules only; existing tasks keep their saved instant and offset.
 
 `subscription_app_upsert` and `subscription_app_remove` change one app of the page every user sees, found by its platform and its name ignoring case (a name two apps of one platform share is refused: change those in the admin). A new app goes to the end of the list. The values are checked exactly like a save in **Subscriptions → User page**: an http(s) download link, an add-link template that starts with an app's own scheme (`happ://add/{url}`, `myclient://add?url={url_enc}&name={name_enc}`) or http(s) but never `javascript:`, `data:` and the like, the known placeholders only, at most 30 apps; on top of that the agent's text may not contain invisible formatting characters. The plan reads the whole settings and remembers their state; if anyone saves the subscription settings before the apply, the apply fails with "the subscription settings changed after the plan" and nothing is overwritten: make a new plan. In `subscription_settings_get` and in the agent's copy of a plan, link query strings and long path segments read `[redacted]`, like every result; the owner's approval card shows every value in full.
+
+The Telegram proxy is one of the three switches in `apps` of `user_create` and `user_update`. A field you leave out keeps the user's value, so `{"apps": {"telegram": true}}` changes Telegram alone. Switching it on makes the person's Telegram key and switching it off revokes it; the plan names the Telegram proxy among the apps. At least one of `happ` and `amnezia` must stay on: Telegram comes in addition. There is no tool for the key itself, and none returns the `tg://proxy` links: re-issuing or revoking a key, and reading the links, are done by the owner in the admin ([MTProto](../guide/mtproto.md)).
 
 ## Plan and apply
 
@@ -257,6 +259,7 @@ The panel also protects the agent and you:
 ## What an agent never gets
 
 - Subscription links and user page passwords.
+- The Telegram proxy key and its `tg://proxy` links.
 - Device keys and configurations, WARP accounts and keys, profile secrets.
 - Server passwords: neither the SSH password of an install nor a rotated one.
 - Node addresses and certificate pins. The exception is the saved SSH endpoint and login that `node_server_access_list` and the `node_install` and rotation plans show an Admin token.

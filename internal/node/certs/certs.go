@@ -122,6 +122,27 @@ func (s *Source) routeALPN(inner func(*tls.ClientHelloInfo) (*tls.Certificate, e
 	}
 }
 
+// SiteCertificate is what a decoy site of the node presents (VLESS "self", MTProto "decoy"). A TLS-ALPN-01 hello and,
+// once a certificate has been issued for the name, every hello go to the ACME entry (autocert returns the cached
+// certificate and renews it in the background). Before the first issuance a persisted self-signed certificate of the
+// same name serves instead: autocert blocks a first handshake for the whole issuance, and that wait would hold up every
+// visitor.
+//
+// "Issued" is "Info reports a certificate": the leaf last handed out. It stays set after the leaf's expiry, on purpose:
+// with no visitor in months the reported leaf is old while the cache already holds the renewed one, and only the ACME
+// entry reads it.
+func SiteCertificate(acmeCert, fallback engine.Cert) func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto {
+			return acmeCert.GetCertificate(hello)
+		}
+		if acmeCert.Info != nil && !acmeCert.Info().NotAfter.IsZero() {
+			return acmeCert.GetCertificate(hello)
+		}
+		return fallback.GetCertificate(hello)
+	}
+}
+
 // Release forgets the inbound's ACME claim; the last release of a name stops its renewals and, when no
 // ACME name is left, the :80 listener. Self-signed files stay.
 func (s *Source) Release(inboundID string) {

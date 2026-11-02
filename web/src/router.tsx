@@ -20,6 +20,7 @@ import { goToSignIn, meQuery, queryClient, setSignedOutHandler } from "@/lib/ses
 import { validateHealthSearch } from "@/screens/health/tabs";
 import { upgradeNodeLink, validateNodeSearch } from "@/screens/node/tabs";
 import { validateReachSearch } from "@/screens/reachability/search";
+import { validateNewProfileSearch, validateProfilesSearch } from "@/screens/profiles/search";
 import { validateSubsSearch } from "@/screens/subscriptions/tabs";
 
 // Every screen is its own chunk: the first paint only needs the router, the session check and the
@@ -151,16 +152,26 @@ const user = createRoute({
   component: lazyRouteComponent(() => import("@/screens/users"), "UserScreen"),
 });
 
+// The Telegram proxy had a tab of its own; its profiles are the MTProto ones of Profiles, its people on their own pages.
+const telegramProxy = createRoute({
+  getParentRoute: () => app,
+  path: "/telegram",
+  beforeLoad: () => {
+    throw redirect({ to: "/profiles", search: { protocol: "mtproto" }, replace: true });
+  },
+});
+
 const profiles = createRoute({
   getParentRoute: () => app,
   path: "/profiles",
+  validateSearch: validateProfilesSearch,
   component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfilesScreen"),
 });
-// "?node=<id>": made from that node's page; the new profile goes on it and the editor returns there.
+// "?node=<id>": made from that node's page; the new profile goes on it and the editor returns there. "?protocol=": step 2.
 const profileNew = createRoute({
   getParentRoute: () => app,
   path: "/profiles/new",
-  validateSearch: (s: Record<string, unknown>): { node?: string } => (typeof s.node === "string" && s.node !== "" ? { node: s.node } : {}),
+  validateSearch: validateNewProfileSearch,
   component: lazyRouteComponent(() => import("@/screens/profiles"), "ProfileEditorScreen"),
 });
 const profile = createRoute({
@@ -241,6 +252,7 @@ const routeTree = root.addChildren([
     node,
     users,
     user,
+    telegramProxy,
     profiles,
     profileNew,
     profile,

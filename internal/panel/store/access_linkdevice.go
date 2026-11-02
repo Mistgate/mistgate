@@ -81,7 +81,7 @@ func linkCeiling(mode string, limit int, hasHWID bool) int {
 const linkDeviceCreateGuard = `
 	NOT EXISTS (SELECT 1 FROM device WHERE user_id = ?1 AND hwid_hash IS ?2 AND kind = 'link' AND revoked_at IS NULL)
 	AND NOT EXISTS (SELECT 1 FROM device WHERE user_id = ?1 AND hwid_hash = ?2 AND blocked_at IS NOT NULL)
-	AND (?3 = 0 OR (SELECT count(*) FROM device d WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND ` + accDeviceLive + `) < ?3)`
+	AND (?3 = 0 OR (SELECT count(*) FROM device d WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND ` + accLimitDevice + `) < ?3)`
 
 // linkDeviceEvictGuard is the condition under which a new HWID device takes the place of a silent one: ?1 the user, ?2 the new
 // hwid_hash, ?3 the ceiling, ?4 the victim, ?5 the cutoff. The user is still at the ceiling (a place was freed by someone else
@@ -90,7 +90,7 @@ const linkDeviceCreateGuard = `
 const linkDeviceEvictGuard = `
 	NOT EXISTS (SELECT 1 FROM device WHERE user_id = ?1 AND hwid_hash IS ?2 AND kind = 'link' AND revoked_at IS NULL)
 	AND NOT EXISTS (SELECT 1 FROM device WHERE user_id = ?1 AND hwid_hash = ?2 AND blocked_at IS NOT NULL)
-	AND (SELECT count(*) FROM device d WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND ` + accDeviceLive + `) >= ?3
+	AND (SELECT count(*) FROM device d WHERE d.user_id = ?1 AND d.revoked_at IS NULL AND ` + accLimitDevice + `) >= ?3
 	AND EXISTS (SELECT 1 FROM device d WHERE d.id = ?4 AND d.user_id = ?1 AND d.kind = 'link' AND d.revoked_at IS NULL AND d.last_seen_at < ?5 AND ` + accDeviceLive + `)`
 
 // linkModeGuard: the mode the attempt decided under (?2, as stored: "" for none) is still the stored one (?1 the setting).
@@ -173,7 +173,7 @@ func (st *linkDeviceState) add(r *reads, userID string, hash []byte, now time.Ti
 	if len(hash) > 0 { // the adoption candidate
 		r.add(appendRows(&st.shared, scanLinkDeviceCredRow), linkDeviceCredsSQL, userID, nil)
 	}
-	r.add(oneRow(&st.used, scanCount), `SELECT count(*) AS n FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive, userID)
+	r.add(oneRow(&st.used, scanCount), `SELECT count(*) AS n FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accLimitDevice, userID)
 	r.add(oneRow(&st.hwidDevices, scanCount), `SELECT count(*) AS n FROM device WHERE user_id = ? AND kind = 'link' AND NOT (hwid_hash IS NULL) AND revoked_at IS NULL`, userID)
 	r.add(appendRows(&st.userIDs, scanString), `SELECT id FROM user WHERE id = ?`, userID)
 }

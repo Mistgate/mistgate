@@ -34,7 +34,7 @@ func (d SubscriptionData) LinkRefusal(limit int, hasHWID bool, now time.Time) er
 		return nil
 	}
 	ceiling := linkCeiling(d.LinkMode, limit, hasHWID)
-	if ceiling == 0 || len(d.Devices) < ceiling {
+	if ceiling == 0 || d.LimitCount() < ceiling {
 		return nil
 	}
 	if hasHWID {
@@ -50,7 +50,18 @@ func (d SubscriptionData) LinkRefusal(limit int, hasHWID bool, now time.Time) er
 			return nil // the first HWID takes the shared device over and spends no place
 		}
 	}
-	return &AccessLimitError{Used: len(d.Devices), Limit: ceiling, Mode: d.LinkMode}
+	return &AccessLimitError{Used: d.LimitCount(), Limit: ceiling, Mode: d.LinkMode}
+}
+
+// LimitCount is how many of the person's devices fill the device limit: all of them but the Telegram key (accLimitDevice).
+func (d SubscriptionData) LimitCount() int {
+	n := 0
+	for _, dev := range d.Devices {
+		if !dev.IsTelegramKey() {
+			n++
+		}
+	}
+	return n
 }
 
 // hasHWIDDevice: some link device in the list reported a HWID (it is not the shared one).

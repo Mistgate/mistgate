@@ -59,7 +59,7 @@ func (s *Service) Desired(ctx context.Context, nodeID string) ([]NodeInbound, er
 	}
 	for _, r := range rows {
 		i, ok := at[r.InboundID]
-		if !ok || !s.allowed(r.Protocol, r.AppHapp, r.AppAmnezia) {
+		if !ok || !s.allowed(r.Protocol, r.AppHapp, r.AppAmnezia, r.AppTelegram) {
 			continue
 		}
 		out[i].Creds = append(out[i].Creds, plugin.UserCred{

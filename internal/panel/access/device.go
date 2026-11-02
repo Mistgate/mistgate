@@ -302,6 +302,9 @@ func (s *Service) limitDevices(ctx context.Context, userID string) string {
 	const shown = 6
 	names := make([]string, 0, shown+1)
 	for _, d := range devs {
+		if d.IsTelegramKey() {
+			continue // it fills no place
+		}
 		if len(names) == shown {
 			names = append(names, "…")
 			break

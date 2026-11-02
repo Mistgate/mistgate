@@ -44,6 +44,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [Hysteria2](guide/hysteria2.md): Hysteria2 profile settings, certificates and obfuscation.
 - [VLESS REALITY](guide/vless.md): VLESS profiles over TCP and XHTTP, when to choose them over Hysteria2, how to pick a REALITY target, ports and apps.
 - [VLESS and Hysteria2 on one node](guide/vless-and-hysteria2.md): who listens where, what happens to the Hysteria2 site and to Let's Encrypt when VLESS takes TCP 443, and how to try VLESS with a few people.
+- [MTProto (Telegram proxy)](guide/mtproto.md): a proxy for the Telegram app only (experimental): the two choices of the name in the handshake, the person's key and link, relays, and its limits.
 - [AmneziaWG](guide/amneziawg.md): AmneziaWG 2.0 and 3.1 profiles, userspace or the kernel module, devices and keys.
 - [WARP](guide/warp.md): sending a profile's traffic out through Cloudflare WARP.
 - [Relays through an entry node](guide/relays.md): when a relay helps people whose network blocks a node, what it cannot solve, what the entry sees, and how to add one.

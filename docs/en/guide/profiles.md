@@ -3,7 +3,7 @@ title: Profiles
 description: What a profile is, how the editor works, how a profile is put on nodes with its port and certificate, and which changes break existing users.
 ---
 
-A profile is a protocol setup with a name: "Hysteria2 · 443 with Salamander and Let's Encrypt", "AmneziaWG 3.1 that looks like DNS". You make it once and put it on as many nodes as you like; each placement is a server on a node. People get a profile through their group. This page covers the **Profiles** section, the profile editor and placing profiles on nodes; the settings of each protocol are on [Hysteria2](hysteria2.md), [VLESS REALITY](vless.md) and [AmneziaWG](amneziawg.md).
+A profile is a protocol setup with a name: "Hysteria2 · 443 with Salamander and Let's Encrypt", "AmneziaWG 3.1 that looks like DNS". You make it once and put it on as many nodes as you like; each placement is a server on a node. People get a profile through their group. This page covers the **Profiles** section, the profile editor and placing profiles on nodes; the settings of each protocol are on [Hysteria2](hysteria2.md), [VLESS REALITY](vless.md), [AmneziaWG](amneziawg.md) and [MTProto](mtproto.md).
 
 ## Profiles, nodes and groups
 
@@ -17,7 +17,7 @@ A person gets a server when all of these hold: the profile is in their group, it
 
 ## Protocols are plugins
 
-Each protocol is a plugin of the panel: today Hysteria2, VLESS and AmneziaWG. A plugin brings its settings as a schema, and the editor draws the form from it. That is why every protocol's form looks alike:
+Each protocol is a plugin of the panel: today Hysteria2, VLESS, AmneziaWG and MTProto, which is marked as experimental. A plugin brings its settings as a schema, and the editor draws the form from it. That is why every protocol's form looks alike:
 
 - fields are grouped into **Basics**, **Obfuscation** and **Advanced**; a group header counts what you changed ("2 changed") and what is wrong ("1 error");
 - numbers carry their unit (Mbit/s, s, bytes);
@@ -39,6 +39,7 @@ Not every subscription format can carry every profile: sing-box has no XHTTP, on
 - The line lists the formats that carry the profile: "Link list · Mihomo · Xray JSON · sing-box". A profile that works everywhere has only this line.
 - A yellow chip marks a real loss: "not in sing-box: XHTTP". Formats that lose the profile for the same reason share one chip: "not in Link list, Xray JSON, sing-box: Gecko". Hover or focus a chip for the full sentence.
 - AmneziaWG is not a loss, it is how it works: the line ends "Mihomo · AmneziaVPN keys", with no chip.
+- MTProto is in no subscription format and is not a loss either: its `tg://` links come from the person's page, and the preview under **What the client sees** shows the link ("Telegram · tg://proxy link"). See [MTProto](mtproto.md).
 - A Hysteria2 port-hopping range is not a loss either. The link list and Xray JSON write it as one port, so their names carry a dotted underline and a tip: "The port range is written as one port."
 - In the editor the line follows your settings as you type, and it is hidden while the draft has errors. On the user card, next to a subscription profile that some format leaves out, only the yellow chip shows.
 
@@ -55,7 +56,7 @@ The reasons are stable codes. The panel's API and [MCP](../reference/mcp.md) ret
 
 ## Creating a profile
 
-1. **New profile**. If the panel has more than one protocol, pick it under **Protocol**. The form starts from the plugin's defaults, with every secret already generated.
+1. **New profile** has two steps. First choose the protocol: a card for each (**Hysteria2**, **VLESS**, **AmneziaWG**, **MTProto**; the experimental one says so). Then the form opens, starting from the plugin's defaults, with every secret already generated. The settings of the protocol you chose are on its page, for example [MTProto](mtproto.md).
 2. **Name**. Until you type one, it follows the port: "Hysteria2 · 443". Up to 64 characters, shown in the panel's lists and, through `{profile}` of the name template, in the server names people see (see [Subscriptions](subscriptions.md)).
 3. Change the settings you need. The panel checks them as you type; a field with a problem is marked, and the preview waits until it is fixed.
 4. **Right after it is created** decides what happens on the click:
@@ -85,7 +86,7 @@ A profile can go on any node of the fleet, including one still waiting for insta
 On a node, a profile can have its own:
 
 - **Port**. Empty means the profile's port.
-- **Domain (SNI)** (Hysteria2). Empty means the profile's domain, and if the profile has none, the node address when it is a domain.
+- **Domain (SNI)** (Hysteria2; and MTProto, where it is the name in the handshake when the profile uses the node's own name). Empty means the profile's domain, and if the profile has none, the node address when it is a domain.
 
 The first AmneziaWG profile on a node also asks which AmneziaWG backend the node uses, see [AmneziaWG](amneziawg.md).
 
@@ -97,7 +98,7 @@ A port can also be held by a program outside Mistgate. The panel cannot see that
 
 ### Certificates
 
-AmneziaWG has no certificate, and neither has VLESS REALITY: it borrows the one of its target site. A Hysteria2 profile has one of two:
+AmneziaWG has no certificate, and neither has VLESS REALITY: it borrows the one of its target site. MTProto has none of its own either: with the node's own name, strangers on its port see the node's site with the node's certificate ([MTProto](mtproto.md#the-name-in-the-handshake)). A Hysteria2 profile has one of two:
 
 | Certificate | Needs | How the app checks it |
 |:--|:--|:--|
@@ -122,6 +123,7 @@ While you fill in the add-profile dialog (and the per-node edit dialog), the pan
 | Code | When | What the dialog says or does |
 |:--|:--|:--|
 | `acme_needs_domain` | Let's Encrypt and no domain on an IP node | The Let's Encrypt block with **Enter a domain** and the self-signed ways. |
+| `mtproto_needs_domain` | An MTProto profile with the node's own name, on a node that has only an IP address | The message asks for a domain for the profile on that node, or for the choice of **Another site**. |
 | `port_taken` | Another profile of the node listens there, or the port lies in its hop range | "Port 443 on de1 is already taken by the profile "Main"." A free port is filled in; **Take N**. |
 | `hop_taken` | This profile's own hop range overlaps another profile on the node | The overlap, and **Open the profile**: only changing the range helps. |
 | `port_in_hop` | The port lies inside the profile's own hop range | "The port must be outside the profile's hop range (20000–30000)." |

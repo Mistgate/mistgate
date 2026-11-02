@@ -76,6 +76,7 @@ A server that a format cannot carry is left out of that format without a word, a
 
 - sing-box has no XHTTP transport and cannot check a self-signed certificate by its fingerprint. Gecko is carried by Mihomo only.
 - AmneziaWG reaches an app only through Mihomo YAML or an AmneziaVPN key.
+- MTProto is in no format. A `tg://proxy` line would be a broken server in every VPN app, so the Telegram links come only from the person's page and the admin ([MTProto](mtproto.md)).
 - A WARP copy is the node's exit; nothing changes on the client, so it follows the profile it copies.
 - A person for whom a format has no server at all gets a placeholder entry: see [When no server fits the app](#when-no-server-fits-the-app).
 
@@ -150,7 +151,7 @@ Next to a server of a node, an app can list up to two more, marked by a label af
 | ` · IPv6` (the same in every language) | The server at one of the node's IPv6 addresses, for people whose network blocks the node's IPv4 address. Apps without IPv6 skip it. In URIs the address is in brackets (`@[2001:db8::5]:443`); in the Mihomo, Xray JSON and sing-box formats it is bare, as those formats want it. | The node's [IPv6 entry](nodes.md#ipv6-entry) |
 | ` · via RU` (ru ` · через RU`, zh ` · 经 RU`) | The server through a relay of an entry node, with the entry's country. | A [relay](relays.md) |
 
-The order is the node's server, its IPv6 server, then the servers through its relays; a relay's server is never doubled for IPv6. Both appear for every person who may use the node (and the entry node, for a relay), at the next refresh of the app. A server behind a CDN, one with a certificate for the node's IPv4 address, and the static AmneziaWG keys get no IPv6 server. The load of an IPv6 server in Happ is the node's. Names are kept within Happ's 30 characters: the label stays, the profile name is shortened first.
+The order is the node's server, its IPv6 server, then the servers through its relays; a relay's server is never doubled for IPv6. Both appear for every person who may use the node (and the entry node, for a relay), at the next refresh of the app. A server behind a CDN, one with a certificate for the node's IPv4 address, and the static AmneziaWG keys get no IPv6 server. The load of an IPv6 server in Happ is the node's. Names are kept within Happ's 30 characters: the label stays, the profile name is shortened first. The links of an [MTProto](mtproto.md#relays-and-ipv6-twins) profile get the same twins, in the person's Telegram block instead of the subscription.
 
 ## Names & texts
 

@@ -958,7 +958,7 @@ func TestPreviewProfile(t *testing.T) {
 			ps = append(ps, p)
 		}
 	}
-	if len(all) != 3 || len(ps) != 1 || len(ps[0].Apps) != 1 || ps[0].Apps[0] != adminv1.App_APP_HAPP ||
+	if len(all) != 4 || len(ps) != 1 || len(ps[0].Apps) != 1 || ps[0].Apps[0] != adminv1.App_APP_HAPP ||
 		!strings.Contains(ps[0].DefaultSettingsJson, `"password":"••••"`) || !json.Valid([]byte(ps[0].SettingsSchemaJson)) {
 		t.Errorf("protocols = %+v", ps)
 	}

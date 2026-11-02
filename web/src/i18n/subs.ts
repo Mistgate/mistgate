@@ -328,6 +328,7 @@ export const en = {
   "subs.dns.src.group": "from the group",
   "subs.dns.src.default": "the default preset",
   "subs.dns.delivery": "When it arrives: the apps on the link ({apps}) with the next subscription update; AmneziaVPN only in new keys.",
+  "subs.dns.deliveryPlain": "When it arrives: the apps on the link with the next subscription update; AmneziaVPN only in new keys.",
   "subs.dns.scopeUser": "Applies across every node in this user's subscription. It does not change when they switch servers.",
   "subs.dns.scopeGroup": "Default for group members across their available nodes. A user's own DNS choice takes priority.",
 
@@ -682,6 +683,7 @@ export const ru: Record<keyof typeof en, string> = {
   "subs.dns.src.group": "из группы",
   "subs.dns.src.default": "пресет по умолчанию",
   "subs.dns.delivery": "Когда дойдёт: приложения по ссылке ({apps}) — при следующем обновлении подписки; AmneziaVPN — только в новых ключах.",
+  "subs.dns.deliveryPlain": "Когда дойдёт: приложения по ссылке — при следующем обновлении подписки; AmneziaVPN — только в новых ключах.",
   "subs.dns.scopeUser": "Действует на всех нодах в подписке пользователя и не меняется при переключении сервера.",
   "subs.dns.scopeGroup": "Действует по умолчанию на всех доступных нодах участников группы. Личный выбор пользователя важнее.",
 
@@ -1035,6 +1037,7 @@ export const zh: typeof en = {
   "subs.dns.src.group": "来自分组",
   "subs.dns.src.default": "默认预设",
   "subs.dns.delivery": "生效时间：订阅类应用（{apps}）在下次更新订阅时生效；AmneziaVPN 仅对新密钥生效。",
+  "subs.dns.deliveryPlain": "生效时间：订阅类应用在下次更新订阅时生效；AmneziaVPN 仅对新密钥生效。",
   "subs.dns.scopeUser": "对此用户订阅中的所有节点生效。切换服务器时不会改变。",
   "subs.dns.scopeGroup": "分组成员在其可用节点上的默认值。用户自己的 DNS 选择优先。",
 

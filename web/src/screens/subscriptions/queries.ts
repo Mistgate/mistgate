@@ -25,9 +25,14 @@ export const settingsQuery = queryOptions({
  */
 export function useLinkAppNames(): string {
   const t = useT();
-  const { data } = useQuery(settingsQuery);
-  const names = [...new Set((data?.settings.apps ?? []).filter((a) => a.kind === App.HAPP).map((a) => a.name).filter(Boolean))];
+  const names = useLinkAppList();
   return names.length > 0 ? names.join(", ") : t("subs.kind.happ");
+}
+
+/** The names of the apps on the link, each once; empty when the page lists none (a sentence then words it without names). */
+export function useLinkAppList(): string[] {
+  const { data } = useQuery(settingsQuery);
+  return [...new Set((data?.settings.apps ?? []).filter((a) => a.kind === App.HAPP).map((a) => a.name).filter(Boolean))];
 }
 
 export const clientsQuery = queryOptions({

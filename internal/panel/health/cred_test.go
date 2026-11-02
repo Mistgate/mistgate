@@ -1,6 +1,7 @@
 package health
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	panelmtproto "github.com/mistgate/mistgate/internal/panel/protocols/mtproto"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -132,6 +134,79 @@ func TestVLESSProbeCredentialIsAnOrdinaryStableUUIDAndIsRemovedWithInbound(t *te
 	}
 	if _, err := e.st.ProbeCred(e.ctx, in); err != store.ErrNotFound {
 		t.Fatalf("VLESS probe credential outlived its inbound: %v", err)
+	}
+}
+
+func TestMTProtoProbeCredentialIsSeparateFromPersonKeysAndStable(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider", true)
+	e.n++
+	settings, err := panelmtproto.New().DefaultSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := e.acc.CreateProfile(e.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{
+		Protocol: "mtproto", Name: "mtproto-de1-" + string(rune('a'+e.n)), SettingsJson: string(settings),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := e.acc.CreateInbound(e.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
+		ProfileId: profile.Msg.Profile.Id, NodeId: "de1", PortOverride: 443,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inboundID := created.Msg.Inbound.Id
+	desired, err := e.acc.Desired(e.ctx, "de1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plain statehash.Inbound
+	for _, item := range desired {
+		if item.Spec.ID == inboundID {
+			plain = statehash.Inbound(item)
+			break
+		}
+	}
+	if plain.Spec.ID == "" || len(plain.Creds) != 0 {
+		t.Fatalf("person-owned MTProto key leaked into health setup: %+v", plain)
+	}
+
+	withProbe := e.s.WithProbeCreds(e.ctx, []statehash.Inbound{plain})
+	if len(withProbe) != 1 || len(withProbe[0].Creds) != 1 {
+		t.Fatalf("MTProto probe credential: %+v", withProbe)
+	}
+	cred := withProbe[0].Creds[0]
+	if cred.UserID != "" || cred.DeviceID != "" || cred.RateLimitBps != probeRateLimitBps || !strings.HasPrefix(cred.CredID, "crd_") {
+		t.Fatalf("MTProto probe credential is not isolated: %+v", cred)
+	}
+	var data struct {
+		Key string
+	}
+	if err := json.Unmarshal(cred.Data, &data); err != nil || len(data.Key) != 32 {
+		t.Fatalf("MTProto node credential: %s %v", cred.Data, err)
+	}
+	if _, err := hex.DecodeString(data.Key); err != nil {
+		t.Fatalf("MTProto node key is not hex: %q", data.Key)
+	}
+	row, err := e.st.ProbeCred(e.ctx, inboundID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := e.v.Open(row.SecretEnc, row.CredID)
+	if err != nil || string(secret) != data.Key {
+		t.Fatalf("MTProto probe secret differs from its node key: %q %v", secret, err)
+	}
+	second := e.s.WithProbeCreds(e.ctx, []statehash.Inbound{plain})
+	if second[0].Creds[0].CredID != cred.CredID || string(second[0].Creds[0].Data) != string(cred.Data) {
+		t.Fatal("MTProto probe credential changed between desired-state builds")
+	}
+	if err := e.st.Access().DeleteInbound(e.ctx, inboundID, time.Time{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.st.ProbeCred(e.ctx, inboundID); err != store.ErrNotFound {
+		t.Fatalf("MTProto probe credential outlived its inbound: %v", err)
 	}
 }
 

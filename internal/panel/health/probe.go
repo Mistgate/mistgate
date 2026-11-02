@@ -52,6 +52,7 @@ type Target struct {
 // DialOptions bound a dial.
 type DialOptions struct {
 	HandshakeTimeout time.Duration
+	ProbeTimeout     time.Duration
 	testTLSPin       []byte // loopback TLS test only; deployed probes verify the normal certificate chain
 }
 
@@ -131,7 +132,7 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 		dialNode = t.relay.entry
 	}
 	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
-		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout})
+		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout, ProbeTimeout: s.cfg.ProbeTimeout})
 	if err != nil {
 		var pe *ProbeError
 		if errors.As(err, &pe) && pe.Skip {
@@ -141,6 +142,11 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 		return Result{Status: adminv1.CheckStatus_CHECK_STATUS_FAILED, At: s.now(), ErrorCode: code, ErrorDetail: detail}, false
 	}
 	defer tn.Close()
+	if checked, ok := tn.(interface{ ProbeResult() Result }); ok {
+		res := checked.ProbeResult()
+		res.At = s.now()
+		return res, false
+	}
 	downloadURL := ""
 	if t.relay != nil {
 		downloadURL = s.cfg.ProbeDownloadURL

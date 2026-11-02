@@ -104,7 +104,7 @@ func TestProfileReadToolsMaskSecretsAndExposePlacement(t *testing.T) {
 	protocolsText := mustOK(t, s, "protocols_list", map[string]any{})
 	noCanary(t, "protocols_list", protocolsText)
 	protocols := decode[protocolsListV](t, protocolsText)
-	if len(protocols.Protocols) != 1 || protocols.Protocols[0].ID != "hysteria2" || !slices.Contains(protocols.Protocols[0].Apps, "happ") {
+	if len(protocols.Protocols) != 2 || protocols.Protocols[0].ID != "hysteria2" || !slices.Contains(protocols.Protocols[0].Apps, "happ") {
 		t.Fatalf("protocol list: %+v", protocols)
 	}
 	var schemaPort, schemaMode, schemaSecret map[string]any

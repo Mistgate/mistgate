@@ -208,10 +208,11 @@ describe("the DNS preset select", () => {
     expect(text()).not.toContain("When it arrives");
   });
 
-  it("falls back to the generic words when the settings name no link app", async () => {
+  it("words the link apps without names when the settings name none (no \"(Subscription link)\" inside the sentence)", async () => {
     settings = settingsWith([]);
     await mount(<DnsSelect value="" onChange={() => {}} inherited={{ id: "p1", fromGroup: false }} />);
-    expect(text()).toContain(fill(en["subs.dns.delivery"], { apps: en["subs.kind.happ"] }));
+    expect(text()).toContain(en["subs.dns.deliveryPlain"]);
+    expect(text()).not.toContain(en["subs.kind.happ"]);
     expect(text()).toContain(en["subs.dns.scopeUser"]);
   });
 

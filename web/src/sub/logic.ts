@@ -177,6 +177,18 @@ export function normalize(raw: unknown): MgData {
         endpoints: str(am.endpoints),
       }
     : null;
+  const tg = r.telegram && typeof r.telegram === "object" ? rec(r.telegram) : null;
+  const telegram = tg
+    ? {
+        links: list(tg.links).flatMap((l): { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string }[] => {
+          const x = rec(l);
+          const url = str(x.url);
+          return /^tg:/i.test(url)
+            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), ipv6: x.ipv6 === true, relay: x.relay === true, via: str(x.via), url }]
+            : [];
+        }),
+      }
+    : null;
   return {
     v: num(r.v) || 1,
     lang: isLang(r.lang) ? r.lang : "ru",
@@ -213,7 +225,8 @@ export function normalize(raw: unknown): MgData {
         ? [{ platform: a.platform as Platform, kind: a.kind as Kind, name: str(a.name), download_url: str(a.download_url), add_url: str(a.add_url), description: str(a.description).trim(), recommended: a.recommended === true }]
         : [],
     ),
-    access: { happ: acc.happ === true, amnezia: acc.amnezia === true },
+    access: { happ: acc.happ === true, amnezia: acc.amnezia === true, telegram: acc.telegram === true },
+    telegram,
     devices: list(r.devices).map(
       (d): Device => ({
         id: str(d.id),
@@ -413,7 +426,7 @@ export function countryLabel(cc: string, lang: Lang, flags = true): string {
 }
 
 /** A server's name split the way the card writes it: the country, and the owner's place after a dot ("Германия" "Франкфурт"). */
-export function serverName(s: ServerEntry, lang: Lang): { country: string; place: string } {
+export function serverName(s: Pick<ServerEntry, "country_code" | "place" | "label">, lang: Lang): { country: string; place: string } {
   const country = countryName(s.country_code, lang);
   if (country) return { country, place: s.place };
   const [head, ...rest] = s.label.split(" · ");

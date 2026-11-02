@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/user.proto.
  */
 export const file_mistgate_admin_v1_user: GenFile = /*@__PURE__*/
-  fileDesc("ChxtaXN0Z2F0ZS9hZG1pbi92MS91c2VyLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSJLChhHZXRVc2VyQ29ubmVjdGlvblJlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCRINCgVob3VycxgCIAEoDRIPCgdieV9ob3VyGAMgASgIIt8DChBEZXZpY2VDb25uZWN0aW9uEhEKCWRldmljZV9pZBgBIAEoCRIPCgdub2RlX2lkGAIgASgJEhEKCW5vZGVfbmFtZRgDIAEoCRISCgppbmJvdW5kX2lkGAQgASgJEhQKDHByb2ZpbGVfbmFtZRgFIAEoCRIQCghwcm90b2NvbBgGIAEoCRIQCghjb25uZWN0cxgHIAEoDRIPCgdyZWplY3RzGAggASgNEg0KBWRyb3BzGAkgASgNEg4KBnN0YWxscxgKIAEoDRIUCghvbmxpbmVfcxgLIAEoBEICMAISGgoObGFzdF9ob3VyX3VuaXgYDCABKANCAjACEhAKCHBsYXRmb3JtGA0gASgJEg4KBmNsaWVudBgOIAEoCRIMCgRraW5kGA8gASgJEioKBWhvdXJzGBAgAygLMhsubWlzdGdhdGUuYWRtaW4udjEuTGlua0hvdXISFQoNY2xpZW50X2Nsb3NlcxgRIAEoDRIPCgdmcmVlemVzGBIgASgNEg0KBXF1aWV0GBMgASgNEg4KBnJ0dF9tcxgUIAEoDRIVCg1sb3NzX3Blcm1pbGxlGBUgASgNEhMKC3J0dF9zYW1wbGVzGBYgASgNEhUKCXBrdHNfc2VudBgXIAEoBEICMAIinAEKGUdldFVzZXJDb25uZWN0aW9uUmVzcG9uc2USFgoKc2luY2VfdW5peBgBIAEoA0ICMAISFAoIbm93X3VuaXgYAiABKANCAjACEjEKBHJvd3MYAyADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5EZXZpY2VDb25uZWN0aW9uEh4KFm5vZGVzX3dpdGhvdXRfY291bnRlcnMYBCADKAkiKwoKQXBwVG9nZ2xlcxIMCgRoYXBwGAEgASgIEg8KB2FtbmV6aWEYAiABKAgiLgoNTm9kZVNlbGVjdGlvbhILCgNhbGwYASABKAgSEAoIbm9kZV9pZHMYAiADKAki5QYKBFVzZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghncm91cF9pZBgDIAEoCRISCgpncm91cF9uYW1lGAQgASgJEi0KBnN0YXR1cxgFIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLlVzZXJTdGF0dXMSKwoEYXBwcxgGIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkFwcFRvZ2dsZXMSIwoDdmlhGAcgAygOMhYubWlzdGdhdGUuYWRtaW4udjEuQXBwEhQKDGRldmljZXNfdXNlZBgIIAEoDRIUCgxkZXZpY2VfbGltaXQYCSABKA0SFgoKdXNlZF9ieXRlcxgKIAEoBEICMAISFwoLcXVvdGFfYnl0ZXMYCyABKARCAjACEjIKC3F1b3RhX3Jlc2V0GAwgASgOMh0ubWlzdGdhdGUuYWRtaW4udjEuUXVvdGFSZXNldBIbCg9uZXh0X3Jlc2V0X3VuaXgYDSABKANCAjACEhgKDGV4cGlyZXNfdW5peBgOIAEoA0ICMAISGgoObGFzdF9zZWVuX3VuaXgYDyABKANCAjACEg4KBm9ubGluZRgQIAEoCBIXCg9jdXJyZW50X25vZGVfaWQYESABKAkSGQoRY3VycmVudF9ub2RlX25hbWUYEiABKAkSGwoPc3BlZWRfbGltaXRfYnBzGBMgASgEQgIwAhIvCgVub2RlcxgUIAEoCzIgLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTZWxlY3Rpb24SGAoMY3JlYXRlZF91bml4GBUgASgDQgIwAhIVCg1kbnNfcHJlc2V0X2lkGBYgASgJEh8KF2VmZmVjdGl2ZV9kbnNfcHJlc2V0X2lkGBcgASgJEiEKGWVmZmVjdGl2ZV9kbnNfcHJlc2V0X25hbWUYGCABKAkSMAoKZG5zX3NvdXJjZRgZIAEoDjIcLm1pc3RnYXRlLmFkbWluLnYxLkRuc1NvdXJjZRITCgthY2Nlc3NfaGFwcBgaIAEoCBIWCg5hY2Nlc3NfYW1uZXppYRgbIAEoCBIZChFzdWJzY3JpcHRpb25fbmFtZRgcIAEoCRITCgtncm91cF9jb2xvchgdIAEoCRIiChZkZXZpY2Vfc3BlZWRfbGltaXRfYnBzGB4gASgEQgIwAiLYAQoQTGlzdFVzZXJzUmVxdWVzdBItCgZmaWx0ZXIYASABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyRmlsdGVyEg0KBXF1ZXJ5GAIgASgJEhAKCGdyb3VwX2lkGAMgASgJEhEKCXBhZ2Vfc2l6ZRgEIAEoDRISCgpwYWdlX3Rva2VuGAUgASgJEg4KBm9mZnNldBgGIAEoDRIpCgRzb3J0GAcgASgOMhsubWlzdGdhdGUuYWRtaW4udjEuVXNlclNvcnQSEgoKZGVzY2VuZGluZxgIIAEoCCKYAQoKVXNlckNvdW50cxILCgNhbGwYASABKA0SDgoGb25saW5lGAIgASgNEhAKCGV4cGlyaW5nGAMgASgNEhIKCm92ZXJfcXVvdGEYBCABKA0SFAoMZGV2aWNlc191c2VkGAUgASgNEhYKDmRldmljZXNfb25saW5lGAYgASgNEhkKEW92ZXJfZGV2aWNlX2xpbWl0GAcgASgNIoMBChFMaXN0VXNlcnNSZXNwb25zZRImCgV1c2VycxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXISFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEi0KBmNvdW50cxgDIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlVzZXJDb3VudHMiIQoOR2V0VXNlclJlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCSKwAwoGRGV2aWNlEgoKAmlkGAEgASgJEhAKCHBsYXRmb3JtGAIgASgJEg0KBW1vZGVsGAMgASgJEhsKD2ZpcnN0X3NlZW5fdW5peBgEIAEoA0ICMAISGgoObGFzdF9zZWVuX3VuaXgYBSABKANCAjACEg4KBm9ubGluZRgGIAEoCBIRCglwcm90b2NvbHMYByADKAkSFgoOYXdnX3Byb2ZpbGVfaWQYCCABKAkSGAoQYXdnX3Byb2ZpbGVfbmFtZRgJIAEoCRITCgthd2dfdmVyc2lvbhgKIAEoCRINCgVzdGFsZRgLIAEoCBIPCgdhZGRyZXNzGAwgASgJEh8KE2xhc3RfaGFuZHNoYWtlX3VuaXgYDSABKANCAjACEisKBGtpbmQYDiABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5EZXZpY2VLaW5kEhIKCm9zX3ZlcnNpb24YDyABKAkSDgoGY2xpZW50GBAgASgJEhYKCnVzZWRfYnl0ZXMYESABKARCAjACEhcKD29ubGluZV9ub2RlX2lkcxgSIAMoCRITCgtmaW5nZXJwcmludBgUIAEoCSI1CgpEYXlUcmFmZmljEhQKCGRheV91bml4GAEgASgDQgIwAhIRCgVieXRlcxgCIAEoBEICMAIiVgoLTm9kZVRyYWZmaWMSDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSEQoFYnl0ZXMYBCABKARCAjACIqcBCgpOb2RlQWNjZXNzEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEhQKDGNvdW50cnlfY29kZRgDIAEoCRIQCghsb2NhdGlvbhgEIAEoCRIQCghwcm92aWRlchgFIAEoCRIRCglwcm90b2NvbHMYBiADKAkSFgoObm9kZV9wcm90b2NvbHMYByADKAkSEAoIc2VsZWN0ZWQYCCABKAgiawoKUHJvZmlsZVJlZhIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHByb3RvY29sGAMgASgJEjEKB2Zvcm1hdHMYBCADKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5Qcm9maWxlRm9ybWF0IvACCg9HZXRVc2VyUmVzcG9uc2USJQoEdXNlchgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXISKgoHZGV2aWNlcxgCIAMoCzIZLm1pc3RnYXRlLmFkbWluLnYxLkRldmljZRI0Cg1kYWlseV90cmFmZmljGAMgAygLMh0ubWlzdGdhdGUuYWRtaW4udjEuRGF5VHJhZmZpYxI0Cgxub2RlX3RyYWZmaWMYBCADKAsyHi5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlVHJhZmZpYxIvCghwcm9maWxlcxgFIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlByb2ZpbGVSZWYSMgoLbm9kZV9hY2Nlc3MYBiADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlQWNjZXNzEjkKD2Jsb2NrZWRfZGV2aWNlcxgHIAMoCzIgLm1pc3RnYXRlLmFkbWluLnYxLkJsb2NrZWREZXZpY2UiewoNQmxvY2tlZERldmljZRIKCgJpZBgBIAEoCRIQCghwbGF0Zm9ybRgCIAEoCRINCgVtb2RlbBgDIAEoCRIOCgZjbGllbnQYBCABKAkSGAoMYmxvY2tlZF91bml4GAUgASgDQgIwAhITCgtmaW5nZXJwcmludBgGIAEoCSLfAgoRQ3JlYXRlVXNlclJlcXVlc3QSDAoEbmFtZRgBIAEoCRIQCghncm91cF9pZBgCIAEoCRIXCgtxdW90YV9ieXRlcxgDIAEoBEICMAISMgoLcXVvdGFfcmVzZXQYBCABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5RdW90YVJlc2V0EhEKCXRlcm1fZGF5cxgFIAEoDRIUCgxkZXZpY2VfbGltaXQYBiABKA0SKwoEYXBwcxgHIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkFwcFRvZ2dsZXMSLwoFbm9kZXMYCCABKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlU2VsZWN0aW9uEhsKD3NwZWVkX2xpbWl0X2JwcxgJIAEoBEICMAISFQoNZG5zX3ByZXNldF9pZBgKIAEoCRIiChZkZXZpY2Vfc3BlZWRfbGltaXRfYnBzGAsgASgEQgIwAiJsChJDcmVhdGVVc2VyUmVzcG9uc2USJQoEdXNlchgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXISGAoQc3Vic2NyaXB0aW9uX3VybBgCIAEoCRIVCg1wYWdlX3Bhc3N3b3JkGAMgASgJIqEFChFVcGRhdGVVc2VyUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJEhEKBG5hbWUYAiABKAlIAIgBARIVCghncm91cF9pZBgDIAEoCUgBiAEBEhwKC3F1b3RhX2J5dGVzGAQgASgEQgIwAkgCiAEBEjcKC3F1b3RhX3Jlc2V0GAUgASgOMh0ubWlzdGdhdGUuYWRtaW4udjEuUXVvdGFSZXNldEgDiAEBEh0KDGV4cGlyZXNfdW5peBgGIAEoA0ICMAJIBIgBARIZCgxkZXZpY2VfbGltaXQYByABKA1IBYgBARIwCgRhcHBzGAggASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuQXBwVG9nZ2xlc0gGiAEBEjQKBW5vZGVzGAkgASgLMiAubWlzdGdhdGUuYWRtaW4udjEuTm9kZVNlbGVjdGlvbkgHiAEBEiAKD3NwZWVkX2xpbWl0X2JwcxgKIAEoBEICMAJICIgBARIaCg1kbnNfcHJlc2V0X2lkGAsgASgJSAmIAQESDwoHZHJ5X3J1bhgMIAEoCBIeChFzdWJzY3JpcHRpb25fbmFtZRgNIAEoCUgKiAEBEicKFmRldmljZV9zcGVlZF9saW1pdF9icHMYDiABKARCAjACSAuIAQFCBwoFX25hbWVCCwoJX2dyb3VwX2lkQg4KDF9xdW90YV9ieXRlc0IOCgxfcXVvdGFfcmVzZXRCDwoNX2V4cGlyZXNfdW5peEIPCg1fZGV2aWNlX2xpbWl0QgcKBV9hcHBzQggKBl9ub2Rlc0ISChBfc3BlZWRfbGltaXRfYnBzQhAKDl9kbnNfcHJlc2V0X2lkQhQKEl9zdWJzY3JpcHRpb25fbmFtZUIZChdfZGV2aWNlX3NwZWVkX2xpbWl0X2JwcyJsChJVcGRhdGVVc2VyUmVzcG9uc2USJQoEdXNlchgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXISLwoGaW1wYWN0GAIgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuQWNjZXNzSW1wYWN0In8KDEFjY2Vzc0ltcGFjdBIuCgRsb3N0GAEgAygLMiAubWlzdGdhdGUuYWRtaW4udjEuSW1wYWN0UHJvZmlsZRIwCgZnYWluZWQYAiADKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5JbXBhY3RQcm9maWxlEg0KBXVzZXJzGAMgASgNIlAKDUltcGFjdFByb2ZpbGUSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghwcm90b2NvbBgDIAEoCRITCgthd2dfZGV2aWNlcxgEIAEoDSI7ChZTZXRVc2Vyc0VuYWJsZWRSZXF1ZXN0EhAKCHVzZXJfaWRzGAEgAygJEg8KB2VuYWJsZWQYAiABKAgiQQoXU2V0VXNlcnNFbmFibGVkUmVzcG9uc2USJgoFdXNlcnMYASADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyIjQKEkV4dGVuZFVzZXJzUmVxdWVzdBIQCgh1c2VyX2lkcxgBIAMoCRIMCgRkYXlzGAIgASgNIj0KE0V4dGVuZFVzZXJzUmVzcG9uc2USJgoFdXNlcnMYASADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyIisKF1Jlc2V0VXNlclRyYWZmaWNSZXF1ZXN0EhAKCHVzZXJfaWRzGAEgAygJIkIKGFJlc2V0VXNlclRyYWZmaWNSZXNwb25zZRImCgV1c2VycxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXIiNwoTUmV2b2tlRGV2aWNlUmVxdWVzdBIRCglkZXZpY2VfaWQYASABKAkSDQoFYmxvY2sYAiABKAgiPQoUUmV2b2tlRGV2aWNlUmVzcG9uc2USJQoEdXNlchgBIAEoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXIiKQoUVW5ibG9ja0RldmljZVJlcXVlc3QSEQoJZGV2aWNlX2lkGAEgASgJIj4KFVVuYmxvY2tEZXZpY2VSZXNwb25zZRIlCgR1c2VyGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlciImChJEZWxldGVVc2Vyc1JlcXVlc3QSEAoIdXNlcl9pZHMYASADKAkiFQoTRGVsZXRlVXNlcnNSZXNwb25zZSI9ChpHZXRTdWJzY3JpcHRpb25MaW5rUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJEg4KBnJvdGF0ZRgCIAEoCCJBChtHZXRTdWJzY3JpcHRpb25MaW5rUmVzcG9uc2USCwoDdXJsGAEgASgJEhUKDXBhZ2VfcGFzc3dvcmQYAiABKAkqjQEKClVzZXJTdGF0dXMSGwoXVVNFUl9TVEFUVVNfVU5TUEVDSUZJRUQQABIWChJVU0VSX1NUQVRVU19BQ1RJVkUQARIYChRVU0VSX1NUQVRVU19ESVNBQkxFRBACEhcKE1VTRVJfU1RBVFVTX0VYUElSRUQQAxIXChNVU0VSX1NUQVRVU19MSU1JVEVEEAQqoAEKClF1b3RhUmVzZXQSGwoXUVVPVEFfUkVTRVRfVU5TUEVDSUZJRUQQABIUChBRVU9UQV9SRVNFVF9OT05FEAESEwoPUVVPVEFfUkVTRVRfREFZEAISFAoQUVVPVEFfUkVTRVRfV0VFSxADEhUKEVFVT1RBX1JFU0VUX01PTlRIEAQSHQoZUVVPVEFfUkVTRVRfUk9MTElOR19NT05USBAFKpoBCgpVc2VyRmlsdGVyEhsKF1VTRVJfRklMVEVSX1VOU1BFQ0lGSUVEEAASFgoSVVNFUl9GSUxURVJfT05MSU5FEAESGAoUVVNFUl9GSUxURVJfRVhQSVJJTkcQAhIaChZVU0VSX0ZJTFRFUl9PVkVSX1FVT1RBEAMSIQodVVNFUl9GSUxURVJfT1ZFUl9ERVZJQ0VfTElNSVQQBCrBAQoIVXNlclNvcnQSGQoVVVNFUl9TT1JUX1VOU1BFQ0lGSUVEEAASEgoOVVNFUl9TT1JUX05BTUUQARIVChFVU0VSX1NPUlRfVFJBRkZJQxACEhQKEFVTRVJfU09SVF9FWFBJUlkQAxIXChNVU0VSX1NPUlRfTEFTVF9TRUVOEAQSFQoRVVNFUl9TT1JUX0RFVklDRVMQBRITCg9VU0VSX1NPUlRfR1JPVVAQBhIUChBVU0VSX1NPUlRfU1RBVFVTEAcqagoJRG5zU291cmNlEhoKFkROU19TT1VSQ0VfVU5TUEVDSUZJRUQQABITCg9ETlNfU09VUkNFX1VTRVIQARIUChBETlNfU09VUkNFX0dST1VQEAISFgoSRE5TX1NPVVJDRV9ERUZBVUxUEAMqcQoKRGV2aWNlS2luZBIbChdERVZJQ0VfS0lORF9VTlNQRUNJRklFRBAAEhQKEERFVklDRV9LSU5EX0xJTksQARIbChdERVZJQ0VfS0lORF9MSU5LX1NIQVJFRBACEhMKD0RFVklDRV9LSU5EX0tFWRADMqsJCgtVc2VyU2VydmljZRJWCglMaXN0VXNlcnMSIy5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0VXNlcnNSZXF1ZXN0GiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdFVzZXJzUmVzcG9uc2USUAoHR2V0VXNlchIhLm1pc3RnYXRlLmFkbWluLnYxLkdldFVzZXJSZXF1ZXN0GiIubWlzdGdhdGUuYWRtaW4udjEuR2V0VXNlclJlc3BvbnNlElkKCkNyZWF0ZVVzZXISJC5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVVc2VyUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVVzZXJSZXNwb25zZRJZCgpVcGRhdGVVc2VyEiQubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlVXNlclJlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVVc2VyUmVzcG9uc2USaAoPU2V0VXNlcnNFbmFibGVkEikubWlzdGdhdGUuYWRtaW4udjEuU2V0VXNlcnNFbmFibGVkUmVxdWVzdBoqLm1pc3RnYXRlLmFkbWluLnYxLlNldFVzZXJzRW5hYmxlZFJlc3BvbnNlElwKC0V4dGVuZFVzZXJzEiUubWlzdGdhdGUuYWRtaW4udjEuRXh0ZW5kVXNlcnNSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRXh0ZW5kVXNlcnNSZXNwb25zZRJrChBSZXNldFVzZXJUcmFmZmljEioubWlzdGdhdGUuYWRtaW4udjEuUmVzZXRVc2VyVHJhZmZpY1JlcXVlc3QaKy5taXN0Z2F0ZS5hZG1pbi52MS5SZXNldFVzZXJUcmFmZmljUmVzcG9uc2USXwoMUmV2b2tlRGV2aWNlEiYubWlzdGdhdGUuYWRtaW4udjEuUmV2b2tlRGV2aWNlUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLlJldm9rZURldmljZVJlc3BvbnNlEmIKDVVuYmxvY2tEZXZpY2USJy5taXN0Z2F0ZS5hZG1pbi52MS5VbmJsb2NrRGV2aWNlUmVxdWVzdBooLm1pc3RnYXRlLmFkbWluLnYxLlVuYmxvY2tEZXZpY2VSZXNwb25zZRJcCgtEZWxldGVVc2VycxIlLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVVzZXJzUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZVVzZXJzUmVzcG9uc2USdAoTR2V0U3Vic2NyaXB0aW9uTGluaxItLm1pc3RnYXRlLmFkbWluLnYxLkdldFN1YnNjcmlwdGlvbkxpbmtSZXF1ZXN0Gi4ubWlzdGdhdGUuYWRtaW4udjEuR2V0U3Vic2NyaXB0aW9uTGlua1Jlc3BvbnNlEm4KEUdldFVzZXJDb25uZWN0aW9uEisubWlzdGdhdGUuYWRtaW4udjEuR2V0VXNlckNvbm5lY3Rpb25SZXF1ZXN0GiwubWlzdGdhdGUuYWRtaW4udjEuR2V0VXNlckNvbm5lY3Rpb25SZXNwb25zZULEAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQglVc2VyUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common, file_mistgate_admin_v1_profile]);
+  fileDesc("ChxtaXN0Z2F0ZS9hZG1pbi92MS91c2VyLnByb3RvEhFtaXN0Z2F0ZS5hZG1pbi52MSJLChhHZXRVc2VyQ29ubmVjdGlvblJlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCRINCgVob3VycxgCIAEoDRIPCgdieV9ob3VyGAMgASgIIt8DChBEZXZpY2VDb25uZWN0aW9uEhEKCWRldmljZV9pZBgBIAEoCRIPCgdub2RlX2lkGAIgASgJEhEKCW5vZGVfbmFtZRgDIAEoCRISCgppbmJvdW5kX2lkGAQgASgJEhQKDHByb2ZpbGVfbmFtZRgFIAEoCRIQCghwcm90b2NvbBgGIAEoCRIQCghjb25uZWN0cxgHIAEoDRIPCgdyZWplY3RzGAggASgNEg0KBWRyb3BzGAkgASgNEg4KBnN0YWxscxgKIAEoDRIUCghvbmxpbmVfcxgLIAEoBEICMAISGgoObGFzdF9ob3VyX3VuaXgYDCABKANCAjACEhAKCHBsYXRmb3JtGA0gASgJEg4KBmNsaWVudBgOIAEoCRIMCgRraW5kGA8gASgJEioKBWhvdXJzGBAgAygLMhsubWlzdGdhdGUuYWRtaW4udjEuTGlua0hvdXISFQoNY2xpZW50X2Nsb3NlcxgRIAEoDRIPCgdmcmVlemVzGBIgASgNEg0KBXF1aWV0GBMgASgNEg4KBnJ0dF9tcxgUIAEoDRIVCg1sb3NzX3Blcm1pbGxlGBUgASgNEhMKC3J0dF9zYW1wbGVzGBYgASgNEhUKCXBrdHNfc2VudBgXIAEoBEICMAIinAEKGUdldFVzZXJDb25uZWN0aW9uUmVzcG9uc2USFgoKc2luY2VfdW5peBgBIAEoA0ICMAISFAoIbm93X3VuaXgYAiABKANCAjACEjEKBHJvd3MYAyADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5EZXZpY2VDb25uZWN0aW9uEh4KFm5vZGVzX3dpdGhvdXRfY291bnRlcnMYBCADKAkiPQoKQXBwVG9nZ2xlcxIMCgRoYXBwGAEgASgIEg8KB2FtbmV6aWEYAiABKAgSEAoIdGVsZWdyYW0YAyABKAgiLgoNTm9kZVNlbGVjdGlvbhILCgNhbGwYASABKAgSEAoIbm9kZV9pZHMYAiADKAkilwcKBFVzZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghncm91cF9pZBgDIAEoCRISCgpncm91cF9uYW1lGAQgASgJEi0KBnN0YXR1cxgFIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLlVzZXJTdGF0dXMSKwoEYXBwcxgGIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLkFwcFRvZ2dsZXMSIwoDdmlhGAcgAygOMhYubWlzdGdhdGUuYWRtaW4udjEuQXBwEhQKDGRldmljZXNfdXNlZBgIIAEoDRIUCgxkZXZpY2VfbGltaXQYCSABKA0SFgoKdXNlZF9ieXRlcxgKIAEoBEICMAISFwoLcXVvdGFfYnl0ZXMYCyABKARCAjACEjIKC3F1b3RhX3Jlc2V0GAwgASgOMh0ubWlzdGdhdGUuYWRtaW4udjEuUXVvdGFSZXNldBIbCg9uZXh0X3Jlc2V0X3VuaXgYDSABKANCAjACEhgKDGV4cGlyZXNfdW5peBgOIAEoA0ICMAISGgoObGFzdF9zZWVuX3VuaXgYDyABKANCAjACEg4KBm9ubGluZRgQIAEoCBIXCg9jdXJyZW50X25vZGVfaWQYESABKAkSGQoRY3VycmVudF9ub2RlX25hbWUYEiABKAkSGwoPc3BlZWRfbGltaXRfYnBzGBMgASgEQgIwAhIvCgVub2RlcxgUIAEoCzIgLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTZWxlY3Rpb24SGAoMY3JlYXRlZF91bml4GBUgASgDQgIwAhIVCg1kbnNfcHJlc2V0X2lkGBYgASgJEh8KF2VmZmVjdGl2ZV9kbnNfcHJlc2V0X2lkGBcgASgJEiEKGWVmZmVjdGl2ZV9kbnNfcHJlc2V0X25hbWUYGCABKAkSMAoKZG5zX3NvdXJjZRgZIAEoDjIcLm1pc3RnYXRlLmFkbWluLnYxLkRuc1NvdXJjZRITCgthY2Nlc3NfaGFwcBgaIAEoCBIWCg5hY2Nlc3NfYW1uZXppYRgbIAEoCBIZChFzdWJzY3JpcHRpb25fbmFtZRgcIAEoCRITCgtncm91cF9jb2xvchgdIAEoCRIiChZkZXZpY2Vfc3BlZWRfbGltaXRfYnBzGB4gASgEQgIwAhIXCg9hY2Nlc3NfdGVsZWdyYW0YHyABKAgSFwoPdGVsZWdyYW1faXNzdWVkGCAgASgIItgBChBMaXN0VXNlcnNSZXF1ZXN0Ei0KBmZpbHRlchgBIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLlVzZXJGaWx0ZXISDQoFcXVlcnkYAiABKAkSEAoIZ3JvdXBfaWQYAyABKAkSEQoJcGFnZV9zaXplGAQgASgNEhIKCnBhZ2VfdG9rZW4YBSABKAkSDgoGb2Zmc2V0GAYgASgNEikKBHNvcnQYByABKA4yGy5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyU29ydBISCgpkZXNjZW5kaW5nGAggASgIIqoBCgpVc2VyQ291bnRzEgsKA2FsbBgBIAEoDRIOCgZvbmxpbmUYAiABKA0SEAoIZXhwaXJpbmcYAyABKA0SEgoKb3Zlcl9xdW90YRgEIAEoDRIUCgxkZXZpY2VzX3VzZWQYBSABKA0SFgoOZGV2aWNlc19vbmxpbmUYBiABKA0SGQoRb3Zlcl9kZXZpY2VfbGltaXQYByABKA0SEAoIdGVsZWdyYW0YCCABKA0igwEKEUxpc3RVc2Vyc1Jlc3BvbnNlEiYKBXVzZXJzGAEgAygLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlchIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkSLQoGY291bnRzGAMgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuVXNlckNvdW50cyIhCg5HZXRVc2VyUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJIrADCgZEZXZpY2USCgoCaWQYASABKAkSEAoIcGxhdGZvcm0YAiABKAkSDQoFbW9kZWwYAyABKAkSGwoPZmlyc3Rfc2Vlbl91bml4GAQgASgDQgIwAhIaCg5sYXN0X3NlZW5fdW5peBgFIAEoA0ICMAISDgoGb25saW5lGAYgASgIEhEKCXByb3RvY29scxgHIAMoCRIWCg5hd2dfcHJvZmlsZV9pZBgIIAEoCRIYChBhd2dfcHJvZmlsZV9uYW1lGAkgASgJEhMKC2F3Z192ZXJzaW9uGAogASgJEg0KBXN0YWxlGAsgASgIEg8KB2FkZHJlc3MYDCABKAkSHwoTbGFzdF9oYW5kc2hha2VfdW5peBgNIAEoA0ICMAISKwoEa2luZBgOIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLkRldmljZUtpbmQSEgoKb3NfdmVyc2lvbhgPIAEoCRIOCgZjbGllbnQYECABKAkSFgoKdXNlZF9ieXRlcxgRIAEoBEICMAISFwoPb25saW5lX25vZGVfaWRzGBIgAygJEhMKC2ZpbmdlcnByaW50GBQgASgJIjUKCkRheVRyYWZmaWMSFAoIZGF5X3VuaXgYASABKANCAjACEhEKBWJ5dGVzGAIgASgEQgIwAiJWCgtOb2RlVHJhZmZpYxIPCgdub2RlX2lkGAEgASgJEhEKCW5vZGVfbmFtZRgCIAEoCRIQCghwcm90b2NvbBgDIAEoCRIRCgVieXRlcxgEIAEoBEICMAIipwEKCk5vZGVBY2Nlc3MSDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSFAoMY291bnRyeV9jb2RlGAMgASgJEhAKCGxvY2F0aW9uGAQgASgJEhAKCHByb3ZpZGVyGAUgASgJEhEKCXByb3RvY29scxgGIAMoCRIWCg5ub2RlX3Byb3RvY29scxgHIAMoCRIQCghzZWxlY3RlZBgIIAEoCCJrCgpQcm9maWxlUmVmEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSMQoHZm9ybWF0cxgEIAMoCzIgLm1pc3RnYXRlLmFkbWluLnYxLlByb2ZpbGVGb3JtYXQi8AIKD0dldFVzZXJSZXNwb25zZRIlCgR1c2VyGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlchIqCgdkZXZpY2VzGAIgAygLMhkubWlzdGdhdGUuYWRtaW4udjEuRGV2aWNlEjQKDWRhaWx5X3RyYWZmaWMYAyADKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5EYXlUcmFmZmljEjQKDG5vZGVfdHJhZmZpYxgEIAMoCzIeLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVUcmFmZmljEi8KCHByb2ZpbGVzGAUgAygLMh0ubWlzdGdhdGUuYWRtaW4udjEuUHJvZmlsZVJlZhIyCgtub2RlX2FjY2VzcxgGIAMoCzIdLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVBY2Nlc3MSOQoPYmxvY2tlZF9kZXZpY2VzGAcgAygLMiAubWlzdGdhdGUuYWRtaW4udjEuQmxvY2tlZERldmljZSJ7Cg1CbG9ja2VkRGV2aWNlEgoKAmlkGAEgASgJEhAKCHBsYXRmb3JtGAIgASgJEg0KBW1vZGVsGAMgASgJEg4KBmNsaWVudBgEIAEoCRIYCgxibG9ja2VkX3VuaXgYBSABKANCAjACEhMKC2ZpbmdlcnByaW50GAYgASgJIt8CChFDcmVhdGVVc2VyUmVxdWVzdBIMCgRuYW1lGAEgASgJEhAKCGdyb3VwX2lkGAIgASgJEhcKC3F1b3RhX2J5dGVzGAMgASgEQgIwAhIyCgtxdW90YV9yZXNldBgEIAEoDjIdLm1pc3RnYXRlLmFkbWluLnYxLlF1b3RhUmVzZXQSEQoJdGVybV9kYXlzGAUgASgNEhQKDGRldmljZV9saW1pdBgGIAEoDRIrCgRhcHBzGAcgASgLMh0ubWlzdGdhdGUuYWRtaW4udjEuQXBwVG9nZ2xlcxIvCgVub2RlcxgIIAEoCzIgLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTZWxlY3Rpb24SGwoPc3BlZWRfbGltaXRfYnBzGAkgASgEQgIwAhIVCg1kbnNfcHJlc2V0X2lkGAogASgJEiIKFmRldmljZV9zcGVlZF9saW1pdF9icHMYCyABKARCAjACImwKEkNyZWF0ZVVzZXJSZXNwb25zZRIlCgR1c2VyGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlchIYChBzdWJzY3JpcHRpb25fdXJsGAIgASgJEhUKDXBhZ2VfcGFzc3dvcmQYAyABKAkioQUKEVVwZGF0ZVVzZXJSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkSEQoEbmFtZRgCIAEoCUgAiAEBEhUKCGdyb3VwX2lkGAMgASgJSAGIAQESHAoLcXVvdGFfYnl0ZXMYBCABKARCAjACSAKIAQESNwoLcXVvdGFfcmVzZXQYBSABKA4yHS5taXN0Z2F0ZS5hZG1pbi52MS5RdW90YVJlc2V0SAOIAQESHQoMZXhwaXJlc191bml4GAYgASgDQgIwAkgEiAEBEhkKDGRldmljZV9saW1pdBgHIAEoDUgFiAEBEjAKBGFwcHMYCCABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5BcHBUb2dnbGVzSAaIAQESNAoFbm9kZXMYCSABKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlU2VsZWN0aW9uSAeIAQESIAoPc3BlZWRfbGltaXRfYnBzGAogASgEQgIwAkgIiAEBEhoKDWRuc19wcmVzZXRfaWQYCyABKAlICYgBARIPCgdkcnlfcnVuGAwgASgIEh4KEXN1YnNjcmlwdGlvbl9uYW1lGA0gASgJSAqIAQESJwoWZGV2aWNlX3NwZWVkX2xpbWl0X2JwcxgOIAEoBEICMAJIC4gBAUIHCgVfbmFtZUILCglfZ3JvdXBfaWRCDgoMX3F1b3RhX2J5dGVzQg4KDF9xdW90YV9yZXNldEIPCg1fZXhwaXJlc191bml4Qg8KDV9kZXZpY2VfbGltaXRCBwoFX2FwcHNCCAoGX25vZGVzQhIKEF9zcGVlZF9saW1pdF9icHNCEAoOX2Ruc19wcmVzZXRfaWRCFAoSX3N1YnNjcmlwdGlvbl9uYW1lQhkKF19kZXZpY2Vfc3BlZWRfbGltaXRfYnBzImwKElVwZGF0ZVVzZXJSZXNwb25zZRIlCgR1c2VyGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlchIvCgZpbXBhY3QYAiABKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5BY2Nlc3NJbXBhY3QifwoMQWNjZXNzSW1wYWN0Ei4KBGxvc3QYASADKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5JbXBhY3RQcm9maWxlEjAKBmdhaW5lZBgCIAMoCzIgLm1pc3RnYXRlLmFkbWluLnYxLkltcGFjdFByb2ZpbGUSDQoFdXNlcnMYAyABKA0iUAoNSW1wYWN0UHJvZmlsZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHByb3RvY29sGAMgASgJEhMKC2F3Z19kZXZpY2VzGAQgASgNIjsKFlNldFVzZXJzRW5hYmxlZFJlcXVlc3QSEAoIdXNlcl9pZHMYASADKAkSDwoHZW5hYmxlZBgCIAEoCCJBChdTZXRVc2Vyc0VuYWJsZWRSZXNwb25zZRImCgV1c2VycxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXIiNAoSRXh0ZW5kVXNlcnNSZXF1ZXN0EhAKCHVzZXJfaWRzGAEgAygJEgwKBGRheXMYAiABKA0iPQoTRXh0ZW5kVXNlcnNSZXNwb25zZRImCgV1c2VycxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLlVzZXIiKwoXUmVzZXRVc2VyVHJhZmZpY1JlcXVlc3QSEAoIdXNlcl9pZHMYASADKAkiQgoYUmVzZXRVc2VyVHJhZmZpY1Jlc3BvbnNlEiYKBXVzZXJzGAEgAygLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlciI3ChNSZXZva2VEZXZpY2VSZXF1ZXN0EhEKCWRldmljZV9pZBgBIAEoCRINCgVibG9jaxgCIAEoCCI9ChRSZXZva2VEZXZpY2VSZXNwb25zZRIlCgR1c2VyGAEgASgLMhcubWlzdGdhdGUuYWRtaW4udjEuVXNlciIpChRVbmJsb2NrRGV2aWNlUmVxdWVzdBIRCglkZXZpY2VfaWQYASABKAkiPgoVVW5ibG9ja0RldmljZVJlc3BvbnNlEiUKBHVzZXIYASABKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Vc2VyIiYKEkRlbGV0ZVVzZXJzUmVxdWVzdBIQCgh1c2VyX2lkcxgBIAMoCSIVChNEZWxldGVVc2Vyc1Jlc3BvbnNlIj0KGkdldFN1YnNjcmlwdGlvbkxpbmtSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkSDgoGcm90YXRlGAIgASgIIkEKG0dldFN1YnNjcmlwdGlvbkxpbmtSZXNwb25zZRILCgN1cmwYASABKAkSFQoNcGFnZV9wYXNzd29yZBgCIAEoCSIqChdHZXRUZWxlZ3JhbUxpbmtzUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJIpgBChFUZWxlZ3JhbVByb3h5TGluaxIPCgdub2RlX2lkGAEgASgJEhEKCW5vZGVfbmFtZRgCIAEoCRISCgpwcm9maWxlX2lkGAMgASgJEhQKDHByb2ZpbGVfbmFtZRgEIAEoCRILCgN1cmwYBSABKAkSDAoEaXB2NhgGIAEoCBINCgVyZWxheRgHIAEoCBILCgN2aWEYCCABKAkilAEKGEdldFRlbGVncmFtTGlua3NSZXNwb25zZRIzCgVsaW5rcxgBIAMoCzIkLm1pc3RnYXRlLmFkbWluLnYxLlRlbGVncmFtUHJveHlMaW5rEg8KB2hhc19rZXkYAiABKAgSFQoNa2V5X2RldmljZV9pZBgDIAEoCRIbCg9rZXlfaXNzdWVkX3VuaXgYBCABKANCAjACIioKF0lzc3VlVGVsZWdyYW1LZXlSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkiVgoYSXNzdWVUZWxlZ3JhbUtleVJlc3BvbnNlEjoKBXByb3h5GAEgASgLMisubWlzdGdhdGUuYWRtaW4udjEuR2V0VGVsZWdyYW1MaW5rc1Jlc3BvbnNlIisKGFJvdGF0ZVRlbGVncmFtS2V5UmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJIlcKGVJvdGF0ZVRlbGVncmFtS2V5UmVzcG9uc2USOgoFcHJveHkYASABKAsyKy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRUZWxlZ3JhbUxpbmtzUmVzcG9uc2UiKwoYUmV2b2tlVGVsZWdyYW1LZXlSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkiVwoZUmV2b2tlVGVsZWdyYW1LZXlSZXNwb25zZRI6CgVwcm94eRgBIAEoCzIrLm1pc3RnYXRlLmFkbWluLnYxLkdldFRlbGVncmFtTGlua3NSZXNwb25zZSqNAQoKVXNlclN0YXR1cxIbChdVU0VSX1NUQVRVU19VTlNQRUNJRklFRBAAEhYKElVTRVJfU1RBVFVTX0FDVElWRRABEhgKFFVTRVJfU1RBVFVTX0RJU0FCTEVEEAISFwoTVVNFUl9TVEFUVVNfRVhQSVJFRBADEhcKE1VTRVJfU1RBVFVTX0xJTUlURUQQBCqgAQoKUXVvdGFSZXNldBIbChdRVU9UQV9SRVNFVF9VTlNQRUNJRklFRBAAEhQKEFFVT1RBX1JFU0VUX05PTkUQARITCg9RVU9UQV9SRVNFVF9EQVkQAhIUChBRVU9UQV9SRVNFVF9XRUVLEAMSFQoRUVVPVEFfUkVTRVRfTU9OVEgQBBIdChlRVU9UQV9SRVNFVF9ST0xMSU5HX01PTlRIEAUqtAEKClVzZXJGaWx0ZXISGwoXVVNFUl9GSUxURVJfVU5TUEVDSUZJRUQQABIWChJVU0VSX0ZJTFRFUl9PTkxJTkUQARIYChRVU0VSX0ZJTFRFUl9FWFBJUklORxACEhoKFlVTRVJfRklMVEVSX09WRVJfUVVPVEEQAxIhCh1VU0VSX0ZJTFRFUl9PVkVSX0RFVklDRV9MSU1JVBAEEhgKFFVTRVJfRklMVEVSX1RFTEVHUkFNEAUqwQEKCFVzZXJTb3J0EhkKFVVTRVJfU09SVF9VTlNQRUNJRklFRBAAEhIKDlVTRVJfU09SVF9OQU1FEAESFQoRVVNFUl9TT1JUX1RSQUZGSUMQAhIUChBVU0VSX1NPUlRfRVhQSVJZEAMSFwoTVVNFUl9TT1JUX0xBU1RfU0VFThAEEhUKEVVTRVJfU09SVF9ERVZJQ0VTEAUSEwoPVVNFUl9TT1JUX0dST1VQEAYSFAoQVVNFUl9TT1JUX1NUQVRVUxAHKmoKCURuc1NvdXJjZRIaChZETlNfU09VUkNFX1VOU1BFQ0lGSUVEEAASEwoPRE5TX1NPVVJDRV9VU0VSEAESFAoQRE5TX1NPVVJDRV9HUk9VUBACEhYKEkROU19TT1VSQ0VfREVGQVVMVBADKo8BCgpEZXZpY2VLaW5kEhsKF0RFVklDRV9LSU5EX1VOU1BFQ0lGSUVEEAASFAoQREVWSUNFX0tJTkRfTElOSxABEhsKF0RFVklDRV9LSU5EX0xJTktfU0hBUkVEEAISEwoPREVWSUNFX0tJTkRfS0VZEAMSHAoYREVWSUNFX0tJTkRfVEVMRUdSQU1fS0VZEAQy5QwKC1VzZXJTZXJ2aWNlElYKCUxpc3RVc2VycxIjLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RVc2Vyc1JlcXVlc3QaJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0VXNlcnNSZXNwb25zZRJQCgdHZXRVc2VyEiEubWlzdGdhdGUuYWRtaW4udjEuR2V0VXNlclJlcXVlc3QaIi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRVc2VyUmVzcG9uc2USWQoKQ3JlYXRlVXNlchIkLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZVVzZXJSZXF1ZXN0GiUubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlVXNlclJlc3BvbnNlElkKClVwZGF0ZVVzZXISJC5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVVc2VyUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZVVzZXJSZXNwb25zZRJoCg9TZXRVc2Vyc0VuYWJsZWQSKS5taXN0Z2F0ZS5hZG1pbi52MS5TZXRVc2Vyc0VuYWJsZWRSZXF1ZXN0GioubWlzdGdhdGUuYWRtaW4udjEuU2V0VXNlcnNFbmFibGVkUmVzcG9uc2USXAoLRXh0ZW5kVXNlcnMSJS5taXN0Z2F0ZS5hZG1pbi52MS5FeHRlbmRVc2Vyc1JlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5FeHRlbmRVc2Vyc1Jlc3BvbnNlEmsKEFJlc2V0VXNlclRyYWZmaWMSKi5taXN0Z2F0ZS5hZG1pbi52MS5SZXNldFVzZXJUcmFmZmljUmVxdWVzdBorLm1pc3RnYXRlLmFkbWluLnYxLlJlc2V0VXNlclRyYWZmaWNSZXNwb25zZRJfCgxSZXZva2VEZXZpY2USJi5taXN0Z2F0ZS5hZG1pbi52MS5SZXZva2VEZXZpY2VSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuUmV2b2tlRGV2aWNlUmVzcG9uc2USYgoNVW5ibG9ja0RldmljZRInLm1pc3RnYXRlLmFkbWluLnYxLlVuYmxvY2tEZXZpY2VSZXF1ZXN0GigubWlzdGdhdGUuYWRtaW4udjEuVW5ibG9ja0RldmljZVJlc3BvbnNlElwKC0RlbGV0ZVVzZXJzEiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlVXNlcnNSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlVXNlcnNSZXNwb25zZRJ0ChNHZXRTdWJzY3JpcHRpb25MaW5rEi0ubWlzdGdhdGUuYWRtaW4udjEuR2V0U3Vic2NyaXB0aW9uTGlua1JlcXVlc3QaLi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRTdWJzY3JpcHRpb25MaW5rUmVzcG9uc2USawoQR2V0VGVsZWdyYW1MaW5rcxIqLm1pc3RnYXRlLmFkbWluLnYxLkdldFRlbGVncmFtTGlua3NSZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuR2V0VGVsZWdyYW1MaW5rc1Jlc3BvbnNlEmsKEElzc3VlVGVsZWdyYW1LZXkSKi5taXN0Z2F0ZS5hZG1pbi52MS5Jc3N1ZVRlbGVncmFtS2V5UmVxdWVzdBorLm1pc3RnYXRlLmFkbWluLnYxLklzc3VlVGVsZWdyYW1LZXlSZXNwb25zZRJuChFSb3RhdGVUZWxlZ3JhbUtleRIrLm1pc3RnYXRlLmFkbWluLnYxLlJvdGF0ZVRlbGVncmFtS2V5UmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLlJvdGF0ZVRlbGVncmFtS2V5UmVzcG9uc2USbgoRUmV2b2tlVGVsZWdyYW1LZXkSKy5taXN0Z2F0ZS5hZG1pbi52MS5SZXZva2VUZWxlZ3JhbUtleVJlcXVlc3QaLC5taXN0Z2F0ZS5hZG1pbi52MS5SZXZva2VUZWxlZ3JhbUtleVJlc3BvbnNlEm4KEUdldFVzZXJDb25uZWN0aW9uEisubWlzdGdhdGUuYWRtaW4udjEuR2V0VXNlckNvbm5lY3Rpb25SZXF1ZXN0GiwubWlzdGdhdGUuYWRtaW4udjEuR2V0VXNlckNvbm5lY3Rpb25SZXNwb25zZULEAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQglVc2VyUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common, file_mistgate_admin_v1_profile]);
 
 /**
  * @generated from message mistgate.admin.v1.GetUserConnectionRequest
@@ -235,6 +235,13 @@ export type AppToggles = Message<"mistgate.admin.v1.AppToggles"> & {
    * @generated from field: bool amnezia = 2;
    */
   amnezia: boolean;
+
+  /**
+   * Telegram clients receive tg://proxy links for the MTProto profiles of the user's groups.
+   *
+   * @generated from field: bool telegram = 3;
+   */
+  telegram: boolean;
 };
 
 /**
@@ -422,7 +429,7 @@ export type User = Message<"mistgate.admin.v1.User"> & {
 
   /**
    * What the user's page offers, by app, as the subscription decides it: the app is switched on and the group gives
-   * it something on a node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
+   * it something on an enabled group node the user may use (an enabled, pending or running inbound on an enrolled node). Both false =
    * the person gets nothing yet. The status does not cut them (a disabled user's page shows the status instead).
    *
    * @generated from field: bool access_happ = 26;
@@ -454,6 +461,21 @@ export type User = Message<"mistgate.admin.v1.User"> & {
    * @generated from field: uint64 device_speed_limit_bps = 30 [jstype = JS_NUMBER];
    */
   deviceSpeedLimitBps: bigint;
+
+  /**
+   * The Telegram toggle and at least one usable MTProto inbound for the person.
+   *
+   * @generated from field: bool access_telegram = 31;
+   */
+  accessTelegram: boolean;
+
+  /**
+   * A Telegram key was issued to the person: a live DEVICE_KIND_TELEGRAM_KEY device. The links need the key, the toggle and
+   * a usable MTProto inbound (access_telegram). Not called "key": a token-reachable response has no field that looks like a secret.
+   *
+   * @generated from field: bool telegram_issued = 32;
+   */
+  telegramIssued: boolean;
 };
 
 /**
@@ -573,6 +595,13 @@ export type UserCounts = Message<"mistgate.admin.v1.UserCounts"> & {
    * @generated from field: uint32 over_device_limit = 7;
    */
   overDeviceLimit: number;
+
+  /**
+   * People with the Telegram toggle on, for the same query and group_id (the chip of USER_FILTER_TELEGRAM).
+   *
+   * @generated from field: uint32 telegram = 8;
+   */
+  telegram: number;
 };
 
 /**
@@ -1596,6 +1625,220 @@ export const GetSubscriptionLinkResponseSchema: GenMessage<GetSubscriptionLinkRe
   messageDesc(file_mistgate_admin_v1_user, 36);
 
 /**
+ * @generated from message mistgate.admin.v1.GetTelegramLinksRequest
+ */
+export type GetTelegramLinksRequest = Message<"mistgate.admin.v1.GetTelegramLinksRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetTelegramLinksRequest.
+ * Use `create(GetTelegramLinksRequestSchema)` to create a new message.
+ */
+export const GetTelegramLinksRequestSchema: GenMessage<GetTelegramLinksRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 37);
+
+/**
+ * One tg://proxy link of a person. The secret is in the URL: the UI must treat it like a password.
+ *
+ * @generated from message mistgate.admin.v1.TelegramProxyLink
+ */
+export type TelegramProxyLink = Message<"mistgate.admin.v1.TelegramProxyLink"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 2;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: string profile_id = 3;
+   */
+  profileId: string;
+
+  /**
+   * @generated from field: string profile_name = 4;
+   */
+  profileName: string;
+
+  /**
+   * @generated from field: string url = 5;
+   */
+  url: string;
+
+  /**
+   * A twin of the node's link: its IPv6 entry, or a relay of an entry node whose country code is `via`. Both false: the link
+   * to the node itself. The owner sees node_name and profile_name; the person's page never does.
+   *
+   * @generated from field: bool ipv6 = 6;
+   */
+  ipv6: boolean;
+
+  /**
+   * @generated from field: bool relay = 7;
+   */
+  relay: boolean;
+
+  /**
+   * @generated from field: string via = 8;
+   */
+  via: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.TelegramProxyLink.
+ * Use `create(TelegramProxyLinkSchema)` to create a new message.
+ */
+export const TelegramProxyLinkSchema: GenMessage<TelegramProxyLink> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 38);
+
+/**
+ * @generated from message mistgate.admin.v1.GetTelegramLinksResponse
+ */
+export type GetTelegramLinksResponse = Message<"mistgate.admin.v1.GetTelegramLinksResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.TelegramProxyLink links = 1;
+   */
+  links: TelegramProxyLink[];
+
+  /**
+   * The person holds a Telegram key. False: links is empty, whatever MTProto profiles run.
+   *
+   * @generated from field: bool has_key = 2;
+   */
+  hasKey: boolean;
+
+  /**
+   * The key's device (RevokeDevice removes it too); empty without a key.
+   *
+   * @generated from field: string key_device_id = 3;
+   */
+  keyDeviceId: string;
+
+  /**
+   * When the key was issued or last rotated; 0 without a key.
+   *
+   * @generated from field: int64 key_issued_unix = 4 [jstype = JS_NUMBER];
+   */
+  keyIssuedUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetTelegramLinksResponse.
+ * Use `create(GetTelegramLinksResponseSchema)` to create a new message.
+ */
+export const GetTelegramLinksResponseSchema: GenMessage<GetTelegramLinksResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 39);
+
+/**
+ * @generated from message mistgate.admin.v1.IssueTelegramKeyRequest
+ */
+export type IssueTelegramKeyRequest = Message<"mistgate.admin.v1.IssueTelegramKeyRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.IssueTelegramKeyRequest.
+ * Use `create(IssueTelegramKeyRequestSchema)` to create a new message.
+ */
+export const IssueTelegramKeyRequestSchema: GenMessage<IssueTelegramKeyRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 40);
+
+/**
+ * @generated from message mistgate.admin.v1.IssueTelegramKeyResponse
+ */
+export type IssueTelegramKeyResponse = Message<"mistgate.admin.v1.IssueTelegramKeyResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.GetTelegramLinksResponse proxy = 1;
+   */
+  proxy?: GetTelegramLinksResponse | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.IssueTelegramKeyResponse.
+ * Use `create(IssueTelegramKeyResponseSchema)` to create a new message.
+ */
+export const IssueTelegramKeyResponseSchema: GenMessage<IssueTelegramKeyResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 41);
+
+/**
+ * @generated from message mistgate.admin.v1.RotateTelegramKeyRequest
+ */
+export type RotateTelegramKeyRequest = Message<"mistgate.admin.v1.RotateTelegramKeyRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RotateTelegramKeyRequest.
+ * Use `create(RotateTelegramKeyRequestSchema)` to create a new message.
+ */
+export const RotateTelegramKeyRequestSchema: GenMessage<RotateTelegramKeyRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 42);
+
+/**
+ * @generated from message mistgate.admin.v1.RotateTelegramKeyResponse
+ */
+export type RotateTelegramKeyResponse = Message<"mistgate.admin.v1.RotateTelegramKeyResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.GetTelegramLinksResponse proxy = 1;
+   */
+  proxy?: GetTelegramLinksResponse | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RotateTelegramKeyResponse.
+ * Use `create(RotateTelegramKeyResponseSchema)` to create a new message.
+ */
+export const RotateTelegramKeyResponseSchema: GenMessage<RotateTelegramKeyResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 43);
+
+/**
+ * @generated from message mistgate.admin.v1.RevokeTelegramKeyRequest
+ */
+export type RevokeTelegramKeyRequest = Message<"mistgate.admin.v1.RevokeTelegramKeyRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RevokeTelegramKeyRequest.
+ * Use `create(RevokeTelegramKeyRequestSchema)` to create a new message.
+ */
+export const RevokeTelegramKeyRequestSchema: GenMessage<RevokeTelegramKeyRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 44);
+
+/**
+ * @generated from message mistgate.admin.v1.RevokeTelegramKeyResponse
+ */
+export type RevokeTelegramKeyResponse = Message<"mistgate.admin.v1.RevokeTelegramKeyResponse"> & {
+  /**
+   * @generated from field: mistgate.admin.v1.GetTelegramLinksResponse proxy = 1;
+   */
+  proxy?: GetTelegramLinksResponse | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RevokeTelegramKeyResponse.
+ * Use `create(RevokeTelegramKeyResponseSchema)` to create a new message.
+ */
+export const RevokeTelegramKeyResponseSchema: GenMessage<RevokeTelegramKeyResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_user, 45);
+
+/**
  * @generated from enum mistgate.admin.v1.UserStatus
  */
 export enum UserStatus {
@@ -1714,6 +1957,13 @@ export enum UserFilter {
    * @generated from enum value: USER_FILTER_OVER_DEVICE_LIMIT = 4;
    */
   OVER_DEVICE_LIMIT = 4,
+
+  /**
+   * The Telegram toggle is on (apps.telegram): the people of the Telegram proxy, whatever their key or the MTProto profiles.
+   *
+   * @generated from enum value: USER_FILTER_TELEGRAM = 5;
+   */
+  TELEGRAM = 5,
 }
 
 /**
@@ -1847,6 +2097,13 @@ export enum DeviceKind {
    * @generated from enum value: DEVICE_KIND_KEY = 3;
    */
   KEY = 3,
+
+  /**
+   * The person's Telegram proxy key (UserService.IssueTelegramKey): one secret for every MTProto link of the person.
+   *
+   * @generated from enum value: DEVICE_KIND_TELEGRAM_KEY = 4;
+   */
+  TELEGRAM_KEY = 4,
 }
 
 /**
@@ -1857,7 +2114,9 @@ export const DeviceKindSchema: GenEnum<DeviceKind> = /*@__PURE__*/
 
 /**
  * Users screen, create-user modal, user detail. Product rules:
- *  - Every user gets BOTH apps by default. Two toggles (Happ, Amnezia), at least one on.
+ *  - Every user gets Happ and Amnezia by default; Telegram is opt-in. Three toggles (Happ, Amnezia,
+ *    Telegram); at least one of Happ and Amnezia stays on (the user table constraint; Telegram is
+ *    additive in the first version).
  *  - Node selection per user: all nodes (automatic, includes nodes added later) or an explicit list.
  *  - Group, quota (+ reset period), term, device limit, optional speed limit.
  *  - "Via" = the apps the user really used recently (derived from traffic/sessions of the last 7 days),
@@ -1865,7 +2124,8 @@ export const DeviceKindSchema: GenEnum<DeviceKind> = /*@__PURE__*/
  *
  * EFFECTIVE ACCESS (what the panel turns into desired state for a node):
  *   for every inbound I (profile P on node N) and every non-revoked device credential C of user U:
- *     U.status == ACTIVE  AND  P in U.group.profiles  AND  (U.all_nodes OR N in U.nodes)
+ *     U.status == ACTIVE  AND  P in U.group.profiles  AND  N not in U.group.disabled_node_ids
+ *     AND  (U.all_nodes OR N in U.nodes)
  *     AND  some enabled app of U consumes P.protocol (Protocol.Clients)  AND  I is enabled  ->  C goes to N.
  *   Changing any of these changes desired state and is pushed to the nodes at once.
  *
@@ -1982,6 +2242,53 @@ export const UserService: GenService<{
     methodKind: "unary";
     input: typeof GetSubscriptionLinkRequestSchema;
     output: typeof GetSubscriptionLinkResponseSchema;
+  },
+  /**
+   * The Telegram proxy of one person: whether they hold a key and the tg://proxy links of their MTProto inbounds, one per
+   * node and profile. A read: it makes no device and no key and records no fetch. No links when Telegram is off, the
+   * person has no key, or no MTProto profile runs for them.
+   *
+   * @generated from rpc mistgate.admin.v1.UserService.GetTelegramLinks
+   */
+  getTelegramLinks: {
+    methodKind: "unary";
+    input: typeof GetTelegramLinksRequestSchema;
+    output: typeof GetTelegramLinksResponseSchema;
+  },
+  /**
+   * Makes the person's Telegram key if they have none (the same answer when they have one). Telegram has to be on for them.
+   * The key is a device of the person (DEVICE_KIND_TELEGRAM_KEY, listed with their devices) but it does NOT count against
+   * their device limit, so this never fails for want of room. Turning Telegram on in CreateUser or UpdateUser makes the key
+   * the same way.
+   *
+   * @generated from rpc mistgate.admin.v1.UserService.IssueTelegramKey
+   */
+  issueTelegramKey: {
+    methodKind: "unary";
+    input: typeof IssueTelegramKeyRequestSchema;
+    output: typeof IssueTelegramKeyResponseSchema;
+  },
+  /**
+   * Gives the key a new secret: every link made before stops working, the new links are in the answer. NOT_FOUND "key"
+   * when the person has none.
+   *
+   * @generated from rpc mistgate.admin.v1.UserService.RotateTelegramKey
+   */
+  rotateTelegramKey: {
+    methodKind: "unary";
+    input: typeof RotateTelegramKeyRequestSchema;
+    output: typeof RotateTelegramKeyResponseSchema;
+  },
+  /**
+   * Revokes the key and frees its place among the devices; the nodes drop the secret with the next desired state. Telegram
+   * stays on. Turning Telegram off or removing the key device (RevokeDevice) does the same.
+   *
+   * @generated from rpc mistgate.admin.v1.UserService.RevokeTelegramKey
+   */
+  revokeTelegramKey: {
+    methodKind: "unary";
+    input: typeof RevokeTelegramKeyRequestSchema;
+    output: typeof RevokeTelegramKeyResponseSchema;
   },
   /**
    * What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto

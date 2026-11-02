@@ -106,11 +106,11 @@ func pageServers(v access.SubView, set *adminv1.SubscriptionSettings, lang strin
 		}
 		appNames = remarks(safe, tmpl, lang)
 	}
-	label := access.ServerLabeler(lang)
+	labels := serverLabels(v, lang)
 	for _, n := range v.Nodes {
 		p := pageNode{
 			ID: n.ID, CountryCode: strings.ToUpper(strings.TrimSpace(n.CountryCode)), Place: place(n.Location),
-			Label: label(n.CountryCode, n.Location), AppNames: []string{}, Connections: []pageConn{}, Online: n.Online,
+			Label: labels[n.ID], AppNames: []string{}, Connections: []pageConn{}, Online: n.Online,
 		}
 		if n.LoadPercent != nil {
 			l := loadLevel(*n.LoadPercent)
@@ -130,6 +130,45 @@ func pageServers(v access.SubView, set *adminv1.SubscriptionSettings, lang strin
 		out = append(out, p)
 	}
 	return out
+}
+
+// serverLabels names the person's servers for the page, one label per node id (access.ServerLabeler: the country and the place,
+// a number where a name repeats, never the panel's node name). The nodes of the server list come first, in order, then the
+// nodes only a Telegram link uses, so a node has the same name in both.
+func serverLabels(v access.SubView, lang string) map[string]string {
+	label := access.ServerLabeler(lang)
+	out := make(map[string]string, len(v.Nodes))
+	for _, n := range v.Nodes {
+		out[n.ID] = label(n.CountryCode, n.Location)
+	}
+	for _, t := range v.Telegram {
+		if _, named := out[t.NodeID]; !named {
+			out[t.NodeID] = label(t.CountryCode, t.Location)
+		}
+	}
+	return out
+}
+
+// pageTelegramOf is the Telegram block of the page: the links of the person's key, each named by its server and, for the
+// node's IPv6 entry and a relay's twin, by the same mark the apps show ("· IPv6", "· via RU"). Nothing of the node's or the
+// profile's own name is in it.
+func pageTelegramOf(v access.SubView, lang string) *pageTelegram {
+	tg := &pageTelegram{Links: []pageTelegramLink{}}
+	labels := serverLabels(v, lang)
+	for _, srv := range v.Telegram {
+		if srv.URI == "" {
+			continue
+		}
+		l := pageTelegramLink{
+			Label: labels[srv.NodeID] + markText(srv.Mark, lang), CountryCode: strings.ToUpper(strings.TrimSpace(srv.CountryCode)),
+			Place: place(srv.Location), IPv6: srv.Mark == access.MarkIPv6, URL: srv.URI,
+		}
+		if cc, ok := strings.CutPrefix(srv.Mark, access.MarkVia); ok {
+			l.Relay, l.Via = true, cc
+		}
+		tg.Links = append(tg.Links, l)
+	}
+	return tg
 }
 
 // place is the owner's text for the location of a node: one line, at most 100 characters, "" when there is none.

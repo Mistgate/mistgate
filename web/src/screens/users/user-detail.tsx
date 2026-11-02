@@ -32,6 +32,7 @@ import { DnsSelect, effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns
 import { AddDeviceModal, DeviceConfigsModal, platformLabel, type DeviceRef } from "./awg-devices";
 import { GroupChip, GroupEditModal, GroupLink, ImpactText, WaysOfGroup } from "./groups";
 import { BlockedList, DeviceRow, LinkDeviceRows, RowMenu, SectionHead, Secondary, Seen, SharedRow, splitDevices, Tile } from "./link-devices";
+import { TelegramSection, telegramShown } from "./telegram-proxy";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { big, detailN, type BlockedN, type DetailN, type DeviceN as Device, type UserN as User } from "./model";
 import { useGo } from "./nav";
@@ -55,7 +56,7 @@ type Patch = Partial<{
   speedLimitBps: number;
   deviceSpeedLimitBps: number;
   dnsPresetId: string;
-  apps: { happ: boolean; amnezia: boolean };
+  apps: { happ: boolean; amnezia: boolean; telegram: boolean };
   nodes: { all: boolean; nodeIds: string[] };
 }>;
 const write = ({ quotaBytes, expiresUnix, speedLimitBps, deviceSpeedLimitBps, ...rest }: Patch) => ({
@@ -234,6 +235,7 @@ function UserDetail({ data }: { data: DetailN }) {
             devices={data.devices}
             blocked={data.blocked}
             nodeName={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? data.nodeTraffic.find((n) => n.nodeId === id)?.nodeName ?? id}
+            nodeCountry={(id) => data.nodeAccess.find((n) => n.nodeId === id)?.countryCode ?? ""}
             profiles={data.profiles}
             actions={actions}
             onEditGroup={() => setGroupOpen(true)}
@@ -482,6 +484,7 @@ function ConnectionCounts({ conn, devices, nodeName, separated }: { conn: UserCo
     const d = devices.find((x) => x.id === id);
     if (!d) return t("conn.deviceGone");
     if (d.kind === DeviceKind.LINK_SHARED) return tx("users.dev.shared");
+    if (d.kind === DeviceKind.TELEGRAM_KEY) return tx("tgproxy.key");
     return d.model || platformLabel(d.platform || "other", tx);
   };
   const missing = conn.nodesWithoutCounters.map(nodeName);
@@ -660,6 +663,7 @@ export function DevicesPanel({
   devices,
   blocked = [],
   nodeName = (id) => id,
+  nodeCountry = () => "",
   profiles,
   actions,
   onEditGroup,
@@ -671,6 +675,8 @@ export function DevicesPanel({
   blocked?: BlockedN[];
   /** The name of a node by its id, for "online · de1". */
   nodeName?: (id: string) => string;
+  /** The country code of a node by its id, for the flag of a Telegram link. */
+  nodeCountry?: (id: string) => string;
   profiles: ProfileRef[];
   actions: Actions;
   onEditGroup: () => void;
@@ -693,6 +699,7 @@ export function DevicesPanel({
   const { link, shared, keys } = splitDevices(devices);
   const showSub = !!user.apps?.happ || link.length > 0 || shared.length > 0;
   const showKeys = !!user.apps?.amnezia || keys.length > 0;
+  const showTg = telegramShown(user, profiles, devices);
   const nameOf = (d: Device) => d.model || platformLabel(d.platform, t);
   const refOf = (d: Device): DeviceRef => ({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale });
   const ask = (d: Device) => {
@@ -722,7 +729,7 @@ export function DevicesPanel({
           </Link>
         </p>
       )}
-      {!showSub && !showKeys && <p className="border-t border-line pt-3.5 pb-1 text-[13px] text-muted">{t("users.noDevices")}</p>}
+      {!showSub && !showKeys && !showTg && <p className="border-t border-line pt-3.5 pb-1 text-[13px] text-muted">{t("users.noDevices")}</p>}
 
       {showSub && (
         <section className="flex flex-col">
@@ -799,6 +806,15 @@ export function DevicesPanel({
             </ul>
           )}
         </section>
+      )}
+
+      {showTg && (
+        <TelegramSection
+          user={user}
+          countryOf={nodeCountry}
+          onTurnOn={() => void actions.update({ apps: { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: true } }).catch(() => {})}
+          onChanged={() => void actions.refresh()}
+        />
       )}
 
       <BlockedList blocked={blocked} onChanged={actions.refresh} />
@@ -946,9 +962,9 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
   };
   const selected = nodes.all ? allIds.length : nodes.ids.filter((id) => allIds.includes(id)).length;
 
-  const flipApp = (which: "happ" | "amnezia", on: boolean) => {
-    const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, [which]: on };
-    if (!apps.happ && !apps.amnezia) return; // at least one app stays on
+  const flipApp = (which: "happ" | "amnezia" | "telegram", on: boolean) => {
+    const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, [which]: on };
+    if (!apps.happ && !apps.amnezia) return; // at least one of the two link/key apps stays on
     void actions.update({ apps }).catch(() => {});
   };
 
@@ -1017,6 +1033,7 @@ function AccessPanel({ data, actions }: { data: DetailN; actions: Actions }) {
           <div className="flex flex-col border-t border-line pt-1">
             <SwitchRow label={linkApps} hint={t("users.happHint")} checked={!!user.apps?.happ} onCheckedChange={(on) => flipApp("happ", on)} />
             <SwitchRow label="AmneziaVPN" hint={t("users.awgHint")} checked={!!user.apps?.amnezia} onCheckedChange={(on) => flipApp("amnezia", on)} />
+            <SwitchRow label={t("tgproxy.toggle")} hint={t("users.telegramHint")} checked={!!user.apps?.telegram} onCheckedChange={(on) => flipApp("telegram", on)} />
           </div>
 
           <div className="flex flex-col border-t border-line pt-1">

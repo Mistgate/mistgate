@@ -31,7 +31,9 @@ type ProtocolInfo struct {
 	// Settings for a brand-new profile, secrets already generated (shown masked).
 	DefaultSettingsJson string `protobuf:"bytes,4,opt,name=default_settings_json,json=defaultSettingsJson,proto3" json:"default_settings_json,omitempty"`
 	// Which user-facing app can consume the protocol (drives the user's Happ/Amnezia toggles).
-	Apps          []App `protobuf:"varint,5,rep,packed,name=apps,proto3,enum=mistgate.admin.v1.App" json:"apps,omitempty"`
+	Apps []App `protobuf:"varint,5,rep,packed,name=apps,proto3,enum=mistgate.admin.v1.App" json:"apps,omitempty"`
+	// The protocol is new and not proven in the field (MTProto today): the list marks it, and the owner knows it may change.
+	Experimental  bool `protobuf:"varint,6,opt,name=experimental,proto3" json:"experimental,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -99,6 +101,13 @@ func (x *ProtocolInfo) GetApps() []App {
 		return x.Apps
 	}
 	return nil
+}
+
+func (x *ProtocolInfo) GetExperimental() bool {
+	if x != nil {
+		return x.Experimental
+	}
+	return false
 }
 
 type ListProtocolsRequest struct {
@@ -1939,13 +1948,14 @@ var File_mistgate_admin_v1_profile_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\n" +
-	"\x1fmistgate/admin/v1/profile.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a$mistgate/admin/v1/subscription.proto\"\xd3\x01\n" +
+	"\x1fmistgate/admin/v1/profile.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a$mistgate/admin/v1/subscription.proto\"\xf7\x01\n" +
 	"\fProtocolInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x120\n" +
 	"\x14settings_schema_json\x18\x03 \x01(\tR\x12settingsSchemaJson\x122\n" +
 	"\x15default_settings_json\x18\x04 \x01(\tR\x13defaultSettingsJson\x12*\n" +
-	"\x04apps\x18\x05 \x03(\x0e2\x16.mistgate.admin.v1.AppR\x04apps\"\x16\n" +
+	"\x04apps\x18\x05 \x03(\x0e2\x16.mistgate.admin.v1.AppR\x04apps\x12\"\n" +
+	"\fexperimental\x18\x06 \x01(\bR\fexperimental\"\x16\n" +
 	"\x14ListProtocolsRequest\"V\n" +
 	"\x15ListProtocolsResponse\x12=\n" +
 	"\tprotocols\x18\x01 \x03(\v2\x1f.mistgate.admin.v1.ProtocolInfoR\tprotocols\"\xbb\x02\n" +

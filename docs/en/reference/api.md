@@ -166,6 +166,18 @@ func main() {
 
 For another language, generate a client from `proto/` with `buf generate` and the Connect or gRPC plugin of that language.
 
+## The Telegram proxy
+
+The [MTProto](../guide/mtproto.md) profiles and a person's Telegram key use these parts of `ProfileService` and `UserService`:
+
+- `ProtocolInfo.experimental` (from `ProfileService.ListProtocols`): true for a protocol that is new and not proven in the field yet. MTProto sets it.
+- `AppToggles.telegram`, in `CreateUser` and `UpdateUser`, is the person's Telegram switch. Turning it on makes the person's key, and turning it off revokes it. At least one of `happ` and `amnezia` must stay on.
+- `ListUsers` takes the filter `USER_FILTER_TELEGRAM`: the people whose Telegram switch is on, whatever their key or the MTProto profiles. Each user in the list carries `access_telegram` (the switch is on and an MTProto server is usable for them) and `telegram_issued` (a key was made).
+- `GetTelegramLinks` reads a person's proxy: `has_key`, `key_device_id`, `key_issued_unix` and the `tg://proxy` links, one per node and profile, with `ipv6`, `relay` and `via` marking the node's IPv6 twin and a relay's twin. It writes nothing. A link carries the person's secret, so treat the answer like a password.
+- `IssueTelegramKey` makes the key when the person has none (it needs the switch on and a person who is not disabled; the device limit does not apply), `RotateTelegramKey` gives it a new secret so that every earlier link stops working (`not_found` "key" without one), and `RevokeTelegramKey` revokes it and leaves the switch on. Each answers with the person's proxy as `GetTelegramLinks` does. The key is a device of the person of kind `DEVICE_KIND_TELEGRAM_KEY`, and `RevokeDevice` removes it too.
+
+All four calls are for the owner and helpers, and closed to API tokens, like the other calls that return a credential.
+
 ## Token profiles
 
 A profile acts as an admin role: **Read only** as read-only, **Operator** as helper, **Admin** as owner. On top of the role, a token may call only the procedures on a fixed allow-list (`internal/panel/auth/policy_tokens.go`); everything else is refused whatever the profile. Nothing on the list returns a credential.
@@ -194,7 +206,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `SubscriptionService.UpdateSubscriptionSettings` (one app of the user page) | no | only through an approved MCP plan | only through an approved MCP plan |
 | `ProfileService.CreateProfile`, `UpdateProfile`, `DeleteProfile`, `CreateInbound`, `DeleteInbound`; `GroupService.UpdateGroup` | no | no | only through an approved MCP plan |
 
-Closed to every token: deleting users, the subscription link, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), creating groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
+Closed to every token: deleting users, the subscription link, the Telegram proxy key and links, devices and their keys, unblocking a device (`UserService.UnblockDevice`; a token can block one with `RevokeDevice` and `block`, but only an admin lifts the block), node enrollment, settings, restarts, logs and retirement, preparing the AmneziaWG kernel module, the admin's own SSH install steps (checking a server, retrying a job, revealing or forgetting saved access), creating groups, DNS presets and subscription settings (except the user page's app list through an approved plan), WARP, backups, panel updates and bundle rescans, brand settings, tokens, approvals, the admins' own account (passkeys, password, sessions, step-up) and the captcha settings.
 
 ## Changes that need the owner
 

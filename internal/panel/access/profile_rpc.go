@@ -32,13 +32,22 @@ func (s *Service) protocol(id string) (protocols.Protocol, error) {
 	return p, nil
 }
 
-func clientApps(p protocols.Protocol) (happ, amnezia bool, apps []adminv1.App) {
+// isTelegram: the protocol is for Telegram clients (MTProto). Its credential is the person's own key, not a link device's,
+// and what it renders is never a line of a subscription.
+func isTelegram(p protocols.Protocol) bool {
+	_, _, telegram, _ := clientApps(p)
+	return telegram
+}
+
+func clientApps(p protocols.Protocol) (happ, amnezia, telegram bool, apps []adminv1.App) {
 	for _, c := range p.Clients() {
 		switch c.Client {
 		case plugin.ClientHapp:
 			happ = true
 		case plugin.ClientAmnezia:
 			amnezia = true
+		case plugin.ClientTelegram:
+			telegram = true
 		}
 	}
 	if happ {
@@ -46,6 +55,9 @@ func clientApps(p protocols.Protocol) (happ, amnezia bool, apps []adminv1.App) {
 	}
 	if amnezia {
 		apps = append(apps, adminv1.App_APP_AMNEZIA)
+	}
+	if telegram {
+		apps = append(apps, adminv1.App_APP_TELEGRAM)
 	}
 	return
 }
@@ -62,10 +74,10 @@ func (s *Service) ListProtocols(ctx context.Context, _ *connect.Request[adminv1.
 		if err != nil {
 			return nil, s.internal("mask defaults", err)
 		}
-		_, _, apps := clientApps(p)
+		_, _, _, apps := clientApps(p)
 		resp.Protocols = append(resp.Protocols, &adminv1.ProtocolInfo{
 			Id: p.ID(), DisplayName: p.DisplayName(), SettingsSchemaJson: string(p.SettingsSchema()),
-			DefaultSettingsJson: string(masked), Apps: apps,
+			DefaultSettingsJson: string(masked), Apps: apps, Experimental: protocols.IsExperimental(p),
 		})
 	}
 	return connect.NewResponse(resp), nil
@@ -84,8 +96,8 @@ func (s *Service) profileSummary(ctx context.Context, p store.AccessProfile, inb
 }
 
 func (s *Service) summaryOf(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, merged json.RawMessage, inbounds []store.AccessInbound) (*adminv1.ProfileSummary, error) {
-	happ, amnezia, _ := clientApps(proto)
-	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia)
+	happ, amnezia, telegram, _ := clientApps(proto)
+	users, err := s.st.Access().ProfileUsers(ctx, p.ID, happ, amnezia, telegram)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}
@@ -277,8 +289,8 @@ func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, prot
 	if len(restartedNodes) == 0 {
 		return impact, nil
 	}
-	happ, amnezia, _ := clientApps(proto)
-	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia)
+	happ, amnezia, telegram, _ := clientApps(proto)
+	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram)
 	if err != nil {
 		return nil, s.internal("profile users", err)
 	}
@@ -543,8 +555,11 @@ func (s *Service) PreviewProfile(ctx context.Context, req *connect.Request[admin
 		return connect.NewResponse(resp), nil
 	}
 	format := plugin.FormatURIList
-	if protocols.IsPerDevice(proto) { // an L3 protocol: Happ cannot carry it, the .conf is what Amnezia users import
+	switch {
+	case protocols.IsPerDevice(proto): // an L3 protocol: Happ cannot carry it, the .conf is what Amnezia users import
 		format, resp.ClientLabel = plugin.FormatAWGConf, "AmneziaVPN · .conf"
+	case isTelegram(proto): // no subscription carries it: the person gets the link from their own page
+		format, resp.ClientLabel = plugin.FormatTelegramLink, "Telegram · tg://proxy link"
 	}
 	if frag, ok := trialRender(proto, merged, node, in, spec, format, ""); ok {
 		resp.ClientPreview = string(frag.Data)
@@ -742,6 +757,8 @@ func buildRefusal(err error, node string) error {
 	var hop *protocols.PortInHopError
 	var name *protocols.ServerNameError
 	switch {
+	case errors.As(err, &domain) && domain.MTProto:
+		return coded(connect.CodeInvalidArgument, "mtproto_needs_domain", "address", domain.Address, "node", node)
 	case errors.As(err, &domain) && domain.Reality:
 		return coded(connect.CodeInvalidArgument, "reality_needs_domain", "address", domain.Address, "node", node)
 	case errors.As(err, &domain):

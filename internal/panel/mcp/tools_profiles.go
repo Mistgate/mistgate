@@ -42,7 +42,7 @@ func profileReadTools() []toolDef {
 					if err != nil {
 						return nil, errors.New("the protocol defaults are unavailable")
 					}
-					pv := protocolV{ID: clean(p.GetId(), 40), Name: nm(p.GetDisplayName()), Apps: []string{}, SettingsSchema: compactSchema(schema), DefaultSettings: defaults}
+					pv := protocolV{ID: clean(p.GetId(), 40), Name: nm(p.GetDisplayName()), Apps: []string{}, SettingsSchema: compactSchema(schema), DefaultSettings: defaults, Experimental: p.GetExperimental()}
 					for _, app := range p.GetApps() {
 						pv.Apps = append(pv.Apps, protocolAppName(app))
 					}
@@ -114,6 +114,7 @@ type protocolV struct {
 	Apps            []string         `json:"apps"`
 	SettingsSchema  []map[string]any `json:"settings_schema"`
 	DefaultSettings json.RawMessage  `json:"default_settings"`
+	Experimental    bool             `json:"experimental,omitempty"` // new and not proven in the field yet
 }
 
 type profileSummaryV struct {

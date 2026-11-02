@@ -21,7 +21,8 @@ import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { FormatDrops } from "@/screens/profiles/formats";
 import { presetName } from "@/screens/subscriptions/model";
-import { dnsPresetsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
+import { dnsPresetsQuery, useLinkAppList } from "@/screens/subscriptions/queries";
+import { telegramOnly } from "@/screens/profiles/protocol-meta";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
 import { groupTone, groupTones, leastUsedTone } from "./format";
@@ -53,6 +54,13 @@ export function PillToggle({ on, onClick, children, mono }: { on: boolean; onCli
 }
 
 // ---- the two ways ----
+
+/** "Subscription (Happ, kl!ck)": the way by the link with the apps on it; just "Subscription" when the page lists none. */
+function useSubLabel(): string {
+  const t = useTx();
+  const names = useLinkAppList();
+  return names.length > 0 ? t("users.reachSub", { apps: names.join(", ") }) : t("users.reachSubPlain");
+}
 
 /** How a person gets a profile: by the subscription link (in any app that takes it) or by an AmneziaVPN key per device. */
 export type Way = "sub" | "awg";
@@ -127,8 +135,14 @@ export function WaysOfGroup({
 }) {
   const t = useTx();
   const protocols = useQuery(protocolsQuery);
-  const apps = useLinkAppNames();
-  const of = (w: Way) => profiles.filter((p) => wayOf(p.protocol, protocols.data) === w);
+  const sub = useSubLabel();
+  // MTProto reaches people by its own tg:// links, never through the subscription: a row of its own, when the group has one
+  const tgOnly = (p: { protocol: string }) => {
+    const apps = protocols.data?.find((x) => x.id === p.protocol)?.apps;
+    return apps ? telegramOnly(apps) : p.protocol === "mtproto";
+  };
+  const of = (w: Way) => profiles.filter((p) => !tgOnly(p) && wayOf(p.protocol, protocols.data) === w);
+  const tg = profiles.filter(tgOnly);
   return (
     <div className={cx("flex flex-col", compact ? "gap-2.5" : "gap-3")}>
       {(["sub", "awg"] as const).map((w) => {
@@ -139,7 +153,7 @@ export function WaysOfGroup({
             <IconChip icon={wayMark[w].icon} tone={wayMark[w].tone} size={22} className="mt-px" />
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="text-xs leading-[22px] font-bold">
-                {w === "sub" ? t("users.reachSub", { apps }) : t("users.reachAwg")}
+                {w === "sub" ? sub : t("users.reachAwg")}
                 {n !== undefined && list.length > 0 && (
                   <span className={cx("font-semibold", n > 0 ? "text-muted" : "text-warn-text")}> · {n > 0 ? t.n("users.reachNodes", n) : t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg")}</span>
                 )}
@@ -163,6 +177,19 @@ export function WaysOfGroup({
           </div>
         );
       })}
+      {tg.length > 0 && (
+        <div className="flex items-start gap-2.5">
+          <IconChip icon="plane" tone="rose" size={22} className="mt-px" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span className="text-xs leading-[22px] font-bold">{t("tgproxy.toggle")}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {tg.map((p) => (
+                <ProfileLink key={p.id} id={p.id} name={p.name} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -173,7 +200,7 @@ export function WaysOfGroup({
  */
 export function ReachLine({ group, action }: { group: Group; action?: ReactNode }) {
   const t = useTx();
-  const apps = useLinkAppNames();
+  const sub = useSubLabel();
   const nothing = group.happNodes === 0 && group.amneziaNodes === 0;
   const item = (w: Way, n: number) => (
     <li key={w} className="flex items-start gap-2 text-xs leading-snug">
@@ -181,7 +208,7 @@ export function ReachLine({ group, action }: { group: Group; action?: ReactNode 
         {n > 0 ? "✓" : "–"}
       </span>
       <span className={n > 0 ? "text-fg" : "text-muted"}>
-        <b>{w === "sub" ? t("users.reachSub", { apps }) : t("users.reachAwg")}</b> — {n > 0 ? t.n("users.reachNodes", n) : t("common.labeled", { label: t("users.reachNo"), value: t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg") })}
+        <b>{w === "sub" ? sub : t("users.reachAwg")}</b> — {n > 0 ? t.n("users.reachNodes", n) : t("common.labeled", { label: t("users.reachNo"), value: t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg") })}
       </span>
     </li>
   );

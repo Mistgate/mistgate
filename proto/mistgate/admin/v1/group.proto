@@ -31,6 +31,8 @@ message Group {
   string color = 8;
   // Nodes that are disabled for users in this group. Empty = every node is available, including future nodes.
   repeated string disabled_node_ids = 9;
+  // Nodes where the group's MTProto profiles give a Telegram proxy right now (same rule as happ_nodes and amnezia_nodes).
+  uint32 telegram_nodes = 10;
 }
 
 message ListGroupsRequest {}

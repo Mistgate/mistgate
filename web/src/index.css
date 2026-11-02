@@ -253,6 +253,11 @@
 .id-fg {
   color: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);
 }
+/* The protocol cards of a new profile: --ring is the tone's readable shade (the border and the corner mark of the chosen
+   card), darkened on the light theme like .id-fg. */
+.tone-ring {
+  --ring: oklch(from color-mix(in oklch, var(--t) var(--_text-pct), #000) l calc(c * var(--_chroma)) h);
+}
 
 /* Motion: screens fade + rise in, cards lift on hover, buttons press. Reduced motion is honoured below. */
 @keyframes mg-ui-in {

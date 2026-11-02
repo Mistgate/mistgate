@@ -36,7 +36,8 @@ import type { LoadLevel, Platform, ServerEntry } from "./types";
 
 const fills: Record<LoadLevel, number> = { low: 1, medium: 2, high: 3 };
 
-function flag(c: Ctx, s: ServerEntry): HTMLElement | null {
+/** The flag of a server (or of a Telegram link): the emoji, or the two letters where the system draws no flags. */
+export function flag(c: Ctx, s: Pick<ServerEntry, "country_code" | "place" | "label">): HTMLElement | null {
   const name = serverName(s, c.s.lang).country;
   if (c.s.amz.here === "windows") return s.country_code ? h("span", { class: "cc", "aria-hidden": "true" }, s.country_code) : null;
   const e = flagEmoji(s.country_code);

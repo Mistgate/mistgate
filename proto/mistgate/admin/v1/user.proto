@@ -6,7 +6,9 @@ import "mistgate/admin/v1/common.proto";
 import "mistgate/admin/v1/profile.proto";
 
 // Users screen, create-user modal, user detail. Product rules:
-//  - Every user gets BOTH apps by default. Two toggles (Happ, Amnezia), at least one on.
+//  - Every user gets Happ and Amnezia by default; Telegram is opt-in. Three toggles (Happ, Amnezia,
+//    Telegram); at least one of Happ and Amnezia stays on (the user table constraint; Telegram is
+//    additive in the first version).
 //  - Node selection per user: all nodes (automatic, includes nodes added later) or an explicit list.
 //  - Group, quota (+ reset period), term, device limit, optional speed limit.
 //  - "Via" = the apps the user really used recently (derived from traffic/sessions of the last 7 days),
@@ -45,6 +47,21 @@ service UserService {
   rpc DeleteUsers(DeleteUsersRequest) returns (DeleteUsersResponse);
   // "Link & QR". The QR is rendered by the SPA from the URL. rotate = issue a new token (old link dies).
   rpc GetSubscriptionLink(GetSubscriptionLinkRequest) returns (GetSubscriptionLinkResponse);
+  // The Telegram proxy of one person: whether they hold a key and the tg://proxy links of their MTProto inbounds, one per
+  // node and profile. A read: it makes no device and no key and records no fetch. No links when Telegram is off, the
+  // person has no key, or no MTProto profile runs for them.
+  rpc GetTelegramLinks(GetTelegramLinksRequest) returns (GetTelegramLinksResponse);
+  // Makes the person's Telegram key if they have none (the same answer when they have one). Telegram has to be on for them.
+  // The key is a device of the person (DEVICE_KIND_TELEGRAM_KEY, listed with their devices) but it does NOT count against
+  // their device limit, so this never fails for want of room. Turning Telegram on in CreateUser or UpdateUser makes the key
+  // the same way.
+  rpc IssueTelegramKey(IssueTelegramKeyRequest) returns (IssueTelegramKeyResponse);
+  // Gives the key a new secret: every link made before stops working, the new links are in the answer. NOT_FOUND "key"
+  // when the person has none.
+  rpc RotateTelegramKey(RotateTelegramKeyRequest) returns (RotateTelegramKeyResponse);
+  // Revokes the key and frees its place among the devices; the nodes drop the secret with the next desired state. Telegram
+  // stays on. Turning Telegram off or removing the key device (RevokeDevice) does the same.
+  rpc RevokeTelegramKey(RevokeTelegramKeyRequest) returns (RevokeTelegramKeyResponse);
   // What the nodes saw of this person's connections over the last hours, per device, node and protocol (agent.proto
   // LinkCounters): connects, refusals, early drops, handshakes that do not complete, time online. Counts only, no
   // address. A read like GetUser: every role and API tokens (the MCP tool user_connection).
@@ -131,6 +148,8 @@ enum UserFilter {
   USER_FILTER_OVER_QUOTA = 3;
   // More live devices than device_limit (a limit of 0 is never over).
   USER_FILTER_OVER_DEVICE_LIMIT = 4;
+  // The Telegram toggle is on (apps.telegram): the people of the Telegram proxy, whatever their key or the MTProto profiles.
+  USER_FILTER_TELEGRAM = 5;
 }
 
 enum UserSort {
@@ -154,6 +173,8 @@ enum UserSort {
 message AppToggles {
   bool happ = 1;
   bool amnezia = 2;
+  // Telegram clients receive tg://proxy links for the MTProto profiles of the user's groups.
+  bool telegram = 3;
 }
 
 message NodeSelection {
@@ -211,6 +232,11 @@ message User {
   string group_color = 29;
   // The DEVICE limit: no single device of the person goes faster than this. 0 = no separate device limit.
   uint64 device_speed_limit_bps = 30 [jstype = JS_NUMBER];
+  // The Telegram toggle and at least one usable MTProto inbound for the person.
+  bool access_telegram = 31;
+  // A Telegram key was issued to the person: a live DEVICE_KIND_TELEGRAM_KEY device. The links need the key, the toggle and
+  // a usable MTProto inbound (access_telegram). Not called "key": a token-reachable response has no field that looks like a secret.
+  bool telegram_issued = 32;
 }
 
 enum DnsSource {
@@ -252,6 +278,8 @@ message UserCounts {
   uint32 devices_online = 6;
   // People with more live devices than their device_limit, counted like devices_used.
   uint32 over_device_limit = 7;
+  // People with the Telegram toggle on, for the same query and group_id (the chip of USER_FILTER_TELEGRAM).
+  uint32 telegram = 8;
 }
 
 message ListUsersResponse {
@@ -313,6 +341,8 @@ enum DeviceKind {
   DEVICE_KIND_LINK_SHARED = 2;
   // An AmneziaVPN key (DeviceService.CreateAwgDevice).
   DEVICE_KIND_KEY = 3;
+  // The person's Telegram proxy key (UserService.IssueTelegramKey): one secret for every MTProto link of the person.
+  DEVICE_KIND_TELEGRAM_KEY = 4;
 }
 
 message DayTraffic {
@@ -522,4 +552,56 @@ message GetSubscriptionLinkResponse {
   // The password of the user's page for this link (xxxx-xxxx), derived from the token: a new link is a new password.
   // Empty when the instance does not ask for one. Like the link, never shown to agents.
   string page_password = 2;
+}
+
+message GetTelegramLinksRequest {
+  string user_id = 1;
+}
+
+// One tg://proxy link of a person. The secret is in the URL: the UI must treat it like a password.
+message TelegramProxyLink {
+  string node_id = 1;
+  string node_name = 2;
+  string profile_id = 3;
+  string profile_name = 4;
+  string url = 5;
+  // A twin of the node's link: its IPv6 entry, or a relay of an entry node whose country code is `via`. Both false: the link
+  // to the node itself. The owner sees node_name and profile_name; the person's page never does.
+  bool ipv6 = 6;
+  bool relay = 7;
+  string via = 8;
+}
+
+message GetTelegramLinksResponse {
+  repeated TelegramProxyLink links = 1;
+  // The person holds a Telegram key. False: links is empty, whatever MTProto profiles run.
+  bool has_key = 2;
+  // The key's device (RevokeDevice removes it too); empty without a key.
+  string key_device_id = 3;
+  // When the key was issued or last rotated; 0 without a key.
+  int64 key_issued_unix = 4 [jstype = JS_NUMBER];
+}
+
+message IssueTelegramKeyRequest {
+  string user_id = 1;
+}
+
+message IssueTelegramKeyResponse {
+  GetTelegramLinksResponse proxy = 1;
+}
+
+message RotateTelegramKeyRequest {
+  string user_id = 1;
+}
+
+message RotateTelegramKeyResponse {
+  GetTelegramLinksResponse proxy = 1;
+}
+
+message RevokeTelegramKeyRequest {
+  string user_id = 1;
+}
+
+message RevokeTelegramKeyResponse {
+  GetTelegramLinksResponse proxy = 1;
 }
