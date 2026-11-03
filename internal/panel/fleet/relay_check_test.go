@@ -64,7 +64,9 @@ func newCheckEnv(t *testing.T, online ...string) *checkEnv {
 		case "entry":
 			x.ec, x.em, _ = connectCaps(x.entry, "entry", append([]string{plugin.CapRelayForward}, caps...)...)
 		case "exit":
-			x.xc, _, _ = connectCaps(x.exit, "exit", caps...)
+			// The exit can run an MTProto server (mtprotoRelay); without the capability the panel withholds that inbound from it and
+			// marks it failed, and a failed server is not forwarded to.
+			x.xc, _, _ = connectCaps(x.exit, "exit", append([]string{capMTProto}, caps...)...)
 		case "s1":
 			x.c1, _, _ = connectCaps(x.s1, "s1", caps...)
 		case "s2":
