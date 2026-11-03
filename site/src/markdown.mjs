@@ -37,7 +37,7 @@ const CALLOUTS = { note: "note", "важно": "note", "注意": "note", "نکت
 // case-insensitive for Turkish too: "İ".toLowerCase() is "i" + U+0307 and "I" lowers to "i", not "ı", so both i's fold to
 // a plain i; Arabic yeh and kaf fold to the Persian letters an Arabic keyboard does not type
 export const fold = (s) => s.toLowerCase().replace(/\u0307/g, "").replace(/ı/g, "i").replace(/ي/g, "ی").replace(/ك/g, "ک");
-const CALLOUT_CHIP = { note: ["info", "lavender"], tip: ["sparkle", "mint"], warning: ["warn", "sand"], danger: ["warn", "rose"] };
+const CALLOUT_CHIP = { note: ["info", "lavender"], tip: ["bolt", "mint"], warning: ["warn", "sand"], danger: ["warn", "rose"] };
 // code block bar: language name and icon; a word after the language (```ini /etc/x.service) names the file instead
 const CODE_NAME = { sh: "Shell", yaml: "YAML", json: "JSON", ini: "INI", toml: "TOML", javascript: "JavaScript", typescript: "TypeScript", go: "Go", sql: "SQL", diff: "Diff" };
 // a table cell that starts with a yes / no / partial answer (then the end, a colon, a full stop, a comma or a bracket)
@@ -128,13 +128,14 @@ export function createRenderer(lang, t, highlight) {
       if (!kind || !/[:：]$/.test(ch[1].content.trim())) continue;
       const label = t.callouts?.[kind] ?? ch[1].content.trim().replace(/[:：]$/, "").trim();
       ch.splice(0, 3);
-      if (ch[0]?.type === "text") ch[0].content = ch[0].content.replace(/^\s+/, "");
+      // the label now stands on its own line, so text that ran on after "Tip:" in lower case starts a sentence (code stays as written)
+      if (ch[0]?.type === "text") ch[0].content = ch[0].content.replace(/^\s+/, "").replace(/^\p{Ll}/u, (c) => c.toLocaleUpperCase(lang));
       let depth = 0, close = -1;
       for (let j = i; j < tk.length; j++) { if (tk[j].type === "blockquote_open") depth++; if (tk[j].type === "blockquote_close" && --depth === 0) { close = j; break; } }
       tk[i].tag = "div"; tk[i].attrJoin("class", `callout callout--${kind}`); tk[i].attrSet("role", "note");
       tk[close].tag = "div";
       const head = new state.Token("html_block", "", 0);
-      head.content = `<div class="callout__label"><span class="id-chip" data-tone="${CALLOUT_CHIP[kind][1]}">${icon(CALLOUT_CHIP[kind][0], 13)}</span><span>${esc(label)}</span></div><div class="callout__body">\n`;
+      head.content = `<div class="callout__label"><span class="id-chip" data-tone="${CALLOUT_CHIP[kind][1]}">${icon(CALLOUT_CHIP[kind][0], 14)}</span><span>${esc(label)}</span></div><div class="callout__body">\n`;
       const tail = new state.Token("html_block", "", 0);
       tail.content = "</div>\n";
       tk.splice(close, 0, tail);

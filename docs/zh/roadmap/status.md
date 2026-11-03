@@ -12,7 +12,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.72`�
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
-      icon: sparkle
+      icon: tag
       release: v0.1.72
       current: true
       points:

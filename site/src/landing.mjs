@@ -14,6 +14,9 @@ const DOCS = process.env.MG_DOCS ? join(process.env.MG_DOCS, "/") : fileURLToPat
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // `code` in copy -> <code>
 const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+// a subhead or a card caption ends without a full stop (the section descriptions keep theirs in the source: they are the
+// admin's own words, brand.test.mjs)
+const stop = (s) => s.replace(/[.。]$/u, "");
 // the columns of the comparison, as in the README's table (product names: lang="en", or the capitals of a Turkish page read MİSTGATE)
 const PANELS = ["Mistgate", "3x-ui", "Remnawave", "Hiddify", "PasarGuard", "s-ui"];
 const CI = `${GITHUB}/blob/main/.github/workflows/ci.yml`, E2E = `${GITHUB}/blob/main/scripts/e2e-wsl.sh`;
@@ -25,7 +28,7 @@ export const LANDING = {
     h1: "A self-hosted panel for a small VPN",
     lead: "For a few servers of your own and the people you share them with. You put the panel on one server and add your VPN servers to it as nodes. Each person gets one subscription link, and their app picks up every server they may use.",
     install: "Install the panel", how: "How it works",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, no Docker"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 / 3.1", "Cloudflare WARP", "Linux amd64 / arm64", "SQLite, no Docker"],
     demoAlt: "A demo of the Mistgate admin: a new node is added, checked and comes online, and it appears on the person's page at once",
     doesH: "What it does",
     does: [
@@ -109,7 +112,7 @@ export const LANDING = {
     h1: "Панель для своего небольшого VPN",
     lead: "Для нескольких своих серверов и людей, с которыми вы ими делитесь. Панель ставится на один сервер, а VPN-серверы добавляются в неё как ноды. Каждый человек получает одну ссылку-подписку, и приложение само подтягивает все положенные ему серверы.",
     install: "Установить панель", how: "Как это устроено",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, без Docker"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 / 3.1", "Cloudflare WARP", "Linux amd64 / arm64", "SQLite, без Docker"],
     demoAlt: "Демо админки Mistgate: новая нода добавляется, проверяется и выходит в строй и сразу появляется на странице человека",
     doesH: "Что умеет",
     does: [
@@ -193,7 +196,7 @@ export const LANDING = {
     h1: "自托管的小型 VPN 面板",
     lead: "用来管理你自己的几台服务器，以及和你一起用它们的人。面板装在一台服务器上，你的 VPN 服务器作为节点加进来。每个人拿到一个订阅链接，应用会自动获取他可以用的所有服务器。",
     install: "安装面板", how: "工作原理",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite，无需 Docker"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 / 3.1", "Cloudflare WARP", "Linux amd64 / arm64", "SQLite，无需 Docker"],
     demoAlt: "Mistgate 管理后台演示：添加新节点，经过检查后上线，并立即出现在用户页面上",
     doesH: "功能",
     does: [
@@ -279,7 +282,7 @@ export const LANDING = {
     h1: "پنلی برای VPN کوچک خودتان",
     lead: "برای چند سرور از آنِ خودتان و کسانی که سرورها را با آن‌ها شریک می‌شوید. پنل را روی یک سرور نصب می‌کنید و سرورهای VPN خود را به‌عنوان نود به آن اضافه می‌کنید. هر نفر یک لینک اشتراک می‌گیرد و برنامه‌اش همهٔ سرورهایی را که اجازهٔ استفاده از آن‌ها را دارد خودش دریافت می‌کند.",
     install: "نصب پنل", how: "چطور کار می‌کند",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite، بدون Docker"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 / 3.1", "Cloudflare WARP", "Linux amd64 / arm64", "SQLite، بدون Docker"],
     demoAlt: "نمایشی از Mistgate: یک نود از مرورگر و از راه SSH اضافه می‌شود، با یک پروفایل به کار می‌افتد و بی‌درنگ در صفحهٔ یک کاربر ظاهر می‌شود",
     doesH: "چه کارهایی می‌کند",
     does: [
@@ -364,7 +367,7 @@ export const LANDING = {
     h1: "Kendi küçük VPN'iniz için bir panel",
     lead: "Size ait birkaç sunucu ve onları paylaştığınız insanlar için. Paneli bir sunucuya kurar, VPN sunucularınızı ona düğüm olarak eklersiniz. Her kişi tek bir abonelik bağlantısı alır ve uygulaması, kullanabileceği bütün sunucuları kendiliğinden çeker.",
     install: "Paneli kurun", how: "Nasıl çalışır",
-    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, Docker yok"],
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 / 3.1", "Cloudflare WARP", "Linux amd64 / arm64", "SQLite, Docker yok"],
     demoAlt: "Mistgate tanıtımı: tarayıcıdan SSH ile bir düğüm eklenir, bir profille çalışmaya başlar ve hemen bir kişinin sayfasında görünür",
     doesH: "Neler yapar",
     does: [
@@ -456,14 +459,14 @@ export function renderLanding({ lang, t, nav, section, name = (p) => esc(p.title
   // the screenshot and the diagram of a language that has none yet are the English ones
   const fitLang = existsSync(`${DOCS}${lang}/diagrams/how-it-fits.svg`) ? lang : "en";
   const title = (key) => (pages.has(key) ? name(pages.get(key)) : esc(key));
-  // an admin section's icon in its tone, or any other icon in lavender
-  const chip = (id, size = 26) => `<span class="id-chip" data-tone="${NAV[id]?.tone ?? "lavender"}" style="width:${size}px;height:${size}px">${icon(NAV[id] ? `nav-${id}` : id, Math.round(size * 0.6))}</span>`;
+  // an admin section's icon in its tone; any other icon on the neutral chip (a tone names a section of the admin, nothing else)
+  const chip = (id) => `<span class="id-chip id-chip--lg${NAV[id] ? "" : " id-chip--plain"}"${NAV[id] ? ` data-tone="${NAV[id].tone}"` : ""}>${icon(NAV[id] ? `nav-${id}` : id, 16)}</span>`;
   const bold = (s) => rich(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   // [text](key#anchor): the page in this language; one not translated yet is the English page, without the anchor
   const fmt = (s) => bold(s).replace(/\[([^\]]+)\]\(([^)\s#]+)(#[^)\s]+)?\)/g, (_, text, to, frag = "") =>
     /^https:/.test(to) ? `<a href="${to}${frag}" rel="noopener">${text}</a>` : `<a href="${url(to)}${own(to) ? frag : ""}">${text}</a>`);
   // icon, heading, text and the page it links to (by its title); Chinese puts no space after its full stop
-  const list = (items) => `<ul class="why">${items.map(([id, h, p, key]) => `<li>${chip(id, 30)}<div><h3>${esc(h)}</h3><p>${fmt(p)}${key ? `${lang === "zh" ? "" : " "}<a href="${url(key)}">${title(key)}</a>` : ""}</p></div></li>`).join("")}</ul>`;
+  const list = (items) => `<ul class="why">${items.map(([id, h, p, key]) => `<li>${chip(id)}<div><h3>${esc(h)}</h3><p>${fmt(p)}${key ? `${lang === "zh" ? "" : " "}<a href="${url(key)}">${title(key)}</a>` : ""}</p></div></li>`).join("")}</ul>`;
   // a comparison cell as the README writes it: ✅ ❌ 🟡 and an optional word become the docs' yes / no / partial pill
   const cell = (c) => {
     const m = /^(✅|❌|🟡)\s*(.*)$/u.exec(c);
@@ -474,11 +477,11 @@ export function renderLanding({ lang, t, nav, section, name = (p) => esc(p.title
 
   const hero = `<section class="hero">
 <svg class="hero__arch" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M30 260V150a120 120 0 0 1 240 0v110" style="stroke:var(--surface-2)" stroke-width="1.5"/><path d="M70 260V160a80 80 0 0 1 160 0v100" style="stroke:var(--border)" stroke-width="1.5"/><path d="M110 260V170a40 40 0 0 1 80 0v90" style="stroke:var(--accent-line)" stroke-width="1.5"/><path d="M0 214c40-14 80 14 120 0s80-14 120 0 40 10 60 4" style="stroke:var(--border)" stroke-width="1.5" stroke-linecap="round"/><path d="M24 238c40-12 70 12 110 0s80-12 120 0" style="stroke:var(--surface-2)" stroke-width="1.5" stroke-linecap="round"/></svg>
-<p class="label">${esc(L.eyebrow)}</p>
+<p class="hero__eyebrow">${esc(L.eyebrow)}</p>
 <h1 class="hero__h1">${esc(L.h1)}</h1>
 <p class="hero__lead">${esc(L.lead)}</p>
 <div class="hero__cta"><a class="btn btn--primary" href="${url("getting-started/install-panel")}">${esc(L.install)}${icon("chevronRight", 14)}</a><a class="btn btn--secondary" href="${url("getting-started/overview")}">${esc(L.how)}</a><a class="btn btn--secondary" href="${GITHUB}" rel="noopener">GitHub${icon("externalLink", 14)}</a></div>
-<ul class="facts">${[...L.facts, langNames.join(" · ")].filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+<ul class="facts">${[...L.facts, langNames.length > 1 ? langNames.join(" · ") : ""].filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
 <figure class="shot shot--video"><video src="/video/hero-${lang}.mp4" poster="/video/hero-poster-${lang}.webp" width="1280" height="720" autoplay muted loop playsinline preload="metadata" aria-label="${esc(L.demoAlt)}"></video></figure>
 </section>`;
 
@@ -498,18 +501,18 @@ ${list(L.stable)}<p class="home-p">${esc(L.ai)}</p></section>`;
   const compare = `<section class="home-sec" aria-labelledby="compare"><h2 id="compare">${esc(L.cmpH)}</h2>
 <div class="cmp" role="region" tabindex="0" aria-labelledby="compare"><table><thead><tr><th></th>${PANELS.map((p) => `<th lang="en">${p}</th>`).join("")}</tr></thead><tbody>${L.cmp.map(([h, ...cells]) => `<tr><td>${esc(h)}</td>${cells.map((c) => `<td>${cell(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
 <p class="home-p">${esc(L.cmpNote)}</p>
-<div class="proof">${L.proof.map(([ico, h, p, key]) => `<a class="proof__card" href="${url(key)}">${chip(ico, 30)}<span class="proof__t">${esc(h)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div></section>`;
+<div class="proof">${L.proof.map(([ico, h, p, key]) => `<a class="proof__card" href="${url(key)}">${chip(ico)}<span class="proof__t">${esc(h)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div></section>`;
 
-  const start = `<section class="home-sec" aria-labelledby="start"><h2 id="start">${esc(L.startH)}</h2><p class="home-p">${esc(L.startP)}</p>
+  const start = `<section class="home-sec" aria-labelledby="start"><h2 id="start">${esc(L.startH)}</h2><p class="home-p">${esc(stop(L.startP))}</p>
 <ol class="steps">${L.steps.map(([h, p, keys]) => `<li><h3>${esc(h)}</h3><p>${bold(p)}</p><p class="steps__links">${keys.map((k) => `<a href="${url(k)}">${title(k)}${icon("chevronRight", 12)}</a>`).join("")}</p></li>`).join("")}</ol></section>`;
 
   // one card per admin section, its pages in sidebar order; the pages of no single section close the grid
   const bySection = new Map(Object.keys(NAV).filter((id) => L.desc[id]).map((id) => [id, []]));
   const first = [], rest = [];
   for (const p of pages.values()) (section(p.key) === "start" ? first : bySection.get(section(p.key)) ?? rest).push(p);
-  const card = (head, desc, items) => `<li class="sec-card">${head}<p>${esc(desc)}</p><ul>${items.map((p) => `<li><a href="${p.url}">${name(p)}</a></li>`).join("")}</ul></li>`;
-  const sections = `<section class="home-sec" aria-labelledby="sections"><h2 id="sections">${esc(L.secH)}</h2><p class="home-p">${esc(L.secP)}</p>
-<ul class="sec-cards">${first.length ? card(`<h3><span class="id-chip" data-tone="lavender" style="width:26px;height:26px">${icon("bolt", 16)}</span><span>${esc(L.first)}</span></h3>`, L.firstDesc, first) : ""}${[...bySection].filter(([, items]) => items.length).map(([id, items]) => card(`<h3>${chip(id)}<span>${esc(t.sections[id])}</span></h3>`, L.desc[id], items)).join("")}${rest.length ? card(`<h3><span class="id-chip id-chip--plain" style="width:26px;height:26px">${icon("text", 16)}</span><span>${esc(L.reference)}</span></h3>`, L.refDesc, rest) : ""}</ul>
+  const card = (head, desc, items) => `<li class="sec-card">${head}<p>${esc(stop(desc))}</p><ul>${items.map((p) => `<li><a href="${p.url}">${name(p)}</a></li>`).join("")}</ul></li>`;
+  const sections = `<section class="home-sec" aria-labelledby="sections"><h2 id="sections">${esc(L.secH)}</h2><p class="home-p">${esc(stop(L.secP))}</p>
+<ul class="sec-cards">${first.length ? card(`<h3><span class="id-chip id-chip--lg id-chip--plain">${icon("bolt", 16)}</span><span>${esc(L.first)}</span></h3>`, L.firstDesc, first) : ""}${[...bySection].filter(([, items]) => items.length).map(([id, items]) => card(`<h3>${chip(id)}<span>${esc(t.sections[id])}</span></h3>`, L.desc[id], items)).join("")}${rest.length ? card(`<h3><span class="id-chip id-chip--lg id-chip--plain">${icon("text", 16)}</span><span>${esc(L.reference)}</span></h3>`, L.refDesc, rest) : ""}</ul>
 <p class="home-status">${esc(L.status)} <a href="${url("roadmap/status")}">${esc(L.statusLink)}</a></p></section>`;
 
   return { hero, body: does + fit + protocols + stable + start + compare + sections, description: L.meta };

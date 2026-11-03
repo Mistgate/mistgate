@@ -153,7 +153,7 @@ export function langMenu({ lang, t, langLinks }) {
 
 function header({ lang, t, langLinks, stars }) {
   return `<header class="top"><div class="top__in">
-<a class="ib menu-btn" href="#nav" data-menu aria-controls="nav" aria-label="${esc(t.menu)}">${icon("menu", 20)}</a>
+<a class="ib menu-btn" href="#nav" data-menu aria-controls="nav" aria-label="${esc(t.menu)}">${icon("menu", 18)}</a>
 <a class="brand" href="${pageUrl(lang, "index")}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="32" height="32" alt="">${wordmark}</a>
 <span class="chip tag">${esc(t.docs)}</span>
 <span class="grow"></span>
@@ -206,7 +206,7 @@ export function renderDoc(ctx) {
   const crumbs = isHome ? "" : `<nav class="crumbs" aria-label="${esc(t.crumbs)}"><a href="${pageUrl(lang, "index")}">${esc(t.docs)}</a>${crumbGroup ? `<span aria-hidden="true">/</span><span>${esc(crumbGroup)}</span>` : ""}<span aria-hidden="true">/</span><span aria-current="page">${esc(page.title)}</span></nav>`;
   const hero = isHome
     ? home.hero
-    : `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 13)}</span><span>${esc(t.inAdmin)}${t.inAdminSep ?? ": "}${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
+    : `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 14)}</span><span>${esc(t.inAdmin)}${t.inAdminSep ?? ": "}${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
   const inlineToc = showToc ? `<details class="toc-inline"><summary>${esc(t.onPage)}</summary>${tocHtml(toc)}</details>` : "";
   const pn = (x, dir) => x ? `<a class="pn pn--${dir}" href="${x.url}" rel="${dir}"><span class="label">${dir === "prev" ? icon("back", 12) : ""}${esc(t[dir])}${dir === "next" ? icon("chevronRight", 12) : ""}</span><span class="pn__t">${pageName(t, x)}</span></a>` : "<span></span>";
   const edit = `<p class="edit"><a href="${editUrl(lang, page.key)}" rel="noopener">${icon("externalLink", 14)}${esc(t.edit)}</a></p>`;

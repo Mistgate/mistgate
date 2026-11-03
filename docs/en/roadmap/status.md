@@ -12,7 +12,7 @@ Mistgate is in **beta**; the current release is `v0.1.72`. It runs in production
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
-      icon: sparkle
+      icon: tag
       release: v0.1.72
       current: true
       points:

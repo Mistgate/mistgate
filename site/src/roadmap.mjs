@@ -106,8 +106,8 @@ export function roadmapTokens(phases, { Token, slugify, label }) {
   const ids = phases.map((p) => slugify(p.title));
   const mark = (status, size) => `<span class="rm-mark" data-status="${status}" aria-hidden="true">${icon(MARK[status], size)}</span>`;
   const chip = (c) => c.section
-    ? `<span class="id-chip" data-tone="${NAV[c.section].tone}" aria-hidden="true">${icon(`nav-${c.section}`, 14)}</span>`
-    : `<span class="id-chip id-chip--plain" aria-hidden="true">${icon(c.icon ?? "list", 14)}</span>`;
+    ? `<span class="id-chip" data-tone="${NAV[c.section].tone}" aria-hidden="true">${icon(`nav-${c.section}`, 16)}</span>`
+    : `<span class="id-chip id-chip--plain" aria-hidden="true">${icon(c.icon ?? "list", 16)}</span>`;
 
   html(`<div class="rm">\n<nav class="rm-nav" aria-label="${esc(label)}"><ol>${phases.map((p, i) => `<li data-status="${p.status}"><a href="#${esc(ids[i])}">${mark(p.status, 12)}<span class="rm-nav__t">${esc(p.title)}</span>${p.meta ? `<span class="rm-nav__m">${esc(p.meta)}</span>` : ""}</a></li>`).join("")}</ol></nav>\n<ol class="rm-phases">\n`);
   phases.forEach((p, i) => {
