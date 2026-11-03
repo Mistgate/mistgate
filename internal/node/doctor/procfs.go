@@ -280,7 +280,9 @@ func socketOwners(e *Env, want map[uint64]bool) map[uint64]int {
 				continue
 			}
 			if m := socketLinkRe.FindStringSubmatch(link); m != nil {
-				if ino, _ := strconv.ParseUint(m[1], 10, 64); want[ino] {
+				// A child the agent is starting holds copies of the agent's sockets until it execs: a socket the agent
+				// itself holds stays the agent's, or its own listener reads as a foreign "unknown(pid)" for one run.
+				if ino, _ := strconv.ParseUint(m[1], 10, 64); want[ino] && owners[ino] != e.SelfPID {
 					owners[ino] = pid
 				}
 			}

@@ -372,6 +372,16 @@ func TestPortConflicts(t *testing.T) {
 		want(t, r, OK, "")
 		code(t, r, CodePortsOK, "checked", "1")
 	})
+	t.Run("a child the agent is starting still holds a copy of our socket", func(t *testing.T) {
+		f := newFake(t)
+		tw := setup(f, ib, h{100, "mistgate-node", 443, 1001})
+		// between fork and exec: a new pid, no name yet, the agent's socket among its descriptors
+		f.put("/proc/4321/fd/3", "")
+		f.links["/proc/4321/fd/3"] = "socket:[1001]"
+		r := run(t, f.doctor(tw), CheckPortConflicts)
+		want(t, r, OK, "")
+		code(t, r, CodePortsOK, "checked", "1")
+	})
 	t.Run("caddy holds UDP 443", func(t *testing.T) {
 		f := newFake(t)
 		tw := setup(f, ib, h{812, "caddy", 443, 1002})
