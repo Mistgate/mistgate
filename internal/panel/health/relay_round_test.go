@@ -219,6 +219,24 @@ func TestRelayDownRequiresFreshMatchingMonitorTarget(t *testing.T) {
 	}
 }
 
+func TestUnverifiableRelayCheckDoesNotOpenRelayDown(t *testing.T) {
+	e, _, id := newRelayMonitorEnv(t)
+	check := store.RelayCheck{At: e.clock.Now().Unix(), Network: "udp", Port: 8443,
+		Leg:  store.RelayStage{Status: "skipped", Code: "unverifiable"},
+		Path: store.RelayStage{Status: "skipped", Code: "unverifiable"}}
+	check.Settle()
+	if !check.OK || check.Verified() {
+		t.Fatalf("check = %+v", check)
+	}
+	if err := e.st.SetRelayCheck(e.ctx, id, check); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	if _, ok := e.active()["relay_down/fi1/"+id]; ok {
+		t.Fatal("an unverifiable setup check opened relay_down without a failed client-eye round")
+	}
+}
+
 func TestDoctorReportCopiesRelayCounters(t *testing.T) {
 	e, _, id := newRelayMonitorEnv(t)
 	report := &agentv1.DoctorReport{Results: []*agentv1.DoctorResult{{

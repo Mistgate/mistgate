@@ -90,7 +90,11 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 		switch {
 		case !runPath:
 		case runLeg && check.Leg.Status != "ok":
-			check.Path = rc.stage("skipped", "leg_failed", "")
+			if check.Leg.Unverifiable() {
+				check.Path = rc.stage("skipped", "unverifiable", "")
+			} else {
+				check.Path = rc.stage("skipped", "leg_failed", "")
+			}
 		default:
 			check.Path = rc.path(ctx)
 		}
@@ -157,7 +161,7 @@ func (r relayRun) leg(ctx context.Context) store.RelayStage {
 	}
 	target, ok := relayTCPTarget(r.spec, r.row, r.spec.Listen.Port)
 	if !ok {
-		return r.stage("fail", "unverifiable", portSenderID(sender))
+		return r.stage("skipped", "unverifiable", portSenderID(sender))
 	}
 	st, _ := r.tcpStage(ctx, r.exit.Address, sender, target)
 	return st
@@ -182,7 +186,7 @@ func (r relayRun) path(ctx context.Context) store.RelayStage {
 	if !r.udp() {
 		var ok bool
 		if target, ok = relayTCPTarget(r.spec, r.row, r.link.Port); !ok {
-			return r.stage("fail", "unverifiable", "")
+			return r.stage("skipped", "unverifiable", "")
 		}
 	}
 	// One attempt per sender, two senders at most. A sender that ran and found the path broken is asked once more with

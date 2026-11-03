@@ -69,10 +69,14 @@ export function enableGate(r: Pick<RelayMsg, "agentSupported" | "exitLive" | "ch
   if (!r.exitLive) return "exit_down";
   const leg = r.check?.leg;
   if (!leg?.status) return "unchecked";
-  if (leg.status !== "ok") return "failed";
+  if (leg.status !== "ok" && !unverifiable(leg)) return "failed";
   if (nowS - leg.atUnix > checkTtlS || r.check!.network !== r.network) return "stale";
   return "";
 }
+
+/** A stage the panel had no way to probe (a server with no name of its own to check, like MTProto fronting another site):
+ * not a failure, the relay may be on, it is just not proven (relay_check.go). */
+export const unverifiable = (s?: Pick<Stage, "status" | "code">) => s?.status === "skipped" && s.code === "unverifiable";
 
 /** The names a reason sentence fills in. */
 export type RelayNames = { entry: string; exit: string; exitPort: number; port: number; network: string };

@@ -368,10 +368,11 @@ type RelayStage struct {
 	Status string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	// Why it failed, or was skipped. Failed: "node_offline", "agent_too_old", "exit_offline", "no_sender", "no_route", "busy",
 	// "failed", "refused" and "timeout" (a TCP port that answers nothing), "other" (a TCP port that answers, but not
-	// Mistgate), "lossy" and "broken" (UDP counted at the exit: 70-95 % and under 70 % of the packets), "unverifiable" (the
-	// server has no name to probe it by), "same_host" (only the panel could send and it runs on the entry or the exit),
-	// "spec" (the server's settings do not build), "apply_failed" and "apply_timeout" (the entry did not install the
-	// forward), "switched_off" (someone switched the relay off while it was waited for). Skipped: "off" (the relay is not switched on, so there is no forward to reach), "leg_failed".
+	// Mistgate), "lossy" and "broken" (UDP counted at the exit: 70-95 % and under 70 % of the packets), "same_host" (only the
+	// panel could send and it runs on the entry or the exit), "spec" (the server's settings do not build), "apply_failed" and
+	// "apply_timeout" (the entry did not install the forward), "switched_off" (someone switched the relay off while it was
+	// waited for). Skipped: "unverifiable" (the server has no name to attribute the TLS identity to this node), "off" (the relay
+	// is not switched on, so there is no forward to reach), "leg_failed".
 	Code string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	// The node that sent the probe (its id), or "panel".
 	SenderId   string `protobuf:"bytes,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
@@ -484,7 +485,7 @@ type RelayCheck struct {
 	To   string      `protobuf:"bytes,4,opt,name=to,proto3" json:"to,omitempty"`
 	Leg  *RelayStage `protobuf:"bytes,5,opt,name=leg,proto3" json:"leg,omitempty"`
 	Path *RelayStage `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
-	// No stage that ran failed, and the leg ran.
+	// No stage that ran failed, and the leg passed or was skipped as unverifiable.
 	Ok bool `protobuf:"varint,7,opt,name=ok,proto3" json:"ok,omitempty"`
 	// The first stage that failed: "leg", "path", or "".
 	Stage string `protobuf:"bytes,8,opt,name=stage,proto3" json:"stage,omitempty"`

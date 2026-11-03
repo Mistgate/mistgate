@@ -245,10 +245,11 @@ export type RelayStage = Message<"mistgate.admin.v1.RelayStage"> & {
   /**
    * Why it failed, or was skipped. Failed: "node_offline", "agent_too_old", "exit_offline", "no_sender", "no_route", "busy",
    * "failed", "refused" and "timeout" (a TCP port that answers nothing), "other" (a TCP port that answers, but not
-   * Mistgate), "lossy" and "broken" (UDP counted at the exit: 70-95 % and under 70 % of the packets), "unverifiable" (the
-   * server has no name to probe it by), "same_host" (only the panel could send and it runs on the entry or the exit),
-   * "spec" (the server's settings do not build), "apply_failed" and "apply_timeout" (the entry did not install the
-   * forward), "switched_off" (someone switched the relay off while it was waited for). Skipped: "off" (the relay is not switched on, so there is no forward to reach), "leg_failed".
+   * Mistgate), "lossy" and "broken" (UDP counted at the exit: 70-95 % and under 70 % of the packets), "same_host" (only the
+   * panel could send and it runs on the entry or the exit), "spec" (the server's settings do not build), "apply_failed" and
+   * "apply_timeout" (the entry did not install the forward), "switched_off" (someone switched the relay off while it was
+   * waited for). Skipped: "unverifiable" (the server has no name to attribute the TLS identity to this node), "off" (the relay
+   * is not switched on, so there is no forward to reach), "leg_failed".
    *
    * @generated from field: string code = 2;
    */
@@ -339,7 +340,7 @@ export type RelayCheck = Message<"mistgate.admin.v1.RelayCheck"> & {
   path?: RelayStage | undefined;
 
   /**
-   * No stage that ran failed, and the leg ran.
+   * No stage that ran failed, and the leg passed or was skipped as unverifiable.
    *
    * @generated from field: bool ok = 7;
    */
@@ -767,13 +768,13 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * Everything here is owner-only over /api (a helper and an API token get PERMISSION_DENIED). Through MCP a token may
  * read relays and run a check, and a change is a plan the owner approves in the admin. Every change is an audit row: relay.create, relay.update, relay.delete; so is every check: relay.check.
  *
- * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), and only after CheckRelay: the leg check
- * (the entry reaches the exit's server) must have passed less than 15 minutes ago, for the relay's present target (the
- * exit's address and server port); otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked",
- * "relay_check_stale" or "relay_check_failed". Switching on then installs the forward and checks the path from outside
- * through the entry (so does moving a relay that is on to another port); if that fails the relay is switched off again and
- * UpdateRelay answers "relay_check_failed" (stage, code). A relay that is on has passed both stages, so it is on only when
- * it works from outside.
+ * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a leg check less than
+ * 15 minutes ago for the relay's present target (the exit's address and server port). The leg must pass or be skipped as
+ * "unverifiable"; otherwise UpdateRelay is refused with FAILED_PRECONDITION "relay_unchecked", "relay_check_stale" or
+ * "relay_check_failed". Switching on installs the forward and checks the path from outside through the entry (so does
+ * moving a relay that is on to another port). A failed path switches the relay off and UpdateRelay answers
+ * "relay_check_failed" (stage, code); an unverifiable path leaves it on and unverified. A relay is offered to users after
+ * both stages pass or are explicitly unverifiable. "verified" is true only when both stages pass.
  * The entry node gets the forward in its desired state only when it is switched on, the exit's server is usable (on, not
  * failed, on an enrolled node) and the entry's agent lists "relay-forward/1".
  *

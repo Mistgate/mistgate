@@ -33,6 +33,7 @@ import {
   seenHint,
   stageReason,
   statePill,
+  unverifiable,
   type Candidate,
   type CandidateNode,
   type CountryHint,
@@ -200,10 +201,17 @@ export function RelayRow({ r, side, cc, busy, note, nowS, onCheck, onOn, onOff, 
           {r.lastError && r.lastError !== "forward_drop" && r.state === InboundState.FAILED && <p className="font-mono text-[11px] leading-snug break-words text-muted">{r.lastError}</p>}
         </div>
       );
+    } else if (state === "on" && r.check && unverifiable(r.check.leg)) {
+      line = <p className="text-xs leading-snug text-pretty text-muted">{t("relay.line.onUnverified", { reason: t("relay.why.unverifiable") })}</p>;
     } else if (state === "on" && r.check && !r.monitor) {
       line = <p className="text-xs leading-snug text-muted">{t("relay.line.on", { ago: fmt.ago(r.check.atUnix, nowS * 1000) })}</p>;
     } else if (state === "off") {
-      line = <p className="text-xs leading-snug text-pretty text-muted">{gate ? t(`relay.gate.${gate}`, { exit: r.exitNodeName }) : t("relay.line.offReady", { ago: fmt.ago(r.check!.leg!.atUnix, nowS * 1000) })}</p>;
+      const off = gate
+        ? t(`relay.gate.${gate}`, { exit: r.exitNodeName })
+        : unverifiable(r.check?.leg)
+          ? t("relay.line.offUnverified", { reason: t("relay.why.unverifiable") })
+          : t("relay.line.offReady", { ago: fmt.ago(r.check!.leg!.atUnix, nowS * 1000) });
+      line = <p className="text-xs leading-snug text-pretty text-muted">{off}</p>;
     }
   }
   // the next useful step is the filled button: turn on after a fresh pass, else check

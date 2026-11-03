@@ -34,9 +34,10 @@ const (
 	// tcpProbeWait covers the 5 s connect and 8 s per port limits of the prober, in parallel, plus the name lookup.
 	tcpProbeWait = 15 * time.Second
 
-	tcpRoleACME  = "acme"
-	tcpRoleSite  = "site"
-	tcpRoleVLESS = "vless"
+	tcpRoleACME    = "acme"
+	tcpRoleSite    = "site"
+	tcpRoleMTProto = "mtproto"
+	tcpRoleVLESS   = "vless"
 )
 
 // tcpSpec is one enabled inbound of the node as the panel builds it for the agent.
@@ -64,6 +65,8 @@ type tcpTarget struct {
 //     the site there, and the VLESS row says what answers.
 //   - a VLESS TCP port (role vless): REALITY with another site is probed with the target's name (a valid chain proves our
 //     REALITY forwarded the hello to that site), "self" and TLS with the node's own name.
+//   - an MTProto TCP port (role mtproto): only its own-site Fake TLS fallback, whose decoy answers with the node's site and
+//     certificate; a Fake TLS fallback to another site cannot prove that the port belongs to this node.
 func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 	sorted := slices.Clone(specs)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Spec.ID < sorted[j].Spec.ID })
@@ -103,6 +106,18 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 				t.ALPN = alpn(t.Port, spec.TLS)
 			}
 			add(t)
+		case spec.Protocol == "mtproto" && spec.Listen.Network == "tcp":
+			var settings struct {
+				Fallback string `json:"fallback"`
+			}
+			if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
+				continue
+			}
+			if settings.Fallback == "site" || (settings.Fallback != "" && settings.Fallback != "decoy") {
+				continue
+			}
+			add(tcpTarget{Port: spec.Listen.Port, Role: tcpRoleMTProto, Profile: s.Profile, Kind: tcpcheck.KindTLS,
+				SNI: spec.TLS.ServerName, Pin: pin})
 		case spec.Protocol == "hysteria2":
 			port := uint16(hy2SitePort(spec))
 			if port == 0 || vlessPorts[port] {

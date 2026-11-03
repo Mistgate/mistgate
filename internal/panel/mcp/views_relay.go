@@ -88,26 +88,40 @@ func errorCode(s string) string {
 
 // RelaysV is the relays_list result.
 type RelaysV struct {
-	Relays    []relayV `json:"relays"`
-	Truncated bool     `json:"truncated,omitempty"`
+	Relays     []relayV `json:"relays"`
+	Offset     int      `json:"offset"`
+	Limit      int      `json:"limit"`
+	Total      int      `json:"total"`
+	NextOffset int      `json:"next_offset,omitempty"`
+	Truncated  bool     `json:"truncated,omitempty"`
 }
 
 func (v *RelaysV) shrink() bool {
 	if cut(&v.Relays) {
 		v.Truncated = true
+		v.NextOffset = v.Offset + len(v.Relays)
 		return true
 	}
 	return false
 }
 
-func relaysView(r *adminv1.ListRelaysResponse) *RelaysV {
-	v := &RelaysV{Relays: []relayV{}}
+func relaysView(r *adminv1.ListRelaysResponse, offset, limit int) *RelaysV {
+	all := make([]relayV, 0, len(r.GetRelays()))
 	for _, x := range r.GetRelays() {
 		if x != nil {
-			v.Relays = append(v.Relays, relayView(x))
+			all = append(all, relayView(x))
 		}
 	}
-	return v
+	total := len(all)
+	offset = min(offset, total)
+	end := offset + min(limit, total-offset)
+	truncated := end < total
+	var nextOffset int
+	if truncated {
+		nextOffset = end
+	}
+	return &RelaysV{Relays: all[offset:end], Offset: offset, Limit: limit, Total: total,
+		NextOffset: nextOffset, Truncated: truncated}
 }
 
 type relayCountryV struct {

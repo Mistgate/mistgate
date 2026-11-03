@@ -34,6 +34,9 @@ describe("the state of a relay", () => {
     expect(enableGate(relay({ check: check({ leg: stage({ atUnix: now - 16 * 60 }) }) as never }), now)).toBe("stale");
     expect(enableGate(relay({ check: check({ network: "udp" }) as never }), now)).toBe("stale"); // checked for another target
     expect(enableGate(relay({ check: check({ ok: false, leg: stage({ status: "fail", code: "timeout" }) }) as never }), now)).toBe("failed");
+    // a server the panel cannot probe (MTProto fronting another site): not a failure, it may be turned on
+    expect(enableGate(relay({ check: check({ leg: stage({ status: "skipped", code: "unverifiable" }) }) as never }), now)).toBe("");
+    expect(enableGate(relay({ check: check({ leg: stage({ status: "skipped", code: "pending" }) }) as never }), now)).toBe("failed");
     expect(enableGate(relay({ agentSupported: false, check: check() as never }), now)).toBe("agent_old");
     expect(enableGate(relay({ exitLive: false, check: check() as never }), now)).toBe("exit_down");
   });

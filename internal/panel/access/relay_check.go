@@ -24,9 +24,10 @@ import (
 //
 // A relay is switched on in two steps, and no step is skipped:
 //
-//  1. The gate (relayCheckGate): the leg check of CheckRelay passed, less than relayCheckTTL ago, for the relay's present target. A relay that is off has no forward, so the leg is all that can be proved before.
+//  1. The gate (relayCheckGate): the leg check of CheckRelay passed or was marked unverifiable, less than relayCheckTTL ago,
+//     for the relay's present target. A relay that is off has no forward, so the leg is all that can be checked before.
 //  2. relaySettle, once the switch is stored and the entry has been told: wait for the entry to report the forward, then check
-//     the path from outside. A relay that fails here is switched off again, so a relay stays on only when it works from outside.
+//     the path from outside. A failure switches it off; an unverifiable path stays on but is not marked verified.
 
 // relayCheckTTL is how fresh a passing leg check must be to switch a relay on. The owner reads the result and decides, which
 // takes minutes, and the leg (a block of the exit by the entry's network, the exit's firewall) does not change in that time
@@ -50,8 +51,8 @@ func (s *Service) relayTo(ctx context.Context, l store.RelayLink) string {
 	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(spec.Listen.Port)))
 }
 
-// relayCheckGate lets a relay be switched on: its latest check proved the leg, recently, for this target. (The leg does not depend
-// on the entry's port; a port moved after the check is covered by the path check that follows the switch.)
+// relayCheckGate lets a relay be switched on: its latest check proved the leg or found it unverifiable, recently, for this target.
+// (The leg does not depend on the entry's port; a port moved after the check is covered by the path check that follows the switch.)
 func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 	c, ok := l.Check()
 	if !ok || s.cfg.CheckRelay == nil || c.Leg.Status == "" {
@@ -61,14 +62,14 @@ func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 	if age > relayCheckTTL || age < -time.Minute || c.Network != l.Network || c.To != s.relayTo(ctx, l) {
 		return coded(connect.CodeFailedPrecondition, "relay_check_stale")
 	}
-	if c.Leg.Status != "ok" {
+	if !c.Leg.Acceptable() {
 		return coded(connect.CodeFailedPrecondition, "relay_check_failed", "stage", store.RelayStageLeg, "code", c.Leg.Code)
 	}
 	return nil
 }
 
 // relaySettle runs after a relay was switched on: the entry installs the forward, then the path is checked from outside. When
-// either fails the relay is switched off again (the reason goes to its check and to the audit) and the caller is refused.
+// the path fails the relay is switched off again; an unverifiable path leaves it on but unverified.
 func (s *Service) relaySettle(ctx context.Context, l store.RelayLink) error {
 	stage, code := store.RelayStagePath, s.awaitRelayForward(ctx, l.ID)
 	if code == "" {
@@ -121,7 +122,7 @@ func (s *Service) awaitRelayForward(ctx context.Context, id string) string {
 	}
 }
 
-// relayPathCheck runs the path stage through the fleet: "" when it passed, else the failure code.
+// relayPathCheck runs the path stage through the fleet: "" when it passed or was unverifiable, else the failure code.
 func (s *Service) relayPathCheck(ctx context.Context, id string) string {
 	if s.cfg.CheckRelay == nil {
 		return "failed"
@@ -131,6 +132,8 @@ func (s *Service) relayPathCheck(ctx context.Context, id string) string {
 	case err != nil:
 		s.log.Warn("access: path check of a relay", "relay", id, "err", err)
 		return "failed"
+	case c.Path.Acceptable():
+		return ""
 	case c.Path.Status != "ok":
 		return cmp.Or(c.Path.Code, "failed")
 	}

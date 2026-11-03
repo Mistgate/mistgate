@@ -174,6 +174,16 @@ func TestNoTwinUnlessTheRelayIsUsableForThePerson(t *testing.T) {
 			t.Errorf("%s: %d servers", name, n)
 		}
 	}
+	unverifiable := store.RelayCheck{At: 1,
+		Leg:  store.RelayStage{Status: "skipped", Code: "unverifiable"},
+		Path: store.RelayStage{Status: "skipped", Code: "unverifiable"}}
+	unverifiable.Settle()
+	if err := f.st.SetRelayCheck(f.ctx, r.Id, unverifiable); err != nil {
+		t.Fatal(err)
+	}
+	if n := servers(); n != 2 {
+		t.Errorf("an enabled relay whose identity cannot be checked: %d servers", n)
+	}
 	f.switchOn(r.Id)
 	if n := servers(); n != 2 {
 		t.Fatalf("a proven relay: %d servers", n)

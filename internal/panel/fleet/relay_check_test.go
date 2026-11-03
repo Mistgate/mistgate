@@ -15,6 +15,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	accesssvc "github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
+	mtprotoProto "github.com/mistgate/mistgate/internal/panel/protocols/mtproto"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
@@ -38,7 +39,7 @@ type checkEnv struct {
 func newCheckEnv(t *testing.T, online ...string) *checkEnv {
 	t.Helper()
 	reg, err := protocols.NewRegistry(fakeProto{"fakehy", plugin.ClientHapp}, fakeProto{"fakewg", plugin.ClientAmnezia},
-		tcpProto{fakeProto{"vless", plugin.ClientMihomo}})
+		tcpProto{fakeProto{"vless", plugin.ClientMihomo}}, mtprotoProto.New())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +82,26 @@ func (x *checkEnv) tcpRelay(on bool) {
 	}
 	if on {
 		x.live("rly_t")
+	}
+}
+
+func (x *checkEnv) mtprotoRelay(on bool, kind string) {
+	x.t.Helper()
+	now := time.Now().Unix()
+	settings := `{"port":443,"fake_tls":{"kind":"own"}}`
+	serverName := "tg.example.com"
+	if kind == "site" {
+		settings = `{"port":443,"fake_tls":{"kind":"site","domain":"www.example.org"}}`
+		serverName = ""
+	}
+	x.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_mt', 'mtproto', 'Telegram', ?, 1, ?, ?)`, settings, now, now)
+	x.exec(`INSERT INTO inbound (id, profile_id, node_id, tls_server_name_override, spec_version, state, created_at, updated_at)
+		VALUES ('inb_mt', 'prf_mt', ?, ?, 1, 'active', ?, ?)`, x.exit.nodeID, serverName, now, now)
+	if err := x.st.CreateRelay(x.ctx, store.Relay{ID: "rly_mt", InboundID: "inb_mt", ViaNodeID: x.entry.nodeID, Network: "tcp", Port: 57893}, time.Now()); err != nil {
+		x.t.Fatal(err)
+	}
+	if on {
+		x.live("rly_mt")
 	}
 }
 
@@ -474,6 +495,38 @@ func TestCheckRelayTCPProvesTheServerAtBothStages(t *testing.T) {
 	idle(t, 100*time.Millisecond, x.c1)
 }
 
+func TestCheckRelayMTProtoOwnFallbackAtBothStages(t *testing.T) {
+	x := newCheckEnv(t, "entry", "exit", "s1")
+	x.mtprotoRelay(true, "own")
+	pin := strings.Repeat("cd", 32)
+	x.exec(`UPDATE inbound SET cert_pin_sha256 = ? WHERE id = 'inb_mt'`, pin)
+	res := x.start("rly_mt")
+	leg := tcpRun(x.ec, "ours", 443)
+	if leg.Host != addrExit || len(leg.Targets) != 1 || leg.Targets[0].Port != 443 || leg.Targets[0].Kind != "tls" ||
+		leg.Targets[0].Sni != "tg.example.com" || leg.Targets[0].PinSha256 != pin {
+		t.Fatalf("MTProto leg probe = %+v", leg)
+	}
+	path := tcpRun(x.c1, "ours", 57893)
+	if path.Host != addrEntry || len(path.Targets) != 1 || path.Targets[0].Port != 57893 || path.Targets[0].Sni != "tg.example.com" || path.Targets[0].PinSha256 != pin {
+		t.Fatalf("MTProto path probe = %+v", path)
+	}
+	c := result(t, res)
+	if !c.Verified() || !c.OK || c.Leg.Verdict != "ours" || c.Path.Verdict != "ours" {
+		t.Fatalf("MTProto own-site check = %+v", c)
+	}
+}
+
+func TestCheckRelayMTProtoForeignFallbackIsUnverifiable(t *testing.T) {
+	x := newCheckEnv(t, "entry", "exit", "s1")
+	x.mtprotoRelay(false, "site")
+	c := result(t, x.start("rly_mt"))
+	if !c.OK || c.Verified() || c.Stage != "" || c.Leg.Status != "skipped" || c.Leg.Code != "unverifiable" ||
+		c.Path.Status != "skipped" || c.Path.Code != "unverifiable" {
+		t.Fatalf("MTProto foreign-site check = %+v", c)
+	}
+	idle(t, 100*time.Millisecond, x.ec, x.xc, x.c1)
+}
+
 func TestCheckRelayTCPPanelFallback(t *testing.T) {
 	x := newCheckEnv(t, "entry", "exit")
 	x.tcpRelay(true)
@@ -634,5 +687,45 @@ func TestSwitchingARelayOnEndToEnd(t *testing.T) {
 	x.ec.quiet(200 * time.Millisecond)
 	if len(x.em.relays) != 1 {
 		t.Errorf("the entry lost the forward: %v", x.em.relays)
+	}
+}
+
+func TestUnverifiableTCPRelayCanBeSwitchedOn(t *testing.T) {
+	x := newCheckEnv(t, "entry", "exit", "s1")
+	x.mtprotoRelay(false, "site")
+	acc, err := accesssvc.New(x.st, x.v, x.f.reg, x.f, nil, accesssvc.Config{CheckRelay: x.f.CheckRelay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc.SetRelayWaitForTest(10*time.Second, 10*time.Millisecond)
+	on := true
+	checked, err := acc.CheckRelay(x.ctx, connect.NewRequest(&adminv1.CheckRelayRequest{Id: "rly_mt"}))
+	if err != nil || !checked.Msg.Relay.Check.Ok || checked.Msg.Relay.Check.Verified ||
+		checked.Msg.Relay.Check.Leg.Status != "skipped" || checked.Msg.Relay.Check.Leg.Code != "unverifiable" {
+		t.Fatalf("check: %+v %v", checked, err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := acc.UpdateRelay(x.ctx, connect.NewRequest(&adminv1.UpdateRelayRequest{Id: "rly_mt", Enabled: &on}))
+		done <- err
+	}()
+	ds := x.ec.next(x.em)
+	if ds.Relays == nil || len(ds.Relays.Items) != 1 || ds.Relays.Items[0].Port != 57893 || ds.Relays.Items[0].ToHost != addrExit {
+		t.Fatalf("the unverifiable relay was not sent to the entry: %v", ds.Relays)
+	}
+	r := applied(ds, x.em.hash())
+	r.GetApplyResult().Relays = []*agentv1.RelayResult{{RelayId: "rly_mt", Ok: true, ToIp: addrExit}}
+	x.ec.send(0, r)
+	if err := <-done; err != nil {
+		t.Fatalf("switch on: %v", err)
+	}
+	link, err := x.st.RelayLink(x.ctx, "rly_mt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check, ok := link.Check()
+	if !ok || !link.Enabled || link.State != "active" || !check.OK || check.Verified() || check.Stage != "" ||
+		check.Leg.Code != "unverifiable" || check.Path.Code != "unverifiable" {
+		t.Fatalf("switched-on unverifiable relay: enabled=%v state=%s check=%+v", link.Enabled, link.State, check)
 	}
 }

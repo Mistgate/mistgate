@@ -112,6 +112,20 @@ func TestTCPTargets(t *testing.T) {
 			specs: []tcpSpec{vlessSpec("b", 8443, `{"reality":{"target":"www.example.org:443"}}`, plugin.TLS{})},
 			want:  []tcpTarget{{Port: 8443, Role: "vless", Profile: "vless-b", Kind: "tls", SNI: "www.example.org"}},
 		},
+		"MTProto own-site fallback is probed by its inbound server name": {
+			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+				TLS: plugin.TLS{ServerName: "node-a.example.com"}, Settings: json.RawMessage(`{"domains":["node-a.example.com"],"fallback":"decoy"}`)}}},
+			pins: map[string]string{"mt": pin},
+			want: []tcpTarget{{Port: 443, Role: "mtproto", Profile: "Telegram", Kind: "tls", SNI: "node-a.example.com", Pin: pin}},
+		},
+		"MTProto foreign-site fallback does not prove this node's identity": {
+			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+				TLS: plugin.TLS{ServerName: "www.example.org"}, Settings: json.RawMessage(`{"domains":["www.example.org"],"fallback":"site"}`)}}},
+		},
+		"MTProto own-site fallback without an SNI is not probed": {
+			specs: []tcpSpec{{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+				Settings: json.RawMessage(`{"domains":["node-a.example.com"],"fallback":"decoy"}`)}}},
+		},
 		"a UDP inbound of another protocol is not a TCP port": {
 			specs: []tcpSpec{{Profile: "awg", Spec: plugin.InboundSpec{ID: "w", Protocol: "awg", Listen: plugin.Listen{Network: "udp", Port: 51820}}}},
 		},

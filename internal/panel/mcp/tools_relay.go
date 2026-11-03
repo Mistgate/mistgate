@@ -30,8 +30,12 @@ func relayTools() []toolDef {
 				"Per relay: the entry and exit nodes, the exit's server (profile, protocol, network), the port on the entry and on the exit, whether it is switched on, "+
 				"what the entry's agent reported (state pending, active or failed, with the first word of its error), whether the exit's server is usable and the entry's agent can take the forward, "+
 				"and the last check: the leg (the entry reaches the exit) and the path (a third node reaches the exit through the entry), each ok, fail or skipped with its code, the node that sent the probe and, for UDP, the packets sent and counted. "+
-				"Optional node (id or exact name) keeps the relays that have it at either end. Never an address of a node. Stored data only: it contacts no node.",
+				"Every protocol and switch state is included. Optional node (id or exact name) keeps the relays that have it at either end. Pages are oldest first: limit defaults to 10 (at most 100), offset starts at 0; continue at next_offset until it is absent. "+
+				"Never an address of a node. Stored data only: it contacts no node.",
 			func(c *call, in relaysListArg) (any, error) {
+				if in.Offset < 0 || in.Limit < 0 {
+					return nil, errors.New("offset and limit must not be negative")
+				}
 				id := ""
 				if in.Node != "" {
 					var err error
@@ -43,7 +47,13 @@ func relayTools() []toolDef {
 				if err != nil {
 					return nil, apiError(err)
 				}
-				return relaysView(r.Msg), nil
+				limit := in.Limit
+				if limit == 0 {
+					limit = defaultRelayListLimit
+				} else {
+					limit = min(limit, maxListLimit)
+				}
+				return relaysView(r.Msg, in.Offset, limit), nil
 			}),
 
 		readTool("relay_candidates", ProfileReadonly,
@@ -69,7 +79,7 @@ func relayTools() []toolDef {
 		readToolWithin(applyTimeout, "relay_check", ProfileAdmin, procs(adminv1connect.RelayServiceCheckRelayProcedure),
 			"Check one relay now and store the result: the leg (the entry node tries the exit's server) and, when the relay is switched on, the path (a third node reaches the exit through the entry's port). "+
 				"It only sends test packets between the owner's nodes: it changes no switch and nothing on any host. It can take up to a minute. "+
-				"Switching a relay on needs a passing leg check made less than 15 minutes earlier; this is that check. Returns the relay with its new last_check.",
+				"Switching a relay on needs a leg check made less than 15 minutes earlier that passed or was skipped as unverifiable; this is that check. Returns the relay with its new last_check.",
 			func(c *call, in relayCheckArg) (any, error) {
 				if err := validID("relay_id", in.RelayID); err != nil {
 					return nil, err
@@ -85,8 +95,12 @@ func relayTools() []toolDef {
 }
 
 type relaysListArg struct {
-	Node string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every relay"`
+	Node   string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every relay"`
+	Offset int    `json:"offset,omitempty" jsonschema:"zero-based offset; continue at next_offset"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"page size; defaults to 10, at most 100"`
 }
+
+const defaultRelayListLimit = 10
 
 type relayCandidatesArg struct {
 	Node string `json:"node" jsonschema:"the entry node, id or exact name"`
@@ -128,9 +142,9 @@ var relayChange = changeSpec[relayArgs]{
 	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.RelayServiceListRelaysProcedure,
 		adminv1connect.RelayServiceListRelayCandidatesProcedure, adminv1connect.RelayServiceCheckRelayProcedure,
 		adminv1connect.RelayServiceCreateRelayProcedure, adminv1connect.RelayServiceUpdateRelayProcedure, adminv1connect.RelayServiceDeleteRelayProcedure),
-	desc: "Make, switch on, switch off, move or delete a relay (action create, enable, disable, port or delete). A relay is a port on an entry node that passes one server of an exit node on, unchanged. " +
+	desc: "Make, switch on, switch off, move or delete a relay (action create, enable, disable, port or delete). A relay is a port on an entry node that passes one server of an exit node on, unchanged. An unverifiable check does not block enabling; a failed check does. " +
 		"Always needs the owner's approval in the admin panel: it changes what the entry node forwards and what people's subscriptions hold. " +
-		"create makes the relay and switches it on only if the checks pass (the leg from the entry to the exit, then the path from a third node through the entry); a relay that fails stays switched off and the apply reports the stage. " +
+		"create makes the relay and switches it on after the leg from the entry to the exit and the path from a third node through the entry pass or are unverifiable; a relay that fails stays switched off and the apply reports the stage. " +
 		"enable runs the same checks. Look at relay_candidates first; check with relay_check; the plan never shows an address.",
 	plan: func(c *call, a relayArgs) (*planned, error) {
 		if err := relayArgsShape(a); err != nil {
@@ -270,10 +284,10 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 		facts = append(facts, Fact{Key: "warning", Value: "the server has a hop range; the relay passes its one port only"})
 	}
 	facts = append(facts,
-		Fact{Key: "checks", Value: "after it is made the entry tries the exit's server (leg), then the relay is switched on and a third node reaches the exit through the entry (path); if either fails the relay stays switched off"},
+		Fact{Key: "checks", Value: "after it is made the entry tries the exit's server (leg), then the relay is switched on and a third node reaches the exit through the entry (path); a failed stage switches it off, while an unverifiable stage leaves it enabled and unverified"},
 		Fact{Key: "effect", Value: relayEntryNote + " " + relayOnNote})
 	return &planned{
-		Summary: "Make a relay on one entry node for one server of an exit node, and switch it on if its checks pass. The entry node gets one forwarding rule for its port. The owner has to approve it first.",
+		Summary: "Make a relay on one entry node for one server of an exit node, and switch it on if its checks pass or cannot verify it. The entry node gets one forwarding rule for its port. The owner has to approve it first.",
 		Facts:   facts, Danger: []string{dangerFleet},
 		Params: relayArgs{Action: relayCreate, Node: id, InboundID: a.InboundID, Port: a.Port},
 	}, nil
@@ -338,7 +352,7 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 		case !r.GetExitLive():
 			return nil, errors.New("the exit's server is not usable now (switched off, failed or its node is not enrolled): fix that first")
 		}
-		summary = "Switch one relay on if its checks pass: the entry tries the exit's server, then a third node reaches the exit through the entry. The owner has to approve it first."
+		summary = "Switch one relay on if its checks pass or are unverifiable: the entry tries the exit's server, then a third node reaches the exit through the entry. The owner has to approve it first."
 		effect = relayEntryNote + " " + relayOnNote
 	case relayDisable:
 		if !r.GetEnabled() {
@@ -371,7 +385,7 @@ func (c *call) relaySwitchOn(id, prefix string) error {
 	if err != nil {
 		return apiError(err)
 	}
-	if leg := chk.Msg.GetRelay().GetCheck().GetLeg(); leg.GetStatus() != "ok" {
+	if leg := chk.Msg.GetRelay().GetCheck().GetLeg(); leg.GetStatus() != "ok" && !(leg.GetStatus() == "skipped" && leg.GetCode() == "unverifiable") {
 		return relayCheckFailure(prefix, "leg", leg.GetCode())
 	}
 	on := true

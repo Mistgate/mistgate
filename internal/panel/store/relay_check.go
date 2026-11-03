@@ -26,6 +26,14 @@ type RelayStage struct {
 	At      int64  `json:"at,omitempty"`
 }
 
+// Unverifiable says the stage was skipped because it could not attribute a TLS identity to the server.
+func (s RelayStage) Unverifiable() bool { return s.Status == "skipped" && s.Code == "unverifiable" }
+
+// Acceptable says the stage either proved the server or could not check it without finding a failure.
+func (s RelayStage) Acceptable() bool {
+	return s.Status == "ok" || s.Unverifiable()
+}
+
 // RelayMonitorCheck is the result of the client-eye probe through an enabled relay. The two automatic-check fields are
 // panel bookkeeping and are deliberately not part of admin.v1.RelayMonitor.
 type RelayMonitorCheck struct {
@@ -70,7 +78,8 @@ type RelayCheck struct {
 	Counters *RelayCounters     `json:"counters,omitempty"`
 }
 
-// Settle recomputes OK and Stage from the two stages.
+// Settle recomputes OK and Stage from the two stages. An unverifiable leg is not a failure: its owner may choose to enable the
+// relay, while Verified remains false until both stages actually prove the server.
 func (c *RelayCheck) Settle() {
 	c.Stage = ""
 	switch {
@@ -79,11 +88,14 @@ func (c *RelayCheck) Settle() {
 	case c.Path.Status == "fail":
 		c.Stage = RelayStagePath
 	}
-	c.OK = c.Leg.Status != "" && c.Leg.Status != "skipped" && c.Stage == ""
+	c.OK = c.Leg.Acceptable() && c.Stage == ""
 }
 
 // Verified: both stages ran and passed, the relay works from outside.
 func (c RelayCheck) Verified() bool { return c.Leg.Status == "ok" && c.Path.Status == "ok" }
+
+// CanUse says both stages passed or were explicitly skipped because the server identity is unverifiable.
+func (c RelayCheck) CanUse() bool { return c.Leg.Acceptable() && c.Path.Acceptable() }
 
 // Check reads the relay's latest check; the second result is false when there is none.
 func (r Relay) Check() (RelayCheck, bool) {
@@ -95,11 +107,16 @@ func (r Relay) Check() (RelayCheck, bool) {
 }
 
 // Proven: the relay's latest check found both stages passing, so the path from outside through the entry to the exit was seen to
-// work. The panel clears the path when it switches a relay on or moves it (access.UpdateRelay) and writes it again only when the
-// path check passes, so a relay that is on but not proven yet (waiting for its entry, or failing) is not offered to people.
+// work. A relay with an unverifiable stage can be usable while not proven.
 func (l RelayLink) Proven() bool {
 	c, ok := l.Check()
 	return ok && c.Verified()
+}
+
+// Usable says every stage either passed or was unverifiable. The caller checks whether the owner enabled the relay.
+func (l RelayLink) Usable() bool {
+	c, ok := l.Check()
+	return ok && c.CanUse()
 }
 
 // SetRelayCheck stores the check of a relay. ErrNotFound when the relay is gone.

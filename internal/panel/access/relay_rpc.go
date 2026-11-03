@@ -42,14 +42,14 @@ func (s *Service) RelayHandler() (string, http.Handler) {
 	return adminv1connect.NewRelayServiceHandler(s, handlerOpts...)
 }
 
-// relayUsable is the rule for a person's entry of a server: the relay is switched on and proven (its path from outside was seen
-// to work, store.RelayLink.Proven: a relay that failed its check is off, and one that is still being checked is on but not yet
-// proven) and the entry's agent holds the forward (State "active": one that failed to install is not offered), the exit's server
-// is usable for the person (usable: group, node, app) and live, and the entry node is live, enabled for the group, and one of the
-// person's nodes. The twin servers of the subscription follow it (subRelays); the entry node's own forward follows only the
-// part that is not about a person (store.RelayLink.Live).
+// relayUsable is the rule for a person's entry of a server: the relay is switched on and its stages passed or were marked
+// unverifiable (a failed check is not usable; a relay still being checked has no path result yet), and the entry's agent holds
+// the forward (State "active": one that failed to install is not offered), the exit's server is usable for the person (usable:
+// group, node, app) and live, and the entry node is live, enabled for the group, and one of the person's nodes. The twin servers
+// of the subscription follow it (subRelays); the entry node's own forward follows only the part that is not about a person
+// (store.RelayLink.Live).
 func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return l.Enabled && l.State == "active" && l.Proven() && l.Live() && l.ViaNodeState == "active" && s.usable(exit, g, u) &&
+	return l.Enabled && l.State == "active" && l.Usable() && l.Live() && l.ViaNodeState == "active" && s.usable(exit, g, u) &&
 		!slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
 }
