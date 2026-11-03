@@ -106,5 +106,7 @@ generated files by hand. Changes to the agent protocol are additive: old agents 
 
 ## License
 
-By contributing you agree that your contribution is licensed under the [GNU AGPL v3.0 only](LICENSE), like the rest
-of the project.
+Mistgate is published under the [GNU AGPL v3.0 only](LICENSE). Before your first pull request is merged, sign the
+[Contributor License Agreement](CLA.md): you keep the copyright in your work and give the project a licence to use it,
+including under other licences later. A bot comments on your pull request with the link; you sign by replying with the
+sentence it gives, once for all your contributions.

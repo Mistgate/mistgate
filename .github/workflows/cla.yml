@@ -1,0 +1,36 @@
+name: cla
+# The Contributor License Agreement (CLA.md): a pull request from someone who has not signed it gets a comment with the
+# link and a failing check; the contributor signs by replying with the sentence the comment gives, once. Signatures are
+# kept on the cla-signatures branch. Nothing of the pull request is checked out or run (pull_request_target runs this
+# file from main). The repository variable CLA_ALLOWLIST names the maintainers and bots who need not sign.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, closed]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  cla:
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request &&
+       (github.event.comment.body == 'recheck' ||
+        github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'))
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-document: https://github.com/Mistgate/mistgate/blob/main/CLA.md
+          path-to-signatures: signatures/cla.json
+          branch: cla-signatures
+          allowlist: ${{ vars.CLA_ALLOWLIST }}
+          lock-pullrequest-aftermerge: false
