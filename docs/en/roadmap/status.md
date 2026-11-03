@@ -3,20 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.72`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.73`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.72
+  meta: v0.1.0 – v0.1.73
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.72
+      release: v0.1.73
       current: true
       points:
-        - "**Persian and Turkish.** The admin and the person's own page speak Persian, right to left in the Vazirmatn font with dates in the Persian calendar, and Turkish; pick the language in the first-run setup, in **Settings → Interface** or from the switch in the top bar. Telegram messages, the node install page and these docs stay in English, Russian and Simplified Chinese. See [User page](../guide/user-page.md)."
+        - "**Who loses the packets.** A UDP port check that loses packets is sent again at once from a node on the other side (in the CIS or not): lost from both, the node's port is at fault; lost from one, the loss is on the way from that sender, the port counts as fine and the sender gets the new `path_lossy` alert. The Ports block shows both measurements. See [Nodes](../guide/nodes.md#ports)."
+        - "**Calmer, truer alerts.** The \"Unreachable from\" alert lists its networks by operator with the sources said once, and names the sources that saw nothing; a way in with one broken port among working ones warns instead of showing Down; an MTProto server can be checked through a relay, and a relay the panel cannot prove may still be turned on. See [Relays](../guide/relays.md)."
     - title: Profiles
       section: profiles
       points:
@@ -81,7 +82,7 @@ Mistgate is in **beta**; the current release is `v0.1.72`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.72
+  meta: v0.1.34 – v0.1.73
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production

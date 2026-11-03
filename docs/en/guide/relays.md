@@ -48,6 +48,8 @@ Accounting stays on the exit: traffic, quotas, speed limits, devices and [torren
 6. **Check and turn on** runs both checks and switches the relay on. **Only check** runs the leg and adds the relay switched off; turn it on with **Turn on** in its row within 15 minutes, or check again (switching on needs a leg check that passed less than 15 minutes ago). The dialog shows the progress and the result per server; **Back** returns to the choice of the node.
 7. The row shows *Works, checked 3 min ago*, or *Not turned on* with the stage: `leg` (the entry cannot reach the exit's server: a block, a route, the exit's firewall), `path` (the port on the entry is not reachable from outside: the entry's firewall or hoster, or `FORWARD` dropped). **Check now** repeats the checks; **Turn off** and **Remove** stop the forward on the entry.
 
+A server the panel has no way to prove is its own is checked as far as it can be: an [MTProto](mtproto.md) server whose Fake TLS falls back to another site has no name of this node to probe. Its row says *The panel cannot check it* instead of a failure, and it can still be turned on. An MTProto server whose Fake TLS falls back to the node's own site is checked like a VLESS one.
+
 You can start from the entry as well: the entry node → **Ways in** → the group **Reached through msk1** → **Relay another node…**. It is the same dialog, with the servers of every node instead of one.
 
 On the exit node, each relay is a lane **Through msk1** on the **Ways in** tab; on the entry node it is a row in the group **Reached through msk1** ("→ DE de1"). Removing a profile from a node, or retiring a node, also removes the relays that depend on it; the dialog says how many.
