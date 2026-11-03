@@ -86,6 +86,9 @@ export const en = {
   "hl.alerts.group.port_lossy": "UDP loses packets on {n} port|UDP loses packets on {n} ports",
   "hl.alerts.group.port_lossy.why":
     "The test packets to these ports get lost on the way. Clients of these profiles may be slow or drop. Move the profiles to other ports; each alert closes when its re-check is clean.",
+  // every port of the card was checked again from a second sender, which lost them too
+  "hl.alerts.group.port_lossy.why.confirmed":
+    "The test packets to these ports got lost from both sides, so this node’s ports lose them. Clients of these profiles may be slow or drop. Move the profiles to other ports; each alert closes when its re-check is clean.",
   "hl.alerts.group.check_failed": "{n} profile fails the client-eye check|{n} profiles fail the client-eye check",
   "hl.alerts.fact.loss": "{lost} % lost",
   "hl.alerts.fact.lossUpTo": "up to {lost} % lost",
@@ -94,6 +97,7 @@ export const en = {
   "hl.alerts.col.profile": "Profile",
   "hl.alerts.col.lost": "Lost",
   "hl.alerts.col.from": "Checked from",
+  "hl.alerts.col.arrived": "Arrived",
   "hl.alerts.mutedSection": "Muted · {n}",
   "hl.alerts.until": "until {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} alert muted until {time}|{node}: {n} alerts muted until {time}",
@@ -327,6 +331,13 @@ export const en = {
   "health.alert.port_lossy.title": "UDP to port {port} loses packets",
   "health.alert.port_lossy.why":
     "The test packets to port {port} of “{profile}” lost {lost} % (checked from {sender}). Clients of this profile may be slow or drop. Move the profile to another port; the alert closes when a re-check is clean.",
+  // a second sender of the other region lost them too: the port is the node's problem, not the path's
+  "health.alert.port_lossy.why.confirmed":
+    "The test packets to port {port} of “{profile}” got lost from both sides: {lost} % from {sender}, {confirm_lost} % from {confirm_sender}, so this node’s port loses them. Clients of this profile may be slow or drop. Move the profile to another port; the alert closes when a re-check is clean.",
+  // on the sender whose packets get lost on the way ({node}); {target} is the node it checked, {other} the sender that got through
+  "health.alert.path_lossy.title": "Loses UDP on the way to {target}",
+  "health.alert.path_lossy.why":
+    "UDP from {node} ({region}) to {target} loses {lost} % on ports {ports}, while {arrived} arrive from {other} ({other_region}). The loss is on the way from {node}, not on {target}: its ports are fine. Port checks send from other nodes first for a day; the alert closes 30 hours after the last check that saw the loss.",
   "health.alert.torrent.title": "Torrent attempts",
   "health.alert.torrent.why":
     "{user_name} is trying to use torrents on {nodes}: {attempts} in a day, blocked.{proof} It closes after a day without attempts.",
@@ -654,6 +665,8 @@ export const ru: typeof en = {
   "hl.alerts.group.port_lossy": "UDP теряет пакеты на {n} порту|UDP теряет пакеты на {n} портах|UDP теряет пакеты на {n} портах",
   "hl.alerts.group.port_lossy.why":
     "Тестовые пакеты до этих портов теряются по дороге. У клиентов этих профилей может тормозить или рваться соединение. Перенеси профили на другие порты; алерт закроется, когда перепроверка будет чистой.",
+  "hl.alerts.group.port_lossy.why.confirmed":
+    "Тестовые пакеты до этих портов терялись с обеих сторон — значит, их теряют порты этой ноды. У клиентов этих профилей может тормозить или рваться соединение. Перенеси профили на другие порты; алерт закроется, когда перепроверка будет чистой.",
   "hl.alerts.group.check_failed":
     "{n} профиль не проходит проверку глазами клиента|{n} профиля не проходят проверку глазами клиента|{n} профилей не проходят проверку глазами клиента",
   "hl.alerts.fact.loss": "потери {lost} %",
@@ -663,6 +676,7 @@ export const ru: typeof en = {
   "hl.alerts.col.profile": "Профиль",
   "hl.alerts.col.lost": "Потери",
   "hl.alerts.col.from": "Проверка с",
+  "hl.alerts.col.arrived": "Дошло",
   "hl.alerts.mutedSection": "Заглушены · {n}",
   "hl.alerts.until": "до {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} алерт заглушён до {time}|{node}: {n} алерта заглушены до {time}|{node}: {n} алертов заглушены до {time}",
@@ -892,6 +906,11 @@ export const ru: typeof en = {
   "health.alert.port_lossy.title": "UDP до порта {port} теряет пакеты",
   "health.alert.port_lossy.why":
     "Тестовые пакеты до порта {port} профиля «{profile}» потерялись на {lost} % (проверка с {sender}). У клиентов этого профиля может тормозить или рваться соединение. Перенеси профиль на другой порт; алерт закроется, когда перепроверка будет чистой.",
+  "health.alert.port_lossy.why.confirmed":
+    "Тестовые пакеты до порта {port} профиля «{profile}» терялись с обеих сторон: {lost} % с {sender}, {confirm_lost} % с {confirm_sender} — значит, их теряет порт этой ноды. У клиентов этого профиля может тормозить или рваться соединение. Перенеси профиль на другой порт; алерт закроется, когда перепроверка будет чистой.",
+  "health.alert.path_lossy.title": "Теряет UDP по пути к {target}",
+  "health.alert.path_lossy.why":
+    "UDP от {node} ({region}) до {target} теряет {lost} % на портах {ports}, а с {other} ({other_region}) доходит {arrived}. Потери на пути от {node}, а не на {target}: его порты в порядке. Сутки проверки портов шлют сначала с других нод; алерт закроется через 30 часов после последней проверки, которая видела потери.",
   "health.alert.torrent.title": "Попытки качать торренты",
   "health.alert.torrent.why":
     "{user_name} пытается качать торренты на {nodes}: {attempts} за сутки, торренты заблокированы.{proof} Алерт закроется после суток без попыток.",
@@ -1214,6 +1233,7 @@ export const zh: typeof en = {
   "hl.alerts.lasted": "持续了 {duration}",
   "hl.alerts.group.port_lossy": "{n} 个端口的 UDP 丢包",
   "hl.alerts.group.port_lossy.why": "发往这些端口的测试包在途中丢失。这些协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；各端口重新检测无丢包后，告警会关闭。",
+  "hl.alerts.group.port_lossy.why.confirmed": "发往这些端口的测试包两边都丢失，说明是此节点的端口在丢包。这些协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；各端口重新检测无丢包后，告警会关闭。",
   "hl.alerts.group.check_failed": "{n} 个协议配置未通过客户端视角检测",
   "hl.alerts.fact.loss": "丢包 {lost}%",
   "hl.alerts.fact.lossUpTo": "丢包最高 {lost}%",
@@ -1222,6 +1242,7 @@ export const zh: typeof en = {
   "hl.alerts.col.profile": "协议配置",
   "hl.alerts.col.lost": "丢包",
   "hl.alerts.col.from": "检测来源",
+  "hl.alerts.col.arrived": "到达",
   "hl.alerts.mutedSection": "已静默 · {n}",
   "hl.alerts.until": "至 {time}",
   "hl.alerts.mutedToastMany": "{node}：{n} 条告警已静默至 {time}",
@@ -1422,6 +1443,9 @@ export const zh: typeof en = {
   "health.alert.users_impacted.why.gone": "{protocol} 的在线用户：现在 {now} 人，此时段通常约 {usual} 人，而节点在线。这看起来是用户侧网络封锁。",
   "health.alert.port_lossy.title": "端口 {port} 的 UDP 丢包",
   "health.alert.port_lossy.why": "发往「{profile}」端口 {port} 的测试包丢失了 {lost}%（由 {sender} 检测）。该协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；重新检测无丢包后，告警会关闭。",
+  "health.alert.port_lossy.why.confirmed": "发往「{profile}」端口 {port} 的测试包两边都丢失：来自 {sender} 丢失 {lost}%，来自 {confirm_sender} 丢失 {confirm_lost}%，说明是此节点的端口在丢包。该协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；重新检测无丢包后，告警会关闭。",
+  "health.alert.path_lossy.title": "发往 {target} 的 UDP 在途中丢失",
+  "health.alert.path_lossy.why": "从 {node}（{region}）发往 {target} 的 UDP 在端口 {ports} 上丢失 {lost}%，而来自 {other}（{other_region}）的到达 {arrived}。丢包发生在从 {node} 出发的路上，不在 {target} 上：它的端口正常。一天内端口检测会优先从其他节点发送；最后一次发现丢包的检测过去 30 小时后，告警会关闭。",
   "health.alert.torrent.title": "BT 下载尝试",
   "health.alert.torrent.why": "{user_name} 正在 {nodes} 上尝试使用 BT 下载：一天内 {attempts}，均已被拦截。{proof}满一天没有新的尝试后，告警会关闭。",
   "health.alert.device_limit.title": "有应用因设备数上限被拒绝",
@@ -1716,6 +1740,7 @@ export const fa: typeof en = {
   "hl.alerts.lasted": "{duration} طول کشید",
   "hl.alerts.group.port_lossy": "UDP روی {n} پورت بسته گم می‌کند",
   "hl.alerts.group.port_lossy.why": "بسته‌های آزمایشی به این پورت‌ها در مسیر گم می‌شوند. ممکن است کلاینت‌های این پروفایل‌ها کند شوند یا اتصالشان قطع شود. پروفایل‌ها را به پورت‌های دیگر ببر؛ هر هشدار وقتی بسته می‌شود که بررسی دوباره‌اش تمیز باشد.",
+  "hl.alerts.group.port_lossy.why.confirmed": "بسته‌های آزمایشی به این پورت‌ها از هر دو طرف گم شدند، پس پورت‌های همین نود آن‌ها را گم می‌کنند. ممکن است کلاینت‌های این پروفایل‌ها کند شوند یا اتصالشان قطع شود. پروفایل‌ها را به پورت‌های دیگر ببر؛ هر هشدار وقتی بسته می‌شود که بررسی دوباره‌اش تمیز باشد.",
   "hl.alerts.group.check_failed": "{n} پروفایل در بررسی از دید کلاینت رد می‌شود",
   "hl.alerts.fact.loss": "{lost}% گم‌شده",
   "hl.alerts.fact.lossUpTo": "تا {lost}% گم‌شده",
@@ -1724,6 +1749,7 @@ export const fa: typeof en = {
   "hl.alerts.col.profile": "پروفایل",
   "hl.alerts.col.lost": "گم‌شده",
   "hl.alerts.col.from": "بررسی از",
+  "hl.alerts.col.arrived": "رسیده",
   "hl.alerts.mutedSection": "بی‌صدا شده · {n}",
   "hl.alerts.until": "تا {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} هشدار تا {time} بی‌صدا شد",
@@ -1916,6 +1942,9 @@ export const fa: typeof en = {
   "health.alert.users_impacted.why.gone": "افراد روی {protocol}: الان {now}، معمولاً در این ساعت حدود {usual}، در حالی که نود آنلاین است. شبیه مسدودسازی از طرف کاربران است.",
   "health.alert.port_lossy.title": "UDP به پورت {port} بسته گم می‌کند",
   "health.alert.port_lossy.why": "بسته‌های آزمایشی به پورت {port} پروفایل «{profile}» {lost}% گم شدند (بررسی از {sender}). ممکن است کلاینت‌های این پروفایل کند شوند یا اتصالشان قطع شود. پروفایل را به پورت دیگری ببر؛ هشدار وقتی بسته می‌شود که بررسی دوباره تمیز باشد.",
+  "health.alert.port_lossy.why.confirmed": "بسته‌های آزمایشی به پورت {port} پروفایل «{profile}» از هر دو طرف گم شدند: {lost}% از {sender} و {confirm_lost}% از {confirm_sender}، پس پورت همین نود آن‌ها را گم می‌کند. ممکن است کلاینت‌های این پروفایل کند شوند یا اتصالشان قطع شود. پروفایل را به پورت دیگری ببر؛ هشدار وقتی بسته می‌شود که بررسی دوباره تمیز باشد.",
+  "health.alert.path_lossy.title": "UDP در مسیر به {target} گم می‌شود",
+  "health.alert.path_lossy.why": "UDP از {node} ({region}) به {target} روی پورت‌های {ports}، {lost}% گم می‌شود، در حالی که از {other} ({other_region}) {arrived} می‌رسد. گم شدن در مسیر از {node} است، نه روی {target}: پورت‌هایش سالم‌اند. تا یک روز بررسی پورت‌ها اول از نودهای دیگر فرستاده می‌شود؛ هشدار 30 ساعت پس از آخرین بررسی‌ای که گم شدن را دید بسته می‌شود.",
   "health.alert.torrent.title": "تلاش برای تورنت",
   "health.alert.torrent.why": "{user_name} روی {nodes} می‌خواهد تورنت دانلود کند: {attempts} در یک روز، مسدود شد.{proof} هشدار بعد از یک روز بدون تلاش بسته می‌شود.",
   "health.alert.device_limit.title": "برنامه‌ای به‌خاطر سقف دستگاه رد شد",
@@ -2200,6 +2229,7 @@ export const tr: typeof en = {
   "hl.alerts.lasted": "{duration} sürdü",
   "hl.alerts.group.port_lossy": "UDP, {n} portta paket kaybediyor",
   "hl.alerts.group.port_lossy.why": "Bu portlara gönderilen test paketleri yolda kayboluyor. Bu profilleri kullanan istemcilerde yavaşlama ya da kopma olabilir. Profilleri başka portlara taşı; her uyarı, yeniden kontrolü temiz geçince kapanır.",
+  "hl.alerts.group.port_lossy.why.confirmed": "Bu portlara gönderilen test paketleri iki taraftan da kayboldu; yani paketleri bu düğümün portları kaybediyor. Bu profilleri kullanan istemcilerde yavaşlama ya da kopma olabilir. Profilleri başka portlara taşı; her uyarı, yeniden kontrolü temiz geçince kapanır.",
   "hl.alerts.group.check_failed": "{n} profil istemci gözüyle kontrolü geçemiyor",
   "hl.alerts.fact.loss": "%{lost} kayıp",
   "hl.alerts.fact.lossUpTo": "%{lost} kadar kayıp",
@@ -2208,6 +2238,7 @@ export const tr: typeof en = {
   "hl.alerts.col.profile": "Profil",
   "hl.alerts.col.lost": "Kayıp",
   "hl.alerts.col.from": "Kontrol yeri",
+  "hl.alerts.col.arrived": "Ulaşan",
   "hl.alerts.mutedSection": "Sessize alınanlar · {n}",
   "hl.alerts.until": "bitiş: {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} uyarı sessize alındı, bitiş: {time}",
@@ -2400,6 +2431,9 @@ export const tr: typeof en = {
   "health.alert.users_impacted.why.gone": "{protocol} kullanan kişi sayısı: şu an {now}, bu saatte genelde yaklaşık {usual}; düğüm ise çevrimiçi. Bu, kullanıcıların tarafında bir engellemeye benziyor.",
   "health.alert.port_lossy.title": "{port} portuna UDP paket kaybediyor",
   "health.alert.port_lossy.why": "“{profile}” profilinin {port} portuna giden test paketlerinde kayıp %{lost} (kontrol yeri: {sender}). Bu profilin istemcilerinde yavaşlama ya da kopma olabilir. Profili başka bir porta taşı; yeniden kontrol temiz çıkınca uyarı kapanır.",
+  "health.alert.port_lossy.why.confirmed": "“{profile}” profilinin {port} portuna giden test paketleri iki taraftan da kayboldu: {sender} tarafından %{lost}, {confirm_sender} tarafından %{confirm_lost}; yani paketleri bu düğümün portu kaybediyor. Bu profilin istemcilerinde yavaşlama ya da kopma olabilir. Profili başka bir porta taşı; yeniden kontrol temiz çıkınca uyarı kapanır.",
+  "health.alert.path_lossy.title": "{target} düğümüne giden UDP yolda kayboluyor",
+  "health.alert.path_lossy.why": "{node} ({region}) düğümünden {target} düğümüne giden UDP, {ports} portlarında %{lost} kaybediyor; oysa {other} ({other_region}) tarafından gönderilenlerden {arrived} ulaşıyor. Kayıp {node} çıkışlı yolda, {target} düğümünde değil: portları sağlam. Port kontrolleri bir gün boyunca önce diğer düğümlerden gönderilir; uyarı, kaybı gören son kontrolden 30 saat sonra kapanır.",
   "health.alert.torrent.title": "Torrent denemeleri",
   "health.alert.torrent.why": "{user_name}, {nodes} üzerinde torrent kullanmaya çalışıyor: bir günde {attempts}, engellendi.{proof} Bir gün boyunca deneme olmazsa uyarı kapanır.",
   "health.alert.device_limit.title": "Bir uygulama cihaz sınırında geri çevrildi",

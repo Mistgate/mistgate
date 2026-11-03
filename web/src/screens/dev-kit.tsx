@@ -286,8 +286,8 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6: one kit alone, for its screenshots
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit }[
+  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports: one kit alone, for its screenshots
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit, ports: PortsKit }[
     new URLSearchParams(location.search).get("only") ?? ""
   ];
   if (only) {

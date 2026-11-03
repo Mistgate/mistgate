@@ -418,15 +418,21 @@ type portInboundV struct {
 }
 
 type portCheckV struct {
-	Port     uint32         `json:"port"`
-	Verdict  string         `json:"verdict,omitempty"`
-	Sent     uint32         `json:"sent"`
-	Got      uint32         `json:"got"`
-	Checked  int64          `json:"checked_unix"`
-	Bad      int64          `json:"bad_unix"`
-	Sender   string         `json:"sender,omitempty"`
-	Reason   string         `json:"reason,omitempty"`
-	Inbounds []portInboundV `json:"inbounds"`
+	Port           uint32         `json:"port"`
+	Verdict        string         `json:"verdict,omitempty"`
+	Sent           uint32         `json:"sent"`
+	Got            uint32         `json:"got"`
+	Checked        int64          `json:"checked_unix"`
+	Bad            int64          `json:"bad_unix"`
+	Sender         string         `json:"sender,omitempty"`
+	SenderVerdict  string         `json:"sender_verdict,omitempty"`
+	ConfirmSender  string         `json:"confirm_sender,omitempty"`
+	ConfirmSent    uint32         `json:"confirm_sent,omitempty"`
+	ConfirmGot     uint32         `json:"confirm_got,omitempty"`
+	ConfirmVerdict string         `json:"confirm_verdict,omitempty"`
+	Blame          string         `json:"blame,omitempty"`
+	Reason         string         `json:"reason,omitempty"`
+	Inbounds       []portInboundV `json:"inbounds"`
 }
 
 // tcpCheckV is one row of the TCP part of the port check: does a connection to Port reach Mistgate itself.
@@ -464,7 +470,10 @@ func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*
 			continue
 		}
 		row := portCheckV{Port: check.GetPort(), Verdict: clean(check.GetVerdict(), 16), Sent: check.GetSent(), Got: check.GetGot(),
-			Checked: check.GetCheckedUnix(), Bad: check.GetBadUnix(), Sender: clean(check.GetSender(), 80), Reason: clean(check.GetReason(), 40),
+			Checked: check.GetCheckedUnix(), Bad: check.GetBadUnix(), Sender: clean(check.GetSender(), 80),
+			SenderVerdict: clean(check.GetSenderVerdict(), 16), ConfirmSender: clean(check.GetConfirmSender(), 80),
+			ConfirmSent: check.GetConfirmSent(), ConfirmGot: check.GetConfirmGot(), ConfirmVerdict: clean(check.GetConfirmVerdict(), 16),
+			Blame: clean(check.GetBlame(), 16), Reason: clean(check.GetReason(), 40),
 			Inbounds: []portInboundV{}}
 		if row.Reason == "" && row.Verdict == "" {
 			row.Reason = v.ErrorCode

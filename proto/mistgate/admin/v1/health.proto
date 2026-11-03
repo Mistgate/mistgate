@@ -139,6 +139,10 @@ enum AlertKind {
   // (a transfer stalls after the first kilobytes). Opens after the usual failure streak, is superseded while the exit's
   // own check alert or the entry's node_down is open, and closes on recovery.
   ALERT_KIND_RELAY_DOWN = 19;
+  // A two-sender UDP check found loss from one sender but delivery from the other. WARNING. node_id = lossy sender,
+  // subject = target node id, params{node, target, target_id, ports, sent, got, other, other_got, region, other_region,
+  // checked_unix}. The condition expires 30 hours after the latest check or when that path-loss row is removed.
+  ALERT_KIND_PATH_LOSSY = 20;
 }
 
 message Alert {

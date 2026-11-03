@@ -1670,6 +1670,95 @@ func TestPortLossyAlertCanCoexistWithClientEyeFailure(t *testing.T) {
 	want(t, e.active(), "check_failed/de1/"+inbound, "port_lossy/de1/"+inbound)
 }
 
+func TestPortLossyAlertExplainsConfirmedRun(t *testing.T) {
+	e := newEnv(t)
+	e.node("alice", "provider-a", true)
+	e.node("bob", "provider-b", true)
+	e.node("nl1", "provider-c", true)
+	inbound := e.inbound("nl1", 8443)
+	node, err := e.st.Node(e.ctx, "nl1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 210,
+		Verdict: "lossy", Sender: "alice", SenderVerdict: "lossy", ConfirmSender: "bob", ConfirmSent: 300,
+		ConfirmGot: 300, ConfirmVerdict: "ok", CheckedAt: e.clock.Now()}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{check}); err != nil {
+		t.Fatal(err)
+	}
+	e.evaluate()
+	alert, ok := e.active()["port_lossy/nl1/"+inbound]
+	if !ok || alert.WhyKey != "health.alert.port_lossy.why.confirmed" || alert.Params["confirm_sender"] != "bob" ||
+		alert.Params["confirm_got"] != "300" || alert.Params["confirm_sent"] != "300" {
+		t.Fatalf("confirmed port alert = %+v, found=%v", alert, ok)
+	}
+}
+
+func TestPathLossyAlertOpensAndResolvesFromItsStoredRow(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		gone bool
+	}{
+		{name: "row removed", gone: true},
+		{name: "older than 30 hours"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("minsk1", "provider-a", true)
+			e.node("nl1", "provider-b", true)
+			e.node("de1", "provider-c", true)
+			senderID, targetID, otherID := "minsk1", "nl1", "de1"
+			e.exec(`UPDATE node SET country_code = 'BY' WHERE id = ?`, senderID)
+			e.exec(`UPDATE node SET country_code = 'NL' WHERE id = ?`, targetID)
+			e.exec(`UPDATE node SET country_code = 'DE' WHERE id = ?`, otherID)
+			checked := e.clock.Now()
+			loss := store.UDPPathLoss{SenderID: senderID, TargetID: targetID, Ports: "2053, 2083", Sent: 300, Got: 237,
+				OtherSenderID: otherID, OtherGot: 299, CheckedAt: checked}
+			if err := e.st.UpdateUDPPathLosses(e.ctx, targetID, []string{senderID, otherID}, []store.UDPPathLoss{loss}); err != nil {
+				t.Fatal(err)
+			}
+			e.evaluate()
+			alert, ok := e.active()["path_lossy/"+senderID+"/"+targetID]
+			if !ok || alert.Severity != sevWarning || alert.TitleKey != "health.alert.path_lossy.title" ||
+				alert.WhyKey != "health.alert.path_lossy.why" || alert.Params["node"] != "minsk1" || alert.Params["target"] != "nl1" ||
+				alert.Params["target_id"] != targetID || alert.Params["ports"] != "2053, 2083" || alert.Params["region"] != "cis" ||
+				alert.Params["other_region"] != "other" {
+				t.Fatalf("path-loss alert = %+v, found=%v", alert, ok)
+			}
+			response, err := (rpc{e.s}).ListAlerts(e.ctx, req(&adminv1.ListAlertsRequest{}))
+			var pathAlert *adminv1.Alert
+			if err == nil {
+				for _, candidate := range response.Msg.Active {
+					if candidate.GetKind() == adminv1.AlertKind_ALERT_KIND_PATH_LOSSY {
+						pathAlert = candidate
+						break
+					}
+				}
+			}
+			if err != nil || pathAlert == nil || strings.Join(pathAlert.GetActions(), ",") != "open_node,mute" {
+				t.Fatalf("path-loss alert actions = %+v, %v", response, err)
+			}
+			if tc.gone {
+				if err := e.st.UpdateUDPPathLosses(e.ctx, targetID, []string{senderID, otherID}, nil); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				loss.CheckedAt = e.clock.Now().Add(-31 * time.Hour)
+				if err := e.st.UpdateUDPPathLosses(e.ctx, targetID, []string{senderID, otherID}, []store.UDPPathLoss{loss}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			e.evaluate()
+			if _, ok := e.active()["path_lossy/"+senderID+"/"+targetID]; ok {
+				t.Fatal("path-loss alert stayed open after its row was removed or aged out")
+			}
+			if history := e.history(); len(history) == 0 || history[0].Resolution != "cleared" {
+				t.Fatalf("path-loss alert history = %+v", history)
+			}
+		})
+	}
+}
+
 // A profile the node could not start (state failed) is not probed, but its open check_failed alert must not end as
 // "cleared": that reads as a recovery in Telegram and on the Events tab while the profile does not run.
 func TestFailedInboundKeepsItsAlertOpen(t *testing.T) {

@@ -24,7 +24,7 @@ import { plain, type Plain } from "./plain";
 import { pollMs } from "./queries";
 import { protocolName } from "./series";
 import { meQuery } from "./session";
-import { lossPct, senderLabel } from "./port-check";
+import { lossPct, regionWord, senderLabel } from "./port-check";
 import { torrentEvidenceText } from "./torrent";
 import { pauseReasonText } from "./updates";
 
@@ -151,6 +151,16 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.PORT_LOSSY) {
     params.lost = String(lossPct(Number(a.params.sent), Number(a.params.got)));
     params.sender = senderLabel(t, a.params.sender ?? "");
+    // confirmed from a second sender (why.confirmed): its share too
+    params.confirm_lost = String(lossPct(Number(a.params.confirm_sent), Number(a.params.confirm_got)));
+    params.confirm_sender = senderLabel(t, a.params.confirm_sender ?? "");
+  }
+  if (a.kind === AlertKind.PATH_LOSSY) {
+    // one value for "299/300", so a right-to-left sentence keeps it in one piece
+    params.lost = String(lossPct(Number(a.params.sent), Number(a.params.got)));
+    params.arrived = `${a.params.other_got ?? ""}/${a.params.sent ?? ""}`;
+    params.region = regionWord(t, a.params.region ?? "");
+    params.other_region = regionWord(t, a.params.other_region ?? "");
   }
   return lookup(t, a.whyKey, params) ?? "";
 }
@@ -302,13 +312,15 @@ export function groupTitle(t: T, g: readonly Alert[]): string {
   return alertTitle(t, a);
 }
 
-/** The number a folded card shows by its title: the loss of the ports, how many networks get nothing. Empty for the rest. */
+/** The number a folded card shows by its title: the loss of the ports (or of a lossy path), how many networks get nothing. Empty for the rest. */
 export function groupFact(t: T, g: readonly Alert[]): string {
   const a = g[0]!;
   if (a.kind === AlertKind.PORT_LOSSY) {
     const lost = Math.max(...g.map((x) => lossPct(Number(x.params.sent), Number(x.params.got))));
     return t(g.length > 1 ? "hl.alerts.fact.lossUpTo" : "hl.alerts.fact.loss", { lost });
   }
+  // the worst port of the lossy sender's run
+  if (a.kind === AlertKind.PATH_LOSSY) return t("hl.alerts.fact.loss", { lost: lossPct(Number(a.params.sent), Number(a.params.got)) });
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     const n = alertNetworks(a.params.networks ?? "").length;
     return n > 1 ? t.n("hl.alerts.fact.nets", n) : "";

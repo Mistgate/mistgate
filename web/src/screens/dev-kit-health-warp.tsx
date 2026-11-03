@@ -211,6 +211,31 @@ const activeAlerts: Alert[] = [
     params: { check: "foreign_vpn", names: "unit:x-ui" },
     actions: ["open_node", "accept", "mute"],
   }),
+  // the UDP check from two senders: minsk1 (CIS) loses its packets on the way to nl1, de1 gets them through
+  alert({
+    id: "a8",
+    kind: AlertKind.PATH_LOSSY,
+    nodeId: "nod_minsk1",
+    nodeName: "minsk1",
+    subject: "nod_nl1",
+    titleKey: "health.alert.path_lossy.title",
+    whyKey: "health.alert.path_lossy.why",
+    params: { node: "minsk1", target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "de1", other_got: "299", region: "cis", other_region: "other", checked_unix: String(NOW - 9 * 60) },
+    firstSeenUnix: NOW - 2 * h,
+  }),
+  // ... and a port both senders lost packets to: the node's own port
+  alert({
+    id: "a9",
+    kind: AlertKind.PORT_LOSSY,
+    nodeId: "nod_de2",
+    nodeName: "de2",
+    subject: "inb_4",
+    titleKey: "health.alert.port_lossy.title",
+    whyKey: "health.alert.port_lossy.why.confirmed",
+    params: { profile: "TUIC · 2083", port: "2083", sent: "300", got: "241", sender: "msk1", confirm_sender: "fi1", confirm_sent: "300", confirm_got: "238", checked_unix: String(NOW - 9 * 60) },
+    actions: ["open_profiles", "open_node", "mute"],
+    firstSeenUnix: NOW - 3 * h,
+  }),
   alert({
     id: "a6",
     severity: AlertSeverity.CRITICAL,

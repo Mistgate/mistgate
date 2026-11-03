@@ -1,18 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
-import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
+import { StatusDot, StatusPill, kindTextClass, type StatusKind } from "@/components/ui/status";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
+import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
-import { bestDelivered, lossPct, reasonShort, reasonText, renewalOf, renewalText, senderLabel } from "@/lib/port-check";
+import { bestDelivered, lossPct, portRuns, reasonShort, reasonText, regionWord, renewalOf, renewalText, senderLabel, udpRegion, type PortRun } from "@/lib/port-check";
 import { plain, type Plain } from "@/lib/plain";
+import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 
 // "Ports" in the Direct way in of a node (design/udp-port-check.md §6.6, design/vless.md §7.4): what the delivery check found
@@ -107,7 +110,8 @@ export function portRows(data: Pick<Plain<GetNodeResponse>, "node" | "inbounds" 
   const unchecked: Check[] = [];
   if (stored.length > 0) {
     for (const port of new Set(udpInbounds.map((i) => i.port))) {
-      if (port > 0 && !stored.some((c) => c.port === port)) unchecked.push({ nodeId: data.node!.id, port, verdict: "", sent: 0, got: 0, checkedUnix: 0, badUnix: 0, sender: "", reason: "" });
+      if (port > 0 && !stored.some((c) => c.port === port))
+        unchecked.push({ nodeId: data.node!.id, port, verdict: "", sent: 0, got: 0, checkedUnix: 0, badUnix: 0, sender: "", reason: "", senderVerdict: "", confirmSender: "", confirmSent: 0, confirmGot: 0, confirmVerdict: "", blame: "" });
     }
   }
   const udp = [...stored, ...unchecked].sort((a, b) => Number(profilesOn(b.port).length > 0) - Number(profilesOn(a.port).length > 0) || a.port - b.port);
@@ -124,6 +128,9 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
   const { udp: rows, tcp, profilesOn } = portRows(data);
   const stored = data.portChecks ?? [];
   const renewal = renewalOf(tcp);
+  // a loss on the way names the region of the sender that lost the packets: its country is in the fleet list
+  const fleet = useQuery({ ...nodesQuery, enabled: rows.some((c) => c.blame === "path") }).data?.nodes;
+  const regionOf = (sender: string) => udpRegion(fleet?.find((n) => n.name === sender)?.countryCode ?? "");
 
   const result = run.data;
   // a run whose TCP part could not probe anything stores nothing, so its reason would otherwise go unsaid
@@ -134,7 +141,7 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
   const counts = result?.errorCode && (result.errorCode === "inconclusive" || result.errorCode === "same_host") ? result.ports.map((p) => `${p.port}: ${p.got}/${p.sent}`).join(" · ") : "";
 
   return (
-    <div data-testid="ports" className="flex flex-col gap-2.5">
+    <div data-testid="ports" className="@container flex flex-col gap-2.5">
       <p className="text-xs leading-snug text-pretty text-muted">{run.isPending ? t("ports.checkingNote") : !linked ? t("ports.offline") : stored.length + tcp.length === 0 ? t("ports.never") : t("ports.intro")}</p>
       {run.isPending && <Progress label={t("ports.checking")} />}
       {why && !run.isPending && (
@@ -151,10 +158,12 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
             const pill = verdictPill(t, c);
             const profiles = profilesOn(c.port);
             const checked = c.checkedUnix > 0;
+            // checked again from a second sender: both runs take the place of "N of M arrived · from X"
+            const runs = portRuns(c);
             const detail = [
-              c.sent > 0 ? t("ports.row.arrived", { got: c.got, sent: c.sent }) : "",
+              !runs && c.sent > 0 ? t("ports.row.arrived", { got: c.got, sent: c.sent }) : "",
               checked ? fmt.ago(c.checkedUnix) : "",
-              checked && c.sender ? t("ports.row.from", { sender: senderLabel(t, c.sender) }) : "",
+              !runs && checked && c.sender ? t("ports.row.from", { sender: senderLabel(t, c.sender) }) : "",
               !checked && c.reason ? reasonShort(t, c.reason) : "",
             ]
               .filter(Boolean)
@@ -163,10 +172,15 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
               <li key={c.port} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 first:border-t-0">
                 <span className="w-[72px] font-mono text-[13px] font-bold">udp/{c.port}</span>
                 <StatusPill kind={pill.kind} label={pill.label} sm />
-                <span className="min-w-[160px] flex-1 text-xs leading-snug text-muted">
-                  {detail}
+                {/* two runs need about one "from X n/m · from Y n/m": in a narrow block they take a line of their own */}
+                <span className={cx("min-w-[160px] flex-1 text-xs leading-snug text-muted", runs && "@max-md:basis-full")}>
+                  {runs && <Runs runs={runs} />}
+                  {runs && detail && " · "}
+                  {/* beside the runs, the age is one unbroken piece too: the line wraps only at a " · " */}
+                  {runs ? <span className="whitespace-nowrap">{detail}</span> : detail}
                   {/* a port that lost packets once and is clean now is still avoided for 30 days: say when */}
                   {c.verdict === "ok" && c.badUnix > 0 && <span className="block text-warn-text">{t("ports.row.cleanNow", { when: fmt.ago(c.badUnix) })}</span>}
+                  {runs && <Blame blame={c.blame} runs={runs} kind={pill.kind} regionOf={regionOf} />}
                 </span>
                 <span className="min-w-0 text-xs break-words">
                   {profiles.length > 0 ? (
@@ -187,6 +201,43 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
       )}
       {renewal && (renewal.kind === "risk" ? <Notice>{renewalText(t, renewal)}</Notice> : <RenewalLine text={renewalText(t, renewal)} />)}
     </div>
+  );
+}
+
+/** Both runs of a port checked from two senders, "from minsk1 236/300 · from de1 299/300": the one that lost packets in its tone. */
+function Runs({ runs }: { runs: readonly PortRun[] }) {
+  const t = useT();
+  return (
+    <>
+      {runs.map((r, i) => (
+        <Fragment key={i}>
+          {i > 0 && " · "}
+          <span className={cx("whitespace-nowrap", r.loss && kindTextClass[r.loss], r.loss && "font-semibold")}>{t("ports.row.run", { sender: senderLabel(t, r.sender), count: `${r.got}/${r.sent}` })}</span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Whose the loss is, as a verdict line under the runs: "path" (one sender lost, the other got through) clears the port and
+ * names the sender and its region; "node" (both lost) puts it on the port. Nothing when both runs were clean.
+ */
+function Blame({ blame, runs, kind, regionOf }: { blame: string; runs: readonly PortRun[]; kind: StatusKind; regionOf: (sender: string) => string }) {
+  const t = useT();
+  let line: { kind: StatusKind; text: string } | null = null;
+  if (blame === "path") {
+    const lossy = runs.find((r) => r.loss) ?? runs[0]!;
+    const sender = senderLabel(t, lossy.sender);
+    const region = regionWord(t, regionOf(lossy.sender));
+    line = { kind: "ok", text: region ? t("ports.blame.path", { sender, region }) : t("ports.blame.pathPlain", { sender }) };
+  } else if (blame === "node") line = { kind, text: t("ports.blame.node") };
+  if (!line) return null;
+  return (
+    <span data-blame={blame} className={`tone-${line.kind} tone-text mt-1 flex items-start gap-1.5 font-semibold`}>
+      <Icon name={line.kind === "ok" ? "check" : "warn"} size={12} aria-hidden className="mt-[2px] flex-none" />
+      {line.text}
+    </span>
   );
 }
 

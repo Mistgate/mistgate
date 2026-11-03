@@ -151,6 +151,10 @@ const (
 	// (a transfer stalls after the first kilobytes). Opens after the usual failure streak, is superseded while the exit's
 	// own check alert or the entry's node_down is open, and closes on recovery.
 	AlertKind_ALERT_KIND_RELAY_DOWN AlertKind = 19
+	// A two-sender UDP check found loss from one sender but delivery from the other. WARNING. node_id = lossy sender,
+	// subject = target node id, params{node, target, target_id, ports, sent, got, other, other_got, region, other_region,
+	// checked_unix}. The condition expires 30 hours after the latest check or when that path-loss row is removed.
+	AlertKind_ALERT_KIND_PATH_LOSSY AlertKind = 20
 )
 
 // Enum value maps for AlertKind.
@@ -176,6 +180,7 @@ var (
 		17: "ALERT_KIND_DEVICE_LIMIT",
 		18: "ALERT_KIND_COUNTRY_BLOCKED",
 		19: "ALERT_KIND_RELAY_DOWN",
+		20: "ALERT_KIND_PATH_LOSSY",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -198,6 +203,7 @@ var (
 		"ALERT_KIND_DEVICE_LIMIT":                17,
 		"ALERT_KIND_COUNTRY_BLOCKED":             18,
 		"ALERT_KIND_RELAY_DOWN":                  19,
+		"ALERT_KIND_PATH_LOSSY":                  20,
 	}
 )
 
@@ -3465,7 +3471,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xca\x04\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xe5\x04\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -3487,7 +3493,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x15ALERT_KIND_PORT_LOSSY\x10\x10\x12\x1b\n" +
 	"\x17ALERT_KIND_DEVICE_LIMIT\x10\x11\x12\x1e\n" +
 	"\x1aALERT_KIND_COUNTRY_BLOCKED\x10\x12\x12\x19\n" +
-	"\x15ALERT_KIND_RELAY_DOWN\x10\x13*\x8e\x01\n" +
+	"\x15ALERT_KIND_RELAY_DOWN\x10\x13\x12\x19\n" +
+	"\x15ALERT_KIND_PATH_LOSSY\x10\x14*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

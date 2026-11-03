@@ -202,10 +202,18 @@ func TestAlertsListReturnsNewProtoKindNames(t *testing.T) {
 		{adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED, "users_impacted"},
 		{adminv1.AlertKind_ALERT_KIND_TORRENT, "torrent"},
 		{adminv1.AlertKind_ALERT_KIND_PORT_LOSSY, "port_lossy"},
+		{adminv1.AlertKind_ALERT_KIND_PATH_LOSSY, "path_lossy"},
 	} {
 		if got := alertView(&adminv1.Alert{Kind: tc.kind}).Kind; got != tc.want {
 			t.Errorf("alert kind = %q, want %q", got, tc.want)
 		}
+	}
+	path := alertView(&adminv1.Alert{Kind: adminv1.AlertKind_ALERT_KIND_PATH_LOSSY, NodeId: "minsk1", Subject: "nl1",
+		TitleKey: "health.alert.path_lossy.title", WhyKey: "health.alert.path_lossy.why",
+		Params: map[string]string{"target": "nl1", "ports": "2053, 2083", "other": "de1"}, Actions: []string{"open_node", "mute"}})
+	if path.Kind != "path_lossy" || path.Params["target"] != "nl1" || path.Params["ports"] != "2053, 2083" ||
+		!reflect.DeepEqual(path.Actions, []string{"open_node", "mute"}) {
+		t.Fatalf("path-loss alert view = %+v", path)
 	}
 }
 
@@ -307,7 +315,10 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 	readonly := e.session(readonlySecret)
 	stored := decode[NodePortsV](t, mustOK(t, readonly, "node_ports", map[string]any{"node": "de1"}))
 	if stored.ErrorCode != "" || len(stored.Ports) != 1 || stored.Ports[0].Port != 443 || stored.Ports[0].Verdict != "ok" ||
-		stored.Ports[0].Sender != "sender-node" || len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" {
+		stored.Ports[0].Sender != "sender-node" || stored.Ports[0].SenderVerdict != "lossy" ||
+		stored.Ports[0].ConfirmSender != "confirm-node" || stored.Ports[0].ConfirmSent != 300 || stored.Ports[0].ConfirmGot != 290 ||
+		stored.Ports[0].ConfirmVerdict != "ok" || stored.Ports[0].Blame != "path" ||
+		len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" {
 		t.Fatalf("stored UDP port checks = %+v", stored)
 	}
 	wantStored := []tcpCheckV{
@@ -327,7 +338,10 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 	_, operatorSecret := e.token(ProfileOperator)
 	operator := e.session(operatorSecret)
 	checked := decode[NodePortsV](t, mustOK(t, operator, "node_ports", map[string]any{"node": "de1", "check": true}))
-	if checked.ErrorCode != "" || checked.Sender != "sender-node" || len(checked.Ports) != 1 || checked.Ports[0].Verdict != "lossy" || checked.Ports[0].Got != 280 {
+	if checked.ErrorCode != "" || checked.Sender != "sender-node" || len(checked.Ports) != 1 || checked.Ports[0].Verdict != "lossy" ||
+		checked.Ports[0].Got != 280 || checked.Ports[0].SenderVerdict != "lossy" || checked.Ports[0].ConfirmSender != "de1" ||
+		checked.Ports[0].ConfirmSent != 300 || checked.Ports[0].ConfirmGot != 280 || checked.Ports[0].ConfirmVerdict != "lossy" ||
+		checked.Ports[0].Blame != "node" {
 		t.Fatalf("checked UDP port results = %+v", checked)
 	}
 	// the TCP rows of the run, including one that could not be probed (empty verdict, with its reason)

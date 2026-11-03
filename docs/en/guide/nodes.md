@@ -109,7 +109,14 @@ Each lane has a ring: green, works and every network sees it; half amber, works 
 
 The **Ports** block sits in the **Direct** lane of the **Ways in** tab (it used to be on the **Profiles** tab). **Check ports** runs two checks from one connected fleet node (or the panel host when available): UDP delivery and TCP reach. Each row shows the port, the verdict, when and from where it was checked, and the profile that listens there.
 
-**UDP.** The check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering. Use it as one vantage point when investigating UDP reachability.
+**UDP.** The check sends probe packets from one connected fleet node (or the panel host when available) to this node and asks its agent how many arrived. It checks delivery from that sender's network path. A passing result does not prove that every client can reach the port, and a failure can depend on the sender, route or source-dependent filtering.
+
+When a port loses packets, the panel sends again at once from a second node on the other side: a node outside the CIS when the first was in it (Russia, Belarus, Kazakhstan, Kyrgyzstan, Armenia, Azerbaijan, Tajikistan, Uzbekistan, Moldova, Turkmenistan), one inside when it was not, then another provider or country. The row shows both measurements, "from minsk1 236/300 · from de1 299/300", and who is at fault:
+
+- **Lost from both sides**: the node's port loses packets. The port counts as lossy and raises `port_lossy`.
+- **Lost from one side only**: the loss is on the way from that sender, not on this node. The port counts as fine; the sender gets the alert `path_lossy` and is asked last for the next 24 hours, so one weak path does not colour every check.
+
+A port is also lossy when it delivered clearly less than the other ports of the same run (the median port), by more than 4 % of the packets and more than the usual spread on a path that loses a little everywhere.
 
 **TCP.** The check opens a real connection to each TCP port the node should answer and asks whether it reached Mistgate itself, not another server in front of it. Port 80 is checked when the node has an ACME certificate name: the agent arms a one-time token and the sender requests it the way Let's Encrypt does. The Hysteria2 site port and each VLESS TCP port get a TLS handshake for the expected name. A VLESS profile that fronts another site's REALITY target is judged by that target's certificate.
 

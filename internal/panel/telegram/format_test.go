@@ -338,6 +338,24 @@ func TestPortLossyAlertTextsAreLocalized(t *testing.T) {
 	}
 }
 
+func TestPathLossyAlertTextsAreLocalized(t *testing.T) {
+	a := store.HealthAlert{Kind: "path_lossy", Severity: 2, NodeID: "minsk1", Subject: "nl1",
+		TitleKey: "health.alert.path_lossy.title", WhyKey: "health.alert.path_lossy.why", Params: map[string]string{
+			"node": "minsk1", "target": "nl1", "target_id": "nl1", "ports": "2053, 2083", "sent": "300", "got": "237",
+			"other": "de1", "other_got": "299", "region": "cis", "other_region": "other",
+		}}
+	for _, lang := range []L{"en", "ru", "zh"} {
+		if title := alertTitle(lang, a); title == "" {
+			t.Errorf("%s title is empty", lang)
+		}
+		if reason := alertReason(lang, a); reason == "" {
+			t.Errorf("%s reason is empty", lang)
+		} else if lang == "en" && reason != "UDP from minsk1 (CIS) to nl1 loses 21% on ports 2053, 2083; from de1 (other region) it arrives 299/300. The loss is on the way from minsk1, not on nl1." {
+			t.Errorf("English path-loss reason = %q", reason)
+		}
+	}
+}
+
 func TestUserHealthAlertsAreLocalized(t *testing.T) {
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	accessEnded := store.HealthAlert{

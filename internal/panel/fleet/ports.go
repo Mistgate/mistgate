@@ -25,11 +25,16 @@ const (
 	udpCheckSendCount = 300
 	udpCheckPPS       = 50
 	udpCheckSize      = 1200
-	// a port that lost this many percent more than the best port of its run is lossy even above 95 % (relativeLoss)
+	// A port must clear both the fixed loss floor and the three-sigma run noise floor to be marked relatively lossy.
 	udpCheckRelativeLossPct = 4
 	udpCheckWait            = 12 * time.Second
 	udpCheckStopWait        = 2 * time.Second
 )
+
+// ponytail: This fixed CIS country list defines the regions used to spread UDP confirmation probes.
+var udpCISCountryCodes = map[string]struct{}{
+	"RU": {}, "BY": {}, "KZ": {}, "KG": {}, "AM": {}, "AZ": {}, "TJ": {}, "UZ": {}, "MD": {}, "TM": {},
+}
 
 // Keep this list in step with access.twinPreferred.
 var udpCheckPreferred = []uint16{8443, 4443, 2053, 2083, 2087, 2096}
@@ -40,6 +45,9 @@ type portCheckOutcome struct {
 	checks    []store.PortCheck
 	sender    string
 	errorCode string
+	combined  bool
+	checked   []string
+	pathLoss  []store.UDPPathLoss
 	// tcp are the rows of the TCP half (ports_tcp.go); tcpRan says the run included that half (it may have had nothing
 	// to probe), so a caller that waited for it can take the rows over.
 	tcp    []store.TCPCheck
@@ -279,7 +287,20 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		f.log.Warn("list nodes for UDP port check", "node", target.ID, "err", err)
 		return portCheckOutcome{errorCode: "failed"}
 	}
-	candidates := f.portSenders(target, allNodes, live, capUDPCheck)
+	now := f.now()
+	pathRows, err := f.st.UDPPathLosses(ctx, now.Add(-24*time.Hour))
+	if err != nil {
+		f.log.Warn("read recent UDP path losses", "node", target.ID, "err", err)
+		return portCheckOutcome{errorCode: "failed"}
+	}
+	demoted := make(map[string]bool, len(pathRows))
+	for _, row := range pathRows {
+		age := now.Sub(row.CheckedAt)
+		if age >= 0 && age < 24*time.Hour {
+			demoted[row.SenderID] = true
+		}
+	}
+	candidates := f.portSenders(target, allNodes, live, capUDPCheck, demoted)
 	if len(candidates) == 0 && !allowPanel {
 		return portCheckOutcome{errorCode: "no_sender"}
 	}
@@ -308,17 +329,29 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		sameHost = panelHasAddress(address)
 	}
 
-	senders := candidates
-	if len(senders) == 0 {
-		senders = []portSender{{panel: true}}
-	} else if len(senders) > 2 {
-		senders = senders[:2]
-	}
 	var result portCheckOutcome
-	for i, sender := range senders {
-		result = f.runPortCheckAttempt(ctx, target, targetLive, sender, dialOf(target), ports)
-		if result.errorCode != "inconclusive" || i != 0 || len(senders) < 2 {
-			break
+	var first, confirmation portSender
+	hasConfirmation := false
+	if len(candidates) == 0 {
+		first = portSender{panel: true}
+	} else {
+		first = candidates[0]
+		confirmation, hasConfirmation = udpConfirmationSender(target, first, candidates[1:], demoted)
+	}
+	result = f.runPortCheckAttempt(ctx, target, targetLive, first, dialOf(target), ports)
+	if (result.errorCode == "" || result.errorCode == "inconclusive") && hasConfirmation &&
+		(result.errorCode == "inconclusive" || portCheckHasBad(result.checks)) {
+		firstResult := result
+		secondResult := f.runPortCheckAttempt(ctx, target, targetLive, confirmation, dialOf(target), ports)
+		switch {
+		case secondResult.errorCode == "inconclusive" && firstResult.errorCode == "inconclusive":
+			result = firstResult
+		case secondResult.errorCode != "" && firstResult.errorCode == "inconclusive":
+			result = firstResult
+		case secondResult.errorCode != "" || secondResult.errorCode == "inconclusive":
+			result = firstResult
+		default:
+			result = combinePortCheckRuns(firstResult, secondResult, target.ID, now)
 		}
 	}
 	if sameHost && (result.errorCode == "" || result.errorCode == "inconclusive") {
@@ -339,16 +372,25 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 			check.BadAt = old.BadAt
 		}
 	}
-	if err := f.st.PutPortChecks(ctx, result.checks); err != nil {
-		f.log.Warn("store UDP port checks", "node", target.ID, "err", err)
+	var storeErr error
+	if result.combined {
+		storeErr = f.st.PutPortChecksAndUDPPathLosses(ctx, result.checks, target.ID, result.checked, result.pathLoss)
+	} else {
+		storeErr = f.st.PutPortChecks(ctx, result.checks)
+	}
+	if storeErr != nil {
+		f.log.Warn("store UDP port checks", "node", target.ID, "err", storeErr)
 		result.errorCode = "failed"
 		return result
+	}
+	if result.combined {
+		f.pathLossyEvents(ctx, target, result.pathLoss)
 	}
 	f.portLossyEvents(ctx, target, inbounds, result.checks, previousByPort)
 	return result
 }
 
-func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live map[string]store.NodeLiveRow, capability string) []portSender {
+func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live map[string]store.NodeLiveRow, capability string, demotedRows ...map[string]bool) []portSender {
 	var eligible []store.NodeRow
 	for _, node := range nodes {
 		if node.ID == target.ID {
@@ -362,7 +404,11 @@ func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live ma
 		}
 		eligible = append(eligible, node)
 	}
-	ordered := udpPortSenderOrder(target, eligible)
+	var demoted map[string]bool
+	if len(demotedRows) > 0 {
+		demoted = demotedRows[0]
+	}
+	ordered := udpPortSenderOrder(target, eligible, demoted)
 	candidates := make([]portSender, 0, len(ordered))
 	for _, node := range ordered {
 		candidates = append(candidates, portSender{node: node, live: live[node.ID]})
@@ -512,26 +558,139 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 			Sent: uint32(sent), Got: uint32(got), Verdict: verdict, Sender: portSenderID(sender), CheckedAt: checkedAt})
 	}
 	if !conclusive {
+		relativeLoss(checks)
+		for i := range checks {
+			checks[i].SenderVerdict = checks[i].Verdict
+		}
 		return portCheckOutcome{checks: checks, sender: portSenderID(sender), errorCode: "inconclusive"}
 	}
 	relativeLoss(checks)
+	for i := range checks {
+		checks[i].SenderVerdict = checks[i].Verdict
+	}
 	return portCheckOutcome{checks: checks, sender: portSenderID(sender)}
 }
 
-// relativeLoss marks lossy an "ok" port that lost clearly more than the best port of the same run: the ports share the
+// relativeLoss marks lossy an "ok" port that lost clearly more than the median port of the same run: the ports share the
 // sender, the path and the minute, so the difference is the port's. A hoster that filters one port often lets most of a
 // slow test through (286 of 300 to a filtered port while every other port got 300), which the absolute 95 % misses.
-// ponytail: 4 % of the packets (12 of 300), well above the noise between ports of one run on a clean path; calibrate.
+// ponytail: 4 % of the packets (12 of 300) or three binomial sigmas at the median's loss, whichever is larger, so a path
+// that loses 2-4 % on every port does not blame one of them; calibrate.
 func relativeLoss(checks []store.PortCheck) {
-	var best uint32
+	gots := make([]uint32, 0, len(checks))
 	for _, c := range checks {
-		best = max(best, c.Got)
+		gots = append(gots, c.Got)
 	}
+	slices.Sort(gots)
+	if len(gots) == 0 {
+		return
+	}
+	baseline := gots[len(gots)/2]
 	for i, c := range checks {
-		if c.Verdict == "ok" && uint64(best-c.Got)*100 >= uint64(c.Sent)*udpCheckRelativeLossPct {
+		if c.Verdict != "ok" || baseline <= c.Got || c.Sent == 0 || baseline > c.Sent {
+			continue
+		}
+		p := float64(c.Sent-baseline) / float64(c.Sent)
+		noise := 3 * math.Sqrt(float64(c.Sent)*p*(1-p))
+		threshold := max(float64(c.Sent)*float64(udpCheckRelativeLossPct)/100, noise)
+		if float64(baseline-c.Got) >= threshold {
 			checks[i].Verdict = "lossy"
 		}
 	}
+}
+
+func portCheckHasBad(checks []store.PortCheck) bool {
+	for _, check := range checks {
+		if portCheckOwnVerdict(check) == "lossy" || portCheckOwnVerdict(check) == "broken" {
+			return true
+		}
+	}
+	return false
+}
+
+func portCheckOwnVerdict(check store.PortCheck) string {
+	if check.SenderVerdict != "" {
+		return check.SenderVerdict
+	}
+	return check.Verdict
+}
+
+func combinePortCheckRuns(first, second portCheckOutcome, targetID string, checkedAt time.Time) portCheckOutcome {
+	secondByPort := make(map[uint16]store.PortCheck, len(second.checks))
+	for _, check := range second.checks {
+		secondByPort[check.Port] = check
+	}
+	combined := portCheckOutcome{checks: append([]store.PortCheck(nil), first.checks...), sender: first.sender,
+		combined: true, checked: []string{first.sender, second.sender}}
+	type groupedLoss struct {
+		loss  store.UDPPathLoss
+		ports []uint16
+	}
+	losses := map[string]*groupedLoss{}
+	for i := range combined.checks {
+		check := &combined.checks[i]
+		confirm, ok := secondByPort[check.Port]
+		if !ok {
+			continue
+		}
+		a, b := portCheckOwnVerdict(*check), portCheckOwnVerdict(confirm)
+		check.SenderVerdict = a
+		check.ConfirmSender = confirm.Sender
+		check.ConfirmSent, check.ConfirmGot = confirm.Sent, confirm.Got
+		check.ConfirmVerdict = b
+		switch {
+		case udpPortBad(a) && udpPortBad(b):
+			check.Blame = "node"
+			check.Verdict = betterUDPVerdict(a, b)
+		case udpPortBad(a) != udpPortBad(b):
+			check.Blame = "path"
+			check.Verdict = "ok"
+			bad, good := *check, confirm
+			if !udpPortBad(a) {
+				bad, good = confirm, *check
+			}
+			group := losses[bad.Sender]
+			if group == nil {
+				group = &groupedLoss{loss: store.UDPPathLoss{SenderID: bad.Sender, TargetID: targetID,
+					OtherSenderID: good.Sender, CheckedAt: checkedAt}}
+				losses[bad.Sender] = group
+			}
+			group.ports = append(group.ports, check.Port)
+			if len(group.ports) == 1 || uint64(bad.Got)*uint64(group.loss.Sent) < uint64(group.loss.Got)*uint64(bad.Sent) {
+				group.loss.Sent, group.loss.Got, group.loss.OtherGot = bad.Sent, bad.Got, good.Got
+			}
+		default:
+			check.Blame = ""
+			check.Verdict = "ok"
+		}
+	}
+	for _, group := range losses {
+		slices.Sort(group.ports)
+		values := make([]string, len(group.ports))
+		for i, port := range group.ports {
+			values[i] = strconv.Itoa(int(port))
+		}
+		group.loss.Ports = strings.Join(values, ", ")
+		combined.pathLoss = append(combined.pathLoss, group.loss)
+	}
+	sort.Slice(combined.pathLoss, func(i, j int) bool { return combined.pathLoss[i].SenderID < combined.pathLoss[j].SenderID })
+	return combined
+}
+
+func udpPortBad(verdict string) bool { return verdict == "lossy" || verdict == "broken" }
+
+func betterUDPVerdict(a, b string) string {
+	if a == "lossy" || b == "lossy" {
+		return "lossy"
+	}
+	return "broken"
+}
+
+func udpRegion(countryCode string) string {
+	if _, ok := udpCISCountryCodes[strings.ToUpper(strings.TrimSpace(countryCode))]; ok {
+		return "cis"
+	}
+	return "other"
 }
 
 func (f *Fleet) sendPortCheck(ctx context.Context, host string, sender portSender, ports []uint16, tag [8]byte) (string, int, string) {
@@ -706,7 +865,7 @@ func (f *Fleet) portLossyEvents(ctx context.Context, target store.NodeRow, inbou
 		}
 		port := spec.Listen.Port
 		check, ok := checked[port]
-		if !ok || check.Verdict == "ok" || previous[port].Bad(f.now()) {
+		if !ok || check.Verdict == "ok" || check.Blame == "path" || previous[port].Bad(f.now()) {
 			continue
 		}
 		params := map[string]string{
@@ -719,10 +878,45 @@ func (f *Fleet) portLossyEvents(ctx context.Context, target store.NodeRow, inbou
 				params["sender"] = sender.Name
 			}
 		}
+		if check.ConfirmSender != "" {
+			params["confirm_sender"] = check.ConfirmSender
+			if check.ConfirmSender != "panel" {
+				if sender, err := f.st.Node(ctx, check.ConfirmSender); err == nil {
+					params["confirm_sender"] = sender.Name
+				}
+			}
+			params["confirm_got"] = strconv.Itoa(int(check.ConfirmGot))
+			params["confirm_sent"] = strconv.Itoa(int(check.ConfirmSent))
+		}
 		err := f.st.InsertEvent(ctx, store.EventRow{Time: f.now(), Severity: 2, Code: "port_lossy", Source: "panel",
 			NodeID: target.ID, InboundID: inbound.ID, Params: params})
 		if err != nil {
 			f.log.Warn("write UDP port loss event", "node", target.ID, "inbound", inbound.ID, "err", err)
+		}
+	}
+}
+
+func (f *Fleet) pathLossyEvents(ctx context.Context, target store.NodeRow, losses []store.UDPPathLoss) {
+	for _, loss := range losses {
+		sender, senderErr := f.st.Node(ctx, loss.SenderID)
+		other, otherErr := f.st.Node(ctx, loss.OtherSenderID)
+		otherName := loss.OtherSenderID
+		senderCountry, otherCountry := "", ""
+		if senderErr == nil {
+			senderCountry = sender.CountryCode
+		}
+		if otherErr == nil {
+			otherName, otherCountry = other.Name, other.CountryCode
+		}
+		params := map[string]string{
+			"target": target.Name, "target_id": target.ID, "ports": loss.Ports,
+			"sent": strconv.Itoa(int(loss.Sent)), "got": strconv.Itoa(int(loss.Got)),
+			"other": otherName, "other_got": strconv.Itoa(int(loss.OtherGot)),
+			"region": udpRegion(senderCountry), "other_region": udpRegion(otherCountry),
+		}
+		if err := f.st.InsertEvent(ctx, store.EventRow{Time: loss.CheckedAt, Severity: 2, Code: "path_lossy", Source: "panel",
+			NodeID: loss.SenderID, Params: params}); err != nil {
+			f.log.Warn("write UDP path loss event", "node", loss.SenderID, "target", target.ID, "err", err)
 		}
 	}
 }
@@ -765,20 +959,40 @@ func portCheckMessages(names map[string]string, checks []store.PortCheck, sender
 		if !check.BadAt.IsZero() {
 			badAt = check.BadAt.Unix()
 		}
+		confirmSender := check.ConfirmSender
+		if confirmSender != "" && confirmSender != "panel" {
+			confirmSender = names[confirmSender]
+			if confirmSender == "" {
+				confirmSender = "unknown"
+			}
+		}
+		senderVerdict := check.SenderVerdict
+		if senderVerdict == "" {
+			senderVerdict = check.Verdict
+		}
 		reason := ""
 		if check.Verdict == "" {
 			reason = errorCode
 		}
 		out = append(out, &adminv1.PortCheck{NodeId: check.NodeID, Port: uint32(check.Port), Verdict: check.Verdict,
-			Sent: check.Sent, Got: check.Got, CheckedUnix: check.CheckedAt.Unix(), BadUnix: badAt, Sender: rowSender, Reason: reason})
+			Sent: check.Sent, Got: check.Got, CheckedUnix: check.CheckedAt.Unix(), BadUnix: badAt, Sender: rowSender, Reason: reason,
+			SenderVerdict: senderVerdict, ConfirmSender: confirmSender, ConfirmSent: check.ConfirmSent,
+			ConfirmGot: check.ConfirmGot, ConfirmVerdict: check.ConfirmVerdict, Blame: check.Blame})
 	}
 	return out, senderName
 }
 
-func udpPortSenderOrder(target store.NodeRow, candidates []store.NodeRow) []store.NodeRow {
+func udpPortSenderOrder(target store.NodeRow, candidates []store.NodeRow, demotedRows ...map[string]bool) []store.NodeRow {
 	out := append([]store.NodeRow(nil), candidates...)
+	var demoted map[string]bool
+	if len(demotedRows) > 0 {
+		demoted = demotedRows[0]
+	}
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
+		if demoted[a.ID] != demoted[b.ID] {
+			return !demoted[a.ID]
+		}
 		aProvider := a.Provider != "" && !strings.EqualFold(a.Provider, target.Provider)
 		bProvider := b.Provider != "" && !strings.EqualFold(b.Provider, target.Provider)
 		if aProvider != bProvider {
@@ -795,4 +1009,55 @@ func udpPortSenderOrder(target store.NodeRow, candidates []store.NodeRow) []stor
 		return a.Name < b.Name
 	})
 	return out
+}
+
+func udpConfirmationSender(target store.NodeRow, first portSender, candidates []portSender, demoted map[string]bool) (portSender, bool) {
+	if first.panel || len(candidates) == 0 {
+		return portSender{}, false
+	}
+	remaining := make([]portSender, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.node.ID != target.ID && candidate.node.ID != first.node.ID {
+			remaining = append(remaining, candidate)
+		}
+	}
+	if len(remaining) == 0 {
+		return portSender{}, false
+	}
+	relativeNodes := make([]store.NodeRow, len(remaining))
+	for i, sender := range remaining {
+		relativeNodes[i] = sender.node
+	}
+	relative := udpPortSenderOrder(target, relativeNodes)
+	rank := make(map[string]int, len(relative))
+	for i, node := range relative {
+		rank[node.ID] = i
+	}
+	sort.SliceStable(remaining, func(i, j int) bool {
+		a, b := remaining[i].node, remaining[j].node
+		aOpposite := udpRegion(a.CountryCode) != udpRegion(first.node.CountryCode)
+		bOpposite := udpRegion(b.CountryCode) != udpRegion(first.node.CountryCode)
+		if aOpposite != bOpposite {
+			return aOpposite
+		}
+		aProvider := differentKnownValue(a.Provider, first.node.Provider)
+		bProvider := differentKnownValue(b.Provider, first.node.Provider)
+		if aProvider != bProvider {
+			return aProvider
+		}
+		aCountry := differentKnownValue(a.CountryCode, first.node.CountryCode)
+		bCountry := differentKnownValue(b.CountryCode, first.node.CountryCode)
+		if aCountry != bCountry {
+			return aCountry
+		}
+		if demoted[a.ID] != demoted[b.ID] {
+			return !demoted[a.ID]
+		}
+		return rank[a.ID] < rank[b.ID]
+	})
+	return remaining[0], true
+}
+
+func differentKnownValue(a, b string) bool {
+	return strings.TrimSpace(a) != "" && strings.TrimSpace(b) != "" && !strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }

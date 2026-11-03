@@ -64,6 +64,7 @@ const textKeys: Record<string, MessageKey> = {
   bandwidth_measured: "event.bandwidth_measured",
   bandwidth_upload_missing: "event.bandwidth_upload_missing",
   port_lossy: "event.port_lossy",
+  path_lossy: "event.path_lossy",
 };
 
 // Dot colour by code first (a blip is grey-blue, never red), else by severity. A restart that happened is a fact, not a
@@ -109,9 +110,16 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       return { text: t(key, { span }), detail };
     case "engine_failed":
       return { text: profile ? t("event.engine_failed.named", { profile }) : t(key), detail };
-    case "port_lossy":
-      // the UDP delivery check found an enabled profile's port losing packets: {sent, got, sender} of its run
-      return { text: t(key, { profile: profile || "—", port: p.port ?? "", lost: lossPct(Number(p.sent), Number(p.got)), sender: senderLabel(t, p.sender ?? "") }), detail };
+    case "port_lossy": {
+      // the UDP delivery check found an enabled profile's port losing packets: {sent, got, sender} of its run, and
+      // {confirm_sender, confirm_sent, confirm_got} when a second sender lost them too
+      const vars = { profile: profile || "—", port: p.port ?? "", lost: lossPct(Number(p.sent), Number(p.got)), sender: senderLabel(t, p.sender ?? "") };
+      if (!p.confirm_sender) return { text: t(key, vars), detail };
+      return { text: t("event.port_lossy.confirmed", { ...vars, confirm_sender: senderLabel(t, p.confirm_sender), confirm_lost: lossPct(Number(p.confirm_sent), Number(p.confirm_got)) }), detail };
+    }
+    case "path_lossy":
+      // this node's test packets got lost on the way to {target}, while {other} got through: {sent, got} is the worst port
+      return { text: t(key, { target: p.target ?? "", ports: p.ports ?? "", other: p.other ?? "", lost: lossPct(Number(p.sent), Number(p.got)), arrived: `${p.other_got ?? ""}/${p.sent ?? ""}` }), detail };
     case "tunnel_v6_fallback":
       return { text: t(p.mode === "none" ? "event.tunnel_v6_fallback.none" : key), detail };
     case "host_firewall_sync_failed":

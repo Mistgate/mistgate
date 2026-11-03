@@ -41,7 +41,7 @@ import {
   type Alert,
 } from "@/lib/health";
 import { plain } from "@/lib/plain";
-import { lossPct, senderLabel } from "@/lib/port-check";
+import { lossPct, regionWord, senderLabel } from "@/lib/port-check";
 import { nodesQuery } from "@/lib/queries";
 import { entryOffered } from "@/lib/ways";
 import { useAcceptDoctor } from "./doctor-parts";
@@ -316,6 +316,7 @@ function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert
     <div id={id} className={cx("flex flex-col gap-2.5", className)}>
       {why && <p className="text-[13px] leading-normal text-pretty text-muted">{why}</p>}
       {a.kind === AlertKind.COUNTRY_BLOCKED && <Networks list={a.params.networks ?? ""} />}
+      {a.kind === AlertKind.PATH_LOSSY && <PathRuns a={a} />}
       {(v6 === "open" || v6 === "entry") && (
         <p data-testid={`alert-v6-${v6}`} className="tone-ok tone-text flex items-center gap-1.5 text-[13px] font-semibold">
           <Icon name="check" size={13} aria-hidden className="flex-none" />
@@ -435,7 +436,10 @@ function GroupCard({ alerts, now, flow }: { alerts: Alert[]; now: number; flow: 
         <div id={body} className="flex flex-col gap-3 px-4 pb-4">
           {first.kind === AlertKind.PORT_LOSSY ? (
             <>
-              <p className="text-[13px] leading-normal text-pretty text-muted">{t("hl.alerts.group.port_lossy.why")}</p>
+              {/* every port confirmed from a second sender: the node's ports lose them, not the way there */}
+              <p className="text-[13px] leading-normal text-pretty text-muted">
+                {t(alerts.every((a) => a.params.confirm_sender) ? "hl.alerts.group.port_lossy.why.confirmed" : "hl.alerts.group.port_lossy.why")}
+              </p>
               <LossTable alerts={alerts} />
             </>
           ) : (
@@ -472,28 +476,101 @@ function GroupCard({ alerts, now, flow }: { alerts: Alert[]; now: number; flow: 
   );
 }
 
-/** The ports of a node that lose packets: port, profile, the share lost and where it was checked from. */
+// a header cell sets its own alignment: the browser centres a <th>, and the table's inherited start does not reach it
+const thStart = "px-3 py-2 text-start font-semibold whitespace-nowrap";
+const thEnd = "px-3 py-2 text-end font-semibold whitespace-nowrap";
+
+/**
+ * The ports of a node that lose packets: port, profile, the share lost and where it was checked from. A port confirmed from a
+ * second sender shows both, a line each, in the same order in both cells.
+ */
 function LossTable({ alerts }: { alerts: Alert[] }) {
   const t = useT();
-  const th = "px-3 py-2 font-semibold";
   return (
     <div className="overflow-x-auto rounded-field border border-line">
       <table className="w-full text-[13px]">
-        <thead className="text-start text-[11px] text-muted">
+        <thead className="text-[11px] text-muted">
           <tr className="border-b border-line">
-            <th className={th}>{t("hl.alerts.col.port")}</th>
-            <th className={th}>{t("hl.alerts.col.profile")}</th>
-            <th className={cx(th, "text-end")}>{t("hl.alerts.col.lost")}</th>
-            <th className={th}>{t("hl.alerts.col.from")}</th>
+            <th className={thStart}>{t("hl.alerts.col.port")}</th>
+            <th className={thStart}>{t("hl.alerts.col.profile")}</th>
+            <th className={thEnd}>{t("hl.alerts.col.lost")}</th>
+            <th className={thStart}>{t("hl.alerts.col.from")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {alerts.map((a) => (
-            <tr key={a.id}>
-              <td className="px-3 py-2 font-mono font-bold">{a.params.port}</td>
-              <td className="px-3 py-2">{a.params.profile}</td>
-              <td className="px-3 py-2 text-end font-mono whitespace-nowrap text-warn-text tabular-nums">{lossPct(Number(a.params.sent), Number(a.params.got))} %</td>
-              <td className="px-3 py-2 text-muted">{senderLabel(t, a.params.sender ?? "")}</td>
+          {alerts.map((a) => {
+            const p = a.params;
+            // one line per sender in both cells, so each share stands next to who measured it
+            const runs = [{ sender: p.sender ?? "", lost: lossPct(Number(p.sent), Number(p.got)) }];
+            if (p.confirm_sender) runs.push({ sender: p.confirm_sender, lost: lossPct(Number(p.confirm_sent), Number(p.confirm_got)) });
+            return (
+              <tr key={a.id}>
+                <td className="px-3 py-2 font-mono font-bold">{p.port}</td>
+                <td className="px-3 py-2">{p.profile}</td>
+                <td className="px-3 py-2 text-end font-mono whitespace-nowrap text-warn-text tabular-nums">
+                  {runs.map((r, i) => (
+                    <span key={i} className="block">
+                      <span dir="ltr">{r.lost} %</span>
+                    </span>
+                  ))}
+                </td>
+                <td className="px-3 py-2 text-muted">
+                  {runs.map((r, i) => (
+                    <span key={i} className="block">
+                      {senderLabel(t, r.sender)}
+                    </span>
+                  ))}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The two senders of a path_lossy alert, so it reads at a glance whose side loses: this node's packets (warn) and the other
+ * sender's that got through (ok), each with its region, what arrived of the worst port and the share lost.
+ */
+function PathRuns({ a }: { a: Alert }) {
+  const t = useT();
+  const p = a.params;
+  const sent = Number(p.sent);
+  const rows = [
+    { name: p.node || a.nodeName, region: p.region ?? "", got: Number(p.got), kind: "warn" as const },
+    { name: p.other ?? "", region: p.other_region ?? "", got: Number(p.other_got), kind: "ok" as const },
+  ];
+  return (
+    // two rows: kept compact, so the numbers stay next to the names on a wide card
+    <div className="max-w-xl overflow-x-auto rounded-field border border-line" data-testid="path-runs">
+      <table className="w-full text-[13px]">
+        <thead className="text-[11px] text-muted">
+          <tr className="border-b border-line">
+            <th className={thStart}>{t("hl.alerts.col.from")}</th>
+            <th className={thEnd}>{t("hl.alerts.col.arrived")}</th>
+            <th className={thEnd}>{t("hl.alerts.col.lost")}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((r) => (
+            <tr key={r.kind}>
+              <td className="px-3 py-2">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <StatusDot kind={r.kind} />
+                  <b className="font-mono">{r.name}</b>
+                  <span className="text-xs text-muted">{regionWord(t, r.region)}</span>
+                </span>
+              </td>
+              <td className="px-3 py-2 text-end font-mono whitespace-nowrap tabular-nums">
+                <span dir="ltr">
+                  {r.got}/{sent}
+                </span>
+              </td>
+              <td className={cx("px-3 py-2 text-end font-mono whitespace-nowrap tabular-nums", r.kind === "warn" ? "font-semibold text-warn-text" : "text-muted")}>
+                <span dir="ltr">{lossPct(sent, r.got)} %</span>
+              </td>
             </tr>
           ))}
         </tbody>

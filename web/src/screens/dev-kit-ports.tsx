@@ -68,6 +68,25 @@ const inbound = (over: object) => ({
 });
 const check = (over: object) => ({ nodeId: "nod_de1", port: 443, verdict: "ok", sent: 300, got: 300, checkedUnix: now - 7 * 60, badUnix: 0, sender: "de2", reason: "", ...over });
 
+// checked again from a second sender of the other region: minsk1 (BY, CIS) first, then fi1 (outside the CIS)
+const minsk1 = { id: "nod_minsk1", name: "minsk1", status: NodeStatus.ONLINE, countryCode: "BY", address: "minsk1.example.com", protocols: [], awgBackend: "auto" };
+const twice = (over: object) => check({ sender: "minsk1", senderVerdict: "ok", confirmSender: "fi1", confirmSent: 300, confirmGot: 300, confirmVerdict: "ok", blame: "", ...over });
+const blameInbounds = [
+  inbound({}),
+  inbound({ id: "inb_5", profileId: "prf_tuic", profileName: "TUIC · 2053", protocol: "tuic", port: 2053, certNotAfterUnix: 0 }),
+  inbound({ id: "inb_6", profileId: "prf_h2083", profileName: "hy2 · 2083", port: 2083 }),
+  inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp" }),
+];
+const blameChecks = [
+  twice({ got: 299, confirmGot: 300 }),
+  // path: minsk1 lost, fi1 got through, so the port is fine
+  twice({ port: 2053, got: 236, senderVerdict: "lossy", confirmGot: 299, blame: "path" }),
+  // node: both lost
+  twice({ port: 2083, verdict: "lossy", got: 241, senderVerdict: "lossy", confirmGot: 238, confirmVerdict: "lossy", blame: "node", badUnix: now - 7 * 60 }),
+  // path the other way: minsk1 got through, fi1 lost
+  twice({ port: 8443, got: 300, confirmGot: 262, confirmVerdict: "lossy", blame: "path" }),
+];
+
 const twoInbounds = [inbound({}), inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp" })];
 const threeInbounds = [...twoInbounds, inbound({ id: "inb_3", profileId: "prf_awg", profileName: "AWG 3.1 · QUIC", protocol: "awg", port: 33183, tlsServerName: "", certNotAfterUnix: 0 }), inbound({ id: "inb_4", profileId: "prf_ext", profileName: "Backup", port: 51820 })];
 
@@ -274,6 +293,12 @@ export function PortsKit() {
               } as never
             }
           />
+        </Cache>
+      </Demo>
+
+      <Demo title="UDP ports checked from two senders: clean from both / lost on the way from minsk1 (CIS), the port is fine / lost from both sides, the port loses / lost on the way from fi1">
+        <Cache fill={[[nodesQuery.queryKey, { nodes: [...kitNodes, minsk1] }]]}>
+          <Ports data={{ node: baseNode(), inbounds: blameInbounds, portChecks: blameChecks, tcpChecks: tcpOk } as never} />
         </Cache>
       </Demo>
 

@@ -505,6 +505,82 @@ describe("the Alerts tab", () => {
     expect(document.querySelector("dd")?.textContent).toBe("AS8359 · Kazan · bsbordAS8359 · Moscow");
   });
 
+  it("folds a path_lossy alert to its sender, the node it lost packets to and the loss; open, both senders with their regions", async () => {
+    await mountTab([
+      alert({
+        id: "alt_p",
+        kind: AlertKind.PATH_LOSSY,
+        nodeId: "nod_minsk1",
+        nodeName: "minsk1",
+        subject: "nod_nl1",
+        titleKey: "health.alert.path_lossy.title",
+        whyKey: "health.alert.path_lossy.why",
+        params: { node: "minsk1", target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "de1", other_got: "299", region: "cis", other_region: "other" },
+      }),
+    ]);
+    const [card] = toggles();
+    expect(expanded(card)).toBe("false");
+    expect(card!.textContent).toContain("Warningminsk1Loses UDP on the way to nl1");
+    expect(card!.textContent).toContain("21 % lost");
+    expect(document.querySelector("[data-testid=path-runs]")).toBeNull();
+    await click(card);
+    expect(text()).toContain("UDP from minsk1 (CIS) to nl1 loses 21 % on ports 2053, 2083, while 299/300 arrive from de1 (outside the CIS).");
+    expect([...document.querySelectorAll("[data-testid=path-runs] tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells].map((c) => c.textContent))).toEqual([
+      ["minsk1CIS", "236/300", "21 %"],
+      ["de1outside the CIS", "299/300", "0 %"],
+    ]);
+    expect(link("Open node")?.getAttribute("href")).toBe("/nodes/nod_minsk1");
+    expect(button("Mute")).toBeDefined();
+  });
+
+  it("names both senders of the ports that lost packets from both sides", async () => {
+    const both = (id: string, port: string, got: string, confirmGot: string) =>
+      alert({
+        id,
+        kind: AlertKind.PORT_LOSSY,
+        nodeId: "nod_nl1",
+        nodeName: "nl1",
+        subject: `inb_${id}`,
+        titleKey: "health.alert.port_lossy.title",
+        whyKey: "health.alert.port_lossy.why.confirmed",
+        params: { port, profile: `TUIC · ${port}`, sent: "300", got, sender: "msk1", confirm_sender: "fi1", confirm_sent: "300", confirm_got: confirmGot },
+        actions: ["open_profiles", "open_node", "mute"],
+      });
+    const cells = () => [...document.querySelectorAll("tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells].map((c) => c.textContent));
+    const remount = async (active: Alert[]) => {
+      act(() => root?.unmount());
+      host?.remove();
+      await mountTab(active);
+      await click(toggles()[0]);
+    };
+    await mountTab([both("a", "2083", "241", "238"), both("b", "4443", "262", "259")]);
+    await click(toggles()[0]);
+    expect(text()).toContain("The test packets to these ports got lost from both sides, so this node’s ports lose them.");
+    // a line per sender in both cells: the shares next to who measured them
+    const lines = (cell: number) => [...document.querySelectorAll("tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells[cell]!.children].map((s) => s.textContent));
+    expect(cells().map((r) => r.slice(0, 2))).toEqual([
+      ["2083", "TUIC · 2083"],
+      ["4443", "TUIC · 4443"],
+    ]);
+    expect(lines(2)).toEqual([
+      ["20 %", "21 %"],
+      ["13 %", "14 %"],
+    ]);
+    expect(lines(3)).toEqual([
+      ["msk1", "fi1"],
+      ["msk1", "fi1"],
+    ]);
+    // a port checked from one sender keeps the words of the way
+    await remount([both("a", "2083", "241", "238"), lossy("b", "nl1", "4443", "276")]);
+    expect(text()).toContain("The test packets to these ports get lost on the way.");
+    expect(cells()[1]).toEqual(["4443", "Hysteria2 · 4443", "8 %", "be1"]);
+    act(() => root?.unmount());
+    host?.remove();
+    await mountTab([both("c", "2083", "241", "238")]);
+    await click(toggles()[0]);
+    expect(text()).toContain("The test packets to port 2083 of “TUIC · 2083” got lost from both sides: 20 % from msk1, 21 % from fi1, so this node’s port loses them.");
+  });
+
   // a day of the real calendar: the day headers count from today
   const noon = Math.floor(new Date().setHours(12, 0, 0, 0) / 1000);
   const episode = (id: string, nodeName: string, dt: number) =>

@@ -38,6 +38,7 @@ const (
 	kUsersImpacted  = "users_impacted"
 	kTorrent        = "torrent"
 	kPortLossy      = "port_lossy"
+	kPathLossy      = "path_lossy"
 	kDeviceLimit    = "device_limit"
 	kRelayDown      = "relay_down"
 )
@@ -54,6 +55,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	kUsersImpacted:  adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED,
 	kTorrent:        adminv1.AlertKind_ALERT_KIND_TORRENT,
 	kPortLossy:      adminv1.AlertKind_ALERT_KIND_PORT_LOSSY,
+	kPathLossy:      adminv1.AlertKind_ALERT_KIND_PATH_LOSSY,
 	kDeviceLimit:    adminv1.AlertKind_ALERT_KIND_DEVICE_LIMIT,
 	kCountryBlocked: adminv1.AlertKind_ALERT_KIND_COUNTRY_BLOCKED,
 	kRelayDown:      adminv1.AlertKind_ALERT_KIND_RELAY_DOWN,
@@ -196,6 +198,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 	var rows []store.DoctorRow
 	var accepts []store.DoctorAccept
 	var portChecks []store.PortCheck
+	var pathLosses []store.UDPPathLoss
 	needFleetData := len(sn.nodes) > 0 || !s.cfg.Edge
 	if needFleetData {
 		liveRows, err = s.fl.Live(ctx)
@@ -225,6 +228,11 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 			s.log.Warn("health: evaluate", "err", err)
 			return
 		}
+		pathLosses, err = s.st.UDPPathLosses(ctx, now.Add(-30*time.Hour))
+		if err != nil {
+			s.log.Warn("health: evaluate UDP path losses", "err", err)
+			return
+		}
 	}
 	active, err := s.st.ActiveAlerts(ctx)
 	if err != nil {
@@ -232,6 +240,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 		return
 	}
 	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, active)
+	addPathLossyConds(now, pathLosses, func(c cond) { d.conds[c.key] = c })
 	s.addRelayDownConds(ctx, now, sn, signals.RelayLinks, active, d)
 	s.nhMu.Lock()
 	s.nodeHealth = d.health
@@ -568,14 +577,53 @@ func addPortLossyConds(sn *snapshot, checks []store.PortCheck, add func(cond)) {
 			if name := names[sender]; name != "" {
 				sender = name
 			}
+			why := "health.alert.port_lossy.why"
+			params := map[string]string{
+				"profile": inbound.in.ProfileName, "port": strconv.Itoa(int(port)),
+				"sent": strconv.FormatUint(uint64(check.Sent), 10), "got": strconv.FormatUint(uint64(check.Got), 10),
+				"sender": sender, "checked_unix": strconv.FormatInt(check.CheckedAt.Unix(), 10),
+			}
+			if check.ConfirmSender != "" {
+				why = "health.alert.port_lossy.why.confirmed"
+				confirmSender := check.ConfirmSender
+				if name := names[confirmSender]; name != "" {
+					confirmSender = name
+				}
+				params["confirm_sender"] = confirmSender
+				params["confirm_got"] = strconv.FormatUint(uint64(check.ConfirmGot), 10)
+				params["confirm_sent"] = strconv.FormatUint(uint64(check.ConfirmSent), 10)
+			}
 			add(cond{key: key{kPortLossy, node.ID, inbound.in.ID}, severity: sevWarning,
-				why: "health.alert.port_lossy.why", params: map[string]string{
-					"profile": inbound.in.ProfileName, "port": strconv.Itoa(int(port)),
-					"sent": strconv.FormatUint(uint64(check.Sent), 10), "got": strconv.FormatUint(uint64(check.Got), 10),
-					"sender": sender, "checked_unix": strconv.FormatInt(check.CheckedAt.Unix(), 10),
-				}})
+				why: why, params: params})
 		}
 	}
+}
+
+func addPathLossyConds(now time.Time, losses []store.UDPPathLoss, add func(cond)) {
+	for _, loss := range losses {
+		age := now.Sub(loss.CheckedAt)
+		if age < 0 || age >= 30*time.Hour {
+			continue
+		}
+		add(cond{key: key{kPathLossy, loss.SenderID, loss.TargetID}, severity: sevWarning,
+			why: "health.alert.path_lossy.why", params: map[string]string{
+				"node": loss.SenderName, "target": loss.TargetName, "target_id": loss.TargetID,
+				"ports": loss.Ports, "sent": strconv.FormatUint(uint64(loss.Sent), 10),
+				"got": strconv.FormatUint(uint64(loss.Got), 10), "other": loss.OtherSenderName,
+				"other_got": strconv.FormatUint(uint64(loss.OtherGot), 10), "region": healthUDPRegion(loss.SenderCountry),
+				"other_region": healthUDPRegion(loss.OtherSenderCountry), "checked_unix": strconv.FormatInt(loss.CheckedAt.Unix(), 10),
+			}})
+	}
+}
+
+func healthUDPRegion(countryCode string) string {
+	if strings.EqualFold(countryCode, "RU") || strings.EqualFold(countryCode, "BY") || strings.EqualFold(countryCode, "KZ") ||
+		strings.EqualFold(countryCode, "KG") || strings.EqualFold(countryCode, "AM") || strings.EqualFold(countryCode, "AZ") ||
+		strings.EqualFold(countryCode, "TJ") || strings.EqualFold(countryCode, "UZ") || strings.EqualFold(countryCode, "MD") ||
+		strings.EqualFold(countryCode, "TM") {
+		return "cis"
+	}
+	return "other"
 }
 
 // probed is an inbound that has been probed at least once, with its cell.

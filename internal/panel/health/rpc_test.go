@@ -111,6 +111,7 @@ func TestNewAlertKindsUseTheirProtoNames(t *testing.T) {
 		{kUserConnection, adminv1.AlertKind_ALERT_KIND_USER_CONNECTION},
 		{kUsersImpacted, adminv1.AlertKind_ALERT_KIND_USERS_IMPACTED},
 		{kPortLossy, adminv1.AlertKind_ALERT_KIND_PORT_LOSSY},
+		{kPathLossy, adminv1.AlertKind_ALERT_KIND_PATH_LOSSY},
 		{kRelayDown, adminv1.AlertKind_ALERT_KIND_RELAY_DOWN},
 	} {
 		if got := kindProto[tc.stored]; got != tc.proto {
@@ -137,6 +138,14 @@ func TestUserAlertsOfferOpenUser(t *testing.T) {
 		if got := strings.Join(m.Actions, ","); got != tc.want {
 			t.Errorf("%s: actions %q, want %q", tc.name, got, tc.want)
 		}
+	}
+}
+
+func TestPathLossyAlertOffersNodeAndMuteActions(t *testing.T) {
+	a := store.HealthAlert{Kind: kPathLossy, Severity: sevWarning, NodeID: "minsk1", Subject: "nl1"}
+	m := alertMsg(a, map[string]string{"minsk1": "minsk1"}, func(store.HealthAlert) string { return "" })
+	if got := strings.Join(m.Actions, ","); got != "open_node,mute" || m.Kind != adminv1.AlertKind_ALERT_KIND_PATH_LOSSY {
+		t.Fatalf("path-loss alert = %+v", m)
 	}
 }
 

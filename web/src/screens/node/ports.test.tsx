@@ -26,7 +26,11 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
-  nodes: { checkPorts: (...a: unknown[]) => checkPorts(...a) },
+  nodes: {
+    checkPorts: (...a: unknown[]) => checkPorts(...a),
+    // the fleet list names the senders' countries: minsk1 is in the CIS, fi1 outside it
+    listNodes: () => Promise.resolve({ nodes: [{ id: "nod_m", name: "minsk1", countryCode: "BY" }, { id: "nod_f", name: "fi1", countryCode: "FI" }] }),
+  },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
 }));
 
@@ -129,6 +133,49 @@ describe("the stored results", () => {
     await mount(data({ node: { id: "nod_1", name: "de1", status: NodeStatus.DOWN }, portChecks: [check({})] }));
     expect((button("Check ports") as HTMLButtonElement).disabled).toBe(true);
     expect(text()).toContain(en["ports.offline"]);
+  });
+});
+
+describe("a port checked again from a second sender", () => {
+  const twice = (over: Record<string, unknown>) => check({ sender: "minsk1", senderVerdict: "ok", confirmSender: "fi1", confirmSent: 300, confirmGot: 300, confirmVerdict: "ok", blame: "", ...over });
+  const row = (port: number) => [...document.querySelectorAll("li")].find((li) => li.textContent?.includes(`udp/${port}`));
+
+  it("shows both runs and clears the port when only one sender lost packets, naming that sender and its region", async () => {
+    await mount(
+      data({
+        inbounds: [inbound({}), inbound({ id: "inb_2", profileName: "TUIC · 2053", port: 2053 }), inbound({ id: "inb_3", profileName: "hy2 · 8443", port: 8443 })],
+        portChecks: [
+          twice({}),
+          twice({ port: 2053, got: 236, senderVerdict: "lossy", confirmGot: 299, blame: "path" }),
+          // the confirmation sender is the one that lost them
+          twice({ port: 8443, confirmGot: 262, confirmVerdict: "lossy", blame: "path" }),
+        ],
+      }),
+    );
+    // clean from both: both runs, no verdict line
+    expect(row(443)?.textContent).toContain("from minsk1 300/300 · from fi1 300/300 · 2 min ago");
+    expect(row(443)?.querySelector("[data-blame]")).toBeNull();
+    expect(row(2053)?.textContent).toContain("OK");
+    expect(row(2053)?.textContent).toContain("from minsk1 236/300 · from fi1 299/300 · 2 min ago");
+    expect(row(2053)?.querySelector("[data-blame=path]")?.textContent).toBe("The port is fine: packets get lost on the way from minsk1 (CIS).");
+    expect(row(8443)?.querySelector("[data-blame=path]")?.textContent).toBe("The port is fine: packets get lost on the way from fi1 (outside the CIS).");
+    // the run that lost packets is the one in the warning tone; the single-sender words are gone
+    expect([...row(2053)!.querySelectorAll(".text-warn-text")].map((s) => s.textContent)).toEqual(["from minsk1 236/300"]);
+    expect(row(2053)?.textContent).not.toContain("arrived");
+  });
+
+  it("puts the loss on the node's port when both senders lost packets", async () => {
+    await mount(data({ portChecks: [twice({ verdict: "lossy", got: 241, senderVerdict: "lossy", confirmGot: 238, confirmVerdict: "lossy", blame: "node" })] }));
+    expect(rows()[0]).toContain("Loses 20 %");
+    expect(rows()[0]).toContain("from minsk1 241/300 · from fi1 238/300");
+    expect(row(443)?.querySelector("[data-blame=node]")?.textContent).toBe(en["ports.blame.node"]);
+    expect([...row(443)!.querySelectorAll(".text-warn-text")].map((s) => s.textContent)).toEqual(["from minsk1 241/300", "from fi1 238/300"]);
+  });
+
+  it("leaves out the region of a sender the fleet list does not have (the panel)", async () => {
+    await mount(data({ portChecks: [twice({ sender: "panel", got: 236, senderVerdict: "lossy", confirmGot: 299, blame: "path" })] }));
+    expect(rows()[0]).toContain("from the panel 236/300");
+    expect(row(443)?.querySelector("[data-blame=path]")?.textContent).toBe("The port is fine: packets get lost on the way from the panel.");
   });
 });
 

@@ -12,6 +12,34 @@ export const lossPct = (sent: number, got: number) => (sent > 0 ? Math.max(0, Ma
 /** "the panel" for the panel host, else the name of the node that sent; "" when unknown. */
 export const senderLabel = (t: T, sender: string) => (sender === "panel" ? t("ports.senderPanel") : sender);
 
+// the panel's udpCISCountryCodes (internal/panel/fleet/ports.go): a confirmation is sent from the other side of this line
+const cis = new Set(["RU", "BY", "KZ", "KG", "AM", "AZ", "TJ", "UZ", "MD", "TM"]);
+
+/** The region of a sender by its country: "cis", "other", or "" when the country is unknown (the panel, a gone node). */
+export const udpRegion = (countryCode: string): string => (countryCode ? (cis.has(countryCode.toUpperCase()) ? "cis" : "other") : "");
+
+/** "CIS" / "outside the CIS"; "" for anything else. */
+export const regionWord = (t: T, region: string): string => (region === "cis" || region === "other" ? t(`ports.region.${region}`) : "");
+
+/** One sender's run of a UDP check: what it sent, what arrived, and whether it lost packets ("warn" lossy, "bad" broken). */
+export type PortRun = { sender: string; sent: number; got: number; loss: "" | "warn" | "bad" };
+
+type Confirmable = { sender: string; sent: number; got: number; verdict: string; senderVerdict: string; confirmSender: string; confirmSent: number; confirmGot: number; confirmVerdict: string };
+
+const lossOf = (verdict: string): PortRun["loss"] => (verdict === "broken" ? "bad" : verdict === "lossy" ? "warn" : "");
+
+/**
+ * The two runs of a port the panel checked from a second sender (blame "path": one lost, "node": both did); null for a
+ * port checked from one sender only, which keeps its single line.
+ */
+export function portRuns(c: Confirmable): [PortRun, PortRun] | null {
+  if (!c.confirmSender) return null;
+  return [
+    { sender: c.sender, sent: c.sent, got: c.got, loss: lossOf(c.senderVerdict || c.verdict) },
+    { sender: c.confirmSender, sent: c.confirmSent, got: c.confirmGot, loss: lossOf(c.confirmVerdict) },
+  ];
+}
+
 /**
  * The values of a port_lossy refusal, warning or event ({port, node, sent, got, at, sender}) plus the words the sentences
  * need: {lost} (percent), {sender} ("the panel" or a node name) and {when} ("5 min ago").

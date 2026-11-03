@@ -542,6 +542,10 @@ func TestD1PortChecksStorage(t *testing.T) {
 	portCheckStoreProof(t, openD1Store(t))
 }
 
+func TestD1UDPPathLossStorage(t *testing.T) {
+	udpPathLossStoreProof(t, openD1Store(t))
+}
+
 func TestD1PortChecksUseOneStatement(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

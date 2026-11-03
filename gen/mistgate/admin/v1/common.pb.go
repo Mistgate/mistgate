@@ -831,7 +831,19 @@ type PortCheck struct {
 	// "panel" or the name of the node that sent.
 	Sender string `protobuf:"bytes,8,opt,name=sender,proto3" json:"sender,omitempty"`
 	// verdict "": node_offline | agent_too_old | no_sender | busy | inconclusive | same_host | no_route | failed.
-	Reason        string `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	Reason string `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The first sender's verdict before comparison with a confirmation sender.
+	SenderVerdict string `protobuf:"bytes,10,opt,name=sender_verdict,json=senderVerdict,proto3" json:"sender_verdict,omitempty"`
+	// "panel" or the name of the confirmation node; empty when there was no confirmation run.
+	ConfirmSender string `protobuf:"bytes,11,opt,name=confirm_sender,json=confirmSender,proto3" json:"confirm_sender,omitempty"`
+	// Packets sent by the confirmation sender for this port; 0 when there was no confirmation run.
+	ConfirmSent uint32 `protobuf:"varint,12,opt,name=confirm_sent,json=confirmSent,proto3" json:"confirm_sent,omitempty"`
+	// Packets counted by the target from the confirmation sender; 0 when there was no confirmation run.
+	ConfirmGot uint32 `protobuf:"varint,13,opt,name=confirm_got,json=confirmGot,proto3" json:"confirm_got,omitempty"`
+	// The confirmation sender's verdict after the relative-loss rule; empty when there was no confirmation run.
+	ConfirmVerdict string `protobuf:"bytes,14,opt,name=confirm_verdict,json=confirmVerdict,proto3" json:"confirm_verdict,omitempty"`
+	// "node" when both runs found loss, "path" when only one did, or empty when unconfirmed or both were clean.
+	Blame         string `protobuf:"bytes,15,opt,name=blame,proto3" json:"blame,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -925,6 +937,48 @@ func (x *PortCheck) GetSender() string {
 func (x *PortCheck) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *PortCheck) GetSenderVerdict() string {
+	if x != nil {
+		return x.SenderVerdict
+	}
+	return ""
+}
+
+func (x *PortCheck) GetConfirmSender() string {
+	if x != nil {
+		return x.ConfirmSender
+	}
+	return ""
+}
+
+func (x *PortCheck) GetConfirmSent() uint32 {
+	if x != nil {
+		return x.ConfirmSent
+	}
+	return 0
+}
+
+func (x *PortCheck) GetConfirmGot() uint32 {
+	if x != nil {
+		return x.ConfirmGot
+	}
+	return 0
+}
+
+func (x *PortCheck) GetConfirmVerdict() string {
+	if x != nil {
+		return x.ConfirmVerdict
+	}
+	return ""
+}
+
+func (x *PortCheck) GetBlame() string {
+	if x != nil {
+		return x.Blame
 	}
 	return ""
 }
@@ -1274,7 +1328,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x1c.mistgate.admin.v1.WarpStateR\x05state\x125\n" +
 	"\x06source\x18\x02 \x01(\x0e2\x1d.mistgate.admin.v1.WarpSourceR\x06source\x12\x12\n" +
 	"\x04colo\x18\x03 \x01(\tR\x04colo\x12!\n" +
-	"\faccount_type\x18\x04 \x01(\tR\vaccountType\"\xee\x01\n" +
+	"\faccount_type\x18\x04 \x01(\tR\vaccountType\"\xbf\x03\n" +
 	"\tPortCheck\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12\x18\n" +
@@ -1284,7 +1338,15 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\fchecked_unix\x18\x06 \x01(\x03B\x020\x02R\vcheckedUnix\x12\x1d\n" +
 	"\bbad_unix\x18\a \x01(\x03B\x020\x02R\abadUnix\x12\x16\n" +
 	"\x06sender\x18\b \x01(\tR\x06sender\x12\x16\n" +
-	"\x06reason\x18\t \x01(\tR\x06reason\"\xd1\x01\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x12%\n" +
+	"\x0esender_verdict\x18\n" +
+	" \x01(\tR\rsenderVerdict\x12%\n" +
+	"\x0econfirm_sender\x18\v \x01(\tR\rconfirmSender\x12!\n" +
+	"\fconfirm_sent\x18\f \x01(\rR\vconfirmSent\x12\x1f\n" +
+	"\vconfirm_got\x18\r \x01(\rR\n" +
+	"confirmGot\x12'\n" +
+	"\x0fconfirm_verdict\x18\x0e \x01(\tR\x0econfirmVerdict\x12\x14\n" +
+	"\x05blame\x18\x0f \x01(\tR\x05blame\"\xd1\x01\n" +
 	"\bTcpCheck\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12\x12\n" +

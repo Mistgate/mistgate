@@ -232,6 +232,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("Torrent attempts", "Попытки качать торренты", "BT 下载尝试")
 	case "port_lossy":
 		return l.pick("UDP packets are being lost", "Теряются UDP-пакеты", "UDP 正在丢包")
+	case "path_lossy":
+		return l.pick("UDP packets are lost on the way to a node", "UDP-пакеты потеряны по пути к ноде", "UDP 测试包在到达节点的路上丢失")
 	case "device_limit":
 		return l.pick("An app was turned away at the device limit", "Приложению отказали: лимит устройств", "有应用因设备数上限被拒绝")
 	case "country_blocked":
@@ -367,6 +369,8 @@ func alertReason(l L, a store.HealthAlert) string {
 		return deviceLimitReason(l, p)
 	case "port_lossy":
 		return portLossReason(l, p)
+	case "path_lossy":
+		return pathLossReason(l, p)
 	case "country_blocked":
 		reason := countryBlockedReason(l, p)
 		if countryPartial(a) {
@@ -499,6 +503,33 @@ func portLossReason(l L, p map[string]string) string {
 
 // deviceLimitReason is the sentence of a DEVICE_LIMIT alert: who is at the limit and what they can do about it. The owner is
 // the reader, so it says what the person can do too. Values from data go through data().
+func pathLossReason(l L, p map[string]string) string {
+	sender, target := data(p["node"], 60), data(p["target"], 60)
+	other, ports := data(p["other"], 60), data(p["ports"], 100)
+	region := udpRegionWord(l, p["region"])
+	otherRegion := udpRegionWord(l, p["other_region"])
+	sent, sentErr := strconv.ParseUint(p["sent"], 10, 32)
+	got, gotErr := strconv.ParseUint(p["got"], 10, 32)
+	percent := "?"
+	if sentErr == nil && gotErr == nil && sent > 0 && got <= sent {
+		percent = strconv.FormatUint(((sent-got)*100+sent/2)/sent, 10)
+	}
+	arrived := data(p["other_got"], 6) + "/" + data(p["sent"], 6)
+	return l.pick("UDP from "+sender+" ("+region+") to "+target+" loses "+percent+"% on ports "+ports+
+		"; from "+other+" ("+otherRegion+") it arrives "+arrived+". The loss is on the way from "+sender+", not on "+target+".",
+		"UDP от "+sender+" ("+region+") к "+target+" теряет "+percent+"% пакетов на портах "+ports+
+			"; от "+other+" ("+otherRegion+") доходит "+arrived+". Потери на пути от "+sender+", а не на "+target+".",
+		"UDP 流量从"+sender+"（"+region+"）到"+target+"时在端口 "+ports+" 丢失 "+percent+"%；从"+
+			other+"（"+otherRegion+"）到达 "+arrived+"。问题在"+sender+"前往"+target+"的路上，不在"+target+"上。")
+}
+
+func udpRegionWord(l L, region string) string {
+	if region == "cis" {
+		return l.pick("CIS", "СНГ", "CIS")
+	}
+	return l.pick("other region", "другой регион", "其他地区")
+}
+
 func deviceLimitReason(l L, p map[string]string) string {
 	name, used, limit := data(p["user_name"], 60), data(p["used"], 6), data(p["limit"], 6)
 	return l.pick(name+" is at the device limit ("+used+" of "+limit+"): an app asking for a new place was turned away. "+
@@ -712,7 +743,7 @@ func alertResolved(l L, a store.HealthAlert, node string) string {
 		line = upperFirst(tail)
 	}
 	reason := ""
-	if a.Kind == "port_lossy" {
+	if a.Kind == "port_lossy" || a.Kind == "path_lossy" {
 		reason = alertReason(l, a)
 	}
 	return join("<b>"+l.pick("Resolved: ", "Решено: ", "已解决：")+alertTitle(l, a)+"</b>", line, reason, againLine(l, a))

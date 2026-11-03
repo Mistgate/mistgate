@@ -13,11 +13,13 @@ const (
 
 // PortCheck is the latest conclusive UDP delivery result for one node address and port.
 type PortCheck struct {
-	NodeID, Address  string
-	Port             uint16
-	Sent, Got        uint32
-	Verdict, Sender  string
-	CheckedAt, BadAt time.Time
+	NodeID, Address                      string
+	Port                                 uint16
+	Sent, Got                            uint32
+	Verdict, Sender, SenderVerdict       string
+	ConfirmSender, ConfirmVerdict, Blame string
+	ConfirmSent, ConfirmGot              uint32
+	CheckedAt, BadAt                     time.Time
 }
 
 // Bad reports whether this port lost packets in the last 30 days.
@@ -40,23 +42,34 @@ func (p PortCheck) Fresh(now time.Time) bool {
 
 // PutPortChecks replaces the latest conclusive results in one atomic multi-row statement.
 func (s *Store) PutPortChecks(ctx context.Context, checks []PortCheck) error {
-	if len(checks) == 0 {
+	stmt, ok := portCheckStatement(checks)
+	if !ok {
 		return nil
 	}
+	_, err := s.W.ExecContext(ctx, stmt.Query, stmt.Args...)
+	return err
+}
+
+func portCheckStatement(checks []PortCheck) (Stmt, bool) {
+	if len(checks) == 0 {
+		return Stmt{}, false
+	}
 	values := make([]string, 0, len(checks))
-	args := make([]any, 0, len(checks)*8)
+	args := make([]any, 0, len(checks)*15)
 	for _, check := range checks {
-		values = append(values, "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		values = append(values, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 		badAt := int64(0)
 		if check.Verdict != "ok" {
 			badAt = unix(check.CheckedAt)
 		}
 		args = append(args, check.NodeID, int64(check.Port), check.Address, int64(check.Sent), int64(check.Got),
-			check.Verdict, check.Sender, unix(check.CheckedAt), badAt)
+			check.Verdict, check.Sender, unix(check.CheckedAt), badAt, check.SenderVerdict, check.ConfirmSender,
+			int64(check.ConfirmSent), int64(check.ConfirmGot), check.ConfirmVerdict, check.Blame)
 	}
-	_, err := s.W.ExecContext(ctx, `INSERT INTO node_port_check
-		(node_id, port, address, sent, got, verdict, sender, checked_at, bad_at)
-		VALUES `+strings.Join(values, ", ")+`
+	return Stmt{Query: `INSERT INTO node_port_check
+		(node_id, port, address, sent, got, verdict, sender, checked_at, bad_at, sender_verdict, confirm_sender,
+		 confirm_sent, confirm_got, confirm_verdict, blame)
+		VALUES ` + strings.Join(values, ", ") + `
 		ON CONFLICT(node_id, port) DO UPDATE SET
 			address = excluded.address,
 			sent = excluded.sent,
@@ -64,18 +77,25 @@ func (s *Store) PutPortChecks(ctx context.Context, checks []PortCheck) error {
 			verdict = excluded.verdict,
 			sender = excluded.sender,
 			checked_at = excluded.checked_at,
+			sender_verdict = excluded.sender_verdict,
+			confirm_sender = excluded.confirm_sender,
+			confirm_sent = excluded.confirm_sent,
+			confirm_got = excluded.confirm_got,
+			confirm_verdict = excluded.confirm_verdict,
+			blame = excluded.blame,
 			bad_at = CASE
+				WHEN excluded.blame = 'path' THEN 0
 				WHEN excluded.verdict <> 'ok' THEN excluded.checked_at
 				WHEN node_port_check.address <> excluded.address THEN 0
 				ELSE node_port_check.bad_at
-			END`, args...)
-	return err
+			END`, Args: args}, true
 }
 
 // PortChecks reads stored results, ignoring rows whose node address has since changed.
 // With no nodeIDs it returns every current result.
 func (s *Store) PortChecks(ctx context.Context, nodeIDs ...string) ([]PortCheck, error) {
-	q := `SELECT c.node_id, c.port, c.address, c.sent, c.got, c.verdict, c.sender, c.checked_at, c.bad_at
+	q := `SELECT c.node_id, c.port, c.address, c.sent, c.got, c.verdict, c.sender, c.checked_at, c.bad_at,
+		c.sender_verdict, c.confirm_sender, c.confirm_sent, c.confirm_got, c.confirm_verdict, c.blame
 		FROM node_port_check c JOIN node n ON n.id = c.node_id AND n.address = c.address`
 	var args []any
 	if len(nodeIDs) > 0 {
@@ -91,11 +111,13 @@ func (s *Store) PortChecks(ctx context.Context, nodeIDs ...string) ([]PortCheck,
 	var out []PortCheck
 	for rows.Next() {
 		var check PortCheck
-		var port, sent, got, checkedAt, badAt int64
-		if err := rows.Scan(&check.NodeID, &port, &check.Address, &sent, &got, &check.Verdict, &check.Sender, &checkedAt, &badAt); err != nil {
+		var port, sent, got, checkedAt, badAt, confirmSent, confirmGot int64
+		if err := rows.Scan(&check.NodeID, &port, &check.Address, &sent, &got, &check.Verdict, &check.Sender, &checkedAt, &badAt,
+			&check.SenderVerdict, &check.ConfirmSender, &confirmSent, &confirmGot, &check.ConfirmVerdict, &check.Blame); err != nil {
 			return nil, err
 		}
 		check.Port, check.Sent, check.Got = uint16(port), uint32(sent), uint32(got)
+		check.ConfirmSent, check.ConfirmGot = uint32(confirmSent), uint32(confirmGot)
 		check.CheckedAt = fromUnix(checkedAt)
 		if badAt != 0 {
 			check.BadAt = fromUnix(badAt)

@@ -172,6 +172,18 @@ message PortCheck {
   string sender = 8;
   // verdict "": node_offline | agent_too_old | no_sender | busy | inconclusive | same_host | no_route | failed.
   string reason = 9;
+  // The first sender's verdict before comparison with a confirmation sender.
+  string sender_verdict = 10;
+  // "panel" or the name of the confirmation node; empty when there was no confirmation run.
+  string confirm_sender = 11;
+  // Packets sent by the confirmation sender for this port; 0 when there was no confirmation run.
+  uint32 confirm_sent = 12;
+  // Packets counted by the target from the confirmation sender; 0 when there was no confirmation run.
+  uint32 confirm_got = 13;
+  // The confirmation sender's verdict after the relative-loss rule; empty when there was no confirmation run.
+  string confirm_verdict = 14;
+  // "node" when both runs found loss, "path" when only one did, or empty when unconfirmed or both were clean.
+  string blame = 15;
 }
 
 // One TCP port of a node in the port check (design/vless.md section 7.4): does a connection reach Mistgate itself.

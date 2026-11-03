@@ -292,7 +292,7 @@ func TestUDPPortVerdictsAndGROMath(t *testing.T) {
 	}
 }
 
-// The run that found a filtered port on a real node: every port 300 of 300, the filtered one 286 (above 95 %).
+// A filtered port is still found when the other seven ports deliver every packet.
 func TestRelativeLossMarksAPortWorseThanItsRun(t *testing.T) {
 	run := func(gots ...uint32) []string {
 		checks := make([]store.PortCheck, len(gots))
@@ -310,14 +310,110 @@ func TestRelativeLossMarksAPortWorseThanItsRun(t *testing.T) {
 		gots []uint32
 		want []string
 	}{
-		{[]uint32{300, 300, 300, 286}, []string{"ok", "ok", "ok", "lossy"}},
-		{[]uint32{300, 289, 288}, []string{"ok", "ok", "lossy"}}, // 11 below the best is noise, 12 is not
-		{[]uint32{294, 290, 286}, []string{"ok", "ok", "ok"}},    // a slightly lossy path: no port stands out
-		{[]uint32{300, 200}, []string{"ok", "broken"}},           // absolute verdicts stay
+		{[]uint32{300, 300, 300, 300, 300, 300, 300, 286}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "lossy"}},
+		{[]uint32{300, 289, 288}, []string{"ok", "ok", "ok"}}, // the median-to-port difference is inside the noise floor
+		{[]uint32{294, 290, 286}, []string{"ok", "ok", "ok"}},
+		// a path that loses 2-4 % on every port: a port at 286 is noise, one at 280 is lossy by the 95 % rule
+		{[]uint32{295, 294, 294, 290, 289, 289, 288, 286}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"}},
+		{[]uint32{295, 294, 294, 290, 289, 289, 288, 280}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "lossy"}},
+		{[]uint32{300, 200}, []string{"ok", "broken"}}, // absolute verdicts stay
 	} {
 		if got := run(test.gots...); !reflect.DeepEqual(got, test.want) {
 			t.Errorf("relativeLoss(%v) = %v, want %v", test.gots, got, test.want)
 		}
+	}
+}
+
+func TestUDPPortSenderDemotionAndConfirmationPreference(t *testing.T) {
+	for _, code := range []string{"RU", "BY", "KZ", "KG", "AM", "AZ", "TJ", "UZ", "MD", "TM"} {
+		if udpRegion(code) != "cis" {
+			t.Errorf("udpRegion(%q) = %q, want cis", code, udpRegion(code))
+		}
+	}
+	if udpRegion("") != "other" || udpRegion("DE") != "other" {
+		t.Fatal("empty and non-CIS country codes must be in the other region")
+	}
+	target := store.NodeRow{ID: "target", Provider: "provider-a", CountryCode: "NL"}
+	first := portSender{node: store.NodeRow{ID: "first", Name: "minsk1", Provider: "provider-b", CountryCode: "BY"}}
+	candidates := []portSender{
+		{node: store.NodeRow{ID: "same-region", Name: "same-region", Provider: "provider-c", CountryCode: "RU"}},
+		{node: store.NodeRow{ID: "opposite-same-provider", Name: "de1", Provider: "provider-b", CountryCode: "DE"}},
+	}
+	if got, ok := udpConfirmationSender(target, first, candidates, nil); !ok || got.node.ID != "opposite-same-provider" {
+		t.Fatalf("confirmation sender = %q, %v, want opposite region before provider", got.node.ID, ok)
+	}
+	providerCandidates := []portSender{
+		{node: store.NodeRow{ID: "same-provider", Name: "same-provider", Provider: "provider-b", CountryCode: "RU"}},
+		{node: store.NodeRow{ID: "different-provider", Name: "different-provider", Provider: "provider-c", CountryCode: "RU"}},
+	}
+	if got, ok := udpConfirmationSender(target, first, providerCandidates, nil); !ok || got.node.ID != "different-provider" {
+		t.Fatalf("provider comparison = %q, %v, want different provider", got.node.ID, ok)
+	}
+	countryFirst := portSender{node: store.NodeRow{ID: "country-first", Name: "first", Provider: "provider-b", CountryCode: "RU"}}
+	countryCandidates := []portSender{
+		{node: store.NodeRow{ID: "same-country", Name: "a-same", Provider: "provider-b", CountryCode: "RU"}},
+		{node: store.NodeRow{ID: "different-country", Name: "z-different", Provider: "provider-b", CountryCode: "BY"}},
+	}
+	if got, ok := udpConfirmationSender(store.NodeRow{CountryCode: "DE"}, countryFirst, countryCandidates, nil); !ok || got.node.ID != "different-country" {
+		t.Fatalf("country comparison = %q, %v, want different country", got.node.ID, ok)
+	}
+	demotedCandidates := []portSender{
+		{node: store.NodeRow{ID: "de1", Name: "de1", Provider: "provider-b", CountryCode: "DE"}},
+		{node: store.NodeRow{ID: "nl1", Name: "nl1", Provider: "provider-b", CountryCode: "FR"}},
+	}
+	if got, ok := udpConfirmationSender(target, first, demotedCandidates, map[string]bool{"de1": true}); !ok || got.node.ID != "nl1" {
+		t.Fatalf("demoted confirmation sender = %q, %v, want non-demoted opposite-region candidate", got.node.ID, ok)
+	}
+
+	ordered := udpPortSenderOrder(target, []store.NodeRow{
+		{ID: "same", Name: "same", Provider: "provider-a", CountryCode: "NL"},
+		{ID: "preferred-demoted", Name: "preferred", Provider: "provider-b", CountryCode: "DE"},
+	}, map[string]bool{"preferred-demoted": true})
+	if ordered[0].ID != "same" {
+		t.Fatalf("demoted first sender = %+v, want non-demoted sender first", ordered)
+	}
+}
+
+func TestUDPPortAttributionCases(t *testing.T) {
+	makeRun := func(sender string, verdicts ...string) portCheckOutcome {
+		checks := make([]store.PortCheck, len(verdicts))
+		for i, verdict := range verdicts {
+			got := uint32(300)
+			if verdict == "lossy" {
+				got = 210
+			} else if verdict == "broken" {
+				got = 100
+			}
+			checks[i] = store.PortCheck{Port: uint16(2053 + i), Sent: 300, Got: got, Verdict: verdict,
+				SenderVerdict: verdict, Sender: sender, CheckedAt: time.Unix(10, 0)}
+		}
+		return portCheckOutcome{checks: checks, sender: sender}
+	}
+	for _, tc := range []struct {
+		name, first, confirm, wantVerdict, wantBlame string
+	}{
+		{"both bad prefer lossy", "broken", "lossy", "lossy", "node"},
+		{"first sender path", "lossy", "ok", "ok", "path"},
+		{"confirmation sender path", "ok", "broken", "ok", "path"},
+		{"both clean", "ok", "ok", "ok", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			first, second := makeRun("minsk1", tc.first), makeRun("de1", tc.confirm)
+			got := combinePortCheckRuns(first, second, "nl1", time.Unix(20, 0))
+			if !got.combined || len(got.checks) != 1 || got.checks[0].Verdict != tc.wantVerdict || got.checks[0].Blame != tc.wantBlame {
+				t.Fatalf("combined check = %+v", got)
+			}
+			if got.checks[0].SenderVerdict != tc.first || got.checks[0].ConfirmVerdict != tc.confirm || got.checks[0].ConfirmSender != "de1" {
+				t.Fatalf("run fields = %+v", got.checks[0])
+			}
+			wantLosses := 0
+			if tc.wantBlame == "path" {
+				wantLosses = 1
+			}
+			if len(got.pathLoss) != wantLosses {
+				t.Fatalf("path loss rows = %+v, want %d", got.pathLoss, wantLosses)
+			}
+		})
 	}
 }
 
@@ -336,7 +432,7 @@ func TestPortSenderPreferenceByProviderThenCountry(t *testing.T) {
 func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
 	first, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
-	_, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 
 	arm := waitUDPCount(targetConn, false)
@@ -357,12 +453,126 @@ func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
 
 	got := <-result
-	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "first" {
+	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "second" {
 		t.Fatalf("retry response = %+v, %v", got.response, got.err)
 	}
 	stored, err := x.st.PortChecks(x.ctx, target.nodeID)
-	if err != nil || len(stored) != 2 || stored[0].Sender != first.nodeID {
+	if err != nil || len(stored) != 2 || stored[0].Sender != second.nodeID || stored[0].SenderVerdict != "broken" ||
+		stored[0].ConfirmSender != first.nodeID || stored[0].Verdict != "ok" || stored[0].Blame != "path" {
 		t.Fatalf("retry stored rows = %+v, %v", stored, err)
+	}
+	if got.response.Ports[0].GetConfirmSender() != "first" || got.response.Ports[0].GetConfirmGot() != 300 ||
+		got.response.Ports[0].GetConfirmVerdict() != "ok" {
+		t.Fatalf("confirmation API fields = %+v", got.response.Ports[0])
+	}
+	if count := x.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'path_lossy' AND severity = 2`, second.nodeID); count != 1 {
+		t.Fatalf("path_lossy events = %d, want one", count)
+	}
+	if count := x.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'port_lossy'`, target.nodeID); count != 0 {
+		t.Fatalf("path-blamed port_lossy events = %d, want none", count)
+	}
+	pathRows, err := x.st.UDPPathLosses(x.ctx, time.Time{})
+	if err != nil || len(pathRows) != 1 || pathRows[0].SenderID != second.nodeID || pathRows[0].TargetID != target.nodeID ||
+		pathRows[0].OtherSenderID != first.nodeID || pathRows[0].Ports != "443, 2053" || pathRows[0].Got != 0 || pathRows[0].OtherGot != 300 {
+		t.Fatalf("path-loss persistence = %+v, %v", pathRows, err)
+	}
+	var raw string
+	if err := x.st.R.QueryRowContext(x.ctx, `SELECT params_json FROM event WHERE node_id = ? AND code = 'path_lossy'`, second.nodeID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var params map[string]string
+	if err := json.Unmarshal([]byte(raw), &params); err != nil {
+		t.Fatal(err)
+	}
+	if params["target"] != "nodea" || params["target_id"] != target.nodeID || params["ports"] != "443, 2053" ||
+		params["sent"] != "300" || params["got"] != "0" || params["other"] != "first" || params["other_got"] != "300" ||
+		params["region"] != "other" || params["other_region"] != "other" {
+		t.Fatalf("path-loss event params = %+v", params)
+	}
+}
+
+func TestCheckPortsDemotesSenderFromPersistedPathLoss(t *testing.T) {
+	x, target, targetConn := portCheckTarget(t)
+	demoted, demotedConn := addPortCheckPeer(x, "de1", "provider-b", "DE", capUDPCheck)
+	other, otherConn := addPortCheckPeer(x, "fr1", "provider-a", "TR", capUDPCheck)
+	if err := x.st.UpdateUDPPathLosses(x.ctx, target.nodeID, []string{demoted.nodeID, other.nodeID}, []store.UDPPathLoss{{
+		SenderID: demoted.nodeID, TargetID: target.nodeID, Ports: "2053", Sent: 300, Got: 200,
+		OtherSenderID: other.nodeID, OtherGot: 300, CheckedAt: x.f.now().Add(-time.Minute),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	_ = demotedConn
+	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	arm := waitUDPCount(targetConn, false)
+	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+	send := waitUDPSend(otherConn)
+	replyPortCommand(otherConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	stop := waitUDPCount(targetConn, true)
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	got := <-result
+	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "fr1" {
+		t.Fatalf("persistently demoted sender was selected: %+v, %v", got.response, got.err)
+	}
+}
+
+func TestCheckPortsBothSendersInconclusiveDoesNotStore(t *testing.T) {
+	x, target, targetConn := portCheckTarget(t)
+	first, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
+	_, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	for _, senderConn := range []*conn{secondConn, firstConn} {
+		arm := waitUDPCount(targetConn, false)
+		replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+		send := waitUDPSend(senderConn)
+		replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+		stop := waitUDPCount(targetConn, true)
+		replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 0, 443: 0}, map[uint16]uint64{2053: 0, 443: 0})
+	}
+	got := <-result
+	if got.err != nil || got.response.ErrorCode != "inconclusive" || len(got.response.Ports) != 2 {
+		t.Fatalf("both inconclusive response = %+v, %v", got.response, got.err)
+	}
+	if rows, err := x.st.PortChecks(x.ctx, target.nodeID); err != nil || len(rows) != 0 {
+		t.Fatalf("both inconclusive rows = %+v, %v", rows, err)
+	}
+	if rows, err := x.st.UDPPathLosses(x.ctx, time.Time{}); err != nil || len(rows) != 0 {
+		t.Fatalf("both inconclusive path rows = %+v, %v", rows, err)
+	}
+	_ = first
+}
+
+func TestCheckPortsFailedConfirmationKeepsFirstRunUnconfirmed(t *testing.T) {
+	x, target, targetConn := portCheckTarget(t)
+	_, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
+	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+
+	arm := waitUDPCount(targetConn, false)
+	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+	send := waitUDPSend(secondConn)
+	replyPortCommand(secondConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	stop := waitUDPCount(targetConn, true)
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 210, 443: 300}, map[uint16]uint64{2053: 210, 443: 300})
+
+	arm = waitUDPCount(targetConn, false)
+	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+	send = waitUDPSend(firstConn)
+	replyPortCommand(firstConn, send.RequestId, &agentv1.CommandResult{Error: "busy"})
+	stop = waitUDPCount(targetConn, true)
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 0, 443: 0}, map[uint16]uint64{2053: 0, 443: 0})
+
+	got := <-result
+	if got.err != nil || got.response.ErrorCode != "" || len(got.response.Ports) != 2 {
+		t.Fatalf("failed confirmation response = %+v, %v", got.response, got.err)
+	}
+	port := got.response.Ports[0]
+	if port.GetPort() != 2053 || port.GetVerdict() != "lossy" || port.GetSenderVerdict() != "lossy" ||
+		port.GetConfirmSender() != "" || port.GetBlame() != "" {
+		t.Fatalf("failed confirmation was not kept as an unconfirmed first run: %+v", port)
+	}
+	rows, err := x.st.PortChecks(x.ctx, target.nodeID)
+	if err != nil || len(rows) != 2 || rows[0].Sender != second.nodeID || rows[0].ConfirmSender != "" {
+		t.Fatalf("stored first run = %+v, %v", rows, err)
 	}
 }
 
@@ -569,6 +779,25 @@ func TestPortLossyEventFiresOnlyOnFirstBadRun(t *testing.T) {
 	}
 	if events := x.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'port_lossy' AND severity = 2`, target.nodeID); events != 1 {
 		t.Fatalf("severity-2 port_lossy events = %d, want one", events)
+	}
+}
+
+func TestPortLossyEventIncludesConfirmationRun(t *testing.T) {
+	x, node, inbounds := portSpecRows(t)
+	x.exec(`INSERT INTO node (id, name, address, created_at) VALUES ('nod_bob', 'bob', '203.0.113.42', 1)`)
+	x.f.portLossyEvents(x.ctx, node, inbounds, []store.PortCheck{{NodeID: node.ID, Port: 443, Verdict: "lossy",
+		Sent: 300, Got: 210, Sender: "panel", ConfirmSender: "nod_bob", ConfirmSent: 300, ConfirmGot: 300,
+		ConfirmVerdict: "ok", CheckedAt: time.Now()}}, map[uint16]store.PortCheck{})
+	var raw string
+	if err := x.st.R.QueryRowContext(x.ctx, `SELECT params_json FROM event WHERE node_id = ? AND code = 'port_lossy'`, node.ID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var params map[string]string
+	if err := json.Unmarshal([]byte(raw), &params); err != nil {
+		t.Fatal(err)
+	}
+	if params["confirm_sender"] != "bob" || params["confirm_got"] != "300" || params["confirm_sent"] != "300" {
+		t.Fatalf("confirmed port_lossy event params = %+v", params)
 	}
 }
 

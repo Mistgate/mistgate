@@ -221,6 +221,24 @@ describe("alerts", () => {
     expect(alertWhy(t, fmt, lossy("de2"))).toMatch(/^The test packets to port 8443 of “hy2 · WARP” lost 37 % \(checked from de2\)\./);
     expect(alertWhy(tRu, fmtRu, lossy("panel"))).toMatch(/^Тестовые пакеты до порта 8443 профиля «hy2 · WARP» потерялись на 37 % \(проверка с панели\)\./);
   });
+  it("words a port_lossy alert confirmed from a second sender with both shares and both senders", () => {
+    const both = alert({ kind: AlertKind.PORT_LOSSY, subject: "inb_1", titleKey: "health.alert.port_lossy.title", whyKey: "health.alert.port_lossy.why.confirmed",
+      params: { profile: "TUIC · 2083", port: "2083", sent: "300", got: "241", sender: "msk1", confirm_sender: "panel", confirm_sent: "300", confirm_got: "238", checked_unix: "1790000000" } });
+    expect(alertWhy(t, fmt, both)).toMatch(/^The test packets to port 2083 of “TUIC · 2083” got lost from both sides: 20 % from msk1, 21 % from the panel, so this node’s port loses them\./);
+    expect(alertWhy(tRu, fmtRu, both)).toMatch(/^Тестовые пакеты до порта 2083 профиля «TUIC · 2083» терялись с обеих сторон: 20 % с msk1, 21 % с панели — значит, их теряет порт этой ноды\./);
+  });
+  it("words a path_lossy alert: whose packets get lost on the way to which node, and the sender that got through", () => {
+    const path = alert({ kind: AlertKind.PATH_LOSSY, nodeId: "nod_minsk1", nodeName: "minsk1", subject: "nod_nl1", titleKey: "health.alert.path_lossy.title", whyKey: "health.alert.path_lossy.why",
+      params: { node: "minsk1", target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "de1", other_got: "299", region: "cis", other_region: "other", checked_unix: "1790000000" } });
+    expect(alertTitle(t, path)).toBe("Loses UDP on the way to nl1");
+    expect(alertWhy(t, fmt, path)).toMatch(/^UDP from minsk1 \(CIS\) to nl1 loses 21 % on ports 2053, 2083, while 299\/300 arrive from de1 \(outside the CIS\)\. The loss is on the way from minsk1, not on nl1: its ports are fine\./);
+    expect(alertWhy(tRu, fmtRu, path)).toMatch(/^UDP от minsk1 \(СНГ\) до nl1 теряет 21 % на портах 2053, 2083, а с de1 \(вне СНГ\) доходит 299\/300\. Потери на пути от minsk1, а не на nl1/);
+    expect(groupFact(tPlural, [path])).toBe("21 % lost");
+    // right to left: the count stays one left-to-right island, never "300/299"
+    const tFa = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dictionaries.fa[key], vars, true), { n: () => "" }) as unknown as T;
+    expect(alertWhy(tFa, fmt, path)).toContain("⁨299/300⁩");
+    expect(alertWhy(tFa, fmt, path)).toContain("⁨minsk1⁩");
+  });
   it("offers the mute choices up to the panel's week, «until morning» to the next 08:00", () => {
     const clock = (h: number, m = 0) => new Date(2026, 9, 1, h, m);
     const secs = (d: Date) => muteChoices(d).map((c) => c.seconds);

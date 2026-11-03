@@ -6,7 +6,7 @@ import { en } from "@/i18n/en";
 import { describeAudit } from "./audit";
 import { errorText } from "./errors";
 import { describeEvent, eventKind } from "./events";
-import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, reasons, reasonText, renewalOf, renewalText } from "./port-check";
+import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, portRuns, reasons, reasonText, regionWord, renewalOf, renewalText, udpRegion } from "./port-check";
 
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 const t = tOf("en");
@@ -37,6 +37,24 @@ describe("port_lossy as an error", () => {
   });
   it("lossyVars survives a refusal without the time", () => {
     expect(lossyVars(t, { sent: "300", got: "300", sender: "n1" }).when).toBe("earlier");
+  });
+});
+
+describe("a port checked from two senders", () => {
+  const twice = { sender: "minsk1", sent: 300, got: 236, verdict: "ok", senderVerdict: "lossy", confirmSender: "fi1", confirmSent: 300, confirmGot: 299, confirmVerdict: "ok" };
+  it("gives both runs, the one that lost packets marked by its verdict, and nothing for a port checked from one sender", () => {
+    expect(portRuns(twice)).toEqual([
+      { sender: "minsk1", sent: 300, got: 236, loss: "warn" },
+      { sender: "fi1", sent: 300, got: 299, loss: "" },
+    ]);
+    // a row from before the confirmation has no sender verdict: the node's verdict is the first sender's
+    expect(portRuns({ ...twice, verdict: "broken", senderVerdict: "", confirmVerdict: "broken" })?.map((r) => r.loss)).toEqual(["bad", "bad"]);
+    expect(portRuns({ ...twice, confirmSender: "" })).toBeNull();
+  });
+  it("puts a sender in the CIS or outside it by its country, and says so", () => {
+    expect(["BY", "ru", "KZ", "DE", "FI", ""].map(udpRegion)).toEqual(["cis", "cis", "cis", "other", "other", ""]);
+    expect(["cis", "other", ""].map((r) => regionWord(t, r))).toEqual(["CIS", "outside the CIS", ""]);
+    expect(regionWord(tOf("ru"), "other")).toBe("вне СНГ");
   });
 });
 
@@ -71,6 +89,15 @@ describe("the event and the audit rows", () => {
     // the profile name the list joined in wins over the one in the params
     expect(describeEvent(t, { ...e, profileName: "Main" }).text).toContain("“Main”");
     expect(eventKind({ code: "port_lossy", severity: EventSeverity.WARNING })).toBe("warn");
+  });
+  it("words a port lost from both senders, and this node's packets lost on the way to another node", () => {
+    const both = { code: "port_lossy", params: { profile: "hy2 · 443", port: "443", sent: "300", got: "241", sender: "minsk1", confirm_sender: "panel", confirm_sent: "300", confirm_got: "238" } };
+    expect(describeEvent(t, both).text).toBe("UDP to port 443 of “hy2 · 443” loses packets from both sides: 20 % from minsk1, 21 % from the panel");
+    expect(describeEvent(tOf("ru"), both).text).toBe("UDP до порта 443 профиля «hy2 · 443» теряется с обеих сторон: 20 % с minsk1, 21 % с панели");
+    const path = { code: "path_lossy", params: { target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "fi1", other_got: "299", region: "cis", other_region: "other" } };
+    expect(describeEvent(t, path).text).toBe("UDP to nl1 gets lost on the way: 21 % on ports 2053, 2083, while 299/300 arrive from fi1");
+    expect(describeEvent(tOf("ru"), path).text).toBe("UDP до nl1 теряется по пути: 21 % на портах 2053, 2083, а с fi1 доходит 299/300");
+    expect(eventKind({ code: "path_lossy", severity: EventSeverity.WARNING })).toBe("warn");
   });
   it("words the check and the 'save anyway' choice", () => {
     expect(describeAudit(t, { action: "node.ports_check", paramsJson: JSON.stringify({ node: "de1", ports: "443,8443" }) })).toBe("checked UDP delivery on de1: ports 443,8443");

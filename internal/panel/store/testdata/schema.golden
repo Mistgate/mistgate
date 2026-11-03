@@ -313,6 +313,12 @@
   },
   {
     "type": "index",
+    "name": "udp_path_loss_checked_at",
+    "tbl_name": "udp_path_loss",
+    "sql": "CREATE INDEX udp_path_loss_checked_at ON udp_path_loss(checked_at)"
+  },
+  {
+    "type": "index",
     "name": "update_rollout_active",
     "tbl_name": "update_rollout",
     "sql": "CREATE UNIQUE INDEX update_rollout_active ON update_rollout ((1)) WHERE status IN ('running', 'paused')"
@@ -603,7 +609,7 @@
     "type": "table",
     "name": "node_port_check",
     "tbl_name": "node_port_check",
-    "sql": "CREATE TABLE node_port_check ( node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, port INTEGER NOT NULL, address TEXT NOT NULL, sent INTEGER NOT NULL, got INTEGER NOT NULL, verdict TEXT NOT NULL, sender TEXT NOT NULL, checked_at INTEGER NOT NULL, bad_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (node_id, port) )"
+    "sql": "CREATE TABLE node_port_check ( node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, port INTEGER NOT NULL, address TEXT NOT NULL, sent INTEGER NOT NULL, got INTEGER NOT NULL, verdict TEXT NOT NULL, sender TEXT NOT NULL, checked_at INTEGER NOT NULL, bad_at INTEGER NOT NULL DEFAULT 0, sender_verdict TEXT NOT NULL DEFAULT '', confirm_sender TEXT NOT NULL DEFAULT '', confirm_sent INTEGER NOT NULL DEFAULT 0, confirm_got INTEGER NOT NULL DEFAULT 0, confirm_verdict TEXT NOT NULL DEFAULT '', blame TEXT NOT NULL DEFAULT '' CHECK (blame IN ('', 'node', 'path')), PRIMARY KEY (node_id, port) )"
   },
   {
     "type": "table",
@@ -724,6 +730,12 @@
     "name": "traffic_bucket",
     "tbl_name": "traffic_bucket",
     "sql": "CREATE TABLE traffic_bucket ( user_id TEXT NOT NULL REFERENCES user (id) ON DELETE CASCADE, node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, protocol TEXT NOT NULL, hour_start INTEGER NOT NULL CHECK (hour_start % 3600 = 0), bytes_up INTEGER NOT NULL DEFAULT 0, -- client -\u003e internet bytes_down INTEGER NOT NULL DEFAULT 0, -- internet -\u003e client PRIMARY KEY (user_id, node_id, protocol, hour_start) ) STRICT, WITHOUT ROWID"
+  },
+  {
+    "type": "table",
+    "name": "udp_path_loss",
+    "tbl_name": "udp_path_loss",
+    "sql": "CREATE TABLE udp_path_loss ( sender_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, target_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, ports TEXT NOT NULL, sent INTEGER NOT NULL, got INTEGER NOT NULL, other_sender_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, other_got INTEGER NOT NULL, checked_at INTEGER NOT NULL, PRIMARY KEY (sender_id, target_id) )"
   },
   {
     "type": "table",
