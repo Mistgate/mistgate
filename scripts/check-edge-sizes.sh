@@ -23,8 +23,9 @@ entries=(
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.
   "mistgate-edge-link:30"
-  # Scheduled work: wireCore, so Telegram, updates and WARP are in it for the work that will move here. Measured 25.1 MiB.
-  "mistgate-edge-jobs:28"
+  # Scheduled work: wireCore, so Telegram, updates and WARP are in it for the work that will move here. Measured 25.1 MiB;
+  # 28.1 MiB in November 2026 with the two-sender UDP port check (fleet, in wireCore: the periodic port recheck runs here).
+  "mistgate-edge-jobs:31"
   # The admin API and the SPA: the largest role, every admin service. Measured 37.6 MiB; 40.1 MiB with the external reachability
   # sources (cheburcheck, bsbord), whose owner RPCs (settings, sealed keys, the paid-check preview) need the admin's step-up and
   # cannot live in jobs, where their ticks run.
