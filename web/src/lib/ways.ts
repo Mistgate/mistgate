@@ -130,13 +130,18 @@ export function lanesOf(w: WaysInput): Ways {
   const tcp = (w.tcpChecks ?? []).map((c) => c.verdict);
   const cells = (w.cells ?? []).filter((c) => c.deployed && c.last);
   const cellsDown = cells.filter((c) => c.last!.status === CheckStatus.FAILED).length;
-  const portsBroken = udp.includes("broken") || tcp.some((v) => v === "refused" || v === "timeout");
+  // a port that gets nothing through: UDP under 70 %, TCP refused or silent. Some such ports make the lane warn, all of
+  // them make it bad: one broken port among working ones is not a way in that is down
+  const udpDead = udp.filter((v) => v === "broken").length;
+  const tcpDead = tcp.filter((v) => v === "refused" || v === "timeout").length;
+  const portsBroken = udpDead + tcpDead > 0;
+  const portsAllBroken = portsBroken && udpDead === udp.length && tcpDead === tcp.length;
   const direct: StatusKind =
     offline || enabled.length === 0
       ? "off"
       : worst(
           failed === 0 ? "ok" : failed === enabled.length ? "bad" : "warn",
-          portsBroken ? "bad" : udp.includes("lossy") || tcp.some((v) => v === "other" || v === "busy") ? "warn" : "ok",
+          portsAllBroken ? "bad" : portsBroken || udp.includes("lossy") || tcp.some((v) => v === "other" || v === "busy") ? "warn" : "ok",
           cellsDown === 0 ? "ok" : cellsDown === cells.length ? "bad" : "warn",
         );
   const own = hintOf(w.country);

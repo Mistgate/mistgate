@@ -85,6 +85,12 @@ describe("lanesOf", () => {
     const broken = lanesOf(base({ portChecks: [{ verdict: "broken" }] }));
     expect(broken.lanes[0]).toMatchObject({ state: "bad", fault: true });
     expect(broken.badge).toBe(1);
+    // one broken port among working ones: the lane warns (and still counts in the badge), it is not down
+    const some = lanesOf(base({ portChecks: [{ verdict: "ok" }, { verdict: "broken" }, { verdict: "lossy" }], tcpChecks: [{ verdict: "ours" }] }));
+    expect(some.lanes[0]).toMatchObject({ state: "warn", fault: true });
+    expect(some.badge).toBe(1);
+    expect(lanesOf(base({ portChecks: [{ verdict: "broken" }], tcpChecks: [{ verdict: "timeout" }] })).lanes[0]!.state).toBe("bad");
+    expect(lanesOf(base({ portChecks: [{ verdict: "broken" }], tcpChecks: [{ verdict: "ours" }] })).lanes[0]!.state).toBe("warn");
     expect(lanesOf(base({ tcpChecks: [{ verdict: "busy" }] })).lanes[0]!.state).toBe("warn");
     const cells = [{ deployed: true, last: { status: CheckStatus.FAILED } }, { deployed: true, last: { status: CheckStatus.OK } }];
     expect(lanesOf(base({ cells })).lanes[0]!.state).toBe("warn");
