@@ -66,7 +66,7 @@ test("a zh page is lang zh-CN, has the zh interface, a callout and the English p
   assert.match(html, /<link rel="alternate" hreflang="x-default" href="https:\/\/mistgate\.app\/getting-started\/overview\/">/);
 });
 
-test("the language menu lists three languages, links to the same page or else the language home, and marks the current one", () => {
+test("the language menu lists every language, links to the same page or else the language home, and marks the current one", () => {
   const en = menu(read("getting-started/overview/index.html"));
   assert.match(en, /<summary class="ib lang__btn" aria-label="Language">/);
   assert.match(en, /href="\/zh\/getting-started\/overview\/" lang="zh-CN" hreflang="zh-Hans"/);

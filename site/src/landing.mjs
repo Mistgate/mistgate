@@ -1,5 +1,5 @@
 // The home page: what Mistgate is and does, how it fits together (D1), the protocols, how stable it is, how to start,
-// how it compares, and the docs by admin section. The copy follows README.md / README.ru.md / README.zh.md in their
+// how it compares, and the docs by admin section. The copy follows README.md / README.<ru|zh|fa|tr>.md in their
 // plain voice: the same facts, no claim the README or the docs do not make. docs/<lang>/index.md stays the sidebar's
 // source and the docs' start page on GitHub.
 // Copy may hold `code`, **bold** and [text](page-key#anchor) or [text](https://...) links.
@@ -14,7 +14,7 @@ const DOCS = process.env.MG_DOCS ? join(process.env.MG_DOCS, "/") : fileURLToPat
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // `code` in copy -> <code>
 const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
-// the columns of the comparison, as in the README's table
+// the columns of the comparison, as in the README's table (product names: lang="en", or the capitals of a Turkish page read MİSTGATE)
 const PANELS = ["Mistgate", "3x-ui", "Remnawave", "Hiddify", "PasarGuard", "s-ui"];
 const CI = `${GITHUB}/blob/main/.github/workflows/ci.yml`, E2E = `${GITHUB}/blob/main/scripts/e2e-wsl.sh`;
 
@@ -271,26 +271,199 @@ export const LANDING = {
     status: "Mistgate 处于测试阶段：当前发布的是 0.1.x 版本，在 1.0 之前，API、已存储的设置和节点协议仍可能变化。",
     statusLink: "状态与路线图",
   },
+  // Persian follows README.fa.md (formal «شما», Latin digits; a range as «16 تا 20» and a date as 2026/10/03, since a dash
+  // between numbers after Persian letters turns round); anchors are left out while the target pages are English
+  fa: {
+    meta: "Mistgate پنلی برای یک VPN کوچک است که روی سرور خودتان اجرا می‌شود: چند سرور از آنِ خودتان و کسانی که سرورها را با آن‌ها شریک می‌شوید. Hysteria2، VLESS و AmneziaWG؛ دو فایل اجرایی Go، به‌علاوهٔ SQLite و systemd.",
+    eyebrow: "بتا · روی سرور خودتان · متن‌باز · AGPL-3.0",
+    h1: "پنلی برای VPN کوچک خودتان",
+    lead: "برای چند سرور از آنِ خودتان و کسانی که سرورها را با آن‌ها شریک می‌شوید. پنل را روی یک سرور نصب می‌کنید و سرورهای VPN خود را به‌عنوان نود به آن اضافه می‌کنید. هر نفر یک لینک اشتراک می‌گیرد و برنامه‌اش همهٔ سرورهایی را که اجازهٔ استفاده از آن‌ها را دارد خودش دریافت می‌کند.",
+    install: "نصب پنل", how: "چطور کار می‌کند",
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite، بدون Docker"],
+    demoAlt: "نمایشی از Mistgate: یک نود از مرورگر و از راه SSH اضافه می‌شود، با یک پروفایل به کار می‌افتد و بی‌درنگ در صفحهٔ یک کاربر ظاهر می‌شود",
+    doesH: "چه کارهایی می‌کند",
+    does: [
+      ["nodes", "نود از مرورگر", "نود را با IP و رمز عبور root اضافه می‌کنید. پنل کلید SSH سرور را به خاطر می‌سپارد، سرور را بررسی می‌کند، اگر UFW یا firewalld فعال باشد پورت‌ها را در آن باز می‌کند و ایجنت امضاشده را نصب می‌کند. یک فرمان نصب یک‌بارمصرف هم کار می‌کند.", "getting-started/add-node"],
+      ["subscriptions", "یک لینک برای هر نفر", "برنامه‌های مبتنی بر Mihomo (kl!ck، FlClash و Clash Verge Rev) هر سه پروتکل را از همین لینک می‌گیرند، Happ پروتکل‌های Hysteria2 و VLESS را، و AmneziaVPN برای هر دستگاه یک کلید جداگانه از صفحهٔ کاربر برمی‌دارد.", "guide/client-apps"],
+      ["health", "بررسی‌ها و هشدارها", "پنل هر 5 دقیقه یک بار، درست مثل یک برنامه، به هر سرور وصل می‌شود. عیب‌یابِ هر نود 17 بررسی روی میزبان انجام می‌دهد و هفت راه‌حل پیشنهاد می‌کند که فقط پس از تأیید شما اجرا می‌شوند. هشدارها در پنل مدیریت دیده می‌شوند و به Telegram هم فرستاده می‌شوند.", "operations/health"],
+      ["share", "رله از راه نودهای دیگرتان", "اگر از برخی شبکه‌ها نتوان به سروری رسید، کاربران از راه نود دیگری از نودهای شما به آن وصل می‌شوند؛ آن نود فقط ترافیک رمزگذاری‌شده را جابه‌جا می‌کند. پنل پیش از روشن کردن مسیر آن را بررسی می‌کند و بعد هم زیر نظرش دارد؛ صفحهٔ نود هر راه ورود را به‌صورت خطی از کاربران تا سرور می‌کشد.", "guide/relays"],
+      ["reachability", "از داخل یک کشور", "بررسی اختیاریِ اینکه سرورهای شما از داخل یک کشور، شبکه به شبکه، باز می‌شوند یا نه: سنجش‌های Globalping در شبکه‌های خانگی و همراه روی IPv4 و IPv6، نقطه‌های سنجش داوطلبان و سیم‌کارت‌ها، فهرست‌های مسدودسازی و یک سنجش TSPU از نود خودتان. بیشتر این منابع فقط در روسیه کار می‌کنند.", "operations/reachability"],
+      ["memory", "دو فایل اجرایی Go", "بدون Docker و بدون سرور پایگاه داده: SQLite و systemd. پنل در حالت بیکار روی سروری با یک vCPU و یک گیگابایت رم فقط 16 تا 20 MiB حافظه مصرف می‌کند.", "reference/benchmarks"],
+      ["mask", "سایت پوششی", "غریبه‌ای که نشانی پنل را باز کند یک سایت پوششی می‌بیند؛ پنل مدیریت پشت یک مسیر یا نام میزبان مخفی است.", "guide/decoy-site"],
+      ["integrations", "MCP برای ایجنت‌های هوش مصنوعی", "یک سرور MCP داخلی به ایجنت هوش مصنوعی اجازه می‌دهد وضعیت همهٔ نودها را بخواند و تغییرات را برنامه‌ریزی کند؛ تغییرات پرخطر در پنل مدیریت منتظر تأیید شما می‌مانند.", "reference/mcp"],
+    ],
+    notYet: "آنچه هنوز نیست: ربات Telegram فعلاً فقط هشدار می‌فرستد و نسخهٔ Cloudflare Workers هنوز [پیش‌نمایش](getting-started/install-edge) است. برخی پیش‌فرض‌ها برای کاربران داخل روسیه انتخاب شده‌اند؛ همهٔ آن‌ها در تنظیمات قابل تغییرند.",
+    fitH: "اجزا چطور کنار هم کار می‌کنند",
+    fitP: "دو برنامه: پنل، و یک ایجنت روی هر سرور. برنامهٔ کاربر فقط برای گرفتن لینکش با پنل حرف می‌زند؛ ترافیک VPN مستقیم به نود می‌رود.",
+    fitAlt: "اجزای Mistgate: شما با پنل مدیریت کار می‌کنید، برنامهٔ کاربر لینکش را از پنل می‌گیرد، ترافیک VPN از برنامه به نود و از آنجا به اینترنت می‌رود، و نود یک اتصال با پنل نگه می‌دارد",
+    protoH: "پروتکل‌ها",
+    protos: [
+      ["Hysteria2", "روی UDP (QUIC) با هستهٔ رسمی Hysteria2. مبهم‌سازی Salamander، پرش پورت، گواهی Let's Encrypt یا گواهی خودامضا با اثرانگشت ثابت.", "guide/hysteria2"],
+      ["VLESS", "روی xray-core. پروتکل REALITY روی XHTTP یا TCP (RAW + Vision)؛ TLS روی XHTTP یا WebSocket، مستقیم یا پشت CDN.", "guide/vless"],
+      ["AmneziaWG", "نسخه‌های 3.1 (پیش‌فرض) و 2.0، با کلید جداگانه برای هر دستگاه. amneziawg-go در فضای کاربر، یا ماژول کرنل.", "guide/amneziawg"],
+      ["MTProto", "آزمایشی. پروکسی فقط برای برنامهٔ Telegram، روی هستهٔ خودِ Mistgate: Fake TLS با دامنهٔ خود نود یا سایتی دیگر به‌عنوان نام، و یک کلید برای هر نفر.", "guide/mtproto"],
+    ],
+    protoP: "پروتکل‌های Hysteria2 و VLESS می‌توانند روی یک نود کنار هم کار کنند، حتی روی TCP 443. هنوز پشتیبانی نمی‌شوند: VMess، Trojan، Shadowsocks، TUIC و WireGuard ساده. پروتکل‌های بیشتری در برنامه است؛ هر کدام از راه [قرارداد افزونهٔ پروتکل](reference/architecture) به همان لینک اشتراک وصل می‌شود.",
+    stableH: "آیا پایدار است؟",
+    stableP: "بتاست و هنوز جوان: برچسب v0.1.0 در 2026/10/03 زده شد. نگه‌دارندهٔ پروژه خودش آن را روی شش سرورش برای خانواده و دوستانش به کار می‌برد.",
+    stable: [
+      ["code", "CI", `روی هر push و pull request: تست‌های Go و vet، ردیاب race روی نشست پنل و ایجنت، \`govulncheck\`، lint و تست‌های پنل مدیریت، ساخت مستندات، و نصب‌کننده روی Debian و Ubuntu. [ci.yml](${CI})`],
+      ["pulse", "اجرای سرتاسری", `پیش از هر نسخه: یک پنل و نود واقعی با کلاینت‌های واقعی Hysteria2، AmneziaWG، Xray، mihomo و sing-box، به‌علاوهٔ به‌روزرسانی و بازگردانی ایجنت و نصب از راه SSH. دستی در WSL یا یک ماشین مجازی، نه در CI. [e2e-wsl.sh](${E2E})`],
+      ["key", "بیلدهای امضاشده", "هر برچسب را GitHub Actions به‌صورت پیش‌نویس می‌سازد. نگه‌دارنده آن را روی ماشینی که کلید آفلاین امضای نسخه‌ها روی آن است از روی همان برچسب دوباره می‌سازد و فقط فایل‌های اجرایی‌ای را امضا می‌کند که بایت به بایت یکسان باشند؛ پنل و نودها فقط بیلدهای امضاشده را نصب می‌کنند.", "operations/releases"],
+      ["updates", "به‌روزرسانی با امکان بازگردانی", "نودها هرگز خودبه‌خود به‌روز نمی‌شوند. هر انتشار با یک نود قناری و 5 دقیقه بررسی سلامت شروع می‌شود؛ نودی که شکست بخورد بیلد قبلی‌اش را پس می‌گیرد و انتشار متوقف می‌شود. پنل فقط وقتی شما تأیید کنید خودش را به‌روز می‌کند و اگر نسخهٔ جدید سرپا نماند، بیلد قبلی را برمی‌گرداند.", "operations/updates"],
+    ],
+    ai: "کد Mistgate با کمک ایجنت‌های کدنویسی هوش مصنوعی نوشته می‌شود: نگه‌دارنده آنچه را می‌نویسند بازبینی می‌کند و تصمیم می‌گیرد چه چیزی ادغام و منتشر شود، و کد آن‌ها از همان بررسی‌هایی می‌گذرد که کد هر کس دیگری.",
+    cmpH: "مقایسه با پنل‌های دیگر",
+    yn: { yes: "بله", no: "خیر", part: "تا حدی" },
+    cmp: [
+      ["اجرا بدون Docker", "✅", "✅", "❌", "✅", "🟡 تا حدی", "✅"],
+      ["رم پنل در حالت بیکار¹", "16 تا 20 MiB", "68 تا 74 MiB", "426 تا 454 MiB", "اندازه‌گیری نشده", "262 تا 265 MiB", "اندازه‌گیری نشده"],
+      ["افزودن نود از پنل (SSH)", "✅", "❌", "❌", "❌", "❌", "?"],
+      ["Hysteria2", "✅", "✅", "🟡 تا حدی", "✅", "✅", "✅"],
+      ["AmneziaWG", "✅ 2.0 و 3.1", "✅ 3.1", "?", "?", "?", "?"],
+      ["VMess، Trojan، Shadowsocks", "❌", "✅", "🟡 تا حدی", "✅", "✅", "✅"],
+      ["ربات Telegram", "🟡 فقط هشدار", "✅", "🟡 تا حدی", "✅", "✅", "?"],
+    ],
+    cmpNote: "¹ حافظهٔ خصوصی کل گروه پردازه‌های پنل، در حالت بیکار و بدون نود متصل، روی یک سرور آزمایشی با یک vCPU و یک گیگابایت رم؛ برای 3x-ui هستهٔ Xray و fail2ban آن هم حساب شده است. علامت «?» یعنی README و مستندات خود آن پروژه چیزی در این باره نمی‌گویند. پنل‌های دیگر در تنوع پروتکل‌ها، اندازهٔ جامعه و ربات‌های کامل Telegram جلوترند.",
+    proof: [
+      ["gauge", "بنچمارک‌ها", "حافظه، پردازنده، دیسک، زمان راه‌اندازی و بار اشتراک‌ها در کنار 3x-ui، Remnawave و PasarGuard روی همان سرور کوچک. روش، نسخه‌ها، و جاهایی که Mistgate کندتر است.", "reference/benchmarks"],
+      ["layers", "جدول کامل", "هفت پنل همراه با منابع، بررسی‌شده در 2026/10/09، و جاهایی که دیگران جلوترند.", "reference/comparison"],
+    ],
+    startH: "شروع سریع",
+    startP: "از یک سرور لینوکس خالی تا نخستین نفری که لینکش کار می‌کند.",
+    steps: [
+      ["پنل را نصب کنید", "یک فرمان روی یک سرور لینوکس تازه: نصب‌کننده مانیفست امضاشدهٔ پنل را بررسی می‌کند، Mistgate را زیر systemd راه می‌اندازد و یک لینک راه‌اندازی یک‌بارمصرف چاپ می‌کند. یا پرامپت نصب را به یک ایجنت هوش مصنوعی بدهید.", ["getting-started/install-panel", "getting-started/ai-agents"]],
+      ["نود اضافه کنید", "**نودها ← افزودن نود** ایجنت را از راه SSH نصب می‌کند، یا یک فرمان یک‌بارمصرف به شما می‌دهد تا خودتان روی سرور اجرا کنید.", ["getting-started/ssh-install", "getting-started/add-node"]],
+      ["لینک‌ها را به کاربران بدهید", "یک پروفایل روی نود بگذارید، یک کاربر بسازید و لینکش را برایش بفرستید.", ["getting-started/first-users"]],
+      ["هشدارها، امنیت، نسخهٔ پشتیبان", "پیش از آنکه دیگران به پنل وابسته شوند، Telegram را برای هشدارها وصل کنید، تنظیمات امنیتی را بررسی کنید و نسخهٔ پشتیبان رمزگذاری‌شده را راه بیندازید.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
+    ],
+    secH: "مستندات بر اساس بخش‌های پنل مدیریت",
+    secP: "هر بخش پنل مدیریت و صفحه‌هایی که درباره‌اش هستند.",
+    reference: "مرجع",
+    first: "از اینجا شروع کنید",
+    firstDesc: "Mistgate چیست، به چه سرورهایی نیاز دارید و پنل را چطور نصب کنید.",
+    desc: {
+      overview: "سلامت همهٔ نودها در یک نگاه: کارت نودها، ترافیک و آخرین رویدادها.",
+      nodes: "سرورهای شما، پروتکل‌ها و بارشان، و راهنمای گام‌به‌گام افزودن نود جدید.",
+      users: "افرادی که دسترسی دارند: برنامه‌ها، دستگاه‌ها، سهمیهٔ ترافیک و تاریخ انقضا.",
+      profiles: "تنظیمات آمادهٔ پروتکل‌ها که روی نودها و کاربران اعمال می‌کنید.",
+      subscriptions: "قالب‌های اشتراک، قانون‌های ارائه و صفحه‌ای که کاربر می‌بیند.",
+      health: "هشدارها، بررسی از دید کلاینت و عیب‌یاب همهٔ نودها.",
+      updates: "نسخه‌های پنل و ایجنت نودها، انتشار مرحله‌ای و بازگردانی.",
+      integrations: "توکن‌های API برای اسکریپت‌ها، MCP برای ایجنت‌های هوش مصنوعی و تغییراتی که از شما می‌خواهند تأیید کنید.",
+      settings: "مدیرها، امنیت، نسخه‌های پشتیبان و دامنه‌ها.",
+    },
+    refDesc: "فرمان‌ها، گزینه‌ها، متغیرها، معماری و پاسخ پرسش‌های رایج.",
+    status: "Mistgate در مرحلهٔ بتاست: نسخه‌ها v0.1.x هستند و تا 1.0 ممکن است API، تنظیمات ذخیره‌شده و پروتکل نود هنوز تغییر کنند.",
+    statusLink: "وضعیت و نقشهٔ راه",
+  },
+  // Turkish follows README.tr.md (formal «siz»); anchors are left out while the target pages are English
+  tr: {
+    meta: "Mistgate, küçük bir VPN için kendi sunucunuzda çalışan bir paneldir: size ait birkaç sunucu ve onları paylaştığınız insanlar. Hysteria2, VLESS ve AmneziaWG; iki Go ikili dosyası, SQLite ve systemd.",
+    eyebrow: "Beta · kendi sunucunuzda · açık kaynak · AGPL-3.0",
+    h1: "Kendi küçük VPN'iniz için bir panel",
+    lead: "Size ait birkaç sunucu ve onları paylaştığınız insanlar için. Paneli bir sunucuya kurar, VPN sunucularınızı ona düğüm olarak eklersiniz. Her kişi tek bir abonelik bağlantısı alır ve uygulaması, kullanabileceği bütün sunucuları kendiliğinden çeker.",
+    install: "Paneli kurun", how: "Nasıl çalışır",
+    facts: ["Hysteria2", "VLESS REALITY", "AmneziaWG 2.0 · 3.1", "Cloudflare WARP", "Linux amd64 · arm64", "SQLite, Docker yok"],
+    demoAlt: "Mistgate tanıtımı: tarayıcıdan SSH ile bir düğüm eklenir, bir profille çalışmaya başlar ve hemen bir kişinin sayfasında görünür",
+    doesH: "Neler yapar",
+    does: [
+      ["nodes", "Tarayıcıdan düğüm ekleme", "Düğümü IP adresi ve root parolasıyla eklersiniz. Panel sunucunun SSH anahtarını sabitler, sunucuyu kontrol eder, etkin bir UFW ya da firewalld varsa portları açar ve imzalı ajanı kurar. Tek kullanımlık bir kurulum komutu da olur.", "getting-started/add-node"],
+      ["subscriptions", "Kişi başına tek bağlantı", "Mihomo tabanlı uygulamalar (kl!ck, FlClash, Clash Verge Rev) bu bağlantıdan üç protokolün hepsini alır, Happ Hysteria2 ve VLESS'i alır, AmneziaVPN ise kişinin sayfasından her cihaz için ayrı bir anahtar alır.", "guide/client-apps"],
+      ["health", "Kontroller ve uyarılar", "Panel her 5 dakikada bir, tıpkı bir uygulama gibi her sunucuya bağlanır. Her düğümdeki Teşhis 17 sunucu kontrolü yapar ve yedi düzeltme önerir; bunlar ancak siz onayladıktan sonra çalışır. Uyarılar yönetim panelinde görünür ve Telegram'a da gelir.", "operations/health"],
+      ["share", "Diğer düğümleriniz üzerinden aktarma", "Bazı ağlardan bir sunucuya ulaşılamıyorsa kişiler ona başka bir düğümünüz üzerinden bağlanır; o düğüm yalnızca şifreli trafiği iletir. Panel yolu açmadan önce kontrol eder, sonra da izlemeye devam eder; düğüm sayfası her giriş yolunu kişilerden sunucuya uzanan bir çizgi olarak çizer.", "guide/relays"],
+      ["reachability", "Bir ülkenin içinden bakış", "İsteğe bağlı olarak, sunucularınızın bir ülkenin içinden açılıp açılmadığını ağ ağ kontrol edebilirsiniz: ev ve mobil ağlarda IPv4 ve IPv6 üzerinden Globalping ölçümleri, gönüllü ve SIM ölçüm noktaları, engelleme listeleri ve kendi düğümünüzden bir TSPU ölçümü. Kaynakların çoğu yalnızca Rusya'da çalışır.", "operations/reachability"],
+      ["memory", "İki Go ikili dosyası", "Docker yok, veritabanı sunucusu yok: SQLite ve systemd. Panel boştayken 1 vCPU / 1 GB'lık bir sunucuda 16–20 MiB bellek kullanır.", "reference/benchmarks"],
+      ["mask", "Kamuflaj sitesi", "Panelin adresini açan yabancılar bir kamuflaj sitesi görür; yönetim paneli gizli bir yolun ya da ana bilgisayar adının arkasındadır.", "guide/decoy-site"],
+      ["integrations", "Yapay zekâ ajanları için MCP", "Yerleşik MCP sunucusu sayesinde bir yapay zekâ ajanı tüm düğümlerin durumunu okuyabilir ve değişiklik planlayabilir; riskli olanlar yönetim panelinde sizin onayınızı bekler.", "reference/mcp"],
+    ],
+    notYet: "Henüz olmayanlar: Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](getting-started/install-edge). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.",
+    fitH: "Parçalar nasıl birleşir",
+    fitP: "İki program: panel ve her sunucudaki ajan. Bir kişinin uygulaması panelle yalnızca bağlantısını almak için konuşur; VPN trafiği doğrudan düğüme gider.",
+    fitAlt: "Mistgate'in parçaları: siz yönetim panelini kullanırsınız, kişinin uygulaması bağlantısını panelden alır, VPN trafiği uygulamadan düğüme ve oradan internete gider, düğüm de panelle tek bir bağlantı tutar",
+    protoH: "Protokoller",
+    protos: [
+      ["Hysteria2", "Resmî Hysteria2 çekirdeğiyle UDP (QUIC). Salamander gizleme, port atlama, Let's Encrypt sertifikası ya da parmak izi sabitlenmiş kendinden imzalı sertifika.", "guide/hysteria2"],
+      ["VLESS", "xray-core üzerinde. XHTTP ya da TCP (RAW + Vision) üzerinden REALITY; XHTTP ya da WebSocket üzerinden TLS, doğrudan veya bir CDN arkasında.", "guide/vless"],
+      ["AmneziaWG", "3.1 (varsayılan) ve 2.0 sürümleri, her cihaz için ayrı anahtar. Kullanıcı alanında amneziawg-go ya da çekirdek modülü.", "guide/amneziawg"],
+      ["MTProto", "Deneysel. Yalnızca Telegram uygulaması için, Mistgate'in kendi çekirdeğinde bir proxy: ad olarak düğümün kendi alan adını ya da başka bir siteyi kullanan Fake TLS, kişi başına bir anahtar.", "guide/mtproto"],
+    ],
+    protoP: "Hysteria2 ve VLESS, TCP 443 dahil, aynı düğümü paylaşabilir. Henüz desteklenmeyenler: VMess, Trojan, Shadowsocks, TUIC ve düz WireGuard. Başka protokoller de planlanıyor; her biri [protokol eklentisi sözleşmesi](reference/architecture) aracılığıyla aynı abonelik bağlantısına eklenir.",
+    stableH: "Kararlı mı?",
+    stableP: "Beta aşamasında ve henüz genç: v0.1.0 etiketi 2026-10-03'te atıldı. Geliştiricisi onu kendi altı sunucusunda, ailesi ve arkadaşları için kullanıyor.",
+    stable: [
+      ["code", "CI", `Her push ve pull request'te: Go testleri ve vet, panel-ajan oturumunda yarış dedektörü, \`govulncheck\`, yönetim panelinin lint ve testleri, belgelerin derlenmesi, Debian ve Ubuntu'da kurulum betiği. [ci.yml](${CI})`],
+      ["pulse", "Uçtan uca çalıştırma", `Her sürümden önce: gerçek Hysteria2, AmneziaWG, Xray, mihomo ve sing-box istemcileriyle gerçek bir panel ve düğüm; ayrıca ajan güncellemeleri, geri almalar ve SSH üzerinden kurulum. WSL'de ya da bir sanal makinede elle, CI'da değil. [e2e-wsl.sh](${E2E})`],
+      ["key", "İmzalı derlemeler", "GitHub Actions her etiketi taslak olarak derler. Geliştirici onu çevrimdışı sürüm anahtarının bulunduğu bir makinede etiketten yeniden derler ve yalnızca bayt bayt eşleşen ikili dosyaları imzalar; panel ve düğümler yalnızca imzalı derlemeleri kurar.", "operations/releases"],
+      ["updates", "Geri alınabilen güncellemeler", "Düğümler asla kendiliğinden güncellenmez. Bir dağıtım tek bir kanarya düğümü ve 5 dakikalık bir sağlık kontrolüyle başlar; başarısız olan düğüm önceki derlemesine döner ve dağıtım duraklar. Panel kendini yalnızca siz onayladığınızda günceller ve yeni sürüm ayakta kalamazsa eski derlemeyi geri yükler.", "operations/updates"],
+    ],
+    ai: "Mistgate yapay zekâ kodlama ajanlarıyla yazılıyor: yazdıklarını geliştirici gözden geçiriyor ve neyin birleştirilip yayımlanacağına o karar veriyor; onların kodu da herkesin kodu gibi aynı kontrollerden geçiyor.",
+    cmpH: "Diğer panellerle karşılaştırma",
+    yn: { yes: "evet", no: "hayır", part: "kısmen" },
+    cmp: [
+      ["Docker olmadan çalışır", "✅", "✅", "❌", "✅", "🟡 kısmen", "✅"],
+      ["Boştaki panelin RAM kullanımı¹", "16–20 MiB", "68–74 MiB", "426–454 MiB", "ölçülmedi", "262–265 MiB", "ölçülmedi"],
+      ["Panelden düğüm ekleme (SSH)", "✅", "❌", "❌", "❌", "❌", "?"],
+      ["Hysteria2", "✅", "✅", "🟡 kısmen", "✅", "✅", "✅"],
+      ["AmneziaWG", "✅ 2.0 ve 3.1", "✅ 3.1", "?", "?", "?", "?"],
+      ["VMess, Trojan, Shadowsocks", "❌", "✅", "🟡 kısmen", "✅", "✅", "✅"],
+      ["Telegram botu", "🟡 yalnızca uyarılar", "✅", "🟡 kısmen", "✅", "✅", "?"],
+    ],
+    cmpNote: "¹ Tüm panel süreç grubunun özel belleği; boşta, bağlı düğüm yokken, 1 vCPU / 1 GB'lık bir test sunucusunda (3x-ui'de Xray çekirdeği ve fail2ban dahil). “?”, projenin kendi README'sinin ve belgelerinin bu konuda bir şey söylemediği anlamına gelir. Protokol çeşitliliğinde, topluluk büyüklüğünde ve tam Telegram botlarında diğerleri önde.",
+    proof: [
+      ["gauge", "Performans testleri", "Aynı küçük sunucuda 3x-ui, Remnawave ve PasarGuard ile yan yana bellek, işlemci, disk, başlangıç süresi ve abonelik yükü. Yöntem, sürümler ve Mistgate'in daha yavaş kaldığı yerler.", "reference/benchmarks"],
+      ["layers", "Tam tablo", "Kaynaklarıyla yedi panel, 2026-10-09'da kontrol edildi; diğerlerinin önde olduğu yerler de dahil.", "reference/comparison"],
+    ],
+    startH: "Hızlı başlangıç",
+    startP: "Boş bir Linux sunucusundan, bağlantısı çalışan ilk kişiye kadar.",
+    steps: [
+      ["Paneli kurun", "Temiz bir Linux sunucusunda tek komut: kurulum betiği imzalı panel manifestini doğrular, Mistgate'i systemd altında başlatır ve tek kullanımlık bir kurulum bağlantısı yazdırır. Ya da kurulum istemini bir yapay zekâ ajanına verin.", ["getting-started/install-panel", "getting-started/ai-agents"]],
+      ["Düğüm ekleyin", "**Düğümler → Düğüm ekle** ajanı SSH üzerinden kurar ya da sunucuda kendiniz çalıştıracağınız tek kullanımlık bir komut verir.", ["getting-started/ssh-install", "getting-started/add-node"]],
+      ["Bağlantıları dağıtın", "Düğüme bir profil koyun, bir kullanıcı oluşturun ve bağlantısını ona gönderin.", ["getting-started/first-users"]],
+      ["Uyarılar, güvenlik, yedekler", "Başkaları panele güvenmeye başlamadan önce uyarılar için Telegram'ı bağlayın, güvenlik ayarlarını gözden geçirin ve şifreli yedekleri kurun.", ["operations/telegram-alerts", "operations/security", "operations/backups"]],
+    ],
+    secH: "Yönetim paneli bölümlerine göre belgeler",
+    secP: "Yönetim panelinin her bölümü ve onu anlatan sayfalar.",
+    reference: "Başvuru",
+    first: "Buradan başlayın",
+    firstDesc: "Mistgate nedir, hangi sunuculara ihtiyacınız var ve panel nasıl kurulur.",
+    desc: {
+      overview: "Tüm düğümlerin durumu tek bakışta: düğüm kartları, trafik ve son olaylar.",
+      nodes: "Düğümlerin çalıştığı sunucular, protokolleri, yükleri ve yeni düğüm eklemek için sihirbaz.",
+      users: "Erişimi olan kişiler: uygulamalar, cihazlar, trafik kotaları ve bitiş tarihleri.",
+      profiles: "Düğümlere ve kullanıcılara dağıttığınız hazır protokol ayarları.",
+      subscriptions: "Abonelik biçimleri, teslim kuralları ve kullanıcıların gördüğü sayfa.",
+      health: "Uyarılar, istemci gözüyle kontroller ve Teşhis.",
+      updates: "Panel ve düğüm ajanı sürümleri, aşamalı dağıtımlar ve geri alma.",
+      integrations: "Betikler için API token'ları, yapay zekâ ajanları için MCP ve onayınızı istedikleri değişiklikler.",
+      settings: "Yöneticiler, güvenlik, yedekler ve alan adları.",
+    },
+    refDesc: "Komutlar, seçenekler, değişkenler, mimari ve sık sorulan soruların yanıtları.",
+    status: "Mistgate beta aşamasında: sürümler 0.1.x ve 1.0'a kadar API, kayıtlı ayarlar ve düğüm protokolü hâlâ değişebilir.",
+    statusLink: "Durum ve yol haritası",
+  },
 };
 
-/** Hero and body of the home page. `nav` gives the order and titles of the pages; `section(key)` names the admin section a page
- *  describes, "start" for the pages before the admin, null for the reference. */
-export function renderLanding({ lang, t, nav, section, langNames = [] }) {
+/** Hero and body of the home page. `nav` gives the order, titles and addresses of the pages (an untranslated one is the
+ *  English page, marked `en`); `name(page)` writes a page's name with its EN mark; `section(key)` names the admin section a
+ *  page describes, "start" for the pages before the admin, null for the reference. */
+export function renderLanding({ lang, t, nav, section, name = (p) => esc(p.title), langNames = [] }) {
   const L = LANDING[lang];
   const pages = new Map(nav.flatMap((g) => g.items).map((i) => [i.key, i]));
-  // a page not translated yet (zh while it is being written) sends the reader to the English one instead of nowhere
-  const url = (key) => pageUrl(pages.has(key) ? lang : "en", key);
+  // a page not translated yet sends the reader to the English one instead of nowhere
+  const url = (key) => pages.get(key)?.url ?? pageUrl("en", key);
+  const own = (key) => pages.has(key) && !pages.get(key).en;
   // the screenshot and the diagram of a language that has none yet are the English ones
   const fitLang = existsSync(`${DOCS}${lang}/diagrams/how-it-fits.svg`) ? lang : "en";
-  const title = (key) => pages.get(key)?.title ?? key;
+  const title = (key) => (pages.has(key) ? name(pages.get(key)) : esc(key));
   // an admin section's icon in its tone, or any other icon in lavender
   const chip = (id, size = 26) => `<span class="id-chip" data-tone="${NAV[id]?.tone ?? "lavender"}" style="width:${size}px;height:${size}px">${icon(NAV[id] ? `nav-${id}` : id, Math.round(size * 0.6))}</span>`;
   const bold = (s) => rich(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   // [text](key#anchor): the page in this language; one not translated yet is the English page, without the anchor
   const fmt = (s) => bold(s).replace(/\[([^\]]+)\]\(([^)\s#]+)(#[^)\s]+)?\)/g, (_, text, to, frag = "") =>
-    /^https:/.test(to) ? `<a href="${to}${frag}" rel="noopener">${text}</a>` : `<a href="${url(to)}${pages.has(to) ? frag : ""}">${text}</a>`);
+    /^https:/.test(to) ? `<a href="${to}${frag}" rel="noopener">${text}</a>` : `<a href="${url(to)}${own(to) ? frag : ""}">${text}</a>`);
   // icon, heading, text and the page it links to (by its title); Chinese puts no space after its full stop
-  const list = (items) => `<ul class="why">${items.map(([id, h, p, key]) => `<li>${chip(id, 30)}<div><h3>${esc(h)}</h3><p>${fmt(p)}${key ? `${lang === "zh" ? "" : " "}<a href="${url(key)}">${esc(title(key))}</a>` : ""}</p></div></li>`).join("")}</ul>`;
+  const list = (items) => `<ul class="why">${items.map(([id, h, p, key]) => `<li>${chip(id, 30)}<div><h3>${esc(h)}</h3><p>${fmt(p)}${key ? `${lang === "zh" ? "" : " "}<a href="${url(key)}">${title(key)}</a>` : ""}</p></div></li>`).join("")}</ul>`;
   // a comparison cell as the README writes it: ✅ ❌ 🟡 and an optional word become the docs' yes / no / partial pill
   const cell = (c) => {
     const m = /^(✅|❌|🟡)\s*(.*)$/u.exec(c);
@@ -323,18 +496,18 @@ ${list(L.does)}<p class="home-p">${fmt(L.notYet)}</p></section>`;
 ${list(L.stable)}<p class="home-p">${esc(L.ai)}</p></section>`;
 
   const compare = `<section class="home-sec" aria-labelledby="compare"><h2 id="compare">${esc(L.cmpH)}</h2>
-<div class="cmp" role="region" tabindex="0" aria-labelledby="compare"><table><thead><tr><th></th>${PANELS.map((p) => `<th>${p}</th>`).join("")}</tr></thead><tbody>${L.cmp.map(([h, ...cells]) => `<tr><td>${esc(h)}</td>${cells.map((c) => `<td>${cell(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+<div class="cmp" role="region" tabindex="0" aria-labelledby="compare"><table><thead><tr><th></th>${PANELS.map((p) => `<th lang="en">${p}</th>`).join("")}</tr></thead><tbody>${L.cmp.map(([h, ...cells]) => `<tr><td>${esc(h)}</td>${cells.map((c) => `<td>${cell(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
 <p class="home-p">${esc(L.cmpNote)}</p>
 <div class="proof">${L.proof.map(([ico, h, p, key]) => `<a class="proof__card" href="${url(key)}">${chip(ico, 30)}<span class="proof__t">${esc(h)}${icon("chevronRight", 14)}</span><span class="proof__p">${esc(p)}</span></a>`).join("")}</div></section>`;
 
   const start = `<section class="home-sec" aria-labelledby="start"><h2 id="start">${esc(L.startH)}</h2><p class="home-p">${esc(L.startP)}</p>
-<ol class="steps">${L.steps.map(([h, p, keys]) => `<li><h3>${esc(h)}</h3><p>${bold(p)}</p><p class="steps__links">${keys.map((k) => `<a href="${url(k)}">${esc(title(k))}${icon("chevronRight", 12)}</a>`).join("")}</p></li>`).join("")}</ol></section>`;
+<ol class="steps">${L.steps.map(([h, p, keys]) => `<li><h3>${esc(h)}</h3><p>${bold(p)}</p><p class="steps__links">${keys.map((k) => `<a href="${url(k)}">${title(k)}${icon("chevronRight", 12)}</a>`).join("")}</p></li>`).join("")}</ol></section>`;
 
   // one card per admin section, its pages in sidebar order; the pages of no single section close the grid
   const bySection = new Map(Object.keys(NAV).filter((id) => L.desc[id]).map((id) => [id, []]));
   const first = [], rest = [];
   for (const p of pages.values()) (section(p.key) === "start" ? first : bySection.get(section(p.key)) ?? rest).push(p);
-  const card = (head, desc, items) => `<li class="sec-card">${head}<p>${esc(desc)}</p><ul>${items.map((p) => `<li><a href="${p.url}">${esc(p.title)}</a></li>`).join("")}</ul></li>`;
+  const card = (head, desc, items) => `<li class="sec-card">${head}<p>${esc(desc)}</p><ul>${items.map((p) => `<li><a href="${p.url}">${name(p)}</a></li>`).join("")}</ul></li>`;
   const sections = `<section class="home-sec" aria-labelledby="sections"><h2 id="sections">${esc(L.secH)}</h2><p class="home-p">${esc(L.secP)}</p>
 <ul class="sec-cards">${first.length ? card(`<h3><span class="id-chip" data-tone="lavender" style="width:26px;height:26px">${icon("bolt", 16)}</span><span>${esc(L.first)}</span></h3>`, L.firstDesc, first) : ""}${[...bySection].filter(([, items]) => items.length).map(([id, items]) => card(`<h3>${chip(id)}<span>${esc(t.sections[id])}</span></h3>`, L.desc[id], items)).join("")}${rest.length ? card(`<h3><span class="id-chip id-chip--plain" style="width:26px;height:26px">${icon("text", 16)}</span><span>${esc(L.reference)}</span></h3>`, L.refDesc, rest) : ""}</ul>
 <p class="home-status">${esc(L.status)} <a href="${url("roadmap/status")}">${esc(L.statusLink)}</a></p></section>`;

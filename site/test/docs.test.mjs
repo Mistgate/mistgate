@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -125,6 +125,16 @@ test("node guides show the SSH install choice, and updates show the published pa
   assert.ok(updatesRu.includes("Проверить GitHub"));
 });
 
+test("the device-ID column of the client apps is answers in every language, and fa and tr mark what is planned", () => {
+  for (const lang of LANGS) {
+    const html = page(lang, "guide/client-apps");
+    assert.equal(html.match(/class="yn yn--yes"/g)?.length, 3, `${lang}: three apps send an ID ("Yes." and "Yes, by default.")`);
+    assert.equal(html.match(/class="yn yn--no"/g)?.length, 1, `${lang}: one row says no`);
+  }
+  assert.ok(page("fa", "getting-started/overview").includes('<strong class="planned">برنامه‌ریزی‌شده</strong>'));
+  assert.ok(page("tr", "getting-started/overview").includes('<strong class="planned">Planlanıyor</strong>'));
+});
+
 // Emphasis that CommonMark does not close (a ** next to full-width punctuation and a letter) shows up as literal asterisks:
 // render every page of every language with the site's own pipeline and look for them in the text, outside code.
 test("no page shows a literal ** or a stray __ after rendering", async () => {
@@ -134,12 +144,13 @@ test("no page shows a literal ** or a stray __ after rendering", async () => {
   const bad = [];
   for (const lang of LANGS) {
     const dir = join(repositoryRoot, "docs", lang);
+    if (!existsSync(dir)) continue; // a language still being translated may not have started
     const render = createRenderer(lang, T[lang], highlight);
     for (const file of walk(dir)) {
       const raw = readFileSync(file, "utf8").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
       const body = raw.replace(/^---\n[\s\S]*?\n---\n?/, "");
       const key = file.slice(dir.length + 1).replace(/\\/g, "/").replace(/\.md$/, "");
-      const env = { lang, key, dir: dirname(file), dirEn: dirname(file), pages: new Map(), warn: () => {}, headings: [], codes: new Map() };
+      const env = { lang, key, dir: dirname(file), dirEn: dirname(join(repositoryRoot, "docs", "en", key)), pages: new Map(), warn: () => {}, headings: [], codes: new Map() };
       const text = render(body, env)
         .replace(/<pre[\s\S]*?<\/pre>/g, " ")
         .replace(/<code[\s\S]*?<\/code>/g, " ")

@@ -13,7 +13,7 @@ const list = (lang) => { const d = join(docs, lang, "diagrams"); return existsSy
 const selectors = (css) => [...css.replace(/@media[^{]*\{/g, "").matchAll(/(?:^|\})\s*([^{}]+?)\s*\{/g)].flatMap((m) => m[1].split(",").map((s) => s.trim()));
 
 // the letters a translated drawing must contain
-const SCRIPT = { ru: /[а-яё]/i, zh: /[一-鿿]/ };
+const SCRIPT = { ru: /[а-яё]/i, zh: /[一-鿿]/, fa: /[آ-ی]/, tr: /[çğıöşüİ]/i };
 const TRANSLATIONS = Object.keys(SCRIPT);
 
 test("every diagram has a file in every complete language, and a language still being translated has no stray ones", () => {

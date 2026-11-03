@@ -31,8 +31,12 @@ const EXTRA = {
 };
 const P = { ...panel.paths, ...EXTRA, ...Object.fromEntries(Object.entries(NAV).map(([k, v]) => [`nav-${k}`, v.d])) };
 
+// the glyphs that point along the line turn round in a right-to-left page (style.css .ico--flip), as in the admin
+const FLIP = new Set(["back", "chevronRight"]);
+
 /** An inline stroke icon (decorative: aria-hidden). Names are the panel's (`externalLink`, `chevronRight` ...), `nav-<section>` or EXTRA. */
 export function icon(name, size = 16, cls = "") {
   if (!P[name]) throw new Error(`unknown icon "${name}"`);
+  if (FLIP.has(name)) cls = cls ? `${cls} ico--flip` : "ico--flip";
   return `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[name]}"/></svg>`;
 }

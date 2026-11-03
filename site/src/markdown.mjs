@@ -3,7 +3,7 @@ import MarkdownIt from "markdown-it";
 import anchor from "markdown-it-anchor";
 import { createHighlighter } from "shiki";
 import { existsSync } from "node:fs";
-import { posix, join } from "node:path";
+import { posix, join, dirname } from "node:path";
 import { pageUrl } from "./urls.mjs";
 import { icon } from "./icons.mjs";
 import { inlineSvg, mermaidSvg } from "./diagrams.mjs";
@@ -32,19 +32,26 @@ const slugify = (s) => s.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "").
 
 // "> **Note:** ..." and friends; GitHub shows the same blockquote, the wiki turns it into an alert (wiki.mjs ALERTS)
 // zh: "注意：" with the full-width colon inside the bold text is read like "Note:" (confirmed by the zh glossary)
-const CALLOUTS = { note: "note", "важно": "note", "注意": "note", tip: "tip", "совет": "tip", "提示": "tip", warning: "warning", "внимание": "warning", "警告": "warning", danger: "danger", "опасно": "danger", "危险": "danger" };
+// fa: نکته / توصیه / هشدار / خطر; tr: Not / İpucu / Uyarı / Tehlike. Keys are folded (see fold).
+const CALLOUTS = { note: "note", "важно": "note", "注意": "note", "نکته": "note", not: "note", tip: "tip", "совет": "tip", "提示": "tip", "توصیه": "tip", ipucu: "tip", warning: "warning", "внимание": "warning", "警告": "warning", "هشدار": "warning", uyari: "warning", danger: "danger", "опасно": "danger", "危险": "danger", "خطر": "danger", tehlike: "danger" };
+// case-insensitive for Turkish too: "İ".toLowerCase() is "i" + U+0307 and "I" lowers to "i", not "ı", so both i's fold to
+// a plain i; Arabic yeh and kaf fold to the Persian letters an Arabic keyboard does not type
+export const fold = (s) => s.toLowerCase().replace(/\u0307/g, "").replace(/ı/g, "i").replace(/ي/g, "ی").replace(/ك/g, "ک");
 const CALLOUT_CHIP = { note: ["info", "lavender"], tip: ["sparkle", "mint"], warning: ["warn", "sand"], danger: ["warn", "rose"] };
 // code block bar: language name and icon; a word after the language (```ini /etc/x.service) names the file instead
 const CODE_NAME = { sh: "Shell", yaml: "YAML", json: "JSON", ini: "INI", toml: "TOML", javascript: "JavaScript", typescript: "TypeScript", go: "Go", sql: "SQL", diff: "Diff" };
-// a table cell that is a yes / no / partial answer becomes a pill (colour + glyph + word, like the panel's status)
-const ANSWER = /^(yes|no|partial|да|нет|частично|是|否|部分)(?=$|[:：]|\s\(|（)/iu;
-const ANSWER_KIND = { yes: "yes", "да": "yes", no: "no", "нет": "no", partial: "part", "частично": "part", "是": "yes", "否": "no", "部分": "part" };
+// a table cell that starts with a yes / no / partial answer (then the end, a colon, a full stop, a comma or a bracket)
+// becomes a pill (colour + glyph + word, like the panel's status)
+const ANSWER = /^(yes|no|partial|да|нет|частично|是|否|部分|بله|خیر|نه|تا حدی|evet|hayır|kısmen)(?=$|[:：.,،，。]|\s\(|（)/iu;
+const ANSWER_KIND = { yes: "yes", "да": "yes", no: "no", "нет": "no", partial: "part", "частично": "part", "是": "yes", "否": "no", "部分": "part", "بله": "yes", "خیر": "no", "نه": "no", "تا حدی": "part", evet: "yes", "hayır": "no", "kısmen": "part" };
 // a name worth finding: starts with a letter, a dash or an underscore, no placeholders or prose
 const SEARCHABLE = /^(?=.{3,60}$)(?=.*[A-Za-z])[A-Za-z_-][\w.:=/@-]*(?: [\w.:=/@-]+){0,3}$/;
 const NOISE = new Set(["true", "false", "yes", "no", "on", "off", "http", "https", "localhost"]);
+const safeDecode = (s) => { try { return decodeURIComponent(s); } catch { return s; } };
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** @returns {(src: string, env: {lang: string, key: string, dirEn: string, pages: Map<string, object>, warn: Function, headings: object[]}) => string} */
+/** env.english(key), for a language still being translated: the ids of the English page `key` (a page this language lacks), or null.
+ *  @returns {(src: string, env: {lang: string, key: string, dirEn: string, pages: Map<string, object>, english?: Function, warn: Function, headings: object[]}) => string} */
 export function createRenderer(lang, t, highlight) {
   const md = new MarkdownIt({ html: false, linkify: false, typographer: false });
 
@@ -84,7 +91,11 @@ export function createRenderer(lang, t, highlight) {
     const video = VIDEO_POSTER.exec(src);
     if (video) {
       const alt = self.renderInlineAsText(tok.children, o, env);
-      return `<figure class="shot shot--video"><video src="/video/${video[1]}-${video[2]}.mp4" poster="/video/${video[1]}-poster-${video[2]}.webp" width="1280" height="720" controls muted playsinline preload="none" aria-label="${esc(alt)}"></video></figure>`;
+      // a language without its own recording or poster yet gets the English one
+      const [, name, l] = video, dir = dirname(join(env.dir, src));
+      const pick = (file) => { if (existsSync(join(dir, file(l)))) return l; env.warn(`${file(l)} does not exist, showing ${file("en")}`); return "en"; };
+      const vl = pick((x) => `${name}-${x}.mp4`), pl = pick((x) => `${name}-poster-${x}.webp`);
+      return `<figure class="shot shot--video"><video src="/video/${name}-${vl}.mp4" poster="/video/${name}-poster-${pl}.webp" width="1280" height="720" controls muted playsinline preload="none" aria-label="${esc(alt)}"></video></figure>`;
     }
     if (!src.endsWith(".svg") || /^([a-z][a-z0-9+.-]*:|\/)/i.test(src)) return image(tokens, idx, o, env, self);
     const alt = self.renderInlineAsText(tok.children, o, env);
@@ -113,9 +124,9 @@ export function createRenderer(lang, t, highlight) {
       const ch = tk[i + 2].children;
       while (ch?.[0]?.type === "text" && ch[0].content === "") ch.shift();
       if (ch?.[0]?.type !== "strong_open" || ch[1]?.type !== "text" || ch[2]?.type !== "strong_close") continue;
-      const kind = CALLOUTS[ch[1].content.replace(/[:：]$/, "").trim().toLowerCase()];
+      const kind = CALLOUTS[fold(ch[1].content.trim().replace(/[:：]$/, "").trim())];
       if (!kind || !/[:：]$/.test(ch[1].content.trim())) continue;
-      const label = ch[1].content.replace(/[:：]$/, "").trim();
+      const label = t.callouts?.[kind] ?? ch[1].content.trim().replace(/[:：]$/, "").trim();
       ch.splice(0, 3);
       if (ch[0]?.type === "text") ch[0].content = ch[0].content.replace(/^\s+/, "");
       let depth = 0, close = -1;
@@ -163,7 +174,7 @@ export function createRenderer(lang, t, highlight) {
             if (!m) return;
             const pill = new state.Token("html_inline", "", 0);
             pill.content = `<span class="yn yn--${ANSWER_KIND[m[1].toLowerCase()]}"><span class="yn__g" aria-hidden="true"></span>${esc(m[1])}</span>`;
-            c.children[0].content = c.children[0].content.slice(m[1].length).replace(/^[:：]\s*/, " ");
+            c.children[0].content = c.children[0].content.slice(m[1].length).replace(/^[:：.,،，。]\s*/, " ");
             c.children.unshift(pill);
           });
         });
@@ -211,12 +222,19 @@ export function createRenderer(lang, t, highlight) {
           const dir = posix.dirname(env.key === "index" ? "index" : env.key);
           const target = posix.normalize(posix.join(dir === "." ? "" : dir, m[1]));
           if (env.pages.has(target)) { tok.attrSet("href", pageUrl(lang, target) + (m[2] ?? "")); stack.push(false); return; }
+          // a language still being translated: the English page, with the anchor when the English page has it
+          const ids = env.english?.(target);
+          if (ids) {
+            let frag = m[2] ?? "";
+            if (frag && !ids.has(safeDecode(frag.slice(1)))) { env.warn(`link ${safeDecode(href)}: the English page has no ${safeDecode(frag)}, linked without it`); frag = ""; }
+            tok.attrSet("href", pageUrl("en", target) + frag); tok.attrSet("hreflang", "en"); stack.push(false); return;
+          }
           env.warn(`link to a page that does not exist yet: ${href}`);
           tok.tag = "span"; tok.attrs = [["class", "pending"], ["title", t.pending]];
           stack.push(true);
         } else if (tok.type === "link_close") {
           if (stack.pop()) tok.tag = "span";
-        } else if (tok.type === "strong_open" && blk.children[n + 1]?.type === "text" && /^(Planned|Планируется|计划中)$/.test(blk.children[n + 1].content)) {
+        } else if (tok.type === "strong_open" && blk.children[n + 1]?.type === "text" && /^(Planned|Планируется|计划中|برنامه\u200c?ریزی\u200c?شده|Planlanıyor)$/.test(blk.children[n + 1].content)) {
           tok.attrJoin("class", "planned");
         }
       });

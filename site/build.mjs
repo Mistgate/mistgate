@@ -77,7 +77,11 @@ for (const lang of LANGS) {
   const pages = new Map(walk(dir).map((f) => readPage(lang, f)).map((p) => [p.key, p]));
   if (!pages.has("index")) { warn(`docs/${lang}/index.md is missing: no home page, no sidebar order`); continue; }
 
-  // sidebar order: the H3 groups and bullet links of index.md, and nothing else
+  // sidebar order: the H3 groups and bullet links of index.md, and nothing else. A language still being translated lists
+  // every English page: one it lacks is the English page (en: true, the EN mark) under the name its index.md gives it.
+  const english = lang !== "en" && !COMPLETE[lang] ? site.en?.pages : null;
+  const item = (key, name) => pages.has(key) ? { key, title: pages.get(key).title, url: pageUrl(lang, key) }
+    : { key, title: name || english.get(key).title, titleLang: name ? null : "en", url: pageUrl("en", key), en: true };
   const keyOf = (href) => posix.normalize(href.replace(/\.md(#.*)?$/, ""));
   const listed = new Set(["index"]);
   const nav = [];
@@ -86,12 +90,19 @@ for (const lang of LANGS) {
     for (const l of g.links) {
       if (!/\.md(#.*)?$/.test(l.href) || /^[a-z]+:/i.test(l.href)) continue;
       const key = keyOf(l.href);
-      if (!pages.has(key)) { warn(`${lang}/index.md lists ${key}.md, which does not exist yet (left out of the sidebar)`); continue; }
+      if (!pages.has(key) && !english?.has(key)) { warn(`${lang}/index.md lists ${key}.md, which does not exist yet (left out of the sidebar)`); continue; }
       if (listed.has(key)) continue;
       listed.add(key);
-      items.push({ key, title: pages.get(key).title, url: pageUrl(lang, key) });
+      items.push(item(key, l.text));
     }
     if (items.length) nav.push({ title: g.title, items });
+  });
+  // English pages its index.md does not list (yet) join the group in the same place as in English
+  if (english) site.en.nav.forEach((g, n) => {
+    const missing = g.items.filter((x) => !listed.has(x.key));
+    if (!missing.length) return;
+    missing.forEach((x) => listed.add(x.key));
+    (nav[n] ?? nav[nav.push({ title: g.title, items: [] }) - 1]).items.push(...missing.map((x) => item(x.key)));
   });
   const orphans = [...pages.keys()].filter((k) => !listed.has(k));
   if (orphans.length) {
@@ -114,7 +125,9 @@ for (const lang of Object.keys(site)) {
     page.headings = [];
     page.codes = new Map();
     const w = (m) => warn(`${lang}/${page.key}.md: ${m}`);
-    const env = { lang, key: page.key, dir: dirname(join(DOCS, lang, page.key)), dirEn: dirname(join(DOCS, "en", page.key)), pages, warn: w, headings: page.headings, codes: page.codes, answersFrom: lang === "en" ? null : site.en?.pages.get(page.key)?.answers };
+    const env = { lang, key: page.key, dir: dirname(join(DOCS, lang, page.key)), dirEn: dirname(join(DOCS, "en", page.key)), pages, warn: w, headings: page.headings, codes: page.codes, answersFrom: lang === "en" ? null : site.en?.pages.get(page.key)?.answers,
+      // English is written first: the ids of an English page this language links to but has not translated
+      english: !COMPLETE[lang] && lang !== "en" ? (key) => (site.en?.pages.has(key) ? written.get(pageUrl("en", key)) : null) : null };
     page.html = render(page.body, env);
     page.answers = env.answers;
     const i = seq.findIndex((s) => s.key === page.key);
@@ -131,6 +144,11 @@ for (const lang of Object.keys(site)) {
     written.set(page.url, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])));
     page.alternates = alternates;
     searchIdx[lang].push({ t: page.title, d: page.description, g: crumbGroup ?? "", u: page.url, h: page.key === "index" ? [] : page.headings.filter((h) => h.level <= 3).map((h) => [h.title, h.id]), k: page.key === "index" ? [] : [...page.codes].map(([c, x]) => (x.def ? [c, x.id, 1] : [c, x.id])) });
+  }
+  // the English pages its sidebar lists are found by the name the sidebar gives them, under its group
+  for (const g of nav) for (const x of g.items) {
+    const en = x.en && searchIdx.en?.find((p) => p.u === x.url);
+    if (en) searchIdx[lang].push({ ...en, t: x.title, g: g.title });
   }
   out(pageUrl(lang, "search-index.json").slice(1).replace(/\/$/, ""), JSON.stringify(searchIdx[lang]));
 }

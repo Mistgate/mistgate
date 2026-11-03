@@ -9,7 +9,7 @@ import { parseArgs } from "node:util";
 import YAML from "yaml";
 import { parseNav } from "./src/markdown.mjs";
 import { expandRoadmap } from "./src/roadmap.mjs";
-import { SITE, GITHUB, LANGS, COMPLETE, pageUrl, editUrl } from "./src/urls.mjs";
+import { SITE, GITHUB, LANGS as SITE_LANGS, COMPLETE, pageUrl, editUrl } from "./src/urls.mjs";
 
 const RAW = GITHUB.replace("github.com", "raw.githubusercontent.com");
 const RESERVED = new Set(["home", "_sidebar", "_footer"]);
@@ -35,6 +35,9 @@ const T = {
     heading: "Mistgate 文档",
   },
 };
+
+// the wiki speaks the languages it has strings for (fa and tr are on the site only, for now)
+const LANGS = SITE_LANGS.filter((l) => T[l]);
 
 const ALERTS = { note: "NOTE", tip: "TIP", warning: "WARNING", danger: "CAUTION", "важно": "NOTE", "совет": "TIP", "внимание": "WARNING", "опасно": "CAUTION", "注意": "NOTE", "提示": "TIP", "警告": "WARNING", "危险": "CAUTION" };
 
@@ -298,7 +301,7 @@ export function buildWiki(sources) {
 export function loadDocs(docsDir) {
   const walk = (d) => readdirSync(d).sort().flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".md") ? [p] : []; });
   const out = {};
-  for (const lang of LANGS) {
+  for (const lang of SITE_LANGS) {
     const dir = join(docsDir, lang);
     out[lang] = {};
     if (existsSync(dir)) for (const f of walk(dir)) out[lang][relative(dir, f).replace(/\\/g, "/").replace(/\.md$/, "")] = readFileSync(f, "utf8");

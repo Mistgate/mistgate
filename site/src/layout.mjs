@@ -34,7 +34,36 @@ export const T = {
     inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", reachability: "可达性", updates: "更新", integrations: "集成", settings: "设置" },
     notFound: "页面不存在", notFoundText: "没有这个页面。它可能已移动，或尚未撰写。", toHome: "前往文档",
   },
+  // Persian, right to left; the words of the admin's glossary (web/src/i18n/fa.ts), in the README's formal «شما»
+  fa: {
+    hreflang: "fa", htmlLang: "fa", dir: "rtl", ogLocale: "fa_IR", name: "فارسی", short: "FA", docs: "مستندات", home: "صفحهٔ اصلی", siteTitle: "مستندات Mistgate",
+    skip: "رفتن به محتوا", menu: "منو", closeMenu: "بستن منو", navLabel: "مستندات", crumbs: "مسیر صفحه",
+    search: "جستجو در مستندات", searchLabel: "جستجو در مستندات", searchEmpty: "چیزی پیدا نشد. واژهٔ دیگری را امتحان کنید.", searchClose: "بستن جستجو", searchIn: "در صفحهٔ",
+    onPage: "در این صفحه", prev: "قبلی", next: "بعدی", edit: "ویرایش این صفحه در GitHub", theme: "تغییر تم", github: "Mistgate در GitHub", stars: "Mistgate در GitHub، {n} ستاره",
+    language: "زبان", copy: "کپی", copied: "کپی شد", table: "جدول", plain: "متن", diagram: "نمودار", permalink: "پیوند به این بخش", pending: "این صفحه هنوز نوشته نشده است", roadmap: "مرحله‌های نقشهٔ راه",
+    license: "منتشرشده با مجوز AGPL-3.0", other: "سایر صفحه‌ها", inEnglish: "این صفحه هنوز ترجمه نشده است و به انگلیسی باز می‌شود",
+    callouts: { note: "نکته", tip: "توصیه", warning: "هشدار", danger: "خطر" },
+    inAdmin: "در پنل مدیریت", sections: { overview: "نمای کلی", nodes: "نودها", users: "کاربران", profiles: "پروفایل‌ها", subscriptions: "اشتراک‌ها", health: "سلامت", reachability: "دسترس‌پذیری", updates: "به‌روزرسانی‌ها", integrations: "یکپارچه‌سازی‌ها", settings: "تنظیمات" },
+    notFound: "صفحه پیدا نشد", notFoundText: "چنین صفحه‌ای وجود ندارد. شاید جابه‌جا شده یا هنوز نوشته نشده باشد.", toHome: "رفتن به مستندات",
+  },
+  // Turkish; the words of the admin's glossary (web/src/i18n/tr.ts), in the README's formal «siz»
+  tr: {
+    hreflang: "tr", htmlLang: "tr", ogLocale: "tr_TR", name: "Türkçe", short: "TR", docs: "Belgeler", home: "Ana sayfa", siteTitle: "Mistgate belgeleri",
+    skip: "İçeriğe geç", menu: "Menü", closeMenu: "Menüyü kapat", navLabel: "Belgeler", crumbs: "Sayfa yolu",
+    search: "Belgelerde ara", searchLabel: "Belgelerde ara", searchEmpty: "Hiçbir şey bulunamadı. Başka bir sözcük deneyin.", searchClose: "Aramayı kapat", searchIn: "Sayfa:",
+    onPage: "Bu sayfada", prev: "Önceki", next: "Sonraki", edit: "Bu sayfayı GitHub'da düzenleyin", theme: "Temayı değiştir", github: "GitHub'da Mistgate", stars: "GitHub'da Mistgate, {n} yıldız",
+    language: "Dil", copy: "Kopyala", copied: "Kopyalandı", table: "Tablo", plain: "Metin", diagram: "Şema", permalink: "Bu bölümün bağlantısı", pending: "Bu sayfa henüz yazılmadı", roadmap: "Yol haritasının aşamaları",
+    license: "AGPL-3.0 lisansıyla yayımlanır", other: "Diğer sayfalar", inEnglish: "Bu sayfa henüz çevrilmedi, İngilizce açılır",
+    callouts: { note: "Not", tip: "İpucu", warning: "Uyarı", danger: "Tehlike" },
+    inAdmin: "Yönetim panelinde", sections: { overview: "Genel bakış", nodes: "Düğümler", users: "Kullanıcılar", profiles: "Profiller", subscriptions: "Abonelikler", health: "Sağlık", reachability: "Erişilebilirlik", updates: "Güncellemeler", integrations: "Entegrasyonlar", settings: "Ayarlar" },
+    notFound: "Sayfa bulunamadı", notFoundText: "Böyle bir sayfa yok. Taşınmış ya da henüz yazılmamış olabilir.", toHome: "Belgelere git",
+  },
 };
+
+/** The quiet mark after the name of a page a language has not translated yet: the link opens the English page. */
+export const enMark = (t) => `<span class="en-mark" title="${esc(t.inEnglish)}"><span aria-hidden="true">EN</span><span class="sr">${esc(t.inEnglish)}</span></span>`;
+/** A page name in a sidebar or a list: the English title of an untranslated page is marked as English. */
+export const pageName = (t, p) => `<span${p.titleLang ? ` lang="${p.titleLang}" dir="ltr"` : ""}>${esc(p.title)}</span>${p.en ? enMark(t) : ""}`;
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -78,8 +107,11 @@ function githubButton(t, stars) {
   return `<a class="ib gh" href="${GITHUB}" rel="noopener" aria-label="${esc(stars ? t.stars.replace("{n}", stars) : t.github)}" data-stars-label="${esc(t.stars)}">${GH}<span class="gh__stars"${stars ? "" : " hidden"}><span class="gh__n">${stars ? formatStars(stars) : ""}</span>${icon("star", 14)}</span></a>`;
 }
 
+// the font files a page needs at once: Turkish letters (ş ğ İ) are in latin-ext, Persian ones in Vazirmatn
+const PRELOAD = { ru: ["onest-cyrillic", "onest-latin"], fa: ["vazirmatn-arabic", "onest-latin"], tr: ["onest-latin", "onest-latin-ext"] };
+
 function head({ lang, t, title, description, canonical, alternates, assets, noindex, home }) {
-  const fonts = (lang === "ru" ? ["onest-cyrillic", "onest-latin"] : ["onest-latin"]).map((f) => `<link rel="preload" href="/fonts/${f}.woff2" as="font" type="font/woff2" crossorigin>`).join("\n");
+  const fonts = (PRELOAD[lang] ?? ["onest-latin"]).map((f) => `<link rel="preload" href="/fonts/${f}.woff2" as="font" type="font/woff2" crossorigin>`).join("\n");
   const alts = alternates.map((a) => `<link rel="alternate" hreflang="${a.lang}" href="${SITE}${a.url}">`).join("\n");
   const fullTitle = home ? title : `${title} — ${t.siteTitle}`;
   return `<meta charset="utf-8">
@@ -133,14 +165,14 @@ ${githubButton(t, stars)}
 }
 
 function sidebar({ lang, t, nav, current }) {
-  const link = (url, text, key) => {
-    const st = pageStyle(key);
-    return `<a class="nav-link" href="${url}"${key === current ? ' aria-current="page"' : ""}><span class="nav-ico"${st.tone ? ` data-tone="${st.tone}"` : ""}>${icon(st.icon, 16)}</span><span>${esc(text)}</span></a>`;
+  const link = (p) => {
+    const st = pageStyle(p.key);
+    return `<a class="nav-link" href="${p.url}"${p.en ? ' hreflang="en"' : ""}${p.key === current ? ' aria-current="page"' : ""}><span class="nav-ico"${st.tone ? ` data-tone="${st.tone}"` : ""}>${icon(st.icon, 16)}</span>${pageName(t, p)}</a>`;
   };
-  const groups = nav.map((g) => `<div class="grp"><div class="grp__label">${esc(g.title)}</div>${g.items.map((i) => link(i.url, i.title, i.key)).join("")}</div>`).join("");
+  const groups = nav.map((g) => `<div class="grp"><div class="grp__label">${esc(g.title)}</div>${g.items.map(link).join("")}</div>`).join("");
   return `<nav class="side" id="nav" aria-label="${esc(t.navLabel)}">
 <div class="side__head"><a class="brand" href="${pageUrl(lang, "index")}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="28" height="28" alt="">${wordmark}</a><a class="ib" href="#content" data-menu-close aria-label="${esc(t.closeMenu)}">${icon("x", 18)}</a></div>
-<div class="side__scroll"><div class="grp">${link(pageUrl(lang, "index"), t.home, "index")}</div>${groups}
+<div class="side__scroll"><div class="grp">${link({ url: pageUrl(lang, "index"), title: t.home, key: "index" })}</div>${groups}
 <div class="side__tools"><button class="ib js-only" type="button" data-theme-toggle aria-label="${esc(t.theme)}"><span class="theme-ico theme-ico--sun">${icon("sun", 18)}</span><span class="theme-ico theme-ico--moon">${icon("moon", 18)}</span></button><a class="ib" href="${GITHUB}" aria-label="${esc(t.github)}" rel="noopener">${GH}</a></div></div>
 </nav><a class="backdrop" href="#content" data-menu-close tabindex="-1" aria-hidden="true"></a>`;
 }
@@ -170,16 +202,16 @@ export function renderDoc(ctx) {
   const st = pageStyle(page.key);
   const toc = page.headings.filter((h) => h.level <= 3 && h.toc !== false);
   const showToc = !isHome && toc.length >= 2;
-  const home = isHome ? renderLanding({ lang, t, nav, langNames: (langLinks ?? []).map((l) => T[l.lang].name), section: (key) => (NOT_IN_ADMIN.has(key) ? "start" : PAGE_SECTION[key] ?? null) }) : null;
+  const home = isHome ? renderLanding({ lang, t, nav, name: (p) => pageName(t, p), langNames: (langLinks ?? []).map((l) => T[l.lang].name), section: (key) => (NOT_IN_ADMIN.has(key) ? "start" : PAGE_SECTION[key] ?? null) }) : null;
   const crumbs = isHome ? "" : `<nav class="crumbs" aria-label="${esc(t.crumbs)}"><a href="${pageUrl(lang, "index")}">${esc(t.docs)}</a>${crumbGroup ? `<span aria-hidden="true">/</span><span>${esc(crumbGroup)}</span>` : ""}<span aria-hidden="true">/</span><span aria-current="page">${esc(page.title)}</span></nav>`;
   const hero = isHome
     ? home.hero
     : `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 13)}</span><span>${esc(t.inAdmin)}${t.inAdminSep ?? ": "}${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
   const inlineToc = showToc ? `<details class="toc-inline"><summary>${esc(t.onPage)}</summary>${tocHtml(toc)}</details>` : "";
-  const pn = (x, dir) => x ? `<a class="pn pn--${dir}" href="${x.url}" rel="${dir}"><span class="label">${dir === "prev" ? icon("back", 12) : ""}${esc(t[dir])}${dir === "next" ? icon("chevronRight", 12) : ""}</span><span class="pn__t">${esc(x.title)}</span></a>` : "<span></span>";
+  const pn = (x, dir) => x ? `<a class="pn pn--${dir}" href="${x.url}" rel="${dir}"><span class="label">${dir === "prev" ? icon("back", 12) : ""}${esc(t[dir])}${dir === "next" ? icon("chevronRight", 12) : ""}</span><span class="pn__t">${pageName(t, x)}</span></a>` : "<span></span>";
   const edit = `<p class="edit"><a href="${editUrl(lang, page.key)}" rel="noopener">${icon("externalLink", 14)}${esc(t.edit)}</a></p>`;
   return `<!doctype html>
-<html lang="${t.htmlLang}">
+<html lang="${t.htmlLang}"${t.dir ? ` dir="${t.dir}"` : ""}>
 <head>
 ${head({ lang, t, title: page.title, description: isHome ? home.description : page.description, canonical: page.url, alternates, assets, home: isHome })}
 </head>
@@ -222,8 +254,8 @@ ${head({ lang: "en", t, title: t.notFound, description: t.notFoundText, canonica
 <p class="nf__code">404</p>
 <h1 class="doc-h1">${esc(t.notFound)}</h1>
 <p class="doc-lead">${esc(t.notFoundText)}</p>
-${others.map((l) => `<p class="doc-lead" lang="${T[l].htmlLang}">${esc(T[l].notFoundText)}</p>`).join("")}
-<div class="hero__cta"><a class="btn btn--primary" href="/">${esc(t.toHome)}${icon("chevronRight", 14)}</a>${others.map((l) => `<a class="btn btn--secondary" href="${pageUrl(l, "index")}" lang="${T[l].htmlLang}">${esc(T[l].toHome)}</a>`).join("")}</div>
+${others.map((l) => `<p class="doc-lead" lang="${T[l].htmlLang}"${T[l].dir ? ` dir="${T[l].dir}"` : ""}>${esc(T[l].notFoundText)}</p>`).join("")}
+<div class="hero__cta"><a class="btn btn--primary" href="/">${esc(t.toHome)}${icon("chevronRight", 14)}</a>${others.map((l) => `<a class="btn btn--secondary" href="${pageUrl(l, "index")}" lang="${T[l].htmlLang}"${T[l].dir ? ` dir="${T[l].dir}"` : ""}>${esc(T[l].toHome)}</a>`).join("")}</div>
 </main>
 ${footer({ lang: "en", t })}
 </body>

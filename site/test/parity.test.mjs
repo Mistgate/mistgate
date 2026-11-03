@@ -31,9 +31,9 @@ export function shape(src) {
   return s;
 }
 
-// Every translation (ru, zh) against English. A language in COMPLETE must have every English page; one that is not
-// (zh while it is being translated) is checked on the pages it has, and may not have a page English lacks. Flip
-// COMPLETE.zh in src/urls.mjs when the last page lands: from then on a missing page fails here.
+// Every translation against English. A language in COMPLETE must have every English page; one that is not (fa and tr
+// while they are being translated) is checked on the pages it has, and may not have a page English lacks. Flip its
+// COMPLETE entry in src/urls.mjs when the last page lands: from then on a missing page fails here.
 const TRANSLATIONS = LANGS.filter((l) => l !== "en");
 
 for (const lang of TRANSLATIONS) {
@@ -64,7 +64,7 @@ for (const lang of TRANSLATIONS) {
   });
 }
 
-test("English and Russian are complete; zh is the only language allowed to lag", () => {
+test("English and Russian are complete; every language says whether it is", () => {
   assert.equal(COMPLETE.en && COMPLETE.ru, true);
   assert.deepEqual(LANGS.filter((l) => !(l in COMPLETE)), [], "every language says whether it is complete");
 });
