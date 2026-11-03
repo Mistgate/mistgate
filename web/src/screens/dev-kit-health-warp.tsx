@@ -139,7 +139,7 @@ const nodeData = {
   notes: "",
   dnsResolvers: [],
   timeouts: { livenessTimeoutS: 90, applyTimeoutS: 120, dialTimeoutS: 15 },
-  facts: { virt: "kvm" },
+  facts: { virt: "kvm", engines: [] },
 };
 
 // ---- alerts
@@ -163,7 +163,53 @@ const alert = (over: Partial<Alert>): Alert => ({
   actions: ["open_node", "mute"],
   ...over,
 });
+// 38 networks of a country alert as the panel joins them (sorted, as health/country.go does): cheburcheck 34, Globalping 2
+// (a full alert names its networks bare), bsbord 2; regions with their own brackets, MTS seen by three sources
+const cc = (op: string, asn: number, region: string) => `${op} (AS${asn}, ${region}, cheburcheck)`;
+const darkNets = [
+  ...["Кировская область", "Костромская область", "Краснодарский край", "Новосибирская область", "Пермский край", "Республика Карелия", "Свердловская область", "Тюменская область", "Республика Саха (Якутия)"].map((r) => cc("Rostelecom", 12389, r)),
+  cc("Rostelecom", 42610, "Москва"),
+  cc("MTS", 43148, "Курганская область"),
+  cc("MTS", 8359, "Владимирская область"),
+  cc("MTS", 8359, "Кировская область"),
+  cc("MTS", 8359, "Свердловская область"),
+  cc("MTS", 30881, "Республика Саха (Якутия)"),
+  "MTS (AS8359, Москва, bsbord)",
+  "MTS",
+  cc("TTK", 15774, "Республика Саха (Якутия)"),
+  cc("SkyNet", 35807, "Ленинградская область"),
+  cc("SkyNet", 35807, "Санкт-Петербург"),
+  cc("Beeline", 8402, "Москва"),
+  cc("Beeline", 3216, "Санкт-Петербург"),
+  cc("BaikalWestCom", 50187, "Иркутская область"),
+  cc("ELIT-TV", 58096, "Ростовская область"),
+  cc("Intersvyaz", 8369, "Челябинская область"),
+  cc("KomTehCentr", 12668, "Свердловская область"),
+  cc("Lan-Optic", 60931, "Тверская область"),
+  cc("MARK-ITT", 3226, "Удмуртская Республика"),
+  cc("Maxima", 39578, "Новгородская область"),
+  cc("Regionset", 41829, "Курская область"),
+  cc("Russian company", 15493, "Тюменская область"),
+  cc("Signal Service", 42514, "Курская область"),
+  cc("Silinet", 51369, "Московская область"),
+  cc("Subnet", 57227, "Республика Дагестан"),
+  cc("Ufanet", 24955, "Республика Башкортостан"),
+  cc("Tele2", 15378, "Нижегородская область"),
+  "ER-Telecom Holding",
+  "Miranda (Крым, bsbord)",
+].sort();
 const activeAlerts: Alert[] = [
+  // the sources disagree: cheburcheck reaches the node through the TSPU on some networks, Globalping and bsbord get nothing
+  alert({
+    id: "a10",
+    kind: AlertKind.COUNTRY_BLOCKED,
+    nodeId: "nod_nl1",
+    nodeName: "nl1",
+    titleKey: "health.alert.country_blocked.title",
+    whyKey: "health.alert.country_blocked.why.blocked",
+    params: { node: "nl1", country: "RU", verdict: "blocked", confidence: "conflict", sources: "globalping,tspu,cheburcheck,bsbord", networks: darkNets.join(", "), ports: "" },
+    firstSeenUnix: NOW - 23 * 60,
+  }),
   alert({
     id: "a1",
     severity: AlertSeverity.CRITICAL,

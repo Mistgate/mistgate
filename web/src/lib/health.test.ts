@@ -32,6 +32,7 @@ import {
   groupSeverity,
   groupTitle,
   networksByOperator,
+  networkSources,
   networksShort,
   hasKey,
   isIssue,
@@ -567,7 +568,7 @@ describe("the server's vocabulary is covered", () => {
       node_down: ["duration", "nodes", "total"],
       host_blip: ["count"],
       device_limit: ["user_name", "used", "limit"],
-      country_blocked: ["country", "networks", "ports"],
+      country_blocked: ["country", "networks", "ports", "probes"], // probes: the names of the networks' sources (alertWhy)
     };
     for (const [kind, params] of Object.entries(sent)) {
       for (const key of Object.keys(en).filter((k) => k.startsWith(`health.alert.${kind}.why`))) {
@@ -1156,22 +1157,22 @@ describe("reachability from a country", () => {
     const tcp = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.tcp_blocked", params: { ...params, verdict: "tcp_blocked" } });
     const gone = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.blocked", params: { ...params, verdict: "blocked" } });
     expect(alertWhy(tPlural, fmt, tcp)).toBe(
-      "The sources disagree: Globalping (probes inside Russia: Beeline, Rostelecom) and your probe node there see this node differently. One of them finds TCP to ports 443 and 8443 cut, so that is shown. Two checks in a row saw it. It closes after two clean checks.",
+      "The sources disagree: the probes of Globalping inside Russia (Beeline, Rostelecom) find TCP to ports 443 and 8443 cut, while other checks there see the node differently. The worse result is shown. Two checks in a row saw it. It closes after two clean checks.",
     );
     expect(alertWhy(tRuPlural, fmtRu, tcp)).toBe(
-      "Источники расходятся: Globalping (зонды внутри России: Beeline, Rostelecom) и твоя нода-зонд там видят ноду по-разному. Один из них видит, что TCP на порты 443 и 8443 режут, поэтому показано это. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+      "Источники расходятся: зонды Globalping внутри России (Beeline, Rostelecom) видят, что TCP на порты 443 и 8443 режут, а другие проверки там видят ноду иначе. Показан худший результат. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
     );
     expect(alertWhy(tZhPlural, fmtZh, tcp)).toBe(
-      "各来源的结果不一致：Globalping（俄罗斯境内的探测点：Beeline, Rostelecom）和你在那里的探测节点看到的情况不同。其中一方发现 TCP 端口 443 和 8443 被封锁，因此显示这一结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+      "各来源的结果不一致：俄罗斯境内的 Globalping 探测点（Beeline, Rostelecom）发现 TCP 端口 443 和 8443 被封锁，而那里的其他检测看到的情况不同。此处显示较差的结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
     );
     expect(alertWhy(tPlural, fmt, gone)).toBe(
-      "The sources disagree: Globalping’s probes inside Russia (Beeline, Rostelecom) cannot reach the node at all, no answer to ping, no TCP connection, while your probe node there sees it differently. The worse result is shown. Two checks in a row saw it. It closes after two clean checks.",
+      "The sources disagree: the probes of Globalping inside Russia (Beeline, Rostelecom) cannot reach the node at all, no answer to ping, no TCP connection, while other checks there see it differently. The worse result is shown. Two checks in a row saw it. It closes after two clean checks.",
     );
     expect(alertWhy(tRuPlural, fmtRu, gone)).toBe(
-      "Источники расходятся: зонды Globalping внутри России (Beeline, Rostelecom) совсем не достают до ноды, нет ответа ни на ping, ни по TCP, а твоя нода-зонд там видит иначе. Показан худший результат. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
+      "Источники расходятся: зонды Globalping внутри России (Beeline, Rostelecom) совсем не достают до ноды, нет ответа ни на ping, ни по TCP, а другие проверки там видят иначе. Показан худший результат. Так показали две проверки подряд. Алерт закроется после двух чистых проверок.",
     );
     expect(alertWhy(tZhPlural, fmtZh, gone)).toBe(
-      "各来源的结果不一致：俄罗斯境内的 Globalping 探测点（Beeline, Rostelecom）完全无法到达节点，ping 和 TCP 都没有响应，而你在那里的探测节点看到的情况不同。此处显示较差的结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
+      "各来源的结果不一致：俄罗斯境内的 Globalping 探测点（Beeline, Rostelecom）完全无法到达节点，ping 和 TCP 都没有响应，而那里的其他检测看到的情况不同。此处显示较差的结果。连续两次检测都是如此。连续两次正常后，告警会关闭。",
     );
     // both sources that agree keep Globalping's words: its probes saw it
     const agree = alert({ kind: AlertKind.COUNTRY_BLOCKED, whyKey: "health.alert.country_blocked.why.tcp_blocked", params: { ...params, confidence: "eyeball", verdict: "tcp_blocked" } });
@@ -1228,14 +1229,14 @@ describe("alert groups", () => {
     const list = "Beeline (AS8402, Moscow, cheburcheck), MTS (AS8359, Kazan, bsbord), MTS (AS8359, Moscow), Rostelecom (AS12389, Moscow), Tele2, MTS (AS8359, Novosibirsk)";
     const nets = alertNetworks(list);
     expect(nets).toEqual([
-      { name: "Beeline", tag: "AS8402 · Moscow · cheburcheck" },
-      { name: "MTS", tag: "AS8359 · Kazan · bsbord" },
-      { name: "MTS", tag: "AS8359 · Moscow" },
-      { name: "Rostelecom", tag: "AS12389 · Moscow" },
-      { name: "Tele2", tag: "" },
-      { name: "MTS", tag: "AS8359 · Novosibirsk" },
+      { name: "Beeline", asn: "8402", region: "Moscow", source: "cheburcheck" },
+      { name: "MTS", asn: "8359", region: "Kazan", source: "bsbord" },
+      { name: "MTS", asn: "8359", region: "Moscow", source: "globalping" },
+      { name: "Rostelecom", asn: "12389", region: "Moscow", source: "globalping" },
+      { name: "Tele2", asn: "", region: "", source: "globalping" },
+      { name: "MTS", asn: "8359", region: "Novosibirsk", source: "globalping" },
     ]);
-    expect(networksByOperator(nets).map((o) => [o.name, o.nets.length])).toEqual([["MTS", 3], ["Beeline", 1], ["Rostelecom", 1], ["Tele2", 1]]);
+    expect(networksByOperator(nets).map((o) => [o.name, o.n])).toEqual([["MTS", 3], ["Beeline", 1], ["Rostelecom", 1], ["Tele2", 1]]);
     expect(networksShort(tPlural, list)).toBe("MTS, Beeline, Rostelecom and 1 more");
     expect(networksShort(tRuPlural, list)).toBe("MTS, Beeline, Rostelecom и ещё 1");
     // a short list stays as the server wrote it
@@ -1243,5 +1244,91 @@ describe("alert groups", () => {
     const a = alert({ kind: AlertKind.COUNTRY_BLOCKED, subject: "partial", titleKey: "health.alert.country_blocked.title", whyKey: "health.alert.country_blocked.why.partial", params: { country: "RU", networks: list } });
     expect(alertWhy(tPlural, fmt, a)).toMatch(/^Home or mobile probes on MTS, Beeline, Rostelecom and 1 more get no answer/);
     expect(groupFact(tPlural, [a])).toBe("6 networks");
+  });
+
+  it("keeps a region with brackets or commas whole, and a network cut off at the end of the list", () => {
+    const list =
+      "MTS (AS30881, Республика Саха (Якутия), cheburcheck), MTS, Rostelecom (AS12389, Республика Саха (Якутия), cheburcheck), " +
+      "Svyaz (AS1, Moscow, Zelenograd, bsbord), A (B) (AS2, X (Y, Z)), ER-Telecom Holding";
+    expect(alertNetworks(list)).toEqual([
+      { name: "MTS", asn: "30881", region: "Республика Саха (Якутия)", source: "cheburcheck" },
+      { name: "MTS", asn: "", region: "", source: "globalping" }, // a full alert names Globalping's networks without details
+      { name: "Rostelecom", asn: "12389", region: "Республика Саха (Якутия)", source: "cheburcheck" },
+      { name: "Svyaz", asn: "1", region: "Moscow, Zelenograd", source: "bsbord" },
+      { name: "A (B)", asn: "2", region: "X (Y, Z)", source: "globalping" },
+      { name: "ER-Telecom Holding", asn: "", region: "", source: "globalping" },
+    ]);
+    // a long list cut short: the whole details stay, the half one goes, and its source is not guessed
+    expect(alertNetworks("Beeline (AS8402, Moscow), MTS (AS8359, Республика Саха (Яку…")).toEqual([
+      { name: "Beeline", asn: "8402", region: "Moscow", source: "globalping" },
+      { name: "MTS", asn: "8359", region: "", source: "" },
+    ]);
+    expect(alertNetworks("Beeline (AS8402, Moscow, cheburcheck), MTS (AS83")).toEqual([
+      { name: "Beeline", asn: "8402", region: "Moscow", source: "cheburcheck" },
+      { name: "MTS", asn: "", region: "", source: "" },
+    ]);
+    expect(alertNetworks("Beeline (AS8402, Moscow, cheburcheck), Rostel…")).toEqual([
+      { name: "Beeline", asn: "8402", region: "Moscow", source: "cheburcheck" },
+      { name: "Rostel…", asn: "", region: "", source: "" },
+    ]);
+    expect(alertNetworks("Beeline (AS8402, Moscow, cheburcheck), …").map((n) => n.name)).toEqual(["Beeline"]);
+    expect(alertNetworks("")).toEqual([]);
+  });
+
+  it("groups the networks by operator: AS numbers once, regions by source, a source named only where it says something", () => {
+    const cc = (op: string, asn: number, region: string) => `${op} (AS${asn}, ${region}, cheburcheck)`;
+    const list = [
+      cc("Rostelecom", 12389, "Пермский край"), cc("Rostelecom", 12389, "Республика Саха (Якутия)"), cc("Rostelecom", 42610, "Москва"), cc("Rostelecom", 12389, "Кировская область"),
+      cc("MTS", 8359, "Кировская область"), cc("MTS", 30881, "Республика Саха (Якутия)"), "MTS (AS8359, Москва, bsbord)", "MTS",
+      cc("TTK", 15774, "Республика Саха (Якутия)"), "Miranda (Крым, bsbord)", "ER-Telecom Holding", cc("Ufanet", 24955, "Республика Башкортостан"),
+    ].join(", ");
+    const nets = alertNetworks(list);
+    expect(networkSources(nets)).toEqual([{ value: "cheburcheck", n: 8 }, { value: "globalping", n: 2 }, { value: "bsbord", n: 2 }]);
+    const ops = networksByOperator(nets, "ru");
+    expect(ops.map((o) => o.name)).toEqual(["MTS", "Rostelecom", "ER-Telecom Holding", "Miranda", "TTK", "Ufanet"]);
+    expect(ops[0]).toEqual({
+      name: "MTS",
+      n: 4,
+      asns: ["8359", "30881"],
+      groups: [
+        { source: "cheburcheck", regions: ["Кировская область", "Республика Саха (Якутия)"], marked: true },
+        { source: "globalping", regions: [], marked: true },
+        { source: "bsbord", regions: ["Москва"], marked: true },
+      ],
+    });
+    // one source, the list's main one: nothing to say; regions in the alphabet of the page, each once
+    expect(ops[1]).toEqual({
+      name: "Rostelecom",
+      n: 4,
+      asns: ["12389", "42610"],
+      groups: [{ source: "cheburcheck", regions: ["Кировская область", "Москва", "Пермский край", "Республика Саха (Якутия)"], marked: false }],
+    });
+    // one source that is not the main one: named; a network without details has no region to show
+    expect(ops[2]!.groups).toEqual([{ source: "globalping", regions: [], marked: true }]);
+    expect(ops[3]!.groups).toEqual([{ source: "bsbord", regions: ["Крым"], marked: true }]);
+    expect(ops[4]!.groups).toEqual([{ source: "cheburcheck", regions: ["Республика Саха (Якутия)"], marked: false }]);
+    // the sentence names operators, never a region, and counts the networks it leaves out
+    expect(networksShort(tPlural, list)).toBe("MTS, Rostelecom, ER-Telecom Holding and 3 more");
+  });
+
+  it("says whose probes got nothing when the sources disagree, never Globalping alone", () => {
+    const conflict = (networks: string, sources: string, verdict = "blocked") =>
+      alert({
+        kind: AlertKind.COUNTRY_BLOCKED,
+        titleKey: "health.alert.country_blocked.title",
+        whyKey: `health.alert.country_blocked.why.${verdict}`,
+        params: { country: "RU", verdict, confidence: "conflict", sources, networks, ports: verdict === "tcp_blocked" ? "443" : "" },
+      });
+    const nets = "Beeline (AS8402, Moscow, cheburcheck), MTS, Miranda (Крым, bsbord), Rostelecom (AS12389, Kirov, cheburcheck), Tele2 (AS15378, Omsk, cheburcheck)";
+    expect(alertWhy(tPlural, fmt, conflict(nets, "globalping,tspu,cheburcheck,bsbord"))).toMatch(
+      /^The sources disagree: the probes of cheburcheck, Globalping, and bsbord inside Russia \(Beeline, Miranda, MTS and 2 more\) cannot reach the node at all/,
+    );
+    expect(alertWhy(tRuPlural, fmtRu, conflict(nets, "globalping,tspu,cheburcheck,bsbord"))).toMatch(/^Источники расходятся: зонды cheburcheck, Globalping и bsbord внутри России/);
+    // Persian: each name its own isolate, so the list reads right to left with its "و"
+    const tFa = Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dictionaries.fa[key], vars, true), { n: () => "" }) as unknown as T;
+    const fmtFa = makeFmt("fa", tFa);
+    expect(alertWhy(tFa, fmtFa, conflict(nets, "globalping,tspu,cheburcheck,bsbord"))).toMatch(/⁨⁨cheburcheck⁩\S*\s⁨Globalping⁩\S*\sو ⁨bsbord⁩⁩/);
+    // no networks to read the sources from: the alert's live sources but the TSPU probe
+    expect(alertWhy(tPlural, fmt, conflict("", "globalping,tspu", "tcp_blocked"))).toMatch(/^The sources disagree: the probes of Globalping inside Russia \(\) find TCP to port 443 cut/);
   });
 });

@@ -502,7 +502,36 @@ describe("the Alerts tab", () => {
     expect([all?.textContent, expanded(all)]).toEqual(["Show all 6", "false"]);
     await click(all);
     expect([...document.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["MTS", "Beeline", "MegaFon", "Rostelecom", "Tele2"]);
-    expect(document.querySelector("dd")?.textContent).toBe("AS8359 · Kazan · bsbordAS8359 · Moscow");
+    // the sources once; a row: the operator, its AS numbers once, its regions, a source named where the operator has several
+    expect(text()).toContain("Sources: Globalping 5 · bsbord 1");
+    const rows = [...document.querySelectorAll("dl > div")].map((r) => [...r.children].map((c) => c.textContent));
+    expect(rows[0]).toEqual(["MTS", "AS8359", "GlobalpingMoscowbsbordKazan"]);
+    expect(rows[1]).toEqual(["Beeline", "AS3216", "Moscow"]);
+    expect(text()).not.toContain("—");
+  });
+
+  it("lists a network without details by its operator alone, and keeps a region with brackets whole", async () => {
+    const networks =
+      "ER-Telecom Holding, MTS (AS30881, Республика Саха (Якутия), cheburcheck), MTS (AS8359, Kirov, cheburcheck), Rostelecom (AS12389, Республика Саха (Якутия), cheburcheck), TTK (AS15774, Республика Саха (Якутия), cheburcheck)";
+    await mountTab([
+      alert({
+        id: "alt_c",
+        kind: AlertKind.COUNTRY_BLOCKED,
+        titleKey: "health.alert.country_blocked.title",
+        whyKey: "health.alert.country_blocked.why.blocked",
+        params: { country: "RU", verdict: "blocked", confidence: "conflict", sources: "globalping,tspu,cheburcheck", networks },
+      }),
+    ]);
+    await click(toggles()[0]);
+    expect(text()).toContain("the probes of cheburcheck and Globalping inside Russia (MTS, ER-Telecom Holding, Rostelecom and 1 more)");
+    await click(document.querySelector("[data-nets-toggle]"));
+    const rows = [...document.querySelectorAll("dl > div")].map((r) => [...r.children].map((c) => c.textContent));
+    expect(rows).toEqual([
+      ["MTS", "AS30881 · AS8359", "Kirov, Республика Саха (Якутия)"],
+      ["ER-Telecom Holding", "Globalping"],
+      ["Rostelecom", "AS12389", "Республика Саха (Якутия)"],
+      ["TTK", "AS15774", "Республика Саха (Якутия)"],
+    ]);
   });
 
   it("folds a path_lossy alert to its sender, the node it lost packets to and the loss; open, both senders with their regions", async () => {

@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useId, useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { EditionNotice } from "@/components/edition-notice";
 import { Chip, SectionLabel } from "@/components/ui/bits";
@@ -32,11 +32,13 @@ import {
   groupTitle,
   isPeopleAlert,
   muteChoices,
+  networkSources,
   networksByOperator,
   resolutionWord,
   restartConsequence,
   severityKind,
   severityWord,
+  sourceName,
   useCan,
   type Alert,
 } from "@/lib/health";
@@ -579,13 +581,18 @@ function PathRuns({ a }: { a: Alert }) {
   );
 }
 
-/** Every network of a country alert, by operator, behind "Show all N" when the sentence names only the first operators. */
+/**
+ * Every network of a country alert behind "Show all N" when the sentence names only the first operators: whose probes they are,
+ * once, then a row per operator with its AS numbers and its regions. A region names its source only where that says something.
+ */
 function Networks({ list }: { list: string }) {
   const t = useT();
+  const fmt = useFmt();
   const id = useId();
   const [open, setOpen] = useState(false);
   const nets = alertNetworks(list);
   if (nets.length <= NETS_INLINE) return null;
+  const sources = networkSources(nets).map((s) => `${sourceName(t, s.value)} ${s.n}`);
   return (
     <div className="flex flex-col gap-2">
       <button
@@ -599,21 +606,36 @@ function Networks({ list }: { list: string }) {
         {open ? t("cr.part.fewer") : t("hl.nets.all", { n: nets.length })}
       </button>
       {open && (
-        // a phone puts the operator above its networks, so a network's tag keeps one line
-        <dl id={id} className="grid grid-cols-1 items-baseline gap-x-4 gap-y-1 rounded-field bg-surface-2 px-3 py-2.5 text-xs @md:grid-cols-[max-content_minmax(0,1fr)] @md:gap-y-2">
-          {networksByOperator(nets).map((o) => (
-            <Fragment key={o.name}>
-              <dt className="font-semibold @max-md:pt-1.5 @max-md:first:pt-0">{o.name}</dt>
-              <dd className="flex flex-wrap gap-1">
-                {o.nets.map((n, i) => (
-                  <span key={i} className="max-w-full rounded-[6px] bg-surface px-1.5 py-0.5 font-mono text-[11px] break-words text-muted">
-                    {n.tag || "—"}
-                  </span>
-                ))}
-              </dd>
-            </Fragment>
-          ))}
-        </dl>
+        <div id={id} className="flex flex-col gap-2 rounded-field bg-surface-2 px-3 py-2.5 text-xs">
+          {sources.length > 0 && <p className="text-[11px] text-muted">{t("common.labeled", { label: t("rc.sources"), value: sources.join(" · ") })}</p>}
+          {/* a wide card: operator, AS numbers and regions in columns; a phone puts the regions under the operator */}
+          <dl className="grid grid-cols-1 border-t border-line @2xl:grid-cols-[max-content_max-content_minmax(0,1fr)] @2xl:gap-x-4">
+            {networksByOperator(nets, fmt.locale).map((o) => {
+              const groups = o.groups.filter((g) => g.regions.length > 0 || g.marked);
+              return (
+                <div key={o.name} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-line py-2 last:border-b-0 last:pb-0 @2xl:col-span-3 @2xl:grid @2xl:grid-cols-subgrid">
+                  <dt className="font-semibold">{o.name}</dt>
+                  {o.asns.length > 0 && (
+                    <dd className="font-mono text-[11px] text-muted">
+                      <span dir="ltr">{o.asns.map((a) => `AS${a}`).join(" · ")}</span>
+                    </dd>
+                  )}
+                  {groups.length > 0 && (
+                    <dd className="flex min-w-0 basis-full flex-col gap-0.5 leading-[18px] text-muted @2xl:col-start-3">
+                      {groups.map((g) => (
+                        // the source leads its regions, so the tags of an operator's lines stand in one column and its regions wrap beside it
+                        <p key={g.source} className="flex items-baseline gap-1.5">
+                          {g.marked && <span className="flex-none rounded-[6px] bg-surface px-1.5 py-px font-mono text-[11px] leading-4">{sourceName(t, g.source)}</span>}
+                          {g.regions.length > 0 && <span className="min-w-0 break-words">{g.regions.join(t("cr.tip.sep"))}</span>}
+                        </p>
+                      ))}
+                    </dd>
+                  )}
+                </div>
+              );
+            })}
+          </dl>
+        </div>
       )}
     </div>
   );

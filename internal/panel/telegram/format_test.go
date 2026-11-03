@@ -552,6 +552,33 @@ func TestPartialCountryBlockedAlertIncludesMixedSourceNetworks(t *testing.T) {
 	}
 }
 
+// A long network list is cut at a whole network, never inside a bracket ("Республика Саха (Якутия)" has its own).
+func TestCountryBlockedNetworksCutAtAWholeNetwork(t *testing.T) {
+	var nets []string
+	for _, region := range []string{"Республика Саха (Якутия)", "Кировская область", "Республика Саха (Якутия)", "Пермский край", "Тюменская область"} {
+		nets = append(nets, "Rostelecom (AS12389, "+region+", cheburcheck)")
+	}
+	list := strings.Join(nets, ", ")
+	got := networksText(list, 160)
+	want := strings.Join(nets[:2], ", ") + "…" // 59 runes each: the third would end at 181
+	if got != want {
+		t.Errorf("networksText = %q, want %q", got, want)
+	}
+	if got := networksText("MTS (AS30881, Республика Саха (Якутия), cheburcheck)", 20); got != "MTS…" {
+		t.Errorf("one long network = %q, want its name", got)
+	}
+	if got := networksText("MTS, Tele2", 160); got != "MTS, Tele2" {
+		t.Errorf("a short list = %q", got)
+	}
+	a := store.HealthAlert{Kind: "country_blocked", Severity: 2, NodeID: "nl1", WhyKey: "health.alert.country_blocked.why.blocked",
+		Params: map[string]string{"node": "nl1", "country": "RU", "verdict": "blocked", "sources": "cheburcheck", "networks": list}}
+	for _, lang := range []L{"en", "ru", "zh"} {
+		if got := alertReason(lang, a); strings.Count(got, "(") != strings.Count(got, ")") {
+			t.Errorf("%s reason has a half bracket: %q", lang, got)
+		}
+	}
+}
+
 // The alert says which sources saw the block: the probe node alone (a data-centre view of TCP only), Globalping with it, and a
 // disagreement between the two.
 func TestCountryBlockedAlertNamesTheSources(t *testing.T) {

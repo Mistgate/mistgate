@@ -404,6 +404,36 @@ func alertReason(l L, a store.HealthAlert) string {
 	return ""
 }
 
+// networksText is the alert's network list ("MTS (AS30881, Республика Саха (Якутия), cheburcheck), Beeline") cut to whole
+// networks within n runes, "…" for the rest: a plain cut would end inside a bracket. One network longer than that keeps its name.
+func networksText(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return data(s, n)
+	}
+	depth, end, open := 0, 0, 0
+	for i, c := range r[:n] {
+		switch {
+		case c == '(':
+			if depth == 0 && open == 0 {
+				open = i
+			}
+			depth++
+		case c == ')' && depth > 0:
+			depth--
+		case c == ',' && depth == 0:
+			end = i
+		}
+	}
+	if end == 0 {
+		end = open
+	}
+	if end == 0 {
+		return data(s, n)
+	}
+	return data(strings.TrimSpace(string(r[:end]))+"…", n)
+}
+
 // countryPartial: the alert is about some networks only. The IPv4 subject is "partial", the IPv6 one "ipv6/partial".
 func countryPartial(a store.HealthAlert) bool {
 	return a.Subject == "partial" || strings.HasSuffix(a.Subject, "/partial")
@@ -418,7 +448,7 @@ func countryBlockedReason(l L, p map[string]string) string {
 	sources := strings.Split(p["sources"], ",")
 	has := func(name string) bool { return slices.Contains(sources, name) }
 	where := ""
-	if nets := data(p["networks"], 160); nets != "" {
+	if nets := networksText(p["networks"], 160); nets != "" {
 		where = l.pick(" ("+nets+")", " ("+nets+")", "（"+nets+"）")
 	}
 	var line string
@@ -443,7 +473,7 @@ func countryBlockedReason(l L, p map[string]string) string {
 }
 
 func countryPartialReason(l L, p map[string]string) string {
-	nets := data(p["networks"], 160)
+	nets := networksText(p["networks"], 160)
 	line := l.pick("Probes on "+nets+" get nothing from it while they reach your other nodes.",
 		"Зонды в сетях "+nets+" не получают от неё ответов, хотя доходят до других ваших нод.",
 		"位于"+nets+"的探测点收不到它的响应，但能到达您的其他节点。")

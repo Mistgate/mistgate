@@ -15,7 +15,7 @@ import {
   type DoctorItem as DoctorItemMsg,
   type NodeDoctor as NodeDoctorMsg,
 } from "@/gen/mistgate/admin/v1/health_pb";
-import type { T } from "@/i18n";
+import { dirOf, type T } from "@/i18n";
 import { en, type MessageKey } from "@/i18n/en";
 import { health } from "./api";
 import { itemParams } from "./doctor-detail";
@@ -138,8 +138,13 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
     params.networks = networksShort(t, a.params.networks ?? "");
     const ports = (a.params.ports ?? "").split(",").map((p) => p.trim()).filter(Boolean);
     params.ports = ports.length ? t.n("cr.alert.ports", ports.length, { ports: listOf(fmt.locale, ports) }) : "";
-    // the server's key assumes Globalping's probes; the TSPU probe alone, and two sources that disagree, have their own
+    // the TSPU probe alone, and sources that disagree, have their own keys
     const sources = (a.params.sources ?? "").split(",");
+    // whose probes got nothing, "cheburcheck, Globalping and bsbord": the sources of the networks, else the alert's live ones
+    const dark = networkSources(alertNetworks(a.params.networks ?? "")).map((s) => s.value);
+    // in Persian each name is an isolate of its own, so the list keeps the right-to-left order of the sentence around it
+    const isolate = (s: string) => (dirOf(fmt.lang) === "rtl" ? `⁨${s}⁩` : s);
+    params.probes = listOf(fmt.locale, (dark.length ? dark : sources.filter((s) => s && s !== "tspu")).map((s) => isolate(sourceName(t, s))));
     const own =
       sources.includes("tspu") && !sources.includes("globalping")
         ? "health.alert.country_blocked.why.tspu"
@@ -329,34 +334,109 @@ export function groupFact(t: T, g: readonly Alert[]): string {
 }
 
 /**
- * The networks of a country alert as the panel joins them ("MTS (AS8359, Moscow, bsbord), Tele2"): split at the commas
- * outside the brackets, "AS8359 · Moscow · bsbord" as the tag.
+ * A network of a country alert that gets nothing from the node: the operator, its AS number and region when the source
+ * named them, and the source that saw it ("globalping" when the panel wrote none; "" for a network cut off at the end).
  */
-export function alertNetworks(s: string): BreakdownNet[] {
-  return s
-    .split(/,\s*(?![^(]*\))/)
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .map((x) => {
-      const m = /^(.*?)\s*\((.*)\)$/.exec(x);
-      return m ? { name: m[1] || m[2]!, tag: m[1] ? m[2]!.split(/,\s*/).join(" · ") : "" } : { name: x, tag: "" };
-    });
+export type AlertNet = { name: string; asn: string; region: string; source: string };
+
+/** The sources the panel writes after a network's region (health/country.go countryVantageName); Globalping's carry none. */
+const netSources = new Set(["tspu", "cheburcheck", "cheburcheck_own", "bsbord", "bsbord_tunnel", "bsbord_geo"]);
+
+/** s split at its commas outside brackets: "MTS (AS1, Sakha (Yakutia)), Tele2" is two parts. */
+function topLevel(s: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i <= s.length; i++) {
+    if (s[i] === "(") depth++;
+    else if (s[i] === ")") depth = Math.max(0, depth - 1);
+    else if (i === s.length || (s[i] === "," && depth === 0)) {
+      parts.push(s.slice(from, i).trim());
+      from = i + 1;
+    }
+  }
+  return parts.filter(Boolean);
 }
 
-/** The networks by operator, the one with most networks first: "Rostelecom" with its four. */
-export function networksByOperator(nets: readonly BreakdownNet[]): { name: string; nets: BreakdownNet[] }[] {
-  const by = new Map<string, BreakdownNet[]>();
+/**
+ * One network as the panel writes it: "MTS (AS30881, Республика Саха (Якутия), cheburcheck)", or a bare "MTS". Its last
+ * bracket at the outer level holds the details, so a region with brackets or commas stays whole. A network cut off at the end
+ * of a long list ("MTS (AS8359, Mosc…", an unclosed bracket) keeps its name and the details that arrived whole.
+ */
+function netOf(x: string): AlertNet {
+  const body = x.replace(/\s*…$/, "");
+  let depth = 0;
+  let open = -1;
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] === "(" && depth++ === 0) open = i;
+    else if (body[i] === ")" && depth > 0) depth--;
+  }
+  const cut = body !== x || depth > 0;
+  if (open < 0 || (depth === 0 && !body.endsWith(")"))) return { name: x, asn: "", region: "", source: cut ? "" : "globalping" };
+  const inner = depth > 0 ? body.slice(open + 1) : body.slice(open + 1, -1);
+  const parts = topLevel(inner);
+  if (depth > 0 && !/,\s*$/.test(inner)) parts.pop(); // the part the cut went through
+  const source = netSources.has(parts.at(-1) ?? "") ? parts.pop()! : cut ? "" : "globalping";
+  const asn = /^AS\d+$/.test(parts[0] ?? "") ? parts.shift()!.slice(2) : "";
+  return { name: body.slice(0, open).trim() || inner, asn, region: parts.join(", "), source };
+}
+
+/** The networks of a country alert as the panel joins them ("MTS (AS8359, Moscow, bsbord), Tele2"), split at the commas outside brackets. */
+export function alertNetworks(s: string): AlertNet[] {
+  return topLevel(s)
+    .filter((x) => x !== "…")
+    .map(netOf);
+}
+
+/** The values by how often they come, the most first; equal counts keep their first order. */
+function byCount(values: readonly string[]): { value: string; n: number }[] {
+  const seen = new Map<string, number>();
+  for (const v of values) seen.set(v, (seen.get(v) ?? 0) + 1);
+  return [...seen].map(([value, n]) => ({ value, n })).sort((a, b) => b.n - a.n);
+}
+
+/** Whose probes the networks come from, the source with most of them first: cheburcheck 34, Globalping 2, bsbord 2. */
+export const networkSources = (nets: readonly AlertNet[]) =>
+  byCount(nets.map((n) => n.source).filter(Boolean)).sort((a, b) => b.n - a.n || sourceRank(a.value) - sourceRank(b.value));
+
+/**
+ * An operator of a country alert: how many of its networks get nothing, its AS numbers (the most used first), its regions by
+ * source. A group names its source (`marked`) when the operator's networks come from several sources, or from one that is not
+ * the list's main source, which the list says once above.
+ */
+export type AlertOperator = { name: string; n: number; asns: string[]; groups: { source: string; regions: string[]; marked: boolean }[] };
+
+/** The networks by operator, the one with most networks first: "Rostelecom" with its ten. */
+export function networksByOperator(nets: readonly AlertNet[], locale = "en"): AlertOperator[] {
+  const main = networkSources(nets)[0]?.value ?? "";
+  const cmp = (a: string, b: string) => a.localeCompare(b, locale);
+  const by = new Map<string, AlertNet[]>();
   for (const n of nets) by.set(n.name, [...(by.get(n.name) ?? []), n]);
-  return [...by].map(([name, list]) => ({ name, nets: list })).sort((a, b) => b.nets.length - a.nets.length || a.name.localeCompare(b.name));
+  return [...by]
+    .map(([name, list]) => {
+      const sources = byCount(list.map((n) => n.source)).sort((a, b) => b.n - a.n || sourceRank(a.value) - sourceRank(b.value));
+      const several = sources.length > 1;
+      return {
+        name,
+        n: list.length,
+        asns: byCount(list.map((n) => n.asn).filter(Boolean)).map((a) => a.value),
+        groups: sources.map(({ value: source }) => ({
+          source,
+          regions: [...new Set(list.filter((n) => n.source === source && n.region).map((n) => n.region))].sort(cmp),
+          marked: source !== "" && (several || source !== main),
+        })),
+      };
+    })
+    .sort((a, b) => b.n - a.n || cmp(a.name, b.name));
 }
 
-/** More networks than a sentence holds: the list is cut to the three operators with most of them, "and N more" (the card lists them all). */
+/** More networks than a sentence holds: the list is cut to the three operators with most of them, "and N more" networks (the card lists them all). */
 export const NETS_INLINE = 4;
 export function networksShort(t: T, s: string): string {
   const nets = alertNetworks(s);
   if (nets.length <= NETS_INLINE) return s;
   const top = networksByOperator(nets).slice(0, 3);
-  const rest = nets.length - top.reduce((n, o) => n + o.nets.length, 0);
+  const rest = nets.length - top.reduce((n, o) => n + o.n, 0);
   const names = top.map((o) => o.name).join(", ");
   return rest > 0 ? t("hl.nets.short", { names, n: rest }) : names;
 }
