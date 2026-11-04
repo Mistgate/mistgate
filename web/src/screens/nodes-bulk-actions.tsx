@@ -4,8 +4,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { usePanelSSHKey } from "@/components/panel-ssh-key";
 import { Fingerprint } from "@/components/ssh-login";
+import { Footer, TargetList as BaseTargetList, type PanelHead, type RowLink } from "@/components/bulk";
 import { Chip } from "@/components/ui/bits";
-import { Button } from "@/components/ui/button";
 import type { IconName, Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Callout } from "@/components/ui/notice";
@@ -18,8 +18,7 @@ import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { health, nodes as nodesApi, provisioning } from "@/lib/api";
-import type { Batch, Outcome, Skipped, Spec, Target } from "@/lib/batch";
-import { cx } from "@/lib/cx";
+import type { Batch, Outcome, Row, Skipped, Spec, Target } from "@/lib/batch";
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { isAccepted } from "@/lib/health";
@@ -57,6 +56,16 @@ export const actionMeta: Record<ActionId, Meta> = {
   unbindKey: { icon: "x", tone: "rose", label: "bulk.unbindKey", title: "bulk.title.unbindKey", done: "bulk.done.unbindKey", ssh: true, danger: true, link: { tab: "server" } },
   decoy: { icon: "mask", tone: "sage", label: "bulk.decoy", title: "bulk.title.decoy", done: "bulk.done.decoy" },
 };
+
+/** How a batch of `action` heads its panel (the chip, the title, the summary) and when a row offers its node's own page. */
+export function panelFor(t: T, action: ActionId): { head: PanelHead; open: (row: Row) => RowLink | null } {
+  const m = actionMeta[action];
+  return {
+    head: { icon: m.icon, tone: m.tone, title: t(m.title), done: (n, ok) => t.n(m.done, n, { ok }), hint: m.ssh ? t("bulk.retryHint") : undefined },
+    // a node's own page is offered for a call that finished well and has something to look at there
+    open: (row) => (m.link && row.state === "ok" && row.link ? { to: "/nodes/$id", params: { id: row.id }, search: m.link } : null),
+  };
+}
 
 /** The saved SSH access of every node, as the node cards and the install wizard read it (one key, one cache). */
 export const accessQuery = queryOptions({
@@ -334,59 +343,15 @@ export type BulkRun = ReturnType<typeof useBulkRun>;
 // ---------------------------------------------------------------------------------------------------
 // Confirms
 
-/** Who takes part and who sits out, under a confirm: the names (each its own direction), the skipped with their reason. */
-export function TargetList({ targets, skipped, hidden = 0 }: { targets?: readonly Target[]; skipped: readonly Skipped[]; hidden?: number }) {
+/** Who takes part and who sits out, under a confirm: "Nodes (3) · 1 hidden by the filter", the skipped with their reason. */
+function TargetList({ targets, skipped, hidden = 0 }: { targets?: readonly Target[]; skipped: readonly Skipped[]; hidden?: number }) {
   const t = useT();
-  const names = (list: readonly { id: string; name: string }[]) =>
-    list.map((x, i) => (
-      <span key={x.id}>
-        {i > 0 && ", "}
-        <bdi>{x.name}</bdi>
-      </span>
-    ));
-  // the skipped grouped by their reason: "de2, fi2 — Logs in by key only"
-  const reasons = new Map<string, Skipped[]>();
-  for (const s of skipped) reasons.set(s.note, [...(reasons.get(s.note) ?? []), s]);
-  return (
-    <div className="flex flex-col gap-2 rounded-field border border-line bg-surface-2 px-3.5 py-3 text-xs leading-snug">
-      {targets && (
-        <p className="text-pretty">
-          <b className="font-bold text-fg">{t("bulk.list.targets", { n: targets.length })}</b>
-          {hidden > 0 && <span className="text-muted"> · {t.n("bulk.hidden", hidden)}</span>}
-          <span className="block text-muted">{targets.length > 0 ? names(targets) : "—"}</span>
-        </p>
-      )}
-      {skipped.length > 0 && (
-        <div className={cx("flex flex-col gap-0.5", targets && "border-t border-line pt-2")}>
-          <b className="font-bold text-fg">{t("bulk.list.skipped", { n: skipped.length })}</b>
-          {[...reasons].map(([why, list]) => (
-            <span key={why} className="text-pretty text-muted">
-              {names(list)} — {why}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return <BaseTargetList title={targets && t("bulk.list.targets", { n: targets.length })} note={hidden > 0 ? t.n("bulk.hidden", hidden) : undefined} targets={targets} skipped={skipped} />;
 }
 
 type DialogProps = { nodes: readonly Node[]; hidden: ReadonlySet<string>; run: BulkRun; onClose: () => void };
 
 const hiddenOf = (targets: readonly Target[], hidden: ReadonlySet<string>) => targets.filter((x) => hidden.has(x.id)).length;
-
-function Footer({ go, label, danger, disabled, onClose }: { go: () => void; label: string; danger?: boolean; disabled?: boolean; onClose: () => void }) {
-  const t = useT();
-  return (
-    <>
-      <Button variant="ghost" size="md" onClick={onClose}>
-        {t("common.cancel")}
-      </Button>
-      <Button variant={danger ? "danger" : "primary"} size="md" disabled={disabled} onClick={go}>
-        {label}
-      </Button>
-    </>
-  );
-}
 
 /** Change the SSH password on the selected nodes: generated per node, never shown here; each row of the result opens its card. */
 export function PasswordDialog({ nodes, hidden, run, onClose }: DialogProps) {

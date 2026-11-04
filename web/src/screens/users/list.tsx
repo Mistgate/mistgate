@@ -1,6 +1,6 @@
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { Avatar, Card, PageTitle } from "@/components/ui/bits";
@@ -22,9 +22,12 @@ import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
 import { clampPage, useMove, usePaging } from "@/lib/paging";
 import { userCountQuery } from "@/lib/queries";
+import { meQuery } from "@/lib/session";
 import { CreateUserModal } from "./create-user";
-import { avatarIndex, barTone, nowSec, seenText, shownKey, shownKind, shownStatus, termText, usage, viaOf } from "./format";
-import { GroupChip, GroupsTab } from "./groups";
+import { avatarIndex, barTone, noAccess, nowSec, seenText, shownKey, shownKind, shownStatus, termText, usage, viaOf } from "./format";
+import { UsersBulk, UsersPick } from "./bulk";
+import { maxBulkUsers } from "./bulk-actions";
+import { canManage, GroupChip, GroupsTab } from "./groups";
 import { LinkModal, linkTargetOf, type LinkTarget } from "./link-modal";
 import { usersPageN, type UserN as User } from "./model";
 import { AppLink, useGo } from "./nav";
@@ -138,8 +141,9 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
   const t = useTx();
   const fmt = useFmt();
   const go = useGo();
-  const qc = useQueryClient();
+  // the owner and the helper tick people for the bulk bar; a read-only admin sees the list alone
   const toast = useToast();
+  const manage = canManage(useQuery(meQuery).data?.admin?.role);
   const [filter, setFilter] = useState<FilterId>("all");
   const [search, setSearch] = useState("");
   const query = useDebounced(search.trim(), 250);
@@ -149,7 +153,6 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
   const groupList = useQuery(groupsQuery);
   const groupName = groupList.data?.find((g) => g.id === groupId)?.name ?? "…";
   const [link, setLink] = useState<{ target: LinkTarget; url?: string; password?: string } | null>(null);
-  const [busy, setBusy] = useState(false);
 
   // numbered pages: the server skips `offset` rows; the size of the filter in use is among the counts of the answer
   const paging = usePaging({ sizes: pageSizes, defaultSize: PAGE });
@@ -169,7 +172,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
     placeholderData: keepPreviousData,
   });
 
-  const rows = list.data?.users ?? [];
+  const rows = useMemo(() => list.data?.users ?? [], [list.data]);
   const counts = list.data?.counts;
   const total = counts ? { all: counts.all, online: counts.online, expiring: counts.expiring, over: counts.overQuota, devices: counts.overDeviceLimit }[filter] : 0;
   const page = clampPage(paging.page, total, paging.size);
@@ -182,7 +185,8 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
     paging.setPage(1, true);
   };
   const pager = { total, page, size: paging.size, sizes: pageSizes, onPage: paging.setPage, onSize: paging.setSize, busy: list.isPlaceholderData };
-  const pickedList = Object.values(picked);
+  const pickedList = useMemo(() => Object.values(picked), [picked]);
+  const shownIds = useMemo(() => new Set(rows.map((u) => u.id)), [rows]);
   const allOnPage = rows.length > 0 && rows.every((u) => picked[u.id]);
   const now = nowSec();
   const groupOf = (u: User) => groupList.data?.find((g) => g.id === u.groupId);
@@ -191,7 +195,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
     setPicked((p) => {
       const next = { ...p };
       if (next[u.id]) delete next[u.id];
-      else next[u.id] = u;
+      else if (Object.keys(next).length < maxBulkUsers) next[u.id] = u;
       return next;
     });
   const toggleAll = () =>
@@ -199,42 +203,30 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
       const next = { ...p };
       for (const u of rows) {
         if (allOnPage) delete next[u.id];
-        else next[u.id] = u;
+        else if (next[u.id] || Object.keys(next).length < maxBulkUsers) next[u.id] = u;
       }
       return next;
     });
-
-  async function act(run: () => Promise<void>) {
-    setBusy(true);
-    try {
-      await run();
-      setPicked({});
-      await qc.invalidateQueries({ queryKey: ["users"] });
-    } catch (e) {
-      toast.error(errorText(e, t));
-    } finally {
-      setBusy(false);
-    }
+  // a refetch brings fresh rows: the ticked ones on screen take them (what a bulk call brought back is merged the same way)
+  const [seenRows, setSeenRows] = useState(rows);
+  if (seenRows !== rows) {
+    setSeenRows(rows);
+    setPicked((p) => {
+      let next: Record<string, User> | null = null;
+      for (const u of rows) if (p[u.id] && p[u.id] !== u) (next ??= { ...p })[u.id] = u;
+      return next ?? p;
+    });
   }
-  const names = (us: User[]) => us.map((u) => u.name).join(", ");
-
-  const extend = () =>
-    act(async () => {
-      // "never expires" users have no date to move: extending would put a term on them, so they are left out
-      const us = pickedList.filter((u) => u.expiresUnix > 0);
-      if (us.length === 0) return void toast(t("users.extendedNone"));
-      await users.extendUsers({ userIds: us.map((u) => u.id), days: 30 });
-      toast(t("users.extended", { names: names(us) }));
+  const clear = useCallback(() => setPicked({}), []);
+  // what a bulk call brought back replaces the ticked person; the ones that are gone leave the selection
+  const merge = useCallback((fresh: User[], gone: readonly string[] = []) => {
+    setPicked((p) => {
+      const next = { ...p };
+      for (const u of fresh) if (next[u.id]) next[u.id] = u;
+      for (const id of gone) delete next[id];
+      return next;
     });
-  const disable = () =>
-    act(async () => {
-      const us = pickedList.filter((u) => u.status !== UserStatus.DISABLED);
-      const ids = us.map((u) => u.id);
-      await users.setUsersEnabled({ userIds: ids, enabled: false });
-      toast(t("users.disabledToast", { names: names(us) }), {
-        undo: () => void users.setUsersEnabled({ userIds: ids, enabled: true }).then(() => qc.invalidateQueries({ queryKey: ["users"] })),
-      });
-    });
+  }, []);
 
   const filterLabels: Record<FilterId, [string, number | undefined]> = {
     all: [t("users.filter.all"), counts?.all],
@@ -302,23 +294,9 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                 ),
               }))}
             />
+            {manage && <UsersPick filter={filterValue[filter]} query={query} groupId={groupId} page={rows} any={pickedList.length > 0} onPick={(people) => setPicked(Object.fromEntries(people.map((u) => [u.id, u])))} />}
             <SortPick order={order} onSort={setSort} t={t} />
           </div>
-
-          {pickedList.length > 0 && (
-            <div className="screen-enter flex flex-wrap items-center gap-2 rounded-field border border-accent-line bg-accent-soft py-2 pe-2 ps-3.5">
-              <b className="min-w-[120px] flex-1 text-[13px]">{t("users.selected", { n: pickedList.length })}</b>
-              <Button disabled={busy} onClick={extend}>
-                {t("users.extend30")}
-              </Button>
-              <Button variant="danger" disabled={busy} onClick={disable}>
-                {t("users.disable")}
-              </Button>
-              <Button variant="ghost" onClick={() => setPicked({})}>
-                {t("users.cancel")}
-              </Button>
-            </div>
-          )}
 
           {list.isPending ? (
             <Pending />
@@ -335,9 +313,11 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                     <table className="w-full table-fixed text-start">
                       <thead>
                         <tr className="h-10 border-b border-line text-[11px] font-bold tracking-[0.06em] text-muted uppercase">
-                          <th scope="col" className="w-[42px] pe-2 ps-4">
-                            <Check checked={allOnPage} onCheckedChange={toggleAll} label={t("users.selectAll")} />
-                          </th>
+                          {manage && (
+                            <th scope="col" className="w-[42px] pe-2 ps-4">
+                              <Check checked={allOnPage} onCheckedChange={toggleAll} label={t("users.selectAll")} />
+                            </th>
+                          )}
                           {columns.map((c) =>
                             c.sort ? (
                               <SortTh key={c.id} id={c.sort} order={order} onSort={(id) => setSort(clickSort(order, id))} label={t(`users.col.${c.id}`)} end={c.end} icon={c.icon} className={col[c.id]} />
@@ -351,7 +331,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                       </thead>
                       <tbody className={cx("transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
                         {rows.map((u) => (
-                          <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                          <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={manage ? () => toggle(u) : undefined} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
                         ))}
                       </tbody>
                     </table>
@@ -360,7 +340,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                   <div className="flex flex-col gap-2 @min-[600px]:hidden">
                     <div className={cx("flex flex-col gap-2 transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
                       {rows.map((u) => (
-                        <UserCard key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={() => toggle(u)} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                        <UserCard key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={manage ? () => toggle(u) : undefined} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
                       ))}
                     </div>
                     {total > Math.min(...pageSizes) && (
@@ -393,6 +373,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
         }}
       />
       <LinkModal target={link?.target ?? null} initialUrl={link?.url} initialPassword={link?.password} onClose={() => setLink(null)} />
+      {manage && <UsersBulk picked={pickedList} shown={shownIds} onClear={clear} onMerge={merge} />}
     </div>
   );
 }
@@ -507,7 +488,8 @@ function SortPick({ order, onSort, t }: { order: SortState; onSort: (next: SortS
   );
 }
 
-type RowProps = { u: User; group?: Group; t: Tx; fmt: Fmt; now: number; on: boolean; onToggle: () => void; onOpen: () => void };
+/** `onToggle` is absent for a read-only admin: no tick box, no bar. */
+type RowProps = { u: User; group?: Group; t: Tx; fmt: Fmt; now: number; on: boolean; onToggle?: () => void; onOpen: () => void };
 
 /** A slim usage bar: quiet while there is room, amber near the quota, red once it is used up. */
 function UsageBar({ pct, tone, className }: { pct: number; tone: keyof typeof barTone; className?: string }) {
@@ -537,7 +519,7 @@ function UsageText({ use, t }: { use: ReturnType<typeof usage>; t: Tx }) {
  */
 function stateOf(u: User, group: Group | undefined, t: Tx): { active: boolean; kind: StatusKind; word: string; why?: string } {
   const s = shownStatus(u);
-  if (s === "active" && !u.accessHapp && !u.accessAmnezia && !u.accessTelegram) {
+  if (s === "active" && noAccess(u)) {
     const groupGivesNothing = !group || (group.happNodes === 0 && group.amneziaNodes === 0);
     return { active: false, kind: "warn", word: t("users.noAccess"), why: t(groupGivesNothing ? "users.noAccessGroup" : "users.noAccessApps") };
   }
@@ -651,15 +633,17 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       )}
     >
       {/* the whole cell picks the row: the 18px box alone was easy to miss, and a miss opened the person */}
-      <td
-        className="pe-2 ps-4"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-      >
-        <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
-      </td>
+      {onToggle && (
+        <td
+          className="pe-2 ps-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        >
+          <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
+        </td>
+      )}
       <td className={col.status}>
         <StatusCell u={u} group={group} t={t} />
       </td>
@@ -718,15 +702,17 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
     >
       <div className="flex items-center gap-2.5">
         {/* a padded hit area around the box, like the table's whole cell: a near miss picks, it does not open */}
-        <span
-          className="-m-2 grid p-2"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-        >
-          <Check large checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
-        </span>
+        {onToggle && (
+          <span
+            className="-m-2 grid p-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+          >
+            <Check large checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
+          </span>
+        )}
         <Avatar name={u.name} index={avatarIndex(u.id)} />
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <AppLink to="/users/$id" params={{ id: u.id }} className="min-w-0 truncate text-[15px] font-bold" onClick={stop}>

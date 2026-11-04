@@ -57,13 +57,29 @@ The list is paged, 50 people to a page (25 or 100 on request): under the card th
 
 ### Bulk actions
 
-Tick people in the list (or all on the page) and a bar appears: "Selected: 3".
+The owner and the helper tick people in the list: a box in each row, one in the header for the whole page. A read-only admin sees the list without boxes. As soon as someone is ticked, a bar floats at the foot of the page (on a phone, in the place of the bottom dock). It counts the people ("37 people selected"), says how many of them are on other pages or under another filter, and holds the actions. The selection stays when you move between pages, sort or filter; **Esc** or the cross clears it. At most 5000 people can be selected at once.
 
-- **Extend 30 days** moves each term 30 days forward from the later of today and the current end. People without an expiry date are skipped: extending would give them one.
-- **Disable** cuts the people off at once. The message has **Undo** for a few seconds.
-- **Cancel** clears the selection.
+**Select** in the filter row replaces the selection in one click:
 
-The API also enables, deletes and resets the traffic of many users in one call. See [API](../reference/api.md).
+- **This page** takes the rows on screen.
+- **All found** takes everybody the current filter, search and group list, not only the page. The panel collects them when the menu opens (a moment for a big list, shown as "…").
+- **Expired**, **Disabled**, **No access** (active, but their page would give nothing) and **Never connected** take the people in that state among the found ones.
+
+The bar has **Extend…**, **Disable** and **More ▾**, and on a narrow screen **Disable** moves into **More**. When most of the selected are off, **Enable** takes the place of **Disable**. **More** holds **Reset traffic**, the other of Enable and Disable, and **Delete…**. A number beside an action is how many of the selected it applies to; an action nobody can take is grayed out and says why on hover.
+
+Every action opens a window first. It names who will change ("alice, bob, carol … and 27 more") and who sits out with the reason, for example "No expiry date, nothing to extend" or "Already disabled".
+
+- **Extend…** has three ways. **Add days** (7, 30, 90, 365 or your own number) counts from the later of today and the current end date, and people whose access had run out get it back; people without an expiry date are skipped, because extending would give them one. **Until a date** ends access at the end of the chosen day in your time zone: people without an expiry get one, and the window warns how many have a later end date that would move earlier. **No expiry** takes the end date away.
+- **Disable** cuts the people off at once. Their links and keys stay as they are.
+- **Enable** switches them back on. Someone whose term has run out is switched on but gets nothing until you extend them; the window says how many.
+- **Reset traffic** sets the used traffic to zero for those who used some. History and the next reset date stay, and anyone stopped by their traffic limit gets access again.
+- **Delete…** removes the people for good, with their links, keys and traffic history. You type the number of people to confirm, and the panel asks you to confirm your sign-in, as for any deletion.
+
+Adding days, disable, enable, reset and delete go to the panel in parts of 200 people, one part after another. A date or "no expiry" is one change per person, four at a time. While a batch runs, the bar grows upwards into its progress: what it does and how far ("Disabling · 120 of 500"), **Stop**, a bar that fills, and, for a long batch, counters (done, running, waiting, skipped) with only the failed people listed below them, each with an **Open** link to their card. **Stop** lets the part in flight finish and starts no more. At the end the summary says "Disabled 497 of 500 people · 1 failed · 2 skipped"; **Retry** runs the failed and the not-started ones again. After a **Disable** the summary has **Enable again** for exactly the people it switched off. Leaving the People list for another page, or for the Groups tab, while a batch runs asks first; paging and sorting never do. The audit log records one row per part for adding days, disabling, enabling and deleting, and one row per person for a date, no expiry and a traffic reset.
+
+Subscription links, page passwords and Telegram or AmneziaVPN keys are never fetched, shown or changed in bulk: a link or key is a credential, and handing out hundreds at once in a table is how they leak. They stay in the person's card, one person at a time.
+
+The API takes many users in one call too. See [API](../reference/api.md).
 
 ## Creating a user
 

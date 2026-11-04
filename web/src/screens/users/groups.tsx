@@ -248,7 +248,8 @@ export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string
 
 // ---- the tab ----
 
-const canManage = (role: Role | undefined) => role === Role.OWNER || role === Role.HELPER;
+/** Who may change people and groups: the owner and the helper (a read-only admin sees the lists). */
+export const canManage = (role: Role | undefined) => role === Role.OWNER || role === Role.HELPER;
 
 /** /users?tab=groups: every group with what it gives and to how many people, and the ways to make, change and delete one. */
 export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { creating: boolean; onCreatingChange: (o: boolean) => void; focus?: string; onFocusDone?: () => void }) {

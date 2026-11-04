@@ -34,6 +34,7 @@ vi.mock("@/lib/api", async (orig) => ({
 vi.mock("@tanstack/react-router", () => ({
   useSearch: () => search,
   useNavigate: () => navigate,
+  useBlocker: () => ({ status: "idle" }),
   Link: ({ children, to, params, search: s, className, onClick, ...rest }: { children?: ReactNode; to: string; params?: object; search?: object; className?: string; onClick?: () => void }) => (
     <a href={to} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(s ?? {})} className={className} onClick={onClick} aria-label={(rest as { "aria-label"?: string })["aria-label"]} data-tone={(rest as { "data-tone"?: string })["data-tone"]}>
       {children}

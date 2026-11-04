@@ -15,8 +15,9 @@ import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { NodesScreen } from "@/screens/nodes";
-import { BatchPanel, BulkControls, BulkDock, type Avail } from "@/screens/nodes-bulk";
-import { AgentDialog, BindDialog, PasswordDialog, UnbindDialog, type ActionId, type BulkRun } from "@/screens/nodes-bulk-actions";
+import { BatchPanel, BulkDock, type Avail } from "@/components/bulk";
+import { BulkControls } from "@/screens/nodes-bulk";
+import { AgentDialog, BindDialog, panelFor, PasswordDialog, UnbindDialog, type ActionId, type BulkRun } from "@/screens/nodes-bulk-actions";
 import { PanelKeyOffer } from "@/screens/nodes-panel-key";
 import { Dock, Sidebar } from "@/screens/shell";
 
@@ -229,25 +230,25 @@ export function BulkKit() {
   const frames = (phone: boolean) => (
     <>
       <Shot id={phone ? "bulk-bar-phone" : "bulk-bar"} title="Three selected, one hidden by the filter" phone={phone} tall>
-        <BulkDock float={false}>
+        <BulkDock float={false} region={t("bulk.region")}>
           <Bar />
         </BulkDock>
       </Shot>
       <Shot id={phone ? "bulk-running-phone" : "bulk-running"} title="A batch: done, failed, running, waiting, skipped" phone={phone}>
-        <BulkDock float={false} wide>
-          <BatchPanel job={jobs.running} rows={jobs.running.rows} onStop={noop} onRetry={noop} onClose={noop} />
+        <BulkDock float={false} wide region={t("bulk.region")}>
+          <BatchPanel job={jobs.running} rows={jobs.running.rows} head={panelFor(t, "password").head} open={panelFor(t, "password").open} onStop={noop} onRetry={noop} onClose={noop} />
           <Bar busy />
         </BulkDock>
       </Shot>
       <Shot id={phone ? "bulk-summary-phone" : "bulk-summary"} title="Its end: a failure, one not started, Retry" phone={phone}>
-        <BulkDock float={false} wide>
-          <BatchPanel job={jobs.finished} rows={jobs.finished.rows} onStop={noop} onRetry={noop} onClose={noop} />
+        <BulkDock float={false} wide region={t("bulk.region")}>
+          <BatchPanel job={jobs.finished} rows={jobs.finished.rows} head={panelFor(t, "password").head} open={panelFor(t, "password").open} onStop={noop} onRetry={noop} onClose={noop} />
           <Bar />
         </BulkDock>
       </Shot>
       <Shot id={phone ? "bulk-ports-phone" : "bulk-ports"} title="A port check: each node's verdict" phone={phone}>
-        <BulkDock float={false} wide>
-          <BatchPanel job={jobs.ports} rows={jobs.ports.rows} onStop={noop} onRetry={noop} onClose={noop} />
+        <BulkDock float={false} wide region={t("bulk.region")}>
+          <BatchPanel job={jobs.ports} rows={jobs.ports.rows} head={panelFor(t, "ports").head} open={panelFor(t, "ports").open} onStop={noop} onRetry={noop} onClose={noop} />
           <Bar />
         </BulkDock>
       </Shot>

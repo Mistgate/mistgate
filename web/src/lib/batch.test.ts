@@ -177,3 +177,104 @@ describe("useBatch", () => {
     expect(batch().job).toBeNull();
   });
 });
+
+describe("useBatch, one server call per slice of the rows", () => {
+  const people = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `usr_${i}`, name: `p${i}`, host: "" }));
+  const sizes = (calls: string[][]) => calls.map((c) => c.length);
+
+  it("calls 450 ids as 200, 200 and 50, one slice after another", async () => {
+    const batch = await mountBatch();
+    const calls: string[][] = [];
+    let release!: () => void;
+    const many = vi.fn((ids: string[]) => {
+      calls.push(ids);
+      return new Promise<void>((r) => (release = r));
+    });
+    await act(async () => batch().start({ action: "enable", limit: 1, many, error: () => "x" }, people(450)));
+    // the first slice runs, the rest wait their turn
+    expect(sizes(calls)).toEqual([200]);
+    expect(batch().job!.rows.filter((r) => r.state === "running")).toHaveLength(200);
+    expect(batch().job!.rows.filter((r) => r.state === "waiting")).toHaveLength(250);
+    await act(async () => release());
+    await settle();
+    expect(sizes(calls)).toEqual([200, 200]);
+    await act(async () => release());
+    await settle();
+    await act(async () => release());
+    await settle();
+    expect(sizes(calls)).toEqual([200, 200, 50]);
+    expect(calls[0]![0]).toBe("usr_0");
+    expect(calls[2]![0]).toBe("usr_400");
+    expect(batch().running).toBe(false);
+    expect(batch().job!.rows.every((r) => r.state === "ok")).toBe(true);
+  });
+
+  it("a failed slice fails its rows with the reason and the next one goes on; Retry runs only the failed", async () => {
+    const batch = await mountBatch();
+    const many = vi.fn(async (ids: string[]) => {
+      if (ids[0] === "usr_3") throw new Error("busy");
+    });
+    const spec: Spec = { action: "reset", limit: 1, chunk: 3, many, error: (e) => (e as Error).message };
+    await act(async () => batch().start(spec, people(8)));
+    await settle();
+    expect(many.mock.calls.map((c) => c[0])).toEqual([
+      ["usr_0", "usr_1", "usr_2"],
+      ["usr_3", "usr_4", "usr_5"],
+      ["usr_6", "usr_7"],
+    ]);
+    expect(batch().job!.rows.map((r) => r.state)).toEqual(["ok", "ok", "ok", "bad", "bad", "bad", "ok", "ok"]);
+    expect(batch().job!.rows[4]!.note).toBe("busy");
+
+    many.mockClear();
+    many.mockResolvedValue(undefined);
+    await act(async () => batch().retry());
+    await settle();
+    expect(many.mock.calls.map((c) => c[0])).toEqual([["usr_3", "usr_4", "usr_5"]]);
+    expect(batch().job!.rows.every((r) => r.state === "ok")).toBe(true);
+  });
+
+  it("Stop lets the slice in flight finish and starts no more; Retry picks up the slices that never started", async () => {
+    const batch = await mountBatch();
+    let release!: () => void;
+    const many = vi.fn((ids: string[]) => (ids[0] === "usr_0" ? new Promise<void>((r) => (release = r)) : Promise.resolve()));
+    await act(async () => batch().start({ action: "delete", limit: 1, chunk: 2, many, error: () => "x" }, people(5)));
+    await act(async () => batch().stop());
+    await act(async () => release());
+    await settle();
+    expect(many).toHaveBeenCalledTimes(1);
+    expect(batch().job!.rows.map((r) => r.state)).toEqual(["ok", "ok", "notStarted", "notStarted", "notStarted"]);
+    many.mockClear();
+    await act(async () => batch().retry());
+    await settle();
+    expect(many.mock.calls.map((c) => c[0])).toEqual([["usr_2", "usr_3"], ["usr_4"]]);
+    expect(batch().job!.rows.every((r) => r.state === "ok")).toBe(true);
+  });
+
+  it("a declined step-up leaves that slice and the rest not started", async () => {
+    const batch = await mountBatch();
+    const many = vi.fn(async (ids: string[]) => {
+      if (ids[0] === "usr_2") throw new StepUpCancelled();
+    });
+    await act(async () => batch().start({ action: "delete", limit: 1, chunk: 2, many, error: () => "x" }, people(6)));
+    await settle();
+    expect(many).toHaveBeenCalledTimes(2);
+    expect(batch().job!.rows.map((r) => r.state)).toEqual(["ok", "ok", "notStarted", "notStarted", "notStarted", "notStarted"]);
+  });
+
+  it("an outcome for one id overrides done (a person who was gone by then), and the rest read done", async () => {
+    const batch = await mountBatch();
+    const many = vi.fn(async () => ({ usr_1: { kind: "off" as const, label: "Gone" } }));
+    await act(async () => batch().start({ action: "enable", limit: 1, many, error: () => "x" }, people(3)));
+    await settle();
+    expect(batch().job!.rows.map((r) => `${r.state}:${r.label ?? ""}`)).toEqual(["ok:", "ok:Gone", "ok:"]);
+  });
+
+  it("takes the skipped into the rows without calling them", async () => {
+    const batch = await mountBatch();
+    const many = vi.fn(async (_ids: string[]) => {});
+    await act(async () => batch().start({ action: "enable", limit: 1, many, error: () => "x" }, people(2), [{ id: "usr_9", name: "p9", host: "", note: "Already on" }]));
+    await settle();
+    expect(many.mock.calls[0]![0]).toEqual(["usr_0", "usr_1"]);
+    expect(batch().job!.rows.map((r) => r.state)).toEqual(["ok", "ok", "skipped"]);
+  });
+});

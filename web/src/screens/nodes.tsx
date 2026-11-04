@@ -26,7 +26,8 @@ import { protocolName, protocolShort, sortProtocols } from "@/lib/series";
 import { meQuery } from "@/lib/session";
 import { useOlderNodes } from "@/lib/updates";
 import { useBatch } from "@/lib/batch";
-import { NodesBulk, PickMenu } from "./nodes-bulk";
+import { PickMenu } from "@/components/bulk";
+import { NodesBulk } from "./nodes-bulk";
 import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
 import { PanelKeyOffer } from "./nodes-panel-key";
 
@@ -149,7 +150,7 @@ export function NodesScreen() {
                 { value: "working", label: chip(t("nodes.working"), working) },
               ]}
             />
-            {owner && <PickMenu picks={picks} any={ticked.size > 0} onPick={pick} />}
+            {owner && <PickMenu picks={picks.map((p) => ({ label: t(p.label), ids: p.ids }))} any={ticked.size > 0} onPick={pick} />}
             <span className="flex-1" />
             <div className="w-[150px]">
               <Select

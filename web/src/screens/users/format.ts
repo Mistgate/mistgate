@@ -62,6 +62,9 @@ export function shownStatus(u: User): Shown {
   }
 }
 
+/** Active in the API's eyes, yet the person's page would give nothing: no subscription link, no AmneziaVPN keys, no Telegram. */
+export const noAccess = (u: Pick<User, "accessHapp" | "accessAmnezia" | "accessTelegram">) => !u.accessHapp && !u.accessAmnezia && !u.accessTelegram;
+
 export const shownKind: Record<Shown, StatusKind> = { active: "ok", expired: "bad", quota: "warn", devices: "warn", disabled: "off" };
 export const shownKey: Record<Shown, Key> = {
   active: "users.status.active",
