@@ -165,6 +165,14 @@ describe("node status and metadata", () => {
     expect(text().split(en["node.reason.enrollment_expired"])).toHaveLength(3);
   });
 
+  it("keeps location metadata on the heading when notes are absent", async () => {
+    await mount([node("de1", { location: "Germany", provider: "examplehost" })]);
+    const names = [...document.querySelectorAll("b")].filter((b) => b.textContent === "de1");
+    expect(names).toHaveLength(2);
+    expect(names.every((name) => name.parentElement?.textContent?.includes("Germany · examplehost"))).toBe(true);
+    expect(document.querySelectorAll("p")).toHaveLength(0);
+  });
+
   it("keeps the separate update action for an outdated healthy node", async () => {
     await mount([node("de1")], undefined, [{ nodeId: "nod_de1", state: NodeUpdateState.OUTDATED }]);
     const updates = [...document.querySelectorAll('a[href="/updates"]')];
