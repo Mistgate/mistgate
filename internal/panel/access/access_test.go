@@ -74,7 +74,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e := &env{t: t, st: st, notify: &fakeNotify{}, online: fakeOnline{}, clock: ts("2026-09-30T12:00:00Z"), ctx: ctx}
-	s, err := New(st, v, builtin.Registry(), e.notify, e.online, Config{SubscriptionBaseURL: "https://sub.example.com/k3xq/"})
+	s, err := New(st, v, builtin.Registry(), e.notify, e.online, Config{SubscriptionBaseURL: "https://sub.example.com/k3xq/", StepUp: func(context.Context) error { return nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,6 +567,42 @@ func TestUserRules(t *testing.T) {
 	}
 	_, err = e.s.DeleteUsers(ctx, req(&adminv1.DeleteUsersRequest{}))
 	wantCode(t, err, connect.CodeInvalidArgument)
+}
+
+func TestDeleteUsersRequiresStepUp(t *testing.T) {
+	e := newEnv(t)
+	g := e.group("friends")
+	u := e.user("alice", g, nil).User
+	calls := 0
+	e.s.cfg.StepUp = func(context.Context) error {
+		calls++
+		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("step-up required"))
+	}
+	_, err := e.s.DeleteUsers(e.ctx, req(&adminv1.DeleteUsersRequest{UserIds: []string{u.Id}}))
+	wantCode(t, err, connect.CodePermissionDenied)
+	if calls != 1 {
+		t.Fatalf("step-up calls = %d, want 1", calls)
+	}
+	users, err := e.st.Access().UsersByIDs(e.ctx, []string{u.Id})
+	if err != nil || len(users) != 1 {
+		t.Fatalf("user after denied delete = %v, %v", users, err)
+	}
+
+	e.s.cfg.StepUp = func(context.Context) error { return nil }
+	must(e.s.DeleteUsers(e.ctx, req(&adminv1.DeleteUsersRequest{UserIds: []string{u.Id}})))
+	users, err = e.st.Access().UsersByIDs(e.ctx, []string{u.Id})
+	if err != nil || len(users) != 0 {
+		t.Fatalf("user after confirmed delete = %v, %v", users, err)
+	}
+
+	u = e.user("bob", g, nil).User
+	e.s.cfg.StepUp = nil
+	_, err = e.s.DeleteUsers(e.ctx, req(&adminv1.DeleteUsersRequest{UserIds: []string{u.Id}}))
+	wantCode(t, err, connect.CodePermissionDenied)
+	users, err = e.st.Access().UsersByIDs(e.ctx, []string{u.Id})
+	if err != nil || len(users) != 1 {
+		t.Fatalf("user after missing step-up = %v, %v", users, err)
+	}
 }
 
 func TestListUsers(t *testing.T) {

@@ -22,7 +22,20 @@ const revokeDevice = vi.fn();
 const unblockDevice = vi.fn();
 const renameDevice = vi.fn();
 const getUserConnection = vi.fn();
+const deleteUsers = vi.fn();
 const subsMode = { v: LinkDeviceLimit.ENFORCE as LinkDeviceLimit };
+// the sign-in check in front of a delete: passes the call through, or turns it down as the admin closing the dialog would
+const stepUp = { cancel: false };
+vi.mock("@/components/step-up", async (orig) => {
+  const m = await orig<typeof import("@/components/step-up")>();
+  return {
+    ...m,
+    useStepUp:
+      () =>
+      <T,>(call: () => Promise<T>) =>
+        stepUp.cancel ? Promise.reject(new m.StepUpCancelled()) : call(),
+  };
+});
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   health: { listAlerts: (...a: unknown[]) => listAlerts(...a) },
@@ -33,6 +46,7 @@ vi.mock("@/lib/api", async (orig) => ({
     revokeDevice: (...a: unknown[]) => revokeDevice(...a),
     unblockDevice: (...a: unknown[]) => unblockDevice(...a),
     getUserConnection: (...a: unknown[]) => getUserConnection(...a),
+    deleteUsers: (...a: unknown[]) => deleteUsers(...a),
   },
   devices: { renameDevice: (...a: unknown[]) => renameDevice(...a) },
   groups: {
@@ -89,8 +103,9 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice, getUserConnection]) m.mockReset();
+  for (const m of [getUser, updateUser, setUsersEnabled, getUserDnsChoices, resetUserDnsChoices, me, listAlerts, revokeDevice, unblockDevice, renameDevice, getUserConnection, deleteUsers]) m.mockReset();
   subsMode.v = LinkDeviceLimit.ENFORCE;
+  stepUp.cancel = false;
 });
 
 const user = {
@@ -634,5 +649,35 @@ describe("the quota period on the user card", () => {
     expect(text()).toContain("no reset");
     expect(text()).not.toContain("Next reset");
     expect(updateUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleting the user from the card", () => {
+  const dialog = () => [...document.querySelectorAll("[role=dialog]")].at(-1)!;
+  async function confirmDelete() {
+    await click(button("Delete"));
+    const field = dialog().querySelector("input")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "Marina");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click([...dialog().querySelectorAll("button")].find((b) => b.textContent?.trim() === "Delete"));
+    await settle();
+  }
+
+  it("asks for the sign-in check, and a check turned down deletes nobody and shows no error", async () => {
+    stepUp.cancel = true;
+    deleteUsers.mockResolvedValue({});
+    await mount();
+    await confirmDelete();
+    expect(deleteUsers).not.toHaveBeenCalled();
+    expect(text()).not.toContain("Marina deleted");
+  });
+
+  it("deletes the user once the check passes", async () => {
+    deleteUsers.mockResolvedValue({});
+    await mount();
+    await confirmDelete();
+    expect(deleteUsers).toHaveBeenCalledWith({ userIds: ["usr_1"] });
   });
 });

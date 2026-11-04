@@ -861,6 +861,12 @@ func (s *Service) UnblockDevice(ctx context.Context, req *connect.Request[adminv
 }
 
 func (s *Service) DeleteUsers(ctx context.Context, req *connect.Request[adminv1.DeleteUsersRequest]) (*connect.Response[adminv1.DeleteUsersResponse], error) {
+	if s.cfg.StepUp == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("step-up required"))
+	}
+	if err := s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
 	if err := checkIDs(req.Msg.UserIds); err != nil {
 		return nil, err
 	}
@@ -897,6 +903,7 @@ func (s *Service) GetSubscriptionLink(ctx context.Context, req *connect.Request[
 		if err := a.SetSubToken(ctx, u.ID, hash, s.vault.Seal([]byte(tok), u.ID)); err != nil {
 			return nil, s.internal("rotate token", err)
 		}
+		s.audit(ctx, actor(ctx), "user_link_rotate", map[string]any{"user": u.ID, "name": u.Name})
 		token = tok
 	} else {
 		pt, err := s.vault.Open(u.SubTokenEnc, u.ID)

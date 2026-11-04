@@ -169,7 +169,7 @@ func BuildPublic(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
-	acc, err = access.New(b.st, b.vlt, b.reg, fl, fl, b.accessConfig(fl))
+	acc, err = access.New(b.st, b.vlt, b.reg, fl, fl, b.accessConfig(fl, nil))
 	if err != nil {
 		return nil, err
 	}

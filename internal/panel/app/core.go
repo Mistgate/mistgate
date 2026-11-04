@@ -118,8 +118,8 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 }
 
 // accessConfig is the access service's configuration, the same in every role.
-func (b base) accessConfig(fl *fleet.Fleet) access.Config {
-	return access.Config{SubscriptionBaseURL: b.subBase, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay}
+func (b base) accessConfig(fl *fleet.Fleet, stepUp func(context.Context) error) access.Config {
+	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts, CheckRelay: fl.CheckRelay}
 }
 
 // usageRecompute is fleet.Config.OnUsage: a quota overrun takes effect right after the stats batch that crossed it.
@@ -247,7 +247,7 @@ func wireCore(c Config) (*core, error) {
 		return nil, err
 	}
 	fl := k.fl
-	acc, err = access.New(st, vlt, b.reg, fl, fl, b.accessConfig(fl))
+	acc, err = access.New(st, vlt, b.reg, fl, fl, b.accessConfig(fl, authSvc.RequireStepUp))
 	if err != nil {
 		return nil, err
 	}

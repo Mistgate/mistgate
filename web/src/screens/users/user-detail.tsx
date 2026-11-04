@@ -6,6 +6,7 @@ import type { DeviceConfig } from "@/gen/mistgate/admin/v1/device_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { DeviceKind, QuotaReset, UserStatus, type AccessImpact, type NodeAccess, type ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
+import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Card, DangerZone, PageTitle, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -105,6 +106,7 @@ function useUserActions(user: User) {
   const t = useTx();
   const toast = useToast();
   const qc = useQueryClient();
+  const guard = useStepUp();
   const refresh = () => qc.invalidateQueries({ queryKey: ["users"] });
   /** A save that shows the server's reason on failure and rejects, so a draft control can drop its unsaved value. */
   async function update(patch: Patch) {
@@ -162,11 +164,11 @@ function useUserActions(user: User) {
     },
     remove: async () => {
       try {
-        await users.deleteUsers({ userIds: [user.id] });
+        await guard(() => users.deleteUsers({ userIds: [user.id] }));
         await refresh();
         toast(t("users.deleted", { name: user.name }));
       } catch (e) {
-        toast.error(errorText(e, t));
+        if (!isStepUpCancelled(e)) toast.error(errorText(e, t));
         throw e;
       }
     },

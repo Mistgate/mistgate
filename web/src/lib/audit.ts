@@ -39,6 +39,7 @@ const keys: Record<string, MessageKey> = {
   user_create: "audit.user_create",
   user_update: "audit.user_update",
   user_delete: "audit.user_delete",
+  user_link_rotate: "audit.user_link_rotate",
   users_disable: "audit.users_disable",
   users_enable: "audit.users_enable",
   users_extend: "audit.users_extend",

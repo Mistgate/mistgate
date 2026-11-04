@@ -55,8 +55,10 @@ type Config struct {
 	// SubscriptionBaseURL is the public subscription address up to and including the secret prefix, e.g.
 	// "https://sub.example.com/k3xq8"; the user's token is appended after a slash.
 	SubscriptionBaseURL string
-	Log                 *slog.Logger
-	AfterResponse       AfterResponseRunner
+	// StepUp is auth.Service.RequireStepUp. A nil callback denies destructive user deletion.
+	StepUp        func(context.Context) error
+	Log           *slog.Logger
+	AfterResponse AfterResponseRunner
 	// CheckPorts runs the fleet UDP delivery check; nil disables save-time checks.
 	CheckPorts func(context.Context, string, []uint16) ([]store.PortCheck, string, string)
 	// CheckRelay runs the fleet's check of a relay (fleet.CheckRelay): the stages it names (store.RelayStageLeg, RelayStagePath;

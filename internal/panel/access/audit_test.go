@@ -101,6 +101,40 @@ func TestPeoplesChangesAreAudited(t *testing.T) {
 	}
 }
 
+func TestSubscriptionLinkRotationIsAuditedWithoutSecrets(t *testing.T) {
+	e := newEnv(t)
+	g := e.group("friends")
+	u := e.user("alice", g, nil).User
+	before := must(e.st.ListAudit(e.ctx, "", 0, 100))
+
+	plain := must(e.s.GetSubscriptionLink(e.ctx, req(&adminv1.GetSubscriptionLinkRequest{UserId: u.Id})))
+	if got := len(must(e.st.ListAudit(e.ctx, "", 0, 100))); got != len(before) {
+		t.Fatalf("plain read wrote an audit row: count %d, want %d", got, len(before))
+	}
+	rotated := must(e.s.GetSubscriptionLink(e.ctx, req(&adminv1.GetSubscriptionLinkRequest{UserId: u.Id, Rotate: true})))
+	rows := must(e.st.ListAudit(e.ctx, "", 0, 100))
+	if len(rows) != len(before)+1 {
+		t.Fatalf("rotate wrote %d audit rows, want exactly one", len(rows)-len(before))
+	}
+	row := rows[0]
+	if row.Action != "user_link_rotate" {
+		t.Fatalf("rotate action = %q, want user_link_rotate", row.Action)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(row.Params), &params); err != nil {
+		t.Fatalf("rotate params %q: %v", row.Params, err)
+	}
+	if len(params) != 2 || params["user"] != u.Id || params["name"] != u.Name {
+		t.Errorf("rotate params = %v, want user %q and name %q", params, u.Id, u.Name)
+	}
+	oldToken := plain.Msg.Url[strings.LastIndex(plain.Msg.Url, "/")+1:]
+	newToken := rotated.Msg.Url[strings.LastIndex(rotated.Msg.Url, "/")+1:]
+	if strings.Contains(row.Params, oldToken) || strings.Contains(row.Params, newToken) ||
+		strings.Contains(row.Params, plain.Msg.Url) || strings.Contains(row.Params, rotated.Msg.Url) {
+		t.Errorf("rotate audit params contain a token or URL: %s", row.Params)
+	}
+}
+
 func TestNameListIsShort(t *testing.T) {
 	if got := nameList([]string{"a", "b", "c", "d", "e", "f", "g"}); got != "a, b, c, d, e, …" {
 		t.Errorf("nameList = %q", got)

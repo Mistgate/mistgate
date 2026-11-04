@@ -460,7 +460,7 @@ func TestListAuditByKind(t *testing.T) {
 	s, st, _ := newTestService(t)
 	octx, _ := ownerCtx(t, s, st)
 	for _, r := range [][2]string{
-		{"login", "fail"}, {"password_change", "ok"}, {"page_unlock_lockout", "locked"}, {"user_delete", "ok"}, {"inbound_add", "ok"},
+		{"login", "fail"}, {"password_change", "ok"}, {"page_unlock_lockout", "locked"}, {"user_delete", "ok"}, {"user_link_rotate", "ok"}, {"inbound_add", "ok"},
 		{"preset_default", "ok"}, {"node.awg_prepare", "ok"}, {"call", "ok"}, {"mcp_plan", "ok"}, {"security_update", "rejected"},
 		{"backup_settings_update", "ok"}, {"backup_create", "ok"}, {"backup_storage_test", "ok"}, {"panel_update", "ok"}, {"node_update_schedule", "ok"},
 		{"node_update_schedule_cancel", "ok"}, {"node_dns_options", "ok"}, {"page_dns_choice", "ok"}, {"user_dns_choices_reset", "ok"},
@@ -485,7 +485,7 @@ func TestListAuditByKind(t *testing.T) {
 	if got := list(adminv1.AuditKind_AUDIT_KIND_SIGN_IN); got != "login password_change page_unlock_lockout" {
 		t.Errorf("sign-in: %s", got)
 	}
-	if got := list(adminv1.AuditKind_AUDIT_KIND_CHANGES); got != "user_delete inbound_add preset_default node.awg_prepare security_update "+
+	if got := list(adminv1.AuditKind_AUDIT_KIND_CHANGES); got != "user_delete user_link_rotate inbound_add preset_default node.awg_prepare security_update "+
 		"backup_settings_update backup_create backup_storage_test panel_update node_update_schedule node_update_schedule_cancel node_dns_options page_dns_choice user_dns_choices_reset link_dns_options page_link_dns_choice" {
 		t.Errorf("changes: %s", got)
 	}
