@@ -553,7 +553,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 placeholder="root"
-                autoComplete="username"
+                autoComplete="off"
                 maxLength={32}
                 pattern={usernamePattern.source}
                 hint={t("node.ssh.loginHint")}
@@ -566,7 +566,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   maxLength={1024}
                   hint={t("node.ssh.passwordHint")}
                   required
@@ -609,7 +609,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               maxLength={1024}
               hint={t("node.ssh.passwordHint")}
               required
@@ -674,7 +674,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   maxLength={1024}
                 />
               )}

@@ -188,6 +188,18 @@ describe("the keys block", () => {
       expect(addNodeServerKey).not.toHaveBeenCalled();
     });
 
+    it("refuses a PuTTY private key and sends nothing that is not one public key line", async () => {
+      await mount({});
+      await click(document.querySelector("[data-bind]"));
+      await type(area(), "PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: none\nPrivate-Lines: 1\nAAAA\n");
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain(en["node.sshKeys.privateRefused"]);
+      expect(area().value).toBe("");
+      await type(area(), "ssh-ed25519 AAAAC3Nz alice@laptop\nssh-ed25519 AAAAC3Nz bob@desk");
+      await click(submit());
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain(en["node.sshKeys.error.invalid"]);
+      expect(addNodeServerKey).not.toHaveBeenCalled();
+    });
+
     it("binds a public key, then reads the list again", async () => {
       addNodeServerKey.mockResolvedValue({ key: key({ comment: "bob@desk" }) });
       await mount({});

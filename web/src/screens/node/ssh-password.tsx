@@ -255,6 +255,7 @@ export function SSHPassword({ nodeId, access }: { nodeId: string; access: NodeSe
             value={mode}
             onValueChange={(m) => {
               setMode(m);
+              setOwn(""); // a typed password does not wait hidden behind Generate
               setProblem("");
             }}
             options={[

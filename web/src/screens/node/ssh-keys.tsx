@@ -61,6 +61,11 @@ export function keyError(error: unknown, t: T, edge = false): string {
   return typeof error === "string" ? t("node.sshKeys.error.unavailable") : sshError(error, t, edge);
 }
 
+// Any private key format (OpenSSH, PEM, PuTTY .ppk) is refused in the browser; a bind sends one public key line only.
+const privateKeyShape = /PRIVATE KEY|PuTTY-User-Key-File|Private-Lines|Private-MAC/i;
+const publicKeyLine =
+  /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+={0,3}( [^\r\n]*)?$/;
+
 const keyTypes: Record<string, string> = {
   "ssh-ed25519": "ED25519",
   "sk-ssh-ed25519@openssh.com": "ED25519-SK",
@@ -123,7 +128,7 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
 
   function typed(value: string) {
     // a private key never leaves the browser, and is not kept in the field either
-    if (value.includes("PRIVATE KEY")) {
+    if (privateKeyShape.test(value)) {
       setPublicKey("");
       setProblem({ at: "bind", text: t("node.sshKeys.privateRefused") });
       return;
@@ -135,7 +140,9 @@ export function SSHKeys({ nodeId, access }: { nodeId: string; access: NodeServer
   async function bind(e: FormEvent) {
     e.preventDefault();
     const line = publicKey.trim();
-    if (!line || line.includes("PRIVATE KEY")) return;
+    if (!line || privateKeyShape.test(line)) return;
+    // only one public key line is sent: anything else (two lines, a PuTTY file, a stray paste) stays in the browser
+    if (!publicKeyLine.test(line)) return setProblem({ at: "bind", text: t("node.sshKeys.error.invalid") });
     // a key the file already holds on a line with options stays as it is (the server appends no bare copy): say so
     const done = (r: { key?: NodeServerKey }) => (r.key?.restricted ? "node.sshKeys.alreadyRestricted" : "node.sshKeys.bound");
     if (await run("bind", "bind", () => provisioning.addNodeServerKey({ nodeId, publicKey: line, confirm: true }), done)) closeBind();

@@ -204,7 +204,7 @@ function AttachDialog({ nodeId, name, address, onClose, onAttached }: { nodeId: 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="root"
-                  autoComplete="username"
+                  autoComplete="off"
                   maxLength={32}
                   hint={t("node.ssh.loginHint")}
                   error={username && !userValid ? t("node.ssh.loginError") : undefined}
@@ -216,7 +216,7 @@ function AttachDialog({ nodeId, name, address, onClose, onAttached }: { nodeId: 
                     value={login.password}
                     onChange={(e) => login.setPassword(e.target.value)}
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     maxLength={1024}
                     required
                   />

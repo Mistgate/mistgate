@@ -142,7 +142,12 @@ function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs:
   const onApprove = () =>
     approve.mutate(
       !install ? { id: a.id } : viaKey ? { id: a.id, usePanelKey: true, confirmedFingerprint: hostKey } : { id: a.id, sshPassword: password, confirmedFingerprint: hostKey },
-      { onSettled: () => setPassword("") },
+      {
+        onSettled: () => {
+          setPassword("");
+          approve.reset(); // the mutation's variables held the password; gcTime 0 drops it from the cache now
+        },
+      },
     );
   // the panel key is shown under the login choice; in the facts it would be the same long line twice
   const facts = install ? a.facts.filter((f) => f.key !== "panel_ssh_key") : a.facts;

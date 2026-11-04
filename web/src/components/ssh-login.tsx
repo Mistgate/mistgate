@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Callout } from "@/components/ui/notice";
@@ -142,6 +142,14 @@ export function OwnKeyField({ login, warn = true, note }: { login: SSHLogin; war
   const file = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState("");
   const [over, setOver] = useState(false);
+  // a file still being read when the owner picks another method (the field goes) must not bring the key back
+  const gone = useRef(false);
+  useEffect(() => {
+    gone.current = false;
+    return () => {
+      gone.current = true;
+    };
+  }, []);
 
   function take(text: string, name = "") {
     setProblem("");
@@ -155,7 +163,8 @@ export function OwnKeyField({ login, warn = true, note }: { login: SSHLogin; war
   async function takeFile(f: File | undefined) {
     if (!f) return;
     if (f.size > maxKeyBytes) return setProblem(t("node.ssh.ownKeyNotKey"));
-    take(await f.text(), f.name);
+    const text = await f.text();
+    if (!gone.current) take(text, f.name);
   }
 
   return (

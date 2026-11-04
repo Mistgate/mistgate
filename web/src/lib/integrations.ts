@@ -511,8 +511,11 @@ export function useApprovalActions() {
     if (!isStepUpCancelled(e)) toast.error(callErrorText(e, t));
   };
   // a node_install approval also carries the owner's login choice (the panel key or the SSH password) and the host key they confirmed
+  // The variables carry the SSH password: with gcTime 0 the caller's reset when it settles drops the finished mutation, and
+  // the password with it, from the mutation cache at once (by default it would stay there for five minutes).
   const approve = useMutation({
     mutationFn: (req: { id: string; sshPassword?: string; usePanelKey?: boolean; confirmedFingerprint?: string }) => guard(() => approvals.approve(req)),
+    gcTime: 0,
     onSuccess: () => toast(t("int.ap.approved")),
     onError: fail,
     onSettled: settled,
