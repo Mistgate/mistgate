@@ -332,7 +332,8 @@ package mistgate.agent.v1;
 //     the module is the panel's job, after the node says "done" (NodeSettings.awg_backend = "kernel").
 //     Events (reliable, severity in brackets): awg_kernel_prepare_started {kernel} (info), awg_kernel_prepare_done
 //     {kernel, minutes} (info) and awg_kernel_prepare_failed {code, reason, kernel, minutes} (error). code is one of
-//     timeout | apt_lock | step_failed | source_moved | module_not_loaded | module_unusable | interrupted;
+//     timeout | apt_lock | step_failed | source_moved | module_not_loaded | module_unusable | module_build_failed |
+//     interrupted;
 //     reason is one short English sentence, never package-manager output (that is in the node's journal, unit
 //     mistgate-awg-prepare). After done and after failed the agent re-runs the checks kernel_headers and awg_backend.
 //     A run that ended while the agent was down is reported when it starts again; a run whose job stopped writing its

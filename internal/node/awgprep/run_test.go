@@ -13,10 +13,15 @@ import (
 
 // recRun is the fake command runner: it records what ran and fails, blocks or answers on a command prefix.
 type recRun struct {
-	ran   []string
-	fail  string            // a command prefix that fails ("exit status 100")
-	block string            // a command prefix that never ends until the context does
-	out   map[string]string // output per command prefix
+	ran     []string
+	fail    string            // a command prefix that fails ("exit status 100")
+	failToo string            // a second one
+	block   string            // a command prefix that never ends until the context does
+	out     map[string]string // output per command prefix
+}
+
+func (r *recRun) fails(line string) bool {
+	return r.fail != "" && strings.HasPrefix(line, r.fail) || r.failToo != "" && strings.HasPrefix(line, r.failToo)
 }
 
 func (r *recRun) run(ctx context.Context, _ io.Writer, _ string, cmd ...string) (string, error) {
@@ -28,13 +33,13 @@ func (r *recRun) run(ctx context.Context, _ io.Writer, _ string, cmd ...string) 
 	}
 	for k, v := range r.out {
 		if strings.HasPrefix(line, k) {
-			if r.fail != "" && strings.HasPrefix(line, r.fail) {
+			if r.fails(line) {
 				return v, errors.New("exit status 100")
 			}
 			return v, nil
 		}
 	}
-	if r.fail != "" && strings.HasPrefix(line, r.fail) {
+	if r.fails(line) {
 		return "", errors.New("exit status 100")
 	}
 	return "", nil
@@ -199,6 +204,61 @@ func TestRunWritesUbuntuFilesThroughSysAndRemovesTheLegacyList(t *testing.T) {
 	}
 	if len(r.ran) != 5 {
 		t.Errorf("commands = %v", r.ran)
+	}
+}
+
+// What an Ubuntu 26.04 node on Linux 7.0 printed: the module's DKMS build fails inside apt and dpkg leaves amneziawg-dkms
+// half-configured, after which every apt install on the host fails.
+const dkmsBuildOutput = "Building module(s)......(bad exit status: 2)\n" +
+	"Error! Bad return status for module build on kernel: 7.0.0-38-generic (x86_64)\n" +
+	"dpkg: error processing package amneziawg-dkms (--configure):\n" +
+	"E: Sub-process /usr/bin/dpkg returned an error code (1)\n"
+
+const purgeModule = "apt-get -o DPkg::Lock::Timeout=1800 purge -y amneziawg amneziawg-dkms"
+
+func TestRunUndoesAModuleThatDoesNotBuild(t *testing.T) {
+	for _, tc := range []struct {
+		name, failing string // the install step whose apt run configures the module
+		undoFails     bool
+		want          string
+	}{
+		{name: "the install of amneziawg", failing: aptOpts + "amneziawg", want: "its packages were removed again"},
+		// a retry after an earlier run that left the package: apt configures it again while installing the headers
+		{name: "the headers, over an earlier run's package", failing: aptOpts + "linux-headers", want: "its packages were removed again"},
+		{name: "the removal fails too", failing: aptOpts + "amneziawg", undoFails: true, want: "apt-get purge amneziawg amneziawg-dkms"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &recRun{fail: tc.failing, out: map[string]string{tc.failing: dkmsBuildOutput}}
+			if tc.undoFails {
+				r.failToo = purgeModule
+			}
+			var wrote string
+			err := Run(context.Background(), io.Discard, ubuntuPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
+			code, detail := Short(err)
+			if code != CodeBuildFailed || !strings.Contains(detail, tc.want) || strings.Contains(detail, "Bad return status") {
+				t.Fatalf("short = %q %q (err %v)", code, detail, err)
+			}
+			if last := r.ran[len(r.ran)-1]; last != purgeModule {
+				t.Errorf("the module's packages were not removed after the failed build: %v", r.ran)
+			}
+			if strings.HasPrefix(wrote, modulesLoadFile+"\n") { // the PPA step writes files too; this is the verify
+				t.Error("verified after a failure")
+			}
+		})
+	}
+}
+
+func TestRunADebianBuildThatFailsIsABuildFailure(t *testing.T) {
+	r := &recRun{fail: "make -C", out: map[string]string{"git -C": pinnedModuleCommit + "abcdef0123456789\n"}}
+	var wrote string
+	err := Run(context.Background(), io.Discard, debianPlan(t), "/tmp/src", r.run, goodSys(&wrote), JobTimeout, nil)
+	if codeOf(t, err) != CodeBuildFailed || !strings.Contains(err.Error(), "nothing else is rolled back") {
+		t.Fatalf("err = %v", err)
+	}
+	for _, line := range r.ran {
+		if strings.Contains(line, "purge") {
+			t.Errorf("the source build removed packages: %v", r.ran)
+		}
 	}
 }
 

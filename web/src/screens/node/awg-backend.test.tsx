@@ -210,7 +210,7 @@ describe("how the preparation is shown", () => {
     expect(text()).toContain("Failed: one of the installation steps failed");
     expect(text()).toContain("step 2 of 5 failed: install the build tools (exit status 100)"); // the short fact
     expect(text()).toContain("The node kept the backend it had");
-    expect(text()).toContain("journalctl -u mistgate-awg-prepare");
+    expect(text()).toContain("journalctl -u mistgate-awg-prepare -e");
     await click(button("Retry"));
     await settle();
     expect(prepareAwgKernel).toHaveBeenCalledWith({ nodeId: "nod_1", confirm: false });

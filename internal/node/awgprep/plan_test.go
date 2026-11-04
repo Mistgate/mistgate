@@ -205,6 +205,60 @@ func TestPlanInstallsNeverPullRecommends(t *testing.T) {
 	}
 }
 
+// An earlier run's half-installed packages go first, and both Ubuntu installs that can configure the module undo it when
+// it does not build; the Debian source build marks its compile step.
+func TestPlanCleansUpAModuleThatDoesNotBuild(t *testing.T) {
+	steps, notes, err := Plan(Env{OSRelease: osr("ubuntu", ""), Kernel: "7.0.0-38-generic", CPUs: 1, Leftover: []string{"amneziawg", "amneziawg-dkms"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	purge := "apt-get -o DPkg::Lock::Timeout=1800 purge -y amneziawg amneziawg-dkms"
+	if got := strings.Join(steps[0].Cmd, " "); got != purge || !strings.Contains(steps[0].Desc, "amneziawg, amneziawg-dkms") {
+		t.Errorf("first step = %q %q", steps[0].Desc, got)
+	}
+	undone := 0
+	for _, s := range steps {
+		if len(s.Undo) > 0 {
+			undone++
+			if got := strings.Join(s.Undo, " "); got != purge || !strings.Contains(strings.Join(s.Cmd, " "), " install ") {
+				t.Errorf("%s: undo %q", s.Desc, got)
+			}
+		}
+	}
+	if undone != 2 || !strings.Contains(strings.Join(notes, " "), "removed again") {
+		t.Errorf("%d steps undo the module, notes %q", undone, notes)
+	}
+	if clean, _, _ := Plan(Env{OSRelease: osr("ubuntu", ""), Kernel: "7.0.0-38-generic", CPUs: 1}); strings.Contains(clean[0].Desc, "earlier run") {
+		t.Error("a host without leftovers got the removal step")
+	}
+	built := 0
+	for _, s := range debianPlan(t) {
+		if s.Build {
+			built++
+			if s.Cmd[0] != "make" || len(s.Undo) > 0 {
+				t.Errorf("build step %q", s.Desc)
+			}
+		}
+	}
+	if built != 1 {
+		t.Errorf("%d Debian build steps", built)
+	}
+}
+
+func TestLeftoverPackages(t *testing.T) {
+	for out, want := range map[string]string{
+		"amneziawg iU \namneziawg-dkms iF \n": "amneziawg amneziawg-dkms", // what the owner's node had after the failed build
+		"amneziawg ii \namneziawg-dkms ii \n": "",                         // installed and working
+		"amneziawg-dkms un \n":                "",                         // known to dpkg, not installed
+		"amneziawg rc \namneziawg-dkms iH\n":  "amneziawg-dkms",           // removed (config left) / half-installed
+		"":                                    "",
+	} {
+		if got := strings.Join(leftoverPackages(out), " "); got != want {
+			t.Errorf("%q: %q, want %q", out, got, want)
+		}
+	}
+}
+
 func TestPackageManagerWaitIsBoundedAndSharedWithApt(t *testing.T) {
 	if LockWait != 30*time.Minute || JobTimeout < LockWait+15*time.Minute {
 		t.Fatalf("lock wait/job timeout = %s/%s, want a 30-minute lock wait plus build time", LockWait, JobTimeout)

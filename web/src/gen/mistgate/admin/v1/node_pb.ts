@@ -376,7 +376,7 @@ export type AwgPrepare = Message<"mistgate.admin.v1.AwgPrepare"> & {
 
   /**
    * FAILED: a stable code (timeout, apt_lock, step_failed, source_moved, module_not_loaded, module_unusable,
-   * interrupted) and one short English sentence. Never package-manager output.
+   * module_build_failed, interrupted) and one short English sentence. Never package-manager output.
    *
    * @generated from field: string reason_code = 4;
    */

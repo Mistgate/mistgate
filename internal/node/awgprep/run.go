@@ -100,7 +100,8 @@ func ctxFailure(ctx context.Context, limit time.Duration) *Failure {
 
 // Run executes the plan (steps already have {src} replaced by src) and then verifies the module: the module is loaded
 // (/sys/module, not modinfo: on ARM two trees can hold one name), speaks genl v3 with room for the 3.1 attributes, and
-// is loaded at boot (modules-load.d). Nothing is rolled back on failure; the error says where it stopped. limit is only
+// is loaded at boot (modules-load.d). Nothing is rolled back on failure, except the module's own packages when it did
+// not build (buildFailure); the error says where it stopped. limit is only
 // used to word a timeout (the caller owns the deadline of ctx).
 func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner, sys Sys, limit time.Duration, progress Progress) error {
 	for i, s := range steps {
@@ -154,9 +155,12 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 				f := &Failure{Code: CodeStepFailed,
 					Detail: fmt.Sprintf("step %d of %d failed: %s (%v)", i+1, len(steps), s.Desc, err),
 					Long:   fmt.Sprintf("step %d (%s) failed: %v (nothing is rolled back; fix the cause and run the command again)", i+1, strings.Join(cmd, " "), err)}
-				if lockBusy(out) {
+				switch {
+				case lockBusy(out):
 					f.Code = CodeAptLock
 					f.Detail = fmt.Sprintf("step %d of %d: another package manager (apt, dpkg, unattended-upgrades) prevented access to the package lock", i+1, len(steps))
+				case s.Build || dkmsBuildFailed(out):
+					f = buildFailure(ctx, w, run, s, i+1, cmd)
 				}
 				return f
 			}
@@ -172,6 +176,34 @@ func Run(ctx context.Context, w io.Writer, steps []Step, src string, run Runner,
 		}
 	}
 	return Verify(w, sys)
+}
+
+// dkmsBuildFailed reports apt output in which the module's DKMS build failed: dkms says "Bad return status for module
+// build" and dpkg leaves amneziawg-dkms half-configured (also when an earlier run's package is configured again).
+func dkmsBuildFailed(out string) bool {
+	return strings.Contains(out, "error processing package amneziawg-dkms") ||
+		strings.Contains(out, "amneziawg") && strings.Contains(out, "Bad return status for module build")
+}
+
+// buildFailure is step i failing because the module does not compile for this kernel (an API change it has no answer
+// for yet). The step's Undo, when it has one, removes the half-configured package the failed build left: without that
+// the host's apt refuses every later install.
+func buildFailure(ctx context.Context, w io.Writer, run Runner, s Step, i int, cmd []string) *Failure {
+	f := &Failure{Code: CodeBuildFailed, Detail: "the AmneziaWG module does not build for this kernel; the node stays on userspace",
+		Long: fmt.Sprintf("step %d (%s) failed: the AmneziaWG module does not build for this kernel (the compiler's errors are above, or in /var/lib/dkms/amneziawg/*/build/make.log)", i, strings.Join(cmd, " "))}
+	if len(s.Undo) == 0 {
+		f.Long += "; nothing else is rolled back"
+		return f
+	}
+	fmt.Fprintf(w, "\nthe module did not build: removing its half-installed packages\n  $ %s\n", strings.Join(s.Undo, " "))
+	if _, err := run(ctx, w, "", s.Undo...); err != nil {
+		f.Detail = "the AmneziaWG module does not build for this kernel, and removing its half-installed packages failed: apt-get purge amneziawg amneziawg-dkms"
+		f.Long += fmt.Sprintf("; removing its packages failed too (%v): run %s by hand, apt refuses other installs until then", err, strings.Join(s.Undo, " "))
+		return f
+	}
+	f.Detail = "the AmneziaWG module does not build for this kernel; its packages were removed again and the node stays on userspace"
+	f.Long += "; its packages were removed again, apt is usable"
+	return f
 }
 
 // Verify is also the whole of --verify-only. A module that works but cannot be set to load at boot is a failure: the

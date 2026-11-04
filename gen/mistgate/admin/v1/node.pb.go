@@ -748,7 +748,7 @@ type AwgPrepare struct {
 	State     AwgPrepareState `protobuf:"varint,2,opt,name=state,proto3,enum=mistgate.admin.v1.AwgPrepareState" json:"state,omitempty"`
 	SinceUnix int64           `protobuf:"varint,3,opt,name=since_unix,json=sinceUnix,proto3" json:"since_unix,omitempty"`
 	// FAILED: a stable code (timeout, apt_lock, step_failed, source_moved, module_not_loaded, module_unusable,
-	// interrupted) and one short English sentence. Never package-manager output.
+	// module_build_failed, interrupted) and one short English sentence. Never package-manager output.
 	ReasonCode    string `protobuf:"bytes,4,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
 	Reason        string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields

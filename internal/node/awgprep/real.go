@@ -50,6 +50,9 @@ func ReadEnv(ctx context.Context) Env {
 		_, err := os.Stat("/run/systemd/system")
 		e.Systemd = err == nil
 	}
+	// dpkg-query exits 1 when one of the names is unknown to dpkg; the lines it printed still count
+	out, _ = exec.CommandContext(ctx, "dpkg-query", append([]string{"-W", "-f", "${Package} ${db:Status-Abbrev}\n"}, modulePackages...)...).Output()
+	e.Leftover = leftoverPackages(string(out))
 	return e
 }
 

@@ -39,6 +39,7 @@ const (
 	CodeSourceMoved    = "source_moved"
 	CodeModuleNotLoad  = "module_not_loaded"
 	CodeModuleUnusable = "module_unusable"
+	CodeBuildFailed    = "module_build_failed" // the module does not compile for this kernel (an API it has no answer for yet)
 	CodeInterrupted    = "interrupted"
 	CodeLaunchFailed   = "launch_failed"
 )
@@ -59,6 +60,9 @@ type Env struct {
 	Container  string // virtualisation of a container kind ("lxc", "openvz", "docker", ...), "" = none
 	SecureBoot bool
 	Systemd    bool // systemd-run is there and systemd is the init (the automatic run needs it)
+	// Leftover are the module's packages an earlier run left half-installed (dpkg unpacked or half-configured): apt
+	// refuses every install on the host until they are configured or gone.
+	Leftover []string
 }
 
 // FileOp is one file change in a plan. Remove deletes a file if it exists; otherwise Run writes Body atomically with
@@ -77,12 +81,26 @@ type Step struct {
 	Files []FileOp
 	Dir   string
 	Check func(out string) error
+	// Build marks the step that compiles the module: its failure is module_build_failed. An apt step is one too when its
+	// output shows the DKMS build of the module failing.
+	Build bool
+	// Undo runs when the step fails because the module did not build. A DKMS package whose build failed stays
+	// half-configured, and apt then refuses every later install on the host; Undo removes it again.
+	Undo []string
 }
 
 // aptInstall is `apt-get install` that never asks, waits for the dpkg lock and does not pull recommended packages (dkms
 // recommends linux-headers-generic, which is neither the running kernel nor small).
 func aptInstall(pkgs ...string) []string {
 	return append([]string{"apt-get", "-o", fmt.Sprintf("DPkg::Lock::Timeout=%d", aptLockTimeoutSeconds), "install", "-y", "--no-install-recommends"}, pkgs...)
+}
+
+// modulePackages are what the Ubuntu recipe installs for the module: amneziawg pulls amneziawg-dkms.
+var modulePackages = []string{"amneziawg", "amneziawg-dkms"}
+
+// aptPurge removes packages with their configuration; a package that is not installed is not an error.
+func aptPurge(pkgs ...string) []string {
+	return append([]string{"apt-get", "-o", fmt.Sprintf("DPkg::Lock::Timeout=%d", aptLockTimeoutSeconds), "purge", "-y"}, pkgs...)
 }
 
 // aptUpdate sets the same timeout for any dpkg lock apt may acquire while refreshing its package index. The explicit
@@ -111,14 +129,21 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		steps = []Step{
-			{Desc: "refresh the package index", Cmd: aptUpdate()},
-			{Desc: "install the headers of the running kernel", Cmd: aptInstall(headers)},
-			{Desc: "add the Amnezia PPA", Files: ppaFiles},
-			{Desc: "refresh the package index from the Amnezia PPA", Cmd: aptUpdate()},
-			{Desc: "install amneziawg", Cmd: aptInstall("amneziawg")},
+		// An install that leaves the module's DKMS package unbuilt (it does not compile for this kernel) is undone, and
+		// so are the leftovers of an earlier run: the host's apt must never stay broken because of this recipe.
+		undo := aptPurge(modulePackages...)
+		if len(e.Leftover) > 0 {
+			steps = append(steps, Step{Desc: "remove the module packages an earlier run left half-installed (" + strings.Join(e.Leftover, ", ") + ")", Cmd: undo})
 		}
-		notes = append(notes, "DKMS rebuilds the module after a kernel upgrade; the build takes about a minute on a small VPS and also rebuilds the initramfs")
+		steps = append(steps,
+			Step{Desc: "refresh the package index", Cmd: aptUpdate()},
+			Step{Desc: "install the headers of the running kernel", Cmd: aptInstall(headers), Undo: undo},
+			Step{Desc: "add the Amnezia PPA", Files: ppaFiles},
+			Step{Desc: "refresh the package index from the Amnezia PPA", Cmd: aptUpdate()},
+			Step{Desc: "install amneziawg", Cmd: aptInstall("amneziawg"), Undo: undo},
+		)
+		notes = append(notes, "DKMS rebuilds the module after a kernel upgrade; the build takes about a minute on a small VPS and also rebuilds the initramfs",
+			"if the module does not build for this kernel, its packages are removed again (apt stays usable) and the node stays on userspace")
 	case id == "debian" || (strings.Contains(like, "debian") && id != ""):
 		cpus := max(e.CPUs, 1)
 		steps = []Step{
@@ -131,7 +156,7 @@ func Plan(e Env) (steps []Step, notes []string, err error) {
 				}
 				return nil
 			}},
-			{Desc: "build the module against the installed headers", Cmd: []string{"make", "-C", "{src}/src", "KERNELDIR=/lib/modules/" + e.Kernel + "/build", fmt.Sprintf("-j%d", cpus)}},
+			{Desc: "build the module against the installed headers", Cmd: []string{"make", "-C", "{src}/src", "KERNELDIR=/lib/modules/" + e.Kernel + "/build", fmt.Sprintf("-j%d", cpus)}, Build: true},
 			{Desc: "install the module for the running kernel", Cmd: []string{"install", "-D", "-m", "0644", "{src}/src/amneziawg.ko", "/lib/modules/" + e.Kernel + "/updates/amneziawg.ko"}},
 			{Desc: "update the module dependency index", Cmd: []string{"depmod", "-a", e.Kernel}},
 		}
@@ -155,6 +180,19 @@ func PlanAuto(e Env) ([]Step, []string, error) {
 		return nil, nil, &Unsupported{CodeNoSystemd, "systemd-run is not available: the build runs as a separate systemd unit, run the command by hand"}
 	}
 	return Plan(e)
+}
+
+// leftoverPackages reads `dpkg-query -W -f '${Package} ${db:Status-Abbrev}\n'`: the packages dpkg left half-installed
+// (H), unpacked but not configured (U) or half-configured (F).
+func leftoverPackages(out string) []string {
+	var left []string
+	for _, line := range strings.Split(out, "\n") {
+		name, abbrev, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if ok && len(abbrev) >= 2 && strings.ContainsRune("HUF", rune(abbrev[1])) {
+			left = append(left, name)
+		}
+	}
+	return left
 }
 
 // ParseOSRelease reads KEY=value lines (values may be quoted).

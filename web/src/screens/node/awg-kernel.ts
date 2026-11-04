@@ -11,8 +11,9 @@ export function prepReasonText(t: T, code: string, reason: string): string {
   return Object.hasOwn(en, key) ? t(key as MessageKey) : reason || code;
 }
 
-/** Codes whose English detail adds something the sentence does not say (which step, what the module answered). */
-export const prepDetailCodes: ReadonlySet<string> = new Set(["step_failed", "module_unusable", "launch_failed"]);
+/** Codes whose English detail adds something the sentence does not say (which step, what the module answered, whether
+ * the packages of a module that did not build were removed). */
+export const prepDetailCodes: ReadonlySet<string> = new Set(["step_failed", "module_unusable", "module_build_failed", "launch_failed"]);
 
 /** Whole minutes a build has been running, "<1" in the first one. */
 export function prepMinutes(sinceUnix: number, nowMs: number): string {

@@ -195,7 +195,7 @@ message AwgPrepare {
   AwgPrepareState state = 2;
   int64 since_unix = 3 [jstype = JS_NUMBER];
   // FAILED: a stable code (timeout, apt_lock, step_failed, source_moved, module_not_loaded, module_unusable,
-  // interrupted) and one short English sentence. Never package-manager output.
+  // module_build_failed, interrupted) and one short English sentence. Never package-manager output.
   string reason_code = 4;
   string reason = 5;
 }

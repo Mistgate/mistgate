@@ -126,10 +126,10 @@ The module is built from source on the node, which installs packages as root. Th
 - it can be built: the window **Build the kernel module on …?** explains what happens. The node installs what the build needs (the running kernel's headers and amneziawg from the Amnezia PPA on Ubuntu; make, gcc and those headers on Debian: a few hundred MB), builds and loads the module. The build usually takes 1–5 minutes. If a system package update is already running, Mistgate waits up to 30 minutes for apt to release its lock. The whole job has a 45-minute limit. AmneziaWG keeps running as before the whole time. When the module is ready, the node switches to it and connected devices reconnect once;
 - it cannot be built here: the card says why and shows the manual command.
 
-The card follows the build: "Preparing the module… (running N min)", then **Module ready**, or **Failed** with the reason and **Retry**. A failed build changes nothing: the node keeps the backend it had. The build's log is on the node:
+The card follows the build: "Preparing the module… (running N min)", then **Module ready**, or **Failed** with the reason and **Retry**. A failed build changes nothing: the node keeps the backend it had. If the module does not compile for the node's kernel (a kernel newer than the module supports), the node also removes the module packages it installed, so apt on the host stays usable; the card says **the AmneziaWG module does not build for this node's kernel yet**. The build's log is on the node (`-e` shows the latest run):
 
 ```sh
-journalctl -u mistgate-awg-prepare
+journalctl -u mistgate-awg-prepare -e
 ```
 
 **By hand**, on the node as root. The card shows the command with `--yes`: for an agent too old to build the module by itself, and under **Do it by hand** for the rest. Without `--yes` the command only prints its plan:
