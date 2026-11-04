@@ -298,34 +298,34 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         return (
           <div
             key={n.id}
-            className={cx("relative grid min-h-[60px] items-center gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
+            className={cx("relative grid min-h-[60px] items-start gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
           >
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0" />
-            {select && <Tick select={select} node={n} />}
+            {select && <Tick select={select} node={n} className="mt-0.5" />}
             <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
                 <b className="min-w-0 break-all text-sm">{n.name}</b>
+                <span className="min-w-0 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
                 <NodeStatusLabel node={n} />
               </div>
-              <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
               {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
               <NodeNotes node={n} />
             </div>
-            <span title={n.address} className="font-mono text-xs break-all text-muted">
+            <span title={n.address} className="self-start pt-0.5 font-mono text-xs break-all text-muted">
               {n.address}
             </span>
-            <span title={n.protocols.map(protocolName).join(", ")} className="truncate font-mono text-xs text-muted">
+            <span title={n.protocols.map(protocolName).join(", ")} className="self-start pt-0.5 truncate font-mono text-xs text-muted">
               {n.protocols.map(protocolShort).join(", ") || "—"}
             </span>
-            <span className="text-end font-mono">{onlineOf(n)}</span>
-            <span className="text-end font-mono">{fmt.bytes(n.trafficTodayBytes)}</span>
-            <div className="flex items-center justify-end gap-2">
+            <span className="self-start pt-0.5 text-end font-mono">{onlineOf(n)}</span>
+            <span className="self-start pt-0.5 text-end font-mono">{fmt.bytes(n.trafficTodayBytes)}</span>
+            <div className="flex items-center justify-end gap-2 self-start pt-1">
               <span className="h-1 w-11 overflow-hidden rounded-[2px] bg-surface-2">
                 <span className="block h-full bg-accent" style={{ width: `${n.hasMetrics ? Math.min(100, n.cpuPct) : 0}%` }} />
               </span>
               <span className="w-8 text-end font-mono text-xs">{n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"}</span>
             </div>
-            <span className="text-end font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"}</span>
+            <span className="self-start pt-0.5 text-end font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"}</span>
           </div>
         );
       })}
@@ -349,12 +349,13 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         return (
           <div key={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
               {select && <Tick select={select} node={n} />}
+              <span className="flex h-5 items-center rounded-md bg-surface-2 px-1.5 font-mono text-[10px] font-bold text-muted">{n.countryCode || "—"}</span>
               <b className="min-w-0 break-all text-[15px]">{n.name}</b>
+              <span className="min-w-0 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
               <NodeStatusLabel node={n} />
             </div>
-            <span className="truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
             {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
             <NodeNotes node={n} />
             <div className="grid grid-cols-4 gap-2">
@@ -384,8 +385,9 @@ function NodeNotes({ node }: { node: Node }) {
   if (!notes) return null;
   // Above the row link: only the notes show this title, and clicking them still opens the node.
   return (
-    <Link to="/nodes/$id" params={{ id: node.id }} title={notes} tabIndex={-1} className="relative z-10 block w-fit min-w-0 max-w-full">
-      <p className="line-clamp-2 whitespace-pre-line break-words text-xs text-muted">{notes}</p>
+    <Link to="/nodes/$id" params={{ id: node.id }} title={notes} tabIndex={-1} className="relative z-10 flex w-fit min-w-0 max-w-full items-start gap-1.5 border-s-2 border-line ps-2 text-xs text-muted">
+      <Icon name="text" size={12} className="mt-0.5 text-faint" />
+      <p className="line-clamp-2 whitespace-pre-line break-words">{notes}</p>
     </Link>
   );
 }

@@ -132,6 +132,11 @@ describe("node notes", () => {
     expect([...rowLinks].every((a) => !a.hasAttribute("title"))).toBe(true);
   });
 
+  it("keeps the country chip on mobile cards", async () => {
+    await mount([node("de1")]);
+    expect([...document.querySelectorAll("span.bg-surface-2")].filter((span) => span.textContent === "DE")).toHaveLength(1);
+  });
+
   it("omits empty and whitespace-only notes", async () => {
     await mount([node("de1"), node("fi1", { notes: " \n\t " })]);
     expect(document.querySelectorAll("p")).toHaveLength(0);
@@ -147,8 +152,8 @@ describe("node status and metadata", () => {
     for (const name of names) {
       const heading = name.parentElement!;
       expect(heading.textContent).toContain(en["node.status.online"]);
+      expect(heading.textContent).toContain("examplehost");
       expect(heading.querySelectorAll('[aria-hidden="true"]')).toHaveLength(1);
-      expect(heading.textContent).not.toContain("examplehost");
       expect(heading.textContent).not.toContain("Renew in March");
       expect(heading.parentElement!.textContent!.split(en["node.status.online"])).toHaveLength(2);
     }
