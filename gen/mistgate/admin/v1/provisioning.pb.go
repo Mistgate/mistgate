@@ -239,9 +239,12 @@ type CheckSSHRequest struct {
 	Password    string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
 	Username    string                 `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
 	// When true, password must be empty and the panel uses its public key's private half.
-	UsePanelKey   bool `protobuf:"varint,6,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	UsePanelKey bool `protobuf:"varint,6,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
+	// An owner's private key is used only for this check. It is never retained.
+	PrivateKey           string `protobuf:"bytes,7,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	PrivateKeyPassphrase string `protobuf:"bytes,8,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CheckSSHRequest) Reset() {
@@ -314,6 +317,20 @@ func (x *CheckSSHRequest) GetUsePanelKey() bool {
 		return x.UsePanelKey
 	}
 	return false
+}
+
+func (x *CheckSSHRequest) GetPrivateKey() string {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return ""
+}
+
+func (x *CheckSSHRequest) GetPrivateKeyPassphrase() string {
+	if x != nil {
+		return x.PrivateKeyPassphrase
+	}
+	return ""
 }
 
 type NodePreflight struct {
@@ -493,9 +510,14 @@ type StartNodeProvisionRequest struct {
 	// chose on that plan's approval screen, and only with the fingerprint the owner confirmed there.
 	PlanId string `protobuf:"bytes,12,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
 	// Direct installs: when true, password must be empty and the panel key is used.
-	UsePanelKey   bool `protobuf:"varint,13,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	UsePanelKey bool `protobuf:"varint,13,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
+	// For wizard requests, the UI sends true by default and false only when the owner opts out.
+	InstallPanelKey bool `protobuf:"varint,14,opt,name=install_panel_key,json=installPanelKey,proto3" json:"install_panel_key,omitempty"`
+	// An owner's private key is used for this install only; the worker replaces it with the panel key for saved access.
+	PrivateKey           string `protobuf:"bytes,15,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	PrivateKeyPassphrase string `protobuf:"bytes,16,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartNodeProvisionRequest) Reset() {
@@ -619,6 +641,27 @@ func (x *StartNodeProvisionRequest) GetUsePanelKey() bool {
 	return false
 }
 
+func (x *StartNodeProvisionRequest) GetInstallPanelKey() bool {
+	if x != nil {
+		return x.InstallPanelKey
+	}
+	return false
+}
+
+func (x *StartNodeProvisionRequest) GetPrivateKey() string {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetPrivateKeyPassphrase() string {
+	if x != nil {
+		return x.PrivateKeyPassphrase
+	}
+	return ""
+}
+
 type RetryNodeProvisionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	JobId          string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
@@ -626,9 +669,13 @@ type RetryNodeProvisionRequest struct {
 	Password       string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
 	SshUsername    string                 `protobuf:"bytes,4,opt,name=ssh_username,json=sshUsername,proto3" json:"ssh_username,omitempty"`
 	// When true, password must be empty and the panel key is used.
-	UsePanelKey   bool `protobuf:"varint,5,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	UsePanelKey          bool   `protobuf:"varint,5,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
+	PrivateKey           string `protobuf:"bytes,6,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	PrivateKeyPassphrase string `protobuf:"bytes,7,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
+	// When true, the panel key is added and verified before access is saved.
+	InstallPanelKey bool `protobuf:"varint,8,opt,name=install_panel_key,json=installPanelKey,proto3" json:"install_panel_key,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RetryNodeProvisionRequest) Reset() {
@@ -692,6 +739,27 @@ func (x *RetryNodeProvisionRequest) GetSshUsername() string {
 func (x *RetryNodeProvisionRequest) GetUsePanelKey() bool {
 	if x != nil {
 		return x.UsePanelKey
+	}
+	return false
+}
+
+func (x *RetryNodeProvisionRequest) GetPrivateKey() string {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return ""
+}
+
+func (x *RetryNodeProvisionRequest) GetPrivateKeyPassphrase() string {
+	if x != nil {
+		return x.PrivateKeyPassphrase
+	}
+	return ""
+}
+
+func (x *RetryNodeProvisionRequest) GetInstallPanelKey() bool {
+	if x != nil {
+		return x.InstallPanelKey
 	}
 	return false
 }
@@ -1475,6 +1543,589 @@ func (x *ListNodeServerAccessResponse) GetAccess() []*NodeServerAccess {
 	return nil
 }
 
+// A public authorized_keys entry. Comments are untrusted server text and are cleaned before they are returned.
+type NodeServerKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Bits          uint32                 `protobuf:"varint,2,opt,name=bits,proto3" json:"bits,omitempty"`
+	Fingerprint   string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	Comment       string                 `protobuf:"bytes,4,opt,name=comment,proto3" json:"comment,omitempty"`
+	PanelKey      bool                   `protobuf:"varint,5,opt,name=panel_key,json=panelKey,proto3" json:"panel_key,omitempty"`
+	Restricted    bool                   `protobuf:"varint,6,opt,name=restricted,proto3" json:"restricted,omitempty"`
+	Lines         uint32                 `protobuf:"varint,7,opt,name=lines,proto3" json:"lines,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeServerKey) Reset() {
+	*x = NodeServerKey{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeServerKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeServerKey) ProtoMessage() {}
+
+func (x *NodeServerKey) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeServerKey.ProtoReflect.Descriptor instead.
+func (*NodeServerKey) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *NodeServerKey) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *NodeServerKey) GetBits() uint32 {
+	if x != nil {
+		return x.Bits
+	}
+	return 0
+}
+
+func (x *NodeServerKey) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *NodeServerKey) GetComment() string {
+	if x != nil {
+		return x.Comment
+	}
+	return ""
+}
+
+func (x *NodeServerKey) GetPanelKey() bool {
+	if x != nil {
+		return x.PanelKey
+	}
+	return false
+}
+
+func (x *NodeServerKey) GetRestricted() bool {
+	if x != nil {
+		return x.Restricted
+	}
+	return false
+}
+
+func (x *NodeServerKey) GetLines() uint32 {
+	if x != nil {
+		return x.Lines
+	}
+	return 0
+}
+
+type ListNodeServerKeysRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodeServerKeysRequest) Reset() {
+	*x = ListNodeServerKeysRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodeServerKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodeServerKeysRequest) ProtoMessage() {}
+
+func (x *ListNodeServerKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodeServerKeysRequest.ProtoReflect.Descriptor instead.
+func (*ListNodeServerKeysRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ListNodeServerKeysRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type ListNodeServerKeysResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Keys          []*NodeServerKey       `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
+	OtherLines    uint32                 `protobuf:"varint,2,opt,name=other_lines,json=otherLines,proto3" json:"other_lines,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodeServerKeysResponse) Reset() {
+	*x = ListNodeServerKeysResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodeServerKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodeServerKeysResponse) ProtoMessage() {}
+
+func (x *ListNodeServerKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodeServerKeysResponse.ProtoReflect.Descriptor instead.
+func (*ListNodeServerKeysResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListNodeServerKeysResponse) GetKeys() []*NodeServerKey {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
+func (x *ListNodeServerKeysResponse) GetOtherLines() uint32 {
+	if x != nil {
+		return x.OtherLines
+	}
+	return 0
+}
+
+type AddNodeServerKeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	PublicKey     string                 `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	PanelKey      bool                   `protobuf:"varint,3,opt,name=panel_key,json=panelKey,proto3" json:"panel_key,omitempty"`
+	Confirm       bool                   `protobuf:"varint,4,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddNodeServerKeyRequest) Reset() {
+	*x = AddNodeServerKeyRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddNodeServerKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddNodeServerKeyRequest) ProtoMessage() {}
+
+func (x *AddNodeServerKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddNodeServerKeyRequest.ProtoReflect.Descriptor instead.
+func (*AddNodeServerKeyRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AddNodeServerKeyRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *AddNodeServerKeyRequest) GetPublicKey() string {
+	if x != nil {
+		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *AddNodeServerKeyRequest) GetPanelKey() bool {
+	if x != nil {
+		return x.PanelKey
+	}
+	return false
+}
+
+func (x *AddNodeServerKeyRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+type AddNodeServerKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           *NodeServerKey         `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddNodeServerKeyResponse) Reset() {
+	*x = AddNodeServerKeyResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddNodeServerKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddNodeServerKeyResponse) ProtoMessage() {}
+
+func (x *AddNodeServerKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddNodeServerKeyResponse.ProtoReflect.Descriptor instead.
+func (*AddNodeServerKeyResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *AddNodeServerKeyResponse) GetKey() *NodeServerKey {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+type RemoveNodeServerKeyRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	NodeId          string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Fingerprint     string                 `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	Confirm         bool                   `protobuf:"varint,3,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	ConfirmPanelKey bool                   `protobuf:"varint,4,opt,name=confirm_panel_key,json=confirmPanelKey,proto3" json:"confirm_panel_key,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RemoveNodeServerKeyRequest) Reset() {
+	*x = RemoveNodeServerKeyRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveNodeServerKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveNodeServerKeyRequest) ProtoMessage() {}
+
+func (x *RemoveNodeServerKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveNodeServerKeyRequest.ProtoReflect.Descriptor instead.
+func (*RemoveNodeServerKeyRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RemoveNodeServerKeyRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *RemoveNodeServerKeyRequest) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *RemoveNodeServerKeyRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+func (x *RemoveNodeServerKeyRequest) GetConfirmPanelKey() bool {
+	if x != nil {
+		return x.ConfirmPanelKey
+	}
+	return false
+}
+
+type RemoveNodeServerKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveNodeServerKeyResponse) Reset() {
+	*x = RemoveNodeServerKeyResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveNodeServerKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveNodeServerKeyResponse) ProtoMessage() {}
+
+func (x *RemoveNodeServerKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveNodeServerKeyResponse.ProtoReflect.Descriptor instead.
+func (*RemoveNodeServerKeyResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{28}
+}
+
+// Attach access to a node that was enrolled outside the SSH installer.
+type AttachNodeServerAccessRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	NodeId               string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	SshHost              string                 `protobuf:"bytes,2,opt,name=ssh_host,json=sshHost,proto3" json:"ssh_host,omitempty"`
+	SshPort              uint32                 `protobuf:"varint,3,opt,name=ssh_port,json=sshPort,proto3" json:"ssh_port,omitempty"`
+	Fingerprint          string                 `protobuf:"bytes,4,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	Username             string                 `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
+	Password             string                 `protobuf:"bytes,6,opt,name=password,proto3" json:"password,omitempty"`
+	UsePanelKey          bool                   `protobuf:"varint,7,opt,name=use_panel_key,json=usePanelKey,proto3" json:"use_panel_key,omitempty"`
+	PrivateKey           string                 `protobuf:"bytes,8,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	PrivateKeyPassphrase string                 `protobuf:"bytes,9,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
+	InstallPanelKey      bool                   `protobuf:"varint,10,opt,name=install_panel_key,json=installPanelKey,proto3" json:"install_panel_key,omitempty"`
+	Confirm              bool                   `protobuf:"varint,11,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AttachNodeServerAccessRequest) Reset() {
+	*x = AttachNodeServerAccessRequest{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachNodeServerAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachNodeServerAccessRequest) ProtoMessage() {}
+
+func (x *AttachNodeServerAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachNodeServerAccessRequest.ProtoReflect.Descriptor instead.
+func (*AttachNodeServerAccessRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *AttachNodeServerAccessRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetSshHost() string {
+	if x != nil {
+		return x.SshHost
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetSshPort() uint32 {
+	if x != nil {
+		return x.SshPort
+	}
+	return 0
+}
+
+func (x *AttachNodeServerAccessRequest) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetUsePanelKey() bool {
+	if x != nil {
+		return x.UsePanelKey
+	}
+	return false
+}
+
+func (x *AttachNodeServerAccessRequest) GetPrivateKey() string {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetPrivateKeyPassphrase() string {
+	if x != nil {
+		return x.PrivateKeyPassphrase
+	}
+	return ""
+}
+
+func (x *AttachNodeServerAccessRequest) GetInstallPanelKey() bool {
+	if x != nil {
+		return x.InstallPanelKey
+	}
+	return false
+}
+
+func (x *AttachNodeServerAccessRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+type AttachNodeServerAccessResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Access *NodeServerAccess      `protobuf:"bytes,1,opt,name=access,proto3" json:"access,omitempty"`
+	// Non-empty when password access was attached but the optional panel key could not be installed.
+	PanelKeyError string `protobuf:"bytes,2,opt,name=panel_key_error,json=panelKeyError,proto3" json:"panel_key_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AttachNodeServerAccessResponse) Reset() {
+	*x = AttachNodeServerAccessResponse{}
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachNodeServerAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachNodeServerAccessResponse) ProtoMessage() {}
+
+func (x *AttachNodeServerAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachNodeServerAccessResponse.ProtoReflect.Descriptor instead.
+func (*AttachNodeServerAccessResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *AttachNodeServerAccessResponse) GetAccess() *NodeServerAccess {
+	if x != nil {
+		return x.Access
+	}
+	return nil
+}
+
+func (x *AttachNodeServerAccessResponse) GetPanelKeyError() string {
+	if x != nil {
+		return x.PanelKeyError
+	}
+	return ""
+}
+
 type RotateNodeServerPasswordRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
@@ -1489,7 +2140,7 @@ type RotateNodeServerPasswordRequest struct {
 
 func (x *RotateNodeServerPasswordRequest) Reset() {
 	*x = RotateNodeServerPasswordRequest{}
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1501,7 +2152,7 @@ func (x *RotateNodeServerPasswordRequest) String() string {
 func (*RotateNodeServerPasswordRequest) ProtoMessage() {}
 
 func (x *RotateNodeServerPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1514,7 +2165,7 @@ func (x *RotateNodeServerPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateNodeServerPasswordRequest.ProtoReflect.Descriptor instead.
 func (*RotateNodeServerPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RotateNodeServerPasswordRequest) GetNodeId() string {
@@ -1554,7 +2205,7 @@ type RotateNodeServerPasswordResponse struct {
 
 func (x *RotateNodeServerPasswordResponse) Reset() {
 	*x = RotateNodeServerPasswordResponse{}
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1566,7 +2217,7 @@ func (x *RotateNodeServerPasswordResponse) String() string {
 func (*RotateNodeServerPasswordResponse) ProtoMessage() {}
 
 func (x *RotateNodeServerPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1579,7 +2230,7 @@ func (x *RotateNodeServerPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateNodeServerPasswordResponse.ProtoReflect.Descriptor instead.
 func (*RotateNodeServerPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *RotateNodeServerPasswordResponse) GetRotated() bool {
@@ -1599,7 +2250,7 @@ type RevealNodeServerPasswordRequest struct {
 
 func (x *RevealNodeServerPasswordRequest) Reset() {
 	*x = RevealNodeServerPasswordRequest{}
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1611,7 +2262,7 @@ func (x *RevealNodeServerPasswordRequest) String() string {
 func (*RevealNodeServerPasswordRequest) ProtoMessage() {}
 
 func (x *RevealNodeServerPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1624,7 +2275,7 @@ func (x *RevealNodeServerPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealNodeServerPasswordRequest.ProtoReflect.Descriptor instead.
 func (*RevealNodeServerPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *RevealNodeServerPasswordRequest) GetNodeId() string {
@@ -1648,7 +2299,7 @@ type RevealNodeServerPasswordResponse struct {
 
 func (x *RevealNodeServerPasswordResponse) Reset() {
 	*x = RevealNodeServerPasswordResponse{}
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1660,7 +2311,7 @@ func (x *RevealNodeServerPasswordResponse) String() string {
 func (*RevealNodeServerPasswordResponse) ProtoMessage() {}
 
 func (x *RevealNodeServerPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1673,7 +2324,7 @@ func (x *RevealNodeServerPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealNodeServerPasswordResponse.ProtoReflect.Descriptor instead.
 func (*RevealNodeServerPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *RevealNodeServerPasswordResponse) GetPassword() string {
@@ -1706,7 +2357,7 @@ type ForgetNodeServerAccessRequest struct {
 
 func (x *ForgetNodeServerAccessRequest) Reset() {
 	*x = ForgetNodeServerAccessRequest{}
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1718,7 +2369,7 @@ func (x *ForgetNodeServerAccessRequest) String() string {
 func (*ForgetNodeServerAccessRequest) ProtoMessage() {}
 
 func (x *ForgetNodeServerAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1731,7 +2382,7 @@ func (x *ForgetNodeServerAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetNodeServerAccessRequest.ProtoReflect.Descriptor instead.
 func (*ForgetNodeServerAccessRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ForgetNodeServerAccessRequest) GetNodeId() string {
@@ -1749,7 +2400,7 @@ type ForgetNodeServerAccessResponse struct {
 
 func (x *ForgetNodeServerAccessResponse) Reset() {
 	*x = ForgetNodeServerAccessResponse{}
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1761,7 +2412,7 @@ func (x *ForgetNodeServerAccessResponse) String() string {
 func (*ForgetNodeServerAccessResponse) ProtoMessage() {}
 
 func (x *ForgetNodeServerAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_provisioning_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1774,7 +2425,7 @@ func (x *ForgetNodeServerAccessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetNodeServerAccessResponse.ProtoReflect.Descriptor instead.
 func (*ForgetNodeServerAccessResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_provisioning_proto_rawDescGZIP(), []int{36}
 }
 
 var File_mistgate_admin_v1_provisioning_proto protoreflect.FileDescriptor
@@ -1794,14 +2445,17 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
 	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1c\n" +
-	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\xb7\x01\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\x8e\x02\n" +
 	"\x0fCheckSSHRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
 	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1a\n" +
 	"\bpassword\x18\x04 \x01(\tR\bpassword\x12\x1a\n" +
 	"\busername\x18\x05 \x01(\tR\busername\x12\"\n" +
-	"\ruse_panel_key\x18\x06 \x01(\bR\vusePanelKey\"\xf1\x02\n" +
+	"\ruse_panel_key\x18\x06 \x01(\bR\vusePanelKey\x12\x1f\n" +
+	"\vprivate_key\x18\a \x01(\tR\n" +
+	"privateKey\x124\n" +
+	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\"\xf1\x02\n" +
 	"\rNodePreflight\x12\"\n" +
 	"\fdistribution\x18\x01 \x01(\tR\fdistribution\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
@@ -1815,7 +2469,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x0fpanel_reachable\x18\n" +
 	" \x01(\bR\x0epanelReachable\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
-	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xa1\x03\n" +
+	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xa4\x04\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +
 	"\x0fconfirm_install\x18\x01 \x01(\bR\x0econfirmInstall\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -1830,13 +2484,21 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	" \x01(\tR\bpassword\x12!\n" +
 	"\fssh_username\x18\v \x01(\tR\vsshUsername\x12\x17\n" +
 	"\aplan_id\x18\f \x01(\tR\x06planId\x12\"\n" +
-	"\ruse_panel_key\x18\r \x01(\bR\vusePanelKey\"\xbe\x01\n" +
+	"\ruse_panel_key\x18\r \x01(\bR\vusePanelKey\x12*\n" +
+	"\x11install_panel_key\x18\x0e \x01(\bR\x0finstallPanelKey\x12\x1f\n" +
+	"\vprivate_key\x18\x0f \x01(\tR\n" +
+	"privateKey\x124\n" +
+	"\x16private_key_passphrase\x18\x10 \x01(\tR\x14privateKeyPassphrase\"\xc1\x02\n" +
 	"\x19RetryNodeProvisionRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12'\n" +
 	"\x0fconfirm_install\x18\x02 \x01(\bR\x0econfirmInstall\x12\x1a\n" +
 	"\bpassword\x18\x03 \x01(\tR\bpassword\x12!\n" +
 	"\fssh_username\x18\x04 \x01(\tR\vsshUsername\x12\"\n" +
-	"\ruse_panel_key\x18\x05 \x01(\bR\vusePanelKey\"S\n" +
+	"\ruse_panel_key\x18\x05 \x01(\bR\vusePanelKey\x12\x1f\n" +
+	"\vprivate_key\x18\x06 \x01(\tR\n" +
+	"privateKey\x124\n" +
+	"\x16private_key_passphrase\x18\a \x01(\tR\x14privateKeyPassphrase\x12*\n" +
+	"\x11install_panel_key\x18\b \x01(\bR\x0finstallPanelKey\"S\n" +
 	"\x1aStartNodeProvisionResponse\x125\n" +
 	"\x03job\x18\x01 \x01(\v2#.mistgate.admin.v1.NodeProvisionJobR\x03job\"S\n" +
 	"\x1aRetryNodeProvisionResponse\x125\n" +
@@ -1890,7 +2552,54 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x15panel_key_fingerprint\x18\r \x01(\tR\x13panelKeyFingerprint\"\x1d\n" +
 	"\x1bListNodeServerAccessRequest\"[\n" +
 	"\x1cListNodeServerAccessResponse\x12;\n" +
-	"\x06access\x18\x01 \x03(\v2#.mistgate.admin.v1.NodeServerAccessR\x06access\"\x93\x01\n" +
+	"\x06access\x18\x01 \x03(\v2#.mistgate.admin.v1.NodeServerAccessR\x06access\"\xc6\x01\n" +
+	"\rNodeServerKey\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
+	"\x04bits\x18\x02 \x01(\rR\x04bits\x12 \n" +
+	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x18\n" +
+	"\acomment\x18\x04 \x01(\tR\acomment\x12\x1b\n" +
+	"\tpanel_key\x18\x05 \x01(\bR\bpanelKey\x12\x1e\n" +
+	"\n" +
+	"restricted\x18\x06 \x01(\bR\n" +
+	"restricted\x12\x14\n" +
+	"\x05lines\x18\a \x01(\rR\x05lines\"4\n" +
+	"\x19ListNodeServerKeysRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"s\n" +
+	"\x1aListNodeServerKeysResponse\x124\n" +
+	"\x04keys\x18\x01 \x03(\v2 .mistgate.admin.v1.NodeServerKeyR\x04keys\x12\x1f\n" +
+	"\vother_lines\x18\x02 \x01(\rR\n" +
+	"otherLines\"\x88\x01\n" +
+	"\x17AddNodeServerKeyRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x02 \x01(\tR\tpublicKey\x12\x1b\n" +
+	"\tpanel_key\x18\x03 \x01(\bR\bpanelKey\x12\x18\n" +
+	"\aconfirm\x18\x04 \x01(\bR\aconfirm\"N\n" +
+	"\x18AddNodeServerKeyResponse\x122\n" +
+	"\x03key\x18\x01 \x01(\v2 .mistgate.admin.v1.NodeServerKeyR\x03key\"\x9d\x01\n" +
+	"\x1aRemoveNodeServerKeyRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\x12\x18\n" +
+	"\aconfirm\x18\x03 \x01(\bR\aconfirm\x12*\n" +
+	"\x11confirm_panel_key\x18\x04 \x01(\bR\x0fconfirmPanelKey\"\x1d\n" +
+	"\x1bRemoveNodeServerKeyResponse\"\x89\x03\n" +
+	"\x1dAttachNodeServerAccessRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x19\n" +
+	"\bssh_host\x18\x02 \x01(\tR\asshHost\x12\x19\n" +
+	"\bssh_port\x18\x03 \x01(\rR\asshPort\x12 \n" +
+	"\vfingerprint\x18\x04 \x01(\tR\vfingerprint\x12\x1a\n" +
+	"\busername\x18\x05 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x06 \x01(\tR\bpassword\x12\"\n" +
+	"\ruse_panel_key\x18\a \x01(\bR\vusePanelKey\x12\x1f\n" +
+	"\vprivate_key\x18\b \x01(\tR\n" +
+	"privateKey\x124\n" +
+	"\x16private_key_passphrase\x18\t \x01(\tR\x14privateKeyPassphrase\x12*\n" +
+	"\x11install_panel_key\x18\n" +
+	" \x01(\bR\x0finstallPanelKey\x12\x18\n" +
+	"\aconfirm\x18\v \x01(\bR\aconfirm\"\x85\x01\n" +
+	"\x1eAttachNodeServerAccessResponse\x12;\n" +
+	"\x06access\x18\x01 \x01(\v2#.mistgate.admin.v1.NodeServerAccessR\x06access\x12&\n" +
+	"\x0fpanel_key_error\x18\x02 \x01(\tR\rpanelKeyError\"\x93\x01\n" +
 	"\x1fRotateNodeServerPasswordRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12!\n" +
 	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\x12\x18\n" +
@@ -1908,7 +2617,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"unverified\"8\n" +
 	"\x1dForgetNodeServerAccessRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\" \n" +
-	"\x1eForgetNodeServerAccessResponse2\x8e\v\n" +
+	"\x1eForgetNodeServerAccessResponse2\xe3\x0e\n" +
 	"\x13ProvisioningService\x12n\n" +
 	"\x11GetSSHFingerprint\x12+.mistgate.admin.v1.GetSSHFingerprintRequest\x1a,.mistgate.admin.v1.GetSSHFingerprintResponse\x12e\n" +
 	"\x0eGetPanelSSHKey\x12(.mistgate.admin.v1.GetPanelSSHKeyRequest\x1a).mistgate.admin.v1.GetPanelSSHKeyResponse\x12S\n" +
@@ -1918,7 +2627,11 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x10GetNodeProvision\x12*.mistgate.admin.v1.GetNodeProvisionRequest\x1a+.mistgate.admin.v1.GetNodeProvisionResponse\x12q\n" +
 	"\x12ListNodeProvisions\x12,.mistgate.admin.v1.ListNodeProvisionsRequest\x1a-.mistgate.admin.v1.ListNodeProvisionsResponse\x12\x80\x01\n" +
 	"\x17ListNodeProvisionEvents\x121.mistgate.admin.v1.ListNodeProvisionEventsRequest\x1a2.mistgate.admin.v1.ListNodeProvisionEventsResponse\x12w\n" +
-	"\x14ListNodeServerAccess\x12..mistgate.admin.v1.ListNodeServerAccessRequest\x1a/.mistgate.admin.v1.ListNodeServerAccessResponse\x12\x83\x01\n" +
+	"\x14ListNodeServerAccess\x12..mistgate.admin.v1.ListNodeServerAccessRequest\x1a/.mistgate.admin.v1.ListNodeServerAccessResponse\x12q\n" +
+	"\x12ListNodeServerKeys\x12,.mistgate.admin.v1.ListNodeServerKeysRequest\x1a-.mistgate.admin.v1.ListNodeServerKeysResponse\x12k\n" +
+	"\x10AddNodeServerKey\x12*.mistgate.admin.v1.AddNodeServerKeyRequest\x1a+.mistgate.admin.v1.AddNodeServerKeyResponse\x12t\n" +
+	"\x13RemoveNodeServerKey\x12-.mistgate.admin.v1.RemoveNodeServerKeyRequest\x1a..mistgate.admin.v1.RemoveNodeServerKeyResponse\x12}\n" +
+	"\x16AttachNodeServerAccess\x120.mistgate.admin.v1.AttachNodeServerAccessRequest\x1a1.mistgate.admin.v1.AttachNodeServerAccessResponse\x12\x83\x01\n" +
 	"\x18RotateNodeServerPassword\x122.mistgate.admin.v1.RotateNodeServerPasswordRequest\x1a3.mistgate.admin.v1.RotateNodeServerPasswordResponse\x12\x83\x01\n" +
 	"\x18RevealNodeServerPassword\x122.mistgate.admin.v1.RevealNodeServerPasswordRequest\x1a3.mistgate.admin.v1.RevealNodeServerPasswordResponse\x12}\n" +
 	"\x16ForgetNodeServerAccess\x120.mistgate.admin.v1.ForgetNodeServerAccessRequest\x1a1.mistgate.admin.v1.ForgetNodeServerAccessResponseB\xcc\x01\n" +
@@ -1936,7 +2649,7 @@ func file_mistgate_admin_v1_provisioning_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_provisioning_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_provisioning_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_mistgate_admin_v1_provisioning_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_mistgate_admin_v1_provisioning_proto_goTypes = []any{
 	(*GetPanelSSHKeyRequest)(nil),            // 0: mistgate.admin.v1.GetPanelSSHKeyRequest
 	(*GetPanelSSHKeyResponse)(nil),           // 1: mistgate.admin.v1.GetPanelSSHKeyResponse
@@ -1960,12 +2673,21 @@ var file_mistgate_admin_v1_provisioning_proto_goTypes = []any{
 	(*NodeServerAccess)(nil),                 // 19: mistgate.admin.v1.NodeServerAccess
 	(*ListNodeServerAccessRequest)(nil),      // 20: mistgate.admin.v1.ListNodeServerAccessRequest
 	(*ListNodeServerAccessResponse)(nil),     // 21: mistgate.admin.v1.ListNodeServerAccessResponse
-	(*RotateNodeServerPasswordRequest)(nil),  // 22: mistgate.admin.v1.RotateNodeServerPasswordRequest
-	(*RotateNodeServerPasswordResponse)(nil), // 23: mistgate.admin.v1.RotateNodeServerPasswordResponse
-	(*RevealNodeServerPasswordRequest)(nil),  // 24: mistgate.admin.v1.RevealNodeServerPasswordRequest
-	(*RevealNodeServerPasswordResponse)(nil), // 25: mistgate.admin.v1.RevealNodeServerPasswordResponse
-	(*ForgetNodeServerAccessRequest)(nil),    // 26: mistgate.admin.v1.ForgetNodeServerAccessRequest
-	(*ForgetNodeServerAccessResponse)(nil),   // 27: mistgate.admin.v1.ForgetNodeServerAccessResponse
+	(*NodeServerKey)(nil),                    // 22: mistgate.admin.v1.NodeServerKey
+	(*ListNodeServerKeysRequest)(nil),        // 23: mistgate.admin.v1.ListNodeServerKeysRequest
+	(*ListNodeServerKeysResponse)(nil),       // 24: mistgate.admin.v1.ListNodeServerKeysResponse
+	(*AddNodeServerKeyRequest)(nil),          // 25: mistgate.admin.v1.AddNodeServerKeyRequest
+	(*AddNodeServerKeyResponse)(nil),         // 26: mistgate.admin.v1.AddNodeServerKeyResponse
+	(*RemoveNodeServerKeyRequest)(nil),       // 27: mistgate.admin.v1.RemoveNodeServerKeyRequest
+	(*RemoveNodeServerKeyResponse)(nil),      // 28: mistgate.admin.v1.RemoveNodeServerKeyResponse
+	(*AttachNodeServerAccessRequest)(nil),    // 29: mistgate.admin.v1.AttachNodeServerAccessRequest
+	(*AttachNodeServerAccessResponse)(nil),   // 30: mistgate.admin.v1.AttachNodeServerAccessResponse
+	(*RotateNodeServerPasswordRequest)(nil),  // 31: mistgate.admin.v1.RotateNodeServerPasswordRequest
+	(*RotateNodeServerPasswordResponse)(nil), // 32: mistgate.admin.v1.RotateNodeServerPasswordResponse
+	(*RevealNodeServerPasswordRequest)(nil),  // 33: mistgate.admin.v1.RevealNodeServerPasswordRequest
+	(*RevealNodeServerPasswordResponse)(nil), // 34: mistgate.admin.v1.RevealNodeServerPasswordResponse
+	(*ForgetNodeServerAccessRequest)(nil),    // 35: mistgate.admin.v1.ForgetNodeServerAccessRequest
+	(*ForgetNodeServerAccessResponse)(nil),   // 36: mistgate.admin.v1.ForgetNodeServerAccessResponse
 }
 var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	5,  // 0: mistgate.admin.v1.CheckSSHResponse.preflight:type_name -> mistgate.admin.v1.NodePreflight
@@ -1975,35 +2697,46 @@ var file_mistgate_admin_v1_provisioning_proto_depIdxs = []int32{
 	15, // 4: mistgate.admin.v1.ListNodeProvisionsResponse.jobs:type_name -> mistgate.admin.v1.NodeProvisionJob
 	17, // 5: mistgate.admin.v1.ListNodeProvisionEventsResponse.events:type_name -> mistgate.admin.v1.NodeProvisionEvent
 	19, // 6: mistgate.admin.v1.ListNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
-	2,  // 7: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:input_type -> mistgate.admin.v1.GetSSHFingerprintRequest
-	0,  // 8: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:input_type -> mistgate.admin.v1.GetPanelSSHKeyRequest
-	4,  // 9: mistgate.admin.v1.ProvisioningService.CheckSSH:input_type -> mistgate.admin.v1.CheckSSHRequest
-	7,  // 10: mistgate.admin.v1.ProvisioningService.StartNodeProvision:input_type -> mistgate.admin.v1.StartNodeProvisionRequest
-	8,  // 11: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:input_type -> mistgate.admin.v1.RetryNodeProvisionRequest
-	11, // 12: mistgate.admin.v1.ProvisioningService.GetNodeProvision:input_type -> mistgate.admin.v1.GetNodeProvisionRequest
-	13, // 13: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:input_type -> mistgate.admin.v1.ListNodeProvisionsRequest
-	16, // 14: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
-	20, // 15: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:input_type -> mistgate.admin.v1.ListNodeServerAccessRequest
-	22, // 16: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:input_type -> mistgate.admin.v1.RotateNodeServerPasswordRequest
-	24, // 17: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:input_type -> mistgate.admin.v1.RevealNodeServerPasswordRequest
-	26, // 18: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:input_type -> mistgate.admin.v1.ForgetNodeServerAccessRequest
-	3,  // 19: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
-	1,  // 20: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:output_type -> mistgate.admin.v1.GetPanelSSHKeyResponse
-	6,  // 21: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
-	9,  // 22: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
-	10, // 23: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
-	12, // 24: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
-	14, // 25: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
-	18, // 26: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
-	21, // 27: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
-	23, // 28: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
-	25, // 29: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:output_type -> mistgate.admin.v1.RevealNodeServerPasswordResponse
-	27, // 30: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:output_type -> mistgate.admin.v1.ForgetNodeServerAccessResponse
-	19, // [19:31] is the sub-list for method output_type
-	7,  // [7:19] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	22, // 7: mistgate.admin.v1.ListNodeServerKeysResponse.keys:type_name -> mistgate.admin.v1.NodeServerKey
+	22, // 8: mistgate.admin.v1.AddNodeServerKeyResponse.key:type_name -> mistgate.admin.v1.NodeServerKey
+	19, // 9: mistgate.admin.v1.AttachNodeServerAccessResponse.access:type_name -> mistgate.admin.v1.NodeServerAccess
+	2,  // 10: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:input_type -> mistgate.admin.v1.GetSSHFingerprintRequest
+	0,  // 11: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:input_type -> mistgate.admin.v1.GetPanelSSHKeyRequest
+	4,  // 12: mistgate.admin.v1.ProvisioningService.CheckSSH:input_type -> mistgate.admin.v1.CheckSSHRequest
+	7,  // 13: mistgate.admin.v1.ProvisioningService.StartNodeProvision:input_type -> mistgate.admin.v1.StartNodeProvisionRequest
+	8,  // 14: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:input_type -> mistgate.admin.v1.RetryNodeProvisionRequest
+	11, // 15: mistgate.admin.v1.ProvisioningService.GetNodeProvision:input_type -> mistgate.admin.v1.GetNodeProvisionRequest
+	13, // 16: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:input_type -> mistgate.admin.v1.ListNodeProvisionsRequest
+	16, // 17: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:input_type -> mistgate.admin.v1.ListNodeProvisionEventsRequest
+	20, // 18: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:input_type -> mistgate.admin.v1.ListNodeServerAccessRequest
+	23, // 19: mistgate.admin.v1.ProvisioningService.ListNodeServerKeys:input_type -> mistgate.admin.v1.ListNodeServerKeysRequest
+	25, // 20: mistgate.admin.v1.ProvisioningService.AddNodeServerKey:input_type -> mistgate.admin.v1.AddNodeServerKeyRequest
+	27, // 21: mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey:input_type -> mistgate.admin.v1.RemoveNodeServerKeyRequest
+	29, // 22: mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess:input_type -> mistgate.admin.v1.AttachNodeServerAccessRequest
+	31, // 23: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:input_type -> mistgate.admin.v1.RotateNodeServerPasswordRequest
+	33, // 24: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:input_type -> mistgate.admin.v1.RevealNodeServerPasswordRequest
+	35, // 25: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:input_type -> mistgate.admin.v1.ForgetNodeServerAccessRequest
+	3,  // 26: mistgate.admin.v1.ProvisioningService.GetSSHFingerprint:output_type -> mistgate.admin.v1.GetSSHFingerprintResponse
+	1,  // 27: mistgate.admin.v1.ProvisioningService.GetPanelSSHKey:output_type -> mistgate.admin.v1.GetPanelSSHKeyResponse
+	6,  // 28: mistgate.admin.v1.ProvisioningService.CheckSSH:output_type -> mistgate.admin.v1.CheckSSHResponse
+	9,  // 29: mistgate.admin.v1.ProvisioningService.StartNodeProvision:output_type -> mistgate.admin.v1.StartNodeProvisionResponse
+	10, // 30: mistgate.admin.v1.ProvisioningService.RetryNodeProvision:output_type -> mistgate.admin.v1.RetryNodeProvisionResponse
+	12, // 31: mistgate.admin.v1.ProvisioningService.GetNodeProvision:output_type -> mistgate.admin.v1.GetNodeProvisionResponse
+	14, // 32: mistgate.admin.v1.ProvisioningService.ListNodeProvisions:output_type -> mistgate.admin.v1.ListNodeProvisionsResponse
+	18, // 33: mistgate.admin.v1.ProvisioningService.ListNodeProvisionEvents:output_type -> mistgate.admin.v1.ListNodeProvisionEventsResponse
+	21, // 34: mistgate.admin.v1.ProvisioningService.ListNodeServerAccess:output_type -> mistgate.admin.v1.ListNodeServerAccessResponse
+	24, // 35: mistgate.admin.v1.ProvisioningService.ListNodeServerKeys:output_type -> mistgate.admin.v1.ListNodeServerKeysResponse
+	26, // 36: mistgate.admin.v1.ProvisioningService.AddNodeServerKey:output_type -> mistgate.admin.v1.AddNodeServerKeyResponse
+	28, // 37: mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey:output_type -> mistgate.admin.v1.RemoveNodeServerKeyResponse
+	30, // 38: mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess:output_type -> mistgate.admin.v1.AttachNodeServerAccessResponse
+	32, // 39: mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword:output_type -> mistgate.admin.v1.RotateNodeServerPasswordResponse
+	34, // 40: mistgate.admin.v1.ProvisioningService.RevealNodeServerPassword:output_type -> mistgate.admin.v1.RevealNodeServerPasswordResponse
+	36, // 41: mistgate.admin.v1.ProvisioningService.ForgetNodeServerAccess:output_type -> mistgate.admin.v1.ForgetNodeServerAccessResponse
+	26, // [26:42] is the sub-list for method output_type
+	10, // [10:26] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_provisioning_proto_init() }
@@ -2017,7 +2750,7 @@ func file_mistgate_admin_v1_provisioning_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_provisioning_proto_rawDesc), len(file_mistgate_admin_v1_provisioning_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

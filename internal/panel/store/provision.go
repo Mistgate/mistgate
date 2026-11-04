@@ -407,6 +407,66 @@ func (s *Store) NodeServerAccesses(ctx context.Context) ([]NodeServerAccess, err
 	return out, rows.Err()
 }
 
+// InsertNodeServerAccess attaches credentials to a live enrolled node only when no access row exists yet.
+func (s *Store) InsertNodeServerAccess(ctx context.Context, access NodeServerAccess) error {
+	result, err := s.W.ExecContext(ctx, `INSERT INTO node_server_access (
+		node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, pending_password, configured_at,
+		panel_key_fp, password_login
+	) SELECT n.id, n.name, ?, ?, ?, ?, ?, NULL, ?, ?, ? FROM node n
+		WHERE n.id = ? AND n.state != 'retired'
+		AND NOT EXISTS (SELECT 1 FROM node_server_access a WHERE a.node_id = n.id)`,
+		access.SSHHost, int64(access.SSHPort), access.SSHUser, access.HostFingerprint,
+		access.Password, unix(access.ConfiguredAt), access.PanelKeyFingerprint, access.PasswordLogin, access.NodeID)
+	if err != nil {
+		if fleetIsUnique(err) {
+			return ErrConflict
+		}
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrConflict
+	}
+	return nil
+}
+
+// SetNodeServerPanelKey records a panel key only for a non-retired node with saved SSH access.
+func (s *Store) SetNodeServerPanelKey(ctx context.Context, nodeID, fingerprint string) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET panel_key_fp = ? WHERE node_id = ?
+		AND EXISTS (SELECT 1 FROM node WHERE id = node_server_access.node_id AND state != 'retired')`, fingerprint, nodeID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n == 1 {
+		return nil
+	}
+	if _, err := s.NodeServerAccess(ctx, nodeID); err != nil {
+		return err
+	}
+	return ErrConflict
+}
+
+// SetNodeServerPasswordLogin records whether the last explicit password proof succeeded for a live node.
+func (s *Store) SetNodeServerPasswordLogin(ctx context.Context, nodeID string, succeeded bool) error {
+	result, err := s.W.ExecContext(ctx, `UPDATE node_server_access SET password_login = ? WHERE node_id = ?
+		AND EXISTS (SELECT 1 FROM node WHERE id = node_server_access.node_id AND state != 'retired')`, succeeded, nodeID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n == 1 {
+		return nil
+	}
+	if _, err := s.NodeServerAccess(ctx, nodeID); err != nil {
+		return err
+	}
+	return ErrConflict
+}
+
 // SetPendingNodeServerPassword journals an encrypted replacement before it is sent to the server. A generated one marks
 // the access as holding a panel-generated password at once: from here on the server may already use it.
 func (s *Store) SetPendingNodeServerPassword(ctx context.Context, nodeID string, encrypted []byte, generated bool, now time.Time) error {

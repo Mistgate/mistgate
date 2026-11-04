@@ -1027,6 +1027,7 @@ PY
   [ "$(edge_do_rows)" -gt 0 ] || die "precondition: the NodeLink object has no stored rows before the retire (_cf_KV is empty)"
   [ -n "$(edge_sql "SELECT 1 FROM node_live WHERE node_id = ?" "$NODE_ID")" ] || die "precondition: node_live has no row before the retire"
   nft list table inet "$NFT_TABLE" >/dev/null 2>&1 || die "precondition: the nft table is gone before the retire"
+  sshn_scn_attach "$NODE_ID"
   RET=$(api NodeService/RetireNode "{\"nodeId\":\"$NODE_ID\",\"confirmName\":\"$NODE_NAME\"}")
   jq -e '.agentNotified == true' <<<"$RET" >/dev/null || die "RetireNode: the connected agent was not notified"
   wait_for 30 "the agent to exit" not_alive "$NODE_PID" || die "the node agent kept running after the retire"
@@ -1036,6 +1037,8 @@ PY
   ! nft list table inet "$NFT_TABLE" >/dev/null 2>&1 || die "nft table $NFT_TABLE is still there after the retire"
   [ ! -e "$SYSCTL_FILE" ] && [ ! -e "$JOURNALD_FILE" ] || die "the agent's sysctl or journald drop-in is still there after the retire"
   [ "$(node_status)" = NODE_STATUS_RETIRED ] || die "node status after the retire: $(node_status)"
+  mutate ProvisioningService/ForgetNodeServerAccess "$(jq -nc --arg id "$NODE_ID" '{nodeId:$id}')" >/dev/null \
+    || die "could not forget the attach-scenario SSH access after retiring the node"
   no_do_rows() { [ "$(edge_do_rows)" = 0 ]; }
   wait_for 30 "the object's stored session to be deleted" no_do_rows || die "the NodeLink object still has $(edge_do_rows) stored row(s) after the retire"
   [ -z "$(edge_sql "SELECT 1 FROM node_live WHERE node_id = ?" "$NODE_ID")" ] || die "node_live still has a row for the retired node"
@@ -1047,6 +1050,8 @@ PY
   sshn_scn_full sshn-full
   sshn_scn_full sshn-reload reload
   sshn_scn_panel_key sshn-panel-key
+  sshn_scn_own_key sshn-owner-key
+  sshn_scn_keys
   sshn_scan_state "$WORK/wrangler-state"
   pass "the stored state (D1 and the Durable Object files) holds no plaintext SSH password"
   FETCHES=$(grep -c "GET /$SSHN_TAG/mistgate-node-linux-" "$WORK/fake-release.log" || true)

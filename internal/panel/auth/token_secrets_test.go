@@ -51,6 +51,9 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.NodeServerAccess.password_login":                   "a bool: whether the saved password last logged in over SSH",
 		"mistgate.admin.v1.NodeServerAccess.panel_key_fingerprint":            "the fingerprint of the panel's public SSH key",
 		"mistgate.admin.v1.GetPanelSSHKeyResponse.public_key":                 "the panel's public SSH key, meant to be copied to servers; the private key is never returned",
+		"mistgate.admin.v1.ListNodeServerKeysResponse.keys":                   "public SSH keys from a server's authorized_keys file; private keys are never read or returned",
+		"mistgate.admin.v1.AddNodeServerKeyResponse.key":                      "the public key just added to a server",
+		"mistgate.admin.v1.NodeServerKey.panel_key":                           "a bool marking the panel's public SSH key",
 	}
 	seen := map[protoreflect.FullName]bool{}
 	var walk func(md protoreflect.MessageDescriptor, via string)

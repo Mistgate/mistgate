@@ -478,6 +478,8 @@ func phaseLabel(phase string) string {
 		return "Ожидает запуска"
 	case "preflight":
 		return "Проверка сервера"
+	case "access":
+		return "Установка ключа панели"
 	case "firewall":
 		return "Настройка firewall сервера"
 	case "transfer":
@@ -527,9 +529,14 @@ func eventLabel(phase, code string) string {
 		return "Ожидание подключения агента"
 	case "agent_connected":
 		return "Нода подключилась к панели"
+	case "installing_panel_key":
+		return "Установка ключа панели на сервер"
 	default:
 		if code == "" {
 			return phaseLabel(phase)
+		}
+		if phase == "access" { // a password install goes on without the panel key; the code says why
+			return "Ключ панели не установлен, панель входит по паролю · " + strings.ReplaceAll(code, "_", " ")
 		}
 		return phaseLabel(phase) + " · " + strings.ReplaceAll(code, "_", " ")
 	}
@@ -581,7 +588,17 @@ func errorLabel(code string) string {
 		// root or a sudo user: the login is the owner's, so is the refusal
 		return "Сервер отклонил SSH-логин или пароль. Проверьте их и повторите установку."
 	case "ssh_password_auth_unavailable":
-		return "Сервер не принимает вход по паролю, только по ключу. Поставьте ноду командой вручную или временно разрешите вход по паролю в sshd."
+		return "Сервер не принимает вход по паролю, только по ключу. Добавьте на сервер ключ панели и повторите установку с ним."
+	case "ssh_panel_key_not_accepted":
+		return "Сервер не принял ключ панели. Проверьте, что он есть в ~/.ssh/authorized_keys этого логина."
+	case "authorized_keys_unsafe":
+		return "~/.ssh или authorized_keys на сервере — ссылка или не обычный файл. Панель такой файл не меняет."
+	case "authorized_keys_changed":
+		return "authorized_keys на сервере изменился во время записи. Повторите установку."
+	case "authorized_keys_too_large":
+		return "authorized_keys на сервере больше 64 КиБ. Панель такой файл не меняет."
+	case "ssh_authorized_keys_unavailable":
+		return "Панели не удалось прочитать или записать authorized_keys на сервере."
 	case "ssh_connection_timeout", "ssh_preflight_timeout":
 		return "Сервер не ответил вовремя. Проверьте сеть и порт SSH."
 	case "unsupported_os", "unsupported_os_version":

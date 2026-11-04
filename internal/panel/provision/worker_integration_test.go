@@ -365,7 +365,7 @@ func TestFinishPanelKeyJobStoresNoPasswordAndItsFingerprint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.finishJob(ctx, running, credentials{Method: "panel_key", Username: "root"})
+	svc.finishJob(ctx, running, credentials{Method: "panel_key", Username: "root"}, key.Fingerprint)
 	access, err := st.NodeServerAccess(ctx, nodeID)
 	if err != nil {
 		t.Fatal(err)

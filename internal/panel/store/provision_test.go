@@ -341,6 +341,60 @@ func TestCompleteProvisionRetainsAccessAndPasswordRotationIsRecoverable(t *testi
 	}
 }
 
+func TestAttachNodeServerAccessIsInsertOnlyAndPanelKeyCanBeCleared(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	for _, node := range []struct{ id, name, state string }{
+		{"nod_attach", "de1", "active"}, {"nod_retired", "nl1", "retired"},
+	} {
+		if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, 'node.example.com', ?, ?)`,
+			node.id, node.name, node.state, now.Unix()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	access := NodeServerAccess{
+		NodeID: "nod_attach", SSHHost: "203.0.113.8", SSHPort: 22, SSHUser: "root", HostFingerprint: "SHA256:host",
+		Password: []byte("sealed-password"), PasswordLogin: true, ConfiguredAt: now,
+	}
+	if err := st.InsertNodeServerAccess(ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertNodeServerAccess(ctx, access); !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate attach = %v, want ErrConflict", err)
+	}
+	loaded, err := st.NodeServerAccess(ctx, access.NodeID)
+	if err != nil || loaded.NodeName != "de1" || string(loaded.Password) != "sealed-password" || !loaded.PasswordLogin || loaded.PanelKeyFingerprint != "" {
+		t.Fatalf("password-only attached access = %+v, err %v", loaded, err)
+	}
+	if err := st.SetNodeServerPanelKey(ctx, access.NodeID, "SHA256:panel"); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err = st.NodeServerAccess(ctx, access.NodeID)
+	if err != nil || loaded.PanelKeyFingerprint != "SHA256:panel" {
+		t.Fatalf("panel-key access = %+v, err %v", loaded, err)
+	}
+	if err := st.SetNodeServerPanelKey(ctx, access.NodeID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetNodeServerPasswordLogin(ctx, access.NodeID, false); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err = st.NodeServerAccess(ctx, access.NodeID)
+	if err != nil || loaded.PasswordLogin {
+		t.Fatalf("failed password proof state = %+v, err %v", loaded, err)
+	}
+	if err := st.SetNodeServerPasswordLogin(ctx, access.NodeID, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertNodeServerAccess(ctx, NodeServerAccess{NodeID: "nod_retired", SSHHost: "203.0.113.9", SSHPort: 22, SSHUser: "root", ConfiguredAt: now}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("retired attach = %v, want ErrConflict", err)
+	}
+	if err := st.SetNodeServerPasswordLogin(ctx, "nod_retired", true); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("password proof state for retired node = %v, want ErrNotFound", err)
+	}
+}
+
 func TestNodeProvisionJobAttemptCapFailsAJobInterruptedThreeTimes(t *testing.T) {
 	checkProvisionAttemptCap(t, openTemp(t))
 }

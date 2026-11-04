@@ -1343,6 +1343,11 @@ fi
 step "10. retire the node: the agent removes its nft table and files"
 nft list table inet "$NFT_TABLE" >/dev/null 2>&1 || die "precondition: the nft table is gone before the retire"
 [ -f "$SYSCTL_FILE" ] || note "precondition: $SYSCTL_FILE was not there before the retire (agent baseline not applied?)"
+if [ -z "$M3_ONLY" ] && [ -z "$OLD_NODE" ]; then
+  SSHN_SQL=sshn_sql_vps
+  sshn_up
+  sshn_scn_attach "$NODE_ID"
+fi
 RET=$(api NodeService/RetireNode "{\"nodeId\":\"$NODE_ID\",\"confirmName\":\"$NODE_NAME\"}")
 jq -e '.agentNotified == true' <<<"$RET" >/dev/null || die "RetireNode: the connected agent was not notified"
 wait_for 30 "the agent to exit" not_alive "$NODE_PID" || die "the node agent kept running after the retire"
@@ -1353,6 +1358,10 @@ wait "$NODE_PID" || NODE_RC=$?
 [ ! -e "$SYSCTL_FILE" ] || die "$SYSCTL_FILE is still there after the retire"
 [ ! -e "$JOURNALD_FILE" ] || die "$JOURNALD_FILE is still there after the retire"
 [ "$(node_status)" = NODE_STATUS_RETIRED ] || die "node status after the retire: $(node_status)"
+if [ -z "$M3_ONLY" ] && [ -z "$OLD_NODE" ]; then
+  mutate ProvisioningService/ForgetNodeServerAccess "$(jq -nc --arg id "$NODE_ID" '{nodeId:$id}')" >/dev/null \
+    || die "could not forget the attach-scenario SSH access after retiring the node"
+fi
 # What the tunnel protocols add to a host: AWG and WARP links, their nft tables, the policy rules and the
 # routes of the WARP table. All of it lives in this run's namespace, and none of it may outlive the node.
 ip -o link show | awk -F': ' '{print $2}' | grep -E '^(mgawg|mgwarp)' && die "a link of the node (mgawg*/mgwarp) is still there after the retire"

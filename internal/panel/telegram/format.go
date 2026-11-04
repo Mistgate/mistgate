@@ -855,6 +855,9 @@ var toolTitles = map[string]localizedText{
 	"node_rollback":               {en: "Roll a node back", ru: "Откатить ноду", zh: "回滚节点"},
 	"node_install":                {en: "Install a node over SSH", ru: "Установить ноду по SSH", zh: "通过 SSH 安装节点"},
 	"node_server_password_rotate": {en: "Change a node’s SSH password", ru: "Сменить SSH-пароль ноды", zh: "更改节点的 SSH 密码"},
+	"node_server_keys_list":       {en: "List a node’s SSH keys", ru: "Показать SSH-ключи ноды", zh: "列出节点的 SSH 密钥"},
+	"node_server_key_add":         {en: "Add a node SSH key", ru: "Добавить SSH-ключ ноды", zh: "添加节点 SSH 密钥"},
+	"node_server_key_remove":      {en: "Remove a node SSH key", ru: "Удалить SSH-ключ ноды", zh: "移除节点 SSH 密钥"},
 	"subscription_app_upsert":     {en: "Add or change an app on the user page", ru: "Добавить или изменить приложение на странице пользователя", zh: "添加或更改用户页面上的应用"},
 	"subscription_app_remove":     {en: "Remove an app from the user page", ru: "Убрать приложение со страницы пользователя", zh: "移除用户页面上的应用"},
 }

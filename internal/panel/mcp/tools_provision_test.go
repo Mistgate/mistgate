@@ -42,8 +42,71 @@ func TestNodeInstallLeavesThePasswordToTheOwnersApproval(t *testing.T) {
 	if r := e.w.installReq[0]; r.GetPassword() != "" || r.GetPlanId() != p.PlanID || r.GetFingerprint() != testHostKey || r.GetSshHost() != "203.0.113.30" {
 		t.Fatalf("install request: %+v", r)
 	}
+	// the panel adds its key on an approved password install by itself and refuses the flag on a plan's install
+	if e.w.installReq[0].GetInstallPanelKey() {
+		t.Fatal("the MCP install sent install_panel_key, which the panel refuses for an approved plan")
+	}
 	if calls := e.w.calls("/mistgate.admin.v1.ProvisioningService/StartNodeProvision"); len(calls) != 1 || calls[0].Approved != p.PlanID {
 		t.Fatalf("the install did not run under the plan's grant: %+v", calls)
+	}
+}
+
+func TestNodeServerKeysUseOwnerApprovedPlans(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+
+	// the whole fingerprint is key-shaped and scrubbed; the key goes out by its key_id, which the remove plan takes back
+	keyID := strings.TrimPrefix(testPanelKeyFingerprint, "SHA256:")[:12]
+	listed := mustOK(t, s, "node_server_keys_list", map[string]any{"node": nodeA})
+	if !strings.Contains(listed, `"key_id":"`+keyID+`"`) || !strings.Contains(listed, `"panel_key":true`) {
+		t.Fatalf("server key list omitted the panel key metadata: %s", listed)
+	}
+
+	add := planOf(t, s, "node_server_key_add", map[string]any{"node": nodeA, "panel_key": true})
+	if !add.NeedsApproval {
+		t.Fatalf("adding a server key did not require approval: %+v", add)
+	}
+	if err := e.plans.decide(add.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	if result := applyOf(t, s, "node_server_key_add", add.ConfirmToken); result.Status != StatusApplied {
+		t.Fatalf("add apply: %+v", result)
+	}
+	if len(e.w.addServerKeyReq) != 1 {
+		t.Fatalf("AddNodeServerKey called %d times", len(e.w.addServerKeyReq))
+	}
+	added := e.w.addServerKeyReq[0]
+	if added.GetNodeId() != nodeA || !added.GetPanelKey() || !added.GetConfirm() || added.GetPublicKey() != "" {
+		t.Fatalf("panel key add request: %+v", added)
+	}
+	if calls := e.w.calls("/mistgate.admin.v1.ProvisioningService/AddNodeServerKey"); len(calls) != 1 || calls[0].Approved != add.PlanID {
+		t.Fatalf("key addition did not use its exact approved plan: %+v", calls)
+	}
+
+	remove := planOf(t, s, "node_server_key_remove", map[string]any{"node": nodeA, "key": keyID})
+	if !remove.NeedsApproval || !strings.Contains(strings.Join(remove.Danger, " "), "saved password") {
+		t.Fatalf("panel key removal did not explain recovery and require approval: %+v", remove)
+	}
+	if err := e.plans.decide(remove.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	if result := applyOf(t, s, "node_server_key_remove", remove.ConfirmToken); result.Status != StatusApplied {
+		t.Fatalf("remove apply: %+v", result)
+	}
+	if len(e.w.removeServerKeyReq) != 1 {
+		t.Fatalf("RemoveNodeServerKey called %d times", len(e.w.removeServerKeyReq))
+	}
+	removed := e.w.removeServerKeyReq[0]
+	if removed.GetNodeId() != nodeA || removed.GetFingerprint() != testPanelKeyFingerprint || !removed.GetConfirm() || !removed.GetConfirmPanelKey() {
+		t.Fatalf("panel key remove request: %+v", removed)
+	}
+	if calls := e.w.calls("/mistgate.admin.v1.ProvisioningService/RemoveNodeServerKey"); len(calls) != 1 || calls[0].Approved != remove.PlanID {
+		t.Fatalf("key removal did not use its exact approved plan: %+v", calls)
+	}
+
+	if out := mustFail(t, s, "node_server_key_add_plan", map[string]any{"node": nodeA, "public_key": "-----BEGIN OPENSSH PRIVATE KEY-----"}); !strings.Contains(out, "private keys are never accepted") {
+		t.Fatalf("private key input was not rejected: %s", out)
 	}
 }
 

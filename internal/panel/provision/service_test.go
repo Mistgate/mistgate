@@ -51,18 +51,26 @@ func TestCredentialOperationsRequireStepUpBeforeSSHOrPersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	fingerprint := "SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, 32))
-	_, err = svc.CheckSSH(context.Background(), connect.NewRequest(&adminv1.CheckSSHRequest{
-		Host: "node.example.com", Port: 22, Fingerprint: fingerprint, Password: "secret",
-	}))
+	checkReq := &adminv1.CheckSSHRequest{
+		Host: "node.example.com", Port: 22, Fingerprint: fingerprint, Password: "secret", PrivateKey: "private-key", PrivateKeyPassphrase: "key-passphrase",
+	}
+	_, err = svc.CheckSSH(context.Background(), connect.NewRequest(checkReq))
 	if connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("CheckSSH without step-up = %v", err)
 	}
-	_, err = svc.StartNodeProvision(context.Background(), connect.NewRequest(&adminv1.StartNodeProvisionRequest{
+	if checkReq.GetPassword() != "" || checkReq.GetPrivateKey() != "" || checkReq.GetPrivateKeyPassphrase() != "" {
+		t.Fatal("CheckSSH retained submitted login credentials after step-up refusal")
+	}
+	startReq := &adminv1.StartNodeProvisionRequest{
 		ConfirmInstall: true, Name: "edge-1", Address: "edge.example.com", SshHost: "node.example.com",
-		SshPort: 22, Fingerprint: fingerprint, Password: "secret",
-	}))
+		SshPort: 22, Fingerprint: fingerprint, Password: "secret", PrivateKey: "private-key", PrivateKeyPassphrase: "key-passphrase",
+	}
+	_, err = svc.StartNodeProvision(context.Background(), connect.NewRequest(startReq))
 	if connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("StartNodeProvision without step-up = %v", err)
+	}
+	if startReq.GetPassword() != "" || startReq.GetPrivateKey() != "" || startReq.GetPrivateKeyPassphrase() != "" {
+		t.Fatal("StartNodeProvision retained submitted login credentials after step-up refusal")
 	}
 	if stepUpCalls != 2 || dialCalls != 0 {
 		t.Fatalf("step-up calls = %d, SSH dials = %d", stepUpCalls, dialCalls)
@@ -85,7 +93,9 @@ func TestSealedCredentialsAreBoundToJobAndNeverReturnedInJobView(t *testing.T) {
 		t.Fatal(err)
 	}
 	opened, err := svc.openCredentials("prv_one", sealed)
-	if err != nil || opened != secret {
+	if err != nil || opened.Method != secret.Method || opened.Username != secret.Username || opened.Password != secret.Password ||
+		opened.EnrollmentToken != secret.EnrollmentToken || opened.CAFingerprint != secret.CAFingerprint || !bytes.Equal(opened.PrivateKey, secret.PrivateKey) ||
+		opened.InstallPanelKey != secret.InstallPanelKey {
 		t.Fatalf("opened credentials = %+v, err %v", opened, err)
 	}
 	if _, err := svc.openCredentials("prv_two", sealed); err == nil {

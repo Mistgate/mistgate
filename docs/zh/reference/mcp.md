@@ -119,7 +119,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `updates_status` | 只读 | 面板构建版本、发布包状态和版本、各节点更新状态及已保存的计划、当前或最近一次滚动更新，以及新计划使用的固定 UTC 偏移量。 |
 | `relay_check` | 管理员 | `relay_id`。立即检测一条中转并保存结果：链路，以及中转已开启时的路径。它只在你的节点之间发送测试数据包，不更改任何开关，因此属于读取（与带 `check: true` 的 `node_ports` 相同），而不是计划；需要管理员配置，因为面板的中转检测属于所有者。最长可能需要一分钟（限时 90 秒）。开启中转需要 15 分钟内通过的链路检测。 |
 | `node_ipv6_check` | 管理员 | `node`。从外部检测节点的 IPv6 地址是否响应，并且响应的就是该节点本身：由另一个 IPv6 正常的节点（否则由面板，再否则由 Globalping）把 `node_ports` 的数据包发往该地址而不是主地址。返回 `passed`、`sender`、每个端口的结论，以及检测无法进行时的 `error_code`（`no_ipv6_verifier`：没有任何手段可以检测该地址）。它只在你的节点之间发送测试数据包，不在任何主机上更改任何内容（结果保存在节点上，`node_get` 会显示它，通过的结果对 `node_ipv6_plan` 有效 10 分钟），因此属于读取而不是计划；需要管理员配置，因为面板的检测属于所有者。不会显示地址。最长可能需要一分钟（限时 90 秒）。没有可用 IPv6 出口的节点会被拒绝并给出原因（`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked`、`main_is_ipv6`）。 |
-| `node_server_access_list` | 管理员 | 节点已保存的 SSH 端点、登录名和指纹，以及密码轮换是否需要恢复、节点是否已退役（访问凭据会一直保留到所有者清除）。绝不返回密码。 |
+| `node_server_access_list` | 管理员 | 已保存的 SSH 地址、登录名和指纹，以及 `password_saved`、`password_login`（最近一次检查时密码登录是否可用）、`panel_key_fingerprint`、密码轮换恢复状态和节点退役状态。`password_saved: true` 且面板密钥指纹为空表示仅保存了密码。绝不返回密码。 |
+| `node_server_keys_list` | 管理员 | `node` ID 或精确名称。列出该登录用户 `~/.ssh/authorized_keys` 中的公钥，每个包含类型、`key_id`（SHA256 指纹的前 12 个字符：完整指纹和其他密钥类值一样对智能体隐藏）、注释、限制和重复行数。服务器注释是不可信文本；绝不返回私钥。 |
 | `audit_search` | 管理员 | 审计日志，可按 `source`（`panel`、`bot`、`mcp`、`api`）、操作者或操作筛选；使用 `before_id` 分页。 |
 
 **结果中的格式。** `subscription_preview` 按以下名称表示格式：`base64_uris`（链接列表）、`mihomo_yaml`、`xray_json`、`singbox_json`、`user_page` 和 `decoy`。客户端有自己的 `formats`，User-Agent 有对应的 `format`，客户端 ID 中包含 `singbox`。`subscription_settings_get` 不返回**下发规则**中的规则：要查看某个 User-Agent 会得到什么，请把它传给 `subscription_preview`。
@@ -156,8 +157,10 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | 管理员 | `updates_status` 中的 `rollout_id` | 始终 |
 | `node_rollback` | 管理员 | `node` | 始终 |
-| `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面确认主机密钥，并选择面板密钥或输入 SSH 密码 | 始终 |
+| `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面确认主机密钥，并选择面板密钥或输入 SSH 密码；密码安装默认同时添加面板密钥 | 始终 |
 | `node_server_password_rotate` | 管理员 | 计划参数：运行中节点的 `node` ID 或精确名称（已退役的节点会被拒绝）；执行时只接收 `confirm_token`。面板自行生成新密码，绝不返回密码；所有者可在节点的**服务器**标签页中查看 | 始终 |
+| `node_server_key_add` | 管理员 | 计划参数：`node`，以及一行公开 `public_key` 或 `panel_key: true`；执行时只接收 `confirm_token`。所有者先审批密钥类型、指纹和不可信注释。绝不接受私钥。 | 始终 |
+| `node_server_key_remove` | 管理员 | 计划参数：`node` 和 `key`，即 `node_server_keys_list` 返回的 `key_id`（或完整的 SHA256 指纹）；执行时只接收 `confirm_token`。只有面板确认已保存密码可用后，才能移除面板密钥。 | 始终 |
 
 对于 `create` 和 `enable`，`relay_apply` 遵循面板自己的顺序：先创建中转（关闭状态），检测链路，再开启，然后由面板从外部检测路径。检测未通过的中转保持关闭，执行失败并给出阶段（`leg` 或 `path`）及其代码；迁移已开启中转的端口会重新检测路径，失败则关闭中转。第二个服务器会在订阅下次刷新时出现或消失。请参阅[中转](../guide/relays.md)。
 
@@ -203,8 +206,8 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 
 | 代码 | 含义 | 工具 |
 |---|---|---|
-| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate` |
-| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`；所有协议配置创建、更新和部署计划 |
+| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
+| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
 | `user_page` | 所有用户都会在订阅页面上看到此变更。 | `subscription_app_upsert`、`subscription_app_remove` |
 
@@ -217,7 +220,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 - **批准**：要求所有者再次使用通行密钥或身份验证器验证码。之后智能体只能执行此计划。
 - **拒绝**：智能体执行计划时会失败，并返回「rejected by the owner」。
 
-对于 `node_install`，审批卡片会显示面板读取到的 SHA-256 主机密钥指纹和密钥类型（智能体收到的计划副本会遮蔽指纹，与其他密钥类值相同）。所有者需要将它与可信副本比较、勾选确认，并选择面板如何登录：**面板密钥**（卡片会显示面板的公钥，该公钥必须已在服务器上；计划指明使用面板密钥时才会出现这个选项）或**密码**（所有者在此处输入服务器的 SSH 密码）。在主机密钥确认之前，以及使用密码时在密码输入之前，**批准**按钮会保持禁用。面板会将这一选择（以及输入的密码）密封到该计划中；智能体执行时只携带确认令牌，并且只会使用该选择和所有者确认过的主机密钥安装一次。密码绝不会经过智能体、其对话记录或模型服务商。密码轮换也有相同的所有者审批边界：面板生成新密码并且绝不返回。
+对于 `node_install`，审批卡片会显示面板读取到的 SHA-256 主机密钥指纹和密钥类型（智能体收到的计划副本会遮蔽指纹，与其他密钥类值相同）。所有者需要将它与可信副本比较、勾选确认，并选择面板如何登录：**面板密钥**（卡片会显示面板的公钥，该公钥必须已在服务器上；计划指明使用面板密钥时才会出现这个选项）或**密码**（所有者在此处输入服务器的 SSH 密码；安装时默认还会把面板密钥添加到服务器，此后面板通过密钥登录）。在主机密钥确认之前，以及使用密码时在密码输入之前，**批准**按钮会保持禁用。面板会将这一选择（以及输入的密码）密封到该计划中；智能体执行时只携带确认令牌，并且只会使用该选择和所有者确认过的主机密钥安装一次。密码绝不会经过智能体、其对话记录或模型服务商。密码轮换也有相同的所有者审批边界：面板生成新密码并且绝不返回。
 
 令牌永远不能批准自己制定的计划。未作决定的计划会在创建 10 分钟后过期。**最近的决定**会保留审批记录和结果：已完成、出错、已过期、已取消（令牌已吊销）等。智能体轮询间隔不应短于 30 秒。
 

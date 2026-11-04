@@ -30,8 +30,9 @@ entries=(
   # sources (cheburcheck, bsbord), whose owner RPCs (settings, sealed keys, the paid-check preview) need the admin's step-up and
   # cannot live in jobs, where their ticks run.
   "mistgate-edge-admin:43"
-  # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB.
-  "mistgate-edge-provision:32"
+  # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB; 31.9 MiB in November 2026 with the panel's SSH key, the
+  # authorized_keys management and the login by an own private key, which need that SSH client and so cannot live elsewhere.
+  "mistgate-edge-provision:35"
 )
 
 status=0

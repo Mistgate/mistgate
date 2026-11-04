@@ -201,6 +201,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	}
 	defer func() {
 		secret.Password = ""
+		clear(secret.PrivateKey)
 		secret.EnrollmentToken = ""
 	}()
 	target, err := NewTarget(job.SSHHost, uint32(job.SSHPort))
@@ -211,6 +212,14 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	var conn *Connection
 	if secret.Method == "panel_key" {
 		conn, _, err = s.dialPanelKey(ctx, target, secret.Username, job.HostFingerprint)
+	} else if secret.Method == "private_key" {
+		var signer ssh.Signer
+		var private any
+		signer, private, err = signerFromPrivateKey(secret.PrivateKey)
+		if err == nil {
+			conn, err = s.ssh.DialKey(ctx, target, secret.Username, signer, job.HostFingerprint)
+		}
+		clearPrivateKey(private)
 	} else {
 		conn, err = s.ssh.DialAs(ctx, target, secret.Username, secret.Password, job.HostFingerprint)
 	}
@@ -268,6 +277,39 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	if nodeState == "retired" {
 		s.failJob(ctx, job, "node_retired")
 		return
+	}
+
+	// The panel's own way back in comes before anything changes on the host: an own-key install whose panel key the server
+	// does not take stops here, not with an agent running and no saved access. For a password install it is optional.
+	panelFingerprint := ""
+	if secret.Method == "panel_key" {
+		key, _, keyErr := s.ensurePanelSSHKey(ctx)
+		if keyErr != nil {
+			s.failJob(ctx, job, "credentials_unavailable")
+			return
+		}
+		panelFingerprint = key.Fingerprint
+	} else if secret.InstallPanelKey {
+		if err := s.setPhase(ctx, &job, "access", "installing_panel_key", secret); err != nil {
+			return
+		}
+		if !s.mayContinue(ctx, &job) {
+			return
+		}
+		panelFingerprint, err = s.installPanelSSHKey(ctx, conn, target, secret.Username, job.HostFingerprint)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			if secret.Method == "private_key" {
+				s.failJob(ctx, job, publicAuthorizedKeysCode(err))
+				return
+			}
+			if recordErr := s.recordAccessEvent(ctx, job, publicAuthorizedKeysCode(err)); recordErr != nil {
+				s.cfg.Log.Error("record optional panel SSH key installation failure", "job_id", job.ID, "err", recordErr)
+			}
+			panelFingerprint = ""
+		}
 	}
 
 	if err := s.setPhase(ctx, &job, "firewall", "preparing_host_firewall", secret); err != nil {
@@ -371,7 +413,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		}
 		return
 	}
-	s.finishJob(ctx, job, secret)
+	s.finishJob(ctx, job, secret, panelFingerprint)
 }
 
 func (s *Service) watchWorkerCancellation(ctx context.Context, jobID string, stop <-chan struct{}, cancel context.CancelFunc) {
@@ -458,21 +500,18 @@ func (s *Service) failJob(ctx context.Context, job store.NodeProvisionJob, code 
 	s.cfg.Log.Warn("node provisioning failed", "job_id", job.ID, "error_code", code)
 }
 
-func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, secret credentials) {
+func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, secret credentials, panelFingerprint string) {
 	now := s.cfg.Now().UTC()
 	access := store.NodeServerAccess{
 		NodeID: job.NodeID, NodeName: job.Name, SSHHost: job.SSHHost, SSHPort: job.SSHPort,
-		SSHUser: secret.Username, HostFingerprint: job.HostFingerprint,
+		SSHUser: secret.Username, HostFingerprint: job.HostFingerprint, PanelKeyFingerprint: panelFingerprint,
 	}
-	if secret.Method == "panel_key" {
-		key, _, err := s.ensurePanelSSHKey(ctx)
-		if err != nil {
-			s.cfg.Log.Error("load panel SSH key after node install", "job_id", job.ID, "err", err)
-			s.failJob(ctx, job, "credentials_unavailable")
+	if secret.Method == "panel_key" || secret.Method == "private_key" {
+		if panelFingerprint == "" {
+			s.failJob(ctx, job, "ssh_panel_key_not_accepted")
 			return
 		}
 		access.Password = []byte{}
-		access.PanelKeyFingerprint = key.Fingerprint
 	} else {
 		plain := []byte(secret.Password)
 		access.Password = s.vault.Seal(plain, "node-access:"+job.NodeID)
@@ -486,6 +525,11 @@ func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, sec
 	}
 	_ = s.auditAs(context.WithoutCancel(ctx), job.CreatedBy, "node.ssh_provision_complete", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
 	secret.Password, secret.EnrollmentToken = "", ""
+	clear(secret.PrivateKey)
+}
+
+func (s *Service) recordAccessEvent(ctx context.Context, job store.NodeProvisionJob, code string) error {
+	return s.st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "running", "access", "", job.Secret, code, s.cfg.Now().UTC())
 }
 
 func (s *Service) finishCancellation(jobID string) {
@@ -760,9 +804,26 @@ func runSSH(ctx context.Context, conn *Connection, command string, input io.Read
 }
 
 func runSSHCapture(ctx context.Context, conn *Connection, command string, input io.Reader, timeout time.Duration, outputLimit int) ([]byte, error) {
-	session, err := conn.NewSession()
+	output, exitCode, err := runSSHCaptureWithExit(ctx, conn, command, input, timeout, outputLimit, true)
 	if err != nil {
 		return nil, err
+	}
+	if exitCode != 0 {
+		return nil, errors.New("provision: remote command failed")
+	}
+	return output, nil
+}
+
+// runSSHCaptureAsUser runs a command as the authenticated login without the provisioning sudo wrapper and preserves
+// ssh.ExitError status codes for the authorized_keys compare-and-swap scripts.
+func runSSHCaptureAsUser(ctx context.Context, conn *Connection, command string, input io.Reader, timeout time.Duration, outputLimit int) ([]byte, int, error) {
+	return runSSHCaptureWithExit(ctx, conn, command, input, timeout, outputLimit, false)
+}
+
+func runSSHCaptureWithExit(ctx context.Context, conn *Connection, command string, input io.Reader, timeout time.Duration, outputLimit int, privileged bool) ([]byte, int, error) {
+	session, err := conn.NewSession()
+	if err != nil {
+		return nil, 0, err
 	}
 	defer session.Close()
 	session.Stdin = input
@@ -776,21 +837,29 @@ func runSSHCapture(ctx context.Context, conn *Connection, command string, input 
 	opCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	stop := context.AfterFunc(opCtx, func() { _ = session.Close() })
-	err = session.Run(conn.PrivilegedCommand(command))
+	if privileged {
+		command = conn.PrivilegedCommand(command)
+	}
+	err = session.Run(command)
 	stop()
 	if opCtx.Err() != nil {
-		return nil, opCtx.Err()
+		return nil, 0, opCtx.Err()
 	}
+	exitCode := 0
 	if err != nil {
-		return nil, errors.New("provision: remote command failed")
+		var exitErr *ssh.ExitError
+		if !errors.As(err, &exitErr) {
+			return nil, 0, errors.New("provision: remote command failed")
+		}
+		exitCode = exitErr.ExitStatus()
 	}
 	if captured != nil {
 		if captured.truncated {
-			return nil, preflightFailure("preflight_output_invalid")
+			return nil, 0, preflightFailure("preflight_output_invalid")
 		}
-		return captured.Bytes(), nil
+		return captured.Bytes(), exitCode, nil
 	}
-	return nil, nil
+	return nil, exitCode, nil
 }
 
 type limitedBuffer struct {

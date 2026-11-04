@@ -86,6 +86,8 @@ var tokenApproved = map[string]bool{
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:                true,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:         true,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure:   true,
+	adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure:           true,
+	adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure:        true,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:          true, // planning only, in the real policy
 	adminv1connect.WarpServiceRegisterWarpProcedure:                       true,
 	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:                   true,
@@ -102,10 +104,11 @@ var tokenApproved = map[string]bool{
 }
 
 var tokenPlanning = map[string]bool{
-	adminv1connect.WarpServiceGetWarpProcedure:              true,
-	adminv1connect.RelayServiceListRelaysProcedure:          true,
-	adminv1connect.RelayServiceListRelayCandidatesProcedure: true,
-	adminv1connect.RelayServiceCheckRelayProcedure:          true,
+	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure: true,
+	adminv1connect.WarpServiceGetWarpProcedure:                true,
+	adminv1connect.RelayServiceListRelaysProcedure:            true,
+	adminv1connect.RelayServiceListRelayCandidatesProcedure:   true,
+	adminv1connect.RelayServiceCheckRelayProcedure:            true,
 }
 
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
@@ -315,35 +318,37 @@ type world struct {
 	adminv1connect.UnimplementedClientProbeServiceHandler
 	adminv1connect.UnimplementedRelayServiceHandler
 
-	rotateReq         []*adminv1.RotateNodeServerPasswordRequest
-	installReq        []*adminv1.StartNodeProvisionRequest
-	checkPortsReq     []*adminv1.CheckPortsRequest
-	ipv6Reqs          []*adminv1.CheckIpv6Request
-	ipv6Err           error // CheckIpv6 answers with this
-	ipv6Node          map[string]*adminv1.NodeIpv6
-	ipv6Updates       []*adminv1.UpdateIpv6EntryRequest
-	ipv6UpdateCode    string // UpdateIpv6Entry answers with this error_code
-	mu                sync.Mutex
-	log               []callRec
-	fixReqs           []*adminv1.ApplyFixRequest
-	fixGrants         []callRec
-	updateReq         []*adminv1.UpdateUserRequest
-	disableReq        []*adminv1.SetUsersEnabledRequest
-	startReq          []*adminv1.StartRolloutRequest
-	scheduleReq       []*adminv1.ScheduleNodeUpdateRequest
-	cancelScheduleReq []*adminv1.CancelNodeUpdateScheduleRequest
-	timezoneReq       []*adminv1.SetUpdateTimezoneRequest
-	pauseReq          []*adminv1.PauseRolloutRequest
-	revokeReq         []*adminv1.RevokeDeviceRequest
-	resetReq          []*adminv1.ResetUserTrafficRequest
-	createReq         []*adminv1.CreateUserRequest
-	muteReq           []*adminv1.MuteAlertRequest
-	rollbackReq       []*adminv1.RollbackNodeRequest
-	subsReq           []*adminv1.UpdateSubscriptionSettingsRequest
-	warpRestarts      []*adminv1.RestartWarpRequest
-	warpRegistrations []*adminv1.RegisterWarpRequest
-	nodeDecoyReqs     []*adminv1.SetNodeDecoyModeRequest
-	relay             relayFixture
+	rotateReq          []*adminv1.RotateNodeServerPasswordRequest
+	installReq         []*adminv1.StartNodeProvisionRequest
+	addServerKeyReq    []*adminv1.AddNodeServerKeyRequest
+	removeServerKeyReq []*adminv1.RemoveNodeServerKeyRequest
+	checkPortsReq      []*adminv1.CheckPortsRequest
+	ipv6Reqs           []*adminv1.CheckIpv6Request
+	ipv6Err            error // CheckIpv6 answers with this
+	ipv6Node           map[string]*adminv1.NodeIpv6
+	ipv6Updates        []*adminv1.UpdateIpv6EntryRequest
+	ipv6UpdateCode     string // UpdateIpv6Entry answers with this error_code
+	mu                 sync.Mutex
+	log                []callRec
+	fixReqs            []*adminv1.ApplyFixRequest
+	fixGrants          []callRec
+	updateReq          []*adminv1.UpdateUserRequest
+	disableReq         []*adminv1.SetUsersEnabledRequest
+	startReq           []*adminv1.StartRolloutRequest
+	scheduleReq        []*adminv1.ScheduleNodeUpdateRequest
+	cancelScheduleReq  []*adminv1.CancelNodeUpdateScheduleRequest
+	timezoneReq        []*adminv1.SetUpdateTimezoneRequest
+	pauseReq           []*adminv1.PauseRolloutRequest
+	revokeReq          []*adminv1.RevokeDeviceRequest
+	resetReq           []*adminv1.ResetUserTrafficRequest
+	createReq          []*adminv1.CreateUserRequest
+	muteReq            []*adminv1.MuteAlertRequest
+	rollbackReq        []*adminv1.RollbackNodeRequest
+	subsReq            []*adminv1.UpdateSubscriptionSettingsRequest
+	warpRestarts       []*adminv1.RestartWarpRequest
+	warpRegistrations  []*adminv1.RegisterWarpRequest
+	nodeDecoyReqs      []*adminv1.SetNodeDecoyModeRequest
+	relay              relayFixture
 
 	subs                   *adminv1.SubscriptionSettings // the stored subscription settings
 	users                  map[string]*adminv1.GetUserResponse
@@ -1181,9 +1186,31 @@ const (
 
 func (w *world) ListNodeServerAccess(context.Context, *connect.Request[adminv1.ListNodeServerAccessRequest]) (*connect.Response[adminv1.ListNodeServerAccessResponse], error) {
 	return connect.NewResponse(&adminv1.ListNodeServerAccessResponse{Access: []*adminv1.NodeServerAccess{
-		{NodeId: nodeA, NodeName: "de1", Host: "203.0.113.10", Port: 22, Username: "root", Fingerprint: testHostKey},
+		{NodeId: nodeA, NodeName: "de1", Host: "203.0.113.10", Port: 22, Username: "root", Fingerprint: testHostKey, PasswordSaved: true, PasswordLogin: true},
 		{NodeId: nodeRetired, NodeName: "de1", Host: "203.0.113.20", Port: 22, Username: "root", Fingerprint: testHostKey, NodeRetired: true, PasswordGenerated: true},
 	}}), nil
+}
+
+func (w *world) ListNodeServerKeys(context.Context, *connect.Request[adminv1.ListNodeServerKeysRequest]) (*connect.Response[adminv1.ListNodeServerKeysResponse], error) {
+	return connect.NewResponse(&adminv1.ListNodeServerKeysResponse{Keys: []*adminv1.NodeServerKey{{
+		Type: "ssh-ed25519", Bits: 256, Fingerprint: testPanelKeyFingerprint, Comment: "mistgate-panel", PanelKey: true, Lines: 1,
+	}}}), nil
+}
+
+func (w *world) AddNodeServerKey(_ context.Context, r *connect.Request[adminv1.AddNodeServerKeyRequest]) (*connect.Response[adminv1.AddNodeServerKeyResponse], error) {
+	w.mu.Lock()
+	w.addServerKeyReq = append(w.addServerKeyReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.AddNodeServerKeyResponse{Key: &adminv1.NodeServerKey{
+		Type: "ssh-ed25519", Bits: 256, Fingerprint: testPanelKeyFingerprint, Comment: "mistgate-panel", PanelKey: r.Msg.GetPanelKey(), Lines: 1,
+	}}), nil
+}
+
+func (w *world) RemoveNodeServerKey(_ context.Context, r *connect.Request[adminv1.RemoveNodeServerKeyRequest]) (*connect.Response[adminv1.RemoveNodeServerKeyResponse], error) {
+	w.mu.Lock()
+	w.removeServerKeyReq = append(w.removeServerKeyReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.RemoveNodeServerKeyResponse{}), nil
 }
 
 func (w *world) RotateNodeServerPassword(_ context.Context, r *connect.Request[adminv1.RotateNodeServerPasswordRequest]) (*connect.Response[adminv1.RotateNodeServerPasswordResponse], error) {

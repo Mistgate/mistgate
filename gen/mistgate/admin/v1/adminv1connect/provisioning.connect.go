@@ -60,6 +60,18 @@ const (
 	// ProvisioningServiceListNodeServerAccessProcedure is the fully-qualified name of the
 	// ProvisioningService's ListNodeServerAccess RPC.
 	ProvisioningServiceListNodeServerAccessProcedure = "/mistgate.admin.v1.ProvisioningService/ListNodeServerAccess"
+	// ProvisioningServiceListNodeServerKeysProcedure is the fully-qualified name of the
+	// ProvisioningService's ListNodeServerKeys RPC.
+	ProvisioningServiceListNodeServerKeysProcedure = "/mistgate.admin.v1.ProvisioningService/ListNodeServerKeys"
+	// ProvisioningServiceAddNodeServerKeyProcedure is the fully-qualified name of the
+	// ProvisioningService's AddNodeServerKey RPC.
+	ProvisioningServiceAddNodeServerKeyProcedure = "/mistgate.admin.v1.ProvisioningService/AddNodeServerKey"
+	// ProvisioningServiceRemoveNodeServerKeyProcedure is the fully-qualified name of the
+	// ProvisioningService's RemoveNodeServerKey RPC.
+	ProvisioningServiceRemoveNodeServerKeyProcedure = "/mistgate.admin.v1.ProvisioningService/RemoveNodeServerKey"
+	// ProvisioningServiceAttachNodeServerAccessProcedure is the fully-qualified name of the
+	// ProvisioningService's AttachNodeServerAccess RPC.
+	ProvisioningServiceAttachNodeServerAccessProcedure = "/mistgate.admin.v1.ProvisioningService/AttachNodeServerAccess"
 	// ProvisioningServiceRotateNodeServerPasswordProcedure is the fully-qualified name of the
 	// ProvisioningService's RotateNodeServerPassword RPC.
 	ProvisioningServiceRotateNodeServerPasswordProcedure = "/mistgate.admin.v1.ProvisioningService/RotateNodeServerPassword"
@@ -82,6 +94,10 @@ type ProvisioningServiceClient interface {
 	ListNodeProvisions(context.Context, *connect.Request[v1.ListNodeProvisionsRequest]) (*connect.Response[v1.ListNodeProvisionsResponse], error)
 	ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error)
 	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
+	ListNodeServerKeys(context.Context, *connect.Request[v1.ListNodeServerKeysRequest]) (*connect.Response[v1.ListNodeServerKeysResponse], error)
+	AddNodeServerKey(context.Context, *connect.Request[v1.AddNodeServerKeyRequest]) (*connect.Response[v1.AddNodeServerKeyResponse], error)
+	RemoveNodeServerKey(context.Context, *connect.Request[v1.RemoveNodeServerKeyRequest]) (*connect.Response[v1.RemoveNodeServerKeyResponse], error)
+	AttachNodeServerAccess(context.Context, *connect.Request[v1.AttachNodeServerAccessRequest]) (*connect.Response[v1.AttachNodeServerAccessResponse], error)
 	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
 	RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error)
 	// Owner-only, step-up protected: deletes the saved access of a retired node, its sealed password included.
@@ -153,6 +169,30 @@ func NewProvisioningServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(provisioningServiceMethods.ByName("ListNodeServerAccess")),
 			connect.WithClientOptions(opts...),
 		),
+		listNodeServerKeys: connect.NewClient[v1.ListNodeServerKeysRequest, v1.ListNodeServerKeysResponse](
+			httpClient,
+			baseURL+ProvisioningServiceListNodeServerKeysProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("ListNodeServerKeys")),
+			connect.WithClientOptions(opts...),
+		),
+		addNodeServerKey: connect.NewClient[v1.AddNodeServerKeyRequest, v1.AddNodeServerKeyResponse](
+			httpClient,
+			baseURL+ProvisioningServiceAddNodeServerKeyProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("AddNodeServerKey")),
+			connect.WithClientOptions(opts...),
+		),
+		removeNodeServerKey: connect.NewClient[v1.RemoveNodeServerKeyRequest, v1.RemoveNodeServerKeyResponse](
+			httpClient,
+			baseURL+ProvisioningServiceRemoveNodeServerKeyProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("RemoveNodeServerKey")),
+			connect.WithClientOptions(opts...),
+		),
+		attachNodeServerAccess: connect.NewClient[v1.AttachNodeServerAccessRequest, v1.AttachNodeServerAccessResponse](
+			httpClient,
+			baseURL+ProvisioningServiceAttachNodeServerAccessProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("AttachNodeServerAccess")),
+			connect.WithClientOptions(opts...),
+		),
 		rotateNodeServerPassword: connect.NewClient[v1.RotateNodeServerPasswordRequest, v1.RotateNodeServerPasswordResponse](
 			httpClient,
 			baseURL+ProvisioningServiceRotateNodeServerPasswordProcedure,
@@ -185,6 +225,10 @@ type provisioningServiceClient struct {
 	listNodeProvisions       *connect.Client[v1.ListNodeProvisionsRequest, v1.ListNodeProvisionsResponse]
 	listNodeProvisionEvents  *connect.Client[v1.ListNodeProvisionEventsRequest, v1.ListNodeProvisionEventsResponse]
 	listNodeServerAccess     *connect.Client[v1.ListNodeServerAccessRequest, v1.ListNodeServerAccessResponse]
+	listNodeServerKeys       *connect.Client[v1.ListNodeServerKeysRequest, v1.ListNodeServerKeysResponse]
+	addNodeServerKey         *connect.Client[v1.AddNodeServerKeyRequest, v1.AddNodeServerKeyResponse]
+	removeNodeServerKey      *connect.Client[v1.RemoveNodeServerKeyRequest, v1.RemoveNodeServerKeyResponse]
+	attachNodeServerAccess   *connect.Client[v1.AttachNodeServerAccessRequest, v1.AttachNodeServerAccessResponse]
 	rotateNodeServerPassword *connect.Client[v1.RotateNodeServerPasswordRequest, v1.RotateNodeServerPasswordResponse]
 	revealNodeServerPassword *connect.Client[v1.RevealNodeServerPasswordRequest, v1.RevealNodeServerPasswordResponse]
 	forgetNodeServerAccess   *connect.Client[v1.ForgetNodeServerAccessRequest, v1.ForgetNodeServerAccessResponse]
@@ -235,6 +279,26 @@ func (c *provisioningServiceClient) ListNodeServerAccess(ctx context.Context, re
 	return c.listNodeServerAccess.CallUnary(ctx, req)
 }
 
+// ListNodeServerKeys calls mistgate.admin.v1.ProvisioningService.ListNodeServerKeys.
+func (c *provisioningServiceClient) ListNodeServerKeys(ctx context.Context, req *connect.Request[v1.ListNodeServerKeysRequest]) (*connect.Response[v1.ListNodeServerKeysResponse], error) {
+	return c.listNodeServerKeys.CallUnary(ctx, req)
+}
+
+// AddNodeServerKey calls mistgate.admin.v1.ProvisioningService.AddNodeServerKey.
+func (c *provisioningServiceClient) AddNodeServerKey(ctx context.Context, req *connect.Request[v1.AddNodeServerKeyRequest]) (*connect.Response[v1.AddNodeServerKeyResponse], error) {
+	return c.addNodeServerKey.CallUnary(ctx, req)
+}
+
+// RemoveNodeServerKey calls mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey.
+func (c *provisioningServiceClient) RemoveNodeServerKey(ctx context.Context, req *connect.Request[v1.RemoveNodeServerKeyRequest]) (*connect.Response[v1.RemoveNodeServerKeyResponse], error) {
+	return c.removeNodeServerKey.CallUnary(ctx, req)
+}
+
+// AttachNodeServerAccess calls mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess.
+func (c *provisioningServiceClient) AttachNodeServerAccess(ctx context.Context, req *connect.Request[v1.AttachNodeServerAccessRequest]) (*connect.Response[v1.AttachNodeServerAccessResponse], error) {
+	return c.attachNodeServerAccess.CallUnary(ctx, req)
+}
+
 // RotateNodeServerPassword calls mistgate.admin.v1.ProvisioningService.RotateNodeServerPassword.
 func (c *provisioningServiceClient) RotateNodeServerPassword(ctx context.Context, req *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error) {
 	return c.rotateNodeServerPassword.CallUnary(ctx, req)
@@ -262,6 +326,10 @@ type ProvisioningServiceHandler interface {
 	ListNodeProvisions(context.Context, *connect.Request[v1.ListNodeProvisionsRequest]) (*connect.Response[v1.ListNodeProvisionsResponse], error)
 	ListNodeProvisionEvents(context.Context, *connect.Request[v1.ListNodeProvisionEventsRequest]) (*connect.Response[v1.ListNodeProvisionEventsResponse], error)
 	ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error)
+	ListNodeServerKeys(context.Context, *connect.Request[v1.ListNodeServerKeysRequest]) (*connect.Response[v1.ListNodeServerKeysResponse], error)
+	AddNodeServerKey(context.Context, *connect.Request[v1.AddNodeServerKeyRequest]) (*connect.Response[v1.AddNodeServerKeyResponse], error)
+	RemoveNodeServerKey(context.Context, *connect.Request[v1.RemoveNodeServerKeyRequest]) (*connect.Response[v1.RemoveNodeServerKeyResponse], error)
+	AttachNodeServerAccess(context.Context, *connect.Request[v1.AttachNodeServerAccessRequest]) (*connect.Response[v1.AttachNodeServerAccessResponse], error)
 	RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error)
 	RevealNodeServerPassword(context.Context, *connect.Request[v1.RevealNodeServerPasswordRequest]) (*connect.Response[v1.RevealNodeServerPasswordResponse], error)
 	// Owner-only, step-up protected: deletes the saved access of a retired node, its sealed password included.
@@ -329,6 +397,30 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 		connect.WithSchema(provisioningServiceMethods.ByName("ListNodeServerAccess")),
 		connect.WithHandlerOptions(opts...),
 	)
+	provisioningServiceListNodeServerKeysHandler := connect.NewUnaryHandler(
+		ProvisioningServiceListNodeServerKeysProcedure,
+		svc.ListNodeServerKeys,
+		connect.WithSchema(provisioningServiceMethods.ByName("ListNodeServerKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
+	provisioningServiceAddNodeServerKeyHandler := connect.NewUnaryHandler(
+		ProvisioningServiceAddNodeServerKeyProcedure,
+		svc.AddNodeServerKey,
+		connect.WithSchema(provisioningServiceMethods.ByName("AddNodeServerKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	provisioningServiceRemoveNodeServerKeyHandler := connect.NewUnaryHandler(
+		ProvisioningServiceRemoveNodeServerKeyProcedure,
+		svc.RemoveNodeServerKey,
+		connect.WithSchema(provisioningServiceMethods.ByName("RemoveNodeServerKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	provisioningServiceAttachNodeServerAccessHandler := connect.NewUnaryHandler(
+		ProvisioningServiceAttachNodeServerAccessProcedure,
+		svc.AttachNodeServerAccess,
+		connect.WithSchema(provisioningServiceMethods.ByName("AttachNodeServerAccess")),
+		connect.WithHandlerOptions(opts...),
+	)
 	provisioningServiceRotateNodeServerPasswordHandler := connect.NewUnaryHandler(
 		ProvisioningServiceRotateNodeServerPasswordProcedure,
 		svc.RotateNodeServerPassword,
@@ -367,6 +459,14 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 			provisioningServiceListNodeProvisionEventsHandler.ServeHTTP(w, r)
 		case ProvisioningServiceListNodeServerAccessProcedure:
 			provisioningServiceListNodeServerAccessHandler.ServeHTTP(w, r)
+		case ProvisioningServiceListNodeServerKeysProcedure:
+			provisioningServiceListNodeServerKeysHandler.ServeHTTP(w, r)
+		case ProvisioningServiceAddNodeServerKeyProcedure:
+			provisioningServiceAddNodeServerKeyHandler.ServeHTTP(w, r)
+		case ProvisioningServiceRemoveNodeServerKeyProcedure:
+			provisioningServiceRemoveNodeServerKeyHandler.ServeHTTP(w, r)
+		case ProvisioningServiceAttachNodeServerAccessProcedure:
+			provisioningServiceAttachNodeServerAccessHandler.ServeHTTP(w, r)
 		case ProvisioningServiceRotateNodeServerPasswordProcedure:
 			provisioningServiceRotateNodeServerPasswordHandler.ServeHTTP(w, r)
 		case ProvisioningServiceRevealNodeServerPasswordProcedure:
@@ -416,6 +516,22 @@ func (UnimplementedProvisioningServiceHandler) ListNodeProvisionEvents(context.C
 
 func (UnimplementedProvisioningServiceHandler) ListNodeServerAccess(context.Context, *connect.Request[v1.ListNodeServerAccessRequest]) (*connect.Response[v1.ListNodeServerAccessResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.ListNodeServerAccess is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) ListNodeServerKeys(context.Context, *connect.Request[v1.ListNodeServerKeysRequest]) (*connect.Response[v1.ListNodeServerKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.ListNodeServerKeys is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) AddNodeServerKey(context.Context, *connect.Request[v1.AddNodeServerKeyRequest]) (*connect.Response[v1.AddNodeServerKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.AddNodeServerKey is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) RemoveNodeServerKey(context.Context, *connect.Request[v1.RemoveNodeServerKeyRequest]) (*connect.Response[v1.RemoveNodeServerKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.RemoveNodeServerKey is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) AttachNodeServerAccess(context.Context, *connect.Request[v1.AttachNodeServerAccessRequest]) (*connect.Response[v1.AttachNodeServerAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.AttachNodeServerAccess is not implemented"))
 }
 
 func (UnimplementedProvisioningServiceHandler) RotateNodeServerPassword(context.Context, *connect.Request[v1.RotateNodeServerPasswordRequest]) (*connect.Response[v1.RotateNodeServerPasswordResponse], error) {

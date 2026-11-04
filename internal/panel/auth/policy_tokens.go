@@ -50,8 +50,11 @@ var tokenProcedures = map[string]int{
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
 	adminv1connect.WarpServiceRestartWarpProcedure:                     TokenAccessDirect,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only
-	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:          TokenAccessPlanning, // node_install_plan only
+	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:          TokenAccessPlanning, // node_install_plan and node_server_key_add_plan
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:    TokenAccessDirect,
+	adminv1connect.ProvisioningServiceListNodeServerKeysProcedure:      TokenAccessDirect,
+	adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure:        TokenAccessApproved,
+	adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure:     TokenAccessApproved,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
 	// The country verdicts of GetChecks over time (the Reachability page), read like them.
 	adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure: TokenAccessDirect,
@@ -135,6 +138,9 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: true,
 	adminv1connect.ProvisioningServiceRevealNodeServerPasswordProcedure: true,
 	adminv1connect.ProvisioningServiceForgetNodeServerAccessProcedure:   true,
+	adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure:         true,
+	adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure:      true,
+	adminv1connect.ProvisioningServiceAttachNodeServerAccessProcedure:   true,
 	adminv1connect.WarpServiceRegisterWarpProcedure:                     true,
 	adminv1connect.WarpServiceImportWarpProcedure:                       true,
 	adminv1connect.WarpServiceDeleteWarpProcedure:                       true,
@@ -183,6 +189,8 @@ var grantProcedures = map[string][]string{
 	"update_timezone":             {adminv1connect.UpdateServiceSetUpdateTimezoneProcedure},
 	NodeInstallTool:               {adminv1connect.ProvisioningServiceStartNodeProvisionProcedure},
 	"node_server_password_rotate": {adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure},
+	"node_server_key_add":         {adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure},
+	"node_server_key_remove":      {adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure},
 	"relay": {
 		adminv1connect.RelayServiceCreateRelayProcedure,
 		adminv1connect.RelayServiceUpdateRelayProcedure,
