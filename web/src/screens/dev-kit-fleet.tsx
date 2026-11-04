@@ -165,7 +165,8 @@ const nodeEvents = [
 function EventsDemo() {
   const [qc] = useState(() => {
     const c = client(empty);
-    c.setQueryData(["node-events", "nod_demo", "all"], { pages: [{ events: nodeEvents, hasMore: false }], pageParams: [0] });
+    // EventsTab's key: filter, cursor (0 = newest page), page size
+    c.setQueryData(["node-events", "nod_demo", "all", 0, 50], { events: nodeEvents, hasMore: false });
     return c;
   });
   return (

@@ -201,6 +201,8 @@ export function NodeDemos() {
                   inbound({}),
                   inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp", state: InboundState.FAILED, certNotAfterUnix: now + 5 * 86400, lastError: "egress warp: tunnel is down" }),
                 ],
+                onlineUsers: [],
+                topToday: [],
                 metrics,
                 facts,
               } as never
@@ -226,6 +228,8 @@ export function NodeDemos() {
                     awg: { backend: "userspace", backendVersion: "amneziawg-go v3.1.20260828", ifaceUp: true, peers: 1, peersOnline: 0, peersHandshaken: 0, newestHandshakeUnix: 0, udpRxPackets: 0 },
                   }),
                 ],
+                onlineUsers: [],
+                topToday: [],
                 metrics,
                 // GetNode names the backend of the newest AWG report, not the Hello's "backend chosen at the first inbound"
                 facts: { ...facts, engines: ["hysteria2: hysteria core v2.6.1", "awg: amneziawg-go v3.1.20260828"] },
@@ -238,14 +242,14 @@ export function NodeDemos() {
       <Demo title="Node: unreachable for 47 min">
         <Mock fill={nodeFill("nod_de1", { checks: nodeChecks(NodeStatus.DOWN, [cell(CheckStatus.SKIPPED, "node_offline")]) })}>
           <NodeDetail
-            data={{ node: baseNode({ status: NodeStatus.DOWN, online: [], lastSeenUnix: now - 47 * 60, reason: { code: "agent_silent", params: { minutes: "47" } }, warp: { state: WarpState.UNKNOWN, source: 1, colo: "", accountType: "" } }), inbounds: [inbound({})], metrics, facts } as never}
+            data={{ node: baseNode({ status: NodeStatus.DOWN, online: [], lastSeenUnix: now - 47 * 60, reason: { code: "agent_silent", params: { minutes: "47" } }, warp: { state: WarpState.UNKNOWN, source: 1, colo: "", accountType: "" } }), inbounds: [inbound({})], onlineUsers: [], topToday: [], metrics, facts } as never}
           />
         </Mock>
       </Demo>
 
       <Demo title="Node: just connected, no profile yet">
         <Mock fill={nodeFill("nod_de1", { checks: { nowUnix: now, intervalS: 300, columns: [], rows: [] } })}>
-          <NodeDetail data={{ node: baseNode({ online: [], warp: { state: WarpState.NOT_CONFIGURED } }), inbounds: [], metrics, facts } as never} />
+          <NodeDetail data={{ node: baseNode({ online: [], warp: { state: WarpState.NOT_CONFIGURED } }), inbounds: [], onlineUsers: [], topToday: [], metrics, facts } as never} />
         </Mock>
       </Demo>
 
@@ -269,6 +273,8 @@ export function NodeDemos() {
                   inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp", state: InboundState.FAILED, certNotAfterUnix: 0, lastError: "listen udp :8443: bind: address already in use" }),
                   inbound({ id: "inb_3", profileId: "prf_awg", profileName: "AWG 3.1 · QUIC", protocol: "awg", port: 51820, tlsServerName: "", certNotAfterUnix: 0, awg: { backend: "kernel", backendVersion: "amneziawg kernel module", ifaceUp: true, peers: 3, peersOnline: 1, peersHandshaken: 3, newestHandshakeUnix: now - 30, udpRxPackets: 900 } }),
                 ],
+                onlineUsers: [],
+                topToday: [],
                 metrics,
                 facts,
               } as never
