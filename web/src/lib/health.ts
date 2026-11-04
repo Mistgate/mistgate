@@ -109,6 +109,7 @@ export function alertTitle(t: T, a: Alert): string {
   if (a.kind === AlertKind.CHECK_FAILED && (a.subject === "panel_egress" || a.subject === "probe_path")) key += "." + a.subject;
   if (a.kind === AlertKind.NODE_DOWN && a.subject === "panel_link") key += ".panel_link"; // fleet-wide, no node to name
   if (a.kind === AlertKind.HOST_BLIP && a.subject === "flapping") key += ".flapping"; // the quiet blip records keep "Host blip"
+  if (a.kind === AlertKind.PATH_LOSSY && params.open) key += ".filtered"; // a filter on the way, not a lossy line (its why is .filtered too)
   if ((a.kind === AlertKind.DOCTOR_WARN || a.kind === AlertKind.DOCTOR_FAIL) && params.check) params.check_title = checkTitle(t, params.check);
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     params.country = countryIn(t, params.country ?? "");
@@ -324,8 +325,9 @@ export function groupFact(t: T, g: readonly Alert[]): string {
     const lost = Math.max(...g.map((x) => lossPct(Number(x.params.sent), Number(x.params.got))));
     return t(g.length > 1 ? "hl.alerts.fact.lossUpTo" : "hl.alerts.fact.loss", { lost });
   }
-  // the worst port of the lossy sender's run
-  if (a.kind === AlertKind.PATH_LOSSY) return t("hl.alerts.fact.loss", { lost: lossPct(Number(a.params.sent), Number(a.params.got)) });
+  // the worst port of the lossy sender's run; a filtered path names the ports that got through instead of "100 % lost"
+  if (a.kind === AlertKind.PATH_LOSSY)
+    return a.params.open ? t("hl.alerts.fact.filtered", { open: a.params.open }) : t("hl.alerts.fact.loss", { lost: lossPct(Number(a.params.sent), Number(a.params.got)) });
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     const n = alertNetworks(a.params.networks ?? "").length;
     return n > 1 ? t.n("hl.alerts.fact.nets", n) : "";

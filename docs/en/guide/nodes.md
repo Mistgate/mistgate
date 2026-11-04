@@ -114,7 +114,7 @@ The **Ports** block sits in the **Direct** lane of the **Ways in** tab (it used 
 When a port loses packets, the panel sends again at once from a second node on the other side: a node outside the CIS when the first was in it (Russia, Belarus, Kazakhstan, Kyrgyzstan, Armenia, Azerbaijan, Tajikistan, Uzbekistan, Moldova, Turkmenistan), one inside when it was not, then another provider or country. The row shows both measurements, "from minsk1 236/300 · from de1 299/300", and who is at fault:
 
 - **Lost from both sides**: the node's port loses packets. The port counts as lossy and raises `port_lossy`.
-- **Lost from one side only**: the loss is on the way from that sender, not on this node. The port counts as fine; the sender gets the alert `path_lossy` and is asked last for the next 24 hours, so one weak path does not colour every check.
+- **Lost from one side only**: the loss is on the way from that sender, not on this node. The port counts as fine; the sender gets the alert `path_lossy` and is asked last for the next 24 hours, so one weak path does not colour every check. When the ports that sender lost got nothing at all (at most 1 %) while its other ports arrived whole (often only 443), the path is **filtered** rather than lossy, typically the hoster's DDoS protection against data-centre traffic; the alert, the event and a line under the UDP rows say so. The node is fine and people on home networks usually connect, but port checks (and a relay) from that sender cannot pass.
 
 A port is also lossy when it delivered clearly less than the other ports of the same run (the median port), by more than 4 % of the packets and more than the usual spread on a path that loses a little everywhere.
 

@@ -153,6 +153,8 @@ const nodeEvents = [
   // checked again from a second sender: lost from both (the port), and this node's own packets lost on the way to nl1
   event("port_lossy", 1500, { severity: EventSeverity.WARNING, params: { inbound: "inb_1", profile: "Hysteria2 · 443", port: "443", sent: "300", got: "241", sender: "minsk1", confirm_sender: "fi1", confirm_sent: "300", confirm_got: "238" }, profileName: "Hysteria2 · 443", inboundId: "inb_1", source: "panel" }),
   event("path_lossy", 1200, { severity: EventSeverity.WARNING, params: { target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "fi1", other_got: "299", region: "other", other_region: "other" }, source: "panel" }),
+  // a filter on the way, not a lossy line: only 443 got through to fi1, the other ports nothing
+  event("path_lossy", 1100, { severity: EventSeverity.WARNING, params: { target: "fi1", target_id: "nod_fi1", ports: "2053, 8443", open: "443", sent: "300", got: "0", other: "msk1", other_got: "300", region: "other", other_region: "cis" }, source: "panel" }),
   event("node_blip", 30_000, { params: { minutes: "3", rebooted: "true" }, source: "panel" }),
   event("clock_skew", 40_000, { severity: EventSeverity.WARNING, params: { offset_s: "4" } }),
   event("engine_failed", 50_000, { severity: EventSeverity.ERROR, params: { error: "listen udp :8443: bind: address already in use" }, profileName: "hy2 · WARP · 8443", inboundId: "inb_2" }),

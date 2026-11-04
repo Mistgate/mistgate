@@ -6,7 +6,7 @@ import { en } from "@/i18n/en";
 import { describeAudit } from "./audit";
 import { errorText } from "./errors";
 import { describeEvent, eventKind } from "./events";
-import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, portRuns, reasons, reasonText, regionWord, renewalOf, renewalText, udpRegion } from "./port-check";
+import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, portRuns, reasons, reasonText, regionWord, renewalOf, renewalText, udpFilters, udpRegion } from "./port-check";
 
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 const t = tOf("en");
@@ -99,6 +99,12 @@ describe("the event and the audit rows", () => {
     expect(describeEvent(tOf("ru"), path).text).toBe("UDP до nl1 теряется по пути: 21 % на портах 2053, 2083, а с fi1 доходит 299/300");
     expect(eventKind({ code: "path_lossy", severity: EventSeverity.WARNING })).toBe("warn");
   });
+  it("words a filtered path: the ports that got through, not a share lost", () => {
+    const filtered = { code: "path_lossy", params: { target: "fi1", target_id: "nod_fi1", ports: "2053, 8443", open: "443", sent: "300", got: "0", other: "msk1", other_got: "300", region: "other", other_region: "cis" } };
+    expect(describeEvent(t, filtered).text).toBe("UDP to fi1 is filtered on the way: only 443 gets through, ports 2053, 8443 get nothing, while everything arrives from msk1");
+    expect(describeEvent(tOf("ru"), filtered).text).toBe("UDP до fi1 режет фильтр по пути: доходит только 443, на порты 2053, 8443 — ничего, а с msk1 доходит всё");
+    expect(describeEvent(t, filtered).text).not.toContain("%");
+  });
   it("words the check and the 'save anyway' choice", () => {
     expect(describeAudit(t, { action: "node.ports_check", paramsJson: JSON.stringify({ node: "de1", ports: "443,8443" }) })).toBe("checked UDP delivery on de1: ports 443,8443");
     expect(describeAudit(t, { action: "port_lossy_override", paramsJson: JSON.stringify({ node: "de1", port: 8443 }) })).toBe("saved the port 8443 on de1 although it loses UDP packets");
@@ -174,5 +180,32 @@ describe("whether the certificates of a node renew", () => {
     expect(renewalText(tRu, { kind: "ok443" })).toBe("Порт 80 закрыт, но TCP 443 отвечает Let’s Encrypt — сертификаты обновляются.");
     expect(renewalText(t, { kind: "risk", profile: "" })).toBe("Port 80 is closed and TCP 443 does not answer Let’s Encrypt: certificates on this node will stop renewing. Open TCP 80 at the provider, move VLESS to 8443, or make its REALITY target “This node’s site”.");
     expect(renewalText(tRu, { kind: "risk", profile: "VLESS 443" })).toBe("Порт 80 закрыт, а TCP 443 не отвечает Let’s Encrypt (его занимает «VLESS 443» — REALITY с другим сайтом) — сертификаты на этой ноде перестанут обновляться. Открой TCP 80 у провайдера, перенеси VLESS на 8443 или поставь ему цель REALITY «Сайт этой ноды».");
+  });
+});
+
+describe("a filter on the way, told from a lossy line", () => {
+  // the panel's stored rows on the target: first sender de1, confirmed from msk1; blame "path" where one side lost
+  const row = (port: number, over: object = {}) => ({ port, verdict: "ok", sender: "de1", sent: 300, got: 300, senderVerdict: "ok", confirmSender: "msk1", confirmSent: 300, confirmGot: 300, confirmVerdict: "ok", blame: "", ...over });
+  const dropped = (port: number) => row(port, { got: 0, senderVerdict: "broken", blame: "path" });
+  it("names the sender whose other ports arrived whole while the lost ones got nothing, with the open ports sorted", () => {
+    expect(udpFilters([dropped(8443), row(8080), dropped(2053), row(443)])).toEqual([{ sender: "de1", open: [443, 8080] }]);
+    // at most 1 % through still counts as nothing
+    expect(udpFilters([row(443), row(2053, { got: 3, senderVerdict: "broken", blame: "path" })])).toEqual([{ sender: "de1", open: [443] }]);
+  });
+  it("finds it on the confirming sender's side too", () => {
+    const lost = row(2053, { confirmGot: 0, confirmVerdict: "broken", blame: "path" });
+    expect(udpFilters([row(443), lost])).toEqual([{ sender: "msk1", open: [443] }]);
+  });
+  it("says nothing for a lossy line, a clean run, a sender that got nothing anywhere, or a port both sides lost", () => {
+    // a share lost on every port: a lossy line
+    expect(udpFilters([row(443, { got: 206, senderVerdict: "lossy", blame: "path" }), row(2053, { got: 210, senderVerdict: "lossy", blame: "path" })])).toEqual([]);
+    // some got through on a lost port (40 of 300): not dropped outright
+    expect(udpFilters([row(443), dropped(2053), row(8443, { got: 40, senderVerdict: "broken", blame: "path" })])).toEqual([]);
+    expect(udpFilters([row(443), row(2053)])).toEqual([]);
+    expect(udpFilters([dropped(443), dropped(2053)])).toEqual([]);
+    // lost from both sides is the node's port, not a path
+    expect(udpFilters([row(443), row(2053, { verdict: "broken", got: 0, senderVerdict: "broken", confirmGot: 0, confirmVerdict: "broken", blame: "node" })])).toEqual([]);
+    // checked from one sender only: nothing to compare
+    expect(udpFilters([row(443, { confirmSender: "" }), row(2053, { confirmSender: "", got: 0, verdict: "broken" })])).toEqual([]);
   });
 });

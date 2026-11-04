@@ -562,6 +562,33 @@ describe("the Alerts tab", () => {
     expect(button("Mute")).toBeDefined();
   });
 
+  it("folds a filtered path_lossy alert to the ports that got through and opens to a filter: only 443 against everything", async () => {
+    await mountTab([
+      alert({
+        id: "alt_f",
+        kind: AlertKind.PATH_LOSSY,
+        nodeId: "nod_de1",
+        nodeName: "de1",
+        subject: "nod_fi1",
+        titleKey: "health.alert.path_lossy.title",
+        whyKey: "health.alert.path_lossy.why.filtered",
+        params: { node: "de1", target: "fi1", target_id: "nod_fi1", ports: "2053, 8443", open: "443", sent: "300", got: "0", other: "msk1", other_got: "300", region: "other", other_region: "cis" },
+      }),
+    ]);
+    const [card] = toggles();
+    expect(card!.textContent).toContain("Warningde1UDP filtered on the way to fi1");
+    expect(card!.textContent).toContain("only 443 gets through");
+    expect(card!.textContent).not.toContain("%");
+    await click(card);
+    expect(text()).toContain("UDP from de1 (outside the CIS) reaches fi1 only on 443; ports 2053, 8443 get nothing, while from msk1 (CIS) everything arrives.");
+    // no share lost: what got through, in words
+    expect([...document.querySelectorAll("[data-testid=path-runs] th")].map((c) => c.textContent)).toEqual(["Checked from", "Arrived"]);
+    expect([...document.querySelectorAll("[data-testid=path-runs] tbody tr")].map((r) => [...(r as HTMLTableRowElement).cells].map((c) => c.textContent))).toEqual([
+      ["de1outside the CIS", "only 443"],
+      ["msk1CIS", "everything"],
+    ]);
+  });
+
   it("names both senders of the ports that lost packets from both sides", async () => {
     const both = (id: string, port: string, got: string, confirmGot: string) =>
       alert({

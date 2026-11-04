@@ -162,6 +162,36 @@ describe("a port checked again from a second sender", () => {
     // the run that lost packets is the one in the warning tone; the single-sender words are gone
     expect([...row(2053)!.querySelectorAll(".text-warn-text")].map((s) => s.textContent)).toEqual(["from minsk1 236/300"]);
     expect(row(2053)?.textContent).not.toContain("arrived");
+    // a share lost here and there is a lossy line, not a filter: no caption
+    expect(document.querySelector("[data-testid=udp-filter]")).toBeNull();
+  });
+
+  it("says under the UDP rows that the way from a sender is filtered when some ports arrive whole and the rest get nothing", async () => {
+    await mount(
+      data({
+        inbounds: [inbound({}), inbound({ id: "inb_2", profileName: "TUIC · 2053", port: 2053 }), inbound({ id: "inb_3", profileName: "hy2 · 8443", port: 8443 })],
+        portChecks: [twice({}), twice({ port: 2053, got: 0, senderVerdict: "broken", blame: "path" }), twice({ port: 8443, got: 0, senderVerdict: "broken", blame: "path" })],
+        tcpChecks: [tcp({})],
+      }),
+    );
+    const caption = document.querySelector("[data-testid=udp-filter]");
+    expect(caption?.textContent).toBe(
+      "From minsk1, UDP arrives only on 443: a filter on the way (often the hoster’s DDoS protection). Port checks from minsk1 do not pass; this is not de1 breaking, and people on home networks usually connect.",
+    );
+    // right under the UDP rows, above the TCP ones
+    const items = [...document.querySelectorAll("li")];
+    expect(items.indexOf(caption as HTMLLIElement)).toBe(items.indexOf(row(8443)!) + 1);
+    expect(items.at(-1)?.textContent).toContain("tcp/80");
+    // the ports stay fine; the sender's empty runs are amber, not red, and the line under them names the filter
+    expect(row(2053)?.textContent).toContain("udp/2053OK");
+    expect([...row(2053)!.querySelectorAll(".text-warn-text")].map((s) => s.textContent)).toEqual(["from minsk1 0/300"]);
+    expect(row(2053)?.querySelector(".text-danger-text")).toBeNull();
+    expect(row(8443)?.querySelector("[data-blame=path]")?.textContent).toBe("The port is fine: UDP from minsk1 is filtered on the way.");
+  });
+
+  it("has no filter caption when every run was clean", async () => {
+    await mount(data({ portChecks: [twice({}), twice({ port: 2053 })] }));
+    expect(document.querySelector("[data-testid=udp-filter]")).toBeNull();
   });
 
   it("puts the loss on the node's port when both senders lost packets", async () => {

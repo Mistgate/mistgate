@@ -240,6 +240,21 @@ describe("alerts", () => {
     expect(alertWhy(tFa, fmt, path)).toContain("⁨299/300⁩");
     expect(alertWhy(tFa, fmt, path)).toContain("⁨minsk1⁩");
   });
+  it("words a filtered path_lossy alert: a filter on the way to a node that is fine, the ports that got through, no share lost", () => {
+    const params = { node: "de1", target: "fi1", target_id: "nod_fi1", ports: "2053, 8443", open: "443", sent: "300", got: "0", other: "msk1", other_got: "300", region: "other", other_region: "cis", checked_unix: "1790000000" };
+    const filtered = alert({ kind: AlertKind.PATH_LOSSY, nodeId: "nod_de1", nodeName: "de1", subject: "nod_fi1", titleKey: "health.alert.path_lossy.title", whyKey: "health.alert.path_lossy.why.filtered", params });
+    expect(alertTitle(t, filtered)).toBe("UDP filtered on the way to fi1");
+    expect(alertTitle(tRu, filtered)).toBe("Фильтр UDP по пути к fi1");
+    expect(alertWhy(t, fmt, filtered)).toBe(
+      "UDP from de1 (outside the CIS) reaches fi1 only on 443; ports 2053, 8443 get nothing, while from msk1 (CIS) everything arrives. This is a filter on the way, often the hoster’s DDoS protection against data-centre traffic: fi1 itself is fine and people on home networks usually connect, but port checks (and a relay) from de1 cannot pass.",
+    );
+    expect(alertWhy(tRu, fmtRu, filtered)).toMatch(/^От de1 \(вне СНГ\) UDP доходит до fi1 только на 443; на порты 2053, 8443 — ничего, а с msk1 \(СНГ\) доходит всё\. Это фильтр по пути, часто защита хостера от DDoS из датацентров: сама fi1 в порядке/);
+    expect(groupFact(tPlural, [filtered])).toBe("only 443 gets through");
+    // without {open} it stays a lossy line
+    const lossy = { ...filtered, whyKey: "health.alert.path_lossy.why", params: { ...params, open: "", got: "206" } };
+    expect(alertTitle(t, lossy)).toBe("Loses UDP on the way to fi1");
+    expect(groupFact(tPlural, [lossy])).toBe("31 % lost");
+  });
   it("offers the mute choices up to the panel's week, «until morning» to the next 08:00", () => {
     const clock = (h: number, m = 0) => new Date(2026, 9, 1, h, m);
     const secs = (d: Date) => muteChoices(d).map((c) => c.seconds);

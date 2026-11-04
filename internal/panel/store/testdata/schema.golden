@@ -741,7 +741,7 @@
     "type": "table",
     "name": "udp_path_loss",
     "tbl_name": "udp_path_loss",
-    "sql": "CREATE TABLE udp_path_loss ( sender_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, target_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, ports TEXT NOT NULL, sent INTEGER NOT NULL, got INTEGER NOT NULL, other_sender_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, other_got INTEGER NOT NULL, checked_at INTEGER NOT NULL, PRIMARY KEY (sender_id, target_id) )"
+    "sql": "CREATE TABLE udp_path_loss ( sender_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, target_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, ports TEXT NOT NULL, sent INTEGER NOT NULL, got INTEGER NOT NULL, other_sender_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, other_got INTEGER NOT NULL, checked_at INTEGER NOT NULL, open_ports TEXT NOT NULL DEFAULT '', PRIMARY KEY (sender_id, target_id) )"
   },
   {
     "type": "table",

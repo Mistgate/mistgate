@@ -605,14 +605,19 @@ func addPathLossyConds(now time.Time, losses []store.UDPPathLoss, add func(cond)
 		if age < 0 || age >= 30*time.Hour {
 			continue
 		}
-		add(cond{key: key{kPathLossy, loss.SenderID, loss.TargetID}, severity: sevWarning,
-			why: "health.alert.path_lossy.why", params: map[string]string{
-				"node": loss.SenderName, "target": loss.TargetName, "target_id": loss.TargetID,
-				"ports": loss.Ports, "sent": strconv.FormatUint(uint64(loss.Sent), 10),
-				"got": strconv.FormatUint(uint64(loss.Got), 10), "other": loss.OtherSenderName,
-				"other_got": strconv.FormatUint(uint64(loss.OtherGot), 10), "region": healthUDPRegion(loss.SenderCountry),
-				"other_region": healthUDPRegion(loss.OtherSenderCountry), "checked_unix": strconv.FormatInt(loss.CheckedAt.Unix(), 10),
-			}})
+		why, params := "health.alert.path_lossy.why", map[string]string{
+			"node": loss.SenderName, "target": loss.TargetName, "target_id": loss.TargetID,
+			"ports": loss.Ports, "sent": strconv.FormatUint(uint64(loss.Sent), 10),
+			"got": strconv.FormatUint(uint64(loss.Got), 10), "other": loss.OtherSenderName,
+			"other_got": strconv.FormatUint(uint64(loss.OtherGot), 10), "region": healthUDPRegion(loss.SenderCountry),
+			"other_region": healthUDPRegion(loss.OtherSenderCountry), "checked_unix": strconv.FormatInt(loss.CheckedAt.Unix(), 10),
+		}
+		if loss.OpenPorts != "" {
+			// Some ports arrived whole and the lost ones not at all: a filter on the way (often the target hoster's DDoS
+			// protection admitting only UDP 443 from some networks), and checks from this sender cannot pass.
+			why, params["open"] = "health.alert.path_lossy.why.filtered", loss.OpenPorts
+		}
+		add(cond{key: key{kPathLossy, loss.SenderID, loss.TargetID}, severity: sevWarning, why: why, params: params})
 	}
 }
 

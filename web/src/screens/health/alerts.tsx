@@ -534,15 +534,17 @@ function LossTable({ alerts }: { alerts: Alert[] }) {
 
 /**
  * The two senders of a path_lossy alert, so it reads at a glance whose side loses: this node's packets (warn) and the other
- * sender's that got through (ok), each with its region, what arrived of the worst port and the share lost.
+ * sender's that got through (ok), each with its region, what arrived of the worst port and the share lost. A filtered path
+ * (params.open) says which ports got through instead, "only 443" against "everything", and has no share lost.
  */
 function PathRuns({ a }: { a: Alert }) {
   const t = useT();
   const p = a.params;
   const sent = Number(p.sent);
+  const open = p.open ?? "";
   const rows = [
-    { name: p.node || a.nodeName, region: p.region ?? "", got: Number(p.got), kind: "warn" as const },
-    { name: p.other ?? "", region: p.other_region ?? "", got: Number(p.other_got), kind: "ok" as const },
+    { name: p.node || a.nodeName, region: p.region ?? "", got: Number(p.got), kind: "warn" as const, arrived: open && t("hl.alerts.path.only", { open }) },
+    { name: p.other ?? "", region: p.other_region ?? "", got: Number(p.other_got), kind: "ok" as const, arrived: open && t("hl.alerts.path.all") },
   ];
   return (
     // two rows: kept compact, so the numbers stay next to the names on a wide card
@@ -552,7 +554,7 @@ function PathRuns({ a }: { a: Alert }) {
           <tr className="border-b border-line">
             <th className={thStart}>{t("hl.alerts.col.from")}</th>
             <th className={thEnd}>{t("hl.alerts.col.arrived")}</th>
-            <th className={thEnd}>{t("hl.alerts.col.lost")}</th>
+            {!open && <th className={thEnd}>{t("hl.alerts.col.lost")}</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -565,14 +567,18 @@ function PathRuns({ a }: { a: Alert }) {
                   <span className="text-xs text-muted">{regionWord(t, r.region)}</span>
                 </span>
               </td>
-              <td className="px-3 py-2 text-end font-mono whitespace-nowrap tabular-nums">
-                <span dir="ltr">
-                  {r.got}/{sent}
-                </span>
+              <td className={cx("px-3 py-2 text-end font-mono whitespace-nowrap tabular-nums", open && (r.kind === "warn" ? "font-semibold text-warn-text" : "text-muted"))}>
+                {r.arrived || (
+                  <span dir="ltr">
+                    {r.got}/{sent}
+                  </span>
+                )}
               </td>
-              <td className={cx("px-3 py-2 text-end font-mono whitespace-nowrap tabular-nums", r.kind === "warn" ? "font-semibold text-warn-text" : "text-muted")}>
-                <span dir="ltr">{lossPct(sent, r.got)} %</span>
-              </td>
+              {!open && (
+                <td className={cx("px-3 py-2 text-end font-mono whitespace-nowrap tabular-nums", r.kind === "warn" ? "font-semibold text-warn-text" : "text-muted")}>
+                  <span dir="ltr">{lossPct(sent, r.got)} %</span>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

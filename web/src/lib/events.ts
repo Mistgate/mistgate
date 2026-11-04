@@ -117,9 +117,13 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       if (!p.confirm_sender) return { text: t(key, vars), detail };
       return { text: t("event.port_lossy.confirmed", { ...vars, confirm_sender: senderLabel(t, p.confirm_sender), confirm_lost: lossPct(Number(p.confirm_sent), Number(p.confirm_got)) }), detail };
     }
-    case "path_lossy":
-      // this node's test packets got lost on the way to {target}, while {other} got through: {sent, got} is the worst port
-      return { text: t(key, { target: p.target ?? "", ports: p.ports ?? "", other: p.other ?? "", lost: lossPct(Number(p.sent), Number(p.got)), arrived: `${p.other_got ?? ""}/${p.sent ?? ""}` }), detail };
+    case "path_lossy": {
+      // this node's test packets got lost on the way to {target}, while {other} got through: {sent, got} is the worst port;
+      // {open}: the ports that arrived whole while the lost ones got nothing, a filter on the way rather than a lossy line
+      const vars = { target: p.target ?? "", ports: p.ports ?? "", other: p.other ?? "" };
+      if (p.open) return { text: t("event.path_lossy.filtered", { ...vars, open: p.open }), detail };
+      return { text: t(key, { ...vars, lost: lossPct(Number(p.sent), Number(p.got)), arrived: `${p.other_got ?? ""}/${p.sent ?? ""}` }), detail };
+    }
     case "tunnel_v6_fallback":
       return { text: t(p.mode === "none" ? "event.tunnel_v6_fallback.none" : key), detail };
     case "host_firewall_sync_failed":

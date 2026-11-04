@@ -417,6 +417,40 @@ func TestUDPPortAttributionCases(t *testing.T) {
 	}
 }
 
+// A path that lets some ports through whole and drops the rest outright is a filter (the case seen live: a hoster that
+// admits only UDP 443 from data-centre networks); one that loses a share of every port is a lossy line.
+func TestUDPPathLossNamesAFilter(t *testing.T) {
+	run := func(sender string, got map[uint16]uint32) portCheckOutcome {
+		var checks []store.PortCheck
+		for _, port := range []uint16{443, 2053, 14491} {
+			verdict := "ok"
+			if got[port]*100 < 300*95 {
+				verdict = "broken"
+			}
+			checks = append(checks, store.PortCheck{Port: port, Sent: 300, Got: got[port], Verdict: verdict, SenderVerdict: verdict,
+				Sender: sender, CheckedAt: time.Unix(10, 0)})
+		}
+		return portCheckOutcome{checks: checks, sender: sender}
+	}
+	whole := map[uint16]uint32{443: 300, 2053: 300, 14491: 300}
+	for _, tc := range []struct {
+		name     string
+		first    map[uint16]uint32
+		wantOpen string
+	}{
+		{"only 443 arrives", map[uint16]uint32{443: 300, 2053: 0, 14491: 0}, "443"},
+		{"a share lost on every port", map[uint16]uint32{443: 206, 2053: 210, 14491: 205}, ""},
+		{"some got through on the lost ports", map[uint16]uint32{443: 300, 2053: 40, 14491: 0}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := combinePortCheckRuns(run("de1", tc.first), run("msk1", whole), "fi1", time.Unix(20, 0))
+			if len(got.pathLoss) != 1 || got.pathLoss[0].SenderID != "de1" || got.pathLoss[0].OpenPorts != tc.wantOpen {
+				t.Fatalf("path loss = %+v, want open ports %q", got.pathLoss, tc.wantOpen)
+			}
+		})
+	}
+}
+
 func TestPortSenderPreferenceByProviderThenCountry(t *testing.T) {
 	target := store.NodeRow{Provider: "provider-a", CountryCode: "TR"}
 	ordered := udpPortSenderOrder(target, []store.NodeRow{

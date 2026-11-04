@@ -269,6 +269,18 @@ const activeAlerts: Alert[] = [
     params: { node: "minsk1", target: "nl1", target_id: "nod_nl1", ports: "2053, 2083", sent: "300", got: "236", other: "de1", other_got: "299", region: "cis", other_region: "other", checked_unix: String(NOW - 9 * 60) },
     firstSeenUnix: NOW - 2 * h,
   }),
+  // a filter on the way, not a lossy line: from de1 only 443 gets through to fi1, the other ports get nothing, msk1 gets everything
+  alert({
+    id: "a10",
+    kind: AlertKind.PATH_LOSSY,
+    nodeId: "nod_de1",
+    nodeName: "de1",
+    subject: "nod_fi1",
+    titleKey: "health.alert.path_lossy.title",
+    whyKey: "health.alert.path_lossy.why.filtered",
+    params: { node: "de1", target: "fi1", target_id: "nod_fi1", ports: "2053, 8443", open: "443", sent: "300", got: "0", other: "msk1", other_got: "300", region: "other", other_region: "cis", checked_unix: String(NOW - 12 * 60) },
+    firstSeenUnix: NOW - 5 * h,
+  }),
   // ... and a port both senders lost packets to: the node's own port
   alert({
     id: "a9",
@@ -380,6 +392,12 @@ function Alerts() {
       {flow.modal}
     </>
   );
+}
+
+/** The two path_lossy alerts alone, as the Alerts tab shows them: a lossy line and a filter. */
+function PathAlerts() {
+  const flow = useFixFlow();
+  return <AlertsTab active={activeAlerts.filter((a) => a.kind === AlertKind.PATH_LOSSY)} history={[]} now={NOW} flow={flow} />;
 }
 
 function People({ active = [...peopleAlerts, ...activeAlerts] }: { active?: Alert[] }) {
@@ -577,6 +595,12 @@ export function HealthWarpKit() {
       <Shot id="alerts" title="Alerts: the cause and the next step, restart by name, mute ▾, accept (the alerts about people are in the list but not shown: they are under People)">
         <Mock fill={() => {}}>
           <Alerts />
+        </Mock>
+      </Shot>
+
+      <Shot id="path" title="UDP path alerts: a lossy line (21 % on every port from minsk1) / a filter (from de1 only 443 reaches fi1, the rest gets nothing)">
+        <Mock fill={() => {}}>
+          <PathAlerts />
         </Mock>
       </Shot>
 

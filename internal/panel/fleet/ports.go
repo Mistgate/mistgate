@@ -623,8 +623,9 @@ func combinePortCheckRuns(first, second portCheckOutcome, targetID string, check
 	combined := portCheckOutcome{checks: append([]store.PortCheck(nil), first.checks...), sender: first.sender,
 		combined: true, checked: []string{first.sender, second.sender}}
 	type groupedLoss struct {
-		loss  store.UDPPathLoss
-		ports []uint16
+		loss    store.UDPPathLoss
+		ports   []uint16
+		dropped bool // every lost port got nothing (at most 1 %) through: a filter, when other ports arrived whole
 	}
 	losses := map[string]*groupedLoss{}
 	for i := range combined.checks {
@@ -652,10 +653,11 @@ func combinePortCheckRuns(first, second portCheckOutcome, targetID string, check
 			group := losses[bad.Sender]
 			if group == nil {
 				group = &groupedLoss{loss: store.UDPPathLoss{SenderID: bad.Sender, TargetID: targetID,
-					OtherSenderID: good.Sender, CheckedAt: checkedAt}}
+					OtherSenderID: good.Sender, CheckedAt: checkedAt}, dropped: true}
 				losses[bad.Sender] = group
 			}
 			group.ports = append(group.ports, check.Port)
+			group.dropped = group.dropped && uint64(bad.Got)*100 <= uint64(bad.Sent)
 			if len(group.ports) == 1 || uint64(bad.Got)*uint64(group.loss.Sent) < uint64(group.loss.Got)*uint64(bad.Sent) {
 				group.loss.Sent, group.loss.Got, group.loss.OtherGot = bad.Sent, bad.Got, good.Got
 			}
@@ -664,13 +666,23 @@ func combinePortCheckRuns(first, second portCheckOutcome, targetID string, check
 			check.Verdict = "ok"
 		}
 	}
-	for _, group := range losses {
-		slices.Sort(group.ports)
-		values := make([]string, len(group.ports))
-		for i, port := range group.ports {
-			values[i] = strconv.Itoa(int(port))
+	for sender, group := range losses {
+		group.loss.Ports = portList(group.ports)
+		if group.dropped {
+			// The same sender got other ports through whole: something on the way lets some ports in and drops the
+			// rest outright (a hoster's DDoS filter that admits only UDP 443 from some networks), not a lossy line.
+			var open []uint16
+			for _, check := range combined.checks {
+				verdict := check.SenderVerdict
+				if sender != first.sender {
+					verdict = check.ConfirmVerdict
+				}
+				if check.ConfirmSender != "" && verdict != "" && !udpPortBad(verdict) {
+					open = append(open, check.Port)
+				}
+			}
+			group.loss.OpenPorts = portList(open)
 		}
-		group.loss.Ports = strings.Join(values, ", ")
 		combined.pathLoss = append(combined.pathLoss, group.loss)
 	}
 	sort.Slice(combined.pathLoss, func(i, j int) bool { return combined.pathLoss[i].SenderID < combined.pathLoss[j].SenderID })
@@ -678,6 +690,16 @@ func combinePortCheckRuns(first, second portCheckOutcome, targetID string, check
 }
 
 func udpPortBad(verdict string) bool { return verdict == "lossy" || verdict == "broken" }
+
+// portList is "443, 2053, 14491": the ports sorted, as the alert and the event show them.
+func portList(ports []uint16) string {
+	slices.Sort(ports)
+	values := make([]string, len(ports))
+	for i, port := range ports {
+		values[i] = strconv.Itoa(int(port))
+	}
+	return strings.Join(values, ", ")
+}
 
 func betterUDPVerdict(a, b string) string {
 	if a == "lossy" || b == "lossy" {
@@ -913,6 +935,9 @@ func (f *Fleet) pathLossyEvents(ctx context.Context, target store.NodeRow, losse
 			"sent": strconv.Itoa(int(loss.Sent)), "got": strconv.Itoa(int(loss.Got)),
 			"other": otherName, "other_got": strconv.Itoa(int(loss.OtherGot)),
 			"region": udpRegion(senderCountry), "other_region": udpRegion(otherCountry),
+		}
+		if loss.OpenPorts != "" { // a filter on the path: these ports arrived whole, the lost ones not at all
+			params["open"] = loss.OpenPorts
 		}
 		if err := f.st.InsertEvent(ctx, store.EventRow{Time: loss.CheckedAt, Severity: 2, Code: "path_lossy", Source: "panel",
 			NodeID: loss.SenderID, Params: params}); err != nil {

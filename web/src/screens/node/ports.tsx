@@ -13,7 +13,7 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
-import { bestDelivered, lossPct, portRuns, reasonShort, reasonText, regionWord, renewalOf, renewalText, senderLabel, udpRegion, type PortRun } from "@/lib/port-check";
+import { bestDelivered, lossPct, portRuns, reasonShort, reasonText, regionWord, renewalOf, renewalText, senderLabel, udpFilters, udpRegion, type PortRun } from "@/lib/port-check";
 import { plain, type Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
@@ -131,6 +131,9 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
   // a loss on the way names the region of the sender that lost the packets: its country is in the fleet list
   const fleet = useQuery({ ...nodesQuery, enabled: rows.some((c) => c.blame === "path") }).data?.nodes;
   const regionOf = (sender: string) => udpRegion(fleet?.find((n) => n.name === sender)?.countryCode ?? "");
+  // a sender whose way here lets some ports through whole and drops the rest: a filter (a hoster's DDoS protection), not this node
+  const filters = udpFilters(rows);
+  const filtered = new Set(filters.map((f) => f.sender));
 
   const result = run.data;
   // a run whose TCP part could not probe anything stores nothing, so its reason would otherwise go unsaid
@@ -174,13 +177,13 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
                 <StatusPill kind={pill.kind} label={pill.label} sm />
                 {/* two runs need about one "from X n/m · from Y n/m": in a narrow block they take a line of their own */}
                 <span className={cx("min-w-[160px] flex-1 text-xs leading-snug text-muted", runs && "@max-md:basis-full")}>
-                  {runs && <Runs runs={runs} />}
+                  {runs && <Runs runs={runs} filtered={filtered} />}
                   {runs && detail && " · "}
                   {/* beside the runs, the age is one unbroken piece too: the line wraps only at a " · " */}
                   {runs ? <span className="whitespace-nowrap">{detail}</span> : detail}
                   {/* a port that lost packets once and is clean now is still avoided for 30 days: say when */}
                   {c.verdict === "ok" && c.badUnix > 0 && <span className="block text-warn-text">{t("ports.row.cleanNow", { when: fmt.ago(c.badUnix) })}</span>}
-                  {runs && <Blame blame={c.blame} runs={runs} kind={pill.kind} regionOf={regionOf} />}
+                  {runs && <Blame blame={c.blame} runs={runs} kind={pill.kind} regionOf={regionOf} filtered={filtered} />}
                 </span>
                 <span className="min-w-0 text-xs break-words">
                   {profiles.length > 0 ? (
@@ -194,6 +197,13 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
               </li>
             );
           })}
+          {/* under the UDP rows it explains: checks from that sender cannot pass, the node is fine */}
+          {filters.map((f) => (
+            <li key={f.sender} data-testid="udp-filter" className="flex items-start gap-2 pb-2.5 text-xs leading-snug text-pretty text-muted">
+              <Icon name="shield" size={13} aria-hidden className="tone-warn tone-text mt-px flex-none" />
+              {t("ports.filter", { sender: senderLabel(t, f.sender), open: f.open.join(", "), node: node.name })}
+            </li>
+          ))}
           {tcp.map((c) => (
             <TcpRow key={c.port} c={c} />
           ))}
@@ -204,33 +214,41 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
   );
 }
 
-/** Both runs of a port checked from two senders, "from minsk1 236/300 · from de1 299/300": the one that lost packets in its tone. */
-function Runs({ runs }: { runs: readonly PortRun[] }) {
+/**
+ * Both runs of a port checked from two senders, "from minsk1 236/300 · from de1 299/300": the one that lost packets in its tone.
+ * A sender behind a filter (`filtered`) is amber even where it got nothing: its way is filtered, the port is not broken.
+ */
+function Runs({ runs, filtered }: { runs: readonly PortRun[]; filtered: ReadonlySet<string> }) {
   const t = useT();
   return (
     <>
-      {runs.map((r, i) => (
-        <Fragment key={i}>
-          {i > 0 && " · "}
-          <span className={cx("whitespace-nowrap", r.loss && kindTextClass[r.loss], r.loss && "font-semibold")}>{t("ports.row.run", { sender: senderLabel(t, r.sender), count: `${r.got}/${r.sent}` })}</span>
-        </Fragment>
-      ))}
+      {runs.map((r, i) => {
+        const loss = r.loss && filtered.has(r.sender) ? "warn" : r.loss;
+        return (
+          <Fragment key={i}>
+            {i > 0 && " · "}
+            <span className={cx("whitespace-nowrap", loss && kindTextClass[loss], loss && "font-semibold")}>{t("ports.row.run", { sender: senderLabel(t, r.sender), count: `${r.got}/${r.sent}` })}</span>
+          </Fragment>
+        );
+      })}
     </>
   );
 }
 
 /**
  * Whose the loss is, as a verdict line under the runs: "path" (one sender lost, the other got through) clears the port and
- * names the sender and its region; "node" (both lost) puts it on the port. Nothing when both runs were clean.
+ * names the sender and its region, or says its way is filtered; "node" (both lost) puts it on the port. Nothing when both
+ * runs were clean.
  */
-function Blame({ blame, runs, kind, regionOf }: { blame: string; runs: readonly PortRun[]; kind: StatusKind; regionOf: (sender: string) => string }) {
+function Blame({ blame, runs, kind, regionOf, filtered }: { blame: string; runs: readonly PortRun[]; kind: StatusKind; regionOf: (sender: string) => string; filtered: ReadonlySet<string> }) {
   const t = useT();
   let line: { kind: StatusKind; text: string } | null = null;
   if (blame === "path") {
     const lossy = runs.find((r) => r.loss) ?? runs[0]!;
     const sender = senderLabel(t, lossy.sender);
     const region = regionWord(t, regionOf(lossy.sender));
-    line = { kind: "ok", text: region ? t("ports.blame.path", { sender, region }) : t("ports.blame.pathPlain", { sender }) };
+    const text = filtered.has(lossy.sender) ? t("ports.blame.filtered", { sender }) : region ? t("ports.blame.path", { sender, region }) : t("ports.blame.pathPlain", { sender });
+    line = { kind: "ok", text };
   } else if (blame === "node") line = { kind, text: t("ports.blame.node") };
   if (!line) return null;
   return (

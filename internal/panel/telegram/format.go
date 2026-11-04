@@ -545,6 +545,19 @@ func pathLossReason(l L, p map[string]string) string {
 		percent = strconv.FormatUint(((sent-got)*100+sent/2)/sent, 10)
 	}
 	arrived := data(p["other_got"], 6) + "/" + data(p["sent"], 6)
+	if open := data(p["open"], 100); open != "" {
+		// A filter, not a lossy line: some ports arrive whole, the rest not at all (health.alert.path_lossy.why.filtered).
+		return l.pick("UDP from "+sender+" ("+region+") reaches "+target+" only on "+open+"; ports "+ports+" get nothing, "+
+			"while from "+other+" ("+otherRegion+") everything arrives. A filter on the way, often the hoster's DDoS protection against "+
+			"data-centre traffic: "+target+" itself is fine and people on home networks usually connect, but port checks (and a relay) from "+
+			sender+" cannot pass.",
+			"UDP от "+sender+" ("+region+") доходит до "+target+" только на "+open+"; на порты "+ports+" — ничего, "+
+				"а от "+other+" ("+otherRegion+") доходит всё. Это фильтр по пути, часто защита хостера от DDoS из датацентров: сам "+
+				target+" в порядке и люди из домашних сетей обычно подключаются, но проверки портов (и ретрансляция) от "+sender+" не пройдут.",
+			"从"+sender+"（"+region+"）到"+target+"的 UDP 只在 "+open+" 上能到达；端口 "+ports+" 完全收不到，"+
+				"而从"+other+"（"+otherRegion+"）全部到达。这是路径上的过滤，常见于服务商针对数据中心流量的 DDoS 防护："+target+
+				"本身正常，家庭网络的用户通常能连接，但来自"+sender+"的端口检测（以及中转）无法通过。")
+	}
 	return l.pick("UDP from "+sender+" ("+region+") to "+target+" loses "+percent+"% on ports "+ports+
 		"; from "+other+" ("+otherRegion+") it arrives "+arrived+". The loss is on the way from "+sender+", not on "+target+".",
 		"UDP от "+sender+" ("+region+") к "+target+" теряет "+percent+"% пакетов на портах "+ports+

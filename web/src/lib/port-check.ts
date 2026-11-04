@@ -40,6 +40,36 @@ export function portRuns(c: Confirmable): [PortRun, PortRun] | null {
   ];
 }
 
+type Checked = Confirmable & { port: number; blame: string };
+
+/**
+ * The senders whose way to this node is filtered rather than lossy, as the panel tells them apart (combinePortCheckRuns in
+ * internal/panel/fleet/ports.go): every port the sender lost while the other sender got through (blame "path") got at most
+ * 1 % of its packets, and other ports arrived whole from that same sender. Typically a hoster's DDoS filter that admits only
+ * UDP 443 from data-centre networks: the node is fine, port checks from that sender cannot pass. `open` is sorted.
+ */
+export function udpFilters(checks: readonly Checked[]): { sender: string; open: number[] }[] {
+  const by = new Map<string, { lost: boolean; dropped: boolean; open: number[] }>();
+  for (const c of checks) {
+    if (!c.confirmSender) continue;
+    const runs = [
+      { sender: c.sender, verdict: c.senderVerdict || c.verdict, sent: c.sent, got: c.got },
+      { sender: c.confirmSender, verdict: c.confirmVerdict, sent: c.confirmSent, got: c.confirmGot },
+    ];
+    for (const r of runs) {
+      if (!r.verdict) continue;
+      const s = by.get(r.sender) ?? { lost: false, dropped: true, open: [] };
+      by.set(r.sender, s);
+      if (!lossOf(r.verdict)) s.open.push(c.port);
+      else if (c.blame === "path") {
+        s.lost = true;
+        s.dropped &&= r.got * 100 <= r.sent;
+      }
+    }
+  }
+  return [...by].filter(([, s]) => s.lost && s.dropped && s.open.length > 0).map(([sender, s]) => ({ sender, open: s.open.sort((a, b) => a - b) }));
+}
+
 /**
  * The values of a port_lossy refusal, warning or event ({port, node, sent, got, at, sender}) plus the words the sentences
  * need: {lost} (percent), {sender} ("the panel" or a node name) and {when} ("5 min ago").

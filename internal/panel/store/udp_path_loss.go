@@ -17,6 +17,9 @@ type UDPPathLoss struct {
 	TargetName                string
 	OtherSenderName           string
 	OtherSenderCountry        string
+	// OpenPorts are the ports the sender delivered whole in the same run, set only when it got nothing at all through on
+	// the lost ones: a filter on the path (a hoster letting only UDP 443 in, say), not a lossy line.
+	OpenPorts string
 }
 
 // UpdateUDPPathLosses replaces the result for senders in a completed two-node check of targetID. Senders present in
@@ -59,18 +62,18 @@ func udpPathLossStatements(targetID string, checkedSenders []string, losses []UD
 		Args: []any{targetID, jsonStrings(checkedSenders), jsonStrings(blamed)}}}
 	if len(losses) > 0 {
 		values := make([]string, 0, len(losses))
-		args := make([]any, 0, len(losses)*8)
+		args := make([]any, 0, len(losses)*9)
 		for _, loss := range losses {
 			if loss.SenderID == "" || loss.TargetID != targetID || loss.OtherSenderID == "" {
 				continue
 			}
-			values = append(values, "(?, ?, ?, ?, ?, ?, ?, ?)")
+			values = append(values, "(?, ?, ?, ?, ?, ?, ?, ?, ?)")
 			args = append(args, loss.SenderID, loss.TargetID, loss.Ports, int64(loss.Sent), int64(loss.Got),
-				loss.OtherSenderID, int64(loss.OtherGot), unix(loss.CheckedAt))
+				loss.OtherSenderID, int64(loss.OtherGot), unix(loss.CheckedAt), loss.OpenPorts)
 		}
 		if len(values) > 0 {
 			statements = append(statements, Stmt{Query: `INSERT INTO udp_path_loss
-				(sender_id, target_id, ports, sent, got, other_sender_id, other_got, checked_at)
+				(sender_id, target_id, ports, sent, got, other_sender_id, other_got, checked_at, open_ports)
 				VALUES ` + strings.Join(values, ", ") + `
 				ON CONFLICT(sender_id, target_id) DO UPDATE SET
 					ports = excluded.ports,
@@ -78,7 +81,8 @@ func udpPathLossStatements(targetID string, checkedSenders []string, losses []UD
 					got = excluded.got,
 					other_sender_id = excluded.other_sender_id,
 					other_got = excluded.other_got,
-					checked_at = excluded.checked_at`, Args: args})
+					checked_at = excluded.checked_at,
+					open_ports = excluded.open_ports`, Args: args})
 		}
 	}
 	return statements
@@ -87,7 +91,7 @@ func udpPathLossStatements(targetID string, checkedSenders []string, losses []UD
 // UDPPathLosses reads path-loss rows newer than since, with node names and countries for alerts and events.
 func (s *Store) UDPPathLosses(ctx context.Context, since time.Time) ([]UDPPathLoss, error) {
 	rows, err := s.R.QueryContext(ctx, `SELECT p.sender_id, p.target_id, p.ports, p.sent, p.got, p.other_sender_id,
-		p.other_got, p.checked_at, sender.name, sender.country_code, target.name, other.name, other.country_code
+		p.other_got, p.checked_at, p.open_ports, sender.name, sender.country_code, target.name, other.name, other.country_code
 		FROM udp_path_loss p
 		JOIN node sender ON sender.id = p.sender_id
 		JOIN node target ON target.id = p.target_id
@@ -102,7 +106,7 @@ func (s *Store) UDPPathLosses(ctx context.Context, since time.Time) ([]UDPPathLo
 		var loss UDPPathLoss
 		var sent, got, otherGot, checkedAt int64
 		if err := rows.Scan(&loss.SenderID, &loss.TargetID, &loss.Ports, &sent, &got, &loss.OtherSenderID,
-			&otherGot, &checkedAt, &loss.SenderName, &loss.SenderCountry, &loss.TargetName, &loss.OtherSenderName,
+			&otherGot, &checkedAt, &loss.OpenPorts, &loss.SenderName, &loss.SenderCountry, &loss.TargetName, &loss.OtherSenderName,
 			&loss.OtherSenderCountry); err != nil {
 			return nil, err
 		}

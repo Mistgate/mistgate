@@ -98,6 +98,10 @@ export const en = {
   "hl.alerts.col.lost": "Lost",
   "hl.alerts.col.from": "Checked from",
   "hl.alerts.col.arrived": "Arrived",
+  // a filtered path (path_lossy with {open}): the fact by the title, then the senders' Arrived cells
+  "hl.alerts.fact.filtered": "only {open} gets through",
+  "hl.alerts.path.only": "only {open}",
+  "hl.alerts.path.all": "everything",
   "hl.alerts.mutedSection": "Muted · {n}",
   "hl.alerts.until": "until {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} alert muted until {time}|{node}: {n} alerts muted until {time}",
@@ -338,6 +342,10 @@ export const en = {
   "health.alert.path_lossy.title": "Loses UDP on the way to {target}",
   "health.alert.path_lossy.why":
     "UDP from {node} ({region}) to {target} loses {lost} % on ports {ports}, while {arrived} arrive from {other} ({other_region}). The loss is on the way from {node}, not on {target}: its ports are fine. Port checks send from other nodes first for a day; the alert closes 30 hours after the last check that saw the loss.",
+  // a filter, not a lossy line ({open}: the ports that got through whole; the lost ones got nothing): {target} itself is fine
+  "health.alert.path_lossy.title.filtered": "UDP filtered on the way to {target}",
+  "health.alert.path_lossy.why.filtered":
+    "UDP from {node} ({region}) reaches {target} only on {open}; ports {ports} get nothing, while from {other} ({other_region}) everything arrives. This is a filter on the way, often the hoster’s DDoS protection against data-centre traffic: {target} itself is fine and people on home networks usually connect, but port checks (and a relay) from {node} cannot pass.",
   "health.alert.torrent.title": "Torrent attempts",
   "health.alert.torrent.why":
     "{user_name} is trying to use torrents on {nodes}: {attempts} in a day, blocked.{proof} It closes after a day without attempts.",
@@ -678,6 +686,9 @@ export const ru: typeof en = {
   "hl.alerts.col.lost": "Потери",
   "hl.alerts.col.from": "Проверка с",
   "hl.alerts.col.arrived": "Дошло",
+  "hl.alerts.fact.filtered": "доходит только {open}",
+  "hl.alerts.path.only": "только {open}",
+  "hl.alerts.path.all": "всё",
   "hl.alerts.mutedSection": "Заглушены · {n}",
   "hl.alerts.until": "до {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} алерт заглушён до {time}|{node}: {n} алерта заглушены до {time}|{node}: {n} алертов заглушены до {time}",
@@ -912,6 +923,9 @@ export const ru: typeof en = {
   "health.alert.path_lossy.title": "Теряет UDP по пути к {target}",
   "health.alert.path_lossy.why":
     "UDP от {node} ({region}) до {target} теряет {lost} % на портах {ports}, а с {other} ({other_region}) доходит {arrived}. Потери на пути от {node}, а не на {target}: его порты в порядке. Сутки проверки портов шлют сначала с других нод; алерт закроется через 30 часов после последней проверки, которая видела потери.",
+  "health.alert.path_lossy.title.filtered": "Фильтр UDP по пути к {target}",
+  "health.alert.path_lossy.why.filtered":
+    "От {node} ({region}) UDP доходит до {target} только на {open}; на порты {ports} — ничего, а с {other} ({other_region}) доходит всё. Это фильтр по пути, часто защита хостера от DDoS из датацентров: сама {target} в порядке, люди из домашних сетей обычно подключаются, но проверки портов (и ретрансляция) с {node} проходить не будут.",
   "health.alert.torrent.title": "Попытки качать торренты",
   "health.alert.torrent.why":
     "{user_name} пытается качать торренты на {nodes}: {attempts} за сутки, торренты заблокированы.{proof} Алерт закроется после суток без попыток.",
@@ -1244,6 +1258,9 @@ export const zh: typeof en = {
   "hl.alerts.col.lost": "丢包",
   "hl.alerts.col.from": "检测来源",
   "hl.alerts.col.arrived": "到达",
+  "hl.alerts.fact.filtered": "仅 {open} 可达",
+  "hl.alerts.path.only": "仅 {open}",
+  "hl.alerts.path.all": "全部",
   "hl.alerts.mutedSection": "已静默 · {n}",
   "hl.alerts.until": "至 {time}",
   "hl.alerts.mutedToastMany": "{node}：{n} 条告警已静默至 {time}",
@@ -1447,6 +1464,9 @@ export const zh: typeof en = {
   "health.alert.port_lossy.why.confirmed": "发往「{profile}」端口 {port} 的测试包两边都丢失：来自 {sender} 丢失 {lost}%，来自 {confirm_sender} 丢失 {confirm_lost}%，说明是此节点的端口在丢包。该协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；重新检测无丢包后，告警会关闭。",
   "health.alert.path_lossy.title": "发往 {target} 的 UDP 在途中丢失",
   "health.alert.path_lossy.why": "从 {node}（{region}）发往 {target} 的 UDP 在端口 {ports} 上丢失 {lost}%，而来自 {other}（{other_region}）的到达 {arrived}。丢包发生在从 {node} 出发的路上，不在 {target} 上：它的端口正常。一天内端口检测会优先从其他节点发送；最后一次发现丢包的检测过去 30 小时后，告警会关闭。",
+  "health.alert.path_lossy.title.filtered": "发往 {target} 的 UDP 在途中被过滤",
+  "health.alert.path_lossy.why.filtered":
+    "从 {node}（{region}）发往 {target} 的 UDP 只有 {open} 能到达；端口 {ports} 完全收不到，而来自 {other}（{other_region}）的全部到达。这是路径上的过滤，常见于服务商针对数据中心流量的 DDoS 防护：{target} 本身正常，家庭网络的用户通常能连接，但来自 {node} 的端口检测（以及中转）无法通过。",
   "health.alert.torrent.title": "BT 下载尝试",
   "health.alert.torrent.why": "{user_name} 正在 {nodes} 上尝试使用 BT 下载：一天内 {attempts}，均已被拦截。{proof}满一天没有新的尝试后，告警会关闭。",
   "health.alert.device_limit.title": "有应用因设备数上限被拒绝",
@@ -1751,6 +1771,9 @@ export const fa: typeof en = {
   "hl.alerts.col.lost": "گم‌شده",
   "hl.alerts.col.from": "بررسی از",
   "hl.alerts.col.arrived": "رسیده",
+  "hl.alerts.fact.filtered": "فقط {open} می‌رسد",
+  "hl.alerts.path.only": "فقط {open}",
+  "hl.alerts.path.all": "همه",
   "hl.alerts.mutedSection": "بی‌صدا شده · {n}",
   "hl.alerts.until": "تا {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} هشدار تا {time} بی‌صدا شد",
@@ -1946,6 +1969,9 @@ export const fa: typeof en = {
   "health.alert.port_lossy.why.confirmed": "بسته‌های آزمایشی به پورت {port} پروفایل «{profile}» از هر دو طرف گم شدند: {lost}% از {sender} و {confirm_lost}% از {confirm_sender}، پس پورت همین نود آن‌ها را گم می‌کند. ممکن است کلاینت‌های این پروفایل کند شوند یا اتصالشان قطع شود. پروفایل را به پورت دیگری ببر؛ هشدار وقتی بسته می‌شود که بررسی دوباره تمیز باشد.",
   "health.alert.path_lossy.title": "UDP در مسیر به {target} گم می‌شود",
   "health.alert.path_lossy.why": "UDP از {node} ({region}) به {target} روی پورت‌های {ports}، {lost}% گم می‌شود، در حالی که از {other} ({other_region}) {arrived} می‌رسد. گم شدن در مسیر از {node} است، نه روی {target}: پورت‌هایش سالم‌اند. تا یک روز بررسی پورت‌ها اول از نودهای دیگر فرستاده می‌شود؛ هشدار 30 ساعت پس از آخرین بررسی‌ای که گم شدن را دید بسته می‌شود.",
+  "health.alert.path_lossy.title.filtered": "UDP در مسیر به {target} فیلتر می‌شود",
+  "health.alert.path_lossy.why.filtered":
+    "UDP از {node} ({region}) فقط روی {open} به {target} می‌رسد؛ به پورت‌های {ports} هیچ چیز نمی‌رسد، در حالی که از {other} ({other_region}) همه چیز می‌رسد. این فیلتری در مسیر است، اغلب محافظت سرویس‌دهنده در برابر DDoS از دیتاسنترها: خود {target} سالم است و کاربران شبکه‌های خانگی معمولاً وصل می‌شوند، اما بررسی پورت‌ها (و رله) از {node} رد نمی‌شود.",
   "health.alert.torrent.title": "تلاش برای تورنت",
   "health.alert.torrent.why": "{user_name} روی {nodes} می‌خواهد تورنت دانلود کند: {attempts} در یک روز، مسدود شد.{proof} هشدار بعد از یک روز بدون تلاش بسته می‌شود.",
   "health.alert.device_limit.title": "برنامه‌ای به‌خاطر سقف دستگاه رد شد",
@@ -2240,6 +2266,9 @@ export const tr: typeof en = {
   "hl.alerts.col.lost": "Kayıp",
   "hl.alerts.col.from": "Kontrol yeri",
   "hl.alerts.col.arrived": "Ulaşan",
+  "hl.alerts.fact.filtered": "yalnızca {open} ulaşıyor",
+  "hl.alerts.path.only": "yalnızca {open}",
+  "hl.alerts.path.all": "hepsi",
   "hl.alerts.mutedSection": "Sessize alınanlar · {n}",
   "hl.alerts.until": "bitiş: {time}",
   "hl.alerts.mutedToastMany": "{node}: {n} uyarı sessize alındı, bitiş: {time}",
@@ -2435,6 +2464,9 @@ export const tr: typeof en = {
   "health.alert.port_lossy.why.confirmed": "“{profile}” profilinin {port} portuna giden test paketleri iki taraftan da kayboldu: {sender} tarafından %{lost}, {confirm_sender} tarafından %{confirm_lost}; yani paketleri bu düğümün portu kaybediyor. Bu profilin istemcilerinde yavaşlama ya da kopma olabilir. Profili başka bir porta taşı; yeniden kontrol temiz çıkınca uyarı kapanır.",
   "health.alert.path_lossy.title": "{target} düğümüne giden UDP yolda kayboluyor",
   "health.alert.path_lossy.why": "{node} ({region}) düğümünden {target} düğümüne giden UDP, {ports} portlarında %{lost} kaybediyor; oysa {other} ({other_region}) tarafından gönderilenlerden {arrived} ulaşıyor. Kayıp {node} çıkışlı yolda, {target} düğümünde değil: portları sağlam. Port kontrolleri bir gün boyunca önce diğer düğümlerden gönderilir; uyarı, kaybı gören son kontrolden 30 saat sonra kapanır.",
+  "health.alert.path_lossy.title.filtered": "{target} düğümüne giden UDP yolda filtreleniyor",
+  "health.alert.path_lossy.why.filtered":
+    "{node} ({region}) düğümünden gelen UDP, {target} düğümüne yalnızca {open} üzerinden ulaşıyor; {ports} portlarına hiçbir şey ulaşmıyor, oysa {other} ({other_region}) tarafından gönderilenlerin hepsi ulaşıyor. Bu, yoldaki bir filtre; çoğu zaman sağlayıcının veri merkezi trafiğine karşı DDoS koruması: {target} düğümünün kendisi sağlam ve ev ağlarındaki kişiler genellikle bağlanır, ancak {node} düğümünden port kontrolleri (ve aktarıcı) geçemez.",
   "health.alert.torrent.title": "Torrent denemeleri",
   "health.alert.torrent.why": "{user_name}, {nodes} üzerinde torrent kullanmaya çalışıyor: bir günde {attempts}, engellendi.{proof} Bir gün boyunca deneme olmazsa uyarı kapanır.",
   "health.alert.device_limit.title": "Bir uygulama cihaz sınırında geri çevrildi",

@@ -87,6 +87,12 @@ const blameChecks = [
   twice({ port: 8443, got: 300, confirmGot: 262, confirmVerdict: "lossy", blame: "path" }),
 ];
 
+// a filter on the way to fi1, not a lossy line: from de1 only 443 arrives whole, 2053 and 8443 get nothing; msk1 (CIS) gets all
+const msk1 = { id: "nod_msk1", name: "msk1", status: NodeStatus.ONLINE, countryCode: "RU", address: "msk1.example.com", protocols: [], awgBackend: "auto" };
+const fromDe1 = (over: object) => check({ nodeId: "nod_fi1", sender: "de1", senderVerdict: "ok", confirmSender: "msk1", confirmSent: 300, confirmGot: 300, confirmVerdict: "ok", blame: "", ...over });
+const filterChecks = [fromDe1({}), fromDe1({ port: 2053, got: 0, senderVerdict: "broken", blame: "path" }), fromDe1({ port: 8443, got: 0, senderVerdict: "broken", blame: "path" })];
+const filterNode = baseNode({ id: "nod_fi1", name: "fi1", countryCode: "FI", location: "Helsinki", address: "fi1.example.com" });
+
 const twoInbounds = [inbound({}), inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp" })];
 const threeInbounds = [...twoInbounds, inbound({ id: "inb_3", profileId: "prf_awg", profileName: "AWG 3.1 · QUIC", protocol: "awg", port: 33183, tlsServerName: "", certNotAfterUnix: 0 }), inbound({ id: "inb_4", profileId: "prf_ext", profileName: "Backup", port: 51820 })];
 
@@ -106,9 +112,9 @@ function Cache({ fill = [], role = Role.OWNER, children }: { fill?: Fill[]; role
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-function Demo({ title, children }: { title: string; children: ReactNode }) {
+function Demo({ title, shot, children }: { title: string; shot?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3">
+    <section data-shot={shot} className="flex flex-col gap-3">
       <SectionLabel>{title}</SectionLabel>
       <div className="rounded-card-lg border border-dashed border-line p-4">{children}</div>
     </section>
@@ -299,6 +305,12 @@ export function PortsKit() {
       <Demo title="UDP ports checked from two senders: clean from both / lost on the way from minsk1 (CIS), the port is fine / lost from both sides, the port loses / lost on the way from fi1">
         <Cache fill={[[nodesQuery.queryKey, { nodes: [...kitNodes, minsk1] }]]}>
           <Ports data={{ node: baseNode(), inbounds: blameInbounds, portChecks: blameChecks, tcpChecks: tcpOk } as never} />
+        </Cache>
+      </Demo>
+
+      <Demo shot="ports-filter" title="UDP ports of fi1 filtered on the way from de1: only 443 arrives whole, 2053 and 8443 get nothing, msk1 (CIS) gets everything; the ports are fine">
+        <Cache fill={[[nodesQuery.queryKey, { nodes: [...kitNodes, msk1] }]]}>
+          <Ports data={{ node: filterNode, inbounds: blameInbounds.filter((i) => i.port !== 2083), portChecks: filterChecks, tcpChecks: tcpOk } as never} />
         </Cache>
       </Demo>
 
