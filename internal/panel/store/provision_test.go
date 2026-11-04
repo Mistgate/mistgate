@@ -5,9 +5,56 @@ package store
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
+
+func TestPanelSSHKeyConcurrentCreateHasOneWinner(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	key := PanelSSHKey{PrivateKey: []byte("sealed-key"), PublicKey: "ssh-ed25519 AAAA test", Fingerprint: "SHA256:fp", CreatedAt: time.Unix(1_800_000_000, 0)}
+	start := make(chan struct{})
+	created := make(chan bool, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			won, err := st.CreatePanelSSHKeyIfAbsent(ctx, key)
+			created <- won
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(created)
+	close(errs)
+	winners := 0
+	for won := range created {
+		if won {
+			winners++
+		}
+	}
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if winners != 1 {
+		t.Fatalf("concurrent inserts had %d winners, want 1", winners)
+	}
+	got, err := st.PanelSSHKey(ctx)
+	if err != nil || string(got.PrivateKey) != string(key.PrivateKey) || got.PublicKey != key.PublicKey || got.Fingerprint != key.Fingerprint {
+		t.Fatalf("stored panel key = %+v, err %v", got, err)
+	}
+	var count int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM panel_ssh_key`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("panel_ssh_key rows = %d, err %v", count, err)
+	}
+}
 
 func TestNodeProvisionJobRecoversAndKeepsEventsRedacted(t *testing.T) {
 	st := openTemp(t)
@@ -256,7 +303,7 @@ func TestCompleteProvisionRetainsAccessAndPasswordRotationIsRecoverable(t *testi
 	if err != nil || string(loaded.Password) != "encrypted-old" || string(loaded.PendingPassword) != "encrypted-new" || !loaded.PasswordGenerated {
 		t.Fatalf("pending access = %+v, err %v", loaded, err)
 	}
-	if err := st.CommitPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new-current"), false, now.Add(3*time.Minute)); err != nil {
+	if err := st.CommitPendingNodeServerPassword(ctx, job.NodeID, []byte("encrypted-new-current"), false, true, now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = st.NodeServerAccess(ctx, job.NodeID)

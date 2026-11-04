@@ -78,10 +78,12 @@ type nodeInstallParams struct {
 func nodeInstallPlanTool() toolDef {
 	const base = "node_install"
 	return toolDef{
-		name: base + "_plan", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure),
+		name: base + "_plan", min: ProfileAdmin, procs: procs(
+			adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure,
+			adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
 		free: true, isPlan: true, danger: true,
-		desc: "Prepare installation of a Mistgate node over SSH. This only reads the public SSH host key. Never ask for or pass the server password: " +
-			"the owner compares the host key fingerprint and enters the password on the approval screen in the admin panel. Tell the user to approve the plan there.",
+		desc: "Prepare installation of a Mistgate node over SSH. This reads the public SSH host key and panel public key. Never ask for or pass a server password: " +
+			"the owner compares the host key fingerprint and chooses Password or Panel key on the approval screen in the admin panel. Tell the user to approve the plan there.",
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in nodeInstallArgs) (*mcp.CallToolResult, any, error) {
@@ -101,8 +103,12 @@ func nodeInstallPlanTool() toolDef {
 					if in.CountryCode != "" && (len(in.CountryCode) != 2 || !allASCIIAlpha(in.CountryCode)) {
 						return nil, nil, errors.New("country_code must be two letters")
 					}
-					// The host-key read is the plan's only call; it runs under the planning grant (a token cannot reach it otherwise).
+					// Both reads run under planning grants; neither sends an SSH login to the target.
 					fingerprint, err := c.cl.Provisioning.GetSSHFingerprint(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetSSHFingerprintRequest{Host: in.Host, Port: in.Port}))
+					if err != nil {
+						return nil, nil, scrubError(apiError(err))
+					}
+					panelKey, err := c.cl.Provisioning.GetPanelSSHKey(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.GetPanelSSHKeyRequest{}))
 					if err != nil {
 						return nil, nil, scrubError(apiError(err))
 					}
@@ -113,13 +119,14 @@ func nodeInstallPlanTool() toolDef {
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
 					}
-					// host_key and host_key_algorithm are what the panel itself read: the owner compares them on the
-					// approval screen and enters the password there (ApproveRequest), never through the agent.
+					// The owner compares host_key and chooses a login method on the approval screen. The public panel key is
+					// safe to show there; no password or private key passes through MCP.
 					planned := &planned{
-						Summary: "Install a new Mistgate agent on one server. The owner confirms the SSH host key and enters the server password on the approval screen; the agent never sees the password.",
+						Summary: "Install a new Mistgate agent on one server. The owner confirms the SSH host key and chooses Password or Panel key on the approval screen; no password passes through MCP or reaches the agent.",
 						Facts: []Fact{{Key: "node", Value: nm(resolved.Name), Untrusted: true}, {Key: "ssh", Value: net.JoinHostPort(resolved.Host, strconv.FormatUint(uint64(resolved.Port), 10)), Untrusted: true},
 							{Key: "username", Value: nm(resolved.Username), Untrusted: true}, {Key: "host_key", Value: resolved.Fingerprint},
 							{Key: "host_key_algorithm", Value: clean(fingerprint.Msg.GetAlgorithm(), 64)},
+							{Key: "panel_ssh_key", Value: panelKey.Msg.GetPublicKey()},
 							{Key: "address", Value: nm(resolved.Address), Untrusted: true}, {Key: "installation", Value: "signed current agent bundle; waits for the new node to connect"}},
 						Danger: []string{dangerStepUp, dangerFleet}, Params: resolved,
 					}

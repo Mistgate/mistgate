@@ -36,6 +36,9 @@ const (
 	// ProvisioningServiceGetSSHFingerprintProcedure is the fully-qualified name of the
 	// ProvisioningService's GetSSHFingerprint RPC.
 	ProvisioningServiceGetSSHFingerprintProcedure = "/mistgate.admin.v1.ProvisioningService/GetSSHFingerprint"
+	// ProvisioningServiceGetPanelSSHKeyProcedure is the fully-qualified name of the
+	// ProvisioningService's GetPanelSSHKey RPC.
+	ProvisioningServiceGetPanelSSHKeyProcedure = "/mistgate.admin.v1.ProvisioningService/GetPanelSSHKey"
 	// ProvisioningServiceCheckSSHProcedure is the fully-qualified name of the ProvisioningService's
 	// CheckSSH RPC.
 	ProvisioningServiceCheckSSHProcedure = "/mistgate.admin.v1.ProvisioningService/CheckSSH"
@@ -71,6 +74,7 @@ const (
 // ProvisioningServiceClient is a client for the mistgate.admin.v1.ProvisioningService service.
 type ProvisioningServiceClient interface {
 	GetSSHFingerprint(context.Context, *connect.Request[v1.GetSSHFingerprintRequest]) (*connect.Response[v1.GetSSHFingerprintResponse], error)
+	GetPanelSSHKey(context.Context, *connect.Request[v1.GetPanelSSHKeyRequest]) (*connect.Response[v1.GetPanelSSHKeyResponse], error)
 	CheckSSH(context.Context, *connect.Request[v1.CheckSSHRequest]) (*connect.Response[v1.CheckSSHResponse], error)
 	StartNodeProvision(context.Context, *connect.Request[v1.StartNodeProvisionRequest]) (*connect.Response[v1.StartNodeProvisionResponse], error)
 	RetryNodeProvision(context.Context, *connect.Request[v1.RetryNodeProvisionRequest]) (*connect.Response[v1.RetryNodeProvisionResponse], error)
@@ -99,6 +103,12 @@ func NewProvisioningServiceClient(httpClient connect.HTTPClient, baseURL string,
 			httpClient,
 			baseURL+ProvisioningServiceGetSSHFingerprintProcedure,
 			connect.WithSchema(provisioningServiceMethods.ByName("GetSSHFingerprint")),
+			connect.WithClientOptions(opts...),
+		),
+		getPanelSSHKey: connect.NewClient[v1.GetPanelSSHKeyRequest, v1.GetPanelSSHKeyResponse](
+			httpClient,
+			baseURL+ProvisioningServiceGetPanelSSHKeyProcedure,
+			connect.WithSchema(provisioningServiceMethods.ByName("GetPanelSSHKey")),
 			connect.WithClientOptions(opts...),
 		),
 		checkSSH: connect.NewClient[v1.CheckSSHRequest, v1.CheckSSHResponse](
@@ -167,6 +177,7 @@ func NewProvisioningServiceClient(httpClient connect.HTTPClient, baseURL string,
 // provisioningServiceClient implements ProvisioningServiceClient.
 type provisioningServiceClient struct {
 	getSSHFingerprint        *connect.Client[v1.GetSSHFingerprintRequest, v1.GetSSHFingerprintResponse]
+	getPanelSSHKey           *connect.Client[v1.GetPanelSSHKeyRequest, v1.GetPanelSSHKeyResponse]
 	checkSSH                 *connect.Client[v1.CheckSSHRequest, v1.CheckSSHResponse]
 	startNodeProvision       *connect.Client[v1.StartNodeProvisionRequest, v1.StartNodeProvisionResponse]
 	retryNodeProvision       *connect.Client[v1.RetryNodeProvisionRequest, v1.RetryNodeProvisionResponse]
@@ -182,6 +193,11 @@ type provisioningServiceClient struct {
 // GetSSHFingerprint calls mistgate.admin.v1.ProvisioningService.GetSSHFingerprint.
 func (c *provisioningServiceClient) GetSSHFingerprint(ctx context.Context, req *connect.Request[v1.GetSSHFingerprintRequest]) (*connect.Response[v1.GetSSHFingerprintResponse], error) {
 	return c.getSSHFingerprint.CallUnary(ctx, req)
+}
+
+// GetPanelSSHKey calls mistgate.admin.v1.ProvisioningService.GetPanelSSHKey.
+func (c *provisioningServiceClient) GetPanelSSHKey(ctx context.Context, req *connect.Request[v1.GetPanelSSHKeyRequest]) (*connect.Response[v1.GetPanelSSHKeyResponse], error) {
+	return c.getPanelSSHKey.CallUnary(ctx, req)
 }
 
 // CheckSSH calls mistgate.admin.v1.ProvisioningService.CheckSSH.
@@ -238,6 +254,7 @@ func (c *provisioningServiceClient) ForgetNodeServerAccess(ctx context.Context, 
 // service.
 type ProvisioningServiceHandler interface {
 	GetSSHFingerprint(context.Context, *connect.Request[v1.GetSSHFingerprintRequest]) (*connect.Response[v1.GetSSHFingerprintResponse], error)
+	GetPanelSSHKey(context.Context, *connect.Request[v1.GetPanelSSHKeyRequest]) (*connect.Response[v1.GetPanelSSHKeyResponse], error)
 	CheckSSH(context.Context, *connect.Request[v1.CheckSSHRequest]) (*connect.Response[v1.CheckSSHResponse], error)
 	StartNodeProvision(context.Context, *connect.Request[v1.StartNodeProvisionRequest]) (*connect.Response[v1.StartNodeProvisionResponse], error)
 	RetryNodeProvision(context.Context, *connect.Request[v1.RetryNodeProvisionRequest]) (*connect.Response[v1.RetryNodeProvisionResponse], error)
@@ -262,6 +279,12 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 		ProvisioningServiceGetSSHFingerprintProcedure,
 		svc.GetSSHFingerprint,
 		connect.WithSchema(provisioningServiceMethods.ByName("GetSSHFingerprint")),
+		connect.WithHandlerOptions(opts...),
+	)
+	provisioningServiceGetPanelSSHKeyHandler := connect.NewUnaryHandler(
+		ProvisioningServiceGetPanelSSHKeyProcedure,
+		svc.GetPanelSSHKey,
+		connect.WithSchema(provisioningServiceMethods.ByName("GetPanelSSHKey")),
 		connect.WithHandlerOptions(opts...),
 	)
 	provisioningServiceCheckSSHHandler := connect.NewUnaryHandler(
@@ -328,6 +351,8 @@ func NewProvisioningServiceHandler(svc ProvisioningServiceHandler, opts ...conne
 		switch r.URL.Path {
 		case ProvisioningServiceGetSSHFingerprintProcedure:
 			provisioningServiceGetSSHFingerprintHandler.ServeHTTP(w, r)
+		case ProvisioningServiceGetPanelSSHKeyProcedure:
+			provisioningServiceGetPanelSSHKeyHandler.ServeHTTP(w, r)
 		case ProvisioningServiceCheckSSHProcedure:
 			provisioningServiceCheckSSHHandler.ServeHTTP(w, r)
 		case ProvisioningServiceStartNodeProvisionProcedure:
@@ -359,6 +384,10 @@ type UnimplementedProvisioningServiceHandler struct{}
 
 func (UnimplementedProvisioningServiceHandler) GetSSHFingerprint(context.Context, *connect.Request[v1.GetSSHFingerprintRequest]) (*connect.Response[v1.GetSSHFingerprintResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.GetSSHFingerprint is not implemented"))
+}
+
+func (UnimplementedProvisioningServiceHandler) GetPanelSSHKey(context.Context, *connect.Request[v1.GetPanelSSHKeyRequest]) (*connect.Response[v1.GetPanelSSHKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.ProvisioningService.GetPanelSSHKey is not implemented"))
 }
 
 func (UnimplementedProvisioningServiceHandler) CheckSSH(context.Context, *connect.Request[v1.CheckSSHRequest]) (*connect.Response[v1.CheckSSHResponse], error) {

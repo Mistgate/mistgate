@@ -23,13 +23,16 @@ const authTestPassword = "correct horse battery staple"
 // KbdInteractiveAuthentication switches of OpenSSH: a method without a callback is not offered. Nothing in it logs, so a
 // connection that ends after the test does not touch a finished *testing.T.
 type fakeSSHD struct {
-	listener    net.Listener
-	signer      ssh.Signer
-	mu          sync.Mutex
-	passwords   []string // every password received, by either method
-	viaPassword int
-	viaKeyboard int
-	exec        provisionSSHExecutor
+	listener      net.Listener
+	signer        ssh.Signer
+	mu            sync.Mutex
+	passwords     []string // every password received, by either method
+	viaPassword   int
+	viaKeyboard   int
+	keyAttempts   int
+	authorizedKey ssh.PublicKey
+	passwordCheck func(string) bool
+	exec          provisionSSHExecutor
 }
 
 type loginMethods struct{ password, keyboard, key bool }
@@ -62,7 +65,14 @@ func newFakeSSHD(t *testing.T, methods loginMethods, exec provisionSSHExecutor) 
 		}
 	}
 	if methods.key {
-		config.PublicKeyCallback = func(ssh.ConnMetadata, ssh.PublicKey) (*ssh.Permissions, error) {
+		config.PublicKeyCallback = func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			d.mu.Lock()
+			d.keyAttempts++
+			authorized := d.authorizedKey
+			d.mu.Unlock()
+			if authorized != nil && ssh.FingerprintSHA256(authorized) == ssh.FingerprintSHA256(key) {
+				return nil, nil
+			}
 			return nil, errors.New("no authorized key")
 		}
 	}
@@ -82,6 +92,12 @@ func (d *fakeSSHD) record(password string, viaPassword bool) {
 }
 
 func (d *fakeSSHD) check(got string) error {
+	if d.passwordCheck != nil {
+		if d.passwordCheck(got) {
+			return nil
+		}
+		return errors.New("wrong password")
+	}
 	if got != authTestPassword {
 		return errors.New("wrong password")
 	}
@@ -92,6 +108,18 @@ func (d *fakeSSHD) received() (passwords []string, viaPassword, viaKeyboard int)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return append([]string(nil), d.passwords...), d.viaPassword, d.viaKeyboard
+}
+
+func (d *fakeSSHD) authorizeKey(key ssh.PublicKey) {
+	d.mu.Lock()
+	d.authorizedKey = key
+	d.mu.Unlock()
+}
+
+func (d *fakeSSHD) keyAttemptCount() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.keyAttempts
 }
 
 func (d *fakeSSHD) serve(config *ssh.ServerConfig) {
@@ -233,6 +261,45 @@ func TestDialServerWithoutPasswordLoginIsDistinguishedFromAWrongPassword(t *test
 	}
 	if passwords, _, _ := d.received(); len(passwords) != 0 {
 		t.Fatalf("the password was sent to a server that does not take one: %q", passwords)
+	}
+}
+
+func TestDialKeyPinsTheHostAndAuthenticatesWithOnlyTheKey(t *testing.T) {
+	d := newFakeSSHD(t, loginMethods{key: true}, nil)
+	d.authorizeKey(d.signer.PublicKey())
+	target := mustTarget(t)
+
+	conn, err := d.client().DialKey(context.Background(), target, "root", d.signer, d.fingerprint())
+	if err != nil {
+		t.Fatalf("DialKey with the authorized key: %v", err)
+	}
+	_ = conn.Close()
+	if got := d.keyAttemptCount(); got != 1 {
+		t.Fatalf("server saw %d key attempts, want 1", got)
+	}
+	if passwords, _, _ := d.received(); len(passwords) != 0 {
+		t.Fatalf("key login sent a password: %q", passwords)
+	}
+
+	_, err = d.client().DialKey(context.Background(), target, "root", testSigner(t), d.fingerprint())
+	if !errors.Is(err, ErrAuthRejected) {
+		t.Fatalf("DialKey with a rejected key = %v, want ErrAuthRejected", err)
+	}
+	if got := publicSSHCode(err); got != "ssh_authentication_failed" {
+		t.Fatalf("rejected key public code = %q", got)
+	}
+	if passwords, _, _ := d.received(); len(passwords) != 0 {
+		t.Fatalf("rejected key login sent a password: %q", passwords)
+	}
+
+	foreign := testSigner(t)
+	before := d.keyAttemptCount()
+	_, err = d.client().DialKey(context.Background(), target, "root", d.signer, ssh.FingerprintSHA256(foreign.PublicKey()))
+	if !errors.Is(err, ErrHostKey) {
+		t.Fatalf("DialKey with a foreign host fingerprint = %v, want ErrHostKey", err)
+	}
+	if got := d.keyAttemptCount(); got != before {
+		t.Fatalf("the server saw a key before its host fingerprint matched: attempts %d -> %d", before, got)
 	}
 }
 

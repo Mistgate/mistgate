@@ -6,6 +6,7 @@ package mistgate.admin.v1;
 // administrator has confirmed the SSH host-key fingerprint shown by GetSSHFingerprint.
 service ProvisioningService {
   rpc GetSSHFingerprint(GetSSHFingerprintRequest) returns (GetSSHFingerprintResponse);
+  rpc GetPanelSSHKey(GetPanelSSHKeyRequest) returns (GetPanelSSHKeyResponse);
   rpc CheckSSH(CheckSSHRequest) returns (CheckSSHResponse);
   rpc StartNodeProvision(StartNodeProvisionRequest) returns (StartNodeProvisionResponse);
   rpc RetryNodeProvision(RetryNodeProvisionRequest) returns (RetryNodeProvisionResponse);
@@ -17,6 +18,13 @@ service ProvisioningService {
   rpc RevealNodeServerPassword(RevealNodeServerPasswordRequest) returns (RevealNodeServerPasswordResponse);
   // Owner-only, step-up protected: deletes the saved access of a retired node, its sealed password included.
   rpc ForgetNodeServerAccess(ForgetNodeServerAccessRequest) returns (ForgetNodeServerAccessResponse);
+}
+
+message GetPanelSSHKeyRequest {}
+
+message GetPanelSSHKeyResponse {
+  string public_key = 1;
+  string fingerprint = 2;
 }
 
 message GetSSHFingerprintRequest {
@@ -39,6 +47,8 @@ message CheckSSHRequest {
   string fingerprint = 3;
   string password = 4;
   string username = 5;
+  // When true, password must be empty and the panel uses its public key's private half.
+  bool use_panel_key = 6;
 }
 
 message NodePreflight {
@@ -71,8 +81,10 @@ message StartNodeProvisionRequest {
   string password = 10;
   string ssh_username = 11;
   // MCP only: the approved node_install plan being applied. password stays empty: the panel uses the password the owner
-  // entered on that plan's approval screen, and only with the fingerprint the owner confirmed there.
+  // chose on that plan's approval screen, and only with the fingerprint the owner confirmed there.
   string plan_id = 12;
+  // Direct installs: when true, password must be empty and the panel key is used.
+  bool use_panel_key = 13;
 }
 
 message RetryNodeProvisionRequest {
@@ -80,6 +92,8 @@ message RetryNodeProvisionRequest {
   bool confirm_install = 2;
   string password = 3;
   string ssh_username = 4;
+  // When true, password must be empty and the panel key is used.
+  bool use_panel_key = 5;
 }
 
 message StartNodeProvisionResponse {
@@ -150,6 +164,12 @@ message NodeServerAccess {
   bool password_generated = 9;
   // The node is retired. Its access stays, so the owner can still reveal the password, until it is forgotten.
   bool node_retired = 10;
+  // False when this node has no saved SSH password (for example, a panel-key install).
+  bool password_saved = 11;
+  // Whether the saved password last authenticated over SSH; false also for key-only installs not yet checked.
+  bool password_login = 12;
+  // SHA256 fingerprint of the panel key, empty when this node uses another login method.
+  string panel_key_fingerprint = 13;
 }
 
 message ListNodeServerAccessRequest {}

@@ -1173,6 +1173,12 @@ const nodeRetired = "nod_rrrrrrrrrrrrrrrrrrrrrrrrrr"
 
 const testHostKey = "SHA256:Vo3wK7ZGgCw1JmQxMZzh3H6pBvO3xuB2Dn8WqzZQyU8"
 
+// The panel's public SSH key as GetPanelSSHKey returns it (a public key: the plan shows it to the owner).
+const (
+	testPanelKey            = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl mistgate-panel"
+	testPanelKeyFingerprint = "SHA256:qcHuF8cXCmTsZ3S2B4ycqHd7hMGBpvlzQOLaS0R8ZIM"
+)
+
 func (w *world) ListNodeServerAccess(context.Context, *connect.Request[adminv1.ListNodeServerAccessRequest]) (*connect.Response[adminv1.ListNodeServerAccessResponse], error) {
 	return connect.NewResponse(&adminv1.ListNodeServerAccessResponse{Access: []*adminv1.NodeServerAccess{
 		{NodeId: nodeA, NodeName: "de1", Host: "203.0.113.10", Port: 22, Username: "root", Fingerprint: testHostKey},
@@ -1189,6 +1195,10 @@ func (w *world) RotateNodeServerPassword(_ context.Context, r *connect.Request[a
 
 func (w *world) GetSSHFingerprint(_ context.Context, r *connect.Request[adminv1.GetSSHFingerprintRequest]) (*connect.Response[adminv1.GetSSHFingerprintResponse], error) {
 	return connect.NewResponse(&adminv1.GetSSHFingerprintResponse{Host: r.Msg.GetHost(), Port: r.Msg.GetPort(), Fingerprint: testHostKey, Algorithm: "ssh-ed25519"}), nil
+}
+
+func (w *world) GetPanelSSHKey(context.Context, *connect.Request[adminv1.GetPanelSSHKeyRequest]) (*connect.Response[adminv1.GetPanelSSHKeyResponse], error) {
+	return connect.NewResponse(&adminv1.GetPanelSSHKeyResponse{PublicKey: testPanelKey, Fingerprint: testPanelKeyFingerprint}), nil
 }
 
 func (w *world) StartNodeProvision(_ context.Context, r *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {

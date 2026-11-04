@@ -208,7 +208,12 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		s.failJob(ctx, job, "ssh_target_invalid")
 		return
 	}
-	conn, err := s.ssh.DialAs(ctx, target, secret.Username, secret.Password, job.HostFingerprint)
+	var conn *Connection
+	if secret.Method == "panel_key" {
+		conn, _, err = s.dialPanelKey(ctx, target, secret.Username, job.HostFingerprint)
+	} else {
+		conn, err = s.ssh.DialAs(ctx, target, secret.Username, secret.Password, job.HostFingerprint)
+	}
 	if err != nil {
 		if ctx.Err() == nil {
 			s.failJob(ctx, job, publicSSHCode(err))
@@ -455,12 +460,24 @@ func (s *Service) failJob(ctx context.Context, job store.NodeProvisionJob, code 
 
 func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, secret credentials) {
 	now := s.cfg.Now().UTC()
-	plain := []byte(secret.Password)
-	ciphertext := s.vault.Seal(plain, "node-access:"+job.NodeID)
-	clearBytes(plain)
 	access := store.NodeServerAccess{
 		NodeID: job.NodeID, NodeName: job.Name, SSHHost: job.SSHHost, SSHPort: job.SSHPort,
-		SSHUser: secret.Username, HostFingerprint: job.HostFingerprint, Password: ciphertext,
+		SSHUser: secret.Username, HostFingerprint: job.HostFingerprint,
+	}
+	if secret.Method == "panel_key" {
+		key, _, err := s.ensurePanelSSHKey(ctx)
+		if err != nil {
+			s.cfg.Log.Error("load panel SSH key after node install", "job_id", job.ID, "err", err)
+			s.failJob(ctx, job, "credentials_unavailable")
+			return
+		}
+		access.Password = []byte{}
+		access.PanelKeyFingerprint = key.Fingerprint
+	} else {
+		plain := []byte(secret.Password)
+		access.Password = s.vault.Seal(plain, "node-access:"+job.NodeID)
+		clearBytes(plain)
+		access.PasswordLogin = true
 	}
 	if err := s.st.CompleteNodeProvisionJob(ctx, job.ID, access, now); err != nil {
 		s.cfg.Log.Error("complete node provisioning job", "job_id", job.ID, "err", err)

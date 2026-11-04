@@ -1046,6 +1046,7 @@ PY
   sshn_scn_truncated sshn-trunc
   sshn_scn_full sshn-full
   sshn_scn_full sshn-reload reload
+  sshn_scn_panel_key sshn-panel-key
   sshn_scan_state "$WORK/wrangler-state"
   pass "the stored state (D1 and the Durable Object files) holds no plaintext SSH password"
   FETCHES=$(grep -c "GET /$SSHN_TAG/mistgate-node-linux-" "$WORK/fake-release.log" || true)

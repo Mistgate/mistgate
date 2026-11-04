@@ -73,6 +73,7 @@ var procedureLevels = map[string]level{
 
 	// ProvisioningService can install a root agent over SSH; every operation is owner-only.
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:        levelOwner,
+	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:           levelOwner,
 	adminv1connect.ProvisioningServiceCheckSSHProcedure:                 levelOwner, // sends a root password after host-key confirmation; also needs step-up
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       levelOwner, // installs a root service; also needs step-up
 	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:       levelOwner, // resumes a root installation; also needs step-up

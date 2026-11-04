@@ -77,6 +77,12 @@ func (l pageLang) tr(s string) string {
 }
 
 var pageEnglish = map[string]string{
+	"Войти с ключом панели": "Log in with the panel key",
+	"Способ входа":          "Login method",
+	"Пароль":                "Password",
+	"Ключ панели":           "Panel key",
+	"Проверьте причину ошибки. Для повтора выберите SSH-логин и пароль или войдите с ключом панели: root или пользователь с passwordless sudo.":   "Check the cause of the error. To retry, choose the SSH login and password or log in with the panel key: root or a user with passwordless sudo.",
+	"Пароль меняется через сохранённый SSH-доступ. Если сервер принимает SSH-пароли, панель проверит новый пароль и сохранит результат проверки.": "The password is changed through the saved SSH access. If the server accepts SSH passwords, the panel checks the new password and records the result.",
 	// the page
 	"Установка ноды — Mistgate":    "Install a node — Mistgate",
 	"Назад в панель":               "Back to the panel",

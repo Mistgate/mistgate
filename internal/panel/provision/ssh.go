@@ -25,8 +25,7 @@ var (
 	errHostKeySeen = errors.New("provision: host key captured")
 	// ErrHostKey reports that the server key changed after the owner confirmed it.
 	ErrHostKey = errors.New("provision: SSH host key does not match the confirmed fingerprint")
-	// ErrAuthRejected reports that the server was sent the password (as a password or a keyboard-interactive answer)
-	// and refused it.
+	// ErrAuthRejected reports that the server refused the offered SSH credential.
 	ErrAuthRejected = errors.New("provision: SSH server rejected the login or password")
 	// ErrNoPasswordAuth reports that the server offers neither password nor keyboard-interactive login (key-only
 	// sshd): the password was never sent, so no password can fix it.
@@ -119,6 +118,25 @@ func (c *Client) DialAs(ctx context.Context, target Target, username, password, 
 	if password == "" || !validFingerprint(confirmedFingerprint) {
 		return nil, errors.New("provision: password and confirmed SHA-256 fingerprint are required")
 	}
+	auth, asked := passwordAuth(password)
+	return c.dial(ctx, target, username, auth, asked, confirmedFingerprint)
+}
+
+// DialKey authenticates with a panel SSH key only after the server presents the confirmed fingerprint.
+func (c *Client) DialKey(ctx context.Context, target Target, username string, signer ssh.Signer, confirmedFingerprint string) (*Connection, error) {
+	if !validSSHUsername(username) || signer == nil || signer.PublicKey() == nil {
+		return nil, errors.New("provision: a valid SSH username and signer are required")
+	}
+	if !validFingerprint(confirmedFingerprint) {
+		return nil, errors.New("provision: confirmed SHA-256 fingerprint is required")
+	}
+	// A key rejection is an authentication failure, whether or not sshd advertises publickey in its method list.
+	used := new(atomic.Bool)
+	used.Store(true)
+	return c.dial(ctx, target, username, []ssh.AuthMethod{ssh.PublicKeys(signer)}, used, confirmedFingerprint)
+}
+
+func (c *Client) dial(ctx context.Context, target Target, username string, auth []ssh.AuthMethod, asked *atomic.Bool, confirmedFingerprint string) (*Connection, error) {
 	resolveCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	addrs, err := target.publicAddresses(resolveCtx, c.resolver)
@@ -131,7 +149,7 @@ func (c *Client) DialAs(ctx context.Context, target Target, username, password, 
 
 	var lastErr error
 	for _, addr := range addrs {
-		conn, err := c.dialPinned(resolveCtx, ctx, target, addr, username, password, confirmedFingerprint)
+		conn, err := c.dialPinned(resolveCtx, ctx, target, addr, username, auth, asked, confirmedFingerprint)
 		if err == nil {
 			if err := ctx.Err(); err != nil {
 				_ = conn.Close()
@@ -248,7 +266,7 @@ func preferredHostKeyAlgorithms() []string {
 	return algorithms
 }
 
-func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Target, addr netip.Addr, username, password, expected string) (*Connection, error) {
+func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Target, addr netip.Addr, username string, auth []ssh.AuthMethod, asked *atomic.Bool, expected string) (*Connection, error) {
 	handshakeCtx, cancel := context.WithTimeout(handshakeParent, c.timeout)
 	defer cancel()
 	conn, err := c.dialer.DialContext(handshakeCtx, "tcp", net.JoinHostPort(addr.String(), strconv.Itoa(int(target.port))))
@@ -262,7 +280,6 @@ func (c *Client) dialPinned(handshakeParent, lifetime context.Context, target Ta
 	}
 	defer stopHandshake()
 
-	auth, asked := passwordAuth(password)
 	config := &ssh.ClientConfig{
 		User:              username,
 		Auth:              auth,

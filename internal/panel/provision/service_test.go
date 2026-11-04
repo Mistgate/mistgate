@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func TestSealedCredentialsAreBoundToJobAndNeverReturnedInJobView(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := &Service{vault: vlt}
-	secret := credentials{Username: "root", Password: "secret", EnrollmentToken: "one-time", CAFingerprint: "aa"}
+	secret := credentials{Method: "password", Username: "root", Password: "secret", EnrollmentToken: "one-time", CAFingerprint: "aa"}
 	sealed, err := svc.sealCredentials("prv_one", secret)
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +94,123 @@ func TestSealedCredentialsAreBoundToJobAndNeverReturnedInJobView(t *testing.T) {
 	view := toProvisionJob(store.NodeProvisionJob{ID: "prv_one", Secret: sealed, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(2, 0)})
 	if view.Id != "prv_one" || view.Name != "" {
 		t.Fatalf("public job mapping = %+v", view)
+	}
+}
+
+func TestPanelSSHKeyIsCreatedOnceForConcurrentRequests(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{},
+		StepUp: func(context.Context) error { return nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	responses := make(chan *adminv1.GetPanelSSHKeyResponse, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			response, err := svc.GetPanelSSHKey(ctx, connect.NewRequest(&adminv1.GetPanelSSHKeyRequest{}))
+			if err != nil {
+				errs <- err
+				return
+			}
+			responses <- response.Msg
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(responses)
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	var first *adminv1.GetPanelSSHKeyResponse
+	for response := range responses {
+		if first == nil {
+			first = response
+		} else if response.GetPublicKey() != first.GetPublicKey() || response.GetFingerprint() != first.GetFingerprint() {
+			t.Fatalf("concurrent requests returned different panel keys: %+v and %+v", first, response)
+		}
+	}
+	if first == nil || !strings.HasPrefix(first.GetPublicKey(), "ssh-ed25519 ") || first.GetFingerprint() == "" {
+		t.Fatalf("panel key response = %+v", first)
+	}
+	var count int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM panel_ssh_key`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("panel_ssh_key rows = %d, err %v", count, err)
+	}
+}
+
+func TestStartNodeProvisionRequiresExactlyOneLoginMethod(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{},
+		StepUp: func(context.Context) error { return nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fingerprint := "SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, 32))
+	base := func() *adminv1.StartNodeProvisionRequest {
+		return &adminv1.StartNodeProvisionRequest{
+			ConfirmInstall: true, Name: "edge-1", Address: "edge.example.com", SshHost: "node.example.com", SshPort: 22, Fingerprint: fingerprint,
+		}
+	}
+	for _, tc := range []struct {
+		name     string
+		password string
+		panelKey bool
+	}{
+		{name: "neither"},
+		{name: "both", password: "server-password", panelKey: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := base()
+			req.Password, req.UsePanelKey = tc.password, tc.panelKey
+			if _, err := svc.StartNodeProvision(ctx, connect.NewRequest(req)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+				t.Fatalf("StartNodeProvision(%s) = %v, want INVALID_ARGUMENT", tc.name, err)
+			}
+		})
+	}
+}
+
+func TestPanelKeyJobSecretContainsNoPassword(t *testing.T) {
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{vault: vlt}
+	sealed, err := svc.sealCredentials("prv_key", credentials{Method: "panel_key", Username: "root"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := svc.openCredentials("prv_key", sealed)
+	if err != nil || opened.Method != "panel_key" || opened.Password != "" {
+		t.Fatalf("panel-key job credentials = %+v, err %v", opened, err)
 	}
 }
 
@@ -247,9 +365,14 @@ func TestStartNodeProvisionTakesTheOwnersPasswordFromTheApprovedPlan(t *testing.
 	}
 	fingerprint := "SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, 32))
 	// an approved node_install plan whose apply has begun, with what the owner entered sealed to it
-	approvedPlan := func(confirmed string) string {
+	approvedPlan := func(confirmed string, panelKey ...bool) string {
+		usePanelKey := len(panelKey) > 0 && panelKey[0]
 		confirm := sha256.Sum256([]byte(store.NewID("cf_")))
-		p := store.MCPPlan{TokenID: tok.ID, Tool: auth.NodeInstallTool, ParamsJSON: `{}`, ConfirmHash: confirm[:], FactsJSON: `[]`,
+		facts := `[]`
+		if usePanelKey {
+			facts = `[{"key":"host_key","value":"` + confirmed + `"},{"key":"panel_ssh_key","value":"ssh-ed25519 AAAA test"}]`
+		}
+		p := store.MCPPlan{TokenID: tok.ID, Tool: auth.NodeInstallTool, ParamsJSON: `{}`, ConfirmHash: confirm[:], FactsJSON: facts,
 			Summary: "s", Danger: `["fleet"]`, NeedsApproval: true, Status: store.PlanAwaiting, CreatedAt: now}
 		if err := st.CreateMCPPlan(ctx, p, 20, 50); err != nil {
 			t.Fatal(err)
@@ -258,7 +381,11 @@ func TestStartNodeProvisionTakesTheOwnersPasswordFromTheApprovedPlan(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		sealed := auth.SealNodeInstallSecret(vlt, p.ID, auth.NodeInstallSecret{Password: "owner-typed-secret", Fingerprint: confirmed})
+		password := "owner-typed-secret"
+		if usePanelKey {
+			password = ""
+		}
+		sealed := auth.SealNodeInstallSecret(vlt, p.ID, auth.NodeInstallSecret{Password: password, Fingerprint: confirmed, PanelKey: usePanelKey})
 		if _, err := st.ApproveMCPPlanWithSecret(ctx, p.ID, ownerID, sealed, now); err != nil {
 			t.Fatal(err)
 		}
@@ -313,8 +440,20 @@ func TestStartNodeProvisionTakesTheOwnersPasswordFromTheApprovedPlan(t *testing.
 	if creds, err := svc.openCredentials(stored.ID, stored.Secret); err != nil || creds.Password != "owner-typed-secret" {
 		t.Fatalf("job credentials: err %v", err)
 	}
-	if _, err := start(planID, "edge-2"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "owner_password_missing") {
+	if _, err := start(planID, "edge-2"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "owner_login_missing") {
 		t.Fatalf("a second install from one approval = %v", err)
+	}
+	keyPlanID := approvedPlan(fingerprint, true)
+	keyJob, err := start(keyPlanID, "edge-key")
+	if err != nil {
+		t.Fatalf("install from an approved panel-key plan: %v", err)
+	}
+	keyStored, err := st.NodeProvisionJob(ctx, keyJob.GetId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds, err := svc.openCredentials(keyStored.ID, keyStored.Secret); err != nil || creds.Method != "panel_key" || creds.Password != "" {
+		t.Fatalf("panel-key job credentials: %+v, err %v", creds, err)
 	}
 	other := approvedPlan("SHA256:" + base64.RawStdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)))
 	if _, err := start(other, "edge-3"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "host_key_not_confirmed_by_owner") {

@@ -10,7 +10,42 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/provisioning.proto.
  */
 export const file_mistgate_admin_v1_provisioning: GenFile = /*@__PURE__*/
-  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9wcm92aXNpb25pbmcucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIjYKGEdldFNTSEZpbmdlcnByaW50UmVxdWVzdBIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0iXwoZR2V0U1NIRmluZ2VycHJpbnRSZXNwb25zZRIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0SEwoLZmluZ2VycHJpbnQYAyABKAkSEQoJYWxnb3JpdGhtGAQgASgJImYKD0NoZWNrU1NIUmVxdWVzdBIMCgRob3N0GAEgASgJEgwKBHBvcnQYAiABKA0SEwoLZmluZ2VycHJpbnQYAyABKAkSEAoIcGFzc3dvcmQYBCABKAkSEAoIdXNlcm5hbWUYBSABKAki7wEKDU5vZGVQcmVmbGlnaHQSFAoMZGlzdHJpYnV0aW9uGAEgASgJEg8KB3ZlcnNpb24YAiABKAkSDgoGa2VybmVsGAMgASgJEhQKDGFyY2hpdGVjdHVyZRgEIAEoCRIRCgljcHVfY291bnQYBSABKA0SGAoMbWVtb3J5X2J5dGVzGAYgASgEQgIwAhIgChRkaXNrX2F2YWlsYWJsZV9ieXRlcxgHIAEoBEICMAISDwoHc3lzdGVtZBgIIAEoCBIYChBhbHJlYWR5X2Vucm9sbGVkGAkgASgIEhcKD3BhbmVsX3JlYWNoYWJsZRgKIAEoCCJHChBDaGVja1NTSFJlc3BvbnNlEjMKCXByZWZsaWdodBgBIAEoCzIgLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcmVmbGlnaHQi/wEKGVN0YXJ0Tm9kZVByb3Zpc2lvblJlcXVlc3QSFwoPY29uZmlybV9pbnN0YWxsGAEgASgIEgwKBG5hbWUYAiABKAkSDwoHYWRkcmVzcxgDIAEoCRIUCgxjb3VudHJ5X2NvZGUYBCABKAkSEAoIbG9jYXRpb24YBSABKAkSEAoIcHJvdmlkZXIYBiABKAkSEAoIc3NoX2hvc3QYByABKAkSEAoIc3NoX3BvcnQYCCABKA0SEwoLZmluZ2VycHJpbnQYCSABKAkSEAoIcGFzc3dvcmQYCiABKAkSFAoMc3NoX3VzZXJuYW1lGAsgASgJEg8KB3BsYW5faWQYDCABKAkibAoZUmV0cnlOb2RlUHJvdmlzaW9uUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSFwoPY29uZmlybV9pbnN0YWxsGAIgASgIEhAKCHBhc3N3b3JkGAMgASgJEhQKDHNzaF91c2VybmFtZRgEIAEoCSJOChpTdGFydE5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIk4KGlJldHJ5Tm9kZVByb3Zpc2lvblJlc3BvbnNlEjAKA2pvYhgBIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25Kb2IiKQoXR2V0Tm9kZVByb3Zpc2lvblJlcXVlc3QSDgoGam9iX2lkGAEgASgJIkwKGEdldE5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIhsKGUxpc3ROb2RlUHJvdmlzaW9uc1JlcXVlc3QiTwoaTGlzdE5vZGVQcm92aXNpb25zUmVzcG9uc2USMQoEam9icxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25Kb2IixwEKEE5vZGVQcm92aXNpb25Kb2ISCgoCaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEhAKCHNzaF9ob3N0GAQgASgJEhAKCHNzaF9wb3J0GAUgASgNEg0KBXN0YXRlGAYgASgJEg0KBXBoYXNlGAcgASgJEhIKCmVycm9yX2NvZGUYCCABKAkSGAoMY3JlYXRlZF91bml4GAkgASgDQgIwAhIYCgx1cGRhdGVkX3VuaXgYCiABKANCAjACIlUKHkxpc3ROb2RlUHJvdmlzaW9uRXZlbnRzUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSFAoIYWZ0ZXJfaWQYAiABKARCAjACEg0KBWxpbWl0GAMgASgNIlsKEk5vZGVQcm92aXNpb25FdmVudBIOCgJpZBgBIAEoBEICMAISDQoFcGhhc2UYAiABKAkSDAoEY29kZRgDIAEoCRIYCgxjcmVhdGVkX3VuaXgYBCABKANCAjACInMKH0xpc3ROb2RlUHJvdmlzaW9uRXZlbnRzUmVzcG9uc2USNQoGZXZlbnRzGAEgAygLMiUubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByb3Zpc2lvbkV2ZW50EhkKDW5leHRfYWZ0ZXJfaWQYAiABKARCAjACIuIBChBOb2RlU2VydmVyQWNjZXNzEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEgwKBGhvc3QYAyABKAkSDAoEcG9ydBgEIAEoDRIQCgh1c2VybmFtZRgFIAEoCRITCgtmaW5nZXJwcmludBgGIAEoCRIbCg9jb25maWd1cmVkX3VuaXgYByABKANCAjACEhgKEHJvdGF0aW9uX3BlbmRpbmcYCCABKAgSGgoScGFzc3dvcmRfZ2VuZXJhdGVkGAkgASgIEhQKDG5vZGVfcmV0aXJlZBgKIAEoCCIdChtMaXN0Tm9kZVNlcnZlckFjY2Vzc1JlcXVlc3QiUwocTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXNwb25zZRIzCgZhY2Nlc3MYASADKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlU2VydmVyQWNjZXNzImsKH1JvdGF0ZU5vZGVTZXJ2ZXJQYXNzd29yZFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIUCgxuZXdfcGFzc3dvcmQYAiABKAkSDwoHY29uZmlybRgDIAEoCBIQCghnZW5lcmF0ZRgEIAEoCCIzCiBSb3RhdGVOb2RlU2VydmVyUGFzc3dvcmRSZXNwb25zZRIPCgdyb3RhdGVkGAEgASgIIjIKH1JldmVhbE5vZGVTZXJ2ZXJQYXNzd29yZFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSJiCiBSZXZlYWxOb2RlU2VydmVyUGFzc3dvcmRSZXNwb25zZRIQCghwYXNzd29yZBgBIAEoCRIYChBwZW5kaW5nX3Bhc3N3b3JkGAIgASgJEhIKCnVudmVyaWZpZWQYAyABKAgiMAodRm9yZ2V0Tm9kZVNlcnZlckFjY2Vzc1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSIgCh5Gb3JnZXROb2RlU2VydmVyQWNjZXNzUmVzcG9uc2UypwoKE1Byb3Zpc2lvbmluZ1NlcnZpY2USbgoRR2V0U1NIRmluZ2VycHJpbnQSKy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRTU0hGaW5nZXJwcmludFJlcXVlc3QaLC5taXN0Z2F0ZS5hZG1pbi52MS5HZXRTU0hGaW5nZXJwcmludFJlc3BvbnNlElMKCENoZWNrU1NIEiIubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tTU0hSZXF1ZXN0GiMubWlzdGdhdGUuYWRtaW4udjEuQ2hlY2tTU0hSZXNwb25zZRJxChJTdGFydE5vZGVQcm92aXNpb24SLC5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydE5vZGVQcm92aXNpb25SZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuU3RhcnROb2RlUHJvdmlzaW9uUmVzcG9uc2UScQoSUmV0cnlOb2RlUHJvdmlzaW9uEiwubWlzdGdhdGUuYWRtaW4udjEuUmV0cnlOb2RlUHJvdmlzaW9uUmVxdWVzdBotLm1pc3RnYXRlLmFkbWluLnYxLlJldHJ5Tm9kZVByb3Zpc2lvblJlc3BvbnNlEmsKEEdldE5vZGVQcm92aXNpb24SKi5taXN0Z2F0ZS5hZG1pbi52MS5HZXROb2RlUHJvdmlzaW9uUmVxdWVzdBorLm1pc3RnYXRlLmFkbWluLnYxLkdldE5vZGVQcm92aXNpb25SZXNwb25zZRJxChJMaXN0Tm9kZVByb3Zpc2lvbnMSLC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbnNSZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVQcm92aXNpb25zUmVzcG9uc2USgAEKF0xpc3ROb2RlUHJvdmlzaW9uRXZlbnRzEjEubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVQcm92aXNpb25FdmVudHNSZXF1ZXN0GjIubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVQcm92aXNpb25FdmVudHNSZXNwb25zZRJ3ChRMaXN0Tm9kZVNlcnZlckFjY2VzcxIuLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2RlU2VydmVyQWNjZXNzUmVxdWVzdBovLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2RlU2VydmVyQWNjZXNzUmVzcG9uc2USgwEKGFJvdGF0ZU5vZGVTZXJ2ZXJQYXNzd29yZBIyLm1pc3RnYXRlLmFkbWluLnYxLlJvdGF0ZU5vZGVTZXJ2ZXJQYXNzd29yZFJlcXVlc3QaMy5taXN0Z2F0ZS5hZG1pbi52MS5Sb3RhdGVOb2RlU2VydmVyUGFzc3dvcmRSZXNwb25zZRKDAQoYUmV2ZWFsTm9kZVNlcnZlclBhc3N3b3JkEjIubWlzdGdhdGUuYWRtaW4udjEuUmV2ZWFsTm9kZVNlcnZlclBhc3N3b3JkUmVxdWVzdBozLm1pc3RnYXRlLmFkbWluLnYxLlJldmVhbE5vZGVTZXJ2ZXJQYXNzd29yZFJlc3BvbnNlEn0KFkZvcmdldE5vZGVTZXJ2ZXJBY2Nlc3MSMC5taXN0Z2F0ZS5hZG1pbi52MS5Gb3JnZXROb2RlU2VydmVyQWNjZXNzUmVxdWVzdBoxLm1pc3RnYXRlLmFkbWluLnYxLkZvcmdldE5vZGVTZXJ2ZXJBY2Nlc3NSZXNwb25zZULMAQoVY29tLm1pc3RnYXRlLmFkbWluLnYxQhFQcm92aXNpb25pbmdQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z");
+  fileDesc("CiRtaXN0Z2F0ZS9hZG1pbi92MS9wcm92aXNpb25pbmcucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIhcKFUdldFBhbmVsU1NIS2V5UmVxdWVzdCJBChZHZXRQYW5lbFNTSEtleVJlc3BvbnNlEhIKCnB1YmxpY19rZXkYASABKAkSEwoLZmluZ2VycHJpbnQYAiABKAkiNgoYR2V0U1NIRmluZ2VycHJpbnRSZXF1ZXN0EgwKBGhvc3QYASABKAkSDAoEcG9ydBgCIAEoDSJfChlHZXRTU0hGaW5nZXJwcmludFJlc3BvbnNlEgwKBGhvc3QYASABKAkSDAoEcG9ydBgCIAEoDRITCgtmaW5nZXJwcmludBgDIAEoCRIRCglhbGdvcml0aG0YBCABKAkifQoPQ2hlY2tTU0hSZXF1ZXN0EgwKBGhvc3QYASABKAkSDAoEcG9ydBgCIAEoDRITCgtmaW5nZXJwcmludBgDIAEoCRIQCghwYXNzd29yZBgEIAEoCRIQCgh1c2VybmFtZRgFIAEoCRIVCg11c2VfcGFuZWxfa2V5GAYgASgIIu8BCg1Ob2RlUHJlZmxpZ2h0EhQKDGRpc3RyaWJ1dGlvbhgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJEg4KBmtlcm5lbBgDIAEoCRIUCgxhcmNoaXRlY3R1cmUYBCABKAkSEQoJY3B1X2NvdW50GAUgASgNEhgKDG1lbW9yeV9ieXRlcxgGIAEoBEICMAISIAoUZGlza19hdmFpbGFibGVfYnl0ZXMYByABKARCAjACEg8KB3N5c3RlbWQYCCABKAgSGAoQYWxyZWFkeV9lbnJvbGxlZBgJIAEoCBIXCg9wYW5lbF9yZWFjaGFibGUYCiABKAgiRwoQQ2hlY2tTU0hSZXNwb25zZRIzCglwcmVmbGlnaHQYASABKAsyIC5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJlZmxpZ2h0IpYCChlTdGFydE5vZGVQcm92aXNpb25SZXF1ZXN0EhcKD2NvbmZpcm1faW5zdGFsbBgBIAEoCBIMCgRuYW1lGAIgASgJEg8KB2FkZHJlc3MYAyABKAkSFAoMY291bnRyeV9jb2RlGAQgASgJEhAKCGxvY2F0aW9uGAUgASgJEhAKCHByb3ZpZGVyGAYgASgJEhAKCHNzaF9ob3N0GAcgASgJEhAKCHNzaF9wb3J0GAggASgNEhMKC2ZpbmdlcnByaW50GAkgASgJEhAKCHBhc3N3b3JkGAogASgJEhQKDHNzaF91c2VybmFtZRgLIAEoCRIPCgdwbGFuX2lkGAwgASgJEhUKDXVzZV9wYW5lbF9rZXkYDSABKAgigwEKGVJldHJ5Tm9kZVByb3Zpc2lvblJlcXVlc3QSDgoGam9iX2lkGAEgASgJEhcKD2NvbmZpcm1faW5zdGFsbBgCIAEoCBIQCghwYXNzd29yZBgDIAEoCRIUCgxzc2hfdXNlcm5hbWUYBCABKAkSFQoNdXNlX3BhbmVsX2tleRgFIAEoCCJOChpTdGFydE5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIk4KGlJldHJ5Tm9kZVByb3Zpc2lvblJlc3BvbnNlEjAKA2pvYhgBIAEoCzIjLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25Kb2IiKQoXR2V0Tm9kZVByb3Zpc2lvblJlcXVlc3QSDgoGam9iX2lkGAEgASgJIkwKGEdldE5vZGVQcm92aXNpb25SZXNwb25zZRIwCgNqb2IYASABKAsyIy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlUHJvdmlzaW9uSm9iIhsKGUxpc3ROb2RlUHJvdmlzaW9uc1JlcXVlc3QiTwoaTGlzdE5vZGVQcm92aXNpb25zUmVzcG9uc2USMQoEam9icxgBIAMoCzIjLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVQcm92aXNpb25Kb2IixwEKEE5vZGVQcm92aXNpb25Kb2ISCgoCaWQYASABKAkSDwoHbm9kZV9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEhAKCHNzaF9ob3N0GAQgASgJEhAKCHNzaF9wb3J0GAUgASgNEg0KBXN0YXRlGAYgASgJEg0KBXBoYXNlGAcgASgJEhIKCmVycm9yX2NvZGUYCCABKAkSGAoMY3JlYXRlZF91bml4GAkgASgDQgIwAhIYCgx1cGRhdGVkX3VuaXgYCiABKANCAjACIlUKHkxpc3ROb2RlUHJvdmlzaW9uRXZlbnRzUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSFAoIYWZ0ZXJfaWQYAiABKARCAjACEg0KBWxpbWl0GAMgASgNIlsKEk5vZGVQcm92aXNpb25FdmVudBIOCgJpZBgBIAEoBEICMAISDQoFcGhhc2UYAiABKAkSDAoEY29kZRgDIAEoCRIYCgxjcmVhdGVkX3VuaXgYBCABKANCAjACInMKH0xpc3ROb2RlUHJvdmlzaW9uRXZlbnRzUmVzcG9uc2USNQoGZXZlbnRzGAEgAygLMiUubWlzdGdhdGUuYWRtaW4udjEuTm9kZVByb3Zpc2lvbkV2ZW50EhkKDW5leHRfYWZ0ZXJfaWQYAiABKARCAjACIrECChBOb2RlU2VydmVyQWNjZXNzEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEgwKBGhvc3QYAyABKAkSDAoEcG9ydBgEIAEoDRIQCgh1c2VybmFtZRgFIAEoCRITCgtmaW5nZXJwcmludBgGIAEoCRIbCg9jb25maWd1cmVkX3VuaXgYByABKANCAjACEhgKEHJvdGF0aW9uX3BlbmRpbmcYCCABKAgSGgoScGFzc3dvcmRfZ2VuZXJhdGVkGAkgASgIEhQKDG5vZGVfcmV0aXJlZBgKIAEoCBIWCg5wYXNzd29yZF9zYXZlZBgLIAEoCBIWCg5wYXNzd29yZF9sb2dpbhgMIAEoCBIdChVwYW5lbF9rZXlfZmluZ2VycHJpbnQYDSABKAkiHQobTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXF1ZXN0IlMKHExpc3ROb2RlU2VydmVyQWNjZXNzUmVzcG9uc2USMwoGYWNjZXNzGAEgAygLMiMubWlzdGdhdGUuYWRtaW4udjEuTm9kZVNlcnZlckFjY2VzcyJrCh9Sb3RhdGVOb2RlU2VydmVyUGFzc3dvcmRSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSFAoMbmV3X3Bhc3N3b3JkGAIgASgJEg8KB2NvbmZpcm0YAyABKAgSEAoIZ2VuZXJhdGUYBCABKAgiMwogUm90YXRlTm9kZVNlcnZlclBhc3N3b3JkUmVzcG9uc2USDwoHcm90YXRlZBgBIAEoCCIyCh9SZXZlYWxOb2RlU2VydmVyUGFzc3dvcmRSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiYgogUmV2ZWFsTm9kZVNlcnZlclBhc3N3b3JkUmVzcG9uc2USEAoIcGFzc3dvcmQYASABKAkSGAoQcGVuZGluZ19wYXNzd29yZBgCIAEoCRISCgp1bnZlcmlmaWVkGAMgASgIIjAKHUZvcmdldE5vZGVTZXJ2ZXJBY2Nlc3NSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkiIAoeRm9yZ2V0Tm9kZVNlcnZlckFjY2Vzc1Jlc3BvbnNlMo4LChNQcm92aXNpb25pbmdTZXJ2aWNlEm4KEUdldFNTSEZpbmdlcnByaW50EisubWlzdGdhdGUuYWRtaW4udjEuR2V0U1NIRmluZ2VycHJpbnRSZXF1ZXN0GiwubWlzdGdhdGUuYWRtaW4udjEuR2V0U1NIRmluZ2VycHJpbnRSZXNwb25zZRJlCg5HZXRQYW5lbFNTSEtleRIoLm1pc3RnYXRlLmFkbWluLnYxLkdldFBhbmVsU1NIS2V5UmVxdWVzdBopLm1pc3RnYXRlLmFkbWluLnYxLkdldFBhbmVsU1NIS2V5UmVzcG9uc2USUwoIQ2hlY2tTU0gSIi5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1NTSFJlcXVlc3QaIy5taXN0Z2F0ZS5hZG1pbi52MS5DaGVja1NTSFJlc3BvbnNlEnEKElN0YXJ0Tm9kZVByb3Zpc2lvbhIsLm1pc3RnYXRlLmFkbWluLnYxLlN0YXJ0Tm9kZVByb3Zpc2lvblJlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5TdGFydE5vZGVQcm92aXNpb25SZXNwb25zZRJxChJSZXRyeU5vZGVQcm92aXNpb24SLC5taXN0Z2F0ZS5hZG1pbi52MS5SZXRyeU5vZGVQcm92aXNpb25SZXF1ZXN0Gi0ubWlzdGdhdGUuYWRtaW4udjEuUmV0cnlOb2RlUHJvdmlzaW9uUmVzcG9uc2USawoQR2V0Tm9kZVByb3Zpc2lvbhIqLm1pc3RnYXRlLmFkbWluLnYxLkdldE5vZGVQcm92aXNpb25SZXF1ZXN0GisubWlzdGdhdGUuYWRtaW4udjEuR2V0Tm9kZVByb3Zpc2lvblJlc3BvbnNlEnEKEkxpc3ROb2RlUHJvdmlzaW9ucxIsLm1pc3RnYXRlLmFkbWluLnYxLkxpc3ROb2RlUHJvdmlzaW9uc1JlcXVlc3QaLS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbnNSZXNwb25zZRKAAQoXTGlzdE5vZGVQcm92aXNpb25FdmVudHMSMS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1JlcXVlc3QaMi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0Tm9kZVByb3Zpc2lvbkV2ZW50c1Jlc3BvbnNlEncKFExpc3ROb2RlU2VydmVyQWNjZXNzEi4ubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXF1ZXN0Gi8ubWlzdGdhdGUuYWRtaW4udjEuTGlzdE5vZGVTZXJ2ZXJBY2Nlc3NSZXNwb25zZRKDAQoYUm90YXRlTm9kZVNlcnZlclBhc3N3b3JkEjIubWlzdGdhdGUuYWRtaW4udjEuUm90YXRlTm9kZVNlcnZlclBhc3N3b3JkUmVxdWVzdBozLm1pc3RnYXRlLmFkbWluLnYxLlJvdGF0ZU5vZGVTZXJ2ZXJQYXNzd29yZFJlc3BvbnNlEoMBChhSZXZlYWxOb2RlU2VydmVyUGFzc3dvcmQSMi5taXN0Z2F0ZS5hZG1pbi52MS5SZXZlYWxOb2RlU2VydmVyUGFzc3dvcmRSZXF1ZXN0GjMubWlzdGdhdGUuYWRtaW4udjEuUmV2ZWFsTm9kZVNlcnZlclBhc3N3b3JkUmVzcG9uc2USfQoWRm9yZ2V0Tm9kZVNlcnZlckFjY2VzcxIwLm1pc3RnYXRlLmFkbWluLnYxLkZvcmdldE5vZGVTZXJ2ZXJBY2Nlc3NSZXF1ZXN0GjEubWlzdGdhdGUuYWRtaW4udjEuRm9yZ2V0Tm9kZVNlcnZlckFjY2Vzc1Jlc3BvbnNlQswBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCEVByb3Zpc2lvbmluZ1Byb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2FkbWluL3YxO2FkbWludjGiAgNNQViqAhFNaXN0Z2F0ZS5BZG1pbi5WMcoCEU1pc3RnYXRlXEFkbWluXFYx4gIdTWlzdGdhdGVcQWRtaW5cVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6QWRtaW46OlYxYgZwcm90bzM");
+
+/**
+ * @generated from message mistgate.admin.v1.GetPanelSSHKeyRequest
+ */
+export type GetPanelSSHKeyRequest = Message<"mistgate.admin.v1.GetPanelSSHKeyRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetPanelSSHKeyRequest.
+ * Use `create(GetPanelSSHKeyRequestSchema)` to create a new message.
+ */
+export const GetPanelSSHKeyRequestSchema: GenMessage<GetPanelSSHKeyRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 0);
+
+/**
+ * @generated from message mistgate.admin.v1.GetPanelSSHKeyResponse
+ */
+export type GetPanelSSHKeyResponse = Message<"mistgate.admin.v1.GetPanelSSHKeyResponse"> & {
+  /**
+   * @generated from field: string public_key = 1;
+   */
+  publicKey: string;
+
+  /**
+   * @generated from field: string fingerprint = 2;
+   */
+  fingerprint: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetPanelSSHKeyResponse.
+ * Use `create(GetPanelSSHKeyResponseSchema)` to create a new message.
+ */
+export const GetPanelSSHKeyResponseSchema: GenMessage<GetPanelSSHKeyResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_provisioning, 1);
 
 /**
  * @generated from message mistgate.admin.v1.GetSSHFingerprintRequest
@@ -32,7 +67,7 @@ export type GetSSHFingerprintRequest = Message<"mistgate.admin.v1.GetSSHFingerpr
  * Use `create(GetSSHFingerprintRequestSchema)` to create a new message.
  */
 export const GetSSHFingerprintRequestSchema: GenMessage<GetSSHFingerprintRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 0);
+  messageDesc(file_mistgate_admin_v1_provisioning, 2);
 
 /**
  * @generated from message mistgate.admin.v1.GetSSHFingerprintResponse
@@ -67,7 +102,7 @@ export type GetSSHFingerprintResponse = Message<"mistgate.admin.v1.GetSSHFingerp
  * Use `create(GetSSHFingerprintResponseSchema)` to create a new message.
  */
 export const GetSSHFingerprintResponseSchema: GenMessage<GetSSHFingerprintResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 1);
+  messageDesc(file_mistgate_admin_v1_provisioning, 3);
 
 /**
  * @generated from message mistgate.admin.v1.CheckSSHRequest
@@ -97,6 +132,13 @@ export type CheckSSHRequest = Message<"mistgate.admin.v1.CheckSSHRequest"> & {
    * @generated from field: string username = 5;
    */
   username: string;
+
+  /**
+   * When true, password must be empty and the panel uses its public key's private half.
+   *
+   * @generated from field: bool use_panel_key = 6;
+   */
+  usePanelKey: boolean;
 };
 
 /**
@@ -104,7 +146,7 @@ export type CheckSSHRequest = Message<"mistgate.admin.v1.CheckSSHRequest"> & {
  * Use `create(CheckSSHRequestSchema)` to create a new message.
  */
 export const CheckSSHRequestSchema: GenMessage<CheckSSHRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 2);
+  messageDesc(file_mistgate_admin_v1_provisioning, 4);
 
 /**
  * @generated from message mistgate.admin.v1.NodePreflight
@@ -166,7 +208,7 @@ export type NodePreflight = Message<"mistgate.admin.v1.NodePreflight"> & {
  * Use `create(NodePreflightSchema)` to create a new message.
  */
 export const NodePreflightSchema: GenMessage<NodePreflight> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 3);
+  messageDesc(file_mistgate_admin_v1_provisioning, 5);
 
 /**
  * @generated from message mistgate.admin.v1.CheckSSHResponse
@@ -183,7 +225,7 @@ export type CheckSSHResponse = Message<"mistgate.admin.v1.CheckSSHResponse"> & {
  * Use `create(CheckSSHResponseSchema)` to create a new message.
  */
 export const CheckSSHResponseSchema: GenMessage<CheckSSHResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 4);
+  messageDesc(file_mistgate_admin_v1_provisioning, 6);
 
 /**
  * @generated from message mistgate.admin.v1.StartNodeProvisionRequest
@@ -246,11 +288,18 @@ export type StartNodeProvisionRequest = Message<"mistgate.admin.v1.StartNodeProv
 
   /**
    * MCP only: the approved node_install plan being applied. password stays empty: the panel uses the password the owner
-   * entered on that plan's approval screen, and only with the fingerprint the owner confirmed there.
+   * chose on that plan's approval screen, and only with the fingerprint the owner confirmed there.
    *
    * @generated from field: string plan_id = 12;
    */
   planId: string;
+
+  /**
+   * Direct installs: when true, password must be empty and the panel key is used.
+   *
+   * @generated from field: bool use_panel_key = 13;
+   */
+  usePanelKey: boolean;
 };
 
 /**
@@ -258,7 +307,7 @@ export type StartNodeProvisionRequest = Message<"mistgate.admin.v1.StartNodeProv
  * Use `create(StartNodeProvisionRequestSchema)` to create a new message.
  */
 export const StartNodeProvisionRequestSchema: GenMessage<StartNodeProvisionRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 5);
+  messageDesc(file_mistgate_admin_v1_provisioning, 7);
 
 /**
  * @generated from message mistgate.admin.v1.RetryNodeProvisionRequest
@@ -283,6 +332,13 @@ export type RetryNodeProvisionRequest = Message<"mistgate.admin.v1.RetryNodeProv
    * @generated from field: string ssh_username = 4;
    */
   sshUsername: string;
+
+  /**
+   * When true, password must be empty and the panel key is used.
+   *
+   * @generated from field: bool use_panel_key = 5;
+   */
+  usePanelKey: boolean;
 };
 
 /**
@@ -290,7 +346,7 @@ export type RetryNodeProvisionRequest = Message<"mistgate.admin.v1.RetryNodeProv
  * Use `create(RetryNodeProvisionRequestSchema)` to create a new message.
  */
 export const RetryNodeProvisionRequestSchema: GenMessage<RetryNodeProvisionRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 6);
+  messageDesc(file_mistgate_admin_v1_provisioning, 8);
 
 /**
  * @generated from message mistgate.admin.v1.StartNodeProvisionResponse
@@ -307,7 +363,7 @@ export type StartNodeProvisionResponse = Message<"mistgate.admin.v1.StartNodePro
  * Use `create(StartNodeProvisionResponseSchema)` to create a new message.
  */
 export const StartNodeProvisionResponseSchema: GenMessage<StartNodeProvisionResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 7);
+  messageDesc(file_mistgate_admin_v1_provisioning, 9);
 
 /**
  * @generated from message mistgate.admin.v1.RetryNodeProvisionResponse
@@ -324,7 +380,7 @@ export type RetryNodeProvisionResponse = Message<"mistgate.admin.v1.RetryNodePro
  * Use `create(RetryNodeProvisionResponseSchema)` to create a new message.
  */
 export const RetryNodeProvisionResponseSchema: GenMessage<RetryNodeProvisionResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 8);
+  messageDesc(file_mistgate_admin_v1_provisioning, 10);
 
 /**
  * @generated from message mistgate.admin.v1.GetNodeProvisionRequest
@@ -341,7 +397,7 @@ export type GetNodeProvisionRequest = Message<"mistgate.admin.v1.GetNodeProvisio
  * Use `create(GetNodeProvisionRequestSchema)` to create a new message.
  */
 export const GetNodeProvisionRequestSchema: GenMessage<GetNodeProvisionRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 9);
+  messageDesc(file_mistgate_admin_v1_provisioning, 11);
 
 /**
  * @generated from message mistgate.admin.v1.GetNodeProvisionResponse
@@ -358,7 +414,7 @@ export type GetNodeProvisionResponse = Message<"mistgate.admin.v1.GetNodeProvisi
  * Use `create(GetNodeProvisionResponseSchema)` to create a new message.
  */
 export const GetNodeProvisionResponseSchema: GenMessage<GetNodeProvisionResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 10);
+  messageDesc(file_mistgate_admin_v1_provisioning, 12);
 
 /**
  * @generated from message mistgate.admin.v1.ListNodeProvisionsRequest
@@ -371,7 +427,7 @@ export type ListNodeProvisionsRequest = Message<"mistgate.admin.v1.ListNodeProvi
  * Use `create(ListNodeProvisionsRequestSchema)` to create a new message.
  */
 export const ListNodeProvisionsRequestSchema: GenMessage<ListNodeProvisionsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 11);
+  messageDesc(file_mistgate_admin_v1_provisioning, 13);
 
 /**
  * @generated from message mistgate.admin.v1.ListNodeProvisionsResponse
@@ -388,7 +444,7 @@ export type ListNodeProvisionsResponse = Message<"mistgate.admin.v1.ListNodeProv
  * Use `create(ListNodeProvisionsResponseSchema)` to create a new message.
  */
 export const ListNodeProvisionsResponseSchema: GenMessage<ListNodeProvisionsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 12);
+  messageDesc(file_mistgate_admin_v1_provisioning, 14);
 
 /**
  * @generated from message mistgate.admin.v1.NodeProvisionJob
@@ -450,7 +506,7 @@ export type NodeProvisionJob = Message<"mistgate.admin.v1.NodeProvisionJob"> & {
  * Use `create(NodeProvisionJobSchema)` to create a new message.
  */
 export const NodeProvisionJobSchema: GenMessage<NodeProvisionJob> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 13);
+  messageDesc(file_mistgate_admin_v1_provisioning, 15);
 
 /**
  * @generated from message mistgate.admin.v1.ListNodeProvisionEventsRequest
@@ -477,7 +533,7 @@ export type ListNodeProvisionEventsRequest = Message<"mistgate.admin.v1.ListNode
  * Use `create(ListNodeProvisionEventsRequestSchema)` to create a new message.
  */
 export const ListNodeProvisionEventsRequestSchema: GenMessage<ListNodeProvisionEventsRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 14);
+  messageDesc(file_mistgate_admin_v1_provisioning, 16);
 
 /**
  * @generated from message mistgate.admin.v1.NodeProvisionEvent
@@ -509,7 +565,7 @@ export type NodeProvisionEvent = Message<"mistgate.admin.v1.NodeProvisionEvent">
  * Use `create(NodeProvisionEventSchema)` to create a new message.
  */
 export const NodeProvisionEventSchema: GenMessage<NodeProvisionEvent> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 15);
+  messageDesc(file_mistgate_admin_v1_provisioning, 17);
 
 /**
  * @generated from message mistgate.admin.v1.ListNodeProvisionEventsResponse
@@ -531,7 +587,7 @@ export type ListNodeProvisionEventsResponse = Message<"mistgate.admin.v1.ListNod
  * Use `create(ListNodeProvisionEventsResponseSchema)` to create a new message.
  */
 export const ListNodeProvisionEventsResponseSchema: GenMessage<ListNodeProvisionEventsResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 16);
+  messageDesc(file_mistgate_admin_v1_provisioning, 18);
 
 /**
  * Public SSH access metadata. Passwords and their ciphertext never leave the panel.
@@ -594,6 +650,27 @@ export type NodeServerAccess = Message<"mistgate.admin.v1.NodeServerAccess"> & {
    * @generated from field: bool node_retired = 10;
    */
   nodeRetired: boolean;
+
+  /**
+   * False when this node has no saved SSH password (for example, a panel-key install).
+   *
+   * @generated from field: bool password_saved = 11;
+   */
+  passwordSaved: boolean;
+
+  /**
+   * Whether the saved password last authenticated over SSH; false also for key-only installs not yet checked.
+   *
+   * @generated from field: bool password_login = 12;
+   */
+  passwordLogin: boolean;
+
+  /**
+   * SHA256 fingerprint of the panel key, empty when this node uses another login method.
+   *
+   * @generated from field: string panel_key_fingerprint = 13;
+   */
+  panelKeyFingerprint: string;
 };
 
 /**
@@ -601,7 +678,7 @@ export type NodeServerAccess = Message<"mistgate.admin.v1.NodeServerAccess"> & {
  * Use `create(NodeServerAccessSchema)` to create a new message.
  */
 export const NodeServerAccessSchema: GenMessage<NodeServerAccess> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 17);
+  messageDesc(file_mistgate_admin_v1_provisioning, 19);
 
 /**
  * @generated from message mistgate.admin.v1.ListNodeServerAccessRequest
@@ -614,7 +691,7 @@ export type ListNodeServerAccessRequest = Message<"mistgate.admin.v1.ListNodeSer
  * Use `create(ListNodeServerAccessRequestSchema)` to create a new message.
  */
 export const ListNodeServerAccessRequestSchema: GenMessage<ListNodeServerAccessRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 18);
+  messageDesc(file_mistgate_admin_v1_provisioning, 20);
 
 /**
  * @generated from message mistgate.admin.v1.ListNodeServerAccessResponse
@@ -631,7 +708,7 @@ export type ListNodeServerAccessResponse = Message<"mistgate.admin.v1.ListNodeSe
  * Use `create(ListNodeServerAccessResponseSchema)` to create a new message.
  */
 export const ListNodeServerAccessResponseSchema: GenMessage<ListNodeServerAccessResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 19);
+  messageDesc(file_mistgate_admin_v1_provisioning, 21);
 
 /**
  * @generated from message mistgate.admin.v1.RotateNodeServerPasswordRequest
@@ -667,7 +744,7 @@ export type RotateNodeServerPasswordRequest = Message<"mistgate.admin.v1.RotateN
  * Use `create(RotateNodeServerPasswordRequestSchema)` to create a new message.
  */
 export const RotateNodeServerPasswordRequestSchema: GenMessage<RotateNodeServerPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 20);
+  messageDesc(file_mistgate_admin_v1_provisioning, 22);
 
 /**
  * @generated from message mistgate.admin.v1.RotateNodeServerPasswordResponse
@@ -684,7 +761,7 @@ export type RotateNodeServerPasswordResponse = Message<"mistgate.admin.v1.Rotate
  * Use `create(RotateNodeServerPasswordResponseSchema)` to create a new message.
  */
 export const RotateNodeServerPasswordResponseSchema: GenMessage<RotateNodeServerPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 21);
+  messageDesc(file_mistgate_admin_v1_provisioning, 23);
 
 /**
  * Owner-only, step-up protected retrieval. This procedure is deliberately not exposed as an MCP tool.
@@ -703,7 +780,7 @@ export type RevealNodeServerPasswordRequest = Message<"mistgate.admin.v1.RevealN
  * Use `create(RevealNodeServerPasswordRequestSchema)` to create a new message.
  */
 export const RevealNodeServerPasswordRequestSchema: GenMessage<RevealNodeServerPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 22);
+  messageDesc(file_mistgate_admin_v1_provisioning, 24);
 
 /**
  * @generated from message mistgate.admin.v1.RevealNodeServerPasswordResponse
@@ -734,7 +811,7 @@ export type RevealNodeServerPasswordResponse = Message<"mistgate.admin.v1.Reveal
  * Use `create(RevealNodeServerPasswordResponseSchema)` to create a new message.
  */
 export const RevealNodeServerPasswordResponseSchema: GenMessage<RevealNodeServerPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 23);
+  messageDesc(file_mistgate_admin_v1_provisioning, 25);
 
 /**
  * @generated from message mistgate.admin.v1.ForgetNodeServerAccessRequest
@@ -751,7 +828,7 @@ export type ForgetNodeServerAccessRequest = Message<"mistgate.admin.v1.ForgetNod
  * Use `create(ForgetNodeServerAccessRequestSchema)` to create a new message.
  */
 export const ForgetNodeServerAccessRequestSchema: GenMessage<ForgetNodeServerAccessRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 24);
+  messageDesc(file_mistgate_admin_v1_provisioning, 26);
 
 /**
  * @generated from message mistgate.admin.v1.ForgetNodeServerAccessResponse
@@ -764,7 +841,7 @@ export type ForgetNodeServerAccessResponse = Message<"mistgate.admin.v1.ForgetNo
  * Use `create(ForgetNodeServerAccessResponseSchema)` to create a new message.
  */
 export const ForgetNodeServerAccessResponseSchema: GenMessage<ForgetNodeServerAccessResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_admin_v1_provisioning, 25);
+  messageDesc(file_mistgate_admin_v1_provisioning, 27);
 
 /**
  * Owner-only SSH installation of a Mistgate node. Credentials are accepted only after the
@@ -780,6 +857,14 @@ export const ProvisioningService: GenService<{
     methodKind: "unary";
     input: typeof GetSSHFingerprintRequestSchema;
     output: typeof GetSSHFingerprintResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.ProvisioningService.GetPanelSSHKey
+   */
+  getPanelSSHKey: {
+    methodKind: "unary";
+    input: typeof GetPanelSSHKeyRequestSchema;
+    output: typeof GetPanelSSHKeyResponseSchema;
   },
   /**
    * @generated from rpc mistgate.admin.v1.ProvisioningService.CheckSSH

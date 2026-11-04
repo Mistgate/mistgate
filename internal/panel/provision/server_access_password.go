@@ -41,12 +41,22 @@ func (s *Service) RevealNodeServerPassword(ctx context.Context, req *connect.Req
 		return nil, internalConnectError()
 	}
 	defer func() { password = "" }()
+	if len(access.Password) == 0 && access.PendingPassword == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_server_password_not_saved"))
+	}
 
 	var pending string
 	if access.PendingPassword != nil {
-		password, pending, err = s.resolvePendingAccessPassword(ctx, access, password)
-		if err != nil {
-			return nil, err
+		if access.PanelKeyFingerprint != "" {
+			pending, err = s.openPendingPassword(access.NodeID, access.PendingPassword)
+			if err != nil {
+				return nil, internalConnectError()
+			}
+		} else {
+			password, pending, err = s.resolvePendingAccessPassword(ctx, access, password)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	defer func() { pending = "" }()
@@ -77,7 +87,7 @@ func (s *Service) resolvePendingAccessPassword(ctx context.Context, access store
 	pendingErr := s.tryLogin(ctx, target, access, pending)
 	if pendingErr == nil {
 		promoted := s.sealAccessPassword(access.NodeID, pending)
-		if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, false, s.cfg.Now().UTC()); err != nil {
+		if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, false, true, s.cfg.Now().UTC()); err != nil {
 			return "", "", internalConnectError()
 		}
 		return pending, "", nil

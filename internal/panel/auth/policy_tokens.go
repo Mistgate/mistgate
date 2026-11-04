@@ -50,6 +50,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
 	adminv1connect.WarpServiceRestartWarpProcedure:                     TokenAccessDirect,
 	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:       TokenAccessPlanning, // node_install_plan only
+	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:          TokenAccessPlanning, // node_install_plan only
 	adminv1connect.ProvisioningServiceListNodeServerAccessProcedure:    TokenAccessDirect,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:      TokenAccessApproved,
 	// The country verdicts of GetChecks over time (the Reachability page), read like them.

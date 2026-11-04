@@ -54,8 +54,8 @@ type installForm struct {
 }
 
 type serverAccessView struct {
-	ID, Name, Host, Username, ConfiguredAt string
-	Pending, Retired                       bool
+	ID, Name, Host, Username, LoginMethod, ConfiguredAt string
+	Pending, Retired                                    bool
 }
 
 type preflightView struct {
@@ -179,9 +179,13 @@ func (s *Service) getPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, item := range access.Msg.Access {
+		loginMethod := "Пароль"
+		if item.PanelKeyFingerprint != "" {
+			loginMethod = "Ключ панели"
+		}
 		page.Access = append(page.Access, serverAccessView{
 			ID: item.NodeId, Name: item.NodeName, Host: net.JoinHostPort(item.Host, strconv.FormatUint(uint64(item.Port), 10)),
-			Username: item.Username, ConfiguredAt: time.Unix(item.ConfiguredUnix, 0).Local().Format("2006-01-02 15:04"),
+			Username: item.Username, LoginMethod: loginMethod, ConfiguredAt: time.Unix(item.ConfiguredUnix, 0).Local().Format("2006-01-02 15:04"),
 			Pending: item.RotationPending, Retired: item.NodeRetired,
 		})
 	}
@@ -301,6 +305,7 @@ func (s *Service) retryPageJob(w http.ResponseWriter, r *http.Request, values ur
 	}
 	result, err := s.RetryNodeProvision(r.Context(), connect.NewRequest(&adminv1.RetryNodeProvisionRequest{
 		JobId: jobID, ConfirmInstall: true, Password: values.Get("password"), SshUsername: sshUsername(values.Get("username")),
+		UsePanelKey: confirmed(values.Get("use_panel_key")),
 	}))
 	if err != nil {
 		s.getPageWithMessage(w, r, jobID, s.userMessage(err, "Не удалось повторить установку. Проверьте логин, пароль и состояние задания."))

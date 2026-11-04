@@ -87,6 +87,7 @@ type Service struct {
 }
 
 type credentials struct {
+	Method           string `json:"method,omitempty"`
 	Username         string `json:"username,omitempty"`
 	Password         string `json:"password"`
 	EnrollmentToken  string `json:"enrollment_token,omitempty"`
@@ -193,10 +194,20 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 	}
 	target, err := NewTarget(req.Msg.Host, req.Msg.Port)
 	username := sshUsername(req.Msg.Username)
-	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validSSHUsername(username) || !validPassword(req.Msg.Password) {
+	usePanelKey := req.Msg.GetUsePanelKey()
+	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validSSHUsername(username) ||
+		usePanelKey && req.Msg.Password != "" || !usePanelKey && !validPassword(req.Msg.Password) {
 		return nil, invalidArgument("invalid SSH credentials or target")
 	}
-	conn, err := s.ssh.DialAs(ctx, target, username, req.Msg.Password, req.Msg.Fingerprint)
+	var conn *Connection
+	if usePanelKey {
+		conn, _, err = s.dialPanelKey(ctx, target, username, req.Msg.Fingerprint)
+		if errors.Is(err, ErrAuthRejected) {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("ssh_panel_key_not_accepted"))
+		}
+	} else {
+		conn, err = s.ssh.DialAs(ctx, target, username, req.Msg.Password, req.Msg.Fingerprint)
+	}
 	if err != nil {
 		return nil, sshConnectError(err)
 	}
@@ -211,8 +222,8 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 	return connect.NewResponse(&adminv1.CheckSSHResponse{Preflight: remote.facts}), nil
 }
 
-// StartNodeProvision stores the SSH credential sealed to this job and queues installation. The owner's UI sends the
-// password; the MCP apply sends plan_id instead and the password comes from that plan's approval (ownerPassword).
+// StartNodeProvision stores the selected SSH login sealed to this job and queues installation. The MCP apply sends
+// plan_id instead and the login choice comes from that plan's approval (ownerLogin).
 func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[adminv1.StartNodeProvisionRequest]) (*connect.Response[adminv1.StartNodeProvisionResponse], error) {
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
@@ -224,10 +235,13 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
 	}
 	fromPlan := req.Msg.PlanId != ""
+	usePanelKey := req.Msg.GetUsePanelKey()
 	target, err := NewTarget(req.Msg.SshHost, req.Msg.SshPort)
 	username := sshUsername(req.Msg.SshUsername)
 	if err != nil || !validFingerprint(req.Msg.Fingerprint) || !validSSHUsername(username) ||
-		fromPlan && (req.Msg.Password != "" || len(req.Msg.PlanId) > 64) || !fromPlan && !validPassword(req.Msg.Password) {
+		fromPlan && (req.Msg.Password != "" || usePanelKey || len(req.Msg.PlanId) > 64) ||
+		!fromPlan && usePanelKey && req.Msg.Password != "" ||
+		!fromPlan && !usePanelKey && !validPassword(req.Msg.Password) {
 		return nil, invalidArgument("invalid SSH credentials or target")
 	}
 	name := strings.ToLower(req.Msg.Name)
@@ -241,12 +255,27 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
 	}
 	password := req.Msg.Password
+	method := "password"
 	if fromPlan {
-		if password, err = s.ownerPassword(ctx, req.Msg.PlanId, req.Msg.Fingerprint); err != nil {
+		var panelKey bool
+		if password, panelKey, err = s.ownerLogin(ctx, req.Msg.PlanId, req.Msg.Fingerprint); err != nil {
 			return nil, err
 		}
+		if panelKey {
+			method = "panel_key"
+		}
+	} else if usePanelKey {
+		method = "panel_key"
 	}
 	defer func() { password = "" }()
+	if method == "panel_key" {
+		if _, _, err := s.ensurePanelSSHKey(ctx); err != nil {
+			s.cfg.Log.Error("load panel SSH key for install", "err", err)
+			return nil, internalConnectError()
+		}
+	} else if !validPassword(password) {
+		return nil, invalidArgument("invalid SSH credentials or target")
+	}
 	now := s.cfg.Now().UTC()
 	job := store.NodeProvisionJob{
 		ID: store.NewID("prv_"), NodeID: store.NewID("nod_"), Name: name, Address: req.Msg.Address,
@@ -254,7 +283,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		SSHHost: target.Host(), SSHPort: target.Port(), HostFingerprint: req.Msg.Fingerprint,
 		CreatedBy: admin.ID, CreatedAt: now, UpdatedAt: now,
 	}
-	secret, err := s.sealCredentials(job.ID, credentials{Username: username, Password: password})
+	secret, err := s.sealCredentials(job.ID, credentials{Method: method, Username: username, Password: password})
 	if err != nil {
 		return nil, internalConnectError()
 	}
@@ -266,38 +295,43 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		s.cfg.Log.Error("save node provisioning job", "err", err)
 		return nil, internalConnectError()
 	}
-	s.audit(ctx, "node.ssh_provision_start", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
+	s.audit(ctx, "node.ssh_provision_start", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name, "auth": method})
 	s.signalWorker()
 	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: toProvisionJob(job)}), nil
 }
 
-// ownerPassword takes, once, the SSH password the owner entered when approving node_install plan planID: only for the
-// MCP token applying that plan, and only with the host key the owner confirmed there.
-func (s *Service) ownerPassword(ctx context.Context, planID, fingerprint string) (string, error) {
+// ownerLogin takes, once, the SSH login the owner approved for node_install planID, and only with the host key they confirmed.
+func (s *Service) ownerLogin(ctx context.Context, planID, fingerprint string) (string, bool, error) {
 	p := auth.PrincipalFrom(ctx)
 	if !p.Token || p.Channel != auth.ChannelMCP {
-		return "", invalidArgument("plan_id is used only by the MCP server")
+		return "", false, invalidArgument("plan_id is used only by the MCP server")
 	}
 	sealed, err := s.st.TakeMCPPlanOwnerSecret(ctx, planID, p.TokenID, auth.NodeInstallTool)
 	if errors.Is(err, store.ErrNotFound) {
-		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("owner_password_missing"))
+		return "", false, connect.NewError(connect.CodeFailedPrecondition, errors.New("owner_login_missing"))
 	}
 	if err != nil {
-		s.cfg.Log.Error("read the owner's node install password", "err", err)
-		return "", internalConnectError()
+		s.cfg.Log.Error("read the owner's node install login", "err", err)
+		return "", false, internalConnectError()
 	}
 	secret, err := auth.OpenNodeInstallSecret(s.vault, planID, sealed)
 	if err != nil {
-		return "", internalConnectError()
+		return "", false, internalConnectError()
 	}
 	if secret.Fingerprint != fingerprint {
 		secret.Password = ""
-		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("host_key_not_confirmed_by_owner"))
+		return "", false, connect.NewError(connect.CodeFailedPrecondition, errors.New("host_key_not_confirmed_by_owner"))
+	}
+	if secret.PanelKey {
+		if secret.Password != "" {
+			return "", false, invalidArgument("invalid SSH credentials or target")
+		}
+		return "", true, nil
 	}
 	if !validPassword(secret.Password) {
-		return "", invalidArgument("invalid SSH credentials or target")
+		return "", false, invalidArgument("invalid SSH credentials or target")
 	}
-	return secret.Password, nil
+	return secret.Password, false, nil
 }
 
 // RetryNodeProvision requeues a failed or cancelled job with freshly supplied SSH login credentials. A cancelled job
@@ -308,8 +342,18 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 		return nil, err
 	}
 	username := sshUsername(req.Msg.SshUsername)
-	if !req.Msg.ConfirmInstall || !validSSHUsername(username) || !validPassword(req.Msg.Password) {
-		return nil, invalidArgument("confirmation and a valid SSH password are required")
+	usePanelKey := req.Msg.GetUsePanelKey()
+	if !req.Msg.ConfirmInstall || !validSSHUsername(username) ||
+		usePanelKey && req.Msg.Password != "" || !usePanelKey && !validPassword(req.Msg.Password) {
+		return nil, invalidArgument("confirmation and exactly one valid SSH login are required")
+	}
+	method := "password"
+	if usePanelKey {
+		method = "panel_key"
+		if _, _, err := s.ensurePanelSSHKey(ctx); err != nil {
+			s.cfg.Log.Error("load panel SSH key for retry", "err", err)
+			return nil, internalConnectError()
+		}
 	}
 	job, err := s.st.NodeProvisionJob(ctx, req.Msg.JobId)
 	if errors.Is(err, store.ErrNotFound) {
@@ -329,7 +373,7 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 	} else if state == "retired" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_retired"))
 	}
-	secret, err := s.sealCredentials(job.ID, credentials{Username: username, Password: req.Msg.Password})
+	secret, err := s.sealCredentials(job.ID, credentials{Method: method, Username: username, Password: req.Msg.Password})
 	if err != nil {
 		return nil, internalConnectError()
 	}
@@ -473,7 +517,13 @@ func (s *Service) openCredentials(jobID string, ciphertext []byte) (credentials,
 	if secret.Username == "" { // Credentials sealed by the previous root-only wizard.
 		secret.Username = "root"
 	}
-	if !validSSHUsername(secret.Username) || !validPassword(secret.Password) {
+	if secret.Method == "" {
+		secret.Method = "password" // jobs written before the login method field used a password.
+	}
+	if !validSSHUsername(secret.Username) ||
+		secret.Method == "password" && !validPassword(secret.Password) ||
+		secret.Method == "panel_key" && secret.Password != "" ||
+		secret.Method != "password" && secret.Method != "panel_key" {
 		return credentials{}, errors.New("provision: encrypted SSH password is invalid")
 	}
 	return secret, nil
@@ -529,16 +579,12 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 	if access.NodeRetired {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_retired"))
 	}
-	target, err := NewTarget(access.SSHHost, uint32(access.SSHPort))
-	if err != nil {
-		return nil, internalConnectError()
-	}
 	current, err := s.openAccessPassword(access.NodeID, access.Password)
 	if err != nil {
 		return nil, internalConnectError()
 	}
 	defer func() { current = "" }()
-	if access.PendingPassword != nil {
+	if access.PendingPassword != nil && access.PanelKeyFingerprint == "" {
 		// A rotation never builds on an undecided one: both candidates unverified is a refusal here.
 		resolved, unverified, err := s.resolvePendingAccessPassword(ctx, access, current)
 		if err != nil {
@@ -548,15 +594,21 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_rotation_recovery_required"))
 		}
 		current = resolved
+		access.Password = s.sealAccessPassword(access.NodeID, resolved)
+		access.PasswordLogin = true
 	}
-	if newPassword == current {
+	if current != "" && newPassword == current {
 		return nil, invalidArgument("new password must differ from the current password")
 	}
-	conn, err := s.ssh.DialAs(ctx, target, access.SSHUser, current, access.HostFingerprint)
+	conn, viaKey, err := s.dialAccess(ctx, access)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_authentication_failed"))
 	}
 	defer conn.Close()
+	target, err := NewTarget(access.SSHHost, uint32(access.SSHPort))
+	if err != nil {
+		return nil, internalConnectError()
+	}
 	pendingPlain := []byte(newPassword)
 	pendingCiphertext := s.vault.Seal(pendingPlain, "node-access-pending:"+access.NodeID)
 	clearBytes(pendingPlain)
@@ -567,15 +619,22 @@ func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("ssh_password_change_unverified"))
 	}
 	verified, err := s.ssh.DialAs(ctx, target, access.SSHUser, newPassword, access.HostFingerprint)
-	if err != nil {
+	passwordLogin := err == nil
+	if err == nil {
+		_ = verified.Close()
+	} else if viaKey && (errors.Is(err, ErrNoPasswordAuth) || errors.Is(err, ErrAuthRejected)) {
+		passwordLogin = false
+	} else {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("ssh_password_change_unverified"))
 	}
-	_ = verified.Close()
 	promoted := s.sealAccessPassword(access.NodeID, newPassword)
-	if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, !req.Msg.Generate, s.cfg.Now().UTC()); err != nil {
+	if err := s.st.CommitPendingNodeServerPassword(ctx, access.NodeID, promoted, !req.Msg.Generate, passwordLogin, s.cfg.Now().UTC()); err != nil {
 		return nil, internalConnectError()
 	}
-	s.audit(ctx, "node.ssh_password_rotate", map[string]string{"node_id": access.NodeID, "generated": strconv.FormatBool(req.Msg.Generate)})
+	s.audit(ctx, "node.ssh_password_rotate", map[string]string{
+		"node_id": access.NodeID, "generated": strconv.FormatBool(req.Msg.Generate),
+		"first": strconv.FormatBool(len(access.Password) == 0), "login_checked": strconv.FormatBool(true),
+	})
 	return connect.NewResponse(&adminv1.RotateNodeServerPasswordResponse{Rotated: true}), nil
 }
 
@@ -608,10 +667,14 @@ func nodeServerAccessView(item store.NodeServerAccess) *adminv1.NodeServerAccess
 	return &adminv1.NodeServerAccess{NodeId: item.NodeID, NodeName: item.NodeName, Host: item.SSHHost,
 		Port: uint32(item.SSHPort), Username: item.SSHUser, Fingerprint: item.HostFingerprint,
 		ConfiguredUnix: item.ConfiguredAt.Unix(), RotationPending: item.PendingPassword != nil,
-		PasswordGenerated: item.PasswordGenerated, NodeRetired: item.NodeRetired}
+		PasswordGenerated: item.PasswordGenerated, NodeRetired: item.NodeRetired, PasswordSaved: len(item.Password) > 0,
+		PasswordLogin: item.PasswordLogin, PanelKeyFingerprint: item.PanelKeyFingerprint}
 }
 
 func (s *Service) openAccessPassword(nodeID string, ciphertext []byte) (string, error) {
+	if len(ciphertext) == 0 {
+		return "", nil
+	}
 	plain, err := s.vault.Open(ciphertext, "node-access:"+nodeID)
 	if err != nil {
 		return "", err

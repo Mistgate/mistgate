@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
+	"golang.org/x/crypto/ssh"
 )
 
 // An interrupted rotation and a server that cannot be reached: nothing can tell which login works, so the owner gets
@@ -69,6 +72,148 @@ func TestRevealWithAnUnreachableServerReturnsBothCandidatesUnverified(t *testing
 	_, err = svc.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{NodeId: nodeID, Generate: true, Confirm: true}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "ssh_rotation_recovery_required") {
 		t.Fatalf("rotation on top of an undecided one = %v", err)
+	}
+}
+
+func TestRotatePasswordThroughPanelKey(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		methods     loginMethods
+		changeFails bool
+		rejectLogin bool
+		wantLogin   bool
+	}{
+		{name: "first password and SSH login accepted", methods: loginMethods{password: true, key: true}, wantLogin: true},
+		{name: "password login closed", methods: loginMethods{key: true}},
+		{name: "password login rejected", methods: loginMethods{password: true, key: true}, rejectLogin: true},
+		{name: "chpasswd failure keeps pending", methods: loginMethods{password: true, key: true}, changeFails: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer st.Close()
+			vlt, err := vault.New(make([]byte, vault.KeySize))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mu sync.Mutex
+			serverPassword := ""
+			rejectPassword := false
+			d := newFakeSSHD(t, tc.methods, func(command string, channel ssh.Channel) ([]byte, error) {
+				if command != "chpasswd" {
+					return nil, errors.New("unexpected remote command")
+				}
+				line, err := io.ReadAll(channel)
+				if err != nil {
+					return nil, err
+				}
+				if tc.changeFails {
+					return nil, errors.New("chpasswd failed")
+				}
+				user, password, ok := strings.Cut(strings.TrimSuffix(string(line), "\n"), ":")
+				if !ok || user != "root" || password == "" {
+					return nil, errors.New("invalid chpasswd input")
+				}
+				mu.Lock()
+				serverPassword = password
+				rejectPassword = tc.rejectLogin
+				mu.Unlock()
+				return nil, nil
+			})
+			d.passwordCheck = func(got string) bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return !rejectPassword && serverPassword != "" && got == serverPassword
+			}
+			now := time.Unix(1_800_000_000, 0).UTC()
+			svc, err := NewService(st, vlt, Config{
+				PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{},
+				SSH: d.client(), StepUp: func(context.Context) error { return nil }, Now: func() time.Time { return now },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			key, signer, private, err := svc.panelKeySigner(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d.authorizeKey(signer.PublicKey())
+			clear(private)
+			const nodeID = "nod_panelkey"
+			if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, 'edge-key', 'edge.example.com', 'active', ?)`, nodeID, now.Unix()); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := st.W.ExecContext(ctx, `INSERT INTO node_server_access
+				(node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, configured_at, panel_key_fp, password_login)
+				VALUES (?, 'edge-key', 'node.example.com', 22, 'root', ?, X'', ?, ?, 0)`,
+				nodeID, d.fingerprint(), now.Unix(), key.Fingerprint); err != nil {
+				t.Fatal(err)
+			}
+			const nextPassword = "first-panel-key-password-123"
+			_, err = svc.RotateNodeServerPassword(ctx, connect.NewRequest(&adminv1.RotateNodeServerPasswordRequest{
+				NodeId: nodeID, NewPassword: nextPassword, Confirm: true,
+			}))
+			access, readErr := st.NodeServerAccess(ctx, nodeID)
+			if tc.changeFails {
+				if connect.CodeOf(err) != connect.CodeUnavailable || !strings.Contains(err.Error(), "ssh_password_change_unverified") {
+					t.Fatalf("failed chpasswd rotation = %v, want pending change error", err)
+				}
+				if readErr != nil || len(access.Password) != 0 || access.PendingPassword == nil {
+					t.Fatalf("failed first change did not keep only its pending password: %+v, err %v", access, readErr)
+				}
+				revealed, revealErr := svc.RevealNodeServerPassword(ctx, connect.NewRequest(&adminv1.RevealNodeServerPasswordRequest{NodeId: nodeID}))
+				if revealErr != nil || revealed.Msg.GetPassword() != "" || revealed.Msg.GetPendingPassword() != nextPassword || !revealed.Msg.GetUnverified() {
+					t.Fatalf("reveal of pending first password = %v, err %v", revealed, revealErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("panel-key password rotation: %v", err)
+			}
+			if readErr != nil || len(access.Password) == 0 || access.PendingPassword != nil || access.PasswordLogin != tc.wantLogin {
+				t.Fatalf("committed password access = %+v, err %v", access, readErr)
+			}
+			gotPassword, err := svc.openAccessPassword(nodeID, access.Password)
+			if err != nil || gotPassword != nextPassword {
+				t.Fatalf("saved password = %q, err %v", gotPassword, err)
+			}
+		})
+	}
+}
+
+func TestRevealUnconfiguredPanelKeyPasswordSaysNotSaved(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	vlt, err := vault.New(make([]byte, vault.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const nodeID = "nod_no_password"
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, 'edge-no-password', 'edge.example.com', 'active', ?)`, nodeID, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node_server_access
+		(node_id, node_name, ssh_host, ssh_port, ssh_username, host_fingerprint, password, configured_at, panel_key_fp, password_login)
+		VALUES (?, 'edge-no-password', 'node.example.com', 22, 'root', 'SHA256:test', X'', ?, 'SHA256:panel', 0)`, nodeID, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewService(st, vlt, Config{
+		PanelAddr: "panel.example.com:443", AgentSNI: "agent.example.com", Nodes: testNodeManager{}, Binaries: testBinarySource{},
+		SSH: NewClient(), StepUp: func(context.Context) error { return nil }, Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.RevealNodeServerPassword(ctx, connect.NewRequest(&adminv1.RevealNodeServerPasswordRequest{NodeId: nodeID})); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "node_server_password_not_saved") {
+		t.Fatalf("RevealNodeServerPassword without a saved password = %v", err)
 	}
 }
 

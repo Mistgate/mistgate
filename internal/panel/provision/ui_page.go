@@ -234,9 +234,10 @@ func renderInstallPage(out io.Writer, l pageLang, d installPageData) error {
 		w(`
 		`)
 		if d.Job != nil && d.Job.CanRetry {
-			w(`<div class="divider"></div><h2>` + tr("Повторить установку") + `</h2><p class="lead">` + tr("Проверьте причину ошибки. Для повтора введите SSH-логин и его пароль: root или пользователь с passwordless sudo.") + `</p>
+			w(`<div class="divider"></div><h2>` + tr("Повторить установку") + `</h2><p class="lead">` + tr("Проверьте причину ошибки. Для повтора выберите SSH-логин и пароль или войдите с ключом панели: root или пользователь с passwordless sudo.") + `</p>
 		<form method="post" action="" autocomplete="off"><input type="hidden" name="action" value="retry"><input type="hidden" name="job_id" value="` + esc(d.Job.ID) + `">
-			<div class="grid" style="margin-top:14px"><div class="field"><label for="retry-username">` + tr("SSH-логин") + `</label><input id="retry-username" name="username" required maxlength="32" value="root" autocomplete="username"></div><div class="field"><label for="retry-password">` + tr("Пароль SSH") + `</label><input id="retry-password" name="password" type="password" required maxlength="1024" autocomplete="new-password"></div></div>
+			<div class="grid" style="margin-top:14px"><div class="field"><label for="retry-username">` + tr("SSH-логин") + `</label><input id="retry-username" name="username" required maxlength="32" value="root" autocomplete="username"></div><div class="field"><label for="retry-password">` + tr("Пароль SSH") + `</label><input id="retry-password" name="password" type="password" maxlength="1024" autocomplete="new-password"></div></div>
+			<div class="check"><input id="retry-panel-key" name="use_panel_key" type="checkbox" value="yes"><label for="retry-panel-key">` + tr("Войти с ключом панели") + `</label></div>
 			<div class="check"><input id="confirm-retry" name="confirm_install" type="checkbox" value="yes" required><label for="confirm-retry">` + tr("Повторно выполнить установку для этой ноды.") + `</label></div>
 			<div class="actions"><button class="button" type="submit">` + tr("Повторить") + `</button><a class="button secondary" href="?lang=` + query(string(d.Lang)) + `">` + tr("К списку заданий") + `</a></div>
 		</form>`)
@@ -287,13 +288,13 @@ func renderInstallPage(out io.Writer, l pageLang, d installPageData) error {
 	w(`
 	`)
 	if !(d.Job != nil) && len(d.Access) > 0 {
-		w(`<section class="card"><h2>` + tr("Доступ к серверам") + `</h2><p class="lead">` + tr("Пароли хранятся в зашифрованном виде. При смене панель сначала проверит новый вход и только затем заменит сохранённый пароль.") + `</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>` + tr("Нода") + `</th><th>SSH</th><th>` + tr("Подключение") + `</th><th>` + tr("Сменить пароль") + `</th></tr></thead><tbody>`)
+		w(`<section class="card"><h2>` + tr("Доступ к серверам") + `</h2><p class="lead">` + tr("Пароль меняется через сохранённый SSH-доступ. Если сервер принимает SSH-пароли, панель проверит новый пароль и сохранит результат проверки.") + `</p><div style="overflow-x:auto"><table class="table"><thead><tr><th>` + tr("Нода") + `</th><th>SSH</th><th>` + tr("Подключение") + `</th><th>` + tr("Способ входа") + `</th><th>` + tr("Сменить пароль") + `</th></tr></thead><tbody>`)
 		for _, ac := range d.Access {
 			w(`<tr><td>` + esc(ac.Name))
 			if ac.Pending {
 				w(`<div class="error">` + tr("Смена ожидает проверки; повторите её для восстановления.") + `</div>`)
 			}
-			w(`</td><td class="mono">` + esc(ac.Host) + `</td><td class="mono">` + esc(ac.Username) + `</td><td>`)
+			w(`</td><td class="mono">` + esc(ac.Host) + `</td><td class="mono">` + esc(ac.Username) + `</td><td>` + tr(ac.LoginMethod) + `</td><td>`)
 			if ac.Retired {
 				w(tr("Нода выведена из флота: панель больше не меняет этот сервер. Пароль можно показать или забыть в настройках ноды."))
 			} else {

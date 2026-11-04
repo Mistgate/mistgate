@@ -308,14 +308,14 @@ func (e *rpcEnv) approvals(awaitingOnly bool) *adminv1.ListApprovalsResponse {
 	return r.Msg
 }
 
-// The agent never carries the root password of a node install: the owner types it on the approval screen, together with
-// a confirmation of the exact host key the panel read. The panel seals both to that plan.
+// The agent never carries the SSH login of a node install: the owner chooses password or panel key on the approval
+// screen, together with a confirmation of the exact host key the panel read. The panel seals that choice to the plan.
 func TestApproveNodeInstallTakesTheOwnersPasswordAndHostKey(t *testing.T) {
 	e := newRPCEnv(t)
 	tok, _ := e.mkToken("ops", store.ProfileAdmin, 600)
 	fp := "SHA256:" + strings.Repeat("A", 43)
 	p := store.MCPPlan{TokenID: tok.ID, Tool: NodeInstallTool, ParamsJSON: `{}`, ConfirmHash: hashToken(store.NewID("cf_")),
-		FactsJSON: `[{"key":"host_key","value":"` + fp + `"},{"key":"host_key_algorithm","value":"ssh-ed25519"}]`,
+		FactsJSON: `[{"key":"host_key","value":"` + fp + `"},{"key":"host_key_algorithm","value":"ssh-ed25519"},{"key":"panel_ssh_key","value":"ssh-ed25519 AAAA test"}]`,
 		Summary:   "s", Danger: `["fleet"]`, NeedsApproval: true, Status: store.PlanAwaiting, CreatedAt: e.s.now()}
 	if err := e.st.CreateMCPPlan(context.Background(), p, 20, 50); err != nil {
 		t.Fatal(err)
@@ -331,7 +331,7 @@ func TestApproveNodeInstallTakesTheOwnersPasswordAndHostKey(t *testing.T) {
 		return err
 	}
 	if err := approve(plan.ID, "", fp); connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Fatalf("approve without the password: %v", err)
+		t.Fatalf("approve without a login choice: %v", err)
 	}
 	if err := approve(plan.ID, "root-secret", "SHA256:"+strings.Repeat("B", 43)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("approve with another host key: %v", err)
@@ -358,10 +358,55 @@ func TestApproveNodeInstallTakesTheOwnersPasswordAndHostKey(t *testing.T) {
 	if rows := e.audits("approval_approve"); len(rows) != 1 || strings.Contains(rows[0].Params, "root-secret") {
 		t.Fatalf("approval audit: %+v", rows)
 	}
+	keyPlan := p
+	keyPlan.ID = ""
+	keyPlan.ConfirmHash = hashToken(store.NewID("cf_"))
+	keyPlan.CreatedAt = e.s.now()
+	if err := e.st.CreateMCPPlan(context.Background(), keyPlan, 20, 50); err != nil {
+		t.Fatal(err)
+	}
+	keyPlan, err = e.st.MCPPlanByConfirm(context.Background(), tok.ID, keyPlan.ConfirmHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.apr.Approve(fresh, connect.NewRequest(&adminv1.ApproveRequest{
+		Id: keyPlan.ID, ConfirmedFingerprint: fp, UsePanelKey: true,
+	})); err != nil {
+		t.Fatalf("approve with the panel key and no password: %v", err)
+	}
+	var keySealed []byte
+	if err := e.st.R.QueryRow(`SELECT owner_secret FROM mcp_plan WHERE id = ?`, keyPlan.ID).Scan(&keySealed); err != nil {
+		t.Fatal(err)
+	}
+	keySecret, err := OpenNodeInstallSecret(e.s.vault, keyPlan.ID, keySealed)
+	if err != nil || !keySecret.PanelKey || keySecret.Password != "" || keySecret.Fingerprint != fp {
+		t.Fatalf("sealed panel-key choice = %+v, err %v", keySecret, err)
+	}
+
+	missingKeyPlan := p
+	missingKeyPlan.ID = ""
+	missingKeyPlan.ConfirmHash = hashToken(store.NewID("cf_"))
+	missingKeyPlan.CreatedAt = e.s.now()
+	missingKeyPlan.FactsJSON = `[{"key":"host_key","value":"` + fp + `"}]`
+	if err := e.st.CreateMCPPlan(context.Background(), missingKeyPlan, 20, 50); err != nil {
+		t.Fatal(err)
+	}
+	missingKeyPlan, err = e.st.MCPPlanByConfirm(context.Background(), tok.ID, missingKeyPlan.ConfirmHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.apr.Approve(fresh, connect.NewRequest(&adminv1.ApproveRequest{
+		Id: missingKeyPlan.ID, ConfirmedFingerprint: fp, UsePanelKey: true,
+	})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("approve with a panel key absent from the plan = %v", err)
+	}
 	// any other tool takes no password
 	other := e.planFor(tok, "rollout_start", true, "awaiting")
 	if err := approve(other.ID, "root-secret", ""); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("a password on another tool's approval: %v", err)
+	}
+	if _, err := e.apr.Approve(fresh, connect.NewRequest(&adminv1.ApproveRequest{Id: other.ID, UsePanelKey: true})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("a panel-key choice on another tool's approval: %v", err)
 	}
 }
 
