@@ -6,7 +6,8 @@
 # of its own, listens on an address of this run's network namespace and dies with it) on a public-looking address that lives
 # on the namespace's lo (the panel refuses private ones). It runs in a mount namespace of its own (unshare -m), so what the
 # install does to "the host" never reaches the machine the test runs on, and the test itself keeps its /root and /etc:
-#   - /etc/passwd and /etc/shadow: private copies with one-time passwords for root and for one unprivileged login
+#   - /etc: a private copy whose passwd and shadow give root and one unprivileged login one-time passwords (the whole
+#     directory, not files bound over the host's: chpasswd replaces /etc/shadow by a rename, which a bound file refuses)
 #   - /root, /var/lib, /usr/local and /etc/systemd/system: empty tmpfs mounts (the agent lands in /root, /usr/local/bin and
 #     /var/lib/mistgate-node, its unit in /etc/systemd/system)
 #   - /etc/ssl/certs/ca-certificates.crt: the system roots plus the run's CA (the edge edition's Worker serves a certificate
@@ -73,6 +74,12 @@ open(d + "/passwd", "w").write(passwd + "%s:x:61999:65534::%s:/bin/sh\n" % (user
 PY
   chmod 600 "$d/shadow"
   cat /etc/ssl/certs/ca-certificates.crt ${CURL_CA:+"$CURL_CA"} >"$d/ca-bundle.crt"
+  # the host's private /etc; the three files are removed first so a symlink among them is replaced, never written through
+  cp -a /etc "$d/etc" || die "could not copy /etc for the SSH host"
+  [ ! -L "$d/etc/ssl" ] && [ ! -L "$d/etc/ssl/certs" ] || die "/etc/ssl/certs is a symlink here; the SSH host needs a directory"
+  rm -f "$d/etc/passwd" "$d/etc/shadow" "$d/etc/ssl/certs/ca-certificates.crt"
+  cp "$d/passwd" "$d/etc/passwd" && cp -p "$d/shadow" "$d/etc/shadow" && cp "$d/ca-bundle.crt" "$d/etc/ssl/certs/ca-certificates.crt" \
+    || die "could not prepare the SSH host's /etc"
   sshn_write_shims
   # sshd insists on its privilege separation directory; the mount namespace cannot hide one that the host lacks
   [ -d /run/sshd ] || { mkdir -p /run/sshd && SSHN_MADE_RUN_SSHD=1; }
@@ -94,9 +101,7 @@ LogLevel VERBOSE
 CONF
   cat >"$d/launch.sh" <<LAUNCH
 set -e
-mount --bind $d/passwd /etc/passwd
-mount --bind $d/shadow /etc/shadow
-mount --bind $d/ca-bundle.crt /etc/ssl/certs/ca-certificates.crt
+mount --bind $d/etc /etc
 mount -t tmpfs -o size=1g,mode=0700 tmpfs /root
 mount -t tmpfs tmpfs /var/lib
 mount -t tmpfs tmpfs /usr/local
