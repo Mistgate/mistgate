@@ -40,6 +40,19 @@ export function portRuns(c: Confirmable): [PortRun, PortRun] | null {
   ];
 }
 
+/** How long before a port check a passing protocol probe through the port still answers it (portProbeTrust in internal/panel/health/eval.go). */
+const portProbeTrustSec = 15 * 60;
+
+/**
+ * A port whose test datagrams were lost (lossy, broken) while the panel's own protocol probe through it passed at most
+ * 15 minutes before the check or any time after it (protocolOkUnix): the test is blocked, typically by a hoster's filter,
+ * and people get through. The panel opens no port_lossy alert for it; the page reads it as calmly.
+ */
+export function testBlocked(c: { verdict: string; checkedUnix?: number; protocolOkUnix?: number }): boolean {
+  const ok = c.protocolOkUnix ?? 0;
+  return (c.verdict === "lossy" || c.verdict === "broken") && ok > 0 && ok >= (c.checkedUnix ?? 0) - portProbeTrustSec;
+}
+
 type Checked = Confirmable & { port: number; blame: string };
 
 /**

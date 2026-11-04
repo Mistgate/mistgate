@@ -427,6 +427,20 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node UDP port checks", err)
 	}
+	protocolOKAt, err := f.portProtocolOKAt(ctx, n, inbounds)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node protocol probe results", err)
+	}
+	for i := range portChecks {
+		portChecks[i].ProtocolOKAt = protocolOKAt[portChecks[i].Port]
+	}
+	udpFilteredAt, err := f.st.UDPFilteredAt(ctx, n.ID)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node UDP source-filter state", err)
+	}
+	if !udpFilteredAt.IsZero() {
+		resp.UdpFilteredUnix = udpFilteredAt.Unix()
+	}
 	tcpChecks, err := f.st.TCPChecks(ctx, n.ID)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node TCP port checks", err)
@@ -507,6 +521,21 @@ func (s nodeService) CheckPorts(ctx context.Context, req *connect.Request[adminv
 		requested = append(requested, uint16(port))
 	}
 	out := f.checkPorts(ctx, n.ID, requested, "", true)
+	protocolOKAt, err := f.portProtocolOKAt(ctx, n, nil)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node protocol probe results", err)
+	}
+	for i := range out.checks {
+		out.checks[i].ProtocolOKAt = protocolOKAt[out.checks[i].Port]
+	}
+	udpFilteredAt, err := f.st.UDPFilteredAt(ctx, n.ID)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node UDP source-filter state", err)
+	}
+	filteredUnix := int64(0)
+	if !udpFilteredAt.IsZero() {
+		filteredUnix = udpFilteredAt.Unix()
+	}
 	var names map[string]string
 	if len(out.checks)+len(out.tcp) > 0 || out.sender != "" {
 		var err error
@@ -516,7 +545,7 @@ func (s nodeService) CheckPorts(ctx context.Context, req *connect.Request[adminv
 	}
 	rows, senderName := portCheckMessages(names, out.checks, out.sender, out.errorCode)
 	return connect.NewResponse(&adminv1.CheckPortsResponse{Ports: rows, Sender: senderName, ErrorCode: out.errorCode,
-		Tcp: tcpCheckMessages(names, out.tcp)}), nil
+		Tcp: tcpCheckMessages(names, out.tcp), UdpFilteredUnix: filteredUnix}), nil
 }
 
 func (f *Fleet) onlineUsers(ctx context.Context, view liveJSONView) ([]*adminv1.OnlineUser, error) {

@@ -29,8 +29,8 @@ arrive, and it never offers a port that lost them. An admin can check the ports 
 The node being checked (the **target**) counts and somebody else sends. The target's agent installs a short-lived nft
 table of its own. Its chain sits at `prerouting` priority −500, before defrag, conntrack, NAT and any firewall. It has
 one named counter per port and matches only datagrams whose UDP payload starts with an 8-byte random **tag**; those are
-counted and dropped. Another node's agent (the **sender**) sends 300 tagged datagrams of 1200 bytes per port at 50 pps,
-port by port in a round robin, from four ephemeral source ports (6 s, ≤ 2.9 MB). It sends to the target's
+counted and dropped. Another node's agent (the **sender**) sends 150 tagged datagrams of 256 bytes per port at 25 pps,
+port by port in a round robin, from four ephemeral source ports (about 6 s, ≤ 300 KiB of UDP payload). It sends to the target's
 `node.address`. When no other node can send, the VPS panel host sends instead. The panel reads the counters (the agent
 deletes the table) and turns `got / sent` into a verdict per port: ok, lossy or broken. 443 is in every run, as an
 anchor. The verdicts go into the `node_port_check` table, which both editions have. The picker never offers a port that
@@ -83,13 +83,13 @@ table inet mistgate_udpcheck {
 | Parameter | Value | Why |
 |---|---|---|
 | payload | 8-byte tag + random fill, generated once per run | looks like Salamander/AWG on the wire (every production hy2 profile uses Salamander); the tag is what nft matches |
-| size | 1200 bytes of payload | the size of a QUIC packet; 1248 bytes with IPv6 headers fits the 1280 minimum MTU, so no fragments. Size made no difference on that node, so one size is enough |
-| count, rate | 300 per port, 50 pps per port | about 6 s. The that node losses came in bursts and 3 s runs missed them 2 times in 8, so a longer run catches more |
+| size | 256 bytes of UDP payload | small enough to keep the probe light; 312 bytes with IPv6 and UDP headers, so it fits the minimum MTU without fragments |
+| count, rate | 150 per port, 25 pps per port | about 6 s. The node's losses came in bursts and 3 s runs missed them 2 times in 8, so retain the longer run |
 | ports per run | at most 8, 443 always among them | 443 is the anchor (§3.3) |
 | source ports | 4 ephemeral sockets, round robin | a provider that hashes flows over a bad link (ECMP/LAG) loses some flows on every port; with one flow per port that would look like a port problem |
 | order | each tick sends one datagram to every port | all ports see the same moments, so a burst of loss hits all of them alike |
 | destination | the target's `node.address`, resolved by the sender, IPv4 first | the address clients use; the same rule as `health.nodeIP` (`internal/panel/health/hy2.go:105`) |
-| total | ≤ 8 × 300 × 1228 B ≈ 2.9 MB, ≤ 400 pps | negligible for both ends |
+| total | ≤ 8 × 150 × 256 B = 300 KiB of UDP payload, ≤ 200 pps | half as many, smaller datagrams while keeping the six-second sample |
 
 `Send` lives in a new package `internal/udpcheck` (one file), used by the agent and by the VPS panel fallback. It
 enforces the caps itself, so neither caller can ask for more. `health.nodeIP` moves into it as `Resolve`, so the two
@@ -107,11 +107,17 @@ For each port, `delivered = got / sent`:
 
 - A port that delivered ≥ 95 % but at least 4 % of the packets fewer than the best port of the same run is **lossy**
   too: the ports share the sender, the path and the minute, so the difference is the port's. The first run on a real
-  node with a filtered port got 300 of 300 on every port and 286 on the filtered one.
+  node with a filtered port got 150 of 150 on every port and 143 on the filtered one. At 150 packets the fixed 4 %
+  floor is six packets; the three-sigma noise floor still applies when a path loses packets across all ports.
 - A run counts only if at least one of its ports delivered ≥ 95 %. Otherwise the path from that sender is lossy, or
   UDP does not get through at all, and nothing can be said about any single port. Such a run is **inconclusive**: the
   panel tries one more sender, then reports `inconclusive` and stores nothing.
 - The runs on that node, delivering 65/53/63/59/83/51/100/100 %, would have read broken five times, lossy once and ok twice.
+
+**Source-filter state.** If both senders get at least 95 % on UDP 443 and at most 1 % on every other tested port, the panel
+records the node as source-filtered. It does not recruit another sender or run a confirmation sample. Periodic checks run
+no more than once a day and reuse a sender already used for that node; a later clean run clears the state. Manual checks
+remain available. A passing panel protocol probe at or after a UDP check suppresses `port_lossy` for that inbound.
 
 **Stickiness.** A conclusive run that finds a port lossy or broken sets `bad_at`. A later clean run updates the verdict
 but keeps `bad_at`. The picker avoids a port whose `bad_at` is less than 30 days old. A wrongly avoided port costs
@@ -180,8 +186,8 @@ inside a session step. On the edge it calls the NodeLink objects of two differen
 | (a) Picker: `free=` of `port_taken`, `free_port` of `validate_only` (`profile_rpc.go:614`) | yes | **cache only**, never a run. Bad ports are left out; a fresh-ok port comes first, then an unchecked one |
 | (b) `validate_only` of CreateInbound / UpdateInbound, UpdateProfile `dry_run` | yes | cache only (stays fast). A port changed to a bad one, or switched back on while bad, is refused with `port_lossy` and a `free=` |
 | (b) Saving: CreateInbound, UpdateInbound (port changed or switched on), UpdateProfile (the effective port of an enabled inbound changed), each per node | yes | fresh ok → saved. Otherwise one run of [port, 443, up to 3 picker candidates]. Bad → `port_lossy` with a `free=` that the same run proved, unless `allow_lossy_port`. Cannot check → saved with the warning `port_unchecked{reason}` |
-| (c) On demand: "Check ports" on the node page, MCP `node_ports` | yes | the node's enabled inbound ports, 443, then the free preferred ports, up to 8; more inbound ports take several runs |
-| (d) Periodic re-check (every 6 h per node) and an alert when an inbound's port turns bad | later (round 5) | the same CheckPorts, driven by the health scheduler on the VPS and by cron on the edge (step 6) |
+| (c) On demand: "Check ports" on the node page, MCP `node_ports` | yes | by default, enabled UDP inbound ports and 443, up to 8; explicit requested lists (including twin/save candidate lists) are checked as supplied, with 443 added |
+| (d) Periodic re-check (every 6 h per node) and an alert when an inbound's port turns bad | later (round 5) | the same CheckPorts, driven by the health scheduler on the VPS; source-filtered nodes are rechecked no more than daily |
 | A port of an inbound that is not changing | — | never refused: an unrelated edit of that node's HY2 WARP inbound (SNI) keeps working, with a `port_lossy` warning |
 
 ## 6. API
@@ -255,8 +261,8 @@ message PortCheck {
 `node.proto`:
 
 ```proto
-// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"): about 6 s per 8 ports, a few MB. Ports:
-// the given ones (at most 7), else the node's enabled inbound ports and the free ports the picker prefers; 443 is
+// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"): about 6 s per 8 ports, at most 300 KiB of UDP payload. Ports:
+// the given ones (at most 7), else the node's enabled UDP inbound ports; 443 is
 // always added. Another node sends (both editions); a VPS panel with no other usable node sends itself. Conclusive
 // results are stored and shown in GetNodeResponse.port_checks. Owner or helper; API tokens directly (like RunDoctor).
 rpc CheckPorts(CheckPortsRequest) returns (CheckPortsResponse);
@@ -277,7 +283,7 @@ returns RPC errors for offline and too old. The reason: the picker and the UI re
 `profile.proto`:
 - New request fields: `CreateInboundRequest.allow_lossy_port = 6`, `UpdateInboundRequest.allow_lossy_port = 6`,
   `UpdateProfileRequest.allow_lossy_port = 6`. They mean "add anyway"; the admin's choice is audited.
-- New refusal code `port_lossy: port=8443&node=n1&sent=300&got=190&at=<unix>&sender=n2&free=2053`
+- New refusal code `port_lossy: port=8443&node=n1&sent=150&got=142&at=<unix>&sender=n2&free=2053`
   (FAILED_PRECONDITION). `free` is a port the same run proved, else the cache-only picker's choice; 0 = none.
 - New warnings: `port_unchecked {node, port, reason}`, and `port_lossy {...}` (saved with `allow_lossy_port`, or the
   port did not change).

@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -86,12 +87,12 @@ func awaitIPv6(t *testing.T, ch <-chan ipv6Done) store.IPv6Check {
 }
 
 // driveUDP6 answers the UDP half with a node sender over IPv6: the target arms its counter, the sender sends to addr, the target
-// counts got of 300 on each port. It returns what the sender was told.
+// counts got packets on each port. It returns what the sender was told.
 func driveUDP6(targetConn, senderConn *conn, got uint64) *agentv1.UdpSend {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	send := waitUDPSend(senderConn)
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "6", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "6", "sent": strconv.Itoa(udpCheckSendCount)}})
 	stop := waitUDPCount(targetConn, true)
 	counts := map[uint16]uint64{}
 	for _, p := range arm.Ports {
@@ -117,7 +118,7 @@ func TestCheckIPv6SendsFromAnIPv6NodeToTheAddressAndWritesNoPortCheck(t *testing
 	x.doctorIPv6(v4only.nodeID, map[string]string{"ipv6": "no"})
 	ch := x.checkIPv6(target.nodeID, v6Entry)
 
-	send := driveUDP6(targetConn, senderConn, 300)
+	send := driveUDP6(targetConn, senderConn, udpCheckSendCount)
 	if send.Host != v6Entry || len(send.Ports) != 1 || send.Ports[0] != 443 {
 		t.Fatalf("UDP send = %+v, want %s on 443", send, v6Entry)
 	}
@@ -164,7 +165,7 @@ func TestCheckIPv6ReportsAPortThatDoesNotAnswerAsTheNodesOwn(t *testing.T) {
 	x, target, targetConn := ipv6Target(t)
 	_, senderConn := x.v6Peer("sender1")
 	ch := x.checkIPv6(target.nodeID, v6Entry)
-	driveUDP6(targetConn, senderConn, 300)
+	driveUDP6(targetConn, senderConn, udpCheckSendCount)
 	probe := waitTCPProbe(senderConn)
 	replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "6", "t443": "ours", "t8443": "other"}})
 	got := awaitIPv6(t, ch)
@@ -199,7 +200,7 @@ func TestCheckIPv6TakesTheNextSenderWhenTheFirstHasNoRoute(t *testing.T) {
 	replyPortCommand(c1, send.RequestId, &agentv1.CommandResult{Ok: false, Error: "no_route"})
 	stop := waitUDPCount(targetConn, true)
 	replyPortStop(targetConn, stop, "6", map[uint16]uint64{}, map[uint16]uint64{})
-	driveUDP6(targetConn, c2, 300)
+	driveUDP6(targetConn, c2, udpCheckSendCount)
 
 	// the TCP half has its own sender: sender1 first, no route again, then sender2
 	p1 := waitTCPProbe(c1)
@@ -285,7 +286,7 @@ func TestCheckIPv6MissingHalfWithOtherSendersIsNoVerifier(t *testing.T) {
 			}
 			ch := x.checkIPv6(target.nodeID, v6Entry)
 			if tc.udpRuns {
-				driveUDP6(targetConn, senderConn, 300)
+				driveUDP6(targetConn, senderConn, udpCheckSendCount)
 			}
 			if tc.tcpRuns {
 				tcp443 := tc.tcp443
@@ -324,7 +325,7 @@ func TestCheckIPv6PanelWithoutIPv6IsNeverAPass(t *testing.T) {
 	var sent atomic.Int32
 	x.f.sendUDP = func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error) {
 		sent.Add(1)
-		return "6", 300, nil
+		return "6", udpCheckSendCount, nil
 	}
 	x.f.probeTCP = func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error) {
 		sent.Add(1)
@@ -350,7 +351,7 @@ func TestCheckIPv6PanelWithIPv6SendsLast(t *testing.T) {
 	x.f.panelIPv6 = func(context.Context) bool { return true }
 	x.f.sendUDP = func(_ context.Context, host string, _ []uint16, _ [8]byte, _, _, _ int) (string, int, error) {
 		udpHost = host
-		return "6", 300, nil
+		return "6", udpCheckSendCount, nil
 	}
 	x.f.probeTCP = func(_ context.Context, host string, _ []tcpcheck.Target) (string, map[uint16]string, error) {
 		tcpHost = host
@@ -360,7 +361,7 @@ func TestCheckIPv6PanelWithIPv6SendsLast(t *testing.T) {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "6", map[uint16]uint64{443: 300}, map[uint16]uint64{443: 300})
+	replyPortStop(targetConn, stop, "6", map[uint16]uint64{443: udpCheckSendCount}, map[uint16]uint64{443: udpCheckSendCount})
 	got := awaitIPv6(t, ch)
 	if !got.Pass || got.By != "panel" || udpHost != v6Entry || tcpHost != v6Entry {
 		t.Fatalf("check = %+v, udp host %q, tcp host %q", got, udpHost, tcpHost)
@@ -531,7 +532,7 @@ func TestCheckIpv6RPCIsOwnerOnlyAndNeedsTheNodesOwnAddress(t *testing.T) {
 		}
 		done <- r
 	}()
-	send := driveUDP6(targetConn, senderConn, 300)
+	send := driveUDP6(targetConn, senderConn, udpCheckSendCount)
 	if send.Host != v6Entry {
 		t.Errorf("the default address was %s, want %s", send.Host, v6Entry)
 	}

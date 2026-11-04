@@ -6,7 +6,7 @@ import { en } from "@/i18n/en";
 import { describeAudit } from "./audit";
 import { errorText } from "./errors";
 import { describeEvent, eventKind } from "./events";
-import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, portRuns, reasons, reasonText, regionWord, renewalOf, renewalText, udpFilters, udpRegion } from "./port-check";
+import { bestDelivered, decoyNote, lossPct, lossyVars, portNotes, portRuns, reasons, reasonText, regionWord, renewalOf, renewalText, testBlocked, udpFilters, udpRegion } from "./port-check";
 
 const tOf = (lang: Lang) => Object.assign((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dict[lang][key], vars), { n: () => "" }) as unknown as T;
 const t = tOf("en");
@@ -207,5 +207,24 @@ describe("a filter on the way, told from a lossy line", () => {
     expect(udpFilters([row(443), row(2053, { verdict: "broken", got: 0, senderVerdict: "broken", confirmGot: 0, confirmVerdict: "broken", blame: "node" })])).toEqual([]);
     // checked from one sender only: nothing to compare
     expect(udpFilters([row(443, { confirmSender: "" }), row(2053, { confirmSender: "", got: 0, verdict: "broken" })])).toEqual([]);
+  });
+});
+
+describe("a port whose test is blocked while the protocol works", () => {
+  const checked = 1_000_000;
+  const row = (over: object = {}) => ({ verdict: "broken", checkedUnix: checked, protocolOkUnix: checked + 60, ...over });
+  it("is a lossy or broken port whose panel protocol check passed after the run or at most 15 minutes before it", () => {
+    expect(testBlocked(row())).toBe(true);
+    expect(testBlocked(row({ verdict: "lossy" }))).toBe(true);
+    expect(testBlocked(row({ protocolOkUnix: checked }))).toBe(true);
+    // the window is portProbeTrust (internal/panel/health/eval.go): 15 minutes before the run still answers it, a second more does not
+    expect(testBlocked(row({ protocolOkUnix: checked - 15 * 60 }))).toBe(true);
+    expect(testBlocked(row({ protocolOkUnix: checked - 15 * 60 - 1 }))).toBe(false);
+  });
+  it("is a real loss when the protocol check failed or never ran, and nothing to say on a clean or unchecked port", () => {
+    expect(testBlocked(row({ protocolOkUnix: 0 }))).toBe(false);
+    expect(testBlocked(row({ protocolOkUnix: undefined }))).toBe(false);
+    expect(testBlocked(row({ verdict: "ok" }))).toBe(false);
+    expect(testBlocked(row({ verdict: "", checkedUnix: 0 }))).toBe(false);
   });
 });

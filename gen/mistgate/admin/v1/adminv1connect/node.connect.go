@@ -113,8 +113,8 @@ type NodeServiceClient interface {
 	// in error_code. One measurement per node at a time.
 	MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error)
 	// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
-	// 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
-	// picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
+	// 8 ports, about 300 KiB of UDP payload at most. Ports: the given ones (at most 7), else the node's enabled UDP inbound ports;
+	// 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
 	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks.
 	// The same call probes the node's TCP ports (agents with "tcpcheck/1"; design/vless.md section 7.4): port 80 only with an
 	// ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
@@ -419,8 +419,8 @@ type NodeServiceHandler interface {
 	// in error_code. One measurement per node at a time.
 	MeasureBandwidth(context.Context, *connect.Request[v1.MeasureBandwidthRequest]) (*connect.Response[v1.MeasureBandwidthResponse], error)
 	// Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
-	// 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
-	// picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
+	// 8 ports, about 300 KiB of UDP payload at most. Ports: the given ones (at most 7), else the node's enabled UDP inbound ports;
+	// 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
 	// itself. Conclusive results are stored and shown in GetNodeResponse.port_checks.
 	// The same call probes the node's TCP ports (agents with "tcpcheck/1"; design/vless.md section 7.4): port 80 only with an
 	// ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for

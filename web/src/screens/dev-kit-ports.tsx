@@ -93,6 +93,24 @@ const fromDe1 = (over: object) => check({ nodeId: "nod_fi1", sender: "de1", send
 const filterChecks = [fromDe1({}), fromDe1({ port: 2053, got: 0, senderVerdict: "broken", blame: "path" }), fromDe1({ port: 8443, got: 0, senderVerdict: "broken", blame: "path" })];
 const filterNode = baseNode({ id: "nod_fi1", name: "fi1", countryCode: "FI", location: "Helsinki", address: "fi1.example.com" });
 
+// a hoster's DDoS filter in front of nl1: from de1 and fi1 only UDP 443 arrives, the other ports get 0 of 150, while the
+// panel's own AmneziaWG check through 2053 passes (test blocked, people get through); the Hysteria2 check through 8443
+// failed too, so 8443 stays red. Both senders saw it, so the panel marked the node filtered (udpFilteredUnix).
+const nl1 = baseNode({ id: "nod_nl1", name: "nl1", countryCode: "NL", location: "Amsterdam", address: "nl1.example.com" });
+const nl1Inbounds = [
+  inbound({ nodeId: "nod_nl1", nodeName: "nl1" }),
+  inbound({ id: "inb_7", nodeId: "nod_nl1", nodeName: "nl1", profileId: "prf_awg", profileName: "AWG · 2053", protocol: "awg", port: 2053, tlsServerName: "", certNotAfterUnix: 0 }),
+  inbound({ id: "inb_8", nodeId: "nod_nl1", nodeName: "nl1", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp" }),
+];
+const fromBoth = (over: object) => check({ nodeId: "nod_nl1", sent: 150, got: 150, sender: "de1", senderVerdict: "ok", confirmSender: "fi1", confirmSent: 150, confirmGot: 150, confirmVerdict: "ok", blame: "", ...over });
+const dropped = { verdict: "broken", got: 0, senderVerdict: "broken", confirmGot: 0, confirmVerdict: "broken", blame: "node" };
+const blockedChecks = [fromBoth({ protocolOkUnix: now - 60 }), fromBoth({ port: 2053, ...dropped, protocolOkUnix: now - 2 * 60 }), fromBoth({ port: 8443, ...dropped, protocolOkUnix: 0 })];
+// a day later, rechecked from de1 alone: 2053 still blocked for the test with AmneziaWG passing; 51820 lost a fifth while its
+// last good Hysteria2 check is 20 min older than the run, past the 15-minute window, so it reads as a real loss
+const nl1Later = [...nl1Inbounds.filter((i) => i.port !== 8443), inbound({ id: "inb_9", nodeId: "nod_nl1", nodeName: "nl1", profileId: "prf_ext", profileName: "Backup", port: 51820 })];
+const fromDe1Only = (over: object) => check({ nodeId: "nod_nl1", sent: 150, got: 150, sender: "de1", checkedUnix: now - 3 * 60, ...over });
+const laterChecks = [fromDe1Only({}), fromDe1Only({ port: 2053, verdict: "broken", got: 0, protocolOkUnix: now - 10 * 60 }), fromDe1Only({ port: 51820, verdict: "lossy", got: 120, protocolOkUnix: now - 23 * 60 })];
+
 const twoInbounds = [inbound({}), inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp" })];
 const threeInbounds = [...twoInbounds, inbound({ id: "inb_3", profileId: "prf_awg", profileName: "AWG 3.1 · QUIC", protocol: "awg", port: 33183, tlsServerName: "", certNotAfterUnix: 0 }), inbound({ id: "inb_4", profileId: "prf_ext", profileName: "Backup", port: 51820 })];
 
@@ -283,7 +301,7 @@ export function PortsKit() {
         </Cache>
       </Demo>
 
-      <Demo title="UDP ports: ok with an old loss (clean now) / lossy from the panel / broken / a free port nobody uses / a profile port not in the last check">
+      <Demo shot="ports-profiles" title="UDP ports: ok with an old loss (clean now) / lossy from the panel / broken / Backup's test blocked while its Hysteria2 check passes / a free port nobody uses">
         <Cache>
           <ProfilesTab
             data={
@@ -294,6 +312,7 @@ export function PortsKit() {
                   check({ badUnix: now - 3 * 86400, checkedUnix: now - 2 * 3600 }),
                   check({ port: 8443, verdict: "lossy", got: 270, sender: "panel", checkedUnix: now - 40 }),
                   check({ port: 33183, verdict: "broken", got: 120 }),
+                  check({ port: 51820, verdict: "broken", got: 0, protocolOkUnix: now - 60 }),
                   check({ port: 2053 }),
                 ],
               } as never
@@ -311,6 +330,18 @@ export function PortsKit() {
       <Demo shot="ports-filter" title="UDP ports of fi1 filtered on the way from de1: only 443 arrives whole, 2053 and 8443 get nothing, msk1 (CIS) gets everything; the ports are fine">
         <Cache fill={[[nodesQuery.queryKey, { nodes: [...kitNodes, msk1] }]]}>
           <Ports data={{ node: filterNode, inbounds: blameInbounds.filter((i) => i.port !== 2083), portChecks: filterChecks, tcpChecks: tcpOk } as never} />
+        </Cache>
+      </Demo>
+
+      <Demo shot="ports-blocked" title="UDP ports of nl1 behind the hoster's filter: only 443 arrives from de1 and fi1; 2053's AmneziaWG check passes (test blocked, protocol works), 8443's Hysteria2 check failed too (a real loss); the node is marked filtered">
+        <Cache fill={[[nodesQuery.queryKey, { nodes: [...kitNodes, { ...nl1, protocols: [] }] }]]}>
+          <Ports data={{ node: nl1, inbounds: nl1Inbounds, portChecks: blockedChecks, tcpChecks: tcpOk, udpFilteredUnix: now - 7 * 60 } as never} />
+        </Cache>
+      </Demo>
+
+      <Demo shot="ports-blocked-one" title="UDP ports of nl1 rechecked from de1 alone, no filter mark: 2053 test blocked with AmneziaWG passing 7 min before the run / 51820 loses a fifth, its last good check 20 min before the run (past the 15-minute window)">
+        <Cache>
+          <Ports data={{ node: nl1, inbounds: nl1Later, portChecks: laterChecks, tcpChecks: tcpOk } as never} />
         </Cache>
       </Demo>
 

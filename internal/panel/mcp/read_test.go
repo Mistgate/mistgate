@@ -316,7 +316,8 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 	stored := decode[NodePortsV](t, mustOK(t, readonly, "node_ports", map[string]any{"node": "de1"}))
 	if stored.ErrorCode != "" || len(stored.Ports) != 1 || stored.Ports[0].Port != 443 || stored.Ports[0].Verdict != "ok" ||
 		stored.Ports[0].Sender != "sender-node" || stored.Ports[0].SenderVerdict != "lossy" ||
-		stored.Ports[0].ConfirmSender != "confirm-node" || stored.Ports[0].ConfirmSent != 300 || stored.Ports[0].ConfirmGot != 290 ||
+		stored.Ports[0].ProtocolOKUnix != 1700001000 || stored.UDPFilteredUnix != 1699995000 ||
+		stored.Ports[0].ConfirmSender != "confirm-node" || stored.Ports[0].ConfirmSent != 150 || stored.Ports[0].ConfirmGot != 145 ||
 		stored.Ports[0].ConfirmVerdict != "ok" || stored.Ports[0].Blame != "path" ||
 		len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" {
 		t.Fatalf("stored UDP port checks = %+v", stored)
@@ -339,8 +340,9 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 	operator := e.session(operatorSecret)
 	checked := decode[NodePortsV](t, mustOK(t, operator, "node_ports", map[string]any{"node": "de1", "check": true}))
 	if checked.ErrorCode != "" || checked.Sender != "sender-node" || len(checked.Ports) != 1 || checked.Ports[0].Verdict != "lossy" ||
-		checked.Ports[0].Got != 280 || checked.Ports[0].SenderVerdict != "lossy" || checked.Ports[0].ConfirmSender != "de1" ||
-		checked.Ports[0].ConfirmSent != 300 || checked.Ports[0].ConfirmGot != 280 || checked.Ports[0].ConfirmVerdict != "lossy" ||
+		checked.UDPFilteredUnix != 1700003000 || checked.Ports[0].ProtocolOKUnix != 1700002000 ||
+		checked.Ports[0].Got != 140 || checked.Ports[0].SenderVerdict != "lossy" || checked.Ports[0].ConfirmSender != "de1" ||
+		checked.Ports[0].ConfirmSent != 150 || checked.Ports[0].ConfirmGot != 140 || checked.Ports[0].ConfirmVerdict != "lossy" ||
 		checked.Ports[0].Blame != "node" {
 		t.Fatalf("checked UDP port results = %+v", checked)
 	}

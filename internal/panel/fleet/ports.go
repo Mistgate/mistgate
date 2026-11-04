@@ -21,10 +21,12 @@ import (
 )
 
 const (
-	capUDPCheck       = "udpcheck/1"
-	udpCheckSendCount = 300
-	udpCheckPPS       = 50
-	udpCheckSize      = 1200
+	capUDPCheck = "udpcheck/1"
+	// Six seconds at 25 packets per second keeps the sample duration while reducing eight-port UDP payload from
+	// 2.88 MB to 300 KiB. At 150 packets, the 4% relative-loss floor is six packets.
+	udpCheckSendCount = 150
+	udpCheckPPS       = 25
+	udpCheckSize      = 256
 	// A port must clear both the fixed loss floor and the three-sigma run noise floor to be marked relatively lossy.
 	udpCheckRelativeLossPct = 4
 	udpCheckWait            = 12 * time.Second
@@ -35,9 +37,6 @@ const (
 var udpCISCountryCodes = map[string]struct{}{
 	"RU": {}, "BY": {}, "KZ": {}, "KG": {}, "AM": {}, "AZ": {}, "TJ": {}, "UZ": {}, "MD": {}, "TM": {},
 }
-
-// Keep this list in step with access.twinPreferred.
-var udpCheckPreferred = []uint16{8443, 4443, 2053, 2083, 2087, 2096}
 
 var panelUDPSlots = make(chan struct{}, 4)
 
@@ -301,9 +300,6 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		}
 	}
 	candidates := f.portSenders(target, allNodes, live, capUDPCheck, demoted)
-	if len(candidates) == 0 && !allowPanel {
-		return portCheckOutcome{errorCode: "no_sender"}
-	}
 
 	inbounds, err := f.st.FleetInbounds(ctx, target.ID, false)
 	if err != nil {
@@ -323,6 +319,39 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	for _, check := range previous {
 		previousByPort[check.Port] = check
 	}
+	filteredAt, err := f.st.UDPFilteredAt(ctx, target.ID)
+	if err != nil {
+		f.log.Warn("read UDP source-filter state", "node", target.ID, "err", err)
+		return portCheckOutcome{errorCode: "failed"}
+	}
+	filtered := !filteredAt.IsZero()
+	filteredSender := ""
+	if filtered {
+		filteredSender, err = f.st.UDPFilteredSender(ctx, target.ID)
+		if err != nil {
+			f.log.Warn("read UDP source-filter sender", "node", target.ID, "err", err)
+			return portCheckOutcome{errorCode: "failed"}
+		}
+		if filteredSender == "" {
+			for _, check := range previous {
+				if check.Sender != "" {
+					filteredSender = check.Sender
+					break
+				}
+			}
+		}
+		if filteredSender == "panel" {
+			candidates = nil
+		} else {
+			candidates = slices.DeleteFunc(candidates, func(candidate portSender) bool {
+				return candidate.node.ID != filteredSender
+			})
+			allowPanel = false
+		}
+	}
+	if len(candidates) == 0 && (!allowPanel || (filtered && filteredSender != "panel")) {
+		return portCheckOutcome{errorCode: "no_sender"}
+	}
 
 	sameHost := false
 	if address, err := udpcheck.Resolve(ctx, target.Address); err == nil {
@@ -336,7 +365,9 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		first = portSender{panel: true}
 	} else {
 		first = candidates[0]
-		confirmation, hasConfirmation = udpConfirmationSender(target, first, candidates[1:], demoted)
+		if !filtered {
+			confirmation, hasConfirmation = udpConfirmationSender(target, first, candidates[1:], demoted)
+		}
 	}
 	result = f.runPortCheckAttempt(ctx, target, targetLive, first, dialOf(target), ports)
 	if (result.errorCode == "" || result.errorCode == "inconclusive") && hasConfirmation &&
@@ -382,6 +413,20 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 		f.log.Warn("store UDP port checks", "node", target.ID, "err", storeErr)
 		result.errorCode = "failed"
 		return result
+	}
+	if udpSourceFiltered(result.checks) {
+		filteredAt = result.checks[0].CheckedAt
+		if err := f.st.SetUDPFilteredState(ctx, target.ID, filteredAt, result.checks[0].Sender); err != nil {
+			f.log.Warn("store UDP source-filter state", "node", target.ID, "err", err)
+			result.errorCode = "failed"
+			return result
+		}
+	} else if filtered && portCheckClean(result.checks) {
+		if err := f.st.SetUDPFilteredAt(ctx, target.ID, time.Time{}); err != nil {
+			f.log.Warn("clear UDP source-filter state", "node", target.ID, "err", err)
+			result.errorCode = "failed"
+			return result
+		}
 	}
 	if result.combined {
 		f.pathLossyEvents(ctx, target, result.pathLoss)
@@ -436,10 +481,6 @@ func (f *Fleet) udpCheckPorts(node store.NodeRow, requested []uint16, inbounds [
 }
 
 func udpCheckPortList(requested []uint16, inbounds []udpCheckInbound) []uint16 {
-	used := make([]udpPortSettings, 0, len(inbounds))
-	for _, inbound := range inbounds {
-		used = append(used, inbound.settings)
-	}
 	var out []uint16
 	seen := make(map[uint16]bool, udpcheck.MaxPorts)
 	nonAnchor := 0
@@ -463,23 +504,9 @@ func udpCheckPortList(requested []uint16, inbounds []udpCheckInbound) []uint16 {
 				add(inbound.settings.Port)
 			}
 		}
-		for _, port := range udpCheckPreferred {
-			if !udpPortUsed(port, used) {
-				add(port)
-			}
-		}
 	}
 	add(443)
 	return out
-}
-
-func udpPortUsed(port uint16, settings []udpPortSettings) bool {
-	for _, current := range settings {
-		if port == current.Port || (current.Hop.From != 0 && port >= current.Hop.From && port <= current.Hop.To) {
-			return true
-		}
-	}
-	return false
 }
 
 // runPortCheckAttempt is one UDP delivery run: the target arms its counter on ports, the sender sends to dial.Host (on dial.Ports,
@@ -572,10 +599,9 @@ func (f *Fleet) runPortCheckAttempt(ctx context.Context, target store.NodeRow, t
 }
 
 // relativeLoss marks lossy an "ok" port that lost clearly more than the median port of the same run: the ports share the
-// sender, the path and the minute, so the difference is the port's. A hoster that filters one port often lets most of a
-// slow test through (286 of 300 to a filtered port while every other port got 300), which the absolute 95 % misses.
-// ponytail: 4 % of the packets (12 of 300) or three binomial sigmas at the median's loss, whichever is larger, so a path
-// that loses 2-4 % on every port does not blame one of them; calibrate.
+// sender, path and minute, so the difference is the port's. The 95% absolute rule leaves a window where this comparison
+// can catch a port. At 150 packets its fixed four-percent floor is six packets, or three binomial sigmas at the median's
+// loss, whichever is larger.
 func relativeLoss(checks []store.PortCheck) {
 	gots := make([]uint32, 0, len(checks))
 	for _, c := range checks {
@@ -687,6 +713,43 @@ func combinePortCheckRuns(first, second portCheckOutcome, targetID string, check
 	}
 	sort.Slice(combined.pathLoss, func(i, j int) bool { return combined.pathLoss[i].SenderID < combined.pathLoss[j].SenderID })
 	return combined
+}
+
+// udpSourceFiltered identifies a paired run where both senders reached UDP 443 but got at most 1% of every other
+// tested port. Such a node-side pattern makes recruiting more confirmation senders harmful.
+func udpSourceFiltered(checks []store.PortCheck) bool {
+	if len(checks) < 2 {
+		return false
+	}
+	anchor, other := false, false
+	for _, check := range checks {
+		if check.ConfirmSender == "" || check.Sent == 0 || check.ConfirmSent == 0 || check.Sender != checks[0].Sender ||
+			check.ConfirmSender != checks[0].ConfirmSender {
+			return false
+		}
+		if check.Port == 443 {
+			anchor = uint64(check.Got)*100 >= uint64(check.Sent)*95 && uint64(check.ConfirmGot)*100 >= uint64(check.ConfirmSent)*95
+			continue
+		}
+		other = true
+		if uint64(check.Got)*100 > uint64(check.Sent) || uint64(check.ConfirmGot)*100 > uint64(check.ConfirmSent) {
+			return false
+		}
+	}
+	return anchor && other
+}
+
+// portCheckClean means every sender used in this sample delivered at least the normal 95% port threshold.
+func portCheckClean(checks []store.PortCheck) bool {
+	if len(checks) == 0 {
+		return false
+	}
+	for _, check := range checks {
+		if portCheckOwnVerdict(check) != "ok" || (check.ConfirmSender != "" && check.ConfirmVerdict != "ok") {
+			return false
+		}
+	}
+	return true
 }
 
 func udpPortBad(verdict string) bool { return verdict == "lossy" || verdict == "broken" }
@@ -877,6 +940,16 @@ func (f *Fleet) portLossyEvents(ctx context.Context, target store.NodeRow, inbou
 	for _, check := range checks {
 		checked[check.Port] = check
 	}
+	// The panel's own protocol check through the inbound answers a blocked test, as for the alert (health.addPortLossyConds):
+	// no "loses 100 %" event for a port whose clients connect.
+	probeOK := map[string]time.Time{}
+	if samples, err := f.st.LatestProbeSamples(ctx, target.ID); err == nil {
+		for _, sample := range samples {
+			if sample.Status == int(adminv1.CheckStatus_CHECK_STATUS_OK) {
+				probeOK[sample.InboundID] = sample.At
+			}
+		}
+	}
 	for _, inbound := range inbounds {
 		if !inbound.Enabled {
 			continue
@@ -887,7 +960,8 @@ func (f *Fleet) portLossyEvents(ctx context.Context, target store.NodeRow, inbou
 		}
 		port := spec.Listen.Port
 		check, ok := checked[port]
-		if !ok || check.Verdict == "ok" || check.Blame == "path" || previous[port].Bad(f.now()) {
+		if !ok || check.Verdict == "ok" || check.Blame == "path" || previous[port].Bad(f.now()) ||
+			store.ProtocolAnswers(probeOK[inbound.ID], check.CheckedAt) {
 			continue
 		}
 		params := map[string]string{
@@ -984,6 +1058,10 @@ func portCheckMessages(names map[string]string, checks []store.PortCheck, sender
 		if !check.BadAt.IsZero() {
 			badAt = check.BadAt.Unix()
 		}
+		protocolOKAt := int64(0)
+		if !check.ProtocolOKAt.IsZero() {
+			protocolOKAt = check.ProtocolOKAt.Unix()
+		}
 		confirmSender := check.ConfirmSender
 		if confirmSender != "" && confirmSender != "panel" {
 			confirmSender = names[confirmSender]
@@ -1002,9 +1080,58 @@ func portCheckMessages(names map[string]string, checks []store.PortCheck, sender
 		out = append(out, &adminv1.PortCheck{NodeId: check.NodeID, Port: uint32(check.Port), Verdict: check.Verdict,
 			Sent: check.Sent, Got: check.Got, CheckedUnix: check.CheckedAt.Unix(), BadUnix: badAt, Sender: rowSender, Reason: reason,
 			SenderVerdict: senderVerdict, ConfirmSender: confirmSender, ConfirmSent: check.ConfirmSent,
-			ConfirmGot: check.ConfirmGot, ConfirmVerdict: check.ConfirmVerdict, Blame: check.Blame})
+			ConfirmGot: check.ConfirmGot, ConfirmVerdict: check.ConfirmVerdict, Blame: check.Blame, ProtocolOkUnix: protocolOKAt})
 	}
 	return out, senderName
+}
+
+// portProtocolOKAt returns each UDP port's newest stored protocol-probe result, without running probes.
+func (f *Fleet) portProtocolOKAt(ctx context.Context, node store.NodeRow, inbounds []store.FleetInboundRow) (map[uint16]time.Time, error) {
+	if inbounds == nil {
+		var err error
+		inbounds, err = f.st.FleetInbounds(ctx, node.ID, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	samples, err := f.st.LatestProbeSamples(ctx, node.ID)
+	if err != nil {
+		return nil, err
+	}
+	sampleByInbound := make(map[string]store.CheckSample, len(samples))
+	for _, sample := range samples {
+		sampleByInbound[sample.InboundID] = sample
+	}
+	type latestPortSample struct {
+		at time.Time
+		ok bool
+	}
+	latestByPort := make(map[uint16]latestPortSample)
+	for _, inbound := range inbounds {
+		if !inbound.Enabled {
+			continue
+		}
+		spec, err := f.buildSpec(node, inbound)
+		if err != nil || spec.Listen.Network != "udp" {
+			continue
+		}
+		sample, ok := sampleByInbound[inbound.ID]
+		if !ok {
+			continue
+		}
+		port := uint16(spec.Listen.Port)
+		previous, seen := latestByPort[port]
+		if !seen || sample.At.After(previous.at) || (sample.At.Equal(previous.at) && sample.Status != int(adminv1.CheckStatus_CHECK_STATUS_OK)) {
+			latestByPort[port] = latestPortSample{at: sample.At, ok: sample.Status == int(adminv1.CheckStatus_CHECK_STATUS_OK)}
+		}
+	}
+	passed := make(map[uint16]time.Time, len(latestByPort))
+	for port, sample := range latestByPort {
+		if sample.ok {
+			passed[port] = sample.at
+		}
+	}
+	return passed, nil
 }
 
 func udpPortSenderOrder(target store.NodeRow, candidates []store.NodeRow, demotedRows ...map[string]bool) []store.NodeRow {

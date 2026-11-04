@@ -843,9 +843,11 @@ type PortCheck struct {
 	// The confirmation sender's verdict after the relative-loss rule; empty when there was no confirmation run.
 	ConfirmVerdict string `protobuf:"bytes,14,opt,name=confirm_verdict,json=confirmVerdict,proto3" json:"confirm_verdict,omitempty"`
 	// "node" when both runs found loss, "path" when only one did, or empty when unconfirmed or both were clean.
-	Blame         string `protobuf:"bytes,15,opt,name=blame,proto3" json:"blame,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Blame string `protobuf:"bytes,15,opt,name=blame,proto3" json:"blame,omitempty"`
+	// Unix time of the latest successful panel protocol probe through an enabled inbound on this port; 0 if its latest result failed or none is stored.
+	ProtocolOkUnix int64 `protobuf:"varint,16,opt,name=protocol_ok_unix,json=protocolOkUnix,proto3" json:"protocol_ok_unix,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PortCheck) Reset() {
@@ -981,6 +983,13 @@ func (x *PortCheck) GetBlame() string {
 		return x.Blame
 	}
 	return ""
+}
+
+func (x *PortCheck) GetProtocolOkUnix() int64 {
+	if x != nil {
+		return x.ProtocolOkUnix
+	}
+	return 0
 }
 
 // One TCP port of a node in the port check (design/vless.md section 7.4): does a connection reach Mistgate itself.
@@ -1328,7 +1337,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x1c.mistgate.admin.v1.WarpStateR\x05state\x125\n" +
 	"\x06source\x18\x02 \x01(\x0e2\x1d.mistgate.admin.v1.WarpSourceR\x06source\x12\x12\n" +
 	"\x04colo\x18\x03 \x01(\tR\x04colo\x12!\n" +
-	"\faccount_type\x18\x04 \x01(\tR\vaccountType\"\xbf\x03\n" +
+	"\faccount_type\x18\x04 \x01(\tR\vaccountType\"\xed\x03\n" +
 	"\tPortCheck\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12\x18\n" +
@@ -1346,7 +1355,8 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\vconfirm_got\x18\r \x01(\rR\n" +
 	"confirmGot\x12'\n" +
 	"\x0fconfirm_verdict\x18\x0e \x01(\tR\x0econfirmVerdict\x12\x14\n" +
-	"\x05blame\x18\x0f \x01(\tR\x05blame\"\xd1\x01\n" +
+	"\x05blame\x18\x0f \x01(\tR\x05blame\x12,\n" +
+	"\x10protocol_ok_unix\x18\x10 \x01(\x03B\x020\x02R\x0eprotocolOkUnix\"\xd1\x01\n" +
 	"\bTcpCheck\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12\x12\n" +

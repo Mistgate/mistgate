@@ -198,6 +198,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 	var rows []store.DoctorRow
 	var accepts []store.DoctorAccept
 	var portChecks []store.PortCheck
+	var probeSamples []store.CheckSample
 	var pathLosses []store.UDPPathLoss
 	needFleetData := len(sn.nodes) > 0 || !s.cfg.Edge
 	if needFleetData {
@@ -228,6 +229,11 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 			s.log.Warn("health: evaluate", "err", err)
 			return
 		}
+		probeSamples, err = s.st.LatestProbeSamples(ctx, "")
+		if err != nil {
+			s.log.Warn("health: evaluate latest protocol probes", "err", err)
+			return
+		}
 		pathLosses, err = s.st.UDPPathLosses(ctx, now.Add(-30*time.Hour))
 		if err != nil {
 			s.log.Warn("health: evaluate UDP path losses", "err", err)
@@ -239,7 +245,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 		s.log.Warn("health: evaluate", "err", err)
 		return
 	}
-	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, active)
+	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, probeSamples, active)
 	addPathLossyConds(now, pathLosses, func(c cond) { d.conds[c.key] = c })
 	s.addRelayDownConds(ctx, now, sn, signals.RelayLinks, active, d)
 	s.nhMu.Lock()
@@ -280,7 +286,7 @@ func accepted(r store.DoctorRow, acc map[string]store.DoctorAccept) (store.Docto
 
 // derive computes the conditions that hold now.
 func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live map[string]store.NodeLiveRow, rows []store.DoctorRow, accepts map[string]map[string]store.DoctorAccept,
-	signals store.HealthSignalBatch, portChecks []store.PortCheck, active []store.HealthAlert) *derived {
+	signals store.HealthSignalBatch, portChecks []store.PortCheck, probeSamples []store.CheckSample, active []store.HealthAlert) *derived {
 	d := &derived{conds: map[key]cond{}, accepted: map[key]bool{}, nodes: map[string]bool{}, holdNode: map[string]bool{}, holdDown: map[string]bool{},
 		holdDoctor: map[string]bool{}, holdKeys: map[key]bool{}, superseded: map[key]bool{}, health: map[string]nodeHealth{}}
 	docs := map[string][]store.DoctorRow{}
@@ -504,7 +510,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 	for _, c := range s.extConds(ctx) { // e.g. a paused rollout (update_failed)
 		add(cond{key: key{c.Kind, c.NodeID, c.Subject}, severity: c.Severity, why: c.Why, params: c.Params})
 	}
-	addPortLossyConds(sn, portChecks, add)
+	addPortLossyConds(sn, portChecks, probeSamples, add)
 	activeKeys := make(map[key]bool, len(active))
 	activeAlerts := make(map[key]store.HealthAlert, len(active))
 	for _, alert := range active {
@@ -550,10 +556,14 @@ func cdnHost(t *target) string {
 // addPortLossyConds derives a port alert from each enabled inbound's current port and its latest stored verdict.
 // check_failed remains active alongside this alert: it describes a client-eye failure, while this check measures
 // whether tagged UDP packets arrived at the node.
-func addPortLossyConds(sn *snapshot, checks []store.PortCheck, add func(cond)) {
+func addPortLossyConds(sn *snapshot, checks []store.PortCheck, probeSamples []store.CheckSample, add func(cond)) {
 	type nodePort struct {
 		node string
 		port uint16
+	}
+	latestProbe := make(map[string]store.CheckSample, len(probeSamples))
+	for _, sample := range probeSamples {
+		latestProbe[sample.InboundID] = sample
 	}
 	latest := make(map[nodePort]store.PortCheck, len(checks))
 	for _, check := range checks {
@@ -571,6 +581,14 @@ func addPortLossyConds(sn *snapshot, checks []store.PortCheck, add func(cond)) {
 			port := uint16(inbound.spec.Listen.Port)
 			check, ok := latest[nodePort{node: node.ID, port: port}]
 			if !ok || (check.Verdict != "lossy" && check.Verdict != "broken") {
+				continue
+			}
+			// A current panel probe through this exact inbound takes precedence over UDP delivery from a fleet sender: a hoster's
+			// filter can drop the test datagrams while real clients connect. The latest result counts when it passed after the
+			// UDP check or at most store.PortProbeTrust before it (waiting for the next probe would open the alert for those
+			// minutes and close it again).
+			if sample, ok := latestProbe[inbound.in.ID]; ok && sample.Status == int(adminv1.CheckStatus_CHECK_STATUS_OK) &&
+				store.ProtocolAnswers(sample.At, check.CheckedAt) {
 				continue
 			}
 			sender := check.Sender

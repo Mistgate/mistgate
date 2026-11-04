@@ -7,9 +7,20 @@ import (
 )
 
 const (
-	portCheckBadFor   = 30 * 24 * time.Hour
-	portCheckFreshFor = 24 * time.Hour
+	portCheckBadFor          = 30 * 24 * time.Hour
+	portCheckFreshFor        = 24 * time.Hour
+	UDPFilteredCheckInterval = 24 * time.Hour
 )
+
+// PortProbeTrust is how long before a UDP port check a passing protocol probe through the same inbound still answers
+// it: a hoster's filter can drop the test datagrams while real clients connect, and probes run every few minutes.
+const PortProbeTrust = 15 * time.Minute
+
+// ProtocolAnswers reports whether a passing protocol probe at probeOK answers a port check at checked: after it, or at
+// most PortProbeTrust before it.
+func ProtocolAnswers(probeOK, checked time.Time) bool {
+	return !probeOK.IsZero() && !probeOK.Before(checked.Add(-PortProbeTrust))
+}
 
 // PortCheck is the latest conclusive UDP delivery result for one node address and port.
 type PortCheck struct {
@@ -20,6 +31,91 @@ type PortCheck struct {
 	ConfirmSender, ConfirmVerdict, Blame string
 	ConfirmSent, ConfirmGot              uint32
 	CheckedAt, BadAt                     time.Time
+	ProtocolOKAt                         time.Time
+}
+
+// UDPFilteredState is a node whose latest paired port check found the source-filtered pattern.
+type UDPFilteredState struct {
+	NodeID    string
+	At        time.Time
+	CheckedAt time.Time
+	SenderID  string
+}
+
+// UDPFilteredAt reads the last time a paired check found source-side filtering; zero means no finding is stored.
+func (s *Store) UDPFilteredAt(ctx context.Context, nodeID string) (time.Time, error) {
+	var at int64
+	err := s.R.QueryRowContext(ctx, `SELECT udp_filtered_at FROM node WHERE id = ?`, nodeID).Scan(&at)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if at == 0 {
+		return time.Time{}, nil
+	}
+	return fromUnix(at), nil
+}
+
+// UDPFilteredSender returns the sender that first participated in the paired finding, so later checks can reuse it.
+func (s *Store) UDPFilteredSender(ctx context.Context, nodeID string) (string, error) {
+	var sender string
+	err := s.R.QueryRowContext(ctx, `SELECT udp_filtered_sender FROM node WHERE id = ?`, nodeID).Scan(&sender)
+	return sender, err
+}
+
+// UDPFilteredNodes returns the nodes with a stored source-filtered finding.
+func (s *Store) UDPFilteredNodes(ctx context.Context) ([]UDPFilteredState, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT id, udp_filtered_at, udp_filtered_checked_at, udp_filtered_sender FROM node WHERE udp_filtered_at > 0 ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []UDPFilteredState
+	for rows.Next() {
+		var state UDPFilteredState
+		var at, checkedAt int64
+		if err := rows.Scan(&state.NodeID, &at, &checkedAt, &state.SenderID); err != nil {
+			return nil, err
+		}
+		state.At = fromUnix(at)
+		if checkedAt != 0 {
+			state.CheckedAt = fromUnix(checkedAt)
+		}
+		out = append(out, state)
+	}
+	return out, rows.Err()
+}
+
+// SetUDPFilteredAt records or clears the latest paired source-filtered finding.
+func (s *Store) SetUDPFilteredAt(ctx context.Context, nodeID string, at time.Time) error {
+	value := int64(0)
+	if !at.IsZero() {
+		value = unix(at)
+	}
+	_, err := s.W.ExecContext(ctx, `UPDATE node SET udp_filtered_at = ?, udp_filtered_sender = CASE WHEN ? = 0 THEN '' ELSE udp_filtered_sender END,
+		udp_filtered_checked_at = CASE WHEN ? = 0 THEN 0 ELSE udp_filtered_checked_at END WHERE id = ?`, value, value, value, nodeID)
+	return err
+}
+
+// SetUDPFilteredState stores the timestamp and a sender for daily retries. Clearing the timestamp clears the sender too.
+func (s *Store) SetUDPFilteredState(ctx context.Context, nodeID string, at time.Time, senderID string) error {
+	value := int64(0)
+	if !at.IsZero() {
+		value = unix(at)
+	} else {
+		senderID = ""
+	}
+	_, err := s.W.ExecContext(ctx, `UPDATE node SET udp_filtered_at = ?, udp_filtered_sender = ?, udp_filtered_checked_at = ? WHERE id = ?`, value, senderID, value, nodeID)
+	return err
+}
+
+// SetUDPFilteredCheckedAt records a periodic recheck attempt, including attempts that could not find a sender.
+func (s *Store) SetUDPFilteredCheckedAt(ctx context.Context, nodeID string, at time.Time) error {
+	value := int64(0)
+	if !at.IsZero() {
+		value = unix(at)
+	}
+	_, err := s.W.ExecContext(ctx, `UPDATE node SET udp_filtered_checked_at = ? WHERE id = ?`, value, nodeID)
+	return err
 }
 
 // Bad reports whether this port lost packets in the last 30 days.

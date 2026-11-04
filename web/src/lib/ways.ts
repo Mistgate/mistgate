@@ -4,6 +4,7 @@ import { CheckStatus, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import type { NodeIpv6 } from "@/gen/mistgate/admin/v1/node_pb";
 import type { CountryCheck } from "./health";
 import type { Plain } from "./plain";
+import { testBlocked } from "./port-check";
 import { isCut, relayState, type CountryHint, type RelayMsg } from "./relay";
 
 // The ways people reach a node (the node page's "Ways in" tab): straight to its address, through another node (a relay),
@@ -39,7 +40,7 @@ export type Lane = {
 export type WaysInput = {
   node: { id: string; status: NodeStatus };
   inbounds: readonly { state: InboundState }[];
-  portChecks?: readonly { verdict: string }[];
+  portChecks?: readonly { verdict: string; checkedUnix?: number; protocolOkUnix?: number }[];
   tcpChecks?: readonly { verdict: string }[];
   /** The client-side checks of the node's profiles (Health). */
   cells?: readonly { deployed: boolean; last?: { status: CheckStatus } }[];
@@ -126,7 +127,8 @@ export function lanesOf(w: WaysInput): Ways {
   const offline = w.node.status === NodeStatus.DOWN || w.node.status === NodeStatus.BLIP;
   const enabled = w.inbounds.filter((i) => i.state !== InboundState.DISABLED);
   const failed = enabled.filter((i) => i.state === InboundState.FAILED).length;
-  const udp = (w.portChecks ?? []).map((c) => c.verdict);
+  // a port whose test is blocked while the protocol through it works lets people in: it counts as a working port
+  const udp = (w.portChecks ?? []).map((c) => (testBlocked(c) ? "ok" : c.verdict));
   const tcp = (w.tcpChecks ?? []).map((c) => c.verdict);
   const cells = (w.cells ?? []).filter((c) => c.deployed && c.last);
   const cellsDown = cells.filter((c) => c.last!.status === CheckStatus.FAILED).length;

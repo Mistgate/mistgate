@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Notice } from "@/components/ui/notice";
 import { StatusDot, StatusPill, kindTextClass, type StatusKind } from "@/components/ui/status";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
@@ -13,9 +14,10 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { agentLinked } from "@/lib/node-status";
-import { bestDelivered, lossPct, portRuns, reasonShort, reasonText, regionWord, renewalOf, renewalText, senderLabel, udpFilters, udpRegion, type PortRun } from "@/lib/port-check";
+import { bestDelivered, lossPct, portRuns, reasonShort, reasonText, regionWord, renewalOf, renewalText, senderLabel, testBlocked, udpFilters, udpRegion, type PortRun } from "@/lib/port-check";
 import { plain, type Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
+import { protocolName } from "@/lib/series";
 import { meQuery } from "@/lib/session";
 
 // "Ports" in the Direct way in of a node (design/udp-port-check.md §6.6, design/vless.md §7.4): what the delivery check found
@@ -26,8 +28,12 @@ import { meQuery } from "@/lib/session";
 type Check = Plain<GetNodeResponse>["portChecks"][number];
 type TcpCheck = Plain<GetNodeResponse>["tcpChecks"][number];
 
-/** How a stored verdict reads: the pill and its tone. "" (not checked) and anything unknown read as not checked. */
-export function verdictPill(t: T, c: Pick<Check, "verdict" | "sent" | "got">): { kind: StatusKind; label: string } {
+/**
+ * How a stored verdict reads: the pill and its tone. A loss whose protocol works through the port is the test being
+ * blocked: amber, not the loss. "" (not checked) and anything unknown read as not checked.
+ */
+export function verdictPill(t: T, c: Pick<Check, "verdict" | "sent" | "got"> & Partial<Pick<Check, "checkedUnix" | "protocolOkUnix">>): { kind: StatusKind; label: string } {
+  if (testBlocked(c)) return { kind: "warn", label: t("ports.testBlocked") };
   const lost = lossPct(c.sent, c.got);
   switch (c.verdict) {
     case "ok":
@@ -111,12 +117,16 @@ export function portRows(data: Pick<Plain<GetNodeResponse>, "node" | "inbounds" 
   if (stored.length > 0) {
     for (const port of new Set(udpInbounds.map((i) => i.port))) {
       if (port > 0 && !stored.some((c) => c.port === port))
-        unchecked.push({ nodeId: data.node!.id, port, verdict: "", sent: 0, got: 0, checkedUnix: 0, badUnix: 0, sender: "", reason: "", senderVerdict: "", confirmSender: "", confirmSent: 0, confirmGot: 0, confirmVerdict: "", blame: "" });
+        unchecked.push({ nodeId: data.node!.id, port, verdict: "", sent: 0, got: 0, checkedUnix: 0, badUnix: 0, sender: "", reason: "", senderVerdict: "", confirmSender: "", confirmSent: 0, confirmGot: 0, confirmVerdict: "", blame: "", protocolOkUnix: 0 });
     }
   }
   const udp = [...stored, ...unchecked].sort((a, b) => Number(profilesOn(b.port).length > 0) - Number(profilesOn(a.port).length > 0) || a.port - b.port);
   return { udp, tcp, profilesOn };
 }
+
+// A row of the list. A wide block lines the rows up as one table (port, pill, what the check found, the profile), so the
+// words of every row start on one line whatever its pill says; a narrow one lets each row wrap as it needs.
+const rowClass = "flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 first:border-t-0 @xl:col-span-full @xl:grid @xl:grid-cols-subgrid @xl:justify-items-start";
 
 /** The rows of the port check and what its last run said. */
 export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCheck }) {
@@ -134,6 +144,10 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
   // a sender whose way here lets some ports through whole and drops the rest: a filter (a hoster's DDoS protection), not this node
   const filters = udpFilters(rows);
   const filtered = new Set(filters.map((f) => f.sender));
+  // both senders got only UDP 443 through: the node's own hoster filters, which says more than any one sender's caption
+  const hosterFilter = (data.udpFilteredUnix ?? 0) > 0;
+  // the protocols whose panel check runs through a port (protocolOkUnix): its enabled UDP profiles
+  const protocolsOn = (port: number) => [...new Set(data.inbounds.filter((i) => i.port === port && i.protocol !== "vless" && i.state !== InboundState.DISABLED).map((i) => protocolName(i.protocol)))].join(", ");
 
   const result = run.data;
   // a run whose TCP part could not probe anything stores nothing, so its reason would otherwise go unsaid
@@ -156,11 +170,13 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
         </Notice>
       )}
       {rows.length + tcp.length > 0 && (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col @xl:grid @xl:grid-cols-[72px_max-content_minmax(0,1fr)_minmax(0,max-content)] @xl:gap-x-3">
           {rows.map((c) => {
             const pill = verdictPill(t, c);
             const profiles = profilesOn(c.port);
             const checked = c.checkedUnix > 0;
+            // the test datagrams were lost but the protocol works through the port: the counts stay quiet, a line says why
+            const blocked = testBlocked(c);
             // checked again from a second sender: both runs take the place of "N of M arrived · from X"
             const runs = portRuns(c);
             const detail = [
@@ -172,18 +188,22 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
               .filter(Boolean)
               .join(" · ");
             return (
-              <li key={c.port} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 first:border-t-0">
+              <li key={c.port} className={rowClass}>
                 <span className="w-[72px] font-mono text-[13px] font-bold">udp/{c.port}</span>
                 <StatusPill kind={pill.kind} label={pill.label} sm />
-                {/* two runs need about one "from X n/m · from Y n/m": in a narrow block they take a line of their own */}
-                <span className={cx("min-w-[160px] flex-1 text-xs leading-snug text-muted", runs && "@max-md:basis-full")}>
-                  {runs && <Runs runs={runs} filtered={filtered} />}
+                {/* two runs need about one "from X n/m · from Y n/m", the blocked test a sentence: in a narrow block they take a line of their own */}
+                <span className={cx("min-w-[160px] flex-1 text-xs leading-snug text-muted", (runs || blocked) && "@max-md:basis-full")}>
+                  {runs && <Runs runs={runs} filtered={filtered} quiet={blocked} />}
                   {runs && detail && " · "}
                   {/* beside the runs, the age is one unbroken piece too: the line wraps only at a " · " */}
                   {runs ? <span className="whitespace-nowrap">{detail}</span> : detail}
                   {/* a port that lost packets once and is clean now is still avoided for 30 days: say when */}
                   {c.verdict === "ok" && c.badUnix > 0 && <span className="block text-warn-text">{t("ports.row.cleanNow", { when: fmt.ago(c.badUnix) })}</span>}
-                  {runs && <Blame blame={c.blame} runs={runs} kind={pill.kind} regionOf={regionOf} filtered={filtered} />}
+                  {blocked ? (
+                    <VerdictLine id="blocked" kind="ok" text={t("ports.blame.blocked", { protocols: protocolsOn(c.port) })} />
+                  ) : (
+                    runs && <Blame blame={c.blame} runs={runs} kind={pill.kind} regionOf={regionOf} filtered={filtered} />
+                  )}
                 </span>
                 <span className="min-w-0 text-xs break-words">
                   {profiles.length > 0 ? (
@@ -197,13 +217,16 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
               </li>
             );
           })}
-          {/* under the UDP rows it explains: checks from that sender cannot pass, the node is fine */}
-          {filters.map((f) => (
-            <li key={f.sender} data-testid="udp-filter" className="flex items-start gap-2 pb-2.5 text-xs leading-snug text-pretty text-muted">
-              <Icon name="shield" size={13} aria-hidden className="tone-warn tone-text mt-px flex-none" />
-              {t("ports.filter", { sender: senderLabel(t, f.sender), open: f.open.join(", "), node: node.name })}
-            </li>
-          ))}
+          {/* under the UDP rows it explains: checks from that sender (or from any of ours, the hoster's filter) cannot pass, the node is fine */}
+          {hosterFilter ? (
+            <Caption id="udp-filtered">{t("ports.filter.hoster")}</Caption>
+          ) : (
+            filters.map((f) => (
+              <Caption key={f.sender} id="udp-filter">
+                {t("ports.filter", { sender: senderLabel(t, f.sender), open: f.open.join(", "), node: node.name })}
+              </Caption>
+            ))
+          )}
           {tcp.map((c) => (
             <TcpRow key={c.port} c={c} />
           ))}
@@ -217,13 +240,14 @@ export function Ports({ data, run }: { data: Plain<GetNodeResponse>; run: PortCh
 /**
  * Both runs of a port checked from two senders, "from minsk1 236/300 · from de1 299/300": the one that lost packets in its tone.
  * A sender behind a filter (`filtered`) is amber even where it got nothing: its way is filtered, the port is not broken.
+ * `quiet` (the test is blocked, the protocol works): every run in the muted text of the counts.
  */
-function Runs({ runs, filtered }: { runs: readonly PortRun[]; filtered: ReadonlySet<string> }) {
+function Runs({ runs, filtered, quiet }: { runs: readonly PortRun[]; filtered: ReadonlySet<string>; quiet?: boolean }) {
   const t = useT();
   return (
     <>
       {runs.map((r, i) => {
-        const loss = r.loss && filtered.has(r.sender) ? "warn" : r.loss;
+        const loss = quiet ? "" : r.loss && filtered.has(r.sender) ? "warn" : r.loss;
         return (
           <Fragment key={i}>
             {i > 0 && " · "}
@@ -251,11 +275,26 @@ function Blame({ blame, runs, kind, regionOf, filtered }: { blame: string; runs:
     line = { kind: "ok", text };
   } else if (blame === "node") line = { kind, text: t("ports.blame.node") };
   if (!line) return null;
+  return <VerdictLine id={blame} kind={line.kind} text={line.text} />;
+}
+
+/** The verdict line under a row's counts: a tick when the port lets people in, else the warning mark, in the line's tone. */
+function VerdictLine({ id, kind, text }: { id: string; kind: StatusKind; text: string }) {
   return (
-    <span data-blame={blame} className={`tone-${line.kind} tone-text mt-1 flex items-start gap-1.5 font-semibold`}>
-      <Icon name={line.kind === "ok" ? "check" : "warn"} size={12} aria-hidden className="mt-[2px] flex-none" />
-      {line.text}
+    <span data-blame={id} className={`tone-${kind} tone-text mt-1 flex items-start gap-1.5 font-semibold`}>
+      <Icon name={kind === "ok" ? "check" : "warn"} size={12} aria-hidden className="mt-0.5 flex-none" />
+      {text}
     </span>
+  );
+}
+
+/** A caption under the UDP rows about the way to the node (a filter): the shield in the warning tone, the words quiet. */
+function Caption({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <li data-testid={id} className="flex items-start gap-2 pb-2.5 text-xs leading-snug text-pretty text-muted @xl:col-span-full">
+      <Icon name="shield" size={12} aria-hidden className="tone-warn tone-text mt-0.5 flex-none" />
+      {children}
+    </li>
   );
 }
 
@@ -270,7 +309,7 @@ function TcpRow({ c }: { c: TcpCheck }) {
   // port 80 belongs to no profile: it is the certificates'; a site is the Hysteria2 profile's
   const owner = c.role === "acme" ? t("ports.tcp.role.acme") : [c.role === "site" ? t("ports.tcp.role.site") : "", c.profile].filter(Boolean).join(" · ");
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5 first:border-t-0">
+    <li className={rowClass}>
       <span className="w-[72px] font-mono text-[13px] font-bold">tcp/{c.port}</span>
       <StatusPill kind={pill.kind} label={pill.label} sm />
       <span className="min-w-[160px] flex-1 text-xs leading-snug text-muted">{detail}</span>

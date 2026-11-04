@@ -613,7 +613,7 @@ func TestUsersImpactedIsSuppressedByHeldActiveCheckFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := e.s.derive(e.ctx, e.clock.Now(), sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, mustActiveAlerts(t, e))
+	d := e.s.derive(e.ctx, e.clock.Now(), sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, nil, mustActiveAlerts(t, e))
 	if !d.holdKeys[key{kCheckFailed, "de1", first}] {
 		t.Fatal("test did not leave CHECK_FAILED in the held state")
 	}
@@ -1456,7 +1456,7 @@ func TestPortLossyAlertOpensForBadLatestInboundVerdict(t *testing.T) {
 	for _, tc := range []struct {
 		verdict string
 		got     uint32
-	}{{"lossy", 286}, {"broken", 100}} {
+	}{{"lossy", 143}, {"broken", 100}} {
 		t.Run(tc.verdict, func(t *testing.T) {
 			e := newEnv(t)
 			e.node("de1", "provider-a", true)
@@ -1465,7 +1465,7 @@ func TestPortLossyAlertOpensForBadLatestInboundVerdict(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: tc.got,
+			check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 150, Got: tc.got,
 				Verdict: tc.verdict, Sender: "panel", CheckedAt: e.clock.Now()}
 			if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{check}); err != nil {
 				t.Fatal(err)
@@ -1474,10 +1474,51 @@ func TestPortLossyAlertOpensForBadLatestInboundVerdict(t *testing.T) {
 
 			alert, ok := e.active()["port_lossy/de1/"+inbound]
 			if !ok || alert.Severity != sevWarning || alert.WhyKey != "health.alert.port_lossy.why" ||
-				alert.Params["profile"] == "" || alert.Params["port"] != "8443" || alert.Params["sent"] != "300" ||
+				alert.Params["profile"] == "" || alert.Params["port"] != "8443" || alert.Params["sent"] != "150" ||
 				alert.Params["got"] != strconv.FormatUint(uint64(tc.got), 10) || alert.Params["sender"] != "panel" ||
 				alert.Params["checked_unix"] != strconv.FormatInt(check.CheckedAt.Unix(), 10) {
 				t.Fatalf("port_lossy alert = %+v, found %v", alert, ok)
+			}
+		})
+	}
+}
+
+func TestPortLossyAlertUsesLatestProtocolProbeForTheInbound(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		status    int
+		probeAge  time.Duration
+		wantAlert bool
+	}{
+		{name: "passed after port check", status: int(cOK), probeAge: time.Minute},
+		{name: "failed after port check", status: int(cFail), probeAge: time.Minute, wantAlert: true},
+		{name: "passed shortly before port check", status: int(cOK), probeAge: -5 * time.Minute},
+		{name: "passed long before port check", status: int(cOK), probeAge: -30 * time.Minute, wantAlert: true},
+		{name: "no stored result", wantAlert: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("de1", "provider-a", true)
+			inbound := e.inbound("de1", 8443)
+			node, err := e.st.Node(e.ctx, "de1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			checkedAt := e.clock.Now()
+			check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 150, Got: 104,
+				Verdict: "broken", Sender: "panel", CheckedAt: checkedAt}
+			if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{check}); err != nil {
+				t.Fatal(err)
+			}
+			if tc.status != 0 {
+				if err := e.st.InsertSample(e.ctx, store.CheckSample{InboundID: inbound, At: checkedAt.Add(tc.probeAge), Status: tc.status}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			e.evaluate()
+			_, got := e.active()["port_lossy/de1/"+inbound]
+			if got != tc.wantAlert {
+				t.Fatalf("port_lossy present = %v, want %v", got, tc.wantAlert)
 			}
 		})
 	}
@@ -1494,8 +1535,8 @@ func TestPortLossyAlertUsesEnabledInboundCurrentPorts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{
-		{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
-		{NodeID: node.ID, Address: node.Address, Port: 2053, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+		{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+		{NodeID: node.ID, Address: node.Address, Port: 2053, Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1515,7 +1556,7 @@ func TestPortLossyAlertResolvesOnCleanRecheckDespiteStickyBadAt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bad := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 100,
+	bad := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 150, Got: 100,
 		Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{bad}); err != nil {
 		t.Fatal(err)
@@ -1525,7 +1566,7 @@ func TestPortLossyAlertResolvesOnCleanRecheckDespiteStickyBadAt(t *testing.T) {
 
 	e.clock.Advance(time.Minute)
 	clean := bad
-	clean.Got, clean.Verdict, clean.CheckedAt = 300, "ok", e.clock.Now()
+	clean.Got, clean.Verdict, clean.CheckedAt = 150, "ok", e.clock.Now()
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{clean}); err != nil {
 		t.Fatal(err)
 	}
@@ -1549,7 +1590,7 @@ func TestPortLossyAlertResolvesWhenInboundMovesPorts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
-		Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+		Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
 		t.Fatal(err)
 	}
 	e.evaluate()
@@ -1575,8 +1616,8 @@ func TestPortLossyAlertResolvesAndReopensWhenNewPortIsAlsoBad(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{
-		{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
-		{NodeID: node.ID, Address: node.Address, Port: 2053, Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+		{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
+		{NodeID: node.ID, Address: node.Address, Port: 2053, Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1602,7 +1643,7 @@ func TestPortLossyAlertResolvesWhenNodeIsRetired(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
-		Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+		Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
 		t.Fatal(err)
 	}
 	e.evaluate()
@@ -1631,7 +1672,7 @@ func TestPortLossyAlertResolvesWhenInboundIsDisabledOrRemoved(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
-				Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+				Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
 				t.Fatal(err)
 			}
 			e.evaluate()
@@ -1662,7 +1703,7 @@ func TestPortLossyAlertCanCoexistWithClientEyeFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{{NodeID: node.ID, Address: node.Address, Port: 8443,
-		Sent: 300, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
+		Sent: 150, Got: 100, Verdict: "broken", Sender: "panel", CheckedAt: e.clock.Now()}}); err != nil {
 		t.Fatal(err)
 	}
 	e.fail(inbound, "timeout")
@@ -1680,16 +1721,16 @@ func TestPortLossyAlertExplainsConfirmedRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 300, Got: 210,
-		Verdict: "lossy", Sender: "alice", SenderVerdict: "lossy", ConfirmSender: "bob", ConfirmSent: 300,
-		ConfirmGot: 300, ConfirmVerdict: "ok", CheckedAt: e.clock.Now()}
+	check := store.PortCheck{NodeID: node.ID, Address: node.Address, Port: 8443, Sent: 150, Got: 140,
+		Verdict: "lossy", Sender: "alice", SenderVerdict: "lossy", ConfirmSender: "bob", ConfirmSent: 150,
+		ConfirmGot: 150, ConfirmVerdict: "ok", CheckedAt: e.clock.Now()}
 	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{check}); err != nil {
 		t.Fatal(err)
 	}
 	e.evaluate()
 	alert, ok := e.active()["port_lossy/nl1/"+inbound]
 	if !ok || alert.WhyKey != "health.alert.port_lossy.why.confirmed" || alert.Params["confirm_sender"] != "bob" ||
-		alert.Params["confirm_got"] != "300" || alert.Params["confirm_sent"] != "300" {
+		alert.Params["confirm_got"] != "150" || alert.Params["confirm_sent"] != "150" {
 		t.Fatalf("confirmed port alert = %+v, found=%v", alert, ok)
 	}
 }
@@ -1712,8 +1753,8 @@ func TestPathLossyAlertOpensAndResolvesFromItsStoredRow(t *testing.T) {
 			e.exec(`UPDATE node SET country_code = 'NL' WHERE id = ?`, targetID)
 			e.exec(`UPDATE node SET country_code = 'DE' WHERE id = ?`, otherID)
 			checked := e.clock.Now()
-			loss := store.UDPPathLoss{SenderID: senderID, TargetID: targetID, Ports: "2053, 2083", Sent: 300, Got: 237,
-				OtherSenderID: otherID, OtherGot: 299, CheckedAt: checked}
+			loss := store.UDPPathLoss{SenderID: senderID, TargetID: targetID, Ports: "2053, 2083", Sent: 150, Got: 118,
+				OtherSenderID: otherID, OtherGot: 150, CheckedAt: checked}
 			if err := e.st.UpdateUDPPathLosses(e.ctx, targetID, []string{senderID, otherID}, []store.UDPPathLoss{loss}); err != nil {
 				t.Fatal(err)
 			}

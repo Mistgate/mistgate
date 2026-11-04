@@ -37,8 +37,8 @@ service NodeService {
   // in error_code. One measurement per node at a time.
   rpc MeasureBandwidth(MeasureBandwidthRequest) returns (MeasureBandwidthResponse);
   // Checks that UDP datagrams sent to the node arrive (agents with "udpcheck/1"; design/udp-port-check.md): about 6 s per
-  // 8 ports, a few MB. Ports: the given ones (at most 7), else the node's enabled inbound ports and the free ports the
-  // picker prefers; 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
+  // 8 ports, about 300 KiB of UDP payload at most. Ports: the given ones (at most 7), else the node's enabled UDP inbound ports;
+  // 443 is always added. Another node sends (both editions); a VPS panel with no other usable node sends
   // itself. Conclusive results are stored and shown in GetNodeResponse.port_checks.
   // The same call probes the node's TCP ports (agents with "tcpcheck/1"; design/vless.md section 7.4): port 80 only with an
   // ACME name on the node, the Hysteria2 site port and the VLESS ports. The rows are CheckPortsResponse.tcp and are stored for
@@ -292,6 +292,8 @@ message GetNodeResponse {
   repeated PortCheck port_checks = 12;
   // Stored TCP checks of this node (the last run), by port.
   repeated TcpCheck tcp_checks = 13;
+  // Latest paired check that found source-side UDP filtering; 0 = none or a later check passed cleanly.
+  int64 udp_filtered_unix = 14 [jstype = JS_NUMBER];
 }
 
 message CreateEnrollmentRequest {
@@ -458,7 +460,7 @@ message MeasureBandwidthResponse {
 
 message CheckPortsRequest {
   string node_id = 1;
-  // At most 7; 443 is always added. Empty = the node's enabled inbound ports, then the free ports the picker prefers.
+  // At most 7; 443 is always added. Empty = the node's enabled UDP inbound ports.
   repeated uint32 ports = 2;
 }
 
@@ -473,6 +475,8 @@ message CheckPortsResponse {
   // sender for the TCP part (no other node lists "tcpcheck/1" and the panel does not send); the UDP part's error_code
   // does not decide it, except node_offline. A row that could not be probed has verdict "" and a reason.
   repeated TcpCheck tcp = 4;
+  // Latest paired check that found source-side UDP filtering; 0 = none or a later check passed cleanly.
+  int64 udp_filtered_unix = 5 [jstype = JS_NUMBER];
 }
 
 message CheckIpv6Request {

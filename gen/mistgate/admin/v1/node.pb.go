@@ -1435,9 +1435,11 @@ type GetNodeResponse struct {
 	// Stored UDP delivery checks of this node's current address, by port.
 	PortChecks []*PortCheck `protobuf:"bytes,12,rep,name=port_checks,json=portChecks,proto3" json:"port_checks,omitempty"`
 	// Stored TCP checks of this node (the last run), by port.
-	TcpChecks     []*TcpCheck `protobuf:"bytes,13,rep,name=tcp_checks,json=tcpChecks,proto3" json:"tcp_checks,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	TcpChecks []*TcpCheck `protobuf:"bytes,13,rep,name=tcp_checks,json=tcpChecks,proto3" json:"tcp_checks,omitempty"`
+	// Latest paired check that found source-side UDP filtering; 0 = none or a later check passed cleanly.
+	UdpFilteredUnix int64 `protobuf:"varint,14,opt,name=udp_filtered_unix,json=udpFilteredUnix,proto3" json:"udp_filtered_unix,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetNodeResponse) Reset() {
@@ -1559,6 +1561,13 @@ func (x *GetNodeResponse) GetTcpChecks() []*TcpCheck {
 		return x.TcpChecks
 	}
 	return nil
+}
+
+func (x *GetNodeResponse) GetUdpFilteredUnix() int64 {
+	if x != nil {
+		return x.UdpFilteredUnix
+	}
+	return 0
 }
 
 type CreateEnrollmentRequest struct {
@@ -2679,7 +2688,7 @@ func (x *MeasureBandwidthResponse) GetServerDetail() string {
 type CheckPortsRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	// At most 7; 443 is always added. Empty = the node's enabled inbound ports, then the free ports the picker prefers.
+	// At most 7; 443 is always added. Empty = the node's enabled UDP inbound ports.
 	Ports         []uint32 `protobuf:"varint,2,rep,packed,name=ports,proto3" json:"ports,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2740,9 +2749,11 @@ type CheckPortsResponse struct {
 	// site port, and the VLESS ports, at most 8, 80 first. Empty when the node has nothing to probe, is offline, or has no
 	// sender for the TCP part (no other node lists "tcpcheck/1" and the panel does not send); the UDP part's error_code
 	// does not decide it, except node_offline. A row that could not be probed has verdict "" and a reason.
-	Tcp           []*TcpCheck `protobuf:"bytes,4,rep,name=tcp,proto3" json:"tcp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Tcp []*TcpCheck `protobuf:"bytes,4,rep,name=tcp,proto3" json:"tcp,omitempty"`
+	// Latest paired check that found source-side UDP filtering; 0 = none or a later check passed cleanly.
+	UdpFilteredUnix int64 `protobuf:"varint,5,opt,name=udp_filtered_unix,json=udpFilteredUnix,proto3" json:"udp_filtered_unix,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CheckPortsResponse) Reset() {
@@ -2801,6 +2812,13 @@ func (x *CheckPortsResponse) GetTcp() []*TcpCheck {
 		return x.Tcp
 	}
 	return nil
+}
+
+func (x *CheckPortsResponse) GetUdpFilteredUnix() int64 {
+	if x != nil {
+		return x.UdpFilteredUnix
+	}
+	return 0
 }
 
 type CheckIpv6Request struct {
@@ -4691,7 +4709,7 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\aTopUser\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tuser_name\x18\x02 \x01(\tR\buserName\x12\x18\n" +
-	"\x05bytes\x18\x03 \x01(\x04B\x020\x02R\x05bytes\"\xb5\x05\n" +
+	"\x05bytes\x18\x03 \x01(\x04B\x020\x02R\x05bytes\"\xe5\x05\n" +
 	"\x0fGetNodeResponse\x12+\n" +
 	"\x04node\x18\x01 \x01(\v2\x17.mistgate.admin.v1.NodeR\x04node\x128\n" +
 	"\ametrics\x18\x02 \x01(\v2\x1e.mistgate.admin.v1.NodeMetricsR\ametrics\x122\n" +
@@ -4708,7 +4726,8 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\vport_checks\x18\f \x03(\v2\x1c.mistgate.admin.v1.PortCheckR\n" +
 	"portChecks\x12:\n" +
 	"\n" +
-	"tcp_checks\x18\r \x03(\v2\x1b.mistgate.admin.v1.TcpCheckR\ttcpChecks\"\xdc\x01\n" +
+	"tcp_checks\x18\r \x03(\v2\x1b.mistgate.admin.v1.TcpCheckR\ttcpChecks\x12.\n" +
+	"\x11udp_filtered_unix\x18\x0e \x01(\x03B\x020\x02R\x0fudpFilteredUnix\"\xdc\x01\n" +
 	"\x17CreateEnrollmentRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -4809,13 +4828,14 @@ const file_mistgate_admin_v1_node_proto_rawDesc = "" +
 	"\rserver_detail\x18\v \x01(\tR\fserverDetail\"B\n" +
 	"\x11CheckPortsRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x14\n" +
-	"\x05ports\x18\x02 \x03(\rR\x05ports\"\xae\x01\n" +
+	"\x05ports\x18\x02 \x03(\rR\x05ports\"\xde\x01\n" +
 	"\x12CheckPortsResponse\x122\n" +
 	"\x05ports\x18\x01 \x03(\v2\x1c.mistgate.admin.v1.PortCheckR\x05ports\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x02 \x01(\tR\terrorCode\x12\x16\n" +
 	"\x06sender\x18\x03 \x01(\tR\x06sender\x12-\n" +
-	"\x03tcp\x18\x04 \x03(\v2\x1b.mistgate.admin.v1.TcpCheckR\x03tcp\"E\n" +
+	"\x03tcp\x18\x04 \x03(\v2\x1b.mistgate.admin.v1.TcpCheckR\x03tcp\x12.\n" +
+	"\x11udp_filtered_unix\x18\x05 \x01(\x03B\x020\x02R\x0fudpFilteredUnix\"E\n" +
 	"\x10CheckIpv6Request\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\"Y\n" +

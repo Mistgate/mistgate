@@ -424,6 +424,7 @@ type portCheckV struct {
 	Got            uint32         `json:"got"`
 	Checked        int64          `json:"checked_unix"`
 	Bad            int64          `json:"bad_unix"`
+	ProtocolOKUnix int64          `json:"protocol_ok_unix"`
 	Sender         string         `json:"sender,omitempty"`
 	SenderVerdict  string         `json:"sender_verdict,omitempty"`
 	ConfirmSender  string         `json:"confirm_sender,omitempty"`
@@ -449,16 +450,18 @@ type tcpCheckV struct {
 
 // NodePortsV is the node_ports result.
 type NodePortsV struct {
-	NodeID    string       `json:"node_id"`
-	NodeName  string       `json:"node_name"`
-	ErrorCode string       `json:"error_code,omitempty"`
-	Sender    string       `json:"sender,omitempty"`
-	Ports     []portCheckV `json:"ports"`
-	TCP       []tcpCheckV  `json:"tcp"`
+	NodeID          string       `json:"node_id"`
+	NodeName        string       `json:"node_name"`
+	ErrorCode       string       `json:"error_code,omitempty"`
+	Sender          string       `json:"sender,omitempty"`
+	UDPFilteredUnix int64        `json:"udp_filtered_unix"`
+	Ports           []portCheckV `json:"ports"`
+	TCP             []tcpCheckV  `json:"tcp"`
 }
 
-func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*adminv1.TcpCheck, inbounds []*adminv1.Inbound, errorCode, sender string) *NodePortsV {
-	v := &NodePortsV{NodeID: nodeID, NodeName: nm(nodeName), ErrorCode: clean(errorCode, 40), Sender: clean(sender, 80), Ports: []portCheckV{}, TCP: []tcpCheckV{}}
+func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*adminv1.TcpCheck, inbounds []*adminv1.Inbound, errorCode, sender string, udpFilteredUnix int64) *NodePortsV {
+	v := &NodePortsV{NodeID: nodeID, NodeName: nm(nodeName), ErrorCode: clean(errorCode, 40), Sender: clean(sender, 80),
+		UDPFilteredUnix: udpFilteredUnix, Ports: []portCheckV{}, TCP: []tcpCheckV{}}
 	for _, row := range tcp {
 		if row != nil {
 			v.TCP = append(v.TCP, tcpCheckV{Port: row.GetPort(), Role: clean(row.GetRole(), 16), ALPN: row.GetAlpn(), Profile: nm(row.GetProfile()),
@@ -470,7 +473,7 @@ func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*
 			continue
 		}
 		row := portCheckV{Port: check.GetPort(), Verdict: clean(check.GetVerdict(), 16), Sent: check.GetSent(), Got: check.GetGot(),
-			Checked: check.GetCheckedUnix(), Bad: check.GetBadUnix(), Sender: clean(check.GetSender(), 80),
+			Checked: check.GetCheckedUnix(), Bad: check.GetBadUnix(), ProtocolOKUnix: check.GetProtocolOkUnix(), Sender: clean(check.GetSender(), 80),
 			SenderVerdict: clean(check.GetSenderVerdict(), 16), ConfirmSender: clean(check.GetConfirmSender(), 80),
 			ConfirmSent: check.GetConfirmSent(), ConfirmGot: check.GetConfirmGot(), ConfirmVerdict: clean(check.GetConfirmVerdict(), 16),
 			Blame: clean(check.GetBlame(), 16), Reason: clean(check.GetReason(), 40),

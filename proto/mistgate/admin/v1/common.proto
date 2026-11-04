@@ -184,6 +184,8 @@ message PortCheck {
   string confirm_verdict = 14;
   // "node" when both runs found loss, "path" when only one did, or empty when unconfirmed or both were clean.
   string blame = 15;
+  // Unix time of the latest successful panel protocol probe through an enabled inbound on this port; 0 if its latest result failed or none is stored.
+  int64 protocol_ok_unix = 16 [jstype = JS_NUMBER];
 }
 
 // One TCP port of a node in the port check (design/vless.md section 7.4): does a connection reach Mistgate itself.

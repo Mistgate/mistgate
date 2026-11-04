@@ -255,11 +255,11 @@ func readTools() []toolDef {
 			func(c *call, in doctorRefreshArg) (any, error) { return c.doctor(in.Node, in.Refresh) }),
 
 		readTool("node_ports", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"The stored port checks for a node. ports: the UDP delivery per port (node verdict, first sender verdict and counts, check time, last bad time, sender, confirmation sender and counts/verdict when present, blame (node or path), and the inbound/profile on that port). tcp: whether a connection to each TCP port (80 for Let's Encrypt, the Hysteria2 site, VLESS) reaches Mistgate: role, verdict (ours, other, busy, refused, timeout; empty with a reason when it could not be probed), alpn, profile, sender, check time. This never contacts a node.",
+			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. This never contacts a node.",
 			func(c *call, in nodePortsArg) (any, error) { return c.nodePorts(in.Node, false) }),
 		readTool("node_ports", ProfileOperator,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceCheckPortsProcedure),
-			"The stored port checks for a node. ports: the UDP delivery per port (node verdict, first sender verdict and counts, check time, last bad time, sender, confirmation sender and counts/verdict when present, blame (node or path), and the inbound/profile on that port). tcp: whether a connection to each TCP port (80 for Let's Encrypt, the Hysteria2 site, VLESS) reaches Mistgate: role, verdict (ours, other, busy, refused, timeout; empty with a reason when it could not be probed), alpn, profile, sender, check time. With check=true, run a bounded check now; it takes about fifteen seconds.",
+			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. With check=true, run a bounded check now; it takes about fifteen seconds.",
 			func(c *call, in nodePortsCheckArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
 
 		readTool("users_search", ProfileReadonly, procs(adminv1connect.UserServiceListUsersProcedure),
@@ -675,14 +675,16 @@ func (c *call) nodePorts(node string, check bool) (any, error) {
 	}
 	checks, tcp := stored.Msg.GetPortChecks(), stored.Msg.GetTcpChecks()
 	errorCode, sender := "", ""
+	filteredUnix := stored.Msg.GetUdpFilteredUnix()
 	if check {
 		result, err := c.cl.Node.CheckPorts(c.ctx, connect.NewRequest(&adminv1.CheckPortsRequest{NodeId: id}))
 		if err != nil {
 			return nil, apiError(err)
 		}
 		checks, tcp, errorCode, sender = result.Msg.GetPorts(), result.Msg.GetTcp(), result.Msg.GetErrorCode(), result.Msg.GetSender()
+		filteredUnix = result.Msg.GetUdpFilteredUnix()
 	}
-	return nodePortsView(id, stored.Msg.GetNode().GetName(), checks, tcp, stored.Msg.GetInbounds(), errorCode, sender), nil
+	return nodePortsView(id, stored.Msg.GetNode().GetName(), checks, tcp, stored.Msg.GetInbounds(), errorCode, sender, filteredUnix), nil
 }
 
 func (c *call) subscriptionPreview(in subPreviewArg) (any, error) {

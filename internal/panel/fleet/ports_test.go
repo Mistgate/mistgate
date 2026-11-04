@@ -221,10 +221,10 @@ func TestCheckPortsOrdersArmSendSettleStopAndFillsGetNode(t *testing.T) {
 	sequenceMu.Lock()
 	sequence = append(sequence, "send")
 	sequenceMu.Unlock()
-	if send.Host != "203.0.113.10" || !reflect.DeepEqual(send.Ports, []uint32{2053, 443}) || send.Count != 300 || send.Pps != 50 || send.Size != 1200 || len(send.Tag) != 8 {
+	if send.Host != "203.0.113.10" || !reflect.DeepEqual(send.Ports, []uint32{2053, 443}) || send.Count != udpCheckSendCount || send.Pps != 25 || send.Size != udpCheckSize || len(send.Tag) != 8 {
 		t.Fatalf("send command = %+v", send)
 	}
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop := waitUDPCount(targetConn, true)
 	if !reflect.DeepEqual(stop.Tag, arm.Tag) {
 		t.Fatalf("stop tag %x does not match arm tag %x", stop.Tag, arm.Tag)
@@ -232,13 +232,13 @@ func TestCheckPortsOrdersArmSendSettleStopAndFillsGetNode(t *testing.T) {
 	sequenceMu.Lock()
 	sequence = append(sequence, "stop")
 	sequenceMu.Unlock()
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 4, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: 4, 443: udpCheckSendCount})
 
 	got := <-result
 	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "sender" || len(got.response.Ports) != 2 {
 		t.Fatalf("CheckPorts response = %+v, %v", got.response, got.err)
 	}
-	if got.response.Ports[0].Port != 2053 || got.response.Ports[0].Verdict != "ok" || got.response.Ports[0].Sent != 300 || got.response.Ports[0].Got != 300 || got.response.Ports[0].Sender != "sender" {
+	if got.response.Ports[0].Port != 2053 || got.response.Ports[0].Verdict != "ok" || got.response.Ports[0].Sent != udpCheckSendCount || got.response.Ports[0].Got != udpCheckSendCount || got.response.Ports[0].Sender != "sender" {
 		t.Errorf("GRO count did not produce the expected result: %+v", got.response.Ports[0])
 	}
 	sequenceMu.Lock()
@@ -276,18 +276,18 @@ func TestUDPPortVerdictsAndGROMath(t *testing.T) {
 	for _, test := range []struct {
 		got     uint64
 		verdict string
-	}{{285, "ok"}, {284, "lossy"}, {210, "lossy"}, {209, "broken"}} {
-		if got := udpPortVerdict(300, test.got); got != test.verdict {
-			t.Errorf("udpPortVerdict(300, %d) = %q, want %q", test.got, got, test.verdict)
+	}{{143, "ok"}, {142, "lossy"}, {105, "lossy"}, {104, "broken"}} {
+		if got := udpPortVerdict(udpCheckSendCount, test.got); got != test.verdict {
+			t.Errorf("udpPortVerdict(udpCheckSendCount, %d) = %q, want %q", test.got, got, test.verdict)
 		}
 	}
-	if got := udpDelivered(4, 4*28+300*1200, 28, 1200, 300); got != 300 {
-		t.Errorf("IPv4 GRO count = %d, want 300", got)
+	if got := udpDelivered(4, 4*28+udpCheckSendCount*udpCheckSize, 28, udpCheckSize, udpCheckSendCount); got != udpCheckSendCount {
+		t.Errorf("IPv4 GRO count = %d, want %d", got, udpCheckSendCount)
 	}
-	if got := udpDelivered(3, 3*48+301*1200, 48, 1200, 300); got != 300 {
-		t.Errorf("IPv6 GRO count clamped to sent = %d, want 300", got)
+	if got := udpDelivered(3, 3*48+(udpCheckSendCount+1)*udpCheckSize, 48, udpCheckSize, udpCheckSendCount); got != udpCheckSendCount {
+		t.Errorf("IPv6 GRO count clamped to sent = %d, want %d", got, udpCheckSendCount)
 	}
-	if got := udpDelivered(5, 5*28, 28, 1200, 300); got != 0 {
+	if got := udpDelivered(5, 5*28, 28, udpCheckSize, udpCheckSendCount); got != 0 {
 		t.Errorf("header-only count = %d, want 0", got)
 	}
 }
@@ -297,7 +297,7 @@ func TestRelativeLossMarksAPortWorseThanItsRun(t *testing.T) {
 	run := func(gots ...uint32) []string {
 		checks := make([]store.PortCheck, len(gots))
 		for i, got := range gots {
-			checks[i] = store.PortCheck{Sent: 300, Got: got, Verdict: udpPortVerdict(300, uint64(got))}
+			checks[i] = store.PortCheck{Sent: udpCheckSendCount, Got: got, Verdict: udpPortVerdict(udpCheckSendCount, uint64(got))}
 		}
 		relativeLoss(checks)
 		verdicts := make([]string, len(checks))
@@ -310,17 +310,110 @@ func TestRelativeLossMarksAPortWorseThanItsRun(t *testing.T) {
 		gots []uint32
 		want []string
 	}{
-		{[]uint32{300, 300, 300, 300, 300, 300, 300, 286}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "lossy"}},
-		{[]uint32{300, 289, 288}, []string{"ok", "ok", "ok"}}, // the median-to-port difference is inside the noise floor
-		{[]uint32{294, 290, 286}, []string{"ok", "ok", "ok"}},
-		// a path that loses 2-4 % on every port: a port at 286 is noise, one at 280 is lossy by the 95 % rule
-		{[]uint32{295, 294, 294, 290, 289, 289, 288, 286}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"}},
-		{[]uint32{295, 294, 294, 290, 289, 289, 288, 280}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "lossy"}},
-		{[]uint32{300, 200}, []string{"ok", "broken"}}, // absolute verdicts stay
+		{[]uint32{150, 150, 150, 150, 150, 150, 150, 143}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "lossy"}},
+		{[]uint32{150, 145, 144}, []string{"ok", "ok", "ok"}}, // the median-to-port difference is inside the noise floor
+		{[]uint32{147, 145, 143}, []string{"ok", "ok", "ok"}},
+		// 4% of 150 packets is six; the difference floor catches seven lost packets over a clean baseline.
+		{[]uint32{150, 150, 150, 150, 150, 150, 150, 144}, []string{"ok", "ok", "ok", "ok", "ok", "ok", "ok", "lossy"}},
+		{[]uint32{udpCheckSendCount, 104}, []string{"ok", "broken"}}, // absolute verdicts stay
 	} {
 		if got := run(test.gots...); !reflect.DeepEqual(got, test.want) {
 			t.Errorf("relativeLoss(%v) = %v, want %v", test.gots, got, test.want)
 		}
+	}
+}
+
+func TestUDPSourceFilteredPatternUsesTheOnePercentAndAnchorFloors(t *testing.T) {
+	run := func(anchorA, anchorB, otherA, otherB uint32) []store.PortCheck {
+		return []store.PortCheck{
+			{Port: 443, Sent: udpCheckSendCount, Got: anchorA, Sender: "de1", SenderVerdict: "ok",
+				ConfirmSender: "nl1", ConfirmSent: udpCheckSendCount, ConfirmGot: anchorB, ConfirmVerdict: "ok"},
+			{Port: 2053, Sent: udpCheckSendCount, Got: otherA, Sender: "de1", SenderVerdict: "broken",
+				ConfirmSender: "nl1", ConfirmSent: udpCheckSendCount, ConfirmGot: otherB, ConfirmVerdict: "broken"},
+		}
+	}
+	if !udpSourceFiltered(run(143, 150, 1, 0)) {
+		t.Fatal("a paired 95-percent-anchor / at-most-1-percent-other-port run was not classified as source-filtered")
+	}
+	if udpSourceFiltered(run(142, 150, 1, 0)) || udpSourceFiltered(run(143, 150, 2, 0)) {
+		t.Fatal("the source-filter classifier accepted a sub-95-percent anchor or more-than-1-percent other-port count")
+	}
+}
+
+func TestSourceFilteredNodeReusesOneSenderUntilACleanRun(t *testing.T) {
+	x, target, targetConn := portCheckTarget(t)
+	_, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
+	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	filtered := map[uint16]uint64{2053: 0, 443: udpCheckSendCount}
+	clean := map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}
+	finish := func(sender *conn, counts map[uint16]uint64) {
+		targetConn.t.Helper()
+		arm := waitUDPCount(targetConn, false)
+		replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
+		send := waitUDPSend(sender)
+		if send.Count != udpCheckSendCount || send.Pps != udpCheckPPS || send.Size != udpCheckSize {
+			targetConn.t.Fatalf("source-filter check send parameters = %+v", send)
+		}
+		replyPortCommand(sender, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
+		stop := waitUDPCount(targetConn, true)
+		replyPortStop(targetConn, stop, "4", counts, counts)
+	}
+	await := func(result <-chan portCheckRPCResult) *adminv1.CheckPortsResponse {
+		targetConn.t.Helper()
+		select {
+		case got := <-result:
+			if got.err != nil {
+				targetConn.t.Fatal(got.err)
+			}
+			return got.response
+		case <-time.After(3 * time.Second):
+			targetConn.t.Fatal("port check did not finish after its one allowed sender")
+			return nil
+		}
+	}
+
+	initial := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	finish(secondConn, filtered)
+	finish(firstConn, filtered)
+	paired := await(initial)
+	if paired.ErrorCode != "" || paired.GetUdpFilteredUnix() == 0 || len(paired.GetPorts()) != 2 || paired.GetPorts()[0].GetBlame() != "node" {
+		t.Fatalf("paired source-filter result = %+v", paired)
+	}
+	filteredAt, err := x.st.UDPFilteredAt(x.ctx, target.nodeID)
+	if err != nil || filteredAt.IsZero() {
+		t.Fatalf("stored source-filter time = %v, %v", filteredAt, err)
+	}
+	filteredSender, err := x.st.UDPFilteredSender(x.ctx, target.nodeID)
+	if err != nil || filteredSender != second.nodeID {
+		t.Fatalf("stored source-filter sender = %q, %v", filteredSender, err)
+	}
+
+	addPortCheckPeer(x, "third", "provider-c", "FR", capUDPCheck)
+	if _, err := x.st.W.ExecContext(x.ctx, `UPDATE node SET address = '203.0.113.11' WHERE id = ?`, target.nodeID); err != nil {
+		t.Fatal(err)
+	}
+	if oldAddressChecks, err := x.st.PortChecks(x.ctx, target.nodeID); err != nil || len(oldAddressChecks) != 0 {
+		t.Fatalf("old-address port checks = %+v, %v", oldAddressChecks, err)
+	}
+	recheck := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	finish(secondConn, filtered)
+	checked := await(recheck)
+	if checked.ErrorCode != "" || checked.GetUdpFilteredUnix() != paired.GetUdpFilteredUnix() ||
+		checked.GetPorts()[0].GetConfirmSender() != "" || checked.GetPorts()[0].GetSender() != "second" {
+		t.Fatalf("filtered single-sender recheck = %+v", checked)
+	}
+	if got, err := x.st.UDPFilteredAt(x.ctx, target.nodeID); err != nil || !got.Equal(filteredAt) {
+		t.Fatalf("non-clean recheck changed source-filter state: %v, %v", got, err)
+	}
+
+	cleanRun := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	finish(secondConn, clean)
+	cleared := await(cleanRun)
+	if cleared.ErrorCode != "" || cleared.GetUdpFilteredUnix() != 0 {
+		t.Fatalf("clean sender run did not clear source-filter state: %+v", cleared)
+	}
+	if got, err := x.st.UDPFilteredAt(x.ctx, target.nodeID); err != nil || !got.IsZero() {
+		t.Fatalf("clean run left source-filter timestamp: %v, %v", got, err)
 	}
 }
 
@@ -378,13 +471,13 @@ func TestUDPPortAttributionCases(t *testing.T) {
 	makeRun := func(sender string, verdicts ...string) portCheckOutcome {
 		checks := make([]store.PortCheck, len(verdicts))
 		for i, verdict := range verdicts {
-			got := uint32(300)
+			got := uint32(udpCheckSendCount)
 			if verdict == "lossy" {
-				got = 210
+				got = 105
 			} else if verdict == "broken" {
-				got = 100
+				got = 50
 			}
-			checks[i] = store.PortCheck{Port: uint16(2053 + i), Sent: 300, Got: got, Verdict: verdict,
+			checks[i] = store.PortCheck{Port: uint16(2053 + i), Sent: udpCheckSendCount, Got: got, Verdict: verdict,
 				SenderVerdict: verdict, Sender: sender, CheckedAt: time.Unix(10, 0)}
 		}
 		return portCheckOutcome{checks: checks, sender: sender}
@@ -424,23 +517,23 @@ func TestUDPPathLossNamesAFilter(t *testing.T) {
 		var checks []store.PortCheck
 		for _, port := range []uint16{443, 2053, 14491} {
 			verdict := "ok"
-			if got[port]*100 < 300*95 {
+			if got[port]*100 < udpCheckSendCount*95 {
 				verdict = "broken"
 			}
-			checks = append(checks, store.PortCheck{Port: port, Sent: 300, Got: got[port], Verdict: verdict, SenderVerdict: verdict,
+			checks = append(checks, store.PortCheck{Port: port, Sent: udpCheckSendCount, Got: got[port], Verdict: verdict, SenderVerdict: verdict,
 				Sender: sender, CheckedAt: time.Unix(10, 0)})
 		}
 		return portCheckOutcome{checks: checks, sender: sender}
 	}
-	whole := map[uint16]uint32{443: 300, 2053: 300, 14491: 300}
+	whole := map[uint16]uint32{443: udpCheckSendCount, 2053: udpCheckSendCount, 14491: udpCheckSendCount}
 	for _, tc := range []struct {
 		name     string
 		first    map[uint16]uint32
 		wantOpen string
 	}{
-		{"only 443 arrives", map[uint16]uint32{443: 300, 2053: 0, 14491: 0}, "443"},
-		{"a share lost on every port", map[uint16]uint32{443: 206, 2053: 210, 14491: 205}, ""},
-		{"some got through on the lost ports", map[uint16]uint32{443: 300, 2053: 40, 14491: 0}, ""},
+		{"only 443 arrives", map[uint16]uint32{443: udpCheckSendCount, 2053: 0, 14491: 0}, "443"},
+		{"a share lost on every port", map[uint16]uint32{443: 103, 2053: 105, 14491: 102}, ""},
+		{"some got through on the lost ports", map[uint16]uint32{443: udpCheckSendCount, 2053: 40, 14491: 0}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := combinePortCheckRuns(run("de1", tc.first), run("msk1", whole), "fi1", time.Unix(20, 0))
@@ -475,16 +568,16 @@ func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 	if send.Host != "203.0.113.10" {
 		t.Fatalf("first sender was not preferred by provider: %+v", send)
 	}
-	replyPortCommand(secondConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(secondConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop := waitUDPCount(targetConn, true)
 	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 0, 443: 0}, map[uint16]uint64{2053: 0, 443: 0})
 
 	arm = waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	send = waitUDPSend(firstConn)
-	replyPortCommand(firstConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(firstConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop = waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 
 	got := <-result
 	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "second" {
@@ -495,7 +588,7 @@ func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 		stored[0].ConfirmSender != first.nodeID || stored[0].Verdict != "ok" || stored[0].Blame != "path" {
 		t.Fatalf("retry stored rows = %+v, %v", stored, err)
 	}
-	if got.response.Ports[0].GetConfirmSender() != "first" || got.response.Ports[0].GetConfirmGot() != 300 ||
+	if got.response.Ports[0].GetConfirmSender() != "first" || got.response.Ports[0].GetConfirmGot() != udpCheckSendCount ||
 		got.response.Ports[0].GetConfirmVerdict() != "ok" {
 		t.Fatalf("confirmation API fields = %+v", got.response.Ports[0])
 	}
@@ -507,7 +600,7 @@ func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 	}
 	pathRows, err := x.st.UDPPathLosses(x.ctx, time.Time{})
 	if err != nil || len(pathRows) != 1 || pathRows[0].SenderID != second.nodeID || pathRows[0].TargetID != target.nodeID ||
-		pathRows[0].OtherSenderID != first.nodeID || pathRows[0].Ports != "443, 2053" || pathRows[0].Got != 0 || pathRows[0].OtherGot != 300 {
+		pathRows[0].OtherSenderID != first.nodeID || pathRows[0].Ports != "443, 2053" || pathRows[0].Got != 0 || pathRows[0].OtherGot != udpCheckSendCount {
 		t.Fatalf("path-loss persistence = %+v, %v", pathRows, err)
 	}
 	var raw string
@@ -519,7 +612,7 @@ func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	if params["target"] != "nodea" || params["target_id"] != target.nodeID || params["ports"] != "443, 2053" ||
-		params["sent"] != "300" || params["got"] != "0" || params["other"] != "first" || params["other_got"] != "300" ||
+		params["sent"] != "150" || params["got"] != "0" || params["other"] != "first" || params["other_got"] != "150" ||
 		params["region"] != "other" || params["other_region"] != "other" {
 		t.Fatalf("path-loss event params = %+v", params)
 	}
@@ -530,8 +623,8 @@ func TestCheckPortsDemotesSenderFromPersistedPathLoss(t *testing.T) {
 	demoted, demotedConn := addPortCheckPeer(x, "de1", "provider-b", "DE", capUDPCheck)
 	other, otherConn := addPortCheckPeer(x, "fr1", "provider-a", "TR", capUDPCheck)
 	if err := x.st.UpdateUDPPathLosses(x.ctx, target.nodeID, []string{demoted.nodeID, other.nodeID}, []store.UDPPathLoss{{
-		SenderID: demoted.nodeID, TargetID: target.nodeID, Ports: "2053", Sent: 300, Got: 200,
-		OtherSenderID: other.nodeID, OtherGot: 300, CheckedAt: x.f.now().Add(-time.Minute),
+		SenderID: demoted.nodeID, TargetID: target.nodeID, Ports: "2053", Sent: udpCheckSendCount, Got: 100,
+		OtherSenderID: other.nodeID, OtherGot: udpCheckSendCount, CheckedAt: x.f.now().Add(-time.Minute),
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -540,9 +633,9 @@ func TestCheckPortsDemotesSenderFromPersistedPathLoss(t *testing.T) {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	send := waitUDPSend(otherConn)
-	replyPortCommand(otherConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(otherConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	got := <-result
 	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "fr1" {
 		t.Fatalf("persistently demoted sender was selected: %+v, %v", got.response, got.err)
@@ -558,7 +651,7 @@ func TestCheckPortsBothSendersInconclusiveDoesNotStore(t *testing.T) {
 		arm := waitUDPCount(targetConn, false)
 		replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 		send := waitUDPSend(senderConn)
-		replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+		replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 		stop := waitUDPCount(targetConn, true)
 		replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 0, 443: 0}, map[uint16]uint64{2053: 0, 443: 0})
 	}
@@ -584,9 +677,9 @@ func TestCheckPortsFailedConfirmationKeepsFirstRunUnconfirmed(t *testing.T) {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	send := waitUDPSend(secondConn)
-	replyPortCommand(secondConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(secondConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 210, 443: 300}, map[uint16]uint64{2053: 210, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 105, 443: udpCheckSendCount}, map[uint16]uint64{2053: 105, 443: udpCheckSendCount})
 
 	arm = waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
@@ -619,9 +712,9 @@ func TestCheckPortsConcurrentCallerReadsCompletedRows(t *testing.T) {
 	second := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	waitPortCheckWaiter(t, x.f, target.nodeID)
 	send := waitUDPSend(senderConn)
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	firstResult := <-first
 	secondResult := <-second
 	if firstResult.err != nil || secondResult.err != nil || firstResult.response.ErrorCode != "" || secondResult.response.ErrorCode != "" {
@@ -651,17 +744,17 @@ func TestCheckPortsPanelFallbackSkipsPeerWithoutCapability(t *testing.T) {
 			count, pps int
 			size       int
 		}{host, ports, count, pps, size}
-		return "4", 300, nil
+		return "4", udpCheckSendCount, nil
 	}
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	call := <-sent
-	if call.host != "203.0.113.10" || !reflect.DeepEqual(call.ports, []uint16{2053, 443}) || call.count != 300 || call.pps != 50 || call.size != 1200 {
+	if call.host != "203.0.113.10" || !reflect.DeepEqual(call.ports, []uint16{2053, 443}) || call.count != udpCheckSendCount || call.pps != 25 || call.size != udpCheckSize {
 		t.Fatalf("panel sender args = %+v", call)
 	}
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	got := <-result
 	if got.err != nil || got.response.ErrorCode != "" || got.response.Sender != "panel" {
 		t.Fatalf("panel fallback response = %+v, %v", got.response, got.err)
@@ -754,15 +847,15 @@ func TestCheckPortsSameHostReturnsCountsWithoutStoring(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
 	x.exec(`UPDATE node SET address = '127.0.0.1' WHERE id = ?`, target.nodeID)
 	x.f.sendUDP = func(_ context.Context, _ string, _ []uint16, _ [8]byte, _, _, _ int) (string, int, error) {
-		return "4", 300, nil
+		return "4", udpCheckSendCount, nil
 	}
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	got := <-result
-	if got.err != nil || got.response.ErrorCode != "same_host" || got.response.Sender != "panel" || len(got.response.Ports) != 2 || got.response.Ports[0].Got != 300 {
+	if got.err != nil || got.response.ErrorCode != "same_host" || got.response.Sender != "panel" || len(got.response.Ports) != 2 || got.response.Ports[0].Got != udpCheckSendCount {
 		t.Fatalf("same-host response = %+v, %v", got.response, got.err)
 	}
 	stored, err := x.st.PortChecks(x.ctx, target.nodeID)
@@ -778,7 +871,7 @@ func TestCheckPortsInconclusiveDoesNotStore(t *testing.T) {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	send := waitUDPSend(senderConn)
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 	stop := waitUDPCount(targetConn, true)
 	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 0, 443: 0}, map[uint16]uint64{2053: 0, 443: 0})
 	got := <-result
@@ -800,9 +893,9 @@ func TestPortLossyEventFiresOnlyOnFirstBadRun(t *testing.T) {
 		arm := waitUDPCount(targetConn, false)
 		replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 		send := waitUDPSend(senderConn)
-		replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+		replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "150"}})
 		stop := waitUDPCount(targetConn, true)
-		replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 210, 443: 300}, map[uint16]uint64{2053: 210, 443: 300})
+		replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 105, 443: udpCheckSendCount}, map[uint16]uint64{2053: 105, 443: udpCheckSendCount})
 		got := <-result
 		if got.err != nil || got.response.ErrorCode != "" || got.response.Ports[0].Verdict != "lossy" {
 			t.Fatalf("lossy run response = %+v, %v", got.response, got.err)
@@ -820,7 +913,7 @@ func TestPortLossyEventIncludesConfirmationRun(t *testing.T) {
 	x, node, inbounds := portSpecRows(t)
 	x.exec(`INSERT INTO node (id, name, address, created_at) VALUES ('nod_bob', 'bob', '203.0.113.42', 1)`)
 	x.f.portLossyEvents(x.ctx, node, inbounds, []store.PortCheck{{NodeID: node.ID, Port: 443, Verdict: "lossy",
-		Sent: 300, Got: 210, Sender: "panel", ConfirmSender: "nod_bob", ConfirmSent: 300, ConfirmGot: 300,
+		Sent: udpCheckSendCount, Got: 105, Sender: "panel", ConfirmSender: "nod_bob", ConfirmSent: udpCheckSendCount, ConfirmGot: udpCheckSendCount,
 		ConfirmVerdict: "ok", CheckedAt: time.Now()}}, map[uint16]store.PortCheck{})
 	var raw string
 	if err := x.st.R.QueryRowContext(x.ctx, `SELECT params_json FROM event WHERE node_id = ? AND code = 'port_lossy'`, node.ID).Scan(&raw); err != nil {
@@ -830,12 +923,34 @@ func TestPortLossyEventIncludesConfirmationRun(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &params); err != nil {
 		t.Fatal(err)
 	}
-	if params["confirm_sender"] != "bob" || params["confirm_got"] != "300" || params["confirm_sent"] != "300" {
+	if params["confirm_sender"] != "bob" || params["confirm_got"] != "150" || params["confirm_sent"] != "150" {
 		t.Fatalf("confirmed port_lossy event params = %+v", params)
 	}
 }
 
-func TestUDPCheckPortListUsesEnabledPortsPreferredFreePortsAndAnchor(t *testing.T) {
+// A hoster's filter drops the test datagrams but the panel's own protocol check through the inbound passes: no
+// "loses 100 %" event for a port whose clients connect (the alert is suppressed by the same rule).
+func TestPortLossyEventSkipsAPortWhoseProtocolWorks(t *testing.T) {
+	x, node, inbounds := portSpecRows(t)
+	checked := time.Now()
+	hy2 := ""
+	for _, inbound := range inbounds {
+		if inbound.ProfileName == "hy2" { // the Hysteria2 inbound on UDP 443
+			hy2 = inbound.ID
+		}
+	}
+	if err := x.st.InsertSample(x.ctx, store.CheckSample{InboundID: hy2, At: checked.Add(-5 * time.Minute),
+		Status: int(adminv1.CheckStatus_CHECK_STATUS_OK)}); err != nil {
+		t.Fatal(err)
+	}
+	x.f.portLossyEvents(x.ctx, node, inbounds, []store.PortCheck{{NodeID: node.ID, Port: 443, Verdict: "broken",
+		Sent: udpCheckSendCount, Got: 0, Sender: "panel", CheckedAt: checked}}, map[uint16]store.PortCheck{})
+	if events := x.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'port_lossy'`, node.ID); events != 0 {
+		t.Fatalf("port_lossy events = %d for a port whose protocol check passed", events)
+	}
+}
+
+func TestUDPCheckPortListUsesEnabledPortsAndAnchorAndKeepsRequestedCandidates(t *testing.T) {
 	inbounds := []store.FleetInboundRow{
 		{Enabled: true, Settings: `{"port":2053}`},
 		{Enabled: true, PortOverride: 4443, Settings: `{"port":8443}`},
@@ -843,12 +958,16 @@ func TestUDPCheckPortListUsesEnabledPortsPreferredFreePortsAndAnchor(t *testing.
 		{Settings: `{"port":3000,"hop":{"from":4000,"to":4500}}`},
 	}
 	got := udpCheckPorts(nil, inbounds)
-	want := []uint16{2053, 4443, 8443, 2083, 2087, 443}
+	want := []uint16{2053, 4443, 443}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("default ports = %v, want %v", got, want)
 	}
 	if got := udpCheckPorts([]uint16{8443}, inbounds); !reflect.DeepEqual(got, []uint16{8443, 443}) {
 		t.Fatalf("explicit ports = %v", got)
+	}
+	requested := []uint16{8443, 4443, 2053, 2083, 2087, 2096}
+	if got := udpCheckPorts(requested, inbounds); !reflect.DeepEqual(got, append(requested, 443)) {
+		t.Fatalf("requested twin candidates = %v", got)
 	}
 }
 

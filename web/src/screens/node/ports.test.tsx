@@ -4,9 +4,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { fill, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { reasons } from "@/lib/port-check";
-import { CheckPortsButton, Ports, usePortCheck } from "./ports";
+import { CheckPortsButton, Ports, usePortCheck, verdictPill } from "./ports";
 
 /** The block as the Direct way in shows it: the button in its action bar, the rows above. */
 function Block({ data }: { data: never }) {
@@ -206,6 +207,73 @@ describe("a port checked again from a second sender", () => {
     await mount(data({ portChecks: [twice({ sender: "panel", got: 236, senderVerdict: "lossy", confirmGot: 299, blame: "path" })] }));
     expect(rows()[0]).toContain("from the panel 236/300");
     expect(row(443)?.querySelector("[data-blame=path]")?.textContent).toBe("The port is fine: packets get lost on the way from the panel.");
+  });
+});
+
+describe("a port whose test is blocked while the protocol works", () => {
+  // the hoster's filter in front of de1: only 443 arrives from minsk1 and fi1, the panel's AmneziaWG check through 2053 passes
+  const both = (over: Record<string, unknown>) =>
+    check({ sent: 150, got: 150, sender: "minsk1", senderVerdict: "ok", confirmSender: "fi1", confirmSent: 150, confirmGot: 150, confirmVerdict: "ok", blame: "", ...over });
+  const lost = { verdict: "broken", got: 0, senderVerdict: "broken", confirmGot: 0, confirmVerdict: "broken", blame: "node" };
+  const inbounds = [inbound({ protocol: "hysteria2" }), inbound({ id: "inb_2", profileName: "AWG · 2053", protocol: "awg", port: 2053 }), inbound({ id: "inb_3", profileName: "hy2 · 8443", protocol: "hysteria2", port: 8443 })];
+  const row = (port: number) => [...document.querySelectorAll("li")].find((li) => li.textContent?.includes(`udp/${port}`));
+  const tEn = ((key: keyof typeof en, vars?: Record<string, string | number>) => fill(en[key], vars)) as unknown as T;
+
+  it("says the test is blocked in amber, keeps the counts quiet and names the protocol whose check passes", async () => {
+    await mount(data({ inbounds, portChecks: [both({}), both({ port: 2053, ...lost, protocolOkUnix: now - 60 })] }));
+    expect(row(2053)?.textContent).toContain("udp/2053!Test blocked");
+    expect(row(2053)?.textContent).toContain("from minsk1 0/150 · from fi1 0/150 · 2 min ago");
+    expect(row(2053)?.querySelector(".tone-warn.pill")?.textContent).toBe("!Test blocked");
+    // no red, no amber in the counts, and the line under them clears the port instead of blaming it
+    expect(row(2053)?.querySelectorAll(".text-danger-text, .text-warn-text")).toHaveLength(0);
+    expect(row(2053)?.querySelector("[data-blame=node]")).toBeNull();
+    expect(row(2053)?.querySelector("[data-blame=blocked]")?.textContent).toBe("The AmneziaWG check through this port passes: the hoster’s filter likely cuts the test packets, not people.");
+    expect(row(2053)?.querySelector("[data-blame=blocked]")?.className).toContain("tone-ok");
+  });
+
+  it("reads the same for a port checked from one sender, with a protocol check up to 15 minutes before the run", async () => {
+    await mount(data({ inbounds, portChecks: [check({ sent: 150, got: 150 }), check({ port: 2053, verdict: "broken", sent: 150, got: 0, protocolOkUnix: now - 120 - 15 * 60 })] }));
+    expect(row(2053)?.textContent).toContain("Test blocked");
+    expect(row(2053)?.textContent).toContain("0 of 150 arrived · 2 min ago · from de2");
+    expect(row(2053)?.querySelector("[data-blame=blocked]")?.textContent).toContain("The AmneziaWG check");
+  });
+
+  it("keeps the loss in red when the protocol check failed too or is older than the window", async () => {
+    await mount(
+      data({
+        inbounds,
+        portChecks: [both({}), both({ port: 8443, ...lost, protocolOkUnix: 0 }), check({ port: 2053, verdict: "lossy", sent: 150, got: 120, protocolOkUnix: now - 120 - 15 * 60 - 1 })],
+      }),
+    );
+    expect(row(8443)?.textContent).toContain("100 % lost");
+    expect(row(8443)?.querySelector("[data-blame=node]")?.textContent).toBe(en["ports.blame.node"]);
+    expect([...row(8443)!.querySelectorAll(".text-danger-text")].map((s) => s.textContent)).toEqual(["from minsk1 0/150", "from fi1 0/150"]);
+    expect(row(2053)?.textContent).toContain("Loses 20 %");
+    expect(row(2053)?.querySelector("[data-blame=blocked]")).toBeNull();
+  });
+
+  it("puts the hoster's filter under the UDP rows when the node is marked filtered, in place of a sender's caption", async () => {
+    // fi1 got through on 2053 where minsk1 got nothing: alone that is minsk1's caption; the node's mark says more
+    const path = both({ port: 2053, got: 0, senderVerdict: "broken", blame: "path" });
+    await mount(data({ inbounds, portChecks: [both({}), path, both({ port: 8443, ...lost, protocolOkUnix: now - 60 })], tcpChecks: [tcp({})], udpFilteredUnix: now - 600 }));
+    const caption = document.querySelector("[data-testid=udp-filtered]");
+    expect(caption?.textContent).toBe(en["ports.filter.hoster"]);
+    expect(document.querySelector("[data-testid=udp-filter]")).toBeNull();
+    const items = [...document.querySelectorAll("li")];
+    expect(items.indexOf(caption as HTMLLIElement)).toBe(items.indexOf(row(8443)!) + 1);
+    expect(caption?.querySelector("svg")?.getAttribute("class")).toContain("tone-warn");
+  });
+
+  it("has no hoster caption without the mark", async () => {
+    await mount(data({ inbounds, portChecks: [both({}), both({ port: 2053, ...lost, protocolOkUnix: now - 60 })], udpFilteredUnix: 0 }));
+    expect(document.querySelector("[data-testid=udp-filtered]")).toBeNull();
+  });
+
+  it("gives the profile row's dot the same calm pill", () => {
+    const c = { verdict: "broken", sent: 150, got: 0, checkedUnix: now - 120 };
+    expect(verdictPill(tEn, { ...c, protocolOkUnix: now - 60 })).toEqual({ kind: "warn", label: "Test blocked" });
+    expect(verdictPill(tEn, { ...c, protocolOkUnix: 0 })).toEqual({ kind: "bad", label: "100 % lost" });
+    expect(verdictPill(tEn, c)).toEqual({ kind: "bad", label: "100 % lost" });
   });
 });
 

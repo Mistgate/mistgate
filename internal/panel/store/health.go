@@ -385,6 +385,36 @@ func (s *Store) RecentSamples(ctx context.Context, inboundID string, n int) ([]C
 		FROM health_check_sample WHERE inbound_id = ? ORDER BY at DESC LIMIT ?`, inboundID, n)
 }
 
+// LatestProbeSamples returns the newest stored health-check result for each current inbound. An empty nodeID means all
+// inbounds; callers use it to compare the panel's protocol probe with the latest UDP port check without running probes.
+func (s *Store) LatestProbeSamples(ctx context.Context, nodeID string) ([]CheckSample, error) {
+	q := `SELECT c.inbound_id, c.at, c.status FROM health_check_sample c
+		JOIN inbound i ON i.id = c.inbound_id
+		WHERE c.at = (SELECT MAX(latest.at) FROM health_check_sample latest WHERE latest.inbound_id = c.inbound_id)`
+	args := []any{}
+	if nodeID != "" {
+		q += ` AND i.node_id = ?`
+		args = append(args, nodeID)
+	}
+	q += ` ORDER BY c.inbound_id`
+	rows, err := s.R.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CheckSample
+	for rows.Next() {
+		var sample CheckSample
+		var at int64
+		if err := rows.Scan(&sample.InboundID, &at, &sample.Status); err != nil {
+			return nil, err
+		}
+		sample.At = fromUnix(at)
+		out = append(out, sample)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) samples(ctx context.Context, q string, args ...any) ([]CheckSample, error) {
 	rows, err := s.R.QueryContext(ctx, q, args...)
 	if err != nil {

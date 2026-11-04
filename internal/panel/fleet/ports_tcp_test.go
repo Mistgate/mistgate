@@ -229,11 +229,11 @@ func driveUDPPart(targetConn, senderConn *conn) {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	send := waitUDPSend(senderConn)
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": strconv.Itoa(udpCheckSendCount)}})
 	stop := waitUDPCount(targetConn, true)
 	got, packets := map[uint16]uint64{}, map[uint16]uint64{}
 	for _, port := range arm.Ports {
-		got[uint16(port)], packets[uint16(port)] = 300, 300
+		got[uint16(port)], packets[uint16(port)] = udpCheckSendCount, udpCheckSendCount
 	}
 	replyPortStop(targetConn, stop, "4", got, packets)
 }
@@ -337,7 +337,7 @@ func assertNoPortCommands(t *testing.T, conns ...*conn) {
 func TestCheckPortsAsSystemUsesThePanelAsTCPSenderOfLastResort(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
 	x.f.sendUDP = func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error) {
-		return "4", 300, nil
+		return "4", udpCheckSendCount, nil
 	}
 	var gotHost string
 	var gotTargets []tcpcheck.Target
@@ -353,7 +353,7 @@ func TestCheckPortsAsSystemUsesThePanelAsTCPSenderOfLastResort(t *testing.T) {
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	mark := waitHTTPMark(targetConn)
 	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
 	if r := <-done; r.code != "" || r.sender != "panel" {
@@ -759,9 +759,9 @@ func TestCheckPortsAdminCallWaitingBehindASaveTimeRunRunsItsOwnTCPHalf(t *testin
 	admin := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	waitPortCheckWaiter(t, x.f, target.nodeID)
 	send := waitUDPSend(senderConn)
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": strconv.Itoa(udpCheckSendCount)}})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	<-saved
 
 	// the waiter may not take the UDP-only result: it runs UDP and TCP of its own
@@ -789,9 +789,9 @@ func TestCheckPortsSaveTimeCallWaitingBehindAFullRunTakesItsResult(t *testing.T)
 	}()
 	waitPortCheckWaiter(t, x.f, target.nodeID)
 	send := waitUDPSend(senderConn)
-	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": "300"}})
+	replyPortCommand(senderConn, send.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"family": "4", "sent": strconv.Itoa(udpCheckSendCount)}})
 	stop := waitUDPCount(targetConn, true)
-	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: 300, 443: 300}, map[uint16]uint64{2053: 300, 443: 300})
+	replyPortStop(targetConn, stop, "4", map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}, map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount})
 	mark := waitHTTPMark(targetConn)
 	replyPortCommand(targetConn, mark.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{"http01": "serving"}})
 	probe := waitTCPProbe(senderConn)

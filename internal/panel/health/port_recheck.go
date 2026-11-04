@@ -23,12 +23,14 @@ const (
 
 // PortCheckScheduleNode is the current eligibility and last stored check time used by DuePortCheckNodes.
 type PortCheckScheduleNode struct {
-	ID                string
-	State             string
-	Online            bool
-	UDPCheck          bool
-	HasEnabledInbound bool
-	LastCheckedAt     time.Time
+	ID                   string
+	State                string
+	Online               bool
+	UDPCheck             bool
+	HasEnabledInbound    bool
+	LastCheckedAt        time.Time
+	UDPFilteredAt        time.Time
+	UDPFilteredCheckedAt time.Time
 }
 
 // DuePortCheckNodes returns eligible nodes whose last check is at least six hours old. Nodes without a stored check
@@ -43,9 +45,19 @@ func DuePortCheckNodes(now time.Time, nodes []PortCheckScheduleNode) []string {
 		if node.ID == "" || node.State != "active" || !node.Online || !node.UDPCheck || !node.HasEnabledInbound {
 			continue
 		}
-		if !node.LastCheckedAt.IsZero() {
-			age := now.Sub(node.LastCheckedAt)
-			if age < PortCheckInterval || age < 0 {
+		interval := PortCheckInterval
+		if !node.UDPFilteredAt.IsZero() {
+			interval = store.UDPFilteredCheckInterval
+		}
+		lastCheckedAt := node.LastCheckedAt
+		if !node.UDPFilteredAt.IsZero() {
+			if node.UDPFilteredCheckedAt.After(lastCheckedAt) {
+				lastCheckedAt = node.UDPFilteredCheckedAt
+			}
+		}
+		if !lastCheckedAt.IsZero() {
+			age := now.Sub(lastCheckedAt)
+			if age < interval || age < 0 {
 				continue
 			}
 		} else if slot != portCheckSlot(node.ID) {
@@ -104,8 +116,24 @@ func (s *Service) runOnePortRecheck(ctx context.Context) bool {
 	period := now.Unix() / int64(PortCheckInterval/time.Second)
 	nodeID := due[0]
 	s.portCheckAttempts[nodeID] = period
+	filteredAt, err := s.st.UDPFilteredAt(ctx, nodeID)
+	if err != nil {
+		s.log.Warn("health: read UDP source-filter state before periodic check", "node", nodeID, "err", err)
+		return true
+	}
+	if !filteredAt.IsZero() {
+		if err := s.st.SetUDPFilteredCheckedAt(ctx, nodeID, now); err != nil {
+			s.log.Warn("health: record UDP source-filter recheck attempt", "node", nodeID, "err", err)
+			return true
+		}
+	}
 	checked, _, errorCode := s.cfg.CheckPorts(ctx, nodeID, nil)
-	if errorCode == "" && portCheckFoundBadInbound(sn.byNode[nodeID], checked) {
+	filteredAt, err = s.st.UDPFilteredAt(ctx, nodeID)
+	if err != nil {
+		s.log.Warn("health: read UDP source-filter state after periodic check", "node", nodeID, "err", err)
+		return true
+	}
+	if filteredAt.IsZero() && errorCode == "" && portCheckFoundBadInbound(sn.byNode[nodeID], checked) {
 		// A second sample confirms bursty loss; the latest stored verdict drives the alert. It is UDP only: the TCP
 		// half has just run and its rows do not depend on the loss.
 		confirm := s.cfg.CheckPortsUDP
@@ -123,6 +151,10 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 	if err != nil {
 		return nil, err
 	}
+	filteredRows, err := s.st.UDPFilteredNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
 	liveRows, err := s.fl.Live(ctx)
 	if err != nil {
 		return nil, err
@@ -133,6 +165,12 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 		if check.CheckedAt.After(lastChecked[check.NodeID]) {
 			lastChecked[check.NodeID] = check.CheckedAt
 		}
+	}
+	filteredAt := make(map[string]time.Time, len(filteredRows))
+	filteredCheckedAt := make(map[string]time.Time, len(filteredRows))
+	for _, row := range filteredRows {
+		filteredAt[row.NodeID] = row.At
+		filteredCheckedAt[row.NodeID] = row.CheckedAt
 	}
 	period := now.Unix() / int64(PortCheckInterval/time.Second)
 	nodes := make([]PortCheckScheduleNode, 0, len(sn.nodes))
@@ -150,7 +188,8 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 		}
 		nodes = append(nodes, PortCheckScheduleNode{
 			ID: node.ID, State: node.State, Online: current.Connected, UDPCheck: slices.Contains(current.AgentCaps, portCheckCapability),
-			HasEnabledInbound: hasEnabledInbound, LastCheckedAt: lastChecked[node.ID],
+			HasEnabledInbound: hasEnabledInbound, LastCheckedAt: lastChecked[node.ID], UDPFilteredAt: filteredAt[node.ID],
+			UDPFilteredCheckedAt: filteredCheckedAt[node.ID],
 		})
 	}
 	return nodes, nil

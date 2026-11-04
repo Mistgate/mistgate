@@ -80,8 +80,8 @@ function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number, dot?: Cell["dot"]
 
 const toneText = { warn: "text-warn-text", bad: "text-danger-text" } as const;
 
-// The last column fits the longest pill ("Не запустился").
-const gridClass = "md:grid-cols-[minmax(0,1.4fr)_92px_minmax(0,0.7fr)_minmax(0,1.3fr)_minmax(0,1fr)_124px]";
+// The port column fits "udp/65535" with its dot (70 + 6 + 16 px) on one line; the last one the longest pill ("Не запустился").
+const gridClass = "md:grid-cols-[minmax(0,1.4fr)_96px_minmax(0,0.7fr)_minmax(0,1.3fr)_minmax(0,1fr)_124px]";
 
 /** The last port check of a profile's port, as a dot: its verdict on hover and to a screen reader, the check a click away. */
 function PortDot({ nodeId, dot }: { nodeId: string; dot: NonNullable<Cell["dot"]> }) {

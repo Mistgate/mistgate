@@ -99,6 +99,17 @@ describe("lanesOf", () => {
     expect(gone.lanes[0]).toMatchObject({ state: "off", fault: false });
   });
 
+  it("a port whose test is blocked while its protocol check passes lets people in: the lane works and has no badge", () => {
+    const blocked = { verdict: "broken", checkedUnix: 1000, protocolOkUnix: 1060 };
+    const w = lanesOf(base({ portChecks: [{ verdict: "ok" }, blocked], tcpChecks: [{ verdict: "ours" }] }));
+    expect(w.lanes[0]).toMatchObject({ state: "ok", fault: false });
+    expect(w.badge).toBe(0);
+    expect(lanesOf(base({ portChecks: [blocked, { ...blocked, verdict: "lossy" }] })).lanes[0]!.state).toBe("ok");
+    // the protocol check failed (0) or is older than 15 minutes before the run: the loss stands
+    expect(lanesOf(base({ portChecks: [{ ...blocked, protocolOkUnix: 0 }] })).lanes[0]).toMatchObject({ state: "bad", fault: true });
+    expect(lanesOf(base({ portChecks: [{ verdict: "ok" }, { ...blocked, protocolOkUnix: 1000 - 16 * 60 }] })).lanes[0]).toMatchObject({ state: "warn", fault: true });
+  });
+
   it("the IPv6 lane: shown, off, for a server with IPv6, seen by the IPv6 rounds", () => {
     expect(lanesOf(base({ ipv6: "none" })).lanes.map((l) => l.id)).toEqual(["direct"]);
     const w = lanesOf(base({ ipv6: "ok", country: country(CountryVerdict.PARTIAL, ["MTS"], { ipv6: country(CountryVerdict.OK) }) }));

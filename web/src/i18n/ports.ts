@@ -33,6 +33,12 @@ export const en = {
   "ports.blame.filtered": "The port is fine: UDP from {sender} is filtered on the way.",
   "ports.filter": "From {sender}, UDP arrives only on {open}: a filter on the way (often the hoster’s DDoS protection). Port checks from {sender} do not pass; this is not {node} breaking, and people on home networks usually connect.",
   "ports.blame.node": "Lost from both sides: this node’s port loses packets.",
+  // the test datagrams are lost while the panel's own protocol check through the port passes (testBlocked in src/lib/port-check.ts);
+  // {protocols} is "AmneziaWG" or "Hysteria2, TUIC"
+  "ports.testBlocked": "Test blocked",
+  "ports.blame.blocked": "The {protocols} check through this port passes: the hoster’s filter likely cuts the test packets, not people.",
+  // both senders got only UDP 443 through (GetNodeResponse.udp_filtered_unix): the node's own hoster filters; it replaces the sender captions
+  "ports.filter.hoster": "This node’s hoster lets only UDP 443 through from our nodes, so port checks say little here. The panel recruits no new senders for it and rechecks once a day.",
   "ports.region.cis": "CIS",
   "ports.region.other": "outside the CIS",
 
@@ -135,6 +141,9 @@ export const ru: typeof en = {
   "ports.blame.filtered": "Порт в порядке: UDP с {sender} режет фильтр по пути.",
   "ports.filter": "С {sender} UDP доходит только на {open} — по пути фильтр (часто защита хостера от DDoS). Проверки портов с {sender} не проходят; это не поломка {node}, люди из домашних сетей обычно подключаются.",
   "ports.blame.node": "Теряются с обеих сторон: пакеты теряет порт этой ноды.",
+  "ports.testBlocked": "Тест не проходит",
+  "ports.blame.blocked": "Проверка {protocols} через этот порт проходит: похоже, фильтр хостера режет тестовые пакеты, а не людей.",
+  "ports.filter.hoster": "Хостер этой ноды пропускает от наших нод только UDP 443 — проверка портов не показательна. Новых отправителей панель не берёт, повтор — раз в сутки.",
   "ports.region.cis": "СНГ",
   "ports.region.other": "вне СНГ",
 
@@ -226,6 +235,9 @@ export const zh: typeof en = {
   "ports.blame.filtered": "端口正常：来自 {sender} 的 UDP 在途中被过滤。",
   "ports.filter": "来自 {sender} 的 UDP 只有 {open} 能到达：路径上有过滤（常见于服务商的 DDoS 防护）。来自 {sender} 的端口检测无法通过；这不是 {node} 的故障，家庭网络的用户通常能连接。",
   "ports.blame.node": "两边都丢包：是此节点的端口在丢包。",
+  "ports.testBlocked": "测试被拦截",
+  "ports.blame.blocked": "通过此端口的 {protocols} 检测正常：看起来是服务商的过滤拦截了测试包，而不是用户。",
+  "ports.filter.hoster": "此节点的服务商只放行来自我们节点的 UDP 443，端口检测参考价值不大。面板不再为它挑选新的发送节点，每天复查一次。",
   "ports.region.cis": "独联体",
   "ports.region.other": "独联体以外",
 
@@ -315,6 +327,9 @@ export const fa: typeof en = {
   "ports.blame.filtered": "پورت سالم است: UDP از {sender} در مسیر فیلتر می‌شود.",
   "ports.filter": "از {sender} فقط روی {open} UDP می‌رسد: فیلتری در مسیر است (اغلب محافظت DDoS سرویس‌دهنده). بررسی پورت‌ها از {sender} رد نمی‌شود؛ این خرابی {node} نیست و کاربران شبکه‌های خانگی معمولاً وصل می‌شوند.",
   "ports.blame.node": "از هر دو طرف گم می‌شوند: پورت همین نود بسته از دست می‌دهد.",
+  "ports.testBlocked": "آزمایش مسدود است",
+  "ports.blame.blocked": "بررسی {protocols} از این پورت موفق است: به نظر می‌رسد فیلتر سرویس‌دهنده بسته‌های آزمایشی را قطع می‌کند، نه کاربران را.",
+  "ports.filter.hoster": "سرویس‌دهندهٔ این نود از نودهای ما فقط UDP 443 را عبور می‌دهد، پس بررسی پورت‌ها چیز زیادی نمی‌گوید. پنل فرستندهٔ تازه‌ای برایش نمی‌گیرد و روزی یک بار دوباره بررسی می‌کند.",
   "ports.region.cis": "کشورهای مشترک‌المنافع",
   "ports.region.other": "بیرون از کشورهای مشترک‌المنافع",
   "ports.tcp.ours": "به Mistgate می‌رسد",
@@ -395,6 +410,9 @@ export const tr: typeof en = {
   "ports.blame.filtered": "Port sağlam: {sender} kaynaklı UDP yolda filtreleniyor.",
   "ports.filter": "{sender} düğümünden UDP yalnızca {open} üzerinden ulaşıyor: yolda bir filtre var (çoğu zaman sağlayıcının DDoS koruması). {sender} düğümünden port kontrolleri geçmiyor; bu {node} düğümünün arızası değil, ev ağlarındaki kişiler genellikle bağlanır.",
   "ports.blame.node": "İki taraftan da kayıp var: paketleri bu düğümün portu kaybediyor.",
+  "ports.testBlocked": "Test engelleniyor",
+  "ports.blame.blocked": "Bu porttan {protocols} kontrolü geçiyor: sağlayıcının filtresi kişileri değil, test paketlerini kesiyor gibi görünüyor.",
+  "ports.filter.hoster": "Bu düğümün sağlayıcısı düğümlerimizden yalnızca UDP 443'ü geçiriyor, bu yüzden port kontrolleri pek bir şey söylemiyor. Panel bu düğüm için yeni gönderici almıyor, günde bir kez yeniden kontrol ediyor.",
   "ports.region.cis": "BDT",
   "ports.region.other": "BDT dışı",
   "ports.tcp.ours": "Mistgate'e ulaşıyor",

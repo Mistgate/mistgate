@@ -529,9 +529,10 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 			Id: "inb_1", ProfileName: "Main", Protocol: "hysteria2", NodeId: nodeA, Port: 443, State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
 			CertPinSha256: canaryPin, LastError: "listen failed\nsee " + canaryVless,
 		}},
-		PortChecks: []*adminv1.PortCheck{{NodeId: r.Msg.GetNodeId(), Port: 443, Verdict: "ok", Sent: 300, Got: 300,
-			CheckedUnix: 1700000000, BadUnix: 1699990000, Sender: "sender-node", SenderVerdict: "lossy",
-			ConfirmSender: "confirm-node", ConfirmSent: 300, ConfirmGot: 290, ConfirmVerdict: "ok", Blame: "path"}},
+		PortChecks: []*adminv1.PortCheck{{NodeId: r.Msg.GetNodeId(), Port: 443, Verdict: "ok", Sent: 150, Got: 150,
+			CheckedUnix: 1700000000, BadUnix: 1699990000, ProtocolOkUnix: 1700001000, Sender: "sender-node", SenderVerdict: "lossy",
+			ConfirmSender: "confirm-node", ConfirmSent: 150, ConfirmGot: 145, ConfirmVerdict: "ok", Blame: "path"}},
+		UdpFilteredUnix: 1699995000,
 		TcpChecks: []*adminv1.TcpCheck{
 			{Port: 80, Role: "acme", Verdict: "ours", Sender: "sender-node", CheckedUnix: 1700000000},
 			{Port: 443, Role: "vless", Alpn: true, Profile: "Main", Verdict: "timeout", Sender: "panel", CheckedUnix: 1700000000},
@@ -545,10 +546,10 @@ func (w *world) CheckPorts(_ context.Context, r *connect.Request[adminv1.CheckPo
 	w.mu.Lock()
 	w.checkPortsReq = append(w.checkPortsReq, r.Msg)
 	w.mu.Unlock()
-	return connect.NewResponse(&adminv1.CheckPortsResponse{Sender: "sender-node", Ports: []*adminv1.PortCheck{{
-		NodeId: r.Msg.GetNodeId(), Port: 443, Verdict: "lossy", Sent: 300, Got: 280, CheckedUnix: 1700003600,
-		BadUnix: 1700000000, Sender: "sender-node", SenderVerdict: "lossy", ConfirmSender: "de1", ConfirmSent: 300,
-		ConfirmGot: 280, ConfirmVerdict: "lossy", Blame: "node",
+	return connect.NewResponse(&adminv1.CheckPortsResponse{Sender: "sender-node", UdpFilteredUnix: 1700003000, Ports: []*adminv1.PortCheck{{
+		NodeId: r.Msg.GetNodeId(), Port: 443, Verdict: "lossy", Sent: 150, Got: 140, CheckedUnix: 1700003600,
+		BadUnix: 1700000000, ProtocolOkUnix: 1700002000, Sender: "sender-node", SenderVerdict: "lossy", ConfirmSender: "de1", ConfirmSent: 150,
+		ConfirmGot: 140, ConfirmVerdict: "lossy", Blame: "node",
 	}}, Tcp: []*adminv1.TcpCheck{
 		{Port: 80, Role: "acme", Reason: "agent_too_old", Sender: "sender-node", CheckedUnix: 1700003600},
 		{Port: 8443, Role: "site", Profile: "Main", Verdict: "other", Sender: "sender-node", CheckedUnix: 1700003600},
