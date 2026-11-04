@@ -170,7 +170,7 @@ export function DecoyCard({ node }: { node: Node }) {
   );
 
   return (
-    <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-panel p-4">
+    <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
       <SectionLabel as="h2" icon="mask" tone="lavender">
         {t("decoy.title")}
       </SectionLabel>

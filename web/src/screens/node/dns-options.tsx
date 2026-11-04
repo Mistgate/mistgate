@@ -40,7 +40,7 @@ export function DnsOptionsCard({ nodeId }: { nodeId: string }) {
   const failed = presets.isError ? presets : options.isError ? options : null;
   const saved = options.data?.find((o) => o.nodeId === nodeId);
   return (
-    <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-panel p-4">
+    <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
       <SectionLabel as="h2" icon="dns" tone="lavender">
         {t("subs.dnsOpt.title")}
       </SectionLabel>
