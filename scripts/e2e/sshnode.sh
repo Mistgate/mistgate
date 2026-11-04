@@ -542,6 +542,7 @@ sshn_scn_own_key() {
 sshn_scn_keys() {
   local node_id=$SSHN_NODE_ID name=$SSHN_NODE_NAME panel_fp public_key fingerprint listed agent_pid err out
   [ -n "$node_id" ] || die "key scenario has no owner-key-installed node"
+  stepup || die "step-up failed" # here, not inside $(mutate ...): a subshell's step-up is lost and its code reused
   out=$(api ProvisioningService/GetPanelSSHKey '{}') || die "GetPanelSSHKey failed"
   panel_fp=$(jq -er .fingerprint <<<"$out") || die "the panel SSH key has no fingerprint: $out"
   listed=$(api ProvisioningService/ListNodeServerKeys "$(jq -nc --arg id "$node_id" '{nodeId:$id}')") || die "ListNodeServerKeys failed"
@@ -579,6 +580,7 @@ sshn_scn_keys() {
 # exact node id. The E2E caller retires that node and forgets this access row after the test.
 sshn_scn_attach() {
   local node_id=$1 out access keys
+  stepup || die "step-up failed" # in this shell: a step-up inside $(mutate ...) is lost and its TOTP code reused
   sshn_reset_host
   sshn_host mkdir -p /var/lib/mistgate-node
   sshn_host sh -c 'printf enrolled >/var/lib/mistgate-node/identity.pem'
@@ -592,6 +594,7 @@ sshn_scn_attach() {
   keys=$(api ProvisioningService/ListNodeServerKeys "$(jq -nc --arg id "$node_id" '{nodeId:$id}')") || die "ListNodeServerKeys after attach failed"
   jq -e --arg f "$(jq -r .panelKeyFingerprint <<<"$access")" '[(.keys // [])[] | select(.fingerprint == $f and .panelKey == true)] | length == 1' <<<"$keys" >/dev/null \
     || die "AttachNodeServerAccess did not install and prove the panel key: $keys"
+  sshn_reset_host # the scenarios after this one start from a host with no node on it
   : >"$WORK/sshd.log" # sshn_wizard later expects a baseline with no prior login attempts
   pass "attach access: SSH preflight matched node $node_id, saved the password login and installed and proved the panel key"
 }
@@ -643,7 +646,7 @@ sshn_run_vps() {
   SSHN_NODE_BIN=$DATA/dist/$(jq -r '.files[0].name' "$manifest")
   SSHN_NODE_BIN_SHA=$(jq -r '.files[0].sha256' "$manifest")
   [ "$(sha256sum "$SSHN_NODE_BIN" | cut -d' ' -f1)" = "$SSHN_NODE_BIN_SHA" ] || die "the bundle's binary does not match its manifest"
-  sshn_up
+  [ -n "$SSHN_D" ] || sshn_up # step 10 started the host already for the attach scenario
   sshn_wizard
   sshn_scn_cancel sshn-cancel
   sshn_scn_retire_waiting sshn-wait

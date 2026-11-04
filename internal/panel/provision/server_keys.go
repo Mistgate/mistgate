@@ -56,6 +56,9 @@ tmp=$(mktemp "$d/.authorized_keys.XXXXXX")
 trap 'rm -f "$tmp"' EXIT HUP INT TERM
 cat > "$tmp"
 chmod 600 "$tmp"
+cur=none
+if [ -f "$f" ]; then cur=$(sha256sum < "$f" | cut -d' ' -f1); fi
+[ "$cur" = "$1" ] || exit 13
 mv -f "$tmp" "$f"
 command -v restorecon >/dev/null 2>&1 && restorecon "$f" || true`
 
@@ -222,8 +225,10 @@ func withKey(contents []byte, canonical string) []byte {
 		} else {
 			rest = nil
 		}
+		// A line of the same key with options (from=, command=) counts too: a bare copy after it would let the key in
+		// without the owner's restriction (sshd tries the next line when one refuses the source).
 		parsed, valid := parseAuthorizedKeyLine(line)
-		if valid && !parsed.restricted && ssh.FingerprintSHA256(parsed.publicKey) == ssh.FingerprintSHA256(keyLine.publicKey) {
+		if valid && ssh.FingerprintSHA256(parsed.publicKey) == ssh.FingerprintSHA256(keyLine.publicKey) {
 			return append([]byte(nil), contents...)
 		}
 	}
@@ -300,6 +305,15 @@ func publicAuthorizedKeysCode(err error) string {
 	}
 }
 
+// savedAccessError is a failed login with the saved access, coded like sshConnectError but never Unauthenticated: to the
+// web client that code is the admin's own session, and the key list is a query whose error would sign the admin out.
+func savedAccessError(err error) error {
+	if e := sshConnectError(err); connect.CodeOf(e) != connect.CodeUnauthenticated {
+		return e
+	}
+	return connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_authentication_failed"))
+}
+
 func keyOperationError(err error) error {
 	if err == nil {
 		return nil
@@ -361,7 +375,7 @@ func (s *Service) AddNodeServerKey(ctx context.Context, req *connect.Request[adm
 	}
 	conn, _, err := s.dialAccess(ctx, access)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_authentication_failed"))
+		return nil, savedAccessError(err)
 	}
 	defer conn.Close()
 	contents, digest, err := readRemoteAuthorizedKeys(ctx, conn)
@@ -476,7 +490,7 @@ func (s *Service) RemoveNodeServerKey(ctx context.Context, req *connect.Request[
 		conn, _, err = s.dialAccess(ctx, access)
 	}
 	if err != nil || conn == nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_authentication_failed"))
+		return nil, savedAccessError(err)
 	}
 	defer conn.Close()
 	contents, digest, err := readRemoteAuthorizedKeys(ctx, conn)
@@ -683,6 +697,11 @@ func readRemoteAuthorizedKeys(ctx context.Context, conn *Connection) ([]byte, st
 	if err := authorizedKeysCommandError(exitCode); err != nil {
 		return nil, "", err
 	}
+	return parseAuthorizedKeysResponse(output)
+}
+
+// parseAuthorizedKeysResponse reads the read script's output: "none", or "sha256:<hex>" and the file's bytes.
+func parseAuthorizedKeysResponse(output []byte) ([]byte, string, error) {
 	lineEnd := strings.IndexByte(string(output), '\n')
 	if lineEnd < 0 {
 		return nil, "", errors.New("provision: invalid authorized_keys response")
@@ -693,7 +712,11 @@ func readRemoteAuthorizedKeys(ctx context.Context, conn *Connection) ([]byte, st
 		return nil, "", errors.New("authorized_keys_too_large")
 	}
 	if header == "none" {
-		return contents, "none", nil
+		// No file prints nothing after the marker: bytes there came from the login's shell and must never become the file.
+		if len(contents) != 0 {
+			return nil, "", errors.New("provision: authorized_keys response has bytes after none")
+		}
+		return nil, "none", nil
 	}
 	if !strings.HasPrefix(header, "sha256:") || len(header) != len("sha256:")+64 {
 		return nil, "", errors.New("provision: invalid authorized_keys digest")
@@ -753,7 +776,7 @@ func (s *Service) ListNodeServerKeys(ctx context.Context, req *connect.Request[a
 	}
 	conn, _, err := s.dialAccess(ctx, access)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_authentication_failed"))
+		return nil, savedAccessError(err)
 	}
 	defer conn.Close()
 	contents, _, err := readRemoteAuthorizedKeys(ctx, conn)

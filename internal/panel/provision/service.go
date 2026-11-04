@@ -616,6 +616,7 @@ func (s *Service) ListNodeServerAccess(ctx context.Context, _ *connect.Request[a
 // with a fresh authentication before the panel promotes the encrypted credential. With generate the panel makes the
 // password itself (the MCP rotation): it is never returned, the owner can reveal it after step-up.
 func (s *Service) RotateNodeServerPassword(ctx context.Context, req *connect.Request[adminv1.RotateNodeServerPasswordRequest]) (*connect.Response[adminv1.RotateNodeServerPasswordResponse], error) {
+	defer func() { req.Msg.NewPassword = "" }()
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}

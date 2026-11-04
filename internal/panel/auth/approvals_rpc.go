@@ -211,6 +211,7 @@ func (r *approvalRPC) decide(ctx context.Context, admin store.Admin, req connect
 
 // Approve is the owner agreeing to exactly what the approval lists. Needs a step-up.
 func (r *approvalRPC) Approve(ctx context.Context, req *connect.Request[adminv1.ApproveRequest]) (*connect.Response[adminv1.ApproveResponse], error) {
+	defer func() { req.Msg.SshPassword = "" }() // sealed to the plan below; no plaintext copy outlives the call
 	admin, err := ownerSession(ctx)
 	if err != nil {
 		return nil, err

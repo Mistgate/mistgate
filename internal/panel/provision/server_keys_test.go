@@ -5,6 +5,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"os"
@@ -106,6 +108,10 @@ func TestAuthorizedKeysParseWithKeyAndWithoutKeyPreserveOtherBytes(t *testing.T)
 	if duplicate := withKey(updated, line); !bytes.Equal(duplicate, updated) {
 		t.Fatalf("adding an unrestricted duplicate changed the file: %q", duplicate)
 	}
+	// contents holds the key only behind from= and command=: a bare copy would let it in without them
+	if same := withKey(contents, line); !bytes.Equal(same, contents) {
+		t.Fatalf("adding a key the file has with options appended a bare copy: %q", same)
+	}
 
 	removed := withoutKey(contents, fingerprint)
 	want := []byte("# owner note\r\n\n" + otherLine)
@@ -115,6 +121,33 @@ func TestAuthorizedKeysParseWithKeyAndWithoutKeyPreserveOtherBytes(t *testing.T)
 	// the newline appended after otherLine now ends its line and stays with it
 	if !bytes.Equal(withoutKey(append(contents, []byte("\n"+line+"\n")...), fingerprint), append(want, '\n')) {
 		t.Fatal("withoutKey did not remove every duplicate line")
+	}
+}
+
+func TestAuthorizedKeysResponseIsTheFileOnly(t *testing.T) {
+	file := []byte("ssh-ed25519 AAAA alice@laptop\n")
+	sum := sha256.Sum256(file)
+	digest := hex.EncodeToString(sum[:])
+	for _, c := range []struct {
+		name, out, digest string
+		file              []byte
+	}{
+		{name: "no file", out: "none\n", digest: "none"},
+		{name: "a file", out: "sha256:" + digest + "\n" + string(file), digest: digest, file: file},
+		{name: "bytes after none (the login's shell)", out: "none\nssh-ed25519 AAAA mallory@host\n"},
+		{name: "bytes the digest does not cover", out: "sha256:" + digest + "\n" + string(file) + "warning: x\n"},
+		{name: "no header line", out: "sha256:" + digest},
+	} {
+		got, gotDigest, err := parseAuthorizedKeysResponse([]byte(c.out))
+		if c.digest == "" {
+			if err == nil {
+				t.Errorf("%s: accepted as %q", c.name, got)
+			}
+			continue
+		}
+		if err != nil || gotDigest != c.digest || !bytes.Equal(got, c.file) {
+			t.Errorf("%s: %q, %q, %v", c.name, got, gotDigest, err)
+		}
 	}
 }
 
