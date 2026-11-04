@@ -229,10 +229,14 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 			s.log.Warn("health: evaluate", "err", err)
 			return
 		}
-		probeSamples, err = s.st.LatestProbeSamples(ctx, "")
-		if err != nil {
-			s.log.Warn("health: evaluate latest protocol probes", "err", err)
-			return
+		// The protocol probes only matter to a port that loses packets (addPortLossyConds); a fleet without one spares
+		// the read.
+		if slices.ContainsFunc(portChecks, func(c store.PortCheck) bool { return c.Verdict == "lossy" || c.Verdict == "broken" }) {
+			probeSamples, err = s.st.LatestProbeSamples(ctx, "")
+			if err != nil {
+				s.log.Warn("health: evaluate latest protocol probes", "err", err)
+				return
+			}
 		}
 		pathLosses, err = s.st.UDPPathLosses(ctx, now.Add(-30*time.Hour))
 		if err != nil {
