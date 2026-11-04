@@ -510,9 +510,9 @@ export function useApprovalActions() {
   const fail = (e: unknown) => {
     if (!isStepUpCancelled(e)) toast.error(callErrorText(e, t));
   };
-  // a node_install approval also carries the owner's SSH password and the host key they confirmed
+  // a node_install approval also carries the owner's login choice (the panel key or the SSH password) and the host key they confirmed
   const approve = useMutation({
-    mutationFn: (req: { id: string; sshPassword?: string; confirmedFingerprint?: string }) => guard(() => approvals.approve(req)),
+    mutationFn: (req: { id: string; sshPassword?: string; usePanelKey?: boolean; confirmedFingerprint?: string }) => guard(() => approvals.approve(req)),
     onSuccess: () => toast(t("int.ap.approved")),
     onError: fail,
     onSettled: settled,

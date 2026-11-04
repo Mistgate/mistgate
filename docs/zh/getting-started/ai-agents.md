@@ -183,7 +183,7 @@ args = ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "
 
 管理员令牌还可以读取协议设置结构和配置状态，并通过计划与执行来创建、更新和部署协议配置。每项协议配置变更都需要你在管理后台审批。分组必须预先存在；MCP 不会创建分组。`x-secret` 值会被遮蔽；要保留原值请使用 `"••••"`，要生成新值请使用 `"$generate"`，不得传入明文秘密。
 
-点击**批准**后，需要再次使用通行密钥或身份验证器验证码确认。对于节点安装，审批卡片还会显示面板读取的 SHA-256 主机密钥指纹和密钥类型：将它与可信副本（服务商控制台中的信息）比较，勾选确认框并在那里输入服务器 SSH 密码。面板会将密码密封保存到这份计划；智能体执行时只会携带确认令牌，因此密码不会经过智能体或其模型服务商。计划创建 10 分钟后过期。
+点击**批准**后，需要再次使用通行密钥或身份验证器验证码确认。对于节点安装，审批卡片还会显示面板读取的 SHA-256 主机密钥指纹和密钥类型：将它与可信副本（服务商控制台中的信息）比较，勾选确认框，并选择面板如何登录：**面板密钥**或**密码**（在那里输入服务器 SSH 密码）。面板会将这一选择（以及输入的密码）密封保存到这份计划；智能体执行时只会携带确认令牌，因此密码不会经过智能体或其模型服务商。计划创建 10 分钟后过期。
 
 智能体不会获得订阅链接、设备密钥或配置、页面密码或任何服务器密码；它也无法看到节点地址，但管理员令牌可访问的 SSH 端点和用户名除外。通过 MCP 更改密码时（先调用 `node_server_password_rotate_plan`，再调用 `node_server_password_rotate_apply`），由面板生成新密码；你可以在节点的**设置 → SSH 凭据**中查看。
 
@@ -214,8 +214,8 @@ LANGUAGE:      English            # 与我交流时使用的语言
 1. Every change is <tool>_plan, then <tool>_apply with the confirm_token only. Show me the
    plan's summary and facts and wait for my "yes" before you apply.
 2. Never ask me for the server's SSH password and never pass any password to a tool. For
-   node_install the owner confirms the host key and types the password on the approval
-   card in the admin.
+   node_install the owner confirms the host key and chooses the panel key or types the
+   password on the approval card in the admin.
 3. When a plan has needs_approval, tell me to approve it in the admin under
    Integrations -> Waiting for you, and wait. Check again at most every 30 seconds. A plan
    expires after 10 minutes; then make a new one.
@@ -234,7 +234,7 @@ LANGUAGE:      English            # 与我交流时使用的语言
    NODE_NAME, address NODE_ADDRESS, country_code COUNTRY, provider PROVIDER and a short
    reason. Show me the facts. Then ask me to approve it in the admin: compare the host key
    fingerprint on the approval card with the one in my provider's console, tick the
-   confirmation, type the SSH password, press Approve.
+   confirmation, choose Panel key or type the SSH password, press Approve.
 3. When I say it is approved, call node_install_apply with only the confirm_token. The panel
    installs in the background, usually within two minutes. Watch node_get NODE_NAME until
    the node is connected. If it is not connected after 5 minutes, tell me to open the

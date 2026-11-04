@@ -183,7 +183,7 @@ An agent with Operator access or higher can also keep the subscription page's ap
 
 An Admin token can read protocol schemas and profile state, then create, update or deploy profiles through plan/apply tools. Every profile change waits for your approval in the admin. A group must already exist; MCP does not create groups. Profile plans mask `x-secret` values; when setting one, use `"••••"` to keep the current value or `"$generate"` to request a generated value, and never send a literal secret.
 
-**Approve** asks for your passkey or authenticator code once more. For a node installation the approval card also shows the SHA-256 host key fingerprint the panel read and its key type: compare it with a trusted copy (your provider's console), tick the confirmation and type the server's SSH password there. The panel keeps the password sealed to that one plan; the agent's apply carries only the confirm token, so the password never passes through the agent or its model provider. Plans expire 10 minutes after they are made.
+**Approve** asks for your passkey or authenticator code once more. For a node installation the approval card also shows the SHA-256 host key fingerprint the panel read and its key type: compare it with a trusted copy (your provider's console), tick the confirmation and choose how the panel logs in: **Panel key** or **Password** (type the server's SSH password there). The panel keeps the choice, and a typed password, sealed to that one plan; the agent's apply carries only the confirm token, so a password never passes through the agent or its model provider. Plans expire 10 minutes after they are made.
 
 The agent never gets subscription links, device keys or configurations, page passwords or any server password; node addresses are hidden from it too, except the SSH endpoint and login an Admin token works with. A password change through MCP (`node_server_password_rotate_plan`, then `node_server_password_rotate_apply`) makes the panel generate the new password; you reveal it in the node's **Settings → SSH access**.
 
@@ -214,8 +214,8 @@ LANGUAGE:      English            # the language you talk to me in
 1. Every change is <tool>_plan, then <tool>_apply with the confirm_token only. Show me the
    plan's summary and facts and wait for my "yes" before you apply.
 2. Never ask me for the server's SSH password and never pass any password to a tool. For
-   node_install the owner confirms the host key and types the password on the approval
-   card in the admin.
+   node_install the owner confirms the host key and chooses the panel key or types the
+   password on the approval card in the admin.
 3. When a plan has needs_approval, tell me to approve it in the admin under
    Integrations -> Waiting for you, and wait. Check again at most every 30 seconds. A plan
    expires after 10 minutes; then make a new one.
@@ -234,7 +234,7 @@ LANGUAGE:      English            # the language you talk to me in
    NODE_NAME, address NODE_ADDRESS, country_code COUNTRY, provider PROVIDER and a short
    reason. Show me the facts. Then ask me to approve it in the admin: compare the host key
    fingerprint on the approval card with the one in my provider's console, tick the
-   confirmation, type the SSH password, press Approve.
+   confirmation, choose Panel key or type the SSH password, press Approve.
 3. When I say it is approved, call node_install_apply with only the confirm_token. The panel
    installs in the background, usually within two minutes. Watch node_get NODE_NAME until
    the node is connected. If it is not connected after 5 minutes, tell me to open the

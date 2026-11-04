@@ -64,6 +64,9 @@ const saved = (over: object = {}) => ({
     host: id === "nod_1" ? "203.0.113.7" : "203.0.113.24",
     port: 22,
     username: "root",
+    passwordSaved: true,
+    passwordLogin: true,
+    panelKeyFingerprint: "",
     ...(id === "nod_1" ? over : {}),
   })),
 });
@@ -201,7 +204,7 @@ describe("node SSH access", () => {
     act(() => root?.unmount());
     host?.remove();
 
-    const retired = { nodeId: "nod_1", nodeName: "de1", host: "203.0.113.7", port: 22, username: "root", nodeRetired: true, passwordGenerated: true };
+    const retired = { nodeId: "nod_1", nodeName: "de1", host: "203.0.113.7", port: 22, username: "root", nodeRetired: true, passwordGenerated: true, passwordSaved: true, passwordLogin: true, panelKeyFingerprint: "" };
     listNodeServerAccess.mockReset();
     listNodeServerAccess.mockResolvedValueOnce({ access: [retired] }).mockResolvedValue({ access: [] });
     forgetNodeServerAccess.mockResolvedValue({});
@@ -386,6 +389,77 @@ describe("node SSH access", () => {
       await mount("nod_1", { nodeRetired: true });
       expect(document.body.textContent).toContain(en["node.sshAccess.show"]);
       expect(toggle()).toBeNull();
+    });
+  });
+
+  describe("the panel key and a node with no password", () => {
+    const keyFp = "SHA256:pAnElKeYfInGeRpRiNt0123456789abcdefghijkl";
+    // a pill reads glyph + word; the word is what the owner reads
+    const pills = () => [...document.querySelectorAll(".pill")].map((p) => p.textContent?.replace(/^[–!×~]/, ""));
+    const toggle = () => document.querySelector<HTMLButtonElement>("button[aria-expanded]");
+    const buttonTexts = () => [...document.querySelectorAll("button")].map((b) => b.textContent);
+    async function remount(over: object) {
+      act(() => root?.unmount());
+      host?.remove();
+      await mount("nod_1", over);
+    }
+
+    it("says in the header how the panel gets in", async () => {
+      await mount();
+      expect(pills()).toContain(en["node.sshAccess.passwordOnly"]);
+      expect(pills()).not.toContain(en["panelKey.title"]);
+      await remount({ panelKeyFingerprint: keyFp });
+      expect(pills()).toContain(en["panelKey.title"]);
+      expect(pills()).not.toContain(en["node.sshAccess.passwordOnly"]);
+    });
+
+    it("a key install keeps no password: Not saved, nothing to reveal, and Set password through the key", async () => {
+      await mount("nod_1", { passwordSaved: false, passwordLogin: false, panelKeyFingerprint: keyFp });
+      expect(pills()).toContain(en["node.sshAccess.notSaved"]);
+      expect(pills()).not.toContain(en["node.sshAccess.verified"]);
+      expect(document.body.textContent).toContain(en["node.sshAccess.notSavedHint"]);
+      expect(document.body.textContent).not.toContain(en["node.sshAccess.loginClosed"]); // no password, no fact about it
+      expect(buttonTexts()).not.toContain(en["node.sshAccess.show"]);
+      expect(toggle()?.textContent).toBe(en["node.sshAccess.setPassword"]);
+
+      rotateNodeServerPassword.mockResolvedValueOnce({ rotated: true });
+      revealNodeServerPassword.mockResolvedValue({ password: "N4QWZ7KXJ2M5RT3VBY6CDF8GHE" });
+      listNodeServerAccess.mockResolvedValue(saved({ passwordSaved: true, passwordLogin: true, panelKeyFingerprint: keyFp, passwordGenerated: true }));
+      await act(async () => toggle()!.click());
+      const submit = document.querySelector<HTMLButtonElement>("form button[type=submit]")!;
+      expect(submit.textContent).toBe(en["node.sshAccess.setNow"]);
+      await act(async () => submit.click());
+      await flush();
+      expect(rotateNodeServerPassword).toHaveBeenCalledWith({ nodeId: "nod_1", newPassword: "", generate: true, confirm: true });
+      expect(document.body.textContent).toContain(en["node.sshAccess.set"]);
+      expect(document.querySelector<HTMLInputElement>("#ssh-password-nod_1")?.value).toBe("N4QWZ7KXJ2M5RT3VBY6CDF8GHE");
+      expect(pills()).toContain(en["node.sshAccess.verified"]);
+    });
+
+    it("notes a saved password that no longer logs in over SSH: it is for the hoster console and sudo", async () => {
+      await mount("nod_1", { panelKeyFingerprint: keyFp, passwordLogin: false });
+      expect(document.body.textContent).toContain(en["node.sshAccess.loginClosed"]);
+      expect(pills()).toContain(en["node.sshAccess.verified"]);
+      expect(buttonTexts()).toContain(en["node.sshAccess.show"]);
+      await remount({ panelKeyFingerprint: keyFp });
+      expect(document.body.textContent).not.toContain(en["node.sshAccess.loginClosed"]);
+    });
+
+    it("words a refused login as the panel key when the panel logs in by key", async () => {
+      await mount("nod_1", { panelKeyFingerprint: keyFp });
+      rotateNodeServerPassword.mockRejectedValueOnce(new ConnectError("ssh_authentication_failed", Code.Unauthenticated));
+      await act(async () => toggle()!.click());
+      await act(async () => document.querySelector<HTMLButtonElement>("form button[type=submit]")!.click());
+      await flush();
+      expect(document.querySelector('[role="alert"] p')?.textContent).toBe(en["node.sshAccess.error.authKey"].replace("{file}", "~/.ssh/authorized_keys"));
+    });
+
+    it("forgetting a key install's access says the key stays on the server", async () => {
+      await mount("nod_1", { nodeRetired: true, passwordSaved: false, passwordLogin: false, panelKeyFingerprint: keyFp });
+      const forget = () => [...document.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Forget"))!;
+      await act(async () => forget().click());
+      expect(document.body.textContent).toContain(en["node.sshAccess.forgetKey"].replace("{file}", "~/.ssh/authorized_keys"));
+      expect(document.body.textContent).not.toContain(en["node.sshAccess.forgetConfirm"]);
     });
   });
 });

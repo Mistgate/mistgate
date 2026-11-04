@@ -2,9 +2,11 @@ import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { authorizedKeysFile, PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Banner, Notice } from "@/components/ui/notice";
+import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import type { NodePreflight } from "@/gen/mistgate/admin/v1/provisioning_pb";
@@ -20,6 +22,8 @@ import { useFmt } from "@/lib/format";
 type Props = { onBack: () => void; onClose: () => void; onManual?: () => void };
 type Step = 0 | 1 | 2 | 3;
 type Busy = "fingerprint" | "check" | "start" | "retry" | null;
+// how the panel logs in to the new server; the owner's own private key joins as the last option later
+type Method = "key" | "password";
 
 // The footer of a step: side by side from sm up; on a phone stacked, the main action on top, each button full width and
 // free to wrap its label ("Close; keep running in background" is wider than a 390 px sheet).
@@ -205,6 +209,12 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   const [confirmedInstall, setConfirmedInstall] = useState(false);
   const [preflight, setPreflight] = useState<NodePreflight | null>(null);
   const [jobId, setJobId] = useState("");
+  // the panel key is the default once it logs in to some node; until the owner picks, the default follows that
+  const keyInUse = usePanelKeyInUse();
+  const [chosenMethod, setChosenMethod] = useState<Method | null>(null);
+  const viaKey = (chosenMethod ?? (keyInUse ? "key" : "password")) === "key";
+  // the how-to under the panel key: open for a key not in use yet, and whenever the server refused it
+  const [howTo, setHowTo] = useState<boolean | null>(null);
   const usernamePattern = /^[A-Za-z_][A-Za-z0-9_.-]{0,31}$/;
 
   const countryOptions = useMemo(
@@ -230,7 +240,20 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     },
   });
 
-  const labels = [t("node.ssh.step.server"), t("node.ssh.step.key"), t("node.ssh.step.check"), t("node.ssh.step.install")];
+  const labels = [t("node.ssh.step.server"), t("node.ssh.step.login"), t("node.ssh.step.check"), t("node.ssh.step.install")];
+  const keyRefused = () => t("node.ssh.error.panelKey", { file: authorizedKeysFile, user: username.trim() });
+  // a refused panel key says where the key must be and opens the how-to; a job words it by the way in it used
+  const fail = (error: unknown) => {
+    if (ConnectError.from(error).rawMessage !== "ssh_panel_key_not_accepted") return setFailure(sshError(error, t, edge));
+    setFailure(keyRefused());
+    setHowTo(true);
+  };
+  const jobText = (code: string) => (viaKey && code === "ssh_authentication_failed" ? keyRefused() : jobError(code, t, edge));
+  const pickMethod = (method: Method) => {
+    setChosenMethod(method);
+    setPassword("");
+    setFailure("");
+  };
   const nameError = touched && !nodeNamePattern.test(name.trim()) ? t("node.add.nameError") : "";
   const addressError = touched && !nodeAddressPattern.test(address.trim()) ? t("node.add.addressError") : "";
   const usernameError = touched && !usernamePattern.test(username.trim()) ? t("node.ssh.loginError") : "";
@@ -279,7 +302,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
     event.preventDefault();
     setTouched(true);
     setFailure("");
-    if (!confirmedKey || !nodeNamePattern.test(name.trim()) || !nodeAddressPattern.test(address.trim()) || !usernamePattern.test(username.trim()) || !password) {
+    if (!confirmedKey || !nodeNamePattern.test(name.trim()) || !nodeAddressPattern.test(address.trim()) || !usernamePattern.test(username.trim()) || (!viaKey && !password)) {
       if (!confirmedKey) setFailure(t("node.ssh.confirmKey"));
       return;
     }
@@ -289,16 +312,18 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
         host: host.trim(),
         port: portNumber,
         fingerprint,
-        password,
+        password: viaKey ? "" : password,
         username: username.trim(),
+        usePanelKey: viaKey,
       }));
       if (!response.preflight) throw new Error("preflight_missing");
       setPreflight(response.preflight);
+      setChosenMethod(viaKey ? "key" : "password"); // the way in just proven holds for the install and its retries
       setPassword("");
       setConfirmedInstall(false);
       setStep(2);
     } catch (error) {
-      if (!isStepUpCancelled(error)) setFailure(sshError(error, t, edge));
+      if (!isStepUpCancelled(error)) fail(error);
     } finally {
       setPassword("");
       setBusy(null);
@@ -308,7 +333,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   async function startInstall(event: FormEvent) {
     event.preventDefault();
     setFailure("");
-    if (!confirmedInstall || !password) {
+    if (!confirmedInstall || (!viaKey && !password)) {
       setFailure(t("node.ssh.confirmInstall"));
       return;
     }
@@ -324,15 +349,16 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
         sshHost: host.trim(),
         sshPort: portNumber,
         fingerprint,
-        password,
+        password: viaKey ? "" : password,
         sshUsername: username.trim(),
+        usePanelKey: viaKey,
       }));
       if (!response.job?.id) throw new Error("provision_job_missing");
       setJobId(response.job.id);
       qc.setQueryData(["node-provision", response.job.id], response.job);
       setStep(3);
     } catch (error) {
-      if (!isStepUpCancelled(error)) setFailure(sshError(error, t, edge));
+      if (!isStepUpCancelled(error)) fail(error);
     } finally {
       setPassword("");
       setBusy(null);
@@ -340,7 +366,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   }
 
   async function retryInstall() {
-    if (!jobId || !password) {
+    if (!jobId || (!viaKey && !password)) {
       setFailure(t("node.ssh.password"));
       return;
     }
@@ -350,13 +376,14 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
       const response = await guard(() => provisioning.retryNodeProvision({
         jobId,
         confirmInstall: true,
-        password,
+        password: viaKey ? "" : password,
         sshUsername: username.trim(),
+        usePanelKey: viaKey,
       }));
       if (response.job) qc.setQueryData(["node-provision", jobId], response.job);
       await qc.invalidateQueries({ queryKey: ["node-provision", jobId] });
     } catch (error) {
-      if (!isStepUpCancelled(error)) setFailure(sshError(error, t, edge));
+      if (!isStepUpCancelled(error)) fail(error);
     } finally {
       setPassword("");
       setBusy(null);
@@ -486,33 +513,55 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             <TextField label={t("node.ssh.provider")} value={provider} onChange={(event) => setProvider(event.target.value)} maxLength={100} autoComplete="off" />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextField
-              label={t("node.ssh.login")}
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="root"
-              autoComplete="username"
-              maxLength={32}
-              pattern={usernamePattern.source}
-              hint={t("node.ssh.loginHint")}
-              error={usernameError}
-              required
-            />
-            <TextField
-              label={t("node.ssh.password")}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              autoComplete="current-password"
-              maxLength={1024}
-              required
-            />
+          {/* how the panel logs in: under a hairline, apart from the node's own details */}
+          <div role="group" aria-labelledby="ssh-login-method" className="flex flex-col gap-3 border-t border-line pt-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <span id="ssh-login-method" className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
+                {t("node.ssh.method")}
+              </span>
+              <Segmented
+                variant="thumb"
+                aria-label={t("node.ssh.method")}
+                value={viaKey ? "key" : "password"}
+                onValueChange={pickMethod}
+                options={[
+                  { value: "key", label: t("panelKey.title") },
+                  { value: "password", label: t("node.ssh.methodPassword") },
+                ]}
+                className="w-full sm:w-72"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <TextField
+                label={t("node.ssh.login")}
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="root"
+                autoComplete="username"
+                maxLength={32}
+                pattern={usernamePattern.source}
+                hint={t("node.ssh.loginHint")}
+                error={usernameError}
+                required
+              />
+              {!viaKey && (
+                <TextField
+                  label={t("node.ssh.password")}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type="password"
+                  autoComplete="current-password"
+                  maxLength={1024}
+                  hint={t("node.ssh.passwordHint")}
+                  required
+                />
+              )}
+            </div>
+            {viaKey && <PanelSSHKey howTo={howTo ?? !keyInUse} onHowTo={setHowTo} className="rounded-card border border-line bg-surface-2 p-4" />}
           </div>
-          <p className="text-xs leading-relaxed text-muted">{t("node.ssh.passwordHint")}</p>
           <div className={`${footerCls} sm:justify-between`}>
             <Button type="button" variant="ghost" size="md" className={footBtn} onClick={back}>{t("node.ssh.back")}</Button>
-            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedKey || !password}>
+            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedKey || (!viaKey && !password)}>
               {busy === "check" ? t("node.ssh.checking") : t("node.ssh.continue")}
             </Button>
           </div>
@@ -536,16 +585,18 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             <Fact label={t("node.ssh.panelReachable")} value={preflight.panelReachable ? t("node.ssh.available") : t("node.ssh.unavailable")} tone={preflight.panelReachable ? "good" : "bad"} />
           </div>
           <p className="rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-muted">{t("node.ssh.firewallHint")}</p>
-          <TextField
-            label={t("node.ssh.password")}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            autoComplete="current-password"
-            maxLength={1024}
-            hint={t("node.ssh.passwordHint")}
-            required
-          />
+          {!viaKey && (
+            <TextField
+              label={t("node.ssh.password")}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              autoComplete="current-password"
+              maxLength={1024}
+              hint={t("node.ssh.passwordHint")}
+              required
+            />
+          )}
           <label className="flex cursor-pointer items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-sm leading-relaxed text-fg">
             <input
               type="checkbox"
@@ -557,7 +608,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
           </label>
           <div className={`${footerCls} sm:justify-between`}>
             <Button type="button" variant="ghost" size="md" className={footBtn} onClick={back}>{t("node.ssh.back")}</Button>
-            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedInstall || !password}>
+            <Button type="submit" variant="primary" size="md" className={footBtn} disabled={busy !== null || !confirmedInstall || (!viaKey && !password)}>
               {busy === "start" ? t("node.ssh.starting") : t("node.ssh.startInstall")}
             </Button>
           </div>
@@ -583,11 +634,11 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
                 <Banner kind="ok" title={t("node.ssh.done")} />
               ) : jobFailed ? (
                 <>
-                  <Notice tone="danger">{jobError(job.data.errorCode, t, edge)}</Notice>
+                  <Notice tone="danger">{jobText(job.data.errorCode)}</Notice>
                   {job.data.errorCode === "ssh_target_refused" && manualButton}
                 </>
               ) : jobCancelled ? (
-                <Notice tone="danger">{jobError(job.data.errorCode, t, edge)}</Notice>
+                <Notice tone="danger">{jobText(job.data.errorCode)}</Notice>
               ) : (
                 <>
                   <p className="text-sm text-muted">{phaseLabel(job.data.phase, t)}</p>
@@ -597,7 +648,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
                   <p className="text-xs leading-relaxed text-muted">{t("node.ssh.closeBackground")}</p>
                 </>
               )}
-              {jobCanRetry && (
+              {jobCanRetry && !viaKey && (
                 <TextField
                   label={t("node.ssh.retryPassword")}
                   value={password}
@@ -615,7 +666,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
             ) : jobCanRetry ? (
               <>
                 <Button type="button" variant="ghost" size="md" className={footBtn} onClick={onClose}>{t("common.close")}</Button>
-                <Button type="button" variant="primary" size="md" className={footBtn} disabled={busy !== null || !password} onClick={() => void retryInstall()}>
+                <Button type="button" variant="primary" size="md" className={footBtn} disabled={busy !== null || (!viaKey && !password)} onClick={() => void retryInstall()}>
                   {busy === "retry" ? t("node.ssh.retrying") : t("node.ssh.retry")}
                 </Button>
               </>

@@ -15,6 +15,8 @@ const listApprovals = vi.fn();
 const approve = vi.fn();
 const reject = vi.fn();
 let role = Role.OWNER;
+let accessList: { nodeId: string; panelKeyFingerprint: string }[] = [];
+const panelPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7cYk4m1x mistgate-panel";
 vi.mock("@/lib/api", () => ({
   apiTokens: {
     listApiTokens: (...a: unknown[]) => listApiTokens(...a),
@@ -29,6 +31,11 @@ vi.mock("@/lib/api", () => ({
   // the Telegram card has its own tests (telegram.test.tsx); here it only has to render
   telegram: { getTelegram: () => Promise.resolve({ status: { bot: { configured: false, username: "", error: "" }, links: [], adminUrlKnown: false } }) },
   updates: {},
+  // a node_install approval: whether the panel key logs in to some node (the default login), and the key itself
+  provisioning: {
+    listNodeServerAccess: async () => ({ access: accessList }),
+    getPanelSSHKey: async () => ({ publicKey: panelPublicKey, fingerprint: "SHA256:pAnElKeYfInGeRpRiNt0123456789abcdefghijkl" }),
+  },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
   isUnauthenticated: () => false,
   webauthnSupported: () => false,
@@ -55,6 +62,7 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
   search = {};
+  accessList = [];
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -329,6 +337,52 @@ describe("the Integrations screen: approvals", () => {
     await settle();
     expect(approve).toHaveBeenCalledWith({ id: "pln_1", sshPassword: "root-secret", confirmedFingerprint: fp });
     expect(document.querySelector<HTMLInputElement>("input[type=password]")?.value ?? "").toBe("");
+    // a plan without the panel key fact (made before the panel key) offers no choice: the panel would refuse the key
+    expect(document.querySelector("article [role=radio]")).toBeNull();
+  });
+
+  describe("the panel key on a node install", () => {
+    const fp = "SHA256:" + "B".repeat(43);
+    const install = approval({
+      tool: "node_install",
+      facts: [
+        { key: "node", value: "nl1", untrusted: true },
+        { key: "username", value: "root", untrusted: true },
+        { key: "host_key", value: fp, untrusted: false },
+        { key: "host_key_algorithm", value: "ssh-ed25519", untrusted: false },
+        { key: "panel_ssh_key", value: panelPublicKey, untrusted: false },
+      ],
+    });
+    const approveButton = () => document.querySelector("button[aria-label='Approve: Install a node over SSH']") as HTMLButtonElement;
+    const loginRadio = (label: string) => [...document.querySelectorAll<HTMLElement>("article [role=radio]")].find((r) => r.textContent === label);
+
+    it("lets the owner pick the panel key, then approves with no password", async () => {
+      approve.mockResolvedValue({});
+      await mount(tokens([]), inbox([install]));
+      expect(loginRadio("Password")?.getAttribute("aria-checked")).toBe("true"); // no node logs in by key yet
+      // the key is shown under the choice, not once more among the facts
+      expect([...document.querySelectorAll("dd")].some((dd) => dd.textContent?.includes("mistgate-panel"))).toBe(false);
+
+      await click(loginRadio("Panel key"));
+      await settle();
+      expect(document.querySelector("article input[type=password]")).toBeNull();
+      expect(document.querySelector("[data-testid=panel-key]")?.textContent).toBe(panelPublicKey);
+      expect(text()).toContain("Confirm the host key to approve.");
+      expect(approveButton().hasAttribute("data-disabled")).toBe(true);
+      await act(async () => void document.querySelector<HTMLInputElement>("article input[type=checkbox]")!.click());
+      expect(approveButton().hasAttribute("data-disabled")).toBe(false);
+      await click(approveButton());
+      await settle();
+      expect(approve).toHaveBeenCalledWith({ id: "pln_1", usePanelKey: true, confirmedFingerprint: fp });
+    });
+
+    it("starts on the panel key once it logs in to some node", async () => {
+      accessList = [{ nodeId: "nod_9", panelKeyFingerprint: "SHA256:pAnElKeYfInGeRpRiNt0123456789abcdefghijkl" }];
+      await mount(tokens([]), inbox([install]));
+      await settle();
+      expect(loginRadio("Panel key")?.getAttribute("aria-checked")).toBe("true");
+      expect(document.querySelector("article input[type=password]")).toBeNull();
+    });
   });
 
   it("shows the WARP terms link and explains the owner-approved device replacement", async () => {

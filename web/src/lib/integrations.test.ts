@@ -136,7 +136,7 @@ describe("words of an approval", () => {
       "name", "subscription_name", "quota", "term", "apps", "nodes", "count", "users", "effect", "user", "device", "last_seen", "alert", "duration", "node", "fix", "detail",
       "drops_sessions", "version", "rollout", "progress", "action", "current_version", "previous_version", "group", "quota_reset", "expires", "device_limit", "speed_limit", "device_speed_limit",
       "dns_preset", "used", "scheduled_at", "scheduled_version", "timezone", "existing_schedule", "from", "to",
-      "ssh", "username", "host_key", "host_key_algorithm", "address", "installation", "recovery",
+      "ssh", "username", "host_key", "host_key_algorithm", "panel_ssh_key", "address", "installation", "recovery",
     ];
     for (const k of keys) {
       expect(factLabel(t, k), k).not.toBe(k);

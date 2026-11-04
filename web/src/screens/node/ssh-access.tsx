@@ -1,8 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { authorizedKeysFile } from "@/components/panel-ssh-key";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/bits";
+import { StatusPill } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
 import { errorText } from "@/lib/errors";
@@ -26,8 +28,9 @@ export function SSHAccessCard({ nodeId }: { nodeId: string }) {
 }
 
 /**
- * Server tab, SSH access: where the panel logs in (address, login, the pinned server key), then a block per way in, each
- * under a hairline: the password (ssh-password.tsx). A retired node adds Forget at the end.
+ * Server tab, SSH access: where the panel logs in (address, login, the pinned server key) and how (the panel key or the
+ * password only, in the header), then a block per way in, each under a hairline: the password (ssh-password.tsx); the
+ * keys block joins later. A retired node adds Forget at the end.
  */
 function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
   const t = useT();
@@ -58,9 +61,18 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
   return (
     <section className="flex flex-col gap-4 rounded-card-lg border border-line bg-surface p-4">
       <div className="flex flex-col gap-2">
-        <SectionLabel as="h2" icon="server" tone="sky">
-          {t("node.sshAccess.title")}
-        </SectionLabel>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <SectionLabel as="h2" icon="server" tone="sky" className="me-auto">
+            {t("node.sshAccess.title")}
+          </SectionLabel>
+          {/* how the panel gets in: its key (verified at install or after), or the saved password alone */}
+          {access.data &&
+            (access.data.panelKeyFingerprint ? (
+              <StatusPill sm kind="ok" label={t("panelKey.title")} />
+            ) : (
+              <StatusPill sm kind="off" label={t("node.sshAccess.passwordOnly")} />
+            ))}
+        </div>
         {access.isError ? (
           <p role="alert" className="text-[13px] leading-snug text-danger-text">
             {t("node.sshAccess.loadFailed")}
@@ -103,7 +115,12 @@ function SSHAccessCardContent({ nodeId }: { nodeId: string }) {
           {access.data.nodeRetired && (
             <div className="flex flex-col gap-3 border-t border-line pt-4">
               <p className="text-[13px] leading-snug text-pretty text-muted">{t("node.sshAccess.retired")}</p>
-              {confirmForget && <p className="text-[13px] leading-snug text-pretty text-danger-text">{t("node.sshAccess.forgetConfirm")}</p>}
+              {confirmForget && (
+                <div className="flex flex-col gap-1.5 text-[13px] leading-snug text-pretty text-danger-text">
+                  {access.data.passwordSaved && <p>{t("node.sshAccess.forgetConfirm")}</p>}
+                  {access.data.panelKeyFingerprint && <p>{t("node.sshAccess.forgetKey", { file: authorizedKeysFile })}</p>}
+                </div>
+              )}
               <div className="grid gap-2 md:flex md:flex-wrap">
                 <Button variant="danger" size="md" disabled={busy} onClick={() => (confirmForget ? void forget() : setConfirmForget(true))}>
                   {confirmForget ? t("node.sshAccess.forgetNow") : t("node.sshAccess.forget")}
