@@ -77,7 +77,7 @@ export function ServerTab({ data }: { data: Plain<GetNodeResponse> }) {
           <AgentPanel data={data} owner={owner} />
         </div>
         <div className="flex min-w-0 flex-col gap-3.5">
-          <SSHAccessCard nodeId={node.id} />
+          <SSHAccessCard nodeId={node.id} attach={retired ? undefined : { name: node.name, address: node.address }} />
           {!retired && <DecoyCard node={node} />}
           {!retired && <AwgBackendCard data={data} />}
           <HostPanel data={data} />

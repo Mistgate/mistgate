@@ -1,6 +1,20 @@
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
-import type { StatusKind } from "./status";
+import { StatusGlyph, type StatusKind } from "./status";
+
+/** A state line inside a card: the status tint and its glyph, still (nothing blinks), an optional action at its end. */
+export function Callout({ kind, alert, action, className, children }: { kind: "warn" | "bad"; alert?: boolean; action?: ReactNode; className?: string; children: ReactNode }) {
+  const Body = typeof children === "string" ? "p" : "div"; // a sentence is a paragraph; a title with its line is not
+  return (
+    <div role={alert ? "alert" : undefined} className={cx(`tint tone-${kind} flex flex-wrap items-start gap-x-2 gap-y-2.5 rounded-ctl p-3`, className)}>
+      <span className="pt-px">
+        <StatusGlyph kind={kind} />
+      </span>
+      <Body className="min-w-0 flex-1 basis-48 text-xs leading-snug text-pretty text-fg">{children}</Body>
+      {action && <div className="flex flex-none flex-wrap gap-2 max-sm:ms-[22px]">{action}</div>}
+    </div>
+  );
+}
 
 /** Inline notice: amber by default, red for errors, grey and still for "nothing is wrong, this just is not here". A dot, a bold lead-in and the text. */
 export function Notice({

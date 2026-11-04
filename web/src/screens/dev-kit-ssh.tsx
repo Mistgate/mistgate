@@ -11,11 +11,15 @@ import { approvals as approvalsApi, provisioning } from "@/lib/api";
 import type { Approvals } from "@/lib/integrations";
 import { ApprovalQueue } from "@/screens/integrations/approvals";
 import { SSHAccessCard } from "@/screens/node/ssh-access";
+import { PanelKeyBulk } from "@/screens/nodes-panel-key";
 
 // Development only, /dev-kit?only=ssh: a node's SSH access card (Server tab) in each state, the SSH install wizard and a
 // node_install approval, on made-up data. The provisioning calls are answered here: by node for the card (a change that
 // goes through, one that never ends, one the server does not confirm, one refused at the login, an interrupted change, a
-// retired node, nodes installed by the panel key), by login for the wizard (deploy: the server refuses the panel key).
+// retired node, nodes installed by the panel key), by login for the wizard (deploy: the server refuses the panel key; an
+// own key always asks for its passphrase first). The keys block reads a made-up authorized_keys per node (the panel key
+// missing, unused, a list that never loads, one the server refuses); a node with no access shows Connect SSH access (its
+// password logs in, the panel key does not go on); the Nodes page offer runs on three nodes of its own (nl1 refuses).
 
 const fingerprint = "SHA256:Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0";
 const panelKey = {
@@ -36,7 +40,36 @@ const access: Record<string, Record<string, unknown>> = {
   nod_keyonly: { nodeName: "de1", host: "203.0.113.7", username: "root", passwordSaved: false, passwordLogin: false, ...viaKey },
   nod_closed: { nodeName: "nl1", host: "203.0.113.24", username: "root", passwordGenerated: true, passwordLogin: false, ...viaKey },
   nod_keyretired: { nodeName: "de1", host: "203.0.113.7", username: "root", nodeRetired: true, passwordSaved: false, passwordLogin: false, ...viaKey },
+  nod_keymissing: { nodeName: "de1", host: "203.0.113.7", username: "root", passwordGenerated: true, ...viaKey },
+  nod_keyunused: { nodeName: "fi1", host: "198.51.100.12", username: "root" },
+  nod_keysloading: { nodeName: "nl1", host: "203.0.113.24", username: "root", ...viaKey },
+  nod_keyserror: { nodeName: "fi1", host: "198.51.100.12", username: "root", ...viaKey },
 };
+
+// authorized_keys per node, as ListNodeServerKeys reads it
+const sshKey = (type: string, bits: number, fp: string, comment: string, over: object = {}) => ({ type, bits, fingerprint: fp, comment, panelKey: false, restricted: false, lines: 1, ...over });
+const k = {
+  panel: sshKey("ssh-ed25519", 256, panelKey.fingerprint, "mistgate-panel", { panelKey: true }),
+  alice: sshKey("ssh-ed25519", 256, "SHA256:Xy7pL2qR9sT4vW8zA1bC3dE5fG6hJ0kM2nP4rS6tU8w", "alice@laptop"),
+  ci: sshKey("ssh-rsa", 3072, "SHA256:Ab9cD8eF7gH6iJ5kL4mN3oP2qR1sT0uV9wX8yZ7aB6c", "deploy@ci.example.com", { restricted: true, lines: 2 }),
+  yubi: sshKey("sk-ssh-ed25519@openssh.com", 256, "SHA256:Qm4nB7vC1xZ9lK3jH5gF8dS2aP6oI0uY4tR7eW1qE3r", "bob@yubikey"),
+  ecdsa: sshKey("ecdsa-sha2-nistp256", 256, "SHA256:Lk8jH2gF5dS9aP1oI4uY7tR3eW6qE0rT2yU5iO8pA1s", ""),
+};
+const keysOf: Record<string, { keys: ReturnType<typeof sshKey>[]; otherLines: number }> = {
+  nod_key: { keys: [k.panel, k.alice, k.ci], otherLines: 2 },
+  nod_idle: { keys: [k.alice, k.ci], otherLines: 0 },
+  nod_generated: { keys: [k.ecdsa, k.yubi], otherLines: 1 },
+  nod_keyonly: { keys: [k.panel], otherLines: 0 },
+  nod_closed: { keys: [k.panel, k.alice], otherLines: 0 },
+  nod_keymissing: { keys: [k.alice, k.yubi], otherLines: 0 },
+  nod_keyunused: { keys: [k.panel, k.alice], otherLines: 0 },
+};
+// the Nodes page offer's own nodes: three log in with a password only, nl1's ~/.ssh is a link
+const bulkAccess = [
+  { nodeId: "nod_b_de1", nodeName: "de1", host: "203.0.113.7" },
+  { nodeId: "nod_b_nl1", nodeName: "nl1", host: "203.0.113.24" },
+  { nodeId: "nod_b_fi1", nodeName: "fi1", host: "198.51.100.12" },
+].map((a) => ({ ...base, username: "root", ...a }));
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const preflight = { distribution: "Ubuntu", version: "24.04", kernel: "6.8.0-45-generic", architecture: "amd64", cpuCount: 2, memoryBytes: 2_147_483_648n, diskAvailableBytes: 21_474_836_480n, systemd: true, alreadyEnrolled: false, panelReachable: true };
@@ -62,6 +95,41 @@ function fakeCalls() {
     return { rotated: true };
   };
   api.forgetNodeServerAccess = async () => ({});
+  api.listNodeServerKeys = async ({ nodeId }: { nodeId: string }) => {
+    if (nodeId === "nod_keysloading") return new Promise(() => {});
+    await wait(700);
+    if (nodeId === "nod_keyserror") throw new ConnectError("ssh_authentication_failed", Code.FailedPrecondition);
+    return keysOf[nodeId] ?? { keys: [k.alice], otherLines: 0 };
+  };
+  api.addNodeServerKey = async ({ nodeId, publicKey, panelKey: panel }: { nodeId: string; publicKey?: string; panelKey?: boolean }) => {
+    await wait(900);
+    if (nodeId === "nod_b_nl1") throw new ConnectError("authorized_keys_unsafe", Code.FailedPrecondition);
+    const list = (keysOf[nodeId] ??= { keys: [k.alice], otherLines: 0 });
+    if (panel) {
+      if (!list.keys.some((x) => x.panelKey)) list.keys.unshift(k.panel);
+      if (access[nodeId]) access[nodeId] = { ...access[nodeId], ...viaKey };
+      return { key: k.panel };
+    }
+    const [type, , ...comment] = (publicKey ?? "").trim().split(/\s+/);
+    if (!type || !/^(ssh-|ecdsa-|sk-)/.test(type)) throw new ConnectError("ssh_public_key_invalid", Code.InvalidArgument);
+    const added = sshKey(type, type === "ssh-rsa" ? 4096 : 256, "SHA256:Nw3eR5tY7uI9oP1aS3dF5gH7jK9lZ1xC3vB5nM7qW9e", comment.join(" "));
+    list.keys.push(added);
+    return { key: added };
+  };
+  api.removeNodeServerKey = async ({ nodeId, fingerprint: fp }: { nodeId: string; fingerprint: string }) => {
+    await wait(900);
+    const list = keysOf[nodeId];
+    if (list) list.keys = list.keys.filter((x) => x.fingerprint !== fp);
+    if (fp === panelKey.fingerprint && access[nodeId]) access[nodeId] = { ...access[nodeId], panelKeyFingerprint: "" };
+    return {};
+  };
+  // a node installed by command: its password logs in, the panel key does not go on (the server's ~/.ssh is a link)
+  api.attachNodeServerAccess = async ({ nodeId, sshHost, username, usePanelKey }: { nodeId: string; sshHost: string; username: string; usePanelKey?: boolean }) => {
+    await wait(900);
+    if (usePanelKey) throw new ConnectError("ssh_panel_key_not_accepted", Code.FailedPrecondition);
+    access[nodeId] = { nodeName: "fi1", host: sshHost, username };
+    return { access: { nodeId, ...base, ...access[nodeId] }, panelKeyError: "authorized_keys_unsafe" };
+  };
   api.getPanelSSHKey = async () => {
     await wait(150);
     return panelKey;
@@ -70,8 +138,9 @@ function fakeCalls() {
     await wait(300);
     return { host, port, fingerprint, algorithm: "ssh-ed25519" };
   };
-  api.checkSSH = async ({ username }: { username: string }) => {
+  api.checkSSH = async ({ username, privateKey, privateKeyPassphrase }: { username: string; privateKey?: string; privateKeyPassphrase?: string }) => {
     await wait(500);
+    if (privateKey && !privateKeyPassphrase) throw new ConnectError("ssh_key_passphrase_required", Code.FailedPrecondition);
     if (username === "deploy") throw new ConnectError("ssh_panel_key_not_accepted", Code.Unauthenticated);
     return { preflight };
   };
@@ -124,8 +193,12 @@ const installApproval: Approvals = {
   ],
 } as unknown as Approvals;
 
-function Shot({ id, title, wide, children }: { id: string; title: string; wide?: boolean; children: ReactNode }) {
-  const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false } } }));
+function Shot({ id, title, wide, seed, children }: { id: string; title: string; wide?: boolean; seed?: [readonly unknown[], unknown]; children: ReactNode }) {
+  const [qc] = useState(() => {
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false } } });
+    if (seed) client.setQueryData(seed[0], seed[1]);
+    return client;
+  });
   return (
     <section data-shot={id} className={`flex w-full flex-col gap-3 ${wide ? "max-w-[640px]" : "max-w-[452px]"}`}>
       <SectionLabel>{title}</SectionLabel>
@@ -162,11 +235,42 @@ export function SSHKit() {
           <ApprovalQueue data={installApproval} />
         </StepUpProvider>
       </Shot>
-      <Shot id="ssh-idle" title="SSH access: saved, verified">
+      <Shot id="ssh-idle" title="SSH access: password only, the panel key offered">
         <SSHAccessCard nodeId="nod_idle" />
       </Shot>
-      <Shot id="ssh-key" title="SSH access: the panel key and a saved password">
+      <Shot id="ssh-key" title="SSH access: the panel key, a saved password, three keys">
         <SSHAccessCard nodeId="nod_key" />
+      </Shot>
+      <Shot id="ssh-keymissing" title="Keys: the panel key is not on the server">
+        <SSHAccessCard nodeId="nod_keymissing" />
+      </Shot>
+      <Shot id="ssh-keyunused" title="Keys: the panel key is there, not used">
+        <SSHAccessCard nodeId="nod_keyunused" />
+      </Shot>
+      <Shot id="ssh-keysloading" title="Keys: reading them over SSH">
+        <SSHAccessCard nodeId="nod_keysloading" />
+      </Shot>
+      <Shot id="ssh-keyserror" title="Keys: the server refused the login">
+        <SSHAccessCard nodeId="nod_keyserror" />
+      </Shot>
+      <Shot id="ssh-bind" title="Keys: bind a key (paste a private one: refused here)">
+        <SSHAccessCard nodeId="nod_key" />
+      </Shot>
+      <Shot id="ssh-unbind" title="Keys: unbind an own key">
+        <SSHAccessCard nodeId="nod_key" />
+      </Shot>
+      <Shot id="ssh-unbindpanel" title="Keys: unbind the panel key (the password is checked first)">
+        <SSHAccessCard nodeId="nod_key" />
+      </Shot>
+      <Shot id="ssh-attach" title="A node installed by command: Connect SSH access">
+        <StepUpProvider>
+          <SSHAccessCard nodeId="nod_attach" attach={{ name: "fi1", address: "fi1.example.com" }} />
+        </StepUpProvider>
+      </Shot>
+      <Shot id="ssh-bulk" title="Nodes page: the panel key on every password-only node" wide seed={[["node-server-access"], { access: bulkAccess }]}>
+        <StepUpProvider>
+          <PanelKeyBulk />
+        </StepUpProvider>
       </Shot>
       <Shot id="ssh-keyonly" title="SSH access: installed by the panel key, no password">
         <SSHAccessCard nodeId="nod_keyonly" />

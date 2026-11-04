@@ -109,7 +109,14 @@ function NodeInstallFields({ a, keyInUse, viaKey, setViaKey, password, setPasswo
       {viaKey ? (
         <PanelSSHKey howTo={howTo ?? !keyInUse} onHowTo={setHowTo} />
       ) : (
-        <TextField label={t("int.ap.ssh.password")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" maxLength={1024} />
+        <>
+          <TextField label={t("int.ap.ssh.password")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" maxLength={1024} />
+          {/* an approved password install always adds the panel key too (the panel decides it, not the agent) */}
+          <p className="flex items-start gap-2 text-xs leading-snug text-pretty text-muted">
+            <Icon name="key" size={14} className="mt-px flex-none" />
+            {t("int.ap.ssh.alsoKey")}
+          </p>
+        </>
       )}
     </div>
   );

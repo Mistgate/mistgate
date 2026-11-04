@@ -328,6 +328,8 @@ describe("the Integrations screen: approvals", () => {
     expect(document.querySelector("[data-testid=host-key]")?.className).toContain("wrap-anywhere");
     expect(text()).toContain("Host key fingerprint · ssh-ed25519");
     expect(approveButton().hasAttribute("data-disabled")).toBe(true);
+    // a password install approved here adds the panel key too: the owner reads it before approving
+    expect(text()).toContain("The panel also adds its own key to the server");
 
     await type(document.querySelector("input[type=password]"), "root-secret");
     expect(approveButton().hasAttribute("data-disabled")).toBe(true); // the key is not confirmed yet

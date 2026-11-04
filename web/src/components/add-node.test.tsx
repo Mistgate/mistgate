@@ -78,9 +78,10 @@ const button = (label: string) => [...document.querySelectorAll("button")].find(
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const toggle = (el: HTMLInputElement | null | undefined) => act(async () => void el?.click());
 const input = (placeholder: string) => document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)!;
-async function type(el: HTMLInputElement, value: string) {
+async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -246,6 +247,7 @@ describe("the add-node window", () => {
       password: "install-secret",
       sshUsername: "root",
       usePanelKey: false,
+      installPanelKey: true, // a password install adds the panel key unless the owner unticks it
     });
     expect(text()).toContain("Waiting to start");
   });
@@ -342,6 +344,131 @@ describe("the add-node window", () => {
       await click(button("Retry installation"));
       await settle();
       expect(retryNodeProvision).toHaveBeenCalledWith({ jobId: "prv_2", confirmInstall: true, password: "", sshUsername: "root", usePanelKey: true });
+    });
+
+    const ownKey = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHI=\n-----END OPENSSH PRIVATE KEY-----\n";
+    const keyField = () => document.querySelector<HTMLTextAreaElement>("textarea");
+    const queued = { job: { id: "prv_4", nodeId: "nod_4", name: "nl1", state: "queued", phase: "queued", errorCode: "" } };
+
+    it("adds the panel key on a password install by default, and not when the owner unticks it", async () => {
+      checkSSH.mockResolvedValue({ preflight });
+      startNodeProvision.mockResolvedValue(queued);
+      getNodeProvision.mockReturnValue(new Promise(() => {}));
+      await toLogin();
+      const box = () => document.querySelector<HTMLInputElement>("input[data-install-panel-key]");
+      expect(box()?.checked).toBe(true);
+      expect(text()).toContain(en["node.ssh.installPanelKeyHint"]);
+      await toggle(box());
+      expect(box()?.checked).toBe(false);
+
+      await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "check-secret");
+      await toggle(hostKeyBox());
+      await click(button("Continue"));
+      await settle();
+      expect(checkSSH.mock.calls[0]![0]).not.toHaveProperty("installPanelKey"); // the check installs nothing
+      await type(document.querySelector<HTMLInputElement>('input[type="password"]')!, "install-secret");
+      await toggle(hostKeyBox());
+      await click(button("Start installation"));
+      await settle();
+      expect(startNodeProvision).toHaveBeenCalledWith(expect.objectContaining({ password: "install-secret", usePanelKey: false, installPanelKey: false }));
+      expect(startNodeProvision.mock.calls[0]![0]).not.toHaveProperty("privateKey");
+    });
+
+    it("logs in with an own key: last and never the default, never shown back, no password sent, the passphrase only once asked", async () => {
+      accessList = [{ nodeId: "nod_9", panelKeyFingerprint: panelKey.fingerprint }];
+      checkSSH.mockRejectedValueOnce(new ConnectError("ssh_key_passphrase_required", Code.FailedPrecondition)).mockResolvedValue({ preflight });
+      startNodeProvision.mockResolvedValue(queued);
+      getNodeProvision.mockReturnValue(new Promise(() => {}));
+      await toLogin();
+      expect([...document.querySelectorAll("[role=radio]")].map((r) => r.textContent)).toEqual(["Panel key", "Password", "Own key"]);
+      expect(checked("Panel key")).toBe(true);
+
+      await click(radio("Own key"));
+      await settle();
+      expect(text()).toContain(en["node.ssh.ownWarn"]);
+      expect(document.querySelector('input[type="password"]')).toBeNull(); // no password, no passphrase yet
+      expect(button("Continue")?.disabled).toBe(true);
+
+      // a .pub line is refused in the browser and not kept
+      await type(keyField()!, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7cYk4 alice@laptop");
+      expect(text()).toContain(en["node.ssh.ownKeyPublic"]);
+      expect(text()).not.toContain(en["node.ssh.ownKeyLoaded"]);
+
+      await type(keyField()!, ownKey);
+      expect(text()).toContain(en["node.ssh.ownKeyLoaded"]);
+      expect(keyField()).toBeNull(); // the field goes once the key is in: nothing on screen holds it
+      expect(document.body.innerHTML).not.toContain("b3BlbnNzaC1rZXktdjE");
+
+      await toggle(hostKeyBox());
+      await click(button("Continue"));
+      await settle();
+      expect(checkSSH).toHaveBeenLastCalledWith({ host: "nl1.example.com", port: 22, fingerprint: "SHA256:server-key", password: "", usePanelKey: false, privateKey: ownKey, username: "root" });
+      // the server asked for the passphrase: its field, no error
+      expect(document.querySelector("[role=alert]")).toBeNull();
+      const phrase = document.querySelector<HTMLInputElement>('input[type="password"]');
+      expect(phrase).not.toBeNull();
+      expect(button("Continue")?.disabled).toBe(true);
+      await type(phrase!, "correct horse");
+      await click(button("Continue"));
+      await settle();
+      expect(checkSSH).toHaveBeenLastCalledWith(expect.objectContaining({ password: "", usePanelKey: false, privateKey: ownKey, privateKeyPassphrase: "correct horse" }));
+      expect(text()).toContain("Server checks passed");
+
+      await toggle(hostKeyBox());
+      await click(button("Start installation"));
+      await settle();
+      expect(startNodeProvision).toHaveBeenCalledWith(
+        expect.objectContaining({ password: "", usePanelKey: false, privateKey: ownKey, privateKeyPassphrase: "correct horse", installPanelKey: true }),
+      );
+    });
+
+    it("drops an own key when the method changes and when the window closes", async () => {
+      await toLogin();
+      await click(radio("Own key"));
+      await type(keyField()!, ownKey);
+      expect(text()).toContain(en["node.ssh.ownKeyLoaded"]);
+      await click(radio("Password"));
+      await click(radio("Own key"));
+      expect(text()).not.toContain(en["node.ssh.ownKeyLoaded"]);
+      expect(keyField()).not.toBeNull();
+
+      await type(keyField()!, ownKey);
+      await click(document.querySelector('[aria-label="Close"]'));
+      await settle();
+      await click(button("open"));
+      await settle();
+      await click(button("Install automatically over SSH"));
+      await type(input("de1.example.com"), "nl1.example.com");
+      await click(button("Check server"));
+      await settle();
+      expect(checked("Password")).toBe(true);
+      await click(radio("Own key"));
+      expect(text()).not.toContain(en["node.ssh.ownKeyLoaded"]);
+      expect(keyField()).not.toBeNull();
+    });
+
+    it("retries an own-key install only with the key given again, and words the server refusing it", async () => {
+      checkSSH.mockResolvedValue({ preflight });
+      startNodeProvision.mockResolvedValue(queued);
+      getNodeProvision.mockResolvedValue({ job: { ...queued.job, state: "failed", phase: "connecting", errorCode: "ssh_authentication_failed" } });
+      retryNodeProvision.mockResolvedValue({});
+      await toLogin();
+      await click(radio("Own key"));
+      await type(keyField()!, ownKey);
+      await toggle(hostKeyBox());
+      await click(button("Continue"));
+      await settle();
+      await toggle(hostKeyBox());
+      await click(button("Start installation"));
+      await settle();
+      await settle();
+      expect(text()).toContain("The server did not accept this key for root.");
+      expect(text()).toContain(en["node.ssh.retryOwnKey"]);
+      expect(button("Retry installation")?.disabled).toBe(true); // the key went with the start
+      await type(keyField()!, ownKey);
+      await click(button("Retry installation"));
+      await settle();
+      expect(retryNodeProvision).toHaveBeenCalledWith({ jobId: "prv_4", confirmInstall: true, password: "", usePanelKey: false, privateKey: ownKey, sshUsername: "root", installPanelKey: true });
     });
   });
 

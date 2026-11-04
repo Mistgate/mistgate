@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { CopyButton } from "@/components/copy-button";
+import { Fingerprint } from "@/components/ssh-login";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -40,6 +41,7 @@ export function PanelSSHKey({ howTo, onHowTo, className }: { howTo: boolean; onH
   const t = useT();
   const key = usePanelSSHKey();
   const publicKey = key.data?.publicKey ?? "";
+  const [keyType = "", keyBody = "", ...keyComment] = publicKey.split(" ");
   const command = `mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${publicKey}' >> ${authorizedKeysFile} && chmod 600 ${authorizedKeysFile}`;
 
   return (
@@ -67,7 +69,15 @@ export function PanelSSHKey({ howTo, onHowTo, className }: { howTo: boolean; onH
             data-testid="panel-key"
             className="block min-h-[68px] rounded-field border border-line bg-surface p-3 font-mono text-xs leading-relaxed wrap-anywhere text-fg select-all"
           >
-            {key.isPending ? <span className="text-muted">{t("common.loading")}</span> : publicKey}
+            {key.isPending ? (
+              <span className="text-muted">{t("common.loading")}</span>
+            ) : (
+              // "mistgate-panel" stays one word: only the base64 run breaks where it must
+              <>
+                <span className="whitespace-nowrap">{keyType}</span> {keyBody}
+                {keyComment.length > 0 && <> <span className="whitespace-nowrap">{keyComment.join(" ")}</span></>}
+              </>
+            )}
           </code>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {publicKey && <CopyButton value={publicKey} label={t("panelKey.copy")} size="md" />}
@@ -75,9 +85,7 @@ export function PanelSSHKey({ howTo, onHowTo, className }: { howTo: boolean; onH
               // on a phone the fingerprint takes its own line: beside the button it would be a narrow column of mono
               <span className="min-w-0 flex-1 text-xs leading-snug text-muted max-sm:basis-full">
                 {t("panelKey.fingerprint")}{" "}
-                <span dir="ltr" className="font-mono wrap-anywhere">
-                  {key.data.fingerprint}
-                </span>
+                <Fingerprint value={key.data.fingerprint} />
               </span>
             )}
           </div>

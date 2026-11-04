@@ -17,9 +17,9 @@ With an SSH installation the panel itself connects to a new server, checks it, i
 ## The four steps
 
 1. **Server.** Enter the **SSH server address** and the **SSH port** (usually 22) and press **Check server**. The panel reads the server's SSH host key from its own server. No login or password is sent yet.
-2. **Login.** Under "Confirm the server key", compare the SHA-256 fingerprint and its key type with a trusted copy: one your provider's console shows, or the output of `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` run on the server through that console. Do not confirm a key you cannot check. Tick the confirmation, then fill in the node: **Name**, **Address** (the public domain or IP clients connect to), **Country**, **Region or city** and **Provider**. Under **Log in with** choose **Panel key** or **Password** and enter the **SSH login** (`root` by default), and for a password the **SSH password**. **Panel key** is chosen for you once the panel key logs in to some node. **Continue** may ask you to confirm your sign-in again (see "Step-up re-authentication" in [Security](../operations/security.md)), then logs in, accepting exactly the confirmed host key, and runs the checks.
+2. **Login.** Under "Confirm the server key", compare the SHA-256 fingerprint and its key type with a trusted copy: one your provider's console shows, or the output of `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` run on the server through that console. Do not confirm a key you cannot check. Tick the confirmation, then fill in the node: **Name**, **Address** (the public domain or IP clients connect to), **Country**, **Region or city** and **Provider**. Under **Log in with** choose **Panel key** or **Password** and enter the **SSH login** (`root` by default), and for a password the **SSH password**. **Panel key** is chosen for you once the panel key logs in to some node. **Continue** may ask you to confirm your sign-in again (see "Step-up re-authentication" in [Security](../operations/security.md)), then logs in, accepting exactly the confirmed host key, and runs the checks. **Own key**, the last option, takes your own private key for this install only: see "Log in with your own key" below. With a password, **Also add the panel key to the server** stays ticked unless you untick it.
 3. **Check.** Review **System**, **Architecture**, **Kernel**, **Processors**, **Memory**, **Free disk**, **systemd** and **Panel connection**. With a password, enter it again; with the panel key there is nothing to enter. Tick "Install the Mistgate agent and create this node" and press **Start installation**. The server is unchanged until this point.
-4. **Install.** The job runs in the panel, phase by phase: connecting over SSH, checking the server, preparing the host firewall, sending the agent, registering the node, starting the agent, waiting for the node to connect. **Close; keep running in background** closes the window; the job goes on. When the agent connects, the window says "Node installed and connected" and offers **Open node**. If the job fails, the window says why and offers **Retry installation** (with the password again, or with the panel key as it is), or **Open install manager**.
+4. **Install.** The job runs in the panel, phase by phase: connecting over SSH, checking the server, preparing the host firewall, sending the agent, registering the node, starting the agent, waiting for the node to connect. **Close; keep running in background** closes the window; the job goes on. When the agent connects, the window says "Node installed and connected" and offers **Open node**. If the job fails, the window says why and offers **Retry installation** (with the password again, or with the panel key as it is), or **Open install manager**. With your own key, or a password and the box ticked, the job adds the panel key before it changes anything else; a retry with your own key needs the key again.
 
 ```mermaid
 sequenceDiagram
@@ -64,6 +64,16 @@ mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAA… mistgate-panel'
 
 If the server refuses the key, the wizard says "The server did not accept the panel key" and opens the how-to: the key must be in `~/.ssh/authorized_keys` of the login you entered. A node installed by key keeps no password; you can set one later on its SSH access card (see "Saved SSH access" below). When an AI agent plans the installation, the approval screen offers the same choice: **Panel key** or **Password**.
 
+A password install puts the panel key on the server too, unless you untick **Also add the panel key to the server**: the panel adds the key, logs in with it to check, and from then on logs in by key, the password kept as a fallback. If the server does not take the key, the install goes on with the password and the install manager notes why. An installation an AI agent plans with a password always adds the key, and the approval screen says so.
+
+## Log in with your own key
+
+**Own key**, the last choice under **Log in with**, takes a private key that already logs in to the server, for example your `~/.ssh/id_ed25519`: drop the file on the field or paste the key. The wizard never shows the key back, only "Key added". If the key has a passphrase, the wizard asks for it once the panel has read the key.
+
+The key serves this install only and is never stored: the job keeps it encrypted while it runs and deletes it when it ends. Before it changes anything else on the server, the panel adds its own key and logs in with it, and from then on the node's saved access is the panel key. A retry needs your key again.
+
+> **Warning:** adding the panel key at your hoster is safer. Your personal key often opens many servers, and this way it passes through the browser and the panel.
+
 ## What the panel does on the server
 
 Everything runs over one SSH connection that accepts only the confirmed host key. For a login other than root, every command runs through `sudo -n`.
@@ -86,7 +96,7 @@ The install manager speaks English, Russian or Simplified Chinese: the admin's l
 - **Cancel.** A queued job stops at once and its temporary SSH data is deleted. A running job is asked to stop; a command that is already running on the server may have changed it, so check the server before you retry.
 - **Retry.** A failed or cancelled job can run again with the SSH login and the password, or with the panel key. The checks see whether the server already holds the identity of this node and the job continues from there; a server that holds another node's identity is refused. A job whose node was retired cannot be retried: start a new installation.
 - **Names.** A node name is reserved while the node is live or an installation for it is active. Retiring a node keeps its history and frees the name.
-- **The password.** While a job runs, the SSH password is stored encrypted with the panel's master key and bound to that job. It is deleted when the job ends; on success it becomes the node's saved access. A job with the panel key stores no secret, only the login.
+- **The password.** While a job runs, the SSH password is stored encrypted with the panel's master key and bound to that job. It is deleted when the job ends; on success it becomes the node's saved access. A job with the panel key stores no secret, only the login. An own private key is kept the same way, without its passphrase, and deleted when the job ends.
 
 ## Saved SSH access
 
@@ -98,6 +108,21 @@ After a successful installation the panel keeps the SSH login and the password (
 - **An interrupted change.** If the server could not confirm the new password, the card reads **Change not confirmed**, and the next reveal or change first tries both. When the server cannot be reached to tell which one works, **Reveal password** shows "Current password (not verified)" and "New password from the interrupted change (not verified)": try the current one first. A new change waits until the server answers. If the server rejects both, reset the password through your provider's console.
 - **A password the panel generated.** Only the panel knows it, and the card says so. Reveal it and keep a copy before you retire the node.
 - **A retired node.** Its SSH access card stays: the panel no longer changes that server, but you can still reveal the password. **Forget saved access**, asked twice and with a fresh sign-in confirmation, deletes it for good. Only a retired node's access can be forgotten. The panel key stays in `~/.ssh/authorized_keys` on that server: remove it there if the panel should no longer get in.
+
+## SSH keys on the server
+
+The **Keys** block of a live node's SSH access card lists `~/.ssh/authorized_keys` of the SSH login, read over SSH when the card opens (**Read the keys again** reads it once more). Each key shows its type (ED25519, RSA 3072, ECDSA 256, ED25519-SK), its comment and SHA-256 fingerprint, and marks: **Panel key**, **Restricted** (the line has options such as `from=` or `command=`) and how many lines hold the same key. Comments and blank lines are only counted. A non-standard `AuthorizedKeysFile` in `sshd_config` is not read, so the list can be incomplete there.
+
+- **Bind a key** takes one public key line, such as the content of `~/.ssh/id_ed25519.pub`; RSA keys need at least 2048 bits. A private key pasted there is refused in the browser and never sent. A key the file already holds with options is left as it is.
+- **Unbind** asks first. If it is your only key and password login is closed on the server, you can then get in only through the panel or the hoster's console.
+- **The panel key.** Unbinding it makes the panel log in with the saved password, which it checks first; with no password saved it cannot be unbound. When the key is gone from the file, the block says "The panel key is not on the server" and offers **Restore**; when it is in the file but the panel logs in with the password, it says "Not used by the panel" and offers **Use**.
+- **A password-only node** offers **Install the panel key** under the card's header: the panel adds its key, logs in with it to check, and keeps the password as a fallback.
+
+On the **Nodes** page the owner sees "N nodes log in with a password only" while live nodes have no panel key. **Install the panel key** there asks you to confirm your sign-in, then adds the key to those nodes one after another and shows for each whether it was installed or why not. It runs only when you click it; **Hide** puts the offer away until another node logs in with a password only.
+
+## Connect SSH access to a node installed by command
+
+A node installed with the manual command has no saved SSH access: its **Server → SSH access** card says "The panel keeps no SSH access to this server" and offers **Connect SSH access**. The window takes the SSH address (the node's address filled in) and port, shows the host key to confirm and asks for the login as the install wizard does: **Panel key**, **Password** with **Also add the panel key to the server**, or **Own key**. The panel logs in once, checks that the server holds this node's identity and saves the access; a server that belongs to another node is refused. When the password logs in but the panel key cannot be added, the access is saved with the password and the card says why.
 
 ## On the Cloudflare edition
 

@@ -1,12 +1,13 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { authorizedKeysFile } from "@/components/panel-ssh-key";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Icon } from "@/components/ui/icons";
+import { Callout } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
 import { StatusGlyph, StatusPill } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
@@ -309,18 +310,6 @@ export function SSHPassword({ nodeId, access }: { nodeId: string; access: NodeSe
           <p className="text-xs leading-snug text-pretty text-muted">{fresh ? t("node.sshAccess.newPasswordHint") : t("node.sshAccess.revealHint")}</p>
         </div>
       )}
-    </div>
-  );
-}
-
-/** A state line of this block: the status tint and its glyph, still (nothing blinks here). */
-function Callout({ kind, alert, children }: { kind: "warn" | "bad"; alert?: boolean; children: ReactNode }) {
-  return (
-    <div role={alert ? "alert" : undefined} className={`tint tone-${kind} flex items-start gap-2 rounded-ctl p-3`}>
-      <span className="pt-px">
-        <StatusGlyph kind={kind} />
-      </span>
-      <p className="text-xs leading-snug text-pretty text-fg">{children}</p>
     </div>
   );
 }

@@ -26,6 +26,7 @@ import { protocolName, protocolShort, sortProtocols } from "@/lib/series";
 import { meQuery } from "@/lib/session";
 import { useOlderNodes } from "@/lib/updates";
 import { DecoyBulk } from "./nodes-decoy";
+import { PanelKeyBulk } from "./nodes-panel-key";
 
 type StatusFilter = "all" | "problems" | "working";
 const all = "all";
@@ -111,6 +112,7 @@ export function NodesScreen() {
         </div>
       ) : (
         <>
+          {owner && <PanelKeyBulk />}
           <div className="flex flex-wrap items-center gap-2">
             <Segmented
               variant="flat"

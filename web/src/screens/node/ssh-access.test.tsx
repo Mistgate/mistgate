@@ -11,6 +11,7 @@ const listNodeServerAccess = vi.fn();
 const revealNodeServerPassword = vi.fn();
 const forgetNodeServerAccess = vi.fn();
 const rotateNodeServerPassword = vi.fn();
+const listNodeServerKeys = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   provisioning: {
@@ -18,6 +19,7 @@ vi.mock("@/lib/api", () => ({
     revealNodeServerPassword: (...args: unknown[]) => revealNodeServerPassword(...args),
     forgetNodeServerAccess: (...args: unknown[]) => forgetNodeServerAccess(...args),
     rotateNodeServerPassword: (...args: unknown[]) => rotateNodeServerPassword(...args),
+    listNodeServerKeys: (...args: unknown[]) => listNodeServerKeys(...args),
   },
 }));
 
@@ -43,7 +45,11 @@ afterEach(() => {
   revealNodeServerPassword.mockReset();
   forgetNodeServerAccess.mockReset();
   rotateNodeServerPassword.mockReset();
+  listNodeServerKeys.mockReset();
 });
+
+// the password block's Reveal / Hide (a password-only node offers the panel key above it, so it is not the first button)
+const revealButton = () => [...document.querySelectorAll("button")].find((b) => /^(Reveal password|Hide password|Loading…)$/.test(b.textContent?.trim() ?? ""));
 
 function tree(nodeId: string) {
   return (
@@ -74,6 +80,7 @@ const saved = (over: object = {}) => ({
 async function mount(nodeId = "nod_1", over: object = {}) {
   listNodeServerAccess.mockResolvedValue(saved(over));
   revealNodeServerPassword.mockResolvedValue({ password: "secret-generated-inside-panel" });
+  listNodeServerKeys.mockResolvedValue({ keys: [], otherLines: 0 });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -101,7 +108,7 @@ describe("node SSH access", () => {
   it("reveals on demand, then clears the secret when hidden without putting it in the query cache", async () => {
     await mount();
     expect(revealNodeServerPassword).not.toHaveBeenCalled();
-    const show = document.querySelector("button");
+    const show = revealButton();
     expect(show).toBeTruthy();
     await act(async () => show!.click());
     await flush();
@@ -112,7 +119,7 @@ describe("node SSH access", () => {
     expect(cached).toBeTruthy();
     expect(cached).not.toHaveProperty("password");
 
-    const hide = document.querySelector("button");
+    const hide = revealButton();
     expect(hide).toBeTruthy();
     await act(async () => hide!.click());
     expect(document.querySelector("#ssh-password-nod_1")).toBeNull();
@@ -120,7 +127,7 @@ describe("node SSH access", () => {
 
   it("clears a revealed password when its settings tab becomes inactive", async () => {
     await mount();
-    await act(async () => document.querySelector("button")!.click());
+    await act(async () => revealButton()!.click());
     await flush();
     expect(document.querySelector<HTMLInputElement>("#ssh-password-nod_1")?.value).toBe("secret-generated-inside-panel");
 
@@ -134,7 +141,7 @@ describe("node SSH access", () => {
   it("discards a pending reveal when the browser tab is hidden", async () => {
     await mount();
     const finish = deferReveal();
-    await act(async () => document.querySelector("button")!.click());
+    await act(async () => revealButton()!.click());
 
     const priorVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
     try {
@@ -157,7 +164,7 @@ describe("node SSH access", () => {
   it("discards a pending reveal on pagehide", async () => {
     await mount();
     const finish = deferReveal();
-    await act(async () => document.querySelector("button")!.click());
+    await act(async () => revealButton()!.click());
 
     await act(async () => window.dispatchEvent(new Event("pagehide")));
     await act(async () => {
@@ -171,7 +178,7 @@ describe("node SSH access", () => {
   it("discards a pending reveal when its settings tab becomes inactive", async () => {
     await mount();
     const finish = deferReveal();
-    await act(async () => document.querySelector("button")!.click());
+    await act(async () => revealButton()!.click());
 
     await act(async () => {
       document.querySelector('[role="tabpanel"]')!.setAttribute("hidden", "");
@@ -188,13 +195,13 @@ describe("node SSH access", () => {
   it("shows both candidates of an interrupted change, labelled unverified, when the server could not be checked", async () => {
     await mount();
     revealNodeServerPassword.mockResolvedValueOnce({ password: "current-one", pendingPassword: "pending-one", unverified: true });
-    await act(async () => document.querySelector("button")!.click());
+    await act(async () => revealButton()!.click());
     await flush();
     expect(document.querySelector<HTMLInputElement>("#ssh-password-nod_1")?.value).toBe("current-one");
     expect(document.querySelector<HTMLInputElement>("#ssh-pending-password-nod_1")?.value).toBe("pending-one");
     expect(document.body.textContent).toContain("Current password (not verified)");
     expect(document.body.textContent).toContain("New password from the interrupted change (not verified)");
-    await act(async () => document.querySelector("button")!.click()); // hide
+    await act(async () => revealButton()!.click()); // hide
     expect(document.querySelector("#ssh-pending-password-nod_1")).toBeNull();
   });
 
@@ -230,7 +237,7 @@ describe("node SSH access", () => {
   it("does not show a previous node's password after nodeId changes during reveal", async () => {
     await mount();
     const finish = deferReveal();
-    await act(async () => document.querySelector("button")!.click());
+    await act(async () => revealButton()!.click());
 
     await renderNode("nod_2");
     await act(async () => {
@@ -380,7 +387,7 @@ describe("node SSH access", () => {
     it("a reveal refused because neither password logs in says so", async () => {
       await mount("nod_1", { rotationPending: true });
       revealNodeServerPassword.mockRejectedValueOnce(new ConnectError("ssh_rotation_recovery_required", Code.FailedPrecondition));
-      await act(async () => document.querySelector("button")!.click());
+      await act(async () => revealButton()!.click());
       await flush();
       expect(document.body.textContent).toContain(en["node.sshAccess.error.recovery"]);
     });

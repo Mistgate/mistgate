@@ -123,6 +123,7 @@ export const en = {
   "int.ap.ssh.needed": "Confirm the host key and enter the password to approve.",
   "int.ap.ssh.bodyKey": "The panel logs in with its own key: no password passes through here. Compare the host key with a trusted copy for the same key type, such as the one your provider’s console shows.",
   "int.ap.ssh.neededKey": "Confirm the host key to approve.",
+  "int.ap.ssh.alsoKey": "The panel also adds its own key to the server and logs in with it from then on; the password stays as a fallback.",
 
   // ---- what the server names by key
   "approval.tool.user_create": "Create a user",
@@ -498,6 +499,7 @@ export const ru: Record<keyof typeof en, string> = {
   "int.ap.ssh.needed": "Чтобы одобрить, подтверди host key и введи пароль.",
   "int.ap.ssh.bodyKey": "Панель войдёт по своему ключу: пароль здесь не нужен. Сверь host key с доверенной копией для того же типа ключа, например с той, что показывает консоль хостера.",
   "int.ap.ssh.neededKey": "Чтобы одобрить, подтверди host key.",
+  "int.ap.ssh.alsoKey": "Панель заодно добавит на сервер свой ключ и дальше будет входить с ним; пароль останется запасным.",
 
   // ---- what the server names by key
   "approval.tool.user_create": "Создать пользователя",
@@ -866,6 +868,7 @@ export const zh: typeof en = {
   "int.ap.ssh.needed": "确认主机密钥并输入密码后才能批准。",
   "int.ap.ssh.bodyKey": "面板会用自己的密钥登录：这里不需要密码。请将主机密钥与同一密钥类型的可信副本比对，例如服务商控制台显示的那个。",
   "int.ap.ssh.neededKey": "确认主机密钥后才能批准。",
+  "int.ap.ssh.alsoKey": "面板还会把自己的密钥添加到服务器，之后用它登录；密码保留作备用。",
 
   // ---- what the server names by key
   "approval.tool.user_create": "创建用户",
@@ -1224,6 +1227,7 @@ export const fa: Record<keyof typeof en, string> = {
   "int.ap.ssh.needed": "برای تأیید، کلید میزبان را تأیید کن و رمز عبور را وارد کن.",
   "int.ap.ssh.bodyKey": "پنل با کلید خودش وارد می‌شود: اینجا رمز عبوری لازم نیست. کلید میزبان را با یک نسخهٔ مطمئن از همان نوع کلید مقایسه کن، مثلاً با آنچه کنسول سرویس‌دهنده‌ات نشان می‌دهد.",
   "int.ap.ssh.neededKey": "برای تأیید، کلید میزبان را تأیید کن.",
+  "int.ap.ssh.alsoKey": "پنل کلید خودش را هم به سرور اضافه می‌کند و از آن به بعد با آن وارد می‌شود؛ رمز به‌عنوان پشتیبان می‌ماند.",
   "approval.tool.user_create": "ساخت کاربر",
   "approval.tool.user_update": "تغییر کاربر",
   "approval.tool.user_disable": "غیرفعال کردن کاربران",
@@ -1568,6 +1572,7 @@ export const tr: Record<keyof typeof en, string> = {
   "int.ap.ssh.needed": "Onaylamak için host anahtarını doğrula ve parolayı gir.",
   "int.ap.ssh.bodyKey": "Panel kendi anahtarıyla giriş yapar: burada parola gerekmez. Host anahtarını aynı anahtar türü için güvenilir bir kopyayla karşılaştır; örneğin sağlayıcının konsolunun gösterdiğiyle.",
   "int.ap.ssh.neededKey": "Onaylamak için host anahtarını doğrula.",
+  "int.ap.ssh.alsoKey": "Panel ayrıca kendi anahtarını sunucuya ekler ve bundan sonra onunla girer; parola yedek olarak kalır.",
   "approval.tool.user_create": "Kullanıcı oluştur",
   "approval.tool.user_update": "Kullanıcıyı değiştir",
   "approval.tool.user_disable": "Kullanıcıları devre dışı bırak",

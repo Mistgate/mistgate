@@ -17,9 +17,9 @@ SSH kurulumunda panelin kendisi yeni sunucuya bağlanır, onu kontrol eder, dü�
 ## Dört adım
 
 1. **Sunucu.** **SSH sunucu adresi** ve **SSH portunu** (genellikle 22) girin ve **Sunucuyu kontrol et** düğmesine basın. Panel sunucunun SSH ana bilgisayar anahtarını kendi sunucusundan okur. Henüz hiçbir kullanıcı adı ya da parola gönderilmez.
-2. **Giriş.** “Sunucu anahtarını onayla” altında SHA-256 parmak izini ve anahtar türünü güvenilir bir kopyayla karşılaştırın: sağlayıcınızın konsolunun gösterdiği ya da o konsol üzerinden sunucuda çalıştırılan `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` çıktısı. Kontrol edemediğiniz bir anahtarı onaylamayın. Onay kutusunu işaretleyin, sonra düğümü doldurun: **Ad**, **Adres** (istemcilerin bağlandığı herkese açık alan adı ya da IP), **Ülke**, **Bölge veya şehir** ve **Sağlayıcı**. **Giriş yöntemi** altında **Panel anahtarı** ya da **Parola** seçin ve **SSH kullanıcı adını** (varsayılan `root`) girin; parola için ayrıca **SSH parolasını**. Panel anahtarı herhangi bir düğümde girişi başardığında **Panel anahtarı** sizin için önceden seçilir. **Devam** sizden oturum açışınızı yeniden doğrulamanızı isteyebilir ([Güvenlik](../operations/security.md) sayfasındaki “Yeniden doğrulama (step-up)” bölümüne bakın), sonra giriş yapar, yalnızca onaylanan ana bilgisayar anahtarını kabul eder, ve kontrolleri çalıştırır.
+2. **Giriş.** “Sunucu anahtarını onayla” altında SHA-256 parmak izini ve anahtar türünü güvenilir bir kopyayla karşılaştırın: sağlayıcınızın konsolunun gösterdiği ya da o konsol üzerinden sunucuda çalıştırılan `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` çıktısı. Kontrol edemediğiniz bir anahtarı onaylamayın. Onay kutusunu işaretleyin, sonra düğümü doldurun: **Ad**, **Adres** (istemcilerin bağlandığı herkese açık alan adı ya da IP), **Ülke**, **Bölge veya şehir** ve **Sağlayıcı**. **Giriş yöntemi** altında **Panel anahtarı** ya da **Parola** seçin ve **SSH kullanıcı adını** (varsayılan `root`) girin; parola için ayrıca **SSH parolasını**. Panel anahtarı herhangi bir düğümde girişi başardığında **Panel anahtarı** sizin için önceden seçilir. **Devam** sizden oturum açışınızı yeniden doğrulamanızı isteyebilir ([Güvenlik](../operations/security.md) sayfasındaki “Yeniden doğrulama (step-up)” bölümüne bakın), sonra giriş yapar, yalnızca onaylanan ana bilgisayar anahtarını kabul eder, ve kontrolleri çalıştırır. Son seçenek olan **Kendi anahtarım**, kendi özel anahtarınızı yalnızca bu kurulum için alır: aşağıdaki "Kendi anahtarınızla giriş" bölümüne bakın. Parolayla **Panel anahtarını da sunucuya ekle** siz işareti kaldırmadıkça işaretli kalır.
 3. **Kontrol.** **Sistem**, **Mimari**, **Çekirdek**, **İşlemciler**, **Bellek**, **Boş disk alanı**, **systemd** ve **Panel bağlantısı** satırlarına göz atın. Parolayla giriyorsanız yeniden girin; panel anahtarıyla girilecek bir şey yok. “Mistgate ajanı kurulur ve bu düğüm oluşturulur” kutusunu işaretleyin ve **Kurulumu başlat** düğmesine basın. Bu noktaya kadar sunucu değişmemiştir.
-4. **Kurulum.** İş panelde aşama aşama çalışır: SSH ile bağlanma, sunucuyu kontrol etme, ana bilgisayarın güvenlik duvarını hazırlama, ajanı gönderme, düğümü kaydetme, ajanı başlatma, düğümün bağlanmasını bekleme. **Kapat; arka planda sürsün** pencereyi kapatır; iş sürer. Ajan bağlandığında pencere “Düğüm kuruldu ve bağlandı” der ve **Düğümü aç** sunar. İş başarısız olursa pencere nedenini söyler ve **Kurulumu yeniden dene** (yeniden parolayla ya da panel anahtarıyla olduğu gibi) ya da **Kurulum yöneticisini aç** sunar.
+4. **Kurulum.** İş panelde aşama aşama çalışır: SSH ile bağlanma, sunucuyu kontrol etme, ana bilgisayarın güvenlik duvarını hazırlama, ajanı gönderme, düğümü kaydetme, ajanı başlatma, düğümün bağlanmasını bekleme. **Kapat; arka planda sürsün** pencereyi kapatır; iş sürer. Ajan bağlandığında pencere “Düğüm kuruldu ve bağlandı” der ve **Düğümü aç** sunar. İş başarısız olursa pencere nedenini söyler ve **Kurulumu yeniden dene** (yeniden parolayla ya da panel anahtarıyla olduğu gibi) ya da **Kurulum yöneticisini aç** sunar. Kendi anahtarınızla ya da parola ve bu işaretle iş, başka bir şeyi değiştirmeden önce panel anahtarını ekler; kendi anahtarınızla yeniden denemek için anahtarı tekrar vermeniz gerekir.
 
 ```mermaid
 sequenceDiagram
@@ -64,6 +64,16 @@ mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAA… mistgate-panel'
 
 Sunucu anahtarı reddederse sihirbaz “Sunucu panel anahtarını kabul etmedi” der ve yönergeyi açar: anahtar, girdiğiniz kullanıcı adının `~/.ssh/authorized_keys` dosyasında olmalıdır. Anahtarla kurulan bir düğümün parolası saklanmaz; sonra SSH erişim kartında bir parola belirleyebilirsiniz (aşağıdaki “Kayıtlı SSH erişimi” bölümüne bakın). Bir yapay zekâ ajanı kurulumu planladığında onay ekranı aynı seçimi sunar: **Panel anahtarı** ya da **Parola**.
 
+Parolalı bir kurulum da panel anahtarını sunucuya koyar, **Panel anahtarını da sunucuya ekle** işaretini kaldırmadığınız sürece: panel anahtarı ekler, denemek için onunla girer ve bundan sonra anahtarla girer, parola yedek olarak kalır. Sunucu anahtarı kabul etmezse kurulum parolayla sürer ve kurulum yöneticisi nedenini yazar. Bir yapay zekâ ajanının parolayla planladığı kurulum anahtarı her zaman ekler ve onay ekranı bunu söyler.
+
+## Kendi anahtarınızla giriş
+
+**Giriş yöntemi** altındaki son seçenek **Kendi anahtarım**, sunucuya zaten giren bir özel anahtarı alır, örneğin `~/.ssh/id_ed25519` dosyanızı: dosyayı alana bırakın ya da anahtarı yapıştırın. Sihirbaz anahtarı asla geri göstermez, yalnızca "Anahtar eklendi" der. Anahtarın parolası varsa, panel anahtarı okuduktan sonra sihirbaz onu sorar.
+
+Anahtar yalnızca bu kurulum için kullanılır ve asla saklanmaz: iş çalışırken onu şifreli tutar ve bitince siler. Sunucuda başka bir şeyi değiştirmeden önce panel kendi anahtarını ekler ve onunla girer; bundan sonra düğümün kayıtlı erişimi panel anahtarıdır. Yeniden denemek için anahtarınızı tekrar vermeniz gerekir.
+
+> **Uyarı:** panel anahtarını sağlayıcınızda eklemek daha güvenlidir. Kişisel anahtarınız çoğu zaman birçok sunucuyu açar ve bu yolla tarayıcıdan ve panelden geçer.
+
 ## Panel sunucuda neler yapar
 
 Her şey yalnızca onaylanan ana bilgisayar anahtarını kabul eden tek bir SSH bağlantısı üzerinden çalışır. Root dışındaki bir kullanıcı adında her komut `sudo -n` ile çalıştırılır.
@@ -86,7 +96,7 @@ Kurulum yöneticisi İngilizce, Rusça ya da Basitleştirilmiş Çince konuşur:
 - **İptal.** Sıradaki bir iş hemen durur ve geçici SSH verileri silinir. Çalışan bir işten durması istenir; sunucuda zaten çalışan bir komut onu değiştirmiş olabilir, bu yüzden yeniden denemeden önce sunucuyu kontrol edin.
 - **Yeniden deneme.** Başarısız ya da iptal edilmiş bir iş, SSH kullanıcı adı ve parolayla ya da panel anahtarıyla yeniden çalışabilir. Kontroller sunucuda bu düğümün kimliğinin zaten bulunup bulunmadığına bakar ve iş oradan devam eder; başka bir düğümün kimliğini taşıyan sunucu reddedilir. Düğümü kullanımdan kaldırılmış bir iş yeniden denenemez: yeni bir kurulum başlatın.
 - **Adlar.** Düğüm canlı olduğu ya da onun için bir kurulum etkin olduğu sürece düğüm adı ayrılmış kalır. Bir düğümü kullanımdan kaldırmak geçmişini korur ve adı serbest bırakır.
-- **Parola.** Bir iş çalışırken SSH parolası panelin ana anahtarıyla şifrelenerek saklanır ve o işe bağlanır. İş bittiğinde silinir; başarıda düğümün kayıtlı erişimi olur. Panel anahtarıyla çalışan bir iş hiçbir gizli bilgi saklamaz, yalnızca kullanıcı adını.
+- **Parola.** Bir iş çalışırken SSH parolası panelin ana anahtarıyla şifrelenerek saklanır ve o işe bağlanır. İş bittiğinde silinir; başarıda düğümün kayıtlı erişimi olur. Panel anahtarıyla çalışan bir iş hiçbir gizli bilgi saklamaz, yalnızca kullanıcı adını. Kendi özel anahtarınız da aynı şekilde, parolası olmadan saklanır ve iş bitince silinir.
 
 ## Kayıtlı SSH erişimi
 
@@ -98,6 +108,21 @@ Başarılı bir kurulumdan sonra panel SSH kullanıcı adını ve parolayı (ana
 - **Yarıda kalan bir değişiklik.** Sunucu yeni parolayı doğrulayamadıysa kart **Değişiklik doğrulanmadı** gösterir ve sonraki gösterme ya da değiştirme önce ikisini de dener. Hangisinin çalıştığını söylemek için sunucuya ulaşılamıyorsa **Parolayı göster** “Mevcut parola (doğrulanmadı)” ve “Yarıda kalan değişiklikteki yeni parola (doğrulanmadı)” gösterir: önce mevcut olanı deneyin. Yeni bir değişiklik sunucu yanıt verene kadar bekler. Sunucu ikisini de reddederse parolayı sağlayıcınızın konsolundan sıfırlayın.
 - **Panelin ürettiği bir parola.** Yalnızca panel bilir ve kart bunu söyler. Düğümü kullanımdan kaldırmadan önce onu gösterin ve bir kopyasını saklayın.
 - **Kullanımdan kaldırılmış bir düğüm.** SSH erişim kartı kalır: panel artık o sunucuyu değiştirmez, ama parolayı yine gösterebilirsiniz. İki kez sorulan ve yeni bir oturum doğrulamasıyla yapılan **Kayıtlı erişimi unut** onu kalıcı olarak siler. Yalnızca kullanımdan kaldırılmış bir düğümün erişimi unutulabilir. Panel anahtarı o sunucuda `~/.ssh/authorized_keys` içinde kalır: panel artık içeri girmeyecekse onu oradan silin.
+
+## Sunucudaki SSH anahtarları
+
+Canlı bir düğümün SSH erişimi kartındaki **Anahtarlar** bölümü, SSH girişinin `~/.ssh/authorized_keys` dosyasını listeler; kart açılınca SSH üzerinden okunur (**Anahtarları yeniden oku** bir kez daha okur). Her anahtar türünü (ED25519, RSA 3072, ECDSA 256, ED25519-SK), açıklamasını ve SHA-256 parmak izini, ayrıca işaretleri gösterir: **Panel anahtarı**, **Kısıtlı** (satırda `from=` veya `command=` gibi seçenekler var) ve aynı anahtarı kaç satırın taşıdığı. Yorumlar ve boş satırlar yalnızca sayılır. `sshd_config` içindeki standart dışı bir `AuthorizedKeysFile` okunmaz, bu yüzden orada liste eksik olabilir.
+
+- **Anahtar bağla** tek bir açık anahtar satırı alır, örneğin `~/.ssh/id_ed25519.pub` içeriğini; RSA anahtarları en az 2048 bit olmalıdır. Oraya yapıştırılan bir özel anahtar tarayıcıda reddedilir ve asla gönderilmez. Dosyada seçeneklerle zaten bulunan bir anahtar olduğu gibi bırakılır.
+- **Kaldır** önce sorar. Bu sizin tek anahtarınızsa ve sunucuda parolayla giriş kapalıysa, sonra yalnızca panelden veya sağlayıcının konsolundan girebilirsiniz.
+- **Panel anahtarı.** Kaldırılırsa panel kayıtlı parolayla girer ve önce onu dener; kayıtlı parola yoksa kaldırılamaz. Anahtar dosyadan gitmişse bölüm "Panel anahtarı sunucuda yok" yazar ve **Geri getir** sunar; dosyada olduğu hâlde panel parolayla giriyorsa "Panel kullanmıyor" yazar ve **Kullan** sunar.
+- **Yalnızca parolalı bir düğüm** kartın başlığının altında **Panel anahtarını kur** sunar: panel anahtarını ekler, denemek için onunla girer ve parolayı yedek olarak tutar.
+
+**Düğümler** sayfasında, canlı düğümlerde panel anahtarı olmadığı sürece sahip "N düğüm yalnızca parolayla giriyor" görür. Oradaki **Panel anahtarını kur** girişinizi onaylamanızı ister, sonra anahtarı bu düğümlere tek tek ekler ve her biri için kurulup kurulmadığını ya da nedenini gösterir. Yalnızca siz tıklayınca çalışır; **Gizle** öneriyi, başka bir düğüm yalnızca parolayla girmeye başlayana kadar kaldırır.
+
+## Komutla kurulmuş bir düğüme SSH erişimi bağlamak
+
+Elle komutla kurulmuş bir düğümün kayıtlı SSH erişimi yoktur: **Sunucu → SSH erişimi** kartı "Panel bu sunucu için SSH erişimi tutmuyor" yazar ve **SSH erişimini bağla** sunar. Pencere SSH adresini (düğümün adresi doldurulmuş) ve portu alır, onay için ana bilgisayar anahtarını gösterir ve girişi kurulum sihirbazı gibi sorar: **Panel anahtarı**, **Panel anahtarını da sunucuya ekle** ile **Parola** ya da **Kendi anahtarım**. Panel bir kez girer, sunucunun bu düğümün kimliğini taşıdığını denetler ve erişimi kaydeder; başka bir düğüme ait sunucu reddedilir. Parola girdiği hâlde panel anahtarı eklenemezse erişim parolayla kaydedilir ve kart nedenini yazar.
 
 ## Cloudflare sürümünde
 
