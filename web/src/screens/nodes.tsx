@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAddNode } from "@/components/add-node";
 import { PageTitle } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
@@ -25,8 +25,10 @@ import { nodesQuery } from "@/lib/queries";
 import { protocolName, protocolShort, sortProtocols } from "@/lib/series";
 import { meQuery } from "@/lib/session";
 import { useOlderNodes } from "@/lib/updates";
-import { DecoyBulk } from "./nodes-decoy";
-import { PanelKeyBulk } from "./nodes-panel-key";
+import { useBatch } from "@/lib/batch";
+import { NodesBulk, PickMenu } from "./nodes-bulk";
+import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
+import { PanelKeyOffer } from "./nodes-panel-key";
 
 type StatusFilter = "all" | "problems" | "working";
 const all = "all";
@@ -41,9 +43,13 @@ export function NodesScreen() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [protocol, setProtocol] = useState(all);
   const [country, setCountry] = useState(all);
-  // ticked nodes (owner only: the bulk decoy change is an owner call)
+  // ticked nodes and the bulk bar (owner only: SSH, rollouts and the decoy site are owner calls)
   const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const batch = useBatch();
+  const run = useBulkRun(batch, owner);
+  const older = useOlderNodes();
+  const clear = useCallback(() => setTicked(new Set()), []);
 
   const nodes = useMemo(() => q.data?.nodes ?? [], [q.data]);
   const problems = nodes.filter(isProblem).length;
@@ -70,6 +76,15 @@ export function NodesScreen() {
   const allShown = shownIds.length > 0 && shownIds.every((id) => ticked.has(id));
   const toggleAll = () => setTicked(allShown ? new Set([...ticked].filter((id) => !shownIds.includes(id))) : new Set([...ticked, ...shownIds].slice(0, maxBulkNodes)));
   const select: Select | undefined = owner ? { ticked, toggle, toggleAll, allShown, someShown: shownIds.some((id) => ticked.has(id)), full: ticked.size >= maxBulkNodes, pickable } : undefined;
+  // every quick pick replaces the selection; "Password only" is the offer's own rule
+  const live = nodes.filter(pickable);
+  const picks = [
+    { label: "bulk.pick.shown", ids: shownIds },
+    { label: "bulk.pick.problems", ids: live.filter(isProblem).map((n) => n.id) },
+    { label: "bulk.pick.password", ids: live.filter((n) => passwordOnly(run.ctx.access?.get(n.id))).map((n) => n.id) },
+    { label: "bulk.pick.outdated", ids: live.filter((n) => older.has(n.id)).map((n) => n.id) },
+  ] as const;
+  const pick = (ids: readonly string[]) => setTicked(new Set(ids.slice(0, maxBulkNodes)));
 
   if (!q.data) {
     return (
@@ -112,7 +127,16 @@ export function NodesScreen() {
         </div>
       ) : (
         <>
-          {owner && <PanelKeyBulk />}
+          {owner && (
+            <PanelKeyOffer
+              busy={batch.running}
+              onStart={(ids) => {
+                const set = new Set(ids.slice(0, maxBulkNodes));
+                setTicked(set);
+                void run.run("panelKey", nodes.filter((n) => set.has(n.id)));
+              }}
+            />
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <Segmented
               variant="flat"
@@ -125,6 +149,7 @@ export function NodesScreen() {
                 { value: "working", label: chip(t("nodes.working"), working) },
               ]}
             />
+            {owner && <PickMenu picks={picks} any={ticked.size > 0} onPick={pick} />}
             <span className="flex-1" />
             <div className="w-[150px]">
               <Select
@@ -146,10 +171,10 @@ export function NodesScreen() {
             </div>
           </div>
 
-          {picked.length > 0 && <DecoyBulk nodes={picked} onClear={() => setTicked(new Set())} />}
           <Table rows={rows} fmt={fmt} select={select} />
           <Cards rows={rows} fmt={fmt} select={select} />
           {rows.length === 0 && <p className="p-8 text-center text-[13px] text-muted">{t("nodes.noRows")}</p>}
+          {owner && <NodesBulk nodes={nodes} picked={picked} shown={new Set(rows.map((n) => n.id))} batch={batch} run={run} onClear={clear} />}
         </>
       )}
     </div>
@@ -166,7 +191,7 @@ type Select = {
   toggleAll: () => void;
   allShown: boolean;
   someShown: boolean;
-  /** 50 are ticked: the rest cannot be (SetNodesDecoyMode takes at most 50). */
+  /** 50 are ticked: the rest cannot be (SetNodesDecoyMode takes at most 50; a batch of more would run for minutes). */
   full: boolean;
   pickable: (n: Node) => boolean;
 };
@@ -179,7 +204,7 @@ function Tick({ select, node, className }: { select: Select; node: Node; classNa
     <input
       type="checkbox"
       className={cx("relative z-10 size-4 flex-none accent-accent", className)}
-      aria-label={t("decoy.bulk.select", { name: node.name })}
+      aria-label={t("bulk.select", { name: node.name })}
       checked={on}
       disabled={!select.pickable(node) || (select.full && !on)}
       onChange={() => select.toggle(node.id)}
@@ -231,7 +256,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
           <input
             type="checkbox"
             className="size-4 accent-accent"
-            aria-label={t("decoy.bulk.selectAll")}
+            aria-label={t("bulk.selectAll")}
             checked={select.allShown}
             ref={(el) => {
               if (el) el.indeterminate = select.someShown && !select.allShown;

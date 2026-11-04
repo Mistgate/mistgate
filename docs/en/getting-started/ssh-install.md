@@ -118,7 +118,7 @@ The **Keys** block of a live node's SSH access card lists `~/.ssh/authorized_key
 - **The panel key.** Unbinding it makes the panel log in with the saved password, which it checks first; with no password saved it cannot be unbound. When the key is gone from the file, the block says "The panel key is not on the server" and offers **Restore**; when it is in the file but the panel logs in with the password, it says "Not used by the panel" and offers **Use**.
 - **A password-only node** offers **Install the panel key** under the card's header: the panel adds its key, logs in with it to check, and keeps the password as a fallback.
 
-On the **Nodes** page the owner sees "N nodes log in with a password only" while live nodes have no panel key. **Install the panel key** there asks you to confirm your sign-in, then adds the key to those nodes one after another and shows for each whether it was installed or why not. It runs only when you click it; **Hide** puts the offer away until another node logs in with a password only.
+On the **Nodes** page the owner sees "N nodes log in with a password only" while live nodes have no panel key. **Install the panel key** there selects those nodes and runs **Panel key** in the bulk bar: it asks you to confirm your sign-in, then adds the key to the nodes one after another and shows for each whether it was installed or why not. It runs only when you click it; **Hide** puts the offer away until another node logs in with a password only. The same bar changes the SSH password of several nodes at once (each gets its own generated password, revealed only in its card) and binds or unbinds one of your keys on them: see [Bulk actions](../guide/nodes.md#bulk-actions).
 
 ## Connect SSH access to a node installed by command
 

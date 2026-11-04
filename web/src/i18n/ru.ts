@@ -13,6 +13,7 @@ import { ru as telegramRu } from "./telegram";
 import { ru as portsRu } from "./ports";
 import { ru as editionRu } from "./edition";
 import { ru as decoyRu } from "./decoy";
+import { ru as bulkRu } from "./bulk";
 import { ru as countryRu } from "./country";
 import { ru as connectionsRu } from "./connections";
 import { ru as journalRu } from "./journal";
@@ -278,4 +279,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Сайт этой ноды или другой сайт",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...protocolsRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...protocolsRu };

@@ -62,8 +62,9 @@ export function keyError(error: unknown, t: T, edge = false): string {
 }
 
 // Any private key format (OpenSSH, PEM, PuTTY .ppk) is refused in the browser; a bind sends one public key line only.
-const privateKeyShape = /PRIVATE KEY|PuTTY-User-Key-File|Private-Lines|Private-MAC/i;
-const publicKeyLine =
+// The bulk bind on the Nodes page (nodes-bulk-actions.tsx) checks with the same two.
+export const privateKeyShape = /PRIVATE KEY|PuTTY-User-Key-File|Private-Lines|Private-MAC/i;
+export const publicKeyLine =
   /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+={0,3}( [^\r\n]*)?$/;
 
 const keyTypes: Record<string, string> = {

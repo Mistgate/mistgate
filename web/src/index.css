@@ -318,6 +318,19 @@
   border-color: var(--accent-line);
 }
 
+/* The Nodes page's bulk bar (screens/nodes-bulk.tsx) floats where the dock is: on a phone it takes the dock's place, on a
+   desktop the toasts move up above it. */
+@media (width < 45rem) {
+  body:has([data-bulk-bar]) [data-dock] {
+    visibility: hidden;
+  }
+}
+@media (width >= 45rem) {
+  body:has([data-bulk-bar]) [data-toast-viewport] {
+    bottom: 92px;
+  }
+}
+
 /* horizontally scrollable strips (settings sub-nav) without a visible scrollbar */
 .no-scrollbar {
   scrollbar-width: none;

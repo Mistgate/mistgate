@@ -130,7 +130,8 @@ function useProblemsBadge(): { n: number; tone: "danger" | "warn" } {
 const linkCls =
   "flex h-[34px] items-center gap-2.5 rounded-ctl px-2.5 text-[13px] font-semibold text-muted transition-colors duration-200 data-[status=active]:bg-surface-2 data-[status=active]:font-bold data-[status=active]:text-fg";
 
-function Sidebar() {
+/** Exported for the dev kit's page frame (dev-kit-bulk.tsx); the app shows it only here. */
+export function Sidebar() {
   const t = useT();
   const signOut = useSignOut();
   const { data } = useSuspenseQuery(meQuery);
@@ -313,8 +314,8 @@ function MobileHeader({ onSearch }: { onSearch: () => void }) {
 const tabCls =
   "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[14px] text-[11px] font-bold text-muted transition-colors duration-300 data-[status=active]:bg-surface-2 data-[status=active]:text-fg";
 
-/** Floating dock: three sections and "More", which opens a sheet with the rest. */
-function Dock() {
+/** Floating dock: three sections and "More", which opens a sheet with the rest. The Nodes page's bulk bar takes its place (index.css). */
+export function Dock() {
   const t = useT();
   const [more, setMore] = useState(false);
   const problems = useProblemsBadge();
@@ -327,6 +328,7 @@ function Dock() {
 
   return (
     <nav
+      data-dock
       aria-label={t("nav.main")}
       className="fixed inset-x-3.5 bottom-3.5 z-10 flex h-[60px] gap-1 rounded-dock border border-line bg-dock p-1.5 shadow-(--shadow-dock) backdrop-blur-[16px] md:hidden"
     >

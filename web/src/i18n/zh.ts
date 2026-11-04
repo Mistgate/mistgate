@@ -13,6 +13,7 @@ import { zh as telegramZh } from "./telegram";
 import { zh as portsZh } from "./ports";
 import { zh as editionZh } from "./edition";
 import { zh as decoyZh } from "./decoy";
+import { zh as bulkZh } from "./bulk";
 import { zh as countryZh } from "./country";
 import { zh as connectionsZh } from "./connections";
 import { zh as journalZh } from "./journal";
@@ -274,4 +275,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "本节点站点或其他站点",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...protocolsZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...protocolsZh };

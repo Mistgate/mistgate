@@ -19,8 +19,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <Toast.Provider limit={2} timeout={3400}>
       <Bridge>{children}</Bridge>
       <Toast.Portal>
-        {/* bottom centre; on the phone it sits above the floating dock */}
-        <Toast.Viewport className="pointer-events-none fixed inset-x-0 bottom-[88px] z-40 flex flex-col items-center gap-2 px-4 md:bottom-5">
+        {/* bottom centre; on the phone it sits above the floating dock, on a desktop above the Nodes page's bulk bar (index.css) */}
+        <Toast.Viewport data-toast-viewport className="pointer-events-none fixed inset-x-0 bottom-[88px] z-40 flex flex-col items-center gap-2 px-4 md:bottom-5">
           <Current />
         </Toast.Viewport>
       </Toast.Portal>

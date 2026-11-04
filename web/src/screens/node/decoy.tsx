@@ -39,6 +39,9 @@ const reasonKind: Record<DecoyReason, StatusKind> = {
   unavailable_in_edition: "off",
 };
 
+/** The tone of a reason code (the Nodes page's bulk rows read it too); one the page does not know is amber. */
+export const decoyReasonKind = (code: string): StatusKind => (isDecoyReason(code) ? reasonKind[code] : "warn");
+
 /**
  * The three-way choice with one line under each. The caller says which ones are off and why (`panelNote` / `ownNote`) and
  * what goes under "Own site" when it is picked (`ownExtra`: the file picker of a single node).
@@ -209,7 +212,7 @@ function AppliedState({ node }: { node: Node }) {
   const t = useT();
   const mode = asDecoyMode(node.decoyMode);
   const reason = node.decoyReasonCode;
-  const kind: StatusKind = reason === "" ? "ok" : isDecoyReason(reason) ? reasonKind[reason] : "warn";
+  const kind: StatusKind = reason === "" ? "ok" : decoyReasonKind(reason);
   const agent = node.decoyAgentMode ? t(`decoy.mode.${asDecoyMode(node.decoyAgentMode)}`) : t("decoy.state.noReport");
   const row = (label: string, value: string, hash: string) => (
     <div className="flex min-w-0 flex-col gap-0.5">

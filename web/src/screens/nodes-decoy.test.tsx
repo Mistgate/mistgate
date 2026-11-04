@@ -14,8 +14,8 @@ import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { NodesScreen } from "./nodes";
 
-// Nodes: tick several nodes, "Set decoy site" for all of them at once. Own is off while one of them has no uploaded site, and in
-// the Cloudflare edition.
+// Nodes: tick several nodes, then "More ▾ → Decoy site…" in the bulk bar sets one mode for all of them in one call, and the
+// bar lists each node with its state read live. Own is off while one of them has no uploaded site, and in the Cloudflare edition.
 
 const setNodesDecoyMode = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -29,6 +29,8 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  useBlocker: () => ({ status: "idle" }),
+  useNavigate: () => vi.fn(),
 }));
 vi.mock("@/components/add-node", () => ({ useAddNode: () => vi.fn() }));
 
@@ -89,30 +91,42 @@ async function mount(nodes: ReturnType<typeof node>[], me: Record<string, unknow
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
-const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
-const tick = (name: string) => document.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${en["decoy.bulk.select"].replace("{name}", name)}"]`)!;
+const tick = (name: string) => document.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${en["bulk.select"].replace("{name}", name)}"]`)!;
 const radio = (mode: string) => document.querySelector<HTMLInputElement>(`input[type=radio][value=${mode}]`)!;
 const click = async (el: Element | null | undefined) => {
   await act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   await settle();
 };
+/** A Base UI menu opens on a press, not on a bare click. */
+const press = async (el: Element | null | undefined) => {
+  await act(async () => {
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) el?.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+  });
+  await settle();
+};
+const bar = () => document.querySelector("[data-bulk-bar]");
+/** More ▾ → Decoy site… */
+const openDecoy = async () => {
+  await press([...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim().startsWith(en["bulk.more"])));
+  await press([...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent?.startsWith(en["bulk.decoy"])));
+};
 
 describe("ticking nodes", () => {
   it("shows how many are ticked, and clears them", async () => {
     await mount([node("de1"), node("fi1")]);
-    expect(button(en["decoy.bulk.action"])).toBeUndefined(); // nothing ticked: no bar
+    expect(bar()).toBeNull(); // nothing ticked: no bar
     await click(tick("de1"));
-    expect(text()).toContain("1 node selected");
+    expect(bar()?.textContent).toContain("1node selected");
     await click(tick("fi1"));
-    expect(text()).toContain("2 nodes selected");
-    await click(button(en["decoy.bulk.clear"]));
-    expect(text()).not.toContain("selected");
+    expect(bar()?.textContent).toContain("2nodes selected");
+    await click(document.querySelector(`[data-bulk-bar] button[aria-label="${en["bulk.clear"]}"]`));
+    expect(bar()).toBeNull();
   });
 
   it("ticks every shown node from the header box", async () => {
     await mount([node("de1"), node("fi1"), node("se1")]);
-    await click(document.querySelector(`input[aria-label="${en["decoy.bulk.selectAll"]}"]`));
-    expect(text()).toContain("3 nodes selected");
+    await click(document.querySelector(`input[aria-label="${en["bulk.selectAll"]}"]`));
+    expect(bar()?.textContent).toContain("3nodes selected");
   });
 
   it("is for the owner only", async () => {
@@ -129,22 +143,27 @@ describe("ticking nodes", () => {
 describe("Set decoy site", () => {
   it("sends the ticked nodes and the picked mode in one call", async () => {
     setNodesDecoyMode.mockResolvedValue({ nodes: [node("de1"), node("fi1")] });
-    await mount([node("de1"), node("fi1"), node("se1")]);
+    await mount([node("de1"), node("fi1", { decoyReasonCode: "pending" }), node("se1")]);
     await click(tick("de1"));
     await click(tick("fi1"));
-    await click(button(en["decoy.bulk.action"]));
+    await openDecoy();
     expect(document.querySelector("[role=dialog]")?.textContent).toContain("Decoy site for 2 nodes");
     await click(radio("panel"));
     await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim() === en["decoy.apply"]));
+    expect(setNodesDecoyMode).toHaveBeenCalledTimes(1);
     expect(setNodesDecoyMode).toHaveBeenCalledWith({ nodeIds: ["nod_de1", "nod_fi1"], mode: "panel" });
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    // the bar lists both, each with its state from the live list (fi1 is still being applied)
+    const rows = [...document.querySelectorAll("[data-batch] li")].map((li) => li.textContent);
+    expect(rows).toEqual([expect.stringContaining(en["bulk.state.ok"]), expect.stringContaining(en["bulk.state.running"])]);
     expect(text()).toContain("Decoy site set on 2 nodes");
-    expect(text()).not.toContain("selected"); // the selection is cleared once it went through
+    expect(bar()?.textContent).toContain("2nodes selected"); // the selection stays for the next action
   });
 
   it("keeps own on while every ticked node has its uploaded site", async () => {
     await mount([node("de1", withBundle), node("fi1")]);
     await click(tick("de1"));
-    await click(button(en["decoy.bulk.action"]));
+    await openDecoy();
     expect(radio("own").disabled).toBe(false);
   });
 
@@ -152,7 +171,7 @@ describe("Set decoy site", () => {
     await mount([node("de1", withBundle), node("fi1")]);
     await click(tick("de1"));
     await click(tick("fi1"));
-    await click(button(en["decoy.bulk.action"]));
+    await openDecoy();
     expect(radio("own").disabled).toBe(true);
     expect(document.querySelector("[role=dialog]")?.textContent).toContain(en["decoy.bulk.ownBlocked"].replace("{names}", "fi1"));
   });
@@ -160,7 +179,7 @@ describe("Set decoy site", () => {
   it("turns own off in the Cloudflare edition", async () => {
     await mount([node("de1", { ...withBundle, decoyOwnAvailable: false })], { admin: { id: "adm_1", role: Role.OWNER }, edition: "edge", unavailable: [...editionFeatures] });
     await click(tick("de1"));
-    await click(button(en["decoy.bulk.action"]));
+    await openDecoy();
     expect(radio("own").disabled).toBe(true);
     expect(document.querySelector("[role=dialog]")?.textContent).toContain(en["err.unavailable_in_edition"].replace("{feature}", en["edition.feature.decoy_own"]));
   });
@@ -169,7 +188,7 @@ describe("Set decoy site", () => {
     setNodesDecoyMode.mockRejectedValue(new ConnectError("panel_unavailable", Code.FailedPrecondition));
     await mount([node("de1")]);
     await click(tick("de1"));
-    await click(button(en["decoy.bulk.action"]));
+    await openDecoy();
     await click(radio("panel"));
     await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent?.trim() === en["decoy.apply"]));
     expect(document.querySelector("[role=dialog] [role=alert]")?.textContent).toBe(en["err.panel_unavailable"]);

@@ -11,7 +11,7 @@ import { approvals as approvalsApi, provisioning } from "@/lib/api";
 import type { Approvals } from "@/lib/integrations";
 import { ApprovalQueue } from "@/screens/integrations/approvals";
 import { SSHAccessCard } from "@/screens/node/ssh-access";
-import { PanelKeyBulk } from "@/screens/nodes-panel-key";
+import { PanelKeyOffer } from "@/screens/nodes-panel-key";
 
 // Development only, /dev-kit?only=ssh: a node's SSH access card (Server tab) in each state, the SSH install wizard and a
 // node_install approval, on made-up data. The provisioning calls are answered here: by node for the card (a change that
@@ -19,7 +19,7 @@ import { PanelKeyBulk } from "@/screens/nodes-panel-key";
 // retired node, nodes installed by the panel key), by login for the wizard (deploy: the server refuses the panel key; an
 // own key always asks for its passphrase first). The keys block reads a made-up authorized_keys per node (the panel key
 // missing, unused, a list that never loads, one the server refuses); a node with no access shows Connect SSH access (its
-// password logs in, the panel key does not go on); the Nodes page offer runs on three nodes of its own (nl1 refuses).
+// password logs in, the panel key does not go on); the Nodes page offer on three nodes of its own (it runs in the bulk bar).
 
 const fingerprint = "SHA256:Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0";
 const panelKey = {
@@ -267,10 +267,8 @@ export function SSHKit() {
           <SSHAccessCard nodeId="nod_attach" attach={{ name: "fi1", address: "fi1.example.com" }} />
         </StepUpProvider>
       </Shot>
-      <Shot id="ssh-bulk" title="Nodes page: the panel key on every password-only node" wide seed={[["node-server-access"], { access: bulkAccess }]}>
-        <StepUpProvider>
-          <PanelKeyBulk />
-        </StepUpProvider>
+      <Shot id="ssh-bulk" title="Nodes page: the offer of the panel key (its run is in the bulk bar, ?only=bulk)" wide seed={[["node-server-access"], { access: bulkAccess }]}>
+        <PanelKeyOffer busy={false} onStart={() => {}} />
       </Shot>
       <Shot id="ssh-keyonly" title="SSH access: installed by the panel key, no password">
         <SSHAccessCard nodeId="nod_keyonly" />

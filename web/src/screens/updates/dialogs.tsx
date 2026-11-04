@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Chip } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -17,6 +17,7 @@ export function RolloutDialog({
   busy,
   onStart,
   onClose,
+  children,
 }: {
   version: string;
   /** The nodes the update would take: outdated, able to update themselves. */
@@ -24,6 +25,8 @@ export function RolloutDialog({
   busy: boolean;
   onStart: (nodeIds: string[]) => void;
   onClose: () => void;
+  /** Under the list: the Nodes page's bulk bar names the selected nodes the update leaves out, and why. */
+  children?: ReactNode;
 }) {
   const t = useT();
   const noProbe = useEdition().off("health_checks"); // the gate there has no client-eye check yet
@@ -69,6 +72,7 @@ export function RolloutDialog({
             );
           })}
         </ul>
+        {children}
         <p className="text-xs leading-normal text-pretty text-muted">
           {t("up.rollout.restart")} {t("up.ro.safety")}
           {noProbe && ` ${t("up.gate.noProbe")}`}

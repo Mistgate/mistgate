@@ -55,6 +55,7 @@ import { UsersKit } from "./dev-kit-users";
 import { SubsKit } from "./dev-kit-subs";
 import { DecoyKit } from "./dev-kit-decoy";
 import { SSHKit } from "./dev-kit-ssh";
+import { BulkKit, BulkPage } from "./dev-kit-bulk";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
 import { Ipv6Kit } from "./dev-kit-ipv6";
 import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
@@ -287,10 +288,11 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh: one kit alone, for its screenshots
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit }[
-    new URLSearchParams(location.search).get("only") ?? ""
-  ];
+  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|bulk: one kit alone, for its screenshots;
+  // ?only=bulk-page is a whole page (the Nodes screen in the shell's frame), drawn without the kit's column
+  const which = new URLSearchParams(location.search).get("only") ?? "";
+  if (which === "bulk-page") return <BulkPage />;
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, bulk: BulkKit }[which];
   if (only) {
     const Kit = only;
     return (

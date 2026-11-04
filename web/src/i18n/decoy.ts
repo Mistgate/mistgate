@@ -57,15 +57,9 @@ export const en = {
   "decoy.reason.unknown": "Not applied yet ({code}).",
 
   // the bulk change on Nodes
-  "decoy.bulk.selectAll": "Select all shown nodes",
-  "decoy.bulk.select": "Select {name}",
-  "decoy.bulk.selected": "{n} node selected|{n} nodes selected",
-  "decoy.bulk.limit": "At most 50 nodes at once.",
   "decoy.bulk.action": "Set decoy site",
-  "decoy.bulk.clear": "Clear",
   "decoy.bulk.title": "Decoy site for {n} node|Decoy site for {n} nodes",
   "decoy.bulk.ownBlocked": "Own site is off: no site is uploaded for {names}. Upload one in each node’s Settings first.",
-  "decoy.bulk.done": "Decoy site set on {n} node|Decoy site set on {n} nodes",
 };
 
 export const ru: typeof en = {
@@ -120,15 +114,9 @@ export const ru: typeof en = {
   "decoy.reason.unavailable_in_edition": "В Cloudflare-версии нет своих сайтов, поэтому нода показывает встроенную страницу.",
   "decoy.reason.unknown": "Пока не применено ({code}).",
 
-  "decoy.bulk.selectAll": "Выбрать все показанные ноды",
-  "decoy.bulk.select": "Выбрать {name}",
-  "decoy.bulk.selected": "Выбрана {n} нода|Выбрано {n} ноды|Выбрано {n} нод",
-  "decoy.bulk.limit": "Не больше 50 нод за раз.",
   "decoy.bulk.action": "Сменить сайт-ширму",
-  "decoy.bulk.clear": "Снять",
   "decoy.bulk.title": "Сайт-ширма для {n} ноды|Сайт-ширма для {n} нод|Сайт-ширма для {n} нод",
   "decoy.bulk.ownBlocked": "«Свой сайт» выключен: для {names} ничего не загружено. Сначала загрузи сайт в настройках каждой ноды.",
-  "decoy.bulk.done": "Сайт-ширма сменён на {n} ноде|Сайт-ширма сменён на {n} нодах|Сайт-ширма сменён на {n} нодах",
 };
 
 export const zh: typeof en = {
@@ -183,15 +171,9 @@ export const zh: typeof en = {
   "decoy.reason.unavailable_in_edition": "Cloudflare 版不支持自有站点，因此节点显示内置页面。",
   "decoy.reason.unknown": "尚未应用（{code}）。",
 
-  "decoy.bulk.selectAll": "选择当前显示的全部节点",
-  "decoy.bulk.select": "选择 {name}",
-  "decoy.bulk.selected": "已选择 {n} 个节点",
-  "decoy.bulk.limit": "一次最多 50 个节点。",
   "decoy.bulk.action": "设置伪装站点",
-  "decoy.bulk.clear": "清除选择",
   "decoy.bulk.title": "为 {n} 个节点设置伪装站点",
   "decoy.bulk.ownBlocked": "「自有站点」不可用：尚未为 {names} 上传站点。请先在各节点的「设置」中上传。",
-  "decoy.bulk.done": "已为 {n} 个节点设置伪装站点",
 };
 
 export const fa: typeof en = {
@@ -242,15 +224,9 @@ export const fa: typeof en = {
   "decoy.reason.own_bundle_missing": "هنوز سایتی برای این نود بارگذاری نشده، برای همین صفحهٔ داخلی را نشان می‌دهد. یک آرشیو بارگذاری کن.",
   "decoy.reason.unavailable_in_edition": "نسخهٔ Cloudflare سایت اختصاصی ندارد، برای همین نود صفحهٔ داخلی را نشان می‌دهد.",
   "decoy.reason.unknown": "هنوز اعمال نشده ({code}).",
-  "decoy.bulk.selectAll": "انتخاب همهٔ نودهای نمایش‌داده‌شده",
-  "decoy.bulk.select": "انتخاب {name}",
-  "decoy.bulk.selected": "{n} نود انتخاب شد",
-  "decoy.bulk.limit": "حداکثر 50 نود در هر بار.",
   "decoy.bulk.action": "تغییر سایت پوششی",
-  "decoy.bulk.clear": "برداشتن انتخاب",
   "decoy.bulk.title": "سایت پوششی برای {n} نود",
   "decoy.bulk.ownBlocked": "«سایت اختصاصی» غیرفعال است: برای {names} چیزی بارگذاری نشده. اول در تنظیمات هر نود یک سایت بارگذاری کن.",
-  "decoy.bulk.done": "سایت پوششی روی {n} نود تنظیم شد",
 };
 
 export const tr: typeof en = {
@@ -301,13 +277,7 @@ export const tr: typeof en = {
   "decoy.reason.own_bundle_missing": "Bu düğüm için henüz site yüklenmedi, bu yüzden yerleşik sayfayı gösteriyor. Bir arşiv yükle.",
   "decoy.reason.unavailable_in_edition": "Cloudflare sürümünde kendi site yok, bu yüzden düğüm yerleşik sayfayı gösteriyor.",
   "decoy.reason.unknown": "Henüz uygulanmadı ({code}).",
-  "decoy.bulk.selectAll": "Gösterilen tüm düğümleri seç",
-  "decoy.bulk.select": "{name} düğümünü seç",
-  "decoy.bulk.selected": "{n} düğüm seçildi",
-  "decoy.bulk.limit": "Tek seferde en fazla 50 düğüm.",
   "decoy.bulk.action": "Kamuflaj sitesini ayarla",
-  "decoy.bulk.clear": "Seçimi kaldır",
   "decoy.bulk.title": "{n} düğüm için kamuflaj sitesi",
   "decoy.bulk.ownBlocked": "“Kendi sitem” kapalı: şu düğümler için site yüklenmedi: {names}. Önce her düğümün Ayarlar bölümünden bir site yükle.",
-  "decoy.bulk.done": "{n} düğümde kamuflaj sitesi ayarlandı",
 };

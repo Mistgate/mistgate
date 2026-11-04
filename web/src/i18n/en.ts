@@ -15,6 +15,7 @@ import { en as telegramEn } from "./telegram";
 import { en as portsEn } from "./ports";
 import { en as editionEn } from "./edition";
 import { en as decoyEn } from "./decoy";
+import { en as bulkEn } from "./bulk";
 import { en as countryEn } from "./country";
 import { en as connectionsEn } from "./connections";
 import { en as journalEn } from "./journal";
@@ -289,7 +290,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

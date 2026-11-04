@@ -13,6 +13,7 @@ import { fa as telegramFa } from "./telegram";
 import { fa as portsFa } from "./ports";
 import { fa as editionFa } from "./edition";
 import { fa as decoyFa } from "./decoy";
+import { fa as bulkFa } from "./bulk";
 import { fa as countryFa } from "./country";
 import { fa as connectionsFa } from "./connections";
 import { fa as journalFa } from "./journal";
@@ -271,4 +272,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "سایت همین نود یا سایتی دیگر",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...countryFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...protocolsFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...protocolsFa };

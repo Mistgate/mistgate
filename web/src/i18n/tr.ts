@@ -13,6 +13,7 @@ import { tr as telegramTr } from "./telegram";
 import { tr as portsTr } from "./ports";
 import { tr as editionTr } from "./edition";
 import { tr as decoyTr } from "./decoy";
+import { tr as bulkTr } from "./bulk";
 import { tr as countryTr } from "./country";
 import { tr as connectionsTr } from "./connections";
 import { tr as journalTr } from "./journal";
@@ -272,4 +273,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Bu düğümün sitesi ya da başka bir site",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...protocolsTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...protocolsTr };

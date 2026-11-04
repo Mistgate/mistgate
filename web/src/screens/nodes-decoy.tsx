@@ -4,11 +4,10 @@ import { EditionNotice } from "@/components/edition-notice";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
-import { useToast } from "@/components/ui/toast";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
-import { asDecoyMode, maxBulkNodes, ownBlockedBy, type DecoyMode } from "@/lib/decoy";
+import { asDecoyMode, ownBlockedBy, type DecoyMode } from "@/lib/decoy";
 import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import type { Plain } from "@/lib/plain";
@@ -17,31 +16,12 @@ import { DecoyModeChoice } from "./node/decoy";
 type Node = Plain<NodeMsg>;
 
 /**
- * The bar that appears when nodes are ticked on the Nodes page: how many, and "Set decoy site" for all of them at once
- * (SetNodesDecoyMode, up to 50). Own is off while any ticked node has no uploaded site, because the panel refuses it then.
+ * "Decoy site…" of the Nodes page's bulk bar: one mode for all the selected nodes in one call (SetNodesDecoyMode, up to
+ * 50). Own is off while any of them has no uploaded site, because the panel refuses it then. Once the panel took it,
+ * `onDone` runs (the bar lists the nodes, each with its state read live) and the window closes; a refusal stays in it.
  */
-export function DecoyBulk({ nodes, onClear }: { nodes: Node[]; onClear: () => void }) {
+export function DecoyBulkDialog({ nodes, onClose, onDone }: { nodes: readonly Node[]; onClose: () => void; onDone: () => void }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-card border border-accent-line bg-surface px-3.5 py-2.5">
-      <span className="text-[13px] font-bold">{t.n("decoy.bulk.selected", nodes.length)}</span>
-      {nodes.length >= maxBulkNodes && <span className="text-xs text-muted">{t("decoy.bulk.limit")}</span>}
-      <span className="flex-1" />
-      <Button variant="primary" size="md" onClick={() => setOpen(true)}>
-        {t("decoy.bulk.action")}
-      </Button>
-      <Button variant="ghost" size="md" onClick={onClear}>
-        {t("decoy.bulk.clear")}
-      </Button>
-      {open && <BulkDialog nodes={nodes} onClose={() => setOpen(false)} onDone={onClear} />}
-    </div>
-  );
-}
-
-function BulkDialog({ nodes, onClose, onDone }: { nodes: Node[]; onClose: () => void; onDone: () => void }) {
-  const t = useT();
-  const toast = useToast();
   const qc = useQueryClient();
   const edge = useEdition().off("decoy_own");
   const blocked = ownBlockedBy(nodes);
@@ -59,8 +39,7 @@ function BulkDialog({ nodes, onClose, onDone }: { nodes: Node[]; onClose: () => 
 
   const apply = useMutation({
     mutationFn: () => nodesApi.setNodesDecoyMode({ nodeIds: nodes.map((n) => n.id), mode }),
-    onSuccess: (r) => {
-      toast(t.n("decoy.bulk.done", r.nodes.length || nodes.length));
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["nodes"] });
       for (const n of nodes) void qc.invalidateQueries({ queryKey: ["node", n.id] });
       onDone();

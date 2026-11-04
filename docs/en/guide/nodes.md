@@ -29,6 +29,27 @@ On a phone the table becomes one card per node with the same facts. The list ref
 
 A healthy node whose agent is older than the version this panel ships reads **Healthy · outdated agent** with its version; the line is a link to **Updates**. See [Updates](../operations/updates.md).
 
+## Bulk actions
+
+The owner can tick nodes in the list (on a phone, on each card) and act on all of them at once. The box in the table's header ticks every shown node; **Select ▾** next to the status chips replaces the selection with **All shown**, **With problems**, **Password only** or **Outdated agent**, or clears it. At most 50 nodes are selected at once, and a retired node cannot be.
+
+While nodes are selected, a bar floats at the foot of the page (on a phone it takes the place of the menu dock): how many are selected and how many of them the filter hides, then the actions. **Esc** clears the selection.
+
+| Action | Where | What it does |
+|:--|:--|:--|
+| **Ports** | **Check ▾** | Runs the port check on each node, one node at a time (a check takes about 10 seconds). Starts at once. |
+| **Doctor** | **Check ▾** | Asks each node for a fresh doctor report, four at a time. Starts at once. |
+| **Update agent** | the bar | Opens the rollout window of **Updates** with the selected nodes whose agent is outdated; the rollout then runs on **Updates**. Off while another rollout runs. |
+| **Change SSH password** | the bar | Asks first. The panel then generates a password of its own for each node, changes it on the server and checks that it logs in. The passwords are not listed: reveal each one in its node's **Server → SSH access** card. The old passwords stop working. |
+| **Panel key** | **More ▾** | Puts the panel key on the nodes that log in with a password only, as the offer above the list does. Starts at once. |
+| **Bind own key…** | **More ▾** | Adds one public key line to `~/.ssh/authorized_keys` of each node. The window shows the key's type, comment and fingerprint before anything is sent; a private key or several lines are refused in the browser. |
+| **Unbind a key…** | **More ▾** | Removes a key by its public line or its `SHA256:` fingerprint. The panel key is not unbound this way: do it in a node's card. A node that did not have the key reads **Was not there**. |
+| **Decoy site…** | **More ▾** | Sets one decoy site option on all of them in one change. See [Decoy site](decoy-site.md). |
+
+Not every selected node takes part in every action, and the window and the progress say which ones sit out and why: an offline node gets no check, a node that logs in by key only has no password to change, a node with no saved SSH access gets no SSH action. The SSH actions read the nodes' saved access fresh before they start, ask you to confirm your sign-in once, and go one node at a time: the panel logs in to each server several times.
+
+A running action grows the bar upwards into a row per node: **Waiting**, **Running…**, **Done** (a check says what it found, with **Open** to the node's page), **Failed** with the reason, or **Skipped** with the reason. **Stop** lets the node in progress finish and starts no more; the rest read **Not started**. At the end a summary says how many went through: **Retry for N** runs the failed and the not started ones again, **Close** puts the rows away and keeps the selection. One action runs at a time, and leaving the page while it runs asks first. If the servers stop answering after several retries, wait a minute: each server limits how often the panel logs in.
+
 ## Node statuses
 
 | Status | What it means | What to do |
