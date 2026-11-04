@@ -3,21 +3,20 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.74`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.75`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.74
+  meta: v0.1.0 – v0.1.75
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.74
+      release: v0.1.75
       current: true
       points:
-        - "**SSH by the panel's own key.** A node installs with the panel's key, added once at the hoster, and no password; a password install adds the key too, and the owner's own private key works once as a last resort, never stored. See [Install a node over SSH](../getting-started/ssh-install.md)."
-        - "**The server's SSH access in the node card.** Change the saved password, see and edit the login's `authorized_keys` (the panel never removes its own last way in), connect access to a node installed by command, and put the panel key on every password-only node at once."
+        - "**A kernel module that does not build no longer breaks apt.** When the AmneziaWG module does not compile for a node's kernel (Linux 7.0 on Ubuntu 26.04 today), the node says so and removes the module packages it installed, so apt on the server keeps working; the node stays on userspace. See [AmneziaWG](../guide/amneziawg.md#preparing-the-kernel-module)."
     - title: Profiles
       section: profiles
       points:
@@ -82,7 +81,7 @@ Mistgate is in **beta**; the current release is `v0.1.74`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.74
+  meta: v0.1.34 – v0.1.75
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
