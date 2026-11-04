@@ -3,21 +3,21 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.73`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.74`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.73
+  meta: v0.1.0 – v0.1.74
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.73
+      release: v0.1.74
       current: true
       points:
-        - "**Who loses the packets.** A UDP port check that loses packets is sent again at once from a node on the other side (in the CIS or not): lost from both, the node's port is at fault; lost from one, the loss is on the way from that sender, the port counts as fine and the sender gets the new `path_lossy` alert. The Ports block shows both measurements. See [Nodes](../guide/nodes.md#ports)."
-        - "**Calmer, truer alerts.** The \"Unreachable from\" alert lists its networks by operator with the sources said once, and names the sources that saw nothing; a way in with one broken port among working ones warns instead of showing Down; an MTProto server can be checked through a relay, and a relay the panel cannot prove may still be turned on. See [Relays](../guide/relays.md)."
+        - "**SSH by the panel's own key.** A node installs with the panel's key, added once at the hoster, and no password; a password install adds the key too, and the owner's own private key works once as a last resort, never stored. See [Install a node over SSH](../getting-started/ssh-install.md)."
+        - "**The server's SSH access in the node card.** Change the saved password, see and edit the login's `authorized_keys` (the panel never removes its own last way in), connect access to a node installed by command, and put the panel key on every password-only node at once."
     - title: Profiles
       section: profiles
       points:
@@ -30,7 +30,7 @@ Mistgate is in **beta**; the current release is `v0.1.73`. It runs in production
       section: nodes
       points:
         - "[SSH installation](../getting-started/ssh-install.md) from the admin, and through MCP with the owner's approval: a pinned host key, checks before any change, jobs that can be cancelled, retried and resumed after an interruption."
-        - "Saved SSH access, encrypted, with a verified password change."
+        - "Saved SSH access, encrypted, with a verified password change; the panel's own SSH key, the server's `authorized_keys` from the node card, and access for nodes installed by command."
         - "[WARP egress](../guide/warp.md) that fails closed when the WARP link drops, and [torrent protection](../guide/torrent-protection.md) on every node."
         - "[Check ports](../guide/nodes.md#ports): UDP delivery and a TCP connection to every port of the node from another node of the fleet."
         - "[Measuring the network capacity](../guide/nodes.md#measuring-the-network-capacity) of a node's link."
@@ -82,7 +82,7 @@ Mistgate is in **beta**; the current release is `v0.1.73`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.73
+  meta: v0.1.34 – v0.1.74
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -189,7 +189,7 @@ Mistgate is in **beta**; the current release is `v0.1.73`. It runs in production
 
 - Client-eye checks skip VLESS when the node agent does not report the required capability. Agents before v0.1.34 have no VLESS engine; TLS profiles also require `vless-tls/1` (v0.1.36 or later).
 - **Check ports** looks from one vantage point: another node of the fleet or the panel host. On VLESS ports it runs a TLS handshake with the expected name, not a REALITY handshake.
-- The SSH installation logs in with the panel's own key or a password. The owner's own private key at install, managing `authorized_keys` and closing password login in sshd are not there yet. See [Install a node over SSH](../getting-started/ssh-install.md).
+- The SSH installation logs in with the panel's own key, a password, or once with the owner's own private key, and the node card manages `authorized_keys`. Closing password login in sshd and rotating the panel's key are not there yet. See [Install a node over SSH](../getting-started/ssh-install.md).
 - MCP can now create and update profiles and deploy them to nodes and groups with the owner's approval; create groups in the admin first.
 - Backups go to Cloudflare R2 only, and a restore is the offline `mistgate backup restore` command into a new data directory.
 - The panel does not create a Cloudflare account, a bucket or a token: you supply a bucket-scoped token with read, write and delete access.

@@ -32,7 +32,7 @@ export const LANDING = {
     demoAlt: "A demo of the Mistgate admin: a new node is added, checked and comes online, and it appears on the person's page at once",
     doesH: "What it does",
     does: [
-      ["nodes", "Nodes from the browser", "Add a node with its IP and root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld and installs the signed agent. A one-time install command works too.", "getting-started/add-node"],
+      ["nodes", "Nodes from the browser", "Add a node by its IP with the panel's own SSH key (added once at your hoster) or the root password. The panel pins the SSH host key, checks the server, opens the ports in an active UFW or firewalld and installs the signed agent; the node's card changes the password and manages the server's SSH keys. A one-time install command works too.", "getting-started/add-node"],
       ["subscriptions", "One link per person", "Mihomo apps (kl!ck, FlClash, Clash Verge Rev) get all three protocols from it, Happ gets Hysteria2 and VLESS, and AmneziaVPN takes a key per device from the person's page.", "guide/client-apps"],
       ["health", "Checks and alerts", "Every 5 minutes the panel connects to every server the way an app does. A doctor on each node runs 17 host checks and offers seven fixes that run only after you confirm. Alerts go to the admin and to Telegram.", "operations/health"],
       ["share", "Relays through your other nodes", "When some networks cannot reach a server, people get to it through another of your nodes, which only forwards the encrypted traffic. The panel checks the path before switching it on and watches it afterwards; the node page draws every way in as a line from the people to the server.", "guide/relays"],
@@ -116,7 +116,7 @@ export const LANDING = {
     demoAlt: "Демо админки Mistgate: новая нода добавляется, проверяется и выходит в строй и сразу появляется на странице человека",
     doesH: "Что умеет",
     does: [
-      ["nodes", "Ноды из браузера", "Ноду добавляют по IP и паролю root. Панель запоминает SSH-ключ сервера, проверяет его, открывает порты во включённом UFW или firewalld и ставит подписанный агент. Можно и одноразовой командой.", "getting-started/add-node"],
+      ["nodes", "Ноды из браузера", "Ноду добавляют по IP — с собственным SSH-ключом панели (его один раз добавляют у хостера) или паролем root. Панель запоминает SSH-ключ сервера, проверяет его, открывает порты во включённом UFW или firewalld и ставит подписанный агент, а в карточке ноды меняет пароль и управляет SSH-ключами сервера. Можно и одноразовой командой.", "getting-started/add-node"],
       ["subscriptions", "Одна ссылка на человека", "Приложения на ядре Mihomo (kl!ck, FlClash, Clash Verge Rev) получают по ней все три протокола, Happ — Hysteria2 и VLESS, а AmneziaVPN берёт ключ на каждое устройство со страницы человека.", "guide/client-apps"],
       ["health", "Проверки и алерты", "Каждые 5 минут панель подключается к каждому серверу, как приложение. Доктор на каждой ноде делает 17 проверок хоста и предлагает семь исправлений; без вашего подтверждения ни одно не запускается. Алерты видны в админке и приходят в Telegram.", "operations/health"],
       ["share", "Ретрансляции через ваши ноды", "Если из каких-то сетей сервер не открывается, люди попадают на него через другую вашу ноду, которая только пересылает зашифрованный трафик. Панель проверяет путь до включения и следит за ним потом; на странице ноды все входы нарисованы линией от людей до сервера.", "guide/relays"],
@@ -200,7 +200,7 @@ export const LANDING = {
     demoAlt: "Mistgate 管理后台演示：添加新节点，经过检查后上线，并立即出现在用户页面上",
     doesH: "功能",
     does: [
-      ["nodes", "在浏览器里添加节点", "输入 IP 和 root 密码即可添加。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent。也可以用一条一次性命令安装。", "getting-started/add-node"],
+      ["nodes", "在浏览器里添加节点", "输入 IP，用面板自己的 SSH 密钥（在服务商处添加一次）或 root 密码即可添加。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent；在节点卡片中还能更换密码、管理服务器的 SSH 密钥。也可以用一条一次性命令安装。", "getting-started/add-node"],
       ["subscriptions", "每人一个链接", "基于 Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）从中获取全部三种协议，Happ 获取 Hysteria2 和 VLESS，AmneziaVPN 则在用户页面上为每台设备取一个密钥。", "guide/client-apps"],
       ["health", "检测和告警", "面板每 5 分钟像应用一样连接一次每台服务器。每个节点上的诊断运行 17 项主机检查，并提供七种修复，只有你确认后才会执行。告警显示在管理后台，也会发到 Telegram。", "operations/health"],
       ["share", "经由你的其他节点中转", "某些网络无法访问某台服务器时，用户可以经由你的另一个节点连接，该节点只转发加密流量。面板在启用前检查路径，之后持续监测；节点页面把每个入口画成一条从用户到服务器的线路。", "guide/relays"],
@@ -286,7 +286,7 @@ export const LANDING = {
     demoAlt: "نمایشی از Mistgate: یک نود از مرورگر و از راه SSH اضافه می‌شود، با یک پروفایل به کار می‌افتد و بی‌درنگ در صفحهٔ یک کاربر ظاهر می‌شود",
     doesH: "چه کارهایی می‌کند",
     does: [
-      ["nodes", "نود از مرورگر", "نود را با IP و رمز عبور root اضافه می‌کنید. پنل کلید SSH سرور را به خاطر می‌سپارد، سرور را بررسی می‌کند، اگر UFW یا firewalld فعال باشد پورت‌ها را در آن باز می‌کند و ایجنت امضاشده را نصب می‌کند. یک فرمان نصب یک‌بارمصرف هم کار می‌کند.", "getting-started/add-node"],
+      ["nodes", "نود از مرورگر", "نود را با IP و کلید SSH خود پنل (یک بار نزد میزبان اضافه‌اش می‌کنید) یا رمز عبور root اضافه می‌کنید. پنل کلید SSH سرور را به خاطر می‌سپارد، سرور را بررسی می‌کند، اگر UFW یا firewalld فعال باشد پورت‌ها را در آن باز می‌کند و ایجنت امضاشده را نصب می‌کند؛ در کارت نود هم رمز را عوض می‌کند و کلیدهای SSH سرور را مدیریت می‌کند. یک فرمان نصب یک‌بارمصرف هم کار می‌کند.", "getting-started/add-node"],
       ["subscriptions", "یک لینک برای هر نفر", "برنامه‌های مبتنی بر Mihomo (kl!ck، FlClash و Clash Verge Rev) هر سه پروتکل را از همین لینک می‌گیرند، Happ پروتکل‌های Hysteria2 و VLESS را، و AmneziaVPN برای هر دستگاه یک کلید جداگانه از صفحهٔ کاربر برمی‌دارد.", "guide/client-apps"],
       ["health", "بررسی‌ها و هشدارها", "پنل هر 5 دقیقه یک بار، درست مثل یک برنامه، به هر سرور وصل می‌شود. عیب‌یابِ هر نود 17 بررسی روی میزبان انجام می‌دهد و هفت راه‌حل پیشنهاد می‌کند که فقط پس از تأیید شما اجرا می‌شوند. هشدارها در پنل مدیریت دیده می‌شوند و به Telegram هم فرستاده می‌شوند.", "operations/health"],
       ["share", "رله از راه نودهای دیگرتان", "اگر از برخی شبکه‌ها نتوان به سروری رسید، کاربران از راه نود دیگری از نودهای شما به آن وصل می‌شوند؛ آن نود فقط ترافیک رمزگذاری‌شده را جابه‌جا می‌کند. پنل پیش از روشن کردن مسیر آن را بررسی می‌کند و بعد هم زیر نظرش دارد؛ صفحهٔ نود هر راه ورود را به‌صورت خطی از کاربران تا سرور می‌کشد.", "guide/relays"],
@@ -371,7 +371,7 @@ export const LANDING = {
     demoAlt: "Mistgate tanıtımı: tarayıcıdan SSH ile bir düğüm eklenir, bir profille çalışmaya başlar ve hemen bir kişinin sayfasında görünür",
     doesH: "Neler yapar",
     does: [
-      ["nodes", "Tarayıcıdan düğüm ekleme", "Düğümü IP adresi ve root parolasıyla eklersiniz. Panel sunucunun SSH anahtarını sabitler, sunucuyu kontrol eder, etkin bir UFW ya da firewalld varsa portları açar ve imzalı ajanı kurar. Tek kullanımlık bir kurulum komutu da olur.", "getting-started/add-node"],
+      ["nodes", "Tarayıcıdan düğüm ekleme", "Düğümü IP adresiyle, panelin kendi SSH anahtarıyla (sağlayıcınıza bir kez eklersiniz) ya da root parolasıyla eklersiniz. Panel sunucunun SSH anahtarını sabitler, sunucuyu kontrol eder, etkin bir UFW ya da firewalld varsa portları açar ve imzalı ajanı kurar; düğüm kartında parolayı değiştirir ve sunucunun SSH anahtarlarını yönetir. Tek kullanımlık bir kurulum komutu da olur.", "getting-started/add-node"],
       ["subscriptions", "Kişi başına tek bağlantı", "Mihomo tabanlı uygulamalar (kl!ck, FlClash, Clash Verge Rev) bu bağlantıdan üç protokolün hepsini alır, Happ Hysteria2 ve VLESS'i alır, AmneziaVPN ise kişinin sayfasından her cihaz için ayrı bir anahtar alır.", "guide/client-apps"],
       ["health", "Kontroller ve uyarılar", "Panel her 5 dakikada bir, tıpkı bir uygulama gibi her sunucuya bağlanır. Her düğümdeki Teşhis 17 sunucu kontrolü yapar ve yedi düzeltme önerir; bunlar ancak siz onayladıktan sonra çalışır. Uyarılar yönetim panelinde görünür ve Telegram'a da gelir.", "operations/health"],
       ["share", "Diğer düğümleriniz üzerinden aktarma", "Bazı ağlardan bir sunucuya ulaşılamıyorsa kişiler ona başka bir düğümünüz üzerinden bağlanır; o düğüm yalnızca şifreli trafiği iletir. Panel yolu açmadan önce kontrol eder, sonra da izlemeye devam eder; düğüm sayfası her giriş yolunu kişilerden sunucuya uzanan bir çizgi olarak çizer.", "guide/relays"],
