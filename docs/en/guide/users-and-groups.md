@@ -171,7 +171,7 @@ The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 ### Danger zone
 
 - **Reset traffic** sets the used traffic of the current period to zero. The period and its end stay, the history stays, and a person stopped by the quota can connect again. The counter cannot be restored.
-- **Delete user** removes the person for good: their keys are dropped from every node, their connections are cut, the link stops working and their traffic history is deleted. Type the name to confirm.
+- **Delete user** removes the person for good: their keys are dropped from every node, their connections are cut, the link stops working and their traffic history is deleted. Type the name to confirm; the panel then asks you to confirm your sign-in (see [Security](../operations/security.md)).
 
 ## Quota periods
 

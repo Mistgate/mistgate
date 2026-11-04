@@ -51,7 +51,8 @@ A stolen session cookie must not be enough to plant a passkey, remove the owner'
 - changing, revealing or forgetting a node's saved SSH password;
 - registering, importing or deleting a WARP account;
 - saving the backup settings, testing the backup storage, creating a backup now;
-- creating or revoking an API token, approving an agent's change.
+- creating or revoking an API token, approving an agent's change;
+- deleting users.
 
 Signing in counts as a proof, so "sign in, then add a passkey" asks nothing more. Otherwise the admin shows **Confirm it is you**: use the passkey or type an authenticator code. A code for step-up must be newer than the one used to sign in (wait for the next 30-second step). Five wrong proofs lock step-up for 15 minutes. An API token never passes step-up; see [API](../reference/api.md).
 
