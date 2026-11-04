@@ -121,6 +121,18 @@ const type = (el: HTMLInputElement, value: string) =>
   });
 
 describe("the people list", () => {
+  it("picks a row by a click anywhere in the tick box's cell, and does not open the person", async () => {
+    await mount();
+    const cell = document.querySelector("table tbody tr td")!;
+    const box = () => cell.querySelector("[role=checkbox]")!;
+    expect(box().getAttribute("aria-checked")).toBe("false");
+    await click(cell); // next to the 18px box, not on it: what the owner hit
+    expect(box().getAttribute("aria-checked")).toBe("true");
+    await click(box()); // the box itself still toggles once
+    expect(box().getAttribute("aria-checked")).toBe("false");
+    expect(navigate).not.toHaveBeenCalledWith(expect.objectContaining({ to: "/users/$id" }));
+  });
+
   it("marks an active person who would get nothing, with the reason on hover", async () => {
     await mount();
     expect(text()).toContain("App"); // the column

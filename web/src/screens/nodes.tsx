@@ -196,19 +196,24 @@ type Select = {
   pickable: (n: Node) => boolean;
 };
 
-/** One tick box: above the row's overlay link (z-10), so ticking does not open the node. */
+/**
+ * One tick box: above the row's overlay link (z-10), so ticking does not open the node. The label around it is the hit
+ * area, a padded square: the 16px box alone was easy to miss, and a miss opened the node.
+ */
 function Tick({ select, node, className }: { select: Select; node: Node; className?: string }) {
   const t = useT();
   const on = select.ticked.has(node.id);
   return (
-    <input
-      type="checkbox"
-      className={cx("relative z-10 size-4 flex-none accent-accent", className)}
-      aria-label={t("bulk.select", { name: node.name })}
-      checked={on}
-      disabled={!select.pickable(node) || (select.full && !on)}
-      onChange={() => select.toggle(node.id)}
-    />
+    <label className={cx("relative z-10 -m-2 grid flex-none cursor-pointer p-2", className)}>
+      <input
+        type="checkbox"
+        className="size-4 accent-accent"
+        aria-label={t("bulk.select", { name: node.name })}
+        checked={on}
+        disabled={!select.pickable(node) || (select.full && !on)}
+        onChange={() => select.toggle(node.id)}
+      />
+    </label>
   );
 }
 

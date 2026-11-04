@@ -650,7 +650,14 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         u.status === UserStatus.DISABLED && "opacity-60",
       )}
     >
-      <td className="pe-2 ps-4">
+      {/* the whole cell picks the row: the 18px box alone was easy to miss, and a miss opened the person */}
+      <td
+        className="pe-2 ps-4"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      >
         <Check checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
       </td>
       <td className={col.status}>
@@ -710,7 +717,16 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       )}
     >
       <div className="flex items-center gap-2.5">
-        <Check large checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
+        {/* a padded hit area around the box, like the table's whole cell: a near miss picks, it does not open */}
+        <span
+          className="-m-2 grid p-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        >
+          <Check large checked={on} onCheckedChange={onToggle} label={t("users.selectOne", { name: u.name })} />
+        </span>
         <Avatar name={u.name} index={avatarIndex(u.id)} />
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <AppLink to="/users/$id" params={{ id: u.id }} className="min-w-0 truncate text-[15px] font-bold" onClick={stop}>
