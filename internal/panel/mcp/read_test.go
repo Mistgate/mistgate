@@ -247,6 +247,9 @@ func TestUntrustedTextIsCleaned(t *testing.T) {
 		t.Errorf("name: %q", name)
 	}
 	n := decode[NodeGetV](t, mustOK(t, s, "node_get", map[string]any{"node": "de1"}))
+	if !strings.Contains(n.Notes, "note from the owner.") {
+		t.Errorf("notes lost safe text: %q", n.Notes)
+	}
 	if strings.Contains(n.Notes, "\n") || strings.Contains(n.Notes, canaryTK) || strings.Contains(n.Notes, canaryPrivLine) {
 		t.Errorf("notes: %q", n.Notes)
 	}
