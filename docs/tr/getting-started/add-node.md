@@ -25,7 +25,7 @@ Bir yapay zekâ ajanı da MCP üzerinden bir SSH kurulumu başlatabilir; onaylar
 | Alan | Ne girilir |
 |:--|:--|
 | Ad | a–z, 0–9 ve tire, 2 ila 24 karakter; örneğin `de1`. Adlar canlı düğümler ve etkin SSH kurulumları arasında benzersizdir; bir düğümü kullanımdan kaldırmak geçmişini korurken adını serbest bırakır. |
-| Ülke | İsteğe bağlı. DNS için önemlidir: Rusya'daki düğümlerde Teşhis gosuslugi.ru'yu kontrol eder ve Yandex DNS önerir. |
+| Ülke | İsteğe bağlı. DNS için önemlidir: Rusya'daki düğümlerde Teşhis gosuslugi.ru'yu kontrol eder ve Yandex DNS önerir; Çin'deki düğümlerde www.baidu.com'u kontrol eder ve AliDNS ile DNSPod önerir. |
 | Adres | `https://` ve port olmadan bir alan adı ya da IP. İstemciler ona bağlanır ve her aboneliğe girer. Hysteria2 için bir Let's Encrypt sertifikası, A kaydı sunucuyu gösteren bir alan adı gerektirir. |
 
 Adres bir IP olduğunda pencere, siz devam etmeden önce bunu söyler: o düğümdeki Hysteria2 için, profili eklerken seçeceğiniz A kaydı olan bir alan adı ya da kendinden imzalı (sabitlenmiş) sertifika gerekir. AmneziaWG bir IP üzerinde olduğu gibi çalışır.

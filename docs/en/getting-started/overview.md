@@ -29,7 +29,7 @@ Mistgate is a self-hosted panel for a small VPN fleet that you run on your own s
 
 ## Who it is for
 
-Mistgate is for a person or a small team that runs a few VPN servers for themselves, family, friends or a small community. You should be comfortable with Linux, SSH, systemd and DNS records. Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings.
+Mistgate is for a person or a small team that runs a few VPN servers for themselves, family, friends or a small community. You should be comfortable with Linux, SSH, systemd and DNS records. Some defaults account for users in Russia and China (Yandex DNS for Russian nodes, AliDNS and DNSPod for Chinese nodes, the doctor's country-specific control domains, split-DNS presets); all of them are settings.
 
 ## Concepts
 

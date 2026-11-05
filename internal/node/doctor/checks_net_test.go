@@ -19,6 +19,8 @@ func TestResolverTargets(t *testing.T) {
 	}{
 		{Settings{}, "1.1.1.1,8.8.8.8"},
 		{Settings{Country: "RU"}, "77.88.8.8,77.88.8.1"},
+		{Settings{Country: "CN"}, "223.5.5.5,119.29.29.29"},
+		{Settings{Country: "cn"}, "223.5.5.5,119.29.29.29"},
 		{Settings{Country: "ru", Resolvers: []string{"9.9.9.9", "dns.example.com", " 10.0.0.1:5353 "}}, "9.9.9.9,10.0.0.1:5353"},
 		{Settings{Resolvers: []string{"not a resolver"}}, "1.1.1.1,8.8.8.8"},
 	}
@@ -81,6 +83,16 @@ func TestResolver(t *testing.T) {
 	want(t, r, Fail, FixSetResolver)
 	r = run(t, f.doctor(lookups([]string{"gosuslugi.ru"}, []string{"gosuslugi.ru"}), ru), CheckResolver)
 	want(t, r, Fail, "") // even the recommended resolver cannot resolve it: the fix would not help
+
+	// The CN node: www.baidu.com alone failing is a FAIL, and its recommended resolvers must answer it for the fix.
+	cn := func(e *Env) { e.Settings = func() Settings { return Settings{Country: "CN"} } }
+	r = run(t, f.doctor(lookups([]string{"www.baidu.com"}, nil), cn), CheckResolver)
+	want(t, r, Fail, FixSetResolver)
+	param(t, r, "failed", "www.baidu.com")
+	param(t, r, "resolver", "223.5.5.5")
+	r = run(t, f.doctor(lookups([]string{"www.baidu.com"}, []string{"www.baidu.com"}), cn), CheckResolver)
+	want(t, r, Fail, "") // even the recommended resolvers cannot resolve it: the fix would not help
+
 	// gosuslugi is not asked on a non-RU node.
 	asked := false
 	want(t, run(t, f.doctor(func(e *Env) {
@@ -94,6 +106,21 @@ func TestResolver(t *testing.T) {
 	}), CheckResolver), OK, "")
 	if asked {
 		t.Error("gosuslugi.ru looked up on a non-RU node")
+	}
+	// www.baidu.com is asked only on a CN node.
+	asked = false
+	want(t, run(t, f.doctor(func(e *Env) {
+		e.Settings = func() Settings { return Settings{Country: "RU"} }
+		e.Lookup = func(_ context.Context, h string) error {
+			if h == "www.baidu.com" {
+				asked = true
+			}
+			return nil
+		}
+		e.LookupVia = func(context.Context, string, string) error { return nil }
+	}), CheckResolver), OK, "")
+	if asked {
+		t.Error("www.baidu.com looked up on a non-CN node")
 	}
 
 	// One retry rescues a single timeout.

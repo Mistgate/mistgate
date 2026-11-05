@@ -1,7 +1,7 @@
 // Countries offered in "Add node" (ISO 3166-1 alpha-2): where VPN servers usually live. The node's country is the badge
 // and the filter, the name friends see for its servers, and it decides the doctor's DNS check: on a node in Russia the
-// doctor tests gosuslugi.ru through the server's resolver and offers Yandex DNS. Any other code can still be set through
-// the API.
+// doctor tests gosuslugi.ru through the server's resolver and offers Yandex DNS, in China www.baidu.com and AliDNS +
+// DNSPod (internal/dnsdefaults, internal/node/doctor). Any other code can still be set through the API.
 export const countryCodes = [
   "AE", "AM", "AR", "AT", "AU", "AZ", "BE", "BG", "BR", "BY", "CA", "CH", "CL", "CN", "CY", "CZ", "DE", "DK", "EE",
   "ES", "FI", "FR", "GB", "GE", "GR", "HK", "HR", "HU", "ID", "IE", "IL", "IN", "IS", "IT", "JP", "KG", "KR",

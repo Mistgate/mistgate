@@ -25,7 +25,7 @@ In **Nodes → Add node**, choose **Get a manual install command**. The same win
 | Field | What to enter |
 |:--|:--|
 | Name | a–z, 0–9 and dash, 2 to 24 characters, for example `de1`. Names are unique among live nodes and active SSH installs; retiring a node releases its name while keeping its history. |
-| Country | Optional. It matters for DNS: on nodes in Russia the doctor checks gosuslugi.ru and offers Yandex DNS. |
+| Country | Optional. It matters for DNS: on nodes in Russia the doctor checks gosuslugi.ru and offers Yandex DNS; on nodes in China it checks www.baidu.com and offers AliDNS and DNSPod. |
 | Address | A domain or an IP, without `https://` and without a port. Clients connect to it, and it goes into every subscription. A Let's Encrypt certificate for Hysteria2 needs a domain whose A record points at the server. |
 
 When the address is an IP, the window says so before you go on: Hysteria2 on that node then needs a domain with an A record or the self-signed (pinned) certificate, which you pick when you add the profile. AmneziaWG works on an IP as it is.

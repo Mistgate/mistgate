@@ -199,4 +199,4 @@ Mistgate is in **beta**; the current release is `v0.1.77`. It runs in production
 - In the Cloudflare edition the digest of what was sent to a node must fit one D1 row (2 MB), about 38,000 credentials per node. See [the limits of this edition](../getting-started/install-edge.md#not-available-in-this-edition-yet).
 - sing-box JSON has no XHTTP and cannot pin a self-signed Hysteria2 certificate; Gecko and AmneziaWG go out only in Mihomo YAML. A server a format cannot carry is left out of that format. See [What works where](../guide/subscriptions.md#what-works-where).
 - The country check looks from a few probes, not from every network, and the block lists cover Russia only. `listed` means the address is in a registry, not that its traffic is cut.
-- Some defaults lean towards users in Russia (Yandex DNS for nodes in Russia, the doctor's control domains, split-DNS presets); all of them are settings.
+- Some defaults are country-specific (Yandex DNS for Russia, AliDNS and DNSPod for China, the doctor's control domains, split-DNS presets); all of them are settings.

@@ -159,7 +159,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | 系统日志大小（`journald_size`） | 磁盘上的 systemd 日志大小。基线设置会将其限制为 200 MB。 | 超过 300 MB（限制未生效） | 超过 1 GB | 清理日志 |
 | 挂起的进程（`dstate_tasks`） | 三次采样中处于不可中断休眠状态的进程（每次间隔 2 秒）、内核日志中的 QXL/TTM 错误，以及 CPU 空闲 10 分钟时负载仍达到 CPU 数量。 | 存在挂起进程 | 连续两轮检测到挂起进程、QXL/TTM 挂起，或出现空闲负载模式 | 无：从服务商控制面板重启服务器 |
 | 时钟（`time_sync`） | 与面板时钟的偏差以及 NTP 是否同步。 | 偏差超过 2 秒，或 NTP 未同步 | 偏差超过 30 秒 | 无：启用 NTP（`timedatectl set-ntp true`） |
-| 服务器 DNS 解析（`resolver`） | 检查主机自己的 DNS 解析器能否解析 `www.cloudflare.com`、`www.gstatic.com` 和 `www.google.com`；对于国家为俄罗斯的节点，还会检查 `gosuslugi.ru`。每个域名检测 3 秒，并重试一次。 | 有一个域名解析失败，或响应中位时间超过 500 ms | 两个或更多域名解析失败，或俄罗斯节点上的 `gosuslugi.ru` 解析失败 | 只有在同一轮检测中推荐的 DNS 解析器均有响应时，才修复 DNS 解析器 |
+| 服务器 DNS 解析（`resolver`） | 检查主机自己的 DNS 解析器能否解析 `www.cloudflare.com`、`www.gstatic.com` 和 `www.google.com`；俄罗斯节点还检查 `gosuslugi.ru`，中国节点检查 `www.baidu.com`。每个域名检测 3 秒，并重试一次。 | 有一个域名解析失败，或响应中位时间超过 500 ms | 两个或更多域名解析失败，或节点所在国家的专属域名解析失败 | 只有在同一轮检测中推荐的 DNS 解析器均有响应时，才修复 DNS 解析器 |
 | IPv6（`ipv6`） | 检查全局 IPv6 地址，并通过端口 443 连接两个公共解析器，测试 IPv6 出站连接。 | 有 IPv6 地址但无法建立出站连接（收到 AAAA 记录的客户端会卡住） | 无 | 无 |
 | 其他 VPN 的残留（`foreign_vpn`） | 检查 x-ui、Xray、remnanode、hysteria-server 和 `wg-quick@` 的 systemd 单元，VPN 镜像的 Docker 容器，不属于 Mistgate 的 `wg*` 和 `awg*` 接口，以及正在运行的 `xray`、`x-ui` 和 `sing-box` 进程。 | 发现上述任一项 | 其中一项占用了协议配置端口 | 无：是否移除由你决定 |
 | 非 Mistgate 防火墙规则（`foreign_nft`） | 检查不属于 Mistgate 的 nftables 表。此检查无法看到旧式 iptables 规则。 | 外部表包含 nat hook | 外部规则重定向、改写或丢弃协议配置端口或端口跳跃范围的流量 | 无 |
@@ -187,7 +187,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | 清理日志 | `journalctl --vacuum-size=200M --vacuum-time=7d` | 系统日志大小、磁盘空间 |
 | 恢复基线设置 | 重新写入 Mistgate 的 sysctl 文件（`/etc/sysctl.d/90-mistgate.conf`：设置 fq、BBR 和至少 16 MiB 的 UDP 缓冲区最大值）、journald drop-in（`/etc/systemd/journald.conf.d/90-mistgate.conf`：将日志限制为 200 MB）以及 SSH 防护（限制每个地址的新 SSH 连接速率）。 | 网络基线设置 |
 | 重启协议配置 | 重启节点上的一个协议配置，或所有启动失败的协议配置。连接会中断几秒，然后自行恢复。 | 端口占用、证书（自签名） |
-| 修复 DNS 解析器 | 将主机 DNS 解析器指向节点的**此节点的 DNS 服务器**（节点的**出口**标签页）；如果使用的是服务器自身的 DNS 解析器，则改为所在国家的节点默认设置：俄罗斯节点使用 Yandex DNS（`77.88.8.8`、`77.88.8.1`），其他节点使用 `1.1.1.1` 和 `8.8.8.8`。如果使用 systemd-resolved，则写入 drop-in（`/etc/systemd/resolved.conf.d/90-mistgate.conf`）；否则重写 `/etc/resolv.conf`，并将原文件保存为 `/etc/resolv.conf.mistgate.bak`。 | 服务器 DNS 解析 |
+| 修复 DNS 解析器 | 将主机 DNS 解析器指向节点的**此节点的 DNS 服务器**（节点的**出口**标签页）；如果使用的是服务器自身的 DNS 解析器，则改为所在国家的节点默认设置：俄罗斯节点使用 Yandex DNS（`77.88.8.8`、`77.88.8.1`），中国节点使用 AliDNS 和 DNSPod（`223.5.5.5`、`119.29.29.29`），其他节点使用 `1.1.1.1` 和 `8.8.8.8`。如果使用 systemd-resolved，则写入 drop-in（`/etc/systemd/resolved.conf.d/90-mistgate.conf`）；否则重写 `/etc/resolv.conf`，并将原文件保存为 `/etc/resolv.conf.mistgate.bak`。 | 服务器 DNS 解析 |
 | 检查 WARP / 离线时重连 | 立即重新运行 WARP 检查。只有隧道已离线或此次检查达到失败阈值时，才会使用同一账户重新创建已配置的隧道及其路由；否则不会更改任何内容。重连期间，经 WARP 的协议配置可能短暂无法传输流量。如果在点击应用前隧道已恢复，则不会执行任何更改。 | WARP 出口 |
 | 刷新服务单元 | 使用固定的临时 systemd 单元运行已安装的二进制，以写入编译好的单元模板、重新加载 systemd 并重启 Agent。节点身份和状态保持不变；连接可能中断几秒。 | 单元版本；报告 `unit_outdated` 的 AmneziaWG 后端 |
 | 允许 Mistgate 转发流量 | 在主机上每条默认策略为 `DROP` 的 `FORWARD` 链开头添加带标记的接受规则。规则只匹配：从 `mgawg*` 隧道进入的流量（客户端发起的新连接，但不包括去往容器网桥 `docker*` 和 `br-*` 的流量）、经 `mgawg*` 返回的属于客户端已建立连接的流量（不放行指向客户端的新连接；经 WARP 的客户端流量同样被覆盖），以及转发到当前 Mistgate 中继目标的 DNAT 流量（双向）。其他流量仍由主机防火墙处理。防火墙重载后，Agent 会在定期同步时恢复这些规则；节点退役时会删除这些规则。 | AmneziaWG 后端检测到转发流量被丢弃时 |

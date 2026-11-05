@@ -142,7 +142,7 @@ describe("the add-node window", () => {
     expect(input("de1")).not.toBeNull();
     expect(text()).toContain("run the one-time install command on the server yourself");
     expect(text()).toContain("A Let’s Encrypt certificate needs a domain with an A record");
-    expect(text()).toContain("Needed for DNS: on nodes in Russia the panel checks Yandex DNS and Gosuslugi.");
+    expect(text()).toContain("Needed for DNS: on nodes in Russia the panel checks Yandex DNS and Gosuslugi, in China AliDNS, DNSPod and Baidu.");
     await type(input("de1.example.com"), "203.0.113.10");
     expect(text()).toContain("This is an IP, not a domain.");
     expect(text()).toContain("Happ is not verified yet");

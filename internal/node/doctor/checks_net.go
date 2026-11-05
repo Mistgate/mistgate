@@ -20,11 +20,15 @@ import (
 
 // ---------------------------------------------------------------------------------------------------
 // resolver: the resolver does not resolve the control domains; a RU node must ask Yandex DNS or
-// gosuslugi.ru dies. Fix: set_resolver, only when the recommended resolvers answered in this very run.
+// gosuslugi.ru dies, and AliDNS and DNSPod resolve www.baidu.com for a CN node. Fix: set_resolver,
+// only when the recommended resolvers answered in this very run.
 
 var controlDomains = []string{"www.cloudflare.com", "www.gstatic.com", "www.google.com"}
 
-const ruDomain = "gosuslugi.ru"
+var countryDomains = map[string]string{
+	"RU": "gosuslugi.ru",
+	"CN": "www.baidu.com",
+}
 
 // ResolverTargets is what set_resolver configures: the usable (IP, optionally host:port) entries of
 // NodeSettings.dns_resolvers, else the default for the country.
@@ -55,10 +59,10 @@ func dialAddr(s string) (string, bool) {
 
 func checkResolver(ctx context.Context, e *Env) Result {
 	st := e.Settings()
-	ru := strings.EqualFold(st.Country, "RU")
+	domesticDomain := countryDomains[strings.ToUpper(st.Country)]
 	domains := append([]string(nil), controlDomains...)
-	if ru {
-		domains = append(domains, ruDomain)
+	if domesticDomain != "" {
+		domains = append(domains, domesticDomain)
 	}
 	type probe struct {
 		err error
@@ -102,12 +106,12 @@ func checkResolver(ctx context.Context, e *Env) Result {
 
 	var failed []string
 	var lat []time.Duration
-	ruFailed := false
+	domesticFailed := false
 	for i, r := range res {
 		if r.err != nil {
 			failed = append(failed, domains[i])
-			if domains[i] == ruDomain {
-				ruFailed = true
+			if domains[i] == domesticDomain {
+				domesticFailed = true
 			}
 		} else {
 			lat = append(lat, r.d)
@@ -121,7 +125,7 @@ func checkResolver(ctx context.Context, e *Env) Result {
 	r := Result{Status: OK, Code: CodeResolverOK, Params: p("failed", csv(failed), "median_ms", strconv.Itoa(int(median.Milliseconds())), "resolver", recommended,
 		"domains", strconv.Itoa(len(domains)), "failed_count", strconv.Itoa(len(failed)))}
 	switch {
-	case ruFailed || len(failed) >= 2:
+	case domesticFailed || len(failed) >= 2:
 		r.Status = Fail
 	case len(failed) == 1 || median > resolverSlow:
 		r.Status = Warn
