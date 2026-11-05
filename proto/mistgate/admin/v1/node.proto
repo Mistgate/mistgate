@@ -145,6 +145,8 @@ message Node {
   bool user_rate_limit_supported = 34;
   // The IPv6 entry of this node: unset only for a node message that was built without the doctor's view (never in the lists).
   NodeIpv6 ipv6 = 35;
+  // Operator notes for the admin list. Not included in user pages or subscription names.
+  string notes = 36;
 }
 
 // The IPv6 entry: an extra way in for people whose network blocks this node's IPv4 address. It adds one server, "<node> · IPv6",

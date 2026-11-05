@@ -33,7 +33,7 @@ const card = (name: string, status: NodeStatus, over: Over = {}) => ({
   hasMetrics: status === NodeStatus.ONLINE, cpuPct: 7, sparkBytes: Array.from({ length: 24 }, (_, i) => (status === NodeStatus.ONLINE ? 2e8 + i * 3e7 : 0)), ...over,
 });
 const row = (c: ReturnType<typeof card>, over: Over = {}) => ({
-  id: c.id, name: c.name, countryCode: c.countryCode, location: c.location, provider: "examplehost", address: `${c.name}.example.com`, status: c.status, reason: c.reason,
+  id: c.id, name: c.name, countryCode: c.countryCode, location: c.location, provider: "examplehost", notes: "", address: `${c.name}.example.com`, status: c.status, reason: c.reason,
   protocols: c.status === NodeStatus.PENDING ? [] : ["hysteria2", "awg"], online: c.online, trafficTodayBytes: c.status === NodeStatus.ONLINE ? 4.2e9 : 0,
   hasMetrics: c.hasMetrics, cpuPct: 7, ramPct: 40, agentVersion: "0.3.1", uptimeS: 86400 * 3, lastSeenUnix: now, awgBackend: "auto", ...over,
 });
@@ -127,7 +127,11 @@ const problems: Data = {
     ],
     topConsumers: [{ userId: "usr_2", userName: "Артём", nodeId: "nod_de1", nodeName: "de1", downBps: 31_000_000 }],
   }),
-  nodes: fleetCards.map((c) => row(c, c.name === "fi2" ? { address: "fi2-helsinki-long-hostname.example.com" } : {})),
+  nodes: fleetCards.map((c) => row(c, c.name === "de1"
+    ? { notes: "Renew in March.\nBilling account: team@example.com" }
+    : c.name === "fi2"
+      ? { address: "fi2-helsinki-long-hostname.example.com", notes: "Standby node for maintenance. Keep the existing reservation until the replacement is ready.\nReference: " + "0123456789abcdef".repeat(8) }
+      : {})),
   profiles: [
     { id: "prf_1", name: "Hysteria2 · 443", protocol: "hysteria2", nodeCount: 3, userCount: 12 },
     { id: "prf_2", name: "AWG 3.1", protocol: "awg", nodeCount: 2, userCount: 4 },
