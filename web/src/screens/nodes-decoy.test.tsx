@@ -145,17 +145,17 @@ describe("node notes", () => {
 });
 
 describe("node status and metadata", () => {
-  it("pairs the healthy word and dot with the name, without a duplicate status line", async () => {
+  it("says the status once, with one dot, and keeps the notes out of the heading", async () => {
     await mount([node("de1", { notes: "Renew in March", provider: "examplehost" })]);
     const names = [...document.querySelectorAll("b")].filter((b) => b.textContent === "de1");
-    expect(names).toHaveLength(2);
+    expect(names).toHaveLength(2); // a table row and a card
     for (const name of names) {
       const heading = name.parentElement!;
-      expect(heading.textContent).toContain(en["node.status.online"]);
       expect(heading.textContent).toContain("examplehost");
-      expect(heading.querySelectorAll('[aria-hidden="true"]')).toHaveLength(1);
       expect(heading.textContent).not.toContain("Renew in March");
-      expect(heading.parentElement!.textContent!.split(en["node.status.online"])).toHaveLength(2);
+      const view = name.closest("div.relative")!;
+      expect(view.querySelectorAll("span.rounded-full[aria-hidden]")).toHaveLength(1);
+      expect(view.textContent!.split(en["node.status.online"])).toHaveLength(2);
     }
   });
 
@@ -177,9 +177,11 @@ describe("node status and metadata", () => {
     await mount([node("de1")], undefined, [{ nodeId: "nod_de1", state: NodeUpdateState.OUTDATED }]);
     const updates = [...document.querySelectorAll('a[href="/updates"]')];
     expect(updates).toHaveLength(2);
-    expect(updates.every((a) => a.textContent?.includes(en["nodes.agentOld"]) && a.textContent.includes("0.3.1"))).toBe(true);
+    expect(updates.every((a) => a.textContent?.includes("0.3.1"))).toBe(true);
+    // the table's line says the status itself; a card has the word beside the name already
+    expect(updates.map((a) => a.textContent!.replace(/ 0\.3\.1$/, "")).sort()).toEqual([en["nodes.agentOldLine"], en["nodes.agentOld"]].sort());
     for (const update of updates) {
-      expect(update.parentElement!.textContent!.split(en["node.status.online"])).toHaveLength(2);
+      expect(update.closest("div.relative")!.textContent!.split(en["node.status.online"])).toHaveLength(2);
     }
   });
 });

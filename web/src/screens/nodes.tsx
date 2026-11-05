@@ -219,19 +219,21 @@ function Tick({ select, node, className }: { select: Select; node: Node; classNa
 }
 
 /**
- * Details below the node heading; an outdated agent (the Updates module knows by build time, not by version text)
- * adds an amber link to the Updates screen, which says what to do.
+ * The line under a node's name. A table row has only the dot beside the name, so its line says the status too
+ * (`withWord`: the reason, else the word); a card has the word beside the name, so its line is the reason alone. An
+ * outdated agent (the Updates module knows by build time, not by version text) turns the line into an amber link to the
+ * Updates screen, which says what to do.
  */
 function useSub() {
   const t = useT();
   const st = useNodeStatus();
   const older = useOlderNodes();
-  return (n: Node): { text: string; cls: string; update: boolean } => {
+  return (n: Node, withWord: boolean): { text: string; cls: string; update: boolean } => {
     const kind = nodeKind(n);
     if (kind === "ok" && older.has(n.id)) {
-      return { text: `${t("nodes.agentOld")} ${n.agentVersion}`.trim(), cls: kindTextClass.warn, update: true };
+      return { text: `${t(withWord ? "nodes.agentOldLine" : "nodes.agentOld")} ${n.agentVersion}`.trim(), cls: kindTextClass.warn, update: true };
     }
-    return { text: st.reason(n.reason), cls: kindTextClass[kind], update: false };
+    return { text: withWord ? st.line(n) : st.reason(n.reason), cls: kindTextClass[kind], update: false };
   };
 }
 
@@ -294,22 +296,28 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         ))}
       </div>
       {rows.map((n) => {
-        const s = sub(n);
+        const kind = nodeKind(n);
+        const s = sub(n, true);
         return (
           <div
             key={n.id}
             className={cx("relative grid min-h-[60px] items-start gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
           >
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0" />
-            {select && <Tick select={select} node={n} className="mt-0.5" />}
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                <b className="min-w-0 break-all text-sm">{n.name}</b>
-                <span className="min-w-0 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
-                <NodeStatusLabel node={n} />
+            {/* -mt-1.5 instead of the hit area's -m-2 at the top: the 16px box centred on the name's 20px line */}
+            {select && <Tick select={select} node={n} className="-mt-1.5" />}
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex h-5 flex-none items-center">
+                <StatusDot kind={kind} />
+              </span>
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <b className="text-sm">{n.name}</b>
+                  <span className="min-w-0 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
+                </span>
+                <SubLine s={s} className="line-clamp-2 text-xs" />
+                <NodeNotes node={n} className="mt-1" />
               </div>
-              {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
-              <NodeNotes node={n} />
             </div>
             <span title={n.address} className="self-start pt-0.5 font-mono text-xs break-all text-muted">
               {n.address}
@@ -339,8 +347,8 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
   return (
     <div className="flex flex-col gap-2 md:hidden">
       {rows.map((n, i) => {
-        const s = sub(n);
-        const stat = (value: string, label: string, hint?: string) => (
+        const s = sub(n, false);
+        const stat =(value: string, label: string, hint?: string) => (
           <div className="flex min-w-0 flex-col gap-0.5" title={hint}>
             <span className="truncate font-mono text-[15px] font-bold">{value}</span>
             <span className="text-[11px] text-muted">{label}</span>
@@ -349,11 +357,11 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         return (
           <div key={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+            <div className="flex items-center gap-2">
               {select && <Tick select={select} node={n} />}
               <span className="flex h-5 items-center rounded-md bg-surface-2 px-1.5 font-mono text-[10px] font-bold text-muted">{n.countryCode || "—"}</span>
-              <b className="min-w-0 break-all text-[15px]">{n.name}</b>
-              <span className="min-w-0 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
+              <b className="text-[15px]">{n.name}</b>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted">{[n.location || fmt.country(n.countryCode), n.provider].filter(Boolean).join(" · ")}</span>
               <NodeStatusLabel node={n} />
             </div>
             {(n.reason?.code || s.update) && <SubLine s={s} className="line-clamp-2 text-xs" />}
@@ -380,13 +388,14 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
   );
 }
 
-function NodeNotes({ node }: { node: Node }) {
+function NodeNotes({ node, className }: { node: Node; className?: string }) {
   const notes = node.notes?.trim();
   if (!notes) return null;
-  // Above the row link: only the notes show this title, and clicking them still opens the node.
+  // Above the row link: only the notes show this title, and clicking them still opens the node. The icon's own
+  // flex-none is replaced by a className, so shrink-0 keeps long notes from squeezing it to a dot.
   return (
-    <Link to="/nodes/$id" params={{ id: node.id }} title={notes} tabIndex={-1} className="relative z-10 flex w-fit min-w-0 max-w-full items-start gap-1.5 border-s-2 border-line ps-2 text-xs text-muted">
-      <Icon name="text" size={12} className="mt-0.5 text-faint" />
+    <Link to="/nodes/$id" params={{ id: node.id }} title={notes} tabIndex={-1} className={cx("relative z-10 flex w-fit min-w-0 max-w-full items-start gap-1.5 border-s-2 border-line ps-2 text-xs text-muted", className)}>
+      <Icon name="text" size={12} className="mt-0.5 shrink-0 text-faint" />
       <p className="line-clamp-2 whitespace-pre-line break-words">{notes}</p>
     </Link>
   );
