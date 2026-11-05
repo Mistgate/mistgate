@@ -75,6 +75,12 @@ beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
+// Every test here mounts the whole People screen (50 rows with tick boxes) and drives menus and windows through many act()
+// turns: 1 to 3 s on an idle machine, so the default 5 s is only a 2x margin. Under load a test timed out, and its body kept
+// running on the shared document and root, which made the following tests fail at press() with "expected undefined to be
+// truthy". A roomy limit for this file only; a test that really hangs still fails, just later.
+vi.setConfig({ testTimeout: 30_000 });
+
 const NOW = Math.floor(Date.now() / 1000);
 const pad = (i: number) => String(i).padStart(4, "0");
 /** Made-up people p0000, p0001…: every 10th is off, every 7th (from 3) expired, every 5th without access, every 4th has no expiry, every 3rd used nothing, every 6th never connected. */
