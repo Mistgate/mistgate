@@ -388,6 +388,7 @@ enum AuditSource {
   AUDIT_SOURCE_BOT = 2;
   AUDIT_SOURCE_MCP = 3;
   AUDIT_SOURCE_API = 4;
+  AUDIT_SOURCE_ASSISTANT = 5;
 }
 
 message AuditEntry {

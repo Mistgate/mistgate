@@ -54,3 +54,9 @@ func scrub(s string) string { return scrubWith(textScrubbers, s) }
 
 // scrubJSON is the last pass over a serialised result.
 func scrubJSON(s string) string { return scrubWith(jsonScrubbers, s) }
+
+// ScrubText applies the MCP result scrubbers to untrusted context the assistant sends to a provider.
+func ScrubText(s string) string { return scrub(s) }
+
+// ScrubJSON applies the final serialized-result scrubbers to assistant tool output.
+func ScrubJSON(s string) string { return scrubJSON(s) }

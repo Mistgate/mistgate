@@ -316,7 +316,15 @@ func (e *env) createPlan(c *call, tool string, params []byte, reason string, pl 
 
 func (e *env) audit(c *call, action string, params map[string]any, result string) {
 	if e.cfg.Audit != nil {
-		e.cfg.Audit(context.WithoutCancel(c.ctx), AuditEntry{Actor: "mcp:" + c.tokenID, Action: action, Params: params, Result: result})
+		actor, source := "mcp:"+c.tokenID, "mcp"
+		if c.assistant != nil {
+			actor = "Assistant of " + c.assistant.AdminName
+			if c.assistant.AdminName == "" {
+				actor = "Assistant of " + c.assistant.AdminID
+			}
+			source = "assistant"
+		}
+		e.cfg.Audit(context.WithoutCancel(c.ctx), AuditEntry{Actor: actor, Action: action, Params: params, Result: result, Source: source})
 	}
 }
 

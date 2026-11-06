@@ -28,6 +28,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/app"
+	"github.com/mistgate/mistgate/internal/panel/assistant"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/backup"
 	"github.com/mistgate/mistgate/internal/panel/bsbord"
@@ -105,6 +106,42 @@ func TestRestoreValidatesProductionSealedValues(t *testing.T) {
 	}
 	owner := store.Admin{ID: created.Msg.Admin.Id, DisplayName: created.Msg.Admin.DisplayName, Role: store.RoleOwner}
 	ctx = auth.WithAdmin(ctx, owner)
+
+	// Assistant values use the shared record-specific AAD helpers consumed by restore validation.
+	assistantNow := time.Now().UTC()
+	assistantToken, err := st.EnsureAssistantToken(ctx, owner.ID, store.ProfileAdmin, assistantNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := adminv1.AssistantProvider_ASSISTANT_PROVIDER_ANTHROPIC
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_provider(provider,key_enc,key_hint,added_at,model,budget_usd) VALUES(?,?,?,?,?,?)`,
+		int32(provider), vlt.Seal([]byte("golden assistant provider key"), assistant.ProviderKeyAAD(provider)), "r-key", assistantNow.Unix(), "claude-opus-5-5", 20); err != nil {
+		t.Fatal(err)
+	}
+	conversationID := "cnv_golden_assistant"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_conversation(id,admin_id,title_enc,summary_enc,created_at,updated_at,segment) VALUES(?,?,?,?,?,?,0)`,
+		conversationID, owner.ID,
+		vlt.Seal([]byte("Golden Assistant"), assistant.ConversationTitleAAD(conversationID)),
+		vlt.Seal([]byte("Golden assistant summary"), assistant.ConversationSummaryAAD(conversationID)), assistantNow.Unix(), assistantNow.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	messageID := "msg_golden_assistant"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_message(id,conversation_id,admin_id,role,segment,body_enc,created_at) VALUES(?,?,?,'assistant',0,?,?)`,
+		messageID, conversationID, owner.ID, vlt.Seal([]byte(`{"text":"golden assistant transcript"}`), assistant.MessageAAD(messageID)), assistantNow.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	assistantPlanID := "pln_golden_assistant"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_plan(id,conversation_id,admin_id,token_id,tool,confirm_enc,card_enc,inbox_only,state,created_at,expires_at,updated_at) VALUES(?,?,?,?,?,?,?,0,'proposed',?,?,?)`,
+		assistantPlanID, conversationID, owner.ID, assistantToken.ID, "user_disable",
+		vlt.Seal([]byte("golden assistant confirm"), assistant.PlanConfirmAAD(assistantPlanID)),
+		vlt.Seal([]byte(`{"summary":"golden plan card"}`), assistant.PlanCardAAD(assistantPlanID)), assistantNow.Unix(), assistantNow.Add(10*time.Minute).Unix(), assistantNow.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	memoryID := "mem_golden_assistant"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_memory(id,admin_id,text_enc,by_assistant,conversation_id,created_at,updated_at) VALUES(?,?,?,1,?,?,?)`,
+		memoryID, owner.ID, vlt.Seal([]byte("golden assistant memory"), assistant.MemoryAAD(memoryID)), conversationID, assistantNow.Unix(), assistantNow.Unix()); err != nil {
+		t.Fatal(err)
+	}
 
 	authPath, authHandler := authSvc.Handler()
 	authMux := http.NewServeMux()
@@ -382,28 +419,35 @@ func TestRestoreValidatesProductionSealedValues(t *testing.T) {
 
 	// Fail with the registry label if any expected production row was not created.
 	for name, query := range map[string]string{
-		"admin_password TOTP":           "SELECT count(*) FROM admin_password WHERE length(totp_secret) > 0",
-		"panel CA":                      "SELECT count(*) FROM panel_ca WHERE length(key_enc) > 0",
-		"profile secrets":               "SELECT count(*) FROM profile WHERE secrets_enc IS NOT NULL AND length(secrets_enc) > 0",
-		"user subscription token":       "SELECT count(*) FROM user WHERE length(sub_token_enc) > 0",
-		"subscription link device":      "SELECT count(*) FROM device WHERE kind = 'link'",
-		"AWG device":                    "SELECT count(*) FROM device WHERE kind = 'key'",
-		"device credentials":            "SELECT count(*) FROM device_credential WHERE length(secret_enc) > 0",
-		"AWG inbound plugin state":      "SELECT count(*) FROM inbound WHERE length(plugin_state_enc) > 0",
-		"retained AWG key":              "SELECT count(*) FROM awg_retained_key WHERE length(state_enc) > 0",
-		"health probe credential":       "SELECT count(*) FROM health_probe_cred WHERE length(secret_enc) > 0",
-		"node provisioning credentials": "SELECT count(*) FROM node_provision_job WHERE length(secret) > 0",
-		"node SSH password":             "SELECT count(*) FROM node_server_access WHERE length(password) > 0",
-		"pending node SSH password":     "SELECT count(*) FROM node_server_access WHERE pending_password IS NOT NULL AND length(pending_password) > 0",
-		"MCP plan owner secret":         "SELECT count(*) FROM mcp_plan WHERE owner_secret IS NOT NULL AND length(owner_secret) > 0",
-		"Telegram bot token":            "SELECT count(*) FROM telegram_bot WHERE length(token) > 0",
-		"pending auth ceremony TOTP":    "SELECT count(*) FROM auth_ceremony WHERE length(totp_enc) > 0",
-		"panel SSH key":                 "SELECT count(*) FROM panel_ssh_key WHERE length(private_key) > 0",
-		"panel backup secret":           "SELECT count(*) FROM panel_backup_settings WHERE length(secret_access_key) > 0",
-		"Turnstile secret setting":      "SELECT count(*) FROM setting WHERE k = 'turnstile_secret' AND length(v) > 0",
-		"Globalping token setting":      "SELECT count(*) FROM setting WHERE k = 'globalping.token' AND length(v) > 0",
-		"Cheburcheck token setting":     "SELECT count(*) FROM setting WHERE k = 'cheburcheck.token' AND length(v) > 0",
-		"Bsbord key setting":            "SELECT count(*) FROM setting WHERE k = 'bsbord.key' AND length(v) > 0",
+		"admin_password TOTP":            "SELECT count(*) FROM admin_password WHERE length(totp_secret) > 0",
+		"panel CA":                       "SELECT count(*) FROM panel_ca WHERE length(key_enc) > 0",
+		"profile secrets":                "SELECT count(*) FROM profile WHERE secrets_enc IS NOT NULL AND length(secrets_enc) > 0",
+		"user subscription token":        "SELECT count(*) FROM user WHERE length(sub_token_enc) > 0",
+		"subscription link device":       "SELECT count(*) FROM device WHERE kind = 'link'",
+		"AWG device":                     "SELECT count(*) FROM device WHERE kind = 'key'",
+		"device credentials":             "SELECT count(*) FROM device_credential WHERE length(secret_enc) > 0",
+		"AWG inbound plugin state":       "SELECT count(*) FROM inbound WHERE length(plugin_state_enc) > 0",
+		"retained AWG key":               "SELECT count(*) FROM awg_retained_key WHERE length(state_enc) > 0",
+		"health probe credential":        "SELECT count(*) FROM health_probe_cred WHERE length(secret_enc) > 0",
+		"node provisioning credentials":  "SELECT count(*) FROM node_provision_job WHERE length(secret) > 0",
+		"node SSH password":              "SELECT count(*) FROM node_server_access WHERE length(password) > 0",
+		"pending node SSH password":      "SELECT count(*) FROM node_server_access WHERE pending_password IS NOT NULL AND length(pending_password) > 0",
+		"MCP plan owner secret":          "SELECT count(*) FROM mcp_plan WHERE owner_secret IS NOT NULL AND length(owner_secret) > 0",
+		"Telegram bot token":             "SELECT count(*) FROM telegram_bot WHERE length(token) > 0",
+		"pending auth ceremony TOTP":     "SELECT count(*) FROM auth_ceremony WHERE length(totp_enc) > 0",
+		"panel SSH key":                  "SELECT count(*) FROM panel_ssh_key WHERE length(private_key) > 0",
+		"panel backup secret":            "SELECT count(*) FROM panel_backup_settings WHERE length(secret_access_key) > 0",
+		"assistant provider key":         "SELECT count(*) FROM assistant_provider WHERE length(key_enc) > 0",
+		"assistant conversation title":   "SELECT count(*) FROM assistant_conversation WHERE length(title_enc) > 0",
+		"assistant conversation summary": "SELECT count(*) FROM assistant_conversation WHERE length(summary_enc) > 0",
+		"assistant message transcript":   "SELECT count(*) FROM assistant_message WHERE length(body_enc) > 0",
+		"assistant plan confirmation":    "SELECT count(*) FROM assistant_plan WHERE length(confirm_enc) > 0",
+		"assistant plan card":            "SELECT count(*) FROM assistant_plan WHERE length(card_enc) > 0",
+		"assistant memory note":          "SELECT count(*) FROM assistant_memory WHERE length(text_enc) > 0",
+		"Turnstile secret setting":       "SELECT count(*) FROM setting WHERE k = 'turnstile_secret' AND length(v) > 0",
+		"Globalping token setting":       "SELECT count(*) FROM setting WHERE k = 'globalping.token' AND length(v) > 0",
+		"Cheburcheck token setting":      "SELECT count(*) FROM setting WHERE k = 'cheburcheck.token' AND length(v) > 0",
+		"Bsbord key setting":             "SELECT count(*) FROM setting WHERE k = 'bsbord.key' AND length(v) > 0",
 	} {
 		var count int
 		if err := st.R.QueryRowContext(ctx, query).Scan(&count); err != nil {

@@ -111,6 +111,7 @@ type AuditEntry struct {
 	Action string // "mcp_plan", "mcp_apply"
 	Params map[string]any
 	Result string // "ok" | "fail"
+	Source string // AuditMCP for external tools; AuditAssistant for assistant calls.
 }
 
 // Config wires the MCP layer.

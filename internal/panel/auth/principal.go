@@ -22,6 +22,8 @@ const (
 	ChannelAPI Channel = "api"
 	// ChannelMCP is a call the MCP layer makes in process on behalf of an agent.
 	ChannelMCP Channel = "mcp"
+	// ChannelAssistant is the in-process MCP call made for a signed-in assistant turn.
+	ChannelAssistant Channel = "assistant"
 )
 
 // Principal describes the token behind a request. The zero value is a signed-in admin (a cookie session).
@@ -32,10 +34,14 @@ type Principal struct {
 	Channel   Channel
 	Name      string    // the token's name
 	ExpiresAt time.Time // when the token stops working
+	Assistant bool      // a hidden per-admin identity; never accepted from bearer auth
 }
 
 // ActorID is the id the audit log shows for the principal: "token:<id>" for the API channel, "mcp:<id>" for MCP.
 func (p Principal) ActorID() string {
+	if p.Assistant && p.Name != "" {
+		return p.Name
+	}
 	if p.Channel == ChannelMCP {
 		return "mcp:" + p.TokenID
 	}
@@ -67,7 +73,7 @@ func channelFrom(ctx context.Context) Channel {
 // request already paid it). The token is still verified against the database on every call. Only ChannelMCP
 // has an effect, and only code that holds the context can set it: a network request cannot.
 func WithChannel(ctx context.Context, c Channel) context.Context {
-	if c != ChannelMCP {
+	if c != ChannelMCP && c != ChannelAssistant {
 		return ctx
 	}
 	return context.WithValue(ctx, channelKey{}, c)

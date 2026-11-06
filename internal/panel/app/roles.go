@@ -64,6 +64,7 @@ func Build(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
+	k.newAssistantService()
 	c = k.c
 	parts := k.base.newSubParts(true)
 	prov, bkp, err := k.provisionAndBackup()
@@ -88,6 +89,7 @@ func BuildAdmin(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
+	k.newAssistantService()
 	parts := k.base.newSubParts(true)
 	prov, bkp, err := k.provisionAndBackup()
 	if err != nil {
@@ -150,6 +152,7 @@ func BuildJobs(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
+	k.assistantRetention = assistantRetentionFunc(k.st.AssistantRetention)
 	return k.panel(), nil
 }
 
@@ -232,6 +235,10 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	}
 	// API tokens and the owner's approvals, then the MCP endpoint over the same admin API.
 	cfg.AdminHandlers = append(cfg.AdminHandlers, integrationHandlers(k.authSvc)...)
+	if path, handler := k.assistantHandler(); path != "" {
+		cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
+	}
+	cfg.AdminAPIReady = func(api http.Handler) { k.attachAssistantRuntime(api) }
 	cfg.AdminPages = []httpserver.AdminPage{{Path: nodeprovision.AdminPagePath, Handler: forwardPage(forward, prov.PageHandler())}}
 	cfg.MCP = mcpEndpoint(k.authSvc, k.st, k.log, k.tg.PlanWaiting, k.c.Clock)
 	// The admin's framed preview of the public user page (session and read role are checked by the server).
@@ -297,7 +304,7 @@ func (k *core) finish(cfg httpserver.Config, prov *nodeprovision.Service, bkp *b
 	p.Handler, p.Server, p.Provision, p.Backup, p.Surface = srv.Public(), srv, prov, bkp, surfaceOf(cfg)
 	if jobs {
 		p.BackgroundJobs = backgroundJobs(k.c, jobServices{fleet: k.fl, access: k.acc, health: k.hl, blocklist: k.bl, probe: k.cp,
-			cheburcheck: k.cc, bsbord: k.bs, update: k.upd, backup: bkp, telegram: k.tg, provision: prov, store: k.st, log: k.log})
+			cheburcheck: k.cc, bsbord: k.bs, update: k.upd, backup: bkp, telegram: k.tg, assistant: k.assistantRetention, provision: prov, store: k.st, log: k.log})
 	}
 	return p, nil
 }

@@ -288,6 +288,26 @@ var procedureLevels = map[string]level{
 	adminv1connect.UserServiceIssueTelegramKeyProcedure:    levelWrite, // like the AmneziaVPN key calls: the key is a user credential
 	adminv1connect.UserServiceRotateTelegramKeyProcedure:   levelWrite,
 	adminv1connect.UserServiceRevokeTelegramKeyProcedure:   levelWrite,
+
+	// AssistantService is a signed-in UI surface only; token access is deliberately absent from policy_tokens.go.
+	adminv1connect.AssistantServiceGetAssistantAccessProcedure:      levelRead,
+	adminv1connect.AssistantServiceGetAssistantSettingsProcedure:    levelOwner,
+	adminv1connect.AssistantServiceUpdateAssistantSettingsProcedure: levelOwner,
+	adminv1connect.AssistantServiceSetProviderKeyProcedure:          levelOwner,
+	adminv1connect.AssistantServiceRemoveProviderKeyProcedure:       levelOwner,
+	adminv1connect.AssistantServiceListProviderModelsProcedure:      levelOwner,
+	adminv1connect.AssistantServiceListConversationsProcedure:       levelRead,
+	adminv1connect.AssistantServiceGetConversationProcedure:         levelRead,
+	adminv1connect.AssistantServiceDeleteConversationProcedure:      levelRead,
+	adminv1connect.AssistantServiceDeleteAllConversationsProcedure:  levelRead,
+	adminv1connect.AssistantServiceChatProcedure:                    levelRead,
+	adminv1connect.AssistantServiceStopTurnProcedure:                levelRead,
+	adminv1connect.AssistantServiceApplyPlanProcedure:               levelRead,
+	adminv1connect.AssistantServiceDismissPlanProcedure:             levelRead,
+	adminv1connect.AssistantServiceListMemoryProcedure:              levelRead,
+	adminv1connect.AssistantServiceSaveMemoryProcedure:              levelRead,
+	adminv1connect.AssistantServiceDeleteMemoryProcedure:            levelRead,
+	adminv1connect.AssistantServiceForgetAllProcedure:               levelRead,
 }
 
 // levelOf is the level a procedure path needs; unknown paths need the owner.

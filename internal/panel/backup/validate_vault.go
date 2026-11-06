@@ -8,7 +8,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/assistant"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
@@ -86,6 +89,30 @@ var restoredSealedValueQueries = []sealedValueQuery{
 	// panel_backup_settings.secret_access_key is sealed with secretRecordID; see backup.rpc.UpdateBackupSettings in backup/service.go.
 	{description: "panel backup secret", table: "panel_backup_settings", columns: []string{"secret_access_key"},
 		query: "SELECT secret_access_key, 'panel_backup_settings.secret_access_key' FROM panel_backup_settings WHERE length(secret_access_key) > 0"},
+	// Assistant provider keys are sealed to the stable provider id; user content uses record-specific AAD helpers.
+	{description: "assistant provider key", table: "assistant_provider", columns: []string{"key_enc", "provider"}, aadParts: 1,
+		aadFrom: func(parts ...string) string {
+			provider, _ := strconv.Atoi(parts[0])
+			return assistant.ProviderKeyAAD(adminv1.AssistantProvider(provider))
+		}, query: "SELECT key_enc, provider FROM assistant_provider WHERE length(key_enc) > 0"},
+	{description: "assistant conversation title", table: "assistant_conversation", columns: []string{"title_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.ConversationTitleAAD(parts[0]) },
+		query:   "SELECT title_enc, id FROM assistant_conversation WHERE length(title_enc) > 0"},
+	{description: "assistant conversation summary", table: "assistant_conversation", columns: []string{"summary_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.ConversationSummaryAAD(parts[0]) },
+		query:   "SELECT summary_enc, id FROM assistant_conversation WHERE length(summary_enc) > 0"},
+	{description: "assistant message transcript", table: "assistant_message", columns: []string{"body_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.MessageAAD(parts[0]) },
+		query:   "SELECT body_enc, id FROM assistant_message WHERE length(body_enc) > 0"},
+	{description: "assistant plan confirmation", table: "assistant_plan", columns: []string{"confirm_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.PlanConfirmAAD(parts[0]) },
+		query:   "SELECT confirm_enc, id FROM assistant_plan WHERE length(confirm_enc) > 0"},
+	{description: "assistant plan card", table: "assistant_plan", columns: []string{"card_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.PlanCardAAD(parts[0]) },
+		query:   "SELECT card_enc, id FROM assistant_plan WHERE length(card_enc) > 0"},
+	{description: "assistant memory note", table: "assistant_memory", columns: []string{"text_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.MemoryAAD(parts[0]) },
+		query:   "SELECT text_enc, id FROM assistant_memory WHERE length(text_enc) > 0"},
 }
 
 var restoredSealedSettingKeys = []struct {

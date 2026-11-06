@@ -184,6 +184,8 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.AuthServiceBeginTotpEnrollmentProcedure:    true,
 	adminv1connect.AuthServiceUpdateSecuritySettingsProcedure: true, // the login captcha (turnstile.go)
 	adminv1connect.UserServiceDeleteUsersProcedure:            true,
+	adminv1connect.AssistantServiceSetProviderKeyProcedure:    true,
+	adminv1connect.AssistantServiceRemoveProviderKeyProcedure: true,
 }
 
 // grantProcedures says which procedures the approved plan of an MCP tool may open with its grant: the grant of

@@ -24,6 +24,17 @@ const maxApprovalIDLen = 64
 
 type approvalRPC struct{ s *Service }
 
+// ApproveAssistantMCPPlan is the same awaiting -> approved operation used by ApprovalService.Approve, for the
+// AssistantService's human-click path. Its caller must have checked the signed-in owner and RequireStepUp first.
+func (s *Service) ApproveAssistantMCPPlan(ctx context.Context, id string, admin store.Admin) (store.MCPPlan, error) {
+	p, err := s.st.DecideMCPPlan(ctx, id, admin.ID, true, s.now())
+	if err != nil {
+		return store.MCPPlan{}, err
+	}
+	s.audit(ctx, admin.ID, "approval_approve", "ok", ClientIPFrom(ctx), map[string]any{"plan_id": p.ID, "tool": p.Tool, "token_id": p.TokenID})
+	return p, nil
+}
+
 // ApprovalHandler returns the Connect path prefix and the handler of ApprovalService. Mount it behind
 // RequireSession.
 func (s *Service) ApprovalHandler() (string, http.Handler) {

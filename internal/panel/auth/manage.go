@@ -266,10 +266,11 @@ var (
 )
 
 var auditSources = map[adminv1.AuditSource]string{
-	adminv1.AuditSource_AUDIT_SOURCE_PANEL: store.AuditPanel,
-	adminv1.AuditSource_AUDIT_SOURCE_BOT:   store.AuditBot,
-	adminv1.AuditSource_AUDIT_SOURCE_MCP:   store.AuditMCP,
-	adminv1.AuditSource_AUDIT_SOURCE_API:   store.AuditAPI,
+	adminv1.AuditSource_AUDIT_SOURCE_PANEL:     store.AuditPanel,
+	adminv1.AuditSource_AUDIT_SOURCE_BOT:       store.AuditBot,
+	adminv1.AuditSource_AUDIT_SOURCE_MCP:       store.AuditMCP,
+	adminv1.AuditSource_AUDIT_SOURCE_API:       store.AuditAPI,
+	adminv1.AuditSource_AUDIT_SOURCE_ASSISTANT: store.AuditAssistant,
 }
 
 // ListAudit pages through the audit log (owner only), optionally for one source.

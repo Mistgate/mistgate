@@ -99,6 +99,10 @@ func ActorLabel(ctx context.Context) string {
 func (s *Service) RequireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = s.WithClientIP(r)
+		if assistant, ok := assistantIdentityFrom(r.Context()); ok {
+			s.serveAssistant(w, r, next, assistant)
+			return
+		}
 		if publicProcedures[r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return

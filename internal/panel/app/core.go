@@ -187,20 +187,22 @@ func (p subParts) mux(b base, acc *access.Service) http.Handler {
 // Only the public Worker does without it: it builds the fleet and access it needs on their own.
 type core struct {
 	base
-	authSvc *auth.Service
-	tg      *telegram.Service
-	fl      *fleet.Fleet
-	acc     *access.Service
-	cr      *countryreach.Service
-	gp      *globalping.Service
-	cc      *cheburcheck.Service
-	bs      *bsbord.Service
-	bl      *blocklist.Service
-	cp      *countryprobe.Service
-	hl      *health.Service
-	upd     *update.Service
-	wsv     *warp.Service
-	desired func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)
+	authSvc            *auth.Service
+	tg                 *telegram.Service
+	fl                 *fleet.Fleet
+	acc                *access.Service
+	cr                 *countryreach.Service
+	gp                 *globalping.Service
+	cc                 *cheburcheck.Service
+	bs                 *bsbord.Service
+	bl                 *blocklist.Service
+	cp                 *countryprobe.Service
+	hl                 *health.Service
+	upd                *update.Service
+	wsv                *warp.Service
+	asst               assistantRPC
+	assistantRetention assistantRetention
+	desired            func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)
 }
 
 // wireCore builds the telegram alerts, the fleet, access, Globalping and the health module, the node-agent updates and WARP,
@@ -422,5 +424,6 @@ func (k *core) panel() *Panel {
 	return &Panel{
 		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Cheburcheck: k.cc, Bsbord: k.bs, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
+		Assistant:     k.assistantRetention,
 	}
 }

@@ -184,6 +184,9 @@ func (s *Service) auditCall(ctx context.Context, p Principal, path string, statu
 	if p.Channel == ChannelMCP {
 		e.Source = store.AuditMCP
 	}
+	if p.Assistant {
+		e.Source = store.AuditAssistant
+	}
 	if ip.IsValid() {
 		e.IP = ip.String()
 	}

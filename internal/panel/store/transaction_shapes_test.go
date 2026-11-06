@@ -48,6 +48,10 @@ var transactionShape1 = map[string]string{
 	"telegram.go:ClearTelegramBot":                   "Deletes links, pending link codes, and the bot as one fixed batch.",
 	"telegram.go:UnlinkTelegram":                     "Deletes the chat link and pending link code as one fixed batch.",
 	"token.go:RevokeAPIToken":                        "Revokes the token and cancels its open plans in one fixed batch.",
+	"assistant.go:DeleteAssistantConversation":       "A fixed batch deletes a conversation's plan, message, and parent rows together.",
+	"assistant.go:DeleteAssistantConversations":      "A fixed batch deletes selected conversations and their plan and message rows together.",
+	"assistant.go:RetainAssistantConversations":      "A fixed batch deletes expired conversations and their plan and message rows together.",
+	"assistant.go:SaveAssistantSettings":             "Provider choices and shared assistant settings are saved in one batch.",
 }
 
 var transactionShape2 = map[string]string{

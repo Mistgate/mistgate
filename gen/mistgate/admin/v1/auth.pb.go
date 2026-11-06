@@ -132,6 +132,7 @@ const (
 	AuditSource_AUDIT_SOURCE_BOT         AuditSource = 2
 	AuditSource_AUDIT_SOURCE_MCP         AuditSource = 3
 	AuditSource_AUDIT_SOURCE_API         AuditSource = 4
+	AuditSource_AUDIT_SOURCE_ASSISTANT   AuditSource = 5
 )
 
 // Enum value maps for AuditSource.
@@ -142,6 +143,7 @@ var (
 		2: "AUDIT_SOURCE_BOT",
 		3: "AUDIT_SOURCE_MCP",
 		4: "AUDIT_SOURCE_API",
+		5: "AUDIT_SOURCE_ASSISTANT",
 	}
 	AuditSource_value = map[string]int32{
 		"AUDIT_SOURCE_UNSPECIFIED": 0,
@@ -149,6 +151,7 @@ var (
 		"AUDIT_SOURCE_BOT":         2,
 		"AUDIT_SOURCE_MCP":         3,
 		"AUDIT_SOURCE_API":         4,
+		"AUDIT_SOURCE_ASSISTANT":   5,
 	}
 )
 
@@ -3458,13 +3461,14 @@ const file_mistgate_admin_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"ROLE_OWNER\x10\x01\x12\x0f\n" +
 	"\vROLE_HELPER\x10\x02\x12\x11\n" +
-	"\rROLE_READONLY\x10\x03*\x85\x01\n" +
+	"\rROLE_READONLY\x10\x03*\xa1\x01\n" +
 	"\vAuditSource\x12\x1c\n" +
 	"\x18AUDIT_SOURCE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12AUDIT_SOURCE_PANEL\x10\x01\x12\x14\n" +
 	"\x10AUDIT_SOURCE_BOT\x10\x02\x12\x14\n" +
 	"\x10AUDIT_SOURCE_MCP\x10\x03\x12\x14\n" +
-	"\x10AUDIT_SOURCE_API\x10\x04*p\n" +
+	"\x10AUDIT_SOURCE_API\x10\x04\x12\x1a\n" +
+	"\x16AUDIT_SOURCE_ASSISTANT\x10\x05*p\n" +
 	"\tAuditKind\x12\x1a\n" +
 	"\x16AUDIT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12AUDIT_KIND_SIGN_IN\x10\x01\x12\x16\n" +

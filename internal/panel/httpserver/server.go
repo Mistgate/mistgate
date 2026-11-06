@@ -116,6 +116,9 @@ type Config struct {
 	// on the admin surface (behind the secret prefix, host or separate listener): never on the decoy side, the public mounts
 	// or the agent endpoint. The handler authenticates its own requests (a bearer token, never a cookie). nil: no endpoint.
 	MCP func(api http.Handler) http.Handler
+	// AdminAPIReady is called with the authenticated in-process API after all handlers have been registered. Internal
+	// services that act through the same API can bind here without depending on the HTTP listener.
+	AdminAPIReady func(api http.Handler)
 }
 
 // mcpWriteWindow is how long an MCP call may take to answer: longer than the listener's write timeout, because a plan that
@@ -295,8 +298,12 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 		s.pages[page.Path+"/"] = protected
 	}
 	s.logo = NewLogoHandler(st, cfg.Log)
+	protectedAPI := a.RequireSession(s.api)
+	if cfg.AdminAPIReady != nil {
+		cfg.AdminAPIReady(protectedAPI)
+	}
 	if cfg.MCP != nil {
-		s.mcp = cfg.MCP(a.RequireSession(s.api))
+		s.mcp = cfg.MCP(protectedAPI)
 	}
 	if cfg.UserPagePreview != nil {
 		s.preview = s.requireLinkAccess(http.HandlerFunc(s.servePreview))

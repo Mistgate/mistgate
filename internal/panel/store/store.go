@@ -78,29 +78,42 @@ type AuditEntry struct {
 	Action string
 	Params string // JSON object without secrets; "" means {}
 	Result string
-	Source string // AuditPanel (default), AuditBot, AuditMCP or AuditAPI
+	Source string // AuditPanel (default), AuditBot, AuditMCP, AuditAPI or AuditAssistant
 	IP     string // client address the action came from, "" if none
 }
 
 // Audit sources, the values of audit.source.
 const (
-	AuditPanel = "panel"
-	AuditBot   = "bot"
-	AuditMCP   = "mcp"
-	AuditAPI   = "api"
+	AuditPanel     = "panel"
+	AuditBot       = "bot"
+	AuditMCP       = "mcp"
+	AuditAPI       = "api"
+	AuditAssistant = "assistant"
 )
 
 type auditSourceKey struct{}
+type auditActorKey struct{}
+
+type auditActorOverride struct{ adminID, actor string }
 
 // WithAuditSource returns ctx marking every audit row written with it, whose entry names no source, as coming
 // from source (AuditAPI or AuditMCP: a call made with an API token). Modules pass the request context to Audit,
 // so their rows carry the source of the call without knowing about tokens. An unknown source is ignored.
 func WithAuditSource(ctx context.Context, source string) context.Context {
 	switch source {
-	case AuditPanel, AuditBot, AuditMCP, AuditAPI:
+	case AuditPanel, AuditBot, AuditMCP, AuditAPI, AuditAssistant:
 		return context.WithValue(ctx, auditSourceKey{}, source)
 	}
 	return ctx
+}
+
+// WithAuditActor replaces a signed-in admin's id with the named in-process actor in audit rows. It is set only by the
+// assistant's trusted MCP bridge and leaves domain writes using the actual admin id.
+func WithAuditActor(ctx context.Context, adminID, actor string) context.Context {
+	if adminID == "" || actor == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, auditActorKey{}, auditActorOverride{adminID: adminID, actor: actor})
 }
 
 // Audit appends a row to the audit log. An entry without a Source takes the one of WithAuditSource, else AuditPanel.
@@ -110,6 +123,9 @@ func (s *Store) Audit(ctx context.Context, now time.Time, e AuditEntry) error {
 	}
 	if e.Source == "" {
 		e.Source, _ = ctx.Value(auditSourceKey{}).(string)
+	}
+	if override, ok := ctx.Value(auditActorKey{}).(auditActorOverride); ok && e.Actor == override.adminID {
+		e.Actor = override.actor
 	}
 	if e.Source == "" {
 		e.Source = AuditPanel

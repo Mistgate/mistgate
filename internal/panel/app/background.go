@@ -11,6 +11,20 @@ import (
 func backgroundJobs(c Config, s jobServices) []BackgroundJob {
 	jobs := mcpBackgroundJobs(s.store, s.log, c.Clock)
 	jobs = append(jobs, []BackgroundJob{
+		{Name: "assistant-retention", Run: func(ctx context.Context) {
+			t := time.NewTicker(24 * time.Hour)
+			defer t.Stop()
+			for ctx.Err() == nil {
+				if err := s.assistant.Retention(ctx, c.Clock()); err != nil && ctx.Err() == nil {
+					s.log.Warn("assistant retention", "err", err)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+				}
+			}
+		}},
 		{Name: "fleet", Run: func(ctx context.Context) { _ = s.fleet.Run(ctx) }},
 		{Name: "access", Run: s.access.Run},
 		{Name: "health", Run: s.health.Run},

@@ -21,15 +21,16 @@ const (
 )
 
 var edgeTickJobs = map[string]string{
-	"access":      "user status sweep every tick",
-	"fleet":       "node-down sweep every tick and desired-state safety net every 10 minutes",
-	"health":      "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
-	"blocklist":   "the block-list check of the country check, when one is due (one setting read while it is off)",
-	"cheburcheck": "one due cheburcheck source and node per tick; off means no site request",
-	"bsbord":      "one previewed, capped mobile reachability request when a round is due; off means no site request",
-	"provision":   "wakes the Provisioner every tick while an install is queued, running or being cancelled",
-	"telegram":    "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
-	"updates":     "advances the edge node rollout and scheduled update state machines",
+	"access":              "user status sweep every tick",
+	"fleet":               "node-down sweep every tick and desired-state safety net every 10 minutes",
+	"health":              "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
+	"blocklist":           "the block-list check of the country check, when one is due (one setting read while it is off)",
+	"cheburcheck":         "one due cheburcheck source and node per tick; off means no site request",
+	"bsbord":              "one previewed, capped mobile reachability request when a round is due; off means no site request",
+	"provision":           "wakes the Provisioner every tick while an install is queued, running or being cancelled",
+	"telegram":            "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
+	"updates":             "advances the edge node rollout and scheduled update state machines",
+	"assistant-retention": "deletes expired assistant conversations once daily at 03:17 UTC",
 }
 
 // edgeDeferred describes background-job functions that stay VPS-only; a job can also have an edge phase above.
@@ -75,6 +76,10 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 		p.Fleet.Sweep(ctx)
 		return nil
 	})
+	// Retention runs once a day to keep the scheduled D1 work bounded.
+	if p.Assistant != nil && now.UTC().Hour() == 3 && now.UTC().Minute() == 17 {
+		run("assistant retention", func(ctx context.Context) error { return p.Assistant.Retention(ctx, now) })
+	}
 	if p.provisionKick != nil {
 		// The installs run in the Provisioner Worker; this is the net under its alarm (an evicted object, a redeploy).
 		run("provision wake", func(ctx context.Context) error {

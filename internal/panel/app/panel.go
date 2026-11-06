@@ -104,6 +104,20 @@ type BackgroundJob struct {
 	Run  func(context.Context)
 }
 
+type assistantRetention interface {
+	Retention(context.Context, time.Time) error
+}
+
+type assistantRPC interface {
+	Handler(opts ...connect.HandlerOption) (string, http.Handler)
+}
+
+type assistantRetentionFunc func(context.Context, time.Time) error
+
+func (f assistantRetentionFunc) Retention(ctx context.Context, now time.Time) error {
+	return f(ctx, now)
+}
+
 // Config contains the edition-specific dependencies and settings for the shared panel.
 type Config struct {
 	Store              *store.Store
@@ -158,6 +172,7 @@ type Panel struct {
 	Provision      *nodeprovision.Service
 	Backup         *backup.Service
 	Telegram       *telegram.Service
+	Assistant      assistantRetention
 	Store          *store.Store
 	Desired        func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)
 	BackgroundJobs []BackgroundJob
@@ -179,6 +194,7 @@ type jobServices struct {
 	update      *update.Service
 	backup      *backup.Service
 	telegram    *telegram.Service
+	assistant   assistantRetention
 	provision   *nodeprovision.Service
 	store       *store.Store
 	log         *slog.Logger
