@@ -53,10 +53,17 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
     Object.fromEntries(statuses.map((s) => [s.provider, { provider: s.provider, model: s.choice?.model ?? "", budgetUsdMonth: s.choice?.budgetUsdMonth ?? 20 } as Choice])),
   );
   const connected = statuses.filter((s) => s.connected);
+  const shownProvider = connected.some((s) => s.provider === draft.provider) ? draft.provider : (connected[0]?.provider ?? AssistantProvider.UNSPECIFIED);
   const set = (patch: Partial<Settings>) => setDraft((d) => ({ ...d, ...patch }));
 
   const save = useMutation({
-    mutationFn: () => assistant.updateAssistantSettings({ settings: draft as never, choices: Object.values(choices) as never }),
+    // the provider the select shows: the stored one, else the first connected (the owner may never have touched the select)
+    // and only the choices of connected providers: the panel refuses a model or budget for a provider without a key
+    mutationFn: () =>
+      assistant.updateAssistantSettings({
+        settings: { ...draft, provider: shownProvider } as never,
+        choices: Object.values(choices).filter((c) => connected.some((s) => s.provider === c.provider)) as never,
+      }),
     onSuccess: () => {
       toast(t("ai.set.saved"));
       void qc.invalidateQueries({ queryKey: ["assistant"] });
@@ -85,7 +92,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
             ) : (
               <Select
                 aria-label={t("ai.set.provider")}
-                value={String(draft.provider || connected[0]!.provider)}
+                value={String(shownProvider)}
                 onValueChange={(v) => set({ provider: Number(v) as AssistantProvider })}
                 options={connected.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)) }))}
               />
@@ -173,7 +180,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                 status={status}
                 name={t(p.name)}
                 data={t(p.data)}
-                inUse={(draft.provider || connected[0]?.provider) === p.id && status.connected}
+                inUse={shownProvider === p.id && status.connected}
                 choice={choices[p.id] ?? ({ provider: p.id, model: "", budgetUsdMonth: 20 } as Choice)}
                 onChoice={(c) => setChoices((all) => ({ ...all, [p.id]: c }))}
               />

@@ -1143,6 +1143,23 @@ func TestAssistantSettingsChoicesValidateBeforeSaving(t *testing.T) {
 	}
 }
 
+// The owner may save before choosing a provider: no provider is fine while the assistant is off, and is "no_provider"
+// once it is turned on.
+func TestAssistantSettingsWithoutAProvider(t *testing.T) {
+	f := newAssistantFixture(t)
+	ctx := auth.WithAdmin(context.Background(), f.admin)
+	off := &adminv1.AssistantSettings{Enabled: false, Effort: adminv1.AssistantEffort_ASSISTANT_EFFORT_NORMAL, Audience: adminv1.AssistantAudience_ASSISTANT_AUDIENCE_OWNER, RetentionDays: 90}
+	if _, err := f.service.UpdateAssistantSettings(ctx, connect.NewRequest(&adminv1.UpdateAssistantSettingsRequest{Settings: off})); err != nil {
+		t.Fatalf("saving with the assistant off and no provider: %v", err)
+	}
+	on := &adminv1.AssistantSettings{Enabled: true, Effort: adminv1.AssistantEffort_ASSISTANT_EFFORT_NORMAL, Audience: adminv1.AssistantAudience_ASSISTANT_AUDIENCE_OWNER, RetentionDays: 90}
+	_, err := f.service.UpdateAssistantSettings(ctx, connect.NewRequest(&adminv1.UpdateAssistantSettingsRequest{Settings: on}))
+	var ce *connect.Error
+	if !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
+		t.Fatalf("turning on with no provider = %v, want FAILED_PRECONDITION no_provider", err)
+	}
+}
+
 func TestAssistantStopTurnCancelsProvider(t *testing.T) {
 	f := newAssistantFixture(t)
 	f.adapter.started = make(chan struct{}, 1)

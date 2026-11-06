@@ -172,7 +172,7 @@ func (s *Service) UpdateAssistantSettings(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 	in := req.Msg.Settings
-	if in.RetentionDays != 0 && (in.RetentionDays < 7 || in.RetentionDays > 365) || utf8.RuneCountInString(in.PanelNotes) > 4000 || !validEffort(in.Effort) || !validAudience(in.Audience) || !validProvider(in.Provider) {
+	if in.RetentionDays != 0 && (in.RetentionDays < 7 || in.RetentionDays > 365) || utf8.RuneCountInString(in.PanelNotes) > 4000 || !validEffort(in.Effort) || !validAudience(in.Audience) || !validProvider(in.Provider) && in.Provider != adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("assistant settings are invalid"))
 	}
 	if in.Enabled && in.Provider == adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED {
