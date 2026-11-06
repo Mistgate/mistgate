@@ -189,6 +189,77 @@ func TestD1StoreSmoke(t *testing.T) {
 	}
 }
 
+func TestD1AssistantBudgetSettingsAndConversationBehavior(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_settings(id) VALUES(1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveAssistantSettings(ctx, nil, true, 2, 2, 1, []byte("sealed-notes"), 30, now); err != nil {
+		t.Fatal(err)
+	}
+	var clear string
+	var notes []byte
+	if err := st.R.QueryRowContext(ctx, `SELECT panel_notes,panel_notes_enc FROM assistant_settings WHERE id=1`).Scan(&clear, &notes); err != nil {
+		t.Fatal(err)
+	}
+	if clear != "" || string(notes) != "sealed-notes" {
+		t.Fatalf("D1 did not save encrypted assistant notes: clear=%q enc=%q", clear, notes)
+	}
+
+	month, provider := "202611", int32(2)
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_provider(provider,budget_usd) VALUES(?,1)`, provider); err != nil {
+		t.Fatal(err)
+	}
+	firstID, secondID := "asres_d1_first", "asres_d1_second"
+	if ok, err := st.ReserveAssistantBudget(ctx, firstID, month, "adm_d1", provider, "deepseek-flash", .7, 1, now); err != nil || !ok {
+		t.Fatalf("first D1 reservation: accepted=%v err=%v", ok, err)
+	}
+	if ok, err := st.ReserveAssistantBudget(ctx, secondID, month, "adm_d1", provider, "deepseek-flash", .4, 1, now); err != nil || ok {
+		t.Fatalf("D1 reservation exceeded provider budget: accepted=%v err=%v", ok, err)
+	}
+	if err := st.ReconcileAssistantBudget(ctx, firstID, month, "adm_d1", provider, 10, 4, .25, true, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ReconcileAssistantBudget(ctx, firstID, month, "adm_d1", provider, 10, 4, .25, true, now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var usd float64
+	var input, output, turns int64
+	if err := st.R.QueryRowContext(ctx, `SELECT usd,input_tokens,output_tokens,turns FROM assistant_usage WHERE month=? AND admin_id=? AND provider=?`, month, "adm_d1", provider).Scan(&usd, &input, &output, &turns); err != nil {
+		t.Fatal(err)
+	}
+	if usd != .25 || input != 10 || output != 4 || turns != 1 {
+		t.Fatalf("D1 reconciled assistant usage: usd=%v input=%d output=%d turns=%d", usd, input, output, turns)
+	}
+	if ok, err := st.ReserveAssistantBudget(ctx, secondID, month, "adm_d1", provider, "deepseek-flash", .7, 1, now); err != nil || !ok {
+		t.Fatalf("D1 did not release reconciled reservation headroom: accepted=%v err=%v", ok, err)
+	}
+
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_conversation(id,admin_id,title_enc,summary_enc,created_at,updated_at) VALUES('cnv_d1','adm_d1',X'01',X'02',?,?)`, now.Unix(), now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_message(id,conversation_id,admin_id,role,body_enc,created_at) VALUES('msg_d1','cnv_d1','adm_d1','user',X'03',?)`, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if deleted, err := st.DeleteAssistantConversation(ctx, "adm_d1", "cnv_d1"); err != nil || !deleted {
+		t.Fatalf("D1 conversation delete: deleted=%v err=%v", deleted, err)
+	}
+	var count int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM assistant_message WHERE conversation_id='cnv_d1'`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("D1 conversation delete left messages: count=%d err=%v", count, err)
+	}
+	result, err := st.W.ExecContext(ctx, `INSERT INTO assistant_message(id,conversation_id,admin_id,role,body_enc,created_at)
+		SELECT 'msg_late','cnv_d1','adm_d1','assistant',X'04',? WHERE EXISTS (SELECT 1 FROM assistant_conversation WHERE id='cnv_d1' AND admin_id='adm_d1')`, now.Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 0 {
+		t.Fatalf("D1 accepted a message after its conversation was deleted: rows=%d err=%v", rows, err)
+	}
+}
+
 func TestD1PanelSSHKeyConcurrentCreateHasOneWinner(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

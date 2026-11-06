@@ -7,6 +7,12 @@
   },
   {
     "type": "index",
+    "name": "assistant_budget_reservation_month",
+    "tbl_name": "assistant_budget_reservation",
+    "sql": "CREATE INDEX assistant_budget_reservation_month ON assistant_budget_reservation(provider, month, state)"
+  },
+  {
+    "type": "index",
     "name": "assistant_conversation_admin",
     "tbl_name": "assistant_conversation",
     "sql": "CREATE INDEX assistant_conversation_admin ON assistant_conversation(admin_id, updated_at DESC, id DESC)"
@@ -421,6 +427,12 @@
   },
   {
     "type": "table",
+    "name": "assistant_budget_reservation",
+    "tbl_name": "assistant_budget_reservation",
+    "sql": "CREATE TABLE assistant_budget_reservation ( id TEXT PRIMARY KEY, month TEXT NOT NULL, admin_id TEXT NOT NULL, provider INTEGER NOT NULL, model TEXT NOT NULL, estimate_usd REAL NOT NULL CHECK (estimate_usd \u003e= 0), state TEXT NOT NULL DEFAULT 'reserved' CHECK (state IN ('reserved', 'settled')), created_at INTEGER NOT NULL, settled_at INTEGER NOT NULL DEFAULT 0 ) STRICT"
+  },
+  {
+    "type": "table",
     "name": "assistant_conversation",
     "tbl_name": "assistant_conversation",
     "sql": "CREATE TABLE assistant_conversation ( id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, title_enc BLOB NOT NULL DEFAULT X'', summary_enc BLOB NOT NULL DEFAULT X'', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, segment INTEGER NOT NULL DEFAULT 0 ) STRICT"
@@ -465,7 +477,7 @@
     "type": "table",
     "name": "assistant_settings",
     "tbl_name": "assistant_settings",
-    "sql": "CREATE TABLE assistant_settings ( id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)), provider INTEGER NOT NULL DEFAULT 0, effort INTEGER NOT NULL DEFAULT 2, audience INTEGER NOT NULL DEFAULT 1, panel_notes TEXT NOT NULL DEFAULT '', retention_days INTEGER NOT NULL DEFAULT 90, updated_at INTEGER NOT NULL DEFAULT 0 ) STRICT"
+    "sql": "CREATE TABLE assistant_settings ( id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)), provider INTEGER NOT NULL DEFAULT 0, effort INTEGER NOT NULL DEFAULT 2, audience INTEGER NOT NULL DEFAULT 1, panel_notes TEXT NOT NULL DEFAULT '', retention_days INTEGER NOT NULL DEFAULT 90, updated_at INTEGER NOT NULL DEFAULT 0 , panel_notes_enc BLOB NOT NULL DEFAULT X'') STRICT"
   },
   {
     "type": "table",

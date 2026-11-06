@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -50,6 +51,55 @@ func TestScrub(t *testing.T) {
 	got := scrubJSON(j)
 	if strings.Contains(got, "vless") || strings.Contains(got, "b=c") || !strings.Contains(got, `"c":"keep"`) || !strings.HasSuffix(got, `"}`) {
 		t.Errorf("json pass: %s", got)
+	}
+}
+
+func TestScrubCredentialFormatsInTextAndSerializedResults(t *testing.T) {
+	secrets := []string{
+		"sk-ant-api03-" + strings.Repeat("aB3_", 10),
+		"sk-" + strings.Repeat("Ab3x", 8),
+		"sk-proj-" + strings.Repeat("Pr0j", 8),
+		"ghp_" + strings.Repeat("aB3x", 9),
+		"gho_" + strings.Repeat("aB3x", 9),
+		"github_pat_" + strings.Repeat("aB3x_", 8),
+		"xoxb-1234567890-" + strings.Repeat("aB3x", 6),
+		"xoxa-1234567890-" + strings.Repeat("aB3x", 6),
+		"xoxp-1234567890-" + strings.Repeat("aB3x", 6),
+		"xoxr-1234567890-" + strings.Repeat("aB3x", 6),
+		"AKIA1234567890ABCDEF",
+		"AIza" + strings.Repeat("aB3x_", 7),
+		"AGE-SECRET-KEY-1" + strings.Repeat("QWERTY1234567890", 4),
+		"-----BEGIN OPENSSH PRIVATE KEY-----\n" + strings.Repeat("aB3x/", 20) + "\n-----END OPENSSH PRIVATE KEY-----",
+		"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0." + strings.Repeat("aB3x", 8),
+		"Bearer " + strings.Repeat("aB3x", 10),
+		"aB3x_7ZpQ9mN2vC5kL8sD1fG4hJ6uW0yR3tE",                             // generic long high-entropy credential
+		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/", // base64-shaped generic credential
+	}
+	for _, secret := range secrets {
+		encoded, err := json.Marshal(secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, got := range map[string]string{
+			"text": scrub(secret),
+			"json": scrubJSON(`{"credential":` + string(encoded) + `}`),
+		} {
+			if strings.Contains(got, secret) {
+				t.Errorf("%s scrub kept credential %q in %q", name, secret, got)
+			}
+		}
+	}
+}
+
+func TestScrubDoesNotOverRedactOrdinaryIdentifiers(t *testing.T) {
+	for _, ordinary := range []string{
+		"nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "nod_1234567890abcdef", "v1.2.3", "10.2.30",
+		"de1.example.com", "vpn-node-27.example.com", "a-long-lowercase-hostname.example.com",
+		strings.Repeat("a", 64),
+	} {
+		if got := scrub(ordinary); got != ordinary {
+			t.Errorf("ordinary value %q became %q", ordinary, got)
+		}
 	}
 }
 

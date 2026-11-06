@@ -114,8 +114,11 @@ func TestRestoreValidatesProductionSealedValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := adminv1.AssistantProvider_ASSISTANT_PROVIDER_ANTHROPIC
-	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_provider(provider,key_enc,key_hint,added_at,model,budget_usd) VALUES(?,?,?,?,?,?)`,
-		int32(provider), vlt.Seal([]byte("golden assistant provider key"), assistant.ProviderKeyAAD(provider)), "r-key", assistantNow.Unix(), "claude-opus-5-5", 20); err != nil {
+	if _, err := st.W.ExecContext(ctx, `UPDATE assistant_provider SET key_enc=?,key_hint=?,added_at=?,model=?,budget_usd=? WHERE provider=?`,
+		vlt.Seal([]byte("golden assistant provider key"), assistant.ProviderKeyAAD(provider)), "r-key", assistantNow.Unix(), "claude-opus-5-5", 20, int32(provider)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `UPDATE assistant_settings SET panel_notes_enc=? WHERE id=1`, vlt.Seal([]byte("golden assistant panel notes"), assistant.PanelNotesAAD())); err != nil {
 		t.Fatal(err)
 	}
 	conversationID := "cnv_golden_assistant"

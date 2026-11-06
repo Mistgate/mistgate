@@ -122,6 +122,16 @@ func TestOpenAIAdapterOllamaOmitsToolChoiceAndCreatesMissingID(t *testing.T) {
 	if _, exists := request["tool_choice"]; exists {
 		t.Fatalf("Ollama request has tool_choice: %#v", request)
 	}
+	streamOptions, _ := request["stream_options"].(map[string]any)
+	if streamOptions["include_usage"] != true {
+		t.Fatalf("Ollama request did not request usage: %#v", request)
+	}
+	if request["max_tokens"] != float64(defaultMaxOutputTokens) {
+		t.Fatalf("Ollama request did not bound output tokens: %#v", request)
+	}
+	if resp.UsageReported {
+		t.Fatalf("stream without a usage chunk was treated as reported usage: %+v", resp)
+	}
 	if len(resp.Tools) != 1 || resp.Tools[0].id == "" || !strings.HasPrefix(resp.Tools[0].id, "call_") {
 		t.Fatalf("missing tool call id was not generated: %+v", resp.Tools)
 	}

@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-var ErrAssistantLimit = errors.New("store: assistant limit reached")
+var (
+	ErrAssistantLimit            = errors.New("store: assistant limit reached")
+	ErrAssistantConversationGone = errors.New("store: assistant conversation no longer exists")
+)
 
 type AssistantProviderChoice struct {
 	Provider int32
@@ -15,7 +18,7 @@ type AssistantProviderChoice struct {
 }
 
 // SaveAssistantSettings applies the provider choices and shared settings as one database batch on both store backends.
-func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantProviderChoice, enabled bool, provider, effort, audience int32, notes string, retention uint32, now time.Time) error {
+func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantProviderChoice, enabled bool, provider, effort, audience int32, notesEnc []byte, retention uint32, now time.Time) error {
 	statements := make([]Stmt, 0, len(choices)+1)
 	for _, choice := range choices {
 		statements = append(statements, Stmt{Query: `UPDATE assistant_provider SET model=?,budget_usd=? WHERE provider=?`, Args: []any{choice.Model, choice.Budget, choice.Provider}})
@@ -24,8 +27,41 @@ func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantPr
 	if enabled {
 		value = 1
 	}
-	statements = append(statements, Stmt{Query: `UPDATE assistant_settings SET enabled=?,provider=?,effort=?,audience=?,panel_notes=?,retention_days=?,updated_at=? WHERE id=1`, Args: []any{value, provider, effort, audience, notes, retention, unix(now)}})
+	statements = append(statements, Stmt{Query: `UPDATE assistant_settings SET enabled=?,provider=?,effort=?,audience=?,panel_notes='',panel_notes_enc=?,retention_days=?,updated_at=? WHERE id=1`, Args: []any{value, provider, effort, audience, notesEnc, retention, unix(now)}})
 	_, err := s.batch(ctx, statements...)
+	return err
+}
+
+// ReserveAssistantBudget performs the budget check and reservation as one guarded statement. Pending reservations and
+// settled usage for the same provider/month are both included, so concurrent calls cannot spend the same headroom.
+func (s *Store) ReserveAssistantBudget(ctx context.Context, id, month, adminID string, provider int32, model string, estimate, budget float64, now time.Time) (bool, error) {
+	r, err := s.W.ExecContext(ctx, `INSERT INTO assistant_budget_reservation(id,month,admin_id,provider,model,estimate_usd,state,created_at)
+		SELECT ?,?,?,?,?,?,'reserved',?
+		WHERE ? <= MIN(?,COALESCE((SELECT budget_usd FROM assistant_provider WHERE provider=?),0))
+			- COALESCE((SELECT SUM(usd) FROM assistant_usage WHERE month=? AND provider=?),0)
+			- COALESCE((SELECT SUM(estimate_usd) FROM assistant_budget_reservation WHERE month=? AND provider=? AND state='reserved'),0)`,
+		id, month, adminID, provider, model, estimate, unix(now), estimate, budget, provider, month, provider, month, provider)
+	if err != nil {
+		return false, err
+	}
+	n, err := r.RowsAffected()
+	return n > 0, err
+}
+
+// ReconcileAssistantBudget settles exactly one reservation and its usage row atomically. Replays do not add usage twice.
+func (s *Store) ReconcileAssistantBudget(ctx context.Context, id, month, adminID string, provider int32, input, output int64, amount float64, turn bool, now time.Time) error {
+	turns := 0
+	if turn {
+		turns = 1
+	}
+	_, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO assistant_usage(month,admin_id,provider,input_tokens,output_tokens,usd,turns)
+			SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM assistant_budget_reservation WHERE id=? AND state='reserved')
+			ON CONFLICT(month,admin_id,provider) DO UPDATE SET input_tokens=input_tokens+excluded.input_tokens,output_tokens=output_tokens+excluded.output_tokens,usd=usd+excluded.usd,turns=turns+excluded.turns
+			WHERE EXISTS (SELECT 1 FROM assistant_budget_reservation WHERE id=? AND state='reserved')`,
+			Args: []any{month, adminID, provider, input, output, amount, turns, id, id}},
+		Stmt{Query: `DELETE FROM assistant_budget_reservation WHERE id=? AND state='reserved'`, Args: []any{id}},
+	)
 	return err
 }
 
@@ -131,6 +167,7 @@ func (s *Store) CancelAssistantMCPPlan(ctx context.Context, id, tokenID string, 
 
 func (s *Store) DeleteAssistantConversation(ctx context.Context, adminID, id string) (bool, error) {
 	results, err := s.batch(ctx,
+		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation deleted in assistant' WHERE id IN (SELECT id FROM assistant_plan WHERE conversation_id=? AND admin_id=?) AND status IN ('planned','awaiting','approved')`, Args: []any{id, adminID}},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id=? AND admin_id=?`, Args: []any{id, adminID}},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id=? AND admin_id=?`, Args: []any{id, adminID}},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE id=? AND admin_id=?`, Args: []any{id, adminID}},
@@ -138,7 +175,7 @@ func (s *Store) DeleteAssistantConversation(ctx context.Context, adminID, id str
 	if err != nil {
 		return false, err
 	}
-	return results[2].RowsAffected > 0, nil
+	return results[3].RowsAffected > 0, nil
 }
 
 func (s *Store) DeleteAssistantConversations(ctx context.Context, adminID string, all bool) (int64, error) {
@@ -149,6 +186,7 @@ func (s *Store) DeleteAssistantConversations(ctx context.Context, adminID string
 		args = nil
 	}
 	results, err := s.batch(ctx,
+		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation deleted in assistant' WHERE id IN (SELECT p.id FROM assistant_plan p JOIN assistant_conversation c ON c.id=p.conversation_id WHERE ` + where + `) AND status IN ('planned','awaiting','approved')`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE ` + where, Args: args},
@@ -156,11 +194,12 @@ func (s *Store) DeleteAssistantConversations(ctx context.Context, adminID string
 	if err != nil {
 		return 0, err
 	}
-	return results[2].RowsAffected, nil
+	return results[3].RowsAffected, nil
 }
 
 func (s *Store) RetainAssistantConversations(ctx context.Context, cutoff time.Time) (int64, error) {
 	results, err := s.batch(ctx,
+		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation expired from assistant' WHERE id IN (SELECT p.id FROM assistant_plan p JOIN assistant_conversation c ON c.id=p.conversation_id WHERE c.updated_at < ?) AND status IN ('planned','awaiting','approved')`, Args: []any{unix(cutoff)}},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE updated_at < ?)`, Args: []any{unix(cutoff)}},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE updated_at < ?)`, Args: []any{unix(cutoff)}},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE updated_at < ?`, Args: []any{unix(cutoff)}},
@@ -168,7 +207,7 @@ func (s *Store) RetainAssistantConversations(ctx context.Context, cutoff time.Ti
 	if err != nil {
 		return 0, err
 	}
-	return results[2].RowsAffected, nil
+	return results[3].RowsAffected, nil
 }
 
 func (s *Store) AssistantRetention(ctx context.Context, now time.Time) error {
@@ -182,6 +221,7 @@ func (s *Store) AssistantRetention(ctx context.Context, now time.Time) error {
 	if days == 0 {
 		return nil
 	}
+	// Retention applies to conversations and their messages; administrator-owned memory notes remain until deleted.
 	_, err := s.RetainAssistantConversations(ctx, now.Add(-time.Duration(days)*24*time.Hour))
 	return err
 }

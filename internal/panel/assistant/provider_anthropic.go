@@ -147,7 +147,7 @@ func anthropicWireRequest(req modelRequest) ([]byte, error) {
 		system = append(system, map[string]any{"type": "text", "text": req.System})
 	}
 	body := map[string]any{
-		"model": req.Model, "max_tokens": 8192, "messages": messages, "system": system,
+		"model": req.Model, "max_tokens": maxOutputTokens(req.MaxOutputTokens, defaultMaxOutputTokens), "messages": messages, "system": system,
 		"tools": tools, "tool_choice": map[string]string{"type": "auto"}, "thinking": map[string]string{"type": "adaptive"},
 		"output_config": map[string]string{"effort": effortString(req.Effort)},
 	}

@@ -176,6 +176,15 @@ func (s *Store) EnsureAssistantToken(ctx context.Context, adminID, profile strin
 	return t, nil
 }
 
+// RevokeAssistantToken revokes a hidden assistant identity and cancels its pending MCP plans in one batch.
+func (s *Store) RevokeAssistantToken(ctx context.Context, id, adminID string, now time.Time) error {
+	_, err := s.batch(ctx,
+		Stmt{Query: `UPDATE api_token SET revoked_at=?,revoked_by=? WHERE id=? AND created_by=? AND assistant_only=1 AND revoked_at=0`, Args: []any{unix(now), adminID, id, adminID}},
+		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='assistant access revoked' WHERE token_id=? AND status IN ('planned','awaiting','approved')`, Args: []any{id}},
+	)
+	return err
+}
+
 // RevokeAPIToken revokes a token and cancels its open plans in one transaction. It is idempotent: a second call
 // changes nothing (the first revoker and time stay) and returns the token. ErrNotFound for an unknown id. The
 // partial unique index on the name is freed by the revocation.

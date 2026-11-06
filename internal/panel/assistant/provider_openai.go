@@ -123,7 +123,11 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 			"name": tool.Name, "description": tool.Description, "parameters": schema,
 		}})
 	}
-	bodyMap := map[string]any{"model": req.Model, "messages": msgs, "stream": true}
+	maxOutput := req.MaxOutputTokens
+	if maxOutput <= 0 {
+		maxOutput = defaultMaxOutputTokens
+	}
+	bodyMap := map[string]any{"model": req.Model, "messages": msgs, "stream": true, "max_tokens": maxOutput}
 	if len(tools) > 0 {
 		bodyMap["tools"] = tools
 	}
@@ -132,6 +136,8 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 	}
 	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_DEEPSEEK || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI {
 		bodyMap["reasoning_effort"] = openAIReasoningEffort(a.kind, req.Effort)
+	}
+	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_DEEPSEEK || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_OLLAMA_CLOUD {
 		bodyMap["stream_options"] = map[string]any{"include_usage": true}
 	}
 	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI {
@@ -158,6 +164,7 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 	toolCalls := map[int]*modelToolCall{}
 	toolArguments := map[int]*strings.Builder{}
 	var inputTokens, outputTokens int64
+	usageReported := false
 	finish := ""
 	done := false
 	scanner := bufio.NewScanner(resp.Body)
@@ -197,6 +204,7 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 		}
 		if chunk.Usage != nil {
 			inputTokens, outputTokens = chunk.Usage.Prompt, chunk.Usage.Completion
+			usageReported = true
 		}
 		for _, choice := range chunk.Choices {
 			if choice.Finish != nil {
@@ -299,7 +307,7 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 	if err != nil {
 		return modelResponse{}, apiError("provider_unreachable")
 	}
-	return modelResponse{Transcript: []jsonRaw{raw}, Tools: calls, Text: text.String(), Stop: finish, InputTokens: inputTokens, OutputTokens: outputTokens}, nil
+	return modelResponse{Transcript: []jsonRaw{raw}, Tools: calls, Text: text.String(), Stop: finish, InputTokens: inputTokens, OutputTokens: outputTokens, UsageReported: usageReported}, nil
 }
 
 func (a *openAIAdapter) ToolResults(calls []modelToolCall, results []toolOutput) []jsonRaw {

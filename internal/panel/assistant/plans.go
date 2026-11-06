@@ -26,7 +26,7 @@ func (s *Service) assistantPlan(ctx context.Context, adminID, conversationID, pl
 	err := s.st.R.QueryRowContext(ctx, `SELECT id,conversation_id,admin_id,token_id,tool,confirm_enc,card_enc,inbox_only,state,created_at,expires_at,updated_at FROM assistant_plan WHERE id=? AND conversation_id=? AND admin_id=?`, planID, conversationID, adminID).
 		Scan(&p.id, &p.conversation, &p.admin, &p.token, &p.tool, &p.confirm, &p.card, &p.inbox, &p.state, &p.created, &p.expires, &p.updated)
 	if errors.Is(err, sql.ErrNoRows) {
-		return p, connect.NewError(connect.CodeNotFound, errors.New("plan not found"))
+		return p, codeConnect("plan_not_pending")
 	}
 	return p, err
 }
@@ -138,27 +138,14 @@ func (s *Service) ApplyPlan(ctx context.Context, req *connect.Request[adminv1.Ap
 		return nil, err
 	}
 	if result.IsError {
-		card.State = adminv1.PlanState_PLAN_STATE_FAILED
-		card.Error = cleanContextText(result.Text, 300)
-		if card.Error == "" {
-			card.Error = "plan apply failed"
-		}
-		if err = s.savePlanCard(ctx, p.id, card, "failed"); err != nil {
-			return nil, err
-		}
-		return connect.NewResponse(&adminv1.ApplyPlanResponse{Plan: card}), nil
+		return s.syncApplyCardFromMCP(ctx, p.id, card, result.Text)
 	}
 	var applied struct {
 		Status string `json:"status"`
 		Result string `json:"result"`
 	}
 	if json.Unmarshal([]byte(result.Text), &applied) != nil || applied.Status == "" {
-		card.State = adminv1.PlanState_PLAN_STATE_FAILED
-		card.Error = "plan apply returned an invalid result"
-		if err = s.savePlanCard(ctx, p.id, card, "failed"); err != nil {
-			return nil, err
-		}
-		return connect.NewResponse(&adminv1.ApplyPlanResponse{Plan: card}), nil
+		return s.syncApplyCardFromMCP(ctx, p.id, card, "plan apply returned an invalid result")
 	}
 	if applied.Status == mcp.StatusApplied || applied.Status == "applied" {
 		card.State = adminv1.PlanState_PLAN_STATE_APPLIED
@@ -168,12 +155,52 @@ func (s *Service) ApplyPlan(ctx context.Context, req *connect.Request[adminv1.Ap
 			return nil, err
 		}
 	} else {
+		return s.syncApplyCardFromMCP(ctx, p.id, card, applied.Result)
+	}
+	return connect.NewResponse(&adminv1.ApplyPlanResponse{Plan: card}), nil
+}
+
+// syncApplyCardFromMCP persists terminal MCP outcomes only. An active plan, including one already applying in
+// another request, remains pending in the assistant card until MCP reports a terminal state.
+func (s *Service) syncApplyCardFromMCP(ctx context.Context, planID string, card *adminv1.PlanCard, message string) (*connect.Response[adminv1.ApplyPlanResponse], error) {
+	current, err := s.st.GetMCPPlan(ctx, planID)
+	if err != nil {
+		return nil, codeConnect("plan_not_pending")
+	}
+	state, stored := "", false
+	switch current.Status {
+	case store.PlanApplied:
+		card.State = adminv1.PlanState_PLAN_STATE_APPLIED
+		card.Result = cleanContextText(current.Result, 300)
+		card.Error = ""
+		state, stored = "applied", true
+	case store.PlanFailed:
 		card.State = adminv1.PlanState_PLAN_STATE_FAILED
-		card.Error = cleanContextText(applied.Result, 300)
+		card.Error = cleanContextText(message, 300)
+		if card.Error == "" {
+			card.Error = cleanContextText(current.Error, 300)
+		}
 		if card.Error == "" {
 			card.Error = "plan apply failed"
 		}
-		if err = s.savePlanCard(ctx, p.id, card, "failed"); err != nil {
+		state, stored = "failed", true
+	case store.PlanRejected:
+		card.State = adminv1.PlanState_PLAN_STATE_REJECTED
+		card.Error = cleanContextText(message, 300)
+		state, stored = "rejected", true
+	case store.PlanExpired:
+		card.State = adminv1.PlanState_PLAN_STATE_EXPIRED
+		card.Error = cleanContextText(message, 300)
+		state, stored = "expired", true
+	case store.PlanCancelled:
+		card.State = adminv1.PlanState_PLAN_STATE_DISMISSED
+		card.Error = cleanContextText(message, 300)
+		state, stored = "dismissed", true
+	default:
+		return connect.NewResponse(&adminv1.ApplyPlanResponse{Plan: card}), nil
+	}
+	if stored {
+		if err = s.savePlanCard(ctx, planID, card, state); err != nil {
 			return nil, err
 		}
 	}

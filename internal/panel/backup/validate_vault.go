@@ -95,6 +95,9 @@ var restoredSealedValueQueries = []sealedValueQuery{
 			provider, _ := strconv.Atoi(parts[0])
 			return assistant.ProviderKeyAAD(adminv1.AssistantProvider(provider))
 		}, query: "SELECT key_enc, provider FROM assistant_provider WHERE length(key_enc) > 0"},
+	{description: "assistant panel notes", table: "assistant_settings", columns: []string{"panel_notes_enc"},
+		aadFrom: func(...string) string { return assistant.PanelNotesAAD() },
+		query:   "SELECT panel_notes_enc FROM assistant_settings WHERE length(panel_notes_enc) > 0"},
 	{description: "assistant conversation title", table: "assistant_conversation", columns: []string{"title_enc", "id"}, aadParts: 1,
 		aadFrom: func(parts ...string) string { return assistant.ConversationTitleAAD(parts[0]) },
 		query:   "SELECT title_enc, id FROM assistant_conversation WHERE length(title_enc) > 0"},
@@ -240,7 +243,7 @@ func validateSealedRows(ctx context.Context, db *sql.DB, v *vault.Vault, item se
 			dest[i+1] = &aadParts[i]
 		}
 		var aad string
-		if item.aadParts == 0 {
+		if item.aadParts == 0 && item.aadFrom == nil {
 			dest = append(dest, &aad)
 		}
 		if err := rows.Scan(dest...); err != nil {

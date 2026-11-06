@@ -53,7 +53,7 @@ func (a *anthropicAdapter) Stream(ctx context.Context, key string, req modelRequ
 		Content []json.RawMessage `json:"content"`
 		Text    string            `json:"-"`
 		Stop    string            `json:"stop_reason"`
-		Usage   struct {
+		Usage   *struct {
 			Input  int64 `json:"input_tokens"`
 			Output int64 `json:"output_tokens"`
 		} `json:"usage"`
@@ -65,7 +65,10 @@ func (a *anthropicAdapter) Stream(ctx context.Context, key string, req modelRequ
 	if err != nil {
 		return modelResponse{}, apiError("provider_unreachable")
 	}
-	result := modelResponse{Transcript: []jsonRaw{assistant}, Stop: wireResponse.Stop, InputTokens: wireResponse.Usage.Input, OutputTokens: wireResponse.Usage.Output}
+	result := modelResponse{Transcript: []jsonRaw{assistant}, Stop: wireResponse.Stop, UsageReported: wireResponse.Usage != nil}
+	if wireResponse.Usage != nil {
+		result.InputTokens, result.OutputTokens = wireResponse.Usage.Input, wireResponse.Usage.Output
+	}
 	for _, raw := range wireResponse.Content {
 		var block struct {
 			Type  string          `json:"type"`

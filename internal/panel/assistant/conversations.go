@@ -82,9 +82,17 @@ func (s *Service) saveMessageID(ctx context.Context, id, conv, admin, role strin
 	if err != nil {
 		return "", err
 	}
-	_, err = s.st.W.ExecContext(ctx, `INSERT INTO assistant_message(id,conversation_id,admin_id,role,segment,body_enc,created_at) VALUES(?,?,?,?,?,?,?)`, id, conv, admin, role, segment, sealed, now.Unix())
+	result, err := s.st.W.ExecContext(ctx, `INSERT INTO assistant_message(id,conversation_id,admin_id,role,segment,body_enc,created_at)
+		SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM assistant_conversation WHERE id=? AND admin_id=?)`, id, conv, admin, role, segment, sealed, now.Unix(), conv, admin)
 	if err != nil {
 		return "", err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return "", err
+	}
+	if inserted == 0 {
+		return "", store.ErrAssistantConversationGone
 	}
 	_, err = s.st.W.ExecContext(ctx, `UPDATE assistant_conversation SET updated_at=? WHERE id=? AND admin_id=?`, now.Unix(), conv, admin)
 	return id, err
@@ -321,6 +329,10 @@ func (s *Service) DeleteConversation(ctx context.Context, req *connect.Request[a
 	if req.Msg.Id == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conversation id is required"))
 	}
+	if _, _, err = s.conversation(ctx, admin.ID, req.Msg.Id); err != nil {
+		return nil, err
+	}
+	s.cancelAssistantTurns(admin.ID, req.Msg.Id, false)
 	deleted, err := s.st.DeleteAssistantConversation(ctx, admin.ID, req.Msg.Id)
 	if err != nil {
 		return nil, err
@@ -347,6 +359,11 @@ func (s *Service) DeleteAllConversations(ctx context.Context, req *connect.Reque
 			return nil, err
 		}
 	}
+	if req.Msg.AllAdmins {
+		s.cancelAssistantTurns("", "", true)
+	} else {
+		s.cancelAssistantTurns(admin.ID, "", false)
+	}
 	deleted, err := s.st.DeleteAssistantConversations(ctx, admin.ID, req.Msg.AllAdmins)
 	if err != nil {
 		return nil, err
@@ -355,6 +372,16 @@ func (s *Service) DeleteAllConversations(ctx context.Context, req *connect.Reque
 		s.audit(ctx, admin, "assistant_conversations_delete_all", "ok", map[string]any{"all_admins": true})
 	}
 	return connect.NewResponse(&adminv1.DeleteAllConversationsResponse{Deleted: uint32(max(deleted, 0))}), nil
+}
+
+func (s *Service) cancelAssistantTurns(adminID, conversationID string, all bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, active := range s.running {
+		if all || conversationID != "" && id == conversationID || conversationID == "" && active.adminID == adminID {
+			active.cancel()
+		}
+	}
 }
 
 func searchWords(query string) []string {
@@ -386,7 +413,7 @@ func assistantPageContext(input *adminv1.PageContext) *adminv1.PageContext {
 	}
 	route := ""
 	if strings.HasPrefix(input.Route, "/") && !strings.HasPrefix(input.Route, "//") && !strings.ContainsAny(input.Route, "?#\\\r\n\t \"'") {
-		route = input.Route
+		route = cleanContextText(input.Route, 300)
 	}
 	return &adminv1.PageContext{Kind: cleanContextText(input.Kind, 40), Id: cleanContextText(input.Id, 100), Label: cleanContextText(input.Label, 120), Route: route}
 }

@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	maxProviderResponse = 4 << 20
-	providerTimeout     = 120 * time.Second
+	maxProviderResponse          = 4 << 20
+	providerTimeout              = 120 * time.Second
+	defaultMaxOutputTokens int64 = 8192
 )
 
 type modelInfo struct {
@@ -36,24 +37,26 @@ type modelToolCall struct {
 }
 
 type modelRequest struct {
-	Model   string
-	System  string
-	Stable  string
-	Effort  adminv1.AssistantEffort
-	History []jsonRaw
-	Tools   []mcp.AssistantTool
+	Model           string
+	System          string
+	Stable          string
+	Effort          adminv1.AssistantEffort
+	MaxOutputTokens int64
+	History         []jsonRaw
+	Tools           []mcp.AssistantTool
 }
 
 // jsonRaw is a named alias so provider transcript blocks cannot accidentally be modified through a shared buffer.
 type jsonRaw = json.RawMessage
 
 type modelResponse struct {
-	Transcript   []jsonRaw
-	Tools        []modelToolCall
-	Text         string
-	Stop         string
-	InputTokens  int64
-	OutputTokens int64
+	Transcript    []jsonRaw
+	Tools         []modelToolCall
+	Text          string
+	Stop          string
+	InputTokens   int64
+	OutputTokens  int64
+	UsageReported bool
 }
 
 type adapter interface {

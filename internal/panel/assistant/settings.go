@@ -16,12 +16,13 @@ import (
 )
 
 type settingsRow struct {
-	enabled    bool
-	provider   adminv1.AssistantProvider
-	effort     adminv1.AssistantEffort
-	audience   adminv1.AssistantAudience
-	panelNotes string
-	retention  uint32
+	enabled       bool
+	provider      adminv1.AssistantProvider
+	effort        adminv1.AssistantEffort
+	audience      adminv1.AssistantAudience
+	panelNotesEnc []byte
+	panelNotes    string
+	retention     uint32
 }
 
 type providerRow struct {
@@ -37,7 +38,7 @@ type providerRow struct {
 func (s *Service) readSettings(ctx context.Context) (settingsRow, error) {
 	var row settingsRow
 	var enabled int
-	err := s.st.R.QueryRowContext(ctx, `SELECT enabled,provider,effort,audience,panel_notes,retention_days FROM assistant_settings WHERE id=1`).Scan(&enabled, &row.provider, &row.effort, &row.audience, &row.panelNotes, &row.retention)
+	err := s.st.R.QueryRowContext(ctx, `SELECT enabled,provider,effort,audience,panel_notes_enc,retention_days FROM assistant_settings WHERE id=1`).Scan(&enabled, &row.provider, &row.effort, &row.audience, &row.panelNotesEnc, &row.retention)
 	row.enabled = enabled != 0
 	return row, err
 }
@@ -117,6 +118,10 @@ func (s *Service) GetAssistantSettings(ctx context.Context, _ *connect.Request[a
 		return nil, err
 	}
 	settings, err := s.readSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	settings.panelNotes, err = openText(s.vault, settings.panelNotesEnc, PanelNotesAAD())
 	if err != nil {
 		return nil, err
 	}
@@ -218,11 +223,12 @@ func (s *Service) UpdateAssistantSettings(ctx context.Context, req *connect.Requ
 			return nil, codeConnect("no_provider")
 		}
 	}
-	if err = s.st.SaveAssistantSettings(ctx, choices, in.Enabled, int32(in.Provider), int32(in.Effort), int32(in.Audience), in.PanelNotes, in.RetentionDays, s.now()); err != nil {
+	sealedNotes := sealText(s.vault, in.PanelNotes, PanelNotesAAD())
+	if err = s.st.SaveAssistantSettings(ctx, choices, in.Enabled, int32(in.Provider), int32(in.Effort), int32(in.Audience), sealedNotes, in.RetentionDays, s.now()); err != nil {
 		return nil, err
 	}
 	s.audit(ctx, admin, "assistant_settings_update", "ok", map[string]any{"enabled": in.Enabled, "provider": in.Provider.String(), "audience": in.Audience.String()})
-	row := settingsRow{enabled: in.Enabled, provider: in.Provider, effort: in.Effort, audience: in.Audience, panelNotes: in.PanelNotes, retention: in.RetentionDays}
+	row := settingsRow{enabled: in.Enabled, provider: in.Provider, effort: in.Effort, audience: in.Audience, panelNotes: in.PanelNotes, panelNotesEnc: sealedNotes, retention: in.RetentionDays}
 	resp := &adminv1.UpdateAssistantSettingsResponse{Settings: settingsProto(row)}
 	for _, spec := range providerSpecs {
 		status, e := providerProto(s, ctx, spec.provider)

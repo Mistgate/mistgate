@@ -47,6 +47,7 @@ type Service struct {
 }
 
 type activeAssistantTurn struct {
+	adminID string
 	cancel  context.CancelFunc
 	stopped *atomic.Bool
 }
@@ -82,6 +83,11 @@ func New(c Config) *Service {
 			s.providers[spec.provider] = &openAIAdapter{kind: spec.provider, http: transport, models: spec.curated, defaultModel: spec.defaultModel}
 		}
 	}
+	if s.st != nil && s.vault != nil {
+		if err := s.ensureRows(context.Background()); err != nil {
+			s.log.Warn("assistant storage initialization failed", "err", err)
+		}
+	}
 	return s
 }
 
@@ -99,6 +105,17 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 func (s *Service) ensureRows(ctx context.Context) error {
 	if _, err := s.st.W.ExecContext(ctx, `INSERT INTO assistant_settings (id) VALUES (1) ON CONFLICT(id) DO NOTHING`); err != nil {
 		return err
+	}
+	var legacyNotes string
+	var notesEnc []byte
+	if err := s.st.R.QueryRowContext(ctx, `SELECT panel_notes,panel_notes_enc FROM assistant_settings WHERE id=1`).Scan(&legacyNotes, &notesEnc); err != nil {
+		return err
+	}
+	if legacyNotes != "" && len(notesEnc) == 0 {
+		sealed := sealText(s.vault, legacyNotes, PanelNotesAAD())
+		if _, err := s.st.W.ExecContext(ctx, `UPDATE assistant_settings SET panel_notes='',panel_notes_enc=? WHERE id=1 AND panel_notes_enc=X'' AND panel_notes=?`, sealed, legacyNotes); err != nil {
+			return err
+		}
 	}
 	for _, spec := range providerSpecs {
 		if _, err := s.st.W.ExecContext(ctx, `INSERT INTO assistant_provider (provider) VALUES (?) ON CONFLICT(provider) DO NOTHING`, int32(spec.provider)); err != nil {

@@ -24,6 +24,7 @@ func MessageAAD(id string) string             { return "assistant-message:" + id
 func PlanConfirmAAD(id string) string         { return "assistant-plan-confirm:" + id }
 func PlanCardAAD(id string) string            { return "assistant-plan-card:" + id }
 func MemoryAAD(id string) string              { return "assistant-memory:" + id }
+func PanelNotesAAD() string                   { return "assistant-settings:panel-notes" }
 
 func providerSlug(p adminv1.AssistantProvider) string {
 	switch p {
@@ -42,8 +43,72 @@ func providerSlug(p adminv1.AssistantProvider) string {
 
 func (s *Service) providerSpend(ctx context.Context, p adminv1.AssistantProvider, month string) (float64, error) {
 	var amount float64
-	err := s.st.R.QueryRowContext(ctx, `SELECT COALESCE(SUM(usd),0) FROM assistant_usage WHERE month=? AND provider=?`, month, int32(p)).Scan(&amount)
+	err := s.st.R.QueryRowContext(ctx, `SELECT
+		COALESCE((SELECT SUM(usd) FROM assistant_usage WHERE month=? AND provider=?),0) +
+		COALESCE((SELECT SUM(estimate_usd) FROM assistant_budget_reservation WHERE month=? AND provider=? AND state='reserved'),0)`,
+		month, int32(p), month, int32(p)).Scan(&amount)
 	return amount, err
+}
+
+type callReservation struct {
+	id, month    string
+	estimatedIn  int64
+	estimatedUSD float64
+}
+
+func maxOutputTokens(value, fallback int64) int64 {
+	if value > 0 {
+		return value
+	}
+	return fallback
+}
+
+func estimateRequestInputTokens(req modelRequest) int64 {
+	size := len(req.System) + len(req.Stable) + 64
+	for _, raw := range req.History {
+		size += len(raw)
+	}
+	for _, tool := range req.Tools {
+		size += len(tool.Name) + len(tool.Description) + len(tool.InputSchema) + 48
+	}
+	// One token per UTF-8 byte is a hard upper bound for the text sent to the provider's tokenizer.
+	return max(1, int64(size))
+}
+
+func (s *Service) reserveProviderCall(ctx context.Context, adminID string, p adminv1.AssistantProvider, model string, budget float64, req modelRequest) (callReservation, error) {
+	maxOutput := maxOutputTokens(req.MaxOutputTokens, defaultMaxOutputTokens)
+	inTokens := estimateRequestInputTokens(req)
+	estimate := estimatePrice(p, model, inTokens, maxOutput)
+	if math.IsNaN(estimate) || math.IsInf(estimate, 0) || estimate < 0 {
+		return callReservation{}, apiError("budget_reached")
+	}
+	month := monthKey(s.now())
+	reservationID := store.NewID("asres_")
+	accepted, err := s.st.ReserveAssistantBudget(ctx, reservationID, month, adminID, int32(p), model, estimate, budget, s.now())
+	if err != nil {
+		return callReservation{}, err
+	}
+	if !accepted {
+		return callReservation{}, apiError("budget_reached")
+	}
+	return callReservation{id: reservationID, month: month, estimatedIn: inTokens, estimatedUSD: estimate}, nil
+}
+
+func (s *Service) reconcileProviderCall(ctx context.Context, reservation callReservation, adminID string, p adminv1.AssistantProvider, model string, input, output int64, reported, turn bool) float64 {
+	amount := reservation.estimatedUSD
+	if reported {
+		input, output = max(input, 0), max(output, 0)
+		amount = estimatePrice(p, model, input, output)
+	} else {
+		input, output = 0, 0
+	}
+	if math.IsNaN(amount) || math.IsInf(amount, 0) || amount < 0 {
+		amount = reservation.estimatedUSD
+	}
+	if err := s.st.ReconcileAssistantBudget(context.WithoutCancel(ctx), reservation.id, reservation.month, adminID, int32(p), input, output, amount, turn, s.now()); err != nil {
+		s.log.Warn("assistant usage reconciliation failed", "provider", p.String(), "err", err)
+	}
+	return amount
 }
 
 type providerState struct {
@@ -77,6 +142,25 @@ func (s *Service) validateAdminAssistant(ctx context.Context, adminID string) er
 	return s.ensureRows(ctx)
 }
 
+func (s *Service) assistantTurnAllowed(ctx context.Context, adminID, role string) (bool, error) {
+	current, err := s.st.Admin(ctx, adminID)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if current.Role != role {
+		return false, nil
+	}
+	var enabled int
+	var audience adminv1.AssistantAudience
+	if err = s.st.R.QueryRowContext(ctx, `SELECT enabled,audience FROM assistant_settings WHERE id=1`).Scan(&enabled, &audience); err != nil {
+		return false, err
+	}
+	return enabled != 0 && audienceAllows(audience, current.Role), nil
+}
+
 func estimatePrice(p adminv1.AssistantProvider, model string, input, output int64) float64 {
 	price := priceFor(p, model)
 	if input < 0 {
@@ -86,23 +170,6 @@ func estimatePrice(p adminv1.AssistantProvider, model string, input, output int6
 		output = 0
 	}
 	return (float64(input)*price.input + float64(output)*price.output) / 1_000_000
-}
-
-func (s *Service) recordUsage(ctx context.Context, adminID string, p adminv1.AssistantProvider, model string, input, output int64, turn bool) float64 {
-	amount := estimatePrice(p, model, input, output)
-	if math.IsNaN(amount) || math.IsInf(amount, 0) {
-		amount = 0
-	}
-	turns := 0
-	if turn {
-		turns = 1
-	}
-	_, err := s.st.W.ExecContext(context.WithoutCancel(ctx), `INSERT INTO assistant_usage(month,admin_id,provider,input_tokens,output_tokens,usd,turns) VALUES(?,?,?,?,?,?,?)
-		ON CONFLICT(month,admin_id,provider) DO UPDATE SET input_tokens=input_tokens+excluded.input_tokens,output_tokens=output_tokens+excluded.output_tokens,usd=usd+excluded.usd,turns=turns+excluded.turns`, monthKey(s.now()), adminID, int32(p), input, output, amount, turns)
-	if err != nil {
-		s.log.Warn("assistant usage write failed", "provider", p.String(), "err", err)
-	}
-	return amount
 }
 
 func cleanContextText(s string, limit int) string {
