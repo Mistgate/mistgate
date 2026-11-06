@@ -112,26 +112,23 @@ latest_channel_release() {
       *) continue ;;
     esac
     printf '%s\t%s\n' "$tag_sort_key" "$tag" >> "$candidates"
-  done < <(awk '
-    function finish() {
-      if (inside && tag != "" && draft != "true") print tag
-      tag = ""
-      draft = "false"
-    }
-    /^  \{/ { finish(); inside = 1; next }
-    /^  \},?$/ { finish(); inside = 0; next }
-    inside && /^    "tag_name":/ {
-      tag = $0
-      sub(/^    "tag_name":[[:space:]]*"/, "", tag)
-      sub(/",[[:space:]]*$/, "", tag)
-    }
-    inside && /^    "draft":/ {
-      draft = $0
-      sub(/^    "draft":[[:space:]]*/, "", draft)
-      sub(/,.*/, "", draft)
-    }
-    END { finish() }
-  ' "$tmp_dir/releases.json")
+  # The API answers with one line of JSON (pretty-printed only for some clients), so the release fields are taken by their
+  # keys, in the order GitHub writes them: "tag_name" comes before "draft" in every release. A quote inside a string (the
+  # notes) is escaped, so text of a release body never matches a key. Assets carry neither key.
+  done < <(tr -d '\r\n' < "$tmp_dir/releases.json" |
+    grep -oE '"(tag_name|draft)"[[:space:]]*:[[:space:]]*("[^"]*"|true|false)' |
+    awk '
+      /^"tag_name"/ {
+        tag = $0
+        sub(/^"tag_name"[[:space:]]*:[[:space:]]*"/, "", tag)
+        sub(/"$/, "", tag)
+        next
+      }
+      /^"draft"/ {
+        if (tag != "" && $0 ~ /false$/) print tag
+        tag = ""
+      }
+    ')
   [[ -s "$candidates" ]] || fail "no published release is available on the $channel channel"
   version=$(LC_ALL=C sort -V -t $'\t' -k1,1 "$candidates" | tail -n 1 | cut -f 2)
 }

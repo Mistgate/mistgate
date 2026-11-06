@@ -482,19 +482,32 @@ func fakePanelReleaseServer(releases ...*fakePanelRelease) (*httptest.Server, *[
 	var requestedTags []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/releases" && req.URL.Query().Get("per_page") == "30" {
+			// The shape GitHub sends: one line, the author and the assets nested in each release, and notes whose text may
+			// quote the keys the installer looks for (escaped in the JSON, so they must never count).
+			type asset struct {
+				Name  string `json:"name"`
+				Draft bool   `json:"draft"`
+			}
 			type releaseRow struct {
-				TagName    string `json:"tag_name"`
-				HTMLURL    string `json:"html_url"`
-				Draft      bool   `json:"draft"`
-				Prerelease bool   `json:"prerelease"`
+				URL        string         `json:"url"`
+				Author     map[string]any `json:"author"`
+				TagName    string         `json:"tag_name"`
+				HTMLURL    string         `json:"html_url"`
+				Name       string         `json:"name"`
+				Draft      bool           `json:"draft"`
+				Prerelease bool           `json:"prerelease"`
+				Assets     []asset        `json:"assets"`
+				Body       string         `json:"body"`
 			}
 			list := make([]releaseRow, 0, len(releases))
 			for _, r := range releases {
 				channel, _ := release.ChannelOf(r.manifest.Version)
-				list = append(list, releaseRow{TagName: r.manifest.Version, HTMLURL: "https://github.com/Mistgate/mistgate/releases/tag/" + r.manifest.Version,
-					Draft: r.draft, Prerelease: channel != release.ChannelStable})
+				list = append(list, releaseRow{URL: "https://api.github.com/repos/Mistgate/mistgate/releases/1", Author: map[string]any{"login": "github-actions[bot]", "site_admin": false},
+					TagName: r.manifest.Version, HTMLURL: "https://github.com/Mistgate/mistgate/releases/tag/" + r.manifest.Version, Name: r.manifest.Version,
+					Draft: r.draft, Prerelease: channel != release.ChannelStable, Assets: []asset{{Name: "SHA256SUMS"}},
+					Body: "## Notes\r\nNot a release: \"tag_name\":\"v99.0.0\",\"draft\":false"})
 			}
-			body, _ := json.MarshalIndent(list, "", "  ")
+			body, _ := json.Marshal(list)
 			_, _ = w.Write(body)
 			return
 		}
