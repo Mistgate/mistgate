@@ -6,6 +6,18 @@ import { errorFromJson } from "@connectrpc/connect/protocol-connect";
 
 const lastKey = (version: string) => `mistgate.backup.downloaded.${version}`;
 
+const connectCodes = new Set(["canceled", "unknown", "invalid_argument", "deadline_exceeded", "not_found", "already_exists", "permission_denied", "resource_exhausted", "failed_precondition", "aborted", "out_of_range", "unimplemented", "internal", "unavailable", "data_loss", "unauthenticated"]);
+
+/** The download's own refusal: its code (backup_busy, backup_create_failed, passphrase_too_short, ...) and message. */
+export class BackupDownloadError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 /** When this browser last saved a backup of this panel version (unix seconds, 0 = never). */
 export function lastDownload(version: string): number {
   const v = Number(localStorage.getItem(lastKey(version)) ?? 0);
@@ -41,8 +53,11 @@ export async function downloadBackup(version: string, passphrase?: string): Prom
     } catch {
       // not the Connect error shape: the status speaks
     }
-    if (json && typeof json === "object" && "code" in json) throw errorFromJson(json as never, res.headers, new ConnectError(text, Code.Unknown));
-    throw new ConnectError(text || res.statusText, res.status === 409 ? Code.Aborted : Code.Unknown);
+    const code = json && typeof json === "object" && "code" in json ? String((json as { code: unknown }).code) : "";
+    // Connect's own codes (a step-up the guard asks for, a lost session) as the RPCs' errors; the download's own
+    // (backup_busy, backup_create_failed, ...) as a BackupDownloadError the window words
+    if (connectCodes.has(code)) throw errorFromJson(json as never, res.headers, new ConnectError(text, Code.Unknown));
+    throw new BackupDownloadError(code || `http_${res.status}`, text || res.statusText);
   }
   const name = res.headers.get("X-Mistgate-Filename") || backupFileName(location.hostname, version, new Date());
   const url = URL.createObjectURL(await res.blob());

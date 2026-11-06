@@ -10,7 +10,7 @@ import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { useT } from "@/i18n";
 import { backups } from "@/lib/api";
-import { backupFileName, downloadBackup, lastDownload } from "@/lib/backup-download";
+import { BackupDownloadError, backupFileName, downloadBackup, lastDownload } from "@/lib/backup-download";
 import { asChannel, type Channel } from "@/lib/channels";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
@@ -215,7 +215,14 @@ export function UpdatePanelDialog({
         >
           {pass.open && (
             <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-              <p className="text-xs leading-snug text-pretty text-muted">{t("up.dlg.pass.why")}</p>
+              {/* a passphrase made up for this file alone: the words say whose it is not, so nobody types an account's */}
+              <div className="flex items-start gap-2">
+                <Icon name="lock" size={14} className="mt-0.5 flex-none text-muted" aria-hidden />
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="text-[13px] font-bold">{t("up.dlg.pass.title")}</span>
+                  <p className="text-xs leading-snug text-pretty text-muted">{t("up.dlg.pass.why")}</p>
+                </div>
+              </div>
               <TextField label={t("up.dlg.pass.a")} type="password" autoComplete="new-password" value={pass.a} onChange={(e) => setPass({ ...pass, a: e.target.value })} />
               <TextField
                 label={t("up.dlg.pass.b")}
@@ -239,6 +246,7 @@ export function UpdatePanelDialog({
                   {t("up.dlg.file.download")}
                 </Button>
               </div>
+              <p className="text-[11px] leading-snug text-pretty text-faint">{t("up.dlg.pass.key")}</p>
             </div>
           )}
         </Row>
@@ -270,7 +278,9 @@ export function PanelUpdateWindow({ open, onOpenChange, data, actions }: { open:
   }).data;
   const r2 = !!settings && !!settings.accountId && !!settings.bucket && !!settings.accessKeyId && settings.hasSecret && !!settings.ageRecipient;
   const failed = (e: unknown) => {
-    if (!isStepUpCancelled(e)) toast.error(errorText(e, t));
+    if (isStepUpCancelled(e)) return false;
+    if (e instanceof BackupDownloadError) toast.error(e.code === "backup_busy" ? t("up.dlg.err.busy") : e.code.startsWith("backup_") ? t("up.dlg.err.failed") : e.message);
+    else toast.error(errorText(e, t));
     return false;
   };
   const backupR2 = useMutation({ mutationFn: () => guard(() => backups.createBackup({})) });
