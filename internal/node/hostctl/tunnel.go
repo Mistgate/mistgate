@@ -17,10 +17,11 @@ import (
 //   - an MSS clamp to the route MTU towards and from a tunnel interface;
 //   - client isolation: a forwarded packet may not leave through another (or the same) tunnel interface, so client
 //     A never reaches client B, not even across profiles (found on a test stand);
-//   - an input policy for packets that arrive on a tunnel interface and are for the node itself: HTTPS is allowed so a
-//     full-tunnel client can reach a panel that shares the node's public address, and an echo request to the tunnel's own
-//     address is answered; everything else is dropped. A client must not reach sshd, backend management ports or the node
-//     address of another profile;
+//   - an input policy for packets that arrive on a tunnel interface and are for the node itself: an echo request to the
+//     tunnel's own address is answered, every other packet to a tunnel address (its own or another profile's) is
+//     dropped, HTTPS to the host's other (public) addresses is allowed so a full-tunnel client reaches a panel that
+//     shares the node's address, and everything else is dropped. A client must not reach sshd or backend management
+//     ports;
 //   - with "IPv6 for clients" off (Tunnel.RejectV6): IPv6 from a tunnel towards the uplink is rejected with ICMPv6
 //     admin-prohibited (chain nov6), not dropped, so apps move to IPv4 immediately;
 //   - one named counter per UDP port, AwgHealth.udp_rx_packets: 0 = the provider or a firewall, > 0 without a
