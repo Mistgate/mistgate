@@ -353,7 +353,9 @@ func TestConfirmRestoreGuardsAuditAndExpiredStages(t *testing.T) {
 	if connect.CodeOf(busyErr) != connect.CodeAborted {
 		t.Fatalf("confirm during a backup = %v", busyErr)
 	}
+	helperCalled := false
 	s.restore.panelData = func(_ context.Context, req RestoreRequest, beforeStart func() error) error {
+		helperCalled = true
 		if req.Source != "upload" || req.FileName != "backup.tar.gz.age" {
 			t.Errorf("restore helper request = %+v", req)
 		}
@@ -362,8 +364,9 @@ func TestConfirmRestoreGuardsAuditAndExpiredStages(t *testing.T) {
 		}
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("a node rollout is active"))
 	}
-	if err := confirm(ownerContext("owner", store.RoleOwner), "Northstar"); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("confirm during panel-update/rollout gate = %v", err)
+	// The name is matched whatever its case and surrounding spaces: the admin shows it in an upper-cased label.
+	if err := confirm(ownerContext("owner", store.RoleOwner), "  NORTHSTAR "); connect.CodeOf(err) != connect.CodeFailedPrecondition || !helperCalled {
+		t.Fatalf("confirm during panel-update/rollout gate = %v (helper called: %v)", err, helperCalled)
 	}
 	assertNoRestoreStages(t, s.dataDir)
 	rows, err := s.st.ListAudit(context.Background(), "", 0, 20)

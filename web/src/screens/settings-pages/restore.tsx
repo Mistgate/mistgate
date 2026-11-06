@@ -31,6 +31,9 @@ type KeyKind = "identity" | "passphrase";
 type Step = "pick" | "busy" | "confirm" | "restarting" | "back" | "timeout";
 type Summary = Plain<RestoreSummary>;
 
+// The typed confirmation: the name as the summary shows it, whatever the case (the field's label is upper-cased).
+const sameName = (typed: string, name: string) => typed.trim().toLocaleLowerCase() === name.trim().toLocaleLowerCase() && name.trim() !== "";
+
 // The installer's restore on a new server: a command, so it is the same in every language (and its pipe is no plural form).
 const installerRestore = (archive: string, identity: string) => `curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --restore ${archive} --identity-file ${identity}`;
 
@@ -347,7 +350,7 @@ export function RestoreDialog({ open, onOpenChange, r2, initialR2, demo }: { ope
             <span>{t("set.backups.rs.sum.kept")}</span>
           </span>
         </Notice>
-        <TextField label={t("set.backups.rs.sum.type", { name })} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
+        <TextField label={t("set.backups.rs.sum.type")} placeholder={name} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
         {errorLine && <p className="text-[13px] text-danger-text">{errorLine}</p>}
       </div>
     );
@@ -356,7 +359,7 @@ export function RestoreDialog({ open, onOpenChange, r2, initialR2, demo }: { ope
         <Button type="button" variant="secondary" disabled={step === "busy"} onClick={reset}>
           {t("set.backups.rs.back")}
         </Button>
-        <Button type="button" variant="danger" disabled={step === "busy" || typed.trim() !== name} onClick={() => void restore()}>
+        <Button type="button" variant="danger" disabled={step === "busy" || !sameName(typed, name)} onClick={() => void restore()}>
           {t("set.backups.rs.do")}
         </Button>
       </>

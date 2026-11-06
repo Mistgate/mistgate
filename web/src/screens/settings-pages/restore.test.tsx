@@ -100,10 +100,11 @@ describe("the restore window", () => {
     expect(button("Restore")?.disabled).toBe(true);
     await type(field("to confirm"), "Mistgat");
     expect(button("Restore")?.disabled).toBe(true);
-    await type(field("to confirm"), "Mistgate");
+    await type(field("to confirm"), "MISTGATE");
+    expect(button("Restore")?.disabled).toBe(false);
     await click(button("Restore"));
     await settle();
-    expect(confirmRestore).toHaveBeenCalledWith({ restoreId: "rst_1", typedPanelName: "Mistgate" });
+    expect(confirmRestore).toHaveBeenCalledWith({ restoreId: "rst_1", typedPanelName: "MISTGATE" });
     expect(text()).toContain("The panel is back");
     expect(button("Sign in")).toBeTruthy();
   });

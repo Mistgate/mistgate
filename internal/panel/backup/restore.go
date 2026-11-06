@@ -603,7 +603,8 @@ func (r rpc) ConfirmRestore(ctx context.Context, req *connect.Request[adminv1.Co
 	if !ok || !r.s.now().Before(record.expires) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("the prepared restore has expired or does not exist"))
 	}
-	if strings.TrimSpace(req.Msg.TypedPanelName) != record.summary.PanelName {
+	// Case does not matter: the name is shown in a label that can be upper-cased, and it guards against a slip, not an attacker.
+	if !strings.EqualFold(strings.TrimSpace(req.Msg.TypedPanelName), strings.TrimSpace(record.summary.PanelName)) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("the typed panel name does not match"))
 	}
 	if r.s.panelOperationRunning() || !r.s.mu.TryLock() {
