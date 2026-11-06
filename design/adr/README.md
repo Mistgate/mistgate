@@ -18,5 +18,6 @@ new record that supersedes the old one, not by editing history.
 | [0011](0011-release-channels.md) | Release channels: stable, testing and dev, told apart by the tag | Accepted |
 | [0012](0012-backup-before-panel-update.md) | A backup to download before the panel updates itself | Accepted |
 | [0014](0014-assistant.md) | The assistant: a cloud model that runs the panel through its own MCP tools | Proposed |
+| [0015](0015-moving-target-transport.md) | A moving target: a dialect of its own for every server, rotated by the panel | Proposed |
 
 The plan they serve: [`../cloudflare-edition/README.md`](../cloudflare-edition/README.md).
