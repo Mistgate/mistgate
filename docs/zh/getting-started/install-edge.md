@@ -141,6 +141,7 @@ Setup link (one-time; the token is valid for 30 minutes from the panel's first s
 |:--|:--|
 | 备份 | 不支持加密备份和恢复。Cloudflare 自带的 D1 恢复功能（Time Travel）可以恢复数据库，但尚未与面板一起测试。妥善保管密钥文件。 |
 | MCP 和 API 令牌 | 不提供 MCP 服务器。已有令牌会显示在列表中，也可以吊销；不能创建新令牌。 |
+| 助手 | 不提供；将与 MCP 一同推出。参见[助手](../guide/assistant.md#在-cloudflare-版中)。 |
 | 隧道检测 | 面板目前不会从客户端视角检测服务器的隧道。 |
 | 节点日志 | 不显示节点 Agent 的实时日志；其警告和错误见节点的[运行记录](../guide/nodes.md#运行记录)。 |
 | 更新面板 | 不支持自更新：需再次运行命令更新（见下文）。 |

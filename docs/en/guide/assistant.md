@@ -1,0 +1,82 @@
+---
+title: Assistant
+description: A cloud model in the admin that answers about your nodes, people and errors and prepares changes you apply. Providers, where the data goes, memory, limits and safety.
+---
+
+# Assistant
+
+The assistant is a chat in the admin with a cloud model you connect with your own API key. Ask it which nodes had problems, why someone cannot connect, who is over the device limit; ask it to make a group, change the subscription texts or turn a profile off for a node. It looks things up with the panel's own tools and prepares every change as a card in the panel's words. **Nothing changes until you press Apply.**
+
+It works with the rights of the admin who talks to it, never more, and it is available on the VPS edition (see [In the Cloudflare edition](#in-the-cloudflare-edition)).
+
+## Turn it on
+
+The owner sets it up in **AI → Assistant**:
+
+1. Under **Providers**, choose **Connect** on a provider, paste its API key and choose **Check and save**. The panel asks for your passkey or code, checks the key with the provider and seals it; the card then shows only its last four characters.
+2. On the connected card, pick the **Model** (the price per million tokens is under it) and the **Monthly budget, $**.
+3. Above, turn **The assistant is on**, pick the **Provider the chat uses**, **How hard it thinks** (**Quick**, **Normal**, **Thorough**), **Who may use it** (**Only me**, **Owner and helpers**, **Everyone in the panel**), the **Notes for the assistant** and how long to **Keep conversations**, and choose **Save**.
+
+A round button appears at the bottom corner of every page for the admins it is open to; **Ctrl+J** (**⌘J** on a Mac) opens and closes the chat too.
+
+## Providers and where your data goes
+
+| Provider | Address the panel calls | Models | Where the data goes |
+|:--|:--|:--|:--|
+| Anthropic | `api.anthropic.com` | from the provider's list; Claude Opus 5.5 by default, Sonnet 5.5 and Haiku 5.5 cheaper | Processed in the United States; API data is not used for training. |
+| DeepSeek | `api.deepseek.com` | from the provider's list | Stored in China; the provider's policy allows using what you send for training. |
+| Z.ai | `api.z.ai` (the international platform) | GLM-5.3 and GLM-5.3-Flash | Processed in Singapore; the provider's agreement says content is not stored. |
+| Ollama Cloud | `ollama.com` | the cloud models that take tools | Processed in the United States; not used for training. |
+
+The card of each provider says the same, so you choose knowing it. The panel talks to a provider only from its own server, at that fixed address: there is no field for another address, and the browser never sees the key.
+
+What the provider receives: the conversation, the assistant's instructions, your notes and the owner's notes, and the results of the tools it calls. Those results pass the same filter as [MCP](../reference/mcp.md#what-an-agent-never-gets): no subscription links or page passwords, no keys, device configurations or tokens, no server passwords, no node addresses. If a message you type looks like a key or a password, the chat asks before sending it.
+
+## What it can do
+
+- **Read**: nodes and their health, people, groups, devices, events and alerts, reachability from the country, subscriptions and DNS, updates; the audit log for the owner. These are the [MCP](../reference/mcp.md) read tools of your role.
+- **Change**: every MCP change, as a plan. The plan comes to the chat as a **Proposed change** card with the panel's own summary, the facts (anything that came from data is quoted) and the danger notes. **Apply** runs exactly that plan, once; **Dismiss** drops it; a plan not applied within 10 minutes expires.
+  - A plan that needs the owner (it changes what runs on the nodes, touches many people, or every person would see it): when the owner talks to the assistant, **Approve and apply** asks for the passkey or code and does both; for anyone else the card says it waits for the owner in **AI → Waiting for you**.
+  - Installing a node over SSH is approved only in **AI → Waiting for you**, where the owner compares the host key and chooses how the panel logs in.
+- **Its rights are yours**: the owner's assistant has the Admin tools, a helper's the Operator tools, a read-only admin's only the read tools.
+
+The model never applies anything itself: it has no tool to do so. Every call is in the audit log as "Assistant of <admin>", with the source **Assistant** (filter by it in **Settings → Audit**).
+
+## Memory
+
+- **Notes.** The assistant saves what it should remember ("Remembered: …" in the chat, with **Forget**). **AI → Memory** lists them: add, edit and delete any, or **Forget everything**. Every note goes into every conversation; at most 100 notes of 400 characters.
+- **Notes for the assistant** (the owner's, in **AI → Assistant**): what every admin's assistant should know about this panel.
+- **Conversations.** The assistant knows the titles of your recent conversations and can search and read the earlier ones when you refer to them. **AI → Memory → Conversations** opens one in the chat, or deletes one or all.
+
+Conversations and notes are sealed in the panel's database and private to each admin: nobody else reads them, the owner included. They are kept as long as **Keep conversations** says.
+
+## Limits and cost
+
+- One answer uses at most 24 tool calls and 10 minutes; **Stop** ends it at once and keeps what was said.
+- One admin sends at most 20 messages a minute, and a conversation runs one answer at a time.
+- Each provider has the owner's **Monthly budget, $**, estimated from the provider's prices and the usage each answer reports. At the budget the assistant stops until next month. **AI → Assistant → This month** shows the cost per admin.
+
+## Safety
+
+- The key is sealed with the panel's master key, entered by the owner after a passkey or code, and never shown, logged or written to the audit log.
+- Names, notes and log lines from nodes and people are data to the assistant, never instructions; it has no tool that reaches the internet; the chat shows no images and no HTML, links to the admin's pages stay in the admin and other links open apart.
+- Even if a node name or a note talked the model into proposing something, it would only be a card: the change happens when a person reads it and presses **Apply**.
+
+## MCP, tokens and approvals
+
+Outside agents (Claude Code, Cursor, your scripts) keep using [MCP](../reference/mcp.md) and [API tokens](../reference/api.md): they moved from Integrations to **AI → MCP and tokens**, and the plans waiting for the owner to **AI → Waiting for you**, with the badge in the menu. **Integrations** keeps the Telegram alerts.
+
+## In the Cloudflare edition
+
+The assistant is not available there yet, like MCP: **AI → Assistant** says so. It will come together with MCP.
+
+## When it does not answer
+
+| The chat says | What to do |
+|:--|:--|
+| The provider refused the key. | Replace the key in **AI → Assistant**. |
+| The provider account has no balance. | Top up the account at the provider. |
+| This month's budget for the provider is spent. | Raise **Monthly budget, $**, or wait for next month. |
+| The owner has not opened the assistant to your role. | The owner changes **Who may use it**. |
+| Too many requests right now. | Wait a minute; the provider or the panel limits the rate. |
+| The provider did not answer, or is overloaded. | Try again later, or switch the provider in **AI → Assistant**. |

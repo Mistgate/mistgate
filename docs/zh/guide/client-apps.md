@@ -129,4 +129,4 @@ Telegram 应用不在**订阅 → 用户页面**的应用列表中：没有可�
 
 ## 通过 MCP 配置
 
-具有操作员权限或更高权限的 AI 智能体可以使用 `subscription_settings_get`、`subscription_app_upsert_plan` / `subscription_app_upsert_apply` 和 `subscription_app_remove_plan` / `subscription_app_remove_apply` 管理相同的列表。所有页面更改都需要所有者批准：所有者在**集成 → 待你审批**中批准，每张卡片都会完整显示各字段。[MCP](../reference/mcp.md#示例为-windows-和-macos-添加-klck) 中有一个为 Windows 和 macOS 添加 kl!ck 的完整示例。[AI 智能体指南](../getting-started/ai-agents.md)中的提示词也包含此步骤。
+具有操作员权限或更高权限的 AI 智能体可以使用 `subscription_settings_get`、`subscription_app_upsert_plan` / `subscription_app_upsert_apply` 和 `subscription_app_remove_plan` / `subscription_app_remove_apply` 管理相同的列表。所有页面更改都需要所有者批准：所有者在**AI → 等待你处理**中批准，每张卡片都会完整显示各字段。[MCP](../reference/mcp.md#示例为-windows-和-macos-添加-klck) 中有一个为 Windows 和 macOS 添加 kl!ck 的完整示例。[AI 智能体指南](../getting-started/ai-agents.md)中的提示词也包含此步骤。

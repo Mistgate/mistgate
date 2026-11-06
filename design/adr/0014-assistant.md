@@ -130,9 +130,19 @@ The owner turns the assistant on and picks who may use it: **Only me** (default)
 
 ### Editions
 
-Both editions. On the Cloudflare edition the loop runs in the admin Worker, which streams the answer; the SDK and the
-OpenAI client must fit the admin script's size budget (measured before the code lands; if the Anthropic SDK does not fit,
-that adapter is written on raw HTTP for `js/wasm` only, with the same tests).
+The VPS edition first. Amended 2026-11-06, when it was built: the assistant runs on the panel's own MCP server in
+process, and the Cloudflare edition does not serve MCP yet; compiled into the admin Worker, the assistant and the MCP
+runtime added 17 MB, two below Cloudflare's 64 MiB ceiling for a Worker. So on that edition the assistant is an
+unavailable feature (`edition.Assistant`, its runtime left out of every `js/wasm` build, the RPCs answer "available on
+the VPS edition", the AI page says so), and it comes together with MCP, in a Worker script of its own (the ADR 0009
+pattern), not in the admin script.
+
+### The assistant's credential
+
+Each admin gets a hidden token row with the profile of their role and no secret ever issued: it is never listed among
+the API tokens, refused on every external route (bearer auth, the MCP endpoint), and used only by the in-process MCP
+session of that admin's turns. MCP plans keep its id, so ApplyPlan applies a plan with the same identity that made it;
+the audit reads "Assistant of <admin>", source `assistant`.
 
 ## Consequences
 

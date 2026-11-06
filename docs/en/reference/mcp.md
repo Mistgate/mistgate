@@ -19,11 +19,11 @@ https://panel.example.com/<prefix>/mcp
 - Every request needs `Authorization: Bearer tk1_…` and is checked again: a revoked or expired token stops at its next request. There is no session to take over.
 - `tools/list` shows only the tools the token's profile may use.
 
-**Integrations → MCP** shows the address and a ready snippet for each kind of client.
+**AI → MCP and tokens** shows the address and a ready snippet for each kind of client.
 
 ## Connect a client
 
-Create a token in **Integrations → API tokens** with the narrowest profile that works (see [Token profiles](api.md)). Then:
+Create a token in **AI → MCP and tokens** with the narrowest profile that works (see [Token profiles](api.md)). Then:
 
 **Claude Code** (Streamable HTTP):
 
@@ -236,7 +236,7 @@ Profile plans validate settings and node additions before storing a plan. Every 
 
 ### Where the owner approves
 
-Such a plan appears in **Integrations → Waiting for you**, with a badge in the admin; if the owner linked Telegram, the panel also sends a message that a plan waits, with a link there (the decision is made in the admin only: see [Telegram alerts](../operations/telegram-alerts.md)). The owner sees the change in the panel's own words, the danger notes, the agent's reason (marked "Written by the agent. The panel did not check it.") and the time left, then chooses:
+Such a plan appears in **AI → Waiting for you**, with a badge in the admin; if the owner linked Telegram, the panel also sends a message that a plan waits, with a link there (the decision is made in the admin only: see [Telegram alerts](../operations/telegram-alerts.md)). The owner sees the change in the panel's own words, the danger notes, the agent's reason (marked "Written by the agent. The panel did not check it.") and the time left, then chooses:
 
 - **Approve**: asks for the owner's passkey or authenticator code once more. The agent's apply goes through after this, for this plan only.
 - **Reject**: the agent's apply fails with "rejected by the owner".
@@ -264,7 +264,7 @@ A token can never confirm its own plan. Undecided plans expire 10 minutes after 
    }
    ```
 
-   The plan has `needs_approval` and the danger `user_page`. Show it, ask the owner to approve it in **Integrations → Waiting for you**, then call `subscription_app_upsert_apply` with the `confirm_token`.
+   The plan has `needs_approval` and the danger `user_page`. Show it, ask the owner to approve it in **AI → Waiting for you**, then call `subscription_app_upsert_apply` with the `confirm_token`.
 3. The same for macOS: the same arguments with `"platform": "macos"`.
 4. So that kl!ck leads, take the badge off Happ on both platforms, one plan each: `{"platform": "windows", "name": "Happ", "recommended": false, "reason": "kl!ck leads on the desktop"}`, then the same with `"macos"`. Only the fields that change are given for an app that already exists.
 

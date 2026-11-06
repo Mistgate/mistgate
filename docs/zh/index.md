@@ -55,6 +55,7 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 - [DNS](guide/dns.md)：用户和分组的 DNS 预设，以及节点的 DNS。
 - [BT 下载拦截](guide/torrent-protection.md)：逐节点的 BitTorrent 拦截功能、拦截内容及事件显示的信息。
 - [自有伪装站点](guide/decoy-site.md)：用自己的小型站点替换内置伪装页面，并提供让 AI 智能体生成独特站点的现成提示词。
+- [助手](guide/assistant.md)：管理后台中的云端模型，回答节点、用户和错误相关的问题并准备更改，由你来应用；提供商、数据去向、记忆和限制。
 
 ### 运维
 

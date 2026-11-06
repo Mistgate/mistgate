@@ -19,11 +19,11 @@ https://panel.example.com/<prefix>/mcp
 - 每个请求都必须包含 `Authorization: Bearer tk1_…`，并会重新验证：令牌被吊销或过期后，下一次请求就会被拒绝。这里没有可被接管的会话。
 - `tools/list` 只会显示该令牌权限级别允许使用的工具。
 
-**集成 → MCP** 会显示端点地址和适用于各类客户端的配置片段。
+**AI → MCP 与令牌** 会显示端点地址和适用于各类客户端的配置片段。
 
 ## 连接客户端
 
-在 **集成 → API 令牌** 中创建令牌，并选择能够满足需求的最低权限级别（参见[令牌权限级别](api.md)）。然后：
+在 **AI → MCP 与令牌** 中创建令牌，并选择能够满足需求的最低权限级别（参见[令牌权限级别](api.md)）。然后：
 
 **Claude Code** (Streamable HTTP):
 
@@ -236,7 +236,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 
 ### 所有者在哪里审批
 
-此类计划会显示在管理后台的 **集成 → 待你审批** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
+此类计划会显示在管理后台的 **AI → 等待你处理** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
 
 - **批准**：要求所有者再次使用通行密钥或身份验证器验证码。之后智能体只能执行此计划。
 - **拒绝**：智能体执行计划时会失败，并返回「rejected by the owner」。
@@ -264,7 +264,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
    }
    ```
 
-   计划的 `needs_approval` 为 true，风险标记为 `user_page`。向所有者展示计划，请其在 **集成 → 待你审批** 中批准，然后使用 `confirm_token` 调用 `subscription_app_upsert_apply`。
+   计划的 `needs_approval` 为 true，风险标记为 `user_page`。向所有者展示计划，请其在 **AI → 等待你处理** 中批准，然后使用 `confirm_token` 调用 `subscription_app_upsert_apply`。
 3. The same for macOS: the same arguments with `"platform": "macos"`.
 4. 要让 kl!ck 排在前面，请在两个平台上分别制定一个计划，取消 Happ 的推荐标记：`{"platform": "windows", "name": "Happ", "recommended": false, "reason": "kl!ck leads on the desktop"}`，然后将平台改为 `"macos"` 再执行一次。更新现有应用时只需提供变更字段。
 

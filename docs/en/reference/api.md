@@ -54,7 +54,7 @@ The comments in the proto files are the reference for every field. Conventions (
 
 ## API tokens
 
-The owner creates tokens in **Integrations → API tokens → New token** (a fresh step-up is needed):
+The owner creates tokens in **AI → MCP and tokens → New token** (a fresh step-up is needed):
 
 | Field | Rule |
 |---|---|
@@ -212,7 +212,7 @@ Closed to every token: deleting users, the subscription link, the Telegram proxy
 
 A token never passes step-up. Procedures that need a step-up, or that change what runs on the nodes, are never callable with a token directly; over the plain API they answer 403 "this needs the owner's approval; it is not available over the API".
 
-They are reachable only through the [MCP server](mcp.md) with an Admin token (the user page's app list from the Operator profile up): the agent plans the change, the owner reads the plan in **Integrations → Waiting for you** and approves it (with a step-up of their own), and only then does the agent's apply carry out the approved plan. The approval is checked in the database on every call, and the grant allows only the procedures listed on that plan. A plan expires 10 minutes after it was made.
+They are reachable only through the [MCP server](mcp.md) with an Admin token (the user page's app list from the Operator profile up): the agent plans the change, the owner reads the plan in **AI → Waiting for you** and approves it (with a step-up of their own), and only then does the agent's apply carry out the approved plan. The approval is checked in the database on every call, and the grant allows only the procedures listed on that plan. A plan expires 10 minutes after it was made.
 
 ## Limits
 

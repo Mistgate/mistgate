@@ -149,7 +149,7 @@ The longer version, with sign-in, roles, step-up, sessions and the audit log, is
 - Can call only the procedures on the token allow-list, up to the level of its profile: read-only reads; operator also manages users (create, change, enable, extend, reset traffic, revoke devices) and runs checks; admin also reads the audit log and the saved SSH endpoints and logins of nodes.
 - Never receives a subscription link, a device key, a page password or a server password: no procedure open to tokens returns one.
 - Cannot pass a step-up, create or revoke tokens, change sign-in settings, manage nodes or profiles. Applying a doctor fix, starting, pausing or cancelling a rollout, scheduling a node update, installing a node over SSH or changing its SSH password works only through MCP and only after the owner approves the plan in the admin.
-- Expires (90 days by default, at most 365) and has a rate limit. Its changes are in the audit log under the token's name, its reads at most once a minute, with the address they came from. Revoke it under **Integrations**.
+- Expires (90 days by default, at most 365) and has a rate limit. Its changes are in the audit log under the token's name, its reads at most once a minute, with the address they came from. Revoke it under **AI → MCP and tokens**.
 
 **A stolen subscription link**
 
