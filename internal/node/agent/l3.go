@@ -26,6 +26,8 @@ import (
 const (
 	capAWG   = "awg/1"
 	capVLESS = "vless/1"
+	// capVLESSUnknownKeys marks agents that report VLESS unknown-user-ID attempts in links/1.
+	capVLESSUnknownKeys = "vless-unknown-keys/1"
 	// capVLESSTLS: the VLESS engine terminates TLS through its certificate source before Xray receives a connection.
 	capVLESSTLS = "vless-tls/1"
 	// capVLESSSelf: the VLESS engine serves the node's own site behind REALITY (reality.target "self", design/vless.md
@@ -144,7 +146,7 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capAWG)
 	}
 	if _, ok := a.engines["vless"]; ok {
-		caps = append(caps, capVLESS)
+		caps = append(caps, capVLESS, capVLESSUnknownKeys)
 		if a.cfg.Certs != nil { // the site needs the certificate source
 			caps = append(caps, capVLESSSelf, capVLESSTLS)
 		}

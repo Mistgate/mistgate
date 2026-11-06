@@ -42,6 +42,9 @@ type eng struct {
 	out   func(string) (engine.Egress, error)
 	users *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
 
+	unknownMu   sync.Mutex
+	unknownKeys map[string]*unknownKeyTracker
+
 	torrentEnabled atomic.Bool
 	idleTimeout    time.Duration
 
@@ -73,6 +76,7 @@ type inbound struct {
 	out         engine.Egress
 	userManager proxy.UserManager
 	connTracker *tcpConnTracker
+	unknownKeys *unknownKeyTracker
 
 	// target "self": the node's own site behind REALITY, and the ACME certificate claim it holds (front.go).
 	site             *site
@@ -105,7 +109,10 @@ func New(env engine.Env) (engine.Engine, error) {
 		now = time.Now
 	}
 	after := afterFunc(func(d time.Duration, f func()) stoppable { return time.AfterFunc(d, f) })
-	e := &eng{env: env, log: logger, now: now, after: after, idleTimeout: 300 * time.Second, inbounds: make(map[string]*inbound)}
+	e := &eng{
+		env: env, log: logger, now: now, after: after, idleTimeout: 300 * time.Second,
+		inbounds: make(map[string]*inbound), unknownKeys: make(map[string]*unknownKeyTracker),
+	}
 	e.out = env.Egress
 	if e.users = env.UserLimits; e.users == nil {
 		e.users = ratelimit.NewRegistry()
@@ -196,7 +203,7 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 
 	in := &inbound{
 		e: e, spec: spec, specHash: sh, generation: generations.Add(1), cfg: cfg, creds: creds,
-		state: plugin.RunStarting, since: e.now(),
+		state: plugin.RunStarting, since: e.now(), unknownKeys: e.unknownKeyTracker(spec.ID),
 	}
 	in.ctx, in.cancel = context.WithCancel(context.Background())
 	in.idx.Store(ix)
@@ -311,6 +318,11 @@ func (in *inbound) start(ctx context.Context) error {
 	if !ok {
 		_ = inst.Close()
 		return errors.New("xray VLESS inbound has no user manager")
+	}
+	// The unknown-key counter is diagnostics: a seam that a future Xray changed must not keep the inbound from serving
+	// people. The tests run the real handler, so such a change fails them before a release; here it only costs the count.
+	if err := instrumentVLESSValidator(getter.GetInbound(), func() { in.unknownKeys.record(in.e.now()) }); err != nil {
+		in.e.log.Warn("vless: unknown keys are not counted on this inbound: " + err.Error())
 	}
 	in.instance, in.out, in.userManager = inst, out, userManager
 	if err := inst.Start(); err != nil {
@@ -541,6 +553,13 @@ func (e *eng) Collect(context.Context) (engine.Collected, error) {
 		}
 	}
 	e.retired = keep
+	e.unknownMu.Lock()
+	for inboundID, counter := range e.unknownKeys {
+		if count := counter.count.Swap(0); count != 0 {
+			out.Links = append(out.Links, plugin.LinkStat{InboundID: inboundID, UnknownKeys: count})
+		}
+	}
+	e.unknownMu.Unlock()
 	sort.Slice(out.Traffic, func(i, j int) bool {
 		a, b := out.Traffic[i], out.Traffic[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
@@ -549,7 +568,19 @@ func (e *eng) Collect(context.Context) (engine.Collected, error) {
 		a, b := out.Sessions[i], out.Sessions[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && (a.CredID < b.CredID || (a.CredID == b.CredID && a.Since.Before(b.Since))))
 	})
+	sort.Slice(out.Links, func(i, j int) bool { return out.Links[i].InboundID < out.Links[j].InboundID })
 	return out, nil
+}
+
+func (e *eng) unknownKeyTracker(inboundID string) *unknownKeyTracker {
+	e.unknownMu.Lock()
+	defer e.unknownMu.Unlock()
+	tracker := e.unknownKeys[inboundID]
+	if tracker == nil {
+		tracker = newUnknownKeyTracker(inboundID, e.log)
+		e.unknownKeys[inboundID] = tracker
+	}
+	return tracker
 }
 
 func (e *eng) Kick(_ context.Context, credIDs []string) (int, error) {

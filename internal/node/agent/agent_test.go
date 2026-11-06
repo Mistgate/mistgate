@@ -33,8 +33,12 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 
 func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {
 	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
-	if !slices.Contains(a.capabilities(), "vless/1") {
-		t.Fatal("Hello.capabilities does not advertise vless/1 for a registered engine")
+	caps := a.capabilities()
+	if !slices.Contains(caps, "vless/1") || !slices.Contains(caps, capVLESSUnknownKeys) {
+		t.Fatalf("Hello.capabilities = %v, want vless/1 and %s for a registered engine", caps, capVLESSUnknownKeys)
+	}
+	if slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), capVLESSUnknownKeys) {
+		t.Fatal("VLESS unknown-key capability is advertised without a VLESS engine")
 	}
 }
 

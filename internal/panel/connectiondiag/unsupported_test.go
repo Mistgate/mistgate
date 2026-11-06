@@ -24,3 +24,21 @@ func TestUnsupportedCounters(t *testing.T) {
 		t.Errorf("Hysteria2 links/2 unsupported = %v, want none", got)
 	}
 }
+
+func TestVLESSUnknownKeysCapability(t *testing.T) {
+	legacy := UnsupportedCountersForNode("vless", nil)
+	if !slices.Contains(legacy, "unknown_keys") {
+		t.Fatalf("legacy VLESS unsupported = %v, want unknown_keys", legacy)
+	}
+
+	current := UnsupportedCountersForNode("VLESS", []string{VLESSUnknownKeysCapability})
+	if slices.Contains(current, "unknown_keys") {
+		t.Fatalf("VLESS agent with %s still marks unknown_keys unsupported: %v", VLESSUnknownKeysCapability, current)
+	}
+	if len(current) != len(legacy)-1 {
+		t.Fatalf("VLESS unsupported with capability = %v, want only unknown_keys removed from %v", current, legacy)
+	}
+	if !slices.Contains(UnsupportedCountersForNode("hysteria2", []string{VLESSUnknownKeysCapability}), "client_closes") {
+		t.Fatal("VLESS capability changed Hysteria2's unsupported counters")
+	}
+}
