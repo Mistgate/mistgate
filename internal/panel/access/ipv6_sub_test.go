@@ -294,3 +294,57 @@ func TestIPv6TwinAndRelayTwinOfOneServer(t *testing.T) {
 		}
 	}
 }
+
+func TestHiddenDirectServerKeepsIPv6AndRelayTwinsInEveryFormat(t *testing.T) {
+	f := newTwinFix(t)
+	f.entry("nod_de1", entryAddr)
+	in := f.inbound(f.vlessWith("vless", "{\"transport\":\"tcp\",\"reality\":{\"target\":\"www.example.org:443\"}}").Id, "nod_de1")
+	r := must(f.create(in.Id, "nod_fi1", 8443))
+	f.switchOn(r.Id)
+	group := f.group("g", in.ProfileId)
+	userID := f.user("alice", group, nil).User.Id
+	token := f.tokenOf(userID)
+	must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: in.Id, DirectInSubscriptions: new(false)})))
+
+	for _, format := range linkFormats {
+		v := f.twinView(token, format)
+		if len(v.Servers) != 2 || len(v.Lines) != 2 || v.Servers[0].Mark != MarkIPv6 || v.Servers[1].Mark != "via:FI" {
+			t.Errorf("%s: servers=%+v lines=%q", format, v.Servers, v.Lines)
+			continue
+		}
+		if strings.Contains(strings.Join(v.Lines, "\n"), "de1.example.com") ||
+			!strings.Contains(v.Lines[0], entryAddr) || !strings.Contains(v.Lines[1], "fi1.example.com") {
+			t.Errorf("%s leaked the direct server or lost a twin:\n%s", format, strings.Join(v.Lines, "\n"))
+		}
+	}
+
+	page := must(f.s.SubscriptionWith(f.ctx, token, SubOptions{Format: plugin.FormatURIList, NoTouch: true}))
+	if len(page.Nodes) != 1 || len(page.Nodes[0].Conns) != 2 ||
+		!page.Nodes[0].Conns[0].IPv6 || page.Nodes[0].Conns[0].Relay ||
+		!page.Nodes[0].Conns[1].Relay || page.Nodes[0].Conns[1].Server != 1 {
+		t.Errorf("the page did not keep only the IPv6 and relay ways in matching order: %+v", page.Nodes)
+	}
+	preview, _, err := f.s.PreviewSubscription(f.ctx, userID)
+	if err != nil || len(preview.Servers) != 2 || preview.Servers[0].Mark != MarkIPv6 || preview.Servers[1].Mark != "via:FI" {
+		t.Errorf("admin subscription preview: servers=%+v err=%v", preview.Servers, err)
+	}
+}
+
+func TestHiddenCDNServerHasNoPlainEntryInAnyFormat(t *testing.T) {
+	f := newRelayFix(t)
+	p := f.vlessWith("cdn", "{\"security\":\"tls\",\"transport\":\"ws\",\"tls_mode\":\"acme_domain\",\"sni\":\"origin.example.com\",\"cdn\":{\"host\":\"cdn.example.org\",\"port\":443},\"ws\":{\"path\":\"/ws\",\"host\":\"\"}}")
+	in := f.inbound(p.Id, "nod_de1")
+	token := f.tokenOf(f.user("alice", f.group("g", p.Id), nil).User.Id)
+	must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: in.Id, DirectInSubscriptions: new(false)})))
+
+	for _, format := range linkFormats {
+		v := f.twinView(token, format)
+		if len(v.Servers) != 0 || len(v.Lines) != 0 {
+			t.Errorf("%s rendered a hidden CDN server: servers=%+v lines=%q", format, v.Servers, v.Lines)
+		}
+	}
+	page := must(f.s.SubscriptionWith(f.ctx, token, SubOptions{Format: plugin.FormatURIList, NoTouch: true}))
+	if len(page.Nodes) != 0 {
+		t.Errorf("the page kept a hidden CDN connection: %+v", page.Nodes)
+	}
+}

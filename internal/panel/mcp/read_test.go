@@ -247,6 +247,9 @@ func TestUntrustedTextIsCleaned(t *testing.T) {
 		t.Errorf("name: %q", name)
 	}
 	n := decode[NodeGetV](t, mustOK(t, s, "node_get", map[string]any{"node": "de1"}))
+	if len(n.Inbounds) != 1 || n.Inbounds[0].DirectInSubscriptions || !n.Inbounds[0].CDN {
+		t.Errorf("node inbound direct/CDN projection: %+v", n.Inbounds)
+	}
 	if !strings.Contains(n.Notes, "note from the owner.") {
 		t.Errorf("notes lost safe text: %q", n.Notes)
 	}
@@ -322,7 +325,8 @@ func TestNodePortsReadonlyUsesStoredRowsAndOperatorCanCheck(t *testing.T) {
 		stored.Ports[0].ProtocolOKUnix != 1700001000 || stored.UDPFilteredUnix != 1699995000 ||
 		stored.Ports[0].ConfirmSender != "confirm-node" || stored.Ports[0].ConfirmSent != 150 || stored.Ports[0].ConfirmGot != 145 ||
 		stored.Ports[0].ConfirmVerdict != "ok" || stored.Ports[0].Blame != "path" ||
-		len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" {
+		len(stored.Ports[0].Inbounds) != 1 || stored.Ports[0].Inbounds[0].Profile != "Main" ||
+		stored.Ports[0].Inbounds[0].DirectInSubscriptions || !stored.Ports[0].Inbounds[0].CDN {
 		t.Fatalf("stored UDP port checks = %+v", stored)
 	}
 	wantStored := []tcpCheckV{

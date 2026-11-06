@@ -56,7 +56,7 @@ func profileReadTools() []toolDef {
 				return c.profileList()
 			}),
 		readTool("profile_get", ProfileReadonly, procs(adminv1connect.ProfileServiceGetProfileProcedure, adminv1connect.GroupServiceListGroupsProcedure),
-			"Get one profile's summary, masked settings, inbounds with node names, effective and override ports and server names, enabled state, and groups that give access.",
+			"Get one profile's summary, masked settings, inbounds with node names, effective and override ports and server names, enabled state, direct_in_subscriptions and cdn, and groups that give access.",
 			func(c *call, in profileGetArgs) (any, error) {
 				if err := validID("profile_id", in.ProfileID); err != nil {
 					return nil, err
@@ -92,6 +92,7 @@ func profileReadTools() []toolDef {
 						TLSServerName: clean(ib.GetTlsServerName(), 253),
 						PortOverride:  ib.GetPortOverride(), TLSServerNameOverride: clean(ib.GetTlsServerNameOverride(), 253),
 						Enabled: ib.GetEnabled(), State: enumName("INBOUND_STATE_", ib.GetState().String()),
+						DirectInSubscriptions: ib.GetDirectInSubscriptions(), CDN: ib.GetCdn(),
 					})
 				}
 				return profileGetV{Profile: profileSummaryView(p, groups[p.GetId()]), Settings: settings, Inbounds: inbounds,
@@ -156,6 +157,8 @@ type profileInboundV struct {
 	TLSServerNameOverride string `json:"tls_server_name_override,omitempty"`
 	Enabled               bool   `json:"enabled"`
 	State                 string `json:"state"`
+	DirectInSubscriptions bool   `json:"direct_in_subscriptions"`
+	CDN                   bool   `json:"cdn"`
 }
 
 func profileSummaryView(p *adminv1.ProfileSummary, groups []string) profileSummaryV {

@@ -277,6 +277,8 @@ message UpdateInboundRequest {
   bool validate_only = 5;
   // As CreateInboundRequest.allow_lossy_port.
   bool allow_lossy_port = 6;
+  // Whether the server at the node's own address is included in subscriptions; absent = leave unchanged.
+  optional bool direct_in_subscriptions = 7;
 }
 
 message UpdateInboundResponse {

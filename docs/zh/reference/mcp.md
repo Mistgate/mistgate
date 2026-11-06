@@ -92,17 +92,18 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | 工具 | 权限级别 | 返回内容 |
 |---|---|---|
 | `fleet_status` | 只读 | 所有节点的状态、原因、在线用户、速度和 CPU；总计、告警数量及当前流量最高的用户。 |
-| `node_get` | 只读 | 单个节点：状态和原因、主机信息、协议配置及其状态、最多 10 位在线用户、所有者备注，以及 `ipv6`：其 [IPv6 入口](../guide/nodes.md#ipv6-入口)是否开启、节点能否接受入口（`unavailable_reason`：`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked` 或 `main_is_ipv6`）和最近一次地址检测。不含地址、密钥或证书固定指纹。 |
+| `node_get` | 只读 | 单个节点：状态和原因、主机信息、入站及其状态、`direct_in_subscriptions`（是否在订阅中列出节点地址）和 `cdn`（客户端是否通过 CDN 主机连接）、最多 10 位在线用户、所有者备注，以及 `ipv6`：其 [IPv6 入口](../guide/nodes.md#ipv6-入口)是否开启、节点能否接受入口（`unavailable_reason`：`no_ipv6`、`ipv6_broken`、`agent_old`、`not_checked` 或 `main_is_ipv6`）和最近一次地址检测。不含地址、密钥或证书固定指纹。 |
 | `warp_status` | 只读 | 单个节点是否有 WARP 账户，以及账户是否已启用或暂停；Agent 状态、colo、距上次握手的时间、Cloudflare 和其他站点的探测状态与延迟、注册时间、是否有刷新令牌，以及经 WARP 出口的协议配置。不含地址、密钥、账户 ID、许可证或令牌。 |
 | `relays_list` | 只读 | [中转](../guide/relays.md)：入口节点上把出口节点的某个服务器原样转发出去的端口。可选的 `node` 只保留以它为任一端的中转。每条中转包含：入口和出口节点、出口的服务器（协议配置、协议、网络）、入口和出口上的端口、`enabled`、`state`（`pending`、`active`、`failed`；`last_error_code` 是 Agent 错误信息的第一个词）、`exit_live`、`agent_supported`，以及 `last_check`：链路（入口能否连到出口的服务器）和路径（第三个节点能否经入口连到它），各自为 `ok`、`fail` 或 `skipped` 并带代码、发出探测的节点，UDP 还有发送和统计到的数据包数。读取的是已保存的数据，不会联系节点。不含地址。 |
 | `relay_candidates` | 只读 | 针对某个入口节点（`node`）：它可以中转的其他节点的服务器。每个服务器包含：`inbound_id`（`relay_plan` 所接收的值）、出口节点、协议配置、协议、网络和端口；`unsupported`（`cdn`、`acme_ip`、`awg`、`build_failed`；为空表示可以中转）；`hop`（服务器带跳跃范围，中转只传递一个端口）；`relay_id`（该入口已在中转它）；`exit_country_check`（国家检测如何看待出口：`ok`、`partial`、`blocked`、`listed` 或 `no_data`，以及它在哪些网络中不可达）；`entry_reaches_exit`（`reach`、`partial`、`blocked` 或 `no_data`，TSPU 探测从该入口运行过时才知道）。`entry_country_check` 是对入口自身的同样检查。`no_data` 表示未知，不表示没问题。不含地址。 |
 | `node_metrics` | 只读 | 节点当前的 CPU、RAM、磁盘和网络数据、今日流量、各协议的在线用户，以及今日流量最高的用户。 |
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 |
+| `node_ports` | 只读 | 已保存的 UDP 投递检查、TCP 可达性，以及每个端口上的入站/协议配置：`direct_in_subscriptions` 表示是否列出节点地址，`cdn` 表示客户端是否通过 CDN 主机连接。操作员权限可设置 `check: true` 运行有时限的检查（约 15 s）。 |
 | `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
 | `protocols_list` | 只读 | 协议插件、客户端应用、精简设置结构（包括关键字段和敏感字段）以及默认设置。敏感默认值会被遮蔽。对尚属新协议、还没有在实际环境中得到验证的协议（MTProto），会设置 `experimental`。 |
 | `profiles_list` | 只读 | 协议配置摘要，包括协议、节点数和用户数、警告、订阅格式、版本以及授予访问权限的分组。 |
-| `profile_get` | 只读 | 单个协议配置的摘要和已遮蔽敏感字段的设置；入站包含节点 ID 和名称、生效及覆盖后的端口和服务器名称、启用状态和运行状态；还包括授予访问权限的分组。参数为 `profile_id`。 |
+| `profile_get` | 只读 | 单个协议配置的摘要和已遮蔽敏感字段的设置；入站包含节点 ID 和名称、生效及覆盖后的端口和服务器名称、启用状态和运行状态、`direct_in_subscriptions`（是否在订阅中列出节点地址）和 `cdn`（客户端是否通过 CDN 主机连接）；还包括授予访问权限的分组。参数为 `profile_id`。 |
 | `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、三个应用开关（`app_happ`、`app_amnezia`、`app_telegram`）、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |

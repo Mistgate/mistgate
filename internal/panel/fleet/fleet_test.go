@@ -1255,12 +1255,16 @@ func TestAdminNodeAndFleetViews(t *testing.T) {
 		t.Errorf("node B %+v", by[ids.nodeB])
 	}
 
+	if _, err := e.st.W.ExecContext(e.ctx, "UPDATE inbound SET direct_in_subscriptions = 0 WHERE id = ?", ids.i1); err != nil {
+		t.Fatal(err)
+	}
 	gn, err := nodes.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	g := gn.Msg
 	if len(g.Inbounds) != 2 || g.Inbounds[0].Port != 443 || g.Inbounds[0].TlsServerName != "nodea.example.com" || g.Inbounds[0].ProfileName != "p1" ||
+		g.Inbounds[0].DirectInSubscriptions || g.Inbounds[0].Cdn ||
 		g.Metrics == nil || g.Metrics.RamTotalBytes != 1024 || g.Facts.Hostname != "h" || g.Timeouts.LivenessTimeoutS != 90 {
 		t.Errorf("GetNode %+v", g)
 	}

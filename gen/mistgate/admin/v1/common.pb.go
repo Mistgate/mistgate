@@ -330,7 +330,8 @@ func (WarpSource) EnumDescriptor() ([]byte, []int) {
 // Codes: agent_silent {minutes}, host_blip {minutes}, enrollment_pending {expires_in_minutes, expires_unix},
 // enrollment_expired (PENDING without a usable install command), inbound_failed {inbound, error, profile, failed,
 // total} (failed of the node's total enabled profiles do not run), state_drift, clock_skew {seconds}, no_profiles
-// (ONLINE, nothing else wrong, but no enabled profile: nobody gets the node).
+// (ONLINE, nothing else wrong, but no enabled profile: nobody gets the node), inbound_no_way_in {profile, node, reason}
+// (hiding the direct server leaves no usable IPv6 twin, CDN host or relay; reason is "awg", "acme_ip" or "no_usable_relay").
 // The health checks add no_traffic {failed, total} (status NO_TRAFFIC: agent on, synthetic
 // checks failing) and doctor_fail {check} (status stays ONLINE, reason shows the worst FAIL of the doctor).
 type StatusReason struct {
@@ -467,7 +468,11 @@ type Inbound struct {
 	// The configured server-name override, or empty when the profile/node default is used.
 	TlsServerNameOverride string `protobuf:"bytes,16,opt,name=tls_server_name_override,json=tlsServerNameOverride,proto3" json:"tls_server_name_override,omitempty"`
 	// Whether this inbound is enabled in the desired state.
-	Enabled       bool `protobuf:"varint,17,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Enabled bool `protobuf:"varint,17,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Whether the server at the node's own address is included in subscriptions. The inbound keeps running when false.
+	DirectInSubscriptions bool `protobuf:"varint,18,opt,name=direct_in_subscriptions,json=directInSubscriptions,proto3" json:"direct_in_subscriptions,omitempty"`
+	// Whether clients reach this inbound through its CDN host instead of the node's address.
+	Cdn           bool `protobuf:"varint,19,opt,name=cdn,proto3" json:"cdn,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -617,6 +622,20 @@ func (x *Inbound) GetTlsServerNameOverride() string {
 func (x *Inbound) GetEnabled() bool {
 	if x != nil {
 		return x.Enabled
+	}
+	return false
+}
+
+func (x *Inbound) GetDirectInSubscriptions() bool {
+	if x != nil {
+		return x.DirectInSubscriptions
+	}
+	return false
+}
+
+func (x *Inbound) GetCdn() bool {
+	if x != nil {
+		return x.Cdn
 	}
 	return false
 }
@@ -1299,7 +1318,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
 	"\rProtocolCount\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x14\n" +
-	"\x05users\x18\x02 \x01(\rR\x05users\"\xe1\x04\n" +
+	"\x05users\x18\x02 \x01(\rR\x05users\"\xab\x05\n" +
 	"\aInbound\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1320,7 +1339,9 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x06egress\x18\x0e \x01(\tR\x06egress\x12#\n" +
 	"\rport_override\x18\x0f \x01(\rR\fportOverride\x127\n" +
 	"\x18tls_server_name_override\x18\x10 \x01(\tR\x15tlsServerNameOverride\x12\x18\n" +
-	"\aenabled\x18\x11 \x01(\bR\aenabled\"\x8f\x03\n" +
+	"\aenabled\x18\x11 \x01(\bR\aenabled\x126\n" +
+	"\x17direct_in_subscriptions\x18\x12 \x01(\bR\x15directInSubscriptions\x12\x10\n" +
+	"\x03cdn\x18\x13 \x01(\bR\x03cdn\"\x8f\x03\n" +
 	"\x10AwgInboundStatus\x12\x18\n" +
 	"\abackend\x18\x01 \x01(\tR\abackend\x12'\n" +
 	"\x0fbackend_version\x18\x02 \x01(\tR\x0ebackendVersion\x12\x19\n" +

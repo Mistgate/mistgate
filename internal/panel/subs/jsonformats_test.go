@@ -312,6 +312,26 @@ func TestJSONFormatsPlaceholders(t *testing.T) {
 	if len([]rune(none)) >= 200 {
 		t.Error("the note does not fit the announcement")
 	}
+
+	// Hiding every inbound takes the same no-server path as an unsupported protocol, instead of returning empty JSON.
+	m.st.W.Exec("UPDATE inbound SET direct_in_subscriptions = 0")
+	_, hiddenTok := m.newUser("hidden", nil)
+	for name, c := range map[string]struct{ path, ua string }{
+		"xray hidden":     {"/" + hiddenTok + "?format=xray-json", v2rayNGUA},
+		"sing-box hidden": {"/" + hiddenTok, sfaUA},
+	} {
+		rec := fetch(h, c.path, c.ua)
+		if rec.Code != 200 || unb64(t, rec.Header().Get("Announce")) != none || !strings.Contains(rec.Body.String(), none) {
+			t.Errorf("%s: %d %v\n%s", name, rec.Code, rec.Header(), rec.Body.String())
+		}
+	}
+	if rec := fetch(h, "/"+hiddenTok, happUA); rec.Code != 200 || decode(t, rec.Body.String()) != "" {
+		t.Errorf("hidden URI list: %d %q", rec.Code, decode(t, rec.Body.String()))
+	}
+	if rec := fetch(h, "/"+hiddenTok, mihomoUA); rec.Code != 200 || len(parseYAML(t, rec.Body.Bytes()).Proxies) != 0 {
+		t.Errorf("hidden Mihomo profile: %d\n%s", rec.Code, rec.Body.String())
+	}
+
 	// The link list of the same person stays what it was (empty: nothing for Happ either).
 	if rec := fetch(h, "/"+tok, happUA); decode(t, rec.Body.String()) != "" || rec.Header().Get("Announce") != "" {
 		t.Errorf("list: %q %v", decode(t, rec.Body.String()), rec.Header())

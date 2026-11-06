@@ -1460,8 +1460,10 @@ type UpdateInboundRequest struct {
 	ValidateOnly bool `protobuf:"varint,5,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
 	// As CreateInboundRequest.allow_lossy_port.
 	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Whether the server at the node's own address is included in subscriptions; absent = leave unchanged.
+	DirectInSubscriptions *bool `protobuf:"varint,7,opt,name=direct_in_subscriptions,json=directInSubscriptions,proto3,oneof" json:"direct_in_subscriptions,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *UpdateInboundRequest) Reset() {
@@ -1532,6 +1534,13 @@ func (x *UpdateInboundRequest) GetValidateOnly() bool {
 func (x *UpdateInboundRequest) GetAllowLossyPort() bool {
 	if x != nil {
 		return x.AllowLossyPort
+	}
+	return false
+}
+
+func (x *UpdateInboundRequest) GetDirectInSubscriptions() bool {
+	if x != nil && x.DirectInSubscriptions != nil {
+		return *x.DirectInSubscriptions
 	}
 	return false
 }
@@ -2057,7 +2066,7 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x15CreateInboundResponse\x124\n" +
 	"\ainbound\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.InboundR\ainbound\x12;\n" +
 	"\bwarnings\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x1b\n" +
-	"\tfree_port\x18\x03 \x01(\rR\bfreePort\"\xc6\x02\n" +
+	"\tfree_port\x18\x03 \x01(\rR\bfreePort\"\x9f\x03\n" +
 	"\x14UpdateInboundRequest\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12(\n" +
@@ -2065,11 +2074,13 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x18tls_server_name_override\x18\x03 \x01(\tH\x01R\x15tlsServerNameOverride\x88\x01\x01\x12\x1d\n" +
 	"\aenabled\x18\x04 \x01(\bH\x02R\aenabled\x88\x01\x01\x12#\n" +
 	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\x12(\n" +
-	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPortB\x10\n" +
+	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPort\x12;\n" +
+	"\x17direct_in_subscriptions\x18\a \x01(\bH\x03R\x15directInSubscriptions\x88\x01\x01B\x10\n" +
 	"\x0e_port_overrideB\x1b\n" +
 	"\x19_tls_server_name_overrideB\n" +
 	"\n" +
-	"\b_enabled\"\xa7\x01\n" +
+	"\b_enabledB\x1a\n" +
+	"\x18_direct_in_subscriptions\"\xa7\x01\n" +
 	"\x15UpdateInboundResponse\x124\n" +
 	"\ainbound\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.InboundR\ainbound\x12;\n" +
 	"\bwarnings\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x1b\n" +

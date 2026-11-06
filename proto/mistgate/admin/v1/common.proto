@@ -35,7 +35,8 @@ enum NodeStatus {
 // Codes: agent_silent {minutes}, host_blip {minutes}, enrollment_pending {expires_in_minutes, expires_unix},
 // enrollment_expired (PENDING without a usable install command), inbound_failed {inbound, error, profile, failed,
 // total} (failed of the node's total enabled profiles do not run), state_drift, clock_skew {seconds}, no_profiles
-// (ONLINE, nothing else wrong, but no enabled profile: nobody gets the node).
+// (ONLINE, nothing else wrong, but no enabled profile: nobody gets the node), inbound_no_way_in {profile, node, reason}
+// (hiding the direct server leaves no usable IPv6 twin, CDN host or relay; reason is "awg", "acme_ip" or "no_usable_relay").
 // The health checks add no_traffic {failed, total} (status NO_TRAFFIC: agent on, synthetic
 // checks failing) and doctor_fail {check} (status stays ONLINE, reason shows the worst FAIL of the doctor).
 message StatusReason {
@@ -98,6 +99,10 @@ message Inbound {
   string tls_server_name_override = 16;
   // Whether this inbound is enabled in the desired state.
   bool enabled = 17;
+  // Whether the server at the node's own address is included in subscriptions. The inbound keeps running when false.
+  bool direct_in_subscriptions = 18;
+  // Whether clients reach this inbound through its CDN host instead of the node's address.
+  bool cdn = 19;
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).

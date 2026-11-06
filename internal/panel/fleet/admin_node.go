@@ -590,12 +590,14 @@ func (f *Fleet) inboundMsg(n store.NodeRow, row store.FleetInboundRow) *adminv1.
 		Id: row.ID, ProfileId: row.ProfileID, ProfileName: row.ProfileName, Protocol: row.Protocol, NodeId: n.ID, NodeName: n.Name,
 		Port: uint32(row.PortOverride), TlsServerName: row.TLSNameOverride, State: inboundStateMsg(row.State), LastError: row.LastError,
 		CertPinSha256: row.CertPin, CertNotAfterUnix: fleetUnix(row.CertNotAfter), Awg: awgStatusMsg(row),
+		DirectInSubscriptions: row.DirectInSubscriptions,
 	}
 	if !row.Enabled {
 		out.State = adminv1.InboundState_INBOUND_STATE_DISABLED
 	}
 	if spec, err := f.buildSpec(n, row); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
+		out.Cdn = protocols.ServerCDN(spec)
 	}
 	return out
 }

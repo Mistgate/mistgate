@@ -527,7 +527,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 		Facts:   &adminv1.NodeFacts{Hostname: "de1.example.com", Os: "linux"},
 		Inbounds: []*adminv1.Inbound{{
 			Id: "inb_1", ProfileName: "Main", Protocol: "hysteria2", NodeId: nodeA, Port: 443, State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
-			CertPinSha256: canaryPin, LastError: "listen failed\nsee " + canaryVless,
+			CertPinSha256: canaryPin, LastError: "listen failed\nsee " + canaryVless, DirectInSubscriptions: false, Cdn: true,
 		}},
 		PortChecks: []*adminv1.PortCheck{{NodeId: r.Msg.GetNodeId(), Port: 443, Verdict: "ok", Sent: 150, Got: 150,
 			CheckedUnix: 1700000000, BadUnix: 1699990000, ProtocolOkUnix: 1700001000, Sender: "sender-node", SenderVerdict: "lossy",

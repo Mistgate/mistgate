@@ -110,12 +110,14 @@ func fleetStatusView(r *adminv1.OverviewResponse) *FleetStatusV {
 // node_get, node_metrics
 
 type inboundV struct {
-	ID        string `json:"id"`
-	Profile   string `json:"profile"`
-	Protocol  string `json:"protocol"`
-	Port      uint32 `json:"port"`
-	State     string `json:"state"`
-	LastError string `json:"last_error,omitempty"`
+	ID                    string `json:"id"`
+	Profile               string `json:"profile"`
+	Protocol              string `json:"protocol"`
+	Port                  uint32 `json:"port"`
+	State                 string `json:"state"`
+	LastError             string `json:"last_error,omitempty"`
+	DirectInSubscriptions bool   `json:"direct_in_subscriptions"`
+	CDN                   bool   `json:"cdn"`
 }
 
 type onlineUserV struct {
@@ -213,6 +215,7 @@ func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {
 		v.Inbounds = append(v.Inbounds, inboundV{
 			ID: in.GetId(), Profile: nm(in.GetProfileName()), Protocol: clean(in.GetProtocol(), 40), Port: in.GetPort(),
 			State: enumName("INBOUND_STATE_", in.GetState().String()), LastError: clean(in.GetLastError(), 200),
+			DirectInSubscriptions: in.GetDirectInSubscriptions(), CDN: in.GetCdn(),
 		})
 	}
 	// one row per person, protocol and device: the node reports each connection, each with the person's whole rate
@@ -412,9 +415,11 @@ func doctorView(nodes []*adminv1.NodeDoctor, fresh bool) *DoctorV {
 // node_ports
 
 type portInboundV struct {
-	InboundID string `json:"inbound_id"`
-	ProfileID string `json:"profile_id"`
-	Profile   string `json:"profile"`
+	InboundID             string `json:"inbound_id"`
+	ProfileID             string `json:"profile_id"`
+	Profile               string `json:"profile"`
+	DirectInSubscriptions bool   `json:"direct_in_subscriptions"`
+	CDN                   bool   `json:"cdn"`
 }
 
 type portCheckV struct {
@@ -489,7 +494,7 @@ func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*
 				continue
 			}
 			row.Inbounds = append(row.Inbounds, portInboundV{InboundID: clean(inbound.GetId(), 80), ProfileID: clean(inbound.GetProfileId(), 80),
-				Profile: nm(inbound.GetProfileName())})
+				Profile: nm(inbound.GetProfileName()), DirectInSubscriptions: inbound.GetDirectInSubscriptions(), CDN: inbound.GetCdn()})
 		}
 		v.Ports = append(v.Ports, row)
 	}

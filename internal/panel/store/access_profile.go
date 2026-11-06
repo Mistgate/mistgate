@@ -165,6 +165,7 @@ type AccessInbound struct {
 	PortOverride          uint16 // 0 = none
 	TLSServerNameOverride string
 	Enabled               bool
+	DirectInSubscriptions bool
 	SpecVersion           uint64
 	State                 string // pending | active | failed | disabled
 	LastError             string
@@ -182,6 +183,7 @@ type AccessInbound struct {
 
 const accInboundCols = `i.id AS inbound_id, i.profile_id AS inbound_profile_id, i.node_id AS inbound_node_id,
 	i.port_override AS inbound_port_override, i.tls_server_name_override AS inbound_tls_server_name_override, i.enabled AS inbound_enabled,
+	i.direct_in_subscriptions AS inbound_direct_in_subscriptions,
 	i.spec_version AS inbound_spec_version, i.state AS inbound_state, i.last_error AS inbound_last_error,
 	i.cert_pin_sha256 AS inbound_cert_pin_sha256, i.cert_not_after AS inbound_cert_not_after, i.created_at AS inbound_created_at,
 	i.updated_at AS inbound_updated_at, i.plugin_state_enc AS inbound_plugin_state_enc, i.plugin_public_json AS inbound_plugin_public_json,
@@ -190,13 +192,13 @@ const accInboundCols = `i.id AS inbound_id, i.profile_id AS inbound_profile_id, 
 func scanAccessInbound(r rowScanner) (AccessInbound, error) {
 	var i AccessInbound
 	var id, profileID, nodeID, tlsName, state, lastError, certPin, pluginPublic, healthJSON sql.NullString
-	var port, enabled, specVersion, notAfter, created, updated, healthAt sql.NullInt64
-	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &enabled, &specVersion,
+	var port, enabled, directInSubscriptions, specVersion, notAfter, created, updated, healthAt sql.NullInt64
+	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &enabled, &directInSubscriptions, &specVersion,
 		&state, &lastError, &certPin, &notAfter, &created, &updated,
 		&i.PluginStateEnc, &pluginPublic, &healthJSON, &healthAt)
 	i.ID, i.ProfileID, i.NodeID = id.String, profileID.String, nodeID.String
 	i.PortOverride, i.TLSServerNameOverride = uint16(port.Int64), tlsName.String
-	i.Enabled, i.SpecVersion = enabled.Int64 == 1, uint64(specVersion.Int64)
+	i.Enabled, i.DirectInSubscriptions, i.SpecVersion = enabled.Int64 == 1, directInSubscriptions.Int64 == 1, uint64(specVersion.Int64)
 	i.State, i.LastError, i.CertPinSHA256 = state.String, lastError.String, certPin.String
 	i.PluginPublicJSON, i.AwgHealthJSON = pluginPublic.String, healthJSON.String
 	i.CreatedAt, i.UpdatedAt = accTimeFromUnix(created), accTimeFromUnix(updated)
@@ -278,12 +280,12 @@ func (a Access) InboundsOfNode(ctx context.Context, nodeID string) ([]AccessInbo
 // UpdateInbound writes the admin-editable fields and the spec version of i (matched by ID). When
 // resetState is set the state goes back to pending (enabled) or disabled, until the node reports again.
 func (a Access) UpdateInbound(ctx context.Context, i AccessInbound, resetState bool, now time.Time) error {
-	q := `UPDATE inbound SET port_override = ?, tls_server_name_override = ?, enabled = ?, spec_version = ?, updated_at = ?`
+	q := `UPDATE inbound SET port_override = ?, tls_server_name_override = ?, enabled = ?, direct_in_subscriptions = ?, spec_version = ?, updated_at = ?`
 	if resetState {
 		q += `, state = CASE WHEN ? = 1 THEN 'pending' ELSE 'disabled' END, last_error = ''`
 	}
 	q += ` WHERE id = ?`
-	args := []any{accNullPort(i.PortOverride), i.TLSServerNameOverride, accBool(i.Enabled), i.SpecVersion, unix(now)}
+	args := []any{accNullPort(i.PortOverride), i.TLSServerNameOverride, accBool(i.Enabled), accBool(i.DirectInSubscriptions), i.SpecVersion, unix(now)}
 	if resetState {
 		args = append(args, accBool(i.Enabled))
 	}
@@ -410,19 +412,19 @@ func (a Access) InboundsFull(ctx context.Context, nodeID string) ([]AccessInboun
 }
 
 func scanAccessInboundFull(r rowScanner) (AccessInboundFull, error) {
-	values, err := scanRowValues(r, 36)
+	values, err := scanRowValues(r, 37)
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	inbound, err := scanAccessInbound(batchRow(values[:17]))
+	inbound, err := scanAccessInbound(batchRow(values[:18]))
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	profile, err := scanAccessProfile(batchRow(values[17:25]))
+	profile, err := scanAccessProfile(batchRow(values[18:26]))
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	node, err := scanAccessNode(batchRow(values[25:]))
+	node, err := scanAccessNode(batchRow(values[26:]))
 	if err != nil {
 		return AccessInboundFull{}, err
 	}

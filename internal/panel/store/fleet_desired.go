@@ -16,6 +16,7 @@ type FleetInboundRow struct {
 	TLSNameOverride                      string
 	SpecVersion                          uint64
 	Enabled                              bool
+	DirectInSubscriptions                bool
 	State, LastError                     string
 	CertPin                              string
 	CertNotAfter                         time.Time
@@ -51,7 +52,7 @@ func (s *Store) FleetInbound(ctx context.Context, inboundID string) (FleetInboun
 func (s *Store) fleetInbounds(ctx context.Context, where string, arg any) ([]FleetInboundRow, error) {
 	q := `
 		SELECT i.id, p.id, p.name, p.protocol, p.version, p.settings_json, p.secrets_enc,
-		       coalesce(i.port_override, 0), i.tls_server_name_override, i.spec_version, i.enabled,
+		       coalesce(i.port_override, 0), i.tls_server_name_override, i.spec_version, i.enabled, i.direct_in_subscriptions,
 		       i.state, i.last_error, i.cert_pin_sha256, i.cert_not_after,
 		       i.plugin_state_enc, i.plugin_public_json, i.awg_health_json, i.awg_health_at
 		FROM inbound i JOIN profile p ON p.id = i.profile_id
@@ -67,7 +68,7 @@ func (s *Store) fleetInbounds(ctx context.Context, where string, arg any) ([]Fle
 		var spec, na, healthAt int64
 		var pv int64
 		if err := rows.Scan(&r.ID, &r.ProfileID, &r.ProfileName, &r.Protocol, &pv, &r.Settings, &r.SecretsEnc,
-			&r.PortOverride, &r.TLSNameOverride, &spec, &r.Enabled, &r.State, &r.LastError, &r.CertPin, &na,
+			&r.PortOverride, &r.TLSNameOverride, &spec, &r.Enabled, &r.DirectInSubscriptions, &r.State, &r.LastError, &r.CertPin, &na,
 			&r.PluginStateEnc, &r.PluginPublic, &r.AwgHealthJSON, &healthAt); err != nil {
 			return nil, err
 		}

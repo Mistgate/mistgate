@@ -586,12 +586,14 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		}
 		frag, ok := proto.Render(in)
 		if ok {
-			srv.URI = string(frag.Data)
-			var conn *SubConn
-			if !protocols.IsPerDevice(proto) { // the page lists a link by its Hysteria2 servers; the keys are counted above
-				conn = &SubConn{Way: "link", Exit: srv.Exit}
+			if f.Inbound.DirectInSubscriptions {
+				srv.URI = string(frag.Data)
+				var conn *SubConn
+				if !protocols.IsPerDevice(proto) { // the page lists a link by its Hysteria2 servers; the keys are counted above
+					conn = &SubConn{Way: "link", Exit: srv.Exit}
+				}
+				emit(srv, conn)
 			}
-			emit(srv, conn)
 			// The IPv6 twin of the server comes first: the node's own address over IPv6, then the twins through its relays (those
 			// are copies of the server itself, never of this twin, so a relay's twin is not doubled for IPv6).
 			if addr := ipv6EntryAddr(f.Node); addr != "" && protocols.IPv6Unsupported(spec) == "" {
@@ -628,7 +630,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			in.Format = plugin.FormatMihomo
 			if _, ok := proto.Render(in); ok {
 				n := nodeOf(f)
-				n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
+				if f.Inbound.DirectInSubscriptions {
+					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
+				}
 				if ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "" { // its IPv6 twin is Mihomo-only as well
 					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, IPv6: true})
 				}

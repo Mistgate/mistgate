@@ -200,7 +200,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("node_get", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"One node: status and reason, host facts, inbounds with their state, up to 10 online users, the owner's notes and ipv6 (whether its IPv6 entry is on, whether the node can take one and why not, and the latest check of the address). No addresses, keys or certificate pins.",
+			"One node: status and reason, host facts, inbounds with their state, direct_in_subscriptions and cdn, up to 10 online users, the owner's notes and ipv6 (whether its IPv6 entry is on, whether the node can take one and why not, and the latest check of the address). No addresses, keys or certificate pins.",
 			func(c *call, in nodeArg) (any, error) {
 				id, _, err := c.nodeRef(in.Node)
 				if err != nil {
@@ -255,11 +255,11 @@ func readTools() []toolDef {
 			func(c *call, in doctorRefreshArg) (any, error) { return c.doctor(in.Node, in.Refresh) }),
 
 		readTool("node_ports", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. This never contacts a node.",
+			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port with direct_in_subscriptions and cdn. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. This never contacts a node.",
 			func(c *call, in nodePortsArg) (any, error) { return c.nodePorts(in.Node, false) }),
 		readTool("node_ports", ProfileOperator,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceCheckPortsProcedure),
-			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. With check=true, run a bounded check now; it takes about fifteen seconds.",
+			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port with direct_in_subscriptions and cdn. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. With check=true, run a bounded check now; it takes about fifteen seconds.",
 			func(c *call, in nodePortsCheckArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
 
 		readTool("users_search", ProfileReadonly, procs(adminv1connect.UserServiceListUsersProcedure),

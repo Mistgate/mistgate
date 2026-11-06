@@ -462,6 +462,24 @@ func TestTelegramLinksMarkTheIPv6Twin(t *testing.T) {
 	}
 }
 
+func TestTelegramLinksHonorHiddenDirectEntryAndKeepIPv6Twin(t *testing.T) {
+	f := newTGFix(t)
+	f.sql("UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_de1'")
+	alice := f.person("alice", true)
+	inbounds := must(f.st.Access().InboundsOfProfile(f.ctx, f.tg.Id))
+	for _, in := range inbounds {
+		must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{
+			InboundId: in.ID, DirectInSubscriptions: new(false),
+		})))
+	}
+
+	links := f.links(alice).Links
+	if len(links) != 1 || links[0].NodeName != "de1" || !links[0].Ipv6 || links[0].Relay ||
+		!strings.Contains(links[0].Url, "server=2001") {
+		t.Fatalf("Telegram links after hiding direct servers: %+v", links)
+	}
+}
+
 // The people of the Telegram proxy are listed by the server: a filter and its count, not the first page filtered by the client.
 func TestListUsersTelegramFilter(t *testing.T) {
 	f := newTGFix(t)

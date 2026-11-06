@@ -618,12 +618,14 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 		NodeId: f.Node.ID, NodeName: f.Node.Name, State: inboundStates[f.Inbound.State], LastError: f.Inbound.LastError,
 		CertPinSha256: f.Inbound.CertPinSHA256, Port: uint32(f.Inbound.PortOverride), TlsServerName: f.Inbound.TLSServerNameOverride,
 		PortOverride: uint32(f.Inbound.PortOverride), TlsServerNameOverride: f.Inbound.TLSServerNameOverride, Enabled: f.Inbound.Enabled,
+		DirectInSubscriptions: f.Inbound.DirectInSubscriptions,
 	}
 	if !f.Inbound.CertNotAfter.IsZero() {
 		out.CertNotAfterUnix = f.Inbound.CertNotAfter.Unix()
 	}
 	if spec, err := s.buildSpec(f, settings); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
+		out.Cdn = protocols.ServerCDN(spec)
 	}
 	out.Awg = awgStatus(f.Inbound)
 	return out
@@ -973,7 +975,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	f := store.AccessInboundFull{Inbound: store.AccessInbound{
 		ID: store.NewID("inb_"), ProfileID: m.ProfileId, NodeID: m.NodeId, PortOverride: port, TLSServerNameOverride: sni,
-		Enabled: true, SpecVersion: 1, State: "pending", CreatedAt: s.now(),
+		Enabled: true, DirectInSubscriptions: true, SpecVersion: 1, State: "pending", CreatedAt: s.now(),
 	}}
 	var proto protocols.Protocol
 	var merged json.RawMessage
@@ -1124,6 +1126,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	in := f.Inbound
 	oldEnabled := in.Enabled
+	oldDirectInSubscriptions := in.DirectInSubscriptions
 	oldSpec, err := s.buildSpec(f, merged)
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
@@ -1150,6 +1153,11 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		enabledChanged = *m.Enabled != in.Enabled
 		in.Enabled = *m.Enabled
 	}
+	directInSubscriptionsChanged := false
+	if m.DirectInSubscriptions != nil {
+		directInSubscriptionsChanged = *m.DirectInSubscriptions != in.DirectInSubscriptions
+		in.DirectInSubscriptions = *m.DirectInSubscriptions
+	}
 	f.Inbound = in
 	spec, err := s.buildSpec(f, merged)
 	if err != nil {
@@ -1175,6 +1183,15 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		}
 		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others); err != nil {
 			return nil, err
+		}
+		if directInSubscriptionsChanged && oldDirectInSubscriptions && !in.DirectInSubscriptions {
+			warning, err := s.inboundNoWayInWarning(ctx, f, spec)
+			if err != nil {
+				return nil, s.internal("check inbound subscription routes", err)
+			}
+			if warning != nil {
+				warnings = append(warnings, warning)
+			}
 		}
 		portChanged := oldSpec.Listen.Port != spec.Listen.Port
 		switchedOn := !oldEnabled && in.Enabled
@@ -1206,8 +1223,9 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		in.SpecVersion++
 		f.Inbound = in
 	}
-	if specChangedByAdmin || enabledChanged {
-		if err := s.st.Access().UpdateInbound(ctx, in, true, s.now()); err != nil {
+	desiredChanged := specChangedByAdmin || enabledChanged
+	if desiredChanged || directInSubscriptionsChanged {
+		if err := s.st.Access().UpdateInbound(ctx, in, desiredChanged, s.now()); err != nil {
 			return nil, s.internal("update inbound", err)
 		}
 		if p, ok := s.reg.Get(f.Profile.Protocol); ok && specChangedByAdmin && protocols.IsPerDevice(p) {
@@ -1216,17 +1234,56 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 				return nil, s.internal("mark devices stale", err)
 			}
 		}
-		f.Inbound.State = "pending"
-		if !in.Enabled {
-			f.Inbound.State = "disabled"
+		if desiredChanged {
+			f.Inbound.State = "pending"
+			if !in.Enabled {
+				f.Inbound.State = "disabled"
+			}
 		}
-		s.audit(ctx, actor(ctx), "inbound_update", map[string]any{"inbound": in.ID, "profile": f.Profile.Name, "node": f.Node.Name, "port": spec.Listen.Port, "enabled": in.Enabled})
+		s.audit(ctx, actor(ctx), "inbound_update", map[string]any{"inbound": in.ID, "profile": f.Profile.Name, "node": f.Node.Name,
+			"port": spec.Listen.Port, "enabled": in.Enabled, "direct_in_subscriptions": in.DirectInSubscriptions})
 		if lossyOverride {
 			s.auditLossyPort(ctx, f.Node.Name, spec.Listen.Port)
 		}
-		s.notify.StateChanged()
+		if desiredChanged {
+			s.notify.StateChanged()
+		}
 	}
 	return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings}), nil
+}
+
+// inboundNoWayInWarning warns when hiding the node's address would leave no address, CDN, or operational relay through which a
+// possible subscriber could reach this inbound. The synthetic audience permits every supported app and node; relayUsable keeps
+// this check aligned with subscription relay enablement, checks, entry state, and the live inbound rules.
+func (s *Service) inboundNoWayInWarning(ctx context.Context, f store.AccessInboundFull, spec plugin.InboundSpec) (*adminv1.StatusReason, error) {
+	if !f.Inbound.Enabled || f.Inbound.DirectInSubscriptions || protocols.ServerCDN(spec) ||
+		(ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "") {
+		return nil, nil
+	}
+
+	unsupported := relayUnsupported(f.Profile.Protocol, spec)
+	if unsupported == "" {
+		links, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: f.Inbound.ID})
+		if err != nil {
+			return nil, err
+		}
+		group := store.AccessGroup{ProfileIDs: []string{f.Profile.ID}}
+		user := store.AccessUser{AllNodes: true, AppHapp: true, AppAmnezia: true, AppTelegram: true}
+		for _, link := range links {
+			if link.ViaNodeAddress != "" && s.relayUsable(link, f, group, user) {
+				return nil, nil
+			}
+		}
+	}
+
+	// a code the admin words: "awg" (AmneziaWG cannot be relayed yet), "acme_ip" (a certificate for the node's IP), or no relay
+	reason := unsupported
+	if reason == "" {
+		reason = "no_usable_relay"
+	}
+	return &adminv1.StatusReason{Code: "inbound_no_way_in", Params: map[string]string{
+		"profile": f.Profile.Name, "node": f.Node.Name, "reason": reason,
+	}}, nil
 }
 
 // nodeEvent puts "an admin changed the profiles of this node" on the node's event list. The profile name and protocol go

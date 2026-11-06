@@ -49,9 +49,13 @@ func (s *Service) RelayHandler() (string, http.Handler) {
 // of the subscription follow it (subRelays); the entry node's own forward follows only the part that is not about a person
 // (store.RelayLink.Live).
 func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return l.Enabled && l.State == "active" && l.Usable() && l.Live() && l.ViaNodeState == "active" && s.usable(exit, g, u) &&
+	return relayPathUsable(l) && s.usable(exit, g, u) &&
 		!slices.Contains(g.DisabledNodeIDs, l.ViaNodeID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
+}
+
+func relayPathUsable(l store.RelayLink) bool {
+	return l.Enabled && l.State == "active" && l.Usable() && l.Live() && l.ViaNodeState == "active"
 }
 
 // relayAgentOK: the entry's agent can take a forward. A node that has not connected yet has no capabilities on record and

@@ -71,6 +71,73 @@ func TestD1MigrationParity(t *testing.T) {
 	}
 }
 
+func TestD1InboundDirectInSubscriptionsRoundTripsAndDefaultsTrue(t *testing.T) {
+	binding := js.Global().Get("__d1")
+	binding.Call("__reset")
+	st, err := OpenD1(context.Background(), binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	now := time.Unix(123, 0).UTC()
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, ?, ?)`,
+		"nod_direct", "de1", "de1.example.com", "active", now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	a := st.Access()
+	if err := a.CreateProfile(ctx, AccessProfile{ID: "prf_direct", Protocol: "hysteria2", Name: "direct", SettingsJSON: "{}", Version: 1, CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.CreateInbound(ctx, AccessInbound{ID: "inb_direct", ProfileID: "prf_direct", NodeID: "nod_direct", Enabled: true, CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	in, err := a.Inbound(ctx, "inb_direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !in.DirectInSubscriptions {
+		t.Fatal("D1 did not apply the listed-by-default migration value")
+	}
+	full, err := a.InboundsFull(ctx, "nod_direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	byNode, err := a.InboundsOfNode(ctx, "nod_direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(full) != 1 || !full[0].Inbound.DirectInSubscriptions || len(byNode) != 1 || !byNode[0].DirectInSubscriptions {
+		t.Fatalf("D1 inbound readers missed the default: full=%+v byNode=%+v", full, byNode)
+	}
+	in.DirectInSubscriptions = false
+	if err := a.UpdateInbound(ctx, in, false, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.Inbound(ctx, in.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fleet, err := st.FleetInbound(ctx, in.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DirectInSubscriptions || fleet.DirectInSubscriptions {
+		t.Fatalf("D1 round trip: access=%+v fleet=%+v", got, fleet)
+	}
+	full, err = a.InboundsFull(ctx, "nod_direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	byNode, err = a.InboundsOfNode(ctx, "nod_direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(full) != 1 || full[0].Inbound.DirectInSubscriptions || len(byNode) != 1 || byNode[0].DirectInSubscriptions {
+		t.Fatalf("D1 inbound readers missed the update: full=%+v byNode=%+v", full, byNode)
+	}
+}
+
 // D1 rejects a batch whose statement ends in a comment ("SQL code did not contain a statement"), which a SQLite-backed
 // fake does not notice, so the shape is checked here.
 func TestD1MigrationStatementsEndInCode(t *testing.T) {

@@ -47,6 +47,7 @@ func fixtureInbound(id, profileID, nodeID, nodeName string) *adminv1.Inbound {
 	return &adminv1.Inbound{
 		Id: id, ProfileId: profileID, NodeId: nodeID, NodeName: nodeName,
 		Port: 443, TlsServerName: "effective.example", PortOverride: 8443, TlsServerNameOverride: "edge.example", Enabled: true,
+		DirectInSubscriptions: false, Cdn: true,
 		State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
 	}
 }
@@ -161,7 +162,8 @@ func TestProfileReadToolsMaskSecretsAndExposePlacement(t *testing.T) {
 	}
 	inbound := profile.Inbounds[0]
 	if inbound.NodeID != nodeA || inbound.NodeName != "de1" || inbound.Port != 443 || inbound.PortOverride != 8443 ||
-		inbound.TLSServerName != "effective.example" || inbound.TLSServerNameOverride != "edge.example" || !inbound.Enabled || inbound.State != "active" || !slices.Contains(profile.GroupIDs, "grp_1") {
+		inbound.TLSServerName != "effective.example" || inbound.TLSServerNameOverride != "edge.example" || !inbound.Enabled || inbound.State != "active" ||
+		inbound.DirectInSubscriptions || !inbound.CDN || !slices.Contains(profile.GroupIDs, "grp_1") {
 		t.Errorf("inbound projection: %+v; groups=%v", inbound, profile.GroupIDs)
 	}
 }
