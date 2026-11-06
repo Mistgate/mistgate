@@ -17,9 +17,10 @@ import (
 //   - an MSS clamp to the route MTU towards and from a tunnel interface;
 //   - client isolation: a forwarded packet may not leave through another (or the same) tunnel interface, so client
 //     A never reaches client B, not even across profiles (found on a test stand);
-//   - an input policy for packets that arrive on a tunnel interface and are for the node itself: only an echo
-//     request to the tunnel's own address is answered, everything else is dropped. A client must not reach sshd, the
-//     decoy site or a management port through the tunnel, nor the node address of another profile;
+//   - an input policy for packets that arrive on a tunnel interface and are for the node itself: HTTPS is allowed so a
+//     full-tunnel client can reach a panel that shares the node's public address, and an echo request to the tunnel's own
+//     address is answered; everything else is dropped. A client must not reach sshd, backend management ports or the node
+//     address of another profile;
 //   - with "IPv6 for clients" off (Tunnel.RejectV6): IPv6 from a tunnel towards the uplink is rejected with ICMPv6
 //     admin-prohibited (chain nov6), not dropped, so apps move to IPv4 immediately;
 //   - one named counter per UDP port, AwgHealth.udp_rx_packets: 0 = the provider or a firewall, > 0 without a
@@ -149,7 +150,10 @@ func renderTunnels(ts []Tunnel, v6verdict string) (string, error) {
 			fmt.Fprintf(&b, "\t\tiifname %q ip6 daddr %s icmpv6 type echo-request accept\n", t.Iface, t.Addr6)
 		}
 	}
-	fmt.Fprintf(&b, "\t\tiifname %s drop\n\t}\n", wild)
+	// HTTPS is the public control plane as well as a common public service. Allowing exactly 443 here lets a
+	// full-tunnel client reach a panel hosted on this node without exposing SSH or backend management listeners.
+	fmt.Fprintf(&b, "		iifname %s tcp dport 443 accept\n", wild)
+	fmt.Fprintf(&b, "		iifname %s drop\n	}\n", wild)
 
 	// Forward: no client-to-client traffic, and the MSS clamp in both directions of a tunnel.
 	fmt.Fprintf(&b, "\tchain isolate {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tiifname %s oifname %s drop\n\t}\n", wild, wild)

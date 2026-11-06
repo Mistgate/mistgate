@@ -41,6 +41,7 @@ table inet mistgate_awg {
 		iifname "mgawg40001" ip daddr 10.66.8.1 icmp type echo-request accept
 		iifname "mgawg51842" ip daddr 10.66.4.1 icmp type echo-request accept
 		iifname "mgawg51842" ip6 daddr fd66:66:0:1::1 icmpv6 type echo-request accept
+		iifname "mgawg*" tcp dport 443 accept
 		iifname "mgawg*" drop
 	}
 	chain isolate {
@@ -61,6 +62,27 @@ table inet mistgate_awg {
 `
 	if got != want {
 		t.Fatalf("ruleset mismatch:\n%s", got)
+	}
+}
+
+func TestRenderTunnelsAllowsHTTPSBeforeLocalDrop(t *testing.T) {
+	rules, err := RenderTunnels([]Tunnel{tun(51842, "10.66.4.0/22", "")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allow := `iifname "mgawg*" tcp dport 443 accept`
+	drop := `iifname "mgawg*" drop`
+	allowAt, dropAt := strings.Index(rules, allow), strings.Index(rules, drop)
+	if allowAt < 0 {
+		t.Fatalf("HTTPS access to the node is not allowed:\n%s", rules)
+	}
+	if dropAt < 0 || allowAt > dropAt {
+		t.Fatalf("HTTPS allow must precede the local-service drop:\n%s", rules)
+	}
+	for _, forbidden := range []string{`tcp dport 22 accept`, `tcp dport 18089 accept`, `tcp dport 18443 accept`} {
+		if strings.Contains(rules, forbidden) {
+			t.Fatalf("management port escaped the local-service drop: %s\n%s", forbidden, rules)
+		}
 	}
 }
 
