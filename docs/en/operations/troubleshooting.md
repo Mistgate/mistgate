@@ -100,7 +100,13 @@ A port inside the port-hopping range of another profile, or held by Caddy or ano
 5. The doctor's **Foreign firewall rules** and **Leftovers of other VPNs**: a foreign nat or redirect rule can swallow the traffic.
 6. The doctor's **IPv6**: an IPv6 address that cannot connect out makes sites with IPv6 records stall.
 
-If the checks are green but one person cannot connect, look at the person: their status (disabled, expired, over quota) and devices on the Users page. See [Users and groups](../guide/users-and-groups.md).
+### The checks pass, but one person's app does not work
+
+The panel's checks connect with the panel's own key, so a green check says nothing about the keys of a person's apps. Each app that fetches the subscription with a device ID gets keys of its own (see [Users and groups](../guide/users-and-groups.md)); the keys of a removed device stop working, and an app over the device limit gets only a placeholder named after the limit.
+
+1. On the person's page, look at their status (disabled, expired, over quota) and **Devices**: how many places are taken out of the limit, and which apps by link.
+2. The **24 h** line under the profile on the node's **Profiles** tab: **unknown keys** that grow while the person tries mean their app comes with a key the node does not know, from a removed device or an old subscription.
+3. Remove the old apps there, then in the app delete the subscription, add the link again and refresh it. One new device appears. Check that the app's list has no entry named after the device limit.
 
 ## The hoster blocks UDP
 
@@ -122,6 +128,24 @@ Hysteria2 and AmneziaWG run over UDP, and some hosters drop UDP on some ports or
 4. If every port is cut, write to the hoster's support or move the node.
 
 The check uses the profile's main port, not the port-hopping range, so a blocked hop range does not show here.
+
+## Works on Wi-Fi, not on mobile data
+
+**How it shows**
+
+- On Wi-Fi the app works; on mobile data it connects and stops answering a few seconds later, or never connects.
+- With AmneziaWG on mobile data the first handshake may pass, and then the app's new handshakes never reach the node; a profile on UDP 443 may get no packet at all.
+- The panel's checks and the port check pass.
+
+**What it means**
+
+The person's mobile operator cuts the traffic, not the node or the hoster: UDP to foreign addresses, QUIC, or every connection to foreign hosting after a few kilobytes. The panel cannot see it: the port check sends from data centres, and the [reachability](reachability.md) checks from the country test ICMP and TCP, not the UDP ports of AmneziaWG and Hysteria2.
+
+**What to do**
+
+1. Give the person a VLESS REALITY server over TCP 443 for mobile data: see [VLESS](../guide/vless.md).
+2. If connections to foreign hosting freeze after a few kilobytes, add a [relay](../guide/relays.md) through an entry node in the person's country. It carries VLESS and Hysteria2, not AmneziaWG yet; under a mobile whitelist it helps only if the entry address is on the list.
+3. Another UDP port or another AmneziaWG mimicry preset sometimes helps. The obfuscation parameters rarely do: the operator cuts the flow, not a signature.
 
 ## The clock drifts
 
