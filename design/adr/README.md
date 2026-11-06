@@ -16,5 +16,6 @@ new record that supersedes the old one, not by editing history.
 | [0009](0009-edge-six-scripts-behind-a-js-front.md) | Edge: six scripts behind a JS front (supplements 0008) | Accepted |
 | [0010](0010-mtproto.md) | MTProto proxy: a clean-room core, Fake TLS only, a real site for everyone else | Accepted |
 | [0011](0011-release-channels.md) | Release channels: stable, testing and dev, told apart by the tag | Accepted |
+| [0012](0012-backup-before-panel-update.md) | A backup to download before the panel updates itself | Accepted |
 
 The plan they serve: [`../cloudflare-edition/README.md`](../cloudflare-edition/README.md).
