@@ -17,9 +17,11 @@ import (
 //   - an MSS clamp to the route MTU towards and from a tunnel interface;
 //   - client isolation: a forwarded packet may not leave through another (or the same) tunnel interface, so client
 //     A never reaches client B, not even across profiles (found on a test stand);
-//   - an input policy for packets that arrive on a tunnel interface and are for the node itself: only an echo
-//     request to the tunnel's own address is answered, everything else is dropped. A client must not reach sshd, the
-//     decoy site or a management port through the tunnel, nor the node address of another profile;
+//   - an input policy for packets that arrive on a tunnel interface and are for the node itself: an echo request to the
+//     tunnel's own address is answered, every other packet to a tunnel address (its own or another profile's) is
+//     dropped, HTTPS to the host's other (public) addresses is allowed so a full-tunnel client reaches a panel that
+//     shares the node's address, and everything else is dropped. A client must not reach sshd or backend management
+//     ports;
 //   - with "IPv6 for clients" off (Tunnel.RejectV6): IPv6 from a tunnel towards the uplink is rejected with ICMPv6
 //     admin-prohibited (chain nov6), not dropped, so apps move to IPv4 immediately;
 //   - one named counter per UDP port, AwgHealth.udp_rx_packets: 0 = the provider or a firewall, > 0 without a
@@ -149,6 +151,22 @@ func renderTunnels(ts []Tunnel, v6verdict string) (string, error) {
 			fmt.Fprintf(&b, "\t\tiifname %q ip6 daddr %s icmpv6 type echo-request accept\n", t.Iface, t.Addr6)
 		}
 	}
+	// The tunnels' own addresses serve nothing but the echo above: through a tunnel a client reaches no service at a
+	// node address of its own or of another profile.
+	addrs4, addrs6 := make([]string, 0, len(sorted)), []string{}
+	for _, t := range sorted {
+		addrs4 = append(addrs4, t.Addr4.String())
+		if t.Subnet6.IsValid() {
+			addrs6 = append(addrs6, t.Addr6.String())
+		}
+	}
+	fmt.Fprintf(&b, "\t\tiifname %s ip daddr { %s } drop\n", wild, strings.Join(addrs4, ", "))
+	if len(addrs6) > 0 {
+		fmt.Fprintf(&b, "\t\tiifname %s ip6 daddr { %s } drop\n", wild, strings.Join(addrs6, ", "))
+	}
+	// HTTPS at the host's other (public) addresses: a full-tunnel client reaches a panel that shares the node's address,
+	// as anyone on the internet does, and nothing more: not SSH, not a management listener (issue #41).
+	fmt.Fprintf(&b, "\t\tiifname %s tcp dport 443 accept\n", wild)
 	fmt.Fprintf(&b, "\t\tiifname %s drop\n\t}\n", wild)
 
 	// Forward: no client-to-client traffic, and the MSS clamp in both directions of a tunnel.
