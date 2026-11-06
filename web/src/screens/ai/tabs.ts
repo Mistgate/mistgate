@@ -1,0 +1,10 @@
+export const aiTabs = ["assistant", "memory", "mcp", "approvals"] as const;
+export type AiTab = (typeof aiTabs)[number];
+
+/** Search-param validation of /ai: only a known tab other than the first is kept in the URL, with the approvals history page. */
+export const validateAiSearch = (s: Record<string, unknown>): { tab?: AiTab; page?: number; new?: "token" } => {
+  const tab = aiTabs.includes(s.tab as AiTab) && s.tab !== "assistant" ? (s.tab as AiTab) : undefined;
+  const page = Number(s.page);
+  // ?new=token: the palette's "New API token" opens the create form of the tokens card
+  return { ...(tab ? { tab } : {}), ...(Number.isInteger(page) && page > 1 ? { page } : {}), ...(s.new === "token" ? { new: "token" as const } : {}) };
+};

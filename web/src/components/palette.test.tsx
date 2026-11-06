@@ -148,7 +148,7 @@ describe("the palette", () => {
     await wait(250);
     const item = [...document.querySelectorAll("[role=option]")].find((o) => o.textContent?.includes(en["palette.newToken"]));
     await act(async () => void item?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(navigate).toHaveBeenCalledWith({ to: "/integrations", search: { new: "token" } });
+    expect(navigate).toHaveBeenCalledWith({ to: "/ai", search: { tab: "mcp", new: "token" } });
 
     await type("выйти");
     await wait(250);

@@ -255,7 +255,7 @@ export function TokensCard() {
   }
   const navigate = useNavigate();
   useEffect(() => {
-    if (wantsNew) void navigate({ to: "/integrations", search: {}, replace: true } as never);
+    if (wantsNew) void navigate({ to: "/ai", search: { tab: "mcp" }, replace: true } as never);
   }, [wantsNew, navigate]);
   const [secret, setSecret] = useState<{ name: string; value: string } | null>(null);
   const [revoking, setRevoking] = useState<Token | null>(null);

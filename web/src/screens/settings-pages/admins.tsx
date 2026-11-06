@@ -40,7 +40,7 @@ export function AdminsPage() {
       </section>
       <p className="text-xs leading-normal text-pretty text-muted">
         {t("set.admins.more")}{" "}
-        <Link to="/integrations" className={link}>
+        <Link to="/ai" search={{ tab: "mcp" } as never} className={link}>
           {t("set.admins.tokens")}
         </Link>
       </p>

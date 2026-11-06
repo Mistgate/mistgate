@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 export type Inline =
   | { kind: "text"; text: string }
   | { kind: "bold"; children: Inline[] }
+  | { kind: "em"; children: Inline[] }
   | { kind: "code"; text: string }
   | { kind: "link"; text: string; href: string };
 
@@ -19,7 +20,8 @@ export type Block =
 
 // Bounded spans: an unclosed "[" or "`" must not make every later position scan to the end of the text (64 KiB of "["
 // took seconds); a real link text, bold run or code span is far shorter.
-const inlineRe = /`([^`\n]{1,400})`|\*\*([^\n]{1,400}?)\*\*|\[([^\]\n]{1,400})\]\(([^)\s]{1,2048})\)/g;
+// A single "*" pair is emphasis only around a word (not "2 * 3 * 4", not inside "**").
+const inlineRe = /`([^`\n]{1,400})`|\*\*([^\n]{1,400}?)\*\*|\[([^\]\n]{1,400})\]\(([^)\s]{1,2048})\)|(?<![*\w])\*(?![\s*])([^*\n]{1,400}?)(?<!\s)\*(?![*\w])/g;
 
 /** The https address of a link, normalised, or "" for anything else (no user info either: it would hide the real host). */
 export function safeHttpsUrl(raw: string): string {
@@ -31,7 +33,8 @@ export function safeHttpsUrl(raw: string): string {
   }
 }
 
-export function parseInline(src: string, depth = 0): Inline[] {
+/** The inline spans of a line. linkHref keeps a link's address (or "" to keep only its text); the notes keep https only. */
+export function parseInline(src: string, depth = 0, linkHref: (raw: string) => string = safeHttpsUrl): Inline[] {
   const out: Inline[] = [];
   let last = 0;
   const push = (text: string) => text && out.push({ kind: "text", text });
@@ -39,9 +42,10 @@ export function parseInline(src: string, depth = 0): Inline[] {
     push(src.slice(last, m.index));
     last = m.index + m[0].length;
     if (m[1] !== undefined) out.push({ kind: "code", text: m[1] });
-    else if (m[2] !== undefined) out.push({ kind: "bold", children: depth < 2 ? parseInline(m[2], depth + 1) : [{ kind: "text", text: m[2] }] });
+    else if (m[2] !== undefined) out.push({ kind: "bold", children: depth < 2 ? parseInline(m[2], depth + 1, linkHref) : [{ kind: "text", text: m[2] }] });
+    else if (m[5] !== undefined) out.push({ kind: "em", children: depth < 2 ? parseInline(m[5], depth + 1, linkHref) : [{ kind: "text", text: m[5] }] });
     else {
-      const href = safeHttpsUrl(m[4]!);
+      const href = linkHref(m[4]!);
       if (href) out.push({ kind: "link", text: m[3]!, href });
       else push(m[3]!);
     }
@@ -103,6 +107,8 @@ function plainOf(nodes: Inline[]): string {
           return `\`${n.text}\``;
         case "bold":
           return `**${plainOf(n.children)}**`;
+        case "em":
+          return `*${plainOf(n.children)}*`;
         case "link":
           return `[${n.text}](${n.href})`;
       }
@@ -121,6 +127,8 @@ function renderInline(nodes: Inline[]): ReactNode[] {
             {renderInline(n.children)}
           </strong>
         );
+      case "em":
+        return <em key={i}>{renderInline(n.children)}</em>;
       case "code":
         return (
           <code key={i} className="rounded-[5px] bg-surface-2 px-1 py-px font-mono text-[0.92em] break-words text-fg">

@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { ApprovalState, TokenChannel, TokenProfile } from "@/gen/mistgate/admin/v1/integrations_pb";
+import { AiScreen } from "@/screens/ai";
 import { IntegrationsScreen } from "./index";
 
 const listApiTokens = vi.fn();
@@ -61,7 +62,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
-  search = {};
+  search = { tab: "mcp" };
   accessList = [];
 });
 afterEach(() => {
@@ -113,7 +114,8 @@ const approval = (over: Record<string, unknown> = {}) => ({
 const tokens = (list: unknown[]) => ({ tokens: list, nowUnix: NOW });
 const inbox = (list: unknown[], awaiting = list.filter((a) => (a as { state: number }).state === ApprovalState.AWAITING).length) => ({ approvals: list, awaiting, nowUnix: NOW });
 
-async function mount(t: unknown, a: unknown = inbox([])) {
+// Tokens, MCP and the approvals live on AI (ADR 0014): its MCP and approvals tabs; Integrations keeps Telegram.
+async function mount(t: unknown, a: unknown = inbox([]), screen: "ai" | "integrations" = "ai") {
   listApiTokens.mockResolvedValue(t);
   listApprovals.mockResolvedValue(a);
   host = document.createElement("div");
@@ -123,7 +125,7 @@ async function mount(t: unknown, a: unknown = inbox([])) {
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <IntegrationsScreen />
+        {screen === "ai" ? <AiScreen /> : <IntegrationsScreen />}
       </QueryClientProvider>,
     ),
   );
@@ -234,26 +236,26 @@ describe("the Integrations screen: tokens", () => {
     expect(dialog()).toBeNull();
   });
 
-  it("says only the owner manages integrations, and asks the panel for nothing", async () => {
+  it("says only the owner manages tokens and MCP, and asks the panel for nothing", async () => {
     role = Role.HELPER;
     await mount(tokens([token()]));
-    expect(text()).toContain("Only the owner manages integrations");
+    expect(text()).toContain("Only the owner sets up the assistant, MCP and the tokens.");
     expect(button("New token")).toBeUndefined();
     expect(listApiTokens).not.toHaveBeenCalled();
     expect(listApprovals).not.toHaveBeenCalled();
   });
 
   it("offers Telegram alerts (the card has its own tests) and no webhooks", async () => {
-    await mount(tokens([]));
+    await mount(tokens([]), inbox([]), "integrations");
     expect(text()).toContain("Telegram alerts");
     expect(text()).not.toMatch(/webhook/i);
   });
 
   it("opens the create form for the palette's “New API token” and takes ?new=token out of the address", async () => {
-    search = { new: "token" };
+    search = { tab: "mcp", new: "token" };
     await mount(tokens([token()]));
     expect(button("Create token")).toBeDefined();
-    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: "/integrations", search: {}, replace: true }));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: "/ai", search: { tab: "mcp" }, replace: true }));
   });
 });
 
@@ -274,6 +276,9 @@ describe("the Integrations screen: MCP", () => {
 });
 
 describe("the Integrations screen: approvals", () => {
+  beforeEach(() => {
+    search = { tab: "approvals" };
+  });
   it("shows what the agent wants in the panel's words, quotes what came from data, and counts down", async () => {
     await mount(tokens([token()]), inbox([approval()]));
     expect(text()).toContain("1 change is waiting for your decision");
@@ -427,14 +432,15 @@ describe("the Integrations screen: approvals", () => {
         approval({ id: "pln_5", tool: "rollout_cancel", state: ApprovalState.REJECTED }),
       ]),
     );
-    expect(text()).not.toContain("Waiting for you");
+    // the tab is named "Waiting for you"; the queue under that title is not there
+    expect(text().split("Waiting for you").length - 1).toBe(1);
     expect(text()).toContain("Recent decisions");
     expect(text()).toContain("Done");
     expect(text()).toContain("Fix applied.");
     expect(text()).toContain("Error");
     expect(text()).toContain("node is offline");
     expect(text()).toContain("Rejected");
-    expect(text()).toContain("API tokens"); // the rest of the screen is still there
+    expect(text()).toContain("MCP and tokens"); // the other tabs are still there
     expect(document.querySelector("nav[aria-label='Recent decisions']")).toBeNull(); // a short history has no pager
   });
 
@@ -448,7 +454,7 @@ describe("the Integrations screen: approvals", () => {
   });
 
   it("opens the history on the page of the URL", async () => {
-    search = { page: 3 as never };
+    search = { tab: "approvals", page: 3 as never };
     const done = (n: number) => approval({ id: `pln_${n}`, tool: "node_fix", state: ApprovalState.APPLIED, decidedUnix: NOW - n, appliedUnix: NOW - n, result: `done ${n}` });
     await mount(tokens([]), inbox(Array.from({ length: 25 }, (_, i) => done(i + 1))));
     expect(text()).toContain("Showing 21–25 of 25");

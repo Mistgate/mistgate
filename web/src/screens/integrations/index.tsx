@@ -1,59 +1,36 @@
-import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Card, PageTitle } from "@/components/ui/bits";
-import { NavIcon } from "@/components/ui/icons";
-import { EmptyState } from "@/components/ui/notice";
-import { QueryError } from "@/components/ui/query-error";
+import { Icon, NavIcon } from "@/components/ui/icons";
 import { useT } from "@/i18n";
-import { approvalsQuery } from "@/lib/integrations";
 import { useIsOwner } from "@/lib/updates";
-import { ApprovalHistory, ApprovalQueue } from "./approvals";
-import { McpCard } from "./mcp";
 import { TelegramCard } from "./telegram";
-import { TokensCard } from "./tokens";
 
 /**
- * Integrations: API tokens (scripts and MCP share one model), how to connect an agent over MCP, the Telegram alerts and the
- * owner's inbox of what an agent planned that needs a human. Tokens and approvals are owner-only on the server; anyone else
- * gets a calm line, and their own Telegram link (every admin links their own chat).
+ * Integrations: the Telegram alerts (every admin links their own chat). MCP, the API tokens and the approval inbox moved to
+ * the AI section (ADR 0014); the owner gets a line that says so, with the way there.
  */
 export function IntegrationsScreen() {
   const t = useT();
   const owner = useIsOwner();
-  const q = useQuery({ ...approvalsQuery, enabled: owner });
-  const waiting = q.data?.awaiting ?? 0;
-
-  const header = (
-    <div className="flex flex-col gap-[3px]">
-      <PageTitle>{t("int.title")}</PageTitle>
-      <span className="text-xs text-muted">{waiting > 0 ? t.n("int.sub.awaiting", waiting) : t("int.sub")}</span>
-    </div>
-  );
-
-  if (!owner) {
-    return (
-      <div className="flex flex-col gap-3.5">
-        {header}
-        <TelegramCard owner={false} />
-        <Card lg className="border-dashed">
-          <EmptyState icon={<NavIcon name="integrations" size={20} />} title={t("int.ownerOnly.title")}>
-            {t("int.ownerOnly.text")}
-          </EmptyState>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3.5">
-      {header}
-      {q.isError && !q.data && <QueryError error={q.error} onRetry={() => void q.refetch()} />}
-      {q.data && <ApprovalQueue data={q.data} />}
-      <div className="grid items-start gap-3.5 xl:grid-cols-2">
-        <TokensCard />
-        <McpCard />
+      <div className="flex flex-col gap-[3px]">
+        <PageTitle>{t("int.title")}</PageTitle>
+        <span className="text-xs text-muted">{t("int.sub")}</span>
       </div>
-      <TelegramCard owner />
-      {q.data && <ApprovalHistory data={q.data} />}
+      {owner && (
+        <Card lg className="flex flex-wrap items-center gap-3 p-4">
+          <span className="grid size-9 flex-none place-items-center rounded-xl bg-accent-soft">
+            <NavIcon name="ai" size={18} />
+          </span>
+          <span className="min-w-[14rem] flex-1 text-[13px] leading-snug text-pretty">{t("int.moved")}</span>
+          <Link to="/ai" search={{ tab: "mcp" } as never} className="inline-flex items-center gap-1 text-[13px] font-bold text-accent-text">
+            {t("int.moved.go")}
+            <Icon name="chevronRight" size={14} className="rtl:-scale-x-100" />
+          </Link>
+        </Card>
+      )}
+      <TelegramCard owner={owner} />
     </div>
   );
 }

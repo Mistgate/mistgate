@@ -30,7 +30,7 @@ import {
 import { card, ProfileChip } from "./parts";
 
 /** One fact. A value that came from data (a name, a node's own text) is quoted and apart from the panel's wording, so it cannot pass for it. */
-function FactRow({ fact }: { fact: Fact }) {
+export function FactRow({ fact }: { fact: Fact }) {
   const t = useT();
   const fmt = useFmt();
   const termsUrl = fact.key === "terms_url" ? safeHttpUrl(fact.value) : "";

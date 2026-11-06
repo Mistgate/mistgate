@@ -19,6 +19,8 @@ import { ChecksTab } from "@/screens/health/checks";
 import { HealthScreen } from "@/screens/health";
 import { NodeChecks } from "@/screens/node/checks";
 import { IntegrationsScreen } from "@/screens/integrations";
+import { McpCard } from "@/screens/integrations/mcp";
+import { TokensCard } from "@/screens/integrations/tokens";
 import { AwgStatusLine } from "@/screens/node/awg-status";
 import { LogsTab } from "@/screens/node/logs";
 import { BackupsPage } from "@/screens/settings-pages/backups";
@@ -140,9 +142,20 @@ describe("EditionNotice", () => {
   });
 });
 
+// Telegram stays on Integrations; MCP and the API tokens moved to AI (ADR 0014): the cards render the same on either page.
+function IntegrationsAndAgents() {
+  return (
+    <>
+      <IntegrationsScreen />
+      <TokensCard />
+      <McpCard />
+    </>
+  );
+}
+
 describe("Integrations on the edge", () => {
   it("keeps Telegram available while MCP is unavailable and offers no new API token", async () => {
-    await mount(<IntegrationsScreen />);
+    await mount(<IntegrationsAndAgents />);
     expect(text()).toContain(notice("mcp"));
     expect(getTelegram).toHaveBeenCalled();
     expect(text()).not.toContain("Not available in the Cloudflare edition yet: Telegram alerts.");
@@ -154,7 +167,7 @@ describe("Integrations on the edge", () => {
 
   it("is unchanged on the VPS", async () => {
     edition = "vps";
-    await mount(<IntegrationsScreen />);
+    await mount(<IntegrationsAndAgents />);
     expect(text()).not.toContain("Not available in the Cloudflare edition yet");
     expect(getTelegram).toHaveBeenCalled();
     expect(document.querySelector("[data-testid='mcp-url']")).not.toBeNull();

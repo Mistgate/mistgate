@@ -6,6 +6,7 @@ import { AddNodeProvider } from "@/components/add-node";
 import { StepUpProvider } from "@/components/step-up";
 import { Brand, Logo, Wordmark } from "@/components/brand";
 import { navKey, sections, type SectionId } from "@/components/nav";
+import { ChatDock } from "@/components/assistant/chat";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
 import { StaleToast } from "@/components/stale-toast";
 import { UpdateToast } from "@/components/update-toast";
@@ -92,6 +93,7 @@ function ShellFrame() {
       </main>
 
       <Dock />
+      <ChatDock />
       <UpdateToast />
       <StaleToast />
       {paletteLoaded && (
@@ -161,7 +163,7 @@ export function Sidebar() {
                 <span className="min-w-0 flex-1 truncate">{t(navKey(s.id))}</span>
                 {!!count && <span className="font-mono text-[11px] font-medium text-muted">{count}</span>}
                 {s.id === "health" && problems.n > 0 && <CountBadge n={problems.n} tone={problems.tone} label={t.n("health.problems", problems.n)} />}
-                {s.id === "integrations" && approvals > 0 && <CountBadge n={approvals} tone="warn" label={t.n("int.badge", approvals)} />}
+                {s.id === "ai" && approvals > 0 && <CountBadge n={approvals} tone="warn" label={t.n("int.badge", approvals)} />}
               </Link>
             </div>
           );
@@ -362,7 +364,7 @@ export function Dock() {
                 <NavIcon name={s.id} size={20} />
                 <span className="flex-1">{t(navKey(s.id))}</span>
                 {s.id === "health" && problems.n > 0 && <CountBadge n={problems.n} tone={problems.tone} label={t.n("health.problems", problems.n)} />}
-                {s.id === "integrations" && approvals > 0 && <CountBadge n={approvals} tone="warn" label={t.n("int.badge", approvals)} />}
+                {s.id === "ai" && approvals > 0 && <CountBadge n={approvals} tone="warn" label={t.n("int.badge", approvals)} />}
                 <span aria-hidden className="text-base text-faint">
                   ›
                 </span>

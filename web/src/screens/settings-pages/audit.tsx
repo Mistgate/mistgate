@@ -19,15 +19,16 @@ import { useFmt } from "@/lib/format";
 
 const pageSizes = [25, 50, 100] as const;
 
-type Source = "all" | "panel" | "bot" | "mcp" | "api";
+type Source = "all" | "panel" | "bot" | "mcp" | "api" | "assistant";
 const sources: Record<Source, AuditSource> = {
   all: AuditSource.UNSPECIFIED,
   panel: AuditSource.PANEL,
   bot: AuditSource.BOT,
   mcp: AuditSource.MCP,
   api: AuditSource.API,
+  assistant: AuditSource.ASSISTANT,
 };
-const sourceLabels: Record<Source, MessageKey> = { all: "audit.all", panel: "audit.panel", bot: "audit.bot", mcp: "audit.mcp", api: "audit.api" };
+const sourceLabels: Record<Source, MessageKey> = { all: "audit.all", panel: "audit.panel", bot: "audit.bot", mcp: "audit.mcp", api: "audit.api", assistant: "audit.assistant" };
 
 type Kind = "all" | "signin" | "changes" | "failures";
 const kinds: Record<Kind, AuditKind> = {
@@ -43,6 +44,7 @@ const badge: Record<AuditSource, { label: string; cls: string }> = {
   [AuditSource.PANEL]: { label: "WEB", cls: "bg-surface-2 text-muted" },
   [AuditSource.BOT]: { label: "BOT", cls: "bg-[color-mix(in_oklch,var(--accent-sky)_var(--_soft-pct),var(--bg))] text-[color-mix(in_oklch,var(--accent-sky)_var(--_text-pct),#000)]" },
   [AuditSource.MCP]: { label: "MCP", cls: "bg-accent-soft text-accent-text" },
+  [AuditSource.ASSISTANT]: { label: "AI", cls: "bg-accent-soft text-accent-text" },
   [AuditSource.API]: { label: "API", cls: "bg-[color-mix(in_oklch,var(--accent-sand)_var(--_soft-pct),var(--bg))] text-[color-mix(in_oklch,var(--accent-sand)_var(--_text-pct),#000)]" },
 };
 

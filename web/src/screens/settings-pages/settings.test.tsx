@@ -366,7 +366,7 @@ describe("Settings → Admins, Domains, Backups", () => {
     expect(text()).toContain("Owner");
     expect(text()).toContain("Signs in with 2 passkeys, a password and a code (login “alice”)");
     expect(text()).toContain(en["set.admins.more"]);
-    expect(document.querySelector("a[href='/integrations']")?.textContent).toBe(en["set.admins.tokens"]);
+    expect(document.querySelector("a[href='/ai']")?.textContent).toBe(en["set.admins.tokens"]);
   });
 
   it("shows the owner both addresses to copy and that setup fixed them", async () => {

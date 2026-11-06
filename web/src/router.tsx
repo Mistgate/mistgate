@@ -22,6 +22,7 @@ import { upgradeNodeLink, validateNodeSearch } from "@/screens/node/tabs";
 import { validateReachSearch } from "@/screens/reachability/search";
 import { validateNewProfileSearch, validateProfilesSearch } from "@/screens/profiles/search";
 import { validateSubsSearch } from "@/screens/subscriptions/tabs";
+import { validateAiSearch } from "@/screens/ai/tabs";
 
 // Every screen is its own chunk: the first paint only needs the router, the session check and the
 // chunk of the screen it lands on (sign-in, or the shell and the section).
@@ -228,6 +229,14 @@ const updates = createRoute({
   component: lazyRouteComponent(() => import("@/screens/updates"), "UpdatesScreen"),
 });
 
+const ai = createRoute({
+  getParentRoute: () => app,
+  path: "/ai",
+  // the tab, and the page of the approvals history
+  validateSearch: validateAiSearch,
+  component: lazyRouteComponent(() => import("@/screens/ai"), "AiScreen"),
+});
+
 const integrations = createRoute({
   getParentRoute: () => app,
   path: "/integrations",
@@ -236,7 +245,7 @@ const integrations = createRoute({
   component: lazyRouteComponent(() => import("@/screens/integrations"), "IntegrationsScreen"),
 });
 
-const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "health", "reachability", "updates", "integrations", "settings"]);
+const built = new Set(["overview", "nodes", "users", "profiles", "subscriptions", "health", "reachability", "updates", "ai", "integrations", "settings"]);
 const placeholderRoutes = sections
   .filter((s) => !built.has(s.id))
   .map((s) => createRoute({ getParentRoute: () => app, path: s.to, component: () => <SectionScreen id={s.id} /> }));
@@ -260,6 +269,7 @@ const routeTree = root.addChildren([
     health,
     reachability,
     updates,
+    ai,
     integrations,
     ...placeholderRoutes,
     settings.addChildren([settingsIndex, settingsPage]),

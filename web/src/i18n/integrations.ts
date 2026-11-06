@@ -7,7 +7,7 @@
 export const en = {
   // ---- page
   "int.title": "Integrations",
-  "int.sub": "API tokens for scripts, MCP for AI agents, and your approval for their riskiest changes.",
+  "int.sub": "Telegram alerts: every admin links their own chat.",
   "int.sub.awaiting": "{n} change is waiting for your decision|{n} changes are waiting for your decision",
   "int.loadFailed": "Cannot load integrations",
   "int.ownerOnly.title": "Only the owner manages integrations",
@@ -383,7 +383,7 @@ export const en = {
 export const ru: Record<keyof typeof en, string> = {
   // ---- page
   "int.title": "Интеграции",
-  "int.sub": "API-токены для скриптов, MCP для ИИ-агентов и твоё одобрение самых рискованных их действий.",
+  "int.sub": "Оповещения в Telegram: каждый админ привязывает свой чат.",
   "int.sub.awaiting": "{n} изменение ждёт твоего решения|{n} изменения ждут твоего решения|{n} изменений ждут твоего решения",
   "int.loadFailed": "Не удалось загрузить интеграции",
   "int.ownerOnly.title": "Интеграциями управляет только владелец",
@@ -752,7 +752,7 @@ export const ru: Record<keyof typeof en, string> = {
 export const zh: typeof en = {
   // ---- page
   "int.title": "集成",
-  "int.sub": "供脚本使用的 API 令牌，供 AI 智能体使用的 MCP，以及对它们高风险变更的审批。",
+  "int.sub": "Telegram 提醒：每位管理员都可以绑定自己的聊天。",
   "int.sub.awaiting": "{n} 项变更正在等待你的决定",
   "int.loadFailed": "无法加载集成",
   "int.ownerOnly.title": "只有所有者可以管理集成",
@@ -1125,7 +1125,7 @@ export const zh: typeof en = {
 
 export const fa: Record<keyof typeof en, string> = {
   "int.title": "یکپارچه‌سازی‌ها",
-  "int.sub": "توکن‌های API برای اسکریپت‌ها، MCP برای ایجنت‌های هوش مصنوعی و تأیید تو برای پرخطرترین کارهایشان.",
+  "int.sub": "هشدارهای تلگرام: هر مدیر گفتگوی خودش را وصل می‌کند.",
   "int.sub.awaiting": "{n} تغییر منتظر تصمیم توست",
   "int.loadFailed": "یکپارچه‌سازی‌ها بارگذاری نشد",
   "int.ownerOnly.title": "یکپارچه‌سازی‌ها را فقط مالک مدیریت می‌کند",
@@ -1470,7 +1470,7 @@ export const fa: Record<keyof typeof en, string> = {
 
 export const tr: Record<keyof typeof en, string> = {
   "int.title": "Entegrasyonlar",
-  "int.sub": "Betikler için API token'ları, yapay zekâ ajanları için MCP ve ajanların en riskli değişiklikleri için senin onayın.",
+  "int.sub": "Telegram uyarıları: her yönetici kendi sohbetini bağlar.",
   "int.sub.awaiting": "{n} değişiklik kararını bekliyor",
   "int.loadFailed": "Entegrasyonlar yüklenemedi",
   "int.ownerOnly.title": "Entegrasyonları yalnızca sahip yönetir",

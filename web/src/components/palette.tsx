@@ -53,7 +53,8 @@ export const places: readonly Place[] = [
     go: { to: "/reachability" },
   },
   { id: "updates", label: "nav.updates", words: "раскатка версии rollout versions 更新 升级 版本 滚动更新 发布", go: { to: "/updates" } },
-  { id: "integrations", label: "nav.integrations", words: "集成 接口 令牌 智能体 审批", go: { to: "/integrations" } },
+  { id: "ai", label: "nav.ai", words: "ии ассистент память чат ai assistant memory chat 助手 人工智能 记忆", go: { to: "/ai" } },
+  { id: "integrations", label: "nav.integrations", words: "телеграм оповещения telegram alerts 集成 提醒", go: { to: "/integrations" } },
   { id: "settings", label: "nav.settings", words: "设置 配置 选项", go: { to: "/settings" } },
   page("interface", "тема язык акцент цвет бренд логотип название theme language accent colour color brand logo 界面 主题 语言 强调色 颜色 品牌 标志 名称"),
   page("security", "passkey пароль код вход cloudflare turnstile капча 2fa totp password code sign-in captcha 安全 通行密钥 密码 验证码 登录 人机验证 两步验证"),
@@ -62,9 +63,9 @@ export const places: readonly Place[] = [
   page("admins", "помощник роли helper roles 管理员 协作者 角色 权限"),
   page("domains", "адрес ссылки address url links 域名 地址 链接 网址"),
   page("backups", "бэкап бэкапы копия backup copy 备份 恢复 快照"),
-  { id: "tokens", label: "int.tok.title", crumb: "nav.integrations", words: "токен токены ключ скрипт token tokens key script api 令牌 密钥 脚本 接口", go: { to: "/integrations" } },
-  { id: "mcp", label: "int.mcp.title", crumb: "nav.integrations", words: "агент ии claude agent ai 智能体 人工智能 MCP", go: { to: "/integrations" } },
-  { id: "approvals", label: "palette.approvals", crumb: "nav.integrations", words: "одобрить решения approve decisions 审批 批准 拒绝 决定", go: { to: "/integrations" } },
+  { id: "tokens", label: "int.tok.title", crumb: "nav.ai", words: "токен токены ключ скрипт token tokens key script api 令牌 密钥 脚本 接口", go: { to: "/ai", search: { tab: "mcp" } } },
+  { id: "mcp", label: "int.mcp.title", crumb: "nav.ai", words: "агент ии claude agent ai 智能体 人工智能 MCP", go: { to: "/ai", search: { tab: "mcp" } } },
+  { id: "approvals", label: "palette.approvals", crumb: "nav.ai", words: "одобрить решения approve decisions 审批 批准 拒绝 决定", go: { to: "/ai", search: { tab: "approvals" } } },
   tab("subscriptions", "formats", "subs.tab.formats", "приложения форматы mihomo happ apps formats clients 应用 格式 客户端", true),
   tab("subscriptions", "rules", "subs.tab.rules", "правила user-agent rules 规则 下发规则", false),
   tab("subscriptions", "texts", "subs.tab.texts", "тексты названия texts names 文本 名称 显示名称", false),
@@ -194,7 +195,7 @@ export default function Palette({ open, onOpenChange }: { open: boolean; onOpenC
           .map((p) => ({ id: `place-${p.id}`, tag: "→", label: t(p.label), meta: p.crumb ? t(p.crumb) : undefined, run: go(p.go) }))
       : [];
     const actions: (Item & { words: string })[] = [
-      { id: "new-token", tag: "+", label: t("palette.newToken"), words: "новый токен создать ключ api new token create key 新建 令牌 创建 密钥", run: go({ to: "/integrations", search: { new: "token" } }) },
+      { id: "new-token", tag: "+", label: t("palette.newToken"), words: "новый токен создать ключ api new token create key 新建 令牌 创建 密钥", run: go({ to: "/ai", search: { tab: "mcp", new: "token" } }) },
       { id: "new-profile", tag: "+", label: t("palette.newProfile"), words: "новый профиль создать new profile create 新建 协议配置 创建", run: go({ to: "/profiles/new" }) },
       { id: "create-user", tag: "+", label: t("palette.createUser"), words: "новый пользователь создать добавить друга new user create add friend 新建 用户 创建 添加 朋友", run: go({ to: "/users", search: { create: "true" } }) },
       {

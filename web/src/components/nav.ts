@@ -1,7 +1,7 @@
 import type { MessageKey } from "@/i18n/en";
 import type { NavIconName } from "@/components/ui/icons";
 
-// The 10 sections of the admin, in order. The first three sit in the mobile dock next to
+// The 11 sections of the admin, in order. The first three sit in the mobile dock next to
 // "More", the rest go into its sheet. `group` puts a labelled separator above the item in the sidebar.
 export const sections = [
   { id: "overview", to: "/" },
@@ -12,6 +12,7 @@ export const sections = [
   { id: "health", to: "/health", group: "nav.group.ops" },
   { id: "reachability", to: "/reachability" },
   { id: "updates", to: "/updates" },
+  { id: "ai", to: "/ai" },
   { id: "integrations", to: "/integrations" },
   { id: "settings", to: "/settings" },
 ] as const satisfies readonly { id: NavIconName; to: string; group?: MessageKey }[];
