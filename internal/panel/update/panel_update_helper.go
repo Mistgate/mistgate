@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/release"
 )
 
 // systemctlFunc runs systemctl with the arguments and returns its trimmed standard output.
@@ -387,6 +388,12 @@ func installLatestPanelUpdate(ctx context.Context, cfg PanelUpdateConfig, system
 	want, err := takePanelUpdateRequest(cfg.DataDir)
 	if err != nil {
 		return fmt.Errorf("panel-update-helper: %w", err)
+	}
+	// The helper does not read the panel's update_channel: it looks on the channel of the release the panel confirmed
+	// (v1.2.3-dev.1 -> dev), so a panel on Testing or Development updates to what it offered, not to the newest stable.
+	// The channel only widens which signed releases are looked at; the version and digest must still match the request.
+	if channel, ok := release.ChannelOf(want.Version); ok {
+		updater.cfg.Channel = func() release.Channel { return channel }
 	}
 	checkCtx, cancelCheck := context.WithTimeout(ctx, panelUpdateCheckTimeout)
 	status, rel, err := updater.fetchStatus(checkCtx)

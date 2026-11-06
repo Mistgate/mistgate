@@ -769,6 +769,41 @@ func TestRootHelperInstallsTheConfirmedSignedRelease(t *testing.T) {
 	}
 }
 
+// A panel on the Development channel confirmed a dev release: the helper looks on that release's channel, not on
+// Stable (where it saw nothing newer and refused with "already up to date"), and installs exactly the confirmed build.
+func TestRootHelperInstallsTheConfirmedReleaseOfItsChannel(t *testing.T) {
+	stable := newPanelFixture()
+	dev := newPanelFixture()
+	dev.tag, dev.built = "v1.2.1-dev.1", panelTestBuilt+100
+	dev.binary = append(minimalELF(elf.EM_X86_64), 1)
+	dataDir, target := helperEnv(t)
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: dev.tag, SHA256: dev.digest()}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := helperConfig(t, stable, dataDir, target)
+	cfg.HTTPClient, _ = panelFixturesClient(t, stable, dev)
+	var calls [][]string
+	if err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, dev.binary) {
+		t.Fatalf("installed binary = %x, %v; want the dev build", got, err)
+	}
+	// A stable request still installs the stable release when a newer dev build exists beside it.
+	dataDir, target = helperEnv(t)
+	if err := writePanelUpdateRequest(dataDir, panelUpdateRequest{Version: stable.tag, SHA256: stable.digest()}); err != nil {
+		t.Fatal(err)
+	}
+	cfg = helperConfig(t, stable, dataDir, target)
+	cfg.HTTPClient, _ = panelFixturesClient(t, stable, dev)
+	if err := installLatestPanelUpdate(context.Background(), cfg, systemctlRecorder(&calls, nil)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, stable.binary) {
+		t.Fatalf("installed binary = %x, %v; want the stable build", got, err)
+	}
+}
+
 // The helper trusts nothing the panel's service user can write except the narrowing request: it verifies the signed
 // manifest again, and anything that does not match stops it before the panel is touched.
 func TestRootHelperRefusesBeforeStoppingThePanel(t *testing.T) {
