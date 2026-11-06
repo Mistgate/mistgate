@@ -90,6 +90,37 @@ is a separate decision.
   limits which families an app can use.
 - A wrong family spread fast hurts many people at once: the canary step and the checks are not optional.
 
+## Nothing breaks
+
+The first rule of every step below; a step that cannot keep it does not ship.
+
+- **Off until turned on.** An updated panel changes no dialect by itself: rotation is opt-in per panel and per profile;
+  today's profiles become "family as drawn, seed as stored" and keep every parameter they have.
+- **A person never loses the connection to a rotation.** The old dialect keeps working until the overlap ends, the overlap
+  outlives the app refresh interval, and a device that still uses the old dialect holds it open longer (up to a cap).
+- **Static clients are not rotated behind their back**: AmneziaVPN keys and Telegram links only by hand or on a confirmed
+  signal, with the new key shown first.
+- **Canaries and rollback.** A rotation reaches a few nodes first; if their reachability or their health checks get worse,
+  it stops and those nodes go back to the old dialect, as a failed node update does.
+- **Same app matrix.** A family is offered only to apps whose formats carry it; an app that cannot carry the new dialect
+  keeps a server it can use.
+- **Tests before a family ships**: interop with each app that carries it, the classifier tests, and a rotation drill on a
+  test fleet (rotate, overlap, retire, roll back).
+
+## Our own protocol
+
+A protocol of our own, when it comes, is designed as a family of this model from its first line, not retrofitted:
+
+- **Metamorphic by construction.** Its wire format is generated from the seed: framing, header layout, padding and the
+  size and timing shaping are parameters of a grammar (in the spirit of FTE and Marionette), so two servers speak two
+  dialects of it and a rotation is a new seed, not a new protocol.
+- **Inside mimicry.** Its outer layer is a protocol an allow list keeps (TLS to a real site or QUIC first), never bytes that
+  look like nothing.
+- **Open.** The grammar, the generator and the client are public; each server's seed and keys are secret. Its advantage is
+  the panel: generation, rotation, signals and delivery to the apps across a fleet, which a protocol alone does not have.
+- **Proven like the others**: the same classifier and probe tests, a published design note, and an outside review before it
+  is offered by default.
+
 ## Plan
 
 1. **Dialects for what exists**: the dialect model, seeds in the vault, the families that describe today's per-profile
