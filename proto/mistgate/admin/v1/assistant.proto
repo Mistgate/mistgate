@@ -1,0 +1,464 @@
+syntax = "proto3";
+
+package mistgate.admin.v1;
+
+import "mistgate/admin/v1/integrations.proto";
+
+// The assistant (design/adr/0014-assistant.md): a cloud model the owner connects with an API key, which every allowed
+// admin talks to in a chat over the admin pages. Conventions: common.proto.
+//
+// ONE RULE. The panel runs the agent loop itself. Each turn is an in-process MCP session to the panel's own MCP server,
+// with the rights of the admin who talks (owner -> Admin profile, helper -> Operator, readonly -> Readonly; source
+// "assistant", audit actor "Assistant of <admin>"). The model sees the same tools, descriptions, scrub and untrusted-data
+// marking an API token of that profile sees, plus the memory tools below. It is never given an `_apply` tool: a plan it
+// makes reaches the chat as a PlanCard, and only ApplyPlan (the human's click) applies it, on the server, with the confirm
+// token that never leaves the server.
+//
+// WHO. GetAssistantAccess: any signed-in admin. Settings and keys: OWNER-ONLY, refused to API tokens; SetProviderKey and
+// RemoveProviderKey also need a fresh step-up. Conversations and memory: each admin's own; nobody reads another admin's
+// (the owner may only delete everyone's, with a step-up). Chat, ApplyPlan and memory need GetAssistantAccess.available.
+//
+// KEYS. A provider key is sealed with the panel vault (AAD "assistant-provider:<provider>") and never returned: the panel
+// shows the provider, the last four characters, when it was added and the last error. The panel calls a provider only from
+// the server, over HTTPS, to the provider's fixed address (no custom URL), without following redirects to another host.
+//
+// LIMITS. Per turn: at most 24 tool calls, 120 s per model call, 10 minutes per turn. Per admin: 20 turns a minute, one
+// running turn per conversation. Per provider: the owner's monthly budget in US dollars, estimated from the provider's
+// price table and the usage each answer reports.
+//
+// ERRORS. Connect codes, each with an AssistantError detail whose `code` the SPA words:
+//   FAILED_PRECONDITION "assistant_off", "not_allowed", "no_provider", "turn_running", "plan_not_pending";
+//   RESOURCE_EXHAUSTED "budget_reached", "rate_limited"; UNAVAILABLE "provider_unreachable", "provider_overloaded";
+//   INVALID_ARGUMENT "bad_key", "no_balance", "text_too_long", "note_too_long", "too_many_notes";
+//   PERMISSION_DENIED as for the rest of the admin (owner-only, step-up with its StepUpRequired detail).
+// Errors that happen inside a running turn arrive as ChatResponse.error with the same codes, and the turn ends.
+
+service AssistantService {
+  // Whether this admin may use the assistant now, and with what: the floating chat button reads it.
+  rpc GetAssistantAccess(GetAssistantAccessRequest) returns (GetAssistantAccessResponse);
+
+  // OWNER-ONLY.
+  rpc GetAssistantSettings(GetAssistantSettingsRequest) returns (GetAssistantSettingsResponse);
+  rpc UpdateAssistantSettings(UpdateAssistantSettingsRequest) returns (UpdateAssistantSettingsResponse);
+  // OWNER-ONLY, fresh step-up. Checks the key with the provider (its model list, or a one-token call where there is no
+  // list) before sealing it; a key the provider refuses is not stored.
+  rpc SetProviderKey(SetProviderKeyRequest) returns (SetProviderKeyResponse);
+  rpc RemoveProviderKey(RemoveProviderKeyRequest) returns (RemoveProviderKeyResponse);
+  // OWNER-ONLY. The models of a connected provider that take tools, for the model picker.
+  rpc ListProviderModels(ListProviderModelsRequest) returns (ListProviderModelsResponse);
+
+  // The admin's own conversations, newest first.
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+  rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse);
+  // The admin's own; with all_admins (owner, fresh step-up) everyone's.
+  rpc DeleteAllConversations(DeleteAllConversationsRequest) returns (DeleteAllConversationsResponse);
+
+  // One turn: the admin's message in, the answer streamed out. An empty conversation_id starts a conversation.
+  rpc Chat(ChatRequest) returns (stream ChatResponse);
+  // Ends the running turn of a conversation at once (the model call is cancelled; what was said so far is kept).
+  rpc StopTurn(StopTurnRequest) returns (StopTurnResponse);
+  // The human's click on a plan card. A plan that needs the owner: the owner approves and applies it in one step (fresh
+  // step-up); for anyone else it is left in the approval inbox and the card says it waits for the owner. A node_install
+  // plan is never applied here (its host key and login are confirmed in the approval inbox).
+  rpc ApplyPlan(ApplyPlanRequest) returns (ApplyPlanResponse);
+  rpc DismissPlan(DismissPlanRequest) returns (DismissPlanResponse);
+
+  // The admin's own notes the assistant reads in every conversation (at most 100 of 400 characters).
+  rpc ListMemory(ListMemoryRequest) returns (ListMemoryResponse);
+  rpc SaveMemory(SaveMemoryRequest) returns (SaveMemoryResponse);
+  rpc DeleteMemory(DeleteMemoryRequest) returns (DeleteMemoryResponse);
+  rpc ForgetAll(ForgetAllRequest) returns (ForgetAllResponse);
+}
+
+// The Connect error detail of every refusal above.
+message AssistantError {
+  string code = 1;
+}
+
+enum AssistantProvider {
+  ASSISTANT_PROVIDER_UNSPECIFIED = 0;
+  // Messages API, https://api.anthropic.com.
+  ASSISTANT_PROVIDER_ANTHROPIC = 1;
+  // OpenAI-compatible Chat Completions, https://api.deepseek.com.
+  ASSISTANT_PROVIDER_DEEPSEEK = 2;
+  // OpenAI-compatible Chat Completions, https://api.z.ai/api/paas/v4 (not the Coding Plan endpoints).
+  ASSISTANT_PROVIDER_ZAI = 3;
+  // OpenAI-compatible Chat Completions, https://ollama.com/v1.
+  ASSISTANT_PROVIDER_OLLAMA_CLOUD = 4;
+}
+
+// How hard the model thinks: Anthropic effort low / medium / high, reasoning_effort where a provider takes one.
+enum AssistantEffort {
+  ASSISTANT_EFFORT_UNSPECIFIED = 0;
+  ASSISTANT_EFFORT_QUICK = 1;
+  ASSISTANT_EFFORT_NORMAL = 2;
+  ASSISTANT_EFFORT_THOROUGH = 3;
+}
+
+// Who may use the assistant; each acts with their own role.
+enum AssistantAudience {
+  ASSISTANT_AUDIENCE_UNSPECIFIED = 0;
+  // The owner only (the default).
+  ASSISTANT_AUDIENCE_OWNER = 1;
+  // The owner and the helpers.
+  ASSISTANT_AUDIENCE_ADMINS = 2;
+  // Every admin of the panel, read-only admins too (with the read tools only).
+  ASSISTANT_AUDIENCE_EVERYONE = 3;
+}
+
+message GetAssistantAccessRequest {}
+
+message GetAssistantAccessResponse {
+  bool available = 1;
+  // Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached".
+  string reason = 2;
+  AssistantProvider provider = 3;
+  string model = 4;
+  // The admin's role gives it the read tools only.
+  bool read_only = 5;
+}
+
+message AssistantSettings {
+  bool enabled = 1;
+  // The provider the chat uses; it must be connected.
+  AssistantProvider provider = 2;
+  AssistantEffort effort = 3;
+  AssistantAudience audience = 4;
+  // The owner's notes every admin's assistant reads ("nl1 is the test node"), at most 4000 characters.
+  string panel_notes = 5;
+  // How long conversations are kept: 7 to 365 days; 0 = until deleted. Default 90.
+  uint32 retention_days = 6;
+}
+
+// What the owner chooses per provider (the key is set apart, by SetProviderKey).
+message ProviderChoice {
+  AssistantProvider provider = 1;
+  // A model id from ListProviderModels; empty = the provider's default.
+  string model = 2;
+  // The monthly budget in US dollars; 0 = the provider's calls stop at once (no budget means no calls). Default 20.
+  double budget_usd_month = 3;
+}
+
+message ProviderStatus {
+  AssistantProvider provider = 1;
+  bool connected = 2;
+  // The last four characters of the key, for the owner to recognise it; empty when not connected.
+  string key_hint = 3;
+  int64 added_unix = 4 [jstype = JS_NUMBER];
+  ProviderChoice choice = 5;
+  // This calendar month (UTC), estimated.
+  double spent_usd_month = 6;
+  // The last refusal or failure of the provider, a code as in ERRORS; empty when the last call worked.
+  string last_error_code = 7;
+  int64 last_error_unix = 8 [jstype = JS_NUMBER];
+}
+
+message AssistantModel {
+  string id = 1;
+  string name = 2;
+  int64 context_tokens = 3 [jstype = JS_NUMBER];
+  // US dollars per million tokens, from the panel's price table; 0 = unknown.
+  double input_usd_per_mtok = 4;
+  double output_usd_per_mtok = 5;
+  // The panel's default for this provider.
+  bool recommended = 6;
+}
+
+// What the assistant cost per admin this month.
+message AssistantUsage {
+  string admin_id = 1;
+  string admin_name = 2;
+  double usd = 3;
+  uint32 turns = 4;
+}
+
+message GetAssistantSettingsRequest {}
+
+message GetAssistantSettingsResponse {
+  AssistantSettings settings = 1;
+  // One per provider the panel knows, connected or not, in the order of AssistantProvider.
+  repeated ProviderStatus providers = 2;
+  repeated AssistantUsage usage = 3;
+}
+
+message UpdateAssistantSettingsRequest {
+  AssistantSettings settings = 1;
+  // Only the providers listed change.
+  repeated ProviderChoice choices = 2;
+}
+
+message UpdateAssistantSettingsResponse {
+  AssistantSettings settings = 1;
+  repeated ProviderStatus providers = 2;
+}
+
+message SetProviderKeyRequest {
+  AssistantProvider provider = 1;
+  // Sealed on arrival; never logged, audited or returned.
+  string api_key = 2;
+}
+
+message SetProviderKeyResponse {
+  ProviderStatus status = 1;
+  repeated AssistantModel models = 2;
+}
+
+message RemoveProviderKeyRequest {
+  AssistantProvider provider = 1;
+}
+
+message RemoveProviderKeyResponse {
+  ProviderStatus status = 1;
+}
+
+message ListProviderModelsRequest {
+  AssistantProvider provider = 1;
+}
+
+message ListProviderModelsResponse {
+  repeated AssistantModel models = 1;
+}
+
+// The page the admin is on when they write; it goes with the message as a removable chip in the chat.
+message PageContext {
+  // "node", "user", "group", "profile", "subscriptions", "health", "settings", ... ; empty = none.
+  string kind = 1;
+  // The object's id when the page is about one ("nod_...", "usr_...").
+  string id = 2;
+  // What the chip says ("Node de1"). Untrusted: it may hold a name.
+  string label = 3;
+  // The admin route, for the answer to link back.
+  string route = 4;
+}
+
+message ConversationSummary {
+  string id = 1;
+  // Written by the model when the conversation first goes idle; empty until then. Untrusted text.
+  string title = 2;
+  int64 created_unix = 3 [jstype = JS_NUMBER];
+  int64 updated_unix = 4 [jstype = JS_NUMBER];
+  uint32 messages = 5;
+}
+
+enum ChatRole {
+  CHAT_ROLE_UNSPECIFIED = 0;
+  CHAT_ROLE_USER = 1;
+  CHAT_ROLE_ASSISTANT = 2;
+}
+
+// One tool call of a turn, as the chat shows it ("Read nodes · 12", expandable to the call).
+message ToolCall {
+  string id = 1;
+  // The MCP tool name ("node_list", "user_disable_plan").
+  string tool = 2;
+  // The arguments as JSON, after the same scrub as the results.
+  string args_json = 3;
+  bool done = 4;
+  bool ok = 5;
+  // How many items a read returned, when it is a list; 0 otherwise.
+  uint32 count = 6;
+  // A refusal or failure, short and without secrets.
+  string error = 7;
+}
+
+enum PlanState {
+  PLAN_STATE_UNSPECIFIED = 0;
+  // Made; waits for the human's click.
+  PLAN_STATE_PROPOSED = 1;
+  // The click went in; the plan needs the owner, who has not approved it yet (in the approval inbox).
+  PLAN_STATE_WAITING_OWNER = 2;
+  PLAN_STATE_APPLIED = 3;
+  PLAN_STATE_FAILED = 4;
+  PLAN_STATE_REJECTED = 5;
+  PLAN_STATE_DISMISSED = 6;
+  // Not applied within 10 minutes of being made.
+  PLAN_STATE_EXPIRED = 7;
+}
+
+// A plan the model made, in the panel's own words: the same facts, danger notes and i18n keys as an Approval
+// ("approval.tool.<tool>", "approval.fact.<key>", "approval.danger.<code>").
+message PlanCard {
+  // "pln_...".
+  string plan_id = 1;
+  // The MCP tool without the _plan suffix.
+  string tool = 2;
+  // The panel's one-line summary (never text from data).
+  string summary = 3;
+  repeated ApprovalFact facts = 4;
+  repeated string danger = 5;
+  bool needs_approval = 6;
+  // node_install: approve it in the approval inbox, not in the chat.
+  bool inbox_only = 7;
+  int64 expires_unix = 8 [jstype = JS_NUMBER];
+  PlanState state = 9;
+  // Once APPLIED or FAILED, as on an Approval.
+  string result = 10;
+  string error = 11;
+  string outcome_code = 12;
+}
+
+message MemoryNote {
+  string id = 1;
+  // At most 400 characters. Untrusted when the assistant wrote it.
+  string text = 2;
+  int64 created_unix = 3 [jstype = JS_NUMBER];
+  int64 updated_unix = 4 [jstype = JS_NUMBER];
+  // Saved by the assistant (shown as "Remembered" in the chat), not typed by the admin.
+  bool by_assistant = 5;
+  // Where the assistant saved it; empty for the admin's own.
+  string conversation_id = 6;
+}
+
+message ChatMessage {
+  string id = 1;
+  ChatRole role = 2;
+  // The admin's text, or the assistant's answer in Markdown (rendered without raw HTML and without images).
+  string text = 3;
+  int64 created_unix = 4 [jstype = JS_NUMBER];
+  // The page the admin was on (user messages).
+  PageContext context = 5;
+  // In the order they happened (assistant messages).
+  repeated ToolCall tools = 6;
+  repeated PlanCard plans = 7;
+  repeated MemoryNote remembered = 8;
+  // How the assistant's turn ended: "end", "stopped", "limit", "refused", "budget", "error".
+  string end = 9;
+}
+
+message ListConversationsRequest {
+  // Words to find in titles and summaries; empty = all.
+  string query = 1;
+  // At most 100; 0 = 30.
+  uint32 limit = 2;
+  string page_token = 3;
+}
+
+message ListConversationsResponse {
+  repeated ConversationSummary conversations = 1;
+  string next_page_token = 2;
+}
+
+message GetConversationRequest {
+  string id = 1;
+}
+
+message GetConversationResponse {
+  ConversationSummary conversation = 1;
+  repeated ChatMessage messages = 2;
+  // A turn of this conversation is running now (opened in another tab): the chat shows it as busy.
+  bool running = 3;
+}
+
+message DeleteConversationRequest {
+  string id = 1;
+}
+
+message DeleteConversationResponse {}
+
+message DeleteAllConversationsRequest {
+  // Owner, fresh step-up: every admin's conversations.
+  bool all_admins = 1;
+}
+
+message DeleteAllConversationsResponse {
+  uint32 deleted = 1;
+}
+
+message ChatRequest {
+  // Empty = a new conversation.
+  string conversation_id = 1;
+  // At most 8000 characters.
+  string text = 2;
+  PageContext context = 3;
+}
+
+message ChatStarted {
+  string conversation_id = 1;
+  string user_message_id = 2;
+  string assistant_message_id = 3;
+}
+
+message TurnUsage {
+  int64 input_tokens = 1 [jstype = JS_NUMBER];
+  int64 output_tokens = 2 [jstype = JS_NUMBER];
+  // Estimated cost of this turn.
+  double usd = 3;
+}
+
+message TurnDone {
+  // As ChatMessage.end.
+  string end = 1;
+  // The conversation's title when this turn gave it one.
+  string title = 2;
+}
+
+message ChatResponse {
+  oneof event {
+    // First event of every turn.
+    ChatStarted started = 1;
+    // The next piece of the answer's Markdown.
+    string text_delta = 2;
+    ToolCall tool_started = 3;
+    ToolCall tool_finished = 4;
+    PlanCard plan = 5;
+    MemoryNote remembered = 6;
+    TurnUsage usage = 7;
+    // Last event of a turn that ended normally, was stopped or hit a limit.
+    TurnDone done = 8;
+    // Last event of a turn that failed; the code as in ERRORS.
+    AssistantError error = 9;
+  }
+}
+
+message StopTurnRequest {
+  string conversation_id = 1;
+}
+
+message StopTurnResponse {}
+
+message ApplyPlanRequest {
+  string conversation_id = 1;
+  string plan_id = 2;
+}
+
+message ApplyPlanResponse {
+  PlanCard plan = 1;
+}
+
+message DismissPlanRequest {
+  string conversation_id = 1;
+  string plan_id = 2;
+}
+
+message DismissPlanResponse {
+  PlanCard plan = 1;
+}
+
+message ListMemoryRequest {}
+
+message ListMemoryResponse {
+  repeated MemoryNote notes = 1;
+}
+
+message SaveMemoryRequest {
+  // Empty = a new note.
+  string id = 1;
+  string text = 2;
+}
+
+message SaveMemoryResponse {
+  MemoryNote note = 1;
+}
+
+message DeleteMemoryRequest {
+  string id = 1;
+}
+
+message DeleteMemoryResponse {}
+
+message ForgetAllRequest {}
+
+message ForgetAllResponse {
+  uint32 deleted = 1;
+}

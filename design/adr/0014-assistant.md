@@ -1,6 +1,6 @@
 # 0014. The assistant: a cloud model that runs the panel through its own MCP tools
 
-Status: proposed, 2026-11-06.
+Status: accepted, 2026-11-06.
 
 ## Context
 
