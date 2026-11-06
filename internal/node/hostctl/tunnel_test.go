@@ -41,6 +41,8 @@ table inet mistgate_awg {
 		iifname "mgawg40001" ip daddr 10.66.8.1 icmp type echo-request accept
 		iifname "mgawg51842" ip daddr 10.66.4.1 icmp type echo-request accept
 		iifname "mgawg51842" ip6 daddr fd66:66:0:1::1 icmpv6 type echo-request accept
+		iifname "mgawg*" ip daddr { 10.66.8.1, 10.66.4.1 } drop
+		iifname "mgawg*" ip6 daddr { fd66:66:0:1::1 } drop
 		iifname "mgawg*" tcp dport 443 accept
 		iifname "mgawg*" drop
 	}
@@ -72,9 +74,14 @@ func TestRenderTunnelsAllowsHTTPSBeforeLocalDrop(t *testing.T) {
 	}
 	allow := `iifname "mgawg*" tcp dport 443 accept`
 	drop := `iifname "mgawg*" drop`
-	allowAt, dropAt := strings.Index(rules, allow), strings.Index(rules, drop)
+	own := `iifname "mgawg*" ip daddr { 10.66.4.1 } drop`
+	allowAt, dropAt, ownAt := strings.Index(rules, allow), strings.Index(rules, drop), strings.Index(rules, own)
 	if allowAt < 0 {
 		t.Fatalf("HTTPS access to the node is not allowed:\n%s", rules)
+	}
+	// the tunnel's own address stays closed: HTTPS is open only at the host's other addresses
+	if ownAt < 0 || ownAt > allowAt {
+		t.Fatalf("the tunnel addresses must be dropped before the HTTPS allow:\n%s", rules)
 	}
 	if dropAt < 0 || allowAt > dropAt {
 		t.Fatalf("HTTPS allow must precede the local-service drop:\n%s", rules)

@@ -150,10 +150,23 @@ func renderTunnels(ts []Tunnel, v6verdict string) (string, error) {
 			fmt.Fprintf(&b, "\t\tiifname %q ip6 daddr %s icmpv6 type echo-request accept\n", t.Iface, t.Addr6)
 		}
 	}
-	// HTTPS is the public control plane as well as a common public service. Allowing exactly 443 here lets a
-	// full-tunnel client reach a panel hosted on this node without exposing SSH or backend management listeners.
-	fmt.Fprintf(&b, "		iifname %s tcp dport 443 accept\n", wild)
-	fmt.Fprintf(&b, "		iifname %s drop\n	}\n", wild)
+	// The tunnels' own addresses serve nothing but the echo above: through a tunnel a client reaches no service at a
+	// node address of its own or of another profile.
+	addrs4, addrs6 := make([]string, 0, len(sorted)), []string{}
+	for _, t := range sorted {
+		addrs4 = append(addrs4, t.Addr4.String())
+		if t.Subnet6.IsValid() {
+			addrs6 = append(addrs6, t.Addr6.String())
+		}
+	}
+	fmt.Fprintf(&b, "\t\tiifname %s ip daddr { %s } drop\n", wild, strings.Join(addrs4, ", "))
+	if len(addrs6) > 0 {
+		fmt.Fprintf(&b, "\t\tiifname %s ip6 daddr { %s } drop\n", wild, strings.Join(addrs6, ", "))
+	}
+	// HTTPS at the host's other (public) addresses: a full-tunnel client reaches a panel that shares the node's address,
+	// as anyone on the internet does, and nothing more: not SSH, not a management listener (issue #41).
+	fmt.Fprintf(&b, "\t\tiifname %s tcp dport 443 accept\n", wild)
+	fmt.Fprintf(&b, "\t\tiifname %s drop\n\t}\n", wild)
 
 	// Forward: no client-to-client traffic, and the MSS clamp in both directions of a tunnel.
 	fmt.Fprintf(&b, "\tchain isolate {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tiifname %s oifname %s drop\n\t}\n", wild, wild)
