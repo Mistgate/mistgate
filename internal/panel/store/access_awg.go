@@ -403,6 +403,59 @@ func (a Access) EnsureLinkAWGCreds(ctx context.Context, dev AccessDevice, limit 
 	return result, nil
 }
 
+// CountLinkAWGKeys counts live AWG peers held by link devices, across all users. AmneziaVPN keys are separate devices and
+// are not part of the subscription link's count.
+func (a Access) CountLinkAWGKeys(ctx context.Context) (int, error) {
+	var count int
+	err := a.s.R.QueryRowContext(ctx, `SELECT count(*) FROM device d
+		JOIN device_credential c ON c.device_id = d.id AND c.protocol = 'awg' AND c.revoked_at IS NULL
+		JOIN awg_peer p ON p.credential_id = c.id AND p.released_at = 0
+		WHERE d.kind = 'link' AND d.revoked_at IS NULL`).Scan(&count)
+	return count, err
+}
+
+// RevokeLinkAWGCreds drops the live AWG credentials of one link device and quarantines their peer indexes in one guarded
+// batch. The device identity is checked in the database so an AmneziaVPN key can never be passed through accidentally.
+func (a Access) RevokeLinkAWGCreds(ctx context.Context, dev AccessDevice, now time.Time) (int, error) {
+	if dev.ID == "" || dev.UserID == "" {
+		return 0, nil
+	}
+	const liveCount = `SELECT count(*) AS n FROM device d
+		JOIN device_credential c ON c.device_id = d.id AND c.user_id = d.user_id
+		WHERE d.id = ? AND d.user_id = ? AND d.kind = 'link' AND d.revoked_at IS NULL
+		AND c.protocol = 'awg' AND c.revoked_at IS NULL`
+	var dropped int
+	_, err := a.s.retryGuarded(ctx, func() ([]Stmt, error) {
+		dropped = 0
+		var live int
+		r := reads{}
+		r.add(oneRow(&live, scanCount), liveCount, dev.ID, dev.UserID)
+		if err := r.run(ctx, a.s); err != nil {
+			return nil, accMapErr(err)
+		}
+		if live == 0 {
+			return nil, nil
+		}
+		dropped = live
+		return []Stmt{
+			guard(`EXISTS (SELECT 1 FROM device d WHERE d.id = ?1 AND d.user_id = ?2 AND d.kind = 'link' AND d.revoked_at IS NULL)
+				AND (SELECT count(*) FROM device_credential c WHERE c.device_id = ?1 AND c.user_id = ?2 AND c.protocol = 'awg' AND c.revoked_at IS NULL) = ?3`,
+				dev.ID, dev.UserID, live),
+			{Query: `UPDATE awg_peer SET released_at = ? WHERE released_at = 0 AND credential_id IN
+				(SELECT c.id FROM device_credential c JOIN device d ON d.id = c.device_id
+				 WHERE d.id = ? AND d.user_id = ? AND d.kind = 'link' AND d.revoked_at IS NULL
+				 AND c.protocol = 'awg' AND c.revoked_at IS NULL)`, Args: []any{unix(now), dev.ID, dev.UserID}},
+			{Query: `UPDATE device_credential SET revoked_at = ? WHERE device_id = ? AND user_id = ? AND protocol = 'awg' AND revoked_at IS NULL
+				AND EXISTS (SELECT 1 FROM device d WHERE d.id = device_credential.device_id AND d.user_id = device_credential.user_id
+				 AND d.kind = 'link' AND d.revoked_at IS NULL)`, Args: []any{unix(now), dev.ID, dev.UserID}},
+		}, nil
+	})
+	if err != nil {
+		return 0, accMapErr(err)
+	}
+	return dropped, nil
+}
+
 type awgBatchIssue struct {
 	profileID string
 	idx       int

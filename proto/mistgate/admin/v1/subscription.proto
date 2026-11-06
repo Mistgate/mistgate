@@ -50,6 +50,9 @@ message SubscriptionSettings {
   HappPing happ_ping = 12;
   // With happ_ping set: Happ pings the servers each time it opens (subscription-ping-onopen-enabled: 1, else 0).
   bool happ_ping_on_open = 13;
+  // AmneziaWG servers in what the subscription link hands out (today only the Mihomo profile carries them).
+  // Absent = true: settings stored before this switch existed keep today's behaviour.
+  optional bool link_awg = 14;
 }
 
 // The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).
@@ -162,6 +165,9 @@ message GetSubscriptionSettingsResponse {
   // People who have a live common (no device ID) place right now: the apps that report none are what STRICT turns away,
   // so the confirmation of switching to it shows this number.
   uint32 shared_link_users = 6;
+  // Live AmneziaWG credentials held by the subscription link's devices, across all users. Turning link_awg off drops
+  // each credential the next time its app fetches a Mihomo profile.
+  uint32 link_awg_keys = 7;
 }
 
 // One server of the preview: what a server name is built from.

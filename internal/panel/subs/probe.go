@@ -17,6 +17,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/clientprobe"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -78,7 +79,8 @@ func (h *handler) serveProbe(w http.ResponseWriter, r *http.Request, token, clie
 	if h.fsrc != nil {
 		format = plugin.FormatMihomo
 	}
-	v, err := h.fetch(ctx, token, format, access.DeviceHint{}, false, false)
+	noLinkAWG := !subsettings.LinkAWG(h.settings(ctx))
+	v, err := h.fetch(ctx, token, format, access.DeviceHint{}, false, false, noLinkAWG)
 	if errors.Is(err, access.ErrUnknownToken) { // rotated a moment ago
 		h.tokens.Delete(token)
 		h.miss(ctx, client)

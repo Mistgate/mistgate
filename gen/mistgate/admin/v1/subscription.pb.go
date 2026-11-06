@@ -285,8 +285,11 @@ type SubscriptionSettings struct {
 	HappPing HappPing `protobuf:"varint,12,opt,name=happ_ping,json=happPing,proto3,enum=mistgate.admin.v1.HappPing" json:"happ_ping,omitempty"`
 	// With happ_ping set: Happ pings the servers each time it opens (subscription-ping-onopen-enabled: 1, else 0).
 	HappPingOnOpen bool `protobuf:"varint,13,opt,name=happ_ping_on_open,json=happPingOnOpen,proto3" json:"happ_ping_on_open,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// AmneziaWG servers in what the subscription link hands out (today only the Mihomo profile carries them).
+	// Absent = true: settings stored before this switch existed keep today's behaviour.
+	LinkAwg       *bool `protobuf:"varint,14,opt,name=link_awg,json=linkAwg,proto3,oneof" json:"link_awg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -406,6 +409,13 @@ func (x *SubscriptionSettings) GetHappPing() HappPing {
 func (x *SubscriptionSettings) GetHappPingOnOpen() bool {
 	if x != nil {
 		return x.HappPingOnOpen
+	}
+	return false
+}
+
+func (x *SubscriptionSettings) GetLinkAwg() bool {
+	if x != nil && x.LinkAwg != nil {
+		return *x.LinkAwg
 	}
 	return false
 }
@@ -762,8 +772,11 @@ type GetSubscriptionSettingsResponse struct {
 	// People who have a live common (no device ID) place right now: the apps that report none are what STRICT turns away,
 	// so the confirmation of switching to it shows this number.
 	SharedLinkUsers uint32 `protobuf:"varint,6,opt,name=shared_link_users,json=sharedLinkUsers,proto3" json:"shared_link_users,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Live AmneziaWG credentials held by the subscription link's devices, across all users. Turning link_awg off drops
+	// each credential the next time its app fetches a Mihomo profile.
+	LinkAwgKeys   uint32 `protobuf:"varint,7,opt,name=link_awg_keys,json=linkAwgKeys,proto3" json:"link_awg_keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetSubscriptionSettingsResponse) Reset() {
@@ -834,6 +847,13 @@ func (x *GetSubscriptionSettingsResponse) GetNamesLanguage() string {
 func (x *GetSubscriptionSettingsResponse) GetSharedLinkUsers() uint32 {
 	if x != nil {
 		return x.SharedLinkUsers
+	}
+	return 0
+}
+
+func (x *GetSubscriptionSettingsResponse) GetLinkAwgKeys() uint32 {
+	if x != nil {
+		return x.LinkAwgKeys
 	}
 	return 0
 }
@@ -1258,7 +1278,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xc1\x05\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xee\x05\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -1274,8 +1294,10 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	" \x01(\x0e2\".mistgate.admin.v1.LinkDeviceLimitH\x00R\x0flinkDeviceLimit\x88\x01\x01\x12<\n" +
 	"\blink_dns\x18\v \x01(\v2!.mistgate.admin.v1.LinkDnsOptionsR\alinkDns\x128\n" +
 	"\thapp_ping\x18\f \x01(\x0e2\x1b.mistgate.admin.v1.HappPingR\bhappPing\x12)\n" +
-	"\x11happ_ping_on_open\x18\r \x01(\bR\x0ehappPingOnOpenB\x14\n" +
-	"\x12_link_device_limit\"[\n" +
+	"\x11happ_ping_on_open\x18\r \x01(\bR\x0ehappPingOnOpen\x12\x1e\n" +
+	"\blink_awg\x18\x0e \x01(\bH\x01R\alinkAwg\x88\x01\x01B\x14\n" +
+	"\x12_link_device_limitB\v\n" +
+	"\t_link_awg\"[\n" +
 	"\x0eLinkDnsOptions\x12\x1d\n" +
 	"\n" +
 	"preset_ids\x18\x01 \x03(\tR\tpresetIds\x12*\n" +
@@ -1302,14 +1324,15 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\vua_contains\x18\x01 \x01(\tR\n" +
 	"uaContains\x124\n" +
 	"\x06format\x18\x02 \x01(\x0e2\x1c.mistgate.admin.v1.SubFormatR\x06format\" \n" +
-	"\x1eGetSubscriptionSettingsRequest\"\xcd\x02\n" +
+	"\x1eGetSubscriptionSettingsRequest\"\xf1\x02\n" +
 	"\x1fGetSubscriptionSettingsResponse\x12C\n" +
 	"\bsettings\x18\x01 \x01(\v2'.mistgate.admin.v1.SubscriptionSettingsR\bsettings\x12'\n" +
 	"\x0feffective_title\x18\x02 \x01(\tR\x0eeffectiveTitle\x12F\n" +
 	"\x0eserver_samples\x18\x03 \x03(\v2\x1f.mistgate.admin.v1.ServerSampleR\rserverSamples\x12!\n" +
 	"\fsample_group\x18\x04 \x01(\tR\vsampleGroup\x12%\n" +
 	"\x0enames_language\x18\x05 \x01(\tR\rnamesLanguage\x12*\n" +
-	"\x11shared_link_users\x18\x06 \x01(\rR\x0fsharedLinkUsers\"\x98\x01\n" +
+	"\x11shared_link_users\x18\x06 \x01(\rR\x0fsharedLinkUsers\x12\"\n" +
+	"\rlink_awg_keys\x18\a \x01(\rR\vlinkAwgKeys\"\x98\x01\n" +
 	"\fServerSample\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\tR\x04node\x12!\n" +
 	"\fcountry_code\x18\x02 \x01(\tR\vcountryCode\x12\x18\n" +

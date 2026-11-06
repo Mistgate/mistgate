@@ -13,8 +13,9 @@ export const settingsQuery = queryOptions({
     const r = await subscriptions.getSubscriptionSettings({}, { signal });
     // the servers of the busiest group, for the preview of the server names (empty: the preview makes some up)
     const samples = (r.serverSamples ?? []).map((s) => ({ node: s.node, countryCode: s.countryCode, profile: s.profile, loadPercent: s.loadPercent }));
-    // sharedLinkUsers: people on the place the apps without a device ID share, for the "strict" confirmation
-    return { settings: plain(r.settings!), effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "", sharedLinkUsers: r.sharedLinkUsers ?? 0 };
+    // sharedLinkUsers: people on the place the apps without a device ID share, for the "strict" confirmation; linkAwgKeys: the
+    // AmneziaWG keys the link apps hold, for the confirmation of taking AmneziaWG out of them
+    return { settings: plain(r.settings!), effectiveTitle: r.effectiveTitle, samples, sampleGroup: r.sampleGroup ?? "", namesLanguage: r.namesLanguage ?? "", sharedLinkUsers: r.sharedLinkUsers ?? 0, linkAwgKeys: r.linkAwgKeys ?? 0 };
   },
   staleTime: 30_000,
 });

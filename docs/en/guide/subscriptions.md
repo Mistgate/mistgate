@@ -77,7 +77,7 @@ A server that a format cannot carry is left out of that format without a word, a
 | The WARP copy of any of these | as its original | as its original | as its original | as its original |
 
 - sing-box has no XHTTP transport and cannot check a self-signed certificate by its fingerprint. Gecko is carried by Mihomo only.
-- AmneziaWG reaches an app only through Mihomo YAML or an AmneziaVPN key.
+- AmneziaWG reaches an app only through Mihomo YAML or an AmneziaVPN key. The first can be turned off: [AmneziaWG in apps on the link](#amneziawg-in-apps-on-the-link).
 - MTProto is in no format. A `tg://proxy` line would be a broken server in every VPN app, so the Telegram links come only from the person's page and the admin ([MTProto](mtproto.md)).
 - A WARP copy is the node's exit; nothing changes on the client, so it follows the profile it copies.
 - A person for whom a format has no server at all gets a placeholder entry: see [When no server fits the app](#when-no-server-fits-the-app).
@@ -100,6 +100,19 @@ What counts as a browser: a User-Agent that starts with `Mozilla/`, has a browse
 **Try a User-Agent**: paste what an app sends, or pick an example, and the tab shows which rule takes it ("Rule 2 matches → Mihomo YAML", "Nothing matched, and it looks like a browser → web page", "Nothing matched → link list"). The examples include `sing-box` and `v2rayNG`.
 
 **Trying a format on one request.** `?format=xray-json` or `?format=sing-box` at the end of a subscription link picks the format for that request, whatever the rules say. It is meant for trying an app that no rule names yet. It grants nothing more than a rule does: a link nobody owns still gets the fake 404, a link whose rule is **Fake 404** stays the fake 404, and any other value is ignored. The user page never shows a link with the parameter.
+
+## AmneziaWG in apps on the link
+
+kl!ck and the other Mihomo apps get the AmneziaWG servers in their profile along with the rest. Happ and the other apps that read the link list never get them: their formats cannot carry AmneziaWG. The switch **AmneziaWG in apps on the link**, a card under the rules of **Who gets what**, takes AmneziaWG out of the apps on the link. It is on by default, and a panel that is updated keeps it on.
+
+Turn it off when people use AmneziaWG in AmneziaVPN anyway: in a Mihomo app it often works worse. Then:
+
+- each Mihomo app gets the subscription without the AmneziaWG servers at its next refresh;
+- at that refresh the AmneziaWG keys of that app are removed, and their addresses in the AmneziaWG network are freed. The confirmation **Take AmneziaWG out of the apps on the link?** says how many keys the apps hold now; when they hold none, the switch turns off at once;
+- AmneziaVPN keys, the person's page and the other formats do not change;
+- a person whose only servers are AmneziaWG gets the placeholder entry in a Mihomo app: see [When no server fits the app](#when-no-server-fits-the-app).
+
+Turned back on, the apps get new keys at their next refresh. While it is off, **Apps & formats** strikes AmneziaWG out on the Mihomo card and links to the switch.
 
 ## Device limit for apps on the link
 
@@ -211,7 +224,7 @@ For such a person the refresh interval drops to 1 hour, so a fix (term extended,
 
 ### When no server fits the app
 
-Xray JSON and sing-box JSON never answer an active person with an empty document. When none of the person's servers can be carried in the format (all of them use XHTTP and the app reads sing-box, or the person has only AmneziaWG, or there is no server at all), the app gets one entry that never connects, named "Your servers do not work in this app. The subscription page shows which app does". The announcement carries the same text.
+Xray JSON and sing-box JSON never answer an active person with an empty document. When none of the person's servers can be carried in the format (all of them use XHTTP and the app reads sing-box, or the person has only AmneziaWG, or there is no server at all), the app gets one entry that never connects, named "Your servers do not work in this app. The subscription page shows which app does". The announcement carries the same text. A Mihomo app gets the same entry when AmneziaWG is taken out of the apps on the link and the person's only servers are AmneziaWG.
 
 In Russian: «Ваши серверы не работают в этом приложении. Какое подойдёт — на странице подписки».
 

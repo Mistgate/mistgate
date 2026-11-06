@@ -63,6 +63,46 @@ func TestSelfServiceAbsentMeansOn(t *testing.T) {
 	}
 }
 
+func TestLinkAWGAbsentMeansOnAndSurvivesSettingsRoundTrip(t *testing.T) {
+	if !LinkAWG(nil) || !LinkAWG(&adminv1.SubscriptionSettings{}) || !LinkAWG(Defaults()) || Defaults().LinkAwg != nil {
+		t.Fatal("an absent link_awg setting must be on and Defaults must leave it unset")
+	}
+	for _, tc := range []struct {
+		name string
+		json string
+		want bool
+	}{{"true", `{"link_awg":true}`, true}, {"false", `{"link_awg":false}`, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			set, err := Parse(tc.json)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if set.LinkAwg == nil || LinkAWG(set) != tc.want {
+				t.Fatalf("parsed link_awg = %v, want %t", set.LinkAwg, tc.want)
+			}
+			Normalize(set)
+			if err := Validate(set); err != nil {
+				t.Fatal(err)
+			}
+			if set.LinkAwg == nil || LinkAWG(set) != tc.want {
+				t.Fatalf("normalized link_awg = %v, want %t", set.LinkAwg, tc.want)
+			}
+		})
+	}
+
+	st := openStore(t)
+	cache := NewCache(st, nil)
+	set := Defaults()
+	set.LinkAwg = proto.Bool(false)
+	if _, err := cache.Update(context.Background(), set); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(context.Background(), st)
+	if err != nil || got.LinkAwg == nil || LinkAWG(got) {
+		t.Fatalf("saved link_awg = %v, %v; want explicit false", got.GetLinkAwg(), err)
+	}
+}
+
 // An installation that saved settings before the Mihomo rules existed gets them once, at the start; the marker keeps them from
 // coming back after the admin deletes them, and an existing rule of the same User-Agent text is left alone.
 func TestMigrateM3(t *testing.T) {

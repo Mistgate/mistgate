@@ -198,6 +198,71 @@ func TestMihomoSubscription(t *testing.T) {
 
 // What the stack really serves (hysteria2 with and without hopping and Gecko, AWG 3.1, the DNS of the default preset and
 // of a DoH one) is accepted by the Mihomo core; skipped without the binary (see mihomo_core_test.go).
+func TestMihomoLinkAWGSwitchAndAWGOnlyPlaceholder(t *testing.T) {
+	m := newM3Rig(t)
+	h, cache := m.handler(func(c *subs.Config) { c.MinInterval = time.Hour })
+	userID, tok := m.newUser("awg-only", func(req *adminv1.CreateUserRequest) {
+		req.Apps = &adminv1.AppToggles{Amnezia: true}
+	})
+
+	// An absent setting keeps the existing profile and creates its link-device credential.
+	onBefore := fetch(h, "/"+tok, mihomoUA)
+	if onBefore.Code != http.StatusOK {
+		t.Fatalf("enabled Mihomo status = %d: %s", onBefore.Code, onBefore.Body.String())
+	}
+	initial := parseYAML(t, onBefore.Body.Bytes())
+	if len(initial.Proxies) != 1 || initial.Proxies[0]["type"] != "wireguard" {
+		t.Fatalf("absent link_awg did not keep the AWG proxy: %+v", initial.Proxies)
+	}
+	var live int
+	if err := m.st.R.QueryRow(`SELECT count(*) FROM device d JOIN device_credential c ON c.device_id = d.id
+		WHERE d.user_id = ? AND d.kind = 'link' AND c.protocol = 'awg' AND c.revoked_at IS NULL`, userID).Scan(&live); err != nil || live != 1 {
+		t.Fatalf("initial link AWG credentials = %d, %v; want one", live, err)
+	}
+
+	off := subsettings.Defaults()
+	no := false
+	off.LinkAwg = &no
+	if _, err := cache.Update(m.ctx, off); err != nil {
+		t.Fatal(err)
+	}
+	offRec := fetch(h, "/"+tok, mihomoUA)
+	if offRec.Code != http.StatusOK {
+		t.Fatalf("disabled Mihomo status = %d: %s", offRec.Code, offRec.Body.String())
+	}
+	withoutAWG := parseYAML(t, offRec.Body.Bytes())
+	const note = "Your servers do not work in this app. The subscription page shows which app does"
+	if len(withoutAWG.Proxies) != 1 || withoutAWG.Proxies[0]["type"] != "hysteria2" || withoutAWG.Proxies[0]["name"] != note {
+		t.Fatalf("AWG-only placeholder = %+v", withoutAWG.Proxies)
+	}
+	if len(withoutAWG.Groups) != 1 || !slices.Equal(withoutAWG.Groups[0].Proxies, []string{note, "DIRECT"}) {
+		t.Fatalf("placeholder proxy group = %+v", withoutAWG.Groups)
+	}
+	if err := m.st.R.QueryRow(`SELECT count(*) FROM device_credential c JOIN device d ON d.id = c.device_id
+		WHERE d.user_id = ? AND d.kind = 'link' AND c.protocol = 'awg' AND c.revoked_at IS NULL`, userID).Scan(&live); err != nil || live != 0 {
+		t.Fatalf("live link AWG credentials after off fetch = %d, %v; want zero", live, err)
+	}
+
+	on := subsettings.Defaults()
+	yes := true
+	on.LinkAwg = &yes
+	if _, err := cache.Update(m.ctx, on); err != nil {
+		t.Fatal(err)
+	}
+	onAgain := fetch(h, "/"+tok, mihomoUA)
+	if onAgain.Code != http.StatusOK {
+		t.Fatalf("re-enabled Mihomo status = %d: %s", onAgain.Code, onAgain.Body.String())
+	}
+	reissued := parseYAML(t, onAgain.Body.Bytes())
+	if len(reissued.Proxies) != 1 || reissued.Proxies[0]["type"] != "wireguard" {
+		t.Fatalf("re-enabled profile did not issue AWG again: %+v", reissued.Proxies)
+	}
+	if err := m.st.R.QueryRow(`SELECT count(*) FROM device_credential c JOIN device d ON d.id = c.device_id
+		WHERE d.user_id = ? AND d.kind = 'link' AND c.protocol = 'awg' AND c.revoked_at IS NULL`, userID).Scan(&live); err != nil || live != 1 {
+		t.Fatalf("live link AWG credentials after re-enable = %d, %v; want one", live, err)
+	}
+}
+
 func TestMihomoCoreAcceptsTheServedProfile(t *testing.T) {
 	m := newM3Rig(t)
 	hop := must(m.svc.CreateProfile(m.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{

@@ -1,6 +1,7 @@
 package access
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -413,6 +414,71 @@ func TestMihomoAWGPeerPerDevice(t *testing.T) {
 	}
 	if len(f.desired()) != 3 {
 		t.Errorf("AWG credentials in the desired state = %d, want 3", len(f.desired()))
+	}
+}
+
+func TestMihomoLinkAWGSwitchRevokesOnlyTheRequestDevice(t *testing.T) {
+	f := newAWGFixture(t)
+	e := f.e
+	token := e.tokenOf(f.user)
+	if got := fetchAs(e, token, DeviceHint{}, plugin.FormatMihomo); len(got.Lines) != 1 {
+		t.Fatalf("initial Mihomo lines = %d, want one AWG proxy", len(got.Lines))
+	}
+	explicit := f.add(f.user, "AmneziaVPN key").Device
+	var linkID string
+	if err := e.st.R.QueryRow(`SELECT d.id FROM device d JOIN device_credential c ON c.device_id = d.id
+		WHERE d.user_id = ? AND d.kind = 'link' AND c.protocol = 'awg' AND c.revoked_at IS NULL`, f.user).Scan(&linkID); err != nil {
+		t.Fatal(err)
+	}
+	oldIdx := f.idxOf(linkID)
+	e.resetNotify()
+
+	// A page-style view is read-only and must not render the old link peer into a Mihomo profile.
+	pageView := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatMihomo, NoLinkAWG: true, NoTouch: true}))
+	if len(pageView.Lines) != 0 || e.notify.n.Load() != 0 || e.count(`SELECT count(*) FROM device_credential WHERE device_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, linkID) != 1 {
+		t.Fatalf("NoTouch view lines=%d, notify=%d, live link AWG=%d", len(pageView.Lines), e.notify.n.Load(), e.count(`SELECT count(*) FROM device_credential WHERE device_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, linkID))
+	}
+	uriView := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatURIList, NoLinkAWG: true, NoPageData: true}))
+	if len(uriView.Lines) != 0 || e.notify.n.Load() != 0 || e.count(`SELECT count(*) FROM device_credential WHERE device_id = ? AND protocol = 'awg' AND revoked_at IS NULL`, linkID) != 1 {
+		t.Fatalf("URI list changed link AWG state: lines=%d, notify=%d", len(uriView.Lines), e.notify.n.Load())
+	}
+	if len(pageView.Devices) < 1 || !slices.ContainsFunc(pageView.Devices, func(d SubDevice) bool { return d.ID == explicit.Id && d.AWG != nil }) {
+		t.Errorf("AmneziaVPN key disappeared from the page view: %+v", pageView.Devices)
+	}
+	if !slices.ContainsFunc(pageView.Nodes, func(n SubNode) bool {
+		return slices.ContainsFunc(n.Conns, func(c SubConn) bool { return c.Way == "key" && c.ProfileID == f.profile })
+	}) {
+		t.Error("the page no longer lists the AWG server as a key")
+	}
+
+	e.resetNotify()
+	off := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatMihomo, NoLinkAWG: true, NoPageData: true}))
+	if len(off.Lines) != 0 || len(off.Servers) != 0 {
+		t.Fatalf("off Mihomo view carries AWG: lines=%d servers=%+v", len(off.Lines), off.Servers)
+	}
+	if e.notify.n.Load() != 1 {
+		t.Fatalf("off fetch notified %d times, want one", e.notify.n.Load())
+	}
+	if count, err := e.st.Access().CountLinkAWGKeys(e.ctx); err != nil || count != 0 {
+		t.Fatalf("live link AWG keys = %d, %v; want none", count, err)
+	}
+	if got := e.count(`SELECT count(*) FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id WHERE c.device_id = ? AND p.idx = ? AND p.released_at = ? AND c.revoked_at = ?`, linkID, oldIdx, e.clock.Unix(), e.clock.Unix()); got != 1 {
+		t.Fatalf("quarantined peer rows = %d, want index %d released", got, oldIdx)
+	}
+	if keys := must(e.st.Access().AWGDevices(e.ctx, f.user)); len(keys) != 1 || keys[0].ID != explicit.Id {
+		t.Fatalf("AmneziaVPN keys after off fetch = %+v, want the explicit key", keys)
+	}
+	if creds := f.desired(); len(creds) != 1 || creds[0].DeviceID != explicit.Id {
+		t.Fatalf("desired AWG credentials after off fetch = %+v, want only the explicit key", creds)
+	}
+
+	e.resetNotify()
+	on := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatMihomo, NoPageData: true}))
+	if len(on.Lines) != 1 || !strings.Contains(on.Lines[0], "amnezia-wg-option") || e.notify.n.Load() != 1 {
+		t.Fatalf("re-enabled Mihomo view lines=%d notify=%d", len(on.Lines), e.notify.n.Load())
+	}
+	if got := f.idxOf(linkID); got == oldIdx {
+		t.Errorf("reissued AWG peer reused quarantined index %d", oldIdx)
 	}
 }
 

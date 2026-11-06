@@ -2,6 +2,7 @@ package subs_test
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/instance"
@@ -16,7 +18,52 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
+
+func TestGetSubscriptionSettingsCountsLinkAWGKeys(t *testing.T) {
+	m := newM3Rig(t)
+	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, nil, nil)
+	for _, name := range []string{"alice", "bob"} {
+		_, token := m.newUser(name, nil)
+		if _, err := m.svc.SubscriptionWith(m.ctx, token, access.SubOptions{Format: plugin.FormatMihomo, NoPageData: true}); err != nil {
+			t.Fatalf("Mihomo fetch for %s: %v", name, err)
+		}
+	}
+	resp := must(svc.GetSubscriptionSettings(m.ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg
+	if resp.LinkAwgKeys != 2 {
+		t.Fatalf("link_awg_keys = %d, want the two users' live peers", resp.LinkAwgKeys)
+	}
+}
+
+func TestSubscriptionSettingsAuditIncludesLinkAWG(t *testing.T) {
+	m := newM3Rig(t)
+	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, nil, nil)
+	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_link_awg"})
+	set := must(svc.GetSubscriptionSettings(ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	no := false
+	set.LinkAwg = &no
+	if _, err := svc.UpdateSubscriptionSettings(ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set})); err != nil {
+		t.Fatal(err)
+	}
+	rows := must(m.st.ListAudit(m.ctx, "", 0, 10))
+	for _, row := range rows {
+		if row.Action != "subscription_settings_update" {
+			continue
+		}
+		var params map[string]any
+		if err := json.Unmarshal([]byte(row.Params), &params); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := params["link_awg"].(bool); !ok || got {
+			t.Fatalf("audit link_awg = %v; want false", params["link_awg"])
+		}
+		return
+	}
+	t.Fatal("subscription settings audit row is missing")
+}
 
 // The admin's preview of server names is drawn from what a person of the busiest group gets in Happ now: its running
 // servers in subscription order, not made-up ones. AmneziaWG, a switched-off inbound and a node out of service are not

@@ -1563,6 +1563,55 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 	})
 }
 
+func TestD1LinkAWGKeyCountAndRevoke(t *testing.T) {
+	ctx := context.Background()
+	st := openD1Store(t)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if err := st.Access().CreateGroup(ctx, AccessGroup{ID: "grp_link_awg", Name: "Link AWG", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	user := AccessUser{ID: "usr_link_awg", Name: "Link AWG", GroupID: "grp_link_awg", Status: "active", AppHapp: true,
+		AppAmnezia: true, AllNodes: true, QuotaReset: "none", PeriodStart: now, DeviceLimit: 5, SubTokenHash: []byte("link-awg-hash"),
+		SubTokenEnc: []byte("sealed"), CreatedAt: now}
+	if err := st.Access().CreateUser(ctx, user, AccessDevice{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	profileID := "prf_link_awg"
+	if err := st.Access().CreateProfile(ctx, AccessProfile{ID: profileID, Protocol: "awg", Name: profileID, SettingsJSON: "{}", CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	want := []AWGImplicitWant{{ProfileID: profileID, MaxIdx: 8, Issue: func(int) (AccessCred, string, error) {
+		return AccessCred{ID: "crd_link_awg", Protocol: "awg", SecretEnc: []byte("sealed"), DataJSON: `{}`}, "pub_link_awg", nil
+	}}}
+	link, err := st.Access().EnsureLinkAWGCreds(ctx, AccessDevice{ID: "dev_link_awg", UserID: user.ID, Implicit: true}, user.DeviceLimit, now, want)
+	if err != nil || len(link.Added) != 1 {
+		t.Fatalf("link AWG credential = %+v, %v", link, err)
+	}
+	if _, err := st.Access().AddAWGDevice(ctx, AWGDeviceAdd{Device: AccessDevice{ID: "dev_explicit_awg", UserID: user.ID}, ProfileID: profileID, MaxIdx: 8, Limit: 5}, now,
+		func(int) (AccessCred, string, error) {
+			return AccessCred{ID: "crd_explicit_awg", Protocol: "awg", SecretEnc: []byte("sealed"), DataJSON: `{}`}, "pub_explicit_awg", nil
+		}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := st.Access().CountLinkAWGKeys(ctx); err != nil || got != 1 {
+		t.Fatalf("CountLinkAWGKeys = %d, %v; want only the link peer", got, err)
+	}
+	if dropped, err := st.Access().RevokeLinkAWGCreds(ctx, link.Device, now); err != nil || dropped != 1 {
+		t.Fatalf("RevokeLinkAWGCreds = %d, %v; want one", dropped, err)
+	}
+	if got, err := st.Access().CountLinkAWGKeys(ctx); err != nil || got != 0 {
+		t.Fatalf("CountLinkAWGKeys after revoke = %d, %v; want zero", got, err)
+	}
+	var released, revoked int
+	if err := st.R.QueryRowContext(ctx, `SELECT p.released_at, c.revoked_at FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id WHERE c.id = 'crd_link_awg'`).Scan(&released, &revoked); err != nil || int64(released) != now.Unix() || int64(revoked) != now.Unix() {
+		t.Fatalf("link peer released/revoked = %d/%d, %v; want %d", released, revoked, err, now.Unix())
+	}
+	keys, err := st.Access().AWGDevices(ctx, user.ID)
+	if err != nil || len(keys) != 1 || keys[0].ID != "dev_explicit_awg" {
+		t.Fatalf("explicit AmneziaVPN keys = %+v, %v; want the original key", keys, err)
+	}
+}
+
 func TestD1RewrittenDNSAndSettingsMethods(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1_800_000_000, 0).UTC()

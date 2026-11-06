@@ -6,6 +6,7 @@ import { protocolsQuery } from "@/screens/users/rpc";
 import { useTx, type Key, type Tx } from "@/screens/users/t";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { formatDescKey, formatKey, ruleFor, ruleFormats, singboxAgents, type Rule } from "./model";
+import { linkAwgOn } from "./link-awg";
 import { clientsQuery, settingsQuery } from "./queries";
 import { Lead } from "./ui";
 
@@ -33,7 +34,10 @@ export function FormatsTab({ go }: { go: (tab: string) => void }) {
   const t = useTx();
   const clients = useQuery(clientsQuery);
   const protocols = useQuery(protocolsQuery);
-  const rules = useQuery(settingsQuery).data?.settings.rules ?? [];
+  const settings = useQuery(settingsQuery).data?.settings;
+  const rules = settings?.rules ?? [];
+  // the owner took AmneziaWG out of the apps on the link: the Mihomo card says so, and where to turn it back on
+  const awgOff = settings !== undefined && !linkAwgOn(settings);
   const protoName = (id: string) => protocols.data?.find((p) => p.id === id)?.displayName ?? id;
   if (clients.isPending) return <Pending />;
   if (clients.isError) return <QueryError error={clients.error} onRetry={() => void clients.refetch()} />;
@@ -61,11 +65,22 @@ export function FormatsTab({ go }: { go: (tab: string) => void }) {
                   <b className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.01em]">{c.name}</b>
                 </div>
                 <span className="flex flex-wrap gap-1.5">
-                  {c.protocols.map((p) => (
-                    <Chip key={p}>{protoName(p)}</Chip>
-                  ))}
+                  {c.protocols.map((p) =>
+                    awgOff && c.id === "mihomo" && p === "awg" ? (
+                      <Chip key={p} className="text-faint line-through decoration-faint">
+                        {protoName(p)}
+                      </Chip>
+                    ) : (
+                      <Chip key={p}>{protoName(p)}</Chip>
+                    ),
+                  )}
                 </span>
                 {clientNote[c.id] && <p className="text-xs leading-snug text-muted">{t(clientNote[c.id]!)}</p>}
+                {awgOff && c.id === "mihomo" && c.protocols.includes("awg") && (
+                  <button type="button" onClick={() => go("rules")} className="self-start text-start text-xs leading-snug font-semibold text-accent-text">
+                    {t("subs.linkAwg.chip")} <span aria-hidden className="inline-block rtl:-scale-x-100">→</span>
+                  </button>
+                )}
                 <div className="flex flex-col gap-1.5 border-t border-line pt-3">
                   <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.clientFormats")}</span>
                   {c.formats.length === 0 ? (

@@ -222,8 +222,9 @@ type tokenState struct {
 // viewKey says whose view a cached fetch is. A device has credentials of its own, so a view is the device's: two HWIDs
 // within MinInterval must not be served each other's keys. hwid is the canonical HWID of the request ("" for none).
 type viewKey struct {
-	format plugin.ClientFormat
-	hwid   string
+	format    plugin.ClientFormat
+	hwid      string
+	noLinkAWG bool
 }
 
 // maxCachedViews bounds the views one token keeps: MaxPerHour fetches an hour bound it too, but that limit can be off.
@@ -327,6 +328,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, sf, _ := Choose(set, r.UserAgent())
 	sf = formatParam(r, sf)
 	format := viewFormat(sf, h.fsrc != nil)
+	noLinkAWG := !subsettings.LinkAWG(set)
 
 	// Only an app counts as "the app received the subscription": a browser (the page, or the decoy) does not.
 	app := sf != adminv1.SubFormat_SUB_FORMAT_USER_PAGE && sf != adminv1.SubFormat_SUB_FORMAT_DECOY
@@ -334,7 +336,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if app {
 		hint = deviceHint(r) // a browser has no device to report
 	}
-	key := viewKey{format: format, hwid: hint.HWID}
+	key := viewKey{format: format, hwid: hint.HWID, noLinkAWG: format == plugin.FormatMihomo && noLinkAWG}
 	st, known := h.tokens.Get(token)
 	admitted := false
 	if known {
@@ -354,7 +356,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		admitted = true
 	}
 
-	v, err := h.fetch(r.Context(), token, format, hint, app, !app)
+	v, err := h.fetch(r.Context(), token, format, hint, app, !app, noLinkAWG)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
 		h.miss(r.Context(), client)
@@ -394,12 +396,12 @@ func (h *handler) notSupported(w http.ResponseWriter, r *http.Request, hint acce
 // asked, so its device is made and marked as having received the subscription (the page view and its calls write nothing).
 // device is what the app says about itself. page: the view carries the data only the page shows (the DNS of each server);
 // an app's fetch and the checks of a call do without it.
-func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, device access.DeviceHint, touch, page bool) (access.SubView, error) {
+func (h *handler) fetch(ctx context.Context, token string, format plugin.ClientFormat, device access.DeviceHint, touch, page, noLinkAWG bool) (access.SubView, error) {
 	if h.fsrc == nil {
 		return h.src.Subscription(ctx, token)
 	}
 	return h.fsrc.SubscriptionWith(ctx, token, access.SubOptions{
-		Format: format, Device: device, NoTouch: !touch, NoPageData: !page,
+		Format: format, Device: device, NoTouch: !touch, NoPageData: !page, NoLinkAWG: noLinkAWG,
 		IncludeEffectiveDNS: format != plugin.FormatURIList && h.cfg.DNS != nil,
 	})
 }
@@ -411,6 +413,13 @@ func (st *tokenState) remember(v access.SubView, key viewKey, now time.Time, app
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.userName = v.UserName
+	if key.format == plugin.FormatMihomo {
+		for old := range st.cached {
+			if old.format == key.format && old.hwid == key.hwid && old.noLinkAWG != key.noLinkAWG {
+				delete(st.cached, old) // the switch changed the view; an older response may hold a revoked peer
+			}
+		}
+	}
 	if keep <= 0 {
 		return
 	}
@@ -613,6 +622,8 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	p := mihomoProfile{title: title, lines: v.Lines, log: h.cfg.Log}
 	if note := stateNote(v, b.Language, h.cfg.Now()); note != "" {
 		p.lines, p.names = []string{placeholderProxy}, []string{note}
+	} else if !subsettings.LinkAWG(set) && len(v.Lines) == 0 && len(v.AWGProfiles) > 0 {
+		p.lines, p.names = []string{placeholderProxy}, []string{noServersNote(b.Language)}
 	} else if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {
 		p.names = remarks(v.Servers, set.GetServerNameTemplate(), b.Language)
 	}

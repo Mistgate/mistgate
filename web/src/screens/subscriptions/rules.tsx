@@ -15,6 +15,7 @@ import { useDebounced } from "@/screens/users/ui";
 import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings } from "./model";
 import { testAgentQuery, useSaveSettings } from "./queries";
 import { DeviceLimitCard } from "./device-limit";
+import { LinkAwgCard } from "./link-awg";
 import { Lead } from "./ui";
 
 // Client User-Agents to try: the chip label and what it fills in.
@@ -154,6 +155,7 @@ export function RulesTab({ settings }: { settings: Settings }) {
           </div>
         </Card>
       </div>
+      <LinkAwgCard settings={settings} />
       <DeviceLimitCard settings={settings} />
     </div>
   );

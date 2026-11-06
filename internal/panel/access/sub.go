@@ -191,8 +191,11 @@ type SubAWGProfile struct {
 // SubOptions says how a subscription view is rendered.
 type SubOptions struct {
 	// Format of the lines; "" = FormatURIList. FormatMihomo also gives the request's device its AWG credentials (one per
-	// usable AWG profile, made on the first fetch).
+	// usable AWG profile, made on the first fetch), unless NoLinkAWG is set.
 	Format plugin.ClientFormat
+	// NoLinkAWG omits AmneziaWG from Mihomo profiles. A touching Mihomo fetch revokes the request's link-device AWG
+	// credentials and quarantines their peer indexes; explicit AmneziaVPN devices are unaffected.
+	NoLinkAWG bool
 	// Device is what the request says about its device (its HWID above all). With a HWID the app gets a device of its own, with
 	// credentials of its own; without one, or when the user has no room for another device, the shared device of the user.
 	Device DeviceHint
@@ -388,6 +391,15 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	if v.Status != StatusActive {
 		// The app keeps fetching after access ended: the touch is what lets health notice that the person is trying.
 		if touch {
+			if opt.Format == plugin.FormatMihomo && opt.NoLinkAWG {
+				dropped, err := a.RevokeLinkAWGCreds(ctx, data.Device, now)
+				if err != nil {
+					return SubView{}, err
+				}
+				if dropped > 0 {
+					s.notify.StateChanged()
+				}
+			}
 			dev, m := data.Device, opt.Device.meta()
 			if dev.ID == "" && hash != nil {
 				// An app that reports a HWID no device is known by (and none is made for a person without access): the shared
@@ -407,16 +419,24 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if rd, v.Refusal, err = s.ensureLinkCreds(ctx, u, opt.Device, rd, data); err != nil {
 			return SubView{}, err
 		}
-		if v.Refusal == "" && opt.Format == plugin.FormatMihomo {
+		changed := rd.added
+		if opt.Format == plugin.FormatMihomo && opt.NoLinkAWG {
+			dropped, err := a.RevokeLinkAWGCreds(ctx, rd.dev, now)
+			if err != nil {
+				return SubView{}, err
+			}
+			changed = changed || dropped > 0
+		} else if v.Refusal == "" && opt.Format == plugin.FormatMihomo {
 			rd, v.Refusal = s.ensureMihomoAWG(ctx, u, g, full, opt.Device, rd, data)
+			changed = rd.added
 		}
 		if v.Refusal != "" {
-			if rd.added {
+			if changed {
 				s.notify.StateChanged()
 			}
 			return v, nil // a refused app gets no server, and the request wrote nothing for it
 		}
-		if rd.added {
+		if changed {
 			s.notify.StateChanged()
 		}
 		if rd.dev.ID != "" && now.Sub(rd.dev.LastSeenAt) >= deviceTouchEvery {
@@ -426,6 +446,9 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			}
 			s.touchDevice(rd.dev.ID, now, m)
 		}
+	}
+	if opt.Format == plugin.FormatMihomo && opt.NoLinkAWG {
+		rd.creds = slices.DeleteFunc(rd.creds, func(c store.AccessCred) bool { return c.Protocol == awg.ID })
 	}
 	secrets := map[string]string{}
 	for _, c := range rd.creds {

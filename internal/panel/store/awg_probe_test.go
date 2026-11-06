@@ -73,6 +73,54 @@ func awgDevice(t *testing.T, s *Store, profile, user, dev string, maxIdx int) (i
 		})
 }
 
+func TestCountAndRevokeLinkAWGKeys(t *testing.T) {
+	ctx := context.Background()
+	s := linkFixture(t, "usr_l")
+	rewriteAccessUser(t, s, "usr_other", "other", "grp_link")
+	profile, _ := awgNet(t, s, "link_awg_revoke")
+	issue := func(id string) []AWGImplicitWant {
+		return []AWGImplicitWant{{ProfileID: profile, MaxIdx: 16, Issue: func(int) (AccessCred, string, error) {
+			return AccessCred{ID: id, Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_" + id, nil
+		}}}
+	}
+	first, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_l", "first", nil), 10, linkNow, issue("crd_link_awg_first"))
+	if err != nil || len(first.Added) != 1 {
+		t.Fatalf("first link credential = %+v, %v", first, err)
+	}
+	second, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_other", "second", nil), 10, linkNow, issue("crd_link_awg_second"))
+	if err != nil || len(second.Added) != 1 {
+		t.Fatalf("second link credential = %+v, %v", second, err)
+	}
+	if _, err := awgDevice(t, s, profile, "usr_l", "dev_link_awg_key", 16); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Access().CountLinkAWGKeys(ctx); err != nil || got != 2 {
+		t.Fatalf("CountLinkAWGKeys = %d, %v; want the two link peers and not the explicit key", got, err)
+	}
+
+	dropped, err := s.Access().RevokeLinkAWGCreds(ctx, first.Device, linkNow)
+	if err != nil || dropped != 1 {
+		t.Fatalf("RevokeLinkAWGCreds = %d, %v; want one", dropped, err)
+	}
+	if got, err := s.Access().CountLinkAWGKeys(ctx); err != nil || got != 1 {
+		t.Fatalf("CountLinkAWGKeys after revoke = %d, %v; want the other user's link peer", got, err)
+	}
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer p JOIN device_credential c ON c.id = p.credential_id WHERE c.id = ? AND c.revoked_at = ? AND p.released_at = ?`, first.Added[0].ID, linkNow.Unix(), linkNow.Unix()); got != 1 {
+		t.Fatalf("released link peer rows = %d, want its credential revoked and index quarantined", got)
+	}
+	if keys, err := s.Access().AWGDevices(ctx, "usr_l"); err != nil || len(keys) != 1 || keys[0].ID != "dev_link_awg_key" {
+		t.Fatalf("explicit AmneziaVPN keys = %+v, %v; want the original key", keys, err)
+	}
+
+	reissued, err := s.Access().EnsureLinkAWGCreds(ctx, linkDevice("usr_l", "again", nil), 10, linkNow.Add(time.Minute), issue("crd_link_awg_again"))
+	if err != nil || len(reissued.Added) != 1 {
+		t.Fatalf("link credential after re-enable = %+v, %v; want a fresh credential", reissued, err)
+	}
+	if got, err := s.Access().CountLinkAWGKeys(ctx); err != nil || got != 2 {
+		t.Fatalf("CountLinkAWGKeys after reissue = %d, %v; want two live link peers", got, err)
+	}
+}
+
 // The probe credential and the devices draw from one pool of tunnel addresses, in either order, and the probe's index
 // is free again with its inbound (no quarantine: nothing outside the panel held that address).
 func TestAWGProbeCredentialSharesTheAllocator(t *testing.T) {

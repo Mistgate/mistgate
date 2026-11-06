@@ -57,6 +57,7 @@ var transactionShape2 = map[string]string{
 	"access_telegram.go:RotateTelegramKey":           "A guarded batch retries if the live Telegram credential it replaces was revoked or replaced meanwhile.",
 	"access_awg.go:RotateAWGDevice":                  "A guarded batch retries if the live credential, selected peer, or profile epoch changed.",
 	"access_awg.go:EnsureLinkAWGCreds":               "Guarded batches retry when the link device, its adoption, the device ceiling, profile epoch, or candidate peer allocation changed.",
+	"access_awg.go:RevokeLinkAWGCreds":               "A link-device and credential-count guard precedes AWG peer quarantine and credential revocation in one atomic batch.",
 	"access_linkdevice.go:EnsureLinkDevice":          "A guarded batch retries when the device appeared, was adopted, was revoked, or the device ceiling was reached by another writer.",
 	"access_user.go:revokeDevice":                    "A live-device guard precedes device, peer, and credential updates plus a returning user lookup.",
 	"access_linkmode.go:UnblockDevice":               "A blocked-device guard precedes the unblock and a returning user lookup.",

@@ -102,6 +102,11 @@ func (s *Service) GetSubscriptionSettings(ctx context.Context, _ *connect.Reques
 		return nil, s.internal("shared link users", err)
 	}
 	resp.SharedLinkUsers = uint32(shared)
+	linkAWGKeys, err := s.st.Access().CountLinkAWGKeys(ctx)
+	if err != nil {
+		return nil, s.internal("link AWG keys", err)
+	}
+	resp.LinkAwgKeys = uint32(linkAWGKeys)
 	if resp.SampleGroup, resp.ServerSamples, err = s.nameSamples(ctx); err != nil {
 		return nil, s.internal("server name samples", err)
 	}
@@ -222,7 +227,10 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 		s.notify.StateChanged() // the shared places are gone from the database: the nodes drop their credentials
 	}
 	// The audit row says that the settings changed and how big they are, never their texts.
-	params, _ := json.Marshal(map[string]any{"apps": len(set.Apps), "rules": len(set.Rules), "link_device_limit": store.LinkModeOf(linkModeWord(set)), "shared_revoked": revoked})
+	params, _ := json.Marshal(map[string]any{
+		"apps": len(set.Apps), "rules": len(set.Rules), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
+		"link_awg": subsettings.LinkAWG(set), "shared_revoked": revoked,
+	})
 	entry := store.AuditEntry{Actor: admin.ID, Action: "subscription_settings_update", Result: "ok", Params: string(params)}
 	if ip := auth.ClientIPFrom(ctx); ip.IsValid() {
 		entry.IP = ip.String()

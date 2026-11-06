@@ -1,12 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { SectionLabel } from "@/components/ui/bits";
-import { HappPing } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { HappPing, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
+import { FormatsTab } from "@/screens/subscriptions/formats";
+import { LinkAwgCard, LinkAwgOffDialog } from "@/screens/subscriptions/link-awg";
 import type { Settings } from "@/screens/subscriptions/model";
+import { clientsQuery, settingsQuery } from "@/screens/subscriptions/queries";
 import { TextsTab } from "@/screens/subscriptions/texts";
+import { protocolsQuery } from "@/screens/users/rpc";
 
-// Development only (the dev kit): Subscriptions → "Names & texts" with how Happ pings the servers, on made-up settings.
-// The block carries data-shot for the screenshot script.
+// Development only (the dev kit): Subscriptions on made-up settings. /dev-kit?only=subs: "Names & texts" with how Happ
+// pings the servers; &state=awg-on|awg-off|awg-ask: the switch "AmneziaWG in apps on the link" on the tab "Who gets
+// what", the Mihomo card of "Apps & formats" while it is off, and its confirmation. The blocks carry data-shot for the
+// screenshot script.
 
 const settings = {
   title: "",
@@ -14,7 +20,11 @@ const settings = {
   supportUrl: "",
   updateIntervalHours: 12,
   serverNameTemplate: "",
-  rules: [],
+  rules: [
+    { uaContains: "mihomo", format: SubFormat.MIHOMO_YAML },
+    { uaContains: "clash", format: SubFormat.MIHOMO_YAML },
+    { uaContains: "sing-box", format: SubFormat.SINGBOX_JSON },
+  ],
   apps: [],
   defaultDnsPresetId: "",
   userPage: { showAnnouncement: true, showSupport: true, showQr: true },
@@ -22,13 +32,51 @@ const settings = {
   happPingOnOpen: true,
 } as unknown as Settings;
 
+const clients = [
+  { id: "happ", name: "Happ", protocols: ["hysteria2", "vless"], formats: [SubFormat.BASE64_URIS, SubFormat.XRAY_JSON] },
+  { id: "mihomo", name: "Mihomo (kl!ck, Clash Verge, FlClash)", protocols: ["hysteria2", "vless", "awg"], formats: [SubFormat.MIHOMO_YAML] },
+  { id: "amnezia", name: "AmneziaVPN", protocols: ["awg"], formats: [] },
+];
+const protocols = [
+  { id: "hysteria2", displayName: "Hysteria2" },
+  { id: "vless", displayName: "VLESS" },
+  { id: "awg", displayName: "AmneziaWG" },
+];
+
 export function SubsKit() {
-  const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } }));
+  const state = new URLSearchParams(location.search).get("state") ?? "";
+  const awg = state.startsWith("awg-");
+  const shown = { ...settings, linkAwg: state === "awg-off" ? false : undefined } as Settings;
+  const [qc] = useState(() => {
+    const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    c.setQueryData(settingsQuery.queryKey, { settings: shown, effectiveTitle: "Mistgate", samples: [], sampleGroup: "", namesLanguage: "", sharedLinkUsers: 0, linkAwgKeys: 14 });
+    c.setQueryData(clientsQuery.queryKey, clients as never);
+    c.setQueryData(protocolsQuery.queryKey, protocols as never);
+    return c;
+  });
+  const [ask, setAsk] = useState(true);
   return (
     <QueryClientProvider client={qc}>
-      <section data-shot="subs-texts" className="relative left-1/2 flex w-[min(calc(100vw-2rem),1080px)] -translate-x-1/2 flex-col gap-3">
-        <SectionLabel>Subscriptions → Names &amp; texts: ping in Happ</SectionLabel>
-        <TextsTab data={{ settings, effectiveTitle: "Mistgate" }} />
+      <section className="relative left-1/2 flex w-[min(calc(100vw-2rem),1080px)] -translate-x-1/2 flex-col gap-6">
+        {!awg && (
+          <div data-shot="subs-texts" className="flex flex-col gap-3">
+            <SectionLabel>Subscriptions → Names &amp; texts: ping in Happ</SectionLabel>
+            <TextsTab data={{ settings, effectiveTitle: "Mistgate" }} />
+          </div>
+        )}
+        {awg && (
+          <div data-shot="subs-link-awg" className="flex flex-col gap-3">
+            <SectionLabel>Subscriptions → Who gets what: AmneziaWG in apps on the link</SectionLabel>
+            <LinkAwgCard settings={shown} />
+          </div>
+        )}
+        {state === "awg-off" && (
+          <div data-shot="subs-formats-awg-off" className="flex flex-col gap-3">
+            <SectionLabel>Subscriptions → Apps &amp; formats, AmneziaWG off for the apps on the link</SectionLabel>
+            <FormatsTab go={() => {}} />
+          </div>
+        )}
+        {state === "awg-ask" && <LinkAwgOffDialog open={ask} onOpenChange={setAsk} keys={14} onConfirm={async () => {}} />}
       </section>
     </QueryClientProvider>
   );
