@@ -246,8 +246,8 @@ func ProcedureRole(path string) string {
 	return store.RoleOwner
 }
 
-// NeedsStepUp reports whether the procedure's handler asks for a step-up.
-func NeedsStepUp(path string) bool { return stepUpProcedures[path] }
+// NeedsStepUp reports whether the procedure or the plain HTTP backup download asks for a step-up.
+func NeedsStepUp(path string) bool { return path == BackupDownloadProcedure || stepUpProcedures[path] }
 
 // TokenAccess says how a token may reach a procedure: TokenAccessDirect, TokenAccessApproved or TokenAccessPlanning; ok
 // is false when the procedure is closed to tokens.

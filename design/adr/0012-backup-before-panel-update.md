@@ -21,11 +21,21 @@ What already exists and is reused:
 
 ## Decision
 
-- **A window before the update.** **Update panel** opens *Update the panel to vX?*: what happens (the panel restarts for
-  about a minute, nodes and people's connections keep working, the data is copied on the server and the panel rolls back
-  by itself if the new version does not start), then *A copy on your computer* with **Download backup**, then **Update**
-  (and **Cancel**). The download is a recommendation, not a gate: **Update** works without it, but the window says when
-  this browser last downloaded one ("downloaded 2 min ago") so the owner sees it was done.
+- **The window** (**Update panel** opens it; owner only). Calm, one screen, nothing blocks the update:
+  1. Title *Update the panel to v0.1.80*, under it *now v0.1.79 · Stable*.
+  2. *What happens*, three short lines with icons: the panel restarts for about a minute; nodes and people's connections
+     keep working; if the new version does not start, the panel goes back to this one by itself.
+  3. *Backup*, two rows that look alike:
+     - **Cloudflare R2.** Configured (account, bucket, keys and recovery recipient set; scheduled or not, read with
+       `GetBackupSettings`): *Last backup: 3 h ago* (or its error, in red) and **Back up now** (`CreateBackup`); while
+       `settings.running` the row says *Backing up…*, then *Done ✓ just now*. Not configured: *Not set up: scheduled
+       backups to your own bucket* and **Set up ›** (Settings → Backups). No other nagging.
+     - **File on this computer.** The file name it will get, and **Download**. Without a recovery recipient the row first
+       opens two passphrase fields (at least 12 characters, typed twice, with *without it the file cannot be opened*).
+       After the download: *Downloaded at 15:42 ✓* (remembered in this browser for this version).
+  4. Footer: when neither R2 nor a download is newer than 24 hours, one amber line *No fresh copy. You can update anyway:
+     the server still keeps a copy of the data*. **Cancel** and **Update**. **Update** waits while an R2 backup runs
+     (*Wait for the backup to finish*), so the panel never stops in the middle of a snapshot; otherwise it never waits.
 - **The file.** `mistgate-backup-<panel>-<version>-<UTC yyyy-mm-dd-hhmm>.tar.gz.age`, where `<panel>` is the panel's
   brand name or host, reduced to `[a-z0-9-]`, and `<version>` the running version (the backup is of this version's data;
   restoring it needs a binary at least this new). It is the same archive format as the R2 backups, so the same restore
@@ -57,6 +67,8 @@ What already exists and is reused:
 1. Go (Codex): the streaming download handler, filename rules, passphrase/scrypt encryption, `restore --passphrase`
    / `--passphrase-file`, step-up and policy, audit, tests (archive round trip with both kinds, no file left behind,
    refusal without step-up or for non-owners, filename sanitising).
-2. Admin (Claude): the update window and **Download a backup now** in Settings → Backups, strings in en, ru, zh, fa, tr.
+2. Admin (Claude): the update window (the R2 branch with **Back up to R2 now** and the last backup, or the line that points
+   to Settings → Backups; **Download to this computer** in both), **Download a backup now** in Settings → Backups,
+   strings in en, ru, zh, fa, tr. The R2 branch needs no new API: `GetBackupSettings`, `CreateBackup`, `running`.
 3. Docs (Claude, en/ru/zh): operations/updates.md (the window), operations/backups.md (the downloaded copy, the
    passphrase restore).

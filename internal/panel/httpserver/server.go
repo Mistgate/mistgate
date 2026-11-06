@@ -28,9 +28,9 @@ import (
 	"github.com/mistgate/mistgate/web"
 )
 
-// AdminHandler is one more Connect service of the admin API. Path is the prefix the
-// generated constructor returns ("/mistgate.admin.v1.NodeService/"). It is served at
-// /api<Path> behind the session middleware, so handlers can rely on auth.AdminFrom.
+// AdminHandler is one more handler under the admin API, usually a Connect service but
+// sometimes a plain HTTP route. Path is its prefix and is served at /api<Path> behind
+// the session middleware, so handlers can rely on auth.AdminFrom.
 type AdminHandler struct {
 	Path    string
 	Handler http.Handler
@@ -219,7 +219,10 @@ func (a apiRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // longUnary are the admin calls that answer after more than the listener's write timeout: a TSPU probe test runs for minutes.
-var longUnary = map[string]bool{adminv1connect.TspuProbeServiceTestTspuProbeProcedure: true}
+var longUnary = map[string]bool{
+	adminv1connect.TspuProbeServiceTestTspuProbeProcedure: true,
+	auth.BackupDownloadProcedure:                          true, // the archive is streamed after its snapshot
+}
 
 // isStream reports a Connect or gRPC streaming-capable request: its response may last
 // longer than the listener's write timeout.

@@ -5,6 +5,9 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
+// BackupDownloadProcedure is the plain HTTP archive route mounted beside Connect services.
+const BackupDownloadProcedure = "/backup/download"
+
 // level is how much of the admin API a procedure needs.
 type level int
 

@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -11,13 +12,15 @@ import (
 	"strings"
 
 	"filippo.io/age"
+	"golang.org/x/term"
 )
 
 const usage = `usage: mistgate backup <keygen|restore> [flags]
 
   keygen  --identity-file FILE
           make the private recovery identity (once, offline) and print its public recipient
-  restore --identity-file FILE --file BACKUP.tar.gz.age --data-dir NEW-DIR
+  restore (--identity-file FILE | --passphrase | --passphrase-file FILE)
+          --file BACKUP.tar.gz.age --data-dir NEW-DIR
           decrypt a downloaded backup into a new data directory, offline
 
 "mistgate backup <command> -h" lists the command's flags.
@@ -83,6 +86,8 @@ func runRestore(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("backup restore", flag.ContinueOnError)
 	fs.SetOutput(out)
 	identityPath := fs.String("identity-file", "", "private age recovery identity created with backup keygen")
+	usePassphrase := fs.Bool("passphrase", false, "prompt for an age scrypt passphrase without echo (requires a terminal)")
+	passphrasePath := fs.String("passphrase-file", "", "read the age scrypt passphrase from the file's first line")
 	archivePath := fs.String("file", "", "downloaded encrypted .tar.gz.age backup")
 	dataDir := fs.String("data-dir", "", "new, non-existing directory for the restored panel data")
 	if err := fs.Parse(args); err != nil {
@@ -91,18 +96,47 @@ func runRestore(args []string, out io.Writer) error {
 		}
 		return err
 	}
-	if *identityPath == "" || *archivePath == "" || *dataDir == "" || fs.NArg() != 0 {
-		return errors.New("usage: mistgate backup restore --identity-file <private-key-file> --file <backup.tar.gz.age> --data-dir <new-directory>")
+	methods := 0
+	if *identityPath != "" {
+		methods++
 	}
-	identityPathValue := strings.TrimSpace(*identityPath)
-	identityFile, err := os.Open(identityPathValue)
-	if err != nil {
-		return fmt.Errorf("open recovery identity: %w", err)
+	if *usePassphrase {
+		methods++
 	}
-	identities, parseErr := age.ParseIdentities(identityFile)
-	closeErr := identityFile.Close()
-	if parseErr != nil || closeErr != nil || len(identities) == 0 {
-		return errors.New("backup: cannot read a valid recovery identity")
+	if *passphrasePath != "" {
+		methods++
+	}
+	if methods != 1 || *archivePath == "" || *dataDir == "" || fs.NArg() != 0 {
+		return errors.New("usage: mistgate backup restore (--identity-file <private-key-file> | --passphrase | --passphrase-file <file>) --file <backup.tar.gz.age> --data-dir <new-directory>")
+	}
+	var identities []age.Identity
+	var err error
+	if *identityPath != "" {
+		identityFile, err := os.Open(strings.TrimSpace(*identityPath))
+		if err != nil {
+			return fmt.Errorf("open recovery identity: %w", err)
+		}
+		parsed, parseErr := age.ParseIdentities(identityFile)
+		closeErr := identityFile.Close()
+		if parseErr != nil || closeErr != nil || len(parsed) == 0 {
+			return errors.New("backup: cannot read a valid recovery identity")
+		}
+		identities = parsed
+	} else {
+		var passphrase string
+		if *usePassphrase {
+			passphrase, err = promptPassphrase()
+		} else {
+			passphrase, err = readPassphraseFile(*passphrasePath)
+		}
+		if err != nil {
+			return err
+		}
+		identity, err := age.NewScryptIdentity(passphrase)
+		if err != nil {
+			return errors.New("backup: cannot create passphrase identity")
+		}
+		identities = []age.Identity{identity}
 	}
 	archive, err := os.Open(*archivePath)
 	if err != nil {
@@ -114,13 +148,51 @@ func runRestore(args []string, out io.Writer) error {
 		return errors.New("backup: archive file is invalid")
 	}
 	restoreErr := RestoreEncryptedArchive(context.Background(), archive, identities, *dataDir)
-	closeErr = archive.Close()
+	archiveCloseErr := archive.Close()
 	if restoreErr != nil {
 		return restoreErr
 	}
-	if closeErr != nil {
-		return closeErr
+	if archiveCloseErr != nil {
+		return archiveCloseErr
 	}
 	_, err = fmt.Fprintf(out, "Panel data restored to %s\nBefore starting Mistgate, update any external systemd master.key credential to use the restored key.\n", *dataDir)
 	return err
+}
+
+const maxPassphraseFileBytes = 64 << 10
+
+func promptPassphrase() (string, error) {
+	fd := int(os.Stdin.Fd())
+	if !term.IsTerminal(fd) {
+		return "", errors.New("backup restore: --passphrase requires an interactive terminal")
+	}
+	if _, err := fmt.Fprint(os.Stderr, "Backup passphrase: "); err != nil {
+		return "", err
+	}
+	secret, err := term.ReadPassword(fd)
+	_, _ = fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", errors.New("backup restore: could not read passphrase from terminal")
+	}
+	passphrase := string(secret)
+	clear(secret)
+	return passphrase, nil
+}
+
+func readPassphraseFile(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("open passphrase file: %w", err)
+	}
+	defer file.Close()
+	line, err := bufio.NewReader(io.LimitReader(file, maxPassphraseFileBytes+1)).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", errors.New("backup restore: could not read passphrase file")
+	}
+	if len(line) > maxPassphraseFileBytes {
+		return "", errors.New("backup restore: passphrase file's first line is too long")
+	}
+	line = strings.TrimSuffix(line, "\n")
+	line = strings.TrimSuffix(line, "\r")
+	return line, nil
 }

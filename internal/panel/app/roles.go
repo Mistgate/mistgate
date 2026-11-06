@@ -224,6 +224,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 		func() (string, http.Handler) { return k.bl.Handler() },
 		func() (string, http.Handler) { return k.cp.Handler() },
 		func() (string, http.Handler) { return probe.Handler() },
+		bkp.DownloadHandler,
 	} {
 		path, handler := h()
 		cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})

@@ -423,30 +423,12 @@ func (s *Service) run(ctx context.Context) (_ backupObject, _ string, err error)
 		s.recordRun(ctx, false, errorCode(errBackupStorageFailed))
 		return backupObject{}, "", errBackupStorageFailed
 	}
-	// The work directory (the snapshot, the encrypted archive) lives in the data directory, on its disk: the only place
-	// the service may write, and not a tmpfs that counts against its memory. One a crash left behind goes first.
-	if entries, err := os.ReadDir(s.dataDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() && strings.HasPrefix(e.Name(), stagePrefix) {
-				os.RemoveAll(filepath.Join(s.dataDir, e.Name()))
-			}
-		}
-	}
-	workDir, err := os.MkdirTemp(s.dataDir, stagePrefix)
+	workDir, snapshot, err := s.stageSnapshot(ctx)
 	if err != nil {
 		s.recordRun(ctx, false, errorCode(errBackupArchiveFailed))
 		return backupObject{}, "", errBackupArchiveFailed
 	}
 	defer os.RemoveAll(workDir)
-	if err := os.Chmod(workDir, 0o700); err != nil {
-		s.recordRun(ctx, false, errorCode(errBackupArchiveFailed))
-		return backupObject{}, "", errBackupArchiveFailed
-	}
-	snapshot := filepath.Join(workDir, "snapshot.db")
-	if err := s.st.SnapshotDatabase(ctx, snapshot); err != nil {
-		s.recordRun(ctx, false, errorCode(errBackupArchiveFailed))
-		return backupObject{}, "", errBackupArchiveFailed
-	}
 	archivePath := filepath.Join(workDir, "mistgate-backup.tar.gz.age")
 	archive, err := os.OpenFile(archivePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
@@ -483,6 +465,36 @@ func (s *Service) run(ctx context.Context) (_ backupObject, _ string, err error)
 		}
 	}
 	return object, warning, nil
+}
+
+// stageSnapshot makes the consistent SQLite snapshot in a private directory under the panel data directory. A crashed
+// prior backup's stage is removed first; callers hold s.mu and remove the returned directory on every exit path.
+func (s *Service) stageSnapshot(ctx context.Context) (workDir, snapshot string, err error) {
+	if entries, readErr := os.ReadDir(s.dataDir); readErr == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), stagePrefix) {
+				_ = os.RemoveAll(filepath.Join(s.dataDir, entry.Name()))
+			}
+		}
+	}
+	workDir, err = os.MkdirTemp(s.dataDir, stagePrefix)
+	if err != nil {
+		return "", "", err
+	}
+	stageDir := workDir
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(stageDir)
+		}
+	}()
+	if err = os.Chmod(workDir, 0o700); err != nil {
+		return "", "", err
+	}
+	snapshot = filepath.Join(workDir, "snapshot.db")
+	if err = s.st.SnapshotDatabase(ctx, snapshot); err != nil {
+		return "", "", err
+	}
+	return workDir, snapshot, nil
 }
 
 func (s *Service) recordRun(ctx context.Context, success bool, code string) error {

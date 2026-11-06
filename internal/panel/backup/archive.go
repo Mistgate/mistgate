@@ -77,6 +77,18 @@ func CreateEncryptedArchive(ctx context.Context, dataDir, snapshotDB string, mas
 	if err != nil {
 		return fmt.Errorf("backup: invalid recovery recipient: %w", err)
 	}
+	return CreateEncryptedArchiveWithRecipient(ctx, dataDir, snapshotDB, masterKey, appVersion, recipient, created, dst)
+}
+
+// CreateEncryptedArchiveWithRecipient snapshots the panel's durable data into an age-encrypted, versioned tar.gz stream
+// using a prepared age recipient. CreateEncryptedArchive is the recovery-recipient form used by scheduled backups.
+func CreateEncryptedArchiveWithRecipient(ctx context.Context, dataDir, snapshotDB string, masterKey []byte, appVersion string, recipient age.Recipient, created time.Time, dst io.Writer) error {
+	if len(masterKey) != vault.KeySize {
+		return errors.New("backup: invalid master key")
+	}
+	if recipient == nil {
+		return errors.New("backup: missing encryption recipient")
+	}
 	files, err := preparePayload(ctx, dataDir, snapshotDB, masterKey)
 	if err != nil {
 		return err

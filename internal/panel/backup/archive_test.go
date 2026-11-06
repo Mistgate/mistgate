@@ -93,6 +93,86 @@ func TestEncryptedArchiveRoundTripIncludesCommittedWAL(t *testing.T) {
 	}
 }
 
+func TestScryptArchiveRoundTripAndWrongPassphrase(t *testing.T) {
+	const passphrase = "correct horse battery staple"
+	archive, wantKey, marker := makeScryptTestArchive(t, passphrase)
+	ctx := context.Background()
+
+	wrongPassphrase := "a wrong phrase that must not be reported"
+	wrong, err := age.NewScryptIdentity(wrongPassphrase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongTarget := filepath.Join(t.TempDir(), "wrong")
+	if err := RestoreEncryptedArchive(ctx, bytes.NewReader(archive), []age.Identity{wrong}, wrongTarget); err == nil || strings.Contains(err.Error(), wrongPassphrase) {
+		t.Fatalf("wrong passphrase restore error = %v", err)
+	}
+	if _, err := os.Lstat(wrongTarget); !os.IsNotExist(err) {
+		t.Fatalf("wrong passphrase left a destination behind: %v", err)
+	}
+
+	identity, err := age.NewScryptIdentity(passphrase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored := filepath.Join(t.TempDir(), "restored")
+	if err := RestoreEncryptedArchive(ctx, bytes.NewReader(archive), []age.Identity{identity}, restored); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(restored, "fixture.txt"))
+	if err != nil || string(got) != marker {
+		t.Errorf("restored fixture = %q, %v; want %q", got, err, marker)
+	}
+	gotKey, err := os.ReadFile(filepath.Join(restored, masterKeyName))
+	if err != nil || !bytes.Equal(gotKey, wantKey) {
+		t.Errorf("restored master key does not match source: %v", err)
+	}
+	st, err := store.Open(ctx, filepath.Join(restored, databaseName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotSetting, err := st.Setting(ctx, "scrypt_fixture")
+	closeErr := st.Close()
+	if err != nil || gotSetting != marker || closeErr != nil {
+		t.Errorf("restored setting = %q, read %v, close %v; want %q", gotSetting, err, closeErr, marker)
+	}
+}
+
+func makeScryptTestArchive(t *testing.T, passphrase string) ([]byte, []byte, string) {
+	t.Helper()
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	st, err := store.Open(ctx, filepath.Join(dataDir, databaseName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	key, err := vault.LoadKey(dataDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const marker = "scrypt-backup-fixture"
+	if err := st.SetSettings(ctx, map[string]string{"scrypt_fixture": marker}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "fixture.txt"), []byte(marker), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := filepath.Join(t.TempDir(), "snapshot.db")
+	if err := st.SnapshotDatabase(ctx, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	recipient, err := age.NewScryptRecipient(passphrase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encrypted bytes.Buffer
+	if err := CreateEncryptedArchiveWithRecipient(ctx, dataDir, snapshot, key, "0.1.0-dev", recipient, time.Now(), &encrypted); err != nil {
+		t.Fatal(err)
+	}
+	return encrypted.Bytes(), key, marker
+}
+
 // An archive from a newer panel, whose database is past the migrations of this binary, is refused with a clear message:
 // goose would take that database, and this code would not know its tables.
 func TestRestoreRefusesANewerSchema(t *testing.T) {
@@ -237,7 +317,7 @@ func TestBackupKeygenWritesPrivateIdentityOnlyOnce(t *testing.T) {
 func TestBackupHelp(t *testing.T) {
 	for _, arg := range []string{"-h", "--help", "help"} {
 		var out bytes.Buffer
-		if err := RunCLI([]string{arg}, &out); err != nil || !strings.Contains(out.String(), "keygen") || !strings.Contains(out.String(), "restore --identity-file") {
+		if err := RunCLI([]string{arg}, &out); err != nil || !strings.Contains(out.String(), "keygen") || !strings.Contains(out.String(), "restore (--identity-file FILE | --passphrase | --passphrase-file FILE)") {
 			t.Errorf("%s: err=%v out=%q", arg, err, out.String())
 		}
 	}
