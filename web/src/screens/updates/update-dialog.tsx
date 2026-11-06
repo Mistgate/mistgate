@@ -56,6 +56,48 @@ function Row({ icon, tone, title, line, lineTone, action, children }: { icon: Ic
   );
 }
 
+/**
+ * The passphrase of a downloaded backup when Settings → Backups has no recovery key: made up for this file alone, typed
+ * twice. Shared by the update window and Settings → Backups.
+ */
+export function PassphraseForm({ busy, onCancel, onDownload }: { busy: boolean; onCancel: () => void; onDownload: (passphrase: string) => void }) {
+  const t = useT();
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const ok = a.length >= 12 && a === b;
+  return (
+    <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+      {/* a passphrase made up for this file alone: the words say whose it is not, so nobody types an account's */}
+      <div className="flex items-start gap-2">
+        <Icon name="lock" size={14} className="mt-0.5 flex-none text-muted" aria-hidden />
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-[13px] font-bold">{t("up.dlg.pass.title")}</span>
+          <p className="text-xs leading-snug text-pretty text-muted">{t("up.dlg.pass.why")}</p>
+        </div>
+      </div>
+      <TextField label={t("up.dlg.pass.a")} type="password" autoComplete="new-password" value={a} onChange={(e) => setA(e.target.value)} />
+      <TextField
+        label={t("up.dlg.pass.b")}
+        type="password"
+        autoComplete="new-password"
+        value={b}
+        error={b && a !== b ? t("up.dlg.pass.mismatch") : a && a.length < 12 ? t("up.dlg.pass.short") : undefined}
+        onChange={(e) => setB(e.target.value)}
+      />
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button variant="secondary" size="sm" disabled={!ok || busy} onClick={() => onDownload(a)}>
+          <Icon name="arrowDown" size={12} />
+          {t("up.dlg.file.download")}
+        </Button>
+      </div>
+      <p className="text-[11px] leading-snug text-pretty text-faint">{t("up.dlg.pass.key")}</p>
+    </div>
+  );
+}
+
 export function UpdatePanelDialog({
   open,
   onOpenChange,
@@ -86,9 +128,8 @@ export function UpdatePanelDialog({
 }) {
   const t = useT();
   const fmt = useFmt();
-  const [pass, setPass] = useState({ open: false, a: "", b: "" });
+  const [passOpen, setPassOpen] = useState(false);
   const [busy, setBusy] = useState<"" | "r2" | "file" | "update">("");
-  const passOk = pass.a.length >= 12 && pass.a === pass.b;
   const fresh = (backup.r2 && now - backup.lastSuccessUnix < day) || now - backup.downloadedUnix < day;
   const act = async (what: "r2" | "file" | "update", fn: () => Promise<boolean>) => {
     setBusy(what);
@@ -200,12 +241,12 @@ export function UpdatePanelDialog({
           }
           lineTone={backup.downloadedUnix > 0 && now - backup.downloadedUnix < day ? "ok" : undefined}
           action={
-            !pass.open && (
+            !passOpen && (
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={!!busy}
-                onClick={() => (backup.recipient ? void act("file", () => onDownload()) : setPass({ ...pass, open: true }))}
+                onClick={() => (backup.recipient ? void act("file", () => onDownload()) : setPassOpen(true))}
               >
                 <Icon name="arrowDown" size={12} />
                 {t("up.dlg.file.download")}
@@ -213,41 +254,12 @@ export function UpdatePanelDialog({
             )
           }
         >
-          {pass.open && (
-            <div className="flex flex-col gap-2.5 border-t border-line pt-3">
-              {/* a passphrase made up for this file alone: the words say whose it is not, so nobody types an account's */}
-              <div className="flex items-start gap-2">
-                <Icon name="lock" size={14} className="mt-0.5 flex-none text-muted" aria-hidden />
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className="text-[13px] font-bold">{t("up.dlg.pass.title")}</span>
-                  <p className="text-xs leading-snug text-pretty text-muted">{t("up.dlg.pass.why")}</p>
-                </div>
-              </div>
-              <TextField label={t("up.dlg.pass.a")} type="password" autoComplete="new-password" value={pass.a} onChange={(e) => setPass({ ...pass, a: e.target.value })} />
-              <TextField
-                label={t("up.dlg.pass.b")}
-                type="password"
-                autoComplete="new-password"
-                value={pass.b}
-                error={pass.b && pass.a !== pass.b ? t("up.dlg.pass.mismatch") : pass.a && pass.a.length < 12 ? t("up.dlg.pass.short") : undefined}
-                onChange={(e) => setPass({ ...pass, b: e.target.value })}
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setPass({ open: false, a: "", b: "" })}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={!passOk || !!busy}
-                  onClick={() => void act("file", () => onDownload(pass.a)).then((ok) => ok && setPass({ open: false, a: "", b: "" }))}
-                >
-                  <Icon name="arrowDown" size={12} />
-                  {t("up.dlg.file.download")}
-                </Button>
-              </div>
-              <p className="text-[11px] leading-snug text-pretty text-faint">{t("up.dlg.pass.key")}</p>
-            </div>
+          {passOpen && (
+            <PassphraseForm
+              busy={!!busy}
+              onCancel={() => setPassOpen(false)}
+              onDownload={(passphrase) => void act("file", () => onDownload(passphrase)).then((ok) => ok && setPassOpen(false))}
+            />
           )}
         </Row>
       </section>

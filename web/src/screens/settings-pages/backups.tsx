@@ -23,6 +23,8 @@ import { errorText } from "@/lib/errors";
 import { clampPage, usePaging } from "@/lib/paging";
 import { plain, type Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
+import { downloadBackup } from "@/lib/backup-download";
+import { PassphraseForm } from "../updates/update-dialog";
 import { CopyRow } from "./domains";
 
 type Stored = Plain<BackupSettings>;
@@ -338,6 +340,8 @@ function BackupsForm({ stored }: { stored: Stored }) {
           <p>{t("set.backups.retentionStatus", { days: stored.retentionDays === 0 ? t("set.backups.retention.never") : t("set.backups.retention.days", { n: stored.retentionDays }) })}</p>
           {stored.lastErrorCode && <p className="text-danger-text sm:col-span-2">{t("set.backups.lastError", { code: stored.lastErrorCode })}</p>}
         </div>
+
+        <FileBackup recipient={!!stored.ageRecipient} />
       </section>
 
       <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
@@ -378,6 +382,44 @@ function BackupRow({ item }: { item: BackupItem }) {
         <span>{formatBytes(item.sizeBytes, locale)}</span>
       </div>
       <CopyRow value={item.key} />
+    </div>
+  );
+}
+
+/**
+ * A backup on this computer (ADR 0012): the same encrypted archive as the R2 backups, R2 or not; to the recovery key when
+ * there is one, else with a passphrase made up for the file.
+ */
+function FileBackup({ recipient }: { recipient: boolean }) {
+  const t = useT();
+  const toast = useToast();
+  const guard = useStepUp();
+  const version = useQuery(meQuery).data?.version ?? "";
+  const [passOpen, setPassOpen] = useState(false);
+  const download = useMutation({
+    mutationFn: (passphrase?: string) => guard(() => downloadBackup(version, passphrase)),
+    onSuccess: (name) => {
+      setPassOpen(false);
+      toast(t("set.backups.file.done", { name }));
+    },
+    onError: (error) => {
+      if (!isStepUpCancelled(error)) toast.error(errorText(error, t));
+    },
+  });
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-[12rem] flex-1 flex-col gap-0.5">
+          <span className="text-[13px] font-bold">{t("set.backups.file.title")}</span>
+          <span className="text-xs leading-snug text-pretty text-muted">{t("set.backups.file.body")}</span>
+        </div>
+        {!passOpen && (
+          <Button type="button" disabled={download.isPending} onClick={() => (recipient ? download.mutate(undefined) : setPassOpen(true))}>
+            {t("set.backups.file.download")}
+          </Button>
+        )}
+      </div>
+      {passOpen && <PassphraseForm busy={download.isPending} onCancel={() => setPassOpen(false)} onDownload={(passphrase) => download.mutate(passphrase)} />}
     </div>
   );
 }
