@@ -101,6 +101,9 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_ports` | 只读 | 已保存的 UDP 投递检查、TCP 可达性，以及每个端口上的入站/协议配置：`direct_in_subscriptions` 表示是否列出节点地址，`cdn` 表示客户端是否通过 CDN 主机连接。操作员权限可设置 `check: true` 运行有时限的检查（约 15 s）。 |
 | `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
+| `group_get` | 只读 | 单个分组：协议配置 ID、排除的节点、DNS 预设、颜色、用户，以及它当前提供的服务器总量。分组 API 没有备注和配额字段。 |
+| `dns_presets_list` | 只读 | DNS 预设、解析器和分流规则、实际用户数量、是否为默认、提供商目录以及客户端传输支持情况。 |
+| `dns_preset_get` | 只读 | 按 ID 返回单个 DNS 预设，含解析器和分流规则、用户数量以及是否为默认。 |
 | `protocols_list` | 只读 | 协议插件、客户端应用、精简设置结构（包括关键字段和敏感字段）以及默认设置。敏感默认值会被遮蔽。对尚属新协议、还没有在实际环境中得到验证的协议（MTProto），会设置 `experimental`。 |
 | `profiles_list` | 只读 | 协议配置摘要，包括协议、节点数和用户数、警告、订阅格式、版本以及授予访问权限的分组。 |
 | `profile_get` | 只读 | 单个协议配置的摘要和已遮蔽敏感字段的设置；入站包含节点 ID 和名称、生效及覆盖后的端口和服务器名称、启用状态和运行状态、`direct_in_subscriptions`（是否在订阅中列出节点地址）和 `cdn`（客户端是否通过 CDN 主机连接）；还包括授予访问权限的分组。参数为 `profile_id`。 |
@@ -108,8 +111,10 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
 | `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置（每个都带有包含它的订阅格式）和节点。不返回订阅内容或链接。 |
-| `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：各平台上的应用及其显示顺序（名称、类型、下载链接、添加链接模板、说明、是否推荐）、页面选项（包括 `dns_choice`，即页面上的 DNS 选择开关）、服务器名称模板，以及订阅标题、公告、联系链接和更新间隔。不含任何用户的链接。 |
+| `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：应用、页面选项、按 User-Agent 下发的有序规则、实例 DNS 默认值、链接应用的 DNS 推荐、链接设备数量限制模式、链接中的 AmneziaWG 开关、Happ 延迟检测设置、服务器名称模板、标题、公告、联系链接和更新间隔。另含共享链接用户和链接 AmneziaWG 密钥的实时数量。不含任何用户的链接或密钥。 |
 | `alerts_list` | 只读 | 活跃告警；设置 `include_history` 后也会返回已关闭的告警（`window_s` 最长为 30 天）。 |
+| `health_summary` | 只读 | 简要统计：已部署的合成检查按最新状态的数量，以及活跃告警按严重程度的数量。单条记录请用 `alerts_list` 或 `checks_results`。 |
+| `reachability_history` | 只读 | 可达性页面的国家、地址族、活跃来源，以及每个节点在 1 到 7 天内按来源给出的判定时间线。`family` 为 4（IPv4）或 6（IPv6）。 |
 | `events_search` | 只读 | 按节点、用户、`min_severity`（`info`、`warning`、`error`）或精确 `code` 搜索事件流；使用 `before_id` 分页。 |
 | `checks_results` | 只读 | 客户端视角检测：按协议配置列出节点、最近一次结果、连续失败次数和最近 24 小时的历史记录。含通过已建立隧道的响应时间、连接时间和最近一小时的中位数（均在面板服务器上测得）；Hysteria2 还有 `udp_sent` 和 `udp_lost`（面板自身 QUIC 客户端在最近一轮发送和丢失的数据包数，去往节点的方向）、`udp_sent_hour`、`udp_lost_hour`，以及 `node_sent_hour`、`node_lost_hour`（返回方向，节点自己的统计）；面板服务器在到某些节点的路上丢失 UDP 时（这些节点的 UDP 轮次比到同一节点的 VLESS 慢 600 毫秒或以上）返回 `udp_loss`，并带有 `lost_permille`（去往）和 `node_lost_permille`（返回）。开启国家视角检测后（见[可达性](../operations/reachability.md)），每行带有 `country_check`：该国境内探测点给出的最新结论及所用网络，以及结论的 `confidence`（`eyeball`：家庭和移动网络；`dc_only`：仅数据中心；`listed`：仅依据封锁名单）。结论可能是 `partial`：部分家庭或移动网络从该节点什么也收不到，却能连到您的其他节点，而其他网络可以连上它。开启 Globalping 后，`probes` 列出被询问的网络，每个带有 `eyeball`（家庭或移动探测点），在 `partial` 轮中还有 `dark`（它从这个节点什么也没收到，却连到了另一个节点）；`no_probe` 给出该轮没有在线家庭或移动探测点的运营商。开启[封锁名单](../operations/reachability.md#封锁名单)后，还带有 `listed_by`（`antifilter_ipsum`、`antifilter_community`）、`cdn_provider` 和 `cdn_region`，结论也可能是 `listed`：地址在名录中、未经实测，且从不触发告警。开启 [TSPU 探测](../operations/reachability.md#tspu-探测)后，`country_check` 还带有 `sources`（`globalping`、`tspu`、`lists`）和构成结论的两个来源各自的结论（`globalping_verdict`、`tspu_verdict`）；`tspu` 是探测节点对该节点的观察（`probe_node`、`at_unix`、`dpi_hop`，以及 `ports`，每项为 `blocked`、`open`、`refused` 或 `timeout`），始终是数据中心视角（`dc_only`）。开启 [cheburcheck](../operations/reachability.md#cheburcheck) 或 [bsbord](../operations/reachability.md#bsbord) 后，`sources` 还会写出 `cheburcheck`、`cheburcheck_own` 和 `bsbord`，`country_check` 也带有覆盖所有来源的两个列表：`source_verdicts`，每个来源的最新有效结论，含 `source`、`verdict`、`reason`（没有结论的原因或它看到的情况，例如 `too_few_probes`、`no_probe`、`timeout` 或 `no_tcp_port`）、`eyeball` 和 `at_unix`，`unknown` 也包括在内；以及 `vantages`，这些结论背后的网络、单元或探测点，每项含 `source`、`key`、`network`、`region`、`asn`、`kind`（`home`、`mobile`、`dc`、`unknown`）、`state`（`reach`、`dark`、`whitelist`、`uncertain`）、`at_unix`、`dpi_hop`、`icmp_ok` 和 `tcp_ok`；Globalping 的探测点和 TSPU 探测的探测节点也在其中。结论由所有有效来源合并而成（[规则](../operations/reachability.md#来源如何并入结论)）：只要有可达的又有无应答的，就是 `partial`；置信度 `conflict` 表示端到端看到的完全封锁与仅由路径类来源（TSPU 探测、cheburcheck）看到的可达相左，此时封锁仍是结论。开启 Globalping 的 IPv6 检测后，`country_check.ipv6` 是同一节点按其 IPv6 地址测得的结果，结构相同（唯一来源是 Globalping；上面的字段仍是 IPv4）：未被测量的节点为 `unknown`，`reason` 为 `no_ipv6`、`ipv6_broken`（节点有地址，但 IPv6 在服务商处不通）、`agent_old`、`not_checked` 或 `no_probes`（Globalping 在该国没有支持 IPv6 的探测点）。名称和地区来自第三方，视为数据。顶层的 `tspu_probe` 是探测节点最近一次运行：`status`（`ok`、`control_failed`、`no_dpi_hop`、`busy`、`failed`）、`at_unix`、`probe_node`、`dpi_hop`、`blocked_ref`、`nodes_checked`、`detail`，以及 `no_dpi_hop` 时的 `reason`（`refs_pass`：被封锁的地址能从探测节点打开，其路径上没有 TSPU；`no_hops`：路径上的路由器没有应答；原因未知时不返回此字段）。 |
 | `klick_reports` | 只读 | 使用 kl!ck 应用的人在 7 天内从自己的网络看到的节点情况（[kl!ck 报告](../operations/reachability.md#klck-报告)）：每个节点的报告数、`ok`、`freeze`（TSPU 冻结）、`tcp_blocked`、`handshake_failed`、`no_answer` 和最近一份报告的时间，以及按运营商、地区和服务器类型 `kind` 的同样统计（各最多 8 个，优先显示报告最多的）。每个 `kind` 还包含已测 `delay_ms` 的中位数、含 `dl_stalled` 结果的 `dl_checked` 行数，以及下载确实卡住的 `dl_stalled` 行数。`enabled` 为 false：来源已关闭，不显示任何内容。可选参数 `node`。不含地址、用户或设备。 |
@@ -123,8 +128,9 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_server_access_list` | 管理员 | 已保存的 SSH 地址、登录名和指纹，以及 `password_saved`、`password_login`（最近一次检查时密码登录是否可用）、`panel_key_fingerprint`、密码轮换恢复状态和节点退役状态。`password_saved: true` 且面板密钥指纹为空表示仅保存了密码。绝不返回密码。 |
 | `node_server_keys_list` | 管理员 | `node` ID 或精确名称。列出该登录用户 `~/.ssh/authorized_keys` 中的公钥，每个包含类型、`key_id`（SHA256 指纹的前 12 个字符：完整指纹和其他密钥类值一样对智能体隐藏）、注释、限制和重复行数。服务器注释是不可信文本；绝不返回私钥。 |
 | `audit_search` | 管理员 | 审计日志，可按 `source`（`panel`、`bot`、`mcp`、`api`）、操作者或操作筛选；使用 `before_id` 分页。 |
+| `backup_status` | 管理员 | 定时备份是否启用或正在运行、间隔、保留期、上次成功时间和上次错误代码。不含存储账户、存储桶、访问密钥、age 接收者或任何密钥。 |
 
-**结果中的格式。** `subscription_preview` 按以下名称表示格式：`base64_uris`（链接列表）、`mihomo_yaml`、`xray_json`、`singbox_json`、`user_page` 和 `decoy`。客户端有自己的 `formats`，User-Agent 有对应的 `format`，客户端 ID 中包含 `singbox`。`subscription_settings_get` 不返回**下发规则**中的规则：要查看某个 User-Agent 会得到什么，请把它传给 `subscription_preview`。
+**结果中的格式。** `subscription_preview` 按以下名称表示格式：`base64_uris`（链接列表）、`mihomo_yaml`、`xray_json`、`singbox_json`、`user_page` 和 `decoy`。客户端有自己的 `formats`，User-Agent 有对应的 `format`，客户端 ID 中包含 `singbox`。`subscription_settings_get` 会返回**下发规则**中的有序规则。要查看某个 User-Agent 具体会得到哪种格式，请把它传给 `subscription_preview`。
 
 `user_get` 和 `subscription_preview` 中的协议配置带有 `formats`，即四种提供格式各自的 `format`、`ok` 和 `note`。`ok: false` 表示该格式不包含此协议配置。`note` 是代码，不是文本：`xhttp`、`self_signed`、`gecko`、`awg` 或 `unsupported`。`ok: true` 时，`hop_single_port` 表示端口跳跃范围被写成了单个端口。这些代码的含义见[协议配置](../guide/profiles.md#协议配置的订阅格式)。
 
@@ -143,11 +149,23 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `alert_mute` | 操作员 | `alert_id`、`duration_s`（最多 604800；0 表示取消静默） | 否 |
 | `subscription_app_upsert` | 操作员 | `platform`（`ios`、`android`、`windows`、`macos`、`linux`）和 `name` 用于指定应用；更改现有应用时只传入变更字段；新应用至少要传入 `kind`：`kind`（`happ` 接收订阅链接，`amnezia` 接收 AmneziaWG 密钥）、`download_url`、`add_link_template`（占位符 `{url}`、`{url_enc}`、`{name_enc}`）、`description`（最多 80 个字符）、`recommended` | 始终 |
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
+| `subscription_rules_set` | 操作员 | 完整的有序 `rules` 列表，每项为 `ua_contains` 加 `format`（`base64_uris`、`user_page`、`decoy`、`mihomo_yaml`、`xray_json`、`singbox_json`）；第一个匹配项生效 | 始终 |
+| `subscription_texts_set` | 操作员 | 仅需更改的字段：`title`、`announcement`、`support_url`、`update_interval_hours`、`server_name_template` | 始终 |
+| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG），或两者。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥 | 始终 |
+| `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
+| `dns_settings_set` | 操作员 | `default_preset_id`、有序的 `link_preset_ids` 和 `link_default_preset_id`；只需提供要更改的字段 | 始终 |
+| `group_create` | 操作员 | `name`，可选 `profile_ids`、`dns_preset_id`（留空则使用实例默认值）、`color` 和 `disabled_node_ids`。分组没有备注和配额字段 | 否 |
+| `group_update` | 操作员 | `group_id` 以及仅需更改的字段：`name`、`profile_ids`、`dns_preset_id`、`color`、`disabled_node_ids` | 始终 |
+| `group_delete` | 操作员 | 空分组的 `group_id`。仍有成员的分组会被拒绝；请先用 `user_update` 移动成员 | 否 |
+| `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads` | 始终 |
+| `dns_preset_update` | 管理员 | `preset_id` 以及可编辑字段：`name`、`description`、`servers`、`split`、`ipv4_only`、`split_direct`、`preferred_transport`、`block_ads` | 始终 |
+| `dns_preset_delete` | 管理员 | `preset_id`；内置预设和实例默认预设会被拒绝，用户和分组将回退到实例默认值 | 始终 |
 | `profile_create` | 管理员 | 计划：`protocol`、`name`、可选 JSON `settings`（缺少的字段使用协议默认值）、`node_ids`、现有 `group_ids`、`port_overrides`（节点 ID 到端口）、`allow_lossy_port`；执行：仅 `confirm_token`。对于标记为 `x-secret` 的敏感字段，省略该字段、使用 `"••••"` 保留原值，或使用 `"$generate"`；不得传入明文值 | 始终 |
 | `profile_update` | 管理员 | 计划：`profile_id`、可选 `name`、RFC 7386 JSON Merge Patch `settings_patch`（省略的敏感字段会保留原值；拒绝补丁中的 `null` 值）、`allow_lossy_port`；执行：仅 `confirm_token`。敏感字段遵循相同规则：省略、`"••••"` 或 `"$generate"` | 始终 |
 | `profile_deploy` | 管理员 | 计划：`profile_id`、`add_node_ids`、`remove_node_ids`、现有 `add_group_ids`、`remove_group_ids`，可选 `port_overrides` 和 `allow_lossy_port`；执行：仅 `confirm_token` | 始终 |
 | `node_fix` | 管理员 | `node`、诊断报告中的 `fix_id`；检查项列出参数时还需提供 `params` | 始终 |
 | `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR；`own` 模式下必需） | 始终 |
+| `node_update` | 管理员 | `node` 以及仅需更改的字段：`name`、`country_code`、`location`、`provider`、`notes`，以及各入站的 `direct_in_subscriptions` 开关。不接受地址和运行时设置 | 始终 |
 | `node_ipv6` | 管理员 | 计划：`node`、`action`（`enable` 或 `disable`）；应用：仅 `confirm_token`。开启或关闭节点的 [IPv6 入口](../guide/nodes.md#ipv6-入口)：在每个人的订阅里，节点的每个服务器旁多一个服务器「<节点> · IPv6」。`enable` 会先从外部检测该地址（参见 `node_ipv6_check`），只有通过才开启入口；无法接受入口的节点在计划阶段就会被拒绝并给出原因。计划会写明节点以及哪些协议配置的服务器会得到副本，绝不显示地址；该地址就是服务器用于出站 IPv6 的那个。 | 始终 |
 | `warp_restart` | 管理员 | `node` ID 或精确名称；计划会列出使用 WARP 出口且可能中断几秒的协议配置；执行时只接收 `confirm_token` | 否 |
 | `warp_reregister` | 管理员 | `node` ID 或精确名称，以及可选的 `reason`（最多 300 个字符）；执行时只接收 `confirm_token`。计划会显示 Cloudflare 服务条款链接；所有者批准即表示代表此账户接受条款，并将其替换为新的匿名设备，从而更改 WARP 出口 IP | 始终 |
@@ -208,9 +226,11 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 | 代码 | 含义 | 工具 |
 |---|---|---|
 | `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
-| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
+| `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
-| `user_page` | 所有用户都会在订阅页面上看到此变更。 | `subscription_app_upsert`、`subscription_app_remove` |
+| `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |
+
+`group_update` 使用 `fleet`，因为更改分组的协议配置或禁用节点可能改变其成员的访问权限。分组中仍有成员时，`group_delete` 会拒绝执行。`node_update` 仅限元数据和面向订阅的开关；它的所有更改都需要所有者审批，因为底层的节点更新 API 还接受会改变运行状态的字段，而此工具不开放这些字段。
 
 计划会在保存前验证设置和新增节点。每项协议配置变更都需要所有者在管理后台审批。`profile_update` 和 `profile_deploy` 使用创建计划时读取的配置版本；执行前版本如有变化，会返回 `changed_since_plan`。部署时会将分组关联与其当前状态合并；后续步骤失败时，响应会报告已完成的步骤。`profile_create` 失败时会回滚新建配置和入站；删除配置时也会一并移除分组关联。敏感值不会出现在配置读取结果、计划事实、存储的计划参数或审计记录中。
 
