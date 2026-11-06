@@ -21,38 +21,39 @@ const (
 )
 
 var edgeTickJobs = map[string]string{
-	"access":              "user status sweep every tick",
-	"fleet":               "node-down sweep every tick and desired-state safety net every 10 minutes",
-	"health":              "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
-	"blocklist":           "the block-list check of the country check, when one is due (one setting read while it is off)",
-	"cheburcheck":         "one due cheburcheck source and node per tick; off means no site request",
-	"bsbord":              "one previewed, capped mobile reachability request when a round is due; off means no site request",
-	"provision":           "wakes the Provisioner every tick while an install is queued, running or being cancelled",
-	"telegram":            "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
-	"updates":             "advances the edge node rollout and scheduled update state machines",
-	"assistant-retention": "deletes expired assistant conversations once daily at 03:17 UTC",
+	"access":      "user status sweep every tick",
+	"fleet":       "node-down sweep every tick and desired-state safety net every 10 minutes",
+	"health":      "alert evaluation every tick, health retention at minute 17, and the country check when a round is due",
+	"blocklist":   "the block-list check of the country check, when one is due (one setting read while it is off)",
+	"cheburcheck": "one due cheburcheck source and node per tick; off means no site request",
+	"bsbord":      "one previewed, capped mobile reachability request when a round is due; off means no site request",
+	"provision":   "wakes the Provisioner every tick while an install is queued, running or being cancelled",
+	"telegram":    "polls pending chat codes, checks the release and agent watcher every fifth tick, and delivers queued messages",
+	"updates":     "advances the edge node rollout and scheduled update state machines",
 }
 
 // edgeDeferred describes background-job functions that stay VPS-only; a job can also have an edge phase above.
 var edgeDeferred = map[string]string{
-	"fleet":          "event-driven Run, local sessions, closeAll and recomputeAll remain VPS-only",
-	"health":         "client-eye checker and periodic UDP port rechecks",
-	"updates":        "installing a panel binary remains an edge deploy operation",
-	"backups":        "R2",
-	"mcp-plan-sweep": "MCP is not served on the edge",
-	"tspu-probe":     "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
+	"fleet":               "event-driven Run, local sessions, closeAll and recomputeAll remain VPS-only",
+	"health":              "client-eye checker and periodic UDP port rechecks",
+	"updates":             "installing a panel binary remains an edge deploy operation",
+	"backups":             "R2",
+	"mcp-plan-sweep":      "MCP is not served on the edge",
+	"assistant-retention": "assistant data is not written on the edge; assistant is VPS-only",
+	"tspu-probe":          "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
 }
 
 // edgeDeferredFeatures maps every deferred function above to the admin features it takes away: the ids Me reports in
 // "unavailable" (internal/panel/edition). A test keeps the two lists in step, so a job cannot be deferred without the
 // admin saying so, nor a feature be listed with nothing behind it.
 var edgeDeferredFeatures = map[string][]string{
-	"fleet":          {edition.AgentLogs},
-	"health":         {edition.HealthChecks},
-	"updates":        {edition.PanelUpdate},
-	"backups":        {edition.Backups},
-	"mcp-plan-sweep": {edition.MCP},
-	"tspu-probe":     {edition.TSPUProbe},
+	"fleet":               {edition.AgentLogs},
+	"health":              {edition.HealthChecks},
+	"updates":             {edition.PanelUpdate},
+	"backups":             {edition.Backups},
+	"mcp-plan-sweep":      {edition.MCP},
+	"assistant-retention": {edition.Assistant},
+	"tspu-probe":          {edition.TSPUProbe},
 }
 
 // EdgeTick runs the scheduled work shared by the edge edition. Each pass gets a fresh timeout so one slow job does not
@@ -76,10 +77,6 @@ func (p *Panel) EdgeTick(ctx context.Context, now time.Time) error {
 		p.Fleet.Sweep(ctx)
 		return nil
 	})
-	// Retention runs once a day to keep the scheduled D1 work bounded.
-	if p.Assistant != nil && now.UTC().Hour() == 3 && now.UTC().Minute() == 17 {
-		run("assistant retention", func(ctx context.Context) error { return p.Assistant.Retention(ctx, now) })
-	}
 	if p.provisionKick != nil {
 		// The installs run in the Provisioner Worker; this is the net under its alarm (an evicted object, a redeploy).
 		run("provision wake", func(ctx context.Context) error {

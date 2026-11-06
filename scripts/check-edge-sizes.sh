@@ -16,32 +16,31 @@ mkdir -p "$out"
 # entry:limit in MiB
 entries=(
   # The program with every role: no longer in the release bundle (the five entries below are), it is what the Node tests and the e2e
-  # bridge run. The assistant belongs to the admin surface and makes this all-in-one test binary 61.1 MiB; 64 MiB is the documented
-  # Workers hard ceiling in design/cloudflare-edition/SPIKE.md. The five split Workers below remain comfortably smaller.
-  "mistgate-edge:64:nethttpomithttp2"
+  # bridge run, and the size the roles split. 42 MiB: about 3 MB above its size after the October 2026 diet, so a regression like
+  # the 7.9 MB template one fails here. 45 MiB since the external reachability sources (cheburcheck, bsbord): every role's code.
+  "mistgate-edge:45"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
-  "mistgate-edge-public:28:nethttpomithttp2,noassistant"
+  "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.
-  "mistgate-edge-link:30:nethttpomithttp2,noassistant"
+  "mistgate-edge-link:30"
   # Scheduled work: wireCore, so Telegram, updates and WARP are in it for the work that will move here. Measured 25.1 MiB;
   # 28.1 MiB in November 2026 with the two-sender UDP port check (fleet, in wireCore: the periodic port recheck runs here).
-  "mistgate-edge-jobs:31:nethttpomithttp2,noassistant"
-  # The admin API and the SPA: the largest role, every admin service. The assistant plus its in-process MCP tool runtime measures
-  # 59.0 MiB; the 62 MiB limit leaves about 3 MiB for growth and stays below the 64 MiB Workers hard ceiling.
-  "mistgate-edge-admin:62:nethttpomithttp2"
+  "mistgate-edge-jobs:31"
+  # The admin API and the SPA: the largest role, every admin service. Measured 37.6 MiB; 40.1 MiB with the external reachability
+  # sources (cheburcheck, bsbord), whose owner RPCs (settings, sealed keys, the paid-check preview) need the admin's step-up and
+  # cannot live in jobs, where their ticks run.
+  "mistgate-edge-admin:43"
   # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB; 31.9 MiB in November 2026 with the panel's SSH key, the
   # authorized_keys management and the login by an own private key, which need that SSH client and so cannot live elsewhere.
-  "mistgate-edge-provision:35:nethttpomithttp2,noassistant"
+  "mistgate-edge-provision:35"
 )
 
 status=0
 for entry in "${entries[@]}"; do
   name="${entry%%:*}"
-  rest="${entry#*:}"
-  limit=$(( ${rest%%:*} * 1048576 ))
-  tags="${entry##*:}"
+  limit=$(( ${entry##*:} * 1048576 ))
   wasm="$out/$name.wasm"
-  GOOS=js GOARCH=wasm go build -tags "$tags" -ldflags="-s -w" -trimpath -o "$wasm" "./cmd/$name"
+  GOOS=js GOARCH=wasm go build -tags nethttpomithttp2 -ldflags="-s -w" -trimpath -o "$wasm" "./cmd/$name"
   bytes=$(stat -c%s "$wasm")
   printf '%-26s %9d bytes  %5.1f MiB  limit %9d  headroom %8d bytes (%d KiB)\n' \
     "$name" "$bytes" "$(echo "$bytes" | awk '{print $1/1048576}')" "$limit" $((limit - bytes)) $(( (limit - bytes) / 1024 ))
@@ -51,7 +50,7 @@ for entry in "${entries[@]}"; do
   fi
   # text/template looks methods up by name, which makes the linker keep every exported method of every type (7.9 MB of the
   # wasm). The install page is Go code (internal/panel/provision/ui_page.go) for that reason.
-  if GOOS=js GOARCH=wasm go list -tags "$tags" -deps "./cmd/$name" | grep -Ex 'text/template|html/template'; then
+  if GOOS=js GOARCH=wasm go list -deps "./cmd/$name" | grep -Ex 'text/template|html/template'; then
     echo "::error::cmd/$name imports a template engine; see the comment above this check"
     status=1
   fi

@@ -389,7 +389,7 @@ func (*GetAssistantAccessRequest) Descriptor() ([]byte, []int) {
 type GetAssistantAccessResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Available bool                   `protobuf:"varint,1,opt,name=available,proto3" json:"available,omitempty"`
-	// Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached".
+	// Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached", "edition".
 	Reason   string            `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
 	Provider AssistantProvider `protobuf:"varint,3,opt,name=provider,proto3,enum=mistgate.admin.v1.AssistantProvider" json:"provider,omitempty"`
 	Model    string            `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`

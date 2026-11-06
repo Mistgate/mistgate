@@ -152,7 +152,6 @@ func BuildJobs(c Config) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
-	k.assistantRetention = assistantRetentionFunc(k.st.AssistantRetention)
 	return k.panel(), nil
 }
 

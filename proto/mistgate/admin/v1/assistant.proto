@@ -111,7 +111,7 @@ message GetAssistantAccessRequest {}
 
 message GetAssistantAccessResponse {
   bool available = 1;
-  // Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached".
+  // Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached", "edition".
   string reason = 2;
   AssistantProvider provider = 3;
   string model = 4;

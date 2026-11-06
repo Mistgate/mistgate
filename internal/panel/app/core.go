@@ -424,6 +424,5 @@ func (k *core) panel() *Panel {
 	return &Panel{
 		Fleet: k.fl, Access: k.acc, Health: k.hl, Blocklist: k.bl, CountryProbe: k.cp, Cheburcheck: k.cc, Bsbord: k.bs, Update: k.upd, Warp: k.wsv, Telegram: k.tg, Store: k.st, Desired: k.desired,
 		provisionKick: k.c.ProvisionKick,
-		Assistant:     k.assistantRetention,
 	}
 }

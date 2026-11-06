@@ -1,3 +1,5 @@
+//go:build !js
+
 // Package mcp is the panel's MCP server for agents: the tools of the token profiles over
 // Streamable HTTP, and the stdio proxy that `mistgate mcp` runs.
 //

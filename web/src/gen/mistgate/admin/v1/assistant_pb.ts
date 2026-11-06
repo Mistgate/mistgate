@@ -56,7 +56,7 @@ export type GetAssistantAccessResponse = Message<"mistgate.admin.v1.GetAssistant
   available: boolean;
 
   /**
-   * Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached".
+   * Why not, when not available: "assistant_off", "not_allowed", "no_provider", "budget_reached", "edition".
    *
    * @generated from field: string reason = 2;
    */

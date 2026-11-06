@@ -1,4 +1,4 @@
-//go:build !noassistant
+//go:build !js
 
 package app
 
