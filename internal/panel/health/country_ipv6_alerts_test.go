@@ -39,6 +39,10 @@ func withoutIPv6(params map[string]string) map[string]string {
 // the family), evaluates the alerts and moves the clock past the interval.
 func (c *countryEnv) pair(node, mode4, mode6 string) {
 	c.t.Helper()
+	last6Before, err := c.st.LastCountryCheckAt(c.ctx, familyV6)
+	if err != nil {
+		c.t.Fatal(err)
+	}
 	c.src.set(node, mode4)
 	if !c.tickOnce() {
 		c.t.Fatal("no IPv4 round was due")
@@ -47,8 +51,12 @@ func (c *countryEnv) pair(node, mode4, mode6 string) {
 	if !c.tickOnce() {
 		c.t.Fatal("no IPv6 round was due")
 	}
-	if rounds := c.src.roundsSnapshot(); rounds[len(rounds)-1].Family != familyV6 {
-		c.t.Fatalf("the second round was of family %d", rounds[len(rounds)-1].Family)
+	last6After, err := c.st.LastCountryCheckAt(c.ctx, familyV6)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	if !last6After.After(last6Before) {
+		c.t.Fatalf("the second tick did not store an IPv6 round: before %v, after %v", last6Before, last6After)
 	}
 	c.evaluate()
 	c.clock.Advance(16 * time.Minute)
@@ -76,7 +84,7 @@ func TestCountryIPv6WordFollowsTheRow(t *testing.T) {
 		{"partial", row(verdictPartial), true, "partial"},
 		{"tcp cut", row(verdictTCPBlocked), true, "blocked"},
 		{"blocked", row(verdictBlocked), true, "blocked"},
-		{"unknown (no IPv6, broken, no probes)", row(verdictUnknown), true, "unknown"},
+		{"unknown (entry off, no IPv6, broken, no probes)", row(verdictUnknown), true, "unknown"},
 		{"a stale row says nothing", row(verdictOK), false, "unknown"},
 		{"no row", nil, true, "unknown"},
 	} {
@@ -101,6 +109,7 @@ func TestIPv4AlertCarriesTheIPv6WordWithoutANewNotification(t *testing.T) {
 	c := newIPv6Env(t)
 	c.onlineNode("se1", "203.0.113.30") // a second node over IPv6: a dark probe is partial only if it reaches another node
 	c.report("se1", true, res("ipv6", dOK, "", "ipv6", "yes", "connect", "ok", "addrs", "2001:db8::30/64", "src", "2001:db8::30"))
+	c.entry("se1", true)
 	seen := c.transitions()
 	const k = "country_blocked/de1/"
 

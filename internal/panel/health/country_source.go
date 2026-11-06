@@ -18,7 +18,8 @@ type CountryConfig struct {
 	Country string
 	// Interval between rounds, at least ten minutes.
 	Interval time.Duration
-	// IPv6: also measure the nodes with working IPv6 by their IPv6 address, in rounds of their own (CountryRound.Family 6).
+	// IPv6: also measure nodes with working IPv6 when their IPv6 entry is on or IPv4 is blocked (including TCP-only) or partial,
+	// in separate rounds (CountryRound.Family 6).
 	IPv6 bool
 }
 

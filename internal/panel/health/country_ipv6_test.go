@@ -66,9 +66,9 @@ func TestCountryPlanBudgetWithIPv6(t *testing.T) {
 	mk := func(withIPv6 int) []countryNode {
 		out := make([]countryNode, 6)
 		for i := range out {
-			out[i] = countryNode{ports: make([]uint16, 2)}
+			out[i] = countryNode{ports: make([]uint16, 2), ipv6Member: i < withIPv6}
 			if i < withIPv6 {
-				out[i].ipv6.state = ipv6OK
+				out[i].ipv6 = ipv6Facts{state: ipv6OK, src: "2001:db8::10"}
 			}
 		}
 		return out
@@ -100,6 +100,11 @@ func TestCountryPlanBudgetWithIPv6(t *testing.T) {
 	if got, want := countryCost(mk(1), 2), (19+1+3)*2; got != want {
 		t.Errorf("cost with one IPv6 node = %d, want %d", got, want)
 	}
+	oneMember := mk(2)
+	oneMember[1].ipv6Member = false
+	if k, every, perHour := countryPlan(oneMember, 15*time.Minute, 250); k != 2 || every != 15*time.Minute || perHour != 184 {
+		t.Errorf("one of two IPv6-capable nodes participates: probes %d every %v, %d an hour; want 2, 15m, 184", k, every, perHour)
+	}
 }
 
 // ipv6Env is a country environment with the IPv6 checks on: de1 has working IPv6, nl1 has an address that does not work at the
@@ -115,6 +120,80 @@ func newIPv6Env(t *testing.T) *countryEnv {
 	c.report("nl1", true, res("ipv6", dWarn, "", "ipv6", "yes", "connect", "failed", "suggest", "client_ipv6_off", "src", "2001:db8::20"))
 	c.report("fi1", true, res("ipv6", dOK, "", "ipv6", "no"))
 	return c
+}
+
+func TestCountryIPv6RoundMembership(t *testing.T) {
+	tests := []struct {
+		name           string
+		entry          bool
+		verdict        string
+		previous       string
+		verdictCountry string
+		measured       bool
+	}{
+		{name: "entry on with open IPv4", entry: true, verdict: verdictOK, measured: true},
+		{name: "entry off with open IPv4", verdict: verdictOK},
+		{name: "entry off with blocked IPv4", verdict: verdictBlocked, measured: true},
+		{name: "entry off with TCP-blocked IPv4", verdict: verdictTCPBlocked, measured: true},
+		{name: "entry off with partial IPv4", verdict: verdictPartial, measured: true},
+		{name: "entry off with unknown IPv4", verdict: verdictUnknown},
+		{name: "entry off with no IPv4 verdict"},
+		{name: "entry off with blocked IPv4 from another country", verdict: verdictBlocked, verdictCountry: "TR"},
+		{name: "newest open verdict overrides older blocked verdict", verdict: verdictOK, previous: verdictBlocked},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newIPv6Env(t)
+			c.entry("de1", tc.entry)
+			country := tc.verdictCountry
+			if country == "" {
+				country = c.cfg.Country
+			}
+			var rows []store.CountryCheck
+			if tc.previous != "" {
+				rows = append(rows, store.CountryCheck{
+					NodeID: "de1", Country: c.cfg.Country, Family: familyV4, Verdict: tc.previous, At: c.clock.Now().Add(-2 * time.Minute),
+				})
+			}
+			if tc.verdict != "" {
+				rows = append(rows, store.CountryCheck{
+					NodeID: "de1", Country: country, Family: familyV4, Verdict: tc.verdict, At: c.clock.Now().Add(-time.Minute),
+				})
+			} else {
+				// Keep the IPv4 scheduler interval current without giving de1 an IPv4 verdict.
+				rows = append(rows, store.CountryCheck{
+					NodeID: "nl1", Country: c.cfg.Country, Family: familyV4, Verdict: verdictOK, At: c.clock.Now().Add(-time.Minute),
+				})
+			}
+			if err := c.st.InsertCountryChecks(c.ctx, rows); err != nil {
+				t.Fatal(err)
+			}
+			if !c.tickOnce() {
+				t.Fatal("IPv6 round did not run")
+			}
+
+			got := c.rows(familyV6, "de1")
+			if len(got) != 1 {
+				t.Fatalf("IPv6 rows = %+v, want one", got)
+			}
+			if tc.measured {
+				if got[0].Verdict == verdictUnknown {
+					t.Fatalf("de1 was not measured: %+v", got[0])
+				}
+				var target bool
+				for _, r := range c.src.roundsSnapshot() {
+					if r.Family == familyV6 && len(r.Targets) == 1 && r.Targets[0].Key == "de1" {
+						target = true
+					}
+				}
+				if !target {
+					t.Fatalf("no IPv6 measurement targeted de1: %+v", c.src.roundsSnapshot())
+				}
+			} else if got[0].Verdict != verdictUnknown || detailOf(t, got[0]).Reason != "entry_off" {
+				t.Fatalf("de1 IPv6 row = %+v, want unknown entry_off", got[0])
+			}
+		})
+	}
 }
 
 // tickOnce is one scheduler poll without moving the clock.
@@ -135,6 +214,7 @@ func (c *countryEnv) rows(family int, node string) []store.CountryCheck {
 
 func TestCountryTickAlternatesIPv4AndIPv6Rounds(t *testing.T) {
 	c := newIPv6Env(t)
+	c.entry("de1", true)
 	if !c.tickOnce() {
 		t.Fatal("no first round")
 	}
@@ -239,6 +319,7 @@ func TestCountryIPv6SwitchOffMeansNoIPv6Rounds(t *testing.T) {
 
 func TestCountryIPv6RoundWithoutProbesAndOtherFailures(t *testing.T) {
 	c := newIPv6Env(t)
+	c.entry("de1", true)
 	if !c.tickOnce() {
 		t.Fatal("no IPv4 round")
 	}
@@ -317,6 +398,7 @@ func TestIPv6RoundsLeaveTheIPv4OutcomeAlone(t *testing.T) {
 
 func TestCountryChecksCarryTheIPv6ResultNested(t *testing.T) {
 	c := newIPv6Env(t)
+	c.entry("de1", true)
 	byNode := func() map[string]*adminv1.CountryCheck {
 		t.Helper()
 		got, err := c.s.countryChecks(c.ctx, "")

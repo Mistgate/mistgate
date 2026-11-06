@@ -594,6 +594,20 @@ describe("IPv6 on the Reachability page", () => {
     }
   });
 
+  it("a node no longer measured over IPv6 (its entry off, IPv4 seen) gets the quiet line, not last week's red IPv6 lane", async () => {
+    getChecks.mockResolvedValue({
+      nowUnix: NOW, intervalS: 300, columns: [], rows: [],
+      countryChecks: countryChecks.map((c) => ({ ...c, ipv6: c.nodeId === "nod_se1" ? v6("nod_se1", CountryVerdict.UNKNOWN, "entry_off") : by[c.nodeId] })),
+    });
+    getHistory.mockImplementation((req: { family?: number }) =>
+      Promise.resolve(req.family === 6 ? { ...week6, nodes: [{ nodeId: "nod_se1", lanes: [lane("globalping", pts([NOW - 50 * H, CountryVerdict.BLOCKED]))] }] } : history(["globalping", "lists", "tspu"])),
+    );
+    await mount();
+    expect(none("se1")?.lastElementChild?.textContent).toBe("The IPv6 entry is off and IPv4 is seen from here: IPv6 is not measured");
+    expect(pills("se1").map((p) => p.textContent?.slice(0, 4))).toEqual(["IPv4"]);
+    expect(row("se1").querySelector("[data-testid=line-globalping6]")).toBeNull();
+  });
+
   it("counts the nodes cut over IPv4 that IPv6 still reaches, under the IPv4 tally", async () => {
     await mount();
     expect(document.querySelector("[data-testid=ipv6-helps]")?.textContent).toContain("Cut over IPv4, open over IPv6: 1");

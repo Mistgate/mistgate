@@ -41,6 +41,8 @@ export const history6Query = queryOptions({
  * when it has none (one quiet line why), null while Globalping's IPv6 checks are off (no CountryCheck.ipv6).
  */
 export function ipv6State(v6: CountryCheck | undefined, lane: Lane | undefined): "data" | "reason" | null {
+  // the node is no longer measured over IPv6 (its entry is off and IPv4 is seen): the reason, not last week's lane
+  if (v6?.reason === "entry_off") return "reason";
   const seen = (v6 && v6.verdict !== CountryVerdict.UNKNOWN) || lane?.points.some((p) => p.verdict !== CountryVerdict.UNKNOWN);
   return seen ? "data" : v6 ? "reason" : null;
 }

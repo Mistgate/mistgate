@@ -47,7 +47,7 @@ const (
 	countryRoundTime   = 60 * time.Second // the whole round, controls and polling included
 	countryHoldSetting = "health.country_check.hold_until"
 	familyV4           = 4 // the address families of country-check rows. IPv6 rows are measured by Globalping alone; they are read by the
-	familyV6           = 6 // nested CountryCheck.ipv6, the IPv6 history and the IPv6 alert of a node with the IPv6 entry
+	familyV6           = 6 // nested CountryCheck.ipv6 and the IPv6 history; an IPv6 alert exists only for a node with the IPv6 entry
 )
 
 // countryControls is the site every probe must reach, per country: big, domestic and never blocked there. Other countries
@@ -77,20 +77,21 @@ func countryControl6(country string) (string, uint16) {
 
 // countryNode is an online node that takes part in a round.
 type countryNode struct {
-	node      store.NodeRow
-	ports     []uint16
-	preferred uint16 // the TLS endpoint a paid source tests: see countryPreferredPort
-	ipv6      ipv6Facts
+	node       store.NodeRow
+	ports      []uint16
+	preferred  uint16 // the TLS endpoint a paid source tests: see countryPreferredPort
+	ipv6       ipv6Facts
+	ipv6Member bool // the entry is on, or the newest IPv4 verdict in this country says IPv6 could help
 }
 
 // countryCost is the tests of the rounds of one interval with k probes: per family a control, then per node one ICMP and one
-// per TCP port, each run by every probe. The IPv4 round has every node; the IPv6 round only the nodes whose IPv6 works, and
-// only exists when there is one.
+// per TCP port, each run by every probe. The IPv4 round has every node; the IPv6 round has only its members with a usable IPv6
+// address, and only exists when there is one.
 func countryCost(nodes []countryNode, k int) int {
 	n, n6 := 1, 0
 	for _, c := range nodes {
 		n += 1 + len(c.ports)
-		if c.ipv6.state == ipv6OK {
+		if _, state := nodeIPv6(c); c.ipv6Member && state == ipv6OK {
 			n6 += 1 + len(c.ports)
 		}
 	}
@@ -101,8 +102,8 @@ func countryCost(nodes []countryNode, k int) int {
 }
 
 // countryPlan chooses the probes per measurement and the interval so that the rounds of an hour (one IPv4 round and, while the
-// IPv6 checks are on, one IPv6 round per interval) stay within 80 % of the source's limit: 3 probes if that fits, else 2, else
-// 2 and a longer interval. limit 0 = unlimited.
+// IPv6 checks are on and have members, one IPv6 round per interval) stay within 80 % of the source's limit: 3 probes if that
+// fits, else 2, else 2 and a longer interval. limit 0 = unlimited.
 func countryPlan(nodes []countryNode, interval time.Duration, limit int) (probes int, effective time.Duration, perHour int) {
 	hourly := func(k int, every time.Duration) int {
 		return int((int64(countryCost(nodes, k))*int64(time.Hour) + int64(every) - 1) / int64(every))
@@ -116,6 +117,11 @@ func countryPlan(nodes []countryNode, interval time.Duration, limit int) (probes
 	every := time.Duration(int64(countryCost(nodes, countryMinProbes)) * int64(time.Hour) / int64(max(budget, 1)))
 	every = max(min(every.Truncate(time.Minute)+time.Minute, countryMaxInterval), interval)
 	return countryMinProbes, every, hourly(countryMinProbes, every)
+}
+
+// countryIPv4NeedsIPv6 reports the IPv4 verdicts where an IPv6 route could restore access to the node's TCP services.
+func countryIPv4NeedsIPv6(verdict string) bool {
+	return verdict == verdictPartial || countryBad(verdict)
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -423,6 +429,35 @@ func (s *Service) countryIPv6Facts(ctx context.Context, nodes []countryNode) {
 	}
 }
 
+// countryIPv6Members sets which nodes may be measured over IPv6. An IPv6 entry is always measured; without one, the latest
+// IPv4 verdict must be from this country and blocked (including TCP-only) or partial. A failed read leaves only entries as
+// members, so unknown IPv4 state never adds probes or Globalping cost.
+func (s *Service) countryIPv6Members(ctx context.Context, country string, nodes []countryNode) {
+	ids := make([]string, len(nodes))
+	for i := range nodes {
+		ids[i] = nodes[i].node.ID
+	}
+	latest, err := s.st.RecentCountryChecks(ctx, familyV4, 1, ids...)
+	if err != nil {
+		s.log.Warn("health: country check IPv6 membership", "err", err)
+		latest = nil
+	}
+	verdicts := make(map[string]store.CountryCheck, len(latest))
+	for _, r := range latest {
+		verdicts[r.NodeID] = r
+	}
+	for i := range nodes {
+		n := &nodes[i]
+		n.ipv6Member = ipv6Entry(n.node)
+		if n.ipv6Member {
+			continue
+		}
+		if r, ok := verdicts[n.node.ID]; ok && r.Country == country {
+			n.ipv6Member = countryIPv4NeedsIPv6(r.Verdict)
+		}
+	}
+}
+
 // nodeIPv6 is the IPv6 address a node is measured on and its state. Only a node whose doctor says that outbound IPv6 works is
 // measured (state ok): an address that the host has but the hoster does not route would read as "blocked". The address is the
 // IPv6 entry's when it is on (it is the address people use), else the node's own when its Address is an IPv6 literal, else the
@@ -493,6 +528,7 @@ func (s *Service) CountryTick(ctx context.Context) bool {
 	}
 	if cc.IPv6 {
 		s.countryIPv6Facts(ctx, nodes)
+		s.countryIPv6Members(ctx, cc.Country, nodes)
 	}
 	probes, every, _ := countryPlan(nodes, cc.Interval, src.HourlyLimit())
 	s.countryNoteStretch(cc.Interval, every)
@@ -566,6 +602,9 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 			var state string
 			if ip, state = nodeIPv6(n); state != ipv6OK {
 				reason = ipv6Reasons[state]
+			} else if !n.ipv6Member {
+				ip = ""
+				reason = "entry_off"
 			}
 		} else if addr, ok := s.countryAddress(rctx, n.node); ok {
 			ip = addr

@@ -153,6 +153,7 @@ export const en = {
   "cr.reason.no_tcp_port": "the node has no TCP port to test",
   // IPv6 (CountryCheck.ipv6): why a node has no IPv6 verdict
   "cr.reason.no_ipv6": "the server has no IPv6",
+  "cr.reason.entry_off": "the IPv6 entry is off and IPv4 is seen from here: IPv6 is not measured",
   "cr.reason.ipv6_broken": "the server has an IPv6 address, but IPv6 does not work at the hoster",
   "cr.reason.agent_old": "the node agent is too old to report IPv6: update it",
   "cr.reason.not_checked": "not checked over IPv6 yet",
@@ -596,6 +597,7 @@ export const ru: Record<keyof typeof en, string> = {
   "cr.reason.no_tcp_port": "у ноды нет TCP-порта для проверки",
   // IPv6 (CountryCheck.ipv6): why a node has no IPv6 verdict
   "cr.reason.no_ipv6": "на сервере нет IPv6",
+  "cr.reason.entry_off": "вход по IPv6 выключен, а IPv4 отсюда виден: IPv6 не меряется",
   "cr.reason.ipv6_broken": "адрес IPv6 есть, но у хостера IPv6 не работает",
   "cr.reason.agent_old": "агент ноды слишком старый для IPv6: обнови его",
   "cr.reason.not_checked": "по IPv6 ещё не проверялась",
@@ -1034,6 +1036,7 @@ export const zh: Record<keyof typeof en, string> = {
   "cr.reason.no_tcp_port": "节点没有可检测的 TCP 端口",
   // IPv6 (CountryCheck.ipv6): why a node has no IPv6 verdict
   "cr.reason.no_ipv6": "服务器没有 IPv6",
+  "cr.reason.entry_off": "IPv6 入口已关闭，且从这里可以访问 IPv4：不检测 IPv6",
   "cr.reason.ipv6_broken": "服务器有 IPv6 地址，但主机商那边的 IPv6 不通",
   "cr.reason.agent_old": "节点代理版本过旧，无法上报 IPv6，请更新",
   "cr.reason.not_checked": "尚未通过 IPv6 检测",
@@ -1470,6 +1473,7 @@ export const fa: Record<keyof typeof en, string> = {
   "cr.reason.no_probe": "هیچ نقطهٔ سنجش سایت آنلاین نبود",
   "cr.reason.no_tcp_port": "نود پورت TCP برای آزمایش ندارد",
   "cr.reason.no_ipv6": "سرور IPv6 ندارد",
+  "cr.reason.entry_off": "ورودی IPv6 خاموش است و IPv4 از اینجا دیده می‌شود: IPv6 اندازه‌گیری نمی‌شود",
   "cr.reason.ipv6_broken": "سرور آدرس IPv6 دارد، اما IPv6 در سرویس‌دهنده کار نمی‌کند",
   "cr.reason.agent_old": "ایجنت نود برای گزارش IPv6 خیلی قدیمی است: به‌روزش کن",
   "cr.reason.not_checked": "هنوز با IPv6 بررسی نشده",
@@ -1901,6 +1905,7 @@ export const tr: Record<keyof typeof en, string> = {
   "cr.reason.no_probe": "sitenin çevrimiçi ölçüm noktası yoktu",
   "cr.reason.no_tcp_port": "düğümde sınanacak TCP portu yok",
   "cr.reason.no_ipv6": "sunucuda IPv6 yok",
+  "cr.reason.entry_off": "IPv6 girişi kapalı ve IPv4 buradan görünüyor: IPv6 ölçülmüyor",
   "cr.reason.ipv6_broken": "sunucunun IPv6 adresi var ama sağlayıcıda IPv6 çalışmıyor",
   "cr.reason.agent_old": "düğüm ajanı IPv6 bildiremeyecek kadar eski: güncelle",
   "cr.reason.not_checked": "IPv6 üzerinden henüz kontrol edilmedi",

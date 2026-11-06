@@ -441,8 +441,9 @@ message CountryCheck {
   // The same node over IPv6, measured by Globalping from the same country (every other field above is IPv4 and does not change
   // with it). Present only while the IPv6 checks of Globalping are on (GlobalpingSettings.ipv6). A node that is not measured
   // over IPv6 has verdict UNKNOWN and a reason: "no_ipv6" (no global IPv6 address), "ipv6_broken" (it has an address, but
-  // outbound IPv6 does not work at the hoster), "agent_old" (the node agent predates the IPv6 facts), "not_checked" (no report
-  // or no round yet), "no_probes" (Globalping has no IPv6 probes in the country), plus the failures of any round
+  // outbound IPv6 does not work at the hoster), "agent_old" (the node agent predates the IPv6 facts), "entry_off" (the IPv6
+  // entry is off and the node's IPv4 is seen from the country, so IPv6 is not measured), "not_checked" (no report or no round
+  // yet), "no_probes" (Globalping has no IPv6 probes in the country), plus the failures of any round
   // ("rate_limited", "source_error", "timeout", "too_few_probes"). Never nested further.
   CountryCheck ipv6 = 23;
 }
