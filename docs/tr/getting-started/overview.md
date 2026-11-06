@@ -29,7 +29,7 @@ Mistgate, kendi sunucularınızda yönettiğiniz küçük bir VPN filosu için k
 
 ## Kimin için
 
-Mistgate, kendisi, ailesi, arkadaşları ya da küçük bir topluluk için birkaç VPN sunucusu işleten bir kişi ya da küçük bir ekip içindir. Linux, SSH, systemd ve DNS kayıtlarıyla rahat olmalısınız. Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir (Rusya'daki düğümler için Yandex DNS, Teşhis'in kontrol alan adları, split DNS hazır ayarları); hepsi birer ayardır.
+Mistgate, kendisi, ailesi, arkadaşları ya da küçük bir topluluk için birkaç VPN sunucusu işleten bir kişi ya da küçük bir ekip içindir. Linux, SSH, systemd ve DNS kayıtlarıyla rahat olmalısınız. Bazı varsayılanlar Rusya ve Çin'deki kullanıcılar düşünülerek seçilmiştir (Rusya'daki düğümler için Yandex DNS, Çin'deki düğümler için AliDNS ve DNSPod, Teşhis'in ülkeye özel kontrol alan adları, split DNS hazır ayarları); hepsi birer ayardır.
 
 ## Kavramlar
 
