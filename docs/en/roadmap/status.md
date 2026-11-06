@@ -3,21 +3,22 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.78`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.79`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.78
+  meta: v0.1.0 – v0.1.79
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.78
+      release: v0.1.79
       current: true
       points:
-        - "**The owner's notes in the Nodes list.** A node's notes show under its name in the table and on the mobile cards, the first two lines with the full text on hover; user pages and subscriptions never carry them. See [Nodes](../guide/nodes.md#the-nodes-list)."
-        - "**Nodes in mainland China.** China is in the country list, and on a node there the doctor checks `www.baidu.com` and offers AliDNS + DNSPod, as it checks `gosuslugi.ru` and offers Yandex DNS on a node in Russia. See [Health](../operations/health.md)."
+        - "**A node only through an entry or a CDN.** On a node's **Ways in** tab, **In subscriptions** keeps the server at the node's own address out of subscriptions while it keeps running for relays and the CDN, so people reach, say, a node abroad only through an entry in Russia; the panel warns first when nobody would have a way left. See [Nodes](../guide/nodes.md#direct)."
+        - "**Unknown keys on VLESS.** A connection with a key the node does not know (a removed device, an old subscription) is counted under the profile and named in the node's log, so an app with a stale key shows even while the panel's checks pass. Needs the agent v0.1.79. See [Troubleshooting](../operations/troubleshooting.md)."
+        - "**IPv6 measured only where it helps.** A node whose IPv6 entry is off is measured over IPv6 only while its IPv4 is blocked from the country, when an IPv6 entry could be the way around; otherwise Reachability says so in one quiet line. See [Reachability](../operations/reachability.md#ipv6)."
     - title: Profiles
       section: profiles
       points:
@@ -82,7 +83,7 @@ Mistgate is in **beta**; the current release is `v0.1.78`. It runs in production
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.78
+  meta: v0.1.34 – v0.1.79
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
