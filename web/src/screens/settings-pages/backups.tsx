@@ -25,7 +25,9 @@ import { plain, type Plain } from "@/lib/plain";
 import { meQuery } from "@/lib/session";
 import { downloadBackup } from "@/lib/backup-download";
 import { PassphraseForm } from "../updates/update-dialog";
+import { backupTime, formatBytes } from "./backup-format";
 import { CopyRow } from "./domains";
+import { RestoreSection } from "./restore";
 
 type Stored = Plain<BackupSettings>;
 type BackupItem = Plain<Backup>;
@@ -81,23 +83,6 @@ function backupErrorKey(error: unknown): MessageKey | null {
   return codeKeys[ConnectError.from(error).rawMessage] ?? null;
 }
 
-function formatBytes(size: number, locale: string) {
-  if (!Number.isFinite(size) || size < 0) return "—";
-  if (size < 1024) return `${size} B`;
-  const units = ["KiB", "MiB", "GiB", "TiB"];
-  let value = size;
-  let unit = -1;
-  do {
-    value /= 1024;
-    unit++;
-  } while (value >= 1024 && unit < units.length - 1);
-  return `${value.toLocaleString(locale, { maximumFractionDigits: 1 })} ${units[unit]}`;
-}
-
-function backupTime(unix: number, locale: string) {
-  return unix > 0 ? new Date(unix * 1000).toLocaleString(locale) : "—";
-}
-
 /** Settings -> Backups: owner-managed encrypted R2 backups and offline restore instructions. */
 export function BackupsPage() {
   const t = useT();
@@ -146,6 +131,8 @@ function BackupsForm({ stored }: { stored: Stored }) {
   const [draft, setDraft] = useState(() => draftFrom(stored));
   const [secretVisible, setSecretVisible] = useState(false);
   const configured = hasConfiguration(stored);
+  // an R2 backup picked in the history for the restore window
+  const [restorePick, setRestorePick] = useState<string | undefined>();
   const dirty = draft.accountId !== stored.accountId || draft.jurisdiction !== (stored.jurisdiction || "default") ||
     draft.bucket !== stored.bucket || draft.accessKeyId !== stored.accessKeyId || draft.ageRecipient !== stored.ageRecipient ||
     draft.enabled !== stored.enabled || draft.intervalHours !== (stored.intervalHours || 24) ||
@@ -352,7 +339,7 @@ function BackupsForm({ stored }: { stored: Stored }) {
         {configured && backupsQuery.data && backupsQuery.data.length === 0 && <p className="text-[13px] text-muted">{t("set.backups.empty")}</p>}
         {configured && backupsQuery.data && backupsQuery.data.length > 0 && (
           <div className="flex flex-col divide-y divide-line">
-            {backupsQuery.data.slice((historyPage - 1) * historySize, historyPage * historySize).map((item) => <BackupRow key={item.key} item={item} />)}
+            {backupsQuery.data.slice((historyPage - 1) * historySize, historyPage * historySize).map((item) => <BackupRow key={item.key} item={item} onRestore={() => setRestorePick(item.key)} />)}
           </div>
         )}
         {configured && backupsQuery.data && (
@@ -360,26 +347,24 @@ function BackupsForm({ stored }: { stored: Stored }) {
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4">
-        <SectionLabel as="h3" icon="shield" tone="mint">{t("set.backups.restore")}</SectionLabel>
-        <p className="text-[13px] leading-normal text-pretty text-muted">{t("set.backups.restoreHint")}</p>
-        <div className="flex flex-col gap-2">
-          <CopyRow value={t("set.backups.keygenCommand", { path: identityFile })} />
-          <CopyRow value={t("set.backups.restoreCommand", { identity: identityFile, archive: archiveFile, dataDir })} />
-        </div>
-        <p className="text-xs leading-normal text-pretty text-muted">{t("set.backups.externalCredential")}</p>
-      </section>
+      <RestoreSection r2={configured ? (backupsQuery.data ?? []) : []} pick={restorePick} onPicked={() => setRestorePick(undefined)} identityFile={identityFile} archiveFile={archiveFile} dataDir={dataDir} />
     </div>
   );
 }
 
-function BackupRow({ item }: { item: BackupItem }) {
+function BackupRow({ item, onRestore }: { item: BackupItem; onRestore: () => void }) {
+  const t = useT();
   const { locale } = useFmt();
   return (
     <div className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
         <span>{backupTime(item.createdUnix, locale)}</span>
-        <span>{formatBytes(item.sizeBytes, locale)}</span>
+        <span className="flex items-center gap-3">
+          {formatBytes(item.sizeBytes, locale)}
+          <Button type="button" size="xs" variant="ghost" onClick={onRestore}>
+            {t("set.backups.rs.do")}
+          </Button>
+        </span>
       </div>
       <CopyRow value={item.key} />
     </div>

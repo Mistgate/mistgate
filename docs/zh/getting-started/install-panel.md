@@ -15,7 +15,7 @@ description: 下载或构建 Mistgate，使用 mistgate setup 准备面板，通
 curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
 ```
 
-默认情况下，安装器会为 URL 中的主机名申请 Let’s Encrypt 证书。它会在更改前询问；非交互式运行时添加 `--yes`。使用 `--dry-run` 下载并验证发布版本，但不更改主机；使用 `--version vX.Y.Z` 安装指定版本，或使用 `--channel testing`、`--channel dev` 安装更早[发布渠道](../operations/updates.md#发布渠道)的最新版本，此后面板会跟随该渠道。`--admin-host`、`--admin-listen`、`--acme-domain` 和 `--data-dir` 用于选择下文介绍的 setup 和服务选项。
+默认情况下，安装器会为 URL 中的主机名申请 Let’s Encrypt 证书。它会在更改前询问；非交互式运行时添加 `--yes`。使用 `--dry-run` 下载并验证发布版本，但不更改主机；使用 `--version vX.Y.Z` 安装指定版本，或使用 `--channel testing`、`--channel dev` 安装更早[发布渠道](../operations/updates.md#发布渠道)的最新版本，此后面板会跟随该渠道。`--restore FILE` 配合 `--identity-file KEY` 或 `--passphrase-file FILE` 会恢复备份，而不是设置新面板：参见[备份](../operations/backups.md#在新面板上恢复)。`--admin-host`、`--admin-listen`、`--acme-domain` 和 `--data-dir` 用于选择下文介绍的 setup 和服务选项。
 
 安装完成后，在浏览器中打开一次性设置链接并创建所有者账户。链接 30 分钟后过期。然后通过**节点 → 添加节点**添加节点。
 

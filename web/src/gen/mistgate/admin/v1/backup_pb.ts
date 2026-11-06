@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/backup.proto.
  */
 export const file_mistgate_admin_v1_backup: GenFile = /*@__PURE__*/
-  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS9iYWNrdXAucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIhoKGEdldEJhY2t1cFNldHRpbmdzUmVxdWVzdCKSAgoOQmFja3VwU2V0dGluZ3MSEgoKYWNjb3VudF9pZBgBIAEoCRIUCgxqdXJpc2RpY3Rpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhUKDWFjY2Vzc19rZXlfaWQYBCABKAkSEgoKaGFzX3NlY3JldBgFIAEoCBIVCg1hZ2VfcmVjaXBpZW50GAYgASgJEg8KB2VuYWJsZWQYByABKAgSFgoOaW50ZXJ2YWxfaG91cnMYCCABKAUSFgoOcmV0ZW50aW9uX2RheXMYCSABKAUSGQoRbGFzdF9zdWNjZXNzX3VuaXgYCiABKAMSFwoPbGFzdF9lcnJvcl9jb2RlGAsgASgJEg8KB3J1bm5pbmcYDCABKAgiUAoZR2V0QmFja3VwU2V0dGluZ3NSZXNwb25zZRIzCghzZXR0aW5ncxgBIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLkJhY2t1cFNldHRpbmdzIvcBChtVcGRhdGVCYWNrdXBTZXR0aW5nc1JlcXVlc3QSEgoKYWNjb3VudF9pZBgBIAEoCRIUCgxqdXJpc2RpY3Rpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhUKDWFjY2Vzc19rZXlfaWQYBCABKAkSGQoRc2VjcmV0X2FjY2Vzc19rZXkYBSABKAkSFQoNYWdlX3JlY2lwaWVudBgGIAEoCRIPCgdlbmFibGVkGAcgASgIEhYKDmludGVydmFsX2hvdXJzGAggASgFEhYKDnJldGVudGlvbl9kYXlzGAkgASgFEhQKDGNsZWFyX3NlY3JldBgKIAEoCCJTChxVcGRhdGVCYWNrdXBTZXR0aW5nc1Jlc3BvbnNlEjMKCHNldHRpbmdzGAEgASgLMiEubWlzdGdhdGUuYWRtaW4udjEuQmFja3VwU2V0dGluZ3MiGgoYVGVzdEJhY2t1cFN0b3JhZ2VSZXF1ZXN0IicKGVRlc3RCYWNrdXBTdG9yYWdlUmVzcG9uc2USCgoCb2sYASABKAgiFQoTQ3JlYXRlQmFja3VwUmVxdWVzdCI4ChRDcmVhdGVCYWNrdXBSZXNwb25zZUoECAEQAkoECAIQA1IGYmFja3VwUgx3YXJuaW5nX2NvZGUiFAoSTGlzdEJhY2t1cHNSZXF1ZXN0IkEKE0xpc3RCYWNrdXBzUmVzcG9uc2USKgoHYmFja3VwcxgBIAMoCzIZLm1pc3RnYXRlLmFkbWluLnYxLkJhY2t1cCI/CgZCYWNrdXASCwoDa2V5GAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMSFAoMY3JlYXRlZF91bml4GAMgASgDMqcECg1CYWNrdXBTZXJ2aWNlEm4KEUdldEJhY2t1cFNldHRpbmdzEisubWlzdGdhdGUuYWRtaW4udjEuR2V0QmFja3VwU2V0dGluZ3NSZXF1ZXN0GiwubWlzdGdhdGUuYWRtaW4udjEuR2V0QmFja3VwU2V0dGluZ3NSZXNwb25zZRJ3ChRVcGRhdGVCYWNrdXBTZXR0aW5ncxIuLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUJhY2t1cFNldHRpbmdzUmVxdWVzdBovLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUJhY2t1cFNldHRpbmdzUmVzcG9uc2USbgoRVGVzdEJhY2t1cFN0b3JhZ2USKy5taXN0Z2F0ZS5hZG1pbi52MS5UZXN0QmFja3VwU3RvcmFnZVJlcXVlc3QaLC5taXN0Z2F0ZS5hZG1pbi52MS5UZXN0QmFja3VwU3RvcmFnZVJlc3BvbnNlEl8KDENyZWF0ZUJhY2t1cBImLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUJhY2t1cFJlcXVlc3QaJy5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVCYWNrdXBSZXNwb25zZRJcCgtMaXN0QmFja3VwcxIlLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RCYWNrdXBzUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RCYWNrdXBzUmVzcG9uc2VCxgEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUILQmFja3VwUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
+  fileDesc("Ch5taXN0Z2F0ZS9hZG1pbi92MS9iYWNrdXAucHJvdG8SEW1pc3RnYXRlLmFkbWluLnYxIhoKGEdldEJhY2t1cFNldHRpbmdzUmVxdWVzdCKSAgoOQmFja3VwU2V0dGluZ3MSEgoKYWNjb3VudF9pZBgBIAEoCRIUCgxqdXJpc2RpY3Rpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhUKDWFjY2Vzc19rZXlfaWQYBCABKAkSEgoKaGFzX3NlY3JldBgFIAEoCBIVCg1hZ2VfcmVjaXBpZW50GAYgASgJEg8KB2VuYWJsZWQYByABKAgSFgoOaW50ZXJ2YWxfaG91cnMYCCABKAUSFgoOcmV0ZW50aW9uX2RheXMYCSABKAUSGQoRbGFzdF9zdWNjZXNzX3VuaXgYCiABKAMSFwoPbGFzdF9lcnJvcl9jb2RlGAsgASgJEg8KB3J1bm5pbmcYDCABKAgiUAoZR2V0QmFja3VwU2V0dGluZ3NSZXNwb25zZRIzCghzZXR0aW5ncxgBIAEoCzIhLm1pc3RnYXRlLmFkbWluLnYxLkJhY2t1cFNldHRpbmdzIvcBChtVcGRhdGVCYWNrdXBTZXR0aW5nc1JlcXVlc3QSEgoKYWNjb3VudF9pZBgBIAEoCRIUCgxqdXJpc2RpY3Rpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhUKDWFjY2Vzc19rZXlfaWQYBCABKAkSGQoRc2VjcmV0X2FjY2Vzc19rZXkYBSABKAkSFQoNYWdlX3JlY2lwaWVudBgGIAEoCRIPCgdlbmFibGVkGAcgASgIEhYKDmludGVydmFsX2hvdXJzGAggASgFEhYKDnJldGVudGlvbl9kYXlzGAkgASgFEhQKDGNsZWFyX3NlY3JldBgKIAEoCCJTChxVcGRhdGVCYWNrdXBTZXR0aW5nc1Jlc3BvbnNlEjMKCHNldHRpbmdzGAEgASgLMiEubWlzdGdhdGUuYWRtaW4udjEuQmFja3VwU2V0dGluZ3MiGgoYVGVzdEJhY2t1cFN0b3JhZ2VSZXF1ZXN0IicKGVRlc3RCYWNrdXBTdG9yYWdlUmVzcG9uc2USCgoCb2sYASABKAgiFQoTQ3JlYXRlQmFja3VwUmVxdWVzdCI4ChRDcmVhdGVCYWNrdXBSZXNwb25zZUoECAEQAkoECAIQA1IGYmFja3VwUgx3YXJuaW5nX2NvZGUiFAoSTGlzdEJhY2t1cHNSZXF1ZXN0IkEKE0xpc3RCYWNrdXBzUmVzcG9uc2USKgoHYmFja3VwcxgBIAMoCzIZLm1pc3RnYXRlLmFkbWluLnYxLkJhY2t1cCI/CgZCYWNrdXASCwoDa2V5GAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMSFAoMY3JlYXRlZF91bml4GAMgASgDImwKFVByZXBhcmVSZXN0b3JlUmVxdWVzdBIRCgl1cGxvYWRfaWQYASABKAkSFQoNcjJfb2JqZWN0X2tleRgCIAEoCRIVCg1pZGVudGl0eV9maWxlGAMgASgMEhIKCnBhc3NwaHJhc2UYBCABKAkiYAoWUHJlcGFyZVJlc3RvcmVSZXNwb25zZRISCgpyZXN0b3JlX2lkGAEgASgJEjIKB3N1bW1hcnkYAiABKAsyIS5taXN0Z2F0ZS5hZG1pbi52MS5SZXN0b3JlU3VtbWFyeSLgAQoOUmVzdG9yZVN1bW1hcnkSEgoKcGFuZWxfbmFtZRgBIAEoCRIXCg9tYWRlX2J5X3ZlcnNpb24YAiABKAkSFAoMY3JlYXRlZF91bml4GAMgASgDEhQKDGJhY2t1cF9ub2RlcxgEIAEoAxIUCgxiYWNrdXBfdXNlcnMYBSABKAMSFwoPYmFja3VwX3Byb2ZpbGVzGAYgASgDEhUKDWN1cnJlbnRfbm9kZXMYByABKAMSFQoNY3VycmVudF91c2VycxgIIAEoAxIYChBjdXJyZW50X3Byb2ZpbGVzGAkgASgDIkUKFUNvbmZpcm1SZXN0b3JlUmVxdWVzdBISCgpyZXN0b3JlX2lkGAEgASgJEhgKEHR5cGVkX3BhbmVsX25hbWUYAiABKAkiGAoWQ29uZmlybVJlc3RvcmVSZXNwb25zZSIVChNMaXN0S2VwdERhdGFSZXF1ZXN0IkgKFExpc3RLZXB0RGF0YVJlc3BvbnNlEjAKC2RpcmVjdG9yaWVzGAEgAygLMhsubWlzdGdhdGUuYWRtaW4udjEuS2VwdERhdGEiQwoIS2VwdERhdGESDAoEbmFtZRgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDEhUKDW1vZGlmaWVkX3VuaXgYAyABKAMiJQoVRGVsZXRlS2VwdERhdGFSZXF1ZXN0EgwKBG5hbWUYASABKAkiGAoWRGVsZXRlS2VwdERhdGFSZXNwb25zZSIZChdHZXRSZXN0b3JlUmVzdWx0UmVxdWVzdCJ/ChhHZXRSZXN0b3JlUmVzdWx0UmVzcG9uc2USDwoHb3V0Y29tZRgBIAEoCRIOCgZzb3VyY2UYAiABKAkSEQoJZmlsZV9uYW1lGAMgASgJEhcKD21hZGVfYnlfdmVyc2lvbhgEIAEoCRIWCg5jb21wbGV0ZWRfdW5peBgFIAEoAzKqCAoNQmFja3VwU2VydmljZRJuChFHZXRCYWNrdXBTZXR0aW5ncxIrLm1pc3RnYXRlLmFkbWluLnYxLkdldEJhY2t1cFNldHRpbmdzUmVxdWVzdBosLm1pc3RnYXRlLmFkbWluLnYxLkdldEJhY2t1cFNldHRpbmdzUmVzcG9uc2USdwoUVXBkYXRlQmFja3VwU2V0dGluZ3MSLi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVCYWNrdXBTZXR0aW5nc1JlcXVlc3QaLy5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVCYWNrdXBTZXR0aW5nc1Jlc3BvbnNlEm4KEVRlc3RCYWNrdXBTdG9yYWdlEisubWlzdGdhdGUuYWRtaW4udjEuVGVzdEJhY2t1cFN0b3JhZ2VSZXF1ZXN0GiwubWlzdGdhdGUuYWRtaW4udjEuVGVzdEJhY2t1cFN0b3JhZ2VSZXNwb25zZRJfCgxDcmVhdGVCYWNrdXASJi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVCYWNrdXBSZXF1ZXN0GicubWlzdGdhdGUuYWRtaW4udjEuQ3JlYXRlQmFja3VwUmVzcG9uc2USXAoLTGlzdEJhY2t1cHMSJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0QmFja3Vwc1JlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0QmFja3Vwc1Jlc3BvbnNlEmUKDlByZXBhcmVSZXN0b3JlEigubWlzdGdhdGUuYWRtaW4udjEuUHJlcGFyZVJlc3RvcmVSZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuUHJlcGFyZVJlc3RvcmVSZXNwb25zZRJlCg5Db25maXJtUmVzdG9yZRIoLm1pc3RnYXRlLmFkbWluLnYxLkNvbmZpcm1SZXN0b3JlUmVxdWVzdBopLm1pc3RnYXRlLmFkbWluLnYxLkNvbmZpcm1SZXN0b3JlUmVzcG9uc2USXwoMTGlzdEtlcHREYXRhEiYubWlzdGdhdGUuYWRtaW4udjEuTGlzdEtlcHREYXRhUmVxdWVzdBonLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RLZXB0RGF0YVJlc3BvbnNlEmUKDkRlbGV0ZUtlcHREYXRhEigubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlS2VwdERhdGFSZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlS2VwdERhdGFSZXNwb25zZRJrChBHZXRSZXN0b3JlUmVzdWx0EioubWlzdGdhdGUuYWRtaW4udjEuR2V0UmVzdG9yZVJlc3VsdFJlcXVlc3QaKy5taXN0Z2F0ZS5hZG1pbi52MS5HZXRSZXN0b3JlUmVzdWx0UmVzcG9uc2VCxgEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUILQmFja3VwUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message mistgate.admin.v1.GetBackupSettingsRequest
@@ -313,6 +313,295 @@ export const BackupSchema: GenMessage<Backup> = /*@__PURE__*/
   messageDesc(file_mistgate_admin_v1_backup, 11);
 
 /**
+ * @generated from message mistgate.admin.v1.PrepareRestoreRequest
+ */
+export type PrepareRestoreRequest = Message<"mistgate.admin.v1.PrepareRestoreRequest"> & {
+  /**
+   * Exactly one source is required. An upload id is returned by POST /backup/upload.
+   *
+   * @generated from field: string upload_id = 1;
+   */
+  uploadId: string;
+
+  /**
+   * @generated from field: string r2_object_key = 2;
+   */
+  r2ObjectKey: string;
+
+  /**
+   * Exactly one key is required. Identity bytes and passphrases are used only for this request.
+   *
+   * @generated from field: bytes identity_file = 3;
+   */
+  identityFile: Uint8Array;
+
+  /**
+   * @generated from field: string passphrase = 4;
+   */
+  passphrase: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.PrepareRestoreRequest.
+ * Use `create(PrepareRestoreRequestSchema)` to create a new message.
+ */
+export const PrepareRestoreRequestSchema: GenMessage<PrepareRestoreRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 12);
+
+/**
+ * @generated from message mistgate.admin.v1.PrepareRestoreResponse
+ */
+export type PrepareRestoreResponse = Message<"mistgate.admin.v1.PrepareRestoreResponse"> & {
+  /**
+   * @generated from field: string restore_id = 1;
+   */
+  restoreId: string;
+
+  /**
+   * @generated from field: mistgate.admin.v1.RestoreSummary summary = 2;
+   */
+  summary?: RestoreSummary | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.PrepareRestoreResponse.
+ * Use `create(PrepareRestoreResponseSchema)` to create a new message.
+ */
+export const PrepareRestoreResponseSchema: GenMessage<PrepareRestoreResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 13);
+
+/**
+ * @generated from message mistgate.admin.v1.RestoreSummary
+ */
+export type RestoreSummary = Message<"mistgate.admin.v1.RestoreSummary"> & {
+  /**
+   * @generated from field: string panel_name = 1;
+   */
+  panelName: string;
+
+  /**
+   * @generated from field: string made_by_version = 2;
+   */
+  madeByVersion: string;
+
+  /**
+   * @generated from field: int64 created_unix = 3;
+   */
+  createdUnix: bigint;
+
+  /**
+   * @generated from field: int64 backup_nodes = 4;
+   */
+  backupNodes: bigint;
+
+  /**
+   * @generated from field: int64 backup_users = 5;
+   */
+  backupUsers: bigint;
+
+  /**
+   * @generated from field: int64 backup_profiles = 6;
+   */
+  backupProfiles: bigint;
+
+  /**
+   * @generated from field: int64 current_nodes = 7;
+   */
+  currentNodes: bigint;
+
+  /**
+   * @generated from field: int64 current_users = 8;
+   */
+  currentUsers: bigint;
+
+  /**
+   * @generated from field: int64 current_profiles = 9;
+   */
+  currentProfiles: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.RestoreSummary.
+ * Use `create(RestoreSummarySchema)` to create a new message.
+ */
+export const RestoreSummarySchema: GenMessage<RestoreSummary> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 14);
+
+/**
+ * @generated from message mistgate.admin.v1.ConfirmRestoreRequest
+ */
+export type ConfirmRestoreRequest = Message<"mistgate.admin.v1.ConfirmRestoreRequest"> & {
+  /**
+   * @generated from field: string restore_id = 1;
+   */
+  restoreId: string;
+
+  /**
+   * @generated from field: string typed_panel_name = 2;
+   */
+  typedPanelName: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ConfirmRestoreRequest.
+ * Use `create(ConfirmRestoreRequestSchema)` to create a new message.
+ */
+export const ConfirmRestoreRequestSchema: GenMessage<ConfirmRestoreRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 15);
+
+/**
+ * @generated from message mistgate.admin.v1.ConfirmRestoreResponse
+ */
+export type ConfirmRestoreResponse = Message<"mistgate.admin.v1.ConfirmRestoreResponse"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ConfirmRestoreResponse.
+ * Use `create(ConfirmRestoreResponseSchema)` to create a new message.
+ */
+export const ConfirmRestoreResponseSchema: GenMessage<ConfirmRestoreResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 16);
+
+/**
+ * @generated from message mistgate.admin.v1.ListKeptDataRequest
+ */
+export type ListKeptDataRequest = Message<"mistgate.admin.v1.ListKeptDataRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListKeptDataRequest.
+ * Use `create(ListKeptDataRequestSchema)` to create a new message.
+ */
+export const ListKeptDataRequestSchema: GenMessage<ListKeptDataRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 17);
+
+/**
+ * @generated from message mistgate.admin.v1.ListKeptDataResponse
+ */
+export type ListKeptDataResponse = Message<"mistgate.admin.v1.ListKeptDataResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.admin.v1.KeptData directories = 1;
+   */
+  directories: KeptData[];
+};
+
+/**
+ * Describes the message mistgate.admin.v1.ListKeptDataResponse.
+ * Use `create(ListKeptDataResponseSchema)` to create a new message.
+ */
+export const ListKeptDataResponseSchema: GenMessage<ListKeptDataResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 18);
+
+/**
+ * @generated from message mistgate.admin.v1.KeptData
+ */
+export type KeptData = Message<"mistgate.admin.v1.KeptData"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: int64 size_bytes = 2;
+   */
+  sizeBytes: bigint;
+
+  /**
+   * @generated from field: int64 modified_unix = 3;
+   */
+  modifiedUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.KeptData.
+ * Use `create(KeptDataSchema)` to create a new message.
+ */
+export const KeptDataSchema: GenMessage<KeptData> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 19);
+
+/**
+ * @generated from message mistgate.admin.v1.DeleteKeptDataRequest
+ */
+export type DeleteKeptDataRequest = Message<"mistgate.admin.v1.DeleteKeptDataRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.DeleteKeptDataRequest.
+ * Use `create(DeleteKeptDataRequestSchema)` to create a new message.
+ */
+export const DeleteKeptDataRequestSchema: GenMessage<DeleteKeptDataRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 20);
+
+/**
+ * @generated from message mistgate.admin.v1.DeleteKeptDataResponse
+ */
+export type DeleteKeptDataResponse = Message<"mistgate.admin.v1.DeleteKeptDataResponse"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.DeleteKeptDataResponse.
+ * Use `create(DeleteKeptDataResponseSchema)` to create a new message.
+ */
+export const DeleteKeptDataResponseSchema: GenMessage<DeleteKeptDataResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 21);
+
+/**
+ * The helper writes the result into the active data directory. The next panel process saves it and exposes it here.
+ *
+ * @generated from message mistgate.admin.v1.GetRestoreResultRequest
+ */
+export type GetRestoreResultRequest = Message<"mistgate.admin.v1.GetRestoreResultRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetRestoreResultRequest.
+ * Use `create(GetRestoreResultRequestSchema)` to create a new message.
+ */
+export const GetRestoreResultRequestSchema: GenMessage<GetRestoreResultRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 22);
+
+/**
+ * @generated from message mistgate.admin.v1.GetRestoreResultResponse
+ */
+export type GetRestoreResultResponse = Message<"mistgate.admin.v1.GetRestoreResultResponse"> & {
+  /**
+   * @generated from field: string outcome = 1;
+   */
+  outcome: string;
+
+  /**
+   * @generated from field: string source = 2;
+   */
+  source: string;
+
+  /**
+   * @generated from field: string file_name = 3;
+   */
+  fileName: string;
+
+  /**
+   * @generated from field: string made_by_version = 4;
+   */
+  madeByVersion: string;
+
+  /**
+   * @generated from field: int64 completed_unix = 5;
+   */
+  completedUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.GetRestoreResultResponse.
+ * Use `create(GetRestoreResultResponseSchema)` to create a new message.
+ */
+export const GetRestoreResultResponseSchema: GenMessage<GetRestoreResultResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_backup, 23);
+
+/**
  * @generated from service mistgate.admin.v1.BackupService
  */
 export const BackupService: GenService<{
@@ -355,6 +644,46 @@ export const BackupService: GenService<{
     methodKind: "unary";
     input: typeof ListBackupsRequestSchema;
     output: typeof ListBackupsResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.BackupService.PrepareRestore
+   */
+  prepareRestore: {
+    methodKind: "unary";
+    input: typeof PrepareRestoreRequestSchema;
+    output: typeof PrepareRestoreResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.BackupService.ConfirmRestore
+   */
+  confirmRestore: {
+    methodKind: "unary";
+    input: typeof ConfirmRestoreRequestSchema;
+    output: typeof ConfirmRestoreResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.BackupService.ListKeptData
+   */
+  listKeptData: {
+    methodKind: "unary";
+    input: typeof ListKeptDataRequestSchema;
+    output: typeof ListKeptDataResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.BackupService.DeleteKeptData
+   */
+  deleteKeptData: {
+    methodKind: "unary";
+    input: typeof DeleteKeptDataRequestSchema;
+    output: typeof DeleteKeptDataResponseSchema;
+  },
+  /**
+   * @generated from rpc mistgate.admin.v1.BackupService.GetRestoreResult
+   */
+  getRestoreResult: {
+    methodKind: "unary";
+    input: typeof GetRestoreResultRequestSchema;
+    output: typeof GetRestoreResultResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_backup, 0);

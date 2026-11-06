@@ -49,7 +49,30 @@ flowchart TD
 
 **File on this computer** in the window before a panel update (see [Updates](updates.md#update-the-panel)) and **Download to this computer** on this page save the same encrypted archive to the computer the browser runs on, named `mistgate-backup-<panel>-<version>-<UTC date>.tar.gz.age`; it does not need R2. When this page has a recovery recipient the file is encrypted to it; otherwise you make up a passphrase for that file (at least 12 characters), which is not stored anywhere: without it the file cannot be opened. Only the owner can download, with a fresh step-up; the panel keeps no copy of the archive, and the audit log records `backup.download`. Restore it as below; for a file with a passphrase use `--passphrase` (asked on the terminal) or `--passphrase-file FILE` instead of `--identity-file`.
 
+## Restore in the panel
+
+**Restore…** under **Restore from a backup** on this page brings the running panel back to a backup. Only the owner can, with a fresh step-up, on the VPS edition.
+
+1. **Backup**: a file from this computer (the panel uploads it to a private folder of its data directory) or one of the R2 backups (the panel downloads it from the bucket itself; **Restore** next to a backup in the list opens the window with it).
+2. **Key**: the recovery key file (the identity `mistgate backup keygen` made; it opens the R2 backups and files downloaded without a passphrase) or the file's passphrase. The key is sent once and used in memory to open this backup: it is not written to disk, to a log or to the audit log.
+3. **Check backup**: the panel decrypts and verifies the archive as `backup restore` does (the manifest, the hashes, `master.key`, the database opens, its migrations are not newer than this panel) and shows the panel's name, the version that made the backup and when, and the nodes, people and profiles in it next to the numbers now. Nothing has changed yet; the check is valid for 30 minutes.
+4. **Restore**, after typing the panel's name: the panel's update helper stops the panel, moves the current data directory aside to `<data-dir>.before-restore-<UTC time>`, puts the backup's data in its place and starts the panel. If the restored panel does not stay up for 45 seconds, the helper puts the previous data back and starts that.
+
+Everything changed after the backup was made is gone, the sessions too: sign in with the password and passkeys of the backup. The section then shows the result, "Restored from a backup" or "The restore failed; the panel runs on its previous data"; the audit log has `backup.restore_started` in the old data and `backup.restored` in the restored. **Data from before a restore** lists the directories moved aside, with their size; each stays until **Delete** (the owner, with a step-up). To go back by hand, stop the service and swap the directories.
+
+One restore runs at a time, and never during a backup, a panel update or a node rollout. A panel that cannot update itself cannot restore itself either (the same helper does both): the window says so, and the way below works.
+
 ## Restore on a new panel
+
+The installer restores a backup on a new server in one command, before the panel's first start:
+
+```sh
+curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --restore ./backup.tar.gz.age --identity-file ./mistgate-recovery.txt
+```
+
+For a file with a passphrase give `--passphrase-file FILE` instead of `--identity-file`; the installer never takes a passphrase on the command line. It installs the binary, restores into the data directory, keeps the backup's `master.key`, panel address and certificates, skips the one-time setup link and says which domain to point at the server: once it points there, the nodes reconnect by themselves. With `--dry-run` it checks the archive and the key without installing anything.
+
+By hand:
 
 Download the encrypted object from R2 and copy it, the recovery identity, and the `mistgate` binary to the new panel host. Stop Mistgate if it is already running. Restore into a **new, non-existing** data directory; the command refuses to overwrite files:
 
