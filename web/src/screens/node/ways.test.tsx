@@ -17,6 +17,7 @@ const checkRelay = vi.fn();
 const updateRelay = vi.fn();
 const checkIpv6 = vi.fn();
 const updateIpv6Entry = vi.fn();
+const updateInbound = vi.fn();
 let role = Role.OWNER;
 let countryChecks: object[] = [];
 vi.mock("@/lib/api", () => ({
@@ -39,6 +40,7 @@ vi.mock("@/lib/api", () => ({
     checkIpv6: (...a: unknown[]) => checkIpv6(...a),
     updateIpv6Entry: (...a: unknown[]) => updateIpv6Entry(...a),
   },
+  profiles: { updateInbound: (...a: unknown[]) => updateInbound(...a) },
   countryReach: { getCountryReachability: () => Promise.resolve({ settings: { country: "RU" } }) },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { updateIntervalHours: 12 }, effectiveTitle: "", serverSamples: [] }) },
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role } }) },
@@ -135,7 +137,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [listRelays, listRelayCandidates, createRelay, checkRelay, updateRelay, checkIpv6, updateIpv6Entry, navigate]) m.mockReset();
+  for (const m of [listRelays, listRelayCandidates, createRelay, checkRelay, updateRelay, checkIpv6, updateIpv6Entry, updateInbound, navigate]) m.mockReset();
   delete (window as { matchMedia?: unknown }).matchMedia;
 });
 
@@ -449,6 +451,63 @@ describe("the IPv6 entry", () => {
     expect(panel().textContent).toContain("Off. Subscriptions connect to 203.0.113.7 only.");
     expect(panel().textContent).toContain("2001:db8::7 is not reachable from outside: udp/443 packets do not arrive. Nothing changed.");
     expect(panel().querySelectorAll("button")).toHaveLength(0);
-    expect(document.querySelector("[role=dialog]")).toBeNull();
+    expect(document.querySelector("[role=dialog]")?.textContent ?? null).toBeNull();
+  });
+});
+
+describe("servers in subscriptions", () => {
+  const vless = { id: "inb_v", port: 443, state: InboundState.ACTIVE, protocol: "vless", profileName: "VLESS · TCP", directInSubscriptions: true, cdn: false };
+  const cdn = { id: "inb_c", port: 443, state: InboundState.ACTIVE, protocol: "vless", profileName: "VLESS · CDN", directInSubscriptions: true, cdn: true };
+  const withInbounds = (inbounds: object[]) => ({ ...(de1() as object), inbounds }) as never;
+
+  it("Direct has a switch per server; off asks the server first and, when no way would be left, confirms with the reason", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    updateInbound.mockImplementation((req: { validateOnly?: boolean }) =>
+      Promise.resolve({ warnings: req.validateOnly ? [{ code: "inbound_no_way_in", params: { profile: "VLESS · TCP", node: "de1", reason: "no_usable_relay" } }] : [] }),
+    );
+    await mount(withInbounds([vless]));
+    expect(panel().textContent).toContain(en["ways.subs.title"]);
+    const sw = panel().querySelector<HTMLElement>("[role=switch]")!;
+    expect(sw.getAttribute("aria-label")).toBe("VLESS · TCP in subscriptions");
+    await click(sw);
+    await settle();
+    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false, validateOnly: true });
+    expect(updateInbound).toHaveBeenCalledTimes(1); // nothing saved before the owner confirms
+    expect(dialog().textContent).toContain("Take VLESS · TCP out of subscriptions?");
+    expect(dialog().textContent).toContain(en["ways.subs.reason.no_usable_relay"]);
+    await click(buttonIn(dialog(), en["ways.subs.hide"]));
+    await settle();
+    expect(updateInbound).toHaveBeenLastCalledWith({ inboundId: "inb_v", directInSubscriptions: false });
+  });
+
+  it("off with a way left (a relay through msk1) saves at once, without asking", async () => {
+    updateInbound.mockResolvedValue({ warnings: [] });
+    await mount(withInbounds([vless]));
+    await click(panel().querySelector("[role=switch]"));
+    await settle();
+    expect(text()).not.toContain("Take VLESS · TCP out of subscriptions?");
+    expect(updateInbound).toHaveBeenCalledTimes(2); // the check, then the save
+    expect(updateInbound).toHaveBeenLastCalledWith({ inboundId: "inb_v", directInSubscriptions: false });
+    expect(text()).toContain(en["common.saved"]);
+  });
+
+  it("a CDN profile is a lane of its own; Direct with every server out of subscriptions says so", async () => {
+    search = { tab: "ways", way: "cdn" };
+    await mount(withInbounds([{ ...vless, directInSubscriptions: false }, cdn]));
+    expect(lanes().map((l) => l.id)).toEqual(["way-tab-direct", "way-tab-cdn", "way-tab-via:nod_msk1", "way-tab-ipv6"]);
+    expect(lane("direct").dataset.ring).toBe("off");
+    expect(lane("direct").textContent).toContain(en["ways.pill.hidden"]);
+    expect(lane("cdn").textContent).toContain(en["ways.cdn"]);
+    expect(lane("cdn").textContent).toContain(en["ways.cdn.seen"]);
+    // the CDN lane's card lists only the CDN server
+    expect(panel().textContent).toContain(en["ways.cdn.sub"]);
+    expect([...panel().querySelectorAll("[role=switch]")].map((e) => e.getAttribute("aria-label"))).toEqual(["VLESS · CDN in subscriptions"]);
+  });
+
+  it("a helper sees the switches but cannot flip them", async () => {
+    role = Role.HELPER;
+    await mount(withInbounds([vless]));
+    const sw = panel().querySelector<HTMLElement>("[role=switch]")!;
+    expect(sw.hasAttribute("data-disabled") || sw.getAttribute("aria-disabled") === "true").toBe(true);
   });
 });

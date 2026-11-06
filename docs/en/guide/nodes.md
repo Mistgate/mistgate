@@ -114,6 +114,7 @@ The checks, alerts and the doctor are described in [Health](../operations/health
 This tab shows every way people reach the node as one "metro line". On top is a chip **People · Russia** (the country of the [country check](../operations/reachability.md)), under it a vertical line with one branch per lane, and at the bottom the node itself. The lanes:
 
 - **Direct**: the node's own address and the number of ports, with a line under it: "From Russia: all networks", "Dark on MTS, Tele2", "Does not open from Russia" or "From Russia: no data".
+- **Through a CDN**: the node's VLESS profiles behind a CDN, if it has any, and their number. People connect to the CDN, not to the node, so the line under it says the country sees the CDN, not the node.
 - **Through msk1**: one lane per entry node that relays this node, with the number of servers and a line saying whether people reach the entry on the networks where this node is dark ("msk1 is seen from MTS"). Only the owner sees these lanes.
 - **IPv6 entry**: an extra server for people whose network blocks the node's IPv4 address; off until the owner turns it on (see [IPv6 entry](#ipv6-entry)). The lane is shown when the server has IPv6 or the entry is on. It reads "off", the entry's address when it is on, or "not available" with the reason under it. It opens the entry's card.
 - **Add a way in…**: a dashed row, for the owner only. When Direct is dark on some networks it turns amber: "Dark on MTS — add a way around". With no other ways yet it says: "If people's network does not see this node, give them another way in: through another node or over IPv6."
@@ -125,6 +126,8 @@ Each lane has a ring: green, works and every network sees it; half amber, works 
 #### Direct
 
 "People connect to 203.0.113.7." Under it come the [Ports](#ports) block, then **Is de1 seen from Russia**: the country check row and, when the block is partial, the breakdown by network. Buttons: **Check ports** and a link **Profiles ›**. With no profiles it says "No profiles: people have nothing to open." and offers **Add profile**. While the country check has nothing on the node it says "The country check has nothing on this node yet." and, for the owner, links **Sources on Reachability**.
+
+**In subscriptions** (for the owner) lists the node's servers on its own address, with a switch each. Off, people do not get the server at the node's address, while it keeps running: its servers through other nodes and over IPv6 stay, and relays forward to it as before. Use it when people should reach a node only through another node, say a node abroad that people reach through an entry in Russia. When turning one off would leave people no way to the server (no working relay, no IPv6 entry, or AmneziaWG, which cannot go through another node yet), the panel asks first and says why. When every server is off, the lane reads **Not in subscriptions**. The **Through a CDN** lane has the same switches for the profiles behind a CDN.
 
 #### Ports
 

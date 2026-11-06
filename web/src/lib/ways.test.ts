@@ -21,6 +21,30 @@ const base = (over: Partial<WaysInput> = {}): WaysInput => ({
 });
 
 describe("lanesOf", () => {
+  it("servers kept out of subscriptions: the direct lane is off and hidden only when all of them are", () => {
+    const hiddenAll = lanesOf(base({ country: country(CountryVerdict.PARTIAL, ["MTS"]), inbounds: [{ state: InboundState.ACTIVE, directInSubscriptions: false }, { state: InboundState.ACTIVE, directInSubscriptions: false }] }));
+    expect(hiddenAll.lanes[0]).toMatchObject({ id: "direct", state: "off", ring: "off", hidden: true, fault: false });
+    const hiddenOne = lanesOf(base({ inbounds: [{ state: InboundState.ACTIVE, directInSubscriptions: false }, { state: InboundState.ACTIVE }] }));
+    expect(hiddenOne.lanes[0]).toMatchObject({ state: "ok", hidden: false });
+    // a disabled server does not count: the one running is hidden
+    const disabledToo = lanesOf(base({ inbounds: [{ state: InboundState.DISABLED }, { state: InboundState.ACTIVE, directInSubscriptions: false }] }));
+    expect(disabledToo.lanes[0]).toMatchObject({ state: "off", hidden: true });
+  });
+
+  it("a CDN profile is a lane of its own, after direct, with no country verdict", () => {
+    const w = lanesOf(base({ country: country(CountryVerdict.BLOCKED), inbounds: [{ state: InboundState.ACTIVE, directInSubscriptions: false }, { state: InboundState.ACTIVE, cdn: true }], relays: [on] }));
+    expect(w.lanes.map((l) => l.id)).toEqual(["direct", "cdn", "via:msk1"]);
+    expect(w.lanes[0]).toMatchObject({ state: "off", hidden: true });
+    expect(w.lanes[1]).toMatchObject({ kind: "cdn", state: "ok", seen: "unknown", ring: "ok", hidden: false });
+    expect(isWayId("cdn")).toBe(true);
+    // only CDN servers: nobody is given the node's address
+    const cdnOnly = lanesOf(base({ inbounds: [{ state: InboundState.ACTIVE, cdn: true }] }));
+    expect(cdnOnly.lanes[0]).toMatchObject({ id: "direct", state: "off", hidden: true });
+    // the CDN servers kept out of subscriptions, or one of them failing
+    expect(lanesOf(base({ inbounds: [{ state: InboundState.ACTIVE, cdn: true, directInSubscriptions: false }] })).lanes[1]).toMatchObject({ state: "off", hidden: true });
+    expect(lanesOf(base({ inbounds: [{ state: InboundState.ACTIVE, cdn: true }, { state: InboundState.FAILED, cdn: true }] })).lanes[1]).toMatchObject({ state: "warn", fault: true });
+  });
+
   it("a node dark on part of the country: direct works, half seen, opened first, no badge", () => {
     const w = lanesOf(base({ country: country(CountryVerdict.PARTIAL, ["Tele2", "MTS"]) }));
     expect(w.lanes.map((l) => l.id)).toEqual(["direct"]);

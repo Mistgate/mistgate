@@ -155,6 +155,8 @@ Next to a server of a node, an app can list up to two more, marked by a label af
 
 The order is the node's server, its IPv6 server, then the servers through its relays; a relay's server is never doubled for IPv6. Both appear for every person who may use the node (and the entry node, for a relay), at the next refresh of the app. A server behind a CDN, one with a certificate for the node's IPv4 address, and the static AmneziaWG keys get no IPv6 server. The load of an IPv6 server in Happ is the node's. Names are kept within Happ's 30 characters: the label stays, the profile name is shortened first. The links of an [MTProto](mtproto.md#relays-and-ipv6-twins) profile get the same twins, in the person's Telegram block instead of the subscription.
 
+A server the owner keeps out of subscriptions on the node's **Ways in** tab (see [Nodes](nodes.md#direct)) is left out itself, while its IPv6 server and the servers through its relays stay.
+
 ## Names & texts
 
 | Setting | What it does |

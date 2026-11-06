@@ -30,10 +30,11 @@ import { CountryRow } from "@/screens/health/country";
 import { EntryDialog, entryReason, EntryState, TurnOffDialog } from "./ipv6-entry";
 import { CheckPortsButton, portRows, Ports, usePortCheck } from "./ports";
 import { AddRelayDialog, ccChip, RelayRows, useAddRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
+import { InSubscriptions } from "./subs-switches";
 import type { NodeSearch } from "./tabs";
 
 // The node page's "Ways in" tab (node-ia plan §3.4): every way people reach the node, drawn as one line from people down
-// to the node with a branch per way (straight to its address, through another node, over IPv6), and on an entry node the
+// to the node with a branch per way (straight to its address, through a CDN, through another node, over IPv6), and on an entry node the
 // nodes reached through it. A list and the open way, like Reachability's sources; `?way=` is the open one, `?add=` the
 // "New way in" dialog ("ipv6": the IPv6 entry's). The verdicts are lib/ways.ts's, the relay rows and dialog relays.tsx's,
 // the IPv6 entry's card and dialog ipv6-entry.tsx's.
@@ -93,7 +94,9 @@ type Look = { kind: StatusKind; word: MessageKey };
 
 /** A lane's state in a word: what is ours to fix first, then how much of the country sees it. An IPv6 entry the node cannot take is "not available". */
 function lookOf(l: Lane, w: { offline: boolean; v6: Ipv6Entry }): Look {
-  if (w.offline && l.kind === "direct") return { kind: "off", word: "ways.pill.offline" };
+  if (w.offline && (l.kind === "direct" || l.kind === "cdn")) return { kind: "off", word: "ways.pill.offline" };
+  // every server of the lane is kept out of subscriptions: people are not given this way, the servers still run
+  if (l.hidden) return { kind: "off", word: "ways.pill.hidden" };
   switch (l.state) {
     case "bad":
       return { kind: "bad", word: "ways.pill.down" };
@@ -110,6 +113,9 @@ function lookOf(l: Lane, w: { offline: boolean; v6: Ipv6Entry }): Look {
 }
 
 const toneText: Record<StatusKind, string> = { ok: "text-muted", off: "text-muted", blip: "text-muted", busy: "text-muted", warn: "text-warn-text", bad: "text-danger-text" };
+
+/** The node's servers that people reach through a CDN (the "cdn" lane), whatever their state. */
+const cdnOf = (data: Data) => data.inbounds.filter((i) => i.cdn);
 
 /** The rows of the Direct lane's port check: its count in the list is the rows the lane shows. */
 const portsOf = (data: Data) => {
@@ -134,7 +140,8 @@ function seenWords(t: T, seen: Lane["seen"], dark: string[], cc: string): Hint {
 /** The third line of a lane: is it seen from the country (an entry against the networks that see this node dark). */
 function seenLine(t: T, l: Lane, w: WaysModel): Hint | null {
   if (l.kind === "out") return null;
-  if (l.kind === "direct" && w.offline) return { tone: "off", text: t("ways.offline") };
+  if ((l.kind === "direct" || l.kind === "cdn") && w.offline) return { tone: "off", text: t("ways.offline") };
+  if (l.kind === "cdn") return { tone: "off", text: t("ways.cdn.seen") };
   if (l.kind === "ipv6") {
     // an entry the node cannot take, or one that is on while the server's IPv6 is down: why, in the doctor's words
     if (l.state === "bad" || (l.state === "off" && !w.v6.entrySupported)) {
@@ -193,7 +200,8 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
   const ccOf = useCountryOf();
   const look = lookOf(l, w);
   const seen = seenLine(t, l, w);
-  const title = l.kind === "direct" ? t("ways.direct") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : l.kind === "ipv6" ? t("ways.ipv6") : l.peer!.name;
+  const title =
+    l.kind === "direct" ? t("ways.direct") : l.kind === "cdn" ? t("ways.cdn") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : l.kind === "ipv6" ? t("ways.ipv6") : l.peer!.name;
   const where =
     l.kind === "direct"
       ? data.inbounds.length === 0
@@ -203,7 +211,9 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
           : data.node!.address
       : l.kind === "ipv6"
         ? w.v6.entry || t(w.v6.entrySupported ? "ways.ipv6.lane.off" : "ways.ipv6.lane.na")
-        : t.n("ways.servers", l.relays.length);
+        : l.kind === "cdn"
+          ? t.n("ways.servers", cdnOf(data).length)
+          : t.n("ways.servers", l.relays.length);
   const mono = (l.kind === "direct" && data.inbounds.length > 0) || (l.kind === "ipv6" && !!w.v6.entry);
   // a lane broken on our side says so in words next to the ring's colour (how much of the country sees it is the line
   // below); the rest is said to a screen reader
@@ -358,6 +368,8 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
         <div role="tabpanel" id="way-panel" aria-labelledby={`way-tab-${lane.id}`} className="flex-1">
           {lane.kind === "direct" ? (
             <DirectDetail data={data} w={w} lane={lane} />
+          ) : lane.kind === "cdn" ? (
+            <CdnDetail data={data} w={w} lane={lane} />
           ) : lane.kind === "ipv6" ? (
             <Ipv6Detail data={data} w={w} lane={lane} onAdd={() => go({ way: "ipv6", add: "ipv6" })} />
           ) : (
@@ -398,6 +410,7 @@ function DirectDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane 
   const look = lookOf(lane, w);
   const run = usePortCheck(node.id);
   const none = data.inbounds.length === 0;
+  const own = data.inbounds.filter((i) => !i.cdn);
   return (
     <DetailCard icon="globe" tone="mint" title={t("ways.direct")} sub={t("ways.direct.sub", { address: node.address })} control={<StatusPill sm kind={look.kind} label={t(look.word)} />}>
       {none && (
@@ -418,9 +431,28 @@ function DirectDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane 
           <Ports data={data} run={run} />
         </Block>
       )}
+      {own.length > 0 && <InSubscriptions nodeId={node.id} nodeName={node.name} address={node.address} inbounds={own} />}
       <SeenBlock w={w} name={node.name} check={w.country} />
       <ActionBar>
         <CheckPortsButton data={data} run={run} />
+        <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "profiles" }} className={linkCls}>
+          {t("node.tab.profiles")}
+          <Icon name="chevronRight" size={14} />
+        </Link>
+      </ActionBar>
+    </DetailCard>
+  );
+}
+
+/** The profiles of the node that people reach through a CDN: the country sees the CDN, so there is no country verdict here. */
+function CdnDetail({ data, w, lane }: { data: Data; w: WaysModel; lane: Lane }) {
+  const t = useT();
+  const node = data.node!;
+  const look = lookOf(lane, w);
+  return (
+    <DetailCard icon="cloud" tone="mint" title={t("ways.cdn")} sub={t("ways.cdn.sub")} control={<StatusPill sm kind={look.kind} label={t(look.word)} />}>
+      <InSubscriptions nodeId={node.id} nodeName={node.name} address={node.address} inbounds={cdnOf(data)} cdn />
+      <ActionBar>
         <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "profiles" }} className={linkCls}>
           {t("node.tab.profiles")}
           <Icon name="chevronRight" size={14} />
@@ -764,7 +796,7 @@ function NewWayDialog({ data, w, start, onClose, onIpv6 }: { data: Data; w: Ways
 
 // ---- the Overview's strip ----
 
-/** "Ways in  People → (◐ Direct · MTS) (● through msk1) (○ IPv6) → de1   All ways in ›" on the node's Overview. */
+/** "Ways in  People → (◐ Direct · MTS) (● CDN) (● through msk1) (○ IPv6) → de1   All ways in ›" on the node's Overview. */
 export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
   const t = useT();
   const node = data.node!;
@@ -784,7 +816,7 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
       <Icon name="chevronRight" size={14} className="text-faint" aria-hidden />
       {w.lanes.map((l) => {
         const note = short(l);
-        const title = l.kind === "direct" ? t("ways.direct") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : t("ways.ipv6");
+        const title = l.kind === "direct" ? t("ways.direct") : l.kind === "cdn" ? t("ways.cdn") : l.kind === "via" ? t("ways.via", { entry: l.peer!.name }) : t("ways.ipv6");
         return (
           <Link
             key={l.id}
