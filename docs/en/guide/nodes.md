@@ -17,7 +17,7 @@ Above the table:
 
 | Column | What it shows |
 |:--|:--|
-| **Node** | The status dot, the name, the location (or country) and the provider. Under it, the reason of the status, or the status word. |
+| **Node** | The status dot, the name, the location (or country) and the provider. Under it, the reason of the status, or the status word, and the first two lines of the node's notes (the full text on hover). |
 | **Address** | The domain or IP clients connect to. |
 | **Protocols** | The protocols of the profiles on the node. |
 | **Online** | People connected now. |
@@ -310,7 +310,7 @@ What this machine is. On a wide screen, two columns: on the left one form (**Nod
 | **Location** | Free text next to the name ("Frankfurt"). Empty shows the country name. |
 | **Provider** | The hoster, for you. |
 | **Network capacity** | Mbps, optional: the provider's symmetric limit. The node's load is its CPU use, or the busier direction of its link as a share of this capacity when that is higher; without it the load is the CPU alone (on a one-core VPS the CPU usually runs out first). The server names in Happ end with the load (" · 64％"), and the user page shows a level: low, medium or high (from 50% and 80%). Never the rates themselves, and nothing in other apps, whose names must stay stable. 0 means unknown. **Measure** can fill it in: see below. |
-| **Notes** | Free text, up to 500 characters. |
+| **Notes** | Free text, up to 500 characters. The first two lines show in the Nodes list; user pages and subscriptions never show them. |
 | **Drop the agent connection after** | 30–600 s, default 90. If the agent stays silent longer, the panel closes the connection. The node turns grey (**Host blip**) first; **Unreachable** comes after 10 minutes without contact. |
 | **Wait for a command result** | 10–900 s, default 120: how long the panel waits before a command counts as unanswered. |
 | **Agent dial timeout** | 5–120 s, default 15: how long the agent waits when it connects to the panel. |
