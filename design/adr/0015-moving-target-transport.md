@@ -68,9 +68,14 @@ across the fleet, on a schedule or when a signal says it is being cut.
   cut from a country or provider, confirmed by a second source), or **Rotate now**.
 - **Never everywhere at once**: canary nodes first, a reachability check, then the rest, with the rollout machinery's steps
   and rollback. A dialect that fails its checks is not spread.
-- **Static clients**: AmneziaVPN keys and Telegram links do not refresh. Their inbounds rotate only by **Rotate now** or a
-  confirmed signal, never on a schedule; the person's page then shows the new key, and the announcement and Telegram say
-  so. The owner can exclude a profile from rotation.
+- **Static clients: no automatic rotation for AmneziaWG in AmneziaVPN.** A `vpn://` key is a static config with every
+  AmneziaWG parameter inside and no address to refresh it from (AmneziaVPN refreshes configs only for its own Premium
+  service), so a new dialect means the person imports a new key and removes the old one. Those inbounds, and Telegram
+  links, therefore never rotate on a schedule or by signal on their own. Only **Rotate now**, or a block the owner
+  confirms, gives them a new dialect, and then usually when the old key has stopped working anyway: the new key is ready
+  at once, on the person's page as a one-tap `vpn://` link and QR code, with the announcement and Telegram saying so; the
+  old dialect stays up for the overlap when it still works. The owner can exclude a profile from rotation. Automatic
+  rotation reaches AmneziaWG only through apps that read the subscription (the Mihomo apps today; our own client later).
 - Every dialect is recorded: family, created, first served, devices on it, the first report that it is cut, retired. The
   owner sees which families last. Nothing leaves the panel; any shared statistics are a later, opt-in, aggregated decision.
 
@@ -125,7 +130,7 @@ A protocol of our own, when it comes, is designed as a family of this model from
 
 1. **Dialects for what exists**: the dialect model, seeds in the vault, the families that describe today's per-profile
    draws (AmneziaWG, Hysteria2, REALITY), the record. **Rotate now** with overlap for REALITY (native) and Hysteria2.
-2. **Overlap for AmneziaWG** (a second listener) and the static-client flow (the new key on the person's page, the notices).
+2. **AmneziaWG by hand**: **Rotate now** with an overlap (a second listener) and the AmneziaVPN flow: the new key ready on the person's page as a one-tap link and QR code, the notices. No automatic rotation for AmneziaVPN keys.
 3. **Scheduled rotation** with canaries, through the rollout machinery.
 4. **Signals**: rotation proposed, then (owner's choice) applied, when two Reachability sources agree that a profile is cut.
 5. **New families**: realistic size and timing distributions inside REALITY and XHTTP padding; programmable shaping in the
