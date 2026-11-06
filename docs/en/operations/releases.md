@@ -59,6 +59,17 @@ gh release edit "$VERSION" --repo Mistgate/mistgate --draft=false
 
 If signing refuses because a binary does not match its rebuild, do not sign: find out why first. The usual causes are a different key in `MISTGATE_RELEASE_PUBLIC_KEY`, a tag moved after the build, or a toolchain difference (below); an unexplained difference may mean a compromised runner.
 
+### Release channels
+
+A tag also says the release's channel (see [Release channels](updates.md#release-channels)): `vX.Y.Z` is stable, `vX.Y.Z-testing.N` testing and `vX.Y.Z-dev.N` development, where `X.Y.Z` is the stable version the work is heading for and `N` counts from 1. The release workflow accepts only these forms. A testing or development tag makes a *prerelease* that is never GitHub's *latest*, so the default installer and older panels keep getting stable releases. A stable or testing tag must point at a commit on `main` or on a `release/*` branch, or the workflow stops; a development tag may point at any commit.
+
+- **Promote a commit, not `main`.** Tag the commit that was tested: the commit of `v0.1.80-testing.2` becomes `v0.1.80`, even when `main` has moved on with unfinished work.
+- **A fix for stable while `main` is not ready**: branch `release/0.1.80` from the stable tag, cherry-pick the fix there, tag `v0.1.81` on that branch, and bring the fix back to `main`.
+- **Signing and publishing** are the same steps for every channel; a development release can use a shorter `--expires` (`30d`).
+- **Notes**: every release gets notes in English, Russian and Chinese separated by `---`; panels show them under **What's new**. The status page names only stable releases.
+
+The design is in `design/adr/0011-release-channels.md`.
+
 ### Reproducible builds
 
 `mistgate release build` (used by the workflow, by `make build` and by the check in `release sign`) gives byte-identical binaries for the same tag and key; a Linux build and a Windows cross-build of one commit were checked to match. It holds when:

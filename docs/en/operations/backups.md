@@ -45,6 +45,10 @@ flowchart TD
   restore --> panel["New panel: nodes keep working"]
 ```
 
+## A copy on this computer
+
+**File on this computer** in the window before a panel update (see [Updates](updates.md#update-the-panel)) and **Download to this computer** on this page save the same encrypted archive to the computer the browser runs on, named `mistgate-backup-<panel>-<version>-<UTC date>.tar.gz.age`; it does not need R2. When this page has a recovery recipient the file is encrypted to it; otherwise you make up a passphrase for that file (at least 12 characters), which is not stored anywhere: without it the file cannot be opened. Only the owner can download, with a fresh step-up; the panel keeps no copy of the archive, and the audit log records `backup.download`. Restore it as below; for a file with a passphrase use `--passphrase` (asked on the terminal) or `--passphrase-file FILE` instead of `--identity-file`.
+
 ## Restore on a new panel
 
 Download the encrypted object from R2 and copy it, the recovery identity, and the `mistgate` binary to the new panel host. Stop Mistgate if it is already running. Restore into a **new, non-existing** data directory; the command refuses to overwrite files:

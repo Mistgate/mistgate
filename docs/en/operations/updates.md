@@ -20,7 +20,7 @@ This page is for running a fleet. Making the release key, signing releases and p
 
 The panel keeps the node bundle in `<data-dir>/dist`. (The [Cloudflare edition](#on-the-cloudflare-edition) has no such folder and uses its own release; this section and the **Release bundle** line describe a VPS panel.)
 
-- **From GitHub.** A panel with a release key checks the latest stable release of `Mistgate/mistgate` when it starts and every 10 minutes after that. When the release carries a node bundle that verifies with the panel's key and is newer than the bundle the panel has, the panel downloads it, checks every file and replaces `dist` in one step. A release signed with another key is ignored and `dist` stays as it is. Downloading a bundle never updates a node by itself.
+- **From GitHub.** A panel with a release key checks the newest release of `Mistgate/mistgate` on the panel's [release channel](#release-channels) when it starts and every 10 minutes after that. When the release carries a node bundle that verifies with the panel's key and is newer than the bundle the panel has, the panel downloads it, checks every file and replaces `dist` in one step. A release signed with another key is ignored and `dist` stays as it is. Downloading a bundle never updates a node by itself.
 - **By hand.** A panel built with your own key gets the bundle you sign and copy into `dist`: see "Use a bundle of your own" in [Releases and signing](releases.md). The panel reads `dist` again within a minute; **Read the folder again** reads it at once.
 
 The **Release bundle** line at the foot of the fleet card of the Updates page shows the result (the details are behind **Details**; they open by themselves when the bundle failed the check or is missing):
@@ -73,6 +73,18 @@ From top to bottom, by what needs you:
 Under the fleet card and in the panel's line the page lists what the update brings, so you can tell whether to do it now or later: the notes of every stable release newer than your oldest node agent, up to the bundle on the panel (and, for the panel, every release between this one and the one it can install). The newest version is shown in full, with **Show all** when it is long; the earlier ones are folded behind "and N earlier versions". The notes appear in the language of the interface (English when the release has none in it).
 
 The text is the description of the release on GitHub, read by the panel over HTTPS from the official repository on the same schedule as the release check. It is informational and **not signed**: only the manifests are. Nothing is decided from it except one badge. A release whose notes have a **Security** section (a heading "Security", "Безопасность" or "安全") is marked **Security fixes**, and the card then says that the update includes security fixes and is worth doing soon. Without such a section the page says nothing about urgency. Without a trusted bundle, or when the panel has not read the notes yet (on the [Cloudflare edition](../getting-started/install-edge.md) that happens when you press **Check GitHub**), the block is simply absent.
+
+## Release channels
+
+Every release belongs to one channel, and its tag says which: `vX.Y.Z` is **Stable**, `vX.Y.Z-testing.N` is **Testing** and `vX.Y.Z-dev.N` is **Development**. A panel follows one channel and is offered the newest release of that channel and of every more stable one: Stable sees stable releases, Testing sees testing and stable ones, Development sees all three. The panel's own update and the node bundle both follow the channel; nodes still update only when you roll the bundle out.
+
+| Channel | For |
+|:--|:--|
+| **Stable** (the default) | Checked releases, for every panel. |
+| **Testing** | The next release before everyone else. It can have bugs: tell us about them. |
+| **Development** | Builds from the work in progress: the newest of everything, and it may break. For a test panel of your own. |
+
+The owner changes the channel on the Updates page: the chip next to the panel's version opens **Release channel**. The change needs a fresh step-up, is written to the audit log and is used by the next check at once. Moving to an earlier channel offers its newest release at once. Moving to a more stable one never installs anything older: the panel and its nodes stay on what they run until the channel has something newer, and the panel's bar says so. **What's new** marks testing and development releases. A panel installed with `--channel testing` or `--channel dev` (see [Install the panel](../getting-started/install-panel.md)) starts on that channel. The MCP tool `updates_status` shows the channel; it cannot change it.
 
 ## Update a node
 
@@ -212,7 +224,9 @@ Run the second command when the first printed `OK`. This is the one time a node 
 
 This section is about a VPS panel. A panel on the [Cloudflare edition](#on-the-cloudflare-edition) is updated with `mistgate edge deploy`.
 
-The Updates page checks the latest stable release of `Mistgate/mistgate` at startup and every ten minutes (the same pace as the node bundle). When a newer signed release is out, the owner sees a small card with its version on every page except Updates. It can be collapsed to a pill, or closed until a newer version appears. **Check GitHub** checks at once (a check made in the last three minutes is answered from memory, which keeps the unauthenticated GitHub quota for the bundle download).
+The Updates page checks the newest release of `Mistgate/mistgate` on the panel's [release channel](#release-channels) at startup and every ten minutes (the same pace as the node bundle). When a newer signed release is out, the owner sees a small card with its version on every page except Updates. It can be collapsed to a pill, or closed until a newer version appears. **Check GitHub** checks at once (a check made in the last three minutes is answered from memory, which keeps the unauthenticated GitHub quota for the bundle download).
+
+**Update panel** first opens a window: what happens (the panel restarts for about a minute; nodes and people's connections keep working; it goes back by itself if the new version does not start) and a backup. When [backups to Cloudflare R2](backups.md) are set up, the window shows the last one and offers **Back up now**; otherwise a link sets them up. **File on this computer** downloads an encrypted backup named `mistgate-backup-<panel>-<version>-<date>.tar.gz.age`: to your recovery key when there is one, else with a passphrase you make up for that file. **Update** never waits for a backup except one to R2 that is still running.
 
 A release can be installed only when it carries `panel-manifest.json` and `panel-manifest.sig`, the signature verifies under the release key compiled into this panel (`release.pub` does not count: the panel's service user can write it), the manifest has not expired, and its build time is newer than this panel's. Releases are ordered by that build time, not by the version string: a panel built from a commit after the tag (for example `v0.1.6-3-gabc1234`) never sees `v0.1.6` as an update, so it is never offered a downgrade onto a database it already migrated. A release without such a manifest is shown as "not signed with this panel’s release key: it cannot be installed"; one whose manifest expired, as expired until it is signed again. The card shows the release's build date and the SHA-256 of the binary for this server. **Update panel** sends exactly that version and SHA-256, and the panel refuses if the latest signed release is another one by then.
 

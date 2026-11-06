@@ -15,7 +15,7 @@ For a fresh Linux server on amd64 or arm64 with systemd, run this as root. The d
 curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
 ```
 
-The installer requests a Let's Encrypt certificate for the URL host by default. It asks before making changes; add `--yes` for a non-interactive run. Use `--dry-run` to download and verify a release without changing the host, or `--version vX.Y.Z` to install a pinned release. `--admin-host`, `--admin-listen`, `--acme-domain` and `--data-dir` select the setup and service options described below.
+The installer requests a Let's Encrypt certificate for the URL host by default. It asks before making changes; add `--yes` for a non-interactive run. Use `--dry-run` to download and verify a release without changing the host, `--version vX.Y.Z` to install a pinned release, or `--channel testing` or `--channel dev` to install the newest release of an earlier [release channel](../operations/updates.md#release-channels), which the panel then follows. `--admin-host`, `--admin-listen`, `--acme-domain` and `--data-dir` select the setup and service options described below.
 
 When it finishes, open the one-time setup link in a browser and create the owner account. The link expires in 30 minutes. Then add a node from **Nodes → Add node**.
 
