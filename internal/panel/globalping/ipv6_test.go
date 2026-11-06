@@ -172,9 +172,10 @@ func TestIPv6SwitchIsOnByDefaultAndStored(t *testing.T) {
 func TestSchedulerRunsTheIPv6RoundNextAndTheSwitchStopsIt(t *testing.T) {
 	e := newEnv(t)
 	now := e.now
-	for _, n := range []struct{ id, address string }{{"de1", "203.0.113.10"}, {"nl1", "203.0.113.20"}} {
-		if _, err := e.st.W.ExecContext(context.Background(), `INSERT INTO node (id, name, address, provider, state, created_at, last_seen_at, last_connected_at)
-			VALUES (?, ?, ?, 'hoster', 'active', 1, ?, ?)`, n.id, n.id, n.address, now.Unix(), now.Unix()); err != nil {
+	// de1's IPv6 entry is on (its IPv4 is seen, so without the entry it would not be measured over IPv6 at all); nl1 has none
+	for _, n := range []struct{ id, address, entry string }{{"de1", "203.0.113.10", "2001:db8::10"}, {"nl1", "203.0.113.20", ""}} {
+		if _, err := e.st.W.ExecContext(context.Background(), `INSERT INTO node (id, name, address, provider, state, created_at, last_seen_at, last_connected_at, ipv6_entry)
+			VALUES (?, ?, ?, 'hoster', 'active', 1, ?, ?, ?)`, n.id, n.id, n.address, now.Unix(), now.Unix(), n.entry); err != nil {
 			t.Fatal(err)
 		}
 	}
