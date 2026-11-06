@@ -223,9 +223,9 @@ func TestPrepareRestoreFromUploadWithRecipientAndPassphrase(t *testing.T) {
 				response.Summary.CurrentNodes != 1 || response.Summary.CurrentUsers != 0 || response.Summary.CurrentProfiles != 0 {
 				t.Fatalf("restore summary = %+v", response.Summary)
 			}
-			s.restoreMu.Lock()
-			record := s.restores[response.RestoreId]
-			s.restoreMu.Unlock()
+			s.restore.mu.Lock()
+			record := s.restore.restores[response.RestoreId]
+			s.restore.mu.Unlock()
 			if response.RestoreId == "" || record.stageDir == "" {
 				t.Fatal("prepared restore stage was not registered")
 			}
@@ -245,9 +245,9 @@ func TestPrepareRestoreFromR2UsesTheConfiguredFakeClient(t *testing.T) {
 	if err != nil || response.Msg.Summary.BackupNodes != 1 || api.getCalls != 1 {
 		t.Fatalf("R2 prepare = %+v, gets %d, err %v", response, api.getCalls, err)
 	}
-	s.restoreMu.Lock()
-	record := s.restores[response.Msg.RestoreId]
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	record := s.restore.restores[response.Msg.RestoreId]
+	s.restore.mu.Unlock()
 	if record.stageDir == "" {
 		t.Fatal("R2 prepare did not retain the verified stage")
 	}
@@ -353,7 +353,7 @@ func TestConfirmRestoreGuardsAuditAndExpiredStages(t *testing.T) {
 	if connect.CodeOf(busyErr) != connect.CodeAborted {
 		t.Fatalf("confirm during a backup = %v", busyErr)
 	}
-	s.restorePanelData = func(_ context.Context, req update.PanelRestoreRequest, beforeStart func() error) error {
+	s.restore.panelData = func(_ context.Context, req RestoreRequest, beforeStart func() error) error {
 		if req.Source != "upload" || req.FileName != "backup.tar.gz.age" {
 			t.Errorf("restore helper request = %+v", req)
 		}
@@ -387,9 +387,9 @@ func TestConfirmRestoreGuardsAuditAndExpiredStages(t *testing.T) {
 	}
 
 	prepared = prepareUploadedRestore(t, s, archive, "expires.tar.gz.age", []byte(identity.String()), "")
-	s.restoreMu.Lock()
-	record := s.restores[prepared.RestoreId]
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	record := s.restore.restores[prepared.RestoreId]
+	s.restore.mu.Unlock()
 	if record.stageDir == "" {
 		t.Fatal("the expiring restore was not staged")
 	}
@@ -404,9 +404,9 @@ func TestRestoreOperationLockSurvivesPanelRestartAndBlocksSecondConfirm(t *testi
 	s, _, identity := newTestService(t)
 	archive := restoreArchiveFixture(t, s, identity.Recipient(), "v1.2.3", time.Now().UTC())
 	prepared := prepareUploadedRestore(t, s, archive, "backup.tar.gz.age", []byte(identity.String()), "")
-	s.restoreMu.Lock()
-	record := s.restores[prepared.RestoreId]
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	record := s.restore.restores[prepared.RestoreId]
+	s.restore.mu.Unlock()
 	if record.stageDir == "" {
 		t.Fatal("restore stage was not prepared")
 	}
@@ -438,9 +438,9 @@ func TestRestoreOperationLockSurvivesPanelRestartAndBlocksSecondConfirm(t *testi
 		t.Fatal(err)
 	}
 	restarted.stepUp = func(context.Context) error { return nil }
-	if !restarted.restorePending.Load() || restarted.pendingRestore.StageDir != request.StageDir {
+	if !restarted.restore.pending.Load() || restarted.restore.pendingRestore.StageDir != request.StageDir {
 		t.Fatalf("restarted service did not reconstruct pending restore: pending=%v request=%+v",
-			restarted.restorePending.Load(), restarted.pendingRestore)
+			restarted.restore.pending.Load(), restarted.restore.pendingRestore)
 	}
 	response := httptest.NewRecorder()
 	upload := httptest.NewRequest(http.MethodPost, auth.BackupUploadProcedure, strings.NewReader("archive"))
@@ -462,7 +462,7 @@ func TestRestoreSecretsNeverReachLogsOrAuditAndResultIsAvailableAfterRestart(t *
 	}
 	archive := restoreArchiveFixture(t, s, recipient, "v3.0.1", time.Now().UTC())
 	prepared := prepareUploadedRestore(t, s, archive, "safe-name.tar.gz.age", nil, secret)
-	s.restorePanelData = func(_ context.Context, _ update.PanelRestoreRequest, beforeStart func() error) error {
+	s.restore.panelData = func(_ context.Context, _ RestoreRequest, beforeStart func() error) error {
 		return beforeStart()
 	}
 	s.stepUp = func(context.Context) error { return nil }
@@ -514,8 +514,8 @@ func TestRestoreAcceptedWithoutHelperStartIsReportedAndUnlocksBackup(t *testing.
 	archive := restoreArchiveFixture(t, s, identity.Recipient(), "v3.0.1", time.Now().UTC())
 	prepared := prepareUploadedRestore(t, s, archive, "helper-never-started.tar.gz.age", []byte(identity.String()), "")
 	s.stepUp = func(context.Context) error { return nil }
-	s.restoreHelperRunning = func() bool { return false }
-	s.restorePanelData = func(_ context.Context, _ update.PanelRestoreRequest, beforeStart func() error) error {
+	s.restore.helperRunning = func() bool { return false }
+	s.restore.panelData = func(_ context.Context, _ RestoreRequest, beforeStart func() error) error {
 		return beforeStart()
 	}
 	if _, err := (rpc{s}).ConfirmRestore(ownerContext("owner", store.RoleOwner), connect.NewRequest(&adminv1.ConfirmRestoreRequest{
@@ -523,15 +523,15 @@ func TestRestoreAcceptedWithoutHelperStartIsReportedAndUnlocksBackup(t *testing.
 	})); err != nil {
 		t.Fatal(err)
 	}
-	s.restoreMu.Lock()
-	stageDir := s.pendingRestore.StageDir
-	s.restoreMu.Unlock()
-	if stageDir == "" || !s.restorePending.Load() {
+	s.restore.mu.Lock()
+	stageDir := s.restore.pendingRestore.StageDir
+	s.restore.mu.Unlock()
+	if stageDir == "" || !s.restore.pending.Load() {
 		t.Fatal("accepted restore was not retained as pending")
 	}
-	s.restoreMu.Lock()
-	request := s.pendingRestore
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	request := s.restore.pendingRestore
+	s.restore.mu.Unlock()
 	request.RequestedUnix = time.Now().Add(-restoreHelperStartGrace - time.Minute).Unix()
 	encoded, err := json.Marshal(request)
 	if err != nil {
@@ -552,7 +552,7 @@ func TestRestoreAcceptedWithoutHelperStartIsReportedAndUnlocksBackup(t *testing.
 		close(startupDone)
 	}()
 	deadline := time.After(2 * time.Second)
-	for restarted.restorePending.Load() {
+	for restarted.restore.pending.Load() {
 		select {
 		case <-deadline:
 			cancelStartup()
@@ -563,7 +563,7 @@ func TestRestoreAcceptedWithoutHelperStartIsReportedAndUnlocksBackup(t *testing.
 	}
 	cancelStartup()
 	<-startupDone
-	if restarted.restorePending.Load() {
+	if restarted.restore.pending.Load() {
 		t.Fatal("a restore whose helper never started remained pending")
 	}
 	if _, err := os.Stat(filepath.Join(s.dataDir, stageDir)); !errors.Is(err, os.ErrNotExist) {
@@ -601,7 +601,7 @@ func TestKeptDataListsAndDeletesOnlyMatchingRestoreDirectories(t *testing.T) {
 		t.Fatalf("delete without step-up = %v", err)
 	}
 	s.stepUp = func(context.Context) error { return nil }
-	s.deleteKeptData = func(_ context.Context, name string) error {
+	s.restore.deleteKeptData = func(_ context.Context, name string) error {
 		if name != validName {
 			return errors.New("unexpected kept name")
 		}
@@ -693,9 +693,9 @@ func TestCleanupExpiredUploadStage(t *testing.T) {
 	now := time.Now().UTC()
 	s.now = func() time.Time { return now }
 	uploadID := uploadRestoreArchive(t, s, []byte("encrypted archive"), "expiry.tar.gz.age")
-	s.restoreMu.Lock()
-	record := s.uploads[uploadID]
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	record := s.restore.uploads[uploadID]
+	s.restore.mu.Unlock()
 	if record.stageDir == "" {
 		t.Fatal("upload stage was not retained")
 	}
@@ -720,7 +720,7 @@ func TestCleanupExpiredUploadStage(t *testing.T) {
 func TestRestorePendingBlocksAllBackupCreation(t *testing.T) {
 	s, _, _ := newTestService(t)
 	s.stepUp = func(context.Context) error { return nil }
-	s.restorePending.Store(true)
+	s.restore.pending.Store(true)
 	if err := s.startBackup(context.Background()); !errors.Is(err, errBackupBusy) {
 		t.Fatalf("manual backup during restore = %v", err)
 	}

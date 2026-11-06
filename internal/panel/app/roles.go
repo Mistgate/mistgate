@@ -14,6 +14,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
 	nodeprovision "github.com/mistgate/mistgate/internal/panel/provision"
 	"github.com/mistgate/mistgate/internal/panel/subs"
+	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
 
@@ -247,7 +248,12 @@ func (k *core) provisionAndBackup() (*nodeprovision.Service, *backup.Service, er
 	bkp, err := backup.New(backup.Config{
 		Store: k.st, Vault: k.vlt, DataDir: k.c.DataDir, MasterKey: k.c.MasterKey,
 		Edge: k.edge, StepUp: k.authSvc.RequireStepUp, OnResult: backupResult(k.tg), Log: k.log,
-		RestorePanelData:     k.upd.StartPanelRestore,
+		RestorePanelData: func(ctx context.Context, request backup.RestoreRequest, beforeStart func() error) error {
+			return k.upd.StartPanelRestore(ctx, update.PanelRestoreRequest{
+				StageDir: request.StageDir, Source: request.Source, FileName: request.FileName,
+				MadeByVersion: request.MadeByVersion, RequestedUnix: request.RequestedUnix,
+			}, beforeStart)
+		},
 		DeleteKeptData:       k.upd.DeleteKeptData,
 		RestoreHelperRunning: k.upd.PanelUpdateRunning,
 	})

@@ -28,8 +28,6 @@ const (
 	maxDownloadBody    = 4 << 10
 	minPassphraseRunes = 12
 	scryptWorkFactor   = 18 // logN 18: approximately one second on a modern machine, matching age's reasonable default.
-	// Reserve one incoming encrypted archive plus two maximum extracted data trees for prepared and active work.
-	maxRestoreStageBytes = maxEncryptedBytes + 2*maxPlaintextBytes
 )
 
 // DownloadHandler is mounted beside the Connect admin services under the same session and cross-origin protection.

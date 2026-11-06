@@ -33,9 +33,6 @@ func testStorage(context.Context, s3API, string) error       { return errEdgeBac
 func uploadBackup(context.Context, s3API, string, string, string) (int64, error) {
 	return 0, errEdgeBackupUnavailable
 }
-func downloadBackup(context.Context, s3API, string, string, string) (int64, error) {
-	return 0, errEdgeBackupUnavailable
-}
 func pruneBackups(context.Context, s3API, string, string, int, time.Time) error {
 	return errEdgeBackupUnavailable
 }

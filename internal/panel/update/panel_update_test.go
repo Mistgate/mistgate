@@ -1,3 +1,5 @@
+//go:build !js
+
 package update
 
 import (
@@ -29,14 +31,6 @@ import (
 
 // The health window of a replaced panel is 45 s in production; tests that need one set it.
 func init() { panelHealthWindow = 0 }
-
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
-func githubResponse(status int, body []byte) *http.Response {
-	return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body))}
-}
 
 func minimalELF(machine elf.Machine) []byte {
 	b := make([]byte, 64)

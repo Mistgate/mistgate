@@ -16,7 +16,6 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -161,59 +160,9 @@ func (s *Service) finishPanelUpdate() {
 	s.mu.Unlock()
 }
 
-// RestorePanelData reserves the panel-update/rollout gate before asking the updater's systemd helper to swap verified
-// restore data into place. The helper's Installing state holds the reservation after this call returns.
-func (s *Service) StartPanelRestore(ctx context.Context, request PanelRestoreRequest, beforeStart func() error) error {
-	if err := edition.Check(s.cfg.Edge, edition.PanelUpdate); err != nil {
-		return err
-	}
-	if err := s.beginPanelUpdate(ctx); err != nil {
-		return err
-	}
-	defer s.finishPanelUpdate()
-	if beforeStart != nil {
-		if err := beforeStart(); err != nil {
-			return err
-		}
-	}
-	restorer, ok := s.cfg.PanelUpdater.(interface {
-		Restore(context.Context, PanelRestoreRequest) error
-	})
-	if !ok {
-		return ErrPanelUnsupported
-	}
-	return restorer.Restore(ctx, request)
-}
-
-// DeleteKeptData reserves the shared panel-update and rollout gate while the privileged helper deletes a kept directory.
-func (s *Service) DeleteKeptData(ctx context.Context, name string) error {
-	if err := edition.Check(s.cfg.Edge, edition.PanelUpdate); err != nil {
-		return err
-	}
-	if err := s.beginPanelUpdate(ctx); err != nil {
-		return err
-	}
-	defer s.finishPanelUpdate()
-	deleter, ok := s.cfg.PanelUpdater.(interface {
-		DeleteKeptData(context.Context, string) error
-	})
-	if !ok {
-		return ErrPanelUnsupported
-	}
-	return deleter.DeleteKeptData(ctx, name)
-}
-
 // panelBusy reports a panel update being scheduled or run by its helper. The caller holds s.mu.
 func (s *Service) panelBusy() bool {
 	return s.panelInstalling || (s.cfg.PanelUpdater != nil && s.cfg.PanelUpdater.Status().Installing)
-}
-
-// PanelUpdateRunning reports whether the shared helper is scheduled or running. The restore coordinator uses it to
-// recover if systemd accepted a restore request but the helper never started.
-func (s *Service) PanelUpdateRunning() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.panelBusy()
 }
 
 // bundlePin is the release a caller approved: the rollout starts only while it is still the trusted bundle.

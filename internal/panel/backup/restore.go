@@ -1,3 +1,5 @@
+//go:build !js
+
 package backup
 
 import (
@@ -30,10 +32,14 @@ import (
 )
 
 const (
-	maxRestoreKeyBytes = 64 << 10
-	restoreStageTTL    = 30 * time.Minute
-	uploadStageTTL     = 30 * time.Minute
-	restoreResultKey   = "backup.restore_result"
+	maxRestoreKeyBytes      = 64 << 10
+	maxRestoreStageBytes    = maxEncryptedBytes + 2*maxPlaintextBytes
+	restoreStageTTL         = 30 * time.Minute
+	uploadStageTTL          = 30 * time.Minute
+	restoreHelperStartGrace = 3 * time.Minute
+	restoreResultKey        = "backup.restore_result"
+	restoreStagePrefix      = update.PanelRestoreStagePrefix
+	uploadStagePrefix       = stagePrefix + "upload-"
 )
 
 var r2ArchiveKeyPattern = regexp.MustCompile(`^mistgate/backups/v1/[A-Za-z0-9/_-]+\.tar\.gz\.age$`)
@@ -145,14 +151,36 @@ func (s *Service) upload(w http.ResponseWriter, r *http.Request) {
 		writeRestoreConnectError(w, r, connect.CodeInternal, "could not register the private upload")
 		return
 	}
-	s.restoreMu.Lock()
-	s.uploads[id] = uploadRecord{stageDir: stageDir, fileName: fileName, expires: s.now().Add(uploadStageTTL)}
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	s.restore.uploads[id] = uploadRecord{stageDir: stageDir, fileName: fileName, expires: s.now().Add(uploadStageTTL)}
+	s.restore.mu.Unlock()
 	s.audit(r.Context(), "backup.uploaded", map[string]any{"file_name": fileName, "size_bytes": n})
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(struct {
 		UploadID string `json:"upload_id"`
 	}{UploadID: id})
+}
+
+func (s *Service) tryBeginArchiveWork(reserve int64) bool {
+	s.restore.mu.Lock()
+	if s.restore.archiveWork || s.panelOperationRunning() {
+		s.restore.mu.Unlock()
+		return false
+	}
+	s.restore.archiveWork = true
+	s.restore.mu.Unlock()
+	withinBudget, err := restoreStageBudgetAllows(s.dataDir, reserve, maxRestoreStageBytes)
+	if err != nil || !withinBudget {
+		s.endArchiveWork()
+		return false
+	}
+	return true
+}
+
+func (s *Service) endArchiveWork() {
+	s.restore.mu.Lock()
+	s.restore.archiveWork = false
+	s.restore.mu.Unlock()
 }
 
 func safeUploadFileName(value string) string {
@@ -184,53 +212,53 @@ func writeRestoreConnectErr(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (s *Service) setStageActive(path string, active bool) {
-	s.restoreMu.Lock()
-	defer s.restoreMu.Unlock()
-	if s.activeStages == nil {
-		s.activeStages = map[string]bool{}
+	s.restore.mu.Lock()
+	defer s.restore.mu.Unlock()
+	if s.restore.activeStages == nil {
+		s.restore.activeStages = map[string]bool{}
 	}
 	if active {
-		s.activeStages[path] = true
+		s.restore.activeStages[path] = true
 	} else {
-		delete(s.activeStages, path)
+		delete(s.restore.activeStages, path)
 	}
 }
 
 func (s *Service) trySetStageActive(path string) bool {
-	s.restoreMu.Lock()
-	defer s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	defer s.restore.mu.Unlock()
 	if s.panelOperationRunning() {
 		return false
 	}
-	if s.activeStages == nil {
-		s.activeStages = map[string]bool{}
+	if s.restore.activeStages == nil {
+		s.restore.activeStages = map[string]bool{}
 	}
-	s.activeStages[path] = true
+	s.restore.activeStages[path] = true
 	return true
 }
 
 func (s *Service) cleanupExpiredStages(now time.Time) {
 	cutoff := now.Add(-max(restoreStageTTL, uploadStageTTL))
 	var remove []string
-	s.restoreMu.Lock()
-	for id, record := range s.uploads {
+	s.restore.mu.Lock()
+	for id, record := range s.restore.uploads {
 		if !now.Before(record.expires) {
 			remove = append(remove, record.stageDir)
-			delete(s.uploads, id)
+			delete(s.restore.uploads, id)
 		}
 	}
-	for id, record := range s.restores {
+	for id, record := range s.restore.restores {
 		if !now.Before(record.expires) {
 			remove = append(remove, record.stageDir)
-			delete(s.restores, id)
+			delete(s.restore.restores, id)
 		}
 	}
-	active := make(map[string]bool, len(s.activeStages))
-	for path := range s.activeStages {
+	active := make(map[string]bool, len(s.restore.activeStages))
+	for path := range s.restore.activeStages {
 		active[path] = true
 	}
 	activeStageCount := len(active)
-	s.restoreMu.Unlock()
+	s.restore.mu.Unlock()
 	for _, path := range remove {
 		_ = os.RemoveAll(path)
 	}
@@ -354,7 +382,7 @@ func (s *Service) prepareRestore(ctx context.Context, req *connect.Request[admin
 	if msg.UploadId != "" {
 		record, ok := s.takeUpload(msg.UploadId)
 		if !ok {
-			if s.restorePending.Load() {
+			if s.restore.pending.Load() {
 				return nil, connect.NewError(connect.CodeAborted, errors.New("a panel restore is already running"))
 			}
 			return nil, connect.NewError(connect.CodeNotFound, errors.New("the uploaded archive has expired or does not exist"))
@@ -399,9 +427,9 @@ func (s *Service) prepareRestore(ctx context.Context, req *connect.Request[admin
 		return nil, connect.NewError(connect.CodeInternal, errors.New("could not register the private restore stage"))
 	}
 	metadata := update.PanelRestoreRequest{StageDir: filepath.Base(stageDir), Source: source, FileName: fileName, MadeByVersion: info.AppVersion}
-	s.restoreMu.Lock()
-	s.restores[restoreID] = restoreRecord{stageDir: stageDir, request: metadata, summary: summary, expires: s.now().Add(restoreStageTTL)}
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	s.restore.restores[restoreID] = restoreRecord{stageDir: stageDir, request: metadata, summary: summary, expires: s.now().Add(restoreStageTTL)}
+	s.restore.mu.Unlock()
 	return connect.NewResponse(&adminv1.PrepareRestoreResponse{RestoreId: restoreID, Summary: summary}), nil
 }
 
@@ -442,21 +470,21 @@ func (s *Service) takeUpload(id string) (uploadRecord, bool) {
 	if _, err := hex.DecodeString(id); err != nil {
 		return uploadRecord{}, false
 	}
-	s.restoreMu.Lock()
-	defer s.restoreMu.Unlock()
-	record, ok := s.uploads[id]
+	s.restore.mu.Lock()
+	defer s.restore.mu.Unlock()
+	record, ok := s.restore.uploads[id]
 	if !ok || s.panelOperationRunning() {
 		return uploadRecord{}, false
 	}
-	delete(s.uploads, id)
+	delete(s.restore.uploads, id)
 	if !s.now().Before(record.expires) {
 		_ = os.RemoveAll(record.stageDir)
 		return uploadRecord{}, false
 	}
-	if s.activeStages == nil {
-		s.activeStages = map[string]bool{}
+	if s.restore.activeStages == nil {
+		s.restore.activeStages = map[string]bool{}
 	}
-	s.activeStages[record.stageDir] = true
+	s.restore.activeStages[record.stageDir] = true
 	return record, true
 }
 
@@ -569,9 +597,9 @@ func (r rpc) ConfirmRestore(ctx context.Context, req *connect.Request[adminv1.Co
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("restore id is required"))
 	}
 	r.s.cleanupExpiredStages(r.s.now())
-	r.s.restoreMu.Lock()
-	record, ok := r.s.restores[req.Msg.RestoreId]
-	r.s.restoreMu.Unlock()
+	r.s.restore.mu.Lock()
+	record, ok := r.s.restore.restores[req.Msg.RestoreId]
+	r.s.restore.mu.Unlock()
 	if !ok || !r.s.now().Before(record.expires) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("the prepared restore has expired or does not exist"))
 	}
@@ -582,23 +610,23 @@ func (r rpc) ConfirmRestore(ctx context.Context, req *connect.Request[adminv1.Co
 		return nil, connect.NewError(connect.CodeAborted, errors.New("a backup or restore is already running"))
 	}
 	defer r.s.mu.Unlock()
-	r.s.restoreMu.Lock()
-	current, stillPrepared := r.s.restores[req.Msg.RestoreId]
+	r.s.restore.mu.Lock()
+	current, stillPrepared := r.s.restore.restores[req.Msg.RestoreId]
 	if !stillPrepared || current.stageDir != record.stageDir || !r.s.now().Before(current.expires) {
-		r.s.restoreMu.Unlock()
+		r.s.restore.mu.Unlock()
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("the prepared restore has expired or does not exist"))
 	}
-	if r.s.panelOperationRunning() || r.s.archiveWork || len(r.s.activeStages) > 0 {
-		r.s.restoreMu.Unlock()
+	if r.s.panelOperationRunning() || r.s.restore.archiveWork || len(r.s.restore.activeStages) > 0 {
+		r.s.restore.mu.Unlock()
 		return nil, connect.NewError(connect.CodeAborted, errors.New("an archive transfer or restore preparation is already running"))
 	}
-	delete(r.s.restores, req.Msg.RestoreId)
-	if r.s.activeStages == nil {
-		r.s.activeStages = map[string]bool{}
+	delete(r.s.restore.restores, req.Msg.RestoreId)
+	if r.s.restore.activeStages == nil {
+		r.s.restore.activeStages = map[string]bool{}
 	}
-	r.s.activeStages[record.stageDir] = true
-	r.s.restorePending.Store(true)
-	r.s.restoreMu.Unlock()
+	r.s.restore.activeStages[record.stageDir] = true
+	r.s.restore.pending.Store(true)
+	r.s.restore.mu.Unlock()
 	restoreScheduled := false
 	defer func() {
 		r.s.setStageActive(record.stageDir, false)
@@ -611,20 +639,23 @@ func (r rpc) ConfirmRestore(ctx context.Context, req *connect.Request[adminv1.Co
 			"source": record.request.Source, "file_name": record.request.FileName, "made_by_version": record.request.MadeByVersion,
 		})
 	}
-	if r.s.restorePanelData == nil {
-		r.s.restorePending.Store(false)
+	if r.s.restore.panelData == nil {
+		r.s.restore.pending.Store(false)
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel restore helper is unavailable"))
 	}
 	acceptedRequest := record.request
 	acceptedRequest.RequestedUnix = r.s.now().UTC().Unix()
-	if err := r.s.restorePanelData(context.WithoutCancel(ctx), acceptedRequest, beforeStart); err != nil {
-		r.s.restorePending.Store(false)
+	if err := r.s.restore.panelData(context.WithoutCancel(ctx), RestoreRequest{
+		StageDir: acceptedRequest.StageDir, Source: acceptedRequest.Source, FileName: acceptedRequest.FileName,
+		MadeByVersion: acceptedRequest.MadeByVersion, RequestedUnix: acceptedRequest.RequestedUnix,
+	}, beforeStart); err != nil {
+		r.s.restore.pending.Store(false)
 		return nil, restoreStartError(err)
 	}
 	restoreScheduled = true
-	r.s.restoreMu.Lock()
-	r.s.pendingRestore = acceptedRequest
-	r.s.restoreMu.Unlock()
+	r.s.restore.mu.Lock()
+	r.s.restore.pendingRestore = acceptedRequest
+	r.s.restore.mu.Unlock()
 	return connect.NewResponse(&adminv1.ConfirmRestoreResponse{}), nil
 }
 
@@ -678,20 +709,20 @@ func (r rpc) DeleteKeptData(ctx context.Context, req *connect.Request[adminv1.De
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("kept restore path is not a real directory"))
 	}
-	if r.s.deleteKeptData == nil {
+	if r.s.restore.deleteKeptData == nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("kept-data deletion helper is unavailable"))
 	}
 	if !r.s.mu.TryLock() {
 		return nil, connect.NewError(connect.CodeAborted, errors.New("a backup or restore is already running"))
 	}
 	defer r.s.mu.Unlock()
-	r.s.restoreMu.Lock()
-	workRunning := r.s.archiveWork || len(r.s.activeStages) > 0
-	r.s.restoreMu.Unlock()
+	r.s.restore.mu.Lock()
+	workRunning := r.s.restore.archiveWork || len(r.s.restore.activeStages) > 0
+	r.s.restore.mu.Unlock()
 	if workRunning {
 		return nil, connect.NewError(connect.CodeAborted, errors.New("an archive transfer or restore preparation is already running"))
 	}
-	if err := r.s.deleteKeptData(ctx, req.Msg.Name); err != nil {
+	if err := r.s.restore.deleteKeptData(ctx, req.Msg.Name); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("kept restore directory could not be deleted"))
 	}
 	r.s.audit(ctx, "backup.kept_data_deleted", map[string]any{"name": req.Msg.Name})
@@ -794,28 +825,28 @@ func (s *Service) consumeRestoreResult(ctx context.Context) {
 		return
 	}
 	_ = os.Remove(filepath.Join(s.dataDir, update.PanelRestoreResultFileName))
-	s.restoreMu.Lock()
-	if s.pendingRestore.StageDir != "" {
-		delete(s.activeStages, filepath.Join(s.dataDir, s.pendingRestore.StageDir))
+	s.restore.mu.Lock()
+	if s.restore.pendingRestore.StageDir != "" {
+		delete(s.restore.activeStages, filepath.Join(s.dataDir, s.restore.pendingRestore.StageDir))
 	}
-	s.pendingRestore = update.PanelRestoreRequest{}
-	s.restoreMu.Unlock()
-	s.restorePending.Store(false)
+	s.restore.pendingRestore = update.PanelRestoreRequest{}
+	s.restore.mu.Unlock()
+	s.restore.pending.Store(false)
 }
 
 // reconcilePendingRestore records a durable failure if the updater has stopped reporting a scheduled helper but no
 // helper result arrived. This prevents an accepted request whose systemd unit never started from locking backups.
 func (s *Service) reconcilePendingRestore(ctx context.Context) {
-	s.restoreMu.Lock()
-	request := s.pendingRestore
-	s.restoreMu.Unlock()
+	s.restore.mu.Lock()
+	request := s.restore.pendingRestore
+	s.restore.mu.Unlock()
 	if request.StageDir == "" {
 		s.reconstructPendingRestore()
-		s.restoreMu.Lock()
-		request = s.pendingRestore
-		s.restoreMu.Unlock()
+		s.restore.mu.Lock()
+		request = s.restore.pendingRestore
+		s.restore.mu.Unlock()
 	}
-	if request.StageDir == "" || !s.restorePending.Load() {
+	if request.StageDir == "" || !s.restore.pending.Load() {
 		return
 	}
 	if _, err := update.ReadPanelRestoreResult(s.dataDir); err == nil {
@@ -849,7 +880,7 @@ func (s *Service) reconcilePendingRestore(ctx context.Context) {
 	if !requestedAt.IsZero() && s.now().Sub(requestedAt) < restoreHelperStartGrace {
 		return
 	}
-	if s.restoreHelperRunning != nil && s.restoreHelperRunning() && requestErr != nil && !exists {
+	if s.restore.helperRunning != nil && s.restore.helperRunning() && requestErr != nil && !exists {
 		return
 	}
 	result := update.PanelRestoreResult{

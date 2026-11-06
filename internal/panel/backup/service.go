@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,12 +17,10 @@ import (
 	"connectrpc.com/connect"
 	"filippo.io/age"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
-	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
@@ -34,8 +31,7 @@ const (
 	listResponseLimit   = 100
 	// backupTimeout bounds one backup, scheduled or started by hand: a snapshot and an upload of up to the 2 GiB the
 	// archive may hold, to a slow bucket.
-	backupTimeout           = 4 * time.Hour
-	restoreHelperStartGrace = 3 * time.Minute
+	backupTimeout = 4 * time.Hour
 )
 
 var (
@@ -58,7 +54,7 @@ type Config struct {
 	// Edge is the edge edition: no scheduled or manual backup runs there yet (R2), so those RPCs refuse.
 	Edge bool
 	// RestorePanelData hands a prepared stage to the update service's privileged helper.
-	RestorePanelData func(context.Context, update.PanelRestoreRequest, func() error) error
+	RestorePanelData func(context.Context, RestoreRequest, func() error) error
 	// DeleteKeptData delegates deletion beside the data directory to the privileged panel-update helper.
 	DeleteKeptData func(context.Context, string) error
 	// RestoreHelperRunning reports the shared panel-update helper's in-progress state.
@@ -69,30 +65,29 @@ type Config struct {
 	Log      *slog.Logger
 }
 
-type Service struct {
-	st                   *store.Store
-	vault                *vault.Vault
-	dataDir              string
-	masterKey            []byte
-	stepUp               func(context.Context) error
-	restorePanelData     func(context.Context, update.PanelRestoreRequest, func() error) error
-	deleteKeptData       func(context.Context, string) error
-	restoreHelperRunning func() bool
-	pendingRestore       update.PanelRestoreRequest
-	onResult             func(code string)
-	edge                 bool
-	log                  *slog.Logger
-	mu                   sync.Mutex  // held while a backup runs
-	running              atomic.Bool // the same, for the settings page to read
-	restorePending       atomic.Bool
-	r2Factory            func(context.Context, store.PanelBackupSettings) (s3API, error)
-	now                  func() time.Time
+// RestoreRequest is the public metadata passed to the VPS restore helper. It contains no recovery key.
+type RestoreRequest struct {
+	StageDir      string
+	Source        string
+	FileName      string
+	MadeByVersion string
+	RequestedUnix int64
+}
 
-	restoreMu    sync.Mutex
-	uploads      map[string]uploadRecord
-	restores     map[string]restoreRecord
-	activeStages map[string]bool
-	archiveWork  bool // one upload or restore preparation across local and R2 sources
+type Service struct {
+	st        *store.Store
+	vault     *vault.Vault
+	dataDir   string
+	masterKey []byte
+	stepUp    func(context.Context) error
+	restore   restoreState
+	onResult  func(code string)
+	edge      bool
+	log       *slog.Logger
+	mu        sync.Mutex  // held while a backup runs
+	running   atomic.Bool // the same, for the settings page to read
+	r2Factory func(context.Context, store.PanelBackupSettings) (s3API, error)
+	now       func() time.Time
 
 	retryMu  sync.Mutex
 	failures int       // backups that failed in a row
@@ -107,72 +102,15 @@ func New(cfg Config) (*Service, error) {
 		cfg.Log = slog.Default()
 	}
 	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...),
-		stepUp: cfg.StepUp, restorePanelData: cfg.RestorePanelData, deleteKeptData: cfg.DeleteKeptData, restoreHelperRunning: cfg.RestoreHelperRunning,
-		onResult: cfg.OnResult, edge: cfg.Edge, log: cfg.Log,
-		now: time.Now, uploads: map[string]uploadRecord{}, restores: map[string]restoreRecord{}, activeStages: map[string]bool{}}
+		stepUp: cfg.StepUp, onResult: cfg.OnResult, edge: cfg.Edge, log: cfg.Log, now: time.Now}
+	s.restore = newRestoreState(cfg)
 	s.r2Factory = s.newR2Client
-	s.reconstructPendingRestore()
-	s.cleanupExpiredStages(s.now())
+	s.initializeRestore()
 	return s, nil
 }
 
-func (s *Service) panelOperationRunning() bool {
-	return s.restorePending.Load() || update.PanelOperationRunning(s.dataDir, s.now()) || update.PanelHelperRequestPending(s.dataDir, s.now())
-}
-
-func (s *Service) tryBeginArchiveWork(reserve int64) bool {
-	s.restoreMu.Lock()
-	if s.archiveWork || s.panelOperationRunning() {
-		s.restoreMu.Unlock()
-		return false
-	}
-	s.archiveWork = true
-	s.restoreMu.Unlock()
-	withinBudget, err := restoreStageBudgetAllows(s.dataDir, reserve, maxRestoreStageBytes)
-	if err != nil || !withinBudget {
-		s.endArchiveWork()
-		return false
-	}
-	return true
-}
-
-func (s *Service) endArchiveWork() {
-	s.restoreMu.Lock()
-	s.archiveWork = false
-	s.restoreMu.Unlock()
-}
-
-func (s *Service) reconstructPendingRestore() {
-	request, requestErr := update.ReadPanelRestoreRequest(s.dataDir)
-	state, active, exists, stateErr := update.ReadPanelOperationState(s.dataDir, s.now())
-	if requestErr == nil {
-		s.pendingRestore = request
-		s.restorePending.Store(true)
-		s.activeStages[filepath.Join(s.dataDir, request.StageDir)] = true
-		return
-	}
-	if stateErr == nil && exists && state.Kind == "restore" && state.RestoreRequest != nil {
-		request = *state.RestoreRequest
-		if request.RequestedUnix == 0 {
-			request.RequestedUnix = state.StartedUnix
-		}
-		s.pendingRestore = request
-		s.restorePending.Store(true)
-		s.activeStages[filepath.Join(s.dataDir, request.StageDir)] = true
-		return
-	}
-	if active && stateErr == nil && state.Kind == "restore" {
-		s.restorePending.Store(true)
-	}
-}
-
-func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) {
-	return adminv1connect.NewBackupServiceHandler(rpc{s}, append([]connect.HandlerOption{connect.WithReadMaxBytes(64 << 10)}, opts...)...)
-}
-
 func (s *Service) Run(ctx context.Context) {
-	s.consumeRestoreResult(ctx)
-	s.reconcilePendingRestore(ctx)
+	s.reconcileRestore(ctx)
 	s.runDue(ctx)
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -181,9 +119,7 @@ func (s *Service) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.cleanupExpiredStages(s.now())
-			s.consumeRestoreResult(ctx)
-			s.reconcilePendingRestore(ctx)
+			s.maintainRestore(ctx)
 			s.runDue(ctx)
 		}
 	}
@@ -570,7 +506,7 @@ func (s *Service) stageSnapshot(ctx context.Context) (workDir, snapshot string, 
 		for _, entry := range entries {
 			name := entry.Name()
 			if entry.IsDir() && strings.HasPrefix(name, stagePrefix) &&
-				!strings.HasPrefix(name, restoreStagePrefix) && !strings.HasPrefix(name, uploadStagePrefix) {
+				!s.protectRestoreStage(name) {
 				_ = os.RemoveAll(filepath.Join(s.dataDir, entry.Name()))
 			}
 		}

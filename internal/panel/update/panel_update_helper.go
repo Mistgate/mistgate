@@ -1,3 +1,5 @@
+//go:build !js
+
 package update
 
 import (
@@ -17,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"debug/elf"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 )
 
@@ -585,27 +586,6 @@ func verifyFileSHA256(path, expected string) error {
 	}
 	if n <= 0 || n > panelUpdateMaxSize || hex.EncodeToString(h.Sum(nil)) != expected {
 		return errors.New("staged binary SHA-256 mismatch")
-	}
-	return nil
-}
-
-func verifyPanelELF(path, arch string) error {
-	f, err := elf.Open(path)
-	if err != nil {
-		return fmt.Errorf("panel release is not a Linux ELF executable: %w", err)
-	}
-	defer f.Close()
-	want := elf.EM_NONE
-	switch arch {
-	case "amd64":
-		want = elf.EM_X86_64
-	case "arm64":
-		want = elf.EM_AARCH64
-	default:
-		return fmt.Errorf("panel self-update does not support architecture %q", arch)
-	}
-	if f.Class != elf.ELFCLASS64 || f.Data != elf.ELFDATA2LSB || f.Machine != want {
-		return fmt.Errorf("panel release architecture mismatch: got %s/%s/%s", f.Class, f.Data, f.Machine)
 	}
 	return nil
 }
