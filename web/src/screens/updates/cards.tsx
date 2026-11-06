@@ -13,7 +13,10 @@ import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { bundleErrorText, heroOf, type Bundle, type UpdateActions, type Updates } from "@/lib/updates";
 import { Command } from "./nodes";
+import { asChannel } from "@/lib/channels";
+import { ChannelChip, ChannelDialog, channelName } from "./channel";
 import { WhatsNew } from "./notes";
+import { PanelUpdateWindow } from "./update-dialog";
 
 const bundleStates: Record<BundleStatus, { kind: StatusKind; key: MessageKey }> = {
   [BundleStatus.UNSPECIFIED]: { kind: "off", key: "up.bundle.status.missing" },
@@ -247,6 +250,7 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
   const edition = useEdition();
   const off = edition.off("panel_update"); // the edition has no binary to swap: no install, no systemd steps
   const { p, update, label, kind } = panelUpdate(t, data, edition.edge);
+  const [win, setWin] = useState(false);
   return (
     <section className={card}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -301,10 +305,11 @@ export function PanelCard({ data, owner, actions }: { data: Updates; owner: bool
             {t("up.panel.check")}
           </Button>
           {owner && !off && update?.available && update.installable && (
-            <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel({ version: update.version, sha256: update.sha256 })}>
+            <Button variant="primary" size="sm" disabled={actions.busy || update.installing} onClick={() => setWin(true)}>
               {t("up.panel.install")}
             </Button>
           )}
+          {owner && !off && <PanelUpdateWindow open={win} onOpenChange={setWin} data={data} actions={actions} />}
         </div>
         {edition.edge ? <EdgeDeploy version={update?.version} /> : off ? <EditionNotice feature="panel_update" /> : <p className="text-[13px] leading-normal text-pretty text-muted">{t("up.panel.updateBody")}</p>}
       </div>
@@ -331,6 +336,9 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
   const [touched, setTouched] = useState<boolean | null>(null);
   const open = touched ?? (!update?.supported && !off);
   const offer = !!update?.available && !update.installing;
+  const [win, setWin] = useState<"" | "channel" | "update">("");
+  const channel = asChannel(data.updateChannel);
+  const running = { version: p?.version ?? "", channel: asChannel(data.runningVersionChannel) };
   return (
     <section className={cx("flex min-w-0 flex-col gap-3 rounded-card-lg border p-4", offer ? "border-accent-line bg-accent-soft" : "border-line bg-surface")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -338,6 +346,7 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
           {t("up.panel.title")}
         </SectionLabel>
         <span className="font-mono text-xs font-bold">{p?.version || "—"}</span>
+        {!edition.edge && <ChannelChip channel={channel} onClick={owner ? () => setWin("channel") : undefined} />}
         {p?.built ? <span className="text-xs text-muted">{t("up.built", { date: fmt.date(p.built) })}</span> : null}
         <span className="flex-1" />
         <StatusPill kind={kind} label={label} sm />
@@ -346,14 +355,21 @@ export function PanelBar({ data, owner, actions }: { data: Updates; owner: boole
           {t("up.panel.check")}
         </Button>
         {owner && !off && update?.available && update.installable && (
-          <Button variant="primary" size="md" disabled={actions.busy || update.installing} onClick={() => void actions.installPanel({ version: update.version, sha256: update.sha256 })}>
+          <Button variant="primary" size="md" disabled={actions.busy || update.installing} onClick={() => setWin("update")}>
             {t("up.panel.install")}
           </Button>
         )}
         <Fold open={open} onToggle={() => setTouched(!open)} label={t("up.panel.details")} controls="up-panel-details" />
       </div>
+      {data.runningNewerThanChannelOffers && (
+        <p className="text-xs leading-snug text-pretty text-muted">{t("up.ch.ahead", { version: running.version, channel: channelName(t, channel) })}</p>
+      )}
       {edition.edge ? <EdgeDeploy version={update?.version} /> : <EditionNotice feature="panel_update" />}
       <WhatsNew notes={data.panelNotes} />
+      {owner && (
+        <ChannelDialog open={win === "channel"} onOpenChange={(o) => setWin(o ? "channel" : "")} current={channel} running={running} onPick={actions.setChannel} />
+      )}
+      {owner && !off && <PanelUpdateWindow open={win === "update"} onOpenChange={(o) => setWin(o ? "update" : "")} data={data} actions={actions} />}
       {open && (
         <div id="up-panel-details" className="flex flex-col gap-3 border-t border-line pt-3">
           <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">

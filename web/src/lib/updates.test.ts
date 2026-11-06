@@ -97,6 +97,10 @@ const bundle = (status: BundleStatus, over: Partial<NonNullable<Updates["bundle"
 const updates = (over: Partial<Updates> = {}): Updates => ({
   nowUnix: 1000,
   scheduleTimezoneOffsetMinutes: 180,
+  updateChannel: "stable",
+  runningVersionChannel: "",
+  offeredReleaseChannel: "",
+  runningNewerThanChannelOffers: false,
   panel: { version: "0.2.0-bbb", built: 200, hasReleaseKey: true, releaseKeyFingerprint: "abcd" },
   bundle: bundle(BundleStatus.TRUSTED),
   nodes: [node({ state: NodeUpdateState.OUTDATED })],

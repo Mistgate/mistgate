@@ -60,6 +60,7 @@ import { UsersBulkKit, UsersBulkPage } from "./dev-kit-users-bulk";
 import { HealthWarpKit } from "@/screens/dev-kit-health-warp";
 import { Ipv6Kit } from "./dev-kit-ipv6";
 import { PagingKit, UpdatesKit } from "./dev-kit-redesign";
+import { ReleaseKit } from "./dev-kit-release";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
 // 390 and 1280 px. Plain English on purpose: this page never ships.
@@ -294,7 +295,7 @@ export default function DevKit() {
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, bulk: BulkKit, "bulk-users": UsersBulkKit }[which];
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit }[which];
   if (only) {
     const Kit = only;
     return (

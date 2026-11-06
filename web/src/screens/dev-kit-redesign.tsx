@@ -33,7 +33,7 @@ const D = 86_400;
 
 type Seed = [readonly unknown[], unknown][];
 
-function Shot({ id, title, seed = [], children }: { id: string; title: string; seed?: Seed; children: ReactNode }) {
+export function Shot({ id, title, seed = [], children }: { id: string; title: string; seed?: Seed; children: ReactNode }) {
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
     c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "Owner", role: Role.OWNER }, version: "0.1.24", stepUpUntilUnix: 0n } as never);

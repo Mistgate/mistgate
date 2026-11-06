@@ -4,8 +4,10 @@ import { SectionLabel } from "@/components/ui/bits";
 import { StatusPill } from "@/components/ui/status";
 import { useLang, useT, type Lang } from "@/i18n";
 import { cx } from "@/lib/cx";
+import { asChannel } from "@/lib/channels";
 import { useFmt } from "@/lib/format";
 import type { Updates } from "@/lib/updates";
+import { ChannelChip } from "./channel";
 
 export type ReleaseNote = Updates["agentNotes"][number];
 
@@ -52,6 +54,7 @@ function Entry({ note, clamp }: { note: ReleaseNote; clamp?: boolean }) {
         ) : (
           <span className="font-mono text-xs font-bold">{note.version}</span>
         )}
+        {asChannel(note.channel) !== "stable" && <ChannelChip channel={asChannel(note.channel)} />}
         {note.publishedUnix > 0 && <span className="text-xs text-muted">{fmt.date(note.publishedUnix)}</span>}
         {note.security && <StatusPill kind="warn" label={t("up.notes.security")} sm />}
       </header>

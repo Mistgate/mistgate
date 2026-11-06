@@ -184,6 +184,14 @@ describe("panel self-update", () => {
     expect(text()).toContain("abababababab");
     await click(button("Update panel"));
     await settle();
+    // the window first: what happens and a backup; nothing is installed before Update in it
+    expect(installPanelUpdate).not.toHaveBeenCalled();
+    const dialog = document.querySelector<HTMLElement>("[role=dialog]")!;
+    expect(dialog.textContent).toContain("Update the panel to v0.3.0");
+    expect(dialog.textContent).toContain("If the new version does not start, the panel goes back to this one by itself.");
+    expect(dialog.textContent).toContain("File on this computer");
+    await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Update"));
+    await settle();
     expect(installPanelUpdate).toHaveBeenCalledWith({ expectedVersion: "v0.3.0", expectedSha256: sha });
   });
 
