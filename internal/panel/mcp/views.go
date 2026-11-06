@@ -589,6 +589,10 @@ type groupV struct {
 	DisabledNodeIDs []string `json:"disabled_node_ids,omitempty"`
 	UserCount       uint32   `json:"user_count"`
 	DNSPreset       string   `json:"dns_preset_id,omitempty"`
+	Color           string   `json:"color,omitempty"`
+	HappNodes       uint32   `json:"happ_nodes"`
+	AmneziaNodes    uint32   `json:"amnezia_nodes"`
+	TelegramNodes   uint32   `json:"telegram_nodes"`
 }
 
 // GroupsV is the groups_list result.
@@ -605,7 +609,8 @@ func (v *GroupsV) shrink() bool {
 func groupsView(r *adminv1.ListGroupsResponse) *GroupsV {
 	v := &GroupsV{Groups: []groupV{}}
 	for _, g := range r.GetGroups() {
-		gv := groupV{ID: g.GetId(), Name: nm(g.GetName()), UserCount: g.GetUserCount(), DNSPreset: clean(g.GetDnsPresetId(), 60)}
+		gv := groupV{ID: g.GetId(), Name: nm(g.GetName()), UserCount: g.GetUserCount(), DNSPreset: clean(g.GetDnsPresetId(), 60),
+			Color: clean(g.GetColor(), 20), HappNodes: g.GetHappNodes(), AmneziaNodes: g.GetAmneziaNodes(), TelegramNodes: g.GetTelegramNodes()}
 		for i, id := range g.GetProfileIds() {
 			if i == maxIDs {
 				break

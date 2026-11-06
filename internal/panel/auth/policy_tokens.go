@@ -38,6 +38,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UserServiceListUsersProcedure:                       TokenAccessDirect,
 	adminv1connect.UserServiceGetUserProcedure:                         TokenAccessDirect,
 	adminv1connect.GroupServiceListGroupsProcedure:                     TokenAccessDirect,
+	adminv1connect.GroupServiceCreateGroupProcedure:                    TokenAccessDirect,
+	adminv1connect.GroupServiceDeleteGroupProcedure:                    TokenAccessDirect,
 	adminv1connect.GroupServiceUpdateGroupProcedure:                    TokenAccessApproved,
 	adminv1connect.ProfileServiceListProtocolsProcedure:                TokenAccessDirect,
 	adminv1connect.ProfileServiceListProfilesProcedure:                 TokenAccessDirect,
@@ -46,6 +48,8 @@ var tokenProcedures = map[string]int{
 	adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure: TokenAccessDirect, // the shared page: names, texts, public app links
 	adminv1connect.SubscriptionServiceListClientsProcedure:             TokenAccessDirect,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:           TokenAccessDirect,
+	adminv1connect.DnsServiceListDnsPresetsProcedure:                   TokenAccessDirect,
+	adminv1connect.BackupServiceGetBackupSettingsProcedure:             TokenAccessDirect,
 	adminv1connect.UpdateServiceGetUpdatesProcedure:                    TokenAccessDirect,
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
 	adminv1connect.WarpServiceRestartWarpProcedure:                     TokenAccessDirect,
@@ -97,9 +101,11 @@ var tokenProcedures = map[string]int{
 	// Only through the owner's approval; no-change planning requests may also use WithPlanning. See Service.WithApprovedStepUp.
 	adminv1connect.HealthServiceApplyFixProcedure:                       TokenAccessApproved,
 	adminv1connect.ProfileServiceCreateProfileProcedure:                 TokenAccessApproved,
+	adminv1connect.NodeServiceUpdateNodeProcedure:                       TokenAccessApproved,
 	adminv1connect.ProfileServiceUpdateProfileProcedure:                 TokenAccessApproved,
 	adminv1connect.ProfileServiceDeleteProfileProcedure:                 TokenAccessApproved,
 	adminv1connect.ProfileServiceCreateInboundProcedure:                 TokenAccessApproved,
+	adminv1connect.ProfileServiceUpdateInboundProcedure:                 TokenAccessApproved,
 	adminv1connect.ProfileServiceDeleteInboundProcedure:                 TokenAccessApproved,
 	adminv1connect.UpdateServiceStartRolloutProcedure:                   TokenAccessApproved,
 	adminv1connect.UpdateServicePauseRolloutProcedure:                   TokenAccessApproved,
@@ -113,6 +119,10 @@ var tokenProcedures = map[string]int{
 	adminv1connect.WarpServiceRegisterWarpProcedure:                     TokenAccessApproved,
 	// What every user's page shows: one app at a time, through subscription_app_upsert / _remove (level write).
 	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: TokenAccessApproved,
+	// DNS presets are owner-only API procedures and only used by the corresponding MCP plan/apply tools.
+	adminv1connect.DnsServiceCreateDnsPresetProcedure: TokenAccessApproved,
+	adminv1connect.DnsServiceUpdateDnsPresetProcedure: TokenAccessApproved,
+	adminv1connect.DnsServiceDeleteDnsPresetProcedure: TokenAccessApproved,
 }
 
 // stepUpProcedures lists exactly the procedures whose handlers call RequireStepUp. A token cannot call them
@@ -201,8 +211,18 @@ var grantProcedures = map[string][]string{
 		adminv1connect.RelayServiceUpdateRelayProcedure,
 		adminv1connect.RelayServiceDeleteRelayProcedure,
 	},
-	"subscription_app_upsert": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
-	"subscription_app_remove": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_app_upsert":      {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_app_remove":      {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_rules_set":       {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_texts_set":       {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_link_limits_set": {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"subscription_page_set":        {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"dns_settings_set":             {adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure},
+	"group_update":                 {adminv1connect.GroupServiceUpdateGroupProcedure},
+	"dns_preset_create":            {adminv1connect.DnsServiceCreateDnsPresetProcedure},
+	"dns_preset_update":            {adminv1connect.DnsServiceUpdateDnsPresetProcedure},
+	"dns_preset_delete":            {adminv1connect.DnsServiceDeleteDnsPresetProcedure},
+	"node_update":                  {adminv1connect.NodeServiceUpdateNodeProcedure, adminv1connect.ProfileServiceUpdateInboundProcedure},
 	"profile_create": {
 		adminv1connect.ProfileServiceCreateProfileProcedure,
 		adminv1connect.ProfileServiceCreateInboundProcedure,

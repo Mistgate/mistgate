@@ -53,7 +53,12 @@ func TestBackupServicesAreOwnerOnlyAndProtected(t *testing.T) {
 		if got := NeedsStepUp(tc.path); got != tc.stepUp {
 			t.Errorf("%s needs step-up = %v, want %v", tc.name, got, tc.stepUp)
 		}
-		if _, allowed := TokenAccess(tc.path); allowed {
+		access, allowed := TokenAccess(tc.path)
+		if tc.name == "GetBackupSettings" {
+			if !allowed || access != TokenAccessDirect {
+				t.Errorf("GetBackupSettings token access = %d, %v; want direct status read", access, allowed)
+			}
+		} else if allowed {
 			t.Errorf("%s must remain closed to API tokens", tc.name)
 		}
 	}

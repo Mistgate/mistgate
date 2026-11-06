@@ -30,9 +30,10 @@ func subscriptionTools() []toolDef {
 	return slices.Concat(
 		[]toolDef{readTool("subscription_settings_get", ProfileReadonly, procs(adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure),
 			"The subscription page every user sees: its apps per platform in display order (name, kind, download link, add-link template, description, "+
-				"recommended), the page options, the server-name template, and the subscription title, announcement, support link and refresh interval. "+
-				"No user's link: this is the shared page. Links show query strings and long path segments as [redacted]; give a field to "+
-				"subscription_app_upsert_plan only when you change it.",
+				"recommended), ordered User-Agent serving rules, page options and Happ ping settings, instance DNS default and link-app DNS offer, "+
+				"link device-limit mode, AmneziaWG-in-link switch, server-name template, title, announcement, support link and refresh interval. "+
+				"Also the current shared link-user and link AmneziaWG-key counts. No user's link or key. Links show query strings and long path "+
+				"segments as [redacted]; give a field to subscription_app_upsert_plan only when you change an app.",
 			func(c *call, _ noArgs) (any, error) {
 				r, err := c.cl.Subs.GetSubscriptionSettings(c.ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))
 				if err != nil {
@@ -41,6 +42,8 @@ func subscriptionTools() []toolDef {
 				return subsSettingsView(r.Msg), nil
 			})},
 		change(subsAppUpsert), change(subsAppRemove),
+		change(subsRulesSet), change(subsTextsSet), change(subsLinkLimitsSet), change(subsPageSet),
+		change(dnsSettingsSet),
 	)
 }
 
@@ -63,7 +66,26 @@ type SubsSettingsV struct {
 		PagePassword      bool `json:"page_password"`
 		DNSChoice         bool `json:"dns_choice"` // people pick the DNS of each server on their page (off when absent)
 	} `json:"user_page"`
-	Apps map[string][]subsAppV `json:"apps"` // by platform, in display order
+	Apps               map[string][]subsAppV `json:"apps"` // by platform, in display order
+	Rules              []serveRuleV          `json:"rules"`
+	DefaultDNSPresetID string                `json:"default_dns_preset_id,omitempty"`
+	LinkDNS            linkDNSView           `json:"link_dns"`
+	LinkDeviceLimit    string                `json:"link_device_limit"`
+	LinkAWG            bool                  `json:"link_awg"`
+	SharedLinkUsers    uint32                `json:"shared_link_users"`
+	LinkAWGKeys        uint32                `json:"link_awg_keys"`
+	HappPing           string                `json:"happ_ping"`
+	HappPingOnOpen     bool                  `json:"happ_ping_on_open"`
+}
+
+type serveRuleV struct {
+	UAContains string `json:"ua_contains"`
+	Format     string `json:"format"`
+}
+
+type linkDNSView struct {
+	PresetIDs       []string `json:"preset_ids"`
+	DefaultPresetID string   `json:"default_preset_id,omitempty"`
 }
 
 type subsAppV struct {
@@ -80,7 +102,16 @@ func subsSettingsView(r *adminv1.GetSubscriptionSettingsResponse) *SubsSettingsV
 	v := &SubsSettingsV{
 		Title: nm(s.GetTitle()), EffectiveTitle: nm(r.GetEffectiveTitle()), Announcement: clean(s.GetAnnouncement(), 1000),
 		SupportURL: clean(s.GetSupportUrl(), 500), UpdateIntervalHours: s.GetUpdateIntervalHours(), ServerNameTemplate: nm(s.GetServerNameTemplate()),
-		Apps: map[string][]subsAppV{},
+		Apps: map[string][]subsAppV{}, Rules: []serveRuleV{}, DefaultDNSPresetID: clean(s.GetDefaultDnsPresetId(), 60),
+		LinkDeviceLimit: linkModeWord(s), LinkAWG: subsettings.LinkAWG(s), SharedLinkUsers: r.GetSharedLinkUsers(),
+		LinkAWGKeys: r.GetLinkAwgKeys(), HappPing: happPingWord(s.GetHappPing()), HappPingOnOpen: s.GetHappPingOnOpen(),
+	}
+	if link := s.GetLinkDns(); link != nil {
+		v.LinkDNS.PresetIDs = cleanIDs(link.GetPresetIds())
+		v.LinkDNS.DefaultPresetID = clean(link.GetDefaultPresetId(), 60)
+	}
+	for _, rule := range s.GetRules() {
+		v.Rules = append(v.Rules, serveRuleV{UAContains: clean(rule.GetUaContains(), 200), Format: subFormatWord(rule.GetFormat())})
 	}
 	o := s.GetUserPage()
 	v.UserPage.ShowAnnouncement, v.UserPage.ShowSupport, v.UserPage.ShowQR = o.GetShowAnnouncement(), o.GetShowSupport(), o.GetShowQr()
@@ -324,6 +355,20 @@ func textChange(key, from, to string) Fact {
 	f := changeFact(key, strconv.Quote(from)+" -> "+strconv.Quote(to), from, to)
 	f.UntrustedParams = []string{"from", "to"}
 	return f
+}
+
+// safeTextChange keeps user or node text out of stored plan facts if it contains a credential-shaped value.
+func safeTextChange(key, from, to string) Fact {
+	return textChange(key, clean(from, maxParamValue), clean(to, maxParamValue))
+}
+
+// rejectSecretShaped refuses text the scrubber would redact; the raw value would otherwise have to be stored in the plan
+// arguments for apply. It also avoids putting bearer-like links and key material into the owner's approval record.
+func rejectSecretShaped(field, value string) error {
+	if scrub(value) != value {
+		return errors.New(field + " looks like a credential or secret link; remove it before planning")
+	}
+	return nil
 }
 
 func appChanges(before, after *adminv1.PlatformApp) []Fact {

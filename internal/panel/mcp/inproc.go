@@ -57,6 +57,9 @@ type clients struct {
 	Warp         adminv1connect.WarpServiceClient
 	ClientProbe  adminv1connect.ClientProbeServiceClient
 	Relay        adminv1connect.RelayServiceClient
+	DNS          adminv1connect.DnsServiceClient
+	Reachability adminv1connect.CountryReachabilityServiceClient
+	Backup       adminv1connect.BackupServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -76,6 +79,9 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Warp:         adminv1connect.NewWarpServiceClient(hc, base),
 		ClientProbe:  adminv1connect.NewClientProbeServiceClient(hc, base),
 		Relay:        adminv1connect.NewRelayServiceClient(hc, base),
+		DNS:          adminv1connect.NewDnsServiceClient(hc, base),
+		Reachability: adminv1connect.NewCountryReachabilityServiceClient(hc, base),
+		Backup:       adminv1connect.NewBackupServiceClient(hc, base),
 	}
 }
 
