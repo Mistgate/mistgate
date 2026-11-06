@@ -7,6 +7,7 @@ import (
 
 // BackupDownloadProcedure is the plain HTTP archive route mounted beside Connect services.
 const BackupDownloadProcedure = "/backup/download"
+const BackupUploadProcedure = "/backup/upload"
 
 // level is how much of the admin API a procedure needs.
 type level int
@@ -256,6 +257,11 @@ var procedureLevels = map[string]level{
 	adminv1connect.BackupServiceTestBackupStorageProcedure:    levelOwner, // writes and deletes a probe object; also needs a step-up
 	adminv1connect.BackupServiceCreateBackupProcedure:         levelOwner, // exports sensitive installation state; also needs a step-up
 	adminv1connect.BackupServiceListBackupsProcedure:          levelOwner,
+	adminv1connect.BackupServicePrepareRestoreProcedure:       levelOwner,
+	adminv1connect.BackupServiceConfirmRestoreProcedure:       levelOwner, // also needs a step-up
+	adminv1connect.BackupServiceListKeptDataProcedure:         levelOwner,
+	adminv1connect.BackupServiceDeleteKeptDataProcedure:       levelOwner, // also needs a step-up
+	adminv1connect.BackupServiceGetRestoreResultProcedure:     levelOwner,
 
 	// TelegramService: setting the bot is the owner's (it decides where alerts go; also needs a step-up); linking, unlinking and
 	// switching alerts is each admin's own account, any role, like passkeys (linking also needs a step-up). Not open to tokens.

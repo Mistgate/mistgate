@@ -192,7 +192,7 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 			s.log.Error("password credential", "err", err)
 			return nil, errInternal(err)
 		}
-		secret, err := s.vault.Open(pw.TOTPSecret, totpAAD(admin.ID))
+		secret, err := s.vault.Open(pw.TOTPSecret, TOTPSecretAAD(admin.ID))
 		if err != nil {
 			s.log.Error("cannot open TOTP secret (wrong master key?)", "admin", admin.ID)
 			return nil, errInternal(err)

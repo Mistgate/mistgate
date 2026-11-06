@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -40,12 +41,66 @@ func RunPanelUpdateHelper(args []string) error {
 	fs := flag.NewFlagSet("panel-update-helper", flag.ContinueOnError)
 	dataDir := fs.String("data-dir", "", "panel data directory")
 	service := fs.String("service", "", "systemd service unit")
-	fetchLatest := fs.Bool("fetch-latest", false, "fetch and verify the confirmed signed release before installing (required)")
+	fetchLatest := fs.Bool("fetch-latest", false, "fetch and verify the confirmed signed release before installing")
+	restore := fs.Bool("restore", false, "swap in the confirmed, verified restore directory")
+	deleteKept := fs.Bool("delete-kept", false, "delete the confirmed kept data directory")
+	auto := fs.Bool("auto", false, "select the mode from the single confirmed request file")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() != 0 || *dataDir == "" || !unitPattern.MatchString(*service) || !*fetchLatest {
+	if *auto {
+		updateExists := regularRequestExists(filepath.Join(*dataDir, panelUpdateRequestName))
+		restoreExists := regularRequestExists(filepath.Join(*dataDir, panelRestoreRequestName))
+		deleteExists := regularRequestExists(filepath.Join(*dataDir, panelKeptDeleteRequestName))
+		if countTrue(updateExists, restoreExists, deleteExists) != 1 {
+			return errors.New("panel-update-helper: expected exactly one confirmed request")
+		}
+		*fetchLatest, *restore, *deleteKept = updateExists, restoreExists, deleteExists
+	}
+	if fs.NArg() != 0 || *dataDir == "" || !unitPattern.MatchString(*service) || countTrue(*fetchLatest, *restore, *deleteKept) != 1 {
 		return errors.New("panel-update-helper: invalid arguments")
+	}
+	absDataDir, err := filepath.Abs(*dataDir)
+	if err != nil || filepath.Clean(absDataDir) == string(filepath.Separator) {
+		return errors.New("panel-update-helper: invalid data directory")
+	}
+	systemctl := func(args ...string) (string, error) {
+		return runCommandWithTimeout("systemctl", 90*time.Second, args...)
+	}
+	kind := "update"
+	var restoreMetadata *PanelRestoreRequest
+	if *restore {
+		kind = "restore"
+		if request, err := ReadPanelRestoreRequest(absDataDir); err == nil {
+			restoreMetadata = &request
+		}
+	} else if *deleteKept {
+		kind = "delete-kept"
+	}
+	lock, err := acquirePanelOperationLock(absDataDir, kind, restoreMetadata, time.Now())
+	if err != nil {
+		return fmt.Errorf("panel-update-helper: %w", err)
+	}
+	defer lock.release()
+	if err := recoverPanelRestoreJournal(absDataDir, *service, systemctl); err != nil {
+		return err
+	}
+	if *restore {
+		request, err := takePanelRestoreRequest(absDataDir)
+		if err != nil {
+			return fmt.Errorf("panel-update-helper: %w", err)
+		}
+		lock.state.RestoreRequest = &request
+		lock.state.HeartbeatUnix = time.Now().UTC().Unix()
+		_ = writePanelOperationState(absDataDir, lock.state)
+		return applyPanelRestore(absDataDir, *service, request, systemctl)
+	}
+	if *deleteKept {
+		request, err := takePanelKeptDeleteRequest(absDataDir)
+		if err != nil {
+			return fmt.Errorf("panel-update-helper: %w", err)
+		}
+		return applyPanelKeptDataDelete(absDataDir, request)
 	}
 	// Only the key compiled into this root-owned binary: the data directory belongs to the panel's service user.
 	key, err := buildinfo.ReleasePublicKey()
@@ -59,12 +114,250 @@ func RunPanelUpdateHelper(args []string) error {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
-	systemctl := func(args ...string) (string, error) {
-		return runCommandWithTimeout("systemctl", 90*time.Second, args...)
-	}
 	return installLatestPanelUpdate(context.Background(), PanelUpdateConfig{
-		CurrentBuilt: buildinfo.BuiltUnix(), Key: key, DataDir: *dataDir, ServiceUnit: *service, Executable: exe, Enabled: true,
+		CurrentBuilt: buildinfo.BuiltUnix(), Key: key, DataDir: absDataDir, ServiceUnit: *service, Executable: exe, Enabled: true,
 	}, systemctl)
+}
+
+func countTrue(values ...bool) int {
+	count := 0
+	for _, value := range values {
+		if value {
+			count++
+		}
+	}
+	return count
+}
+
+func regularRequestExists(path string) bool {
+	info, err := os.Lstat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
+// applyPanelRestore stops the panel before it inspects, writes or changes the staged tree. The previous directory stays
+// beside the live one after success; a journal lets the next helper run finish or undo an interrupted swap.
+func applyPanelRestore(dataDir, service string, request PanelRestoreRequest, systemctl systemctlFunc) error {
+	if dataDir == "" || !unitPattern.MatchString(strings.TrimSpace(service)) || systemctl == nil || !validPanelRestoreRequest(request) {
+		return ErrPanelUnsupported
+	}
+	absoluteData, err := filepath.Abs(dataDir)
+	if err != nil || filepath.Clean(absoluteData) == string(filepath.Separator) || filepath.Base(absoluteData) == "." {
+		return errors.New("panel-update-helper: invalid data directory")
+	}
+	dataInfo, err := os.Lstat(absoluteData)
+	if err != nil || !dataInfo.IsDir() || dataInfo.Mode()&os.ModeSymlink != 0 {
+		return errors.New("panel-update-helper: panel data path must be a real directory")
+	}
+	runSystemctl := func(args ...string) error {
+		_, err := systemctl(args...)
+		return err
+	}
+	recordFailure := func(cause error) error {
+		result := PanelRestoreResult{Outcome: "failed", Source: request.Source, FileName: request.FileName,
+			MadeByVersion: request.MadeByVersion, CompletedUnix: time.Now().UTC().Unix()}
+		if err := writePanelRestoreResultOwned(absoluteData, result, dataInfo); err != nil {
+			return errors.Join(cause, fmt.Errorf("panel-update-helper: record failed restore: %w", err))
+		}
+		return cause
+	}
+	if err := runSystemctl("stop", service); err != nil {
+		return recordFailure(fmt.Errorf("panel-update-helper: stop panel before restore: %w", err))
+	}
+	restartPanel := func(cause error) error {
+		return errors.Join(cause, runSystemctl("start", service))
+	}
+	stagePath := filepath.Join(absoluteData, request.StageDir)
+	stageInfo, err := os.Lstat(stagePath)
+	if err != nil || !stageInfo.IsDir() || stageInfo.Mode()&os.ModeSymlink != 0 {
+		return restartPanel(recordFailure(errors.New("panel-update-helper: staged restore path must be a real directory inside the panel data directory")))
+	}
+	stageOutside := absoluteData + ".restore-stage-" + request.StageDir
+	if _, err := os.Lstat(stageOutside); err == nil {
+		return restartPanel(recordFailure(errors.New("panel-update-helper: restore staging path already exists")))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return restartPanel(recordFailure(err))
+	}
+	kept, err := newKeptRestorePath(absoluteData, time.Now().UTC())
+	if err != nil {
+		return restartPanel(recordFailure(err))
+	}
+	if _, err := os.Lstat(kept); err == nil {
+		return restartPanel(recordFailure(errors.New("panel-update-helper: kept restore path already exists")))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return restartPanel(recordFailure(err))
+	}
+	if err := normalizeRestoreOwnership(stagePath, dataInfo); err != nil {
+		_ = os.RemoveAll(stagePath)
+		return restartPanel(recordFailure(fmt.Errorf("panel-update-helper: prepare restored data ownership: %w", err)))
+	}
+	markerName := ".mistgate-restore-marker-" + strings.TrimPrefix(request.StageDir, PanelRestoreStagePrefix)
+	if err := createRestoreStageMarker(stagePath, markerName, request.StageDir); err != nil {
+		_ = os.RemoveAll(stagePath)
+		return restartPanel(recordFailure(fmt.Errorf("panel-update-helper: mark staged restore: %w", err)))
+	}
+	journal := panelRestoreJournal{Version: restoreJournalVersion, Phase: "prepared", DataDir: absoluteData,
+		StageName: request.StageDir, StagePath: stagePath, StageOutside: stageOutside, KeptPath: kept,
+		MarkerName: markerName, Request: request}
+	if _, err := os.Lstat(restoreJournalPath(absoluteData)); err == nil {
+		_ = os.RemoveAll(stagePath)
+		return restartPanel(recordFailure(errors.New("panel-update-helper: an interrupted restore journal needs recovery")))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		_ = os.RemoveAll(stagePath)
+		return restartPanel(recordFailure(err))
+	}
+	if err := swapRestoreDirectories(&journal); err != nil {
+		if errors.Is(err, errRestoreJournalInterruption) {
+			return err // The test seam models a process death: leave the durable journal and filesystem exactly as found.
+		}
+		rbErr := rollbackRestoreJournal(&journal)
+		if rbErr != nil {
+			return errors.Join(fmt.Errorf("panel-update-helper: swap restore data: %w", err), rbErr)
+		}
+		failed := recordFailure(fmt.Errorf("panel-update-helper: swap restore data: %w", err))
+		journalErr := removeRestoreJournal(absoluteData)
+		return restartPanel(errors.Join(failed, journalErr))
+	}
+	if err := removeRestoreStageMarker(absoluteData, markerName); err != nil {
+		err = errors.Join(fmt.Errorf("panel-update-helper: remove restore stage marker: %w", err), rollbackRestoreJournal(&journal))
+		return restartPanel(recordFailure(err))
+	}
+	if err := startPanelService(service, systemctl); err != nil {
+		if stopErr := runSystemctl("stop", service); stopErr != nil {
+			return errors.Join(fmt.Errorf("panel restore failed and rollback could not stop the panel: %w", err), stopErr)
+		}
+		if rbErr := rollbackRestoreJournal(&journal); rbErr != nil {
+			return errors.Join(fmt.Errorf("panel restore failed and rollback could not restore the previous directory: %w", err), rbErr)
+		}
+		failed := recordFailure(fmt.Errorf("panel restore failed and was rolled back: %w", err))
+		journalErr := removeRestoreJournal(absoluteData)
+		return restartPanel(errors.Join(failed, journalErr))
+	}
+	marker := PanelRestoreResult{Outcome: "restored", Source: request.Source, FileName: request.FileName,
+		MadeByVersion: request.MadeByVersion, CompletedUnix: time.Now().UTC().Unix()}
+	if err := writePanelRestoreResultOwned(absoluteData, marker, dataInfo); err != nil {
+		_ = runSystemctl("stop", service)
+		if rbErr := rollbackRestoreJournal(&journal); rbErr != nil {
+			return errors.Join(fmt.Errorf("panel-update-helper: write restore result: %w", err), rbErr)
+		}
+		failed := recordFailure(fmt.Errorf("panel-update-helper: write restore result: %w", err))
+		journalErr := removeRestoreJournal(absoluteData)
+		return restartPanel(errors.Join(failed, journalErr))
+	}
+	if err := commitRestoreJournal(&journal); err != nil {
+		if errors.Is(err, errRestoreJournalInterruption) {
+			return err
+		}
+		_ = runSystemctl("stop", service)
+		if rbErr := rollbackRestoreJournal(&journal); rbErr != nil {
+			return errors.Join(fmt.Errorf("panel-update-helper: commit restore: %w", err), rbErr)
+		}
+		failed := recordFailure(fmt.Errorf("panel-update-helper: commit restore: %w", err))
+		journalErr := removeRestoreJournal(absoluteData)
+		return restartPanel(errors.Join(failed, journalErr))
+	}
+	if err := removeRestoreJournal(absoluteData); err != nil {
+		return fmt.Errorf("panel-update-helper: finalize restore journal: %w", err)
+	}
+	return nil
+}
+
+func normalizeRestoreOwnership(root string, current os.FileInfo) error {
+	uid, gid, ok := panelDataOwner(current)
+	if !ok || runtime.GOOS == "windows" {
+		return nil
+	}
+	return filepath.WalkDir(root, func(path string, _ os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		return lchownPath(path, uid, gid)
+	})
+}
+
+func newKeptRestorePath(dataDir string, now time.Time) (string, error) {
+	for offset := 0; offset < 120; offset++ {
+		path := dataDir + ".before-restore-" + now.Add(time.Duration(offset)*time.Second).UTC().Format("20060102-150405")
+		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+			return path, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+	return "", errors.New("panel-update-helper: no unused kept restore name is available")
+}
+
+func applyPanelKeptDataDelete(dataDir string, request PanelKeptDeleteRequest) error {
+	absoluteData, err := filepath.Abs(dataDir)
+	if err != nil || filepath.Clean(absoluteData) == string(filepath.Separator) || filepath.Base(absoluteData) == "." ||
+		!validKeptDeleteName(absoluteData, request.Name) {
+		return errors.New("panel-update-helper: invalid kept-data deletion request")
+	}
+	owner, err := os.Lstat(absoluteData)
+	if err != nil || !owner.IsDir() || owner.Mode()&os.ModeSymlink != 0 {
+		return errors.New("panel-update-helper: panel data path must be a real directory")
+	}
+	kept := filepath.Join(filepath.Dir(absoluteData), request.Name)
+	result := PanelKeptDeleteResult{Outcome: "failed", Name: request.Name, CompletedUnix: time.Now().UTC().Unix()}
+	finishFailure := func(cause error) error {
+		if writeErr := writePanelKeptDeleteResult(absoluteData, result, owner); writeErr != nil {
+			return errors.Join(cause, fmt.Errorf("panel-update-helper: record kept-data deletion result: %w", writeErr))
+		}
+		return cause
+	}
+	info, err := os.Lstat(kept)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return finishFailure(errors.New("panel-update-helper: kept data path is not a real directory"))
+	}
+	if err := rejectSymlinksInTree(kept); err != nil {
+		return finishFailure(fmt.Errorf("panel-update-helper: kept data contains a symlink: %w", err))
+	}
+	if err := os.RemoveAll(kept); err != nil {
+		return finishFailure(fmt.Errorf("panel-update-helper: remove kept data: %w", err))
+	}
+	syncDirectory(filepath.Dir(kept))
+	result.Outcome = "deleted"
+	if err := writePanelKeptDeleteResult(absoluteData, result, owner); err != nil {
+		return fmt.Errorf("panel-update-helper: record kept-data deletion result: %w", err)
+	}
+	return nil
+}
+
+func rejectSymlinksInTree(root string) error {
+	return filepath.WalkDir(root, func(path string, _ os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlink at %s", filepath.Base(path))
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return fmt.Errorf("non-regular file at %s", filepath.Base(path))
+		}
+		return nil
+	})
+}
+
+func panelDataOwner(info os.FileInfo) (int, int, bool) {
+	sys := info.Sys()
+	if sys == nil {
+		return 0, 0, false
+	}
+	value := reflect.ValueOf(sys)
+	if value.Kind() == reflect.Pointer {
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return 0, 0, false
+	}
+	uid, gid := value.FieldByName("Uid"), value.FieldByName("Gid")
+	if !uid.IsValid() || !gid.IsValid() || !uid.CanUint() || !gid.CanUint() {
+		return 0, 0, false
+	}
+	return int(uid.Uint()), int(gid.Uint()), true
 }
 
 // installLatestPanelUpdate is the privileged path. It takes the version and digest the owner confirmed from the

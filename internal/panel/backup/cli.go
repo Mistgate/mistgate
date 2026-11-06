@@ -7,11 +7,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"filippo.io/age"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"golang.org/x/term"
 )
 
@@ -155,8 +157,32 @@ func runRestore(args []string, out io.Writer) error {
 	if archiveCloseErr != nil {
 		return archiveCloseErr
 	}
+	panelURL := restoredPanelURL(context.Background(), *dataDir)
 	_, err = fmt.Fprintf(out, "Panel data restored to %s\nBefore starting Mistgate, update any external systemd master.key credential to use the restored key.\n", *dataDir)
+	if err == nil && panelURL != "" {
+		_, err = fmt.Fprintf(out, "Panel URL: %s\n", panelURL)
+	}
 	return err
+}
+
+func restoredPanelURL(ctx context.Context, dataDir string) string {
+	st, err := store.Open(ctx, filepath.Join(dataDir, databaseName))
+	if err != nil {
+		return ""
+	}
+	defer st.Close()
+	values, err := st.SettingValues(ctx, []string{"public_url", "admin_host", "admin_prefix"})
+	if err != nil {
+		return ""
+	}
+	public, err := url.Parse(values["public_url"])
+	if err != nil || public.Scheme == "" {
+		return ""
+	}
+	if values["admin_host"] != "" {
+		return public.Scheme + "://" + values["admin_host"] + "/"
+	}
+	return strings.TrimRight(values["public_url"], "/") + values["admin_prefix"]
 }
 
 const maxPassphraseFileBytes = 64 << 10

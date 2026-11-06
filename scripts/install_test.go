@@ -398,6 +398,96 @@ func TestInstallerSkipsSystemdInTestMode(t *testing.T) {
 	}
 }
 
+func TestInstallerRestoresAnEncryptedBackupBeforeTheFirstStart(t *testing.T) {
+	bash := installerBash(t)
+	if !installerSSHKeygenYAvailable() && !installerOpenSSL32Available() {
+		t.Skip("neither supported signature verification path is installed")
+	}
+	release := newFakePanelRelease(t)
+	release.assets[installerTestBinary] = []byte(`#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${1:-} == backup && ${2:-} == restore ]]; then
+  shift 2
+  target=""
+  passphrase=""
+  while (($#)); do
+    case "$1" in
+      --data-dir) target=$2; shift 2 ;;
+      --passphrase-file) [[ -r "$2" ]]; passphrase=$(cat -- "$2"); shift 2 ;;
+      --file|--identity-file) [[ -r "$2" ]]; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [[ "$passphrase" != "wrong passphrase" ]] || exit 10
+  [[ -n "$target" ]]
+  mkdir -p -- "$target"
+  printf '%s' restored-master-key > "$target/master.key"
+  printf '%s\n' 'Panel URL: https://panel.example.com/control/'
+  exit 0
+fi
+if [[ ${1:-} == setup ]]; then
+  printf '%s\n' 'Data dir: /tmp/mistgate-test' 'Admin URL: https://panel.example.com/test/' 'Setup link: https://panel.example.com/test/setup#` + installerTestToken + `'
+  exit 0
+fi
+exit 2
+`)
+	release.updateBinaryMetadata(t)
+	release.resign(t)
+	server := release.server()
+	defer server.Close()
+	base := t.TempDir()
+	archive := filepath.Join(base, "mistgate-backup.tar.gz.age")
+	identity := filepath.Join(base, "recovery.txt")
+	passphrase := filepath.Join(base, "passphrase.txt")
+	wrongPassphrase := filepath.Join(base, "wrong-passphrase.txt")
+	for path, value := range map[string]string{archive: "encrypted archive fixture", identity: "AGE-SECRET-KEY-1TEST", passphrase: "installer secret passphrase", wrongPassphrase: "wrong passphrase"} {
+		if err := os.WriteFile(path, []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Dry run exercises the same installed binary's backup restore command while leaving the host and install paths alone.
+	dryBinDir := filepath.Join(base, "dry-bin")
+	dryDataDir := filepath.Join(base, "dry-data")
+	output, err := runInstaller(t, bash, server.URL, release.publicKey, release.sshPublicKey, filepath.ToSlash(dryBinDir), "x86_64",
+		"--restore", archive, "--identity-file", identity, "--data-dir", dryDataDir, "--dry-run")
+	if err != nil || !strings.Contains(output, "would restore the verified backup") || !strings.Contains(output, "panel.example.com") || strings.Contains(output, "Setup link") {
+		t.Fatalf("restore dry run output %q, error %v", output, err)
+	}
+	if _, err := os.Stat(dryDataDir); !os.IsNotExist(err) {
+		t.Fatalf("dry run created its requested data directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dryBinDir, "mistgate")); !os.IsNotExist(err) {
+		t.Fatalf("dry run installed a binary: %v", err)
+	}
+
+	// The passphrase is read from a file, restored master.key is retained, and no one-time setup link is printed.
+	installBinDir := filepath.Join(base, "install-bin")
+	installDataDir := filepath.Join(base, "installed-data")
+	output, err = runInstaller(t, bash, server.URL, release.publicKey, release.sshPublicKey, filepath.ToSlash(installBinDir), "x86_64",
+		"--restore", archive, "--passphrase-file", wrongPassphrase, "--data-dir", installDataDir, "--yes")
+	if err == nil || !strings.Contains(output, "the backup archive or recovery key could not be verified") {
+		t.Fatalf("wrong-key restore output %q, error %v", output, err)
+	}
+	if _, err := os.Stat(filepath.Join(installBinDir, "mistgate")); !os.IsNotExist(err) {
+		t.Fatalf("wrong key left an installed binary behind: %v", err)
+	}
+	if _, err := os.Stat(installDataDir); !os.IsNotExist(err) {
+		t.Fatalf("wrong key left a data directory behind: %v", err)
+	}
+	output, err = runInstaller(t, bash, server.URL, release.publicKey, release.sshPublicKey, filepath.ToSlash(installBinDir), "x86_64",
+		"--restore", archive, "--passphrase-file", passphrase, "--data-dir", installDataDir, "--yes")
+	if err != nil {
+		t.Fatalf("restore install failed: %v\n%s", err, output)
+	}
+	if !strings.Contains(output, "Point panel.example.com at this server; nodes reconnect by themselves.") || strings.Contains(output, "Setup link") || strings.Contains(output, "installer secret passphrase") {
+		t.Fatalf("restore install output leaked or omitted expected text: %s", output)
+	}
+	if got, err := os.ReadFile(filepath.Join(installDataDir, "master.key")); err != nil || string(got) != "restored-master-key" {
+		t.Fatalf("restored master.key = %q, %v", got, err)
+	}
+}
+
 type fakePanelRelease struct {
 	assets       map[string][]byte
 	manifest     release.Manifest

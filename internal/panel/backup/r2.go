@@ -129,6 +129,29 @@ func uploadBackup(ctx context.Context, api s3API, bucket, key, filePath string) 
 	return uploadBackupWithLimits(ctx, api, bucket, key, filePath, r2SingleUploadLimit, r2MultipartPartSize)
 }
 
+func downloadBackup(ctx context.Context, api s3API, bucket, key, filePath string) (int64, error) {
+	out, err := api.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+	if err != nil {
+		return 0, errBackupStorageFailed
+	}
+	if out == nil || out.Body == nil {
+		return 0, errBackupStorageFailed
+	}
+	defer out.Body.Close()
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return 0, errBackupStorageFailed
+	}
+	n, copyErr := copyContextN(ctx, f, out.Body, maxEncryptedBytes+1)
+	syncErr := f.Sync()
+	closeErr := f.Close()
+	if copyErr != nil || syncErr != nil || closeErr != nil || n > maxEncryptedBytes {
+		_ = os.Remove(filePath)
+		return 0, errBackupStorageFailed
+	}
+	return n, nil
+}
+
 func uploadBackupWithLimits(ctx context.Context, api s3API, bucket, key, filePath string, singleLimit, partSize int64) (int64, error) {
 	f, err := os.Open(filePath)
 	if err != nil {

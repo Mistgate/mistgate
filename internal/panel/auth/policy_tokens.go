@@ -151,6 +151,9 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.BackupServiceUpdateBackupSettingsProcedure:           true,
 	adminv1connect.BackupServiceTestBackupStorageProcedure:              true,
 	adminv1connect.BackupServiceCreateBackupProcedure:                   true,
+	adminv1connect.BackupServicePrepareRestoreProcedure:                 true,
+	adminv1connect.BackupServiceConfirmRestoreProcedure:                 true,
+	adminv1connect.BackupServiceDeleteKeptDataProcedure:                 true,
 	adminv1connect.TelegramServiceSetTelegramBotProcedure:               true,
 	adminv1connect.TelegramServiceBeginTelegramLinkProcedure:            true,
 	adminv1connect.GlobalpingServiceUpdateGlobalpingProcedure:           true,
@@ -246,8 +249,10 @@ func ProcedureRole(path string) string {
 	return store.RoleOwner
 }
 
-// NeedsStepUp reports whether the procedure or the plain HTTP backup download asks for a step-up.
-func NeedsStepUp(path string) bool { return path == BackupDownloadProcedure || stepUpProcedures[path] }
+// NeedsStepUp reports whether the procedure or a plain HTTP backup transfer asks for a step-up.
+func NeedsStepUp(path string) bool {
+	return path == BackupDownloadProcedure || path == BackupUploadProcedure || stepUpProcedures[path]
+}
 
 // TokenAccess says how a token may reach a procedure: TokenAccessDirect, TokenAccessApproved or TokenAccessPlanning; ok
 // is false when the procedure is closed to tokens.

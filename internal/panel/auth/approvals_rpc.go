@@ -117,13 +117,14 @@ type NodeInstallSecret struct {
 	PanelKey    bool   `json:"panel_key,omitempty"`
 }
 
-func nodeInstallSecretAAD(planID string) string { return "mcp-plan-node-install:" + planID }
+// NodeInstallSecretAAD is the vault AAD for the secret the owner supplied while approving an MCP install plan.
+func NodeInstallSecretAAD(planID string) string { return "mcp-plan-node-install:" + planID }
 
 // SealNodeInstallSecret seals what the owner entered to plan planID (the approval does it; tests too).
 func SealNodeInstallSecret(v *vault.Vault, planID string, s NodeInstallSecret) []byte {
 	plain, _ := json.Marshal(s)
 	defer clear(plain)
-	return v.Seal(plain, nodeInstallSecretAAD(planID))
+	return v.Seal(plain, NodeInstallSecretAAD(planID))
 }
 
 // OpenNodeInstallSecret opens what ApproveMCPPlanWithSecret stored for plan planID.
@@ -132,7 +133,7 @@ func OpenNodeInstallSecret(v *vault.Vault, planID string, sealed []byte) (NodeIn
 	if v == nil {
 		return out, errors.New("auth: no vault")
 	}
-	plain, err := v.Open(sealed, nodeInstallSecretAAD(planID))
+	plain, err := v.Open(sealed, NodeInstallSecretAAD(planID))
 	if err != nil {
 		return out, err
 	}

@@ -8,6 +8,11 @@ service BackupService {
   rpc TestBackupStorage(TestBackupStorageRequest) returns (TestBackupStorageResponse);
   rpc CreateBackup(CreateBackupRequest) returns (CreateBackupResponse);
   rpc ListBackups(ListBackupsRequest) returns (ListBackupsResponse);
+  rpc PrepareRestore(PrepareRestoreRequest) returns (PrepareRestoreResponse);
+  rpc ConfirmRestore(ConfirmRestoreRequest) returns (ConfirmRestoreResponse);
+  rpc ListKeptData(ListKeptDataRequest) returns (ListKeptDataResponse);
+  rpc DeleteKeptData(DeleteKeptDataRequest) returns (DeleteKeptDataResponse);
+  rpc GetRestoreResult(GetRestoreResultRequest) returns (GetRestoreResultResponse);
 }
 
 message GetBackupSettingsRequest {}
@@ -64,4 +69,53 @@ message Backup {
   string key = 1;
   int64 size_bytes = 2;
   int64 created_unix = 3;
+}
+
+message PrepareRestoreRequest {
+  // Exactly one source is required. An upload id is returned by POST /backup/upload.
+  string upload_id = 1;
+  string r2_object_key = 2;
+  // Exactly one key is required. Identity bytes and passphrases are used only for this request.
+  bytes identity_file = 3;
+  string passphrase = 4;
+}
+message PrepareRestoreResponse {
+  string restore_id = 1;
+  RestoreSummary summary = 2;
+}
+message RestoreSummary {
+  string panel_name = 1;
+  string made_by_version = 2;
+  int64 created_unix = 3;
+  int64 backup_nodes = 4;
+  int64 backup_users = 5;
+  int64 backup_profiles = 6;
+  int64 current_nodes = 7;
+  int64 current_users = 8;
+  int64 current_profiles = 9;
+}
+message ConfirmRestoreRequest {
+  string restore_id = 1;
+  string typed_panel_name = 2;
+}
+message ConfirmRestoreResponse {}
+
+message ListKeptDataRequest {}
+message ListKeptDataResponse { repeated KeptData directories = 1; }
+message KeptData {
+  string name = 1;
+  int64 size_bytes = 2;
+  int64 modified_unix = 3;
+}
+message DeleteKeptDataRequest { string name = 1; }
+message DeleteKeptDataResponse {}
+
+// The helper writes the result into the active data directory. The next panel process saves it and exposes it here.
+message GetRestoreResultRequest {}
+message GetRestoreResultResponse {
+  string outcome = 1;
+  string source = 2;
+  string file_name = 3;
+  string made_by_version = 4;
+  int64 completed_unix = 5;
 }

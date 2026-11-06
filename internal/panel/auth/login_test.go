@@ -51,7 +51,7 @@ func TestSetupWrongTOTPUpdatesExistingCeremony(t *testing.T) {
 	if err := st.R.QueryRowContext(ctx, `SELECT tries, totp_enc FROM auth_ceremony WHERE id = ?`, begin.Msg.CeremonyId).Scan(&tries, &sealed); err != nil || tries != 1 {
 		t.Fatalf("ceremony after typo = tries %d, err %v; want same live ceremony at try 1", tries, err)
 	}
-	opened, err := s.vault.Open(sealed, ceremonyTOTPRecordID(begin.Msg.CeremonyId))
+	opened, err := s.vault.Open(sealed, AuthCeremonyTOTPRecordID(begin.Msg.CeremonyId))
 	if err != nil || string(opened) != string(secret) || begin.Msg.TotpUri == "" {
 		t.Fatalf("ceremony QR secret changed after typo: err %v", err)
 	}
@@ -159,10 +159,10 @@ func TestPasswordSetupAndLogin(t *testing.T) {
 	if strings.Contains(string(cred.TOTPSecret), string(secret)) {
 		t.Error("TOTP secret stored in the clear")
 	}
-	if opened, err := s.vault.Open(cred.TOTPSecret, totpAAD(adminID)); err != nil || string(opened) != string(secret) {
+	if opened, err := s.vault.Open(cred.TOTPSecret, TOTPSecretAAD(adminID)); err != nil || string(opened) != string(secret) {
 		t.Errorf("sealed secret: %v", err)
 	}
-	if _, err := s.vault.Open(cred.TOTPSecret, totpAAD("adm_other")); err == nil {
+	if _, err := s.vault.Open(cred.TOTPSecret, TOTPSecretAAD("adm_other")); err == nil {
 		t.Error("sealed secret opens for another admin")
 	}
 	if n, _ := st.AdminCount(ctx); n != 1 {

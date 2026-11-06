@@ -23,6 +23,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
@@ -31,9 +32,10 @@ const (
 	secretRecordID      = "panel_backup_settings.secret_access_key"
 	defaultIntervalHour = 24
 	listResponseLimit   = 100
-	// backupTimeout bounds one backup, scheduled or started by hand: a snapshot and an upload of up to the 50 GiB the
+	// backupTimeout bounds one backup, scheduled or started by hand: a snapshot and an upload of up to the 2 GiB the
 	// archive may hold, to a slow bucket.
-	backupTimeout = 4 * time.Hour
+	backupTimeout           = 4 * time.Hour
+	restoreHelperStartGrace = 3 * time.Minute
 )
 
 var (
@@ -55,6 +57,12 @@ type Config struct {
 	StepUp    func(context.Context) error
 	// Edge is the edge edition: no scheduled or manual backup runs there yet (R2), so those RPCs refuse.
 	Edge bool
+	// RestorePanelData hands a prepared stage to the update service's privileged helper.
+	RestorePanelData func(context.Context, update.PanelRestoreRequest, func() error) error
+	// DeleteKeptData delegates deletion beside the data directory to the privileged panel-update helper.
+	DeleteKeptData func(context.Context, string) error
+	// RestoreHelperRunning reports the shared panel-update helper's in-progress state.
+	RestoreHelperRunning func() bool
 	// OnResult is told how every backup ended: "" when it worked, else the error code (backup_storage_failed, ...). The
 	// Telegram alerts hang on it. It must not block.
 	OnResult func(code string)
@@ -62,18 +70,29 @@ type Config struct {
 }
 
 type Service struct {
-	st        *store.Store
-	vault     *vault.Vault
-	dataDir   string
-	masterKey []byte
-	stepUp    func(context.Context) error
-	onResult  func(code string)
-	edge      bool
-	log       *slog.Logger
-	mu        sync.Mutex  // held while a backup runs
-	running   atomic.Bool // the same, for the settings page to read
-	r2Factory func(context.Context, store.PanelBackupSettings) (s3API, error)
-	now       func() time.Time
+	st                   *store.Store
+	vault                *vault.Vault
+	dataDir              string
+	masterKey            []byte
+	stepUp               func(context.Context) error
+	restorePanelData     func(context.Context, update.PanelRestoreRequest, func() error) error
+	deleteKeptData       func(context.Context, string) error
+	restoreHelperRunning func() bool
+	pendingRestore       update.PanelRestoreRequest
+	onResult             func(code string)
+	edge                 bool
+	log                  *slog.Logger
+	mu                   sync.Mutex  // held while a backup runs
+	running              atomic.Bool // the same, for the settings page to read
+	restorePending       atomic.Bool
+	r2Factory            func(context.Context, store.PanelBackupSettings) (s3API, error)
+	now                  func() time.Time
+
+	restoreMu    sync.Mutex
+	uploads      map[string]uploadRecord
+	restores     map[string]restoreRecord
+	activeStages map[string]bool
+	archiveWork  bool // one upload or restore preparation across local and R2 sources
 
 	retryMu  sync.Mutex
 	failures int       // backups that failed in a row
@@ -87,9 +106,64 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...), stepUp: cfg.StepUp, onResult: cfg.OnResult, edge: cfg.Edge, log: cfg.Log, now: time.Now}
+	s := &Service{st: cfg.Store, vault: cfg.Vault, dataDir: cfg.DataDir, masterKey: append([]byte(nil), cfg.MasterKey...),
+		stepUp: cfg.StepUp, restorePanelData: cfg.RestorePanelData, deleteKeptData: cfg.DeleteKeptData, restoreHelperRunning: cfg.RestoreHelperRunning,
+		onResult: cfg.OnResult, edge: cfg.Edge, log: cfg.Log,
+		now: time.Now, uploads: map[string]uploadRecord{}, restores: map[string]restoreRecord{}, activeStages: map[string]bool{}}
 	s.r2Factory = s.newR2Client
+	s.reconstructPendingRestore()
+	s.cleanupExpiredStages(s.now())
 	return s, nil
+}
+
+func (s *Service) panelOperationRunning() bool {
+	return s.restorePending.Load() || update.PanelOperationRunning(s.dataDir, s.now()) || update.PanelHelperRequestPending(s.dataDir, s.now())
+}
+
+func (s *Service) tryBeginArchiveWork(reserve int64) bool {
+	s.restoreMu.Lock()
+	if s.archiveWork || s.panelOperationRunning() {
+		s.restoreMu.Unlock()
+		return false
+	}
+	s.archiveWork = true
+	s.restoreMu.Unlock()
+	withinBudget, err := restoreStageBudgetAllows(s.dataDir, reserve, maxRestoreStageBytes)
+	if err != nil || !withinBudget {
+		s.endArchiveWork()
+		return false
+	}
+	return true
+}
+
+func (s *Service) endArchiveWork() {
+	s.restoreMu.Lock()
+	s.archiveWork = false
+	s.restoreMu.Unlock()
+}
+
+func (s *Service) reconstructPendingRestore() {
+	request, requestErr := update.ReadPanelRestoreRequest(s.dataDir)
+	state, active, exists, stateErr := update.ReadPanelOperationState(s.dataDir, s.now())
+	if requestErr == nil {
+		s.pendingRestore = request
+		s.restorePending.Store(true)
+		s.activeStages[filepath.Join(s.dataDir, request.StageDir)] = true
+		return
+	}
+	if stateErr == nil && exists && state.Kind == "restore" && state.RestoreRequest != nil {
+		request = *state.RestoreRequest
+		if request.RequestedUnix == 0 {
+			request.RequestedUnix = state.StartedUnix
+		}
+		s.pendingRestore = request
+		s.restorePending.Store(true)
+		s.activeStages[filepath.Join(s.dataDir, request.StageDir)] = true
+		return
+	}
+	if active && stateErr == nil && state.Kind == "restore" {
+		s.restorePending.Store(true)
+	}
 }
 
 func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) {
@@ -97,6 +171,8 @@ func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) 
 }
 
 func (s *Service) Run(ctx context.Context) {
+	s.consumeRestoreResult(ctx)
+	s.reconcilePendingRestore(ctx)
 	s.runDue(ctx)
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -105,6 +181,9 @@ func (s *Service) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			s.cleanupExpiredStages(s.now())
+			s.consumeRestoreResult(ctx)
+			s.reconcilePendingRestore(ctx)
 			s.runDue(ctx)
 		}
 	}
@@ -113,6 +192,9 @@ func (s *Service) Run(ctx context.Context) {
 // runDue starts a scheduled backup once the interval has passed since the last success. After a failure it waits out
 // the backoff first (retryDelay): every attempt snapshots the database and reads the whole data directory.
 func (s *Service) runDue(ctx context.Context) {
+	if s.panelOperationRunning() {
+		return
+	}
 	settings, err := s.st.PanelBackupSettings(ctx)
 	if err != nil {
 		s.log.Error("read panel backup schedule", "code", "backup_settings_unavailable")
@@ -270,7 +352,14 @@ func (r rpc) CreateBackup(ctx context.Context, _ *connect.Request[adminv1.Create
 // a slow bucket takes longer. A busy or unconfigured service is refused at once; the outcome lands in the settings (last
 // success, last error) and the audit log. ctx carries the owner for the audit and must not end with the request.
 func (s *Service) startBackup(ctx context.Context) error {
+	if s.panelOperationRunning() {
+		return errBackupBusy
+	}
 	if !s.mu.TryLock() {
+		return errBackupBusy
+	}
+	if s.panelOperationRunning() {
+		s.mu.Unlock()
 		return errBackupBusy
 	}
 	settings, err := s.st.PanelBackupSettings(ctx)
@@ -382,7 +471,14 @@ func validateSettings(settings store.PanelBackupSettings, enabled bool) error {
 
 // createBackup makes one backup unless one is already running (the scheduler's way).
 func (s *Service) createBackup(ctx context.Context) (backupObject, string, error) {
+	if s.panelOperationRunning() {
+		return backupObject{}, "", errBackupBusy
+	}
 	if !s.mu.TryLock() {
+		return backupObject{}, "", errBackupBusy
+	}
+	if s.panelOperationRunning() {
+		s.mu.Unlock()
 		return backupObject{}, "", errBackupBusy
 	}
 	defer s.mu.Unlock()
@@ -472,12 +568,14 @@ func (s *Service) run(ctx context.Context) (_ backupObject, _ string, err error)
 func (s *Service) stageSnapshot(ctx context.Context) (workDir, snapshot string, err error) {
 	if entries, readErr := os.ReadDir(s.dataDir); readErr == nil {
 		for _, entry := range entries {
-			if entry.IsDir() && strings.HasPrefix(entry.Name(), stagePrefix) {
+			name := entry.Name()
+			if entry.IsDir() && strings.HasPrefix(name, stagePrefix) &&
+				!strings.HasPrefix(name, restoreStagePrefix) && !strings.HasPrefix(name, uploadStagePrefix) {
 				_ = os.RemoveAll(filepath.Join(s.dataDir, entry.Name()))
 			}
 		}
 	}
-	workDir, err = os.MkdirTemp(s.dataDir, stagePrefix)
+	workDir, err = os.MkdirTemp(s.dataDir, snapshotStagePrefix)
 	if err != nil {
 		return "", "", err
 	}

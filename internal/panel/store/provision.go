@@ -7,6 +7,15 @@ import (
 	"time"
 )
 
+// NodeProvisionCredentialsAAD binds a temporary install credential to its durable provisioning job.
+func NodeProvisionCredentialsAAD(jobID string) string { return "node-provision:" + jobID }
+
+// NodeServerAccessPasswordAAD binds a saved SSH password to its node.
+func NodeServerAccessPasswordAAD(nodeID string) string { return "node-access:" + nodeID }
+
+// PendingNodeServerPasswordAAD binds an unverified replacement SSH password to its node.
+func PendingNodeServerPasswordAAD(nodeID string) string { return "node-access-pending:" + nodeID }
+
 // NodeProvisionJob is durable metadata for one owner-requested SSH installation.
 // Secret is ciphertext produced by vault.Vault and is never returned by RPC methods.
 type NodeProvisionJob struct {

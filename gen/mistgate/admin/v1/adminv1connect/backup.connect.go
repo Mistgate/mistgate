@@ -48,6 +48,21 @@ const (
 	// BackupServiceListBackupsProcedure is the fully-qualified name of the BackupService's ListBackups
 	// RPC.
 	BackupServiceListBackupsProcedure = "/mistgate.admin.v1.BackupService/ListBackups"
+	// BackupServicePrepareRestoreProcedure is the fully-qualified name of the BackupService's
+	// PrepareRestore RPC.
+	BackupServicePrepareRestoreProcedure = "/mistgate.admin.v1.BackupService/PrepareRestore"
+	// BackupServiceConfirmRestoreProcedure is the fully-qualified name of the BackupService's
+	// ConfirmRestore RPC.
+	BackupServiceConfirmRestoreProcedure = "/mistgate.admin.v1.BackupService/ConfirmRestore"
+	// BackupServiceListKeptDataProcedure is the fully-qualified name of the BackupService's
+	// ListKeptData RPC.
+	BackupServiceListKeptDataProcedure = "/mistgate.admin.v1.BackupService/ListKeptData"
+	// BackupServiceDeleteKeptDataProcedure is the fully-qualified name of the BackupService's
+	// DeleteKeptData RPC.
+	BackupServiceDeleteKeptDataProcedure = "/mistgate.admin.v1.BackupService/DeleteKeptData"
+	// BackupServiceGetRestoreResultProcedure is the fully-qualified name of the BackupService's
+	// GetRestoreResult RPC.
+	BackupServiceGetRestoreResultProcedure = "/mistgate.admin.v1.BackupService/GetRestoreResult"
 )
 
 // BackupServiceClient is a client for the mistgate.admin.v1.BackupService service.
@@ -57,6 +72,11 @@ type BackupServiceClient interface {
 	TestBackupStorage(context.Context, *connect.Request[v1.TestBackupStorageRequest]) (*connect.Response[v1.TestBackupStorageResponse], error)
 	CreateBackup(context.Context, *connect.Request[v1.CreateBackupRequest]) (*connect.Response[v1.CreateBackupResponse], error)
 	ListBackups(context.Context, *connect.Request[v1.ListBackupsRequest]) (*connect.Response[v1.ListBackupsResponse], error)
+	PrepareRestore(context.Context, *connect.Request[v1.PrepareRestoreRequest]) (*connect.Response[v1.PrepareRestoreResponse], error)
+	ConfirmRestore(context.Context, *connect.Request[v1.ConfirmRestoreRequest]) (*connect.Response[v1.ConfirmRestoreResponse], error)
+	ListKeptData(context.Context, *connect.Request[v1.ListKeptDataRequest]) (*connect.Response[v1.ListKeptDataResponse], error)
+	DeleteKeptData(context.Context, *connect.Request[v1.DeleteKeptDataRequest]) (*connect.Response[v1.DeleteKeptDataResponse], error)
+	GetRestoreResult(context.Context, *connect.Request[v1.GetRestoreResultRequest]) (*connect.Response[v1.GetRestoreResultResponse], error)
 }
 
 // NewBackupServiceClient constructs a client for the mistgate.admin.v1.BackupService service. By
@@ -100,6 +120,36 @@ func NewBackupServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(backupServiceMethods.ByName("ListBackups")),
 			connect.WithClientOptions(opts...),
 		),
+		prepareRestore: connect.NewClient[v1.PrepareRestoreRequest, v1.PrepareRestoreResponse](
+			httpClient,
+			baseURL+BackupServicePrepareRestoreProcedure,
+			connect.WithSchema(backupServiceMethods.ByName("PrepareRestore")),
+			connect.WithClientOptions(opts...),
+		),
+		confirmRestore: connect.NewClient[v1.ConfirmRestoreRequest, v1.ConfirmRestoreResponse](
+			httpClient,
+			baseURL+BackupServiceConfirmRestoreProcedure,
+			connect.WithSchema(backupServiceMethods.ByName("ConfirmRestore")),
+			connect.WithClientOptions(opts...),
+		),
+		listKeptData: connect.NewClient[v1.ListKeptDataRequest, v1.ListKeptDataResponse](
+			httpClient,
+			baseURL+BackupServiceListKeptDataProcedure,
+			connect.WithSchema(backupServiceMethods.ByName("ListKeptData")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteKeptData: connect.NewClient[v1.DeleteKeptDataRequest, v1.DeleteKeptDataResponse](
+			httpClient,
+			baseURL+BackupServiceDeleteKeptDataProcedure,
+			connect.WithSchema(backupServiceMethods.ByName("DeleteKeptData")),
+			connect.WithClientOptions(opts...),
+		),
+		getRestoreResult: connect.NewClient[v1.GetRestoreResultRequest, v1.GetRestoreResultResponse](
+			httpClient,
+			baseURL+BackupServiceGetRestoreResultProcedure,
+			connect.WithSchema(backupServiceMethods.ByName("GetRestoreResult")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -110,6 +160,11 @@ type backupServiceClient struct {
 	testBackupStorage    *connect.Client[v1.TestBackupStorageRequest, v1.TestBackupStorageResponse]
 	createBackup         *connect.Client[v1.CreateBackupRequest, v1.CreateBackupResponse]
 	listBackups          *connect.Client[v1.ListBackupsRequest, v1.ListBackupsResponse]
+	prepareRestore       *connect.Client[v1.PrepareRestoreRequest, v1.PrepareRestoreResponse]
+	confirmRestore       *connect.Client[v1.ConfirmRestoreRequest, v1.ConfirmRestoreResponse]
+	listKeptData         *connect.Client[v1.ListKeptDataRequest, v1.ListKeptDataResponse]
+	deleteKeptData       *connect.Client[v1.DeleteKeptDataRequest, v1.DeleteKeptDataResponse]
+	getRestoreResult     *connect.Client[v1.GetRestoreResultRequest, v1.GetRestoreResultResponse]
 }
 
 // GetBackupSettings calls mistgate.admin.v1.BackupService.GetBackupSettings.
@@ -137,6 +192,31 @@ func (c *backupServiceClient) ListBackups(ctx context.Context, req *connect.Requ
 	return c.listBackups.CallUnary(ctx, req)
 }
 
+// PrepareRestore calls mistgate.admin.v1.BackupService.PrepareRestore.
+func (c *backupServiceClient) PrepareRestore(ctx context.Context, req *connect.Request[v1.PrepareRestoreRequest]) (*connect.Response[v1.PrepareRestoreResponse], error) {
+	return c.prepareRestore.CallUnary(ctx, req)
+}
+
+// ConfirmRestore calls mistgate.admin.v1.BackupService.ConfirmRestore.
+func (c *backupServiceClient) ConfirmRestore(ctx context.Context, req *connect.Request[v1.ConfirmRestoreRequest]) (*connect.Response[v1.ConfirmRestoreResponse], error) {
+	return c.confirmRestore.CallUnary(ctx, req)
+}
+
+// ListKeptData calls mistgate.admin.v1.BackupService.ListKeptData.
+func (c *backupServiceClient) ListKeptData(ctx context.Context, req *connect.Request[v1.ListKeptDataRequest]) (*connect.Response[v1.ListKeptDataResponse], error) {
+	return c.listKeptData.CallUnary(ctx, req)
+}
+
+// DeleteKeptData calls mistgate.admin.v1.BackupService.DeleteKeptData.
+func (c *backupServiceClient) DeleteKeptData(ctx context.Context, req *connect.Request[v1.DeleteKeptDataRequest]) (*connect.Response[v1.DeleteKeptDataResponse], error) {
+	return c.deleteKeptData.CallUnary(ctx, req)
+}
+
+// GetRestoreResult calls mistgate.admin.v1.BackupService.GetRestoreResult.
+func (c *backupServiceClient) GetRestoreResult(ctx context.Context, req *connect.Request[v1.GetRestoreResultRequest]) (*connect.Response[v1.GetRestoreResultResponse], error) {
+	return c.getRestoreResult.CallUnary(ctx, req)
+}
+
 // BackupServiceHandler is an implementation of the mistgate.admin.v1.BackupService service.
 type BackupServiceHandler interface {
 	GetBackupSettings(context.Context, *connect.Request[v1.GetBackupSettingsRequest]) (*connect.Response[v1.GetBackupSettingsResponse], error)
@@ -144,6 +224,11 @@ type BackupServiceHandler interface {
 	TestBackupStorage(context.Context, *connect.Request[v1.TestBackupStorageRequest]) (*connect.Response[v1.TestBackupStorageResponse], error)
 	CreateBackup(context.Context, *connect.Request[v1.CreateBackupRequest]) (*connect.Response[v1.CreateBackupResponse], error)
 	ListBackups(context.Context, *connect.Request[v1.ListBackupsRequest]) (*connect.Response[v1.ListBackupsResponse], error)
+	PrepareRestore(context.Context, *connect.Request[v1.PrepareRestoreRequest]) (*connect.Response[v1.PrepareRestoreResponse], error)
+	ConfirmRestore(context.Context, *connect.Request[v1.ConfirmRestoreRequest]) (*connect.Response[v1.ConfirmRestoreResponse], error)
+	ListKeptData(context.Context, *connect.Request[v1.ListKeptDataRequest]) (*connect.Response[v1.ListKeptDataResponse], error)
+	DeleteKeptData(context.Context, *connect.Request[v1.DeleteKeptDataRequest]) (*connect.Response[v1.DeleteKeptDataResponse], error)
+	GetRestoreResult(context.Context, *connect.Request[v1.GetRestoreResultRequest]) (*connect.Response[v1.GetRestoreResultResponse], error)
 }
 
 // NewBackupServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -183,6 +268,36 @@ func NewBackupServiceHandler(svc BackupServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(backupServiceMethods.ByName("ListBackups")),
 		connect.WithHandlerOptions(opts...),
 	)
+	backupServicePrepareRestoreHandler := connect.NewUnaryHandler(
+		BackupServicePrepareRestoreProcedure,
+		svc.PrepareRestore,
+		connect.WithSchema(backupServiceMethods.ByName("PrepareRestore")),
+		connect.WithHandlerOptions(opts...),
+	)
+	backupServiceConfirmRestoreHandler := connect.NewUnaryHandler(
+		BackupServiceConfirmRestoreProcedure,
+		svc.ConfirmRestore,
+		connect.WithSchema(backupServiceMethods.ByName("ConfirmRestore")),
+		connect.WithHandlerOptions(opts...),
+	)
+	backupServiceListKeptDataHandler := connect.NewUnaryHandler(
+		BackupServiceListKeptDataProcedure,
+		svc.ListKeptData,
+		connect.WithSchema(backupServiceMethods.ByName("ListKeptData")),
+		connect.WithHandlerOptions(opts...),
+	)
+	backupServiceDeleteKeptDataHandler := connect.NewUnaryHandler(
+		BackupServiceDeleteKeptDataProcedure,
+		svc.DeleteKeptData,
+		connect.WithSchema(backupServiceMethods.ByName("DeleteKeptData")),
+		connect.WithHandlerOptions(opts...),
+	)
+	backupServiceGetRestoreResultHandler := connect.NewUnaryHandler(
+		BackupServiceGetRestoreResultProcedure,
+		svc.GetRestoreResult,
+		connect.WithSchema(backupServiceMethods.ByName("GetRestoreResult")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.BackupService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BackupServiceGetBackupSettingsProcedure:
@@ -195,6 +310,16 @@ func NewBackupServiceHandler(svc BackupServiceHandler, opts ...connect.HandlerOp
 			backupServiceCreateBackupHandler.ServeHTTP(w, r)
 		case BackupServiceListBackupsProcedure:
 			backupServiceListBackupsHandler.ServeHTTP(w, r)
+		case BackupServicePrepareRestoreProcedure:
+			backupServicePrepareRestoreHandler.ServeHTTP(w, r)
+		case BackupServiceConfirmRestoreProcedure:
+			backupServiceConfirmRestoreHandler.ServeHTTP(w, r)
+		case BackupServiceListKeptDataProcedure:
+			backupServiceListKeptDataHandler.ServeHTTP(w, r)
+		case BackupServiceDeleteKeptDataProcedure:
+			backupServiceDeleteKeptDataHandler.ServeHTTP(w, r)
+		case BackupServiceGetRestoreResultProcedure:
+			backupServiceGetRestoreResultHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -222,4 +347,24 @@ func (UnimplementedBackupServiceHandler) CreateBackup(context.Context, *connect.
 
 func (UnimplementedBackupServiceHandler) ListBackups(context.Context, *connect.Request[v1.ListBackupsRequest]) (*connect.Response[v1.ListBackupsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.BackupService.ListBackups is not implemented"))
+}
+
+func (UnimplementedBackupServiceHandler) PrepareRestore(context.Context, *connect.Request[v1.PrepareRestoreRequest]) (*connect.Response[v1.PrepareRestoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.BackupService.PrepareRestore is not implemented"))
+}
+
+func (UnimplementedBackupServiceHandler) ConfirmRestore(context.Context, *connect.Request[v1.ConfirmRestoreRequest]) (*connect.Response[v1.ConfirmRestoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.BackupService.ConfirmRestore is not implemented"))
+}
+
+func (UnimplementedBackupServiceHandler) ListKeptData(context.Context, *connect.Request[v1.ListKeptDataRequest]) (*connect.Response[v1.ListKeptDataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.BackupService.ListKeptData is not implemented"))
+}
+
+func (UnimplementedBackupServiceHandler) DeleteKeptData(context.Context, *connect.Request[v1.DeleteKeptDataRequest]) (*connect.Response[v1.DeleteKeptDataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.BackupService.DeleteKeptData is not implemented"))
+}
+
+func (UnimplementedBackupServiceHandler) GetRestoreResult(context.Context, *connect.Request[v1.GetRestoreResultRequest]) (*connect.Response[v1.GetRestoreResultResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.BackupService.GetRestoreResult is not implemented"))
 }

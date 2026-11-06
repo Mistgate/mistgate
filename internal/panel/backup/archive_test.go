@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -90,6 +92,20 @@ func TestEncryptedArchiveRoundTripIncludesCommittedWAL(t *testing.T) {
 	restoredKey, err := os.ReadFile(filepath.Join(restored, masterKeyName))
 	if err != nil || !bytes.Equal(restoredKey, key) {
 		t.Errorf("restored master key does not match the source")
+	}
+}
+
+func TestEncryptedArchiveLimitWriterRejectsTheFirstByteOverLimit(t *testing.T) {
+	var output bytes.Buffer
+	writer := &encryptedArchiveLimitWriter{dst: &output, remaining: 5}
+	if n, err := writer.Write([]byte("1234")); n != 4 || err != nil {
+		t.Fatalf("first write = %d, %v", n, err)
+	}
+	if n, err := writer.Write([]byte("56")); n != 0 || !errors.Is(err, errArchiveTooLarge) {
+		t.Fatalf("over-limit write = %d, %v", n, err)
+	}
+	if got := output.String(); got != "1234" {
+		t.Fatalf("writer emitted %q beyond the limit", got)
 	}
 }
 
@@ -214,6 +230,133 @@ func TestRestoreRefusesANewerSchema(t *testing.T) {
 	}
 	if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("a refused restore created the destination: %v", err)
+	}
+}
+
+func TestRestoreRejectsMasterKeyThatDoesNotOpenSealedDatabaseValues(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	dbPath := filepath.Join(dataDir, databaseName)
+	st, err := store.Open(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	correctKey := bytes.Repeat([]byte{0x42}, vault.KeySize)
+	correctVault, err := vault.New(correctKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed := correctVault.Seal([]byte("private test value"), "setting/turnstile_secret")
+	if err := st.SetSettings(ctx, map[string]string{
+		"turnstile_secret": base64.StdEncoding.EncodeToString(sealed),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []string{
+		"DROP TABLE auth_ceremony",
+		"DROP TABLE awg_retained_key",
+		"DROP TABLE health_probe_cred",
+		"ALTER TABLE node_server_access DROP COLUMN pending_password",
+		"ALTER TABLE mcp_plan DROP COLUMN owner_secret",
+	} {
+		if _, err := st.W.ExecContext(ctx, statement); err != nil {
+			t.Fatalf("make archive schema older at %q: %v", statement, err)
+		}
+	}
+	snapshot := filepath.Join(t.TempDir(), "snapshot.db")
+	if err := st.SnapshotDatabase(ctx, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	wrongKey := make([]byte, vault.KeySize)
+	if _, err := rand.Read(wrongKey); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := age.GenerateHybridIdentity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var correctArchive bytes.Buffer
+	if err := CreateEncryptedArchiveWithRecipient(ctx, dataDir, snapshot, correctKey, "test-version", identity.Recipient(), time.Now(), &correctArchive); err != nil {
+		t.Fatal(err)
+	}
+	correctTarget := filepath.Join(t.TempDir(), "restore-correct")
+	if err := RestoreEncryptedArchive(ctx, bytes.NewReader(correctArchive.Bytes()), []age.Identity{identity}, correctTarget); err != nil {
+		t.Fatalf("restore with correct key and an older schema: %v", err)
+	}
+	restoredStore, err := store.Open(ctx, filepath.Join(correctTarget, databaseName))
+	if err != nil {
+		t.Fatalf("open restored database with dropped sealed schema: %v", err)
+	}
+	defer restoredStore.Close()
+	for _, table := range []string{"auth_ceremony", "awg_retained_key", "health_probe_cred"} {
+		var exists int
+		if err := restoredStore.R.QueryRowContext(ctx,
+			"SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?)", table,
+		).Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists != 0 {
+			t.Errorf("restored schema unexpectedly contains dropped table %s", table)
+		}
+	}
+	for _, missingColumn := range []struct{ table, column string }{
+		{"node_server_access", "pending_password"},
+		{"mcp_plan", "owner_secret"},
+	} {
+		var count int
+		if err := restoredStore.R.QueryRowContext(ctx,
+			"SELECT count(*) FROM pragma_table_info(?) WHERE name = ?", missingColumn.table, missingColumn.column,
+		).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Errorf("restored schema unexpectedly contains dropped column %s.%s", missingColumn.table, missingColumn.column)
+		}
+	}
+
+	var encrypted bytes.Buffer
+	if err := CreateEncryptedArchiveWithRecipient(ctx, dataDir, snapshot, wrongKey, "test-version", identity.Recipient(), time.Now(), &encrypted); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "restore")
+	err = RestoreEncryptedArchive(ctx, bytes.NewReader(encrypted.Bytes()), []age.Identity{identity}, target)
+	if err == nil || !strings.Contains(err.Error(), "does not match master.key") {
+		t.Fatalf("restore with mismatched master key = %v", err)
+	}
+	if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("refused restore left destination behind: %v", err)
+	}
+}
+
+func TestRestoreAllowsAnEmptyDatabaseWithNoSealedValues(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	st, err := store.Open(ctx, filepath.Join(dataDir, databaseName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := bytes.Repeat([]byte{0x19}, vault.KeySize)
+	snapshot := filepath.Join(t.TempDir(), "snapshot.db")
+	if err := st.SnapshotDatabase(ctx, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := age.GenerateHybridIdentity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encrypted bytes.Buffer
+	if err := CreateEncryptedArchiveWithRecipient(ctx, dataDir, snapshot, key, "test-version", identity.Recipient(), time.Now(), &encrypted); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "restore")
+	if err := RestoreEncryptedArchive(ctx, bytes.NewReader(encrypted.Bytes()), []age.Identity{identity}, target); err != nil {
+		t.Fatalf("empty archive restore with valid random master key: %v", err)
 	}
 }
 

@@ -201,7 +201,7 @@ func TestRebindAuthenticator(t *testing.T) {
 	}
 	// Nothing is stored before the code comes back: the old app still signs in.
 	stored, _ := st.PasswordByAdmin(context.Background(), adminID)
-	if opened, _ := s.vault.Open(stored.TOTPSecret, totpAAD(adminID)); !bytes.Equal(opened, oldSecret) {
+	if opened, _ := s.vault.Open(stored.TOTPSecret, TOTPSecretAAD(adminID)); !bytes.Equal(opened, oldSecret) {
 		t.Fatal("the secret changed before it was confirmed")
 	}
 
@@ -447,10 +447,10 @@ func TestResetLoginGivesAPasskeyAdminAPasswordLogin(t *testing.T) {
 	// The secret is sealed for that admin only.
 	cred, _ := st.PasswordByAdmin(ctx, helper.ID)
 	other, _ := vault.New(bytes.Repeat([]byte{7}, vault.KeySize))
-	if _, err := other.Open(cred.TOTPSecret, totpAAD(helper.ID)); err == nil {
+	if _, err := other.Open(cred.TOTPSecret, TOTPSecretAAD(helper.ID)); err == nil {
 		t.Error("the secret opens with another master key")
 	}
-	if _, err := s.vault.Open(cred.TOTPSecret, totpAAD(admin.ID)); err == nil {
+	if _, err := s.vault.Open(cred.TOTPSecret, TOTPSecretAAD(admin.ID)); err == nil {
 		t.Error("the secret opens as another admin's")
 	}
 }

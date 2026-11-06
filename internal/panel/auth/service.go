@@ -270,7 +270,8 @@ func (s *Service) failCeremony(ctx context.Context, id string) (bool, error) {
 	return s.st.FailAuthCeremony(ctx, id, maxSetupCodeTries)
 }
 
-func ceremonyTOTPRecordID(id string) string { return "auth_ceremony.totp:" + id }
+// AuthCeremonyTOTPRecordID is the vault AAD for a TOTP secret held by a pending auth ceremony.
+func AuthCeremonyTOTPRecordID(id string) string { return "auth_ceremony.totp:" + id }
 
 func (s *Service) ceremonyRow(id string, c *ceremony) (store.AuthCeremony, error) {
 	data, err := json.Marshal(c.data)
@@ -282,7 +283,7 @@ func (s *Service) ceremonyRow(id string, c *ceremony) (store.AuthCeremony, error
 		if s.vault == nil {
 			return store.AuthCeremony{}, errors.New("auth: cannot persist setup ceremony without a vault")
 		}
-		sealedTOTP = s.vault.Seal(c.totp, ceremonyTOTPRecordID(id))
+		sealedTOTP = s.vault.Seal(c.totp, AuthCeremonyTOTPRecordID(id))
 	}
 	name := c.name
 	if c.kind == ceremonySetup || c.kind == ceremonySetupPassword {
@@ -315,7 +316,7 @@ func (s *Service) ceremonyFromRow(row store.AuthCeremony) (*ceremony, error) {
 			return nil, errors.New("auth: cannot open setup ceremony without a vault")
 		}
 		var err error
-		if c.totp, err = s.vault.Open(row.TOTPEncrypted, ceremonyTOTPRecordID(row.ID)); err != nil {
+		if c.totp, err = s.vault.Open(row.TOTPEncrypted, AuthCeremonyTOTPRecordID(row.ID)); err != nil {
 			return nil, err
 		}
 	}

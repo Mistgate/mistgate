@@ -689,6 +689,657 @@ func (x *Backup) GetCreatedUnix() int64 {
 	return 0
 }
 
+type PrepareRestoreRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Exactly one source is required. An upload id is returned by POST /backup/upload.
+	UploadId    string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	R2ObjectKey string `protobuf:"bytes,2,opt,name=r2_object_key,json=r2ObjectKey,proto3" json:"r2_object_key,omitempty"`
+	// Exactly one key is required. Identity bytes and passphrases are used only for this request.
+	IdentityFile  []byte `protobuf:"bytes,3,opt,name=identity_file,json=identityFile,proto3" json:"identity_file,omitempty"`
+	Passphrase    string `protobuf:"bytes,4,opt,name=passphrase,proto3" json:"passphrase,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrepareRestoreRequest) Reset() {
+	*x = PrepareRestoreRequest{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrepareRestoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrepareRestoreRequest) ProtoMessage() {}
+
+func (x *PrepareRestoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrepareRestoreRequest.ProtoReflect.Descriptor instead.
+func (*PrepareRestoreRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PrepareRestoreRequest) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+func (x *PrepareRestoreRequest) GetR2ObjectKey() string {
+	if x != nil {
+		return x.R2ObjectKey
+	}
+	return ""
+}
+
+func (x *PrepareRestoreRequest) GetIdentityFile() []byte {
+	if x != nil {
+		return x.IdentityFile
+	}
+	return nil
+}
+
+func (x *PrepareRestoreRequest) GetPassphrase() string {
+	if x != nil {
+		return x.Passphrase
+	}
+	return ""
+}
+
+type PrepareRestoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RestoreId     string                 `protobuf:"bytes,1,opt,name=restore_id,json=restoreId,proto3" json:"restore_id,omitempty"`
+	Summary       *RestoreSummary        `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrepareRestoreResponse) Reset() {
+	*x = PrepareRestoreResponse{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrepareRestoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrepareRestoreResponse) ProtoMessage() {}
+
+func (x *PrepareRestoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrepareRestoreResponse.ProtoReflect.Descriptor instead.
+func (*PrepareRestoreResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PrepareRestoreResponse) GetRestoreId() string {
+	if x != nil {
+		return x.RestoreId
+	}
+	return ""
+}
+
+func (x *PrepareRestoreResponse) GetSummary() *RestoreSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
+type RestoreSummary struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PanelName       string                 `protobuf:"bytes,1,opt,name=panel_name,json=panelName,proto3" json:"panel_name,omitempty"`
+	MadeByVersion   string                 `protobuf:"bytes,2,opt,name=made_by_version,json=madeByVersion,proto3" json:"made_by_version,omitempty"`
+	CreatedUnix     int64                  `protobuf:"varint,3,opt,name=created_unix,json=createdUnix,proto3" json:"created_unix,omitempty"`
+	BackupNodes     int64                  `protobuf:"varint,4,opt,name=backup_nodes,json=backupNodes,proto3" json:"backup_nodes,omitempty"`
+	BackupUsers     int64                  `protobuf:"varint,5,opt,name=backup_users,json=backupUsers,proto3" json:"backup_users,omitempty"`
+	BackupProfiles  int64                  `protobuf:"varint,6,opt,name=backup_profiles,json=backupProfiles,proto3" json:"backup_profiles,omitempty"`
+	CurrentNodes    int64                  `protobuf:"varint,7,opt,name=current_nodes,json=currentNodes,proto3" json:"current_nodes,omitempty"`
+	CurrentUsers    int64                  `protobuf:"varint,8,opt,name=current_users,json=currentUsers,proto3" json:"current_users,omitempty"`
+	CurrentProfiles int64                  `protobuf:"varint,9,opt,name=current_profiles,json=currentProfiles,proto3" json:"current_profiles,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RestoreSummary) Reset() {
+	*x = RestoreSummary{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestoreSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestoreSummary) ProtoMessage() {}
+
+func (x *RestoreSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestoreSummary.ProtoReflect.Descriptor instead.
+func (*RestoreSummary) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RestoreSummary) GetPanelName() string {
+	if x != nil {
+		return x.PanelName
+	}
+	return ""
+}
+
+func (x *RestoreSummary) GetMadeByVersion() string {
+	if x != nil {
+		return x.MadeByVersion
+	}
+	return ""
+}
+
+func (x *RestoreSummary) GetCreatedUnix() int64 {
+	if x != nil {
+		return x.CreatedUnix
+	}
+	return 0
+}
+
+func (x *RestoreSummary) GetBackupNodes() int64 {
+	if x != nil {
+		return x.BackupNodes
+	}
+	return 0
+}
+
+func (x *RestoreSummary) GetBackupUsers() int64 {
+	if x != nil {
+		return x.BackupUsers
+	}
+	return 0
+}
+
+func (x *RestoreSummary) GetBackupProfiles() int64 {
+	if x != nil {
+		return x.BackupProfiles
+	}
+	return 0
+}
+
+func (x *RestoreSummary) GetCurrentNodes() int64 {
+	if x != nil {
+		return x.CurrentNodes
+	}
+	return 0
+}
+
+func (x *RestoreSummary) GetCurrentUsers() int64 {
+	if x != nil {
+		return x.CurrentUsers
+	}
+	return 0
+}
+
+func (x *RestoreSummary) GetCurrentProfiles() int64 {
+	if x != nil {
+		return x.CurrentProfiles
+	}
+	return 0
+}
+
+type ConfirmRestoreRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RestoreId      string                 `protobuf:"bytes,1,opt,name=restore_id,json=restoreId,proto3" json:"restore_id,omitempty"`
+	TypedPanelName string                 `protobuf:"bytes,2,opt,name=typed_panel_name,json=typedPanelName,proto3" json:"typed_panel_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConfirmRestoreRequest) Reset() {
+	*x = ConfirmRestoreRequest{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmRestoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmRestoreRequest) ProtoMessage() {}
+
+func (x *ConfirmRestoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmRestoreRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmRestoreRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ConfirmRestoreRequest) GetRestoreId() string {
+	if x != nil {
+		return x.RestoreId
+	}
+	return ""
+}
+
+func (x *ConfirmRestoreRequest) GetTypedPanelName() string {
+	if x != nil {
+		return x.TypedPanelName
+	}
+	return ""
+}
+
+type ConfirmRestoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmRestoreResponse) Reset() {
+	*x = ConfirmRestoreResponse{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmRestoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmRestoreResponse) ProtoMessage() {}
+
+func (x *ConfirmRestoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmRestoreResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmRestoreResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{16}
+}
+
+type ListKeptDataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListKeptDataRequest) Reset() {
+	*x = ListKeptDataRequest{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListKeptDataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListKeptDataRequest) ProtoMessage() {}
+
+func (x *ListKeptDataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListKeptDataRequest.ProtoReflect.Descriptor instead.
+func (*ListKeptDataRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{17}
+}
+
+type ListKeptDataResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Directories   []*KeptData            `protobuf:"bytes,1,rep,name=directories,proto3" json:"directories,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListKeptDataResponse) Reset() {
+	*x = ListKeptDataResponse{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListKeptDataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListKeptDataResponse) ProtoMessage() {}
+
+func (x *ListKeptDataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListKeptDataResponse.ProtoReflect.Descriptor instead.
+func (*ListKeptDataResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListKeptDataResponse) GetDirectories() []*KeptData {
+	if x != nil {
+		return x.Directories
+	}
+	return nil
+}
+
+type KeptData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	SizeBytes     int64                  `protobuf:"varint,2,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	ModifiedUnix  int64                  `protobuf:"varint,3,opt,name=modified_unix,json=modifiedUnix,proto3" json:"modified_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeptData) Reset() {
+	*x = KeptData{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeptData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeptData) ProtoMessage() {}
+
+func (x *KeptData) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeptData.ProtoReflect.Descriptor instead.
+func (*KeptData) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *KeptData) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *KeptData) GetSizeBytes() int64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *KeptData) GetModifiedUnix() int64 {
+	if x != nil {
+		return x.ModifiedUnix
+	}
+	return 0
+}
+
+type DeleteKeptDataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteKeptDataRequest) Reset() {
+	*x = DeleteKeptDataRequest{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteKeptDataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteKeptDataRequest) ProtoMessage() {}
+
+func (x *DeleteKeptDataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteKeptDataRequest.ProtoReflect.Descriptor instead.
+func (*DeleteKeptDataRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DeleteKeptDataRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type DeleteKeptDataResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteKeptDataResponse) Reset() {
+	*x = DeleteKeptDataResponse{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteKeptDataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteKeptDataResponse) ProtoMessage() {}
+
+func (x *DeleteKeptDataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteKeptDataResponse.ProtoReflect.Descriptor instead.
+func (*DeleteKeptDataResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{21}
+}
+
+// The helper writes the result into the active data directory. The next panel process saves it and exposes it here.
+type GetRestoreResultRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRestoreResultRequest) Reset() {
+	*x = GetRestoreResultRequest{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRestoreResultRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRestoreResultRequest) ProtoMessage() {}
+
+func (x *GetRestoreResultRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRestoreResultRequest.ProtoReflect.Descriptor instead.
+func (*GetRestoreResultRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{22}
+}
+
+type GetRestoreResultResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Outcome       string                 `protobuf:"bytes,1,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	Source        string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
+	FileName      string                 `protobuf:"bytes,3,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	MadeByVersion string                 `protobuf:"bytes,4,opt,name=made_by_version,json=madeByVersion,proto3" json:"made_by_version,omitempty"`
+	CompletedUnix int64                  `protobuf:"varint,5,opt,name=completed_unix,json=completedUnix,proto3" json:"completed_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRestoreResultResponse) Reset() {
+	*x = GetRestoreResultResponse{}
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRestoreResultResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRestoreResultResponse) ProtoMessage() {}
+
+func (x *GetRestoreResultResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_backup_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRestoreResultResponse.ProtoReflect.Descriptor instead.
+func (*GetRestoreResultResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_backup_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetRestoreResultResponse) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+func (x *GetRestoreResultResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *GetRestoreResultResponse) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *GetRestoreResultResponse) GetMadeByVersion() string {
+	if x != nil {
+		return x.MadeByVersion
+	}
+	return ""
+}
+
+func (x *GetRestoreResultResponse) GetCompletedUnix() int64 {
+	if x != nil {
+		return x.CompletedUnix
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_backup_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_backup_proto_rawDesc = "" +
@@ -740,13 +1391,63 @@ const file_mistgate_admin_v1_backup_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1d\n" +
 	"\n" +
 	"size_bytes\x18\x02 \x01(\x03R\tsizeBytes\x12!\n" +
-	"\fcreated_unix\x18\x03 \x01(\x03R\vcreatedUnix2\xa7\x04\n" +
+	"\fcreated_unix\x18\x03 \x01(\x03R\vcreatedUnix\"\x9d\x01\n" +
+	"\x15PrepareRestoreRequest\x12\x1b\n" +
+	"\tupload_id\x18\x01 \x01(\tR\buploadId\x12\"\n" +
+	"\rr2_object_key\x18\x02 \x01(\tR\vr2ObjectKey\x12#\n" +
+	"\ridentity_file\x18\x03 \x01(\fR\fidentityFile\x12\x1e\n" +
+	"\n" +
+	"passphrase\x18\x04 \x01(\tR\n" +
+	"passphrase\"t\n" +
+	"\x16PrepareRestoreResponse\x12\x1d\n" +
+	"\n" +
+	"restore_id\x18\x01 \x01(\tR\trestoreId\x12;\n" +
+	"\asummary\x18\x02 \x01(\v2!.mistgate.admin.v1.RestoreSummaryR\asummary\"\xde\x02\n" +
+	"\x0eRestoreSummary\x12\x1d\n" +
+	"\n" +
+	"panel_name\x18\x01 \x01(\tR\tpanelName\x12&\n" +
+	"\x0fmade_by_version\x18\x02 \x01(\tR\rmadeByVersion\x12!\n" +
+	"\fcreated_unix\x18\x03 \x01(\x03R\vcreatedUnix\x12!\n" +
+	"\fbackup_nodes\x18\x04 \x01(\x03R\vbackupNodes\x12!\n" +
+	"\fbackup_users\x18\x05 \x01(\x03R\vbackupUsers\x12'\n" +
+	"\x0fbackup_profiles\x18\x06 \x01(\x03R\x0ebackupProfiles\x12#\n" +
+	"\rcurrent_nodes\x18\a \x01(\x03R\fcurrentNodes\x12#\n" +
+	"\rcurrent_users\x18\b \x01(\x03R\fcurrentUsers\x12)\n" +
+	"\x10current_profiles\x18\t \x01(\x03R\x0fcurrentProfiles\"`\n" +
+	"\x15ConfirmRestoreRequest\x12\x1d\n" +
+	"\n" +
+	"restore_id\x18\x01 \x01(\tR\trestoreId\x12(\n" +
+	"\x10typed_panel_name\x18\x02 \x01(\tR\x0etypedPanelName\"\x18\n" +
+	"\x16ConfirmRestoreResponse\"\x15\n" +
+	"\x13ListKeptDataRequest\"U\n" +
+	"\x14ListKeptDataResponse\x12=\n" +
+	"\vdirectories\x18\x01 \x03(\v2\x1b.mistgate.admin.v1.KeptDataR\vdirectories\"b\n" +
+	"\bKeptData\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x02 \x01(\x03R\tsizeBytes\x12#\n" +
+	"\rmodified_unix\x18\x03 \x01(\x03R\fmodifiedUnix\"+\n" +
+	"\x15DeleteKeptDataRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x18\n" +
+	"\x16DeleteKeptDataResponse\"\x19\n" +
+	"\x17GetRestoreResultRequest\"\xb8\x01\n" +
+	"\x18GetRestoreResultResponse\x12\x18\n" +
+	"\aoutcome\x18\x01 \x01(\tR\aoutcome\x12\x16\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\x12\x1b\n" +
+	"\tfile_name\x18\x03 \x01(\tR\bfileName\x12&\n" +
+	"\x0fmade_by_version\x18\x04 \x01(\tR\rmadeByVersion\x12%\n" +
+	"\x0ecompleted_unix\x18\x05 \x01(\x03R\rcompletedUnix2\xaa\b\n" +
 	"\rBackupService\x12n\n" +
 	"\x11GetBackupSettings\x12+.mistgate.admin.v1.GetBackupSettingsRequest\x1a,.mistgate.admin.v1.GetBackupSettingsResponse\x12w\n" +
 	"\x14UpdateBackupSettings\x12..mistgate.admin.v1.UpdateBackupSettingsRequest\x1a/.mistgate.admin.v1.UpdateBackupSettingsResponse\x12n\n" +
 	"\x11TestBackupStorage\x12+.mistgate.admin.v1.TestBackupStorageRequest\x1a,.mistgate.admin.v1.TestBackupStorageResponse\x12_\n" +
 	"\fCreateBackup\x12&.mistgate.admin.v1.CreateBackupRequest\x1a'.mistgate.admin.v1.CreateBackupResponse\x12\\\n" +
-	"\vListBackups\x12%.mistgate.admin.v1.ListBackupsRequest\x1a&.mistgate.admin.v1.ListBackupsResponseB\xc6\x01\n" +
+	"\vListBackups\x12%.mistgate.admin.v1.ListBackupsRequest\x1a&.mistgate.admin.v1.ListBackupsResponse\x12e\n" +
+	"\x0ePrepareRestore\x12(.mistgate.admin.v1.PrepareRestoreRequest\x1a).mistgate.admin.v1.PrepareRestoreResponse\x12e\n" +
+	"\x0eConfirmRestore\x12(.mistgate.admin.v1.ConfirmRestoreRequest\x1a).mistgate.admin.v1.ConfirmRestoreResponse\x12_\n" +
+	"\fListKeptData\x12&.mistgate.admin.v1.ListKeptDataRequest\x1a'.mistgate.admin.v1.ListKeptDataResponse\x12e\n" +
+	"\x0eDeleteKeptData\x12(.mistgate.admin.v1.DeleteKeptDataRequest\x1a).mistgate.admin.v1.DeleteKeptDataResponse\x12k\n" +
+	"\x10GetRestoreResult\x12*.mistgate.admin.v1.GetRestoreResultRequest\x1a+.mistgate.admin.v1.GetRestoreResultResponseB\xc6\x01\n" +
 	"\x15com.mistgate.admin.v1B\vBackupProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -761,7 +1462,7 @@ func file_mistgate_admin_v1_backup_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_backup_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_backup_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_mistgate_admin_v1_backup_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_mistgate_admin_v1_backup_proto_goTypes = []any{
 	(*GetBackupSettingsRequest)(nil),     // 0: mistgate.admin.v1.GetBackupSettingsRequest
 	(*BackupSettings)(nil),               // 1: mistgate.admin.v1.BackupSettings
@@ -775,26 +1476,50 @@ var file_mistgate_admin_v1_backup_proto_goTypes = []any{
 	(*ListBackupsRequest)(nil),           // 9: mistgate.admin.v1.ListBackupsRequest
 	(*ListBackupsResponse)(nil),          // 10: mistgate.admin.v1.ListBackupsResponse
 	(*Backup)(nil),                       // 11: mistgate.admin.v1.Backup
+	(*PrepareRestoreRequest)(nil),        // 12: mistgate.admin.v1.PrepareRestoreRequest
+	(*PrepareRestoreResponse)(nil),       // 13: mistgate.admin.v1.PrepareRestoreResponse
+	(*RestoreSummary)(nil),               // 14: mistgate.admin.v1.RestoreSummary
+	(*ConfirmRestoreRequest)(nil),        // 15: mistgate.admin.v1.ConfirmRestoreRequest
+	(*ConfirmRestoreResponse)(nil),       // 16: mistgate.admin.v1.ConfirmRestoreResponse
+	(*ListKeptDataRequest)(nil),          // 17: mistgate.admin.v1.ListKeptDataRequest
+	(*ListKeptDataResponse)(nil),         // 18: mistgate.admin.v1.ListKeptDataResponse
+	(*KeptData)(nil),                     // 19: mistgate.admin.v1.KeptData
+	(*DeleteKeptDataRequest)(nil),        // 20: mistgate.admin.v1.DeleteKeptDataRequest
+	(*DeleteKeptDataResponse)(nil),       // 21: mistgate.admin.v1.DeleteKeptDataResponse
+	(*GetRestoreResultRequest)(nil),      // 22: mistgate.admin.v1.GetRestoreResultRequest
+	(*GetRestoreResultResponse)(nil),     // 23: mistgate.admin.v1.GetRestoreResultResponse
 }
 var file_mistgate_admin_v1_backup_proto_depIdxs = []int32{
 	1,  // 0: mistgate.admin.v1.GetBackupSettingsResponse.settings:type_name -> mistgate.admin.v1.BackupSettings
 	1,  // 1: mistgate.admin.v1.UpdateBackupSettingsResponse.settings:type_name -> mistgate.admin.v1.BackupSettings
 	11, // 2: mistgate.admin.v1.ListBackupsResponse.backups:type_name -> mistgate.admin.v1.Backup
-	0,  // 3: mistgate.admin.v1.BackupService.GetBackupSettings:input_type -> mistgate.admin.v1.GetBackupSettingsRequest
-	3,  // 4: mistgate.admin.v1.BackupService.UpdateBackupSettings:input_type -> mistgate.admin.v1.UpdateBackupSettingsRequest
-	5,  // 5: mistgate.admin.v1.BackupService.TestBackupStorage:input_type -> mistgate.admin.v1.TestBackupStorageRequest
-	7,  // 6: mistgate.admin.v1.BackupService.CreateBackup:input_type -> mistgate.admin.v1.CreateBackupRequest
-	9,  // 7: mistgate.admin.v1.BackupService.ListBackups:input_type -> mistgate.admin.v1.ListBackupsRequest
-	2,  // 8: mistgate.admin.v1.BackupService.GetBackupSettings:output_type -> mistgate.admin.v1.GetBackupSettingsResponse
-	4,  // 9: mistgate.admin.v1.BackupService.UpdateBackupSettings:output_type -> mistgate.admin.v1.UpdateBackupSettingsResponse
-	6,  // 10: mistgate.admin.v1.BackupService.TestBackupStorage:output_type -> mistgate.admin.v1.TestBackupStorageResponse
-	8,  // 11: mistgate.admin.v1.BackupService.CreateBackup:output_type -> mistgate.admin.v1.CreateBackupResponse
-	10, // 12: mistgate.admin.v1.BackupService.ListBackups:output_type -> mistgate.admin.v1.ListBackupsResponse
-	8,  // [8:13] is the sub-list for method output_type
-	3,  // [3:8] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	14, // 3: mistgate.admin.v1.PrepareRestoreResponse.summary:type_name -> mistgate.admin.v1.RestoreSummary
+	19, // 4: mistgate.admin.v1.ListKeptDataResponse.directories:type_name -> mistgate.admin.v1.KeptData
+	0,  // 5: mistgate.admin.v1.BackupService.GetBackupSettings:input_type -> mistgate.admin.v1.GetBackupSettingsRequest
+	3,  // 6: mistgate.admin.v1.BackupService.UpdateBackupSettings:input_type -> mistgate.admin.v1.UpdateBackupSettingsRequest
+	5,  // 7: mistgate.admin.v1.BackupService.TestBackupStorage:input_type -> mistgate.admin.v1.TestBackupStorageRequest
+	7,  // 8: mistgate.admin.v1.BackupService.CreateBackup:input_type -> mistgate.admin.v1.CreateBackupRequest
+	9,  // 9: mistgate.admin.v1.BackupService.ListBackups:input_type -> mistgate.admin.v1.ListBackupsRequest
+	12, // 10: mistgate.admin.v1.BackupService.PrepareRestore:input_type -> mistgate.admin.v1.PrepareRestoreRequest
+	15, // 11: mistgate.admin.v1.BackupService.ConfirmRestore:input_type -> mistgate.admin.v1.ConfirmRestoreRequest
+	17, // 12: mistgate.admin.v1.BackupService.ListKeptData:input_type -> mistgate.admin.v1.ListKeptDataRequest
+	20, // 13: mistgate.admin.v1.BackupService.DeleteKeptData:input_type -> mistgate.admin.v1.DeleteKeptDataRequest
+	22, // 14: mistgate.admin.v1.BackupService.GetRestoreResult:input_type -> mistgate.admin.v1.GetRestoreResultRequest
+	2,  // 15: mistgate.admin.v1.BackupService.GetBackupSettings:output_type -> mistgate.admin.v1.GetBackupSettingsResponse
+	4,  // 16: mistgate.admin.v1.BackupService.UpdateBackupSettings:output_type -> mistgate.admin.v1.UpdateBackupSettingsResponse
+	6,  // 17: mistgate.admin.v1.BackupService.TestBackupStorage:output_type -> mistgate.admin.v1.TestBackupStorageResponse
+	8,  // 18: mistgate.admin.v1.BackupService.CreateBackup:output_type -> mistgate.admin.v1.CreateBackupResponse
+	10, // 19: mistgate.admin.v1.BackupService.ListBackups:output_type -> mistgate.admin.v1.ListBackupsResponse
+	13, // 20: mistgate.admin.v1.BackupService.PrepareRestore:output_type -> mistgate.admin.v1.PrepareRestoreResponse
+	16, // 21: mistgate.admin.v1.BackupService.ConfirmRestore:output_type -> mistgate.admin.v1.ConfirmRestoreResponse
+	18, // 22: mistgate.admin.v1.BackupService.ListKeptData:output_type -> mistgate.admin.v1.ListKeptDataResponse
+	21, // 23: mistgate.admin.v1.BackupService.DeleteKeptData:output_type -> mistgate.admin.v1.DeleteKeptDataResponse
+	23, // 24: mistgate.admin.v1.BackupService.GetRestoreResult:output_type -> mistgate.admin.v1.GetRestoreResultResponse
+	15, // [15:25] is the sub-list for method output_type
+	5,  // [5:15] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_backup_proto_init() }
@@ -808,7 +1533,7 @@ func file_mistgate_admin_v1_backup_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_backup_proto_rawDesc), len(file_mistgate_admin_v1_backup_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

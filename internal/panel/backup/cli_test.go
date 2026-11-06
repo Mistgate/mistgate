@@ -2,10 +2,12 @@ package backup
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRestoreCLIRequiresExactlyOneIdentitySource(t *testing.T) {
@@ -43,5 +45,31 @@ func TestRestoreCLIReadsFirstPassphraseFileLine(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(restored, "fixture.txt"))
 	if err != nil || string(got) != marker {
 		t.Fatalf("restored fixture = %q, %v; want %q", got, err, marker)
+	}
+}
+
+func TestRestoreCLIPrintsTheRestoredPanelURL(t *testing.T) {
+	s, _, identity := newTestService(t)
+	if err := s.st.SetSettings(context.Background(), map[string]string{
+		"public_url": "https://panel.example.com/sub/", "admin_prefix": "/admin/", "admin_host": "",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	archive := restoreArchiveFixture(t, s, identity.Recipient(), "v1.2.3", time.Now().UTC())
+	directory := t.TempDir()
+	archivePath := filepath.Join(directory, "backup.tar.gz.age")
+	if err := os.WriteFile(archivePath, archive, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	identityPath := filepath.Join(directory, "identity.txt")
+	if err := os.WriteFile(identityPath, []byte(identity.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := RunCLI([]string{"restore", "--identity-file", identityPath, "--file", archivePath, "--data-dir", filepath.Join(directory, "restored")}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Panel URL: https://panel.example.com/sub/admin/") {
+		t.Fatalf("restore output does not identify the saved admin URL: %s", output.String())
 	}
 }

@@ -514,7 +514,7 @@ func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, sec
 		access.Password = []byte{}
 	} else {
 		plain := []byte(secret.Password)
-		access.Password = s.vault.Seal(plain, "node-access:"+job.NodeID)
+		access.Password = s.vault.Seal(plain, store.NodeServerAccessPasswordAAD(job.NodeID))
 		clearBytes(plain)
 		access.PasswordLogin = true
 	}

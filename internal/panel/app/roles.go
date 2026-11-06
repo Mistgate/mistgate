@@ -247,6 +247,9 @@ func (k *core) provisionAndBackup() (*nodeprovision.Service, *backup.Service, er
 	bkp, err := backup.New(backup.Config{
 		Store: k.st, Vault: k.vlt, DataDir: k.c.DataDir, MasterKey: k.c.MasterKey,
 		Edge: k.edge, StepUp: k.authSvc.RequireStepUp, OnResult: backupResult(k.tg), Log: k.log,
+		RestorePanelData:     k.upd.StartPanelRestore,
+		DeleteKeptData:       k.upd.DeleteKeptData,
+		RestoreHelperRunning: k.upd.PanelUpdateRunning,
 	})
 	if err != nil {
 		return nil, nil, err

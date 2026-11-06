@@ -28,6 +28,8 @@ const (
 	maxDownloadBody    = 4 << 10
 	minPassphraseRunes = 12
 	scryptWorkFactor   = 18 // logN 18: approximately one second on a modern machine, matching age's reasonable default.
+	// Reserve one incoming encrypted archive plus two maximum extracted data trees for prepared and active work.
+	maxRestoreStageBytes = maxEncryptedBytes + 2*maxPlaintextBytes
 )
 
 // DownloadHandler is mounted beside the Connect admin services under the same session and cross-origin protection.
@@ -45,6 +47,10 @@ type downloadError struct {
 }
 
 func (s *Service) download(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == auth.BackupUploadProcedure {
+		s.upload(w, r)
+		return
+	}
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		writeDownloadError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
@@ -78,11 +84,19 @@ func (s *Service) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.panelOperationRunning() {
+		writeDownloadError(w, http.StatusConflict, "backup_busy", "a panel restore is already running")
+		return
+	}
 	if !s.mu.TryLock() {
 		writeDownloadError(w, http.StatusConflict, "backup_busy", "another backup is already running")
 		return
 	}
 	defer s.mu.Unlock()
+	if s.panelOperationRunning() {
+		writeDownloadError(w, http.StatusConflict, "backup_busy", "a panel restore is already running")
+		return
+	}
 	s.running.Store(true)
 	defer s.running.Store(false)
 

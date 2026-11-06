@@ -22,6 +22,7 @@ import (
 	"filippo.io/age"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
@@ -32,12 +33,13 @@ const (
 	masterKeyName       = "master.key"
 	maxManifestBytes    = 2 << 20
 	maxBackupFiles      = 10000
-	maxBackupBytes      = int64(50 << 30)
-	maxEncryptedBytes   = maxBackupBytes + int64(256<<20)
+	maxBackupBytes      = int64(2 << 30)
+	maxEncryptedBytes   = int64(2 << 30)
 	maxPlaintextBytes   = maxBackupBytes + maxManifestBytes + int64(maxBackupFiles*8192)
 )
 
 var errInvalidBackup = errors.New("backup: invalid or unsupported archive")
+var errArchiveTooLarge = errors.New("backup: encrypted archive exceeds the size limit")
 
 type backupManifest struct {
 	FormatVersion int          `json:"format_version"`
@@ -65,6 +67,13 @@ type preparedFile struct {
 // directory: the service may write nowhere else on disk, and /tmp may be a tmpfs counted against the panel's memory.
 // The archive leaves such directories out.
 const stagePrefix = ".mistgate-backup-"
+
+const (
+	snapshotStagePrefix = stagePrefix + "snapshot-"
+	restoreStagePrefix  = update.PanelRestoreStagePrefix
+	uploadStagePrefix   = stagePrefix + "upload-"
+	extractStagePrefix  = restoreStagePrefix + "extract-"
+)
 
 // CreateEncryptedArchive snapshots the panel's durable data into an age-encrypted, versioned tar.gz stream. The files of
 // the data directory are streamed into it, not copied first: their hashes are taken in a first pass (the manifest leads
@@ -108,7 +117,21 @@ func CreateEncryptedArchiveWithRecipient(ctx context.Context, dataDir, snapshotD
 	if len(encodedManifest) > maxManifestBytes {
 		return errors.New("backup: manifest is too large")
 	}
-	return writeEncryptedTar(ctx, dst, recipient, files, encodedManifest, created)
+	return writeEncryptedTar(ctx, &encryptedArchiveLimitWriter{dst: dst, remaining: maxEncryptedBytes}, recipient, files, encodedManifest, created)
+}
+
+type encryptedArchiveLimitWriter struct {
+	dst       io.Writer
+	remaining int64
+}
+
+func (w *encryptedArchiveLimitWriter) Write(p []byte) (int, error) {
+	if int64(len(p)) > w.remaining {
+		return 0, errArchiveTooLarge
+	}
+	n, err := w.dst.Write(p)
+	w.remaining -= int64(n)
+	return n, err
 }
 
 func parseRecipient(text string) (age.Recipient, error) {
@@ -356,32 +379,44 @@ func copyContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, erro
 // RestoreEncryptedArchive decrypts and validates a v1 backup into a new data directory.
 // It refuses any existing target and never follows archive paths or archive links.
 func RestoreEncryptedArchive(ctx context.Context, src io.Reader, identities []age.Identity, destination string) error {
+	_, err := RestoreEncryptedArchiveWithInfo(ctx, src, identities, destination)
+	return err
+}
+
+// ArchiveInfo is the public, non-secret summary carried by a verified archive manifest.
+type ArchiveInfo struct {
+	AppVersion string
+	CreatedAt  time.Time
+}
+
+// RestoreEncryptedArchiveWithInfo is RestoreEncryptedArchive plus the verified manifest's public metadata.
+func RestoreEncryptedArchiveWithInfo(ctx context.Context, src io.Reader, identities []age.Identity, destination string) (ArchiveInfo, error) {
 	if len(identities) == 0 {
-		return errors.New("backup: no recovery identity was supplied")
+		return ArchiveInfo{}, errors.New("backup: no recovery identity was supplied")
 	}
 	target, err := filepath.Abs(destination)
 	if err != nil {
-		return err
+		return ArchiveInfo{}, err
 	}
 	if filepath.Clean(target) != target || filepath.Base(target) == "." || filepath.Base(target) == string(filepath.Separator) {
-		return errors.New("backup: invalid restore destination")
+		return ArchiveInfo{}, errors.New("backup: invalid restore destination")
 	}
 	if _, err := os.Lstat(target); err == nil {
-		return errors.New("backup: restore destination already exists")
+		return ArchiveInfo{}, errors.New("backup: restore destination already exists")
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return ArchiveInfo{}, err
 	}
 	parent := filepath.Dir(target)
 	if err := os.MkdirAll(parent, 0o700); err != nil {
-		return err
+		return ArchiveInfo{}, err
 	}
-	stage, err := os.MkdirTemp(parent, ".mistgate-restore-")
+	stage, err := os.MkdirTemp(parent, extractStagePrefix)
 	if err != nil {
-		return err
+		return ArchiveInfo{}, err
 	}
 	if err := os.Chmod(stage, 0o700); err != nil {
 		os.RemoveAll(stage)
-		return err
+		return ArchiveInfo{}, err
 	}
 	keepStage := false
 	defer func() {
@@ -391,21 +426,22 @@ func RestoreEncryptedArchive(ctx context.Context, src io.Reader, identities []ag
 	}()
 	var manifest backupManifest
 	if err := extractEncryptedArchive(ctx, src, identities, stage, &manifest); err != nil {
-		return err
+		return ArchiveInfo{}, err
 	}
 	if err := validateRestoredData(ctx, stage, manifest.AppVersion); err != nil {
-		return err
+		return ArchiveInfo{}, err
 	}
 	if _, err := os.Lstat(target); err == nil {
-		return errors.New("backup: restore destination appeared during restore")
+		return ArchiveInfo{}, errors.New("backup: restore destination appeared during restore")
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return ArchiveInfo{}, err
 	}
 	if err := os.Rename(stage, target); err != nil {
-		return fmt.Errorf("backup: install restored data directory: %w", err)
+		return ArchiveInfo{}, fmt.Errorf("backup: install restored data directory: %w", err)
 	}
 	keepStage = true
-	return nil
+	createdAt, _ := time.Parse(time.RFC3339Nano, manifest.CreatedAt)
+	return ArchiveInfo{AppVersion: manifest.AppVersion, CreatedAt: createdAt}, nil
 }
 
 // extractEncryptedArchive checks and unpacks an archive into stage; out gets its manifest.
@@ -599,9 +635,13 @@ func validateRestoredData(ctx context.Context, root, appVersion string) error {
 	if err != nil {
 		return fmt.Errorf("backup: validate restored database: %w", err)
 	}
+	sealedErr := validateSealedDatabaseValues(ctx, st.R, key)
 	var check string
 	queryErr := st.R.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&check)
 	closeErr := st.Close()
+	if sealedErr != nil {
+		return sealedErr
+	}
 	if queryErr != nil {
 		return fmt.Errorf("backup: check restored database: %w", queryErr)
 	}

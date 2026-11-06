@@ -275,7 +275,7 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 	}
 	var create func() error
 	if c.kind == ceremonySetupPassword {
-		sealed := s.vault.Seal(c.totp, totpAAD(c.admin.ID))
+		sealed := s.vault.Seal(c.totp, TOTPSecretAAD(c.admin.ID))
 		create = func() error {
 			return s.st.CreateFirstAdminPassword(ctx, hash, now, c.admin,
 				store.PasswordCred{Login: c.login, Hash: c.pwHash, TOTPSecret: sealed, TOTPStep: step})
@@ -314,7 +314,8 @@ func (s *Service) FinishSetup(ctx context.Context, req *connect.Request[adminv1.
 	return resp, nil
 }
 
-func totpAAD(adminID string) string { return adminID + "/totp" }
+// TOTPSecretAAD is the vault AAD for an admin's password-login authenticator secret.
+func TOTPSecretAAD(adminID string) string { return adminID + "/totp" }
 
 func passkeyFromCredential(adminID, name string, cred *webauthn.Credential) store.Passkey {
 	tr := make([]string, len(cred.Transport))
@@ -497,7 +498,7 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	if found && s.vault != nil {
-		if secret, err := s.vault.Open(cred.TOTPSecret, totpAAD(cred.AdminID)); err != nil {
+		if secret, err := s.vault.Open(cred.TOTPSecret, TOTPSecretAAD(cred.AdminID)); err != nil {
 			s.log.Error("cannot open TOTP secret (wrong master key?)", "admin", cred.AdminID)
 		} else {
 			var codeOK bool

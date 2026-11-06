@@ -10,12 +10,19 @@ readonly DEFAULT_DATA_DIR="/var/lib/mistgate"
 readonly UNIT_FILE="/etc/systemd/system/mistgate.service"
 
 public_url=""
+public_host=""
 admin_host=""
 admin_listen=""
 version=""
 channel="stable"
 data_dir="$DEFAULT_DATA_DIR"
+restore_file=""
+identity_file=""
+passphrase_file=""
+restored_panel_url=""
+restored_domain=""
 acme_domains=()
+acme_domains_explicit=0
 dry_run=0
 yes=0
 skip_signature=0
@@ -31,11 +38,11 @@ test_skip_port_check=0
 
 usage() {
   cat <<'USAGE'
-Usage: install.sh --public-url URL [options]
+Usage: install.sh [--public-url URL] [options]
 
 Install the latest Mistgate panel on a fresh Linux server with systemd.
 
-Required:
+Required for a fresh install:
   --public-url URL       Public HTTPS URL, for example https://panel.example.com
 
 Options:
@@ -45,6 +52,9 @@ Options:
   --channel CHANNEL      stable, testing or dev (default: stable)
   --version TAG          Install a specific release tag
   --data-dir DIR         Panel data directory (default: /var/lib/mistgate)
+  --restore FILE         Restore an encrypted backup before the first start
+  --identity-file KEY   Private recovery identity file for --restore
+  --passphrase-file FILE Passphrase file for --restore (never pass a passphrase argument)
   --dry-run              Download and verify, then print the planned changes
   --yes                  Do not ask for confirmation
   --insecure-skip-signature
@@ -53,6 +63,7 @@ Options:
 
 Example:
   curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com
+  install.sh --restore mistgate-backup.tar.gz.age --identity-file recovery.txt --yes
 USAGE
 }
 
@@ -200,11 +211,62 @@ verify_panel_manifest_with_ssh_keygen() {
   printf 'Verified panel manifest with ssh-keygen.\n'
 }
 
+run_archive_restore() {
+  local binary="$1" target="$2"
+  local -a args=(backup restore --file "$restore_file" --data-dir "$target")
+  [[ -f "$restore_file" && -r "$restore_file" ]] || fail "the restore archive must be a readable file"
+  if [[ -n "$identity_file" ]]; then
+    [[ -f "$identity_file" && -r "$identity_file" ]] || fail "the recovery identity must be a readable file"
+    args+=(--identity-file "$identity_file")
+  else
+    [[ -f "$passphrase_file" && -r "$passphrase_file" ]] || fail "the passphrase file must be a readable file"
+    args+=(--passphrase-file "$passphrase_file")
+  fi
+  if ! "$binary" "${args[@]}" > "$tmp_dir/restore-output" 2>&1; then
+    fail "the backup archive or recovery key could not be verified"
+  fi
+  restored_panel_url=$(sed -n 's/^Panel URL:[[:space:]]*//p' "$tmp_dir/restore-output")
+  [[ "$restored_panel_url" =~ ^https?:// ]] || fail "the backup does not contain a usable panel URL"
+  restored_domain=${restored_panel_url#*://}
+  restored_domain=${restored_domain%%/*}
+  restored_domain=${restored_domain%%:*}
+  [[ "$restored_domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ && "$restored_domain" != *..* && "$restored_domain" != *.-* && "$restored_domain" != *-.* ]] ||
+    fail "the restored panel URL does not contain a valid public domain"
+}
+
+set_restored_domains() {
+  public_host=$restored_domain
+  if [[ "$acme_domains_explicit" == "0" ]]; then
+    acme_domains=("$public_host")
+  fi
+  for domain in "${acme_domains[@]}"; do
+    [[ "$domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ && "$domain" != *..* && "$domain" != *.-* && "$domain" != *-.* ]] ||
+      fail "invalid --acme-domain: $domain"
+  done
+  printf '%s\n' "${acme_domains[@]}" | grep -Fxq -- "$public_host" ||
+    fail "--acme-domain must include the restored panel domain ($public_host)"
+}
+
 while (($#)); do
   case "$1" in
     --public-url)
       need_value "$1" "${2:-}"
       public_url=$2
+      shift 2
+      ;;
+    --restore)
+      need_value "$1" "${2:-}"
+      restore_file=$2
+      shift 2
+      ;;
+    --identity-file)
+      need_value "$1" "${2:-}"
+      identity_file=$2
+      shift 2
+      ;;
+    --passphrase-file)
+      need_value "$1" "${2:-}"
+      passphrase_file=$2
       shift 2
       ;;
     --admin-host)
@@ -220,6 +282,7 @@ while (($#)); do
     --acme-domain)
       need_value "$1" "${2:-}"
       acme_domains+=("$2")
+      acme_domains_explicit=1
       shift 2
       ;;
     --version)
@@ -277,15 +340,24 @@ else
   done
 fi
 
-if [[ -z "$public_url" ]]; then
+if [[ -z "$public_url" && -z "$restore_file" ]]; then
   fail "--public-url is required. Run: curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://panel.example.com"
 fi
-if [[ ! "$public_url" =~ ^https://([A-Za-z0-9.-]+)(/[^#]*)?$ ]]; then
+if [[ -n "$public_url" && ! "$public_url" =~ ^https://([A-Za-z0-9.-]+)(/[^#]*)?$ ]]; then
   fail "--public-url must be an HTTPS URL with a host and no fragment"
 fi
-public_host=${BASH_REMATCH[1]}
-if [[ "$public_host" == .* || "$public_host" == *..* || "$public_host" == *- || "$public_host" == *.-* ]]; then
-  fail "--public-url must contain a valid public host name"
+if [[ -n "$public_url" ]]; then
+  public_host=${BASH_REMATCH[1]}
+  if [[ "$public_host" == .* || "$public_host" == *..* || "$public_host" == *- || "$public_host" == *.-* ]]; then
+    fail "--public-url must contain a valid public host name"
+  fi
+fi
+if [[ -n "$restore_file" ]]; then
+  [[ -z "$admin_host" && -z "$admin_listen" ]] || fail "restore uses the saved panel address; omit --admin-host and --admin-listen"
+  [[ -n "$identity_file" || -n "$passphrase_file" ]] || fail "--restore needs --identity-file or --passphrase-file"
+  [[ -z "$identity_file" || -z "$passphrase_file" ]] || fail "use only one of --identity-file and --passphrase-file"
+elif [[ -n "$identity_file" || -n "$passphrase_file" ]]; then
+  fail "--identity-file and --passphrase-file require --restore"
 fi
 if [[ -n "$admin_host" && -n "$admin_listen" ]]; then
   fail "--admin-host and --admin-listen cannot be combined"
@@ -302,15 +374,28 @@ fi
 if [[ "$data_dir" == /home || "$data_dir" == /home/* || "$data_dir" == /root || "$data_dir" == /root/* ]]; then
   fail "--data-dir cannot be under /home or /root because the service protects home directories"
 fi
-if [[ -z "${acme_domains[*]}" ]]; then
+if [[ -n "$restore_file" ]]; then
+  [[ -f "$restore_file" && -r "$restore_file" ]] || fail "the restore archive must be a readable file"
+  if [[ -n "$identity_file" ]]; then
+    [[ -f "$identity_file" && -r "$identity_file" ]] || fail "the recovery identity must be a readable file"
+  else
+    [[ -f "$passphrase_file" && -r "$passphrase_file" ]] || fail "the passphrase file must be a readable file"
+  fi
+  if [[ "$dry_run" != "1" ]]; then
+    [[ ! -e "$data_dir" && ! -L "$data_dir" ]] || fail "restore requires a new data directory: $data_dir already exists"
+  fi
+fi
+if [[ -n "$public_host" && ${#acme_domains[@]} -eq 0 ]]; then
   acme_domains=("$public_host")
 fi
 for domain in "${acme_domains[@]}"; do
   [[ "$domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ && "$domain" != *..* && "$domain" != *.-* && "$domain" != *-.* ]] ||
     fail "invalid --acme-domain: $domain"
 done
-printf '%s\n' "${acme_domains[@]}" | grep -Fxq -- "$public_host" ||
-  fail "--acme-domain must include the host from --public-url ($public_host)"
+if [[ -n "$public_host" ]]; then
+  printf '%s\n' "${acme_domains[@]}" | grep -Fxq -- "$public_host" ||
+    fail "--acme-domain must include the host from --public-url ($public_host)"
+fi
 if [[ -n "$admin_host" ]]; then
   [[ "$admin_host" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ && "$admin_host" != *..* ]] ||
     fail "invalid --admin-host: $admin_host"
@@ -426,7 +511,11 @@ if [[ "$dry_run" != "1" && "$yes" != "1" ]]; then
   else
     fail "no terminal is available; run: curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url $public_url --yes"
   fi
-  printf 'Install Mistgate on this server and request TLS certificates for %s? [y/N] ' "${acme_domains[*]}" >&"$prompt_fd"
+  if [[ -n "$restore_file" ]]; then
+    printf 'Restore Mistgate from this backup on this server? [y/N] ' >&"$prompt_fd"
+  else
+    printf 'Install Mistgate on this server and request TLS certificates for %s? [y/N] ' "${acme_domains[*]}" >&"$prompt_fd"
+  fi
   IFS= read -r answer <&"$prompt_fd" || answer=""
   [[ "$answer" == "y" || "$answer" == "Y" || "$answer" == "yes" || "$answer" == "YES" ]] || fail "cancelled"
 fi
@@ -549,7 +638,19 @@ binary_size=$(wc -c < "$tmp_dir/$binary_name" | tr -d '[:space:]')
 [[ "$entry_size" == "$binary_size" ]] || fail "$binary_name size does not match panel-manifest.json"
 [[ "${entry_sha,,}" == "${actual_sha,,}" ]] || fail "$binary_name SHA-256 does not match panel-manifest.json"
 
+if [[ -n "$restore_file" ]]; then
+  chmod 0700 -- "$tmp_dir/$binary_name"
+  run_archive_restore "$tmp_dir/$binary_name" "$tmp_dir/restore-check-data"
+  set_restored_domains
+fi
+
 if [[ "$dry_run" == "1" ]]; then
+  if [[ -n "$restore_file" ]]; then
+    printf '4. Dry run: would install %s as %s/mistgate with mode 0755.\n' "$binary_name" "$install_bin_dir"
+    printf '5. Dry run: would restore the verified backup and start the panel for %s.\n' "$restored_domain"
+    printf '6. Dry run complete; the host was not changed and no setup link was created.\n'
+    exit 0
+  fi
   printf '4. Dry run: would install %s as %s/mistgate with mode 0755.\n' "$binary_name" "$install_bin_dir"
   printf '5. Dry run: would run mistgate setup, install the Mistgate systemd unit, enable it, and wait for ports 80 and 443.\n'
   printf '6. Dry run complete; the host was not changed and no setup link was created.\n'
@@ -562,16 +663,26 @@ if [[ "$test_mode" == "1" ]]; then
 fi
 install -D -m 0755 -- "$tmp_dir/$binary_name" "$install_bin_dir/mistgate"
 
-printf '5. Run setup and install the service.\n'
-setup_args=(setup --public-url "$public_url" --data-dir "$data_dir")
-[[ -z "$admin_host" ]] || setup_args+=(--admin-host "$admin_host")
-[[ -z "$admin_listen" ]] || setup_args+=(--admin-listen "$admin_listen")
-if ! "$install_bin_dir/mistgate" "${setup_args[@]}" > "$tmp_dir/setup-output" 2>&1; then
-  fail "mistgate setup failed. To start over, remove $install_bin_dir/mistgate and $data_dir, then run the installer again"
+printf '5. Prepare the panel data and install the service.\n'
+if [[ -n "$restore_file" ]]; then
+  [[ ! -e "$data_dir" && ! -L "$data_dir" ]] || fail "restore requires a new data directory: $data_dir already exists"
+  if ! run_archive_restore "$install_bin_dir/mistgate" "$data_dir"; then
+    fail "mistgate could not restore the backup. The panel has not been started"
+  fi
+  set_restored_domains
+  admin_url=$restored_panel_url
+  setup_link=""
+else
+  setup_args=(setup --public-url "$public_url" --data-dir "$data_dir")
+  [[ -z "$admin_host" ]] || setup_args+=(--admin-host "$admin_host")
+  [[ -z "$admin_listen" ]] || setup_args+=(--admin-listen "$admin_listen")
+  if ! "$install_bin_dir/mistgate" "${setup_args[@]}" > "$tmp_dir/setup-output" 2>&1; then
+    fail "mistgate setup failed. To start over, remove $install_bin_dir/mistgate and $data_dir, then run the installer again"
+  fi
+  admin_url=$(sed -n 's/^Admin URL:[[:space:]]*//p' "$tmp_dir/setup-output")
+  setup_link=$(sed -n 's/^Setup link:[[:space:]]*//p' "$tmp_dir/setup-output")
+  [[ -n "$admin_url" && -n "$setup_link" ]] || fail "mistgate setup did not return the admin URL and one-time setup link"
 fi
-admin_url=$(sed -n 's/^Admin URL:[[:space:]]*//p' "$tmp_dir/setup-output")
-setup_link=$(sed -n 's/^Setup link:[[:space:]]*//p' "$tmp_dir/setup-output")
-[[ -n "$admin_url" && -n "$setup_link" ]] || fail "mistgate setup did not return the admin URL and one-time setup link"
 
 if [[ "$test_skip_systemd" == "1" ]]; then
   printf 'Systemd actions skipped by the test harness.\n'
@@ -644,5 +755,9 @@ fi
 
 printf '7. Mistgate is ready.\n'
 printf 'Admin URL: %s\n' "$admin_url"
+if [[ -n "$restore_file" ]]; then
+  printf 'Point %s at this server; nodes reconnect by themselves.\n' "$restored_domain"
+  exit 0
+fi
 printf 'Setup link (valid for 30 minutes): %s\n' "$setup_link"
 printf 'Next: open the setup link, create the owner account, then add a node from Nodes → Add node.\n'

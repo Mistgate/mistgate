@@ -221,7 +221,7 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 	if !consumed {
 		return nil, expired()
 	}
-	sealed := s.vault.Seal(c.totp, totpAAD(admin.ID))
+	sealed := s.vault.Seal(c.totp, TOTPSecretAAD(admin.ID))
 	resp := &adminv1.FinishTotpEnrollmentResponse{Login: c.login}
 	if c.pwHash == "" { // re-bind
 		switch err := s.st.SetTOTPSecret(ctx, admin.ID, sealed, step); {
@@ -347,7 +347,7 @@ func ResetLogin(ctx context.Context, st *store.Store, v *vault.Vault, in ResetLo
 		brand = set.BrandName()
 	}
 	out.TOTPURI, out.TOTPSecret = totpURI(brand, login, secret), b32.EncodeToString(secret)
-	cred := store.PasswordCred{AdminID: target.ID, Login: login, Hash: hash, TOTPSecret: v.Seal(secret, totpAAD(target.ID))}
+	cred := store.PasswordCred{AdminID: target.ID, Login: login, Hash: hash, TOTPSecret: v.Seal(secret, TOTPSecretAAD(target.ID))}
 	params, _ := json.Marshal(map[string]any{"admin": target.ID, "login": login, "created": out.Created})
 	actor := in.Actor
 	if actor == "" {

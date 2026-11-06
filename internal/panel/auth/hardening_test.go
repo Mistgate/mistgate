@@ -302,7 +302,7 @@ func TestConcurrentCeremonyFinishesConsumeOnce(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					got, err := s.vault.Open(pw.TOTPSecret, totpAAD(adminID))
+					got, err := s.vault.Open(pw.TOTPSecret, TOTPSecretAAD(adminID))
 					if err != nil || !bytes.Equal(got, newSecret) || countAuditResult(t, st, "totp_rebind", "ok") != 1 {
 						t.Fatalf("TOTP enrollment state: secret updated=%v err=%v", bytes.Equal(got, newSecret), err)
 					}
