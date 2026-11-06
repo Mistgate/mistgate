@@ -8,7 +8,7 @@ import { Pending, QueryError } from "@/components/ui/query-error";
 import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
 import { assistant } from "@/lib/api";
-import { assistantErrorKey, conversationsQuery, memoryQuery, type Note } from "@/lib/assistant";
+import { assistantErrorKey, conversationsQuery, looksSecret, memoryQuery, type Note } from "@/lib/assistant";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 
@@ -87,6 +87,7 @@ function Notes() {
           {t("ai.mem.add")}
         </Button>
       </form>
+      {looksSecret(text) && <p className="text-xs text-warn-text">{t("ai.secretHint")}</p>}
       {q.isPending && <Pending compact />}
       {q.isError && <QueryError compact error={q.error} onRetry={() => void q.refetch()} />}
       {q.data && notes.length === 0 && <p className="text-[13px] text-muted">{t("ai.mem.empty")}</p>}

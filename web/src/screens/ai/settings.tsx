@@ -15,7 +15,7 @@ import { AssistantAudience, AssistantEffort, AssistantProvider, type AssistantSe
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { assistant } from "@/lib/api";
-import { assistantErrorKey, providerName, providers, settingsQuery } from "@/lib/assistant";
+import { assistantErrorKey, looksSecret, providerName, providers, settingsQuery } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
@@ -143,6 +143,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
               className="min-h-24 resize-y rounded-field border border-line bg-canvas px-3 py-2 text-[13px] leading-snug outline-none focus:border-accent"
             />
             <span className="text-xs text-muted">{t("ai.set.notesHint")}</span>
+            {looksSecret(draft.panelNotes) && <span className="text-xs text-warn-text">{t("ai.secretHint")}</span>}
           </label>
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.set.retention")}</span>

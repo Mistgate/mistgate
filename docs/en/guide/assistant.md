@@ -48,7 +48,7 @@ The model never applies anything itself: it has no tool to do so. Every call is 
 - **Notes for the assistant** (the owner's, in **AI → Assistant**): what every admin's assistant should know about this panel.
 - **Conversations.** The assistant knows the titles of your recent conversations and can search and read the earlier ones when you refer to them. **AI → Memory → Conversations** opens one in the chat, or deletes one or all.
 
-Conversations and notes are sealed in the panel's database and private to each admin: nobody else reads them, the owner included. They are kept as long as **Keep conversations** says.
+Conversations and notes are sealed in the panel's database and private to each admin: nobody else reads them, the owner included. Conversations are kept as long as **Keep conversations** says; notes stay until you delete them. Whatever looks like a key or a password is cut out of everything the panel sends to the provider, apart from the message you type yourself.
 
 ## Limits and cost
 

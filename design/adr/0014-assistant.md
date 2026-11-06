@@ -98,7 +98,8 @@ assistant act, a chat that reaches anything its human cannot.
 - **Long conversations** are compacted: past a share of the model's context, the older turns are replaced, from that point
   on, by a summary the model writes (a new segment; earlier requests are not edited, so thinking stays valid).
 - Conversations and notes are sealed at rest (vault, associated data = their id), private to their admin (the owner can
-  delete everyone's, not read them), kept 90 days by default (owner setting: 7 to 365, or until deleted).
+  delete everyone's, not read them). Conversations are kept 90 days by default (owner setting: 7 to 365, or until
+  deleted); notes are durable facts the admin sees and edits, and stay until deleted. The owner's panel notes are sealed too.
 
 ### Limits
 
