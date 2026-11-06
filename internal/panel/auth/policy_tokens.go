@@ -132,6 +132,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:             true,
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       true,
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              true,
+	adminv1connect.UpdateServiceSetUpdateChannelProcedure:               true,
 	adminv1connect.ProvisioningServiceCheckSSHProcedure:                 true,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
 	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:       true,

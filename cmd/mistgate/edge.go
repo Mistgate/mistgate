@@ -13,6 +13,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/edgedeploy"
+	"github.com/mistgate/mistgate/internal/release"
 )
 
 const edgeUsage = `usage:
@@ -28,14 +29,18 @@ On edge, --admin takes an admin login; the VPS mistgate auth reset-login --admin
 
 // releaseVersionRe matches the stamp of a release build (the tag, with or without the v); a development build
 // ("0.1.0-dev", a commit hash) does not.
-var releaseVersionRe = regexp.MustCompile(`^v?\d+\.\d+\.\d+$`)
+var releaseVersionRe = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(dev|testing)\.[1-9][0-9]*)?$`)
 
 // edgeDefaultVersion is the edge release that goes with this binary, vX.Y.Z; empty for a development build.
 func edgeDefaultVersion() string {
 	if !releaseVersionRe.MatchString(buildinfo.Version) {
 		return ""
 	}
-	return "v" + strings.TrimPrefix(buildinfo.Version, "v")
+	tag := "v" + strings.TrimPrefix(buildinfo.Version, "v")
+	if !release.ValidChannelTag(tag) {
+		return ""
+	}
+	return tag
 }
 
 func runEdge(args []string, out io.Writer) error {

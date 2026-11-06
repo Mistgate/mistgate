@@ -6,7 +6,6 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
@@ -28,31 +27,35 @@ const (
 	githubBundleMaxSig      = ed25519.SignatureSize
 )
 
-var ErrGitHubNodeBundleMissing = errors.New("the latest GitHub release has no signed node bundle")
+var ErrGitHubNodeBundleMissing = errors.New("the selected GitHub release has no signed node bundle")
 
 // GitHubNodeBundleConfig configures the signed agent-bundle source. Production uses the fixed official release API;
 // the API URL and HTTP client are injectable for tests.
 type GitHubNodeBundleConfig struct {
 	DataDir    string
 	Key        ed25519.PublicKey
+	Channel    func() release.Channel
 	APIURL     string
 	HTTPClient *http.Client
 	Now        func() time.Time
 	Log        *slog.Logger
 }
 
-// GitHubNodeBundleSource downloads node binaries from the latest stable Mistgate release. It accepts a package only
+// GitHubNodeBundleSource downloads node binaries from the newest release allowed by the panel's channel. It accepts a package only
 // when the installation's pinned release key verifies its manifest and every file matches that manifest.
 type GitHubNodeBundleSource struct {
 	distDir        string
 	key            ed25519.PublicKey
 	apiURL         string
+	channel        func() release.Channel
 	client         *http.Client
 	now            func() time.Time
 	log            *slog.Logger
 	mu             sync.Mutex
 	available      bool
 	manifestSHA256 string
+	releases       []githubRelease
+	releasesETag   string
 }
 
 func NewGitHubNodeBundleSource(cfg GitHubNodeBundleConfig) *GitHubNodeBundleSource {
@@ -63,7 +66,7 @@ func NewGitHubNodeBundleSource(cfg GitHubNodeBundleConfig) *GitHubNodeBundleSour
 		cfg.Log = slog.Default()
 	}
 	if cfg.APIURL == "" {
-		cfg.APIURL = githubLatestReleaseURL
+		cfg.APIURL = GitHubReleaseListURL
 	}
 	distDir := ""
 	if cfg.DataDir != "" {
@@ -75,18 +78,27 @@ func NewGitHubNodeBundleSource(cfg GitHubNodeBundleConfig) *GitHubNodeBundleSour
 	}
 	return &GitHubNodeBundleSource{
 		distDir: distDir, key: append(ed25519.PublicKey(nil), cfg.Key...),
-		apiURL: cfg.APIURL, client: cfg.HTTPClient, now: cfg.Now, log: cfg.Log,
+		apiURL: cfg.APIURL, channel: cfg.Channel, client: cfg.HTTPClient, now: cfg.Now, log: cfg.Log,
 	}
 }
 
-// BundleStatus reports whether the latest stable signed GitHub bundle exactly matches the current manifest in dist/.
+func (u *GitHubNodeBundleSource) updateChannel() release.Channel {
+	if u.channel != nil {
+		if channel := u.channel(); channel.Valid() {
+			return channel
+		}
+	}
+	return release.ChannelStable
+}
+
+// BundleStatus reports whether the newest channel-visible signed GitHub bundle exactly matches the current manifest in dist/.
 func (u *GitHubNodeBundleSource) BundleStatus() (bool, string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return u.available, u.manifestSHA256
 }
 
-// Sync fetches the latest release's signed package when its build is newer than the trusted local package. It returns
+// Sync fetches the selected release's signed package when its build is newer than the trusted local package. It returns
 // true only after the complete package has been verified and atomically installed.
 func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (bool, error) {
 	u.mu.Lock()
@@ -100,7 +112,25 @@ func (u *GitHubNodeBundleSource) Sync(ctx context.Context, currentBuilt int64) (
 		return false, errors.New("node bundle source has no data directory")
 	}
 
-	r, err := fetchLatestRelease(ctx, u.client, u.apiURL, "Mistgate-node-bundle-updater")
+	list, newETag, notModified, err := fetchGitHubReleaseList(ctx, u.client, u.apiURL, "Mistgate-node-bundle-updater", u.releasesETag)
+	if err != nil {
+		return false, err
+	}
+	if notModified {
+		if len(u.releases) == 0 {
+			list, newETag, notModified, err = fetchGitHubReleaseList(ctx, u.client, u.apiURL, "Mistgate-node-bundle-updater", "")
+			if err != nil {
+				return false, err
+			}
+			if notModified {
+				return false, errors.New("GitHub returned 304 without a cached release list")
+			}
+		} else {
+			list = u.releases
+		}
+	}
+	u.releases, u.releasesETag = list, newETag
+	r, err := latestGitHubRelease(list, u.updateChannel())
 	if err != nil {
 		return false, err
 	}
@@ -224,36 +254,6 @@ func sameReleaseFiles(a, b []release.File) bool {
 		}
 	}
 	return true
-}
-
-// fetchLatestRelease reads the latest stable release of the official repository and checks its tag and page URL.
-func fetchLatestRelease(ctx context.Context, client *http.Client, apiURL, userAgent string) (githubRelease, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
-	if err != nil {
-		return githubRelease{}, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := client.Do(req)
-	if err != nil {
-		return githubRelease{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
-		return githubRelease{}, ErrNoPanelRelease
-	}
-	if resp.StatusCode != http.StatusOK {
-		return githubRelease{}, fmt.Errorf("GitHub releases API returned HTTP %d", resp.StatusCode)
-	}
-	var r githubRelease
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&r); err != nil {
-		return githubRelease{}, fmt.Errorf("decode GitHub release: %w", err)
-	}
-	if r.Draft || r.Prerelease || !validReleaseTag(r.TagName) || !validReleasePage(r.HTMLURL, r.TagName) {
-		return githubRelease{}, errors.New("GitHub returned an invalid stable release")
-	}
-	return r, nil
 }
 
 func validateGitHubBundleAsset(asset githubAsset, tag string, maxSize int64) error {

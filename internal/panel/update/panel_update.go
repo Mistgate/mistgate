@@ -21,13 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/mod/semver"
-
 	"github.com/mistgate/mistgate/internal/release"
 )
 
 const (
-	githubLatestReleaseURL     = "https://api.github.com/repos/Mistgate/mistgate/releases/latest"
 	githubReleasePageBase      = "https://github.com/Mistgate/mistgate/releases/tag/"
 	panelReleasePrefix         = "https://github.com/Mistgate/mistgate/releases/download/"
 	panelUpdateInterval        = 10 * time.Minute // as often as the node bundle: 12 anonymous GitHub calls an hour together, the limit is 60
@@ -42,14 +39,14 @@ const (
 )
 
 var (
-	ErrNoPanelRelease    = errors.New("no stable panel release is published")
+	ErrNoPanelRelease    = errors.New("no panel release is published on the selected channel")
 	ErrNoPanelUpdate     = errors.New("the panel is already up to date")
 	ErrPanelUnsupported  = errors.New("panel self-update requires a supported systemd update path")
-	ErrPanelAssetMissing = errors.New("the latest release has no binary for this architecture")
-	ErrPanelUnsigned     = errors.New("the latest release has no panel manifest signed with this panel's release key")
-	ErrPanelExpired      = errors.New("the signed panel manifest of the latest release has expired")
+	ErrPanelAssetMissing = errors.New("the selected release has no binary for this architecture")
+	ErrPanelUnsigned     = errors.New("the selected release has no panel manifest signed with this panel's release key")
+	ErrPanelExpired      = errors.New("the signed panel manifest of the selected release has expired")
 	ErrPanelNoKey        = errors.New("this panel build has no release key to verify panel releases")
-	ErrPanelChanged      = errors.New("the latest signed panel release is not the one that was confirmed")
+	ErrPanelChanged      = errors.New("the selected signed panel release is not the one that was confirmed")
 )
 
 // panelWatchInterval is how often an accepted update looks at its helper unit (a test seam).
@@ -63,6 +60,7 @@ var unitPattern = regexp.MustCompile(`^[A-Za-z0-9_.@-]+\.service$`)
 // releases, and the digest of this architecture's binary is what an install must name back.
 type PanelUpdateStatus struct {
 	Version       string
+	Channel       release.Channel
 	URL           string
 	PublishedUnix int64
 	CheckedUnix   int64
@@ -72,6 +70,7 @@ type PanelUpdateStatus struct {
 	Supported     bool
 	Installable   bool
 	Installing    bool
+	RunningNewer  bool
 	ErrorKey      string
 }
 
@@ -101,9 +100,8 @@ type PanelUpdateConfig struct {
 	// APIURL, HTTPClient, Runner, OS, Arch and Now are injectable test seams. Production uses the fixed Mistgate
 	// endpoint, the default GitHub client and the host values. Runner returns the command's standard output.
 	APIURL string
-	// NotesURL is the release list that feeds "What's new" (GitHubReleaseNotesURL in production). Empty = the panel
-	// reads no release notes; tests that inject APIURL leave it empty so they make no second request.
-	NotesURL   string
+	// Channel is read for each lookup, so changing update_channel applies without rebuilding the updater.
+	Channel    func() release.Channel
 	HTTPClient *http.Client
 	Runner     func(context.Context, string, ...string) ([]byte, error)
 	OS         string
@@ -118,6 +116,7 @@ type githubRelease struct {
 	PublishedAt time.Time     `json:"published_at"`
 	Draft       bool          `json:"draft"`
 	Prerelease  bool          `json:"prerelease"`
+	Body        string        `json:"body"`
 	Assets      []githubAsset `json:"assets"`
 }
 
@@ -153,9 +152,10 @@ type GitHubPanelUpdater struct {
 	seq        uint64 // accepted installs, so a stale watcher cannot end a newer one
 	install    sync.Mutex
 
-	notesMu   sync.Mutex
-	notes     []ReleaseNote // the last good list, newest first (changelog.go)
-	notesETag string
+	notesMu      sync.Mutex
+	notes        []ReleaseNote // the last good list, newest first (changelog.go)
+	releases     []githubRelease
+	releasesETag string
 }
 
 // PanelUpdateHostSupported reports whether this installation has the required systemd update path.
@@ -180,7 +180,7 @@ func NewGitHubPanelUpdater(cfg PanelUpdateConfig) *GitHubPanelUpdater {
 		cfg.Arch = runtime.GOARCH
 	}
 	if cfg.APIURL == "" {
-		cfg.APIURL = githubLatestReleaseURL
+		cfg.APIURL = GitHubReleaseListURL
 	}
 	if cfg.Executable == "" {
 		cfg.Executable, _ = os.Executable()
@@ -238,7 +238,25 @@ func (u *GitHubPanelUpdater) Status() PanelUpdateStatus {
 	return u.status
 }
 
-// Check fetches the latest stable release and its signed panel manifest. A lookup made in the last few minutes is
+func (u *GitHubPanelUpdater) channel() release.Channel {
+	if u.cfg.Channel != nil {
+		if channel := u.cfg.Channel(); channel.Valid() {
+			return channel
+		}
+	}
+	return release.ChannelStable
+}
+
+// Invalidate makes the next explicit or scheduled check fetch the current channel immediately.
+func (u *GitHubPanelUpdater) Invalidate() {
+	u.checkMu.Lock()
+	defer u.checkMu.Unlock()
+	u.mu.Lock()
+	u.status.CheckedUnix = 0
+	u.mu.Unlock()
+}
+
+// Check fetches the newest channel-visible release and its signed panel manifest. A lookup made in the last few minutes is
 // answered from memory: the button costs nothing, and the unauthenticated GitHub quota it shares with the node bundle
 // sync is not spent on clicks.
 func (u *GitHubPanelUpdater) Check(ctx context.Context) PanelUpdateStatus {
@@ -247,7 +265,6 @@ func (u *GitHubPanelUpdater) Check(ctx context.Context) PanelUpdateStatus {
 	if s := u.Status(); s.CheckedUnix > 0 && u.now().Sub(time.Unix(s.CheckedUnix, 0)) < panelUpdateCheckCache {
 		return s
 	}
-	defer u.refreshNotes(ctx) // after the verdict is stored; it never changes it
 	checkCtx, cancel := context.WithTimeout(ctx, panelUpdateCheckTimeout)
 	defer cancel()
 
@@ -286,9 +303,6 @@ func (u *GitHubPanelUpdater) keepKnownRelease(errorKey string) bool {
 func (u *GitHubPanelUpdater) Run(ctx context.Context) {
 	check := func() { _ = u.Check(ctx) }
 	if !u.supported {
-		if u.cfg.NotesURL == "" {
-			return
-		}
 		// no self-update here, but the node card still shows "What's new" for the bundle
 		check = func() { u.refreshNotes(ctx) }
 	}
@@ -482,15 +496,20 @@ func (u *GitHubPanelUpdater) setStatus(status PanelUpdateStatus, installing bool
 	u.mu.Unlock()
 }
 
-// fetchStatus reads the latest stable release and verifies its signed panel manifest with the compiled-in release
+// fetchStatus reads the newest release allowed by the panel's channel and verifies its signed panel manifest with the compiled-in release
 // key. A release is offered only when that manifest is valid, unexpired and newer by build time than this binary:
 // the version string orders nothing (a git-describe build of a later commit is newer than its tag).
 func (u *GitHubPanelUpdater) fetchStatus(ctx context.Context) (PanelUpdateStatus, panelRelease, error) {
 	status := PanelUpdateStatus{Supported: u.supported}
-	r, err := fetchLatestRelease(ctx, u.client, u.apiURL, "Mistgate-panel-updater")
+	list, err := u.fetchReleases(ctx, "Mistgate-panel-updater")
 	if err != nil {
 		return status, panelRelease{}, err
 	}
+	r, err := latestGitHubRelease(list, u.channel())
+	if err != nil {
+		return status, panelRelease{}, err
+	}
+	status.Channel, _ = release.ChannelOf(r.TagName)
 	status.Version = r.TagName
 	status.URL = r.HTMLURL
 	if !r.PublishedAt.IsZero() {
@@ -527,6 +546,7 @@ func (u *GitHubPanelUpdater) fetchStatus(ctx context.Context) (PanelUpdateStatus
 		return status, panelRelease{}, fmt.Errorf("%w: it names version %q", ErrPanelUnsigned, m.Version)
 	}
 	status.Built = m.Built
+	status.RunningNewer = m.Expires >= u.now().Unix() && u.cfg.CurrentBuilt > m.Built
 	file, err := m.FileFor("linux", u.arch)
 	if err != nil {
 		return status, panelRelease{}, ErrPanelAssetMissing
@@ -552,9 +572,7 @@ func (u *GitHubPanelUpdater) fetchStatus(ctx context.Context) (PanelUpdateStatus
 	return status, panelRelease{tag: r.TagName, asset: asset, file: file}, nil
 }
 
-func validReleaseTag(tag string) bool {
-	return semver.IsValid(tag) && semver.Canonical(tag) != "" && semver.Prerelease(tag) == "" && semver.Build(tag) == ""
-}
+func validReleaseTag(tag string) bool { return release.ValidChannelTag(tag) }
 
 func validReleasePage(rawURL, tag string) bool {
 	u, err := url.Parse(rawURL)

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -39,6 +40,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/panel/warp"
+	"github.com/mistgate/mistgate/internal/release"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
 
@@ -61,7 +63,18 @@ func nodeUpdateConfig(dataDir string, edge, onEdge bool, key ed25519.PublicKey, 
 		gateHealth = gate
 	}
 	return update.Config{DataDir: dataDir, Key: key, PanelVersion: buildinfo.Version, PanelBuilt: buildinfo.BuiltUnix(),
-		Edge: edge, StepUp: stepUp, PanelUpdater: panelUpdater, NodeBundleSource: source, Log: log}, gateHealth
+		InitialChannel: os.Getenv("MISTGATE_UPDATE_CHANNEL"),
+		Edge:           edge, StepUp: stepUp, PanelUpdater: panelUpdater, NodeBundleSource: source, Log: log}, gateHealth
+}
+
+func configuredUpdateChannel(st *store.Store) release.Channel {
+	value, err := st.Setting(context.Background(), update.UpdateChannelSetting)
+	if err == nil {
+		if channel, ok := release.ParseChannel(value); ok {
+			return channel
+		}
+	}
+	return release.ChannelStable
 }
 
 // base is what every role needs from its Config: the defaults filled in, and the few values derived from it.
@@ -358,7 +371,8 @@ func wireCore(c Config) (*core, error) {
 	// the panel's service user. Without one the Updates page says the panel cannot verify releases.
 	compiledKey, _ := buildinfo.ReleasePublicKey()
 	panelUpdater := update.NewGitHubPanelUpdater(update.PanelUpdateConfig{
-		CurrentBuilt: buildinfo.BuiltUnix(), Key: compiledKey, DataDir: c.DataDir, NotesURL: update.GitHubReleaseNotesURL,
+		CurrentBuilt: buildinfo.BuiltUnix(), Key: compiledKey, DataDir: c.DataDir,
+		Channel:     func() release.Channel { return configuredUpdateChannel(st) },
 		ServiceUnit: c.UpdateService, Enabled: update.PanelUpdateHostSupported(),
 		UseRootHelperService: update.PanelUpdateUsesRootHelperService(), Log: log,
 	})
@@ -373,6 +387,7 @@ func wireCore(c Config) (*core, error) {
 	if len(relKey) > 0 && c.DataDir != "" && !onEdge {
 		nodeBundleSource = update.NewGitHubNodeBundleSource(update.GitHubNodeBundleConfig{
 			DataDir: c.DataDir, Key: relKey, Log: log,
+			Channel: func() release.Channel { return configuredUpdateChannel(st) },
 		})
 	}
 	updateConfig, gateHealth := nodeUpdateConfig(c.DataDir, edge, onEdge, relKey, authSvc.RequireStepUp, panelUpdater, nodeBundleSource, hl, log)

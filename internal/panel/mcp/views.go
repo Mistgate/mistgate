@@ -1773,13 +1773,17 @@ type bundleV struct {
 
 // UpdatesV is the updates_status result.
 type UpdatesV struct {
-	NowUnix      int64         `json:"now_unix"`
-	PanelVersion string        `json:"panel_version"`
-	PanelBuilt   int64         `json:"panel_built,omitempty"`
-	Bundle       *bundleV      `json:"bundle,omitempty"`
-	Nodes        []nodeUpdateV `json:"nodes"`
-	Rollout      *rolloutV     `json:"rollout,omitempty"`
-	Truncated    bool          `json:"truncated,omitempty"`
+	NowUnix                       int64         `json:"now_unix"`
+	PanelVersion                  string        `json:"panel_version"`
+	PanelBuilt                    int64         `json:"panel_built,omitempty"`
+	UpdateChannel                 string        `json:"update_channel"`
+	RunningVersionChannel         string        `json:"running_version_channel,omitempty"`
+	OfferedReleaseChannel         string        `json:"offered_release_channel,omitempty"`
+	RunningNewerThanChannelOffers bool          `json:"running_newer_than_channel_offers"`
+	Bundle                        *bundleV      `json:"bundle,omitempty"`
+	Nodes                         []nodeUpdateV `json:"nodes"`
+	Rollout                       *rolloutV     `json:"rollout,omitempty"`
+	Truncated                     bool          `json:"truncated,omitempty"`
 }
 
 func (v *UpdatesV) shrink() bool {
@@ -1809,7 +1813,12 @@ func rolloutView(r *adminv1.Rollout) *rolloutV {
 }
 
 func updatesView(r *adminv1.GetUpdatesResponse) *UpdatesV {
-	v := &UpdatesV{NowUnix: r.GetNowUnix(), PanelVersion: clean(r.GetPanel().GetVersion(), 60), PanelBuilt: r.GetPanel().GetBuilt(), Nodes: []nodeUpdateV{}}
+	v := &UpdatesV{
+		NowUnix: r.GetNowUnix(), PanelVersion: clean(r.GetPanel().GetVersion(), 60), PanelBuilt: r.GetPanel().GetBuilt(),
+		UpdateChannel: clean(r.GetUpdateChannel(), 16), RunningVersionChannel: clean(r.GetRunningVersionChannel(), 16),
+		OfferedReleaseChannel:         clean(r.GetOfferedReleaseChannel(), 16),
+		RunningNewerThanChannelOffers: r.GetRunningNewerThanChannelOffers(), Nodes: []nodeUpdateV{},
+	}
 	if b := r.GetBundle(); b != nil {
 		v.Bundle = &bundleV{
 			Status: enumName("BUNDLE_STATUS_", b.GetStatus().String()), Version: clean(b.GetVersion(), 60), Built: b.GetBuilt(),

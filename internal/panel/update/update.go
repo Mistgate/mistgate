@@ -16,6 +16,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/release"
 )
 
 // Fleet is what the module needs from the fleet module (*fleet.Fleet implements it).
@@ -88,6 +90,9 @@ const (
 	rolloutAge   = 90 * 24 * time.Hour
 )
 
+// UpdateChannelSetting is the setting key that controls panel and node-bundle release discovery.
+const UpdateChannelSetting = "update_channel"
+
 // Config configures Service.
 type Config struct {
 	// DataDir holds dist/ (the bundle). Empty = no bundle directory at all (tests).
@@ -98,6 +103,8 @@ type Config struct {
 	// PanelVersion and PanelBuilt describe this panel's own build (buildinfo.Version, buildinfo.BuiltUnix()).
 	PanelVersion string
 	PanelBuilt   int64
+	// InitialChannel is seeded only when update_channel is unset, as by the installer's systemd environment.
+	InitialChannel string
 	// PanelUpdater checks official GitHub releases and schedules a checked panel binary replacement when available.
 	PanelUpdater PanelUpdater
 	// NodeBundleSource polls the official GitHub release for a bundle signed by this installation's release key.
@@ -161,6 +168,14 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	if cfg.InitialChannel != "" {
+		if _, ok := release.ParseChannel(cfg.InitialChannel); !ok {
+			return nil, fmt.Errorf("update: invalid initial update channel %q", cfg.InitialChannel)
+		}
+		if _, err := st.SetSettingsIfAbsent(context.Background(), map[string]string{UpdateChannelSetting: cfg.InitialChannel}); err != nil {
+			return nil, fmt.Errorf("update: seed initial update channel: %w", err)
+		}
+	}
 	if cfg.Actor == nil {
 		cfg.Actor = func(ctx context.Context) string {
 			if a, ok := auth.AdminFrom(ctx); ok {
@@ -180,6 +195,21 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 	s.rescan()
 	s.loadUpdating(context.Background())
 	return s, nil
+}
+
+func (s *Service) updateChannel(ctx context.Context) (release.Channel, error) {
+	value, err := s.st.Setting(ctx, UpdateChannelSetting)
+	if errors.Is(err, store.ErrNotFound) {
+		return release.ChannelStable, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	channel, ok := release.ParseChannel(value)
+	if !ok {
+		return "", fmt.Errorf("stored update channel %q is invalid", value)
+	}
+	return channel, nil
 }
 
 // Handler is the admin UpdateService (see fleet.NodeHandler for how it is mounted behind the session).

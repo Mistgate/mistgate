@@ -13,6 +13,7 @@ public_url=""
 admin_host=""
 admin_listen=""
 version=""
+channel="stable"
 data_dir="$DEFAULT_DATA_DIR"
 acme_domains=()
 dry_run=0
@@ -41,7 +42,8 @@ Options:
   --admin-host HOST      Reach the admin on a separate host name
   --admin-listen ADDR    Reach the admin on a separate listener
   --acme-domain DOMAIN   Request a Let's Encrypt certificate (repeatable; defaults to the URL host)
-  --version vX.Y.Z       Install a specific release (default: latest)
+  --channel CHANNEL      stable, testing or dev (default: stable)
+  --version TAG          Install a specific release tag
   --data-dir DIR         Panel data directory (default: /var/lib/mistgate)
   --dry-run              Download and verify, then print the planned changes
   --yes                  Do not ask for confirmation
@@ -61,6 +63,77 @@ fail() {
 
 need_value() {
   [[ $# -ge 2 && -n "$2" ]] || fail "$1 needs a value"
+}
+
+canonical_integer() {
+  [[ "$1" == "0" || "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+# parse_release_tag sets tag_channel and tag_sort_key for canonical Mistgate tags.
+parse_release_tag() {
+  local tag="$1" value major minor patch suffix number rank
+  local -a fields
+  [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(dev|testing)\.[0-9]+)?$ ]] || return 1
+  value=${tag#v}
+  IFS='.-' read -r -a fields <<< "$value"
+  ((${#fields[@]} == 3 || ${#fields[@]} == 5)) || return 1
+  major=${fields[0]}
+  minor=${fields[1]}
+  patch=${fields[2]}
+  canonical_integer "$major" && canonical_integer "$minor" && canonical_integer "$patch" || return 1
+  if ((${#fields[@]} == 3)); then
+    tag_channel="stable"
+    rank=3
+    number=0
+  else
+    suffix=${fields[3]}
+    number=${fields[4]}
+    [[ "$suffix" == "dev" || "$suffix" == "testing" ]] || return 1
+    [[ "$number" =~ ^[1-9][0-9]*$ ]] || return 1
+    if [[ "$suffix" == "dev" ]]; then
+      tag_channel="dev"
+      rank=1
+    else
+      tag_channel="testing"
+      rank=2
+    fi
+  fi
+  tag_sort_key="$major.$minor.$patch-$rank.$number"
+}
+
+latest_channel_release() {
+  local tag
+  local candidates="$tmp_dir/channel-releases"
+  : > "$candidates"
+  while IFS= read -r tag; do
+    parse_release_tag "$tag" || continue
+    case "$channel:$tag_channel" in
+      stable:stable|testing:stable|testing:testing|dev:stable|dev:testing|dev:dev) ;;
+      *) continue ;;
+    esac
+    printf '%s\t%s\n' "$tag_sort_key" "$tag" >> "$candidates"
+  done < <(awk '
+    function finish() {
+      if (inside && tag != "" && draft != "true") print tag
+      tag = ""
+      draft = "false"
+    }
+    /^  \{/ { finish(); inside = 1; next }
+    /^  \},?$/ { finish(); inside = 0; next }
+    inside && /^    "tag_name":/ {
+      tag = $0
+      sub(/^    "tag_name":[[:space:]]*"/, "", tag)
+      sub(/",[[:space:]]*$/, "", tag)
+    }
+    inside && /^    "draft":/ {
+      draft = $0
+      sub(/^    "draft":[[:space:]]*/, "", draft)
+      sub(/,.*/, "", draft)
+    }
+    END { finish() }
+  ' "$tmp_dir/releases.json")
+  [[ -s "$candidates" ]] || fail "no published release is available on the $channel channel"
+  version=$(LC_ALL=C sort -V -t $'\t' -k1,1 "$candidates" | tail -n 1 | cut -f 2)
 }
 
 is_pre_sshsig_release() {
@@ -157,6 +230,11 @@ while (($#)); do
       version=$2
       shift 2
       ;;
+    --channel)
+      need_value "$1" "${2:-}"
+      channel=$2
+      shift 2
+      ;;
     --data-dir)
       need_value "$1" "${2:-}"
       data_dir=$2
@@ -215,8 +293,11 @@ fi
 if [[ -n "$admin_host" && -n "$admin_listen" ]]; then
   fail "--admin-host and --admin-listen cannot be combined"
 fi
-if [[ -n "$version" && ! "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  fail "--version must be a release tag such as v1.2.3"
+if [[ "$channel" != "stable" && "$channel" != "testing" && "$channel" != "dev" ]]; then
+  fail "--channel must be stable, testing or dev"
+fi
+if [[ -n "$version" ]] && ! parse_release_tag "$version"; then
+  fail "--version must be a release tag such as v1.2.3, v1.2.3-testing.1 or v1.2.3-dev.1"
 fi
 if [[ ! "$data_dir" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
   fail "--data-dir must be an absolute path made of letters, digits and . _ - /"
@@ -266,7 +347,7 @@ if [[ "$test_skip_systemd" != "1" ]]; then
   [[ -d /run/systemd/system ]] || fail "systemd is required"
   command -v systemctl >/dev/null 2>&1 || fail "systemctl is required"
 fi
-for tool in curl sha256sum base64 awk grep install mktemp sed wc tr date; do
+for tool in curl sha256sum base64 awk grep install mktemp sed wc tr date sort tail cut; do
   command -v "$tool" >/dev/null 2>&1 || fail "required command not found: $tool"
 done
 if [[ "$test_skip_port_check" != "1" ]]; then
@@ -305,7 +386,7 @@ fi
 if [[ -n "$version" ]]; then
   release_path="$base_url/releases/download/$version"
 else
-  release_path="$base_url/releases/latest/download"
+  release_path=""
 fi
 binary_name="mistgate-linux-$arch"
 unit_file="$UNIT_FILE"
@@ -356,12 +437,25 @@ fi
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/mistgate-install.XXXXXX")
 trap 'rm -rf -- "$tmp_dir"' EXIT
 
-printf '3. Download and verify %s.\n' "${version:-the latest release}"
+printf '3. Download and verify %s.\n' "${version:-the latest $channel release}"
 curl_args=(--fail --silent --show-error --location --retry 5 --retry-delay 1)
 if [[ "$test_mode" == "1" && "$base_url" == http://* ]]; then
   curl_args+=(--proto '=http,https')
 else
   curl_args+=(--proto '=https' --tlsv1.2)
+fi
+if [[ -z "$version" ]]; then
+  if [[ "$test_mode" == "1" ]]; then
+    release_list_url="$base_url/releases?per_page=30"
+  else
+    release_list_url="https://api.github.com/repos/Mistgate/mistgate/releases?per_page=30"
+  fi
+  if ! curl "${curl_args[@]}" --header 'Accept: application/vnd.github+json' --header 'X-GitHub-Api-Version: 2022-11-28' \
+    --user-agent Mistgate-installer --output "$tmp_dir/releases.json" "$release_list_url"; then
+    fail "could not download the GitHub release list"
+  fi
+  latest_channel_release
+  release_path="$base_url/releases/download/$version"
 fi
 for asset in "$binary_name" SHA256SUMS panel-manifest.json panel-manifest.sig; do
   if ! curl "${curl_args[@]}" --output "$tmp_dir/$asset" "$release_path/$asset"; then
@@ -499,6 +593,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=$service_command
+Environment=MISTGATE_UPDATE_CHANNEL=$channel
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

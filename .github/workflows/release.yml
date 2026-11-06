@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
@@ -29,8 +30,8 @@ jobs:
           RELEASE_KEY: ${{ vars.MISTGATE_RELEASE_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "release tag must be semantic version vMAJOR.MINOR.PATCH" >&2
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(dev|testing)\.[1-9][0-9]*)?$ ]]; then
+            echo "release tag must be vX.Y.Z, vX.Y.Z-testing.N or vX.Y.Z-dev.N with canonical numbers" >&2
             exit 1
           fi
           if [[ ! "$RELEASE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] || [[ "$(printf '%s' "$RELEASE_KEY" | base64 --decode 2>/dev/null | wc -c)" -ne 32 ]]; then
@@ -40,6 +41,36 @@ jobs:
           INSTALLER_KEY=$(sed -n 's/^readonly RELEASE_PUBLIC_KEY_BASE64="\([^"]*\)"$/\1/p' scripts/install.sh)
           if [[ "$RELEASE_KEY" != "$INSTALLER_KEY" ]]; then
             echo "scripts/install.sh release key differs from MISTGATE_RELEASE_PUBLIC_KEY" >&2
+            exit 1
+          fi
+      - name: Check stable and testing tag ancestry
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$TAG" =~ -dev\.[1-9][0-9]*$ ]]; then
+            echo "Development releases may be tagged from any commit."
+            exit 0
+          fi
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          tagged_commit=$(git rev-parse "$TAG^{commit}")
+          found=0
+          branches=(origin/main)
+          while IFS= read -r branch; do
+            branches+=("$branch")
+          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/release/)
+          for branch in "${branches[@]}"; do
+            if ! git rev-parse --verify --quiet "$branch^{commit}" >/dev/null; then
+              continue
+            fi
+            if git merge-base --is-ancestor "$tagged_commit" "$branch"; then
+              found=1
+              break
+            fi
+          done
+          if [[ "$found" != "1" ]]; then
+            echo "stable and testing tags must point to a commit on origin/main or an origin/release/* branch" >&2
             exit 1
           fi
       - name: Build node binaries
@@ -169,6 +200,15 @@ jobs:
           cd release
           bins=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64 mistgate-edge.tar.gz)
           sha256sum "${bins[@]}" > SHA256SUMS
+          channel=stable
+          release_flags=()
+          if [[ "$TAG" =~ -testing\.[1-9][0-9]*$ ]]; then
+            channel=testing
+            release_flags+=(--prerelease --latest=false)
+          elif [[ "$TAG" =~ -dev\.[1-9][0-9]*$ ]]; then
+            channel=dev
+            release_flags+=(--prerelease --latest=false)
+          fi
           gh release create "$TAG" "${bins[@]}" SHA256SUMS BUILDINFO install.sh --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --draft --title "$TAG" --generate-notes
-          echo "::notice::The release stays a draft until the owner rebuilds the binaries and the edge bundle from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig, panel-manifest.sshsig, edge-manifest.json and edge-manifest.sig. Publish it only after all seven are attached."
+            --draft --title "$TAG" --generate-notes "${release_flags[@]}"
+          echo "::notice::The $channel release stays a draft until the owner rebuilds the binaries and the edge bundle from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig, panel-manifest.sshsig, edge-manifest.json and edge-manifest.sig. Publish it only after all seven are attached."

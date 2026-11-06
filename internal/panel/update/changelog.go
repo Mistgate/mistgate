@@ -10,16 +10,20 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/mod/semver"
+
+	"github.com/mistgate/mistgate/internal/release"
 )
 
-// GitHubReleaseNotesURL lists the official repository's releases, newest first. The panel reads it on the schedule of the
-// release check, with a conditional request, to show "What's new" on the Updates page.
-const GitHubReleaseNotesURL = "https://api.github.com/repos/Mistgate/mistgate/releases?per_page=30"
+// GitHubReleaseListURL lists the official repository's releases, newest first. Discovery and "What's new" share this
+// conditionally fetched page.
+const GitHubReleaseListURL = "https://api.github.com/repos/Mistgate/mistgate/releases?per_page=30"
+
+// GitHubReleaseNotesURL remains the public name used by the application wiring.
+const GitHubReleaseNotesURL = GitHubReleaseListURL
 
 const (
 	notesMaxReleases = 30       // the page size above; also what is kept
@@ -27,24 +31,18 @@ const (
 	notesMaxResponse = 4 << 20  // the whole listing, assets and all
 )
 
-// ReleaseNote is one stable release's description, split by language. The text is INFORMATIONAL and not signed: unlike the
-// manifests it is whatever the GitHub release page says, fetched over HTTPS from the official repository. Nothing is
-// decided from it except a badge ("security"); the SPA renders it as text, never as HTML.
+type githubNotesRelease = githubRelease
+
+// ReleaseNote is one channel-visible release's description, split by language. The text is INFORMATIONAL and not signed:
+// unlike the manifests it is whatever the GitHub release page says, fetched over HTTPS from the official repository.
+// Nothing is decided from it except a badge ("security"); the SPA renders it as text, never as HTML.
 type ReleaseNote struct {
 	Version       string
+	Channel       release.Channel
 	URL           string
 	PublishedUnix int64
 	En, Ru, Zh    string
 	Security      bool
-}
-
-type githubNotesRelease struct {
-	TagName     string    `json:"tag_name"`
-	HTMLURL     string    `json:"html_url"`
-	PublishedAt time.Time `json:"published_at"`
-	Draft       bool      `json:"draft"`
-	Prerelease  bool      `json:"prerelease"`
-	Body        string    `json:"body"`
 }
 
 // securityHeading matches a markdown heading of a security section in any of the three languages ("## Security",
@@ -160,17 +158,16 @@ func capBody(s string) string {
 	return s
 }
 
-// fetchReleaseNotes reads the release list. etag is the validator of the last answer ("" = none): GitHub answers 304
-// to a request that carries it when nothing changed, and that answer does not count against the unauthenticated quota.
-// notModified is true then, and notes is nil. Drafts, prereleases and tags that are not a plain vX.Y.Z are skipped.
-func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag string) (notes []ReleaseNote, newETag string, notModified bool, err error) {
+// fetchGitHubReleaseList reads the first page of release metadata, conditionally when etag is available. The same list
+// supplies both release discovery and notes, so an unchanged page costs one conditional request per checker.
+func fetchGitHubReleaseList(ctx context.Context, client *http.Client, url, userAgent, etag string) (releases []githubRelease, newETag string, notModified bool, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", false, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "Mistgate-release-notes")
+	req.Header.Set("User-Agent", userAgent)
 	if etag != "" {
 		req.Header.Set("If-None-Match", etag)
 	}
@@ -182,6 +179,8 @@ func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag strin
 	switch resp.StatusCode {
 	case http.StatusNotModified:
 		return nil, etag, true, nil
+	case http.StatusNotFound:
+		return nil, "", false, ErrNoPanelRelease
 	case http.StatusOK:
 	default:
 		return nil, "", false, fmt.Errorf("GitHub releases API returned HTTP %d", resp.StatusCode)
@@ -190,12 +189,24 @@ func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag strin
 	if err != nil {
 		return nil, "", false, fmt.Errorf("decode GitHub release list: %w", err)
 	}
+	return list, resp.Header.Get("ETag"), false, nil
+}
+
+func releaseNotesForChannel(list []githubRelease, channel release.Channel) []ReleaseNote {
+	if !channel.Valid() {
+		return nil
+	}
+	var notes []ReleaseNote
 	for _, r := range list {
-		if r.Draft || r.Prerelease || !validReleaseTag(r.TagName) || !validReleasePage(r.HTMLURL, r.TagName) {
+		if r.Draft || !release.ValidChannelTag(r.TagName) || !validReleasePage(r.HTMLURL, r.TagName) {
+			continue
+		}
+		releaseChannel, ok := release.ChannelOf(r.TagName)
+		if !ok || !channel.Allows(releaseChannel) {
 			continue
 		}
 		n := parseReleaseBody(capBody(r.Body))
-		n.Version, n.URL = r.TagName, r.HTMLURL
+		n.Version, n.Channel, n.URL = r.TagName, releaseChannel, r.HTMLURL
 		if !r.PublishedAt.IsZero() {
 			n.PublishedUnix = r.PublishedAt.Unix()
 		}
@@ -205,21 +216,83 @@ func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag strin
 	if len(notes) > notesMaxReleases {
 		notes = notes[:notesMaxReleases]
 	}
-	return notes, resp.Header.Get("ETag"), false, nil
+	return notes
+}
+
+// fetchReleaseNotes is the stable-channel helper retained for callers that only need notes. Discovery uses the same
+// underlying release-list fetch through fetchGitHubReleaseList.
+func fetchReleaseNotes(ctx context.Context, client *http.Client, url, etag string) (notes []ReleaseNote, newETag string, notModified bool, err error) {
+	list, newETag, notModified, err := fetchGitHubReleaseList(ctx, client, url, "Mistgate-release-notes", etag)
+	if err != nil || notModified {
+		return nil, newETag, notModified, err
+	}
+	return releaseNotesForChannel(list, release.ChannelStable), newETag, false, nil
+}
+
+func (u *GitHubPanelUpdater) fetchReleases(ctx context.Context, userAgent string) ([]githubRelease, error) {
+	u.notesMu.Lock()
+	etag, cached := u.releasesETag, u.releases
+	u.notesMu.Unlock()
+
+	list, newETag, notModified, err := fetchGitHubReleaseList(ctx, u.client, u.apiURL, userAgent, etag)
+	if err != nil {
+		return nil, err
+	}
+	if notModified {
+		if len(cached) == 0 {
+			list, newETag, _, err = fetchGitHubReleaseList(ctx, u.client, u.apiURL, userAgent, "")
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			list = cached
+		}
+	}
+	notes := releaseNotesForChannel(list, u.channel())
+	u.notesMu.Lock()
+	u.releases, u.releasesETag = list, newETag
+	u.notes = notes
+	u.notesMu.Unlock()
+	return list, nil
+}
+
+func latestGitHubRelease(list []githubRelease, channel release.Channel) (githubRelease, error) {
+	tags := make([]string, 0, len(list))
+	byTag := make(map[string]githubRelease, len(list))
+	for _, r := range list {
+		if r.Draft || !release.ValidChannelTag(r.TagName) {
+			continue
+		}
+		tagChannel, ok := release.ChannelOf(r.TagName)
+		if !ok || !channel.Allows(tagChannel) {
+			continue
+		}
+		tags = append(tags, r.TagName)
+		byTag[r.TagName] = r
+	}
+	tag, ok := release.LatestTagForChannel(tags, channel)
+	if !ok {
+		return githubRelease{}, ErrNoPanelRelease
+	}
+	r := byTag[tag]
+	if !validReleasePage(r.HTMLURL, r.TagName) {
+		return githubRelease{}, errors.New("GitHub returned a release with an invalid page URL")
+	}
+	return r, nil
 }
 
 // decodeReleaseList reads the first notesMaxReleases entries of a JSON array one by one and stops there: the page asks for
 // that many, and an answer of many small entries (a hostile or broken one) must not be allocated whole before the cap.
-func decodeReleaseList(r io.Reader) ([]githubNotesRelease, error) {
+func decodeReleaseList(r io.Reader) ([]githubRelease, error) {
 	dec := json.NewDecoder(r)
 	if tok, err := dec.Token(); err != nil {
 		return nil, err
 	} else if tok != json.Delim('[') {
 		return nil, errors.New("not a JSON array")
 	}
-	var list []githubNotesRelease
+	var list []githubRelease
 	for len(list) < notesMaxReleases && dec.More() {
-		var rel githubNotesRelease
+		var rel githubRelease
 		if err := dec.Decode(&rel); err != nil {
 			return nil, err
 		}
@@ -233,34 +306,25 @@ func decodeReleaseList(r io.Reader) ([]githubNotesRelease, error) {
 // minutes of a start) refills it.
 func (u *GitHubPanelUpdater) ReleaseNotes() []ReleaseNote {
 	u.notesMu.Lock()
-	defer u.notesMu.Unlock()
-	return u.notes
+	list := append([]githubRelease(nil), u.releases...)
+	notes := append([]ReleaseNote(nil), u.notes...)
+	u.notesMu.Unlock()
+	if len(list) > 0 {
+		return releaseNotesForChannel(list, u.channel())
+	}
+	return notes
 }
 
 // refreshNotes reads the release list after a check. A failure leaves the notes already known: they are a nicety, never a
 // reason to report the update check as failed.
 func (u *GitHubPanelUpdater) refreshNotes(ctx context.Context) {
-	if u.cfg.NotesURL == "" {
-		return
-	}
 	ctx, cancel := context.WithTimeout(ctx, panelUpdateCheckTimeout)
 	defer cancel()
-	u.notesMu.Lock()
-	etag := u.notesETag
-	u.notesMu.Unlock()
-	notes, newETag, same, err := fetchReleaseNotes(ctx, u.client, u.cfg.NotesURL, etag)
-	if err != nil {
+	if _, err := u.fetchReleases(ctx, "Mistgate-release-notes"); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			u.log.Debug("read GitHub release notes", "err", err)
 		}
-		return
 	}
-	if same {
-		return
-	}
-	u.notesMu.Lock()
-	u.notes, u.notesETag = notes, newETag
-	u.notesMu.Unlock()
 }
 
 // gitDescribeSuffix is what git describe adds after a tag: commits since it and the hash, and "-dirty".

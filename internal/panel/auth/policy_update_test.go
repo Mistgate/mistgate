@@ -17,6 +17,7 @@ func TestUpdateServiceRolePolicy(t *testing.T) {
 	}{
 		{"GetUpdates", adminv1connect.UpdateServiceGetUpdatesProcedure, true, true},
 		{"CheckPanelUpdate", adminv1connect.UpdateServiceCheckPanelUpdateProcedure, true, true},
+		{"SetUpdateChannel", adminv1connect.UpdateServiceSetUpdateChannelProcedure, true, false},
 		{"InstallPanelUpdate", adminv1connect.UpdateServiceInstallPanelUpdateProcedure, true, false},
 		{"StartRollout", adminv1connect.UpdateServiceStartRolloutProcedure, true, false},
 		{"PauseRollout", adminv1connect.UpdateServicePauseRolloutProcedure, true, false},
@@ -34,5 +35,11 @@ func TestUpdateServiceRolePolicy(t *testing.T) {
 				t.Errorf("%s as %s: allowed = %v, want %v", tc.name, role, got, want)
 			}
 		}
+	}
+	if access, ok := TokenAccess(adminv1connect.UpdateServiceSetUpdateChannelProcedure); ok {
+		t.Errorf("SetUpdateChannel is available to tokens with access %d", access)
+	}
+	if !NeedsStepUp(adminv1connect.UpdateServiceSetUpdateChannelProcedure) {
+		t.Error("SetUpdateChannel does not require step-up")
 	}
 }

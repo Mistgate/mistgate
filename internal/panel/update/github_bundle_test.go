@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func signedNodeRelease(t *testing.T, priv ed25519.PrivateKey, tag string, built 
 		r.Assets = append(r.Assets, githubAsset{Name: name, Size: int64(len(data)), Digest: "sha256:" + hex.EncodeToString(sum[:]),
 			BrowserDownloadURL: panelReleasePrefix + tag + "/" + url.PathEscape(name)})
 	}
-	api, err := json.Marshal(r)
+	api, err := json.Marshal([]githubRelease{r})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,6 +145,90 @@ func TestGitHubNodeBundleSourceDownloadsAndVerifiesRelease(t *testing.T) {
 	}
 }
 
+func TestGitHubNodeBundleSourceFollowsChannelWithoutDowngrading(t *testing.T) {
+	_, priv, err := release.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{
+		"mistgate-node-linux-amd64": []byte("signed linux amd64 agent"),
+		"mistgate-node-linux-arm64": []byte("signed linux arm64 agent"),
+	}
+	versions := []struct {
+		tag   string
+		built int64
+	}{
+		{"v0.2.0", 1_770_000_000},
+		{"v0.2.1-testing.1", 1_780_000_000},
+		{"v0.2.2-dev.1", 1_790_000_000},
+	}
+	var releases []githubRelease
+	assetsByTag := make(map[string]map[string][]byte, len(versions))
+	for _, version := range versions {
+		body, assets := signedNodeRelease(t, priv, version.tag, version.built, 2_000_000_000, files)
+		var rels []githubRelease
+		if err := json.Unmarshal(body, &rels); err != nil || len(rels) != 1 {
+			t.Fatalf("decode %s release: %v", version.tag, err)
+		}
+		releases = append(releases, rels[0])
+		assetsByTag[version.tag] = assets
+	}
+	apiBody, err := json.Marshal(releases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host == "api.github.com" {
+			return githubResponse(http.StatusOK, apiBody), nil
+		}
+		if r.URL.Host == "github.com" {
+			parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+			tag, name := parts[len(parts)-2], filepath.Base(r.URL.Path)
+			if data, ok := assetsByTag[tag][name]; ok {
+				return githubResponse(http.StatusOK, data), nil
+			}
+			return githubResponse(http.StatusNotFound, nil), nil
+		}
+		return nil, errors.New("unexpected host " + r.URL.Host)
+	})}
+	channel := release.ChannelStable
+	dataDir := t.TempDir()
+	source := NewGitHubNodeBundleSource(GitHubNodeBundleConfig{
+		DataDir: dataDir, Key: priv.Public().(ed25519.PublicKey), Channel: func() release.Channel { return channel }, HTTPClient: client,
+		Now: func() time.Time { return time.Unix(1_800_000_000, 0) },
+	})
+	currentBuilt := int64(0)
+	for _, tc := range []struct {
+		channel release.Channel
+		version string
+		built   int64
+	}{
+		{release.ChannelStable, versions[0].tag, versions[0].built},
+		{release.ChannelTesting, versions[1].tag, versions[1].built},
+		{release.ChannelDev, versions[2].tag, versions[2].built},
+	} {
+		channel = tc.channel
+		changed, err := source.Sync(context.Background(), currentBuilt)
+		if err != nil || !changed {
+			t.Fatalf("sync %s = %v, %v", tc.channel, changed, err)
+		}
+		manifestBytes, err := os.ReadFile(filepath.Join(dataDir, "dist", release.ManifestName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		manifest, err := release.Parse(manifestBytes)
+		if err != nil || manifest.Version != tc.version {
+			t.Fatalf("channel %s installed %+v, err %v; want %s", tc.channel, manifest, err, tc.version)
+		}
+		currentBuilt = tc.built
+	}
+	channel = release.ChannelStable
+	changed, err := source.Sync(context.Background(), currentBuilt)
+	if err != nil || changed {
+		t.Fatalf("switching back to stable downgraded the bundle: changed=%v err=%v", changed, err)
+	}
+}
+
 func TestSameReleaseFilesIgnoresManifestOrder(t *testing.T) {
 	first := release.File{Name: "mistgate-node-linux-amd64"}
 	second := release.File{Name: "mistgate-node-linux-arm64"}
@@ -231,17 +316,18 @@ func TestGitHubNodeBundleSourceRequiresSignedSidecars(t *testing.T) {
 	})
 	delete(assets, release.SignatureName)
 	// Keep the release API response structurally valid while removing the signature asset.
-	var r githubRelease
-	if err := json.Unmarshal(apiBody, &r); err != nil {
+	var releases []githubRelease
+	if err := json.Unmarshal(apiBody, &releases); err != nil || len(releases) != 1 {
 		t.Fatal(err)
 	}
+	r := releases[0]
 	for i := range r.Assets {
 		if r.Assets[i].Name == release.SignatureName {
 			r.Assets = append(r.Assets[:i], r.Assets[i+1:]...)
 			break
 		}
 	}
-	apiBody, _ = json.Marshal(r)
+	apiBody, _ = json.Marshal([]githubRelease{r})
 	requested := map[string]int{}
 	u, dataDir := newTestGitHubNodeBundleSource(t, priv.Public().(ed25519.PublicKey), apiBody, assets, requested)
 	changed, err := u.Sync(context.Background(), 0)

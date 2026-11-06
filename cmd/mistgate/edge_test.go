@@ -53,7 +53,10 @@ func TestEdgeDeploySkipSignatureNeedsABundle(t *testing.T) {
 func TestEdgeDefaultVersionIsTheBinarysRelease(t *testing.T) {
 	old := buildinfo.Version
 	defer func() { buildinfo.Version = old }()
-	for stamp, want := range map[string]string{"v0.1.4": "v0.1.4", "0.1.4": "v0.1.4", "0.1.0-dev": "", "0.1.0-abc1234": "", "": "", "v1.2": ""} {
+	for stamp, want := range map[string]string{
+		"v0.1.4": "v0.1.4", "0.1.4": "v0.1.4", "0.1.4-testing.1": "v0.1.4-testing.1", "v0.1.4-dev.2": "v0.1.4-dev.2",
+		"0.1.0-dev": "", "0.1.0-dev.1": "v0.1.0-dev.1", "0.1.0-abc1234": "", "": "", "v1.2": "",
+	} {
 		buildinfo.Version = stamp
 		if got := edgeDefaultVersion(); got != want {
 			t.Errorf("version stamp %q: default %q, want %q", stamp, got, want)

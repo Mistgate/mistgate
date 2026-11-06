@@ -51,6 +51,8 @@ service UpdateService {
   rpc CancelNodeUpdateSchedule(CancelNodeUpdateScheduleRequest) returns (CancelNodeUpdateScheduleResponse);
   // Change the fixed UTC offset used to enter new scheduled updates. Existing schedules keep their original offset.
   rpc SetUpdateTimezone(SetUpdateTimezoneRequest) returns (SetUpdateTimezoneResponse);
+  // Change the release channel this panel follows. Owner-only with a fresh step-up; never available to API tokens.
+  rpc SetUpdateChannel(SetUpdateChannelRequest) returns (SetUpdateChannelResponse);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -299,9 +301,17 @@ message GetUpdatesResponse {
   // bundle, when no node is behind it, or when the panel has not read the release notes (the Cloudflare edition never
   // does: it has no bundle).
   repeated ReleaseNote agent_notes = 8;
-  // The same for this panel: every stable release newer than PanelBuild.version, up to PanelUpdate.version. Only while
+  // The same for this panel: every release visible to update_channel newer than PanelBuild.version, up to PanelUpdate.version. Only while
   // PanelUpdate.available (a release whose signed panel manifest verified), else empty.
   repeated ReleaseNote panel_notes = 9;
+  // The configured channel used for panel and node-bundle discovery (stable when the setting is unset).
+  string update_channel = 10;
+  // The channel encoded by PanelBuild.version, empty for an unstamped development build.
+  string running_version_channel = 11;
+  // The channel encoded by PanelUpdate.version, empty when no release is known.
+  string offered_release_channel = 12;
+  // The signed manifest of the newest release visible to update_channel is older than this panel's build time.
+  bool running_newer_than_channel_offers = 13;
 }
 
 // The notes of one GitHub release, as the maintainers wrote them in the release description. They are INFORMATIONAL and
@@ -323,6 +333,8 @@ message ReleaseNote {
   // A heading "Security", "Безопасность" or "安全" (any level) is in the notes: the SPA badges the release and tells the
   // owner it is worth updating soon.
   bool security = 7;
+  // The release channel encoded by version: stable, testing or dev.
+  string channel = 8;
 }
 
 message CheckPanelUpdateRequest {}
@@ -423,4 +435,13 @@ message SetUpdateTimezoneRequest {
 
 message SetUpdateTimezoneResponse {
   int32 timezone_offset_minutes = 1;
+}
+
+message SetUpdateChannelRequest {
+  // One of stable, testing or dev.
+  string channel = 1;
+}
+
+message SetUpdateChannelResponse {
+  string channel = 1;
 }

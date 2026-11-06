@@ -81,32 +81,42 @@ func (f *panelFixture) digest() string {
 
 // client serves the release API and its assets, counting the requests by kind.
 func (f *panelFixture) client(t *testing.T) (*http.Client, map[string]int) {
+	return panelFixturesClient(t, f)
+}
+
+func panelFixturesClient(t *testing.T, fixtures ...*panelFixture) (*http.Client, map[string]int) {
 	t.Helper()
-	served := f.served
-	if served == nil {
-		served = f.binary
-	}
-	assets := map[string][]byte{"mistgate-linux-amd64": served}
-	if !f.unsigned {
-		m := release.Manifest{Schema: release.Schema, Version: f.tag, Built: f.built, Expires: f.expires,
-			Files: []release.File{{OS: "linux", Arch: "amd64", Name: "mistgate-linux-amd64", Size: int64(len(f.binary)), SHA256: f.digest()}}}
-		body, err := m.Marshal()
-		if err != nil {
-			t.Fatal(err)
+	var releases []githubRelease
+	assets := make(map[string]map[string][]byte, len(fixtures))
+	for _, f := range fixtures {
+		served := f.served
+		if served == nil {
+			served = f.binary
 		}
-		sig := release.SignPanel(f.signer, body)
-		if f.nodeSig {
-			sig = release.Sign(f.signer, body)
+		byName := map[string][]byte{"mistgate-linux-amd64": served}
+		if !f.unsigned {
+			m := release.Manifest{Schema: release.Schema, Version: f.tag, Built: f.built, Expires: f.expires,
+				Files: []release.File{{OS: "linux", Arch: "amd64", Name: "mistgate-linux-amd64", Size: int64(len(f.binary)), SHA256: f.digest()}}}
+			body, err := m.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sig := release.SignPanel(f.signer, body)
+			if f.nodeSig {
+				sig = release.Sign(f.signer, body)
+			}
+			byName[release.PanelManifestName], byName[release.PanelSignatureName] = body, sig
 		}
-		assets[release.PanelManifestName], assets[release.PanelSignatureName] = body, sig
+		rel := githubRelease{TagName: f.tag, HTMLURL: githubReleasePageBase + f.tag, PublishedAt: time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)}
+		for name, b := range byName {
+			sum := sha256.Sum256(b)
+			rel.Assets = append(rel.Assets, githubAsset{Name: name, Size: int64(len(b)), BrowserDownloadURL: panelReleasePrefix + f.tag + "/" + name,
+				Digest: "sha256:" + hex.EncodeToString(sum[:])})
+		}
+		releases = append(releases, rel)
+		assets[f.tag] = byName
 	}
-	rel := githubRelease{TagName: f.tag, HTMLURL: githubReleasePageBase + f.tag, PublishedAt: time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)}
-	for name, b := range assets {
-		sum := sha256.Sum256(b)
-		rel.Assets = append(rel.Assets, githubAsset{Name: name, Size: int64(len(b)), BrowserDownloadURL: panelReleasePrefix + f.tag + "/" + name,
-			Digest: "sha256:" + hex.EncodeToString(sum[:])})
-	}
-	relBody, err := json.Marshal(rel)
+	relBody, err := json.Marshal(releases)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,9 +129,14 @@ func (f *panelFixture) client(t *testing.T) (*http.Client, map[string]int) {
 			counts["api"]++
 			return githubResponse(http.StatusOK, relBody), nil
 		}
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		name := filepath.Base(r.URL.Path)
+		tag := ""
+		if len(parts) >= 2 {
+			tag = parts[len(parts)-2]
+		}
 		counts[name]++
-		if b, ok := assets[name]; ok && r.URL.Host == "github.com" {
+		if b, ok := assets[tag][name]; ok && r.URL.Host == "github.com" {
 			return githubResponse(http.StatusOK, b), nil
 		}
 		return githubResponse(http.StatusNotFound, nil), nil
@@ -366,6 +381,50 @@ func TestPanelUpdaterOrdersByBuildTime(t *testing.T) {
 		if s := updater.Check(context.Background()); s.Available != tc.want || s.ErrorKey != "" {
 			t.Errorf("%s: %+v", name, s)
 		}
+	}
+}
+
+func TestPanelUpdaterDiscoveryChannelsAndNoDowngrade(t *testing.T) {
+	stable := newPanelFixture()
+	stable.tag, stable.built = "v1.2.0", 1_770_000_000
+	testingRelease := newPanelFixture()
+	testingRelease.tag, testingRelease.built = "v1.2.1-testing.1", 1_780_000_000
+	dev := newPanelFixture()
+	dev.tag, dev.built = "v1.2.2-dev.1", 1_790_000_000
+	client, _ := panelFixturesClient(t, stable, testingRelease, dev)
+	channel := release.ChannelStable
+	updater, _, _ := newPanelUpdater(t, stable, &recorder{}, func(c *PanelUpdateConfig) {
+		c.HTTPClient = client
+		c.CurrentBuilt = 1_760_000_000
+		c.Channel = func() release.Channel { return channel }
+	})
+
+	for _, tc := range []struct {
+		channel release.Channel
+		version string
+		notes   int
+	}{
+		{release.ChannelStable, stable.tag, 1},
+		{release.ChannelTesting, testingRelease.tag, 2},
+		{release.ChannelDev, dev.tag, 3},
+	} {
+		channel = tc.channel
+		updater.Invalidate()
+		status := updater.Check(context.Background())
+		if status.Version != tc.version || status.Channel != tc.channel || !status.Available {
+			t.Fatalf("channel %s status = %+v, want %s", tc.channel, status, tc.version)
+		}
+		if got := updater.ReleaseNotes(); len(got) != tc.notes {
+			t.Fatalf("channel %s notes count = %d, want %d: %+v", tc.channel, len(got), tc.notes, got)
+		}
+	}
+
+	channel = release.ChannelStable
+	updater.cfg.CurrentBuilt = dev.built
+	updater.Invalidate()
+	status := updater.Check(context.Background())
+	if status.Version != stable.tag || status.Available || !status.RunningNewer {
+		t.Fatalf("stable channel must not offer an older stable bundle to a newer dev build: %+v", status)
 	}
 }
 

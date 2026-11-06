@@ -229,13 +229,13 @@ func rel(tag, body string) githubNotesRelease {
 
 func TestFetchReleaseNotesFiltersAndOrders(t *testing.T) {
 	api := &notesAPI{etag: `W/"abc"`}
-	draft, pre := rel("v0.1.99", "draft"), rel("v0.1.98", "pre")
+	draft, pre := rel("v0.1.99", "draft"), rel("v0.1.98-testing.1", "pre")
 	draft.Draft, pre.Prerelease = true, true
 	badTag := rel("nightly", "x")
 	foreignPage := rel("v0.1.97", "x")
 	foreignPage.HTMLURL = "https://evil.example/releases/tag/v0.1.97"
-	rcTag := rel("v0.1.96-rc1", "x")
-	api.set([]githubNotesRelease{draft, pre, badTag, foreignPage, rcTag, rel("v0.1.37", bodyEnRu), rel("v0.1.38", bodyEnRuZh)})
+	rcTag := rel("v0.1.96-rc.1", "x")
+	api.set([]githubNotesRelease{draft, pre, badTag, foreignPage, rcTag, rel("v0.1.37", bodyEnRu), rel("v0.1.38", bodyEnRuZh), rel("v0.1.99-dev.1", "dev")})
 
 	notes, etag, same, err := fetchReleaseNotes(context.Background(), api.client(), GitHubReleaseNotesURL, "")
 	if err != nil || same || etag != `W/"abc"` {
@@ -243,6 +243,14 @@ func TestFetchReleaseNotesFiltersAndOrders(t *testing.T) {
 	}
 	if len(notes) != 2 || notes[0].Version != "v0.1.38" || notes[1].Version != "v0.1.37" {
 		t.Fatalf("drafts, prereleases and foreign pages must be skipped, newest first: %+v", notes)
+	}
+	testingNotes := releaseNotesForChannel([]githubRelease{draft, pre, rel("v0.1.37", bodyEnRu), rel("v0.1.38", bodyEnRuZh)}, release.ChannelTesting)
+	if len(testingNotes) != 3 || testingNotes[0].Channel != release.ChannelTesting || testingNotes[1].Channel != release.ChannelStable {
+		t.Fatalf("testing notes must include testing and stable releases: %+v", testingNotes)
+	}
+	devNotes := releaseNotesForChannel([]githubRelease{pre, rel("v0.1.37", bodyEnRu), rel("v0.1.99-dev.1", "dev")}, release.ChannelDev)
+	if len(devNotes) != 3 || devNotes[0].Channel != release.ChannelDev {
+		t.Fatalf("dev notes must include all channels: %+v", devNotes)
 	}
 	if notes[0].Zh == "" || notes[0].Ru == "" || notes[1].Zh != "" || notes[0].PublishedUnix == 0 || notes[0].URL != githubReleasePageBase+"v0.1.38" {
 		t.Fatalf("%+v", notes[0])
@@ -300,7 +308,7 @@ func TestPanelUpdaterReadsNotesConditionally(t *testing.T) {
 	api := &notesAPI{etag: `W/"v1"`}
 	api.set([]githubNotesRelease{rel("v0.1.38", bodyEnRuZh), rel("v0.1.37", bodyEnRu)})
 	updater.client = api.client()
-	updater.cfg.NotesURL = GitHubReleaseNotesURL
+	updater.apiURL = GitHubReleaseNotesURL
 	updater.log = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	updater.refreshNotes(context.Background())
@@ -313,7 +321,7 @@ func TestPanelUpdaterReadsNotesConditionally(t *testing.T) {
 	if len(api.gotMatch) != 2 || api.gotMatch[1] != `W/"v1"` {
 		t.Fatalf("the second request must carry the ETag: %q", api.gotMatch)
 	}
-	if got := updater.ReleaseNotes(); len(got) != 2 || &got[0] != &first[0] {
+	if got := updater.ReleaseNotes(); len(got) != 2 || got[0] != first[0] {
 		t.Fatal("a 304 must leave the notes as they were")
 	}
 
@@ -337,30 +345,17 @@ func TestPanelUpdaterReadsNotesConditionally(t *testing.T) {
 	}
 }
 
-// Check reads the notes after its own verdict, and never when no URL is configured (the tests, the helper process, the edge).
-func TestPanelUpdaterCheckReadsNotesOnlyWhenConfigured(t *testing.T) {
+// Check shares the conditional release-list request between discovery and notes.
+func TestPanelUpdaterCheckSharesReleaseListForDiscoveryAndNotes(t *testing.T) {
 	f := newPanelFixture()
 	updater, counts, _ := newPanelUpdater(t, f, &recorder{}, nil)
-	updater.Check(context.Background())
-	if counts["api"] != 1 || len(updater.ReleaseNotes()) != 0 {
-		t.Fatalf("no URL: api requests %v", counts)
-	}
-
-	updater, _, _ = newPanelUpdater(t, f, &recorder{}, nil)
-	api := &notesAPI{}
-	api.set([]githubNotesRelease{rel("v1.2.0", "- x")})
-	base := updater.client
-	updater.cfg.NotesURL = GitHubReleaseNotesURL
-	updater.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Path == "/repos/Mistgate/mistgate/releases" {
-			return api.client().Do(r)
-		}
-		return base.Do(r)
-	})}
 	if s := updater.Check(context.Background()); !s.Available {
 		t.Fatalf("the verdict must not depend on the notes: %+v", s)
 	}
-	if got := updater.ReleaseNotes(); len(got) != 1 || got[0].Version != "v1.2.0" {
+	if counts["api"] != 1 {
+		t.Fatalf("discovery and notes made %d API calls, want one", counts["api"])
+	}
+	if got := updater.ReleaseNotes(); len(got) != 1 || got[0].Version != f.tag {
 		t.Fatalf("notes after Check: %+v", got)
 	}
 }
