@@ -3,22 +3,23 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.79`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.79
+  meta: v0.1.0 – v0.1.80
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.79
+      release: v0.1.80
       current: true
       points:
-        - "**A node only through an entry or a CDN.** On a node's **Ways in** tab, **In subscriptions** keeps the server at the node's own address out of subscriptions while it keeps running for relays and the CDN, so people reach, say, a node abroad only through an entry in Russia; the panel warns first when nobody would have a way left. See [Nodes](../guide/nodes.md#direct)."
-        - "**Unknown keys on VLESS.** A connection with a key the node does not know (a removed device, an old subscription) is counted under the profile and named in the node's log, so an app with a stale key shows even while the panel's checks pass. Needs the agent v0.1.79. See [Troubleshooting](../operations/troubleshooting.md)."
-        - "**IPv6 measured only where it helps.** A node whose IPv6 entry is off is measured over IPv6 only while its IPv4 is blocked from the country, when an IPv6 entry could be the way around; otherwise Reachability says so in one quiet line. See [Reachability](../operations/reachability.md#ipv6)."
+        - "**Release channels.** Stable, Testing and Development: the chip next to the panel's version on the Updates page picks which releases the panel offers, for itself and its nodes; moving to a more stable channel never installs anything older, and the installer takes `--channel`. See [Updates](../operations/updates.md#release-channels)."
+        - "**A backup before the panel updates itself.** **Update panel** first opens a window: what happens, a backup to Cloudflare R2 (or the way to set it up) and an encrypted file on this computer; **Settings → Backups** downloads one too. See [Backups](../operations/backups.md#a-copy-on-this-computer)."
+        - "**Restore from a backup.** In **Settings → Backups** the panel checks a backup (a file or one in R2) and shows what is in it before anything changes, then swaps its data and keeps the previous data aside; on a new server `install.sh --restore` does it before the first start. See [Backups](../operations/backups.md#restore-in-the-panel)."
+        - "**AmneziaWG out of the link apps.** A switch under **Subscriptions → Who gets what** takes AmneziaWG out of kl!ck and the other Mihomo apps when people use it in AmneziaVPN anyway. See [Subscriptions](../guide/subscriptions.md#amneziawg-in-apps-on-the-link)."
     - title: Profiles
       section: profiles
       points:
@@ -67,6 +68,7 @@ Mistgate is in **beta**; the current release is `v0.1.79`. It runs in production
         - "[What's new](../operations/updates.md#whats-new): the release notes between your version and the available one, in the interface language."
         - "[Signed node agent updates](../operations/updates.md), one node at a time, now or on a schedule, with a health gate and automatic rollback."
         - "Panel self-update from signed GitHub releases, with a rollback when the new panel does not stay up."
+        - "[Release channels](../operations/updates.md#release-channels) (stable, testing, development) for the panel and its nodes, and a backup offered before the panel updates itself."
         - "[A one-line panel install](../getting-started/install-panel.md#one-line-install) that verifies the release signature."
         - "[Reproducible releases](../operations/releases.md) signed offline from the tag."
     - title: Integrations
@@ -80,10 +82,10 @@ Mistgate is in **beta**; the current release is `v0.1.79`. It runs in production
       points:
         - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese, the admin and the user page also in Persian and Turkish; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
-        - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, and an offline restore."
+        - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, or to a file on the owner's computer; restore in the panel or on a new server with the installer."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.79
+  meta: v0.1.34 – v0.1.80
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -192,7 +194,7 @@ Mistgate is in **beta**; the current release is `v0.1.79`. It runs in production
 - **Check ports** looks from one vantage point: another node of the fleet or the panel host. On VLESS ports it runs a TLS handshake with the expected name, not a REALITY handshake.
 - The SSH installation logs in with the panel's own key, a password, or once with the owner's own private key, and the node card manages `authorized_keys`. Closing password login in sshd and rotating the panel's key are not there yet. See [Install a node over SSH](../getting-started/ssh-install.md).
 - MCP can now create and update profiles and deploy them to nodes and groups with the owner's approval; create groups in the admin first.
-- Backups go to Cloudflare R2 only, and a restore is the offline `mistgate backup restore` command into a new data directory.
+- Backups go to Cloudflare R2 or to a file on the owner's computer. Restore is in the VPS edition (the panel and the installer); the Cloudflare edition keeps its data in D1 and has no restore yet.
 - The panel does not create a Cloudflare account, a bucket or a token: you supply a bucket-scoped token with read, write and delete access.
 - The Cloudflare edition is a preview, not yet tried on a real Cloudflare account: some features are not available in it yet (see [the list](../getting-started/install-edge.md#not-available-in-this-edition-yet)), and a fleet cannot be moved between it and a VPS panel.
 - A device ID is what the app reports. Blocking refuses that ID; an app that reports another ID is a new device and takes a free place. To cut off a link that was passed on, issue a new link as well.
