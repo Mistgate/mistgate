@@ -100,6 +100,22 @@ func TestAgentStartedOncePerStartWithVersions(t *testing.T) {
 	}
 }
 
+func TestAgentStartedIgnoresOversizedVersionFile(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) { c.Version = "0.1.0-a" }})
+	path := filepath.Join(h.dir, fileLastVersion)
+	if err := os.WriteFile(path, []byte(strings.Repeat("x", maxAgentStateFileBytes+1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.start()
+	defer h.stop()
+	h.waitConnected()
+	eventually(t, func() bool { return h.panel.hasEvent("agent_started") }, "agent_started event")
+	params := h.panel.eventsByCode("agent_started")[0].Params
+	if params["prev_version"] != "" || params["version"] != "0.1.0-a" {
+		t.Fatalf("oversized last_version was used: %v", params)
+	}
+}
+
 func TestAgentStartedUpdateMarkerNamesPreviousVersion(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) { c.Version = "0.1.0-b" }})
 	h.a.upMarker = &update.Marker{FromVersion: "0.1.0-a", ToVersion: "0.1.0-b"}

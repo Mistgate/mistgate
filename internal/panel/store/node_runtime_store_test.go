@@ -129,4 +129,26 @@ func nodeRuntimeStoreProof(t *testing.T, st *Store) {
 	if hours, err = st.NodeHostHours(ctx, "nod_rt_a", base, 24); err != nil || len(hours) != 1 || hours[0].HourStart != hour {
 		t.Errorf("after the prune: %+v, %v", hours, err)
 	}
+	// The daily prune removes at most one batch; the next sweep clears the backlog.
+	_, err = st.W.ExecContext(ctx, `WITH RECURSIVE seq(n) AS (
+		SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < ?
+	)
+	INSERT INTO node_host_hour (node_id, hour_start)
+	SELECT 'nod_rt_a', ? - (n * 3600) FROM seq`, nodeHostHourPruneBatch+1, hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := st.PruneNodeHostHours(ctx, base)
+	if err != nil || got != nodeHostHourPruneBatch {
+		t.Fatalf("first sweep pruned %d rows: %v, want %d", got, err, nodeHostHourPruneBatch)
+	}
+	var left int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM node_host_hour WHERE node_id = 'nod_rt_a'`).Scan(&left); err != nil || left != 2 {
+		t.Fatalf("rows after first sweep = %d, %v, want one expired and the current hour", left, err)
+	}
+	got, err = st.PruneNodeHostHours(ctx, base)
+	if err != nil || got != 1 {
+		t.Fatalf("next sweep pruned %d rows: %v, want the remaining expired row", got, err)
+	}
 }

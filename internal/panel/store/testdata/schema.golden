@@ -223,6 +223,12 @@
   },
   {
     "type": "index",
+    "name": "health_check_daily_day_inbound",
+    "tbl_name": "health_check_daily",
+    "sql": "CREATE INDEX health_check_daily_day_inbound ON health_check_daily (day, inbound_id)"
+  },
+  {
+    "type": "index",
     "name": "health_check_sample_at",
     "tbl_name": "health_check_sample",
     "sql": "CREATE INDEX health_check_sample_at ON health_check_sample (at)"

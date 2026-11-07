@@ -17,11 +17,14 @@ func TestStatsBatchesFeedHostHours(t *testing.T) {
 	a := e.enroll("nodea")
 	ids := e.fixture(a.nodeID)
 	c, _, _ := connectFull(a, "host-hours")
-	now := time.Now().Unix()
-	for seq, cpu := range map[uint64]float32{1: 10, 2: 30} {
+	now := e.f.now().Unix()
+	for _, sample := range []struct {
+		seq uint64
+		cpu float32
+	}{{seq: 1, cpu: 10}, {seq: 2, cpu: 30}} {
 		b := statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: now - 60}})
-		b.GetStats().Host = &agentv1.HostMetrics{CpuPct: cpu, SoftirqPct: 4, Load1: 0.5, RamUsedBytes: 512, RamTotalBytes: 1024, NetRxBps: 100 * uint64(seq), NetTxBps: 50}
-		c.send(seq, b)
+		b.GetStats().Host = &agentv1.HostMetrics{CpuPct: sample.cpu, SoftirqPct: 4, Load1: 0.5, RamUsedBytes: 512, RamTotalBytes: 1024, NetRxBps: 100 * sample.seq, NetTxBps: 50}
+		c.send(sample.seq, b)
 	}
 	node := nodeService{e.f}
 	waitFor(t, func() bool {

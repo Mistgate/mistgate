@@ -100,16 +100,25 @@ func (f *Fleet) startProbe(ctx context.Context, a, b string) (func(), error) {
 	if _, running := p.busy[pair]; running {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("a probe between these nodes is already running"))
 	}
+	if p.active >= maxActiveProbes {
+		return nil, activeProbeLimitError()
+	}
 	p.caller[actor] = append(callerTimes, now)
 	for _, id := range ends {
 		p.node[id] = append(nodeTimes[id], now)
 	}
 	p.busy[pair] = struct{}{}
+	p.active++
 	return func() {
 		p.mu.Lock()
 		delete(p.busy, pair)
+		p.active--
 		p.mu.Unlock()
 	}, nil
+}
+
+func activeProbeLimitError() error {
+	return connect.NewError(connect.CodeResourceExhausted, errors.New("fleet probe limit reached; try again later"))
 }
 
 // probeNode reads a node a probe may name: not retired.

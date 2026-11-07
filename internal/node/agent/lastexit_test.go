@@ -38,6 +38,22 @@ func TestParseExitFacts(t *testing.T) {
 	}
 }
 
+func TestRecordCrashIgnoresOversizedLog(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	line := strconv.FormatInt(now.Add(-time.Minute).Unix(), 10) + "\n"
+	path := filepath.Join(h.dir, fileCrashLog)
+	if err := os.WriteFile(path, []byte(strings.Repeat(line, 1000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.a.recordCrash(now); got != 1 {
+		t.Fatalf("crash count from oversized log = %d, want the new crash only", got)
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != strconv.FormatInt(now.Unix(), 10)+"\n" {
+		t.Fatalf("trimmed oversized log = %q, %v", got, err)
+	}
+}
+
 // startWithProbe starts a fresh agent process on the harness's state directory with a fake systemd reader and waits for its
 // agent_started event, returning the params.
 func (h *harness) startWithProbe(probe exitProbe) map[string]string {

@@ -349,6 +349,40 @@ func TestProbeRateLimitsPerCallerPerNodeAndPerPair(t *testing.T) {
 	}
 }
 
+func TestProbeAndSpeedShareFleetActiveLimit(t *testing.T) {
+	x, _, _ := portCheckTarget(t)
+	actor := ""
+	x.f.cfg.Actor = func(context.Context) string { return actor }
+	releases := make([]func(), 0, maxActiveProbes)
+	for i := 0; i < maxActiveProbes-1; i++ {
+		actor = "probe-" + strconv.Itoa(i)
+		release, err := x.f.startProbe(x.ctx, "from"+strconv.Itoa(i), "to"+strconv.Itoa(i))
+		if err != nil {
+			t.Fatalf("probe %d: %v", i, err)
+		}
+		releases = append(releases, release)
+	}
+	actor = "speed"
+	release, err := x.f.startSpeed(x.ctx, "speed-from", "speed-to")
+	if err != nil {
+		t.Fatalf("speed test filled the fleet limit: %v", err)
+	}
+	releases = append(releases, release)
+
+	actor = "another-operator"
+	if _, err := x.f.startProbe(x.ctx, "last-from", "last-to"); connect.CodeOf(err) != connect.CodeResourceExhausted || !strings.Contains(err.Error(), "fleet probe limit") {
+		t.Fatalf("ninth active probe = %v, want fleet limit", err)
+	}
+	for _, release := range releases {
+		release()
+	}
+	if release, err := x.f.startProbe(x.ctx, "last-from", "last-to"); err != nil {
+		t.Fatalf("a released fleet slot stayed busy: %v", err)
+	} else {
+		release()
+	}
+}
+
 func TestPathProbeRateLimitReachesTheRPC(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
 	sender, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck) // too old: each probe ends at once but counts
