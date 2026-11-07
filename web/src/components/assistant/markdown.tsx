@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
+import { cx } from "@/lib/cx";
 import { parseInline, safeHttpsUrl, type Inline } from "@/components/mini-markdown";
 
 // The assistant's answers (ADR 0014): Markdown from a model that read untrusted data, so it is rendered like the release
@@ -83,7 +84,7 @@ function inline(nodes: Inline[], onNavigate?: () => void): ReactNode[] {
         return <em key={i}>{inline(n.children, onNavigate)}</em>;
       case "code":
         return (
-          <code key={i} className="rounded-[5px] bg-surface-2 px-1 py-px font-mono text-[0.92em]">
+          <code key={i} className="rounded-md bg-fg/[0.07] px-1.5 py-0.5 font-mono text-[0.86em] font-normal">
             {n.text}
           </code>
         );
@@ -111,12 +112,12 @@ function inline(nodes: Inline[], onNavigate?: () => void): ReactNode[] {
 /** An answer of the assistant. onNavigate: a page link was followed (the chat may close on a phone). */
 export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: () => void }) {
   return (
-    <div className="flex flex-col gap-2 text-[13.5px] leading-relaxed text-pretty break-words">
+    <div className="flex flex-col gap-3 text-[15px] leading-[1.65] font-normal text-pretty break-words">
       {parseChatMarkdown(text).map((b, i) => {
         switch (b.kind) {
           case "code":
             return (
-              <pre key={i} className="overflow-x-auto rounded-field bg-canvas px-3 py-2 font-mono text-xs leading-normal">
+              <pre key={i} className="overflow-x-auto rounded-xl bg-fg/[0.06] px-3.5 py-3 font-mono text-[12.5px] leading-normal">
                 <code>{b.text}</code>
               </pre>
             );
@@ -131,7 +132,7 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
           case "list": {
             const Tag = b.ordered ? "ol" : "ul";
             return (
-              <Tag key={i} className={b.ordered ? "flex list-decimal flex-col gap-1 ps-5" : "flex list-disc flex-col gap-1 ps-5"}>
+              <Tag key={i} className={cx("flex flex-col gap-1.5 ps-5 marker:text-muted", b.ordered ? "list-decimal marker:tabular-nums" : "list-disc")}>
                 {b.items.map((it, j) => (
                   <li key={j}>{inline(it, onNavigate)}</li>
                 ))}

@@ -98,6 +98,20 @@ const working: Msg[] = [
   msg({ role: ChatRole.ASSISTANT, createdUnix: at(1), text: "", tools: [{ id: "t1", tool: "user_devices", argsJson: "{}", done: true, ok: true, count: 3, error: "" }, { id: "t2", tool: "node_journal", argsJson: "{}", done: false, ok: false, count: 0, error: "" }] }),
 ];
 
+const access = {
+  available: true,
+  reason: "",
+  provider: AssistantProvider.ANTHROPIC,
+  model: "claude-opus-5-5",
+  readOnly: false,
+  effort: AssistantEffort.NORMAL,
+  choices: [
+    { provider: AssistantProvider.ANTHROPIC, model: "claude-opus-5-5", inputUsdPerMtok: 4, outputUsdPerMtok: 20, budgetReached: false },
+    { provider: AssistantProvider.DEEPSEEK, model: "deepseek-v4.1-flash", inputUsdPerMtok: 0.3, outputUsdPerMtok: 1.2, budgetReached: false },
+    { provider: AssistantProvider.OLLAMA_CLOUD, model: "gpt-oss:120b", inputUsdPerMtok: 0, outputUsdPerMtok: 0, budgetReached: true },
+  ],
+};
+
 function fakeChat(messages: Msg[], running = false): ChatApi {
   const none = async () => {};
   return { conversationId: "cnv_2", messages, running, error: null, send: none, stop: none, open: none, reset: () => {}, apply: none, dismiss: none, forget: none } as unknown as ChatApi;
@@ -136,9 +150,9 @@ export function AiKit() {
   }
   const messages = state === "chat-empty" ? [] : state === "chat-typing" ? working : conversation;
   return (
-    <Shot id={`ai-${state}`} title="The floating chat" seed={[[["assistant", "conversations", ""], conversations]]}>
+    <Shot id={`ai-${state}`} title="The floating chat" seed={[[["assistant", "conversations", ""], conversations], [["assistant", "access"], access]]}>
       <div className="relative h-[1000px]">
-        <ChatPanel chat={fakeChat(messages, state === "chat-typing")} readOnly={false} providerLabel="claude-opus-5-5" provider={AssistantProvider.ANTHROPIC} onClose={() => {}} initialContext={{ kind: "user", id: "usr_anna", label: "Users · anna", route: "/users/usr_anna" } as never} />
+        <ChatPanel chat={fakeChat(messages, state === "chat-typing")} readOnly={false} providerLabel="claude-opus-5-5" provider={AssistantProvider.ANTHROPIC} onClose={() => {}} pickerOpen={params.get("menu") === "1"} initialContext={{ kind: "user", id: "usr_anna", label: "Users · anna", route: "/users/usr_anna" } as never} />
       </div>
     </Shot>
   );

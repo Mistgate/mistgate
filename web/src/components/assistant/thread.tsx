@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
 import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
-import { useT, type T } from "@/i18n";
+import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { splitText, type LiveMsg, type LiveTool, type Msg, type Note } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
@@ -9,25 +9,11 @@ import { dayLabel, useFmt } from "@/lib/format";
 import { ChatMarkdown } from "./markdown";
 import { PlanCardView } from "./plan-card";
 import type { ChatApi } from "./chat";
-import { Thinking, ToolCards } from "./tool-cards";
+import { Thinking, ToolGroup, toolWords } from "./tool-cards";
 
 // The conversation as a messenger thread: a date line between days, messages grouped by sender (the name and time over the
-// first of a group, the round avatar beside the last), the assistant's tools folded into one muted line per turn, and a
+// first of a group, the round avatar beside the first), the assistant's words straight on the canvas and its tools in one quiet group, and a
 // typing indicator while it works. Logical properties only, so right-to-left languages mirror.
-
-const toolNames: Record<string, MessageKey> = {
-  fleet_status: "ai.toolname.fleet_status",
-  health_summary: "ai.toolname.health_summary",
-  alerts_list: "ai.toolname.alerts_list",
-  node_journal: "ai.toolname.node_journal",
-  nodes_list: "ai.toolname.nodes_list",
-  user_get: "ai.toolname.user_get",
-  user_devices: "ai.toolname.user_devices",
-  events_search: "ai.toolname.events_search",
-};
-
-/** The tool in words when we have them, else null (the caller shows the id itself). */
-const toolWords = (t: T, id: string): string | null => (toolNames[id] ? t(toolNames[id]) : null);
 
 function endText(end: string): MessageKey | null {
   switch (end) {
@@ -54,7 +40,7 @@ function dayKey(unix: number) {
 /** A thin line each side of a centred muted word: the date, or the way a turn ended. */
 export function Rule({ children, tone = "muted", role }: { children: ReactNode; tone?: "muted" | "danger"; role?: "status" | "alert" }) {
   return (
-    <div role={role} className={cx("my-3 flex items-center gap-3 text-[11px] font-medium", tone === "danger" ? "text-danger-text" : "text-muted")}>
+    <div role={role} className={cx("my-5 flex items-center gap-3 text-[11px] font-medium", tone === "danger" ? "text-danger-text" : "text-muted")}>
       <span aria-hidden className="h-px flex-1 bg-line" />
       <span className="max-w-[80%] text-center text-pretty">{children}</span>
       <span aria-hidden className="h-px flex-1 bg-line" />
@@ -70,15 +56,15 @@ export function Avatar() {
   );
 }
 
-/** The avatar's column: the avatar itself on the last message of a group, an empty slot of the same width on the others. */
-const Slot = ({ show }: { show: boolean }) => <div className="flex size-7 flex-none items-end">{show && <Avatar />}</div>;
+/** The avatar's column: the avatar itself beside the first message of a group, an empty slot of the same width beside the others. */
+const Slot = ({ show }: { show: boolean }) => <div className="flex size-7 flex-none items-start">{show && <Avatar />}</div>;
 
-export function Typing({ label }: { label: ReactNode }) {
+export function Typing({ label, avatar = true }: { label: ReactNode; avatar?: boolean }) {
   return (
-    <div role="status" data-slot="typing" className="mt-3 flex items-end gap-2">
-      <Slot show />
+    <div role="status" data-slot="typing" className="chat-in mt-4 flex items-center gap-3">
+      <Slot show={avatar} />
       <div className="flex items-center gap-2">
-        <span aria-hidden className="flex items-center gap-1 rounded-[18px] bg-surface-2 px-3.5 py-3">
+        <span aria-hidden className="flex items-center gap-1 rounded-full bg-fg/[0.06] px-3 py-2.5">
           <i className="chat-dot size-1.5 rounded-full bg-muted" />
           <i className="chat-dot size-1.5 rounded-full bg-muted" />
           <i className="chat-dot size-1.5 rounded-full bg-muted" />
@@ -106,7 +92,7 @@ function CheckingLabel({ tool }: { tool: string }) {
 
 function Header({ name, time }: { name: string; time: string }) {
   return (
-    <div className="flex items-baseline gap-2 px-1 text-xs">
+    <div className="flex h-7 items-center gap-2 text-xs">
       <b className="font-medium text-fg">{name}</b>
       {time && <span className="text-muted">{time}</span>}
     </div>
@@ -116,23 +102,24 @@ function Header({ name, time }: { name: string; time: string }) {
 function Remembered({ note, onForget }: { note: Note; onForget: () => void }) {
   const t = useT();
   return (
-    <div className="flex max-w-full items-center gap-1.5 rounded-full bg-accent-soft py-1 ps-2.5 pe-2 text-xs">
-      <Icon name="bolt" size={12} className="flex-none text-accent-text" />
+    <div className="chat-in flex max-w-full items-center gap-2 rounded-full bg-fg/[0.05] py-1.5 ps-3 pe-3 text-xs">
+      <Icon name="bookmark" size={12} className="flex-none text-accent-text" />
       <span className="min-w-0 truncate text-muted">{t("ai.mem.saved", { text: note.text })}</span>
-      <button type="button" onClick={onForget} className="flex-none font-semibold text-accent-text hover:underline">
+      <button type="button" onClick={onForget} className="flex-none font-medium text-accent-text hover:underline">
         {t("ai.mem.undo")}
       </button>
     </div>
   );
 }
 
-function UserBubble({ m, first, tail }: { m: Msg; first: boolean; tail: ReactNode }) {
+function UserBubble({ m, first, last }: { m: Msg; first: boolean; last: boolean }) {
   const t = useT();
+  const fmt = useFmt();
   return (
-    <div data-role="user" className={cx("flex flex-col items-end gap-1", first ? "mt-4" : "mt-1")}>
+    <div data-role="user" className={cx("chat-in group flex flex-col items-end gap-1", first ? "mt-6" : "mt-2")}>
       {m.context?.label && <span className="px-1 text-[11px] text-faint">{t("ai.chat.page", { label: m.context.label })}</span>}
-      <div className="max-w-[80%] rounded-[18px] bg-fg px-3.5 py-2.5 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-canvas">{m.text}</div>
-      {tail}
+      <div className="max-w-[82%] rounded-[18px] bg-fg px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap text-canvas">{m.text}</div>
+      {m.createdUnix > 0 && <span className={cx("px-1 text-[11px] text-muted transition-opacity", last ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>{fmt.clock(m.createdUnix)}</span>}
     </div>
   );
 }
@@ -142,15 +129,16 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
   const { interim, answer } = splitText(m);
   const fmt = useFmt();
   const [busy, setBusy] = useState("");
+  const live = m as LiveMsg;
   return (
-    <div data-role="assistant" className={cx("flex items-end gap-2", first ? "mt-4" : "mt-1")}>
+    <div data-role="assistant" className={cx("chat-in flex items-start gap-3", first ? "mt-6" : "mt-3")}>
       <Slot show={avatar} />
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
         {first && <Header name={t("ai.chat.title")} time={m.createdUnix > 0 ? fmt.clock(m.createdUnix) : ""} />}
-        {(m.tools.length > 0 || interim) && <Thinking m={m as LiveMsg} running={running} interim={interim} />}
-        {m.tools.length > 0 && <ToolCards tools={m.tools as LiveTool[]} />}
+        {(interim || (running && m.tools.length > 0)) && <Thinking m={live} running={running} interim={interim} />}
+        {m.tools.length > 0 && <ToolGroup tools={m.tools as LiveTool[]} running={running} workedMs={interim ? undefined : live.workedMs} />}
         {answer && (
-          <div data-slot="bubble" className="max-w-full rounded-[18px] bg-surface-2 px-3.5 py-2.5">
+          <div data-slot="bubble" className="max-w-full">
             <ChatMarkdown text={answer} onNavigate={onNavigate} />
           </div>
         )}
@@ -189,33 +177,19 @@ export function Thread({ chat, owner, onNavigate }: { chat: ChatApi; owner: bool
   const typing = chat.running && !!last && (last.role === ChatRole.USER || !splitText(last).answer || !!openTool);
   const lastShown = shown[shown.length - 1];
   const lastUser = [...shown].reverse().find((m) => m.role === ChatRole.USER);
-  const answered = !!lastShown && lastShown.role === ChatRole.ASSISTANT && lastUser !== undefined && shown.indexOf(lastShown) > shown.indexOf(lastUser);
 
   const out: ReactNode[] = [];
   shown.forEach((m, i) => {
     const prev = shown[i - 1];
-    const next = shown[i + 1];
     const day = m.createdUnix > 0 ? dayKey(m.createdUnix) : "";
     const newDay = day !== "" && (!prev || prev.createdUnix <= 0 || dayKey(prev.createdUnix) !== day);
     if (newDay) out.push(<Rule key={`day-${m.id}`}>{dayLabel(t, fmt, m.createdUnix)}</Rule>);
     const first = !prev || prev.role !== m.role || newDay;
-    const nextDay = next && next.createdUnix > 0 && day !== "" && dayKey(next.createdUnix) !== day;
-    const lastOfGroup = !next || next.role !== m.role || !!nextDay;
     if (m.role === ChatRole.USER) {
-      const status =
-        m === lastUser ? (
-          <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
-            <span aria-hidden className="inline-flex">
-              <Icon name="check" size={11} />
-              {answered && <Icon name="check" size={11} className="-ms-1.5" />}
-            </span>
-            {t(answered ? "ai.chat.read" : "ai.chat.sent", { time: m.createdUnix > 0 ? fmt.clock(answered && lastShown ? lastShown.createdUnix || m.createdUnix : m.createdUnix) : "" }).trim()}
-          </span>
-        ) : null;
-      out.push(<UserBubble key={m.id} m={m} first={first} tail={status} />);
+      out.push(<UserBubble key={m.id} m={m} first={first} last={m === lastUser} />);
     } else {
       const isTail = m === lastShown;
-      out.push(<AssistantBubble key={m.id} m={m} first={first} avatar={lastOfGroup && !(isTail && typing)} running={chat.running && isTail} owner={owner} chat={chat} onNavigate={onNavigate} />);
+      out.push(<AssistantBubble key={m.id} m={m} first={first} avatar={first} running={chat.running && isTail} owner={owner} chat={chat} onNavigate={onNavigate} />);
       const end = endText(m.end);
       if (end) out.push(<Rule key={`end-${m.id}`} role="status">{t(end)}</Rule>);
     }
@@ -224,7 +198,7 @@ export function Thread({ chat, owner, onNavigate }: { chat: ChatApi; owner: bool
   return (
     <>
       {out}
-      {typing && <Typing label={openTool ? <CheckingLabel tool={openTool.tool} /> : t("ai.chat.typing")} />}
+      {typing && <Typing avatar={lastShown?.role !== ChatRole.ASSISTANT} label={openTool ? <CheckingLabel tool={openTool.tool} /> : t("ai.chat.typing")} />}
       {chat.error && (
         <Rule tone="danger" role="alert">
           {chat.error.startsWith("ai.") ? t(chat.error as MessageKey) : chat.error}

@@ -451,6 +451,21 @@
   animation: mg-ring 1.6s ease-out infinite;
 }
 
+/* a new message or tool row: fades in with a 4px rise */
+@keyframes mg-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.chat-in {
+  animation: mg-chat-in 0.16s ease-out both;
+}
+
 /* The assistant chat's typing dots: three dots that rise in turn; still and half-lit with reduced motion. */
 @keyframes mg-typing {
   0%,

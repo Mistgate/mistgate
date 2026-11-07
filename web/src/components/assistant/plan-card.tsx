@@ -1,45 +1,67 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import type { Plan } from "@/lib/assistant";
-import { useFmt } from "@/lib/format";
-import { dangerText, toolTitle, type Fact } from "@/lib/integrations";
 import { cx } from "@/lib/cx";
-import { FactRow } from "@/screens/integrations/approvals";
+import { useFmt } from "@/lib/format";
+import { dangerText, factLabel, factWords, toolTitle, type Fact } from "@/lib/integrations";
 
 /**
- * A change the assistant prepared (ADR 0014): in the panel's own words, with the same facts and danger notes as an approval.
- * Only this card's button applies it; the model never can. A plan that needs the owner is approved and applied in one step
- * by the owner (with a fresh step-up), and waits in the approval inbox for anyone else.
+ * A change the assistant prepared (ADR 0014), as an attachment card: what it is and what it does, the facts as a plain
+ * two-column list, and the buttons. In the panel's own words, with the same facts and danger notes as an approval. Only
+ * this card's button applies it; the model never can. A plan that needs the owner is approved and applied in one step by the
+ * owner (with a fresh step-up), and waits in the approval inbox for anyone else.
  */
 export function PlanCardView({ plan, owner, busy, onApply, onDismiss }: { plan: Plan; owner: boolean; busy: boolean; onApply: () => void; onDismiss: () => void }) {
   const t = useT();
   const fmt = useFmt();
   const open = plan.state === PlanState.PROPOSED;
   const status = statusLine(t, plan);
+  const [now] = useState(() => Math.floor(Date.now() / 1000));
+  const left = plan.expiresUnix > 0 ? Math.max(60, plan.expiresUnix - now) : 0;
   return (
-    <div data-slot="plan" className={cx("flex flex-col gap-2.5 rounded-[18px] p-3.5", open ? "bg-surface-2 ring-1 ring-accent-line" : "bg-surface-2")}>
-      <div className="flex items-start gap-2">
-        <Icon name="sliders" size={15} className="mt-0.5 flex-none text-accent-text" />
+    <div data-slot="plan" className="chat-in flex flex-col gap-3 rounded-2xl bg-fg/[0.04] p-4 ring-1 ring-line/70">
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="grid size-8 flex-none place-items-center rounded-[10px] bg-accent-soft text-accent-text">
+          <Icon name="sliders" size={15} />
+        </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.plan.title")}</span>
-          <b className="text-[13.5px] leading-snug">{toolTitle(t, plan.tool)}</b>
-          {plan.summary && <span className="text-[13px] leading-snug text-pretty">{plan.summary}</span>}
+          <span className="text-[11px] font-medium text-muted">{t("ai.plan.title")}</span>
+          <b className="text-[14px] leading-snug font-semibold">{toolTitle(t, plan.tool)}</b>
+          {plan.summary && <span className="pt-0.5 text-[13px] leading-snug text-pretty text-muted">{plan.summary}</span>}
         </div>
       </div>
       {plan.facts.length > 0 && (
-        <dl className="flex flex-col gap-1.5 border-t border-line pt-2.5">
-          {plan.facts.map((f, i) => (
-            <FactRow key={i} fact={f as unknown as Fact} />
-          ))}
+        <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-line/60 pt-3 text-[13px]">
+          {plan.facts.map((f, i) => {
+            const fact = f as unknown as Fact;
+            return (
+              <div key={i} className="contents">
+                <dt className="text-xs leading-5 text-muted">{factLabel(t, fact.key)}</dt>
+                <dd className="min-w-0 leading-5 text-pretty wrap-anywhere">
+                  {factWords(t, fmt, fact).map((p, j) =>
+                    typeof p === "string" ? (
+                      <span key={j}>{p}</span>
+                    ) : (
+                      // text a person or a node supplied: plain, with the panel's note that it is untrusted on hover
+                      <span key={j} title={t("int.ap.untrusted")} className="font-medium whitespace-pre-wrap decoration-faint decoration-dotted underline-offset-4 hover:underline">
+                        {p.data}
+                      </span>
+                    ),
+                  )}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       )}
       {(plan.danger.length > 0 || plan.needsApproval) && (
         <div className="flex flex-wrap gap-1.5">
-          {plan.needsApproval && <span className="tone-warn tint rounded-ctl px-2 py-0.5 text-[11px] font-bold">{t("ai.plan.needsOwner")}</span>}
+          {plan.needsApproval && <span className="tone-warn tint rounded-full px-2.5 py-0.5 text-[11px] font-semibold">{t("ai.plan.needsOwner")}</span>}
           {plan.danger.map((d) => (
-            <span key={d} className="rounded-ctl bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted">
+            <span key={d} className="rounded-full bg-fg/[0.06] px-2.5 py-0.5 text-[11px] text-muted">
               {dangerText(t, d)}
             </span>
           ))}
@@ -47,20 +69,24 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss }: { plan: 
       )}
       {open && plan.inboxOnly && <p className="text-xs leading-snug text-muted">{t("ai.plan.inbox")}</p>}
       {open && !plan.inboxOnly && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pt-0.5">
           <Button type="button" size="sm" variant="primary" disabled={busy} onClick={onApply}>
             {plan.needsApproval && owner ? t("ai.plan.approveApply") : t("ai.plan.apply")}
           </Button>
           <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onDismiss}>
             {t("ai.plan.dismiss")}
           </Button>
-          {plan.expiresUnix > 0 && <span className="ms-auto text-[11px] text-faint">{t("ai.plan.expires", { time: fmt.clock(plan.expiresUnix) })}</span>}
+          {left > 0 && (
+            <span title={t("ai.plan.expires", { time: fmt.clock(plan.expiresUnix) })} className="ms-auto inline-flex items-center gap-1 rounded-full bg-fg/[0.06] px-2.5 py-1 text-[11px] text-muted">
+              <Icon name="clock" size={11} />
+              {t("ai.chat.valid", { time: fmt.duration(left) })}
+            </span>
+          )}
         </div>
       )}
-      {open && plan.inboxOnly && null}
       {!open && status && (
-        <p className={cx("flex items-center gap-1.5 text-xs font-semibold", plan.state === PlanState.APPLIED ? "text-ok-text" : plan.state === PlanState.FAILED ? "text-danger-text" : "text-muted")}>
-          <Icon name={plan.state === PlanState.APPLIED ? "check" : plan.state === PlanState.WAITING_OWNER ? "clock" : "info"} size={13} />
+        <p className={cx("flex items-center gap-2 text-[13px]", plan.state === PlanState.APPLIED ? "text-ok-text" : plan.state === PlanState.FAILED ? "text-danger-text" : "text-muted")}>
+          <Icon name={plan.state === PlanState.APPLIED ? "check" : plan.state === PlanState.WAITING_OWNER ? "clock" : plan.state === PlanState.FAILED ? "warn" : "info"} size={14} className="flex-none" />
           <span className="min-w-0">{status}</span>
         </p>
       )}

@@ -251,7 +251,7 @@ export function ChatButton({ onClick, running }: { onClick: () => void; running:
   );
 }
 
-export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, initialContext }: { chat: ChatApi; readOnly: boolean; providerLabel: string; provider?: number; onClose: () => void; initialContext?: Context | null }) {
+export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, initialContext, pickerOpen }: { chat: ChatApi; readOnly: boolean; providerLabel: string; provider?: number; onClose: () => void; initialContext?: Context | null; pickerOpen?: boolean }) {
   const t = useT();
   const owner = useIsOwner();
   const pageContext = usePageContext();
@@ -260,8 +260,9 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   const [askSecret, setAskSecret] = useState(false);
   const [history, setHistory] = useState(false);
   const list = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
   const context = initialContext !== undefined ? initialContext : pageContext;
-  const pick = usePick({ owner, provider, model: providerLabel });
+  const pick = usePick({ provider, model: providerLabel });
 
   // the list follows the answer as it grows: new messages, text, tool lines, plan cards
   const tail = chat.messages[chat.messages.length - 1];
@@ -289,7 +290,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
       aria-label={t("ai.chat.title")}
       className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-surface md:inset-auto md:end-4 md:top-4 md:bottom-4 md:w-[440px] md:rounded-card-lg md:border md:border-line md:shadow-(--shadow-dock)"
     >
-      <header className="flex items-center gap-1 px-4 pt-3.5 pb-2.5">
+      <header className={cx("flex items-center gap-1 border-b px-5 pt-4 pb-3 transition-colors duration-200", scrolled ? "border-line/70" : "border-transparent")}>
         <div className="flex min-w-0 flex-1 flex-col">
           <b className="text-[15px] leading-tight font-semibold">{t("ai.chat.title")}</b>
           {(pick.label || providerLabel) && <span className="truncate text-[11px] text-muted">{pick.label || (provName ? `${provName} · ${providerLabel}` : providerLabel)}</span>}
@@ -318,7 +319,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
           }}
         />
       ) : (
-        <div ref={list} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-1 pb-4">
+        <div ref={list} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 2)} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-1 pb-5">
           {chat.messages.length === 0 && <Hello onPick={(q) => void chat.send(q, attach ? context : null)} />}
           <Thread chat={chat} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} />
         </div>
@@ -334,7 +335,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
             </Button>
           </div>
         )}
-        <Composer text={text} onText={setText} onSubmit={() => submit()} running={chat.running} onStop={() => void chat.stop()} context={context} attached={attach} onAttach={setAttach} pick={pick} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} />
+        <Composer text={text} onText={setText} onSubmit={() => submit()} running={chat.running} onStop={() => void chat.stop()} context={context} attached={attach} onAttach={setAttach} pick={pick} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} pickerOpen={pickerOpen} />
       </footer>
     </section>
   );

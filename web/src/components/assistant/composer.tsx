@@ -22,6 +22,7 @@ export function Composer({
   pick,
   owner,
   onNavigate,
+  pickerOpen,
 }: {
   text: string;
   onText: (v: string) => void;
@@ -34,6 +35,7 @@ export function Composer({
   pick: Pick;
   owner: boolean;
   onNavigate?: () => void;
+  pickerOpen?: boolean;
 }) {
   const t = useT();
   const area = useRef<HTMLTextAreaElement>(null);
@@ -92,7 +94,7 @@ export function Composer({
           </Tip>
         )}
         <div className="flex min-w-0 flex-1">
-          <AgentPicker pick={pick} owner={owner} onNavigate={onNavigate} />
+          <AgentPicker pick={pick} owner={owner} onNavigate={onNavigate} defaultOpen={pickerOpen} />
         </div>
         {running ? (
           <button type="button" onClick={onStop} aria-label={t("ai.chat.stop")} title={t("ai.chat.stop")} className="grid size-8 flex-none place-items-center rounded-full bg-fg text-canvas transition-transform active:scale-95">

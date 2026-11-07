@@ -21,6 +21,19 @@ vi.mock("@/lib/api", async (orig) => ({
     deleteMemory: (...a: unknown[]) => deleteMemory(...a),
     stopTurn: async () => ({}),
     listConversations: async () => ({ conversations: [] }),
+    getAssistantAccess: async () => ({
+      available: true,
+      reason: "",
+      provider: 1,
+      model: "claude-opus-5-5",
+      readOnly: false,
+      effort: 2,
+      choices: [
+        { provider: 1, model: "claude-opus-5-5", inputUsdPerMtok: 4, outputUsdPerMtok: 20, budgetReached: false },
+        { provider: 2, model: "deepseek-v4.1-flash", inputUsdPerMtok: 0.3, outputUsdPerMtok: 1.2, budgetReached: false },
+        { provider: 4, model: "gpt-oss", inputUsdPerMtok: 0, outputUsdPerMtok: 0, budgetReached: true },
+      ],
+    }),
     getAssistantSettings: async () => ({
       settings: { enabled: true, provider: 1, effort: 2, audience: 1, panelNotes: "", retentionDays: 90 },
       providers: [
@@ -167,6 +180,8 @@ describe("the assistant's chat", () => {
     await settle();
     const radios = [...document.querySelectorAll("[role=menuitemradio]")];
     expect(radios.map((r) => r.textContent)).toEqual(expect.arrayContaining([expect.stringContaining("DeepSeek"), expect.stringContaining("Thorough")]));
+    // a provider whose budget is spent is listed but cannot be picked
+    expect(radios.find((r) => r.textContent?.includes("budget spent"))?.getAttribute("aria-disabled")).toBe("true");
     await click(radios.find((r) => r.textContent?.includes("DeepSeek")));
     await settle();
     const thorough = [...document.querySelectorAll("[role=menuitemradio]")].find((r) => r.textContent?.includes("Thorough"));
@@ -224,7 +239,7 @@ async function mountThread(c: ChatApi) {
 }
 
 describe("the assistant's thread", () => {
-  it("groups by sender: name and time on the first, the avatar on the last only, a date line between days", async () => {
+  it("groups by sender: name and time on the first, the avatar beside the first only, a date line between days", async () => {
     await mountThread(
       fakeChat([
         message(ChatRole.USER, ts(1), "yesterday question"),
@@ -237,17 +252,17 @@ describe("the assistant's thread", () => {
     const rows = [...document.querySelectorAll("[data-role=assistant]")];
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain("Assistant");
-    expect(rows[0]!.querySelector("[data-slot=avatar]")).toBeNull();
+    expect(rows[0]!.querySelector("[data-slot=avatar]")).not.toBeNull();
     expect(rows[1]!.textContent).not.toContain("Assistant");
-    expect(rows[1]!.querySelector("[data-slot=avatar]")).not.toBeNull();
+    expect(rows[1]!.querySelector("[data-slot=avatar]")).toBeNull();
     expect(text()).toContain("Yesterday");
     expect(text()).toContain("Today");
-    // two own messages in a row: one status line, under the last
+    // an assistant does not "read": only the time is under the bubbles
     expect(document.querySelectorAll("[data-role=user]")).toHaveLength(3);
-    expect(text().match(/Sent|Read/g)).toHaveLength(1);
+    expect(text()).not.toMatch(/Read|Sent/);
   });
 
-  it("shows each tool call as a card: icon, name, the telling argument, state; a failure is tinted, not shouted", async () => {
+  it("folds the tool calls into one quiet group; a failure is a small glyph and a count, not a red box", async () => {
     const tool = (id: string, ok: boolean, error = "", args = '{"node":"de1","limit":5}') => ({ id, tool: "node_journal", argsJson: args, done: true, ok, count: ok ? 2 : 0, error, ms: 1400 });
     await mountThread(
       fakeChat([
@@ -255,10 +270,20 @@ describe("the assistant's thread", () => {
         message(ChatRole.ASSISTANT, ts(0, 1), "answer", { tools: [tool("t1", true), tool("t2", false, "tool input rejected: a very long reason")], t0: Date.now() - 6000, workedMs: 6000, interimEnd: 9, text: "Checking.\nanswer" }),
       ]),
     );
+    // one quiet group, folded to a summary once the turn is done
+    const group = document.querySelector("[data-slot=tools]")!;
+    const summary = group.querySelector("button")!;
+    expect(summary.textContent).toContain("Used 2 tools");
+    expect(summary.textContent).toContain("1 failed");
+    expect(summary.getAttribute("aria-expanded")).toBe("false");
+    await click(summary);
+    expect(summary.getAttribute("aria-expanded")).toBe("true");
     const cards = [...document.querySelectorAll("[data-slot=tool]")];
     expect(cards).toHaveLength(2);
-    expect(cards[0]!.textContent).toContain("de1");
-    expect(cards[0]!.textContent).toContain("1.4s");
+    // friendly name and the telling argument as a chip; the raw id only in the details
+    expect(cards[0]!.querySelector("button")!.textContent).toContain("Node journal");
+    expect(cards[0]!.querySelector("button")!.textContent).toContain("de1");
+    expect(cards[0]!.querySelector("button")!.textContent).not.toContain("node_journal");
     expect(cards[1]!.getAttribute("data-state")).toBe("failed");
     // closed until asked; the input is coloured JSON and the output the error
     const head = cards[1]!.querySelector("button")!;
@@ -267,6 +292,8 @@ describe("the assistant's thread", () => {
     expect(head.getAttribute("aria-expanded")).toBe("true");
     expect(cards[1]!.textContent).toContain("tool input rejected: a very long reason");
     expect(cards[1]!.textContent).toContain('"node"');
+    expect(cards[1]!.textContent).toContain("node_journal");
+    expect(cards[1]!.textContent).toContain("1.4s");
     // thinking header with the working time, over what was said between rounds; the answer stays the bubble
     const thinking = document.querySelector("[data-slot=thinking]")!;
     expect(thinking.textContent).toContain("Thought for");
@@ -275,6 +302,7 @@ describe("the assistant's thread", () => {
     await click(thinking.querySelector("button"));
     expect(thinking.textContent).toContain("Checking.");
     expect(document.querySelector("[data-slot=bubble]")?.textContent).toBe("answer");
+    expect(document.querySelector("[data-slot=bubble]")?.className).not.toMatch(/bg-/);
   });
 
   it("keeps the last three cards of a long turn and folds the rest under a muted line", async () => {

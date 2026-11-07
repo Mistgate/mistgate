@@ -6,14 +6,14 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { AssistantEffort, AssistantProvider } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { providerName, settingsQuery } from "@/lib/assistant";
+import { accessQuery, providerName } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { readPref, writePref } from "@/lib/storage";
 
 // The chat's agent picker: which connected provider answers this turn and how hard it thinks. The choice is the browser's
 // (localStorage) and goes with every turn (ChatRequest.provider / .effort); empty means the panel's own setting. The list of
-// connected providers comes from the settings, which only the owner may read, so the others pick the depth only.
+// connected providers (with their model and price) comes from the access the panel answers every admin.
 
 const providerIcon: Record<number, IconName> = {
   [AssistantProvider.ANTHROPIC]: "sparkle",
@@ -38,28 +38,26 @@ export type Pick = {
   effort: number;
   setProvider: (p: number) => void;
   setEffort: (e: number) => void;
-  /** The connected providers (the owner sees them; others get none). */
-  options: { id: number; name: string; model: string; spent: number; budget: number; isDefault: boolean }[];
+  /** The connected providers, the panel's own first. A provider whose month's budget is spent can be seen but not picked. */
+  options: { id: number; name: string; model: string; inUsd: number; outUsd: number; budgetReached: boolean; isDefault: boolean }[];
   /** The provider and the depth in effect, in words: "Ollama Cloud · deepseek-v4.1-flash". */
   label: string;
   selectedProvider: number;
   selectedEffort: number;
 };
 
-export function usePick({ owner, provider: accessProvider, model: accessModel }: { owner: boolean; provider?: number; model?: string }): Pick {
+export function usePick({ provider: accessProvider, model: accessModel }: { provider?: number; model?: string }): Pick {
   const t = useT();
-  const q = useQuery({ ...settingsQuery, enabled: owner });
+  const q = useQuery(accessQuery);
   const [stored, setStored] = useState(() => ({ provider: readNum(PROVIDER_KEY), effort: readNum(EFFORT_KEY) }));
-  const statuses = q.data?.providers ?? [];
-  const settings = q.data?.settings;
-  const connected = statuses.filter((s) => s.connected);
-  const def = connected.some((s) => s.provider === settings?.provider) ? settings!.provider : (connected[0]?.provider ?? accessProvider ?? 0);
-  const options = connected.map((s) => ({ id: s.provider as number, name: t(providerName(s.provider)), model: s.choice?.model ?? "", spent: s.spentUsdMonth ?? 0, budget: s.choice?.budgetUsdMonth ?? 0, isDefault: s.provider === def }));
-  // a saved provider that is no longer connected falls back to the default without a word
-  const valid = owner && connected.some((s) => s.provider === stored.provider);
+  const choices = q.data?.choices ?? [];
+  const def = choices[0]?.provider ?? accessProvider ?? 0;
+  const options = choices.map((c, i) => ({ id: c.provider as number, name: t(providerName(c.provider)), model: c.model, inUsd: c.inputUsdPerMtok, outUsd: c.outputUsdPerMtok, budgetReached: c.budgetReached, isDefault: i === 0 }));
+  // a saved provider that is no longer connected (or whose budget is spent) falls back to the default without a word
+  const valid = options.some((o) => o.id === stored.provider && !o.budgetReached);
   const provider = valid ? stored.provider : 0;
   const selectedProvider = provider || def;
-  const selectedEffort = stored.effort || (owner ? settings?.effort || AssistantEffort.NORMAL : 0);
+  const selectedEffort = stored.effort || q.data?.effort || 0;
   const chosen = options.find((o) => o.id === selectedProvider);
   const modelName = chosen ? chosen.model || t("ai.prov.modelDefault") : accessModel || "";
   const providerLabel = chosen?.name ?? (accessProvider ? t(providerName(accessProvider)) : "");
@@ -85,12 +83,12 @@ export function usePick({ owner, provider: accessProvider, model: accessModel }:
 
 const item = "flex w-full cursor-default items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-start outline-none data-highlighted:bg-surface-2";
 
-export function AgentPicker({ pick, owner, onNavigate }: { pick: Pick; owner: boolean; onNavigate?: () => void }) {
+export function AgentPicker({ pick, owner, onNavigate, defaultOpen }: { pick: Pick; owner: boolean; onNavigate?: () => void; defaultOpen?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const money = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 2 });
   return (
-    <Menu.Root>
+    <Menu.Root defaultOpen={defaultOpen}>
       <Menu.Trigger aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} className="flex min-w-0 items-center gap-1.5 rounded-full px-2 py-1.5 text-xs text-muted transition-colors outline-none hover:bg-surface-2 hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-surface-2 data-popup-open:text-fg">
         <Icon name="layers" size={14} />
         <span className="min-w-0 truncate">{pick.label || t("ai.pick.agent")}</span>
@@ -103,7 +101,7 @@ export function AgentPicker({ pick, owner, onNavigate }: { pick: Pick; owner: bo
               <>
                 <Menu.RadioGroup value={String(pick.selectedProvider)} onValueChange={(v) => pick.setProvider(pick.options.find((o) => String(o.id) === v)?.isDefault ? 0 : Number(v))} aria-label={t("ai.pick.agent")}>
                   {pick.options.map((o) => (
-                    <Menu.RadioItem key={o.id} value={String(o.id)} closeOnClick={false} className={item}>
+                    <Menu.RadioItem key={o.id} value={String(o.id)} closeOnClick={false} disabled={o.budgetReached} className={cx(item, o.budgetReached && "opacity-50")}>
                       <span aria-hidden className="mt-0.5 grid size-7 flex-none place-items-center rounded-lg bg-accent-soft text-accent-text">
                         <Icon name={providerIcon[o.id] ?? "layers"} size={14} />
                       </span>
@@ -112,8 +110,10 @@ export function AgentPicker({ pick, owner, onNavigate }: { pick: Pick; owner: bo
                           {o.name}
                           {o.isDefault && <span className="rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium text-muted">{t("ai.pick.default")}</span>}
                         </span>
-                        <span className="truncate text-xs text-muted">{o.model || t("ai.prov.modelDefault")}</span>
-                        {o.budget > 0 && <span className="text-[11px] text-faint">{t("ai.prov.spent", { usd: money(o.spent), budget: money(o.budget) })}</span>}
+                        <span className="truncate text-xs text-muted">
+                          {o.budgetReached ? t("ai.pick.budget") : o.model || t("ai.prov.modelDefault")}
+                        </span>
+                        {!o.budgetReached && o.inUsd > 0 && <span className="text-[11px] text-faint">{t("ai.prov.price", { in: money(o.inUsd), out: money(o.outUsd) })}</span>}
                       </span>
                       <Menu.RadioItemIndicator className="mt-1 flex-none text-accent-text">
                         <Icon name="check" size={14} />
