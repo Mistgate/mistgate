@@ -394,7 +394,12 @@ type GetAssistantAccessResponse struct {
 	Provider AssistantProvider `protobuf:"varint,3,opt,name=provider,proto3,enum=mistgate.admin.v1.AssistantProvider" json:"provider,omitempty"`
 	Model    string            `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
 	// The admin's role gives it the read tools only.
-	ReadOnly      bool `protobuf:"varint,5,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	ReadOnly bool `protobuf:"varint,5,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	// The connected providers this admin may pick for a turn (ChatRequest.provider), the panel's chat provider first;
+	// empty when the assistant is off or not for this admin. No keys, no budgets: only what the picker shows.
+	Choices []*ChatProviderChoice `protobuf:"bytes,6,rep,name=choices,proto3" json:"choices,omitempty"`
+	// The panel's thinking depth, what a turn uses unless the admin picks another.
+	Effort        AssistantEffort `protobuf:"varint,7,opt,name=effort,proto3,enum=mistgate.admin.v1.AssistantEffort" json:"effort,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -464,6 +469,99 @@ func (x *GetAssistantAccessResponse) GetReadOnly() bool {
 	return false
 }
 
+func (x *GetAssistantAccessResponse) GetChoices() []*ChatProviderChoice {
+	if x != nil {
+		return x.Choices
+	}
+	return nil
+}
+
+func (x *GetAssistantAccessResponse) GetEffort() AssistantEffort {
+	if x != nil {
+		return x.Effort
+	}
+	return AssistantEffort_ASSISTANT_EFFORT_UNSPECIFIED
+}
+
+type ChatProviderChoice struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Provider AssistantProvider      `protobuf:"varint,1,opt,name=provider,proto3,enum=mistgate.admin.v1.AssistantProvider" json:"provider,omitempty"`
+	// The model set for it (or its default).
+	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	// USD per million tokens, 0 when unknown.
+	InputUsdPerMtok  float64 `protobuf:"fixed64,3,opt,name=input_usd_per_mtok,json=inputUsdPerMtok,proto3" json:"input_usd_per_mtok,omitempty"`
+	OutputUsdPerMtok float64 `protobuf:"fixed64,4,opt,name=output_usd_per_mtok,json=outputUsdPerMtok,proto3" json:"output_usd_per_mtok,omitempty"`
+	// Its monthly budget is spent: a turn on it is refused until next month or a higher budget.
+	BudgetReached bool `protobuf:"varint,5,opt,name=budget_reached,json=budgetReached,proto3" json:"budget_reached,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatProviderChoice) Reset() {
+	*x = ChatProviderChoice{}
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatProviderChoice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatProviderChoice) ProtoMessage() {}
+
+func (x *ChatProviderChoice) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatProviderChoice.ProtoReflect.Descriptor instead.
+func (*ChatProviderChoice) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ChatProviderChoice) GetProvider() AssistantProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED
+}
+
+func (x *ChatProviderChoice) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *ChatProviderChoice) GetInputUsdPerMtok() float64 {
+	if x != nil {
+		return x.InputUsdPerMtok
+	}
+	return 0
+}
+
+func (x *ChatProviderChoice) GetOutputUsdPerMtok() float64 {
+	if x != nil {
+		return x.OutputUsdPerMtok
+	}
+	return 0
+}
+
+func (x *ChatProviderChoice) GetBudgetReached() bool {
+	if x != nil {
+		return x.BudgetReached
+	}
+	return false
+}
+
 type AssistantSettings struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Enabled bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -481,7 +579,7 @@ type AssistantSettings struct {
 
 func (x *AssistantSettings) Reset() {
 	*x = AssistantSettings{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -493,7 +591,7 @@ func (x *AssistantSettings) String() string {
 func (*AssistantSettings) ProtoMessage() {}
 
 func (x *AssistantSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[3]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -506,7 +604,7 @@ func (x *AssistantSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistantSettings.ProtoReflect.Descriptor instead.
 func (*AssistantSettings) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{3}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AssistantSettings) GetEnabled() bool {
@@ -565,7 +663,7 @@ type ProviderChoice struct {
 
 func (x *ProviderChoice) Reset() {
 	*x = ProviderChoice{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -577,7 +675,7 @@ func (x *ProviderChoice) String() string {
 func (*ProviderChoice) ProtoMessage() {}
 
 func (x *ProviderChoice) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[4]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -590,7 +688,7 @@ func (x *ProviderChoice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProviderChoice.ProtoReflect.Descriptor instead.
 func (*ProviderChoice) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ProviderChoice) GetProvider() AssistantProvider {
@@ -633,7 +731,7 @@ type ProviderStatus struct {
 
 func (x *ProviderStatus) Reset() {
 	*x = ProviderStatus{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -645,7 +743,7 @@ func (x *ProviderStatus) String() string {
 func (*ProviderStatus) ProtoMessage() {}
 
 func (x *ProviderStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[5]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -658,7 +756,7 @@ func (x *ProviderStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProviderStatus.ProtoReflect.Descriptor instead.
 func (*ProviderStatus) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ProviderStatus) GetProvider() AssistantProvider {
@@ -733,7 +831,7 @@ type AssistantModel struct {
 
 func (x *AssistantModel) Reset() {
 	*x = AssistantModel{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -745,7 +843,7 @@ func (x *AssistantModel) String() string {
 func (*AssistantModel) ProtoMessage() {}
 
 func (x *AssistantModel) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[6]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -758,7 +856,7 @@ func (x *AssistantModel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistantModel.ProtoReflect.Descriptor instead.
 func (*AssistantModel) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AssistantModel) GetId() string {
@@ -816,7 +914,7 @@ type AssistantUsage struct {
 
 func (x *AssistantUsage) Reset() {
 	*x = AssistantUsage{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +926,7 @@ func (x *AssistantUsage) String() string {
 func (*AssistantUsage) ProtoMessage() {}
 
 func (x *AssistantUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[7]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +939,7 @@ func (x *AssistantUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistantUsage.ProtoReflect.Descriptor instead.
 func (*AssistantUsage) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AssistantUsage) GetAdminId() string {
@@ -880,7 +978,7 @@ type GetAssistantSettingsRequest struct {
 
 func (x *GetAssistantSettingsRequest) Reset() {
 	*x = GetAssistantSettingsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -892,7 +990,7 @@ func (x *GetAssistantSettingsRequest) String() string {
 func (*GetAssistantSettingsRequest) ProtoMessage() {}
 
 func (x *GetAssistantSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[8]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -905,7 +1003,7 @@ func (x *GetAssistantSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssistantSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetAssistantSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{9}
 }
 
 type GetAssistantSettingsResponse struct {
@@ -920,7 +1018,7 @@ type GetAssistantSettingsResponse struct {
 
 func (x *GetAssistantSettingsResponse) Reset() {
 	*x = GetAssistantSettingsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +1030,7 @@ func (x *GetAssistantSettingsResponse) String() string {
 func (*GetAssistantSettingsResponse) ProtoMessage() {}
 
 func (x *GetAssistantSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[9]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1043,7 @@ func (x *GetAssistantSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssistantSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetAssistantSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetAssistantSettingsResponse) GetSettings() *AssistantSettings {
@@ -980,7 +1078,7 @@ type UpdateAssistantSettingsRequest struct {
 
 func (x *UpdateAssistantSettingsRequest) Reset() {
 	*x = UpdateAssistantSettingsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -992,7 +1090,7 @@ func (x *UpdateAssistantSettingsRequest) String() string {
 func (*UpdateAssistantSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateAssistantSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[10]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1005,7 +1103,7 @@ func (x *UpdateAssistantSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAssistantSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAssistantSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateAssistantSettingsRequest) GetSettings() *AssistantSettings {
@@ -1032,7 +1130,7 @@ type UpdateAssistantSettingsResponse struct {
 
 func (x *UpdateAssistantSettingsResponse) Reset() {
 	*x = UpdateAssistantSettingsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1044,7 +1142,7 @@ func (x *UpdateAssistantSettingsResponse) String() string {
 func (*UpdateAssistantSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateAssistantSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[11]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1057,7 +1155,7 @@ func (x *UpdateAssistantSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAssistantSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAssistantSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UpdateAssistantSettingsResponse) GetSettings() *AssistantSettings {
@@ -1085,7 +1183,7 @@ type SetProviderKeyRequest struct {
 
 func (x *SetProviderKeyRequest) Reset() {
 	*x = SetProviderKeyRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1097,7 +1195,7 @@ func (x *SetProviderKeyRequest) String() string {
 func (*SetProviderKeyRequest) ProtoMessage() {}
 
 func (x *SetProviderKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[12]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1208,7 @@ func (x *SetProviderKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetProviderKeyRequest.ProtoReflect.Descriptor instead.
 func (*SetProviderKeyRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SetProviderKeyRequest) GetProvider() AssistantProvider {
@@ -1137,7 +1235,7 @@ type SetProviderKeyResponse struct {
 
 func (x *SetProviderKeyResponse) Reset() {
 	*x = SetProviderKeyResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1149,7 +1247,7 @@ func (x *SetProviderKeyResponse) String() string {
 func (*SetProviderKeyResponse) ProtoMessage() {}
 
 func (x *SetProviderKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[13]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1162,7 +1260,7 @@ func (x *SetProviderKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetProviderKeyResponse.ProtoReflect.Descriptor instead.
 func (*SetProviderKeyResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SetProviderKeyResponse) GetStatus() *ProviderStatus {
@@ -1188,7 +1286,7 @@ type RemoveProviderKeyRequest struct {
 
 func (x *RemoveProviderKeyRequest) Reset() {
 	*x = RemoveProviderKeyRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +1298,7 @@ func (x *RemoveProviderKeyRequest) String() string {
 func (*RemoveProviderKeyRequest) ProtoMessage() {}
 
 func (x *RemoveProviderKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[14]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +1311,7 @@ func (x *RemoveProviderKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveProviderKeyRequest.ProtoReflect.Descriptor instead.
 func (*RemoveProviderKeyRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RemoveProviderKeyRequest) GetProvider() AssistantProvider {
@@ -1232,7 +1330,7 @@ type RemoveProviderKeyResponse struct {
 
 func (x *RemoveProviderKeyResponse) Reset() {
 	*x = RemoveProviderKeyResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1244,7 +1342,7 @@ func (x *RemoveProviderKeyResponse) String() string {
 func (*RemoveProviderKeyResponse) ProtoMessage() {}
 
 func (x *RemoveProviderKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[15]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1257,7 +1355,7 @@ func (x *RemoveProviderKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveProviderKeyResponse.ProtoReflect.Descriptor instead.
 func (*RemoveProviderKeyResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RemoveProviderKeyResponse) GetStatus() *ProviderStatus {
@@ -1276,7 +1374,7 @@ type ListProviderModelsRequest struct {
 
 func (x *ListProviderModelsRequest) Reset() {
 	*x = ListProviderModelsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1288,7 +1386,7 @@ func (x *ListProviderModelsRequest) String() string {
 func (*ListProviderModelsRequest) ProtoMessage() {}
 
 func (x *ListProviderModelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[16]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1301,7 +1399,7 @@ func (x *ListProviderModelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProviderModelsRequest.ProtoReflect.Descriptor instead.
 func (*ListProviderModelsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListProviderModelsRequest) GetProvider() AssistantProvider {
@@ -1320,7 +1418,7 @@ type ListProviderModelsResponse struct {
 
 func (x *ListProviderModelsResponse) Reset() {
 	*x = ListProviderModelsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1332,7 +1430,7 @@ func (x *ListProviderModelsResponse) String() string {
 func (*ListProviderModelsResponse) ProtoMessage() {}
 
 func (x *ListProviderModelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[17]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1345,7 +1443,7 @@ func (x *ListProviderModelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProviderModelsResponse.ProtoReflect.Descriptor instead.
 func (*ListProviderModelsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListProviderModelsResponse) GetModels() []*AssistantModel {
@@ -1372,7 +1470,7 @@ type PageContext struct {
 
 func (x *PageContext) Reset() {
 	*x = PageContext{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1384,7 +1482,7 @@ func (x *PageContext) String() string {
 func (*PageContext) ProtoMessage() {}
 
 func (x *PageContext) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[18]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1397,7 +1495,7 @@ func (x *PageContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageContext.ProtoReflect.Descriptor instead.
 func (*PageContext) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{18}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PageContext) GetKind() string {
@@ -1442,7 +1540,7 @@ type ConversationSummary struct {
 
 func (x *ConversationSummary) Reset() {
 	*x = ConversationSummary{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1454,7 +1552,7 @@ func (x *ConversationSummary) String() string {
 func (*ConversationSummary) ProtoMessage() {}
 
 func (x *ConversationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[19]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1467,7 +1565,7 @@ func (x *ConversationSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConversationSummary.ProtoReflect.Descriptor instead.
 func (*ConversationSummary) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{19}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ConversationSummary) GetId() string {
@@ -1525,7 +1623,7 @@ type ToolCall struct {
 
 func (x *ToolCall) Reset() {
 	*x = ToolCall{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1635,7 @@ func (x *ToolCall) String() string {
 func (*ToolCall) ProtoMessage() {}
 
 func (x *ToolCall) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[20]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1648,7 @@ func (x *ToolCall) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolCall.ProtoReflect.Descriptor instead.
 func (*ToolCall) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{20}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ToolCall) GetId() string {
@@ -1629,7 +1727,7 @@ type PlanCard struct {
 
 func (x *PlanCard) Reset() {
 	*x = PlanCard{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1641,7 +1739,7 @@ func (x *PlanCard) String() string {
 func (*PlanCard) ProtoMessage() {}
 
 func (x *PlanCard) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[21]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1654,7 +1752,7 @@ func (x *PlanCard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanCard.ProtoReflect.Descriptor instead.
 func (*PlanCard) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{21}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *PlanCard) GetPlanId() string {
@@ -1758,7 +1856,7 @@ type MemoryNote struct {
 
 func (x *MemoryNote) Reset() {
 	*x = MemoryNote{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1770,7 +1868,7 @@ func (x *MemoryNote) String() string {
 func (*MemoryNote) ProtoMessage() {}
 
 func (x *MemoryNote) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[22]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1783,7 +1881,7 @@ func (x *MemoryNote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryNote.ProtoReflect.Descriptor instead.
 func (*MemoryNote) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{22}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *MemoryNote) GetId() string {
@@ -1849,7 +1947,7 @@ type ChatMessage struct {
 
 func (x *ChatMessage) Reset() {
 	*x = ChatMessage{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1861,7 +1959,7 @@ func (x *ChatMessage) String() string {
 func (*ChatMessage) ProtoMessage() {}
 
 func (x *ChatMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[23]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1874,7 +1972,7 @@ func (x *ChatMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
 func (*ChatMessage) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{23}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ChatMessage) GetId() string {
@@ -1953,7 +2051,7 @@ type ListConversationsRequest struct {
 
 func (x *ListConversationsRequest) Reset() {
 	*x = ListConversationsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1965,7 +2063,7 @@ func (x *ListConversationsRequest) String() string {
 func (*ListConversationsRequest) ProtoMessage() {}
 
 func (x *ListConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[24]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1978,7 +2076,7 @@ func (x *ListConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConversationsRequest.ProtoReflect.Descriptor instead.
 func (*ListConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{24}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListConversationsRequest) GetQuery() string {
@@ -2012,7 +2110,7 @@ type ListConversationsResponse struct {
 
 func (x *ListConversationsResponse) Reset() {
 	*x = ListConversationsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2024,7 +2122,7 @@ func (x *ListConversationsResponse) String() string {
 func (*ListConversationsResponse) ProtoMessage() {}
 
 func (x *ListConversationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2037,7 +2135,7 @@ func (x *ListConversationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConversationsResponse.ProtoReflect.Descriptor instead.
 func (*ListConversationsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListConversationsResponse) GetConversations() []*ConversationSummary {
@@ -2063,7 +2161,7 @@ type GetConversationRequest struct {
 
 func (x *GetConversationRequest) Reset() {
 	*x = GetConversationRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2075,7 +2173,7 @@ func (x *GetConversationRequest) String() string {
 func (*GetConversationRequest) ProtoMessage() {}
 
 func (x *GetConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2088,7 +2186,7 @@ func (x *GetConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConversationRequest.ProtoReflect.Descriptor instead.
 func (*GetConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetConversationRequest) GetId() string {
@@ -2110,7 +2208,7 @@ type GetConversationResponse struct {
 
 func (x *GetConversationResponse) Reset() {
 	*x = GetConversationResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2122,7 +2220,7 @@ func (x *GetConversationResponse) String() string {
 func (*GetConversationResponse) ProtoMessage() {}
 
 func (x *GetConversationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2135,7 +2233,7 @@ func (x *GetConversationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConversationResponse.ProtoReflect.Descriptor instead.
 func (*GetConversationResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetConversationResponse) GetConversation() *ConversationSummary {
@@ -2168,7 +2266,7 @@ type DeleteConversationRequest struct {
 
 func (x *DeleteConversationRequest) Reset() {
 	*x = DeleteConversationRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2180,7 +2278,7 @@ func (x *DeleteConversationRequest) String() string {
 func (*DeleteConversationRequest) ProtoMessage() {}
 
 func (x *DeleteConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2193,7 +2291,7 @@ func (x *DeleteConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConversationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{28}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *DeleteConversationRequest) GetId() string {
@@ -2211,7 +2309,7 @@ type DeleteConversationResponse struct {
 
 func (x *DeleteConversationResponse) Reset() {
 	*x = DeleteConversationResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2223,7 +2321,7 @@ func (x *DeleteConversationResponse) String() string {
 func (*DeleteConversationResponse) ProtoMessage() {}
 
 func (x *DeleteConversationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2236,7 +2334,7 @@ func (x *DeleteConversationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConversationResponse.ProtoReflect.Descriptor instead.
 func (*DeleteConversationResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{29}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{30}
 }
 
 type DeleteAllConversationsRequest struct {
@@ -2249,7 +2347,7 @@ type DeleteAllConversationsRequest struct {
 
 func (x *DeleteAllConversationsRequest) Reset() {
 	*x = DeleteAllConversationsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2261,7 +2359,7 @@ func (x *DeleteAllConversationsRequest) String() string {
 func (*DeleteAllConversationsRequest) ProtoMessage() {}
 
 func (x *DeleteAllConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2274,7 +2372,7 @@ func (x *DeleteAllConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAllConversationsRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAllConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{30}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *DeleteAllConversationsRequest) GetAllAdmins() bool {
@@ -2293,7 +2391,7 @@ type DeleteAllConversationsResponse struct {
 
 func (x *DeleteAllConversationsResponse) Reset() {
 	*x = DeleteAllConversationsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2305,7 +2403,7 @@ func (x *DeleteAllConversationsResponse) String() string {
 func (*DeleteAllConversationsResponse) ProtoMessage() {}
 
 func (x *DeleteAllConversationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2318,7 +2416,7 @@ func (x *DeleteAllConversationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAllConversationsResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAllConversationsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{31}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DeleteAllConversationsResponse) GetDeleted() uint32 {
@@ -2346,7 +2444,7 @@ type ChatRequest struct {
 
 func (x *ChatRequest) Reset() {
 	*x = ChatRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2358,7 +2456,7 @@ func (x *ChatRequest) String() string {
 func (*ChatRequest) ProtoMessage() {}
 
 func (x *ChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2371,7 +2469,7 @@ func (x *ChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatRequest.ProtoReflect.Descriptor instead.
 func (*ChatRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{32}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ChatRequest) GetConversationId() string {
@@ -2420,7 +2518,7 @@ type ChatStarted struct {
 
 func (x *ChatStarted) Reset() {
 	*x = ChatStarted{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2432,7 +2530,7 @@ func (x *ChatStarted) String() string {
 func (*ChatStarted) ProtoMessage() {}
 
 func (x *ChatStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2445,7 +2543,7 @@ func (x *ChatStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatStarted.ProtoReflect.Descriptor instead.
 func (*ChatStarted) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ChatStarted) GetConversationId() string {
@@ -2481,7 +2579,7 @@ type TurnUsage struct {
 
 func (x *TurnUsage) Reset() {
 	*x = TurnUsage{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2493,7 +2591,7 @@ func (x *TurnUsage) String() string {
 func (*TurnUsage) ProtoMessage() {}
 
 func (x *TurnUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2506,7 +2604,7 @@ func (x *TurnUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnUsage.ProtoReflect.Descriptor instead.
 func (*TurnUsage) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{34}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *TurnUsage) GetInputTokens() int64 {
@@ -2542,7 +2640,7 @@ type TurnDone struct {
 
 func (x *TurnDone) Reset() {
 	*x = TurnDone{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2554,7 +2652,7 @@ func (x *TurnDone) String() string {
 func (*TurnDone) ProtoMessage() {}
 
 func (x *TurnDone) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2567,7 +2665,7 @@ func (x *TurnDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnDone.ProtoReflect.Descriptor instead.
 func (*TurnDone) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{35}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *TurnDone) GetEnd() string {
@@ -2604,7 +2702,7 @@ type ChatResponse struct {
 
 func (x *ChatResponse) Reset() {
 	*x = ChatResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2616,7 +2714,7 @@ func (x *ChatResponse) String() string {
 func (*ChatResponse) ProtoMessage() {}
 
 func (x *ChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2629,7 +2727,7 @@ func (x *ChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatResponse.ProtoReflect.Descriptor instead.
 func (*ChatResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{36}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ChatResponse) GetEvent() isChatResponse_Event {
@@ -2791,7 +2889,7 @@ type StopTurnRequest struct {
 
 func (x *StopTurnRequest) Reset() {
 	*x = StopTurnRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2803,7 +2901,7 @@ func (x *StopTurnRequest) String() string {
 func (*StopTurnRequest) ProtoMessage() {}
 
 func (x *StopTurnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2816,7 +2914,7 @@ func (x *StopTurnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTurnRequest.ProtoReflect.Descriptor instead.
 func (*StopTurnRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{37}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *StopTurnRequest) GetConversationId() string {
@@ -2834,7 +2932,7 @@ type StopTurnResponse struct {
 
 func (x *StopTurnResponse) Reset() {
 	*x = StopTurnResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2846,7 +2944,7 @@ func (x *StopTurnResponse) String() string {
 func (*StopTurnResponse) ProtoMessage() {}
 
 func (x *StopTurnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2859,7 +2957,7 @@ func (x *StopTurnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTurnResponse.ProtoReflect.Descriptor instead.
 func (*StopTurnResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{38}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{39}
 }
 
 type ApplyPlanRequest struct {
@@ -2872,7 +2970,7 @@ type ApplyPlanRequest struct {
 
 func (x *ApplyPlanRequest) Reset() {
 	*x = ApplyPlanRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2884,7 +2982,7 @@ func (x *ApplyPlanRequest) String() string {
 func (*ApplyPlanRequest) ProtoMessage() {}
 
 func (x *ApplyPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2897,7 +2995,7 @@ func (x *ApplyPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyPlanRequest.ProtoReflect.Descriptor instead.
 func (*ApplyPlanRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{39}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ApplyPlanRequest) GetConversationId() string {
@@ -2923,7 +3021,7 @@ type ApplyPlanResponse struct {
 
 func (x *ApplyPlanResponse) Reset() {
 	*x = ApplyPlanResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2935,7 +3033,7 @@ func (x *ApplyPlanResponse) String() string {
 func (*ApplyPlanResponse) ProtoMessage() {}
 
 func (x *ApplyPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2948,7 +3046,7 @@ func (x *ApplyPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyPlanResponse.ProtoReflect.Descriptor instead.
 func (*ApplyPlanResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{40}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ApplyPlanResponse) GetPlan() *PlanCard {
@@ -2968,7 +3066,7 @@ type DismissPlanRequest struct {
 
 func (x *DismissPlanRequest) Reset() {
 	*x = DismissPlanRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2980,7 +3078,7 @@ func (x *DismissPlanRequest) String() string {
 func (*DismissPlanRequest) ProtoMessage() {}
 
 func (x *DismissPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2993,7 +3091,7 @@ func (x *DismissPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissPlanRequest.ProtoReflect.Descriptor instead.
 func (*DismissPlanRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{41}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *DismissPlanRequest) GetConversationId() string {
@@ -3019,7 +3117,7 @@ type DismissPlanResponse struct {
 
 func (x *DismissPlanResponse) Reset() {
 	*x = DismissPlanResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3031,7 +3129,7 @@ func (x *DismissPlanResponse) String() string {
 func (*DismissPlanResponse) ProtoMessage() {}
 
 func (x *DismissPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3044,7 +3142,7 @@ func (x *DismissPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissPlanResponse.ProtoReflect.Descriptor instead.
 func (*DismissPlanResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{42}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *DismissPlanResponse) GetPlan() *PlanCard {
@@ -3062,7 +3160,7 @@ type ListMemoryRequest struct {
 
 func (x *ListMemoryRequest) Reset() {
 	*x = ListMemoryRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3074,7 +3172,7 @@ func (x *ListMemoryRequest) String() string {
 func (*ListMemoryRequest) ProtoMessage() {}
 
 func (x *ListMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3087,7 +3185,7 @@ func (x *ListMemoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMemoryRequest.ProtoReflect.Descriptor instead.
 func (*ListMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{43}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{44}
 }
 
 type ListMemoryResponse struct {
@@ -3099,7 +3197,7 @@ type ListMemoryResponse struct {
 
 func (x *ListMemoryResponse) Reset() {
 	*x = ListMemoryResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3111,7 +3209,7 @@ func (x *ListMemoryResponse) String() string {
 func (*ListMemoryResponse) ProtoMessage() {}
 
 func (x *ListMemoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3124,7 +3222,7 @@ func (x *ListMemoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMemoryResponse.ProtoReflect.Descriptor instead.
 func (*ListMemoryResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{44}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ListMemoryResponse) GetNotes() []*MemoryNote {
@@ -3145,7 +3243,7 @@ type SaveMemoryRequest struct {
 
 func (x *SaveMemoryRequest) Reset() {
 	*x = SaveMemoryRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3157,7 +3255,7 @@ func (x *SaveMemoryRequest) String() string {
 func (*SaveMemoryRequest) ProtoMessage() {}
 
 func (x *SaveMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3170,7 +3268,7 @@ func (x *SaveMemoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveMemoryRequest.ProtoReflect.Descriptor instead.
 func (*SaveMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{45}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *SaveMemoryRequest) GetId() string {
@@ -3196,7 +3294,7 @@ type SaveMemoryResponse struct {
 
 func (x *SaveMemoryResponse) Reset() {
 	*x = SaveMemoryResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3208,7 +3306,7 @@ func (x *SaveMemoryResponse) String() string {
 func (*SaveMemoryResponse) ProtoMessage() {}
 
 func (x *SaveMemoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3221,7 +3319,7 @@ func (x *SaveMemoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveMemoryResponse.ProtoReflect.Descriptor instead.
 func (*SaveMemoryResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{46}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *SaveMemoryResponse) GetNote() *MemoryNote {
@@ -3240,7 +3338,7 @@ type DeleteMemoryRequest struct {
 
 func (x *DeleteMemoryRequest) Reset() {
 	*x = DeleteMemoryRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3252,7 +3350,7 @@ func (x *DeleteMemoryRequest) String() string {
 func (*DeleteMemoryRequest) ProtoMessage() {}
 
 func (x *DeleteMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3265,7 +3363,7 @@ func (x *DeleteMemoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMemoryRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{47}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *DeleteMemoryRequest) GetId() string {
@@ -3283,7 +3381,7 @@ type DeleteMemoryResponse struct {
 
 func (x *DeleteMemoryResponse) Reset() {
 	*x = DeleteMemoryResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3295,7 +3393,7 @@ func (x *DeleteMemoryResponse) String() string {
 func (*DeleteMemoryResponse) ProtoMessage() {}
 
 func (x *DeleteMemoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3308,7 +3406,7 @@ func (x *DeleteMemoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMemoryResponse.ProtoReflect.Descriptor instead.
 func (*DeleteMemoryResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{48}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{49}
 }
 
 type ForgetAllRequest struct {
@@ -3319,7 +3417,7 @@ type ForgetAllRequest struct {
 
 func (x *ForgetAllRequest) Reset() {
 	*x = ForgetAllRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3331,7 +3429,7 @@ func (x *ForgetAllRequest) String() string {
 func (*ForgetAllRequest) ProtoMessage() {}
 
 func (x *ForgetAllRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3344,7 +3442,7 @@ func (x *ForgetAllRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetAllRequest.ProtoReflect.Descriptor instead.
 func (*ForgetAllRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{49}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{50}
 }
 
 type ForgetAllResponse struct {
@@ -3356,7 +3454,7 @@ type ForgetAllResponse struct {
 
 func (x *ForgetAllResponse) Reset() {
 	*x = ForgetAllResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3368,7 +3466,7 @@ func (x *ForgetAllResponse) String() string {
 func (*ForgetAllResponse) ProtoMessage() {}
 
 func (x *ForgetAllResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3381,7 +3479,7 @@ func (x *ForgetAllResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetAllResponse.ProtoReflect.Descriptor instead.
 func (*ForgetAllResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{50}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *ForgetAllResponse) GetDeleted() uint32 {
@@ -3398,13 +3496,21 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"!mistgate/admin/v1/assistant.proto\x12\x11mistgate.admin.v1\x1a$mistgate/admin/v1/integrations.proto\"$\n" +
 	"\x0eAssistantError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\"\x1b\n" +
-	"\x19GetAssistantAccessRequest\"\xc7\x01\n" +
+	"\x19GetAssistantAccessRequest\"\xc4\x02\n" +
 	"\x1aGetAssistantAccessResponse\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12@\n" +
 	"\bprovider\x18\x03 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x14\n" +
 	"\x05model\x18\x04 \x01(\tR\x05model\x12\x1b\n" +
-	"\tread_only\x18\x05 \x01(\bR\breadOnly\"\xb5\x02\n" +
+	"\tread_only\x18\x05 \x01(\bR\breadOnly\x12?\n" +
+	"\achoices\x18\x06 \x03(\v2%.mistgate.admin.v1.ChatProviderChoiceR\achoices\x12:\n" +
+	"\x06effort\x18\a \x01(\x0e2\".mistgate.admin.v1.AssistantEffortR\x06effort\"\xef\x01\n" +
+	"\x12ChatProviderChoice\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12+\n" +
+	"\x12input_usd_per_mtok\x18\x03 \x01(\x01R\x0finputUsdPerMtok\x12-\n" +
+	"\x13output_usd_per_mtok\x18\x04 \x01(\x01R\x10outputUsdPerMtok\x12%\n" +
+	"\x0ebudget_reached\x18\x05 \x01(\bR\rbudgetReached\"\xb5\x02\n" +
 	"\x11AssistantSettings\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12@\n" +
 	"\bprovider\x18\x02 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12:\n" +
@@ -3664,7 +3770,7 @@ func file_mistgate_admin_v1_assistant_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_assistant_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_assistant_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_mistgate_admin_v1_assistant_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
 var file_mistgate_admin_v1_assistant_proto_goTypes = []any{
 	(AssistantProvider)(0),                  // 0: mistgate.admin.v1.AssistantProvider
 	(AssistantEffort)(0),                    // 1: mistgate.admin.v1.AssistantEffort
@@ -3674,144 +3780,148 @@ var file_mistgate_admin_v1_assistant_proto_goTypes = []any{
 	(*AssistantError)(nil),                  // 5: mistgate.admin.v1.AssistantError
 	(*GetAssistantAccessRequest)(nil),       // 6: mistgate.admin.v1.GetAssistantAccessRequest
 	(*GetAssistantAccessResponse)(nil),      // 7: mistgate.admin.v1.GetAssistantAccessResponse
-	(*AssistantSettings)(nil),               // 8: mistgate.admin.v1.AssistantSettings
-	(*ProviderChoice)(nil),                  // 9: mistgate.admin.v1.ProviderChoice
-	(*ProviderStatus)(nil),                  // 10: mistgate.admin.v1.ProviderStatus
-	(*AssistantModel)(nil),                  // 11: mistgate.admin.v1.AssistantModel
-	(*AssistantUsage)(nil),                  // 12: mistgate.admin.v1.AssistantUsage
-	(*GetAssistantSettingsRequest)(nil),     // 13: mistgate.admin.v1.GetAssistantSettingsRequest
-	(*GetAssistantSettingsResponse)(nil),    // 14: mistgate.admin.v1.GetAssistantSettingsResponse
-	(*UpdateAssistantSettingsRequest)(nil),  // 15: mistgate.admin.v1.UpdateAssistantSettingsRequest
-	(*UpdateAssistantSettingsResponse)(nil), // 16: mistgate.admin.v1.UpdateAssistantSettingsResponse
-	(*SetProviderKeyRequest)(nil),           // 17: mistgate.admin.v1.SetProviderKeyRequest
-	(*SetProviderKeyResponse)(nil),          // 18: mistgate.admin.v1.SetProviderKeyResponse
-	(*RemoveProviderKeyRequest)(nil),        // 19: mistgate.admin.v1.RemoveProviderKeyRequest
-	(*RemoveProviderKeyResponse)(nil),       // 20: mistgate.admin.v1.RemoveProviderKeyResponse
-	(*ListProviderModelsRequest)(nil),       // 21: mistgate.admin.v1.ListProviderModelsRequest
-	(*ListProviderModelsResponse)(nil),      // 22: mistgate.admin.v1.ListProviderModelsResponse
-	(*PageContext)(nil),                     // 23: mistgate.admin.v1.PageContext
-	(*ConversationSummary)(nil),             // 24: mistgate.admin.v1.ConversationSummary
-	(*ToolCall)(nil),                        // 25: mistgate.admin.v1.ToolCall
-	(*PlanCard)(nil),                        // 26: mistgate.admin.v1.PlanCard
-	(*MemoryNote)(nil),                      // 27: mistgate.admin.v1.MemoryNote
-	(*ChatMessage)(nil),                     // 28: mistgate.admin.v1.ChatMessage
-	(*ListConversationsRequest)(nil),        // 29: mistgate.admin.v1.ListConversationsRequest
-	(*ListConversationsResponse)(nil),       // 30: mistgate.admin.v1.ListConversationsResponse
-	(*GetConversationRequest)(nil),          // 31: mistgate.admin.v1.GetConversationRequest
-	(*GetConversationResponse)(nil),         // 32: mistgate.admin.v1.GetConversationResponse
-	(*DeleteConversationRequest)(nil),       // 33: mistgate.admin.v1.DeleteConversationRequest
-	(*DeleteConversationResponse)(nil),      // 34: mistgate.admin.v1.DeleteConversationResponse
-	(*DeleteAllConversationsRequest)(nil),   // 35: mistgate.admin.v1.DeleteAllConversationsRequest
-	(*DeleteAllConversationsResponse)(nil),  // 36: mistgate.admin.v1.DeleteAllConversationsResponse
-	(*ChatRequest)(nil),                     // 37: mistgate.admin.v1.ChatRequest
-	(*ChatStarted)(nil),                     // 38: mistgate.admin.v1.ChatStarted
-	(*TurnUsage)(nil),                       // 39: mistgate.admin.v1.TurnUsage
-	(*TurnDone)(nil),                        // 40: mistgate.admin.v1.TurnDone
-	(*ChatResponse)(nil),                    // 41: mistgate.admin.v1.ChatResponse
-	(*StopTurnRequest)(nil),                 // 42: mistgate.admin.v1.StopTurnRequest
-	(*StopTurnResponse)(nil),                // 43: mistgate.admin.v1.StopTurnResponse
-	(*ApplyPlanRequest)(nil),                // 44: mistgate.admin.v1.ApplyPlanRequest
-	(*ApplyPlanResponse)(nil),               // 45: mistgate.admin.v1.ApplyPlanResponse
-	(*DismissPlanRequest)(nil),              // 46: mistgate.admin.v1.DismissPlanRequest
-	(*DismissPlanResponse)(nil),             // 47: mistgate.admin.v1.DismissPlanResponse
-	(*ListMemoryRequest)(nil),               // 48: mistgate.admin.v1.ListMemoryRequest
-	(*ListMemoryResponse)(nil),              // 49: mistgate.admin.v1.ListMemoryResponse
-	(*SaveMemoryRequest)(nil),               // 50: mistgate.admin.v1.SaveMemoryRequest
-	(*SaveMemoryResponse)(nil),              // 51: mistgate.admin.v1.SaveMemoryResponse
-	(*DeleteMemoryRequest)(nil),             // 52: mistgate.admin.v1.DeleteMemoryRequest
-	(*DeleteMemoryResponse)(nil),            // 53: mistgate.admin.v1.DeleteMemoryResponse
-	(*ForgetAllRequest)(nil),                // 54: mistgate.admin.v1.ForgetAllRequest
-	(*ForgetAllResponse)(nil),               // 55: mistgate.admin.v1.ForgetAllResponse
-	(*ApprovalFact)(nil),                    // 56: mistgate.admin.v1.ApprovalFact
+	(*ChatProviderChoice)(nil),              // 8: mistgate.admin.v1.ChatProviderChoice
+	(*AssistantSettings)(nil),               // 9: mistgate.admin.v1.AssistantSettings
+	(*ProviderChoice)(nil),                  // 10: mistgate.admin.v1.ProviderChoice
+	(*ProviderStatus)(nil),                  // 11: mistgate.admin.v1.ProviderStatus
+	(*AssistantModel)(nil),                  // 12: mistgate.admin.v1.AssistantModel
+	(*AssistantUsage)(nil),                  // 13: mistgate.admin.v1.AssistantUsage
+	(*GetAssistantSettingsRequest)(nil),     // 14: mistgate.admin.v1.GetAssistantSettingsRequest
+	(*GetAssistantSettingsResponse)(nil),    // 15: mistgate.admin.v1.GetAssistantSettingsResponse
+	(*UpdateAssistantSettingsRequest)(nil),  // 16: mistgate.admin.v1.UpdateAssistantSettingsRequest
+	(*UpdateAssistantSettingsResponse)(nil), // 17: mistgate.admin.v1.UpdateAssistantSettingsResponse
+	(*SetProviderKeyRequest)(nil),           // 18: mistgate.admin.v1.SetProviderKeyRequest
+	(*SetProviderKeyResponse)(nil),          // 19: mistgate.admin.v1.SetProviderKeyResponse
+	(*RemoveProviderKeyRequest)(nil),        // 20: mistgate.admin.v1.RemoveProviderKeyRequest
+	(*RemoveProviderKeyResponse)(nil),       // 21: mistgate.admin.v1.RemoveProviderKeyResponse
+	(*ListProviderModelsRequest)(nil),       // 22: mistgate.admin.v1.ListProviderModelsRequest
+	(*ListProviderModelsResponse)(nil),      // 23: mistgate.admin.v1.ListProviderModelsResponse
+	(*PageContext)(nil),                     // 24: mistgate.admin.v1.PageContext
+	(*ConversationSummary)(nil),             // 25: mistgate.admin.v1.ConversationSummary
+	(*ToolCall)(nil),                        // 26: mistgate.admin.v1.ToolCall
+	(*PlanCard)(nil),                        // 27: mistgate.admin.v1.PlanCard
+	(*MemoryNote)(nil),                      // 28: mistgate.admin.v1.MemoryNote
+	(*ChatMessage)(nil),                     // 29: mistgate.admin.v1.ChatMessage
+	(*ListConversationsRequest)(nil),        // 30: mistgate.admin.v1.ListConversationsRequest
+	(*ListConversationsResponse)(nil),       // 31: mistgate.admin.v1.ListConversationsResponse
+	(*GetConversationRequest)(nil),          // 32: mistgate.admin.v1.GetConversationRequest
+	(*GetConversationResponse)(nil),         // 33: mistgate.admin.v1.GetConversationResponse
+	(*DeleteConversationRequest)(nil),       // 34: mistgate.admin.v1.DeleteConversationRequest
+	(*DeleteConversationResponse)(nil),      // 35: mistgate.admin.v1.DeleteConversationResponse
+	(*DeleteAllConversationsRequest)(nil),   // 36: mistgate.admin.v1.DeleteAllConversationsRequest
+	(*DeleteAllConversationsResponse)(nil),  // 37: mistgate.admin.v1.DeleteAllConversationsResponse
+	(*ChatRequest)(nil),                     // 38: mistgate.admin.v1.ChatRequest
+	(*ChatStarted)(nil),                     // 39: mistgate.admin.v1.ChatStarted
+	(*TurnUsage)(nil),                       // 40: mistgate.admin.v1.TurnUsage
+	(*TurnDone)(nil),                        // 41: mistgate.admin.v1.TurnDone
+	(*ChatResponse)(nil),                    // 42: mistgate.admin.v1.ChatResponse
+	(*StopTurnRequest)(nil),                 // 43: mistgate.admin.v1.StopTurnRequest
+	(*StopTurnResponse)(nil),                // 44: mistgate.admin.v1.StopTurnResponse
+	(*ApplyPlanRequest)(nil),                // 45: mistgate.admin.v1.ApplyPlanRequest
+	(*ApplyPlanResponse)(nil),               // 46: mistgate.admin.v1.ApplyPlanResponse
+	(*DismissPlanRequest)(nil),              // 47: mistgate.admin.v1.DismissPlanRequest
+	(*DismissPlanResponse)(nil),             // 48: mistgate.admin.v1.DismissPlanResponse
+	(*ListMemoryRequest)(nil),               // 49: mistgate.admin.v1.ListMemoryRequest
+	(*ListMemoryResponse)(nil),              // 50: mistgate.admin.v1.ListMemoryResponse
+	(*SaveMemoryRequest)(nil),               // 51: mistgate.admin.v1.SaveMemoryRequest
+	(*SaveMemoryResponse)(nil),              // 52: mistgate.admin.v1.SaveMemoryResponse
+	(*DeleteMemoryRequest)(nil),             // 53: mistgate.admin.v1.DeleteMemoryRequest
+	(*DeleteMemoryResponse)(nil),            // 54: mistgate.admin.v1.DeleteMemoryResponse
+	(*ForgetAllRequest)(nil),                // 55: mistgate.admin.v1.ForgetAllRequest
+	(*ForgetAllResponse)(nil),               // 56: mistgate.admin.v1.ForgetAllResponse
+	(*ApprovalFact)(nil),                    // 57: mistgate.admin.v1.ApprovalFact
 }
 var file_mistgate_admin_v1_assistant_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.GetAssistantAccessResponse.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	0,  // 1: mistgate.admin.v1.AssistantSettings.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	1,  // 2: mistgate.admin.v1.AssistantSettings.effort:type_name -> mistgate.admin.v1.AssistantEffort
-	2,  // 3: mistgate.admin.v1.AssistantSettings.audience:type_name -> mistgate.admin.v1.AssistantAudience
-	0,  // 4: mistgate.admin.v1.ProviderChoice.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	0,  // 5: mistgate.admin.v1.ProviderStatus.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	9,  // 6: mistgate.admin.v1.ProviderStatus.choice:type_name -> mistgate.admin.v1.ProviderChoice
-	8,  // 7: mistgate.admin.v1.GetAssistantSettingsResponse.settings:type_name -> mistgate.admin.v1.AssistantSettings
-	10, // 8: mistgate.admin.v1.GetAssistantSettingsResponse.providers:type_name -> mistgate.admin.v1.ProviderStatus
-	12, // 9: mistgate.admin.v1.GetAssistantSettingsResponse.usage:type_name -> mistgate.admin.v1.AssistantUsage
-	8,  // 10: mistgate.admin.v1.UpdateAssistantSettingsRequest.settings:type_name -> mistgate.admin.v1.AssistantSettings
-	9,  // 11: mistgate.admin.v1.UpdateAssistantSettingsRequest.choices:type_name -> mistgate.admin.v1.ProviderChoice
-	8,  // 12: mistgate.admin.v1.UpdateAssistantSettingsResponse.settings:type_name -> mistgate.admin.v1.AssistantSettings
-	10, // 13: mistgate.admin.v1.UpdateAssistantSettingsResponse.providers:type_name -> mistgate.admin.v1.ProviderStatus
-	0,  // 14: mistgate.admin.v1.SetProviderKeyRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	10, // 15: mistgate.admin.v1.SetProviderKeyResponse.status:type_name -> mistgate.admin.v1.ProviderStatus
-	11, // 16: mistgate.admin.v1.SetProviderKeyResponse.models:type_name -> mistgate.admin.v1.AssistantModel
-	0,  // 17: mistgate.admin.v1.RemoveProviderKeyRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	10, // 18: mistgate.admin.v1.RemoveProviderKeyResponse.status:type_name -> mistgate.admin.v1.ProviderStatus
-	0,  // 19: mistgate.admin.v1.ListProviderModelsRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	11, // 20: mistgate.admin.v1.ListProviderModelsResponse.models:type_name -> mistgate.admin.v1.AssistantModel
-	56, // 21: mistgate.admin.v1.PlanCard.facts:type_name -> mistgate.admin.v1.ApprovalFact
-	4,  // 22: mistgate.admin.v1.PlanCard.state:type_name -> mistgate.admin.v1.PlanState
-	3,  // 23: mistgate.admin.v1.ChatMessage.role:type_name -> mistgate.admin.v1.ChatRole
-	23, // 24: mistgate.admin.v1.ChatMessage.context:type_name -> mistgate.admin.v1.PageContext
-	25, // 25: mistgate.admin.v1.ChatMessage.tools:type_name -> mistgate.admin.v1.ToolCall
-	26, // 26: mistgate.admin.v1.ChatMessage.plans:type_name -> mistgate.admin.v1.PlanCard
-	27, // 27: mistgate.admin.v1.ChatMessage.remembered:type_name -> mistgate.admin.v1.MemoryNote
-	24, // 28: mistgate.admin.v1.ListConversationsResponse.conversations:type_name -> mistgate.admin.v1.ConversationSummary
-	24, // 29: mistgate.admin.v1.GetConversationResponse.conversation:type_name -> mistgate.admin.v1.ConversationSummary
-	28, // 30: mistgate.admin.v1.GetConversationResponse.messages:type_name -> mistgate.admin.v1.ChatMessage
-	23, // 31: mistgate.admin.v1.ChatRequest.context:type_name -> mistgate.admin.v1.PageContext
-	0,  // 32: mistgate.admin.v1.ChatRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	1,  // 33: mistgate.admin.v1.ChatRequest.effort:type_name -> mistgate.admin.v1.AssistantEffort
-	38, // 34: mistgate.admin.v1.ChatResponse.started:type_name -> mistgate.admin.v1.ChatStarted
-	25, // 35: mistgate.admin.v1.ChatResponse.tool_started:type_name -> mistgate.admin.v1.ToolCall
-	25, // 36: mistgate.admin.v1.ChatResponse.tool_finished:type_name -> mistgate.admin.v1.ToolCall
-	26, // 37: mistgate.admin.v1.ChatResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	27, // 38: mistgate.admin.v1.ChatResponse.remembered:type_name -> mistgate.admin.v1.MemoryNote
-	39, // 39: mistgate.admin.v1.ChatResponse.usage:type_name -> mistgate.admin.v1.TurnUsage
-	40, // 40: mistgate.admin.v1.ChatResponse.done:type_name -> mistgate.admin.v1.TurnDone
-	5,  // 41: mistgate.admin.v1.ChatResponse.error:type_name -> mistgate.admin.v1.AssistantError
-	26, // 42: mistgate.admin.v1.ApplyPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	26, // 43: mistgate.admin.v1.DismissPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	27, // 44: mistgate.admin.v1.ListMemoryResponse.notes:type_name -> mistgate.admin.v1.MemoryNote
-	27, // 45: mistgate.admin.v1.SaveMemoryResponse.note:type_name -> mistgate.admin.v1.MemoryNote
-	6,  // 46: mistgate.admin.v1.AssistantService.GetAssistantAccess:input_type -> mistgate.admin.v1.GetAssistantAccessRequest
-	13, // 47: mistgate.admin.v1.AssistantService.GetAssistantSettings:input_type -> mistgate.admin.v1.GetAssistantSettingsRequest
-	15, // 48: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:input_type -> mistgate.admin.v1.UpdateAssistantSettingsRequest
-	17, // 49: mistgate.admin.v1.AssistantService.SetProviderKey:input_type -> mistgate.admin.v1.SetProviderKeyRequest
-	19, // 50: mistgate.admin.v1.AssistantService.RemoveProviderKey:input_type -> mistgate.admin.v1.RemoveProviderKeyRequest
-	21, // 51: mistgate.admin.v1.AssistantService.ListProviderModels:input_type -> mistgate.admin.v1.ListProviderModelsRequest
-	29, // 52: mistgate.admin.v1.AssistantService.ListConversations:input_type -> mistgate.admin.v1.ListConversationsRequest
-	31, // 53: mistgate.admin.v1.AssistantService.GetConversation:input_type -> mistgate.admin.v1.GetConversationRequest
-	33, // 54: mistgate.admin.v1.AssistantService.DeleteConversation:input_type -> mistgate.admin.v1.DeleteConversationRequest
-	35, // 55: mistgate.admin.v1.AssistantService.DeleteAllConversations:input_type -> mistgate.admin.v1.DeleteAllConversationsRequest
-	37, // 56: mistgate.admin.v1.AssistantService.Chat:input_type -> mistgate.admin.v1.ChatRequest
-	42, // 57: mistgate.admin.v1.AssistantService.StopTurn:input_type -> mistgate.admin.v1.StopTurnRequest
-	44, // 58: mistgate.admin.v1.AssistantService.ApplyPlan:input_type -> mistgate.admin.v1.ApplyPlanRequest
-	46, // 59: mistgate.admin.v1.AssistantService.DismissPlan:input_type -> mistgate.admin.v1.DismissPlanRequest
-	48, // 60: mistgate.admin.v1.AssistantService.ListMemory:input_type -> mistgate.admin.v1.ListMemoryRequest
-	50, // 61: mistgate.admin.v1.AssistantService.SaveMemory:input_type -> mistgate.admin.v1.SaveMemoryRequest
-	52, // 62: mistgate.admin.v1.AssistantService.DeleteMemory:input_type -> mistgate.admin.v1.DeleteMemoryRequest
-	54, // 63: mistgate.admin.v1.AssistantService.ForgetAll:input_type -> mistgate.admin.v1.ForgetAllRequest
-	7,  // 64: mistgate.admin.v1.AssistantService.GetAssistantAccess:output_type -> mistgate.admin.v1.GetAssistantAccessResponse
-	14, // 65: mistgate.admin.v1.AssistantService.GetAssistantSettings:output_type -> mistgate.admin.v1.GetAssistantSettingsResponse
-	16, // 66: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:output_type -> mistgate.admin.v1.UpdateAssistantSettingsResponse
-	18, // 67: mistgate.admin.v1.AssistantService.SetProviderKey:output_type -> mistgate.admin.v1.SetProviderKeyResponse
-	20, // 68: mistgate.admin.v1.AssistantService.RemoveProviderKey:output_type -> mistgate.admin.v1.RemoveProviderKeyResponse
-	22, // 69: mistgate.admin.v1.AssistantService.ListProviderModels:output_type -> mistgate.admin.v1.ListProviderModelsResponse
-	30, // 70: mistgate.admin.v1.AssistantService.ListConversations:output_type -> mistgate.admin.v1.ListConversationsResponse
-	32, // 71: mistgate.admin.v1.AssistantService.GetConversation:output_type -> mistgate.admin.v1.GetConversationResponse
-	34, // 72: mistgate.admin.v1.AssistantService.DeleteConversation:output_type -> mistgate.admin.v1.DeleteConversationResponse
-	36, // 73: mistgate.admin.v1.AssistantService.DeleteAllConversations:output_type -> mistgate.admin.v1.DeleteAllConversationsResponse
-	41, // 74: mistgate.admin.v1.AssistantService.Chat:output_type -> mistgate.admin.v1.ChatResponse
-	43, // 75: mistgate.admin.v1.AssistantService.StopTurn:output_type -> mistgate.admin.v1.StopTurnResponse
-	45, // 76: mistgate.admin.v1.AssistantService.ApplyPlan:output_type -> mistgate.admin.v1.ApplyPlanResponse
-	47, // 77: mistgate.admin.v1.AssistantService.DismissPlan:output_type -> mistgate.admin.v1.DismissPlanResponse
-	49, // 78: mistgate.admin.v1.AssistantService.ListMemory:output_type -> mistgate.admin.v1.ListMemoryResponse
-	51, // 79: mistgate.admin.v1.AssistantService.SaveMemory:output_type -> mistgate.admin.v1.SaveMemoryResponse
-	53, // 80: mistgate.admin.v1.AssistantService.DeleteMemory:output_type -> mistgate.admin.v1.DeleteMemoryResponse
-	55, // 81: mistgate.admin.v1.AssistantService.ForgetAll:output_type -> mistgate.admin.v1.ForgetAllResponse
-	64, // [64:82] is the sub-list for method output_type
-	46, // [46:64] is the sub-list for method input_type
-	46, // [46:46] is the sub-list for extension type_name
-	46, // [46:46] is the sub-list for extension extendee
-	0,  // [0:46] is the sub-list for field type_name
+	8,  // 1: mistgate.admin.v1.GetAssistantAccessResponse.choices:type_name -> mistgate.admin.v1.ChatProviderChoice
+	1,  // 2: mistgate.admin.v1.GetAssistantAccessResponse.effort:type_name -> mistgate.admin.v1.AssistantEffort
+	0,  // 3: mistgate.admin.v1.ChatProviderChoice.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	0,  // 4: mistgate.admin.v1.AssistantSettings.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	1,  // 5: mistgate.admin.v1.AssistantSettings.effort:type_name -> mistgate.admin.v1.AssistantEffort
+	2,  // 6: mistgate.admin.v1.AssistantSettings.audience:type_name -> mistgate.admin.v1.AssistantAudience
+	0,  // 7: mistgate.admin.v1.ProviderChoice.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	0,  // 8: mistgate.admin.v1.ProviderStatus.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	10, // 9: mistgate.admin.v1.ProviderStatus.choice:type_name -> mistgate.admin.v1.ProviderChoice
+	9,  // 10: mistgate.admin.v1.GetAssistantSettingsResponse.settings:type_name -> mistgate.admin.v1.AssistantSettings
+	11, // 11: mistgate.admin.v1.GetAssistantSettingsResponse.providers:type_name -> mistgate.admin.v1.ProviderStatus
+	13, // 12: mistgate.admin.v1.GetAssistantSettingsResponse.usage:type_name -> mistgate.admin.v1.AssistantUsage
+	9,  // 13: mistgate.admin.v1.UpdateAssistantSettingsRequest.settings:type_name -> mistgate.admin.v1.AssistantSettings
+	10, // 14: mistgate.admin.v1.UpdateAssistantSettingsRequest.choices:type_name -> mistgate.admin.v1.ProviderChoice
+	9,  // 15: mistgate.admin.v1.UpdateAssistantSettingsResponse.settings:type_name -> mistgate.admin.v1.AssistantSettings
+	11, // 16: mistgate.admin.v1.UpdateAssistantSettingsResponse.providers:type_name -> mistgate.admin.v1.ProviderStatus
+	0,  // 17: mistgate.admin.v1.SetProviderKeyRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	11, // 18: mistgate.admin.v1.SetProviderKeyResponse.status:type_name -> mistgate.admin.v1.ProviderStatus
+	12, // 19: mistgate.admin.v1.SetProviderKeyResponse.models:type_name -> mistgate.admin.v1.AssistantModel
+	0,  // 20: mistgate.admin.v1.RemoveProviderKeyRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	11, // 21: mistgate.admin.v1.RemoveProviderKeyResponse.status:type_name -> mistgate.admin.v1.ProviderStatus
+	0,  // 22: mistgate.admin.v1.ListProviderModelsRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	12, // 23: mistgate.admin.v1.ListProviderModelsResponse.models:type_name -> mistgate.admin.v1.AssistantModel
+	57, // 24: mistgate.admin.v1.PlanCard.facts:type_name -> mistgate.admin.v1.ApprovalFact
+	4,  // 25: mistgate.admin.v1.PlanCard.state:type_name -> mistgate.admin.v1.PlanState
+	3,  // 26: mistgate.admin.v1.ChatMessage.role:type_name -> mistgate.admin.v1.ChatRole
+	24, // 27: mistgate.admin.v1.ChatMessage.context:type_name -> mistgate.admin.v1.PageContext
+	26, // 28: mistgate.admin.v1.ChatMessage.tools:type_name -> mistgate.admin.v1.ToolCall
+	27, // 29: mistgate.admin.v1.ChatMessage.plans:type_name -> mistgate.admin.v1.PlanCard
+	28, // 30: mistgate.admin.v1.ChatMessage.remembered:type_name -> mistgate.admin.v1.MemoryNote
+	25, // 31: mistgate.admin.v1.ListConversationsResponse.conversations:type_name -> mistgate.admin.v1.ConversationSummary
+	25, // 32: mistgate.admin.v1.GetConversationResponse.conversation:type_name -> mistgate.admin.v1.ConversationSummary
+	29, // 33: mistgate.admin.v1.GetConversationResponse.messages:type_name -> mistgate.admin.v1.ChatMessage
+	24, // 34: mistgate.admin.v1.ChatRequest.context:type_name -> mistgate.admin.v1.PageContext
+	0,  // 35: mistgate.admin.v1.ChatRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	1,  // 36: mistgate.admin.v1.ChatRequest.effort:type_name -> mistgate.admin.v1.AssistantEffort
+	39, // 37: mistgate.admin.v1.ChatResponse.started:type_name -> mistgate.admin.v1.ChatStarted
+	26, // 38: mistgate.admin.v1.ChatResponse.tool_started:type_name -> mistgate.admin.v1.ToolCall
+	26, // 39: mistgate.admin.v1.ChatResponse.tool_finished:type_name -> mistgate.admin.v1.ToolCall
+	27, // 40: mistgate.admin.v1.ChatResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	28, // 41: mistgate.admin.v1.ChatResponse.remembered:type_name -> mistgate.admin.v1.MemoryNote
+	40, // 42: mistgate.admin.v1.ChatResponse.usage:type_name -> mistgate.admin.v1.TurnUsage
+	41, // 43: mistgate.admin.v1.ChatResponse.done:type_name -> mistgate.admin.v1.TurnDone
+	5,  // 44: mistgate.admin.v1.ChatResponse.error:type_name -> mistgate.admin.v1.AssistantError
+	27, // 45: mistgate.admin.v1.ApplyPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	27, // 46: mistgate.admin.v1.DismissPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	28, // 47: mistgate.admin.v1.ListMemoryResponse.notes:type_name -> mistgate.admin.v1.MemoryNote
+	28, // 48: mistgate.admin.v1.SaveMemoryResponse.note:type_name -> mistgate.admin.v1.MemoryNote
+	6,  // 49: mistgate.admin.v1.AssistantService.GetAssistantAccess:input_type -> mistgate.admin.v1.GetAssistantAccessRequest
+	14, // 50: mistgate.admin.v1.AssistantService.GetAssistantSettings:input_type -> mistgate.admin.v1.GetAssistantSettingsRequest
+	16, // 51: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:input_type -> mistgate.admin.v1.UpdateAssistantSettingsRequest
+	18, // 52: mistgate.admin.v1.AssistantService.SetProviderKey:input_type -> mistgate.admin.v1.SetProviderKeyRequest
+	20, // 53: mistgate.admin.v1.AssistantService.RemoveProviderKey:input_type -> mistgate.admin.v1.RemoveProviderKeyRequest
+	22, // 54: mistgate.admin.v1.AssistantService.ListProviderModels:input_type -> mistgate.admin.v1.ListProviderModelsRequest
+	30, // 55: mistgate.admin.v1.AssistantService.ListConversations:input_type -> mistgate.admin.v1.ListConversationsRequest
+	32, // 56: mistgate.admin.v1.AssistantService.GetConversation:input_type -> mistgate.admin.v1.GetConversationRequest
+	34, // 57: mistgate.admin.v1.AssistantService.DeleteConversation:input_type -> mistgate.admin.v1.DeleteConversationRequest
+	36, // 58: mistgate.admin.v1.AssistantService.DeleteAllConversations:input_type -> mistgate.admin.v1.DeleteAllConversationsRequest
+	38, // 59: mistgate.admin.v1.AssistantService.Chat:input_type -> mistgate.admin.v1.ChatRequest
+	43, // 60: mistgate.admin.v1.AssistantService.StopTurn:input_type -> mistgate.admin.v1.StopTurnRequest
+	45, // 61: mistgate.admin.v1.AssistantService.ApplyPlan:input_type -> mistgate.admin.v1.ApplyPlanRequest
+	47, // 62: mistgate.admin.v1.AssistantService.DismissPlan:input_type -> mistgate.admin.v1.DismissPlanRequest
+	49, // 63: mistgate.admin.v1.AssistantService.ListMemory:input_type -> mistgate.admin.v1.ListMemoryRequest
+	51, // 64: mistgate.admin.v1.AssistantService.SaveMemory:input_type -> mistgate.admin.v1.SaveMemoryRequest
+	53, // 65: mistgate.admin.v1.AssistantService.DeleteMemory:input_type -> mistgate.admin.v1.DeleteMemoryRequest
+	55, // 66: mistgate.admin.v1.AssistantService.ForgetAll:input_type -> mistgate.admin.v1.ForgetAllRequest
+	7,  // 67: mistgate.admin.v1.AssistantService.GetAssistantAccess:output_type -> mistgate.admin.v1.GetAssistantAccessResponse
+	15, // 68: mistgate.admin.v1.AssistantService.GetAssistantSettings:output_type -> mistgate.admin.v1.GetAssistantSettingsResponse
+	17, // 69: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:output_type -> mistgate.admin.v1.UpdateAssistantSettingsResponse
+	19, // 70: mistgate.admin.v1.AssistantService.SetProviderKey:output_type -> mistgate.admin.v1.SetProviderKeyResponse
+	21, // 71: mistgate.admin.v1.AssistantService.RemoveProviderKey:output_type -> mistgate.admin.v1.RemoveProviderKeyResponse
+	23, // 72: mistgate.admin.v1.AssistantService.ListProviderModels:output_type -> mistgate.admin.v1.ListProviderModelsResponse
+	31, // 73: mistgate.admin.v1.AssistantService.ListConversations:output_type -> mistgate.admin.v1.ListConversationsResponse
+	33, // 74: mistgate.admin.v1.AssistantService.GetConversation:output_type -> mistgate.admin.v1.GetConversationResponse
+	35, // 75: mistgate.admin.v1.AssistantService.DeleteConversation:output_type -> mistgate.admin.v1.DeleteConversationResponse
+	37, // 76: mistgate.admin.v1.AssistantService.DeleteAllConversations:output_type -> mistgate.admin.v1.DeleteAllConversationsResponse
+	42, // 77: mistgate.admin.v1.AssistantService.Chat:output_type -> mistgate.admin.v1.ChatResponse
+	44, // 78: mistgate.admin.v1.AssistantService.StopTurn:output_type -> mistgate.admin.v1.StopTurnResponse
+	46, // 79: mistgate.admin.v1.AssistantService.ApplyPlan:output_type -> mistgate.admin.v1.ApplyPlanResponse
+	48, // 80: mistgate.admin.v1.AssistantService.DismissPlan:output_type -> mistgate.admin.v1.DismissPlanResponse
+	50, // 81: mistgate.admin.v1.AssistantService.ListMemory:output_type -> mistgate.admin.v1.ListMemoryResponse
+	52, // 82: mistgate.admin.v1.AssistantService.SaveMemory:output_type -> mistgate.admin.v1.SaveMemoryResponse
+	54, // 83: mistgate.admin.v1.AssistantService.DeleteMemory:output_type -> mistgate.admin.v1.DeleteMemoryResponse
+	56, // 84: mistgate.admin.v1.AssistantService.ForgetAll:output_type -> mistgate.admin.v1.ForgetAllResponse
+	67, // [67:85] is the sub-list for method output_type
+	49, // [49:67] is the sub-list for method input_type
+	49, // [49:49] is the sub-list for extension type_name
+	49, // [49:49] is the sub-list for extension extendee
+	0,  // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_assistant_proto_init() }
@@ -3820,7 +3930,7 @@ func file_mistgate_admin_v1_assistant_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_integrations_proto_init()
-	file_mistgate_admin_v1_assistant_proto_msgTypes[36].OneofWrappers = []any{
+	file_mistgate_admin_v1_assistant_proto_msgTypes[37].OneofWrappers = []any{
 		(*ChatResponse_Started)(nil),
 		(*ChatResponse_TextDelta)(nil),
 		(*ChatResponse_ToolStarted)(nil),
@@ -3837,7 +3947,7 @@ func file_mistgate_admin_v1_assistant_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_assistant_proto_rawDesc), len(file_mistgate_admin_v1_assistant_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   51,
+			NumMessages:   52,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

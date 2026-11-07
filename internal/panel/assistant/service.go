@@ -4,6 +4,7 @@ package assistant
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -163,6 +164,10 @@ func (s *Service) access(ctx context.Context, admin store.Admin) (*adminv1.GetAs
 		resp.Reason = "not_allowed"
 		return resp, nil
 	}
+	resp.Effort = settings.effort
+	if resp.Choices, err = s.chatChoices(ctx, settings.provider); err != nil {
+		return nil, err
+	}
 	provider := settings.provider
 	if provider == adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED {
 		resp.Reason = "no_provider"
@@ -189,6 +194,50 @@ func (s *Service) access(ctx context.Context, admin store.Admin) (*adminv1.GetAs
 	}
 	resp.Available = true
 	return resp, nil
+}
+
+// chatChoices are the connected providers for the chat's picker, the panel's own first, then in the settings' order.
+func (s *Service) chatChoices(ctx context.Context, first adminv1.AssistantProvider) ([]*adminv1.ChatProviderChoice, error) {
+	var out []*adminv1.ChatProviderChoice
+	for _, spec := range providerSpecs {
+		row, err := s.readProviderRow(ctx, spec.provider)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(row.sealed) == 0 {
+			continue
+		}
+		model := row.model
+		if model == "" {
+			model = defaultModel(spec.provider)
+		}
+		spent, err := s.providerSpend(ctx, spec.provider, monthKey(s.now()))
+		if err != nil {
+			return nil, err
+		}
+		p := listedPrice(spec, model)
+		choice := &adminv1.ChatProviderChoice{Provider: spec.provider, Model: model, InputUsdPerMtok: p.input, OutputUsdPerMtok: p.output, BudgetReached: row.budget <= 0 || spent >= row.budget}
+		if spec.provider == first {
+			out = append([]*adminv1.ChatProviderChoice{choice}, out...)
+		} else {
+			out = append(out, choice)
+		}
+	}
+	return out, nil
+}
+
+// listedPrice is a model's own price for the picker, zero when the model is not in the curated list (budgeting uses
+// priceFor, which assumes the dearest).
+func listedPrice(spec providerSpec, model string) price {
+	for _, known := range spec.curated {
+		if known.id == model {
+			return price{known.inputPrice, known.outputPrice}
+		}
+	}
+	return price{}
 }
 
 func audienceAllows(a adminv1.AssistantAudience, role string) bool {

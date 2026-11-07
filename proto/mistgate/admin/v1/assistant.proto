@@ -117,6 +117,22 @@ message GetAssistantAccessResponse {
   string model = 4;
   // The admin's role gives it the read tools only.
   bool read_only = 5;
+  // The connected providers this admin may pick for a turn (ChatRequest.provider), the panel's chat provider first;
+  // empty when the assistant is off or not for this admin. No keys, no budgets: only what the picker shows.
+  repeated ChatProviderChoice choices = 6;
+  // The panel's thinking depth, what a turn uses unless the admin picks another.
+  AssistantEffort effort = 7;
+}
+
+message ChatProviderChoice {
+  AssistantProvider provider = 1;
+  // The model set for it (or its default).
+  string model = 2;
+  // USD per million tokens, 0 when unknown.
+  double input_usd_per_mtok = 3;
+  double output_usd_per_mtok = 4;
+  // Its monthly budget is spent: a turn on it is refused until next month or a higher budget.
+  bool budget_reached = 5;
 }
 
 message AssistantSettings {
