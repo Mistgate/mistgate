@@ -32,10 +32,10 @@ type FleetJournal struct {
 
 // NodeJournalFilter selects saved node journal entries. Since and Until are inclusive hour-window bounds.
 type NodeJournalFilter struct {
-	NodeID, Source, InboundID, Query string
-	Since, Until                     time.Time
-	MinLevel                         int32
-	Limit                            int
+	NodeID, Source, InboundID, Query, Code string
+	Since, Until                           time.Time
+	MinLevel                               int32
+	Limit                                  int
 }
 
 // NodeJournalRow is one saved error kind with its display names resolved at read time.
@@ -226,6 +226,11 @@ func (s *Store) NodeJournal(ctx context.Context, filter NodeJournalFilter) ([]No
 	if filter.InboundID != "" {
 		where = append(where, "j.inbound_id = ?")
 		args = append(args, filter.InboundID)
+	}
+	if filter.Code != "" {
+		// the attribute "code" of the entry (logscrub.JournalAttrs lists it), compared as a whole, ASCII case-insensitively
+		where = append(where, `lower(COALESCE(json_extract(j.attrs_json, '$.code'), '')) = lower(?)`)
+		args = append(args, filter.Code)
 	}
 	if filter.Query != "" {
 		q := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(filter.Query)

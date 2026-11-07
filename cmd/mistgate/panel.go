@@ -30,11 +30,12 @@ import (
 type panelOpts struct {
 	in            instance
 	decoyDir      string
-	panelAddr     string // host:port agents dial (goes into the install command); "" = not configured
-	dataDir       string // holds dist/, the release bundle of the node-agent updates
-	updateService string // systemd unit restarted by the GitHub panel updater
-	masterKey     []byte // the effective key (including systemd credentials) used by this panel process
-	title         string // subscription title apps show (the brand name)
+	panelAddr     string         // host:port agents dial (goes into the install command); "" = not configured
+	dataDir       string         // holds dist/, the release bundle of the node-agent updates
+	updateService string         // systemd unit restarted by the GitHub panel updater
+	masterKey     []byte         // the effective key (including systemd credentials) used by this panel process
+	title         string         // subscription title apps show (the brand name)
+	ops           *app.OpsConfig // the log ring and level of the process logger; nil in tests
 }
 
 // panel is the VPS listener and background-loop adapter around the shared assembly.
@@ -73,7 +74,7 @@ func newPanel(st *store.Store, vlt *vault.Vault, authSvc *auth.Service, o panelO
 			AgentSNI: o.in.AgentSNI, SubPrefix: o.in.SubPrefix, LinkPrefix: o.in.LinkPrefix,
 		},
 		DecoyDir: o.decoyDir, PanelAddr: o.panelAddr, DataDir: o.dataDir,
-		UpdateService: o.updateService, Title: o.title, HealthBlipWindow: healthBlipWindow,
+		UpdateService: o.updateService, Title: o.title, HealthBlipWindow: healthBlipWindow, Ops: o.ops,
 	})
 	if err != nil {
 		return nil, err

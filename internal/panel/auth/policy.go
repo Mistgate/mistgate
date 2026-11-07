@@ -9,6 +9,15 @@ import (
 const BackupDownloadProcedure = "/backup/download"
 const BackupUploadProcedure = "/backup/upload"
 
+// The ProbeService procedures (proto/mistgate/probe/v1) as strings: importing probev1connect here would put the generated
+// messages into the Cloudflare Workers, which have no room for them and never serve the service. A test compares them with the
+// generated names.
+const (
+	PathProbeProcedure    = "/mistgate.probe.v1.ProbeService/PathProbe"
+	NodeTraceProcedure    = "/mistgate.probe.v1.ProbeService/NodeTrace"
+	NodeDnsCheckProcedure = "/mistgate.probe.v1.ProbeService/NodeDnsCheck"
+)
+
 // level is how much of the admin API a procedure needs.
 type level int
 
@@ -56,13 +65,17 @@ var procedureLevels = map[string]level{
 	adminv1connect.FleetServiceOverviewProcedure:   levelRead,
 	adminv1connect.FleetServiceListEventsProcedure: levelRead,
 
-	adminv1connect.NodeServiceListNodesProcedure:           levelRead,
-	adminv1connect.NodeServiceGetNodeProcedure:             levelRead,
-	adminv1connect.NodeServiceGetNodeConnectionsProcedure:  levelRead,  // counts only, no address
-	adminv1connect.NodeServiceGetNodeJournalProcedure:      levelRead,  // addresses cut on the node and in the panel
-	adminv1connect.NodeServiceGetNodeRuntimeProcedure:      levelRead,  // desired vs applied: hashes, states, no address or pin
-	adminv1connect.NodeServiceGetNodeHostHistoryProcedure:  levelRead,  // hourly host load
-	adminv1connect.NodeServiceGetPathLossProcedure:         levelRead,  // node names, never addresses
+	adminv1connect.NodeServiceListNodesProcedure:          levelRead,
+	adminv1connect.NodeServiceGetNodeProcedure:            levelRead,
+	adminv1connect.NodeServiceGetNodeConnectionsProcedure: levelRead, // counts only, no address
+	adminv1connect.NodeServiceGetNodeJournalProcedure:     levelRead, // addresses cut on the node and in the panel
+	adminv1connect.NodeServiceGetNodeRuntimeProcedure:     levelRead, // desired vs applied: hashes, states, no address or pin
+	adminv1connect.NodeServiceGetNodeHostHistoryProcedure: levelRead, // hourly host load
+	adminv1connect.NodeServiceGetPathLossProcedure:        levelRead, // node names, never addresses
+	// On-demand probes between nodes send test traffic (rate-limited, one per pair): day-to-day work like "check now".
+	PathProbeProcedure:    levelWrite, // node names only, never addresses
+	NodeTraceProcedure:    levelWrite, // hops with their round trip, no router address
+	NodeDnsCheckProcedure: levelWrite, // resolver timings of the doctor's control domains
 	adminv1connect.NodeServiceGetFleetConnectionsProcedure: levelRead,  // counts only, no address
 	adminv1connect.NodeServiceUpdateNodeProcedure:          levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from) or moves the address: owner only
 	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:    levelOwner,

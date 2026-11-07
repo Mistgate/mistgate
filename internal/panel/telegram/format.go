@@ -872,6 +872,7 @@ var toolTitles = map[string]localizedText{
 	"node_update_schedule_cancel": {en: "Cancel a scheduled node update", ru: "Отменить запланированное обновление ноды", zh: "取消节点的定时更新"},
 	"update_timezone":             {en: "Change the time zone of update schedules", ru: "Сменить часовой пояс расписания обновлений", zh: "更改更新计划的时区"},
 	"update_download_timeout":     {en: "Change the update download timeout", ru: "Изменить тайм-аут загрузки обновлений", zh: "更改更新下载超时"},
+	"retention":                   {en: "Change how long the panel keeps its data", ru: "Изменить сроки хранения данных панели", zh: "更改面板的数据保留时间"},
 	"node_rollback":               {en: "Roll a node back", ru: "Откатить ноду", zh: "回滚节点"},
 	"node_install":                {en: "Install a node over SSH", ru: "Установить ноду по SSH", zh: "通过 SSH 安装节点"},
 	"node_server_password_rotate": {en: "Change a node’s SSH password", ru: "Сменить SSH-пароль ноды", zh: "更改节点的 SSH 密码"},

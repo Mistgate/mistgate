@@ -122,7 +122,7 @@ func (a *Agent) expireUDPCount(arm *udpCountArm) {
 
 func (a *Agent) udpSend(s *session, r *pb.UdpSend) {
 	ports, err := udpPorts(r.Ports)
-	if err != nil || udpcheck.Validate(r.Host, ports, int(r.Count), int(r.Pps), int(r.Size)) != nil || len(r.Tag) != 8 {
+	if err != nil || udpcheck.ValidateDF(r.Host, ports, int(r.Count), int(r.Pps), int(r.Size), r.Df) != nil || len(r.Tag) != 8 {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "bad_params"}))
 		return
 	}
@@ -154,7 +154,17 @@ func (a *Agent) udpSend(s *session, r *pb.UdpSend) {
 	if send == nil {
 		send = udpcheck.Send
 	}
-	family, sent, err := send(s.ctx, r.Host, ports, tag, int(r.Count), int(r.Pps), int(r.Size))
+	var family string
+	var sent int
+	if r.Df {
+		sendDF := a.sendUDPDF
+		if sendDF == nil {
+			sendDF = udpcheck.SendDF
+		}
+		family, sent, err = sendDF(s.ctx, r.Host, ports, tag, int(r.Count), int(r.Pps), int(r.Size), true)
+	} else {
+		family, sent, err = send(s.ctx, r.Host, ports, tag, int(r.Count), int(r.Pps), int(r.Size))
+	}
 	if s.ctx.Err() != nil {
 		return
 	}
@@ -199,7 +209,7 @@ func udpSendError(err error) string {
 	switch {
 	case errors.Is(err, udpcheck.ErrBadParams):
 		return "bad_params"
-	case errors.Is(err, udpcheck.ErrUnsupportedHost):
+	case errors.Is(err, udpcheck.ErrUnsupportedHost), errors.Is(err, udpcheck.ErrNoDF):
 		return "unsupported_host"
 	case errors.Is(err, udpcheck.ErrNoRoute):
 		return "no_route"

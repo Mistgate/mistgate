@@ -52,6 +52,8 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | 放置自有伪装站点的目录。其中的 `404.html` 和 `429.html` 会替换内置错误页面。 |
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` (comma-separated) | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 和 `Forwarded` 请求头会被采信。可重复指定。未设置时，TCP 对端就是客户端。 |
 | `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | 面板自身的 systemd 单元；面板更新程序在替换二进制文件前后会停止并重新启动它。面板以 root 运行时使用此值；面板以其他用户身份运行时，会启动固定的 root 辅助单元，命令行中会指定该单元本身。 |
+| `--log-level` | `MISTGATE_LOG_LEVEL` | `info` | 启动时的面板日志级别：`debug`、`info`、`warn` 或 `error`。所有者可在面板运行时更改（设置 → 系统）；重启后恢复该值。 |
+| `--log-format` | `MISTGATE_LOG_FORMAT` | `text` | `text` 或 `json`：stderr 上日志的格式。 |
 | `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | 此构建源代码的发布地址，会显示在管理后台版本旁（AGPL-3.0 第 13 节）。派生版本（fork）应指向自己的仓库；设为空可隐藏链接。 |
 | `--dev` | `MISTGATE_DEV` (`1`, `true`, `yes`, `on`) | off | 开发模式，见下文。 |
 

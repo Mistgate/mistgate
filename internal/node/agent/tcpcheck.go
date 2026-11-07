@@ -78,10 +78,14 @@ func (a *Agent) tcpProbe(s *session, r *pb.TcpProbe) {
 		a.tcp.mu.Unlock()
 	}()
 
+	var family string
+	var verdicts map[uint16]string
+	var timings map[uint16]int64
 	if probe == nil {
-		probe = tcpcheck.Probe
+		family, verdicts, timings, err = tcpcheck.ProbeTimed(s.ctx, r.Host, targets)
+	} else {
+		family, verdicts, err = probe(s.ctx, r.Host, targets)
 	}
-	family, verdicts, err := probe(s.ctx, r.Host, targets)
 	if s.ctx.Err() != nil {
 		return
 	}
@@ -93,6 +97,9 @@ func (a *Agent) tcpProbe(s *session, r *pb.TcpProbe) {
 	params["family"] = family
 	for port, verdict := range verdicts {
 		params["t"+strconv.Itoa(int(port))] = verdict
+		if ms, ok := timings[port]; ok { // "probe/1": the time to the verdict
+			params["m"+strconv.Itoa(int(port))] = strconv.FormatInt(ms, 10)
+		}
 	}
 	s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Ok: true, Params: params}))
 }

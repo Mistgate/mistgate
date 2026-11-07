@@ -75,6 +75,11 @@ var tokenProcedures = map[string]int{
 	adminv1connect.NodeServiceGetNodeRuntimeProcedure:     TokenAccessDirect,
 	adminv1connect.NodeServiceGetNodeHostHistoryProcedure: TokenAccessDirect,
 	adminv1connect.NodeServiceGetPathLossProcedure:        TokenAccessDirect,
+	// Probes between the owner's own nodes (operator profile and up): path_probe, node_trace, node_dns_check. They send bounded test
+	// traffic between fleet nodes, never to a host a caller names, and return node names, timings and counts: no address.
+	PathProbeProcedure:    TokenAccessDirect,
+	NodeTraceProcedure:    TokenAccessDirect,
+	NodeDnsCheckProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,

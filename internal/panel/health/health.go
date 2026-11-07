@@ -67,12 +67,6 @@ const (
 	fixResolveFor = 5 * time.Minute  // a resolve this soon after ApplyFix is "fix_applied"
 	failStreakMin = 2                // failed rounds before a synthetic alert opens
 
-	sampleKeep = 25 * time.Hour
-	dailyKeep  = 90 * 24 * time.Hour
-	alertKeep  = 90 * 24 * time.Hour
-	infoEvents = 90 * 24 * time.Hour  // 00002: events of severity info
-	warnEvents = 400 * 24 * time.Hour // warning and error
-	auditKeep  = 400 * 24 * time.Hour // the audit log
 )
 
 // Config configures Service. The zero value is production: only Actor and Log are usually set.

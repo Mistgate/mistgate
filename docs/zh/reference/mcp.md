@@ -102,10 +102,15 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `relay_candidates` | 只读 | 针对某个入口节点（`node`）：它可以中转的其他节点的服务器。每个服务器包含：`inbound_id`（`relay_plan` 所接收的值）、出口节点、协议配置、协议、网络和端口；`unsupported`（`cdn`、`acme_ip`、`awg`、`build_failed`；为空表示可以中转）；`hop`（服务器带跳跃范围，中转只传递一个端口）；`relay_id`（该入口已在中转它）；`exit_country_check`（国家检测如何看待出口：`ok`、`partial`、`blocked`、`listed` 或 `no_data`，以及它在哪些网络中不可达）；`entry_reaches_exit`（`reach`、`partial`、`blocked` 或 `no_data`，TSPU 探测从该入口运行过时才知道）。`entry_country_check` 是对入口自身的同样检查。`no_data` 表示未知，不表示没问题。不含地址。 |
 | `node_metrics` | 只读 | 节点当前的 CPU、RAM、磁盘和网络数据、今日流量、各协议的在线用户，以及今日流量最高的用户。带 `hours`（1 到 720）时还返回按小时的主机负载（CPU 均值与峰值、softirq、RAM、网络、会话；超过 96 小时的窗口按 `bucket_hours` 分组）以及整个窗口的峰值及其所在小时。面板保留 90 天。 不带 `node` 时：为每个未退役的节点返回一行当前指标（不含用户排行和历史）。 |
 | `node_runtime` | 只读 | `node`（留空 = 所有节点）。节点实际运行的内容与面板期望的对照：期望与已应用的版本号和哈希（12 个字符）、`in_sync`、`drift` 及起始时间、最近一次应用，以及每个 inbound 的 `enabled`（属于期望状态）、`spec_version`、已应用的规格哈希、已应用与实时状态、最近错误和证书到期时间。`attention` 列出不一致之处：`applied_not_desired`（孤儿 inbound 的样子）、`desired_not_applied`、`failed`、`unknown_running`。不返回地址、证书指纹或密钥；不会联系节点。 |
+| `panel_logs` | 管理员 | 面板自身最近的日志记录（内存环形缓冲，保留最近 5000 条，重启后丢失），最新的在前；地址、秘密名称和形似密钥的值已移除，属性只保留白名单中的键。筛选：`min_level`（`debug`、`info`、`warn`、`error`，默认 `info`）、`minutes`（最多 10080）、`query`（消息或属性值的子串，最长 100 个字符，在清理后的文本中匹配）、`component`（`health`、`fleet`、`http` 等）、`code`（精确的错误码）、`request_id`（管理界面在请求失败时显示的代码）、`limit`（默认 100，最多 500）和 `cursor`（上一页的 `next_cursor`）。`level`、`buffered` 和 `capacity` 说明缓冲区的状态。消息来自面板自己的代码和它处理过的数据：属于不可信文本。 |
+| `retention_status` | 管理员 | 面板保存所存数据的时长：每项设置（`journal_days`、`events_info_days`、`events_warn_days`、`audit_days`、`alerts_days`、`check_samples_hours`、`check_daily_days`、`host_history_days`、`traffic_bucket_days`、`node_traffic_hour_days`）的当前值、默认值、范围和单位。 |
 | `path_loss_matrix` | 只读 | `hours`（1 到 720，默认 24）。端口检测中丢包的节点间 UDP 路径：发送方、目标、端口、发送数、到达数、`loss_pct`、同一目标上到达正常的另一个发送方和 `open_ports`（途中的过滤），以及每个目标有多少发送方丢包，用来区分节点问题和路径问题。只显示节点名称。 |
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 带 `refresh: true` 且不带 `node` 时，每个已连接的节点都会运行自己的检查（一次最多 24 个节点）；`kept_last_report` 列出保留上一份报告的节点：它们离线，或其代理版本过旧。 |
 | `node_ports` | 只读 | 已保存的 UDP 投递检查、TCP 可达性，以及每个端口上的入站/协议配置：`direct_in_subscriptions` 表示是否列出节点地址，`cdn` 表示客户端是否通过 CDN 主机连接。操作员权限可设置 `check: true` 运行有时限的检查（约 15 s）。 不带 `node` 时：为每个未退役的节点返回一行精简结果，只含已保存的结果（`check` 需要指定节点）。 |
 | `checks_run_now` | 操作员 | 立即运行健康检查而不等下一轮，并按 `checks_results` 的格式返回被检测 inbound 的最新结果。`node`：单个节点，留空 = 所有节点；`inbound`：只看该 inbound。面板对每个 inbound 至多每 30 秒运行一轮：过早再次请求会被拒绝，并提示改用 `checks_results`。最长等待 25 秒；`complete: false` 表示仍有轮次未结束。 |
+| `path_probe` | 操作员 | 立即在你的两个节点之间发送测试流量：`from`、`to`（节点 id 或准确名称），`kind` 为 `udp`、`tcp` 或 `tls`，可选 `ports`（目标自己的部分端口；目标未提供的端口会被拒绝）。`udp`：每个端口 150 个带标记的数据报，返回发送数、到达数和结论（`ok`、`lossy`、`broken`）。`tcp`：对目标提供的每个 TCP 端口做普通连接，并给出毫秒数。`tls`：使用目标自己的名称和证书指纹握手（只有真正的监听者才是 `ours`），并给出毫秒数。`mtu_sweep: true`（或 `sizes`，最多 5 个 64 到 1472 的载荷大小）在一个端口上对每个大小发送十个禁止分片的数据报，并返回 `largest_size`，即至少一半到达的最大大小。目标始终是集群中的节点：无法指定主机或 URL。发送方需要支持探测的代理（否则为 `agent_too_old`），`udp` 还要求目标节点在线。有速率限制：同一节点对同时只能有一个探测，每个节点 5 分钟内最多 6 次，每个令牌 10 分钟内最多 12 次。结果保存 7 天。不是只读工具：它会发送流量。只返回节点名称，绝不返回地址。Cloudflare 版不提供。 |
+| `node_trace` | 操作员 | 从你的一个节点（`from`）到另一个节点（`to`）做 TTL 递增的 TCP SYN 路由追踪：每一跳的往返时间以及路由器是否应答；目标那一跳显示节点名称，其余为 `hop N`（不返回第三方路由器的地址）。与该节点对上一次追踪比较（保留最近 20 次）：`diff` 和 `changed_at_hop` 说明路由变长、变短或某一跳不再应答。长度和应答模式不变的路由变化会显示为未变化。限制与 `path_probe` 相同；仅限 Linux 节点。 |
+| `node_dns_check` | 操作员 | 节点自己的解析器：医生检查所用控制域名的查询耗时（`p50_ms`、`p95_ms`）和失败数，最新一次运行、最近 24 次运行以及 `trend`（`steady`、`slower`、`faster`，不足四次为 `unknown`）。除非 `stored_only` 为 true，否则立即运行医生的解析器检查；已保存的医生结果也会并入历史。限制与 `path_probe` 相同。 |
 | `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
 | `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
 | `group_get` | 只读 | 单个分组：协议配置 ID、排除的节点、DNS 预设、颜色、用户，以及它当前提供的服务器总量。分组 API 没有备注和配额字段。 |
@@ -183,6 +188,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_update_schedule_cancel` | 管理员 | `node_id` | 始终 |
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
 | `update_download_timeout` | 管理员 | `timeout_seconds`（300 到 7200 秒；只影响新发送的更新，已经开始的步骤保留发送时捕获的窗口） | 始终 |
+| `log_level` | 管理员 | `level`（`debug`、`info`、`warn` 或 `error`）。设置面板的日志级别，直到下次重启，之后回到 `--log-level` / `MISTGATE_LOG_LEVEL`。不删除任何内容。 | 否 |
+| `retention` | 管理员 | `values`：设置名称及其新值（名称、单位和范围见 `retention_status`）。更短的时间会在下一次每小时清理时永久删除更早的行。 | 总是（需 step-up） |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | 管理员 | `updates_status` 中的 `rollout_id` | 始终 |
 | `node_rollback` | 管理员 | `node` | 始终 |
 | `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面确认主机密钥，并选择面板密钥或输入 SSH 密码；密码安装默认同时添加面板密钥 | 始终 |
@@ -234,7 +241,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 
 | 代码 | 含义 | 工具 |
 |---|---|---|
-| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`update_download_timeout`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
+| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`update_download_timeout`、`retention``node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
 | `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
 | `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |

@@ -1,0 +1,486 @@
+# Warn and Error calls in internal/panel that have no "code" attribute yet: file, message, number of calls.
+# This list only shrinks (see logcodes_test.go). Give the call a code, then run: MG_LOGCODES_SHRINK=1 go test ./internal/panel/logcodes
+access/access.go	<"access: " + op>	1
+access/access.go	access: status sweep failed	1
+access/desired.go	access: cannot build inbound	1
+access/desired.go	access: cannot open profile secrets	1
+access/desired.go	access: cannot record inbound build error	1
+access/device.go	access: audit write failed	1
+access/device.go	access: cannot build inbound for a device config	1
+access/device.go	access: cannot render a device config	1
+access/device.go	access: device limit event	1
+access/names.go	access: brand unreadable, keys are named after the defaults	1
+access/node_dns.go	access: audit write failed	1
+access/node_dns.go	access: cannot read a dns preset	1
+access/node_dns.go	access: cannot read the subscription DNS state	1
+access/profile_rpc.go	access: retained server key unreadable, making a new one	1
+access/profile_rpc.go	access: server key of the removed inbound is unreadable, not kept	1
+access/relay_check.go	access: path check of a relay	1
+access/relay_check.go	access: store a relay check	2
+access/relay_check.go	access: switch a failed relay off	1
+access/sub.go	access: AWG profile network is full for a Mihomo subscription	1
+access/sub.go	access: bad AWG network	1
+access/sub.go	access: cannot build inbound for subscription	1
+access/sub.go	access: cannot issue AWG credentials for a Mihomo subscription	1
+access/sub.go	access: cannot open profile secrets	1
+access/sub.go	access: cannot record subscription fetch	1
+access/sub.go	access: device limit event	1
+access/twin_rpc.go	access: twin rollback: inbound not removed	1
+access/twin_rpc.go	access: twin rollback: profile not removed	1
+app/assistant_wiring.go	assistant MCP tools are off	1
+app/background.go	assistant retention	1
+app/background.go	provision worker stopped; retrying	1
+app/core.go	health: read the external sources	1
+app/core.go	recompute user status after usage	1
+app/core.go	release key is unusable, node updates are off	1
+app/core.go	release key mismatch: node bundles are not trusted and rollouts are off	1
+app/edge_tick.go	edge: taking a round lease	1
+app/integrations_mcp.go	mcp endpoint is off	1
+app/mcp_internal.go	audit mcp row	1
+app/mcp_internal.go	mcp plan sweep	1
+app/roles.go	wake the provisioner	1
+assistant/chat.go	assistant turn save failed	1
+assistant/data.go	assistant usage reconciliation failed	1
+assistant/service.go	assistant audit write failed	1
+assistant/service.go	assistant provider configuration	1
+assistant/service.go	assistant storage initialization failed	1
+assistant/settings.go	assistant provider error status update failed	1
+assistant/settings.go	assistant provider status update failed	1
+auth/approvals_rpc.go	decide approval	1
+auth/approvals_rpc.go	list approvals	1
+auth/bearer.go	audit write failed	1
+auth/bearer.go	bearer refused	2
+auth/bearer.go	look up api token	1
+auth/bearer.go	touch api token	1
+auth/credentials.go	add password login	1
+auth/credentials.go	clear step-up failures	1
+auth/credentials.go	consume TOTP enrollment ceremony	1
+auth/credentials.go	consume foreign TOTP enrollment ceremony	1
+auth/credentials.go	end other sessions	2
+auth/credentials.go	password credential	3
+auth/credentials.go	password lookup	1
+auth/credentials.go	record step-up failure	1
+auth/credentials.go	set password	1
+auth/credentials.go	set totp secret	1
+auth/credentials.go	step-up failures	1
+auth/handler.go	admin count	1
+auth/handler.go	admin of password login	1
+auth/handler.go	advance totp step	1
+auth/handler.go	any password	1
+auth/handler.go	begin login	1
+auth/handler.go	begin registration	1
+auth/handler.go	cannot open TOTP secret (wrong master key?)	1
+auth/handler.go	check setup token	1
+auth/handler.go	clear login failures	1
+auth/handler.go	consume setup ceremony	1
+auth/handler.go	consume setup ceremony after bad token	1
+auth/handler.go	create first admin	1
+auth/handler.go	create session	3
+auth/handler.go	delete session	1
+auth/handler.go	load instance settings	1
+auth/handler.go	load turnstile settings	1
+auth/handler.go	login failures	1
+auth/handler.go	password lookup	1
+auth/handler.go	record login failure	1
+auth/handler.go	record source failure	1
+auth/handler.go	source failures	1
+auth/handler.go	touch passkey	1
+auth/handler.go	upgrade password hash	2
+auth/manage.go	add passkey	1
+auth/manage.go	begin registration	1
+auth/manage.go	delete other sessions	1
+auth/manage.go	delete passkey	1
+auth/manage.go	delete session	1
+auth/manage.go	list audit	1
+auth/manage.go	list passkeys	2
+auth/manage.go	list sessions	1
+auth/manage.go	take add-passkey ceremony	1
+auth/recovery.go	check recovery token	1
+auth/recovery.go	consume recovery token	1
+auth/recovery.go	encode edge recovery response	1
+auth/recovery.go	reset admin login through edge recovery	1
+auth/recovery.go	resolve edge recovery target	1
+auth/service.go	audit write failed	1
+auth/service.go	consume unreadable auth ceremony	1
+auth/service.go	consume wrong-kind auth ceremony	1
+auth/service.go	delete expired session	1
+auth/service.go	purge sessions	1
+auth/service.go	touch session	1
+auth/stepup.go	advance totp step	1
+auth/stepup.go	begin step-up	1
+auth/stepup.go	cannot open TOTP secret (wrong master key?)	1
+auth/stepup.go	clear step-up failures	1
+auth/stepup.go	list passkeys	2
+auth/stepup.go	password credential	1
+auth/stepup.go	record step-up	1
+auth/stepup.go	record step-up failure	1
+auth/stepup.go	step-up failures	1
+auth/stepup.go	touch passkey	1
+auth/tokens_rpc.go	create api token	1
+auth/tokens_rpc.go	list api tokens	1
+auth/tokens_rpc.go	revoke api token	1
+auth/turnstile.go	load turnstile settings	3
+auth/turnstile.go	save security settings	1
+blocklist/service.go	blocklist: a list could not be refreshed; the copy in memory stays	1
+blocklist/service.go	blocklist: audit	1
+blocklist/service.go	blocklist: check failed; trying again later	1
+blocklist/service.go	blocklist: disconnect	1
+blocklist/service.go	blocklist: forget the results	1
+blocklist/service.go	blocklist: read nodes	1
+blocklist/service.go	blocklist: read results	2
+blocklist/service.go	blocklist: read settings	3
+blocklist/service.go	blocklist: save retry time	1
+blocklist/service.go	blocklist: save settings	1
+blocklist/service.go	blocklist: test	1
+blocklist/service.go	blocklist: the registry list could not be downloaded	1
+bsbord/service.go	bsbord: API version changed	1
+bsbord/service.go	bsbord: audit	1
+bsbord/service.go	bsbord: cancel pending request	1
+bsbord/service.go	bsbord: create next request key	1
+bsbord/service.go	bsbord: create request key	1
+bsbord/service.go	bsbord: disconnect	1
+bsbord/service.go	bsbord: prepare targets	1
+bsbord/service.go	bsbord: read settings	2
+bsbord/service.go	bsbord: read source state	1
+bsbord/service.go	bsbord: read targets	1
+bsbord/service.go	bsbord: save cap hold	1
+bsbord/service.go	bsbord: save expired request	1
+bsbord/service.go	bsbord: save failed request	1
+bsbord/service.go	bsbord: save no-dpi result	1
+bsbord/service.go	bsbord: save probe spend	1
+bsbord/service.go	bsbord: save request state	1
+bsbord/service.go	bsbord: save retry state	1
+bsbord/service.go	bsbord: save settings	1
+bsbord/service.go	bsbord: store probe results	1
+bsbord/service.go	bsbord: store skipped targets	1
+bsbord/service.go	bsbord: the stored key cannot be opened; it is ignored	1
+bsbord/service.go	bsbord: verify request state	1
+cheburcheck/run_native.go	cheburcheck: tick	1
+cheburcheck/service.go	cheburcheck: audit	2
+cheburcheck/service.go	cheburcheck: delete rows	1
+cheburcheck/service.go	cheburcheck: disconnect	1
+cheburcheck/service.go	cheburcheck: read latest rows	1
+cheburcheck/service.go	cheburcheck: read settings	2
+cheburcheck/service.go	cheburcheck: request failed	1
+cheburcheck/service.go	cheburcheck: save failure state	1
+cheburcheck/service.go	cheburcheck: save settings	1
+cheburcheck/service.go	cheburcheck: stored token cannot be opened; it is ignored	1
+clientprobe/service.go	clientprobe: audit	1
+clientprobe/service.go	clientprobe: disconnect	1
+clientprobe/service.go	clientprobe: forget the reports	1
+clientprobe/service.go	clientprobe: read the counts	1
+clientprobe/service.go	clientprobe: read the kind counts	1
+clientprobe/service.go	clientprobe: read the reports	1
+clientprobe/service.go	clientprobe: read the switch	1
+clientprobe/service.go	clientprobe: save the switch	1
+countryprobe/service.go	countryprobe: audit	1
+countryprobe/service.go	countryprobe: disconnect	1
+countryprobe/service.go	countryprobe: forget the results	1
+countryprobe/service.go	countryprobe: read nodes	4
+countryprobe/service.go	countryprobe: read results	1
+countryprobe/service.go	countryprobe: read settings	3
+countryprobe/service.go	countryprobe: run failed	1
+countryprobe/service.go	countryprobe: save settings	1
+countryprobe/service.go	countryprobe: test	1
+countryprobe/service.go	countryprobe: the probe node did not answer	1
+countryreach/countryreach.go	countryreach: audit	1
+countryreach/countryreach.go	countryreach: read the country	1
+countryreach/countryreach.go	countryreach: read the history	1
+countryreach/countryreach.go	countryreach: save the country	1
+dns/dns.go	<"dns: " + op>	1
+dns/dns.go	dns: audit	1
+dns/dns.go	dns: cannot parse preset	1
+fleet/admin_node.go	agent failed to restart inbounds	1
+fleet/admin_node.go	audit	1
+fleet/admin_node.go	restart event	1
+fleet/agent.go	disconnect session core	1
+fleet/agent.go	hello response	1
+fleet/agent.go	prepare desired state	1
+fleet/agent.go	record update answer	1
+fleet/agent.go	session step	1
+fleet/awgprep.go	agent failed to prepare the awg kernel module	1
+fleet/awgprep.go	record awg prepare	1
+fleet/awgprep.go	restore awg prepare state	1
+fleet/bandwidth.go	audit	1
+fleet/bandwidth.go	store the measured bandwidth	1
+fleet/decoy.go	sync node decoy site	1
+fleet/enroll.go	enroll	1
+fleet/enroll.go	renew	1
+fleet/enroll.go	renew refused	1
+fleet/fleet.go	close remote node link	1
+fleet/fleet.go	poke connected remote nodes	1
+fleet/fleet.go	read live nodes	2
+fleet/fleet.go	read live nodes for remote fan-out	1
+fleet/fleet.go	read online devices	1
+fleet/fleet.go	sweep	1
+fleet/fleet.go	sweep live nodes	1
+fleet/ipv6_check.go	IPv6 check through Globalping	1
+fleet/ipv6_check.go	list inbounds for the IPv6 check	1
+fleet/ipv6_check.go	list nodes for the IPv6 check	1
+fleet/ipv6_check.go	read live nodes for the IPv6 check	1
+fleet/ipv6_check.go	read the doctor's IPv6 for the IPv6 check	1
+fleet/ipv6_entry_rpc.go	read the doctor's IPv6 of a node	1
+fleet/ipv6_entry_rpc.go	read the doctor's IPv6 of the nodes	1
+fleet/l3.go	warp account	1
+fleet/link_driver.go	link state dropped on open	1
+fleet/link_driver.go	prepare desired state	1
+fleet/ports.go	audit	1
+fleet/ports.go	clear UDP source-filter state	1
+fleet/ports.go	get node for UDP port check	1
+fleet/ports.go	list inbounds for UDP port check	1
+fleet/ports.go	list nodes for UDP port check	1
+fleet/ports.go	make UDP port check tag	1
+fleet/ports.go	read UDP source-filter sender	1
+fleet/ports.go	read UDP source-filter state	1
+fleet/ports.go	read completed UDP port check	1
+fleet/ports.go	read live nodes for UDP port check	1
+fleet/ports.go	read previous UDP port checks	1
+fleet/ports.go	read recent UDP path losses	1
+fleet/ports.go	store UDP port checks	1
+fleet/ports.go	store UDP source-filter state	1
+fleet/ports.go	write UDP path loss event	1
+fleet/ports.go	write UDP port loss event	1
+fleet/ports_tcp.go	clear TCP port checks	1
+fleet/ports_tcp.go	list inbounds for TCP port check	1
+fleet/ports_tcp.go	list nodes for TCP port check	1
+fleet/ports_tcp.go	read live nodes for TCP port check	1
+fleet/ports_tcp.go	store TCP port checks	1
+fleet/relay.go	read relays of node	1
+fleet/relay.go	record relay results	1
+fleet/relay.go	relay: the server's spec does not build, the forward is left out	1
+fleet/relay_check.go	relay check: list nodes	1
+fleet/relay_check.go	relay check: the server's spec does not build	1
+fleet/relay_check.go	store relay check	1
+fleet/session_core.go	apply result	1
+fleet/session_core.go	clear warp attention	1
+fleet/session_core.go	hello	1
+fleet/session_core.go	hello names another node than the certificate	1
+fleet/session_core.go	ingest event	1
+fleet/session_core.go	ingest stats	1
+fleet/session_core.go	mark withheld inbounds	1
+fleet/session_core.go	node live projection exceeds the row size limit; retaining the previous row	1
+fleet/session_core.go	node reported a malformed certificate pin, ignored	1
+fleet/session_core.go	node_sent digest of the node is close to the 2 MB row limit of Cloudflare D1: fewer devices or inbounds on it	1
+fleet/session_core.go	record apply result	1
+fleet/session_core.go	record apply time	1
+fleet/session_core.go	record in-sync time	1
+fleet/session_core.go	record warp attention	1
+fleet/session_core.go	stats batch failed the sanity check, traffic dropped	1
+fleet/session_core.go	stats batch refused by the database twice, dropped	1
+fleet/session_core.go	stats for unknown credentials or foreign inbounds dropped	1
+fleet/session_core.go	store awg health	1
+fleet/session_core.go	store warp health	1
+fleet/statsguard.go	connection counters over the row limit, the rest dropped	1
+fleet/statsguard.go	node journal over the row limit, the rest dropped	1
+fleet/tls.go	certificate lookup failed	1
+fleet/tls.go	certificate recheck failed	1
+fleet/update.go	record last update	1
+globalping/service.go	globalping: audit	1
+globalping/service.go	globalping: disconnect	1
+globalping/service.go	globalping: read settings	2
+globalping/service.go	globalping: save settings	1
+globalping/service.go	globalping: the stored token cannot be opened; it is ignored	1
+globalping/source.go	globalping: probe list	1
+health/checker.go	health: list probe targets	1
+health/checker.go	health: read live nodes	1
+health/checker.go	health: store check round	1
+health/country.go	health: country alerts	3
+health/country.go	health: country check IPv6 facts	1
+health/country.go	health: country check IPv6 membership	1
+health/country.go	health: country check IPv6 rounds	1
+health/country.go	health: country check TSPU rounds	1
+health/country.go	health: country check hold	1
+health/country.go	health: country check interval stretched to stay within the hourly limit of the source	1
+health/country.go	health: country check last round	1
+health/country.go	health: country check rounds	1
+health/country.go	health: country check source failed	1
+health/country.go	health: country check targets	1
+health/country.go	health: external country check rounds	1
+health/country.go	health: reconcile country alerts	1
+health/country.go	health: store country check	1
+health/country_operators.go	health: country check operator rotation	1
+health/doctor.go	health: drop stale acceptances	1
+health/doctor.go	health: store doctor report	1
+health/doctor.go	health: store relay counters	1
+health/eval.go	health: edge evaluator requires a deadline	1
+health/eval.go	health: evaluate	6
+health/eval.go	health: evaluate UDP path losses	1
+health/eval.go	health: evaluate latest protocol probes	1
+health/eval.go	health: evaluate live	1
+health/eval.go	health: reconcile alerts	1
+health/health.go	<"health: " + what>	1
+health/health.go	audit	1
+health/hooks.go	health: alert counts	1
+health/hooks.go	health: blip record	1
+health/hooks.go	health: decode node summary	1
+health/hooks.go	health: encode node summary	1
+health/hooks.go	health: read node summary	1
+health/hooks.go	health: store node summary	1
+health/port_recheck.go	health: read UDP source-filter state after periodic check	1
+health/port_recheck.go	health: read UDP source-filter state before periodic check	1
+health/port_recheck.go	health: record UDP source-filter recheck attempt	1
+health/port_recheck.go	health: select periodic UDP port check	2
+health/probe.go	health: probe credential unreadable	1
+health/relay_hints.go	relay hints: country checks	1
+health/relay_hints.go	relay hints: tspu rows	1
+health/relay_round.go	health: diagnose relay	1
+health/relay_round.go	health: reserve relay diagnosis	1
+health/relay_round.go	health: store relay monitor	1
+health/retention.go	health: daily rollup	1
+health/retention.go	health: prune	1
+health/retention.go	health: prune TSPU checks	1
+health/retention.go	health: prune audit	1
+health/retention.go	health: prune block-list checks	1
+health/retention.go	health: prune connection counters	1
+health/retention.go	health: prune country checks	1
+health/retention.go	health: prune devices	1
+health/retention.go	health: prune events	1
+health/retention.go	health: prune external checks	1
+health/retention.go	health: prune host load	1
+health/retention.go	health: prune kl!ck reports	1
+health/retention.go	health: prune node journal	1
+health/retention.go	health: prune node traffic	1
+health/retention.go	health: prune traffic buckets	1
+health/targets.go	health: no probe credential	1
+httpserver/decoy.go	close decoy directory root	1
+httpserver/decoy.go	open decoy directory	1
+httpserver/instanceapi.go	audit write failed	1
+httpserver/instanceapi.go	load instance settings	1
+httpserver/instanceapi.go	load logo	1
+httpserver/instanceapi.go	update instance settings	1
+httpserver/server.go	<msg>	1
+httpserver/tlsconfig.go	reload tls certificate	1
+mcp/plan.go	mcp: find plan	1
+mcp/plan.go	mcp: finish apply	2
+mcp/plan.go	mcp: store plan	1
+provision/panel_key.go	audit panel SSH key creation	1
+provision/panel_key.go	load panel SSH key	1
+provision/server_access_password.go	read node server password for reveal	1
+provision/server_keys.go	check existing SSH access before attach	1
+provision/server_keys.go	clear panel SSH key access before removal	1
+provision/server_keys.go	read SSH access before adding a server key	1
+provision/server_keys.go	read SSH access before removing a server key	1
+provision/server_keys.go	read attached node SSH access	1
+provision/server_keys.go	read node SSH access for key list	1
+provision/server_keys.go	read node state before attaching SSH access	1
+provision/server_keys.go	read panel SSH fingerprint for key list	1
+provision/server_keys.go	record failed password proof before panel-key removal	1
+provision/server_keys.go	record password proof before panel-key removal	1
+provision/server_keys.go	save attached node SSH access	1
+provision/server_keys.go	save verified panel SSH key access	1
+provision/service.go	audit node provisioning	1
+provision/service.go	forget node server access	1
+provision/service.go	list node provisioning events	1
+provision/service.go	list node provisioning jobs	1
+provision/service.go	list node server access	1
+provision/service.go	load panel SSH key for install	1
+provision/service.go	load panel SSH key for retry	1
+provision/service.go	read node provisioning job	2
+provision/service.go	read node provisioning job before cancellation	1
+provision/service.go	read node provisioning job for events	1
+provision/service.go	read node server access	1
+provision/service.go	read node state before provisioning retry	1
+provision/service.go	read the owner's node install login	1
+provision/service.go	request node provisioning cancellation	1
+provision/service.go	retry node provisioning job	1
+provision/service.go	save node provisioning job	1
+provision/ui.go	render node provisioning page	1
+provision/worker.go	clear failed node provisioning job secret	1
+provision/worker.go	complete node provisioning job	1
+provision/worker.go	finish cancelled node provisioning job	1
+provision/worker.go	mark node provisioning failed	1
+provision/worker.go	node provisioning cancelled; remote state may be partial	1
+provision/worker.go	node provisioning failed	1
+provision/worker.go	record optional panel SSH key installation failure	1
+subs/common.go	read brand for subscription	1
+subs/common.go	render user page	1
+subs/common.go	user page preview	1
+subs/mihomo.go	mihomo profile: a rendered proxy was skipped	1
+subs/mihomo.go	mihomo profile: the dns section was left out	1
+subs/probe.go	store a kl!ck report	1
+subs/service.go	<"subscription settings: " + what>	1
+subs/service.go	audit	1
+subs/service.go	read brand	1
+subs/singbox.go	sing-box profile	1
+subs/singbox.go	sing-box profile: a rendered outbound was skipped	1
+subs/singbox.go	sing-box profile: the dns section was left out	1
+subs/subs.go	happ routing header skipped	1
+subs/subs.go	mihomo profile	1
+subs/subs.go	profile: no dns section	1
+subs/subs.go	subscription base URL is not a usable origin	1
+subs/subs.go	subscription miss limit unavailable	1
+subs/subs.go	user page is not available, serving the base64 list to browsers	1
+subs/subs.go	write subscription event	1
+subs/unlock.go	audit page unlock lockout	1
+subs/unlock.go	user page: too many password entries	1
+subs/xrayjson.go	xray json	1
+subs/xrayjson.go	xray json: a rendered outbound was skipped	1
+subs/xrayjson.go	xray json: the dns section was left out	1
+subsettings/subsettings.go	subscription settings unreadable, keeping the last good copy	1
+subsettings/subsettings.go	subscription settings: the Mihomo format rules were not added	1
+subsettings/subsettings.go	subscription settings: the device limit mode was not set	1
+subsettings/subsettings.go	subscription settings: the sing-box format rule was not added	1
+telegram/rpc.go	telegram: audit	1
+telegram/rpc.go	telegram: clear bot	1
+telegram/rpc.go	telegram: create link code	1
+telegram/rpc.go	telegram: read bot	1
+telegram/rpc.go	telegram: read link	1
+telegram/rpc.go	telegram: save bot	1
+telegram/rpc.go	telegram: status	1
+telegram/rpc.go	telegram: switch alerts	1
+telegram/rpc.go	telegram: unlink	1
+telegram/service.go	telegram: audit	1
+telegram/service.go	telegram: bind chat	1
+telegram/service.go	telegram: consume link code	1
+telegram/service.go	telegram: message dropped after retries	1
+telegram/service.go	telegram: message refused	1
+telegram/service.go	telegram: rate limited	1
+telegram/service.go	telegram: read bot	1
+telegram/service.go	telegram: read links	1
+telegram/service.go	telegram: release poll lease	1
+telegram/service.go	telegram: remember announced version	1
+telegram/service.go	telegram: save offset	1
+telegram/service.go	telegram: the bot token is refused	1
+telegram/service.go	telegram: the stored bot token cannot be opened	1
+update/bundle.go	update: bundle file unreadable	1
+update/bundle_auto.go	update: check active rollout before GitHub bundle sync	1
+update/bundle_auto.go	update: downloaded GitHub node bundle did not pass local verification	1
+update/bundle_auto.go	update: installed node bundle does not match the GitHub release manifest	1
+update/bundle_auto.go	update: sync signed node bundle from GitHub	1
+update/panel_update.go	check GitHub panel release	1
+update/panel_update.go	the panel update helper finished but the panel was not replaced	1
+update/rollout.go	<"update: " + what>	1
+update/rollout.go	update: create link download token	1
+update/rollout.go	update: decode recorded rollback answer	1
+update/rollout.go	update: decode recorded update answer	1
+update/rollout.go	update: finish rollout	1
+update/rollout.go	update: load live nodes	1
+update/rollout.go	update: load node	1
+update/rollout.go	update: load rollout	1
+update/rollout.go	update: load steps	1
+update/rollout.go	update: mark link update sent	1
+update/rollout.go	update: pause rollout	1
+update/rollout.go	update: record last update	1
+update/rollout.go	update: restart gate window	1
+update/rollout.go	update: restore step after failed manual rollback	1
+update/rollout.go	update: rollout paused	1
+update/rollout.go	update: run checks	1
+update/rollout.go	update: save step	1
+update/rollout.go	update: step event	1
+update/schedule.go	update: check active rollout before scheduled update	1
+update/schedule.go	update: list nodes for scheduled update	1
+update/schedule.go	update: load due node updates	1
+update/schedule.go	update: load node update schedules	1
+update/schedule.go	update: mark missed node update schedules	1
+update/schedule.go	update: remove obsolete node update schedule	1
+update/schedule.go	update: start scheduled node update	1
+update/update.go	update: audit	1
+update/update.go	update: prune rollouts	1
+warp/service.go	<"warp: " + what>	1
+warp/service.go	warp: audit	1
+warp/service.go	warp: cloudflare call failed	1
+warp/service.go	warp: delete device at cloudflare failed	1
+warp/service.go	warp: open secrets (wrong master key?); deleting the local account only	1
+warp/service.go	warp: read params	1
+warp/service.go	warp: record attention	1
+warp/views.go	warp: open secrets (wrong master key?)	1

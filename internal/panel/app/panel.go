@@ -148,6 +148,8 @@ type Config struct {
 	NodeBinaries nodeprovision.BinarySource
 	// OnAlertTransition, when set, sees every alert the health module opens or resolves, besides the Telegram announcement.
 	OnAlertTransition func(health.Transition)
+	// Ops is the VPS process's log ring and level (see OpsConfig); nil on the edge and in most tests.
+	Ops *OpsConfig
 }
 
 // Panel is the assembled panel: its public HTTP handler, VPS listener adapter and services.

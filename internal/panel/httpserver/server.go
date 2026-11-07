@@ -119,6 +119,10 @@ type Config struct {
 	// AdminAPIReady is called with the authenticated in-process API after all handlers have been registered. Internal
 	// services that act through the same API can bind here without depending on the HTTP listener.
 	AdminAPIReady func(api http.Handler)
+	// Metrics, if set, is asked first for <admin>/metrics on the admin surface only. It authenticates its own requests (a
+	// bearer secret of its own, never a session) and returns false, having written nothing, while the owner has the endpoint
+	// off: the request then gets what any unknown admin path gets. nil: no endpoint (the Cloudflare edition).
+	Metrics func(w http.ResponseWriter, r *http.Request) bool
 }
 
 // mcpWriteWindow is how long an MCP call may take to answer: longer than the listener's write timeout, because a plan that
@@ -575,7 +579,7 @@ func (s *Server) AdminListener() http.Handler {
 func (s *Server) newAdmin(base string) http.Handler {
 	api := http.StripPrefix("/api", s.auth.RequireSession(withVersion(s.api)))
 	spa := s.spa(base)
-	return s.securityHeaders(s.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return s.requestID(s.securityHeaders(s.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch p := r.URL.Path; {
 		case p == "/api/recover-login":
 			if !s.auth.RecoveryEnabled() {
@@ -588,6 +592,7 @@ func (s *Server) newAdmin(base string) http.Handler {
 		case p == "/mcp" && s.mcp != nil:
 			http.NewResponseController(w).SetWriteDeadline(time.Now().Add(mcpWriteWindow)) // the error: a writer without deadlines
 			s.mcp.ServeHTTP(w, r)
+		case p == "/metrics" && s.serveMetrics(w, r): // answered (token, or 401); false: off, fall through
 		case p == "/brand/logo.svg":
 			s.logo.ServeHTTP(w, r)
 		case p == "/recover" && !s.auth.RecoveryEnabled():
@@ -599,7 +604,7 @@ func (s *Server) newAdmin(base string) http.Handler {
 		default:
 			spa.ServeHTTP(w, r)
 		}
-	})))
+	}))))
 }
 
 // cloudflare is the one third-party origin the admin pages may use: while the captcha is on, and on the page where the

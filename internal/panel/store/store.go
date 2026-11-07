@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mistgate/mistgate/internal/reqid"
 )
 
 //go:embed migrations/*.sql
@@ -121,6 +123,7 @@ func (s *Store) Audit(ctx context.Context, now time.Time, e AuditEntry) error {
 	if e.Params == "" {
 		e.Params = "{}"
 	}
+	e.Params = withRequestID(e.Params, reqid.From(ctx))
 	if e.Source == "" {
 		e.Source, _ = ctx.Value(auditSourceKey{}).(string)
 	}

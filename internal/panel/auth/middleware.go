@@ -8,6 +8,7 @@ import (
 
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/reqid"
 )
 
 // publicProcedures are the only admin API paths reachable without a session. The list
@@ -121,6 +122,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 			writeJSONError(w, http.StatusForbidden, forbiddenBody)
 			return
 		}
+		reqid.MarkAuthed(r.Context())
 		ctx := context.WithValue(r.Context(), adminKey{}, admin)
 		ctx = context.WithValue(ctx, sessionKey{}, sess)
 		next.ServeHTTP(w, r.WithContext(ctx))

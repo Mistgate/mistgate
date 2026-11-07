@@ -232,6 +232,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 		path, handler := h()
 		cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
 	}
+	cfg.AdminHandlers = append(cfg.AdminHandlers, probeAdminHandlers(k.fl)...) // probes between nodes: the VPS only
 	// API tokens and the owner's approvals, then the MCP endpoint over the same admin API.
 	cfg.AdminHandlers = append(cfg.AdminHandlers, integrationHandlers(k.authSvc)...)
 	if path, handler := k.assistantHandler(); path != "" {
@@ -242,6 +243,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	cfg.MCP = mcpEndpoint(k.authSvc, k.st, k.log, k.tg.PlanWaiting, k.c.Clock)
 	// The admin's framed preview of the public user page (session and read role are checked by the server).
 	cfg.UserPagePreview = subs.PreviewHandler(k.acc, parts.cfg)
+	k.addOps(&cfg)
 	return cfg
 }
 

@@ -37,6 +37,8 @@ var transactionShape1 = map[string]string{
 	"port_check.go:PutTCPChecks":                     "Deletes a node's TCP check rows and inserts the new ones in one fixed batch.",
 	"udp_path_loss.go:PutPortChecksAndUDPPathLosses": "Saves per-port verdicts and changes their path-loss rows together in one fixed batch.",
 	"udp_path_loss.go:UpdateUDPPathLosses":           "Deletes cleared sender-to-target losses and upserts current path losses in one fixed batch.",
+	"path_probe.go:AddNodeTrace":                     "Inserts the trace and drops the pair's traces beyond the newest 20 in one fixed batch.",
+	"path_probe.go:AddNodeDNSRun":                    "Inserts the resolver run and drops the node's runs beyond the newest 24 in one fixed batch.",
 	"relay.go:RelaysApplied":                         "The reported forwards of one entry update their rows (switched-on relays of that node only) in one fixed batch.",
 	"relay_check.go:SetRelayCounters":                "Updates each enabled relay owned by the reporting entry in one fixed batch.",
 	"provision.go:FinishCancelledNodeProvisionJob":   "The cancellation event and guarded state transition run in one fixed batch.",

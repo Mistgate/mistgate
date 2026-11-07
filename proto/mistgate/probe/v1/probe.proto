@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package mistgate.probe.v1;
+
+// On-demand probes between fleet nodes, for the MCP tools path_probe, node_trace and node_dns_check and for an operator.
+//
+// A separate package on purpose: nothing here is served or compiled on the Cloudflare edition, where the admin Worker has a
+// size limit (scripts/check-edge-sizes.sh) and no caller for these. The panel VPS mounts the service (internal/panel/fleet
+// path_probe.go); the generated code is imported by files that are not built for js/wasm only. Every procedure is operator
+// and up (role helper), open to API tokens directly (internal/panel/auth policy.go, policy_tokens.go).
+//
+// Every target is a fleet node or one of its ports, named by node id: a caller can never name a host or a URL. The probes send
+// bounded test traffic and are rate limited (per caller, per node, one per node pair at a time). Responses carry node names,
+// counts and timings: never an address, a certificate pin or a router.
+service ProbeService {
+  // An on-demand probe from one fleet node to another: UDP (optionally an MTU sweep), TCP connect or TLS handshake with the
+  // target's pin, against the target's own ports. Kept 7 days.
+  rpc PathProbe(PathProbeRequest) returns (PathProbeResponse);
+  // A TCP SYN TTL walk from one fleet node to another: hops with their round trip, whether a router answered, and a diff
+  // against the previous trace of the pair (the last 20 are kept). No router address is returned.
+  rpc NodeTrace(NodeTraceRequest) returns (NodeTraceResponse);
+  // Lookup timing (p50, p95, failures) of the doctor's control domains from a node's resolver, with a trend over the last 24
+  // runs.
+  rpc NodeDnsCheck(NodeDnsCheckRequest) returns (NodeDnsCheckResponse);
+}
+
+message PathProbeRequest {
+  // The sender and the target: fleet node ids.
+  string from_node_id = 1;
+  string to_node_id = 2;
+  // "udp", "tcp" or "tls".
+  string kind = 3;
+  // The target's ports to probe; empty = the target's own server ports of that kind. Only ports the target serves are accepted.
+  repeated uint32 ports = 4;
+  // udp only: a non-empty list runs the MTU sweep with the don't-fragment flag over these payload sizes (at most 5 of 64 to 1472;
+  // 256, 576, 1200, 1350, 1452 are the usual set).
+  repeated uint32 sizes = 5;
+}
+
+// One port of a probe. udp: sent and got of its datagrams. tcp and tls: the verdict and the milliseconds to it.
+message PathProbePort {
+  uint32 port = 1;
+  uint32 sent = 2;
+  uint32 got = 3;
+  // "ok", "lossy" or "broken" (udp); "ours", "other", "refused" or "timeout" (tcp, tls); "failed" for a verdict the panel does not know.
+  string verdict = 4;
+  // 0 = not measured (an agent that predates the timing).
+  uint32 ms = 5;
+}
+
+message PathProbeSize {
+  uint32 size = 1;
+  uint32 sent = 2;
+  uint32 got = 3;
+}
+
+message PathProbeResponse {
+  string from_name = 1;
+  string to_name = 2;
+  string kind = 3;
+  int64 at_unix = 4 [jstype = JS_NUMBER];
+  // Empty when the probe ran. Otherwise a short code: node_offline, agent_too_old (the sender lacks "probe/1"), busy, no_route,
+  // no_ports (the target serves no port of that kind), bad_port (a requested port the target does not serve), failed.
+  string error = 5;
+  repeated PathProbePort ports = 6;
+  // The sweep, one row per size, in the order asked.
+  repeated PathProbeSize sizes = 7;
+  // The largest size of which at least half the datagrams arrived; 0 = none (or no sweep).
+  uint32 largest_size = 8;
+}
+
+message NodeTraceRequest {
+  string from_node_id = 1;
+  string to_node_id = 2;
+}
+
+message TraceHop {
+  uint32 ttl = 1;
+  // Milliseconds until a router (or the target) answered; 0 when nothing did.
+  uint32 rtt_ms = 2;
+  // A router answered this hop.
+  bool answered = 3;
+  // "hop N", or the node name for the hop where the target itself answered. Never an address.
+  string label = 4;
+}
+
+message NodeTraceResponse {
+  string from_name = 1;
+  string to_name = 2;
+  int64 at_unix = 3 [jstype = JS_NUMBER];
+  // Empty when the trace ran; otherwise node_offline, agent_too_old, busy, unsupported, no_route, failed.
+  string error = 4;
+  // The target (or a RST from its address) answered.
+  bool reached = 5;
+  repeated TraceHop hops = 6;
+  // The first hop whose answering state differs from the previous trace of the pair; 0 = no change or no previous trace.
+  uint32 changed_at_hop = 7;
+  // "route changed at hop N: ...", "same as before", "first trace of this pair" or a note on a hop that stopped answering.
+  string diff = 8;
+  int64 previous_unix = 9 [jstype = JS_NUMBER];
+  // How many traces of the pair are kept (at most 20).
+  uint32 kept = 10;
+}
+
+message NodeDnsCheckRequest {
+  string node_id = 1;
+  // Run the resolver check on the node now (false = read the stored runs only).
+  bool run = 2;
+}
+
+message DnsRun {
+  int64 at_unix = 1 [jstype = JS_NUMBER];
+  uint32 p50_ms = 2;
+  uint32 p95_ms = 3;
+  uint32 failed = 4;
+  uint32 domains = 5;
+}
+
+message NodeDnsCheckResponse {
+  string node_name = 1;
+  // Empty when a run was read; otherwise node_offline, agent_too_old, failed.
+  string error = 2;
+  // The newest run, from this call or the stored doctor result.
+  DnsRun latest = 3;
+  // Oldest first, at most 24.
+  repeated DnsRun history = 4;
+  // "steady", "slower", "faster" or "unknown", from the last runs against the earlier ones.
+  string trend = 5;
+}

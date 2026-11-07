@@ -16,6 +16,8 @@ var (
 	ErrBadParams       = errors.New("udpcheck: bad parameters")
 	ErrUnsupportedHost = errors.New("udpcheck: unsupported destination")
 	ErrNoRoute         = errors.New("udpcheck: no route")
+	// ErrNoDF: this host cannot set the don't-fragment flag on a UDP socket.
+	ErrNoDF = errors.New("udpcheck: don't-fragment is not supported on this host")
 )
 
 const (
@@ -24,7 +26,9 @@ const (
 	MaxPPS   = 50
 	MinSize  = 64
 	MaxSize  = 1200
-	maxRun   = 10 * time.Second
+	// MaxSizeDF is the payload cap with the don't-fragment flag: an Ethernet MTU of 1500 less the IPv4 and UDP headers.
+	MaxSizeDF = 1472
+	maxRun    = 10 * time.Second
 )
 
 // Resolve resolves a node address to one IP, preferring IPv4. Its behavior matches the health probe resolver.
@@ -46,6 +50,11 @@ func Resolve(ctx context.Context, host string) (netip.Addr, error) {
 
 // Validate checks the same hard limits Send enforces before opening sockets.
 func Validate(host string, ports []uint16, count, pps, size int) error {
+	return ValidateDF(host, ports, count, pps, size, false)
+}
+
+// ValidateDF is Validate with the larger payload cap of a don't-fragment send (MaxSizeDF).
+func ValidateDF(host string, ports []uint16, count, pps, size int, df bool) error {
 	if strings.TrimSpace(host) == "" {
 		return fmt.Errorf("%w: empty host", ErrBadParams)
 	}
@@ -68,8 +77,12 @@ func Validate(host string, ports []uint16, count, pps, size int) error {
 	if pps < 1 || pps > MaxPPS {
 		return fmt.Errorf("%w: rate must be 1-%d", ErrBadParams, MaxPPS)
 	}
-	if size < MinSize || size > MaxSize {
-		return fmt.Errorf("%w: payload size must be %d-%d", ErrBadParams, MinSize, MaxSize)
+	maxSize := MaxSize
+	if df {
+		maxSize = MaxSizeDF
+	}
+	if size < MinSize || size > maxSize {
+		return fmt.Errorf("%w: payload size must be %d-%d", ErrBadParams, MinSize, maxSize)
 	}
 	if count > int(maxRun/time.Second)*pps {
 		return fmt.Errorf("%w: send would exceed %s", ErrBadParams, maxRun)
@@ -80,7 +93,13 @@ func Validate(host string, ports []uint16, count, pps, size int) error {
 // Send emits count datagrams per port, one to every port per tick. sent is the number of complete ticks delivered to
 // every port. The payload is generated once and reused, with tag as its first eight bytes.
 func Send(ctx context.Context, host string, ports []uint16, tag [8]byte, count, pps, size int) (family string, sent int, err error) {
-	if err := Validate(host, ports, count, pps, size); err != nil {
+	return SendDF(ctx, host, ports, tag, count, pps, size, false)
+}
+
+// SendDF is Send with the don't-fragment flag on every datagram when df is set (Linux only: ErrNoDF elsewhere), and a payload
+// cap of MaxSizeDF. A datagram the local interface cannot carry whole fails the send (ErrNoRoute, EMSGSIZE).
+func SendDF(ctx context.Context, host string, ports []uint16, tag [8]byte, count, pps, size int, df bool) (family string, sent int, err error) {
+	if err := ValidateDF(host, ports, count, pps, size, df); err != nil {
 		return "", 0, err
 	}
 	runCtx, cancel := context.WithTimeout(ctx, maxRun)
@@ -124,6 +143,11 @@ func Send(ctx context.Context, host string, ports []uint16, tag [8]byte, count, 
 			return family, 0, noRoute(runCtx, ctx, fmt.Errorf("open source socket: %w", err))
 		}
 		sockets[i] = c
+		if df {
+			if err := setDontFragment(c, ip.Is6()); err != nil {
+				return family, 0, err
+			}
+		}
 		if err := c.SetWriteDeadline(deadline); err != nil {
 			return family, 0, noRoute(runCtx, ctx, fmt.Errorf("set send deadline: %w", err))
 		}
