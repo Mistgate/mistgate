@@ -73,4 +73,18 @@ const (
 	cpuFail           = 97.0
 	softirqWindow     = 10 * time.Minute
 	softirqMinSamples = 30
+
+	// cpu_steal: the mean share of CPU time the hypervisor gave to other guests over the same window as cpu_softirq. A few
+	// percent is normal on shared hosts; 10% is felt as slower handshakes and jitter, 25% means the host is oversold.
+	stealWarn = 10.0
+	stealFail = 25.0
+
+	// conntrack_fill: entries against nf_conntrack_max. At 100% the kernel drops new connections.
+	conntrackWarnPct = 80
+	conntrackFailPct = 95
+
+	// agent_fds: the agent's open descriptors (every socket is one) against its soft limit. At the limit accept() and
+	// new outbound connections fail with EMFILE.
+	fdsWarnPct = 80
+	fdsFailPct = 95
 )

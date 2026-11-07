@@ -71,6 +71,15 @@ const (
 	// cpu_softirq: softirq_pct, cpu_pct, samples, need
 	CodeCPULoad       = "cpu_softirq.load"
 	CodeCPUCollecting = "cpu_softirq.collecting"
+	// cpu_steal: steal_pct (mean), steal_max_pct, samples, need
+	CodeStealLoad       = "cpu_steal.load"
+	CodeStealCollecting = "cpu_steal.collecting"
+	// conntrack_fill: count, max, fill_pct
+	CodeConntrackFill      = "conntrack_fill.fill"
+	CodeConntrackNotLoaded = "conntrack_fill.not_loaded"
+	// agent_fds: fds, limit, used_pct
+	CodeFDsUsage   = "agent_fds.usage"
+	CodeFDsUnknown = "agent_fds.unknown"
 	// kernel_headers: kernel, missing, mode (auto | kernel | userspace), virt
 	CodeHeadersNoAwg     = "kernel_headers.no_awg"
 	CodeHeadersContainer = "kernel_headers.container"
@@ -138,5 +147,6 @@ var Codes = []string{
 	CodeUnitCurrent, CodeUnitOutdated, CodeUnitManual, CodeUnitOtherUnit, CodeUnitUnknown, CodeUnitRefreshFailed,
 	CodeSecurityUpdatesOn, CodeSecurityUpdatesNotInstalled, CodeSecurityUpdatesOff, CodeSecurityUpdatesNotAPT, CodeSecurityUpdatesNoSystemd,
 	CodeSecurityUpdatesEnabling, CodeSecurityUpdatesEnableFailed,
+	CodeStealLoad, CodeStealCollecting, CodeConntrackFill, CodeConntrackNotLoaded, CodeFDsUsage, CodeFDsUnknown,
 	CodeSkipUnsupported, CodeSkipTimeout, CodeSkipInternal, CodeSkipUnknown,
 }

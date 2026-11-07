@@ -195,6 +195,12 @@ package mistgate.agent.v1;
 //                       table_in_use | rule_pref_in_use | interface_in_use
 //     unit_generation   the generation of the hardened systemd unit running this agent; manual runs SKIP. Params: unit_gen, current
 //     security_updates   unattended-upgrades, effective APT::Periodic settings and apt-daily timers on Debian/Ubuntu (WARN only; never FAIL)
+//     cpu_steal         the mean CPU steal over the last 10 min (WARN 10%, FAIL 25%); SKIP while collecting. Params: steal_pct,
+//                       steal_max_pct, samples
+//     conntrack_fill    connection-tracking entries against nf_conntrack_max (WARN 80%, FAIL 95%); SKIP where conntrack is not
+//                       loaded. Params: count, max, fill_pct
+//     agent_fds         the agent's open file descriptors against its soft limit (WARN 80%, FAIL 95%); SKIP when they cannot be
+//                       read. Params: fds, limit, used_pct
 //   FIX IDS (stable; all avoid data loss; only enable_security_updates installs a package, unattended-upgrades, after
 //   owner confirmation). allow_forwarding is the only fix that edits
 //   a host-owned FORWARD chain: after owner confirmation, it inserts tagged ACCEPT rules only for new traffic from

@@ -90,7 +90,7 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 	a.addLinkCounters(b, links, start, end)
 	a.l3Health(ctx, b, off)
 	m := a.host.Metrics()
-	a.hostRing.Add(doctor.Sample{At: a.now(), CPU: m.CPUPct, Softirq: m.SoftirqPct, Load1: m.Load1})
+	a.hostRing.Add(doctor.Sample{At: a.now(), CPU: m.CPUPct, Softirq: m.SoftirqPct, Load1: m.Load1, Steal: m.StealPct})
 	b.Host = &pb.HostMetrics{
 		CpuPct: float32(m.CPUPct), SoftirqPct: float32(m.SoftirqPct), Load1: float32(m.Load1),
 		RamUsedBytes: m.RAMUsed, RamTotalBytes: m.RAMTotal, DiskUsedBytes: m.DiskUsed, DiskTotalBytes: m.DiskTotal,

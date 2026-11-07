@@ -167,7 +167,7 @@ type Agent struct {
 
 	doc       *doctor.Doctor
 	doctorRun func(context.Context, string, ...string) ([]byte, error)
-	hostRing  doctor.Ring                          // host samples for the doctor's cpu_softirq and idle-load rules
+	hostRing  doctor.Ring                          // host samples for the doctor's cpu_softirq, cpu_steal and idle-load rules
 	self      sysstat.ProcSampler                  // the agent process's own CPU and memory, for HostMetrics.agent
 	certNA    atomic.Pointer[map[string]time.Time] // certificate expiry per inbound at the last apply
 
