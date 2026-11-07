@@ -10,6 +10,7 @@ import { accessQuery, providerName } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { readPref, writePref } from "@/lib/storage";
+import { AUTO_OPEN_KEY } from "@/lib/ui-actions";
 
 // The chat's agent picker: which connected provider answers this turn and how hard it thinks. The choice is the browser's
 // (localStorage) and goes with every turn (ChatRequest.provider / .effort); empty means the panel's own setting. The list of
@@ -87,6 +88,8 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen }: { pick: Pi
   const t = useT();
   const fmt = useFmt();
   const money = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 2 });
+  // this browser's "open pages without asking": a page the assistant opens in a turn is opened at once
+  const [auto, setAuto] = useState(() => readPref(AUTO_OPEN_KEY) === "1");
   return (
     <Menu.Root defaultOpen={defaultOpen}>
       <Menu.Trigger aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} className="flex min-w-0 items-center gap-1.5 rounded-full px-2 py-1.5 text-xs text-muted transition-colors outline-none hover:bg-surface-2 hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-surface-2 data-popup-open:text-fg">
@@ -138,6 +141,21 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen }: { pick: Pi
                 </Menu.RadioItem>
               ))}
             </Menu.RadioGroup>
+            <div role="separator" className="mx-1 my-1.5 h-px bg-line" />
+            <Menu.CheckboxItem
+              checked={auto}
+              closeOnClick={false}
+              onCheckedChange={(v) => {
+                setAuto(v);
+                writePref(AUTO_OPEN_KEY, v ? "1" : null);
+              }}
+              className={cx(item, "items-center text-[13px]")}
+            >
+              <span className="min-w-0 flex-1">{t("ai.ui.auto")}</span>
+              <Menu.CheckboxItemIndicator className="flex-none text-accent-text">
+                <Icon name="check" size={14} />
+              </Menu.CheckboxItemIndicator>
+            </Menu.CheckboxItem>
             {owner && (
               <>
                 <div role="separator" className="mx-1 my-1.5 h-px bg-line" />

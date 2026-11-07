@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
 import { useIsOwner } from "@/lib/updates";
+import { readPref } from "@/lib/storage";
+import { actionOf, AUTO_OPEN_KEY, markAction } from "@/lib/ui-actions";
 import { usePick } from "./agent-picker";
 import { Composer } from "./composer";
 import { Thread } from "./thread";
@@ -41,6 +43,7 @@ export function useChat() {
   const t = useT();
   const qc = useQueryClient();
   const guard = useStepUp();
+  const navigate = useNavigate();
   const [s, setS] = useState<ChatState>(empty);
   const abort = useRef<AbortController | null>(null);
   const convRef = useRef("");
@@ -85,6 +88,12 @@ export function useChat() {
           case "toolFinished": {
             const fin = plain(ev.value) as Tool;
             const at = Date.now();
+            // "open without asking": a page the assistant opens in this turn is opened at once (a form to fill never is)
+            const act = actionOf({ tool: fin.tool, argsJson: fin.argsJson, done: true, ok: fin.ok });
+            if (act?.kind === "open" && readPref(AUTO_OPEN_KEY) === "1") {
+              markAction(fin.id, "used");
+              void navigate(act.target as never);
+            }
             const done = (old?: LiveTool) => ({ ...fin, startedAt: old?.startedAt, ms: old?.startedAt ? at - old.startedAt : undefined }) as LiveTool;
             patchLast((m) => ({ ...m, tools: m.tools.some((x) => x.id === fin.id) ? m.tools.map((x) => (x.id === fin.id ? done(x as LiveTool) : x)) : [...m.tools, done()] }));
             break;
@@ -142,6 +151,11 @@ export function useChat() {
     [t],
   );
 
+  /** Reloads the open conversation (a plan decided elsewhere, in this chat's own approval form, shows its new state). */
+  function refresh() {
+    if (convRef.current && !abort.current) void open(convRef.current);
+  }
+
   function reset() {
     abort.current?.abort();
     convRef.current = "";
@@ -175,7 +189,7 @@ export function useChat() {
     void qc.invalidateQueries({ queryKey: ["assistant", "memory"] });
   }
 
-  return { ...s, send, stop, open, reset, apply, dismiss, forget };
+  return { ...s, send, stop, open, refresh, reset, apply, dismiss, forget };
 }
 
 export type ChatApi = ReturnType<typeof useChat>;
