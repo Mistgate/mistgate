@@ -248,7 +248,7 @@ const alignCls = { left: "text-start", right: "text-end", center: "text-center" 
 export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onNavigate?: () => void; entities?: readonly ChatEntity[] }) {
   const pattern = useMemo(() => entityPattern(entities ?? []), [entities]);
   const ctx: Ctx = { onNavigate, entities, pattern };
-  const inline_ = (c: Inline[]) => inline(c, ctx);
+  const inlineCtx = (c: Inline[]) => inline(c, ctx);
   return (
     <div className="flex flex-col gap-3 text-[15px] leading-[1.65] font-normal text-pretty break-words">
       {parseChatMarkdown(text).map((b, i) => {
@@ -262,23 +262,23 @@ export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onN
           case "heading":
             return b.level === 1 ? (
               <h3 key={i} className="mt-1.5 text-[16.5px] leading-snug font-bold tracking-[-0.01em] first:mt-0">
-                {inline_(b.children)}
+                {inlineCtx(b.children)}
               </h3>
             ) : b.level === 2 ? (
               <h4 key={i} className="mt-1 text-[15.5px] leading-snug font-bold first:mt-0">
-                {inline_(b.children)}
+                {inlineCtx(b.children)}
               </h4>
             ) : (
               <h5 key={i} className="mt-0.5 text-[13px] leading-snug font-bold tracking-[0.02em] text-muted uppercase first:mt-0">
-                {inline_(b.children)}
+                {inlineCtx(b.children)}
               </h5>
             );
           case "paragraph":
-            return <p key={i}>{inline_(b.children)}</p>;
+            return <p key={i}>{inlineCtx(b.children)}</p>;
           case "quote":
             return (
               <blockquote key={i} className="border-s-2 border-line ps-3 text-muted">
-                {inline_(b.children)}
+                {inlineCtx(b.children)}
               </blockquote>
             );
           case "rule":
@@ -289,11 +289,11 @@ export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onN
               <Tag key={i} className={cx("flex flex-col gap-1.5 ps-5 marker:text-muted", b.ordered ? "list-decimal marker:tabular-nums" : "list-disc")}>
                 {b.items.map((it, j) => (
                   <li key={j} className="ps-0.5">
-                    {inline_(it.text)}
+                    {inlineCtx(it.text)}
                     {it.children.length > 0 && (
                       <ul className="mt-1 flex list-[circle] flex-col gap-1 ps-4 text-[14px] text-fg/85 marker:text-faint">
                         {it.children.map((c, k) => (
-                          <li key={k}>{inline_(c)}</li>
+                          <li key={k}>{inlineCtx(c)}</li>
                         ))}
                       </ul>
                     )}
@@ -310,7 +310,7 @@ export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onN
                     <tr className="border-b border-line">
                       {b.head.map((c, j) => (
                         <th key={j} scope="col" className={cx("px-3 py-2 text-[12px] font-semibold whitespace-nowrap text-muted", alignCls[b.align[j] ?? "left"])}>
-                          {inline_(c)}
+                          {inlineCtx(c)}
                         </th>
                       ))}
                     </tr>
@@ -320,7 +320,7 @@ export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onN
                       <tr key={j} className="border-b border-line/60 align-top last:border-0">
                         {r.map((c, k) => (
                           <td key={k} className={cx("px-3 py-2", k === 0 && "font-semibold whitespace-nowrap", alignCls[b.align[k] ?? "left"])}>
-                            {inline_(c)}
+                            {inlineCtx(c)}
                           </td>
                         ))}
                       </tr>
