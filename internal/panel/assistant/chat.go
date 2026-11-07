@@ -69,7 +69,20 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 	if err != nil {
 		return err
 	}
-	provider := settings.provider
+	// the person may pick, for this turn, another connected provider (its own model and budget) and the thinking depth
+	provider, effort := settings.provider, settings.effort
+	if p := req.Msg.Provider; p != adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED {
+		if !validProvider(p) {
+			return codeConnect("invalid_provider")
+		}
+		provider = p
+	}
+	if e := req.Msg.Effort; e != adminv1.AssistantEffort_ASSISTANT_EFFORT_UNSPECIFIED {
+		if !validEffort(e) {
+			return codeConnect("invalid_effort")
+		}
+		effort = e
+	}
 	state, err := s.readProviderRow(ctx, provider)
 	if err != nil {
 		return err
@@ -306,7 +319,7 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 			end = "limit"
 			break
 		}
-		response, callErr := callModel(settings.effort, true)
+		response, callErr := callModel(effort, true)
 		if callErr != nil {
 			if accessRevoked.Load() {
 				end, terminalError = "error", "not_allowed"

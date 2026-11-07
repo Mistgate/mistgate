@@ -2333,8 +2333,13 @@ type ChatRequest struct {
 	// Empty = a new conversation.
 	ConversationId string `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	// At most 8000 characters.
-	Text          string       `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	Context       *PageContext `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`
+	Text    string       `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Context *PageContext `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`
+	// The provider for this turn, one of the connected ones, with the model and the monthly budget set for it.
+	// UNSPECIFIED = the panel's chat provider. A provider without a key answers no_provider.
+	Provider AssistantProvider `protobuf:"varint,4,opt,name=provider,proto3,enum=mistgate.admin.v1.AssistantProvider" json:"provider,omitempty"`
+	// How deeply to think on this turn. UNSPECIFIED = the panel's setting.
+	Effort        AssistantEffort `protobuf:"varint,5,opt,name=effort,proto3,enum=mistgate.admin.v1.AssistantEffort" json:"effort,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2388,6 +2393,20 @@ func (x *ChatRequest) GetContext() *PageContext {
 		return x.Context
 	}
 	return nil
+}
+
+func (x *ChatRequest) GetProvider() AssistantProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED
+}
+
+func (x *ChatRequest) GetEffort() AssistantEffort {
+	if x != nil {
+		return x.Effort
+	}
+	return AssistantEffort_ASSISTANT_EFFORT_UNSPECIFIED
 }
 
 type ChatStarted struct {
@@ -3521,11 +3540,13 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\n" +
 	"all_admins\x18\x01 \x01(\bR\tallAdmins\":\n" +
 	"\x1eDeleteAllConversationsResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\rR\adeleted\"\x84\x01\n" +
+	"\adeleted\x18\x01 \x01(\rR\adeleted\"\x82\x02\n" +
 	"\vChatRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x128\n" +
-	"\acontext\x18\x03 \x01(\v2\x1e.mistgate.admin.v1.PageContextR\acontext\"\x90\x01\n" +
+	"\acontext\x18\x03 \x01(\v2\x1e.mistgate.admin.v1.PageContextR\acontext\x12@\n" +
+	"\bprovider\x18\x04 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12:\n" +
+	"\x06effort\x18\x05 \x01(\x0e2\".mistgate.admin.v1.AssistantEffortR\x06effort\"\x90\x01\n" +
 	"\vChatStarted\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12&\n" +
 	"\x0fuser_message_id\x18\x02 \x01(\tR\ruserMessageId\x120\n" +
@@ -3736,59 +3757,61 @@ var file_mistgate_admin_v1_assistant_proto_depIdxs = []int32{
 	24, // 29: mistgate.admin.v1.GetConversationResponse.conversation:type_name -> mistgate.admin.v1.ConversationSummary
 	28, // 30: mistgate.admin.v1.GetConversationResponse.messages:type_name -> mistgate.admin.v1.ChatMessage
 	23, // 31: mistgate.admin.v1.ChatRequest.context:type_name -> mistgate.admin.v1.PageContext
-	38, // 32: mistgate.admin.v1.ChatResponse.started:type_name -> mistgate.admin.v1.ChatStarted
-	25, // 33: mistgate.admin.v1.ChatResponse.tool_started:type_name -> mistgate.admin.v1.ToolCall
-	25, // 34: mistgate.admin.v1.ChatResponse.tool_finished:type_name -> mistgate.admin.v1.ToolCall
-	26, // 35: mistgate.admin.v1.ChatResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	27, // 36: mistgate.admin.v1.ChatResponse.remembered:type_name -> mistgate.admin.v1.MemoryNote
-	39, // 37: mistgate.admin.v1.ChatResponse.usage:type_name -> mistgate.admin.v1.TurnUsage
-	40, // 38: mistgate.admin.v1.ChatResponse.done:type_name -> mistgate.admin.v1.TurnDone
-	5,  // 39: mistgate.admin.v1.ChatResponse.error:type_name -> mistgate.admin.v1.AssistantError
-	26, // 40: mistgate.admin.v1.ApplyPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	26, // 41: mistgate.admin.v1.DismissPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	27, // 42: mistgate.admin.v1.ListMemoryResponse.notes:type_name -> mistgate.admin.v1.MemoryNote
-	27, // 43: mistgate.admin.v1.SaveMemoryResponse.note:type_name -> mistgate.admin.v1.MemoryNote
-	6,  // 44: mistgate.admin.v1.AssistantService.GetAssistantAccess:input_type -> mistgate.admin.v1.GetAssistantAccessRequest
-	13, // 45: mistgate.admin.v1.AssistantService.GetAssistantSettings:input_type -> mistgate.admin.v1.GetAssistantSettingsRequest
-	15, // 46: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:input_type -> mistgate.admin.v1.UpdateAssistantSettingsRequest
-	17, // 47: mistgate.admin.v1.AssistantService.SetProviderKey:input_type -> mistgate.admin.v1.SetProviderKeyRequest
-	19, // 48: mistgate.admin.v1.AssistantService.RemoveProviderKey:input_type -> mistgate.admin.v1.RemoveProviderKeyRequest
-	21, // 49: mistgate.admin.v1.AssistantService.ListProviderModels:input_type -> mistgate.admin.v1.ListProviderModelsRequest
-	29, // 50: mistgate.admin.v1.AssistantService.ListConversations:input_type -> mistgate.admin.v1.ListConversationsRequest
-	31, // 51: mistgate.admin.v1.AssistantService.GetConversation:input_type -> mistgate.admin.v1.GetConversationRequest
-	33, // 52: mistgate.admin.v1.AssistantService.DeleteConversation:input_type -> mistgate.admin.v1.DeleteConversationRequest
-	35, // 53: mistgate.admin.v1.AssistantService.DeleteAllConversations:input_type -> mistgate.admin.v1.DeleteAllConversationsRequest
-	37, // 54: mistgate.admin.v1.AssistantService.Chat:input_type -> mistgate.admin.v1.ChatRequest
-	42, // 55: mistgate.admin.v1.AssistantService.StopTurn:input_type -> mistgate.admin.v1.StopTurnRequest
-	44, // 56: mistgate.admin.v1.AssistantService.ApplyPlan:input_type -> mistgate.admin.v1.ApplyPlanRequest
-	46, // 57: mistgate.admin.v1.AssistantService.DismissPlan:input_type -> mistgate.admin.v1.DismissPlanRequest
-	48, // 58: mistgate.admin.v1.AssistantService.ListMemory:input_type -> mistgate.admin.v1.ListMemoryRequest
-	50, // 59: mistgate.admin.v1.AssistantService.SaveMemory:input_type -> mistgate.admin.v1.SaveMemoryRequest
-	52, // 60: mistgate.admin.v1.AssistantService.DeleteMemory:input_type -> mistgate.admin.v1.DeleteMemoryRequest
-	54, // 61: mistgate.admin.v1.AssistantService.ForgetAll:input_type -> mistgate.admin.v1.ForgetAllRequest
-	7,  // 62: mistgate.admin.v1.AssistantService.GetAssistantAccess:output_type -> mistgate.admin.v1.GetAssistantAccessResponse
-	14, // 63: mistgate.admin.v1.AssistantService.GetAssistantSettings:output_type -> mistgate.admin.v1.GetAssistantSettingsResponse
-	16, // 64: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:output_type -> mistgate.admin.v1.UpdateAssistantSettingsResponse
-	18, // 65: mistgate.admin.v1.AssistantService.SetProviderKey:output_type -> mistgate.admin.v1.SetProviderKeyResponse
-	20, // 66: mistgate.admin.v1.AssistantService.RemoveProviderKey:output_type -> mistgate.admin.v1.RemoveProviderKeyResponse
-	22, // 67: mistgate.admin.v1.AssistantService.ListProviderModels:output_type -> mistgate.admin.v1.ListProviderModelsResponse
-	30, // 68: mistgate.admin.v1.AssistantService.ListConversations:output_type -> mistgate.admin.v1.ListConversationsResponse
-	32, // 69: mistgate.admin.v1.AssistantService.GetConversation:output_type -> mistgate.admin.v1.GetConversationResponse
-	34, // 70: mistgate.admin.v1.AssistantService.DeleteConversation:output_type -> mistgate.admin.v1.DeleteConversationResponse
-	36, // 71: mistgate.admin.v1.AssistantService.DeleteAllConversations:output_type -> mistgate.admin.v1.DeleteAllConversationsResponse
-	41, // 72: mistgate.admin.v1.AssistantService.Chat:output_type -> mistgate.admin.v1.ChatResponse
-	43, // 73: mistgate.admin.v1.AssistantService.StopTurn:output_type -> mistgate.admin.v1.StopTurnResponse
-	45, // 74: mistgate.admin.v1.AssistantService.ApplyPlan:output_type -> mistgate.admin.v1.ApplyPlanResponse
-	47, // 75: mistgate.admin.v1.AssistantService.DismissPlan:output_type -> mistgate.admin.v1.DismissPlanResponse
-	49, // 76: mistgate.admin.v1.AssistantService.ListMemory:output_type -> mistgate.admin.v1.ListMemoryResponse
-	51, // 77: mistgate.admin.v1.AssistantService.SaveMemory:output_type -> mistgate.admin.v1.SaveMemoryResponse
-	53, // 78: mistgate.admin.v1.AssistantService.DeleteMemory:output_type -> mistgate.admin.v1.DeleteMemoryResponse
-	55, // 79: mistgate.admin.v1.AssistantService.ForgetAll:output_type -> mistgate.admin.v1.ForgetAllResponse
-	62, // [62:80] is the sub-list for method output_type
-	44, // [44:62] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	0,  // 32: mistgate.admin.v1.ChatRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	1,  // 33: mistgate.admin.v1.ChatRequest.effort:type_name -> mistgate.admin.v1.AssistantEffort
+	38, // 34: mistgate.admin.v1.ChatResponse.started:type_name -> mistgate.admin.v1.ChatStarted
+	25, // 35: mistgate.admin.v1.ChatResponse.tool_started:type_name -> mistgate.admin.v1.ToolCall
+	25, // 36: mistgate.admin.v1.ChatResponse.tool_finished:type_name -> mistgate.admin.v1.ToolCall
+	26, // 37: mistgate.admin.v1.ChatResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	27, // 38: mistgate.admin.v1.ChatResponse.remembered:type_name -> mistgate.admin.v1.MemoryNote
+	39, // 39: mistgate.admin.v1.ChatResponse.usage:type_name -> mistgate.admin.v1.TurnUsage
+	40, // 40: mistgate.admin.v1.ChatResponse.done:type_name -> mistgate.admin.v1.TurnDone
+	5,  // 41: mistgate.admin.v1.ChatResponse.error:type_name -> mistgate.admin.v1.AssistantError
+	26, // 42: mistgate.admin.v1.ApplyPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	26, // 43: mistgate.admin.v1.DismissPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	27, // 44: mistgate.admin.v1.ListMemoryResponse.notes:type_name -> mistgate.admin.v1.MemoryNote
+	27, // 45: mistgate.admin.v1.SaveMemoryResponse.note:type_name -> mistgate.admin.v1.MemoryNote
+	6,  // 46: mistgate.admin.v1.AssistantService.GetAssistantAccess:input_type -> mistgate.admin.v1.GetAssistantAccessRequest
+	13, // 47: mistgate.admin.v1.AssistantService.GetAssistantSettings:input_type -> mistgate.admin.v1.GetAssistantSettingsRequest
+	15, // 48: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:input_type -> mistgate.admin.v1.UpdateAssistantSettingsRequest
+	17, // 49: mistgate.admin.v1.AssistantService.SetProviderKey:input_type -> mistgate.admin.v1.SetProviderKeyRequest
+	19, // 50: mistgate.admin.v1.AssistantService.RemoveProviderKey:input_type -> mistgate.admin.v1.RemoveProviderKeyRequest
+	21, // 51: mistgate.admin.v1.AssistantService.ListProviderModels:input_type -> mistgate.admin.v1.ListProviderModelsRequest
+	29, // 52: mistgate.admin.v1.AssistantService.ListConversations:input_type -> mistgate.admin.v1.ListConversationsRequest
+	31, // 53: mistgate.admin.v1.AssistantService.GetConversation:input_type -> mistgate.admin.v1.GetConversationRequest
+	33, // 54: mistgate.admin.v1.AssistantService.DeleteConversation:input_type -> mistgate.admin.v1.DeleteConversationRequest
+	35, // 55: mistgate.admin.v1.AssistantService.DeleteAllConversations:input_type -> mistgate.admin.v1.DeleteAllConversationsRequest
+	37, // 56: mistgate.admin.v1.AssistantService.Chat:input_type -> mistgate.admin.v1.ChatRequest
+	42, // 57: mistgate.admin.v1.AssistantService.StopTurn:input_type -> mistgate.admin.v1.StopTurnRequest
+	44, // 58: mistgate.admin.v1.AssistantService.ApplyPlan:input_type -> mistgate.admin.v1.ApplyPlanRequest
+	46, // 59: mistgate.admin.v1.AssistantService.DismissPlan:input_type -> mistgate.admin.v1.DismissPlanRequest
+	48, // 60: mistgate.admin.v1.AssistantService.ListMemory:input_type -> mistgate.admin.v1.ListMemoryRequest
+	50, // 61: mistgate.admin.v1.AssistantService.SaveMemory:input_type -> mistgate.admin.v1.SaveMemoryRequest
+	52, // 62: mistgate.admin.v1.AssistantService.DeleteMemory:input_type -> mistgate.admin.v1.DeleteMemoryRequest
+	54, // 63: mistgate.admin.v1.AssistantService.ForgetAll:input_type -> mistgate.admin.v1.ForgetAllRequest
+	7,  // 64: mistgate.admin.v1.AssistantService.GetAssistantAccess:output_type -> mistgate.admin.v1.GetAssistantAccessResponse
+	14, // 65: mistgate.admin.v1.AssistantService.GetAssistantSettings:output_type -> mistgate.admin.v1.GetAssistantSettingsResponse
+	16, // 66: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:output_type -> mistgate.admin.v1.UpdateAssistantSettingsResponse
+	18, // 67: mistgate.admin.v1.AssistantService.SetProviderKey:output_type -> mistgate.admin.v1.SetProviderKeyResponse
+	20, // 68: mistgate.admin.v1.AssistantService.RemoveProviderKey:output_type -> mistgate.admin.v1.RemoveProviderKeyResponse
+	22, // 69: mistgate.admin.v1.AssistantService.ListProviderModels:output_type -> mistgate.admin.v1.ListProviderModelsResponse
+	30, // 70: mistgate.admin.v1.AssistantService.ListConversations:output_type -> mistgate.admin.v1.ListConversationsResponse
+	32, // 71: mistgate.admin.v1.AssistantService.GetConversation:output_type -> mistgate.admin.v1.GetConversationResponse
+	34, // 72: mistgate.admin.v1.AssistantService.DeleteConversation:output_type -> mistgate.admin.v1.DeleteConversationResponse
+	36, // 73: mistgate.admin.v1.AssistantService.DeleteAllConversations:output_type -> mistgate.admin.v1.DeleteAllConversationsResponse
+	41, // 74: mistgate.admin.v1.AssistantService.Chat:output_type -> mistgate.admin.v1.ChatResponse
+	43, // 75: mistgate.admin.v1.AssistantService.StopTurn:output_type -> mistgate.admin.v1.StopTurnResponse
+	45, // 76: mistgate.admin.v1.AssistantService.ApplyPlan:output_type -> mistgate.admin.v1.ApplyPlanResponse
+	47, // 77: mistgate.admin.v1.AssistantService.DismissPlan:output_type -> mistgate.admin.v1.DismissPlanResponse
+	49, // 78: mistgate.admin.v1.AssistantService.ListMemory:output_type -> mistgate.admin.v1.ListMemoryResponse
+	51, // 79: mistgate.admin.v1.AssistantService.SaveMemory:output_type -> mistgate.admin.v1.SaveMemoryResponse
+	53, // 80: mistgate.admin.v1.AssistantService.DeleteMemory:output_type -> mistgate.admin.v1.DeleteMemoryResponse
+	55, // 81: mistgate.admin.v1.AssistantService.ForgetAll:output_type -> mistgate.admin.v1.ForgetAllResponse
+	64, // [64:82] is the sub-list for method output_type
+	46, // [46:64] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_assistant_proto_init() }

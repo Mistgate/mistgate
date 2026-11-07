@@ -371,6 +371,11 @@ message ChatRequest {
   // At most 8000 characters.
   string text = 2;
   PageContext context = 3;
+  // The provider for this turn, one of the connected ones, with the model and the monthly budget set for it.
+  // UNSPECIFIED = the panel's chat provider. A provider without a key answers no_provider.
+  AssistantProvider provider = 4;
+  // How deeply to think on this turn. UNSPECIFIED = the panel's setting.
+  AssistantEffort effort = 5;
 }
 
 message ChatStarted {
