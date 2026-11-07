@@ -436,6 +436,24 @@ package mistgate.agent.v1;
 //   - ERRORS (CommandResult.error): busy (a mark already armed, 4 probes running, or a bandwidth test running),
 //     bad_params, unsupported_host, no_route (resolve failed), "failed: <short message>".
 
+// PATH PROBE (additive, protocol api_version stays 1)
+//   On-demand diagnostics between fleet nodes, asked for by an operator or an agent (the panel's path_probe, node_trace and
+//   node_dns_check). Targets are always fleet nodes, as the panel knows their addresses; the panel never sends an arbitrary host.
+//   - CAPABILITY GATE. An agent lists "probe/1" in Hello.capabilities when it can answer what this section adds: UdpSend.df,
+//     the per-port timing of TcpProbe ("m<port>") and the "connect" kind of TcpTarget, and PathTrace. The panel sends any of
+//     those ONLY to a stream that listed it, so an older agent is refused by the panel ("agent too old"), never sent a
+//     field it would ignore. PathTrace also needs a Linux host whose TCP socket accepts IP_TTL and IP_RECVERR.
+//   - UdpSend.df: the datagrams carry the don't-fragment flag (Linux IP_MTU_DISCOVER = DO) and the payload cap is 1472
+//     bytes instead of 1200, so the panel can sweep the path MTU. A datagram the local interface cannot carry fails the
+//     send with no_route.
+//   - TcpTarget kind "connect": a plain TCP connect, no payload. The verdict is ours (connected), refused or timeout.
+//     TcpProbe answers with "m<port>": the milliseconds until the verdict (connect, plus the handshake for "tls").
+//   - PathTrace. A TCP SYN walk to host:port with TTL 1..max_ttl, one SYN per hop in turn (the walk of "COUNTRY PROBE",
+//     without its DPI logic). Answer: CommandResult{ok, params{"family": "4", "reached": "1"|"0", "h<ttl>": "<kind>:<rtt_ms>"}}
+//     with kind icmp (a router answered), silent (nothing within the wait), open or refused (the destination answered).
+//     The agent returns no router address. Caps: 1-32 hops, 1.5 s per hop, one trace at a time ("busy"), 60 s in all.
+//     Errors as the other probes: bad_params, unsupported_host, unsupported, no_route, busy, "failed: <short message>".
+
 // COUNTRY PROBE (additive, protocol api_version stays 1)
 //   Does a TCP SYN to a fleet node survive the national DPI (the Russian TSPU)? Run on a node INSIDE that country, so the
 //   answer is for the network of that node's datacenter. The method needs no raw socket and no capability: a plain TCP
@@ -641,7 +659,7 @@ message Hello {
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS").
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -1092,6 +1110,8 @@ message ConnectResponse {
     SetDecoy set_decoy = 30;
     // Only sent to agents with "country-probe/1" in Hello.capabilities (see "COUNTRY PROBE").
     CountryProbe country_probe = 31;
+    // Only sent to agents with "probe/1" in Hello.capabilities (see "PATH PROBE").
+    PathTrace path_trace = 32;
   }
 }
 
@@ -1141,8 +1161,21 @@ message UdpSend {
   uint32 count = 5;
   // Per port, 1-50.
   uint32 pps = 6;
-  // UDP payload bytes, 64-1200.
+  // UDP payload bytes, 64-1200; 64-1472 with df.
   uint32 size = 7;
+  // Set the don't-fragment flag (see "PATH PROBE"). Only sent to agents with "probe/1" in Hello.capabilities.
+  bool df = 8;
+}
+
+// A TCP SYN walk toward another node of the fleet (see "PATH PROBE"). One CommandResult after the last hop.
+message PathTrace {
+  string request_id = 1;
+  // The target node's address (node.address): an IP, or a name this node resolves (IPv4 first).
+  string host = 2;
+  // The TCP port the SYNs go to.
+  uint32 port = 3;
+  // The highest TTL, 1-32; 0 = 30.
+  uint32 max_ttl = 4;
 }
 
 // Arm one one-shot answer to an HTTP-01 shaped request on this node's TCP 80 (see "TCP DELIVERY CHECK"). One
@@ -1170,7 +1203,8 @@ message TcpProbe {
 
 message TcpTarget {
   uint32 port = 1;
-  // "http_mark": GET the mark path (token and answer set). "tls": TLS handshake (sni set).
+  // "http_mark": GET the mark path (token and answer set). "tls": TLS handshake (sni set). "connect": a plain TCP connect
+  // ("probe/1", see "PATH PROBE").
   string kind = 2;
   // tls: the server name to send and to verify.
   string sni = 3;

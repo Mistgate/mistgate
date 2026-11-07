@@ -20,7 +20,7 @@ const (
 	CodeDstateCut       = "dstate_tasks.interrupted"
 	// time_sync: offset_s, ntp_synced (yes | no | unknown)
 	CodeTimeOffset = "time_sync.offset"
-	// resolver: domains, failed_count, failed, median_ms
+	// resolver: domains, failed_count, failed, median_ms, p50_ms, p95_ms (lookup timings of the control domains)
 	CodeResolverOK     = "resolver.ok"
 	CodeResolverFailed = "resolver.failed"
 	// ipv6: ipv6 (yes | no), connect (ok | failed), warp_inbounds, client_ipv6 (off), suggest (client_ipv6_off);

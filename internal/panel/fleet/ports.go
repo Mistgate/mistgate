@@ -22,6 +22,8 @@ import (
 
 const (
 	capUDPCheck = "udpcheck/1"
+	// capProbe: UdpSend.df, the "connect" kind and timings of TcpProbe, PathTrace (agent.proto "PATH PROBE").
+	capProbe = "probe/1"
 	// Six seconds at 25 packets per second keeps the sample duration while reducing eight-port UDP payload from
 	// 2.88 MB to 300 KiB. At 150 packets, the 4% relative-loss floor is six packets.
 	udpCheckSendCount = 150

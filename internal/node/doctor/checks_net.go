@@ -123,7 +123,8 @@ func checkResolver(ctx context.Context, e *Env) Result {
 		median = lat[len(lat)/2]
 	}
 	r := Result{Status: OK, Code: CodeResolverOK, Params: p("failed", csv(failed), "median_ms", strconv.Itoa(int(median.Milliseconds())), "resolver", recommended,
-		"domains", strconv.Itoa(len(domains)), "failed_count", strconv.Itoa(len(failed)))}
+		"domains", strconv.Itoa(len(domains)), "failed_count", strconv.Itoa(len(failed)),
+		"p50_ms", strconv.Itoa(int(median.Milliseconds())), "p95_ms", strconv.Itoa(int(percentile(lat, 95).Milliseconds())))}
 	switch {
 	case domesticFailed || len(failed) >= 2:
 		r.Status = Fail
@@ -140,6 +141,15 @@ func checkResolver(ctx context.Context, e *Env) Result {
 		r.FixID = FixSetResolver
 	}
 	return r
+}
+
+// percentile is the nearest-rank percentile of lat, which is sorted; 0 for no samples.
+func percentile(lat []time.Duration, pct int) time.Duration {
+	if len(lat) == 0 {
+		return 0
+	}
+	rank := (len(lat)*pct + 99) / 100
+	return lat[max(rank, 1)-1]
 }
 
 // timedLookup resolves one name through the host resolver: 3 s, one retry. The duration is that of the

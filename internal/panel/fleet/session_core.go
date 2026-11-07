@@ -360,6 +360,7 @@ func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
 		frame.GetHttpMark() != nil,
 		frame.GetTcpProbe() != nil,
 		frame.GetCountryProbe() != nil,
+		frame.GetPathTrace() != nil,
 		frame.GetSetDecoy() != nil:
 		return PendingCommand
 	case frame.GetRetire() != nil:

@@ -1,0 +1,11 @@
+//go:build js
+
+package health
+
+import (
+	"context"
+	"time"
+)
+
+// sweepProbes does nothing on the Cloudflare edition: it has no path probes (retention_probe.go).
+func (s *Service) sweepProbes(context.Context, time.Time) {}

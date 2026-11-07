@@ -232,6 +232,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 		path, handler := h()
 		cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
 	}
+	cfg.AdminHandlers = append(cfg.AdminHandlers, probeAdminHandlers(k.fl)...) // probes between nodes: the VPS only
 	// API tokens and the owner's approvals, then the MCP endpoint over the same admin API.
 	cfg.AdminHandlers = append(cfg.AdminHandlers, integrationHandlers(k.authSvc)...)
 	if path, handler := k.assistantHandler(); path != "" {

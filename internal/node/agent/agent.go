@@ -156,8 +156,10 @@ type Agent struct {
 	udpSends      int
 	udpAfterFunc  func(time.Duration, func()) udpCountTimer
 	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	sendUDPDF     func(context.Context, string, []uint16, [8]byte, int, int, int, bool) (string, int, error) // test seam of a don't-fragment send
 	tcp           tcpProbeState
 	country       countryProbeState
+	pathTrace     pathTraceState
 	linkCounterMu sync.Mutex
 	linkVolumes   map[linkCounterKey]linkCounterVolume
 	linkWindow    time.Duration // test seam; zero selects the production ten-minute window
@@ -1085,6 +1087,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.httpMark(s, m.HttpMark) })
 	case *pb.ConnectResponse_TcpProbe:
 		a.goBusy(func() { a.tcpProbe(s, m.TcpProbe) })
+	case *pb.ConnectResponse_PathTrace:
+		a.goBusy(func() { a.runPathTrace(s, m.PathTrace) })
 	case *pb.ConnectResponse_CountryProbe:
 		a.goBusy(func() { a.countryProbe(s, m.CountryProbe) })
 	case *pb.ConnectResponse_SetDecoy:

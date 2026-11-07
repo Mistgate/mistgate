@@ -26,6 +26,8 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
@@ -342,6 +344,10 @@ type world struct {
 	pathLossHours      []uint32
 	hostHours          []int
 	pathLossRows       []*adminv1.PathLossRow // when set, GetPathLoss answers with these
+	probeReqs          []*probev1.PathProbeRequest
+	traceReqs          []*probev1.NodeTraceRequest
+	dnsReqs            []*probev1.NodeDnsCheckRequest
+	probeRateLimited   bool // PathProbe answers resource exhausted
 	mu                 sync.Mutex
 	log                []callRec
 	fixReqs            []*adminv1.ApplyFixRequest
@@ -1678,6 +1684,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return adminv1connect.NewWarpServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewClientProbeServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewRelayServiceHandler(w) },
+		func() (string, http.Handler) { return probev1connect.NewProbeServiceHandler(w) },
 	} {
 		p, hh := h()
 		mux.Handle(p, hh)

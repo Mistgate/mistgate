@@ -59,7 +59,7 @@ func (t toolDef) description() string {
 // for operators): a server takes the highest entry its profile reaches.
 var registry = slices.Concat(
 	readTools(), ownerReadTools(), changeTools(), nodeProvisionTools(), subscriptionTools(),
-	groupTools(), dnsTools(), nodeSettingsTools(), profileTools(), relayTools(), ipv6Tools(), batchTools(), insightTools(), dataTools(),
+	groupTools(), dnsTools(), nodeSettingsTools(), profileTools(), relayTools(), ipv6Tools(), batchTools(), insightTools(), dataTools(), probeTools(),
 )
 
 // toolsFor lists the tools a profile sees, by name.

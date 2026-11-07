@@ -411,15 +411,19 @@ func insertAdmin(t *testing.T, st *store.Store, role string) store.Admin {
 // otherwise be owner-only by default, and a stale entry would hide that an RPC was removed.
 func TestEveryProcedureHasAPolicy(t *testing.T) {
 	registered := map[string]bool{}
-	protoregistry.GlobalFiles.RangeFilesByPackage("mistgate.admin.v1", func(fd protoreflect.FileDescriptor) bool {
-		for i := 0; i < fd.Services().Len(); i++ {
-			svc := fd.Services().Get(i)
-			for j := 0; j < svc.Methods().Len(); j++ {
-				registered["/"+string(svc.FullName())+"/"+string(svc.Methods().Get(j).Name())] = true
+	// mistgate.probe.v1 is the ProbeService, a package of its own so that its messages stay out of the Cloudflare Workers; its
+	// procedures sit in the same role policy (the test file policy_probe_test.go imports the generated package).
+	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1"} {
+		protoregistry.GlobalFiles.RangeFilesByPackage(pkg, func(fd protoreflect.FileDescriptor) bool {
+			for i := 0; i < fd.Services().Len(); i++ {
+				svc := fd.Services().Get(i)
+				for j := 0; j < svc.Methods().Len(); j++ {
+					registered["/"+string(svc.FullName())+"/"+string(svc.Methods().Get(j).Name())] = true
+				}
 			}
-		}
-		return true
-	})
+			return true
+		})
+	}
 	if len(registered) < 40 {
 		t.Fatalf("found only %d procedures: the walk is broken", len(registered))
 	}

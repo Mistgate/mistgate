@@ -27,6 +27,8 @@ import (
 const (
 	KindHTTPMark = "http_mark"
 	KindTLS      = "tls"
+	// KindConnect is a plain TCP connect with no payload (the agent's "probe/1"): ours = connected.
+	KindConnect = "connect"
 
 	VerdictOurs    = "ours"
 	VerdictOther   = "other"
@@ -93,6 +95,10 @@ func Validate(host string, targets []Target) error {
 			if len(target.Token) != MarkSize || len(target.Answer) != MarkSize || target.SNI != "" || target.PinSHA256 != "" {
 				return ErrBadParams
 			}
+		case KindConnect:
+			if len(target.Token) != 0 || len(target.Answer) != 0 || target.SNI != "" || target.PinSHA256 != "" {
+				return ErrBadParams
+			}
 		case KindTLS:
 			if strings.TrimSpace(target.SNI) == "" || len(target.Token) != 0 || len(target.Answer) != 0 {
 				return ErrBadParams
@@ -120,11 +126,22 @@ func Probe(ctx context.Context, host string, targets []Target) (family string, v
 }
 
 func probe(ctx context.Context, host string, targets []Target, options probeOptions) (string, map[uint16]string, error) {
+	family, verdicts, _, err := probeTimed(ctx, host, targets, options)
+	return family, verdicts, err
+}
+
+// ProbeTimed is Probe that also returns, per port, the milliseconds until the verdict (the connect, plus the handshake or the
+// request when the kind has one). A cancelled or refused-in-no-time port reads 0..1 ms; a timeout reads its timeout.
+func ProbeTimed(ctx context.Context, host string, targets []Target) (family string, verdicts map[uint16]string, ms map[uint16]int64, err error) {
+	return probeTimed(ctx, host, targets, probeOptions{connectTimeout: defaultConnectTimeout, requestTimeout: defaultRequestTimeout})
+}
+
+func probeTimed(ctx context.Context, host string, targets []Target, options probeOptions) (string, map[uint16]string, map[uint16]int64, error) {
 	if err := Validate(host, targets); err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	if err := ctx.Err(); err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	if options.connectTimeout <= 0 {
 		options.connectTimeout = defaultConnectTimeout
@@ -141,12 +158,12 @@ func probe(ctx context.Context, host string, targets []Target, options probeOpti
 	stopResolve()
 	if err != nil {
 		if ctx.Err() != nil {
-			return "", nil, ctx.Err()
+			return "", nil, nil, ctx.Err()
 		}
-		return "", nil, fmt.Errorf("%w: %v", ErrNoRoute, err)
+		return "", nil, nil, fmt.Errorf("%w: %v", ErrNoRoute, err)
 	}
 	if unsupportedDestination(ip) {
-		return "", nil, fmt.Errorf("%w: %s", ErrUnsupportedHost, ip)
+		return "", nil, nil, fmt.Errorf("%w: %s", ErrUnsupportedHost, ip)
 	}
 	family := "4"
 	if ip.Is6() {
@@ -154,6 +171,7 @@ func probe(ctx context.Context, host string, targets []Target, options probeOpti
 	}
 
 	verdicts := make(map[uint16]string, len(targets))
+	timings := make(map[uint16]int64, len(targets))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, target := range targets {
@@ -161,18 +179,31 @@ func probe(ctx context.Context, host string, targets []Target, options probeOpti
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			started := time.Now()
 			verdict := probeTarget(ctx, ip, host, target, options)
+			elapsed := time.Since(started).Milliseconds()
 			mu.Lock()
 			verdicts[target.Port] = verdict
+			timings[target.Port] = elapsed
 			mu.Unlock()
 		}()
 	}
 	wg.Wait()
 	// a cancelled run has only timeouts to show, and those are not verdicts about the port
 	if err := ctx.Err(); err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	return family, verdicts, nil
+	return family, verdicts, timings, nil
+}
+
+// probeConnect is the "connect" kind: a TCP connect and nothing else. Connected is ours; the rest reads like the other kinds.
+func probeConnect(ctx context.Context, dialer *net.Dialer, addr string) string {
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return verdictForError(err)
+	}
+	_ = conn.Close()
+	return VerdictOurs
 }
 
 func probeTarget(ctx context.Context, ip netip.Addr, host string, target Target, options probeOptions) string {
@@ -182,6 +213,9 @@ func probeTarget(ctx context.Context, ip netip.Addr, host string, target Target,
 	dialer := &net.Dialer{Timeout: options.connectTimeout}
 	if target.Kind == KindHTTPMark {
 		return probeHTTPMark(probeCtx, dialer, addr, host, target)
+	}
+	if target.Kind == KindConnect {
+		return probeConnect(probeCtx, dialer, addr)
 	}
 	return probeTLS(probeCtx, dialer, addr, target, options.rootCAs)
 }

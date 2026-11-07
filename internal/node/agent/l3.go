@@ -37,7 +37,9 @@ const (
 	capTorrentGuard = "torrentguard/1"
 	capUDPCheck     = "udpcheck/1"
 	capTCPCheck     = "tcpcheck/1"
-	capDecoy        = "decoy/1"
+	// capProbe: UdpSend.df, the "connect" kind and the timings of TcpProbe, PathTrace (agent.proto "PATH PROBE").
+	capProbe = "probe/1"
+	capDecoy = "decoy/1"
 	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
@@ -141,7 +143,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capJournal}
+	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capJournal, capProbe}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
 	}

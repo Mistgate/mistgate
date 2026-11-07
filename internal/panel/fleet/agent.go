@@ -830,6 +830,8 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 		return capUDPCheck, "agent too old"
 	case frame.GetHttpMark() != nil, frame.GetTcpProbe() != nil:
 		return capTCPCheck, "agent too old"
+	case frame.GetPathTrace() != nil:
+		return capProbe, "agent too old"
 	case frame.GetCountryProbe() != nil:
 		return capCountryProbe, "agent too old"
 	case frame.GetSetDecoy() != nil:

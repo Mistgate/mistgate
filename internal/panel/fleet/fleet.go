@@ -158,6 +158,7 @@ type Fleet struct {
 	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
 	probeTCP      func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
 	settleUDP     func(context.Context) error
+	probes        probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
 	panelIPv6     func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
 }
 
