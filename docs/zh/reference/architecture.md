@@ -95,7 +95,7 @@ Agent 通过面板的公共端口访问接入端点：使用私密名称进行 T
 - **SSH 安装**使用所有者输入的密码，以 root 身份或具有免密 sudo 权限的用户身份连接，并且只连接到所有者已确认的主机密钥。面板会在已启用的主机防火墙（UFW 或 firewalld）中开放 SSH、80/tcp、443/tcp 和 443/udp，上传可信发布包中的 Agent，通过标准输入使用新令牌注册 Agent，启动服务单元并等待节点连接。密码会使用主密钥加密封存在数据库中，作为节点已保存的凭据（可轮换密码，也可在再次验证身份后查看密码）；即使节点已退役，这些凭据仍会保留，直到所有者清除。参见[通过 SSH 安装节点](../getting-started/ssh-install.md)。
 - **备份**按计划（每 1 到 168 小时）或按需运行：面板会对数据库创建快照，将其与其他数据文件及主密钥打包，用 age 加密归档到所有者的公开接收方，然后上传到 Cloudflare R2。私钥不会到达面板；`mistgate backup restore` 会在离线状态下解密。参见[备份](../operations/backups.md)。
 
-**Cloudflare 版**将面板数据存储在 D1 中，并通过 `mistgate edge deploy` 安装（参见[安装 Cloudflare 版](../getting-started/install-edge.md)）。目前尚不支持隧道检测；计划将检测迁移到节点上（ADR 0004）。节点的 SSH 安装在第二个 Worker 脚本中运行，并由一个 Durable Object 持有套接字（ADR 0008）；对于 Worker 无法连接的服务器，仍需使用手动安装命令。Worker 中无法使用基于文件的面板备份和面板更新操作；该版本的异地备份需要 R2 绑定（第 2 阶段）。`mistgate edge deploy` 会设置 `SETUP_TOKEN_SHA256` 密钥（它选择的设置令牌的 SHA-256），因此 Worker 日志只记录该令牌的过期时间，不会记录设置链接；若手动部署时未设置该密钥，则会记录一次设置链接，参见 `edge/worker/README.md`。
+**Cloudflare 版**将面板数据存储在 D1 中，并通过 `mistgate edge deploy` 安装（参见[安装 Cloudflare 版](../getting-started/install-edge.md)）。目前尚不支持隧道检测；计划将检测迁移到节点上（ADR 0004）。节点的 SSH 安装在第二个 Worker 脚本中运行，并由一个 Durable Object 持有套接字（ADR 0008）；对于 Worker 无法连接的服务器，仍需使用手动安装命令。Worker 中无法使用基于文件的面板备份和面板更新操作；该版本的异地备份需要 R2 绑定（第 2 阶段）。`mistgate edge deploy` 会设置 `SETUP_TOKEN_SHA256` 密钥（它选择的设置令牌的 SHA-256），因此 Worker 日志只记录该令牌的过期时间，不会记录设置链接；手动部署时也必须设置它：未设置时 Worker 不会创建设置令牌，日志中只说明如何设置该密钥，因为日志中的链接会让任何能读取日志的人抢先创建所有者（参见 `edge/worker/README.md`）。
 
 ## 面板的 HTTP 接口
 
