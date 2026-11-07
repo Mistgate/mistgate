@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -1226,11 +1227,19 @@ func TestAssistantRefusalSchemaValidationAndToolCallLimit(t *testing.T) {
 		}
 	})
 
-	t.Run("24 calls end the turn", func(t *testing.T) {
-		responses := make([]modelResponse, maxTurnToolCalls)
-		for i := range responses {
-			responses[i] = modelResponse{Tools: []modelToolCall{scriptedTool("read_node", "call_"+string(rune('a'+i)), `{"node":"node-1"}`)}}
+	// a real panel's turn stopped at the limit with 24 doctor reports read and no answer: past the limit the model gets
+	// one more round without tools and answers from what it has
+	t.Run("24 calls, then an answer without tools", func(t *testing.T) {
+		responses := make([]modelResponse, 0, maxTurnToolCalls+1)
+		for i := 0; i < maxTurnToolCalls-1; i++ {
+			responses = append(responses, modelResponse{Tools: []modelToolCall{scriptedTool("read_node", fmt.Sprintf("call_%d", i), `{"node":"node-1"}`)}})
 		}
+		// the last round asks for three at once: one runs, two are refused
+		responses = append(responses,
+			modelResponse{Tools: []modelToolCall{scriptedTool("read_node", "call_x", `{"node":"node-1"}`), scriptedTool("read_node", "call_y", `{"node":"node-1"}`), scriptedTool("read_node", "call_z", `{"node":"node-1"}`)}},
+			modelResponse{Text: "Here is what I found; two nodes were not checked."},
+			modelResponse{Text: `{"title":"t","summary":"s"}`},
+		)
 		f := newAssistantFixture(t, responses...)
 		stream, err := f.client.Chat(context.Background(), connect.NewRequest(&adminv1.ChatRequest{Text: "inspect nodes"}))
 		if err != nil {
@@ -1238,11 +1247,27 @@ func TestAssistantRefusalSchemaValidationAndToolCallLimit(t *testing.T) {
 		}
 		events := drainChat(t, stream)
 		last := events[len(events)-1].GetDone()
+		var text strings.Builder
+		refused := 0
+		for _, e := range events {
+			text.WriteString(e.GetTextDelta())
+			if tf := e.GetToolFinished(); tf != nil && strings.Contains(tf.Error, "limit") {
+				refused++
+			}
+		}
 		f.runtime.mu.Lock()
 		calls := len(f.runtime.calls)
 		f.runtime.mu.Unlock()
-		if last == nil || last.End != "limit" || calls != maxTurnToolCalls || len(f.adapter.requests()) != maxTurnToolCalls {
-			t.Fatalf("tool limit not enforced: done=%+v runtime calls=%d model calls=%d", last, calls, len(f.adapter.requests()))
+		reqs := f.adapter.requests()
+		if last == nil || last.End != "end" || calls != maxTurnToolCalls || refused != 2 || !strings.Contains(text.String(), "Here is what I found") {
+			t.Fatalf("no answer after the limit: done=%+v runtime calls=%d refused=%d text=%q", last, calls, refused, text.String())
+		}
+		final := reqs[maxTurnToolCalls]
+		if len(final.Tools) != 0 || !strings.Contains(final.System, toolLimitNote) {
+			t.Fatalf("the round after the limit offered tools or did not say why: tools=%d system=%q", len(final.Tools), final.System)
+		}
+		if strings.Contains(reqs[0].System, toolLimitNote) {
+			t.Fatal("the limit note was there from the start")
 		}
 	})
 }

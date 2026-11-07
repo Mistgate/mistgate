@@ -18,6 +18,9 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
+// toolLimitNote is added to the system prompt of the round after the turn's last tool call.
+const toolLimitNote = "The tool calls of this turn are used up: no more tools now. Answer the person from what the tools already returned. Say in one short line what you could not check, and offer to go on in the next message."
+
 const (
 	maxTurnDuration  = 10 * time.Minute
 	maxTurnToolCalls = 24
@@ -32,6 +35,7 @@ Rules:
 - Never ask the person to send passwords, provider keys, private keys, SSH credentials, or other secrets. If a workflow needs a secret, direct them to the panel's secure approval flow.
 - Answer in the language the administrator writes in. Be clear and concise.
 - The chat is a narrow side panel (about 420 px). Format for it: a short lead sentence, then short sections under ## headings, bullet lists, bold only for the key names and numbers. Use a Markdown table only for two or three short columns; never a wide table.
+- Prefer one call that covers the fleet over one call per node: leave node empty where a tool reads every node (node_doctor, checks_results, node_journal, alerts_list). A turn has at most 24 tool calls.
 - Finish every turn with an answer. When you need more facts, call the tools now, in this turn; never end a turn by announcing what you will check next. If a tool fails, say what you could not see and answer with the rest.
 - Link panel pages as Markdown links using the admin routes. Never invent external links.
 - Read-only administrators only have read tools.`
@@ -267,7 +271,7 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 	var terminalError string
 	var title string
 
-	callModel := func(effort adminv1.AssistantEffort, useTools bool) (modelResponse, error) {
+	callModel := func(effort adminv1.AssistantEffort, useTools bool, note string) (modelResponse, error) {
 		if cancelledByStop(turnCtx, &manuallyStopped) {
 			return modelResponse{}, context.Canceled
 		}
@@ -277,7 +281,11 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 				modelTools = append(modelTools, tool.AssistantTool)
 			}
 		}
-		request := modelRequest{Model: model, System: system, Stable: assistantFixedPrompt, Effort: effort, MaxOutputTokens: defaultMaxOutputTokens, History: history, Tools: modelTools}
+		roundSystem := system
+		if note != "" {
+			roundSystem = strings.TrimSpace(system + "\n\n" + note)
+		}
+		request := modelRequest{Model: model, System: roundSystem, Stable: assistantFixedPrompt, Effort: effort, MaxOutputTokens: defaultMaxOutputTokens, History: history, Tools: modelTools}
 		reservation, reserveErr := s.reserveProviderCall(turnCtx, admin.ID, provider, model, state.budget, request)
 		if reserveErr != nil {
 			return modelResponse{}, reserveErr
@@ -324,11 +332,13 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 			end = "stopped"
 			break
 		}
-		if usedCalls >= maxTurnToolCalls {
-			end = "limit"
-			break
+		// the turn's tools are used up: one more round without them, so the person gets an answer from what was read
+		finalRound := usedCalls >= maxTurnToolCalls
+		note := ""
+		if finalRound {
+			note = toolLimitNote
 		}
-		response, callErr := callModel(effort, true)
+		response, callErr := callModel(effort, !finalRound, note)
 		if callErr != nil {
 			if accessRevoked.Load() {
 				end, terminalError = "error", "not_allowed"
@@ -373,7 +383,7 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 			end = "limit"
 			break
 		}
-		if len(response.Tools) == 0 {
+		if len(response.Tools) == 0 || finalRound {
 			break
 		}
 		spent, spendErr := s.providerSpend(ctx, provider, monthKey(s.now()))
@@ -404,7 +414,6 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 			tool, exists := byName[call.name]
 			execution := toolExecution{output: toolOutput{err: true, text: "unknown tool; this tool is not available to you"}}
 			if blockedByLimit {
-				end = "limit"
 				execution.output = toolOutput{err: true, text: "tool call limit reached; no tool was run"}
 			} else if exists {
 				if input, schemaErr := validateToolInput(tool.InputSchema, call.input); schemaErr != nil {
