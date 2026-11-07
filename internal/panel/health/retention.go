@@ -46,83 +46,52 @@ func (s *Service) Retention(ctx context.Context) { s.sweep(ctx) }
 // sweep runs every retention job once; a failure of one does not stop the others.
 func (s *Service) sweep(ctx context.Context) {
 	now := s.now()
-	pol := s.retentionPolicy(ctx)
 	if err := s.st.RollupDaily(ctx, now); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: daily rollup", "err", err)
+		s.log.Warn("health: daily rollup", "code", "daily_rollup_failed", "err", err)
 	}
-	if n, err := s.st.PruneHealth(ctx, now, pol.Duration("check_samples_hours"), pol.Duration("check_daily_days"), pol.Duration("alerts_days")); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned rows", "count", n)
-	}
-	if n, err := s.st.PruneEvents(ctx, now, pol.Duration("events_info_days"), pol.Duration("events_warn_days"), eventBatch); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune events", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned events", "count", n)
-	}
-	if n, err := s.st.PruneAudit(ctx, now.Add(-pol.Duration("audit_days")), eventBatch); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune audit", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned audit rows", "count", n)
+	if pol, err := s.retentionPolicy(ctx); err != nil {
+		if ctx.Err() == nil {
+			s.log.Warn("health: read retention settings", "code", "retention_settings_unreadable", "err", err)
+		}
+	} else {
+		s.sweepPolicyPrunes(ctx, now, pol)
 	}
 	if n, err := s.st.PruneCountryChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune country checks", "err", err)
+		s.log.Warn("health: prune country checks", "code", "prune_country_checks_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned country checks", "count", n)
 	}
 	if n, err := s.st.PruneBlocklistChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune block-list checks", "err", err)
+		s.log.Warn("health: prune block-list checks", "code", "prune_blocklist_checks_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned block-list checks", "count", n)
 	}
 	if n, err := s.st.PruneTSPUChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune TSPU checks", "err", err)
+		s.log.Warn("health: prune TSPU checks", "code", "prune_tspu_checks_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned TSPU checks", "count", n)
 	}
 	if n, err := s.st.PruneExtChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune external checks", "err", err)
+		s.log.Warn("health: prune external checks", "code", "prune_external_checks_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned external checks", "count", n)
 	}
 	if n, err := s.st.PruneClientProbeReports(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune kl!ck reports", "err", err)
+		s.log.Warn("health: prune kl!ck reports", "code", "prune_client_reports_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned kl!ck reports", "count", n)
 	}
 	// The connection counters (link_hour) are hour buckets; retain them for the maximum RPC window.
 	if n, err := s.st.PruneLinkHours(ctx, now.Add(-linkKeep)); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune connection counters", "err", err)
+		s.log.Warn("health: prune connection counters", "code", "prune_link_hours_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned connection counters", "count", n)
 	}
-	if n, err := s.st.PruneNodeJournal(ctx, now.Add(-pol.Duration("journal_days"))); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune node journal", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned node journal", "count", n)
-	}
-	// The hourly host load (node_host_hour) is kept 90 days by default.
-	if n, err := s.st.PruneNodeHostHours(ctx, now.Add(-pol.Duration("host_history_days"))); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune host load", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned host load hours", "count", n)
-	}
 	s.sweepProbes(ctx, now)        // path probes, 7 days; VPS only
 	s.sweepDebugCaptures(ctx, now) // debug captures of a node, 24 hours; VPS only
-	// The hourly traffic tables: 400 days by default.
-	if n, err := s.st.PruneTrafficBuckets(ctx, now.Add(-pol.Duration("traffic_bucket_days"))); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune traffic buckets", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned traffic buckets", "count", n)
-	}
-	if n, err := s.st.PruneNodeTrafficHours(ctx, now.Add(-pol.Duration("node_traffic_hour_days"))); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune node traffic", "err", err)
-	} else if n > 0 {
-		s.log.Info("health: pruned node traffic hours", "count", n)
-	}
 	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
 	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {
-		s.log.Warn("health: prune devices", "err", err)
+		s.log.Warn("health: prune devices", "code", "prune_devices_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned revoked devices", "count", n)
 	}
@@ -136,14 +105,49 @@ func (s *Service) sweep(ctx context.Context) {
 	s.fixMu.Unlock()
 }
 
-// retentionPolicy reads the owner's retention settings in one call. A failed read keeps the defaults: the sweep still runs.
-func (s *Service) retentionPolicy(ctx context.Context) retention.Policy {
+func (s *Service) sweepPolicyPrunes(ctx context.Context, now time.Time, pol retention.Policy) {
+	if n, err := s.st.PruneHealth(ctx, now, pol.Duration("check_samples_hours"), pol.Duration("check_daily_days"), pol.Duration("alerts_days")); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune", "code", "prune_health_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned rows", "count", n)
+	}
+	if n, err := s.st.PruneEvents(ctx, now, pol.Duration("events_info_days"), pol.Duration("events_warn_days"), eventBatch); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune events", "code", "prune_events_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned events", "count", n)
+	}
+	if n, err := s.st.PruneAudit(ctx, now.Add(-pol.Duration("audit_days")), eventBatch); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune audit", "code", "prune_audit_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned audit rows", "count", n)
+	}
+	if n, err := s.st.PruneNodeJournal(ctx, now.Add(-pol.Duration("journal_days"))); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune node journal", "code", "prune_node_journal_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned node journal", "count", n)
+	}
+	if n, err := s.st.PruneNodeHostHours(ctx, now.Add(-pol.Duration("host_history_days"))); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune host load", "code", "prune_host_hours_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned host load hours", "count", n)
+	}
+	if n, err := s.st.PruneTrafficBuckets(ctx, now.Add(-pol.Duration("traffic_bucket_days"))); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune traffic buckets", "code", "prune_traffic_buckets_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned traffic buckets", "count", n)
+	}
+	if n, err := s.st.PruneNodeTrafficHours(ctx, now.Add(-pol.Duration("node_traffic_hour_days"))); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune node traffic", "code", "prune_node_traffic_hours_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned node traffic hours", "count", n)
+	}
+}
+
+// retentionPolicy reads the owner's retention settings in one call. A read error means policy-driven prunes must wait.
+func (s *Service) retentionPolicy(ctx context.Context) (retention.Policy, error) {
 	stored, err := s.st.SettingValues(ctx, retention.Keys())
 	if err != nil {
-		if ctx.Err() == nil {
-			s.log.Warn("health: read retention settings", "code", "retention_settings_unreadable", "err", err)
-		}
-		return retention.Default()
+		return retention.Policy{}, err
 	}
-	return retention.Parse(stored)
+	return retention.Parse(stored), nil
 }

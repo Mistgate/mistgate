@@ -87,8 +87,10 @@ func (s nodeService) GetNodeRuntime(ctx context.Context, req *connect.Request[ad
 			LastApplyUnix: fleetUnix(meta.AppliedAt), LastApplyStatus: meta.Status, LastApplyMs: meta.DurationMS,
 		}
 		liveState := map[string]string{}
+		view := liveJSONView{}
 		if live.Connected {
-			for _, h := range decodeLiveView(live).Health {
+			view = decodeLiveView(live)
+			for _, h := range view.Health {
 				liveState[h.InboundID] = h.RunState
 			}
 		}
@@ -101,15 +103,24 @@ func (s nodeService) GetNodeRuntime(ctx context.Context, req *connect.Request[ad
 				CertNotAfterUnix: fleetUnix(in.CertNotAfter), LiveState: liveState[in.ID],
 			})
 		}
-		for id, st := range liveState {
-			if !known[id] && st != "" {
-				out.UnknownRunningInboundIds = append(out.UnknownRunningInboundIds, store.Clip(id, 64))
-			}
+		for _, id := range unknownRunningInboundIDs(view.RunningInboundIDs, known) {
+			out.UnknownRunningInboundIds = append(out.UnknownRunningInboundIds, id)
 		}
 		sort.Strings(out.UnknownRunningInboundIds)
 		resp.Nodes = append(resp.Nodes, out)
 	}
 	return connect.NewResponse(resp), nil
+}
+
+func unknownRunningInboundIDs(ids []string, known map[string]bool) []string {
+	var out []string
+	for _, id := range ids {
+		if !known[id] {
+			out = append(out, store.Clip(id, 64))
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // GetNodeHostHistory returns a node's hourly host load.

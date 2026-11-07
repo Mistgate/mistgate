@@ -478,3 +478,32 @@ func TestPruneAudit(t *testing.T) {
 		t.Fatalf("left: %+v", rows)
 	}
 }
+
+func TestPruneAuditCapsBatchesPerSweep(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	now := time.Now()
+	const batch = 2000
+	const rows = auditPruneMaxBatches*batch + 3
+	_, err := s.W.ExecContext(ctx, `WITH RECURSIVE seq(n) AS (
+		SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < ?
+	)
+	INSERT INTO audit (ts, actor, action, params, result, source)
+	SELECT ?, 'a', 'bulk', '{}', 'ok', 'panel' FROM seq`, rows, now.Add(-500*24*time.Hour).Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.PruneAudit(ctx, now.Add(-400*24*time.Hour), batch)
+	if err != nil || got != auditPruneMaxBatches*batch {
+		t.Fatalf("first sweep pruned %d: %v, want %d", got, err, auditPruneMaxBatches*batch)
+	}
+	var left int
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM audit WHERE action = 'bulk'`).Scan(&left); err != nil || left != 3 {
+		t.Fatalf("rows after first sweep = %d, %v, want 3", left, err)
+	}
+	got, err = s.PruneAudit(ctx, now.Add(-400*24*time.Hour), batch)
+	if err != nil || got != 3 {
+		t.Fatalf("next sweep pruned %d: %v, want the remaining 3", got, err)
+	}
+}

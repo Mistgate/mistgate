@@ -251,25 +251,6 @@ fleet/relay.go	relay: the server's spec does not build, the forward is left out	
 fleet/relay_check.go	relay check: list nodes	1
 fleet/relay_check.go	relay check: the server's spec does not build	1
 fleet/relay_check.go	store relay check	1
-fleet/session_core.go	apply result	1
-fleet/session_core.go	clear warp attention	1
-fleet/session_core.go	hello	1
-fleet/session_core.go	hello names another node than the certificate	1
-fleet/session_core.go	ingest event	1
-fleet/session_core.go	ingest stats	1
-fleet/session_core.go	mark withheld inbounds	1
-fleet/session_core.go	node live projection exceeds the row size limit; retaining the previous row	1
-fleet/session_core.go	node reported a malformed certificate pin, ignored	1
-fleet/session_core.go	node_sent digest of the node is close to the 2 MB row limit of Cloudflare D1: fewer devices or inbounds on it	1
-fleet/session_core.go	record apply result	1
-fleet/session_core.go	record apply time	1
-fleet/session_core.go	record in-sync time	1
-fleet/session_core.go	record warp attention	1
-fleet/session_core.go	stats batch failed the sanity check, traffic dropped	1
-fleet/session_core.go	stats batch refused by the database twice, dropped	1
-fleet/session_core.go	stats for unknown credentials or foreign inbounds dropped	1
-fleet/session_core.go	store awg health	1
-fleet/session_core.go	store warp health	1
 fleet/statsguard.go	connection counters over the row limit, the rest dropped	1
 fleet/statsguard.go	node journal over the row limit, the rest dropped	1
 fleet/tls.go	certificate lookup failed	1
@@ -326,21 +307,6 @@ health/relay_hints.go	relay hints: tspu rows	1
 health/relay_round.go	health: diagnose relay	1
 health/relay_round.go	health: reserve relay diagnosis	1
 health/relay_round.go	health: store relay monitor	1
-health/retention.go	health: daily rollup	1
-health/retention.go	health: prune	1
-health/retention.go	health: prune TSPU checks	1
-health/retention.go	health: prune audit	1
-health/retention.go	health: prune block-list checks	1
-health/retention.go	health: prune connection counters	1
-health/retention.go	health: prune country checks	1
-health/retention.go	health: prune devices	1
-health/retention.go	health: prune events	1
-health/retention.go	health: prune external checks	1
-health/retention.go	health: prune host load	1
-health/retention.go	health: prune kl!ck reports	1
-health/retention.go	health: prune node journal	1
-health/retention.go	health: prune node traffic	1
-health/retention.go	health: prune traffic buckets	1
 health/targets.go	health: no probe credential	1
 httpserver/decoy.go	close decoy directory root	1
 httpserver/decoy.go	open decoy directory	1

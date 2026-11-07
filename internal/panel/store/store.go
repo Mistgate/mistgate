@@ -231,11 +231,13 @@ func (s *Store) ListAuditQuery(ctx context.Context, q AuditQuery) ([]AuditRow, e
 	return out, rows.Err()
 }
 
-// PruneAudit deletes audit rows older than before, in batches so the single writer is never held for long (the audit_ts
-// index serves the scan). It returns the number of rows removed.
+const auditPruneMaxBatches = 5
+
+// PruneAudit deletes a bounded number of audit rows per sweep so a large backlog cannot use the whole D1 budget. The audit_ts
+// index serves each batch scan. Rows left after the last batch are removed on a later sweep.
 func (s *Store) PruneAudit(ctx context.Context, before time.Time, batch int) (int64, error) {
 	var total int64
-	for {
+	for batches := 0; batches < auditPruneMaxBatches; batches++ {
 		res, err := s.W.ExecContext(ctx, `DELETE FROM audit WHERE id IN (SELECT id FROM audit WHERE ts < ? LIMIT ?)`, unix(before), batch)
 		if err != nil {
 			return total, err
@@ -246,6 +248,7 @@ func (s *Store) PruneAudit(ctx context.Context, before time.Time, batch int) (in
 			return total, nil
 		}
 	}
+	return total, nil
 }
 
 // Setting returns a setting value, or ErrNotFound.

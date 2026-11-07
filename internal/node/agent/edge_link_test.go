@@ -1176,7 +1176,7 @@ func TestEdgeLinkFailedStepCountsEveryBatchOnce(t *testing.T) {
 		}
 	})
 	slow.Store(true)
-	r.em.failNext(r.nodeID, fleet.LinkFrame)
+	r.em.failNextFrame(r.nodeID, "stats")
 	eventually(t, func() bool { return slices.IndexFunc(r.em.steps(r.nodeID), func(s emuStep) bool { return s.Err }) >= 0 }, "the injected failure")
 	eventually(t, func() bool { return r.session() == 2 }, "the agent reconnects as generation 2")
 	eventually(t, func() bool { return countSteps(r.em.steps(r.nodeID), stepIs(2, fleet.LinkFrame, "stats")) >= 3 }, "stats of generation 2")

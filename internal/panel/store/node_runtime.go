@@ -182,9 +182,15 @@ func (s *Store) NodeHostHours(ctx context.Context, nodeID string, now time.Time,
 	return out, rows.Err()
 }
 
-// PruneNodeHostHours drops hour rows older than the cut (the hour bucket that touches the cut stays).
+const nodeHostHourPruneBatch = 1000
+
+// PruneNodeHostHours drops up to one batch of hour rows older than the cut (the hour bucket that touches the cut stays).
+// Rows left after this batch are removed on a later sweep.
 func (s *Store) PruneNodeHostHours(ctx context.Context, before time.Time) (int64, error) {
-	res, err := s.W.ExecContext(ctx, `DELETE FROM node_host_hour WHERE hour_start < ?`, hourBucket(before))
+	res, err := s.W.ExecContext(ctx, `DELETE FROM node_host_hour
+		WHERE (node_id, hour_start) IN (
+			SELECT node_id, hour_start FROM node_host_hour WHERE hour_start < ? LIMIT ?
+		)`, hourBucket(before), nodeHostHourPruneBatch)
 	if err != nil {
 		return 0, err
 	}

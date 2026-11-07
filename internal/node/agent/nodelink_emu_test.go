@@ -120,7 +120,7 @@ func (e *nodeLinkEmu) object(id string) *linkObject {
 	o := e.objs[id]
 	if o == nil {
 		o = &linkObject{e: e, id: id, wake: make(chan struct{}, 1), waiters: map[string]*emuWaiter{},
-			failNext: map[fleet.LinkKind]int{}, loseState: map[fleet.LinkKind]int{}}
+			failNext: map[fleet.LinkKind]int{}, failNextFrame: map[string]int{}, loseState: map[fleet.LinkKind]int{}}
 		e.objs[id] = o
 		if !e.closed {
 			e.wg.Add(1)
@@ -373,6 +373,11 @@ func (e *nodeLinkEmu) failNext(nodeID string, kind fleet.LinkKind) {
 	o.do(func() { o.failNext[kind]++ })
 }
 
+func (e *nodeLinkEmu) failNextFrame(nodeID, message string) {
+	o := e.object(nodeID)
+	o.do(func() { o.failNextFrame[message]++ })
+}
+
 // loseState makes the next step of this kind lose the state it returns: frames, replies and alarm are applied, the state
 // string is not written. This is the harsher case and cannot happen on workerd, where the output gate holds the frames
 // until the state write is durable (no state write, no frames); the real path to a stale state is failNext. It tests that
@@ -542,15 +547,16 @@ type linkObject struct {
 	wake  chan struct{}
 
 	// Storage (sync kv). Only the object's goroutine touches it; tests read through do().
-	gen, live uint64
-	state     string
-	alarmAt   int64
-	poke      bool
-	sockets   []*linkSocket
-	until     time.Time // the end of the current serial block's Go budget
-	forget    bool      // a step asked to forget the node: storage and alarm go after the block
-	failNext  map[fleet.LinkKind]int
-	loseState map[fleet.LinkKind]int
+	gen, live     uint64
+	state         string
+	alarmAt       int64
+	poke          bool
+	sockets       []*linkSocket
+	until         time.Time // the end of the current serial block's Go budget
+	forget        bool      // a step asked to forget the node: storage and alarm go after the block
+	failNext      map[fleet.LinkKind]int
+	failNextFrame map[string]int
+	loseState     map[fleet.LinkKind]int
 
 	// The platform alarm.
 	tmu         sync.Mutex
@@ -1133,6 +1139,14 @@ func takeFault(faults map[fleet.LinkKind]int, kind fleet.LinkKind) bool {
 	return true
 }
 
+func takeMessageFault(faults map[string]int, message string) bool {
+	if faults[message] == 0 {
+		return false
+	}
+	faults[message]--
+	return true
+}
+
 // run is one session step on the Go side, applied to the session's socket (nil once it is gone). The state is written
 // first, then the frames go out. An error or a spent budget closes 1011, rejects the waiters and writes nothing.
 func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) (fleet.LinkOut, error) {
@@ -1152,7 +1166,11 @@ func (o *linkObject) run(s *linkSocket, ev emuEvent, gen uint64) (fleet.LinkOut,
 			step.Result = frame.GetCommandResult()
 		}
 	}
-	fail, lose := takeFault(o.failNext, ev.kind), takeFault(o.loseState, ev.kind)
+	fail := takeFault(o.failNext, ev.kind)
+	if !fail {
+		fail = ev.kind == fleet.LinkFrame && takeMessageFault(o.failNextFrame, step.Msg)
+	}
+	lose := takeFault(o.loseState, ev.kind)
 	before := o.e.beforeHook()
 	out, err := emuCall(o, func(ctx context.Context) (fleet.LinkOut, error) {
 		if before != nil {
