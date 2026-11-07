@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
 import { cx } from "@/lib/cx";
 import { parseInline, safeHttpsUrl, type Inline } from "@/components/mini-markdown";
@@ -20,6 +20,24 @@ type Block =
   | { kind: "table"; head: Inline[][]; rows: Inline[][][]; align: ("left" | "right" | "center")[] }
   | { kind: "quote"; children: Inline[] }
   | { kind: "rule" };
+
+/**
+ * Something the panel knows by name, drawn as a chip that opens it when an answer names it: a node (its status as a dot).
+ * Matched on the exact name as a whole word, never inside code or a link. A name that is also a common English word ("be",
+ * "mass") is matched only where the answer set it in bold, as models do for names.
+ */
+export type ChatEntity = { name: string; id: string; dot: "ok" | "warn" | "bad" | "off" };
+
+const commonWords = new Set(["a", "an", "as", "at", "be", "by", "do", "go", "he", "if", "in", "is", "it", "me", "my", "no", "of", "on", "or", "so", "to", "up", "us", "we", "all", "and", "any", "are", "but", "can", "for", "has", "new", "not", "now", "one", "out", "the", "two", "was", "way", "edge", "home", "main", "mass", "test", "free", "fast", "next", "last"]);
+
+const dotCls = { ok: "bg-ok", warn: "bg-warn", bad: "bg-danger", off: "bg-faint" } as const;
+
+function entityPattern(list: readonly ChatEntity[]): RegExp | null {
+  const names = [...new Set(list.map((e) => e.name).filter((n) => n.trim().length > 0))].sort((a, b) => b.length - a.length);
+  if (names.length === 0) return null;
+  const alt = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return new RegExp(`(?<![\\p{L}\\p{N}_-])(${alt})(?![\\p{L}\\p{N}_-])`, "gu");
+}
 
 /** A path of the admin itself: "/" then letters, digits and the usual id characters, no "//", no scheme. */
 export const internalPath = (href: string) => /^\/(?!\/)[\w.~!$&'()*+,;=:@%/?#-]*$/.test(href) && !href.includes("//");
@@ -145,19 +163,55 @@ export function parseChatMarkdown(src: string): Block[] {
   return blocks;
 }
 
-function inline(nodes: Inline[], onNavigate?: () => void): ReactNode[] {
+type Ctx = { onNavigate?: () => void; entities?: readonly ChatEntity[]; pattern?: RegExp | null; bold?: boolean };
+
+function EntityChip({ e, label, onNavigate }: { e: ChatEntity; label: string; onNavigate?: () => void }) {
+  return (
+    <Link
+      to="/nodes/$id"
+      params={{ id: e.id }}
+      onClick={onNavigate}
+      data-entity="node"
+      className="mx-px inline-flex items-baseline gap-1 rounded-md bg-fg/[0.07] px-1.5 py-px align-baseline font-semibold text-fg no-underline transition-colors hover:bg-accent-soft hover:text-accent-text"
+    >
+      <span aria-hidden className={cx("size-1.5 shrink-0 -translate-y-px self-center rounded-full", dotCls[e.dot])} />
+      {label}
+    </Link>
+  );
+}
+
+/** Plain text with the names of known things drawn as chips. */
+function linkify(text: string, ctx: Ctx, keyBase: string): ReactNode[] {
+  const { pattern, entities } = ctx;
+  if (!pattern || !entities?.length) return [text];
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(pattern)) {
+    const name = m[1]!;
+    const e = entities.find((x) => x.name === name);
+    if (!e || (commonWords.has(name.toLowerCase()) && !ctx.bold)) continue;
+    if (m.index! > last) out.push(text.slice(last, m.index));
+    out.push(<EntityChip key={`${keyBase}-${m.index}`} e={e} label={name} onNavigate={ctx.onNavigate} />);
+    last = m.index! + name.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+function inline(nodes: Inline[], ctx: Ctx): ReactNode[] {
+  const onNavigate = ctx.onNavigate;
   return nodes.map((n, i) => {
     switch (n.kind) {
       case "text":
-        return n.text;
+        return <Fragment key={i}>{linkify(n.text, ctx, String(i))}</Fragment>;
       case "bold":
         return (
           <strong key={i} className="font-semibold text-fg">
-            {inline(n.children, onNavigate)}
+            {inline(n.children, { ...ctx, bold: true })}
           </strong>
         );
       case "em":
-        return <em key={i}>{inline(n.children, onNavigate)}</em>;
+        return <em key={i}>{inline(n.children, ctx)}</em>;
       case "code":
         return (
           <code key={i} className="rounded-md bg-fg/[0.07] px-1.5 py-0.5 font-mono text-[0.84em] font-normal whitespace-nowrap">
@@ -167,7 +221,7 @@ function inline(nodes: Inline[], onNavigate?: () => void): ReactNode[] {
       case "link": {
         if (internalPath(n.href)) {
           return (
-            <Link key={i} to={n.href} onClick={onNavigate} className="font-semibold text-accent-text underline decoration-accent-line underline-offset-2">
+            <Link key={i} to={n.href} onClick={onNavigate} data-internal="" className="font-semibold text-accent-text underline decoration-accent-line underline-offset-2">
               {n.text}
             </Link>
           );
@@ -187,8 +241,14 @@ function inline(nodes: Inline[], onNavigate?: () => void): ReactNode[] {
 
 const alignCls = { left: "text-start", right: "text-end", center: "text-center" } as const;
 
-/** An answer of the assistant. onNavigate: a page link was followed (the chat may close on a phone). */
-export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: () => void }) {
+/**
+ * An answer of the assistant. onNavigate: a page link was followed (the chat may close on a phone). entities: the things the
+ * panel knows by name (nodes), drawn as chips that open them.
+ */
+export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onNavigate?: () => void; entities?: readonly ChatEntity[] }) {
+  const pattern = useMemo(() => entityPattern(entities ?? []), [entities]);
+  const ctx: Ctx = { onNavigate, entities, pattern };
+  const inlineCtx = (c: Inline[]) => inline(c, ctx);
   return (
     <div className="flex flex-col gap-3 text-[15px] leading-[1.65] font-normal text-pretty break-words">
       {parseChatMarkdown(text).map((b, i) => {
@@ -202,23 +262,23 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
           case "heading":
             return b.level === 1 ? (
               <h3 key={i} className="mt-1.5 text-[16.5px] leading-snug font-bold tracking-[-0.01em] first:mt-0">
-                {inline(b.children, onNavigate)}
+                {inlineCtx(b.children)}
               </h3>
             ) : b.level === 2 ? (
               <h4 key={i} className="mt-1 text-[15.5px] leading-snug font-bold first:mt-0">
-                {inline(b.children, onNavigate)}
+                {inlineCtx(b.children)}
               </h4>
             ) : (
               <h5 key={i} className="mt-0.5 text-[13px] leading-snug font-bold tracking-[0.02em] text-muted uppercase first:mt-0">
-                {inline(b.children, onNavigate)}
+                {inlineCtx(b.children)}
               </h5>
             );
           case "paragraph":
-            return <p key={i}>{inline(b.children, onNavigate)}</p>;
+            return <p key={i}>{inlineCtx(b.children)}</p>;
           case "quote":
             return (
               <blockquote key={i} className="border-s-2 border-line ps-3 text-muted">
-                {inline(b.children, onNavigate)}
+                {inlineCtx(b.children)}
               </blockquote>
             );
           case "rule":
@@ -229,11 +289,11 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
               <Tag key={i} className={cx("flex flex-col gap-1.5 ps-5 marker:text-muted", b.ordered ? "list-decimal marker:tabular-nums" : "list-disc")}>
                 {b.items.map((it, j) => (
                   <li key={j} className="ps-0.5">
-                    {inline(it.text, onNavigate)}
+                    {inlineCtx(it.text)}
                     {it.children.length > 0 && (
                       <ul className="mt-1 flex list-[circle] flex-col gap-1 ps-4 text-[14px] text-fg/85 marker:text-faint">
                         {it.children.map((c, k) => (
-                          <li key={k}>{inline(c, onNavigate)}</li>
+                          <li key={k}>{inlineCtx(c)}</li>
                         ))}
                       </ul>
                     )}
@@ -250,7 +310,7 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
                     <tr className="border-b border-line">
                       {b.head.map((c, j) => (
                         <th key={j} scope="col" className={cx("px-3 py-2 text-[12px] font-semibold whitespace-nowrap text-muted", alignCls[b.align[j] ?? "left"])}>
-                          {inline(c, onNavigate)}
+                          {inlineCtx(c)}
                         </th>
                       ))}
                     </tr>
@@ -260,7 +320,7 @@ export function ChatMarkdown({ text, onNavigate }: { text: string; onNavigate?: 
                       <tr key={j} className="border-b border-line/60 align-top last:border-0">
                         {r.map((c, k) => (
                           <td key={k} className={cx("px-3 py-2", k === 0 && "font-semibold whitespace-nowrap", alignCls[b.align[k] ?? "left"])}>
-                            {inline(c, onNavigate)}
+                            {inlineCtx(c)}
                           </td>
                         ))}
                       </tr>

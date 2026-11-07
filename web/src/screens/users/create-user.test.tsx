@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { isFresh, resetFresh } from "@/components/fx/registry";
+import { setEffectsEnabled } from "@/lib/effects";
 import { ToastProvider } from "@/components/ui/toast";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
@@ -97,6 +98,7 @@ describe("the new user form", () => {
 
   it("marks the new person fresh, so their row sweeps in once when the list shows it", async () => {
     resetFresh();
+    setEffectsEnabled(true); // off by default while the reveal animation is in Beta
     createUser.mockResolvedValue({ user: { id: "usr_new", name: "Marina", usedBytes: 0n, quotaBytes: 0n, nextResetUnix: 0n, expiresUnix: 0n, lastSeenUnix: 0n, speedLimitBps: 0n, deviceSpeedLimitBps: 0n, createdUnix: 0n }, subscriptionUrl: "https://x/s", pagePassword: "" });
     await mount([group()]);
     await type(document.querySelector<HTMLInputElement>("input[placeholder='E.g. Marina']")!, "Marina");

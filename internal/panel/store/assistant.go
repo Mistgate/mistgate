@@ -179,14 +179,16 @@ func (s *Store) DeleteAssistantConversation(ctx context.Context, adminID, id str
 }
 
 func (s *Store) DeleteAssistantConversations(ctx context.Context, adminID string, all bool) (int64, error) {
-	where := "admin_id=?"
+	// planWhere names the conversation's column: the plan table has an admin_id too, and an unqualified one in the join was
+	// "ambiguous column name", so deleting one's own conversations failed while "all admins" (1=1) worked
+	where, planWhere := "admin_id=?", "c.admin_id=?"
 	args := []any{adminID}
 	if all {
-		where = "1=1"
+		where, planWhere = "1=1", "1=1"
 		args = nil
 	}
 	results, err := s.batch(ctx,
-		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation deleted in assistant' WHERE id IN (SELECT p.id FROM assistant_plan p JOIN assistant_conversation c ON c.id=p.conversation_id WHERE ` + where + `) AND status IN ('planned','awaiting','approved')`, Args: args},
+		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation deleted in assistant' WHERE id IN (SELECT p.id FROM assistant_plan p JOIN assistant_conversation c ON c.id=p.conversation_id WHERE ` + planWhere + `) AND status IN ('planned','awaiting','approved')`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE ` + where, Args: args},

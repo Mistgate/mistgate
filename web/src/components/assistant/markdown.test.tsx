@@ -4,8 +4,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ChatMarkdown, internalPath, parseChatMarkdown } from "./markdown";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, className }: { children?: ReactNode; to: string; className?: string }) => (
-    <a href={to} data-internal="1" className={className}>
+  Link: ({ children, to, params, className, ...rest }: { children?: ReactNode; to: string; params?: { id?: string }; className?: string; "data-entity"?: string }) => (
+    <a href={params?.id ? to.replace("$id", params.id) : to} data-internal="1" data-entity={rest["data-entity"]} className={className}>
       {children}
     </a>
   ),
@@ -23,11 +23,11 @@ afterEach(() => {
   root = host = null;
 });
 
-function render(text: string) {
+function render(text: string, entities?: Parameters<typeof ChatMarkdown>[0]["entities"]) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  act(() => root!.render(<ChatMarkdown text={text} />));
+  act(() => root!.render(<ChatMarkdown text={text} entities={entities} />));
   return host;
 }
 
@@ -100,6 +100,24 @@ describe("the assistant's Markdown", () => {
     expect([...outer.querySelectorAll("li > ul > li")].map((li) => li.textContent)).toEqual(["blocked", "0/150 to de"]);
     expect(el.querySelector("blockquote")?.textContent).toBe("a quote");
     expect(el.querySelector("hr")).not.toBeNull();
+  });
+
+  it("draws the nodes an answer names as chips that open them, never inside code or links, and a common word only in bold", () => {
+    const entities = [
+      { name: "de", id: "nod_de", dot: "ok" as const },
+      { name: "de2", id: "nod_de2", dot: "bad" as const },
+      { name: "be", id: "nod_be", dot: "warn" as const },
+    ];
+    render("WARP on de flapped, de2 is down. `de` in code, [de](/nodes/nod_de) as a link. It will be fine; **be** lost packets.", entities);
+    const chips = [...host!.querySelectorAll<HTMLAnchorElement>("a[data-entity='node']")];
+    expect(chips.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["de", "/nodes/nod_de"],
+      ["de2", "/nodes/nod_de2"],
+      ["be", "/nodes/nod_be"],
+    ]);
+    // the plain "be" of "will be fine" stays a word; the one in bold is the node
+    expect(host!.textContent).toContain("will be fine");
+    expect(host!.querySelector("code")?.textContent).toBe("de");
   });
 
   it("leaves a line with a pipe but no separator row as text", () => {

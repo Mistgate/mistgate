@@ -82,6 +82,13 @@ type StepRow struct {
 	PreFailed                   []string // inbound ids that were FAILED before the update
 	SentAt, AckedAt             time.Time
 	AnswerWait                  time.Duration // effective command wait captured when the step was sent
+	ProgressPhase               string
+	ProgressRank                int
+	ProgressDownloaded          uint64
+	ProgressTotal               uint64
+	ProgressSpeed               uint64
+	ProgressUpdatedUnix         int64
+	ProgressError               string
 	ReconnectedAt, FinishedAt   time.Time
 	ErrorKey                    string
 	Params                      map[string]string
@@ -117,12 +124,18 @@ func scanRollout(r rowScanner) (RolloutRow, error) {
 }
 
 func insertStepStmt(x StepRow) Stmt {
+	progressRank := x.ProgressRank
+	if x.ProgressPhase == "" {
+		progressRank = -1
+	}
 	return Stmt{Query: `
 		INSERT INTO update_step (rollout_id, node_id, node_name, stage, state, from_version, from_built, pre_failed_json,
-			sent_at, acked_at, answer_wait_seconds, reconnected_at, finished_at, error_key, params_json)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			sent_at, acked_at, answer_wait_seconds, progress_phase, progress_rank, progress_downloaded, progress_total,
+			progress_speed, progress_updated_unix, progress_error, reconnected_at, finished_at, error_key, params_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		Args: []any{x.RolloutID, x.NodeID, x.NodeName, int64(x.Stage), x.State, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed),
-			fleetUnix(x.SentAt), fleetUnix(x.AckedAt), durationSeconds(x.AnswerWait), fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params)}}
+			fleetUnix(x.SentAt), fleetUnix(x.AckedAt), durationSeconds(x.AnswerWait), x.ProgressPhase, int64(progressRank), int64(x.ProgressDownloaded), int64(x.ProgressTotal),
+			int64(x.ProgressSpeed), x.ProgressUpdatedUnix, x.ProgressError, fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params)}}
 }
 
 func durationSeconds(d time.Duration) int64 {
@@ -225,7 +238,8 @@ func (s *Store) Rollout(ctx context.Context, id string) (RolloutRow, error) {
 func (s *Store) RolloutSteps(ctx context.Context, rolloutID string) ([]StepRow, error) {
 	rows, err := s.R.QueryContext(ctx, `
 		SELECT rollout_id, node_id, node_name, stage, state, from_version, from_built, pre_failed_json, sent_at, acked_at,
-		       answer_wait_seconds, reconnected_at, finished_at, error_key, params_json, request_id, request_at, answer_json, download_sha
+		       answer_wait_seconds, progress_phase, progress_rank, progress_downloaded, progress_total, progress_speed, progress_updated_unix,
+		       progress_error, reconnected_at, finished_at, error_key, params_json, request_id, request_at, answer_json, download_sha
 		FROM update_step WHERE rollout_id = ? ORDER BY stage, node_name COLLATE NOCASE, node_id`, rolloutID)
 	if err != nil {
 		return nil, err
@@ -235,14 +249,16 @@ func (s *Store) RolloutSteps(ctx context.Context, rolloutID string) ([]StepRow, 
 	for rows.Next() {
 		var x StepRow
 		var pre, params string
-		var sent, acked, answerWait, recon, fin, requestAt int64
+		var sent, acked, answerWait, progressRank, progressDownloaded, progressTotal, progressSpeed, progressUpdated, recon, fin, requestAt int64
 		if err := rows.Scan(&x.RolloutID, &x.NodeID, &x.NodeName, &x.Stage, &x.State, &x.FromVersion, &x.FromBuilt, &pre,
-			&sent, &acked, &answerWait, &recon, &fin, &x.ErrorKey, &params, &x.RequestID, &requestAt, &x.Answer, &x.DownloadSHA); err != nil {
+			&sent, &acked, &answerWait, &x.ProgressPhase, &progressRank, &progressDownloaded, &progressTotal, &progressSpeed, &progressUpdated,
+			&x.ProgressError, &recon, &fin, &x.ErrorKey, &params, &x.RequestID, &requestAt, &x.Answer, &x.DownloadSHA); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(pre), &x.PreFailed)
 		_ = json.Unmarshal([]byte(params), &x.Params)
 		x.SentAt, x.AckedAt, x.AnswerWait, x.ReconnectedAt, x.FinishedAt, x.RequestAt = fleetTime(sent), fleetTime(acked), time.Duration(answerWait)*time.Second, fleetTime(recon), fleetTime(fin), fleetTime(requestAt)
+		x.ProgressRank, x.ProgressDownloaded, x.ProgressTotal, x.ProgressSpeed, x.ProgressUpdatedUnix = int(progressRank), uint64(progressDownloaded), uint64(progressTotal), uint64(progressSpeed), progressUpdated
 		x.loaded, x.loadedState, x.loadedRequestID, x.loadedAnswer = true, x.State, x.RequestID, x.Answer
 		out = append(out, x)
 	}
@@ -279,14 +295,24 @@ func (s *Store) SaveStep(ctx context.Context, x *StepRow) error {
 	if x == nil {
 		return ErrNotFound
 	}
-	query := `
-		UPDATE update_step SET state = ?, from_version = ?, from_built = ?, pre_failed_json = ?, sent_at = ?, acked_at = ?,
-			answer_wait_seconds = ?, reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?, request_id = ?, request_at = ?,
-			answer_json = ?, download_sha = ?
-		WHERE rollout_id = ? AND node_id = ?`
+	// Progress frames can arrive while a SENT row is being saved by the rollout worker. Preserve those fields for
+	// ordinary SENT updates, while a new send (loaded state was PENDING) and every non-SENT transition clear them.
+	persistProgress := x.State != StepSent || !x.loaded || x.loadedState != StepSent
+	query := `UPDATE update_step SET state = ?, from_version = ?, from_built = ?, pre_failed_json = ?, sent_at = ?, acked_at = ?, answer_wait_seconds = ?`
 	args := []any{x.State, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed), fleetUnix(x.SentAt), fleetUnix(x.AckedAt),
-		durationSeconds(x.AnswerWait), fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RequestID, fleetUnix(x.RequestAt),
-		x.Answer, x.DownloadSHA, x.RolloutID, x.NodeID}
+		durationSeconds(x.AnswerWait)}
+	if persistProgress {
+		progressRank := x.ProgressRank
+		if x.ProgressPhase == "" {
+			progressRank = -1
+		}
+		query += `, progress_phase = ?, progress_rank = ?, progress_downloaded = ?, progress_total = ?, progress_speed = ?, progress_updated_unix = ?, progress_error = ?`
+		args = append(args, x.ProgressPhase, int64(progressRank), int64(x.ProgressDownloaded), int64(x.ProgressTotal), int64(x.ProgressSpeed), x.ProgressUpdatedUnix, x.ProgressError)
+	}
+	query += `, reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?, request_id = ?, request_at = ?, answer_json = ?, download_sha = ?
+		WHERE rollout_id = ? AND node_id = ?`
+	args = append(args, fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RequestID, fleetUnix(x.RequestAt),
+		x.Answer, x.DownloadSHA, x.RolloutID, x.NodeID)
 	if x.loaded {
 		query += ` AND state = ? AND request_id = ? AND answer_json = ?`
 		args = append(args, x.loadedState, x.loadedRequestID, x.loadedAnswer)
@@ -310,12 +336,18 @@ func (s *Store) MarkStepSent(ctx context.Context, x *StepRow) (bool, error) {
 	if x == nil || !x.loaded || x.loadedState != StepPending {
 		return false, nil
 	}
+	progressRank := x.ProgressRank
+	if x.ProgressPhase == "" {
+		progressRank = -1
+	}
 	res, err := s.W.ExecContext(ctx, `UPDATE update_step SET state = ?, from_version = ?, from_built = ?, pre_failed_json = ?, sent_at = ?, acked_at = ?,
-		answer_wait_seconds = ?, reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?, request_id = ?, request_at = ?, answer_json = ?, download_sha = ?
+		answer_wait_seconds = ?, progress_phase = ?, progress_rank = ?, progress_downloaded = ?, progress_total = ?, progress_speed = ?, progress_updated_unix = ?, progress_error = ?,
+		reconnected_at = ?, finished_at = ?, error_key = ?, params_json = ?, request_id = ?, request_at = ?, answer_json = ?, download_sha = ?
 		WHERE rollout_id = ? AND node_id = ? AND state = ? AND request_id = ? AND answer_json = ?
 		AND EXISTS (SELECT 1 FROM update_rollout WHERE id = ? AND status = 'running')`,
 		StepSent, x.FromVersion, x.FromBuilt, jsonStrings(x.PreFailed), fleetUnix(x.SentAt), fleetUnix(x.AckedAt),
-		durationSeconds(x.AnswerWait), fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RequestID, fleetUnix(x.RequestAt), x.Answer, x.DownloadSHA,
+		durationSeconds(x.AnswerWait), x.ProgressPhase, int64(progressRank), int64(x.ProgressDownloaded), int64(x.ProgressTotal), int64(x.ProgressSpeed), x.ProgressUpdatedUnix, x.ProgressError,
+		fleetUnix(x.ReconnectedAt), fleetUnix(x.FinishedAt), x.ErrorKey, jsonMap(x.Params), x.RequestID, fleetUnix(x.RequestAt), x.Answer, x.DownloadSHA,
 		x.RolloutID, x.NodeID, x.loadedState, x.loadedRequestID, x.loadedAnswer, x.RolloutID)
 	if err != nil {
 		return false, err
@@ -338,6 +370,30 @@ func (s *Store) SetStepAnswer(ctx context.Context, nodeID, requestID, answer str
 		WHERE node_id = ? AND request_id = ? AND request_id != '' AND answer_json = '' AND state IN ('sent', 'gating')
 		AND EXISTS (SELECT 1 FROM update_rollout WHERE id = update_step.rollout_id AND status IN ('running', 'paused'))`,
 		answer, nodeID, requestID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// RecordStepProgress atomically advances the progress of a currently SENT update step. The rank and byte
+// conditions make delayed frames harmless even when they arrive through different edge isolates.
+func (s *Store) RecordStepProgress(ctx context.Context, nodeID, requestID, phase string, rank int, downloaded, total, speed uint64, updatedUnix int64, progressError string) (bool, error) {
+	if nodeID == "" || requestID == "" || phase == "" {
+		return false, nil
+	}
+	res, err := s.W.ExecContext(ctx, `UPDATE update_step SET
+		progress_phase = ?, progress_rank = ?,
+		progress_downloaded = CASE WHEN progress_downloaded > ? THEN progress_downloaded ELSE ? END,
+		progress_total = CASE WHEN ? > 0 THEN ? ELSE progress_total END,
+		progress_speed = ?, progress_updated_unix = ?, progress_error = ?
+		WHERE node_id = ? AND request_id = ? AND state = 'sent'
+		AND EXISTS (SELECT 1 FROM update_rollout WHERE id = update_step.rollout_id AND status IN ('running', 'paused'))
+		AND (progress_rank < ? OR (progress_rank = ? AND progress_phase = ? AND (? >= progress_downloaded OR ? >= 5)))
+		AND (progress_total = 0 OR ? = 0 OR progress_total = ?)`,
+		phase, rank, int64(downloaded), int64(downloaded), int64(total), int64(total), int64(speed), updatedUnix, progressError,
+		nodeID, requestID, rank, rank, phase, int64(downloaded), rank, int64(total), int64(total))
 	if err != nil {
 		return false, err
 	}

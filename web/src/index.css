@@ -293,8 +293,31 @@
     transform: rotate(360deg);
   }
 }
+/* a page opening: the whole screen settles in at once, short and quiet, from the first frame (no blank flash, no tile
+   popping in after another) */
+@keyframes mg-page-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(3px);
+  }
+}
 .screen-enter {
-  animation: mg-ui-in 0.45s var(--ease-out-soft) both;
+  animation: mg-page-in 0.2s var(--ease-out-soft) both;
+}
+/* "Loading…" only when the wait is long enough to notice: a fast load never flashes it */
+@keyframes mg-show {
+  from {
+    opacity: 0;
+  }
+}
+.pending-delay {
+  animation: mg-show 0.16s ease-out 0.22s both;
+}
+/* a list that was waited for appears as one, not row by row */
+@keyframes mg-list-in {
+  from {
+    opacity: 0;
+  }
 }
 /* the line of a node's ways in draws itself from people down to the node, once */
 @keyframes mg-ways-draw {

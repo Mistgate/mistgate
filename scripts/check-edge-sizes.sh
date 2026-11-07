@@ -18,7 +18,10 @@ entries=(
   # The program with every role: no longer in the release bundle (the five entries below are), it is what the Node tests and the e2e
   # bridge run, and the size the roles split. 42 MiB: about 3 MB above its size after the October 2026 diet, so a regression like
   # the 7.9 MB template one fails here. 45 MiB since the external reachability sources (cheburcheck, bsbord): every role's code.
-  "mistgate-edge:45"
+  # 46 MiB in November 2026: closing alerts, the server-side audit filters and retention, the split check rollup and the
+  # agent crash-loop alert are admin and jobs code the shipped Workers already carry within their own limits; this entry is
+  # their sum and ships nowhere. The node runtime, host history and path loss reads stay out of the edge (no MCP there).
+  "mistgate-edge:46"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.

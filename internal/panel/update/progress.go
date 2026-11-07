@@ -8,8 +8,7 @@ import (
 )
 
 type progressExpectation struct {
-	RequestID  string
-	SentAtUnix int64
+	RequestID string
 }
 
 var progressPhases = map[string]bool{
@@ -22,8 +21,8 @@ var progressPhases = map[string]bool{
 	"failed":      true,
 }
 
-// A progress frame is best effort and can cross a reconnect. Keep the phase monotonic even when two frames have the
-// same second-level timestamp, which is common for accepted/failed frames emitted back to back.
+// A progress frame can cross a reconnect. The rank is persisted with the step so ordering does not depend on agent
+// timestamps.
 var progressPhaseOrder = map[string]int{
 	"accepted":    0,
 	"downloading": 1,
@@ -34,27 +33,31 @@ var progressPhaseOrder = map[string]int{
 	"failed":      5,
 }
 
-// RecordProgress is deliberately in memory: progress is advisory and high-frequency writes must not compete with the
-// rollout's durable state. It is accepted only for a currently SENT step and only for that step's request ID, so a
-// delayed frame cannot repaint a later update. A reconnect or a fresh rollout naturally replaces stale values.
-func (s *Service) RecordProgress(_ context.Context, nodeID string, p *agentv1.UpdateProgress) error {
+// RecordProgress persists the latest valid frame on the rollout step. This is deliberately a database operation:
+// the edge edition receives frames in one isolate and serves GetUpdates from another.
+func (s *Service) RecordProgress(ctx context.Context, nodeID string, p *agentv1.UpdateProgress) error {
 	if p == nil || nodeID == "" || p.RequestId == "" {
 		return nil
 	}
 	if !progressPhases[p.Phase] || (p.BytesTotal > 0 && p.BytesDownloaded > p.BytesTotal) {
 		return nil
 	}
+	rank := progressPhaseOrder[p.Phase]
+	accepted, err := s.st.RecordStepProgress(ctx, nodeID, p.RequestId, p.Phase, rank, p.BytesDownloaded, p.BytesTotal,
+		p.BytesPerSecond, p.UpdatedUnix, p.Error)
+	if err != nil {
+		return err
+	}
+	if !accepted {
+		return nil
+	}
+
 	s.progressMu.Lock()
 	defer s.progressMu.Unlock()
-	expected, ok := s.progressActive[nodeID]
-	if !ok || (expected.RequestID != "" && expected.RequestID != p.RequestId) ||
-		(expected.SentAtUnix > 0 && p.UpdatedUnix > 0 && p.UpdatedUnix < expected.SentAtUnix) {
+	if expected, ok := s.progressActive[nodeID]; ok && expected.RequestID != "" && expected.RequestID != p.RequestId {
 		return nil
 	}
 	if previous, ok := s.progress[nodeID]; ok {
-		if p.UpdatedUnix > 0 && previous.UpdatedUnix > 0 && p.UpdatedUnix < previous.UpdatedUnix {
-			return nil
-		}
 		if progressPhaseOrder[p.Phase] < progressPhaseOrder[previous.Phase] ||
 			(previous.Phase == "completed" || previous.Phase == "failed") && p.Phase != previous.Phase {
 			return nil
@@ -92,7 +95,7 @@ func (s *Service) beginProgress(nodeID, requestID string, sentAt time.Time) {
 		return
 	}
 	s.progressMu.Lock()
-	s.progressActive[nodeID] = progressExpectation{RequestID: requestID, SentAtUnix: sentAt.Unix()}
+	s.progressActive[nodeID] = progressExpectation{RequestID: requestID}
 	delete(s.progress, nodeID)
 	s.progressMu.Unlock()
 }

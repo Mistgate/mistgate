@@ -1,13 +1,14 @@
-// Pages: the sweep when a page opens (and, softer, when the shell first appears after sign-in), and the staggered entrance of a
-// screen's main list on its first data. A screen gets one of the two: a list that is ready in time takes the page's moment
-// for itself (the sweep then stays out), otherwise the sweep reveals the page and the list does not move again.
+// Pages. Opening a page is quiet: the whole screen settles in at once (.screen-enter, 200 ms, from the first frame) and nothing
+// that is already drawn is hidden again. The aurora band plays once, softly, when the panel first appears after sign-in, as
+// light passing over content that is already there (no mask), and never over a "Loading…". A screen's main list that had to
+// be waited for appears as one; a list that came from the cache is simply there.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { effectsFor, prefersReducedMotion } from "@/lib/effects";
 import { blockedByDialog } from "./fresh";
 import { cancelSweep, sweep, type SweepOptions } from "./sweep";
 
-/** How long a page waits for its first meaningful content before sweeping anyway. */
-export const READY_CAP_MS = 400;
+/** How long the first sweep waits for the page's first content; a page still loading after that gets no sweep. */
+export const READY_CAP_MS = 1500;
 /** A list's rows after a sweep (or while one is under way) keep still for this long. */
 const QUIET_MS = 1500;
 
@@ -53,11 +54,16 @@ export function contentBox(main: Element): () => { left: number; top: number; ri
   };
 }
 
-/** Resolves when nothing in `el` says "loading" any more (data-fx-pending), or after the cap. */
-function whenReady(el: Element, cap: number): Promise<void> {
+/** Resolves true when nothing in `el` says "loading" any more (data-fx-pending), false when the cap passes first. */
+function whenReady(el: Element, cap: number): Promise<boolean> {
   return new Promise((resolve) => {
     const t0 = now();
-    const poll = () => (!el.isConnected || !el.querySelector("[data-fx-pending]") || now() - t0 >= cap ? resolve() : void requestAnimationFrame(poll));
+    const poll = () => {
+      if (!el.isConnected) return resolve(false);
+      if (!el.querySelector("[data-fx-pending]")) return resolve(true);
+      if (now() - t0 >= cap) return resolve(false);
+      requestAnimationFrame(poll);
+    };
     poll();
   });
 }
@@ -67,43 +73,40 @@ export function playPage(el: HTMLElement, first: boolean, extra?: SweepOptions):
   if (!effectsFor("pages") || prefersReducedMotion()) return Promise.resolve();
   const since = state.navAt;
   state.pending = true;
-  const ready = whenReady(el, READY_CAP_MS).then(() => {
-    if (blockedByDialog(el) || (!first && state.listAt >= since)) cancelSweep(el);
+  // light over what is drawn, never hiding it: no mask, nothing held invisible, no band over a page still loading
+  const ready = whenReady(el, READY_CAP_MS).then((ok) => {
+    if (!ok || blockedByDialog(el) || (!first && state.listAt >= since)) cancelSweep(el);
   });
-  return sweep(el, { ...(first ? firstSweepOptions(extra) : pageSweepOptions(extra)), hold: ready, hideWhileHeld: true, clipBox: contentBox(el.closest("main") ?? el) }).finally(() => {
+  return sweep(el, { ...(first ? firstSweepOptions(extra) : pageSweepOptions(extra)), reveal: false, hold: ready, hideWhileHeld: false, clipBox: contentBox(el.closest("main") ?? el) }).finally(() => {
     state.pending = false;
     state.endedAt = now();
   });
 }
 
 /**
- * Plays the page sweep on the element behind `ref` once per pathname change (not on search-only changes, so switching a tab
- * does not sweep) and once when it first mounts (the first-load sweep). `pathname` comes from the router.
+ * Plays the band once, when the shell first appears (after sign-in or a reload). Moving between pages does not sweep: the
+ * screen settles in by itself (.screen-enter); a band on every page was too much. `pathname` comes from the router.
  */
-export function usePageTransition(ref: RefObject<HTMLElement | null>, pathname: string, enabled = true) {
+export function usePageTransition(ref: RefObject<HTMLElement | null>, _pathname: string, enabled = true) {
   const first = useRef(true);
-  const prev = useRef(pathname);
   useLayoutEffect(() => {
     const isFirst = first.current;
     first.current = false;
-    const changed = prev.current !== pathname;
-    prev.current = pathname;
-    if (!enabled || (!isFirst && !changed) || !ref.current) return;
+    if (!enabled || !isFirst || !ref.current) return;
     // no cancel on cleanup: StrictMode runs this twice at mount, and a sweep ends by itself when its element goes
     void playPage(ref.current, isFirst);
-  }, [pathname, enabled, ref]);
+  }, [enabled, ref]);
 }
 
 // --- lists ---
 
 /**
- * The entrance of a screen's main list on its first data in this visit: `entrance(i)` is the style of row i (a fade with a 4 px
- * rise, 18 ms per row, the first 12 rows), undefined for the rest and for ever after. `ready` turns true when the first data is
- * in. Refetches, polling and filters do not play it again (decided once per mount, and over after a moment), and it does not
- * play when the page sweep is about to (or just did), under reduced motion or with the effects off.
+ * The entrance of a screen's main list when its first data had to be waited for: every row fades in together (the list
+ * appears as one, not row by row). A list ready on the first render (from the cache) is simply there; refetches, polling
+ * and filters never play it; nor do reduced motion, the effects off, or a band that is playing.
  */
 export function useListEntrance(ready: boolean): (i: number) => CSSProperties | undefined {
-  const [mode, setMode] = useState<"wait" | "play" | "done">("wait");
+  const [mode, setMode] = useState<"wait" | "play" | "done">(ready ? "done" : "wait");
   if (ready && mode === "wait") {
     // decided once, while rendering the first data (so the rows are drawn with their style, never without it first)
     const go = effectsFor("pages") && !prefersReducedMotion() && !sweepRecent();
@@ -115,5 +118,5 @@ export function useListEntrance(ready: boolean): (i: number) => CSSProperties | 
     const t = setTimeout(() => setMode("done"), 1000);
     return () => clearTimeout(t);
   }, [mode]);
-  return (i) => (mode === "play" && i < 12 ? { animation: `mg-row-in 340ms var(--ease-out-soft) ${i * 18}ms both` } : undefined);
+  return () => (mode === "play" ? { animation: "mg-list-in 200ms ease-out both" } : undefined);
 }

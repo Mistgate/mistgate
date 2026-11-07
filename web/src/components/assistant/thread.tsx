@@ -1,12 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
 import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
+import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { splitText, type LiveMsg, type LiveTool, type Msg, type Note } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { dayLabel, useFmt } from "@/lib/format";
-import { ChatMarkdown } from "./markdown";
+import { nodesQuery } from "@/lib/queries";
+import { ChatMarkdown, type ChatEntity } from "./markdown";
 import { PlanCardView } from "./plan-card";
 import type { ChatApi } from "./chat";
 import { Thinking, ToolGroup, toolWords } from "./tool-cards";
@@ -130,6 +133,7 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
   const fmt = useFmt();
   const [busy, setBusy] = useState("");
   const live = m as LiveMsg;
+  const entities = useNodeEntities();
   return (
     <div data-role="assistant" className={cx("chat-in flex items-start gap-3", first ? "mt-6" : "mt-3")}>
       <Slot show={avatar} />
@@ -139,7 +143,7 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
         {m.tools.length > 0 && <ToolGroup tools={m.tools as LiveTool[]} running={running} workedMs={interim ? undefined : live.workedMs} />}
         {answer && (
           <div data-slot="bubble" className="max-w-full">
-            <ChatMarkdown text={answer} onNavigate={onNavigate} />
+            <ChatMarkdown text={answer} onNavigate={onNavigate} entities={entities} />
           </div>
         )}
         {m.plans.map((p) => (
@@ -205,5 +209,21 @@ export function Thread({ chat, owner, onNavigate }: { chat: ChatApi; owner: bool
         </Rule>
       )}
     </>
+  );
+}
+
+/** The fleet's nodes as names an answer may mention: each becomes a chip with the node's status that opens its page. */
+function useNodeEntities(): ChatEntity[] {
+  const nodes = useQuery(nodesQuery).data?.nodes;
+  return useMemo(
+    () =>
+      (nodes ?? [])
+        .filter((n) => n.status !== NodeStatus.RETIRED && n.name.trim() !== "")
+        .map((n) => ({
+          name: n.name,
+          id: n.id,
+          dot: n.status === NodeStatus.ONLINE ? "ok" : n.status === NodeStatus.BLIP ? "warn" : n.status === NodeStatus.DOWN ? "bad" : "off",
+        })),
+    [nodes],
   );
 }

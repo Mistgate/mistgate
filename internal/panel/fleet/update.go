@@ -110,10 +110,8 @@ func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Dura
 
 // SendUpdateAgent sends an update command through the edge link without waiting for CommandResult.
 func (f *Fleet) SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time, downloadTimeout time.Duration) error {
-	r := &agentv1.UpdateAgent{RequestId: requestID, Manifest: manifest, Signature: signature, DownloadToken: downloadToken}
-	if downloadTimeout > 0 {
-		r.DownloadTimeoutSeconds = uint32(downloadTimeout / time.Second)
-	}
+	r := updateAgentFrame(requestID, manifest, signature, downloadTimeout).GetUpdateAgent()
+	r.DownloadToken = downloadToken
 	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: r}}
 	return f.sendRecorded(ctx, nodeID, requestID, frame, deadline)
 }

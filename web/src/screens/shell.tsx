@@ -22,7 +22,8 @@ import { useAwaitingApprovals } from "@/lib/integrations";
 import { basepath } from "@/lib/api";
 import { meQuery, useSignOut } from "@/lib/session";
 import { noteNavigation, usePageTransition } from "@/components/fx/page";
-import { useEffectKind, useEffectsEnabled } from "@/lib/effects";
+import { setEffectsAllowed, useEffectKind, useEffectsEnabled } from "@/lib/effects";
+import { useEdition } from "@/lib/edition";
 import { cx } from "@/lib/cx";
 
 // The palette (and Base UI's dialog behind it) is loaded the first time it is opened.
@@ -50,6 +51,9 @@ export function Shell() {
 
 function ShellFrame() {
   const t = useT();
+  // the Cloudflare edition has no reveal animation: set before the effects below read it
+  const edge = useEdition().edge;
+  setEffectsAllowed(!edge);
   const [palette, setPalette] = useState(false);
   const [paletteLoaded, setPaletteLoaded] = useState(false);
   // matches: root, app layout, then the section route: the key that restarts the enter animation
@@ -98,7 +102,7 @@ function ShellFrame() {
       {/* one width rule for every screen: a centred column of at most 1360px, side padding that grows with the window.
           A screen that needs more (a wide table) puts an element with the class "app-wide" inside and the column lifts its cap. */}
       <main id="main" tabIndex={-1} className="outline-none px-4 pt-1.5 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
-        <div key={section} ref={content} className={cx(!pageFx && "screen-enter", "mx-auto max-w-[1360px] has-[.app-wide]:max-w-none")}>
+        <div key={section} ref={content} className="screen-enter mx-auto max-w-[1360px] has-[.app-wide]:max-w-none">
           <Outlet />
         </div>
       </main>

@@ -115,10 +115,12 @@ type fakeSrc struct {
 	failed    []string
 	offsets   []uint64
 	calls     int
+	progress  []*pb.UpdateProgress
 }
 
-func (s *fakeSrc) Now() time.Time   { return s.now }
-func (s *fakeSrc) Failed() []string { return s.failed }
+func (s *fakeSrc) Now() time.Time                { return s.now }
+func (s *fakeSrc) Failed() []string              { return s.failed }
+func (s *fakeSrc) Progress(p *pb.UpdateProgress) { s.progress = append(s.progress, p) }
 func (s *fakeSrc) Fetch(_ context.Context, name string, off uint64, w io.Writer) (uint64, error) {
 	s.calls++
 	s.offsets = append(s.offsets, off)
@@ -179,6 +181,32 @@ func TestDownloadDoesNotTreatBusyPanelAsIdleStall(t *testing.T) {
 	src.retry = 1
 	if err := u.download(context.Background(), src, release.File{Name: "node", Size: int64(len(newBin))}, time.Second, nil); err != nil {
 		t.Fatalf("download after a busy slot = %v", err)
+	}
+}
+
+func TestApplyDuplicateRequestDoesNotReportFailure(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	manifest, sig := e.manifest(newBin, newBuilt, nil)
+	src := e.src(newBin)
+	u.busy.Store(true)
+	u.activeMu.Lock()
+	u.activeRequest = "req-1"
+	u.activeMu.Unlock()
+	defer func() {
+		u.activeMu.Lock()
+		u.activeRequest = ""
+		u.busy.Store(false)
+		u.activeMu.Unlock()
+	}()
+	res, finish := u.Apply(context.Background(), e.req(manifest, sig), src)
+	if finish != nil || res.Error != "busy" {
+		t.Fatalf("duplicate apply = (%+v, %v), want busy without finish", res, finish)
+	}
+	for _, p := range src.progress {
+		if p.Phase == "failed" {
+			t.Fatalf("duplicate emitted terminal progress: %+v", src.progress)
+		}
 	}
 }
 

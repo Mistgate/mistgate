@@ -77,7 +77,12 @@ func rolloutMsgWithProgress(ro store.RolloutRow, steps []store.StepRow, progress
 		if len(x.Params) > 0 {
 			st.Params = x.Params
 		}
-		if p, ok := progress[x.NodeID]; ok && x.State == store.StepSent && x.RequestID != "" && p.RequestID == x.RequestID {
+		p, ok := progress[x.NodeID]
+		if !ok && x.ProgressPhase != "" {
+			p, ok = progressState{RequestID: x.RequestID, Phase: x.ProgressPhase, Downloaded: x.ProgressDownloaded,
+				Total: x.ProgressTotal, Speed: x.ProgressSpeed, UpdatedUnix: x.ProgressUpdatedUnix}, true
+		}
+		if ok && x.State == store.StepSent && x.RequestID != "" && p.RequestID == x.RequestID {
 			st.DownloadPhase, st.DownloadedBytes, st.TotalBytes, st.BytesPerSecond = p.Phase, p.Downloaded, p.Total, p.Speed
 		}
 		m.Steps = append(m.Steps, st)
@@ -146,15 +151,6 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 		return nil, s.internal("load update download timeout", err)
 	}
 	resp.UpdateDownloadTimeoutSeconds = uint32(timeout / time.Second)
-	if resp.Rollout != nil {
-		progress := map[string]progressState{}
-		s.progressMu.RLock()
-		for k, v := range s.progress {
-			progress[k] = v
-		}
-		s.progressMu.RUnlock()
-		resp.Rollout = rolloutMsgWithProgress(ro, steps, progress)
-	}
 	if !ro.Active() {
 		steps = nil // only an active rollout makes a node UPDATING
 	}
