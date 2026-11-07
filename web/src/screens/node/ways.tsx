@@ -852,11 +852,17 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
   const t = useT();
   const node = data.node!;
   if (!w.ready) return null;
-  const short = (l: Lane): string => {
+  // The note after a lane's name. A way seen on part of the networks names the dark ones; past two they become "+N" and the
+  // full list goes to the tooltip, so a long list cannot push the chip out of the card.
+  const short = (l: Lane): { text: string; full?: string } => {
     const look = lookOf(l, w);
-    if (look.kind === "ok") return "";
-    if (l.state === "ok" && l.seen === "part" && l.dark.length) return l.dark.join(", ");
-    return t(look.word);
+    if (look.kind === "ok") return { text: "" };
+    if (l.state === "ok" && l.seen === "part" && l.dark.length) {
+      const full = l.dark.join(", ");
+      if (l.dark.length <= 2) return { text: full, full };
+      return { text: t("ways.darkMore", { first: l.dark.slice(0, 2).join(", "), n: l.dark.length - 2 }), full };
+    }
+    return { text: t(look.word) };
   };
   return (
     <section aria-label={t("node.tab.ways")} className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-card border border-line bg-surface px-4 py-3">
@@ -874,11 +880,12 @@ export function WaysStrip({ data, w }: { data: Data; w: WaysModel }) {
             to="/nodes/$id"
             params={{ id: node.id }}
             search={{ tab: "ways", way: l.id }}
-            className="inline-flex h-[26px] items-center gap-1.5 rounded-xl border border-line px-2.5 text-xs font-bold whitespace-nowrap transition-colors hover:border-accent-line hover:bg-surface-2"
+            title={note.full ? `${title} · ${t("ways.darkTitle", { list: note.full })}` : undefined}
+            className="inline-flex h-[26px] max-w-full min-w-0 items-center gap-1.5 rounded-xl border border-line px-2.5 text-xs font-bold whitespace-nowrap transition-colors hover:border-accent-line hover:bg-surface-2"
           >
             <RingMark ring={l.ring} />
-            {title}
-            {note && <span className={cx("font-semibold", toneText[lookOf(l, w).kind])}>· {note}</span>}
+            <span className="shrink-0">{title}</span>
+            {note.text && <span className={cx("min-w-0 truncate font-semibold", toneText[lookOf(l, w).kind])}>· {note.text}</span>}
           </Link>
         );
       })}
