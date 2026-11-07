@@ -385,12 +385,12 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 				end = "limit"
 				execution.output = toolOutput{err: true, text: "tool call limit reached; no tool was run"}
 			} else if exists {
-				if schemaErr := validateToolInput(tool.InputSchema, call.input); schemaErr != nil {
-					execution.output = toolOutput{err: true, text: "tool input rejected because it did not match the tool schema"}
+				if input, schemaErr := validateToolInput(tool.InputSchema, call.input); schemaErr != nil {
+					execution.output = toolOutput{err: true, text: schemaErr.Error()}
 				} else if tool.local {
-					execution = s.executeLocalTool(turnCtx, admin, conversationID, call.name, call.input)
+					execution = s.executeLocalTool(turnCtx, admin, conversationID, call.name, input)
 				} else {
-					execution = s.executeMCPTool(turnCtx, toolSession, admin, conversationID, identity.ID, call.name, call.input)
+					execution = s.executeMCPTool(turnCtx, toolSession, admin, conversationID, identity.ID, call.name, input)
 				}
 			}
 			outputs = append(outputs, execution.output)
