@@ -119,3 +119,31 @@ func TestAssistantRoundsAreSeparateParagraphs(t *testing.T) {
 		}
 	}
 }
+
+// "Delete all" of one's own conversations failed on a real panel ("something went wrong") once a conversation held a plan:
+// the plan cancel joined two tables that both have admin_id and named it unqualified.
+func TestAssistantDeleteOwnConversationsWithAPlan(t *testing.T) {
+	f := newAssistantFixture(t,
+		modelResponse{Tools: []modelToolCall{scriptedTool("remove_user_plan", "call_plan", `{"user_id":"usr_1"}`)}},
+		modelResponse{Text: "The plan is ready."},
+		modelResponse{Text: `{"title":"t","summary":"s"}`},
+	)
+	ctx := context.Background()
+	stream, err := f.client.Chat(ctx, connect.NewRequest(&adminv1.ChatRequest{Text: "remove usr_1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainChat(t, stream)
+	var plans int
+	if err := f.st.R.QueryRowContext(ctx, `SELECT count(*) FROM assistant_plan`).Scan(&plans); err != nil || plans != 1 {
+		t.Fatalf("fixture: %d plans, %v", plans, err)
+	}
+	resp, err := f.service.DeleteAllConversations(auth.WithAdmin(ctx, f.admin), connect.NewRequest(&adminv1.DeleteAllConversationsRequest{}))
+	if err != nil || resp.Msg.Deleted != 1 {
+		t.Fatalf("delete own conversations: %v %v", resp, err)
+	}
+	var left int
+	if err := f.st.R.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM assistant_conversation) + (SELECT count(*) FROM assistant_plan) + (SELECT count(*) FROM assistant_message)`).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("rows left after delete: %d %v", left, err)
+	}
+}
