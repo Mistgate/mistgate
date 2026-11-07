@@ -34,6 +34,7 @@ import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 import { tcpPill, verdictPill } from "./ports";
+import { Fresh } from "@/components/fx/fresh";
 import { alsoRemovesText, useRelaysOf } from "./relays";
 
 export const states: Record<InboundState, { kind: StatusKind; word: MessageKey }> = {
@@ -192,7 +193,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
             </Link>
           ) : null;
         return (
-          <div key={i.id} className="flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
+          <Fresh key={i.id} kind="inbound" id={i.id} className="flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5">
             <div className={`grid items-center gap-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${gridClass}`}>
               <div className="flex min-w-0 items-center gap-2.5">
                 <IconChip icon="sliders" tone="sage" size={28} />
@@ -248,7 +249,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                 {t("node.profiles.remove")}
               </Button>
             </div>
-          </div>
+          </Fresh>
         );
       })}
 

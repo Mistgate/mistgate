@@ -6,6 +6,8 @@ import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
 import type { ProfileFormat } from "@/gen/mistgate/admin/v1/profile_pb";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { Fresh } from "@/components/fx/fresh";
+import { markFresh } from "@/components/fx/registry";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
@@ -271,6 +273,7 @@ export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { 
   const everyone = useMutation({
     mutationFn: () => groupsApi.createGroup({ name: t("users.everyone"), profileIds: (profiles.data ?? []).map((p) => p.id) }),
     onSuccess: async (r) => {
+      if (r.group) markFresh("group", r.group.id);
       await Promise.all(["groups", "users", "profiles"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
       toast(t("users.everyoneCreated", { name: r.group?.name ?? t("users.everyone") }));
     },
@@ -311,7 +314,7 @@ export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { 
         list.data.map((g) => {
           const ps = g.profileIds.map(profileOf).filter((p) => p !== undefined);
           return (
-            <Card key={g.id} lg className={cx("flex flex-col gap-3 p-4 transition-colors", focus === g.id && "border-accent-line")}>
+            <Fresh key={g.id} kind="group" id={g.id} className={cx("flex flex-col gap-3 rounded-card-lg border border-line bg-surface p-4 transition-colors", focus === g.id && "border-accent-line")}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
                 <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-3">
                   <IconChip icon="family" tone={groupTone(g.id, g.color)} size={28} />
@@ -345,7 +348,7 @@ export function GroupsTab({ creating, onCreatingChange, focus, onFocusDone }: { 
                 <WaysOfGroup profiles={ps} reach={{ sub: g.happNodes, awg: g.amneziaNodes }} />
               )}
               {g.dnsPresetId && dnsName(g.dnsPresetId) && <span className="text-[11px] text-muted">{t("users.groupDns", { name: dnsName(g.dnsPresetId) })}</span>}
-            </Card>
+            </Fresh>
           );
         })
       )}
@@ -493,6 +496,7 @@ export function GroupForm({
     },
     onSuccess: async (res) => {
       if (!res) return;
+      if (!group) markFresh("group", res.id); // a new group: its card sweeps in once
       // a group change reaches its users' cards, devices and subscription previews, and the profiles' "where it runs"
       await Promise.all(["groups", "users", "subs", "profiles", "nodes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
       onCreated(res);

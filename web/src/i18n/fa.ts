@@ -154,6 +154,8 @@ const core: CoreMessages = {
   "settings.accent.rose": "گل‌رز",
   "settings.accent.sage": "مریم‌گلی",
   "settings.local": "این انتخاب‌ها فقط روی همین دستگاه نگه داشته می‌شوند.",
+  "settings.fx": "جلوه‌های رابط",
+  "settings.fx.hint": "روی چیزی که همین حالا ساخته‌اید، نوری نرم می‌گذرد. اگر خاموش باشد یا سیستم شما کاهش حرکت را روشن کرده باشد، موارد تازه فقط ظاهر می‌شوند.",
   "settings.device": "فقط روی این دستگاه",
   "auth.setup.welcomeTitle": "سلام!",
   "auth.setup.welcomeBody": "این {brand} است، پنلی برای سرورهای VPN تو. اول زبان را انتخاب کن؛ بعداً می‌توانی عوضش کنی.",

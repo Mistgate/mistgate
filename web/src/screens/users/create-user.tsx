@@ -18,6 +18,7 @@ import { GB } from "./format";
 import { big, userN, type UserN as User } from "./model";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { defaultGroup, GroupEditModal, GroupForm, PillToggle, ReachLine } from "./groups";
+import { markFresh } from "@/components/fx/registry";
 import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx } from "./t";
 import { InfoTip, ResetSelect, resetCode, SettingRow, SpeedPair, SwitchRow } from "./ui";
@@ -97,6 +98,7 @@ function CreateForm({ onCreated }: { onCreated: (user: User, url: string, passwo
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ["users"] });
       void qc.invalidateQueries({ queryKey: ["groups"] });
+      if (res.user) markFresh("user", res.user.id); // the row sweeps in once, when it shows up in the list
       if (res.user) onCreated(userN(res.user), res.subscriptionUrl, res.pagePassword);
     },
     onError: (e) => setError(errorText(e, t)),

@@ -21,6 +21,7 @@ import { checksQuery, countryColumn, countryIn, doctorQuery, type CountryCheck }
 import { nodeLoad } from "@/lib/node-load";
 import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
+import { useFresh } from "@/components/fx/fresh";
 import { candidatesQuery, countryHint, isCut, reachHint, relaysQuery, seenHint, type CountryHint, type Hint } from "@/lib/relay";
 import { useNow } from "@/lib/time";
 import { ipv6Helps } from "@/lib/reachability";
@@ -197,6 +198,7 @@ const rowCls =
 
 function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysModel; data: Data; selected: boolean; tabbable: boolean; onPick: () => void }) {
   const t = useT();
+  const fresh = useFresh<HTMLButtonElement>("lane", `${data.node!.id}:${l.id}`); // a lane that just came to be sweeps in once
   const ccOf = useCountryOf();
   const look = lookOf(l, w);
   const seen = seenLine(t, l, w);
@@ -222,6 +224,7 @@ function LaneRow({ l, w, data, selected, tabbable, onPick }: { l: Lane; w: WaysM
     <button
       type="button"
       role="tab"
+      ref={fresh}
       id={`way-tab-${l.id}`}
       aria-selected={selected}
       aria-controls="way-panel"

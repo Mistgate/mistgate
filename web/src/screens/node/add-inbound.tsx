@@ -24,6 +24,7 @@ import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { asMode, AwgBackendChoice, canPrepare, useSaveAwgBackend, type AwgMode } from "./awg-backend";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
+import { markFresh } from "@/components/fx/registry";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 
 type Node = NonNullable<Plain<GetNodeResponse>["node"]>;
@@ -152,6 +153,7 @@ function AddForm({
     },
     onSuccess: (r) => {
       onDone();
+      if (r?.inbound) markFresh("inbound", r.inbound.id); // the new server's card on the node's Profiles tab sweeps in once
       // the UDP check could not run (port_unchecked), or the port was added although it loses packets: said once, a bit longer
       const notes = portNotes(t, r?.warnings);
       toast(withNotes(t("node.profiles.added", { name: node.name }), notes), notes.length > 0 ? { ms: 8000 } : undefined);
@@ -418,6 +420,8 @@ function QuickProfile({ node, taken, selfSigned, onDone, onBack }: { node: Node;
       for (const g of groups.data ?? []) {
         if (chosen.includes(g.id)) await groupsApi.updateGroup({ groupId: g.id, profileIds: { values: [...g.profileIds, made.id] } });
       }
+      markFresh("profile", made.id);
+      if (added?.inbound) markFresh("inbound", added.inbound.id);
       return { name: final, notes: portNotes(t, added?.warnings) };
     },
     onSuccess: ({ name, notes }) => {

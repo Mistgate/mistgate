@@ -23,6 +23,7 @@ import { useFmt, type Fmt } from "@/lib/format";
 import { clampPage, useMove, usePaging } from "@/lib/paging";
 import { userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
+import { Fresh } from "@/components/fx/fresh";
 import { CreateUserModal } from "./create-user";
 import { avatarIndex, barTone, noAccess, nowSec, seenText, shownKey, shownKind, shownStatus, termText, usage, viaOf } from "./format";
 import { UsersBulk, UsersPick } from "./bulk";
@@ -624,7 +625,10 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
   return (
-    <tr
+    <Fresh
+      as="tr"
+      kind="user"
+      id={u.id}
       onClick={onOpen}
       className={cx(
         "h-14 cursor-pointer border-b border-line text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2",
@@ -680,7 +684,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       <td className={col.seen}>
         <SeenCell u={u} t={t} now={now} />
       </td>
-    </tr>
+    </Fresh>
   );
 }
 
@@ -692,7 +696,9 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
   return (
-    <div
+    <Fresh
+      kind="user"
+      id={u.id}
       onClick={onOpen}
       className={cx(
         "flex cursor-pointer flex-col gap-2.5 rounded-card border px-3.5 py-3",
@@ -747,6 +753,6 @@ function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
         <UsageBar pct={use.pct} tone={use.tone} className={cx("flex-1", u.quotaBytes <= 0 && "invisible")} />
         <UsageText use={use} t={t} />
       </div>
-    </div>
+    </Fresh>
   );
 }

@@ -159,6 +159,8 @@ const core = {
   "settings.accent.rose": "Rose",
   "settings.accent.sage": "Sage",
   "settings.local": "These choices are kept on this device only.",
+  "settings.fx": "Interface effects",
+  "settings.fx.hint": "A soft glow sweeps over what you have just created. Off, or with reduced motion set in your system, new things simply appear.",
   "settings.device": "Only on this device",
 
   "auth.setup.welcomeTitle": "Hi!",

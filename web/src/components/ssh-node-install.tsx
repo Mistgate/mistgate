@@ -2,6 +2,8 @@ import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { markFresh } from "@/components/fx/registry";
+import { Sweep } from "@/components/fx/sweep-react";
 import { authorizedKeysFile, PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
 import { Fingerprint, InstallPanelKeyBox, LoginSwitch, OwnKeyField, useSSHLogin, type LoginMethod } from "@/components/ssh-login";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
@@ -289,6 +291,7 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   // the install manager speaks the admin's language: it cannot read the SPA's choice by itself
   const installManagerHref = new URL(`nodes/install?lang=${fmt.lang}&job=${encodeURIComponent(jobId)}`, document.baseURI).href;
   const jobDone = jobState === "completed";
+  const nodeId = job.data?.nodeId;
   const jobFailed = jobState === "failed";
   const jobCancelled = jobState === "cancelled";
   // a cancelled job resumes safely (preflight checks the host's enrollment first); the panel refuses a retired node
@@ -297,9 +300,10 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
 
   useEffect(() => {
     if (!jobDone && !jobFailed) return;
+    if (jobDone && nodeId) markFresh("node", nodeId); // the new node's card sweeps in once
     void qc.invalidateQueries({ queryKey: ["nodes"] });
     void qc.invalidateQueries({ queryKey: ["overview"] });
-  }, [jobDone, jobFailed, qc]);
+  }, [jobDone, jobFailed, nodeId, qc]);
 
   async function getFingerprint(event: FormEvent) {
     event.preventDefault();
@@ -426,7 +430,6 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
   };
 
   const openNode = () => {
-    const nodeId = job.data?.nodeId;
     if (!nodeId) return;
     onClose();
     void navigate({ to: "/nodes/$id", params: { id: nodeId } });
@@ -650,7 +653,9 @@ export function SSHNodeInstall({ onBack, onClose, onManual }: Props) {
                 </span>
               </div>
               {jobDone ? (
-                <Banner kind="ok" title={t("node.ssh.done")} />
+                <Sweep play onMount>
+                  <Banner kind="ok" title={t("node.ssh.done")} />
+                </Sweep>
               ) : jobFailed ? (
                 <>
                   <Notice tone="danger">{jobText(job.data.errorCode)}</Notice>

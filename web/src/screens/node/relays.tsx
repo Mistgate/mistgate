@@ -43,6 +43,7 @@ import {
   type Stage,
 } from "@/lib/relay";
 import { protocolName } from "@/lib/series";
+import { markFresh } from "@/components/fx/registry";
 import { useNow } from "@/lib/time";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 
@@ -449,6 +450,8 @@ export function useAddRelay({ entry, exitId, enabled, onClose, onBack }: AddProp
   const one = async (c: Candidate, on: boolean, port: string) => {
     const names = { entry: entry.name, exit: c.nodeName, exitPort: c.port, port: Number(port) || c.port, network: c.network };
     set(c.inboundId, { leg: "running", path: on ? "waiting" : null, tone: undefined, text: undefined, free: undefined });
+    // the first relay between these two nodes makes their lane: only that one sweeps in (a second relay joins a lane that is there)
+    const hadLane = qc.getQueryData<RelayMsg[]>(["relays", c.nodeId])?.some((x) => x.viaNodeId === entry.id && x.exitNodeId === c.nodeId) ?? false;
     let r: RelayMsg;
     try {
       r = plain(await relaysApi.createRelay({ inboundId: c.inboundId, viaNodeId: entry.id, port: Number(port) || 0 })).relay!;
@@ -472,6 +475,10 @@ export function useAddRelay({ entry, exitId, enabled, onClose, onBack }: AddProp
     set(c.inboundId, { leg: "ok", path: "running" });
     try {
       await relaysApi.updateRelay({ id: r.id, enabled: true });
+      if (!hadLane) {
+        markFresh("lane", `${c.nodeId}:via:${entry.id}`); // on the exit's page ...
+        markFresh("lane", `${entry.id}:out:${c.nodeId}`); // ... and on the entry's
+      }
       set(c.inboundId, { path: "ok", tone: "ok", text: t("relay.dlg.result.on", { via: viaLabel(t, entry.cc), hours }) });
     } catch (e) {
       const ce = ConnectError.from(e);

@@ -7,6 +7,8 @@ import { Icon } from "@/components/ui/icons";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { setEffectsEnabled, useEffectsEnabled } from "@/lib/effects";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
@@ -35,6 +37,7 @@ export function InterfacePage() {
   const theme = useTheme();
   const me = useQuery(meQuery);
   const { own } = useAccentChoice();
+  const effects = useEffectsEnabled();
   const row = "flex min-h-14 items-center gap-3 border-t border-line";
   return (
     <>
@@ -81,6 +84,13 @@ export function InterfacePage() {
               </button>
             </p>
           )}
+        </div>
+        <div className={row}>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2">
+            <span className="text-[13px] font-bold">{t("settings.fx")}</span>
+            <span className="text-xs leading-snug text-muted">{t("settings.fx.hint")}</span>
+          </span>
+          <Switch checked={effects} onCheckedChange={setEffectsEnabled} aria-label={t("settings.fx")} />
         </div>
         <p className="border-t border-line py-3 text-xs leading-normal text-muted">{t("settings.local")}</p>
       </Card>

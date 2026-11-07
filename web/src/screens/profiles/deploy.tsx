@@ -19,6 +19,7 @@ import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import { asMode, AwgBackendFields, canPrepare, type AwgMode } from "@/screens/node/awg-backend";
 import { useTx, type Tx } from "@/screens/users/t";
+import { markFresh } from "@/components/fx/registry";
 import { Check } from "@/screens/users/ui";
 
 // "Put on nodes" from the profile page: tick nodes (or all of them), one button, one CreateInbound per node, and the
@@ -198,6 +199,7 @@ function DeployBody({
           tlsServerNameOverride: awg ? "" : r.sni.trim(),
           ...(r.anyway && { allowLossyPort: true }),
         });
+        if (added.inbound) markFresh("inbound", added.inbound.id);
         patch(id, { state: "ok", notes: portNotes(t, added?.warnings) });
         ok++;
       } catch (e) {

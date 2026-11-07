@@ -38,6 +38,7 @@ import { byProtocol, lookOf, summaryParts, telegramOnly } from "./protocol-meta"
 import { SchemaForm, type Problem } from "./schema-form";
 import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
+import { markFresh } from "@/components/fx/registry";
 import { WherePanel } from "./where";
 
 /**
@@ -355,6 +356,7 @@ function Editor({ info, initial, profile, inbounds = [], fromNode = "", draft, o
     const res = await profiles.createProfile({ protocol: info.id, name: name.trim(), settingsJson });
     onCreated?.();
     const p = res.profile!;
+    markFresh("profile", p.id); // its row in the profile list sweeps in once
     const plan = after.plan;
     if (plan.groupsOn) {
       try {

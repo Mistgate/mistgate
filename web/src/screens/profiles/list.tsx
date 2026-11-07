@@ -18,6 +18,7 @@ import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/r
 import { useTx, type Tx } from "@/screens/users/t";
 import { dropsOf, dropWords, keysOnly, nameOf } from "./formats";
 import { byProtocol, lookOf, summaryParts, telegramOnly, viaWarp } from "./protocol-meta";
+import { Fresh } from "@/components/fx/fresh";
 import { facetIds, validateProfilesSearch, type FacetId } from "./search";
 
 const warnText = (w: StatusReason, t: Tx) => t.opt(`profiles.warn.${w.code}`, w.params) ?? w.code.replaceAll("_", " ");
@@ -358,7 +359,9 @@ export function ProfileRow({ p, t, protocol, groups }: { p: ProfileSummary; t: T
   const look = lookOf(p.protocol);
   const name = protocol?.displayName ?? p.protocol;
   return (
-    <div
+    <Fresh
+      kind="profile"
+      id={p.id}
       role="listitem"
       className={cx(
         "group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 border-b border-line px-4 py-3 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2/50 has-[a:focus-visible]:bg-surface-2/50",
@@ -398,6 +401,6 @@ export function ProfileRow({ p, t, protocol, groups }: { p: ProfileSummary; t: T
         size={16}
         className="col-start-3 row-span-3 row-start-1 text-faint transition-colors group-hover:text-muted @min-[760px]:col-start-auto @min-[760px]:row-span-1 @min-[760px]:row-start-auto"
       />
-    </div>
+    </Fresh>
   );
 }

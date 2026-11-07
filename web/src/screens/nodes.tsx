@@ -28,6 +28,7 @@ import { useOlderNodes } from "@/lib/updates";
 import { useBatch } from "@/lib/batch";
 import { PickMenu } from "@/components/bulk";
 import { NodesBulk } from "./nodes-bulk";
+import { Fresh } from "@/components/fx/fresh";
 import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
 import { PanelKeyOffer } from "./nodes-panel-key";
 
@@ -299,7 +300,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
         const kind = nodeKind(n);
         const s = sub(n, true);
         return (
-          <div
+          <Fresh kind="node" id={n.id}
             key={n.id}
             className={cx("relative grid min-h-[60px] items-start gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
           >
@@ -334,7 +335,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               <span className="w-8 text-end font-mono text-xs">{n.hasMetrics ? `${Math.round(n.cpuPct)}%` : "—"}</span>
             </div>
             <span className="self-start pt-0.5 text-end font-mono text-xs text-muted">{n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"}</span>
-          </div>
+          </Fresh>
         );
       })}
     </div>
@@ -355,7 +356,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
           </div>
         );
         return (
-          <div key={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
+          <Fresh key={n.id} kind="node" id={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
             <div className="flex items-center gap-2">
               {select && <Tick select={select} node={n} />}
@@ -381,7 +382,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
               <span className="flex-1" />
               <span className="min-w-0 text-end font-mono text-[11px] break-all text-muted">{n.address}</span>
             </div>
-          </div>
+          </Fresh>
         );
       })}
     </div>

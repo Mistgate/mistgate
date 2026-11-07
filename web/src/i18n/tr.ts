@@ -155,6 +155,8 @@ const core: CoreMessages = {
   "settings.accent.rose": "Gül",
   "settings.accent.sage": "Adaçayı",
   "settings.local": "Bu tercihler yalnızca bu cihazda saklanır.",
+  "settings.fx": "Arayüz efektleri",
+  "settings.fx.hint": "Yeni oluşturduğunuz şeyin üzerinden yumuşak bir ışık geçer. Kapalıyken ya da sistemde hareketi azaltma açıkken yeni öğeler doğrudan görünür.",
   "settings.device": "Yalnızca bu cihazda",
   "auth.setup.welcomeTitle": "Merhaba!",
   "auth.setup.welcomeBody": "Burası {brand}: VPN sunucuların için bir panel. Önce bir dil seç; sonra değiştirebilirsin.",

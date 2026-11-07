@@ -152,6 +152,8 @@ const core: CoreMessages = {
   "settings.accent.rose": "Роза",
   "settings.accent.sage": "Шалфей",
   "settings.local": "Эти настройки хранятся только на этом устройстве.",
+  "settings.fx": "Эффекты интерфейса",
+  "settings.fx.hint": "Мягкое свечение пробегает по только что созданному. Выключено, или если в системе включено уменьшение движения, новое просто появляется.",
   "settings.device": "Только на этом устройстве",
 
   "auth.setup.welcomeTitle": "Привет!",

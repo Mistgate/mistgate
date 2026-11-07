@@ -16,6 +16,8 @@ import { plain, type Plain } from "@/lib/plain";
 import { useT } from "@/i18n";
 import { nodes as nodesApi } from "@/lib/api";
 import { countryCodes } from "@/lib/countries";
+import { markFresh } from "@/components/fx/registry";
+import { Sweep } from "@/components/fx/sweep-react";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
@@ -126,7 +128,7 @@ function AddNodeModal({ open, reenroll, onClose }: { open: boolean; reenroll?: A
       className={method === "ssh" ? "md:max-w-[760px] md:max-h-[90vh]" : undefined}
     >
       {issued ? (
-        <InstallSteps issued={issued} onClose={onClose} />
+        <InstallSteps issued={issued} onClose={onClose} fresh={!reenroll} />
       ) : !reenroll && method === "ssh" ? (
         <SSHNodeInstall onBack={() => setMethod("choose")} onClose={close} onManual={() => setMethod("manual")} />
       ) : !reenroll && method === "choose" ? (
@@ -234,7 +236,8 @@ const codeCls = "rounded-field border border-line bg-canvas p-3 font-mono text-x
  * Three steps: put the binary on the server (a ready scp from the panel's own trusted bundle when it has one), paste the
  * one-line command as root, wait. The CA fingerprint is under "Details": it is inside the command already.
  */
-export function InstallSteps({ issued, onClose }: { issued: Plain<CreateEnrollmentResponse>; onClose: () => void }) {
+/** `fresh`: the node is new (not a re-enrolment), so its card sweeps in when the agent comes online. */
+export function InstallSteps({ issued, onClose, fresh = true }: { issued: Plain<CreateEnrollmentResponse>; onClose: () => void; fresh?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const navigate = useNavigate();
@@ -258,9 +261,10 @@ export function InstallSteps({ issued, onClose }: { issued: Plain<CreateEnrollme
   // a node that just came online: refresh the lists once, the modal has done its job
   useEffect(() => {
     if (!online) return;
+    if (fresh && id) markFresh("node", id); // its card in the Nodes list sweeps in once
     void qc.invalidateQueries({ queryKey: ["nodes"] });
     void qc.invalidateQueries({ queryKey: ["overview"] });
-  }, [online, qc]);
+  }, [online, qc, fresh, id]);
 
   const go = (tab?: "profiles") => {
     onClose();
@@ -293,10 +297,11 @@ export function InstallSteps({ issued, onClose }: { issued: Plain<CreateEnrollme
           <span className="text-xs text-muted">{t("node.add.once", { time: fmt.clock(issued.expiresUnix) })}</span>
         </Step>
         <Step n={3} title={t("node.add.step3")} done={online}>
-          <div className="flex items-center gap-2.5 rounded-field border border-line bg-surface-2 px-3 py-2.5" aria-live="polite">
+          {/* the wizard's own success step: "connected" sweeps in when the agent comes online */}
+          <Sweep play={online} className="flex items-center gap-2.5 rounded-field border border-line bg-surface-2 px-3 py-2.5" aria-live="polite">
             <StatusPill kind={online ? "ok" : nodeKind({ status })} label={online ? t("node.add.connected") : st.word({ status })} sm />
             <span className="text-xs leading-snug text-pretty text-muted">{online ? t("node.add.connectedBody") : t("node.add.waiting")}</span>
-          </div>
+          </Sweep>
         </Step>
       </ol>
 
