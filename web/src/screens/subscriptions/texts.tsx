@@ -9,6 +9,7 @@ import { HappPing } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { errorText } from "@/lib/errors";
 import { cx } from "@/lib/cx";
 import { useTx, type Tx } from "@/screens/users/t";
+import { ScrollFade } from "@/components/ui/scroll-fade";
 import { SwitchRow } from "@/screens/users/ui";
 import { announceMax, cutAnnounce, defaultNameTemplate, serverNames, validSupportLink, type Settings } from "./model";
 import { useSaveSettings } from "./queries";
@@ -254,16 +255,19 @@ function SubscriptionPreview({ t, title, announcement, hours, support, template,
         )}
         <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("subs.texts.pv.servers")}</span>
-          <div aria-live="polite" className="flex flex-col gap-1.5">
-            {names.map((name, i) => (
-              <div key={i} className="flex h-10 items-center gap-2.5 rounded-xl border border-line bg-surface px-3">
-                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
-                  <FlagText text={name} size={14} />
-                </span>
-                <span aria-hidden className="size-1.5 flex-none rounded-full bg-ok" />
-              </div>
-            ))}
-          </div>
+          {/* about seven rows and a half: the cut row says there is more */}
+          <ScrollFade label={t("subs.texts.pv.servers")} className="-me-1.5 max-h-[300px] pe-1.5">
+            <div aria-live="polite" className="flex flex-col gap-1.5">
+              {names.map((name, i) => (
+                <div key={i} className="flex h-10 flex-none items-center gap-2.5 rounded-xl border border-line bg-surface px-3">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                    <FlagText text={name} size={14} />
+                  </span>
+                  <span aria-hidden className="size-1.5 flex-none rounded-full bg-ok" />
+                </div>
+              ))}
+            </div>
+          </ScrollFade>
         </div>
         <div className="flex flex-col gap-1.5 border-t border-line pt-3">
           <div className="flex items-baseline gap-2 text-xs">

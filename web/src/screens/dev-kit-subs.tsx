@@ -47,9 +47,14 @@ export function SubsKit() {
   const state = new URLSearchParams(location.search).get("state") ?? "";
   const awg = state.startsWith("awg-");
   const shown = { ...settings, linkAwg: state === "awg-off" ? false : undefined } as Settings;
+  // &state=many: a group with as many servers as a real fleet gives, so the preview scrolls
+  const samples =
+    state === "many"
+      ? ["nl", "ru", "de", "tr", "fi", "be"].flatMap((cc, i) => ["HY2", "VLESS · XHTTP", "VLESS · TCP"].map((profile) => ({ node: `${cc}1`, countryCode: cc === "be" ? "BY" : cc.toUpperCase(), profile, loadPercent: i + 1 })))
+      : [];
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-    c.setQueryData(settingsQuery.queryKey, { settings: shown, effectiveTitle: "Mistgate", samples: [], sampleGroup: "", namesLanguage: "", sharedLinkUsers: 0, linkAwgKeys: 14 });
+    c.setQueryData(settingsQuery.queryKey, { settings: shown, effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "", namesLanguage: "", sharedLinkUsers: 0, linkAwgKeys: 14 });
     c.setQueryData(clientsQuery.queryKey, clients as never);
     c.setQueryData(protocolsQuery.queryKey, protocols as never);
     return c;
@@ -61,7 +66,7 @@ export function SubsKit() {
         {!awg && (
           <div data-shot="subs-texts" className="flex flex-col gap-3">
             <SectionLabel>Subscriptions → Names &amp; texts: ping in Happ</SectionLabel>
-            <TextsTab data={{ settings, effectiveTitle: "Mistgate" }} />
+            <TextsTab data={{ settings, effectiveTitle: "Mistgate", samples, sampleGroup: state === "many" ? "Default" : "" } as never} />
           </div>
         )}
         {awg && (

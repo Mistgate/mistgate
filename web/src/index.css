@@ -339,6 +339,53 @@
   display: none;
 }
 
+/* a quiet scroll area (ScrollFade): a thin scrollbar that shows on hover or focus, and a soft fade at an edge only while
+   there is more beyond it */
+@property --fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.scroll-soft {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  transition:
+    --fade-top 0.18s ease,
+    --fade-bottom 0.18s ease,
+    scrollbar-color 0.2s ease;
+}
+.scroll-soft[data-top="1"] {
+  --fade-top: 22px;
+}
+.scroll-soft[data-bottom="1"] {
+  --fade-bottom: 28px;
+}
+.scroll-soft:hover,
+.scroll-soft:focus-visible {
+  scrollbar-color: color-mix(in oklch, var(--muted) 45%, transparent) transparent;
+}
+.scroll-soft:focus-visible {
+  outline: none;
+}
+.scroll-soft::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-soft::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: transparent;
+}
+.scroll-soft:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--muted) 45%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
