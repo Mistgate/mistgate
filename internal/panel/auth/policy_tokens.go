@@ -78,6 +78,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UserServiceResetUserTrafficProcedure: TokenAccessDirect,
 	adminv1connect.UserServiceRevokeDeviceProcedure:     TokenAccessDirect,
 	adminv1connect.HealthServiceMuteAlertProcedure:      TokenAccessDirect,
+	adminv1connect.HealthServiceDismissAlertProcedure:   TokenAccessDirect,
 	adminv1connect.HealthServiceRunChecksNowProcedure:   TokenAccessDirect,
 	adminv1connect.HealthServiceRunDoctorProcedure:      TokenAccessDirect,
 	adminv1connect.NodeServiceCheckPortsProcedure:       TokenAccessDirect,

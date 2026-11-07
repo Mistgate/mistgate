@@ -857,6 +857,7 @@ var toolTitles = map[string]localizedText{
 	"user_reset_traffic":          {en: "Reset users’ traffic", ru: "Сбросить трафик пользователей", zh: "重置用户流量"},
 	"device_revoke":               {en: "Remove a device", ru: "Удалить устройство", zh: "移除设备"},
 	"alert_mute":                  {en: "Mute an alert", ru: "Заглушить алерт", zh: "静默告警"},
+	"alert_close":                 {en: "Close an alert", ru: "Закрыть алерт", zh: "关闭告警"},
 	"node_fix":                    {en: "Fix a node", ru: "Исправить ноду", zh: "修复节点"},
 	"rollout_start":               {en: "Update a node now", ru: "Обновить ноду сейчас", zh: "立即更新节点"},
 	"rollout_pause":               {en: "Pause the rollout", ru: "Поставить раскатку на паузу", zh: "暂停滚动更新"},

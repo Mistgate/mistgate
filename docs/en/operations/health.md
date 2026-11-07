@@ -312,7 +312,8 @@ A card has at most one primary button, and only when it is the fix. Depending on
 - the node's WARP card;
 - **Open node**;
 - **This is normal for this node**, for a doctor warning;
-- **Mute**.
+- **Mute**;
+- **Close**.
 
 ### Muting
 
@@ -322,6 +323,10 @@ A card has at most one primary button, and only when it is the fix. Depending on
 - It is not counted in the badges.
 - If its severity rises, the mute ends and the alert counts again.
 - Muting is written to the audit log.
+
+### Closing
+
+**Mute** keeps the alert on the list and only quiets it for a while; **Close** takes it off the list. A closed alert is resolved at once, shows in the history as "Closed by an admin", sends no message and is written to the audit log. It stays closed for as long as the same problem continues: the panel keeps seeing the condition and does not open the alert again. It opens again only if the problem stops for more than an hour and then returns, or if it gets worse (its severity rises). A toast after Close offers **Undo**, and **Close all shown** closes every alert of the list at once after a confirmation that names the count; it is useful for the "never connected" notices on the People tab. Closing has the same permissions as muting.
 
 > **Note:** Alerts are seen in the admin (the header badge, the Overview, the Health page) and through the [API](../reference/api.md) and [MCP](../reference/mcp.md). The panel can also send them to Telegram when they open and when they resolve: see [Telegram alerts](telegram-alerts.md). A muted alert stays quiet there too.
 
@@ -356,8 +361,8 @@ Events of severity info are kept for 90 days, warnings and errors for 400 days. 
 | Action | Owner | Helper | Read-only |
 |---|---|---|---|
 | See alerts, checks and doctor reports | yes | yes | yes |
-| Mute an alert, Check now, Run again | yes | yes | no |
+| Mute or close an alert, Check now, Run again | yes | yes | no |
 | This is normal for this node, Count it again | yes | yes | no |
 | Apply a doctor fix | yes | no | no |
 
-An API token with the operator profile can mute alerts, start checks and run the doctor. A doctor fix through a token is possible only via MCP, as a plan the owner approves (see [MCP](../reference/mcp.md)).
+An API token with the operator profile can mute and close alerts, start checks and run the doctor. A doctor fix through a token is possible only via MCP, as a plan the owner approves (see [MCP](../reference/mcp.md)).

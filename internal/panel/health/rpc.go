@@ -267,6 +267,39 @@ func (r rpc) MuteAlert(ctx context.Context, req *connect.Request[adminv1.MuteAle
 	return connect.NewResponse(&adminv1.MuteAlertResponse{Alert: alertMsg(a, names, fixable)}), nil
 }
 
+// DismissAlert closes an active alert (resolution "dismissed", silent) or, with reopen, undoes the close.
+func (r rpc) DismissAlert(ctx context.Context, req *connect.Request[adminv1.DismissAlertRequest]) (*connect.Response[adminv1.DismissAlertResponse], error) {
+	s := r.s
+	var a store.HealthAlert
+	var err error
+	if req.Msg.Reopen {
+		a, err = s.st.ReopenDismissedAlert(ctx, req.Msg.AlertId, s.now())
+	} else {
+		a, err = s.st.DismissAlert(ctx, req.Msg.AlertId, s.now())
+	}
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, notFound("alert")
+	case errors.Is(err, store.ErrConflict) && req.Msg.Reopen:
+		return nil, precondition("the alert is not closed or has been opened again")
+	case errors.Is(err, store.ErrConflict):
+		return nil, precondition("the alert is already resolved")
+	case err != nil:
+		return nil, s.internal("dismiss alert", err)
+	}
+	action := "health.dismiss_alert"
+	if req.Msg.Reopen {
+		action = "health.reopen_alert"
+	}
+	s.audit(ctx, action, map[string]string{"alert_id": a.ID, "kind": a.Kind, "node_id": a.NodeID})
+	names, _ := s.nodeNames(ctx)
+	fixable, err := s.fixOffers(ctx)
+	if err != nil {
+		return nil, s.internal("doctor rows", err)
+	}
+	return connect.NewResponse(&adminv1.DismissAlertResponse{Alert: alertMsg(a, names, fixable)}), nil
+}
+
 // ---------------------------------------------------------------------------------------------------
 // Synthetic checks
 

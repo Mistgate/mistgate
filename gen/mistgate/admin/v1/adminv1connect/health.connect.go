@@ -38,6 +38,9 @@ const (
 	HealthServiceListAlertsProcedure = "/mistgate.admin.v1.HealthService/ListAlerts"
 	// HealthServiceMuteAlertProcedure is the fully-qualified name of the HealthService's MuteAlert RPC.
 	HealthServiceMuteAlertProcedure = "/mistgate.admin.v1.HealthService/MuteAlert"
+	// HealthServiceDismissAlertProcedure is the fully-qualified name of the HealthService's
+	// DismissAlert RPC.
+	HealthServiceDismissAlertProcedure = "/mistgate.admin.v1.HealthService/DismissAlert"
 	// HealthServiceGetChecksProcedure is the fully-qualified name of the HealthService's GetChecks RPC.
 	HealthServiceGetChecksProcedure = "/mistgate.admin.v1.HealthService/GetChecks"
 	// HealthServiceRunChecksNowProcedure is the fully-qualified name of the HealthService's
@@ -65,6 +68,12 @@ type HealthServiceClient interface {
 	// "muted until" caption), or unmute it. Muting never hides the alert from the list and never stops the
 	// panel from resolving it.
 	MuteAlert(context.Context, *connect.Request[v1.MuteAlertRequest]) (*connect.Response[v1.MuteAlertResponse], error)
+	// Close an active alert ("dismissed" in the history): it is resolved now, with no notification, and stays
+	// closed while the same condition continues. It opens again only after the problem has stopped for longer
+	// than the re-open window and then returns, or when its severity rises. With reopen the call undoes a close
+	// (the Undo of the toast). FAILED_PRECONDITION: the alert is already resolved (reopen: it is not closed
+	// any more, or another alert of the same key is active).
+	DismissAlert(context.Context, *connect.Request[v1.DismissAlertRequest]) (*connect.Response[v1.DismissAlertResponse], error)
 	// Node x profile matrix of the synthetic checks, with the last result and the last 24 h per cell.
 	GetChecks(context.Context, *connect.Request[v1.GetChecksRequest]) (*connect.Response[v1.GetChecksResponse], error)
 	// "Check now": schedule an immediate round for every inbound of one node (or of the fleet). Returns at
@@ -112,6 +121,12 @@ func NewHealthServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+HealthServiceMuteAlertProcedure,
 			connect.WithSchema(healthServiceMethods.ByName("MuteAlert")),
+			connect.WithClientOptions(opts...),
+		),
+		dismissAlert: connect.NewClient[v1.DismissAlertRequest, v1.DismissAlertResponse](
+			httpClient,
+			baseURL+HealthServiceDismissAlertProcedure,
+			connect.WithSchema(healthServiceMethods.ByName("DismissAlert")),
 			connect.WithClientOptions(opts...),
 		),
 		getChecks: connect.NewClient[v1.GetChecksRequest, v1.GetChecksResponse](
@@ -163,6 +178,7 @@ func NewHealthServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 type healthServiceClient struct {
 	listAlerts         *connect.Client[v1.ListAlertsRequest, v1.ListAlertsResponse]
 	muteAlert          *connect.Client[v1.MuteAlertRequest, v1.MuteAlertResponse]
+	dismissAlert       *connect.Client[v1.DismissAlertRequest, v1.DismissAlertResponse]
 	getChecks          *connect.Client[v1.GetChecksRequest, v1.GetChecksResponse]
 	runChecksNow       *connect.Client[v1.RunChecksNowRequest, v1.RunChecksNowResponse]
 	getDoctor          *connect.Client[v1.GetDoctorRequest, v1.GetDoctorResponse]
@@ -180,6 +196,11 @@ func (c *healthServiceClient) ListAlerts(ctx context.Context, req *connect.Reque
 // MuteAlert calls mistgate.admin.v1.HealthService.MuteAlert.
 func (c *healthServiceClient) MuteAlert(ctx context.Context, req *connect.Request[v1.MuteAlertRequest]) (*connect.Response[v1.MuteAlertResponse], error) {
 	return c.muteAlert.CallUnary(ctx, req)
+}
+
+// DismissAlert calls mistgate.admin.v1.HealthService.DismissAlert.
+func (c *healthServiceClient) DismissAlert(ctx context.Context, req *connect.Request[v1.DismissAlertRequest]) (*connect.Response[v1.DismissAlertResponse], error) {
+	return c.dismissAlert.CallUnary(ctx, req)
 }
 
 // GetChecks calls mistgate.admin.v1.HealthService.GetChecks.
@@ -225,6 +246,12 @@ type HealthServiceHandler interface {
 	// "muted until" caption), or unmute it. Muting never hides the alert from the list and never stops the
 	// panel from resolving it.
 	MuteAlert(context.Context, *connect.Request[v1.MuteAlertRequest]) (*connect.Response[v1.MuteAlertResponse], error)
+	// Close an active alert ("dismissed" in the history): it is resolved now, with no notification, and stays
+	// closed while the same condition continues. It opens again only after the problem has stopped for longer
+	// than the re-open window and then returns, or when its severity rises. With reopen the call undoes a close
+	// (the Undo of the toast). FAILED_PRECONDITION: the alert is already resolved (reopen: it is not closed
+	// any more, or another alert of the same key is active).
+	DismissAlert(context.Context, *connect.Request[v1.DismissAlertRequest]) (*connect.Response[v1.DismissAlertResponse], error)
 	// Node x profile matrix of the synthetic checks, with the last result and the last 24 h per cell.
 	GetChecks(context.Context, *connect.Request[v1.GetChecksRequest]) (*connect.Response[v1.GetChecksResponse], error)
 	// "Check now": schedule an immediate round for every inbound of one node (or of the fleet). Returns at
@@ -268,6 +295,12 @@ func NewHealthServiceHandler(svc HealthServiceHandler, opts ...connect.HandlerOp
 		HealthServiceMuteAlertProcedure,
 		svc.MuteAlert,
 		connect.WithSchema(healthServiceMethods.ByName("MuteAlert")),
+		connect.WithHandlerOptions(opts...),
+	)
+	healthServiceDismissAlertHandler := connect.NewUnaryHandler(
+		HealthServiceDismissAlertProcedure,
+		svc.DismissAlert,
+		connect.WithSchema(healthServiceMethods.ByName("DismissAlert")),
 		connect.WithHandlerOptions(opts...),
 	)
 	healthServiceGetChecksHandler := connect.NewUnaryHandler(
@@ -318,6 +351,8 @@ func NewHealthServiceHandler(svc HealthServiceHandler, opts ...connect.HandlerOp
 			healthServiceListAlertsHandler.ServeHTTP(w, r)
 		case HealthServiceMuteAlertProcedure:
 			healthServiceMuteAlertHandler.ServeHTTP(w, r)
+		case HealthServiceDismissAlertProcedure:
+			healthServiceDismissAlertHandler.ServeHTTP(w, r)
 		case HealthServiceGetChecksProcedure:
 			healthServiceGetChecksHandler.ServeHTTP(w, r)
 		case HealthServiceRunChecksNowProcedure:
@@ -347,6 +382,10 @@ func (UnimplementedHealthServiceHandler) ListAlerts(context.Context, *connect.Re
 
 func (UnimplementedHealthServiceHandler) MuteAlert(context.Context, *connect.Request[v1.MuteAlertRequest]) (*connect.Response[v1.MuteAlertResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.HealthService.MuteAlert is not implemented"))
+}
+
+func (UnimplementedHealthServiceHandler) DismissAlert(context.Context, *connect.Request[v1.DismissAlertRequest]) (*connect.Response[v1.DismissAlertResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.HealthService.DismissAlert is not implemented"))
 }
 
 func (UnimplementedHealthServiceHandler) GetChecks(context.Context, *connect.Request[v1.GetChecksRequest]) (*connect.Response[v1.GetChecksResponse], error) {

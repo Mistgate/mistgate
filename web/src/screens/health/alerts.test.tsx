@@ -12,6 +12,7 @@ import { AlertCard, AlertsTab, Ipv6Tag } from "./alerts";
 import { useFixFlow } from "./fix";
 
 const muteAlert = vi.fn();
+const dismissAlert = vi.fn();
 const acceptDoctorItem = vi.fn();
 const restartInbounds = vi.fn();
 const updateNode = vi.fn();
@@ -19,7 +20,7 @@ let role = Role.OWNER;
 /** Node.ipv6 of the alerts' node nod_1: it can take an entry, off */
 let node1V6: object = { entry: "", entrySupported: true, unavailableReason: "", addresses: [], src: "" };
 vi.mock("@/lib/api", () => ({
-  health: { muteAlert: (...a: unknown[]) => muteAlert(...a), acceptDoctorItem: (...a: unknown[]) => acceptDoctorItem(...a), applyFix: vi.fn() },
+  health: { muteAlert: (...a: unknown[]) => muteAlert(...a), dismissAlert: (...a: unknown[]) => dismissAlert(...a), acceptDoctorItem: (...a: unknown[]) => acceptDoctorItem(...a), applyFix: vi.fn() },
   nodes: {
     restartInbounds: (...a: unknown[]) => restartInbounds(...a),
     updateNode: (...a: unknown[]) => updateNode(...a),
@@ -56,7 +57,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const f of [muteAlert, acceptDoctorItem, restartInbounds, updateNode]) f.mockReset();
+  for (const f of [muteAlert, dismissAlert, acceptDoctorItem, restartInbounds, updateNode]) f.mockReset();
 });
 
 const NOW = 2_000_000_000;
@@ -287,6 +288,51 @@ describe("muting and accepting", () => {
     expect(button("Mute")).toBeUndefined();
     await click(button("Unmute"));
     expect(muteAlert).toHaveBeenCalledWith({ alertId: "alt_1", durationS: 0 });
+  });
+
+  it("«Close» has a one-line tooltip, closes without asking and «Undo» re-opens the alert", async () => {
+    dismissAlert.mockResolvedValue({ alert: {} });
+    await mount(alert());
+    const close = button("Close")!;
+    expect(close.title).toBe("Closes the alert. It won't come back while this continues — only if it stops and happens again, or gets worse.");
+    await click(close);
+    expect(dismissAlert).toHaveBeenCalledTimes(1);
+    expect(dismissAlert).toHaveBeenCalledWith({ alertId: "alt_1", reopen: false });
+    expect(text()).not.toContain("alert?"); // no confirmation
+    expect(text()).toContain("Alert closed");
+    await click(button("Undo"));
+    expect(dismissAlert).toHaveBeenLastCalledWith({ alertId: "alt_1", reopen: true });
+  });
+
+  it("a muted alert can be closed too, and a role that cannot mute has no «Close»", async () => {
+    await mount(alert({ mutedUntilUnix: NOW + 3600 }));
+    expect(button("Close")).toBeTruthy();
+    expect(button("Unmute")).toBeTruthy();
+    act(() => root?.unmount());
+    host?.remove();
+    role = Role.READONLY;
+    await mount(alert());
+    expect(button("Close")).toBeUndefined();
+  });
+
+  it("«Close all shown» asks first, with the number, and closes every alert shown", async () => {
+    dismissAlert.mockResolvedValue({ alert: {} });
+    await mountTab([alert({ id: "a" }), alert({ id: "b", nodeName: "msk1", nodeId: "nod_msk1" }), alert({ id: "c", mutedUntilUnix: NOW + 3600 })]);
+    await click(button("Close all shown"));
+    expect(dismissAlert).not.toHaveBeenCalled();
+    expect(text()).toContain("Close 2 alerts?");
+    const confirm = [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Close").at(-1);
+    await click(confirm);
+    expect(dismissAlert.mock.calls.map((c) => c[0])).toEqual([
+      { alertId: "a", reopen: false },
+      { alertId: "b", reopen: false },
+    ]);
+    expect(text()).toContain("2 alerts closed");
+  });
+
+  it("a list of one has no «Close all shown»", async () => {
+    await mountTab([alert()]);
+    expect(button("Close all shown")).toBeUndefined();
   });
 
   it("a doctor warning can be accepted as normal for the node", async () => {
@@ -666,6 +712,13 @@ describe("the Alerts tab", () => {
     const episodes = [...document.getElementById(row.getAttribute("aria-controls")!)!.querySelectorAll("li")];
     expect(episodes.map((li) => li.id)).toEqual(mtproto().map((e) => `alert-${e.id}-${e.resolvedAtUnix}`));
     expect(episodes[0]!.textContent).not.toContain("MTProto"); // the row says it once
+  });
+
+  it("says a closed alert was closed by an admin, with the time", async () => {
+    const closed = alert({ id: "alt_x", openedUnix: NOW - 3600, resolvedAtUnix: NOW - 600, resolution: "dismissed" });
+    await mountTab([], [closed]);
+    expect([...document.querySelectorAll('[role="img"][aria-label]')].map((g) => g.getAttribute("aria-label"))).toEqual(["Closed by an admin"]);
+    expect(document.querySelector("[data-history-toggle]") ?? document.querySelector("section li")).toBeTruthy();
   });
 
   it("shows the latest 20 events and the rest on request", async () => {

@@ -181,6 +181,36 @@ func TestMuteAlertRPC(t *testing.T) {
 	}
 }
 
+func TestDismissAlertRPC(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	r := rpc{e.s}
+	e.report("de1", false, res("disk_space", dFail, ""))
+	id := e.active()["doctor_fail/de1/disk_space"].ID
+
+	_, err := r.DismissAlert(e.ctx, req(&adminv1.DismissAlertRequest{AlertId: "alt_nope"}))
+	wantCode(t, err, connect.CodeNotFound, "alert")
+	d, err := r.DismissAlert(e.ctx, req(&adminv1.DismissAlertRequest{AlertId: id}))
+	if err != nil || d.Msg.Alert.ResolvedAtUnix == 0 || d.Msg.Alert.Resolution != "dismissed" {
+		t.Fatalf("dismiss: %+v %v", d, err)
+	}
+	if n, _ := e.s.AlertCounts(e.ctx); n != 0 {
+		t.Fatal("closed alert in the badge")
+	}
+	_, err = r.DismissAlert(e.ctx, req(&adminv1.DismissAlertRequest{AlertId: id}))
+	wantCode(t, err, connect.CodeFailedPrecondition, "resolved")
+	u, err := r.DismissAlert(e.ctx, req(&adminv1.DismissAlertRequest{AlertId: id, Reopen: true}))
+	if err != nil || u.Msg.Alert.ResolvedAtUnix != 0 {
+		t.Fatalf("reopen: %+v %v", u, err)
+	}
+	_, err = r.DismissAlert(e.ctx, req(&adminv1.DismissAlertRequest{AlertId: id, Reopen: true}))
+	wantCode(t, err, connect.CodeFailedPrecondition, "not closed")
+	rows, _ := e.st.ListAudit(e.ctx, "", 0, 10)
+	if len(rows) != 2 || rows[0].Action != "health.reopen_alert" || rows[1].Action != "health.dismiss_alert" || rows[1].Actor != "adm_test" {
+		t.Fatalf("audit: %+v", rows)
+	}
+}
+
 func TestGetChecksMatrix(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)

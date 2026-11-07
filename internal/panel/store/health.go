@@ -110,13 +110,33 @@ func (s *Store) AlertHistory(ctx context.Context, since time.Time, nodeID string
 // reopenWithin ago is re-opened (id and first_seen stay, so flapping does not fill the history; opened_at moves to
 // now, the start of the new episode); otherwise a row is inserted. The active-alert unique index makes concurrent
 // opens update the same row instead of duplicating it.
+//
+// An alert an admin closed (resolution "dismissed") stays closed while its condition continues: when the latest
+// dismissed row of the key was last seen within reopenWithin, at the same or a higher severity than a, and no alert
+// of the key is active, only that row's last_seen moves and it is returned still resolved (the caller must not notify).
+// A gap longer than reopenWithin, or a higher severity, opens a new alert; a dismissed row is never re-opened in place.
 func (s *Store) OpenAlert(ctx context.Context, a HealthAlert, reopenWithin time.Duration, now time.Time) (out HealthAlert, reopened bool, err error) {
 	a.ID, a.FirstSeen, a.CreatedAt = NewID("alt_"), now, now
+	held, err := s.batch(ctx, Stmt{Query: `UPDATE health_alert SET last_seen = ?
+		WHERE id = (SELECT id FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ?
+			AND resolved_at > 0 AND resolution = 'dismissed' AND last_seen >= ? AND severity >= ?
+			ORDER BY last_seen DESC, resolved_at DESC LIMIT 1)
+		AND NOT EXISTS (SELECT 1 FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ? AND resolved_at = 0)
+		RETURNING ` + alertCols,
+		Args: []any{unix(now), a.Kind, a.NodeID, a.Subject, unix(now.Add(-reopenWithin)), int64(a.Severity),
+			a.Kind, a.NodeID, a.Subject}, Returning: true})
+	if err != nil {
+		return HealthAlert{}, false, err
+	}
+	if len(held) == 1 && len(held[0].Rows) == 1 {
+		out, err = scanAlert(batchRow(held[0].Rows[0]))
+		return out, false, err
+	}
 	results, err := s.batch(ctx,
 		Stmt{Query: `UPDATE health_alert SET resolved_at = 0, resolution = '', severity = ?, params_json = ?,
 			title_key = ?, why_key = ?, last_seen = ?, opened_at = ?
 			WHERE id = (SELECT id FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ?
-				AND resolved_at >= ? AND resolved_at > 0 ORDER BY resolved_at DESC LIMIT 1)
+				AND resolved_at >= ? AND resolved_at > 0 AND resolution != 'dismissed' ORDER BY resolved_at DESC LIMIT 1)
 			AND NOT EXISTS (SELECT 1 FROM health_alert WHERE kind = ? AND node_id = ? AND subject = ? AND resolved_at = 0)
 			RETURNING ` + alertCols,
 			Args: []any{int64(a.Severity), jsonMap(a.Params), a.TitleKey, a.WhyKey, unix(now), unix(now),
@@ -175,6 +195,43 @@ func (s *Store) InsertResolvedAlert(ctx context.Context, a HealthAlert) error {
 // the alert does not exist, ErrConflict when it is already resolved.
 func (s *Store) MuteAlert(ctx context.Context, id string, until time.Time) (HealthAlert, error) {
 	res, err := s.W.ExecContext(ctx, `UPDATE health_alert SET muted_until = ? WHERE id = ? AND resolved_at = 0`, fleetUnix(until), id)
+	if err != nil {
+		return HealthAlert{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		if _, err := s.HealthAlert(ctx, id); err != nil {
+			return HealthAlert{}, err
+		}
+		return HealthAlert{}, ErrConflict
+	}
+	return s.HealthAlert(ctx, id)
+}
+
+// DismissAlert closes an active alert as resolved with resolution "dismissed" (an admin's Close) and clears its mute.
+// OpenAlert keeps it closed while the condition continues. ErrNotFound when the alert does not exist, ErrConflict
+// when it is already resolved.
+func (s *Store) DismissAlert(ctx context.Context, id string, now time.Time) (HealthAlert, error) {
+	res, err := s.W.ExecContext(ctx, `UPDATE health_alert SET resolved_at = ?, resolution = 'dismissed', muted_until = 0
+		WHERE id = ? AND resolved_at = 0`, max(unix(now), 1), id)
+	if err != nil {
+		return HealthAlert{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		if _, err := s.HealthAlert(ctx, id); err != nil {
+			return HealthAlert{}, err
+		}
+		return HealthAlert{}, ErrConflict
+	}
+	return s.HealthAlert(ctx, id)
+}
+
+// ReopenDismissedAlert undoes DismissAlert: the alert becomes active again. ErrNotFound when it does not exist,
+// ErrConflict when it was not closed by an admin or another alert of the same key is active by now.
+func (s *Store) ReopenDismissedAlert(ctx context.Context, id string, now time.Time) (HealthAlert, error) {
+	res, err := s.W.ExecContext(ctx, `UPDATE health_alert SET resolved_at = 0, resolution = '', last_seen = ?
+		WHERE id = ? AND resolved_at > 0 AND resolution = 'dismissed'
+		AND NOT EXISTS (SELECT 1 FROM health_alert o WHERE o.kind = health_alert.kind AND o.node_id = health_alert.node_id
+			AND o.subject = health_alert.subject AND o.resolved_at = 0)`, unix(now), id)
 	if err != nil {
 		return HealthAlert{}, err
 	}

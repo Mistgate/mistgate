@@ -122,7 +122,7 @@ describe("the countdown", () => {
 describe("words of an approval", () => {
   it("titles every tool that can plan a change, in both languages", () => {
     const tools = [
-      "user_create", "user_update", "user_disable", "user_enable", "user_reset_traffic", "device_revoke", "alert_mute", "node_fix", "rollout_start", "rollout_pause", "rollout_resume",
+      "user_create", "user_update", "user_disable", "user_enable", "user_reset_traffic", "device_revoke", "alert_mute", "alert_close", "node_fix", "rollout_start", "rollout_pause", "rollout_resume",
       "rollout_cancel", "node_update_schedule", "node_update_schedule_cancel", "update_timezone", "node_rollback", "node_install", "node_server_password_rotate",
     ];
     for (const tool of tools) {

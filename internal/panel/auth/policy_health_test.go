@@ -19,6 +19,7 @@ func TestHealthServiceRolePolicy(t *testing.T) {
 		{"GetChecks", adminv1connect.HealthServiceGetChecksProcedure, true, true, true},
 		{"GetDoctor", adminv1connect.HealthServiceGetDoctorProcedure, true, true, true},
 		{"MuteAlert", adminv1connect.HealthServiceMuteAlertProcedure, true, true, false},
+		{"DismissAlert", adminv1connect.HealthServiceDismissAlertProcedure, true, true, false},
 		{"RunChecksNow", adminv1connect.HealthServiceRunChecksNowProcedure, true, true, false},
 		{"RunDoctor", adminv1connect.HealthServiceRunDoctorProcedure, true, true, false},
 		{"ApplyFix", adminv1connect.HealthServiceApplyFixProcedure, true, false, false},

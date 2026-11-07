@@ -195,7 +195,7 @@ func main() {
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | да | да | да |
 | `UpdateService.GetUpdates` | да | да | да |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | нет | да | да |
-| `HealthService.MuteAlert`, `RunChecksNow`, `RunDoctor` | нет | да | да |
+| `HealthService.MuteAlert`, `DismissAlert`, `RunChecksNow`, `RunDoctor` | нет | да | да |
 | `AuthService.ListAudit` | нет | нет | да |
 | `HealthService.ApplyFix` | нет | нет | только через одобренный план MCP |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | нет | нет | только через одобренный план MCP |

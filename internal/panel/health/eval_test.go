@@ -2052,3 +2052,48 @@ func TestMutedAlertReopensWithItsMute(t *testing.T) {
 		t.Fatalf("expected a re-open that carries the mute, got %+v", last)
 	}
 }
+
+// A closed alert stays closed while its condition holds: no new alert, no transition, no event. After the problem has gone
+// for longer than the re-open window and comes back, it alerts again.
+func TestDismissedAlertStaysClosedUntilTheProblemStops(t *testing.T) {
+	var seen []Transition
+	e := newEnv(t, func(c *Config) { c.OnTransition = func(tr Transition) { seen = append(seen, tr) } })
+	e.node("de1", "hetzner", true)
+	a := e.inbound("de1", 443)
+	b := e.inbound("de1", 8443)
+	e.pass(a)
+	e.fail(b, "timeout")
+	e.fail(b, "timeout")
+	al := e.active()["check_failed/de1/"+b]
+	if al.ID == "" {
+		t.Fatal("no alert opened")
+	}
+	if _, err := e.st.DismissAlert(e.ctx, al.ID, e.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	seen = nil
+	events := len(e.events("de1"))
+	for range 4 {
+		e.clock.Advance(10 * time.Minute)
+		e.fail(b, "timeout")
+	}
+	want(t, e.active())
+	if len(seen) != 0 || len(e.events("de1")) != events {
+		t.Fatalf("a closed alert announced: transitions=%+v events=%d (was %d)", seen, len(e.events("de1")), events)
+	}
+	if h := e.history(); len(h) != 1 || h[0].ID != al.ID || h[0].Resolution != "dismissed" {
+		t.Fatalf("history = %+v", h)
+	}
+	// the problem stops, and returns after more than the re-open window
+	e.pass(b)
+	e.clock.Advance(2 * time.Hour)
+	e.fail(b, "timeout")
+	e.fail(b, "timeout")
+	now := e.active()["check_failed/de1/"+b]
+	if now.ID == "" || now.ID == al.ID {
+		t.Fatalf("no new alert after the problem returned: %+v", now)
+	}
+	if len(seen) == 0 || seen[len(seen)-1].Resolved {
+		t.Fatalf("the new alert was not announced: %+v", seen)
+	}
+}

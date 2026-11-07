@@ -582,6 +582,13 @@ func TestNodeRollbackAndOtherChanges(t *testing.T) {
 	mustFail(t, s, "alert_mute_plan", map[string]any{"alert_id": "alr_none", "duration_s": 60})
 	mustFail(t, s, "alert_mute_plan", map[string]any{"alert_id": "alr_1", "duration_s": 999999})
 
+	cl := planOf(t, s, "alert_close", map[string]any{"alert_id": "alr_1"})
+	applyOf(t, s, "alert_close", cl.ConfirmToken)
+	if len(e.w.dismissReq) != 1 || e.w.dismissReq[0].GetAlertId() != "alr_1" || e.w.dismissReq[0].GetReopen() {
+		t.Errorf("close: %+v", e.w.dismissReq)
+	}
+	mustFail(t, s, "alert_close_plan", map[string]any{"alert_id": "alr_none"})
+
 	d := planOf(t, s, "device_revoke", map[string]any{"user_id": "usr_alice", "device_id": "dev_1"})
 	applyOf(t, s, "device_revoke", d.ConfirmToken)
 	if len(e.w.revokeReq) != 1 || e.w.revokeReq[0].GetDeviceId() != "dev_1" {

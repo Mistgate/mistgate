@@ -84,6 +84,83 @@ export function useMute() {
 }
 
 /**
+ * Close one alert or a card's several at once (the alert resolves now and stays closed while its problem goes on); the toast
+ * offers "Undo", which re-opens them. No confirmation: it is reversible.
+ */
+export function useClose() {
+  const t = useT();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const call = useMutation({
+    mutationFn: (v: { ids: string[]; reopen: boolean }) => Promise.all(v.ids.map(async (id) => plain(await health.dismissAlert({ alertId: id, reopen: v.reopen })))),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["health", "alerts"] });
+      void qc.invalidateQueries({ queryKey: ["overview"] });
+    },
+    onError: (e) => toast.error(errorText(e, t)),
+  });
+  return (alerts: readonly Alert[], onDone?: () => void) => {
+    const ids = alerts.map((x) => x.id);
+    const n = ids.length;
+    call.mutate(
+      { ids, reopen: false },
+      {
+        onSuccess: () => {
+          onDone?.();
+          toast(n > 1 ? t.n("hl.alerts.closedToastMany", n) : t("hl.alerts.closedToast"), { undo: () => call.mutate({ ids, reopen: true }) });
+        },
+      },
+    );
+  };
+}
+
+/** "Close", a quiet button with what closing means in its tooltip. */
+function CloseButton({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  return (
+    <Button variant="ghost" size="md" title={t("hl.alerts.closeHint")} onClick={onClose}>
+      {t("hl.alerts.close")}
+    </Button>
+  );
+}
+
+/**
+ * "Close all shown", above a list of several alerts: asks first, naming how many. Nothing for a list of one (its card has Close)
+ * or for a role that cannot close.
+ */
+export function CloseAll({ alerts }: { alerts: readonly Alert[] }) {
+  const t = useT();
+  const can = useCan();
+  const close = useClose();
+  const [open, setOpen] = useState(false);
+  if (!can.run || alerts.length < 2) return null;
+  return (
+    <div className="flex justify-end">
+      <Button variant="ghost" size="md" title={t("hl.alerts.closeHint")} onClick={() => setOpen(true)}>
+        {t("hl.alerts.closeAll")}
+      </Button>
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        title={t.n("hl.alerts.closeAllTitle", alerts.length)}
+        footer={
+          <>
+            <Button variant="ghost" size="md" onClick={() => setOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" size="md" onClick={() => close(alerts, () => setOpen(false))}>
+              {t("hl.alerts.close")}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13px] leading-normal text-pretty">{t("hl.alerts.closeAllBody")}</p>
+      </Modal>
+    </div>
+  );
+}
+
+/**
  * The IPv6 side of a country alert, after its title: "IPv6" on the IPv6 alert itself, "reachable over IPv6" on an IPv4 one whose
  * node the IPv6 rounds reach, "IPv6 entry on" on one whose node has its IPv6 entry on. Nothing on any other alert.
  */
@@ -131,6 +208,7 @@ export function AlertsTab({ active: all, history: closed, now, flow }: { active:
         </div>
       ) : (
         <div className="flex flex-col gap-2">
+          <CloseAll alerts={live.flat()} />
           {live.map((g) => (
             <AlertGroup key={g[0]!.id} alerts={g} now={now} flow={flow} />
           ))}
@@ -288,6 +366,7 @@ function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert
   const fmt = useFmt();
   const can = useCan();
   const mute = useMute();
+  const close = useClose();
   const accept = useAcceptDoctor();
   const [restarting, setRestarting] = useState(false);
   const fix = alertFix(a);
@@ -386,7 +465,12 @@ function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert
               {t("hl.doctor.accept")}
             </Button>
           )}
-          {shared && can.run && a.actions.includes("mute") && <MuteControl muted={muted} onMute={(seconds) => mute([a], seconds)} />}
+          {shared && can.run && (
+            <span className="ms-auto flex">
+              <CloseButton onClose={() => close([a])} />
+              {a.actions.includes("mute") && <MuteControl muted={muted} onMute={(seconds) => mute([a], seconds)} />}
+            </span>
+          )}
         </div>
       )}
       {restart && <RestartDialog open={restarting} onOpenChange={setRestarting} alert={a} scope={restart} />}
@@ -398,11 +482,11 @@ function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert
 /** A card's row of buttons; a quiet one that leads it starts in line with the text above (its padding pulled back). */
 const actionRow = "flex flex-wrap items-center gap-1.5 [&>.bg-transparent:first-child]:-ms-3.5";
 
-/** "Mute ▾", or "Unmute" on a muted alert; pushed to the right end of its row of buttons. */
+/** "Mute ▾", or "Unmute" on a muted alert. */
 function MuteControl({ muted, onMute }: { muted: boolean; onMute: (seconds: number) => void }) {
   const t = useT();
   return (
-    <span className="ms-auto flex">
+    <span className="flex">
       {muted ? (
         <Button variant="ghost" size="md" onClick={() => onMute(0)}>
           {t("hl.alerts.unmute")}
@@ -422,6 +506,7 @@ function GroupCard({ alerts, now, flow }: { alerts: Alert[]; now: number; flow: 
   const t = useT();
   const can = useCan();
   const mute = useMute();
+  const close = useClose();
   const body = useId();
   const first = alerts[0]!;
   const [open, setOpen] = useState(() => groupSeverity(alerts) === AlertSeverity.CRITICAL || targeted(alerts.map((a) => `alert-${a.id}`)));
@@ -470,7 +555,12 @@ function GroupCard({ alerts, now, flow }: { alerts: Alert[]; now: number; flow: 
                 {t("hl.alerts.openNode")}
               </Link>
             )}
-            {can.run && has("mute") && <MuteControl muted={muted} onMute={(seconds) => mute(alerts, seconds)} />}
+            {can.run && (
+              <span className="ms-auto flex">
+                <CloseButton onClose={() => close(alerts)} />
+                {has("mute") && <MuteControl muted={muted} onMute={(seconds) => mute(alerts, seconds)} />}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -815,6 +905,7 @@ const endings: Record<string, { icon: IconName; cls: string }> = {
   cleared: { icon: "refresh", cls: "text-muted" },
   node_returned: { icon: "refresh", cls: "text-muted" },
   fix_applied: { icon: "check", cls: "tone-ok tone-text" },
+  dismissed: { icon: "x", cls: "text-muted" },
   accepted: { icon: "check", cls: "text-muted" },
   superseded: { icon: "layers", cls: "text-muted" },
   node_retired: { icon: "x", cls: "text-muted" },

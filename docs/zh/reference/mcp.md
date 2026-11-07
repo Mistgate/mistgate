@@ -147,6 +147,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_reset_traffic` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `device_revoke` | 操作员 | `user_id`、`device_id`，可选 `block`（在所有者于管理后台解除拉黑前，这个设备 ID 无法再次注册；报告其他 ID 的应用算作新设备；只有会发送设备 ID 的应用才能被拉黑） | 否 |
 | `alert_mute` | 操作员 | `alert_id`、`duration_s`（最多 604800；0 表示取消静默） | 否 |
+| `alert_close` | 操作员 | `alert_id`；关闭告警且不发送通知，同一问题持续期间保持关闭 | 否 |
 | `subscription_app_upsert` | 操作员 | `platform`（`ios`、`android`、`windows`、`macos`、`linux`）和 `name` 用于指定应用；更改现有应用时只传入变更字段；新应用至少要传入 `kind`：`kind`（`happ` 接收订阅链接，`amnezia` 接收 AmneziaWG 密钥）、`download_url`、`add_link_template`（占位符 `{url}`、`{url_enc}`、`{name_enc}`）、`description`（最多 80 个字符）、`recommended` | 始终 |
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
 | `subscription_rules_set` | 操作员 | 完整的有序 `rules` 列表，每项为 `ua_contains` 加 `format`（`base64_uris`、`user_page`、`decoy`、`mihomo_yaml`、`xray_json`、`singbox_json`）；第一个匹配项生效 | 始终 |

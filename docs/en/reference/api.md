@@ -195,7 +195,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | yes | yes | yes |
 | `UpdateService.GetUpdates` | yes | yes | yes |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | no | yes | yes |
-| `HealthService.MuteAlert`, `RunChecksNow`, `RunDoctor` | no | yes | yes |
+| `HealthService.MuteAlert`, `DismissAlert`, `RunChecksNow`, `RunDoctor` | no | yes | yes |
 | `AuthService.ListAudit` | no | no | yes |
 | `HealthService.ApplyFix` | no | no | only through an approved MCP plan |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | no | no | only through an approved MCP plan |

@@ -8,7 +8,7 @@ import "mistgate/admin/v1/tspu_probe.proto";
 // Health screen (Alerts / Checks / Doctor tabs), the Doctor tab of the node page and the synthetic-check
 // pills of the node Overview tab. Conventions: common.proto.
 //
-// Roles (internal/panel/auth/policy.go): the three reads are open to every role; MuteAlert, RunChecksNow and
+// Roles (internal/panel/auth/policy.go): the three reads are open to every role; MuteAlert, DismissAlert, RunChecksNow and
 // RunDoctor need owner or helper; ApplyFix needs the owner (it changes the host), except that the panel may
 // let a helper apply restart_inbound with an in-handler role check.
 //
@@ -25,6 +25,12 @@ service HealthService {
   // "muted until" caption), or unmute it. Muting never hides the alert from the list and never stops the
   // panel from resolving it.
   rpc MuteAlert(MuteAlertRequest) returns (MuteAlertResponse);
+  // Close an active alert ("dismissed" in the history): it is resolved now, with no notification, and stays
+  // closed while the same condition continues. It opens again only after the problem has stopped for longer
+  // than the re-open window and then returns, or when its severity rises. With reopen the call undoes a close
+  // (the Undo of the toast). FAILED_PRECONDITION: the alert is already resolved (reopen: it is not closed
+  // any more, or another alert of the same key is active).
+  rpc DismissAlert(DismissAlertRequest) returns (DismissAlertResponse);
 
   // Node x profile matrix of the synthetic checks, with the last result and the last 24 h per cell.
   rpc GetChecks(GetChecksRequest) returns (GetChecksResponse);
@@ -208,6 +214,17 @@ message MuteAlertRequest {
 }
 
 message MuteAlertResponse {
+  Alert alert = 1;
+}
+
+message DismissAlertRequest {
+  string alert_id = 1;
+  // true = undo a close of the alert (re-open it); false = close an active alert.
+  bool reopen = 2;
+}
+
+message DismissAlertResponse {
+  // The alert after the call: resolved with resolution "dismissed", or active again after a reopen.
   Alert alert = 1;
 }
 

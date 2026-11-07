@@ -84,6 +84,8 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["device_revoke", {}],
   ["user_reset_traffic", { user: "usr_1", was_bytes: 5 }],
   ["health.mute_alert", { alert_id: "alr_1" }],
+  ["health.dismiss_alert", { alert_id: "alr_1" }],
+  ["health.reopen_alert", { alert_id: "alr_1" }],
   ["health.fix_plan", { node_id: "nod_1" }],
   ["health.apply_fix", { node_id: "nod_1" }],
   ["update_rollout_start", { rollout_id: "rol_1", version: "v1.2", nodes: "3", batch_size: "1" }],

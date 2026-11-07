@@ -137,6 +137,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.HealthServiceGetChecksProcedure:    levelRead,
 	adminv1connect.HealthServiceGetDoctorProcedure:    levelRead,
 	adminv1connect.HealthServiceMuteAlertProcedure:    levelWrite,
+	adminv1connect.HealthServiceDismissAlertProcedure: levelWrite, // Close: like a mute, day-to-day work
 	adminv1connect.HealthServiceRunChecksNowProcedure: levelWrite,
 	adminv1connect.HealthServiceRunDoctorProcedure:    levelWrite,
 	adminv1connect.HealthServiceApplyFixProcedure:     levelOwner,

@@ -91,6 +91,7 @@ func TestHealthWiring(t *testing.T) {
 		{"GetChecks", `{}`, 200, 200, 200},
 		{"GetDoctor", `{}`, 200, 200, 200},
 		{"MuteAlert", `{"alertId":"alt_x","durationS":60}`, 404, 404, 403},
+		{"DismissAlert", `{"alertId":"alt_x"}`, 404, 404, 403},
 		{"RunChecksNow", `{"nodeId":"nod_x"}`, 404, 404, 403},
 		{"RunDoctor", `{"nodeId":"nod_x"}`, 404, 404, 403},
 		{"ApplyFix", `{"nodeId":"nod_x","fixId":"journald_vacuum","dryRun":true}`, 404, 403, 403},

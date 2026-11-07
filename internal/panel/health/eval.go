@@ -1051,6 +1051,9 @@ func (s *Service) reconcile(ctx context.Context, now time.Time, d *derived, acti
 		if err != nil {
 			return err
 		}
+		if !a.ResolvedAt.IsZero() {
+			continue // closed by an admin and the condition still holds: stays closed, nothing to announce
+		}
 		s.transition(a, false)
 		s.alertEvent(ctx, a, now)
 	}

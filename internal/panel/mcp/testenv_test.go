@@ -353,6 +353,7 @@ type world struct {
 	resetReq           []*adminv1.ResetUserTrafficRequest
 	createReq          []*adminv1.CreateUserRequest
 	muteReq            []*adminv1.MuteAlertRequest
+	dismissReq         []*adminv1.DismissAlertRequest
 	rollbackReq        []*adminv1.RollbackNodeRequest
 	subsReq            []*adminv1.UpdateSubscriptionSettingsRequest
 	groupCreateReq     []*adminv1.CreateGroupRequest
@@ -1158,6 +1159,13 @@ func (w *world) MuteAlert(_ context.Context, r *connect.Request[adminv1.MuteAler
 	w.muteReq = append(w.muteReq, r.Msg)
 	w.mu.Unlock()
 	return connect.NewResponse(&adminv1.MuteAlertResponse{}), nil
+}
+
+func (w *world) DismissAlert(_ context.Context, r *connect.Request[adminv1.DismissAlertRequest]) (*connect.Response[adminv1.DismissAlertResponse], error) {
+	w.mu.Lock()
+	w.dismissReq = append(w.dismissReq, r.Msg)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.DismissAlertResponse{}), nil
 }
 
 func (w *world) GetChecks(context.Context, *connect.Request[adminv1.GetChecksRequest]) (*connect.Response[adminv1.GetChecksResponse], error) {

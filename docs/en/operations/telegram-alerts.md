@@ -43,7 +43,7 @@ Once linked you can switch **Send me alerts** off without unlinking, **Send test
 How the messages behave:
 
 - **Bursts become one message.** Events that arrive within about 30 seconds of each other are sent together, one message per chat; an identical line is not repeated.
-- **The same open alert is never sent twice.** When it resolves you get one message that says how long it lasted. An alert that a worse one replaced, one you accepted as normal and one you muted end without a message, and so does the device-limit alert.
+- **The same open alert is never sent twice.** When it resolves you get one message that says how long it lasted. An alert that a worse one replaced, one you accepted as normal, one you muted and one you closed end without a message, and so does the device-limit alert.
 - **Info-level alerts are not sent.** Only warnings and critical ones are (a fixed floor in this version; there are no quiet hours or filters yet).
 - **Short, in the panel language.** Messages are in English, Russian or Simplified Chinese, whichever the panel's default language is (**Settings → Interface → Default language**); a panel in Persian or Turkish sends them in English. Names that come from data, such as a node, a profile or a token, are escaped and cut to one line.
 - **Never a secret.** A message holds no token, no subscription link and no password.

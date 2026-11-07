@@ -195,7 +195,7 @@ func main() {
 | `SubscriptionService.GetSubscriptionSettings`, `ListClients`, `TestUserAgent` | 是 | 是 | 是 |
 | `UpdateService.GetUpdates` | 是 | 是 | 是 |
 | `UserService.CreateUser`, `UpdateUser`, `SetUsersEnabled`, `ExtendUsers`, `ResetUserTraffic`, `RevokeDevice` | 否 | 是 | 是 |
-| `HealthService.MuteAlert`, `RunChecksNow`, `RunDoctor` | 否 | 是 | 是 |
+| `HealthService.MuteAlert`, `DismissAlert`, `RunChecksNow`, `RunDoctor` | 否 | 是 | 是 |
 | `AuthService.ListAudit` | 否 | 否 | 是 |
 | `HealthService.ApplyFix` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | 否 | 否 | 仅可通过已批准的 MCP 计划执行 |

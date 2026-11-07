@@ -34,7 +34,7 @@ const (
 func changeTools() []toolDef {
 	var out []toolDef
 	for _, g := range [][]toolDef{
-		change(userCreate), change(userUpdate), change(userDisable), change(userEnable), change(userResetTraffic), change(deviceRevoke), change(alertMute),
+		change(userCreate), change(userUpdate), change(userDisable), change(userEnable), change(userResetTraffic), change(deviceRevoke), change(alertMute), change(alertClose),
 		change(warpRestart), change(warpReregister),
 		change(nodeFix), change(rolloutStart), change(nodeUpdateSchedule), change(nodeUpdateScheduleCancel), change(updateTimezone),
 		change(rolloutPause), change(rolloutResume), change(rolloutCancel), change(nodeRollback),
@@ -1014,6 +1014,49 @@ var alertMute = changeSpec[alertMuteArgs]{
 			return doneWith("alert_unmuted", "Alert unmuted."), nil
 		}
 		return doneWith("alert_muted", "Alert muted.", "seconds", strconv.FormatUint(uint64(a.DurationS), 10)), nil
+	},
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// alert_close
+
+type alertCloseArgs struct {
+	ReasonField
+	AlertID string `json:"alert_id"`
+}
+
+var alertClose = changeSpec[alertCloseArgs]{
+	name: "alert_close", min: ProfileOperator,
+	procs: procs(adminv1connect.HealthServiceListAlertsProcedure, adminv1connect.HealthServiceDismissAlertProcedure),
+	desc:  "Close an active alert. It is resolved now (\"dismissed\" in the history), sends no notification and stays closed while the same problem continues; it opens again only if the problem stops and returns, or gets worse.",
+	plan: func(c *call, a alertCloseArgs) (*planned, error) {
+		if err := validID("alert_id", a.AlertID); err != nil {
+			return nil, err
+		}
+		r, err := c.cl.Health.ListAlerts(c.ctx, connect.NewRequest(&adminv1.ListAlertsRequest{}))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		for _, al := range r.Msg.GetActive() {
+			if al.GetId() != a.AlertID {
+				continue
+			}
+			kind, sev := enumName("ALERT_KIND_", al.GetKind().String()), enumName("ALERT_SEVERITY_", al.GetSeverity().String())
+			return &planned{
+				Summary: "Close one active alert: it stays closed while the problem continues.",
+				Facts: []Fact{
+					codedFact("alert", kind+", "+sev, "alert", "kind", kind, "severity", sev),
+					{Key: "node", Value: nm(al.GetNodeName()), Untrusted: true},
+				},
+			}, nil
+		}
+		return nil, errors.New("no such active alert")
+	},
+	apply: func(c *call, a alertCloseArgs, _ Plan) (done, error) {
+		if _, err := c.cl.Health.DismissAlert(c.ctx, connect.NewRequest(&adminv1.DismissAlertRequest{AlertId: a.AlertID})); err != nil {
+			return done{}, apiError(err)
+		}
+		return doneWith("alert_closed", "Alert closed."), nil
 	},
 }
 

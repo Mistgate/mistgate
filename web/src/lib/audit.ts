@@ -69,6 +69,8 @@ const keys: Record<string, MessageKey> = {
   device_revoke: "audit.device_revoke",
   user_reset_traffic: "audit.user_reset_traffic",
   "health.mute_alert": "audit.health.mute_alert",
+  "health.dismiss_alert": "audit.health.dismiss_alert",
+  "health.reopen_alert": "audit.health.reopen_alert",
   "health.fix_plan": "audit.health.fix_plan",
   "health.apply_fix": "audit.health.apply_fix",
   update_rollout_start: "audit.update_rollout_start",

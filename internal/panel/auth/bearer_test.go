@@ -351,6 +351,7 @@ func TestBearerAllowListAndProfiles(t *testing.T) {
 		{adminv1connect.FleetServiceOverviewProcedure, 200, 200, 200}, // a read on the list
 		{pCreateUser, 403, 200, 200},                                  // a write: operator and up
 		{adminv1connect.HealthServiceMuteAlertProcedure, 403, 200, 200},
+		{adminv1connect.HealthServiceDismissAlertProcedure, 403, 200, 200},
 		{pListAudit, 403, 403, 200}, // owner level on the list: the admin profile only
 		// closed to every profile, whatever the level
 		{pDeleteUsers, 403, 403, 403},
