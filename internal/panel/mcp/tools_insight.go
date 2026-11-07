@@ -1022,7 +1022,9 @@ func (c *call) fleetDigest(in digestArg) (any, error) {
 
 	// country verdict changes
 	days := uint32(min(max((hours+23)/24, 1), 3))
-	if rh, err := c.cl.Reachability.GetReachabilityHistory(c.ctx, connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{Days: days, Family: 4})); err == nil {
+	if rh, err := c.cl.Reachability.GetReachabilityHistory(c.ctx, connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{Days: days, Family: 4})); err != nil {
+		v.Unavailable = append(v.Unavailable, "reachability_history")
+	} else {
 		for _, nh := range rh.Msg.GetNodes() {
 			for _, lane := range nh.GetLanes() {
 				for i, pt := range lane.GetPoints() {
@@ -1077,7 +1079,9 @@ func (c *call) fleetDigest(in digestArg) (any, error) {
 		}
 	}
 	// Per-pair UDP loss: the sender loses packets on the way to the target while another sender gets through.
-	if pl, err := c.cl.Node.GetPathLoss(c.ctx, connect.NewRequest(&adminv1.GetPathLossRequest{Hours: uint32(hours)})); err == nil {
+	if pl, err := c.cl.Node.GetPathLoss(c.ctx, connect.NewRequest(&adminv1.GetPathLossRequest{Hours: uint32(hours)})); err != nil {
+		v.Unavailable = append(v.Unavailable, "path_loss")
+	} else {
 		for _, row := range pl.Msg.GetRows() {
 			if row.GetCheckedUnix() < since || b.byID[row.GetFromNodeId()] == nil {
 				continue

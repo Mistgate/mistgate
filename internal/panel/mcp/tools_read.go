@@ -540,7 +540,7 @@ func readTools() []toolDef {
 					v.Entries = append(v.Entries, auditV{
 						ID: e.GetId(), Time: e.GetTimeUnix(), Source: enumName("AUDIT_SOURCE_", e.GetSource().String()),
 						ActorID: clean(e.GetActorId(), 80), ActorName: nm(e.GetActorName()), Action: clean(e.GetAction(), 80),
-						Params: auditParamsWithoutAddresses(e.GetParamsJson()), Result: clean(e.GetResult(), 60), IP: clean(e.GetIp(), 64),
+						Params: auditParamsWithoutAddresses(e.GetParamsJson()), Result: clean(e.GetResult(), 60),
 					})
 				}
 				v.NextBeforeID = r.Msg.GetNextBeforeId()

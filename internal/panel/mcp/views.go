@@ -928,7 +928,7 @@ func alertView(a *adminv1.Alert) alertV {
 	v := alertV{
 		ID: a.GetId(), Severity: enumName("ALERT_SEVERITY_", a.GetSeverity().String()), Kind: enumName("ALERT_KIND_", a.GetKind().String()),
 		NodeID: a.GetNodeId(), NodeName: nm(a.GetNodeName()), Subject: nm(a.GetSubject()), Title: clean(a.GetTitleKey(), 80),
-		Params: cleanMap(a.GetParams(), maxParamValue), Why: clean(a.GetWhyKey(), 80), First: a.GetFirstSeenUnix(), Opened: a.GetOpenedUnix(),
+		Params: insMap(a.GetParams(), maxParamValue), Why: clean(a.GetWhyKey(), 80), First: a.GetFirstSeenUnix(), Opened: a.GetOpenedUnix(),
 		Last: a.GetLastSeenUnix(), Resolved: a.GetResolvedAtUnix(), Resolution: clean(a.GetResolution(), 60),
 		MutedTill: a.GetMutedUntilUnix(),
 	}
@@ -1727,7 +1727,7 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 				cv.AtUnix, cv.LatencyMs, cv.ExitCtry = l.GetAtUnix(), l.GetLatencyMs(), clean(l.GetExitCountry(), 8)
 				cv.ConnectMs, cv.ResponseMs = l.GetConnectMs(), l.GetResponseMs()
 				cv.UDPSent, cv.UDPLost = l.GetUdpSent(), l.GetUdpLost()
-				cv.ErrorCode, cv.ErrorInfo = clean(l.GetErrorCode(), 60), clean(l.GetErrorDetail(), 200)
+				cv.ErrorCode, cv.ErrorInfo = clean(l.GetErrorCode(), 60), noAddr(clean(l.GetErrorDetail(), 200))
 			}
 			for _, b := range c.GetHistory() {
 				cv.OK24h += b.GetOk()
@@ -1762,7 +1762,6 @@ type auditV struct {
 	Action    string `json:"action"`
 	Params    string `json:"params,omitempty"`
 	Result    string `json:"result,omitempty"`
-	IP        string `json:"ip,omitempty"`
 }
 
 // AuditV is the audit_search result.

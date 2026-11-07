@@ -20,8 +20,10 @@ func TestScrub(t *testing.T) {
 		{"vless link", "see " + canaryVless + " now", []string{"vless://", "CANARYPBK", "11111111"}, []string{"see ", " now"}},
 		{"hysteria link", "hysteria2://pw@203.0.113.7:443/?sni=example.com#n", []string{"hysteria2://", "pw@"}, nil},
 		{"private key line", "[Interface]\nPrivateKey = " + key43 + "=\nAddress = 10.0.0.2", []string{key43, "[Interface]"}, []string{"Address"}},
+		{"Telegram bot token", "bot 123456:" + strings.Repeat("Ab3_-", 6), []string{"123456:"}, []string{"bot ", "[token]"}},
 		{"preshared", "PresharedKey: " + key43 + "=", []string{key43}, nil},
 		{"bare 32-byte key", "key " + key43 + "= end", []string{key43}, []string{"key ", " end"}},
+		{"hex key", "key " + strings.Repeat("0123456789abcdef", 2) + " end", []string{strings.Repeat("0123456789abcdef", 2)}, []string{"key ", " end"}},
 		{"two keys", key43 + " " + key43, []string{key43}, nil},
 		{"subscription url", "https://sub.example.com/ZZsecretprefix1234567890/CANARYtoken0123456789abcdefghij", []string{"ZZsecret", "CANARYtoken"}, []string{"sub.example.com"}},
 		{"url with a query", "https://example.com/a?token=abc123&x=1", []string{"abc123", "x=1"}, []string{"example.com/a"}},
@@ -41,7 +43,7 @@ func TestScrub(t *testing.T) {
 		}
 	}
 	// ids, versions, hashes and ordinary words are not touched
-	for _, s := range []string{"usr_alice", "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "v1.2.3", "node_blip", "alert.node_down", strings.Repeat("a", 64), "10.8.0.2", "de1.example.com"} {
+	for _, s := range []string{"usr_alice", "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "v1.2.3", "node_blip", "alert.node_down", strings.Repeat("a", 64), "10.8.0.2", "de1.example.com", "https://example.com/550e8400-e29b-41d4-a716-446655440000"} {
 		if got := scrub(s); got != s {
 			t.Errorf("%q became %q", s, got)
 		}

@@ -14,14 +14,17 @@ import (
 // Stats batches produce hourly host rows: the host load of two batches of one hour is one row, mean and peak.
 func TestStatsBatchesFeedHostHours(t *testing.T) {
 	e := newEnv(t)
-	a := e.enroll("nodea")
+	a := e.enroll("de1")
 	ids := e.fixture(a.nodeID)
 	c, _, _ := connectFull(a, "host-hours")
 	now := time.Now().Unix()
-	for seq, cpu := range map[uint64]float32{1: 10, 2: 30} {
+	for _, batch := range []struct {
+		seq uint64
+		cpu float32
+	}{{seq: 1, cpu: 10}, {seq: 2, cpu: 30}} {
 		b := statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: now - 60}})
-		b.GetStats().Host = &agentv1.HostMetrics{CpuPct: cpu, SoftirqPct: 4, Load1: 0.5, RamUsedBytes: 512, RamTotalBytes: 1024, NetRxBps: 100 * uint64(seq), NetTxBps: 50}
-		c.send(seq, b)
+		b.GetStats().Host = &agentv1.HostMetrics{CpuPct: batch.cpu, SoftirqPct: 4, Load1: 0.5, RamUsedBytes: 512, RamTotalBytes: 1024, NetRxBps: 100 * batch.seq, NetTxBps: 50}
+		c.send(batch.seq, b)
 	}
 	node := nodeService{e.f}
 	waitFor(t, func() bool {
@@ -33,7 +36,7 @@ func TestStatsBatchesFeedHostHours(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := r.Msg.Hours[len(r.Msg.Hours)-1]
-	if r.Msg.NodeName != "nodea" || h.CpuAvgPct != 20 || h.CpuMaxPct != 30 || h.SoftirqMaxPct != 4 || h.RamUsedMaxBytes != 512 ||
+	if r.Msg.NodeName != "de1" || h.CpuAvgPct != 20 || h.CpuMaxPct != 30 || h.SoftirqMaxPct != 4 || h.RamUsedMaxBytes != 512 ||
 		h.RxMaxBps != 200 || h.RxAvgBps != 150 || h.SessionsMax != 1 {
 		t.Errorf("host hour = %+v (node %q)", h, r.Msg.NodeName)
 	}

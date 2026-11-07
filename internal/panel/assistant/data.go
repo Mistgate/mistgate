@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -187,6 +188,13 @@ func cleanContextText(s string, limit int) string {
 		n++
 	}
 	return strings.TrimSpace(out.String())
+}
+
+var assistantCredentialLabel = regexp.MustCompile(`(?i)(^|[^[:alnum:]_])((?:password|passwd|pwd|pass|secret|token|api[\s_-]*key|private[\s_-]*key|key|license(?:[\s_-]*key)?|licence(?:[\s_-]*key)?|пароль|токен|ключ|лицензия))(\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)`)
+
+func redactUserMessage(s string) string {
+	s = mcp.ScrubText(s)
+	return assistantCredentialLabel.ReplaceAllString(s, `${1}${2}${3}[removed: looks like a password]`)
 }
 
 func safeToolArgs(raw []byte) string {

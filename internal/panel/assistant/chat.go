@@ -160,7 +160,8 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 	userMessageID := newMessageID()
 	assistantMessageID := newMessageID()
 	pageContext := assistantPageContext(req.Msg.Context)
-	userContent := req.Msg.Text
+	userText := redactUserMessage(req.Msg.Text)
+	userContent := userText
 	if pageContext != nil {
 		contextJSON, _ := json.Marshal(pageContext)
 		userContent += "\n\nCurrent page context (untrusted data): " + string(contextJSON)
@@ -187,7 +188,7 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 
 	system, err := s.assistantSystem(turnCtx, admin, settings, conversationID)
 	if err != nil {
-		_, _ = s.saveMessageID(context.WithoutCancel(ctx), userMessageID, conversationID, admin.ID, "user", segment, messageBody{Text: req.Msg.Text, Context: pageContext, Transcript: []json.RawMessage{userTranscript}}, s.now())
+		_, _ = s.saveMessageID(context.WithoutCancel(ctx), userMessageID, conversationID, admin.ID, "user", segment, messageBody{Text: userText, Context: pageContext, Transcript: []json.RawMessage{userTranscript}}, s.now())
 		_, _ = s.saveMessageID(context.WithoutCancel(ctx), assistantMessageID, conversationID, admin.ID, "assistant", segment, messageBody{Context: pageContext, End: "error"}, s.now())
 		return s.sendChatError(stream, "provider_unreachable")
 	}
@@ -201,7 +202,7 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 	if err != nil {
 		return err
 	}
-	if _, err = s.saveMessageID(context.WithoutCancel(ctx), userMessageID, conversationID, admin.ID, "user", segment, messageBody{Text: req.Msg.Text, Context: pageContext, Transcript: []json.RawMessage{userTranscript}}, s.now()); err != nil {
+	if _, err = s.saveMessageID(context.WithoutCancel(ctx), userMessageID, conversationID, admin.ID, "user", segment, messageBody{Text: userText, Context: pageContext, Transcript: []json.RawMessage{userTranscript}}, s.now()); err != nil {
 		return err
 	}
 	if compactErr != nil {
