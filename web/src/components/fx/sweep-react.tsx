@@ -52,7 +52,7 @@ type SweepProps = SweepOptions &
  * `<Sweep play={key}>content</Sweep>`: sweeps over its content each time `play` changes to a truthy value. The change and the
  * new content come in the same render, so the content that arrives is the content revealed behind the band.
  */
-export function Sweep({ play, onMount, as = "div", children, direction, duration, easing, palette, bandWidth, peakAlpha, brightness, wave, ripple, fadeOut, reveal, delay, hold, hideWhileHeld, signal, freeze, ...rest }: SweepProps) {
-  const ref = useSweepWhen(play, onMount, { direction, duration, easing, palette, bandWidth, peakAlpha, brightness, wave, ripple, fadeOut, reveal, delay, hold, hideWhileHeld, signal, freeze });
+export function Sweep({ play, onMount, as = "div", children, direction, duration, easing, palette, bandWidth, peakAlpha, brightness, wave, ripple, fadeOut, reveal, delay, hold, hideWhileHeld, signal, freeze, radius, clipBox, ...rest }: SweepProps) {
+  const ref = useSweepWhen(play, onMount, { direction, duration, easing, palette, bandWidth, peakAlpha, brightness, wave, ripple, fadeOut, reveal, delay, hold, hideWhileHeld, signal, freeze, radius, clipBox });
   return createElement(as, { ...rest, ref }, children);
 }

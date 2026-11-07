@@ -8,7 +8,8 @@ import { Card, SectionLabel } from "@/components/ui/bits";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { setEffectsEnabled, useEffectsEnabled } from "@/lib/effects";
+import { pageSweepOptions } from "@/components/fx/page";
+import { setEffectKind, setEffectsEnabled, useEffectKind, useEffectsEnabled, type FxKind } from "@/lib/effects";
 import { sweep } from "@/components/fx/sweep";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -96,16 +97,34 @@ export function InterfacePage() {
             <span className="text-xs leading-snug text-muted">{t("settings.fx.hint")}</span>
           </span>
           {effects && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => fxRow.current && void sweep(fxRow.current)}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => fxRow.current && void sweep(fxRow.current, pageSweepOptions())}>
               {t("settings.fx.show")}
             </Button>
           )}
           <Switch checked={effects} onCheckedChange={setEffectsEnabled} aria-label={t("settings.fx")} />
         </div>
+        {effects && (
+          <>
+            {(["create", "pages"] as const).map((k) => (
+              <FxKindRow key={k} kind={k} label={t(`settings.fx.${k}`)} />
+            ))}
+          </>
+        )}
         <p className="border-t border-line py-3 text-xs leading-normal text-muted">{t("settings.local")}</p>
       </Card>
       {me.data?.admin?.role === Role.OWNER && <BrandBlock />}
     </>
+  );
+}
+
+/** One of the moments the reveal animation plays at, indented under the main switch. */
+function FxKindRow({ kind, label }: { kind: FxKind; label: string }) {
+  const on = useEffectKind(kind);
+  return (
+    <div className="flex min-h-12 items-center gap-3 border-t border-line ps-4">
+      <span className="flex-1 text-[13px] font-semibold text-muted">{label}</span>
+      <Switch checked={on} onCheckedChange={(v) => setEffectKind(kind, v)} aria-label={label} />
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { App, StatusReason } from "@/gen/mistgate/admin/v1/common_pb";
 import type { ProfileSummary } from "@/gen/mistgate/admin/v1/profile_pb";
 import { Card, Chip, PageTitle } from "@/components/ui/bits";
@@ -19,6 +19,7 @@ import { useTx, type Tx } from "@/screens/users/t";
 import { dropsOf, dropWords, keysOnly, nameOf } from "./formats";
 import { byProtocol, lookOf, summaryParts, telegramOnly, viaWarp } from "./protocol-meta";
 import { Fresh } from "@/components/fx/fresh";
+import { useListEntrance } from "@/components/fx/page";
 import { facetIds, validateProfilesSearch, type FacetId } from "./search";
 
 const warnText = (w: StatusReason, t: Tx) => t.opt(`profiles.warn.${w.code}`, w.params) ?? w.code.replaceAll("_", " ");
@@ -44,6 +45,7 @@ export function ProfilesScreen() {
   const list = useQuery(profileListQuery);
   const protocols = useQuery(protocolsQuery);
   const groups = useQuery(groupsQuery);
+  const entrance = useListEntrance(list.data !== undefined && groups.data !== undefined && protocols.data !== undefined);
   // the box is the reader's own; the URL mirrors it (replace: no history entry per letter)
   const [q, setQ] = useState(search.q ?? "");
   const protocol = search.protocol ?? "";
@@ -185,8 +187,8 @@ export function ProfilesScreen() {
               <span>{t("profiles.col.people")}</span>
               <span />
             </div>
-            {shown.map((p) => (
-              <ProfileRow key={p.id} p={p} t={t} protocol={protocols.data?.find((x) => x.id === p.protocol)} groups={groupsOf(p.id)} />
+            {shown.map((p, i) => (
+              <ProfileRow key={p.id} style={entrance(i)} p={p} t={t} protocol={protocols.data?.find((x) => x.id === p.protocol)} groups={groupsOf(p.id)} />
             ))}
           </div>
         </Card>
@@ -355,7 +357,7 @@ function People({ p, t, groups }: { p: ProfileSummary; t: Tx; groups?: readonly 
  * then icons with numbers, the words of each in its tooltip: the settings, the formats, the nodes, the people, and a chevron.
  * Below 760px the row stacks: the name, the settings, then the protocol's name with the three counts.
  */
-export function ProfileRow({ p, t, protocol, groups }: { p: ProfileSummary; t: Tx; protocol?: { displayName: string; apps: App[] }; groups?: readonly { id: string; name: string }[] }) {
+export function ProfileRow({ p, t, protocol, groups, style }: { style?: CSSProperties; p: ProfileSummary; t: Tx; protocol?: { displayName: string; apps: App[] }; groups?: readonly { id: string; name: string }[] }) {
   const look = lookOf(p.protocol);
   const name = protocol?.displayName ?? p.protocol;
   return (
@@ -363,6 +365,7 @@ export function ProfileRow({ p, t, protocol, groups }: { p: ProfileSummary; t: T
       kind="profile"
       id={p.id}
       role="listitem"
+      style={style}
       className={cx(
         "group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 border-b border-line px-4 py-3 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2/50 has-[a:focus-visible]:bg-surface-2/50",
         subgrid,

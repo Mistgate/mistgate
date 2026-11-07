@@ -3,7 +3,7 @@ import { isFresh, subscribeFresh, takeFresh } from "./registry";
 import { sweep, type SweepOptions } from "./sweep";
 
 /** A dialog that is open and does not hold `el` (a thing created behind a window sweeps when the window is gone). */
-const blockedByDialog = (el: Element) => [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((d) => !d.contains(el));
+export const blockedByDialog = (el: Element) => [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((d) => !d.contains(el));
 
 /** Resolves when no such dialog is open (or after `max` ms: the sweep then plays behind it rather than never). */
 function untilDialogsClose(el: Element, max: number): Promise<void> {

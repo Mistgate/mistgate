@@ -158,6 +158,8 @@ const core: CoreMessages = {
   "settings.fx": "出现动画",
   "settings.fx.beta": "测试版",
   "settings.fx.show": "演示",
+  "settings.fx.create": "创建内容时",
+  "settings.fx.pages": "打开页面时",
   "settings.fx.hint": "新的节点、用户、分组或配置会在一道轻柔的彩色光波下显现。关闭，或系统设置了减少动态效果时，新内容会直接出现。",
   "settings.device": "仅限此设备",
 

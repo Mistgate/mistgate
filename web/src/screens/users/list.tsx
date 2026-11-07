@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { Avatar, Card, PageTitle } from "@/components/ui/bits";
@@ -24,6 +24,7 @@ import { clampPage, useMove, usePaging } from "@/lib/paging";
 import { userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { Fresh } from "@/components/fx/fresh";
+import { useListEntrance } from "@/components/fx/page";
 import { CreateUserModal } from "./create-user";
 import { avatarIndex, barTone, noAccess, nowSec, seenText, shownKey, shownKind, shownStatus, termText, usage, viaOf } from "./format";
 import { UsersBulk, UsersPick } from "./bulk";
@@ -173,6 +174,7 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
     placeholderData: keepPreviousData,
   });
 
+  const entrance = useListEntrance(list.data !== undefined);
   const rows = useMemo(() => list.data?.users ?? [], [list.data]);
   const counts = list.data?.counts;
   const total = counts ? { all: counts.all, online: counts.online, expiring: counts.expiring, over: counts.overQuota, devices: counts.overDeviceLimit }[filter] : 0;
@@ -331,8 +333,8 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                         </tr>
                       </thead>
                       <tbody className={cx("transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
-                        {rows.map((u) => (
-                          <Row key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={manage ? () => toggle(u) : undefined} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                        {rows.map((u, i) => (
+                          <Row key={u.id} style={entrance(i)} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={manage ? () => toggle(u) : undefined} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
                         ))}
                       </tbody>
                     </table>
@@ -340,8 +342,8 @@ function PeopleTab({ groupId, onCreate, creating, setCreating }: { groupId: stri
                   </Card>
                   <div className="flex flex-col gap-2 @min-[600px]:hidden">
                     <div className={cx("flex flex-col gap-2 transition-opacity duration-200", list.isPlaceholderData && "opacity-60")} aria-busy={list.isPlaceholderData || undefined}>
-                      {rows.map((u) => (
-                        <UserCard key={u.id} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={manage ? () => toggle(u) : undefined} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
+                      {rows.map((u, i) => (
+                        <UserCard key={u.id} style={entrance(i)} u={u} group={groupOf(u)} t={t} fmt={fmt} now={now} on={!!picked[u.id]} onToggle={manage ? () => toggle(u) : undefined} onOpen={() => go("/users/$id", { params: { id: u.id } })} />
                       ))}
                     </div>
                     {total > Math.min(...pageSizes) && (
@@ -490,7 +492,7 @@ function SortPick({ order, onSort, t }: { order: SortState; onSort: (next: SortS
 }
 
 /** `onToggle` is absent for a read-only admin: no tick box, no bar. */
-type RowProps = { u: User; group?: Group; t: Tx; fmt: Fmt; now: number; on: boolean; onToggle?: () => void; onOpen: () => void };
+type RowProps = { u: User; group?: Group; t: Tx; fmt: Fmt; now: number; on: boolean; onToggle?: () => void; onOpen: () => void; style?: CSSProperties };
 
 /** A slim usage bar: quiet while there is room, amber near the quota, red once it is used up. */
 function UsageBar({ pct, tone, className }: { pct: number; tone: keyof typeof barTone; className?: string }) {
@@ -621,7 +623,7 @@ const Inf = ({ title }: { title: string }) => (
 /** The term: days left, or ∞ for no expiry. */
 const TermText = ({ u, text, t }: { u: User; text: string; t: Tx }) => (u.expiresUnix === 0 ? <Inf title={t("users.never")} /> : text);
 
-function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
+function Row({ u, group, t, fmt, now, on, onToggle, onOpen, style }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
   return (
@@ -629,6 +631,7 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
       as="tr"
       kind="user"
       id={u.id}
+      style={style}
       onClick={onOpen}
       className={cx(
         "h-14 cursor-pointer border-b border-line text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2",
@@ -692,13 +695,14 @@ function Row({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
  * The card of the narrow list: the person on the first line (a problem right after the name, when they were last seen on
  * the right), the group, the apps, the devices and the term under it, the traffic and its bar at the bottom.
  */
-function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen }: RowProps) {
+function UserCard({ u, group, t, fmt, now, on, onToggle, onOpen, style }: RowProps) {
   const use = usage(u.usedBytes, u.quotaBytes, fmt);
   const term = termText(u, t, now);
   return (
     <Fresh
       kind="user"
       id={u.id}
+      style={style}
       onClick={onOpen}
       className={cx(
         "flex cursor-pointer flex-col gap-2.5 rounded-card border px-3.5 py-3",

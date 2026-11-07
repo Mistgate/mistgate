@@ -50,6 +50,10 @@ export type SweepOptions = {
   hideWhileHeld?: boolean;
   /** Cancels the sweep: the element is as it was and the promise resolves. */
   signal?: AbortSignal;
+  /** Corner radius of the cut, px; default the element's own. */
+  radius?: number;
+  /** An extra window-coordinate box the band is clipped to, asked every frame (a page sweep keeps off the sidebar and the bars). */
+  clipBox?: () => { left: number; top: number; right: number; bottom: number } | null;
   /** Dev kit: paint the band paused at this progress (0..1) and never finish (until cancelled). */
   freeze?: number;
 };
@@ -122,7 +126,7 @@ export function sweep(element: Element, options: SweepOptions = {}): Promise<voi
       start: null,
       holding: !!options.hold,
       seed: Math.random() * 100,
-      radius: Number.parseFloat(cs.borderTopLeftRadius) || 0,
+      radius: options.radius ?? (Number.parseFloat(cs.borderTopLeftRadius) || 0),
       masked: false,
       prevMask: [el.style.maskImage, el.style.getPropertyValue("-webkit-mask-image")],
       done: resolve,
@@ -243,6 +247,13 @@ function frame(now: number) {
       y0 = Math.max(y0, cr.top);
       x1 = Math.min(x1, cr.right);
       y1 = Math.min(y1, cr.bottom);
+    }
+    const box = t.opts.clipBox?.();
+    if (box) {
+      x0 = Math.max(x0, box.left);
+      y0 = Math.max(y0, box.top);
+      x1 = Math.min(x1, box.right);
+      y1 = Math.min(y1, box.bottom);
     }
     if (x1 <= x0 || y1 <= y0) continue;
     const job: PaintJob = {

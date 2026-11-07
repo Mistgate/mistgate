@@ -556,3 +556,11 @@
   direction: ltr;
   text-align: left;
 }
+
+/* a screen's list rows on their first data: a fade with a 4px rise (components/fx/page.tsx) */
+@keyframes mg-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

@@ -1,7 +1,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Link, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AddNodeProvider } from "@/components/add-node";
 import { StepUpProvider } from "@/components/step-up";
 import { Brand, Logo, Wordmark } from "@/components/brand";
@@ -21,6 +21,8 @@ import { healthKind, problemCount, useFleetHealth, useFleetSummary } from "@/lib
 import { useAwaitingApprovals } from "@/lib/integrations";
 import { basepath } from "@/lib/api";
 import { meQuery, useSignOut } from "@/lib/session";
+import { noteNavigation, usePageTransition } from "@/components/fx/page";
+import { useEffectKind, useEffectsEnabled } from "@/lib/effects";
 import { cx } from "@/lib/cx";
 
 // The palette (and Base UI's dialog behind it) is loaded the first time it is opened.
@@ -51,6 +53,15 @@ function ShellFrame() {
   const [palette, setPalette] = useState(false);
   const [paletteLoaded, setPaletteLoaded] = useState(false);
   // matches: root, app layout, then the section route: the key that restarts the enter animation
+  // the page sweep: once per pathname change (a tab switch is a search change: it does not), and once when the shell first appears
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const router = useRouter();
+  useEffect(() => router.subscribe("onBeforeNavigate", noteNavigation), [router]);
+  const effectsOn = useEffectsEnabled();
+  const pagesOn = useEffectKind("pages");
+  const pageFx = effectsOn && pagesOn;
+  const content = useRef<HTMLDivElement>(null);
+  usePageTransition(content, pathname, pageFx);
   const section = useRouterState({ select: (s) => s.matches[2]?.routeId ?? "" });
 
   function openPalette() {
@@ -87,7 +98,7 @@ function ShellFrame() {
       {/* one width rule for every screen: a centred column of at most 1360px, side padding that grows with the window.
           A screen that needs more (a wide table) puts an element with the class "app-wide" inside and the column lifts its cap. */}
       <main id="main" tabIndex={-1} className="outline-none px-4 pt-1.5 pb-24 md:px-[clamp(24px,4vw,64px)] md:pt-6 md:pb-8">
-        <div key={section} className="screen-enter mx-auto max-w-[1360px] has-[.app-wide]:max-w-none">
+        <div key={section} ref={content} className={cx(!pageFx && "screen-enter", "mx-auto max-w-[1360px] has-[.app-wide]:max-w-none")}>
           <Outlet />
         </div>
       </main>
@@ -211,7 +222,7 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
   const t = useT();
   const health = useFleetHealth();
   return (
-    <header className="sticky top-0 z-10 hidden h-14 items-center gap-3 border-b border-line bg-canvas px-5 md:flex">
+    <header data-fx-chrome="top" className="sticky top-0 z-10 hidden h-14 items-center gap-3 border-b border-line bg-canvas px-5 md:flex">
       {/* the whole placeholder and the shortcut fit beside the other controls from 1280 px; narrower, the search is the
           icon button of the phone, as tall as its neighbours, rather than a box that cuts its own words */}
       <button
@@ -293,7 +304,7 @@ function MobileHeader({ onSearch }: { onSearch: () => void }) {
   const t = useT();
   const health = useFleetHealth();
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center gap-2.5 bg-canvas px-4 pt-2 md:hidden">
+    <header data-fx-chrome="top" className="sticky top-0 z-10 flex h-14 items-center gap-2.5 bg-canvas px-4 pt-2 md:hidden">
       <Logo size={32} />
       <Wordmark size={16} />
       <div className="flex-1" />
@@ -332,7 +343,7 @@ export function Dock() {
     <nav
       data-dock
       aria-label={t("nav.main")}
-      className="fixed inset-x-3.5 bottom-3.5 z-10 flex h-[60px] gap-1 rounded-dock border border-line bg-dock p-1.5 shadow-(--shadow-dock) backdrop-blur-[16px] md:hidden"
+      data-fx-chrome="bottom" className="fixed inset-x-3.5 bottom-3.5 z-10 flex h-[60px] gap-1 rounded-dock border border-line bg-dock p-1.5 shadow-(--shadow-dock) backdrop-blur-[16px] md:hidden"
     >
       {primary.map((s) => (
         <Link key={s.id} to={s.to} activeOptions={{ exact: s.to === "/" }} className={tabCls}>

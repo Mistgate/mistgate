@@ -159,6 +159,8 @@ const core: CoreMessages = {
   "settings.fx": "انیمیشن ظاهر شدن",
   "settings.fx.beta": "بتا",
   "settings.fx.show": "نمایش",
+  "settings.fx.create": "هنگام ساخته شدن چیزی",
+  "settings.fx.pages": "هنگام باز شدن صفحه‌ها",
   "settings.fx.hint": "گره، کاربر، گروه یا پروفایل تازه زیر موجی سبک از رنگ پدیدار می‌شود. اگر خاموش باشد یا سیستم شما کاهش حرکت را روشن کرده باشد، موارد تازه فقط ظاهر می‌شوند.",
   "settings.device": "فقط روی این دستگاه",
   "auth.setup.welcomeTitle": "سلام!",

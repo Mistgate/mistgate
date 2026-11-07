@@ -160,6 +160,8 @@ const core: CoreMessages = {
   "settings.fx": "Belirme animasyonu",
   "settings.fx.beta": "Beta",
   "settings.fx.show": "Göster",
+  "settings.fx.create": "Bir şey oluşturulduğunda",
+  "settings.fx.pages": "Sayfalar açıldığında",
   "settings.fx.hint": "Yeni bir düğüm, kişi, grup veya profil hafif bir renk dalgasının altında belirir. Kapalıyken ya da sistemde hareketi azaltma açıkken yeni öğeler doğrudan görünür.",
   "settings.device": "Yalnızca bu cihazda",
   "auth.setup.welcomeTitle": "Merhaba!",

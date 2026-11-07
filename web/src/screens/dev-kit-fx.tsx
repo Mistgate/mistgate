@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Fresh } from "@/components/fx/fresh";
+import { contentBox, firstSweepOptions, pageSweepOptions } from "@/components/fx/page";
 import { markFresh } from "@/components/fx/registry";
 import { paletteNames, paletteStops, resolvePalette, easings, type Direction, type EasingName, type PaletteName } from "@/components/fx/palette";
 import { painterKind } from "@/components/fx/renderer";
@@ -133,6 +134,7 @@ export function FxKit() {
         </div>
       </Card>
 
+      <PageDemo />
       <Block title="A table being filled">
         <div className="flex gap-2">
           <Button variant="primary" onClick={fill}>
@@ -216,6 +218,45 @@ export function FxKit() {
         Sweep every card
       </Button>
     </div>
+  );
+}
+
+/** A page opening: a mock shell (sidebar, top bar, content) whose content column sweeps; the band stays inside the content area. */
+function PageDemo() {
+  const [round, setRound] = useState(freeze !== undefined ? 1 : 0);
+  const [first, setFirst] = useState(false);
+  const main = useRef<HTMLDivElement>(null);
+  const opts = (first ? firstSweepOptions : pageSweepOptions)({ ...(freeze !== undefined && { freeze }) });
+  return (
+    <Block title="A page opening (route sweep; the band keeps off the sidebar and the top bar)">
+      <div className="flex gap-2">
+        <Button onClick={() => { setFirst(false); setRound((r) => r + 1); }}>Open page</Button>
+        <Button onClick={() => { setFirst(true); setRound((r) => r + 1); }}>First load</Button>
+      </div>
+      <div className="flex h-[300px] overflow-hidden rounded-card-lg border border-line bg-canvas">
+        <div className="flex w-40 flex-none flex-col gap-1.5 border-e border-line p-3 text-xs font-bold text-muted">
+          {["Overview", "Nodes", "Users", "Profiles"].map((n) => (
+            <span key={n} className="rounded-ctl px-2.5 py-2">{n}</span>
+          ))}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div data-fx-chrome="top" className="flex h-12 flex-none items-center border-b border-line px-4 text-xs text-muted">Search</div>
+          <div ref={main} className="min-h-0 flex-1 overflow-hidden px-6 py-5">
+            <Sweep play={round} onMount={freeze !== undefined} {...opts} clipBox={() => (main.current ? contentBox(main.current)() : null)} className="flex flex-col gap-3">
+              <h2 className="text-[22px] font-extrabold tracking-[-0.03em]">Users</h2>
+              {people.slice(0, 4).map(([name, node, traffic]) => (
+                <div key={name} className="flex items-center gap-3 rounded-card border border-line bg-surface px-3.5 py-2.5 text-[13px]">
+                  <Avatar name={name} index={name.length} />
+                  <b className="flex-1">{name}</b>
+                  <span className="font-mono text-xs text-muted">{node}</span>
+                  <span className="font-mono text-xs">{traffic}</span>
+                </div>
+              ))}
+            </Sweep>
+          </div>
+        </div>
+      </div>
+    </Block>
   );
 }
 

@@ -29,6 +29,7 @@ import { useBatch } from "@/lib/batch";
 import { PickMenu } from "@/components/bulk";
 import { NodesBulk } from "./nodes-bulk";
 import { Fresh } from "@/components/fx/fresh";
+import { useListEntrance } from "@/components/fx/page";
 import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
 import { PanelKeyOffer } from "./nodes-panel-key";
 
@@ -42,6 +43,7 @@ export function NodesScreen() {
   const fmt = useFmt();
   const addNode = useAddNode();
   const q = useQuery(nodesQuery);
+  const entrance = useListEntrance(q.data !== undefined);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [protocol, setProtocol] = useState(all);
   const [country, setCountry] = useState(all);
@@ -173,8 +175,8 @@ export function NodesScreen() {
             </div>
           </div>
 
-          <Table rows={rows} fmt={fmt} select={select} />
-          <Cards rows={rows} fmt={fmt} select={select} />
+          <Table rows={rows} fmt={fmt} select={select} entrance={entrance} />
+          <Cards rows={rows} fmt={fmt} select={select} entrance={entrance} />
           {rows.length === 0 && <p className="p-8 text-center text-[13px] text-muted">{t("nodes.noRows")}</p>}
           {owner && <NodesBulk nodes={nodes} picked={picked} shown={new Set(rows.map((n) => n.id))} batch={batch} run={run} onClear={clear} />}
         </>
@@ -187,6 +189,7 @@ const cols = "md:grid-cols-[minmax(220px,2.4fr)_minmax(150px,1fr)_minmax(90px,0.
 const colsSelect = "md:grid-cols-[18px_minmax(220px,2.4fr)_minmax(150px,1fr)_minmax(90px,0.8fr)_56px_76px_92px_60px]";
 
 /** Ticking nodes for a bulk change (owner only): which are ticked, and how the page ticks them. */
+type Entrance = ReturnType<typeof useListEntrance>;
 type Select = {
   ticked: ReadonlySet<string>;
   toggle: (id: string) => void;
@@ -265,7 +268,7 @@ function NodeStatusLabel({ node }: { node: Node }) {
   );
 }
 
-function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select | undefined }) {
+function Table({ rows, fmt, select, entrance }: { rows: Node[]; fmt: Fmt; select: Select | undefined; entrance: Entrance }) {
   const t = useT();
   const sub = useSub();
   const heads = [t("nodes.col.node"), t("nodes.col.address"), t("nodes.col.protocols"), t("nodes.col.online"), t("nodes.col.today"), t("nodes.col.cpu"), t("nodes.col.uptime")];
@@ -296,12 +299,13 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
           </span>
         ))}
       </div>
-      {rows.map((n) => {
+      {rows.map((n, i) => {
         const kind = nodeKind(n);
         const s = sub(n, true);
         return (
           <Fresh kind="node" id={n.id}
             key={n.id}
+            style={entrance(i)}
             className={cx("relative grid min-h-[60px] items-start gap-4 border-b border-line px-5 py-2 text-[13px] transition-colors duration-200 last:border-b-0 hover:bg-surface-2", select ? colsSelect : cols)}
           >
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0" />
@@ -342,7 +346,7 @@ function Table({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
   );
 }
 
-function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select | undefined }) {
+function Cards({ rows, fmt, select, entrance }: { rows: Node[]; fmt: Fmt; select: Select | undefined; entrance: Entrance }) {
   const t = useT();
   const sub = useSub();
   return (
@@ -356,7 +360,7 @@ function Cards({ rows, fmt, select }: { rows: Node[]; fmt: Fmt; select: Select |
           </div>
         );
         return (
-          <Fresh key={n.id} kind="node" id={n.id} className="screen-enter relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={{ animationDelay: `${i * 45}ms` }}>
+          <Fresh key={n.id} kind="node" id={n.id} className="relative flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3.5" style={entrance(i)}>
             <Link to="/nodes/$id" params={{ id: n.id }} aria-label={n.name} className="absolute inset-0 rounded-card" />
             <div className="flex items-center gap-2">
               {select && <Tick select={select} node={n} />}
