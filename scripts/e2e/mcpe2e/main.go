@@ -557,7 +557,7 @@ func (e *env) scenario() {
 	roN, roD, _ := toolNames(ro)
 	opN, _, _ := toolNames(op)
 	adN, _, _ := toolNames(ad)
-	e.check("tool counts per profile 15 / 33 / 57", len(roN) == 15 && len(opN) == 33 && len(adN) == 57, "%d / %d / %d", len(roN), len(opN), len(adN))
+	e.check("tool counts per profile 35 / 71 / 127", len(roN) == 35 && len(opN) == 71 && len(adN) == 127, "%d / %d / %d", len(roN), len(opN), len(adN))
 	writes := 0
 	for _, n := range roN {
 		if isWrite(n) {

@@ -1003,7 +1003,7 @@ func eventsView(evs []*adminv1.Event, code string, hasMore bool) *EventsV {
 		}
 		v.Events = append(v.Events, eventV{
 			ID: e.GetId(), Time: e.GetTimeUnix(), Severity: enumName("EVENT_SEVERITY_", e.GetSeverity().String()),
-			Code: clean(e.GetCode(), 80), Params: cleanMap(e.GetParams(), maxParamValue),
+			Code: clean(e.GetCode(), 80), Params: insMap(e.GetParams(), maxParamValue),
 			NodeID: e.GetNodeId(), NodeName: nm(e.GetNodeName()), UserID: e.GetUserId(), UserName: nm(e.GetUserName()),
 		})
 	}
