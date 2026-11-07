@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card, SectionLabel } from "@/components/ui/bits";
+import { Card } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -56,9 +56,7 @@ function Notes() {
     <Card lg className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex min-w-[14rem] flex-1 flex-col gap-0.5">
-          <SectionLabel icon="bolt" tone="lavender">
-            {t("ai.mem.title")}
-          </SectionLabel>
+          <b className="text-[14px] font-semibold">{t("ai.mem.title")}</b>
           <span className="text-xs leading-snug text-pretty text-muted">{t("ai.mem.hint")}</span>
         </div>
         {notes.length > 0 && (
@@ -164,9 +162,7 @@ function Conversations() {
   return (
     <Card lg className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <SectionLabel icon="list" tone="sky" className="flex-1">
-          {t("ai.conv.title")}
-        </SectionLabel>
+        <b className="flex-1 text-[14px] font-semibold">{t("ai.conv.title")}</b>
         {list.length > 0 && !query && (
           <Button type="button" size="sm" variant="ghostDanger" onClick={() => setWipe(true)}>
             {t("ai.conv.deleteAll")}

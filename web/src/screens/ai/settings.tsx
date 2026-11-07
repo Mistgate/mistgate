@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { Card, SectionLabel } from "@/components/ui/bits";
+import { SaveBar } from "@/screens/subscriptions/ui";
+import { RowList, Section, SettingRow } from "./parts";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -44,14 +45,17 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
   const qc = useQueryClient();
   const settings = (data.settings ?? {}) as Settings;
   const statuses = (data.providers ?? []) as Status[];
-  const [draft, setDraft] = useState<Settings>({
+  // what the form starts from (the same object tells whether anything changed, and is what Discard goes back to)
+  const [initDraft] = useState<Settings>({
     ...settings,
     effort: settings.effort || AssistantEffort.NORMAL,
     audience: settings.audience || AssistantAudience.OWNER,
   });
-  const [choices, setChoices] = useState<Record<number, Choice>>(() =>
+  const [initChoices] = useState<Record<number, Choice>>(() =>
     Object.fromEntries(statuses.map((s) => [s.provider, { provider: s.provider, model: s.choice?.model ?? "", budgetUsdMonth: s.choice?.budgetUsdMonth ?? 20 } as Choice])),
   );
+  const [draft, setDraft] = useState<Settings>(initDraft);
+  const [choices, setChoices] = useState<Record<number, Choice>>(initChoices);
   const connected = statuses.filter((s) => s.connected);
   const shownProvider = connected.some((s) => s.provider === draft.provider) ? draft.provider : (connected[0]?.provider ?? AssistantProvider.UNSPECIFIED);
   const set = (patch: Partial<Settings>) => setDraft((d) => ({ ...d, ...patch }));
@@ -71,35 +75,35 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
     onError: (e) => toast.error(t((assistantErrorKey(e) ?? "") as MessageKey) || errorText(e, t)),
   });
 
+  const dirty = JSON.stringify([draft, choices]) !== JSON.stringify([initDraft, initChoices]);
+  const rank = (s: Status) => (s.connected && shownProvider === s.provider ? 0 : s.connected ? 1 : 2);
+  const rows = providers
+    .map((p) => ({ p, status: statuses.find((s) => s.provider === p.id) ?? ({ provider: p.id, connected: false } as Status) }))
+    .sort((a, b) => rank(a.status) - rank(b.status));
+
   return (
-    <div className="flex flex-col gap-3.5">
-      <p className="max-w-[760px] text-[13px] leading-normal text-pretty text-muted">{t("ai.set.lead")}</p>
+    <div className="flex flex-col gap-6">
+      <p className="max-w-[720px] text-[13px] leading-normal text-pretty text-muted">{t("ai.set.lead")}</p>
 
-      <Card lg className="flex flex-col gap-4 p-4">
-        <label className="flex items-start gap-3">
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[14px] font-bold">{t("ai.set.enabled")}</span>
-            <span className="text-xs text-muted">{t("ai.set.enabledHint")}</span>
-          </span>
-          <Switch checked={draft.enabled} onCheckedChange={(v) => set({ enabled: v })} aria-label={t("ai.set.enabled")} />
-        </label>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.set.provider")}</span>
+      <Section title={t("ai.sec.general")} desc={t("ai.sec.generalDesc")}>
+        <RowList>
+          <SettingRow label={t("ai.set.enabled")} hint={t("ai.set.enabledHint")}>
+            <Switch checked={draft.enabled} onCheckedChange={(v) => set({ enabled: v })} aria-label={t("ai.set.enabled")} />
+          </SettingRow>
+          <SettingRow label={t("ai.set.provider")}>
             {connected.length === 0 ? (
               <span className="text-[13px] text-muted">{t("ai.set.providerNone")}</span>
             ) : (
               <Select
                 aria-label={t("ai.set.provider")}
+                className="min-w-[200px]"
                 value={String(shownProvider)}
                 onValueChange={(v) => set({ provider: Number(v) as AssistantProvider })}
                 options={connected.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)) }))}
               />
             )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.set.effort")}</span>
+          </SettingRow>
+          <SettingRow label={t("ai.set.effort")} hint={t("ai.effort.hint")}>
             <Segmented
               aria-label={t("ai.set.effort")}
               value={String(draft.effort)}
@@ -110,97 +114,83 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                 { value: String(AssistantEffort.THOROUGH), label: t("ai.effort.thorough") },
               ]}
             />
-            <span className="text-xs text-muted">{t("ai.effort.hint")}</span>
-          </div>
-        </div>
+          </SettingRow>
+        </RowList>
+      </Section>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.set.audience")}</span>
-          <div className="grid gap-1.5 md:grid-cols-3">
-            {([
-              [AssistantAudience.OWNER, "ai.aud.owner"],
-              [AssistantAudience.ADMINS, "ai.aud.admins"],
-              [AssistantAudience.EVERYONE, "ai.aud.everyone"],
-            ] as const).map(([v, label]) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={draft.audience === v}
-                onClick={() => set({ audience: v })}
-                className={cx("flex items-center gap-2.5 rounded-field border p-3 text-start text-[13px] font-semibold transition-colors", draft.audience === v ? "border-accent-line bg-accent-soft" : "border-line bg-surface")}
-              >
-                <span aria-hidden className={cx("grid size-4 flex-none place-items-center rounded-full border-[1.5px]", draft.audience === v ? "border-accent" : "border-faint")}>
-                  {draft.audience === v && <span className="size-2 rounded-full bg-accent" />}
-                </span>
-                {t(label)}
-              </button>
-            ))}
-          </div>
-          <span className="text-xs text-muted">{t("ai.aud.hint")}</span>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.set.notes")}</span>
-            <textarea
-              value={draft.panelNotes}
-              maxLength={4000}
-              rows={4}
-              onChange={(e) => set({ panelNotes: e.target.value })}
-              className="min-h-24 resize-y rounded-field border border-line bg-canvas px-3 py-2 text-[13px] leading-snug outline-none focus:border-accent"
+      <Section title={t("ai.sec.access")} desc={t("ai.sec.accessDesc")}>
+        <RowList>
+          <SettingRow label={t("ai.set.audience")} hint={t("ai.aud.hint")}>
+            <Segmented
+              aria-label={t("ai.set.audience")}
+              value={String(draft.audience)}
+              onValueChange={(v) => set({ audience: Number(v) as AssistantAudience })}
+              options={[
+                { value: String(AssistantAudience.OWNER), label: t("ai.aud.owner") },
+                { value: String(AssistantAudience.ADMINS), label: t("ai.aud.admins") },
+                { value: String(AssistantAudience.EVERYONE), label: t("ai.aud.everyone") },
+              ]}
             />
-            <span className="text-xs text-muted">{t("ai.set.notesHint")}</span>
-            {looksSecret(draft.panelNotes) && <span className="text-xs text-warn-text">{t("ai.secretHint")}</span>}
-          </label>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.set.retention")}</span>
+          </SettingRow>
+          <SettingRow label={t("ai.set.retention")}>
             <Select
               aria-label={t("ai.set.retention")}
+              className="min-w-[160px]"
               value={String(draft.retentionDays)}
               onValueChange={(v) => set({ retentionDays: Number(v) })}
               options={retentions.map((d) => ({ value: String(d), label: d === 0 ? t("ai.ret.forever") : t.n("ai.ret.days", d) }))}
             />
-          </div>
-        </div>
-      </Card>
-
-      <section className="flex flex-col gap-2.5">
-        <div className="flex flex-col gap-0.5">
-          <SectionLabel icon="key" tone="lavender">
-            {t("ai.prov.title")}
-          </SectionLabel>
-          <span className="text-xs text-muted">{t("ai.prov.hint")}</span>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {providers.map((p) => {
-            const status = statuses.find((s) => s.provider === p.id) ?? ({ provider: p.id, connected: false } as Status);
-            return (
-              <ProviderCard
-                key={p.id}
-                status={status}
-                name={t(p.name)}
-                data={t(p.data)}
-                inUse={shownProvider === p.id && status.connected}
-                choice={choices[p.id] ?? ({ provider: p.id, model: "", budgetUsdMonth: 20 } as Choice)}
-                onChoice={(c) => setChoices((all) => ({ ...all, [p.id]: c }))}
+          </SettingRow>
+          <SettingRow label={t("ai.set.notes")} hint={t("ai.set.notesHint")} stack htmlFor="ai-notes">
+            <div className="flex w-full flex-col gap-1.5">
+              <textarea
+                id="ai-notes"
+                value={draft.panelNotes}
+                maxLength={4000}
+                rows={4}
+                onChange={(e) => set({ panelNotes: e.target.value })}
+                className="min-h-24 w-full resize-y rounded-field border border-line bg-canvas px-3 py-2 text-[13px] leading-snug outline-none focus:border-accent"
               />
-            );
-          })}
-        </div>
-      </section>
+              {looksSecret(draft.panelNotes) && <span className="text-xs text-warn-text">{t("ai.secretHint")}</span>}
+            </div>
+          </SettingRow>
+        </RowList>
+      </Section>
 
-      <div className="flex justify-end">
-        <Button type="button" variant="primary" size="lg" disabled={save.isPending} onClick={() => save.mutate()}>
-          {t("ai.set.save")}
-        </Button>
-      </div>
+      <Section title={t("ai.prov.title")} desc={t("ai.prov.hint")}>
+        <RowList>
+          {rows.map(({ p, status }) => (
+            <ProviderRow
+              key={p.id}
+              status={status}
+              name={t(p.name)}
+              data={t(p.data)}
+              inUse={shownProvider === p.id && status.connected}
+              choice={choices[p.id] ?? ({ provider: p.id, model: "", budgetUsdMonth: 20 } as Choice)}
+              onChoice={(c) => setChoices((all) => ({ ...all, [p.id]: c }))}
+            />
+          ))}
+        </RowList>
+      </Section>
 
       <Usage usage={data.usage ?? []} />
+
+      {dirty && (
+        <SaveBar
+          busy={save.isPending}
+          canSave
+          onSave={() => save.mutate()}
+          onDiscard={() => {
+            setDraft(initDraft);
+            setChoices(initChoices);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ProviderCard({ status, name, data, inUse, choice, onChoice }: { status: Status; name: string; data: string; inUse: boolean; choice: Choice; onChoice: (c: Choice) => void }) {
+function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: Status; name: string; data: string; inUse: boolean; choice: Choice; onChoice: (c: Choice) => void }) {
   const t = useT();
   const toast = useToast();
   const guard = useStepUp();
@@ -208,6 +198,7 @@ function ProviderCard({ status, name, data, inUse, choice, onChoice }: { status:
   const [entering, setEntering] = useState(false);
   const [key, setKey] = useState("");
   const [removing, setRemoving] = useState(false);
+  const [open, setOpen] = useState(inUse);
   const models = useQuery({
     queryKey: ["assistant", "models", status.provider],
     queryFn: async ({ signal }) => plain(await assistant.listProviderModels({ provider: status.provider }, { signal })).models,
@@ -241,37 +232,57 @@ function ProviderCard({ status, name, data, inUse, choice, onChoice }: { status:
   const fmt = useFmt();
   const money = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 2 });
   const model = models.data?.find((m) => m.id === choice.model);
+  const spent = status.spentUsdMonth ?? 0;
+  const pct = choice.budgetUsdMonth > 0 ? Math.min(100, (spent / choice.budgetUsdMonth) * 100) : 0;
 
   return (
-    <Card lg className={cx("flex flex-col gap-3 p-4", inUse && "border-accent-line")}>
-      <div className="flex items-start gap-2.5">
+    <div className="flex flex-col gap-3 py-3.5">
+      <div className="flex items-center gap-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <b className="flex items-center gap-2 text-[15px]">
+          <b className="flex items-center gap-2 text-[13.5px] font-medium">
             {name}
-            {inUse && <span className="rounded-ctl bg-accent-soft px-1.5 py-0.5 text-[10.5px] font-bold text-accent-text">{t("ai.prov.inUse")}</span>}
+            {inUse && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-semibold text-accent-text">{t("ai.prov.inUse")}</span>}
           </b>
-          <span className={cx("text-xs", status.connected ? "text-ok-text" : "text-muted")}>{status.connected ? t("ai.prov.connected", { hint: status.keyHint }) : t("ai.prov.notConnected")}</span>
+          <span className={cx("flex items-center gap-1.5 text-xs", status.connected ? "text-ok-text" : "text-muted")}>
+            {status.connected && <span aria-hidden className="size-1.5 rounded-full bg-ok" />}
+            {status.connected ? t("ai.prov.connected", { hint: status.keyHint }) : t("ai.prov.notConnected")}
+          </span>
         </div>
-        {status.connected && !entering && (
-          <div className="flex gap-1">
-            <Button type="button" size="sm" variant="ghost" onClick={() => setEntering(true)}>
-              {t("ai.prov.replace")}
-            </Button>
-            <Button type="button" size="sm" variant="ghostDanger" onClick={() => setRemoving(true)}>
-              {t("ai.prov.remove")}
-            </Button>
+        {!entering && (
+          <div className="flex flex-none items-center gap-1">
+            {status.connected ? (
+              <>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEntering(true)}>
+                  {t("ai.prov.replace")}
+                </Button>
+                <Button type="button" size="sm" variant="ghostDanger" onClick={() => setRemoving(true)}>
+                  {t("ai.prov.remove")}
+                </Button>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-label={t("ai.prov.details")}
+                  title={t("ai.prov.details")}
+                  onClick={() => setOpen((v) => !v)}
+                  className="grid size-8 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                >
+                  <Icon name="chevronDown" size={14} className={cx("transition-transform", open && "rotate-180")} />
+                </button>
+              </>
+            ) : (
+              <Button type="button" size="sm" variant="secondary" onClick={() => setEntering(true)}>
+                {t("ai.prov.connect")}
+              </Button>
+            )}
           </div>
         )}
-        {!status.connected && !entering && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => setEntering(true)}>
-            {t("ai.prov.connect")}
-          </Button>
-        )}
       </div>
-      <p className="flex items-start gap-1.5 text-xs leading-snug text-muted">
-        <Icon name="globe" size={12} className="mt-0.5 flex-none" />
-        <span>{data}</span>
-      </p>
+      {(entering || open || !status.connected) && (
+        <p className="flex items-start gap-1.5 text-xs leading-snug text-muted">
+          <Icon name="globe" size={12} className="mt-0.5 flex-none" />
+          <span>{data}</span>
+        </p>
+      )}
       {entering && (
         <div className="flex flex-col gap-2 rounded-field bg-surface-2 p-3">
           <TextField type="password" label={t("ai.prov.keyLabel", { name })} placeholder={t("ai.prov.keyPh")} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} mono />
@@ -285,28 +296,38 @@ function ProviderCard({ status, name, data, inUse, choice, onChoice }: { status:
           </div>
         </div>
       )}
-      {status.connected && (
-        <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-[minmax(0,1fr)_150px]">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("ai.prov.model")}</span>
-            <Select
-              aria-label={t("ai.prov.model")}
-              value={choice.model}
-              onValueChange={(v) => onChoice({ ...choice, model: v })}
-              options={[{ value: "", label: t("ai.prov.modelDefault") }, ...(models.data ?? []).map((m) => ({ value: m.id, label: m.name || m.id }))]}
-            />
-            {model && model.inputUsdPerMtok > 0 && <span className="text-xs text-muted">{t("ai.prov.price", { in: money(model.inputUsdPerMtok), out: money(model.outputUsdPerMtok) })}</span>}
+      {status.connected && open && (
+        <div className="flex flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted">{t("ai.prov.model")}</span>
+              <Select
+                aria-label={t("ai.prov.model")}
+                value={choice.model}
+                onValueChange={(v) => onChoice({ ...choice, model: v })}
+                options={[{ value: "", label: t("ai.prov.modelDefault") }, ...(models.data ?? []).map((m) => ({ value: m.id, label: m.name || m.id }))]}
+              />
+              {model && model.inputUsdPerMtok > 0 && <span className="text-xs text-muted">{t("ai.prov.price", { in: money(model.inputUsdPerMtok), out: money(model.outputUsdPerMtok) })}</span>}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted">{t("ai.prov.budget")}</span>
+              <TextField
+                aria-label={t("ai.prov.budget")}
+                inputMode="decimal"
+                value={String(choice.budgetUsdMonth)}
+                onChange={(e) => {
+                  const n = Number(e.target.value.replace(",", "."));
+                  if (Number.isFinite(n) && n >= 0) onChoice({ ...choice, budgetUsdMonth: n });
+                }}
+              />
+            </div>
           </div>
-          <TextField
-            label={t("ai.prov.budget")}
-            inputMode="decimal"
-            value={String(choice.budgetUsdMonth)}
-            onChange={(e) => {
-              const n = Number(e.target.value.replace(",", "."));
-              if (Number.isFinite(n) && n >= 0) onChoice({ ...choice, budgetUsdMonth: n });
-            }}
-            hint={t("ai.prov.spent", { usd: money(status.spentUsdMonth ?? 0), budget: money(choice.budgetUsdMonth) })}
-          />
+          <div className="flex flex-col gap-1.5">
+            <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={t("ai.prov.budget")} className="h-1 overflow-hidden rounded-full bg-surface-2">
+              <div className={cx("h-full rounded-full", pct >= 100 ? "bg-warn" : "bg-accent")} style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-xs text-muted">{t("ai.prov.spent", { usd: money(spent), budget: money(choice.budgetUsdMonth) })}</span>
+          </div>
         </div>
       )}
       {status.lastErrorCode && <p className="text-xs text-danger-text">{t("ai.prov.lastError", { error: t((assistantErrorKey(status.lastErrorCode) ?? "ai.err.provider_unreachable") as MessageKey) })}</p>}
@@ -326,7 +347,7 @@ function ProviderCard({ status, name, data, inUse, choice, onChoice }: { status:
           </>
         }
       />
-    </Card>
+    </div>
   );
 }
 
@@ -334,32 +355,31 @@ function Usage({ usage }: { usage: { adminId: string; adminName: string; usd: nu
   const t = useT();
   const fmt = useFmt();
   return (
-    <Card lg className="flex flex-col gap-2.5 p-4">
-      <SectionLabel icon="gauge" tone="sky">
-        {t("ai.usage.title")}
-      </SectionLabel>
-      {usage.length === 0 ? (
-        <p className="text-[13px] text-muted">{t("ai.usage.none")}</p>
-      ) : (
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">
-              <th className="pb-1.5 text-start font-bold">{t("ai.usage.admin")}</th>
-              <th className="pb-1.5 text-end font-bold">{t("ai.usage.turns")}</th>
-              <th className="pb-1.5 text-end font-bold">{t("ai.usage.cost")}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {usage.map((u) => (
-              <tr key={u.adminId}>
-                <td className="py-1.5">{u.adminName}</td>
-                <td className="py-1.5 text-end tabular-nums">{u.turns.toLocaleString(fmt.locale)}</td>
-                <td className="py-1.5 text-end tabular-nums">${u.usd.toLocaleString(fmt.locale, { maximumFractionDigits: 2 })}</td>
+    <Section title={t("ai.usage.title")}>
+      <RowList>
+        {usage.length === 0 ? (
+          <p className="py-3.5 text-[13px] text-muted">{t("ai.usage.none")}</p>
+        ) : (
+          <table className="my-1.5 w-full text-[13px]">
+            <thead>
+              <tr className="text-xs text-muted">
+                <th className="py-2 text-start font-medium">{t("ai.usage.admin")}</th>
+                <th className="py-2 text-end font-medium">{t("ai.usage.turns")}</th>
+                <th className="py-2 text-end font-medium">{t("ai.usage.cost")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </Card>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {usage.map((u) => (
+                <tr key={u.adminId}>
+                  <td className="py-2">{u.adminName}</td>
+                  <td className="py-2 text-end tabular-nums">{u.turns.toLocaleString(fmt.locale)}</td>
+                  <td className="py-2 text-end tabular-nums">${u.usd.toLocaleString(fmt.locale, { maximumFractionDigits: 2 })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </RowList>
+    </Section>
   );
 }

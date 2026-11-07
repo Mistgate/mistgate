@@ -74,15 +74,31 @@ async function mount() {
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
 describe("the assistant's settings", () => {
-  it("saves the provider the select shows and only the connected providers' choices", async () => {
+  const saveButton = () => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Save");
+
+  it("offers Save only once something changed, then saves the provider the select shows and only the connected providers' choices", async () => {
     await mount();
-    await click([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Save"));
+    expect(saveButton()).toBeUndefined();
+    const thorough = [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === "Thorough");
+    await click(thorough);
+    expect(saveButton()).toBeDefined();
+    await click(saveButton());
     for (let i = 0; i < 4; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
     expect(updateAssistantSettings).toHaveBeenCalledTimes(1);
     const req = updateAssistantSettings.mock.calls[0]![0] as { settings: { provider: number; effort: number; audience: number }; choices: { provider: number }[] };
     expect(req.settings.provider).toBe(AssistantProvider.OLLAMA_CLOUD);
-    expect(req.settings.effort).toBe(AssistantEffort.NORMAL);
+    expect(req.settings.effort).toBe(AssistantEffort.THOROUGH);
     expect(req.settings.audience).toBe(AssistantAudience.OWNER);
     expect(req.choices.map((c) => c.provider)).toEqual([AssistantProvider.OLLAMA_CLOUD]);
+  });
+
+  it("discards changes and lists the provider in use first", async () => {
+    await mount();
+    const names = [...document.querySelectorAll("section b")].map((b) => b.textContent);
+    expect(names[0]).toContain("Ollama Cloud");
+    await click([...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === "Quick"));
+    expect(saveButton()).toBeDefined();
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Discard"));
+    expect(saveButton()).toBeUndefined();
   });
 });

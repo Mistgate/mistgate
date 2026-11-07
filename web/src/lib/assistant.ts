@@ -75,5 +75,17 @@ export function looksSecret(text: string): boolean {
   );
 }
 
+/** A tool call as the chat shows it: what the server sends, plus how long it took (measured here, only for a live turn). */
+export type LiveTool = Tool & { startedAt?: number; ms?: number };
+/** A turn as the chat shows it: `interimEnd` is where in the text the last tool round began (what came before it is the
+ *  model thinking aloud, not the answer), `t0`/`workedMs` the turn's working time. All three only exist for a live turn. */
+export type LiveMsg = Msg & { interimEnd?: number; t0?: number; workedMs?: number };
+
+/** The text a turn said before its last tool round, and the answer after it. History has no split: all of it is the answer. */
+export function splitText(m: Msg): { interim: string; answer: string } {
+  const end = (m as LiveMsg).interimEnd ?? 0;
+  return end > 0 ? { interim: m.text.slice(0, end).trim(), answer: m.text.slice(end).trim() } : { interim: "", answer: m.text };
+}
+
 export const isAssistant = (m: Msg) => m.role === ChatRole.ASSISTANT;
 export const planOpen = (p: Plan) => p.state === PlanState.PROPOSED;

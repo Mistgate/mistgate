@@ -19,7 +19,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss }: { plan: 
   const open = plan.state === PlanState.PROPOSED;
   const status = statusLine(t, plan);
   return (
-    <div className={cx("flex flex-col gap-2.5 rounded-field border p-3", open ? "border-accent-line bg-accent-soft" : "border-line bg-surface-2")}>
+    <div data-slot="plan" className={cx("flex flex-col gap-2.5 rounded-[18px] p-3.5", open ? "bg-surface-2 ring-1 ring-accent-line" : "bg-surface-2")}>
       <div className="flex items-start gap-2">
         <Icon name="sliders" size={15} className="mt-0.5 flex-none text-accent-text" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
