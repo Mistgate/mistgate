@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { StepUpProvider } from "@/components/step-up";
+import { approvals, assistant, provisioning } from "@/lib/api";
 import { setTheme } from "@/lib/theme";
 import { AssistantAudience, AssistantEffort, AssistantProvider, ChatRole, PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { ChatButton, ChatPanel, type ChatApi } from "@/components/assistant/chat";
@@ -112,6 +114,65 @@ const access = {
   ],
 };
 
+/** The calls of the secure cards, answered here and noted on window.devCalls for the live check: the value goes only to these. */
+function fakeSecureCalls() {
+  const w = window as unknown as { devCalls: unknown[] };
+  w.devCalls = [];
+  const note = (name: string, arg: unknown) => w.devCalls.push({ name, arg });
+  (approvals as unknown as { approve: unknown }).approve = async (r: unknown) => (note("approve", r), new Promise((res) => setTimeout(() => res({}), 400)));
+  (approvals as unknown as { reject: unknown }).reject = async (r: unknown) => (note("reject", r), {});
+  (assistant as unknown as { setProviderKey: unknown }).setProviderKey = async (r: unknown) => (note("setProviderKey", r), new Promise((res) => setTimeout(() => res({ status: { keyHint: "Q7wA" } }), 400)));
+  (provisioning as unknown as { listNodeServerAccess: unknown }).listNodeServerAccess = async () => ({ access: [] });
+  (provisioning as unknown as { getPanelSSHKey: unknown }).getPanelSSHKey = async () => ({ publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7cYk4m1x mistgate-panel", fingerprint: "SHA256:pAnElKeYfInGeRpRiNt0123456789abcdefghijkl" });
+}
+
+const installPlan = { planId: "pln_install", tool: "node_install", summary: "Install a node on 203.0.113.9 as de2.", facts: [{ key: "host", value: "203.0.113.9", untrusted: false, code: "", params: {}, untrustedParams: [] }, { key: "name", value: "de2", untrusted: false, code: "", params: {}, untrustedParams: [] }], danger: [], needsApproval: true, inboxOnly: true, expiresUnix: NOW + 540, state: PlanState.PROPOSED, result: "", error: "", outcomeCode: "" };
+const secureTurn: Msg[] = [
+  msg({ role: ChatRole.USER, createdUnix: at(5), text: "Add a node de2 at 203.0.113.9, and where do I see the ways of nl1?" }),
+  msg({
+    role: ChatRole.ASSISTANT,
+    createdUnix: at(4),
+    text: "I prepared the install: compare the server's host key and type its password on the card below. The assistant never sees the password. For the ways of nl1, open the page.\n\nI also need an API key for DeepSeek to switch the chat over: enter it in the secure field.",
+    tools: [
+      { id: "o1", tool: "ui_open", argsJson: '{"id":"nl1","page":"node_ways"}', done: true, ok: true, count: 0, error: "" },
+      { id: "k1", tool: "ui_secret_form", argsJson: '{"kind":"provider_key","provider":"deepseek"}', done: true, ok: true, count: 0, error: "" },
+    ] as never,
+    plans: [installPlan] as never,
+    end: "end",
+  }),
+];
+const installApproval = {
+  approvals: [
+    {
+      id: "pln_install",
+      tokenId: "tok_1",
+      tokenName: "Assistant",
+      tokenProfile: 1,
+      tool: "node_install",
+      facts: [
+        { key: "host", value: "203.0.113.9", untrusted: false, code: "", params: {}, untrustedParams: [] },
+        { key: "host_key", value: "SHA256:Qm9y3xk2Jv0eVwUQxk1v2Tn8sY4GmR7pL5dXc1aF0hE", untrusted: false, code: "", params: {}, untrustedParams: [] },
+        { key: "host_key_algorithm", value: "ssh-ed25519", untrusted: false, code: "", params: {}, untrustedParams: [] },
+      ],
+      danger: [],
+      reason: "",
+      state: 1,
+      createdUnix: NOW,
+      expiresUnix: NOW + 540,
+      decidedByName: "",
+      decidedUnix: 0,
+      appliedUnix: 0,
+      result: "",
+      error: "",
+      outcomeCode: "",
+      outcomeParams: {},
+    },
+  ],
+  awaiting: 1,
+  nowUnix: NOW,
+  receivedMs: Date.now(),
+};
+
 function fakeChat(messages: Msg[], running = false): ChatApi {
   const none = async () => {};
   return { conversationId: "cnv_2", messages, running, error: null, send: none, stop: none, open: none, reset: () => {}, apply: none, dismiss: none, forget: none } as unknown as ChatApi;
@@ -157,11 +218,14 @@ export function AiKit() {
       text: "## Коротко\n\nЗа последние 24 часа проблемы были у **5 нод**, критичных алертов сейчас нет.\n\n| Нода | Что произошло | До de |\n|---|---|--:|\n| **tr** | Доступность из РФ — `blocked` (источники спорят) | 0/150 |\n| **ru2** | Сильные потери на пути к **de**, порт 8443 | 37/150 |\n| **be** | Минутный `host_blip`, нода вернулась | 126/150 |\n| **de2** | WARP перешёл из `up` в `down`, сейчас здоров | 135/150 |\n| **nl** | Потери на пути к **de**, порт 8443 | 98/150 |\n\n### Что бы я сделал\n\n1. Убрать прямые серверы **tr** и **be** из подписок, оставить реле через ru:\n   - люди получат рабочий путь вместо мёртвого адреса;\n   - реле сейчас в норме.\n2. Посмотреть UDP 8443 на пути **tr → de**.\n\n> Потери до **de** у шести нод сразу — это скорее порты самой de, а не источники.\n\nСтраницы: [Ноды](/nodes) · [Алерты](/health)",
     }),
   ];
-  const messages = state === "chat-empty" ? [] : state === "chat-typing" ? working : state === "chat-table" ? tableTurn : conversation;
+  if (state === "chat-secure") fakeSecureCalls();
+  const messages = state === "chat-secure" ? secureTurn : state === "chat-empty" ? [] : state === "chat-typing" ? working : state === "chat-table" ? tableTurn : conversation;
   return (
-    <Shot id={`ai-${state}`} title="The floating chat" seed={[[["assistant", "conversations", ""], conversations], [["assistant", "access"], access]]}>
+    <Shot id={`ai-${state}`} title="The floating chat" seed={[[["assistant", "conversations", ""], conversations], [["assistant", "access"], access], [["approvals", "list"], installApproval]]}>
       <div className="relative h-[1000px]">
-        <ChatPanel chat={fakeChat(messages, state === "chat-typing")} readOnly={false} providerLabel="claude-opus-5-5" provider={AssistantProvider.ANTHROPIC} onClose={() => {}} pickerOpen={params.get("menu") === "1"} initialContext={{ kind: "user", id: "usr_anna", label: "Users · anna", route: "/users/usr_anna" } as never} />
+        <StepUpProvider>
+          <ChatPanel chat={fakeChat(messages, state === "chat-typing")} readOnly={false} providerLabel="claude-opus-5-5" provider={AssistantProvider.ANTHROPIC} onClose={() => {}} pickerOpen={params.get("menu") === "1"} initialContext={{ kind: "user", id: "usr_anna", label: "Users · anna", route: "/users/usr_anna" } as never} />
+        </StepUpProvider>
       </div>
     </Shot>
   );

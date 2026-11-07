@@ -1,4 +1,5 @@
 import { act } from "react";
+import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Graph, GraphPortRow, type GraphEdge, type GraphNode } from ".";
@@ -350,5 +351,44 @@ describe("grabbing a wire's end", () => {
     await key(wire, "Delete");
     await settle();
     expect(status()).toBe("busy");
+  });
+});
+
+describe("cards that move, and popovers that are not the canvas", () => {
+  const pointer = (type: string, x: number, y: number) => {
+    const ev = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+    Object.defineProperty(ev, "pointerId", { value: 1 });
+    Object.defineProperty(ev, "pointerType", { value: "mouse" });
+    return ev;
+  };
+  const stubs = () => {
+    Element.prototype.setPointerCapture = () => {};
+    Element.prototype.releasePointerCapture = () => {};
+    Element.prototype.hasPointerCapture = () => false;
+  };
+
+  it("a card that cannot be selected still moves with the pointer, snapped, alone", async () => {
+    stubs();
+    const onPositionsChange = vi.fn();
+    const fixed: GraphNode[] = nodes.map((n) => ({ ...n, selectable: false }));
+    await mount(<Graph nodes={fixed} edges={[]} typeColors={colors} ariaLabel="g" positions={{ de1: { x: 0, y: 0 }, nl1: { x: 300, y: 0 }, fi1: { x: 600, y: 0 } }} onPositionsChange={onPositionsChange} />);
+    const card = host!.querySelector<HTMLElement>('[data-gnode="nl1"] .mg-ghead')!;
+    const app = host!.querySelector<HTMLElement>('[role="application"]')!;
+    await act(async () => void card.dispatchEvent(pointer("pointerdown", 100, 100)));
+    await act(async () => void app.dispatchEvent(pointer("pointermove", 140, 124)));
+    await act(async () => void app.dispatchEvent(pointer("pointerup", 140, 124)));
+    expect(onPositionsChange).toHaveBeenLastCalledWith({ de1: { x: 0, y: 0 }, nl1: { x: 344, y: 24 }, fi1: { x: 600, y: 0 } });
+  });
+
+  it("a pointerdown in a popover portaled out of a card does not start a pan (it would swallow the click)", async () => {
+    stubs();
+    const capture = vi.spyOn(Element.prototype, "setPointerCapture");
+    const withPortal: GraphNode[] = [{ ...nodes[0]!, body: createPortal(<button type="button">in a popover</button>, document.body) }];
+    await mount(<Graph nodes={withPortal} edges={[]} typeColors={colors} ariaLabel="g" />);
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent === "in a popover")!;
+    await act(async () => void button.dispatchEvent(pointer("pointerdown", 5, 5)));
+    expect(capture).not.toHaveBeenCalled();
+    expect(host!.querySelector('[role="application"]')!.getAttribute("data-mode")).toBeNull();
+    capture.mockRestore();
   });
 });

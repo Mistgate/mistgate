@@ -5,6 +5,7 @@ import { Card, PageTitle } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
 import { Switch } from "@/components/ui/switch";
 import { setTheme } from "@/lib/theme";
+import { FleetShowcase } from "./dev-kit-fleet-map";
 import { WaysShowcase } from "./dev-kit-ways-graph";
 
 // Development only, /dev-kit?only=graph: the node graph editor (components/graph) in two demos on made-up data.
@@ -162,6 +163,7 @@ export function GraphKit() {
     if (theme === "light" || theme === "dark") setTheme(theme);
   }, [theme]);
   if (demo === "ways") return <WaysShowcase />;
+  if (demo === "fleet") return <FleetShowcase />;
   if (demo === "shader") return <ShaderDemo />;
   return (
     <div className="flex flex-col gap-10">

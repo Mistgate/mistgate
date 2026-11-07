@@ -37,8 +37,8 @@ vi.mock("@/lib/api", () => ({
 let search: Record<string, unknown> = {};
 const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, params, className }: { children?: ReactNode; to: string; params?: { id: string }; className?: string }) => (
-    <a href={to.replace("$id", params?.id ?? "")} className={className}>
+  Link: ({ children, to, params, search: s, className }: { children?: ReactNode; to: string; params?: { id: string }; search?: Record<string, string>; className?: string }) => (
+    <a href={`${to.replace("$id", params?.id ?? "")}${s ? "?" + new URLSearchParams(s).toString() : ""}`} className={className}>
       {children}
     </a>
   ),
@@ -219,18 +219,18 @@ describe("the owner's edits", () => {
     deleteRelay.mockResolvedValue({});
     await mount();
     await click(more("Through msk1"));
-    expect(["Check all", "Turn all off", "Add a relay…", "Remove all relays…"].every((l) => !!item(l))).toBe(true);
-    await click(item("Check all"));
+    expect(["Check", "Turn off", "Add servers to this relay…", "Remove…"].every((l) => !!item(l))).toBe(true);
+    await click(item("Check"));
     await settle();
     expect(checkRelay).toHaveBeenCalledWith({ id: "rly_1" });
 
     await click(more("Through msk1"));
-    await click(item("Turn all off"));
+    await click(item("Turn off"));
     await settle();
     expect(updateRelay).toHaveBeenCalledWith({ id: "rly_1", enabled: false });
 
     await click(more("Through msk1"));
-    await click(item("Add a relay…"));
+    await click(item("Add servers to this relay…"));
     await settle();
     expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
     expect(dialog()?.textContent).toContain("msk1");
@@ -238,7 +238,7 @@ describe("the owner's edits", () => {
     await settle();
 
     await click(more("Through msk1"));
-    await click(item("Remove all relays…"));
+    await click(item("Remove…"));
     expect(deleteRelay).not.toHaveBeenCalled();
     await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Remove"));
     await settle();
@@ -311,14 +311,40 @@ describe("the owner's edits", () => {
     expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
   });
 
-  it("the add-a-way card lists the other nodes to go through, and a node picked becomes a card", async () => {
+  it("the add-a-way card lists the other nodes; a node picked opens the relay dialog at once, prefilled, and cancelling changes nothing", async () => {
     await mount();
     expect(card("way:via:nod_spb1")).toBeNull();
     await click(more("Add a way in: through a node, CDN, IPv6"));
     expect(item("Through spb1")).toBeTruthy();
     await click(item("Through spb1"));
     await settle();
-    expect(text("way:via:nod_spb1")).toContain("no relay yet");
+    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_spb1" }, expect.anything());
+    expect(dialog()?.textContent).toContain("spb1");
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
+    await settle();
+    expect(card("way:via:nod_spb1")).toBeNull();
+  });
+
+  it("the CDN item goes to the new-profile form of this node, not to an empty card", async () => {
+    await mount();
+    await click(more("Add a way in: through a node, CDN, IPv6"));
+    expect(item("Through a CDN: add a profile")?.getAttribute("href")).toBe("/profiles/new?protocol=vless&node=nod_de1");
+  });
+
+  it("with only Direct a hint card says what a way in is for, with a button that opens the same menu", async () => {
+    listRelays.mockResolvedValue({ relays: [] });
+    await mount();
+    expect(card("ghost:way")).toBeNull();
+    expect(text("hint:way")).toContain("No other ways in yet");
+    await click(more("Add a way in"));
+    await click(item("Through msk1"));
+    await settle();
+    expect(dialog()?.textContent).toContain("msk1");
+  });
+
+  it("node names on the cards link to that node's Ways in graph", async () => {
+    await mount();
+    expect(card("way:via:nod_msk1")!.querySelector("a")?.getAttribute("href")).toBe("/nodes/nod_msk1?tab=ways&view=graph");
   });
 
   it("the other exit card offers WARP setup, and through another node is disabled with the reason", async () => {

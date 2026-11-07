@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cx } from "@/lib/cx";
 import { PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/bits";
@@ -6,7 +7,7 @@ import { Icon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
 import { Segmented } from "@/components/ui/segmented";
 import { StatusPill } from "@/components/ui/status";
-import { TextField } from "@/components/ui/text-field";
+import { SecureField } from "@/components/assistant/secure-field";
 import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import { useFmt } from "@/lib/format";
@@ -110,7 +111,7 @@ function NodeInstallFields({ a, keyInUse, viaKey, setViaKey, password, setPasswo
         <PanelSSHKey howTo={howTo ?? !keyInUse} onHowTo={setHowTo} />
       ) : (
         <>
-          <TextField label={t("int.ap.ssh.password")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" maxLength={1024} />
+          <SecureField label={t("int.ap.ssh.password")} value={password} onChange={setPassword} maxLength={1024} />
           {/* an approved password install always adds the panel key too (the panel decides it, not the agent) */}
           <p className="flex items-start gap-2 text-xs leading-snug text-pretty text-muted">
             <Icon name="key" size={14} className="mt-px flex-none" />
@@ -123,7 +124,7 @@ function NodeInstallFields({ a, keyInUse, viaKey, setViaKey, password, setPasswo
 }
 
 /** What an agent asked for, in the panel's words, with Approve and Reject. The countdown is the panel's 10 minutes from the plan. */
-function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs: number }) {
+export function ApprovalCard({ a, data, nowMs, focused, onDecided }: { a: Approval; data: Approvals; nowMs: number; focused?: boolean; onDecided?: () => void }) {
   const t = useT();
   const { approve, reject, busy } = useApprovalActions();
   const left = secondsLeft(a, data, nowMs);
@@ -143,6 +144,7 @@ function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs:
     approve.mutate(
       !install ? { id: a.id } : viaKey ? { id: a.id, usePanelKey: true, confirmedFingerprint: hostKey } : { id: a.id, sshPassword: password, confirmedFingerprint: hostKey },
       {
+        onSuccess: onDecided,
         onSettled: () => {
           setPassword("");
           approve.reset(); // the mutation's variables held the password; gcTime 0 drops it from the cache now
@@ -153,7 +155,15 @@ function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs:
   const facts = install ? a.facts.filter((f) => f.key !== "panel_ssh_key") : a.facts;
 
   return (
-    <article className="flex min-w-0 flex-col gap-3.5 rounded-card-lg border border-warn-line bg-warn-soft p-4 md:p-[18px]">
+    <article
+      id={`approval-${a.id}`}
+      ref={(el) => {
+        // opened from the assistant's card ("Open and confirm"): this plan is brought into view once
+        if (el && focused) el.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      }}
+      data-focused={focused || undefined}
+      className={cx("flex min-w-0 flex-col gap-3.5 rounded-card-lg border border-warn-line bg-warn-soft p-4 md:p-[18px]", focused && "ring-2 ring-accent")}
+    >
       <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
         <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
           <h3 className="text-[17px] leading-tight font-extrabold tracking-[-0.02em]">{tool}</h3>
@@ -198,7 +208,7 @@ function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs:
         <Button variant="primary" size="md" disabled={busy || expired || !installReady} aria-label={t("int.ap.approve.aria", { tool })} onClick={onApprove}>
           {t("int.ap.approve")}
         </Button>
-        <Button variant="secondary" size="md" disabled={busy || expired} aria-label={t("int.ap.reject.aria", { tool })} onClick={() => reject.mutate(a.id)}>
+        <Button variant="secondary" size="md" disabled={busy || expired} aria-label={t("int.ap.reject.aria", { tool })} onClick={() => reject.mutate(a.id, { onSuccess: onDecided })}>
           {t("int.ap.reject")}
         </Button>
         <span className="text-xs text-muted">{installReady ? t("int.ap.approve.hint") : t(viaKey ? "int.ap.ssh.neededKey" : "int.ap.ssh.needed")}</span>
@@ -208,7 +218,7 @@ function ApprovalCard({ a, data, nowMs }: { a: Approval; data: Approvals; nowMs:
 }
 
 /** The queue: changes an agent planned that wait for the owner. It sits at the top of the screen and is only there while something waits. */
-export function ApprovalQueue({ data }: { data: Approvals }) {
+export function ApprovalQueue({ data, focus }: { data: Approvals; focus?: string }) {
   const t = useT();
   const waiting = data.approvals.filter((a) => a.state === ApprovalState.AWAITING);
   const nowMs = useTick(waiting.length > 0);
@@ -222,7 +232,7 @@ export function ApprovalQueue({ data }: { data: Approvals }) {
         <span className="text-xs text-muted">{t("int.ap.sub")}</span>
       </div>
       {waiting.map((a) => (
-        <ApprovalCard key={a.id} a={a} data={data} nowMs={nowMs} />
+        <ApprovalCard key={a.id} a={a} data={data} nowMs={nowMs} focused={a.id === focus} />
       ))}
     </section>
   );

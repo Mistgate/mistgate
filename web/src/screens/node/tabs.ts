@@ -10,7 +10,7 @@ export type HistoryView = (typeof historyViews)[number];
 
 /** The Ways in tab's view: the list or the graph (ADR 0016). */
 export type WaysView = "list" | "graph";
-export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Exclude<HistoryView, "events"> | WaysView; before?: number; size?: number; /** The graph of the Ways in tab, full screen. */ full?: "1" };
+export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Exclude<HistoryView, "events"> | WaysView; before?: number; size?: number; /** The graph of the Ways in tab, full screen. */ full?: "1"; /** Came from the fleet map: the page shows its breadcrumb back. */ from?: "map" };
 
 /**
  * Search-param validation of /nodes/$id: only a known tab other than the first is kept in the URL. `add` (a profile id,
@@ -21,6 +21,10 @@ export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Excl
  * the rows per page (`size`).
  */
 export const validateNodeSearch = (s: Record<string, unknown>): NodeSearch => {
+  const r = validateTab(s);
+  return s.from === "map" ? { ...r, from: "map" } : r;
+};
+const validateTab = (s: Record<string, unknown>): NodeSearch => {
   if (!nodeTabs.includes(s.tab as NodeTab) || s.tab === "overview") return {};
   const tab = s.tab as NodeTab;
   if (tab === "history") {

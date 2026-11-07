@@ -12,14 +12,22 @@ const chat = vi.fn();
 const applyPlan = vi.fn();
 const dismissPlan = vi.fn();
 const deleteMemory = vi.fn();
+const approve = vi.fn();
+const setProviderKey = vi.fn();
+let approvalList: unknown[] = [];
+// the saved access of other nodes: one with panelKeyFingerprint makes the panel key the default way in
+let accessList: { nodeId: string; panelKeyFingerprint: string }[] = [];
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
+  approvals: { listApprovals: async () => ({ approvals: approvalList, awaiting: approvalList.length }), approve: (...a: unknown[]) => approve(...a), reject: async () => ({}) },
+  provisioning: { listNodeServerAccess: async () => ({ access: accessList }), getPanelSSHKey: async () => ({ publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7cYk4m1x mistgate-panel", fingerprint: "SHA256:pAnElKeYfInGeRpRiNt0123456789abcdefghijkl" }) },
   assistant: {
     chat: (...a: unknown[]) => chat(...a),
     applyPlan: (...a: unknown[]) => applyPlan(...a),
     dismissPlan: (...a: unknown[]) => dismissPlan(...a),
     deleteMemory: (...a: unknown[]) => deleteMemory(...a),
     stopTurn: async () => ({}),
+    setProviderKey: (...a: unknown[]) => setProviderKey(...a),
     listConversations: async () => ({ conversations: [] }),
     getAssistantAccess: async () => ({
       available: true,
@@ -49,8 +57,11 @@ vi.mock("@/components/step-up", () => ({
   useStepUp: () => async <T,>(call: () => Promise<T>) => call(),
   isStepUpCancelled: () => false,
 }));
-vi.mock("@/lib/updates", () => ({ useIsOwner: () => true }));
+let owner = true;
+vi.mock("@/lib/updates", () => ({ useIsOwner: () => owner }));
+const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigate,
   Link: ({ children, to }: { children?: ReactNode; to: string }) => <a href={to}>{children}</a>,
   useRouterState: ({ select }: { select: (s: { location: { pathname: string } }) => unknown }) => select({ location: { pathname: "/nodes/nod_1" } }),
 }));
@@ -66,7 +77,11 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [chat, applyPlan, dismissPlan, deleteMemory]) m.mockReset();
+  for (const m of [chat, applyPlan, dismissPlan, deleteMemory, navigate]) m.mockReset();
+  localStorage.clear();
+  owner = true;
+  accessList = [];
+  for (const m of [approve, setProviderKey]) m.mockReset();
 });
 
 const ev = (c: string, value: unknown) => ({ event: { case: c, value } });
@@ -338,5 +353,149 @@ describe("the assistant's chat, more", () => {
     await click(button("Send anyway"));
     await settle();
     expect(chat).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the assistant's interface cards", () => {
+  const call = (id: string, tool: string, args: unknown, over: Record<string, unknown> = {}) => ({ id, tool, argsJson: JSON.stringify(args), done: true, ok: true, count: 0, error: "", ...over });
+  const thread = (tools: unknown[], extra: Record<string, unknown> = {}) => fakeChat([message(ChatRole.USER, ts(0), "q"), message(ChatRole.ASSISTANT, ts(0, 1), "Here you go.", { tools, ...extra })]);
+  const card = () => document.querySelector("[data-slot=action]");
+  const field = () => document.querySelector<HTMLInputElement>('[data-slot=secure-field] input, [data-slot=secure-field] textarea');
+  const typeInto = (el: HTMLInputElement | HTMLTextAreaElement | null, value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, "value")!.set!.call(el, value);
+      el!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+  it("draws ui_open as a card with the page's name and a button that navigates and is then marked used", async () => {
+    await mountThread(thread([call("c1", "ui_open", { page: "node_ways", id: "nod_de1" })]));
+    expect(card()?.textContent).toContain("Nodes");
+    expect(card()?.textContent).toContain("nod_de1");
+    expect(document.querySelector("[data-slot=tools]")).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+    await click(button("Open"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_de1" }, search: { tab: "ways" } });
+    expect(card()?.getAttribute("data-state")).toBe("used");
+    expect(card()?.textContent).toContain("Opened");
+    expect(button("Open")).toBeUndefined();
+  });
+
+  it("keeps a dismissed card quiet, and draws nothing for a page off the whitelist, a refused call or ui_prefill", async () => {
+    await mountThread(thread([call("c3", "ui_open", { page: "users" })]));
+    await click(button("Dismiss"));
+    expect(card()?.getAttribute("data-state")).toBe("dismissed");
+    expect(navigate).not.toHaveBeenCalled();
+    act(() => root?.unmount());
+    host?.remove();
+    await mountThread(thread([call("c4", "ui_open", { page: "https://evil.example" }), call("c5", "ui_prefill", { form: "add_node", fields: { host: "h" } }), call("c6", "ui_open", { page: "nodes" }, { ok: false, error: "unknown page" })]));
+    expect(card()).toBeNull();
+    expect(document.querySelector("[data-slot=tools]")).not.toBeNull();
+  });
+
+  it("opens a page of the turn being written by itself only when 'open without asking' is on", async () => {
+    localStorage.setItem("assistant-ui-auto", "1");
+    chat.mockImplementation(async function* () {
+      yield ev("started", { conversationId: "cnv_n", userMessageId: "m1", assistantMessageId: "m2" });
+      yield ev("toolFinished", call("n1", "ui_open", { page: "health" }));
+      yield ev("done", { end: "end", title: "" });
+    });
+    await mount();
+    await send("where is health?");
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith({ to: "/health" });
+    expect(card()?.getAttribute("data-state")).toBe("used");
+    navigate.mockReset();
+    localStorage.removeItem("assistant-ui-auto");
+    await send("again");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  const install = (extra: Record<string, unknown> = {}) => ({ ...plan, planId: "pln_7", tool: "node_install", inboxOnly: true, needsApproval: true, ...extra });
+  const fact = (key: string, value: string) => ({ key, value, untrusted: false, code: "", params: {}, untrustedParams: [] });
+  const approval = (facts: unknown[]) => ({ id: "pln_7", tokenId: "tok_1", tokenName: "assistant", tokenProfile: 1, tool: "node_install", facts, danger: [], reason: "", state: 1, createdUnix: 0n, expiresUnix: BigInt(Math.floor(Date.now() / 1000) + 500), decidedByName: "", decidedUnix: 0n, appliedUnix: 0n, result: "", error: "", outcomeCode: "", outcomeParams: {} });
+
+  it("approves a node install right in the plan's card: the host key is compared and the password goes only to the approval call", async () => {
+    approvalList = [approval([fact("host", "203.0.113.9"), fact("host_key", "SHA256:srvkey123")])];
+    approve.mockResolvedValue({});
+    await mountThread(thread([], { plans: [install()] }));
+    await settle();
+    expect(document.querySelector("[data-slot=inline-approval]")).not.toBeNull();
+    expect(text()).toContain("SHA256:srvkey123");
+    expect(button("Open in Waiting for you")).toBeDefined();
+    // not yet: the key is not confirmed and no password is typed
+    const approveButton = () => [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.getAttribute("aria-label")?.startsWith("Approve"))!;
+    expect(approveButton().disabled).toBe(true);
+    await typeInto(field(), "s3cr3t-pass");
+    await click(document.querySelector('input[type="checkbox"]'));
+    expect(approveButton().disabled).toBe(false);
+    await click(approveButton());
+    await settle();
+    expect(approve).toHaveBeenCalledWith({ id: "pln_7", sshPassword: "s3cr3t-pass", confirmedFingerprint: "SHA256:srvkey123" });
+    // the typed value is gone from the form and was never part of a chat request
+    expect(field()?.value ?? "").toBe("");
+    expect(chat).not.toHaveBeenCalled();
+    expect(JSON.stringify(chat.mock.calls)).not.toContain("s3cr3t-pass");
+    expect(document.body.textContent).not.toContain("s3cr3t-pass");
+  });
+
+  it("approves a node install with the panel's own key, without any password", async () => {
+    accessList = [{ nodeId: "nod_1", panelKeyFingerprint: "SHA256:pAnElKeYfInGeRpRiNt0123456789abcdefghijkl" }];
+    approvalList = [approval([fact("host", "203.0.113.9"), fact("host_key", "SHA256:srvkey123"), fact("panel_ssh_key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7cYk4m1x mistgate-panel")])];
+    approve.mockResolvedValue({});
+    await mountThread(thread([], { plans: [install()] }));
+    await settle();
+    await settle();
+    expect(field()).toBeNull();
+    await click(document.querySelector('input[type="checkbox"]'));
+    await click([...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.getAttribute("aria-label")?.startsWith("Approve")));
+    await settle();
+    expect(approve).toHaveBeenCalledWith({ id: "pln_7", usePanelKey: true, confirmedFingerprint: "SHA256:srvkey123" });
+  });
+
+  it("goes to that plan's place in Waiting for you from the secondary button", async () => {
+    approvalList = [approval([fact("host_key", "SHA256:srvkey123")])];
+    await mountThread(thread([], { plans: [install()] }));
+    await settle();
+    await click(button("Open in Waiting for you"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/ai", search: { tab: "approvals", plan: "pln_7" } });
+  });
+
+  it("shows a secure field for a provider key; the value goes to the panel's own call, the card forgets it, and only a hint is kept", async () => {
+    setProviderKey.mockResolvedValue({ status: { keyHint: "Q7wA" } });
+    await mountThread(thread([call("s1", "ui_secret_form", { kind: "provider_key", provider: "anthropic" })]));
+    expect(document.querySelector("[data-slot=secret]")?.textContent).toContain("Anthropic");
+    expect(document.querySelector("[data-slot=secret]")?.textContent).toContain("never sees");
+    expect(field()?.type).toBe("password");
+    expect(field()?.getAttribute("autocomplete")).toBe("new-password");
+    expect(button("Save")?.disabled).toBe(true);
+    await typeInto(field(), "sk-ant-api03-REALVALUE0123456789");
+    await click(button("Show"));
+    expect(field()?.type).toBe("text");
+    await click(button("Save"));
+    await settle();
+    expect(setProviderKey).toHaveBeenCalledWith({ provider: 1, apiKey: "sk-ant-api03-REALVALUE0123456789" });
+    expect(field()).toBeNull();
+    expect(document.querySelector("[data-slot=secret]")?.getAttribute("data-state")).toBe("done");
+    expect(document.querySelector("[data-slot=secret]")?.textContent).toContain("●●●● Q7wA");
+    expect(document.body.textContent).not.toContain("REALVALUE");
+    expect(JSON.stringify(localStorage)).not.toContain("REALVALUE");
+    expect(chat).not.toHaveBeenCalled();
+  });
+
+  it("gives the secure form to the owner only", async () => {
+    owner = false;
+    await mountThread(thread([call("s2", "ui_secret_form", { kind: "telegram_token" })]));
+    expect(document.querySelector("[data-slot=secret]")?.textContent).toContain("Only the owner can enter this.");
+    expect(field()).toBeNull();
+  });
+
+  it("warns, as the message is typed, that it looks like a secret", async () => {
+    await mount();
+    const area = document.querySelector("textarea")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, "my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789");
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(text()).toContain("This looks like a secret. Do not send it in the chat");
   });
 });

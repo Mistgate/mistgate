@@ -25,6 +25,7 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
   useBlocker: () => ({ status: "idle" }),
+  useSearch: () => ({}),
   useNavigate: () => vi.fn(),
 }));
 vi.mock("@/components/add-node", () => ({ useAddNode: () => vi.fn() }));

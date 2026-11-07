@@ -64,3 +64,12 @@ describe("upgradeNodeLink", () => {
     expect(upgradeNodeLink({ tab: "exit" }, "warp")).toBeUndefined();
   });
 });
+
+describe("coming from the fleet map", () => {
+  it("keeps ?from=map on any tab, and on the overview, so the page can show its breadcrumb back", () => {
+    expect(validateNodeSearch({ tab: "ways", view: "graph", from: "map" })).toEqual({ tab: "ways", view: "graph", from: "map" });
+    expect(validateNodeSearch({ from: "map" })).toEqual({ from: "map" });
+    expect(validateNodeSearch({ tab: "doctor", from: "map" })).toEqual({ tab: "doctor", from: "map" });
+    expect(validateNodeSearch({ tab: "ways", from: "elsewhere" })).toEqual({ tab: "ways" });
+  });
+});

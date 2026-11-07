@@ -168,6 +168,19 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
 
   return (
     <div className="flex flex-col gap-3.5">
+      {search.from === "map" && (
+        <nav aria-label="breadcrumb" className="flex items-center gap-1.5 text-[12.5px] text-muted">
+          <Link to="/nodes" className="hover:text-fg hover:underline">
+            {t("fm.crumb.nodes")}
+          </Link>
+          <span aria-hidden>›</span>
+          <Link to="/nodes" search={{ view: "map", focus: node.id }} className="hover:text-fg hover:underline">
+            {t("fm.crumb.map")}
+          </Link>
+          <span aria-hidden>›</span>
+          <span className="font-semibold text-fg">{node.name}</span>
+        </nav>
+      )}
       <div className="flex items-start gap-3">
         <Link
           to="/nodes"

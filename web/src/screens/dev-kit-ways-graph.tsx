@@ -42,7 +42,7 @@ const v6Of = (s: V6) => ({
 });
 const factOf = (s: V6) => (s === "none" ? { ipv6: "no" } : s === "broken" || s === "down" ? { ipv6: "yes", connect: "failed" } : { ipv6: "yes", connect: "ok" });
 
-type Scenario = "be" | "entry" | "cdn";
+type Scenario = "be" | "entry" | "cdn" | "empty";
 type Ib = ReturnType<typeof ib>;
 const ib = (nodeId: string, id: string, profileName: string, protocol: string, port: number, over: object = {}) => ({
   id, profileId: `prf_${id}`, profileName, protocol, port, state: InboundState.ACTIVE, enabled: true, egress: "direct", cdn: false, directInSubscriptions: true, nodeId, nodeName: nodeId.slice(4), ...over,
@@ -55,6 +55,17 @@ const relay = (over: object) => ({
 const tcp = { network: "tcp" };
 
 function scenarioOf(s: Scenario) {
+  if (s === "empty") {
+    return {
+      nodeId: "nod_be",
+      name: "be",
+      cc: "BE",
+      address: "203.0.113.40",
+      inbounds: [ib("nod_be", "hy2", "HY2", "hysteria2", 443), ib("nod_be", "vless", "VLESS TCP", "vless", 8443), ib("nod_be", "xhttp", "VLESS XHTTP", "vless", 4443)],
+      verdict: CountryVerdict.BLOCKED,
+      relays: [] as ReturnType<typeof relay>[],
+    };
+  }
   if (s === "entry") {
     const own = [ib("nod_ru2", "own1", "VLESS TCP", "vless", 443), ib("nod_ru2", "own2", "HY2", "hysteria2", 8443)];
     return {
@@ -126,6 +137,7 @@ const cand = (inb: Ib) => ({
 });
 
 let fakeRelays: ReturnType<typeof relay>[] = [];
+let currentInbounds: Ib[] = [];
 function fakeCalls() {
   const wait = () => new Promise((r) => setTimeout(r, 900));
   const api = relaysApi as unknown as Record<string, unknown>;
@@ -139,6 +151,15 @@ function fakeCalls() {
     await wait();
     fakeRelays = fakeRelays.map((x) => (x.id === r.id ? { ...x, ...(r.enabled !== undefined ? { enabled: r.enabled, state: InboundState.ACTIVE, check: undefined as never } : {}), ...(r.port ? { port: r.port } : {}) } : x));
     return { relay: fakeRelays.find((x) => x.id === r.id) };
+  };
+  api.createRelay = async (r: { inboundId: string; viaNodeId: string; port: number }) => {
+    await wait();
+    const inb = (JSON.parse(JSON.stringify(currentInbounds)) as Ib[]).find((i) => i.id === r.inboundId)!;
+    const via = fleet.find((n) => n.id === r.viaNodeId)!;
+    const udp = inb.protocol === "hysteria2" || inb.protocol === "awg";
+    const made = relay({ id: `rn${fakeRelays.length + 1}`, inboundId: inb.id, profileName: inb.profileName, protocol: inb.protocol, network: udp ? "udp" : "tcp", port: r.port || inb.port, exitPort: inb.port, viaNodeId: via.id, viaNodeName: via.name, enabled: false, state: InboundState.PENDING });
+    fakeRelays = [...fakeRelays, made];
+    return { relay: made };
   };
   api.deleteRelay = async (r: { id: string }) => {
     await wait();
@@ -155,6 +176,7 @@ function Mock({ v6, role, scenario, children }: { v6: V6; role: Role; scenario: 
   const sc = scenarioOf(scenario);
   const [qc] = useState(() => {
     fakeRelays = sc.relays;
+    currentInbounds = sc.inbounds as Ib[];
     fakeCalls();
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
     c.setQueryData(nodesQuery.queryKey, { nodes: fleet } as never);
@@ -170,7 +192,7 @@ function Mock({ v6, role, scenario, children }: { v6: V6; role: Role; scenario: 
   qc.setQueryData(relaysQuery(sc.nodeId).queryKey, role === Role.OWNER ? (fakeRelays as never) : ([] as never));
   const own = country(sc.nodeId, sc.verdict, sc.verdict === CountryVerdict.BLOCKED ? ["MTS", "Beeline"] : sc.verdict === CountryVerdict.PARTIAL ? ["MTS"] : [], { ipv6: country(sc.nodeId, CountryVerdict.OK) });
   qc.setQueryData(checksQuery(sc.nodeId).queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [own] } as never);
-  qc.setQueryData(checksQuery("").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [own, country("nod_ru2", CountryVerdict.OK), country("nod_ru3", CountryVerdict.PARTIAL, ["MTS"])] } as never);
+  qc.setQueryData(checksQuery("").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [own, country("nod_ru2", CountryVerdict.OK), country("nod_ru3", CountryVerdict.PARTIAL, ["MTS"]), country("nod_spb1", CountryVerdict.OK), country("nod_de1", CountryVerdict.OK)] } as never);
   qc.setQueryData(doctorQuery(sc.nodeId).queryKey, { nowUnix: now, nodes: [{ nodeId: sc.nodeId, items: [{ id: "ipv6", status: 1, params: factOf(v6) }] }] } as never);
   return (
     <QueryClientProvider client={qc}>
@@ -230,6 +252,7 @@ export function WaysShowcase() {
             { value: "be", label: "be: blocked, via ru2" },
             { value: "cdn", label: "CDN + WARP" },
             { value: "entry", label: "entry node" },
+            { value: "empty", label: "only Direct" },
           ]}
         />
         <label className="flex items-center gap-2 text-[13px] text-muted">

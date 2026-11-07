@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
-import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
+import { ChatRole, PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
+import { InlineApproval } from "./inline-approval";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -12,6 +14,9 @@ import { nodesQuery } from "@/lib/queries";
 import { ChatMarkdown, type ChatEntity } from "./markdown";
 import { PlanCardView } from "./plan-card";
 import type { ChatApi } from "./chat";
+import { actionOf } from "@/lib/ui-actions";
+import { ActionCard } from "./action-card";
+import { SecretCard } from "./secret-card";
 import { Thinking, ToolGroup, toolWords } from "./tool-cards";
 
 // The conversation as a messenger thread: a date line between days, messages grouped by sender (the name and time over the
@@ -133,25 +138,38 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
   const fmt = useFmt();
   const [busy, setBusy] = useState("");
   const live = m as LiveMsg;
+  const navigate = useNavigate();
+  // the navigation tools that passed the whitelist are cards of their own; a refused one stays in the tool group with its reason
+  const actions = (m.tools as LiveTool[]).flatMap((x) => {
+    const action = actionOf(x);
+    return action ? [{ id: x.id, action }] : [];
+  });
+  const shownTools = (m.tools as LiveTool[]).filter((x) => !actions.some((a) => a.id === x.id));
   const entities = useNodeEntities();
   return (
     <div data-role="assistant" className={cx("chat-in flex items-start gap-3", first ? "mt-6" : "mt-3")}>
       <Slot show={avatar} />
       <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
         {first && <Header name={t("ai.chat.title")} time={m.createdUnix > 0 ? fmt.clock(m.createdUnix) : ""} />}
-        {(interim || (running && m.tools.length > 0)) && <Thinking m={live} running={running} interim={interim} />}
-        {m.tools.length > 0 && <ToolGroup tools={m.tools as LiveTool[]} running={running} workedMs={interim ? undefined : live.workedMs} />}
+        {(interim || (running && shownTools.length > 0)) && <Thinking m={live} running={running} interim={interim} />}
+        {shownTools.length > 0 && <ToolGroup tools={shownTools} running={running} workedMs={interim ? undefined : live.workedMs} />}
         {answer && (
           <div data-slot="bubble" className="max-w-full">
             <ChatMarkdown text={answer} onNavigate={onNavigate} entities={entities} />
           </div>
         )}
+        {actions.map((a) => (a.action.kind === "secret" ? <SecretCard key={a.id} toolId={a.id} action={a.action} owner={owner} /> : <ActionCard key={a.id} toolId={a.id} action={a.action} onNavigate={onNavigate} />))}
         {m.plans.map((p) => (
           <div key={p.planId} className="w-full">
             <PlanCardView
               plan={p}
               owner={owner}
               busy={busy === p.planId}
+              inline={owner && (p.state === PlanState.WAITING_OWNER || (p.state === PlanState.PROPOSED && p.inboxOnly)) ? <InlineApproval planId={p.planId} onDecided={() => chat.refresh?.()} /> : undefined}
+              onOpenApproval={() => {
+                void navigate({ to: "/ai", search: { tab: "approvals", plan: p.planId } } as never);
+                onNavigate();
+              }}
               onApply={() => {
                 setBusy(p.planId);
                 void chat.apply(p.planId).finally(() => setBusy(""));

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Graph, HelpGroup, Kbd, KeyRow, type GraphEdge, type GraphNode, type HelpTab } from "@/components/graph";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -41,13 +41,13 @@ const colors = { udp: "var(--muted)" };
 const SERVER = "application/x-mg-server";
 const RELAY = "application/x-mg-relay";
 
-const badgeKind: Record<RmState, ChipKind> = { ok: "ok", partial: "warn", blocked: "cut", off: "off", bad: "bad", checking: "busy" };
+export const badgeKind: Record<RmState, ChipKind> = { ok: "ok", partial: "warn", blocked: "cut", off: "off", bad: "bad", checking: "busy" };
 
 /** The card a way is (the selected card is the open way), and back. */
 const cardOfWay = (id: WayId): string => (id.startsWith("out:") ? `fwd:${id.slice(4)}` : `way:${id}`);
 const wayOfCard = (id: string): WayId | undefined => (id.startsWith("fwd:") ? (`out:${id.slice(4)}` as WayId) : id.startsWith("way:") ? (id.slice(4) as WayId) : undefined);
 
-const say = (t: T, s: Say) => (s.n !== undefined ? t.n(s.key as MessageKey, s.n, s.params) : t(s.key as MessageKey, s.params));
+export const say = (t: T, s: Say) => (s.n !== undefined ? t.n(s.key as MessageKey, s.n, s.params) : t(s.key as MessageKey, s.params));
 
 type Dialog =
   | { kind: "draw"; entry: Entry; inboundId?: string }
@@ -118,6 +118,30 @@ export function WaysGraph({
     onFull?.(false);
     setTimeout(() => document.querySelector<HTMLElement>("[data-graph-expand]")?.focus(), 0);
   };
+
+  // a way card that appears after the first draw (the dialog made its relays) rings for a second once the dialog is closed
+  const wayIds = model.ways.map((x) => x.id).join("|");
+  const seenWays = useRef<Set<string> | null>(null);
+  const toRing = useRef<string[]>([]);
+  useEffect(() => {
+    const now = new Set(wayIds.split("|").filter(Boolean));
+    const before = seenWays.current;
+    seenWays.current = now;
+    if (before) toRing.current.push(...[...now].filter((id) => !before.has(id)));
+  }, [wayIds]);
+  const dialogOpen = dlg !== null;
+  useEffect(() => {
+    if (dialogOpen || toRing.current.length === 0) return;
+    const ids = toRing.current.splice(0);
+    const set = (on: boolean) => ids.forEach((id) => (on ? document.querySelector(`[data-gnode="${id}"]`)?.setAttribute("data-fresh", "") : document.querySelector(`[data-gnode="${id}"]`)?.removeAttribute("data-fresh")));
+    const on = window.setTimeout(() => set(true), 250);
+    const off = window.setTimeout(() => set(false), 1600);
+    return () => {
+      window.clearTimeout(on);
+      window.clearTimeout(off);
+      set(false);
+    };
+  }, [dialogOpen, wayIds]);
 
   // ---- words
   const altText = (alt: AltRef[]) => alt.map((a) => (a.kind === "via" ? t("rm.alt.via", { name: a.name ?? "" }) : t(`rm.alt.${a.kind}` as MessageKey))).join(", ");
@@ -335,7 +359,7 @@ export function WaysGraph({
     width,
     headless: true,
     anchors: true,
-    draggable: false,
+    draggable: true,
     ports: [...(ports.in ? [{ id: "in", side: "in" as const, type: "udp" }] : []), ...(ports.out ? [{ id: "out", side: "out" as const, type: "udp" }] : [])],
     body,
     ...extraProps,
@@ -387,7 +411,7 @@ export function WaysGraph({
         x.id,
         258,
         <div className="p-3.5" onDragOver={wayOver(x)} onDrop={dropOnWay(x)}>
-          {head(undefined, title, <><Badge kind={badgeKind[x.state]}>{say(t, x.badge)}</Badge>{wayMenu(x)}</>)}
+          {head(undefined, x.kind === "via" && x.peer ? <NodeLink id={x.peer.id}>{title}</NodeLink> : title, <><Badge kind={badgeKind[x.state]}>{say(t, x.badge)}</Badge>{wayMenu(x)}</>)}
           {sub(say(t, x.sub))}
           {cons && sub(cons)}
           {chipsOf(x.chips)}
@@ -400,55 +424,82 @@ export function WaysGraph({
   if (owner) {
     const entryIds = new Set(model.ways.filter((x) => x.peer).map((x) => x.peer!.id));
     const addable = nodesList.filter((n) => n.id !== node.id && n.status !== NodeStatus.RETIRED && !entryIds.has(n.id));
-    nodes.push(
-      card(
-        "ghost:way",
-        246,
-        <Pop
-          label={t("rm.ghost.way")}
-          trigger={
-            <span className="flex w-full items-start gap-2 px-3.5 py-3 text-start text-[13px] leading-snug">
-              <Icon name="plus" size={14} />
-              {t("rm.ghost.way")}
-            </span>
-          }
-          triggerProps={{ className: "block w-full rounded-[10px] text-muted hover:text-fg" }}
-        >
-          {(close) => (
-            <>
-              {addable.length === 0 && <PopItem disabled>{t("rm.add.nodeNone")}</PopItem>}
-              {addable.map((n) => (
-                <PopItem
-                  key={n.id}
-                  onClick={() => {
-                    close();
-                    setExtra((e) => [...e, { id: n.id, name: n.name }]);
-                  }}
-                >
-                  {t("rm.add.node", { node: n.name })}
-                </PopItem>
-              ))}
-              <Link to="/profiles" className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2">
-                {t("rm.add.cdn")}
-              </Link>
-              {model.canAddIpv6 && (
-                <PopItem
-                  onClick={() => {
-                    close();
-                    onIpv6();
-                  }}
-                >
-                  {t("rm.add.ipv6")}
-                </PopItem>
-              )}
-            </>
-          )}
-        </Pop>,
-        {},
-        t("rm.ghost.way"),
-        { variant: "ghost", selectable: false },
-      ),
+    // "Through a node" opens the relay dialog at once, prefilled with that entry: the owner ticks the servers there
+    const addMenu = (close: () => void) => (
+      <>
+        {addable.length === 0 && <PopItem disabled>{t("rm.add.nodeNone")}</PopItem>}
+        {addable.map((n) => (
+          <PopItem
+            key={n.id}
+            icon={<Icon name="server" size={14} />}
+            onClick={() => {
+              close();
+              setDlg({ kind: "draw", entry: { id: n.id, name: n.name, cc: ccOf(n.id) } });
+            }}
+          >
+            {t("rm.add.node", { node: n.name })}
+          </PopItem>
+        ))}
+        <Link to="/profiles/new" search={{ protocol: "vless", node: node.id }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2">
+          <Icon name="cloud" size={14} />
+          {t("rm.add.cdn")}
+        </Link>
+        {model.canAddIpv6 && (
+          <PopItem
+            icon={<Icon name="network" size={14} />}
+            onClick={() => {
+              close();
+              onIpv6();
+            }}
+          >
+            {t("rm.add.ipv6")}
+          </PopItem>
+        )}
+      </>
     );
+    const onlyDirect = model.ways.length === 1 && model.ways[0]!.kind === "direct";
+    if (onlyDirect) {
+      // nothing but Direct yet: say what a way in is for, with the button that opens the same menu
+      nodes.push(
+        card(
+          "hint:way",
+          258,
+          <div className="flex flex-col items-start gap-2.5 p-3.5">
+            <p className="text-[13px] leading-snug text-muted">{t("rm.hint.body")}</p>
+            <Pop label={t("rm.hint.add")} trigger={<span className="inline-flex h-8 items-center gap-1.5 rounded-ctl bg-accent px-3 text-[13px] font-bold text-on-accent"><Icon name="plus" size={14} />{t("rm.hint.add")}</span>} triggerProps={{ className: "rounded-ctl" }}>
+              {addMenu}
+            </Pop>
+          </div>,
+          {},
+          t("rm.hint.add"),
+          { variant: "ghost", selectable: false, draggable: false },
+        ),
+      );
+    } else {
+      nodes.push(
+        card(
+          "ghost:way",
+          246,
+          <Pop
+            label={t("rm.ghost.way")}
+            trigger={
+              <span className="flex w-full items-start gap-2.5 px-3.5 py-3 text-start text-[13px] leading-snug">
+                <span className="mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full border border-current">
+                  <Icon name="plus" size={12} />
+                </span>
+                {t("rm.ghost.way")}
+              </span>
+            }
+            triggerProps={{ className: "block w-full rounded-[10px] text-muted transition-colors hover:text-accent-text" }}
+          >
+            {addMenu}
+          </Pop>,
+          {},
+          t("rm.ghost.way"),
+          { variant: "ghost", selectable: false, draggable: false },
+        ),
+      );
+    }
   }
   const nodeTitle = node.name;
   nodes.push(
@@ -509,7 +560,7 @@ export function WaysGraph({
       </Pop>,
       {},
       t("rm.ghost.exit"),
-      { variant: "ghost", selectable: false },
+      { variant: "ghost", selectable: false, draggable: false },
     ),
   );
   for (const f of model.forwards) {
@@ -518,7 +569,7 @@ export function WaysGraph({
         f.id,
         232,
         <div className="p-3.5">
-          {head("server", f.peer.name, <Badge kind={badgeKind[f.state]}>{say(t, f.badge)}</Badge>)}
+          {head("server", <NodeLink id={f.peer.id}>{f.peer.name}</NodeLink>, <Badge kind={badgeKind[f.state]}>{say(t, f.badge)}</Badge>)}
           {sub(say(t, f.sub))}
           {chipsOf(f.chips)}
         </div>,
@@ -571,8 +622,9 @@ export function WaysGraph({
         height={full ? "100%" : "fit"}
         className={full ? "h-full rounded-none border-0" : undefined}
         layoutKey={`routemap:${node.id}`}
-        arrange={(sizes) => routeLayout(sizes, { colGap: 56 })}
+        arrange={(sizes) => routeLayout(sizes, { gaps: [56, 96, 56, 56] })}
         rearrangeOnChange
+        autoArrange
         minFitZoom={0.7}
         fitPad={52}
         fitFocus="node"
@@ -596,6 +648,12 @@ export function WaysGraph({
   if (!full) {
     return (
       <div className="flex min-w-0 flex-col gap-2.5">
+        <div className="flex justify-end">
+          <Link to="/nodes" search={{ view: "map", focus: node.id }} className="inline-flex h-8 items-center gap-1.5 rounded-ctl border border-line bg-surface px-3 text-[12.5px] font-semibold text-muted transition-colors hover:text-fg">
+            <Icon name="map" size={14} />
+            {t("fm.fleetMap")}
+          </Link>
+        </div>
         {graph}
         {detail}
         {dialogs}
@@ -647,6 +705,17 @@ export function WaysGraph({
       )}
       {dialogs}
     </>
+  );
+}
+
+/** A node's name on a card: it goes to that node's page and its Ways in graph; a small arrow shows on hover. */
+function NodeLink({ id, children }: { id: string; children: ReactNode }) {
+  const t = useT();
+  return (
+    <Link to="/nodes/$id" params={{ id }} search={{ tab: "ways", view: "graph" }} title={t("rm.openNode")} className="group/nl inline-flex max-w-full items-center gap-1 hover:underline">
+      <span className="truncate">{children}</span>
+      <Icon name="externalLink" size={11} className="shrink-0 opacity-0 transition-opacity group-hover/nl:opacity-60 group-focus-visible/nl:opacity-60" />
+    </Link>
   );
 }
 

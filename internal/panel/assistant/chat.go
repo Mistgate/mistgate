@@ -39,6 +39,9 @@ Rules:
 - Prefer one call that covers the fleet over one call per node: leave node empty where a tool reads every node (node_doctor, checks_results, node_journal, alerts_list). A turn has at most 24 tool calls.
 - Finish every turn with an answer. When you need more facts, call the tools now, in this turn; never end a turn by announcing what you will check next. If a tool fails, say what you could not see and answer with the rest.
 - Link panel pages as Markdown links using the admin routes. Never invent external links.
+- When the person asks where something is or how to get to it, call ui_open with the page (and the node, user or profile id when it needs one) instead of describing the clicks: they get a card with an Open button.
+- To create or change something (a node, a user, a profile, a relay), do not hand the person a form or a list of questions. Decide the details yourself from the tools: which servers to relay and on which port, which group, which node. Prepare one plan with the matching *_plan tool (node_install_plan, user_create_plan, profile_create_plan, relay_plan) and a short rationale. Ask the person only for what you cannot know, such as the host and login of a server to install.
+- Never ask for or put into a tool a password, SSH credentials, a key or a token, and never ask the person to type one into the chat: a plan's approval card takes the install password and the host key check, and ui_secret_form gives the owner a secure field for an AI provider key, the Telegram bot token or a node's WARP account. You never see those values. A secret pasted into the chat anyway is cut from what reaches you; say so and offer the secure field.
 - Read-only administrators only have read tools.`
 
 type chatTool struct {
@@ -54,8 +57,10 @@ type localToolArgs struct {
 
 type toolExecution struct {
 	output toolOutput
-	card   *adminv1.PlanCard
-	note   *adminv1.MemoryNote
+	// args: the checked, canonical arguments of a navigation tool (unknown fields dropped); the card in the chat is drawn from them
+	args string
+	card *adminv1.PlanCard
+	note *adminv1.MemoryNote
 }
 
 func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatRequest], stream *connect.ServerStream[adminv1.ChatResponse]) error {
@@ -248,6 +253,9 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 		if admin.Role == store.RoleReadonly && (t.Name == "memory_save" || t.Name == "memory_forget") {
 			continue
 		}
+		if t.Name == "ui_secret_form" && admin.Role != store.RoleOwner {
+			continue
+		}
 		item := chatTool{AssistantTool: t, local: true}
 		tools = append(tools, item)
 		byName[t.Name] = item
@@ -428,6 +436,9 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 			outputs = append(outputs, execution.output)
 			ui.Done = true
 			ui.Ok = !execution.output.err
+			if execution.args != "" && !execution.output.err {
+				ui.ArgsJson = clipped(execution.args, 1200)
+			}
 			if execution.output.err {
 				ui.Error = clipped(cleanContextText(execution.output.text, 240), 240)
 			} else {
@@ -673,6 +684,15 @@ func (s *Service) persistPlan(ctx context.Context, adminID, conversationID, toke
 }
 
 func (s *Service) executeLocalTool(ctx context.Context, admin store.Admin, conversationID, name string, raw []byte) toolExecution {
+	switch name {
+	case "ui_open":
+		return uiOpenTool(raw)
+	case "ui_secret_form":
+		if admin.Role != store.RoleOwner {
+			return toolExecution{output: toolOutput{err: true, text: "only the owner can enter these secrets"}}
+		}
+		return uiSecretTool(raw)
+	}
 	var args localToolArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return toolExecution{output: toolOutput{err: true, text: "invalid tool input JSON"}}

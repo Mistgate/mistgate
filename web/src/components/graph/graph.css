@@ -563,3 +563,31 @@
   box-shadow: none;
   pointer-events: none;
 }
+
+/* a card that just appeared (a way made by the relay dialog) rings once */
+.mg-gnode[data-fresh] {
+  animation: mg-gfresh 1.2s ease-out;
+}
+@keyframes mg-gfresh {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 70%, transparent), var(--shadow-node);
+  }
+  35% {
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--accent) 45%, transparent), var(--shadow-node);
+    border-color: var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent, var(--shadow-node);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mg-gnode[data-fresh] {
+    animation: none;
+    border-color: var(--accent);
+  }
+}
+.mg-gnode[data-variant="ghost"]:hover,
+.mg-gnode[data-variant="ghost"]:has([aria-expanded="true"]) {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 6%, transparent);
+}

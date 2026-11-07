@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import { Icon } from "@/components/ui/icons";
 import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
-import type { Context } from "@/lib/assistant";
+import { looksSecret, type Context } from "@/lib/assistant";
 import { AgentPicker, type Pick } from "./agent-picker";
 
 /**
@@ -85,6 +85,12 @@ export function Composer({
         }}
         className="scroll-soft block min-h-5 w-full resize-none bg-transparent px-1 text-[13.5px] leading-5 outline-none placeholder:text-muted"
       />
+      {looksSecret(text) && (
+        <p role="status" className="flex items-start gap-1.5 px-1 text-[11.5px] leading-snug text-warn-text">
+          <Icon name="lock" size={11} className="mt-0.5 flex-none" />
+          {t("ai.secret.warning")}
+        </p>
+      )}
       <div className="flex items-center gap-1">
         {context && !attached && (
           <Tip label={t("ai.chat.attach")}>

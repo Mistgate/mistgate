@@ -210,11 +210,11 @@ function badge(state: RmState, cc: string): Say {
  * headers of the columns on one line above the tallest column. On an entry node the exits are top-aligned and the forwards bottom-aligned. Ids: "col:<n>" headers, "people", "way:*", "ghost:way",
  * "node", "exit:*", "ghost:exit", "fwd:*".
  */
-export function routeLayout(cards: readonly { id: string; w: number; h: number }[], opts: { colGap?: number; rowGap?: number } = {}): Record<string, { x: number; y: number }> {
+export function routeLayout(cards: readonly { id: string; w: number; h: number }[], opts: { colGap?: number; gaps?: number[]; rowGap?: number } = {}): Record<string, { x: number; y: number }> {
   const colGap = opts.colGap ?? 56;
   const rowGap = opts.rowGap ?? 14;
   const hasFwd = cards.some((c) => c.id.startsWith("fwd:"));
-  const colOf = (id: string) => (id.startsWith("col:") ? Number(id.slice(4)) : id === "people" ? 0 : id.startsWith("way:") || id === "ghost:way" ? 1 : id === "node" ? 2 : id.startsWith("exit:") || id === "ghost:exit" ? 3 : 4);
+  const colOf = (id: string) => (id.startsWith("col:") ? Number(id.slice(4)) : id === "people" ? 0 : id.startsWith("way:") || id === "ghost:way" || id === "hint:way" ? 1 : id === "node" ? 2 : id.startsWith("exit:") || id === "ghost:exit" ? 3 : 4);
   const cols = new Map<number, { id: string; w: number; h: number }[]>();
   for (const c of cards) if (!c.id.startsWith("col:")) cols.set(colOf(c.id), [...(cols.get(colOf(c.id)) ?? []), c]);
   const count = hasFwd ? 5 : 4;
@@ -222,7 +222,7 @@ export function routeLayout(cards: readonly { id: string; w: number; h: number }
   let x = 0;
   for (let k = 0; k < count; k++) {
     xs.push(x);
-    x += Math.max(0, ...(cols.get(k) ?? [{ w: 0 }]).map((c) => c.w), cards.find((c) => c.id === `col:${k}`)?.w ?? 0) + colGap;
+    x += Math.max(0, ...(cols.get(k) ?? [{ w: 0 }]).map((c) => c.w), cards.find((c) => c.id === `col:${k}`)?.w ?? 0) + (opts.gaps?.[k] ?? colGap);
   }
   const heights = [...cols.values()].map((list) => list.reduce((s, c) => s + c.h, 0) + rowGap * (list.length - 1));
   const tallest = Math.max(0, ...heights);

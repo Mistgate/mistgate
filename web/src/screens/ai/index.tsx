@@ -26,7 +26,8 @@ export function AiScreen() {
   const owner = useIsOwner();
   const edition = useEdition();
   const navigate = useNavigate();
-  const tab = (useSearch({ strict: false }) as { tab?: AiTab }).tab ?? (owner ? "assistant" : "memory");
+  const search = useSearch({ strict: false }) as { tab?: AiTab; plan?: string };
+  const tab = search.tab ?? (owner ? "assistant" : "memory");
   const approvals = useQuery({ ...approvalsQuery, enabled: owner });
   const waiting = approvals.data?.awaiting ?? 0;
   const go = (next: string) => void navigate({ to: "/ai", search: next === "assistant" ? {} : { tab: next as AiTab }, replace: true } as never);
@@ -61,7 +62,7 @@ export function AiScreen() {
       content: owner ? (
         <div className="flex flex-col gap-3.5">
           {approvals.isError && !approvals.data && <QueryError error={approvals.error} onRetry={() => void approvals.refetch()} />}
-          {approvals.data && <ApprovalQueue data={approvals.data} />}
+          {approvals.data && <ApprovalQueue data={approvals.data} focus={search.plan} />}
           {approvals.data && <ApprovalHistory data={approvals.data} />}
         </div>
       ) : (

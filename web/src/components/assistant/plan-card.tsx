@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
@@ -14,11 +14,14 @@ import { dangerText, factLabel, factWords, toolTitle, type Fact } from "@/lib/in
  * this card's button applies it; the model never can. A plan that needs the owner is approved and applied in one step by the
  * owner (with a fresh step-up), and waits in the approval inbox for anyone else.
  */
-export function PlanCardView({ plan, owner, busy, onApply, onDismiss }: { plan: Plan; owner: boolean; busy: boolean; onApply: () => void; onDismiss: () => void }) {
+export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenApproval, inline }: { plan: Plan; owner: boolean; busy: boolean; onApply: () => void; onDismiss: () => void; onOpenApproval?: () => void; inline?: ReactNode }) {
   const t = useT();
   const fmt = useFmt();
   const open = plan.state === PlanState.PROPOSED;
   const status = statusLine(t, plan);
+  // a plan that waits for the owner is decided on the approval screen (for an install, where the host key is compared and the
+  // password typed: never in the chat): this button opens that screen at this plan
+  const openApproval = owner && !!onOpenApproval && ((open && plan.inboxOnly) || plan.state === PlanState.WAITING_OWNER);
   const [now] = useState(() => Math.floor(Date.now() / 1000));
   const left = plan.expiresUnix > 0 ? Math.max(60, plan.expiresUnix - now) : 0;
   return (
@@ -68,6 +71,18 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss }: { plan: 
         </div>
       )}
       {open && plan.inboxOnly && <p className="text-xs leading-snug text-muted">{t("ai.plan.inbox")}</p>}
+      {openApproval && (
+        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <Button type="button" size="sm" variant={inline ? "ghost" : "primary"} onClick={onOpenApproval}>
+            {inline ? t("ai.plan.openWaiting") : t("ai.plan.openConfirm")}
+          </Button>
+          {open && (
+            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onDismiss}>
+              {t("ai.plan.dismiss")}
+            </Button>
+          )}
+        </div>
+      )}
       {open && !plan.inboxOnly && (
         <div className="flex flex-wrap items-center gap-2 pt-0.5">
           <Button type="button" size="sm" variant="primary" disabled={busy} onClick={onApply}>
@@ -84,6 +99,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss }: { plan: 
           )}
         </div>
       )}
+      {openApproval && inline}
       {!open && status && (
         <p className={cx("flex items-center gap-2 text-[13px]", plan.state === PlanState.APPLIED ? "text-ok-text" : plan.state === PlanState.FAILED ? "text-danger-text" : "text-muted")}>
           <Icon name={plan.state === PlanState.APPLIED ? "check" : plan.state === PlanState.WAITING_OWNER ? "clock" : plan.state === PlanState.FAILED ? "warn" : "info"} size={14} className="flex-none" />

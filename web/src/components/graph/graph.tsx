@@ -78,7 +78,11 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   const instrId = `graph-help-${useId()}`;
 
   // ----- committed state
-  const [own, setOwn] = useState<Positions>(() => (props.positions ? {} : loadPositions(layoutKey)));
+  // with autoArrange the saved places are only the user's own: without a move of theirs the cards are laid out afresh
+  const customKey = layoutKey ? `mg.graph.${layoutKey}.custom` : "";
+  const startCustom = !props.autoArrange || (!!customKey && readPref(customKey) === "1");
+  const custom = useRef(startCustom);
+  const [own, setOwn] = useState<Positions>(() => (props.positions || !startCustom ? {} : loadPositions(layoutKey)));
   const positions = props.positions ?? own;
   const [selOwn, setSelOwn] = useState<string[]>([]);
   const sel = props.selected ?? selOwn;
@@ -103,6 +107,9 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   useLayoutEffect(() => {
     live.current = { nodes, edges, virtual, positions, sel, selEdge, canConnect, onConnect, onEdgeDelete, canWire, canDelete, canGrab, readOnly, kb, drag, props, menu };
   });
+  useEffect(() => {
+    live.current.props.onEdgeSelect?.(selEdge);
+  }, [selEdge]);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -149,8 +156,12 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   );
 
   // ----- positions
-  const commitPositions = useCallback((next: Positions) => {
+  const commitPositions = useCallback((next: Positions, byUser = false) => {
     const { props: p } = live.current;
+    if (byUser && p.autoArrange && !custom.current) {
+      custom.current = true;
+      if (p.layoutKey) writePref(`mg.graph.${p.layoutKey}.custom`, "1");
+    }
     if (!p.positions) {
       setOwn(next);
       savePositions(p.layoutKey, next);
@@ -364,6 +375,18 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       }),
     [store],
   );
+  const lastSig = useRef("");
+  /** The cards' sizes in one string: a change of it is a reason to lay out again. */
+  const sig = useCallback(
+    () =>
+      live.current.nodes
+        .map((n) => {
+          const m = store.measure.get(n.id);
+          return m ? `${n.id}:${Math.round(m.w)}x${Math.round(m.h)}` : "";
+        })
+        .join("|"),
+    [store],
+  );
   const layoutEdges = useCallback(() => live.current.edges.map((e) => ({ from: e.from.node, to: e.to.node })), []);
   useLayoutEffect(() => {
     if (measureVersion < 0) return; // measureVersion is a dependency: re-run when a card is measured
@@ -390,6 +413,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
             taken.push({ ...p, w: a.w, h: a.h });
           }
         }
+        lastSig.current = sig();
         commitPositions(next);
       }, 0);
       return () => clearTimeout(timer);
@@ -408,7 +432,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       fitted.current = true;
       fit(false);
     }
-  }, [nodes, positions, measureVersion, store, sizes, layoutEdges, commitPositions, fit, allRects]);
+  }, [nodes, positions, measureVersion, store, sizes, layoutEdges, commitPositions, fit, allRects, sig]);
 
   // other nodes: fit again once they are placed
   const lastKey = useRef(nodeKey);
@@ -465,8 +489,28 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
 
   const arrange = useCallback(() => {
     const target = (live.current.props.arrange ?? computeLayout)(sizes(), layoutEdges());
+    // Arrange gives the layout back to the graph
+    custom.current = false;
+    if (live.current.props.layoutKey) writePref(`mg.graph.${live.current.props.layoutKey}.custom`, null);
+    lastSig.current = sig();
     animateTo(target);
-  }, [sizes, layoutEdges, animateTo]);
+  }, [sizes, layoutEdges, animateTo, sig]);
+
+  // autoArrange: when the cards' sizes change (a state changed a line of text) and the user has not placed them, lay out again
+  useLayoutEffect(() => {
+    if (measureVersion < 0 || !live.current.props.autoArrange || custom.current || !fitted.current || animating.current) return;
+    const s = sig();
+    if (!s || s === lastSig.current) return;
+    const timer = setTimeout(() => {
+      if (custom.current) return;
+      lastSig.current = sig();
+      const target = (live.current.props.arrange ?? computeLayout)(sizes(), layoutEdges());
+      const next: Positions = {};
+      for (const n of live.current.nodes) if (target[n.id]) next[n.id] = target[n.id]!;
+      commitPositions(next);
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [measureVersion, sig, sizes, layoutEdges, commitPositions]);
 
   // ----- connecting
   const verdictFor = useCallback((from: PortRef, to: PortRef, ignoreEdge?: string): Verdict => {
@@ -634,6 +678,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // a popover or menu portaled out of a card is a React child of the canvas but not part of it: its events are its own
+    if (!e.currentTarget.contains(e.target as Node)) return;
     const target = e.target as HTMLElement;
     if (target.closest("[data-gui]")) return;
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -695,7 +741,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         select(ids);
       }
       setSelEdge(null);
-      const dragIds = ids.filter((x) => live.current.nodes.find((m) => m.id === x)?.draggable !== false);
+      // a card that cannot be selected still moves, alone
+      const dragIds = (n.selectable === false ? [id] : ids).filter((x) => live.current.nodes.find((m) => m.id === x)?.draggable !== false);
       mode.current = { kind: "node", id: e.pointerId, sx: e.clientX, sy: e.clientY, node: id, ids: dragIds, starts: null, mod, was, canDrag: n.draggable !== false && dragIds.includes(id) };
       return;
     }
@@ -714,7 +761,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       const p = store.live.get(id);
       if (p) next[id] = p;
     }
-    commitPositions(next);
+    commitPositions(next, true);
     refreshOrder();
     rootRef.current?.removeAttribute("data-mode");
   };
@@ -873,6 +920,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // a popover or menu portaled out of a card is a React child of the canvas but not part of it: its events are its own
+    if (!e.currentTarget.contains(e.target as Node)) return;
     if (ptrs.current.has(e.pointerId)) ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const m = mode.current;
     if (!m) {
@@ -945,6 +994,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>, cancelled = false) => {
+    // a popover or menu portaled out of a card is a React child of the canvas but not part of it: its events are its own
+    if (!e.currentTarget.contains(e.target as Node)) return;
     ptrs.current.delete(e.pointerId);
     const m = mode.current;
     if (!m) return;
@@ -991,6 +1042,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
 
   // ----- keyboard
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    // a popover or menu portaled out of a card is a React child of the canvas but not part of it: its events are its own
+    if (!e.currentTarget.contains(e.target as Node)) return;
     const target = e.target as HTMLElement;
     const l = live.current;
     if (target.closest("[data-gui]") && e.key !== "Escape") return;
@@ -1081,10 +1134,12 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         if (!p || n?.draggable === false) continue;
         next[id] = { x: p.x + dx, y: p.y + dy };
       }
-      commitPositions(next);
+      commitPositions(next, true);
     }
   };
   const onKeyUp = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    // a popover or menu portaled out of a card is a React child of the canvas but not part of it: its events are its own
+    if (!e.currentTarget.contains(e.target as Node)) return;
     if (e.key === " ") {
       spaceDown.current = false;
       rootRef.current?.removeAttribute("data-space");
@@ -1140,6 +1195,13 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     props.onHelpChange?.(tab);
   };
   const onDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // a popover or menu portaled out of a card is a React child of the canvas but not part of it: its events are its own
+    if (!e.currentTarget.contains(e.target as Node)) return;
+    const nodeEl = (e.target as HTMLElement).closest<HTMLElement>("[data-gnode]");
+    if (nodeEl && !(e.target as HTMLElement).closest(INTERACTIVE + ",[data-gui]")) {
+      live.current.props.onNodeActivate?.(nodeEl.dataset.gnode!);
+      return;
+    }
     if ((e.target as HTMLElement).closest("[data-gui],[data-gnode],[data-gedge],.mg-glabel")) return;
     const p = store.toLocal(e.clientX, e.clientY);
     animateView(zoomAround(store.view, p, store.view.z * (e.shiftKey ? 1 / 1.5 : 1.5)), 220);
