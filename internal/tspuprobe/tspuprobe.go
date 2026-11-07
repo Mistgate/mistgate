@@ -329,6 +329,11 @@ func (r *runner) address(ctx context.Context, host string) (netip.Addr, error) {
 
 // probe takes a place among the sockets in flight and sends one SYN.
 func (r *runner) probe(ctx context.Context, dst netip.AddrPort, ttl int, wait time.Duration) (hop, error) {
+	// A select with a free slot and an ended context picks either case at random, so an ended walk or sweep could send one more
+	// probe; the context is checked first.
+	if err := ctx.Err(); err != nil {
+		return hopSilent, err
+	}
 	select {
 	case r.sem <- struct{}{}:
 	case <-ctx.Done():

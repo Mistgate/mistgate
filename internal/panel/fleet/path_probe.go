@@ -201,7 +201,7 @@ func (s probeService) PathProbe(ctx context.Context, req *connect.Request[probev
 	if res.Error == "" {
 		if b, err := json.Marshal(res); err == nil {
 			if err := f.st.AddPathProbe(ctx, from.ID, to.ID, m.Kind, at, string(b)); err != nil {
-				f.log.Warn("store path probe", "err", err)
+				f.log.Warn("store path probe", "code", "store_failed", "err", err)
 			}
 		}
 	}
@@ -245,7 +245,7 @@ func probeArgs(m *probev1.PathProbeRequest) (ports []uint16, sizes []uint32, err
 func (f *Fleet) runPathProbe(ctx context.Context, from, to store.NodeRow, kind string, requested []uint16, sizes []uint32) pathProbeResult {
 	liveRows, err := f.Live(ctx)
 	if err != nil {
-		f.log.Warn("read live nodes for path probe", "err", err)
+		f.log.Warn("read live nodes for path probe", "code", "store_failed", "err", err)
 		return pathProbeResult{Error: "failed"}
 	}
 	live := liveRowsByID(liveRows)
@@ -283,7 +283,7 @@ func (f *Fleet) runPathProbe(ctx context.Context, from, to store.NodeRow, kind s
 func (f *Fleet) probeUDPPorts(ctx context.Context, to store.NodeRow, requested []uint16) ([]uint16, string) {
 	inbounds, err := f.st.FleetInbounds(ctx, to.ID, false)
 	if err != nil {
-		f.log.Warn("list inbounds for path probe", "err", err)
+		f.log.Warn("list inbounds for path probe", "code", "store_failed", "err", err)
 		return nil, "failed"
 	}
 	own := f.udpCheckPorts(to, nil, inbounds)
@@ -303,7 +303,7 @@ func (f *Fleet) probeUDPPorts(ctx context.Context, to store.NodeRow, requested [
 func (f *Fleet) probeTCPPorts(ctx context.Context, to store.NodeRow, kind string, requested []uint16) ([]tcpTarget, string) {
 	specs, pins, err := f.tcpSpecsOf(ctx, to)
 	if err != nil {
-		f.log.Warn("list inbounds for path probe", "err", err)
+		f.log.Warn("list inbounds for path probe", "code", "store_failed", "err", err)
 		return nil, "failed"
 	}
 	var own []tcpTarget
@@ -556,7 +556,7 @@ func (s probeService) NodeTrace(ctx context.Context, req *connect.Request[probev
 		}
 		if b, err := json.Marshal(cur); err == nil {
 			if err := f.st.AddNodeTrace(ctx, from.ID, to.ID, at, string(b)); err != nil {
-				f.log.Warn("store node trace", "err", err)
+				f.log.Warn("store node trace", "code", "store_failed", "err", err)
 			}
 		}
 		if all, err := f.st.NodeTraces(ctx, from.ID, to.ID, store.NodeTraceKeep); err == nil {
@@ -570,7 +570,7 @@ func (s probeService) NodeTrace(ctx context.Context, req *connect.Request[probev
 func (f *Fleet) runTrace(ctx context.Context, from, to store.NodeRow) (traceJSON, string) {
 	liveRows, err := f.Live(ctx)
 	if err != nil {
-		f.log.Warn("read live nodes for trace", "err", err)
+		f.log.Warn("read live nodes for trace", "code", "store_failed", "err", err)
 		return traceJSON{}, "failed"
 	}
 	fromLive, code := f.probeLive(liveRowsByID(liveRows), from.ID, capProbe)
@@ -704,7 +704,7 @@ func (s probeService) NodeDnsCheck(ctx context.Context, req *connect.Request[pro
 			return
 		}
 		if err := f.st.AddNodeDNSRun(ctx, r); err != nil {
-			f.log.Warn("store resolver run", "err", err)
+			f.log.Warn("store resolver run", "code", "store_failed", "err", err)
 			return
 		}
 		runs = append(runs, r)
