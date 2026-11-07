@@ -63,6 +63,11 @@ func TestConntrackFill(t *testing.T) {
 	r = run(t, f.doctor(), CheckConntrackFill)
 	want(t, r, OK, "")
 	code(t, r, CodeConntrackFill, "count", "1000", "max", "262144", "fill_pct", "0")
+	if _, ok := r.Params["drops"]; ok {
+		t.Errorf("drops without /proc/net/stat/nf_conntrack: %v", r.Params)
+	}
+	f.put("/proc/net/stat/nf_conntrack", "entries drop early_drop\n00000001 0000000e 00000002\n00000002 00000010 00000004\n")
+	param(t, run(t, f.doctor(), CheckConntrackFill), "drops", "30")
 	set(79, 100)
 	want(t, run(t, f.doctor(), CheckConntrackFill), OK, "")
 	set(80, 100)

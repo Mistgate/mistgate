@@ -43,20 +43,22 @@ func checkCPUSteal(_ context.Context, e *Env) Result {
 // ---------------------------------------------------------------------------------------------------
 // conntrack_fill: the kernel's connection-tracking table. When it is full the kernel drops every new connection
 // ("nf_conntrack: table full, dropping packet"), which looks to people like a node that stopped answering while the
-// ones already connected carry on. Nothing to check where conntrack is not loaded.
+// ones already connected carry on. Nothing to check where conntrack is not loaded. It owns the verdict on the fill;
+// net_baseline only reports it next to the table's size.
 
 func checkConntrackFill(_ context.Context, e *Env) Result {
-	cs, err1 := e.read("/proc/sys/net/netfilter/nf_conntrack_count")
-	ms, err2 := e.read("/proc/sys/net/netfilter/nf_conntrack_max")
-	count, ok1 := sysstat.ParseUint(cs)
-	limit, ok2 := sysstat.ParseUint(ms)
-	if err1 != nil || err2 != nil || !ok1 || !ok2 || limit == 0 {
+	ct, dropsOK := readConntrackSnapshot(e) // the same reading net_baseline reports in its params
+	if !ct.hasCountAndMax || ct.max == 0 {
 		return skip(CodeConntrackNotLoaded, "connection tracking is not loaded")
 	}
-	pct := int(min(count*100/limit, 100))
+	count, limit := ct.count, ct.max
+	pct := int(min(count/limit*100+count%limit*100/limit, 100)) // count*100 could overflow a bogus count
 	r := Result{Status: OK, Code: CodeConntrackFill,
 		Params: p("count", strconv.FormatUint(count, 10), "max", strconv.FormatUint(limit, 10), "fill_pct", strconv.Itoa(pct)),
 		Detail: fmt.Sprintf("connection tracking %d of %d entries (%d%%)", count, limit, pct)}
+	if dropsOK { // since boot; kernels without CONFIG_NF_CONNTRACK_PROCFS (Ubuntu's) do not count them
+		r.Params["drops"] = strconv.FormatUint(ct.drops, 10)
+	}
 	switch {
 	case pct >= conntrackFailPct:
 		r.Status = Fail
