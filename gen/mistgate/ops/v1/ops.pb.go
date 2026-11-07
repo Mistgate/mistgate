@@ -1087,6 +1087,699 @@ func (x *SetMetricsSettingsResponse) GetToken() string {
 	return ""
 }
 
+// One capture as the panel holds it.
+type DebugCaptureInfo struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CaptureId string                 `protobuf:"bytes,1,opt,name=capture_id,json=captureId,proto3" json:"capture_id,omitempty"`
+	NodeId    string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName  string                 `protobuf:"bytes,3,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	// "running" (the node is capturing), "done" (shipped) or "expired" (the time passed and no report came).
+	State string `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	// "debug" or "info".
+	Level       string   `protobuf:"bytes,5,opt,name=level,proto3" json:"level,omitempty"`
+	Sources     []string `protobuf:"bytes,6,rep,name=sources,proto3" json:"sources,omitempty"`
+	DurationS   uint32   `protobuf:"varint,7,opt,name=duration_s,json=durationS,proto3" json:"duration_s,omitempty"`
+	StartedUnix int64    `protobuf:"varint,8,opt,name=started_unix,json=startedUnix,proto3" json:"started_unix,omitempty"`
+	// When the capture ends on the node.
+	EndsUnix int64 `protobuf:"varint,9,opt,name=ends_unix,json=endsUnix,proto3" json:"ends_unix,omitempty"`
+	// The admin that asked (an id or a token's name).
+	Actor string `protobuf:"bytes,10,opt,name=actor,proto3" json:"actor,omitempty"`
+	// Records stored, and records the node or the panel did not keep because a limit was reached.
+	Records uint32 `protobuf:"varint,11,opt,name=records,proto3" json:"records,omitempty"`
+	Dropped uint32 `protobuf:"varint,12,opt,name=dropped,proto3" json:"dropped,omitempty"`
+	// "expired", "stopped" or "shutdown" once done; "" while running.
+	EndReason     string `protobuf:"bytes,13,opt,name=end_reason,json=endReason,proto3" json:"end_reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DebugCaptureInfo) Reset() {
+	*x = DebugCaptureInfo{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DebugCaptureInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DebugCaptureInfo) ProtoMessage() {}
+
+func (x *DebugCaptureInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DebugCaptureInfo.ProtoReflect.Descriptor instead.
+func (*DebugCaptureInfo) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DebugCaptureInfo) GetCaptureId() string {
+	if x != nil {
+		return x.CaptureId
+	}
+	return ""
+}
+
+func (x *DebugCaptureInfo) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *DebugCaptureInfo) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *DebugCaptureInfo) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *DebugCaptureInfo) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *DebugCaptureInfo) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *DebugCaptureInfo) GetDurationS() uint32 {
+	if x != nil {
+		return x.DurationS
+	}
+	return 0
+}
+
+func (x *DebugCaptureInfo) GetStartedUnix() int64 {
+	if x != nil {
+		return x.StartedUnix
+	}
+	return 0
+}
+
+func (x *DebugCaptureInfo) GetEndsUnix() int64 {
+	if x != nil {
+		return x.EndsUnix
+	}
+	return 0
+}
+
+func (x *DebugCaptureInfo) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *DebugCaptureInfo) GetRecords() uint32 {
+	if x != nil {
+		return x.Records
+	}
+	return 0
+}
+
+func (x *DebugCaptureInfo) GetDropped() uint32 {
+	if x != nil {
+		return x.Dropped
+	}
+	return 0
+}
+
+func (x *DebugCaptureInfo) GetEndReason() string {
+	if x != nil {
+		return x.EndReason
+	}
+	return ""
+}
+
+type StartDebugCaptureRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// "debug" or "info"; "" means "debug".
+	Level string `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	// Log sources ("agent", "hysteria2", "xray", "awg" ...); empty = all. At most 8, each of 1 to 32 letters, digits, "-" or "_".
+	Sources []string `protobuf:"bytes,3,rep,name=sources,proto3" json:"sources,omitempty"`
+	// 1 to 900 seconds; 0 means 300.
+	DurationS     uint32 `protobuf:"varint,4,opt,name=duration_s,json=durationS,proto3" json:"duration_s,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartDebugCaptureRequest) Reset() {
+	*x = StartDebugCaptureRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartDebugCaptureRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartDebugCaptureRequest) ProtoMessage() {}
+
+func (x *StartDebugCaptureRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartDebugCaptureRequest.ProtoReflect.Descriptor instead.
+func (*StartDebugCaptureRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *StartDebugCaptureRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *StartDebugCaptureRequest) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *StartDebugCaptureRequest) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *StartDebugCaptureRequest) GetDurationS() uint32 {
+	if x != nil {
+		return x.DurationS
+	}
+	return 0
+}
+
+type StartDebugCaptureResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Capture       *DebugCaptureInfo      `protobuf:"bytes,1,opt,name=capture,proto3" json:"capture,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartDebugCaptureResponse) Reset() {
+	*x = StartDebugCaptureResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartDebugCaptureResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartDebugCaptureResponse) ProtoMessage() {}
+
+func (x *StartDebugCaptureResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartDebugCaptureResponse.ProtoReflect.Descriptor instead.
+func (*StartDebugCaptureResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *StartDebugCaptureResponse) GetCapture() *DebugCaptureInfo {
+	if x != nil {
+		return x.Capture
+	}
+	return nil
+}
+
+type StopDebugCaptureRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CaptureId     string                 `protobuf:"bytes,1,opt,name=capture_id,json=captureId,proto3" json:"capture_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopDebugCaptureRequest) Reset() {
+	*x = StopDebugCaptureRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopDebugCaptureRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopDebugCaptureRequest) ProtoMessage() {}
+
+func (x *StopDebugCaptureRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopDebugCaptureRequest.ProtoReflect.Descriptor instead.
+func (*StopDebugCaptureRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *StopDebugCaptureRequest) GetCaptureId() string {
+	if x != nil {
+		return x.CaptureId
+	}
+	return ""
+}
+
+type StopDebugCaptureResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Capture       *DebugCaptureInfo      `protobuf:"bytes,1,opt,name=capture,proto3" json:"capture,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopDebugCaptureResponse) Reset() {
+	*x = StopDebugCaptureResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopDebugCaptureResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopDebugCaptureResponse) ProtoMessage() {}
+
+func (x *StopDebugCaptureResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopDebugCaptureResponse.ProtoReflect.Descriptor instead.
+func (*StopDebugCaptureResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *StopDebugCaptureResponse) GetCapture() *DebugCaptureInfo {
+	if x != nil {
+		return x.Capture
+	}
+	return nil
+}
+
+type ListDebugCapturesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "" = every node.
+	NodeId        string `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDebugCapturesRequest) Reset() {
+	*x = ListDebugCapturesRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDebugCapturesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDebugCapturesRequest) ProtoMessage() {}
+
+func (x *ListDebugCapturesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDebugCapturesRequest.ProtoReflect.Descriptor instead.
+func (*ListDebugCapturesRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ListDebugCapturesRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type ListDebugCapturesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Captures      []*DebugCaptureInfo    `protobuf:"bytes,1,rep,name=captures,proto3" json:"captures,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDebugCapturesResponse) Reset() {
+	*x = ListDebugCapturesResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDebugCapturesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDebugCapturesResponse) ProtoMessage() {}
+
+func (x *ListDebugCapturesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDebugCapturesResponse.ProtoReflect.Descriptor instead.
+func (*ListDebugCapturesResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListDebugCapturesResponse) GetCaptures() []*DebugCaptureInfo {
+	if x != nil {
+		return x.Captures
+	}
+	return nil
+}
+
+type GetDebugCaptureRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One of the two: a capture, or a node (its newest capture).
+	CaptureId string `protobuf:"bytes,1,opt,name=capture_id,json=captureId,proto3" json:"capture_id,omitempty"`
+	NodeId    string `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// The lowest level: "debug" or "info"; "" = everything.
+	MinLevel string `protobuf:"bytes,3,opt,name=min_level,json=minLevel,proto3" json:"min_level,omitempty"`
+	// One log source; "" = all.
+	Source string `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	// Case-insensitive substring of the cleaned message or an attribute value; at most 100 characters.
+	Query string `protobuf:"bytes,5,opt,name=query,proto3" json:"query,omitempty"`
+	// At most 500; 0 means 100.
+	Limit uint32 `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	// The next_cursor of the previous page (0 = from the first record).
+	AfterSeq      int64 `protobuf:"varint,7,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDebugCaptureRequest) Reset() {
+	*x = GetDebugCaptureRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDebugCaptureRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDebugCaptureRequest) ProtoMessage() {}
+
+func (x *GetDebugCaptureRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDebugCaptureRequest.ProtoReflect.Descriptor instead.
+func (*GetDebugCaptureRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetDebugCaptureRequest) GetCaptureId() string {
+	if x != nil {
+		return x.CaptureId
+	}
+	return ""
+}
+
+func (x *GetDebugCaptureRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *GetDebugCaptureRequest) GetMinLevel() string {
+	if x != nil {
+		return x.MinLevel
+	}
+	return ""
+}
+
+func (x *GetDebugCaptureRequest) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *GetDebugCaptureRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *GetDebugCaptureRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetDebugCaptureRequest) GetAfterSeq() int64 {
+	if x != nil {
+		return x.AfterSeq
+	}
+	return 0
+}
+
+type DebugRecord struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Seq        int64                  `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	TimeUnixMs int64                  `protobuf:"varint,2,opt,name=time_unix_ms,json=timeUnixMs,proto3" json:"time_unix_ms,omitempty"`
+	// "debug", "info", "warn" or "error".
+	Level   string `protobuf:"bytes,3,opt,name=level,proto3" json:"level,omitempty"`
+	Source  string `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	Message string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	// Only the allow-listed keys, values scrubbed.
+	Attrs         map[string]string `protobuf:"bytes,6,rep,name=attrs,proto3" json:"attrs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DebugRecord) Reset() {
+	*x = DebugRecord{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DebugRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DebugRecord) ProtoMessage() {}
+
+func (x *DebugRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DebugRecord.ProtoReflect.Descriptor instead.
+func (*DebugRecord) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *DebugRecord) GetSeq() int64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *DebugRecord) GetTimeUnixMs() int64 {
+	if x != nil {
+		return x.TimeUnixMs
+	}
+	return 0
+}
+
+func (x *DebugRecord) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *DebugRecord) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *DebugRecord) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DebugRecord) GetAttrs() map[string]string {
+	if x != nil {
+		return x.Attrs
+	}
+	return nil
+}
+
+type GetDebugCaptureResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Capture *DebugCaptureInfo      `protobuf:"bytes,1,opt,name=capture,proto3" json:"capture,omitempty"`
+	Records []*DebugRecord         `protobuf:"bytes,2,rep,name=records,proto3" json:"records,omitempty"`
+	// Pass as after_seq for the next page; 0 when there is none.
+	NextCursor int64 `protobuf:"varint,3,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	// The sources that appear in the capture, to fill a filter.
+	Sources       []string `protobuf:"bytes,4,rep,name=sources,proto3" json:"sources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDebugCaptureResponse) Reset() {
+	*x = GetDebugCaptureResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDebugCaptureResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDebugCaptureResponse) ProtoMessage() {}
+
+func (x *GetDebugCaptureResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDebugCaptureResponse.ProtoReflect.Descriptor instead.
+func (*GetDebugCaptureResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetDebugCaptureResponse) GetCapture() *DebugCaptureInfo {
+	if x != nil {
+		return x.Capture
+	}
+	return nil
+}
+
+func (x *GetDebugCaptureResponse) GetRecords() []*DebugRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+func (x *GetDebugCaptureResponse) GetNextCursor() int64 {
+	if x != nil {
+		return x.NextCursor
+	}
+	return 0
+}
+
+func (x *GetDebugCaptureResponse) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
 var File_mistgate_ops_v1_ops_proto protoreflect.FileDescriptor
 
 const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
@@ -1176,7 +1869,69 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x1aSetMetricsSettingsResponse\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1b\n" +
 	"\thas_token\x18\x02 \x01(\bR\bhasToken\x12\x14\n" +
-	"\x05token\x18\x03 \x01(\tR\x05token2\x97\x06\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\"\xfd\x02\n" +
+	"\x10DebugCaptureInfo\x12\x1d\n" +
+	"\n" +
+	"capture_id\x18\x01 \x01(\tR\tcaptureId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x03 \x01(\tR\bnodeName\x12\x14\n" +
+	"\x05state\x18\x04 \x01(\tR\x05state\x12\x14\n" +
+	"\x05level\x18\x05 \x01(\tR\x05level\x12\x18\n" +
+	"\asources\x18\x06 \x03(\tR\asources\x12\x1d\n" +
+	"\n" +
+	"duration_s\x18\a \x01(\rR\tdurationS\x12%\n" +
+	"\fstarted_unix\x18\b \x01(\x03B\x020\x02R\vstartedUnix\x12\x1f\n" +
+	"\tends_unix\x18\t \x01(\x03B\x020\x02R\bendsUnix\x12\x14\n" +
+	"\x05actor\x18\n" +
+	" \x01(\tR\x05actor\x12\x18\n" +
+	"\arecords\x18\v \x01(\rR\arecords\x12\x18\n" +
+	"\adropped\x18\f \x01(\rR\adropped\x12\x1d\n" +
+	"\n" +
+	"end_reason\x18\r \x01(\tR\tendReason\"\x82\x01\n" +
+	"\x18StartDebugCaptureRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x14\n" +
+	"\x05level\x18\x02 \x01(\tR\x05level\x12\x18\n" +
+	"\asources\x18\x03 \x03(\tR\asources\x12\x1d\n" +
+	"\n" +
+	"duration_s\x18\x04 \x01(\rR\tdurationS\"X\n" +
+	"\x19StartDebugCaptureResponse\x12;\n" +
+	"\acapture\x18\x01 \x01(\v2!.mistgate.ops.v1.DebugCaptureInfoR\acapture\"8\n" +
+	"\x17StopDebugCaptureRequest\x12\x1d\n" +
+	"\n" +
+	"capture_id\x18\x01 \x01(\tR\tcaptureId\"W\n" +
+	"\x18StopDebugCaptureResponse\x12;\n" +
+	"\acapture\x18\x01 \x01(\v2!.mistgate.ops.v1.DebugCaptureInfoR\acapture\"3\n" +
+	"\x18ListDebugCapturesRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"Z\n" +
+	"\x19ListDebugCapturesResponse\x12=\n" +
+	"\bcaptures\x18\x01 \x03(\v2!.mistgate.ops.v1.DebugCaptureInfoR\bcaptures\"\xd2\x01\n" +
+	"\x16GetDebugCaptureRequest\x12\x1d\n" +
+	"\n" +
+	"capture_id\x18\x01 \x01(\tR\tcaptureId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tmin_level\x18\x03 \x01(\tR\bminLevel\x12\x16\n" +
+	"\x06source\x18\x04 \x01(\tR\x06source\x12\x14\n" +
+	"\x05query\x18\x05 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\rR\x05limit\x12\x1f\n" +
+	"\tafter_seq\x18\a \x01(\x03B\x020\x02R\bafterSeq\"\x8a\x02\n" +
+	"\vDebugRecord\x12\x14\n" +
+	"\x03seq\x18\x01 \x01(\x03B\x020\x02R\x03seq\x12$\n" +
+	"\ftime_unix_ms\x18\x02 \x01(\x03B\x020\x02R\n" +
+	"timeUnixMs\x12\x14\n" +
+	"\x05level\x18\x03 \x01(\tR\x05level\x12\x16\n" +
+	"\x06source\x18\x04 \x01(\tR\x06source\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12=\n" +
+	"\x05attrs\x18\x06 \x03(\v2'.mistgate.ops.v1.DebugRecord.AttrsEntryR\x05attrs\x1a8\n" +
+	"\n" +
+	"AttrsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcd\x01\n" +
+	"\x17GetDebugCaptureResponse\x12;\n" +
+	"\acapture\x18\x01 \x01(\v2!.mistgate.ops.v1.DebugCaptureInfoR\acapture\x126\n" +
+	"\arecords\x18\x02 \x03(\v2\x1c.mistgate.ops.v1.DebugRecordR\arecords\x12#\n" +
+	"\vnext_cursor\x18\x03 \x01(\x03B\x020\x02R\n" +
+	"nextCursor\x12\x18\n" +
+	"\asources\x18\x04 \x03(\tR\asources2\xbe\t\n" +
 	"\n" +
 	"OpsService\x12a\n" +
 	"\x0eGetLogSettings\x12&.mistgate.ops.v1.GetLogSettingsRequest\x1a'.mistgate.ops.v1.GetLogSettingsResponse\x12X\n" +
@@ -1187,7 +1942,11 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\n" +
 	"ExportData\x12\".mistgate.ops.v1.ExportDataRequest\x1a#.mistgate.ops.v1.ExportDataResponse0\x01\x12m\n" +
 	"\x12GetMetricsSettings\x12*.mistgate.ops.v1.GetMetricsSettingsRequest\x1a+.mistgate.ops.v1.GetMetricsSettingsResponse\x12m\n" +
-	"\x12SetMetricsSettings\x12*.mistgate.ops.v1.SetMetricsSettingsRequest\x1a+.mistgate.ops.v1.SetMetricsSettingsResponseB\xb5\x01\n" +
+	"\x12SetMetricsSettings\x12*.mistgate.ops.v1.SetMetricsSettingsRequest\x1a+.mistgate.ops.v1.SetMetricsSettingsResponse\x12j\n" +
+	"\x11StartDebugCapture\x12).mistgate.ops.v1.StartDebugCaptureRequest\x1a*.mistgate.ops.v1.StartDebugCaptureResponse\x12g\n" +
+	"\x10StopDebugCapture\x12(.mistgate.ops.v1.StopDebugCaptureRequest\x1a).mistgate.ops.v1.StopDebugCaptureResponse\x12j\n" +
+	"\x11ListDebugCaptures\x12).mistgate.ops.v1.ListDebugCapturesRequest\x1a*.mistgate.ops.v1.ListDebugCapturesResponse\x12d\n" +
+	"\x0fGetDebugCapture\x12'.mistgate.ops.v1.GetDebugCaptureRequest\x1a(.mistgate.ops.v1.GetDebugCaptureResponseB\xb5\x01\n" +
 	"\x13com.mistgate.ops.v1B\bOpsProtoP\x01Z6github.com/mistgate/mistgate/gen/mistgate/ops/v1;opsv1\xa2\x02\x03MOX\xaa\x02\x0fMistgate.Ops.V1\xca\x02\x0fMistgate\\Ops\\V1\xe2\x02\x1bMistgate\\Ops\\V1\\GPBMetadata\xea\x02\x11Mistgate::Ops::V1b\x06proto3"
 
 var (
@@ -1202,7 +1961,7 @@ func file_mistgate_ops_v1_ops_proto_rawDescGZIP() []byte {
 	return file_mistgate_ops_v1_ops_proto_rawDescData
 }
 
-var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*GetLogSettingsRequest)(nil),      // 0: mistgate.ops.v1.GetLogSettingsRequest
 	(*GetLogSettingsResponse)(nil),     // 1: mistgate.ops.v1.GetLogSettingsResponse
@@ -1222,36 +1981,61 @@ var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*GetMetricsSettingsResponse)(nil), // 15: mistgate.ops.v1.GetMetricsSettingsResponse
 	(*SetMetricsSettingsRequest)(nil),  // 16: mistgate.ops.v1.SetMetricsSettingsRequest
 	(*SetMetricsSettingsResponse)(nil), // 17: mistgate.ops.v1.SetMetricsSettingsResponse
-	nil,                                // 18: mistgate.ops.v1.PanelLogEntry.AttrsEntry
-	nil,                                // 19: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	(*DebugCaptureInfo)(nil),           // 18: mistgate.ops.v1.DebugCaptureInfo
+	(*StartDebugCaptureRequest)(nil),   // 19: mistgate.ops.v1.StartDebugCaptureRequest
+	(*StartDebugCaptureResponse)(nil),  // 20: mistgate.ops.v1.StartDebugCaptureResponse
+	(*StopDebugCaptureRequest)(nil),    // 21: mistgate.ops.v1.StopDebugCaptureRequest
+	(*StopDebugCaptureResponse)(nil),   // 22: mistgate.ops.v1.StopDebugCaptureResponse
+	(*ListDebugCapturesRequest)(nil),   // 23: mistgate.ops.v1.ListDebugCapturesRequest
+	(*ListDebugCapturesResponse)(nil),  // 24: mistgate.ops.v1.ListDebugCapturesResponse
+	(*GetDebugCaptureRequest)(nil),     // 25: mistgate.ops.v1.GetDebugCaptureRequest
+	(*DebugRecord)(nil),                // 26: mistgate.ops.v1.DebugRecord
+	(*GetDebugCaptureResponse)(nil),    // 27: mistgate.ops.v1.GetDebugCaptureResponse
+	nil,                                // 28: mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	nil,                                // 29: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	nil,                                // 30: mistgate.ops.v1.DebugRecord.AttrsEntry
 }
 var file_mistgate_ops_v1_ops_proto_depIdxs = []int32{
-	18, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	28, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
 	5,  // 1: mistgate.ops.v1.GetPanelLogsResponse.entries:type_name -> mistgate.ops.v1.PanelLogEntry
 	7,  // 2: mistgate.ops.v1.GetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
-	19, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	29, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
 	7,  // 4: mistgate.ops.v1.SetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
-	0,  // 5: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
-	2,  // 6: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
-	4,  // 7: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
-	8,  // 8: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
-	10, // 9: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
-	12, // 10: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
-	14, // 11: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
-	16, // 12: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
-	1,  // 13: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
-	3,  // 14: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
-	6,  // 15: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
-	9,  // 16: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
-	11, // 17: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
-	13, // 18: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
-	15, // 19: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
-	17, // 20: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
-	13, // [13:21] is the sub-list for method output_type
-	5,  // [5:13] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	18, // 5: mistgate.ops.v1.StartDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
+	18, // 6: mistgate.ops.v1.StopDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
+	18, // 7: mistgate.ops.v1.ListDebugCapturesResponse.captures:type_name -> mistgate.ops.v1.DebugCaptureInfo
+	30, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
+	18, // 9: mistgate.ops.v1.GetDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
+	26, // 10: mistgate.ops.v1.GetDebugCaptureResponse.records:type_name -> mistgate.ops.v1.DebugRecord
+	0,  // 11: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
+	2,  // 12: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
+	4,  // 13: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
+	8,  // 14: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
+	10, // 15: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
+	12, // 16: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
+	14, // 17: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
+	16, // 18: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
+	19, // 19: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
+	21, // 20: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
+	23, // 21: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
+	25, // 22: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
+	1,  // 23: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
+	3,  // 24: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
+	6,  // 25: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
+	9,  // 26: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
+	11, // 27: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
+	13, // 28: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
+	15, // 29: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
+	17, // 30: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
+	20, // 31: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
+	22, // 32: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
+	24, // 33: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
+	27, // 34: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
+	23, // [23:35] is the sub-list for method output_type
+	11, // [11:23] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_ops_v1_ops_proto_init() }
@@ -1266,7 +2050,7 @@ func file_mistgate_ops_v1_ops_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_ops_v1_ops_proto_rawDesc), len(file_mistgate_ops_v1_ops_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

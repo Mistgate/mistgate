@@ -25,7 +25,8 @@ func (k *core) addOps(cfg *httpserver.Config) {
 		Secrets: []string{k.in.AgentSNI, agentSNIPrefix, k.in.AdminPrefix, k.in.SubPrefix, k.in.LinkPrefix},
 		StepUp:  k.authSvc.RequireStepUp,
 		Fleet:   fleetH, Health: healthH, Relay: relayH,
-		Now: k.c.Clock, Log: k.log,
+		Debug: k.fl,
+		Now:   k.c.Clock, Log: k.log,
 	})
 	path, handler := svc.Handler()
 	cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})

@@ -52,6 +52,18 @@ const (
 	// OpsServiceSetMetricsSettingsProcedure is the fully-qualified name of the OpsService's
 	// SetMetricsSettings RPC.
 	OpsServiceSetMetricsSettingsProcedure = "/mistgate.ops.v1.OpsService/SetMetricsSettings"
+	// OpsServiceStartDebugCaptureProcedure is the fully-qualified name of the OpsService's
+	// StartDebugCapture RPC.
+	OpsServiceStartDebugCaptureProcedure = "/mistgate.ops.v1.OpsService/StartDebugCapture"
+	// OpsServiceStopDebugCaptureProcedure is the fully-qualified name of the OpsService's
+	// StopDebugCapture RPC.
+	OpsServiceStopDebugCaptureProcedure = "/mistgate.ops.v1.OpsService/StopDebugCapture"
+	// OpsServiceListDebugCapturesProcedure is the fully-qualified name of the OpsService's
+	// ListDebugCaptures RPC.
+	OpsServiceListDebugCapturesProcedure = "/mistgate.ops.v1.OpsService/ListDebugCaptures"
+	// OpsServiceGetDebugCaptureProcedure is the fully-qualified name of the OpsService's
+	// GetDebugCapture RPC.
+	OpsServiceGetDebugCaptureProcedure = "/mistgate.ops.v1.OpsService/GetDebugCapture"
 )
 
 // OpsServiceClient is a client for the mistgate.ops.v1.OpsService service.
@@ -75,6 +87,17 @@ type OpsServiceClient interface {
 	// Turns /metrics on or off and, with rotate_token, makes a new token; the token is in this response once and only its hash is
 	// stored. Turning it on without a token makes one.
 	SetMetricsSettings(context.Context, *connect.Request[v1.SetMetricsSettingsRequest]) (*connect.Response[v1.SetMetricsSettingsResponse], error)
+	// DEBUG CAPTURE of one node (agent capability "debug/1"). Starts it: the node raises its log level for the chosen sources for up
+	// to 15 minutes, keeps the records in a bounded buffer and ships them, scrubbed, when the time is up. An agent without the
+	// capability is FAILED_PRECONDITION "agent too old"; a node that is offline is FAILED_PRECONDITION "node is offline". Admin
+	// profile tokens start one only through an approved plan (node_debug_capture_plan / _apply); it is audit-logged.
+	StartDebugCapture(context.Context, *connect.Request[v1.StartDebugCaptureRequest]) (*connect.Response[v1.StartDebugCaptureResponse], error)
+	// Ends a running capture now: the node ships what it holds. A capture that is already over is returned as it is.
+	StopDebugCapture(context.Context, *connect.Request[v1.StopDebugCaptureRequest]) (*connect.Response[v1.StopDebugCaptureResponse], error)
+	// The captures the panel still holds for a node (24 hours), newest first.
+	ListDebugCaptures(context.Context, *connect.Request[v1.ListDebugCapturesRequest]) (*connect.Response[v1.ListDebugCapturesResponse], error)
+	// The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
+	GetDebugCapture(context.Context, *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error)
 }
 
 // NewOpsServiceClient constructs a client for the mistgate.ops.v1.OpsService service. By default,
@@ -136,6 +159,30 @@ func NewOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(opsServiceMethods.ByName("SetMetricsSettings")),
 			connect.WithClientOptions(opts...),
 		),
+		startDebugCapture: connect.NewClient[v1.StartDebugCaptureRequest, v1.StartDebugCaptureResponse](
+			httpClient,
+			baseURL+OpsServiceStartDebugCaptureProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("StartDebugCapture")),
+			connect.WithClientOptions(opts...),
+		),
+		stopDebugCapture: connect.NewClient[v1.StopDebugCaptureRequest, v1.StopDebugCaptureResponse](
+			httpClient,
+			baseURL+OpsServiceStopDebugCaptureProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("StopDebugCapture")),
+			connect.WithClientOptions(opts...),
+		),
+		listDebugCaptures: connect.NewClient[v1.ListDebugCapturesRequest, v1.ListDebugCapturesResponse](
+			httpClient,
+			baseURL+OpsServiceListDebugCapturesProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("ListDebugCaptures")),
+			connect.WithClientOptions(opts...),
+		),
+		getDebugCapture: connect.NewClient[v1.GetDebugCaptureRequest, v1.GetDebugCaptureResponse](
+			httpClient,
+			baseURL+OpsServiceGetDebugCaptureProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("GetDebugCapture")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -149,6 +196,10 @@ type opsServiceClient struct {
 	exportData         *connect.Client[v1.ExportDataRequest, v1.ExportDataResponse]
 	getMetricsSettings *connect.Client[v1.GetMetricsSettingsRequest, v1.GetMetricsSettingsResponse]
 	setMetricsSettings *connect.Client[v1.SetMetricsSettingsRequest, v1.SetMetricsSettingsResponse]
+	startDebugCapture  *connect.Client[v1.StartDebugCaptureRequest, v1.StartDebugCaptureResponse]
+	stopDebugCapture   *connect.Client[v1.StopDebugCaptureRequest, v1.StopDebugCaptureResponse]
+	listDebugCaptures  *connect.Client[v1.ListDebugCapturesRequest, v1.ListDebugCapturesResponse]
+	getDebugCapture    *connect.Client[v1.GetDebugCaptureRequest, v1.GetDebugCaptureResponse]
 }
 
 // GetLogSettings calls mistgate.ops.v1.OpsService.GetLogSettings.
@@ -191,6 +242,26 @@ func (c *opsServiceClient) SetMetricsSettings(ctx context.Context, req *connect.
 	return c.setMetricsSettings.CallUnary(ctx, req)
 }
 
+// StartDebugCapture calls mistgate.ops.v1.OpsService.StartDebugCapture.
+func (c *opsServiceClient) StartDebugCapture(ctx context.Context, req *connect.Request[v1.StartDebugCaptureRequest]) (*connect.Response[v1.StartDebugCaptureResponse], error) {
+	return c.startDebugCapture.CallUnary(ctx, req)
+}
+
+// StopDebugCapture calls mistgate.ops.v1.OpsService.StopDebugCapture.
+func (c *opsServiceClient) StopDebugCapture(ctx context.Context, req *connect.Request[v1.StopDebugCaptureRequest]) (*connect.Response[v1.StopDebugCaptureResponse], error) {
+	return c.stopDebugCapture.CallUnary(ctx, req)
+}
+
+// ListDebugCaptures calls mistgate.ops.v1.OpsService.ListDebugCaptures.
+func (c *opsServiceClient) ListDebugCaptures(ctx context.Context, req *connect.Request[v1.ListDebugCapturesRequest]) (*connect.Response[v1.ListDebugCapturesResponse], error) {
+	return c.listDebugCaptures.CallUnary(ctx, req)
+}
+
+// GetDebugCapture calls mistgate.ops.v1.OpsService.GetDebugCapture.
+func (c *opsServiceClient) GetDebugCapture(ctx context.Context, req *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error) {
+	return c.getDebugCapture.CallUnary(ctx, req)
+}
+
 // OpsServiceHandler is an implementation of the mistgate.ops.v1.OpsService service.
 type OpsServiceHandler interface {
 	// The log level now in force, the one the panel started with, and the size of the ring.
@@ -212,6 +283,17 @@ type OpsServiceHandler interface {
 	// Turns /metrics on or off and, with rotate_token, makes a new token; the token is in this response once and only its hash is
 	// stored. Turning it on without a token makes one.
 	SetMetricsSettings(context.Context, *connect.Request[v1.SetMetricsSettingsRequest]) (*connect.Response[v1.SetMetricsSettingsResponse], error)
+	// DEBUG CAPTURE of one node (agent capability "debug/1"). Starts it: the node raises its log level for the chosen sources for up
+	// to 15 minutes, keeps the records in a bounded buffer and ships them, scrubbed, when the time is up. An agent without the
+	// capability is FAILED_PRECONDITION "agent too old"; a node that is offline is FAILED_PRECONDITION "node is offline". Admin
+	// profile tokens start one only through an approved plan (node_debug_capture_plan / _apply); it is audit-logged.
+	StartDebugCapture(context.Context, *connect.Request[v1.StartDebugCaptureRequest]) (*connect.Response[v1.StartDebugCaptureResponse], error)
+	// Ends a running capture now: the node ships what it holds. A capture that is already over is returned as it is.
+	StopDebugCapture(context.Context, *connect.Request[v1.StopDebugCaptureRequest]) (*connect.Response[v1.StopDebugCaptureResponse], error)
+	// The captures the panel still holds for a node (24 hours), newest first.
+	ListDebugCaptures(context.Context, *connect.Request[v1.ListDebugCapturesRequest]) (*connect.Response[v1.ListDebugCapturesResponse], error)
+	// The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
+	GetDebugCapture(context.Context, *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error)
 }
 
 // NewOpsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -269,6 +351,30 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(opsServiceMethods.ByName("SetMetricsSettings")),
 		connect.WithHandlerOptions(opts...),
 	)
+	opsServiceStartDebugCaptureHandler := connect.NewUnaryHandler(
+		OpsServiceStartDebugCaptureProcedure,
+		svc.StartDebugCapture,
+		connect.WithSchema(opsServiceMethods.ByName("StartDebugCapture")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceStopDebugCaptureHandler := connect.NewUnaryHandler(
+		OpsServiceStopDebugCaptureProcedure,
+		svc.StopDebugCapture,
+		connect.WithSchema(opsServiceMethods.ByName("StopDebugCapture")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceListDebugCapturesHandler := connect.NewUnaryHandler(
+		OpsServiceListDebugCapturesProcedure,
+		svc.ListDebugCaptures,
+		connect.WithSchema(opsServiceMethods.ByName("ListDebugCaptures")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceGetDebugCaptureHandler := connect.NewUnaryHandler(
+		OpsServiceGetDebugCaptureProcedure,
+		svc.GetDebugCapture,
+		connect.WithSchema(opsServiceMethods.ByName("GetDebugCapture")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.ops.v1.OpsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OpsServiceGetLogSettingsProcedure:
@@ -287,6 +393,14 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 			opsServiceGetMetricsSettingsHandler.ServeHTTP(w, r)
 		case OpsServiceSetMetricsSettingsProcedure:
 			opsServiceSetMetricsSettingsHandler.ServeHTTP(w, r)
+		case OpsServiceStartDebugCaptureProcedure:
+			opsServiceStartDebugCaptureHandler.ServeHTTP(w, r)
+		case OpsServiceStopDebugCaptureProcedure:
+			opsServiceStopDebugCaptureHandler.ServeHTTP(w, r)
+		case OpsServiceListDebugCapturesProcedure:
+			opsServiceListDebugCapturesHandler.ServeHTTP(w, r)
+		case OpsServiceGetDebugCaptureProcedure:
+			opsServiceGetDebugCaptureHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -326,4 +440,20 @@ func (UnimplementedOpsServiceHandler) GetMetricsSettings(context.Context, *conne
 
 func (UnimplementedOpsServiceHandler) SetMetricsSettings(context.Context, *connect.Request[v1.SetMetricsSettingsRequest]) (*connect.Response[v1.SetMetricsSettingsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.SetMetricsSettings is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) StartDebugCapture(context.Context, *connect.Request[v1.StartDebugCaptureRequest]) (*connect.Response[v1.StartDebugCaptureResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.StartDebugCapture is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) StopDebugCapture(context.Context, *connect.Request[v1.StopDebugCaptureRequest]) (*connect.Response[v1.StopDebugCaptureResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.StopDebugCapture is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) ListDebugCaptures(context.Context, *connect.Request[v1.ListDebugCapturesRequest]) (*connect.Response[v1.ListDebugCapturesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.ListDebugCaptures is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) GetDebugCapture(context.Context, *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetDebugCapture is not implemented"))
 }

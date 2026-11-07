@@ -25,6 +25,7 @@ import { CodeBlock } from "@/screens/integrations/parts";
 import { Panel, SettingRow } from "@/screens/users/ui";
 import { AwgBackendCard } from "./awg-backend";
 import { BandwidthMeasure } from "./bandwidth-measure";
+import { DebugCaptureCard } from "./debug-capture";
 import { DecoyCard } from "./decoy";
 import { useNodeForm, useSaveNode } from "./node-form";
 import { useRelaysOf } from "./relays";
@@ -81,6 +82,7 @@ export function ServerTab({ data }: { data: Plain<GetNodeResponse> }) {
           {!retired && <DecoyCard node={node} />}
           {!retired && <AwgBackendCard data={data} />}
           <HostPanel data={data} />
+          {!retired && <DebugCaptureCard node={node} />}
         </div>
       </div>
       {!retired && <RetireZone nodeId={node.id} name={node.name} onUnreached={() => setUnreached(true)} />}

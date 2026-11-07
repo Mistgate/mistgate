@@ -362,6 +362,7 @@ func requestKind(frame *agentv1.ConnectResponse) PendingRequestKind {
 		frame.GetCountryProbe() != nil,
 		frame.GetPathTrace() != nil,
 		frame.GetSpeedTest() != nil,
+		frame.GetDebugCapture() != nil,
 		frame.GetSetDecoy() != nil:
 		return PendingCommand
 	case frame.GetRetire() != nil:
@@ -463,6 +464,8 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 		default:
 			tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Renew{Renew: resp}})
 		}
+	case m.GetDebugReport() != nil:
+		c.f.recordDebugReport(ctx, tr.state.NodeID, m.GetDebugReport()) // unsolicited, like a DoctorReport
 	case m.GetLogChunk() != nil:
 		chunk := m.GetLogChunk()
 		pending, ok := tr.state.Pending[chunk.RequestId]
