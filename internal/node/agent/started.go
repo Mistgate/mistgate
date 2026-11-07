@@ -43,6 +43,7 @@ func (a *Agent) announceStart(ctx context.Context) {
 	p := filepath.Join(a.cfg.StateDir, fileLastVersion)
 	b, _ := os.ReadFile(p)
 	prev := strings.TrimSpace(string(b))
+	hadPrevious := prev != ""
 	updated := a.upMarker != nil
 	if updated && prev == "" {
 		prev = a.upMarker.FromVersion
@@ -55,6 +56,9 @@ func (a *Agent) announceStart(ctx context.Context) {
 	params := map[string]string{"version": a.cfg.Version, "reason": reason}
 	if prev != "" {
 		params["prev_version"] = prev
+	}
+	for k, v := range a.previousExit(ctx, hadPrevious, updated, reason) {
+		params[k] = v
 	}
 	a.event(pb.Severity_SEVERITY_INFO, "agent_started", "", params)
 	if prev != a.cfg.Version {

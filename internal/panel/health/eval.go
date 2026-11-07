@@ -41,6 +41,7 @@ const (
 	kPathLossy      = "path_lossy"
 	kDeviceLimit    = "device_limit"
 	kRelayDown      = "relay_down"
+	kAgentCrashLoop = "agent_crash_loop"
 )
 
 var kindProto = map[string]adminv1.AlertKind{
@@ -59,6 +60,7 @@ var kindProto = map[string]adminv1.AlertKind{
 	kDeviceLimit:    adminv1.AlertKind_ALERT_KIND_DEVICE_LIMIT,
 	kCountryBlocked: adminv1.AlertKind_ALERT_KIND_COUNTRY_BLOCKED,
 	kRelayDown:      adminv1.AlertKind_ALERT_KIND_RELAY_DOWN,
+	kAgentCrashLoop: adminv1.AlertKind_ALERT_KIND_AGENT_CRASH_LOOP,
 }
 
 const (
@@ -67,6 +69,7 @@ const (
 	sevCritical = 3
 
 	flapMin            = 3 // blips and agent restarts in an hour that make a node "flapping"
+	crashLoopMin       = 3 // crash restarts of the agent in 30 minutes that make a crash loop
 	panelEgressSubject = "panel_egress"
 	panelLinkSubject   = "panel_link"
 	panelProbeSubject  = "probe_path"
@@ -509,6 +512,14 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 		if f.Count >= flapMin && nodeActive[f.NodeID] {
 			add(cond{key: key{kHostBlip, f.NodeID, "flapping"}, severity: sevWarning, why: "health.alert.host_blip.why.flapping",
 				params: map[string]string{"count": strconv.Itoa(f.Count)}})
+		}
+	}
+	// An agent that keeps crashing: three agent_started events in 30 minutes whose params say the previous run ended uncleanly.
+	// The condition is the window itself, so it resolves by itself once the crashes stop.
+	for _, cr := range signals.CrashLoops {
+		if cr.Count >= crashLoopMin && nodeActive[cr.NodeID] {
+			add(cond{key: key{kAgentCrashLoop, cr.NodeID, "agent"}, severity: sevWarning, why: "health.alert.agent_crash_loop.why",
+				params: map[string]string{"count": strconv.Itoa(cr.Count), "window_min": "30", "last_unix": strconv.FormatInt(cr.LastAt.Unix(), 10)}})
 		}
 	}
 	for _, c := range s.extConds(ctx) { // e.g. a paused rollout (update_failed)

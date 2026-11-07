@@ -2527,6 +2527,12 @@ func (x *WarpProbeResult) GetFailureCode() string {
 // engine_restarted, state_applied, state_drift, cert_renewed, clock_skew, host_rebooted,
 // stats_dropped, disk_low, credential_expired. Update (see "UPDATE"): update_committed, update_rolled_back.
 // agent_started {version, prev_version, reason: update | boot | restart}: once per process start, before anything else.
+// Also, when known: prev_exit (clean | unclean | unknown), crash ("1": an unclean end that was not a boot or an update), crash_loop
+// (crash restarts in the last 30 minutes), exit_code, exit_signal, exit_result (systemd's), oom ("1") and systemd_restarts.
+// Also, how the previous run ended (all optional, best effort, added later): prev_exit clean | unclean | unknown; for a crash restart
+// (unclean, not a boot or an update) crash = "1" and crash_loop = crash restarts in the last 30 minutes, with exit_code, exit_signal,
+// exit_result (systemd's), oom = "1" and systemd_restarts (NRestarts) when they could be read. The panel raises agent_crash_loop
+// from crash = "1" events.
 // engine_started / engine_restarted {protocol, reason}: reason is agent_start | profile_added | recovered, and
 // restart_command | config_changed. state_applied {revision, inbounds, added, removed, changed, users}.
 // AWG and WARP (see "AWG AND WARP"): awg_backend_unavailable, warp_state, warp_needs_attention, awg_kernel_prepare_started,

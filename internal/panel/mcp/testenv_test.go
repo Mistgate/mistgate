@@ -337,7 +337,11 @@ type world struct {
 	ipv6Err            error // CheckIpv6 answers with this
 	ipv6Node           map[string]*adminv1.NodeIpv6
 	ipv6Updates        []*adminv1.UpdateIpv6EntryRequest
-	ipv6UpdateCode     string // UpdateIpv6Entry answers with this error_code
+	ipv6UpdateCode     string   // UpdateIpv6Entry answers with this error_code
+	runtimeReqs        []string // GetNodeRuntime node ids (tools_data_test.go)
+	pathLossHours      []uint32
+	hostHours          []int
+	pathLossRows       []*adminv1.PathLossRow // when set, GetPathLoss answers with these
 	mu                 sync.Mutex
 	log                []callRec
 	fixReqs            []*adminv1.ApplyFixRequest

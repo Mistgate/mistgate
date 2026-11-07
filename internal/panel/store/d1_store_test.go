@@ -2198,3 +2198,7 @@ func TestD1LinkDNS(t *testing.T) {
 		t.Fatalf("after the preset was deleted: %+v %v", eff, err)
 	}
 }
+
+func TestD1NodeRuntimeStorage(t *testing.T) {
+	nodeRuntimeStoreProof(t, openD1Store(t))
+}

@@ -76,6 +76,17 @@ service NodeService {
   // GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
   // and API tokens.
   rpc GetFleetConnections(GetFleetConnectionsRequest) returns (GetFleetConnectionsResponse);
+  // What the panel wants a node to run against what the node reports it runs, one node or every node that is not retired: the
+  // desired and applied revision and hash, whether they agree, since when they have not, the last apply and, per inbound, the
+  // panel's spec version, the applied spec hash, the node's state for it, its last error and certificate expiry. No
+  // address, certificate pin or key. A read: every role and API tokens (the MCP tool node_runtime).
+  rpc GetNodeRuntime(GetNodeRuntimeRequest) returns (GetNodeRuntimeResponse);
+  // A node's host load per hour (HostMetrics of every stats batch, rolled up by the panel, kept 90 days): means and peaks of CPU,
+  // softirq, RAM, network and sessions. A read: every role and API tokens (the MCP tool node_metrics with hours).
+  rpc GetNodeHostHistory(GetNodeHostHistoryRequest) returns (GetNodeHostHistoryResponse);
+  // The paths the UDP port check found lossy: from one node to another, with the loss and the other sender's result, and a
+  // summary per target. Node names only, never an address. A read: every role and API tokens (the MCP tool path_loss_matrix).
+  rpc GetPathLoss(GetPathLossRequest) returns (GetPathLossResponse);
 }
 
 // One row of the nodes table / one card.
@@ -758,4 +769,139 @@ enum LogLevel {
   LOG_LEVEL_INFO = 1;
   LOG_LEVEL_WARNING = 2;
   LOG_LEVEL_ERROR = 3;
+}
+
+message GetNodeRuntimeRequest {
+  // "" = every node that is not retired.
+  string node_id = 1;
+}
+
+// One inbound of the node: the panel's side and the node's last report. "Applied" means the node confirmed it in an apply
+// result; an inbound the panel no longer wants (enabled = false) that still has an applied spec hash and a running state is
+// what an orphan looks like: the panel took it out of the desired state and the node has not confirmed it stopped. Compare
+// live_state too: a node that still lists a not-enabled inbound as active runs something the panel does not want.
+message InboundRuntime {
+  string inbound_id = 1;
+  string profile_name = 2;
+  string protocol = 3;
+  // The panel's desired state: true = in the desired state sent to the node.
+  bool enabled = 4;
+  // Goes into the spec sent to the node; bumped with the profile version and overrides.
+  int64 spec_version = 5 [jstype = JS_NUMBER];
+  // The first 12 characters of the spec hash the node reported for the inbound; "" = it never reported one.
+  string applied_spec_hash = 6;
+  // The panel's stored state of it, from the node's last apply result: "active" (running), "failed", "pending" (not confirmed
+  // running yet) or "disabled" (the panel took it out of the desired state and recorded it as stopped).
+  string applied_state = 7;
+  // The node's last error for it, cut short; "" = none.
+  string last_error = 8;
+  // Certificate expiry of what the inbound serves (0 = none or not reported). The pin is never returned.
+  int64 cert_not_after_unix = 9 [jstype = JS_NUMBER];
+  // What the node's latest stats batch (every 10 s) says this inbound is doing: "active", "failed" or "pending" (starting or
+  // stopped); "" = the node did not list it (not connected, or the node does not run it).
+  string live_state = 10;
+}
+
+message NodeRuntime {
+  string node_id = 1;
+  string node_name = 2;
+  // "pending" or "active" (retired nodes are not listed).
+  string state = 3;
+  bool connected = 4;
+  uint64 desired_revision = 5 [jstype = JS_NUMBER];
+  // The first 12 characters of the hash of the desired state; "" = nothing was computed yet.
+  string desired_hash = 6;
+  uint64 applied_revision = 7 [jstype = JS_NUMBER];
+  string applied_hash = 8;
+  // The desired and applied hashes are equal, non-empty, and the node is not drifting.
+  bool in_sync = 9;
+  // The node applied a state other than the one sent, twice in a row; since when (0 = no drift).
+  bool drift = 10;
+  int64 drift_since_unix = 11 [jstype = JS_NUMBER];
+  // When the node last reported an apply result or a Hello that matched (0 = never since this feature) and how it ended:
+  // "applied", "partial" or "in_sync".
+  int64 last_apply_unix = 12 [jstype = JS_NUMBER];
+  string last_apply_status = 13;
+  uint32 last_apply_ms = 14;
+  repeated InboundRuntime inbounds = 15;
+  // Inbound ids the node's latest stats batch lists as running or starting that the panel has no inbound row for at all: a
+  // node running something the panel does not know. Empty for a node that is not connected.
+  repeated string unknown_running_inbound_ids = 16;
+}
+
+message GetNodeRuntimeResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  repeated NodeRuntime nodes = 2;
+}
+
+message GetNodeHostHistoryRequest {
+  string node_id = 1;
+  // Hours back from now, 1 to 720. 0 means 24; more is cut to 720.
+  uint32 hours = 2;
+}
+
+// One hour of host load. Means are over the hour's stats batches (one per 10 s); peaks are the highest batch.
+message HostHour {
+  int64 hour_start_unix = 1 [jstype = JS_NUMBER];
+  uint32 samples = 2;
+  float cpu_avg_pct = 3;
+  float cpu_max_pct = 4;
+  float softirq_max_pct = 5;
+  float load1_max = 6;
+  uint64 ram_used_max_bytes = 7 [jstype = JS_NUMBER];
+  uint64 ram_total_bytes = 8 [jstype = JS_NUMBER];
+  uint64 rx_avg_bps = 9 [jstype = JS_NUMBER];
+  uint64 rx_max_bps = 10 [jstype = JS_NUMBER];
+  uint64 tx_avg_bps = 11 [jstype = JS_NUMBER];
+  uint64 tx_max_bps = 12 [jstype = JS_NUMBER];
+  uint32 sessions_max = 13;
+}
+
+message GetNodeHostHistoryResponse {
+  string node_id = 1;
+  string node_name = 2;
+  int64 since_unix = 3 [jstype = JS_NUMBER];
+  int64 now_unix = 4 [jstype = JS_NUMBER];
+  // Oldest first; an hour without a sample is absent.
+  repeated HostHour hours = 5;
+}
+
+message GetPathLossRequest {
+  // Only paths checked in the last hours, 1 to 720. 0 means 24 (the alert's own window is 30).
+  uint32 hours = 1;
+}
+
+// One lossy path: packets of the sender did not arrive at the target while another sender's did.
+message PathLossRow {
+  string from_node_id = 1;
+  string from_name = 2;
+  string to_node_id = 3;
+  string to_name = 4;
+  // The UDP ports of the run, comma separated.
+  string ports = 5;
+  uint32 sent = 6;
+  uint32 got = 7;
+  // 100 * (sent - got) / sent.
+  float loss_pct = 8;
+  // The second sender that got packets through to the same target, and how many.
+  string other_name = 9;
+  uint32 other_got = 10;
+  // Ports the sender delivered whole while the lost ones got nothing: a filter on the way, not a lossy line. "" = none.
+  string open_ports = 11;
+  int64 checked_unix = 12 [jstype = JS_NUMBER];
+}
+
+// Per target: how many senders lose packets on the way to it. One sender: the path of that sender. Several: look at the target.
+message PathLossTarget {
+  string node_id = 1;
+  string name = 2;
+  uint32 lossy_senders = 3;
+  float worst_loss_pct = 4;
+}
+
+message GetPathLossResponse {
+  int64 since_unix = 1 [jstype = JS_NUMBER];
+  int64 now_unix = 2 [jstype = JS_NUMBER];
+  repeated PathLossRow rows = 3;
+  repeated PathLossTarget targets = 4;
 }

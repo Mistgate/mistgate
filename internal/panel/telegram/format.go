@@ -232,6 +232,8 @@ func alertTitle(l L, a store.HealthAlert) string {
 		return l.pick("Torrent attempts", "Попытки качать торренты", "BT 下载尝试")
 	case "port_lossy":
 		return l.pick("UDP packets are being lost", "Теряются UDP-пакеты", "UDP 正在丢包")
+	case "agent_crash_loop":
+		return l.pick("The node agent keeps crashing", "Агент ноды постоянно падает", "节点 Agent 反复崩溃")
 	case "path_lossy":
 		return l.pick("UDP packets are lost on the way to a node", "UDP-пакеты потеряны по пути к ноде", "UDP 测试包在到达节点的路上丢失")
 	case "device_limit":
@@ -369,6 +371,9 @@ func alertReason(l L, a store.HealthAlert) string {
 		return deviceLimitReason(l, p)
 	case "port_lossy":
 		return portLossReason(l, p)
+	case "agent_crash_loop":
+		n, w := data(p["count"], 4), data(p["window_min"], 4)
+		return l.pick("The agent crashed and restarted "+n+" times in "+w+" minutes.", "Агент упал и перезапустился "+n+" раз за "+w+" минут.", "Agent 在 "+w+" 分钟内崩溃并重启了 "+n+" 次。")
 	case "path_lossy":
 		return pathLossReason(l, p)
 	case "country_blocked":

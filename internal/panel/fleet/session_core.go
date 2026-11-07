@@ -514,6 +514,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		in.Sessions = append(in.Sessions, store.FleetSessionRef{CredID: se.CredId, InboundID: se.InboundId, ConnectedAt: connectedAt})
 	}
 	in.Certs = certStats(st, now)
+	in.Host = hostSample(st)
 	out, err := c.f.st.IngestStats(ctx, in)
 	if projectionTooLarge {
 		c.f.warnOversizedLiveProjection(projectionState.NodeID)
@@ -909,6 +910,13 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, tr.state.OwnerGeneration, tr.state.Drift, r.Revision, r.StateHash, in, now); err != nil {
 		c.f.log.Warn("record apply result", "node", tr.state.NodeID, "err", err)
 	}
+	status := "applied"
+	if r.Status == agentv1.ApplyStatus_APPLY_STATUS_PARTIAL {
+		status = "partial"
+	}
+	if err := c.f.st.RecordNodeApplyMeta(ctx, tr.state.NodeID, status, r.DurationMs, tr.state.Drift, now); err != nil {
+		c.f.log.Warn("record apply time", "node", tr.state.NodeID, "err", err)
+	}
 	c.relaysApplied(ctx, tr.state.NodeID, r, len(in) > 0, now)
 	return nil
 }
@@ -939,7 +947,28 @@ func (c *SessionCore) updateApplyDrift(ctx context.Context, tr *coreTransition, 
 // session like a failed storeDesired, so the agent reconnects and the write is tried again.
 func (c *SessionCore) helloInSync(ctx context.Context, nodeID string, state *SessionState) error {
 	state.Drift, state.DriftResent = false, false
-	return c.f.st.NodeInSync(ctx, nodeID, state.OwnerGeneration, state.HelloAppliedRevision, state.HelloAppliedStateHash)
+	if err := c.f.st.NodeInSync(ctx, nodeID, state.OwnerGeneration, state.HelloAppliedRevision, state.HelloAppliedStateHash); err != nil {
+		return err
+	}
+	if err := c.f.st.RecordNodeApplyMeta(ctx, nodeID, "in_sync", 0, false, c.f.now()); err != nil {
+		c.f.log.Warn("record in-sync time", "node", nodeID, "err", err)
+	}
+	return nil
+}
+
+// hostSample is the batch's HostMetrics for the hourly host rollup (nil: the agent sent none). Values are clamped like the
+// live projection's: a bogus agent cannot write a number SQLite or a chart cannot hold.
+func hostSample(st *agentv1.StatsBatch) *store.HostSample {
+	m := st.Host
+	if m == nil {
+		return nil
+	}
+	const maxRate = uint64(1 << 50)
+	return &store.HostSample{
+		CPUPct: clampLiveFloat(float64(m.CpuPct), 0, 100), SoftirqPct: clampLiveFloat(finiteLiveFloat(float64(m.SoftirqPct)), 0, 100),
+		Load1: max(finiteLiveFloat(float64(m.Load1)), 0), RAMUsed: m.RamUsedBytes, RAMTotal: m.RamTotalBytes,
+		RxBps: min(m.NetRxBps, maxRate), TxBps: min(m.NetTxBps, maxRate), Sessions: min(len(st.Sessions), maxStatsDeltas),
+	}
 }
 
 func (c *SessionCore) requestDesiredPreparation(tr *coreTransition) {

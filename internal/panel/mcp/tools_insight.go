@@ -47,7 +47,7 @@ func insightTools() []toolDef {
 		"partial_sources names a source that hit its read cap, so older items of the window may be missing from it. Times are unix seconds."
 	digestDesc := "The fleet's problems in one call. hours is 1 to 72 (default 24); everything is counted only inside that window, so \"which nodes had problems today\" is hours 24. " +
 		"problem_nodes lists each node with a reason list (code, count, last_at): outages and blips with durations (from node_down, node_blip and node_recovered events, minutes_in_window clipped to the window), " +
-		"alerts opened in the window or still open by kind, journal warnings and errors by source, failed check rounds, path_lossy and other warning events, country verdict changes, update failures and rollbacks, and a node that is not online now. " +
+		"alerts opened in the window or still open by kind, journal warnings and errors by source, failed check rounds, path_lossy and other warning events, country verdict changes, update failures and rollbacks, agent crash restarts (agent_crash, with crash_loop at three within 30 minutes), host reboots (host_reboot), UDP paths that lose packets (path_loss, per sender and target), and a node that is not online now. " +
 		"quiet_nodes names the nodes with none of that. totals holds fleet totals, and traffic_hourly and online_hourly are the hourly series (bytes up plus down; peak people online) that fleet_status leaves out; problem nodes carry spark_bytes_24h. " +
 		"Check history is hourly: buckets that overlap the window count. unavailable names a part that could not be read. Use timeline for the order of events on one node and node_get, node_journal or checks_results for detail."
 	diagnoseDesc := "Why one person cannot connect, in one call: user_id (as users_search gives it) and hours (1 to 168, default 24) for the connection counters. " +
@@ -69,7 +69,8 @@ func insightTools() []toolDef {
 			timelineDesc, func(c *call, in timelineArg) (any, error) { return c.timeline(in) }),
 		readTool("fleet_digest", ProfileReadonly,
 			procs(adminv1connect.FleetServiceOverviewProcedure, adminv1connect.FleetServiceListEventsProcedure, adminv1connect.HealthServiceListAlertsProcedure,
-				adminv1connect.NodeServiceGetNodeJournalProcedure, adminv1connect.HealthServiceGetChecksProcedure, adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure),
+				adminv1connect.NodeServiceGetNodeJournalProcedure, adminv1connect.HealthServiceGetChecksProcedure, adminv1connect.CountryReachabilityServiceGetReachabilityHistoryProcedure,
+				adminv1connect.NodeServiceGetPathLossProcedure),
 			digestDesc, func(c *call, in digestArg) (any, error) { return c.fleetDigest(in) }),
 		readTool("user_diagnose", ProfileReadonly,
 			procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceGetUserConnectionProcedure, adminv1connect.NodeServiceListNodesProcedure,
@@ -1037,8 +1038,54 @@ func (c *call) fleetDigest(in digestArg) (any, error) {
 			}
 		}
 	}
-	// TODO(stream B: node_runtime, path_loss_matrix, host history and crash reasons): add reasons "host_reboot", "crash_loop"
-	// and per-pair loss here from those RPCs; none of them is needed for the digest to be correct.
+	// Restarts: the agent_started events of the window say how the previous run ended (crash = 1: it did not end cleanly and
+	// the host had not just booted; reason boot: the host rebooted). Three crashes inside 30 minutes are a crash loop, the
+	// same bar as the agent_crash_loop alert. evs is oldest first here.
+	crashAt := map[string][]int64{}
+	for _, e := range evs {
+		id, p := e.GetNodeId(), e.GetParams()
+		if e.GetCode() != "agent_started" || id == "" || b.byID[id] == nil {
+			continue
+		}
+		switch {
+		case p["crash"] == "1":
+			detail := "prev run ended uncleanly"
+			switch {
+			case p["oom"] == "1":
+				detail = "killed for memory (oom)"
+			case p["exit_signal"] != "":
+				detail = "killed by signal " + p["exit_signal"]
+			case p["exit_code"] != "":
+				detail = "exit code " + p["exit_code"]
+			}
+			b.reason(id, "", "agent_crash", 1, e.GetTimeUnix(), 0, detail, 4)
+			crashAt[id] = append(crashAt[id], e.GetTimeUnix())
+		case p["reason"] == "boot":
+			b.reason(id, "", "host_reboot", 1, e.GetTimeUnix(), 0, "", 3)
+		}
+	}
+	for id, ts := range crashAt {
+		most, lo := 0, 0
+		for hi := range ts {
+			for ts[hi]-ts[lo] > 30*60 {
+				lo++
+			}
+			most = max(most, hi-lo+1)
+		}
+		if most >= 3 {
+			b.reason(id, "", "crash_loop", 1, ts[len(ts)-1], 0, fmt.Sprintf("%d crash restarts within 30 minutes", most), 6)
+		}
+	}
+	// Per-pair UDP loss: the sender loses packets on the way to the target while another sender gets through.
+	if pl, err := c.cl.Node.GetPathLoss(c.ctx, connect.NewRequest(&adminv1.GetPathLossRequest{Hours: uint32(hours)})); err == nil {
+		for _, row := range pl.Msg.GetRows() {
+			if row.GetCheckedUnix() < since || b.byID[row.GetFromNodeId()] == nil {
+				continue
+			}
+			b.reason(row.GetFromNodeId(), "", "path_loss", 1, row.GetCheckedUnix(), 0,
+				fmt.Sprintf("to %s: %.0f%% lost", nm(row.GetToName()), row.GetLossPct()), 3)
+		}
+	}
 
 	for _, node := range b.order {
 		if len(node.Reasons) == 0 || node.Status == "retired" {

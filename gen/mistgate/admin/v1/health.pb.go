@@ -155,6 +155,10 @@ const (
 	// subject = target node id, params{node, target, target_id, ports, sent, got, other, other_got, region, other_region,
 	// checked_unix}. The condition expires 30 hours after the latest check or when that path-loss row is removed.
 	AlertKind_ALERT_KIND_PATH_LOSSY AlertKind = 20
+	// The node's agent crashed and restarted three or more times in 30 minutes (agent_started events whose params say the
+	// previous run ended without a clean exit: prev_exit = unclean). WARNING. node_id = the node, subject = "agent",
+	// params{count, window_min, last_unix}. Closes once the window holds fewer than three crash restarts.
+	AlertKind_ALERT_KIND_AGENT_CRASH_LOOP AlertKind = 21
 )
 
 // Enum value maps for AlertKind.
@@ -181,6 +185,7 @@ var (
 		18: "ALERT_KIND_COUNTRY_BLOCKED",
 		19: "ALERT_KIND_RELAY_DOWN",
 		20: "ALERT_KIND_PATH_LOSSY",
+		21: "ALERT_KIND_AGENT_CRASH_LOOP",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -204,6 +209,7 @@ var (
 		"ALERT_KIND_COUNTRY_BLOCKED":             18,
 		"ALERT_KIND_RELAY_DOWN":                  19,
 		"ALERT_KIND_PATH_LOSSY":                  20,
+		"ALERT_KIND_AGENT_CRASH_LOOP":            21,
 	}
 )
 
@@ -3843,7 +3849,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xe5\x04\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\x86\x05\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -3866,7 +3872,8 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x17ALERT_KIND_DEVICE_LIMIT\x10\x11\x12\x1e\n" +
 	"\x1aALERT_KIND_COUNTRY_BLOCKED\x10\x12\x12\x19\n" +
 	"\x15ALERT_KIND_RELAY_DOWN\x10\x13\x12\x19\n" +
-	"\x15ALERT_KIND_PATH_LOSSY\x10\x14*\x8e\x01\n" +
+	"\x15ALERT_KIND_PATH_LOSSY\x10\x14\x12\x1f\n" +
+	"\x1bALERT_KIND_AGENT_CRASH_LOOP\x10\x15*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

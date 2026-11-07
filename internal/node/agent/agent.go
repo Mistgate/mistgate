@@ -182,7 +182,9 @@ type Agent struct {
 	// brought back by this process starting (the reason of engine_started). upMarker is the update marker of a new build.
 	warm     bool
 	upMarker *update.Marker
-	hopRej   map[string]string // inbound id -> why its hop range was refused (F12), rebuilt by every syncHops
+	// exitProbe reads how the previous run ended from systemd and the journals (nil = the real host; tests replace it).
+	exitProbe exitProbe
+	hopRej    map[string]string // inbound id -> why its hop range was refused (F12), rebuilt by every syncHops
 
 	// L3 (l3.go): inbounds that may not run in this reconcile (id -> why), the failures already reported (one event per
 	// distinct message), and whether the tunnel table and the WARP subnet rules were ever installed (their removal is sent once).
@@ -519,6 +521,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	cancel(cause)
 	wg.Wait()
 	a.closeEngines()
+	a.markCleanExit() // a crash or a kill never gets here: the next start reads the missing marker as an unclean end
 	if errors.Is(cause, ErrRetired) {
 		return ErrRetired
 	}

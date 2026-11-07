@@ -44,6 +44,8 @@ type FleetStatsIn struct {
 	JournalSecrets   []string // this panel's secret names and path prefixes, removed before the journal is stored
 	Sessions         []FleetSessionRef
 	Certs            []FleetInboundCert
+	// Host is the batch's HostMetrics (nil = the agent sent none): folded into node_host_hour in the same batch.
+	Host *HostSample
 	// Live builds the session projection inside each guarded attempt. It must not mutate captured state.
 	Live func(refs map[string]FleetCredRef) FleetLive
 }
@@ -442,7 +444,7 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 	if err != nil {
 		return nil, err
 	}
-	return []Stmt{
+	stmts := []Stmt{
 		guard(`EXISTS (SELECT 1 FROM node WHERE id = ? AND agent_instance_id = ? AND last_seq = ?)`, in.NodeID, instance, int64(last)),
 		{Query: `
 			INSERT INTO traffic_bucket (user_id, node_id, protocol, hour_start, bytes_up, bytes_down)
@@ -478,8 +480,11 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 		linkStmt,
 		journalStmt,
 		liveStmt,
-		commitSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now),
-	}, nil
+	}
+	if in.Host != nil {
+		stmts = append(stmts, HostHourStmt(in.NodeID, in.HourStart, *in.Host))
+	}
+	return append(stmts, commitSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now)), nil
 }
 
 func nodeLiveStatsStmt(nodeID string, session uint64, live FleetLive) (Stmt, error) {

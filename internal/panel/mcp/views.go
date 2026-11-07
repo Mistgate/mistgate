@@ -310,7 +310,8 @@ func warpStatusView(nodeID, nodeName string, r *adminv1.GetWarpResponse, now tim
 	return v
 }
 
-// NodeMetricsV is the node_metrics result. The API has no history per node: these are the current gauges and today's totals.
+// NodeMetricsV is the node_metrics result: the current gauges and today's totals, and with hours the host load per hour
+// (Series, oldest first, bucketed when the window is long) and the peaks over the whole window.
 type NodeMetricsV struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
@@ -329,6 +330,11 @@ type NodeMetricsV struct {
 	TrafficToday uint64            `json:"traffic_today_bytes"`
 	OnlineByProt map[string]uint32 `json:"online_by_protocol,omitempty"`
 	TopToday     []topUserV        `json:"top_today,omitempty"`
+	HistoryHours int               `json:"history_hours,omitempty"`
+	BucketHours  int               `json:"bucket_hours,omitempty"`
+	Peaks        *metricsPeaksV    `json:"peaks,omitempty"`
+	Series       []metricsHourV    `json:"series,omitempty"`
+	Truncated    bool              `json:"truncated,omitempty"`
 }
 
 func nodeMetricsView(r *adminv1.GetNodeResponse) *NodeMetricsV {

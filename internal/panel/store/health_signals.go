@@ -54,6 +54,14 @@ type HealthNodeFlapSignal struct {
 	Count  int
 }
 
+// HealthCrashSignal is how many crash restarts (agent_started with params crash = 1) a node's agent made in the last
+// 30 minutes, and when the last was.
+type HealthCrashSignal struct {
+	NodeID string
+	Count  int
+	LastAt time.Time
+}
+
 // HealthSignalBatch contains the stored inputs for user and fleet impact alerts.
 type HealthSignalBatch struct {
 	Users      []HealthUserSignal
@@ -63,6 +71,7 @@ type HealthSignalBatch struct {
 	// DeviceLimits are the people refused at their device limit; the sightings TRACK writes are history only and are not here.
 	DeviceLimits []HealthDeviceLimitSignal
 	NodeFlaps    []HealthNodeFlapSignal
+	CrashLoops   []HealthCrashSignal
 	// RelayLinks are the enabled relays with their latest client-eye result; read here so the evaluator costs no extra D1 call.
 	RelayLinks []RelayLink
 }
@@ -152,6 +161,25 @@ const healthNodeFlapSQL = `
 	WHERE severity IN (1, 2) AND ts >= ? AND code IN ('node_blip', 'agent_restarted') AND node_id IS NOT NULL
 	GROUP BY 1`
 
+func scanHealthCrash(r rowScanner) (HealthCrashSignal, error) {
+	var signal HealthCrashSignal
+	var last int64
+	if err := r.Scan(&signal.NodeID, &signal.Count, &last); err != nil {
+		return HealthCrashSignal{}, err
+	}
+	signal.LastAt = fleetTime(last)
+	return signal, nil
+}
+
+// healthCrashSQL counts the last 30 minutes' agent_started events that say the previous run crashed, per node. agent_started is
+// severity 1, so the (severity, ts) index of event_retention serves it like the flap query.
+const healthCrashSQL = `
+	SELECT node_id AS node_id, count(*) AS crashes, max(ts) AS last_at
+	FROM event
+	WHERE severity IN (1, 2) AND ts >= ? AND code = 'agent_started' AND node_id IS NOT NULL
+		AND json_extract(params_json, '$.crash') = '1'
+	GROUP BY 1`
+
 func scanHealthDeviceLimit(r rowScanner) (HealthDeviceLimitSignal, error) {
 	var signal HealthDeviceLimitSignal
 	var lastAt int64
@@ -209,6 +237,7 @@ func (s *Store) HealthSignals(ctx context.Context, now time.Time) (HealthSignalB
 	reads.add(appendRows(&out.Torrents, scanHealthTorrent), healthTorrentSQL, now.Add(-24*time.Hour).Unix())
 	reads.add(appendRows(&out.DeviceLimits, scanHealthDeviceLimit), healthDeviceLimitSQL, now.Add(-24*time.Hour).Unix())
 	reads.add(appendRows(&out.NodeFlaps, scanHealthNodeFlap), healthNodeFlapSQL, now.Add(-time.Hour).Unix())
+	reads.add(appendRows(&out.CrashLoops, scanHealthCrash), healthCrashSQL, now.Add(-30*time.Minute).Unix())
 	reads.add(appendRows(&out.RelayLinks, scanRelayLink), relayEnabledQuery)
 	if err := reads.run(ctx, s); err != nil {
 		return HealthSignalBatch{}, err

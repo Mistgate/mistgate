@@ -98,6 +98,12 @@ func (s *Service) sweep(ctx context.Context) {
 	} else if n > 0 {
 		s.log.Info("health: pruned node journal", "count", n)
 	}
+	// The hourly host load (node_host_hour) is kept 90 days.
+	if n, err := s.st.PruneNodeHostHours(ctx, now.Add(-time.Duration(store.HostKeepHours)*time.Hour)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune host load", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned host load hours", "count", n)
+	}
 	// A device revoked long ago is only a row now (stats of its past traffic never needed it); a blocked one stays.
 	if n, err := s.st.PruneRevokedDevices(ctx, now.Add(-deviceKeep), eventBatch); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune devices", "err", err)

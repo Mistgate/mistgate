@@ -348,6 +348,8 @@ export const en = {
     "The test packets to port {port} of “{profile}” got lost from both sides: {lost} % from {sender}, {confirm_lost} % from {confirm_sender}, so this node’s port loses them. Clients of this profile may be slow or drop. Move the profile to another port; the alert closes when a re-check is clean.",
   // on the sender whose packets get lost on the way ({node}); {target} is the node it checked, {other} the sender that got through
   "health.alert.path_lossy.title": "Loses UDP on the way to {target}",
+  "health.alert.agent_crash_loop.title": "The agent keeps crashing",
+  "health.alert.agent_crash_loop.why": "The node agent crashed and restarted {count} times in the last {window_min} minutes. Each restart is an agent_started event whose previous run did not end cleanly; its params say whether systemd saw an exit code, a signal or an out-of-memory kill. The alert closes when fewer than three crash restarts are left in the window.",
   "health.alert.path_lossy.why":
     "UDP from {node} ({region}) to {target} loses {lost} % on ports {ports}, while {arrived} arrive from {other} ({other_region}). The loss is on the way from {node}, not on {target}: its ports are fine. Port checks send from other nodes first for a day; the alert closes 30 hours after the last check that saw the loss.",
   // a filter, not a lossy line ({open}: the ports that got through whole; the lost ones got nothing): {target} itself is fine
@@ -937,6 +939,8 @@ export const ru: typeof en = {
   "health.alert.port_lossy.why.confirmed":
     "Тестовые пакеты до порта {port} профиля «{profile}» терялись с обеих сторон: {lost} % с {sender}, {confirm_lost} % с {confirm_sender} — значит, их теряет порт этой ноды. У клиентов этого профиля может тормозить или рваться соединение. Перенеси профиль на другой порт; алерт закроется, когда перепроверка будет чистой.",
   "health.alert.path_lossy.title": "Теряет UDP по пути к {target}",
+  "health.alert.agent_crash_loop.title": "Агент ноды постоянно падает",
+  "health.alert.agent_crash_loop.why": "Агент ноды упал и перезапустился {count} раз за последние {window_min} минут. Каждый перезапуск — событие agent_started, где прошлый запуск закончился не штатно; в его параметрах видно, что сообщил systemd: код выхода, сигнал или нехватку памяти. Тревога закроется, когда в окне останется меньше трёх аварийных перезапусков.",
   "health.alert.path_lossy.why":
     "UDP от {node} ({region}) до {target} теряет {lost} % на портах {ports}, а с {other} ({other_region}) доходит {arrived}. Потери на пути от {node}, а не на {target}: его порты в порядке. Сутки проверки портов шлют сначала с других нод; алерт закроется через 30 часов после последней проверки, которая видела потери.",
   "health.alert.path_lossy.title.filtered": "Фильтр UDP по пути к {target}",
@@ -1487,6 +1491,8 @@ export const zh: typeof en = {
   "health.alert.port_lossy.why": "发往「{profile}」端口 {port} 的测试包丢失了 {lost}%（由 {sender} 检测）。该协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；重新检测无丢包后，告警会关闭。",
   "health.alert.port_lossy.why.confirmed": "发往「{profile}」端口 {port} 的测试包两边都丢失：来自 {sender} 丢失 {lost}%，来自 {confirm_sender} 丢失 {confirm_lost}%，说明是此节点的端口在丢包。该协议配置的客户端可能变慢或掉线。请把协议配置换到其他端口；重新检测无丢包后，告警会关闭。",
   "health.alert.path_lossy.title": "发往 {target} 的 UDP 在途中丢失",
+  "health.alert.agent_crash_loop.title": "节点 Agent 反复崩溃",
+  "health.alert.agent_crash_loop.why": "节点 Agent 在最近 {window_min} 分钟内崩溃并重启了 {count} 次。每次重启都是一个 agent_started 事件，且上一次运行不是正常退出；事件参数会说明 systemd 看到的是退出码、信号还是内存不足被杀。窗口内的崩溃重启少于三次时，告警关闭。",
   "health.alert.path_lossy.why": "从 {node}（{region}）发往 {target} 的 UDP 在端口 {ports} 上丢失 {lost}%，而来自 {other}（{other_region}）的到达 {arrived}。丢包发生在从 {node} 出发的路上，不在 {target} 上：它的端口正常。一天内端口检测会优先从其他节点发送；最后一次发现丢包的检测过去 30 小时后，告警会关闭。",
   "health.alert.path_lossy.title.filtered": "发往 {target} 的 UDP 在途中被过滤",
   "health.alert.path_lossy.why.filtered":
@@ -2000,6 +2006,8 @@ export const fa: typeof en = {
   "health.alert.port_lossy.why": "بسته‌های آزمایشی به پورت {port} پروفایل «{profile}» {lost}% گم شدند (بررسی از {sender}). ممکن است کلاینت‌های این پروفایل کند شوند یا اتصالشان قطع شود. پروفایل را به پورت دیگری ببر؛ هشدار وقتی بسته می‌شود که بررسی دوباره تمیز باشد.",
   "health.alert.port_lossy.why.confirmed": "بسته‌های آزمایشی به پورت {port} پروفایل «{profile}» از هر دو طرف گم شدند: {lost}% از {sender} و {confirm_lost}% از {confirm_sender}، پس پورت همین نود آن‌ها را گم می‌کند. ممکن است کلاینت‌های این پروفایل کند شوند یا اتصالشان قطع شود. پروفایل را به پورت دیگری ببر؛ هشدار وقتی بسته می‌شود که بررسی دوباره تمیز باشد.",
   "health.alert.path_lossy.title": "UDP در مسیر به {target} گم می‌شود",
+  "health.alert.agent_crash_loop.title": "ایجنت نود مدام از کار می‌افتد",
+  "health.alert.agent_crash_loop.why": "ایجنت نود در {window_min} دقیقهٔ اخیر {count} بار از کار افتاد و دوباره راه‌اندازی شد. هر راه‌اندازی یک رویداد agent_started است که اجرای قبلی‌اش به‌طور عادی تمام نشده بود؛ پارامترهایش می‌گویند systemd کد خروج، سیگنال یا کشته‌شدن به دلیل کمبود حافظه را دیده است. وقتی کمتر از سه راه‌اندازی ناشی از خرابی در بازه بماند، هشدار بسته می‌شود.",
   "health.alert.path_lossy.why": "UDP از {node} ({region}) به {target} روی پورت‌های {ports}، {lost}% گم می‌شود، در حالی که از {other} ({other_region}) {arrived} می‌رسد. گم شدن در مسیر از {node} است، نه روی {target}: پورت‌هایش سالم‌اند. تا یک روز بررسی پورت‌ها اول از نودهای دیگر فرستاده می‌شود؛ هشدار 30 ساعت پس از آخرین بررسی‌ای که گم شدن را دید بسته می‌شود.",
   "health.alert.path_lossy.title.filtered": "UDP در مسیر به {target} فیلتر می‌شود",
   "health.alert.path_lossy.why.filtered":
@@ -2503,6 +2511,8 @@ export const tr: typeof en = {
   "health.alert.port_lossy.why": "“{profile}” profilinin {port} portuna giden test paketlerinde kayıp %{lost} (kontrol yeri: {sender}). Bu profilin istemcilerinde yavaşlama ya da kopma olabilir. Profili başka bir porta taşı; yeniden kontrol temiz çıkınca uyarı kapanır.",
   "health.alert.port_lossy.why.confirmed": "“{profile}” profilinin {port} portuna giden test paketleri iki taraftan da kayboldu: {sender} tarafından %{lost}, {confirm_sender} tarafından %{confirm_lost}; yani paketleri bu düğümün portu kaybediyor. Bu profilin istemcilerinde yavaşlama ya da kopma olabilir. Profili başka bir porta taşı; yeniden kontrol temiz çıkınca uyarı kapanır.",
   "health.alert.path_lossy.title": "{target} düğümüne giden UDP yolda kayboluyor",
+  "health.alert.agent_crash_loop.title": "Düğüm ajanı sürekli çöküyor",
+  "health.alert.agent_crash_loop.why": "Düğüm ajanı son {window_min} dakikada {count} kez çöküp yeniden başladı. Her yeniden başlatma, önceki çalışması düzgün bitmemiş bir agent_started olayıdır; parametreleri systemd'nin çıkış kodu, sinyal veya bellek yetersizliği nedeniyle sonlandırma görüp görmediğini söyler. Pencerede üçten az çöküş kalınca uyarı kapanır.",
   "health.alert.path_lossy.why": "{node} ({region}) düğümünden {target} düğümüne giden UDP, {ports} portlarında %{lost} kaybediyor; oysa {other} ({other_region}) tarafından gönderilenlerden {arrived} ulaşıyor. Kayıp {node} çıkışlı yolda, {target} düğümünde değil: portları sağlam. Port kontrolleri bir gün boyunca önce diğer düğümlerden gönderilir; uyarı, kaybı gören son kontrolden 30 saat sonra kapanır.",
   "health.alert.path_lossy.title.filtered": "{target} düğümüne giden UDP yolda filtreleniyor",
   "health.alert.path_lossy.why.filtered":

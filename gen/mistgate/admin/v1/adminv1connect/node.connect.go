@@ -80,6 +80,14 @@ const (
 	// NodeServiceGetFleetConnectionsProcedure is the fully-qualified name of the NodeService's
 	// GetFleetConnections RPC.
 	NodeServiceGetFleetConnectionsProcedure = "/mistgate.admin.v1.NodeService/GetFleetConnections"
+	// NodeServiceGetNodeRuntimeProcedure is the fully-qualified name of the NodeService's
+	// GetNodeRuntime RPC.
+	NodeServiceGetNodeRuntimeProcedure = "/mistgate.admin.v1.NodeService/GetNodeRuntime"
+	// NodeServiceGetNodeHostHistoryProcedure is the fully-qualified name of the NodeService's
+	// GetNodeHostHistory RPC.
+	NodeServiceGetNodeHostHistoryProcedure = "/mistgate.admin.v1.NodeService/GetNodeHostHistory"
+	// NodeServiceGetPathLossProcedure is the fully-qualified name of the NodeService's GetPathLoss RPC.
+	NodeServiceGetPathLossProcedure = "/mistgate.admin.v1.NodeService/GetPathLoss"
 )
 
 // NodeServiceClient is a client for the mistgate.admin.v1.NodeService service.
@@ -152,6 +160,17 @@ type NodeServiceClient interface {
 	// GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
 	// and API tokens.
 	GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error)
+	// What the panel wants a node to run against what the node reports it runs, one node or every node that is not retired: the
+	// desired and applied revision and hash, whether they agree, since when they have not, the last apply and, per inbound, the
+	// panel's spec version, the applied spec hash, the node's state for it, its last error and certificate expiry. No
+	// address, certificate pin or key. A read: every role and API tokens (the MCP tool node_runtime).
+	GetNodeRuntime(context.Context, *connect.Request[v1.GetNodeRuntimeRequest]) (*connect.Response[v1.GetNodeRuntimeResponse], error)
+	// A node's host load per hour (HostMetrics of every stats batch, rolled up by the panel, kept 90 days): means and peaks of CPU,
+	// softirq, RAM, network and sessions. A read: every role and API tokens (the MCP tool node_metrics with hours).
+	GetNodeHostHistory(context.Context, *connect.Request[v1.GetNodeHostHistoryRequest]) (*connect.Response[v1.GetNodeHostHistoryResponse], error)
+	// The paths the UDP port check found lossy: from one node to another, with the loss and the other sender's result, and a
+	// summary per target. Node names only, never an address. A read: every role and API tokens (the MCP tool path_loss_matrix).
+	GetPathLoss(context.Context, *connect.Request[v1.GetPathLossRequest]) (*connect.Response[v1.GetPathLossResponse], error)
 }
 
 // NewNodeServiceClient constructs a client for the mistgate.admin.v1.NodeService service. By
@@ -273,6 +292,24 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("GetFleetConnections")),
 			connect.WithClientOptions(opts...),
 		),
+		getNodeRuntime: connect.NewClient[v1.GetNodeRuntimeRequest, v1.GetNodeRuntimeResponse](
+			httpClient,
+			baseURL+NodeServiceGetNodeRuntimeProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("GetNodeRuntime")),
+			connect.WithClientOptions(opts...),
+		),
+		getNodeHostHistory: connect.NewClient[v1.GetNodeHostHistoryRequest, v1.GetNodeHostHistoryResponse](
+			httpClient,
+			baseURL+NodeServiceGetNodeHostHistoryProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("GetNodeHostHistory")),
+			connect.WithClientOptions(opts...),
+		),
+		getPathLoss: connect.NewClient[v1.GetPathLossRequest, v1.GetPathLossResponse](
+			httpClient,
+			baseURL+NodeServiceGetPathLossProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("GetPathLoss")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -296,6 +333,9 @@ type nodeServiceClient struct {
 	getNodeConnections  *connect.Client[v1.GetNodeConnectionsRequest, v1.GetNodeConnectionsResponse]
 	getNodeJournal      *connect.Client[v1.GetNodeJournalRequest, v1.GetNodeJournalResponse]
 	getFleetConnections *connect.Client[v1.GetFleetConnectionsRequest, v1.GetFleetConnectionsResponse]
+	getNodeRuntime      *connect.Client[v1.GetNodeRuntimeRequest, v1.GetNodeRuntimeResponse]
+	getNodeHostHistory  *connect.Client[v1.GetNodeHostHistoryRequest, v1.GetNodeHostHistoryResponse]
+	getPathLoss         *connect.Client[v1.GetPathLossRequest, v1.GetPathLossResponse]
 }
 
 // ListNodes calls mistgate.admin.v1.NodeService.ListNodes.
@@ -388,6 +428,21 @@ func (c *nodeServiceClient) GetFleetConnections(ctx context.Context, req *connec
 	return c.getFleetConnections.CallUnary(ctx, req)
 }
 
+// GetNodeRuntime calls mistgate.admin.v1.NodeService.GetNodeRuntime.
+func (c *nodeServiceClient) GetNodeRuntime(ctx context.Context, req *connect.Request[v1.GetNodeRuntimeRequest]) (*connect.Response[v1.GetNodeRuntimeResponse], error) {
+	return c.getNodeRuntime.CallUnary(ctx, req)
+}
+
+// GetNodeHostHistory calls mistgate.admin.v1.NodeService.GetNodeHostHistory.
+func (c *nodeServiceClient) GetNodeHostHistory(ctx context.Context, req *connect.Request[v1.GetNodeHostHistoryRequest]) (*connect.Response[v1.GetNodeHostHistoryResponse], error) {
+	return c.getNodeHostHistory.CallUnary(ctx, req)
+}
+
+// GetPathLoss calls mistgate.admin.v1.NodeService.GetPathLoss.
+func (c *nodeServiceClient) GetPathLoss(ctx context.Context, req *connect.Request[v1.GetPathLossRequest]) (*connect.Response[v1.GetPathLossResponse], error) {
+	return c.getPathLoss.CallUnary(ctx, req)
+}
+
 // NodeServiceHandler is an implementation of the mistgate.admin.v1.NodeService service.
 type NodeServiceHandler interface {
 	// All nodes. The fleet is at most ~50 nodes, so no pagination; filtering by country, status and
@@ -458,6 +513,17 @@ type NodeServiceHandler interface {
 	// GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
 	// and API tokens.
 	GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error)
+	// What the panel wants a node to run against what the node reports it runs, one node or every node that is not retired: the
+	// desired and applied revision and hash, whether they agree, since when they have not, the last apply and, per inbound, the
+	// panel's spec version, the applied spec hash, the node's state for it, its last error and certificate expiry. No
+	// address, certificate pin or key. A read: every role and API tokens (the MCP tool node_runtime).
+	GetNodeRuntime(context.Context, *connect.Request[v1.GetNodeRuntimeRequest]) (*connect.Response[v1.GetNodeRuntimeResponse], error)
+	// A node's host load per hour (HostMetrics of every stats batch, rolled up by the panel, kept 90 days): means and peaks of CPU,
+	// softirq, RAM, network and sessions. A read: every role and API tokens (the MCP tool node_metrics with hours).
+	GetNodeHostHistory(context.Context, *connect.Request[v1.GetNodeHostHistoryRequest]) (*connect.Response[v1.GetNodeHostHistoryResponse], error)
+	// The paths the UDP port check found lossy: from one node to another, with the loss and the other sender's result, and a
+	// summary per target. Node names only, never an address. A read: every role and API tokens (the MCP tool path_loss_matrix).
+	GetPathLoss(context.Context, *connect.Request[v1.GetPathLossRequest]) (*connect.Response[v1.GetPathLossResponse], error)
 }
 
 // NewNodeServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -575,6 +641,24 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("GetFleetConnections")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceGetNodeRuntimeHandler := connect.NewUnaryHandler(
+		NodeServiceGetNodeRuntimeProcedure,
+		svc.GetNodeRuntime,
+		connect.WithSchema(nodeServiceMethods.ByName("GetNodeRuntime")),
+		connect.WithHandlerOptions(opts...),
+	)
+	nodeServiceGetNodeHostHistoryHandler := connect.NewUnaryHandler(
+		NodeServiceGetNodeHostHistoryProcedure,
+		svc.GetNodeHostHistory,
+		connect.WithSchema(nodeServiceMethods.ByName("GetNodeHostHistory")),
+		connect.WithHandlerOptions(opts...),
+	)
+	nodeServiceGetPathLossHandler := connect.NewUnaryHandler(
+		NodeServiceGetPathLossProcedure,
+		svc.GetPathLoss,
+		connect.WithSchema(nodeServiceMethods.ByName("GetPathLoss")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.NodeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case NodeServiceListNodesProcedure:
@@ -613,6 +697,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceGetNodeJournalHandler.ServeHTTP(w, r)
 		case NodeServiceGetFleetConnectionsProcedure:
 			nodeServiceGetFleetConnectionsHandler.ServeHTTP(w, r)
+		case NodeServiceGetNodeRuntimeProcedure:
+			nodeServiceGetNodeRuntimeHandler.ServeHTTP(w, r)
+		case NodeServiceGetNodeHostHistoryProcedure:
+			nodeServiceGetNodeHostHistoryHandler.ServeHTTP(w, r)
+		case NodeServiceGetPathLossProcedure:
+			nodeServiceGetPathLossHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -692,4 +782,16 @@ func (UnimplementedNodeServiceHandler) GetNodeJournal(context.Context, *connect.
 
 func (UnimplementedNodeServiceHandler) GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetFleetConnections is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) GetNodeRuntime(context.Context, *connect.Request[v1.GetNodeRuntimeRequest]) (*connect.Response[v1.GetNodeRuntimeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetNodeRuntime is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) GetNodeHostHistory(context.Context, *connect.Request[v1.GetNodeHostHistoryRequest]) (*connect.Response[v1.GetNodeHostHistoryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetNodeHostHistory is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) GetPathLoss(context.Context, *connect.Request[v1.GetPathLossRequest]) (*connect.Response[v1.GetPathLossResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetPathLoss is not implemented"))
 }

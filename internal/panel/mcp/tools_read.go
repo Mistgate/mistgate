@@ -225,21 +225,20 @@ func readTools() []toolDef {
 				return warpStatusView(id, name, r.Msg, c.e.now()), nil
 			}),
 
-		readTool("node_metrics", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"The node's current gauges (CPU, RAM, disk, network), traffic today, online users per protocol and today's top users. The panel keeps no per-node history, so there are no time series. With no node: one compact row of gauges for every node that is not retired (no top users).",
-			func(c *call, in nodeOptArg) (any, error) {
+		readTool("node_metrics", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceGetNodeHostHistoryProcedure),
+			"The node's current gauges (CPU, RAM, disk, network), traffic today, online users per protocol and today's top users. "+
+				"With hours (1 to 720) it also returns the host load per hour (series: CPU mean and peak, softirq peak, RAM peak, network mean and peak, sessions peak; oldest first; "+
+				"windows over 96 hours are grouped into bucket_hours-long points) and peaks over the whole window with the hour of each. "+
+				"The history is kept 90 days and starts when the panel first stored it; an hour with no sample is absent. "+
+				"With no node: one compact row of current gauges for every node that is not retired (no top users, no history).",
+			func(c *call, in nodeMetricsArg) (any, error) {
 				if in.Node == "" {
+					if in.Hours != 0 {
+						return nil, errors.New("hours needs a node: the history is read one node at a time")
+					}
 					return c.fleetMetrics()
 				}
-				id, _, err := c.nodeRef(in.Node)
-				if err != nil {
-					return nil, err
-				}
-				r, err := c.cl.Node.GetNode(c.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: id}))
-				if err != nil {
-					return nil, apiError(err)
-				}
-				return nodeMetricsView(r.Msg), nil
+				return c.nodeMetrics(in)
 			}),
 
 		// node_doctor: the stored report for everybody; operators and admins also get `refresh`.

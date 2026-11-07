@@ -670,7 +670,7 @@ func (e *env) scenario() {
 		"fleet_connections": {}, "node_journal": {}, "audit_search": {"hours": 24}, "updates_status": {}, "backup_status": {}, "dns_presets_list": {},
 		"profiles_list": {}, "protocols_list": {}, "relays_list": {}, "node_server_access_list": {}, "node_server_keys_list": {"node": "de1"},
 		"node_ipv6_check": {"node": "de1"}, "relay_candidates": {"node": "de1"},
-		"timeline": {"hours": 24}, "fleet_digest": {}, "user_diagnose": {"user_id": userIDs[0]},
+		"timeline": {"hours": 24}, "fleet_digest": {}, "user_diagnose": {"user_id": userIDs[0]}, "node_runtime": {}, "path_loss_matrix": {"hours": 24},
 	}
 	// These need a fixture the throwaway panel does not have (a connected node, a profile, a relay): a clean tool error is
 	// an answer; a protocol error never is.
