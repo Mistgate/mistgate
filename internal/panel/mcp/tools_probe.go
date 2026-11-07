@@ -30,7 +30,7 @@ var sweepSizes = []uint32{256, 576, 1200, 1350, 1452}
 const probeLimits = "It sends real traffic between your nodes, so it is rate limited: one probe per node pair at a time, at most 6 per node in 5 minutes and 12 per token in 10 minutes (a refused call says when to retry); do not repeat it to watch a number move. "
 
 func probeTools() []toolDef {
-	return []toolDef{
+	return append(change(pathSpeed), []toolDef{
 		probeTool("path_probe", probeToolTimeout, procs(adminv1connect.NodeServiceListNodesProcedure, probev1connect.ProbeServicePathProbeProcedure),
 			"Probe the path from one of your nodes (from) to another (to) now, to tell a bad node from a bad path or a filtered port. Both are node ids or exact names; the targets are always the ports the to node itself serves, never a host you name. "+
 				"kind udp: the sender sends 150 tagged 256-byte datagrams per port at 25 a second and the target counts them (about 6 s): per port sent, got and a verdict ok, lossy or broken. "+
@@ -50,7 +50,7 @@ func probeTools() []toolDef {
 			"How fast and reliable a node's own DNS resolver is, from the doctor's resolver check: lookup timing (p50 and p95 in milliseconds) and how many of the control domains failed, for the newest run, with the history of the last 24 runs (oldest first) and a trend (steady, slower, faster, unknown until 4 runs). "+
 				"Unless stored_only is true it asks the node to run the check now (a handful of lookups of public control domains from the node, a few seconds). The stored doctor results are folded into the history too. "+probeLimits+"No addresses.",
 			func(c *call, in nodeDNSArg) (any, error) { return c.nodeDNSCheck(in) }),
-	}
+	}...)
 }
 
 // probeTool is readToolWithin for a tool that acts on the network: not read-only, never destructive, not idempotent (every

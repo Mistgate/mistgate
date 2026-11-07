@@ -160,6 +160,7 @@ type Agent struct {
 	tcp           tcpProbeState
 	country       countryProbeState
 	pathTrace     pathTraceState
+	speed         speedState
 	linkCounterMu sync.Mutex
 	linkVolumes   map[linkCounterKey]linkCounterVolume
 	linkWindow    time.Duration // test seam; zero selects the production ten-minute window
@@ -1087,6 +1088,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.httpMark(s, m.HttpMark) })
 	case *pb.ConnectResponse_TcpProbe:
 		a.goBusy(func() { a.tcpProbe(s, m.TcpProbe) })
+	case *pb.ConnectResponse_SpeedTest:
+		a.goBusy(func() { a.speedTest(s, m.SpeedTest) })
 	case *pb.ConnectResponse_PathTrace:
 		a.goBusy(func() { a.runPathTrace(s, m.PathTrace) })
 	case *pb.ConnectResponse_CountryProbe:
