@@ -42,6 +42,12 @@ What the provider receives: the conversation, the assistant's instructions, your
 
 The model never applies anything itself: it has no tool to do so. Every call is in the audit log as "Assistant of <admin>", with the source **Assistant** (filter by it in **Settings → Audit**).
 
+## Work out what does not open
+
+Ask "who cannot connect, and what do we fix?", or press **Work out what does not open** on **Health → People**: the chat opens with the question ready to send. The assistant starts with `access_report`, which sets protocol against node (and group) over the last day: who tried, who got through, the rejects, stalls, freezes and loss the counters can tell apart, and who was given a server but never connected. It adds the view from the country (operators that see a node dark, which TSPU ports are cut, what kl!ck users saw) and `block_diagnosis`, which says how a node is blocked: the address is banned, one port is cut, TCP is throttled, UDP is cut, one protocol is recognised, only whitelisted addresses pass on mobile, or nothing is blocked and the node is simply broken.
+
+It answers with a short picture per protocol, node and group, then three to five ranked recommendations, each tied to its evidence and offered as one plan (a relay through an entry people reach, a move to port 443, a different protocol for a group, a CDN profile, the IPv6 entry, taking a blocked server out of subscriptions). The rules are fixed, so the same facts give the same answer; where a signal is missing it says so and names the check that would tell (for example `path_probe` over UDP from a node in the country). VLESS keeps no attempt counter, so its failures show only through the country view and kl!ck.
+
 ## Memory
 
 - **Notes.** The assistant saves what it should remember ("Remembered: …" in the chat, with **Forget**). **AI → Memory** lists them: add, edit and delete any, or **Forget everything**. Every note goes into every conversation; at most 100 notes of 400 characters.

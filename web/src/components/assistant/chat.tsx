@@ -217,17 +217,25 @@ export function ChatDock() {
   const openConversation = chat.open;
   const available = access.data?.available ?? false;
 
-  // a conversation opened from AI -> Memory
+  const [draft, setDraft] = useState<{ text: string; n: number } | undefined>();
+  const resetChat = chat.reset;
+
+  // a conversation opened from AI -> Memory, or a new one with text in the composer (askAssistant)
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const id = (e as CustomEvent<{ id: string }>).detail?.id;
-      if (!id) return;
-      setOpen(true);
-      void openConversation(id);
+      const detail = (e as CustomEvent<{ id?: string; text?: string }>).detail;
+      if (detail?.id) {
+        setOpen(true);
+        void openConversation(detail.id);
+      } else if (detail?.text) {
+        resetChat();
+        setDraft({ text: detail.text, n: Date.now() });
+        setOpen(true);
+      }
     };
     window.addEventListener("mistgate:assistant-open", onOpen);
     return () => window.removeEventListener("mistgate:assistant-open", onOpen);
-  }, [openConversation]);
+  }, [openConversation, resetChat]);
 
   useEffect(() => {
     if (!available) return;
@@ -246,7 +254,7 @@ export function ChatDock() {
   return (
     <>
       {!open && <ChatButton onClick={() => setOpen(true)} running={chat.running} />}
-      {open && <ChatPanel chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} onClose={() => setOpen(false)} />}
+      {open && <ChatPanel key={draft?.n ?? 0} chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} draft={draft} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -265,12 +273,12 @@ export function ChatButton({ onClick, running }: { onClick: () => void; running:
   );
 }
 
-export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, initialContext, pickerOpen }: { chat: ChatApi; readOnly: boolean; providerLabel: string; provider?: number; onClose: () => void; initialContext?: Context | null; pickerOpen?: boolean }) {
+export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, initialContext, pickerOpen, draft }: { chat: ChatApi; readOnly: boolean; providerLabel: string; provider?: number; onClose: () => void; initialContext?: Context | null; pickerOpen?: boolean; draft?: { text: string; n: number } }) {
   const t = useT();
   const owner = useIsOwner();
   const pageContext = usePageContext();
   const [attach, setAttach] = useState(true);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(draft?.text ?? "");
   const [askSecret, setAskSecret] = useState(false);
   const [history, setHistory] = useState(false);
   const list = useRef<HTMLDivElement>(null);

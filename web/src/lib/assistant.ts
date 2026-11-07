@@ -87,5 +87,8 @@ export function splitText(m: Msg): { interim: string; answer: string } {
   return end > 0 ? { interim: m.text.slice(0, end).trim(), answer: m.text.slice(end).trim() } : { interim: "", answer: m.text };
 }
 
-export const isAssistant = (m: Msg) => m.role === ChatRole.ASSISTANT;
+/** Opens the assistant chat as a new conversation with `text` in the composer (the person reads it and sends it). */
+export const askAssistant = (text: string) => window.dispatchEvent(new CustomEvent("mistgate:assistant-open", { detail: { text } }));
+
+export const isAssistant =(m: Msg) => m.role === ChatRole.ASSISTANT;
 export const planOpen = (p: Plan) => p.state === PlanState.PROPOSED;
