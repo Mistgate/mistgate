@@ -45,22 +45,25 @@ const nodes: GraphNode[] = [
   { id: "fi1", title: "fi1", rank: 2, ports: [{ id: "in", side: "in", type: "any", label: "In" }] },
 ];
 
-function mount(ui: React.ReactElement) {
+const settle = async () => {
+  for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+};
+async function mount(ui: React.ReactElement) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  act(() => root!.render(ui));
+  await act(async () => root!.render(ui));
+  await settle(); // the cards are placed a tick after they are measured
 }
-const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const port = (node: string, id: string) => host!.querySelector<HTMLElement>(`[data-gnode="${node}"] [data-port-id="${id}"]`)!;
 const key = (el: Element, k: string, init: KeyboardEventInit = {}) => act(async () => void el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init })));
 const click = (el: Element) => act(async () => void el.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const status = () => host!.querySelector('[role="status"]')!.textContent;
 
 describe("Graph", () => {
-  it("renders an application region, node groups, ports and wires", () => {
+  it("renders an application region, node groups, ports and wires", async () => {
     const edges: GraphEdge[] = [{ id: "e1", from: { node: "de1", port: "relay" }, to: { node: "nl1", port: "hy2" } }];
-    mount(<Graph nodes={nodes} edges={edges} typeColors={colors} ariaLabel="Ways" />);
+    await mount(<Graph nodes={nodes} edges={edges} typeColors={colors} ariaLabel="Ways" />);
     const app = host!.querySelector('[role="application"]')!;
     expect(app.getAttribute("aria-label")).toBe("Ways");
     expect(app.getAttribute("aria-describedby")).toBeTruthy();
@@ -76,9 +79,9 @@ describe("Graph", () => {
     expect(host!.querySelector('[role="toolbar"]')).toBeTruthy();
   });
 
-  it("places nodes without a saved position and keeps new positions under the layout key", () => {
+  it("places nodes without a saved position and keeps new positions under the layout key", async () => {
     const onPositionsChange = vi.fn();
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" layoutKey="t" onPositionsChange={onPositionsChange} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" layoutKey="t" onPositionsChange={onPositionsChange} />);
     expect(onPositionsChange).toHaveBeenCalled();
     const saved = JSON.parse(localStorage.getItem("mg.graph.t")!);
     expect(Object.keys(saved).sort()).toEqual(["de1", "fi1", "nl1"]);
@@ -88,7 +91,7 @@ describe("Graph", () => {
 
   it("connects from the keyboard: Enter on a port, Tab to a target, Enter", async () => {
     const onConnect = vi.fn(async () => {});
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} />);
     const src = port("de1", "relay");
     src.focus();
     await key(src, "Enter");
@@ -107,7 +110,7 @@ describe("Graph", () => {
 
   it("cancels keyboard wiring with Escape", async () => {
     const onConnect = vi.fn();
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} />);
     const src = port("de1", "tcp");
     src.focus();
     await key(src, "Enter");
@@ -121,7 +124,7 @@ describe("Graph", () => {
     const onConnect = vi.fn(async () => {
       throw new Error("node is busy");
     });
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} />);
     const src = port("de1", "relay");
     await key(src, "Enter");
     await key(document.activeElement!, "Enter");
@@ -133,7 +136,7 @@ describe("Graph", () => {
   it("removes a selected wire with Delete when onEdgeDelete exists", async () => {
     const onEdgeDelete = vi.fn();
     const edges: GraphEdge[] = [{ id: "e1", from: { node: "de1", port: "relay" }, to: { node: "nl1", port: "hy2" } }];
-    mount(<Graph nodes={nodes} edges={edges} typeColors={colors} ariaLabel="g" onEdgeDelete={onEdgeDelete} />);
+    await mount(<Graph nodes={nodes} edges={edges} typeColors={colors} ariaLabel="g" onEdgeDelete={onEdgeDelete} />);
     const wire = host!.querySelector("[data-gedge]")!;
     await click(wire);
     await key(wire, "Delete");
@@ -144,7 +147,7 @@ describe("Graph", () => {
 
   it("does not delete wires without onEdgeDelete", async () => {
     const edges: GraphEdge[] = [{ id: "e1", from: { node: "de1", port: "relay" }, to: { node: "nl1", port: "hy2" } }];
-    mount(<Graph nodes={nodes} edges={edges} typeColors={colors} ariaLabel="g" />);
+    await mount(<Graph nodes={nodes} edges={edges} typeColors={colors} ariaLabel="g" />);
     const wire = host!.querySelector("[data-gedge]")!;
     await click(wire);
     await key(wire, "Delete");
@@ -153,7 +156,7 @@ describe("Graph", () => {
 
   it("opens the wire menu on click and closes it", async () => {
     const edges: GraphEdge[] = [{ id: "e1", from: { node: "de1", port: "relay" }, to: { node: "nl1", port: "hy2" } }];
-    mount(
+    await mount(
       <Graph
         nodes={nodes}
         edges={edges}
@@ -174,7 +177,7 @@ describe("Graph", () => {
 
   it("blocks connecting in read-only mode", async () => {
     const onConnect = vi.fn();
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} readOnly />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} readOnly />);
     const src = port("de1", "relay");
     await key(src, "Enter");
     expect(host!.querySelector('[data-role="target"]')).toBeNull();
@@ -183,7 +186,7 @@ describe("Graph", () => {
 
   it("refuses a pair canConnect rejects: it is not offered as a target", async () => {
     const onConnect = vi.fn();
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} canConnect={(_, to) => (to.node === "fi1" ? "nope" : true)} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onConnect={onConnect} canConnect={(_, to) => (to.node === "fi1" ? "nope" : true)} />);
     await key(port("de1", "relay"), "Enter");
     expect(host!.querySelectorAll('[data-role="target"], [data-role="current"]')).toHaveLength(1);
     expect(port("fi1", "in").getAttribute("data-role")).toBe("dim");
@@ -191,14 +194,14 @@ describe("Graph", () => {
 
   it("announces when no port can take a wire", async () => {
     const lone: GraphNode[] = [{ id: "be", title: "be", ports: [{ id: "o", side: "out", type: "udp" }] }];
-    mount(<Graph nodes={lone} edges={[]} typeColors={colors} ariaLabel="g" onConnect={() => {}} />);
+    await mount(<Graph nodes={lone} edges={[]} typeColors={colors} ariaLabel="g" onConnect={() => {}} />);
     await key(port("be", "o"), "Enter");
     expect(status()).toContain("No port");
   });
 
   it("selects a node on focus and reports it", async () => {
     const onSelectionChange = vi.fn();
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onSelectionChange={onSelectionChange} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onSelectionChange={onSelectionChange} />);
     await act(async () => host!.querySelector<HTMLElement>('[data-gnode="nl1"]')!.focus());
     expect(onSelectionChange).toHaveBeenCalledWith(["nl1"]);
     expect(host!.querySelector('[data-gnode="nl1"]')!.hasAttribute("data-selected")).toBe(true);
@@ -206,7 +209,7 @@ describe("Graph", () => {
 
   it("nudges the selected node with the arrow keys", async () => {
     const onPositionsChange = vi.fn();
-    mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" positions={{ de1: { x: 0, y: 0 }, nl1: { x: 300, y: 0 }, fi1: { x: 600, y: 0 } }} onPositionsChange={onPositionsChange} />);
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" positions={{ de1: { x: 0, y: 0 }, nl1: { x: 300, y: 0 }, fi1: { x: 600, y: 0 } }} onPositionsChange={onPositionsChange} />);
     const card = host!.querySelector<HTMLElement>('[data-gnode="nl1"]')!;
     await act(async () => card.focus());
     await key(card, "ArrowRight");

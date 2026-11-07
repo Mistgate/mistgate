@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { IconChip } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
+import { TextField } from "@/components/ui/text-field";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
@@ -352,7 +353,7 @@ function Stages({ r, busy }: { r: RelayMsg; busy?: Busy }) {
   );
 }
 
-function RemoveRelay({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
+export function RemoveRelay({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
   const t = useT();
   const toast = useToast();
   const qc = useQueryClient();
@@ -410,6 +411,8 @@ type AddProps = {
   exitId?: string;
   /** Ask for the candidates: the dialog is open. */
   enabled: boolean;
+  /** A server (inbound id) ticked from the start: the graph draws a relay from an entry to it. */
+  preselect?: string;
   onClose: () => void;
   /** A Back button in place of Cancel while nothing runs ("New way in" goes back a step). */
   onBack?: () => void;
@@ -419,14 +422,14 @@ type AddProps = {
  * "Add relay": the candidates with the three hints, the ports, then the checks one server after another. The body and the
  * buttons, for a dialog of their own (AddRelayDialog) or the last step of "New way in".
  */
-export function useAddRelay({ entry, exitId, enabled, onClose, onBack }: AddProps) {
+export function useAddRelay({ entry, exitId, enabled, preselect, onClose, onBack }: AddProps) {
   const t = useT();
   const qc = useQueryClient();
   const ccOf = useCountryOf();
   const cc = useQuery(countryQuery).data?.country || "RU";
   const hours = useQuery(settingsQuery).data?.settings.updateIntervalHours || 12;
   const cands = useQuery({ ...candidatesQuery(entry.id), enabled: enabled && entry.id !== "" });
-  const [picked, setPicked] = useState<Record<string, string>>({}); // inbound id -> port text ("" = auto)
+  const [picked, setPicked] = useState<Record<string, string>>(() => (preselect ? { [preselect]: "" } : {})); // inbound id -> port text ("" = auto)
   const [runs, setRuns] = useState<Record<string, Run> | null>(null);
   const [mode, setMode] = useState<"on" | "check">("on");
   const [working, setWorking] = useState(false);
@@ -436,7 +439,7 @@ export function useAddRelay({ entry, exitId, enabled, onClose, onBack }: AddProp
   const chosen = candidates.filter((c) => c.inboundId in picked);
 
   const reset = () => {
-    setPicked({});
+    setPicked(preselect ? { [preselect]: "" } : {});
     setRuns(null);
   };
   const close = () => {
@@ -683,9 +686,9 @@ export function useAddRelay({ entry, exitId, enabled, onClose, onBack }: AddProp
 }
 
 /** "Add relay" in a dialog of its own: from an entry ("Relay another node…"), or more servers of one exit ("Add server…"). */
-export function AddRelayDialog({ open, onOpenChange, entry, exitId }: { open: boolean; onOpenChange: (open: boolean) => void; entry: Entry; exitId?: string }) {
+export function AddRelayDialog({ open, onOpenChange, entry, exitId, preselect }: { open: boolean; onOpenChange: (open: boolean) => void; entry: Entry; exitId?: string; preselect?: string }) {
   const t = useT();
-  const add = useAddRelay({ entry, exitId, enabled: open, onClose: () => onOpenChange(false) });
+  const add = useAddRelay({ entry, exitId, enabled: open, preselect, onClose: () => onOpenChange(false) });
   return (
     <Modal
       open={open}
@@ -729,4 +732,54 @@ export function alsoRemovesText(t: T, gone: RelayMsg[]): string {
   if (gone.length === 0) return "";
   const entries = [...new Set(gone.map((r) => r.viaNodeName))].join(", ");
   return t.n("relay.removeAlso", gone.length, { entries });
+}
+
+/** "Change port": the relay's port on its entry, through the same UpdateRelay the switch uses; the panel checks the port is free. */
+export function ChangeRelayPort({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
+  const t = useT();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [port, setPort] = useState(String(r.port));
+  const [error, setError] = useState<unknown>(null);
+  const [pending, setPending] = useState(false);
+  const n = Number(port);
+  const valid = Number.isInteger(n) && n >= 1 && n <= 65535;
+  const save = async () => {
+    setPending(true);
+    try {
+      await relaysApi.updateRelay({ id: r.id, port: n });
+      onClose();
+      toast(t("common.saved"));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(false);
+      void qc.invalidateQueries({ queryKey: ["relays"] });
+    }
+  };
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && !pending && onClose()}
+      title={t("wg.port.title", { entry: r.viaNodeName })}
+      description={t("wg.port.hint", { entry: r.viaNodeName, exit: r.exitNodeName })}
+      footer={
+        <>
+          <Button variant="ghost" size="md" disabled={pending} onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" size="md" disabled={pending || !valid || n === r.port} onClick={() => void save()}>
+            {t("wg.port.save")}
+          </Button>
+        </>
+      }
+    >
+      <TextField label={t("wg.port.label")} mono inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
+      {error != null && (
+        <Notice tone="danger" className="items-start">
+          {errorText(error, t)}
+        </Notice>
+      )}
+    </Modal>
+  );
 }

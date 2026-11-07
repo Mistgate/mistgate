@@ -60,7 +60,7 @@ function savePositions(layoutKey: string | undefined, p: Positions) {
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
 export function Graph<D = unknown>(props: GraphProps<D>) {
-  const { nodes, edges, typeColors, layoutKey, canConnect, onConnect, onEdgeDelete, renderEdgeMenu, readOnly = false, minimap = true, height = 560, ariaLabel, className } = props;
+  const { nodes, edges, typeColors, layoutKey, canConnect, onConnect, onEdgeDelete, renderEdgeMenu, readOnly = false, minimap = true, legend, height = 560, ariaLabel, className } = props;
   const t = useT();
   const [store] = useState(() => new GraphStore());
   const rootRef = useRef<HTMLDivElement>(null);
@@ -277,23 +277,28 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     const missing = nodes.filter((n) => !positions[n.id]);
     if (missing.length) {
       if (!missing.every((n) => store.measure.has(n.id))) return;
-      const all = sizes();
-      const full = computeLayout(all, layoutEdges());
-      const next: Positions = {};
-      for (const n of nodes) if (positions[n.id]) next[n.id] = positions[n.id]!;
-      const placed = nodes.length > missing.length;
-      if (!placed) Object.assign(next, full);
-      else {
-        const taken = all.filter((a) => next[a.id]).map((a) => ({ ...next[a.id]!, w: a.w, h: a.h }));
-        for (const a of all) {
-          if (next[a.id]) continue;
-          const p = clearOf({ ...full[a.id]!, w: a.w, h: a.h }, taken);
-          next[a.id] = p;
-          taken.push({ ...p, w: a.w, h: a.h });
+      // a tick later, on what the cards measure once their rows have claimed their ports (the first measure is of a card
+      // that still draws a port twice)
+      const timer = setTimeout(() => {
+        if (!missing.every((n) => store.measure.has(n.id))) return;
+        const all = sizes();
+        const full = (live.current.props.arrange ?? computeLayout)(all, layoutEdges());
+        const next: Positions = {};
+        for (const n of nodes) if (positions[n.id]) next[n.id] = positions[n.id]!;
+        const placed = nodes.length > missing.length;
+        if (!placed) Object.assign(next, full);
+        else {
+          const taken = all.filter((a) => next[a.id]).map((a) => ({ ...next[a.id]!, w: a.w, h: a.h }));
+          for (const a of all) {
+            if (next[a.id]) continue;
+            const p = clearOf({ ...full[a.id]!, w: a.w, h: a.h }, taken);
+            next[a.id] = p;
+            taken.push({ ...p, w: a.w, h: a.h });
+          }
         }
-      }
-      commitPositions(next);
-      return;
+        commitPositions(next);
+      }, 0);
+      return () => clearTimeout(timer);
     }
     if (!fitted.current && store.size.w > 0 && nodes.every((n) => store.measure.has(n.id) && store.live.has(n.id))) {
       fitted.current = true;
@@ -333,7 +338,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   );
 
   const arrange = useCallback(() => {
-    const target = computeLayout(sizes(), layoutEdges());
+    const target = (live.current.props.arrange ?? computeLayout)(sizes(), layoutEdges());
     animateTo(target);
   }, [sizes, layoutEdges, animateTo]);
 
@@ -963,9 +968,28 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
             </IconButton>
           </Tip>
         </div>
+        {legend && <Legend>{legend}</Legend>}
         {minimap && !compact && <Minimap store={store} ids={nodes.map((n) => n.id)} selected={selSet} onCenter={centerOn} />}
       </div>
     </GraphContext.Provider>
+  );
+}
+
+function Legend({ children }: { children: ReactNode }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mg-glegend" data-gui data-open={open || undefined}>
+      {open && (
+        <div id="graph-legend" className="mg-glegend-body" role="region" aria-label={t("graph.legend")}>
+          {children}
+        </div>
+      )}
+      <button type="button" className="mg-glegend-btn" aria-expanded={open} aria-controls={open ? "graph-legend" : undefined} onClick={() => setOpen((o) => !o)}>
+        <Icon name="info" size={13} />
+        {t("graph.legend")}
+      </button>
+    </div>
   );
 }
 

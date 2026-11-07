@@ -4,9 +4,9 @@ import { boundsOf, type Rect } from "./geometry";
 import { useStoreVersion, type GraphStore } from "./store";
 import type { Pos } from "./types";
 
-export const MINIMAP_W = 170;
-export const MINIMAP_H = 110;
-const PAD = 8;
+export const MINIMAP_W = 132;
+export const MINIMAP_H = 84;
+const PAD = 6;
 
 /** The overview in the corner: node rects (selected ones in the accent) and the viewport; click or drag recentres the view. */
 export function Minimap({ store, ids, selected, onCenter }: { store: GraphStore; ids: string[]; selected: ReadonlySet<string>; onCenter: (world: Pos) => void }) {
@@ -22,6 +22,9 @@ export function Minimap({ store, ids, selected, onCenter }: { store: GraphStore;
     if (r) rects.push({ id, r });
   }
   const vp: Rect = { x: -view.x / view.z, y: -view.y / view.z, w: size.w / view.z, h: size.h / view.z };
+  // everything is in view: the map would tell nothing
+  const all = boundsOf(rects.map((x) => x.r));
+  if (size.w > 0 && all && all.x >= vp.x && all.y >= vp.y && all.x + all.w <= vp.x + vp.w && all.y + all.h <= vp.y + vp.h) return null;
   const b = boundsOf([...rects.map((x) => x.r), ...(size.w > 0 ? [vp] : [])]) ?? { x: 0, y: 0, w: 1, h: 1 };
   const s = Math.min((MINIMAP_W - PAD * 2) / Math.max(b.w, 1), (MINIMAP_H - PAD * 2) / Math.max(b.h, 1));
   const ox = (MINIMAP_W - b.w * s) / 2 - b.x * s;

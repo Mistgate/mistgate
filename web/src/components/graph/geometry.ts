@@ -141,7 +141,7 @@ export function zoomAround(v: View, p: Pos, z: number): View {
 }
 
 /** The view that shows `b` centred with a margin; never zoomed in past 100%. */
-export function fitView(b: Rect | null, size: { w: number; h: number }, pad = 48): View {
+export function fitView(b: Rect | null, size: { w: number; h: number }, pad = 32): View {
   if (!b || size.w <= 0 || size.h <= 0) return { x: 0, y: 0, z: 1 };
   const z = clamp(Math.min((size.w - pad * 2) / Math.max(b.w, 1), (size.h - pad * 2) / Math.max(b.h, 1), 1), MIN_ZOOM, MAX_ZOOM);
   return { z, x: size.w / 2 - (b.x + b.w / 2) * z, y: size.h / 2 - (b.y + b.h / 2) * z };

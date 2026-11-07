@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { LayoutEdge, LayoutNode } from "./layout";
 
 /** A port's type: a free-form tag ("udp", "tcp", "any"). Two ports connect when the tags match or either is "any". */
 export type PortType = string;
@@ -13,6 +14,8 @@ export interface GraphPort {
   /** In: false by default (one wire). Out: true by default (many wires). */
   multi?: boolean;
   disabled?: boolean;
+  /** What the way into or out of this port is like: a filled dot works (ok, warn), hollow is none, a ring with a slash is blocked. Without it a port is filled when a wire is connected. */
+  status?: "ok" | "warn" | "none" | "blocked";
 }
 
 export interface GraphNode<D = unknown> {
@@ -34,7 +37,8 @@ export interface GraphNode<D = unknown> {
   data?: D;
 }
 
-export type EdgeState = "ok" | "warn" | "bad" | "off" | "pending";
+/** "blocked": a way something cuts off (a country), drawn thin, muted and dashed, never as an alarm. */
+export type EdgeState = "ok" | "warn" | "bad" | "off" | "pending" | "blocked";
 
 export interface PortRef {
   node: string;
@@ -47,6 +51,8 @@ export interface GraphEdge {
   to: PortRef;
   state?: EdgeState;
   label?: ReactNode;
+  /** Where the label sits: on the middle of the wire (default) or just before the target port, like a badge on it. */
+  labelAt?: "mid" | "end";
   /** A slow flowing dash in the direction of traffic (not with reduced motion). */
   animated?: boolean;
 }
@@ -79,6 +85,10 @@ export interface GraphProps<D = unknown> {
   onSelectionChange?: (ids: string[]) => void;
   readOnly?: boolean;
   minimap?: boolean;
+  /** Explains the line styles and chips; shown in a small collapsible panel at the bottom-left. */
+  legend?: ReactNode;
+  /** Replaces the default column layout (first layout and Arrange). */
+  arrange?: (nodes: LayoutNode[], edges: LayoutEdge[]) => Positions;
   height?: number | string;
   ariaLabel: string;
   className?: string;

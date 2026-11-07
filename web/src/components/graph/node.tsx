@@ -28,6 +28,7 @@ function PortDot({ node, port }: { node: GraphNode; port: GraphPort }) {
       data-port-id={port.id}
       data-side={port.side}
       data-connected={connected || undefined}
+      data-status={port.status}
       data-role={role}
       data-disabled={port.disabled || undefined}
       aria-label={label}

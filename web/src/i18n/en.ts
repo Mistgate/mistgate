@@ -25,6 +25,7 @@ import { en as tgproxyEn } from "./tgproxy";
 import { en as protocolsEn } from "./protocols";
 import { en as aiEn } from "./ai";
 import { en as graphEn } from "./graph";
+import { en as waysgraphEn } from "./waysgraph";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
@@ -296,7 +297,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn, ...aiEn, ...graphEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

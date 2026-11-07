@@ -3,6 +3,8 @@
 
 export const en = {
   "graph.zoomIn": "Zoom in",
+  "graph.legend": "Legend",
+  "graph.edge.blocked": "cut off",
   "graph.node": "node",
   "graph.zoomOut": "Zoom out",
   "graph.fit": "Fit to view",
@@ -42,6 +44,8 @@ export const en = {
 
 export const ru: typeof en = {
   "graph.zoomIn": "Приблизить",
+  "graph.legend": "Легенда",
+  "graph.edge.blocked": "отрезан",
   "graph.node": "узел",
   "graph.zoomOut": "Отдалить",
   "graph.fit": "Показать всё",
@@ -81,6 +85,8 @@ export const ru: typeof en = {
 
 export const zh: typeof en = {
   "graph.zoomIn": "放大",
+  "graph.legend": "图例",
+  "graph.edge.blocked": "被切断",
   "graph.node": "节点",
   "graph.zoomOut": "缩小",
   "graph.fit": "适应视图",
@@ -120,6 +126,8 @@ export const zh: typeof en = {
 
 export const fa: typeof en = {
   "graph.zoomIn": "بزرگ‌نمایی",
+  "graph.legend": "راهنما",
+  "graph.edge.blocked": "قطع‌شده",
   "graph.node": "گره",
   "graph.zoomOut": "کوچک‌نمایی",
   "graph.fit": "نمایش همه",
@@ -159,6 +167,8 @@ export const fa: typeof en = {
 
 export const tr: typeof en = {
   "graph.zoomIn": "Yakınlaştır",
+  "graph.legend": "Gösterge",
+  "graph.edge.blocked": "kesik",
   "graph.node": "düğüm",
   "graph.zoomOut": "Uzaklaştır",
   "graph.fit": "Görünüme sığdır",

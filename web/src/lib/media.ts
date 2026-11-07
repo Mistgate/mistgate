@@ -5,15 +5,15 @@ import { useSyncExternalStore } from "react";
 const query = "(max-width: 44.99rem)";
 
 function subscribe(cb: () => void) {
-  const m = window.matchMedia(query);
-  m.addEventListener("change", cb);
-  return () => m.removeEventListener("change", cb);
+  const m = window.matchMedia?.(query);
+  m?.addEventListener?.("change", cb);
+  return () => m?.removeEventListener?.("change", cb);
 }
 
 export function useIsPhone(): boolean {
   return useSyncExternalStore(
     subscribe,
-    () => window.matchMedia(query).matches,
+    () => !!window.matchMedia?.(query)?.matches,
     () => false,
   );
 }

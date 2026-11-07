@@ -138,7 +138,7 @@ export function NodeDetail({ data }: { data: Plain<GetNodeResponse> }) {
     {
       value: "history",
       label: t("node.tab.history"),
-      content: search.tab === "history" ? <HistoryTab data={data} view={search.view ?? "events"} onView={setView} /> : null,
+      content: search.tab === "history" ? <HistoryTab data={data} view={search.view === "journal" || search.view === "logs" ? search.view : "events"} onView={setView} /> : null,
     },
     {
       value: "doctor",

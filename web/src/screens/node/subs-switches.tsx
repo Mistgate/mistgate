@@ -31,10 +31,13 @@ const reasonKeys: Record<string, MessageKey> = {
 
 const reasonText = (t: T, code: string) => (reasonKeys[code] ? t(reasonKeys[code]) : code);
 
-export function InSubscriptions({ nodeId, nodeName, address, inbounds, cdn }: { nodeId: string; nodeName: string; address: string; inbounds: In[]; cdn?: boolean }) {
+/**
+ * The In subscriptions switch of one server, shared by this list and the graph's wire menu: turning one off asks the
+ * server first and, when it would leave people no way to the server, a confirmation dialog (`dialog`, to be rendered).
+ */
+export function useInSubscriptions(nodeId: string, nodeName: string) {
   const t = useT();
   const toast = useToast();
-  const owner = useIsOwner();
   const refresh = useInboundRefresh(nodeId);
   const [ask, setAsk] = useState<{ inbound: In; reason: string } | null>(null);
   const [error, setError] = useState("");
@@ -69,7 +72,40 @@ export function InSubscriptions({ nodeId, nodeName, address, inbounds, cdn }: { 
     set.mutate({ id: i.id, on });
   };
 
-  const busy = set.isPending || check.isPending;
+  const dialog = (
+    <Modal
+      open={!!ask}
+      onOpenChange={(o) => {
+        if (!o && !set.isPending) {
+          setAsk(null);
+          setError("");
+        }
+      }}
+      title={t("ways.subs.offTitle", { name: ask?.inbound.profileName ?? "" })}
+      footer={
+        <>
+          <Button variant="ghost" size="md" disabled={set.isPending} onClick={() => setAsk(null)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="danger" size="md" disabled={set.isPending} onClick={() => ask && set.mutate({ id: ask.inbound.id, on: false })}>
+            {t("ways.subs.hide")}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[13px] leading-normal text-pretty">
+        {t("ways.subs.offBody", { name: ask?.inbound.profileName ?? "", node: nodeName, reason: reasonText(t, ask?.reason ?? "") })}
+      </p>
+      {error && <Notice tone="danger">{error}</Notice>}
+    </Modal>
+  );
+  return { toggle, busy: set.isPending || check.isPending, error, asking: !!ask, dialog };
+}
+
+export function InSubscriptions({ nodeId, nodeName, address, inbounds, cdn }: { nodeId: string; nodeName: string; address: string; inbounds: In[]; cdn?: boolean }) {
+  const t = useT();
+  const owner = useIsOwner();
+  const { toggle, busy, error, asking, dialog } = useInSubscriptions(nodeId, nodeName);
   return (
     <Block title={t("ways.subs.title")}>
       <p className="text-xs leading-snug text-pretty text-muted">{cdn ? t("ways.subs.note.cdn") : t("ways.subs.note.direct", { address })}</p>
@@ -93,32 +129,8 @@ export function InSubscriptions({ nodeId, nodeName, address, inbounds, cdn }: { 
           </li>
         ))}
       </ul>
-      {error && !ask && <Notice tone="danger">{error}</Notice>}
-      <Modal
-        open={!!ask}
-        onOpenChange={(o) => {
-          if (!o && !set.isPending) {
-            setAsk(null);
-            setError("");
-          }
-        }}
-        title={t("ways.subs.offTitle", { name: ask?.inbound.profileName ?? "" })}
-        footer={
-          <>
-            <Button variant="ghost" size="md" disabled={set.isPending} onClick={() => setAsk(null)}>
-              {t("common.cancel")}
-            </Button>
-            <Button variant="danger" size="md" disabled={set.isPending} onClick={() => ask && set.mutate({ id: ask.inbound.id, on: false })}>
-              {t("ways.subs.hide")}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[13px] leading-normal text-pretty">
-          {t("ways.subs.offBody", { name: ask?.inbound.profileName ?? "", node: nodeName, reason: reasonText(t, ask?.reason ?? "") })}
-        </p>
-        {error && <Notice tone="danger">{error}</Notice>}
-      </Modal>
+      {error && !asking && <Notice tone="danger">{error}</Notice>}
+      {dialog}
     </Block>
   );
 }

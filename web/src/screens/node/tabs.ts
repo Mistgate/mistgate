@@ -8,7 +8,9 @@ export type NodeTab = (typeof nodeTabs)[number];
 export const historyViews = ["events", "journal", "logs"] as const;
 export type HistoryView = (typeof historyViews)[number];
 
-export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Exclude<HistoryView, "events">; before?: number; size?: number };
+/** The Ways in tab's view: the list or the graph (ADR 0016). */
+export type WaysView = "list" | "graph";
+export type NodeSearch = { tab?: NodeTab; way?: WayId; add?: string; view?: Exclude<HistoryView, "events"> | WaysView; before?: number; size?: number };
 
 /**
  * Search-param validation of /nodes/$id: only a known tab other than the first is kept in the URL. `add` (a profile id,
@@ -28,7 +30,7 @@ export const validateNodeSearch = (s: Record<string, unknown>): NodeSearch => {
   }
   if (tab === "ways") {
     const add = s.add === "1" || s.add === 1 ? "1" : typeof s.add === "string" && (s.add === "ipv6" || /^via:[\w-]+$/.test(s.add)) ? s.add : undefined;
-    return { tab, ...(isWayId(s.way) ? { way: s.way } : {}), ...(add ? { add } : {}) };
+    return { tab, ...(isWayId(s.way) ? { way: s.way } : {}), ...(add ? { add } : {}), ...(s.view === "graph" || s.view === "list" ? { view: s.view } : {}) };
   }
   return tab === "profiles" && typeof s.add === "string" && s.add !== "" ? { tab, add: s.add } : { tab };
 };

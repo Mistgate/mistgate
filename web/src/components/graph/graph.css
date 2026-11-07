@@ -375,3 +375,93 @@
   outline-offset: 3px;
   border-radius: 6px;
 }
+
+/* a port that states its way: filled works, hollow is none, a ring with a slash is blocked */
+.mg-gport[data-status] {
+  background: var(--surface);
+}
+.mg-gport[data-status="ok"] {
+  background: color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+}
+.mg-gport[data-status="warn"] {
+  background: color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3.5px var(--warning);
+}
+.mg-gport[data-status="none"] {
+  border-style: solid;
+  opacity: 0.8;
+}
+.mg-gport[data-status="blocked"] {
+  border-color: color-mix(in oklch, var(--danger) 80%, var(--muted));
+}
+.mg-gport[data-status="blocked"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--danger) 80%, var(--muted));
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+/* a badge on a wire's end: a quiet pill, rose only as a tint */
+.mg-glabel[data-end] {
+  transform: translate(-100%, -50%);
+}
+.mg-glabel[data-state="blocked"],
+.mg-cut {
+  border: 1px solid color-mix(in oklch, var(--danger) 14%, var(--border));
+  background: color-mix(in oklch, var(--danger) 5%, var(--surface));
+  color: color-mix(in oklch, var(--danger-text) 48%, var(--muted));
+}
+.mg-glabel[data-state="warn"] {
+  border-color: color-mix(in oklch, var(--warning) 40%, var(--border));
+  color: var(--warning-text);
+}
+/* the legend, bottom-left */
+.mg-glegend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.mg-glegend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.mg-glegend-btn:hover,
+.mg-glegend[data-open] .mg-glegend-btn {
+  color: var(--text);
+}
+.mg-glegend-body {
+  max-width: 320px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-toast);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.mg-gminimap {
+  opacity: 0.9;
+  box-shadow: none;
+  background: color-mix(in oklch, var(--surface) 70%, transparent);
+}

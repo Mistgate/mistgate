@@ -1,5 +1,9 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { Segmented } from "@/components/ui/segmented";
+import { useIsPhone } from "@/lib/media";
+import { readPref, writePref } from "@/lib/storage";
+import { WaysGraph } from "./ways-graph";
 import { useState, type ReactNode } from "react";
 import { ActionBar, Block, SectionLabel } from "@/components/ui/bits";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -32,7 +36,7 @@ import { EntryDialog, entryReason, EntryState, TurnOffDialog } from "./ipv6-entr
 import { CheckPortsButton, portRows, Ports, usePortCheck } from "./ports";
 import { AddRelayDialog, ccChip, RelayRows, useAddRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
 import { InSubscriptions } from "./subs-switches";
-import type { NodeSearch } from "./tabs";
+import type { NodeSearch, WaysView } from "./tabs";
 
 // The node page's "Ways in" tab (node-ia plan §3.4): every way people reach the node, drawn as one line from people down
 // to the node with a branch per way (straight to its address, through a CDN, through another node, over IPv6), and on an entry node the
@@ -346,40 +350,75 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
   const all = [...w.lanes, ...w.out];
   const chosen = all.some((l) => l.id === search.way) ? search.way : undefined;
   const open = chosen ?? w.first;
-  const go = (next: NodeSearch, replace = true) => void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", ...next }, replace, resetScroll: false });
+  const phone = useIsPhone();
+  // the graph is for a wide screen; the view is the URL's, else the one this browser used last, else the list
+  const asked: WaysView | undefined = search.view === "graph" || search.view === "list" ? search.view : undefined;
+  const view: WaysView = phone ? "list" : (asked ?? (readPref("ways.view") === "graph" ? "graph" : "list"));
+  const go = (next: NodeSearch, replace = true) =>
+    void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", ...(asked ? { view: asked } : {}), ...next }, replace, resetScroll: false });
+  const setView = (v: WaysView) => {
+    writePref("ways.view", v);
+    go({ way: search.way, view: v });
+  };
   // a phone takes turns: opening moves the focus to the way back, going back (the link or the browser's) to the lane left
   const { pick, back } = useTurns({ chosen, backId: "way-back", rowId: (id) => `way-tab-${id}`, open: (id, replace) => go({ way: id }, replace), close: () => go({}) });
   const [relayOther, setRelayOther] = useState(false);
 
   if (!w.ready) return <Pending />;
   const lane = all.find((l) => l.id === open) ?? w.lanes[0]!;
+  const detail = (
+    <div role="tabpanel" id="way-panel" aria-labelledby={`way-tab-${lane.id}`} className="flex-1">
+      {lane.kind === "direct" ? (
+        <DirectDetail data={data} w={w} lane={lane} />
+      ) : lane.kind === "cdn" ? (
+        <CdnDetail data={data} w={w} lane={lane} />
+      ) : lane.kind === "ipv6" ? (
+        <Ipv6Detail data={data} w={w} lane={lane} onAdd={() => go({ way: "ipv6", add: "ipv6" })} />
+      ) : (
+        <RelayDetail key={lane.id} data={data} w={w} lane={lane} />
+      )}
+    </div>
+  );
   return (
-    // side by side from lg; between 720 and 1023 px (the sidebar still shown) the line stands above the open lane, and a
-    // phone takes turns
-    <div className="grid gap-3.5 lg:grid-cols-[336px_minmax(0,1fr)]">
-      <Line
-        data={data}
-        w={w}
-        open={open}
-        onPick={pick}
-        onAdd={() => go({ way: search.way, add: "1" })}
-        onRelayOther={() => setRelayOther(true)}
-        className={cx("lg:sticky lg:top-[72px]", chosen && "max-md:hidden")}
-      />
-      <div className={cx("flex min-w-0 flex-col gap-2.5", !chosen && "max-md:hidden")}>
-        <BackButton id="way-back" label={t("ways.back")} onClick={back} />
-        <div role="tabpanel" id="way-panel" aria-labelledby={`way-tab-${lane.id}`} className="flex-1">
-          {lane.kind === "direct" ? (
-            <DirectDetail data={data} w={w} lane={lane} />
-          ) : lane.kind === "cdn" ? (
-            <CdnDetail data={data} w={w} lane={lane} />
-          ) : lane.kind === "ipv6" ? (
-            <Ipv6Detail data={data} w={w} lane={lane} onAdd={() => go({ way: "ipv6", add: "ipv6" })} />
-          ) : (
-            <RelayDetail key={lane.id} data={data} w={w} lane={lane} />
-          )}
+    <div className="flex flex-col gap-3.5">
+      {!phone && (
+        <div className="flex justify-end">
+          <Segmented
+            variant="flat"
+            aria-label={t("wg.view")}
+            value={view}
+            onValueChange={setView}
+            options={[
+              { value: "list", label: t("wg.view.list") },
+              { value: "graph", label: t("wg.view.graph") },
+            ]}
+          />
         </div>
-      </div>
+      )}
+      {view === "graph" ? (
+        <div className="flex min-w-0 flex-col gap-3.5">
+          <WaysGraph data={data} w={w} open={open} onOpen={(id) => go({ way: id })} onIpv6={() => go({ way: "ipv6", add: "ipv6" })} />
+          {detail}
+        </div>
+      ) : (
+        // side by side from lg; between 720 and 1023 px (the sidebar still shown) the line stands above the open lane, and a
+        // phone takes turns
+        <div className="grid gap-3.5 lg:grid-cols-[336px_minmax(0,1fr)]">
+          <Line
+            data={data}
+            w={w}
+            open={open}
+            onPick={pick}
+            onAdd={() => go({ way: search.way, add: "1" })}
+            onRelayOther={() => setRelayOther(true)}
+            className={cx("lg:sticky lg:top-[72px]", chosen && "max-md:hidden")}
+          />
+          <div className={cx("flex min-w-0 flex-col gap-2.5", !chosen && "max-md:hidden")}>
+            <BackButton id="way-back" label={t("ways.back")} onClick={back} />
+            {detail}
+          </div>
+        </div>
+      )}
       {w.owner && (
         <NewWayDialog
           data={data}

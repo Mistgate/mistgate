@@ -1,6 +1,7 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { useT } from "@/i18n";
 import { nodeLabel } from "./context";
+import { cubicPoint } from "./geometry";
 import { routeWire, type Route } from "./geometry";
 import { useStoreVersion, type GraphStore } from "./store";
 import type { EdgeState, GraphEdge, GraphNode } from "./types";
@@ -17,6 +18,7 @@ const stateColor: Record<EdgeState, string> = {
   bad: "var(--danger)",
   off: "var(--muted)",
   pending: "var(--accent)",
+  blocked: "var(--muted)",
 };
 
 /** The wire's route from the ports' live positions (backward wires loop below both cards), or null while unmeasured. */
@@ -76,14 +78,19 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
           const sel = selectedEdge === e.id;
           const hot = sel || hover === e.id;
           const off = e.state === "off" && !e.virtual;
+          const quiet = e.state === "blocked" && !e.virtual;
           const label = e.virtual === "error" ? e.errorText : e.label;
           if (label) {
+            const end = e.labelAt === "end" && !e.virtual;
+            const at = end ? { ...cubicPoint(route.segments[route.segments.length - 1]!, 1), x: route.segments[route.segments.length - 1]!.p3.x - 16 } : route.mid;
             labels.push(
               <div
                 key={e.id}
                 className="mg-glabel"
                 data-error={e.virtual === "error" || undefined}
-                style={{ left: route.mid.x, top: route.mid.y }}
+                data-end={end || undefined}
+                data-state={e.state}
+                style={{ left: at.x, top: at.y }}
                 onClick={() => e.virtual !== "error" && onEdgeClick(e.id)}
               >
                 {label}
@@ -111,7 +118,12 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
               <path
                 d={route.d}
                 className={e.virtual === "pending" ? "mg-gwire mg-gwire-pending" : "mg-gwire"}
-                style={{ stroke: color, strokeWidth: hot ? 2.5 : 2, strokeDasharray: off ? "5 6" : undefined, opacity: off ? 0.75 : e.animated ? 0.45 : 1 }}
+                style={{
+                  stroke: color,
+                  strokeWidth: hot ? 2.5 : quiet ? 1.5 : e.state === "bad" ? 1.75 : 2,
+                  strokeDasharray: off ? "5 6" : quiet ? "2 5" : undefined,
+                  opacity: off ? 0.75 : quiet ? 0.7 : e.animated ? 0.45 : 1,
+                }}
               />
               {e.animated && !off && !e.virtual && <path d={route.d} className="mg-gwire mg-gwire-flow" style={{ stroke: color, strokeWidth: hot ? 2.5 : 2 }} />}
             </g>
