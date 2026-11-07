@@ -673,7 +673,7 @@ func (e *env) scenario() {
 		"timeline": {"hours": 24}, "fleet_digest": {}, "user_diagnose": {"user_id": userIDs[0]}, "node_runtime": {}, "path_loss_matrix": {"hours": 24},
 		// they send test traffic between nodes, so they are not read-only; the throwaway panel has no connected nodes (needsFixture)
 		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"},
-		"panel_logs": {"min_level": "debug"}, "retention_status": {},
+		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "capacity_report": {"hours": 24}, "panel_resources": {},
 	}
 	// These need a fixture the throwaway panel does not have (a connected node, a profile, a relay): a clean tool error is
 	// an answer; a protocol error never is.

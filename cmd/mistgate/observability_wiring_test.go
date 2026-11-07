@@ -188,6 +188,13 @@ func TestObservabilityOnARealPanel(t *testing.T) {
 		}
 		return sb.String(), r.IsError
 	}
+	// the load reads reach the real services through MCP
+	if out := mustTool(t, tool, "panel_resources", map[string]any{}); !strings.Contains(out, `"page_count":`) || !strings.Contains(out, `"admin_api":`) {
+		t.Errorf("panel_resources: %s", out)
+	}
+	if out := mustTool(t, tool, "capacity_report", map[string]any{"hours": 24}); !strings.Contains(out, `"hours":24`) || !strings.Contains(out, `"summary":`) {
+		t.Errorf("capacity_report: %s", out)
+	}
 	out, isErr := tool("panel_logs", map[string]any{"min_level": "warn", "code": "dial_failed"})
 	if isErr || !strings.Contains(out, `"dial_failed"`) || strings.Contains(out, "203.0.113.77") || strings.Contains(out, "k4m9x2q7") || strings.Contains(out, "canary-person") {
 		t.Errorf("panel_logs: %v %s", isErr, out)

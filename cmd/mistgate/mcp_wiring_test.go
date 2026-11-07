@@ -164,7 +164,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	if a, b, c := count(ro), count(op), count(ad); a != 38 || b != 78 || c != 140 {
+	if a, b, c := count(ro), count(op), count(ad); a != 40 || b != 80 || c != 142 {
 		t.Errorf("tools per profile: readonly %d, operator %d, admin %d", a, b, c)
 	}
 	// an operator token neither sees nor calls a fleet tool
@@ -476,7 +476,7 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("connect through mistgate mcp: %v (%s)", err, proxyErr.String())
 	}
 	defer ps.Close()
-	if n := count(ps); n != 38 {
+	if n := count(ps); n != 40 {
 		t.Errorf("tools through the proxy: %d", n)
 	}
 	if out := ok(ps, "fleet_status", map[string]any{}); !strings.Contains(out, `"nodes_total"`) {

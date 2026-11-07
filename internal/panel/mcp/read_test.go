@@ -59,6 +59,9 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"node_journal", map[string]any{"node": "de1", "query": "failed"}},
 		{"audit_search", map[string]any{}},
 		{"updates_status", map[string]any{}},
+		{"capacity_report", map[string]any{}},
+		{"capacity_report", map[string]any{"node": "de1", "hours": 720}},
+		{"panel_resources", map[string]any{}},
 	}
 	for _, c := range calls {
 		out := mustOK(t, s, c.tool, c.args)
