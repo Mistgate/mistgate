@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { useAddNode } from "@/components/add-node";
 import { PageTitle } from "@/components/ui/bits";
@@ -25,6 +25,9 @@ import { nodesQuery } from "@/lib/queries";
 import { protocolName, protocolShort, sortProtocols } from "@/lib/series";
 import { meQuery } from "@/lib/session";
 import { useOlderNodes } from "@/lib/updates";
+import { useIsPhone } from "@/lib/media";
+import { readPref, writePref } from "@/lib/storage";
+import { FleetMap } from "./nodes-map";
 import { useBatch } from "@/lib/batch";
 import { PickMenu } from "@/components/bulk";
 import { NodesBulk } from "./nodes-bulk";
@@ -54,6 +57,15 @@ export function NodesScreen() {
   const run = useBulkRun(batch, owner);
   const older = useOlderNodes();
   const clear = useCallback(() => setTicked(new Set()), []);
+  // List or the fleet map: the URL's (?view=map), else the one this browser used last; a phone has the list only
+  const navigate = useNavigate();
+  const phone = useIsPhone();
+  const search = useSearch({ strict: false }) as { view?: "map"; focus?: string };
+  const view: "list" | "map" = phone ? "list" : search.view === "map" || (!search.view && readPref("nodes.view") === "map") ? "map" : "list";
+  const setView = (v: "list" | "map") => {
+    writePref("nodes.view", v);
+    void navigate({ to: "/nodes", search: v === "map" ? { view: "map" } : {}, replace: true });
+  };
 
   const nodes = useMemo(() => q.data?.nodes ?? [], [q.data]);
   const problems = nodes.filter(isProblem).length;
@@ -141,6 +153,24 @@ export function NodesScreen() {
               }}
             />
           )}
+          {!phone && (
+            <div className="flex justify-end">
+              <Segmented
+                variant="flat"
+                aria-label={t("fm.view")}
+                value={view}
+                onValueChange={setView}
+                options={[
+                  { value: "list", label: t("wg.view.list") },
+                  { value: "map", label: t("fm.view.map") },
+                ]}
+              />
+            </div>
+          )}
+          {view === "map" ? (
+            <FleetMap nodes={nodes} owner={owner} focus={search.focus} />
+          ) : (
+            <>
           <div className="flex flex-wrap items-center gap-2">
             <Segmented
               variant="flat"
@@ -179,6 +209,8 @@ export function NodesScreen() {
           <Cards rows={rows} fmt={fmt} select={select} entrance={entrance} />
           {rows.length === 0 && <p className="p-8 text-center text-[13px] text-muted">{t("nodes.noRows")}</p>}
           {owner && <NodesBulk nodes={nodes} picked={picked} shown={new Set(rows.map((n) => n.id))} batch={batch} run={run} onClear={clear} />}
+            </>
+          )}
         </>
       )}
     </div>

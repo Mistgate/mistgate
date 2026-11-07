@@ -31,6 +31,7 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useBlocker: () => ({ status: "idle" }),
+  useSearch: () => ({}),
   useNavigate: () => vi.fn(),
 }));
 vi.mock("@/components/add-node", () => ({ useAddNode: () => vi.fn() }));

@@ -355,7 +355,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
   const asked: WaysView | undefined = search.view === "graph" || search.view === "list" ? search.view : undefined;
   const view: WaysView = phone ? "list" : (asked ?? (readPref("ways.view") === "graph" ? "graph" : "list"));
   const go = (next: NodeSearch, replace = true) =>
-    void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", ...(asked ? { view: asked } : {}), ...(search.full ? { full: search.full } : {}), ...next }, replace, resetScroll: false });
+    void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", ...(asked ? { view: asked } : {}), ...(search.full ? { full: search.full } : {}), ...(search.from ? { from: search.from } : {}), ...next }, replace, resetScroll: false });
   const full = view === "graph" && search.full === "1";
   const setView = (v: WaysView) => {
     writePref("ways.view", v);

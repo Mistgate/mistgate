@@ -113,6 +113,10 @@ export interface GraphProps<D = unknown> {
   /** An Expand button in the toolbar (and Shift+F). */
   onExpand?: () => void;
   expanded?: boolean;
+  /** The wire selected (or null when none is): a click on it, or the keyboard. */
+  onEdgeSelect?: (id: string | null) => void;
+  /** A double-click on a card (not on a control in it). */
+  onNodeActivate?: (id: string) => void;
   /** A plain mouse wheel pans (full screen); otherwise it scrolls the page and only Ctrl/Cmd + wheel zooms. */
   wheelPans?: boolean;
   /** Fit never zooms out past this (default 0.3, the zoom limit). */
@@ -123,6 +127,11 @@ export interface GraphProps<D = unknown> {
   fitFocus?: string;
   /** When the nodes change, lay everything out again instead of placing only the new ones. */
   rearrangeOnChange?: boolean;
+  /**
+   * The cards are laid out by `arrange` again whenever their sizes change, until the user moves one (then their places
+   * are kept, per browser, until Arrange is pressed).
+   */
+  autoArrange?: boolean;
   /** Replaces the default column layout (first layout and Arrange). */
   arrange?: (nodes: LayoutNode[], edges: LayoutEdge[]) => Positions;
   /** A number or CSS size; "fit": the content at zoom 1, between 560px and the viewport less 200px. */
