@@ -490,7 +490,7 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 	case m.GetUpdateProgress() != nil:
 		if u := c.f.updates(); u != nil {
 			if err := u.RecordProgress(ctx, tr.state.NodeID, m.GetUpdateProgress()); err != nil {
-				c.f.log.Warn("record update progress", "node", tr.state.NodeID, "err", err)
+				c.f.log.Warn("record update progress", "code", "update_progress_store_failed", "node", tr.state.NodeID, "err", err)
 			}
 		}
 	}

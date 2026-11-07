@@ -43,7 +43,7 @@ func (s *Service) updateDownloadTimeout(ctx context.Context) (time.Duration, err
 func (s *Service) downloadTimeoutOrDefault(ctx context.Context) time.Duration {
 	d, err := s.updateDownloadTimeout(ctx)
 	if err != nil {
-		s.log.Warn("load update download timeout", "err", err)
+		s.log.Warn("load update download timeout", "code", "update_download_timeout_unreadable", "err", err)
 		return defaultUpdateDownloadTimeout
 	}
 	return d
