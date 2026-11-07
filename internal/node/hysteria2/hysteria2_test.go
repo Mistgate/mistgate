@@ -112,15 +112,21 @@ func tcpEcho(t *testing.T) string {
 
 func startTCPDestinationPair(t *testing.T, serve func(string, net.Conn)) string {
 	t.Helper()
-	a, err := net.Listen("tcp", "127.0.0.2:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	port := strconv.Itoa(a.Addr().(*net.TCPAddr).Port)
-	b, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
-	if err != nil {
+	// The port the kernel hands out at 127.0.0.2 can be held at 127.0.0.1 by another test's socket: then take another.
+	var a, b net.Listener
+	for attempt := 1; ; attempt++ {
+		var err error
+		if a, err = net.Listen("tcp", "127.0.0.2:0"); err != nil {
+			t.Fatal(err)
+		}
+		port := strconv.Itoa(a.Addr().(*net.TCPAddr).Port)
+		if b, err = net.Listen("tcp", net.JoinHostPort("127.0.0.1", port)); err == nil {
+			break
+		}
 		_ = a.Close()
-		t.Fatal(err)
+		if attempt == 20 {
+			t.Fatal(err)
+		}
 	}
 	t.Cleanup(func() {
 		_ = a.Close()
