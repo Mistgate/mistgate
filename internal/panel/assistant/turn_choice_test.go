@@ -87,3 +87,35 @@ func TestAssistantAccessListsConnectedProviders(t *testing.T) {
 		t.Fatalf("the access answer carries key material: %s", encoded)
 	}
 }
+
+// The text of a round after tool calls is a new paragraph: it does not run on from the last round's ("…the last
+// day.## In short"), so a heading stays a heading.
+func TestAssistantRoundsAreSeparateParagraphs(t *testing.T) {
+	f := newAssistantFixture(t,
+		modelResponse{Text: "Checking the alerts.", Tools: []modelToolCall{scriptedTool("read_node", "call_a", `{"node":"de1"}`)}},
+		modelResponse{Text: "One more look.\n", Tools: []modelToolCall{scriptedTool("read_node", "call_b", `{"node":"nl1"}`)}},
+		modelResponse{Text: "## In short\nAll fine."},
+		modelResponse{Text: `{"title":"t","summary":"s"}`},
+	)
+	stream, err := f.client.Chat(context.Background(), connect.NewRequest(&adminv1.ChatRequest{Text: "Problems today?"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var text strings.Builder
+	for _, event := range drainChat(t, stream) {
+		text.WriteString(event.GetTextDelta())
+	}
+	if want := "Checking the alerts.\n\nOne more look.\n\n## In short\nAll fine."; text.String() != want {
+		t.Fatalf("streamed text = %q, want %q", text.String(), want)
+	}
+	for _, c := range [][2]string{{"", "a"}, {"a", "b"}, {"a\n", "b"}, {"a\n\n", "b"}, {"a", "\n\nb"}} {
+		prev, next := c[0], c[1]
+		got := paragraphBreak(prev, next)
+		if joined := prev + got + next; prev != "" && !strings.Contains(joined, "\n\n") {
+			t.Errorf("%q + %q joined as %q", prev, next, joined)
+		}
+		if prev == "" && got != "" {
+			t.Errorf("a first round got a break: %q", got)
+		}
+	}
+}

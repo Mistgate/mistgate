@@ -7,6 +7,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -120,6 +121,7 @@ type eventsArg struct {
 	Code        string `json:"code,omitempty" jsonschema:"only events with exactly this code (applied to the fetched page: use has_more and next_before_id to continue)"`
 	BeforeID    int64  `json:"before_id,omitempty" jsonschema:"only events older than this id (next_before_id of the previous page)"`
 	Limit       int    `json:"limit,omitempty" jsonschema:"default 50, at most 100"`
+	Hours       int    `json:"hours,omitempty" jsonschema:"only events of the last hours, 1 to 168 (24 = today's question); empty = any age"`
 }
 
 type checksArg struct {
@@ -361,7 +363,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("events_search", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.FleetServiceListEventsProcedure),
-			"The event feed, newest first, filtered by node, user, minimum severity or exact code. Paged with before_id.",
+			"The event feed, newest first, filtered by node, user, minimum severity, exact code and age (hours: only the last N hours; use it for \"today\" or \"the last day\" instead of judging times yourself). Each event has its time (unix). Paged with before_id.",
 			func(c *call, in eventsArg) (any, error) {
 				sev, err := eventSeverity(in.MinSeverity)
 				if err != nil {
@@ -383,6 +385,12 @@ func readTools() []toolDef {
 				}
 				if len(in.Code) > 80 {
 					return nil, errors.New("code too long")
+				}
+				if in.Hours < 0 || in.Hours > 168 {
+					return nil, errors.New("hours must be 1 to 168")
+				}
+				if in.Hours > 0 {
+					return eventsSince(c, req, c.e.now().Add(-time.Duration(in.Hours)*time.Hour).Unix(), in.Code, listLimit(in.Limit))
 				}
 				r, err := c.cl.Fleet.ListEvents(c.ctx, connect.NewRequest(req))
 				if err != nil {
@@ -730,3 +738,43 @@ func (c *call) subscriptionPreview(in subPreviewArg) (any, error) {
 	}
 	return v, nil
 }
+
+// eventsSince is events_search over a time window: the feed has no age filter, so the pages are read newest first
+// until they are older than the cutoff (at most eventsSincePages of them), and only the events inside the window that
+// match the code are kept. has_more says more matching events of the window remain past the limit or the pages read.
+func eventsSince(c *call, req *adminv1.ListEventsRequest, cutoff int64, code string, limit int) (any, error) {
+	var kept []*adminv1.Event
+	more := false
+	req.Limit = 200
+	for page := 0; page < eventsSincePages; page++ {
+		r, err := c.cl.Fleet.ListEvents(c.ctx, connect.NewRequest(req))
+		if err != nil {
+			return nil, apiError(err)
+		}
+		evs := r.Msg.GetEvents()
+		old := false
+		for _, e := range evs {
+			if e.GetTimeUnix() < cutoff {
+				old = true
+				break
+			}
+			if code == "" || e.GetCode() == code {
+				kept = append(kept, e)
+			}
+		}
+		if old || !r.Msg.GetHasMore() || len(evs) == 0 {
+			break
+		}
+		if page == eventsSincePages-1 {
+			more = true // the window goes on past what was read
+			break
+		}
+		req.BeforeId = evs[len(evs)-1].GetId()
+	}
+	if len(kept) > limit {
+		kept, more = kept[:limit], true
+	}
+	return eventsView(kept, "", more), nil
+}
+
+const eventsSincePages = 5

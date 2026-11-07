@@ -283,7 +283,14 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 		}
 		callCtx, callCancel := context.WithTimeout(turnCtx, providerTimeout)
 		defer callCancel()
+		roundStart := true
 		response, callErr := adapter.Stream(callCtx, key, request, func(delta string) error {
+			// a round after tool calls starts a new paragraph: its text would otherwise run on from the last one
+			// ("…the last day.## In short")
+			if roundStart && delta != "" {
+				roundStart = false
+				delta = paragraphBreak(assistantText.String(), delta) + delta
+			}
 			assistantText.WriteString(delta)
 			return stream.Send(&adminv1.ChatResponse{Event: &adminv1.ChatResponse_TextDelta{TextDelta: delta}})
 		})
@@ -969,6 +976,21 @@ func assistantErrorCode(err error) string {
 	var pe *providerError
 	if errors.As(err, &pe) {
 		return pe.Code
+	}
+	return ""
+}
+
+// paragraphBreak is what goes between the text so far and the first text of a new round, so they read as separate
+// paragraphs (and a Markdown heading at the start of the new round stays a heading).
+func paragraphBreak(prev, next string) string {
+	if prev == "" {
+		return ""
+	}
+	const nl = "\n"
+	lead := len(next) - len(strings.TrimLeft(next, nl))
+	trail := len(prev) - len(strings.TrimRight(prev, nl))
+	if missing := 2 - lead - trail; missing > 0 {
+		return strings.Repeat(nl, missing)
 	}
 	return ""
 }

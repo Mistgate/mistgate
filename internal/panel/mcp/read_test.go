@@ -477,3 +477,38 @@ func TestCountryCheckViewIPv6Shape(t *testing.T) {
 		t.Fatalf("a view without IPv6 data mentions it: %s", plain)
 	}
 }
+
+// "Today" is a window the tool cuts, not the model: hours keeps the events of the last N hours, reads past a full page
+// to find them, and stops at the first older one.
+func TestEventsSearchHours(t *testing.T) {
+	e := newTestEnv(t)
+	now := e.now().Unix()
+	var evs []*adminv1.Event
+	id := int64(1000)
+	add := func(ageH float64, code string) {
+		evs = append(evs, &adminv1.Event{Id: id, TimeUnix: now - int64(ageH*3600), Severity: adminv1.EventSeverity_EVENT_SEVERITY_WARNING, Code: code, NodeId: nodeA, NodeName: "de1"})
+		id--
+	}
+	for i := 0; i < 230; i++ { // more than one page inside the window
+		add(float64(i)*0.1, "path_lossy")
+	}
+	add(23.5, "relay_down")
+	add(25, "torrent_attempt") // yesterday: outside
+	add(31, "check_failing")
+	e.w.timedEvents = evs
+	_, secret := e.token(ProfileReadonly)
+	s := e.session(secret)
+
+	v := decode[EventsV](t, mustOK(t, s, "events_search", map[string]any{"hours": 24, "code": "relay_down"}))
+	if len(v.Events) != 1 || v.Events[0].Code != "relay_down" || v.HasMore {
+		t.Fatalf("relay_down inside the window, past the first page: %+v", v)
+	}
+	v = decode[EventsV](t, mustOK(t, s, "events_search", map[string]any{"hours": 24, "limit": 100}))
+	if len(v.Events) != 100 || !v.HasMore {
+		t.Fatalf("a full window is limited and says there is more: %d events, more=%v", len(v.Events), v.HasMore)
+	}
+	for _, ev := range decode[EventsV](t, mustOK(t, s, "events_search", map[string]any{"hours": 24, "code": "torrent_attempt"})).Events {
+		t.Fatalf("an event older than the window came back: %+v", ev)
+	}
+	mustFail(t, s, "events_search", map[string]any{"hours": 500})
+}

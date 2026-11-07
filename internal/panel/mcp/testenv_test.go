@@ -390,7 +390,8 @@ type world struct {
 	scheduledUnix          int64
 	startErr               error // StartRollout refuses with it when set
 	manyEvents             int
-	block                  chan struct{} // when set, ListUsers waits on it (concurrency test)
+	timedEvents            []*adminv1.Event // when set, ListEvents pages these (newest first) by before_id and limit
+	block                  chan struct{}    // when set, ListUsers waits on it (concurrency test)
 	entered                chan struct{}
 }
 
@@ -497,6 +498,21 @@ func (w *world) Overview(context.Context, *connect.Request[adminv1.OverviewReque
 }
 
 func (w *world) ListEvents(_ context.Context, r *connect.Request[adminv1.ListEventsRequest]) (*connect.Response[adminv1.ListEventsResponse], error) {
+	if w.timedEvents != nil {
+		var page []*adminv1.Event
+		more := false
+		for _, e := range w.timedEvents {
+			if b := r.Msg.GetBeforeId(); b != 0 && e.GetId() >= b {
+				continue
+			}
+			if uint32(len(page)) == r.Msg.GetLimit() {
+				more = true
+				break
+			}
+			page = append(page, e)
+		}
+		return connect.NewResponse(&adminv1.ListEventsResponse{Events: page, HasMore: more}), nil
+	}
 	n := w.manyEvents
 	if n == 0 {
 		n = 3
