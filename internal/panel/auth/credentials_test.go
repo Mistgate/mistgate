@@ -513,3 +513,48 @@ func TestRandomPassword(t *testing.T) {
 		seen[p] = true
 	}
 }
+
+// The filters an agent sets (hours, failed_only, action and actor substrings) run in the query and combine with kind.
+func TestListAuditServerSideFilters(t *testing.T) {
+	s, st, _ := newTestService(t)
+	octx, _ := ownerCtx(t, s, st)
+	add := func(at time.Time, actor, action, result string) {
+		t.Helper()
+		if err := st.Audit(context.Background(), at, store.AuditEntry{Actor: actor, Action: action, Result: result}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add(s.now().Add(-72*time.Hour), "mcp:tok_a", "user_create", "ok")
+	add(s.now().Add(-2*time.Hour), "mcp:tok_a", "user_disable", "fail")
+	add(s.now().Add(-time.Hour), "mcp:tok_b", "node_restart", "fail")
+	add(s.now().Add(-time.Minute), "mcp:tok_b", "user_delete", "ok")
+	list := func(req *adminv1.ListAuditRequest) string {
+		t.Helper()
+		r, err := s.ListAudit(octx, connect.NewRequest(req))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for i := len(r.Msg.Entries) - 1; i >= 0; i-- {
+			out = append(out, r.Msg.Entries[i].Action)
+		}
+		return strings.Join(out, " ")
+	}
+	if got := list(&adminv1.ListAuditRequest{Hours: 24, ActionContains: "user_"}); got != "user_disable user_delete" {
+		t.Errorf("hours + action: %s", got)
+	}
+	if got := list(&adminv1.ListAuditRequest{FailedOnly: true, ActorContains: "tok_b"}); got != "node_restart" {
+		t.Errorf("failed + actor: %s", got)
+	}
+	if got := list(&adminv1.ListAuditRequest{FailedOnly: true, Kind: adminv1.AuditKind_AUDIT_KIND_CHANGES}); got != "user_disable" {
+		t.Errorf("failed + kind: %s", got)
+	}
+	// a page is full of matching rows: a page of one with a filter is the newest match, with a cursor to the next
+	r, err := s.ListAudit(octx, connect.NewRequest(&adminv1.ListAuditRequest{FailedOnly: true, PageSize: 1}))
+	if err != nil || len(r.Msg.Entries) != 1 || r.Msg.Entries[0].Action != "node_restart" || r.Msg.NextBeforeId == 0 {
+		t.Fatalf("page: %+v %v", r, err)
+	}
+	if _, err := s.ListAudit(octx, connect.NewRequest(&adminv1.ListAuditRequest{ActorContains: strings.Repeat("x", 101)})); codeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("long filter: %v", err)
+	}
+}

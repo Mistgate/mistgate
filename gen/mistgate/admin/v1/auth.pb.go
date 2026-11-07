@@ -2689,9 +2689,17 @@ type ListAuditRequest struct {
 	// Default 50, at most 200.
 	PageSize uint32 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Only one kind of action; unspecified = all. Combines with source.
-	Kind          AuditKind `protobuf:"varint,4,opt,name=kind,proto3,enum=mistgate.admin.v1.AuditKind" json:"kind,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Kind AuditKind `protobuf:"varint,4,opt,name=kind,proto3,enum=mistgate.admin.v1.AuditKind" json:"kind,omitempty"`
+	// Only entries of the last hours (1..8760); 0 = any age. Combines with every other filter.
+	Hours uint32 `protobuf:"varint,5,opt,name=hours,proto3" json:"hours,omitempty"`
+	// Only rows whose result is not "ok" (what AUDIT_KIND_FAILURES does), also together with another kind.
+	FailedOnly bool `protobuf:"varint,6,opt,name=failed_only,json=failedOnly,proto3" json:"failed_only,omitempty"`
+	// Literal substrings (at most 100 characters, ASCII case-insensitive): the action contains action_contains; the actor's
+	// id or name contains actor_contains. "" = any. Applied in the query, before the page is cut.
+	ActionContains string `protobuf:"bytes,7,opt,name=action_contains,json=actionContains,proto3" json:"action_contains,omitempty"`
+	ActorContains  string `protobuf:"bytes,8,opt,name=actor_contains,json=actorContains,proto3" json:"actor_contains,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListAuditRequest) Reset() {
@@ -2750,6 +2758,34 @@ func (x *ListAuditRequest) GetKind() AuditKind {
 		return x.Kind
 	}
 	return AuditKind_AUDIT_KIND_UNSPECIFIED
+}
+
+func (x *ListAuditRequest) GetHours() uint32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+func (x *ListAuditRequest) GetFailedOnly() bool {
+	if x != nil {
+		return x.FailedOnly
+	}
+	return false
+}
+
+func (x *ListAuditRequest) GetActionContains() string {
+	if x != nil {
+		return x.ActionContains
+	}
+	return ""
+}
+
+func (x *ListAuditRequest) GetActorContains() string {
+	if x != nil {
+		return x.ActorContains
+	}
+	return ""
 }
 
 type ListAuditResponse struct {
@@ -3414,12 +3450,17 @@ const file_mistgate_admin_v1_auth_proto_rawDesc = "" +
 	"\vparams_json\x18\a \x01(\tR\n" +
 	"paramsJson\x12\x16\n" +
 	"\x06result\x18\b \x01(\tR\x06result\x12\x0e\n" +
-	"\x02ip\x18\t \x01(\tR\x02ip\"\xba\x01\n" +
+	"\x02ip\x18\t \x01(\tR\x02ip\"\xc1\x02\n" +
 	"\x10ListAuditRequest\x126\n" +
 	"\x06source\x18\x01 \x01(\x0e2\x1e.mistgate.admin.v1.AuditSourceR\x06source\x12\x1f\n" +
 	"\tbefore_id\x18\x02 \x01(\x03B\x020\x02R\bbeforeId\x12\x1b\n" +
 	"\tpage_size\x18\x03 \x01(\rR\bpageSize\x120\n" +
-	"\x04kind\x18\x04 \x01(\x0e2\x1c.mistgate.admin.v1.AuditKindR\x04kind\"v\n" +
+	"\x04kind\x18\x04 \x01(\x0e2\x1c.mistgate.admin.v1.AuditKindR\x04kind\x12\x14\n" +
+	"\x05hours\x18\x05 \x01(\rR\x05hours\x12\x1f\n" +
+	"\vfailed_only\x18\x06 \x01(\bR\n" +
+	"failedOnly\x12'\n" +
+	"\x0faction_contains\x18\a \x01(\tR\x0eactionContains\x12%\n" +
+	"\x0eactor_contains\x18\b \x01(\tR\ractorContains\"v\n" +
 	"\x11ListAuditResponse\x127\n" +
 	"\aentries\x18\x01 \x03(\v2\x1d.mistgate.admin.v1.AuditEntryR\aentries\x12(\n" +
 	"\x0enext_before_id\x18\x02 \x01(\x03B\x020\x02R\fnextBeforeId\"\x1c\n" +

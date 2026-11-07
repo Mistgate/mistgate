@@ -368,3 +368,40 @@ func TestPruneEventsKeepsWarningsLonger(t *testing.T) {
 		t.Fatalf("left %d: %v", left, err)
 	}
 }
+
+func TestRollupDailyConnectResponseJitter(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	_, in := fixtureInbound(t, s, "split")
+	day := int64(20_000) * 86400
+	put := func(at int64, st int, lat, conn, resp uint32) {
+		t.Helper()
+		if err := s.InsertSample(ctx, CheckSample{InboundID: in, At: time.Unix(at, 0), Status: st, LatencyMS: lat, ConnectMS: conn, ResponseMS: resp}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(day+10, 1, 300, 200, 100)
+	put(day+20, 1, 500, 300, 200)
+	put(day+30, 2, 700, 500, 0)     // no response measured: left out of the response stats
+	put(day+40, 3, 0, 900, 999)     // failed rounds never count
+	put(day+86400+5, 1, 50, 40, 10) // the running day
+	if err := s.RollupDaily(ctx, time.Unix(day+86400+3600, 0)); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.DailyRows(ctx, in)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("rows: %+v %v", rows, err)
+	}
+	r := rows[0]
+	// connect 200,300,500: p50 is the 2nd, p95 the 3rd. response 100,200: p50 the 1st, p95 the 2nd; stddev of {100,200} = 50.
+	if r.ConnectP50MS != 300 || r.ConnectP95MS != 500 || r.ResponseP50MS != 100 || r.ResponseP95MS != 200 || r.JitterMS != 50 {
+		t.Fatalf("split stats: %+v", r)
+	}
+	since, err := s.DailyRowsSince(ctx, time.Unix(day, 0))
+	if err != nil || len(since) != 1 {
+		t.Fatalf("since: %+v %v", since, err)
+	}
+	if none, _ := s.DailyRowsSince(ctx, time.Unix(day+86400, 0)); len(none) != 0 {
+		t.Fatalf("since is a lower bound: %+v", none)
+	}
+}

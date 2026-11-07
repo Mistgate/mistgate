@@ -431,6 +431,14 @@ message ListAuditRequest {
   uint32 page_size = 3;
   // Only one kind of action; unspecified = all. Combines with source.
   AuditKind kind = 4;
+  // Only entries of the last hours (1..8760); 0 = any age. Combines with every other filter.
+  uint32 hours = 5;
+  // Only rows whose result is not "ok" (what AUDIT_KIND_FAILURES does), also together with another kind.
+  bool failed_only = 6;
+  // Literal substrings (at most 100 characters, ASCII case-insensitive): the action contains action_contains; the actor's
+  // id or name contains actor_contains. "" = any. Applied in the query, before the page is cut.
+  string action_contains = 7;
+  string actor_contains = 8;
 }
 
 message ListAuditResponse {

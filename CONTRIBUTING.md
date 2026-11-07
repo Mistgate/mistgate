@@ -42,7 +42,7 @@ make gen                              # buf lint + buf generate after editing pr
 
 End-to-end tests:
 
-- `scripts/e2e-wsl.sh [--keep] [--m3 | --awg | --warp | --mihomo | --m3-only | --old-node <path>]`: the panel, a node,
+- `scripts/e2e-wsl.sh [--keep | --hold] [--m3 | --awg | --warp | --mihomo | --m3-only | --old-node <path>]`: the panel, a node,
   a real Hysteria2 client and self-update, optionally AmneziaWG clients, a fake WARP peer and a real mihomo. Runs as
   root in WSL in its own network namespace (`wsl -d Ubuntu -u root -- bash scripts/e2e-wsl.sh` from the repo root);
   needs go, curl, jq, python3 (with yaml for the tunnel steps), openssl, nft, ip, and internet access. 3 to 10 minutes.

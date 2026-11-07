@@ -328,6 +328,41 @@ message CheckCell {
   // them every 10 minutes, so the newest are missing for up to that long. 0 = none counted.
   uint32 node_sent_hour = 11;
   uint32 node_lost_hour = 12;
+  // The last 24 hours of rounds (the window of `history`) of the rounds whose tunnel came up. Unset without any.
+  CheckStats stats_24h = 13;
+  // Finished UTC days from the daily rollup, oldest first; only when GetChecksRequest.daily_days > 0.
+  repeated CheckDay daily = 14;
+}
+
+// Percentiles of the two parts of a round and the jitter over a window; 0 = not measured. Nearest rank, measured on the
+// panel's server.
+message CheckStats {
+  // Rounds that came up (OK or DEGRADED) in the window.
+  uint32 rounds = 1;
+  uint32 connect_p50_ms = 2;
+  uint32 connect_p95_ms = 3;
+  uint32 response_p50_ms = 4;
+  uint32 response_p95_ms = 5;
+  // Population standard deviation of response_ms.
+  uint32 jitter_ms = 6;
+}
+
+// One finished UTC day of one inbound (health_check_daily). The connect and response figures are 0 for a day rolled up
+// before the panel kept them.
+message CheckDay {
+  int64 day_unix = 1 [jstype = JS_NUMBER];
+  uint32 ok = 2;
+  uint32 degraded = 3;
+  uint32 failed = 4;
+  // Of latency_ms, the cold time of the whole round.
+  uint32 latency_p50_ms = 5;
+  uint32 latency_p95_ms = 6;
+  uint32 connect_p50_ms = 7;
+  uint32 connect_p95_ms = 8;
+  uint32 response_p50_ms = 9;
+  uint32 response_p95_ms = 10;
+  // Standard deviation of response_ms.
+  uint32 jitter_ms = 11;
 }
 
 message CheckRow {
@@ -342,6 +377,8 @@ message CheckRow {
 message GetChecksRequest {
   // Empty = every node (the Health tab); set = only that node (the node Overview pills).
   string node_id = 1;
+  // Attach the last N finished days (at most 90) of the daily rollup to every cell; 0 = none.
+  uint32 daily_days = 2;
 }
 
 message GetChecksResponse {

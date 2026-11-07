@@ -72,6 +72,7 @@ const (
 	alertKeep  = 90 * 24 * time.Hour
 	infoEvents = 90 * 24 * time.Hour  // 00002: events of severity info
 	warnEvents = 400 * 24 * time.Hour // warning and error
+	auditKeep  = 400 * 24 * time.Hour // the audit log
 )
 
 // Config configures Service. The zero value is production: only Actor and Log are usually set.

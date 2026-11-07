@@ -9,7 +9,7 @@ import (
 
 // Retention (see also the 00002 schema comments): raw check rounds live 25 h after the finished days
 // were rolled up, daily aggregates 90 days, resolved alerts 90 days, events 90 days (info) or 400 days
-// (warning, error). The sweep runs at start, after a minute, and hourly.
+// (warning, error), audit rows 400 days (audit_ts serves the scan). The sweep runs at start, after a minute, and hourly.
 // traffic_bucket and node_traffic_hour (00002: 400 days) are not pruned here; their tables have no
 // time index, so a DELETE would scan them while holding the only writer. Add an index in a migration first.
 
@@ -56,6 +56,11 @@ func (s *Service) sweep(ctx context.Context) {
 		s.log.Warn("health: prune events", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned events", "count", n)
+	}
+	if n, err := s.st.PruneAudit(ctx, now.Add(-auditKeep), eventBatch); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune audit", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned audit rows", "count", n)
 	}
 	if n, err := s.st.PruneCountryChecks(ctx, now.Add(-countryKeep)); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune country checks", "err", err)

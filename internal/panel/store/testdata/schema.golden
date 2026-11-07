@@ -603,7 +603,7 @@
     "type": "table",
     "name": "health_check_daily",
     "tbl_name": "health_check_daily",
-    "sql": "CREATE TABLE health_check_daily ( inbound_id TEXT NOT NULL REFERENCES inbound (id) ON DELETE CASCADE, day INTEGER NOT NULL CHECK (day % 86400 = 0), ok INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, degraded INTEGER NOT NULL DEFAULT 0, p50_ms INTEGER NOT NULL DEFAULT 0, p95_ms INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (inbound_id, day) ) STRICT, WITHOUT ROWID"
+    "sql": "CREATE TABLE health_check_daily ( inbound_id TEXT NOT NULL REFERENCES inbound (id) ON DELETE CASCADE, day INTEGER NOT NULL CHECK (day % 86400 = 0), ok INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, degraded INTEGER NOT NULL DEFAULT 0, p50_ms INTEGER NOT NULL DEFAULT 0, p95_ms INTEGER NOT NULL DEFAULT 0, connect_p50_ms INTEGER NOT NULL DEFAULT 0, connect_p95_ms INTEGER NOT NULL DEFAULT 0, response_p50_ms INTEGER NOT NULL DEFAULT 0, response_p95_ms INTEGER NOT NULL DEFAULT 0, jitter_ms INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (inbound_id, day) ) STRICT, WITHOUT ROWID"
   },
   {
     "type": "table",

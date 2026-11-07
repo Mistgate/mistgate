@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -34,26 +35,15 @@ func (c *call) nodeRef(ref string) (id, name string, err error) {
 	if ref == "" || len(ref) > 200 {
 		return "", "", errors.New("node: give a node id or its exact name")
 	}
-	r, err := c.cl.Node.ListNodes(c.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))
+	all, err := c.listNodes()
 	if err != nil {
-		return "", "", apiError(err)
+		return "", "", err
 	}
-	var byName []*adminv1.Node
-	for _, n := range r.Msg.GetNodes() {
-		if n.GetId() == ref {
-			return n.GetId(), n.GetName(), nil
-		}
-		if n.GetName() == ref {
-			byName = append(byName, n)
-		}
+	n, err := resolveNode(all, ref)
+	if err != nil {
+		return "", "", err
 	}
-	switch len(byName) {
-	case 0:
-		return "", "", errors.New("node not found")
-	case 1:
-		return byName[0].GetId(), byName[0].GetName(), nil
-	}
-	return "", "", errors.New("several nodes have this name: use the node id")
+	return n.GetId(), n.GetName(), nil
 }
 
 func (c *call) getUser(id string) (*adminv1.GetUserResponse, error) {
@@ -71,15 +61,6 @@ type noArgs struct{}
 
 type nodeArg struct {
 	Node string `json:"node" jsonschema:"node id or its exact name"`
-}
-
-type nodePortsArg struct {
-	Node string `json:"node" jsonschema:"node id or exact name"`
-}
-
-type nodePortsCheckArg struct {
-	Node  string `json:"node" jsonschema:"node id or exact name"`
-	Check bool   `json:"check,omitempty" jsonschema:"true: run a UDP delivery check now; false: show the stored results"`
 }
 
 type doctorArg struct {
@@ -112,6 +93,8 @@ type alertsArg struct {
 	Node           string `json:"node,omitempty" jsonschema:"node id or exact name"`
 	IncludeHistory bool   `json:"include_history,omitempty"`
 	WindowS        int    `json:"window_s,omitempty" jsonschema:"how far back the history goes, in seconds (default: the panel's)"`
+	MinSeverity    string `json:"min_severity,omitempty" jsonschema:"info, warning or critical: only alerts of at least this severity"`
+	Kind           string `json:"kind,omitempty" jsonschema:"only alerts of this kind, as shown in the kind field of the results (node_down, port_lossy, ...)"`
 }
 
 type eventsArg struct {
@@ -122,10 +105,16 @@ type eventsArg struct {
 	BeforeID    int64  `json:"before_id,omitempty" jsonschema:"only events older than this id (next_before_id of the previous page)"`
 	Limit       int    `json:"limit,omitempty" jsonschema:"default 50, at most 100"`
 	Hours       int    `json:"hours,omitempty" jsonschema:"only events of the last hours, 1 to 168 (24 = today's question); empty = any age"`
+	Family      string `json:"family,omitempty" jsonschema:"profiles (events about a profile on a node: engine, profile, hop and credential events) or agent (all the others); empty = both"`
 }
 
 type checksArg struct {
 	Node string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every node"`
+}
+
+type checksResultsArg struct {
+	Node      string `json:"node,omitempty" jsonschema:"node id or exact name; empty = every node"`
+	DailyDays int    `json:"daily_days,omitempty" jsonschema:"also attach the last N finished days (1 to 90) of the daily rollup to every cell; empty = none"`
 }
 
 type userConnectionArg struct {
@@ -182,11 +171,13 @@ func journalMinLevel(level string) (adminv1.EventSeverity, error) {
 }
 
 type auditArg struct {
-	Source   string `json:"source,omitempty" jsonschema:"panel, bot, mcp or api"`
-	Actor    string `json:"actor,omitempty" jsonschema:"keep entries whose actor id or name contains this (applied to the fetched page)"`
-	Action   string `json:"action,omitempty" jsonschema:"keep entries whose action contains this (applied to the fetched page)"`
-	BeforeID int64  `json:"before_id,omitempty" jsonschema:"only entries older than this id (next_before_id of the previous page)"`
-	Limit    int    `json:"limit,omitempty" jsonschema:"default 50, at most 100"`
+	Source     string `json:"source,omitempty" jsonschema:"panel, bot, mcp or api"`
+	Actor      string `json:"actor,omitempty" jsonschema:"keep entries whose actor id or name contains this (checked by the panel before the page is cut)"`
+	Action     string `json:"action,omitempty" jsonschema:"keep entries whose action contains this (checked by the panel before the page is cut)"`
+	Hours      int    `json:"hours,omitempty" jsonschema:"only entries of the last hours, 1 to 8760; empty = any age"`
+	FailedOnly bool   `json:"failed_only,omitempty" jsonschema:"true: only entries whose result is not ok"`
+	BeforeID   int64  `json:"before_id,omitempty" jsonschema:"only entries older than this id (next_before_id of the previous page)"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"default 50, at most 100"`
 }
 
 func procs(p ...string) []string { return p }
@@ -218,8 +209,11 @@ func readTools() []toolDef {
 			}),
 
 		readTool("warp_status", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.WarpServiceGetWarpProcedure),
-			"One node's WARP account and last agent report: whether it is enabled or paused, agent state, colo, handshake age, Cloudflare and other-site probes, registration time, refresh availability, and profiles using WARP egress. No addresses, keys or tokens.",
-			func(c *call, in nodeArg) (any, error) {
+			"One node's WARP account and last agent report: whether it is enabled or paused, agent state, colo, handshake age, Cloudflare and other-site probes, registration time, refresh availability, and profiles using WARP egress. With no node: the same compact row for every node that is not retired (unavailable names the nodes that did not answer). No addresses, keys or tokens.",
+			func(c *call, in nodeOptArg) (any, error) {
+				if in.Node == "" {
+					return c.fleetWarp()
+				}
 				id, name, err := c.nodeRef(in.Node)
 				if err != nil {
 					return nil, err
@@ -232,8 +226,11 @@ func readTools() []toolDef {
 			}),
 
 		readTool("node_metrics", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"The node's current gauges (CPU, RAM, disk, network), traffic today, online users per protocol and today's top users. The panel keeps no per-node history, so there are no time series.",
-			func(c *call, in nodeArg) (any, error) {
+			"The node's current gauges (CPU, RAM, disk, network), traffic today, online users per protocol and today's top users. The panel keeps no per-node history, so there are no time series. With no node: one compact row of gauges for every node that is not retired (no top users).",
+			func(c *call, in nodeOptArg) (any, error) {
+				if in.Node == "" {
+					return c.fleetMetrics()
+				}
 				id, _, err := c.nodeRef(in.Node)
 				if err != nil {
 					return nil, err
@@ -250,21 +247,21 @@ func readTools() []toolDef {
 			"The doctor's report on a node, or on every node: the last stored result of its checks (never contacts a node), each with detail params and a fix id when one exists. "+
 				"For IPv6, suggest=client_ipv6_off means the owner can turn off IPv6 for clients in the panel; it is a panel setting, not a node fix.",
 			func(c *call, in doctorArg) (any, error) { return c.doctor(in.Node, false) }),
-		readTool("node_doctor", ProfileOperator,
+		readToolWithin(45*time.Second, "node_doctor", ProfileOperator,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceGetDoctorProcedure, adminv1connect.HealthServiceRunDoctorProcedure),
 			"The doctor's report on a node, or on every node: the last stored result of its checks, each with detail params and a fix id when one exists. "+
 				"For IPv6, suggest=client_ipv6_off means the owner can turn off IPv6 for clients in the panel; it is a panel setting, not a node fix. "+
 				"With refresh=true the node's agent runs its checks now "+
-				"(it only reads the host; changing anything is node_fix).",
+				"(it only reads the host; changing anything is node_fix); with refresh=true and no node every connected node does, at most 24 nodes at once, and kept_last_report names the nodes that kept their last report because they are offline or their agent is too old.",
 			func(c *call, in doctorRefreshArg) (any, error) { return c.doctor(in.Node, in.Refresh) }),
 
 		readTool("node_ports", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure),
-			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port with direct_in_subscriptions and cdn. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. This never contacts a node.",
-			func(c *call, in nodePortsArg) (any, error) { return c.nodePorts(in.Node, false) }),
+			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port with direct_in_subscriptions and cdn. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. This never contacts a node. With no node: one compact row per node that is not retired (ports with verdict and counts, tcp verdicts), without the inbound detail.",
+			func(c *call, in nodeOptArg) (any, error) { return c.nodePorts(in.Node, false) }),
 		readTool("node_ports", ProfileOperator,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceCheckPortsProcedure),
-			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port with direct_in_subscriptions and cdn. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. With check=true, run a bounded check now; it takes about fifteen seconds.",
-			func(c *call, in nodePortsCheckArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
+			"The stored port checks for a node. ports: UDP delivery per port, its latest successful panel protocol probe time (protocol_ok_unix; 0 if the latest result failed or none is stored), sender counts, verdict, and the inbound/profile on that port with direct_in_subscriptions and cdn. udp_filtered_unix is the latest paired run that found source-side filtering (0 if none or a later check passed cleanly). tcp: whether each TCP port reaches Mistgate. With check=true, run a bounded check now; it takes about fifteen seconds. With no node: one compact row per node that is not retired, stored results only (check needs a node).",
+			func(c *call, in nodePortsOptArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
 
 		readTool("users_search", ProfileReadonly, procs(adminv1connect.UserServiceListUsersProcedure),
 			"Find users by part of the name, by filter (online, expiring, over_quota) or group. Paged: pass next_page_token to continue.",
@@ -342,7 +339,7 @@ func readTools() []toolDef {
 			func(c *call, in subPreviewArg) (any, error) { return c.subscriptionPreview(in) }),
 
 		readTool("alerts_list", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceListAlertsProcedure),
-			"Active alerts, and with include_history the recently resolved ones. Titles and reasons are keys; parameters are as the panel reports them.",
+			"Active alerts, and with include_history the recently resolved ones. min_severity (info, warning, critical) and kind narrow the list. Titles and reasons are keys; parameters are as the panel reports them.",
 			func(c *call, in alertsArg) (any, error) {
 				req := &adminv1.ListAlertsRequest{}
 				if in.Node != "" {
@@ -355,21 +352,29 @@ func readTools() []toolDef {
 				if in.IncludeHistory && in.WindowS > 0 {
 					req.HistoryWindowS = uint32(min(in.WindowS, 30*24*3600))
 				}
+				f, err := newAlertFilter(in.MinSeverity, in.Kind)
+				if err != nil {
+					return nil, err
+				}
 				r, err := c.cl.Health.ListAlerts(c.ctx, connect.NewRequest(req))
 				if err != nil {
 					return nil, apiError(err)
 				}
+				f.apply(r.Msg)
 				return alertsView(r.Msg, in.IncludeHistory), nil
 			}),
 
 		readTool("events_search", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.FleetServiceListEventsProcedure),
-			"The event feed, newest first, filtered by node, user, minimum severity, exact code and age (hours: only the last N hours; use it for \"today\" or \"the last day\" instead of judging times yourself). Each event has its time (unix). Paged with before_id.",
+			"The event feed, newest first, filtered by node, user, minimum severity, family (profiles or agent), exact code and age (hours: only the last N hours; use it for \"today\" or \"the last day\" instead of judging times yourself). Each event has its time (unix). Paged with before_id.",
 			func(c *call, in eventsArg) (any, error) {
 				sev, err := eventSeverity(in.MinSeverity)
 				if err != nil {
 					return nil, err
 				}
-				req := &adminv1.ListEventsRequest{MinSeverity: sev, BeforeId: max(in.BeforeID, 0), Limit: uint32(listLimit(in.Limit))}
+				if in.Family != "" && in.Family != "profiles" && in.Family != "agent" {
+					return nil, errors.New("family: profiles or agent")
+				}
+				req := &adminv1.ListEventsRequest{MinSeverity: sev, BeforeId: max(in.BeforeID, 0), Limit: uint32(listLimit(in.Limit)), Family: in.Family}
 				if in.User != "" {
 					if err := validID("user", in.User); err != nil {
 						return nil, err
@@ -400,9 +405,12 @@ func readTools() []toolDef {
 			}),
 
 		readTool("checks_results", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceGetChecksProcedure),
-			"The health checks: a matrix of nodes by profile with the last result, the failure streak and the last 24 hours of passes and failures. Times are measured on the panel's server: response_ms is a request through an open tunnel (what a person feels), connect_ms is the time to open the tunnel, latency_ms is both plus a fresh TLS connection; *_hour_ms are medians of the last hour. For Hysteria2, udp_sent and udp_lost are the packets the panel's own QUIC client sent and declared lost in the last round (handshake included), udp_sent_hour and udp_lost_hour the same over the last hour: the way from the panel to the node; node_sent_hour and node_lost_hour are the way back, what the node sent to the check and lost (its own counters, flushed every 10 minutes). Both are the panel's path, not a person's. udp_loss names the nodes whose UDP rounds (Hysteria2, AWG) keep paying for lost packets - a cold time 600 ms or more above the same node's VLESS rounds - while the panel's TCP probes are fine, with lost_permille (the panel's Hysteria2 client) and node_lost_permille (the nodes, the way back): the panel's server loses UDP on its way to those nodes, not a problem of the nodes or of people's connections. When the country check is on (the Globalping integration, the TSPU probe, the block lists, or any of them), each row has country_check: how that node looks from inside a country - verdict ok, partial (some vantages are dark while others reach the node; dark marks those observations), tcp_blocked (ICMP passes, TCP is cut: the SYN is dropped), blocked, listed or unknown - with confidence (eyeball: probes on home or mobile networks; dc_only: data centres only; listed: no live check, only a block list). With Globalping on, probes lists the networks that were asked and their per-probe eyeball tag; no_probe lists named operators without a matching home or mobile probe. With the block lists on, listed_by names the public lists that hold the node's address, and cdn_provider/cdn_region the hosting or CDN range it sits in; listed means the address is in the registry, not that the traffic is dropped, and never raises an alert. With the Globalping IPv6 checks on, country_check.ipv6 holds the same node measured over its IPv6 address, in the same shape (Globalping is its only source; every field outside ipv6 is IPv4 and does not change): a node that is not measured over IPv6 is unknown with a reason - no_ipv6 (no global IPv6 address), ipv6_broken (it has an address, but IPv6 does not work at the hoster), agent_old (the node agent predates the IPv6 facts), not_checked (no report or round yet) or no_probes (Globalping has no IPv6 probes in the country). The TSPU probe is one of your own nodes inside the country (the probe node) that sends TCP SYNs of a limited TTL to the other nodes: tspu holds its view of this node (probe_node, at_unix, dpi_hop - the TTL of the last router before the TSPU box - and ports, each blocked, open, refused or timeout), always a data-centre view (dc_only); sources names live sources with verdicts, or lists when a list hit alone says listed (globalping, tspu, lists, cheburcheck, cheburcheck_own, bsbord, bsbord_tunnel, bsbord_geo); confidence conflict means an end-to-end block faces a path-only reach, and the end-to-end block stays the verdict (globalping_verdict and tspu_verdict give each source result); Globalping ok with TSPU tcp_blocked is partial/dc_only. Partial can come from dark observations at any source. The top-level tspu_probe is the probe node's newest run: status ok, control_failed (the method does not apply on that network), no_dpi_hop (the TSPU could not be placed; reason says why: refs_pass - every blocked reference was tried and some answered, so blocked addresses get through on the probe node's path and it needs a node whose provider filters - or no_hops - no router on the path answers; absent when not known), busy or failed, with at_unix, probe_node, dpi_hop, blocked_ref and nodes_checked. There is no UDP test, so a Hysteria2 or AWG port is judged through the node's address and its TCP ports. source_verdicts lists each fresh source verdict, time and reason; vantages lists source-tagged networks, units or probes as reach, dark, whitelist or uncertain. The combined verdict uses all fresh sources: any reach plus dark is partial, except a non-path full block stays full when all reaches come from path carriers.",
-			func(c *call, in checksArg) (any, error) {
-				req := &adminv1.GetChecksRequest{}
+			"The health checks: a matrix of nodes by profile with the last result, the failure streak and the last 24 hours of passes and failures. Times are measured on the panel's server: response_ms is a request through an open tunnel (what a person feels), connect_ms is the time to open the tunnel, latency_ms is both plus a fresh TLS connection; *_hour_ms are medians of the last hour. For Hysteria2, udp_sent and udp_lost are the packets the panel's own QUIC client sent and declared lost in the last round (handshake included), udp_sent_hour and udp_lost_hour the same over the last hour: the way from the panel to the node; node_sent_hour and node_lost_hour are the way back, what the node sent to the check and lost (its own counters, flushed every 10 minutes). Both are the panel's path, not a person's. udp_loss names the nodes whose UDP rounds (Hysteria2, AWG) keep paying for lost packets - a cold time 600 ms or more above the same node's VLESS rounds - while the panel's TCP probes are fine, with lost_permille (the panel's Hysteria2 client) and node_lost_permille (the nodes, the way back): the panel's server loses UDP on its way to those nodes, not a problem of the nodes or of people's connections. When the country check is on (the Globalping integration, the TSPU probe, the block lists, or any of them), each row has country_check: how that node looks from inside a country - verdict ok, partial (some vantages are dark while others reach the node; dark marks those observations), tcp_blocked (ICMP passes, TCP is cut: the SYN is dropped), blocked, listed or unknown - with confidence (eyeball: probes on home or mobile networks; dc_only: data centres only; listed: no live check, only a block list). With Globalping on, probes lists the networks that were asked and their per-probe eyeball tag; no_probe lists named operators without a matching home or mobile probe. With the block lists on, listed_by names the public lists that hold the node's address, and cdn_provider/cdn_region the hosting or CDN range it sits in; listed means the address is in the registry, not that the traffic is dropped, and never raises an alert. With the Globalping IPv6 checks on, country_check.ipv6 holds the same node measured over its IPv6 address, in the same shape (Globalping is its only source; every field outside ipv6 is IPv4 and does not change): a node that is not measured over IPv6 is unknown with a reason - no_ipv6 (no global IPv6 address), ipv6_broken (it has an address, but IPv6 does not work at the hoster), agent_old (the node agent predates the IPv6 facts), not_checked (no report or round yet) or no_probes (Globalping has no IPv6 probes in the country). The TSPU probe is one of your own nodes inside the country (the probe node) that sends TCP SYNs of a limited TTL to the other nodes: tspu holds its view of this node (probe_node, at_unix, dpi_hop - the TTL of the last router before the TSPU box - and ports, each blocked, open, refused or timeout), always a data-centre view (dc_only); sources names live sources with verdicts, or lists when a list hit alone says listed (globalping, tspu, lists, cheburcheck, cheburcheck_own, bsbord, bsbord_tunnel, bsbord_geo); confidence conflict means an end-to-end block faces a path-only reach, and the end-to-end block stays the verdict (globalping_verdict and tspu_verdict give each source result); Globalping ok with TSPU tcp_blocked is partial/dc_only. Partial can come from dark observations at any source. The top-level tspu_probe is the probe node's newest run: status ok, control_failed (the method does not apply on that network), no_dpi_hop (the TSPU could not be placed; reason says why: refs_pass - every blocked reference was tried and some answered, so blocked addresses get through on the probe node's path and it needs a node whose provider filters - or no_hops - no router on the path answers; absent when not known), busy or failed, with at_unix, probe_node, dpi_hop, blocked_ref and nodes_checked. There is no UDP test, so a Hysteria2 or AWG port is judged through the node's address and its TCP ports. source_verdicts lists each fresh source verdict, time and reason; vantages lists source-tagged networks, units or probes as reach, dark, whitelist or uncertain. The combined verdict uses all fresh sources: any reach plus dark is partial, except a non-path full block stays full when all reaches come from path carriers. Each cell has its inbound_id and stats_24h: p50 and p95 of connect_ms and response_ms and the jitter (standard deviation of response_ms) over the last 24 hours' rounds that came up; with daily_days (up to 90) each cell also holds daily: one entry per finished UTC day with ok, degraded, failed, the p50 and p95 of latency_ms, connect_ms and response_ms, and jitter_ms (0 = not measured; days rolled up by an older panel have no connect or response figures).",
+			func(c *call, in checksResultsArg) (any, error) {
+				if in.DailyDays < 0 || in.DailyDays > 90 {
+					return nil, errors.New("daily_days must be 1 to 90")
+				}
+				req := &adminv1.GetChecksRequest{DailyDays: uint32(in.DailyDays)}
 				if in.Node != "" {
 					id, _, err := c.nodeRef(in.Node)
 					if err != nil {
@@ -508,7 +516,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("audit_search", ProfileAdmin, procs(adminv1connect.AuthServiceListAuditProcedure),
-			"The audit log, newest first: who did what, from where (panel, bot, mcp, api). Needs the admin profile because it names admins, tokens and addresses. Paged with before_id.",
+			"The audit log, newest first: who did what, from where (panel, bot, mcp, api). Filters (source, actor, action substring, hours, failed_only) are applied by the panel before the page is cut, so a page is full of matching entries. Needs the admin profile because it names admins, tokens and addresses. Paged with before_id.",
 			func(c *call, in auditArg) (any, error) {
 				src, err := auditSource(in.Source)
 				if err != nil {
@@ -517,20 +525,18 @@ func readTools() []toolDef {
 				if len(in.Actor) > 100 || len(in.Action) > 100 {
 					return nil, errors.New("actor or action filter too long")
 				}
+				if in.Hours < 0 || in.Hours > 8760 {
+					return nil, errors.New("hours must be 1 to 8760")
+				}
 				r, err := c.cl.Auth.ListAudit(c.ctx, connect.NewRequest(&adminv1.ListAuditRequest{
 					Source: src, BeforeId: max(in.BeforeID, 0), PageSize: uint32(listLimit(in.Limit)),
+					Hours: uint32(in.Hours), FailedOnly: in.FailedOnly, ActionContains: in.Action, ActorContains: in.Actor,
 				}))
 				if err != nil {
 					return nil, apiError(err)
 				}
 				v := &AuditV{Entries: []auditV{}}
 				for _, e := range r.Msg.GetEntries() {
-					if in.Actor != "" && !strings.Contains(e.GetActorId(), in.Actor) && !strings.Contains(e.GetActorName(), in.Actor) {
-						continue
-					}
-					if in.Action != "" && !strings.Contains(e.GetAction(), in.Action) {
-						continue
-					}
 					v.Entries = append(v.Entries, auditV{
 						ID: e.GetId(), Time: e.GetTimeUnix(), Source: enumName("AUDIT_SOURCE_", e.GetSource().String()),
 						ActorID: clean(e.GetActorId(), 80), ActorName: nm(e.GetActorName()), Action: clean(e.GetAction(), 80),
@@ -659,7 +665,7 @@ func (c *call) doctor(node string, refresh bool) (any, error) {
 	}
 	if refresh {
 		if id == "" {
-			return nil, errors.New("refresh needs a node")
+			return c.doctorFleetRefresh()
 		}
 		r, err := c.cl.Health.RunDoctor(c.ctx, connect.NewRequest(&adminv1.RunDoctorRequest{NodeId: id}))
 		if err != nil {
@@ -675,6 +681,12 @@ func (c *call) doctor(node string, refresh bool) (any, error) {
 }
 
 func (c *call) nodePorts(node string, check bool) (any, error) {
+	if node == "" {
+		if check {
+			return nil, errors.New("check needs a node")
+		}
+		return c.fleetPorts()
+	}
 	id, _, err := c.nodeRef(node)
 	if err != nil {
 		return nil, err
@@ -778,3 +790,40 @@ func eventsSince(c *call, req *adminv1.ListEventsRequest, cutoff int64, code str
 }
 
 const eventsSincePages = 5
+
+// alertFilter narrows a ListAlerts answer by severity and kind.
+type alertFilter struct {
+	min  adminv1.AlertSeverity
+	kind adminv1.AlertKind
+}
+
+func newAlertFilter(minSeverity, kind string) (alertFilter, error) {
+	var f alertFilter
+	switch minSeverity {
+	case "":
+	case "info":
+		f.min = adminv1.AlertSeverity_ALERT_SEVERITY_INFO
+	case "warning":
+		f.min = adminv1.AlertSeverity_ALERT_SEVERITY_WARNING
+	case "critical":
+		f.min = adminv1.AlertSeverity_ALERT_SEVERITY_CRITICAL
+	default:
+		return f, errors.New("min_severity: info, warning or critical")
+	}
+	if kind != "" {
+		v, ok := adminv1.AlertKind_value["ALERT_KIND_"+strings.ToUpper(kind)]
+		if !ok || v == 0 || len(kind) > 40 {
+			return f, errors.New("kind: use a kind as shown in the results of alerts_list (node_down, port_lossy, ...)")
+		}
+		f.kind = adminv1.AlertKind(v)
+	}
+	return f, nil
+}
+
+func (f alertFilter) apply(r *adminv1.ListAlertsResponse) {
+	keep := func(a *adminv1.Alert) bool {
+		return a.GetSeverity() >= f.min && (f.kind == 0 || a.GetKind() == f.kind)
+	}
+	r.Active = slices.DeleteFunc(r.Active, func(a *adminv1.Alert) bool { return !keep(a) })
+	r.History = slices.DeleteFunc(r.History, func(a *adminv1.Alert) bool { return !keep(a) })
+}

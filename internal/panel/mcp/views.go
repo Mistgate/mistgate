@@ -1040,6 +1040,53 @@ type checkV struct {
 	FailStreak   uint32 `json:"fail_streak,omitempty"`
 	OK24h        uint32 `json:"ok_24h"`
 	Failed24h    uint32 `json:"failed_24h"`
+	// InboundID is the inbound this cell is (checks_run_now's inbound argument). Stats24h: p50 and p95 of connect_ms and
+	// response_ms and the jitter (standard deviation of response_ms) over the rounds of the last 24 hours that came up.
+	// Daily: the finished UTC days of the daily rollup, oldest first, only with daily_days.
+	InboundID string       `json:"inbound_id,omitempty"`
+	Stats24h  *checkStatsV `json:"stats_24h,omitempty"`
+	Daily     []checkDayV  `json:"daily,omitempty"`
+}
+
+type checkStatsV struct {
+	Rounds        uint32 `json:"rounds"`
+	ConnectP50Ms  uint32 `json:"connect_p50_ms,omitempty"`
+	ConnectP95Ms  uint32 `json:"connect_p95_ms,omitempty"`
+	ResponseP50Ms uint32 `json:"response_p50_ms,omitempty"`
+	ResponseP95Ms uint32 `json:"response_p95_ms,omitempty"`
+	JitterMs      uint32 `json:"jitter_ms,omitempty"`
+}
+
+type checkDayV struct {
+	DayUnix       int64  `json:"day_unix"`
+	OK            uint32 `json:"ok"`
+	Degraded      uint32 `json:"degraded,omitempty"`
+	Failed        uint32 `json:"failed"`
+	LatencyP50Ms  uint32 `json:"latency_p50_ms,omitempty"`
+	LatencyP95Ms  uint32 `json:"latency_p95_ms,omitempty"`
+	ConnectP50Ms  uint32 `json:"connect_p50_ms,omitempty"`
+	ConnectP95Ms  uint32 `json:"connect_p95_ms,omitempty"`
+	ResponseP50Ms uint32 `json:"response_p50_ms,omitempty"`
+	ResponseP95Ms uint32 `json:"response_p95_ms,omitempty"`
+	JitterMs      uint32 `json:"jitter_ms,omitempty"`
+}
+
+func checkStatsView(s *adminv1.CheckStats) *checkStatsV {
+	if s == nil {
+		return nil
+	}
+	return &checkStatsV{Rounds: s.GetRounds(), ConnectP50Ms: s.GetConnectP50Ms(), ConnectP95Ms: s.GetConnectP95Ms(),
+		ResponseP50Ms: s.GetResponseP50Ms(), ResponseP95Ms: s.GetResponseP95Ms(), JitterMs: s.GetJitterMs()}
+}
+
+func checkDaysView(days []*adminv1.CheckDay) []checkDayV {
+	var out []checkDayV
+	for _, d := range days {
+		out = append(out, checkDayV{DayUnix: d.GetDayUnix(), OK: d.GetOk(), Degraded: d.GetDegraded(), Failed: d.GetFailed(),
+			LatencyP50Ms: d.GetLatencyP50Ms(), LatencyP95Ms: d.GetLatencyP95Ms(), ConnectP50Ms: d.GetConnectP50Ms(), ConnectP95Ms: d.GetConnectP95Ms(),
+			ResponseP50Ms: d.GetResponseP50Ms(), ResponseP95Ms: d.GetResponseP95Ms(), JitterMs: d.GetJitterMs()})
+	}
+	return out
 }
 
 type checkRowV struct {
@@ -1667,7 +1714,8 @@ func checksView(r *adminv1.GetChecksResponse) *ChecksV {
 			Country: countryCheckView(country[row.GetNodeId()])}
 		for _, c := range row.GetCells() {
 			cv := checkV{Deployed: c.GetDeployed(), FailStreak: c.GetFailStreak(), ResponseHourMs: c.GetResponseHourMs(), ConnectHourMs: c.GetConnectHourMs(),
-				UDPSentHour: c.GetUdpSentHour(), UDPLostHour: c.GetUdpLostHour(), NodeSentHour: c.GetNodeSentHour(), NodeLostHour: c.GetNodeLostHour()}
+				UDPSentHour: c.GetUdpSentHour(), UDPLostHour: c.GetUdpLostHour(), NodeSentHour: c.GetNodeSentHour(), NodeLostHour: c.GetNodeLostHour(),
+				InboundID: clean(c.GetInboundId(), 80), Stats24h: checkStatsView(c.GetStats_24H()), Daily: checkDaysView(c.GetDaily())}
 			if l := c.GetLast(); l != nil {
 				cv.Status = enumName("CHECK_STATUS_", l.GetStatus().String())
 				cv.AtUnix, cv.LatencyMs, cv.ExitCtry = l.GetAtUnix(), l.GetLatencyMs(), clean(l.GetExitCountry(), 8)

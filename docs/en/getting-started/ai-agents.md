@@ -187,6 +187,17 @@ An Admin token can read protocol schemas and profile state, then create, update 
 
 The agent never gets subscription links, device keys or configurations, page passwords or any server password; node addresses are hidden from it too, except the SSH endpoint and login an Admin token works with. A password change through MCP (`node_server_password_rotate_plan`, then `node_server_password_rotate_apply`) makes the panel generate the new password; you reveal it in the node's **Settings → SSH access**.
 
+### Try it on a test panel
+
+To let a coding agent drive a throwaway panel instead of your own, start the end-to-end panel and keep it running, then make a token on it (WSL or a Linux VM, see [Contributing](https://github.com/mistgate/mistgate/blob/main/CONTRIBUTING.md)):
+
+```sh
+bash scripts/e2e-wsl.sh --hold                      # a test panel with a node; stays up until Ctrl-C and prints the env file
+bash scripts/e2e/mcp-token.sh /tmp/mg-e2e.XXXXXX/owner.env --profile operator
+```
+
+The second command prints the `claude mcp add --transport http mistgate <admin URL>mcp --header "Authorization: Bearer <token>"` line for that panel; run it where the agent runs (the panel listens inside the run's network namespace, and the script says how to reach it). The token lives one day (`--ttl-days`) and has the profile you chose (`readonly`, `operator`, `admin`). Use it on test panels only: the helper signs in as the test panel's owner.
+
 ### 4. The prompt
 
 The MCP tools can create, update and deploy profiles but cannot create groups. The prompt checks for the requested group first and asks you to create it in the admin if it is missing.

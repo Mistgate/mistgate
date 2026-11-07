@@ -6,8 +6,10 @@
 #
 # Needs: go (GOTOOLCHAIN=auto fetches the pinned one), curl, jq, python3, openssl, nft, ip, internet access.
 # --keep (or KEEP=1 where the environment reaches the script; wsl.exe does not pass it) keeps the work directory
-# with the logs and configs. Secrets (admin password, session cookie, enrollment token, subscription token,
-# Hysteria2 credentials) are never printed, and every log is grepped for them at the end.
+# with the logs and configs. --hold (VPS edition; implies --keep) leaves the panel and the node running after the last
+# step and writes owner.env into the work directory (mode 0600): with it scripts/e2e/mcp-token.sh makes an MCP token, so
+# a coding agent can drive this panel over MCP; Ctrl-C ends the run and removes owner.env.
+# Secrets (admin password, session cookie, enrollment token, subscription token, Hysteria2 credentials) are never printed, and every log is grepped for them at the end.
 #
 # Panel: `mistgate setup` + `serve` with a self-signed certificate on the public listener; the node agent dials
 # that listener with the secret SNI name (the production path; no --agent-listen).
@@ -86,6 +88,7 @@ ARGS=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
     --keep) KEEP=1 ;;
+    --hold) KEEP=1 HOLD=1 ;;
     --m3) M3_AWG=1 M3_WARP=1 M3_MIHOMO=1 M3_VLESS=1 M3_JSON=1 M3_DECOY=1 ;;
     --awg) M3_AWG=1 ;;
     --warp) M3_WARP=1 ;;
@@ -171,7 +174,7 @@ PY
   # --edge: the Worker answers on de1.example.com, a name that exists only inside this namespace
   [ -z "$EDGE" ] || printf '127.0.0.1 localhost\n127.0.0.1 de1.example.com\n' >"/etc/netns/$NS/hosts"
   echo "network namespace $NS: $nic $addr via $dev, gateway $gw"
-  MG_E2E_INNER=1 ip netns exec "$NS" bash "${BASH_SOURCE[0]}" "$@" || rc=$?
+  MG_E2E_INNER=1 MG_E2E_NS="$NS" ip netns exec "$NS" bash "${BASH_SOURCE[0]}" "$@" || rc=$?
   return "$rc"
 }
 
@@ -273,6 +276,7 @@ cleanup() {
     tail_logs
   fi
   [ -e "$WORK/sampling" ] && rm -f "$WORK/sampling"
+  rm -f "$WORK/owner.env" # --hold: the owner session and authenticator secret never outlive the run
   for ((p = ${#PIDS[@]} - 1; p >= 0; p--)); do stop_pid "${PIDS[$p]}"; done
   ! declare -F edge_reap >/dev/null || edge_reap # workerd and the wrangler processes that outlived their parent
   sshn_reap # the agent an SSH install started on the test host, and its sshd sessions
@@ -1390,3 +1394,16 @@ for s in "${SECRETS[@]}"; do
 done
 [ "$LEAKS" = 0 ] || die "$LEAKS secret(s) found in logs"
 pass "no secret (admin password, TOTP, cookie, enrollment token, SNI, subscription tokens, hysteria credentials, the SSH passwords of the test host (in the panel, sshd and installed agent logs too), and with the tunnel steps the AWG client and preshared keys, header protection keys, WARP keys, Mihomo credentials, VLESS user ids) in any log"
+
+# ================================================================ 12. hold (--hold)
+if [ -n "${HOLD:-}" ]; then
+  [ -z "$EDGE" ] || die "--hold is for the VPS edition"
+  ( umask 077
+    printf 'MG_ADMIN_URL=%s/\nMG_OWNER_COOKIE=%s\nMG_TOTP_SECRET=%s\nMG_NETNS=%s\n' \
+      "$ADMIN" "${COOKIE#__Host-sid=}" "$TOTP_SECRET" "${MG_E2E_NS:-}" >"$WORK/owner.env" )
+  step "12. holding: the test panel stays up until Ctrl-C"
+  say "admin $ADMIN/ (in network namespace ${MG_E2E_NS:-none}), owner session and authenticator secret in $WORK/owner.env"
+  say "make an MCP token (from another shell):  bash scripts/e2e/mcp-token.sh $WORK/owner.env"
+  trap 'exit 0' INT TERM
+  while :; do sleep 3600 & wait $!; done
+fi

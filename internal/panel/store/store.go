@@ -157,13 +157,17 @@ func (s *Store) ListAudit(ctx context.Context, source string, beforeID int64, li
 
 // AuditQuery is one page of the audit log: newest first, id < BeforeID (0 = from the newest), at most Limit rows.
 // Source keeps one source ("" = all). Actions and Prefixes keep the rows whose action is one of Actions or starts with
-// one of Prefixes (both empty = every action). Failed keeps the rows whose result is not "ok".
+// one of Prefixes (both empty = every action). Failed keeps the rows whose result is not "ok". Since keeps the rows at or
+// after that time (zero = any age). Actor keeps the rows whose actor id or resolved name contains it, Contains
+// the rows whose action contains it; both are literal substrings (LIKE: ASCII case-insensitive), "" = any.
 type AuditQuery struct {
 	Source            string
 	BeforeID          int64
 	Limit             int
 	Actions, Prefixes []string
 	Failed            bool
+	Since             time.Time
+	Actor, Contains   string
 }
 
 // ListAuditQuery returns the rows of q.
@@ -187,6 +191,20 @@ func (s *Store) ListAuditQuery(ctx context.Context, q AuditQuery) ([]AuditRow, e
 	if q.Failed {
 		where += ` AND a.result NOT IN ('', 'ok')`
 	}
+	if !q.Since.IsZero() {
+		where += ` AND a.ts >= ?`
+		args = append(args, unix(q.Since))
+	}
+	like := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	if q.Contains != "" {
+		where += ` AND a.action LIKE ? ESCAPE '\'`
+		args = append(args, "%"+like.Replace(q.Contains)+"%")
+	}
+	if q.Actor != "" {
+		where += ` AND (a.actor LIKE ? ESCAPE '\' OR COALESCE(d.display_name, k.name, '') LIKE ? ESCAPE '\')`
+		pat := "%" + like.Replace(q.Actor) + "%"
+		args = append(args, pat, pat)
+	}
 	rows, err := s.R.QueryContext(ctx, `
 		SELECT a.id, a.ts, a.actor, COALESCE(d.display_name, k.name, ''), a.action, a.params, a.result, a.source, a.ip
 		FROM audit a LEFT JOIN admin d ON d.id = a.actor
@@ -208,6 +226,23 @@ func (s *Store) ListAuditQuery(ctx context.Context, q AuditQuery) ([]AuditRow, e
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// PruneAudit deletes audit rows older than before, in batches so the single writer is never held for long (the audit_ts
+// index serves the scan). It returns the number of rows removed.
+func (s *Store) PruneAudit(ctx context.Context, before time.Time, batch int) (int64, error) {
+	var total int64
+	for {
+		res, err := s.W.ExecContext(ctx, `DELETE FROM audit WHERE id IN (SELECT id FROM audit WHERE ts < ? LIMIT ?)`, unix(before), batch)
+		if err != nil {
+			return total, err
+		}
+		n, _ := res.RowsAffected()
+		total += n
+		if n < int64(batch) {
+			return total, nil
+		}
+	}
 }
 
 // Setting returns a setting value, or ErrNotFound.

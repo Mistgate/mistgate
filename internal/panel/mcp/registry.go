@@ -59,7 +59,7 @@ func (t toolDef) description() string {
 // for operators): a server takes the highest entry its profile reaches.
 var registry = slices.Concat(
 	readTools(), ownerReadTools(), changeTools(), nodeProvisionTools(), subscriptionTools(),
-	groupTools(), dnsTools(), nodeSettingsTools(), profileTools(), relayTools(), ipv6Tools(), insightTools(),
+	groupTools(), dnsTools(), nodeSettingsTools(), profileTools(), relayTools(), ipv6Tools(), batchTools(), insightTools(),
 )
 
 // toolsFor lists the tools a profile sees, by name.
@@ -79,6 +79,16 @@ func toolsFor(p Profile) []toolDef {
 	}
 	slices.SortFunc(out, func(a, b toolDef) int { return strings.Compare(a.name, b.name) })
 	return out
+}
+
+// ToolNames lists, sorted, the names of the tools a token profile sees: the registry that tests and the end-to-end harness
+// (scripts/e2e/mcpe2e) compare a running server against, so a tool count is never written down twice.
+func ToolNames(p Profile) []string {
+	var names []string
+	for _, t := range toolsFor(p) {
+		names = append(names, t.name)
+	}
+	return names
 }
 
 func (e *env) newServer(p Profile) *mcp.Server {

@@ -187,6 +187,17 @@ args = ["mcp", "--url", "https://panel.example.com/<prefix>/", "--token-file", "
 
 智能体不会获得订阅链接、设备密钥或配置、页面密码或任何服务器密码；它也无法看到节点地址，但管理员令牌可访问的 SSH 端点和用户名除外。通过 MCP 更改密码时（先调用 `node_server_password_rotate_plan`，再调用 `node_server_password_rotate_apply`），由面板生成新密码；你可以在节点的**设置 → SSH 凭据**中查看。
 
+### 在测试面板上试用
+
+若想让编码智能体操作一次性的面板而不是你自己的，请启动端到端测试面板并保持运行，然后在其上创建令牌（WSL 或 Linux 虚拟机，见 [Contributing](https://github.com/mistgate/mistgate/blob/main/CONTRIBUTING.md)）：
+
+```sh
+bash scripts/e2e-wsl.sh --hold                      # 带一个节点的测试面板；运行到按 Ctrl-C，并打印 env 文件路径
+bash scripts/e2e/mcp-token.sh /tmp/mg-e2e.XXXXXX/owner.env --profile operator
+```
+
+第二条命令会为该面板打印 `claude mcp add --transport http mistgate <管理地址>mcp --header "Authorization: Bearer <令牌>"` 一行；在智能体所在的环境中运行它（面板监听在本次运行的网络命名空间内，脚本会提示如何访问）。令牌有效期一天（`--ttl-days`），权限为你选择的档位（`readonly`、`operator`、`admin`）。仅限测试面板：该工具以测试面板所有者身份登录。
+
 ### 4. 提示词
 
 MCP 工具可以创建、更新和部署协议配置，但不能创建分组。提示词会先检查分组；如果分组不存在，会请你在管理后台创建。

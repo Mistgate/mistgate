@@ -76,3 +76,18 @@ func TestSweepAppliesRetention(t *testing.T) {
 		t.Fatalf("daily after 90 days: %+v", daily)
 	}
 }
+
+// The audit log keeps 400 days.
+func TestSweepPrunesAudit(t *testing.T) {
+	e := newEnv(t)
+	now := e.clock.Now()
+	day := 24 * time.Hour
+	for i, age := range []time.Duration{401 * day, 399 * day} {
+		e.exec(`INSERT INTO audit (ts, actor, action, params, result, source) VALUES (?, 'a', ?, '{}', 'ok', 'panel')`, now.Add(-age).Unix(), fmt.Sprint("retention_", i))
+	}
+	e.s.sweep(e.ctx)
+	var n int
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM audit WHERE action LIKE 'retention_%'`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("audit rows left: %d %v", n, err)
+	}
+}

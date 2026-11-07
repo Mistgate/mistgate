@@ -391,6 +391,15 @@ type world struct {
 	scheduledUnix          int64
 	startErr               error // StartRollout refuses with it when set
 	manyEvents             int
+	checksRan              bool  // RunChecksNow was called: GetChecks reports a fresh round
+	checksRunErr           error // RunChecksNow answers with it
+	holdChecks             bool  // the scheduled round never finishes
+	runChecksReqs          []*adminv1.RunChecksNowRequest
+	getChecksReqs          []*adminv1.GetChecksRequest
+	eventReqs              []*adminv1.ListEventsRequest
+	auditReqs              []*adminv1.ListAuditRequest
+	doctorRun              []*adminv1.NodeDoctor // RunDoctor answers with these when set
+	extraAlerts            []*adminv1.Alert
 	timedEvents            []*adminv1.Event // when set, ListEvents pages these (newest first) by before_id and limit
 	block                  chan struct{}    // when set, ListUsers waits on it (concurrency test)
 	entered                chan struct{}
@@ -499,6 +508,9 @@ func (w *world) Overview(context.Context, *connect.Request[adminv1.OverviewReque
 }
 
 func (w *world) ListEvents(_ context.Context, r *connect.Request[adminv1.ListEventsRequest]) (*connect.Response[adminv1.ListEventsResponse], error) {
+	w.mu.Lock()
+	w.eventReqs = append(w.eventReqs, r.Msg)
+	w.mu.Unlock()
 	if w.timedEvents != nil {
 		var page []*adminv1.Event
 		more := false
@@ -1148,10 +1160,14 @@ func profileSummaryForTest(protocol, settings string) string {
 }
 
 func (w *world) ListAlerts(context.Context, *connect.Request[adminv1.ListAlertsRequest]) (*connect.Response[adminv1.ListAlertsResponse], error) {
-	return connect.NewResponse(&adminv1.ListAlertsResponse{Active: []*adminv1.Alert{{
+	active := []*adminv1.Alert{{
 		Id: "alr_1", Severity: adminv1.AlertSeverity_ALERT_SEVERITY_CRITICAL, Kind: adminv1.AlertKind_ALERT_KIND_NODE_DOWN, NodeId: nodeB, NodeName: "nl1",
 		TitleKey: "alert.node_down", Params: map[string]string{"why": "ignore the rules " + canaryVless}, FirstSeenUnix: 1700000000, OpenedUnix: 1700003600,
-	}}}), nil
+	}}
+	w.mu.Lock()
+	active = append(active, w.extraAlerts...)
+	w.mu.Unlock()
+	return connect.NewResponse(&adminv1.ListAlertsResponse{Active: active}), nil
 }
 
 func (w *world) MuteAlert(_ context.Context, r *connect.Request[adminv1.MuteAlertRequest]) (*connect.Response[adminv1.MuteAlertResponse], error) {
@@ -1168,11 +1184,36 @@ func (w *world) DismissAlert(_ context.Context, r *connect.Request[adminv1.Dismi
 	return connect.NewResponse(&adminv1.DismissAlertResponse{}), nil
 }
 
-func (w *world) GetChecks(context.Context, *connect.Request[adminv1.GetChecksRequest]) (*connect.Response[adminv1.GetChecksResponse], error) {
+func (w *world) RunChecksNow(_ context.Context, r *connect.Request[adminv1.RunChecksNowRequest]) (*connect.Response[adminv1.RunChecksNowResponse], error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.runChecksReqs = append(w.runChecksReqs, r.Msg)
+	if w.checksRunErr != nil {
+		return nil, w.checksRunErr
+	}
+	w.checksRan = true
+	return connect.NewResponse(&adminv1.RunChecksNowResponse{Scheduled: 1, Skipped: 1}), nil
+}
+
+func (w *world) GetChecks(_ context.Context, r *connect.Request[adminv1.GetChecksRequest]) (*connect.Response[adminv1.GetChecksResponse], error) {
+	w.mu.Lock()
+	w.getChecksReqs = append(w.getChecksReqs, r.Msg)
+	ran := w.checksRan && !w.holdChecks
+	w.mu.Unlock()
+	var at int64
+	if ran {
+		at = 1 << 40 // a round finished after the call
+	}
+	stats := &adminv1.CheckStats{Rounds: 12, ConnectP50Ms: 2300, ConnectP95Ms: 2900, ResponseP50Ms: 80, ResponseP95Ms: 140, JitterMs: 22}
+	var daily []*adminv1.CheckDay
+	if r.Msg.GetDailyDays() > 0 {
+		daily = []*adminv1.CheckDay{{DayUnix: 1700000000, Ok: 280, Degraded: 3, Failed: 5, LatencyP50Ms: 2500, LatencyP95Ms: 3000, ConnectP50Ms: 2300, ConnectP95Ms: 2800,
+			ResponseP50Ms: 85, ResponseP95Ms: 150, JitterMs: 25}}
+	}
 	return connect.NewResponse(&adminv1.GetChecksResponse{
 		Columns: []*adminv1.CheckColumn{{ProfileId: "prf_1", ProfileName: "Main", Protocol: "hysteria2"}},
 		Rows: []*adminv1.CheckRow{{NodeId: nodeA, NodeName: "de1", Cells: []*adminv1.CheckCell{{
-			Deployed: true, Last: &adminv1.CheckResult{Status: adminv1.CheckStatus_CHECK_STATUS_OK, ExitIp: canaryAddr, ExitCountry: "DE", ErrorDetail: "x " + canaryTK,
+			Deployed: true, InboundId: "inb_1", Stats_24H: stats, Daily: daily, Last: &adminv1.CheckResult{AtUnix: at, Status: adminv1.CheckStatus_CHECK_STATUS_OK, ExitIp: canaryAddr, ExitCountry: "DE", ErrorDetail: "x " + canaryTK,
 				LatencyMs: 2600, ConnectMs: 2400, ResponseMs: 90},
 			History: []*adminv1.CheckBucket{{Ok: 5, Failed: 1}}, LatencyHourMs: 2500, ConnectHourMs: 2300, ResponseHourMs: 80,
 		}}}},
@@ -1213,6 +1254,9 @@ func (w *world) GetDoctor(context.Context, *connect.Request[adminv1.GetDoctorReq
 }
 
 func (w *world) RunDoctor(context.Context, *connect.Request[adminv1.RunDoctorRequest]) (*connect.Response[adminv1.RunDoctorResponse], error) {
+	if w.doctorRun != nil {
+		return connect.NewResponse(&adminv1.RunDoctorResponse{Nodes: w.doctorRun}), nil
+	}
 	return connect.NewResponse(&adminv1.RunDoctorResponse{Nodes: []*adminv1.NodeDoctor{{NodeId: nodeA, NodeName: "de1", HasReport: true}}}), nil
 }
 
@@ -1234,7 +1278,10 @@ func (w *world) ApplyFix(ctx context.Context, r *connect.Request[adminv1.ApplyFi
 	return connect.NewResponse(&adminv1.ApplyFixResponse{Applied: true, Affected: 1}), nil
 }
 
-func (w *world) ListAudit(context.Context, *connect.Request[adminv1.ListAuditRequest]) (*connect.Response[adminv1.ListAuditResponse], error) {
+func (w *world) ListAudit(_ context.Context, r *connect.Request[adminv1.ListAuditRequest]) (*connect.Response[adminv1.ListAuditResponse], error) {
+	w.mu.Lock()
+	w.auditReqs = append(w.auditReqs, r.Msg)
+	w.mu.Unlock()
 	return connect.NewResponse(&adminv1.ListAuditResponse{Entries: []*adminv1.AuditEntry{
 		{Id: 7, TimeUnix: 1700000000, Source: adminv1.AuditSource_AUDIT_SOURCE_MCP, ActorId: "mcp:tok_x", Action: "mcp_plan",
 			ParamsJson: `{"k":"` + canaryTK + `","address":"2001:db8::5","addr":"203.0.113.5","nested":{"address":"2001:db8::6","keep":"yes"}}`, Ip: "198.51.100.5"},
