@@ -28,6 +28,8 @@ import { useOlderNodes } from "@/lib/updates";
 import { useIsPhone } from "@/lib/media";
 import { readPref, writePref } from "@/lib/storage";
 import { FleetMap } from "./nodes-map";
+import { FleetLoad } from "./nodes-load";
+import { useEdition } from "@/lib/edition";
 import { useBatch } from "@/lib/batch";
 import { PickMenu } from "@/components/bulk";
 import { NodesBulk } from "./nodes-bulk";
@@ -37,6 +39,7 @@ import { passwordOnly, useBulkRun } from "./nodes-bulk-actions";
 import { PanelKeyOffer } from "./nodes-panel-key";
 
 type StatusFilter = "all" | "problems" | "working";
+type NodesView = "list" | "map" | "load";
 const all = "all";
 
 const onlineOf = (n: Node) => n.online.reduce((a, o) => a + o.users, 0);
@@ -57,14 +60,17 @@ export function NodesScreen() {
   const run = useBulkRun(batch, owner);
   const older = useOlderNodes();
   const clear = useCallback(() => setTicked(new Set()), []);
-  // List or the fleet map: the URL's (?view=map), else the one this browser used last; a phone has the list only
+  // List, the fleet map or the load: the URL's (?view=map, ?view=load), else the one this browser used last. A phone has no
+  // map; the Cloudflare edition has no load (OpsService is the VPS edition's).
   const navigate = useNavigate();
   const phone = useIsPhone();
-  const search = useSearch({ strict: false }) as { view?: "map"; focus?: string };
-  const view: "list" | "map" = phone ? "list" : search.view === "map" || (!search.view && readPref("nodes.view") === "map") ? "map" : "list";
-  const setView = (v: "list" | "map") => {
+  const { edge } = useEdition();
+  const search = useSearch({ strict: false }) as { view?: NodesView; focus?: string };
+  const wanted = search.view ?? readPref("nodes.view");
+  const view: NodesView = wanted === "map" && !phone ? "map" : wanted === "load" && !edge ? "load" : "list";
+  const setView = (v: NodesView) => {
     writePref("nodes.view", v);
-    void navigate({ to: "/nodes", search: v === "map" ? { view: "map" } : {}, replace: true });
+    void navigate({ to: "/nodes", search: v === "list" ? {} : { view: v }, replace: true });
   };
 
   const nodes = useMemo(() => q.data?.nodes ?? [], [q.data]);
@@ -153,7 +159,7 @@ export function NodesScreen() {
               }}
             />
           )}
-          {!phone && (
+          {(!phone || !edge) && (
             <div className="flex justify-end">
               <Segmented
                 variant="flat"
@@ -161,14 +167,17 @@ export function NodesScreen() {
                 value={view}
                 onValueChange={setView}
                 options={[
-                  { value: "list", label: t("wg.view.list") },
-                  { value: "map", label: t("fm.view.map") },
+                  { value: "list" as const, label: t("wg.view.list") },
+                  ...(phone ? [] : [{ value: "map" as const, label: t("fm.view.map") }]),
+                  ...(edge ? [] : [{ value: "load" as const, label: t("load.view") }]),
                 ]}
               />
             </div>
           )}
           {view === "map" ? (
             <FleetMap nodes={nodes} owner={owner} focus={search.focus} />
+          ) : view === "load" ? (
+            <FleetLoad />
           ) : (
             <>
           <div className="flex flex-wrap items-center gap-2">

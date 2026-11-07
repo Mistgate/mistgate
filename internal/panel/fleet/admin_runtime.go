@@ -150,6 +150,10 @@ func (s nodeService) GetNodeHostHistory(ctx context.Context, req *connect.Reques
 			HourStartUnix: h.HourStart, Samples: h.Samples, CpuAvgPct: float32(h.CPUAvg), CpuMaxPct: float32(h.CPUMax),
 			SoftirqMaxPct: float32(h.SoftirqMax), Load1Max: float32(h.LoadMax), RamUsedMaxBytes: h.RAMUsedMax, RamTotalBytes: h.RAMTotal,
 			RxAvgBps: h.RxAvg, RxMaxBps: h.RxMax, TxAvgBps: h.TxAvg, TxMaxBps: h.TxMax, SessionsMax: h.SessionsMax,
+			SessionsAvg: float32(h.SessionsAvg), ExtSamples: h.ExtSamples, StealAvgPct: float32(h.StealAvg), StealMaxPct: float32(h.StealMax),
+			IowaitMaxPct: float32(h.IOWaitMax), SwapUsedMaxBytes: h.SwapUsedMax, ConntrackMax: h.ConntrackMax, ConntrackLimit: h.ConntrackLimit,
+			TcpSocketsMax: h.TCPSocketsMax, NicSpeedMbps: h.NICSpeedMbps, AgentCpuAvgPct: float32(h.AgentCPUAvg), AgentCpuMaxPct: float32(h.AgentCPUMax),
+			AgentRssMaxBytes: h.AgentRSSMax,
 		})
 	}
 	return connect.NewResponse(resp), nil

@@ -659,27 +659,23 @@ func TestNetBaselineConntrackParamsAndPressure(t *testing.T) {
 	param(t, r, "conntrack_max", "65536")
 	param(t, r, "conntrack_drops", "30")
 
+	// A table over 80% full is conntrack_fill's warning, not a baseline difference: the baseline stays OK and reports the fill.
 	f.put("/proc/sys/net/netfilter/nf_conntrack_count", "52429\n")
 	r = run(t, f.doctor(), CheckNetBaseline)
-	want(t, r, Warn, "")
-	if !strings.Contains(r.Detail, "80%") || !strings.Contains(r.Detail, "52429/65536") {
-		t.Fatalf("conntrack pressure detail is unclear: %q", r.Detail)
-	}
-	param(t, r, "differs", "conntrack_pressure")
+	want(t, r, OK, "")
+	param(t, r, "conntrack_count", "52429")
+	want(t, run(t, f.doctor(), CheckConntrackFill), Warn, "")
 
 	good(f)
 	f.put("/proc/sys/net/netfilter/nf_conntrack_count", "52429\n")
 	f.remove("/proc/net/stat/nf_conntrack")
 	r = run(t, f.doctor(), CheckNetBaseline)
-	want(t, r, Warn, "")
+	want(t, r, OK, "")
 	// Ubuntu's kernels have no /proc/net/stat/nf_conntrack: the fill is still reported, only the drops are not.
 	param(t, r, "conntrack_count", "52429")
 	param(t, r, "conntrack_max", "65536")
 	if _, ok := r.Params["conntrack_drops"]; ok {
 		t.Errorf("missing drop stats added conntrack_drops: %v", r.Params)
-	}
-	if !strings.Contains(r.Detail, "52429/65536") {
-		t.Fatalf("missing drop stats hid the count warning: %+v", r)
 	}
 
 	for _, missing := range []string{

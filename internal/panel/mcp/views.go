@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"math"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -313,21 +314,23 @@ func warpStatusView(nodeID, nodeName string, r *adminv1.GetWarpResponse, now tim
 // NodeMetricsV is the node_metrics result: the current gauges and today's totals, and with hours the host load per hour
 // (Series, oldest first, bucketed when the window is long) and the peaks over the whole window.
 type NodeMetricsV struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Status       string            `json:"status"`
-	HasMetrics   bool              `json:"has_metrics"`
-	AtUnix       int64             `json:"at_unix,omitempty"`
-	CPUPct       float32           `json:"cpu_pct"`
-	SoftIRQPct   float32           `json:"softirq_pct"`
-	Load1        float32           `json:"load1"`
-	RAMUsed      uint64            `json:"ram_used_bytes"`
-	RAMTotal     uint64            `json:"ram_total_bytes"`
-	DiskUsed     uint64            `json:"disk_used_bytes"`
-	DiskTotal    uint64            `json:"disk_total_bytes"`
-	NetRxBps     uint64            `json:"net_rx_bps"`
-	NetTxBps     uint64            `json:"net_tx_bps"`
-	TrafficToday uint64            `json:"traffic_today_bytes"`
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	Status       string  `json:"status"`
+	HasMetrics   bool    `json:"has_metrics"`
+	AtUnix       int64   `json:"at_unix,omitempty"`
+	CPUPct       float32 `json:"cpu_pct"`
+	SoftIRQPct   float32 `json:"softirq_pct"`
+	Load1        float32 `json:"load1"`
+	RAMUsed      uint64  `json:"ram_used_bytes"`
+	RAMTotal     uint64  `json:"ram_total_bytes"`
+	DiskUsed     uint64  `json:"disk_used_bytes"`
+	DiskTotal    uint64  `json:"disk_total_bytes"`
+	NetRxBps     uint64  `json:"net_rx_bps"`
+	NetTxBps     uint64  `json:"net_tx_bps"`
+	TrafficToday uint64  `json:"traffic_today_bytes"`
+	// Res is absent when the agent predates the resource fields: those are not known, not zero.
+	Res          *liveResV         `json:"resources,omitempty"`
 	OnlineByProt map[string]uint32 `json:"online_by_protocol,omitempty"`
 	TopToday     []topUserV        `json:"top_today,omitempty"`
 	HistoryHours int               `json:"history_hours,omitempty"`
@@ -347,12 +350,50 @@ func nodeMetricsView(r *adminv1.GetNodeResponse) *NodeMetricsV {
 		v.AtUnix, v.CPUPct, v.SoftIRQPct, v.Load1 = m.GetAtUnix(), m.GetCpuPct(), m.GetSoftirqPct(), m.GetLoad1()
 		v.RAMUsed, v.RAMTotal, v.DiskUsed, v.DiskTotal = m.GetRamUsedBytes(), m.GetRamTotalBytes(), m.GetDiskUsedBytes(), m.GetDiskTotalBytes()
 		v.NetRxBps, v.NetTxBps = m.GetNetRxBps(), m.GetNetTxBps()
+		v.Res = liveResView(m)
 	}
 	for i, t := range r.GetTopToday() {
 		if i == 10 {
 			break
 		}
 		v.TopToday = append(v.TopToday, topUserV{UserID: t.GetUserId(), UserName: nm(t.GetUserName()), Bytes: t.GetBytes()})
+	}
+	return v
+}
+
+// liveResV is what an agent with the resource fields adds to the current gauges: the parts of the CPU, swap, connection
+// tracking, sockets, the link speed, and the agent process itself (every engine runs inside it: what Mistgate costs the node).
+type liveResV struct {
+	StealPct         float32 `json:"steal_pct"`
+	IOWaitPct        float32 `json:"iowait_pct"`
+	SwapUsed         uint64  `json:"swap_used_bytes"`
+	SwapTotal        uint64  `json:"swap_total_bytes"`
+	ConntrackCount   uint64  `json:"conntrack_count,omitempty"`
+	ConntrackMax     uint64  `json:"conntrack_max,omitempty"`
+	ConntrackFillPct float32 `json:"conntrack_fill_pct,omitempty"`
+	TCPSockets       uint32  `json:"tcp_sockets"`
+	UDPSockets       uint32  `json:"udp_sockets"`
+	NICSpeedMbps     uint32  `json:"nic_speed_mbps,omitempty"`
+	AgentCPUPct      float32 `json:"agent_cpu_pct"`
+	AgentRSS         uint64  `json:"agent_rss_bytes"`
+	AgentGoHeap      uint64  `json:"agent_go_heap_bytes"`
+	AgentGoroutines  uint32  `json:"agent_goroutines"`
+	AgentThreads     uint32  `json:"agent_threads"`
+	AgentFDs         uint32  `json:"agent_open_fds"`
+	AgentFDLimit     uint32  `json:"agent_fd_limit,omitempty"`
+}
+
+func liveResView(m *adminv1.NodeMetrics) *liveResV {
+	a := m.GetAgent()
+	if a == nil {
+		return nil
+	}
+	v := &liveResV{StealPct: m.GetStealPct(), IOWaitPct: m.GetIowaitPct(), SwapUsed: m.GetSwapUsedBytes(), SwapTotal: m.GetSwapTotalBytes(),
+		ConntrackCount: m.GetConntrackCount(), ConntrackMax: m.GetConntrackMax(), TCPSockets: m.GetTcpSockets(), UDPSockets: m.GetUdpSockets(),
+		NICSpeedMbps: m.GetNicSpeedMbps(), AgentCPUPct: a.GetCpuPct(), AgentRSS: a.GetRssBytes(), AgentGoHeap: a.GetGoHeapBytes(),
+		AgentGoroutines: a.GetGoroutines(), AgentThreads: a.GetThreads(), AgentFDs: a.GetOpenFds(), AgentFDLimit: a.GetFdLimit()}
+	if mx := m.GetConntrackMax(); mx > 0 {
+		v.ConntrackFillPct = float32(math.Round(float64(m.GetConntrackCount())/float64(mx)*1000) / 10)
 	}
 	return v
 }

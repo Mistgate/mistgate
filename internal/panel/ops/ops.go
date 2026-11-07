@@ -1,7 +1,8 @@
 //go:build !js
 
 // Package ops is the panel's own diagnostics and data lifecycle for the owner: the log ring and its level, retention of the
-// tables the sweep prunes, a scrubbed export, and the /metrics endpoint. It is the OpsService of proto/mistgate/ops/v1, a package
+// tables the sweep prunes, a scrubbed export, and the /metrics endpoint; and two reads for every admin, the panel's own
+// resources and the fleet's load (internal/panel/capacity). It is the OpsService of proto/mistgate/ops/v1, a package
 // of its own so the Cloudflare edition's admin Worker does not link it; that edition mounts a stub that answers UNIMPLEMENTED
 // (internal/panel/app/ops_wiring_js.go).
 //
@@ -21,6 +22,8 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	"github.com/mistgate/mistgate/internal/logring"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/capacity"
+	"github.com/mistgate/mistgate/internal/panel/rpcstat"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -41,8 +44,13 @@ type Config struct {
 	Fleet, Health, Relay http.Handler
 	// Debug starts and stops the on-demand debug captures of a node (the fleet). nil answers UNIMPLEMENTED for them.
 	Debug DebugBackend
-	Now   func() time.Time
-	Log   *slog.Logger
+	// RPC is the admin API's call counter that the HTTP middleware fills (httpserver.Config.RPCStats); nil leaves the RPC
+	// load of GetPanelResources empty.
+	RPC *rpcstat.Window
+	// Capacity reads the nodes for GetFleetLoad over a window of hours (fleet.CapacityNodes); nil answers with no nodes.
+	Capacity func(ctx context.Context, hours int) ([]capacity.Node, error)
+	Now      func() time.Time
+	Log      *slog.Logger
 }
 
 // Service is the OpsService.
@@ -50,6 +58,8 @@ type Service struct {
 	cfg   Config
 	scrub *Scrubber
 	m     metricsState
+	res   resourcesState
+	load  loadCache
 }
 
 // New returns the service.

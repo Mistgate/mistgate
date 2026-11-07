@@ -5,8 +5,10 @@ package mistgate.ops.v1;
 // The panel's own diagnostics and data lifecycle: its log ring and level, retention of what it stores, an export, and the
 // metrics endpoint's switch. A separate package from mistgate.admin.v1 on purpose: the Cloudflare edition's admin Worker links
 // every admin message, and none of this runs there (the VPS edition mounts the service; the edition without it answers
-// UNIMPLEMENTED "not available on this edition"). Every procedure is owner-only (admin-profile tokens read panel logs and plan
-// changes through MCP); a procedure missing from the role policy is owner-only too.
+// UNIMPLEMENTED "not available on this edition"). The logs, retention, export and metrics procedures are owner-only (admin-profile
+// tokens read panel logs and plan changes through MCP); GetPanelResources and GetFleetLoad are reads of numbers and node names
+// that every signed-in admin and every token may call; the debug capture's rules are with its procedures below. A procedure
+// missing from the role policy is owner-only.
 service OpsService {
   // The log level now in force, the one the panel started with, and the size of the ring.
   rpc GetLogSettings(GetLogSettingsRequest) returns (GetLogSettingsResponse);
@@ -38,6 +40,12 @@ service OpsService {
   rpc ListDebugCaptures(ListDebugCapturesRequest) returns (ListDebugCapturesResponse);
   // The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
   rpc GetDebugCapture(GetDebugCaptureRequest) returns (GetDebugCaptureResponse);
+  // What the panel itself costs: its process (CPU, memory, Go runtime, threads, descriptors), the machine it runs on, its
+  // database and the admin API's load over the last minutes. Numbers only: no address, path or name of a person.
+  rpc GetPanelResources(GetPanelResourcesRequest) returns (GetPanelResourcesResponse);
+  // How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
+  // how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
+  rpc GetFleetLoad(GetFleetLoadRequest) returns (GetFleetLoadResponse);
 }
 
 message GetLogSettingsRequest {}
@@ -254,4 +262,179 @@ message GetDebugCaptureResponse {
   int64 next_cursor = 3 [jstype = JS_NUMBER];
   // The sources that appear in the capture, to fill a filter.
   repeated string sources = 4;
+}
+
+message GetPanelResourcesRequest {}
+
+// The panel's own process.
+message PanelProcess {
+  // CPU time since the previous read, in percent of the whole machine (all CPUs): 25 on four CPUs is one CPU fully used.
+  float cpu_pct = 1;
+  uint64 rss_bytes = 2 [jstype = JS_NUMBER];
+  // The Go runtime: all memory it mapped from the OS, the part in heap objects, and its goroutines.
+  uint64 go_total_bytes = 3 [jstype = JS_NUMBER];
+  uint64 go_heap_bytes = 4 [jstype = JS_NUMBER];
+  uint32 goroutines = 5;
+  uint32 threads = 6;
+  // Open file descriptors (sockets among them) and the soft limit (0 = not known).
+  uint32 open_fds = 7;
+  uint32 fd_limit = 8;
+  uint64 uptime_s = 9 [jstype = JS_NUMBER];
+}
+
+// The machine the panel runs on. Zeros where it cannot be read (not a Linux host).
+message PanelHost {
+  uint32 cpus = 1;
+  // Since the previous read, in percent of all CPUs: busy (everything but idle and I/O wait; steal included), the part the
+  // hypervisor gave to other guests, and the idle time spent waiting for the disk.
+  float cpu_busy_pct = 2;
+  float steal_pct = 3;
+  float iowait_pct = 4;
+  float load1 = 5;
+  uint64 ram_used_bytes = 6 [jstype = JS_NUMBER];
+  uint64 ram_total_bytes = 7 [jstype = JS_NUMBER];
+  uint64 swap_used_bytes = 8 [jstype = JS_NUMBER];
+  uint64 swap_total_bytes = 9 [jstype = JS_NUMBER];
+  // The file system that holds the panel's data directory.
+  uint64 disk_used_bytes = 10 [jstype = JS_NUMBER];
+  uint64 disk_total_bytes = 11 [jstype = JS_NUMBER];
+}
+
+// The panel's SQLite database. It is read at most once a minute.
+message PanelDatabase {
+  // The main file and its write-ahead log.
+  uint64 file_bytes = 1 [jstype = JS_NUMBER];
+  uint64 wal_bytes = 2 [jstype = JS_NUMBER];
+  // Pages in the file, the free ones among them (space a VACUUM would give back), and the page size in bytes.
+  uint64 page_count = 3 [jstype = JS_NUMBER];
+  uint64 freelist_count = 4 [jstype = JS_NUMBER];
+  uint32 page_size = 5;
+  int64 measured_unix = 6 [jstype = JS_NUMBER];
+}
+
+// The admin API's calls (the admin UI and API tokens over /api; not /mcp or /metrics) over the last window_s seconds.
+message PanelRpcLoad {
+  uint32 window_s = 1;
+  uint64 requests = 2 [jstype = JS_NUMBER];
+  // Calls that ended in a server error (HTTP 5xx), and in a refusal or a bad request (4xx).
+  uint64 server_errors = 3 [jstype = JS_NUMBER];
+  uint64 client_errors = 4 [jstype = JS_NUMBER];
+  // The 95th percentile of the time to answer a unary call, in milliseconds (streams are left out); 0 without calls.
+  float p95_ms = 5;
+}
+
+message GetPanelResourcesResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  PanelProcess process = 2;
+  PanelHost host = 3;
+  PanelDatabase database = 4;
+  // Agents connected now, and the nodes that are not retired.
+  uint32 agents_connected = 5;
+  uint32 nodes = 6;
+  PanelRpcLoad rpc = 7;
+}
+
+message GetFleetLoadRequest {
+  // The window in hours, 1 to 720; 0 means 168 (a week holds the busy hour of every weekday).
+  uint32 hours = 1;
+}
+
+// What to do about a node's load. The admin UI and the assistant word it from code and params.
+message LoadRecommendation {
+  // update_agent (the agent predates the resource fields: steal, swap, conntrack and its own cost are not known),
+  // steal_high (steal_pct: the provider oversells the host; move the node), conntrack_near_limit (fill_pct, limit),
+  // cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom),
+  // cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), bandwidth_busy (peak_pct, link_mbps, and target,
+  // target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
+  // agent_memory_growing (growth_pct_day, rss_mb, days: the agent's daily peak memory climbs faster than its people).
+  string code = 1;
+  // "info", "warn" or "crit".
+  string severity = 2;
+  // Plain decimal numbers and node names.
+  map<string, string> params = 3;
+}
+
+// One node's load over the window. An optional field that is unset is not known: no hour carried it (an agent that predates
+// the resource fields), or there is nothing to measure.
+message NodeLoad {
+  string node_id = 1;
+  string node_name = 2;
+  bool connected = 3;
+  uint32 cpus = 4;
+  // "ok", "busy", "overloaded", or "unknown" (no hour of host load in the window).
+  string status = 5;
+  // What runs out first once it is at least halfway to its limit: cpu, steal, bandwidth, ram, conntrack or disk; "" otherwise.
+  string bottleneck = 6;
+  // Hours of the window with samples, and those whose samples carried the resource fields.
+  uint32 hours_with_data = 7;
+  uint32 ext_hours = 8;
+  // The busy hour: the hour with the highest CPU mean, that mean, and the mean people online in it.
+  int64 busy_hour_unix = 9 [jstype = JS_NUMBER];
+  float busy_hour_cpu_pct = 10;
+  float people_busy_hour = 11;
+  uint32 people_peak = 12;
+  // The 95th percentile of the hourly CPU peaks.
+  float cpu_peak_p95_pct = 13;
+  // The 95th percentile of the hourly steal means.
+  optional float steal_p95_pct = 14;
+  // The highest hourly peak of connection-tracking entries against the limit.
+  optional float conntrack_peak_pct = 15;
+  optional float ram_peak_pct = 16;
+  optional uint64 swap_used_max_bytes = 17 [jstype = JS_NUMBER];
+  // The latest sample's root file system.
+  optional float disk_used_pct = 18;
+  // The highest hourly peaks of the main NIC, bits per second.
+  uint64 rx_peak_bps = 19 [jstype = JS_NUMBER];
+  uint64 tx_peak_bps = 20 [jstype = JS_NUMBER];
+  // The capacity the traffic is set against: the owner's ("configured", Node.bandwidth_mbps) or the link speed the agent
+  // reported ("nic"); 0 and "" = not known.
+  uint32 capacity_mbps = 21;
+  string capacity_source = 22;
+  optional float bandwidth_peak_pct = 23;
+  // The agent process: mean and peak CPU in percent of the machine, peak memory, and how fast its daily peak memory grows
+  // (percent per day, from three days on).
+  optional float agent_cpu_avg_pct = 24;
+  optional float agent_cpu_max_pct = 25;
+  optional uint64 agent_rss_max_bytes = 26 [jstype = JS_NUMBER];
+  optional float agent_rss_growth_pct_per_day = 27;
+  // "ok" when the per-person costs could be read from the hours (a least-squares fit of the hourly CPU mean on the hourly
+  // mean people online); otherwise why not: "few_hours" (under 24 hours with samples), "flat" (people online changed by
+  // fewer than 4), "no_trend" (the CPU does not rise with the people).
+  string fit = 28;
+  optional float cpu_pct_per_hundred_people = 29;
+  optional float mbps_per_person = 30;
+  // People the node could add before its busy-hour CPU mean reaches 80% (and, with a known link and per-person traffic, its
+  // busier direction 90% of the link). 0 when it is overloaded already.
+  optional uint32 headroom_people = 31;
+  // Most severe first.
+  repeated LoadRecommendation recommendations = 32;
+}
+
+message LoadNodeRef {
+  string node_id = 1;
+  string node_name = 2;
+  string status = 3;
+  float busy_hour_cpu_pct = 4;
+  optional uint32 headroom_people = 5;
+}
+
+message FleetLoadSummary {
+  uint32 ok = 1;
+  uint32 busy = 2;
+  uint32 overloaded = 3;
+  uint32 unknown = 4;
+  // The headroom of the nodes whose headroom is known, added up, and how many nodes those are.
+  uint32 headroom_people = 5;
+  uint32 headroom_nodes = 6;
+  // Up to three nodes closest to a limit, most loaded first; up to three that are not busy, most headroom first.
+  repeated LoadNodeRef most_loaded = 7;
+  repeated LoadNodeRef most_free = 8;
+}
+
+message GetFleetLoadResponse {
+  int64 now_unix = 1 [jstype = JS_NUMBER];
+  uint32 hours = 2;
+  // Every node that is not retired, most pressing first.
+  repeated NodeLoad nodes = 3;
+  FleetLoadSummary summary = 4;
 }

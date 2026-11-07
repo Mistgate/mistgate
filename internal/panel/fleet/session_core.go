@@ -589,6 +589,47 @@ type liveJSONMetrics struct {
 	RxBPS          uint64  `json:"rx_bps"`
 	TxBPS          uint64  `json:"tx_bps"`
 	UptimeS        uint64  `json:"uptime_s"`
+	// Present when the agent sends the resource fields (HostMetrics.agent); nil from older agents.
+	Res *liveJSONResources `json:"res,omitempty"`
+}
+
+// liveJSONResources is what an agent with the resource fields adds to the live metrics.
+type liveJSONResources struct {
+	StealPct       float64 `json:"steal_pct"`
+	IOWaitPct      float64 `json:"iowait_pct"`
+	SwapUsed       uint64  `json:"swap_used"`
+	SwapTotal      uint64  `json:"swap_total"`
+	ConntrackCount uint64  `json:"ct_count"`
+	ConntrackMax   uint64  `json:"ct_max"`
+	TCPSockets     uint32  `json:"tcp"`
+	UDPSockets     uint32  `json:"udp"`
+	NICSpeedMbps   uint32  `json:"nic_mbps"`
+	AgentCPUPct    float64 `json:"agent_cpu_pct"`
+	AgentRSS       uint64  `json:"agent_rss"`
+	AgentGoTotal   uint64  `json:"agent_go_total"`
+	AgentGoHeap    uint64  `json:"agent_go_heap"`
+	Goroutines     uint32  `json:"goroutines"`
+	Threads        uint32  `json:"threads"`
+	FDs            uint32  `json:"fds"`
+	FDLimit        uint32  `json:"fd_limit"`
+}
+
+// liveResources clamps the agent's resource fields like the rest of the live metrics: a bogus agent cannot store a number a
+// chart cannot hold. nil when the agent did not send them.
+func liveResources(m *agentv1.HostMetrics) *liveJSONResources {
+	a := m.GetAgent()
+	if a == nil {
+		return nil
+	}
+	pct := func(v float32) float64 { return clampLiveFloat(finiteLiveFloat(float64(v)), 0, 100) }
+	const maxBytes = uint64(1 << 50)
+	return &liveJSONResources{
+		StealPct: pct(m.StealPct), IOWaitPct: pct(m.IowaitPct), SwapUsed: min(m.SwapUsedBytes, maxBytes), SwapTotal: min(m.SwapTotalBytes, maxBytes),
+		ConntrackCount: min(m.ConntrackCount, 1<<40), ConntrackMax: min(m.ConntrackMax, 1<<40), TCPSockets: m.TcpSockets, UDPSockets: m.UdpSockets,
+		NICSpeedMbps: min(m.NicSpeedMbps, 10_000_000), AgentCPUPct: pct(a.CpuPct), AgentRSS: min(a.RssBytes, maxBytes),
+		AgentGoTotal: min(a.GoTotalBytes, maxBytes), AgentGoHeap: min(a.GoHeapBytes, maxBytes), Goroutines: a.Goroutines, Threads: a.Threads,
+		FDs: a.OpenFds, FDLimit: a.FdLimit,
+	}
 }
 
 type liveJSONHealth struct {
@@ -635,6 +676,7 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 			CPUPct: cpu, SoftirqPct: finiteLiveFloat(float64(metrics.SoftirqPct)), Load1: finiteLiveFloat(float64(metrics.Load1)),
 			RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes,
 			DiskUsedBytes: metrics.DiskUsedBytes, DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: rxBPS, TxBPS: txBPS, UptimeS: metrics.UptimeS,
+			Res: liveResources(metrics),
 		}
 		projection.SampleAt, projection.RxBps, projection.TxBps = view.MetricsAtUnix, rxBPS, txBPS
 		projection.CPUPct = int64(math.Round(cpu))
@@ -984,11 +1026,16 @@ func hostSample(st *agentv1.StatsBatch, stale bool) *store.HostSample {
 		return nil
 	}
 	const maxRate = uint64(1 << 50)
-	return &store.HostSample{
+	s := &store.HostSample{
 		CPUPct: clampLiveFloat(float64(m.CpuPct), 0, 100), SoftirqPct: clampLiveFloat(finiteLiveFloat(float64(m.SoftirqPct)), 0, 100),
 		Load1: max(finiteLiveFloat(float64(m.Load1)), 0), RAMUsed: m.RamUsedBytes, RAMTotal: m.RamTotalBytes,
 		RxBps: min(m.NetRxBps, maxRate), TxBps: min(m.NetTxBps, maxRate), Sessions: min(len(st.Sessions), maxStatsDeltas),
 	}
+	if r := liveResources(m); r != nil {
+		s.Ext = &store.HostSampleExt{StealPct: r.StealPct, IOWaitPct: r.IOWaitPct, SwapUsed: r.SwapUsed, ConntrackCount: r.ConntrackCount,
+			ConntrackMax: r.ConntrackMax, TCPSockets: r.TCPSockets, NICSpeedMbps: r.NICSpeedMbps, AgentCPUPct: r.AgentCPUPct, AgentRSS: r.AgentRSS}
+	}
+	return s
 }
 
 func (c *SessionCore) requestDesiredPreparation(tr *coreTransition) {

@@ -123,6 +123,11 @@ type Config struct {
 	// bearer secret of its own, never a session) and returns false, having written nothing, while the owner has the endpoint
 	// off: the request then gets what any unknown admin path gets. nil: no endpoint (the Cloudflare edition).
 	Metrics func(w http.ResponseWriter, r *http.Request) bool
+	// RPCStats, if set, is told about every admin API call (/api/...) when it ends: its status, how long it took and whether
+	// it was a stream (rpcstat.Window, read by OpsService.GetPanelResources). The VPS edition only.
+	RPCStats interface {
+		Record(status int, d time.Duration, stream bool)
+	}
 }
 
 // mcpWriteWindow is how long an MCP call may take to answer: longer than the listener's write timeout, because a plan that

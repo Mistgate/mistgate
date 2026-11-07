@@ -219,7 +219,8 @@ func (h *fakeHost) Facts(context.Context) hostctl.Facts {
 		RAMTotal: 1 << 30, DiskTotal: 20 << 30, Virt: "kvm", HasIPv6: true, Boot: time.Unix(1700000000, 0)}
 }
 func (h *fakeHost) Metrics() hostctl.Metrics {
-	return hostctl.Metrics{CPUPct: 12.5, SoftirqPct: 3, Load1: 0.5, RAMUsed: 100, RAMTotal: 200, UptimeS: 99}
+	return hostctl.Metrics{CPUPct: 12.5, SoftirqPct: 3, Load1: 0.5, RAMUsed: 100, RAMTotal: 200, UptimeS: 99,
+		StealPct: 2, IOWaitPct: 1, SwapUsed: 10, SwapTotal: 20, ConntrackCount: 30, ConntrackMax: 40, TCPSockets: 5, UDPSockets: 6, NICSpeedMbps: 1000}
 }
 func (h *fakeHost) ApplyBaseline(context.Context) error {
 	h.mu.Lock()

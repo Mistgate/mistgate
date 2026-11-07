@@ -26,6 +26,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
@@ -329,6 +330,10 @@ type world struct {
 	adminv1connect.UnimplementedWarpServiceHandler
 	adminv1connect.UnimplementedClientProbeServiceHandler
 	adminv1connect.UnimplementedRelayServiceHandler
+	opsv1connect.UnimplementedOpsServiceHandler
+
+	loadHours     []uint32 // GetFleetLoad windows (tools_capacity_test.go)
+	withResources bool     // GetNode of nodeA carries the resource fields of a current agent
 
 	rotateReq          []*adminv1.RotateNodeServerPasswordRequest
 	installReq         []*adminv1.StartNodeProvisionRequest
@@ -618,7 +623,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 			HasMetrics: true, Online: []*adminv1.ProtocolCount{{Protocol: "hysteria2", Users: 15}}, DecoyPanelAvailable: true, DecoyOwnAvailable: true,
 			Ipv6: w.ipv6Of(r.Msg.GetNodeId()),
 		},
-		Metrics: &adminv1.NodeMetrics{CpuPct: 12, Load1: 0.5, RamUsedBytes: 1 << 30, RamTotalBytes: 2 << 30},
+		Metrics: w.metricsOf(r.Msg.GetNodeId()),
 		Facts:   &adminv1.NodeFacts{Hostname: "de1.example.com", Os: "linux"},
 		Inbounds: []*adminv1.Inbound{{
 			Id: "inb_1", ProfileName: "Main", Protocol: "hysteria2", NodeId: nodeA, Port: 443, State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
@@ -1687,6 +1692,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return adminv1connect.NewClientProbeServiceHandler(w) },
 		func() (string, http.Handler) { return adminv1connect.NewRelayServiceHandler(w) },
 		func() (string, http.Handler) { return probev1connect.NewProbeServiceHandler(w) },
+		func() (string, http.Handler) { return opsv1connect.NewOpsServiceHandler(w) },
 	} {
 		p, hh := h()
 		mux.Handle(p, hh)

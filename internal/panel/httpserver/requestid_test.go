@@ -14,9 +14,43 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/logring"
+	"github.com/mistgate/mistgate/internal/panel/rpcstat"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/reqid"
 )
+
+// The admin API's load (GetPanelResources) counts the /api calls with their status and time, and nothing else the admin
+// surface serves: not the SPA's pages and assets, not /mcp or /metrics. A stream is counted without its duration.
+func TestRequestIDCountsAdminAPICalls(t *testing.T) {
+	stats := rpcstat.New(nil)
+	s := &Server{cfg: Config{Log: slog.New(slog.DiscardHandler), RPCStats: stats}}
+	handler := s.requestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/x.Service/Fail":
+			http.Error(w, "boom", http.StatusInternalServerError)
+		case "/api/x.Service/Deny":
+			http.Error(w, "no", http.StatusForbidden)
+		case "/api/x.Service/Stream":
+			time.Sleep(30 * time.Millisecond)
+			w.Write([]byte("chunk"))
+		default:
+			w.Write([]byte("ok"))
+		}
+	}))
+	for _, p := range []string{"/api/x.Service/Do", "/api/x.Service/Do", "/api/x.Service/Fail", "/api/x.Service/Deny", "/", "/assets/a.js", "/mcp", "/metrics"} {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, p, nil))
+	}
+	stream := httptest.NewRequest(http.MethodPost, "/api/x.Service/Stream", nil)
+	stream.Header.Set("Content-Type", "application/connect+proto")
+	handler.ServeHTTP(httptest.NewRecorder(), stream)
+	got := stats.Snapshot()
+	if got.Requests != 5 || got.ServerErrors != 1 || got.ClientErrors != 1 {
+		t.Fatalf("counted %+v", got)
+	}
+	if got.P95ms >= 30 {
+		t.Fatalf("the stream's 30 ms reached the latency: p95 %v", got.P95ms)
+	}
+}
 
 // A request gets an id the handler, the log records and the audit rows share; the response header carries it only once the
 // caller was accepted (a stranger must see what the decoy shows); a client's own X-Request-Id is never used.

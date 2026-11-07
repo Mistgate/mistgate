@@ -129,6 +129,19 @@ func TestObservabilityOnARealPanel(t *testing.T) {
 			t.Errorf("admin token %s over the API: %d", m, code)
 		}
 	}
+	// the panel's resources and the fleet's load are reads for everybody, a readonly token included; the admin API calls made
+	// above are counted by the middleware
+	if code, body, _ := call(true, "", "GetPanelResources", `{}`); code != 200 || !strings.Contains(body, `"requests":"`) || !strings.Contains(body, `"pageCount":"`) {
+		t.Errorf("owner GetPanelResources: %d %s", code, body)
+	}
+	for _, m := range []string{"GetPanelResources", "GetFleetLoad"} {
+		if code, body, _ := call(false, roSecret, m, `{"hours":24}`); code != 200 || strings.Contains(body, dir) {
+			t.Errorf("readonly token %s: %d %s", m, code, body)
+		}
+	}
+	if code, _, _ := call(false, "", "GetFleetLoad", `{}`); code == 200 {
+		t.Error("a stranger read the fleet's load")
+	}
 
 	// the request id is on the audit row of the change
 	if code, body, hdr := call(true, "", "SetLogLevel", `{"level":"debug"}`); code != 200 {
@@ -174,6 +187,13 @@ func TestObservabilityOnARealPanel(t *testing.T) {
 			}
 		}
 		return sb.String(), r.IsError
+	}
+	// the load reads reach the real services through MCP
+	if out := mustTool(t, tool, "panel_resources", map[string]any{}); !strings.Contains(out, `"page_count":`) || !strings.Contains(out, `"admin_api":`) {
+		t.Errorf("panel_resources: %s", out)
+	}
+	if out := mustTool(t, tool, "capacity_report", map[string]any{"hours": 24}); !strings.Contains(out, `"hours":24`) || !strings.Contains(out, `"summary":`) {
+		t.Errorf("capacity_report: %s", out)
 	}
 	out, isErr := tool("panel_logs", map[string]any{"min_level": "warn", "code": "dial_failed"})
 	if isErr || !strings.Contains(out, `"dial_failed"`) || strings.Contains(out, "203.0.113.77") || strings.Contains(out, "k4m9x2q7") || strings.Contains(out, "canary-person") {
