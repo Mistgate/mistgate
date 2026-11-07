@@ -4,6 +4,7 @@ import { useT, useLang } from "@/i18n";
 import { useFmt } from "@/lib/format";
 import { updateTimezoneName, useIsOwner, useUpdateActions, useUpdates, type Updates } from "@/lib/updates";
 import { PanelCard } from "@/screens/updates/cards";
+import { PanelResourcesCard } from "./panel-resources";
 import { OpsCards } from "./system-ops";
 
 const card = "flex min-w-0 flex-col gap-3.5 rounded-card-lg border border-line bg-surface p-4 md:p-[18px]";
@@ -27,6 +28,7 @@ export function SystemPage() {
       ) : (
         <Pending />
       )}
+      <PanelResourcesCard />
       <OpsCards />
       <AboutCard panel={q.data?.panel} />
     </div>
