@@ -31,6 +31,21 @@ function graph(over: { inbounds?: GraphInput["inbounds"]; relays?: RelayMsg[]; n
 }
 
 describe("waysGraph", () => {
+  // a real panel's node page drew every server "off", with no direct way and no exit: GetNode sends a switched-off
+  // server as state DISABLED and never filled enabled, so the state is what counts
+  it("a server is on by its state, whether or not enabled came with it", () => {
+    const g = graph({ verdict: CountryVerdict.OK, inbounds: [inbound("hy2", "hysteria2", 443, { enabled: false }), inbound("vless", "vless", 8443, { enabled: false, state: InboundState.DISABLED })] });
+    const node = g.cards.find((c) => c.kind === "node");
+    expect(node?.kind === "node" && node.servers.map((s) => [s.inboundId, s.on])).toEqual([
+      ["vless", false],
+      ["hy2", true],
+    ]);
+    const ids = g.wires.map((w) => w.id);
+    expect(ids).toContain("direct:hy2");
+    expect(ids).toContain("egress:hy2");
+    expect(ids).not.toContain("egress:vless");
+  });
+
   it("lays the cards out in columns: people, entries, the node, the exits", () => {
     const g = graph({ relays: [relay({})] });
     expect(g.cards.map((c) => [c.id, c.column])).toEqual([

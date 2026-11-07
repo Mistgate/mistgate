@@ -146,7 +146,8 @@ export function wayOf(s: Pick<GServer, "on" | "failed" | "listed" | "cdn">, lane
 
 function serverOf(i: GraphInput["inbounds"][number]): GServer {
   const net = networkOf(i.protocol);
-  const on = i.enabled && i.state !== InboundState.DISABLED;
+  // GetNode gives a switched-off server as state DISABLED (older panels never filled enabled): the state decides
+  const on = i.state !== InboundState.DISABLED;
   return {
     inboundId: i.id,
     name: i.profileName,
