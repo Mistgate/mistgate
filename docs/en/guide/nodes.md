@@ -27,6 +27,8 @@ Above the table:
 
 On a phone the table becomes one card per node with the same facts. The list refreshes every 10 seconds. Retired nodes are not listed.
 
+**List**, **Map** and **Load** above the table switch the view, and the browser remembers the last one. A phone has no map; the Cloudflare edition has no load (see [Load](#load)).
+
 A healthy node whose agent is older than the version this panel ships reads **Healthy · outdated agent** with its version; the line is a link to **Updates**. See [Updates](../operations/updates.md).
 
 ## Bulk actions
@@ -49,6 +51,24 @@ While nodes are selected, a bar floats at the foot of the page (on a phone it ta
 Not every selected node takes part in every action, and the window and the progress say which ones sit out and why: an offline node gets no check, a node that logs in by key only has no password to change, a node with no saved SSH access gets no SSH action. The SSH actions read the nodes' saved access fresh before they start, ask you to confirm your sign-in once, and go one node at a time: the panel logs in to each server several times.
 
 A running action grows the bar upwards into a row per node: **Waiting**, **Running…**, **Done** (a check says what it found, with **Open** to the node's page), **Failed** with the reason, or **Skipped** with the reason. **Stop** lets the node in progress finish and starts no more; the rest read **Not started**. At the end a summary says how many went through: **Retry for N** runs the failed and the not started ones again, **Close** puts the rows away and keeps the selection. One action runs at a time, and leaving the page while it runs asks first. If the servers stop answering after several retries, wait a minute: each server limits how often the panel logs in.
+
+## Load
+
+**Load** reads each node's hours of host load over the last 24 hours, 7 days (the default) or 30 days, and says how loaded the node was, what runs out first and how many more people it can take. It never contacts a node. The VPS edition only: the Cloudflare edition does not keep these hours.
+
+Above the table: the nodes by status, the room left across the fleet ("room for about 80 more people") and the node with the most room.
+
+| Column | What it shows |
+|:--|:--|
+| **People at peak** | The most people online at once in the period. |
+| **Busy-hour CPU** | The CPU mean of the busiest hour: the hour the node has to get through every day. |
+| **Runs out first** | The resource closest to its limit once it is halfway there: CPU, CPU steal, bandwidth, memory, connection tracking or disk; **Nothing close** otherwise. |
+| **Room for** | How many more people the node can take before its busy hour reaches 80% CPU (and, with a known bandwidth, before its busier direction reaches 90% of it). **No room** on an overloaded node. A dash when the data cannot tell, with the reason on hover: under a day of readings, a number of people online that barely changed, or a CPU that does not follow the people. |
+| **Status** | **OK**, **Busy** (worth a look), **Overloaded** (people already feel it) or **No data**. |
+
+A node is **Busy** from a 60% busy hour, CPU peaks of 85% (the 95th percentile of the hourly peaks), 10% steal, 70% of its bandwidth, 85% memory, 80% connection tracking or an 80% full disk, and **Overloaded** from 80%, 97%, 25%, 90%, 95%, 95% and 92%; the steal, connection tracking and disk thresholds are the doctor's. The bandwidth is the one set in the node's settings, else the link speed its network card reports.
+
+The arrow at the end of a row opens what to do and the numbers behind it. The recommendations name the node with the most room to move people to, say when the provider oversells the host (high steal), when connection tracking, memory or the disk fills, when the server swaps, and when the agent's memory grows day after day while the people do not (a likely leak). The cost per person, "CPU per 100 people" and "traffic per person", comes from a least-squares fit of the hourly CPU and traffic on the hourly mean of people online. An agent older than this panel does not report steal, swap, connection tracking or its own cost: those say "not known", never zero, and the node asks for an update. The [assistant](assistant.md) and MCP (`capacity_report`) read the same report.
 
 ## Node statuses
 
@@ -100,6 +120,8 @@ The page has seven tabs, each answering one question: **Overview** (is all well?
 ### Overview
 
 - **CPU**, **RAM**, **DISK**, **NETWORK**: the latest readings. The CPU bar shows the softirq part (network interrupts) in a second colour, with the vCPU count and the load. Readings arrive a few seconds after the agent connects; an offline node keeps its last readings and says since when it is offline.
+- **Resources**: what took the machine's CPU, split into **Mistgate** (the agent and every engine inside it: what Mistgate itself costs the server), **Kernel networking** (softirq), **Steal** (time the hypervisor gave to other virtual machines) and **Everything else**; memory with Mistgate's share and swap; the connection-tracking table and the agent's open files as meters (amber from 80%, red from 95%); sockets; and the link against the speed of the network card when its driver reports one. Each part explains itself on hover. An agent older than this panel does not report these: the card asks to update it.
+- **Load history**: the node's hours over the last 24 hours or 7 days, the mean and the peak of each hour: CPU, people online, and steal and Mistgate's own CPU once an updated agent has reported them. The VPS edition only.
 - **Traffic · 24 h**: hourly traffic through the node.
 - **Ways in**: a one-line strip with a chip per lane; a chip opens that lane on the **Ways in** tab, and **All ways in ›** opens the tab.
 - **Alerts**: the open alerts of this node, with the same buttons as on the Health page, and the last three that closed. **All alerts** opens the Health page. The card is hidden when there was nothing.

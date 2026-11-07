@@ -164,10 +164,13 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 | 其他 VPN 的残留（`foreign_vpn`） | 检查 x-ui、Xray、remnanode、hysteria-server 和 `wg-quick@` 的 systemd 单元，VPN 镜像的 Docker 容器，不属于 Mistgate 的 `wg*` 和 `awg*` 接口，以及正在运行的 `xray`、`x-ui` 和 `sing-box` 进程。 | 发现上述任一项 | 其中一项占用了协议配置端口 | 无：是否移除由你决定 |
 | 非 Mistgate 防火墙规则（`foreign_nft`） | 检查不属于 Mistgate 的 nftables 表。此检查无法看到旧式 iptables 规则。 | 外部表包含 nat hook | 外部规则重定向、改写或丢弃协议配置端口或端口跳跃范围的流量 | 无 |
 | 端口占用（`port_conflicts`） | 检查协议配置端口、端口跳跃范围，以及 Hysteria2 协议配置的 HTTPS 伪装站点和 ACME 的 TCP 端口上的监听套接字。 | 端口跳跃范围内有外部监听程序、TCP 端口被外部进程占用，或协议配置之前无法绑定端口但当前已空闲 | 外部进程占用了协议配置端口 | 仅重启未能绑定端口的协议配置 |
-| 网络基线设置（`net_baseline`） | 检查 `fq` 默认 qdisc、BBR 拥塞控制、UDP 缓冲区最大值（`net.core.rmem_max` 和 `net.core.wmem_max`，至少 16 MiB）、Mistgate 的 sysctl 文件和 journald drop-in。新的 UDP 中继套接字从 `net.core.rmem_default` 和 `net.core.wmem_default` 继承的缓冲区至少为 1 MiB；`net.ipv4.udp_mem` 仍会限制 UDP 总内存。conntrack 表至少有 65,536 个条目和 16,384 个 bucket，同时保留更高的现有值。 | 设置与基线不符，或 conntrack 表使用率达到 80% | 无 | 设置不符时恢复基线设置 |
+| 网络基线设置（`net_baseline`） | 检查 `fq` 默认 qdisc、BBR 拥塞控制、UDP 缓冲区最大值（`net.core.rmem_max` 和 `net.core.wmem_max`，至少 16 MiB）、Mistgate 的 sysctl 文件和 journald drop-in。新的 UDP 中继套接字从 `net.core.rmem_default` 和 `net.core.wmem_default` 继承的缓冲区至少为 1 MiB；`net.ipv4.udp_mem` 仍会限制 UDP 总内存。conntrack 表至少有 65,536 个条目和 16,384 个 bucket，同时保留更高的现有值。 | 设置与基线不符（conntrack 表是否快满由 `conntrack_fill` 判断） | 无 | 设置不符时恢复基线设置 |
 | 证书（`cert_expiry`） | 检查每个 TLS 协议配置实际提供的证书及其是否匹配域名，还会检查 Agent 自身连接面板的证书。 | 协议配置证书剩余不到 14 天；Agent 证书剩余不到 5 天 | 证书剩余不到 3 天、已过期或域名不匹配；Agent 证书剩余不到 1 天 | 仅重启使用自签名证书的协议配置 |
 | 内存（`memory_pressure`） | 检查可用内存、swap、内存压力（PSI）以及过去 24 小时内核日志中的 OOM 终止记录。 | 可用内存少于 12%、压力下 swap 使用率超过 50%，或发生 OOM 终止 | 可用内存少于 5%、压力严重，或 OOM killer 终止了 Agent 或 VPN 引擎 | 无 |
 | CPU softirq（`cpu_softirq`） | 检查 10 分钟内 softirq 平均占比和 CPU 总使用率。采集到 30 个样本前会跳过。 | softirq 达到 50% | softirq 达到 90%，或 CPU 达到 97% | 无 |
+| CPU 窃取时间（`cpu_steal`） | 同样 10 分钟内，虚拟化层分给同一宿主机上其他虚拟机的 CPU 时间平均占比。采集到 30 个样本前会跳过。 | 达到 10% | 达到 25% | 无：请服务商迁移服务器，或迁移节点 |
+| 连接跟踪表（`conntrack_fill`） | 内核连接跟踪表的条目数与 `nf_conntrack_max` 之比，以及内核统计的丢弃数。表满时所有新连接都会被丢弃。未加载 conntrack 时跳过。 | 使用率达到 80% | 使用率达到 95% | 无：调大 `net.netfilter.nf_conntrack_max`，或迁移用户 |
+| Agent 打开的文件（`agent_fds`） | Agent 打开的文件描述符数量（每条连接占一个）与其软限制之比；服务允许 65,536 个。 | 达到上限的 80% | 达到上限的 95% | 无：以服务方式运行 Agent，或迁移用户 |
 | 内核头文件（`kernel_headers`） | 检查 AmneziaWG 内核模块所需的头文件、`dkms`、`make` 和 `gcc`。没有 AmneziaWG 协议配置时会跳过；仅当 AmneziaWG 运行在用户态时作为信息显示。 | 请求使用内核模式，但工具缺失且模块未运行 | 无 | 无：参见 [AmneziaWG](../guide/amneziawg.md) |
 | AmneziaWG 后端（`awg_backend`） | 检查 AmneziaWG 使用的后端：内核模块或用户态。没有 AmneziaWG 协议配置时会跳过。 | 主机防火墙丢弃转发流量（Docker 中常见） | 没有可用后端：缺少 `/dev/net/tun`、服务文件过旧，或内核模式下缺少模块 | 报告 `unit_outdated` 且 Agent 提供修复时刷新服务单元 |
 | WARP 出口（`warp_path`） | 检查节点的 WARP 隧道及路由。节点没有 WARP 账户且没有协议配置经 WARP 出口时会跳过。 | 协议配置经 WARP 出口时，WARP 处于暂停状态；或隧道已建立，但最近一次检测失败 | 协议配置经 WARP 出口，但节点没有账户；主机与 WARP 的路由表、规则优先级或接口名称冲突；没有 WireGuard 后端；或 WARP 离线 | 隧道离线或最近一次检测失败时，检查 WARP；如果离线则重连 |
