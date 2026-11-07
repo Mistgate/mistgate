@@ -1179,7 +1179,7 @@ func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
 	updated.State, updated.SentAt, updated.FromVersion, updated.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = store.NewID("req_"), p.now, "", digest
 	updated.AnswerWait = p.configuredAnswerWait(n)
-	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError = "", -1, 0, 0, 0, 0, 0, ""
+	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError = "", -1, 0, 0, 0, 0, ""
 	ok, err := s.st.MarkStepSent(p.ctx, &updated)
 	if err != nil {
 		s.log.Warn("update: mark link update sent", "node", x.NodeID, "err", err)
