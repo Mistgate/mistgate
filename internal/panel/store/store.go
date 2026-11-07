@@ -304,6 +304,22 @@ func (s *Store) DeleteSettings(ctx context.Context, keys ...string) error {
 	return err
 }
 
+// SetAndDeleteSettings applies setting upserts and deletes in one atomic batch.
+func (s *Store) SetAndDeleteSettings(ctx context.Context, kv map[string]string, keys ...string) error {
+	stmts := make([]Stmt, 0, len(kv)+1)
+	for k, v := range kv {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`, Args: []any{k, v}})
+	}
+	if len(keys) > 0 {
+		stmts = append(stmts, Stmt{Query: `DELETE FROM setting WHERE k IN (SELECT value FROM json_each(?))`, Args: []any{accJSON(keys)}})
+	}
+	if len(stmts) == 0 {
+		return nil
+	}
+	_, err := s.batch(ctx, stmts...)
+	return err
+}
+
 // SetSettingsIfAbsent stores each setting of kv that has no value yet and returns the stored value of every key of kv
 // (the supplied one, or the one that was there first). Isolates that generate the same first-run settings at the same
 // time all end up with the stored ones.

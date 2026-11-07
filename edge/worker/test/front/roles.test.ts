@@ -63,6 +63,7 @@ describe("public and admin roles", () => {
 
 describe("link role", () => {
   it("hands the upgrade the panel marks to the NodeLink object of its node, in FRONT's script", async () => {
+    const nodeId = `nod_${"a".repeat(26)}`;
     const forwarded: { id: string; request: Request }[] = [];
     const ns = {
       idFromName: (n: string) => n,
@@ -73,12 +74,12 @@ describe("link role", () => {
         },
       }),
     };
-    const f = fake({ fetch: async () => answer(204, [["X-Mistgate-Link", "nod_7"]]) });
-    const upgrade = new Request("https://p.example.test/lnk/link/nod_7", { headers: { Upgrade: "websocket" } });
+    const f = fake({ fetch: async () => answer(204, [["X-Mistgate-Link", nodeId]]) });
+    const upgrade = new Request(`https://p.example.test/lnk/link/${nodeId}`, { headers: { Upgrade: "websocket" } });
     const response = await linkRole(f.runtime).fetch(upgrade, env({ NODELINK: ns }), ctx());
     expect([response.status, await response.text()]).toEqual([202, "socket"]);
     expect(forwarded).toHaveLength(1);
-    expect(forwarded[0]!.id).toBe("nod_7");
+    expect(forwarded[0]!.id).toBe(nodeId);
     expect(forwarded[0]!.request).toBe(upgrade);
   });
 

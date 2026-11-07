@@ -239,7 +239,8 @@ describe.skipIf(!dir)("the built edge bundle in workerd", () => {
 
   it("a link upgrade is LINK's: 101 from the node's NodeLink object in FRONT, whose first frame is the challenge from PanelLink", async () => {
     const { link_prefix } = await settings();
-    const response = await mf.dispatchFetch(`${ORIGIN}${link_prefix}link/nod_bundle_probe`, { headers: { Upgrade: "websocket" } });
+    const nodeId = `nod_${"a".repeat(26)}`;
+    const response = await mf.dispatchFetch(`${ORIGIN}${link_prefix}link/${nodeId}`, { headers: { Upgrade: "websocket" } });
     expect(response.status).toBe(101);
     const socket = (response as unknown as { webSocket: WebSocket }).webSocket;
     expect(socket).toBeTruthy();
@@ -256,7 +257,7 @@ describe.skipIf(!dir)("the built edge bundle in workerd", () => {
     expect(new TextDecoder("latin1").decode(bytes)).toContain("panel.example.test");
     socket.close(1000, "done");
     // without the upgrade the same path is the decoy
-    expect((await mf.dispatchFetch(`${ORIGIN}${link_prefix}link/nod_bundle_probe`)).status).toBe(404);
+    expect((await mf.dispatchFetch(`${ORIGIN}${link_prefix}link/${nodeId}`)).status).toBe(404);
   }, 120_000);
 
   it("a cron tick is JOBS's: a user whose expiry has passed becomes EXPIRED", async () => {

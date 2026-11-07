@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -235,6 +236,30 @@ func TestRetentionSettingsAreValidatedAndStored(t *testing.T) {
 	}
 }
 
+func TestRetentionChangesRollbackWhenAResetFails(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if err := e.st.SetSettings(ctx, map[string]string{"retention.events_info_days": "45", "retention.journal_days": "3"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.st.W.ExecContext(ctx, `CREATE TRIGGER reject_journal_retention_reset BEFORE DELETE ON setting
+		WHEN OLD.k = 'retention.journal_days' BEGIN SELECT RAISE(ABORT, 'reject reset'); END`); err != nil {
+		t.Fatal(err)
+	}
+	_, err := e.cl.SetRetention(ctx, connect.NewRequest(&opsv1.SetRetentionRequest{Values: map[string]uint32{"events_info_days": 30, "journal_days": 7}}))
+	if err == nil {
+		t.Fatal("the failing reset succeeded")
+	}
+	values, err := e.st.SettingValues(ctx, []string{"retention.events_info_days", "retention.journal_days"})
+	if err != nil || values["retention.events_info_days"] != "45" || values["retention.journal_days"] != "3" {
+		t.Fatalf("the failed batch left partial settings: %v, %v", values, err)
+	}
+	var audits int
+	if err := e.st.R.QueryRowContext(ctx, `SELECT count(*) FROM audit WHERE action = 'retention_set'`).Scan(&audits); err != nil || audits != 0 {
+		t.Fatalf("failed change wrote %d audit rows: %v", audits, err)
+	}
+}
+
 func TestExportIsScrubbedNDJSON(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
@@ -410,6 +435,86 @@ func TestMetricsAuthAndContent(t *testing.T) {
 		if strings.Contains(a.Params, "mgm_") {
 			t.Errorf("audit row holds a token: %+v", a)
 		}
+	}
+}
+
+func TestMetricsScrapesReuseSettingsWithTheBody(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	on := true
+	settings, err := e.cl.SetMetricsSettings(ctx, connect.NewRequest(&opsv1.SetMetricsSettingsRequest{Enabled: &on}))
+	if err != nil || settings.Msg.Token == "" {
+		t.Fatalf("enable metrics: %+v, %v", settings, err)
+	}
+	serve := func() *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		r.Header.Set("Authorization", "Bearer "+settings.Msg.Token)
+		w := httptest.NewRecorder()
+		e.svc.MetricsHandler()(w, r)
+		return w
+	}
+	if first := serve(); first.Code != http.StatusOK {
+		t.Fatalf("first scrape: %d %s", first.Code, first.Body.String())
+	}
+	if _, err := e.st.W.ExecContext(ctx, `DROP TABLE setting`); err != nil {
+		t.Fatal(err)
+	}
+	if second := serve(); second.Code != http.StatusOK {
+		t.Fatalf("second scrape reread settings instead of using the body cache: %d %s", second.Code, second.Body.String())
+	}
+}
+
+func TestJournalExportMarksTruncation(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	nodeID := "nod_export"
+	if _, err := e.st.W.ExecContext(ctx, `INSERT INTO node (id, name, state, address, created_at) VALUES (?, 'de1', 'active', '203.0.113.8', ?)`, nodeID, now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := e.st.W.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO node_journal (node_id, hour_start, key, level, source, message, inbound_id, attrs_json, count, first_at, last_at)
+		VALUES (?, ?, ?, 2, 'agent', 'warning', '', '{}', 1, ?, ?)`)
+	if err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	for i := 0; i <= exportMaxRows; i++ {
+		if _, err := stmt.ExecContext(ctx, nodeID, now.Truncate(time.Hour).Unix(), strconv.Itoa(i), now.Unix(), now.Unix()); err != nil {
+			_ = stmt.Close()
+			_ = tx.Rollback()
+			t.Fatalf("insert journal row %d: %v", i, err)
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	stream, err := e.cl.ExportData(ctx, connect.NewRequest(&opsv1.ExportDataRequest{
+		SinceUnix: now.Add(-time.Hour).Unix(), UntilUnix: now.Unix(), Sources: []string{"journal"},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	for stream.Receive() {
+		out.Write(stream.Msg().Data)
+	}
+	if err := stream.Err(); err != nil {
+		t.Fatal(err)
+	}
+	body := out.String()
+	if got := strings.Count(body, `"node":"de1"`); got != exportMaxRows {
+		t.Fatalf("exported %d journal rows, want %d", got, exportMaxRows)
+	}
+	if !strings.Contains(body, `"source":"journal","truncated":true`) {
+		t.Fatalf("journal export omitted the truncated marker")
 	}
 }
 

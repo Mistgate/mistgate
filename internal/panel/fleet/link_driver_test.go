@@ -530,9 +530,10 @@ func TestLinkStateRoundTripContinuesTheSession(t *testing.T) {
 }
 
 func TestLinkHandlerAnswersWithTheMarkerOnTheEdge(t *testing.T) {
+	const nodeID = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa"
 	r := newLinkRig(t, "alice-marker")
 	serve := func(h http.Handler, upgrade string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodGet, "/link/nod_x", nil)
+		req := httptest.NewRequest(http.MethodGet, "/link/"+nodeID, nil)
 		if upgrade != "" {
 			req.Header.Set("Upgrade", upgrade)
 		}
@@ -542,7 +543,7 @@ func TestLinkHandlerAnswersWithTheMarkerOnTheEdge(t *testing.T) {
 	}
 	r.e.f.cfg.Remote = &testRemote{}
 	h := r.e.f.LinkHandler()
-	if w := serve(h, "websocket"); w.Code != http.StatusNoContent || w.Header().Get(LinkMarkerHeader) != "nod_x" {
+	if w := serve(h, "websocket"); w.Code != http.StatusNoContent || w.Header().Get(LinkMarkerHeader) != nodeID {
 		t.Fatalf("edge upgrade: status %d, header %q", w.Code, w.Header().Get(LinkMarkerHeader))
 	}
 	if w := serve(h, ""); w.Code != http.StatusNotFound {

@@ -320,7 +320,7 @@ function advanceClock(ms) {
 // agent played by node:crypto. agentlink signs the SHA-256 digest of "domain NUL node NUL audience NUL nonce(s)", which is
 // plain ECDSA-SHA256 over that preimage, in IEEE P1363 r||s form.
 async function assertLinkHandshake(panel) {
-  const nodeID = "nod_bridge";
+  const nodeID = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa";
   const audience = "link.example.com";
   const link = (op, args) => Promise.race([panel.link(op, args), wasmFailure]);
   const nodeKey = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -401,7 +401,7 @@ async function assertLinkHandshake(panel) {
   await opened.waitUntil;
 
   // A Hello on a bare node (no inbounds) costs 5 D1 calls. Its update cost is the per-isolate "updating" cache (10 s): a
-  // stale cache adds one read of the active rollout, and a second one for its steps when there is a rollout. nod_bridge has
+  // stale cache adds one read of the active rollout, and a second one for its steps when there is a rollout. The bridge node has
   // inbounds, so its own Hello is dominated by their reads. The clock is moved forward instead of sleeping, and each node
   // and rollout is removed afterwards, so later counts and the connected-node lists are unchanged.
   const helloCost = async (id, { advanceMs = 0, rollout = false } = {}) => {
@@ -939,13 +939,13 @@ async function run() {
 
     // Seed the node fixture like the Go subscription fixtures, then create the profiles and access rows through the admin API.
     await globalThis.__d1.prepare("INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind("nod_bridge", "node de", "de.example.com", "active", 1).run();
+      .bind("nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "node de", "de.example.com", "active", 1).run();
     const hysteriaProfile = await connectRPC(secondPanel, "ProfileService/CreateProfile", {
       protocol: "hysteria2", name: "bridge-hysteria2",
     }, adminCookie);
     assert.equal(hysteriaProfile.response.status, 200, "the admin API creates a Hysteria2 profile");
     const hysteriaInbound = await connectRPC(secondPanel, "ProfileService/CreateInbound", {
-      profileId: hysteriaProfile.message.profile.id, nodeId: "nod_bridge",
+      profileId: hysteriaProfile.message.profile.id, nodeId: "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa",
     }, adminCookie);
     assert.equal(hysteriaInbound.response.status, 200, "the admin API deploys the Hysteria2 profile");
     const awgProfile = await connectRPC(secondPanel, "ProfileService/CreateProfile", {
@@ -953,7 +953,7 @@ async function run() {
     }, adminCookie);
     assert.equal(awgProfile.response.status, 200, "the admin API creates an AmneziaWG profile");
     const awgInbound = await connectRPC(secondPanel, "ProfileService/CreateInbound", {
-      profileId: awgProfile.message.profile.id, nodeId: "nod_bridge",
+      profileId: awgProfile.message.profile.id, nodeId: "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa",
     }, adminCookie);
     assert.equal(awgInbound.response.status, 200, "the admin API deploys the AmneziaWG profile");
     const group = await connectRPC(secondPanel, "GroupService/CreateGroup", {
@@ -1167,7 +1167,7 @@ async function run() {
     const baseCronDate = new Date();
     // This node is deliberately disconnected for the fleet fan-out assertion but still inside the blip window, so the
     // evaluator pass has no alert transition to add a variable Telegram node-name lookup.
-    await globalThis.__d1.prepare("UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'nod_bridge'")
+    await globalThis.__d1.prepare("UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'nod_aaaaaaaaaaaaaaaaaaaaaaaaaa'")
       .bind(nowS, nowS).run();
     const normalCronDate = new Date(baseCronDate);
     normalCronDate.setUTCMinutes(3, 0, 0);

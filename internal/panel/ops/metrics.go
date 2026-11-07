@@ -39,10 +39,14 @@ const (
 )
 
 type metricsState struct {
-	mu      sync.Mutex
-	at      time.Time
-	body    []byte
-	hashHex string // last token hash seen, to drop the cache when the token changes
+	mu            sync.Mutex
+	at            time.Time
+	body          []byte
+	hashHex       string // token hash used to build the cached body
+	configAt      time.Time
+	configSet     bool
+	configEnabled bool
+	configHash    string
 }
 
 func (r rpc) GetMetricsSettings(ctx context.Context, _ *connect.Request[opsv1.GetMetricsSettingsRequest]) (*connect.Response[opsv1.GetMetricsSettingsResponse], error) {
@@ -81,6 +85,8 @@ func (r rpc) SetMetricsSettings(ctx context.Context, req *connect.Request[opsv1.
 	}
 	s.m.mu.Lock()
 	s.m.body = nil
+	s.m.hashHex = ""
+	s.m.configSet = false
 	s.m.mu.Unlock()
 	state := "off"
 	if enabled {
@@ -111,11 +117,27 @@ func (s *Service) metricsConfig(ctx context.Context) (enabled bool, hash string,
 	return kv[metricsEnabledKey] == "1", kv[metricsTokenHashKey], nil
 }
 
+func (s *Service) cachedMetricsConfig(ctx context.Context) (enabled bool, hash string, err error) {
+	s.m.mu.Lock()
+	defer s.m.mu.Unlock()
+	now := s.cfg.Now()
+	if s.m.configSet && now.Sub(s.m.configAt) < metricsCacheFor {
+		return s.m.configEnabled, s.m.configHash, nil
+	}
+	enabled, hash, err = s.metricsConfig(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	s.m.configAt, s.m.configSet = now, true
+	s.m.configEnabled, s.m.configHash = enabled, hash
+	return enabled, hash, nil
+}
+
 // MetricsHandler serves /metrics and reports whether it answered. Off, or with no token made yet, it writes nothing and returns
 // false, so the admin answers as for any unknown path. A missing or wrong token: 401.
 func (s *Service) MetricsHandler() func(w http.ResponseWriter, r *http.Request) bool {
 	return func(w http.ResponseWriter, r *http.Request) bool {
-		enabled, hash, err := s.metricsConfig(r.Context())
+		enabled, hash, err := s.cachedMetricsConfig(r.Context())
 		if err != nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return true

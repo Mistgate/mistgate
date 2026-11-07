@@ -738,7 +738,8 @@ describe("the front door forward", () => {
 
   it("hands a 204 + marker answer's upgrade to the node's object, which takes its node id from its name, not from the client", async () => {
     const fake = script();
-    const res = await fetchFront("https://panel.test/p/link/nod_front", { headers: { Upgrade: "websocket", "X-Mistgate-Link": "nod_other" } });
+    const nodeId = `nod_${"a".repeat(26)}`;
+    const res = await fetchFront(`https://panel.test/p/link/${nodeId}`, { headers: { Upgrade: "websocket", "X-Mistgate-Link": `nod_${"b".repeat(26)}` } });
     expect(res.status).toBe(101);
     expect(res.headers.get("x-mistgate-link")).toBeNull();
     const c = new Client(res.webSocket!);
@@ -748,7 +749,7 @@ describe("the front door forward", () => {
     expect(fake.calls.find((x) => x.op === "challenge")?.args).toEqual({ audience: "panel.test" }); // not calls[0]: an earlier test's late closed step can come first
     c.send("auth");
     await c.until(() => fake.calls.some((x) => x.op === "accept"), "the accept call");
-    expect(fake.calls.find((x) => x.op === "accept")?.args).toMatchObject({ nodeId: "nod_front" }); // not the client's nod_other
+    expect(fake.calls.find((x) => x.op === "accept")?.args).toMatchObject({ nodeId }); // not the client's node id
   });
 
   it("leaves every other panel answer alone", async () => {
