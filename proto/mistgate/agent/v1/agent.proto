@@ -454,6 +454,26 @@ package mistgate.agent.v1;
 //     The agent returns no router address. Caps: 1-32 hops, 1.5 s per hop, one trace at a time ("busy"), 60 s in all.
 //     Errors as the other probes: bad_params, unsupported_host, unsupported, no_route, busy, "failed: <short message>".
 
+// PATH SPEED (additive, protocol api_version stays 1)
+//   A bounded throughput test between two fleet nodes (the panel's path_speed, owner-approved: it moves bulk traffic).
+//   - WIRE SHAPE. The command speed_test reuses the UdpSend message instead of a message of its own: the admin Worker of the
+//     Cloudflare edition has no room for another generated message (see scripts/check-edge-sizes.sh). The fields mean: size
+//     = the step (1 serve, 2 run, 3 stop), host = the target node's address (run), ports[0] = the test port (run), tag = the
+//     16-byte one-time token (all steps), count = mb, 8-32 MiB (serve, run), pps = the longest the listener or the run may
+//     take in seconds, 1-30 (serve, run), df = direction up (true) or down (false). UdpSend's own limits do not apply.
+//   - CAPABILITY GATE. An agent lists "speed/1" in Hello.capabilities. The panel sends speed_test ONLY to a stream that
+//     listed it, to both ends of the test.
+//   - SERVE (the target). Step 1 opens a TCP listener on an ephemeral port, accepts ONE connection that starts with the
+//     token, and closes the listener. Answer: CommandResult{ok, params{"port": "<n>"}}. The listener closes by itself after
+//     pps seconds. Direction down: the listener sends mb MiB to the connection; up: it reads mb MiB and answers one byte.
+//     Step 3 with the same token closes it early.
+//   - RUN (the sender). Step 2 dials host:port, sends the token, moves mb MiB in the direction and answers
+//     CommandResult{ok, params{"mbit_s": "<n.n>", "connect_ms", "first_byte_ms", "duration_ms", "bytes"}}. The agent never
+//     dials a destination it would refuse for TcpProbe (unspecified, multicast, link-local).
+//   - CAPS. One test per agent at a time ("busy", also while a bandwidth test runs); no traffic to or from anything but the
+//     address in the message. Errors: bad_params, unsupported_host, no_route, busy, timeout, refused, "failed: <short
+//     message>".
+
 // COUNTRY PROBE (additive, protocol api_version stays 1)
 //   Does a TCP SYN to a fleet node survive the national DPI (the Russian TSPU)? Run on a node INSIDE that country, so the
 //   answer is for the network of that node's datacenter. The method needs no raw socket and no capability: a plain TCP
@@ -538,6 +558,27 @@ package mistgate.agent.v1;
 // LOGS
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
+//
+// DEBUG CAPTURE (additive; capability "debug/1")
+//   The panel asks one node to log more for a short while. Nothing here is on by default and nothing survives a restart.
+//   - CAPABILITY GATE. The panel sends DebugCapture ONLY to a stream whose Hello carried "debug/1"; an older agent is never
+//     asked (the admin call answers FAILED_PRECONDITION "agent too old").
+//   - START. DebugCapture{request_id, level, sources, duration_s} is answered with one CommandResult: ok, or error "busy"
+//     (a capture is already running on this node), "invalid" (a level, a source or a duration it does not accept) or
+//     "unsupported". level is "debug" or "info"; sources names the agent's own log sources ("agent", "hysteria2", "xray",
+//     "awg", ...), empty = all; duration_s is 1..900 (the agent clips what is above). The agent raises its log level to the
+//     capture's, buffers the matching records in a bounded capture buffer (20000 records and 4 MiB; what does not fit is
+//     counted in `dropped`), and puts the level back when the time is up, on a stop, or when the process restarts (the
+//     capture lives in memory only).
+//   - SCRUB ON THE NODE. A record enters the capture buffer already cleaned, by the same internal/logscrub pass and the same
+//     attribute allow-list (logscrub.JournalAttrs) as a journal entry: addresses become "<ip>", names are cut for xray, and
+//     key-shaped runs are removed. The raw record never leaves the process.
+//   - SHIP. When the time is up (or on a stop) the agent sends the buffer as DebugCaptureReport chunks (request_id echoed,
+//     at most 64 lines each, the last with eof). A capture that ends while the link is down is shipped when the next
+//     session opens, if that is within 15 minutes of its end; after that it is dropped.
+//   - STOP. DebugCapture{request_id, stop: true, capture_id of the running capture} ships what is buffered now and ends the capture; the
+//     CommandResult comes after the last chunk. A stop for an unknown capture is answered ok with detail "none".
+//
 
 // Bootstrap and certificate renewal.
 service EnrollmentService {
@@ -627,6 +668,8 @@ message ConnectRequest {
     RenewRequest renew = 18;
     // Best-effort progress for an UpdateAgent command. The latest value is enough for the panel UI.
     UpdateProgress update_progress = 19;
+    // The records of a debug capture (seq = 0, see "DEBUG CAPTURE"). Sent only by agents that list "debug/1".
+    DebugCaptureReport debug_report = 40;
   }
 }
 
@@ -673,7 +716,7 @@ message Hello {
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS").
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -977,6 +1020,8 @@ enum Severity {
   SEVERITY_INFO = 1;
   SEVERITY_WARNING = 2;
   SEVERITY_ERROR = 3;
+  // Only in DebugCaptureReport lines (see "DEBUG CAPTURE"); the log ring and the journal never hold it.
+  SEVERITY_DEBUG = 4;
 }
 
 // Reliable (carries seq). The code vocabulary is open (plugins add their own); the UI maps
@@ -1126,6 +1171,10 @@ message ConnectResponse {
     CountryProbe country_probe = 31;
     // Only sent to agents with "probe/1" in Hello.capabilities (see "PATH PROBE").
     PathTrace path_trace = 32;
+    // Only sent to agents with "speed/1" in Hello.capabilities (see "PATH SPEED"; the wire shape is UdpSend).
+    UdpSend speed_test = 33;
+    // Only sent to agents with "debug/1" in Hello.capabilities (see "DEBUG CAPTURE").
+    DebugCapture debug_capture = 40;
   }
 }
 
@@ -1620,4 +1669,33 @@ message FetchUpdateResponse {
   bytes data = 1;
   // Size of the whole file, set on every message so a resumed download can check it against the manifest.
   uint64 total_size = 2;
+}
+
+// Panel -> node ("DEBUG CAPTURE"). Answered with one CommandResult carrying the same request_id.
+message DebugCapture {
+  string request_id = 1;
+  // "debug" or "info": the lowest level the capture keeps.
+  string level = 2;
+  // Log sources to capture ("agent", an engine's name ...); empty = all.
+  repeated string sources = 3;
+  // How long to capture, 1..900 seconds.
+  uint32 duration_s = 4;
+  // Stop the running capture named by capture_id and ship it now; level, sources and duration_s are ignored. The CommandResult
+  // carries this message's own request_id.
+  bool stop = 5;
+  // With stop: the request_id of the capture to stop.
+  string capture_id = 6;
+}
+
+// Node -> panel: one piece of a finished capture, oldest record first. Lines are already scrubbed on the node; a debug line has
+// level SEVERITY_DEBUG.
+message DebugCaptureReport {
+  string request_id = 1;
+  repeated LogLine lines = 2;
+  // Set on the last chunk of the capture.
+  bool eof = 3;
+  // Records that did not fit the capture buffer (counted, not kept). Set on the last chunk.
+  uint32 dropped = 4;
+  // "expired" (the time was up), "stopped" (a stop), "shutdown" (the agent was stopping). Set on the last chunk.
+  string end_reason = 5;
 }

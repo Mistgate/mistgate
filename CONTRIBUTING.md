@@ -55,6 +55,14 @@ End-to-end tests:
   reloaded in the middle of an upload; `--ssh-only` skips the traffic steps.
 - `scripts/e2e-mcp.sh [-mode listener|prefix|both] [-keep]`: API tokens and MCP against a real panel on loopback, any
   OS, no internet, about a minute.
+- `scripts/dev-fleet.sh [--netem "delay 25ms loss 0.5%"] | --down`: a throwaway panel and three node agents (de1, nl1, fi1) in
+  network namespaces on one Linux host (WSL as root), for a coding agent to run `path_probe`, `node_trace`, `path_speed` and
+  `checks_run_now` against real agents; prints the admin URL and an MCP token. See
+  [AI agents](docs/en/getting-started/ai-agents.md).
+- `scripts/bench.sh [--engines ...] [--variants ...] [--repeat 3] [--update]`: the engine benchmark suite (Hysteria2, VLESS,
+  AmneziaWG; throughput, CPU per GB, latency under load, memory, handshakes; netem variants) against
+  `internal/node/bench/baseline.json`, as root in WSL. Not run on pull requests; see
+  [Benchmarks](docs/en/reference/benchmarks.md#engine-benchmark-suite).
 
 Every stable tag builds a draft release in GitHub Actions; a maintainer rebuilds it from the tag on a machine with the
 offline release key and signs only binaries that rebuild byte for byte. The whole procedure:

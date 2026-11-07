@@ -102,6 +102,8 @@ const written: [string, Record<string, unknown>, string?][] = [
   ["warp_refresh", { node_id: "nod_1" }],
   ["warp_delete", { node: "de1" }],
   ["warp_reregister", { node: "de1" }],
+  ["node.debug_capture", { node_id: "nod_1", node: "de1", capture_id: "req_1", level: "debug", sources: "xray", duration_s: "300" }],
+  ["node.debug_capture_stop", { node_id: "nod_1", node: "de1", capture_id: "req_1" }],
   ["log_level_set", { from: "info", to: "debug", req: "abc12345" }],
   ["retention_set", { audit_days: "100", req: "abc12345" }],
   ["metrics_set", { state: "on", token_rotated: "true" }],

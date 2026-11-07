@@ -26,6 +26,8 @@ const keys: Record<string, MessageKey> = {
   "node.awg_prepare": "audit.node.awg_prepare",
   "node.bandwidth_measure": "audit.node.bandwidth_measure",
   "node.bandwidth_auto": "audit.node.bandwidth_auto",
+  "node.debug_capture": "audit.node.debug_capture",
+  "node.debug_capture_stop": "audit.node.debug_capture_stop",
   "node.ports_check": "audit.node.ports_check",
   "node.ipv6_check": "audit.node.ipv6_check",
   "node.ipv6_entry": "audit.node.ipv6_entry",

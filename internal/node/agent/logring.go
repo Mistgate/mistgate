@@ -101,13 +101,22 @@ func (r *logRing) takeDropped(f *follower) uint32 {
 type ringHandler struct {
 	ring    *logRing
 	journal *journal
+	dbg     *debugState // nil: no debug capture (tests)
 	inner   slog.Handler
 	attrs   []slog.Attr // with the group prefix already applied
 	group   string
+	src     string // the source a WithAttrs gave this logger ("" = agent)
 }
 
 func (h *ringHandler) Enabled(ctx context.Context, l slog.Level) bool {
-	return l >= slog.LevelInfo || h.inner.Enabled(ctx, l)
+	return l >= slog.LevelInfo || h.inner.Enabled(ctx, l) || h.dbg.wants(h.source(), l)
+}
+
+func (h *ringHandler) source() string {
+	if h.src != "" {
+		return h.src
+	}
+	return defaultSrc
 }
 
 func (h *ringHandler) Handle(ctx context.Context, r slog.Record) error {
@@ -134,11 +143,16 @@ func (h *ringHandler) Handle(ctx context.Context, r slog.Record) error {
 		put(a, h.group)
 		return true
 	})
-	h.ring.add(rec)
+	if r.Level >= slog.LevelInfo { // the ring is Info and above, even while a capture or the flag lets debug through
+		h.ring.add(rec)
+	}
 	if h.journal != nil && rec.level >= pb.Severity_SEVERITY_WARNING {
 		h.journal.note(rec)
 	}
-	if h.inner.Enabled(ctx, r.Level) {
+	h.dbg.add(r.Level, rec)
+	// While a capture holds the level up, what it asks for goes to its scrubbed buffer only: the process log (journald) shows what
+	// the configured level shows, as before.
+	if h.inner.Enabled(ctx, r.Level) && (h.dbg == nil || r.Level >= h.dbg.base) {
 		return h.inner.Handle(ctx, r)
 	}
 	return nil
@@ -149,6 +163,9 @@ func (h *ringHandler) WithAttrs(as []slog.Attr) slog.Handler {
 	c.inner = h.inner.WithAttrs(as)
 	c.attrs = append([]slog.Attr(nil), h.attrs...)
 	for _, a := range as {
+		if h.group == "" && a.Key == "source" {
+			c.src = a.Value.Resolve().String()
+		}
 		if h.group != "" {
 			a.Key = h.group + a.Key
 		}

@@ -62,6 +62,9 @@ type Config struct {
 	// Log receives the agent's records; every record also goes to the in-memory ring that LogRequest reads.
 	// Nil = slog.Default().
 	Log *slog.Logger
+	// Level is the LevelVar behind Log's handler. A debug capture raises it for its duration and puts it back; nil = the agent keeps
+	// a private one and the capture only gates what reaches its own buffer.
+	Level *slog.LevelVar
 
 	// Host-side services handed to the engines (engine.Env). Nil Certs means engines get no certificates,
 	// nil Egress means only a "no egress configured" error. Nil Masquerade uses the persisted node decoy site.
@@ -109,6 +112,7 @@ type Agent struct {
 	log       *slog.Logger
 	ring      *logRing
 	journal   *journal
+	debug     *debugState
 	host      hostctl.Host
 	meta      Meta
 	id        atomic.Pointer[identity]
@@ -160,6 +164,7 @@ type Agent struct {
 	tcp           tcpProbeState
 	country       countryProbeState
 	pathTrace     pathTraceState
+	speed         speedState
 	linkCounterMu sync.Mutex
 	linkVolumes   map[linkCounterKey]linkCounterVolume
 	linkWindow    time.Duration // test seam; zero selects the production ten-minute window
@@ -366,10 +371,11 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	}
 	ring := newLogRing()
 	journal := newJournal()
+	dbg := newDebugState(cfg.Level, time.Now)
 	a := &Agent{
-		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, host: host, meta: id.meta,
+		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
 		decoySite:     site,
-		log:           slog.New(&ringHandler{ring: ring, journal: journal, inner: inner}),
+		log:           slog.New(&ringHandler{ring: ring, journal: journal, dbg: dbg, inner: inner}),
 		engines:       map[string]engine.Engine{},
 		torrentEvents: map[string]time.Time{},
 		torrentUTPSyn: map[string]*torrentUTPSynWindow{},
@@ -491,6 +497,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.cancel = cancel
 	a.runCtx = ctx
 	defer cancel(nil)
+	defer a.debug.shutdown() // the capture lives in this process only: the level goes back to what it was
 
 	if a.startUpdate(ctx) { // a rollback decided at start replaces this process before anything runs
 		return context.Cause(ctx)
@@ -958,6 +965,7 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport) err
 	}
 	a.cur.Store(s)
 	defer a.cur.CompareAndSwap(s, nil)
+	a.goBusy(func() { a.debugResume(s) }) // a capture that ended while the link was down
 	if a.clientIPv6DoctorPending.Load() {
 		a.submit(s, job{sweep: true}) // apply HelloAck settings before their doctor re-check
 	}
@@ -1088,6 +1096,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.httpMark(s, m.HttpMark) })
 	case *pb.ConnectResponse_TcpProbe:
 		a.goBusy(func() { a.tcpProbe(s, m.TcpProbe) })
+	case *pb.ConnectResponse_SpeedTest:
+		a.goBusy(func() { a.speedTest(s, m.SpeedTest) })
 	case *pb.ConnectResponse_PathTrace:
 		a.goBusy(func() { a.runPathTrace(s, m.PathTrace) })
 	case *pb.ConnectResponse_CountryProbe:
@@ -1098,6 +1108,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.applyUpdate(s, m.UpdateAgent) })
 	case *pb.ConnectResponse_RollbackAgent:
 		a.goBusy(func() { a.rollbackUpdate(s, m.RollbackAgent) })
+	case *pb.ConnectResponse_DebugCapture:
+		a.goBusy(func() { a.debugCapture(s, m.DebugCapture) })
 	case *pb.ConnectResponse_LogRequest:
 		s.startLog(m.LogRequest)
 	case *pb.ConnectResponse_LogCancel:

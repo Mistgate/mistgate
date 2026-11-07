@@ -27,6 +27,17 @@ service OpsService {
   // Turns /metrics on or off and, with rotate_token, makes a new token; the token is in this response once and only its hash is
   // stored. Turning it on without a token makes one.
   rpc SetMetricsSettings(SetMetricsSettingsRequest) returns (SetMetricsSettingsResponse);
+  // DEBUG CAPTURE of one node (agent capability "debug/1"). Starts it: the node raises its log level for the chosen sources for up
+  // to 15 minutes, keeps the records in a bounded buffer and ships them, scrubbed, when the time is up. An agent without the
+  // capability is FAILED_PRECONDITION "agent too old"; a node that is offline is FAILED_PRECONDITION "node is offline". Admin
+  // profile tokens start one only through an approved plan (node_debug_capture_plan / _apply); it is audit-logged.
+  rpc StartDebugCapture(StartDebugCaptureRequest) returns (StartDebugCaptureResponse);
+  // Ends a running capture now: the node ships what it holds. A capture that is already over is returned as it is.
+  rpc StopDebugCapture(StopDebugCaptureRequest) returns (StopDebugCaptureResponse);
+  // The captures the panel still holds for a node (24 hours), newest first.
+  rpc ListDebugCaptures(ListDebugCapturesRequest) returns (ListDebugCapturesResponse);
+  // The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
+  rpc GetDebugCapture(GetDebugCaptureRequest) returns (GetDebugCaptureResponse);
 }
 
 message GetLogSettingsRequest {}
@@ -153,4 +164,94 @@ message SetMetricsSettingsResponse {
   bool has_token = 2;
   // Set only when a token was made by this call. It is not stored and cannot be read again.
   string token = 3;
+}
+
+// One capture as the panel holds it.
+message DebugCaptureInfo {
+  string capture_id = 1;
+  string node_id = 2;
+  string node_name = 3;
+  // "running" (the node is capturing), "done" (shipped) or "expired" (the time passed and no report came).
+  string state = 4;
+  // "debug" or "info".
+  string level = 5;
+  repeated string sources = 6;
+  uint32 duration_s = 7;
+  int64 started_unix = 8 [jstype = JS_NUMBER];
+  // When the capture ends on the node.
+  int64 ends_unix = 9 [jstype = JS_NUMBER];
+  // The admin that asked (an id or a token's name).
+  string actor = 10;
+  // Records stored, and records the node or the panel did not keep because a limit was reached.
+  uint32 records = 11;
+  uint32 dropped = 12;
+  // "expired", "stopped" or "shutdown" once done; "" while running.
+  string end_reason = 13;
+}
+
+message StartDebugCaptureRequest {
+  string node_id = 1;
+  // "debug" or "info"; "" means "debug".
+  string level = 2;
+  // Log sources ("agent", "hysteria2", "xray", "awg" ...); empty = all. At most 8, each of 1 to 32 letters, digits, "-" or "_".
+  repeated string sources = 3;
+  // 1 to 900 seconds; 0 means 300.
+  uint32 duration_s = 4;
+}
+
+message StartDebugCaptureResponse {
+  DebugCaptureInfo capture = 1;
+}
+
+message StopDebugCaptureRequest {
+  string capture_id = 1;
+}
+
+message StopDebugCaptureResponse {
+  DebugCaptureInfo capture = 1;
+}
+
+message ListDebugCapturesRequest {
+  // "" = every node.
+  string node_id = 1;
+}
+
+message ListDebugCapturesResponse {
+  repeated DebugCaptureInfo captures = 1;
+}
+
+message GetDebugCaptureRequest {
+  // One of the two: a capture, or a node (its newest capture).
+  string capture_id = 1;
+  string node_id = 2;
+  // The lowest level: "debug" or "info"; "" = everything.
+  string min_level = 3;
+  // One log source; "" = all.
+  string source = 4;
+  // Case-insensitive substring of the cleaned message or an attribute value; at most 100 characters.
+  string query = 5;
+  // At most 500; 0 means 100.
+  uint32 limit = 6;
+  // The next_cursor of the previous page (0 = from the first record).
+  int64 after_seq = 7 [jstype = JS_NUMBER];
+}
+
+message DebugRecord {
+  int64 seq = 1 [jstype = JS_NUMBER];
+  int64 time_unix_ms = 2 [jstype = JS_NUMBER];
+  // "debug", "info", "warn" or "error".
+  string level = 3;
+  string source = 4;
+  string message = 5;
+  // Only the allow-listed keys, values scrubbed.
+  map<string, string> attrs = 6;
+}
+
+message GetDebugCaptureResponse {
+  DebugCaptureInfo capture = 1;
+  repeated DebugRecord records = 2;
+  // Pass as after_seq for the next page; 0 when there is none.
+  int64 next_cursor = 3 [jstype = JS_NUMBER];
+  // The sources that appear in the capture, to fill a filter.
+  repeated string sources = 4;
 }

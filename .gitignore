@@ -9,3 +9,4 @@ web/dist/*
 *.db-shm
 .env
 /mistgate-edge
+/bench-report.json

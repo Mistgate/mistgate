@@ -198,6 +198,18 @@ bash scripts/e2e/mcp-token.sh /tmp/mg-e2e.XXXXXX/owner.env --profile operator
 
 第二条命令会为该面板打印 `claude mcp add --transport http mistgate <管理地址>mcp --header "Authorization: Bearer <令牌>"` 一行；在智能体所在的环境中运行它（面板监听在本次运行的网络命名空间内，脚本会提示如何访问）。令牌有效期一天（`--ttl-days`），权限为你选择的档位（`readonly`、`operator`、`admin`）。仅限测试面板：该工具以测试面板所有者身份登录。
 
+### 用于测试的智能体集群
+
+探测、路由追踪和测速需要真实的节点代理。`scripts/dev-fleet.sh` 会在同一台 Linux 主机上（以 root 运行的 WSL 或一次性虚拟机；在 Windows 上脚本会自行转入 WSL）用独立的网络命名空间启动一个面板和三个节点代理（`de1`、`nl1`、`fi1`），用网桥相连，节点之间可选加 netem：
+
+```sh
+bash scripts/dev-fleet.sh                                  # 面板 + de1、nl1、fi1，每个节点一个 Hysteria2 入站；打印管理地址和 MCP 令牌
+bash scripts/dev-fleet.sh --netem "delay 25ms loss 0.5%"   # 同上，节点之间往返 50 毫秒、约 1% 丢包
+bash scripts/dev-fleet.sh --down                           # 全部停止，删除命名空间和 /tmp/mg-devfleet 中的状态
+```
+
+令牌由 `scripts/e2e/mcp-token.sh` 生成（默认管理员配置，因为 `path_speed` 需要它；其余用 `--profile operator` 即可）。管理端监听命名空间 `mgdf-panel` 内的回环地址，所以智能体也要在那里运行（`ip netns exec mgdf-panel ...`；打印出的 `claude mcp add` 命令会说明方法）。然后让它在节点之间运行 `path_probe`（udp、tcp、tls、MTU 扫描）、`node_trace`、`node_dns_check`、`checks_run_now` 和 `path_speed`：`path_speed_plan` 返回计划，你在面板中批准（管理地址，**集成**），`path_speed_apply` 会在两个节点之间传输 8 到 32 MB 并报告 Mbit/s。脚本添加的一切都在名为 `mgdf-*` 的命名空间和私有 tmpfs 挂载中，不会触碰主机的网卡、路由或 nft 表。节点没有互联网，因此没有自更新和公共测速。仅用于测试面板。
+
 ### 4. 提示词
 
 MCP 工具可以创建、更新和部署协议配置，但不能创建分组。提示词会先检查分组；如果分组不存在，会请你在管理后台创建。

@@ -1366,14 +1366,18 @@ func TestRolloutSurvivesAPanelRestart(t *testing.T) {
 		e := newEnv(t)
 		e.defaultBundle()
 		a := e.addNode("a", nodeOpts{})
-		hold := make(chan struct{})
+		hold, onWire := make(chan struct{}), make(chan struct{})
 		e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+			close(onWire)
 			<-hold // the panel dies before the answer arrives
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("the node link dropped"))
 		}
 		e.startRollout()
 		e.s.tick(e.ctx)
 		e.wantStep(a, store.StepSent, "")
+		// The step is marked sent before the command goroutine reaches the node; the restart below is meant to come after the
+		// update is on the wire, so wait for that rather than race it.
+		<-onWire
 		old := e.s
 		e.restart()
 		e.upgrade(a) // it updated while the panel was down

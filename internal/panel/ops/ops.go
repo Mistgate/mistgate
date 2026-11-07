@@ -39,8 +39,10 @@ type Config struct {
 	// Fleet, Health and Relay are the raw admin services /metrics reads (no session in front of them: the metrics handler has its
 	// own token). nil leaves that part of the metrics out.
 	Fleet, Health, Relay http.Handler
-	Now                  func() time.Time
-	Log                  *slog.Logger
+	// Debug starts and stops the on-demand debug captures of a node (the fleet). nil answers UNIMPLEMENTED for them.
+	Debug DebugBackend
+	Now   func() time.Time
+	Log   *slog.Logger
 }
 
 // Service is the OpsService.

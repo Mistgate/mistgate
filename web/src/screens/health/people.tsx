@@ -1,5 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/ui/status";
 import { useT } from "@/i18n";
+import { accessQuery, askAssistant } from "@/lib/assistant";
 import { peopleOrder, type Alert } from "@/lib/health";
 import { AlertCard, CloseAll } from "./alerts";
 import type { FixFlow } from "./fix";
@@ -13,8 +16,16 @@ import type { FixFlow } from "./fix";
 export function PeopleTab({ active, now, flow }: { active: Alert[]; now: number; flow: FixFlow }) {
   const t = useT();
   const rows = peopleOrder(active);
+  const access = useQuery(accessQuery);
   return (
     <div className="flex flex-col gap-3.5">
+      {access.data?.available && (
+        <div>
+          <Button variant="secondary" onClick={() => askAssistant(t("hl.people.diagnosePrompt"))}>
+            {t("hl.people.diagnose")}
+          </Button>
+        </div>
+      )}
       {rows.length === 0 && (
         <div className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-surface px-4 py-3.5 text-[13px]">
           <StatusDot kind="ok" />

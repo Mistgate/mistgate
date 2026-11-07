@@ -265,7 +265,8 @@ func tcpPayloadServer(t *testing.T, data []byte) string {
 func collectLinkTotal(t *testing.T, r *rig, id string, ready func(plugin.LinkStat) bool) plugin.LinkStat {
 	t.Helper()
 	var total plugin.LinkStat
-	eventually(t, "link counters for "+id, func() bool {
+	// the idle timeout is max(idle, 3 PTO) after the last receive, and a loaded machine stretches the probe timeout
+	eventuallyWithin(t, "link counters for "+id, 20*time.Second, func() bool {
 		c := r.collect()
 		for _, stat := range c.Links {
 			if stat.CredID == id {
@@ -304,7 +305,8 @@ func TestIdleTimeoutDiagnosticsFreezeAndQuiet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_ = stream.SetReadDeadline(time.Now().Add(5 * time.Second))
+		// the client sends nothing, so the node's sniffer waits its full 4 s before it dials the payload server
+		_ = stream.SetReadDeadline(time.Now().Add(20 * time.Second))
 		if _, err := io.ReadFull(stream, make([]byte, 8<<10)); err != nil {
 			t.Fatalf("initial download: %v", err)
 		}
@@ -330,10 +332,12 @@ func TestIdleTimeoutDiagnosticsFreezeAndQuiet(t *testing.T) {
 		if err := echoOnce(c, r.echo, payload(128)); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(100 * time.Millisecond)
-		_ = r.collect() // no packets are in flight after the short request
+		conn := waitSessionConn(t, r, "crd_quiet")
+		waitConnSettled(t, conn) // nothing the server sent waits for an acknowledgement, and it owes none
 		proxy.blackholeBoth()
 		factory.goSilent()
+		waitConnSettled(t, conn) // what was already on the way has arrived and been acknowledged
+		_ = r.collect()          // the snapshot after the last receive: a send after it would be a freeze
 
 		got := collectLinkTotal(t, r, "crd_quiet", func(s plugin.LinkStat) bool { return s.Freezes+s.Quiet > 0 })
 		if got.Quiet != 1 || got.Freezes != 0 {
@@ -613,6 +617,26 @@ func waitSessionConn(t *testing.T, r *rig, credID string) *quic.Conn {
 		return false
 	})
 	return found
+}
+
+// waitConnSettled waits until the server's side of conn has sent and received nothing for longer than two probe timeouts
+// (a packet still waiting for its acknowledgement would have been probed again, an owed acknowledgement sent) and six
+// round trips (a path MTU probe goes out every five while the discovery runs). A fixed sleep is too short under CPU load.
+func waitConnSettled(t *testing.T, conn *quic.Conn) {
+	t.Helper()
+	last, since := conn.ConnectionStats(), time.Now()
+	for deadline := since.Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		st := conn.ConnectionStats()
+		if st.PacketsSent != last.PacketsSent || st.PacketsReceived != last.PacketsReceived {
+			last, since = st, time.Now()
+			continue
+		}
+		pto := st.SmoothedRTT + 4*st.MeanDeviation + 25*time.Millisecond // RFC 9002 with the default max_ack_delay
+		if time.Since(since) >= max(300*time.Millisecond, 2*pto, 6*st.SmoothedRTT) {
+			return
+		}
+	}
+	t.Fatalf("the server's connection did not settle: %+v", last)
 }
 
 func TestIdleFreezeUsesLatestStableReceiveSnapshot(t *testing.T) {

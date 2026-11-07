@@ -348,7 +348,9 @@ type world struct {
 	probeReqs          []*probev1.PathProbeRequest
 	traceReqs          []*probev1.NodeTraceRequest
 	dnsReqs            []*probev1.NodeDnsCheckRequest
-	probeRateLimited   bool // PathProbe answers resource exhausted
+	speedReqs          []*probev1.PathSpeedRequest
+	speedCode          string // the error code PathSpeed answers with
+	probeRateLimited   bool   // PathProbe answers resource exhausted
 	mu                 sync.Mutex
 	log                []callRec
 	fixReqs            []*adminv1.ApplyFixRequest

@@ -308,6 +308,19 @@ func verdictForError(err error) string {
 	return VerdictOther
 }
 
+// ResolveDestination resolves host the way a probe does (IPv4 first) and refuses a destination that is no node (ErrNoRoute when it
+// does not resolve, ErrUnsupportedHost for an unspecified, multicast, broadcast or link-local address).
+func ResolveDestination(ctx context.Context, host string) (netip.Addr, error) {
+	ip, err := resolve(ctx, host)
+	if err != nil {
+		return netip.Addr{}, fmt.Errorf("%w: %v", ErrNoRoute, err)
+	}
+	if unsupportedDestination(ip) {
+		return netip.Addr{}, fmt.Errorf("%w: %s", ErrUnsupportedHost, ip)
+	}
+	return ip, nil
+}
+
 func resolve(ctx context.Context, host string) (netip.Addr, error) {
 	if ip, err := netip.ParseAddr(host); err == nil {
 		return ip.Unmap(), nil

@@ -828,6 +828,9 @@ func requestOfflineError(frame *agentv1.ConnectResponse) error {
 	return errNodeOffline
 }
 
+// capDebug: the agent can capture its debug log on request (agent.proto "DEBUG CAPTURE").
+const capDebug = "debug/1"
+
 func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capability, message string) {
 	updateCapability := capUpdate
 	if linkOnly {
@@ -850,6 +853,10 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 		return capTCPCheck, "agent too old"
 	case frame.GetPathTrace() != nil:
 		return capProbe, "agent too old"
+	case frame.GetSpeedTest() != nil:
+		return capSpeed, "agent too old"
+	case frame.GetDebugCapture() != nil:
+		return capDebug, "agent too old"
 	case frame.GetCountryProbe() != nil:
 		return capCountryProbe, "agent too old"
 	case frame.GetSetDecoy() != nil:

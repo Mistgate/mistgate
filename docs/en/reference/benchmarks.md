@@ -251,6 +251,55 @@ AMD Ryzen 7 7800X3D (8 cores, 16 threads), 15.5 GB RAM, Windows 11 host, WSL2 wi
 
 The scripts, compose files, the diff of the modified builds, the load generators and the aggregated results are in [`tools/bench`](https://github.com/Mistgate/mistgate/tree/main/tools/bench) in the repository, with a README: `py/bench.py` (panel only), `py/onebox.py` (one server), `py/profile_run.py` (profiling), `py/aggregate*.py`, `loadgen/`, `hyload/`, `compose/`, `profiling/` (the pprof overlay) and `results/` (tables and per-repetition CSVs). The raw JSON and the 1 Hz samples are not published. The harness creates and removes Docker images and systemd slices: run it on a test machine and read the README first.
 
+## Engine benchmark suite
+
+The tables above compare panels. This suite measures the engines inside the node (Hysteria2, VLESS and AmneziaWG) against their own earlier numbers, so a change that makes one of them slower is seen before a release. It is a regression check, not a comparison with other products.
+
+**What it measures.** For each engine, between two network namespaces joined by a veth pair, with a third namespace as the "internet" behind the node:
+
+- throughput of 1 and of 8 parallel streams (Mbit/s, download through the tunnel);
+- CPU seconds per gigabyte the engine process used while it moved both phases (`/proc` user plus system time);
+- p50 and p99 latency of a small request (64 bytes, every 20 ms) while the 8 streams load the link;
+- the engine process's peak resident memory (`VmHWM`);
+- handshakes per second: new Hysteria2 sessions (QUIC handshake plus authentication), new VLESS REALITY connections (each one a REALITY handshake and a VLESS session, no multiplexing), and for AmneziaWG a re-handshake of one peer with one ping, paced at WireGuard's own limit of one initiation per 20 ms, so it tops out near 30 and mainly shows that each one succeeds.
+
+The engines are the real ones from this repository, started as the node starts them: Hysteria2 (self-signed certificate, pinned by the client), VLESS with REALITY over TCP (Vision) and over XHTTP, and AmneziaWG on the userspace backend with a real amneziawg-go client. The clients are the real client libraries (the Hysteria client, an in-process Xray client). The engine runs in its own process, so its CPU and memory are its own.
+
+**Network variants.** `clean` (no shaping), `rtt50-loss1` (25 ms and 0.5 % each way on the client link: a 50 ms round trip with about 1 % lost) and `mtu1280` (the client link at an MTU of 1280). An engine that cannot carry traffic at all over a variant has no case for it: Hysteria2 over a 1280-byte link is skipped, because QUIC sends 1280-byte datagrams with the don't-fragment flag and the link drops them.
+
+**Run it.** It needs Linux, root, `ip` (iproute2), `tc` for the netem variants, `nft` for AmneziaWG and Go, and it changes network state, so use WSL or a throwaway machine, never a fleet host. Every namespace is named `mg3-awg-b-*`; the host's own interfaces, routes and nft tables are not touched.
+
+```sh
+scripts/bench.sh                                  # all engines and variants; from Windows it runs itself in WSL as root
+scripts/bench.sh --engines hysteria2,awg --variants clean --seconds 6
+scripts/bench.sh --repeat 3 --update              # make a new baseline from the median of three runs
+MISTGATE_BENCH=1 go test -tags bench ./internal/node/bench/ -run '^TestBench$' -count=1 -v -timeout 0   # as root on Linux, the same thing
+```
+
+Without `MISTGATE_BENCH=1`, without root, or without network namespaces the test skips with a message; without `tc` the netem variants are skipped, without `nft` AmneziaWG is. The report is JSON (`bench-report.json`, or `--out`): one object per `<engine>/<variant>`.
+
+**The baseline.** `internal/node/bench/baseline.json` holds the numbers of a reference run, with the kernel, CPU count and Go version it was taken on. A run is compared with it metric by metric and **fails when a metric is more than 15 % worse** (lower throughput and handshakes, higher CPU per gigabyte, latency and memory). The threshold is `--threshold` (or `MISTGATE_BENCH_THRESHOLD`: `15`, `15%` or `0.15`). A change smaller than a minimum amount does not count however large it is in percent (5 Mbit/s, 0.3 CPU seconds per GB, 2 ms at p50 and 5 ms at p99, 8 MB, 2 handshakes per second), a case with no baseline is only noted, and so is a baseline case that was not run. Absolute numbers depend on the machine: a baseline taken on one machine says little about another. Make it on the machine that will check it, from the median of three runs (`--repeat 3 --update`), and read a failure on a shared machine as "measure again on a quiet one" before reading it as a regression.
+
+The GitHub workflow `bench` (**Actions → bench → Run workflow**) runs the same thing on a hosted runner. It starts by hand only, never on a pull request or a schedule.
+
+**The reference run** (WSL2, kernel 6.6, 16 threads, the median of three runs of 4 s per phase; in-memory veth links, so the clean throughput is far above any real link and measures the engine's CPU, not a network):
+
+| Case | 1 stream, Mbit/s | 8 streams, Mbit/s | CPU s per GB | p50 ms | p99 ms | RSS MB | Handshakes per s |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| `awg/clean` | 4683 | 4307 | 4.8 | 9.1 | 37.2 | 394 | 32.8 |
+| `awg/mtu1280` | 4926 | 3607 | 4.6 | 7.7 | 34.1 | 362 | 33.6 |
+| `awg/rtt50-loss1` | 307 | 1785 | 8.0 | 59.7 | 102.8 | 351 | 3.9 |
+| `hysteria2/clean` | 1753 | 2137 | 7.2 | 1.6 | 16.9 | 33 | 721.5 |
+| `hysteria2/rtt50-loss1` | 612 | 1365 | 5.1 | 81.9 | 134.7 | 83 | 36.9 |
+| `vless-tcp/clean` | 2894 | 16985 | 2.4 | 7.5 | 36.5 | 32 | 1106.8 |
+| `vless-tcp/mtu1280` | 3454 | 17214 | 2.2 | 8.1 | 27.3 | 32 | 1092.8 |
+| `vless-tcp/rtt50-loss1` | 370 | 2778 | 1.8 | 50.8 | 90.7 | 30 | 24.0 |
+| `vless-xhttp/clean` | 931 | 1031 | 13.9 | 1.3 | 6.1 | 33 | 2633.3 |
+| `vless-xhttp/mtu1280` | 711 | 869 | 16.3 | 9.1 | 105.9 | 33 | 1042.3 |
+| `vless-xhttp/rtt50-loss1` | 255 | 347 | 7.5 | 116.9 | 184.0 | 31 | 69.3 |
+
+CPU per gigabyte is the node process's own time, and the figures are for one 4-second phase on one machine: use them to see a change, not to rank the protocols. AmneziaWG ran on its userspace backend, whose process holds hundreds of megabytes of packet buffers; a kernel backend does its work outside the process, so its CPU and memory do not show in these two columns.
+
 ## What the numbers do not tell you
 
 - One desktop CPU, one WSL2 VM, three repetitions. Spreads are small in the panel-only tables and in the control-plane rows of the one-server table, but a different CPU, kernel or filesystem will move absolute values. The machine was not dedicated: during the one-server series other work ran on it, which is why its tunnel throughput rows are withheld (see the note in that section).

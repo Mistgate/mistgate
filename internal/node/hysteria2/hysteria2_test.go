@@ -445,7 +445,12 @@ func sessionsOf(c engine.Collected, credID string) int {
 
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(8 * time.Second)
+	eventuallyWithin(t, what, 8*time.Second, cond)
+}
+
+func eventuallyWithin(t *testing.T, what string, wait time.Duration, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(wait)
 	for time.Now().Before(deadline) {
 		if cond() {
 			return
