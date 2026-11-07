@@ -2,7 +2,7 @@ import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setEffectKind, setEffectsEnabled } from "@/lib/effects";
-import { noteNavigation, resetPageFx, useListEntrance, usePageTransition } from "./page";
+import { resetPageFx, useListEntrance, usePageTransition } from "./page";
 import { isFresh, markFresh, resetFresh } from "./registry";
 
 const sweep = vi.fn((_el: Element, _o?: unknown) => Promise.resolve());
@@ -43,36 +43,36 @@ function Page({ pathname, search = "", enabled = true, loading = false }: { path
 }
 const render = (ui: React.ReactNode) => act(async () => root!.render(ui));
 
+// a fresh shell: the band plays when the shell first appears, so each case mounts one anew
+async function remount(ui: React.ReactNode) {
+  act(() => root!.unmount());
+  root = createRoot(host!);
+  await render(ui);
+}
+
 describe("the page sweep", () => {
-  it("plays once when the shell first appears, softer than a page", async () => {
+  it("plays once when the shell first appears, softer than a page, as light over the content (no mask, nothing hidden)", async () => {
     await render(<Page pathname="/overview" />);
     expect(sweep).toHaveBeenCalledTimes(1);
-    const first = sweep.mock.calls[0]![1] as { duration: number; peakAlpha: number };
+    const first = sweep.mock.calls[0]![1] as { duration: number; reveal: boolean; hideWhileHeld: boolean };
     expect(first.duration).toBeGreaterThan(720);
+    expect(first).toMatchObject({ reveal: false, hideWhileHeld: false });
     await render(<Page pathname="/overview" />);
     expect(sweep).toHaveBeenCalledTimes(1);
   });
 
-  it("plays once per route change, and not when only the search changes (a tab switch)", async () => {
+  it("does not sweep when moving between pages or tabs: the screen settles in by itself", async () => {
     await render(<Page pathname="/nodes" />);
     sweep.mockClear();
     await render(<Page pathname="/nodes" search="?tab=ways" />);
-    await render(<Page pathname="/nodes" search="?tab=profiles" />);
-    expect(sweep).not.toHaveBeenCalled();
     await render(<Page pathname="/nodes/n1" />);
-    expect(sweep).toHaveBeenCalledTimes(1);
-    expect(sweep.mock.calls[0]![1]).toMatchObject({ duration: 720, hideWhileHeld: true, hold: expect.any(Promise) });
-    await render(<Page pathname="/nodes/n1" search="?tab=ways" />);
-    expect(sweep).toHaveBeenCalledTimes(1);
     await render(<Page pathname="/users" />);
-    expect(sweep).toHaveBeenCalledTimes(2);
+    expect(sweep).not.toHaveBeenCalled();
   });
 
-  it("waits for the page's loading marker to go, and does not wait past the cap", async () => {
+  it("waits for the page's loading marker to go, and gives up at the cap instead of sweeping over a page still loading", async () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
-    await render(<Page pathname="/a" />);
-    sweep.mockClear();
-    await render(<Page pathname="/b" loading />);
+    await remount(<Page pathname="/b" loading />);
     const el = host!.firstElementChild!;
     const hold = sweep.mock.calls[0]![1] as { hold: Promise<void> };
     let ready = false;
@@ -82,64 +82,41 @@ describe("the page sweep", () => {
     el.innerHTML = ""; // the data arrived
     await vi.advanceTimersByTimeAsync(50);
     expect(ready).toBe(true);
+    expect(cancelSweep).not.toHaveBeenCalled();
 
-    sweep.mockClear(); // a page that never finishes: the cap lets it go
-    await render(<Page pathname="/c" loading />);
-    const hold2 = sweep.mock.calls[0]![1] as { hold: Promise<void> };
-    let late = false;
-    void hold2.hold.then(() => (late = true));
-    await vi.advanceTimersByTimeAsync(450);
-    expect(late).toBe(true);
+    sweep.mockClear(); // a page that never finishes: no band over its "Loading…"
+    await remount(<Page pathname="/c" loading />);
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(cancelSweep).toHaveBeenCalledTimes(1);
   });
 
-  it("stays out when a list takes the page's moment, and when a dialog is open", async () => {
+  it("stays out when a dialog is open", async () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
-    function List() {
-      const entrance = useListEntrance(true);
-      return <i data-s={entrance(0) ? "1" : "0"} />;
-    }
-    const Both = ({ path, list }: { path: string; list?: boolean }) => (
-      <>
-        {list ? <List /> : null}
-        <Page pathname={path} />
-      </>
-    );
-    await render(<Both path="/a" />);
-    resetPageFx();
-    noteNavigation();
-    await render(<Both path="/users" list />);
-    await vi.advanceTimersByTimeAsync(50);
-    expect(cancelSweep).toHaveBeenCalledTimes(1); // the list (a child of the shell, so its effect runs first) was ready first
-
-    cancelSweep.mockClear();
-    resetPageFx();
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");
     document.body.append(dialog);
-    await render(<Both path="/profiles" />);
+    await remount(<Page pathname="/profiles" />);
     await vi.advanceTimersByTimeAsync(50);
     expect(cancelSweep).toHaveBeenCalledTimes(1);
     dialog.remove();
   });
 
   it("does nothing when pages are off, when the effects are off, and under reduced motion", async () => {
-    await render(<Page pathname="/a" />);
-    sweep.mockClear();
     setEffectKind("pages", false);
-    await render(<Page pathname="/b" />);
+    await remount(<Page pathname="/b" />);
     expect(sweep).not.toHaveBeenCalled();
     setEffectKind("pages", true);
     setEffectsEnabled(false);
-    await render(<Page pathname="/c" />);
+    await remount(<Page pathname="/c" />);
     expect(sweep).not.toHaveBeenCalled();
     setEffectsEnabled(true);
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q }));
-    await render(<Page pathname="/d" />);
+    await remount(<Page pathname="/d" />);
     expect(sweep).not.toHaveBeenCalled();
-    // "create" is its own switch: the page sweep does not depend on it
+    // "create" is its own switch: the first band does not depend on it
     vi.unstubAllGlobals();
     setEffectKind("create", false);
-    await render(<Page pathname="/e" />);
+    await remount(<Page pathname="/e" />);
     expect(sweep).toHaveBeenCalledTimes(1);
   });
 });
@@ -157,16 +134,14 @@ describe("the list entrance", () => {
   };
   const animated = () => [...host!.querySelectorAll("li")].filter((l) => l.style.animation !== "").length;
 
-  it("staggers the first 12 rows by 18 ms on the first data, and never again for refetches or filters", async () => {
+  it("a list that was waited for appears as one (every row together, no stagger), and never again for refetches or filters", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
     await render(<Rows ready={false} />);
     expect(animated()).toBe(0);
     await render(<Rows ready />);
-    expect(animated()).toBe(12);
+    expect(animated()).toBe(20);
     const rows = [...host!.querySelectorAll("li")];
-    expect(rows[0]!.style.animation).toContain("0ms");
-    expect(rows[11]!.style.animation).toContain("198ms");
-    expect(rows[12]!.style.animation).toBe("");
+    expect(rows[0]!.style.animation).toBe(rows[19]!.style.animation);
     await act(async () => void vi.advanceTimersByTime(1100));
     expect(animated()).toBe(0);
     await render(<Rows ready={false} />); // polling / a filter: loading again, then data
@@ -174,14 +149,21 @@ describe("the list entrance", () => {
     expect(animated()).toBe(0);
   });
 
-  it("is quiet when pages are off, with reduced motion, or right after a page sweep", async () => {
+  it("a list ready on its first render (from the cache) is simply there", async () => {
+    await render(<Rows ready />);
+    expect(animated()).toBe(0);
+  });
+
+  it("is quiet when pages are off or with reduced motion", async () => {
     setEffectKind("pages", false);
+    await render(<Rows ready={false} />);
     await render(<Rows ready />);
     expect(animated()).toBe(0);
     act(() => root!.unmount());
     root = createRoot(host!);
     setEffectKind("pages", true);
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q }));
+    await render(<Rows ready={false} />);
     await render(<Rows ready />);
     expect(animated()).toBe(0);
   });

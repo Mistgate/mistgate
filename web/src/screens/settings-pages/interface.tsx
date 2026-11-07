@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { pageSweepOptions } from "@/components/fx/page";
 import { setEffectKind, setEffectsEnabled, useEffectKind, useEffectsEnabled, type FxKind } from "@/lib/effects";
+import { useEdition } from "@/lib/edition";
 import { sweep } from "@/components/fx/sweep";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
@@ -40,6 +41,7 @@ export function InterfacePage() {
   const me = useQuery(meQuery);
   const { own } = useAccentChoice();
   const effects = useEffectsEnabled();
+  const edition = useEdition();
   const fxRow = useRef<HTMLDivElement>(null);
   const row = "flex min-h-14 items-center gap-3 border-t border-line";
   return (
@@ -88,6 +90,7 @@ export function InterfacePage() {
             </p>
           )}
         </div>
+        {!edition.edge && (
         <div ref={fxRow} className={row}>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2">
             <span className="flex items-center gap-1.5 text-[13px] font-bold">
@@ -103,7 +106,8 @@ export function InterfacePage() {
           )}
           <Switch checked={effects} onCheckedChange={setEffectsEnabled} aria-label={t("settings.fx")} />
         </div>
-        {effects && (
+        )}
+        {effects && !edition.edge && (
           <>
             {(["create", "pages"] as const).map((k) => (
               <FxKindRow key={k} kind={k} label={t(`settings.fx.${k}`)} />
