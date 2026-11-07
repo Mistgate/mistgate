@@ -155,3 +155,83 @@ func TestGetPathLossRowsAndTargets(t *testing.T) {
 		}
 	}
 }
+
+// The resource fields of an agent that sends them reach GetNode's metrics and the hourly history; a batch from an agent that
+// predates them leaves them unknown (no agent process, no ext samples) instead of zero.
+func TestStatsBatchResourcesReachNodeAndHistory(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	e.fixture(a.nodeID)
+	c, _, _ := connectFull(a, "resources")
+	node := nodeService{e.f}
+	now := time.Now().Unix()
+
+	old := statsBatch(now-20, now-10, nil, nil)
+	old.GetStats().Host = &agentv1.HostMetrics{CpuPct: 40, RamUsedBytes: 512, RamTotalBytes: 1024}
+	c.send(1, old)
+	waitFor(t, func() bool {
+		r, err := node.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+		return err == nil && r.Msg.Metrics != nil && r.Msg.Metrics.CpuPct == 40
+	})
+	if r, _ := node.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID})); r.Msg.Metrics.Agent != nil || r.Msg.Metrics.StealPct != 0 {
+		t.Fatalf("an old agent's metrics carry resources: %+v", r.Msg.Metrics)
+	}
+
+	cur := statsBatch(now-10, now, nil, nil)
+	cur.GetStats().Host = &agentv1.HostMetrics{CpuPct: 60, RamUsedBytes: 600, RamTotalBytes: 1024,
+		StealPct: 12.5, IowaitPct: 3, SwapUsedBytes: 100, SwapTotalBytes: 2048, ConntrackCount: 900, ConntrackMax: 1000,
+		TcpSockets: 70, UdpSockets: 8, NicSpeedMbps: 1000,
+		Agent: &agentv1.ProcessUsage{CpuPct: 7.5, RssBytes: 64 << 20, GoTotalBytes: 40 << 20, GoHeapBytes: 20 << 20, Goroutines: 300, Threads: 12, OpenFds: 150, FdLimit: 65536}}
+	c.send(2, cur)
+	waitFor(t, func() bool {
+		r, err := node.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+		return err == nil && r.Msg.Metrics != nil && r.Msg.Metrics.CpuPct == 60
+	})
+	r, err := node.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := r.Msg.Metrics
+	if m.StealPct != 12.5 || m.IowaitPct != 3 || m.SwapUsedBytes != 100 || m.SwapTotalBytes != 2048 || m.ConntrackCount != 900 || m.ConntrackMax != 1000 ||
+		m.TcpSockets != 70 || m.UdpSockets != 8 || m.NicSpeedMbps != 1000 || m.Agent == nil {
+		t.Fatalf("node metrics = %+v", m)
+	}
+	if p := m.Agent; p.CpuPct != 7.5 || p.RssBytes != 64<<20 || p.GoTotalBytes != 40<<20 || p.GoHeapBytes != 20<<20 || p.Goroutines != 300 ||
+		p.Threads != 12 || p.OpenFds != 150 || p.FdLimit != 65536 {
+		t.Fatalf("agent process = %+v", p)
+	}
+
+	var h *adminv1.HostHour
+	waitFor(t, func() bool {
+		r, err := node.GetNodeHostHistory(e.ctx, connect.NewRequest(&adminv1.GetNodeHostHistoryRequest{NodeId: a.nodeID, Hours: 2}))
+		if err != nil || len(r.Msg.Hours) == 0 {
+			return false
+		}
+		var samples uint32
+		for _, x := range r.Msg.Hours {
+			samples += x.Samples
+			if x.ExtSamples > 0 {
+				h = x
+			}
+		}
+		return samples == 2 && h != nil
+	})
+	if h.ExtSamples != 1 || h.StealAvgPct != 12.5 || h.StealMaxPct != 12.5 || h.IowaitMaxPct != 3 || h.SwapUsedMaxBytes != 100 ||
+		h.ConntrackMax != 900 || h.ConntrackLimit != 1000 || h.TcpSocketsMax != 70 || h.NicSpeedMbps != 1000 ||
+		h.AgentCpuAvgPct != 7.5 || h.AgentCpuMaxPct != 7.5 || h.AgentRssMaxBytes != 64<<20 {
+		t.Errorf("host hour = %+v", h)
+	}
+
+	// A bogus agent cannot store a number a chart cannot hold.
+	bad := statsBatch(now, now+1, nil, nil)
+	bad.GetStats().Host = &agentv1.HostMetrics{CpuPct: 1, StealPct: 1e9, Agent: &agentv1.ProcessUsage{CpuPct: -5, RssBytes: 1 << 62}}
+	c.send(3, bad)
+	waitFor(t, func() bool {
+		r, err := node.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+		return err == nil && r.Msg.Metrics != nil && r.Msg.Metrics.CpuPct == 1
+	})
+	r, _ = node.GetNode(e.ctx, connect.NewRequest(&adminv1.GetNodeRequest{NodeId: a.nodeID}))
+	if m := r.Msg.Metrics; m.StealPct != 100 || m.Agent.CpuPct != 0 || m.Agent.RssBytes != 1<<50 {
+		t.Errorf("clamped metrics = %+v", m)
+	}
+}

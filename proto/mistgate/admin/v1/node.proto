@@ -241,6 +241,37 @@ message NodeMetrics {
   uint64 net_rx_bps = 8 [jstype = JS_NUMBER];
   uint64 net_tx_bps = 9 [jstype = JS_NUMBER];
   int64 at_unix = 10 [jstype = JS_NUMBER];
+  // The fields below come from agents that send them (agent.proto HostMetrics 11 to 20); `agent` is absent otherwise, and then
+  // they are not known rather than zero.
+  // Parts of the machine's CPU in percent of all CPUs: steal (the hypervisor gave the time to other guests; inside cpu_pct) and
+  // I/O wait (not in cpu_pct).
+  float steal_pct = 11;
+  float iowait_pct = 12;
+  uint64 swap_used_bytes = 13 [jstype = JS_NUMBER];
+  uint64 swap_total_bytes = 14 [jstype = JS_NUMBER];
+  // Connection tracking entries and the limit (0 and 0 when conntrack is not loaded). A full table drops new connections.
+  uint64 conntrack_count = 15 [jstype = JS_NUMBER];
+  uint64 conntrack_max = 16 [jstype = JS_NUMBER];
+  uint32 tcp_sockets = 17;
+  uint32 udp_sockets = 18;
+  // Main NIC link speed in Mbit/s; 0 = the driver does not say (most virtual NICs).
+  uint32 nic_speed_mbps = 19;
+  // The agent process, inside which every engine runs: what Mistgate costs the machine.
+  ProcessUsage agent = 20;
+}
+
+// What one process uses. cpu_pct is in percent of the whole machine (all CPUs).
+message ProcessUsage {
+  float cpu_pct = 1;
+  uint64 rss_bytes = 2 [jstype = JS_NUMBER];
+  // The Go runtime: all memory it mapped from the OS, the part in heap objects, and its goroutines.
+  uint64 go_total_bytes = 3 [jstype = JS_NUMBER];
+  uint64 go_heap_bytes = 4 [jstype = JS_NUMBER];
+  uint32 goroutines = 5;
+  uint32 threads = 6;
+  // Open file descriptors (sockets among them) and the soft limit (0 = not known).
+  uint32 open_fds = 7;
+  uint32 fd_limit = 8;
 }
 
 // "Host facts" block. The full pre-check result comes with SSH provisioning.
@@ -857,6 +888,25 @@ message HostHour {
   uint64 tx_avg_bps = 11 [jstype = JS_NUMBER];
   uint64 tx_max_bps = 12 [jstype = JS_NUMBER];
   uint32 sessions_max = 13;
+  // Mean people online over the hour's samples.
+  float sessions_avg = 14;
+  // How many of the hour's samples carried the resource fields below (agents that send HostMetrics.agent). 0 = none did, and
+  // the fields are not known rather than zero.
+  uint32 ext_samples = 15;
+  float steal_avg_pct = 16;
+  float steal_max_pct = 17;
+  float iowait_max_pct = 18;
+  uint64 swap_used_max_bytes = 19 [jstype = JS_NUMBER];
+  // Peak connection-tracking entries and the latest limit.
+  uint64 conntrack_max = 20 [jstype = JS_NUMBER];
+  uint64 conntrack_limit = 21 [jstype = JS_NUMBER];
+  uint32 tcp_sockets_max = 22;
+  // The latest link speed of the main NIC the agent reported; 0 = not known.
+  uint32 nic_speed_mbps = 23;
+  // The agent process: mean and peak CPU in percent of the machine, peak resident memory.
+  float agent_cpu_avg_pct = 24;
+  float agent_cpu_max_pct = 25;
+  uint64 agent_rss_max_bytes = 26 [jstype = JS_NUMBER];
 }
 
 message GetNodeHostHistoryResponse {

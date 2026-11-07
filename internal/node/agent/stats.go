@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"math"
 	"sort"
 	"strconv"
 	"time"
@@ -9,6 +10,7 @@ import (
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/sysstat"
 )
 
 const defaultLinkCounterWindow = 10 * time.Minute
@@ -93,6 +95,9 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 		CpuPct: float32(m.CPUPct), SoftirqPct: float32(m.SoftirqPct), Load1: float32(m.Load1),
 		RamUsedBytes: m.RAMUsed, RamTotalBytes: m.RAMTotal, DiskUsedBytes: m.DiskUsed, DiskTotalBytes: m.DiskTotal,
 		NetRxBps: m.NetRxBps, NetTxBps: m.NetTxBps, UptimeS: m.UptimeS,
+		StealPct: float32(m.StealPct), IowaitPct: float32(m.IOWaitPct), SwapUsedBytes: m.SwapUsed, SwapTotalBytes: m.SwapTotal,
+		ConntrackCount: m.ConntrackCount, ConntrackMax: m.ConntrackMax, TcpSockets: m.TCPSockets, UdpSockets: m.UDPSockets,
+		NicSpeedMbps: m.NICSpeedMbps, Agent: a.selfUsage(),
 	}
 	if a.journal != nil {
 		b.Journal = a.journal.take(off)
@@ -221,4 +226,16 @@ func (a *Agent) linkOnlineCap() time.Duration {
 		}
 	}
 	return 2 * interval
+}
+
+// selfUsage is the agent process's own CPU, memory, threads and descriptors. Every engine runs inside it, so this is what
+// Mistgate costs the machine.
+func (a *Agent) selfUsage() *pb.ProcessUsage {
+	p := a.self.Sample()
+	g := sysstat.ReadGoRuntime()
+	u32 := func(v uint64) uint32 { return uint32(min(v, math.MaxUint32)) }
+	return &pb.ProcessUsage{
+		CpuPct: float32(p.CPUPct), RssBytes: p.RSS, GoTotalBytes: g.TotalBytes, GoHeapBytes: g.HeapBytes,
+		Goroutines: u32(g.Goroutines), Threads: p.Threads, OpenFds: u32(p.FDs), FdLimit: u32(p.FDLimit),
+	}
 }

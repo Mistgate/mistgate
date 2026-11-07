@@ -865,6 +865,38 @@ message HostMetrics {
   uint64 net_rx_bps = 8;
   uint64 net_tx_bps = 9;
   uint64 uptime_s = 10;
+  // Parts of the machine's CPU, in percent of all CPUs: steal is time the hypervisor gave to other guests (a busy neighbour;
+  // it is inside cpu_pct), iowait is idle time spent waiting for the disk (not in cpu_pct).
+  float steal_pct = 11;
+  float iowait_pct = 12;
+  uint64 swap_used_bytes = 13;
+  uint64 swap_total_bytes = 14;
+  // Connection tracking: entries and the limit (0 and 0 when conntrack is not loaded). A full table drops new connections.
+  uint64 conntrack_count = 15;
+  uint64 conntrack_max = 16;
+  // Sockets in use, IPv4 and IPv6 together.
+  uint32 tcp_sockets = 17;
+  uint32 udp_sockets = 18;
+  // Link speed of the main NIC in Mbit/s; 0 = the driver does not say (most virtual NICs).
+  uint32 nic_speed_mbps = 19;
+  // The agent's own process. Every engine (Xray, Hysteria, userspace AmneziaWG, MTProto) runs inside it, so this is what
+  // Mistgate costs the machine; a kernel AmneziaWG is in softirq instead. Absent from agents that predate the field, which
+  // is how the panel tells that the fields 11 to 19 are not known rather than zero.
+  ProcessUsage agent = 20;
+}
+
+message ProcessUsage {
+  // CPU time over the interval, in percent of the whole machine (all CPUs): 25 on four CPUs is one CPU fully used.
+  float cpu_pct = 1;
+  uint64 rss_bytes = 2;
+  // The Go runtime: all memory it mapped from the OS, the part in heap objects, and its goroutines.
+  uint64 go_total_bytes = 3;
+  uint64 go_heap_bytes = 4;
+  uint32 goroutines = 5;
+  uint32 threads = 6;
+  // Open file descriptors (sockets among them) and the soft limit (0 = not known).
+  uint32 open_fds = 7;
+  uint32 fd_limit = 8;
 }
 
 enum InboundRunState {

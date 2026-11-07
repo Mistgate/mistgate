@@ -19,6 +19,7 @@ import (
 	"time"
 
 	torrentlinux "github.com/mistgate/mistgate/internal/node/torrentguard/linux"
+	"github.com/mistgate/mistgate/internal/sysstat"
 )
 
 // runner runs an external command with optional stdin and returns its combined output.
@@ -82,7 +83,8 @@ type linuxHost struct {
 	torrentIfaces []string
 
 	mu      sync.Mutex
-	prevCPU cpuSample
+	prevCPU sysstat.CPUTimes
+	sys     sysstat.Reader
 	prevNet struct {
 		iface  string
 		rx, tx uint64
@@ -143,8 +145,8 @@ func (h *linuxHost) Facts(ctx context.Context) Facts {
 		}
 	}
 	f.Kernel = strings.TrimSpace(h.read("sys/kernel/osrelease"))
-	f.RAMTotal, _ = parseMeminfo(h.read("meminfo"))
-	f.DiskTotal, _ = diskUsage("/")
+	f.RAMTotal = sysstat.ParseMeminfo(h.read("meminfo")).Total
+	f.DiskTotal, _ = sysstat.DiskUsage("/")
 	if bt := parseBtime(h.read("stat")); bt > 0 {
 		f.Boot = time.Unix(bt, 0).UTC()
 	}
@@ -157,34 +159,28 @@ func (h *linuxHost) Facts(ctx context.Context) Facts {
 	return f
 }
 
-func diskUsage(path string) (total, used uint64) {
-	var st syscall.Statfs_t
-	if syscall.Statfs(path, &st) != nil {
-		return 0, 0
-	}
-	total = st.Blocks * uint64(st.Bsize)
-	used = (st.Blocks - st.Bfree) * uint64(st.Bsize)
-	return
-}
-
 func (h *linuxHost) Metrics() Metrics {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	var m Metrics
-	if cur, ok := parseCPUStat(h.read("stat")); ok {
-		if h.prevCPU.total != 0 {
-			m.CPUPct, m.SoftirqPct = cpuPct(h.prevCPU, cur)
+	if cur, ok := sysstat.ParseCPU(h.read("stat")); ok {
+		if h.prevCPU.Total != 0 {
+			c := sysstat.CPUDelta(h.prevCPU, cur)
+			m.CPUPct, m.SoftirqPct, m.StealPct, m.IOWaitPct = c.Busy, c.Softirq, c.Steal, c.IOWait
 		}
 		h.prevCPU = cur
 	}
 	m.Load1 = parseFirstFloat(h.read("loadavg"))
 	m.UptimeS = uint64(parseFirstFloat(h.read("uptime")))
-	total, avail := parseMeminfo(h.read("meminfo"))
-	m.RAMTotal = total
-	if total >= avail {
-		m.RAMUsed = total - avail
-	}
-	m.DiskTotal, m.DiskUsed = diskUsage("/")
+	mem := sysstat.ParseMeminfo(h.read("meminfo"))
+	m.RAMTotal, m.RAMUsed = mem.Total, mem.Used()
+	m.SwapTotal, m.SwapUsed = mem.SwapTotal, mem.SwapUsed()
+	m.DiskTotal, m.DiskUsed = sysstat.DiskUsage("/")
+	r := h.sys
+	r.Proc = h.procRoot
+	m.ConntrackCount, m.ConntrackMax = r.Conntrack()
+	socks := r.Sockets()
+	m.TCPSockets, m.UDPSockets = socks.TCP, socks.UDP
 
 	// Main NIC = the default route's interface (IPv4, else IPv6). Rates are averaged since the previous sample.
 	if iface, rx, tx, ok := NICCountersAt(h.procRoot); ok {
@@ -197,6 +193,7 @@ func (h *linuxHost) Metrics() Metrics {
 			}
 		}
 		p.iface, p.rx, p.tx, p.at = iface, rx, tx, now
+		m.NICSpeedMbps = r.NICSpeedMbps(iface)
 	}
 	return m
 }

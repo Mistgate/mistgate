@@ -97,3 +97,24 @@ func sameLinkCounters(a, b *pb.LinkCounters) bool {
 		a.Quiet == b.Quiet && a.Accepted == b.Accepted && a.HellosForeign == b.HellosForeign && a.RttMsSum == b.RttMsSum &&
 		a.RttSamples == b.RttSamples && a.PktsSent == b.PktsSent && a.PktsLost == b.PktsLost
 }
+
+// Every batch carries the host's resource fields and the agent's own process: the panel tells an agent that sends them from one
+// that predates them by HostMetrics.agent being there.
+func TestBuildBatchCarriesResources(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	at := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	b := h.a.buildBatch(context.Background(), at, at.Add(10*time.Second))
+	m := b.GetHost()
+	if m == nil || m.StealPct != 2 || m.IowaitPct != 1 || m.SwapUsedBytes != 10 || m.SwapTotalBytes != 20 || m.ConntrackCount != 30 || m.ConntrackMax != 40 ||
+		m.TcpSockets != 5 || m.UdpSockets != 6 || m.NicSpeedMbps != 1000 {
+		t.Fatalf("host metrics = %+v", m)
+	}
+	p := m.GetAgent()
+	if p == nil {
+		t.Fatal("no agent process in the batch")
+	}
+	// The Go runtime's counters are read on every OS; /proc only on Linux.
+	if p.Goroutines == 0 || p.GoTotalBytes == 0 || p.GoHeapBytes == 0 {
+		t.Errorf("agent process = %+v", p)
+	}
+}

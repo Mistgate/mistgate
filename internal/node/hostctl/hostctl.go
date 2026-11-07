@@ -118,6 +118,17 @@ type Metrics struct {
 	NetRxBps   uint64
 	NetTxBps   uint64
 	UptimeS    uint64
+
+	// Parts of the machine's CPU: steal (given by the hypervisor to other guests; inside CPUPct) and I/O wait (not in
+	// CPUPct).
+	StealPct, IOWaitPct float64
+	SwapUsed, SwapTotal uint64
+	// Connection tracking entries and limit (0, 0 = conntrack not loaded).
+	ConntrackCount, ConntrackMax uint64
+	// Sockets in use, IPv4 and IPv6 together.
+	TCPSockets, UDPSockets uint32
+	// Link speed of the main NIC in Mbit/s; 0 = the driver does not say (most virtual NICs).
+	NICSpeedMbps uint32
 }
 
 // Hop is one port-hopping range: packets to Network/From-To are redirected to the inbound's real Port.
