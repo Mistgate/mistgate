@@ -67,6 +67,10 @@ const step = (over: Partial<Step> = {}): Step => ({
   finishedUnix: 0,
   errorKey: "",
   params: {},
+  downloadPhase: "",
+  downloadedBytes: 0,
+  totalBytes: 0,
+  bytesPerSecond: 0,
   ...over,
 });
 const rollout = (over: Partial<Rollout> = {}): Rollout => ({
@@ -107,6 +111,7 @@ const updates = (over: Partial<Updates> = {}): Updates => ({
   distDir: "/var/lib/mistgate/dist",
   agentNotes: [],
   panelNotes: [],
+  updateDownloadTimeoutSeconds: 1800,
   ...over,
 });
 

@@ -607,7 +607,20 @@ message ConnectRequest {
     // store error).
     // A panel that predates the field ignores the frame; the agent gives up after two minutes and retries later.
     RenewRequest renew = 18;
+    // Best-effort progress for an UpdateAgent command. The latest value is enough for the panel UI.
+    UpdateProgress update_progress = 19;
   }
+}
+
+message UpdateProgress {
+  string request_id = 1;
+  // accepted, downloading, verifying, installing, restarting, completed or failed.
+  string phase = 2;
+  uint64 bytes_downloaded = 3 [jstype = JS_NUMBER];
+  uint64 bytes_total = 4 [jstype = JS_NUMBER];
+  uint64 bytes_per_second = 5 [jstype = JS_NUMBER];
+  int64 updated_unix = 6 [jstype = JS_NUMBER];
+  string error = 7;
 }
 
 message Hello {
@@ -631,7 +644,8 @@ message Hello {
   // Optional features of this agent build, stable lowercase "name/version" strings. The panel sends a
   // feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
   // "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
-  // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-link/1" (link-only UpdateAgent
+  // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-timeout/1" (the
+  // UpdateAgent download timeout field), "update-link/1" (link-only UpdateAgent
   // with a Worker download token), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
@@ -1551,6 +1565,8 @@ message UpdateAgent {
   bytes signature = 3;
   // Edge link-only download credential. Empty for the VPS mTLS bundle stream.
   string download_token = 4;
+  // Maximum time allowed for downloading the selected bundle file. Zero keeps the agent default.
+  uint32 download_timeout_seconds = 5;
 }
 
 // Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.

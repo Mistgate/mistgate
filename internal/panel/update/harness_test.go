@@ -140,7 +140,15 @@ func (f *fakeFleet) precondition(id string) error {
 
 func okResult() *agentv1.CommandResult { return &agentv1.CommandResult{Ok: true, Affected: 1} }
 
-func (f *fakeFleet) UpdateAgent(_ context.Context, id string, _, _ []byte, _ time.Duration) (*agentv1.CommandResult, error) {
+func (f *fakeFleet) UpdateAgent(_ context.Context, id string, _, _ []byte, _, _ time.Duration) (*agentv1.CommandResult, error) {
+	return f.updateAgent(id)
+}
+
+func (f *fakeFleet) UpdateAgentWithRequestID(_ context.Context, id, _ string, _, _ []byte, _, _ time.Duration) (*agentv1.CommandResult, error) {
+	return f.updateAgent(id)
+}
+
+func (f *fakeFleet) updateAgent(id string) (*agentv1.CommandResult, error) {
 	if err := f.precondition(id); err != nil {
 		return nil, err
 	}
@@ -179,7 +187,7 @@ type sentRollbackFrame struct {
 	deadline          time.Time
 }
 
-func (f *fakeFleet) SendUpdateAgent(_ context.Context, nodeID, requestID string, manifest, signature []byte, token string, deadline time.Time) error {
+func (f *fakeFleet) SendUpdateAgent(_ context.Context, nodeID, requestID string, manifest, signature []byte, token string, deadline time.Time, _ time.Duration) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sendFrames = append(f.sendFrames, sentUpdateFrame{nodeID: nodeID, requestID: requestID, manifest: append([]byte(nil), manifest...),

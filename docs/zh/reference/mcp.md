@@ -182,6 +182,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_update_schedule` | 管理员 | 计划参数：`node_id`、`local_datetime`（使用 `updates_status` 中的偏移量，格式为 `YYYY-MM-DDTHH:mm`，至少提前一分钟且最多提前一年）；计划会固定受信任的版本和偏移量 | 始终 |
 | `node_update_schedule_cancel` | 管理员 | `node_id` | 始终 |
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
+| `update_download_timeout` | 管理员 | `timeout_seconds`（300 到 7200 秒；只影响新发送的更新，已经开始的步骤保留发送时捕获的窗口） | 始终 |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | 管理员 | `updates_status` 中的 `rollout_id` | 始终 |
 | `node_rollback` | 管理员 | `node` | 始终 |
 | `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面确认主机密钥，并选择面板密钥或输入 SSH 密码；密码安装默认同时添加面板密钥 | 始终 |
@@ -193,7 +194,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 每个 `_plan` 还接收 `reason`：由智能体自行撰写，最多 300 个字符，并以引文形式显示给所有者。没有工具会接收或返回服务器密码：所有者在审批页面选择面板密钥或输入安装密码，轮换后的密码由面板自行生成。`user_create` 绝不会返回新用户的订阅链接；所有者需在管理后台中复制链接。
 
-`rollout_start_plan` 会立即更新一个选定节点，不能启动全体节点更新。只能选择 Agent 支持自更新且版本早于发布包的节点（版本过旧、更新失败或已回滚）；已有滚动更新正在运行或暂停时，会拒绝执行。计划会固定到制定时受信任的签名发布包：执行前发布包发生变化时，执行会失败，需要重新制定计划。所有者批准后，`node_update_schedule_plan` 会为一个节点保存未来的更新计划；制定计划时节点可以离线，新计划会替换该节点的旧计划。保存的任务会固定到相应签名发布版本和 UTC 固定偏移量。到期时如果节点离线，面板最多等待两小时让节点重新连接，之后会将任务标记为错过，绝不会自行启动任务；若签名发布包发生变化，面板会保留任务并继续显示，不会替换为其他发布版本。使用 `node_update_schedule_cancel_plan` 可取消待执行任务。更改 `update_timezone` 只影响新计划；现有任务会保留已保存的时间点和偏移量。
+`rollout_start_plan` 会立即更新一个选定节点，不能启动全体节点更新。只能选择 Agent 支持自更新且版本早于发布包的节点（版本过旧、更新失败或已回滚）；已有滚动更新正在运行或暂停时，会拒绝执行。计划会固定到制定时受信任的签名发布包：执行前发布包发生变化时，执行会失败，需要重新制定计划。所有者批准后，`node_update_schedule_plan` 会为一个节点保存未来的更新计划；制定计划时节点可以离线，新计划会替换该节点的旧计划。保存的任务会固定到相应签名发布版本和 UTC 固定偏移量。到期时如果节点离线，面板最多等待两小时让节点重新连接，之后会将任务标记为错过，绝不会自行启动任务；若签名发布包发生变化，面板会保留任务并继续显示，不会替换为其他发布版本。使用 `node_update_schedule_cancel_plan` 可取消待执行任务。更改 `update_timezone` 只影响新计划；现有任务会保留已保存的时间点和偏移量。`update_download_timeout` 只改变新发送步骤的下载窗口；支持该能力的 Agent 会在命令中收到新值，旧 Agent 继续使用内置限制，已经开始的步骤会保留发送时捕获的窗口。
 
 `subscription_app_upsert` 和 `subscription_app_remove` 会更改每位用户都能看到的页面上的一个应用，按平台和名称（不区分大小写）查找（同一平台上有两个应用同名时会拒绝执行：请在管理后台中更改）。新应用会添加到列表末尾。字段值的验证方式与保存**订阅 → 用户页面**时完全相同：下载链接必须是 http(s)；添加链接模板必须以应用自己的协议开头（`happ://add/{url}`、`myclient://add?url={url_enc}&name={name_enc}`），或使用 http(s)，不得使用 `javascript:`、`data:` 等协议；只能使用已知占位符；应用最多 30 个。此外，智能体提供的文本不能包含不可见格式字符。计划会读取并记住完整设置的状态；如果在执行前有人保存了订阅设置，执行会失败并返回「the subscription settings changed after the plan」，不会覆盖任何内容：请重新制定计划。在 `subscription_settings_get` 和智能体收到的计划副本中，链接查询字符串和较长的路径片段会显示为 `[redacted]`，与其他结果相同；所有者审批卡片会显示完整值。
 
@@ -233,7 +234,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 
 | 代码 | 含义 | 工具 |
 |---|---|---|
-| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
+| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`update_download_timeout`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
 | `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
 | `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |

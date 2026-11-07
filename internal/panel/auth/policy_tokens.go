@@ -121,6 +121,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:             TokenAccessApproved,
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       TokenAccessApproved,
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              TokenAccessApproved,
+	adminv1connect.UpdateServiceSetUpdateDownloadTimeoutProcedure:       TokenAccessApproved,
 	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure: TokenAccessApproved,
 	adminv1connect.WarpServiceRegisterWarpProcedure:                     TokenAccessApproved,
 	// What every user's page shows: one app at a time, through subscription_app_upsert / _remove (level write).
@@ -149,6 +150,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:       true,
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:              true,
 	adminv1connect.UpdateServiceSetUpdateChannelProcedure:               true,
+	adminv1connect.UpdateServiceSetUpdateDownloadTimeoutProcedure:       true,
 	adminv1connect.ProvisioningServiceCheckSSHProcedure:                 true,
 	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:       true,
 	adminv1connect.ProvisioningServiceRetryNodeProvisionProcedure:       true,
@@ -210,6 +212,7 @@ var grantProcedures = map[string][]string{
 	"node_update_schedule":        {adminv1connect.UpdateServiceScheduleNodeUpdateProcedure},
 	"node_update_schedule_cancel": {adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure},
 	"update_timezone":             {adminv1connect.UpdateServiceSetUpdateTimezoneProcedure},
+	"update_download_timeout":     {adminv1connect.UpdateServiceSetUpdateDownloadTimeoutProcedure},
 	NodeInstallTool:               {adminv1connect.ProvisioningServiceStartNodeProvisionProcedure},
 	"node_server_password_rotate": {adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure},
 	"node_server_key_add":         {adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure},

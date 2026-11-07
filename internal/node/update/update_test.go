@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -144,6 +145,65 @@ func (s *fakeSrc) Fetch(_ context.Context, name string, off uint64, w io.Writer)
 }
 
 func (e *env) src(content []byte) *fakeSrc { return &fakeSrc{now: e.now, content: content} }
+
+func TestDownloadReportsProgressAndStopsOnIdle(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(func(c *Config) { c.IdleTimeout = 20 * time.Millisecond })
+	f := release.File{Name: "node", Size: int64(len(newBin))}
+	var got []*pb.UpdateProgress
+	src := e.src(newBin)
+	src.now = e.now.Add(time.Hour)
+	if err := u.download(context.Background(), src, f, time.Second, func(p *pb.UpdateProgress) { got = append(got, p) }); err != nil {
+		t.Fatalf("download = %v", err)
+	}
+	if len(got) == 0 || got[0].Phase != "downloading" || got[len(got)-1].BytesDownloaded != uint64(len(newBin)) {
+		t.Fatalf("progress = %+v", got)
+	}
+	if got[0].UpdatedUnix != src.now.Unix() {
+		t.Fatalf("progress timestamp = %d, want source clock %d", got[0].UpdatedUnix, src.now.Unix())
+	}
+	stalled := &stallSrc{}
+	err := u.download(context.Background(), stalled, f, time.Second, nil)
+	if err == nil || !strings.Contains(err.Error(), "download idle timeout") {
+		t.Fatalf("stall error = %v", err)
+	}
+}
+
+func TestDownloadDoesNotTreatBusyPanelAsIdleStall(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(func(c *Config) {
+		c.IdleTimeout = 20 * time.Millisecond
+		c.RetryWait = 50 * time.Millisecond
+	})
+	src := e.src(newBin)
+	src.retry = 1
+	if err := u.download(context.Background(), src, release.File{Name: "node", Size: int64(len(newBin))}, time.Second, nil); err != nil {
+		t.Fatalf("download after a busy slot = %v", err)
+	}
+}
+
+func TestProgressSpeedUsesLatestInterval(t *testing.T) {
+	e := newEnv(t)
+	current := e.now
+	var got []*pb.UpdateProgress
+	tracker := newProgressTracker(func(p *pb.UpdateProgress) { got = append(got, p) }, int64(len(newBin)), func() time.Time { return current })
+	current = current.Add(5 * time.Second)
+	tracker.add(100)
+	current = current.Add(5 * time.Second)
+	tracker.add(300)
+	if len(got) != 3 || got[1].BytesPerSecond != 20 || got[2].BytesPerSecond != 60 {
+		t.Fatalf("progress = %+v, want interval speeds 20 and 60 B/s", got)
+	}
+}
+
+type stallSrc struct{}
+
+func (stallSrc) Now() time.Time   { return time.Now() }
+func (stallSrc) Failed() []string { return nil }
+func (stallSrc) Fetch(ctx context.Context, _ string, _ uint64, _ io.Writer) (uint64, error) {
+	<-ctx.Done()
+	return 0, ctx.Err()
+}
 
 func TestUnitRefreshReservationBlocksUpdatesUntilOutcome(t *testing.T) {
 	e := newEnv(t)
@@ -801,8 +861,8 @@ func TestCapabilities(t *testing.T) {
 		mut  func(*Config)
 		want []string
 	}{
-		{"signed, writable, guarded unit", nil, []string{"update/1", "update-guard/1"}},
-		{"generation 1 unit: writable dir in a foreground run", func(c *Config) { c.UnitGen = 1 }, []string{"update/1"}},
+		{"signed, writable, guarded unit", nil, []string{"update/1", "update-timeout/1", "update-guard/1"}},
+		{"generation 1 unit: writable dir in a foreground run", func(c *Config) { c.UnitGen = 1 }, []string{"update/1", "update-timeout/1"}},
 		{"unsigned build", func(c *Config) { c.Key = nil }, nil},
 		{"not linux", func(c *Config) { c.GOOS = "darwin" }, nil},
 		{"executable directory not writable", func(c *Config) { c.ExePath = filepath.Join(e.dir, "nope", "x") }, nil},

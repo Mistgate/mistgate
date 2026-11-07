@@ -20,6 +20,7 @@ export function SystemPage() {
         <>
           <PanelCard data={q.data} owner={owner} actions={actions} />
           <UpdateTimezoneCard data={q.data} owner={owner} busy={actions.busy} onChange={actions.setUpdateTimezone} />
+          <UpdateDownloadTimeoutCard data={q.data} owner={owner} busy={actions.busy} onChange={actions.setDownloadTimeout} />
         </>
       ) : q.isError ? (
         <QueryError error={q.error} onRetry={() => void q.refetch()} />
@@ -60,6 +61,37 @@ function UpdateTimezoneCard({ data, owner, busy, onChange }: { data: Updates; ow
         </label>
       ) : (
         <p className="font-mono text-sm font-semibold">{updateTimezoneName(current)}</p>
+      )}
+    </section>
+  );
+}
+
+function UpdateDownloadTimeoutCard({ data, owner, busy, onChange }: { data: Updates; owner: boolean; busy: boolean; onChange: (seconds: number) => Promise<boolean> }) {
+  const t = useT();
+  const current = data.updateDownloadTimeoutSeconds || 1800;
+  const options = [300, 600, 1800, 3600, 7200];
+  if (!options.includes(current)) options.push(current);
+  options.sort((a, b) => a - b);
+  return (
+    <section className={card}>
+      <SectionLabel as="h2" icon="refresh" tone="sky">
+        {t("up.downloadTimeout")}
+      </SectionLabel>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-pretty text-muted">{t("up.downloadTimeout.body")}</p>
+      {owner ? (
+        <label className="flex max-w-sm flex-col gap-1.5 text-xs font-semibold">
+          {t("up.downloadTimeout.label")}
+          <select
+            value={current}
+            disabled={busy}
+            onChange={(event) => void onChange(Number(event.target.value))}
+            className="h-10 rounded-ctl border border-line bg-surface px-3 text-sm text-fg disabled:opacity-60"
+          >
+            {options.map((seconds) => <option key={seconds} value={seconds}>{t(seconds < 3600 ? "up.downloadTimeout.minutes" : "up.downloadTimeout.hours", { n: seconds < 3600 ? seconds / 60 : seconds / 3600 })}</option>)}
+          </select>
+        </label>
+      ) : (
+        <p className="font-mono text-sm font-semibold">{t(current < 3600 ? "up.downloadTimeout.minutes" : "up.downloadTimeout.hours", { n: current < 3600 ? current / 60 : current / 3600 })}</p>
       )}
     </section>
   );

@@ -53,7 +53,7 @@ From top to bottom, by what needs you:
 
 - **This panel** comes first, because the panel is updated before the nodes: one line with its version, build date, state and **Check GitHub**. When a signed release is out, the card stands out and carries **Update panel**. The release key fingerprint, the SHA-256 and the explanation are behind **Details**; a panel that cannot update itself opens its steps on its own.
 - **The fleet card**: where the fleet stands ("2 of 4 nodes on v0.1.24"), a bar with one segment per node, the count of each state under it, and the one main button. With something to update that is **Update N nodes** (below); while a rollout runs, **Pause** / **Resume** / **Cancel rollout**. Its last line is the **Release bundle**: the bundle in `<data-dir>/dist`, the verdict of the signature check, its version and dates, **Read the folder again**, and the folded details (files, the reason for a refusal, the steps to make a bundle yourself).
-- **The rollout**: a running one sits right under the fleet card, by stage (the canary, the batches) with the nodes of each; the last finished one comes after the node list, folded to one line (**Show stages**) when it ended well.
+- **The rollout**: a running one sits right under the fleet card, by stage (the canary, the batches) with the nodes of each; while a compatible agent downloads its file, its phase, progress, downloaded size and recent transfer speed are shown; the last finished one comes after the node list, folded to one line (**Show stages**) when it ended well.
 - **Nodes**: every node with its agent version and build date, its state and its last update on one line. The owner gets one main button per row, **Update** (or **Schedule** when an update is already scheduled), and a **⋯** menu beside it with **Schedule…** and **Roll back…**. A node that belongs to the running rollout says so in its row ("Queued · batch 2", "Updating…") and has no update or schedule of its own; **Roll back…** stays where it was allowed.
 
 | Node state | Meaning |
@@ -129,7 +129,7 @@ Each update is pinned to a release:
 ### One node's update
 
 1. The panel sends the signed manifest. The agent checks it, downloads its file, keeps its current binary as `<binary>.prev`, puts the new one in its place and restarts itself in place (systemd sees nothing). The node is offline for a few seconds; the admin shows it as updating, not as an outage.
-2. The panel waits up to 10 minutes for the agent's answer (the download included), then up to 3 minutes for the node to come back with the new build.
+2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Download timeout**); the window is captured when the command is sent, and a transfer with no data for 90 seconds still fails. Changing the setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
 3. The **gate** runs for up to 5 minutes after the node is back. It passes when all of this holds:
    - the new build has committed: it connected and applied its configuration without a failed profile;
    - the configuration the node applied is the panel's;
@@ -178,7 +178,7 @@ Common step errors:
 | The bundle has no file for this node's system and architecture | The bundle lacks the binary for its architecture (for example `arm64`). |
 | The node could not download the file from the panel | Look at the node's link to the panel. |
 | The node cannot write next to its program file | Check the disk of the node; apply **Refresh the service** in Health → Doctor when offered, or run `mistgate-node install` once with a current binary. |
-| The node did not answer the update command in 10 minutes | Look at the node. |
+| The node did not answer the update command within its download window (30 minutes by default; 10 minutes for older agents) | Look at the node and its download progress. |
 | The node did not come back within 3 minutes | Look at the node and its logs. |
 | The client-eye check failed after the update | See [Health](health.md); the node is back on the previous version. |
 

@@ -56,6 +56,10 @@ func (u *fakeUpdates) RecordAnswer(_ context.Context, nodeID, requestID string, 
 	return nil
 }
 
+func (u *fakeUpdates) RecordProgress(context.Context, string, *agentv1.UpdateProgress) error {
+	return nil
+}
+
 func (u *fakeUpdates) LinkDownload(_ context.Context, nodeID, name, token string) (string, error) {
 	u.mu.Lock()
 	u.assets = append(u.assets, fakeLinkAssetRequest{nodeID: nodeID, name: name, token: token})
@@ -167,7 +171,7 @@ func TestCommandsAreOfflineAfterPanelRestartWithFreshLiveRow(t *testing.T) {
 			t.Errorf("%s after restart = %v, want an offline precondition", name, err)
 		}
 	}
-	_, err = e.f.UpdateAgent(e.ctx, a.nodeID, nil, nil, time.Millisecond)
+	_, err = e.f.UpdateAgent(e.ctx, a.nodeID, nil, nil, time.Millisecond, 0)
 	checkOffline("UpdateAgent", err)
 	_, err = e.f.RunDoctor(e.ctx, a.nodeID, nil, time.Millisecond)
 	checkOffline("RunDoctor", err)
@@ -223,11 +227,11 @@ func TestUpdateAgentAnswerSurvivesTheStreamEnding(t *testing.T) {
 	}
 	done := make(chan out, 1)
 	go func() {
-		res, err := e.f.UpdateAgent(e.ctx, a.nodeID, []byte("manifest-bytes"), []byte("signature-bytes"), 10*time.Second)
+		res, err := e.f.UpdateAgent(e.ctx, a.nodeID, []byte("manifest-bytes"), []byte("signature-bytes"), 10*time.Second, 90*time.Minute)
 		done <- out{res, err}
 	}()
 	msg := c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetUpdateAgent() != nil }).GetUpdateAgent()
-	if msg.RequestId == "" || !bytes.Equal(msg.Manifest, []byte("manifest-bytes")) || !bytes.Equal(msg.Signature, []byte("signature-bytes")) {
+	if msg.RequestId == "" || !bytes.Equal(msg.Manifest, []byte("manifest-bytes")) || !bytes.Equal(msg.Signature, []byte("signature-bytes")) || msg.DownloadTimeoutSeconds != 5400 {
 		t.Fatalf("UpdateAgent: %+v", msg)
 	}
 	c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: &agentv1.CommandResult{
@@ -265,14 +269,14 @@ func TestUpdateCommandsNeedTheCapability(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("nodea")
 	e.fixture(a.nodeID)
-	_, err := e.f.UpdateAgent(e.ctx, a.nodeID, []byte("m"), []byte("s"), time.Second)
+	_, err := e.f.UpdateAgent(e.ctx, a.nodeID, []byte("m"), []byte("s"), time.Second, 0)
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "offline") {
 		t.Fatalf("offline: %v", err)
 	}
 	c := connectUpdater(a, "inst1", 100, "doctor/1") // no update/1
 	for name, call := range map[string]func() error{
 		"UpdateAgent": func() error {
-			_, err := e.f.UpdateAgent(e.ctx, a.nodeID, []byte("m"), []byte("s"), time.Second)
+			_, err := e.f.UpdateAgent(e.ctx, a.nodeID, []byte("m"), []byte("s"), time.Second, 0)
 			return err
 		},
 		"RollbackAgent": func() error { _, err := e.f.RollbackAgent(e.ctx, a.nodeID, time.Second); return err },
