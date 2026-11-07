@@ -8,7 +8,7 @@ import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { Ipv6EntryAction } from "@/gen/mistgate/admin/v1/node_pb";
 import { en } from "@/i18n/en";
-import { useWays, WaysTab } from "./ways";
+import { useWays, WaysStrip, WaysTab } from "./ways";
 
 const listRelays = vi.fn();
 const listRelayCandidates = vi.fn();
@@ -48,8 +48,8 @@ vi.mock("@/lib/api", () => ({
 let search: Record<string, unknown> = {};
 const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, params, search: s, className }: { children?: ReactNode; to: string; params?: { id: string }; search?: Record<string, string>; className?: string }) => (
-    <a href={`${to.replace("$id", params?.id ?? "")}${s ? "?" + new URLSearchParams(s).toString() : ""}`} className={className}>
+  Link: ({ children, to, params, search: s, className, title }: { children?: ReactNode; to: string; params?: { id: string }; search?: Record<string, string>; className?: string; title?: string }) => (
+    <a href={`${to.replace("$id", params?.id ?? "")}${s ? "?" + new URLSearchParams(s).toString() : ""}`} className={className} title={title}>
       {children}
     </a>
   ),
@@ -509,5 +509,41 @@ describe("servers in subscriptions", () => {
     await mount(withInbounds([vless]));
     const sw = panel().querySelector<HTMLElement>("[role=switch]")!;
     expect(sw.hasAttribute("data-disabled") || sw.getAttribute("aria-disabled") === "true").toBe(true);
+  });
+});
+
+function Strip({ data }: { data: never }) {
+  const w = useWays(data);
+  return <WaysStrip data={data} w={w} />;
+}
+
+describe("the Overview's strip", () => {
+  it("names two dark networks and counts the rest, with the whole list in the tooltip, so a long list stays inside the card", async () => {
+    countryChecks = [
+      country("nod_de1", CountryVerdict.PARTIAL, ["MTS", "Beeline", "MegaFon", "Tele2", "Rostelecom"]),
+      country("nod_msk1", CountryVerdict.OK),
+      country("nod_fi1", CountryVerdict.PARTIAL, ["MTS"]),
+    ];
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () =>
+      root!.render(
+        <QueryClientProvider client={qc}>
+          <ToastProvider>
+            <Strip data={de1()} />
+          </ToastProvider>
+        </QueryClientProvider>,
+      ),
+    );
+    await settle();
+    const direct = [...document.querySelectorAll("a")].find((a) => a.textContent?.startsWith("Direct"))!;
+    expect(direct.textContent).toContain("Beeline, MTS +3");
+    expect(direct.textContent).not.toContain("Rostelecom");
+    const title = direct.getAttribute("title")!;
+    expect(title.startsWith("Direct · not seen on: ")).toBe(true);
+    for (const n of ["MTS", "Beeline", "MegaFon", "Tele2", "Rostelecom"]) expect(title).toContain(n);
+    expect(direct.className).toContain("max-w-full");
   });
 });
