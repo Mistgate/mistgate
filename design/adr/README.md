@@ -20,5 +20,6 @@ new record that supersedes the old one, not by editing history.
 | [0013](0013-restore-from-a-backup.md) | Restore from a backup: in the panel, and on a new server | Accepted |
 | [0014](0014-assistant.md) | The assistant: a cloud model that runs the panel through its own MCP tools | Accepted |
 | [0015](0015-moving-target-transport.md) | A moving target: a dialect of its own for every server, rotated by the panel | Proposed |
+| [0016](0016-ways-graph.md) | The ways as a graph: a node's entries, relays and exits in a node editor | Proposed |
 
 The plan they serve: [`../cloudflare-edition/README.md`](../cloudflare-edition/README.md).
