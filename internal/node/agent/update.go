@@ -41,8 +41,26 @@ var errExec = errors.New("re-exec failed")
 
 // updSource is the update package's view of the agent.
 type updSource struct {
-	a     *Agent
-	token string
+	a         *Agent
+	token     string
+	requestID string
+	touch     func()
+}
+
+// SetActivity lets the updater's common idle timer observe bytes that a link client reads while it is discarding a
+// server's ignored Range prefix. The callback is best effort and is only used during one update.
+func (s *updSource) SetActivity(fn func()) { s.touch = fn }
+
+func (s updSource) Progress(p *pb.UpdateProgress) {
+	if p == nil {
+		return
+	}
+	if p.RequestId == "" {
+		p.RequestId = s.requestID
+	}
+	if session := s.a.cur.Load(); session != nil {
+		session.send(&pb.ConnectRequest{Message: &pb.ConnectRequest_UpdateProgress{UpdateProgress: p}})
+	}
 }
 
 func (s updSource) Now() time.Time { return s.a.now() }
@@ -94,11 +112,13 @@ func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w 
 	if err != nil {
 		return 0, fmt.Errorf("%w: invalid link download URL: %v", update.ErrPermanent, err)
 	}
-	keepaliveTimeout := 45 * time.Second
-	if st := a.settings.Load(); st != nil {
-		keepaliveTimeout = secs(st.KeepaliveTimeoutS, keepaliveTimeout)
+	idle := update.DefaultIdleTimeout
+	if a.upd != nil {
+		idle = a.upd.IdleTimeout()
 	}
-	idle := durOr(a.linkPingTimeout, keepaliveTimeout)
+	if a.updateLinkIdle > 0 {
+		idle = a.updateLinkIdle
+	}
 	requestCtx, cancel := context.WithCancel(ctx)
 	var stallFired atomic.Bool
 	stall := time.AfterFunc(idle, func() {
@@ -136,7 +156,7 @@ func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w 
 		return 0, fmt.Errorf("link download request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	body := linkStallReader{r: resp.Body, stall: stall, idle: idle}
+	body := linkStallReader{r: resp.Body, stall: stall, idle: idle, touch: s.touch}
 
 	var total uint64
 	switch resp.StatusCode {
@@ -180,12 +200,16 @@ type linkStallReader struct {
 	r     io.Reader
 	stall *time.Timer
 	idle  time.Duration
+	touch func()
 }
 
 func (r linkStallReader) Read(p []byte) (int, error) {
 	n, err := r.r.Read(p)
 	if n > 0 {
 		r.stall.Reset(r.idle)
+		if r.touch != nil {
+			r.touch()
+		}
 	}
 	return n, err
 }
@@ -348,7 +372,8 @@ func (a *Agent) applyUpdate(s *session, r *pb.UpdateAgent) {
 	if a.linkOnly() && a.runCtx != nil {
 		ctx = a.runCtx
 	}
-	res, fin := a.upd.Apply(ctx, r, updSource{a: a, token: r.GetDownloadToken()})
+	source := &updSource{a: a, token: r.GetDownloadToken(), requestID: r.RequestId}
+	res, fin := a.upd.Apply(ctx, r, source)
 	a.finishCommand(s, res, fin)
 }
 

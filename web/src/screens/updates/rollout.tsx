@@ -12,6 +12,50 @@ import { isActive, progressOf, rolloutInfo, stagesOf, stepErrorText, stepInfo, t
 
 const decided = (s: Step) => s.state === StepState.PASSED || s.state === StepState.FAILED || s.state === StepState.ROLLED_BACK || s.state === StepState.SKIPPED;
 
+const downloadPhaseKeys: Record<string, Parameters<T>[0]> = {
+  accepted: "up.download.phase.accepted",
+  downloading: "up.download.phase.downloading",
+  verifying: "up.download.phase.verifying",
+  installing: "up.download.phase.installing",
+  restarting: "up.download.phase.restarting",
+  completed: "up.download.phase.completed",
+  failed: "up.download.phase.failed",
+};
+
+function size(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KiB`;
+  return `${(n / 1024 ** 2).toFixed(1)} MiB`;
+}
+
+function DownloadProgress({ step }: { step: Step }) {
+  const t = useT();
+  if (!step.downloadPhase || step.state !== StepState.SENT) return null;
+  const total = step.totalBytes;
+  const done = Math.min(step.downloadedBytes, total || step.downloadedBytes);
+  const percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  const downloading = step.downloadPhase === "downloading";
+  return (
+    <div
+      className="basis-full flex min-w-48 max-w-sm flex-col gap-1 text-[11px] text-muted sm:ms-auto sm:basis-auto"
+      role="progressbar"
+      aria-label={t("up.download.aria", { percent })}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+    >
+      <div className="flex items-center justify-between gap-2 font-mono">
+        <span>{t(downloadPhaseKeys[step.downloadPhase] ?? "up.download.phase.downloading")}</span>
+        <span>{total ? `${percent}%${downloading ? ` · ${size(step.bytesPerSecond)}/s` : ""}` : t("up.download.phase.waiting")}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
+        <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${percent}%` }} />
+      </div>
+      {total > 0 && <span className="font-mono">{size(done)} / {size(total)}</span>}
+    </div>
+  );
+}
+
 function stageTexts(t: T, st: Stage): { name: string; what: string } {
   if (st.kind === "skipped") return { name: t("up.ro.skipped"), what: t("up.ro.skipped.what") };
   if (st.kind === "canary") return { name: t("up.ro.canary"), what: t("up.ro.canary.what") };
@@ -24,12 +68,13 @@ function NodeChip({ step, toVersion }: { step: Step; toVersion: string }) {
   const info = stepInfo(step.state);
   const label = step.state === StepState.PASSED ? t("up.step.to", { version: toVersion }) : t(info.key);
   return (
-    <li className="flex h-7 items-center gap-2 rounded-ctl border border-line bg-surface-2 px-2.5 text-xs">
+    <li className="flex min-h-7 flex-wrap items-center gap-2 rounded-ctl border border-line bg-surface-2 px-2.5 py-1 text-xs">
       <StatusDot kind={info.kind} />
       <Link to="/nodes/$id" params={{ id: step.nodeId }} className="font-mono font-bold hover:underline">
         {step.nodeName}
       </Link>
       <span className={cx("whitespace-nowrap", info.kind === "off" ? "text-muted" : "text-fg")}>{label}</span>
+      <DownloadProgress step={step} />
     </li>
   );
 }

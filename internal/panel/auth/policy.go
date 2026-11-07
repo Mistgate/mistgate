@@ -219,6 +219,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure: levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:        levelOwner, // also needs a step-up
 	adminv1connect.UpdateServiceSetUpdateChannelProcedure:         levelOwner, // also needs a step-up; never available to tokens
+	adminv1connect.UpdateServiceSetUpdateDownloadTimeoutProcedure: levelOwner, // also needs a step-up
 
 	// DeviceService: devices that hold their own keys. All of it is levelWrite, like the subscription link
 	// (it is a user credential), and every call that returns a private key writes an audit row in the handler;

@@ -51,7 +51,7 @@ func applyLinkUpdate(ctx context.Context, a *Agent, f *updFix, token string, con
 	req := &pb.UpdateAgent{
 		RequestId: "update-link-test", Manifest: manifest, Signature: signature, DownloadToken: token,
 	}
-	return a.upd.Apply(ctx, req, updSource{a: a, token: req.GetDownloadToken()})
+	return a.upd.Apply(ctx, req, &updSource{a: a, token: req.GetDownloadToken()})
 }
 
 func TestUpdateLinkFetchFullFileAndEscapesPath(t *testing.T) {
@@ -207,7 +207,7 @@ func TestUpdateLinkFetchRetriesStalledDownload(t *testing.T) {
 			http.Error(w, "too many requests", http.StatusInternalServerError)
 		}
 	}))
-	a.linkPingTimeout = 50 * time.Millisecond
+	a.updateLinkIdle = 50 * time.Millisecond
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -393,6 +393,50 @@ func TestUpdateLinkFetchDiscardsPrefixWhenRangeGets200(t *testing.T) {
 	}
 	if rangeHeader != "bytes=5-" || total != uint64(len(content)) || got.String() != string(content[5:]) {
 		t.Errorf("Fetch total=%d range=%q body=%q", total, rangeHeader, got.String())
+	}
+}
+
+func TestUpdateLinkSlowRange200PrefixKeepsIdleTimerAlive(t *testing.T) {
+	content := bytes.Repeat([]byte("x"), 64)
+	cut := 8
+	var calls atomic.Int32
+	a, f, _ := newLinkUpdateAgent(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch calls.Add(1) {
+		case 1:
+			w.Header().Set("Content-Length", fmt.Sprint(len(content)))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(content[:cut])
+		case 2:
+			if got, want := r.Header.Get("Range"), fmt.Sprintf("bytes=%d-", cut); got != want {
+				t.Errorf("range = %q, want %q", got, want)
+			}
+			w.Header().Set("Content-Length", fmt.Sprint(len(content)))
+			w.WriteHeader(http.StatusOK) // the origin ignores Range; the agent must discard the prefix
+			flusher, _ := w.(http.Flusher)
+			for i := range content {
+				if _, err := w.Write(content[i : i+1]); err != nil {
+					return
+				}
+				if flusher != nil {
+					flusher.Flush()
+				}
+				time.Sleep(15 * time.Millisecond)
+			}
+		default:
+			t.Errorf("unexpected request %d", calls.Load())
+		}
+	}), func(c *update.Config) { c.IdleTimeout = 50 * time.Millisecond })
+	a.updateLinkIdle = 50 * time.Millisecond
+
+	result, finish := applyLinkUpdate(context.Background(), a, f, linkDownloadToken, content)
+	if result == nil || !result.Ok || finish == nil {
+		t.Fatalf("Apply = (%v, %v), want success and finish", result, finish != nil)
+	}
+	if got, err := os.ReadFile(f.exe); err != nil || !bytes.Equal(got, content) {
+		t.Fatalf("updated executable = %d bytes, err %v", len(got), err)
+	}
+	if err := finish(); err != nil {
+		t.Fatal(err)
 	}
 }
 

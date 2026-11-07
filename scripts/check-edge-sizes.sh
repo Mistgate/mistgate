@@ -31,8 +31,9 @@ entries=(
   "mistgate-edge-jobs:31"
   # The admin API and the SPA: the largest role, every admin service. Measured 37.6 MiB; 40.1 MiB with the external reachability
   # sources (cheburcheck, bsbord), whose owner RPCs (settings, sealed keys, the paid-check preview) need the admin's step-up and
-  # cannot live in jobs, where their ticks run.
-  "mistgate-edge-admin:43"
+  # cannot live in jobs, where their ticks run. 44 MiB in November 2026: the Agent update timeout/progress controls are
+  # owner-facing admin RPCs and UI state, so they stay here rather than adding another Worker boundary.
+  "mistgate-edge-admin:44"
   # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB; 31.9 MiB in November 2026 with the panel's SSH key, the
   # authorized_keys management and the login by an own private key, which need that SSH client and so cannot live elsewhere.
   "mistgate-edge-provision:35"

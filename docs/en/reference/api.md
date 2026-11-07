@@ -199,7 +199,7 @@ A profile acts as an admin role: **Read only** as read-only, **Operator** as hel
 | `AuthService.ListAudit` | no | no | yes |
 | `HealthService.ApplyFix` | no | no | only through an approved MCP plan |
 | `UpdateService.StartRollout`, `PauseRollout`, `ResumeRollout`, `CancelRollout`, `RollbackNode` | no | no | only through an approved MCP plan |
-| `UpdateService.ScheduleNodeUpdate`, `CancelNodeUpdateSchedule`, `SetUpdateTimezone` | no | no | only through an approved MCP plan |
+| `UpdateService.ScheduleNodeUpdate`, `CancelNodeUpdateSchedule`, `SetUpdateTimezone`, `SetUpdateDownloadTimeout` | no | no | only through an approved MCP plan |
 | `ProvisioningService.ListNodeServerAccess` (connection metadata, never a password) | no | no | yes |
 | `ProvisioningService.GetSSHFingerprint` | no | no | only while the MCP server makes a `node_install` plan |
 | `ProvisioningService.StartNodeProvision`, `RotateNodeServerPassword` | no | no | only through an approved MCP plan |

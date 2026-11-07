@@ -278,7 +278,7 @@ func TestFleetRemoteMapsNilAndTimeoutToNoAnswer(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			remote.answer = tc.answer
-			_, err := e.f.UpdateAgent(e.ctx, a.nodeID, nil, nil, time.Second)
+			_, err := e.f.UpdateAgent(e.ctx, a.nodeID, nil, nil, time.Second, 0)
 			if err == nil || connect.CodeOf(err) != connect.CodeOf(tc.want) || err.Error() != tc.want.Error() {
 				t.Fatalf("UpdateAgent error = %v, want %v", err, tc.want)
 			}
@@ -333,7 +333,7 @@ func TestFleetRemoteRefusesOfflineAndOldAgent(t *testing.T) {
 	offline.fixture(offlineAgent.nodeID)
 	offlineRemote := &testRemote{}
 	offline.f.cfg.Remote = offlineRemote
-	if _, err := offline.f.UpdateAgent(offline.ctx, offlineAgent.nodeID, nil, nil, time.Second); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
+	if _, err := offline.f.UpdateAgent(offline.ctx, offlineAgent.nodeID, nil, nil, time.Second, 0); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
 		t.Fatalf("offline UpdateAgent error = %v", err)
 	}
 
@@ -343,7 +343,7 @@ func TestFleetRemoteRefusesOfflineAndOldAgent(t *testing.T) {
 	if _, err := old.f.RunDoctor(old.ctx, oldAgent.nodeID, nil, time.Second); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: agent too old" {
 		t.Fatalf("old RunDoctor error = %v", err)
 	}
-	if _, err := old.f.UpdateAgent(old.ctx, oldAgent.nodeID, nil, nil, time.Second); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node cannot update itself" {
+	if _, err := old.f.UpdateAgent(old.ctx, oldAgent.nodeID, nil, nil, time.Second, 0); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node cannot update itself" {
 		t.Fatalf("old UpdateAgent error = %v", err)
 	}
 	for name, remote := range map[string]*testRemote{"offline": offlineRemote, "old": oldRemote} {
@@ -361,7 +361,7 @@ func TestFleetRemoteSendRefusesOfflineAndMissingCapability(t *testing.T) {
 	offlineRemote := &testRemote{}
 	offline.f.cfg.Remote = offlineRemote
 	if err := offline.f.SendUpdateAgent(offline.ctx, offlineAgent.nodeID, "req-offline", []byte("manifest"), []byte("signature"),
-		"invented-token", offline.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
+		"invented-token", offline.f.now().Add(time.Minute), 0); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
 		t.Fatalf("offline SendUpdateAgent error = %v", err)
 	}
 
@@ -369,7 +369,7 @@ func TestFleetRemoteSendRefusesOfflineAndMissingCapability(t *testing.T) {
 	oldRemote := &testRemote{}
 	old.f.cfg.Remote = oldRemote
 	if err := old.f.SendUpdateAgent(old.ctx, oldAgent.nodeID, "req-old", []byte("manifest"), []byte("signature"),
-		"invented-token", old.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node cannot update itself" {
+		"invented-token", old.f.now().Add(time.Minute), 0); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node cannot update itself" {
 		t.Fatalf("old SendUpdateAgent error = %v", err)
 	}
 	for name, remote := range map[string]*testRemote{"offline": offlineRemote, "old": oldRemote} {
@@ -384,7 +384,7 @@ func TestFleetRemoteSendPassesRecordedUpdateFrame(t *testing.T) {
 	remote := &testRemote{}
 	e.f.cfg.Remote = remote
 	deadline := e.f.now().Add(time.Minute)
-	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", []byte("manifest"), []byte("signature"), "invented-token", deadline); err != nil {
+	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", []byte("manifest"), []byte("signature"), "invented-token", deadline, 90*time.Minute); err != nil {
 		t.Fatalf("SendUpdateAgent = %v", err)
 	}
 	calls := remote.sendCalls()
@@ -395,14 +395,14 @@ func TestFleetRemoteSendPassesRecordedUpdateFrame(t *testing.T) {
 	frame := call.frame.GetUpdateAgent()
 	if call.nodeID != a.nodeID || call.requestID != "req-send" || call.frame.GetUpdateAgent() == nil ||
 		frame.GetRequestId() != "req-send" || string(frame.GetManifest()) != "manifest" || string(frame.GetSignature()) != "signature" ||
-		frame.GetDownloadToken() != "invented-token" || !call.deadline.Equal(deadline) {
+		frame.GetDownloadToken() != "invented-token" || frame.GetDownloadTimeoutSeconds() != 5400 || !call.deadline.Equal(deadline) {
 		t.Fatal("remote Send did not receive the recorded update request")
 	}
 }
 
 func TestFleetSendUpdateAgentRequiresRemote(t *testing.T) {
 	e, a, _ := remoteReadyNode(t, "update-link/1")
-	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", nil, nil, "invented-token", e.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition {
+	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", nil, nil, "invented-token", e.f.now().Add(time.Minute), 0); code(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("SendUpdateAgent without Remote = %v, want FailedPrecondition", err)
 	}
 }
@@ -411,7 +411,7 @@ func TestFleetRemoteSendFailureMapsToOffline(t *testing.T) {
 	e, a, _ := remoteReadyNode(t, "update-link/1")
 	remote := &testRemote{sendErr: errors.New("link lost")}
 	e.f.cfg.Remote = remote
-	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", []byte("manifest"), []byte("signature"), "invented-token", e.f.now().Add(time.Minute)); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
+	if err := e.f.SendUpdateAgent(e.ctx, a.nodeID, "req-send", []byte("manifest"), []byte("signature"), "invented-token", e.f.now().Add(time.Minute), 0); code(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: node is offline" {
 		t.Fatalf("SendUpdateAgent error = %v", err)
 	}
 	if calls := remote.sendCalls(); len(calls) != 1 {
