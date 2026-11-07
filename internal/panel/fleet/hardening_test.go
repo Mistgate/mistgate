@@ -172,7 +172,10 @@ func TestStatsFutureEndDoesNotFreezeLiveView(t *testing.T) {
 	year := now + 365*24*3600
 
 	c.send(1, statsBatch(year-10, year, nil, []*agentv1.Session{{CredId: "crd_alice_hy", InboundId: ids.i1, ConnectedAtUnix: year}}))
-	c.send(2, statsBatch(now-10, now, nil, []*agentv1.Session{{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 5}}))
+	// The future batch's end is clamped to the moment the panel takes it in, which on a slow runner (-race) is a second or
+	// more after `now`: an honest end of exactly `now` would then look older and be skipped. A minute ahead is still honest
+	// (within maxFuture) and always later than that clamp.
+	c.send(2, statsBatch(now-10, now+60, nil, []*agentv1.Session{{CredId: "crd_erin_hy", InboundId: ids.i1, ConnectedAtUnix: now - 5}}))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 2 })
 	on := e.f.Online(e.ctx)
 	if len(on) != 1 || on[0].UserID != "usr_erin" {
