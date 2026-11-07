@@ -144,7 +144,7 @@ export function wayOf(s: Pick<GServer, "on" | "failed" | "listed" | "cdn">, lane
   return lane.ring === "ok" ? "works" : "partial";
 }
 
-function serverOf(i: GraphInput["inbounds"][number]): GServer {
+export function serverOf(i: GraphInput["inbounds"][number]): GServer {
   const net = networkOf(i.protocol);
   // GetNode gives a switched-off server as state DISABLED (older panels never filled enabled): the state decides
   const on = i.state !== InboundState.DISABLED;
@@ -164,10 +164,10 @@ function serverOf(i: GraphInput["inbounds"][number]): GServer {
   };
 }
 
-const order = (a: GServer, b: GServer) => (a.net ?? "").localeCompare(b.net ?? "") || a.port - b.port || a.name.localeCompare(b.name);
+export const serverOrder = (a: GServer, b: GServer) => (a.net ?? "").localeCompare(b.net ?? "") || a.port - b.port || a.name.localeCompare(b.name);
 
 export function waysGraph(g: GraphInput): WaysGraph {
-  const servers = g.inbounds.map(serverOf).sort(order);
+  const servers = g.inbounds.map(serverOf).sort(serverOrder);
   const lane = (id: string) => g.ways.lanes.find((l) => l.id === id);
   for (const s of servers) s.way = wayOf(s, s.cdn ? lane("cdn") : lane("direct"));
   const ipv6 = lane("ipv6");

@@ -221,7 +221,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   const fitTarget = useCallback(() => {
     const b = boundsOf(allRects());
     const floor = live.current.props.minFitZoom ?? MIN_ZOOM;
-    const v = fitView(b, store.size, 32, floor);
+    const v = fitView(b, store.size, live.current.props.fitPad ?? 32, floor);
     const focus = live.current.props.fitFocus ? store.nodeRect(live.current.props.fitFocus) : null;
     // wider than the canvas even at the floor: keep the focus (the node itself) in the middle instead of cutting both ends
     if (b && focus && v.z === floor && b.w * v.z > store.size.w - 64) return { ...v, x: store.size.w / 2 - (focus.x + focus.w / 2) * v.z };
@@ -440,7 +440,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         commitPositions(target);
         refreshOrder();
       };
-      animateView(fitView(boundsOf(live.current.nodes.map((n) => ({ ...target[n.id]!, w: store.measure.get(n.id)?.w || n.width || 220, h: store.measure.get(n.id)?.h || 96 }))), store.size, 32, live.current.props.minFitZoom ?? MIN_ZOOM), ms);
+      animateView(fitView(boundsOf(live.current.nodes.map((n) => ({ ...target[n.id]!, w: store.measure.get(n.id)?.w || n.width || 220, h: store.measure.get(n.id)?.h || 96 }))), store.size, live.current.props.fitPad ?? 32, live.current.props.minFitZoom ?? MIN_ZOOM), ms);
       if (reducedMotion() || typeof requestAnimationFrame !== "function") {
         for (const [id, p] of Object.entries(target)) store.setLive(id, p);
         store.commitLive();

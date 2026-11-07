@@ -33,6 +33,12 @@ export interface GraphNode<D = unknown> {
   body?: ReactNode;
   selectable?: boolean;
   draggable?: boolean;
+  /** No header: the body is the whole card (a card that draws its own title). */
+  headless?: boolean;
+  /** "ghost": a dashed, empty-looking card; "label": text on the canvas with no card. */
+  variant?: "ghost" | "label";
+  /** Wires attach to invisible anchors at the card's left and right middle instead of rows of ports. */
+  anchors?: boolean;
   /** Card width in px (default 220). */
   width?: number;
   data?: D;
@@ -54,6 +60,8 @@ export interface GraphEdge {
   label?: ReactNode;
   /** Where the label sits: on the middle of the wire (default) or just before the target port, like a badge on it. */
   labelAt?: "mid" | "end";
+  /** The stroke width in px (default 2): a wire that carries more is thicker. */
+  weight?: number;
   /** Its ends can be grabbed (default true when the graph takes onReconnect); false for a wire that is a fact, not a setting. */
   grabbable?: boolean;
   /** A slow flowing dash in the direction of traffic (not with reduced motion). */
@@ -109,6 +117,8 @@ export interface GraphProps<D = unknown> {
   wheelPans?: boolean;
   /** Fit never zooms out past this (default 0.3, the zoom limit). */
   minFitZoom?: number;
+  /** The margin the fit keeps around the content (default 32). */
+  fitPad?: number;
   /** A node to keep centred when the content is wider than the canvas at the fit floor (the rest is panned to). */
   fitFocus?: string;
   /** When the nodes change, lay everything out again instead of placing only the new ones. */

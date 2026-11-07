@@ -12,16 +12,15 @@ import { checksQuery, doctorQuery } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
 import { candidatesQuery, relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
-import { profileListQuery } from "@/screens/users/rpc";
-import { WaysGraph } from "@/screens/node/ways-graph";
-import { useWays } from "@/screens/node/ways";
 import type { WayId } from "@/lib/ways";
+import { useWays } from "@/screens/node/ways";
+import { WaysGraph } from "@/screens/node/ways-graph";
+import { profileListQuery } from "@/screens/users/rpc";
 
-// Development only, /dev-kit?only=graph&demo=ways: the real WaysGraph of the node page on made-up data (private query cache,
-// the relay and subscription calls faked here). The node "be" is cut off in Russia on every direct way; ru2 carries HY2 over
-// a working relay, ru3's relay is failing, spb1 is a node that is not an entry yet ("Add entry node"). Servers cover every
-// state: blocked, works (through a CDN), kept out of subscriptions, off, not relayable (AWG, CDN). The IPv6 row has every
-// state in the selector.
+// Development only, /dev-kit?only=graph&demo=ways: the real WaysGraph (the route map) of the node page on made-up data (private
+// query cache, the relay and subscription calls faked here). &scenario=be (default: direct blocked in Russia, three relays
+// through ru2 working, IPv6 per &v6=), entry (an entry node forwarding to be and de1), cdn (CDN and WARP servers, one relay
+// failing); &extra=2 puts spb1 and de1 on the map as entries without a relay; &role=helper is the read-only view.
 
 const now = Math.floor(Date.now() / 1000);
 const min = 60;
@@ -43,28 +42,76 @@ const v6Of = (s: V6) => ({
 });
 const factOf = (s: V6) => (s === "none" ? { ipv6: "no" } : s === "broken" || s === "down" ? { ipv6: "yes", connect: "failed" } : { ipv6: "yes", connect: "ok" });
 
-const ib = (id: string, profileName: string, protocol: string, port: number, over: object = {}) => ({
-  id, profileId: `prf_${id}`, profileName, protocol, port, state: InboundState.ACTIVE, enabled: true, egress: "direct", cdn: false, directInSubscriptions: true, nodeId: "nod_be", nodeName: "be", ...over,
+type Scenario = "be" | "entry" | "cdn";
+type Ib = ReturnType<typeof ib>;
+const ib = (nodeId: string, id: string, profileName: string, protocol: string, port: number, over: object = {}) => ({
+  id, profileId: `prf_${id}`, profileName, protocol, port, state: InboundState.ACTIVE, enabled: true, egress: "direct", cdn: false, directInSubscriptions: true, nodeId, nodeName: nodeId.slice(4), ...over,
 });
-const inbounds = [
-  ib("hy2", "HY2", "hysteria2", 443),
-  ib("awg", "AWG", "awg", 14491),
-  ib("xhttp", "VLESS XHTTP", "vless", 4443),
-  ib("vless", "VLESS TCP", "vless", 8443, { egress: "warp" }),
-  ib("cdn", "VLESS CDN", "vless", 2053, { cdn: true }),
-  ib("mt", "MTProto", "mtproto", 443, { directInSubscriptions: false }),
-  ib("trj", "Trojan", "vless", 9443, { enabled: false, state: InboundState.DISABLED }),
-];
 
 const relay = (over: object) => ({
   id: "r1", inboundId: "hy2", exitNodeId: "nod_be", exitNodeName: "be", profileId: "prf_hy2", profileName: "HY2", protocol: "hysteria2", viaNodeId: "nod_ru2", viaNodeName: "ru2", network: "udp", port: 443, exitPort: 443,
   enabled: true, state: InboundState.ACTIVE, lastError: "", toIp: "203.0.113.40", appliedUnix: now - 3600, exitLive: true, agentSupported: true, createdUnix: now - 7200, bytes: 0, packets: 0, countedUnix: 0, ...over,
 });
-const fixtureRelays = () => [
-  relay({}),
-  relay({ id: "r2", inboundId: "vless", profileName: "VLESS TCP", protocol: "vless", network: "tcp", port: 8443, exitPort: 8443, viaNodeId: "nod_ru3", viaNodeName: "ru3", state: InboundState.FAILED, lastError: "forward_drop" }),
-  relay({ id: "r3", inboundId: "xhttp", profileName: "VLESS XHTTP", protocol: "vless", network: "tcp", port: 4443, exitPort: 4443, enabled: false, state: InboundState.PENDING }),
-];
+const tcp = { network: "tcp" };
+
+function scenarioOf(s: Scenario) {
+  if (s === "entry") {
+    const own = [ib("nod_ru2", "own1", "VLESS TCP", "vless", 443), ib("nod_ru2", "own2", "HY2", "hysteria2", 8443)];
+    return {
+      nodeId: "nod_ru2",
+      name: "ru2",
+      cc: "RU",
+      address: "198.51.100.20",
+      inbounds: own,
+      verdict: CountryVerdict.OK,
+      relays: [
+        relay({ id: "o1", viaNodeId: "nod_ru2", viaNodeName: "ru2", exitNodeId: "nod_be", exitNodeName: "be" }),
+        relay({ id: "o2", inboundId: "vless", profileName: "VLESS TCP", ...tcp, port: 8443, viaNodeId: "nod_ru2", viaNodeName: "ru2", exitNodeId: "nod_be", exitNodeName: "be" }),
+        relay({ id: "o3", inboundId: "x1", profileName: "Trojan", ...tcp, port: 2053, viaNodeId: "nod_ru2", viaNodeName: "ru2", exitNodeId: "nod_de1", exitNodeName: "de1", state: InboundState.FAILED, lastError: "forward_drop" }),
+        relay({ id: "o4", inboundId: "x2", profileName: "VLESS XHTTP", ...tcp, port: 4443, viaNodeId: "nod_ru2", viaNodeName: "ru2", exitNodeId: "nod_de1", exitNodeName: "de1" }),
+      ],
+    };
+  }
+  if (s === "cdn") {
+    return {
+      nodeId: "nod_be",
+      name: "be",
+      cc: "BE",
+      address: "203.0.113.40",
+      inbounds: [
+        ib("nod_be", "hy2", "HY2", "hysteria2", 443),
+        ib("nod_be", "vless", "VLESS TCP", "vless", 8443, { egress: "warp" }),
+        ib("nod_be", "xhttp", "VLESS XHTTP", "vless", 4443, { egress: "warp" }),
+        ib("nod_be", "cdn1", "VLESS CDN", "vless", 2053, { cdn: true }),
+        ib("nod_be", "cdn2", "Trojan CDN", "vless", 2083, { cdn: true }),
+        ib("nod_be", "mt", "MTProto", "mtproto", 443, { directInSubscriptions: false }),
+      ],
+      verdict: CountryVerdict.PARTIAL,
+      relays: [relay({}), relay({ id: "r2", inboundId: "vless", profileName: "VLESS TCP", ...tcp, port: 8443, viaNodeId: "nod_ru3", viaNodeName: "ru3", state: InboundState.FAILED, lastError: "forward_drop" })],
+    };
+  }
+  return {
+    nodeId: "nod_be",
+    name: "be",
+    cc: "BE",
+    address: "203.0.113.40",
+    inbounds: [
+      ib("nod_be", "hy2", "HY2", "hysteria2", 443),
+      ib("nod_be", "vless", "VLESS TCP", "vless", 8443),
+      ib("nod_be", "xhttp", "VLESS XHTTP", "vless", 4443),
+      ib("nod_be", "mt", "MTProto", "mtproto", 443, { directInSubscriptions: false }),
+      ib("nod_be", "awg", "AWG2", "awg", 14491),
+      ib("nod_be", "awg3", "AWG3.1", "awg", 14492),
+      ib("nod_be", "trj", "Trojan", "vless", 9443, { enabled: false, state: InboundState.DISABLED }),
+    ],
+    verdict: CountryVerdict.BLOCKED,
+    relays: [
+      relay({}),
+      relay({ id: "r2", inboundId: "vless", profileName: "VLESS TCP", ...tcp, port: 8443, exitPort: 8443 }),
+      relay({ id: "r3", inboundId: "xhttp", profileName: "VLESS XHTTP", ...tcp, port: 4443, exitPort: 4443 }),
+    ],
+  };
+}
 
 const fleet = [
   { id: "nod_be", name: "be", countryCode: "BE", status: NodeStatus.ONLINE },
@@ -73,12 +120,12 @@ const fleet = [
   { id: "nod_spb1", name: "spb1", countryCode: "RU", status: NodeStatus.ONLINE },
   { id: "nod_de1", name: "de1", countryCode: "DE", status: NodeStatus.ONLINE },
 ];
-const cand = (inb: (typeof inbounds)[number]) => ({
-  inboundId: inb.id, nodeId: "nod_be", nodeName: "be", profileId: inb.profileId, profileName: inb.profileName, protocol: inb.protocol, network: inb.protocol === "hysteria2" || inb.protocol === "awg" ? "udp" : "tcp", port: inb.port,
+const cand = (inb: Ib) => ({
+  inboundId: inb.id, nodeId: inb.nodeId, nodeName: inb.nodeName, profileId: inb.profileId, profileName: inb.profileName, protocol: inb.protocol, network: inb.protocol === "hysteria2" || inb.protocol === "awg" ? "udp" : "tcp", port: inb.port,
   unsupported: inb.protocol === "awg" ? "awg" : "", hop: false, relayId: "", country: { verdict: "blocked", dark: ["MTS", "Beeline"], atUnix: now }, reach: { verdict: "reach", source: "tspu_row", atUnix: now },
 });
 
-let fakeRelays = fixtureRelays();
+let fakeRelays: ReturnType<typeof relay>[] = [];
 function fakeCalls() {
   const wait = () => new Promise((r) => setTimeout(r, 900));
   const api = relaysApi as unknown as Record<string, unknown>;
@@ -104,25 +151,27 @@ function fakeCalls() {
   };
 }
 
-function Mock({ v6, role, children }: { v6: V6; role: Role; children: ReactNode }) {
+function Mock({ v6, role, scenario, children }: { v6: V6; role: Role; scenario: Scenario; children: ReactNode }) {
+  const sc = scenarioOf(scenario);
   const [qc] = useState(() => {
-    fakeRelays = fixtureRelays();
+    fakeRelays = sc.relays;
     fakeCalls();
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
     c.setQueryData(nodesQuery.queryKey, { nodes: fleet } as never);
     c.setQueryData(countryQuery.queryKey, { country: "RU" } as never);
-    c.setQueryData(profileListQuery.queryKey, inbounds.map((i) => ({ id: i.profileId, name: i.profileName, protocol: i.protocol, version: 1 })) as never);
-    c.setQueryData(candidatesQuery("nod_ru2").queryKey, { agentSupported: true, entryCountry: { verdict: "ok", dark: [], atUnix: now }, candidates: inbounds.filter((i) => !i.cdn && i.enabled).map(cand) } as never);
-    c.setQueryData(candidatesQuery("nod_ru3").queryKey, { agentSupported: true, entryCountry: { verdict: "partial", dark: ["MTS"], atUnix: now }, candidates: inbounds.filter((i) => !i.cdn && i.enabled).map(cand) } as never);
-    c.setQueryData(candidatesQuery("nod_spb1").queryKey, { agentSupported: true, entryCountry: { verdict: "ok", dark: [], atUnix: now }, candidates: inbounds.filter((i) => !i.cdn && i.enabled).map(cand) } as never);
+    c.setQueryData(profileListQuery.queryKey, sc.inbounds.map((i) => ({ id: i.profileId, name: i.profileName, protocol: i.protocol, version: 1 })) as never);
+    const own = sc.inbounds.filter((i) => !i.cdn && i.enabled);
+    for (const [id, verdict, dark] of [["nod_ru2", "ok", []], ["nod_ru3", "partial", ["MTS"]], ["nod_spb1", "ok", []], ["nod_de1", "ok", []]] as const) {
+      c.setQueryData(candidatesQuery(id).queryKey, { agentSupported: true, entryCountry: { verdict, dark, atUnix: now }, candidates: own.map(cand) } as never);
+    }
     return c;
   });
   qc.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role } } as never);
-  qc.setQueryData(relaysQuery("nod_be").queryKey, fakeRelays as never);
-  const be = country("nod_be", CountryVerdict.BLOCKED, ["MTS", "Beeline"], { ipv6: country("nod_be", CountryVerdict.OK) });
-  qc.setQueryData(checksQuery("nod_be").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [be] } as never);
-  qc.setQueryData(checksQuery("").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [be, country("nod_ru2", CountryVerdict.OK), country("nod_ru3", CountryVerdict.PARTIAL, ["MTS"])] } as never);
-  qc.setQueryData(doctorQuery("nod_be").queryKey, { nowUnix: now, nodes: [{ nodeId: "nod_be", items: [{ id: "ipv6", status: 1, params: factOf(v6) }] }] } as never);
+  qc.setQueryData(relaysQuery(sc.nodeId).queryKey, role === Role.OWNER ? (fakeRelays as never) : ([] as never));
+  const own = country(sc.nodeId, sc.verdict, sc.verdict === CountryVerdict.BLOCKED ? ["MTS", "Beeline"] : sc.verdict === CountryVerdict.PARTIAL ? ["MTS"] : [], { ipv6: country(sc.nodeId, CountryVerdict.OK) });
+  qc.setQueryData(checksQuery(sc.nodeId).queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [own] } as never);
+  qc.setQueryData(checksQuery("").queryKey, { nowUnix: now, intervalS: 300, columns: [], rows: [], countryChecks: [own, country("nod_ru2", CountryVerdict.OK), country("nod_ru3", CountryVerdict.PARTIAL, ["MTS"])] } as never);
+  qc.setQueryData(doctorQuery(sc.nodeId).queryKey, { nowUnix: now, nodes: [{ nodeId: sc.nodeId, items: [{ id: "ipv6", status: 1, params: factOf(v6) }] }] } as never);
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>{children}</ToastProvider>
@@ -130,13 +179,15 @@ function Mock({ v6, role, children }: { v6: V6; role: Role; children: ReactNode 
   );
 }
 
-function Screen({ v6 }: { v6: V6 }) {
+function Screen({ v6, scenario }: { v6: V6; scenario: Scenario }) {
+  const sc = scenarioOf(scenario);
+  const q = new URLSearchParams(location.search);
   const [open, setOpen] = useState<WayId>("direct");
-  const [full, setFull] = useState(new URLSearchParams(location.search).get("full") === "1");
-  const extra = new URLSearchParams(location.search).get("extra") === "0" ? [] : [{ id: "nod_spb1", name: "spb1" }, { id: "nod_de1", name: "de1" }];
+  const [full, setFull] = useState(q.get("full") === "1");
+  const extra = q.get("extra") === "2" ? [{ id: "nod_spb1", name: "spb1" }, { id: "nod_de1", name: "de1" }] : [];
   const data = {
-    node: { id: "nod_be", name: "be", countryCode: "BE", address: "203.0.113.40", status: NodeStatus.ONLINE, bandwidthMbps: 0, ipv6: v6Of(v6), warp: { state: WarpState.UP, colo: "AMS" } },
-    inbounds,
+    node: { id: sc.nodeId, name: sc.name, countryCode: sc.cc, address: sc.address, status: NodeStatus.ONLINE, bandwidthMbps: 0, ipv6: v6Of(v6), warp: { state: WarpState.NOT_CONFIGURED } },
+    inbounds: sc.inbounds,
     portChecks: [],
     tcpChecks: [],
     facts: { hasIpv6: v6 !== "none" },
@@ -163,13 +214,26 @@ function Screen({ v6 }: { v6: V6 }) {
 }
 
 export function WaysShowcase() {
-  const [v6, setV6] = useState<V6>(() => (new URLSearchParams(location.search).get("v6") as V6) || "can");
-  const [owner, setOwner] = useState(new URLSearchParams(location.search).get("role") !== "helper");
+  const q = new URLSearchParams(location.search);
+  const [v6, setV6] = useState<V6>(() => (q.get("v6") as V6) || "broken");
+  const [owner, setOwner] = useState(q.get("role") !== "helper");
+  const [scenario, setScenario] = useState<Scenario>(() => (q.get("scenario") as Scenario) || "be");
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-4">
+        <Segmented
+          variant="flat"
+          aria-label="Scenario"
+          value={scenario}
+          onValueChange={setScenario}
+          options={[
+            { value: "be", label: "be: blocked, via ru2" },
+            { value: "cdn", label: "CDN + WARP" },
+            { value: "entry", label: "entry node" },
+          ]}
+        />
         <label className="flex items-center gap-2 text-[13px] text-muted">
-          IPv6 row
+          IPv6
           <Segmented
             variant="flat"
             aria-label="IPv6 state"
@@ -189,8 +253,8 @@ export function WaysShowcase() {
           <Switch checked={owner} onCheckedChange={setOwner} aria-label="Owner" />
         </label>
       </div>
-      <Mock key={String(owner)} v6={v6} role={owner ? Role.OWNER : Role.HELPER}>
-        <Screen v6={v6} />
+      <Mock key={`${owner}/${scenario}`} v6={v6} role={owner ? Role.OWNER : Role.HELPER} scenario={scenario}>
+        <Screen v6={v6} scenario={scenario} />
       </Mock>
     </div>
   );

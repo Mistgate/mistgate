@@ -5,7 +5,7 @@ import { NodeContext, nodeLabel, textOf, useGraph, type NodeCtx } from "./contex
 import { portKey, type GraphNode, type GraphPort, type Pos } from "./types";
 import { useContext } from "react";
 
-function PortDot({ node, port }: { node: GraphNode; port: GraphPort }) {
+function PortDot({ node, port, anchor }: { node: GraphNode; port: GraphPort; anchor?: boolean }) {
   const g = useGraph();
   const t = useT();
   const ref = { node: node.id, port: port.id };
@@ -23,7 +23,8 @@ function PortDot({ node, port }: { node: GraphNode; port: GraphPort }) {
   return (
     <button
       type="button"
-      className="mg-gport"
+      className={anchor ? "mg-gport mg-ganchor" : "mg-gport"}
+      tabIndex={anchor ? -1 : undefined}
       data-gport={key}
       data-port-id={port.id}
       data-side={port.side}
@@ -165,6 +166,7 @@ export const NodeCard = memo(function NodeCard({ node, pos, selected }: CardProp
       <div
         ref={ref}
         className="mg-gnode"
+        data-variant={node.variant}
         data-gnode={node.id}
         data-tone={node.tone}
         data-selected={selected || undefined}
@@ -178,6 +180,7 @@ export const NodeCard = memo(function NodeCard({ node, pos, selected }: CardProp
           if (e.target === e.currentTarget) g.onFocusNode(node.id);
         }}
       >
+        {!node.headless && (
         <div className="mg-ghead">
           {node.icon && (
             <span className="id-chip size-6 shrink-0" aria-hidden>
@@ -186,8 +189,10 @@ export const NodeCard = memo(function NodeCard({ node, pos, selected }: CardProp
           )}
           <span className="min-w-0 flex-1 truncate">{node.title}</span>
         </div>
-        {node.body && <div className="py-1.5">{node.body}</div>}
-        {rows.length > 0 && (
+        )}
+        {node.body && <div className={node.headless ? "" : "py-1.5"}>{node.body}</div>}
+        {node.anchors && rest.map((p) => <PortDot key={p.id} node={node} port={p} anchor />)}
+        {!node.anchors && rows.length > 0 && (
           <div className={cx("py-1", node.body ? "border-t border-line" : "")}>
             {rows.map((ports, i) => (
               <RowShell key={i} node={node} ports={ports}>

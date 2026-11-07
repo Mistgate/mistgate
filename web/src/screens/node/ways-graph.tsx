@@ -1,108 +1,109 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type DragEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Graph, GraphMenuItem, GraphPortRow, GraphValue, HelpGroup, Kbd, KeyRow, modKey, type GraphEdge, type GraphNode, type GraphPort, type HelpTab, type PortRef } from "@/components/graph";
-import { Icon } from "@/components/ui/icons";
+import { Graph, HelpGroup, Kbd, KeyRow, type GraphEdge, type GraphNode, type HelpTab } from "@/components/graph";
+import { Icon, type IconName } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
-import { Select } from "@/components/ui/select";
-import { NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/toast";
+import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
+import { relays as relaysApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import type { RelayMsg } from "@/lib/relay";
+import { routeLayout, routeMap, type AltRef, type RmChip, type RmState, type RmWay, type Say } from "@/lib/route-map";
 import { protocolShort } from "@/lib/series";
 import { readPref, writePref } from "@/lib/storage";
 import type { WayId } from "@/lib/ways";
-import { grabbable, port, reconnectRule, relayRefusal, waysGraph, waysLayout, type ReconnectContext, type GCard, type GServer, type GWire, type Ipv6State, type ServerWay } from "@/lib/ways-graph";
-import { profileListQuery } from "@/screens/users/rpc";
-import { TwinPanel } from "@/screens/profiles/twin";
+import { relayRefusal } from "@/lib/ways-graph";
 import { TurnOffDialog } from "./ipv6-entry";
 import { AddRelayDialog, ChangeRelayPort, RemoveRelay, useCountryOf, useRelayRuns, type Entry } from "./relays";
 import { useInSubscriptions } from "./subs-switches";
 import type { WaysModel } from "./ways";
+import { Badge, Dot, MoreButton, Pop, PopItem, ServerChip, type ChipKind } from "./ways-map-parts";
 
-// The Ways in tab drawn as a graph (ADR 0016): the same lanes and relays the list shows, as cards and wires. The mapping is
-// lib/ways-graph.ts's (pure, with tests); this file turns it into the graph component's nodes and edges, words every state
-// (the chip on a row, the badge on a wire's end, the legend) and routes the edits to the dialogs and calls the list uses.
-// Colour is spent sparingly: green dashes only on a way that carries traffic, amber for a way that works in part, rose only
-// as a small pill or port ring; a way a country cuts is a thin dotted line ending in a badge, never a wide stroke.
+// The Ways in tab as a route map (ADR 0016, revised): four labelled columns, Who -> How they get in -> the Node -> Where they
+// exit (and, on an entry node, Forwards to), one card per way and one wire per way. The mapping is lib/route-map.ts's (pure,
+// with tests); this file draws it and routes the owner's edits to the dialogs and calls the list uses. Menus are primary;
+// dragging a server onto a way (a relay) and a relay out of one (remove, confirmed) are a bonus.
 
 type Data = Plain<GetNodeResponse>;
 
-const typeColors = { udp: "var(--accent-sky)", tcp: "var(--accent-lavender)", people: "var(--muted)", egress: "var(--muted)", any: "var(--muted)" };
+const colors = { udp: "var(--muted)" };
+const SERVER = "application/x-mg-server";
+const RELAY = "application/x-mg-relay";
 
-const dotColor = { ok: "var(--accent-mint)", warn: "var(--warning)", bad: "var(--accent-rose)", cut: "var(--accent-rose)", off: "var(--faint)", busy: "var(--accent-sky)" };
+const badgeKind: Record<RmState, ChipKind> = { ok: "ok", partial: "warn", blocked: "cut", off: "off", bad: "bad", checking: "busy" };
 
-/** A small status word on a row: neutral, with only a 6px dot to carry the colour. */
-export function Chip({ kind, children, onClick, title }: { kind: keyof typeof dotColor; children: ReactNode; onClick?: () => void; title?: string }) {
-  const cls = "inline-flex h-[19px] shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-muted";
-  const dot = <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: `color-mix(in oklch, ${dotColor[kind]} var(--wp, 100%), #000)` }} />;
-  return onClick ? (
-    <button type="button" className={cx(cls, "cursor-pointer hover:text-fg")} title={title} onClick={onClick}>
-      {dot}
-      {children}
-    </button>
-  ) : (
-    <span className={cls} title={title}>
-      {dot}
-      {children}
-    </span>
-  );
-}
+/** The card a way is (the selected card is the open way), and back. */
+const cardOfWay = (id: WayId): string => (id.startsWith("out:") ? `fwd:${id.slice(4)}` : `way:${id}`);
+const wayOfCard = (id: string): WayId | undefined => (id.startsWith("fwd:") ? (`out:${id.slice(4)}` as WayId) : id.startsWith("way:") ? (id.slice(4) as WayId) : undefined);
 
-const wayChip: Record<ServerWay, ["ok" | "warn" | "bad" | "off" | "cut", MessageKey] | null> = {
-  works: ["ok", "wg.chip.works"],
-  partial: ["warn", "wg.chip.partial"],
-  blocked: ["cut", "wg.chip.blocked"],
-  off: ["off", "wg.chip.off"],
-  failed: ["bad", "wg.chip.failed"],
-  hidden: ["off", "wg.chip.hidden"],
-  unknown: null,
-};
-const v6Chip: Record<Ipv6State, ["ok" | "warn" | "bad" | "off" | "busy", MessageKey]> = {
-  on: ["ok", "wg.v6.on"],
-  on_down: ["bad", "wg.v6.on_down"],
-  can: ["busy", "wg.v6.can"],
-  none: ["off", "wg.v6.none"],
-  broken: ["warn", "wg.v6.broken"],
-  unavailable: ["off", "wg.v6.unavailable"],
-};
-
-const relayWord = (t: T, w: GWire["state"]) => (w === "pending" ? t("wg.wire.checking") : w === "bad" ? t("wg.wire.failing") : w === "off" ? t("wg.wire.off") : "");
-
-/** The card a way belongs to (the open way is the selected card), and back. */
-const cardOfWay = (id: WayId): string => (id.startsWith("via:") ? `entry:${id.slice(4)}` : id.startsWith("out:") ? `exit:${id.slice(4)}` : "node");
-const wayOfCard = (id: string): WayId | undefined => (id.startsWith("entry:") ? (`via:${id.slice(6)}` as WayId) : id.startsWith("exit:") ? (`out:${id.slice(5)}` as WayId) : id === "node" ? "direct" : undefined);
+const say = (t: T, s: Say) => (s.n !== undefined ? t.n(s.key as MessageKey, s.n, s.params) : t(s.key as MessageKey, s.params));
 
 type Dialog =
-  | { kind: "draw"; entry: Entry; inboundId: string }
-  | { kind: "move"; entry: Entry; inboundId: string; old: RelayMsg }
+  | { kind: "draw"; entry: Entry; inboundId?: string }
   | { kind: "remove"; r: RelayMsg }
   | { kind: "port"; r: RelayMsg }
-  | { kind: "twin"; inboundId: string }
+  | { kind: "removeWay"; entry: { id: string; name: string }; relays: RelayMsg[] }
   | { kind: "v6off" };
 
-export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false, onFull, initialExtra }: { initialExtra?: { id: string; name: string }[]; data: Data; w: WaysModel; open: WayId; onOpen: (id: WayId) => void; onIpv6: () => void; detail?: ReactNode; full?: boolean; onFull?: (full: boolean) => void }) {
+export function WaysGraph({
+  data,
+  w,
+  open,
+  onOpen,
+  onIpv6,
+  detail,
+  full = false,
+  onFull,
+  initialExtra,
+}: {
+  initialExtra?: { id: string; name: string }[];
+  data: Data;
+  w: WaysModel;
+  open: WayId;
+  onOpen: (id: WayId) => void;
+  onIpv6: () => void;
+  detail?: ReactNode;
+  full?: boolean;
+  onFull?: (full: boolean) => void;
+}) {
   const t = useT();
   const fmt = useFmt();
+  const toast = useToast();
   const node = data.node!;
   const owner = w.owner;
   const ccOf = useCountryOf();
   const runs = useRelayRuns();
   const subs = useInSubscriptions(node.id, node.name);
   const nodesList = useQuery({ ...nodesQuery, enabled: owner }).data?.nodes ?? [];
-  const profiles = useQuery({ ...profileListQuery, enabled: owner }).data;
   const [extra, setExtra] = useState<{ id: string; name: string }[]>(initialExtra ?? []);
   const [dlg, setDlg] = useState<Dialog | null>(null);
-  // a move: the new relay was switched on, so the old one is offered for removal once the dialog closes
-  const moveDone = useRef(false);
-  const cc = w.cc;
   const [help, setHelp] = useState<HelpTab | "">(() => (readPref("mg.graph.help") === "legend" ? "legend" : readPref("mg.graph.help") === "shortcuts" ? "shortcuts" : ""));
+  const cc = w.cc;
+
+  const model = routeMap({
+    node: { id: node.id, name: node.name, address: node.address, countryCode: node.countryCode },
+    inbounds: data.inbounds,
+    ways: w,
+    country: cc,
+    warp: false,
+    extraEntries: extra,
+    ipv6: { fact: w.ipv6, v6: w.v6 },
+    relaysKnown: owner,
+  });
+  const allRelays = [...model.ways.flatMap((x) => x.relays), ...model.forwards.flatMap((f) => f.relays)];
+  const inboundOf = (id: string) => data.inbounds.find((i) => i.id === id);
+  const serverOf = (id: string) => model.node.chips.find((c) => c.inboundId === id)?.server;
 
   // full screen: the page behind does not scroll
   useEffect(() => {
@@ -118,411 +119,483 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
     setTimeout(() => document.querySelector<HTMLElement>("[data-graph-expand]")?.focus(), 0);
   };
 
-  const warp = !!node.warp && node.warp.state !== WarpState.NOT_CONFIGURED && node.warp.state !== WarpState.UNSPECIFIED;
-  const model = waysGraph({ node: { id: node.id, name: node.name }, inbounds: data.inbounds, ways: w, country: cc, warp, extraEntries: extra, ipv6: { fact: w.ipv6, v6: w.v6 } });
-  const wires = useMemo(() => new Map(model.wires.map((x) => [x.id, x])), [model]);
-  const relays = useMemo(() => w.lanes.flatMap((l) => (l.kind === "via" ? l.relays : [])), [w.lanes]);
-  const nodeCard = model.cards.find((c): c is Extract<GCard, { kind: "node" }> => c.kind === "node")!;
-  const serverOf = (id: string) => nodeCard.servers.find((s) => s.inboundId === id);
-  const inboundOf = (id: string) => data.inbounds.find((i) => i.id === id);
+  // ---- words
+  const altText = (alt: AltRef[]) => alt.map((a) => (a.kind === "via" ? t("rm.alt.via", { name: a.name ?? "" }) : t(`rm.alt.${a.kind}` as MessageKey))).join(", ");
+  const wayTitle = (x: RmWay) => (x.kind === "via" ? t("rm.way.via", { node: x.peer?.name ?? "" }) : t(`rm.way.${x.kind}` as MessageKey));
+  const dot = (c: RmChip): ChipKind => c.state;
 
-  // ---- the cards
-  const graphNodes = ((): GraphNode[] => {
-    const portsOf = (c: GCard): GraphPort[] =>
-      c.ports
-        .filter((p) => owner || p.id !== port.newRelay)
-        .map((p) => ({ id: p.id, side: p.side, type: p.id === port.newRelay || p.type === "people" ? "any" : p.type, status: p.status, multi: p.side === "in" ? true : undefined, label: portLabel(c, p.id) }));
-    function portLabel(c: GCard, id: string): string {
-      if (id === port.people) return t("ways.peopleShort");
-      if (id === port.reach) return t("wg.entry.reach");
-      if (id === port.ipv6) return "IPv6";
-      if (id === port.newRelay) return t("wg.relay.port");
-      if (id === port.exit) return c.kind === "warp" ? t("wg.exit.warp") : t("wg.exit.internet");
-      const inbound = id.startsWith("in:") || id.startsWith("out:") ? id.slice(id.indexOf(":") + 1) : "";
-      if (inbound) return serverOf(inbound)?.name ?? inbound;
-      const relay = id.startsWith("relay:") ? [...relays, ...w.out.flatMap((l) => l.relays)].find((r) => r.id === id.slice(6)) : undefined;
-      return relay?.profileName ?? id;
-    }
-    const netBadge = (net: string | undefined, p: number) => (
-      <GraphValue>
-        {net ?? "?"}/{p}
-      </GraphValue>
+  // ---- chips with their popovers
+  const serverState = (c: RmChip) => (c.server?.way === "hidden" ? t("rm.st.hidden") : t(`rm.st.${c.state === "warn" ? "ok" : c.state}` as MessageKey));
+  const serverChip = (c: RmChip): ReactNode => {
+    const s = c.server!;
+    const i = inboundOf(c.inboundId);
+    return (
+      <Pop
+        key={c.id}
+        trigger={<ServerChip kind={dot(c)} label={c.label} port={c.port} net={c.net} tabIndex={-1} />}
+        label={c.label}
+        triggerProps={{
+          draggable: owner && !s.noRelay,
+          onDragStart: (e: DragEvent) => e.dataTransfer.setData(SERVER, c.inboundId),
+          className: "max-w-full",
+        }}
+      >
+        {() => (
+          <div className="flex flex-col gap-2.5 p-2">
+            <p className="text-[14px] font-semibold">{c.label}</p>
+            <dl className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-1 text-[12px]">
+              <dt className="text-muted">{t("rm.chip.protocol")}</dt>
+              <dd>{protocolShort(s.protocol)}</dd>
+              <dt className="text-muted">{t("rm.chip.port")}</dt>
+              <dd className="font-mono">
+                {s.net}/{s.port}
+              </dd>
+              <dt className="text-muted">{t("rm.chip.state")}</dt>
+              <dd className="flex items-center gap-1.5">
+                <Dot kind={dot(c)} />
+                {serverState(c)}
+              </dd>
+              <dt className="text-muted">{t("rm.chip.exit")}</dt>
+              <dd>{s.egress === "warp" ? t("rm.chip.warp") : t("rm.chip.internet")}</dd>
+            </dl>
+            {owner && !s.cdn && i && s.on && (
+              <label className="flex items-center justify-between gap-3 text-[12.5px] font-medium">
+                {t("rm.chip.subs")}
+                <Switch
+                  checked={i.directInSubscriptions}
+                  disabled={subs.busy}
+                  aria-label={t("ways.subs.switch", { name: s.name })}
+                  onCheckedChange={(on) => void subs.toggle(i, on, t(on ? "wg.subs.in" : "wg.subs.out", { name: s.name }))}
+                />
+              </label>
+            )}
+            {s.noRelay === "cdn" || s.noRelay === "awg" ? <p className="text-[11.5px] leading-snug text-muted">{t(s.noRelay === "cdn" ? "wg.noRelay.cdn" : "wg.noRelay.awg")}</p> : null}
+          </div>
+        )}
+      </Pop>
     );
-    const out: GraphNode[] = [];
-    for (const c of model.cards) {
-      const common = { id: c.id, ports: portsOf(c), draggable: true };
-      if (c.kind === "people") {
-        out.push({
-          ...common,
-          title: t("ways.people", { country: fmt.country(cc) }),
-          label: t("ways.people", { country: fmt.country(cc) }),
-          icon: <Icon name="people" size={13} />,
-          tone: "sand",
-          width: 232,
-          body: (
-            <>
-              <GraphPortRow port={port.people} align="end">
-                <span className="font-medium">{t("wg.people.sub", { country: fmt.country(cc) })}</span>
-              </GraphPortRow>
-            </>
-          ),
-        });
-      } else if (c.kind === "entry") {
-        const mine = c.relays;
-        out.push({
-          ...common,
-          title: (
-            <span className="flex items-center gap-2">
-              {c.name}
-              <span className="ms-auto font-mono text-[10.5px] font-medium text-muted">{ccOf(c.nodeId)}</span>
-            </span>
-          ),
-          label: c.name,
-          icon: <Icon name="server" size={13} />,
-          tone: "sky",
-          width: 252,
-          body: mine.length === 0 && owner ? (
-            // an entry with no relay yet: one compact row, the hint on the port
-            <GraphPortRow port={[port.reach, port.newRelay]}>
-              <span className="flex items-center justify-end gap-1.5 text-muted" title={t("wg.entry.none")}>
-                <Icon name="plus" size={12} />
-                {t("wg.relay.port")}
-              </span>
-            </GraphPortRow>
-          ) : (
-            <>
-              <GraphPortRow port={port.reach}>
-                <span className="text-muted">{t("wg.entry.reach")}</span>
-              </GraphPortRow>
-              {mine.map((r) => {
-                const wire = wires.get(`relay:${r.id}`);
-                const word = wire ? relayWord(t, wire.state) : "";
-                return (
-                  <GraphPortRow key={r.id} port={port.relay(r.id)}>
-                    <span className="flex items-center justify-end gap-2">
-                      <span className="min-w-0 truncate font-medium">{r.profileName}</span>
-                      {netBadge(r.network, r.port)}
-                      {word && <Chip kind={wire!.state === "bad" ? "bad" : wire!.state === "pending" ? "busy" : "off"}>{word}</Chip>}
-                    </span>
-                  </GraphPortRow>
-                );
-              })}
-              {owner && (
-                <GraphPortRow port={port.newRelay}>
-                  <span className="flex items-center justify-end gap-1.5 text-muted">
-                    <Icon name="plus" size={12} />
-                    {t("wg.relay.port")}
-                  </span>
-                </GraphPortRow>
-              )}
-            </>
-          ),
-        });
-      } else if (c.kind === "node") {
-        const v6 = c.v6;
-        out.push({
-          ...common,
-          title: c.name,
-          label: c.name,
-          icon: <Icon name="shield" size={13} />,
-          tone: "mint",
-          width: 344,
-          body: (
-            <>
-              {v6 && (
-                <GraphPortRow port={port.ipv6}>
-                  <span className="flex items-center gap-2">
-                    <span className="flex-1 font-medium">IPv6</span>
-                    <V6Chip state={v6.state} blockedCc={v6.state === "on" && wires.get("ipv6")?.blocked ? cc : ""} onClick={owner && v6.state === "can" ? onIpv6 : undefined} />
-                  </span>
-                </GraphPortRow>
-              )}
-              {c.servers.map((s) => (
-                <GraphPortRow key={s.inboundId} port={[port.serverIn(s.inboundId), port.serverOut(s.inboundId)]}>
-                  <ServerRow s={s} cc={cc} onShow={owner && s.way === "hidden" ? () => void subs.toggle(inboundOf(s.inboundId)!, true) : undefined} />
-                </GraphPortRow>
-              ))}
-              {c.ports
-                .filter((p) => p.id.startsWith("relay:"))
-                .map((p) => {
-                  const r = w.out.flatMap((l) => l.relays).find((x) => `relay:${x.id}` === p.id);
-                  if (!r) return null;
-                  const wire = wires.get(`relay:${r.id}`);
-                  const word = wire ? relayWord(t, wire.state) : "";
+  };
+  const relayChip = (c: RmChip): ReactNode => {
+    const r = c.relay!;
+    return (
+      <Pop
+        key={c.id}
+        trigger={<ServerChip kind={dot(c)} label={c.label} port={c.port} net={c.net} tabIndex={-1} />}
+        label={c.label}
+        triggerProps={{ draggable: owner, onDragStart: (e: DragEvent) => e.dataTransfer.setData(RELAY, r.id), className: "max-w-full" }}
+      >
+        {(close) => (
+          <div className="flex flex-col gap-1.5 p-1">
+            <div className="px-2 pt-1.5">
+              <p className="text-[14px] font-semibold">{c.label}</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
+                <Dot kind={dot(c)} />
+                {t(`rm.st.${c.state === "warn" ? "ok" : c.state}` as MessageKey)} · {r.viaNodeName} → {r.exitNodeName} · <span className="font-mono">{r.network}/{r.port}</span>
+              </p>
+            </div>
+            {owner && (
+              <div className="flex flex-col">
+                <PopItem
+                  onClick={() => {
+                    close();
+                    runs.check(r);
+                  }}
+                >
+                  {t("wg.menu.check")}
+                </PopItem>
+                <PopItem
+                  onClick={() => {
+                    close();
+                    if (r.enabled) runs.off(r);
+                    else runs.on(r);
+                  }}
+                >
+                  {r.enabled ? t("wg.menu.off") : t("wg.menu.on")}
+                </PopItem>
+                <PopItem
+                  onClick={() => {
+                    close();
+                    setDlg({ kind: "port", r });
+                  }}
+                >
+                  {t("wg.menu.port")}
+                </PopItem>
+                <PopItem
+                  danger
+                  onClick={() => {
+                    close();
+                    setDlg({ kind: "remove", r });
+                  }}
+                >
+                  {t("wg.menu.remove")}
+                </PopItem>
+              </div>
+            )}
+          </div>
+        )}
+      </Pop>
+    );
+  };
+  const chipsOf = (chips: RmChip[]) => chips.length > 0 && <div className="flex flex-wrap gap-1.5 pt-1">{chips.map((c) => (c.relay ? relayChip(c) : serverChip(c)))}</div>;
+
+  // ---- the ⋯ menu of a way
+  const wayMenu = (x: RmWay): ReactNode => {
+    if (!owner) return null;
+    return (
+      <MoreButton label={wayTitle(x)}>
+        {(close) => {
+          const pick = (fn: () => void) => () => {
+            close();
+            fn();
+          };
+          if (x.kind === "via" && x.peer) {
+            const peer = x.peer;
+            const entry: Entry = { id: peer.id, name: peer.name, cc: ccOf(peer.id) };
+            const anyOff = x.relays.some((r) => !r.enabled);
+            return (
+              <>
+                {x.relays.length > 0 && <PopItem onClick={pick(() => void runs.checkAll(x.relays))}>{t("rm.menu.checkAll")}</PopItem>}
+                {x.relays.length > 0 && (
+                  <PopItem onClick={pick(() => x.relays.filter((r) => r.enabled === !anyOff).forEach((r) => (anyOff ? runs.on(r) : runs.off(r))))}>{anyOff ? t("rm.menu.onAll") : t("rm.menu.offAll")}</PopItem>
+                )}
+                <PopItem onClick={pick(() => setDlg({ kind: "draw", entry }))}>{t("rm.menu.addRelay")}</PopItem>
+                {x.relays.length > 0 ? (
+                  <PopItem danger onClick={pick(() => setDlg({ kind: "removeWay", entry: peer, relays: x.relays }))}>
+                    {t("rm.menu.removeWay")}
+                  </PopItem>
+                ) : (
+                  <PopItem onClick={pick(() => setExtra((e) => e.filter((n) => n.id !== peer.id)))}>{t("rm.menu.removeEntry")}</PopItem>
+                )}
+              </>
+            );
+          }
+          if (x.kind === "direct") {
+            const list = model.node.chips.filter((c) => c.server && !c.server.cdn && c.server.on);
+            return (
+              <div className="flex min-w-[230px] flex-col gap-1 p-1.5">
+                <p className="px-1 pb-1 text-[11px] font-semibold text-faint">{t("rm.menu.subs")}</p>
+                {list.map((c) => {
+                  const i = inboundOf(c.inboundId);
                   return (
-                    <GraphPortRow key={p.id} port={p.id}>
-                      <span className="flex items-center justify-end gap-2">
-                        <span className="min-w-0 truncate font-medium">{r.profileName}</span>
-                        {netBadge(r.network, r.port)}
-                        {word && <Chip kind={wire!.state === "bad" ? "bad" : wire!.state === "pending" ? "busy" : "off"}>{word}</Chip>}
-                      </span>
-                    </GraphPortRow>
+                    i && (
+                      <label key={c.id} className="flex items-center justify-between gap-3 rounded-lg px-1 py-1 text-[13px] font-medium">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{c.label}</span>
+                          <span className="font-mono text-[10.5px] font-normal text-muted">{c.port}</span>
+                        </span>
+                        <Switch checked={i.directInSubscriptions} disabled={subs.busy} aria-label={t("ways.subs.switch", { name: c.label })} onCheckedChange={(on) => void subs.toggle(i, on, t(on ? "wg.subs.in" : "wg.subs.out", { name: c.label }))} />
+                      </label>
+                    )
                   );
                 })}
-            </>
-          ),
-        });
-      } else if (c.kind === "exit") {
-        out.push({
-          ...common,
-          title: c.name,
-          label: c.name,
-          icon: <Icon name="server" size={13} />,
-          tone: "lavender",
-          width: 240,
-          body: (
-            <>
-              {c.relays.map((r) => (
-                <GraphPortRow key={r.id} port={port.serverIn(r.inboundId)}>
-                  <span className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate font-medium">{r.profileName}</span>
-                    {netBadge(r.network, r.exitPort)}
-                  </span>
-                </GraphPortRow>
-              ))}
-            </>
-          ),
-        });
-      } else {
-        const warpCard = c.kind === "warp";
-        out.push({
-          ...common,
-          title: warpCard ? t("wg.exit.warp") : t("wg.exit.internet"),
-          label: warpCard ? t("wg.exit.warp") : t("wg.exit.internet"),
-          icon: <Icon name={warpCard ? "cloud" : "globe"} size={13} />,
-          tone: warpCard ? "sage" : "lavender",
-          width: 232,
-          body: (
-            <GraphPortRow port={port.exit}>
-              <span className="text-muted">{warpCard ? t("wg.exit.warpSub") : t("wg.exit.internetSub")}</span>
-            </GraphPortRow>
-          ),
-        });
-      }
-    }
-    return out;
-  })();
-
-  // ---- the wires
-  // each state is said once, on the row: a wire carries none (a blocked way is a thin dotted grey line, a failing relay one rose line)
-  const edges: GraphEdge[] = model.wires.map((x) => {
-    // a server leaving by its exit is plain plumbing: drawn in the quiet type colour unless it fails
-    const state: GraphEdge["state"] = x.blocked ? "blocked" : x.kind === "egress" && x.state === "ok" ? undefined : x.state === "unknown" ? "off" : x.state;
-    return { id: x.id, from: { node: x.from.card, port: x.from.port }, to: { node: x.to.card, port: x.to.port }, state, animated: x.flowing, grabbable: grabbable(x.kind) };
-  });
-
-  // ---- editing (the owner's)
-  const canConnect = (from: PortRef, to: PortRef) => {
-    // drawing from People puts a server that is out of subscriptions back in
-    if (from.node === "people") {
-      const s = to.node === "node" && to.port.startsWith("in:") ? serverOf(to.port.slice(3)) : undefined;
-      return s && s.on && !s.listed && !s.cdn ? true : t("wg.refuse.peopleTarget");
-    }
-    if (!from.node.startsWith("entry:")) return t("wg.refuse.source");
-    const s = to.node === "node" && to.port.startsWith("in:") ? serverOf(to.port.slice(3)) : undefined;
-    if (!s) return t("wg.refuse.target");
-    const why = relayRefusal(from.node.slice(6), node.id, s, relays);
-    return why ? t(`wg.refuse.${why}` as MessageKey) : true;
-  };
-  const onConnect = (from: PortRef, to: PortRef) => {
-    if (from.node === "people") {
-      const i = inboundOf(to.port.slice(3));
-      if (i) void subs.toggle(i, true, t("wg.subs.in", { name: i.profileName }));
-      return;
-    }
-    const id = from.node.slice(6);
-    const entry = model.cards.find((c) => c.id === from.node);
-    setDlg({ kind: "draw", entry: { id, name: entry && "name" in entry ? entry.name : id, cc: ccOf(id) }, inboundId: to.port.slice(3) });
-  };
-  // grabbing a wire's end (and Delete, which drops its `to` end on empty canvas): the rule is lib/ways-graph.ts's
-  const rctx: ReconnectContext = { nodeId: node.id, servers: nodeCard.servers, relays };
-  const ruleOf = (e: GraphEdge, end: "from" | "to", target: PortRef | null) => {
-    const x = wires.get(e.id);
-    return x ? reconnectRule(x, end, target ? { card: target.node, port: target.port } : null, rctx) : ({ ok: false, reason: "grab" } as const);
-  };
-  const canReconnect = (e: GraphEdge, end: "from" | "to", target: PortRef | null) => {
-    const r = ruleOf(e, end, target);
-    return r.ok ? true : t(`wg.refuse.${r.reason}` as MessageKey);
-  };
-  const onReconnect = (e: GraphEdge, end: "from" | "to", target: PortRef | null) => {
-    const r = ruleOf(e, end, target);
-    if (!r.ok) return;
-    const a = r.action;
-    switch (a.type) {
-      case "removeRelay":
-        return setDlg({ kind: "remove", r: a.relay });
-      case "moveRelay":
-        moveDone.current = false;
-        return setDlg({ kind: "move", entry: { id: a.relay.viaNodeId, name: a.relay.viaNodeName, cc: ccOf(a.relay.viaNodeId) }, inboundId: a.inboundId, old: a.relay });
-      case "subsOut": {
-        const i = inboundOf(a.inboundId);
-        if (i) void subs.toggle(i, false, t("wg.subs.out", { name: i.profileName }));
-        return;
-      }
-      case "v6off":
-        return setDlg({ kind: "v6off" });
-      case "twin":
-        return setDlg({ kind: "twin", inboundId: a.inboundId });
-    }
-  };
-
-  const renderMenu = (e: GraphEdge, close: () => void) => {
-    const x = wires.get(e.id);
-    if (!x) return null;
-    const pick = (fn: () => void) => () => {
-      close();
-      fn();
-    };
-    if (x.kind === "relay" && x.relay) {
-      const r = x.relay;
-      const busy = !!runs.busy[r.id];
-      return (
-        <>
-          <GraphMenuItem icon={<Icon name="pulse" size={14} />} onClick={pick(() => runs.check(r))}>
-            {t("wg.menu.check")}
-          </GraphMenuItem>
-          <GraphMenuItem icon={<Icon name={r.enabled ? "eyeOff" : "eye"} size={14} />} onClick={pick(() => (r.enabled ? runs.off(r) : runs.on(r)))}>
-            {r.enabled ? t("wg.menu.off") : t("wg.menu.on")}
-          </GraphMenuItem>
-          <GraphMenuItem icon={<Icon name="sliders" size={14} />} onClick={pick(() => setDlg({ kind: "port", r }))}>
-            {t("wg.menu.port")}
-          </GraphMenuItem>
-          <div className="my-1 h-px bg-line" />
-          <GraphMenuItem danger icon={<Icon name="trash" size={14} />} onClick={pick(() => setDlg({ kind: "remove", r }))}>
-            {t("wg.menu.remove")}
-          </GraphMenuItem>
-          {busy && <span className="sr-only">{t("wg.wire.checking")}</span>}
-        </>
-      );
-    }
-    if ((x.kind === "direct" || x.kind === "cdn") && x.inboundId) {
-      const i = inboundOf(x.inboundId);
-      return (
-        i && (
-          <GraphMenuItem icon={<Icon name="eyeOff" size={14} />} onClick={pick(() => void subs.toggle(i, false))}>
-            {t("wg.menu.subsOff")}
-          </GraphMenuItem>
-        )
-      );
-    }
-    if (x.kind === "ipv6") {
-      return (
-        <GraphMenuItem icon={<Icon name="eyeOff" size={14} />} onClick={pick(() => setDlg({ kind: "v6off" }))}>
-          {t("wg.menu.v6off")}
-        </GraphMenuItem>
-      );
-    }
-    if (x.kind === "egress" && x.inboundId) {
-      const s = serverOf(x.inboundId);
-      return (
-        <GraphMenuItem icon={<Icon name="cloud" size={14} />} onClick={pick(() => setDlg({ kind: "twin", inboundId: x.inboundId! }))}>
-          {s?.egress === "warp" ? t("wg.menu.twinDirect") : t("wg.menu.twinWarp")}
-        </GraphMenuItem>
-      );
-    }
-    if (x.kind === "reach") {
-      const id = x.to.card.slice(6);
-      const entry = model.cards.find((c) => c.id === x.to.card);
-      return (
-        <Link to="/nodes/$id" params={{ id }} search={{ tab: "ways", way: `out:${node.id}` as WayId }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2">
-          <Icon name="externalLink" size={14} />
-          {t("wg.menu.open", { node: entry && entry.kind === "entry" ? entry.name : id })}
-        </Link>
-      );
-    }
-    return null;
-  };
-
-  const entryIds = new Set(model.cards.filter((c) => c.kind === "entry").map((c) => c.id.slice(6)));
-  const addable = nodesList.filter((n) => n.id !== node.id && n.status !== NodeStatus.RETIRED && !entryIds.has(n.id));
-  const twinInbound = dlg?.kind === "twin" ? inboundOf(dlg.inboundId) : undefined;
-  const twinProfile = twinInbound ? profiles?.find((p) => p.id === twinInbound.profileId) : undefined;
-
-  const addEntry = owner && (
-    <div className="w-[220px]">
-      <Select
-        compact
-        aria-label={t("wg.addEntry")}
-        value=""
-        onValueChange={(id) => {
-          const n = nodesList.find((x) => x.id === id);
-          if (n) setExtra((e) => [...e, { id: n.id, name: n.name }]);
+              </div>
+            );
+          }
+          if (x.kind === "ipv6")
+            return x.state === "ok" || x.state === "partial" || x.state === "blocked" || (x.state === "bad" && w.v6.entry) ? (
+              <PopItem onClick={pick(() => setDlg({ kind: "v6off" }))}>{t("wg.menu.v6off")}</PopItem>
+            ) : (
+              <PopItem onClick={pick(onIpv6)}>{t("rm.add.ipv6")}</PopItem>
+            );
+          // cdn: the profile of its first server
+          const first = x.chips[0] && inboundOf(x.chips[0].inboundId);
+          return first ? (
+            <Link to="/profiles/$id" params={{ id: first.profileId }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2">
+              <Icon name="externalLink" size={14} />
+              {t("rm.menu.profile")}
+            </Link>
+          ) : null;
         }}
-        options={[{ value: "", label: addable.length ? `+ ${t("wg.addEntry")}` : t("wg.addEntry.none"), disabled: true }, ...addable.map((n) => ({ value: n.id, label: n.name, hint: ccOf(n.id) }))]}
-      />
+      </MoreButton>
+    );
+  };
+
+  // ---- dragging: a server onto a way relays it from that entry, a relay out onto the canvas removes it
+  const dropOnWay = (x: RmWay) => (e: DragEvent) => {
+    if (!owner || x.kind !== "via" || !x.peer) return;
+    if (e.dataTransfer.types.includes(RELAY)) return e.stopPropagation();
+    const id = e.dataTransfer.getData(SERVER);
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const s = serverOf(id);
+    const why = s ? relayRefusal(x.peer.id, node.id, s, w.lanes.flatMap((l) => (l.kind === "via" ? l.relays : []))) : "net";
+    if (why) return toast.error(`${t("rm.drag.refused")}: ${t(`wg.refuse.${why}` as MessageKey)}`);
+    setDlg({ kind: "draw", entry: { id: x.peer.id, name: x.peer.name, cc: ccOf(x.peer.id) }, inboundId: id });
+  };
+  const wayOver = (x: RmWay) => (e: DragEvent) => {
+    if (owner && x.kind === "via" && e.dataTransfer.types.includes(SERVER)) e.preventDefault();
+  };
+
+  // ---- the cards
+  const card = (id: string, width: number, body: ReactNode, ports: { in?: boolean; out?: boolean }, label: string, extraProps: Partial<GraphNode> = {}): GraphNode => ({
+    id,
+    title: label,
+    label,
+    width,
+    headless: true,
+    anchors: true,
+    draggable: false,
+    ports: [...(ports.in ? [{ id: "in", side: "in" as const, type: "udp" }] : []), ...(ports.out ? [{ id: "out", side: "out" as const, type: "udp" }] : [])],
+    body,
+    ...extraProps,
+  });
+  const head = (icon: IconName | undefined, title: ReactNode, right?: ReactNode) => (
+    <div className="flex items-center gap-2">
+      {icon && <Icon name={icon} size={15} />}
+      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{title}</span>
+      {right}
     </div>
   );
-  const graph = (
-    <Graph
-      nodes={graphNodes}
-      edges={edges}
-      typeColors={typeColors}
-      ariaLabel={t("wg.graph", { node: node.name })}
-      height={full ? "100%" : "fit"}
-      className={full ? "h-full rounded-none border-0" : undefined}
-      layoutKey={`ways:${node.id}`}
-      arrange={(sizes) => waysLayout(sizes)}
-      rearrangeOnChange
-      minFitZoom={0.8}
-      fitFocus="node"
-      wheelPans={full}
-      onExpand={onFull ? () => onFull(!full) : undefined}
-      expanded={full}
-      help={help}
-      onHelpChange={setHelp}
-      readOnly={!owner}
-      canConnect={canConnect}
-      onConnect={owner ? onConnect : undefined}
-      onReconnect={owner ? onReconnect : undefined}
-      canReconnect={canReconnect}
-      renderEdgeMenu={owner ? renderMenu : undefined}
-      selected={[cardOfWay(open)]}
-      onSelectionChange={(ids) => {
-        const way = ids[0] ? wayOfCard(ids[0]) : undefined;
-        if (way && way !== open && (w.lanes.some((l) => l.id === way) || w.out.some((l) => l.id === way))) onOpen(way);
-      }}
-      legend={<Legend cc={cc} owner={owner} />}
-      extraShortcuts={owner ? <WaysShortcuts /> : undefined}
-    />
+  const sub = (s: ReactNode) => <p className="mt-1 text-[12px] leading-snug text-muted">{s}</p>;
+  const nodes: GraphNode[] = [];
+  const colLabels = [t("rm.col.who"), t("rm.col.how"), t("rm.col.node"), t("rm.col.exit"), ...(model.hasForwards ? [t("rm.col.fwd")] : [])];
+  colLabels.forEach((txt, k) =>
+    nodes.push({ id: `col:${k}`, title: txt, label: txt, ports: [], width: 170, headless: true, variant: "label", draggable: false, selectable: false, body: <p className="px-0.5 text-[11px] font-bold tracking-[0.09em] text-muted uppercase">{txt}</p> }),
   );
+  const peopleTitle = t("ways.people", { country: fmt.country(cc) });
+  nodes.push(
+    card(
+      "people",
+      178,
+      <div className="p-3.5">
+        {head("people", peopleTitle)}
+        {sub(
+          <>
+            {t("rm.people.sub")}
+            {owner && (
+              <>
+                {" · "}
+                <Link to="/reachability" hash="sources" className="underline hover:text-fg">
+                  {t("rm.people.change")}
+                </Link>
+              </>
+            )}
+          </>,
+        )}
+      </div>,
+      { out: true },
+      peopleTitle,
+      { selectable: false },
+    ),
+  );
+  for (const x of model.ways) {
+    const title = wayTitle(x);
+    const cons = x.consequence ? (x.consequence.alt.length > 0 ? t(x.consequence.kind === "blocked" ? "rm.cons.blocked" : "rm.cons.bad", { cc, via: altText(x.consequence.alt) }) : t("rm.cons.none")) : null;
+    nodes.push(
+      card(
+        x.id,
+        258,
+        <div className="p-3.5" onDragOver={wayOver(x)} onDrop={dropOnWay(x)}>
+          {head(undefined, title, <><Badge kind={badgeKind[x.state]}>{say(t, x.badge)}</Badge>{wayMenu(x)}</>)}
+          {sub(say(t, x.sub))}
+          {cons && sub(cons)}
+          {chipsOf(x.chips)}
+        </div>,
+        { in: true, out: true },
+        title,
+      ),
+    );
+  }
+  if (owner) {
+    const entryIds = new Set(model.ways.filter((x) => x.peer).map((x) => x.peer!.id));
+    const addable = nodesList.filter((n) => n.id !== node.id && n.status !== NodeStatus.RETIRED && !entryIds.has(n.id));
+    nodes.push(
+      card(
+        "ghost:way",
+        246,
+        <Pop
+          label={t("rm.ghost.way")}
+          trigger={
+            <span className="flex w-full items-start gap-2 px-3.5 py-3 text-start text-[13px] leading-snug">
+              <Icon name="plus" size={14} />
+              {t("rm.ghost.way")}
+            </span>
+          }
+          triggerProps={{ className: "block w-full rounded-[10px] text-muted hover:text-fg" }}
+        >
+          {(close) => (
+            <>
+              {addable.length === 0 && <PopItem disabled>{t("rm.add.nodeNone")}</PopItem>}
+              {addable.map((n) => (
+                <PopItem
+                  key={n.id}
+                  onClick={() => {
+                    close();
+                    setExtra((e) => [...e, { id: n.id, name: n.name }]);
+                  }}
+                >
+                  {t("rm.add.node", { node: n.name })}
+                </PopItem>
+              ))}
+              <Link to="/profiles" className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2">
+                {t("rm.add.cdn")}
+              </Link>
+              {model.canAddIpv6 && (
+                <PopItem
+                  onClick={() => {
+                    close();
+                    onIpv6();
+                  }}
+                >
+                  {t("rm.add.ipv6")}
+                </PopItem>
+              )}
+            </>
+          )}
+        </Pop>,
+        {},
+        t("rm.ghost.way"),
+        { variant: "ghost", selectable: false },
+      ),
+    );
+  }
+  const nodeTitle = node.name;
+  nodes.push(
+    card(
+      "node",
+      258,
+      <div className="p-3.5">
+        {head("shield", nodeTitle, <Badge kind={model.node.online ? "ok" : "off"}>{t(model.node.online ? "rm.node.online" : "rm.node.offline")}</Badge>)}
+        {sub(t("rm.node.sub", { country: model.node.countryCode ? fmt.country(model.node.countryCode) : "", address: model.node.address }).replace(/^ · | · $/g, ""))}
+        {chipsOf(model.node.chips)}
+      </div>,
+      { in: true, out: true },
+      nodeTitle,
+      { selectable: false },
+    ),
+  );
+  for (const e of model.exits) {
+    const title = t(e.id === "warp" ? "rm.exit.warpTitle" : "rm.exit.internetTitle");
+    nodes.push(
+      card(
+        `exit:${e.id}`,
+        204,
+        <div className="p-3.5">
+          {head(e.id === "warp" ? "cloud" : "globe", title)}
+          {sub(say(t, e.sub))}
+        </div>,
+        { in: true },
+        title,
+        { selectable: false },
+      ),
+    );
+  }
+  nodes.push(
+    card(
+      "ghost:exit",
+      204,
+      <Pop
+        label={t("rm.ghost.exit")}
+        trigger={
+          <span className="flex w-full items-start gap-2 px-3.5 py-3 text-start text-[13px] leading-snug">
+            <Icon name="plus" size={14} />
+            {t("rm.ghost.exit")}
+          </span>
+        }
+        triggerProps={{ className: "block w-full rounded-[10px] text-muted hover:text-fg" }}
+      >
+        {() => (
+          <>
+            <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "exit" }} className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium hover:bg-surface-2">
+              <Icon name="cloud" size={14} />
+              {t("rm.exit.warpOpen")}
+            </Link>
+            <PopItem disabled title={t("rm.exit.viaNodeHint")}>
+              {t("rm.exit.viaNode")}
+            </PopItem>
+          </>
+        )}
+      </Pop>,
+      {},
+      t("rm.ghost.exit"),
+      { variant: "ghost", selectable: false },
+    ),
+  );
+  for (const f of model.forwards) {
+    nodes.push(
+      card(
+        f.id,
+        232,
+        <div className="p-3.5">
+          {head("server", f.peer.name, <Badge kind={badgeKind[f.state]}>{say(t, f.badge)}</Badge>)}
+          {sub(say(t, f.sub))}
+          {chipsOf(f.chips)}
+        </div>,
+        { in: true },
+        f.peer.name,
+      ),
+    );
+  }
+
+  // ---- the wires: one per way
+  const edges: GraphEdge[] = model.wires.map((x) => ({
+    id: x.id,
+    from: { node: x.from, port: "out" },
+    to: { node: x.to, port: "in" },
+    state: x.style === "flow" ? "ok" : x.style === "partial" ? "warn" : x.style === "fail" ? "bad" : "blocked",
+    animated: x.style === "flow",
+    weight: Math.min(3.5, 2 + (x.count - 1) * 0.3),
+    label: x.label && x.label.n ? <span className="text-[11px]">{say(t, x.label)}</span> : undefined,
+    grabbable: false,
+  }));
+
   const dialogs = (
     <>
       {owner && dlg?.kind === "draw" && (
-        <AddRelayDialog key={`${dlg.entry.id}/${dlg.inboundId}`} open onOpenChange={() => setDlg(null)} entry={dlg.entry} exitId={node.id} preselect={dlg.inboundId} />
-      )}
-      {owner && dlg?.kind === "move" && (
-        <AddRelayDialog
-          key={`move/${dlg.old.id}/${dlg.inboundId}`}
-          open
-          onOpenChange={() => {
-            // the new relay is on: the old one goes, after a confirmation of its own
-            setDlg(moveDone.current ? { kind: "remove", r: dlg.old } : null);
-          }}
-          entry={dlg.entry}
-          exitId={node.id}
-          preselect={dlg.inboundId}
-          notice={t("wg.move.notice", { old: dlg.old.profileName, entry: dlg.entry.name })}
-          onSuccess={() => {
-            moveDone.current = true;
-          }}
-        />
+        <AddRelayDialog key={`${dlg.entry.id}/${dlg.inboundId ?? ""}`} open onOpenChange={() => setDlg(null)} entry={dlg.entry} exitId={node.id} preselect={dlg.inboundId} />
       )}
       {owner && dlg?.kind === "remove" && <RemoveRelay r={dlg.r} onClose={() => setDlg(null)} />}
       {owner && dlg?.kind === "port" && <ChangeRelayPort r={dlg.r} onClose={() => setDlg(null)} />}
+      {owner && dlg?.kind === "removeWay" && <RemoveWay entry={dlg.entry} exit={node.name} relays={dlg.relays} onClose={() => setDlg(null)} />}
       {owner && <TurnOffDialog open={dlg?.kind === "v6off"} onOpenChange={(o) => !o && setDlg(null)} node={node} />}
-      {owner && (
-        <Modal open={dlg?.kind === "twin"} onOpenChange={(o) => !o && setDlg(null)} title={t("wg.twin.title")} description={t("wg.twin.body")} closeLabel={t("common.close")}>
-          {twinProfile && twinInbound && <TwinPanel profile={twinProfile} egress={twinInbound.egress === "warp" ? "warp" : "direct"} dirty={false} />}
-        </Modal>
-      )}
       {subs.dialog}
     </>
+  );
+
+  const onDropCanvas = (e: DragEvent) => {
+    const id = e.dataTransfer.getData(RELAY);
+    if (!owner || !id) return;
+    e.preventDefault();
+    const r = allRelays.find((x) => x.id === id);
+    if (r) setDlg({ kind: "remove", r });
+  };
+
+  const graph = (
+    <div className={cx(full ? "h-full" : "")} onDragOver={(e) => owner && e.dataTransfer.types.includes(RELAY) && e.preventDefault()} onDrop={onDropCanvas}>
+      <Graph
+        nodes={owner ? nodes : nodes.filter((n) => n.id !== "ghost:exit")}
+        edges={edges}
+        typeColors={colors}
+        ariaLabel={t("wg.graph", { node: node.name })}
+        height={full ? "100%" : "fit"}
+        className={full ? "h-full rounded-none border-0" : undefined}
+        layoutKey={`routemap:${node.id}`}
+        arrange={(sizes) => routeLayout(sizes, { colGap: 56 })}
+        rearrangeOnChange
+        minFitZoom={0.7}
+        fitPad={52}
+        fitFocus="node"
+        wheelPans={full}
+        onExpand={onFull ? () => onFull(!full) : undefined}
+        expanded={full}
+        help={help}
+        onHelpChange={setHelp}
+        readOnly
+        selected={[cardOfWay(open)]}
+        onSelectionChange={(ids) => {
+          const way = ids[0] ? wayOfCard(ids[0]) : undefined;
+          if (way && way !== open && (w.lanes.some((l) => l.id === way) || w.out.some((l) => l.id === way))) onOpen(way);
+        }}
+        legend={<Legend cc={cc} owner={owner} t={t} />}
+        extraShortcuts={owner ? <RouteShortcuts /> : undefined}
+      />
+    </div>
   );
 
   if (!full) {
     return (
       <div className="flex min-w-0 flex-col gap-2.5">
-        {addEntry}
         {graph}
         {detail}
         {dialogs}
@@ -536,8 +609,9 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
       data-active={help === tab || undefined}
       aria-expanded={help === tab}
       onClick={() => {
-        setHelp(help === tab ? "" : tab);
-        writePrefHelp(help === tab ? "" : tab);
+        const next = help === tab ? "" : tab;
+        setHelp(next);
+        writePref("mg.graph.help", next || null);
       }}
     >
       {label}
@@ -558,7 +632,6 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
           <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
             <span className="min-w-0 truncate text-[14px] font-semibold">{t("wg.full.bar", { node: node.name })}</span>
             <span className="flex-1" />
-            {addEntry}
             {helpBtn("legend", t("graph.legend"))}
             {helpBtn("shortcuts", t("graph.shortcuts"))}
             <button type="button" aria-label={t("wg.full.close")} title={`${t("wg.full.close")} (Esc)`} onClick={closeFull} className="flex size-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg">
@@ -577,51 +650,54 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
   );
 }
 
-function V6Chip({ state, blockedCc, onClick }: { state: Ipv6State; blockedCc: string; onClick?: () => void }) {
+/** Remove every relay of an entry for this node: one confirmation, then the calls the single removal uses. */
+function RemoveWay({ entry, exit, relays, onClose }: { entry: { id: string; name: string }; exit: string; relays: RelayMsg[]; onClose: () => void }) {
   const t = useT();
-  if (blockedCc) return <Chip kind="cut">{t("wg.v6.blocked", { cc: blockedCc })}</Chip>;
-  const [kind, word] = v6Chip[state];
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const go = async () => {
+    setPending(true);
+    try {
+      for (const r of relays) await relaysApi.deleteRelay({ id: r.id });
+      onClose();
+      toast(t("relay.removed"));
+    } catch (e) {
+      setError(errorText(e, t));
+    } finally {
+      setPending(false);
+      void qc.invalidateQueries({ queryKey: ["relays"] });
+    }
+  };
   return (
-    <Chip kind={kind} onClick={onClick}>
-      {t(word)}
-    </Chip>
+    <Modal
+      open
+      onOpenChange={(o) => !o && !pending && onClose()}
+      title={t("rm.remove.title", { entry: entry.name })}
+      description={t.n("rm.remove.body", relays.length, { exit, entry: entry.name })}
+      footer={
+        <>
+          <Button variant="ghost" size="md" disabled={pending} onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="danger" size="md" disabled={pending} onClick={() => void go()}>
+            {t("rm.remove.go")}
+          </Button>
+        </>
+      }
+    >
+      {error && <p className="text-[13px] text-danger-text">{error}</p>}
+    </Modal>
   );
 }
 
-function ServerRow({ s, cc, onShow }: { s: GServer; cc: string; onShow?: () => void }) {
-  const t = useT();
-  const chip = wayChip[s.way];
-  const noRelay = s.noRelay === "cdn" || s.noRelay === "awg" ? s.noRelay : undefined;
-  return (
-    <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="flex items-center gap-2">
-        <span className={cx("min-w-0 flex-1 truncate font-medium", s.way === "off" && "text-muted")}>{s.name}</span>
-        <GraphValue>
-          {s.net ?? protocolShort(s.protocol)}/{s.port}
-        </GraphValue>
-        {chip && (
-          <Chip kind={chip[0]} onClick={onShow} title={onShow ? t("wg.chip.hiddenOn") : undefined}>
-            {t(chip[1], { cc })}
-          </Chip>
-        )}
-      </span>
-      {noRelay && <span className="text-[10.5px] leading-tight font-medium text-muted">{t(noRelay === "cdn" ? "wg.noRelay.cdn" : "wg.noRelay.awg")}</span>}
-    </span>
-  );
-}
-
-/** The legend: the lines, the ports and the chips, drawn with the very SVG, CSS and chip component the canvas uses. */
-function Legend({ cc, owner }: { cc: string; owner: boolean }) {
-  const t = useT();
-  const line = (cls: string, color: string, dash?: string, opacity = 1) => (
+/** The legend of the route map: the wires, the chips and the cards, drawn with the canvas's own SVG and components. */
+function Legend({ cc, owner, t }: { cc: string; owner: boolean; t: T }) {
+  const line = (cls: string, color: string, dash?: string, opacity = 1, width = 2) => (
     <svg width="28" height="10" aria-hidden className="shrink-0">
-      <line x1="2" y1="5" x2="26" y2="5" className={cls} style={{ stroke: `color-mix(in oklch, ${color} var(--wp, 100%), #000)`, strokeWidth: 2, strokeLinecap: "round", strokeDasharray: dash, opacity }} />
+      <line x1="2" y1="5" x2="26" y2="5" className={cls} style={{ stroke: `color-mix(in oklch, ${color} var(--wp, 100%), #000)`, strokeWidth: width, strokeLinecap: "round", strokeDasharray: dash, opacity }} />
     </svg>
-  );
-  const dot = (status: string) => (
-    <span className="relative inline-block size-3 shrink-0">
-      <span aria-hidden className="mg-gport" data-status={status} style={{ position: "absolute", left: 6, top: 6, pointerEvents: "none", ["--pc" as never]: "var(--accent-sky)" }} />
-    </span>
   );
   const row = (glyph: ReactNode, text: string) => (
     <li className="flex h-7 items-center gap-2">
@@ -630,54 +706,50 @@ function Legend({ cc, owner }: { cc: string; owner: boolean }) {
     </li>
   );
   return (
-    <div className="flex w-[264px] flex-col gap-3 text-[12px]">
+    <div className="flex w-full flex-col gap-3 text-[12px]">
       <p className="text-[13px] font-semibold">{t("graph.legend")}</p>
       <HelpGroup title={t("wg.legend.lines")}>
         <ul>
-          {row(line("mg-gwire mg-gwire-flow", "var(--accent-mint)"), t("wg.lg.flow"))}
-          {row(line("mg-gwire", "var(--accent-sand)"), t("wg.lg.warn"))}
-          {row(line("mg-gwire", "var(--muted)", "2 5", 0.35), t("wg.lg.blocked"))}
-          {row(line("mg-gwire", "var(--muted)", "5 6", 0.75), t("wg.lg.off"))}
-          {row(line("mg-gwire mg-gwire-pending", "var(--accent)"), t("wg.lg.checking"))}
+          {row(line("mg-gwire mg-gwire-flow", "var(--accent-mint)", undefined, 1, 2.5), t("rm.lg.flow"))}
+          {row(line("mg-gwire", "var(--accent-sand)"), t("rm.lg.partial"))}
+          {row(line("mg-gwire", "var(--muted)", "1.5 5", 0.35, 1.5), t("rm.lg.muted"))}
+          {row(line("mg-gwire", "var(--accent-rose)", undefined, 1, 1.5), t("rm.lg.fail"))}
         </ul>
-      </HelpGroup>
-      <HelpGroup title={t("wg.legend.ports")}>
-        <ul>
-          {row(dot("ok"), t("wg.lg.portOk"))}
-          {row(dot("none"), t("wg.lg.portNone"))}
-          {row(dot("blocked"), t("wg.lg.portBlocked"))}
-        </ul>
+        <p className="text-[11px] text-faint">{t("rm.lg.thick")}</p>
       </HelpGroup>
       <HelpGroup title={t("wg.legend.status")}>
         <div className="flex flex-wrap gap-1.5">
-          <Chip kind="ok">{t("wg.chip.works")}</Chip>
-          <Chip kind="warn">{t("wg.chip.partial")}</Chip>
-          <Chip kind="cut">{t("wg.chip.blocked", { cc })}</Chip>
-          <Chip kind="off">{t("wg.chip.off")}</Chip>
-          <Chip kind="busy">{t("wg.v6.can")}</Chip>
-          <Chip kind="off">{t("wg.v6.none")}</Chip>
+          <Badge kind="ok">{t("rm.badge.ok")}</Badge>
+          <Badge kind="warn">{t("rm.badge.partial")}</Badge>
+          <Badge kind="cut">{t("rm.badge.blocked", { cc })}</Badge>
+          <Badge kind="off">{t("rm.badge.off")}</Badge>
+          <Badge kind="bad">{t("rm.badge.bad")}</Badge>
+          <Badge kind="busy">{t("rm.badge.checking")}</Badge>
         </div>
       </HelpGroup>
-      {owner && <p className="text-[11px] leading-snug text-faint">{t("wg.lg.help", { key: modKey })}</p>}
-      {owner && <p className="-mt-1.5 text-[11px] leading-snug text-faint">{t("wg.lg.grab")}</p>}
+      <HelpGroup title={t("rm.lg.cards")}>
+        <ul>
+          {row(<Icon name="server" size={15} />, t("rm.lg.way"))}
+          {row(<ServerChip kind="ok" label="" tabIndex={-1} className="!h-3 !w-3 !gap-0 !px-0" />, t("rm.lg.chip"))}
+          {row(<Icon name="plus" size={14} />, t("rm.lg.ghost"))}
+        </ul>
+      </HelpGroup>
+      {owner && <p className="text-[11px] leading-snug text-faint">{t("rm.lg.help")}</p>}
     </div>
   );
 }
 
-/** The shortcuts of the ways (the owner's): what the graph's own list does not have. */
-function WaysShortcuts() {
+function RouteShortcuts() {
   const t = useT();
   return (
-    <HelpGroup title={t("wg.k.group")}>
+    <HelpGroup title={t("rm.k.group")}>
       <ul className="flex flex-col gap-1">
-        <KeyRow keys={<><Kbd>{t("graph.key.drag")}</Kbd><Kbd>+ {t("wg.relay.port")}</Kbd></>}>{t("wg.k.newRelay")}</KeyRow>
-        <KeyRow keys={<Kbd>Enter</Kbd>}>{t("wg.k.wire")}</KeyRow>
-        <KeyRow keys={<><Kbd>{t("graph.key.click")}</Kbd><Kbd>Enter</Kbd></>}>{t("wg.k.menu")}</KeyRow>
-        <KeyRow keys={<><Kbd>{t("graph.key.drag")}</Kbd><Kbd>●</Kbd></>}>{t("wg.k.unhook")}</KeyRow>
-        <KeyRow keys={<Kbd>Delete</Kbd>}>{t("wg.k.delete")}</KeyRow>
+        <KeyRow keys={<Kbd>⋯</Kbd>}>{t("rm.k.menu")}</KeyRow>
+        <KeyRow keys={<Kbd>{t("rm.key.dragChip")}</Kbd>}>{t("rm.k.relay")}</KeyRow>
+        <KeyRow keys={<Kbd>{t("rm.key.dragOut")}</Kbd>}>{t("rm.k.unrelay")}</KeyRow>
+        <KeyRow keys={<Kbd>{t("graph.key.click")}</Kbd>}>{t("rm.k.select")}</KeyRow>
       </ul>
     </HelpGroup>
   );
 }
 
-const writePrefHelp = (tab: string) => writePref("mg.graph.help", tab || null);

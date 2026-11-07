@@ -536,3 +536,30 @@
 .mg-graph[data-handle] {
   cursor: grab;
 }
+
+/* cards of the route map: wires attach to invisible anchors at the middle of the left and right edges */
+.mg-ganchor {
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.mg-ganchor::before {
+  display: none;
+}
+.mg-gnode[data-variant="ghost"] {
+  border-style: dashed;
+  border-color: color-mix(in oklch, var(--muted) 38%, transparent);
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+.mg-gnode[data-variant="label"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}

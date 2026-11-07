@@ -120,11 +120,10 @@ async function mount(data: never = de1()) {
   await settle();
 }
 const app = () => document.querySelector('[role="application"]');
-const port = (card: string, id: string) => document.querySelector<HTMLElement>(`[data-gnode="${card}"] [data-port-id="${id}"]`)!;
-const wire = (id: string) => document.querySelector<HTMLElement>(`[data-gedge="${id}"]`)!;
 const click = (el: Element | undefined | null) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-const key = (el: Element, k: string) => act(async () => void el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })));
-const menuItem = (label: string) => [...document.querySelectorAll<HTMLElement>(".mg-gmenu button, .mg-gmenu a")].find((b) => b.textContent?.trim() === label);
+// an item of an open popover (menu or details)
+const item = (label: string) => [...document.querySelectorAll<HTMLElement>("[data-base-ui-inert], body > div button, body > div a")].find((b) => b.textContent?.trim() === label);
+const more = (title: string) => document.querySelector<HTMLElement>(`button[aria-label="${title}"]`);
 // the last one: a toast ("The relay is off") is a dialog too
 const dialog = () => [...document.querySelectorAll<HTMLElement>("[role=dialog]")].at(-1) ?? null;
 
@@ -163,72 +162,96 @@ describe("the List | Graph switch", () => {
   });
 });
 
-describe("the graph's cards and wires", () => {
-  it("draws people, the entry, the node's servers and the exit, with a wire per way", async () => {
+const card = (id: string) => document.querySelector<HTMLElement>(`[data-gnode="${id}"]`);
+const text = (id: string) => card(id)?.textContent ?? "";
+const drop = (el: Element, type: string, id: string) =>
+  act(async () => {
+    const ev = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "dataTransfer", { value: { types: [type], getData: (t: string) => (t === type ? id : "") } });
+    el.dispatchEvent(ev);
+  });
+const wayBody = (id: string) => card(id)!.querySelector<HTMLElement>(".p-3\\.5")!;
+
+describe("the route map", () => {
+  it("has the four labelled columns, people, a card per way, the node with its servers as chips, and where they exit", async () => {
     await mount();
-    const cards = [...document.querySelectorAll("[data-gnode]")].map((c) => c.getAttribute("data-gnode"));
-    expect(cards).toEqual(expect.arrayContaining(["people", "entry:nod_msk1", "node", "internet"]));
-    expect(wire("relay:rly_1")).toBeTruthy();
-    expect(wire("direct:inb_v")).toBeTruthy();
-    expect(wire("egress:inb_v")).toBeTruthy();
-    expect(wire("reach:nod_msk1")).toBeTruthy();
-    // the chip on each server's row, the IPv6 row for a host with none
-    const nodeCard = document.querySelector('[data-gnode="node"]')!.textContent!;
-    expect(nodeCard).toContain("VLESS · TCP");
-    expect(nodeCard).toContain("no IPv6 here");
+    const cols = [...document.querySelectorAll("[data-variant=label]")].map((c) => c.textContent);
+    expect(cols).toEqual(["Who", "How they get in", "Node", "Where they exit"]);
+    expect(text("people")).toContain("People · Russia");
+    expect(text("way:direct")).toContain("Direct");
+    expect(text("way:via:nod_msk1")).toContain("Through msk1");
+    expect(text("way:via:nod_msk1")).toContain("1 relay");
+    expect(text("way:via:nod_msk1")).toContain("VLESS · TCP");
+    expect(text("node")).toContain("de1");
+    expect(text("node")).toContain("online");
+    expect(text("node")).toContain("Hysteria2");
+    expect(text("exit:internet")).toContain("directly from de1 · 2 servers");
+    expect(text("ghost:way")).toContain("Add a way in");
+    expect(text("ghost:exit")).toContain("WARP or through another node");
   });
 
-  it("selects a card the way the list opens a way, through ?way=", async () => {
+  it("draws one wire per way, no rows of ports and no pills at wire ends", async () => {
     await mount();
-    const card = document.querySelector<HTMLElement>('[data-gnode="entry:nod_msk1"]')!;
-    await act(async () => card.focus());
+    expect([...document.querySelectorAll("[data-gedge]")].map((e) => e.getAttribute("data-gedge")).sort()).toEqual(
+      ["node:exit:internet", "people:way:direct", "people:way:via:nod_msk1", "way:direct:node", "way:via:nod_msk1:node"].sort(),
+    );
+    expect(document.querySelectorAll(".mg-gport:not(.mg-ganchor)")).toHaveLength(0);
+    expect(document.querySelector(".mg-glabel[data-end]")).toBeNull();
+    expect(document.querySelector(".mg-glabel")?.textContent).toBe("1 server");
+  });
+
+  it("selecting a way card opens that way through ?way=", async () => {
+    await mount();
+    await act(async () => card("way:via:nod_msk1")!.focus());
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ tab: "ways", way: "via:nod_msk1" }) }));
+  });
+
+  it("the People card links to where the country is set, for the owner", async () => {
+    await mount();
+    expect(card("people")!.querySelector("a")?.getAttribute("href")).toBe("/reachability");
   });
 });
 
 describe("the owner's edits", () => {
-  it("drawing a relay from an entry to a server opens the relay dialog with both filled in", async () => {
-    await mount();
-    const out = port("entry:nod_msk1", "relay:new");
-    out.focus();
-    // the server msk1 already relays is not offered; the other one is
-    await key(out, "Enter");
-    expect(document.querySelectorAll('[data-role="target"], [data-role="current"]')).toHaveLength(1);
-    expect(port("node", "in:inb_h").getAttribute("data-role")).toBe("current");
-    await key(document.activeElement!, "Enter");
-    await settle();
-    expect(dialog()?.textContent).toContain("msk1");
-    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
-    const box = dialog()!.querySelector<HTMLInputElement>('input[aria-label="Relay Hysteria2 of de1"]');
-    expect(box?.checked).toBe(true);
-  });
-
-  it("explains why a server cannot take a relay: an existing one is not even offered as a target", async () => {
-    await mount();
-    const out = port("entry:nod_msk1", "relay:new");
-    await key(out, "Enter");
-    expect(port("node", "in:inb_v").getAttribute("data-role")).toBe("dim");
-  });
-
-  it("a relay wire's menu checks, turns off, changes the port and removes through the list's own calls", async () => {
+  it("the ⋯ of a through-card checks all, turns all off, adds a relay for another server (prefilled with the entry) and removes", async () => {
     updateRelay.mockResolvedValue({ relay: relay() });
     checkRelay.mockResolvedValue({ relay: relay() });
     deleteRelay.mockResolvedValue({});
     await mount();
-
-    await click(wire("relay:rly_1"));
-    expect([...document.querySelectorAll(".mg-gmenu button")].map((b) => b.textContent)).toEqual(["Check", "Turn off", "Change port…", "Remove…"]);
-    await click(menuItem("Check"));
+    await click(more("Through msk1"));
+    expect(["Check all", "Turn all off", "Add a relay…", "Remove all relays…"].every((l) => !!item(l))).toBe(true);
+    await click(item("Check all"));
     await settle();
     expect(checkRelay).toHaveBeenCalledWith({ id: "rly_1" });
 
-    await click(wire("relay:rly_1"));
-    await click(menuItem("Turn off"));
+    await click(more("Through msk1"));
+    await click(item("Turn all off"));
     await settle();
     expect(updateRelay).toHaveBeenCalledWith({ id: "rly_1", enabled: false });
 
-    await click(wire("relay:rly_1"));
-    await click(menuItem("Change port…"));
+    await click(more("Through msk1"));
+    await click(item("Add a relay…"));
+    await settle();
+    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
+    expect(dialog()?.textContent).toContain("msk1");
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
+    await settle();
+
+    await click(more("Through msk1"));
+    await click(item("Remove all relays…"));
+    expect(deleteRelay).not.toHaveBeenCalled();
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Remove"));
+    await settle();
+    expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
+  });
+
+  it("a relay chip opens its details and actions: change port and remove ask in their own dialogs", async () => {
+    updateRelay.mockResolvedValue({ relay: relay() });
+    await mount();
+    const chip = [...card("way:via:nod_msk1")!.querySelectorAll("button")].find((b) => b.textContent?.includes("VLESS · TCP"))!;
+    await click(chip);
+    expect(document.body.textContent).toContain("msk1 → de1");
+    await click(item("Change port…"));
     const input = dialog()!.querySelector<HTMLInputElement>("input")!;
     expect(input.value).toBe("443");
     await act(async () => {
@@ -238,74 +261,127 @@ describe("the owner's edits", () => {
     await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Save"));
     await settle();
     expect(updateRelay).toHaveBeenCalledWith({ id: "rly_1", port: 8444 });
+  });
 
-    // removing asks first
-    await click(wire("relay:rly_1"));
-    await click(menuItem("Remove…"));
+  it("a server chip on the node opens its details with the In subscriptions switch, which asks first and offers Undo", async () => {
+    updateInbound.mockResolvedValue({ warnings: [] });
+    await mount();
+    const chip = [...card("node")!.querySelectorAll("button")].find((b) => b.textContent?.includes("VLESS · TCP"))!;
+    await click(chip);
+    expect(document.body.textContent).toContain("Protocol");
+    expect(document.body.textContent).toContain("tcp/443");
+    // the popover is the last in the page (the detail card below the map has the list's own switches)
+    const sw = [...document.querySelectorAll<HTMLElement>('[role="switch"][aria-label*="VLESS"]')].at(-1)!;
+    await click(sw);
+    await settle();
+    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false, validateOnly: true });
+    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false });
+    expect(document.body.textContent).toContain("VLESS · TCP is out of subscriptions");
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Undo"));
+    await settle();
+    expect(updateInbound).toHaveBeenLastCalledWith({ inboundId: "inb_v", directInSubscriptions: true });
+  });
+
+  it("the Direct card's ⋯ has a switch per server", async () => {
+    await mount();
+    await click(more("Direct"));
+    expect(document.body.textContent).toContain("In subscriptions");
+    expect(document.querySelectorAll('[role="switch"]').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("dragging a server onto a through-card opens the relay dialog prefilled; one the entry already relays is refused", async () => {
+    await mount();
+    await drop(wayBody("way:via:nod_msk1"), "application/x-mg-server", "inb_h");
+    await settle();
+    expect(listRelayCandidates).toHaveBeenCalledWith({ viaNodeId: "nod_msk1" }, expect.anything());
+    expect(dialog()!.querySelector<HTMLInputElement>('input[aria-label="Relay Hysteria2 of de1"]')?.checked).toBe(true);
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel" || b.textContent === "Close"));
+    await settle();
+    await drop(wayBody("way:via:nod_msk1"), "application/x-mg-server", "inb_v");
+    expect(document.body.textContent).toContain("Cannot relay this server here");
+  });
+
+  it("dragging a relay out onto the canvas asks to remove it, and removes it once confirmed", async () => {
+    deleteRelay.mockResolvedValue({});
+    await mount();
+    await drop(document.querySelector('[role="application"]')!, "application/x-mg-relay", "rly_1");
     expect(deleteRelay).not.toHaveBeenCalled();
-    await click([...dialog()!.querySelectorAll("button")].find((b) => /remove/i.test(b.textContent ?? "") && b.className.includes("danger")) ?? [...dialog()!.querySelectorAll("button")].pop());
+    await click([...dialog()!.querySelectorAll("button")].find((b) => b.className.includes("danger")) ?? [...dialog()!.querySelectorAll("button")].pop());
     await settle();
     expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
   });
 
-  it("Delete on a selected relay wire asks to remove it, and the people-to-server wire offers the In subscriptions switch", async () => {
-    updateInbound.mockResolvedValue({ warnings: [] });
+  it("the add-a-way card lists the other nodes to go through, and a node picked becomes a card", async () => {
     await mount();
-    const w = wire("relay:rly_1");
-    await click(w);
-    await key(w, "Delete");
-    expect(dialog()).not.toBeNull();
-    expect(deleteRelay).not.toHaveBeenCalled();
-    await click([...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel"));
+    expect(card("way:via:nod_spb1")).toBeNull();
+    await click(more("Add a way in: through a node, CDN, IPv6"));
+    expect(item("Through spb1")).toBeTruthy();
+    await click(item("Through spb1"));
     await settle();
-
-    await click(wire("direct:inb_v"));
-    expect([...document.querySelectorAll(".mg-gmenu button")].map((b) => b.textContent)).toEqual(["Keep out of subscriptions…"]);
-    await click(menuItem("Keep out of subscriptions…"));
-    await settle();
-    // the server is asked first (validate only), then switched
-    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false, validateOnly: true });
-    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false });
+    expect(text("way:via:nod_spb1")).toContain("no relay yet");
   });
 
-  it("the exit wire offers a twin with the other exit", async () => {
+  it("the other exit card offers WARP setup, and through another node is disabled with the reason", async () => {
     await mount();
-    await click(wire("egress:inb_v"));
-    expect([...document.querySelectorAll(".mg-gmenu button")].map((b) => b.textContent)).toEqual(["Make a twin through WARP…"]);
-  });
-
-  it("adds an entry node from the list of the other nodes", async () => {
-    await mount();
-    expect(document.querySelector('[data-gnode="entry:nod_spb1"]')).toBeNull();
-    expect(document.querySelector('button[aria-label="Add entry node"]')).not.toBeNull();
+    await click(more("WARP or through another node"));
+    expect(item("Set up WARP")?.getAttribute("href") ?? "").toContain("/nodes/nod_de1");
+    expect(item("Through another node")?.hasAttribute("disabled")).toBe(true);
+    expect(item("Through another node")?.getAttribute("title")).toBe("Needs support in the system first");
   });
 });
 
 describe("another role", () => {
-  it("a helper sees the graph read-only: no way to add a relay, no wire menu, no add-entry control", async () => {
+  it("a helper sees the map read-only: no menus, no add-a-way, no exit setup, no draggable chips", async () => {
     role = Role.HELPER;
     await mount();
     expect(app()).not.toBeNull();
-    expect(document.querySelector('button[aria-label="Add entry node"]')).toBeNull();
-    // a helper is not given relays, so there is no entry at all, and no output to draw from
-    expect(document.querySelector('[data-port-id="relay:new"]')).toBeNull();
-    expect(wire("direct:inb_v")).toBeTruthy();
-    await click(wire("direct:inb_v"));
-    expect(document.querySelector(".mg-gmenu")).toBeNull();
+    expect(text("way:direct")).toContain("Direct");
+    expect(card("ghost:way")).toBeNull();
+    expect(card("ghost:exit")).toBeNull();
+    expect(document.querySelector('[data-gnode="way:direct"] button[aria-label]:not(.mg-ganchor)')).toBeNull();
+    expect(card("people")!.querySelector("a")).toBeNull();
+    expect(document.querySelector("[draggable=true]")).toBeNull();
     expect(listRelays).not.toHaveBeenCalled();
   });
 });
 
+describe("the legend and the shortcuts", () => {
+  it("the legend shows the wires, the statuses and the cards; the editing line is the owner's", async () => {
+    await mount();
+    const btn = (label: string) => [...document.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === label)!;
+    await click(btn("Legend"));
+    const help = document.querySelector("#graph-help")!.textContent!;
+    expect(help).toContain("Traffic flows");
+    expect(help).toContain("Blocked or off");
+    expect(help).toContain("Relay failing");
+    expect(help).toContain("Drag a server onto a way");
+    act(() => root!.unmount());
+    host!.remove();
+    role = Role.HELPER;
+    await mount();
+    // the open card is remembered by the browser: still open on the second mount
+    if (!document.querySelector("#graph-help")) await click(btn("Legend"));
+    expect(document.querySelector("#graph-help")!.textContent).toContain("Traffic flows");
+    expect(document.querySelector("#graph-help")!.textContent).not.toContain("Drag a server onto a way");
+  });
+
+  it("the shortcuts card has the route map's own group for the owner", async () => {
+    await mount();
+    const btn = [...document.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === "Shortcuts")!;
+    await click(btn);
+    expect(document.querySelector("#graph-help")!.textContent).toContain("Relay a server");
+  });
+});
 
 describe("full screen", () => {
-  it("opens from the toolbar button into ?full=1, with the way's detail in a drawer", async () => {
+  it("opens from the toolbar button into ?full=1", async () => {
     await mount();
     expect(document.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
     await click(document.querySelector("[data-graph-expand]"));
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ tab: "ways", view: "graph", full: "1" }) }));
   });
 
-  it("?full=1 restores the overlay: a top bar, the graph, a drawer with the detail, and no page scroll behind", async () => {
+  it("?full=1 restores the overlay: a top bar, the map, a drawer with the detail, and no page scroll behind", async () => {
     search = { tab: "ways", view: "graph", full: "1" };
     await mount();
     const overlay = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
@@ -314,11 +390,9 @@ describe("full screen", () => {
     expect(overlay.querySelector('[role="application"]')).not.toBeNull();
     expect(overlay.querySelector("aside #way-panel")).not.toBeNull();
     expect(document.body.style.overflow).toBe("hidden");
-    // the in-tab list/graph switch is under the overlay, not in it
-    expect(overlay.querySelector("[role=radiogroup]")).toBeNull();
   });
 
-  it("Esc and the close button leave it; the page scrolls again", async () => {
+  it("Esc and the close button leave it", async () => {
     search = { tab: "ways", view: "graph", full: "1" };
     await mount();
     const overlay = () => document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
@@ -327,109 +401,5 @@ describe("full screen", () => {
     navigate.mockClear();
     await click(overlay().querySelector('button[aria-label="Close"]'));
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.not.objectContaining({ full: "1" }) }));
-  });
-
-  it("the shortcuts card in full screen also lists the ways' own shortcuts for the owner", async () => {
-    search = { tab: "ways", view: "graph", full: "1" };
-    await mount();
-    const overlay = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
-    const shortcuts = [...overlay.querySelectorAll<HTMLElement>("header button")].find((b) => b.textContent === "Shortcuts")!;
-    await click(shortcuts);
-    const card = overlay.querySelector("#graph-help")!;
-    expect(card.textContent).toContain("New relay");
-    expect(card.textContent).toContain("Remove relay");
-  });
-
-  it("a helper's shortcuts have no ways group, and the legend leaves out the editing line", async () => {
-    role = Role.HELPER;
-    await mount();
-    const btn = (label: string) => [...document.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === label)!;
-    await click(btn("Shortcuts"));
-    expect(document.querySelector("#graph-help")?.textContent).not.toContain("New relay");
-    await click(btn("Legend"));
-    expect(document.querySelector("#graph-help")?.textContent).toContain("Traffic flows");
-    expect(document.querySelector("#graph-help")?.textContent).not.toContain("Drag from");
-  });
-});
-
-describe("grabbing wires in the ways graph", () => {
-  const pointerMove = () =>
-    act(async () => {
-      const ev = new MouseEvent("pointermove", { bubbles: true, clientX: 18, clientY: 0 });
-      Object.defineProperty(ev, "pointerType", { value: "mouse" });
-      document.querySelector('[role="application"]')!.dispatchEvent(ev);
-    });
-  const status = () => document.querySelector('[role="application"] [role="status"]')?.textContent ?? "";
-
-  it("the owner gets handles, a helper none", async () => {
-    // people on the left of the node on one line, so the direct wires are straight from the people port
-    localStorage.setItem("mg.graph.ways:nod_de1", JSON.stringify({ people: { x: 0, y: 0 }, "entry:nod_msk1": { x: 0, y: 900 }, node: { x: 500, y: 0 }, internet: { x: 1000, y: 0 } }));
-    await mount();
-    await pointerMove();
-    expect(document.querySelector(".mg-ghandle")).not.toBeNull();
-    act(() => root!.unmount());
-    host!.remove();
-    role = Role.HELPER;
-    await mount();
-    await pointerMove();
-    expect(document.querySelector(".mg-ghandle")).toBeNull();
-  });
-
-  it("a direct way dropped on empty canvas takes the server out of subscriptions, with an Undo that puts it back", async () => {
-    updateInbound.mockResolvedValue({ warnings: [] });
-    await mount();
-    const w = wire("direct:inb_v");
-    await click(w);
-    await key(w, "Delete");
-    await settle();
-    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false });
-    expect(document.body.textContent).toContain("VLESS · TCP is out of subscriptions");
-    const undo = [...document.querySelectorAll("button")].find((b) => b.textContent === "Undo")!;
-    expect(undo).toBeTruthy();
-    await click(undo);
-    await settle();
-    expect(updateInbound).toHaveBeenLastCalledWith({ inboundId: "inb_v", directInSubscriptions: true });
-  });
-
-  it("a relay dropped on empty canvas asks to remove it, and removes it once confirmed", async () => {
-    deleteRelay.mockResolvedValue({});
-    await mount();
-    const w = wire("relay:rly_1");
-    await click(w);
-    await key(w, "Delete");
-    expect(deleteRelay).not.toHaveBeenCalled();
-    const confirm = [...dialog()!.querySelectorAll("button")].find((b) => b.className.includes("danger"));
-    await click(confirm ?? [...dialog()!.querySelectorAll("button")].pop());
-    await settle();
-    expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
-  });
-
-  it("a server's exit dropped on empty canvas is refused with the reason, and nothing is called", async () => {
-    await mount();
-    const w = wire("egress:inb_v");
-    await click(w);
-    await key(w, "Delete");
-    expect(status()).toContain("A server always leaves somewhere");
-    expect(dialog()).toBeNull();
-    expect(updateInbound).not.toHaveBeenCalled();
-  });
-
-  it("the way people reach an entry is not grabbable: Delete does nothing", async () => {
-    await mount();
-    const w = wire("reach:nod_msk1");
-    await click(w);
-    await key(w, "Delete");
-    expect(dialog()).toBeNull();
-    expect(deleteRelay).not.toHaveBeenCalled();
-    expect(updateInbound).not.toHaveBeenCalled();
-  });
-
-  it("the shortcuts card and the legend tell how to move or unhook a wire", async () => {
-    await mount();
-    const btn = (label: string) => [...document.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === label)!;
-    await click(btn("Shortcuts"));
-    expect(document.querySelector("#graph-help")?.textContent).toContain("Move or unhook a wire");
-    await click(btn("Legend"));
-    expect(document.querySelector("#graph-help")?.textContent).toContain("Drag a wire’s end to move or unhook it.");
   });
 });
