@@ -79,15 +79,8 @@ func (r rpc) SetRetention(ctx context.Context, req *connect.Request[opsv1.SetRet
 			set[retention.Prefix+k] = strconv.Itoa(v)
 		}
 	}
-	if len(set) > 0 {
-		if err := s.cfg.Store.SetSettings(ctx, set); err != nil {
-			return nil, internalErr(s.cfg.Log, "save retention", err)
-		}
-	}
-	if len(reset) > 0 {
-		if err := s.cfg.Store.DeleteSettings(ctx, reset...); err != nil {
-			return nil, internalErr(s.cfg.Log, "reset retention", err)
-		}
+	if err := s.cfg.Store.SetAndDeleteSettings(ctx, set, reset...); err != nil {
+		return nil, internalErr(s.cfg.Log, "save retention", err)
 	}
 	s.audit(ctx, "retention_set", changed)
 	items, err := s.retentionItems(ctx)

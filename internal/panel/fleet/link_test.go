@@ -224,7 +224,7 @@ func TestLinkHandshakeRefusals(t *testing.T) {
 		})
 	})
 	t.Run("unknown node", func(t *testing.T) {
-		assertLinkRefused(t, e, server.URL, "node_unknown", a, func(ch *agentv1.LinkChallenge) (string, []byte) {
+		assertLinkRefused(t, e, server.URL, "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", a, func(ch *agentv1.LinkChallenge) (string, []byte) {
 			return ch.Audience, ch.Nonce
 		})
 	})
@@ -396,6 +396,7 @@ func TestLinkAcceptStep(t *testing.T) {
 }
 
 func TestLinkMarker(t *testing.T) {
+	const nodeID = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa"
 	serve := func(method, path, upgrade string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, path, nil)
 		if upgrade != "" {
@@ -405,16 +406,17 @@ func TestLinkMarker(t *testing.T) {
 		LinkMarker().ServeHTTP(w, r)
 		return w
 	}
-	if w := serve(http.MethodGet, "/link/nod_x", "websocket"); w.Code != http.StatusNoContent || w.Header().Get(LinkMarkerHeader) != "nod_x" {
+	if w := serve(http.MethodGet, "/link/"+nodeID, "websocket"); w.Code != http.StatusNoContent || w.Header().Get(LinkMarkerHeader) != nodeID {
 		t.Fatalf("upgrade: status %d, header %q", w.Code, w.Header().Get(LinkMarkerHeader))
 	}
 	for name, w := range map[string]*httptest.ResponseRecorder{
-		"no upgrade":     serve(http.MethodGet, "/link/nod_x", ""),
-		"POST":           serve(http.MethodPost, "/link/nod_x", "websocket"),
-		"other path":     serve(http.MethodGet, "/other/nod_x", "websocket"),
+		"no upgrade":     serve(http.MethodGet, "/link/"+nodeID, ""),
+		"POST":           serve(http.MethodPost, "/link/"+nodeID, "websocket"),
+		"other path":     serve(http.MethodGet, "/other/"+nodeID, "websocket"),
 		"nested id":      serve(http.MethodGet, "/link/a/b", "websocket"),
 		"empty id":       serve(http.MethodGet, "/link/", "websocket"),
-		"other protocol": serve(http.MethodGet, "/link/nod_x", "h2c"),
+		"malformed id":   serve(http.MethodGet, "/link/nod_fabricated", "websocket"),
+		"other protocol": serve(http.MethodGet, "/link/"+nodeID, "h2c"),
 	} {
 		if w.Code != http.StatusNotFound || w.Header().Get(LinkMarkerHeader) != "" {
 			t.Errorf("%s: status %d, header %q", name, w.Code, w.Header().Get(LinkMarkerHeader))

@@ -185,14 +185,20 @@ func (s *Service) exportAudit(ctx context.Context, w *exportWriter, since, until
 }
 
 func (s *Service) exportJournal(ctx context.Context, w *exportWriter, since, until time.Time) error {
-	rows, err := s.cfg.Store.NodeJournal(ctx, store.NodeJournalFilter{Since: since, Until: until, MinLevel: 2, Limit: exportMaxRows})
+	rows, err := s.cfg.Store.NodeJournal(ctx, store.NodeJournalFilter{Since: since, Until: until, MinLevel: 2, Limit: exportMaxRows + 1})
 	if err != nil {
 		return err
 	}
+	n := 0
 	for _, j := range rows {
 		if j.LastAt < since.Unix() || j.FirstAt > until.Unix() {
 			continue
 		}
+		if n == exportMaxRows {
+			w.line(map[string]any{"source": "journal", "truncated": true})
+			return nil
+		}
+		n++
 		w.line(map[string]any{"source": "journal", "node": j.NodeName, "hour": j.HourStart, "level": j.Level, "origin": j.Source,
 			"message": j.Message, "inbound": j.InboundID, "profile": j.ProfileName, "attrs": j.Attrs, "count": j.Count, "first": j.FirstAt, "last": j.LastAt})
 	}

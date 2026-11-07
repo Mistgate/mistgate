@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 
 const LINK = "/lnk-secret-1/";
 const ADMIN = "/adm-secret-2/";
+const NODE_ID = `nod_${"a".repeat(26)}`;
+const OTHER_NODE_ID = `nod_${"b".repeat(26)}`;
 // the pool's `exports` is typed per project; the main module's default handler is FRONT here
 const main = (exports as unknown as { default: Fetcher }).default;
 const front = (path: string, init?: RequestInit) => main.fetch(new Request(`https://panel.example.test${path}`, init));
@@ -68,7 +70,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("the agent link through FRONT", () => {
   it("upgrades through the LINK binding to the NodeLink object of FRONT's script, whose Go side is the link role's PanelLink", async () => {
-    const response = await front(`${LINK}link/nod_ws1`, { headers: { Upgrade: "websocket" } });
+    const response = await front(`${LINK}link/${NODE_ID}`, { headers: { Upgrade: "websocket" } });
     expect(response.status).toBe(101);
     const ws = response.webSocket!;
     const inbox: string[] = [];
@@ -87,7 +89,7 @@ describe("the agent link through FRONT", () => {
       expect(inbox[0]).toBe("challenge panel.example.test");
       ws.send(new TextEncoder().encode("auth"));
       await until(2);
-      expect(inbox[1]).toBe("accept nod_ws1");
+      expect(inbox[1]).toBe(`accept ${NODE_ID}`);
       ws.send(new TextEncoder().encode("ping"));
       await until(3);
       expect(inbox[2]).toBe("ping"); // a session step of PanelLink echoed the frame
@@ -98,7 +100,7 @@ describe("the agent link through FRONT", () => {
   });
 
   it("does not upgrade a request on another path: the same socket request to the public surface is just a page", async () => {
-    const response = await front(`/sub-secret/link/nod_ws2`, { headers: { Upgrade: "websocket" } });
+    const response = await front(`/sub-secret/link/${OTHER_NODE_ID}`, { headers: { Upgrade: "websocket" } });
     expect(response.status).toBe(201);
     expect(response.webSocket).toBeNull();
     expect(response.headers.get("X-Role")).toBe("public");
