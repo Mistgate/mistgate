@@ -65,13 +65,38 @@ export function assistantErrorKey(e: unknown): MessageKey | null {
   return errorCodes.has(code) ? (`ai.err.${code}` as MessageKey) : null;
 }
 
-/** The text looks like a secret someone pasted by mistake: a long token-like run, a private key block, a URL with a password. */
+const secretLabel = /(?:^|[^A-Za-z0-9_])(?:password|passwd|pwd|pass|secret|token|api[\s_-]*key|private[\s_-]*key|key|license(?:[\s_-]*key)?|licence(?:[\s_-]*key)?|пароль|токен|ключ|лицензия)\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/iu;
+const secretShape = /\b(?:sk-ant-[A-Za-z0-9_-]{10,}|sk-proj-[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9_-]{20,}|(?:ghp|gho)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[A-Za-z0-9_-]{30,}|AGE-SECRET-KEY-1[0-9A-Z]{30,})\b|\b[0-9]{6,}:[A-Za-z0-9_-]{30,}|eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{8,}|\bBearer\s+\S+/i;
+const uuidValue = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
+const uuidInText = /\b[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}\b/gi;
+
+function highEntropyKey(value: string): boolean {
+  if (value.length < 32 || uuidValue.test(value)) return false;
+  if (value.length === 43 && /^[A-Za-z0-9+/_-]{43}$/.test(value)) return true;
+  const hexKey = /^[\da-f]{32,}$/i.test(value);
+  const counts = new Map<string, number>();
+  const classes = new Set<string>();
+  for (const char of value) {
+    counts.set(char, (counts.get(char) ?? 0) + 1);
+    classes.add(/[a-z]/.test(char) ? "lower" : /[A-Z]/.test(char) ? "upper" : /\d/.test(char) ? "digit" : "punctuation");
+  }
+  if (classes.size < 3 && !hexKey) return false;
+  let entropy = 0;
+  for (const count of counts.values()) {
+    const share = count / value.length;
+    entropy -= share * Math.log2(share);
+  }
+  return entropy >= 3.5;
+}
+
+/** The text looks like a secret someone pasted by mistake: a credential label, token, private key, or URL password. */
 export function looksSecret(text: string): boolean {
   return (
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text) ||
-    /\b(sk|pk|rk|ghp|gho|xox[abp]|AKIA|AGE-SECRET-KEY)[-_A-Za-z0-9]{12,}/.test(text) ||
+    secretLabel.test(text) ||
+    /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/i.test(text) ||
+    secretShape.test(text) ||
     /[a-z]+:\/\/[^\s/:@]+:[^\s/@]+@/i.test(text) ||
-    /\b[A-Za-z0-9+/_-]{40,}={0,2}\b/.test(text)
+    [...text.replace(uuidInText, " ").matchAll(/[A-Za-z0-9+/_=-]{32,}/g)].some(([value]) => highEntropyKey(value))
   );
 }
 

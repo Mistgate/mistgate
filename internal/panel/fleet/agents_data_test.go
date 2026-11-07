@@ -14,7 +14,7 @@ import (
 // Stats batches produce hourly host rows: the host load of two batches of one hour is one row, mean and peak.
 func TestStatsBatchesFeedHostHours(t *testing.T) {
 	e := newEnv(t)
-	a := e.enroll("nodea")
+	a := e.enroll("de1")
 	ids := e.fixture(a.nodeID)
 	c, _, _ := connectFull(a, "host-hours")
 	now := e.f.now().Unix()
@@ -36,7 +36,7 @@ func TestStatsBatchesFeedHostHours(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := r.Msg.Hours[len(r.Msg.Hours)-1]
-	if r.Msg.NodeName != "nodea" || h.CpuAvgPct != 20 || h.CpuMaxPct != 30 || h.SoftirqMaxPct != 4 || h.RamUsedMaxBytes != 512 ||
+	if r.Msg.NodeName != "de1" || h.CpuAvgPct != 20 || h.CpuMaxPct != 30 || h.SoftirqMaxPct != 4 || h.RamUsedMaxBytes != 512 ||
 		h.RxMaxBps != 200 || h.RxAvgBps != 150 || h.SessionsMax != 1 {
 		t.Errorf("host hour = %+v (node %q)", h, r.Msg.NodeName)
 	}

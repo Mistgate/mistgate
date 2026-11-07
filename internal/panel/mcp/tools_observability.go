@@ -77,6 +77,16 @@ type PanelLogsV struct {
 	Capacity   uint32          `json:"capacity"`
 	NextCursor int64           `json:"next_cursor,omitempty"`
 	Entries    []panelLogEntry `json:"entries"`
+	Truncated  bool            `json:"truncated,omitempty"`
+}
+
+func (v *PanelLogsV) shrink() bool {
+	v.Truncated = true
+	ok := cut(&v.Entries)
+	if n := len(v.Entries); n > 0 {
+		v.NextCursor = v.Entries[n-1].Seq
+	}
+	return ok
 }
 
 type panelLogEntry struct {

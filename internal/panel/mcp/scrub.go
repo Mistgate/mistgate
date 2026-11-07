@@ -5,6 +5,8 @@ package mcp
 import (
 	"math"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 // scrub is the last wall: every string an agent can see is run through it, after the projection has
@@ -30,6 +32,7 @@ func scrubbers(stop string) []scrubber {
 		{regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{20,}`), `[key]`},
 		{regexp.MustCompile(`\b(?:ghp|gho)_[A-Za-z0-9]{20,}`), `[key]`},
 		{regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}`), `[key]`},
+		{regexp.MustCompile(`\b[0-9]{6,}:[A-Za-z0-9_-]{30,}`), `[token]`},
 		{regexp.MustCompile(`\bxox[abpr]-[A-Za-z0-9-]{10,}`), `[key]`},
 		{regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`), `[key]`},
 		{regexp.MustCompile(`\bAIza[0-9A-Za-z_-]{30,}`), `[key]`},
@@ -52,12 +55,21 @@ func scrubbers(stop string) []scrubber {
 var (
 	textScrubbers = scrubbers(``)
 	jsonScrubbers = scrubbers(`"\\`)
+	uuidShape     = regexp.MustCompile(`(?i)\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b`)
 	// keyShaped is a bare 43-character base64 value (a 32-byte key), optionally with its padding, between delimiters.
 	keyShaped = regexp.MustCompile(`([^A-Za-z0-9+/_=-]|^)([A-Za-z0-9+/_-]{43}=?)([^A-Za-z0-9+/_=-]|$)`)
 	longToken = regexp.MustCompile(`(^|[^A-Za-z0-9+/=_-])([A-Za-z0-9+/=_-]{32,})([^A-Za-z0-9+/=_-]|$)`)
 )
 
 func scrubWith(set []scrubber, s string) string {
+	var uuids []string
+	var markers []string
+	s = uuidShape.ReplaceAllStringFunc(s, func(value string) string {
+		marker := "\x00u" + strconv.Itoa(len(uuids)) + "\x00"
+		uuids = append(uuids, value)
+		markers = append(markers, marker)
+		return marker
+	})
 	for _, sc := range set {
 		s = sc.re.ReplaceAllString(s, sc.repl)
 	}
@@ -73,6 +85,9 @@ func scrubWith(set []scrubber, s string) string {
 			}
 			return parts[1] + `[token]` + parts[3]
 		})
+	}
+	for i, marker := range markers {
+		s = strings.ReplaceAll(s, marker, uuids[i])
 	}
 	return s
 }
@@ -103,7 +118,7 @@ func highEntropy(value string) bool {
 			classes++
 		}
 	}
-	if classes < 3 {
+	if classes < 3 && !isHexKey(value) {
 		return false
 	}
 	entropy := 0.0
@@ -115,6 +130,19 @@ func highEntropy(value string) bool {
 		entropy -= p * math.Log2(p)
 	}
 	return entropy >= 3.5
+}
+
+func isHexKey(value string) bool {
+	if len(value) < 32 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 // scrub cleans a piece of text from data.
