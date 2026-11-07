@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Graph, GraphMenuItem, GraphPortRow, GraphValue, HelpGroup, Kbd, KeyRow, modKey, type GraphEdge, type GraphNode, type GraphPort, type HelpTab, type PortRef } from "@/components/graph";
 import { Icon } from "@/components/ui/icons";
@@ -18,7 +18,7 @@ import type { RelayMsg } from "@/lib/relay";
 import { protocolShort } from "@/lib/series";
 import { readPref, writePref } from "@/lib/storage";
 import type { WayId } from "@/lib/ways";
-import { port, relayRefusal, waysGraph, waysLayout, type GCard, type GServer, type GWire, type Ipv6State, type ServerWay } from "@/lib/ways-graph";
+import { grabbable, port, reconnectRule, relayRefusal, waysGraph, waysLayout, type ReconnectContext, type GCard, type GServer, type GWire, type Ipv6State, type ServerWay } from "@/lib/ways-graph";
 import { profileListQuery } from "@/screens/users/rpc";
 import { TwinPanel } from "@/screens/profiles/twin";
 import { TurnOffDialog } from "./ipv6-entry";
@@ -81,6 +81,7 @@ const wayOfCard = (id: string): WayId | undefined => (id.startsWith("entry:") ? 
 
 type Dialog =
   | { kind: "draw"; entry: Entry; inboundId: string }
+  | { kind: "move"; entry: Entry; inboundId: string; old: RelayMsg }
   | { kind: "remove"; r: RelayMsg }
   | { kind: "port"; r: RelayMsg }
   | { kind: "twin"; inboundId: string }
@@ -98,6 +99,8 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
   const profiles = useQuery({ ...profileListQuery, enabled: owner }).data;
   const [extra, setExtra] = useState<{ id: string; name: string }[]>(initialExtra ?? []);
   const [dlg, setDlg] = useState<Dialog | null>(null);
+  // a move: the new relay was switched on, so the old one is offered for removal once the dialog closes
+  const moveDone = useRef(false);
   const cc = w.cc;
   const [help, setHelp] = useState<HelpTab | "">(() => (readPref("mg.graph.help") === "legend" ? "legend" : readPref("mg.graph.help") === "shortcuts" ? "shortcuts" : ""));
 
@@ -128,7 +131,7 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
     const portsOf = (c: GCard): GraphPort[] =>
       c.ports
         .filter((p) => owner || p.id !== port.newRelay)
-        .map((p) => ({ id: p.id, side: p.side, type: p.id === port.newRelay ? "any" : p.type, status: p.status, multi: p.side === "in" ? true : undefined, label: portLabel(c, p.id) }));
+        .map((p) => ({ id: p.id, side: p.side, type: p.id === port.newRelay || p.type === "people" ? "any" : p.type, status: p.status, multi: p.side === "in" ? true : undefined, label: portLabel(c, p.id) }));
     function portLabel(c: GCard, id: string): string {
       if (id === port.people) return t("ways.peopleShort");
       if (id === port.reach) return t("wg.entry.reach");
@@ -305,11 +308,16 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
   const edges: GraphEdge[] = model.wires.map((x) => {
     // a server leaving by its exit is plain plumbing: drawn in the quiet type colour unless it fails
     const state: GraphEdge["state"] = x.blocked ? "blocked" : x.kind === "egress" && x.state === "ok" ? undefined : x.state === "unknown" ? "off" : x.state;
-    return { id: x.id, from: { node: x.from.card, port: x.from.port }, to: { node: x.to.card, port: x.to.port }, state, animated: x.flowing };
+    return { id: x.id, from: { node: x.from.card, port: x.from.port }, to: { node: x.to.card, port: x.to.port }, state, animated: x.flowing, grabbable: grabbable(x.kind) };
   });
 
   // ---- editing (the owner's)
   const canConnect = (from: PortRef, to: PortRef) => {
+    // drawing from People puts a server that is out of subscriptions back in
+    if (from.node === "people") {
+      const s = to.node === "node" && to.port.startsWith("in:") ? serverOf(to.port.slice(3)) : undefined;
+      return s && s.on && !s.listed && !s.cdn ? true : t("wg.refuse.peopleTarget");
+    }
     if (!from.node.startsWith("entry:")) return t("wg.refuse.source");
     const s = to.node === "node" && to.port.startsWith("in:") ? serverOf(to.port.slice(3)) : undefined;
     if (!s) return t("wg.refuse.target");
@@ -317,13 +325,45 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
     return why ? t(`wg.refuse.${why}` as MessageKey) : true;
   };
   const onConnect = (from: PortRef, to: PortRef) => {
+    if (from.node === "people") {
+      const i = inboundOf(to.port.slice(3));
+      if (i) void subs.toggle(i, true, t("wg.subs.in", { name: i.profileName }));
+      return;
+    }
     const id = from.node.slice(6);
     const entry = model.cards.find((c) => c.id === from.node);
     setDlg({ kind: "draw", entry: { id, name: entry && "name" in entry ? entry.name : id, cc: ccOf(id) }, inboundId: to.port.slice(3) });
   };
-  const onEdgeDelete = (e: GraphEdge) => {
-    const r = wires.get(e.id)?.relay;
-    if (r) setDlg({ kind: "remove", r });
+  // grabbing a wire's end (and Delete, which drops its `to` end on empty canvas): the rule is lib/ways-graph.ts's
+  const rctx: ReconnectContext = { nodeId: node.id, servers: nodeCard.servers, relays };
+  const ruleOf = (e: GraphEdge, end: "from" | "to", target: PortRef | null) => {
+    const x = wires.get(e.id);
+    return x ? reconnectRule(x, end, target ? { card: target.node, port: target.port } : null, rctx) : ({ ok: false, reason: "grab" } as const);
+  };
+  const canReconnect = (e: GraphEdge, end: "from" | "to", target: PortRef | null) => {
+    const r = ruleOf(e, end, target);
+    return r.ok ? true : t(`wg.refuse.${r.reason}` as MessageKey);
+  };
+  const onReconnect = (e: GraphEdge, end: "from" | "to", target: PortRef | null) => {
+    const r = ruleOf(e, end, target);
+    if (!r.ok) return;
+    const a = r.action;
+    switch (a.type) {
+      case "removeRelay":
+        return setDlg({ kind: "remove", r: a.relay });
+      case "moveRelay":
+        moveDone.current = false;
+        return setDlg({ kind: "move", entry: { id: a.relay.viaNodeId, name: a.relay.viaNodeName, cc: ccOf(a.relay.viaNodeId) }, inboundId: a.inboundId, old: a.relay });
+      case "subsOut": {
+        const i = inboundOf(a.inboundId);
+        if (i) void subs.toggle(i, false, t("wg.subs.out", { name: i.profileName }));
+        return;
+      }
+      case "v6off":
+        return setDlg({ kind: "v6off" });
+      case "twin":
+        return setDlg({ kind: "twin", inboundId: a.inboundId });
+    }
   };
 
   const renderMenu = (e: GraphEdge, close: () => void) => {
@@ -433,7 +473,8 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
       readOnly={!owner}
       canConnect={canConnect}
       onConnect={owner ? onConnect : undefined}
-      onEdgeDelete={owner ? onEdgeDelete : undefined}
+      onReconnect={owner ? onReconnect : undefined}
+      canReconnect={canReconnect}
       renderEdgeMenu={owner ? renderMenu : undefined}
       selected={[cardOfWay(open)]}
       onSelectionChange={(ids) => {
@@ -448,6 +489,23 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false,
     <>
       {owner && dlg?.kind === "draw" && (
         <AddRelayDialog key={`${dlg.entry.id}/${dlg.inboundId}`} open onOpenChange={() => setDlg(null)} entry={dlg.entry} exitId={node.id} preselect={dlg.inboundId} />
+      )}
+      {owner && dlg?.kind === "move" && (
+        <AddRelayDialog
+          key={`move/${dlg.old.id}/${dlg.inboundId}`}
+          open
+          onOpenChange={() => {
+            // the new relay is on: the old one goes, after a confirmation of its own
+            setDlg(moveDone.current ? { kind: "remove", r: dlg.old } : null);
+          }}
+          entry={dlg.entry}
+          exitId={node.id}
+          preselect={dlg.inboundId}
+          notice={t("wg.move.notice", { old: dlg.old.profileName, entry: dlg.entry.name })}
+          onSuccess={() => {
+            moveDone.current = true;
+          }}
+        />
       )}
       {owner && dlg?.kind === "remove" && <RemoveRelay r={dlg.r} onClose={() => setDlg(null)} />}
       {owner && dlg?.kind === "port" && <ChangeRelayPort r={dlg.r} onClose={() => setDlg(null)} />}
@@ -601,6 +659,7 @@ function Legend({ cc, owner }: { cc: string; owner: boolean }) {
         </div>
       </HelpGroup>
       {owner && <p className="text-[11px] leading-snug text-faint">{t("wg.lg.help", { key: modKey })}</p>}
+      {owner && <p className="-mt-1.5 text-[11px] leading-snug text-faint">{t("wg.lg.grab")}</p>}
     </div>
   );
 }
@@ -614,6 +673,7 @@ function WaysShortcuts() {
         <KeyRow keys={<><Kbd>{t("graph.key.drag")}</Kbd><Kbd>+ {t("wg.relay.port")}</Kbd></>}>{t("wg.k.newRelay")}</KeyRow>
         <KeyRow keys={<Kbd>Enter</Kbd>}>{t("wg.k.wire")}</KeyRow>
         <KeyRow keys={<><Kbd>{t("graph.key.click")}</Kbd><Kbd>Enter</Kbd></>}>{t("wg.k.menu")}</KeyRow>
+        <KeyRow keys={<><Kbd>{t("graph.key.drag")}</Kbd><Kbd>●</Kbd></>}>{t("wg.k.unhook")}</KeyRow>
         <KeyRow keys={<Kbd>Delete</Kbd>}>{t("wg.k.delete")}</KeyRow>
       </ul>
     </HelpGroup>

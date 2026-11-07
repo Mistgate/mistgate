@@ -9,13 +9,14 @@ import { EdgeLayer, routeFor, wireInk, type RenderEdge } from "./edges";
 import { readPref, writePref } from "@/lib/storage";
 import { accumulate, glideStopped, inertiaStep, releaseVelocity, smoothStep, wheelFactor } from "./motion";
 import { GraphHelp, modKey, type HelpTab } from "./help";
+import { decideDrop, grabIdle, grabStep, grabTargets, handleAt, handlePoint, type End, type GrabState, type Handle } from "./reconnect";
 import { MAX_ZOOM, MIN_ZOOM, boundsOf, clamp, dragWire, fitView, nearestPoint, rectsIntersect, snapTo, zoomAround, type Rect } from "./geometry";
 import { clearOf, computeLayout, tabOrder } from "./layout";
 import { Minimap } from "./minimap";
 import { NodeCard } from "./node";
 import { checkConnection, findPort, orient, validTargets, type Verdict } from "./rules";
 import { GraphStore, useStoreVersion } from "./store";
-import { portKey, type GraphEdge, type GraphProps, type Pos, type PortRef, type Positions, type View } from "./types";
+import { portKey, type ConnectCheck, type GraphEdge, type GraphProps, type Pos, type PortRef, type Positions, type View } from "./types";
 import { currentTarget, idle, wiringStep, type WiringAction, type WiringState } from "./wiring";
 
 const DRAG_THRESHOLD = 3;
@@ -28,7 +29,7 @@ type Mode =
   | { kind: "pan"; id: number; sx: number; sy: number; v: View; moved: boolean; samples: { x: number; y: number; t: number }[] }
   | { kind: "node"; id: number; sx: number; sy: number; node: string; ids: string[]; starts: Map<string, Pos> | null; mod: boolean; was: boolean; canDrag: boolean }
   | { kind: "marquee"; id: number; sx: number; sy: number; base: string[]; moved: boolean }
-  | { kind: "wire"; id: number; sx: number; sy: number; ref: PortRef; started: boolean; source: PortRef; replace?: string; snap: PortRef | null }
+  | { kind: "wire"; id: number; sx: number; sy: number; ref: PortRef; started: boolean; source: PortRef; replace?: string; snap: PortRef | null; grab?: { edge: RenderEdge; end: End }; end?: Pos; bad?: string }
   | { kind: "pinch"; d0: number; z0: number; v0: View; c0: Pos };
 
 interface DragWire {
@@ -61,6 +62,7 @@ function savePositions(layoutKey: string | undefined, p: Positions) {
 }
 
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+const nowMs = () => performance.now();
 
 export function Graph<D = unknown>(props: GraphProps<D>) {
   const { nodes, edges, typeColors, layoutKey, canConnect, onConnect, onEdgeDelete, renderEdgeMenu, readOnly = false, minimap = true, legend, height = 560, ariaLabel, className } = props;
@@ -93,12 +95,13 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   const measureVersion = useStoreVersion(store, "measure");
 
   const canWire = !readOnly && !!onConnect;
-  const canDelete = !readOnly && !!onEdgeDelete;
+  const canDelete = !readOnly && (!!onEdgeDelete || !!props.onReconnect);
+  const canGrab = !readOnly && !!props.onReconnect;
 
   // the freshest props and state for handlers that outlive a render
-  const live = useRef({ nodes, edges, virtual, positions, sel, selEdge, canConnect, onConnect, onEdgeDelete, canWire, canDelete, readOnly, kb, drag, props, menu });
+  const live = useRef({ nodes, edges, virtual, positions, sel, selEdge, canConnect, onConnect, onEdgeDelete, canWire, canDelete, canGrab, readOnly, kb, drag, props, menu });
   useLayoutEffect(() => {
-    live.current = { nodes, edges, virtual, positions, sel, selEdge, canConnect, onConnect, onEdgeDelete, canWire, canDelete, readOnly, kb, drag, props, menu };
+    live.current = { nodes, edges, virtual, positions, sel, selEdge, canConnect, onConnect, onEdgeDelete, canWire, canDelete, canGrab, readOnly, kb, drag, props, menu };
   });
   const mounted = useRef(true);
   useEffect(() => {
@@ -197,7 +200,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       cancelViewAnim();
       const from = store.view;
       if (reducedMotion() || ms <= 0 || typeof requestAnimationFrame !== "function") return store.setView(target);
-      const t0 = performance.now();
+      const t0 = nowMs();
       const step = (now: number) => {
         const k = ease(Math.min(1, (now - t0) / ms));
         store.setView({ x: from.x + (target.x - from.x) * k, y: from.y + (target.y - from.y) * k, z: from.z + (target.z - from.z) * k });
@@ -252,7 +255,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         return;
       }
       if (zoomRaf.current) return;
-      let last = performance.now();
+      let last = nowMs();
       const step = (now: number) => {
         const target = zoomTarget.current;
         if (!target) {
@@ -277,7 +280,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     (v0: { x: number; y: number }) => {
       if (reducedMotion() || typeof requestAnimationFrame !== "function" || glideStopped(v0, 0.08)) return;
       let vel = v0;
-      let last = performance.now();
+      let last = nowMs();
       const step = (now: number) => {
         const s = inertiaStep(vel, Math.min(48, now - last));
         last = now;
@@ -444,7 +447,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         return finish();
       }
       animating.current = true;
-      const t0 = performance.now();
+      const t0 = nowMs();
       const step = (now: number) => {
         const k = ease(Math.min(1, (now - t0) / ms));
         for (const [id, p] of Object.entries(target)) {
@@ -658,6 +661,16 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     }
     if (mouse && e.button !== 0) return;
     const portEl = target.closest<HTMLElement>("[data-gport]");
+    const grabbed = !portEl && live.current.canGrab ? handleUnder(e.clientX, e.clientY, mouse ? 12 : 22) : null;
+    if (grabbed) {
+      const edge = allEdgesRef.current.find((x) => x.id === grabbed.edge);
+      if (edge) {
+        const fixed = grabbed.end === "to" ? edge.from : edge.to;
+        grabRef.current = grabStep({ phase: "hover", handle: grabbed }, { type: "press" }).state;
+        mode.current = { kind: "wire", id: e.pointerId, sx: e.clientX, sy: e.clientY, ref: fixed, started: false, source: fixed, snap: null, grab: { edge, end: grabbed.end }, replace: edge.id };
+        return;
+      }
+    }
     if (portEl) {
       if (!live.current.canWire) return;
       const ref = { node: (portEl.closest("[data-gnode]") as HTMLElement).dataset.gnode!, port: portEl.dataset.portId! };
@@ -706,6 +719,94 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     rootRef.current?.removeAttribute("data-mode");
   };
 
+  // ----- grabbing a wire by its end
+  const allEdgesRef = useRef<RenderEdge[]>([]);
+  const grabRef = useRef<GrabState>(grabIdle);
+  const [handle, setHandle] = useState<Handle | null>(null);
+  const reconnectVerdict = (edge: RenderEdge, end: End, target: PortRef | null): ConnectCheck => {
+    const l = live.current;
+    const cr = l.props.canReconnect;
+    if (cr) return cr(edge, end, target);
+    if (!target) return true;
+    const fixed = end === "to" ? edge.from : edge.to;
+    const v = checkConnection(l.nodes, l.edges.filter((x) => x.id !== edge.id), end === "to" ? fixed : target, end === "to" ? target : fixed, l.canConnect);
+    return v.ok ? true : reasonOf(v);
+  };
+  /** The handle of a wire's end within `radius` screen px of the pointer. */
+  const handleUnder = (clientX: number, clientY: number, radius: number): Handle | null => {
+    const handles: Handle[] = [];
+    for (const x of allEdgesRef.current) {
+      if (x.virtual || x.grabbable === false) continue;
+      const route = routeFor(store, x);
+      if (!route) continue;
+      handles.push({ ...handlePoint(route, "from"), edge: x.id, end: "from" }, { ...handlePoint(route, "to"), edge: x.id, end: "to" });
+    }
+    const w = store.toWorld(clientX, clientY);
+    return handleAt(w, handles, radius / store.view.z);
+  };
+  const drawDrag = (source: PortRef, end: Pos) => {
+    const sp = findPort(live.current.nodes, source);
+    const a = store.portWorld(source);
+    if (a && sp && dragPathRef.current) dragPathRef.current.setAttribute("d", sp.side === "out" ? dragWire(a, end) : dragWire(end, a));
+  };
+  const showReason = (reason: string, at?: Pos) => {
+    announce(reason);
+    const el = hintRef.current;
+    if (!el) return;
+    el.textContent = reason;
+    el.hidden = false;
+    if (at) {
+      el.style.left = `${at.x + 14}px`;
+      el.style.top = `${at.y + 16}px`;
+    }
+    window.setTimeout(() => {
+      el.hidden = true;
+    }, 2200);
+  };
+  /** The dragged end flies back to its port, then the wire shows again where it was. */
+  const springBack = (m: Extract<Mode, { kind: "wire" }>) => {
+    const orig = m.grab ? (m.grab.end === "to" ? m.grab.edge.to : m.grab.edge.from) : null;
+    const target = orig ? store.portWorld(orig) : null;
+    const from = m.end;
+    if (!target || !from || reducedMotion() || typeof requestAnimationFrame !== "function") return endWire();
+    const t0 = nowMs();
+    const step = (now: number) => {
+      const k = ease(Math.min(1, (now - t0) / 200));
+      drawDrag(m.source, { x: from.x + (target.x - from.x) * k, y: from.y + (target.y - from.y) * k });
+      if (k < 1) requestAnimationFrame(step);
+      else endWire();
+    };
+    requestAnimationFrame(step);
+  };
+  const grabRelease = async (m: Extract<Mode, { kind: "wire" }>, cancelled: boolean) => {
+    const { edge, end } = m.grab!;
+    const orig = end === "to" ? edge.to : edge.from;
+    const { effect } = grabStep({ phase: "drag", edge: edge.id, end, snap: m.snap, refused: m.bad ?? null }, { type: cancelled ? "cancel" : "release" });
+    grabRef.current = grabIdle;
+    hideHint();
+    clearHover();
+    const at = m.end ? { x: m.end.x * store.view.z + store.view.x, y: m.end.y * store.view.z + store.view.y } : undefined;
+    if (effect?.type !== "drop") return springBack(m);
+    if (effect.refused) {
+      showReason(effect.refused, at);
+      return springBack(m);
+    }
+    const verdict = effect.target ? true : reconnectVerdict(edge, end, null);
+    const d = decideDrop(orig, effect.target, verdict);
+    if (d.kind === "noop") return springBack(m);
+    if (d.kind === "refuse") {
+      showReason(d.reason, at);
+      return springBack(m);
+    }
+    try {
+      await live.current.props.onReconnect?.(edge, end, d.target);
+      endWire();
+    } catch (err) {
+      showReason(err instanceof Error && err.message ? err.message : t("graph.failedGeneric"), at);
+      springBack(m);
+    }
+  };
+
   const wireMove = (m: Extract<Mode, { kind: "wire" }>, e: ReactPointerEvent) => {
     const l = live.current;
     if (!m.started) {
@@ -715,17 +816,10 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         mode.current = null;
         return;
       }
-      let source = m.ref;
-      let replace: string | undefined;
-      if (port.side === "in" && !(port.multi ?? false)) {
-        const ex = l.edges.find((x) => x.to.node === m.ref.node && x.to.port === m.ref.port);
-        if (ex && l.canDelete) {
-          source = ex.from;
-          replace = ex.id;
-        }
-      }
+      const source = m.ref;
+      const replace = m.grab?.edge.id;
       const es = [...l.edges, ...l.virtual.filter((v) => v.virtual === "pending")].filter((x) => x.id !== replace);
-      const targets = new Set(validTargets(l.nodes, es, source, l.canConnect).map(portKey));
+      const targets = new Set((m.grab ? grabTargets(l.nodes, allEdgesRef.current, m.grab.edge, m.grab.end, (x, en, target) => reconnectVerdict(x as RenderEdge, en, target)) : validTargets(l.nodes, es, source, l.canConnect)).map(portKey));
       m.started = true;
       m.source = source;
       m.replace = replace;
@@ -748,9 +842,11 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     let end = w;
     m.snap = null;
     let hint = "";
+    m.bad = undefined;
     if (near) {
       const o = orient(l.nodes, m.source, near.ref);
-      const v = o ? verdictFor(o.from, o.to, m.replace) : ({ ok: false, code: "side" } as Verdict);
+      const gv = m.grab ? reconnectVerdict(m.grab.edge, m.grab.end, near.ref) : true;
+      const v = m.grab ? (gv === true ? ({ ok: true } as Verdict) : ({ ok: false, code: "custom", message: gv } as Verdict)) : o ? verdictFor(o.from, o.to, m.replace) : ({ ok: false, code: "side" } as Verdict);
       if (v.ok) {
         m.snap = near.ref;
         end = near;
@@ -758,6 +854,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       } else {
         setHover(store.portEl(near.ref), "data-bad");
         hint = reasonOf(v);
+        m.bad = hint;
       }
     } else clearHover();
     const hintEl = hintRef.current;
@@ -770,14 +867,23 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         hintEl.style.top = `${lp.y + 16}px`;
       }
     }
-    const a = store.portWorld(m.source);
-    if (a && dragPathRef.current) dragPathRef.current.setAttribute("d", sp.side === "out" ? dragWire(a, end) : dragWire(end, a));
+    m.end = end;
+    if (m.grab) grabRef.current = grabStep(grabRef.current, { type: "move", snap: m.snap, refused: m.bad ?? null }).state;
+    drawDrag(m.source, end);
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (ptrs.current.has(e.pointerId)) ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const m = mode.current;
-    if (!m) return;
+    if (!m) {
+      if (live.current.canGrab && e.pointerType === "mouse") {
+        const h = handleUnder(e.clientX, e.clientY, 12);
+        grabRef.current = grabStep(grabRef.current, { type: "hover", handle: h }).state;
+        setHandle((cur) => (cur?.edge === h?.edge && cur?.end === h?.end ? cur : h));
+        rootRef.current?.toggleAttribute("data-handle", !!h);
+      }
+      return;
+    }
     if (m.kind === "pinch") {
       if (ptrs.current.size < 2) return;
       const [a, b] = [...ptrs.current.values()] as [Pos, Pos];
@@ -795,7 +901,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       const dy = e.clientY - m.sy;
       if (!m.moved && Math.hypot(dx, dy) < 2) return;
       m.moved = true;
-      m.samples.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+      m.samples.push({ x: e.clientX, y: e.clientY, t: nowMs() });
       if (m.samples.length > 12) m.samples.shift();
       store.setView({ ...m.v, x: m.v.x + dx, y: m.v.y + dy });
     } else if (m.kind === "node") {
@@ -855,8 +961,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         selectOnly([]);
         setSelEdge(null);
         setMenu(null);
-      } else if (m.moved && !cancelled && e.pointerType !== "mouse") glide(releaseVelocity(m.samples, performance.now()));
-      else if (m.moved && !cancelled) glide(releaseVelocity(m.samples, performance.now()));
+      } else if (m.moved && !cancelled && e.pointerType !== "mouse") glide(releaseVelocity(m.samples, nowMs()));
+      else if (m.moved && !cancelled) glide(releaseVelocity(m.samples, nowMs()));
     } else if (m.kind === "node") {
       if (m.starts) finishNode(m);
       else if (!cancelled) {
@@ -868,6 +974,11 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       if (!m.moved && !cancelled && !m.base.length) selectOnly([]);
       if (!m.moved) setSelEdge(null);
     } else if (m.kind === "wire") {
+      if (m.grab) {
+        if (m.started) void grabRelease(m, cancelled);
+        else grabRef.current = grabIdle;
+        return;
+      }
       if (m.started) {
         const snap = m.snap;
         const replace = m.replace;
@@ -940,7 +1051,14 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     if (k === "Delete" || k === "Backspace") {
       if (l.selEdge && l.canDelete) {
         e.preventDefault();
-        void removeEdge(l.selEdge);
+        // Delete is dropping the wire's `to` end on empty canvas: the same mapping
+        const edge = allEdgesRef.current.find((x) => x.id === l.selEdge);
+        if (l.props.onReconnect && edge) {
+          if (edge.grabbable === false) return;
+          const v = reconnectVerdict(edge, "to", null);
+          if (v !== true) return announce(v);
+          void Promise.resolve(l.props.onReconnect(edge, "to", null)).catch((err) => announce(err instanceof Error && err.message ? err.message : t("graph.failedGeneric")));
+        } else void removeEdge(l.selEdge);
       }
       return;
     }
@@ -1026,6 +1144,9 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     const p = store.toLocal(e.clientX, e.clientY);
     animateView(zoomAround(store.view, p, store.view.z * (e.shiftKey ? 1 / 1.5 : 1.5)), 220);
   };
+  useLayoutEffect(() => {
+    allEdgesRef.current = allEdges;
+  });
   const menuEdge = menu ? edges.find((x) => x.id === menu.id) : undefined;
   const dragColor = drag ? wireInk(typeColors[findPort(nodes, drag.source)?.type ?? ""] ?? "var(--muted)") : undefined;
 
@@ -1076,6 +1197,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
           />
           <svg className="mg-gsvg mg-gtop" aria-hidden>
             {drag && <path ref={dragPathRef} className="mg-gwire mg-gwire-drag" style={{ stroke: dragColor }} />}
+            {handle && !drag && <circle className="mg-ghandle" cx={handle.x} cy={handle.y} r={5.5 / Math.max(0.6, store.view.z)} />}
             {kb.phase === "picking" && <KeyboardPreview store={store} kb={kb} nodes={nodes} color={wireInk(typeColors[findPort(nodes, kb.source)?.type ?? ""] ?? "var(--muted)")} />}
           </svg>
         </div>

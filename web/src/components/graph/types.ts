@@ -54,6 +54,8 @@ export interface GraphEdge {
   label?: ReactNode;
   /** Where the label sits: on the middle of the wire (default) or just before the target port, like a badge on it. */
   labelAt?: "mid" | "end";
+  /** Its ends can be grabbed (default true when the graph takes onReconnect); false for a wire that is a fact, not a setting. */
+  grabbable?: boolean;
   /** A slow flowing dash in the direction of traffic (not with reduced motion). */
   animated?: boolean;
 }
@@ -78,8 +80,15 @@ export interface GraphProps<D = unknown> {
   onPositionsChange?: (positions: Positions) => void;
   canConnect?: (from: PortRef, to: PortRef) => ConnectCheck;
   onConnect?: (from: PortRef, to: PortRef) => void | Promise<void>;
-  /** Without it wires cannot be deleted (or re-plugged). */
+  /** Without onReconnect and this, wires cannot be deleted. */
   onEdgeDelete?: (edge: GraphEdge) => void | Promise<void>;
+  /**
+   * A wire's end was grabbed and dropped: on a port (`target`) or on empty canvas (null: unhooked). Also what Delete does on
+   * a selected wire (its `to` end, null). A rejection, or a refusal by canReconnect, springs the wire back.
+   */
+  onReconnect?: (edge: GraphEdge, end: "from" | "to", target: PortRef | null) => void | Promise<void>;
+  /** true, or the reason shown while the end is dragged (and at the drop) when it may not go there. */
+  canReconnect?: (edge: GraphEdge, end: "from" | "to", target: PortRef | null) => ConnectCheck;
   /** A small popover at the wire's midpoint, on click or Enter. */
   renderEdgeMenu?: (edge: GraphEdge, close: () => void) => ReactNode;
   selected?: string[];

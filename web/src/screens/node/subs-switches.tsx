@@ -39,13 +39,15 @@ export function useInSubscriptions(nodeId: string, nodeName: string) {
   const t = useT();
   const toast = useToast();
   const refresh = useInboundRefresh(nodeId);
-  const [ask, setAsk] = useState<{ inbound: In; reason: string } | null>(null);
+  const [ask, setAsk] = useState<{ inbound: In; reason: string; report?: string } | null>(null);
   const [error, setError] = useState("");
   const set = useMutation({
-    mutationFn: ({ id, on }: { id: string; on: boolean }) => profilesApi.updateInbound({ inboundId: id, directInSubscriptions: on }),
-    onSuccess: () => {
+    mutationFn: ({ id, on }: { id: string; on: boolean; report?: string }) => profilesApi.updateInbound({ inboundId: id, directInSubscriptions: on }),
+    onSuccess: (_r, v) => {
       setAsk(null);
-      toast(t("common.saved"));
+      // a change the graph made says what it did and offers the way back
+      if (v.report) toast(v.report, { undo: () => set.mutate({ id: v.id, on: !v.on }) });
+      else toast(t("common.saved"));
     },
     onError: (e) => setError(errorText(e, t)),
     onSettled: refresh,
@@ -54,14 +56,15 @@ export function useInSubscriptions(nodeId: string, nodeName: string) {
     mutationFn: (i: In) => profilesApi.updateInbound({ inboundId: i.id, directInSubscriptions: false, validateOnly: true }),
   });
 
-  const toggle = async (i: In, on: boolean) => {
+  /** `report`: the sentence of the toast with Undo that follows (the graph's wires); without it a plain Saved. */
+  const toggle = async (i: In, on: boolean, report?: string) => {
     setError("");
     if (!on) {
       try {
         const r = await check.mutateAsync(i);
         const w = r.warnings.find((x) => x.code === "inbound_no_way_in");
         if (w) {
-          setAsk({ inbound: i, reason: w.params.reason ?? "" });
+          setAsk({ inbound: i, reason: w.params.reason ?? "", report });
           return;
         }
       } catch (e) {
@@ -69,7 +72,7 @@ export function useInSubscriptions(nodeId: string, nodeName: string) {
         return;
       }
     }
-    set.mutate({ id: i.id, on });
+    set.mutate({ id: i.id, on, report });
   };
 
   const dialog = (
@@ -87,7 +90,7 @@ export function useInSubscriptions(nodeId: string, nodeName: string) {
           <Button variant="ghost" size="md" disabled={set.isPending} onClick={() => setAsk(null)}>
             {t("common.cancel")}
           </Button>
-          <Button variant="danger" size="md" disabled={set.isPending} onClick={() => ask && set.mutate({ id: ask.inbound.id, on: false })}>
+          <Button variant="danger" size="md" disabled={set.isPending} onClick={() => ask && set.mutate({ id: ask.inbound.id, on: false, report: ask.report })}>
             {t("ways.subs.hide")}
           </Button>
         </>

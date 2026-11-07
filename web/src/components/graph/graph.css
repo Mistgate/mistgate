@@ -525,3 +525,14 @@
   box-shadow: none;
   background: color-mix(in oklch, var(--surface) 70%, transparent);
 }
+/* the handle on a wire's end: grab it to move or unhook that end */
+.mg-ghandle {
+  fill: var(--node-bg);
+  stroke: var(--text);
+  stroke-width: 2px;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.35));
+}
+.mg-graph[data-handle] {
+  cursor: grab;
+}

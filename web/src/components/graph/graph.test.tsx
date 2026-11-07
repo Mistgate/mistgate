@@ -277,3 +277,78 @@ describe("help and shortcuts", () => {
     expect(e.defaultPrevented).toBe(true);
   });
 });
+
+describe("grabbing a wire's end", () => {
+  const edges: GraphEdge[] = [
+    { id: "e1", from: { node: "de1", port: "relay" }, to: { node: "nl1", port: "hy2" } },
+    { id: "e2", from: { node: "de1", port: "tcp" }, to: { node: "nl1", port: "vless" }, grabbable: false },
+  ];
+  // the cards sit apart on one line, so the wire from de1 to nl1 is straight and its `from` handle is 18px from de1's port
+  const spread = { de1: { x: 0, y: 0 }, nl1: { x: 400, y: 0 }, fi1: { x: 800, y: 0 } };
+  const move = (el: Element) =>
+    act(async () => {
+      const ev = new MouseEvent("pointermove", { bubbles: true, clientX: 18, clientY: 0 });
+      Object.defineProperty(ev, "pointerType", { value: "mouse" });
+      el.dispatchEvent(ev);
+    });
+
+  it("shows a handle on a wire's end near the pointer, with a grab cursor", async () => {
+    await mount(<Graph nodes={nodes} edges={edges.slice(0, 1)} typeColors={colors} ariaLabel="g" positions={spread} onReconnect={() => {}} />);
+    const app = host!.querySelector<HTMLElement>('[role="application"]')!;
+    expect(host!.querySelector(".mg-ghandle")).toBeNull();
+    await move(app);
+    expect(host!.querySelector(".mg-ghandle")).not.toBeNull();
+    expect(app.hasAttribute("data-handle")).toBe(true);
+  });
+
+  it("gives no handle to a wire that is a fact, to a read-only graph, or without onReconnect", async () => {
+    await mount(<Graph nodes={nodes} edges={edges.slice(1)} typeColors={colors} ariaLabel="g" positions={spread} onReconnect={() => {}} />);
+    await move(host!.querySelector('[role="application"]')!);
+    expect(host!.querySelector(".mg-ghandle")).toBeNull();
+    act(() => root!.unmount());
+    host!.remove();
+    await mount(<Graph nodes={nodes} edges={edges.slice(0, 1)} typeColors={colors} ariaLabel="g" positions={spread} onReconnect={() => {}} readOnly />);
+    await move(host!.querySelector('[role="application"]')!);
+    expect(host!.querySelector(".mg-ghandle")).toBeNull();
+    act(() => root!.unmount());
+    host!.remove();
+    await mount(<Graph nodes={nodes} edges={edges.slice(0, 1)} typeColors={colors} ariaLabel="g" positions={spread} onEdgeDelete={() => {}} />);
+    await move(host!.querySelector('[role="application"]')!);
+    expect(host!.querySelector(".mg-ghandle")).toBeNull();
+  });
+
+  it("Delete on a selected wire drops its `to` end on empty canvas: onReconnect(edge, 'to', null)", async () => {
+    const onReconnect = vi.fn();
+    await mount(<Graph nodes={nodes} edges={edges.slice(0, 1)} typeColors={colors} ariaLabel="g" onReconnect={onReconnect} />);
+    const wire = host!.querySelector("[data-gedge]")!;
+    await click(wire);
+    await key(wire, "Delete");
+    expect(onReconnect).toHaveBeenCalledWith(edges[0], "to", null);
+  });
+
+  it("Delete is refused with the reason when canReconnect says so, and a wire that is a fact is left alone", async () => {
+    const onReconnect = vi.fn();
+    await mount(<Graph nodes={nodes} edges={edges.slice(0, 1)} typeColors={colors} ariaLabel="g" onReconnect={onReconnect} canReconnect={() => "A server always leaves somewhere"} />);
+    let wire = host!.querySelector("[data-gedge]")!;
+    await click(wire);
+    await key(wire, "Delete");
+    expect(onReconnect).not.toHaveBeenCalled();
+    expect(status()).toBe("A server always leaves somewhere");
+    act(() => root!.unmount());
+    host!.remove();
+    await mount(<Graph nodes={nodes} edges={edges.slice(1)} typeColors={colors} ariaLabel="g" onReconnect={onReconnect} />);
+    wire = host!.querySelector("[data-gedge]")!;
+    await click(wire);
+    await key(wire, "Delete");
+    expect(onReconnect).not.toHaveBeenCalled();
+  });
+
+  it("a rejected onReconnect is announced, not thrown", async () => {
+    await mount(<Graph nodes={nodes} edges={edges.slice(0, 1)} typeColors={colors} ariaLabel="g" onReconnect={async () => Promise.reject(new Error("busy"))} />);
+    const wire = host!.querySelector("[data-gedge]")!;
+    await click(wire);
+    await key(wire, "Delete");
+    await settle();
+    expect(status()).toBe("busy");
+  });
+});

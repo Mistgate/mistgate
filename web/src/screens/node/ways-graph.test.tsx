@@ -351,3 +351,85 @@ describe("full screen", () => {
     expect(document.querySelector("#graph-help")?.textContent).not.toContain("Drag from");
   });
 });
+
+describe("grabbing wires in the ways graph", () => {
+  const pointerMove = () =>
+    act(async () => {
+      const ev = new MouseEvent("pointermove", { bubbles: true, clientX: 18, clientY: 0 });
+      Object.defineProperty(ev, "pointerType", { value: "mouse" });
+      document.querySelector('[role="application"]')!.dispatchEvent(ev);
+    });
+  const status = () => document.querySelector('[role="application"] [role="status"]')?.textContent ?? "";
+
+  it("the owner gets handles, a helper none", async () => {
+    // people on the left of the node on one line, so the direct wires are straight from the people port
+    localStorage.setItem("mg.graph.ways:nod_de1", JSON.stringify({ people: { x: 0, y: 0 }, "entry:nod_msk1": { x: 0, y: 900 }, node: { x: 500, y: 0 }, internet: { x: 1000, y: 0 } }));
+    await mount();
+    await pointerMove();
+    expect(document.querySelector(".mg-ghandle")).not.toBeNull();
+    act(() => root!.unmount());
+    host!.remove();
+    role = Role.HELPER;
+    await mount();
+    await pointerMove();
+    expect(document.querySelector(".mg-ghandle")).toBeNull();
+  });
+
+  it("a direct way dropped on empty canvas takes the server out of subscriptions, with an Undo that puts it back", async () => {
+    updateInbound.mockResolvedValue({ warnings: [] });
+    await mount();
+    const w = wire("direct:inb_v");
+    await click(w);
+    await key(w, "Delete");
+    await settle();
+    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", directInSubscriptions: false });
+    expect(document.body.textContent).toContain("VLESS · TCP is out of subscriptions");
+    const undo = [...document.querySelectorAll("button")].find((b) => b.textContent === "Undo")!;
+    expect(undo).toBeTruthy();
+    await click(undo);
+    await settle();
+    expect(updateInbound).toHaveBeenLastCalledWith({ inboundId: "inb_v", directInSubscriptions: true });
+  });
+
+  it("a relay dropped on empty canvas asks to remove it, and removes it once confirmed", async () => {
+    deleteRelay.mockResolvedValue({});
+    await mount();
+    const w = wire("relay:rly_1");
+    await click(w);
+    await key(w, "Delete");
+    expect(deleteRelay).not.toHaveBeenCalled();
+    const confirm = [...dialog()!.querySelectorAll("button")].find((b) => b.className.includes("danger"));
+    await click(confirm ?? [...dialog()!.querySelectorAll("button")].pop());
+    await settle();
+    expect(deleteRelay).toHaveBeenCalledWith({ id: "rly_1" });
+  });
+
+  it("a server's exit dropped on empty canvas is refused with the reason, and nothing is called", async () => {
+    await mount();
+    const w = wire("egress:inb_v");
+    await click(w);
+    await key(w, "Delete");
+    expect(status()).toContain("A server always leaves somewhere");
+    expect(dialog()).toBeNull();
+    expect(updateInbound).not.toHaveBeenCalled();
+  });
+
+  it("the way people reach an entry is not grabbable: Delete does nothing", async () => {
+    await mount();
+    const w = wire("reach:nod_msk1");
+    await click(w);
+    await key(w, "Delete");
+    expect(dialog()).toBeNull();
+    expect(deleteRelay).not.toHaveBeenCalled();
+    expect(updateInbound).not.toHaveBeenCalled();
+  });
+
+  it("the shortcuts card and the legend tell how to move or unhook a wire", async () => {
+    await mount();
+    const btn = (label: string) => [...document.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === label)!;
+    await click(btn("Shortcuts"));
+    expect(document.querySelector("#graph-help")?.textContent).toContain("Move or unhook a wire");
+    await click(btn("Legend"));
+    expect(document.querySelector("#graph-help")?.textContent).toContain("Drag a wire’s end to move or unhook it.");
+  });
+});

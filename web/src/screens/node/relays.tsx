@@ -413,6 +413,8 @@ type AddProps = {
   enabled: boolean;
   /** A server (inbound id) ticked from the start: the graph draws a relay from an entry to it. */
   preselect?: string;
+  /** A relay of this run was switched on (the graph's "move" then offers to remove the old one). */
+  onSuccess?: () => void;
   onClose: () => void;
   /** A Back button in place of Cancel while nothing runs ("New way in" goes back a step). */
   onBack?: () => void;
@@ -422,7 +424,7 @@ type AddProps = {
  * "Add relay": the candidates with the three hints, the ports, then the checks one server after another. The body and the
  * buttons, for a dialog of their own (AddRelayDialog) or the last step of "New way in".
  */
-export function useAddRelay({ entry, exitId, enabled, preselect, onClose, onBack }: AddProps) {
+export function useAddRelay({ entry, exitId, enabled, preselect, onSuccess, onClose, onBack }: AddProps) {
   const t = useT();
   const qc = useQueryClient();
   const ccOf = useCountryOf();
@@ -483,6 +485,7 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onClose, onBack
         markFresh("lane", `${entry.id}:out:${c.nodeId}`); // ... and on the entry's
       }
       set(c.inboundId, { path: "ok", tone: "ok", text: t("relay.dlg.result.on", { via: viaLabel(t, entry.cc), hours }) });
+      onSuccess?.();
     } catch (e) {
       const ce = ConnectError.from(e);
       const v = errorVars(ce.rawMessage);
@@ -686,9 +689,9 @@ export function useAddRelay({ entry, exitId, enabled, preselect, onClose, onBack
 }
 
 /** "Add relay" in a dialog of its own: from an entry ("Relay another node…"), or more servers of one exit ("Add server…"). */
-export function AddRelayDialog({ open, onOpenChange, entry, exitId, preselect }: { open: boolean; onOpenChange: (open: boolean) => void; entry: Entry; exitId?: string; preselect?: string }) {
+export function AddRelayDialog({ open, onOpenChange, entry, exitId, preselect, notice, onSuccess }: { open: boolean; onOpenChange: (open: boolean) => void; entry: Entry; exitId?: string; preselect?: string; notice?: string; onSuccess?: () => void }) {
   const t = useT();
-  const add = useAddRelay({ entry, exitId, enabled: open, preselect, onClose: () => onOpenChange(false) });
+  const add = useAddRelay({ entry, exitId, enabled: open, preselect, onSuccess, onClose: () => onOpenChange(false) });
   return (
     <Modal
       open={open}
@@ -699,6 +702,7 @@ export function AddRelayDialog({ open, onOpenChange, entry, exitId, preselect }:
       description={t("relay.dlg.intro", { entry: entry.name })}
       footer={add.footer}
     >
+      {notice && <Notice tone="quiet">{notice}</Notice>}
       {add.body}
     </Modal>
   );

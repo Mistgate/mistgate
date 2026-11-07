@@ -5,7 +5,7 @@ import type { CountryCheck } from "./health";
 import type { RelayMsg } from "./relay";
 import { lanesOf } from "./ways";
 import type { Ipv6Entry } from "./ways";
-import { ipv6StateOf, networkOf, port, relayRefusal, relayWire, waysGraph, waysLayout, wayOf, type GraphInput, type GServer } from "./ways-graph";
+import { grabbable, reconnectRule, ipv6StateOf, networkOf, port, relayRefusal, relayWire, waysGraph, waysLayout, wayOf, type GraphInput, type GServer, type GWire } from "./ways-graph";
 
 const country = (verdict: CountryVerdict) => ({ nodeId: "", verdict, atUnix: 100, probes: [], vantages: [] }) as unknown as CountryCheck;
 const inbound = (id: string, protocol: string, portNo: number, over: Partial<GraphInput["inbounds"][number]> = {}) => ({
@@ -253,5 +253,66 @@ describe("waysLayout", () => {
     expect(small.node!.x).toBe(200 + 144);
     const entry = waysLayout([{ id: "people", w: 200, h: 60 }, { id: "node", w: 300, h: 200 }, { id: "exit:be", w: 220, h: 120 }, { id: "internet", w: 200, h: 60 }]);
     expect(entry["exit:be"]!.x).toBeLessThan(entry.internet!.x);
+  });
+});
+
+describe("reconnectRule: what grabbing a wire's end does", () => {
+  const servers: GServer[] = [
+    { inboundId: "hy2", name: "HY2", protocol: "hysteria2", net: "udp", port: 443, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
+    { inboundId: "hy3", name: "HY3", protocol: "hysteria2", net: "udp", port: 444, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
+    { inboundId: "vless", name: "VLESS", protocol: "vless", net: "tcp", port: 8443, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works" },
+    { inboundId: "awg", name: "AWG", protocol: "awg", net: "udp", port: 1, egress: "direct", listed: true, cdn: false, on: true, failed: false, way: "works", noRelay: "awg" },
+    { inboundId: "cdn", name: "CDN", protocol: "vless", net: "tcp", port: 2, egress: "direct", listed: true, cdn: true, on: true, failed: false, way: "works", noRelay: "cdn" },
+  ];
+  const r1 = relay({});
+  const ctx = { nodeId: "be", servers, relays: [r1, relay({ id: "r2", viaNodeId: "msk1", inboundId: "hy3" })] };
+  const rWire = { id: "relay:r1", kind: "relay", from: { card: "entry:msk1", port: "relay:r1" }, to: { card: "node", port: "in:hy2" }, state: "ok", flowing: true, relay: r1, inboundId: "hy2" } as unknown as GWire;
+  const onServer = (id: string) => ({ card: "node", port: `in:${id}` });
+
+  it("a relay dropped on empty canvas is removed (the dialog confirms)", () => {
+    expect(reconnectRule(rWire, "to", null, ctx)).toEqual({ ok: true, action: { type: "removeRelay", relay: r1 } });
+    expect(reconnectRule(rWire, "from", null, ctx)).toMatchObject({ ok: true, action: { type: "removeRelay" } });
+  });
+  it("a relay dropped on another server of its network is moved there", () => {
+    const wire = { ...rWire, relay: relay({ id: "r9", inboundId: "hy2" }) } as never;
+    expect(reconnectRule(wire, "to", onServer("hy3"), { ...ctx, relays: [relay({ id: "r9", inboundId: "hy2" })] })).toMatchObject({ ok: true, action: { type: "moveRelay", inboundId: "hy3" } });
+  });
+  it("refuses another network, AWG, a CDN server, a server this entry already relays, and moving the entry end", () => {
+    expect(reconnectRule(rWire, "to", onServer("vless"), ctx)).toEqual({ ok: false, reason: "network" });
+    expect(reconnectRule(rWire, "to", onServer("awg"), ctx)).toEqual({ ok: false, reason: "awg" });
+    expect(reconnectRule(rWire, "to", onServer("hy3"), ctx)).toEqual({ ok: false, reason: "exists" });
+    expect(reconnectRule(rWire, "to", { card: "internet", port: "exit" }, ctx)).toEqual({ ok: false, reason: "target" });
+    expect(reconnectRule(rWire, "from", onServer("hy3"), ctx)).toEqual({ ok: false, reason: "relayEntry" });
+    const cdnCtx = { ...ctx, servers: servers.map((s) => (s.inboundId === "cdn" ? { ...s, net: "udp" as const } : s)) };
+    expect(reconnectRule(rWire, "to", onServer("cdn"), cdnCtx)).toEqual({ ok: false, reason: "cdn" });
+  });
+  it("on an entry node a relay to an exit can only be removed", () => {
+    const out = { ...rWire, from: { card: "node", port: "relay:r1" }, to: { card: "exit:be", port: "in:hy2" } } as never;
+    expect(reconnectRule(out, "to", null, ctx)).toMatchObject({ ok: true });
+    expect(reconnectRule(out, "to", onServer("hy3"), ctx)).toEqual({ ok: false, reason: "relayOut" });
+  });
+  it("a direct way dropped on empty canvas takes the server out of subscriptions; elsewhere it is refused", () => {
+    const wire = { id: "direct:vless", kind: "direct", from: { card: "people", port: "people" }, to: { card: "node", port: "in:vless" }, inboundId: "vless" } as never;
+    expect(reconnectRule(wire, "to", null, ctx)).toEqual({ ok: true, action: { type: "subsOut", inboundId: "vless" } });
+    expect(reconnectRule(wire, "from", null, ctx)).toMatchObject({ ok: true, action: { type: "subsOut" } });
+    expect(reconnectRule(wire, "to", onServer("hy2"), ctx)).toEqual({ ok: false, reason: "direct" });
+  });
+  it("a server's exit moves only to the other exit (a twin); empty canvas is refused", () => {
+    const wire = { id: "egress:vless", kind: "egress", from: { card: "node", port: "out:vless" }, to: { card: "internet", port: "exit" }, inboundId: "vless" } as never;
+    expect(reconnectRule(wire, "to", { card: "warp", port: "exit" }, ctx)).toEqual({ ok: true, action: { type: "twin", inboundId: "vless" } });
+    expect(reconnectRule(wire, "to", null, ctx)).toEqual({ ok: false, reason: "exit" });
+    expect(reconnectRule(wire, "to", { card: "internet", port: "exit" }, ctx)).toEqual({ ok: false, reason: "exit" });
+    expect(reconnectRule(wire, "from", { card: "node", port: "out:hy2" }, ctx)).toEqual({ ok: false, reason: "exit" });
+  });
+  it("the IPv6 way dropped on empty canvas turns the entry off", () => {
+    const wire = { id: "ipv6", kind: "ipv6", from: { card: "people", port: "people" }, to: { card: "node", port: "ipv6" } } as never;
+    expect(reconnectRule(wire, "to", null, ctx)).toEqual({ ok: true, action: { type: "v6off" } });
+    expect(reconnectRule(wire, "to", onServer("hy2"), ctx)).toEqual({ ok: false, reason: "ipv6" });
+  });
+  it("the way people reach an entry is a fact: not grabbable at all", () => {
+    const wire = { id: "reach:msk1", kind: "reach", from: { card: "people", port: "people" }, to: { card: "entry:msk1", port: "reach" } } as never;
+    expect(grabbable("reach")).toBe(false);
+    expect(grabbable("relay")).toBe(true);
+    expect(reconnectRule(wire, "to", null, ctx)).toEqual({ ok: false, reason: "grab" });
   });
 });

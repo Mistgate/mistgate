@@ -357,3 +357,55 @@ export function waysLayout(cards: readonly { id: string; w: number; h: number }[
   }
   return out;
 }
+
+/** Why an end may not go where it was dropped; the screen words each (wg.refuse.<key>). */
+export type ReconnectRefusal = "grab" | "relayEntry" | "relayOut" | "target" | "network" | "direct" | "ipv6" | "exit" | NonNullable<ReturnType<typeof relayRefusal>>;
+
+/** What dropping a wire's end does: the move is a dialog or a call the list already has. */
+export type ReconnectAction =
+  | { type: "removeRelay"; relay: RelayMsg }
+  | { type: "moveRelay"; relay: RelayMsg; inboundId: string }
+  | { type: "subsOut"; inboundId: string }
+  | { type: "v6off" }
+  | { type: "twin"; inboundId: string };
+
+export type ReconnectContext = { nodeId: string; servers: readonly GServer[]; relays: readonly RelayMsg[] };
+
+/**
+ * The rule of grabbing a wire (ADR 0016 follow-up). `target` is the card and port the end is dropped on, or null for empty
+ * canvas. Never surprising: a relay is removed (confirmed) or moved to another server of its network; a direct way is taken
+ * out of subscriptions (reversible); a server's exit moves only to the other exit (a twin); IPv6 is turned off; the way
+ * people reach an entry is a fact, not grabbable.
+ */
+export function reconnectRule(wire: GWire, end: "from" | "to", target: { card: string; port: string } | null, ctx: ReconnectContext): { ok: true; action: ReconnectAction } | { ok: false; reason: ReconnectRefusal } {
+  const no = (reason: ReconnectRefusal) => ({ ok: false as const, reason });
+  switch (wire.kind) {
+    case "relay": {
+      const r = wire.relay;
+      if (!r) return no("grab");
+      if (target === null) return { ok: true, action: { type: "removeRelay", relay: r } };
+      // on an entry node the relays go on to other nodes: they are moved from the exit's page
+      if (wire.from.card === "node") return no("relayOut");
+      if (end === "from") return no("relayEntry");
+      const s = target.card === "node" && target.port.startsWith("in:") ? ctx.servers.find((x) => x.inboundId === target.port.slice(3)) : undefined;
+      if (!s) return no("target");
+      if (s.net !== (r.network === "udp" ? "udp" : "tcp")) return no("network");
+      const why = relayRefusal(r.viaNodeId, ctx.nodeId, s, ctx.relays.filter((x) => x.id !== r.id));
+      return why ? no(why) : { ok: true, action: { type: "moveRelay", relay: r, inboundId: s.inboundId } };
+    }
+    case "direct":
+    case "cdn":
+      return target === null && wire.inboundId ? { ok: true, action: { type: "subsOut", inboundId: wire.inboundId } } : no("direct");
+    case "ipv6":
+      return target === null ? { ok: true, action: { type: "v6off" } } : no("ipv6");
+    case "egress":
+      return end === "to" && target && (target.card === "internet" || target.card === "warp") && target.card !== wire.to.card && wire.inboundId
+        ? { ok: true, action: { type: "twin", inboundId: wire.inboundId } }
+        : no("exit");
+    default:
+      return no("grab");
+  }
+}
+
+/** The wire kinds whose ends can be grabbed at all. */
+export const grabbable = (kind: GWire["kind"]) => kind !== "reach";
