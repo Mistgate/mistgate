@@ -160,8 +160,10 @@ const core = {
   "settings.accent.rose": "Rose",
   "settings.accent.sage": "Sage",
   "settings.local": "These choices are kept on this device only.",
-  "settings.fx": "Interface effects",
-  "settings.fx.hint": "A soft glow sweeps over what you have just created. Off, or with reduced motion set in your system, new things simply appear.",
+  "settings.fx": "Reveal animation",
+  "settings.fx.beta": "Beta",
+  "settings.fx.show": "Show",
+  "settings.fx.hint": "A new node, person, group or profile appears under a light wave of colour. Off, or with reduced motion set in your system, new things simply appear.",
   "settings.device": "Only on this device",
 
   "auth.setup.welcomeTitle": "Hi!",

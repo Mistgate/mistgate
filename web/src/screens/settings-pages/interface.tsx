@@ -9,6 +9,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { setEffectsEnabled, useEffectsEnabled } from "@/lib/effects";
+import { sweep } from "@/components/fx/sweep";
 import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
@@ -38,6 +39,7 @@ export function InterfacePage() {
   const me = useQuery(meQuery);
   const { own } = useAccentChoice();
   const effects = useEffectsEnabled();
+  const fxRow = useRef<HTMLDivElement>(null);
   const row = "flex min-h-14 items-center gap-3 border-t border-line";
   return (
     <>
@@ -85,11 +87,19 @@ export function InterfacePage() {
             </p>
           )}
         </div>
-        <div className={row}>
+        <div ref={fxRow} className={row}>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2">
-            <span className="text-[13px] font-bold">{t("settings.fx")}</span>
+            <span className="flex items-center gap-1.5 text-[13px] font-bold">
+              {t("settings.fx")}
+              <span className="rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-bold tracking-wide text-accent-text uppercase">{t("settings.fx.beta")}</span>
+            </span>
             <span className="text-xs leading-snug text-muted">{t("settings.fx.hint")}</span>
           </span>
+          {effects && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => fxRow.current && void sweep(fxRow.current)}>
+              {t("settings.fx.show")}
+            </Button>
+          )}
           <Switch checked={effects} onCheckedChange={setEffectsEnabled} aria-label={t("settings.fx")} />
         </div>
         <p className="border-t border-line py-3 text-xs leading-normal text-muted">{t("settings.local")}</p>
