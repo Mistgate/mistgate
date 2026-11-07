@@ -115,6 +115,18 @@
   },
   {
     "type": "index",
+    "name": "debug_capture_node",
+    "tbl_name": "debug_capture",
+    "sql": "CREATE INDEX debug_capture_node ON debug_capture (node_id, started_at)"
+  },
+  {
+    "type": "index",
+    "name": "debug_capture_started",
+    "tbl_name": "debug_capture",
+    "sql": "CREATE INDEX debug_capture_started ON debug_capture (started_at)"
+  },
+  {
+    "type": "index",
     "name": "device_credential_live",
     "tbl_name": "device_credential",
     "sql": "CREATE UNIQUE INDEX device_credential_live ON device_credential (device_id, protocol, COALESCE(profile_id, '')) WHERE revoked_at IS NULL"
@@ -574,6 +586,18 @@
     "name": "country_tspu_check",
     "tbl_name": "country_tspu_check",
     "sql": "CREATE TABLE country_tspu_check ( node_id TEXT NOT NULL, vantage TEXT NOT NULL, at INTEGER NOT NULL, verdict TEXT NOT NULL, dpi_hop INTEGER NOT NULL DEFAULT 0, control_ok INTEGER NOT NULL DEFAULT 0 CHECK (control_ok IN (0, 1)), detail_json TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (node_id, vantage, at) ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "debug_capture",
+    "tbl_name": "debug_capture",
+    "sql": "CREATE TABLE debug_capture ( id TEXT PRIMARY KEY, node_id TEXT NOT NULL, actor TEXT NOT NULL, level TEXT NOT NULL CHECK (level IN ('debug', 'info')), sources TEXT NOT NULL DEFAULT '', duration_s INTEGER NOT NULL, started_at INTEGER NOT NULL, ends_at INTEGER NOT NULL, state TEXT NOT NULL CHECK (state IN ('running', 'done')), end_reason TEXT NOT NULL DEFAULT '', records INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0, dropped INTEGER NOT NULL DEFAULT 0 ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "debug_capture_line",
+    "tbl_name": "debug_capture_line",
+    "sql": "CREATE TABLE debug_capture_line ( capture_id TEXT NOT NULL, seq INTEGER NOT NULL, at_ms INTEGER NOT NULL, level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 3), source TEXT NOT NULL, message TEXT NOT NULL, attrs_json TEXT NOT NULL DEFAULT '{}', PRIMARY KEY (capture_id, seq) ) STRICT"
   },
   {
     "type": "table",

@@ -31,8 +31,11 @@ entries=(
   "mistgate-edge-jobs:31"
   # The admin API and the SPA: the largest role, every admin service. Measured 37.6 MiB; 40.1 MiB with the external reachability
   # sources (cheburcheck, bsbord), whose owner RPCs (settings, sealed keys, the paid-check preview) need the admin's step-up and
-  # cannot live in jobs, where their ticks run.
-  "mistgate-edge-admin:43"
+  # cannot live in jobs, where their ticks run. 44 MiB (45.1 MB measured) for the debug capture's agent messages (DebugCapture,
+  # DebugCaptureReport, SEVERITY_DEBUG in agent.proto): every Worker links the generated agentv1 package, so two messages and their
+  # getters cost about 15 KB in each of them, and the admin Worker had 4 KB left. Nothing else of the feature is in the Workers:
+  # its RPCs are the VPS-only OpsService, the store, fleet and retention code are behind //go:build !js.
+  "mistgate-edge-admin:44"
   # The Provisioner: wireCore plus the SSH client. Measured 29.4 MiB; 31.9 MiB in November 2026 with the panel's SSH key, the
   # authorized_keys management and the login by an own private key, which need that SSH client and so cannot live elsewhere.
   "mistgate-edge-provision:35"

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/ops/v1/ops.proto.
  */
 export const file_mistgate_ops_v1_ops: GenFile = /*@__PURE__*/
-  fileDesc("ChltaXN0Z2F0ZS9vcHMvdjEvb3BzLnByb3RvEg9taXN0Z2F0ZS5vcHMudjEiFwoVR2V0TG9nU2V0dGluZ3NSZXF1ZXN0InIKFkdldExvZ1NldHRpbmdzUmVzcG9uc2USDQoFbGV2ZWwYASABKAkSFQoNZGVmYXVsdF9sZXZlbBgCIAEoCRIOCgZmb3JtYXQYAyABKAkSEAoIYnVmZmVyZWQYBCABKA0SEAoIY2FwYWNpdHkYBSABKA0iIwoSU2V0TG9nTGV2ZWxSZXF1ZXN0Eg0KBWxldmVsGAEgASgJIiQKE1NldExvZ0xldmVsUmVzcG9uc2USDQoFbGV2ZWwYASABKAkiwwEKE0dldFBhbmVsTG9nc1JlcXVlc3QSEQoJbWluX2xldmVsGAEgASgJEhYKCnNpbmNlX3VuaXgYAiABKANCAjACEhYKCnVudGlsX3VuaXgYAyABKANCAjACEg0KBXF1ZXJ5GAQgASgJEhEKCWNvbXBvbmVudBgFIAEoCRIMCgRjb2RlGAYgASgJEhIKCnJlcXVlc3RfaWQYByABKAkSDQoFbGltaXQYCCABKA0SFgoKYmVmb3JlX3NlcRgJIAEoA0ICMAIi9wEKDVBhbmVsTG9nRW50cnkSDwoDc2VxGAEgASgDQgIwAhIYCgx0aW1lX3VuaXhfbXMYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhEKCWNvbXBvbmVudBgEIAEoCRIPCgdtZXNzYWdlGAUgASgJEgwKBGNvZGUYBiABKAkSEgoKcmVxdWVzdF9pZBgHIAEoCRI4CgVhdHRycxgIIAMoCzIpLm1pc3RnYXRlLm9wcy52MS5QYW5lbExvZ0VudHJ5LkF0dHJzRW50cnkaLAoKQXR0cnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpMBChRHZXRQYW5lbExvZ3NSZXNwb25zZRIvCgdlbnRyaWVzGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlBhbmVsTG9nRW50cnkSFwoLbmV4dF9jdXJzb3IYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhAKCGJ1ZmZlcmVkGAQgASgNEhAKCGNhcGFjaXR5GAUgASgNImoKDVJldGVudGlvbkl0ZW0SCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgNEhUKDWRlZmF1bHRfdmFsdWUYAyABKA0SCwoDbWluGAQgASgNEgsKA21heBgFIAEoDRIMCgR1bml0GAYgASgJIhUKE0dldFJldGVudGlvblJlcXVlc3QiRQoUR2V0UmV0ZW50aW9uUmVzcG9uc2USLQoFaXRlbXMYASADKAsyHi5taXN0Z2F0ZS5vcHMudjEuUmV0ZW50aW9uSXRlbSKGAQoTU2V0UmV0ZW50aW9uUmVxdWVzdBJACgZ2YWx1ZXMYASADKAsyMC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdC5WYWx1ZXNFbnRyeRotCgtWYWx1ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKA06AjgBIkUKFFNldFJldGVudGlvblJlc3BvbnNlEi0KBWl0ZW1zGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlJldGVudGlvbkl0ZW0iVAoRRXhwb3J0RGF0YVJlcXVlc3QSFgoKc2luY2VfdW5peBgBIAEoA0ICMAISFgoKdW50aWxfdW5peBgCIAEoA0ICMAISDwoHc291cmNlcxgDIAMoCSIiChJFeHBvcnREYXRhUmVzcG9uc2USDAoEZGF0YRgBIAEoDCIbChlHZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0IkAKGkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgSEQoJaGFzX3Rva2VuGAIgASgIIlMKGVNldE1ldHJpY3NTZXR0aW5nc1JlcXVlc3QSFAoHZW5hYmxlZBgBIAEoCEgAiAEBEhQKDHJvdGF0ZV90b2tlbhgCIAEoCEIKCghfZW5hYmxlZCJPChpTZXRNZXRyaWNzU2V0dGluZ3NSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIEhEKCWhhc190b2tlbhgCIAEoCBINCgV0b2tlbhgDIAEoCTKXBgoKT3BzU2VydmljZRJhCg5HZXRMb2dTZXR0aW5ncxImLm1pc3RnYXRlLm9wcy52MS5HZXRMb2dTZXR0aW5nc1JlcXVlc3QaJy5taXN0Z2F0ZS5vcHMudjEuR2V0TG9nU2V0dGluZ3NSZXNwb25zZRJYCgtTZXRMb2dMZXZlbBIjLm1pc3RnYXRlLm9wcy52MS5TZXRMb2dMZXZlbFJlcXVlc3QaJC5taXN0Z2F0ZS5vcHMudjEuU2V0TG9nTGV2ZWxSZXNwb25zZRJbCgxHZXRQYW5lbExvZ3MSJC5taXN0Z2F0ZS5vcHMudjEuR2V0UGFuZWxMb2dzUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRQYW5lbExvZ3NSZXNwb25zZRJbCgxHZXRSZXRlbnRpb24SJC5taXN0Z2F0ZS5vcHMudjEuR2V0UmV0ZW50aW9uUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRSZXRlbnRpb25SZXNwb25zZRJbCgxTZXRSZXRlbnRpb24SJC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5TZXRSZXRlbnRpb25SZXNwb25zZRJXCgpFeHBvcnREYXRhEiIubWlzdGdhdGUub3BzLnYxLkV4cG9ydERhdGFSZXF1ZXN0GiMubWlzdGdhdGUub3BzLnYxLkV4cG9ydERhdGFSZXNwb25zZTABEm0KEkdldE1ldHJpY3NTZXR0aW5ncxIqLm1pc3RnYXRlLm9wcy52MS5HZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0GisubWlzdGdhdGUub3BzLnYxLkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEm0KElNldE1ldHJpY3NTZXR0aW5ncxIqLm1pc3RnYXRlLm9wcy52MS5TZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0GisubWlzdGdhdGUub3BzLnYxLlNldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlQrUBChNjb20ubWlzdGdhdGUub3BzLnYxQghPcHNQcm90b1ABWjZnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9vcHMvdjE7b3BzdjGiAgNNT1iqAg9NaXN0Z2F0ZS5PcHMuVjHKAg9NaXN0Z2F0ZVxPcHNcVjHiAhtNaXN0Z2F0ZVxPcHNcVjFcR1BCTWV0YWRhdGHqAhFNaXN0Z2F0ZTo6T3BzOjpWMWIGcHJvdG8z");
+  fileDesc("ChltaXN0Z2F0ZS9vcHMvdjEvb3BzLnByb3RvEg9taXN0Z2F0ZS5vcHMudjEiFwoVR2V0TG9nU2V0dGluZ3NSZXF1ZXN0InIKFkdldExvZ1NldHRpbmdzUmVzcG9uc2USDQoFbGV2ZWwYASABKAkSFQoNZGVmYXVsdF9sZXZlbBgCIAEoCRIOCgZmb3JtYXQYAyABKAkSEAoIYnVmZmVyZWQYBCABKA0SEAoIY2FwYWNpdHkYBSABKA0iIwoSU2V0TG9nTGV2ZWxSZXF1ZXN0Eg0KBWxldmVsGAEgASgJIiQKE1NldExvZ0xldmVsUmVzcG9uc2USDQoFbGV2ZWwYASABKAkiwwEKE0dldFBhbmVsTG9nc1JlcXVlc3QSEQoJbWluX2xldmVsGAEgASgJEhYKCnNpbmNlX3VuaXgYAiABKANCAjACEhYKCnVudGlsX3VuaXgYAyABKANCAjACEg0KBXF1ZXJ5GAQgASgJEhEKCWNvbXBvbmVudBgFIAEoCRIMCgRjb2RlGAYgASgJEhIKCnJlcXVlc3RfaWQYByABKAkSDQoFbGltaXQYCCABKA0SFgoKYmVmb3JlX3NlcRgJIAEoA0ICMAIi9wEKDVBhbmVsTG9nRW50cnkSDwoDc2VxGAEgASgDQgIwAhIYCgx0aW1lX3VuaXhfbXMYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhEKCWNvbXBvbmVudBgEIAEoCRIPCgdtZXNzYWdlGAUgASgJEgwKBGNvZGUYBiABKAkSEgoKcmVxdWVzdF9pZBgHIAEoCRI4CgVhdHRycxgIIAMoCzIpLm1pc3RnYXRlLm9wcy52MS5QYW5lbExvZ0VudHJ5LkF0dHJzRW50cnkaLAoKQXR0cnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpMBChRHZXRQYW5lbExvZ3NSZXNwb25zZRIvCgdlbnRyaWVzGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlBhbmVsTG9nRW50cnkSFwoLbmV4dF9jdXJzb3IYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhAKCGJ1ZmZlcmVkGAQgASgNEhAKCGNhcGFjaXR5GAUgASgNImoKDVJldGVudGlvbkl0ZW0SCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgNEhUKDWRlZmF1bHRfdmFsdWUYAyABKA0SCwoDbWluGAQgASgNEgsKA21heBgFIAEoDRIMCgR1bml0GAYgASgJIhUKE0dldFJldGVudGlvblJlcXVlc3QiRQoUR2V0UmV0ZW50aW9uUmVzcG9uc2USLQoFaXRlbXMYASADKAsyHi5taXN0Z2F0ZS5vcHMudjEuUmV0ZW50aW9uSXRlbSKGAQoTU2V0UmV0ZW50aW9uUmVxdWVzdBJACgZ2YWx1ZXMYASADKAsyMC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdC5WYWx1ZXNFbnRyeRotCgtWYWx1ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKA06AjgBIkUKFFNldFJldGVudGlvblJlc3BvbnNlEi0KBWl0ZW1zGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlJldGVudGlvbkl0ZW0iVAoRRXhwb3J0RGF0YVJlcXVlc3QSFgoKc2luY2VfdW5peBgBIAEoA0ICMAISFgoKdW50aWxfdW5peBgCIAEoA0ICMAISDwoHc291cmNlcxgDIAMoCSIiChJFeHBvcnREYXRhUmVzcG9uc2USDAoEZGF0YRgBIAEoDCIbChlHZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0IkAKGkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgSEQoJaGFzX3Rva2VuGAIgASgIIlMKGVNldE1ldHJpY3NTZXR0aW5nc1JlcXVlc3QSFAoHZW5hYmxlZBgBIAEoCEgAiAEBEhQKDHJvdGF0ZV90b2tlbhgCIAEoCEIKCghfZW5hYmxlZCJPChpTZXRNZXRyaWNzU2V0dGluZ3NSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIEhEKCWhhc190b2tlbhgCIAEoCBINCgV0b2tlbhgDIAEoCSKDAgoQRGVidWdDYXB0dXJlSW5mbxISCgpjYXB0dXJlX2lkGAEgASgJEg8KB25vZGVfaWQYAiABKAkSEQoJbm9kZV9uYW1lGAMgASgJEg0KBXN0YXRlGAQgASgJEg0KBWxldmVsGAUgASgJEg8KB3NvdXJjZXMYBiADKAkSEgoKZHVyYXRpb25fcxgHIAEoDRIYCgxzdGFydGVkX3VuaXgYCCABKANCAjACEhUKCWVuZHNfdW5peBgJIAEoA0ICMAISDQoFYWN0b3IYCiABKAkSDwoHcmVjb3JkcxgLIAEoDRIPCgdkcm9wcGVkGAwgASgNEhIKCmVuZF9yZWFzb24YDSABKAkiXwoYU3RhcnREZWJ1Z0NhcHR1cmVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDQoFbGV2ZWwYAiABKAkSDwoHc291cmNlcxgDIAMoCRISCgpkdXJhdGlvbl9zGAQgASgNIk8KGVN0YXJ0RGVidWdDYXB0dXJlUmVzcG9uc2USMgoHY2FwdHVyZRgBIAEoCzIhLm1pc3RnYXRlLm9wcy52MS5EZWJ1Z0NhcHR1cmVJbmZvIi0KF1N0b3BEZWJ1Z0NhcHR1cmVSZXF1ZXN0EhIKCmNhcHR1cmVfaWQYASABKAkiTgoYU3RvcERlYnVnQ2FwdHVyZVJlc3BvbnNlEjIKB2NhcHR1cmUYASABKAsyIS5taXN0Z2F0ZS5vcHMudjEuRGVidWdDYXB0dXJlSW5mbyIrChhMaXN0RGVidWdDYXB0dXJlc1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSJQChlMaXN0RGVidWdDYXB0dXJlc1Jlc3BvbnNlEjMKCGNhcHR1cmVzGAEgAygLMiEubWlzdGdhdGUub3BzLnYxLkRlYnVnQ2FwdHVyZUluZm8ilQEKFkdldERlYnVnQ2FwdHVyZVJlcXVlc3QSEgoKY2FwdHVyZV9pZBgBIAEoCRIPCgdub2RlX2lkGAIgASgJEhEKCW1pbl9sZXZlbBgDIAEoCRIOCgZzb3VyY2UYBCABKAkSDQoFcXVlcnkYBSABKAkSDQoFbGltaXQYBiABKA0SFQoJYWZ0ZXJfc2VxGAcgASgDQgIwAiLOAQoLRGVidWdSZWNvcmQSDwoDc2VxGAEgASgDQgIwAhIYCgx0aW1lX3VuaXhfbXMYAiABKANCAjACEg0KBWxldmVsGAMgASgJEg4KBnNvdXJjZRgEIAEoCRIPCgdtZXNzYWdlGAUgASgJEjYKBWF0dHJzGAYgAygLMicubWlzdGdhdGUub3BzLnYxLkRlYnVnUmVjb3JkLkF0dHJzRW50cnkaLAoKQXR0cnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIqYBChdHZXREZWJ1Z0NhcHR1cmVSZXNwb25zZRIyCgdjYXB0dXJlGAEgASgLMiEubWlzdGdhdGUub3BzLnYxLkRlYnVnQ2FwdHVyZUluZm8SLQoHcmVjb3JkcxgCIAMoCzIcLm1pc3RnYXRlLm9wcy52MS5EZWJ1Z1JlY29yZBIXCgtuZXh0X2N1cnNvchgDIAEoA0ICMAISDwoHc291cmNlcxgEIAMoCTK+CQoKT3BzU2VydmljZRJhCg5HZXRMb2dTZXR0aW5ncxImLm1pc3RnYXRlLm9wcy52MS5HZXRMb2dTZXR0aW5nc1JlcXVlc3QaJy5taXN0Z2F0ZS5vcHMudjEuR2V0TG9nU2V0dGluZ3NSZXNwb25zZRJYCgtTZXRMb2dMZXZlbBIjLm1pc3RnYXRlLm9wcy52MS5TZXRMb2dMZXZlbFJlcXVlc3QaJC5taXN0Z2F0ZS5vcHMudjEuU2V0TG9nTGV2ZWxSZXNwb25zZRJbCgxHZXRQYW5lbExvZ3MSJC5taXN0Z2F0ZS5vcHMudjEuR2V0UGFuZWxMb2dzUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRQYW5lbExvZ3NSZXNwb25zZRJbCgxHZXRSZXRlbnRpb24SJC5taXN0Z2F0ZS5vcHMudjEuR2V0UmV0ZW50aW9uUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRSZXRlbnRpb25SZXNwb25zZRJbCgxTZXRSZXRlbnRpb24SJC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5TZXRSZXRlbnRpb25SZXNwb25zZRJXCgpFeHBvcnREYXRhEiIubWlzdGdhdGUub3BzLnYxLkV4cG9ydERhdGFSZXF1ZXN0GiMubWlzdGdhdGUub3BzLnYxLkV4cG9ydERhdGFSZXNwb25zZTABEm0KEkdldE1ldHJpY3NTZXR0aW5ncxIqLm1pc3RnYXRlLm9wcy52MS5HZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0GisubWlzdGdhdGUub3BzLnYxLkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEm0KElNldE1ldHJpY3NTZXR0aW5ncxIqLm1pc3RnYXRlLm9wcy52MS5TZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0GisubWlzdGdhdGUub3BzLnYxLlNldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEmoKEVN0YXJ0RGVidWdDYXB0dXJlEikubWlzdGdhdGUub3BzLnYxLlN0YXJ0RGVidWdDYXB0dXJlUmVxdWVzdBoqLm1pc3RnYXRlLm9wcy52MS5TdGFydERlYnVnQ2FwdHVyZVJlc3BvbnNlEmcKEFN0b3BEZWJ1Z0NhcHR1cmUSKC5taXN0Z2F0ZS5vcHMudjEuU3RvcERlYnVnQ2FwdHVyZVJlcXVlc3QaKS5taXN0Z2F0ZS5vcHMudjEuU3RvcERlYnVnQ2FwdHVyZVJlc3BvbnNlEmoKEUxpc3REZWJ1Z0NhcHR1cmVzEikubWlzdGdhdGUub3BzLnYxLkxpc3REZWJ1Z0NhcHR1cmVzUmVxdWVzdBoqLm1pc3RnYXRlLm9wcy52MS5MaXN0RGVidWdDYXB0dXJlc1Jlc3BvbnNlEmQKD0dldERlYnVnQ2FwdHVyZRInLm1pc3RnYXRlLm9wcy52MS5HZXREZWJ1Z0NhcHR1cmVSZXF1ZXN0GigubWlzdGdhdGUub3BzLnYxLkdldERlYnVnQ2FwdHVyZVJlc3BvbnNlQrUBChNjb20ubWlzdGdhdGUub3BzLnYxQghPcHNQcm90b1ABWjZnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9vcHMvdjE7b3BzdjGiAgNNT1iqAg9NaXN0Z2F0ZS5PcHMuVjHKAg9NaXN0Z2F0ZVxPcHNcVjHiAhtNaXN0Z2F0ZVxPcHNcVjFcR1BCTWV0YWRhdGHqAhFNaXN0Z2F0ZTo6T3BzOjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message mistgate.ops.v1.GetLogSettingsRequest
@@ -528,6 +528,363 @@ export const SetMetricsSettingsResponseSchema: GenMessage<SetMetricsSettingsResp
   messageDesc(file_mistgate_ops_v1_ops, 17);
 
 /**
+ * One capture as the panel holds it.
+ *
+ * @generated from message mistgate.ops.v1.DebugCaptureInfo
+ */
+export type DebugCaptureInfo = Message<"mistgate.ops.v1.DebugCaptureInfo"> & {
+  /**
+   * @generated from field: string capture_id = 1;
+   */
+  captureId: string;
+
+  /**
+   * @generated from field: string node_id = 2;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 3;
+   */
+  nodeName: string;
+
+  /**
+   * "running" (the node is capturing), "done" (shipped) or "expired" (the time passed and no report came).
+   *
+   * @generated from field: string state = 4;
+   */
+  state: string;
+
+  /**
+   * "debug" or "info".
+   *
+   * @generated from field: string level = 5;
+   */
+  level: string;
+
+  /**
+   * @generated from field: repeated string sources = 6;
+   */
+  sources: string[];
+
+  /**
+   * @generated from field: uint32 duration_s = 7;
+   */
+  durationS: number;
+
+  /**
+   * @generated from field: int64 started_unix = 8 [jstype = JS_NUMBER];
+   */
+  startedUnix: bigint;
+
+  /**
+   * When the capture ends on the node.
+   *
+   * @generated from field: int64 ends_unix = 9 [jstype = JS_NUMBER];
+   */
+  endsUnix: bigint;
+
+  /**
+   * The admin that asked (an id or a token's name).
+   *
+   * @generated from field: string actor = 10;
+   */
+  actor: string;
+
+  /**
+   * Records stored, and records the node or the panel did not keep because a limit was reached.
+   *
+   * @generated from field: uint32 records = 11;
+   */
+  records: number;
+
+  /**
+   * @generated from field: uint32 dropped = 12;
+   */
+  dropped: number;
+
+  /**
+   * "expired", "stopped" or "shutdown" once done; "" while running.
+   *
+   * @generated from field: string end_reason = 13;
+   */
+  endReason: string;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.DebugCaptureInfo.
+ * Use `create(DebugCaptureInfoSchema)` to create a new message.
+ */
+export const DebugCaptureInfoSchema: GenMessage<DebugCaptureInfo> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 18);
+
+/**
+ * @generated from message mistgate.ops.v1.StartDebugCaptureRequest
+ */
+export type StartDebugCaptureRequest = Message<"mistgate.ops.v1.StartDebugCaptureRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * "debug" or "info"; "" means "debug".
+   *
+   * @generated from field: string level = 2;
+   */
+  level: string;
+
+  /**
+   * Log sources ("agent", "hysteria2", "xray", "awg" ...); empty = all. At most 8, each of 1 to 32 letters, digits, "-" or "_".
+   *
+   * @generated from field: repeated string sources = 3;
+   */
+  sources: string[];
+
+  /**
+   * 1 to 900 seconds; 0 means 300.
+   *
+   * @generated from field: uint32 duration_s = 4;
+   */
+  durationS: number;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.StartDebugCaptureRequest.
+ * Use `create(StartDebugCaptureRequestSchema)` to create a new message.
+ */
+export const StartDebugCaptureRequestSchema: GenMessage<StartDebugCaptureRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 19);
+
+/**
+ * @generated from message mistgate.ops.v1.StartDebugCaptureResponse
+ */
+export type StartDebugCaptureResponse = Message<"mistgate.ops.v1.StartDebugCaptureResponse"> & {
+  /**
+   * @generated from field: mistgate.ops.v1.DebugCaptureInfo capture = 1;
+   */
+  capture?: DebugCaptureInfo | undefined;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.StartDebugCaptureResponse.
+ * Use `create(StartDebugCaptureResponseSchema)` to create a new message.
+ */
+export const StartDebugCaptureResponseSchema: GenMessage<StartDebugCaptureResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 20);
+
+/**
+ * @generated from message mistgate.ops.v1.StopDebugCaptureRequest
+ */
+export type StopDebugCaptureRequest = Message<"mistgate.ops.v1.StopDebugCaptureRequest"> & {
+  /**
+   * @generated from field: string capture_id = 1;
+   */
+  captureId: string;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.StopDebugCaptureRequest.
+ * Use `create(StopDebugCaptureRequestSchema)` to create a new message.
+ */
+export const StopDebugCaptureRequestSchema: GenMessage<StopDebugCaptureRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 21);
+
+/**
+ * @generated from message mistgate.ops.v1.StopDebugCaptureResponse
+ */
+export type StopDebugCaptureResponse = Message<"mistgate.ops.v1.StopDebugCaptureResponse"> & {
+  /**
+   * @generated from field: mistgate.ops.v1.DebugCaptureInfo capture = 1;
+   */
+  capture?: DebugCaptureInfo | undefined;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.StopDebugCaptureResponse.
+ * Use `create(StopDebugCaptureResponseSchema)` to create a new message.
+ */
+export const StopDebugCaptureResponseSchema: GenMessage<StopDebugCaptureResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 22);
+
+/**
+ * @generated from message mistgate.ops.v1.ListDebugCapturesRequest
+ */
+export type ListDebugCapturesRequest = Message<"mistgate.ops.v1.ListDebugCapturesRequest"> & {
+  /**
+   * "" = every node.
+   *
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.ListDebugCapturesRequest.
+ * Use `create(ListDebugCapturesRequestSchema)` to create a new message.
+ */
+export const ListDebugCapturesRequestSchema: GenMessage<ListDebugCapturesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 23);
+
+/**
+ * @generated from message mistgate.ops.v1.ListDebugCapturesResponse
+ */
+export type ListDebugCapturesResponse = Message<"mistgate.ops.v1.ListDebugCapturesResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.ops.v1.DebugCaptureInfo captures = 1;
+   */
+  captures: DebugCaptureInfo[];
+};
+
+/**
+ * Describes the message mistgate.ops.v1.ListDebugCapturesResponse.
+ * Use `create(ListDebugCapturesResponseSchema)` to create a new message.
+ */
+export const ListDebugCapturesResponseSchema: GenMessage<ListDebugCapturesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 24);
+
+/**
+ * @generated from message mistgate.ops.v1.GetDebugCaptureRequest
+ */
+export type GetDebugCaptureRequest = Message<"mistgate.ops.v1.GetDebugCaptureRequest"> & {
+  /**
+   * One of the two: a capture, or a node (its newest capture).
+   *
+   * @generated from field: string capture_id = 1;
+   */
+  captureId: string;
+
+  /**
+   * @generated from field: string node_id = 2;
+   */
+  nodeId: string;
+
+  /**
+   * The lowest level: "debug" or "info"; "" = everything.
+   *
+   * @generated from field: string min_level = 3;
+   */
+  minLevel: string;
+
+  /**
+   * One log source; "" = all.
+   *
+   * @generated from field: string source = 4;
+   */
+  source: string;
+
+  /**
+   * Case-insensitive substring of the cleaned message or an attribute value; at most 100 characters.
+   *
+   * @generated from field: string query = 5;
+   */
+  query: string;
+
+  /**
+   * At most 500; 0 means 100.
+   *
+   * @generated from field: uint32 limit = 6;
+   */
+  limit: number;
+
+  /**
+   * The next_cursor of the previous page (0 = from the first record).
+   *
+   * @generated from field: int64 after_seq = 7 [jstype = JS_NUMBER];
+   */
+  afterSeq: bigint;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.GetDebugCaptureRequest.
+ * Use `create(GetDebugCaptureRequestSchema)` to create a new message.
+ */
+export const GetDebugCaptureRequestSchema: GenMessage<GetDebugCaptureRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 25);
+
+/**
+ * @generated from message mistgate.ops.v1.DebugRecord
+ */
+export type DebugRecord = Message<"mistgate.ops.v1.DebugRecord"> & {
+  /**
+   * @generated from field: int64 seq = 1 [jstype = JS_NUMBER];
+   */
+  seq: bigint;
+
+  /**
+   * @generated from field: int64 time_unix_ms = 2 [jstype = JS_NUMBER];
+   */
+  timeUnixMs: bigint;
+
+  /**
+   * "debug", "info", "warn" or "error".
+   *
+   * @generated from field: string level = 3;
+   */
+  level: string;
+
+  /**
+   * @generated from field: string source = 4;
+   */
+  source: string;
+
+  /**
+   * @generated from field: string message = 5;
+   */
+  message: string;
+
+  /**
+   * Only the allow-listed keys, values scrubbed.
+   *
+   * @generated from field: map<string, string> attrs = 6;
+   */
+  attrs: { [key: string]: string };
+};
+
+/**
+ * Describes the message mistgate.ops.v1.DebugRecord.
+ * Use `create(DebugRecordSchema)` to create a new message.
+ */
+export const DebugRecordSchema: GenMessage<DebugRecord> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 26);
+
+/**
+ * @generated from message mistgate.ops.v1.GetDebugCaptureResponse
+ */
+export type GetDebugCaptureResponse = Message<"mistgate.ops.v1.GetDebugCaptureResponse"> & {
+  /**
+   * @generated from field: mistgate.ops.v1.DebugCaptureInfo capture = 1;
+   */
+  capture?: DebugCaptureInfo | undefined;
+
+  /**
+   * @generated from field: repeated mistgate.ops.v1.DebugRecord records = 2;
+   */
+  records: DebugRecord[];
+
+  /**
+   * Pass as after_seq for the next page; 0 when there is none.
+   *
+   * @generated from field: int64 next_cursor = 3 [jstype = JS_NUMBER];
+   */
+  nextCursor: bigint;
+
+  /**
+   * The sources that appear in the capture, to fill a filter.
+   *
+   * @generated from field: repeated string sources = 4;
+   */
+  sources: string[];
+};
+
+/**
+ * Describes the message mistgate.ops.v1.GetDebugCaptureResponse.
+ * Use `create(GetDebugCaptureResponseSchema)` to create a new message.
+ */
+export const GetDebugCaptureResponseSchema: GenMessage<GetDebugCaptureResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 27);
+
+/**
  * The panel's own diagnostics and data lifecycle: its log ring and level, retention of what it stores, an export, and the
  * metrics endpoint's switch. A separate package from mistgate.admin.v1 on purpose: the Cloudflare edition's admin Worker links
  * every admin message, and none of this runs there (the VPS edition mounts the service; the edition without it answers
@@ -619,6 +976,49 @@ export const OpsService: GenService<{
     methodKind: "unary";
     input: typeof SetMetricsSettingsRequestSchema;
     output: typeof SetMetricsSettingsResponseSchema;
+  },
+  /**
+   * DEBUG CAPTURE of one node (agent capability "debug/1"). Starts it: the node raises its log level for the chosen sources for up
+   * to 15 minutes, keeps the records in a bounded buffer and ships them, scrubbed, when the time is up. An agent without the
+   * capability is FAILED_PRECONDITION "agent too old"; a node that is offline is FAILED_PRECONDITION "node is offline". Admin
+   * profile tokens start one only through an approved plan (node_debug_capture_plan / _apply); it is audit-logged.
+   *
+   * @generated from rpc mistgate.ops.v1.OpsService.StartDebugCapture
+   */
+  startDebugCapture: {
+    methodKind: "unary";
+    input: typeof StartDebugCaptureRequestSchema;
+    output: typeof StartDebugCaptureResponseSchema;
+  },
+  /**
+   * Ends a running capture now: the node ships what it holds. A capture that is already over is returned as it is.
+   *
+   * @generated from rpc mistgate.ops.v1.OpsService.StopDebugCapture
+   */
+  stopDebugCapture: {
+    methodKind: "unary";
+    input: typeof StopDebugCaptureRequestSchema;
+    output: typeof StopDebugCaptureResponseSchema;
+  },
+  /**
+   * The captures the panel still holds for a node (24 hours), newest first.
+   *
+   * @generated from rpc mistgate.ops.v1.OpsService.ListDebugCaptures
+   */
+  listDebugCaptures: {
+    methodKind: "unary";
+    input: typeof ListDebugCapturesRequestSchema;
+    output: typeof ListDebugCapturesResponseSchema;
+  },
+  /**
+   * The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
+   *
+   * @generated from rpc mistgate.ops.v1.OpsService.GetDebugCapture
+   */
+  getDebugCapture: {
+    methodKind: "unary";
+    input: typeof GetDebugCaptureRequestSchema;
+    output: typeof GetDebugCaptureResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_ops_v1_ops, 0);

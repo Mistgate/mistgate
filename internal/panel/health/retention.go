@@ -107,7 +107,8 @@ func (s *Service) sweep(ctx context.Context) {
 	} else if n > 0 {
 		s.log.Info("health: pruned host load hours", "count", n)
 	}
-	s.sweepProbes(ctx, now) // path probes, 7 days; VPS only
+	s.sweepProbes(ctx, now)        // path probes, 7 days; VPS only
+	s.sweepDebugCaptures(ctx, now) // debug captures of a node, 24 hours; VPS only
 	// The hourly traffic tables: 400 days by default.
 	if n, err := s.st.PruneTrafficBuckets(ctx, now.Add(-pol.Duration("traffic_bucket_days"))); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune traffic buckets", "err", err)

@@ -57,6 +57,8 @@ export const errorCodes = [
   "relay_check_stale",
   "relay_check_failed",
   "check_unavailable",
+  // a debug capture of a node (ops.proto StartDebugCapture): one at a time per node
+  "debug_busy",
 ] as const;
 
 /**

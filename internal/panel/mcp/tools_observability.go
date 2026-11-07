@@ -19,6 +19,7 @@ import (
 // needs the owner's approval.
 
 func observabilityTools() []toolDef {
+	dbg := debugTools()
 	out := []toolDef{
 		readTool("panel_logs", ProfileAdmin, procs(opsv1connect.OpsServiceGetPanelLogsProcedure),
 			"The panel's own recent log records (an in-memory ring, lost on restart), newest first, with addresses, secret names and key-shaped values removed and only allow-listed attributes. "+
@@ -54,6 +55,7 @@ func observabilityTools() []toolDef {
 	}
 	out = append(out, change(logLevel)...)
 	out = append(out, change(retentionSet)...)
+	out = append(out, dbg...)
 	return out
 }
 

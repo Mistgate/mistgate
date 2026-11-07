@@ -203,6 +203,66 @@ func TestObservabilityOnARealPanel(t *testing.T) {
 		t.Fatalf("SetRetention: %d %s", code, body)
 	}
 
+	// The debug capture of a node: closed to a readonly token, an admin token may start and read, never stop, and a node
+	// that is not connected refuses it cleanly. What a capture holds is cleaned again on the way out, over the API and MCP.
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, state, address, created_at) VALUES ('nod_dbg', 'de1', 'active', '203.0.113.10', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []string{"StartDebugCapture", "StopDebugCapture", "ListDebugCaptures", "GetDebugCapture"} {
+		if code, _, _ := call(false, roSecret, m, `{"nodeId":"nod_dbg","captureId":"req_x"}`); code != 403 {
+			t.Errorf("readonly token %s: %d", m, code)
+		}
+	}
+	if code, _, _ := call(false, adSecret, "StopDebugCapture", `{"captureId":"req_x"}`); code != 403 {
+		t.Errorf("admin token StopDebugCapture over the API: %d (a stop is the owner's)", code)
+	}
+	if code, body, _ := call(false, adSecret, "StartDebugCapture", `{"nodeId":"nod_dbg","durationS":60}`); code == 403 || !strings.Contains(body, "node_offline") {
+		t.Errorf("admin token StartDebugCapture: %d %s (allowed, and refused by the fleet: no agent)", code, body)
+	}
+	if code, body, _ := call(true, "", "StartDebugCapture", `{"nodeId":"nod_dbg","durationS":60}`); code != 400 && code != 412 || !strings.Contains(body, "node_offline") {
+		t.Errorf("owner StartDebugCapture on a node with no agent: %d %s", code, body)
+	}
+	var running int
+	if err := st.R.QueryRowContext(ctx, `SELECT COUNT(*) FROM debug_capture`).Scan(&running); err != nil || running != 0 {
+		t.Errorf("a refused start left %d captures (%v)", running, err)
+	}
+	if out, isErr := tool("node_debug_capture_plan", map[string]any{"node": "de1", "duration_s": 5000}); !isErr || !strings.Contains(out, "900") {
+		t.Errorf("node_debug_capture_plan with 5000 s: %v %s", isErr, out)
+	}
+	dp := decodeJSON[mcp.PlanOut](t, mustTool(t, tool, "node_debug_capture_plan", map[string]any{"node": "de1", "sources": []string{"xray"}, "duration_s": 60, "reason": "tls errors"}))
+	if dp.NeedsApproval || !strings.Contains(mustJSON(t, dp.Facts), "xray") {
+		t.Errorf("plan = %+v", dp)
+	}
+	if out, isErr := tool("node_debug_capture_apply", map[string]any{"confirm_token": dp.ConfirmToken}); !isErr || !strings.Contains(out, "offline") {
+		t.Errorf("node_debug_capture_apply with no agent: %v %s", isErr, out)
+	}
+	canaries := []string{"203.0.113.88", "k4m9x2q7", "canary-person", "Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI"}
+	for _, q := range []string{
+		`INSERT INTO debug_capture (id, node_id, actor, level, sources, duration_s, started_at, ends_at, state, end_reason, records) VALUES ('req_dbg1', 'nod_dbg', 'adm_o', 'debug', 'xray', 60, 1, 61, 'done', 'expired', 2)`,
+		`INSERT INTO debug_capture_line VALUES ('req_dbg1', 1, 1000, 0, 'xray', 'tls to 203.0.113.88 sni k4m9x2q7.node.example.com', '{"user":"canary-person","err":"key Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI","code":"tls"}')`,
+		`INSERT INTO debug_capture_line VALUES ('req_dbg1', 2, 1001, 1, 'agent', 'second', '{}')`,
+	} {
+		if _, err := st.W.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := mustTool(t, tool, "node_debug_logs", map[string]any{})
+	if !strings.Contains(list, "req_dbg1") {
+		t.Errorf("node_debug_logs list: %s", list)
+	}
+	logs := mustTool(t, tool, "node_debug_logs", map[string]any{"capture_id": "req_dbg1", "source": "xray"})
+	if !strings.Contains(logs, `"tls"`) || strings.Contains(logs, "second") {
+		t.Errorf("node_debug_logs: %s", logs)
+	}
+	for _, leak := range canaries {
+		if strings.Contains(logs, leak) || strings.Contains(list, leak) {
+			t.Errorf("node_debug_logs leaked %q: %s", leak, logs)
+		}
+	}
+	if code, body, _ := call(false, adSecret, "GetDebugCapture", `{"captureId":"req_dbg1"}`); code != 200 || strings.Contains(body, "203.0.113.88") || strings.Contains(body, "k4m9x2q7") {
+		t.Errorf("admin token GetDebugCapture: %d %s", code, body)
+	}
+
 	// /metrics: unknown to a stranger while off; the owner turns it on and gets a token once
 	metrics := func(authz string) (int, string) {
 		req, _ := http.NewRequest("GET", admin.URL+"/metrics", nil)
@@ -248,4 +308,13 @@ func mustTool(t *testing.T, tool func(string, map[string]any) (string, bool), na
 		t.Fatalf("%s: %s", name, out)
 	}
 	return out
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

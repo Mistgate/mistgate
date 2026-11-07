@@ -67,6 +67,7 @@ type fakePanel struct {
 	applies   chan *pb.ApplyResult
 	cmds      chan *pb.CommandResult
 	logs      chan *pb.LogChunk
+	debugs    chan *pb.DebugCaptureReport
 	connects  chan struct{}
 	doctors   chan *pb.DoctorReport
 	bundle    map[string][]byte // FetchUpdate serves these by name (guarded by mu)
@@ -93,7 +94,7 @@ func newFakePanel(t *testing.T) *fakePanel {
 		t: t, token: "tok-one-time", certValidity: 30 * 24 * time.Hour,
 		lastSeq: map[string]uint64{}, up: map[string]uint64{}, down: map[string]uint64{},
 		hellos: make(chan *pb.Hello, 64), applies: make(chan *pb.ApplyResult, 64),
-		cmds: make(chan *pb.CommandResult, 64), logs: make(chan *pb.LogChunk, 256), connects: make(chan struct{}, 64),
+		cmds: make(chan *pb.CommandResult, 64), logs: make(chan *pb.LogChunk, 256), debugs: make(chan *pb.DebugCaptureReport, 256), connects: make(chan struct{}, 64),
 		doctors: make(chan *pb.DoctorReport, 64),
 	}
 	p.ackedOverride.Store(-1)
@@ -326,6 +327,8 @@ func (p *fakePanel) handle(stream *connect.BidiStream[pb.ConnectRequest, pb.Conn
 		p.cmds <- msg.CommandResult
 	case *pb.ConnectRequest_LogChunk:
 		p.logs <- msg.LogChunk
+	case *pb.ConnectRequest_DebugReport:
+		p.debugs <- msg.DebugReport
 	case *pb.ConnectRequest_DoctorReport:
 		if m.Seq != 0 {
 			p.badSeq.Add(1)

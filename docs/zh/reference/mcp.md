@@ -104,6 +104,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_runtime` | 只读 | `node`（留空 = 所有节点）。节点实际运行的内容与面板期望的对照：期望与已应用的版本号和哈希（12 个字符）、`in_sync`、`drift` 及起始时间、最近一次应用，以及每个 inbound 的 `enabled`（属于期望状态）、`spec_version`、已应用的规格哈希、已应用与实时状态、最近错误和证书到期时间。`attention` 列出不一致之处：`applied_not_desired`（孤儿 inbound 的样子）、`desired_not_applied`、`failed`、`unknown_running`。不返回地址、证书指纹或密钥；不会联系节点。 |
 | `panel_logs` | 管理员 | 面板自身最近的日志记录（内存环形缓冲，保留最近 5000 条，重启后丢失），最新的在前；地址、秘密名称和形似密钥的值已移除，属性只保留白名单中的键。筛选：`min_level`（`debug`、`info`、`warn`、`error`，默认 `info`）、`minutes`（最多 10080）、`query`（消息或属性值的子串，最长 100 个字符，在清理后的文本中匹配）、`component`（`health`、`fleet`、`http` 等）、`code`（精确的错误码）、`request_id`（管理界面在请求失败时显示的代码）、`limit`（默认 100，最多 500）和 `cursor`（上一页的 `next_cursor`）。`level`、`buffered` 和 `capacity` 说明缓冲区的状态。消息来自面板自己的代码和它处理过的数据：属于不可信文本。 |
 | `retention_status` | 管理员 | 面板保存所存数据的时长：每项设置（`journal_days`、`events_info_days`、`events_warn_days`、`audit_days`、`alerts_days`、`check_samples_hours`、`check_daily_days`、`host_history_days`、`traffic_bucket_days`、`node_traffic_hour_days`）的当前值、默认值、范围和单位。 |
+| `node_debug_logs` | 管理员 | 节点的调试抓取（用 `node_debug_capture_plan` / `_apply` 开始），最早的记录在前。指定抓取（`capture_id`）或节点（它最新的抓取）；两者都不给则返回面板保存的抓取列表（24 小时），最新的在前。抓取会给出 `state`：`running`（时间到了记录才会到达）、`done`，或 `expired`（时间已过而节点始终没有发送）。筛选项：`min_level`（`debug`、`info`、`warn`、`error`）、`source`、`query`（消息或属性值的子串，最多 100 个字符，在清理后的文本上匹配）、`limit`（默认 100，最多 500）和 `cursor`（上一次的 `next_cursor`）。记录在节点和面板中都经过清理：地址为 `<ip>`，没有机密名称和密钥，只有一份简短的属性列表。消息来自节点的引擎：属于不可信文本。 |
 | `path_loss_matrix` | 只读 | `hours`（1 到 720，默认 24）。端口检测中丢包的节点间 UDP 路径：发送方、目标、端口、发送数、到达数、`loss_pct`、同一目标上到达正常的另一个发送方和 `open_ports`（途中的过滤），以及每个目标有多少发送方丢包，用来区分节点问题和路径问题。只显示节点名称。 |
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 带 `refresh: true` 且不带 `node` 时，每个已连接的节点都会运行自己的检查（一次最多 24 个节点）；`kept_last_report` 列出保留上一份报告的节点：它们离线，或其代理版本过旧。 |
 | `node_ports` | 只读 | 已保存的 UDP 投递检查、TCP 可达性，以及每个端口上的入站/协议配置：`direct_in_subscriptions` 表示是否列出节点地址，`cdn` 表示客户端是否通过 CDN 主机连接。操作员权限可设置 `check: true` 运行有时限的检查（约 15 s）。 不带 `node` 时：为每个未退役的节点返回一行精简结果，只含已保存的结果（`check` 需要指定节点）。 |
@@ -188,6 +189,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_update_schedule_cancel` | 管理员 | `node_id` | 始终 |
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
 | `log_level` | 管理员 | `level`（`debug`、`info`、`warn` 或 `error`）。设置面板的日志级别，直到下次重启，之后回到 `--log-level` / `MISTGATE_LOG_LEVEL`。不删除任何内容。 | 否 |
+| `node_debug_capture` | 管理员 | `node`、`level`（`debug` 或 `info`，默认 `debug`）、`sources`（最多 8 个日志来源，如 `agent`、`hysteria2`、`xray`；为空表示全部）、`duration_s`（1 至 900，默认 300）。节点必须在线，且其 Agent 声明了 `debug/1`；每个节点同一时间只有一个抓取。节点为这些来源提高日志级别，保存最多 20000 条记录（4 MiB），时间到了把清理后的记录发出，并自行恢复级别。用 `node_debug_logs` 读取结果。写入审计日志：谁请求的、节点、来源和时长。 | 否 |
 | `retention` | 管理员 | `values`：设置名称及其新值（名称、单位和范围见 `retention_status`）。更短的时间会在下一次每小时清理时永久删除更早的行。 | 总是（需 step-up） |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | 管理员 | `updates_status` 中的 `rollout_id` | 始终 |
 | `node_rollback` | 管理员 | `node` | 始终 |
