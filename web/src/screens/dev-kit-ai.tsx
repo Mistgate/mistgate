@@ -148,7 +148,16 @@ export function AiKit() {
       </Shot>
     );
   }
-  const messages = state === "chat-empty" ? [] : state === "chat-typing" ? working : conversation;
+  // &state=chat-table: an answer with a heading, a table and nested points, as a real panel's model writes them
+  const tableTurn = [
+    msg({ role: ChatRole.USER, createdUnix: at(5), text: "У каких нод сегодня были проблемы?" }),
+    msg({
+      role: ChatRole.ASSISTANT,
+      createdUnix: at(4),
+      text: "## Коротко\n\nЗа последние 24 часа проблемы были у **5 нод**, критичных алертов сейчас нет.\n\n| Нода | Что произошло | До de |\n|---|---|--:|\n| **tr** | Доступность из РФ — `blocked` (источники спорят) | 0/150 |\n| **ru2** | Сильные потери на пути к **de**, порт 8443 | 37/150 |\n| **be** | Минутный `host_blip`, нода вернулась | 126/150 |\n| **de2** | WARP перешёл из `up` в `down`, сейчас здоров | 135/150 |\n| **nl** | Потери на пути к **de**, порт 8443 | 98/150 |\n\n### Что бы я сделал\n\n1. Убрать прямые серверы **tr** и **be** из подписок, оставить реле через ru:\n   - люди получат рабочий путь вместо мёртвого адреса;\n   - реле сейчас в норме.\n2. Посмотреть UDP 8443 на пути **tr → de**.\n\n> Потери до **de** у шести нод сразу — это скорее порты самой de, а не источники.\n\nСтраницы: [Ноды](/nodes) · [Алерты](/health)",
+    }),
+  ];
+  const messages = state === "chat-empty" ? [] : state === "chat-typing" ? working : state === "chat-table" ? tableTurn : conversation;
   return (
     <Shot id={`ai-${state}`} title="The floating chat" seed={[[["assistant", "conversations", ""], conversations], [["assistant", "access"], access]]}>
       <div className="relative h-[1000px]">

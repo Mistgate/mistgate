@@ -72,4 +72,37 @@ describe("the assistant's Markdown", () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toMatchObject({ kind: "list", ordered: false });
   });
+
+  // what a real answer sent and the chat showed as one run-on paragraph of pipes
+  it("draws a table, with its alignment, and keeps a pipe inside code in its cell", () => {
+    const el = render(
+      "За последние 24 часа проблемы у **9 нод**:\n\n| Нода | Что произошло | Потери |\n|---|---|--:|\n| **tr** | Доступность из РФ: `blocked` | 0/150 |\n| ru2 | Порт `a|b` | 37/150 |\n\nde отдельных ошибок не имеет.",
+    );
+    const table = el.querySelector("table")!;
+    expect(table).not.toBeNull();
+    expect([...table.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["Нода", "Что произошло", "Потери"]);
+    const rows = [...table.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
+    expect(rows).toEqual([
+      ["tr", "Доступность из РФ: blocked", "0/150"],
+      ["ru2", "Порт a|b", "37/150"],
+    ]);
+    expect(table.querySelector("tbody td:last-child")?.className).toContain("text-end");
+    expect(el.textContent).not.toContain("|---|");
+    expect([...el.querySelectorAll("p")].map((p) => p.textContent)).toEqual(["За последние 24 часа проблемы у 9 нод:", "de отдельных ошибок не имеет."]);
+  });
+
+  it("nests an indented list, and knows headings, quotes and rules", () => {
+    const el = render("## Коротко\n\n- tr\n  - blocked\n  - 0/150 to de\n- be\n\n> a quote\n\n---\n\n#### small");
+    expect(el.querySelector("h3")?.textContent).toBe("Коротко");
+    expect(el.querySelector("h5")?.textContent).toBe("small");
+    const outer = el.querySelector("ul")!;
+    expect(outer.children).toHaveLength(2);
+    expect([...outer.querySelectorAll("li > ul > li")].map((li) => li.textContent)).toEqual(["blocked", "0/150 to de"]);
+    expect(el.querySelector("blockquote")?.textContent).toBe("a quote");
+    expect(el.querySelector("hr")).not.toBeNull();
+  });
+
+  it("leaves a line with a pipe but no separator row as text", () => {
+    expect(parseChatMarkdown("a | b\nnot a table")).toEqual([expect.objectContaining({ kind: "paragraph" })]);
+  });
 });
