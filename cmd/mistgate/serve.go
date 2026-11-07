@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -15,6 +14,8 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/logring"
+	"github.com/mistgate/mistgate/internal/panel/app"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
 	settings "github.com/mistgate/mistgate/internal/panel/instance"
@@ -57,6 +58,8 @@ func runServe(args []string) error {
 	acmeEmail := fs.String("acme-email", os.Getenv("MISTGATE_ACME_EMAIL"), "contact address for Let's Encrypt (optional)")
 	acmeHTTP := fs.String("acme-http", envSetOr("MISTGATE_ACME_HTTP", ":80"), "listener for ACME HTTP-01 and the http -> https redirect, used with --acme-domain (empty disables it)")
 	sourceURL := fs.String("source-url", sourceURLDefault(), "where the source code of this build is published, linked next to the version in the admin only (AGPL-3.0 section 13); a fork points it at its own repository, empty hides the link")
+	logLevel := fs.String("log-level", envOr("MISTGATE_LOG_LEVEL", "info"), "the panel log level at start: debug, info, warn or error (the owner can change it while it runs: Settings -> System; a restart returns to this value)")
+	logFormat := fs.String("log-format", envOr("MISTGATE_LOG_FORMAT", "text"), "format of the panel log on stderr: text or json")
 	var acmeDomains, trustedProxies listFlag
 	fs.Var(&acmeDomains, "acme-domain", "get a Let's Encrypt certificate for this host name (repeatable; comma-separated env MISTGATE_ACME_DOMAIN); the public listener must be reachable on port 443; using it accepts the CA's terms of service")
 	fs.Var(&trustedProxies, "trusted-proxy", "CIDR or IP of a reverse proxy whose X-Forwarded-For / Forwarded headers are believed (repeatable; env MISTGATE_TRUSTED_PROXY). Without it the TCP peer is the client")
@@ -85,7 +88,14 @@ func runServe(args []string) error {
 	if *updateService == "" && !*dev {
 		*updateService = "mistgate.service"
 	}
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	level, ok := logring.ParseLevel(*logLevel)
+	if !ok {
+		return fmt.Errorf("--log-level %q: want debug, info, warn or error", *logLevel)
+	}
+	if *logFormat != "text" && *logFormat != "json" {
+		return fmt.Errorf("--log-format %q: want text or json", *logFormat)
+	}
+	log, logs, logLevelVar := logring.New(os.Stderr, *logFormat, level, logring.DefaultCapacity)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if *dev {
@@ -158,6 +168,7 @@ func runServe(args []string) error {
 	p, err := newPanel(st, vlt, authSvc, panelOpts{
 		in: in, decoyDir: *decoyDir, title: brand.BrandName(), dataDir: *dataDir,
 		panelAddr: agentAddress(*agentAddr, *agentListen, in.PublicURL), updateService: *updateService, masterKey: key,
+		ops: &app.OpsConfig{Ring: logs, Level: logLevelVar, DefaultLevel: level, Format: *logFormat},
 	}, log)
 	if err != nil {
 		return err

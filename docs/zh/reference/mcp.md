@@ -102,6 +102,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `relay_candidates` | 只读 | 针对某个入口节点（`node`）：它可以中转的其他节点的服务器。每个服务器包含：`inbound_id`（`relay_plan` 所接收的值）、出口节点、协议配置、协议、网络和端口；`unsupported`（`cdn`、`acme_ip`、`awg`、`build_failed`；为空表示可以中转）；`hop`（服务器带跳跃范围，中转只传递一个端口）；`relay_id`（该入口已在中转它）；`exit_country_check`（国家检测如何看待出口：`ok`、`partial`、`blocked`、`listed` 或 `no_data`，以及它在哪些网络中不可达）；`entry_reaches_exit`（`reach`、`partial`、`blocked` 或 `no_data`，TSPU 探测从该入口运行过时才知道）。`entry_country_check` 是对入口自身的同样检查。`no_data` 表示未知，不表示没问题。不含地址。 |
 | `node_metrics` | 只读 | 节点当前的 CPU、RAM、磁盘和网络数据、今日流量、各协议的在线用户，以及今日流量最高的用户。带 `hours`（1 到 720）时还返回按小时的主机负载（CPU 均值与峰值、softirq、RAM、网络、会话；超过 96 小时的窗口按 `bucket_hours` 分组）以及整个窗口的峰值及其所在小时。面板保留 90 天。 不带 `node` 时：为每个未退役的节点返回一行当前指标（不含用户排行和历史）。 |
 | `node_runtime` | 只读 | `node`（留空 = 所有节点）。节点实际运行的内容与面板期望的对照：期望与已应用的版本号和哈希（12 个字符）、`in_sync`、`drift` 及起始时间、最近一次应用，以及每个 inbound 的 `enabled`（属于期望状态）、`spec_version`、已应用的规格哈希、已应用与实时状态、最近错误和证书到期时间。`attention` 列出不一致之处：`applied_not_desired`（孤儿 inbound 的样子）、`desired_not_applied`、`failed`、`unknown_running`。不返回地址、证书指纹或密钥；不会联系节点。 |
+| `panel_logs` | 管理员 | 面板自身最近的日志记录（内存环形缓冲，保留最近 5000 条，重启后丢失），最新的在前；地址、秘密名称和形似密钥的值已移除，属性只保留白名单中的键。筛选：`min_level`（`debug`、`info`、`warn`、`error`，默认 `info`）、`minutes`（最多 10080）、`query`（消息或属性值的子串，最长 100 个字符，在清理后的文本中匹配）、`component`（`health`、`fleet`、`http` 等）、`code`（精确的错误码）、`request_id`（管理界面在请求失败时显示的代码）、`limit`（默认 100，最多 500）和 `cursor`（上一页的 `next_cursor`）。`level`、`buffered` 和 `capacity` 说明缓冲区的状态。消息来自面板自己的代码和它处理过的数据：属于不可信文本。 |
+| `retention_status` | 管理员 | 面板保存所存数据的时长：每项设置（`journal_days`、`events_info_days`、`events_warn_days`、`audit_days`、`alerts_days`、`check_samples_hours`、`check_daily_days`、`host_history_days`、`traffic_bucket_days`、`node_traffic_hour_days`）的当前值、默认值、范围和单位。 |
 | `path_loss_matrix` | 只读 | `hours`（1 到 720，默认 24）。端口检测中丢包的节点间 UDP 路径：发送方、目标、端口、发送数、到达数、`loss_pct`、同一目标上到达正常的另一个发送方和 `open_ports`（途中的过滤），以及每个目标有多少发送方丢包，用来区分节点问题和路径问题。只显示节点名称。 |
 | `node_doctor` | 只读 | 单个节点或所有节点最近保存的诊断报告，以及修复 ID。从操作员权限级别起，还可设置 `refresh: true`：让节点立即运行检查（只读取主机信息，最多等待 30 s）。 带 `refresh: true` 且不带 `node` 时，每个已连接的节点都会运行自己的检查（一次最多 24 个节点）；`kept_last_report` 列出保留上一份报告的节点：它们离线，或其代理版本过旧。 |
 | `node_ports` | 只读 | 已保存的 UDP 投递检查、TCP 可达性，以及每个端口上的入站/协议配置：`direct_in_subscriptions` 表示是否列出节点地址，`cdn` 表示客户端是否通过 CDN 主机连接。操作员权限可设置 `check: true` 运行有时限的检查（约 15 s）。 不带 `node` 时：为每个未退役的节点返回一行精简结果，只含已保存的结果（`check` 需要指定节点）。 |
@@ -185,6 +187,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_update_schedule` | 管理员 | 计划参数：`node_id`、`local_datetime`（使用 `updates_status` 中的偏移量，格式为 `YYYY-MM-DDTHH:mm`，至少提前一分钟且最多提前一年）；计划会固定受信任的版本和偏移量 | 始终 |
 | `node_update_schedule_cancel` | 管理员 | `node_id` | 始终 |
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
+| `log_level` | 管理员 | `level`（`debug`、`info`、`warn` 或 `error`）。设置面板的日志级别，直到下次重启，之后回到 `--log-level` / `MISTGATE_LOG_LEVEL`。不删除任何内容。 | 否 |
+| `retention` | 管理员 | `values`：设置名称及其新值（名称、单位和范围见 `retention_status`）。更短的时间会在下一次每小时清理时永久删除更早的行。 | 总是（需 step-up） |
 | `rollout_pause`, `rollout_resume`, `rollout_cancel` | 管理员 | `updates_status` 中的 `rollout_id` | 始终 |
 | `node_rollback` | 管理员 | `node` | 始终 |
 | `node_install` | 管理员 | 计划参数：`host`、`port`（默认 22）、`username`（root 或具有免密 sudo 权限的用户）、节点 `name`（2 到 24 个字母、数字或连字符）、`address`，以及可选的 `country_code`、`location`、`provider`；执行时只接收 `confirm_token`。计划只读取服务器的公开主机密钥。所有者在审批页面确认主机密钥，并选择面板密钥或输入 SSH 密码；密码安装默认同时添加面板密钥 | 始终 |
@@ -236,7 +240,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 
 | 代码 | 含义 | 工具 |
 |---|---|---|
-| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
+| `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`retention`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
 | `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
 | `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |

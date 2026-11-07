@@ -166,8 +166,8 @@ func TestCronOpRunsEdgeTickAndReleasesFanout(t *testing.T) {
 	// the signal batch, the active alerts, the interval setting, the update rollout and the country settings. Telegram's pending
 	// code check adds one read on every tick. The updates job adds the active rollout read, and its history prune at minute 17.
 	// The evaluator pass reads both external-source settings in one batched call, even while those sources are off.
-	if got := retentionCounts.Get("sequentialQueries").Int(); got != 33 {
-		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 33 (5 tick + 2 updates + Telegram code check + one cheburcheck and one bsbord settings read + 16 retention + 6 evaluator + one batched external settings read)", got)
+	if got := retentionCounts.Get("sequentialQueries").Int(); got != 36 {
+		t.Fatalf("minute 17 cron used %d sequential D1 calls, want 36 (5 tick + 2 updates + Telegram code check + one cheburcheck and one bsbord settings read + 19 retention (the batched retention settings read and the two hourly traffic prunes included) + 6 evaluator + one batched external settings read)", got)
 	}
 	// Three batches: the node-down sweep's live read (every tick), the evaluator's signal batch and the daily rollup; the
 	// prunes are single statements.

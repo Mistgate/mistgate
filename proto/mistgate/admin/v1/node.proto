@@ -603,6 +603,8 @@ message GetNodeJournalRequest {
   string query = 6;
   // At most 200; 0 means 100.
   uint32 limit = 7;
+  // "" = all; else only entries whose "code" attribute is exactly this (case-insensitive), such as "engine_failed".
+  string code = 8;
 }
 
 // One kind of record of one node in one hour.

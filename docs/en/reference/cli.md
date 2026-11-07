@@ -52,6 +52,8 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | A directory with your own decoy site. `404.html` and `429.html` in it replace the built-in error pages. |
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` (comma-separated) | none | CIDR or IP of a reverse proxy whose `X-Forwarded-For` and `Forwarded` headers are believed. Repeatable. Without it the TCP peer is the client. |
 | `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | The panel's own systemd unit, which the panel updater stops and starts again around the binary swap. Used when the panel runs as root; a panel running as another user starts the fixed root helper unit, whose command line names the unit itself. |
+| `--log-level` | `MISTGATE_LOG_LEVEL` | `info` | The panel log level at start: `debug`, `info`, `warn` or `error`. The owner can change it while the panel runs (Settings → System); a restart returns to this value. |
+| `--log-format` | `MISTGATE_LOG_FORMAT` | `text` | `text` or `json`: the format of the log on stderr. |
 | `--source-url` | `MISTGATE_SOURCE_URL` | `https://github.com/Mistgate/mistgate` | Where the source code of this build is published, linked next to the version in the admin (AGPL-3.0 section 13). A fork points it at its own repository; an empty value hides the link. |
 | `--dev` | `MISTGATE_DEV` (`1`, `true`, `yes`, `on`) | off | Development mode, see below. |
 

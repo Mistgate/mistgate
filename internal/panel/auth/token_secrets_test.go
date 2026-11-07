@@ -60,6 +60,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.ListNodeServerKeysResponse.keys":                   "public SSH keys from a server's authorized_keys file; private keys are never read or returned",
 		"mistgate.admin.v1.AddNodeServerKeyResponse.key":                      "the public key just added to a server",
 		"mistgate.admin.v1.NodeServerKey.panel_key":                           "a bool marking the panel's public SSH key",
+		"mistgate.ops.v1.RetentionItem.key":                                   "the name of a retention setting (journal_days ...), not a key",
 	}
 	seen := map[protoreflect.FullName]bool{}
 	var walk func(md protoreflect.MessageDescriptor, via string)

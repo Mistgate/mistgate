@@ -243,6 +243,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	cfg.MCP = mcpEndpoint(k.authSvc, k.st, k.log, k.tg.PlanWaiting, k.c.Clock)
 	// The admin's framed preview of the public user page (session and read role are checked by the server).
 	cfg.UserPagePreview = subs.PreviewHandler(k.acc, parts.cfg)
+	k.addOps(&cfg)
 	return cfg
 }
 

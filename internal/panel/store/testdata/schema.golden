@@ -367,6 +367,12 @@
   },
   {
     "type": "index",
+    "name": "traffic_bucket_hour",
+    "tbl_name": "traffic_bucket",
+    "sql": "CREATE INDEX traffic_bucket_hour ON traffic_bucket (hour_start)"
+  },
+  {
+    "type": "index",
     "name": "traffic_bucket_node_hour",
     "tbl_name": "traffic_bucket",
     "sql": "CREATE INDEX traffic_bucket_node_hour ON traffic_bucket (node_id, hour_start)"

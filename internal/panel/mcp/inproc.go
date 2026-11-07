@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
 )
 
@@ -64,6 +65,7 @@ type clients struct {
 	Reachability adminv1connect.CountryReachabilityServiceClient
 	Backup       adminv1connect.BackupServiceClient
 	Probe        probev1connect.ProbeServiceClient
+	Ops          opsv1connect.OpsServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -87,6 +89,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Reachability: adminv1connect.NewCountryReachabilityServiceClient(hc, base),
 		Backup:       adminv1connect.NewBackupServiceClient(hc, base),
 		Probe:        probev1connect.NewProbeServiceClient(hc, base),
+		Ops:          opsv1connect.NewOpsServiceClient(hc, base),
 	}
 }
 

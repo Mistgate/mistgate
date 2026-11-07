@@ -112,6 +112,21 @@ function known(c: ConnectError, t: T): string | undefined {
   return t(`err.${code}`, filled);
 }
 
+/**
+ * The generic "something went wrong" line, with the request code the panel stamped on the response (X-Request-Id, VPS edition) so
+ * a person can quote it and an operator finds the request in the panel logs and the audit log.
+ */
+function generic(c: ConnectError, t: T): string {
+  const id = requestIdOf(c);
+  return id ? `${t("err.generic")} ${t("err.requestCode", { id })}` : t("err.generic");
+}
+
+/** The request code the panel put on a failed call (the X-Request-Id header of a signed-in call, VPS edition), or "". */
+export function requestIdOf(e: unknown): string {
+  const id = ConnectError.from(e).metadata.get("x-request-id") ?? "";
+  return /^[0-9a-f]{8}$/.test(id) ? id : "";
+}
+
 /** PermissionDenied messages from bearer policy have distinct causes; keep the actual role denial distinct too. */
 function permissionDenied(c: ConnectError, t: T): string {
   switch (c.rawMessage) {
@@ -152,9 +167,9 @@ export function errorText(e: unknown, t: T): string {
     case Code.AlreadyExists:
     case Code.FailedPrecondition:
     case Code.Aborted:
-      return known(c, t) ?? (c.rawMessage || t("err.generic"));
+      return known(c, t) ?? (c.rawMessage || generic(c, t));
     default:
-      return t("err.generic");
+      return generic(c, t);
   }
 }
 

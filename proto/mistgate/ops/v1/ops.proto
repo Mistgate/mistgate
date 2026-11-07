@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package mistgate.ops.v1;
+
+// The panel's own diagnostics and data lifecycle: its log ring and level, retention of what it stores, an export, and the
+// metrics endpoint's switch. A separate package from mistgate.admin.v1 on purpose: the Cloudflare edition's admin Worker links
+// every admin message, and none of this runs there (the VPS edition mounts the service; the edition without it answers
+// UNIMPLEMENTED "not available on this edition"). Every procedure is owner-only (admin-profile tokens read panel logs and plan
+// changes through MCP); a procedure missing from the role policy is owner-only too.
+service OpsService {
+  // The log level now in force, the one the panel started with, and the size of the ring.
+  rpc GetLogSettings(GetLogSettingsRequest) returns (GetLogSettingsResponse);
+  // Changes the level until the next restart; the panel goes back to its configured default (--log-level or MISTGATE_LOG_LEVEL).
+  rpc SetLogLevel(SetLogLevelRequest) returns (SetLogLevelResponse);
+  // The panel's recent log records, newest first, with their text scrubbed (addresses, secret names, key-shaped values) and only
+  // the attribute keys of an allow-list. A read: every record is cleaned on the way out.
+  rpc GetPanelLogs(GetPanelLogsRequest) returns (GetPanelLogsResponse);
+  // How long each pruned table keeps its rows: the owner's values and the defaults.
+  rpc GetRetention(GetRetentionRequest) returns (GetRetentionResponse);
+  // Changes some of them. A value outside its limits is INVALID_ARGUMENT; a field left out stays as it is.
+  rpc SetRetention(SetRetentionRequest) returns (SetRetentionResponse);
+  // Streams newline-delimited JSON of the timeline events, the audit log, the node journal and the panel's logs of a window.
+  // Every row is scrubbed like panel_logs. The stream is a download: the admin UI saves it as a file.
+  rpc ExportData(ExportDataRequest) returns (stream ExportDataResponse);
+  // Whether /metrics is on and whether it has a token. The token itself is never returned here.
+  rpc GetMetricsSettings(GetMetricsSettingsRequest) returns (GetMetricsSettingsResponse);
+  // Turns /metrics on or off and, with rotate_token, makes a new token; the token is in this response once and only its hash is
+  // stored. Turning it on without a token makes one.
+  rpc SetMetricsSettings(SetMetricsSettingsRequest) returns (SetMetricsSettingsResponse);
+}
+
+message GetLogSettingsRequest {}
+
+message GetLogSettingsResponse {
+  // "debug", "info", "warn" or "error".
+  string level = 1;
+  // The level the panel starts with.
+  string default_level = 2;
+  // "text" or "json": the format of the process's own output (the ring is the same either way).
+  string format = 3;
+  // Records held now and the most the ring keeps.
+  uint32 buffered = 4;
+  uint32 capacity = 5;
+}
+
+message SetLogLevelRequest {
+  // "debug", "info", "warn" or "error".
+  string level = 1;
+}
+
+message SetLogLevelResponse {
+  string level = 1;
+}
+
+message GetPanelLogsRequest {
+  // The lowest level: "debug", "info", "warn" or "error". "" means "info".
+  string min_level = 1;
+  // The window, unix seconds; 0 = open on that side.
+  int64 since_unix = 2 [jstype = JS_NUMBER];
+  int64 until_unix = 3 [jstype = JS_NUMBER];
+  // Case-insensitive substring of the message or of an attribute value; at most 100 characters.
+  string query = 4;
+  // The part of the panel that logged ("health", "fleet", "http" ...); "" = all.
+  string component = 5;
+  // An exact error code ("prune_failed" ...); "" = all.
+  string code = 6;
+  // A request id as the admin UI shows it ("abc12345"); "" = all.
+  string request_id = 7;
+  // At most 500; 0 means 100.
+  uint32 limit = 8;
+  // The next_cursor of the previous page ("" = from the newest).
+  int64 before_seq = 9 [jstype = JS_NUMBER];
+}
+
+message PanelLogEntry {
+  int64 seq = 1 [jstype = JS_NUMBER];
+  int64 time_unix_ms = 2 [jstype = JS_NUMBER];
+  // "debug", "info", "warn" or "error".
+  string level = 3;
+  string component = 4;
+  string message = 5;
+  string code = 6;
+  string request_id = 7;
+  // Only the allow-listed keys, values scrubbed.
+  map<string, string> attrs = 8;
+}
+
+message GetPanelLogsResponse {
+  repeated PanelLogEntry entries = 1;
+  // Pass as before_seq for the next page; 0 when there is none.
+  int64 next_cursor = 2 [jstype = JS_NUMBER];
+  // The level in force and the ring, so an empty answer can be read ("the level hides debug").
+  string level = 3;
+  uint32 buffered = 4;
+  uint32 capacity = 5;
+}
+
+// One retention setting.
+message RetentionItem {
+  // journal_days, events_info_days, events_warn_days, audit_days, alerts_days, check_samples_hours, check_daily_days,
+  // host_history_days, traffic_bucket_days, node_traffic_hour_days.
+  string key = 1;
+  uint32 value = 2;
+  uint32 default_value = 3;
+  uint32 min = 4;
+  uint32 max = 5;
+  // "days" or "hours".
+  string unit = 6;
+}
+
+message GetRetentionRequest {}
+
+message GetRetentionResponse {
+  repeated RetentionItem items = 1;
+}
+
+message SetRetentionRequest {
+  // key -> value, only the fields to change.
+  map<string, uint32> values = 1;
+}
+
+message SetRetentionResponse {
+  repeated RetentionItem items = 1;
+}
+
+message ExportDataRequest {
+  // The window, unix seconds, at most 31 days; 0 and 0 mean the last 24 hours.
+  int64 since_unix = 1 [jstype = JS_NUMBER];
+  int64 until_unix = 2 [jstype = JS_NUMBER];
+  // Which sources: "events", "audit", "journal", "logs". Empty = all four.
+  repeated string sources = 3;
+}
+
+message ExportDataResponse {
+  // A piece of the NDJSON, always ending at a line boundary.
+  bytes data = 1;
+}
+
+message GetMetricsSettingsRequest {}
+
+message GetMetricsSettingsResponse {
+  bool enabled = 1;
+  bool has_token = 2;
+}
+
+message SetMetricsSettingsRequest {
+  optional bool enabled = 1;
+  bool rotate_token = 2;
+}
+
+message SetMetricsSettingsResponse {
+  bool enabled = 1;
+  bool has_token = 2;
+  // Set only when a token was made by this call. It is not stored and cannot be read again.
+  string token = 3;
+}
