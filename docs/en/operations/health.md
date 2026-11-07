@@ -139,7 +139,7 @@ Whether the nodes open from inside a country (Russia by default) is checked by G
 
 ## Node doctor
 
-Every node agent runs 18 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
+Every node agent runs 21 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
 
 ### When it runs
 

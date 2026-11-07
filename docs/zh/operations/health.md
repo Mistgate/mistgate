@@ -139,7 +139,7 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 
 ## 节点诊断
 
-每个节点 Agent 都会运行 18 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
+每个节点 Agent 都会运行 21 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
 
 ### 运行时间
 
