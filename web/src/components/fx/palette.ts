@@ -120,10 +120,13 @@ export function bandHalfWidth(bandWidth: number, length: number): number {
   return Math.min(420, Math.max(64, (bandWidth * length) / 2));
 }
 
-/** Where the band's centre is along the element (px from the start edge) at eased progress `p`: from off the edge to off the other edge. */
+/**
+ * Where the band's centre is along the element (px from the start edge) at eased progress `p`: from wholly off the start
+ * edge to wholly off the end edge, so the light crosses the element from edge to edge and never stops short of one.
+ */
 export function bandCenter(p: number, length: number, half: number): number {
-  const from = -half * 0.9;
-  const to = length + half * 0.9;
+  const from = -half * 1.15;
+  const to = length + half * 1.15;
   return from + (to - from) * p;
 }
 

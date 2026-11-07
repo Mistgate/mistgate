@@ -19,7 +19,7 @@ import {
   type EasingName,
   type PaletteName,
 } from "./palette";
-import { getPainter, releasePainter, type PaintJob } from "./renderer";
+import { getPainter, releasePainter, viewportBox, type PaintJob } from "./renderer";
 
 export type SweepOptions = {
   /** Which way the band goes. "inline" (default) follows the reading direction: right to left in Persian. */
@@ -204,8 +204,7 @@ function frame(now: number) {
   // dark pages get the band added to them (screen); light ones a normal, softer blend
   const dark = document.documentElement.dataset.theme !== "light";
   painter.begin(dark ? "screen" : "normal");
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const { w: vw, h: vh } = viewportBox();
   for (const t of [...tasks.values()]) {
     const el = t.el;
     if (!el.isConnected) {

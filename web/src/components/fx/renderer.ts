@@ -177,8 +177,11 @@ class GlPainter implements Painter {
     this.layer.style.mixBlendMode = blend;
     const gl = this.gl;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.round(window.innerWidth * this.dpr));
-    const h = Math.max(1, Math.round(window.innerHeight * this.dpr));
+    // the layer's own box, not innerWidth: the page keeps a scrollbar gutter, and a buffer as wide as the window would be
+    // squeezed into the narrower layer, so every band would land short of its element's end edge and be cut there
+    const { w: cssW, h: cssH } = viewportBox();
+    const w = Math.max(1, Math.round(cssW * this.dpr));
+    const h = Math.max(1, Math.round(cssH * this.dpr));
     if (w !== this.bufW || h !== this.bufH) {
       this.canvas.width = this.bufW = w;
       this.canvas.height = this.bufH = h;
@@ -374,3 +377,8 @@ export function resetPainter(): void {
   clearTimeout(idle);
 }
 
+/** The area the fixed effects layer covers, in CSS px: the viewport without its scrollbars. */
+export function viewportBox(): { w: number; h: number } {
+  const root = document.documentElement;
+  return { w: root.clientWidth || window.innerWidth, h: root.clientHeight || window.innerHeight };
+}
