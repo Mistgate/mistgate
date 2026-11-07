@@ -79,6 +79,10 @@ const paths = {
   cloud: "M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 9.1 4.5 4.5 0 0 0 7 18z",
   pin: "M9 3h6l-1 6 3 3H7l3-3-1-6zM12 12v9",
   qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z",
+  // the graph editor's toolbar
+  minus: "M5 12h14",
+  fit: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
+  arrange: "M3 8h5v8H3zM16 4h5v5h-5zM16 15h5v5h-5zM8 12h4M12 6.5h4M12 17.5h4M12 6.5v11",
 } as const;
 
 export type IconName = keyof typeof paths;

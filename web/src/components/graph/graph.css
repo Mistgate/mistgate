@@ -1,0 +1,377 @@
+/* Node graph editor (components/graph). The canvas is a dot grid in a rounded frame; node cards, ports and wires use the
+   panel's tokens, so both themes work. Ports: hollow = free, filled = connected, coloured by --pc (the port type). */
+[data-tone="muted"] {
+  --t: var(--muted);
+}
+.mg-graph {
+  --shadow-node: 0 1px 2px rgb(0 0 0 / 0.28), 0 12px 28px -16px rgb(0 0 0 / 0.65);
+  --wp: 100%; /* how much of a type or state colour a wire and a port keep: darkened a little on the light theme */
+  --gstep: 24px;
+  --gx: 0px;
+  --gy: 0px;
+  background-color: color-mix(in oklch, var(--surface) 38%, var(--bg));
+  background-image: radial-gradient(circle, color-mix(in oklch, var(--muted) 42%, transparent) 1px, transparent 1.5px);
+  background-size: var(--gstep) var(--gstep);
+  background-position: var(--gx) var(--gy);
+  touch-action: none;
+  cursor: default;
+}
+:root[data-theme="light"] .mg-graph {
+  --wp: 90%;
+  --shadow-node: 0 1px 2px rgb(20 20 30 / 0.07), 0 10px 24px -16px rgb(20 20 30 / 0.22);
+  background-color: color-mix(in oklch, var(--surface-2) 55%, var(--surface));
+}
+.mg-graph[data-space] {
+  cursor: grab;
+}
+.mg-graph[data-mode="pan"],
+.mg-graph[data-mode="drag"] {
+  cursor: grabbing;
+}
+.mg-graph[data-mode="wire"] {
+  cursor: crosshair;
+}
+.mg-gworld {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+.mg-gsvg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+.mg-gsvg.mg-gtop {
+  z-index: 4;
+}
+.mg-gnode {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-node);
+  color: var(--text);
+  outline: none;
+  cursor: default;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.mg-gnode:not([data-fixed]) {
+  cursor: grab;
+}
+.mg-graph[data-mode="drag"] .mg-gnode {
+  cursor: grabbing;
+}
+.mg-gnode[data-selected] {
+  z-index: 2;
+  border-color: color-mix(in oklch, var(--text) 82%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--text) 30%, transparent),
+    var(--shadow-node);
+}
+.mg-gnode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.mg-ghead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 9px 9px 0 0;
+  background: color-mix(in oklch, var(--t, var(--muted)) 8%, var(--surface));
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+.mg-gport {
+  --tx: -50%;
+  --s: 1;
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: crosshair;
+  transform: translate(var(--tx), -50%) scale(var(--s));
+  transition:
+    transform 0.14s var(--ease-out-soft),
+    box-shadow 0.18s,
+    opacity 0.18s,
+    background-color 0.18s;
+}
+.mg-gport::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 999px;
+}
+.mg-gport[data-side="in"] {
+  left: -0.5px;
+}
+.mg-gport[data-side="out"] {
+  --tx: 50%;
+  right: -0.5px;
+}
+.mg-gport[data-connected] {
+  background: color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+}
+.mg-gport:hover,
+.mg-gport:focus-visible {
+  --s: 1.28;
+}
+.mg-gport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mg-gport[data-role="source"] {
+  --s: 1.2;
+  background: color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--pc, var(--muted)) 26%, transparent);
+}
+.mg-gport[data-role="target"] {
+  --s: 1.15;
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--pc, var(--muted)) 28%, transparent);
+  animation: mg-gpulse 1.4s ease-in-out infinite;
+}
+.mg-gport[data-role="dim"] {
+  opacity: 0.2;
+}
+.mg-gport[data-role="current"],
+.mg-gport[data-snap] {
+  --s: 1.4;
+  background: color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 5px color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
+  animation: none;
+}
+.mg-gport[data-bad] {
+  --s: 1.2;
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px var(--danger-soft);
+  opacity: 1;
+}
+.mg-gport[data-disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+@keyframes mg-gpulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--pc, var(--muted)) 12%, transparent);
+  }
+}
+/* wires */
+.mg-gwire {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: stroke-width 0.12s;
+}
+.mg-gwire-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+  cursor: pointer;
+  outline: none;
+}
+.mg-gwire-hit:focus-visible {
+  stroke: color-mix(in oklch, var(--accent) 30%, transparent);
+}
+.mg-gwire-halo {
+  fill: none;
+  stroke-width: 8px;
+  stroke-linecap: round;
+  opacity: 0.16;
+  pointer-events: none;
+}
+.mg-gwire-drag {
+  stroke-width: 2px;
+  stroke-dasharray: 2 5;
+}
+.mg-gwire-flow {
+  stroke-dasharray: 6 10;
+  animation: mg-gflow 1.8s linear infinite;
+}
+.mg-gwire-pending {
+  stroke-dasharray: 4 7;
+  animation: mg-gflow 0.9s linear infinite;
+}
+@keyframes mg-gflow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mg-gwire-flow,
+  .mg-gwire-pending,
+  .mg-gport[data-role="target"] {
+    animation: none;
+  }
+}
+.mg-glabels {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.mg-glabel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 220px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.mg-glabel[data-error] {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  cursor: default;
+}
+/* chrome: toolbar, minimap, menu, marquee, hint */
+.mg-gtoolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in oklch, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-dock);
+}
+.mg-gminimap {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--surface) 85%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-dock);
+}
+.mg-gmenu {
+  position: absolute;
+  z-index: 11;
+  min-width: 168px;
+  padding: 4px;
+  transform: translate(-50%, 14px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-toast);
+}
+.mg-gmarquee {
+  position: absolute;
+  z-index: 9;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+  pointer-events: none;
+}
+.mg-ghint {
+  position: absolute;
+  z-index: 12;
+  max-width: 260px;
+  padding: 5px 9px;
+  border: 1px solid var(--danger);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--danger-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: var(--shadow-toast);
+}
+/* a slider in a node: a thin track with the accent up to the thumb */
+.mg-range {
+  display: block;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.mg-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--accent) var(--p, 50%), var(--surface-2) var(--p, 50%));
+}
+.mg-range::-moz-range-track {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--surface-2);
+}
+.mg-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+.mg-range::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid var(--accent);
+  border-radius: 99px;
+  background: var(--surface);
+  appearance: none;
+  transition: transform 0.12s;
+}
+.mg-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--accent);
+  border-radius: 99px;
+  background: var(--surface);
+}
+.mg-range:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.mg-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}

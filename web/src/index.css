@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./fonts/fonts.css";
 @import "./assets/mark-motion.css";
+@import "./components/graph/graph.css";
 
 /*
  * Design tokens. This is the ONE place colours, radii, type and

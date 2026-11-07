@@ -64,6 +64,7 @@ import { ReleaseKit } from "./dev-kit-release";
 import { RestoreKit } from "./dev-kit-restore";
 import { AiKit } from "./dev-kit-ai";
 import { FxKit } from "./dev-kit-fx";
+import { GraphKit } from "./dev-kit-graph";
 
 // Development only (see router.tsx): every primitive in one place, to look at in both themes and at
 // 390 and 1280 px. Plain English on purpose: this page never ships.
@@ -293,12 +294,12 @@ export default function DevKit() {
   const turnstile = useRef<TurnstileHandle>(null);
   const [replay, setReplay] = useState(0);
   const [linkDemo, setLinkDemo] = useState<"pw" | "plain" | "awg" | "nothing" | null>(null);
-  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|bulk|bulk-users: one kit alone, for its screenshots;
+  // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|bulk|bulk-users|graph: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
-  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit }[which];
+  const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit }[which];
   if (only) {
     const Kit = only;
     return (
