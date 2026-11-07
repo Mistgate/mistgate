@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/probe/v1/probe.proto.
  */
 export const file_mistgate_probe_v1_probe: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9wcm9iZS92MS9wcm9iZS5wcm90bxIRbWlzdGdhdGUucHJvYmUudjEiaAoQUGF0aFByb2JlUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIMCgRraW5kGAMgASgJEg0KBXBvcnRzGAQgAygNEg0KBXNpemVzGAUgAygNIlUKDVBhdGhQcm9iZVBvcnQSDAoEcG9ydBgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDRIPCgd2ZXJkaWN0GAQgASgJEgoKAm1zGAUgASgNIjgKDVBhdGhQcm9iZVNpemUSDAoEc2l6ZRgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDSLhAQoRUGF0aFByb2JlUmVzcG9uc2USEQoJZnJvbV9uYW1lGAEgASgJEg8KB3RvX25hbWUYAiABKAkSDAoEa2luZBgDIAEoCRITCgdhdF91bml4GAQgASgDQgIwAhINCgVlcnJvchgFIAEoCRIvCgVwb3J0cxgGIAMoCzIgLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVBvcnQSLwoFc2l6ZXMYByADKAsyIC5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVTaXplEhQKDGxhcmdlc3Rfc2l6ZRgIIAEoDSI8ChBOb2RlVHJhY2VSZXF1ZXN0EhQKDGZyb21fbm9kZV9pZBgBIAEoCRISCgp0b19ub2RlX2lkGAIgASgJIkgKCFRyYWNlSG9wEgsKA3R0bBgBIAEoDRIOCgZydHRfbXMYAiABKA0SEAoIYW5zd2VyZWQYAyABKAgSDQoFbGFiZWwYBCABKAki5gEKEU5vZGVUcmFjZVJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhMKB2F0X3VuaXgYAyABKANCAjACEg0KBWVycm9yGAQgASgJEg8KB3JlYWNoZWQYBSABKAgSKQoEaG9wcxgGIAMoCzIbLm1pc3RnYXRlLnByb2JlLnYxLlRyYWNlSG9wEhYKDmNoYW5nZWRfYXRfaG9wGAcgASgNEgwKBGRpZmYYCCABKAkSGQoNcHJldmlvdXNfdW5peBgJIAEoA0ICMAISDAoEa2VwdBgKIAEoDSIzChNOb2RlRG5zQ2hlY2tSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSCwoDcnVuGAIgASgIIl4KBkRuc1J1bhITCgdhdF91bml4GAEgASgDQgIwAhIOCgZwNTBfbXMYAiABKA0SDgoGcDk1X21zGAMgASgNEg4KBmZhaWxlZBgEIAEoDRIPCgdkb21haW5zGAUgASgNIp4BChROb2RlRG5zQ2hlY2tSZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSKQoGbGF0ZXN0GAMgASgLMhkubWlzdGdhdGUucHJvYmUudjEuRG5zUnVuEioKB2hpc3RvcnkYBCADKAsyGS5taXN0Z2F0ZS5wcm9iZS52MS5EbnNSdW4SDQoFdHJlbmQYBSABKAkynwIKDFByb2JlU2VydmljZRJWCglQYXRoUHJvYmUSIy5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVSZXF1ZXN0GiQubWlzdGdhdGUucHJvYmUudjEuUGF0aFByb2JlUmVzcG9uc2USVgoJTm9kZVRyYWNlEiMubWlzdGdhdGUucHJvYmUudjEuTm9kZVRyYWNlUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVUcmFjZVJlc3BvbnNlEl8KDE5vZGVEbnNDaGVjaxImLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVEbnNDaGVja1JlcXVlc3QaJy5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlRG5zQ2hlY2tSZXNwb25zZULFAQoVY29tLm1pc3RnYXRlLnByb2JlLnYxQgpQcm9iZVByb3RvUAFaOmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL3Byb2JlL3YxO3Byb2JldjGiAgNNUFiqAhFNaXN0Z2F0ZS5Qcm9iZS5WMcoCEU1pc3RnYXRlXFByb2JlXFYx4gIdTWlzdGdhdGVcUHJvYmVcVjFcR1BCTWV0YWRhdGHqAhNNaXN0Z2F0ZTo6UHJvYmU6OlYxYgZwcm90bzM");
+  fileDesc("Ch1taXN0Z2F0ZS9wcm9iZS92MS9wcm9iZS5wcm90bxIRbWlzdGdhdGUucHJvYmUudjEiaAoQUGF0aFByb2JlUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIMCgRraW5kGAMgASgJEg0KBXBvcnRzGAQgAygNEg0KBXNpemVzGAUgAygNIlUKDVBhdGhQcm9iZVBvcnQSDAoEcG9ydBgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDRIPCgd2ZXJkaWN0GAQgASgJEgoKAm1zGAUgASgNIjgKDVBhdGhQcm9iZVNpemUSDAoEc2l6ZRgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDSLhAQoRUGF0aFByb2JlUmVzcG9uc2USEQoJZnJvbV9uYW1lGAEgASgJEg8KB3RvX25hbWUYAiABKAkSDAoEa2luZBgDIAEoCRITCgdhdF91bml4GAQgASgDQgIwAhINCgVlcnJvchgFIAEoCRIvCgVwb3J0cxgGIAMoCzIgLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVBvcnQSLwoFc2l6ZXMYByADKAsyIC5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVTaXplEhQKDGxhcmdlc3Rfc2l6ZRgIIAEoDSI8ChBOb2RlVHJhY2VSZXF1ZXN0EhQKDGZyb21fbm9kZV9pZBgBIAEoCRISCgp0b19ub2RlX2lkGAIgASgJIkgKCFRyYWNlSG9wEgsKA3R0bBgBIAEoDRIOCgZydHRfbXMYAiABKA0SEAoIYW5zd2VyZWQYAyABKAgSDQoFbGFiZWwYBCABKAki5gEKEU5vZGVUcmFjZVJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhMKB2F0X3VuaXgYAyABKANCAjACEg0KBWVycm9yGAQgASgJEg8KB3JlYWNoZWQYBSABKAgSKQoEaG9wcxgGIAMoCzIbLm1pc3RnYXRlLnByb2JlLnYxLlRyYWNlSG9wEhYKDmNoYW5nZWRfYXRfaG9wGAcgASgNEgwKBGRpZmYYCCABKAkSGQoNcHJldmlvdXNfdW5peBgJIAEoA0ICMAISDAoEa2VwdBgKIAEoDSIzChNOb2RlRG5zQ2hlY2tSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSCwoDcnVuGAIgASgIIl4KBkRuc1J1bhITCgdhdF91bml4GAEgASgDQgIwAhIOCgZwNTBfbXMYAiABKA0SDgoGcDk1X21zGAMgASgNEg4KBmZhaWxlZBgEIAEoDRIPCgdkb21haW5zGAUgASgNIp4BChROb2RlRG5zQ2hlY2tSZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSKQoGbGF0ZXN0GAMgASgLMhkubWlzdGdhdGUucHJvYmUudjEuRG5zUnVuEioKB2hpc3RvcnkYBCADKAsyGS5taXN0Z2F0ZS5wcm9iZS52MS5EbnNSdW4SDQoFdHJlbmQYBSABKAkiWwoQUGF0aFNwZWVkUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIKCgJtYhgDIAEoDRIRCglkaXJlY3Rpb24YBCABKAki2QEKEVBhdGhTcGVlZFJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhEKCWRpcmVjdGlvbhgDIAEoCRIKCgJtYhgEIAEoDRITCgdhdF91bml4GAUgASgDQgIwAhINCgVlcnJvchgGIAEoCRIOCgZtYml0X3MYByABKAESEgoKY29ubmVjdF9tcxgIIAEoDRIVCg1maXJzdF9ieXRlX21zGAkgASgNEhMKC2R1cmF0aW9uX21zGAogASgNEg0KBWJ5dGVzGAsgASgEMvcCCgxQcm9iZVNlcnZpY2USVgoJUGF0aFByb2JlEiMubWlzdGdhdGUucHJvYmUudjEuUGF0aFByb2JlUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVJlc3BvbnNlElYKCU5vZGVUcmFjZRIjLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVUcmFjZVJlcXVlc3QaJC5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlVHJhY2VSZXNwb25zZRJfCgxOb2RlRG5zQ2hlY2sSJi5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlRG5zQ2hlY2tSZXF1ZXN0GicubWlzdGdhdGUucHJvYmUudjEuTm9kZURuc0NoZWNrUmVzcG9uc2USVgoJUGF0aFNwZWVkEiMubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUucHJvYmUudjFCClByb2JlUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvcHJvYmUvdjE7cHJvYmV2MaICA01QWKoCEU1pc3RnYXRlLlByb2JlLlYxygIRTWlzdGdhdGVcUHJvYmVcVjHiAh1NaXN0Z2F0ZVxQcm9iZVxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpQcm9iZTo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message mistgate.probe.v1.PathProbeRequest
@@ -426,6 +426,116 @@ export const NodeDnsCheckResponseSchema: GenMessage<NodeDnsCheckResponse> = /*@_
   messageDesc(file_mistgate_probe_v1_probe, 9);
 
 /**
+ * @generated from message mistgate.probe.v1.PathSpeedRequest
+ */
+export type PathSpeedRequest = Message<"mistgate.probe.v1.PathSpeedRequest"> & {
+  /**
+   * @generated from field: string from_node_id = 1;
+   */
+  fromNodeId: string;
+
+  /**
+   * @generated from field: string to_node_id = 2;
+   */
+  toNodeId: string;
+
+  /**
+   * 8 to 32.
+   *
+   * @generated from field: uint32 mb = 3;
+   */
+  mb: number;
+
+  /**
+   * "down" (the sender pulls from the target) or "up" (the sender pushes to the target).
+   *
+   * @generated from field: string direction = 4;
+   */
+  direction: string;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.PathSpeedRequest.
+ * Use `create(PathSpeedRequestSchema)` to create a new message.
+ */
+export const PathSpeedRequestSchema: GenMessage<PathSpeedRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 10);
+
+/**
+ * @generated from message mistgate.probe.v1.PathSpeedResponse
+ */
+export type PathSpeedResponse = Message<"mistgate.probe.v1.PathSpeedResponse"> & {
+  /**
+   * @generated from field: string from_name = 1;
+   */
+  fromName: string;
+
+  /**
+   * @generated from field: string to_name = 2;
+   */
+  toName: string;
+
+  /**
+   * @generated from field: string direction = 3;
+   */
+  direction: string;
+
+  /**
+   * @generated from field: uint32 mb = 4;
+   */
+  mb: number;
+
+  /**
+   * @generated from field: int64 at_unix = 5 [jstype = JS_NUMBER];
+   */
+  atUnix: bigint;
+
+  /**
+   * Empty when the test ran. Otherwise a short code: node_offline, agent_too_old (an end lacks "speed/1"), busy, unreachable (the
+   * sender could not connect to the target's test port), timeout, no_route, failed.
+   *
+   * @generated from field: string error = 6;
+   */
+  error: string;
+
+  /**
+   * Megabits per second over the whole transfer.
+   *
+   * @generated from field: double mbit_s = 7;
+   */
+  mbitS: number;
+
+  /**
+   * @generated from field: uint32 connect_ms = 8;
+   */
+  connectMs: number;
+
+  /**
+   * Milliseconds from the start of the transfer to its first byte (down); 0 for up.
+   *
+   * @generated from field: uint32 first_byte_ms = 9;
+   */
+  firstByteMs: number;
+
+  /**
+   * @generated from field: uint32 duration_ms = 10;
+   */
+  durationMs: number;
+
+  /**
+   * @generated from field: uint64 bytes = 11;
+   */
+  bytes: bigint;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.PathSpeedResponse.
+ * Use `create(PathSpeedResponseSchema)` to create a new message.
+ */
+export const PathSpeedResponseSchema: GenMessage<PathSpeedResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 11);
+
+/**
  * On-demand probes between fleet nodes, for the MCP tools path_probe, node_trace and node_dns_check and for an operator.
  *
  * A separate package on purpose: nothing here is served or compiled on the Cloudflare edition, where the admin Worker has a
@@ -472,6 +582,18 @@ export const ProbeService: GenService<{
     methodKind: "unary";
     input: typeof NodeDnsCheckRequestSchema;
     output: typeof NodeDnsCheckResponseSchema;
+  },
+  /**
+   * A bounded throughput test between two fleet nodes: the target serves 8 to 32 MB over a short-lived TCP listener opened for one
+   * connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
+   * plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
+   *
+   * @generated from rpc mistgate.probe.v1.ProbeService.PathSpeed
+   */
+  pathSpeed: {
+    methodKind: "unary";
+    input: typeof PathSpeedRequestSchema;
+    output: typeof PathSpeedResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_probe_v1_probe, 0);

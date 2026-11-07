@@ -349,6 +349,18 @@
   },
   {
     "type": "index",
+    "name": "path_speed_at",
+    "tbl_name": "path_speed",
+    "sql": "CREATE INDEX path_speed_at ON path_speed (at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_pair",
+    "tbl_name": "path_speed",
+    "sql": "CREATE INDEX path_speed_pair ON path_speed (from_node_id, to_node_id, at_unix)"
+  },
+  {
+    "type": "index",
     "name": "relay_via",
     "tbl_name": "relay",
     "sql": "CREATE INDEX relay_via ON relay (via_node_id)"
@@ -832,6 +844,12 @@
     "name": "path_probe",
     "tbl_name": "path_probe",
     "sql": "CREATE TABLE path_probe ( id INTEGER PRIMARY KEY AUTOINCREMENT, from_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, to_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, kind TEXT NOT NULL CHECK (kind IN ('udp', 'tcp', 'tls')), at_unix INTEGER NOT NULL, result_json TEXT NOT NULL )"
+  },
+  {
+    "type": "table",
+    "name": "path_speed",
+    "tbl_name": "path_speed",
+    "sql": "CREATE TABLE path_speed ( id INTEGER PRIMARY KEY AUTOINCREMENT, from_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, to_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, direction TEXT NOT NULL CHECK (direction IN ('down', 'up')), at_unix INTEGER NOT NULL, result_json TEXT NOT NULL )"
   },
   {
     "type": "table",

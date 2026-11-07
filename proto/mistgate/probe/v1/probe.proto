@@ -22,6 +22,10 @@ service ProbeService {
   // Lookup timing (p50, p95, failures) of the doctor's control domains from a node's resolver, with a trend over the last 24
   // runs.
   rpc NodeDnsCheck(NodeDnsCheckRequest) returns (NodeDnsCheckResponse);
+  // A bounded throughput test between two fleet nodes: the target serves 8 to 32 MB over a short-lived TCP listener opened for one
+  // connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
+  // plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
+  rpc PathSpeed(PathSpeedRequest) returns (PathSpeedResponse);
 }
 
 message PathProbeRequest {
@@ -126,4 +130,31 @@ message NodeDnsCheckResponse {
   repeated DnsRun history = 4;
   // "steady", "slower", "faster" or "unknown", from the last runs against the earlier ones.
   string trend = 5;
+}
+
+message PathSpeedRequest {
+  string from_node_id = 1;
+  string to_node_id = 2;
+  // 8 to 32.
+  uint32 mb = 3;
+  // "down" (the sender pulls from the target) or "up" (the sender pushes to the target).
+  string direction = 4;
+}
+
+message PathSpeedResponse {
+  string from_name = 1;
+  string to_name = 2;
+  string direction = 3;
+  uint32 mb = 4;
+  int64 at_unix = 5 [jstype = JS_NUMBER];
+  // Empty when the test ran. Otherwise a short code: node_offline, agent_too_old (an end lacks "speed/1"), busy, unreachable (the
+  // sender could not connect to the target's test port), timeout, no_route, failed.
+  string error = 6;
+  // Megabits per second over the whole transfer.
+  double mbit_s = 7;
+  uint32 connect_ms = 8;
+  // Milliseconds from the start of the transfer to its first byte (down); 0 for up.
+  uint32 first_byte_ms = 9;
+  uint32 duration_ms = 10;
+  uint64 bytes = 11;
 }

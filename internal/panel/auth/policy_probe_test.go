@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
@@ -15,6 +16,7 @@ func TestPathProbeProcedurePolicy(t *testing.T) {
 		PathProbeProcedure:    probev1connect.ProbeServicePathProbeProcedure,
 		NodeTraceProcedure:    probev1connect.ProbeServiceNodeTraceProcedure,
 		NodeDnsCheckProcedure: probev1connect.ProbeServiceNodeDnsCheckProcedure,
+		PathSpeedProcedure:    probev1connect.ProbeServicePathSpeedProcedure,
 	} {
 		if got != want {
 			t.Errorf("policy constant %q differs from the generated procedure %q", got, want)
@@ -33,6 +35,26 @@ func TestPathProbeProcedurePolicy(t *testing.T) {
 		}
 		if NeedsStepUp(path) {
 			t.Errorf("%s needs a step-up", path)
+		}
+	}
+}
+
+// path_speed moves bulk traffic between two nodes: the owner only, and for a token only through the approved plan of path_speed
+// (the grant of any other tool cannot open it, and a bare token cannot call it).
+func TestPathSpeedProcedureNeedsTheOwnersApproval(t *testing.T) {
+	path := probev1connect.ProbeServicePathSpeedProcedure
+	if got := ProcedureRole(path); got != store.RoleOwner {
+		t.Errorf("ProcedureRole = %q, want owner", got)
+	}
+	if got, ok := TokenAccess(path); !ok || got != TokenAccessApproved {
+		t.Errorf("TokenAccess = %v, %v; want approved (never direct)", got, ok)
+	}
+	if got := grantProcedures["path_speed"]; len(got) != 1 || got[0] != path {
+		t.Errorf("the path_speed grant = %v, want only PathSpeed", got)
+	}
+	for tool, paths := range grantProcedures {
+		if tool != "path_speed" && slices.Contains(paths, path) {
+			t.Errorf("the plan of %s may open PathSpeed", tool)
 		}
 	}
 }

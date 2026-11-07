@@ -40,6 +40,8 @@ const (
 	// ProbeServiceNodeDnsCheckProcedure is the fully-qualified name of the ProbeService's NodeDnsCheck
 	// RPC.
 	ProbeServiceNodeDnsCheckProcedure = "/mistgate.probe.v1.ProbeService/NodeDnsCheck"
+	// ProbeServicePathSpeedProcedure is the fully-qualified name of the ProbeService's PathSpeed RPC.
+	ProbeServicePathSpeedProcedure = "/mistgate.probe.v1.ProbeService/PathSpeed"
 )
 
 // ProbeServiceClient is a client for the mistgate.probe.v1.ProbeService service.
@@ -53,6 +55,10 @@ type ProbeServiceClient interface {
 	// Lookup timing (p50, p95, failures) of the doctor's control domains from a node's resolver, with a trend over the last 24
 	// runs.
 	NodeDnsCheck(context.Context, *connect.Request[v1.NodeDnsCheckRequest]) (*connect.Response[v1.NodeDnsCheckResponse], error)
+	// A bounded throughput test between two fleet nodes: the target serves 8 to 32 MB over a short-lived TCP listener opened for one
+	// connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
+	// plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
+	PathSpeed(context.Context, *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error)
 }
 
 // NewProbeServiceClient constructs a client for the mistgate.probe.v1.ProbeService service. By
@@ -84,6 +90,12 @@ func NewProbeServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(probeServiceMethods.ByName("NodeDnsCheck")),
 			connect.WithClientOptions(opts...),
 		),
+		pathSpeed: connect.NewClient[v1.PathSpeedRequest, v1.PathSpeedResponse](
+			httpClient,
+			baseURL+ProbeServicePathSpeedProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("PathSpeed")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -92,6 +104,7 @@ type probeServiceClient struct {
 	pathProbe    *connect.Client[v1.PathProbeRequest, v1.PathProbeResponse]
 	nodeTrace    *connect.Client[v1.NodeTraceRequest, v1.NodeTraceResponse]
 	nodeDnsCheck *connect.Client[v1.NodeDnsCheckRequest, v1.NodeDnsCheckResponse]
+	pathSpeed    *connect.Client[v1.PathSpeedRequest, v1.PathSpeedResponse]
 }
 
 // PathProbe calls mistgate.probe.v1.ProbeService.PathProbe.
@@ -109,6 +122,11 @@ func (c *probeServiceClient) NodeDnsCheck(ctx context.Context, req *connect.Requ
 	return c.nodeDnsCheck.CallUnary(ctx, req)
 }
 
+// PathSpeed calls mistgate.probe.v1.ProbeService.PathSpeed.
+func (c *probeServiceClient) PathSpeed(ctx context.Context, req *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error) {
+	return c.pathSpeed.CallUnary(ctx, req)
+}
+
 // ProbeServiceHandler is an implementation of the mistgate.probe.v1.ProbeService service.
 type ProbeServiceHandler interface {
 	// An on-demand probe from one fleet node to another: UDP (optionally an MTU sweep), TCP connect or TLS handshake with the
@@ -120,6 +138,10 @@ type ProbeServiceHandler interface {
 	// Lookup timing (p50, p95, failures) of the doctor's control domains from a node's resolver, with a trend over the last 24
 	// runs.
 	NodeDnsCheck(context.Context, *connect.Request[v1.NodeDnsCheckRequest]) (*connect.Response[v1.NodeDnsCheckResponse], error)
+	// A bounded throughput test between two fleet nodes: the target serves 8 to 32 MB over a short-lived TCP listener opened for one
+	// connection with a one-time token, the sender pulls (or pushes) it and measures. It moves bulk traffic, so the MCP tool is
+	// plan/apply with the owner's approval. At most one test per node at a time and a few per node per day. Kept 7 days.
+	PathSpeed(context.Context, *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error)
 }
 
 // NewProbeServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -147,6 +169,12 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(probeServiceMethods.ByName("NodeDnsCheck")),
 		connect.WithHandlerOptions(opts...),
 	)
+	probeServicePathSpeedHandler := connect.NewUnaryHandler(
+		ProbeServicePathSpeedProcedure,
+		svc.PathSpeed,
+		connect.WithSchema(probeServiceMethods.ByName("PathSpeed")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.probe.v1.ProbeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProbeServicePathProbeProcedure:
@@ -155,6 +183,8 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 			probeServiceNodeTraceHandler.ServeHTTP(w, r)
 		case ProbeServiceNodeDnsCheckProcedure:
 			probeServiceNodeDnsCheckHandler.ServeHTTP(w, r)
+		case ProbeServicePathSpeedProcedure:
+			probeServicePathSpeedHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -174,4 +204,8 @@ func (UnimplementedProbeServiceHandler) NodeTrace(context.Context, *connect.Requ
 
 func (UnimplementedProbeServiceHandler) NodeDnsCheck(context.Context, *connect.Request[v1.NodeDnsCheckRequest]) (*connect.Response[v1.NodeDnsCheckResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.NodeDnsCheck is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) PathSpeed(context.Context, *connect.Request[v1.PathSpeedRequest]) (*connect.Response[v1.PathSpeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.PathSpeed is not implemented"))
 }

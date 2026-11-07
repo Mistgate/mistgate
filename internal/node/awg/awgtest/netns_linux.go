@@ -170,6 +170,9 @@ func (n NS) Start(t testing.TB, env []string, args ...string) *Proc {
 	return p
 }
 
+// Pid is the process id (the benchmark suite reads its CPU time and memory from /proc).
+func (p *Proc) Pid() int { return p.cmd.Process.Pid }
+
 // Output is everything the process printed so far.
 func (p *Proc) Output() string { return p.out.String() }
 

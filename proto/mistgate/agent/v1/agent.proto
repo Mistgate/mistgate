@@ -454,6 +454,26 @@ package mistgate.agent.v1;
 //     The agent returns no router address. Caps: 1-32 hops, 1.5 s per hop, one trace at a time ("busy"), 60 s in all.
 //     Errors as the other probes: bad_params, unsupported_host, unsupported, no_route, busy, "failed: <short message>".
 
+// PATH SPEED (additive, protocol api_version stays 1)
+//   A bounded throughput test between two fleet nodes (the panel's path_speed, owner-approved: it moves bulk traffic).
+//   - WIRE SHAPE. The command speed_test reuses the UdpSend message instead of a message of its own: the admin Worker of the
+//     Cloudflare edition has no room for another generated message (see scripts/check-edge-sizes.sh). The fields mean: size
+//     = the step (1 serve, 2 run, 3 stop), host = the target node's address (run), ports[0] = the test port (run), tag = the
+//     16-byte one-time token (all steps), count = mb, 8-32 MiB (serve, run), pps = the longest the listener or the run may
+//     take in seconds, 1-30 (serve, run), df = direction up (true) or down (false). UdpSend's own limits do not apply.
+//   - CAPABILITY GATE. An agent lists "speed/1" in Hello.capabilities. The panel sends speed_test ONLY to a stream that
+//     listed it, to both ends of the test.
+//   - SERVE (the target). Step 1 opens a TCP listener on an ephemeral port, accepts ONE connection that starts with the
+//     token, and closes the listener. Answer: CommandResult{ok, params{"port": "<n>"}}. The listener closes by itself after
+//     pps seconds. Direction down: the listener sends mb MiB to the connection; up: it reads mb MiB and answers one byte.
+//     Step 3 with the same token closes it early.
+//   - RUN (the sender). Step 2 dials host:port, sends the token, moves mb MiB in the direction and answers
+//     CommandResult{ok, params{"mbit_s": "<n.n>", "connect_ms", "first_byte_ms", "duration_ms", "bytes"}}. The agent never
+//     dials a destination it would refuse for TcpProbe (unspecified, multicast, link-local).
+//   - CAPS. One test per agent at a time ("busy", also while a bandwidth test runs); no traffic to or from anything but the
+//     address in the message. Errors: bad_params, unsupported_host, no_route, busy, timeout, refused, "failed: <short
+//     message>".
+
 // COUNTRY PROBE (additive, protocol api_version stays 1)
 //   Does a TCP SYN to a fleet node survive the national DPI (the Russian TSPU)? Run on a node INSIDE that country, so the
 //   answer is for the network of that node's datacenter. The method needs no raw socket and no capability: a plain TCP
@@ -659,7 +679,7 @@ message Hello {
   // "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS").
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
@@ -1112,6 +1132,8 @@ message ConnectResponse {
     CountryProbe country_probe = 31;
     // Only sent to agents with "probe/1" in Hello.capabilities (see "PATH PROBE").
     PathTrace path_trace = 32;
+    // Only sent to agents with "speed/1" in Hello.capabilities (see "PATH SPEED"; the wire shape is UdpSend).
+    UdpSend speed_test = 33;
   }
 }
 

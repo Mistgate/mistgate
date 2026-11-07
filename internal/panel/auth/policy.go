@@ -16,6 +16,7 @@ const (
 	PathProbeProcedure    = "/mistgate.probe.v1.ProbeService/PathProbe"
 	NodeTraceProcedure    = "/mistgate.probe.v1.ProbeService/NodeTrace"
 	NodeDnsCheckProcedure = "/mistgate.probe.v1.ProbeService/NodeDnsCheck"
+	PathSpeedProcedure    = "/mistgate.probe.v1.ProbeService/PathSpeed"
 )
 
 // level is how much of the admin API a procedure needs.
@@ -76,6 +77,7 @@ var procedureLevels = map[string]level{
 	PathProbeProcedure:    levelWrite, // node names only, never addresses
 	NodeTraceProcedure:    levelWrite, // hops with their round trip, no router address
 	NodeDnsCheckProcedure: levelWrite, // resolver timings of the doctor's control domains
+	PathSpeedProcedure:    levelOwner, // moves up to 32 MB between two nodes: owner only, and for tokens only through an approved plan (policy_tokens.go)
 	adminv1connect.NodeServiceGetFleetConnectionsProcedure: levelRead,  // counts only, no address
 	adminv1connect.NodeServiceUpdateNodeProcedure:          levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from) or moves the address: owner only
 	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:    levelOwner,

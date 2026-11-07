@@ -182,6 +182,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR；`own` 模式下必需） | 始终 |
 | `node_update` | 管理员 | `node` 以及仅需更改的字段：`name`、`country_code`、`location`、`provider`、`notes`，以及各入站的 `direct_in_subscriptions` 开关。不接受地址和运行时设置 | 始终 |
 | `node_ipv6` | 管理员 | 计划：`node`、`action`（`enable` 或 `disable`）；应用：仅 `confirm_token`。开启或关闭节点的 [IPv6 入口](../guide/nodes.md#ipv6-入口)：在每个人的订阅里，节点的每个服务器旁多一个服务器「<节点> · IPv6」。`enable` 会先从外部检测该地址（参见 `node_ipv6_check`），只有通过才开启入口；无法接受入口的节点在计划阶段就会被拒绝并给出原因。计划会写明节点以及哪些协议配置的服务器会得到副本，绝不显示地址；该地址就是服务器用于出站 IPv6 的那个。 | 始终 |
+| `path_speed` | 管理员 | 计划：`from`、`to`（节点 id 或完整名称），可选 `mb`（8 到 32，默认 16）和 `direction`（`down` 表示 `from` 从 `to` 拉取数据，默认；`up` 表示推送）；应用：仅 `confirm_token`。两个节点之间有上限的吞吐测试：`to` 为一个连接打开短时 TCP 监听（一次性令牌，最多 30 秒后关闭）并提供数据，`from` 传输并测量。应用结果给出整个传输的 Mbit/s、连接时间、首字节时间（`down`）和时长，保留 7 天。它会让大量流量经过两个节点的链路，所以总是等待所有者批准，就像面板自己的带宽测试仅限所有者一样。上限：最多 32 MB 和 30 秒，每个节点同一时间一次测试，每个节点每天 6 次、每个令牌每天 12 次。目标只能是机群节点，绝不是公共服务器；两个代理都需要 `speed/1`（否则 `agent_too_old`），且目标的测试端口必须能被发送方访问。计划和结果只显示节点名称，不显示地址。Cloudflare 版本不可用。 | 总是 |
 | `warp_restart` | 管理员 | `node` ID 或精确名称；计划会列出使用 WARP 出口且可能中断几秒的协议配置；执行时只接收 `confirm_token` | 否 |
 | `warp_reregister` | 管理员 | `node` ID 或精确名称，以及可选的 `reason`（最多 300 个字符）；执行时只接收 `confirm_token`。计划会显示 Cloudflare 服务条款链接；所有者批准即表示代表此账户接受条款，并将其替换为新的匿名设备，从而更改 WARP 出口 IP | 始终 |
 | `relay` | 管理员 | 计划参数：`action` 及其参数；执行时只接收 `confirm_token`。`create`：`node`（入口，ID 或精确名称）、`inbound_id`（来自 `relay_candidates`），以及可选的 `port`（443 或 1024 到 65535；省略时，若出口的端口在入口上空闲则用它，否则用一个空闲端口）。`enable`、`disable` 和 `delete`：`relay_id`。`port`：`relay_id` 和 `port`。计划会不带地址地说明这项更改：入口、出口、服务器、端口、国家检测如何看待两端、最近一次检测，以及用户会看到什么 | 始终 |
@@ -245,6 +246,7 @@ Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关
 | `step_up` | 操作本身要求在管理后台再次确认。 | 滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`update_timezone`、`retention`、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove` |
 | `fleet` | 会更改节点上运行的内容或移除用户访问权限。 | `node_fix`、`node_decoy`、`node_ipv6`、`relay`、`group_update`、滚动更新工具、`node_rollback`、`node_update_schedule` 及其取消工具、`node_install`、`node_server_password_rotate`、`node_server_key_add`、`node_server_key_remove`；所有协议配置创建、更新和部署计划 |
 | `bulk` | 一次操作影响超过 3 位用户。 | `user_disable`、`user_reset_traffic` |
+| `traffic` | 它会在节点之间发送大量测试流量。 | `path_speed` |
 | `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |
 
 `group_update` 使用 `fleet`，因为更改分组的协议配置或禁用节点可能改变其成员的访问权限。分组中仍有成员时，`group_delete` 会拒绝执行。`node_update` 仅限元数据和面向订阅的开关；它的所有更改都需要所有者审批，因为底层的节点更新 API 还接受会改变运行状态的字段，而此工具不开放这些字段。

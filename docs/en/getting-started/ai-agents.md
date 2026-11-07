@@ -198,6 +198,18 @@ bash scripts/e2e/mcp-token.sh /tmp/mg-e2e.XXXXXX/owner.env --profile operator
 
 The second command prints the `claude mcp add --transport http mistgate <admin URL>mcp --header "Authorization: Bearer <token>"` line for that panel; run it where the agent runs (the panel listens inside the run's network namespace, and the script says how to reach it). The token lives one day (`--ttl-days`) and has the profile you chose (`readonly`, `operator`, `admin`). Use it on test panels only: the helper signs in as the test panel's owner.
 
+### A fleet of agents to test against
+
+Probes, traces and speed tests need real agents. `scripts/dev-fleet.sh` starts one panel and three node agents (`de1`, `nl1`, `fi1`) in separate network namespaces on one Linux host (WSL as root or a throwaway VM; from Windows the script runs itself in WSL), joined by a bridge, with an optional netem between them:
+
+```sh
+bash scripts/dev-fleet.sh                                  # panel + de1, nl1, fi1, a Hysteria2 inbound on each; prints the admin URL and an MCP token
+bash scripts/dev-fleet.sh --netem "delay 25ms loss 0.5%"   # the same with a 50 ms round trip and about 1 % loss between the nodes
+bash scripts/dev-fleet.sh --down                           # stops everything, removes the namespaces and the state in /tmp/mg-devfleet
+```
+
+The token is made by `scripts/e2e/mcp-token.sh` (admin profile by default, because `path_speed` needs it; `--profile operator` for the rest). The admin listens on loopback inside the namespace `mgdf-panel`, so the agent runs there too (`ip netns exec mgdf-panel ...`; the printed `claude mcp add` line says how). Then ask it to run `path_probe` (udp, tcp, tls, the MTU sweep), `node_trace`, `node_dns_check`, `checks_run_now` and `path_speed` between the nodes: `path_speed_plan` returns a plan, you approve it in the panel (the admin URL, **Integrations**), and `path_speed_apply` moves 8 to 32 MB between the two nodes and reports Mbit/s. Everything the script adds lives in namespaces named `mgdf-*` and on private tmpfs mounts; it never touches the host's interfaces, routes or nft tables. The nodes have no internet, so there is no self-update and no public speed test. Use it for test panels only.
+
 ### 4. The prompt
 
 The MCP tools can create, update and deploy profiles but cannot create groups. The prompt checks for the requested group first and asks you to create it in the admin if it is missing.
