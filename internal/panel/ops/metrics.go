@@ -23,12 +23,13 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/sysstat"
 )
 
 // The metrics endpoint: fleet gauges for a scraper, in the OpenMetrics text format. It is off until the owner turns it on
 // (Settings -> System), answers 404 while off, and asks for a bearer secret of its own, made by the owner's request and stored
 // only as a hash. It never names a person and never carries an address: gauges are counts and per-node numbers keyed by the
-// node's name.
+// node's name, and the panel process's own memory, goroutines and database size.
 
 const (
 	metricsEnabledKey   = "metrics.enabled"
@@ -183,6 +184,14 @@ func (s *Service) gather(ctx context.Context) []byte {
 	defer cancel()
 	var m expo
 	m.gauge("mistgate_build_info", "Build of this panel; the value is always 1.", sample{labels: lbl("version", buildinfo.Version), v: 1})
+	// The panel process itself. A sampler of its own: the one of GetPanelResources measures CPU between its own reads.
+	if rss := (&sysstat.ProcSampler{}).Sample().RSS; rss > 0 {
+		m.gauge("process_resident_memory_bytes", "Resident memory of the panel process, bytes.", sample{v: float64(rss)})
+	}
+	m.gauge("go_goroutines", "Goroutines of the panel process.", sample{v: float64(sysstat.ReadGoRuntime().Goroutines)})
+	if db, at := s.dbStats(ctx); !at.IsZero() {
+		m.gauge("mistgate_db_bytes", "Size of the panel's database: the main file and its write-ahead log, bytes.", sample{v: float64(db.file + db.wal)})
+	}
 	if s.cfg.Fleet != nil {
 		fc := adminv1connect.NewFleetServiceClient(client(s.cfg.Fleet), "http://panel.invalid")
 		if r, err := fc.Overview(ctx, connect.NewRequest(&adminv1.OverviewRequest{EventLimit: 1})); err == nil {

@@ -129,6 +129,19 @@ func TestObservabilityOnARealPanel(t *testing.T) {
 			t.Errorf("admin token %s over the API: %d", m, code)
 		}
 	}
+	// the panel's resources and the fleet's load are reads for everybody, a readonly token included; the admin API calls made
+	// above are counted by the middleware
+	if code, body, _ := call(true, "", "GetPanelResources", `{}`); code != 200 || !strings.Contains(body, `"requests":"`) || !strings.Contains(body, `"pageCount":"`) {
+		t.Errorf("owner GetPanelResources: %d %s", code, body)
+	}
+	for _, m := range []string{"GetPanelResources", "GetFleetLoad"} {
+		if code, body, _ := call(false, roSecret, m, `{"hours":24}`); code != 200 || strings.Contains(body, dir) {
+			t.Errorf("readonly token %s: %d %s", m, code, body)
+		}
+	}
+	if code, _, _ := call(false, "", "GetFleetLoad", `{}`); code == 200 {
+		t.Error("a stranger read the fleet's load")
+	}
 
 	// the request id is on the audit row of the change
 	if code, body, hdr := call(true, "", "SetLogLevel", `{"level":"debug"}`); code != 200 {

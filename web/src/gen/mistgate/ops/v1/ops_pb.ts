@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/ops/v1/ops.proto.
  */
 export const file_mistgate_ops_v1_ops: GenFile = /*@__PURE__*/
-  fileDesc("ChltaXN0Z2F0ZS9vcHMvdjEvb3BzLnByb3RvEg9taXN0Z2F0ZS5vcHMudjEiFwoVR2V0TG9nU2V0dGluZ3NSZXF1ZXN0InIKFkdldExvZ1NldHRpbmdzUmVzcG9uc2USDQoFbGV2ZWwYASABKAkSFQoNZGVmYXVsdF9sZXZlbBgCIAEoCRIOCgZmb3JtYXQYAyABKAkSEAoIYnVmZmVyZWQYBCABKA0SEAoIY2FwYWNpdHkYBSABKA0iIwoSU2V0TG9nTGV2ZWxSZXF1ZXN0Eg0KBWxldmVsGAEgASgJIiQKE1NldExvZ0xldmVsUmVzcG9uc2USDQoFbGV2ZWwYASABKAkiwwEKE0dldFBhbmVsTG9nc1JlcXVlc3QSEQoJbWluX2xldmVsGAEgASgJEhYKCnNpbmNlX3VuaXgYAiABKANCAjACEhYKCnVudGlsX3VuaXgYAyABKANCAjACEg0KBXF1ZXJ5GAQgASgJEhEKCWNvbXBvbmVudBgFIAEoCRIMCgRjb2RlGAYgASgJEhIKCnJlcXVlc3RfaWQYByABKAkSDQoFbGltaXQYCCABKA0SFgoKYmVmb3JlX3NlcRgJIAEoA0ICMAIi9wEKDVBhbmVsTG9nRW50cnkSDwoDc2VxGAEgASgDQgIwAhIYCgx0aW1lX3VuaXhfbXMYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhEKCWNvbXBvbmVudBgEIAEoCRIPCgdtZXNzYWdlGAUgASgJEgwKBGNvZGUYBiABKAkSEgoKcmVxdWVzdF9pZBgHIAEoCRI4CgVhdHRycxgIIAMoCzIpLm1pc3RnYXRlLm9wcy52MS5QYW5lbExvZ0VudHJ5LkF0dHJzRW50cnkaLAoKQXR0cnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpMBChRHZXRQYW5lbExvZ3NSZXNwb25zZRIvCgdlbnRyaWVzGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlBhbmVsTG9nRW50cnkSFwoLbmV4dF9jdXJzb3IYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhAKCGJ1ZmZlcmVkGAQgASgNEhAKCGNhcGFjaXR5GAUgASgNImoKDVJldGVudGlvbkl0ZW0SCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgNEhUKDWRlZmF1bHRfdmFsdWUYAyABKA0SCwoDbWluGAQgASgNEgsKA21heBgFIAEoDRIMCgR1bml0GAYgASgJIhUKE0dldFJldGVudGlvblJlcXVlc3QiRQoUR2V0UmV0ZW50aW9uUmVzcG9uc2USLQoFaXRlbXMYASADKAsyHi5taXN0Z2F0ZS5vcHMudjEuUmV0ZW50aW9uSXRlbSKGAQoTU2V0UmV0ZW50aW9uUmVxdWVzdBJACgZ2YWx1ZXMYASADKAsyMC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdC5WYWx1ZXNFbnRyeRotCgtWYWx1ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKA06AjgBIkUKFFNldFJldGVudGlvblJlc3BvbnNlEi0KBWl0ZW1zGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlJldGVudGlvbkl0ZW0iVAoRRXhwb3J0RGF0YVJlcXVlc3QSFgoKc2luY2VfdW5peBgBIAEoA0ICMAISFgoKdW50aWxfdW5peBgCIAEoA0ICMAISDwoHc291cmNlcxgDIAMoCSIiChJFeHBvcnREYXRhUmVzcG9uc2USDAoEZGF0YRgBIAEoDCIbChlHZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0IkAKGkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgSEQoJaGFzX3Rva2VuGAIgASgIIlMKGVNldE1ldHJpY3NTZXR0aW5nc1JlcXVlc3QSFAoHZW5hYmxlZBgBIAEoCEgAiAEBEhQKDHJvdGF0ZV90b2tlbhgCIAEoCEIKCghfZW5hYmxlZCJPChpTZXRNZXRyaWNzU2V0dGluZ3NSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIEhEKCWhhc190b2tlbhgCIAEoCBINCgV0b2tlbhgDIAEoCTKXBgoKT3BzU2VydmljZRJhCg5HZXRMb2dTZXR0aW5ncxImLm1pc3RnYXRlLm9wcy52MS5HZXRMb2dTZXR0aW5nc1JlcXVlc3QaJy5taXN0Z2F0ZS5vcHMudjEuR2V0TG9nU2V0dGluZ3NSZXNwb25zZRJYCgtTZXRMb2dMZXZlbBIjLm1pc3RnYXRlLm9wcy52MS5TZXRMb2dMZXZlbFJlcXVlc3QaJC5taXN0Z2F0ZS5vcHMudjEuU2V0TG9nTGV2ZWxSZXNwb25zZRJbCgxHZXRQYW5lbExvZ3MSJC5taXN0Z2F0ZS5vcHMudjEuR2V0UGFuZWxMb2dzUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRQYW5lbExvZ3NSZXNwb25zZRJbCgxHZXRSZXRlbnRpb24SJC5taXN0Z2F0ZS5vcHMudjEuR2V0UmV0ZW50aW9uUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRSZXRlbnRpb25SZXNwb25zZRJbCgxTZXRSZXRlbnRpb24SJC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5TZXRSZXRlbnRpb25SZXNwb25zZRJXCgpFeHBvcnREYXRhEiIubWlzdGdhdGUub3BzLnYxLkV4cG9ydERhdGFSZXF1ZXN0GiMubWlzdGdhdGUub3BzLnYxLkV4cG9ydERhdGFSZXNwb25zZTABEm0KEkdldE1ldHJpY3NTZXR0aW5ncxIqLm1pc3RnYXRlLm9wcy52MS5HZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0GisubWlzdGdhdGUub3BzLnYxLkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEm0KElNldE1ldHJpY3NTZXR0aW5ncxIqLm1pc3RnYXRlLm9wcy52MS5TZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0GisubWlzdGdhdGUub3BzLnYxLlNldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlQrUBChNjb20ubWlzdGdhdGUub3BzLnYxQghPcHNQcm90b1ABWjZnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9vcHMvdjE7b3BzdjGiAgNNT1iqAg9NaXN0Z2F0ZS5PcHMuVjHKAg9NaXN0Z2F0ZVxPcHNcVjHiAhtNaXN0Z2F0ZVxPcHNcVjFcR1BCTWV0YWRhdGHqAhFNaXN0Z2F0ZTo6T3BzOjpWMWIGcHJvdG8z");
+  fileDesc("ChltaXN0Z2F0ZS9vcHMvdjEvb3BzLnByb3RvEg9taXN0Z2F0ZS5vcHMudjEiFwoVR2V0TG9nU2V0dGluZ3NSZXF1ZXN0InIKFkdldExvZ1NldHRpbmdzUmVzcG9uc2USDQoFbGV2ZWwYASABKAkSFQoNZGVmYXVsdF9sZXZlbBgCIAEoCRIOCgZmb3JtYXQYAyABKAkSEAoIYnVmZmVyZWQYBCABKA0SEAoIY2FwYWNpdHkYBSABKA0iIwoSU2V0TG9nTGV2ZWxSZXF1ZXN0Eg0KBWxldmVsGAEgASgJIiQKE1NldExvZ0xldmVsUmVzcG9uc2USDQoFbGV2ZWwYASABKAkiwwEKE0dldFBhbmVsTG9nc1JlcXVlc3QSEQoJbWluX2xldmVsGAEgASgJEhYKCnNpbmNlX3VuaXgYAiABKANCAjACEhYKCnVudGlsX3VuaXgYAyABKANCAjACEg0KBXF1ZXJ5GAQgASgJEhEKCWNvbXBvbmVudBgFIAEoCRIMCgRjb2RlGAYgASgJEhIKCnJlcXVlc3RfaWQYByABKAkSDQoFbGltaXQYCCABKA0SFgoKYmVmb3JlX3NlcRgJIAEoA0ICMAIi9wEKDVBhbmVsTG9nRW50cnkSDwoDc2VxGAEgASgDQgIwAhIYCgx0aW1lX3VuaXhfbXMYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhEKCWNvbXBvbmVudBgEIAEoCRIPCgdtZXNzYWdlGAUgASgJEgwKBGNvZGUYBiABKAkSEgoKcmVxdWVzdF9pZBgHIAEoCRI4CgVhdHRycxgIIAMoCzIpLm1pc3RnYXRlLm9wcy52MS5QYW5lbExvZ0VudHJ5LkF0dHJzRW50cnkaLAoKQXR0cnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIpMBChRHZXRQYW5lbExvZ3NSZXNwb25zZRIvCgdlbnRyaWVzGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlBhbmVsTG9nRW50cnkSFwoLbmV4dF9jdXJzb3IYAiABKANCAjACEg0KBWxldmVsGAMgASgJEhAKCGJ1ZmZlcmVkGAQgASgNEhAKCGNhcGFjaXR5GAUgASgNImoKDVJldGVudGlvbkl0ZW0SCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgNEhUKDWRlZmF1bHRfdmFsdWUYAyABKA0SCwoDbWluGAQgASgNEgsKA21heBgFIAEoDRIMCgR1bml0GAYgASgJIhUKE0dldFJldGVudGlvblJlcXVlc3QiRQoUR2V0UmV0ZW50aW9uUmVzcG9uc2USLQoFaXRlbXMYASADKAsyHi5taXN0Z2F0ZS5vcHMudjEuUmV0ZW50aW9uSXRlbSKGAQoTU2V0UmV0ZW50aW9uUmVxdWVzdBJACgZ2YWx1ZXMYASADKAsyMC5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVxdWVzdC5WYWx1ZXNFbnRyeRotCgtWYWx1ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKA06AjgBIkUKFFNldFJldGVudGlvblJlc3BvbnNlEi0KBWl0ZW1zGAEgAygLMh4ubWlzdGdhdGUub3BzLnYxLlJldGVudGlvbkl0ZW0iVAoRRXhwb3J0RGF0YVJlcXVlc3QSFgoKc2luY2VfdW5peBgBIAEoA0ICMAISFgoKdW50aWxfdW5peBgCIAEoA0ICMAISDwoHc291cmNlcxgDIAMoCSIiChJFeHBvcnREYXRhUmVzcG9uc2USDAoEZGF0YRgBIAEoDCIbChlHZXRNZXRyaWNzU2V0dGluZ3NSZXF1ZXN0IkAKGkdldE1ldHJpY3NTZXR0aW5nc1Jlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgSEQoJaGFzX3Rva2VuGAIgASgIIlMKGVNldE1ldHJpY3NTZXR0aW5nc1JlcXVlc3QSFAoHZW5hYmxlZBgBIAEoCEgAiAEBEhQKDHJvdGF0ZV90b2tlbhgCIAEoCEIKCghfZW5hYmxlZCJPChpTZXRNZXRyaWNzU2V0dGluZ3NSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIEhEKCWhhc190b2tlbhgCIAEoCBINCgV0b2tlbhgDIAEoCSIaChhHZXRQYW5lbFJlc291cmNlc1JlcXVlc3QizAEKDFBhbmVsUHJvY2VzcxIPCgdjcHVfcGN0GAEgASgCEhUKCXJzc19ieXRlcxgCIAEoBEICMAISGgoOZ29fdG90YWxfYnl0ZXMYAyABKARCAjACEhkKDWdvX2hlYXBfYnl0ZXMYBCABKARCAjACEhIKCmdvcm91dGluZXMYBSABKA0SDwoHdGhyZWFkcxgGIAEoDRIQCghvcGVuX2ZkcxgHIAEoDRIQCghmZF9saW1pdBgIIAEoDRIUCgh1cHRpbWVfcxgJIAEoBEICMAIilAIKCVBhbmVsSG9zdBIMCgRjcHVzGAEgASgNEhQKDGNwdV9idXN5X3BjdBgCIAEoAhIRCglzdGVhbF9wY3QYAyABKAISEgoKaW93YWl0X3BjdBgEIAEoAhINCgVsb2FkMRgFIAEoAhIaCg5yYW1fdXNlZF9ieXRlcxgGIAEoBEICMAISGwoPcmFtX3RvdGFsX2J5dGVzGAcgASgEQgIwAhIbCg9zd2FwX3VzZWRfYnl0ZXMYCCABKARCAjACEhwKEHN3YXBfdG90YWxfYnl0ZXMYCSABKARCAjACEhsKD2Rpc2tfdXNlZF9ieXRlcxgKIAEoBEICMAISHAoQZGlza190b3RhbF9ieXRlcxgLIAEoBEICMAIioAEKDVBhbmVsRGF0YWJhc2USFgoKZmlsZV9ieXRlcxgBIAEoBEICMAISFQoJd2FsX2J5dGVzGAIgASgEQgIwAhIWCgpwYWdlX2NvdW50GAMgASgEQgIwAhIaCg5mcmVlbGlzdF9jb3VudBgEIAEoBEICMAISEQoJcGFnZV9zaXplGAUgASgNEhkKDW1lYXN1cmVkX3VuaXgYBiABKANCAjACInwKDFBhbmVsUnBjTG9hZBIQCgh3aW5kb3dfcxgBIAEoDRIUCghyZXF1ZXN0cxgCIAEoBEICMAISGQoNc2VydmVyX2Vycm9ycxgDIAEoBEICMAISGQoNY2xpZW50X2Vycm9ycxgEIAEoBEICMAISDgoGcDk1X21zGAUgASgCIpICChlHZXRQYW5lbFJlc291cmNlc1Jlc3BvbnNlEhQKCG5vd191bml4GAEgASgDQgIwAhIuCgdwcm9jZXNzGAIgASgLMh0ubWlzdGdhdGUub3BzLnYxLlBhbmVsUHJvY2VzcxIoCgRob3N0GAMgASgLMhoubWlzdGdhdGUub3BzLnYxLlBhbmVsSG9zdBIwCghkYXRhYmFzZRgEIAEoCzIeLm1pc3RnYXRlLm9wcy52MS5QYW5lbERhdGFiYXNlEhgKEGFnZW50c19jb25uZWN0ZWQYBSABKA0SDQoFbm9kZXMYBiABKA0SKgoDcnBjGAcgASgLMh0ubWlzdGdhdGUub3BzLnYxLlBhbmVsUnBjTG9hZCIkChNHZXRGbGVldExvYWRSZXF1ZXN0Eg0KBWhvdXJzGAEgASgNIqQBChJMb2FkUmVjb21tZW5kYXRpb24SDAoEY29kZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoCRI/CgZwYXJhbXMYAyADKAsyLy5taXN0Z2F0ZS5vcHMudjEuTG9hZFJlY29tbWVuZGF0aW9uLlBhcmFtc0VudHJ5Gi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEipAkKCE5vZGVMb2FkEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEhEKCWNvbm5lY3RlZBgDIAEoCBIMCgRjcHVzGAQgASgNEg4KBnN0YXR1cxgFIAEoCRISCgpib3R0bGVuZWNrGAYgASgJEhcKD2hvdXJzX3dpdGhfZGF0YRgHIAEoDRIRCglleHRfaG91cnMYCCABKA0SGgoOYnVzeV9ob3VyX3VuaXgYCSABKANCAjACEhkKEWJ1c3lfaG91cl9jcHVfcGN0GAogASgCEhgKEHBlb3BsZV9idXN5X2hvdXIYCyABKAISEwoLcGVvcGxlX3BlYWsYDCABKA0SGAoQY3B1X3BlYWtfcDk1X3BjdBgNIAEoAhIaCg1zdGVhbF9wOTVfcGN0GA4gASgCSACIAQESHwoSY29ubnRyYWNrX3BlYWtfcGN0GA8gASgCSAGIAQESGQoMcmFtX3BlYWtfcGN0GBAgASgCSAKIAQESJAoTc3dhcF91c2VkX21heF9ieXRlcxgRIAEoBEICMAJIA4gBARIaCg1kaXNrX3VzZWRfcGN0GBIgASgCSASIAQESFwoLcnhfcGVha19icHMYEyABKARCAjACEhcKC3R4X3BlYWtfYnBzGBQgASgEQgIwAhIVCg1jYXBhY2l0eV9tYnBzGBUgASgNEhcKD2NhcGFjaXR5X3NvdXJjZRgWIAEoCRIfChJiYW5kd2lkdGhfcGVha19wY3QYFyABKAJIBYgBARIeChFhZ2VudF9jcHVfYXZnX3BjdBgYIAEoAkgGiAEBEh4KEWFnZW50X2NwdV9tYXhfcGN0GBkgASgCSAeIAQESJAoTYWdlbnRfcnNzX21heF9ieXRlcxgaIAEoBEICMAJICIgBARIpChxhZ2VudF9yc3NfZ3Jvd3RoX3BjdF9wZXJfZGF5GBsgASgCSAmIAQESCwoDZml0GBwgASgJEicKGmNwdV9wY3RfcGVyX2h1bmRyZWRfcGVvcGxlGB0gASgCSAqIAQESHAoPbWJwc19wZXJfcGVyc29uGB4gASgCSAuIAQESHAoPaGVhZHJvb21fcGVvcGxlGB8gASgNSAyIAQESPAoPcmVjb21tZW5kYXRpb25zGCAgAygLMiMubWlzdGdhdGUub3BzLnYxLkxvYWRSZWNvbW1lbmRhdGlvbkIQCg5fc3RlYWxfcDk1X3BjdEIVChNfY29ubnRyYWNrX3BlYWtfcGN0Qg8KDV9yYW1fcGVha19wY3RCFgoUX3N3YXBfdXNlZF9tYXhfYnl0ZXNCEAoOX2Rpc2tfdXNlZF9wY3RCFQoTX2JhbmR3aWR0aF9wZWFrX3BjdEIUChJfYWdlbnRfY3B1X2F2Z19wY3RCFAoSX2FnZW50X2NwdV9tYXhfcGN0QhYKFF9hZ2VudF9yc3NfbWF4X2J5dGVzQh8KHV9hZ2VudF9yc3NfZ3Jvd3RoX3BjdF9wZXJfZGF5Qh0KG19jcHVfcGN0X3Blcl9odW5kcmVkX3Blb3BsZUISChBfbWJwc19wZXJfcGVyc29uQhIKEF9oZWFkcm9vbV9wZW9wbGUijgEKC0xvYWROb2RlUmVmEg8KB25vZGVfaWQYASABKAkSEQoJbm9kZV9uYW1lGAIgASgJEg4KBnN0YXR1cxgDIAEoCRIZChFidXN5X2hvdXJfY3B1X3BjdBgEIAEoAhIcCg9oZWFkcm9vbV9wZW9wbGUYBSABKA1IAIgBAUISChBfaGVhZHJvb21fcGVvcGxlIuYBChBGbGVldExvYWRTdW1tYXJ5EgoKAm9rGAEgASgNEgwKBGJ1c3kYAiABKA0SEgoKb3ZlcmxvYWRlZBgDIAEoDRIPCgd1bmtub3duGAQgASgNEhcKD2hlYWRyb29tX3Blb3BsZRgFIAEoDRIWCg5oZWFkcm9vbV9ub2RlcxgGIAEoDRIxCgttb3N0X2xvYWRlZBgHIAMoCzIcLm1pc3RnYXRlLm9wcy52MS5Mb2FkTm9kZVJlZhIvCgltb3N0X2ZyZWUYCCADKAsyHC5taXN0Z2F0ZS5vcHMudjEuTG9hZE5vZGVSZWYimQEKFEdldEZsZWV0TG9hZFJlc3BvbnNlEhQKCG5vd191bml4GAEgASgDQgIwAhINCgVob3VycxgCIAEoDRIoCgVub2RlcxgDIAMoCzIZLm1pc3RnYXRlLm9wcy52MS5Ob2RlTG9hZBIyCgdzdW1tYXJ5GAQgASgLMiEubWlzdGdhdGUub3BzLnYxLkZsZWV0TG9hZFN1bW1hcnky4AcKCk9wc1NlcnZpY2USYQoOR2V0TG9nU2V0dGluZ3MSJi5taXN0Z2F0ZS5vcHMudjEuR2V0TG9nU2V0dGluZ3NSZXF1ZXN0GicubWlzdGdhdGUub3BzLnYxLkdldExvZ1NldHRpbmdzUmVzcG9uc2USWAoLU2V0TG9nTGV2ZWwSIy5taXN0Z2F0ZS5vcHMudjEuU2V0TG9nTGV2ZWxSZXF1ZXN0GiQubWlzdGdhdGUub3BzLnYxLlNldExvZ0xldmVsUmVzcG9uc2USWwoMR2V0UGFuZWxMb2dzEiQubWlzdGdhdGUub3BzLnYxLkdldFBhbmVsTG9nc1JlcXVlc3QaJS5taXN0Z2F0ZS5vcHMudjEuR2V0UGFuZWxMb2dzUmVzcG9uc2USWwoMR2V0UmV0ZW50aW9uEiQubWlzdGdhdGUub3BzLnYxLkdldFJldGVudGlvblJlcXVlc3QaJS5taXN0Z2F0ZS5vcHMudjEuR2V0UmV0ZW50aW9uUmVzcG9uc2USWwoMU2V0UmV0ZW50aW9uEiQubWlzdGdhdGUub3BzLnYxLlNldFJldGVudGlvblJlcXVlc3QaJS5taXN0Z2F0ZS5vcHMudjEuU2V0UmV0ZW50aW9uUmVzcG9uc2USVwoKRXhwb3J0RGF0YRIiLm1pc3RnYXRlLm9wcy52MS5FeHBvcnREYXRhUmVxdWVzdBojLm1pc3RnYXRlLm9wcy52MS5FeHBvcnREYXRhUmVzcG9uc2UwARJtChJHZXRNZXRyaWNzU2V0dGluZ3MSKi5taXN0Z2F0ZS5vcHMudjEuR2V0TWV0cmljc1NldHRpbmdzUmVxdWVzdBorLm1pc3RnYXRlLm9wcy52MS5HZXRNZXRyaWNzU2V0dGluZ3NSZXNwb25zZRJtChJTZXRNZXRyaWNzU2V0dGluZ3MSKi5taXN0Z2F0ZS5vcHMudjEuU2V0TWV0cmljc1NldHRpbmdzUmVxdWVzdBorLm1pc3RnYXRlLm9wcy52MS5TZXRNZXRyaWNzU2V0dGluZ3NSZXNwb25zZRJqChFHZXRQYW5lbFJlc291cmNlcxIpLm1pc3RnYXRlLm9wcy52MS5HZXRQYW5lbFJlc291cmNlc1JlcXVlc3QaKi5taXN0Z2F0ZS5vcHMudjEuR2V0UGFuZWxSZXNvdXJjZXNSZXNwb25zZRJbCgxHZXRGbGVldExvYWQSJC5taXN0Z2F0ZS5vcHMudjEuR2V0RmxlZXRMb2FkUmVxdWVzdBolLm1pc3RnYXRlLm9wcy52MS5HZXRGbGVldExvYWRSZXNwb25zZUK1AQoTY29tLm1pc3RnYXRlLm9wcy52MUIIT3BzUHJvdG9QAVo2Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvb3BzL3YxO29wc3YxogIDTU9YqgIPTWlzdGdhdGUuT3BzLlYxygIPTWlzdGdhdGVcT3BzXFYx4gIbTWlzdGdhdGVcT3BzXFYxXEdQQk1ldGFkYXRh6gIRTWlzdGdhdGU6Ok9wczo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message mistgate.ops.v1.GetLogSettingsRequest
@@ -528,11 +528,698 @@ export const SetMetricsSettingsResponseSchema: GenMessage<SetMetricsSettingsResp
   messageDesc(file_mistgate_ops_v1_ops, 17);
 
 /**
+ * @generated from message mistgate.ops.v1.GetPanelResourcesRequest
+ */
+export type GetPanelResourcesRequest = Message<"mistgate.ops.v1.GetPanelResourcesRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.ops.v1.GetPanelResourcesRequest.
+ * Use `create(GetPanelResourcesRequestSchema)` to create a new message.
+ */
+export const GetPanelResourcesRequestSchema: GenMessage<GetPanelResourcesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 18);
+
+/**
+ * The panel's own process.
+ *
+ * @generated from message mistgate.ops.v1.PanelProcess
+ */
+export type PanelProcess = Message<"mistgate.ops.v1.PanelProcess"> & {
+  /**
+   * CPU time since the previous read, in percent of the whole machine (all CPUs): 25 on four CPUs is one CPU fully used.
+   *
+   * @generated from field: float cpu_pct = 1;
+   */
+  cpuPct: number;
+
+  /**
+   * @generated from field: uint64 rss_bytes = 2 [jstype = JS_NUMBER];
+   */
+  rssBytes: bigint;
+
+  /**
+   * The Go runtime: all memory it mapped from the OS, the part in heap objects, and its goroutines.
+   *
+   * @generated from field: uint64 go_total_bytes = 3 [jstype = JS_NUMBER];
+   */
+  goTotalBytes: bigint;
+
+  /**
+   * @generated from field: uint64 go_heap_bytes = 4 [jstype = JS_NUMBER];
+   */
+  goHeapBytes: bigint;
+
+  /**
+   * @generated from field: uint32 goroutines = 5;
+   */
+  goroutines: number;
+
+  /**
+   * @generated from field: uint32 threads = 6;
+   */
+  threads: number;
+
+  /**
+   * Open file descriptors (sockets among them) and the soft limit (0 = not known).
+   *
+   * @generated from field: uint32 open_fds = 7;
+   */
+  openFds: number;
+
+  /**
+   * @generated from field: uint32 fd_limit = 8;
+   */
+  fdLimit: number;
+
+  /**
+   * @generated from field: uint64 uptime_s = 9 [jstype = JS_NUMBER];
+   */
+  uptimeS: bigint;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.PanelProcess.
+ * Use `create(PanelProcessSchema)` to create a new message.
+ */
+export const PanelProcessSchema: GenMessage<PanelProcess> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 19);
+
+/**
+ * The machine the panel runs on. Zeros where it cannot be read (not a Linux host).
+ *
+ * @generated from message mistgate.ops.v1.PanelHost
+ */
+export type PanelHost = Message<"mistgate.ops.v1.PanelHost"> & {
+  /**
+   * @generated from field: uint32 cpus = 1;
+   */
+  cpus: number;
+
+  /**
+   * Since the previous read, in percent of all CPUs: busy (everything but idle and I/O wait; steal included), the part the
+   * hypervisor gave to other guests, and the idle time spent waiting for the disk.
+   *
+   * @generated from field: float cpu_busy_pct = 2;
+   */
+  cpuBusyPct: number;
+
+  /**
+   * @generated from field: float steal_pct = 3;
+   */
+  stealPct: number;
+
+  /**
+   * @generated from field: float iowait_pct = 4;
+   */
+  iowaitPct: number;
+
+  /**
+   * @generated from field: float load1 = 5;
+   */
+  load1: number;
+
+  /**
+   * @generated from field: uint64 ram_used_bytes = 6 [jstype = JS_NUMBER];
+   */
+  ramUsedBytes: bigint;
+
+  /**
+   * @generated from field: uint64 ram_total_bytes = 7 [jstype = JS_NUMBER];
+   */
+  ramTotalBytes: bigint;
+
+  /**
+   * @generated from field: uint64 swap_used_bytes = 8 [jstype = JS_NUMBER];
+   */
+  swapUsedBytes: bigint;
+
+  /**
+   * @generated from field: uint64 swap_total_bytes = 9 [jstype = JS_NUMBER];
+   */
+  swapTotalBytes: bigint;
+
+  /**
+   * The file system that holds the panel's data directory.
+   *
+   * @generated from field: uint64 disk_used_bytes = 10 [jstype = JS_NUMBER];
+   */
+  diskUsedBytes: bigint;
+
+  /**
+   * @generated from field: uint64 disk_total_bytes = 11 [jstype = JS_NUMBER];
+   */
+  diskTotalBytes: bigint;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.PanelHost.
+ * Use `create(PanelHostSchema)` to create a new message.
+ */
+export const PanelHostSchema: GenMessage<PanelHost> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 20);
+
+/**
+ * The panel's SQLite database. It is read at most once a minute.
+ *
+ * @generated from message mistgate.ops.v1.PanelDatabase
+ */
+export type PanelDatabase = Message<"mistgate.ops.v1.PanelDatabase"> & {
+  /**
+   * The main file and its write-ahead log.
+   *
+   * @generated from field: uint64 file_bytes = 1 [jstype = JS_NUMBER];
+   */
+  fileBytes: bigint;
+
+  /**
+   * @generated from field: uint64 wal_bytes = 2 [jstype = JS_NUMBER];
+   */
+  walBytes: bigint;
+
+  /**
+   * Pages in the file, the free ones among them (space a VACUUM would give back), and the page size in bytes.
+   *
+   * @generated from field: uint64 page_count = 3 [jstype = JS_NUMBER];
+   */
+  pageCount: bigint;
+
+  /**
+   * @generated from field: uint64 freelist_count = 4 [jstype = JS_NUMBER];
+   */
+  freelistCount: bigint;
+
+  /**
+   * @generated from field: uint32 page_size = 5;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: int64 measured_unix = 6 [jstype = JS_NUMBER];
+   */
+  measuredUnix: bigint;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.PanelDatabase.
+ * Use `create(PanelDatabaseSchema)` to create a new message.
+ */
+export const PanelDatabaseSchema: GenMessage<PanelDatabase> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 21);
+
+/**
+ * The admin API's calls (the admin UI and API tokens over /api; not /mcp or /metrics) over the last window_s seconds.
+ *
+ * @generated from message mistgate.ops.v1.PanelRpcLoad
+ */
+export type PanelRpcLoad = Message<"mistgate.ops.v1.PanelRpcLoad"> & {
+  /**
+   * @generated from field: uint32 window_s = 1;
+   */
+  windowS: number;
+
+  /**
+   * @generated from field: uint64 requests = 2 [jstype = JS_NUMBER];
+   */
+  requests: bigint;
+
+  /**
+   * Calls that ended in a server error (HTTP 5xx), and in a refusal or a bad request (4xx).
+   *
+   * @generated from field: uint64 server_errors = 3 [jstype = JS_NUMBER];
+   */
+  serverErrors: bigint;
+
+  /**
+   * @generated from field: uint64 client_errors = 4 [jstype = JS_NUMBER];
+   */
+  clientErrors: bigint;
+
+  /**
+   * The 95th percentile of the time to answer a unary call, in milliseconds (streams are left out); 0 without calls.
+   *
+   * @generated from field: float p95_ms = 5;
+   */
+  p95Ms: number;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.PanelRpcLoad.
+ * Use `create(PanelRpcLoadSchema)` to create a new message.
+ */
+export const PanelRpcLoadSchema: GenMessage<PanelRpcLoad> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 22);
+
+/**
+ * @generated from message mistgate.ops.v1.GetPanelResourcesResponse
+ */
+export type GetPanelResourcesResponse = Message<"mistgate.ops.v1.GetPanelResourcesResponse"> & {
+  /**
+   * @generated from field: int64 now_unix = 1 [jstype = JS_NUMBER];
+   */
+  nowUnix: bigint;
+
+  /**
+   * @generated from field: mistgate.ops.v1.PanelProcess process = 2;
+   */
+  process?: PanelProcess | undefined;
+
+  /**
+   * @generated from field: mistgate.ops.v1.PanelHost host = 3;
+   */
+  host?: PanelHost | undefined;
+
+  /**
+   * @generated from field: mistgate.ops.v1.PanelDatabase database = 4;
+   */
+  database?: PanelDatabase | undefined;
+
+  /**
+   * Agents connected now, and the nodes that are not retired.
+   *
+   * @generated from field: uint32 agents_connected = 5;
+   */
+  agentsConnected: number;
+
+  /**
+   * @generated from field: uint32 nodes = 6;
+   */
+  nodes: number;
+
+  /**
+   * @generated from field: mistgate.ops.v1.PanelRpcLoad rpc = 7;
+   */
+  rpc?: PanelRpcLoad | undefined;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.GetPanelResourcesResponse.
+ * Use `create(GetPanelResourcesResponseSchema)` to create a new message.
+ */
+export const GetPanelResourcesResponseSchema: GenMessage<GetPanelResourcesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 23);
+
+/**
+ * @generated from message mistgate.ops.v1.GetFleetLoadRequest
+ */
+export type GetFleetLoadRequest = Message<"mistgate.ops.v1.GetFleetLoadRequest"> & {
+  /**
+   * The window in hours, 1 to 720; 0 means 168 (a week holds the busy hour of every weekday).
+   *
+   * @generated from field: uint32 hours = 1;
+   */
+  hours: number;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.GetFleetLoadRequest.
+ * Use `create(GetFleetLoadRequestSchema)` to create a new message.
+ */
+export const GetFleetLoadRequestSchema: GenMessage<GetFleetLoadRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 24);
+
+/**
+ * What to do about a node's load. The admin UI and the assistant word it from code and params.
+ *
+ * @generated from message mistgate.ops.v1.LoadRecommendation
+ */
+export type LoadRecommendation = Message<"mistgate.ops.v1.LoadRecommendation"> & {
+  /**
+   * update_agent (the agent predates the resource fields: steal, swap, conntrack and its own cost are not known),
+   * steal_high (steal_pct: the provider oversells the host; move the node), conntrack_near_limit (fill_pct, limit),
+   * cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom),
+   * cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), bandwidth_busy (peak_pct, link_mbps, and target,
+   * target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
+   * agent_memory_growing (growth_pct_day, rss_mb, days: the agent's daily peak memory climbs faster than its people).
+   *
+   * @generated from field: string code = 1;
+   */
+  code: string;
+
+  /**
+   * "info", "warn" or "crit".
+   *
+   * @generated from field: string severity = 2;
+   */
+  severity: string;
+
+  /**
+   * Plain decimal numbers and node names.
+   *
+   * @generated from field: map<string, string> params = 3;
+   */
+  params: { [key: string]: string };
+};
+
+/**
+ * Describes the message mistgate.ops.v1.LoadRecommendation.
+ * Use `create(LoadRecommendationSchema)` to create a new message.
+ */
+export const LoadRecommendationSchema: GenMessage<LoadRecommendation> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 25);
+
+/**
+ * One node's load over the window. An optional field that is unset is not known: no hour carried it (an agent that predates
+ * the resource fields), or there is nothing to measure.
+ *
+ * @generated from message mistgate.ops.v1.NodeLoad
+ */
+export type NodeLoad = Message<"mistgate.ops.v1.NodeLoad"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 2;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: bool connected = 3;
+   */
+  connected: boolean;
+
+  /**
+   * @generated from field: uint32 cpus = 4;
+   */
+  cpus: number;
+
+  /**
+   * "ok", "busy", "overloaded", or "unknown" (no hour of host load in the window).
+   *
+   * @generated from field: string status = 5;
+   */
+  status: string;
+
+  /**
+   * What runs out first once it is at least halfway to its limit: cpu, steal, bandwidth, ram, conntrack or disk; "" otherwise.
+   *
+   * @generated from field: string bottleneck = 6;
+   */
+  bottleneck: string;
+
+  /**
+   * Hours of the window with samples, and those whose samples carried the resource fields.
+   *
+   * @generated from field: uint32 hours_with_data = 7;
+   */
+  hoursWithData: number;
+
+  /**
+   * @generated from field: uint32 ext_hours = 8;
+   */
+  extHours: number;
+
+  /**
+   * The busy hour: the hour with the highest CPU mean, that mean, and the mean people online in it.
+   *
+   * @generated from field: int64 busy_hour_unix = 9 [jstype = JS_NUMBER];
+   */
+  busyHourUnix: bigint;
+
+  /**
+   * @generated from field: float busy_hour_cpu_pct = 10;
+   */
+  busyHourCpuPct: number;
+
+  /**
+   * @generated from field: float people_busy_hour = 11;
+   */
+  peopleBusyHour: number;
+
+  /**
+   * @generated from field: uint32 people_peak = 12;
+   */
+  peoplePeak: number;
+
+  /**
+   * The 95th percentile of the hourly CPU peaks.
+   *
+   * @generated from field: float cpu_peak_p95_pct = 13;
+   */
+  cpuPeakP95Pct: number;
+
+  /**
+   * The 95th percentile of the hourly steal means.
+   *
+   * @generated from field: optional float steal_p95_pct = 14;
+   */
+  stealP95Pct?: number | undefined;
+
+  /**
+   * The highest hourly peak of connection-tracking entries against the limit.
+   *
+   * @generated from field: optional float conntrack_peak_pct = 15;
+   */
+  conntrackPeakPct?: number | undefined;
+
+  /**
+   * @generated from field: optional float ram_peak_pct = 16;
+   */
+  ramPeakPct?: number | undefined;
+
+  /**
+   * @generated from field: optional uint64 swap_used_max_bytes = 17 [jstype = JS_NUMBER];
+   */
+  swapUsedMaxBytes?: bigint | undefined;
+
+  /**
+   * The latest sample's root file system.
+   *
+   * @generated from field: optional float disk_used_pct = 18;
+   */
+  diskUsedPct?: number | undefined;
+
+  /**
+   * The highest hourly peaks of the main NIC, bits per second.
+   *
+   * @generated from field: uint64 rx_peak_bps = 19 [jstype = JS_NUMBER];
+   */
+  rxPeakBps: bigint;
+
+  /**
+   * @generated from field: uint64 tx_peak_bps = 20 [jstype = JS_NUMBER];
+   */
+  txPeakBps: bigint;
+
+  /**
+   * The capacity the traffic is set against: the owner's ("configured", Node.bandwidth_mbps) or the link speed the agent
+   * reported ("nic"); 0 and "" = not known.
+   *
+   * @generated from field: uint32 capacity_mbps = 21;
+   */
+  capacityMbps: number;
+
+  /**
+   * @generated from field: string capacity_source = 22;
+   */
+  capacitySource: string;
+
+  /**
+   * @generated from field: optional float bandwidth_peak_pct = 23;
+   */
+  bandwidthPeakPct?: number | undefined;
+
+  /**
+   * The agent process: mean and peak CPU in percent of the machine, peak memory, and how fast its daily peak memory grows
+   * (percent per day, from three days on).
+   *
+   * @generated from field: optional float agent_cpu_avg_pct = 24;
+   */
+  agentCpuAvgPct?: number | undefined;
+
+  /**
+   * @generated from field: optional float agent_cpu_max_pct = 25;
+   */
+  agentCpuMaxPct?: number | undefined;
+
+  /**
+   * @generated from field: optional uint64 agent_rss_max_bytes = 26 [jstype = JS_NUMBER];
+   */
+  agentRssMaxBytes?: bigint | undefined;
+
+  /**
+   * @generated from field: optional float agent_rss_growth_pct_per_day = 27;
+   */
+  agentRssGrowthPctPerDay?: number | undefined;
+
+  /**
+   * "ok" when the per-person costs could be read from the hours (a least-squares fit of the hourly CPU mean on the hourly
+   * mean people online); otherwise why not: "few_hours" (under 24 hours with samples), "flat" (people online changed by
+   * fewer than 4), "no_trend" (the CPU does not rise with the people).
+   *
+   * @generated from field: string fit = 28;
+   */
+  fit: string;
+
+  /**
+   * @generated from field: optional float cpu_pct_per_hundred_people = 29;
+   */
+  cpuPctPerHundredPeople?: number | undefined;
+
+  /**
+   * @generated from field: optional float mbps_per_person = 30;
+   */
+  mbpsPerPerson?: number | undefined;
+
+  /**
+   * People the node could add before its busy-hour CPU mean reaches 80% (and, with a known link and per-person traffic, its
+   * busier direction 90% of the link). 0 when it is overloaded already.
+   *
+   * @generated from field: optional uint32 headroom_people = 31;
+   */
+  headroomPeople?: number | undefined;
+
+  /**
+   * Most severe first.
+   *
+   * @generated from field: repeated mistgate.ops.v1.LoadRecommendation recommendations = 32;
+   */
+  recommendations: LoadRecommendation[];
+};
+
+/**
+ * Describes the message mistgate.ops.v1.NodeLoad.
+ * Use `create(NodeLoadSchema)` to create a new message.
+ */
+export const NodeLoadSchema: GenMessage<NodeLoad> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 26);
+
+/**
+ * @generated from message mistgate.ops.v1.LoadNodeRef
+ */
+export type LoadNodeRef = Message<"mistgate.ops.v1.LoadNodeRef"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * @generated from field: string node_name = 2;
+   */
+  nodeName: string;
+
+  /**
+   * @generated from field: string status = 3;
+   */
+  status: string;
+
+  /**
+   * @generated from field: float busy_hour_cpu_pct = 4;
+   */
+  busyHourCpuPct: number;
+
+  /**
+   * @generated from field: optional uint32 headroom_people = 5;
+   */
+  headroomPeople?: number | undefined;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.LoadNodeRef.
+ * Use `create(LoadNodeRefSchema)` to create a new message.
+ */
+export const LoadNodeRefSchema: GenMessage<LoadNodeRef> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 27);
+
+/**
+ * @generated from message mistgate.ops.v1.FleetLoadSummary
+ */
+export type FleetLoadSummary = Message<"mistgate.ops.v1.FleetLoadSummary"> & {
+  /**
+   * @generated from field: uint32 ok = 1;
+   */
+  ok: number;
+
+  /**
+   * @generated from field: uint32 busy = 2;
+   */
+  busy: number;
+
+  /**
+   * @generated from field: uint32 overloaded = 3;
+   */
+  overloaded: number;
+
+  /**
+   * @generated from field: uint32 unknown = 4;
+   */
+  unknown: number;
+
+  /**
+   * The headroom of the nodes whose headroom is known, added up, and how many nodes those are.
+   *
+   * @generated from field: uint32 headroom_people = 5;
+   */
+  headroomPeople: number;
+
+  /**
+   * @generated from field: uint32 headroom_nodes = 6;
+   */
+  headroomNodes: number;
+
+  /**
+   * Up to three nodes closest to a limit, most loaded first; up to three that are not busy, most headroom first.
+   *
+   * @generated from field: repeated mistgate.ops.v1.LoadNodeRef most_loaded = 7;
+   */
+  mostLoaded: LoadNodeRef[];
+
+  /**
+   * @generated from field: repeated mistgate.ops.v1.LoadNodeRef most_free = 8;
+   */
+  mostFree: LoadNodeRef[];
+};
+
+/**
+ * Describes the message mistgate.ops.v1.FleetLoadSummary.
+ * Use `create(FleetLoadSummarySchema)` to create a new message.
+ */
+export const FleetLoadSummarySchema: GenMessage<FleetLoadSummary> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 28);
+
+/**
+ * @generated from message mistgate.ops.v1.GetFleetLoadResponse
+ */
+export type GetFleetLoadResponse = Message<"mistgate.ops.v1.GetFleetLoadResponse"> & {
+  /**
+   * @generated from field: int64 now_unix = 1 [jstype = JS_NUMBER];
+   */
+  nowUnix: bigint;
+
+  /**
+   * @generated from field: uint32 hours = 2;
+   */
+  hours: number;
+
+  /**
+   * Every node that is not retired, most pressing first.
+   *
+   * @generated from field: repeated mistgate.ops.v1.NodeLoad nodes = 3;
+   */
+  nodes: NodeLoad[];
+
+  /**
+   * @generated from field: mistgate.ops.v1.FleetLoadSummary summary = 4;
+   */
+  summary?: FleetLoadSummary | undefined;
+};
+
+/**
+ * Describes the message mistgate.ops.v1.GetFleetLoadResponse.
+ * Use `create(GetFleetLoadResponseSchema)` to create a new message.
+ */
+export const GetFleetLoadResponseSchema: GenMessage<GetFleetLoadResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_ops_v1_ops, 29);
+
+/**
  * The panel's own diagnostics and data lifecycle: its log ring and level, retention of what it stores, an export, and the
  * metrics endpoint's switch. A separate package from mistgate.admin.v1 on purpose: the Cloudflare edition's admin Worker links
  * every admin message, and none of this runs there (the VPS edition mounts the service; the edition without it answers
- * UNIMPLEMENTED "not available on this edition"). Every procedure is owner-only (admin-profile tokens read panel logs and plan
- * changes through MCP); a procedure missing from the role policy is owner-only too.
+ * UNIMPLEMENTED "not available on this edition"). The logs, retention, export and metrics procedures are owner-only (admin-profile
+ * tokens read panel logs and plan changes through MCP); GetPanelResources and GetFleetLoad are reads of numbers and node names
+ * that every signed-in admin and every token may call. A procedure missing from the role policy is owner-only.
  *
  * @generated from service mistgate.ops.v1.OpsService
  */
@@ -619,6 +1306,28 @@ export const OpsService: GenService<{
     methodKind: "unary";
     input: typeof SetMetricsSettingsRequestSchema;
     output: typeof SetMetricsSettingsResponseSchema;
+  },
+  /**
+   * What the panel itself costs: its process (CPU, memory, Go runtime, threads, descriptors), the machine it runs on, its
+   * database and the admin API's load over the last minutes. Numbers only: no address, path or name of a person.
+   *
+   * @generated from rpc mistgate.ops.v1.OpsService.GetPanelResources
+   */
+  getPanelResources: {
+    methodKind: "unary";
+    input: typeof GetPanelResourcesRequestSchema;
+    output: typeof GetPanelResourcesResponseSchema;
+  },
+  /**
+   * How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
+   * how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
+   *
+   * @generated from rpc mistgate.ops.v1.OpsService.GetFleetLoad
+   */
+  getFleetLoad: {
+    methodKind: "unary";
+    input: typeof GetFleetLoadRequestSchema;
+    output: typeof GetFleetLoadResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_ops_v1_ops, 0);
