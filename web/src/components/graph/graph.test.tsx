@@ -218,3 +218,62 @@ describe("Graph", () => {
     expect(onPositionsChange).toHaveBeenLastCalledWith(expect.objectContaining({ nl1: { x: 300, y: 1 } }));
   });
 });
+
+describe("help and shortcuts", () => {
+  it("? opens the shortcuts card with a key column, Esc closes it, and the choice is remembered", async () => {
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" legend={<p>legend text</p>} />);
+    const app = host!.querySelector<HTMLElement>('[role="application"]')!;
+    app.focus();
+    await key(app, "?");
+    const card = host!.querySelector("#graph-help")!;
+    expect(card.getAttribute("aria-label")).toBe("Shortcuts");
+    expect(card.querySelectorAll("kbd").length).toBeGreaterThan(10);
+    expect(card.textContent).toContain("Box select");
+    expect(localStorage.getItem("mg.graph.help")).toBe("shortcuts");
+    await key(app, "Escape");
+    expect(host!.querySelector("#graph-help")).toBeNull();
+    expect(localStorage.getItem("mg.graph.help")).toBeNull();
+  });
+
+  it("the Legend button shows what the screen gives it, and the other button swaps the card", async () => {
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" legend={<p>legend text</p>} />);
+    const btn = (label: string) => [...host!.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === label)!;
+    await click(btn("Legend"));
+    expect(host!.querySelector("#graph-help")?.textContent).toBe("legend text");
+    await click(btn("Shortcuts"));
+    expect(host!.querySelector("#graph-help")?.getAttribute("aria-label")).toBe("Shortcuts");
+  });
+
+  it("Shift+F asks to expand (and F only fits); the expand button does the same", async () => {
+    const onExpand = vi.fn();
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" onExpand={onExpand} />);
+    const app = host!.querySelector<HTMLElement>('[role="application"]')!;
+    await key(app, "f");
+    expect(onExpand).not.toHaveBeenCalled();
+    await key(app, "F", { shiftKey: true });
+    expect(onExpand).toHaveBeenCalledTimes(1);
+    await click(host!.querySelector("[data-graph-expand]")!);
+    expect(onExpand).toHaveBeenCalledTimes(2);
+  });
+
+  it("a plain wheel is left to the page; Ctrl + wheel is taken for zoom; full screen takes any wheel", async () => {
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" />);
+    const app = host!.querySelector<HTMLElement>('[role="application"]')!;
+    const wheel = (init: WheelEventInit) => {
+      const e = new WheelEvent("wheel", { bubbles: true, cancelable: true, ...init });
+      app.dispatchEvent(e);
+      return e.defaultPrevented;
+    };
+    expect(wheel({ deltaY: 100 })).toBe(false);
+    expect(wheel({ deltaY: -100, ctrlKey: true })).toBe(true);
+    expect(wheel({ deltaX: 40, deltaY: 2 })).toBe(true);
+  });
+
+  it("full screen: a plain wheel pans", async () => {
+    await mount(<Graph nodes={nodes} edges={[]} typeColors={colors} ariaLabel="g" wheelPans />);
+    const app = host!.querySelector<HTMLElement>('[role="application"]')!;
+    const e = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 80 });
+    app.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+  });
+});

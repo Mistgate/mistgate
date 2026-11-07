@@ -82,6 +82,7 @@ const paths = {
   // the graph editor's toolbar
   minus: "M5 12h14",
   fit: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
+  expand: "M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7",
   arrange: "M3 8h5v8H3zM16 4h5v5h-5zM16 15h5v5h-5zM8 12h4M12 6.5h4M12 17.5h4M12 6.5v11",
 } as const;
 

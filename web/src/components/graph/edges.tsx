@@ -15,7 +15,7 @@ export interface RenderEdge extends GraphEdge {
 const stateColor: Record<EdgeState, string> = {
   ok: "var(--accent-mint)",
   warn: "var(--accent-sand)",
-  bad: "var(--danger)",
+  bad: "var(--accent-rose)",
   off: "var(--muted)",
   pending: "var(--accent)",
   blocked: "var(--muted)",
@@ -120,9 +120,9 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
                 className={e.virtual === "pending" ? "mg-gwire mg-gwire-pending" : "mg-gwire"}
                 style={{
                   stroke: color,
-                  strokeWidth: hot ? 2.5 : quiet ? 1.5 : e.state === "bad" ? 1.75 : 2,
-                  strokeDasharray: off ? "5 6" : quiet ? "2 5" : undefined,
-                  opacity: off ? 0.75 : quiet ? 0.7 : e.animated ? 0.45 : 1,
+                  strokeWidth: hot ? 2.25 : quiet ? 1.5 : e.state === "bad" ? 1.5 : 2,
+                  strokeDasharray: off ? "5 6" : quiet ? "1.5 5" : undefined,
+                  opacity: off ? 0.75 : quiet ? 0.35 : e.animated ? 0.45 : 1,
                 }}
               />
               {e.animated && !off && !e.virtual && <path d={route.d} className="mg-gwire mg-gwire-flow" style={{ stroke: color, strokeWidth: hot ? 2.5 : 2 }} />}

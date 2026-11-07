@@ -6,6 +6,9 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { GraphContext, nodeLabel, textOf, type GraphCtx, type PortHighlight } from "./context";
 import { EdgeLayer, routeFor, wireInk, type RenderEdge } from "./edges";
+import { readPref, writePref } from "@/lib/storage";
+import { accumulate, glideStopped, inertiaStep, releaseVelocity, smoothStep, wheelFactor } from "./motion";
+import { GraphHelp, modKey, type HelpTab } from "./help";
 import { MAX_ZOOM, MIN_ZOOM, boundsOf, clamp, dragWire, fitView, nearestPoint, rectsIntersect, snapTo, zoomAround, type Rect } from "./geometry";
 import { clearOf, computeLayout, tabOrder } from "./layout";
 import { Minimap } from "./minimap";
@@ -22,7 +25,7 @@ const INTERACTIVE = "button,a,input,select,textarea,label,summary,[role=switch],
 const TYPING = "input,textarea,select,[contenteditable=true]";
 
 type Mode =
-  | { kind: "pan"; id: number; sx: number; sy: number; v: View; moved: boolean }
+  | { kind: "pan"; id: number; sx: number; sy: number; v: View; moved: boolean; samples: { x: number; y: number; t: number }[] }
   | { kind: "node"; id: number; sx: number; sy: number; node: string; ids: string[]; starts: Map<string, Pos> | null; mod: boolean; was: boolean; canDrag: boolean }
   | { kind: "marquee"; id: number; sx: number; sy: number; base: string[]; moved: boolean }
   | { kind: "wire"; id: number; sx: number; sy: number; ref: PortRef; started: boolean; source: PortRef; replace?: string; snap: PortRef | null }
@@ -61,6 +64,8 @@ const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
 export function Graph<D = unknown>(props: GraphProps<D>) {
   const { nodes, edges, typeColors, layoutKey, canConnect, onConnect, onEdgeDelete, renderEdgeMenu, readOnly = false, minimap = true, legend, height = 560, ariaLabel, className } = props;
+  const [zoomHint, setZoomHint] = useState(false);
+  const [helpOwn, setHelpOwn] = useState<HelpTab | "">(() => (readPref("mg.graph.help") === "legend" ? "legend" : readPref("mg.graph.help") === "shortcuts" ? "shortcuts" : ""));
   const t = useT();
   const [store] = useState(() => new GraphStore());
   const rootRef = useRef<HTMLDivElement>(null);
@@ -177,9 +182,15 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
 
   // ----- view
   const viewAnim = useRef(0);
+  const zoomTarget = useRef<{ z: number; p: Pos } | null>(null);
+  const zoomRaf = useRef(0);
+  const glideRaf = useRef(0);
   const cancelViewAnim = useCallback(() => {
     cancelAnimationFrame(viewAnim.current);
-    viewAnim.current = 0;
+    cancelAnimationFrame(zoomRaf.current);
+    cancelAnimationFrame(glideRaf.current);
+    viewAnim.current = zoomRaf.current = glideRaf.current = 0;
+    zoomTarget.current = null;
   }, []);
   const animateView = useCallback(
     (target: View, ms = 240) => {
@@ -204,20 +215,92 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     }
     return out;
   }, [store]);
-  const fit = useCallback((animate = true) => animateView(fitView(boundsOf(allRects()), store.size), animate ? 260 : 0), [animateView, allRects, store]);
+  const fitTarget = useCallback(() => {
+    const b = boundsOf(allRects());
+    const floor = live.current.props.minFitZoom ?? MIN_ZOOM;
+    const v = fitView(b, store.size, 32, floor);
+    const focus = live.current.props.fitFocus ? store.nodeRect(live.current.props.fitFocus) : null;
+    // wider than the canvas even at the floor: keep the focus (the node itself) in the middle instead of cutting both ends
+    if (b && focus && v.z === floor && b.w * v.z > store.size.w - 64) return { ...v, x: store.size.w / 2 - (focus.x + focus.w / 2) * v.z };
+    return v;
+  }, [allRects, store]);
+  const fit = useCallback((animate = true) => animateView(fitTarget(), animate ? 260 : 0), [animateView, fitTarget]);
   const zoomBy = useCallback(
     (f: number) => animateView(zoomAround(store.view, { x: store.size.w / 2, y: store.size.h / 2 }, store.view.z * f), 160),
     [animateView, store],
   );
   const resetZoom = useCallback(() => animateView(zoomAround(store.view, { x: store.size.w / 2, y: store.size.h / 2 }, 1), 160), [animateView, store]);
   const centerOn = useCallback(
-    (w: Pos) => {
-      cancelViewAnim();
+    (w: Pos, animate = false) => {
       const v = store.view;
-      store.setView({ ...v, x: store.size.w / 2 - w.x * v.z, y: store.size.h / 2 - w.y * v.z });
+      const target = { ...v, x: store.size.w / 2 - w.x * v.z, y: store.size.h / 2 - w.y * v.z };
+      if (animate) return animateView(target, 260);
+      cancelViewAnim();
+      store.setView(target);
     },
-    [store, cancelViewAnim],
+    [store, cancelViewAnim, animateView],
   );
+
+  /** Wheel zoom: events add up into a target scale, and the view eases toward it around the pointer, a frame at a time. */
+  const wheelZoom = useCallback(
+    (factor: number, p: Pos) => {
+      const z = accumulate(zoomTarget.current?.z ?? store.view.z, factor, MIN_ZOOM, MAX_ZOOM);
+      zoomTarget.current = { z, p };
+      if (reducedMotion() || typeof requestAnimationFrame !== "function") {
+        store.setView(zoomAround(store.view, p, z));
+        zoomTarget.current = null;
+        return;
+      }
+      if (zoomRaf.current) return;
+      let last = performance.now();
+      const step = (now: number) => {
+        const target = zoomTarget.current;
+        if (!target) {
+          zoomRaf.current = 0;
+          return;
+        }
+        const nz = smoothStep(store.view.z, target.z, Math.min(48, now - last));
+        last = now;
+        store.setView(zoomAround(store.view, target.p, nz));
+        if (nz === target.z) {
+          zoomTarget.current = null;
+          zoomRaf.current = 0;
+        } else zoomRaf.current = requestAnimationFrame(step);
+      };
+      zoomRaf.current = requestAnimationFrame(step);
+    },
+    [store],
+  );
+
+  /** A drag released while moving glides on and slows down. */
+  const glide = useCallback(
+    (v0: { x: number; y: number }) => {
+      if (reducedMotion() || typeof requestAnimationFrame !== "function" || glideStopped(v0, 0.08)) return;
+      let vel = v0;
+      let last = performance.now();
+      const step = (now: number) => {
+        const s = inertiaStep(vel, Math.min(48, now - last));
+        last = now;
+        vel = s.v;
+        const cur = store.view;
+        store.setView({ ...cur, x: cur.x + s.dx, y: cur.y + s.dy });
+        glideRaf.current = glideStopped(vel) ? 0 : requestAnimationFrame(step);
+      };
+      glideRaf.current = requestAnimationFrame(step);
+    },
+    [store],
+  );
+
+  const showZoomHint = useCallback(() => {
+    if (readPref("mg.graph.zoomhint") === "1") return;
+    setZoomHint(true);
+    window.clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(() => {
+      setZoomHint(false);
+      writePref("mg.graph.zoomhint", "1");
+    }, 1800);
+  }, []);
+  const hintTimer = useRef(0);
 
   // canvas size
   useLayoutEffect(() => {
@@ -243,22 +326,30 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     const onWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("[data-gui],textarea,[data-wheel]")) return;
-      e.preventDefault();
-      cancelViewAnim();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
-      const v = store.view;
       if (e.ctrlKey || e.metaKey) {
-        const f = Math.exp(-clamp(e.deltaY * unit, -60, 60) * 0.0065);
-        store.setView(zoomAround(v, store.toLocal(e.clientX, e.clientY), v.z * f));
-      } else {
+        e.preventDefault();
+        cancelAnimationFrame(viewAnim.current);
+        cancelAnimationFrame(glideRaf.current);
+        wheelZoom(wheelFactor(e.deltaY, e.deltaMode), store.toLocal(e.clientX, e.clientY));
+        return;
+      }
+      // a plain wheel scrolls the page (the graph never traps it); a sideways swipe, Shift + wheel and, full screen, any wheel pan
+      const sideways = e.deltaX !== 0 && Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.6;
+      if (live.current.props.wheelPans || sideways || e.shiftKey) {
+        e.preventDefault();
+        cancelViewAnim();
+        const v = store.view;
         const dx = e.shiftKey && e.deltaX === 0 ? e.deltaY : e.deltaX;
         const dy = e.shiftKey && e.deltaX === 0 ? 0 : e.deltaY;
         store.setView({ ...v, x: v.x - dx * unit, y: v.y - dy * unit });
+        return;
       }
+      showZoomHint();
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [store, cancelViewAnim]);
+  }, [store, cancelViewAnim, wheelZoom, showZoomHint]);
 
   // ----- first layout and nodes without a position
   const fitted = useRef(false);
@@ -286,7 +377,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         const next: Positions = {};
         for (const n of nodes) if (positions[n.id]) next[n.id] = positions[n.id]!;
         const placed = nodes.length > missing.length;
-        if (!placed) Object.assign(next, full);
+        if (!placed || live.current.props.rearrangeOnChange) Object.assign(next, full);
         else {
           const taken = all.filter((a) => next[a.id]).map((a) => ({ ...next[a.id]!, w: a.w, h: a.h }));
           for (const a of all) {
@@ -301,10 +392,42 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       return () => clearTimeout(timer);
     }
     if (!fitted.current && store.size.w > 0 && nodes.every((n) => store.measure.has(n.id) && store.live.has(n.id))) {
+      if (live.current.props.height === "fit") {
+        // the canvas takes the content at zoom 1, between 560px and the viewport less 200px; then it is fitted in that
+        const b = boundsOf(allRects());
+        const target = Math.round(clamp((b?.h ?? 0) + 80, 560, Math.max(560, window.innerHeight - 200)));
+        if (rootRef.current && rootRef.current.style.height !== `${target}px`) {
+          rootRef.current.style.height = `${target}px`;
+          requestAnimationFrame(() => store.poke());
+          return;
+        }
+      }
       fitted.current = true;
       fit(false);
     }
-  }, [nodes, positions, measureVersion, store, sizes, layoutEdges, commitPositions, fit]);
+  }, [nodes, positions, measureVersion, store, sizes, layoutEdges, commitPositions, fit, allRects]);
+
+  // other nodes: fit again once they are placed
+  const lastKey = useRef(nodeKey);
+  useLayoutEffect(() => {
+    if (lastKey.current !== nodeKey) {
+      lastKey.current = nodeKey;
+      fitted.current = false;
+    }
+  }, [nodeKey]);
+
+  // a way picked from outside (the list, a link) is brought into view with an animated pan
+  const selectedId = props.selected?.length === 1 ? props.selected[0] : undefined;
+  useEffect(() => {
+    const id = selectedId;
+    const r = id ? store.nodeRect(id) : null;
+    if (!r || !fitted.current || store.size.w === 0) return;
+    const v = store.view;
+    const m = 24;
+    const x0 = r.x * v.z + v.x;
+    const y0 = r.y * v.z + v.y;
+    if (x0 < m || y0 < m || x0 + r.w * v.z > store.size.w - m || y0 + r.h * v.z > store.size.h - m) centerOn({ x: r.x + r.w / 2, y: r.y + r.h / 2 }, true);
+  }, [selectedId, store, centerOn]);
 
   const animateTo = useCallback(
     (target: Positions, ms = 380) => {
@@ -314,7 +437,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         commitPositions(target);
         refreshOrder();
       };
-      animateView(fitView(boundsOf(live.current.nodes.map((n) => ({ ...target[n.id]!, w: store.measure.get(n.id)?.w || n.width || 220, h: store.measure.get(n.id)?.h || 96 }))), store.size), ms);
+      animateView(fitView(boundsOf(live.current.nodes.map((n) => ({ ...target[n.id]!, w: store.measure.get(n.id)?.w || n.width || 220, h: store.measure.get(n.id)?.h || 96 }))), store.size, 32, live.current.props.minFitZoom ?? MIN_ZOOM), ms);
       if (reducedMotion() || typeof requestAnimationFrame !== "function") {
         for (const [id, p] of Object.entries(target)) store.setLive(id, p);
         store.commitLive();
@@ -525,7 +648,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     if (ptrs.current.size > 2 || mode.current) return;
     const mouse = e.pointerType === "mouse";
     const startPan = () => {
-      mode.current = { kind: "pan", id: e.pointerId, sx: e.clientX, sy: e.clientY, v: store.view, moved: false };
+      mode.current = { kind: "pan", id: e.pointerId, sx: e.clientX, sy: e.clientY, v: store.view, moved: false, samples: [] };
       rootRef.current?.setPointerCapture(e.pointerId);
       rootRef.current?.setAttribute("data-mode", "pan");
     };
@@ -672,6 +795,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
       const dy = e.clientY - m.sy;
       if (!m.moved && Math.hypot(dx, dy) < 2) return;
       m.moved = true;
+      m.samples.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+      if (m.samples.length > 12) m.samples.shift();
       store.setView({ ...m.v, x: m.v.x + dx, y: m.v.y + dy });
     } else if (m.kind === "node") {
       if (!m.starts) {
@@ -730,7 +855,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         selectOnly([]);
         setSelEdge(null);
         setMenu(null);
-      }
+      } else if (m.moved && !cancelled && e.pointerType !== "mouse") glide(releaseVelocity(m.samples, performance.now()));
+      else if (m.moved && !cancelled) glide(releaseVelocity(m.samples, performance.now()));
     } else if (m.kind === "node") {
       if (m.starts) finishNode(m);
       else if (!cancelled) {
@@ -799,9 +925,12 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     if (k === "+" || k === "=") return zoomBy(1.25);
     if (k === "-" || k === "_") return zoomBy(0.8);
     if (k === "0") return resetZoom();
+    if (k === "?") return setHelp(help === "shortcuts" ? "" : "shortcuts");
+    if (k === "F" && e.shiftKey) return void l.props.onExpand?.();
     if (k === "f" || k === "F") return fit();
     if (k === "Escape") {
-      if (l.menu) setMenu(null);
+      if (help) setHelp("");
+      else if (l.menu) setMenu(null);
       else if (l.sel.length || l.selEdge) {
         selectOnly([]);
         setSelEdge(null);
@@ -885,6 +1014,18 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     return [...nodes].sort((a, b) => (idx.get(a.id) ?? 1e9) - (idx.get(b.id) ?? 1e9));
   }, [nodes, order]);
 
+  const help = props.help !== undefined ? props.help : helpOwn;
+  const setHelp = (tab: HelpTab | "") => {
+    if (props.help === undefined) setHelpOwn(tab);
+    else writePref("mg.graph.help", tab || null);
+    if (props.help === undefined) writePref("mg.graph.help", tab || null);
+    props.onHelpChange?.(tab);
+  };
+  const onDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("[data-gui],[data-gnode],[data-gedge],.mg-glabel")) return;
+    const p = store.toLocal(e.clientX, e.clientY);
+    animateView(zoomAround(store.view, p, store.view.z * (e.shiftKey ? 1 / 1.5 : 1.5)), 220);
+  };
   const menuEdge = menu ? edges.find((x) => x.id === menu.id) : undefined;
   const dragColor = drag ? wireInk(typeColors[findPort(nodes, drag.source)?.type ?? ""] ?? "var(--muted)") : undefined;
 
@@ -898,7 +1039,8 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         aria-describedby={instrId}
         tabIndex={0}
         className={cx("mg-graph relative overflow-hidden rounded-card border border-line outline-none select-none focus-visible:border-accent-line", className)}
-        style={{ height }}
+        style={height === "fit" ? { minHeight: 560 } : { height }}
+        onDoubleClick={onDoubleClick}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={(e) => onPointerUp(e)}
@@ -967,29 +1109,21 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
               <Icon name="arrange" size={15} />
             </IconButton>
           </Tip>
+          {props.onExpand && (
+            <Tip label={`${props.expanded ? t("graph.collapse") : t("graph.expand")} (Shift+F)`}>
+              <IconButton variant="flat" aria-label={props.expanded ? t("graph.collapse") : t("graph.expand")} data-graph-expand onClick={props.onExpand}>
+                <Icon name={props.expanded ? "x" : "expand"} size={15} />
+              </IconButton>
+            </Tip>
+          )}
         </div>
-        {legend && <Legend>{legend}</Legend>}
+        <GraphHelp open={help} onOpen={setHelp} legend={legend} expand={!!props.onExpand} extraShortcuts={props.extraShortcuts} />
+        <div className="mg-gzoomhint" data-show={zoomHint || undefined} aria-hidden>
+          {t("graph.zoomHint", { key: modKey })}
+        </div>
         {minimap && !compact && <Minimap store={store} ids={nodes.map((n) => n.id)} selected={selSet} onCenter={centerOn} />}
       </div>
     </GraphContext.Provider>
-  );
-}
-
-function Legend({ children }: { children: ReactNode }) {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mg-glegend" data-gui data-open={open || undefined}>
-      {open && (
-        <div id="graph-legend" className="mg-glegend-body" role="region" aria-label={t("graph.legend")}>
-          {children}
-        </div>
-      )}
-      <button type="button" className="mg-glegend-btn" aria-expanded={open} aria-controls={open ? "graph-legend" : undefined} onClick={() => setOpen((o) => !o)}>
-        <Icon name="info" size={13} />
-        {t("graph.legend")}
-      </button>
-    </div>
   );
 }
 

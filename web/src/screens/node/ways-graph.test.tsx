@@ -296,3 +296,58 @@ describe("another role", () => {
   });
 });
 
+
+describe("full screen", () => {
+  it("opens from the toolbar button into ?full=1, with the way's detail in a drawer", async () => {
+    await mount();
+    expect(document.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
+    await click(document.querySelector("[data-graph-expand]"));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.objectContaining({ tab: "ways", view: "graph", full: "1" }) }));
+  });
+
+  it("?full=1 restores the overlay: a top bar, the graph, a drawer with the detail, and no page scroll behind", async () => {
+    search = { tab: "ways", view: "graph", full: "1" };
+    await mount();
+    const overlay = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
+    expect(overlay).not.toBeNull();
+    expect(overlay.querySelector("header")?.textContent).toContain("Ways in to de1");
+    expect(overlay.querySelector('[role="application"]')).not.toBeNull();
+    expect(overlay.querySelector("aside #way-panel")).not.toBeNull();
+    expect(document.body.style.overflow).toBe("hidden");
+    // the in-tab list/graph switch is under the overlay, not in it
+    expect(overlay.querySelector("[role=radiogroup]")).toBeNull();
+  });
+
+  it("Esc and the close button leave it; the page scrolls again", async () => {
+    search = { tab: "ways", view: "graph", full: "1" };
+    await mount();
+    const overlay = () => document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
+    await act(async () => void overlay().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.not.objectContaining({ full: "1" }) }));
+    navigate.mockClear();
+    await click(overlay().querySelector('button[aria-label="Close"]'));
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: expect.not.objectContaining({ full: "1" }) }));
+  });
+
+  it("the shortcuts card in full screen also lists the ways' own shortcuts for the owner", async () => {
+    search = { tab: "ways", view: "graph", full: "1" };
+    await mount();
+    const overlay = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
+    const shortcuts = [...overlay.querySelectorAll<HTMLElement>("header button")].find((b) => b.textContent === "Shortcuts")!;
+    await click(shortcuts);
+    const card = overlay.querySelector("#graph-help")!;
+    expect(card.textContent).toContain("New relay");
+    expect(card.textContent).toContain("Remove relay");
+  });
+
+  it("a helper's shortcuts have no ways group, and the legend leaves out the editing line", async () => {
+    role = Role.HELPER;
+    await mount();
+    const btn = (label: string) => [...document.querySelectorAll<HTMLElement>(".mg-glegend-btn")].find((b) => b.textContent === label)!;
+    await click(btn("Shortcuts"));
+    expect(document.querySelector("#graph-help")?.textContent).not.toContain("New relay");
+    await click(btn("Legend"));
+    expect(document.querySelector("#graph-help")?.textContent).toContain("Traffic flows");
+    expect(document.querySelector("#graph-help")?.textContent).not.toContain("Drag from");
+  });
+});

@@ -37,6 +37,11 @@ export class GraphStore {
     this.subs[ch].forEach((cb) => cb());
   }
 
+  /** Ask the layout effects to look again (the canvas was resized by hand). */
+  poke() {
+    this.bump("measure");
+  }
+
   attach(canvas: HTMLElement, world: HTMLElement | null) {
     this.canvas = canvas;
     this.world = world;
@@ -48,6 +53,8 @@ export class GraphStore {
     if (this.canvas) {
       const step = 24 * v.z < 12 ? 48 * v.z : 24 * v.z;
       this.canvas.style.setProperty("--gstep", `${step}px`);
+      // the dots are quiet and fade out when zoomed far out
+      this.canvas.style.setProperty("--gdot", `${(7 * Math.min(1, Math.max(0, (v.z - 0.35) / 0.35))).toFixed(2)}%`);
       this.canvas.style.setProperty("--gx", `${v.x}px`);
       this.canvas.style.setProperty("--gy", `${v.y}px`);
     }

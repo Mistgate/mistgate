@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
-import { Graph, GraphMenuItem, GraphPortRow, GraphValue, type GraphEdge, type GraphNode, type GraphPort, type PortRef } from "@/components/graph";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Graph, GraphMenuItem, GraphPortRow, GraphValue, HelpGroup, Kbd, KeyRow, modKey, type GraphEdge, type GraphNode, type GraphPort, type HelpTab, type PortRef } from "@/components/graph";
 import { Icon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
@@ -15,6 +16,7 @@ import type { Plain } from "@/lib/plain";
 import { nodesQuery } from "@/lib/queries";
 import type { RelayMsg } from "@/lib/relay";
 import { protocolShort } from "@/lib/series";
+import { readPref, writePref } from "@/lib/storage";
 import type { WayId } from "@/lib/ways";
 import { port, relayRefusal, waysGraph, waysLayout, type GCard, type GServer, type GWire, type Ipv6State, type ServerWay } from "@/lib/ways-graph";
 import { profileListQuery } from "@/screens/users/rpc";
@@ -34,16 +36,20 @@ type Data = Plain<GetNodeResponse>;
 
 const typeColors = { udp: "var(--accent-sky)", tcp: "var(--accent-lavender)", people: "var(--muted)", egress: "var(--muted)", any: "var(--muted)" };
 
-/** A small status word on a row. */
-function Chip({ kind, children, onClick, title }: { kind: "ok" | "warn" | "bad" | "off" | "busy" | "cut"; children: ReactNode; onClick?: () => void; title?: string }) {
-  // "cut": a way a country blocks: grey, with rose only in the word
-  const cls = cx(kind === "cut" ? "mg-cut" : "pill tone-" + kind, "inline-flex h-[18px] shrink-0 items-center rounded-full px-2 text-[10.5px] leading-none font-bold whitespace-nowrap");
+const dotColor = { ok: "var(--accent-mint)", warn: "var(--warning)", bad: "var(--accent-rose)", cut: "var(--accent-rose)", off: "var(--faint)", busy: "var(--accent-sky)" };
+
+/** A small status word on a row: neutral, with only a 6px dot to carry the colour. */
+export function Chip({ kind, children, onClick, title }: { kind: keyof typeof dotColor; children: ReactNode; onClick?: () => void; title?: string }) {
+  const cls = "inline-flex h-[19px] shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-muted";
+  const dot = <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: `color-mix(in oklch, ${dotColor[kind]} var(--wp, 100%), #000)` }} />;
   return onClick ? (
-    <button type="button" className={cx(cls, "cursor-pointer hover:brightness-110")} title={title} onClick={onClick}>
+    <button type="button" className={cx(cls, "cursor-pointer hover:text-fg")} title={title} onClick={onClick}>
+      {dot}
       {children}
     </button>
   ) : (
     <span className={cls} title={title}>
+      {dot}
       {children}
     </span>
   );
@@ -80,7 +86,7 @@ type Dialog =
   | { kind: "twin"; inboundId: string }
   | { kind: "v6off" };
 
-export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: WaysModel; open: WayId; onOpen: (id: WayId) => void; onIpv6: () => void }) {
+export function WaysGraph({ data, w, open, onOpen, onIpv6, detail, full = false, onFull, initialExtra }: { initialExtra?: { id: string; name: string }[]; data: Data; w: WaysModel; open: WayId; onOpen: (id: WayId) => void; onIpv6: () => void; detail?: ReactNode; full?: boolean; onFull?: (full: boolean) => void }) {
   const t = useT();
   const fmt = useFmt();
   const node = data.node!;
@@ -90,9 +96,24 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
   const subs = useInSubscriptions(node.id, node.name);
   const nodesList = useQuery({ ...nodesQuery, enabled: owner }).data?.nodes ?? [];
   const profiles = useQuery({ ...profileListQuery, enabled: owner }).data;
-  const [extra, setExtra] = useState<{ id: string; name: string }[]>([]);
+  const [extra, setExtra] = useState<{ id: string; name: string }[]>(initialExtra ?? []);
   const [dlg, setDlg] = useState<Dialog | null>(null);
   const cc = w.cc;
+  const [help, setHelp] = useState<HelpTab | "">(() => (readPref("mg.graph.help") === "legend" ? "legend" : readPref("mg.graph.help") === "shortcuts" ? "shortcuts" : ""));
+
+  // full screen: the page behind does not scroll
+  useEffect(() => {
+    if (!full) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [full]);
+  const closeFull = () => {
+    onFull?.(false);
+    setTimeout(() => document.querySelector<HTMLElement>("[data-graph-expand]")?.focus(), 0);
+  };
 
   const warp = !!node.warp && node.warp.state !== WarpState.NOT_CONFIGURED && node.warp.state !== WarpState.UNSPECIFIED;
   const model = waysGraph({ node: { id: node.id, name: node.name }, inbounds: data.inbounds, ways: w, country: cc, warp, extraEntries: extra, ipv6: { fact: w.ipv6, v6: w.v6 } });
@@ -134,7 +155,7 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
           label: t("ways.people", { country: fmt.country(cc) }),
           icon: <Icon name="people" size={13} />,
           tone: "sand",
-          width: 210,
+          width: 232,
           body: (
             <>
               <GraphPortRow port={port.people} align="end">
@@ -156,8 +177,16 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
           label: c.name,
           icon: <Icon name="server" size={13} />,
           tone: "sky",
-          width: 236,
-          body: (
+          width: 252,
+          body: mine.length === 0 && owner ? (
+            // an entry with no relay yet: one compact row, the hint on the port
+            <GraphPortRow port={[port.reach, port.newRelay]}>
+              <span className="flex items-center justify-end gap-1.5 text-muted" title={t("wg.entry.none")}>
+                <Icon name="plus" size={12} />
+                {t("wg.relay.port")}
+              </span>
+            </GraphPortRow>
+          ) : (
             <>
               <GraphPortRow port={port.reach}>
                 <span className="text-muted">{t("wg.entry.reach")}</span>
@@ -183,7 +212,6 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
                   </span>
                 </GraphPortRow>
               )}
-              {owner && mine.length === 0 && <p className="px-3.5 pb-1 text-[11px] leading-snug text-muted">{t("wg.entry.none")}</p>}
             </>
           ),
         });
@@ -195,7 +223,7 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
           label: c.name,
           icon: <Icon name="shield" size={13} />,
           tone: "mint",
-          width: 318,
+          width: 344,
           body: (
             <>
               {v6 && (
@@ -238,7 +266,7 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
           label: c.name,
           icon: <Icon name="server" size={13} />,
           tone: "lavender",
-          width: 224,
+          width: 240,
           body: (
             <>
               {c.relays.map((r) => (
@@ -260,7 +288,7 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
           label: warpCard ? t("wg.exit.warp") : t("wg.exit.internet"),
           icon: <Icon name={warpCard ? "cloud" : "globe"} size={13} />,
           tone: warpCard ? "sage" : "lavender",
-          width: 206,
+          width: 232,
           body: (
             <GraphPortRow port={port.exit}>
               <span className="text-muted">{warpCard ? t("wg.exit.warpSub") : t("wg.exit.internetSub")}</span>
@@ -273,22 +301,11 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
   })();
 
   // ---- the wires
+  // each state is said once, on the row: a wire carries none (a blocked way is a thin dotted grey line, a failing relay one rose line)
   const edges: GraphEdge[] = model.wires.map((x) => {
-        // a server leaving by its exit is plain plumbing: drawn in the quiet type colour unless it fails
+    // a server leaving by its exit is plain plumbing: drawn in the quiet type colour unless it fails
     const state: GraphEdge["state"] = x.blocked ? "blocked" : x.kind === "egress" && x.state === "ok" ? undefined : x.state === "unknown" ? "off" : x.state;
-        let label: ReactNode;
-        let labelAt: GraphEdge["labelAt"];
-        if (x.blocked) {
-          label = t(x.kind === "reach" ? "wg.wire.dark" : "wg.wire.blocked", { cc });
-          labelAt = "end";
-        } else if (x.kind === "reach" && x.state === "warn") {
-          label = t("wg.wire.partial");
-          labelAt = "end";
-        } else if (x.kind === "ipv6" && x.state === "bad") {
-          label = t("wg.wire.failing");
-          labelAt = "end";
-        } else if (x.kind === "relay") label = relayWord(t, x.state) || undefined;
-        return { id: x.id, from: { node: x.from.card, port: x.from.port }, to: { node: x.to.card, port: x.to.port }, state, animated: x.flowing, label, labelAt };
+    return { id: x.id, from: { node: x.from.card, port: x.from.port }, to: { node: x.to.card, port: x.to.port }, state, animated: x.flowing };
   });
 
   // ---- editing (the owner's)
@@ -381,42 +398,54 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
   const twinInbound = dlg?.kind === "twin" ? inboundOf(dlg.inboundId) : undefined;
   const twinProfile = twinInbound ? profiles?.find((p) => p.id === twinInbound.profileId) : undefined;
 
-  return (
-    <div className="flex min-w-0 flex-col gap-2.5">
-      {owner && (
-        <div className="w-[220px]">
-          <Select
-            compact
-            aria-label={t("wg.addEntry")}
-            value=""
-            onValueChange={(id) => {
-              const n = nodesList.find((x) => x.id === id);
-              if (n) setExtra((e) => [...e, { id: n.id, name: n.name }]);
-            }}
-            options={[{ value: "", label: addable.length ? `+ ${t("wg.addEntry")}` : t("wg.addEntry.none"), disabled: true }, ...addable.map((n) => ({ value: n.id, label: n.name, hint: ccOf(n.id) }))]}
-          />
-        </div>
-      )}
-      <Graph
-        nodes={graphNodes}
-        edges={edges}
-        typeColors={typeColors}
-        ariaLabel={t("wg.graph", { node: node.name })}
-        height={560}
-        layoutKey={`ways:${node.id}`}
-        arrange={(sizes) => waysLayout(sizes)}
-        readOnly={!owner}
-        canConnect={canConnect}
-        onConnect={owner ? onConnect : undefined}
-        onEdgeDelete={owner ? onEdgeDelete : undefined}
-        renderEdgeMenu={owner ? renderMenu : undefined}
-        selected={[cardOfWay(open)]}
-        onSelectionChange={(ids) => {
-          const way = ids[0] ? wayOfCard(ids[0]) : undefined;
-          if (way && way !== open && (w.lanes.some((l) => l.id === way) || w.out.some((l) => l.id === way))) onOpen(way);
+  const addEntry = owner && (
+    <div className="w-[220px]">
+      <Select
+        compact
+        aria-label={t("wg.addEntry")}
+        value=""
+        onValueChange={(id) => {
+          const n = nodesList.find((x) => x.id === id);
+          if (n) setExtra((e) => [...e, { id: n.id, name: n.name }]);
         }}
-        legend={<Legend cc={cc} />}
+        options={[{ value: "", label: addable.length ? `+ ${t("wg.addEntry")}` : t("wg.addEntry.none"), disabled: true }, ...addable.map((n) => ({ value: n.id, label: n.name, hint: ccOf(n.id) }))]}
       />
+    </div>
+  );
+  const graph = (
+    <Graph
+      nodes={graphNodes}
+      edges={edges}
+      typeColors={typeColors}
+      ariaLabel={t("wg.graph", { node: node.name })}
+      height={full ? "100%" : "fit"}
+      className={full ? "h-full rounded-none border-0" : undefined}
+      layoutKey={`ways:${node.id}`}
+      arrange={(sizes) => waysLayout(sizes)}
+      rearrangeOnChange
+      minFitZoom={0.8}
+      fitFocus="node"
+      wheelPans={full}
+      onExpand={onFull ? () => onFull(!full) : undefined}
+      expanded={full}
+      help={help}
+      onHelpChange={setHelp}
+      readOnly={!owner}
+      canConnect={canConnect}
+      onConnect={owner ? onConnect : undefined}
+      onEdgeDelete={owner ? onEdgeDelete : undefined}
+      renderEdgeMenu={owner ? renderMenu : undefined}
+      selected={[cardOfWay(open)]}
+      onSelectionChange={(ids) => {
+        const way = ids[0] ? wayOfCard(ids[0]) : undefined;
+        if (way && way !== open && (w.lanes.some((l) => l.id === way) || w.out.some((l) => l.id === way))) onOpen(way);
+      }}
+      legend={<Legend cc={cc} owner={owner} />}
+      extraShortcuts={owner ? <WaysShortcuts /> : undefined}
+    />
+  );
+  const dialogs = (
+    <>
       {owner && dlg?.kind === "draw" && (
         <AddRelayDialog key={`${dlg.entry.id}/${dlg.inboundId}`} open onOpenChange={() => setDlg(null)} entry={dlg.entry} exitId={node.id} preselect={dlg.inboundId} />
       )}
@@ -429,7 +458,64 @@ export function WaysGraph({ data, w, open, onOpen, onIpv6 }: { data: Data; w: Wa
         </Modal>
       )}
       {subs.dialog}
-    </div>
+    </>
+  );
+
+  if (!full) {
+    return (
+      <div className="flex min-w-0 flex-col gap-2.5">
+        {addEntry}
+        {graph}
+        {detail}
+        {dialogs}
+      </div>
+    );
+  }
+  const helpBtn = (tab: HelpTab, label: string) => (
+    <button
+      type="button"
+      className="mg-glegend-btn"
+      data-active={help === tab || undefined}
+      aria-expanded={help === tab}
+      onClick={() => {
+        setHelp(help === tab ? "" : tab);
+        writePrefHelp(help === tab ? "" : tab);
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <>
+      {createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("wg.full.bar", { node: node.name })}
+          className="fixed inset-0 z-[45] flex flex-col bg-canvas"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !help && !(e.target as HTMLElement).closest("[data-gui]")) closeFull();
+          }}
+        >
+          <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+            <span className="min-w-0 truncate text-[14px] font-semibold">{t("wg.full.bar", { node: node.name })}</span>
+            <span className="flex-1" />
+            {addEntry}
+            {helpBtn("legend", t("graph.legend"))}
+            {helpBtn("shortcuts", t("graph.shortcuts"))}
+            <button type="button" aria-label={t("wg.full.close")} title={`${t("wg.full.close")} (Esc)`} onClick={closeFull} className="flex size-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg">
+              <Icon name="x" size={16} />
+            </button>
+          </header>
+          <div className="flex min-h-0 flex-1">
+            <div className="relative min-w-0 flex-1">{graph}</div>
+            {detail && <aside className="hidden w-[380px] shrink-0 overflow-y-auto border-s border-line bg-surface p-4 min-[1000px]:block">{detail}</aside>}
+          </div>
+        </div>,
+        document.body,
+      )}
+      {dialogs}
+    </>
   );
 }
 
@@ -466,40 +552,72 @@ function ServerRow({ s, cc, onShow }: { s: GServer; cc: string; onShow?: () => v
   );
 }
 
-/** The legend: line styles and port marks, drawn the way the graph draws them. */
-function Legend({ cc }: { cc: string }) {
+/** The legend: the lines, the ports and the chips, drawn with the very SVG, CSS and chip component the canvas uses. */
+function Legend({ cc, owner }: { cc: string; owner: boolean }) {
   const t = useT();
-  const line = (cls: string, color: string, dash?: string) => (
-    <svg width="38" height="10" aria-hidden className="shrink-0">
-      <line x1="2" y1="5" x2="36" y2="5" className={cls} style={{ stroke: `color-mix(in oklch, ${color} var(--wp, 100%), #000)`, strokeWidth: 2, strokeLinecap: "round", strokeDasharray: dash }} />
+  const line = (cls: string, color: string, dash?: string, opacity = 1) => (
+    <svg width="28" height="10" aria-hidden className="shrink-0">
+      <line x1="2" y1="5" x2="26" y2="5" className={cls} style={{ stroke: `color-mix(in oklch, ${color} var(--wp, 100%), #000)`, strokeWidth: 2, strokeLinecap: "round", strokeDasharray: dash, opacity }} />
     </svg>
   );
   const dot = (status: string) => (
-    <span className="relative inline-block h-3 w-3 shrink-0">
-      <button type="button" tabIndex={-1} aria-hidden className="mg-gport" data-status={status} style={{ position: "absolute", left: 6, top: 6, pointerEvents: "none", ["--pc" as never]: "var(--accent-sky)" }} />
+    <span className="relative inline-block size-3 shrink-0">
+      <span aria-hidden className="mg-gport" data-status={status} style={{ position: "absolute", left: 6, top: 6, pointerEvents: "none", ["--pc" as never]: "var(--accent-sky)" }} />
     </span>
   );
-  const row = (icon: ReactNode, text: string) => (
-    <li className="flex items-center gap-2.5">
-      <span className="flex w-[38px] shrink-0 justify-center">{icon}</span>
-      <span className="text-muted">{text}</span>
+  const row = (glyph: ReactNode, text: string) => (
+    <li className="flex h-7 items-center gap-2">
+      <span className="flex w-7 shrink-0 items-center justify-center">{glyph}</span>
+      <span>{text}</span>
     </li>
   );
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[11px] font-bold tracking-[0.08em] text-muted uppercase">{t("wg.legend.title")}</p>
-      <ul className="flex flex-col gap-1.5">
-        {row(line("mg-gwire mg-gwire-flow", "var(--accent-mint)"), t("wg.legend.flow"))}
-        {row(line("mg-gwire", "var(--accent-sand)"), t("wg.legend.warn"))}
-        {row(<span className="mg-cut inline-flex h-[17px] items-center rounded-full px-1.5 text-[10px] font-bold">⊘ {cc}</span>, t("wg.legend.blocked"))}
-        {row(line("mg-gwire", "var(--muted)", "5 6"), t("wg.legend.off"))}
-        {row(line("mg-gwire mg-gwire-pending", "var(--accent)"), t("wg.legend.pending"))}
-        {row(dot("ok"), t("wg.legend.portOk"))}
-        {row(dot("none"), t("wg.legend.portNone"))}
-        {row(dot("blocked"), t("wg.legend.portBlocked"))}
-      </ul>
-      <p className="text-muted">{t("wg.legend.chips")}</p>
-      <p className="text-muted">{t("wg.legend.use")}</p>
+    <div className="flex w-[264px] flex-col gap-3 text-[12px]">
+      <p className="text-[13px] font-semibold">{t("graph.legend")}</p>
+      <HelpGroup title={t("wg.legend.lines")}>
+        <ul>
+          {row(line("mg-gwire mg-gwire-flow", "var(--accent-mint)"), t("wg.lg.flow"))}
+          {row(line("mg-gwire", "var(--accent-sand)"), t("wg.lg.warn"))}
+          {row(line("mg-gwire", "var(--muted)", "2 5", 0.35), t("wg.lg.blocked"))}
+          {row(line("mg-gwire", "var(--muted)", "5 6", 0.75), t("wg.lg.off"))}
+          {row(line("mg-gwire mg-gwire-pending", "var(--accent)"), t("wg.lg.checking"))}
+        </ul>
+      </HelpGroup>
+      <HelpGroup title={t("wg.legend.ports")}>
+        <ul>
+          {row(dot("ok"), t("wg.lg.portOk"))}
+          {row(dot("none"), t("wg.lg.portNone"))}
+          {row(dot("blocked"), t("wg.lg.portBlocked"))}
+        </ul>
+      </HelpGroup>
+      <HelpGroup title={t("wg.legend.status")}>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip kind="ok">{t("wg.chip.works")}</Chip>
+          <Chip kind="warn">{t("wg.chip.partial")}</Chip>
+          <Chip kind="cut">{t("wg.chip.blocked", { cc })}</Chip>
+          <Chip kind="off">{t("wg.chip.off")}</Chip>
+          <Chip kind="busy">{t("wg.v6.can")}</Chip>
+          <Chip kind="off">{t("wg.v6.none")}</Chip>
+        </div>
+      </HelpGroup>
+      {owner && <p className="text-[11px] leading-snug text-faint">{t("wg.lg.help", { key: modKey })}</p>}
     </div>
   );
 }
+
+/** The shortcuts of the ways (the owner's): what the graph's own list does not have. */
+function WaysShortcuts() {
+  const t = useT();
+  return (
+    <HelpGroup title={t("wg.k.group")}>
+      <ul className="flex flex-col gap-1">
+        <KeyRow keys={<><Kbd>{t("graph.key.drag")}</Kbd><Kbd>+ {t("wg.relay.port")}</Kbd></>}>{t("wg.k.newRelay")}</KeyRow>
+        <KeyRow keys={<Kbd>Enter</Kbd>}>{t("wg.k.wire")}</KeyRow>
+        <KeyRow keys={<><Kbd>{t("graph.key.click")}</Kbd><Kbd>Enter</Kbd></>}>{t("wg.k.menu")}</KeyRow>
+        <KeyRow keys={<Kbd>Delete</Kbd>}>{t("wg.k.delete")}</KeyRow>
+      </ul>
+    </HelpGroup>
+  );
+}
+
+const writePrefHelp = (tab: string) => writePref("mg.graph.help", tab || null);

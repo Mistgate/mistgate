@@ -313,9 +313,9 @@ export function relayRefusal(entryNodeId: string, nodeId: string, server: GServe
  * "internet"/"warp"); sizes are the measured ones.
  */
 export function waysLayout(cards: readonly { id: string; w: number; h: number }[], opts: { colGap?: number; rowGap?: number; band?: number } = {}): Record<string, { x: number; y: number }> {
-  const colGap = opts.colGap ?? 112;
-  const rowGap = opts.rowGap ?? 28;
-  const band = opts.band ?? 36;
+  const colGap = opts.colGap ?? 144;
+  const rowGap = opts.rowGap ?? 10;
+  const band = opts.band ?? 28;
   const hasExitCards = cards.some((c) => c.id.startsWith("exit:"));
   const col = (id: string) => (id === "people" ? 0 : id.startsWith("entry:") ? 1 : id === "node" ? 2 : id.startsWith("exit:") ? 3 : hasExitCards ? 4 : 3);
   const cols = new Map<number, { id: string; w: number; h: number }[]>();

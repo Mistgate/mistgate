@@ -132,6 +132,8 @@ function Mock({ v6, role, children }: { v6: V6; role: Role; children: ReactNode 
 
 function Screen({ v6 }: { v6: V6 }) {
   const [open, setOpen] = useState<WayId>("direct");
+  const [full, setFull] = useState(new URLSearchParams(location.search).get("full") === "1");
+  const extra = new URLSearchParams(location.search).get("extra") === "0" ? [] : [{ id: "nod_spb1", name: "spb1" }, { id: "nod_de1", name: "de1" }];
   const data = {
     node: { id: "nod_be", name: "be", countryCode: "BE", address: "203.0.113.40", status: NodeStatus.ONLINE, bandwidthMbps: 0, ipv6: v6Of(v6), warp: { state: WarpState.UP, colo: "AMS" } },
     inbounds,
@@ -140,7 +142,24 @@ function Screen({ v6 }: { v6: V6 }) {
     facts: { hasIpv6: v6 !== "none" },
   } as never;
   const w = useWays(data);
-  return <WaysGraph data={data} w={w} open={open} onOpen={setOpen} onIpv6={() => undefined} />;
+  return (
+    <WaysGraph
+      data={data}
+      w={w}
+      open={open}
+      onOpen={setOpen}
+      onIpv6={() => undefined}
+      full={full}
+      onFull={setFull}
+      initialExtra={extra}
+      detail={
+        <div className="rounded-card border border-line bg-surface p-4 text-[13px] text-muted">
+          <p className="mb-1 text-[14px] font-semibold text-fg">{open}</p>
+          The way&apos;s detail card (ports, checks, the country row) opens here: below the graph, or in a drawer on the right in full screen.
+        </div>
+      }
+    />
+  );
 }
 
 export function WaysShowcase() {

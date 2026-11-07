@@ -355,7 +355,8 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
   const asked: WaysView | undefined = search.view === "graph" || search.view === "list" ? search.view : undefined;
   const view: WaysView = phone ? "list" : (asked ?? (readPref("ways.view") === "graph" ? "graph" : "list"));
   const go = (next: NodeSearch, replace = true) =>
-    void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", ...(asked ? { view: asked } : {}), ...next }, replace, resetScroll: false });
+    void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", ...(asked ? { view: asked } : {}), ...(search.full ? { full: search.full } : {}), ...next }, replace, resetScroll: false });
+  const full = view === "graph" && search.full === "1";
   const setView = (v: WaysView) => {
     writePref("ways.view", v);
     go({ way: search.way, view: v });
@@ -397,8 +398,16 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
       )}
       {view === "graph" ? (
         <div className="flex min-w-0 flex-col gap-3.5">
-          <WaysGraph data={data} w={w} open={open} onOpen={(id) => go({ way: id })} onIpv6={() => go({ way: "ipv6", add: "ipv6" })} />
-          {detail}
+          <WaysGraph
+            data={data}
+            w={w}
+            open={open}
+            onOpen={(id) => go({ way: id })}
+            onIpv6={() => go({ way: "ipv6", add: "ipv6" })}
+            detail={detail}
+            full={full}
+            onFull={(on) => void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", view: "graph", ...(search.way ? { way: search.way } : {}), ...(on ? { full: "1" as const } : {}) }, replace: true, resetScroll: false })}
+          />
         </div>
       ) : (
         // side by side from lg; between 720 and 1023 px (the sidebar still shown) the line stands above the open lane, and a

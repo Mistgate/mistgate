@@ -235,7 +235,7 @@ describe("waysLayout", () => {
   it("keeps the entries out of the band of the node, above and below, and no two cards overlap", () => {
     for (const id of ["entry:a", "entry:b", "entry:c"]) {
       const r = rect(id);
-      expect(r.y + r.h <= pos.node!.y - 36 || r.y >= pos.node!.y + 280 + 36, id).toBe(true);
+      expect(r.y + r.h <= pos.node!.y - 28 || r.y >= pos.node!.y + 280 + 28, id).toBe(true);
     }
     expect(pos["entry:a"]!.y).toBeLessThan(pos.node!.y);
     expect(pos["entry:b"]!.y).toBeGreaterThan(pos.node!.y);
@@ -250,7 +250,7 @@ describe("waysLayout", () => {
 
   it("collapses a column nobody is in, and on an entry node puts the exit cards before the internet", () => {
     const small = waysLayout([{ id: "people", w: 200, h: 60 }, { id: "node", w: 300, h: 200 }, { id: "internet", w: 200, h: 60 }]);
-    expect(small.node!.x).toBe(200 + 112);
+    expect(small.node!.x).toBe(200 + 144);
     const entry = waysLayout([{ id: "people", w: 200, h: 60 }, { id: "node", w: 300, h: 200 }, { id: "exit:be", w: 220, h: 120 }, { id: "internet", w: 200, h: 60 }]);
     expect(entry["exit:be"]!.x).toBeLessThan(entry.internet!.x);
   });

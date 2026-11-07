@@ -1,5 +1,6 @@
 export { Graph, loadPositions } from "./graph";
 export { GraphPortRow } from "./node";
+export { HelpGroup, Kbd, KeyRow, modKey, type HelpTab } from "./help";
 export { GraphSlider, GraphValue, GraphMenuItem } from "./controls";
 export { computeLayout, assignRanks, tabOrder } from "./layout";
 export { routeWire, hitEdge, distanceToRoute } from "./geometry";

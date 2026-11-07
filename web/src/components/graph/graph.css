@@ -4,13 +4,17 @@
   --t: var(--muted);
 }
 .mg-graph {
-  --shadow-node: 0 1px 2px rgb(0 0 0 / 0.28), 0 12px 28px -16px rgb(0 0 0 / 0.65);
+  --shadow-node: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px rgb(0 0 0 / 0.35);
   --wp: 100%; /* how much of a type or state colour a wire and a port keep: darkened a little on the light theme */
+  --node-bg: var(--surface);
+  --node-border: color-mix(in oklch, var(--border) 72%, #fff);
   --gstep: 24px;
+  --gdot: 7%;
   --gx: 0px;
   --gy: 0px;
-  background-color: color-mix(in oklch, var(--surface) 38%, var(--bg));
-  background-image: radial-gradient(circle, color-mix(in oklch, var(--muted) 42%, transparent) 1px, transparent 1.5px);
+  /* a quieter plane than the page, so the cards stand out of it */
+  background-color: color-mix(in oklch, var(--bg) 55%, #000);
+  background-image: radial-gradient(circle, color-mix(in oklch, var(--text) var(--gdot), transparent) 1px, transparent 1.3px);
   background-size: var(--gstep) var(--gstep);
   background-position: var(--gx) var(--gy);
   touch-action: none;
@@ -18,8 +22,9 @@
 }
 :root[data-theme="light"] .mg-graph {
   --wp: 90%;
-  --shadow-node: 0 1px 2px rgb(20 20 30 / 0.07), 0 10px 24px -16px rgb(20 20 30 / 0.22);
-  background-color: color-mix(in oklch, var(--surface-2) 55%, var(--surface));
+  --shadow-node: 0 1px 2px rgb(20 20 30 / 0.06), 0 8px 24px -8px rgb(20 20 30 / 0.2);
+  --node-border: color-mix(in oklch, var(--border) 82%, #000);
+  background-color: color-mix(in oklch, var(--surface-2) 78%, var(--border));
 }
 .mg-graph[data-space] {
   cursor: grab;
@@ -57,9 +62,9 @@
   left: 0;
   top: 0;
   z-index: 1;
-  border: 1px solid var(--border);
+  border: 1px solid var(--node-border);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--node-bg);
   box-shadow: var(--shadow-node);
   color: var(--text);
   outline: none;
@@ -76,9 +81,9 @@
 }
 .mg-gnode[data-selected] {
   z-index: 2;
-  border-color: color-mix(in oklch, var(--text) 82%, transparent);
+  border-color: var(--accent);
   box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--text) 30%, transparent),
+    0 0 0 2px color-mix(in oklch, var(--accent) 38%, transparent),
     var(--shadow-node);
 }
 .mg-gnode:focus-visible {
@@ -89,12 +94,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border);
+  height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--node-border);
   border-radius: 9px 9px 0 0;
-  background: color-mix(in oklch, var(--t, var(--muted)) 8%, var(--surface));
-  font-size: 13px;
+  background: color-mix(in oklch, var(--t, var(--muted)) 7%, var(--node-bg));
+  font-size: 13.5px;
   font-weight: 650;
   letter-spacing: -0.005em;
   white-space: nowrap;
@@ -110,7 +115,7 @@
   padding: 0;
   border: 2px solid color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--node-bg);
   cursor: crosshair;
   transform: translate(var(--tx), -50%) scale(var(--s));
   transition:
@@ -285,7 +290,7 @@
   bottom: 12px;
   z-index: 10;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--node-border);
   border-radius: 11px;
   background: color-mix(in oklch, var(--surface) 85%, transparent);
   backdrop-filter: blur(10px);
@@ -378,7 +383,7 @@
 
 /* a port that states its way: filled works, hollow is none, a ring with a slash is blocked */
 .mg-gport[data-status] {
-  background: var(--surface);
+  background: var(--node-bg);
 }
 .mg-gport[data-status="ok"] {
   background: color-mix(in oklch, var(--pc, var(--muted)) var(--wp), #000);
@@ -394,7 +399,7 @@
   opacity: 0.8;
 }
 .mg-gport[data-status="blocked"] {
-  border-color: color-mix(in oklch, var(--danger) 80%, var(--muted));
+  border-color: color-mix(in oklch, var(--danger) 45%, var(--muted));
 }
 .mg-gport[data-status="blocked"]::after {
   content: "";
@@ -404,18 +409,12 @@
   width: 9px;
   height: 2px;
   border-radius: 2px;
-  background: color-mix(in oklch, var(--danger) 80%, var(--muted));
+  background: color-mix(in oklch, var(--danger) 45%, var(--muted));
   transform: translate(-50%, -50%) rotate(-45deg);
 }
 /* a badge on a wire's end: a quiet pill, rose only as a tint */
 .mg-glabel[data-end] {
   transform: translate(-100%, -50%);
-}
-.mg-glabel[data-state="blocked"],
-.mg-cut {
-  border: 1px solid color-mix(in oklch, var(--danger) 14%, var(--border));
-  background: color-mix(in oklch, var(--danger) 5%, var(--surface));
-  color: color-mix(in oklch, var(--danger-text) 48%, var(--muted));
 }
 .mg-glabel[data-state="warn"] {
   border-color: color-mix(in oklch, var(--warning) 40%, var(--border));
@@ -451,14 +450,75 @@
   color: var(--text);
 }
 .mg-glegend-body {
-  max-width: 320px;
+  width: 292px;
+  max-width: calc(100vw - 48px);
   padding: 12px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--node-border);
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: var(--shadow-toast);
+  box-shadow: var(--shadow-node);
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+  max-height: min(480px, 70vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform-origin: bottom left;
+  animation: mg-ghelp-in 0.16s var(--ease-out-soft);
+}
+@keyframes mg-ghelp-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+.mg-kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mg-keyrow {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+.mg-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.mg-gzoomhint {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  z-index: 12;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--text) 88%, transparent);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.mg-gzoomhint[data-show] {
+  opacity: 1;
 }
 .mg-gminimap {
   opacity: 0.9;

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { HelpTab } from "./help";
 import type { LayoutEdge, LayoutNode } from "./layout";
 
 /** A port's type: a free-form tag ("udp", "tcp", "any"). Two ports connect when the tags match or either is "any". */
@@ -85,10 +86,27 @@ export interface GraphProps<D = unknown> {
   onSelectionChange?: (ids: string[]) => void;
   readOnly?: boolean;
   minimap?: boolean;
-  /** Explains the line styles and chips; shown in a small collapsible panel at the bottom-left. */
+  /** Explains the line styles and chips; a card opened from the Legend button at the bottom-left. */
   legend?: ReactNode;
+  /** More shortcut groups for the Shortcuts card (the screen's own). */
+  extraShortcuts?: ReactNode;
+  /** Which help card is open ("" none). Without it the graph keeps its own, remembered per browser. */
+  help?: HelpTab | "";
+  onHelpChange?: (tab: HelpTab | "") => void;
+  /** An Expand button in the toolbar (and Shift+F). */
+  onExpand?: () => void;
+  expanded?: boolean;
+  /** A plain mouse wheel pans (full screen); otherwise it scrolls the page and only Ctrl/Cmd + wheel zooms. */
+  wheelPans?: boolean;
+  /** Fit never zooms out past this (default 0.3, the zoom limit). */
+  minFitZoom?: number;
+  /** A node to keep centred when the content is wider than the canvas at the fit floor (the rest is panned to). */
+  fitFocus?: string;
+  /** When the nodes change, lay everything out again instead of placing only the new ones. */
+  rearrangeOnChange?: boolean;
   /** Replaces the default column layout (first layout and Arrange). */
   arrange?: (nodes: LayoutNode[], edges: LayoutEdge[]) => Positions;
+  /** A number or CSS size; "fit": the content at zoom 1, between 560px and the viewport less 200px. */
   height?: number | string;
   ariaLabel: string;
   className?: string;

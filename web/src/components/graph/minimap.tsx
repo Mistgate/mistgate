@@ -9,7 +9,7 @@ export const MINIMAP_H = 84;
 const PAD = 6;
 
 /** The overview in the corner: node rects (selected ones in the accent) and the viewport; click or drag recentres the view. */
-export function Minimap({ store, ids, selected, onCenter }: { store: GraphStore; ids: string[]; selected: ReadonlySet<string>; onCenter: (world: Pos) => void }) {
+export function Minimap({ store, ids, selected, onCenter }: { store: GraphStore; ids: string[]; selected: ReadonlySet<string>; onCenter: (world: Pos, animate?: boolean) => void }) {
   useStoreVersion(store, "geo");
   useStoreVersion(store, "view");
   useStoreVersion(store, "measure");
@@ -47,7 +47,7 @@ export function Minimap({ store, ids, selected, onCenter }: { store: GraphStore;
           if (e.button !== 0) return;
           drag.current = true;
           e.currentTarget.setPointerCapture(e.pointerId);
-          onCenter(toWorld(e));
+          onCenter(toWorld(e), true);
         }}
         onPointerMove={(e) => drag.current && onCenter(toWorld(e))}
         onPointerUp={() => (drag.current = false)}
