@@ -8,15 +8,20 @@ on:
 
 jobs:
   race:
-    # The agent session (panel and node) is concurrent by design; the race detector guards it.
+    # The agent session (panel and node) is concurrent by design; the race detector guards it. The two packages run as
+    # two jobs: in one job they shared the runner's cores, and fleet alone takes 12-20 min under -race on a hosted runner
+    # (700-1200 s on the same code, by runner), so sharing pushed it past its limit.
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: [./internal/panel/fleet/, ./internal/node/agent/]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
-      # fleet takes 12-20 min under -race on a hosted runner (700-1200 s on the same code, by runner), so 20 min cut it twice
-      - run: go test -race -count=1 -timeout 35m ./internal/panel/fleet/ ./internal/node/agent/
+      - run: go test -race -count=1 -timeout 35m ${{ matrix.pkg }}
   edge-store:
     runs-on: ubuntu-24.04
     steps:
