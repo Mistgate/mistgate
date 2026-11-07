@@ -576,6 +576,7 @@ func (p *pass) finish(x *store.StepRow, state, key string, params map[string]str
 	updated := *x
 	updated.State, updated.ErrorKey, updated.Params, updated.FinishedAt = state, key, params, p.now
 	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA, updated.AnswerWait = "", time.Time{}, "", "", 0
+	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError = "", -1, 0, 0, 0, 0, ""
 	if !p.save(&updated) {
 		return false
 	}
@@ -1128,6 +1129,7 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 	x.State, x.SentAt, x.FromVersion, x.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	x.RequestID, x.RequestAt = store.NewID("req_"), p.now
 	x.AnswerWait = p.configuredAnswerWait(n)
+	x.ProgressPhase, x.ProgressRank, x.ProgressDownloaded, x.ProgressTotal, x.ProgressSpeed, x.ProgressUpdatedUnix, x.ProgressError = "", -1, 0, 0, 0, 0, ""
 	if !p.save(x) {
 		return
 	}
@@ -1177,6 +1179,7 @@ func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
 	updated.State, updated.SentAt, updated.FromVersion, updated.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = store.NewID("req_"), p.now, "", digest
 	updated.AnswerWait = p.configuredAnswerWait(n)
+	updated.ProgressPhase, updated.ProgressRank, updated.ProgressDownloaded, updated.ProgressTotal, updated.ProgressSpeed, updated.ProgressUpdatedUnix, updated.ProgressError = "", -1, 0, 0, 0, 0, 0, ""
 	ok, err := s.st.MarkStepSent(p.ctx, &updated)
 	if err != nil {
 		s.log.Warn("update: mark link update sent", "node", x.NodeID, "err", err)
@@ -1280,12 +1283,6 @@ func (s *Service) recover(ctx context.Context) {
 		switch steps[i].State {
 		case store.StepSent:
 			s.orphans[steps[i].NodeID] = true
-			if steps[i].AnswerWait <= 0 {
-				steps[i].AnswerWait = s.cfg.AnswerWait
-				if err := s.st.SaveStep(ctx, &steps[i]); err != nil {
-					s.log.Warn("update: persist legacy step wait", "node", steps[i].NodeID, "err", err)
-				}
-			}
 			s.beginProgress(steps[i].NodeID, steps[i].RequestID, steps[i].SentAt)
 		case store.StepGating:
 			steps[i].ReconnectedAt = now

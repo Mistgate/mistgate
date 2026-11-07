@@ -131,9 +131,11 @@ type Updater struct {
 	started  time.Time
 	deadline time.Time
 
-	busy    atomic.Bool
-	pend    atomic.Pointer[Marker]        // set by Startup for a new build inside its commit window
-	outcome atomic.Pointer[pb.LastUpdate] // what Hello reports until a HelloAck for it
+	busy          atomic.Bool
+	activeMu      sync.Mutex
+	activeRequest string
+	pend          atomic.Pointer[Marker]        // set by Startup for a new build inside its commit window
+	outcome       atomic.Pointer[pb.LastUpdate] // what Hello reports until a HelloAck for it
 }
 
 // New fills the defaults. It touches no file.
@@ -552,6 +554,11 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		u.log.Warn("update refused", "code", res.Error, "err", err)
 		return res, nil
 	}
+	busyResult := func() (*pb.CommandResult, Finish) {
+		res.Error = "busy"
+		res.Detail = "another update or rollback is in progress"
+		return res, nil
+	}
 	if u.cfg.Key == nil {
 		return fail(step("unsigned_build", errors.New("unsigned build: update by hand")))
 	}
@@ -571,17 +578,31 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 	if err != nil {
 		return fail(err)
 	}
-	if u.updateBlocked() || !u.busy.CompareAndSwap(false, true) {
+	u.activeMu.Lock()
+	if u.busy.Load() {
+		duplicate := req.RequestId != "" && req.RequestId == u.activeRequest
+		u.activeMu.Unlock()
+		if duplicate {
+			// A redelivery of the same command is still in flight. Do not emit a
+			// terminal frame for it: that would poison the progress stream of the
+			// original request.
+			return busyResult()
+		}
 		return fail(step("busy", errors.New("another update or rollback is in progress")))
 	}
-	if u.updateBlocked() { // close the race with a unit-refresh reservation made after the first check
-		u.busy.Store(false)
-		return fail(step("busy", errors.New("a unit refresh or update commit is in progress")))
+	if u.updateBlocked() || !u.busy.CompareAndSwap(false, true) {
+		u.activeMu.Unlock()
+		return fail(step("busy", errors.New("another update or rollback is in progress")))
 	}
+	u.activeRequest = req.RequestId
+	u.activeMu.Unlock()
 	swapped := false
 	defer func() {
 		if !swapped {
+			u.activeMu.Lock()
+			u.activeRequest = ""
 			u.busy.Store(false)
+			u.activeMu.Unlock()
 		}
 	}()
 	if err := u.probe(); err != nil {
@@ -754,7 +775,15 @@ func (u *Updater) download(ctx context.Context, src Source, f release.File, time
 				return step("download_failed", ctx.Err())
 			}
 		case idleFired.Load():
-			return step("download_failed", errors.New("download idle timeout"))
+			idleFired.Store(false)
+			if failed >= len(u.cfg.Backoff) {
+				return step("download_failed", errors.New("download idle timeout"))
+			}
+			u.log.Warn("download idle, retrying", "have", cw.n, "of", f.Size)
+			if !sleep(ctx, u.cfg.Backoff[failed]) {
+				return step("download_failed", ctx.Err())
+			}
+			failed++
 		case errors.Is(err, ErrPermanent):
 			return step("download_failed", err)
 		default:
