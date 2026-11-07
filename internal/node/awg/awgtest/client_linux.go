@@ -177,6 +177,20 @@ func StartClient(t testing.TB, ns NS, cfg ClientCfg) *Client {
 	return c
 }
 
+// ReplacePeer configures the server peer again from scratch (the old one is removed first): the session keys are gone and the next
+// packet makes the client start a new handshake. The benchmark suite uses it to count handshakes.
+func (c *Client) ReplacePeer(cfg ClientCfg) error {
+	ka, err := awgcfg.ParseRange(cfg.Keepalive)
+	if err != nil {
+		return err
+	}
+	return c.uapi("set=1\n" + awguapi.PeersSet(true, []awgcfg.Peer{{
+		PublicKey: cfg.ServerPub, PSK: cfg.PSK, Endpoint: cfg.Endpoint,
+		AllowedIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")},
+		Keepalive:  ka,
+	}}))
+}
+
 // uapi sends one request to the client's socket and checks "errno=0".
 func (c *Client) uapi(req string) error {
 	_, err := c.uapiRaw(req)

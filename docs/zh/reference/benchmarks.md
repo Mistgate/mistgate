@@ -251,6 +251,55 @@ AMD Ryzen 7 7800X3D（8 核、16 线程）、15.5 GB RAM、Windows 11 主机、W
 
 脚本、compose 文件、修改版构建的差异、负载生成器和汇总结果均位于仓库中的 [`tools/bench`](https://github.com/Mistgate/mistgate/tree/main/tools/bench)，并附有 README：`py/bench.py`（仅面板）、`py/onebox.py`（单服务器）、`py/profile_run.py`（性能剖析）、`py/aggregate*.py`、`loadgen/`、`hyload/`、`compose/`、`profiling/`（pprof overlay）和 `results/`（表格和每次重复测试的 CSV）。未公布原始 JSON 和 1 Hz 采样数据。测试工具会创建并删除 Docker 镜像和 systemd slice；请先阅读 README，再在测试机器上运行。
 
+## 引擎基准测试套件
+
+上面的表格比较的是各个面板。这个套件测量节点内部的引擎（Hysteria2、VLESS 和 AmneziaWG），并与它们自己以前的数字对比，这样任何一个变慢的改动在发布前就能被发现。它是回归检查，不是与其他产品的比较。
+
+**测量内容。** 对每个引擎，在由 veth 对连接的两个网络命名空间之间，节点后面的第三个命名空间充当“互联网”：
+
+- 1 条和 8 条并行流的吞吐量（Mbit/s，经隧道下载）；
+- 引擎进程在两个阶段传输期间每 GB 使用的 CPU 秒数（来自 `/proc` 的用户加系统时间）；
+- 8 条流占满链路时，小请求（64 字节，每 20 毫秒一次）的 p50 和 p99 延迟；
+- 引擎进程的峰值常驻内存（`VmHWM`）；
+- 每秒握手数：新的 Hysteria2 会话（QUIC 握手加认证）、新的 VLESS REALITY 连接（每个都是一次 REALITY 握手和一个 VLESS 会话，不复用）；AmneziaWG 则是对一个对端重新握手并发一次 ping，节奏受 WireGuard 自身每 20 毫秒一次发起握手的限制，所以最多约 30，主要说明每次都成功。
+
+引擎是本仓库中的真实引擎，按节点启动它们的方式启动：Hysteria2（自签名证书，由客户端固定）、基于 TCP（Vision）和 XHTTP 的 VLESS REALITY，以及用户态后端的 AmneziaWG（使用真实的 amneziawg-go 客户端）。客户端是真实的客户端库（Hysteria 客户端、进程内的 Xray 客户端）。引擎运行在自己的进程里，所以 CPU 和内存都是它自己的。
+
+**网络变体。** `clean`（不做整形）、`rtt50-loss1`（客户端链路每个方向 25 毫秒和 0.5% 丢包：往返 50 毫秒，约 1% 丢包）和 `mtu1280`（客户端链路 MTU 为 1280）。如果某个引擎在某个变体下完全无法传输，就没有对应的用例：Hysteria2 在 1280 字节链路上会被跳过，因为 QUIC 发送带“不分片”标志的 1280 字节数据报，而链路会丢弃它们。
+
+**运行方法。** 需要 Linux、root、`ip`（iproute2）、用于 netem 变体的 `tc`、用于 AmneziaWG 的 `nft` 以及 Go。它会改变网络状态，所以请在 WSL 或一次性机器上运行，绝不要在生产节点上运行。所有命名空间都叫 `mg3-awg-b-*`；主机自己的网卡、路由和 nft 表不会被触碰。
+
+```sh
+scripts/bench.sh                                  # 所有引擎和变体；在 Windows 上会自行转入 WSL 以 root 运行
+scripts/bench.sh --engines hysteria2,awg --variants clean --seconds 6
+scripts/bench.sh --repeat 3 --update              # 用三次运行的中位数生成新的基线
+MISTGATE_BENCH=1 go test -tags bench ./internal/node/bench/ -run '^TestBench$' -count=1 -v -timeout 0   # 在 Linux 上以 root 运行，效果相同
+```
+
+没有 `MISTGATE_BENCH=1`、没有 root 或没有网络命名空间时，测试会带着提示信息跳过；没有 `tc` 时跳过 netem 变体，没有 `nft` 时跳过 AmneziaWG。报告是 JSON（`bench-report.json` 或 `--out`）：每个 `<引擎>/<变体>` 一个对象。
+
+**基线。** `internal/node/bench/baseline.json` 保存参考运行的数字，以及它所用的内核、CPU 数和 Go 版本。每次运行都会逐项指标与它比较，**任何指标比基线差 15% 以上就会失败**（吞吐量和握手数更低，每 GB 的 CPU、延迟和内存更高）。阈值用 `--threshold`（或 `MISTGATE_BENCH_THRESHOLD`：`15`、`15%` 或 `0.15`）设置。变化小于最小绝对量时，无论百分比多大都不计入（5 Mbit/s、每 GB 0.3 CPU 秒、p50 为 2 毫秒、p99 为 5 毫秒、8 MB、每秒 2 次握手）；没有基线的用例只作记录，基线中有但未运行的用例同样只作记录。绝对数字取决于机器：一台机器上的基线对另一台说明不了什么。请在负责检查的那台机器上，用三次运行的中位数（`--repeat 3 --update`）生成基线；在共享机器上失败时，先当作“在安静的机器上再测一次”，再考虑是否为回归。
+
+GitHub 工作流 `bench`（**Actions → bench → Run workflow**）在托管 runner 上运行同样的内容。它只能手动启动，绝不在 pull request 或定时任务中运行。
+
+**参考运行**（WSL2，内核 6.6，16 线程，每阶段 4 秒、三次运行的中位数；veth 链路在内存中，因此 clean 的吞吐量远高于任何真实链路，反映的是引擎的 CPU，而不是网络）：
+
+| 用例 | 1 条流，Mbit/s | 8 条流，Mbit/s | 每 GB CPU 秒 | p50 毫秒 | p99 毫秒 | RSS MB | 每秒握手数 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| `awg/clean` | 4683 | 4307 | 4.8 | 9.1 | 37.2 | 394 | 32.8 |
+| `awg/mtu1280` | 4926 | 3607 | 4.6 | 7.7 | 34.1 | 362 | 33.6 |
+| `awg/rtt50-loss1` | 307 | 1785 | 8.0 | 59.7 | 102.8 | 351 | 3.9 |
+| `hysteria2/clean` | 1753 | 2137 | 7.2 | 1.6 | 16.9 | 33 | 721.5 |
+| `hysteria2/rtt50-loss1` | 612 | 1365 | 5.1 | 81.9 | 134.7 | 83 | 36.9 |
+| `vless-tcp/clean` | 2894 | 16985 | 2.4 | 7.5 | 36.5 | 32 | 1106.8 |
+| `vless-tcp/mtu1280` | 3454 | 17214 | 2.2 | 8.1 | 27.3 | 32 | 1092.8 |
+| `vless-tcp/rtt50-loss1` | 370 | 2778 | 1.8 | 50.8 | 90.7 | 30 | 24.0 |
+| `vless-xhttp/clean` | 931 | 1031 | 13.9 | 1.3 | 6.1 | 33 | 2633.3 |
+| `vless-xhttp/mtu1280` | 711 | 869 | 16.3 | 9.1 | 105.9 | 33 | 1042.3 |
+| `vless-xhttp/rtt50-loss1` | 255 | 347 | 7.5 | 116.9 | 184.0 | 31 | 69.3 |
+
+每 GB 的 CPU 是节点进程自己的时间，数字来自一台机器上一个 4 秒的阶段：用它们观察变化，而不是给协议排名。AmneziaWG 运行在用户态后端上，其进程持有数百 MB 的数据包缓冲；内核后端在进程之外完成工作，所以它的 CPU 和内存不会出现在这两列里。
+
 ## 这些数据不能说明什么
 
 - 使用一台桌面计算机的一个 CPU、一个 WSL2 虚拟机，重复三次。仅面板表格和单服务器表格中的控制平面数据波动较小，但更换 CPU、内核或文件系统会改变绝对值。这台机器并非专用测试机：单服务器测试期间还有其他任务运行，因此未公布隧道吞吐量数据（参见该节中的说明）。

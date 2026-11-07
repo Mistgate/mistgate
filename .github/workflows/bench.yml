@@ -1,0 +1,60 @@
+name: bench
+# The engine benchmark suite (internal/node/bench, scripts/bench.sh, docs/en/reference/benchmarks.md): Hysteria2, VLESS and
+# AmneziaWG between network namespaces on a hosted runner, compared with the committed baseline. Started by hand only: never on a
+# pull request and never on a schedule. A hosted runner is a shared machine, so read a failure as "measure again on a quiet one"
+# before reading it as a regression; --update on a machine you trust is how the baseline moves.
+on:
+  workflow_dispatch:
+    inputs:
+      engines:
+        description: "Comma list of hysteria2, vless-tcp, vless-xhttp, awg (empty = all)"
+        required: false
+        default: ""
+      variants:
+        description: "Comma list of clean, rtt50-loss1, mtu1280 (empty = all)"
+        required: false
+        default: ""
+      seconds:
+        description: "Length of each throughput phase"
+        required: false
+        default: "4"
+      threshold:
+        description: "How much worse than the baseline fails: 15, 15% or 0.15"
+        required: false
+        default: "15"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - name: Tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends iproute2 nftables
+      - name: Benchmarks
+        env:
+          ENGINES: ${{ inputs.engines }}
+          VARIANTS: ${{ inputs.variants }}
+          SECONDS_PER_PHASE: ${{ inputs.seconds }}
+          THRESHOLD: ${{ inputs.threshold }}
+        run: |
+          set -eu
+          args=(--seconds "$SECONDS_PER_PHASE" --threshold "$THRESHOLD" --out "$RUNNER_TEMP/bench-report.json")
+          [ -z "$ENGINES" ] || args+=(--engines "$ENGINES")
+          [ -z "$VARIANTS" ] || args+=(--variants "$VARIANTS")
+          status=0
+          sudo -E env "PATH=$PATH" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" "HOME=$HOME" \
+            bash scripts/bench.sh "${args[@]}" || status=$?
+          {
+            echo '### Engine benchmarks'
+            echo '```json'
+            cat "$RUNNER_TEMP/bench-report.json" 2>/dev/null || echo '{}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
