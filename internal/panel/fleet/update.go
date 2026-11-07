@@ -30,6 +30,8 @@ type Updates interface {
 	LinkDownload(ctx context.Context, nodeID, name, token string) (string, error)
 	// RecordAnswer stores the first result of an edge update command against its sent step. Other command results never call it.
 	RecordAnswer(ctx context.Context, nodeID, requestID string, result *agentv1.CommandResult) error
+	// RecordProgress stores the latest best-effort progress for an in-flight update command.
+	RecordProgress(ctx context.Context, nodeID string, progress *agentv1.UpdateProgress) error
 	// Updating reports that a rollout step of the node is in flight (command sent, reconnect or gate pending): its
 	// stream drops when the agent re-executes, and that is neither a blip nor an outage.
 	Updating(nodeID string) bool
@@ -78,11 +80,24 @@ func (a agentService) FetchUpdate(ctx context.Context, req *connect.Request[agen
 // UpdateAgent sends a signed manifest to a connected node with the update capability and waits up to wait for the
 // CommandResult (the download is part of it). The agent answers before it re-executes; a stream that drops right
 // after the answer still delivers it.
-func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error) {
+func (f *Fleet) UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait, downloadTimeout time.Duration) (*agentv1.CommandResult, error) {
 	return f.command(ctx, nodeID, wait, func(reqID string) *agentv1.ConnectResponse {
-		return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{
-			UpdateAgent: &agentv1.UpdateAgent{RequestId: reqID, Manifest: manifest, Signature: signature}}}
+		return updateAgentFrame(reqID, manifest, signature, downloadTimeout)
 	})
+}
+
+// UpdateAgentWithRequestID is the rollout path. The caller persists the request ID with the step so progress and
+// command replies from a previous attempt cannot be mistaken for the current update after a reconnect or restart.
+func (f *Fleet) UpdateAgentWithRequestID(ctx context.Context, nodeID, requestID string, manifest, signature []byte, wait, downloadTimeout time.Duration) (*agentv1.CommandResult, error) {
+	return f.commandWithRequestID(ctx, nodeID, requestID, wait, updateAgentFrame(requestID, manifest, signature, downloadTimeout))
+}
+
+func updateAgentFrame(requestID string, manifest, signature []byte, downloadTimeout time.Duration) *agentv1.ConnectResponse {
+	r := &agentv1.UpdateAgent{RequestId: requestID, Manifest: manifest, Signature: signature}
+	if downloadTimeout > 0 {
+		r.DownloadTimeoutSeconds = uint32(downloadTimeout / time.Second)
+	}
+	return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: r}}
 }
 
 // RollbackAgent asks a connected node with the update capability to put its previous binary back.
@@ -94,10 +109,12 @@ func (f *Fleet) RollbackAgent(ctx context.Context, nodeID string, wait time.Dura
 }
 
 // SendUpdateAgent sends an update command through the edge link without waiting for CommandResult.
-func (f *Fleet) SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time) error {
-	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: &agentv1.UpdateAgent{
-		RequestId: requestID, Manifest: manifest, Signature: signature, DownloadToken: downloadToken,
-	}}}
+func (f *Fleet) SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time, downloadTimeout time.Duration) error {
+	r := &agentv1.UpdateAgent{RequestId: requestID, Manifest: manifest, Signature: signature, DownloadToken: downloadToken}
+	if downloadTimeout > 0 {
+		r.DownloadTimeoutSeconds = uint32(downloadTimeout / time.Second)
+	}
+	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_UpdateAgent{UpdateAgent: r}}
 	return f.sendRecorded(ctx, nodeID, requestID, frame, deadline)
 }
 

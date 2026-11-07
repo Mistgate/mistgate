@@ -478,6 +478,7 @@ export function useUpdateActions() {
     setUpdateTimezone: (timezoneOffsetMinutes: number) => run(() => updates.setUpdateTimezone({ timezoneOffsetMinutes }), t("up.timezone.saved")),
     /** The release channel (ADR 0011): the next check uses it at once. */
     setChannel: (channel: string) => run(() => updates.setUpdateChannel({ channel }), t("common.saved")),
+    setDownloadTimeout: (timeoutSeconds: number) => run(() => updates.setUpdateDownloadTimeout({ timeoutSeconds }), t("up.downloadTimeoutSaved")),
     pause: (id: string) => run(() => updates.pauseRollout({ rolloutId: id }), t("up.toast.paused")),
     resume: (id: string) => run(() => updates.resumeRollout({ rolloutId: id }), t("up.toast.resumed")),
     cancel: (id: string) => run(() => updates.cancelRollout({ rolloutId: id }), t("up.toast.cancelled")),

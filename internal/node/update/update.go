@@ -38,10 +38,14 @@ const (
 	FileOutcome            = "update.outcome"
 	FileUnitRefreshPending = "unit-refresh.pending"
 	CapUpdate              = "update/1"
+	CapUpdateTimeout       = "update-timeout/1"
 	CapGuard               = "update-guard/1"
 	CommitWindow           = 5 * time.Minute
+	DefaultIdleTimeout     = 90 * time.Second
 	probeName              = ".mistgate-write-probe"
 	defaultTimeout         = 10 * time.Minute
+	minDownloadTimeout     = 5 * time.Minute
+	maxDownloadTimeout     = 2 * time.Hour
 	defaultRetryWait       = 5 * time.Second
 	defaultMaxReasonSz     = 64
 )
@@ -87,22 +91,23 @@ type Finish func() error
 // Config describes the running binary and its environment. Zero values are production defaults except Exec, which
 // the caller sets to syscall.Exec (nil means "do not exec", for tests).
 type Config struct {
-	StateDir string
-	ExePath  string // default: the running executable, symlinks resolved, taken once at New
-	Version  string
-	Built    int64
-	Key      ed25519.PublicKey // nil = unsigned build: no self-update
-	UnitGen  int               // MISTGATE_UNIT_GEN: >= 2 means the unit carries the crash-loop guard
-	Exec     func(path string, argv, env []string) error
-	Args     []string // default os.Args
-	Env      []string // default os.Environ()
-	Now      func() time.Time
-	GOOS     string // default runtime.GOOS
-	GOARCH   string
-	Window   time.Duration // commit window, default CommitWindow
-	Backoff  []time.Duration
-	Timeout  time.Duration // whole download, default 10 min
-	Log      *slog.Logger
+	StateDir    string
+	ExePath     string // default: the running executable, symlinks resolved, taken once at New
+	Version     string
+	Built       int64
+	Key         ed25519.PublicKey // nil = unsigned build: no self-update
+	UnitGen     int               // MISTGATE_UNIT_GEN: >= 2 means the unit carries the crash-loop guard
+	Exec        func(path string, argv, env []string) error
+	Args        []string // default os.Args
+	Env         []string // default os.Environ()
+	Now         func() time.Time
+	GOOS        string // default runtime.GOOS
+	GOARCH      string
+	Window      time.Duration // commit window, default CommitWindow
+	Backoff     []time.Duration
+	Timeout     time.Duration // whole download, default 10 min
+	IdleTimeout time.Duration // no download data, default 90 s
+	Log         *slog.Logger
 	// RetryWait is the pause after ErrRetryLater.
 	RetryWait time.Duration
 }
@@ -151,6 +156,9 @@ func New(cfg Config) *Updater {
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = defaultTimeout
 	}
+	if cfg.IdleTimeout <= 0 {
+		cfg.IdleTimeout = DefaultIdleTimeout
+	}
 	if cfg.RetryWait <= 0 {
 		cfg.RetryWait = defaultRetryWait
 	}
@@ -176,6 +184,15 @@ func New(cfg Config) *Updater {
 	return u
 }
 
+// IdleTimeout is the no-data limit used by this updater. Link-only downloads use the same value so the two update
+// transports expose one idle-time contract.
+func (u *Updater) IdleTimeout() time.Duration {
+	if u == nil || u.cfg.IdleTimeout <= 0 {
+		return DefaultIdleTimeout
+	}
+	return u.cfg.IdleTimeout
+}
+
 // Capabilities lists "update/1" only when this process can really update itself: signed build, Linux, and
 // a writable executable directory (false under the generation 1 unit, which is what keeps old nodes on "update by
 // hand once"); "update-guard/1" when the unit carries the crash-loop guard.
@@ -183,7 +200,7 @@ func (u *Updater) Capabilities() []string {
 	if u == nil || u.cfg.Key == nil || u.cfg.GOOS != "linux" || u.exe == "" || u.probe() != nil {
 		return nil
 	}
-	caps := []string{CapUpdate}
+	caps := []string{CapUpdate, CapUpdateTimeout}
 	if u.cfg.UnitGen >= 2 {
 		caps = append(caps, CapGuard)
 	}
@@ -520,15 +537,25 @@ func (u *Updater) loadOutcome() {
 // binary was swapped and the caller must send the result, drain the engines and call it.
 func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*pb.CommandResult, Finish) {
 	res := &pb.CommandResult{RequestId: req.RequestId}
+	report := func(p *pb.UpdateProgress) {
+		if p.RequestId == "" {
+			p.RequestId = req.RequestId
+		}
+		if x, ok := src.(interface{ Progress(*pb.UpdateProgress) }); ok {
+			x.Progress(p)
+		}
+	}
 	fail := func(err error) (*pb.CommandResult, Finish) {
 		res.Error = codeOf(err)
 		res.Detail = err.Error()
+		report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "failed", UpdatedUnix: src.Now().Unix(), Error: res.Error})
 		u.log.Warn("update refused", "code", res.Error, "err", err)
 		return res, nil
 	}
 	if u.cfg.Key == nil {
 		return fail(step("unsigned_build", errors.New("unsigned build: update by hand")))
 	}
+	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "accepted", UpdatedUnix: src.Now().Unix()})
 	m, err := release.Verify(u.cfg.Key, req.Manifest, req.Signature)
 	if err != nil {
 		return fail(err)
@@ -561,14 +588,26 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		return fail(step("not_writable", err))
 	}
 
-	if err := u.download(ctx, src, file); err != nil {
+	timeout := u.cfg.Timeout
+	if req.DownloadTimeoutSeconds != 0 {
+		timeout = time.Duration(req.DownloadTimeoutSeconds) * time.Second
+		if timeout < minDownloadTimeout {
+			timeout = minDownloadTimeout
+		}
+		if timeout > maxDownloadTimeout {
+			timeout = maxDownloadTimeout
+		}
+	}
+	if err := u.download(ctx, src, file, timeout, report); err != nil {
 		_ = os.Remove(u.newPath())
 		return fail(err)
 	}
+	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "verifying", BytesDownloaded: uint64(file.Size), BytesTotal: uint64(file.Size), UpdatedUnix: src.Now().Unix()})
 	if err := u.verifyNew(file); err != nil {
 		_ = os.Remove(u.newPath())
 		return fail(err)
 	}
+	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "installing", BytesDownloaded: uint64(file.Size), BytesTotal: uint64(file.Size), UpdatedUnix: src.Now().Unix()})
 	if err := copyFile(u.exe, u.prev(), 0o755); err != nil {
 		_ = os.Remove(u.newPath())
 		return fail(step("not_writable", err))
@@ -587,6 +626,7 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		_ = os.Remove(u.newPath())
 		return fail(step("not_writable", err))
 	}
+	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "restarting", BytesDownloaded: uint64(file.Size), BytesTotal: uint64(file.Size), UpdatedUnix: src.Now().Unix()})
 	syncDir(filepath.Dir(u.exe))
 	swapped = true
 	u.log.Info("binary replaced, re-executing", "from", marker.FromVersion, "to", marker.ToVersion)
@@ -659,34 +699,64 @@ func (u *Updater) Rollback(_ context.Context, req *pb.RollbackAgent) (*pb.Comman
 
 // download streams the file into <exe>.new (0700 while it is being written), resuming from the bytes already on disk
 // after a dropped stream: one try plus one retry per Backoff entry, each failure counted; ErrRetryLater waits without
-// counting; the whole thing is bounded by Config.Timeout.
-func (u *Updater) download(ctx context.Context, src Source, f release.File) error {
-	ctx, cancel := context.WithTimeout(ctx, u.cfg.Timeout)
+// counting; the whole thing is bounded by timeout and by the configured no-data idle timeout.
+func (u *Updater) download(ctx context.Context, src Source, f release.File, timeout time.Duration, report func(*pb.UpdateProgress)) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	activity, hasActivity := src.(interface{ SetActivity(func()) })
+	// Progress timestamps must use the same corrected source clock as the other update frames. The updater's
+	// process clock is deliberately not authoritative: an agent can correct it after connecting to the panel.
+	tracker := newProgressTracker(report, f.Size, src.Now)
 	fh, err := os.OpenFile(u.newPath(), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o700)
 	if err != nil {
 		return step("not_writable", err)
 	}
 	defer fh.Close()
-	w := &capWriter{w: fh, left: f.Size}
+	cw := &capWriter{w: fh, left: f.Size}
+	resetIdle := func() {}
+	w := &progressWriter{w: cw, onWrite: func(n int) {
+		resetIdle()
+		tracker.add(uint64(n))
+	}}
 	failed := 0
-	for w.n < f.Size {
-		total, err := src.Fetch(ctx, f.Name, uint64(w.n), w)
+	for cw.n < f.Size {
+		attemptCtx, attemptCancel := context.WithCancel(ctx)
+		var idleFired atomic.Bool
+		idle := time.AfterFunc(u.cfg.IdleTimeout, func() {
+			idleFired.Store(true)
+			attemptCancel()
+		})
+		resetIdle = func() { idle.Reset(u.cfg.IdleTimeout) }
+		if hasActivity {
+			activity.SetActivity(resetIdle)
+		}
+		total, err := src.Fetch(attemptCtx, f.Name, uint64(cw.n), w)
+		if hasActivity {
+			activity.SetActivity(nil)
+		}
+		resetIdle = func() {}
+		idle.Stop()
+		attemptCancel()
 		if err == nil && total != 0 && total != uint64(f.Size) {
 			return step("size_mismatch", fmt.Errorf("panel serves %d bytes, manifest says %d", total, f.Size))
 		}
 		switch {
-		case err == nil && w.n == f.Size:
+		case err == nil && cw.n == f.Size:
 		case errors.Is(err, errOverflow):
 			return step("size_mismatch", err)
 		case ctx.Err() != nil:
 			return step("download_failed", ctx.Err())
-		case errors.Is(err, ErrPermanent):
-			return step("download_failed", err)
 		case errors.Is(err, ErrRetryLater):
+			// A busy panel has not started this attempt. The idle timer is scoped to
+			// the fetch, so the retry wait is not mistaken for a stalled transfer;
+			// the overall timeout still bounds how long the update may wait.
 			if !sleep(ctx, u.cfg.RetryWait) {
 				return step("download_failed", ctx.Err())
 			}
+		case idleFired.Load():
+			return step("download_failed", errors.New("download idle timeout"))
+		case errors.Is(err, ErrPermanent):
+			return step("download_failed", err)
 		default:
 			if err == nil {
 				err = io.ErrUnexpectedEOF // the stream ended early
@@ -694,17 +764,76 @@ func (u *Updater) download(ctx context.Context, src Source, f release.File) erro
 			if failed >= len(u.cfg.Backoff) {
 				return step("download_failed", err)
 			}
-			u.log.Warn("download interrupted, retrying", "have", w.n, "of", f.Size, "err", err)
+			u.log.Warn("download interrupted, retrying", "have", cw.n, "of", f.Size, "err", err)
 			if !sleep(ctx, u.cfg.Backoff[failed]) {
 				return step("download_failed", ctx.Err())
 			}
 			failed++
 		}
 	}
+	tracker.flush()
 	if err := fh.Sync(); err != nil {
 		return step("not_writable", err)
 	}
 	return nil
+}
+
+type progressWriter struct {
+	w       io.Writer
+	onWrite func(int)
+}
+
+func (w *progressWriter) Write(p []byte) (int, error) {
+	n, err := w.w.Write(p)
+	if n > 0 && w.onWrite != nil {
+		w.onWrite(n)
+	}
+	return n, err
+}
+
+type progressTracker struct {
+	report            func(*pb.UpdateProgress)
+	total, done, last uint64
+	lastAt            time.Time
+	now               func() time.Time
+}
+
+func newProgressTracker(report func(*pb.UpdateProgress), total int64, now func() time.Time) *progressTracker {
+	t := now()
+	p := &progressTracker{report: report, total: uint64(total), lastAt: t, now: now}
+	if report != nil {
+		report(&pb.UpdateProgress{Phase: "downloading", BytesTotal: uint64(total), UpdatedUnix: t.Unix()})
+	}
+	return p
+}
+
+func (p *progressTracker) add(n uint64) {
+	p.done += n
+	now := p.now()
+	if p.report == nil || now.Sub(p.lastAt) < 5*time.Second {
+		return
+	}
+	p.emit(now)
+}
+
+func (p *progressTracker) flush() {
+	if p.report != nil {
+		p.emit(p.now())
+	}
+}
+
+func (p *progressTracker) emit(now time.Time) {
+	if now.Equal(p.lastAt) && p.done == p.last {
+		return
+	}
+	elapsed := now.Sub(p.lastAt)
+	delta := p.done - p.last
+	var speed uint64
+	if elapsed > 0 && delta > 0 {
+		speed = uint64(float64(delta) / elapsed.Seconds())
+	}
+	p.report(&pb.UpdateProgress{Phase: "downloading", BytesDownloaded: p.done, BytesTotal: p.total, BytesPerSecond: speed, UpdatedUnix: now.Unix()})
+	p.lastAt, p.last = now, p.done
 }
 
 // verifyNew checks size and SHA-256 of <exe>.new against the signed manifest, then makes it executable and durable.

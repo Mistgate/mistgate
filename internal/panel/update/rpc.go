@@ -53,6 +53,10 @@ func unixOrZero(t interface {
 
 // rolloutMsg converts a rollout with its steps. Keys are sent whole ("updates.pause.<code>", "updates.step.err.<code>").
 func rolloutMsg(ro store.RolloutRow, steps []store.StepRow) *adminv1.Rollout {
+	return rolloutMsgWithProgress(ro, steps, nil)
+}
+
+func rolloutMsgWithProgress(ro store.RolloutRow, steps []store.StepRow, progress map[string]progressState) *adminv1.Rollout {
 	m := &adminv1.Rollout{Id: ro.ID, Status: rolloutStatusProto[ro.Status], ToVersion: ro.ToVersion, ToBuilt: ro.ToBuilt,
 		BatchSize: uint32(ro.BatchSize), CreatedUnix: ro.CreatedAt.Unix(), FinishedUnix: unixOrZero(ro.FinishedAt)}
 	if ro.Status == store.RolloutPaused && ro.PauseKey != "" {
@@ -72,6 +76,9 @@ func rolloutMsg(ro store.RolloutRow, steps []store.StepRow) *adminv1.Rollout {
 		}
 		if len(x.Params) > 0 {
 			st.Params = x.Params
+		}
+		if p, ok := progress[x.NodeID]; ok && x.State == store.StepSent && x.RequestID != "" && p.RequestID == x.RequestID {
+			st.DownloadPhase, st.DownloadedBytes, st.TotalBytes, st.BytesPerSecond = p.Phase, p.Downloaded, p.Total, p.Speed
 		}
 		m.Steps = append(m.Steps, st)
 	}
@@ -133,6 +140,20 @@ func (r rpc) GetUpdates(ctx context.Context, _ *connect.Request[adminv1.GetUpdat
 		resp.Rollout = rolloutMsg(ro, steps)
 	case err != store.ErrNotFound:
 		return nil, s.internal("load rollout", err)
+	}
+	timeout, err := s.updateDownloadTimeout(ctx)
+	if err != nil {
+		return nil, s.internal("load update download timeout", err)
+	}
+	resp.UpdateDownloadTimeoutSeconds = uint32(timeout / time.Second)
+	if resp.Rollout != nil {
+		progress := map[string]progressState{}
+		s.progressMu.RLock()
+		for k, v := range s.progress {
+			progress[k] = v
+		}
+		s.progressMu.RUnlock()
+		resp.Rollout = rolloutMsgWithProgress(ro, steps, progress)
 	}
 	if !ro.Active() {
 		steps = nil // only an active rollout makes a node UPDATING
@@ -423,6 +444,18 @@ func (r rpc) SetUpdateChannel(ctx context.Context, req *connect.Request[adminv1.
 		}
 	}
 	return connect.NewResponse(&adminv1.SetUpdateChannelResponse{Channel: string(channel)}), nil
+}
+
+func (r rpc) SetUpdateDownloadTimeout(ctx context.Context, req *connect.Request[adminv1.SetUpdateDownloadTimeoutRequest]) (*connect.Response[adminv1.SetUpdateDownloadTimeoutResponse], error) {
+	ctx, cancel := r.requestContext(ctx)
+	defer cancel()
+	if err := r.s.cfg.StepUp(ctx); err != nil {
+		return nil, err
+	}
+	if err := r.s.setUpdateDownloadTimeout(ctx, req.Msg.TimeoutSeconds); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminv1.SetUpdateDownloadTimeoutResponse{TimeoutSeconds: req.Msg.TimeoutSeconds}), nil
 }
 
 // Conditions is the health condition source (health.Service.AddConditionSource): while the active rollout is paused

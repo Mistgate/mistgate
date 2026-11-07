@@ -509,6 +509,10 @@ type pass struct {
 	steps []store.StepRow
 	live  map[string]store.NodeLiveRow
 	now   time.Time
+	// downloadWait is loaded once per worker pass so an in-flight edge step and
+	// the command deadline use the same panel setting without one database read
+	// per node.
+	downloadWait time.Duration
 }
 
 func (s *Service) tick(ctx context.Context) {
@@ -538,7 +542,7 @@ func (s *Service) tick(ctx context.Context) {
 	for _, row := range liveRows {
 		live[row.NodeID] = row
 	}
-	p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, live: live, now: now}
+	p := &pass{s: s, ctx: ctx, ro: ro, steps: steps, live: live, now: now, downloadWait: s.downloadTimeoutOrDefault(ctx)}
 	for i := range p.steps {
 		switch p.steps[i].State {
 		case store.StepSent:
@@ -571,11 +575,12 @@ func (p *pass) save(x *store.StepRow) bool {
 func (p *pass) finish(x *store.StepRow, state, key string, params map[string]string) bool {
 	updated := *x
 	updated.State, updated.ErrorKey, updated.Params, updated.FinishedAt = state, key, params, p.now
-	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = "", time.Time{}, "", ""
+	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA, updated.AnswerWait = "", time.Time{}, "", "", 0
 	if !p.save(&updated) {
 		return false
 	}
 	*x = updated
+	p.s.clearProgress(x.NodeID)
 	delete(p.s.failing, x.NodeID)
 	p.event(x, state, key)
 	if state == store.StepPassed {
@@ -665,9 +670,10 @@ func (p *pass) advanceSent(i int) {
 	if connected && n.AgentBuilt >= p.ro.ToBuilt {
 		updated := *x
 		updated.State, updated.ReconnectedAt = store.StepGating, p.now
-		updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = "", time.Time{}, "", ""
+		updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA, updated.AnswerWait = "", time.Time{}, "", "", 0
 		if p.save(&updated) {
 			*x = updated
+			p.s.clearProgress(x.NodeID)
 		}
 		return
 	}
@@ -700,13 +706,37 @@ func (p *pass) advanceSent(i int) {
 		if p.now.After(x.AckedAt.Add(cfg.ReconnectWait)) {
 			p.finishAndPause(x, store.StepFailed, errNotReconnected, nil, pauseGateFailed, errNotReconnected)
 		}
-	case p.now.After(x.SentAt.Add(cfg.AnswerWait + cfg.ReconnectWait)):
+	case p.now.After(x.SentAt.Add(p.stepAnswerWait(x) + cfg.ReconnectWait)):
 		pauseCode := pauseGateFailed
 		if p.s.orphans[x.NodeID] { // nobody has been waiting for this answer since the panel restarted
 			pauseCode = pausePanelRestart
 		}
 		p.finishAndPause(x, store.StepFailed, errNoAnswer, nil, pauseCode, errNoAnswer)
 	}
+}
+
+func (p *pass) configuredAnswerWait(n store.NodeRow) time.Duration {
+	wait := p.s.cfg.AnswerWait
+	if p.downloadTimeoutFor(n) > 0 && wait < p.downloadWait+time.Minute {
+		wait = p.downloadWait + time.Minute
+	}
+	return wait
+}
+
+func (p *pass) downloadTimeoutFor(n store.NodeRow) time.Duration {
+	if !slices.Contains(n.AgentCaps, updateTimeoutCapability) {
+		return 0
+	}
+	return p.downloadWait
+}
+
+func (p *pass) stepAnswerWait(x *store.StepRow) time.Duration {
+	if x.AnswerWait > 0 {
+		return x.AnswerWait
+	}
+	// Steps created before answer_wait_seconds was introduced have no snapshot.
+	// Keep their historical behavior while all newly sent steps persist one.
+	return p.s.cfg.AnswerWait
 }
 
 // gateResult is the outcome of one evaluation of the gate.
@@ -1094,16 +1124,25 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 		return
 	}
 	x.PreFailed = preFailed
+	s.clearProgress(x.NodeID)
 	x.State, x.SentAt, x.FromVersion, x.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
-	p.save(x)
+	x.RequestID, x.RequestAt = store.NewID("req_"), p.now
+	x.AnswerWait = p.configuredAnswerWait(n)
+	if !p.save(x) {
+		return
+	}
 	delete(s.orphans, x.NodeID)
 	s.inflight[x.NodeID] = true
+	s.beginProgress(x.NodeID, x.RequestID, x.SentAt)
 	s.setUpdatingAdd(x.NodeID) // before the agent re-executes: its dropped stream must not look like an outage
 	rolloutID, nodeID, manifest, sig, runCtx := p.ro.ID, x.NodeID, p.ro.Manifest, p.ro.Signature, s.runCtx
+	downloadTimeout := p.downloadTimeoutFor(n)
+	answerWait := x.AnswerWait
+	requestID := x.RequestID
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		res, err := s.fl.UpdateAgent(runCtx, nodeID, manifest, sig, s.cfg.AnswerWait)
+		res, err := s.fl.UpdateAgentWithRequestID(runCtx, nodeID, requestID, manifest, sig, answerWait, downloadTimeout)
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		delete(s.inflight, nodeID)
@@ -1134,8 +1173,10 @@ func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
 	}
 	updated := *x
 	updated.PreFailed = preFailed
+	s.clearProgress(x.NodeID)
 	updated.State, updated.SentAt, updated.FromVersion, updated.FromBuilt = store.StepSent, p.now, n.AgentVersion, n.AgentBuilt
 	updated.RequestID, updated.RequestAt, updated.Answer, updated.DownloadSHA = store.NewID("req_"), p.now, "", digest
+	updated.AnswerWait = p.configuredAnswerWait(n)
 	ok, err := s.st.MarkStepSent(p.ctx, &updated)
 	if err != nil {
 		s.log.Warn("update: mark link update sent", "node", x.NodeID, "err", err)
@@ -1145,9 +1186,12 @@ func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
 		return // the rollout was cancelled or another tick already changed the pending row
 	}
 	*x = updated
+	s.beginProgress(x.NodeID, x.RequestID, x.SentAt)
 	s.setUpdatingAdd(x.NodeID)
-	deadline := p.now.Add(s.cfg.AnswerWait + s.cfg.ReconnectWait)
-	if err := s.fl.SendUpdateAgent(p.ctx, x.NodeID, x.RequestID, p.ro.Manifest, p.ro.Signature, token, deadline); err != nil {
+	downloadTimeout := p.downloadTimeoutFor(n)
+	answerWait := x.AnswerWait
+	deadline := p.now.Add(answerWait + s.cfg.ReconnectWait)
+	if err := s.fl.SendUpdateAgent(p.ctx, x.NodeID, x.RequestID, p.ro.Manifest, p.ro.Signature, token, deadline, downloadTimeout); err != nil {
 		if !p.finish(x, store.StepSkipped, errOffline, nil) {
 			return // a recorded answer or another tick won the step CAS
 		}
@@ -1236,6 +1280,13 @@ func (s *Service) recover(ctx context.Context) {
 		switch steps[i].State {
 		case store.StepSent:
 			s.orphans[steps[i].NodeID] = true
+			if steps[i].AnswerWait <= 0 {
+				steps[i].AnswerWait = s.cfg.AnswerWait
+				if err := s.st.SaveStep(ctx, &steps[i]); err != nil {
+					s.log.Warn("update: persist legacy step wait", "node", steps[i].NodeID, "err", err)
+				}
+			}
+			s.beginProgress(steps[i].NodeID, steps[i].RequestID, steps[i].SentAt)
 		case store.StepGating:
 			steps[i].ReconnectedAt = now
 			if err := s.st.SaveStep(ctx, &steps[i]); err != nil {

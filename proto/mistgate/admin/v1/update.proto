@@ -53,6 +53,8 @@ service UpdateService {
   rpc SetUpdateTimezone(SetUpdateTimezoneRequest) returns (SetUpdateTimezoneResponse);
   // Change the release channel this panel follows. Owner-only with a fresh step-up; never available to API tokens.
   rpc SetUpdateChannel(SetUpdateChannelRequest) returns (SetUpdateChannelResponse);
+  // Change the maximum time an agent may spend downloading one update binary. Owner-only with a fresh step-up.
+  rpc SetUpdateDownloadTimeout(SetUpdateDownloadTimeoutRequest) returns (SetUpdateDownloadTimeoutResponse);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -255,6 +257,11 @@ message RolloutStep {
   // cancelled. Before 0.1.47 state_not_applied also stood for not_committed and inbounds_unreadable.
   string error_key = 9;
   map<string, string> params = 10;
+  // Best-effort live download information while the step is SENT. Empty/zero when no progress was reported.
+  string download_phase = 11;
+  uint64 downloaded_bytes = 12 [jstype = JS_NUMBER];
+  uint64 total_bytes = 13 [jstype = JS_NUMBER];
+  uint64 bytes_per_second = 14 [jstype = JS_NUMBER];
 }
 
 message Rollout {
@@ -312,6 +319,8 @@ message GetUpdatesResponse {
   string offered_release_channel = 12;
   // The signed manifest of the newest release visible to update_channel is older than this panel's build time.
   bool running_newer_than_channel_offers = 13;
+  // Maximum time sent to new UpdateAgent commands, in seconds.
+  uint32 update_download_timeout_seconds = 14;
 }
 
 // The notes of one GitHub release, as the maintainers wrote them in the release description. They are INFORMATIONAL and
@@ -444,4 +453,12 @@ message SetUpdateChannelRequest {
 
 message SetUpdateChannelResponse {
   string channel = 1;
+}
+
+message SetUpdateDownloadTimeoutRequest {
+  uint32 timeout_seconds = 1;
+}
+
+message SetUpdateDownloadTimeoutResponse {
+  uint32 timeout_seconds = 1;
 }

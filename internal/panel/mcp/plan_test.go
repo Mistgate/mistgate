@@ -532,6 +532,33 @@ func TestUpdateTimezoneChangeUsesOwnerApproval(t *testing.T) {
 	}
 }
 
+func TestUpdateDownloadTimeoutChangeUsesOwnerApproval(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+
+	p := planOf(t, s, "update_download_timeout", map[string]any{"timeout_seconds": float64(3600)})
+	from, to := factOf(t, p, "from"), factOf(t, p, "to")
+	if !p.NeedsApproval || from.Code != "seconds" || from.Params["n"] != "1800" || to.Code != "seconds" || to.Params["n"] != "3600" {
+		t.Fatalf("download timeout plan: %+v", p)
+	}
+	if len(e.w.timeoutReq) != 0 {
+		t.Fatal("planning changed the download timeout")
+	}
+	if got := mustFail(t, s, "update_download_timeout_plan", map[string]any{"timeout_seconds": float64(299)}); !strings.Contains(got, "from 300 to 7200") {
+		t.Errorf("invalid download timeout accepted: %q", got)
+	}
+
+	e.plans.decide(p.PlanID, true)
+	applyOf(t, s, "update_download_timeout", p.ConfirmToken)
+	if len(e.w.timeoutReq) != 1 || e.w.timeoutReq[0].GetTimeoutSeconds() != 3600 {
+		t.Fatalf("SetUpdateDownloadTimeout calls: %+v", e.w.timeoutReq)
+	}
+	if calls := e.w.calls("/mistgate.admin.v1.UpdateService/SetUpdateDownloadTimeout"); len(calls) != 1 || calls[0].Approved != p.PlanID || calls[0].Planning {
+		t.Fatalf("download timeout approval grant: %+v", calls)
+	}
+}
+
 func TestRolloutPauseNeedsRunning(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)
