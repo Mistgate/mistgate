@@ -11,7 +11,9 @@ import { useFixFlow } from "./fix";
 import { PeopleTab } from "./people";
 
 const dismissAlert = vi.fn((..._a: unknown[]) => Promise.resolve({ alert: {} }));
+let assistantOn = false;
 vi.mock("@/lib/api", () => ({
+  assistant: { getAssistantAccess: () => Promise.resolve({ available: assistantOn }) },
   health: { muteAlert: vi.fn(), dismissAlert: (...a: unknown[]) => dismissAlert(...a), acceptDoctorItem: vi.fn(), applyFix: vi.fn() },
   nodes: {},
   auth: { me: () => Promise.resolve({ admin: { id: "adm_1", role: Role.OWNER } }) },
@@ -180,6 +182,25 @@ describe("Health ▸ People", () => {
     await mount({ people: [ended(), connection()] });
     const hrefs = [...document.querySelectorAll("a")].filter((a) => a.textContent === "Open user").map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual(["/users/usr_masha", "/users/usr_oleg"]);
+  });
+
+  it("opens the assistant with the access question in the composer, only when the assistant is on", async () => {
+    assistantOn = false;
+    await mount({ people: [ended()] });
+    expect(text()).not.toContain("Work out what does not open");
+    act(() => root?.unmount());
+    host?.remove();
+    assistantOn = true;
+    await mount({ people: [ended()] });
+    const button = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Work out what does not open")!;
+    expect(button).toBeTruthy();
+    const seen: unknown[] = [];
+    const listen = (e: Event) => seen.push((e as CustomEvent).detail);
+    window.addEventListener("mistgate:assistant-open", listen);
+    await act(async () => void button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    window.removeEventListener("mistgate:assistant-open", listen);
+    assistantOn = false;
+    expect(seen).toEqual([{ text: "Work out who cannot open what over the last day, and what to fix." }]);
   });
 
   it("offers Mute like the other alerts", async () => {
