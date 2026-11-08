@@ -5,6 +5,7 @@ import { SaveBar } from "@/screens/subscriptions/ui";
 import { RowList, Section, SettingRow } from "./parts";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
+import { BrandMark, modelBrand, providerBrand } from "@/components/assistant/brand-icons";
 import { Modal } from "@/components/ui/modal";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Segmented } from "@/components/ui/segmented";
@@ -21,6 +22,16 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { plain, type Plain } from "@/lib/plain";
+
+/** A provider's or a model maker's mark (components/assistant/brand-icons), or nothing for one without a known mark. */
+const provMark = (provider: AssistantProvider, size = 14) => {
+  const brand = providerBrand[provider];
+  return brand ? <BrandMark brand={brand} size={size} /> : undefined;
+};
+const modelMark = (model: string) => {
+  const brand = modelBrand(model);
+  return brand ? <BrandMark brand={brand} size={14} /> : undefined;
+};
 
 // The owner's settings of the assistant (ADR 0014): on or off, the provider the chat uses, how hard it thinks, who may use
 // it, the notes every admin's assistant reads, how long conversations are kept; per provider the key (sealed, step-up),
@@ -102,7 +113,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                 className="min-w-[200px]"
                 value={String(shownProvider)}
                 onValueChange={(v) => set({ provider: Number(v) as AssistantProvider })}
-                options={connected.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)) }))}
+                options={connected.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)), icon: provMark(s.provider) }))}
               />
             )}
           </SettingRow>
@@ -113,7 +124,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                 className="min-w-[200px]"
                 value={String(shownFallback)}
                 onValueChange={(v) => set({ fallbackProvider: Number(v) as AssistantProvider })}
-                options={[{ value: String(AssistantProvider.UNSPECIFIED), label: t("ai.set.fallbackNone") }, ...fallbacks.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)) }))]}
+                options={[{ value: String(AssistantProvider.UNSPECIFIED), label: t("ai.set.fallbackNone") }, ...fallbacks.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)), icon: provMark(s.provider) }))]}
               />
             </SettingRow>
           )}
@@ -254,6 +265,7 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
       <div className="flex items-center gap-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <b className="flex items-center gap-2 text-[13.5px] font-medium">
+            {provMark(status.provider, 15)}
             {name}
             {inUse && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-semibold text-accent-text">{t("ai.prov.inUse")}</span>}
           </b>
@@ -319,7 +331,7 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
                 aria-label={t("ai.prov.model")}
                 value={choice.model}
                 onValueChange={(v) => onChoice({ ...choice, model: v })}
-                options={[{ value: "", label: t("ai.prov.modelDefault") }, ...(models.data ?? []).map((m) => ({ value: m.id, label: m.name || m.id }))]}
+                options={[{ value: "", label: t("ai.prov.modelDefault") }, ...(models.data ?? []).map((m) => ({ value: m.id, label: m.name || m.id, icon: modelMark(m.id) }))]}
               />
               {model && model.inputUsdPerMtok > 0 && <span className="text-xs text-muted">{t("ai.prov.price", { in: money(model.inputUsdPerMtok), out: money(model.outputUsdPerMtok) })}</span>}
             </div>

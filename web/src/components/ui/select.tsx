@@ -1,8 +1,12 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
+import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
-/** `hint` is a second, muted line under the label in the list; a `disabled` option is greyed out and cannot be picked. */
-export type SelectOption = { value: string; label: string; hint?: string; disabled?: boolean };
+/**
+ * `hint` is a second, muted line under the label in the list; a `disabled` option is greyed out and cannot be picked; `icon`
+ * (a small mark, decorative) stands before the label in the list and in the closed field.
+ */
+export type SelectOption = { value: string; label: string; hint?: string; disabled?: boolean; icon?: ReactNode };
 
 type Props = {
   value: string;
@@ -45,7 +49,14 @@ export function Select({ value, onValueChange, options, compact, className, ...r
         {...rest}
       >
         {/* one line always: a long label is cut with an ellipsis, never wrapped out of the box */}
-        <BaseSelect.Value className="min-w-0 truncate" />
+        <span className="flex min-w-0 items-center gap-2">
+          {options.find((o) => o.value === value)?.icon && (
+            <span aria-hidden className="flex flex-none text-fg">
+              {options.find((o) => o.value === value)!.icon}
+            </span>
+          )}
+          <BaseSelect.Value className="min-w-0 truncate" />
+        </span>
         <BaseSelect.Icon className="flex-none text-muted">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 4.5l3 3 3-3" />
@@ -64,6 +75,11 @@ export function Select({ value, onValueChange, options, compact, className, ...r
                   disabled={o.disabled}
                   className={cx(selectItemClass, "data-disabled:cursor-default data-disabled:opacity-45")}
                 >
+                  {o.icon && (
+                    <span aria-hidden className="flex flex-none text-fg">
+                      {o.icon}
+                    </span>
+                  )}
                   <span className="flex min-w-0 flex-1 flex-col">
                     <BaseSelect.ItemText>{o.label}</BaseSelect.ItemText>
                     {o.hint && <span className="truncate text-[11px] leading-snug font-medium text-muted">{o.hint}</span>}
