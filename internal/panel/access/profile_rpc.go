@@ -423,9 +423,6 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			if oldErr == nil && !specChanged(oldSpec, newSpec) {
 				continue
 			}
-			if newSpec.Listen.Network != "udp" {
-				continue
-			}
 			others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
 			if err != nil {
 				return nil, err
@@ -440,17 +437,26 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		nodeIDs := make([]string, 0, len(changedPorts))
 		seen := make(map[string]bool, len(changedPorts))
 		for _, changed := range changedPorts {
-			if !seen[changed.node.ID] {
+			if changed.listen.Network == "udp" && !seen[changed.node.ID] {
 				seen[changed.node.ID] = true
 				nodeIDs = append(nodeIDs, changed.node.ID)
 			}
 		}
-		portChecks, err := s.readPortChecks(ctx, nodeIDs...)
-		if err != nil {
-			return nil, s.internal("read UDP port checks", err)
+		portChecks := portCheckCache{}
+		if len(nodeIDs) > 0 {
+			portChecks, err = s.readPortChecks(ctx, nodeIDs...)
+			if err != nil {
+				return nil, s.internal("read UDP port checks", err)
+			}
 		}
 		for _, changed := range changedPorts {
 			checks := portChecks[changed.node.ID]
+			if err := portRefusal(p.Protocol, changed.node.Name, changed.listen, changed.others, checks, s.now()); err != nil {
+				return nil, err
+			}
+			if changed.listen.Network != "udp" {
+				continue
+			}
 			if m.DryRun {
 				if bad, ok := cachedListenPortLossy(changed.listen, checks, s.now()); ok {
 					if changed.portChanged && !m.AllowLossyPort {

@@ -203,7 +203,15 @@ func (v *AccessReportV) shrink() bool {
 			}
 		}
 	}
-	return cut(&v.Country) || cut(&v.Matrix) || cut(&v.BlockDiagnosis) || cut(&v.Findings) || cut(&v.Recommendations)
+	if cut(&v.Country) || cut(&v.Matrix) || cut(&v.BlockDiagnosis) || cut(&v.Findings) || cut(&v.Recommendations) {
+		return true
+	}
+	for i := range v.BlockDiagnosis {
+		if cut(&v.BlockDiagnosis[i].Classes) {
+			return true
+		}
+	}
+	return false
 }
 
 var accessLimits = []string{
@@ -1045,7 +1053,7 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 	var recs []accessRecV
 	seen := map[string]bool{}
 	add := func(r accessRecV) {
-		r.key = r.Kind + "|" + r.Target["node"] + "|" + r.Target["inbound_id"] + "|" + r.Target["group"] + "|" + r.Target["entry_node"] + "|" + r.Target["to_port"]
+		r.key = r.Kind + "|" + r.Target["node"] + "|" + r.Target["inbound_id"] + "|" + r.Target["group_id"] + "|" + r.Target["group"] + "|" + r.Target["entry_node"] + "|" + r.Target["to_port"]
 		if seen[r.key] {
 			return
 		}
@@ -1123,44 +1131,50 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 					r.Effect = "The node's IPv6 address is reachable from the country: a second server per protocol over IPv6 for networks that block the IPv4 one."
 					add(r)
 				}
-				if (c.Class == clsIPBlocked && c.Confidence != confLow && c.Detail["scope"] == "ip" || c.Class == clsIPBlocked && c.Confidence == confHigh) && a.otherWayExists(nid) {
-					if ids := a.idsOf(nid, func(x *accInbound) bool { return x.Direct }); len(ids) > 0 {
+				if c.Class == clsIPBlocked && c.Confidence != confLow && c.Detail["scope"] == "ip" || c.Class == clsIPBlocked && c.Confidence == confHigh {
+					for _, id := range scoped {
+						x := a.inboundByID(id)
+						if x == nil || !x.Direct || !a.otherWayExists(nid, id) {
+							continue
+						}
 						r := base("remove_from_subscriptions")
-						r.Target["inbound_id"] = ids[0]
+						r.Target["inbound_id"] = id
 						r.PlanTool = "node_update_plan"
 						r.Effect = "People stop getting a server that fails for them; the other servers of their groups stay."
 						add(r)
+						break
 					}
 				}
 			case clsPortBlocked:
 				open := []uint32{}
 				if cc != nil {
-					open, _, _, _ = tspuIndex(cc.TSPU)
+					open, _, _ = tspuIndex(cc.TSPU)
 				}
-				if len(open) > 0 {
-					to := open[0]
-					if slices.Contains(open, 443) {
-						to = 443
+				profileID := ""
+				if firstIn != "" {
+					if x := a.inboundByID(firstIn); x != nil {
+						profileID = x.ProfileID
 					}
+				}
+				to := a.freeProfilePort(profileID, netOf(c.protocol), c.port, open)
+				if to != 0 {
 					r := base("move_port")
 					if firstIn != "" {
 						r.Target["inbound_id"] = firstIn
 					}
 					r.Target["from_port"] = u32(c.port)
 					r.Target["to_port"] = u32(to)
-					r.Target["open_ports"] = portList(open)
+					r.Target["open_ports"] = u32(to)
 					r.PlanTool = "profile_update_plan"
 					r.Effect = "The server listens on a port the TSPU probe sees open on the same address; people reconnect after their next subscription refresh."
 					add(r)
 				}
 			case clsTCPThrottled:
 				if alt := a.workingProtocol(nid, "udp"); alt != "" {
-					r := base("prefer_protocol")
-					r.Target["group"] = strings.Join(aff.Groups, ",")
-					r.Target["prefer"] = alt
-					r.PlanTool = "group_update_plan"
-					r.Effect = "Affected groups get the UDP server that is not frozen; TCP is throttled after a few KB, so a port change does not help."
-					add(r)
+					for _, r := range a.preferProtocolRecs(base("prefer_protocol"), nid, scoped, c.protocol, alt) {
+						r.Effect = "The group keeps its other profiles and uses the working " + alt + " profile; TCP is throttled after a few KB, so a port change does not help."
+						add(r)
+					}
 				}
 				if !a.anyCDNWorks() {
 					r := base("add_cdn_profile")
@@ -1182,12 +1196,19 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 				r.PlanTool = "profile_create_plan"
 				r.Effect = "A VLESS server over TCP or XHTTP on 443 works where UDP is cut."
 				add(r)
-				if ids := a.idsOf(nid, func(x *accInbound) bool { return x.Direct && isUDPProto(x.Protocol) }); len(ids) > 0 && a.workingProtocol(nid, "tcp") != "" {
+				for _, id := range scoped {
+					x := a.inboundByID(id)
+					if x == nil || !x.Direct || !isUDPProto(x.Protocol) || !a.usersHaveWorkingAlternate([]string{id}, func(other *accInbound) bool {
+						return other.NodeID == nid && netOf(other.Protocol) == "tcp"
+					}) {
+						continue
+					}
 					r := base("remove_from_subscriptions")
-					r.Target["inbound_id"] = ids[0]
+					r.Target["inbound_id"] = id
 					r.PlanTool = "node_update_plan"
-					r.Effect = "People stop getting UDP servers that cannot connect from this country; their TCP servers stay."
+					r.Effect = "People stop getting UDP servers that cannot connect from this country; their working TCP servers stay."
 					add(r)
+					break
 				}
 			case clsFingerprinted:
 				r := base("change_obfuscation")
@@ -1198,12 +1219,10 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 				r.Effect = "A different obfuscation (AmneziaWG parameters, Hysteria2 obfs) may stop the DPI from recognising the protocol; the signal is weak, so try one group first."
 				add(r)
 				if alt := a.workingProtocol(nid, ""); alt != "" && alt != c.protocol {
-					r := base("prefer_protocol")
-					r.Target["group"] = strings.Join(aff.Groups, ",")
-					r.Target["prefer"] = alt
-					r.PlanTool = "group_update_plan"
-					r.Effect = "The group uses the protocol that works on this node."
-					add(r)
+					for _, r := range a.preferProtocolRecs(base("prefer_protocol"), nid, scoped, c.protocol, alt) {
+						r.Effect = "The group keeps its other profiles and uses the working " + alt + " profile."
+						add(r)
+					}
 				}
 			case clsBroken:
 				r := base("fix_ours")
@@ -1236,9 +1255,11 @@ func (a *accessCtx) recommendations(findings []accessFindingV) []accessRecV {
 			if g == "" {
 				continue
 			}
-			if alt := a.groupAltProfile(g); alt != "" {
-				add(accessRecV{Kind: "prefer_protocol", Target: map[string]string{"group": g, "add_profile": alt}, Why: f.Evidence, Affected: f.Affected, PlanTool: "group_update_plan",
-					Effect: "The group gets a profile that has a working server, so its people have a way in again.", sev: 3, Conf: confMedium})
+			if group, profileID := a.groupAltProfile(g); group != nil && profileID != "" {
+				profileIDs := append(slices.Clone(group.ProfileIDs), profileID)
+				profileIDs = sortedUnique(profileIDs)
+				add(accessRecV{Kind: "prefer_protocol", Target: map[string]string{"group_id": group.ID, "profile_ids": strings.Join(profileIDs, ",")}, Why: f.Evidence, Affected: f.Affected, PlanTool: "group_update_plan",
+					Effect: "The group adds a profile that has a working server, so its people have a way in again.", sev: 3, Conf: confMedium})
 			}
 		}
 	}
@@ -1273,14 +1294,148 @@ func firstWith(list []string, prefix string) string {
 	return ""
 }
 
-// otherWayExists: some other node has a working inbound given to people.
-func (a *accessCtx) otherWayExists(nid string) bool {
-	for _, x := range a.in.Inbounds {
-		if x.NodeID != nid && a.ways[x.ID].works() && len(a.given[x.ID]) > 0 {
-			return true
+// otherWayExists: every user of this inbound has a working inbound on another node.
+func (a *accessCtx) otherWayExists(nid, inboundID string) bool {
+	return a.usersHaveWorkingAlternate([]string{inboundID}, func(x *accInbound) bool { return x.NodeID != nid })
+}
+
+func (a *accessCtx) usersHaveWorkingAlternate(ids []string, eligible func(*accInbound) bool) bool {
+	affected := map[string]bool{}
+	for _, id := range ids {
+		for _, u := range a.given[id] {
+			affected[u.ID] = true
 		}
 	}
-	return false
+	if len(affected) == 0 {
+		return false
+	}
+	for userID := range affected {
+		found := false
+		for i := range a.in.Inbounds {
+			x := &a.in.Inbounds[i]
+			if !eligible(x) || !a.ways[x.ID].works() {
+				continue
+			}
+			for _, u := range a.given[x.ID] {
+				if u.ID == userID {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *accessCtx) freeProfilePort(profileID, network string, from uint32, candidates []uint32) uint32 {
+	if profileID == "" {
+		return 0
+	}
+	for _, missing := range a.in.Unavailable {
+		if missing == "nodes_beyond_cap" || strings.HasPrefix(missing, "node:") {
+			return 0
+		}
+	}
+	placements := map[string]bool{}
+	for _, x := range a.in.Inbounds {
+		if x.ProfileID == profileID && x.Enabled {
+			placements[x.NodeID] = true
+		}
+	}
+	if len(placements) == 0 {
+		return 0
+	}
+	var free []uint32
+	for _, port := range candidates {
+		if port == 0 || port == from {
+			continue
+		}
+		occupied := false
+		for _, x := range a.in.Inbounds {
+			if placements[x.NodeID] && x.ProfileID != profileID && netOf(x.Protocol) == network && x.Port == port {
+				occupied = true
+				break
+			}
+		}
+		if !occupied {
+			free = append(free, port)
+		}
+	}
+	if slices.Contains(free, 443) {
+		return 443
+	}
+	if len(free) > 0 {
+		return free[0]
+	}
+	return 0
+}
+
+func (a *accessCtx) preferProtocolRecs(base accessRecV, nodeID string, inboundIDs []string, failed, alternative string) []accessRecV {
+	groups := map[string]bool{}
+	for _, id := range inboundIDs {
+		for _, u := range a.given[id] {
+			groups[u.GroupID] = true
+		}
+	}
+	groupIDs := make([]string, 0, len(groups))
+	for id := range groups {
+		groupIDs = append(groupIDs, id)
+	}
+	slices.Sort(groupIDs)
+	var out []accessRecV
+	for _, id := range groupIDs {
+		g := a.groupsByID[id]
+		if g == nil {
+			continue
+		}
+		profiles := map[string]bool{}
+		for _, profileID := range g.ProfileIDs {
+			if normProtocol(a.in.Profiles[profileID].Protocol) != failed {
+				profiles[profileID] = true
+			}
+		}
+		for _, x := range a.in.Inbounds {
+			if x.NodeID == nodeID && x.Enabled && x.State != "disabled" && x.State != "failed" && x.Direct &&
+				normProtocol(x.Protocol) == alternative && a.ways[x.ID].works() {
+				profiles[x.ProfileID] = true
+			}
+		}
+		profileIDs := make([]string, 0, len(profiles))
+		for profileID := range profiles {
+			profileIDs = append(profileIDs, profileID)
+		}
+		profileIDs = sortedUnique(profileIDs)
+		current := sortedUnique(slices.Clone(g.ProfileIDs))
+		if len(profileIDs) == 0 || slices.Equal(profileIDs, current) {
+			continue
+		}
+		r := base
+		r.Target = make(map[string]string, len(base.Target)+2)
+		for key, value := range base.Target {
+			r.Target[key] = value
+		}
+		r.Target["group_id"] = g.ID
+		r.Target["profile_ids"] = strings.Join(profileIDs, ",")
+		r.Target["protocol"] = alternative
+		r.PlanTool = "group_update_plan"
+		users := map[string]bool{}
+		for _, inboundID := range inboundIDs {
+			for _, u := range a.given[inboundID] {
+				if u.GroupID == id {
+					users[u.ID] = true
+				}
+			}
+		}
+		r.Affected = affectedV{Users: len(users), Groups: []string{nm(g.Name)}}
+		out = append(out, r)
+	}
+	return out
 }
 
 // workingProtocol names a protocol of the node whose way works ("udp" or "tcp" narrows by network).
@@ -1309,7 +1464,7 @@ func (a *accessCtx) profileHas(ids []string, word string) bool {
 }
 
 // groupAltProfile names a profile outside the group that has a working direct server.
-func (a *accessCtx) groupAltProfile(groupName string) string {
+func (a *accessCtx) groupAltProfile(groupName string) (*accGroup, string) {
 	var g *accGroup
 	for _, x := range a.groupsByID {
 		if nm(x.Name) == groupName {
@@ -1317,18 +1472,17 @@ func (a *accessCtx) groupAltProfile(groupName string) string {
 		}
 	}
 	if g == nil {
-		return ""
+		return nil, ""
 	}
-	var names []string
+	var ids []string
 	for _, x := range a.in.Inbounds {
 		if !slices.Contains(g.ProfileIDs, x.ProfileID) && a.ways[x.ID].works() && x.Direct {
-			names = append(names, nm(a.in.Profiles[x.ProfileID].Name))
+			ids = append(ids, x.ProfileID)
 		}
 	}
-	slices.Sort(names)
-	names = slices.Compact(names)
-	if len(names) > 0 {
-		return names[0]
+	ids = sortedUnique(ids)
+	if len(ids) > 0 {
+		return g, ids[0]
 	}
-	return ""
+	return g, ""
 }

@@ -180,6 +180,58 @@ func TestAccessVlessPortBlockedWhileHY2Works(t *testing.T) {
 	}
 }
 
+func TestAccessMovePortSkipsCollisionOnAnotherProfilePlacement(t *testing.T) {
+	f := newFx().node("de1", "DE", "online")
+	f.inbound("de1", "prf_vless", "vless", 8443)
+	f.in.Profiles["prf_other"] = accProfile{ID: "prf_other", Name: "Other", Protocol: "vless", Summary: "TCP 443"}
+	f.in.Inbounds = append(f.in.Inbounds, accInbound{ID: "inb_de1_other", NodeID: "nod_de1", ProfileID: "prf_other", Protocol: "vless", Port: 443, Enabled: true, Direct: true, State: "active"})
+	f.cc("de1", "partial", func(c *accCountry) { c.TSPU = ports(443, "open", 8443, "blocked") })
+	if rec(buildAccess(f.in), "move_port") != nil {
+		t.Fatal("move_port recommended a TCP port already used on the profile placement")
+	}
+}
+
+func TestAccessNodeCapKeepsRequestedNode(t *testing.T) {
+	nodes := make([]accNode, 0, accessNodeCap+10)
+	for i := 0; i < accessNodeCap+10; i++ {
+		nodes = append(nodes, accNode{ID: "nod_" + u32(uint32(i)), Name: "de1", Status: "online"})
+	}
+	target := nodes[len(nodes)-1].ID
+	capped, truncated := capAccessNodes(nodes, target)
+	if !truncated || len(capped) != accessNodeCap || capped[len(capped)-1].ID != target {
+		t.Fatalf("node cap dropped the requested node: truncated=%v nodes=%+v", truncated, capped)
+	}
+}
+
+func TestAccessRemoveRecommendationNeedsAlternateForSameUsers(t *testing.T) {
+	f := newFx().node("de1", "DE", "online").node("nl1", "NL", "online").
+		group("red", "prf_vless").group("blue", "prf_hy2").users("red", 2, 1).users("blue", 2, 1)
+	red := f.inbound("nl1", "prf_vless", "vless", 443)
+	blue := f.inbound("de1", "prf_hy2", "hysteria2", 443)
+	f.in.Totals[blue] = hy2Good()
+	f.rows("blue", blue, "de1", accRow{Connects: 5})
+	f.cc("nl1", "blocked", func(c *accCountry) {
+		c.TSPU = ports(443, "blocked", 8443, "blocked")
+		c.ListedBy = []string{"antifilter_ipsum"}
+		c.Vantages = []accVantage{vant("MTS", "home", "dark", false), vant("Beeline", "mobile", "dark", false)}
+	})
+	f.cc("de1", "ok", func(c *accCountry) { c.Vantages = []accVantage{vant("MTS", "home", "reach", true)} })
+	r := buildAccess(f.in)
+	if rec(r, "remove_from_subscriptions") != nil {
+		t.Fatalf("Red's blocked inbound %s has no alternate for Red users: %+v", red, r.Recommendations)
+	}
+}
+
+func TestBlockDoesNotTreatTestedTSPUPortsAsAddressWide(t *testing.T) {
+	f := newFx().node("de1", "DE", "online")
+	f.inbound("de1", "prf_vless", "vless", 443)
+	f.cc("de1", "partial", func(c *accCountry) { c.TSPU = ports(443, "blocked", 8443, "refused") })
+	r := buildAccess(f.in)
+	if c := classOf(r, "de1", clsIPBlocked); c != nil {
+		t.Fatalf("the tested ports did not show an address-wide block: %+v", c)
+	}
+}
+
 func TestAccessNodeDarkForOneOperator(t *testing.T) {
 	f := newFx().node("nl1", "NL", "online").node("msk1", "RU", "online").group("family", "prf_hy2").users("family", 3, 1699990000)
 	h := f.inbound("nl1", "prf_hy2", "hysteria2", 443)
@@ -231,7 +283,7 @@ func TestAccessGroupWhoseOnlyProfilesFail(t *testing.T) {
 			t.Fatal("family has HY2 on de1")
 		}
 	}
-	if p := rec(r, "prefer_protocol"); p == nil || p.Target["group"] != "kids" || p.Target["add_profile"] != "Fast" || p.PlanTool != "group_update_plan" {
+	if p := rec(r, "prefer_protocol"); p == nil || p.Target["group_id"] != "kids" || p.Target["profile_ids"] != "prf_hy2,prf_vless" || p.PlanTool != "group_update_plan" {
 		t.Fatalf("prefer_protocol: %+v", p)
 	}
 	if rl := rec(r, "add_relay"); rl == nil || rl.Target["entry_node"] != "de1" {
@@ -253,7 +305,7 @@ func TestAccessAWGHandshakeNoReply(t *testing.T) {
 	f.in.Totals[h] = hy2Good()
 	f.rows("family", a, "fi1", accRow{Stalls: 4})
 	f.rows("family", h, "fi1", accRow{Connects: 4})
-	f.in.Nodes[0].UDPChecks = []accUDPCheck{{Port: 51820, Verdict: "ok", Sender: "msk1"}}
+	f.in.Nodes[0].UDPChecks = []accUDPCheck{{Port: 51820, Verdict: "ok", Sender: "msk1", CheckedUnix: f.in.NowUnix}}
 	f.cc("fi1", "ok", func(c *accCountry) {
 		c.TSPU = ports(443, "open")
 		c.Vantages = []accVantage{vant("MTS", "home", "reach", true)}
@@ -433,50 +485,62 @@ func TestBlockWhitelistVersusIPBlocked(t *testing.T) {
 
 func TestBlockTCPThrottledVersusBroken(t *testing.T) {
 	build := func(status string) *AccessReportV {
-		f := newFx().node("be", "BE", status).group("g", "prf_vless", "prf_hy2").users("g", 2, 1)
-		f.inbound("be", "prf_vless", "vless", 443)
-		h := f.inbound("be", "prf_hy2", "hysteria2", 8443)
+		f := newFx().node("de1", "DE", status).group("g1", "prf_vless", "prf_hy2").group("g2", "prf_vless", "prf_hy2").
+			users("g1", 2, 1).users("g2", 1, 1)
+		f.inbound("de1", "prf_vless", "vless", 443)
+		h := f.inbound("de1", "prf_hy2", "hysteria2", 8443)
 		f.in.Totals[h] = hy2Good()
-		f.in.Klick["nod_be"] = &accKlick{accKlickTally: accKlickTally{Reports: 6, OK: 2, Freeze: 4}, Kinds: []accKlickKind{
+		f.in.Klick["nod_de1"] = &accKlick{accKlickTally: accKlickTally{Reports: 6, OK: 2, Freeze: 4}, Kinds: []accKlickKind{
 			{Kind: "vless", accKlickTally: accKlickTally{Reports: 5, OK: 1, Freeze: 4}, DLChecked: 5, DLStalled: 4},
 			{Kind: "hysteria2", accKlickTally: accKlickTally{Reports: 3, OK: 3}}}}
-		f.cc("be", "ok", func(c *accCountry) {
+		f.cc("de1", "ok", func(c *accCountry) {
 			c.TSPU = ports(443, "open")
 			c.Vantages = []accVantage{vant("MTS", "home", "reach", true)}
 		})
 		return buildAccess(f.in)
 	}
 	r := build("online")
-	c := classOf(r, "be", clsTCPThrottled)
+	c := classOf(r, "de1", clsTCPThrottled)
 	if c == nil || c.Confidence != confHigh || c.protocol != "vless" || c.Detail["udp_works"] != "yes" {
 		t.Fatalf("throttled: %+v", c)
 	}
-	if p := rec(r, "prefer_protocol"); p == nil || p.Target["prefer"] != "hysteria2" || rec(r, "move_port") != nil {
+	var prefer []accessRecV
+	for _, recommendation := range r.Recommendations {
+		if recommendation.Kind == "prefer_protocol" {
+			prefer = append(prefer, recommendation)
+		}
+	}
+	if len(prefer) != 2 || rec(r, "move_port") != nil {
 		t.Fatalf("throttled wants UDP, never a port: %+v", r.Recommendations)
+	}
+	for _, recommendation := range prefer {
+		if recommendation.Target["group_id"] == "" || recommendation.Target["profile_ids"] != "prf_hy2" || recommendation.Target["prefer"] != "" || recommendation.PlanTool != "group_update_plan" {
+			t.Fatalf("group update target does not match its plan: %+v", recommendation)
+		}
 	}
 	// the node is down: ours, never the censor
 	r = build("down")
-	if cl := classes(r, "be"); !slices.Equal(cl, []string{clsBroken}) {
+	if cl := classes(r, "de1"); !slices.Equal(cl, []string{clsBroken}) {
 		t.Fatalf("down node: %v", cl)
 	}
 	if rec(r, "fix_ours") == nil {
 		t.Fatal("fix_ours")
 	}
 	// a failed server: ours for that server
-	f := newFx().node("be", "BE", "online")
-	f.inbound("be", "prf_vless", "vless", 443)
+	f := newFx().node("de1", "DE", "online")
+	f.inbound("de1", "prf_vless", "vless", 443)
 	f.in.Inbounds[0].State, f.in.Inbounds[0].LastErrorCode = "failed", "bind"
-	f.cc("be", "ok", nil)
-	if c := classOf(buildAccess(f.in), "be", clsBroken); c == nil || c.Scope != "inbound:"+f.in.Inbounds[0].ID {
+	f.cc("de1", "ok", nil)
+	if c := classOf(buildAccess(f.in), "de1", clsBroken); c == nil || c.Scope != "inbound:"+f.in.Inbounds[0].ID {
 		t.Fatalf("failed inbound: %+v", c)
 	}
 	// a closed port seen from outside the country is ours too
-	f = newFx().node("be", "BE", "online")
-	f.in.Nodes[0].TCPChecks = []accTCPCheck{{Port: 8443, Verdict: "refused", Sender: "panel"}}
-	f.cc("be", "ok", func(c *accCountry) { c.TSPU = ports(443, "open", 8443, "blocked") })
+	f = newFx().node("de1", "DE", "online")
+	f.in.Nodes[0].TCPChecks = []accTCPCheck{{Port: 8443, Verdict: "refused", Sender: "panel", CheckedUnix: f.in.NowUnix}}
+	f.cc("de1", "ok", func(c *accCountry) { c.TSPU = ports(443, "open", 8443, "blocked") })
 	r = buildAccess(f.in)
-	if classOf(r, "be", clsBroken) == nil || classOf(r, "be", clsPortBlocked) != nil {
-		t.Fatalf("refused port: %v", classes(r, "be"))
+	if classOf(r, "de1", clsBroken) == nil || classOf(r, "de1", clsPortBlocked) != nil {
+		t.Fatalf("refused port: %v", classes(r, "de1"))
 	}
 }
 
@@ -500,10 +564,10 @@ func TestBlockUDPBlocked(t *testing.T) {
 	if rec(r, "prefer_tcp_protocol") == nil {
 		t.Fatalf("recs: %+v", r.Recommendations)
 	}
-	// counters only, no in-country check: medium and the missing check is named
+	// counters only, no in-country check: low confidence and the missing check is named
 	f.in.Loss = nil
 	c = classOf(buildAccess(f.in), "fi1", clsUDPBlocked)
-	if c == nil || c.Confidence != confMedium || !strings.Contains(strings.Join(c.Unknown, " "), "path_probe udp") {
+	if c == nil || c.Confidence != confLow || !strings.Contains(strings.Join(c.Unknown, " "), "path_probe udp") {
 		t.Fatalf("counters only: %+v", c)
 	}
 	// no TCP evidence: UDP failing does not prove UDP is cut (the node may be broken)
@@ -511,6 +575,26 @@ func TestBlockUDPBlocked(t *testing.T) {
 	cc.Verdict, cc.Vantages, cc.TSPU = "unknown", nil, nil
 	if classOf(buildAccess(f.in), "fi1", clsUDPBlocked) != nil {
 		t.Fatal("no claim without a working TCP path")
+	}
+}
+
+func TestBlockIgnoresStalePortChecks(t *testing.T) {
+	f := newFx().node("de1", "DE", "online").node("msk1", "RU", "online").group("g", "prf_vless", "prf_hy2").users("g", 2, 1)
+	f.inbound("de1", "prf_vless", "vless", 8443)
+	h := f.inbound("de1", "prf_hy2", "hysteria2", 443)
+	f.in.Totals[h] = accTotals{Protocol: "hysteria2", Hellos: 60, Accepted: 0, Handshakes: 0, HellosForeign: 5}
+	f.in.Nodes[0].UDPChecks = []accUDPCheck{{Port: 443, Verdict: "broken", Sender: "msk1", CheckedUnix: f.in.NowUnix - 25*60*60}}
+	f.in.Nodes[0].TCPChecks = []accTCPCheck{{Port: 8443, Verdict: "refused", Sender: "panel", CheckedUnix: f.in.NowUnix - 25*60*60}}
+	f.cc("de1", "ok", func(c *accCountry) {
+		c.TSPU = ports(443, "open")
+		c.Vantages = []accVantage{vant("MTS", "home", "reach", true)}
+	})
+	r := buildAccess(f.in)
+	if c := classOf(r, "de1", clsUDPBlocked); c == nil || c.Confidence != confLow || !strings.Contains(strings.Join(c.Unknown, " "), "path_probe udp") {
+		t.Fatalf("stale local UDP check affected classification: %+v", c)
+	}
+	if c := classOf(r, "de1", clsBroken); c != nil {
+		t.Fatalf("stale foreign TCP refusal affected classification: %+v", c)
 	}
 }
 
@@ -637,6 +721,27 @@ func TestAccessSizeCap(t *testing.T) {
 	}
 }
 
+func TestAccessSizeCapShrinksClassesWithinOneNode(t *testing.T) {
+	f := newFx().node("de1", "DE", "online")
+	for i := 0; i < 400; i++ {
+		f.inbound("de1", "prf_vless", "vless", uint32(i+1))
+		f.in.Inbounds[len(f.in.Inbounds)-1].State = "failed"
+	}
+	r := buildAccess(f.in)
+	full, _ := marshal(r)
+	if len(full) <= maxResultBytes {
+		t.Fatalf("the one-node fixture is too small to test nested shrinking: %d", len(full))
+	}
+	res, _, err := result(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := res.Content[0].(*sdk.TextContent).Text
+	if len(text) > maxResultBytes || !r.Truncated {
+		t.Fatalf("size %d, truncated %v", len(text), r.Truncated)
+	}
+}
+
 // Through the real MCP layer over the fake admin API: the tool answers, and nothing secret or addressed reaches the agent.
 func TestAccessToolsAreReadonlyAndLeakNothing(t *testing.T) {
 	e := newTestEnv(t)
@@ -668,7 +773,7 @@ func TestAccessToolsAreReadonlyAndLeakNothing(t *testing.T) {
 	if out := mustFail(t, s, "access_report", map[string]any{"group": "nope"}); !strings.Contains(out, "not found") {
 		t.Fatalf("group: %s", out)
 	}
-	if strings.Contains(out, "usr_") && false {
-		t.Fatal("unreachable")
+	if strings.Contains(out, "usr_") {
+		t.Fatal("successful access report exposes user IDs")
 	}
 }

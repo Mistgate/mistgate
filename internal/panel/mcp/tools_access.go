@@ -125,6 +125,29 @@ func accessHours(h int) (int, error) {
 	return h, nil
 }
 
+func capAccessNodes(nodes []accNode, targetID string) ([]accNode, bool) {
+	if len(nodes) <= accessNodeCap {
+		return nodes, false
+	}
+	if targetID == "" {
+		return nodes[:accessNodeCap], true
+	}
+	for _, n := range nodes[:accessNodeCap] {
+		if n.ID == targetID {
+			return nodes[:accessNodeCap], true
+		}
+	}
+	for _, n := range nodes[accessNodeCap:] {
+		if n.ID == targetID {
+			out := make([]accNode, accessNodeCap)
+			copy(out, nodes[:accessNodeCap-1])
+			out[accessNodeCap-1] = n
+			return out, true
+		}
+	}
+	return nodes[:accessNodeCap], true
+}
+
 func (c *call) accessReport(a accessArg) (any, error) {
 	hours, err := accessHours(a.Hours)
 	if err != nil {
@@ -202,8 +225,8 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 		ids[n.GetId()] = n.GetName()
 		in.Nodes = append(in.Nodes, an)
 	}
-	if len(in.Nodes) > accessNodeCap {
-		in.Nodes = in.Nodes[:accessNodeCap]
+	if capped, truncated := capAccessNodes(in.Nodes, in.Node); truncated {
+		in.Nodes = capped
 		miss("nodes_beyond_cap")
 	}
 	byID := map[string]*accNode{}
@@ -223,10 +246,10 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 				State: inboundStateName(x.GetState()), LastErrorCode: errorCode(x.GetLastError())})
 		}
 		for _, p := range r.Msg.GetPortChecks() {
-			n.UDPChecks = append(n.UDPChecks, accUDPCheck{Port: p.GetPort(), Verdict: clean(p.GetVerdict(), 12), Sender: nm(p.GetSender())})
+			n.UDPChecks = append(n.UDPChecks, accUDPCheck{Port: p.GetPort(), Verdict: clean(p.GetVerdict(), 12), Sender: nm(p.GetSender()), CheckedUnix: p.GetCheckedUnix()})
 		}
 		for _, t := range r.Msg.GetTcpChecks() {
-			n.TCPChecks = append(n.TCPChecks, accTCPCheck{Port: t.GetPort(), Verdict: clean(t.GetVerdict(), 12), Sender: nm(t.GetSender())})
+			n.TCPChecks = append(n.TCPChecks, accTCPCheck{Port: t.GetPort(), Verdict: clean(t.GetVerdict(), 12), Sender: nm(t.GetSender()), CheckedUnix: t.GetCheckedUnix()})
 		}
 	}
 	if r, err := c.cl.Profile.ListProfiles(c.ctx, connect.NewRequest(&adminv1.ListProfilesRequest{})); err != nil {
