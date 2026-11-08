@@ -783,6 +783,7 @@ type Task struct {
 	Problem        bool   `protobuf:"varint,15,opt,name=problem,proto3" json:"problem,omitempty"`
 	ProblemSummary string `protobuf:"bytes,16,opt,name=problem_summary,json=problemSummary,proto3" json:"problem_summary,omitempty"`
 	Running        bool   `protobuf:"varint,17,opt,name=running,proto3" json:"running,omitempty"`
+	Version        uint64 `protobuf:"varint,18,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -934,6 +935,13 @@ func (x *Task) GetRunning() bool {
 		return x.Running
 	}
 	return false
+}
+
+func (x *Task) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type ListTasksRequest struct {
@@ -1783,7 +1791,7 @@ const file_mistgate_tasks_v1_tasks_proto_rawDesc = "" +
 	"\x05model\x18\f \x01(\tR\x05model\x12\x10\n" +
 	"\x03usd\x18\r \x01(\x01R\x03usd\x12\x1b\n" +
 	"\tfell_back\x18\x0e \x01(\bR\bfellBack\x12\x14\n" +
-	"\x05actor\x18\x0f \x01(\tR\x05actor\"\xf7\x04\n" +
+	"\x05actor\x18\x0f \x01(\tR\x05actor\"\x91\x05\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12/\n" +
@@ -1803,7 +1811,8 @@ const file_mistgate_tasks_v1_tasks_proto_rawDesc = "" +
 	"failStreak\x12\x18\n" +
 	"\aproblem\x18\x0f \x01(\bR\aproblem\x12'\n" +
 	"\x0fproblem_summary\x18\x10 \x01(\tR\x0eproblemSummary\x12\x18\n" +
-	"\arunning\x18\x11 \x01(\bR\arunning\"\x12\n" +
+	"\arunning\x18\x11 \x01(\bR\arunning\x12\x18\n" +
+	"\aversion\x18\x12 \x01(\x04R\aversion\"\x12\n" +
 	"\x10ListTasksRequest\"\xb6\x01\n" +
 	"\x11ListTasksResponse\x12-\n" +
 	"\x05tasks\x18\x01 \x03(\v2\x17.mistgate.tasks.v1.TaskR\x05tasks\x126\n" +

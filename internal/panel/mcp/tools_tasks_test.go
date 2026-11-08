@@ -30,7 +30,7 @@ type fakeTasks struct {
 
 func newFakeTasks() *fakeTasks {
 	return &fakeTasks{tasks: map[string]*tasksv1.Task{
-		"tsk_morning": {Id: "tsk_morning", Name: "Morning check", Kind: tasksv1.TaskKind_TASK_KIND_CHECK, Enabled: true, UpdatedUnix: 1700000000,
+		"tsk_morning": {Id: "tsk_morning", Name: "Morning check", Kind: tasksv1.TaskKind_TASK_KIND_CHECK, Enabled: true, UpdatedUnix: 1700000000, Version: 1,
 			Schedule: &tasksv1.Schedule{Kind: tasksv1.ScheduleKind_SCHEDULE_KIND_DAILY, MinuteOfDay: 450}, NextRunUnix: 1700050000, Problem: true,
 			ProblemSummary: "fleet_digest: totals.nodes_problem_now = 2",
 			Steps:          []*tasksv1.CheckStep{{Tool: "fleet_digest", ArgsJson: `{"hours":24}`, Conditions: []*tasksv1.Condition{{Path: "totals.nodes_problem_now", Op: "gt", Value: "0"}}}},
@@ -245,7 +245,7 @@ func TestTaskUpdateAndDeletePlans(t *testing.T) {
 	p = planOf(t, s, "task_update", map[string]any{"task_id": "tsk_morning", "name": "Evening check"})
 	_ = e.plans.decide(p.PlanID, true)
 	e.w.tasks.mu.Lock()
-	e.w.tasks.tasks["tsk_morning"].UpdatedUnix++
+	e.w.tasks.tasks["tsk_morning"].Version++
 	e.w.tasks.mu.Unlock()
 	if out := applyError(t, s, "task_update", p.ConfirmToken); !strings.Contains(out, "changed since the plan") {
 		t.Fatalf("stale update: %s", out)

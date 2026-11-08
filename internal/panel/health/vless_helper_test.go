@@ -32,6 +32,15 @@ import (
 // tests, and the panel process stays free of any Xray code, which is the point of the check's design.
 const vlessTestServerEnv = "MISTGATE_HEALTH_VLESS_TEST_SERVER"
 
+// Xray v1.260327.0's VLESS outbound uses uintptr pointer arithmetic at outbound.go:288, which fails checkptr under -race.
+// Production builds do not enable checkptr.
+func skipVLESSOutboundCheckptrRace(t *testing.T) {
+	t.Helper()
+	if raceBuild {
+		t.Skip("Xray VLESS outbound pointer arithmetic fails checkptr under -race")
+	}
+}
+
 // runVLESSHelperTestSubprocess serves the test binary's re-exec modes: the panel's client helper (real or fake) and the
 // loopback VLESS server. It returns false for a normal test run.
 func runVLESSHelperTestSubprocess() bool {

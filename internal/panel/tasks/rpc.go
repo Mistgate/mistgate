@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 
 	tasksv1 "github.com/mistgate/mistgate/gen/mistgate/tasks/v1"
+	"github.com/mistgate/mistgate/internal/panel/assistant"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -202,7 +203,7 @@ func RunProto(r store.ScheduledTaskRun) *tasksv1.TaskRun {
 func (s *Service) taskProto(t store.ScheduledTask, last *store.ScheduledTaskRun) (*tasksv1.Task, error) {
 	p := &tasksv1.Task{Id: t.ID, Name: t.Name, Kind: kindProto(t.Kind), Enabled: t.Enabled, Schedule: ScheduleProto(scheduleOf(t)),
 		NotifyTelegram: t.NotifyTelegram, ConversationId: t.ConversationID, CreatedUnix: t.CreatedAt.Unix(), UpdatedUnix: t.UpdatedAt.Unix(),
-		FailStreak: uint32(max(t.FailStreak, 0)), Problem: t.Problem, ProblemSummary: t.ProblemSummary, Running: t.Running(s.now())}
+		FailStreak: uint32(max(t.FailStreak, 0)), Problem: t.Problem, ProblemSummary: t.ProblemSummary, Running: t.Running(s.now()), Version: uint64(t.Version)}
 	if t.Enabled && !t.NextRunAt.IsZero() {
 		p.NextRunUnix = t.NextRunAt.Unix()
 	}
@@ -221,10 +222,16 @@ func (s *Service) taskProto(t store.ScheduledTask, last *store.ScheduledTaskRun)
 	return p, nil
 }
 
-// looksSecret: the text changes under the MCP scrubber, so it holds something shaped like a key, a token or a link.
-func looksSecret(text string) bool { return text != "" && mcp.ScrubText(text) != text }
+// looksSecret rejects values the scrubber would change and credential labels the scrubber leaves alone.
+func looksSecret(text string) bool {
+	if text == "" {
+		return false
+	}
+	scrubbed := mcp.ScrubText(text)
+	return scrubbed != text || assistant.HasCredentialLabel(scrubbed)
+}
 
-// LooksSecret is the secret test of a task's text (spec.Check): the MCP scrubber would change it.
+// LooksSecret rejects task text the scrubber would change or that carries a credential label.
 func LooksSecret(text string) bool { return looksSecret(text) }
 
 // DefinitionOf is a TaskInput as the spec package checks it.
@@ -523,11 +530,26 @@ func (r rpc) RunTaskNow(ctx context.Context, req *connect.Request[tasksv1.RunTas
 	if t.Running(now) {
 		return nil, coded(connect.CodeFailedPrecondition, "task_running")
 	}
-	runID, started, err := s.start(t, "manual", actorName(ctx, admin), now.Add(-manualEvery(t.Kind)), nil)
+	sem := s.runSemaphore(t.Kind)
+	select {
+	case sem <- struct{}{}:
+	default:
+		return nil, coded(connect.CodeResourceExhausted, "tasks_busy")
+	}
+	release := func() { <-sem }
+	runID, started, err := s.start(t, "manual", actorName(ctx, admin), now.Add(-manualEvery(t.Kind)), release)
 	if err != nil {
+		release()
 		return nil, s.internal("start run", err)
 	}
 	if !started {
+		release()
+		s.mu.Lock()
+		_, active := s.running[t.ID]
+		s.mu.Unlock()
+		if active {
+			return nil, coded(connect.CodeFailedPrecondition, "task_running")
+		}
 		if cur, e := s.cfg.Store.ScheduledTask(ctx, t.ID); e == nil && cur.Running(s.now()) {
 			return nil, coded(connect.CodeFailedPrecondition, "task_running")
 		}

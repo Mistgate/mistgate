@@ -139,6 +139,10 @@ func TestScheduledTaskLimitUpdateAndDelete(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1_800_000_000, 0).UTC()
 	task := scheduledFixture(t, st, "tsk_c", now)
+	before, err := st.ScheduledTask(ctx, "tsk_c")
+	if err != nil || before.Version != 1 {
+		t.Fatalf("new task version = %d, %v; want 1", before.Version, err)
+	}
 	if err := st.InsertScheduledTask(ctx, ScheduledTask{ID: "tsk_d", Name: "x", Kind: "check", ScheduleKind: "every", EveryMinutes: 5, CreatedBy: "a", CreatedAt: now, UpdatedAt: now}, 1); !errors.Is(err, ErrScheduledTaskLimit) {
 		t.Fatalf("over the limit: %v", err)
 	}
@@ -150,7 +154,7 @@ func TestScheduledTaskLimitUpdateAndDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := st.ScheduledTask(ctx, "tsk_c")
-	if got.Name != "Renamed" || got.Enabled || !got.NextRunAt.IsZero() || got.Problem || got.FailStreak != 0 {
+	if got.Name != "Renamed" || got.Enabled || !got.NextRunAt.IsZero() || got.Problem || got.FailStreak != 0 || got.Version != before.Version+1 {
 		t.Fatalf("after update: %+v", got)
 	}
 	if err := st.UpdateScheduledTask(ctx, ScheduledTask{ID: "tsk_none", UpdatedAt: now}); !errors.Is(err, ErrNotFound) {

@@ -10,6 +10,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/tasks/spec"
 )
 
 func TestParseScheduleLocalTimeFixedOffset(t *testing.T) {
@@ -31,6 +32,40 @@ func TestParseScheduleLocalTimeFixedOffset(t *testing.T) {
 		if _, err := parseScheduleLocalTime(tc.local, tc.offset); err == nil {
 			t.Errorf("parseScheduleLocalTime(%q, %d) unexpectedly succeeded", tc.local, tc.offset)
 		}
+	}
+}
+
+func TestChangingScheduleTimezoneRecalculatesEnabledTaskNextRun(t *testing.T) {
+	e := newEnv(t)
+	ctx := e.ctx
+	if err := e.st.SetSettings(ctx, map[string]string{updateScheduleTimezoneKey: "180"}); err != nil {
+		t.Fatal(err)
+	}
+	now := e.clk.Now()
+	schedule := spec.Schedule{Kind: spec.Daily, MinuteOfDay: 7*60 + 30}
+	jitter := spec.Jitter("tsk_timezone", schedule)
+	oldNext := schedule.Next(now, 180, jitter)
+	if err := e.st.InsertScheduledTask(ctx, store.ScheduledTask{
+		ID: "tsk_timezone", Name: "Morning check", Kind: spec.KindCheck, Enabled: true,
+		ScheduleKind: schedule.Kind, MinuteOfDay: schedule.MinuteOfDay, Steps: `[{"tool":"fleet_digest"}]`,
+		CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now, NextRunAt: oldNext,
+	}, 50); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := e.s.setScheduleTimezone(ctx, 240); err != nil {
+		t.Fatal(err)
+	}
+	got, err := e.st.ScheduledTask(ctx, "tsk_timezone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantNext := schedule.Next(now, 240, jitter)
+	if oldNext.Equal(wantNext) || !got.NextRunAt.Equal(wantNext) {
+		t.Fatalf("next run after offset change = %s, want %s (old was %s)", got.NextRunAt, wantNext, oldNext)
+	}
+	if offset, err := e.s.scheduleTimezoneOffset(ctx); err != nil || offset != 240 {
+		t.Fatalf("schedule offset = %d, %v; want 240", offset, err)
 	}
 }
 
