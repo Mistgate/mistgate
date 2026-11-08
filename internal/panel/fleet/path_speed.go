@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -55,8 +54,8 @@ type speedJSON struct {
 	Bytes       uint64  `json:"bytes,omitempty"`
 }
 
-// startSpeed admits a test between two nodes: it applies the limits and takes both nodes. The returned function gives them
-// back.
+// startSpeed admits a test between two nodes: it applies the limits, records the reservation and takes both nodes. The returned
+// function gives them back.
 func (f *Fleet) startSpeed(ctx context.Context, a, b string) (func(), error) {
 	actor := f.cfg.Actor(ctx)
 	now := f.now()
@@ -64,36 +63,43 @@ func (f *Fleet) startSpeed(ctx context.Context, a, b string) (func(), error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.speedBusy == nil {
-		p.speedBusy, p.speedCaller, p.speedNode = map[string]struct{}{}, map[string][]time.Time{}, map[string][]time.Time{}
+		p.speedBusy = map[string]struct{}{}
 	}
-	recent := func(times []time.Time) []time.Time {
-		return slices.DeleteFunc(slices.Clone(times), func(t time.Time) bool { return now.Sub(t) >= speedDayWindow })
+	usage, err := f.st.PathSpeedStartUsage(ctx, actor, a, b, now.Add(-speedDayWindow))
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		f.log.Error("read path speed start reservations", "code", "store_failed", "err", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
 	}
 	retry := func(times []time.Time) error {
 		wait := speedDayWindow - now.Sub(times[0])
 		return connect.NewError(connect.CodeResourceExhausted,
 			fmt.Errorf("speed test limit reached: try again in %d minutes", int(wait.Minutes())+1))
 	}
-	callerTimes := recent(p.speedCaller[actor])
-	if len(callerTimes) >= speedCallerDayMax {
-		return nil, retry(callerTimes)
+	if len(usage.Caller) >= speedCallerDayMax {
+		return nil, retry(usage.Caller)
 	}
-	nodeTimes := map[string][]time.Time{}
 	for _, id := range []string{a, b} {
 		if _, running := p.speedBusy[id]; running {
 			return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("a speed test already runs on one of these nodes"))
 		}
-		nodeTimes[id] = recent(p.speedNode[id])
-		if len(nodeTimes[id]) >= speedNodeDayMax {
-			return nil, retry(nodeTimes[id])
+		if len(usage.Nodes[id]) >= speedNodeDayMax {
+			return nil, retry(usage.Nodes[id])
 		}
 	}
 	if p.active >= maxActiveProbes {
 		return nil, activeProbeLimitError()
 	}
-	p.speedCaller[actor] = append(callerTimes, now)
+	if err := f.st.AddPathSpeedStart(ctx, actor, a, b, now); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		f.log.Error("reserve path speed start", "code", "store_failed", "err", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
 	for _, id := range []string{a, b} {
-		p.speedNode[id] = append(nodeTimes[id], now)
 		p.speedBusy[id] = struct{}{}
 	}
 	p.active++

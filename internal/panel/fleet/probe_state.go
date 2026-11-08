@@ -18,7 +18,5 @@ type probeState struct {
 	node   map[string][]time.Time // node id -> when probes touching it started, inside the window
 
 	// path_speed (path_speed.go): a node runs one test at a time, and starts are counted over a day per node and per caller.
-	speedBusy   map[string]struct{}
-	speedCaller map[string][]time.Time
-	speedNode   map[string][]time.Time
+	speedBusy map[string]struct{}
 }

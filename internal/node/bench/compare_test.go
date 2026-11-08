@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The comparison is plain Go: these tests run on every OS (the suite itself needs Linux, root and the "bench" tag).
@@ -123,6 +125,31 @@ func TestParseThreshold(t *testing.T) {
 	t.Setenv(ThresholdEnv, "30")
 	if got, err := ThresholdFromEnv(); err != nil || got != 0.30 {
 		t.Errorf("ThresholdFromEnv = %v, %v", got, err)
+	}
+}
+
+func TestSelectBenchmarkNamesRejectsUnknownAndEmptyRequests(t *testing.T) {
+	got, err := selectBenchmarkNames(engines, " hysteria2, vless-tcp ")
+	if err != nil || !slices.Equal(got, []string{"hysteria2", "vless-tcp"}) {
+		t.Fatalf("selectBenchmarkNames = %v, %v", got, err)
+	}
+	for _, requested := range []string{"unknown", "hysteria2, typo", " , "} {
+		if got, err := selectBenchmarkNames(engines, requested); err == nil {
+			t.Errorf("selectBenchmarkNames(%q) = %v, want error", requested, got)
+		}
+	}
+	got, err = selectBenchmarkNames(engines, " ")
+	if err != nil || !slices.Equal(got, engines) {
+		t.Errorf("default selection = %v, %v; want all engines", got, err)
+	}
+}
+
+func TestHandshakeRateRequiresAtLeastOneSuccessfulSession(t *testing.T) {
+	if got, err := handshakeRate(0, time.Second); err == nil || got != 0 {
+		t.Fatalf("handshakeRate with no successes = %v, %v; want an error", got, err)
+	}
+	if got, err := handshakeRate(10, 2*time.Second); err != nil || got != 5 {
+		t.Errorf("handshakeRate = %v, %v; want 5", got, err)
 	}
 }
 

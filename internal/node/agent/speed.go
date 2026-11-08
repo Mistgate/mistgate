@@ -124,7 +124,7 @@ func (a *Agent) speedTest(s *session, u *pb.UdpSend) {
 		go func() {
 			defer a.speed.release()
 			if err := serveSpeed(ln, r.Token, r.Direction == "down", int64(r.Mb)<<20, limit); err != nil {
-				a.log.Debug("speed test: serve ended", "err", err)
+				a.log.Debug("speed test: serve ended", "code", speedServeLogCode(err))
 			}
 		}()
 		reply(&pb.CommandResult{Ok: true, Params: map[string]string{"port": strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)}})
@@ -183,6 +183,21 @@ func speedError(err error) string {
 	return "failed: " + shortUDPError(err)
 }
 
+// speedServeLogCode keeps peer addresses out of debug logs while preserving the failure category.
+func speedServeLogCode(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return "timeout"
+	}
+	if errors.Is(err, net.ErrClosed) {
+		return "closed"
+	}
+	return "transfer_failed"
+}
+
 var errSpeedRefused = errors.New("connection refused")
 
 // speedBlock is the bytes that are sent: random, so that nothing on the path can compress them away.
@@ -205,7 +220,11 @@ func serveSpeed(ln net.Listener, token []byte, down bool, total int64, limit tim
 		if err != nil {
 			return err
 		}
-		conn.SetDeadline(time.Now().Add(speedTokenWait))
+		tokenDeadline := time.Now().Add(speedTokenWait)
+		if deadline.Before(tokenDeadline) {
+			tokenDeadline = deadline
+		}
+		conn.SetDeadline(tokenDeadline)
 		got := make([]byte, speedTokenSize)
 		if _, err := io.ReadFull(conn, got); err != nil || subtle.ConstantTimeCompare(got, token) != 1 {
 			conn.Close() // somebody else: the listener stays for the real sender until its limit

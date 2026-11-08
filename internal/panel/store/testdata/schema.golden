@@ -379,6 +379,30 @@
   },
   {
     "type": "index",
+    "name": "path_speed_start_actor_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_actor_at ON path_speed_start (actor_id, at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_start_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_at ON path_speed_start (at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_start_from_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_from_at ON path_speed_start (from_node_id, at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_start_to_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_to_at ON path_speed_start (to_node_id, at_unix)"
+  },
+  {
+    "type": "index",
     "name": "relay_via",
     "tbl_name": "relay",
     "sql": "CREATE INDEX relay_via ON relay (via_node_id)"
@@ -898,6 +922,12 @@
     "name": "path_speed",
     "tbl_name": "path_speed",
     "sql": "CREATE TABLE path_speed ( id INTEGER PRIMARY KEY AUTOINCREMENT, from_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, to_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, direction TEXT NOT NULL CHECK (direction IN ('down', 'up')), at_unix INTEGER NOT NULL, result_json TEXT NOT NULL )"
+  },
+  {
+    "type": "table",
+    "name": "path_speed_start",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE TABLE path_speed_start ( id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, from_node_id TEXT NOT NULL, to_node_id TEXT NOT NULL, at_unix INTEGER NOT NULL )"
   },
   {
     "type": "table",

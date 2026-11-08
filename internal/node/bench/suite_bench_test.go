@@ -74,7 +74,14 @@ func TestBench(t *testing.T) {
 	if v, err := strconv.Atoi(os.Getenv("MISTGATE_BENCH_REPEAT")); err == nil && v > 0 {
 		repeat = min(v, 9)
 	}
-	wantEngines, wantVariants := pick(engines, "MISTGATE_BENCH_ENGINES"), pick(variants, "MISTGATE_BENCH_VARIANTS")
+	wantEngines, err := selectBenchmarkNames(engines, os.Getenv("MISTGATE_BENCH_ENGINES"))
+	if err != nil {
+		t.Fatalf("MISTGATE_BENCH_ENGINES: %v", err)
+	}
+	wantVariants, err := selectBenchmarkNames(variants, os.Getenv("MISTGATE_BENCH_VARIANTS"))
+	if err != nil {
+		t.Fatalf("MISTGATE_BENCH_VARIANTS: %v", err)
+	}
 
 	report := Report{Schema: SchemaVersion, When: time.Now().UTC().Format(time.RFC3339), Host: hostDescription(), Cases: map[string]Metrics{}}
 	for _, eng := range wantEngines {
@@ -141,20 +148,6 @@ func TestBench(t *testing.T) {
 	if res.Failed() {
 		t.Errorf("%d metrics are more than %.0f%% worse than the baseline", len(res.Regressions), threshold*100)
 	}
-}
-
-func pick(all []string, env string) []string {
-	v := strings.TrimSpace(os.Getenv(env))
-	if v == "" {
-		return all
-	}
-	var out []string
-	for _, s := range strings.Split(v, ",") {
-		if s = strings.TrimSpace(s); s != "" && isKnown(all, s) {
-			out = append(out, s)
-		}
-	}
-	return out
 }
 
 func envOr(k, def string) string {
