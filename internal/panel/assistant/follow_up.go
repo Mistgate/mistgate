@@ -42,6 +42,9 @@ const (
 	followUpSameMoment = time.Minute
 	// followUpTries: a follow-up whose run a stop of the panel interrupted this often is given up, with a note.
 	followUpTries = 3
+	// followUpChain: after this many follow-up turns in a row with no message of the person between, no new one is set (a model
+	// that keeps coming back by itself would spend the budget with nobody there)
+	followUpChain = 5
 	// the waits before a follow-up is tried again: its conversation is busy (a turn runs), the admin's turns are rate
 	// limited, or the store failed
 	followUpBusyWait  = 30 * time.Second
@@ -209,6 +212,11 @@ func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversat
 	if note == "" {
 		return fail("note must say what to do then (1 to 400 characters)")
 	}
+	if chain, err := s.followUpChain(ctx, admin.ID, conversationID); err != nil {
+		return fail("the follow-up could not be set")
+	} else if chain >= followUpChain {
+		return fail("you came back " + strconv.Itoa(chain) + " times in a row without the person writing: answer with what you have and let them ask again")
+	}
 	now := s.now()
 	f := store.AssistantFollowUp{ID: newFollowUpID(), ConversationID: conversationID, AdminID: admin.ID, NotifyTelegram: args.NotifyTelegram, CreatedAt: now}
 	if planID := strings.TrimSpace(args.PlanID); planID != "" {
@@ -282,6 +290,32 @@ func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversat
 		return fail("the follow-up could not be set")
 	}
 	return result(f, false)
+}
+
+// followUpChain counts the follow-up turns at the end of a conversation since the person last wrote.
+func (s *Service) followUpChain(ctx context.Context, adminID, conversationID string) (int, error) {
+	rows, err := s.st.R.QueryContext(ctx, `SELECT id,body_enc FROM assistant_message WHERE conversation_id=? AND admin_id=? AND role='user' ORDER BY rowid DESC LIMIT ?`, conversationID, adminID, followUpChain)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var id string
+		var sealed []byte
+		if err = rows.Scan(&id, &sealed); err != nil {
+			return 0, err
+		}
+		var body messageBody
+		if err = openJSON(s.vault, sealed, MessageAAD(id), &body); err != nil {
+			return 0, err
+		}
+		if body.FollowUp == nil {
+			break
+		}
+		n++
+	}
+	return n, rows.Err()
 }
 
 // followUpCancelTool is the follow_up_cancel tool.

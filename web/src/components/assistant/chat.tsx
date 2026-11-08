@@ -10,7 +10,7 @@ import { navKey, sections, type SectionId } from "@/components/nav";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { assistant } from "@/lib/api";
-import { accessQuery, assistantErrorKey, conversationsQuery, looksSecret, providerName, type Context, type LiveMsg, type LiveTool, type Msg, type Note, type Plan, type Tool } from "@/lib/assistant";
+import { accessQuery, assistantErrorKey, conversationsQuery, followUpPoll, looksSecret, providerName, type Context, type FollowUp, type LiveMsg, type LiveTool, type Msg, type Note, type Plan, type Tool } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
@@ -29,11 +29,15 @@ import { Thread } from "./thread";
 type ChatState = {
   conversationId: string;
   messages: Msg[];
+  /** a turn of the conversation runs: this chat's own (live), or one on the server (a follow-up's, another tab's) */
   running: boolean;
+  live: boolean;
   error: MessageKey | string | null;
+  /** the follow-ups the assistant set in this conversation that have not run yet */
+  followUps: FollowUp[];
 };
 
-const empty: ChatState = { conversationId: "", messages: [], running: false, error: null };
+const empty: ChatState = { conversationId: "", messages: [], running: false, live: false, error: null, followUps: [] };
 
 const newMessage = (role: ChatRole, text: string, context?: Context): Msg =>
   ({ id: `local-${Math.random().toString(36).slice(2)}`, role, text, createdUnix: Math.floor(Date.now() / 1000), context, tools: [], plans: [], remembered: [], end: "", ...(role === ChatRole.ASSISTANT ? { t0: Date.now() } : {}) }) as unknown as Msg;
@@ -67,7 +71,7 @@ export function useChat() {
     if (!body || s.running) return;
     const ctl = new AbortController();
     abort.current = ctl;
-    setS((cur) => ({ ...cur, running: true, error: null, messages: [...cur.messages, newMessage(ChatRole.USER, body, context ?? undefined), newMessage(ChatRole.ASSISTANT, "")] }));
+    setS((cur) => ({ ...cur, running: true, live: true, error: null, messages: [...cur.messages, newMessage(ChatRole.USER, body, context ?? undefined), newMessage(ChatRole.ASSISTANT, "")] }));
     try {
       for await (const res of assistant.chat({ conversationId: convRef.current, text: body, context: context ?? undefined, provider: turn?.provider ?? 0, effort: turn?.effort ?? 0 }, { signal: ctl.signal })) {
         const ev = res.event;
@@ -109,6 +113,16 @@ export function useChat() {
             void qc.invalidateQueries({ queryKey: ["assistant", "memory"] });
             break;
           }
+          case "followUp": {
+            const fu = plain(ev.value) as FollowUp;
+            setS((cur) => ({ ...cur, followUps: [...cur.followUps.filter((x) => x.id !== fu.id), fu] }));
+            break;
+          }
+          case "followUpCancelled": {
+            const id = ev.value;
+            setS((cur) => ({ ...cur, followUps: cur.followUps.filter((x) => x.id !== id) }));
+            break;
+          }
           case "done":
             patchLast((m) => ({ ...m, end: ev.value.end }));
             break;
@@ -123,7 +137,7 @@ export function useChat() {
     } finally {
       abort.current = null;
       patchLast((m) => ((m as LiveMsg).t0 && (m as LiveMsg).workedMs === undefined ? ({ ...m, workedMs: Date.now() - (m as LiveMsg).t0! } as LiveMsg) : m));
-      setS((cur) => ({ ...cur, running: false }));
+      setS((cur) => ({ ...cur, running: false, live: false }));
       void qc.invalidateQueries({ queryKey: ["assistant", "conversations"] });
       void qc.invalidateQueries({ queryKey: ["assistant", "access"] });
     }
@@ -143,18 +157,23 @@ export function useChat() {
       try {
         const r = plain(await assistant.getConversation({ id }));
         convRef.current = id;
-        setS({ conversationId: id, messages: r.messages as Msg[], running: r.running, error: null });
+        setS({ conversationId: id, messages: r.messages as Msg[], running: r.running, live: false, error: null, followUps: (r.followUps ?? []) as FollowUp[] });
+        // opening it reads what a follow-up answered: the dots go
+        if ((qc.getQueryData(accessQuery.queryKey)?.unread ?? 0) > 0) {
+          void qc.invalidateQueries({ queryKey: ["assistant", "access"] });
+          void qc.invalidateQueries({ queryKey: ["assistant", "conversations"] });
+        }
       } catch (e) {
         setS((cur) => ({ ...cur, error: assistantErrorKey(e) ?? errorText(e, t) }));
       }
     },
-    [t],
+    [t, qc],
   );
 
-  /** Reloads the open conversation (a plan decided elsewhere, in this chat's own approval form, shows its new state). */
-  function refresh() {
+  /** Reloads the open conversation (a plan decided elsewhere, a follow-up's turn the server ran, shows its new state). */
+  const refresh = useCallback(() => {
     if (convRef.current && !abort.current) void open(convRef.current);
-  }
+  }, [open]);
 
   function reset() {
     abort.current?.abort();
@@ -183,13 +202,45 @@ export function useChat() {
     }
   }
 
+  async function cancelFollowUp(id: string) {
+    try {
+      await assistant.cancelFollowUp({ conversationId: convRef.current, id });
+      setS((cur) => ({ ...cur, followUps: cur.followUps.filter((x) => x.id !== id) }));
+      void qc.invalidateQueries({ queryKey: ["assistant", "access"] });
+    } catch (e) {
+      setS((cur) => ({ ...cur, error: assistantErrorKey(e) ?? errorText(e, t) }));
+      refresh();
+    }
+  }
+
   async function forget(noteId: string) {
     await assistant.deleteMemory({ id: noteId }).catch(() => {});
     setS((cur) => ({ ...cur, messages: cur.messages.map((m) => ({ ...m, remembered: m.remembered.filter((n) => n.id !== noteId) })) }));
     void qc.invalidateQueries({ queryKey: ["assistant", "memory"] });
   }
 
-  return { ...s, send, stop, open, refresh, reset, apply, dismiss, forget };
+  return { ...s, send, stop, open, refresh, reset, apply, dismiss, forget, cancelFollowUp };
+}
+
+/**
+ * While the panel is open the conversation follows what the server does without this chat: a turn running there (a follow-up's,
+ * another tab's) is looked at every 4 s until it ends, and a follow-up is looked for just after its time.
+ */
+function useServerTurns(chat: ChatApi) {
+  const { conversationId, running, live, refresh } = chat;
+  const followUps = chat.followUps ?? [];
+  const next = followUps.reduce((min, f) => (Number(f.dueUnix) > 0 ? Math.min(min, Number(f.dueUnix)) : min), Infinity);
+  useEffect(() => {
+    if (!conversationId || live || !refresh) return;
+    let delay: number;
+    const ahead = next * 1000 - Date.now();
+    if (running) delay = 4_000;
+    else if (!Number.isFinite(next)) return;
+    // due: the scheduler takes it within a tick; long overdue (the assistant was off), looked at now and then
+    else delay = ahead > 0 ? Math.min(ahead + 3_000, 10 * 60_000) : ahead > -120_000 ? 5_000 : 30_000;
+    const id = setTimeout(refresh, delay);
+    return () => clearTimeout(id);
+  }, [conversationId, running, live, next, refresh]);
 }
 
 export type ChatApi = ReturnType<typeof useChat>;
@@ -211,7 +262,8 @@ function usePageContext(): Context | null {
 
 /** The round button and the panel. Mounted once in the shell; renders nothing while the assistant is not open to this admin. */
 export function ChatDock() {
-  const access = useQuery(accessQuery);
+  // the button looks again soon after the admin's next follow-up is due: its answer lights the dot
+  const access = useQuery({ ...accessQuery, refetchInterval: (q) => followUpPoll(q.state.data) });
   const [open, setOpen] = useState(false);
   const chat = useChat();
   const openConversation = chat.open;
@@ -253,20 +305,23 @@ export function ChatDock() {
   if (!available) return null;
   return (
     <>
-      {!open && <ChatButton onClick={() => setOpen(true)} running={chat.running} />}
+      {!open && <ChatButton onClick={() => setOpen(true)} running={chat.running} unread={access.data?.unread ?? 0} />}
       {open && <ChatPanel key={draft?.n ?? 0} chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} draft={draft} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-export function ChatButton({ onClick, running }: { onClick: () => void; running: boolean }) {
+export function ChatButton({ onClick, running, unread = 0 }: { onClick: () => void; running: boolean; unread?: number }) {
   const t = useT();
+  // a follow-up answered while the admin was away: a dot on the button, and the count in its name
+  const label = unread > 0 ? `${t("ai.chat.open")}: ${t.n("ai.chat.unread", unread)}` : t("ai.chat.open");
   return (
     <div className="fixed end-4 bottom-[92px] z-20 md:end-6 md:bottom-6">
-      <Tip label={`${t("ai.chat.open")} (Ctrl+J)`}>
-        <button type="button" onClick={onClick} aria-label={t("ai.chat.open")} className="chat-fab relative grid size-[52px] place-items-center rounded-full text-on-accent">
+      <Tip label={`${label} (Ctrl+J)`}>
+        <button type="button" onClick={onClick} aria-label={label} className="chat-fab relative grid size-[52px] place-items-center rounded-full text-on-accent">
           {running && <span aria-hidden className="chat-fab-ring pointer-events-none absolute inset-0 rounded-full border-2 border-accent" />}
           <Icon name="sparkle" size={22} fill="currentColor" strokeWidth={1.6} />
+          {unread > 0 && <span aria-hidden data-slot="unread" className="absolute end-0.5 top-0.5 size-3 rounded-full border-2 border-surface bg-danger" />}
         </button>
       </Tip>
     </div>
@@ -277,10 +332,19 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
   const t = useT();
   const owner = useIsOwner();
   const pageContext = usePageContext();
+  const access = useQuery(accessQuery);
   const [attach, setAttach] = useState(true);
   const [text, setText] = useState(draft?.text ?? "");
   const [askSecret, setAskSecret] = useState(false);
-  const [history, setHistory] = useState(false);
+  // opened with an answer that came while the admin was away and no conversation in front: the list, where it is marked
+  const [history, setHistory] = useState(() => !chat.conversationId && (access.data?.unread ?? 0) > 0);
+  useServerTurns(chat);
+  // opened again on a conversation that had follow-ups waiting (or an unread answer): it may have moved on meanwhile
+  const reopen = useRef({ chat, unread: access.data?.unread ?? 0 });
+  useEffect(() => {
+    const { chat: c, unread } = reopen.current;
+    if (c.conversationId && !c.live && ((c.followUps?.length ?? 0) > 0 || unread > 0)) c.refresh?.();
+  }, []);
   const list = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const context = initialContext !== undefined ? initialContext : pageContext;
@@ -384,11 +448,39 @@ function Hello({ onPick }: { onPick: (q: string) => void }) {
 
 
 
-function History({ onPick }: { onPick: (id: string) => void }) {
+type Conversation = NonNullable<ReturnType<typeof useConversations>["data"]>[number];
+const useConversations = (query: string) => useQuery(conversationsQuery(query));
+
+/** A conversation's title in a list, with its marks: scheduled, and the dot of an answer that came while the admin was away. */
+export function ConversationHead({ c }: { c: Conversation }) {
+  const t = useT();
+  return (
+    <span className="flex w-full items-center gap-1.5">
+      {c.unread && <span role="img" aria-label={t("ai.conv.unread")} title={t("ai.conv.unread")} data-slot="unread" className="size-2 flex-none rounded-full bg-danger" />}
+      <span className={cx("min-w-0 truncate text-[13px]", c.unread ? "font-bold" : "font-semibold")}>{c.title || t("ai.conv.untitled")}</span>
+      {c.taskId && <span className="flex-none rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-semibold text-accent-text">{t("ai.conv.scheduled")}</span>}
+    </span>
+  );
+}
+
+/** When it last moved, its size, and when its next follow-up is due (the panel's time zone). */
+export function ConversationMeta({ c, tz }: { c: Conversation; tz: number }) {
   const t = useT();
   const fmt = useFmt();
+  const due = Number(c.followUpUnix ?? 0);
+  return (
+    <span className="text-[11px] text-muted">
+      {fmt.ago(c.updatedUnix)} · {t.n("ai.conv.messages", c.messages)}
+      {due > 0 && <> · {t("ai.conv.followUp", { time: fmt.stampAt(due, tz) })}</>}
+    </span>
+  );
+}
+
+function History({ onPick }: { onPick: (id: string) => void }) {
+  const t = useT();
   const [query, setQuery] = useState("");
-  const q = useQuery(conversationsQuery(query.trim()));
+  const q = useConversations(query.trim());
+  const tz = useQuery(accessQuery).data?.timezoneOffsetMinutes ?? 0;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 py-3">
       <input
@@ -402,13 +494,8 @@ function History({ onPick }: { onPick: (id: string) => void }) {
         {q.data?.length === 0 && <p className="py-6 text-center text-[13px] text-muted">{t("ai.conv.empty")}</p>}
         {q.data?.map((c) => (
           <button key={c.id} type="button" onClick={() => onPick(c.id)} className="flex flex-col items-start gap-0.5 rounded-field px-2.5 py-2 text-start hover:bg-surface-2">
-            <span className="flex w-full items-center gap-1.5">
-              <span className="min-w-0 truncate text-[13px] font-semibold">{c.title || t("ai.conv.untitled")}</span>
-              {c.taskId && <span className="flex-none rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-semibold text-accent-text">{t("ai.conv.scheduled")}</span>}
-            </span>
-            <span className="text-[11px] text-muted">
-              {fmt.ago(c.updatedUnix)} · {t.n("ai.conv.messages", c.messages)}
-            </span>
+            <ConversationHead c={c} />
+            <ConversationMeta c={c} tz={tz} />
           </button>
         ))}
       </div>

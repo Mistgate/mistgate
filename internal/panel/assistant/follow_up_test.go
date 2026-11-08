@@ -542,3 +542,31 @@ func TestCancelFollowUp(t *testing.T) {
 		t.Fatal("still waiting")
 	}
 }
+
+// A model that keeps coming back by itself is stopped: after followUpChain follow-up turns in a row with no message of the
+// person between, no new follow-up is set; the person's next message starts the count again.
+func TestFollowUpChainIsBounded(t *testing.T) {
+	f := newAssistantFixture(t)
+	ctx := context.Background()
+	conv, _ := f.service.createConversation(ctx, f.admin.ID, time.Now())
+	line := func(followUp bool) {
+		body := messageBody{Text: "x"}
+		if followUp {
+			body.FollowUp = &adminv1.FollowUpTurn{Id: "afu_chain"}
+		}
+		if _, err := f.service.saveMessage(ctx, conv, f.admin.ID, "user", 0, body, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	line(false)
+	for i := 0; i < followUpChain; i++ {
+		line(true)
+	}
+	if got := setFollowUp(t, f, conv, followUpArgs(60, "again")); !got.output.err || !strings.Contains(got.output.text, "in a row") {
+		t.Fatalf("a sixth time: %+v", got.output)
+	}
+	line(false)
+	if got := setFollowUp(t, f, conv, followUpArgs(60, "again")); got.output.err {
+		t.Fatalf("after the person wrote: %s", got.output.text)
+	}
+}

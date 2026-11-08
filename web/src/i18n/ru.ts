@@ -29,6 +29,7 @@ import { ru as observabilityRu } from "./observability";
 import { ru as debugRu } from "./debug";
 import { ru as resourcesRu } from "./resources";
 import { ru as tasksRu } from "./tasks";
+import { ru as followupRu } from "./followup";
 
 // Typed against the English shape: a missing or extra key fails `pnpm typecheck`. The admin UI speaks «ты».
 const core: CoreMessages = {
@@ -293,4 +294,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Сайт этой ноды или другой сайт",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu };
