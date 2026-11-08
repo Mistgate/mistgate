@@ -309,3 +309,35 @@ func TestDebugCaptureTTLPerNodeCapAndPrune(t *testing.T) {
 		t.Fatalf("orphan lines after the prune %d %v", orphans, err)
 	}
 }
+
+// A capture names who started it the way the audit log does: an admin by display name, an MCP or API token by its name, and
+// anything else as it was stored.
+func TestDebugCaptureActorIsNamed(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	debugNode(t, st, "nod_1", "de1")
+	debugNode(t, st, "nod_2", "nl1")
+	debugNode(t, st, "nod_3", "fi1")
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin (id, display_name, role, user_handle, created_at) VALUES ('adm_x', 'Dev admin', 'owner', x'01', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO api_token (id, name, name_key, profile, secret_hash, hint, rate_per_min, created_by, created_at, expires_at)
+		VALUES ('tok_y', 'night agent', 'night agent', 'admin', x'02', 'abcd', 60, 'adm_x', 1, 9999999999)`); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
+	for _, c := range []struct{ id, node, actor, want string }{
+		{"req_a", "nod_1", "adm_x", "Dev admin"},
+		{"req_b", "nod_2", "mcp:tok_y", "night agent"},
+		{"req_c", "nod_3", "someone else", "someone else"},
+	} {
+		row := DebugCaptureRow{ID: c.id, NodeID: c.node, Actor: c.actor, Level: "debug", DurationS: 60, StartedAt: at, EndsAt: at.Add(time.Minute)}
+		if err := st.BeginDebugCapture(ctx, row, at); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.DebugCapture(ctx, c.id)
+		if err != nil || got.Actor != c.want {
+			t.Errorf("capture %s started by %q reads as %q, %v; want %q", c.id, c.actor, got.Actor, err, c.want)
+		}
+	}
+}

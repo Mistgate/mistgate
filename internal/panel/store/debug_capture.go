@@ -248,7 +248,9 @@ func (s *Store) FinishDebugCapture(ctx context.Context, nodeID, id, reason strin
 	return err
 }
 
-const debugColumns = `c.id, c.node_id, COALESCE(n.name, ''), c.actor, c.level, c.sources, c.duration_s, c.started_at, c.ends_at,
+// debugColumns name the actor the way the audit log does: the admin's display name, a token's name for "mcp:<id>" and
+// "token:<id>", else the stored value as it is.
+const debugColumns = `c.id, c.node_id, COALESCE(n.name, ''), COALESCE(NULLIF(a.display_name, ''), NULLIF(t.name, ''), c.actor), c.level, c.sources, c.duration_s, c.started_at, c.ends_at,
 	c.state, c.end_reason, c.records, c.bytes, c.dropped, c.last_chunk_seq`
 
 func scanDebugCapture(r rowScanner, now time.Time) (DebugCaptureRow, error) {
@@ -271,7 +273,8 @@ func scanDebugCapture(r rowScanner, now time.Time) (DebugCaptureRow, error) {
 
 // DebugCapture returns one capture, or ErrNotFound. A running capture whose report never came reads as expired at the real time.
 func (s *Store) DebugCapture(ctx context.Context, id string) (DebugCaptureRow, error) {
-	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id
+	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id LEFT JOIN admin a ON a.id = c.actor
+		LEFT JOIN api_token t ON c.actor IN ('mcp:' || t.id, 'token:' || t.id)
 		WHERE c.id = ?`, id), time.Time{})
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrNotFound
@@ -281,7 +284,8 @@ func (s *Store) DebugCapture(ctx context.Context, id string) (DebugCaptureRow, e
 
 // LatestDebugCapture is the newest capture of a node, or ErrNotFound.
 func (s *Store) LatestDebugCapture(ctx context.Context, nodeID string, now time.Time) (DebugCaptureRow, error) {
-	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id
+	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id LEFT JOIN admin a ON a.id = c.actor
+		LEFT JOIN api_token t ON c.actor IN ('mcp:' || t.id, 'token:' || t.id)
 		WHERE c.node_id = ? ORDER BY c.started_at DESC, c.id DESC LIMIT 1`, nodeID), now)
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrNotFound
@@ -291,7 +295,8 @@ func (s *Store) LatestDebugCapture(ctx context.Context, nodeID string, now time.
 
 // DebugCaptures lists the captures of a node (every node when empty), newest first.
 func (s *Store) DebugCaptures(ctx context.Context, nodeID string, now time.Time) ([]DebugCaptureRow, error) {
-	rows, err := s.R.QueryContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id
+	rows, err := s.R.QueryContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id LEFT JOIN admin a ON a.id = c.actor
+		LEFT JOIN api_token t ON c.actor IN ('mcp:' || t.id, 'token:' || t.id)
 		WHERE (? = '' OR c.node_id = ?) ORDER BY c.started_at DESC, c.id DESC LIMIT 100`, nodeID, nodeID)
 	if err != nil {
 		return nil, err
