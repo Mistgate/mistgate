@@ -162,10 +162,10 @@ func (f *Fleet) refreshDebug(ctx context.Context, row store.DebugCaptureRow) sto
 }
 
 // recordDebugReport stores a chunk of a capture and, on the last one, ends it. A report for a capture that is not running (unknown,
-// of another node, over its time) is dropped. The chunk is cleaned again here: the node's pass is not trusted.
-func (f *Fleet) recordDebugReport(ctx context.Context, nodeID string, rep *agentv1.DebugCaptureReport) {
+// of another node, over its time) is dropped. Sequenced chunks are safe to retry; only their final chunk needs an acknowledgement.
+func (f *Fleet) recordDebugReport(ctx context.Context, nodeID string, rep *agentv1.DebugCaptureReport) bool {
 	if rep.GetRequestId() == "" {
-		return
+		return false
 	}
 	lines := rep.GetLines()
 	if len(lines) > 256 { // the agent sends 64; more is not this protocol
@@ -175,17 +175,32 @@ func (f *Fleet) recordDebugReport(ctx context.Context, nodeID string, rep *agent
 	for i, l := range lines {
 		in[i] = store.DebugLineIn{AtMs: l.GetTimeUnixMs(), Level: int32(l.GetLevel()), Source: l.GetSource(), Message: l.GetMessage(), Attrs: l.GetAttrs()}
 	}
-	_, ok, err := f.st.AppendDebugLines(ctx, nodeID, rep.RequestId, in, f.cfg.JournalSecrets, f.now())
+	var ok bool
+	var err error
+	if rep.ChunkSeq != nil {
+		_, ok, err = f.st.AppendDebugChunk(ctx, nodeID, rep.RequestId, rep.GetChunkSeq(), in, f.cfg.JournalSecrets, f.now())
+	} else {
+		_, ok, err = f.st.AppendDebugLines(ctx, nodeID, rep.RequestId, in, f.cfg.JournalSecrets, f.now())
+	}
 	if err != nil {
 		f.log.Warn("fleet: debug capture lines not stored", "code", "debug_capture_store", "err", err)
-		return
+		return false
 	}
 	if !ok {
-		return
+		return false
 	}
 	if rep.GetEof() {
+		if rep.ChunkSeq != nil {
+			row, err := f.st.DebugCapture(ctx, rep.GetRequestId())
+			if err != nil || row.NodeID != nodeID || row.LastChunkSeq != int64(rep.GetChunkSeq()) {
+				return false
+			}
+		}
 		if err := f.st.FinishDebugCapture(ctx, nodeID, rep.RequestId, rep.GetEndReason(), rep.GetDropped()); err != nil {
 			f.log.Warn("fleet: debug capture not finished", "code", "debug_capture_store", "err", err)
+			return false
 		}
+		return rep.ChunkSeq != nil
 	}
+	return false
 }

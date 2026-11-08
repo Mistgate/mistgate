@@ -38,8 +38,11 @@ func TestDebugCaptureLifecycleAndFilters(t *testing.T) {
 		t.Fatalf("second running capture: %v", err)
 	}
 	secrets := []string{"agent-secret.example.com", "secret-admin-path"}
+	debugUUID := "00000000-0000-0000-0000-000000000000"
+	debugKey := strings.Repeat("z", 40)
 	lines := []DebugLineIn{
-		{AtMs: now.UnixMilli(), Level: 4, Source: "hysteria2", Message: "dial 203.0.113.7:4433 failed", Attrs: map[string]string{"err": "refused by 198.51.100.4", "user": "alice", "code": "dial"}},
+		{AtMs: now.UnixMilli(), Level: 4, Source: "hysteria2", Message: "dial 203.0.113.7:4433 failed SNI=private-client.example UUID=" + debugUUID + " key=" + debugKey,
+			Attrs: map[string]string{"err": "refused by 198.51.100.4", "user": "alice", "code": "dial"}},
 		{AtMs: now.UnixMilli() + 1, Level: 1, Source: "xray", Message: "accepted tcp:canary.example.net:443 via secret-admin-path", Attrs: map[string]string{"state": "ok"}},
 		{AtMs: now.UnixMilli() + 2, Level: 2, Source: "agent", Message: "SNI agent-secret.example.com seen"},
 		{AtMs: now.UnixMilli() + 3, Level: 3, Source: "bad source!", Message: "Boom_100%"},
@@ -74,12 +77,12 @@ func TestDebugCaptureLifecycleAndFilters(t *testing.T) {
 	for _, l := range all {
 		fmt.Fprintf(&text, "%s|%s|%v\n", l.Source, l.Message, l.Attrs)
 	}
-	for _, leak := range []string{"203.0.113.7", "198.51.100.4", "canary.example.net", "secret-admin-path", "agent-secret.example.com", "alice"} {
+	for _, leak := range []string{"203.0.113.7", "198.51.100.4", "canary.example.net", "secret-admin-path", "agent-secret.example.com", "private-client.example", debugUUID, debugKey, "alice"} {
 		if strings.Contains(text.String(), leak) {
 			t.Errorf("%q stored:\n%s", leak, text.String())
 		}
 	}
-	for _, want := range []string{"<ip>:port", "<host>", "<secret>", "agent|Boom_100%"} {
+	for _, want := range []string{"<ip>:port", "<host>", "<key>", "<secret>", "agent|Boom_100%"} {
 		if !strings.Contains(text.String(), want) {
 			t.Errorf("missing %q:\n%s", want, text.String())
 		}
@@ -119,6 +122,71 @@ func TestDebugCaptureLifecycleAndFilters(t *testing.T) {
 	}
 	if _, err := st.DebugCapture(ctx, "req_zz"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown capture: %v", err)
+	}
+}
+
+func TestDebugCaptureReadScrubsOlderUncleanRows(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	debugNode(t, st, "nod_1", "de1")
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	beginDebug(t, st, "req_old", "nod_1", now)
+	if _, ok, err := st.AppendDebugLines(ctx, "nod_1", "req_old", []DebugLineIn{{Source: "hysteria2", Message: "clean"}}, nil, now); err != nil || !ok {
+		t.Fatalf("AppendDebugLines = %v %v", ok, err)
+	}
+	uuid := "00000000-0000-0000-0000-000000000000"
+	key := strings.Repeat("q", 40)
+	unsafe := "SNI=private-client.example UUID=" + uuid + " key=" + key
+	attrs := fmt.Sprintf(`{"err":%q}`, unsafe)
+	if _, err := st.W.ExecContext(ctx, `UPDATE debug_capture_line SET message = ?, attrs_json = ? WHERE capture_id = ? AND seq = 1`, unsafe, attrs, "req_old"); err != nil {
+		t.Fatal(err)
+	}
+	lines, _, err := st.DebugLines(ctx, "req_old", DebugLineFilter{})
+	if err != nil || len(lines) != 1 {
+		t.Fatalf("DebugLines = %+v, %v", lines, err)
+	}
+	read := lines[0].Message + lines[0].Attrs["err"]
+	for _, leak := range []string{"private-client.example", uuid, key} {
+		if strings.Contains(read, leak) {
+			t.Errorf("%q returned from the read scrub: %s", leak, read)
+		}
+	}
+	if !strings.Contains(read, "<host>") || strings.Count(read, "<key>") != 4 {
+		t.Errorf("read scrub did not keep all markers: %s", read)
+	}
+}
+
+func TestDebugCaptureChunksAreIdempotent(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	debugNode(t, st, "nod_1", "de1")
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	beginDebug(t, st, "req_chunks", "nod_1", now)
+	first := []DebugLineIn{{AtMs: 1, Level: 1, Source: "agent", Message: "first"}}
+	if n, ok, err := st.AppendDebugChunk(ctx, "nod_1", "req_chunks", 0, first, nil, now); err != nil || !ok || n != 1 {
+		t.Fatalf("first chunk = %d %v %v", n, ok, err)
+	}
+	if n, ok, err := st.AppendDebugChunk(ctx, "nod_1", "req_chunks", 0, first, nil, now); err != nil || !ok || n != 0 {
+		t.Fatalf("repeated chunk = %d %v %v", n, ok, err)
+	}
+	if _, ok, err := st.AppendDebugChunk(ctx, "nod_1", "req_chunks", 2, nil, nil, now); err != nil || ok {
+		t.Fatalf("out-of-order chunk = %v %v", ok, err)
+	}
+	last := []DebugLineIn{{AtMs: 2, Level: 1, Source: "agent", Message: "last"}}
+	if n, ok, err := st.AppendDebugChunk(ctx, "nod_1", "req_chunks", 1, last, nil, now); err != nil || !ok || n != 1 {
+		t.Fatalf("last chunk = %d %v %v", n, ok, err)
+	}
+	if err := st.FinishDebugCapture(ctx, "nod_1", "req_chunks", "expired", 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, seq := range []uint32{0, 1} {
+		if n, ok, err := st.AppendDebugChunk(ctx, "nod_1", "req_chunks", seq, first, nil, now); err != nil || !ok || n != 0 {
+			t.Fatalf("repeated chunk %d after eof = %d %v %v", seq, n, ok, err)
+		}
+	}
+	row, err := st.DebugCapture(ctx, "req_chunks")
+	if err != nil || row.State != "done" || row.Records != 2 || row.LastChunkSeq != 1 {
+		t.Fatalf("capture = %+v, %v", row, err)
 	}
 }
 

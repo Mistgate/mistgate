@@ -5,7 +5,7 @@ export const en = {
   "debug.intro":
     "Ask the node to log in detail for a few minutes, then read what it logged. Records are cleaned on the node and again in the panel: client addresses, secret names and keys are cut out. The capture ends by itself, a restart of the agent ends it too, and nothing is kept longer than 24 hours.",
   "debug.unavailable": "Not available on the Cloudflare edition: debug captures belong to the VPS edition.",
-  "debug.ownerOnly": "Only the owner starts a capture. You can read the captures that exist.",
+  "debug.ownerOnly": "Only the owner can start, stop or read captures.",
   "debug.offline": "The node is not connected, so it cannot capture now.",
   "debug.button": "Debug for {n} min",
   "debug.duration": "Duration",
@@ -51,7 +51,7 @@ export const ru: Record<keyof typeof en, string> = {
   "debug.intro":
     "Попроси ноду на несколько минут вести подробный журнал, а потом прочитай его. Записи чистятся на ноде и ещё раз в панели: адреса клиентов, секретные имена и ключи вырезаны. Запись заканчивается сама, перезапуск агента тоже её заканчивает, и ничего не хранится дольше 24 часов.",
   "debug.unavailable": "В Cloudflare-версии недоступно: отладочные записи есть только в VPS-версии.",
-  "debug.ownerOnly": "Запустить запись может только владелец. Уже сделанные записи можно читать.",
+  "debug.ownerOnly": "Только владелец может запускать, останавливать и читать записи.",
   "debug.offline": "Нода не на связи, сейчас она не может вести запись.",
   "debug.button": "Отладка на {n} мин",
   "debug.duration": "Длительность",
@@ -97,7 +97,7 @@ export const zh: Record<keyof typeof en, string> = {
   "debug.intro":
     "让节点在几分钟内记录详细日志，然后读取它记下的内容。记录在节点上清理一次，在面板中再清理一次：客户端地址、机密名称和密钥都会被去掉。抓取会自行结束，Agent 重启也会结束它，任何内容保存都不超过 24 小时。",
   "debug.unavailable": "Cloudflare 版本不支持：调试抓取仅限 VPS 版本。",
-  "debug.ownerOnly": "只有所有者可以开始抓取。已有的抓取记录可以查看。",
+  "debug.ownerOnly": "只有所有者可以开始、停止和查看抓取记录。",
   "debug.offline": "节点未连接，现在无法抓取。",
   "debug.button": "调试 {n} 分钟",
   "debug.duration": "时长",
@@ -143,7 +143,7 @@ export const fa: Record<keyof typeof en, string> = {
   "debug.intro":
     "از نود بخواه چند دقیقه با جزئیات لاگ بگیرد و بعد آنچه را ثبت کرده بخوان. رکوردها یک بار روی نود و یک بار دیگر در پنل پاک‌سازی می‌شوند: نشانی مشتری‌ها، نام‌های محرمانه و کلیدها حذف می‌شوند. ثبت خودش تمام می‌شود، راه‌اندازی دوبارهٔ ایجنت هم آن را تمام می‌کند و چیزی بیش از ۲۴ ساعت نگه داشته نمی‌شود.",
   "debug.unavailable": "در نسخهٔ Cloudflare در دسترس نیست: ثبت اشکال‌زدایی فقط در نسخهٔ VPS هست.",
-  "debug.ownerOnly": "فقط مالک می‌تواند ثبت را شروع کند. ثبت‌های موجود را می‌شود خواند.",
+  "debug.ownerOnly": "فقط مالک می‌تواند ثبت را شروع کند، متوقف کند یا بخواند.",
   "debug.offline": "نود متصل نیست و الان نمی‌تواند ثبت کند.",
   "debug.button": "اشکال‌زدایی برای {n} دقیقه",
   "debug.duration": "مدت",
@@ -189,7 +189,7 @@ export const tr: Record<keyof typeof en, string> = {
   "debug.intro":
     "Düğümden birkaç dakika ayrıntılı günlük tutmasını iste, sonra kaydettiklerini oku. Kayıtlar düğümde ve panelde bir kez daha temizlenir: istemci adresleri, gizli adlar ve anahtarlar çıkarılır. Kayıt kendiliğinden biter, ajanın yeniden başlaması da onu bitirir ve hiçbir şey 24 saatten uzun tutulmaz.",
   "debug.unavailable": "Cloudflare sürümünde yok: hata ayıklama kayıtları yalnızca VPS sürümündedir.",
-  "debug.ownerOnly": "Kaydı yalnızca sahip başlatır. Var olan kayıtları okuyabilirsin.",
+  "debug.ownerOnly": "Kayıtları yalnızca sahip başlatabilir, durdurabilir ve okuyabilir.",
   "debug.offline": "Düğüm bağlı değil, şu an kayıt alamaz.",
   "debug.button": "{n} dk hata ayıkla",
   "debug.duration": "Süre",

@@ -175,8 +175,14 @@ func (d *debugState) start(id string, level slog.Level, sources map[string]bool,
 	if d.cur != nil {
 		return time.Time{}, false
 	}
+	if d.done != nil {
+		if d.now().Sub(d.done.at) <= debugShipGrace {
+			return time.Time{}, false
+		}
+		d.done = nil
+	}
 	c := &debugCapture{id: id, level: level, sources: sources, end: d.now().Add(dur), prev: d.lv.Level()}
-	d.cur, d.done = c, nil // an older finished capture that was never shipped is dropped
+	d.cur = c
 	if level < c.prev {
 		d.lv.Set(level) // the raise: slog skips the work of a record nobody wants
 	}
@@ -201,7 +207,7 @@ func (d *debugState) finish(id, reason string) *debugCapture {
 	return c
 }
 
-// take hands out the finished capture (once). With a nonempty id it must be that capture. Within the grace only.
+// take returns the finished capture for this shipment attempt. With a nonempty id it must be that capture. Within the grace only.
 func (d *debugState) take(id string) (*debugCapture, string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -209,11 +215,30 @@ func (d *debugState) take(id string) (*debugCapture, string) {
 	if f == nil || (id != "" && f.c.id != id) {
 		return nil, ""
 	}
-	d.done = nil
 	if d.now().Sub(f.at) > debugShipGrace {
+		d.done = nil
 		return nil, ""
 	}
 	return f.c, f.reason
+}
+
+// acknowledge drops the finished capture after the panel confirms its final chunk.
+func (d *debugState) acknowledge(id string, chunkSeq uint32) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	f := d.done
+	if f == nil || f.c.id != id {
+		return false
+	}
+	last := uint32(0)
+	if len(f.c.recs) > 0 {
+		last = uint32((len(f.c.recs) - 1) / debugChunkLines)
+	}
+	if chunkSeq != last {
+		return false
+	}
+	d.done = nil
+	return true
 }
 
 // shutdown drops a running capture without shipping it and puts the level back (Run ends: the process is going away).
@@ -277,19 +302,21 @@ func (a *Agent) debugExpired(id string) {
 	}
 }
 
-// debugResume ships a finished capture that has not been shipped (a session opened after it ended).
+// debugResume retries a finished capture that has not been acknowledged.
 func (a *Agent) debugResume(s *session) {
 	if c, reason := a.debug.take(""); c != nil {
 		a.shipDebug(s, c, reason)
 	}
 }
 
-// shipDebug sends a capture as DebugCaptureReport chunks, the last with eof.
+// shipDebug sends a capture as sequenced DebugCaptureReport chunks, the last with eof.
 func (a *Agent) shipDebug(s *session, c *debugCapture, reason string) {
 	recs, dropped := a.debug.records(c)
+	var chunkSeq uint32
 	for first := true; first || len(recs) > 0; first = false {
 		n := min(len(recs), debugChunkLines)
-		rep := &pb.DebugCaptureReport{RequestId: c.id, Lines: make([]*pb.LogLine, n)}
+		seq := chunkSeq
+		rep := &pb.DebugCaptureReport{RequestId: c.id, Lines: make([]*pb.LogLine, n), ChunkSeq: &seq}
 		for i, r := range recs[:n] {
 			rep.Lines[i] = r.line()
 		}
@@ -298,5 +325,6 @@ func (a *Agent) shipDebug(s *session, c *debugCapture, reason string) {
 			rep.Eof, rep.Dropped, rep.EndReason = true, dropped, reason
 		}
 		s.send(&pb.ConnectRequest{Message: &pb.ConnectRequest_DebugReport{DebugReport: rep}})
+		chunkSeq++
 	}
 }

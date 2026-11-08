@@ -9,4 +9,6 @@ import (
 )
 
 // The Cloudflare edition cannot start a debug capture (OpsService is VPS-only), so a report that somehow arrives is dropped.
-func (f *Fleet) recordDebugReport(context.Context, string, *agentv1.DebugCaptureReport) {}
+func (f *Fleet) recordDebugReport(context.Context, string, *agentv1.DebugCaptureReport) bool {
+	return false
+}

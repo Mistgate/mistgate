@@ -110,7 +110,7 @@ func TestDebugCaptureReadCleansEveryRecordAgain(t *testing.T) {
 		}
 	}
 	first := r.Msg.Records[0]
-	if first.Level != "debug" || first.Source != "hysteria2" || !strings.Contains(first.Message, "<secret>") || !strings.Contains(first.Message, "<ip>") {
+	if first.Level != "debug" || first.Source != "hysteria2" || !strings.Contains(first.Message, "<host>") || !strings.Contains(first.Message, "<ip>") {
 		t.Errorf("first record = %+v", first)
 	}
 	if _, ok := first.Attrs["user"]; ok {
@@ -161,7 +161,7 @@ func TestDebugCaptureReadFiltersAndPages(t *testing.T) {
 			t.Errorf("a search for %q found records %s", q, got)
 		}
 	}
-	if got := seqs(get(&opsv1.GetDebugCaptureRequest{Query: "<secret>"})); got != "1,3" {
+	if got := seqs(get(&opsv1.GetDebugCaptureRequest{Query: "<secret>"})); got != "3" {
 		t.Errorf("a search for the cleaned text: %s", got)
 	}
 	page := get(&opsv1.GetDebugCaptureRequest{Limit: 2})

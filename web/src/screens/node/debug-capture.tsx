@@ -57,14 +57,13 @@ function useNow(on: boolean): number {
 
 /**
  * "Debug capture" of a node (Server tab): the owner picks the sources and the length, sees the countdown, and reads the cleaned
- * records when the node has sent them (OpsService, VPS edition). Everyone who reaches the page reads the captures; only the owner
- * starts or stops one.
+ * records when the node has sent them (OpsService, VPS edition). Only the owner can start, stop or read captures.
  */
 export function DebugCaptureCard({ node }: { node: Node }) {
   const t = useT();
   const owner = useQuery(meQuery).data?.admin?.role === Role.OWNER;
   const online = agentLinked(node.status);
-  const list = useQuery(debugListQuery(node.id));
+  const list = useQuery({ ...debugListQuery(node.id), enabled: owner });
   const { start, stop } = useDebugActions(node.id, node.name);
   const [minutes, setMinutes] = useState<number>(5);
   const [level, setLevel] = useState<DebugLevel>("debug");
@@ -85,8 +84,8 @@ export function DebugCaptureCard({ node }: { node: Node }) {
       <p className="text-[13px] leading-snug text-pretty text-muted">{t("debug.intro")}</p>
       {list.isError && isUnavailable(list.error) && <Notice tone="quiet">{t("debug.unavailable")}</Notice>}
       {!(list.isError && isUnavailable(list.error)) && (
-        <>
-          {owner ? (
+        owner ? (
+          <>
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("debug.sources")}</span>
@@ -135,16 +134,16 @@ export function DebugCaptureCard({ node }: { node: Node }) {
               </div>
               {!online && <p className="text-xs text-muted">{t("debug.offline")}</p>}
             </div>
-          ) : (
-            <p className="text-xs text-muted">{t("debug.ownerOnly")}</p>
-          )}
 
-          {running && <RunningRow capture={running} now={now} owner={owner} stopping={stop.isPending} onStop={() => stop.mutate(running.captureId)} />}
+            {running && <RunningRow capture={running} now={now} owner={owner} stopping={stop.isPending} onStop={() => stop.mutate(running.captureId)} />}
 
-          {list.isPending && <Pending />}
-          {list.data && captures.length === 0 && <p className="text-[13px] text-muted">{t("debug.none")}</p>}
-          {current && !isLive(current) && <Viewer key={`${current.captureId}:${current.state}`} capture={current} captures={captures} onPick={setPicked} />}
-        </>
+            {list.isPending && <Pending />}
+            {list.data && captures.length === 0 && <p className="text-[13px] text-muted">{t("debug.none")}</p>}
+            {current && !isLive(current) && <Viewer key={`${current.captureId}:${current.state}`} capture={current} captures={captures} onPick={setPicked} />}
+          </>
+        ) : (
+          <p className="text-xs text-muted">{t("debug.ownerOnly")}</p>
+        )
       )}
     </section>
   );
