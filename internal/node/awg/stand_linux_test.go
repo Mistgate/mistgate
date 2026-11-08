@@ -922,7 +922,7 @@ func TestStandHandshakeCounts(t *testing.T) {
 
 	ns, server := s.secondClientNS()
 	nft := ns.Cmd("nft", "-f", "-")
-	nft.Stdin = strings.NewReader(`table inet mg3awg_cut { chain input { type filter hook input priority filter; udp sport 51842 drop; } }`)
+	nft.Stdin = strings.NewReader("table inet mg3awg_cut {\n  chain input {\n    type filter hook input priority filter; policy accept;\n    udp sport 51842 drop\n  }\n}\n")
 	if out, err := nft.CombinedOutput(); err != nil {
 		t.Fatalf("cut the return path: %v: %s", err, out)
 	}

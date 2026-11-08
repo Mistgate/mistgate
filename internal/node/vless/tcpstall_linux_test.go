@@ -3,14 +3,18 @@
 package vless
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // TestTCPStallOfAFreezeAfter16K drives the real TCP_INFO reading: on loopback, nftables drops everything the server sends
@@ -24,13 +28,23 @@ func TestTCPStallOfAFreezeAfter16K(t *testing.T) {
 	if os.Getenv("MG_ROOT_TESTS") != "1" || os.Geteuid() != 0 {
 		t.Skip("needs root and MG_ROOT_TESTS=1")
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	// segments of an ordinary size: loopback's 64 KiB segments would cross the 16 KiB mark with the first one
+	smallMSS := func(_, _ string, c syscall.RawConn) error {
+		return c.Control(func(fd uintptr) { _ = unix.SetsockoptInt(int(fd), unix.IPPROTO_TCP, unix.TCP_MAXSEG, 1400) })
+	}
+	ln, err := (&net.ListenConfig{Control: smallMSS}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ln.Close()
 	port := ln.Addr().(*net.TCPAddr).Port
-	rules := fmt.Sprintf(`table inet mg3vless_stall { chain output { type filter hook output priority filter; tcp sport %d ct reply bytes > 16384 drop; } }`, port)
+	rules := fmt.Sprintf(`table inet mg3vless_stall {
+  chain input {
+    type filter hook input priority filter; policy accept;
+    tcp sport %d ct reply bytes > 16384 drop
+  }
+}
+`, port)
 	nft := exec.Command("nft", "-f", "-")
 	nft.Stdin = strings.NewReader(rules)
 	if out, err := nft.CombinedOutput(); err != nil {
@@ -49,10 +63,19 @@ func TestTCPStallOfAFreezeAfter16K(t *testing.T) {
 		_, _ = io.Copy(io.Discard, conn) // until the client's FIN, which still gets through
 		time.Sleep(4 * time.Second)      // the retransmissions of the frozen data go on
 		stalled, first := tcpStallOf(conn)
+		if raw, err := conn.(*net.TCPConn).SyscallConn(); err == nil {
+			_ = raw.Control(func(fd uintptr) {
+				if i, err := unix.GetsockoptTCPInfo(int(fd), unix.IPPROTO_TCP, unix.TCP_INFO); err == nil {
+					t.Logf("TCP_INFO at the close: total_retrans %d, bytes_sent %d, bytes_retrans %d, bytes_acked %d, unacked %d, state %d",
+						i.Total_retrans, i.Bytes_sent, i.Bytes_retrans, i.Bytes_acked, i.Unacked, i.State)
+				}
+			})
+		}
 		_ = conn.Close()
 		got <- [2]bool{stalled, first}
 	}()
-	client, err := net.Dial("tcp", ln.Addr().String())
+	dialer := &net.Dialer{Control: smallMSS}
+	client, err := dialer.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +103,7 @@ func TestTCPStallOfAFreezeAfter16K(t *testing.T) {
 		_ = conn.Close()
 		got <- [2]bool{stalled, first}
 	}()
-	client, err = net.Dial("tcp", ln.Addr().String())
+	client, err = dialer.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
