@@ -132,6 +132,7 @@ function TaskList({ owner, focus }: { owner: boolean; focus?: string }) {
           {list.map((task) => (
             <TaskRow
               key={task.id}
+              tz={q.data?.timezoneOffsetMinutes ?? 0}
               task={task}
               owner={owner}
               expanded={open === task.id}
@@ -167,6 +168,7 @@ function TaskList({ owner, focus }: { owner: boolean; focus?: string }) {
 }
 
 function TaskRow({
+  tz,
   task,
   owner,
   expanded,
@@ -176,6 +178,8 @@ function TaskRow({
   onEdit,
   onDelete,
 }: {
+  /** The panel's schedule offset in minutes: task times are shown in it, like the schedule itself. */
+  tz: number;
   task: TaskP;
   owner: boolean;
   expanded: boolean;
@@ -201,7 +205,7 @@ function TaskRow({
             {task.notifyTelegram && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-semibold text-accent-text">{t("task.telegramOn")}</span>}
           </div>
           <span className="text-xs text-muted">
-            {scheduleText(t, task.schedule)} · {task.enabled ? (task.nextRunUnix > 0 ? t("task.next", { time: fmt.stamp(task.nextRunUnix) }) : "") : t("task.off")}
+            {scheduleText(t, task.schedule)} · {task.enabled ? (task.nextRunUnix > 0 ? t("task.next", { time: fmt.stampAt(task.nextRunUnix, tz) }) : "") : t("task.off")}
           </span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             {running ? (
@@ -243,14 +247,14 @@ function TaskRow({
       </div>
       {expanded && (
         <div id={runsId}>
-          <Runs taskId={task.id} running={task.running} />
+          <Runs taskId={task.id} running={task.running} tz={tz} />
         </div>
       )}
     </div>
   );
 }
 
-function Runs({ taskId, running }: { taskId: string; running: boolean }) {
+function Runs({ taskId, running, tz }: { taskId: string; running: boolean; tz: number }) {
   const t = useT();
   const q = useQuery(taskRunsQuery(taskId, running));
   if (q.isPending) return <Pending compact />;
@@ -259,13 +263,13 @@ function Runs({ taskId, running }: { taskId: string; running: boolean }) {
   return (
     <ul className="flex flex-col gap-2 rounded-field bg-surface-2 p-2.5">
       {q.data.map((run) => (
-        <RunItem key={run.id} run={run} />
+        <RunItem key={run.id} run={run} tz={tz} />
       ))}
     </ul>
   );
 }
 
-function RunItem({ run }: { run: RunP }) {
+function RunItem({ run, tz }: { run: RunP; tz: number }) {
   const t = useT();
   const fmt = useFmt();
   // a run or a step takes seconds: say them, and the coarse units from a minute and a half on
@@ -278,7 +282,7 @@ function RunItem({ run }: { run: RunP }) {
     <li className="flex flex-col gap-1.5 rounded-ctl bg-surface px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <StatusPill sm kind={runKind(run.status)} label={t(runWord(run.status))} />
-        <span className="font-medium">{fmt.stamp(run.startedUnix)}</span>
+        <span className="font-medium">{fmt.stampAt(run.startedUnix, tz)}</span>
         <span className="text-muted">
           {trigger}
           {took && ` · ${took}`}

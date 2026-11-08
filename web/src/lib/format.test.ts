@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fill } from "@/i18n";
 import { ru } from "@/i18n/ru";
-import { agoOf, coarseDuration, dateTimeOf, dayOf, minutesText, scaleBytes, stampOf } from "./format";
+import { agoOf, coarseDuration, dateTimeOf, dayOf, minutesText, scaleBytes, stampAtOffsetOf, stampOf } from "./format";
 
 describe("minutesText", () => {
   const t = Object.assign((key: keyof typeof ru, vars?: Record<string, string | number>) => fill(ru[key], vars), { n: () => "" });
@@ -64,5 +64,22 @@ describe("agoOf", () => {
     expect(agoOf(t, 100_000 - 3 * 3600 - 59, 100_000)).toBe("3 ч назад");
     expect(agoOf(t, 1_000_000 - 2 * 86400, 1_000_000)).toBe("2 дн назад");
     expect(agoOf(t, 1010, 1000)).toBe("только что"); // a clock a little ahead is not "in 10 s"
+  });
+});
+
+describe("stampAtOffsetOf", () => {
+  // 2026-11-09 07:30 UTC, seen on 2026-11-08 13:00 UTC
+  const at = Date.UTC(2026, 10, 9, 7, 30) / 1000;
+  const now = new Date(Date.UTC(2026, 10, 8, 13, 0));
+  it("shows the time in the given offset, not in the browser's zone", () => {
+    expect(stampAtOffsetOf(at, 0, "en", now)).toContain("07:30");
+    expect(stampAtOffsetOf(at, 180, "en", now)).toContain("10:30");
+    expect(stampAtOffsetOf(at, -300, "en", now)).toContain("02:30");
+  });
+  it("says only the clock for a time on the same day in that offset, and the day otherwise", () => {
+    expect(stampAtOffsetOf(Date.UTC(2026, 10, 8, 20, 0) / 1000, 0, "en", now)).toBe("20:00");
+    // 20:00 UTC is already the next day at UTC+5
+    expect(stampAtOffsetOf(Date.UTC(2026, 10, 8, 20, 0) / 1000, 300, "en", now)).not.toBe("01:00");
+    expect(stampAtOffsetOf(Date.UTC(2026, 10, 8, 20, 0) / 1000, 300, "en", now)).toContain("01:00");
   });
 });
