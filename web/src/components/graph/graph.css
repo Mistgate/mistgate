@@ -71,7 +71,9 @@
   cursor: default;
   transition:
     border-color 0.15s,
-    box-shadow 0.15s;
+    box-shadow 0.15s,
+    opacity 0.18s,
+    filter 0.18s;
 }
 .mg-gnode:not([data-fixed]) {
   cursor: grab;
@@ -590,4 +592,70 @@
 .mg-gnode[data-variant="ghost"]:has([aria-expanded="true"]) {
   border-color: var(--accent);
   background: color-mix(in oklch, var(--accent) 6%, transparent);
+}
+
+/* focusPaths: what is not on the paths of the focused card fades back, so the paths read at a glance on a busy map; the
+   faded cards still answer the mouse and keep their own selection look. */
+.mg-gnode[data-dim] {
+  opacity: 0.32;
+  filter: saturate(0.35);
+}
+.mg-gedge {
+  transition: opacity 0.18s;
+}
+.mg-gedge[data-dim] {
+  opacity: 0.1;
+}
+.mg-glabel {
+  transition: opacity 0.18s;
+}
+.mg-glabel[data-dim] {
+  opacity: 0.25;
+}
+.mg-gfocus {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(560px, calc(100% - 220px));
+  transform: translateX(-50%);
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in oklch, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-dock);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.mg-gfocus-all {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-weight: 600;
+  color: var(--accent-text, var(--accent));
+}
+.mg-gfocus-all:hover {
+  background: var(--surface-2);
+}
+.mg-gfocus-key {
+  flex: none;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mg-gnode,
+  .mg-gedge,
+  .mg-glabel {
+    transition: none;
+  }
 }

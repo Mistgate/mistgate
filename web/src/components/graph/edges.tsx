@@ -45,13 +45,15 @@ interface Props {
   edges: RenderEdge[];
   typeColors: Record<string, string>;
   selectedEdge: string | null;
+  /** The wires a focus keeps bright (focusPaths); the others are drawn faint. null: no focus. */
+  focusEdges?: Set<string> | null;
   hiddenEdge: string | null;
   onEdgeClick: (id: string) => void;
   onEdgeFocus: (id: string) => void;
 }
 
 /** The wires, under the cards: re-rendered by moves and measurements only (it reads the store, not the node list's state). */
-export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColors, selectedEdge, hiddenEdge, onEdgeClick, onEdgeFocus }: Props) {
+export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColors, selectedEdge, focusEdges, hiddenEdge, onEdgeClick, onEdgeFocus }: Props) {
   useStoreVersion(store, "geo");
   const t = useT();
   const [hover, setHover] = useState<string | null>(null);
@@ -77,6 +79,8 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
         {drawn.map(({ e, route, color }) => {
           const sel = selectedEdge === e.id;
           const hot = sel || hover === e.id;
+          // off the paths of a focus: faint, no flowing dash, its label faint too
+          const dim = !!focusEdges && !focusEdges.has(e.id) && !e.virtual;
           const off = e.state === "off" && !e.virtual;
           const quiet = e.state === "blocked" && !e.virtual;
           const label = e.virtual === "error" ? e.errorText : e.label;
@@ -89,6 +93,7 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
                 className="mg-glabel"
                 data-error={e.virtual === "error" || undefined}
                 data-end={end || undefined}
+                data-dim={dim || undefined}
                 data-state={e.state}
                 style={{ left: at.x, top: at.y }}
                 onClick={() => e.virtual !== "error" && onEdgeClick(e.id)}
@@ -99,7 +104,7 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
           }
           const stateWord = t(`graph.edge.${e.virtual === "pending" ? "pending" : (e.state ?? "plain")}` as "graph.edge.ok");
           return (
-            <g key={e.id} className="mg-gedge" data-selected={sel || undefined} data-state={e.virtual ?? e.state}>
+            <g key={e.id} className="mg-gedge" data-selected={sel || undefined} data-dim={dim || undefined} data-state={e.virtual ?? e.state}>
               {e.virtual !== "error" && (
                 <path
                   d={route.d}
@@ -125,7 +130,7 @@ export const EdgeLayer = memo(function EdgeLayer({ store, nodes, edges, typeColo
                   opacity: off ? 0.75 : quiet ? 0.35 : e.animated ? 0.45 : 1,
                 }}
               />
-              {e.animated && !off && !e.virtual && <path d={route.d} className="mg-gwire mg-gwire-flow" style={{ stroke: color, strokeWidth: hot ? (e.weight ?? 2) + 0.5 : (e.weight ?? 2) }} />}
+              {e.animated && !off && !e.virtual && !dim && <path d={route.d} className="mg-gwire mg-gwire-flow" style={{ stroke: color, strokeWidth: hot ? (e.weight ?? 2) + 0.5 : (e.weight ?? 2) }} />}
             </g>
           );
         })}

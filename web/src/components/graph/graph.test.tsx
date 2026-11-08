@@ -392,3 +392,37 @@ describe("cards that move, and popovers that are not the canvas", () => {
     capture.mockRestore();
   });
 });
+
+describe("Graph focusPaths", () => {
+  const focusNodes: GraphNode[] = [...nodes, { id: "x", title: "x", rank: 1, ports: [{ id: "in", side: "in", type: "udp", label: "In" }] }];
+  const focusEdges: GraphEdge[] = [
+    { id: "e1", from: { node: "de1", port: "relay" }, to: { node: "nl1", port: "hy2" } },
+    { id: "e2", from: { node: "nl1", port: "out" }, to: { node: "fi1", port: "in" } },
+    { id: "e3", from: { node: "de1", port: "relay" }, to: { node: "x", port: "in" } },
+  ];
+  const dimmed = () => [...host!.querySelectorAll("[data-gnode][data-dim]")].map((e) => e.getAttribute("data-gnode")).sort();
+  const dimWires = () => [...host!.querySelectorAll("g.mg-gedge[data-dim] [data-gedge]")].map((e) => e.getAttribute("data-gedge")).sort();
+
+  it("a selected card keeps the paths through it and fades the rest, and says how to show everything", async () => {
+    let selected = ["fi1"];
+    const onSel = (ids: string[]) => (selected = ids);
+    await mount(<Graph nodes={focusNodes} edges={focusEdges} typeColors={colors} ariaLabel="Map" focusPaths selected={selected} onSelectionChange={onSel} />);
+    expect(dimmed()).toEqual(["x"]);
+    expect(dimWires()).toEqual(["e3"]);
+    const caption = host!.querySelector(".mg-gfocus")!;
+    expect(caption.textContent).toContain("Paths through fi1");
+    await click(caption.querySelector("button")!);
+    expect(selected).toEqual([]);
+  });
+
+  it("without focusPaths, or with nothing selected, nothing fades", async () => {
+    await mount(<Graph nodes={focusNodes} edges={focusEdges} typeColors={colors} ariaLabel="Map" selected={["fi1"]} />);
+    expect(dimmed()).toEqual([]);
+    expect(host!.querySelector(".mg-gfocus")).toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(<Graph nodes={focusNodes} edges={focusEdges} typeColors={colors} ariaLabel="Map" focusPaths selected={[]} />);
+    expect(dimmed()).toEqual([]);
+    expect(dimWires()).toEqual([]);
+  });
+});

@@ -96,9 +96,11 @@ interface CardProps {
   node: GraphNode;
   pos: Pos | undefined;
   selected: boolean;
+  /** Off the paths of a focus (focusPaths): drawn faint. */
+  dim?: boolean;
 }
 
-export const NodeCard = memo(function NodeCard({ node, pos, selected }: CardProps) {
+export const NodeCard = memo(function NodeCard({ node, pos, selected, dim }: CardProps) {
   const g = useGraph();
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -170,6 +172,7 @@ export const NodeCard = memo(function NodeCard({ node, pos, selected }: CardProp
         data-gnode={node.id}
         data-tone={node.tone}
         data-selected={selected || undefined}
+        data-dim={dim || undefined}
         data-fixed={node.draggable === false || undefined}
         role="group"
         aria-label={title}

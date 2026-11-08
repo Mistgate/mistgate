@@ -103,6 +103,12 @@ export interface GraphProps<D = unknown> {
   onSelectionChange?: (ids: string[]) => void;
   readOnly?: boolean;
   minimap?: boolean;
+  /**
+   * Selecting a card (or resting the mouse on one) keeps the paths through it bright and dims the rest: what reaches it,
+   * where it leads, and the wires along the way (focus.ts). A selected wire keeps itself and its two ends. A line at the top
+   * says what is shown and how to show everything again.
+   */
+  focusPaths?: boolean;
   /** Explains the line styles and chips; a card opened from the Legend button at the bottom-left. */
   legend?: ReactNode;
   /** More shortcut groups for the Shortcuts card (the screen's own). */
