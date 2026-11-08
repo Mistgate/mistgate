@@ -138,6 +138,18 @@ func TestPathSpeedUpDirectionAndTheTargetStopsAfterAFailure(t *testing.T) {
 	if rows, _ := x.st.PathSpeeds(x.ctx, time.Unix(0, 0), "", 0); len(rows) != 0 {
 		t.Errorf("a test that did not run was stored: %+v", rows)
 	}
+	// The failed run still reserved a start. Five more reservations reach the node limit; the panel's replacement must keep it.
+	for range speedNodeDayMax - 1 {
+		release, err := x.f.startSpeed(x.ctx, sender.nodeID, target.nodeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		release()
+	}
+	restarted := &Fleet{st: x.st, cfg: x.f.cfg, now: x.f.now}
+	if _, err := restarted.startSpeed(x.ctx, sender.nodeID, target.nodeID); connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("failed test reservation after restart = %v, want resource exhausted", err)
+	}
 }
 
 func TestPathSpeedMapsAgentErrorsToShortCodes(t *testing.T) {
@@ -232,6 +244,47 @@ func TestPathSpeedRefusesWhatIsOutsideTheCaps(t *testing.T) {
 			t.Fatalf("a refused request reached an agent: %v", m)
 		}
 	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestPathSpeedDailyLimitsSurviveFleetRestart(t *testing.T) {
+	x, sender, target, _, _ := speedPair(t)
+	de := x.enroll("de1")
+	nl := x.enroll("nl1")
+	fi := x.enroll("fi1")
+	msk := x.enroll("msk1")
+	pairs := [][2]string{
+		{sender.nodeID, target.nodeID},
+		{de.nodeID, nl.nodeID},
+		{fi.nodeID, msk.nodeID},
+	}
+	for _, pair := range pairs {
+		for range 4 {
+			release, err := x.f.startSpeed(x.ctx, pair[0], pair[1])
+			if err != nil {
+				t.Fatal(err)
+			}
+			release()
+		}
+	}
+
+	// A new Fleet has no in-memory usage. The stored caller reservations still block a thirteenth start.
+	restarted := &Fleet{st: x.st, cfg: x.f.cfg, now: x.f.now}
+	if _, err := restarted.startSpeed(x.ctx, pairs[0][0], pairs[0][1]); connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("caller limit after restart = %v, want resource exhausted", err)
+	}
+
+	// A different caller has room, but the same nodes have only two daily starts left.
+	restarted.cfg.Actor = func(context.Context) string { return "adm_other" }
+	for range 2 {
+		release, err := restarted.startSpeed(x.ctx, pairs[0][0], pairs[0][1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		release()
+	}
+	if _, err := restarted.startSpeed(x.ctx, pairs[0][0], pairs[0][1]); connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("node limit after restart = %v, want resource exhausted", err)
 	}
 }
 

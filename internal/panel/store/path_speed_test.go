@@ -46,3 +46,38 @@ func TestPathSpeedsKeepSevenDaysPruneAndFollowTheNode(t *testing.T) {
 		t.Fatalf("tests left after their node was deleted: %+v", got)
 	}
 }
+
+func TestPathSpeedStartUsageCountsCallersAndNodesAndPrunesTheDailyWindow(t *testing.T) {
+	ctx := context.Background()
+	st := openTemp(t)
+	probeNodes(t, st)
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	for _, start := range []struct {
+		actor string
+		from  string
+		to    string
+		at    time.Time
+	}{
+		{"adm_test", "nod_pp_a", "nod_pp_b", now.Add(-2 * time.Hour)},
+		{"adm_other", "nod_pp_b", "nod_pp_a", now.Add(-time.Hour)},
+		{"adm_test", "nod_pp_a", "nod_pp_b", now.Add(-25 * time.Hour)},
+	} {
+		if err := st.AddPathSpeedStart(ctx, start.actor, start.from, start.to, start.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	usage, err := st.PathSpeedStartUsage(ctx, "adm_test", "nod_pp_a", "nod_pp_b", now.Add(-24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(usage.Caller) != 1 || len(usage.Nodes["nod_pp_a"]) != 2 || len(usage.Nodes["nod_pp_b"]) != 2 {
+		t.Fatalf("daily usage = %+v, want one caller start and two starts on each node", usage)
+	}
+	if !usage.Caller[0].Equal(now.Add(-2 * time.Hour)) {
+		t.Errorf("caller start = %v, want oldest recent start", usage.Caller[0])
+	}
+	n, err := st.PrunePathSpeedStarts(ctx, now.Add(-24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("PrunePathSpeedStarts = %d, %v; want one old reservation", n, err)
+	}
+}

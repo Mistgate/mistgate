@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"io"
 	"net"
 	"strconv"
 	"testing"
@@ -21,6 +22,34 @@ func speedMessage(id string, step uint32, host string, port, mb uint32, token []
 }
 
 var speedToken = []byte("0123456789abcdef")
+
+type deadlineSpeedConn struct {
+	net.Conn
+	deadlines chan time.Time
+}
+
+func (c *deadlineSpeedConn) SetDeadline(at time.Time) error {
+	c.deadlines <- at
+	return c.Conn.SetDeadline(at)
+}
+
+type oneSpeedConnListener struct {
+	conn      net.Conn
+	accepted  chan time.Time
+	didAccept bool
+}
+
+func (l *oneSpeedConnListener) Accept() (net.Conn, error) {
+	if l.didAccept {
+		return nil, net.ErrClosed
+	}
+	l.didAccept = true
+	l.accepted <- time.Now()
+	return l.conn, nil
+}
+
+func (*oneSpeedConnListener) Close() error     { return nil }
+func (l *oneSpeedConnListener) Addr() net.Addr { return l.conn.LocalAddr() }
 
 func TestSpeedCapabilityIsAdvertised(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
@@ -214,5 +243,32 @@ func TestSpeedListenerClosesByItselfAtTheLimitAndOnStop(t *testing.T) {
 			t.Fatal("stop did not close the listener")
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestServeSpeedTokenDeadlineDoesNotOutliveTheListener(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	wrapped := &deadlineSpeedConn{Conn: server, deadlines: make(chan time.Time, 1)}
+	ln := &oneSpeedConnListener{conn: wrapped, accepted: make(chan time.Time, 1)}
+	const limit = 200 * time.Millisecond
+	done := make(chan error, 1)
+	go func() { done <- serveSpeed(ln, speedToken, true, 8<<20, limit) }()
+	acceptedAt := <-ln.accepted
+	readDeadline := <-wrapped.deadlines
+	if readDeadline.After(acceptedAt.Add(limit)) {
+		t.Fatalf("token read deadline %v exceeds the listener deadline window from accept %v", readDeadline, acceptedAt.Add(limit))
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("the token read kept the listener occupied after its overall deadline")
+	}
+}
+
+func TestSpeedServeLogCodeDoesNotExposePeerAddress(t *testing.T) {
+	err := &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.ParseIP("203.0.113.9"), Port: 443}, Err: io.ErrUnexpectedEOF}
+	if got := speedServeLogCode(err); got != "transfer_failed" {
+		t.Fatalf("speedServeLogCode = %q, want a fixed transfer failure category", got)
 	}
 }

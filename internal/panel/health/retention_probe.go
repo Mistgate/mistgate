@@ -9,8 +9,8 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-// sweepProbes prunes the on-demand path probes (7 days). It is VPS-only: the Cloudflare edition cannot run a probe, so its cron
-// has nothing to prune and makes no extra D1 call for it.
+// sweepProbes prunes the on-demand path probes (7 days) and speed-test reservations (24 hours). It is VPS-only: the Cloudflare
+// edition cannot run a probe, so its cron has nothing to prune and makes no extra D1 call for it.
 func (s *Service) sweepProbes(ctx context.Context, now time.Time) {
 	if n, err := s.st.PrunePathProbes(ctx, now.Add(-time.Duration(store.PathProbeKeepHours)*time.Hour)); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune path probes", "code", "prune_failed", "err", err)
@@ -19,6 +19,9 @@ func (s *Service) sweepProbes(ctx context.Context, now time.Time) {
 	}
 	if _, err := s.st.PrunePathSpeeds(ctx, now.Add(-time.Duration(store.PathSpeedKeepHours)*time.Hour)); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune path speeds", "code", "prune_failed", "err", err)
+	}
+	if _, err := s.st.PrunePathSpeedStarts(ctx, now.Add(-24*time.Hour)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune path speed reservations", "code", "prune_failed", "err", err)
 	}
 }
 
