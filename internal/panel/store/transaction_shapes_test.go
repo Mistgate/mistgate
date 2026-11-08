@@ -40,7 +40,7 @@ var transactionShape1 = map[string]string{
 	"path_probe.go:AddNodeTrace":                     "Inserts the trace and drops the pair's traces beyond the newest 20 in one fixed batch.",
 	"path_probe.go:AddNodeDNSRun":                    "Inserts the resolver run and drops the node's runs beyond the newest 24 in one fixed batch.",
 	"debug_capture.go:BeginDebugCapture":             "A running-capture check precedes one fixed batch: drop the node's oldest captures and their lines, insert the new one.",
-	"debug_capture.go:AppendDebugLines":              "The capture's lines and its record, byte and drop counters are written in one batch; only one session of the node feeds a capture.",
+	"debug_capture.go:appendDebugLines":              "The capture's lines and counters share one fixed batch; sequenced reports guard the last accepted chunk so retries do not store it twice.",
 	"debug_capture.go:PruneDebugCaptures":            "The old captures' lines and the captures themselves are deleted in one fixed batch.",
 	"relay.go:RelaysApplied":                         "The reported forwards of one entry update their rows (switched-on relays of that node only) in one fixed batch.",
 	"relay_check.go:SetRelayCounters":                "Updates each enabled relay owned by the reporting entry in one fixed batch.",
@@ -120,8 +120,9 @@ var transactionShape2 = map[string]string{
 }
 
 var transactionShape3 = map[string]string{
-	"fleet_node.go:NodeApplied": "The node row, guarded live drift update, and json_each inbound results commit in one fixed three-statement batch.",
-	"fleet_stats.go:SkipSeq":    "Writes only inside a transaction; D1 stages the sequence update and commits it as one batch.",
+	"fleet_node.go:NodeApplied":                                  "The node row, guarded live drift update, and json_each inbound results commit in one fixed three-statement batch.",
+	"fleet_stats.go:SkipSeq":                                     "Writes only inside a transaction; D1 stages the sequence update and commits it as one batch.",
+	"scheduled_task_timezone.go:SetSettingAndScheduledTaskNexts": "The schedule offset and enabled tasks' next runs change in one batch.",
 }
 
 func TestTransactionCallSitesClassified(t *testing.T) {

@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // SchemaVersion is the version of the report format. A baseline of another version is not compared.
@@ -75,6 +77,41 @@ var metrics = []metric{
 	{"p99_ms", false, 5, func(m Metrics) float64 { return m.P99MS }},
 	{"rss_mb", false, 8, func(m Metrics) float64 { return m.RSSMB }},
 	{"handshakes_per_s", true, 2, func(m Metrics) float64 { return m.HandshakesPerS }},
+}
+
+// selectBenchmarkNames reads an explicit engine or variant list. Unknown names must stop the run instead of producing an empty
+// report that looks successful.
+func selectBenchmarkNames(all []string, requested string) ([]string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		return slices.Clone(all), nil
+	}
+	var selected []string
+	for _, name := range strings.Split(requested, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if !slices.Contains(all, name) {
+			return nil, fmt.Errorf("unknown benchmark name %q; choose from %s", name, strings.Join(all, ", "))
+		}
+		selected = append(selected, name)
+	}
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("no benchmark names were requested")
+	}
+	return selected, nil
+}
+
+// handshakeRate rejects a run where every fresh session attempt failed, so a zero metric cannot pass comparison as unmeasured.
+func handshakeRate(successes int64, elapsed time.Duration) (float64, error) {
+	if successes <= 0 {
+		return 0, fmt.Errorf("no successful handshakes")
+	}
+	if elapsed <= 0 {
+		return 0, fmt.Errorf("handshake duration is not positive")
+	}
+	return float64(successes) / elapsed.Seconds(), nil
 }
 
 // MedianOf is the metric-by-metric median of several runs of one case (a metric a run did not measure is left out of its own

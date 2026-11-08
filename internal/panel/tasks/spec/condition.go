@@ -128,17 +128,34 @@ type found struct {
 	value any
 }
 
+const conditionVisitLimit = 10000
+
 // values collects what the path names in doc, with the concrete path of each ("nodes[2].status").
 func values(doc any, path string) []found {
+	out, _ := valuesWithBudget(doc, path, conditionVisitLimit)
+	return out
+}
+
+func valuesWithBudget(doc any, path string, limit int) ([]found, int) {
+	if limit <= 0 {
+		return nil, 0
+	}
 	if path == "" {
-		return []found{{path: "", value: doc}}
+		return []found{{path: "", value: doc}}, 1
 	}
 	var out []found
+	visited := 0
+	exhausted := limit <= 0
 	var walk func(v any, at string, segs []string)
 	walk = func(v any, at string, segs []string) {
-		if len(out) >= 1000 {
+		if exhausted || len(out) >= 1000 {
 			return
 		}
+		if visited >= limit {
+			exhausted = true
+			return
+		}
+		visited++
 		if len(segs) == 0 {
 			out = append(out, found{path: at, value: v})
 			return
@@ -151,16 +168,25 @@ func values(doc any, path string) []found {
 			switch x := v.(type) {
 			case map[string]any:
 				for _, k := range sortedKeys(x) {
+					if exhausted || len(out) >= 1000 {
+						break
+					}
 					walk(x[k], join(at, k), segs)
 				}
 			case []any:
 				for i, e := range x {
+					if exhausted || len(out) >= 1000 {
+						break
+					}
 					walk(e, at+"["+strconv.Itoa(i)+"]", segs)
 				}
 			}
 		case seg == "[]":
 			if list, ok := v.([]any); ok {
 				for i, e := range list {
+					if exhausted || len(out) >= 1000 {
+						break
+					}
 					walk(e, at+"["+strconv.Itoa(i)+"]", segs[1:])
 				}
 			}
@@ -180,6 +206,9 @@ func values(doc any, path string) []found {
 					return
 				}
 				for i, e := range list {
+					if exhausted || len(out) >= 1000 {
+						break
+					}
 					walk(e, join(at, name)+"["+strconv.Itoa(i)+"]", segs[1:])
 				}
 				return
@@ -188,7 +217,7 @@ func values(doc any, path string) []found {
 		}
 	}
 	walk(doc, "", strings.Split(path, "."))
-	return out
+	return out, visited
 }
 
 func join(at, name string) string {

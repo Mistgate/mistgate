@@ -87,6 +87,7 @@ type ScheduledTask struct {
 	FailReason     string
 	Problem        bool
 	ProblemSummary string
+	Version        int64
 }
 
 // Running reports whether a run holds the task's lease at now.
@@ -108,14 +109,14 @@ type ScheduledTaskRun struct {
 
 const scheduledTaskColumns = `id, name, kind, enabled, schedule_kind, every_minutes, minute_of_day, weekday, steps, prompt_enc,
 	notify_telegram, conversation_id, jitter_s, created_by, created_at, updated_at, next_run_at, lease_id, lease_until,
-	last_manual_at, fail_streak, fail_reason, problem, problem_summary`
+	last_manual_at, fail_streak, fail_reason, problem, problem_summary, version`
 
 func scanScheduledTask(row interface{ Scan(...any) error }) (ScheduledTask, error) {
 	var t ScheduledTask
 	var created, updated, next, leaseUntil, manual int64
 	err := row.Scan(&t.ID, &t.Name, &t.Kind, &t.Enabled, &t.ScheduleKind, &t.EveryMinutes, &t.MinuteOfDay, &t.Weekday, &t.Steps, &t.PromptEnc,
 		&t.NotifyTelegram, &t.ConversationID, &t.JitterS, &t.CreatedBy, &created, &updated, &next, &t.LeaseID, &leaseUntil,
-		&manual, &t.FailStreak, &t.FailReason, &t.Problem, &t.ProblemSummary)
+		&manual, &t.FailStreak, &t.FailReason, &t.Problem, &t.ProblemSummary, &t.Version)
 	if err != nil {
 		return t, err
 	}
@@ -179,7 +180,7 @@ func (s *Store) InsertScheduledTask(ctx context.Context, t ScheduledTask, max in
 func (s *Store) UpdateScheduledTask(ctx context.Context, t ScheduledTask) error {
 	r, err := s.W.ExecContext(ctx, `UPDATE scheduled_task SET name = ?, enabled = ?, schedule_kind = ?, every_minutes = ?, minute_of_day = ?,
 		weekday = ?, steps = ?, prompt_enc = ?, notify_telegram = ?, updated_at = ?, next_run_at = ?,
-		fail_streak = 0, fail_reason = '', problem = 0, problem_summary = '' WHERE id = ?`,
+		fail_streak = 0, fail_reason = '', problem = 0, problem_summary = '', version = version + 1 WHERE id = ?`,
 		t.Name, scheduledBool(t.Enabled), t.ScheduleKind, t.EveryMinutes, t.MinuteOfDay, t.Weekday, t.Steps, nonNilBlob(t.PromptEnc),
 		scheduledBool(t.NotifyTelegram), unix(t.UpdatedAt), unixOrZero(t.NextRunAt), t.ID)
 	if err != nil {
@@ -205,6 +206,22 @@ func (s *Store) ScheduledTask(ctx context.Context, id string) (ScheduledTask, er
 // ScheduledTasks lists every task, oldest first.
 func (s *Store) ScheduledTasks(ctx context.Context) ([]ScheduledTask, error) {
 	return s.scheduledTasksWhere(ctx, `1 = 1 ORDER BY created_at, id`)
+}
+
+// EnabledScheduledTaskSchedules returns the schedules whose next runs need recalculating after an offset change.
+func (s *Store) EnabledScheduledTaskSchedules(ctx context.Context) ([]ScheduledTaskSchedule, error) {
+	tasks, err := s.ScheduledTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	schedules := make([]ScheduledTaskSchedule, 0, len(tasks))
+	for _, task := range tasks {
+		if task.Enabled {
+			schedules = append(schedules, ScheduledTaskSchedule{ID: task.ID, Kind: task.ScheduleKind, EveryMinutes: task.EveryMinutes,
+				MinuteOfDay: task.MinuteOfDay, Weekday: task.Weekday})
+		}
+	}
+	return schedules, nil
 }
 
 // DueScheduledTasks lists the enabled tasks whose time has come and that no run holds, the most overdue first.

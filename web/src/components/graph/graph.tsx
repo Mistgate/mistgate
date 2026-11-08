@@ -18,6 +18,7 @@ import { checkConnection, findPort, orient, validTargets, type Verdict } from ".
 import { GraphStore, useStoreVersion } from "./store";
 import { portKey, type ConnectCheck, type GraphEdge, type GraphProps, type Pos, type PortRef, type Positions, type View } from "./types";
 import { currentTarget, idle, wiringStep, type WiringAction, type WiringState } from "./wiring";
+import { pathsThrough, wireFocus } from "./focus";
 
 const DRAG_THRESHOLD = 3;
 const SNAP_RADIUS = 20;
@@ -95,6 +96,17 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
   const [order, setOrder] = useState<string[]>([]);
   const [compact, setCompact] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  // the card the mouse rests on, for focusPaths; set after a short pause so crossing the canvas does not flicker
+  const [hoverCard, setHoverCard] = useState<string | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverWanted = useRef<string | null>(null);
+  const restOn = useCallback((id: string | null) => {
+    if (hoverWanted.current === id) return;
+    hoverWanted.current = id;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHoverCard(id), id ? 160 : 220);
+  }, []);
+  useEffect(() => () => void (hoverTimer.current && clearTimeout(hoverTimer.current)), []);
 
   const measureVersion = useStoreVersion(store, "measure");
 
@@ -924,6 +936,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     if (!e.currentTarget.contains(e.target as Node)) return;
     if (ptrs.current.has(e.pointerId)) ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const m = mode.current;
+    if (!m && props.focusPaths && e.pointerType === "mouse") restOn((e.target as Element).closest("[data-gnode]")?.getAttribute("data-gnode") ?? null);
     if (!m) {
       if (live.current.canGrab && e.pointerType === "mouse") {
         const h = handleUnder(e.clientX, e.clientY, 12);
@@ -1187,6 +1200,19 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
     return [...nodes].sort((a, b) => (idx.get(a.id) ?? 1e9) - (idx.get(b.id) ?? 1e9));
   }, [nodes, order]);
 
+  // focusPaths: what is kept bright. A selection wins over the card the mouse rests on; a selected wire keeps itself.
+  const focusSel = useMemo(() => sel.filter((id) => nodes.some((n) => n.id === id)), [sel, nodes]);
+  const focusWire = selEdge ? edges.find((e) => e.id === selEdge) : undefined;
+  const focusFrom: "sel" | "wire" | "hover" | null = !props.focusPaths ? null : focusSel.length ? "sel" : focusWire ? "wire" : hoverCard && !drag ? "hover" : null;
+  const focus = useMemo(
+    () => (focusFrom === "sel" ? pathsThrough(focusSel, edges) : focusFrom === "wire" ? wireFocus(focusWire!) : focusFrom === "hover" ? pathsThrough([hoverCard!], edges) : null),
+    [focusFrom, focusSel, focusWire, hoverCard, edges],
+  );
+  const nameOf = (id: string) => {
+    const n = nodes.find((x) => x.id === id);
+    return n ? nodeLabel(n) : id;
+  };
+
   const help = props.help !== undefined ? props.help : helpOwn;
   const setHelp = (tab: HelpTab | "") => {
     if (props.help === undefined) setHelpOwn(tab);
@@ -1245,7 +1271,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
         </div>
         <div ref={worldRef} className="mg-gworld">
           {sorted.map((n) => (
-            <NodeCard key={n.id} node={n} pos={positions[n.id]} selected={selSet.has(n.id)} />
+            <NodeCard key={n.id} node={n} pos={positions[n.id]} selected={selSet.has(n.id)} dim={!!focus && !focus.nodes.has(n.id)} />
           ))}
           <EdgeLayer
             store={store}
@@ -1253,6 +1279,7 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
             edges={allEdges}
             typeColors={typeColors}
             selectedEdge={selEdge}
+            focusEdges={focus?.edges ?? null}
             hiddenEdge={drag?.replace ?? null}
             onEdgeClick={onEdgeClick}
             onEdgeFocus={onEdgeFocus}
@@ -1264,6 +1291,28 @@ export function Graph<D = unknown>(props: GraphProps<D>) {
           </svg>
         </div>
         <div ref={marqueeRef} hidden className="mg-gmarquee" />
+        {focus && focusFrom !== "hover" && (
+          <div className="mg-gfocus" data-gui>
+            <span className="truncate">
+              {focusFrom === "wire"
+                ? t("graph.focus.wire", { from: nameOf(focusWire!.from.node), to: nameOf(focusWire!.to.node) })
+                : focusSel.length === 1
+                  ? t("graph.focus.one", { name: nameOf(focusSel[0]!) })
+                  : t("graph.focus.many", { n: focusSel.length })}
+            </span>
+            <button
+              type="button"
+              className="mg-gfocus-all"
+              onClick={() => {
+                selectOnly([]);
+                setSelEdge(null);
+              }}
+            >
+              {t("graph.focus.all")}
+            </button>
+            <kbd className="mg-gfocus-key">Esc</kbd>
+          </div>
+        )}
         <div ref={hintRef} hidden className="mg-ghint" aria-hidden />
         {menu && menuEdge && renderEdgeMenu && (
           <EdgeMenu store={store} edge={menuEdge} focus={menu.focus} onClose={() => setMenu(null)}>

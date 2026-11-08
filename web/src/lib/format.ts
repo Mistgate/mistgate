@@ -56,7 +56,29 @@ export function stampOf(unix: number, lang: Lang, now = new Date()) {
   return sameDay(new Date(unix * 1000), now) ? clockOf(unix, lang) : dateTimeOf(unix, lang, now);
 }
 
-/** The short "5 мин назад / 3 ч назад / 2 дн назад" of every list; "только что" under a minute. */
+/**
+ * stampOf in a fixed UTC offset instead of the browser's time zone: "14:06" for today there, "27 сент., 03:00" for another
+ * day. For times the panel schedules in its own time zone (scheduled tasks), so "daily at 07:30" and "next run 07:30" agree
+ * whatever zone the browser is in.
+ */
+export function stampAtOffsetOf(unix: number, offsetMinutes: number, lang: Lang, now = new Date()) {
+  const shifted = new Date((unix + offsetMinutes * 60) * 1000);
+  const today = new Date(now.getTime() + offsetMinutes * 60_000);
+  const locale = intlLocaleOf(lang);
+  const clock = shifted.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
+  if (shifted.getUTCFullYear() === today.getUTCFullYear() && shifted.getUTCMonth() === today.getUTCMonth() && shifted.getUTCDate() === today.getUTCDate()) {
+    return clock;
+  }
+  const day = shifted.toLocaleDateString(locale, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    ...(shifted.getUTCFullYear() === today.getUTCFullYear() ? {} : { year: "numeric" }),
+  });
+  return `${day}, ${clock}`;
+}
+
+/** The short "5 мин назад / 3 ч назад / 2 дн назад" of every list; "только что" под минуту. */
 export function agoOf(t: (key: "common.justNow" | "users.ago.m" | "users.ago.h" | "users.ago.d", vars?: { n: number }) => string, unix: number, nowSec: number) {
   const s = Math.max(0, nowSec - unix);
   if (s < 60) return t("common.justNow");
@@ -115,6 +137,7 @@ export function makeFmt(lang: Lang, t: T) {
     duration,
     clock: (unix: number) => clockOf(unix, lang),
     stamp: (unix: number) => stampOf(unix, lang),
+    stampAt: (unix: number, offsetMinutes: number) => stampAtOffsetOf(unix, offsetMinutes, lang),
     date: (unix: number) => dayOf(unix, lang),
     dateTime: (unix: number) => dateTimeOf(unix, lang),
     /** Country name in the UI language from an ISO 3166-1 alpha-2 code; the code itself when unknown. */

@@ -507,6 +507,27 @@ func TestUpdateProfileChecksChangedPortPerNode(t *testing.T) {
 	}
 }
 
+func TestUpdateProfileRejectsTCPPortCollisionOnEveryPlacement(t *testing.T) {
+	e := newEnv(t)
+	e.node("nod_de1", "de1", "de1.example.com", "active")
+	e.node("nod_nl1", "nl1", "nl1.example.com", "active")
+	main := must(e.s.CreateProfile(e.ctx, req(&adminv1.CreateProfileRequest{
+		Protocol: "vless", Name: "main", SettingsJson: `{"port":8443,"reality":{"target":"www.example.org:443"}}`,
+	}))).Msg.Profile
+	other := e.vlessProfile("other")
+	e.inbound(main.Id, "nod_de1")
+	e.inbound(main.Id, "nod_nl1")
+	e.inbound(other.Id, "nod_nl1")
+	settings := `{"port":443,"reality":{"target":"www.example.org:443"}}`
+	_, err := e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{
+		ProfileId: main.Id, ExpectedVersion: main.Version, SettingsJson: &settings, DryRun: true,
+	}))
+	wantCoded(t, err, connect.CodeAlreadyExists, "port_taken", map[string]string{"node": "nl1", "port": "443", "profile": "other"})
+	if current := must(e.st.Access().Profile(e.ctx, main.Id)); current.Version != main.Version {
+		t.Fatalf("refused dry run changed profile version to %d", current.Version)
+	}
+}
+
 func TestTwinPortChecksCandidatesInParallelAndSkipsBad(t *testing.T) {
 	e := newEnv(t)
 	e.node("nod_de1", "de1", "de1.example.com", "active")

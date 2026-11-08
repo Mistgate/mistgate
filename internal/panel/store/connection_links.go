@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// LinkReasons are the links/3 sums (migration 00115): why handshakes failed, where the engine could see it.
+// LinkReasons are the links/3 sums (migration 00114): why handshakes failed, where the engine could see it.
 type LinkReasons struct {
 	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint64
 	RealityFallback, AuthFailed, TCPStalls, TCPStalls16K       uint64

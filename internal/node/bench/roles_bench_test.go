@@ -460,7 +460,10 @@ func runClient(a roleArgs, res *clientResult) error {
 		}
 		start := time.Now()
 		wg.Wait()
-		res.HandshakesPerS = float64(n.Load()) / time.Since(start).Seconds()
+		res.HandshakesPerS, err = handshakeRate(n.Load(), time.Since(start))
+		if err != nil {
+			return fmt.Errorf("handshake phase: %w", err)
+		}
 		return nil
 	}
 	// a short warm-up: the first connection pays for the handshake of the tunnel

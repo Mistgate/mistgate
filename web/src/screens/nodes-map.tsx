@@ -218,6 +218,7 @@ export function FleetMap({ nodes, owner, focus, onFocus, onOpenNode }: { nodes: 
       minFitZoom={0.7}
       fitPad={44}
       readOnly
+      focusPaths
       selected={sel}
       onSelectionChange={(ids) => {
         const nodeIds = ids.filter((i) => i.startsWith("node:"));

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,6 +34,11 @@ const (
 	debugSourceBytes  = 32
 )
 
+var (
+	debugUUID   = regexp.MustCompile(`(?i)\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b`)
+	debugKeyRun = regexp.MustCompile(`[A-Za-z0-9+/_=-]{32,}`)
+)
+
 // ErrDebugBusy: a capture of this node is still running.
 var ErrDebugBusy = errors.New("store: a debug capture of this node is running")
 
@@ -44,6 +50,7 @@ type DebugCaptureRow struct {
 	StartedAt, EndsAt                  time.Time
 	State, EndReason                   string // running | done | expired (read time); "stopped", "expired", "shutdown" once done
 	Records, Bytes, Dropped            int
+	LastChunkSeq                       int64
 }
 
 // Running reports whether the capture may still receive records at now.
@@ -119,33 +126,53 @@ func debugLevel(sev int32) int {
 	}
 }
 
-// AppendDebugLines stores a chunk of a running capture of this node, after the panel's own scrub: addresses, the secret names
-// (the journal's secrets), names in xray's text, attribute keys of the journal's allow-list only, every text cut. Lines beyond
-// DebugMaxLines or DebugMaxBytes are counted as dropped, not stored. A capture that is not running (unknown, other node, already
-// done) takes nothing: the second return value is false.
+// AppendDebugLines stores a chunk of a running capture of this node, after the panel's own scrub: addresses, secret names,
+// UUIDs, key-shaped values and hostnames. Only allow-listed attributes are kept, and every text is cut to a bound. Lines beyond
+// DebugMaxLines or DebugMaxBytes are counted as dropped, not stored. A capture that is not running takes nothing: the second
+// return value is false.
 func (s *Store) AppendDebugLines(ctx context.Context, nodeID, id string, lines []DebugLineIn, secrets []string, now time.Time) (stored int, ok bool, err error) {
+	return s.appendDebugLines(ctx, nodeID, id, lines, secrets, now, nil)
+}
+
+// AppendDebugChunk stores a sequenced report chunk once. A retry of an accepted sequence is acknowledged without storing it again.
+func (s *Store) AppendDebugChunk(ctx context.Context, nodeID, id string, chunkSeq uint32, lines []DebugLineIn, secrets []string, now time.Time) (stored int, ok bool, err error) {
+	return s.appendDebugLines(ctx, nodeID, id, lines, secrets, now, &chunkSeq)
+}
+
+func (s *Store) appendDebugLines(ctx context.Context, nodeID, id string, lines []DebugLineIn, secrets []string, now time.Time, chunkSeq *uint32) (stored int, ok bool, err error) {
 	row, err := s.DebugCapture(ctx, id)
-	if errors.Is(err, ErrNotFound) || err == nil && (row.NodeID != nodeID || !row.Running(now)) {
+	if errors.Is(err, ErrNotFound) {
 		return 0, false, nil
 	}
 	if err != nil {
 		return 0, false, err
 	}
+	if row.NodeID != nodeID {
+		return 0, false, nil
+	}
+	if chunkSeq != nil {
+		if int64(*chunkSeq) <= row.LastChunkSeq {
+			return 0, true, nil
+		}
+		if int64(*chunkSeq) != row.LastChunkSeq+1 || !row.Running(now) {
+			return 0, false, nil
+		}
+	} else if !row.Running(now) {
+		return 0, false, nil
+	}
 	seq, size, dropped := int64(row.Records), row.Bytes, 0
 	var stmts []Stmt
+	if chunkSeq != nil {
+		stmts = append(stmts, guard(`SELECT 1 FROM debug_capture WHERE id = ? AND node_id = ? AND state = 'running' AND last_chunk_seq = ?`,
+			id, nodeID, row.LastChunkSeq))
+	}
 	add := 0
 	for _, l := range lines {
 		source := logscrub.Clip(scrubJournalText(l.Source, secrets), debugSourceBytes)
 		if !validDebugSource(source) {
 			source = "agent"
 		}
-		clean := func(text string) string {
-			text = scrubJournalText(text, secrets)
-			if source == "xray" { // its text may name a destination
-				text = logscrub.Hosts(text)
-			}
-			return text
-		}
+		clean := func(text string) string { return scrubDebugText(text, secrets) }
 		msg := logscrub.Clip(clean(logscrub.Clip(l.Message, debugMessageBytes)), debugMessageBytes)
 		attrs := map[string]string{}
 		for _, key := range logscrub.JournalAttrs {
@@ -168,12 +195,33 @@ func (s *Store) AppendDebugLines(ctx context.Context, nodeID, id string, lines [
 		stmts = append(stmts, Stmt{Query: `INSERT INTO debug_capture_line (capture_id, seq, at_ms, level, source, message, attrs_json)
 			VALUES (?, ?, ?, ?, ?, ?, ?)`, Args: []any{id, seq, l.AtMs, debugLevel(l.Level), source, msg, attrsJSON}})
 	}
-	stmts = append(stmts, Stmt{Query: `UPDATE debug_capture SET records = ?, bytes = ?, dropped = dropped + ? WHERE id = ?`,
-		Args: []any{seq, size, dropped, id}})
-	if _, err := s.batch(ctx, stmts...); err != nil {
+	if chunkSeq == nil {
+		stmts = append(stmts, Stmt{Query: `UPDATE debug_capture SET records = ?, bytes = ?, dropped = dropped + ? WHERE id = ?`,
+			Args: []any{seq, size, dropped, id}})
+	} else {
+		stmts = append(stmts, Stmt{Query: `UPDATE debug_capture SET records = ?, bytes = ?, dropped = dropped + ?, last_chunk_seq = ? WHERE id = ?`,
+			Args: []any{seq, size, dropped, *chunkSeq, id}})
+	}
+	if _, err := s.batch(ctx, stmts...); errors.Is(err, errGuard) {
+		fresh, readErr := s.DebugCapture(ctx, id)
+		if readErr != nil {
+			return 0, false, readErr
+		}
+		if chunkSeq != nil && fresh.NodeID == nodeID && int64(*chunkSeq) <= fresh.LastChunkSeq {
+			return 0, true, nil
+		}
+		return 0, false, nil
+	} else if err != nil {
 		return 0, false, err
 	}
 	return add, true, nil
+}
+
+func scrubDebugText(text string, secrets []string) string {
+	text = scrubJournalText(text, secrets)
+	text = debugUUID.ReplaceAllString(text, "<key>")
+	text = debugKeyRun.ReplaceAllString(text, "<key>")
+	return logscrub.Hosts(text)
 }
 
 func validDebugSource(s string) bool {
@@ -200,15 +248,17 @@ func (s *Store) FinishDebugCapture(ctx context.Context, nodeID, id, reason strin
 	return err
 }
 
-const debugColumns = `c.id, c.node_id, COALESCE(n.name, ''), c.actor, c.level, c.sources, c.duration_s, c.started_at, c.ends_at,
-	c.state, c.end_reason, c.records, c.bytes, c.dropped`
+// debugColumns name the actor the way the audit log does: the admin's display name, a token's name for "mcp:<id>" and
+// "token:<id>", else the stored value as it is.
+const debugColumns = `c.id, c.node_id, COALESCE(n.name, ''), COALESCE(NULLIF(a.display_name, ''), NULLIF(t.name, ''), c.actor), c.level, c.sources, c.duration_s, c.started_at, c.ends_at,
+	c.state, c.end_reason, c.records, c.bytes, c.dropped, c.last_chunk_seq`
 
 func scanDebugCapture(r rowScanner, now time.Time) (DebugCaptureRow, error) {
 	var c DebugCaptureRow
 	var sources string
 	var started, ends int64
 	if err := r.Scan(&c.ID, &c.NodeID, &c.NodeName, &c.Actor, &c.Level, &sources, &c.DurationS, &started, &ends,
-		&c.State, &c.EndReason, &c.Records, &c.Bytes, &c.Dropped); err != nil {
+		&c.State, &c.EndReason, &c.Records, &c.Bytes, &c.Dropped, &c.LastChunkSeq); err != nil {
 		return c, err
 	}
 	if sources != "" {
@@ -223,7 +273,8 @@ func scanDebugCapture(r rowScanner, now time.Time) (DebugCaptureRow, error) {
 
 // DebugCapture returns one capture, or ErrNotFound. A running capture whose report never came reads as expired at the real time.
 func (s *Store) DebugCapture(ctx context.Context, id string) (DebugCaptureRow, error) {
-	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id
+	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id LEFT JOIN admin a ON a.id = c.actor
+		LEFT JOIN api_token t ON c.actor IN ('mcp:' || t.id, 'token:' || t.id)
 		WHERE c.id = ?`, id), time.Time{})
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrNotFound
@@ -233,7 +284,8 @@ func (s *Store) DebugCapture(ctx context.Context, id string) (DebugCaptureRow, e
 
 // LatestDebugCapture is the newest capture of a node, or ErrNotFound.
 func (s *Store) LatestDebugCapture(ctx context.Context, nodeID string, now time.Time) (DebugCaptureRow, error) {
-	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id
+	row, err := scanDebugCapture(s.R.QueryRowContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id LEFT JOIN admin a ON a.id = c.actor
+		LEFT JOIN api_token t ON c.actor IN ('mcp:' || t.id, 'token:' || t.id)
 		WHERE c.node_id = ? ORDER BY c.started_at DESC, c.id DESC LIMIT 1`, nodeID), now)
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrNotFound
@@ -243,7 +295,8 @@ func (s *Store) LatestDebugCapture(ctx context.Context, nodeID string, now time.
 
 // DebugCaptures lists the captures of a node (every node when empty), newest first.
 func (s *Store) DebugCaptures(ctx context.Context, nodeID string, now time.Time) ([]DebugCaptureRow, error) {
-	rows, err := s.R.QueryContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id
+	rows, err := s.R.QueryContext(ctx, `SELECT `+debugColumns+` FROM debug_capture c LEFT JOIN node n ON n.id = c.node_id LEFT JOIN admin a ON a.id = c.actor
+		LEFT JOIN api_token t ON c.actor IN ('mcp:' || t.id, 'token:' || t.id)
 		WHERE (? = '' OR c.node_id = ?) ORDER BY c.started_at DESC, c.id DESC LIMIT 100`, nodeID, nodeID)
 	if err != nil {
 		return nil, err
@@ -287,9 +340,13 @@ func (s *Store) DebugLines(ctx context.Context, id string, f DebugLineFilter) ([
 		if err := rows.Scan(&l.Seq, &l.AtMs, &l.Level, &l.Source, &l.Message, &attrsJSON); err != nil {
 			return nil, nil, err
 		}
+		l.Message = scrubDebugText(l.Message, nil)
 		l.Attrs = map[string]string{}
 		if err := json.Unmarshal([]byte(attrsJSON), &l.Attrs); err != nil {
 			return nil, nil, err
+		}
+		for key, value := range l.Attrs {
+			l.Attrs[key] = scrubDebugText(value, nil)
 		}
 		out = append(out, l)
 	}

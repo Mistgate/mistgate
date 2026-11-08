@@ -18,6 +18,19 @@ import (
 
 func nodeSettingsTools() []toolDef { return change(nodeUpdate) }
 
+func statusWarningFact(w *adminv1.StatusReason) Fact {
+	code := clean(w.GetCode(), 60)
+	params := make(map[string]string, len(w.GetParams()))
+	untrusted := make([]string, 0, len(w.GetParams()))
+	for key, value := range w.GetParams() {
+		key = clean(key, 40)
+		params[key] = clean(value, 160)
+		untrusted = append(untrusted, key)
+	}
+	slices.Sort(untrusted)
+	return Fact{Key: "warning", Value: code, Code: code, Params: params, UntrustedParams: untrusted}
+}
+
 type directSubscriptionArg struct {
 	InboundID string `json:"inbound_id" jsonschema:"inbound id from the node detail"`
 	Included  bool   `json:"included" jsonschema:"whether the node's own address appears in subscriptions"`
@@ -149,10 +162,15 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 		if err != nil {
 			return nil, err
 		}
+		var warningFacts []Fact
 		for _, item := range changed {
 			value := item.Included
-			if _, err := c.cl.Profile.UpdateInbound(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, DirectInSubscriptions: &value, ValidateOnly: true})); err != nil {
+			validated, err := c.cl.Profile.UpdateInbound(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, DirectInSubscriptions: &value, ValidateOnly: true}))
+			if err != nil {
 				return nil, apiError(err)
+			}
+			for _, warning := range validated.Msg.GetWarnings() {
+				warningFacts = append(warningFacts, statusWarningFact(warning))
 			}
 		}
 		facts := []Fact{{Key: "node", Value: nm(name), Untrusted: true}}
@@ -181,6 +199,7 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 			}
 			facts = append(facts, Fact{Key: "direct_in_subscriptions", Value: nm(profile) + " / " + nm(inName) + " (" + clean(item.InboundID, 60) + ") -> " + strconvBool(item.Included), Untrusted: true})
 		}
+		facts = append(facts, warningFacts...)
 		// NodeService.UpdateNode also accepts runtime-changing fields at the API boundary. The MCP tool keeps its
 		// arguments to metadata, but still requires the owner grant for this exact procedure.
 		danger := []string{dangerPage}

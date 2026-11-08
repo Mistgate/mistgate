@@ -1112,6 +1112,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.rollbackUpdate(s, m.RollbackAgent) })
 	case *pb.ConnectResponse_DebugCapture:
 		a.goBusy(func() { a.debugCapture(s, m.DebugCapture) })
+	case *pb.ConnectResponse_DebugCaptureAck:
+		a.debug.acknowledge(m.DebugCaptureAck.GetCaptureId(), m.DebugCaptureAck.GetChunkSeq())
 	case *pb.ConnectResponse_LogRequest:
 		s.startLog(m.LogRequest)
 	case *pb.ConnectResponse_LogCancel:

@@ -28,6 +28,8 @@ const (
 const (
 	summaryRunes  = 300
 	matchesPerRun = 5
+	// finishRetryWindow gives transient store failures time to clear without blocking shutdown forever.
+	finishRetryWindow = time.Minute
 )
 
 // Run is the scheduler: it ends the runs a stopped panel left, then starts the due tasks every tick until ctx ends, and waits
@@ -36,15 +38,26 @@ func (s *Service) Run(ctx context.Context) {
 	s.mu.Lock()
 	s.base = ctx
 	s.mu.Unlock()
-	if n, err := s.cfg.Store.RecoverScheduledRuns(ctx, s.now()); err != nil && ctx.Err() == nil {
-		s.cfg.Log.Warn("tasks: recover interrupted runs", "code", "scheduled_recover_failed", "err", err)
-	} else if n > 0 {
-		s.cfg.Log.Info("tasks: runs interrupted by the last stop", "count", n)
-	}
+	recoveryPending := true
 	t := time.NewTicker(s.cfg.Tick)
 	defer t.Stop()
 	for {
-		s.dispatch(ctx)
+		if recoveryPending {
+			n, err := s.cfg.Store.RecoverScheduledRuns(ctx, s.now())
+			if err != nil {
+				if ctx.Err() == nil {
+					s.cfg.Log.Warn("tasks: recover interrupted runs", "code", "scheduled_recover_failed", "err", err)
+				}
+			} else {
+				recoveryPending = false
+				if n > 0 {
+					s.cfg.Log.Info("tasks: runs interrupted by the last stop", "count", n)
+				}
+			}
+		}
+		if !recoveryPending {
+			s.dispatch(ctx)
+		}
 		select {
 		case <-ctx.Done():
 			s.wg.Wait()
@@ -66,10 +79,7 @@ func (s *Service) dispatch(ctx context.Context) {
 		return
 	}
 	for _, t := range due {
-		sem := s.checkSem
-		if t.Kind == spec.KindAssistant {
-			sem = s.assistSem
-		}
+		sem := s.runSemaphore(t.Kind)
 		select {
 		case sem <- struct{}{}:
 		default:
@@ -89,22 +99,39 @@ func (s *Service) dispatch(ctx context.Context) {
 	}
 }
 
-// start takes the task's lease and starts a run of it. notBefore, for a manual run, refuses one that comes sooner than the
-// task's manual cooldown; release (nil for a manual run) gives back the scheduler's slot when the run ends.
+// start reserves cancellation before claiming the lease, so deleting a task can stop a run even while the claim is in flight.
+// notBefore, for a manual run, refuses one that comes sooner than the task's manual cooldown; release gives back its slot.
 func (s *Service) start(t store.ScheduledTask, trigger, actor string, notBefore time.Time, release func()) (string, bool, error) {
 	now := s.now()
 	run := store.ScheduledTaskRun{ID: store.NewID("run_"), TaskID: t.ID, Trigger: trigger, Actor: actor, StartedAt: now}
 	lease := store.NewID("lease_")
 	s.mu.Lock()
 	base := s.base
+	if _, exists := s.running[t.ID]; exists {
+		s.mu.Unlock()
+		return "", false, nil
+	}
+	runCtx, cancel := context.WithCancel(base)
+	active := &activeRun{cancel: cancel}
+	s.running[t.ID] = active
 	s.mu.Unlock()
 	ok, err := s.cfg.Store.ClaimScheduledTask(base, run, lease, now, now.Add(limitFor(t.Kind)+time.Minute), notBefore)
 	if err != nil || !ok {
+		s.clearRun(t.ID, active)
 		return "", false, err
 	}
 	s.wg.Add(1)
-	go s.execute(base, t, run, lease, release)
+	go s.execute(runCtx, t, run, lease, release, active)
 	return run.ID, true, nil
+}
+
+func (s *Service) clearRun(taskID string, active *activeRun) {
+	s.mu.Lock()
+	if s.running[taskID] == active {
+		delete(s.running, taskID)
+	}
+	s.mu.Unlock()
+	active.cancel()
 }
 
 // outcome is what a runner found.
@@ -113,20 +140,15 @@ type outcome struct {
 	detail                  runDetail
 }
 
-func (s *Service) execute(base context.Context, t store.ScheduledTask, run store.ScheduledTaskRun, lease string, release func()) {
+func (s *Service) execute(base context.Context, t store.ScheduledTask, run store.ScheduledTaskRun, lease string, release func(), active *activeRun) {
 	defer s.wg.Done()
 	if release != nil {
 		defer release()
 	}
 	ctx, cancel := context.WithTimeout(base, limitFor(t.Kind))
-	s.mu.Lock()
-	s.running[t.ID] = cancel
-	s.mu.Unlock()
 	defer func() {
-		s.mu.Lock()
-		delete(s.running, t.ID)
-		s.mu.Unlock()
 		cancel()
+		s.clearRun(t.ID, active)
 	}()
 	var o outcome
 	func() {
@@ -150,16 +172,15 @@ func (s *Service) execute(base context.Context, t store.ScheduledTask, run store
 	}
 	detail, _ := json.Marshal(o.detail)
 	run.Status, run.Reason, run.Summary, run.Detail, run.FinishedAt = o.status, o.reason, clip(o.summary, summaryRunes), string(detail), s.now()
-	fctx := context.WithoutCancel(ctx)
+	fctx, cancelFinish := context.WithTimeout(context.WithoutCancel(ctx), finishRetryWindow)
+	defer cancelFinish()
 	next := timeZero
 	if cur, err := s.cfg.Store.ScheduledTask(fctx, t.ID); err == nil && cur.Enabled {
 		// the schedule as it is now: the owner may have changed it during the run
 		sc := scheduleOf(cur)
 		next = sc.Next(s.now(), s.timezone(fctx), spec.Jitter(cur.ID, sc))
 	}
-	if err := s.cfg.Store.FinishScheduledRun(fctx, run, lease, next); err != nil {
-		s.cfg.Log.Warn("tasks: record a run", "code", "scheduled_finish_failed", "task_id", t.ID, "err", err)
-	}
+	s.finishRun(fctx, t.ID, run, lease, next)
 	if run.Status == "failed" && run.Reason != "interrupted" {
 		s.cfg.Log.Warn("tasks: run failed", "code", "scheduled_run_failed", "task_id", t.ID, "reason", run.Reason)
 	} else {
@@ -167,13 +188,34 @@ func (s *Service) execute(base context.Context, t store.ScheduledTask, run store
 	}
 }
 
+func (s *Service) finishRun(ctx context.Context, taskID string, run store.ScheduledTaskRun, lease string, next time.Time) {
+	delay := 100 * time.Millisecond
+	logged := false
+	for {
+		if err := s.cfg.Store.FinishScheduledRun(ctx, run, lease, next); err == nil {
+			return
+		} else if !logged {
+			s.cfg.Log.Warn("tasks: record a run", "code", "scheduled_finish_failed", "task_id", taskID, "err", err)
+			logged = true
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+		delay = min(delay*2, 5*time.Second)
+	}
+}
+
 // cancelRun stops the run of a task in progress (the task was deleted).
 func (s *Service) cancelRun(taskID string) {
 	s.mu.Lock()
-	cancel := s.running[taskID]
+	active := s.running[taskID]
 	s.mu.Unlock()
-	if cancel != nil {
-		cancel()
+	if active != nil {
+		active.cancel()
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -17,13 +16,14 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/store/storetest"
 )
 
 // End to end: the public listener resolves the client address (here through a trusted proxy header) and the
 // Enroll limiter counts failures per IPv4 address / IPv6 /64 of THAT address, not of the TCP peer.
 func TestEnrollLimiterCountsTheResolvedClientNetwork(t *testing.T) {
 	e := newEnv(t)
-	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "auth.db"))
+	st, err := store.Open(context.Background(), storetest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

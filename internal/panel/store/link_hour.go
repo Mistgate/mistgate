@@ -16,7 +16,7 @@ type FleetLink struct {
 	UnknownKeys, Hellos, Handshakes                                   uint32
 	ClientCloses, Freezes, Quiet, Accepted, HellosForeign, RttSamples uint32
 	RttMSSum, PktsSent, PktsLost                                      uint64
-	// links/3 (migration 00115)
+	// links/3 (migration 00114)
 	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint32
 	RealityFallback, AuthFailed, TCPStalls, TCPStalls16K       uint32
 	Initiations, Responses, ResponsesUnmatched                 uint32

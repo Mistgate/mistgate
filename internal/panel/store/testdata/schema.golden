@@ -379,6 +379,30 @@
   },
   {
     "type": "index",
+    "name": "path_speed_start_actor_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_actor_at ON path_speed_start (actor_id, at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_start_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_at ON path_speed_start (at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_start_from_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_from_at ON path_speed_start (from_node_id, at_unix)"
+  },
+  {
+    "type": "index",
+    "name": "path_speed_start_to_at",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE INDEX path_speed_start_to_at ON path_speed_start (to_node_id, at_unix)"
+  },
+  {
+    "type": "index",
     "name": "relay_via",
     "tbl_name": "relay",
     "sql": "CREATE INDEX relay_via ON relay (via_node_id)"
@@ -627,7 +651,7 @@
     "type": "table",
     "name": "debug_capture",
     "tbl_name": "debug_capture",
-    "sql": "CREATE TABLE debug_capture ( id TEXT PRIMARY KEY, node_id TEXT NOT NULL, actor TEXT NOT NULL, level TEXT NOT NULL CHECK (level IN ('debug', 'info')), sources TEXT NOT NULL DEFAULT '', duration_s INTEGER NOT NULL, started_at INTEGER NOT NULL, ends_at INTEGER NOT NULL, state TEXT NOT NULL CHECK (state IN ('running', 'done')), end_reason TEXT NOT NULL DEFAULT '', records INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0, dropped INTEGER NOT NULL DEFAULT 0 ) STRICT"
+    "sql": "CREATE TABLE debug_capture ( id TEXT PRIMARY KEY, node_id TEXT NOT NULL, actor TEXT NOT NULL, level TEXT NOT NULL CHECK (level IN ('debug', 'info')), sources TEXT NOT NULL DEFAULT '', duration_s INTEGER NOT NULL, started_at INTEGER NOT NULL, ends_at INTEGER NOT NULL, state TEXT NOT NULL CHECK (state IN ('running', 'done')), end_reason TEXT NOT NULL DEFAULT '', records INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0, dropped INTEGER NOT NULL DEFAULT 0 , last_chunk_seq INTEGER NOT NULL DEFAULT -1) STRICT"
   },
   {
     "type": "table",
@@ -901,6 +925,12 @@
   },
   {
     "type": "table",
+    "name": "path_speed_start",
+    "tbl_name": "path_speed_start",
+    "sql": "CREATE TABLE path_speed_start ( id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, from_node_id TEXT NOT NULL, to_node_id TEXT NOT NULL, at_unix INTEGER NOT NULL )"
+  },
+  {
+    "type": "table",
     "name": "profile",
     "tbl_name": "profile",
     "sql": "CREATE TABLE profile ( id TEXT PRIMARY KEY, -- prf_... protocol TEXT NOT NULL, -- plugin id: \"hysteria2\" name TEXT NOT NULL COLLATE NOCASE UNIQUE, settings_json TEXT NOT NULL CHECK (json_valid(settings_json)), -- validated by the plugin; NO secrets inside secrets_enc BLOB, -- vault, AAD = id; JSON object {json-pointer: value} of x-secret fields version INTEGER NOT NULL DEFAULT 1, -- bumped on every change; optimistic concurrency created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL , critical_epoch INTEGER NOT NULL DEFAULT 0) STRICT"
@@ -921,7 +951,7 @@
     "type": "table",
     "name": "scheduled_task",
     "tbl_name": "scheduled_task",
-    "sql": "CREATE TABLE scheduled_task ( id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('check', 'assistant')), enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)), schedule_kind TEXT NOT NULL CHECK (schedule_kind IN ('every', 'daily', 'weekly')), every_minutes INTEGER NOT NULL DEFAULT 0, minute_of_day INTEGER NOT NULL DEFAULT 0, weekday INTEGER NOT NULL DEFAULT 0, steps TEXT NOT NULL DEFAULT '[]', prompt_enc BLOB NOT NULL DEFAULT X'', notify_telegram INTEGER NOT NULL DEFAULT 0 CHECK (notify_telegram IN (0, 1)), conversation_id TEXT NOT NULL DEFAULT '', jitter_s INTEGER NOT NULL DEFAULT 0, created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, next_run_at INTEGER NOT NULL DEFAULT 0, lease_id TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0, last_manual_at INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, fail_reason TEXT NOT NULL DEFAULT '', problem INTEGER NOT NULL DEFAULT 0 CHECK (problem IN (0, 1)), problem_summary TEXT NOT NULL DEFAULT '' ) STRICT"
+    "sql": "CREATE TABLE scheduled_task ( id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('check', 'assistant')), enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)), schedule_kind TEXT NOT NULL CHECK (schedule_kind IN ('every', 'daily', 'weekly')), every_minutes INTEGER NOT NULL DEFAULT 0, minute_of_day INTEGER NOT NULL DEFAULT 0, weekday INTEGER NOT NULL DEFAULT 0, steps TEXT NOT NULL DEFAULT '[]', prompt_enc BLOB NOT NULL DEFAULT X'', notify_telegram INTEGER NOT NULL DEFAULT 0 CHECK (notify_telegram IN (0, 1)), conversation_id TEXT NOT NULL DEFAULT '', jitter_s INTEGER NOT NULL DEFAULT 0, created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, next_run_at INTEGER NOT NULL DEFAULT 0, lease_id TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0, last_manual_at INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, fail_reason TEXT NOT NULL DEFAULT '', problem INTEGER NOT NULL DEFAULT 0 CHECK (problem IN (0, 1)), problem_summary TEXT NOT NULL DEFAULT '' , version INTEGER NOT NULL DEFAULT 1 CHECK (version \u003e 0)) STRICT"
   },
   {
     "type": "table",

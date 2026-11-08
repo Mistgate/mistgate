@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -29,6 +28,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/store/storetest"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -119,7 +119,7 @@ func newCoreEnv(t *testing.T) *env {
 func newEnvWithoutServer(t *testing.T, reg *protocols.Registry) *env {
 	t.Helper()
 	ctx := context.Background()
-	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.db"))
+	st, err := store.Open(ctx, storetest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

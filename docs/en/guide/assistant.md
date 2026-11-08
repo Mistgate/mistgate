@@ -82,6 +82,7 @@ You can also ask the assistant ("check the fleet every morning and tell me if so
 ### When it runs
 
 - **Every** N minutes or hours (a check at most every 5 minutes, an assistant task every 15), **Daily** at a time, or **Weekly** on a day at a time, in the panel's time zone (the one of the update schedules; the tab names it).
+- Changing the panel's fixed UTC offset recalculates the next run of enabled tasks. The panel does not follow daylight-saving time changes; set the offset again when local time changes.
 - Each task starts up to a few minutes after its time, always by the same delay, so the tasks do not all start on the same second.
 - One run of a task at a time. A run the panel missed while it was down runs once when it starts again, not once per missed time; a run cut short by a stop reads as interrupted.
 - **Run now** starts one at once: at most once a minute for a check and once in five minutes for an assistant task.

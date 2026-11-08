@@ -691,7 +691,11 @@ func (w *world) UpdateInbound(_ context.Context, r *connect.Request[adminv1.Upda
 			w.inboundDirect[r.Msg.GetInboundId()] = direct
 		}
 	}
-	return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: &adminv1.Inbound{Id: r.Msg.GetInboundId(), ProfileName: "Main", Protocol: "hysteria2", DirectInSubscriptions: direct}}), nil
+	warnings := make([]*adminv1.StatusReason, 0, len(w.inboundWarnings))
+	for _, warning := range w.inboundWarnings {
+		warnings = append(warnings, proto.Clone(warning).(*adminv1.StatusReason))
+	}
+	return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: &adminv1.Inbound{Id: r.Msg.GetInboundId(), ProfileName: "Main", Protocol: "hysteria2", DirectInSubscriptions: direct}, Warnings: warnings}), nil
 }
 
 func (w *world) CheckPorts(_ context.Context, r *connect.Request[adminv1.CheckPortsRequest]) (*connect.Response[adminv1.CheckPortsResponse], error) {

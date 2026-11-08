@@ -465,7 +465,12 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 			tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_Renew{Renew: resp}})
 		}
 	case m.GetDebugReport() != nil:
-		c.f.recordDebugReport(ctx, tr.state.NodeID, m.GetDebugReport()) // unsolicited, like a DoctorReport
+		report := m.GetDebugReport()
+		if c.f.recordDebugReport(ctx, tr.state.NodeID, report) {
+			tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_DebugCaptureAck{
+				DebugCaptureAck: &agentv1.DebugCaptureAck{CaptureId: report.GetRequestId(), ChunkSeq: report.GetChunkSeq()},
+			}})
+		}
 	case m.GetLogChunk() != nil:
 		chunk := m.GetLogChunk()
 		pending, ok := tr.state.Pending[chunk.RequestId]

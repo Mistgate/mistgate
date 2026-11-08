@@ -13,7 +13,7 @@ import { meQuery } from "@/lib/session";
 import { DebugCaptureCard } from "./debug-capture";
 
 // Node -> Server -> "Debug capture": the button and its choices, the countdown while the node captures, and the viewer of the
-// records it sent (levels, source, search, the cursor). Only the owner starts or stops one; everyone reads.
+// records it sent (levels, source, search, the cursor). Only the owner starts, stops or reads one.
 
 const ops = vi.hoisted(() => ({ listDebugCaptures: vi.fn(), startDebugCapture: vi.fn(), stopDebugCapture: vi.fn(), getDebugCapture: vi.fn() }));
 vi.mock("@/lib/api", () => ({ ops, auth: { me: () => Promise.resolve({}) } }));
@@ -133,13 +133,15 @@ describe("the button", () => {
     expect(text()).toContain(en["err.agent_too_old"]);
   });
 
-  it("is not offered to a helper, who still reads", async () => {
+  it("does not fetch or show captures to a helper", async () => {
     ops.listDebugCaptures.mockResolvedValue({ captures: [capture()] });
     ops.getDebugCapture.mockResolvedValue(records());
     await mount(node(), { admin: { id: "adm_2", role: Role.HELPER } });
     expect(button(label("debug.button", { n: 5 }))).toBeUndefined();
     expect(text()).toContain(en["debug.ownerOnly"]);
-    expect(text()).toContain("second line");
+    expect(text()).not.toContain("second line");
+    expect(ops.listDebugCaptures).not.toHaveBeenCalled();
+    expect(ops.getDebugCapture).not.toHaveBeenCalled();
   });
 
   it("is off while the node is not connected", async () => {

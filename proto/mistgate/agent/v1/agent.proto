@@ -580,8 +580,9 @@ package mistgate.agent.v1;
 //     attribute allow-list (logscrub.JournalAttrs) as a journal entry: addresses become "<ip>", names are cut for xray, and
 //     key-shaped runs are removed. The raw record never leaves the process.
 //   - SHIP. When the time is up (or on a stop) the agent sends the buffer as DebugCaptureReport chunks (request_id echoed,
-//     at most 64 lines each, the last with eof). A capture that ends while the link is down is shipped when the next
-//     session opens, if that is within 15 minutes of its end; after that it is dropped.
+//     chunk_seq starts at 0, at most 64 lines each, the last with eof). The panel acknowledges eof after storing it. Re-sending
+//     the same capture and chunk_seq is safe. A finished capture stays in memory until that acknowledgement or 15 minutes after
+//     it ended; after that it is dropped. A capture that ends while the link is down is shipped when the next session opens.
 //   - STOP. DebugCapture{request_id, stop: true, capture_id of the running capture} ships what is buffered now and ends the capture; the
 //     CommandResult comes after the last chunk. A stop for an unknown capture is answered ok with detail "none".
 //
@@ -1254,6 +1255,8 @@ message ConnectResponse {
     UdpSend speed_test = 33;
     // Only sent to agents with "debug/1" in Hello.capabilities (see "DEBUG CAPTURE").
     DebugCapture debug_capture = 40;
+    // Acknowledges a stored DebugCaptureReport eof. The agent keeps the finished capture until this arrives.
+    DebugCaptureAck debug_capture_ack = 41;
   }
 }
 
@@ -1777,4 +1780,12 @@ message DebugCaptureReport {
   uint32 dropped = 4;
   // "expired" (the time was up), "stopped" (a stop), "shutdown" (the agent was stopping). Set on the last chunk.
   string end_reason = 5;
+  // Zero-based sequence for retrying this chunk. Older agents omit it.
+  optional uint32 chunk_seq = 6;
+}
+
+// Panel -> node. Acknowledges the stored final chunk of a DebugCaptureReport.
+message DebugCaptureAck {
+  string capture_id = 1;
+  uint32 chunk_seq = 2;
 }

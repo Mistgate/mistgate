@@ -88,7 +88,7 @@ type Service struct {
 	tools   []checkTool
 	toolsAt time.Time
 	base    context.Context // the scheduler's context: manual runs end with the panel too
-	running map[string]context.CancelFunc
+	running map[string]*activeRun
 
 	conds     conditions
 	wake      chan struct{}
@@ -113,9 +113,11 @@ func New(cfg Config) *Service {
 	if cfg.Tick <= 0 {
 		cfg.Tick = defaultTick
 	}
-	return &Service{cfg: cfg, running: map[string]context.CancelFunc{}, wake: make(chan struct{}, 1),
+	return &Service{cfg: cfg, running: map[string]*activeRun{}, wake: make(chan struct{}, 1),
 		checkSem: make(chan struct{}, checkRunsAtOnce), assistSem: make(chan struct{}, assistantRunsAtOnce), base: context.Background()}
 }
+
+type activeRun struct{ cancel context.CancelFunc }
 
 // SetToolRuntime installs the in-process MCP server once the admin API is assembled (the assistant's, internal/panel/app).
 func (s *Service) SetToolRuntime(r mcp.AssistantRuntime) {
@@ -256,4 +258,11 @@ func manualEvery(kind string) time.Duration {
 		return assistantManualEvery
 	}
 	return checkManualEvery
+}
+
+func (s *Service) runSemaphore(kind string) chan struct{} {
+	if kind == spec.KindAssistant {
+		return s.assistSem
+	}
+	return s.checkSem
 }
