@@ -674,6 +674,7 @@ func (e *env) scenario() {
 		// they send test traffic between nodes, so they are not read-only; the throwaway panel has no connected nodes (needsFixture)
 		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"},
 		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "access_report": {}, "block_diagnosis": {}, "node_debug_logs": {},
+		"tasks_list": {},
 	}
 	// These need a fixture the throwaway panel does not have (a connected node, a profile, a relay): a clean tool error is
 	// an answer; a protocol error never is.
@@ -681,6 +682,8 @@ func (e *env) scenario() {
 		"node_metrics": true, "node_doctor": true, "checks_results": true, "checks_run_now": true, "node_ipv6_check": true, "relay_candidates": true,
 		"node_connections": true, "node_server_keys_list": true, "dns_preset_get": true, "profile_get": true, "relay_check": true, "node_ports": true,
 		"warp_status": true, "nodes_get": true, "path_probe": true, "node_trace": true, "node_dns_check": true,
+		// the throwaway panel has no scheduled task: task_not_found is a clean answer
+		"task_get": true, "task_runs": true, "task_run_now": true,
 		// BackupService.GetBackupSettings wants the owner session itself, so an admin token gets "owner access required" on a
 		// real panel although the fakes of the unit tests let it through. A finding, not the harness's to fix.
 		"backup_status": true,

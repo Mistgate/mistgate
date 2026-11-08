@@ -35,4 +35,5 @@ func (k *core) attachAssistantRuntime(api http.Handler) {
 	if ok {
 		service.SetToolRuntime(runtime)
 	}
+	k.attachTasksRuntime(runtime)
 }

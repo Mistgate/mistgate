@@ -153,6 +153,14 @@ enum AlertKind {
   // previous run ended without a clean exit: prev_exit = unclean). WARNING. node_id = the node, subject = "agent",
   // params{count, window_min, last_unix}. Closes once the window holds fewer than three crash restarts.
   ALERT_KIND_AGENT_CRASH_LOOP = 21;
+  // A scheduled task of the owner (mistgate.tasks.v1, the VPS edition) found a problem: a condition of a check task held, or an
+  // assistant task's verdict said so. WARNING. node_id = "", subject = the task id, params{task, task_id, task_kind, summary,
+  // telegram}. Closes when a later run of the task is clean, or when the task is disabled or deleted.
+  ALERT_KIND_SCHEDULED_CHECK = 22;
+  // A scheduled task failed three or more runs in a row (a tool refused, the provider did not answer, no verdict ...). WARNING.
+  // node_id = "", subject = the task id, params{task, task_id, task_kind, count, reason, telegram}. Closes with the next run that
+  // works, or when the task is disabled or deleted.
+  ALERT_KIND_SCHEDULED_TASK_FAILING = 23;
 }
 
 message Alert {

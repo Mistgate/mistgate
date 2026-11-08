@@ -68,13 +68,49 @@ Conversations and notes are sealed in the panel's database and private to each a
 - Names, notes and log lines from nodes and people are data to the assistant, never instructions; it has no tool that reaches the internet; the chat shows no images and no HTML, links to the admin's pages stay in the admin and other links open apart.
 - Even if a node name or a note talked the model into proposing something, it would only be a card: the change happens when a person reads it and presses **Apply**.
 
+## Scheduled tasks
+
+The panel can check the fleet on its own, on a schedule, and tell you when it finds something: open **AI → Scheduled tasks**. The owner creates, changes and deletes tasks; helpers see them and may **Run now**; read-only admins do not see them.
+
+### Two kinds
+
+- **Check**: a list of the panel's own tools with their arguments, run in order, with no model and no cost: `fleet_digest`, `checks_run_now`, `block_diagnosis` for a country, `path_probe` between two nodes and the other read and probe tools of the operator profile. Each step may carry conditions on the tool's result; a condition that holds means the run found a problem. The editor offers the usual ones in one click: **A finding at warning or worse**, **A node is not online**, **A number above a threshold**, **A list is not empty**. A field is a dotted path into the result (`totals.nodes_problem_now`, `nodes[].status`, or `**.severity` for a field at any depth). **A failure of the tool is a problem too** counts a node that does not answer as a problem instead of a failed run.
+- **Assistant**: a prompt, such as "Check the fleet and tell me whether something is wrong", given to the assistant on a schedule. It works with the operator's tools: it reads and probes and may prepare a plan, which waits for you as a card; it never applies anything. Its answers go into a conversation of the task's own, marked **Scheduled** in **AI → Memory** and in the chat's history, a new part per run; you can open it and go on from the last run. It ends every run with a verdict, which is what decides whether the run found a problem. Its cost comes from the assistant's monthly budget.
+
+You can also ask the assistant ("check the fleet every morning and tell me if something is wrong"): it prepares the task as a plan that you approve. Outside agents do the same over [MCP](../reference/mcp.md) with `task_create_plan`.
+
+### When it runs
+
+- **Every** N minutes or hours (a check at most every 5 minutes, an assistant task every 15), **Daily** at a time, or **Weekly** on a day at a time, in the panel's time zone (the one of the update schedules; the tab names it).
+- Each task starts up to a few minutes after its time, always by the same delay, so the tasks do not all start on the same second.
+- One run of a task at a time. A run the panel missed while it was down runs once when it starts again, not once per missed time; a run cut short by a stop reads as interrupted.
+- **Run now** starts one at once: at most once a minute for a check and once in five minutes for an assistant task.
+
+### What a run says
+
+| Status | Meaning |
+|:--|:--|
+| OK | Nothing to report. |
+| Problem | A condition held, or the assistant's verdict says so. |
+| Failed | The run could not do its work: a tool did not answer, the provider failed, no verdict; the reason is shown. |
+| Skipped | The run did not start: the assistant is off, or this month's budget is spent. |
+
+A problem opens the alert **Scheduled check found a problem** on **Health**, with the task's name and a short summary; it closes itself when a later run is clean. Three failed runs in a row open **Scheduled task keeps failing** with the reason. With **Also send to Telegram** on the task, both go to the chats linked for alerts. **Runs** under a task lists its last 50 runs (30 days at most): what each step matched and the start of the result, or the assistant's conversation and its cost.
+
+### Reliability
+
+- A provider that does not answer is asked again, with a growing wait; when it still fails, the run starts over on the **Fallback for scheduled tasks** you pick in **AI → Assistant**.
+- The monthly budget of each provider holds: a run that would pass it does not start and says so.
+- A check run takes at most 5 minutes, an assistant run at most 10 minutes on each provider; at most two checks and one assistant task run at the same time.
+- A task holds no secret: a name, an argument or a prompt that looks like a key, a token or a link with a secret is refused, and the prompt is sealed in the panel's database like the assistant's notes.
+
 ## MCP, tokens and approvals
 
 Outside agents (Claude Code, Cursor, your scripts) keep using [MCP](../reference/mcp.md) and [API tokens](../reference/api.md): they moved from Integrations to **AI → MCP and tokens**, and the plans waiting for the owner to **AI → Waiting for you**, with the badge in the menu. **Integrations** keeps the Telegram alerts.
 
 ## In the Cloudflare edition
 
-The assistant is not available there yet, like MCP: **AI → Assistant** says so. It will come together with MCP.
+The assistant is not available there yet, like MCP and the scheduled tasks: **AI → Assistant** and **AI → Scheduled tasks** say so. They will come together with MCP.
 
 ## When it does not answer
 

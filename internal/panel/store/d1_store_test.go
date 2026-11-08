@@ -196,7 +196,7 @@ func TestD1AssistantBudgetSettingsAndConversationBehavior(t *testing.T) {
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_settings(id) VALUES(1)`); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SaveAssistantSettings(ctx, nil, true, 2, 2, 1, []byte("sealed-notes"), 30, now); err != nil {
+	if err := st.SaveAssistantSettings(ctx, nil, true, 2, 2, 1, 0, []byte("sealed-notes"), 30, now); err != nil {
 		t.Fatal(err)
 	}
 	var clear string

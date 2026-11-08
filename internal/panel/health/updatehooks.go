@@ -14,15 +14,21 @@ import (
 
 const kUpdateFailed = "update_failed"
 
-// ExtCond is a condition another module holds right now. Only kinds this module knows are accepted (update_failed
-// today); the rest is dropped. Why is the i18n key of the explanation, Severity one of 1 info, 2 warning, 3 critical.
+// The scheduled tasks' alerts (internal/panel/tasks, the VPS edition): a run that found a problem, and a task that keeps failing.
+const (
+	kScheduledCheck   = "scheduled_check"
+	kScheduledFailing = "scheduled_task_failing"
+)
+
+// ExtCond is a condition another module holds right now. Only kinds this module knows are accepted (update_failed, and the
+// scheduled tasks' scheduled_check and scheduled_task_failing); the rest is dropped. Why is the i18n key of the explanation, Severity one of 1 info, 2 warning, 3 critical.
 type ExtCond struct {
 	Kind, NodeID, Subject, Why string
 	Severity                   int
 	Params                     map[string]string
 }
 
-var extKinds = map[string]bool{kUpdateFailed: true}
+var extKinds = map[string]bool{kUpdateFailed: true, kScheduledCheck: true, kScheduledFailing: true}
 
 type condSources struct {
 	mu  sync.Mutex

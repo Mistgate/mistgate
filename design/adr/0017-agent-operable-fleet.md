@@ -110,7 +110,7 @@ when the admin Worker has room; otherwise they move to a VPS-only service and th
 | Node debug capture | in progress |
 | Resources: HostMetrics 11 to 20, host hours, capacity, panel resources, load checks, UI | in progress |
 | Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | next |
-| Scheduled tasks, provider fallback | next |
+| Scheduled tasks, provider fallback | built (feat/scheduled-tasks) |
 | Censorship simulation and dev-fleet MCP runs | next |
 | Coarse network (ASN) bucket per hour, no addresses | to decide with the owner (privacy) |
 

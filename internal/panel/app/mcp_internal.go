@@ -87,6 +87,9 @@ func (a mcpAuth) WithApprovedStepUp(ctx context.Context, planID string) context.
 }
 
 func (a mcpAuth) WithAssistant(ctx context.Context, identity mcp.AssistantIdentity) context.Context {
+	if identity.Scheduled {
+		return auth.WithScheduledTask(ctx, identity.TokenID, identity.AdminID, identity.AdminName)
+	}
 	return auth.WithAssistant(ctx, identity.TokenID, identity.Profile, identity.AdminID, identity.AdminName)
 }
 

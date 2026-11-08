@@ -412,9 +412,10 @@ func insertAdmin(t *testing.T, st *store.Store, role string) store.Admin {
 // otherwise be owner-only by default, and a stale entry would hide that an RPC was removed.
 func TestEveryProcedureHasAPolicy(t *testing.T) {
 	registered := map[string]bool{}
-	// mistgate.probe.v1 (ProbeService) and mistgate.ops.v1 (OpsService, policy_ops.go) are the VPS edition's own service
-	// packages, kept out of the Cloudflare Workers; their procedures need a level too.
-	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1", "mistgate.ops.v1"} {
+	// mistgate.probe.v1 (ProbeService), mistgate.ops.v1 (OpsService, policy_ops.go) and mistgate.tasks.v1 (TasksService,
+	// policy_tasks.go) are the VPS edition's own service packages, kept out of the Cloudflare Workers; their procedures need a
+	// level too.
+	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1", "mistgate.ops.v1", "mistgate.tasks.v1"} {
 		protoregistry.GlobalFiles.RangeFilesByPackage(pkg, func(fd protoreflect.FileDescriptor) bool {
 			for i := 0; i < fd.Services().Len(); i++ {
 				svc := fd.Services().Get(i)

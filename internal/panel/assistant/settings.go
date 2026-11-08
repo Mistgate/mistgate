@@ -23,6 +23,7 @@ type settingsRow struct {
 	panelNotesEnc []byte
 	panelNotes    string
 	retention     uint32
+	fallback      adminv1.AssistantProvider
 }
 
 type providerRow struct {
@@ -38,7 +39,7 @@ type providerRow struct {
 func (s *Service) readSettings(ctx context.Context) (settingsRow, error) {
 	var row settingsRow
 	var enabled int
-	err := s.st.R.QueryRowContext(ctx, `SELECT enabled,provider,effort,audience,panel_notes_enc,retention_days FROM assistant_settings WHERE id=1`).Scan(&enabled, &row.provider, &row.effort, &row.audience, &row.panelNotesEnc, &row.retention)
+	err := s.st.R.QueryRowContext(ctx, `SELECT enabled,provider,effort,audience,panel_notes_enc,retention_days,fallback_provider FROM assistant_settings WHERE id=1`).Scan(&enabled, &row.provider, &row.effort, &row.audience, &row.panelNotesEnc, &row.retention, &row.fallback)
 	row.enabled = enabled != 0
 	return row, err
 }
@@ -154,7 +155,7 @@ func (s *Service) GetAssistantSettings(ctx context.Context, _ *connect.Request[a
 }
 
 func settingsProto(row settingsRow) *adminv1.AssistantSettings {
-	return &adminv1.AssistantSettings{Enabled: row.enabled, Provider: row.provider, Effort: row.effort, Audience: row.audience, PanelNotes: row.panelNotes, RetentionDays: row.retention}
+	return &adminv1.AssistantSettings{Enabled: row.enabled, Provider: row.provider, Effort: row.effort, Audience: row.audience, PanelNotes: row.panelNotes, RetentionDays: row.retention, FallbackProvider: row.fallback}
 }
 
 func (s *Service) UpdateAssistantSettings(ctx context.Context, req *connect.Request[adminv1.UpdateAssistantSettingsRequest]) (*connect.Response[adminv1.UpdateAssistantSettingsResponse], error) {
@@ -177,6 +178,15 @@ func (s *Service) UpdateAssistantSettings(ctx context.Context, req *connect.Requ
 	}
 	if in.Enabled && in.Provider == adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED {
 		return nil, codeConnect("no_provider")
+	}
+	// the fallback of the scheduled tasks: another connected provider, or none
+	if fb := in.FallbackProvider; fb != adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED {
+		if !validProvider(fb) || fb == in.Provider {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("assistant settings are invalid"))
+		}
+		if row, e := s.readProviderRow(ctx, fb); e != nil || len(row.sealed) == 0 {
+			return nil, codeConnect("no_provider")
+		}
 	}
 	choices := make([]store.AssistantProviderChoice, 0, len(req.Msg.Choices))
 	seenProviders := make(map[adminv1.AssistantProvider]struct{}, len(req.Msg.Choices))
@@ -224,11 +234,11 @@ func (s *Service) UpdateAssistantSettings(ctx context.Context, req *connect.Requ
 		}
 	}
 	sealedNotes := sealText(s.vault, in.PanelNotes, PanelNotesAAD())
-	if err = s.st.SaveAssistantSettings(ctx, choices, in.Enabled, int32(in.Provider), int32(in.Effort), int32(in.Audience), sealedNotes, in.RetentionDays, s.now()); err != nil {
+	if err = s.st.SaveAssistantSettings(ctx, choices, in.Enabled, int32(in.Provider), int32(in.Effort), int32(in.Audience), int32(in.FallbackProvider), sealedNotes, in.RetentionDays, s.now()); err != nil {
 		return nil, err
 	}
-	s.audit(ctx, admin, "assistant_settings_update", "ok", map[string]any{"enabled": in.Enabled, "provider": in.Provider.String(), "audience": in.Audience.String()})
-	row := settingsRow{enabled: in.Enabled, provider: in.Provider, effort: in.Effort, audience: in.Audience, panelNotes: in.PanelNotes, panelNotesEnc: sealedNotes, retention: in.RetentionDays}
+	s.audit(ctx, admin, "assistant_settings_update", "ok", map[string]any{"enabled": in.Enabled, "provider": in.Provider.String(), "audience": in.Audience.String(), "fallback_provider": in.FallbackProvider.String()})
+	row := settingsRow{enabled: in.Enabled, provider: in.Provider, effort: in.Effort, audience: in.Audience, panelNotes: in.PanelNotes, panelNotesEnc: sealedNotes, retention: in.RetentionDays, fallback: in.FallbackProvider}
 	resp := &adminv1.UpdateAssistantSettingsResponse{Settings: settingsProto(row)}
 	for _, spec := range providerSpecs {
 		status, e := providerProto(s, ctx, spec.provider)

@@ -13,9 +13,11 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// AssistantIdentity is minted by the signed-in AssistantService and is scoped to one MCP session.
+// AssistantIdentity is minted by the signed-in AssistantService and is scoped to one MCP session. Scheduled marks the identity
+// of an admin's scheduled tasks (store.ScheduledTokenID, the operator profile), which runs without a person in the loop.
 type AssistantIdentity struct {
 	TokenID, Profile, AdminID, AdminName string
+	Scheduled                            bool
 }
 
 // AssistantTool is one role-filtered tool from the live MCP registry.

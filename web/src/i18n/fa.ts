@@ -27,6 +27,7 @@ import { fa as waysgraphFa } from "./waysgraph";
 import { fa as fleetmapFa } from "./fleetmap";
 import { fa as observabilityFa } from "./observability";
 import { fa as debugFa } from "./debug";
+import { fa as tasksFa } from "./tasks";
 
 // Persian (fa, right to left). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
 // The admin speaks to the owner as «تو» in standard written Persian (اگر می‌خواهی…، ایجنت را به‌روز کن); buttons and tabs
@@ -284,4 +285,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "سایت همین نود یا سایتی دیگر",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...tasksFa };

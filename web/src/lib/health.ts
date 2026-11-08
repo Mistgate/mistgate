@@ -132,6 +132,8 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.NODE_DOWN && a.params.minutes) params.duration = fmt.duration(Number(a.params.minutes) * 60);
   if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
   if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
+  // a scheduled task that keeps failing names its last reason as a code (tasks.proto RUN REASONS)
+  if (a.kind === AlertKind.SCHEDULED_TASK_FAILING && a.params.reason) params.reason = lookup(t, `task.reason.${a.params.reason}`) ?? a.params.reason;
   if (a.kind === AlertKind.TORRENT) return lookup(t, a.whyKey, torrentParams(t, params)) ?? "";
   if (a.kind === AlertKind.COUNTRY_BLOCKED) {
     // "RU" and "443, 8443" as the sentence needs them: "from Russia", "ports 443 and 8443"

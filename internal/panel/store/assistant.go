@@ -18,7 +18,7 @@ type AssistantProviderChoice struct {
 }
 
 // SaveAssistantSettings applies the provider choices and shared settings as one database batch on both store backends.
-func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantProviderChoice, enabled bool, provider, effort, audience int32, notesEnc []byte, retention uint32, now time.Time) error {
+func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantProviderChoice, enabled bool, provider, effort, audience, fallback int32, notesEnc []byte, retention uint32, now time.Time) error {
 	statements := make([]Stmt, 0, len(choices)+1)
 	for _, choice := range choices {
 		statements = append(statements, Stmt{Query: `UPDATE assistant_provider SET model=?,budget_usd=? WHERE provider=?`, Args: []any{choice.Model, choice.Budget, choice.Provider}})
@@ -27,7 +27,7 @@ func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantPr
 	if enabled {
 		value = 1
 	}
-	statements = append(statements, Stmt{Query: `UPDATE assistant_settings SET enabled=?,provider=?,effort=?,audience=?,panel_notes='',panel_notes_enc=?,retention_days=?,updated_at=? WHERE id=1`, Args: []any{value, provider, effort, audience, notesEnc, retention, unix(now)}})
+	statements = append(statements, Stmt{Query: `UPDATE assistant_settings SET enabled=?,provider=?,effort=?,audience=?,fallback_provider=?,panel_notes='',panel_notes_enc=?,retention_days=?,updated_at=? WHERE id=1`, Args: []any{value, provider, effort, audience, fallback, notesEnc, retention, unix(now)}})
 	_, err := s.batch(ctx, statements...)
 	return err
 }

@@ -159,6 +159,14 @@ const (
 	// previous run ended without a clean exit: prev_exit = unclean). WARNING. node_id = the node, subject = "agent",
 	// params{count, window_min, last_unix}. Closes once the window holds fewer than three crash restarts.
 	AlertKind_ALERT_KIND_AGENT_CRASH_LOOP AlertKind = 21
+	// A scheduled task of the owner (mistgate.tasks.v1, the VPS edition) found a problem: a condition of a check task held, or an
+	// assistant task's verdict said so. WARNING. node_id = "", subject = the task id, params{task, task_id, task_kind, summary,
+	// telegram}. Closes when a later run of the task is clean, or when the task is disabled or deleted.
+	AlertKind_ALERT_KIND_SCHEDULED_CHECK AlertKind = 22
+	// A scheduled task failed three or more runs in a row (a tool refused, the provider did not answer, no verdict ...). WARNING.
+	// node_id = "", subject = the task id, params{task, task_id, task_kind, count, reason, telegram}. Closes with the next run that
+	// works, or when the task is disabled or deleted.
+	AlertKind_ALERT_KIND_SCHEDULED_TASK_FAILING AlertKind = 23
 )
 
 // Enum value maps for AlertKind.
@@ -186,6 +194,8 @@ var (
 		19: "ALERT_KIND_RELAY_DOWN",
 		20: "ALERT_KIND_PATH_LOSSY",
 		21: "ALERT_KIND_AGENT_CRASH_LOOP",
+		22: "ALERT_KIND_SCHEDULED_CHECK",
+		23: "ALERT_KIND_SCHEDULED_TASK_FAILING",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED":                 0,
@@ -210,6 +220,8 @@ var (
 		"ALERT_KIND_RELAY_DOWN":                  19,
 		"ALERT_KIND_PATH_LOSSY":                  20,
 		"ALERT_KIND_AGENT_CRASH_LOOP":            21,
+		"ALERT_KIND_SCHEDULED_CHECK":             22,
+		"ALERT_KIND_SCHEDULED_TASK_FAILING":      23,
 	}
 )
 
@@ -3849,7 +3861,7 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_SEVERITY_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ALERT_SEVERITY_INFO\x10\x01\x12\x1a\n" +
 	"\x16ALERT_SEVERITY_WARNING\x10\x02\x12\x1b\n" +
-	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\x86\x05\n" +
+	"\x17ALERT_SEVERITY_CRITICAL\x10\x03*\xcd\x05\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ALERT_KIND_NODE_DOWN\x10\x01\x12\x18\n" +
@@ -3873,7 +3885,9 @@ const file_mistgate_admin_v1_health_proto_rawDesc = "" +
 	"\x1aALERT_KIND_COUNTRY_BLOCKED\x10\x12\x12\x19\n" +
 	"\x15ALERT_KIND_RELAY_DOWN\x10\x13\x12\x19\n" +
 	"\x15ALERT_KIND_PATH_LOSSY\x10\x14\x12\x1f\n" +
-	"\x1bALERT_KIND_AGENT_CRASH_LOOP\x10\x15*\x8e\x01\n" +
+	"\x1bALERT_KIND_AGENT_CRASH_LOOP\x10\x15\x12\x1e\n" +
+	"\x1aALERT_KIND_SCHEDULED_CHECK\x10\x16\x12%\n" +
+	"!ALERT_KIND_SCHEDULED_TASK_FAILING\x10\x17*\x8e\x01\n" +
 	"\vCheckStatus\x12\x1c\n" +
 	"\x18CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCHECK_STATUS_OK\x10\x01\x12\x19\n" +

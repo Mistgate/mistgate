@@ -28,6 +28,7 @@ import { UpdateService } from "@/gen/mistgate/admin/v1/update_pb";
 import { UserService } from "@/gen/mistgate/admin/v1/user_pb";
 import { WarpService } from "@/gen/mistgate/admin/v1/warp_pb";
 import { OpsService } from "@/gen/mistgate/ops/v1/ops_pb";
+import { TasksService } from "@/gen/mistgate/tasks/v1/tasks_pb";
 import type { MessageKey } from "@/i18n/en";
 import { versionInterceptor } from "./stale";
 
@@ -71,6 +72,8 @@ export const cheburcheck = createClient(CheburcheckService, transport);
 export const bsbord = createClient(BsbordService, transport);
 // The panel's own logs, retention, export and metrics settings (the VPS edition; the edge answers UNIMPLEMENTED).
 export const ops = createClient(OpsService, transport);
+// The owner's scheduled tasks (the VPS edition; the edge answers UNIMPLEMENTED).
+export const tasks = createClient(TasksService, transport);
 // CheckRelay and switching a relay on wait for probes and for the entry to install the forward (up to ~40 s): no deadline here either.
 export const relays = createClient(RelayService, transport);
 

@@ -379,6 +379,24 @@
   },
   {
     "type": "index",
+    "name": "scheduled_task_due",
+    "tbl_name": "scheduled_task",
+    "sql": "CREATE INDEX scheduled_task_due ON scheduled_task (enabled, next_run_at)"
+  },
+  {
+    "type": "index",
+    "name": "scheduled_task_run_started",
+    "tbl_name": "scheduled_task_run",
+    "sql": "CREATE INDEX scheduled_task_run_started ON scheduled_task_run (started_at)"
+  },
+  {
+    "type": "index",
+    "name": "scheduled_task_run_task",
+    "tbl_name": "scheduled_task_run",
+    "sql": "CREATE INDEX scheduled_task_run_task ON scheduled_task_run (task_id, started_at)"
+  },
+  {
+    "type": "index",
     "name": "session_admin",
     "tbl_name": "session",
     "sql": "CREATE INDEX session_admin ON session(admin_id)"
@@ -489,7 +507,7 @@
     "type": "table",
     "name": "assistant_conversation",
     "tbl_name": "assistant_conversation",
-    "sql": "CREATE TABLE assistant_conversation ( id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, title_enc BLOB NOT NULL DEFAULT X'', summary_enc BLOB NOT NULL DEFAULT X'', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, segment INTEGER NOT NULL DEFAULT 0 ) STRICT"
+    "sql": "CREATE TABLE assistant_conversation ( id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, title_enc BLOB NOT NULL DEFAULT X'', summary_enc BLOB NOT NULL DEFAULT X'', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, segment INTEGER NOT NULL DEFAULT 0 , task_id TEXT NOT NULL DEFAULT '') STRICT"
   },
   {
     "type": "table",
@@ -531,7 +549,7 @@
     "type": "table",
     "name": "assistant_settings",
     "tbl_name": "assistant_settings",
-    "sql": "CREATE TABLE assistant_settings ( id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)), provider INTEGER NOT NULL DEFAULT 0, effort INTEGER NOT NULL DEFAULT 2, audience INTEGER NOT NULL DEFAULT 1, panel_notes TEXT NOT NULL DEFAULT '', retention_days INTEGER NOT NULL DEFAULT 90, updated_at INTEGER NOT NULL DEFAULT 0 , panel_notes_enc BLOB NOT NULL DEFAULT X'') STRICT"
+    "sql": "CREATE TABLE assistant_settings ( id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)), provider INTEGER NOT NULL DEFAULT 0, effort INTEGER NOT NULL DEFAULT 2, audience INTEGER NOT NULL DEFAULT 1, panel_notes TEXT NOT NULL DEFAULT '', retention_days INTEGER NOT NULL DEFAULT 90, updated_at INTEGER NOT NULL DEFAULT 0 , panel_notes_enc BLOB NOT NULL DEFAULT X'', fallback_provider INTEGER NOT NULL DEFAULT 0) STRICT"
   },
   {
     "type": "table",
@@ -892,6 +910,18 @@
     "name": "relay",
     "tbl_name": "relay",
     "sql": "CREATE TABLE relay ( id TEXT PRIMARY KEY, inbound_id TEXT NOT NULL REFERENCES inbound (id) ON DELETE CASCADE, via_node_id TEXT NOT NULL REFERENCES node (id) ON DELETE CASCADE, network TEXT NOT NULL CHECK (network IN ('tcp', 'udp')), port INTEGER NOT NULL CHECK (port = 443 OR port BETWEEN 1024 AND 65535), enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)), state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'active', 'failed')), last_error TEXT NOT NULL DEFAULT '', to_ip TEXT NOT NULL DEFAULT '', applied_at INTEGER NOT NULL DEFAULT 0, check_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(check_json)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE (inbound_id, via_node_id), UNIQUE (via_node_id, network, port) ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "scheduled_task",
+    "tbl_name": "scheduled_task",
+    "sql": "CREATE TABLE scheduled_task ( id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('check', 'assistant')), enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)), schedule_kind TEXT NOT NULL CHECK (schedule_kind IN ('every', 'daily', 'weekly')), every_minutes INTEGER NOT NULL DEFAULT 0, minute_of_day INTEGER NOT NULL DEFAULT 0, weekday INTEGER NOT NULL DEFAULT 0, steps TEXT NOT NULL DEFAULT '[]', prompt_enc BLOB NOT NULL DEFAULT X'', notify_telegram INTEGER NOT NULL DEFAULT 0 CHECK (notify_telegram IN (0, 1)), conversation_id TEXT NOT NULL DEFAULT '', jitter_s INTEGER NOT NULL DEFAULT 0, created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, next_run_at INTEGER NOT NULL DEFAULT 0, lease_id TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0, last_manual_at INTEGER NOT NULL DEFAULT 0, fail_streak INTEGER NOT NULL DEFAULT 0, fail_reason TEXT NOT NULL DEFAULT '', problem INTEGER NOT NULL DEFAULT 0 CHECK (problem IN (0, 1)), problem_summary TEXT NOT NULL DEFAULT '' ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "scheduled_task_run",
+    "tbl_name": "scheduled_task_run",
+    "sql": "CREATE TABLE scheduled_task_run ( id TEXT PRIMARY KEY, task_id TEXT NOT NULL, trigger_kind TEXT NOT NULL CHECK (trigger_kind IN ('schedule', 'manual', 'missed')), status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'problem', 'failed', 'skipped')), reason TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '{}', actor TEXT NOT NULL DEFAULT '', started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL DEFAULT 0 ) STRICT"
   },
   {
     "type": "table",

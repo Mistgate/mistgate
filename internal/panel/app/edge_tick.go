@@ -40,6 +40,7 @@ var edgeDeferred = map[string]string{
 	"backups":             "R2",
 	"mcp-plan-sweep":      "MCP is not served on the edge",
 	"assistant-retention": "assistant data is not written on the edge; assistant is VPS-only",
+	"scheduled-tasks":     "scheduled tasks run MCP tools and the assistant in process, which the edge does not serve",
 	"tspu-probe":          "the TSPU probe of the country check: a run takes minutes (a batch of commands to a node in the country), the cron has 15 minutes of wall time and 30 seconds of CPU; Get says it is unavailable and nothing runs",
 }
 
@@ -53,6 +54,7 @@ var edgeDeferredFeatures = map[string][]string{
 	"backups":             {edition.Backups},
 	"mcp-plan-sweep":      {edition.MCP},
 	"assistant-retention": {edition.Assistant},
+	"scheduled-tasks":     {edition.Assistant},
 	"tspu-probe":          {edition.TSPUProbe},
 }
 
