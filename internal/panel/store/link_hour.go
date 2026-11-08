@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,93 @@ type FleetLink struct {
 	UnknownKeys, Hellos, Handshakes                                   uint32
 	ClientCloses, Freezes, Quiet, Accepted, HellosForeign, RttSamples uint32
 	RttMSSum, PktsSent, PktsLost                                      uint64
+	// links/3 (migration 00115)
+	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint32
+	RealityFallback, AuthFailed, TCPStalls, TCPStalls16K       uint32
+	Initiations, Responses, ResponsesUnmatched                 uint32
+}
+
+// linkRow is one row of the link_hour statement: the key, its person and the counters in the order of linkHourColumns. A
+// typed row written straight to JSON keeps the edge's largest batch inside the isolate's memory (TestD1IngestStatsAtEdgeCap),
+// which boxed values and reflection did not once the links/3 counters came.
+type linkRow struct {
+	cred, inbound, user string
+	n                   [linkHourCounters]uint64
+}
+
+// linkHourCounters is len(linkHourColumns).
+const linkHourCounters = 31
+
+// Positions in linkRow.n (linkHourColumns).
+const (
+	lcConnects = iota
+	lcRejects
+	lcDrops
+	lcStalls
+	lcOnlineS
+	lcUnknownKeys
+	lcHellos
+	lcHandshakes
+	lcProbeHandshakes
+	lcClientCloses
+	lcFreezes
+	lcQuiet
+	lcAccepted
+	lcHellosForeign
+	lcRttMSSum
+	lcRttSamples
+	lcPktsSent
+	lcPktsLost
+	lcProbePktsSent
+	lcProbePktsLost
+	lcHsUnfinished // links/3 from here on
+)
+
+// row is the link as a stored row of user, with every counter clamped (maxLinkCount, maxLinkSum).
+func (l FleetLink) row(user string) linkRow {
+	r := linkRow{cred: l.CredID, inbound: l.InboundID, user: user}
+	c := func(v uint32) uint64 { return uint64(min(v, maxLinkCount)) }
+	w := func(v uint64) uint64 { return min(v, maxLinkSum) }
+	copy(r.n[:], []uint64{c(l.Connects), c(l.Rejects), c(l.Drops), c(l.Stalls), c(l.OnlineS), c(l.UnknownKeys), c(l.Hellos),
+		c(l.Handshakes), 0, c(l.ClientCloses), c(l.Freezes), c(l.Quiet), c(l.Accepted), c(l.HellosForeign), w(l.RttMSSum),
+		c(l.RttSamples), w(l.PktsSent), w(l.PktsLost), 0, 0,
+		c(l.HsUnfinished), c(l.TLSAlertsSent), c(l.TLSAlertsRecv), c(l.TLSCertRefused), c(l.RealityFallback), c(l.AuthFailed),
+		c(l.TCPStalls), c(l.TCPStalls16K), c(l.Initiations), c(l.Responses), c(l.ResponsesUnmatched)})
+	return r
+}
+
+// appendJSON writes the row as a JSON array.
+func (r *linkRow) appendJSON(b []byte) []byte {
+	b = append(b, '[')
+	for _, s := range []string{r.cred, r.inbound, r.user} {
+		b = appendJSONString(b, s)
+		b = append(b, ',')
+	}
+	for i, v := range r.n {
+		if i > 0 {
+			b = append(b, ',')
+		}
+		b = strconv.AppendUint(b, v, 10)
+	}
+	return append(b, ']')
+}
+
+// appendJSONString writes s as a JSON string. Ids are valid UTF-8 (protobuf strings are); only quotes, backslashes and control
+// characters need escaping.
+func appendJSONString(b []byte, s string) []byte {
+	const hex = "0123456789abcdef"
+	b = append(b, '"')
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c == '"' || c == '\\':
+			b = append(b, '\\', c)
+		case c < 0x20:
+			b = append(b, '\\', 'u', '0', '0', hex[c>>4], hex[c&0xf])
+		default:
+			b = append(b, c)
+		}
+	}
+	return append(b, '"')
 }
 
 // maxLinkCount clamps one counter of a row of one batch (about a million: no engine counts that many events or seconds of one key in
@@ -28,57 +117,69 @@ const maxLinkSum = 1 << 32
 // zero reports a row with no counter at all (the agent does not send one; it is not stored).
 func (l FleetLink) zero() bool {
 	return l.Connects|l.Rejects|l.Drops|l.Stalls|l.OnlineS|l.UnknownKeys|l.Hellos|l.Handshakes|
-		l.ClientCloses|l.Freezes|l.Quiet|l.Accepted|l.HellosForeign|l.RttSamples == 0 &&
+		l.ClientCloses|l.Freezes|l.Quiet|l.Accepted|l.HellosForeign|l.RttSamples|l.HsUnfinished|l.TLSAlertsSent|l.TLSAlertsRecv|
+		l.TLSCertRefused|l.RealityFallback|l.AuthFailed|l.TCPStalls|l.TCPStalls16K|l.Initiations|l.Responses|l.ResponsesUnmatched == 0 &&
 		l.RttMSSum|l.PktsSent|l.PktsLost == 0
 }
 
-// linkHourStmt adds the rows to the hour's bucket in one statement. The rows go as two JSON arguments of positional arrays
-// ([cred, inbound, user, connects, rejects, drops, stalls, online_s, unknown_keys, hellos, handshakes, probe_handshakes,
-// client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms_sum, rtt_samples, pkts_sent, pkts_lost, probe_pkts_sent,
-// probe_pkts_lost]): D1 binds at most 100
-// values. Splitting the rows keeps each bound value under D1's 2,000,000-byte limit at the 10,000-row edge cap.
-// With no rows it still runs (an empty array), so the batch has the same shape on every call.
-func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
-	if rows == nil {
-		rows = [][]any{}
+// linkHourColumns are the counter columns of a row's positional array from index 3 on (0 cred, 1 inbound, 2 user), each
+// added up on conflict.
+var linkHourColumns = []string{"connects", "rejects", "drops", "stalls", "online_s", "unknown_keys", "hellos", "handshakes",
+	"probe_handshakes", "client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms_sum", "rtt_samples", "pkts_sent",
+	"pkts_lost", "probe_pkts_sent", "probe_pkts_lost",
+	"hs_unfinished", "tls_alerts_sent", "tls_alerts_recv", "tls_cert_refused", "reality_fallback", "auth_failed", "tcp_stalls",
+	"tcp_stalls_16k", "initiations", "responses", "responses_unmatched"}
+
+// linkHourParts is how many JSON arguments the rows are split into: one bound value stays under D1's 2,000,000 bytes at the
+// 10,000-row edge cap (TestD1IngestStatsAtEdgeCap) with every counter of every row at its clamp.
+const linkHourParts = 3
+
+var linkHourQuery = func() string {
+	var cols, sel, set, from strings.Builder
+	for i, c := range linkHourColumns {
+		fmt.Fprintf(&cols, ", %s", c)
+		fmt.Fprintf(&sel, ", CAST(json_extract(l.value, '$[%d]') AS INTEGER)", i+3)
+		if i > 0 {
+			set.WriteString(", ")
+		}
+		fmt.Fprintf(&set, "%s = %s + excluded.%s", c, c, c)
 	}
-	middle := (len(rows) + 1) / 2
-	first, err := json.Marshal(rows[:middle])
-	if err != nil {
-		return Stmt{}, err
+	for i := range linkHourParts {
+		if i > 0 {
+			from.WriteString(" UNION ALL ")
+		}
+		fmt.Fprintf(&from, "SELECT value FROM json_each(?%d)", i+1)
 	}
-	second, err := json.Marshal(rows[middle:])
-	if err != nil {
-		return Stmt{}, err
-	}
-	return Stmt{Query: `
-		INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, connects, rejects, drops, stalls, online_s,
-			unknown_keys, hellos, handshakes, probe_handshakes, client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms_sum,
-			rtt_samples, pkts_sent, pkts_lost, probe_pkts_sent, probe_pkts_lost)
-		SELECT ?3, ?4, json_extract(l.value, '$[1]'), json_extract(l.value, '$[0]'), json_extract(l.value, '$[2]'),
-			CAST(json_extract(l.value, '$[3]') AS INTEGER), CAST(json_extract(l.value, '$[4]') AS INTEGER),
-			CAST(json_extract(l.value, '$[5]') AS INTEGER), CAST(json_extract(l.value, '$[6]') AS INTEGER),
-			CAST(json_extract(l.value, '$[7]') AS INTEGER), CAST(json_extract(l.value, '$[8]') AS INTEGER),
-			CAST(json_extract(l.value, '$[9]') AS INTEGER), CAST(json_extract(l.value, '$[10]') AS INTEGER),
-			CAST(json_extract(l.value, '$[11]') AS INTEGER), CAST(json_extract(l.value, '$[12]') AS INTEGER),
-			CAST(json_extract(l.value, '$[13]') AS INTEGER), CAST(json_extract(l.value, '$[14]') AS INTEGER),
-			CAST(json_extract(l.value, '$[15]') AS INTEGER), CAST(json_extract(l.value, '$[16]') AS INTEGER),
-			CAST(json_extract(l.value, '$[17]') AS INTEGER), CAST(json_extract(l.value, '$[18]') AS INTEGER),
-			CAST(json_extract(l.value, '$[19]') AS INTEGER), CAST(json_extract(l.value, '$[20]') AS INTEGER),
-			CAST(json_extract(l.value, '$[21]') AS INTEGER), CAST(json_extract(l.value, '$[22]') AS INTEGER)
-		FROM (SELECT value FROM json_each(?1) UNION ALL SELECT value FROM json_each(?2)) AS l
+	return fmt.Sprintf(`
+		INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id%s)
+		SELECT ?%d, ?%d, json_extract(l.value, '$[1]'), json_extract(l.value, '$[0]'), json_extract(l.value, '$[2]')%s
+		FROM (%s) AS l
 		WHERE 1
-		ON CONFLICT (node_id, hour_start, inbound_id, cred_id) DO UPDATE SET
-			connects = connects + excluded.connects, rejects = rejects + excluded.rejects, drops = drops + excluded.drops,
-			stalls = stalls + excluded.stalls, online_s = online_s + excluded.online_s,
-			unknown_keys = unknown_keys + excluded.unknown_keys, hellos = hellos + excluded.hellos,
-			handshakes = handshakes + excluded.handshakes, probe_handshakes = probe_handshakes + excluded.probe_handshakes,
-			client_closes = client_closes + excluded.client_closes, freezes = freezes + excluded.freezes,
-			quiet = quiet + excluded.quiet, accepted = accepted + excluded.accepted, hellos_foreign = hellos_foreign + excluded.hellos_foreign,
-			rtt_ms_sum = rtt_ms_sum + excluded.rtt_ms_sum, rtt_samples = rtt_samples + excluded.rtt_samples,
-			pkts_sent = pkts_sent + excluded.pkts_sent, pkts_lost = pkts_lost + excluded.pkts_lost,
-			probe_pkts_sent = probe_pkts_sent + excluded.probe_pkts_sent, probe_pkts_lost = probe_pkts_lost + excluded.probe_pkts_lost`,
-		Args: []any{string(first), string(second), nodeID, hourStart}}, nil
+		ON CONFLICT (node_id, hour_start, inbound_id, cred_id) DO UPDATE SET %s`,
+		cols.String(), linkHourParts+1, linkHourParts+2, sel.String(), from.String(), set.String())
+}()
+
+// linkHourStmt adds the rows to the hour's bucket in one statement. The rows go as linkHourParts JSON arguments of positional
+// arrays ([cred, inbound, user] and then linkHourColumns): D1 binds at most 100 values, and splitting the rows keeps each
+// bound value under D1's 2,000,000-byte limit at the 10,000-row edge cap. With no rows it still runs (empty arrays), so the
+// batch has the same shape on every call.
+func linkHourStmt(nodeID string, hourStart int64, rows []linkRow) (Stmt, error) {
+	args := make([]any, 0, linkHourParts+2)
+	per := (len(rows) + linkHourParts - 1) / linkHourParts
+	var b []byte
+	for i := range linkHourParts {
+		lo, hi := min(i*per, len(rows)), min((i+1)*per, len(rows))
+		b = append(b[:0], '[')
+		for j := lo; j < hi; j++ {
+			if j > lo {
+				b = append(b, ',')
+			}
+			b = rows[j].appendJSON(b)
+		}
+		b = append(b, ']')
+		args = append(args, string(b))
+	}
+	return Stmt{Query: linkHourQuery, Args: append(args, nodeID, hourStart)}, nil
 }
 
 // linkHourOf is the first hour bucket a window of the given start touches: the hour that holds since.
@@ -125,6 +226,7 @@ type LinkInboundSums struct {
 	KeysStalled, KeysTried                                uint64
 	ClientCloses, Freezes, Quiet, Accepted, HellosForeign uint64
 	RttMSSum, RttSamples, PktsSent, PktsLost              uint64
+	LinkReasons
 }
 
 // NodeLinkSums reads the counters of a node's inbounds over the hour buckets that touch [since, now], one row per inbound that
@@ -172,6 +274,10 @@ type UserLink struct {
 	RttMSSum, RttSamples, PktsSent, PktsLost                     uint64
 	LastHour                                                     time.Time
 	Hours                                                        []LinkHourSums
+	LinkReasons
+	// What decides which links/3 counters the row can have (connectiondiag.Variant): the VLESS security, transport and CDN host
+	// as a small JSON object ("" for other protocols), and the AmneziaWG backend of the inbound's last report ("" = none).
+	Variant, AwgBackend string
 }
 
 // UserLinks reads a person's counters over the hour buckets that touch [since, now], per device, node and inbound, the ones with a

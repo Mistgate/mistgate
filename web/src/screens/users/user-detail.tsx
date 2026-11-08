@@ -525,7 +525,9 @@ export function PartsLine({ parts }: { parts: Part[] }) {
         <span key={i}>
           {i > 0 && " "}
           <span className="whitespace-nowrap">
-            <span className={cx(p.warn && "font-semibold text-warn-text")}>{p.text}</span>
+            <span className={cx(p.warn && "font-semibold text-warn-text", p.hint && "cursor-help underline decoration-dotted underline-offset-2")} title={p.hint}>
+              {p.text}
+            </span>
             {i < parts.length - 1 && " ·"}
           </span>
         </span>

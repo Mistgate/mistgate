@@ -24,6 +24,52 @@ type linkCounterVolume struct {
 	accepted, hellosForeign      uint32
 	rttSamples                   uint32
 	rttMSSum, pktsSent, pktsLost uint64
+	// links/3
+	hsUnfinished, tlsAlertsSent, tlsAlertsRecv, tlsCertRefused uint32
+	realityFallback, authFailed                                uint32
+	initiations, responses, responsesUnmatched                 uint32
+}
+
+// add folds the volume counters of one engine delta in.
+func (v *linkCounterVolume) add(stat plugin.LinkStat) {
+	v.hellos += stat.Hellos
+	v.handshakes += stat.Handshakes
+	v.accepted += stat.Accepted
+	v.hellosForeign += stat.HellosForeign
+	v.rttMSSum += stat.RTTMSSum
+	v.rttSamples += stat.RTTSamples
+	v.pktsSent += stat.PktsSent
+	v.pktsLost += stat.PktsLost
+	v.hsUnfinished += stat.HsUnfinished
+	v.tlsAlertsSent += stat.TLSAlertsSent
+	v.tlsAlertsRecv += stat.TLSAlertsRecv
+	v.tlsCertRefused += stat.TLSCertRefused
+	v.realityFallback += stat.RealityFallback
+	v.authFailed += stat.AuthFailed
+	v.initiations += stat.Initiations
+	v.responses += stat.Responses
+	v.responsesUnmatched += stat.ResponsesUnmatched
+}
+
+func (v linkCounterVolume) zero() bool {
+	return v.onlineS|v.hellos|v.handshakes|v.accepted|v.hellosForeign|v.rttSamples|v.hsUnfinished|v.tlsAlertsSent|v.tlsAlertsRecv|
+		v.tlsCertRefused|v.realityFallback|v.authFailed|v.initiations|v.responses|v.responsesUnmatched == 0 &&
+		v.rttMSSum|v.pktsSent|v.pktsLost == 0
+}
+
+// hasLinkVolume reports a delta with a volume counter (kept until the 10-minute boundary).
+func hasLinkVolume(stat plugin.LinkStat) bool {
+	return stat.Hellos|stat.Handshakes|stat.Accepted|stat.HellosForeign|stat.RTTSamples|stat.HsUnfinished|stat.TLSAlertsSent|
+		stat.TLSAlertsRecv|stat.TLSCertRefused|stat.RealityFallback|stat.AuthFailed|stat.Initiations|stat.Responses|
+		stat.ResponsesUnmatched != 0 || stat.RTTMSSum|stat.PktsSent|stat.PktsLost != 0
+}
+
+// linkRowEmpty reports a row with no counter at all (it is not sent).
+func linkRowEmpty(row *pb.LinkCounters) bool {
+	return row.Connects|row.Rejects|row.Drops|row.Stalls|row.OnlineS|row.UnknownKeys|row.Hellos|row.Handshakes|row.ClientCloses|
+		row.Freezes|row.Quiet|row.Accepted|row.HellosForeign|row.RttSamples|row.HsUnfinished|row.TlsAlertsSent|row.TlsAlertsRecv|
+		row.TlsCertRefused|row.RealityFallback|row.AuthFailed|row.TcpStalls|row.TcpStalls_16K|row.Initiations|row.Responses|
+		row.ResponsesUnmatched == 0 && row.RttMsSum|row.PktsSent|row.PktsLost == 0
 }
 
 // collectLoop produces one StatsBatch per stats interval, even when it is empty (it doubles as the
@@ -117,7 +163,7 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 	}
 	for _, stat := range stats {
 		key := linkCounterKey{credID: stat.CredID, inboundID: stat.InboundID}
-		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.ClientCloses|stat.Freezes|stat.Quiet != 0 {
+		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.ClientCloses|stat.Freezes|stat.Quiet|stat.TCPStalls|stat.TCPStalls16K != 0 {
 			row := rowFor(key)
 			row.Connects += stat.Connects
 			row.Rejects += stat.Rejects
@@ -127,19 +173,14 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 			row.ClientCloses += stat.ClientCloses
 			row.Freezes += stat.Freezes
 			row.Quiet += stat.Quiet
+			row.TcpStalls += stat.TCPStalls
+			row.TcpStalls_16K += stat.TCPStalls16K
 		}
-		if stat.Hellos|stat.Handshakes|stat.Accepted|stat.HellosForeign|stat.RTTSamples != 0 || stat.RTTMSSum|stat.PktsSent|stat.PktsLost != 0 {
+		if hasLinkVolume(stat) {
 			a.linkCounterMu.Lock()
 			a.ensureLinkVolumesLocked()
 			volume := a.linkVolumes[key]
-			volume.hellos += stat.Hellos
-			volume.handshakes += stat.Handshakes
-			volume.accepted += stat.Accepted
-			volume.hellosForeign += stat.HellosForeign
-			volume.rttMSSum += stat.RTTMSSum
-			volume.rttSamples += stat.RTTSamples
-			volume.pktsSent += stat.PktsSent
-			volume.pktsLost += stat.PktsLost
+			volume.add(stat)
 			a.linkVolumes[key] = volume
 			a.linkCounterMu.Unlock()
 		}
@@ -178,7 +219,7 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 	if end.After(start) && end.UTC().Truncate(window).After(start.UTC().Truncate(window)) {
 		a.linkCounterMu.Lock()
 		for key, volume := range a.linkVolumes {
-			if volume.onlineS|volume.hellos|volume.handshakes|volume.accepted|volume.hellosForeign|volume.rttSamples == 0 && volume.rttMSSum|volume.pktsSent|volume.pktsLost == 0 {
+			if volume.zero() {
 				continue
 			}
 			row := rowFor(key)
@@ -191,6 +232,15 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 			row.RttSamples += volume.rttSamples
 			row.PktsSent += volume.pktsSent
 			row.PktsLost += volume.pktsLost
+			row.HsUnfinished += volume.hsUnfinished
+			row.TlsAlertsSent += volume.tlsAlertsSent
+			row.TlsAlertsRecv += volume.tlsAlertsRecv
+			row.TlsCertRefused += volume.tlsCertRefused
+			row.RealityFallback += volume.realityFallback
+			row.AuthFailed += volume.authFailed
+			row.Initiations += volume.initiations
+			row.Responses += volume.responses
+			row.ResponsesUnmatched += volume.responsesUnmatched
 			delete(a.linkVolumes, key)
 		}
 		a.linkCounterMu.Unlock()
@@ -198,7 +248,7 @@ func (a *Agent) addLinkCounters(b *pb.StatsBatch, stats []plugin.LinkStat, start
 
 	keys := make([]linkCounterKey, 0, len(rows))
 	for key, row := range rows {
-		if row.Connects|row.Rejects|row.Drops|row.Stalls|row.OnlineS|row.UnknownKeys|row.Hellos|row.Handshakes|row.ClientCloses|row.Freezes|row.Quiet|row.Accepted|row.HellosForeign|row.RttSamples != 0 || row.RttMsSum|row.PktsSent|row.PktsLost != 0 {
+		if !linkRowEmpty(row) {
 			keys = append(keys, key)
 		}
 	}

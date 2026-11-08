@@ -2088,6 +2088,10 @@ func TestD1ClientProbeReportsStorage(t *testing.T) {
 	clientProbeStoreProof(t, openD1Store(t))
 }
 
+func TestD1LinkReasonsStorage(t *testing.T) {
+	linkReasonsStoreProof(t, openD1Store(t))
+}
+
 func TestD1LinkHourStorage(t *testing.T) {
 	st := openD1Store(t)
 	linkHourStoreProof(t, st)

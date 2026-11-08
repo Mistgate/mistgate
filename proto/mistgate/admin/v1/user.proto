@@ -107,6 +107,15 @@ message DeviceConnection {
   uint32 loss_permille = 21;
   uint32 rtt_samples = 22;
   uint64 pkts_sent = 23 [jstype = JS_NUMBER];
+  // The per-key counters of agents that list "links/3" (InboundConnections in node.proto says what they mean): VLESS
+  // tcp_stalls and tcp_stalls_16k, AmneziaWG (userspace backend) initiations, responses and responses_unmatched.
+  uint32 tcp_stalls = 24;
+  uint32 tcp_stalls_16k = 25;
+  uint32 initiations = 26;
+  uint32 responses = 27;
+  uint32 responses_unmatched = 28;
+  // Which of these five this row's protocol, transport, AWG backend or agent does not count: their zero means nothing.
+  repeated string unsupported = 29;
 }
 
 message GetUserConnectionResponse {

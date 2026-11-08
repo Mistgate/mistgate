@@ -12,6 +12,11 @@ A copy of `github.com/apernet/hysteria/core/v2` **v2.12.3** (MIT, `LICENSE.md`),
   `ConnectionStats.PacketsLost` only in its own congestion controller; BBR and Brutal are wrapped in a counter of
   `OnCongestionEvent` (called once per lost packet whatever the controller), dropped when `handleClient` ends. quic-go's
   own count, which covers the handshake and the authentication, stays and is added.
+- `server/config.go`, `server/server.go`: `QUICConfig.ConnContext`, passed to `quic.Transport.ConnContext`. quic-go calls it
+  for every connection the server creates, before the handshake, and ends the context it hands in when the connection
+  ends, with the close error as its cause, also for a handshake that never completed (a timeout, a TLS alert either way).
+  That is the only place a failed handshake shows: the listener never returns such a connection. One callback per
+  connection, nothing per packet (a `quic.Config.Tracer` would build an event for every packet).
 - `client/client.go`: the client sets the counting controllers too, `ConnectionStats()` on the client returns the QUIC
   statistics with these lost packets, and `Close` drops the connection's counter (the panel's health checks report what
   their client lost).
@@ -19,8 +24,9 @@ A copy of `github.com/apernet/hysteria/core/v2` **v2.12.3** (MIT, `LICENSE.md`),
 Why: the node agent needs the QUIC connection itself — its statistics (RTT, packets sent, received and lost) tell a
 frozen path (the node keeps sending, nothing comes back) from a client that simply went quiet, and its address cannot
 name a connection because it moves with port hopping (`DisablePathManager`). See
-`design/connection-diagnostics-gaps.md` (B1, B2, step S2).
+`design/connection-diagnostics-gaps.md` (B1, B2, step S2). `ConnContext` gives the reason a handshake failed (links/3: timeouts,
+TLS alerts sent and received), which tells a path that drops the answer from a client that refuses the certificate.
 
 To move to a new upstream version: copy the new `core/v2` module from the Go module cache over this directory, apply the
-hunks above again (they are small and marked by `ConnEventLogger` and `LostPackets`), update the version here and in `go.mod`'s
+hunks above again (they are small and marked by `ConnEventLogger`, `LostPackets` and `ConnContext`), update the version here and in `go.mod`'s
 `require`, and run `go build ./...` and the Hysteria2 engine tests (`go test ./internal/node/hysteria2/`).

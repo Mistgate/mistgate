@@ -169,7 +169,7 @@ func TestStatsLinks2QualityIsStoredAndRead(t *testing.T) {
 		t.Fatalf("GetNodeConnections with links/2 = %+v, %v", resp, err)
 	}
 	hy := resp.Msg.Inbounds[0]
-	if len(hy.Unsupported) != 0 || hy.ClientCloses != 1 || hy.Freezes != 2 || hy.Quiet != 3 || hy.Accepted != 9 || hy.HellosForeign != 4 ||
+	if !equalStrings(hy.Unsupported, connectiondiag.Link3Fields) || hy.ClientCloses != 1 || hy.Freezes != 2 || hy.Quiet != 3 || hy.Accepted != 9 || hy.HellosForeign != 4 ||
 		hy.RttMs != 500 || hy.LossPermille != 10 || hy.RttSamples != 3 || hy.PktsSent != 1000 || len(hy.Hours) != 1 ||
 		hy.Hours[0].ClientCloses != 1 || hy.Hours[0].Freezes != 2 || hy.Hours[0].Accepted != 9 || hy.Hours[0].HellosForeign != 4 ||
 		hy.Hours[0].RttMs != 500 || hy.Hours[0].LossPermille != 10 || hy.Hours[0].RttSamples != 3 || hy.Hours[0].PktsSent != 1000 ||
@@ -179,8 +179,82 @@ func TestStatsLinks2QualityIsStoredAndRead(t *testing.T) {
 
 	fleet, err := node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{}))
 	if err != nil || len(fleet.Msg.Nodes) == 0 || fleet.Msg.Nodes[0].Inbounds[0].Accepted != 9 || fleet.Msg.Nodes[0].Inbounds[0].RttMs != 500 ||
-		fleet.Msg.Nodes[0].Inbounds[0].LossPermille != 10 || len(fleet.Msg.Nodes[0].Inbounds[0].Unsupported) != 0 {
+		fleet.Msg.Nodes[0].Inbounds[0].LossPermille != 10 || !equalStrings(fleet.Msg.Nodes[0].Inbounds[0].Unsupported, connectiondiag.Link3Fields) {
 		t.Errorf("GetFleetConnections links/2 = %+v, %v", fleet, err)
+	}
+}
+
+// links/3: the handshake-failure reasons of a batch are stored and read back per inbound and hour, and unsupported names what the
+// protocol, the VLESS transport or the AWG backend cannot see (an old agent: all of them).
+func TestStatsLinks3ReasonsAreStoredAndRead(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("nodea")
+	ids := e.fixture(a.nodeID)
+	e.exec(`UPDATE profile SET protocol = CASE id WHEN 'prf_1' THEN 'hysteria2' WHEN 'prf_2' THEN 'awg' END WHERE id IN ('prf_1', 'prf_2')`)
+	e.exec(`UPDATE device_credential SET protocol = CASE protocol WHEN 'fakehy' THEN 'hysteria2' WHEN 'fakewg' THEN 'awg' END WHERE protocol IN ('fakehy', 'fakewg')`)
+	e.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES ('prf_vless', 'vless', 'VLESS',
+		'{"security":"reality","transport":"tcp","reality":{"target":"www.example.com:443"}}', 1, unixepoch(), unixepoch())`)
+	e.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES ('inb_vless', 'prf_vless', ?, 1, unixepoch(), unixepoch())`, a.nodeID)
+	health, err := protojson.Marshal(&agentv1.AwgHealth{Backend: "userspace"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.SetInboundAwgHealth(e.ctx, a.nodeID, ids.i2, string(health), e.f.now()); err != nil {
+		t.Fatal(err)
+	}
+	c := connectLinksWithCaps(a, "inst3", capLinks, connectiondiag.Links2Capability, connectiondiag.Links3Capability)
+	c.send(1, linksBatch(
+		&agentv1.LinkCounters{InboundId: ids.i1, Hellos: 40, Accepted: 20, HsUnfinished: 12, TlsAlertsSent: 2, TlsAlertsRecv: 5, TlsCertRefused: 4},
+		&agentv1.LinkCounters{CredId: "crd_alice_wg", InboundId: ids.i2, Connects: 1, Initiations: 9, Responses: 8, ResponsesUnmatched: 7},
+		&agentv1.LinkCounters{InboundId: "inb_vless", Hellos: 30, HellosForeign: 6, RealityFallback: 11, AuthFailed: 4, HsUnfinished: 3},
+	))
+	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
+
+	node := nodeService{e.f}
+	resp, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID, ByHour: true}))
+	if err != nil || len(resp.Msg.Inbounds) != 3 {
+		t.Fatalf("GetNodeConnections = %+v, %v", resp, err)
+	}
+	by := map[string]*adminv1.InboundConnections{}
+	for _, in := range resp.Msg.Inbounds {
+		by[in.InboundId] = in
+	}
+	hy, wg, vl := by[ids.i1], by[ids.i2], by["inb_vless"]
+	if hy.HsUnfinished != 12 || hy.TlsAlertsSent != 2 || hy.TlsAlertsRecv != 5 || hy.TlsCertRefused != 4 || len(hy.Hours) != 1 || hy.Hours[0].HsUnfinished != 12 ||
+		hy.Hours[0].TlsCertRefused != 4 || contains(hy.Unsupported, "hs_unfinished") || !contains(hy.Unsupported, "reality_fallback") {
+		t.Errorf("Hysteria2 links/3 = %+v", hy)
+	}
+	if wg.Initiations != 9 || wg.Responses != 8 || wg.ResponsesUnmatched != 7 || contains(wg.Unsupported, "responses_unmatched") ||
+		!contains(wg.Unsupported, "hs_unfinished") || wg.Hours[0].ResponsesUnmatched != 7 {
+		t.Errorf("AWG links/3 = %+v", wg)
+	}
+	if vl.Hellos != 30 || vl.HellosForeign != 6 || vl.RealityFallback != 11 || vl.AuthFailed != 4 || vl.HsUnfinished != 3 ||
+		contains(vl.Unsupported, "hellos") || contains(vl.Unsupported, "connects") || contains(vl.Unsupported, "tcp_stalls") ||
+		!contains(vl.Unsupported, "tls_alerts_sent") || !contains(vl.Unsupported, "initiations") {
+		t.Errorf("VLESS links/3 = %+v", vl)
+	}
+	fleet, err := node.GetFleetConnections(e.ctx, connect.NewRequest(&adminv1.GetFleetConnectionsRequest{}))
+	if err != nil || len(fleet.Msg.Nodes) == 0 {
+		t.Fatalf("GetFleetConnections = %+v, %v", fleet, err)
+	}
+	for _, in := range fleet.Msg.Nodes[0].Inbounds {
+		want := by[in.InboundId]
+		if in.HsUnfinished != want.HsUnfinished || in.RealityFallback != want.RealityFallback || in.ResponsesUnmatched != want.ResponsesUnmatched ||
+			!equalStrings(in.Unsupported, want.Unsupported) {
+			t.Errorf("fleet %s = %+v, node read %+v", in.InboundId, in, want)
+		}
+	}
+
+	// the kernel backend cannot tell initiations from responses: not known
+	health, _ = protojson.Marshal(&agentv1.AwgHealth{Backend: "kernel"})
+	if err := e.st.SetInboundAwgHealth(e.ctx, a.nodeID, ids.i2, string(health), e.f.now()); err != nil {
+		t.Fatal(err)
+	}
+	resp, _ = node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: a.nodeID}))
+	for _, in := range resp.Msg.Inbounds {
+		if in.InboundId == ids.i2 && !contains(in.Unsupported, "initiations") {
+			t.Errorf("AWG kernel backend unsupported = %v, want initiations", in.Unsupported)
+		}
 	}
 }
 

@@ -359,6 +359,13 @@ func newXrayClientWithOptions(t *testing.T, serverPort uint16, transport, credID
 // newXrayClientSNI is the in-process client with the REALITY server name of its choice.
 func newXrayClientSNI(t *testing.T, serverName string, serverPort uint16, transport, credID, userID, flow string, mux bool) *xrayClient {
 	t.Helper()
+	return newXrayClientShortID(t, serverName, "6ba85179", serverPort, transport, credID, userID, flow, mux)
+}
+
+// newXrayClientShortID is newXrayClientSNI with the REALITY short id of its choice (one the inbound does not hold fails
+// REALITY authentication).
+func newXrayClientShortID(t *testing.T, serverName, shortIDHex string, serverPort uint16, transport, credID, userID, flow string, mux bool) *xrayClient {
+	t.Helper()
 	socksPort := reservePort(t)
 	transportName := "tcp"
 	var transportSettings []*internet.TransportConfig
@@ -374,7 +381,7 @@ func newXrayClientSNI(t *testing.T, serverName string, serverPort uint16, transp
 	if err != nil {
 		t.Fatal(err)
 	}
-	shortID, err := hex.DecodeString("6ba85179")
+	shortID, err := hex.DecodeString(shortIDHex)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -65,8 +65,9 @@ func NewServer(config *Config) (Server, error) {
 		DisablePathManager:             true,
 	}
 	tr := &quic.Transport{
-		Conn:       config.Conn,
-		DisableGSO: config.QUICConfig.DisableGSO,
+		Conn:        config.Conn,
+		DisableGSO:  config.QUICConfig.DisableGSO,
+		ConnContext: config.QUICConfig.ConnContext, // Mistgate patch, see MISTGATE.md
 	}
 	// A nil key means quic-go never sends stateless resets. Clients then have to
 	// wait for the idle timeout to notice the server is gone, so keep them on

@@ -107,6 +107,7 @@ type UserTraffic struct {
 
 // LinkStat is a connection-counter delta. Event counters are reported in the next stats batch; hello, handshake,
 // connection-quality, and packet-volume counters are accumulated by the agent until its next UTC ten-minute boundary.
+// agent.proto LinkCounters says which is which and which engine counts what.
 type LinkStat struct {
 	CredID, InboundID                             string
 	Connects, Rejects, Drops, Stalls, UnknownKeys uint32
@@ -116,6 +117,19 @@ type LinkStat struct {
 	RTTMSSum                                      uint64
 	RTTSamples                                    uint32
 	PktsSent, PktsLost                            uint64
+	// links/3. Volume: the handshake failures of the inbound row and the AmneziaWG handshake counts of a key. Event: the
+	// TCP stalls of a VLESS key (or of the inbound, behind the TLS front).
+	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint32
+	RealityFallback, AuthFailed                                uint32
+	TCPStalls, TCPStalls16K                                    uint32
+	Initiations, Responses, ResponsesUnmatched                 uint32
+}
+
+// Zero reports a delta without any counter (an engine leaves it out).
+func (s LinkStat) Zero() bool {
+	return s.Connects|s.Rejects|s.Drops|s.Stalls|s.UnknownKeys|s.Hellos|s.Handshakes|s.ClientCloses|s.Freezes|s.Quiet|s.Accepted|
+		s.HellosForeign|s.RTTSamples|s.HsUnfinished|s.TLSAlertsSent|s.TLSAlertsRecv|s.TLSCertRefused|s.RealityFallback|s.AuthFailed|
+		s.TCPStalls|s.TCPStalls16K|s.Initiations|s.Responses|s.ResponsesUnmatched == 0 && s.RTTMSSum|s.PktsSent|s.PktsLost == 0
 }
 
 // Session is one open client connection (QUIC connection for Hysteria2, recent handshake for AWG).

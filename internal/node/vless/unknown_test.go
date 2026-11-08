@@ -81,8 +81,10 @@ func TestUnknownVLESSUUIDsCountOncePerInbound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(collected.Links) != 0 {
-		t.Fatalf("known UUIDs added unknown-key counters: %+v", collected.Links)
+	for _, stat := range collected.Links {
+		if stat.UnknownKeys != 0 {
+			t.Fatalf("known UUIDs added unknown-key counters: %+v", collected.Links)
+		}
 	}
 }
 

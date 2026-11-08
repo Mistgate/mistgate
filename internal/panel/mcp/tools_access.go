@@ -46,8 +46,8 @@ func accessTools() []toolDef {
 	return []toolDef{
 		readToolWithin(accessTimeout, "access_report", ProfileReadonly, accessProcs,
 			"Which servers do not open for people, for whom, and what to change, in one call. hours is 1 to 168 (default 24); optional country (two letters), group (id or exact name), node (id or exact name) and protocol (hysteria2, awg, vless ...) narrow it. "+
-				"matrix: per node and server (protocol, transport, port, network, egress, CDN) over the window: given_users, devices and users that tried and that succeeded, success_pct (absent for VLESS, which keeps no attempt counter: attempts_observable false), "+
-				"rejects split as far as the counters allow (reject_split: key_expired, unknown_key, handshake_incomplete, no_auth, stalled_handshake), stalls, freezes, loss and rtt for Hysteria2, never-connected and untried people given the server, a verdict, and the same per group. "+
+				"matrix: per node and server (protocol, transport, port, network, egress, CDN) over the window: given_users, devices and users that tried and that succeeded, success_pct (absent for VLESS, which keeps no failure counter per device: attempts_observable false), "+
+				"rejects split as far as the counters allow (reject_split: key_expired, unknown_key, handshake_incomplete, no_auth, stalled_handshake, and with links/3 agents why: no_reply (the node answered, nothing came back), cert_refused, alerts_sent, alerts_recv, reality_fallback, reality_auth_failed, answers_lost and unanswered for AmneziaWG on the userspace backend), stalls, freezes, loss and rtt for Hysteria2, tcp_stalls and tcp_stalls_16k for VLESS, signals (tcp_freeze_16k, answers_lost, cert_refused among them), never-connected and untried people given the server, a verdict, and the same per group. "+
 				"country: per node the country verdict, TSPU ports (blocked, open, refused, timeout), dark and reaching operators, and the kl!ck reports by operator and by server kind. "+
 				"block_diagnosis: the block class of each node (see block_diagnosis). "+
 				"findings: machine-readable codes (node_down, node_blocked_in_country, ip_blocked, port_blocked, tcp_throttled, udp_blocked, protocol_fingerprinted, whitelist_mode, operator_specific, regional, not_blocked_but_broken, protocol_blocked_on_node, udp_lossy_path, awg_handshake_no_reply, relay_down, group_without_working_way, cdn_only_option, given_never_connected, counters_unavailable) with severity, evidence refs and affected users and groups. "+
@@ -60,11 +60,11 @@ func accessTools() []toolDef {
 			"How a node is blocked, not only whether: per node (and per port or protocol where it matters) a class with confidence, evidence refs, the operators and regions concerned, what is unknown and which check would tell, and the next steps with the plan tool for each. "+
 				"Classes: ip_blocked (every TCP port dark, often ICMP too, the address itself is banned; changing ports does not help; scope tcp_only when ICMP still passes), "+
 				"port_blocked (the TSPU probe or Globalping sees some ports cut while others of the same address open), "+
-				"tcp_throttled (TCP connects but kl!ck downloads stall after a few KB: DPI freezing), "+
+				"tcp_throttled (TCP connects but downloads stall after a few KB: kl!ck downloads, or the node's own VLESS connections whose client stopped acknowledging after 8 to 32 KiB (tcp_stalls_16k); DPI freezing), "+
 				"udp_blocked (packets from in-country senders are lost or QUIC and WireGuard handshakes never complete, while TCP works), "+
-				"protocol_fingerprinted (UDP passes as a whole but one protocol's handshakes fail while another works: weak, low confidence until per-reason handshake counters exist), "+
+				"protocol_fingerprinted (UDP passes as a whole but one protocol's handshakes fail while another works, stronger where the node sees its answers lost: Hysteria2 hs_unfinished, AmneziaWG responses_unmatched; or VLESS REALITY handshakes answered and never finished: cut after the ClientHello), "+
 				"whitelist_mode (mobile networks dark, fixed lines reach it: only whitelisted addresses help, ports and protocols do not), "+
-				"operator_specific and regional (dark only for some operators or regions), not_blocked_but_broken (the node is down, a server failed or a port is closed on the host: our problem, not the censor's), and unknown (no view from inside the country). "+
+				"operator_specific and regional (dark only for some operators or regions), not_blocked_but_broken (the node is down, a server failed or a port is closed on the host, apps refuse the node's certificate, AmneziaWG initiations go unanswered, or REALITY authentication fails for everyone (detail.reason): our problem, not the censor's), and unknown (no view from inside the country). "+
 				"node (id or exact name), country and hours (1 to 168, default 24, for the link counters) are optional. Stored data only: it contacts no node. Names and counts only. "+connectiondiag2(),
 			func(c *call, in blockArg) (any, error) { return c.blockDiagnosis(in) }),
 	}
@@ -247,7 +247,10 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 				in.Totals[i.GetInboundId()] = accTotals{Protocol: clean(i.GetProtocol(), 40), Connects: i.GetConnects(), Rejects: i.GetRejects(), Drops: i.GetDrops(), Stalls: i.GetStalls(),
 					Freezes: i.GetFreezes(), Quiet: i.GetQuiet(), ClientCloses: i.GetClientCloses(), Hellos: i.GetHellos(), Handshakes: i.GetHandshakes(), Accepted: i.GetAccepted(),
 					HellosForeign: i.GetHellosForeign(), UnknownKeys: i.GetUnknownKeys(), KeysStalled: i.GetKeysStalled(), KeysTried: i.GetKeysTried(), OnlineS: i.GetOnlineS(),
-					RttMs: i.GetRttMs(), RttSamples: i.GetRttSamples(), LossPermille: i.GetLossPermille(), PktsSent: i.GetPktsSent(), Unsupported: slices.Clone(i.GetUnsupported())}
+					RttMs: i.GetRttMs(), RttSamples: i.GetRttSamples(), LossPermille: i.GetLossPermille(), PktsSent: i.GetPktsSent(), Unsupported: slices.Clone(i.GetUnsupported()),
+					HsUnfinished: i.GetHsUnfinished(), TLSAlertsSent: i.GetTlsAlertsSent(), TLSAlertsRecv: i.GetTlsAlertsRecv(), TLSCertRefused: i.GetTlsCertRefused(),
+					RealityFallback: i.GetRealityFallback(), AuthFailed: i.GetAuthFailed(), TCPStalls: i.GetTcpStalls(), TCPStalls16K: i.GetTcpStalls_16K(),
+					Initiations: i.GetInitiations(), Responses: i.GetResponses(), ResponsesUnmatched: i.GetResponsesUnmatched()}
 			}
 		}
 	}
@@ -421,7 +424,9 @@ func (c *call) gatherUsers(in *accessInput, groupRef string) error {
 			for _, d := range r.Msg.GetRows() {
 				in.Rows = append(in.Rows, accRow{UserID: uid, DeviceID: clean(d.GetDeviceId(), 80), NodeID: d.GetNodeId(), InboundID: d.GetInboundId(),
 					Connects: d.GetConnects(), Rejects: d.GetRejects(), Drops: d.GetDrops(), Stalls: d.GetStalls(), Freezes: d.GetFreezes(), Quiet: d.GetQuiet(),
-					ClientCloses: d.GetClientCloses(), OnlineS: d.GetOnlineS(), RttMs: d.GetRttMs(), RttSamples: d.GetRttSamples(), LossPermille: d.GetLossPermille(), PktsSent: d.GetPktsSent()})
+					ClientCloses: d.GetClientCloses(), OnlineS: d.GetOnlineS(), RttMs: d.GetRttMs(), RttSamples: d.GetRttSamples(), LossPermille: d.GetLossPermille(), PktsSent: d.GetPktsSent(),
+					TCPStalls: d.GetTcpStalls(), TCPStalls16K: d.GetTcpStalls_16K(), Initiations: d.GetInitiations(), Responses: d.GetResponses(),
+					ResponsesUnmatched: d.GetResponsesUnmatched(), Unsupported: slices.Clone(d.GetUnsupported())})
 			}
 		}(u.ID)
 	}

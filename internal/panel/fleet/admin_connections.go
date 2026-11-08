@@ -58,15 +58,18 @@ func (s nodeService) GetNodeConnections(ctx context.Context, req *connect.Reques
 			Accepted: clamp32(r.Accepted), HellosForeign: clamp32(r.HellosForeign),
 			RttMs:        connectiondiag.AverageRTTMS(r.RttMSSum, r.RttSamples),
 			LossPermille: connectiondiag.LossPermille(r.PktsLost, r.PktsSent), RttSamples: clamp32(r.RttSamples), PktsSent: r.PktsSent,
-			Unsupported: connectiondiag.UnsupportedCountersForNode(in.Protocol, n.AgentCaps),
+			Unsupported: connectiondiag.UnsupportedCountersFor(in.Protocol, n.AgentCaps, linkVariant(in)),
 		}
+		setInboundReasons(msg, r.LinkReasons)
 		for _, h := range report.Hours {
-			msg.Hours = append(msg.Hours, &adminv1.LinkHour{HourStartUnix: h.HourStart, Connects: clamp32(h.Connects), Rejects: clamp32(h.Rejects),
+			hour := &adminv1.LinkHour{HourStartUnix: h.HourStart, Connects: clamp32(h.Connects), Rejects: clamp32(h.Rejects),
 				Drops: clamp32(h.Drops), Stalls: clamp32(h.Stalls), OnlineS: h.OnlineS, UnknownKeys: clamp32(h.UnknownKeys),
 				Hellos: clamp32(h.Hellos), Handshakes: clamp32(h.Handshakes), ClientCloses: clamp32(h.ClientCloses),
 				Freezes: clamp32(h.Freezes), Quiet: clamp32(h.Quiet), Accepted: clamp32(h.Accepted), HellosForeign: clamp32(h.HellosForeign),
 				RttMs: connectiondiag.AverageRTTMS(h.RttMSSum, h.RttSamples), LossPermille: connectiondiag.LossPermille(h.PktsLost, h.PktsSent),
-				RttSamples: clamp32(h.RttSamples), PktsSent: h.PktsSent})
+				RttSamples: clamp32(h.RttSamples), PktsSent: h.PktsSent}
+			setHourReasons(hour, h.LinkReasons)
+			msg.Hours = append(msg.Hours, hour)
 		}
 		for _, c := range report.Clients {
 			msg.Clients = append(msg.Clients, &adminv1.ClientConnections{Client: c.Client, Platform: c.Platform, Devices: clamp32(c.Devices),
@@ -87,6 +90,36 @@ func (s nodeService) GetNodeConnections(ctx context.Context, req *connect.Reques
 
 // clamp32 fits a window sum into a uint32 field (168 hours of uint32 batches can in theory pass it).
 func clamp32(n uint64) uint32 { return uint32(min(n, math.MaxUint32)) }
+
+// linkVariant is what decides, beyond the protocol and the agent, which counters the inbound has: the VLESS settings, or the AWG
+// backend of the node's last report.
+func linkVariant(in store.FleetInboundRow) connectiondiag.Variant {
+	switch in.Protocol {
+	case "vless":
+		return connectiondiag.VLESSVariant(in.Settings)
+	case "awg":
+		if h := awgStatusMsg(in); h != nil {
+			return connectiondiag.Variant{AwgBackend: h.GetBackend()}
+		}
+	}
+	return connectiondiag.Variant{}
+}
+
+// setInboundReasons copies the links/3 sums of an inbound (agent.proto LinkCounters from hs_unfinished on).
+func setInboundReasons(msg *adminv1.InboundConnections, r store.LinkReasons) {
+	msg.HsUnfinished, msg.TlsAlertsSent, msg.TlsAlertsRecv = clamp32(r.HsUnfinished), clamp32(r.TLSAlertsSent), clamp32(r.TLSAlertsRecv)
+	msg.TlsCertRefused, msg.RealityFallback, msg.AuthFailed = clamp32(r.TLSCertRefused), clamp32(r.RealityFallback), clamp32(r.AuthFailed)
+	msg.TcpStalls, msg.TcpStalls_16K = clamp32(r.TCPStalls), clamp32(r.TCPStalls16K)
+	msg.Initiations, msg.Responses, msg.ResponsesUnmatched = clamp32(r.Initiations), clamp32(r.Responses), clamp32(r.ResponsesUnmatched)
+}
+
+// setHourReasons copies the links/3 sums of an hour bucket.
+func setHourReasons(h *adminv1.LinkHour, r store.LinkReasons) {
+	h.HsUnfinished, h.TlsAlertsSent, h.TlsAlertsRecv = clamp32(r.HsUnfinished), clamp32(r.TLSAlertsSent), clamp32(r.TLSAlertsRecv)
+	h.TlsCertRefused, h.RealityFallback, h.AuthFailed = clamp32(r.TLSCertRefused), clamp32(r.RealityFallback), clamp32(r.AuthFailed)
+	h.TcpStalls, h.TcpStalls_16K = clamp32(r.TCPStalls), clamp32(r.TCPStalls16K)
+	h.Initiations, h.Responses, h.ResponsesUnmatched = clamp32(r.Initiations), clamp32(r.Responses), clamp32(r.ResponsesUnmatched)
+}
 
 // GetFleetConnections returns the counters of every non-retired node, with one metadata read and one link_hour read.
 func (s nodeService) GetFleetConnections(ctx context.Context, req *connect.Request[adminv1.GetFleetConnectionsRequest]) (*connect.Response[adminv1.GetFleetConnectionsResponse], error) {
@@ -124,8 +157,9 @@ func (s nodeService) GetFleetConnections(ctx context.Context, req *connect.Reque
 					Accepted: clamp32(r.Accepted), HellosForeign: clamp32(r.HellosForeign),
 					RttMs:        connectiondiag.AverageRTTMS(r.RttMSSum, r.RttSamples),
 					LossPermille: connectiondiag.LossPermille(r.PktsLost, r.PktsSent), RttSamples: clamp32(r.RttSamples), PktsSent: r.PktsSent,
-					Unsupported: connectiondiag.UnsupportedCountersForNode(in.Protocol, n.AgentCaps),
+					Unsupported: connectiondiag.UnsupportedCountersFor(in.Protocol, n.AgentCaps, linkVariant(in)),
 				}
+				setInboundReasons(msg, r.LinkReasons)
 				if in.Protocol == "awg" {
 					if h := awgStatusMsg(in); h != nil {
 						msg.Awg = &adminv1.AwgPackets{UdpRxPackets: h.GetUdpRxPackets(), ReportedUnix: h.GetReportedUnix(),

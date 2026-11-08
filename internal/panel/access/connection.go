@@ -41,12 +41,14 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 	resp := &adminv1.GetUserConnectionResponse{SinceUnix: since.Unix(), NowUnix: now.Unix()}
 	seen := map[string]bool{}
 	links2ByNode := map[string]bool{}
+	capsByNode := map[string][]string{}
 	for _, f := range full {
 		if seen[f.Node.ID] || !s.usable(f, g, u) {
 			continue
 		}
 		seen[f.Node.ID] = true
 		links2ByNode[f.Node.ID] = slices.Contains(f.Node.AgentCaps, connectiondiag.Links2Capability)
+		capsByNode[f.Node.ID] = f.Node.AgentCaps
 		if !slices.Contains(f.Node.AgentCaps, capLinks) {
 			resp.NodesWithoutCounters = append(resp.NodesWithoutCounters, f.Node.ID)
 		}
@@ -69,6 +71,20 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 			msg.RttMs = connectiondiag.AverageRTTMS(r.RttMSSum, r.RttSamples)
 			msg.LossPermille = connectiondiag.LossPermille(r.PktsLost, r.PktsSent)
 			msg.RttSamples, msg.PktsSent = clamp32(r.RttSamples), r.PktsSent
+		}
+		// links/3, per key: a node that is no longer in the person's reach is read as an old agent ("not known")
+		variant := connectiondiag.Variant{AwgBackend: r.AwgBackend}
+		if r.Protocol == "vless" {
+			variant = connectiondiag.VLESSVariant(r.Variant)
+		}
+		msg.Unsupported = connectiondiag.UnsupportedKeyCounters(r.Protocol, capsByNode[r.NodeID], variant)
+		msg.TcpStalls, msg.TcpStalls_16K = clamp32(r.TCPStalls), clamp32(r.TCPStalls16K)
+		msg.Initiations, msg.Responses, msg.ResponsesUnmatched = clamp32(r.Initiations), clamp32(r.Responses), clamp32(r.ResponsesUnmatched)
+		for i, h := range r.Hours {
+			if i < len(msg.Hours) {
+				msg.Hours[i].TcpStalls, msg.Hours[i].TcpStalls_16K = clamp32(h.TCPStalls), clamp32(h.TCPStalls16K)
+				msg.Hours[i].Initiations, msg.Hours[i].Responses, msg.Hours[i].ResponsesUnmatched = clamp32(h.Initiations), clamp32(h.Responses), clamp32(h.ResponsesUnmatched)
+			}
 		}
 		resp.Rows = append(resp.Rows, msg)
 	}

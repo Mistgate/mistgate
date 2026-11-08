@@ -109,7 +109,7 @@ when the admin Worker has room; otherwise they move to a VPS-only service and th
 | path_speed, engine benchmarks, dev fleet | in progress |
 | Node debug capture | in progress |
 | Resources: HostMetrics 11 to 20, host hours, capacity, panel resources, load checks, UI | in progress |
-| Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | next |
+| Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | in review (`links/3`; the kernel AWG backend cannot tell initiations from responses) |
 | Scheduled tasks, provider fallback | next |
 | Censorship simulation and dev-fleet MCP runs | next |
 | Coarse network (ASN) bucket per hour, no addresses | to decide with the owner (privacy) |
