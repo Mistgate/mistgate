@@ -117,11 +117,25 @@ func TestDebugCaptureStartAuditsStoresAndTakesTheReport(t *testing.T) {
 	send := func(rep *agentv1.DebugCaptureReport) {
 		c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_DebugReport{DebugReport: rep}})
 	}
-	send(&agentv1.DebugCaptureReport{RequestId: row.ID, Lines: []*agentv1.LogLine{
-		{TimeUnixMs: 1, Level: agentv1.Severity_SEVERITY_DEBUG, Source: "hysteria2", Message: "sni agent-secret.example.com from 203.0.113.9:1234"},
+	chunk0, chunk1 := uint32(0), uint32(1)
+	debugUUID, debugKey := "00000000-0000-0000-0000-000000000000", strings.Repeat("z", 40)
+	reportLines := []*agentv1.LogLine{
+		{TimeUnixMs: 1, Level: agentv1.Severity_SEVERITY_DEBUG, Source: "hysteria2", Message: "sni agent-secret.example.com from 203.0.113.9:1234 UUID=" + debugUUID + " key=" + debugKey},
 		{TimeUnixMs: 2, Level: agentv1.Severity_SEVERITY_INFO, Source: "xray", Message: "to canary.example.net"},
-	}})
-	send(&agentv1.DebugCaptureReport{RequestId: row.ID, Eof: true, Dropped: 3, EndReason: "expired"})
+	}
+	send(&agentv1.DebugCaptureReport{RequestId: row.ID, ChunkSeq: &chunk0, Lines: reportLines})
+	send(&agentv1.DebugCaptureReport{RequestId: row.ID, ChunkSeq: &chunk1, Eof: true, Dropped: 3, EndReason: "expired"})
+	ack := c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetDebugCaptureAck() != nil }).GetDebugCaptureAck()
+	if ack.GetCaptureId() != row.ID || ack.GetChunkSeq() != chunk1 {
+		t.Fatalf("final chunk acknowledgement = %+v", ack)
+	}
+	// A reconnect can resend the whole capture; accepted chunks are acknowledged without adding their lines twice.
+	send(&agentv1.DebugCaptureReport{RequestId: row.ID, ChunkSeq: &chunk0, Lines: reportLines})
+	send(&agentv1.DebugCaptureReport{RequestId: row.ID, ChunkSeq: &chunk1, Eof: true, Dropped: 3, EndReason: "expired"})
+	ack = c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetDebugCaptureAck() != nil }).GetDebugCaptureAck()
+	if ack.GetCaptureId() != row.ID || ack.GetChunkSeq() != chunk1 {
+		t.Fatalf("retry acknowledgement = %+v", ack)
+	}
 	// a report for a capture nobody asked for is dropped
 	send(&agentv1.DebugCaptureReport{RequestId: "req_unknown", Eof: true, Lines: []*agentv1.LogLine{{Message: "nope"}}})
 	deadline := time.Now().Add(5 * time.Second)
@@ -136,15 +150,18 @@ func TestDebugCaptureStartAuditsStoresAndTakesTheReport(t *testing.T) {
 	if got.State != "done" || got.EndReason != "expired" || got.Records != 2 || got.Dropped != 3 {
 		t.Fatalf("capture after the report = %+v", got)
 	}
-	lines, _, _ := x.st.DebugLines(x.ctx, row.ID, store.DebugLineFilter{})
+	storedLines, _, _ := x.st.DebugLines(x.ctx, row.ID, store.DebugLineFilter{})
 	var all string
-	for _, l := range lines {
+	for _, l := range storedLines {
 		all += l.Message + "\n"
 	}
-	for _, leak := range []string{"agent-secret.example.com", "203.0.113.9", "canary.example.net"} {
+	for _, leak := range []string{"agent-secret.example.com", "203.0.113.9", "canary.example.net", "private-client.example", debugUUID, debugKey} {
 		if strings.Contains(all, leak) {
 			t.Errorf("%q stored:\n%s", leak, all)
 		}
+	}
+	if !strings.Contains(all, "<host>") || strings.Count(all, "<key>") != 2 {
+		t.Errorf("panel did not retain debug scrub markers: %s", all)
 	}
 	if n := x.count(`SELECT count(*) FROM debug_capture WHERE id = 'req_unknown'`); n != 0 {
 		t.Error("a capture appeared from a report")

@@ -63,6 +63,13 @@ func nextReport(t *testing.T, h *harness) *pb.DebugCaptureReport {
 	}
 }
 
+func ackDebugReport(h *harness, rep *pb.DebugCaptureReport) {
+	h.t.Helper()
+	h.panel.send(&pb.ConnectResponse{Message: &pb.ConnectResponse_DebugCaptureAck{DebugCaptureAck: &pb.DebugCaptureAck{
+		CaptureId: rep.GetRequestId(), ChunkSeq: rep.GetChunkSeq(),
+	}}})
+}
+
 // drainReport reads chunks up to the eof one.
 func drainReport(t *testing.T, h *harness) (lines []*pb.LogLine, last *pb.DebugCaptureReport) {
 	t.Helper()
@@ -151,9 +158,10 @@ func TestDebugCaptureStopShipsAtOnceAndAnswersAfterTheLastChunk(t *testing.T) {
 	}
 	select {
 	case rep := <-h.panel.debugs:
-		if !rep.Eof || rep.EndReason != "stopped" {
+		if !rep.Eof || rep.EndReason != "stopped" || rep.GetChunkSeq() != 0 {
 			t.Errorf("report = %+v", rep)
 		}
+		ackDebugReport(h, rep)
 	case <-time.After(2 * time.Second):
 		t.Fatal("the answer came before the report")
 	}
@@ -196,6 +204,11 @@ func TestDebugCaptureRefusals(t *testing.T) {
 	}
 	h.panel.send(&pb.ConnectResponse{Message: &pb.ConnectResponse_DebugCapture{DebugCapture: &pb.DebugCapture{RequestId: "req_stop3", CaptureId: "req_first", Stop: true}}})
 	h.panel.nextCmd()
+	rep := nextReport(t, h)
+	if !rep.Eof || rep.RequestId != "req_first" {
+		t.Fatalf("stop report = %+v", rep)
+	}
+	ackDebugReport(h, rep)
 	// more than 900 s is clipped, not refused
 	if r := startCapture(h, "req_long", "debug", nil, 99999); !r.Ok {
 		t.Errorf("long duration = %+v", r)
@@ -245,8 +258,20 @@ func TestDebugCaptureEndedWhileOfflineIsShippedOnTheNextSession(t *testing.T) {
 	if c == nil || reason != "expired" || len(c.recs) != 1 {
 		t.Fatalf("take = %+v %q", c, reason)
 	}
+	if again, againReason := d.take(""); again != c || againReason != reason {
+		t.Error("finished capture was not retained for a retry")
+	}
+	if _, ok := d.start("req_blocked", slog.LevelDebug, nil, time.Hour, func(string) {}); ok {
+		t.Error("started a new capture before acknowledging the finished one")
+	}
+	if d.acknowledge("other", 0) {
+		t.Error("accepted an acknowledgement for another capture")
+	}
+	if !d.acknowledge("req_off", 0) {
+		t.Error("did not accept the final chunk acknowledgement")
+	}
 	if c, _ := d.take(""); c != nil {
-		t.Error("shipped twice")
+		t.Error("kept an acknowledged capture")
 	}
 	// past the grace it is dropped
 	now := time.Now()
@@ -256,6 +281,63 @@ func TestDebugCaptureEndedWhileOfflineIsShippedOnTheNextSession(t *testing.T) {
 	d.now = func() time.Time { return now.Add(debugShipGrace + time.Second) }
 	if c, _ := d.take(""); c != nil {
 		t.Error("a capture older than the grace was shipped")
+	}
+}
+
+func TestDebugCaptureShipsChunksWithStableSequenceNumbers(t *testing.T) {
+	d := newDebugState(nil, time.Now)
+	if _, ok := d.start("req_chunks", slog.LevelDebug, nil, time.Hour, func(string) {}); !ok {
+		t.Fatal("capture did not start")
+	}
+	for i := 0; i < debugChunkLines+1; i++ {
+		d.add(slog.LevelDebug, logRecord{at: time.Now(), source: "agent", msg: "line"})
+	}
+	d.finish("req_chunks", "expired")
+	c, reason := d.take("")
+	a := &Agent{debug: d}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &session{ctx: ctx, ctl: make(chan ctlMsg, 1)}
+	shipped := make(chan struct{})
+	go func() {
+		a.shipDebug(s, c, reason)
+		close(shipped)
+	}()
+	deadline := time.NewTimer(2 * time.Second)
+	ticker := time.NewTicker(time.Millisecond)
+	defer deadline.Stop()
+	defer ticker.Stop()
+	for len(s.ctl) == 0 {
+		select {
+		case <-deadline.C:
+			cancel()
+			t.Fatal("no first chunk was queued")
+		case <-ticker.C:
+		}
+	}
+	cancel()
+	select {
+	case <-shipped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("shipping did not stop with its session")
+	}
+	partial := (<-s.ctl).m.GetDebugReport()
+	if partial == nil || partial.GetChunkSeq() != 0 || partial.Eof {
+		t.Fatalf("interrupted shipment = %+v", partial)
+	}
+	if retry, retryReason := d.take(""); retry != c || retryReason != reason {
+		t.Fatal("finished capture was cleared before the panel acknowledged eof")
+	}
+	s = &session{ctx: context.Background(), ctl: make(chan ctlMsg, 2)}
+	a.shipDebug(s, c, reason)
+	for wantSeq := uint32(0); wantSeq < 2; wantSeq++ {
+		msg := <-s.ctl
+		report := msg.m.GetDebugReport()
+		if report == nil || report.GetChunkSeq() != wantSeq || report.Eof != (wantSeq == 1) {
+			t.Fatalf("chunk %d = %+v", wantSeq, report)
+		}
+	}
+	if !d.acknowledge("req_chunks", 1) || d.done != nil {
+		t.Error("the eof acknowledgement did not release the finished capture")
 	}
 }
 
