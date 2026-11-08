@@ -947,7 +947,8 @@ type Hello struct {
 	// UdpSend; see "UDP DELIVERY CHECK"), "tcpcheck/1" (HttpMark, TcpProbe; see "TCP DELIVERY CHECK"), and
 	// "decoy/1" (SetDecoy; see "NODE DECOY SITE"), and "user-rate-limit/1" (Credential.user_rate_limit_bps; see
 	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
-	// LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "journal/1" (StatsBatch.journal; see
+	// LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
+	// hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "journal/1" (StatsBatch.journal; see
 	// JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE").
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
@@ -1622,8 +1623,13 @@ func (x *JournalEntry) GetLastUnix() int64 {
 //     that followed (accepted or not); drops are idle timeouts of a connection younger than 60 s or under 64 KiB.
 //   - awg: connects (a peer's handshake moved after it was offline), stalls (initiations arrive, no handshake completes:
 //     the answer does not reach the client) and unknown_keys (initiations of a key the interface does not hold; kernel
-//     backend and userspace). WireGuard drops anything else silently: no rejects, drops, hellos or handshakes.
-//   - vless: none yet (a later version of this feature).
+//     backend and userspace). WireGuard drops anything else silently: no rejects, drops, hellos or handshakes. With links/3
+//     the userspace backend adds initiations, responses and responses_unmatched; the kernel module's netlink statistics
+//     have no handshake counters, so the kernel backend leaves them zero (the panel reads the backend from AwgHealth and
+//     says "not known").
+//   - vless: unknown_keys (agents with "vless-unknown-keys/1"), and with links/3 hellos, hellos_foreign, connects (RAW
+//     transport), hs_unfinished, reality_fallback and auth_failed (REALITY), tls_alerts_sent, tls_alerts_recv and
+//     tls_cert_refused (security tls), tcp_stalls and tcp_stalls_16k (RAW transport, Linux).
 type LinkCounters struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "" = the inbound itself.
@@ -1666,10 +1672,44 @@ type LinkCounters struct {
 	RttMsSum   uint64 `protobuf:"varint,16,opt,name=rtt_ms_sum,json=rttMsSum,proto3" json:"rtt_ms_sum,omitempty"`
 	RttSamples uint32 `protobuf:"varint,17,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
 	// Volume: QUIC packets the node sent on the key's connections, and those it declared lost.
-	PktsSent      uint64 `protobuf:"varint,18,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
-	PktsLost      uint64 `protobuf:"varint,19,opt,name=pkts_lost,json=pktsLost,proto3" json:"pkts_lost,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	PktsSent uint64 `protobuf:"varint,18,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
+	PktsLost uint64 `protobuf:"varint,19,opt,name=pkts_lost,json=pktsLost,proto3" json:"pkts_lost,omitempty"`
+	// links/3: why handshakes fail, where the engine can see it (see the engine list above). Volume counters leave with
+	// online_s at the 10-minute boundary, event counters in the next batch. Hello volumes (hellos, accepted) go with them,
+	// so their ratios hold within one bucket.
+	// Volume, inbound row only: the node answered a ClientHello and the handshake never finished: hysteria2 a QUIC handshake
+	// that timed out (nothing came back), vless REALITY a handshake whose client never sent its Finished, vless tls one that
+	// reached its 10-second deadline. The answer did not reach the client, or the client gave up without a word.
+	HsUnfinished uint32 `protobuf:"varint,20,opt,name=hs_unfinished,json=hsUnfinished,proto3" json:"hs_unfinished,omitempty"`
+	// Volume, inbound row only (hysteria2, vless tls): handshakes the node ended with a TLS alert (no common ALPN, version or
+	// cipher: scanners, a client of another protocol, a probe), and handshakes the client ended with one (it refused what
+	// the node offered).
+	TlsAlertsSent uint32 `protobuf:"varint,21,opt,name=tls_alerts_sent,json=tlsAlertsSent,proto3" json:"tls_alerts_sent,omitempty"`
+	TlsAlertsRecv uint32 `protobuf:"varint,22,opt,name=tls_alerts_recv,json=tlsAlertsRecv,proto3" json:"tls_alerts_recv,omitempty"`
+	// Volume, inbound row only: of tls_alerts_recv, the alerts that refuse the certificate (bad_certificate,
+	// unsupported_certificate, certificate_revoked, certificate_expired, certificate_unknown, unknown_ca): the app got the
+	// node's certificate and did not trust it (a pin that no longer matches, an expired or self-signed certificate).
+	TlsCertRefused uint32 `protobuf:"varint,23,opt,name=tls_cert_refused,json=tlsCertRefused,proto3" json:"tls_cert_refused,omitempty"`
+	// Volume, inbound row only (vless REALITY): connections REALITY passed to its target as not a client: another server name
+	// (counted in hellos_foreign too), no ClientHello, a TLS version below 1.3, or a failed REALITY authentication.
+	RealityFallback uint32 `protobuf:"varint,24,opt,name=reality_fallback,json=realityFallback,proto3" json:"reality_fallback,omitempty"`
+	// Volume, inbound row only: of reality_fallback, ClientHellos with the inbound's server name that failed REALITY
+	// authentication (another public key or short id: a stale or wrong client config, or a probe).
+	AuthFailed uint32 `protobuf:"varint,25,opt,name=auth_failed,json=authFailed,proto3" json:"auth_failed,omitempty"`
+	// Event (vless, RAW transport, Linux): connections that ended with data of the node the client never acknowledged, after
+	// at least three retransmissions: the path stopped carrying the node's data (TCP_INFO at the close). On the key's row; on
+	// the inbound row for security tls, whose TLS front holds the TCP connection before the key is known.
+	TcpStalls uint32 `protobuf:"varint,26,opt,name=tcp_stalls,json=tcpStalls,proto3" json:"tcp_stalls,omitempty"`
+	// Event: of tcp_stalls, those whose client had acknowledged 8 to 32 KiB: the freeze after the first bytes of a TSPU.
+	TcpStalls_16K uint32 `protobuf:"varint,27,opt,name=tcp_stalls_16k,json=tcpStalls16k,proto3" json:"tcp_stalls_16k,omitempty"`
+	// Volume (awg userspace backend): handshake initiations of the key that reached the node (replays and floods included),
+	// the responses the node sent to it, and the responses the device never confirmed with a packet under the new keys
+	// within the next stats round (the answer was lost on the way back, or the device's next packets were).
+	Initiations        uint32 `protobuf:"varint,28,opt,name=initiations,proto3" json:"initiations,omitempty"`
+	Responses          uint32 `protobuf:"varint,29,opt,name=responses,proto3" json:"responses,omitempty"`
+	ResponsesUnmatched uint32 `protobuf:"varint,30,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *LinkCounters) Reset() {
@@ -1831,6 +1871,83 @@ func (x *LinkCounters) GetPktsSent() uint64 {
 func (x *LinkCounters) GetPktsLost() uint64 {
 	if x != nil {
 		return x.PktsLost
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetHsUnfinished() uint32 {
+	if x != nil {
+		return x.HsUnfinished
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetTlsAlertsSent() uint32 {
+	if x != nil {
+		return x.TlsAlertsSent
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetTlsAlertsRecv() uint32 {
+	if x != nil {
+		return x.TlsAlertsRecv
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetTlsCertRefused() uint32 {
+	if x != nil {
+		return x.TlsCertRefused
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetRealityFallback() uint32 {
+	if x != nil {
+		return x.RealityFallback
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetAuthFailed() uint32 {
+	if x != nil {
+		return x.AuthFailed
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetTcpStalls() uint32 {
+	if x != nil {
+		return x.TcpStalls
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetTcpStalls_16K() uint32 {
+	if x != nil {
+		return x.TcpStalls_16K
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetInitiations() uint32 {
+	if x != nil {
+		return x.Initiations
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetResponses() uint32 {
+	if x != nil {
+		return x.Responses
+	}
+	return 0
+}
+
+func (x *LinkCounters) GetResponsesUnmatched() uint32 {
+	if x != nil {
+		return x.ResponsesUnmatched
 	}
 	return 0
 }
@@ -6965,7 +7082,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"AttrsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb1\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd2\a\n" +
 	"\fLinkCounters\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +
@@ -6991,7 +7108,20 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\vrtt_samples\x18\x11 \x01(\rR\n" +
 	"rttSamples\x12\x1b\n" +
 	"\tpkts_sent\x18\x12 \x01(\x04R\bpktsSent\x12\x1b\n" +
-	"\tpkts_lost\x18\x13 \x01(\x04R\bpktsLost\"\x80\x01\n" +
+	"\tpkts_lost\x18\x13 \x01(\x04R\bpktsLost\x12#\n" +
+	"\rhs_unfinished\x18\x14 \x01(\rR\fhsUnfinished\x12&\n" +
+	"\x0ftls_alerts_sent\x18\x15 \x01(\rR\rtlsAlertsSent\x12&\n" +
+	"\x0ftls_alerts_recv\x18\x16 \x01(\rR\rtlsAlertsRecv\x12(\n" +
+	"\x10tls_cert_refused\x18\x17 \x01(\rR\x0etlsCertRefused\x12)\n" +
+	"\x10reality_fallback\x18\x18 \x01(\rR\x0frealityFallback\x12\x1f\n" +
+	"\vauth_failed\x18\x19 \x01(\rR\n" +
+	"authFailed\x12\x1d\n" +
+	"\n" +
+	"tcp_stalls\x18\x1a \x01(\rR\ttcpStalls\x12$\n" +
+	"\x0etcp_stalls_16k\x18\x1b \x01(\rR\ftcpStalls16k\x12 \n" +
+	"\vinitiations\x18\x1c \x01(\rR\vinitiations\x12\x1c\n" +
+	"\tresponses\x18\x1d \x01(\rR\tresponses\x12/\n" +
+	"\x13responses_unmatched\x18\x1e \x01(\rR\x12responsesUnmatched\"\x80\x01\n" +
 	"\fTrafficDelta\x12\x17\n" +
 	"\acred_id\x18\x01 \x01(\tR\x06credId\x12\x1d\n" +
 	"\n" +

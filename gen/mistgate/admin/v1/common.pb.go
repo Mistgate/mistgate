@@ -1145,8 +1145,21 @@ type LinkHour struct {
 	LossPermille  uint32 `protobuf:"varint,16,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
 	RttSamples    uint32 `protobuf:"varint,17,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
 	PktsSent      uint64 `protobuf:"varint,18,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Agents that list "links/3" (see InboundConnections); device rows carry only the per-key ones (tcp_stalls,
+	// tcp_stalls_16k, initiations, responses, responses_unmatched).
+	HsUnfinished       uint32 `protobuf:"varint,19,opt,name=hs_unfinished,json=hsUnfinished,proto3" json:"hs_unfinished,omitempty"`
+	TlsAlertsSent      uint32 `protobuf:"varint,20,opt,name=tls_alerts_sent,json=tlsAlertsSent,proto3" json:"tls_alerts_sent,omitempty"`
+	TlsAlertsRecv      uint32 `protobuf:"varint,21,opt,name=tls_alerts_recv,json=tlsAlertsRecv,proto3" json:"tls_alerts_recv,omitempty"`
+	TlsCertRefused     uint32 `protobuf:"varint,22,opt,name=tls_cert_refused,json=tlsCertRefused,proto3" json:"tls_cert_refused,omitempty"`
+	RealityFallback    uint32 `protobuf:"varint,23,opt,name=reality_fallback,json=realityFallback,proto3" json:"reality_fallback,omitempty"`
+	AuthFailed         uint32 `protobuf:"varint,24,opt,name=auth_failed,json=authFailed,proto3" json:"auth_failed,omitempty"`
+	TcpStalls          uint32 `protobuf:"varint,25,opt,name=tcp_stalls,json=tcpStalls,proto3" json:"tcp_stalls,omitempty"`
+	TcpStalls_16K      uint32 `protobuf:"varint,26,opt,name=tcp_stalls_16k,json=tcpStalls16k,proto3" json:"tcp_stalls_16k,omitempty"`
+	Initiations        uint32 `protobuf:"varint,27,opt,name=initiations,proto3" json:"initiations,omitempty"`
+	Responses          uint32 `protobuf:"varint,28,opt,name=responses,proto3" json:"responses,omitempty"`
+	ResponsesUnmatched uint32 `protobuf:"varint,29,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *LinkHour) Reset() {
@@ -1305,6 +1318,83 @@ func (x *LinkHour) GetPktsSent() uint64 {
 	return 0
 }
 
+func (x *LinkHour) GetHsUnfinished() uint32 {
+	if x != nil {
+		return x.HsUnfinished
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTlsAlertsSent() uint32 {
+	if x != nil {
+		return x.TlsAlertsSent
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTlsAlertsRecv() uint32 {
+	if x != nil {
+		return x.TlsAlertsRecv
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTlsCertRefused() uint32 {
+	if x != nil {
+		return x.TlsCertRefused
+	}
+	return 0
+}
+
+func (x *LinkHour) GetRealityFallback() uint32 {
+	if x != nil {
+		return x.RealityFallback
+	}
+	return 0
+}
+
+func (x *LinkHour) GetAuthFailed() uint32 {
+	if x != nil {
+		return x.AuthFailed
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTcpStalls() uint32 {
+	if x != nil {
+		return x.TcpStalls
+	}
+	return 0
+}
+
+func (x *LinkHour) GetTcpStalls_16K() uint32 {
+	if x != nil {
+		return x.TcpStalls_16K
+	}
+	return 0
+}
+
+func (x *LinkHour) GetInitiations() uint32 {
+	if x != nil {
+		return x.Initiations
+	}
+	return 0
+}
+
+func (x *LinkHour) GetResponses() uint32 {
+	if x != nil {
+		return x.Responses
+	}
+	return 0
+}
+
+func (x *LinkHour) GetResponsesUnmatched() uint32 {
+	if x != nil {
+		return x.ResponsesUnmatched
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -1386,7 +1476,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\averdict\x18\x05 \x01(\tR\averdict\x12\x16\n" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x16\n" +
 	"\x06sender\x18\a \x01(\tR\x06sender\x12%\n" +
-	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\xaa\x04\n" +
+	"\fchecked_unix\x18\b \x01(\x03B\x020\x02R\vcheckedUnix\"\xcb\a\n" +
 	"\bLinkHour\x12*\n" +
 	"\x0fhour_start_unix\x18\x01 \x01(\x03B\x020\x02R\rhourStartUnix\x12\x1a\n" +
 	"\bconnects\x18\x02 \x01(\rR\bconnects\x12\x18\n" +
@@ -1409,7 +1499,20 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\rloss_permille\x18\x10 \x01(\rR\flossPermille\x12\x1f\n" +
 	"\vrtt_samples\x18\x11 \x01(\rR\n" +
 	"rttSamples\x12\x1f\n" +
-	"\tpkts_sent\x18\x12 \x01(\x04B\x020\x02R\bpktsSent*\xd5\x01\n" +
+	"\tpkts_sent\x18\x12 \x01(\x04B\x020\x02R\bpktsSent\x12#\n" +
+	"\rhs_unfinished\x18\x13 \x01(\rR\fhsUnfinished\x12&\n" +
+	"\x0ftls_alerts_sent\x18\x14 \x01(\rR\rtlsAlertsSent\x12&\n" +
+	"\x0ftls_alerts_recv\x18\x15 \x01(\rR\rtlsAlertsRecv\x12(\n" +
+	"\x10tls_cert_refused\x18\x16 \x01(\rR\x0etlsCertRefused\x12)\n" +
+	"\x10reality_fallback\x18\x17 \x01(\rR\x0frealityFallback\x12\x1f\n" +
+	"\vauth_failed\x18\x18 \x01(\rR\n" +
+	"authFailed\x12\x1d\n" +
+	"\n" +
+	"tcp_stalls\x18\x19 \x01(\rR\ttcpStalls\x12$\n" +
+	"\x0etcp_stalls_16k\x18\x1a \x01(\rR\ftcpStalls16k\x12 \n" +
+	"\vinitiations\x18\x1b \x01(\rR\vinitiations\x12\x1c\n" +
+	"\tresponses\x18\x1c \x01(\rR\tresponses\x12/\n" +
+	"\x13responses_unmatched\x18\x1d \x01(\rR\x12responsesUnmatched*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +

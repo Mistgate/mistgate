@@ -664,6 +664,19 @@ message GetNodeJournalResponse {
 //   - hellos_foreign: ClientHellos for another server name (scanners).
 //   - rtt_ms (average smoothed RTT of connections that moved data, over rtt_samples samples) and loss_permille (packets
 //     the node declared lost per thousand it sent, over pkts_sent): how fast and clean the path was.
+// Why handshakes fail, with agents that list "links/3" (agent.proto LinkCounters; unsupported names what this protocol,
+// transport or AWG backend cannot see):
+//   - hs_unfinished: the node answered a ClientHello and the handshake never finished (the answer did not reach the client,
+//     or it gave up).
+//   - tls_alerts_sent, tls_alerts_recv: handshakes the node, or the client, ended with a TLS alert; tls_cert_refused: of the
+//     client's, those that refused the node's certificate (a pin or certificate problem on our side).
+//   - reality_fallback (VLESS REALITY): connections sent to the target as not a client (scanners, probes, another name);
+//     auth_failed: of them, hellos with our name that failed REALITY authentication (a wrong key or short id).
+//   - tcp_stalls (VLESS): connections whose data stopped being acknowledged; tcp_stalls_16k: of them, those that stalled
+//     after 8 to 32 KiB (the TSPU's freeze after the first bytes).
+//   - initiations, responses, responses_unmatched (AmneziaWG, userspace backend): handshake initiations of known keys, the
+//     node's answers, and answers the device never confirmed (lost on the way back).
+//   - VLESS with links/3 also counts hellos, hellos_foreign and connects.
 message InboundConnections {
   string inbound_id = 1;
   string profile_id = 2;
@@ -685,7 +698,8 @@ message InboundConnections {
   // The counters this protocol, or this node's agent, does not count (their zero means nothing): awg "rejects", "drops",
   // "hellos", "handshakes" and every links/2 counter; vless every counter until its agent counts them; hysteria2 on an
   // agent without "links/2" the links/2 counters (client_closes, freezes, quiet, accepted, hellos_foreign, rtt_ms,
-  // loss_permille, rtt_samples, pkts_sent).
+  // loss_permille, rtt_samples, pkts_sent); the links/3 counters an agent without "links/3" does not send, and those the
+  // protocol, its transport or the AWG backend cannot see (see above).
   repeated string unsupported = 15;
   // With by_hour: the hours of the window that have a counter, oldest first.
   repeated LinkHour hours = 16;
@@ -703,6 +717,17 @@ message InboundConnections {
   uint32 loss_permille = 25;
   uint32 rtt_samples = 26;
   uint64 pkts_sent = 27 [jstype = JS_NUMBER];
+  uint32 hs_unfinished = 28;
+  uint32 tls_alerts_sent = 29;
+  uint32 tls_alerts_recv = 30;
+  uint32 tls_cert_refused = 31;
+  uint32 reality_fallback = 32;
+  uint32 auth_failed = 33;
+  uint32 tcp_stalls = 34;
+  uint32 tcp_stalls_16k = 35;
+  uint32 initiations = 36;
+  uint32 responses = 37;
+  uint32 responses_unmatched = 38;
 }
 
 message ClientConnections {

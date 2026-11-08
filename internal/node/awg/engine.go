@@ -125,6 +125,23 @@ type counters struct {
 	hs     time.Time
 	online bool
 	seen   bool
+	// pending: responses of the previous round that no handshake has confirmed yet (handshakeRound).
+	pending uint32
+}
+
+// handshakeRound turns one round of a peer's handshake counts into the responses its device never confirmed. A response is
+// confirmed when the device's first packet under the new keys arrives, which moves the peer's last handshake; it gets until
+// the end of the next round (10 to 20 s; the device answers within one RTT). advanced says the last handshake moved in this
+// round: it confirms the newest response, and every earlier one of the round and of the pending ones was lost. Without a
+// move the pending ones are lost and this round's responses wait.
+func handshakeRound(pending, responses uint32, advanced bool) (unmatched, next uint32) {
+	if advanced {
+		if pending+responses == 0 {
+			return 0, 0 // the node itself initiated, or a response of before the first round
+		}
+		return pending + responses - 1, 0
+	}
+	return pending, responses
 }
 
 // inbound is one interface.
@@ -502,12 +519,34 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 			continue
 		}
 		links := make(map[string]*plugin.LinkStat)
+		var hs map[[32]byte]handshakeCounts
+		source, counted := e.backend.(handshakeSource)
+		if counted {
+			keys := make([][32]byte, 0, len(st))
+			for _, h := range st {
+				keys = append(keys, h.PublicKey)
+			}
+			hs = source.TakeHandshakes(in.cfg.name, keys)
+		}
 		for _, h := range st {
 			w := in.peers[h.PublicKey]
 			if w == nil {
 				continue // not ours: a peer we did not add
 			}
 			p := in.prev[h.PublicKey]
+			pending := p.pending
+			if counted {
+				c := hs[h.PublicKey]
+				advanced := p.seen && h.LastHS.After(p.hs) || !p.seen && h.LastHS.After(in.since)
+				var unmatched uint32
+				unmatched, pending = handshakeRound(p.pending, c.responses, advanced)
+				if c.initiations|c.responses|unmatched != 0 {
+					stat := linkStatFor(links, in.spec.ID, w.credID)
+					stat.Initiations += c.initiations
+					stat.Responses += c.responses
+					stat.ResponsesUnmatched += unmatched
+				}
+			}
 			if p.seen {
 				if !p.online && h.LastHS.After(p.hs) {
 					linkStatFor(links, in.spec.ID, w.credID).Connects++
@@ -522,7 +561,7 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 				linkStatFor(links, in.spec.ID, w.credID).Connects++
 			}
 			e.addTraffic(in.spec.ID, w.credID, deltaOf(p.rx, h.RxBytes), deltaOf(p.tx, h.TxBytes))
-			in.prev[h.PublicKey] = counters{rx: h.RxBytes, tx: h.TxBytes, hs: h.LastHS, online: online(h, now), seen: true}
+			in.prev[h.PublicKey] = counters{rx: h.RxBytes, tx: h.TxBytes, hs: h.LastHS, online: online(h, now), seen: true, pending: pending}
 			if online(h, now) {
 				out.Sessions = append(out.Sessions, plugin.Session{CredID: w.credID, InboundID: in.spec.ID, Since: h.LastHS})
 			}

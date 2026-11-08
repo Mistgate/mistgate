@@ -907,6 +907,50 @@ func TestStandTwoProfiles(t *testing.T) {
 	}
 }
 
+// links/3 on the real userspace backend: a device that gets through has its initiations answered and confirmed; a device
+// whose return path is cut (its namespace drops everything from the node's port) keeps initiating, the node keeps
+// answering, and the answers stay unmatched.
+func TestStandHandshakeCounts(t *testing.T) {
+	s := newStand(t)
+	p := newProfile(t, awgcfg.Version31, 51842, 1, full31(t))
+	ok, cut := newDevice(t, p, 2), newDevice(t, p, 3)
+	s.apply(p.spec(t, "inb1"), ok.cred("ok"), cut.cred("cut"))
+	_ = s.collect() // the baseline round
+	cl := s.client(awgtest.Flavor31, p, ok)
+	s.mustHandshake(cl)
+	s.mustPing("10.66.4.1", 2)
+
+	ns, server := s.secondClientNS()
+	nft := ns.Cmd("nft", "-f", "-")
+	nft.Stdin = strings.NewReader(`table inet mg3awg_cut { chain input { type filter hook input priority filter; udp sport 51842 drop; } }`)
+	if out, err := nft.CombinedOutput(); err != nil {
+		t.Fatalf("cut the return path: %v: %s", err, out)
+	}
+	cutCl := s.clientIn(ns, server, awgtest.Flavor31, p, cut)
+	sum := map[string]plugin.LinkStat{}
+	for range 4 { // rounds of 6 s: the cut device retries every 5 s
+		time.Sleep(6 * time.Second)
+		for _, l := range s.collect().Links {
+			x := sum[l.CredID]
+			x.Connects += l.Connects
+			x.Initiations += l.Initiations
+			x.Responses += l.Responses
+			x.ResponsesUnmatched += l.ResponsesUnmatched
+			sum[l.CredID] = x
+		}
+	}
+	if cutCl.Handshaken() {
+		t.Fatal("the device behind the cut return path completed a handshake")
+	}
+	if o := sum["ok"]; o.Initiations == 0 || o.Responses == 0 || o.ResponsesUnmatched != 0 {
+		t.Errorf("the device that got through: %+v; want initiations answered and confirmed", o)
+	}
+	if c := sum["cut"]; c.Initiations < 2 || c.Responses < 2 || c.ResponsesUnmatched == 0 || c.Connects != 0 {
+		t.Errorf("the device behind the cut return path: %+v; want answers that stay unmatched", c)
+	}
+	t.Logf("handshake counts: ok %+v, cut %+v", sum["ok"], sum["cut"])
+}
+
 // What the firewall layer must still decide (not the engine's job): can a tunnel client reach another client?
 // The answer is logged for the agent's hostctl.SetTunnels; the test asserts nothing about it.
 func TestStandFindingClientToClient(t *testing.T) {
