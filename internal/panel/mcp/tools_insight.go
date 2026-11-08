@@ -52,9 +52,9 @@ func insightTools() []toolDef {
 		"Check history is hourly: buckets that overlap the window count. unavailable names a part that could not be read. Use timeline for the order of events on one node and node_get, node_journal or checks_results for detail."
 	diagnoseDesc := "Why one person cannot connect, in one call: user_id (as users_search gives it) and hours (1 to 168, default 24) for the connection counters. " +
 		"Returns the user and their access (status, expiry, quota and usage, device limit and devices with platform, client and fingerprint), which nodes and profiles their subscription gives them (structure only, as subscription_preview: no link, no keys, no addresses), " +
-		"per device and node the connection verdict from the nodes' link counters (ok, rejected, stalled, frozen, lossy, slow, no_attempts or no_counters, with signals and the counts: connects, rejects, stalls, freezes, rtt, loss), " +
+		"per device and node the connection verdict from the nodes' link counters (ok, rejected, unanswered, answers_lost, stalled, throttled, frozen, lossy, slow, no_attempts or no_counters, with signals and the counts: connects, rejects, stalls, freezes, rtt, loss, and with links/3 agents tcp_stalls, tcp_stalls_16k, initiations, responses, responses_unmatched; not_known names those of them this node cannot tell, so their zero means nothing), " +
 		"the alerts and events about the person in the window, the state of the nodes they use (status, country verdict, check failures), and findings: a short machine-readable list " +
-		"(device_limit_reached, expired, disabled, over_quota, never_connected, no_attempts_in_window, rejects_auth, stalls, freezes, high_loss, high_rtt, node_down, node_blocked_in_country, no_node_access, no_profiles, device_blocked, no_counters), " +
+		"(device_limit_reached, expired, disabled, over_quota, never_connected, no_attempts_in_window, rejects_auth, handshake_unanswered (AmneziaWG: the node does not answer: our side), handshake_answers_lost (the node answers and the answers do not arrive: the way back is cut), stalls, tcp_freeze_16k (VLESS: connections stop after the first 8 to 32 KiB: TCP throttling), freezes, high_loss, high_rtt, node_down, node_blocked_in_country, no_node_access, no_profiles, device_blocked, no_counters), " +
 		"each with severity, evidence refs (user:..., conn:<device>:<node>, alert:<id>, event:<id>, check:<node>) and detail. verdict is the most severe finding, or no_issue_found. " +
 		"Counts only: never a key, a link, a page password or a client address. Counters mean what user_connection says they mean."
 	return []toolDef{
@@ -1219,6 +1219,14 @@ type diagConnV struct {
 	LossPermille *uint32  `json:"loss_permille,omitempty"`
 	OnlineS      uint64   `json:"online_s"`
 	LastHour     int64    `json:"last_hour_unix,omitempty"`
+	// links/3 of the device's keys: VLESS TCP stalls, AmneziaWG handshake counts; not_known names those its protocol could
+	// have and this node cannot tell (an older agent, the kernel AWG backend, a VLESS transport without them).
+	TCPStalls          uint32   `json:"tcp_stalls,omitempty"`
+	TCPStalls16K       uint32   `json:"tcp_stalls_16k,omitempty"`
+	Initiations        uint32   `json:"initiations,omitempty"`
+	Responses          uint32   `json:"responses,omitempty"`
+	ResponsesUnmatched uint32   `json:"responses_unmatched,omitempty"`
+	NotKnown           []string `json:"not_known,omitempty"`
 }
 
 type diagEventV struct {
@@ -1354,6 +1362,16 @@ func (c *call) userDiagnose(in diagnoseArg) (any, error) {
 			g.Quiet += r.GetQuiet()
 			g.ClientCloses += r.GetClientCloses()
 			g.OnlineS += r.GetOnlineS()
+			g.TCPStalls += r.GetTcpStalls()
+			g.TCPStalls16K += r.GetTcpStalls_16K()
+			g.Initiations += r.GetInitiations()
+			g.Responses += r.GetResponses()
+			g.ResponsesUnmatched += r.GetResponsesUnmatched()
+			for _, f := range keyReasonFields(r.GetProtocol()) {
+				if slices.Contains(r.GetUnsupported(), f) && !slices.Contains(g.NotKnown, f) {
+					g.NotKnown = append(g.NotKnown, f)
+				}
+			}
 			g.LastHour = max(g.LastHour, r.GetLastHourUnix())
 			devConnects[r.GetDeviceId()] += r.GetConnects()
 			if n := uint64(r.GetRttSamples()); n > 0 {
@@ -1384,9 +1402,30 @@ func (c *call) userDiagnose(in diagnoseArg) (any, error) {
 			g.Signals = append(g.Signals, "rejects")
 			add("rejects_auth", "error", map[string]string{"rejects": strconv.FormatUint(uint64(g.Rejects), 10), "why": "a known key was refused because its term ended", "node": g.NodeName}, ref)
 		}
+		awgKnown := !slices.Contains(g.NotKnown, "responses_unmatched") && slices.Contains(g.Protocols, "awg")
+		if awgKnown && g.Initiations >= minReasonCount && g.Responses*5 < g.Initiations {
+			// the node does not answer: our side, whatever the path does
+			g.Signals = append(g.Signals, "unanswered")
+			add("handshake_unanswered", "error", map[string]string{"initiations": u32(g.Initiations), "responses": u32(g.Responses), "node": g.NodeName,
+				"why": "the device's initiations reach the node and it does not answer them: replays, a flood limit or an engine failure on the node"}, ref)
+		}
+		if awgKnown && g.Responses >= minReasonCount && g.ResponsesUnmatched*100 >= g.Responses*answerLostPct {
+			g.Signals = append(g.Signals, "answers_lost")
+			add("handshake_answers_lost", "warning", map[string]string{"responses": u32(g.Responses), "responses_unmatched": u32(g.ResponsesUnmatched), "node": g.NodeName,
+				"why": "the node answered the device's handshakes and the answers never arrived: the way back to the device is cut, or the device cannot read them"}, ref)
+		}
 		if g.Stalls > 0 && (g.Connects == 0 || g.Stalls >= 3) {
 			g.Signals = append(g.Signals, "stalls")
-			add("stalls", "warning", map[string]string{"stalls": strconv.FormatUint(uint64(g.Stalls), 10), "connects": strconv.FormatUint(uint64(g.Connects), 10), "node": g.NodeName}, ref)
+			d := map[string]string{"stalls": strconv.FormatUint(uint64(g.Stalls), 10), "connects": strconv.FormatUint(uint64(g.Connects), 10), "node": g.NodeName}
+			if slices.Contains(g.NotKnown, "responses_unmatched") {
+				d["why"] = "not known: the node's agent or its kernel AmneziaWG backend cannot tell an unanswered initiation from a lost answer"
+			}
+			add("stalls", "warning", d, ref)
+		}
+		if g.TCPStalls16K >= 2 && g.TCPStalls16K*2 >= g.TCPStalls {
+			g.Signals = append(g.Signals, "tcp_freeze_16k")
+			add("tcp_freeze_16k", "warning", map[string]string{"tcp_stalls": u32(g.TCPStalls), "tcp_stalls_16k": u32(g.TCPStalls16K), "connects": u32(g.Connects), "node": g.NodeName,
+				"why": "the device's VLESS connections stop after the first 8 to 32 KiB: the TSPU's freeze of a TCP stream; a UDP protocol or XHTTP behind a CDN avoids it"}, ref)
 		}
 		if g.Freezes >= 2 {
 			g.Signals = append(g.Signals, "freezes")
@@ -1403,8 +1442,14 @@ func (c *call) userDiagnose(in diagnoseArg) (any, error) {
 		switch {
 		case slices.Contains(g.Signals, "rejects"):
 			g.Verdict = "rejected"
+		case slices.Contains(g.Signals, "unanswered"):
+			g.Verdict = "unanswered"
+		case slices.Contains(g.Signals, "answers_lost"):
+			g.Verdict = "answers_lost"
 		case slices.Contains(g.Signals, "stalls"):
 			g.Verdict = "stalled"
+		case slices.Contains(g.Signals, "tcp_freeze_16k"):
+			g.Verdict = "throttled"
 		case slices.Contains(g.Signals, "freezes"):
 			g.Verdict = "frozen"
 		case slices.Contains(g.Signals, "high_loss"):
@@ -1553,7 +1598,7 @@ func (c *call) userDiagnose(in diagnoseArg) (any, error) {
 	}
 	total := uint32(0)
 	for _, g := range v.Connections {
-		total += g.Connects + g.Rejects + g.Stalls + g.Drops
+		total += g.Connects + g.Rejects + g.Stalls + g.Drops + g.Initiations
 	}
 	switch {
 	case u.GetLastSeenUnix() == 0 && len(v.Devices) == 0 && total == 0:

@@ -32,6 +32,15 @@ type rejectSplitV struct {
 	HandshakeIncomplete uint32 `json:"handshake_incomplete,omitempty"`
 	NoAuth              uint32 `json:"no_auth,omitempty"`
 	StalledHandshake    uint32 `json:"stalled_handshake,omitempty"`
+	// links/3: why, where the engine sees it
+	NoReply           uint32 `json:"no_reply,omitempty"`            // hs_unfinished: the node answered, nothing came back
+	CertRefused       uint32 `json:"cert_refused,omitempty"`        // the app refused the node's certificate
+	AlertsSent        uint32 `json:"alerts_sent,omitempty"`         // the node refused the hello (ALPN, version)
+	AlertsRecv        uint32 `json:"alerts_recv,omitempty"`         // the app ended the handshake with an alert
+	RealityFallback   uint32 `json:"reality_fallback,omitempty"`    // sent to the REALITY target as not a client
+	RealityAuthFailed uint32 `json:"reality_auth_failed,omitempty"` // our name, wrong key or short id
+	AnswersLost       uint32 `json:"answers_lost,omitempty"`        // AWG responses never confirmed
+	Unanswered        uint32 `json:"unanswered,omitempty"`          // AWG initiations the node did not answer
 }
 
 type accessGroupCellV struct {
@@ -78,6 +87,8 @@ type accessCellV struct {
 	RejectSplit        *rejectSplitV      `json:"reject_split,omitempty"`
 	Hellos             uint32             `json:"hellos,omitempty"`
 	Handshakes         uint32             `json:"handshakes,omitempty"`
+	TCPStalls          uint32             `json:"tcp_stalls,omitempty"`
+	TCPStalls16K       uint32             `json:"tcp_stalls_16k,omitempty"`
 	Verdict            string             `json:"verdict"`
 	Signals            []string           `json:"signals,omitempty"`
 	Unsupported        []string           `json:"unsupported,omitempty"`
@@ -196,8 +207,8 @@ func (v *AccessReportV) shrink() bool {
 }
 
 var accessLimits = []string{
-	"VLESS keeps no attempt counter, only online_s: its attempts are not observable, so success_pct is absent and a VLESS failure shows only through the country view and kl!ck.",
-	"rejects are known keys refused for an ended term; unknown_keys are keys the node does not hold. The counters do not say why a handshake failed (a TLS alert, an auth failure and an AWG initiation without a reply are separate causes that look alike).",
+	"VLESS keeps no failure counter per device, so success_pct is absent; with links/3 agents its server counts hellos, connects over REALITY TCP, REALITY refusals, unfinished handshakes and TCP stalls (reject_split, tcp_stalls, signals).",
+	"rejects are known keys refused for an ended term; unknown_keys are keys the node does not hold. Why a handshake failed (no reply, a TLS alert either way, a refused certificate, a failed REALITY authentication, AWG answers lost or not sent) is in reject_split for links/3 agents only where the engine sees it; unsupported names the rest, including every reason on older agents and the AWG handshake counts on the kernel backend.",
 	"The country check judges TCP ports and addresses only: there is no UDP test, so UDP protocols are judged by in-country port checks, path loss and the counters.",
 	"kl!ck reports have no operator by protocol split: operators and server kinds are tallied apart. Counters know no country or operator of a person.",
 }
@@ -454,8 +465,21 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 	if c.Protocol == "awg" {
 		split.StalledHandshake = max(c.Stalls, t.Stalls)
 	}
+	split.NoReply, split.CertRefused, split.AlertsSent = t.HsUnfinished, t.TLSCertRefused, t.TLSAlertsSent
+	split.AlertsRecv, split.RealityFallback, split.RealityAuthFailed = t.TLSAlertsRecv, t.RealityFallback, t.AuthFailed
+	split.AnswersLost, split.Unanswered = t.ResponsesUnmatched, t.Initiations-min(t.Initiations, t.Responses)
 	if split != (rejectSplitV{}) {
 		c.RejectSplit = &split
+	}
+	c.TCPStalls, c.TCPStalls16K = t.TCPStalls, t.TCPStalls16K
+	if freeze, _, _ := t.tcpFreeze(); freeze {
+		c.Signals = append(c.Signals, "tcp_freeze_16k")
+	}
+	if lost, _ := t.answerLost(c.Protocol); lost {
+		c.Signals = append(c.Signals, "answers_lost")
+	}
+	if t.known("tls_cert_refused") && t.TLSCertRefused >= minReasonCount {
+		c.Signals = append(c.Signals, "cert_refused")
 	}
 	// signals and the verdict
 	if c.Rejects > 0 {
@@ -475,6 +499,9 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 		c.Verdict = "no_signal"
 		if c.DevicesOK > 0 {
 			c.Verdict = "ok"
+		}
+		if slices.Contains(c.Signals, "tcp_freeze_16k") || slices.Contains(c.Signals, "answers_lost") || slices.Contains(c.Signals, "cert_refused") {
+			c.Verdict = "degraded" // the server's own handshakes or streams say so, though no device counts its failures
 		}
 	case c.DevicesTried == 0:
 		c.Verdict = "no_attempts"

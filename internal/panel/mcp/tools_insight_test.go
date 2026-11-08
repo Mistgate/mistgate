@@ -622,6 +622,59 @@ func TestUserDiagnoseFindings(t *testing.T) {
 		{"no access", func(w *insightWorld) {
 			w.users["usr_alice"].NodeAccess, w.users["usr_alice"].Profiles = nil, nil
 		}, []string{"no_node_access", "no_profiles"}, nil, nil},
+		// links/3: an AmneziaWG device whose answers never arrive, one the node does not answer, a VLESS device frozen after 16 KiB
+		{"awg answers lost", func(w *insightWorld) {
+			w.conn = &adminv1.GetUserConnectionResponse{Rows: []*adminv1.DeviceConnection{row("dev_link", nodeA, "de1", func(r *adminv1.DeviceConnection) {
+				r.Protocol, r.Connects, r.Stalls, r.Initiations, r.Responses, r.ResponsesUnmatched = "awg", 0, 4, 9, 9, 8
+				r.Unsupported = []string{"tcp_stalls", "tcp_stalls_16k"}
+			})}}
+		}, []string{"handshake_answers_lost", "stalls"}, []string{"handshake_unanswered"}, func(t *testing.T, d DiagnoseV) {
+			c := d.Connections[0]
+			if c.Verdict != "answers_lost" || c.ResponsesUnmatched != 8 || len(c.NotKnown) != 0 || finding(d, "stalls").Detail["why"] != "" {
+				t.Errorf("connection %+v, stalls %+v", c, finding(d, "stalls"))
+			}
+		}},
+		{"awg unanswered", func(w *insightWorld) {
+			w.conn = &adminv1.GetUserConnectionResponse{Rows: []*adminv1.DeviceConnection{row("dev_link", nodeA, "de1", func(r *adminv1.DeviceConnection) {
+				r.Protocol, r.Connects, r.Initiations, r.Responses = "awg", 0, 12, 0
+				r.Unsupported = []string{"tcp_stalls", "tcp_stalls_16k"}
+			})}}
+		}, []string{"handshake_unanswered"}, []string{"handshake_answers_lost", "no_attempts_in_window"}, func(t *testing.T, d DiagnoseV) {
+			if d.Connections[0].Verdict != "unanswered" || d.Verdict != "handshake_unanswered" {
+				t.Errorf("verdict %q connection %+v", d.Verdict, d.Connections[0])
+			}
+		}},
+		{"awg kernel backend: not known", func(w *insightWorld) {
+			w.conn = &adminv1.GetUserConnectionResponse{Rows: []*adminv1.DeviceConnection{row("dev_link", nodeA, "de1", func(r *adminv1.DeviceConnection) {
+				r.Protocol, r.Connects, r.Stalls = "awg", 0, 5
+				r.Unsupported = []string{"tcp_stalls", "tcp_stalls_16k", "initiations", "responses", "responses_unmatched"}
+			})}}
+		}, []string{"stalls"}, []string{"handshake_answers_lost", "handshake_unanswered"}, func(t *testing.T, d DiagnoseV) {
+			c := d.Connections[0]
+			if !slices.Equal(c.NotKnown, []string{"initiations", "responses", "responses_unmatched"}) || !strings.Contains(finding(d, "stalls").Detail["why"], "not known") {
+				t.Errorf("connection %+v, stalls %+v", c, finding(d, "stalls"))
+			}
+		}},
+		{"vless frozen after 16 KiB", func(w *insightWorld) {
+			w.conn = &adminv1.GetUserConnectionResponse{Rows: []*adminv1.DeviceConnection{row("dev_link", nodeA, "de1", func(r *adminv1.DeviceConnection) {
+				r.Protocol, r.Connects, r.TcpStalls, r.TcpStalls_16K = "vless", 6, 5, 4
+				r.Unsupported = []string{"initiations", "responses", "responses_unmatched"}
+			})}}
+		}, []string{"tcp_freeze_16k"}, nil, func(t *testing.T, d DiagnoseV) {
+			if c := d.Connections[0]; c.Verdict != "throttled" || c.TCPStalls16K != 4 || len(c.NotKnown) != 0 {
+				t.Errorf("connection %+v", c)
+			}
+		}},
+		{"vless on an old agent: not known", func(w *insightWorld) {
+			w.conn = &adminv1.GetUserConnectionResponse{Rows: []*adminv1.DeviceConnection{row("dev_link", nodeA, "de1", func(r *adminv1.DeviceConnection) {
+				r.Protocol, r.Connects = "vless", 0
+				r.Unsupported = []string{"tcp_stalls", "tcp_stalls_16k", "initiations", "responses", "responses_unmatched"}
+			})}}
+		}, nil, []string{"tcp_freeze_16k"}, func(t *testing.T, d DiagnoseV) {
+			if c := d.Connections[0]; !slices.Equal(c.NotKnown, []string{"tcp_stalls", "tcp_stalls_16k"}) {
+				t.Errorf("connection %+v", c)
+			}
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
