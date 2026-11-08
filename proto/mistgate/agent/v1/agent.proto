@@ -886,8 +886,8 @@ message LinkCounters {
   // reached its 10-second deadline. The answer did not reach the client, or the client gave up without a word.
   uint32 hs_unfinished = 20;
   // Volume, inbound row only (hysteria2, vless tls): handshakes the node ended with a TLS alert (no common ALPN, version or
-  // cipher: scanners, a client of another protocol, a probe), and handshakes the client ended with one (it refused what
-  // the node offered).
+  // cipher: scanners, a client of another protocol, a probe; a refused ALPN comes before the certificate, so it is not in
+  // hellos), and handshakes the client ended with one (it refused what the node offered).
   uint32 tls_alerts_sent = 21;
   uint32 tls_alerts_recv = 22;
   // Volume, inbound row only: of tls_alerts_recv, the alerts that refuse the certificate (bad_certificate,

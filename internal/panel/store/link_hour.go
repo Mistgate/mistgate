@@ -2,8 +2,8 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,12 +22,87 @@ type FleetLink struct {
 	Initiations, Responses, ResponsesUnmatched                 uint32
 }
 
-// reasons is the links/3 part of the row, in the order of linkHourColumns.
-func (l FleetLink) reasons() []any {
-	return []any{min(l.HsUnfinished, maxLinkCount), min(l.TLSAlertsSent, maxLinkCount), min(l.TLSAlertsRecv, maxLinkCount),
-		min(l.TLSCertRefused, maxLinkCount), min(l.RealityFallback, maxLinkCount), min(l.AuthFailed, maxLinkCount),
-		min(l.TCPStalls, maxLinkCount), min(l.TCPStalls16K, maxLinkCount), min(l.Initiations, maxLinkCount),
-		min(l.Responses, maxLinkCount), min(l.ResponsesUnmatched, maxLinkCount)}
+// linkRow is one row of the link_hour statement: the key, its person and the counters in the order of linkHourColumns. A
+// typed row written straight to JSON keeps the edge's largest batch inside the isolate's memory (TestD1IngestStatsAtEdgeCap),
+// which boxed values and reflection did not once the links/3 counters came.
+type linkRow struct {
+	cred, inbound, user string
+	n                   [linkHourCounters]uint64
+}
+
+// linkHourCounters is len(linkHourColumns).
+const linkHourCounters = 31
+
+// Positions in linkRow.n (linkHourColumns).
+const (
+	lcConnects = iota
+	lcRejects
+	lcDrops
+	lcStalls
+	lcOnlineS
+	lcUnknownKeys
+	lcHellos
+	lcHandshakes
+	lcProbeHandshakes
+	lcClientCloses
+	lcFreezes
+	lcQuiet
+	lcAccepted
+	lcHellosForeign
+	lcRttMSSum
+	lcRttSamples
+	lcPktsSent
+	lcPktsLost
+	lcProbePktsSent
+	lcProbePktsLost
+	lcHsUnfinished // links/3 from here on
+)
+
+// row is the link as a stored row of user, with every counter clamped (maxLinkCount, maxLinkSum).
+func (l FleetLink) row(user string) linkRow {
+	r := linkRow{cred: l.CredID, inbound: l.InboundID, user: user}
+	c := func(v uint32) uint64 { return uint64(min(v, maxLinkCount)) }
+	w := func(v uint64) uint64 { return min(v, maxLinkSum) }
+	copy(r.n[:], []uint64{c(l.Connects), c(l.Rejects), c(l.Drops), c(l.Stalls), c(l.OnlineS), c(l.UnknownKeys), c(l.Hellos),
+		c(l.Handshakes), 0, c(l.ClientCloses), c(l.Freezes), c(l.Quiet), c(l.Accepted), c(l.HellosForeign), w(l.RttMSSum),
+		c(l.RttSamples), w(l.PktsSent), w(l.PktsLost), 0, 0,
+		c(l.HsUnfinished), c(l.TLSAlertsSent), c(l.TLSAlertsRecv), c(l.TLSCertRefused), c(l.RealityFallback), c(l.AuthFailed),
+		c(l.TCPStalls), c(l.TCPStalls16K), c(l.Initiations), c(l.Responses), c(l.ResponsesUnmatched)})
+	return r
+}
+
+// appendJSON writes the row as a JSON array.
+func (r *linkRow) appendJSON(b []byte) []byte {
+	b = append(b, '[')
+	for _, s := range []string{r.cred, r.inbound, r.user} {
+		b = appendJSONString(b, s)
+		b = append(b, ',')
+	}
+	for i, v := range r.n {
+		if i > 0 {
+			b = append(b, ',')
+		}
+		b = strconv.AppendUint(b, v, 10)
+	}
+	return append(b, ']')
+}
+
+// appendJSONString writes s as a JSON string. Ids are valid UTF-8 (protobuf strings are); only quotes, backslashes and control
+// characters need escaping.
+func appendJSONString(b []byte, s string) []byte {
+	const hex = "0123456789abcdef"
+	b = append(b, '"')
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c == '"' || c == '\\':
+			b = append(b, '\\', c)
+		case c < 0x20:
+			b = append(b, '\\', 'u', '0', '0', hex[c>>4], hex[c&0xf])
+		default:
+			b = append(b, c)
+		}
+	}
+	return append(b, '"')
 }
 
 // maxLinkCount clamps one counter of a row of one batch (about a million: no engine counts that many events or seconds of one key in
@@ -88,19 +163,21 @@ var linkHourQuery = func() string {
 // arrays ([cred, inbound, user] and then linkHourColumns): D1 binds at most 100 values, and splitting the rows keeps each
 // bound value under D1's 2,000,000-byte limit at the 10,000-row edge cap. With no rows it still runs (empty arrays), so the
 // batch has the same shape on every call.
-func linkHourStmt(nodeID string, hourStart int64, rows [][]any) (Stmt, error) {
-	if rows == nil {
-		rows = [][]any{}
-	}
+func linkHourStmt(nodeID string, hourStart int64, rows []linkRow) (Stmt, error) {
 	args := make([]any, 0, linkHourParts+2)
 	per := (len(rows) + linkHourParts - 1) / linkHourParts
+	var b []byte
 	for i := range linkHourParts {
 		lo, hi := min(i*per, len(rows)), min((i+1)*per, len(rows))
-		part, err := json.Marshal(rows[lo:hi])
-		if err != nil {
-			return Stmt{}, err
+		b = append(b[:0], '[')
+		for j := lo; j < hi; j++ {
+			if j > lo {
+				b = append(b, ',')
+			}
+			b = rows[j].appendJSON(b)
 		}
-		args = append(args, string(part))
+		b = append(b, ']')
+		args = append(args, string(b))
 	}
 	return Stmt{Query: linkHourQuery, Args: append(args, nodeID, hourStart)}, nil
 }

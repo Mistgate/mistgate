@@ -831,8 +831,8 @@ export type LinkCounters = Message<"mistgate.agent.v1.LinkCounters"> & {
 
   /**
    * Volume, inbound row only (hysteria2, vless tls): handshakes the node ended with a TLS alert (no common ALPN, version or
-   * cipher: scanners, a client of another protocol, a probe), and handshakes the client ended with one (it refused what
-   * the node offered).
+   * cipher: scanners, a client of another protocol, a probe; a refused ALPN comes before the certificate, so it is not in
+   * hellos), and handshakes the client ended with one (it refused what the node offered).
    *
    * @generated from field: uint32 tls_alerts_sent = 21;
    */

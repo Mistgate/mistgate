@@ -120,17 +120,18 @@ func rememberClose(addr string, counters *inboundCounters, now time.Time) {
 	recentCloses.mu.Unlock()
 }
 
-// takeClose finds and forgets the newest close of addr within the TTL.
+// takeClose finds and forgets the newest close of addr within the TTL. A taken entry keeps its time and is skipped, so a
+// verdict that comes after another connection's still finds its own.
 func takeClose(addr string, now time.Time) *inboundCounters {
 	recentCloses.mu.Lock()
 	defer recentCloses.mu.Unlock()
 	n := len(recentCloses.ring)
 	for i := 1; i <= n; i++ {
 		e := &recentCloses.ring[(recentCloses.next-i+n)%n]
-		if e.counters == nil || now.Sub(e.at) > recentCloseTTL {
-			return nil // older entries are older still
+		if e.at.IsZero() || now.Sub(e.at) > recentCloseTTL {
+			return nil // never used, or older than the TTL: older entries are older still
 		}
-		if e.addr == addr {
+		if e.counters != nil && e.addr == addr {
 			c := e.counters
 			*e = recentClose{at: e.at}
 			return c

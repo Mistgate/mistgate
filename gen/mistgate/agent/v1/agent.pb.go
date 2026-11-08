@@ -1682,8 +1682,8 @@ type LinkCounters struct {
 	// reached its 10-second deadline. The answer did not reach the client, or the client gave up without a word.
 	HsUnfinished uint32 `protobuf:"varint,20,opt,name=hs_unfinished,json=hsUnfinished,proto3" json:"hs_unfinished,omitempty"`
 	// Volume, inbound row only (hysteria2, vless tls): handshakes the node ended with a TLS alert (no common ALPN, version or
-	// cipher: scanners, a client of another protocol, a probe), and handshakes the client ended with one (it refused what
-	// the node offered).
+	// cipher: scanners, a client of another protocol, a probe; a refused ALPN comes before the certificate, so it is not in
+	// hellos), and handshakes the client ended with one (it refused what the node offered).
 	TlsAlertsSent uint32 `protobuf:"varint,21,opt,name=tls_alerts_sent,json=tlsAlertsSent,proto3" json:"tls_alerts_sent,omitempty"`
 	TlsAlertsRecv uint32 `protobuf:"varint,22,opt,name=tls_alerts_recv,json=tlsAlertsRecv,proto3" json:"tls_alerts_recv,omitempty"`
 	// Volume, inbound row only: of tls_alerts_recv, the alerts that refuse the certificate (bad_certificate,

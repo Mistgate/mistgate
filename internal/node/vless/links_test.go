@@ -309,6 +309,15 @@ func TestRealityVerdictLines(t *testing.T) {
 		t.Fatalf("verdicts = fallback %d, foreign %d, auth %d, unfinished %d", c.realityFallback.Load(), c.hellosForeign.Load(),
 			c.authFailed.Load(), c.hsUnfinished.Load())
 	}
+	// two connections close, the newer one's verdict comes first: the older one still finds its own entry
+	a, b := &inboundCounters{}, &inboundCounters{}
+	rememberClose("192.0.2.1:1001", a, now)
+	rememberClose("192.0.2.2:1002", b, now)
+	realityVerdict("REALITY: processed invalid connection from 192.0.2.2:1002: failed to read client hello", now)
+	realityVerdict("REALITY: processed invalid connection from 192.0.2.1:1001: authentication failed or validation criteria not met", now)
+	if a.authFailed.Load() != 1 || b.realityFallback.Load() != 1 || b.authFailed.Load() != 0 {
+		t.Fatalf("out-of-order verdicts: a auth %d, b fallback %d auth %d", a.authFailed.Load(), b.realityFallback.Load(), b.authFailed.Load())
+	}
 	// an address seen long ago, or never, counts nowhere; a line of another kind is not a verdict
 	rememberClose("198.51.100.4:1000", c, now.Add(-time.Minute))
 	realityVerdict("REALITY: processed invalid connection from 198.51.100.4:1000: authentication failed", now)

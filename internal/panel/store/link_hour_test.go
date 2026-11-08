@@ -22,20 +22,20 @@ func TestLinkHourD1PayloadAtEdgeCap(t *testing.T) {
 	credID := "crd_" + strings.Repeat("c", 26)
 	inboundID := "inb_" + strings.Repeat("i", 26)
 	userID := "usr_" + strings.Repeat("u", 26)
-	row := []any{credID, inboundID, userID}
-	for i := 0; i < 8; i++ { // legacy counts
-		row = append(row, uint32(maxLinkCount))
+	row := linkRow{cred: credID, inbound: inboundID, user: userID}
+	for i := range row.n {
+		switch i {
+		case lcProbeHandshakes:
+		case lcRttMSSum, lcPktsSent, lcPktsLost, lcProbePktsSent, lcProbePktsLost:
+			row.n[i] = maxLinkSum
+		default:
+			row.n[i] = maxLinkCount
+		}
 	}
-	row = append(row, uint32(0)) // probe_handshakes
-	for i := 0; i < 5; i++ {     // client_closes through hellos_foreign
-		row = append(row, uint32(maxLinkCount))
+	if len(linkHourColumns) != linkHourCounters || linkHourColumns[lcHsUnfinished] != "hs_unfinished" || linkHourColumns[lcProbePktsLost] != "probe_pkts_lost" {
+		t.Fatalf("linkRow positions do not match linkHourColumns")
 	}
-	row = append(row, uint64(maxLinkSum), uint32(maxLinkCount), uint64(maxLinkSum), uint64(maxLinkSum))
-	row = append(row, uint64(maxLinkSum), uint64(maxLinkSum)) // probe_pkts_sent, probe_pkts_lost
-	for i := 0; i < 11; i++ {                                 // links/3: hs_unfinished through responses_unmatched
-		row = append(row, uint32(maxLinkCount))
-	}
-	rows := make([][]any, rowsAtCap)
+	rows := make([]linkRow, rowsAtCap)
 	for i := range rows {
 		rows[i] = row
 	}
@@ -43,9 +43,15 @@ func TestLinkHourD1PayloadAtEdgeCap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	full, err := json.Marshal(rows)
-	if err != nil {
-		t.Fatal(err)
+	full := make([]byte, 0, 4<<20)
+	for i := range rows {
+		full = rows[i].appendJSON(append(full, ','))
+	}
+	// the JSON the statement binds is valid and holds the clamps
+	var back [][]any
+	if err := json.Unmarshal([]byte(stmt.Args[0].(string)), &back); err != nil || len(back[0]) != 3+linkHourCounters ||
+		back[0][0] != credID || back[0][3+lcRttMSSum] != float64(maxLinkSum) || back[0][3+lcHsUnfinished] != float64(maxLinkCount) {
+		t.Fatalf("link_hour JSON: %v, first row %v", err, back[0])
 	}
 	if len(stmt.Args) != linkHourParts+2 || len(full) <= d1ValueLimit {
 		t.Fatalf("edge link_hour: %d arguments, unsplit JSON %d bytes; want %d arguments and the unsplit value over D1's limit",
@@ -59,4 +65,12 @@ func TestLinkHourD1PayloadAtEdgeCap(t *testing.T) {
 		}
 	}
 	t.Logf("link_hour JSON at %d rows: unsplit=%d bytes, split=%v bytes", rowsAtCap, len(full), parts)
+}
+
+func TestLinkRowJSONEscapes(t *testing.T) {
+	r := linkRow{cred: "c\"1\\", inbound: "inb\n", user: "пользователь"}
+	var back []any
+	if err := json.Unmarshal(r.appendJSON(nil), &back); err != nil || back[0] != "c\"1\\" || back[1] != "inb\n" || back[2] != "пользователь" {
+		t.Fatalf("escaped row = %v, %v", back, err)
+	}
 }

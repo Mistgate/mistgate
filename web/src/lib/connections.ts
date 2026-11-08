@@ -49,7 +49,8 @@ type KeyReasons = {
  */
 function keyReasonParts(t: T, x: KeyReasons): Part[] {
   const parts: Part[] = [];
-  const known = (f: string) => !x.unsupported.includes(f);
+  const unsupported = x.unsupported ?? []; // a row of a panel before links/3 has no list
+  const known = (f: string) => !unsupported.includes(f);
   if (known("tcp_stalls_16k") && x.tcpStalls16k > 0) {
     parts.push({ text: t("conn.freeze16k", { n: x.tcpStalls16k }), warn: x.tcpStalls16k >= 2, hint: t("conn.freeze16k.hint") });
   }
