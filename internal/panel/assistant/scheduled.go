@@ -174,27 +174,17 @@ func (s *Service) RunScheduled(ctx context.Context, run ScheduledRun) ScheduledO
 	if err != nil {
 		return fail("failed", "tools_unavailable")
 	}
-	tools := make([]chatTool, 0, len(registry)+3)
+	tools := make([]chatTool, 0, len(registry)+1)
 	for _, t := range registry {
 		if t.Name == "" || strings.HasSuffix(t.Name, "_apply") {
 			continue
 		}
 		tools = append(tools, chatTool{AssistantTool: t})
 	}
-	for _, t := range assistantToolSchemas() {
-		// no person reads along: nothing to remember for them, no page to open, no secret field to show
-		if t.Name == "conversation_search" || t.Name == "conversation_read" {
-			tools = append(tools, chatTool{AssistantTool: t, local: true})
-		}
-	}
 	tools = append(tools, chatTool{AssistantTool: verdictSchema(), local: true})
 
-	system, err := s.assistantSystem(ctx, admin, settings, conversationID)
-	if err != nil {
-		return fail("failed", "internal")
-	}
 	note := scheduledNote + "\nThe task is named " + quoteUntrusted(cleanContextText(run.TaskName, 120)) + "."
-	system = strings.TrimSpace(note + "\n\n" + system)
+	system := strings.TrimSpace(note)
 
 	lastCode, attemptedAny := "", false
 	for i, provider := range providers {

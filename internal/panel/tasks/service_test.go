@@ -72,17 +72,62 @@ func (s *fakeSession) CallTool(_ context.Context, name string, _ json.RawMessage
 func (*fakeSession) Close() error { return nil }
 
 type fakeAssistant struct {
-	mu   sync.Mutex
-	runs []assistant.ScheduledRun
-	out  assistant.ScheduledOutcome
+	mu      sync.Mutex
+	runs    []assistant.ScheduledRun
+	out     assistant.ScheduledOutcome
+	entered chan struct{}
+	release chan struct{}
 }
 
-func (a *fakeAssistant) RunScheduled(_ context.Context, run assistant.ScheduledRun) assistant.ScheduledOutcome {
+func (a *fakeAssistant) RunScheduled(ctx context.Context, run assistant.ScheduledRun) assistant.ScheduledOutcome {
+	if a.entered != nil {
+		select {
+		case a.entered <- struct{}{}:
+		default:
+		}
+	}
+	if a.release != nil {
+		select {
+		case <-a.release:
+		case <-ctx.Done():
+		}
+	}
+	if ctx.Err() != nil {
+		return assistant.ScheduledOutcome{Status: "failed", Reason: "interrupted"}
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.runs = append(a.runs, run)
 	return a.out
 }
+
+type codeSignalHandler struct {
+	want string
+	hit  chan struct{}
+}
+
+func (*codeSignalHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *codeSignalHandler) Handle(_ context.Context, record slog.Record) error {
+	var code string
+	record.Attrs(func(attr slog.Attr) bool {
+		if attr.Key == "code" {
+			code = attr.Value.String()
+			return false
+		}
+		return true
+	})
+	if code == h.want {
+		select {
+		case h.hit <- struct{}{}:
+		default:
+		}
+	}
+	return nil
+}
+
+func (h *codeSignalHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *codeSignalHandler) WithGroup(string) slog.Handler      { return h }
 
 type fixture struct {
 	st      *store.Store
@@ -212,6 +257,15 @@ func TestCreateTaskChecksTheDefinition(t *testing.T) {
 	for want, in := range bad {
 		if _, err := create(f.owner, in); code(err) != want {
 			t.Errorf("%s: %v", want, err)
+		}
+	}
+	for name, in := range map[string]*tasksv1.TaskInput{
+		"prompt": {Name: "x", Kind: tasksv1.TaskKind_TASK_KIND_ASSISTANT, Schedule: &tasksv1.Schedule{Kind: tasksv1.ScheduleKind_SCHEDULE_KIND_DAILY}, Prompt: "password: fixture-value"},
+		"args": {Name: "x", Kind: tasksv1.TaskKind_TASK_KIND_CHECK, Schedule: &tasksv1.Schedule{Kind: tasksv1.ScheduleKind_SCHEDULE_KIND_DAILY},
+			Steps: []*tasksv1.CheckStep{{Tool: "path_probe", ArgsJson: `{"from":"password: fixture-value","to":"nl1"}`}}},
+	} {
+		if _, err := create(f.owner, in); code(err) != "secret_in_task" {
+			t.Errorf("secret label in task %s: %v", name, err)
 		}
 	}
 	task, err := create(f.owner, &tasksv1.TaskInput{Name: " Morning look ", Kind: tasksv1.TaskKind_TASK_KIND_ASSISTANT, Enabled: true, Prompt: "Check the fleet.",
@@ -365,6 +419,229 @@ func TestAssistantTaskRuns(t *testing.T) {
 	runs, _ := f.st.ScheduledTaskRuns(context.Background(), id, 1)
 	if runs[0].Status != "skipped" || runs[0].Reason != "assistant_off" {
 		t.Fatalf("without the assistant: %+v", runs[0])
+	}
+}
+
+func TestManualAssistantRunsUseTheGlobalSemaphore(t *testing.T) {
+	f := newFixture(t)
+	r := rpc{f.svc}
+	resp, err := r.CreateTask(f.as(f.owner), connect.NewRequest(&tasksv1.CreateTaskRequest{Task: &tasksv1.TaskInput{
+		Name: "Assistant check", Kind: tasksv1.TaskKind_TASK_KIND_ASSISTANT, Enabled: true, Prompt: "Check the fleet.",
+		Schedule: &tasksv1.Schedule{Kind: tasksv1.ScheduleKind_SCHEDULE_KIND_EVERY, EveryMinutes: 15},
+	}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := r.CreateTask(f.as(f.owner), connect.NewRequest(&tasksv1.CreateTaskRequest{Task: &tasksv1.TaskInput{
+		Name: "Second assistant check", Kind: tasksv1.TaskKind_TASK_KIND_ASSISTANT, Enabled: true, Prompt: "Check the fleet.",
+		Schedule: &tasksv1.Schedule{Kind: tasksv1.ScheduleKind_SCHEDULE_KIND_EVERY, EveryMinutes: 15},
+	}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.asst.out = assistant.ScheduledOutcome{Status: "ok", Summary: "all clear"}
+	f.asst.entered = make(chan struct{}, 2)
+	f.asst.release = make(chan struct{})
+	first, err := r.RunTaskNow(f.as(f.owner), connect.NewRequest(&tasksv1.RunTaskNowRequest{Id: resp.Msg.Task.Id}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-f.asst.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first manual run did not start")
+	}
+	if _, err = r.RunTaskNow(f.as(f.owner), connect.NewRequest(&tasksv1.RunTaskNowRequest{Id: other.Msg.Task.Id})); code(err) != "tasks_busy" {
+		t.Fatalf("second manual run while the slot was occupied: %v", err)
+	}
+	close(f.asst.release)
+	f.svc.wg.Wait()
+	if _, err = r.RunTaskNow(f.as(f.owner), connect.NewRequest(&tasksv1.RunTaskNowRequest{Id: other.Msg.Task.Id})); err != nil {
+		t.Fatalf("manual run after the slot was released: %v", err)
+	}
+	f.svc.wg.Wait()
+	if _, err = f.st.ScheduledTaskRun(context.Background(), first.Msg.RunId); err != nil {
+		t.Fatalf("first run was lost: %v", err)
+	}
+}
+
+func TestRunCancellationIsRegisteredBeforeLeaseClaim(t *testing.T) {
+	f := newFixture(t)
+	resp, err := rpc{f.svc}.CreateTask(f.as(f.owner), connect.NewRequest(&tasksv1.CreateTaskRequest{Task: checkInput("Cancel while claiming")}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, err := f.st.ScheduledTask(context.Background(), resp.Msg.Task.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	tx, err := f.st.W.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE scheduled_task SET updated_at=updated_at WHERE id=?`, task.ID); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	type startResult struct {
+		id      string
+		started bool
+		err     error
+	}
+	started := make(chan startResult, 1)
+	go func() {
+		id, ok, startErr := f.svc.start(task, "manual", "Owner", f.now().Add(-manualEvery(task.Kind)), nil)
+		started <- startResult{id: id, started: ok, err: startErr}
+	}()
+	active := false
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		f.svc.mu.Lock()
+		active = f.svc.running[task.ID] != nil
+		f.svc.mu.Unlock()
+		if active {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if active {
+		f.svc.cancelRun(task.ID)
+	}
+	if err = tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	result := <-started
+	if !active {
+		f.svc.wg.Wait()
+		t.Fatal("start did not register cancellation while its lease claim was blocked")
+	}
+	if result.err != nil || !result.started {
+		t.Fatalf("start after claim: %+v", result)
+	}
+	f.svc.wg.Wait()
+	if len(f.rt.calls) != 0 {
+		t.Fatalf("a canceled run called MCP tools: %v", f.rt.calls)
+	}
+	run, err := f.st.ScheduledTaskRun(ctx, result.id)
+	if err != nil || run.Reason != "interrupted" {
+		t.Fatalf("canceled run = %+v, %v", run, err)
+	}
+}
+
+func TestSchedulerRetriesRecoveryUntilTheStoreWorks(t *testing.T) {
+	f := newFixture(t)
+	input := checkInput("Disabled check")
+	input.Enabled = false
+	resp, err := rpc{f.svc}.CreateTask(f.as(f.owner), connect.NewRequest(&tasksv1.CreateTaskRequest{Task: input}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := f.now()
+	if ok, err := f.st.ClaimScheduledTask(context.Background(), store.ScheduledTaskRun{ID: "run_recover", TaskID: resp.Msg.Task.Id, Trigger: "schedule", StartedAt: now},
+		"lease_recover", now, now.Add(time.Hour), time.Time{}); err != nil || !ok {
+		t.Fatalf("claim stale run: %v %v", ok, err)
+	}
+	if _, err = f.st.W.ExecContext(context.Background(), `ALTER TABLE scheduled_task_run RENAME TO scheduled_task_run_held`); err != nil {
+		t.Fatal(err)
+	}
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_, _ = f.st.W.ExecContext(context.Background(), `ALTER TABLE scheduled_task_run_held RENAME TO scheduled_task_run`)
+		}
+	})
+	f.svc.cfg.Tick = 10 * time.Millisecond
+	failedRecovery := make(chan struct{}, 1)
+	f.svc.cfg.Log = slog.New(&codeSignalHandler{want: "scheduled_recover_failed", hit: failedRecovery})
+	ctx, stop := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { f.svc.Run(ctx); close(done) }()
+	select {
+	case <-failedRecovery:
+	case <-time.After(3 * time.Second):
+		stop()
+		<-done
+		t.Fatal("recovery did not report the temporary store error")
+	}
+	if _, err = f.st.W.ExecContext(context.Background(), `ALTER TABLE scheduled_task_run_held RENAME TO scheduled_task_run`); err != nil {
+		stop()
+		<-done
+		t.Fatal(err)
+	}
+	restored = true
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		run, readErr := f.st.ScheduledTaskRun(context.Background(), "run_recover")
+		if readErr == nil && run.Reason == "interrupted" {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	stop()
+	<-done
+	run, err := f.st.ScheduledTaskRun(context.Background(), "run_recover")
+	if err != nil || run.Status != "failed" || run.Reason != "interrupted" {
+		t.Fatalf("recovered run = %+v, %v", run, err)
+	}
+}
+
+func TestRunRetriesFinishAfterTheStoreWorks(t *testing.T) {
+	f := newFixture(t)
+	r := rpc{f.svc}
+	resp, err := r.CreateTask(f.as(f.owner), connect.NewRequest(&tasksv1.CreateTaskRequest{Task: &tasksv1.TaskInput{
+		Name: "Assistant check", Kind: tasksv1.TaskKind_TASK_KIND_ASSISTANT, Enabled: true, Prompt: "Check the fleet.",
+		Schedule: &tasksv1.Schedule{Kind: tasksv1.ScheduleKind_SCHEDULE_KIND_EVERY, EveryMinutes: 15},
+	}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.asst.out = assistant.ScheduledOutcome{Status: "ok", Summary: "all clear"}
+	f.asst.entered = make(chan struct{}, 1)
+	f.asst.release = make(chan struct{})
+	failedFinish := make(chan struct{}, 1)
+	f.svc.cfg.Log = slog.New(&codeSignalHandler{want: "scheduled_finish_failed", hit: failedFinish})
+	run, err := r.RunTaskNow(f.as(f.owner), connect.NewRequest(&tasksv1.RunTaskNowRequest{Id: resp.Msg.Task.Id}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-f.asst.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("assistant run did not start")
+	}
+	if _, err = f.st.W.ExecContext(context.Background(), `ALTER TABLE scheduled_task_run RENAME TO scheduled_task_run_held`); err != nil {
+		t.Fatal(err)
+	}
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_, _ = f.st.W.ExecContext(context.Background(), `ALTER TABLE scheduled_task_run_held RENAME TO scheduled_task_run`)
+		}
+	})
+	close(f.asst.release)
+	select {
+	case <-failedFinish:
+	case <-time.After(3 * time.Second):
+		t.Fatal("finish write did not report the temporary store error")
+	}
+	if _, err = f.st.W.ExecContext(context.Background(), `ALTER TABLE scheduled_task_run_held RENAME TO scheduled_task_run`); err != nil {
+		t.Fatal(err)
+	}
+	restored = true
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		current, readErr := f.st.ScheduledTaskRun(context.Background(), run.Msg.RunId)
+		if readErr == nil && current.Status != "running" {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	f.svc.wg.Wait()
+	current, err := f.st.ScheduledTaskRun(context.Background(), run.Msg.RunId)
+	task, taskErr := f.st.ScheduledTask(context.Background(), resp.Msg.Task.Id)
+	if err != nil || taskErr != nil || current.Status != "ok" || task.Running(f.now()) {
+		t.Fatalf("run after retry = %+v, %v; task = %+v, %v", current, err, task, taskErr)
 	}
 }
 

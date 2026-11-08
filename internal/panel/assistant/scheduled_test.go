@@ -113,7 +113,8 @@ func TestScheduledRunAnswersInTheTasksConversation(t *testing.T) {
 	}
 	reqs := f.adapter.requests()
 	for _, tool := range reqs[0].Tools {
-		if strings.HasSuffix(tool.Name, "_apply") || tool.Name == "memory_save" || tool.Name == "ui_open" || tool.Name == "ui_secret_form" {
+		if strings.HasSuffix(tool.Name, "_apply") || tool.Name == "memory_save" || tool.Name == "ui_open" || tool.Name == "ui_secret_form" ||
+			tool.Name == "conversation_search" || tool.Name == "conversation_read" {
 			t.Errorf("a scheduled run was offered %s", tool.Name)
 		}
 	}
@@ -137,6 +138,50 @@ func TestScheduledRunAnswersInTheTasksConversation(t *testing.T) {
 	}
 	if summary, _, _ = f.service.conversation(ctx, f.admin.ID, out.ConversationID); summary.Messages != 4 {
 		t.Fatalf("the conversation holds %d messages, want both runs", summary.Messages)
+	}
+}
+
+func TestScheduledRunDoesNotSendAdminWideContext(t *testing.T) {
+	f := newAssistantFixture(t, modelResponse{Tools: []modelToolCall{verdictCall(false, "all clear")}})
+	ctx := context.Background()
+	adminID := f.admin.ID
+	privatePanelNote := "admin panel context marker"
+	sealedNotes := f.vault.Seal([]byte(privatePanelNote), PanelNotesAAD())
+	if _, err := f.st.W.ExecContext(ctx, `UPDATE assistant_settings SET panel_notes_enc=? WHERE id=1`, sealedNotes); err != nil {
+		t.Fatal(err)
+	}
+	privateMemory := "administrator memory marker"
+	memoryID := "mem_scheduled_context"
+	if err := f.st.InsertAssistantMemory(ctx, memoryID, adminID, f.vault.Seal([]byte(privateMemory), MemoryAAD(memoryID)), false, "", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	otherConversation, err := f.service.createConversation(ctx, adminID, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateTitle := "other conversation title marker"
+	if _, err := f.st.W.ExecContext(ctx, `UPDATE assistant_conversation SET title_enc=? WHERE id=?`, f.vault.Seal([]byte(privateTitle), ConversationTitleAAD(otherConversation)), otherConversation); err != nil {
+		t.Fatal(err)
+	}
+
+	out := f.service.RunScheduled(ctx, ScheduledRun{TaskID: "tsk_context", TaskName: "Context check", AdminID: adminID, Prompt: "Check the fleet."})
+	if out.Status != "ok" {
+		t.Fatalf("scheduled run: %+v", out)
+	}
+	requests := f.adapter.requests()
+	if len(requests) != 1 {
+		t.Fatalf("provider requests = %d, want 1", len(requests))
+	}
+	request := requests[0]
+	for _, marker := range []string{privatePanelNote, privateMemory, privateTitle} {
+		if strings.Contains(request.System, marker) {
+			t.Errorf("scheduled system prompt included admin-wide context %q", marker)
+		}
+	}
+	for _, tool := range request.Tools {
+		if tool.Name == "conversation_search" || tool.Name == "conversation_read" {
+			t.Errorf("scheduled run was offered %s", tool.Name)
+		}
 	}
 }
 

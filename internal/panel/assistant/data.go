@@ -194,6 +194,13 @@ var assistantCredentialLabel = regexp.MustCompile(`(?i)(^|[^[:alnum:]_])((?:pass
 
 func redactUserMessage(s string) string {
 	s = mcp.ScrubText(s)
+	return redactCredentialLabels(s)
+}
+
+// HasCredentialLabel reports whether text contains a credential label with a value.
+func HasCredentialLabel(s string) bool { return assistantCredentialLabel.MatchString(s) }
+
+func redactCredentialLabels(s string) string {
 	return assistantCredentialLabel.ReplaceAllString(s, `${1}${2}${3}[removed: looks like a password]`)
 }
 

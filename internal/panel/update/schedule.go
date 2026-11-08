@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/tasks/spec"
 )
 
 const (
@@ -47,7 +48,23 @@ func (s *Service) setScheduleTimezone(ctx context.Context, offset int32) error {
 	if !validScheduleTimezoneOffset(offset) {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("timezone offset must be between UTC-12:00 and UTC+14:00 in 15-minute steps"))
 	}
-	if err := s.st.SetSettings(ctx, map[string]string{updateScheduleTimezoneKey: strconv.FormatInt(int64(offset), 10)}); err != nil {
+	previous, err := s.scheduleTimezoneOffset(ctx)
+	if err != nil {
+		return s.internal("load update timezone", err)
+	}
+	var nexts []store.ScheduledTaskNext
+	if offset != previous {
+		schedules, err := s.st.EnabledScheduledTaskSchedules(ctx)
+		if err != nil {
+			return s.internal("load scheduled tasks", err)
+		}
+		now := s.now()
+		for _, task := range schedules {
+			schedule := spec.Schedule{Kind: task.Kind, EveryMinutes: task.EveryMinutes, MinuteOfDay: task.MinuteOfDay, Weekday: task.Weekday}
+			nexts = append(nexts, store.ScheduledTaskNext{ID: task.ID, NextRunAt: schedule.Next(now, int(offset), spec.Jitter(task.ID, schedule))})
+		}
+	}
+	if err := s.st.SetSettingAndScheduledTaskNexts(ctx, updateScheduleTimezoneKey, strconv.FormatInt(int64(offset), 10), nexts); err != nil {
 		return s.internal("save update timezone", err)
 	}
 	s.audit(ctx, "update_schedule_timezone", map[string]string{"offset_minutes": strconv.FormatInt(int64(offset), 10)})

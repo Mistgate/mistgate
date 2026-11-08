@@ -196,6 +196,7 @@ message Task {
   bool problem = 15;
   string problem_summary = 16;
   bool running = 17;
+  uint64 version = 18;
 }
 
 message ListTasksRequest {}

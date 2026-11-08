@@ -517,7 +517,7 @@ type taskUpdateArgs struct {
 // taskUpdateStored is what a task_update plan keeps: the whole new definition and the version it was planned from.
 type taskUpdateStored struct {
 	TaskID  string      `json:"task_id"`
-	Updated int64       `json:"updated_unix"`
+	Version uint64      `json:"version"`
 	Def     taskDefArgs `json:"definition"`
 }
 
@@ -588,7 +588,7 @@ var taskUpdate = changeSpec[taskUpdateArgs]{
 		return &planned{
 			Summary: "Change a scheduled task. The lines below are the task as it will be; its open alerts close and the next run tells again.",
 			Facts:   append([]Fact{{Key: "task_id", Value: clean(t.GetId(), 64)}}, taskFacts(d)...), Danger: []string{dangerSchedule},
-			Params:      taskUpdateStored{TaskID: t.GetId(), Updated: t.GetUpdatedUnix(), Def: defArgsOf(d)},
+			Params:      taskUpdateStored{TaskID: t.GetId(), Version: t.GetVersion(), Def: defArgsOf(d)},
 			AuditParams: map[string]any{"task_id": t.GetId(), "schedule": d.Schedule.String(), "enabled": d.Enabled},
 		}, nil
 	},
@@ -601,7 +601,7 @@ var taskUpdate = changeSpec[taskUpdateArgs]{
 		if err != nil {
 			return done{}, err
 		}
-		if t.GetUpdatedUnix() != st.Updated {
+		if t.GetVersion() != st.Version {
 			return done{}, failure("changed_since_plan", "the task changed since the plan was made: make a new plan")
 		}
 		d, err := st.Def.definition()
