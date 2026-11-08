@@ -915,8 +915,8 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 34 {
-		t.Errorf("%d procedures need approval, want 34: %v", len(approved), approved)
+	if len(approved) != 37 {
+		t.Errorf("%d procedures need approval, want 37: %v", len(approved), approved)
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)

@@ -67,8 +67,14 @@ func openText(v *vault.Vault, blob []byte, aad string) (string, error) {
 }
 
 func (s *Service) createConversation(ctx context.Context, adminID string, now time.Time) (string, error) {
+	return s.createTaskConversation(ctx, adminID, "", "", now)
+}
+
+// createTaskConversation is createConversation for the runs of a scheduled task: it carries the task's id and, as its title,
+// the task's name (a person's conversation gets its title from the model).
+func (s *Service) createTaskConversation(ctx context.Context, adminID, taskID, title string, now time.Time) (string, error) {
 	id := newConversationID()
-	_, err := s.st.W.ExecContext(ctx, `INSERT INTO assistant_conversation(id,admin_id,title_enc,summary_enc,created_at,updated_at,segment) VALUES(?,?,?,?,?,?,0)`, id, adminID, sealText(s.vault, "", ConversationTitleAAD(id)), sealText(s.vault, "", ConversationSummaryAAD(id)), now.Unix(), now.Unix())
+	_, err := s.st.W.ExecContext(ctx, `INSERT INTO assistant_conversation(id,admin_id,title_enc,summary_enc,created_at,updated_at,segment,task_id) VALUES(?,?,?,?,?,?,0,?)`, id, adminID, sealText(s.vault, title, ConversationTitleAAD(id)), sealText(s.vault, "", ConversationSummaryAAD(id)), now.Unix(), now.Unix(), taskID)
 	return id, err
 }
 
@@ -102,7 +108,7 @@ func (s *Service) conversation(ctx context.Context, adminID, id string) (*adminv
 	summary := &adminv1.ConversationSummary{}
 	var titleEnc, summaryEnc []byte
 	var segment int
-	err := s.st.R.QueryRowContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,segment FROM assistant_conversation WHERE id=? AND admin_id=?`, id, adminID).Scan(&summary.Id, &titleEnc, &summaryEnc, &summary.CreatedUnix, &summary.UpdatedUnix, &segment)
+	err := s.st.R.QueryRowContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,segment,task_id FROM assistant_conversation WHERE id=? AND admin_id=?`, id, adminID).Scan(&summary.Id, &titleEnc, &summaryEnc, &summary.CreatedUnix, &summary.UpdatedUnix, &segment, &summary.TaskId)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, connect.NewError(connect.CodeNotFound, errors.New("conversation not found"))
 	}
@@ -151,7 +157,7 @@ func (s *Service) ListConversations(ctx context.Context, req *connect.Request[ad
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("page token is invalid"))
 		}
 	}
-	rows, err := s.st.R.QueryContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,(SELECT count(*) FROM assistant_message m WHERE m.conversation_id=c.id AND m.admin_id=c.admin_id) FROM assistant_conversation c WHERE admin_id=? ORDER BY updated_at DESC,id DESC LIMIT 5000`, admin.ID)
+	rows, err := s.st.R.QueryContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,(SELECT count(*) FROM assistant_message m WHERE m.conversation_id=c.id AND m.admin_id=c.admin_id),task_id FROM assistant_conversation c WHERE admin_id=? ORDER BY updated_at DESC,id DESC LIMIT 5000`, admin.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +168,7 @@ func (s *Service) ListConversations(ctx context.Context, req *connect.Request[ad
 		var id string
 		var titleEnc, summaryEnc []byte
 		var item adminv1.ConversationSummary
-		if err = rows.Scan(&id, &titleEnc, &summaryEnc, &item.CreatedUnix, &item.UpdatedUnix, &item.Messages); err != nil {
+		if err = rows.Scan(&id, &titleEnc, &summaryEnc, &item.CreatedUnix, &item.UpdatedUnix, &item.Messages, &item.TaskId); err != nil {
 			return nil, err
 		}
 		item.Id = id

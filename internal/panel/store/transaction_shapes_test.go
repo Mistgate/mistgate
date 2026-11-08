@@ -60,6 +60,9 @@ var transactionShape1 = map[string]string{
 	"assistant.go:ReconcileAssistantBudget":          "Usage is added only for a live reservation, then that reservation is deleted in one fixed batch.",
 	"assistant.go:SaveAssistantSettings":             "Provider choices and shared assistant settings are saved in one batch.",
 	"token.go:RevokeAssistantToken":                  "The hidden identity is revoked and its pending MCP plans are cancelled in one fixed batch.",
+	"scheduled_task.go:DeleteScheduledTask":          "A task's runs and the task are deleted in one fixed batch.",
+	"scheduled_task.go:RecoverScheduledRuns":         "Runs left running are marked interrupted and every lease is given back in one fixed batch.",
+	"scheduled_task.go:PruneScheduledTaskRuns":       "Old and surplus runs and the matching messages and plan cards of task conversations are deleted in one fixed batch.",
 }
 
 var transactionShape2 = map[string]string{
@@ -112,6 +115,8 @@ var transactionShape2 = map[string]string{
 	"update.go:AddNodeToRunningRollout":              "A current-rollout guard precedes stage shifting, insertion, and schedule consumption.",
 	"update.go:createRollout":                        "One SQL guard checks the rollout id, active slot, and optional exact schedule before fixed writes.",
 	"warp.go:ReplaceWarpAccount":                     "An account-exists guard precedes the delete and replacement insert.",
+	"scheduled_task.go:ClaimScheduledTask":           "A free-lease (and manual cooldown) compare-and-swap takes the lease; the run row is inserted only if that lease holds.",
+	"scheduled_task.go:FinishScheduledRun":           "The run row is updated; the task's outcome update is a compare-and-swap on the run's own lease.",
 }
 
 var transactionShape3 = map[string]string{

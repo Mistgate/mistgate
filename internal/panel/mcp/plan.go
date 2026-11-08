@@ -320,9 +320,13 @@ func (e *env) audit(c *call, action string, params map[string]any, result string
 	if e.cfg.Audit != nil {
 		actor, source := "mcp:"+c.tokenID, "mcp"
 		if c.assistant != nil {
-			actor = "Assistant of " + c.assistant.AdminName
-			if c.assistant.AdminName == "" {
-				actor = "Assistant of " + c.assistant.AdminID
+			who := c.assistant.AdminName
+			if who == "" {
+				who = c.assistant.AdminID
+			}
+			actor = "Assistant of " + who
+			if c.assistant.Scheduled {
+				actor = "Scheduled tasks of " + who
 			}
 			source = "assistant"
 		}

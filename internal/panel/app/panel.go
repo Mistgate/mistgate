@@ -112,6 +112,12 @@ type assistantRPC interface {
 	Handler(opts ...connect.HandlerOption) (string, http.Handler)
 }
 
+// scheduledTasks is the TasksService with its scheduler (internal/panel/tasks, the VPS edition).
+type scheduledTasks interface {
+	Handler(opts ...connect.HandlerOption) (string, http.Handler)
+	Run(context.Context)
+}
+
 // Config contains the edition-specific dependencies and settings for the shared panel.
 type Config struct {
 	Store              *store.Store
@@ -190,6 +196,7 @@ type jobServices struct {
 	backup      *backup.Service
 	telegram    *telegram.Service
 	assistant   assistantRetention
+	tasks       scheduledTasks
 	provision   *nodeprovision.Service
 	store       *store.Store
 	log         *slog.Logger

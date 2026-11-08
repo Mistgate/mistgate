@@ -15,6 +15,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
+	"github.com/mistgate/mistgate/gen/mistgate/tasks/v1/tasksv1connect"
 )
 
 // forwardedHeaders are the request headers of the agent's MCP call that an in-process API call carries: the credential
@@ -66,6 +67,7 @@ type clients struct {
 	Backup       adminv1connect.BackupServiceClient
 	Probe        probev1connect.ProbeServiceClient
 	Ops          opsv1connect.OpsServiceClient
+	Tasks        tasksv1connect.TasksServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -90,6 +92,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Backup:       adminv1connect.NewBackupServiceClient(hc, base),
 		Probe:        probev1connect.NewProbeServiceClient(hc, base),
 		Ops:          opsv1connect.NewOpsServiceClient(hc, base),
+		Tasks:        tasksv1connect.NewTasksServiceClient(hc, base),
 	}
 }
 

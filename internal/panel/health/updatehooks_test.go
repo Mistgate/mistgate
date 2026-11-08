@@ -65,6 +65,42 @@ func TestExtConditionSourceOpensAndClearsAnAlert(t *testing.T) {
 	want(t, e.active())
 }
 
+// The scheduled tasks (internal/panel/tasks) raise their two alerts through a condition source too: one per task, no node,
+// and they close when the task's condition goes.
+func TestScheduledTaskConditionsOpenAlerts(t *testing.T) {
+	e := newEnv(t)
+	var mu sync.Mutex
+	var conds []ExtCond
+	e.s.AddConditionSource(func(context.Context) []ExtCond {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]ExtCond(nil), conds...)
+	})
+	set := func(c ...ExtCond) {
+		mu.Lock()
+		conds = c
+		mu.Unlock()
+		e.evaluate()
+	}
+	problem := ExtCond{Kind: "scheduled_check", Subject: "tsk_1", Severity: sevWarning, Why: "health.alert.scheduled_check.why",
+		Params: map[string]string{"task": "Morning check", "task_id": "tsk_1", "summary": "fleet_digest: totals.nodes_problem_now = 2", "telegram": "1"}}
+	failing := ExtCond{Kind: "scheduled_task_failing", Subject: "tsk_1", Severity: sevWarning, Why: "health.alert.scheduled_task_failing.why",
+		Params: map[string]string{"task": "Morning check", "task_id": "tsk_1", "count": "3", "reason": "tool_failed", "telegram": "0"}}
+	set(problem, failing)
+	got := e.active()
+	want(t, got, "scheduled_check//tsk_1", "scheduled_task_failing//tsk_1")
+	for key, kind := range map[string]adminv1.AlertKind{"scheduled_check//tsk_1": adminv1.AlertKind_ALERT_KIND_SCHEDULED_CHECK, "scheduled_task_failing//tsk_1": adminv1.AlertKind_ALERT_KIND_SCHEDULED_TASK_FAILING} {
+		a := got[key]
+		if msg := alertMsg(a, nil, func(store.HealthAlert) string { return "" }); msg.Kind != kind || msg.TitleKey != "health.alert."+a.Kind+".title" {
+			t.Errorf("%s: %+v", key, msg)
+		}
+	}
+	set(failing)
+	want(t, e.active(), "scheduled_task_failing//tsk_1")
+	set()
+	want(t, e.active())
+}
+
 // NodeChecksSince counts what the rollout gate needs: the probeable inbounds and the rounds that ended after the reconnect.
 func TestNodeChecksSince(t *testing.T) {
 	e := newEnv(t)

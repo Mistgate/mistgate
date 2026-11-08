@@ -578,6 +578,10 @@ func (s *Service) AlertTransition(a store.HealthAlert, resolved bool) {
 	if a.Severity < minSeverity {
 		return
 	}
+	// a scheduled task's alerts go to Telegram only when the owner asked for it on the task
+	if (a.Kind == "scheduled_check" || a.Kind == "scheduled_task_failing") && a.Params["telegram"] != "1" {
+		return
+	}
 	if !s.cfg.Edge { // on the edge the alert row and the health-eval lease decide; a per-isolate map would drop a re-open
 		key := a.Kind + "/" + a.NodeID + "/" + a.Subject
 		s.mu.Lock()

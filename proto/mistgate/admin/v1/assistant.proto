@@ -145,6 +145,9 @@ message AssistantSettings {
   string panel_notes = 5;
   // How long conversations are kept: 7 to 365 days; 0 = until deleted. Default 90.
   uint32 retention_days = 6;
+  // The provider a scheduled assistant task turns to when the main one keeps failing (it is retried first); it must be
+  // connected and differ from provider. UNSPECIFIED: none.
+  AssistantProvider fallback_provider = 7;
 }
 
 // What the owner chooses per provider (the key is set apart, by SetProviderKey).
@@ -255,6 +258,8 @@ message ConversationSummary {
   int64 created_unix = 3 [jstype = JS_NUMBER];
   int64 updated_unix = 4 [jstype = JS_NUMBER];
   uint32 messages = 5;
+  // The scheduled task (mistgate.tasks.v1) whose runs write here; empty for a conversation a person started.
+  string task_id = 6;
 }
 
 enum ChatRole {

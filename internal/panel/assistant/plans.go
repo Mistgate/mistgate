@@ -59,6 +59,10 @@ func (s *Service) assistantSession(ctx context.Context, admin store.Admin, token
 		return nil, errors.New("assistant panel tools are unavailable")
 	}
 	profile := profileForRole(admin.Role)
+	if tokenID != "" && tokenID == store.ScheduledTokenID(admin.ID) {
+		// a plan a scheduled task prepared: its apply runs with the identity that made it, the operator profile
+		return runtime.OpenAssistant(ctx, mcp.AssistantIdentity{TokenID: tokenID, Profile: store.ProfileOperator, AdminID: admin.ID, AdminName: admin.DisplayName, Scheduled: true})
+	}
 	if tokenID == "" {
 		token, err := s.st.EnsureAssistantToken(ctx, admin.ID, profile, s.now())
 		if err != nil {

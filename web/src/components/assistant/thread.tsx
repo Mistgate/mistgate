@@ -125,7 +125,12 @@ function UserBubble({ m, first, last }: { m: Msg; first: boolean; last: boolean 
   const fmt = useFmt();
   return (
     <div data-role="user" className={cx("chat-in group flex flex-col items-end gap-1", first ? "mt-6" : "mt-2")}>
-      {m.context?.label && <span className="px-1 text-[11px] text-faint">{t("ai.chat.page", { label: m.context.label })}</span>}
+      {/* a scheduled task's run (internal/panel/assistant/scheduled.go) names its task and when it ran, not a page */}
+      {m.context?.label && (
+        <span className="px-1 text-[11px] text-faint">
+          {m.context.kind === "task" ? t("ai.chat.scheduledRun", { label: m.context.label, time: fmt.stamp(m.createdUnix) }) : t("ai.chat.page", { label: m.context.label })}
+        </span>
+      )}
       <div className="max-w-[82%] rounded-[18px] bg-fg px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap text-canvas">{m.text}</div>
       {m.createdUnix > 0 && <span className={cx("px-1 text-[11px] text-muted transition-opacity", last ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>{fmt.clock(m.createdUnix)}</span>}
     </div>

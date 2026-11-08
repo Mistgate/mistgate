@@ -25,6 +25,11 @@ func backgroundJobs(c Config, s jobServices) []BackgroundJob {
 				}
 			}
 		}},
+		{Name: "scheduled-tasks", Run: func(ctx context.Context) {
+			if s.tasks != nil {
+				s.tasks.Run(ctx)
+			}
+		}},
 		{Name: "fleet", Run: func(ctx context.Context) { _ = s.fleet.Run(ctx) }},
 		{Name: "access", Run: s.access.Run},
 		{Name: "health", Run: s.health.Run},

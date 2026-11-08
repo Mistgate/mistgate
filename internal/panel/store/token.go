@@ -148,8 +148,7 @@ func (s *Store) EnsureAssistantToken(ctx context.Context, adminID, profile strin
 	if adminID == "" || profile != ProfileReadonly && profile != ProfileOperator && profile != ProfileAdmin {
 		return APIToken{}, errors.New("store: invalid assistant token identity")
 	}
-	idHash := sha256.Sum256([]byte("mistgate assistant identity:" + adminID))
-	id := "ast_" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(idHash[:16]))
+	id := assistantTokenID("mistgate assistant identity:", "ast_", adminID)
 	secretHash := make([]byte, 32)
 	if _, err := rand.Read(secretHash); err != nil {
 		return APIToken{}, err
@@ -174,6 +173,20 @@ func (s *Store) EnsureAssistantToken(ctx context.Context, adminID, profile strin
 		return APIToken{}, errors.New("store: assistant token identity conflict")
 	}
 	return t, nil
+}
+
+// assistantTokenID derives the id of a hidden identity of an admin: the same admin always gets the same row.
+func assistantTokenID(label, prefix, adminID string) string {
+	h := sha256.Sum256([]byte(label + adminID))
+	return prefix + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(h[:16]))
+}
+
+// ScheduledTokenID is the id of the hidden identity the scheduled tasks of an admin run with (internal/panel/tasks): a row like
+// the assistant's (assistant_only, never issued, refused on every external route) with the operator profile, whatever the
+// admin's role, so a task can read, run probes and prepare plans but never reach an admin tool. Its own id keeps it apart
+// from the admin's assistant identity, which carries the admin's own profile.
+func ScheduledTokenID(adminID string) string {
+	return assistantTokenID("mistgate scheduled task identity:", "sct_", adminID)
 }
 
 // RevokeAssistantToken revokes a hidden assistant identity and cancels its pending MCP plans in one batch.

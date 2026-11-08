@@ -444,6 +444,11 @@ function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a: Alert
               {t("up.alert.open")}
             </Link>
           )}
+          {shared && (a.kind === AlertKind.SCHEDULED_CHECK || a.kind === AlertKind.SCHEDULED_TASK_FAILING) && (
+            <Link to="/ai" search={{ tab: "tasks", task: a.subject }} className={buttonClass("secondary", "md")}>
+              {t("task.open")}
+            </Link>
+          )}
           {shared && a.nodeId && a.actions.includes("open_node") && !go && !onNodePage && (
             <Link to="/nodes/$id" params={{ id: a.nodeId }} className={buttonClass("ghost", "md")}>
               {t("hl.alerts.openNode")}

@@ -58,6 +58,9 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
   const [choices, setChoices] = useState<Record<number, Choice>>(initChoices);
   const connected = statuses.filter((s) => s.connected);
   const shownProvider = connected.some((s) => s.provider === draft.provider) ? draft.provider : (connected[0]?.provider ?? AssistantProvider.UNSPECIFIED);
+  // the scheduled tasks' fallback: another connected provider, or none (a fallback that became the main one, or lost its key, is none)
+  const fallbacks = connected.filter((s) => s.provider !== shownProvider);
+  const shownFallback = fallbacks.some((s) => s.provider === draft.fallbackProvider) ? draft.fallbackProvider : AssistantProvider.UNSPECIFIED;
   const set = (patch: Partial<Settings>) => setDraft((d) => ({ ...d, ...patch }));
 
   const save = useMutation({
@@ -65,7 +68,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
     // and only the choices of connected providers: the panel refuses a model or budget for a provider without a key
     mutationFn: () =>
       assistant.updateAssistantSettings({
-        settings: { ...draft, provider: shownProvider } as never,
+        settings: { ...draft, provider: shownProvider, fallbackProvider: shownFallback } as never,
         choices: Object.values(choices).filter((c) => connected.some((s) => s.provider === c.provider)) as never,
       }),
     onSuccess: () => {
@@ -103,6 +106,17 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
               />
             )}
           </SettingRow>
+          {fallbacks.length > 0 && (
+            <SettingRow label={t("ai.set.fallback")} hint={t("ai.set.fallbackHint")}>
+              <Select
+                aria-label={t("ai.set.fallback")}
+                className="min-w-[200px]"
+                value={String(shownFallback)}
+                onValueChange={(v) => set({ fallbackProvider: Number(v) as AssistantProvider })}
+                options={[{ value: String(AssistantProvider.UNSPECIFIED), label: t("ai.set.fallbackNone") }, ...fallbacks.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)) }))]}
+              />
+            </SettingRow>
+          )}
           <SettingRow label={t("ai.set.effort")} hint={t("ai.effort.hint")}>
             <Segmented
               aria-label={t("ai.set.effort")}

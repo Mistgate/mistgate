@@ -30,7 +30,7 @@ func (k *core) addOps(cfg *httpserver.Config) {
 		StepUp:  k.authSvc.RequireStepUp,
 		Fleet:   fleetH, Health: healthH, Relay: relayH,
 		Debug: k.fl,
-		RPC: calls, Capacity: k.fl.CapacityNodes,
+		RPC:   calls, Capacity: k.fl.CapacityNodes,
 		Now: k.c.Clock, Log: k.log,
 	})
 	path, handler := svc.Handler()

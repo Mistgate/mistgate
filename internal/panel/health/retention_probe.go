@@ -31,3 +31,13 @@ func (s *Service) sweepDebugCaptures(ctx context.Context, now time.Time) {
 		s.log.Info("health: pruned debug captures", "count", n)
 	}
 }
+
+// sweepScheduledRuns prunes the runs of the scheduled tasks (the last 50 of a task, at most 30 days) and the conversations of
+// the assistant tasks alike. VPS only: the Cloudflare edition runs no task.
+func (s *Service) sweepScheduledRuns(ctx context.Context, now time.Time) {
+	if n, err := s.st.PruneScheduledTaskRuns(ctx, now.Add(-store.ScheduledRunsKeep)); err != nil && ctx.Err() == nil {
+		s.log.Warn("health: prune scheduled task runs", "code", "prune_failed", "err", err)
+	} else if n > 0 {
+		s.log.Info("health: pruned scheduled task runs", "count", n)
+	}
+}

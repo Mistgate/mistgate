@@ -202,6 +202,7 @@ type core struct {
 	wsv                *warp.Service
 	asst               assistantRPC
 	assistantRetention assistantRetention
+	sched              scheduledTasks // the scheduled tasks (VPS only; nil on the edge)
 	desired            func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)
 }
 
