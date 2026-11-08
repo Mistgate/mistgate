@@ -591,7 +591,7 @@
     "type": "table",
     "name": "assistant_provider",
     "tbl_name": "assistant_provider",
-    "sql": "CREATE TABLE assistant_provider ( provider INTEGER PRIMARY KEY, key_enc BLOB NOT NULL DEFAULT X'', key_hint TEXT NOT NULL DEFAULT '', added_at INTEGER NOT NULL DEFAULT 0, model TEXT NOT NULL DEFAULT '', budget_usd REAL NOT NULL DEFAULT 20 CHECK (budget_usd \u003e= 0), last_error_code TEXT NOT NULL DEFAULT '', last_error_at INTEGER NOT NULL DEFAULT 0 ) STRICT"
+    "sql": "CREATE TABLE assistant_provider ( provider INTEGER PRIMARY KEY, key_enc BLOB NOT NULL DEFAULT X'', key_hint TEXT NOT NULL DEFAULT '', added_at INTEGER NOT NULL DEFAULT 0, model TEXT NOT NULL DEFAULT '', budget_usd REAL NOT NULL DEFAULT 20 CHECK (budget_usd \u003e= 0), last_error_code TEXT NOT NULL DEFAULT '', last_error_at INTEGER NOT NULL DEFAULT 0 , custom_name TEXT NOT NULL DEFAULT '', custom_url TEXT NOT NULL DEFAULT '', allow_local INTEGER NOT NULL DEFAULT 0 CHECK (allow_local IN (0, 1)), input_usd_per_mtok REAL NOT NULL DEFAULT 0 CHECK (input_usd_per_mtok \u003e= 0), output_usd_per_mtok REAL NOT NULL DEFAULT 0 CHECK (output_usd_per_mtok \u003e= 0)) STRICT"
   },
   {
     "type": "table",

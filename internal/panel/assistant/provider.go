@@ -166,7 +166,7 @@ func (p providerHTTP) request(ctx context.Context, method, path, key, contentTyp
 	if err != nil {
 		return nil, apiError("provider_unreachable")
 	}
-	if key != "" {
+	if key = strings.TrimSpace(key); key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 	if contentType != "" {

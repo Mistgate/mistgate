@@ -207,7 +207,7 @@ func (s *Service) openTurnProvider(ctx context.Context, p adminv1.AssistantProvi
 	} else if spent >= row.budget {
 		return turnProvider{}, "budget_reached"
 	}
-	a := s.providers[p]
+	a := s.adapterForRow(p, row)
 	if a == nil {
 		return turnProvider{}, "provider_unreachable"
 	}
@@ -1103,12 +1103,16 @@ func (s *Service) compactIfNeeded(ctx context.Context, admin store.Admin, conver
 	if historyTokens(history) < threshold || len(history) == 0 {
 		return 0, 0, 0, nil
 	}
-	keyBytes, err := s.openProviderKey(ctx, provider)
-	if err != nil || len(keyBytes) == 0 {
+	row, err := s.readProviderRow(ctx, provider)
+	if err != nil || len(row.sealed) == 0 {
 		return 0, 0, 0, errors.New("assistant provider is unavailable")
 	}
+	keyBytes, err := s.vault.Open(row.sealed, ProviderKeyAAD(provider))
+	if err != nil {
+		return 0, 0, 0, err
+	}
 	defer zero(keyBytes)
-	adapter := s.providers[provider]
+	adapter := s.adapterForRow(provider, row)
 	if adapter == nil {
 		return 0, 0, 0, errors.New("assistant provider is unavailable")
 	}
@@ -1164,12 +1168,16 @@ func historyTokens(history []json.RawMessage) int64 {
 }
 
 func (s *Service) writeConversationTitle(ctx context.Context, admin store.Admin, conversationID string, provider adminv1.AssistantProvider, model string, budget float64, system string, history []json.RawMessage, totalInput, totalOutput *int64, totalUSD *float64, send func(*adminv1.ChatResponse) error, turnCounted *bool) (string, error) {
-	keyBytes, err := s.openProviderKey(ctx, provider)
+	row, err := s.readProviderRow(ctx, provider)
+	if err != nil || len(row.sealed) == 0 {
+		return "", errors.New("assistant provider is unavailable")
+	}
+	keyBytes, err := s.vault.Open(row.sealed, ProviderKeyAAD(provider))
 	if err != nil {
 		return "", err
 	}
 	defer zero(keyBytes)
-	adapter := s.providers[provider]
+	adapter := s.adapterForRow(provider, row)
 	if adapter == nil {
 		return "", nil
 	}

@@ -28,7 +28,9 @@ A round button appears at the bottom corner of every page for the admins it is o
 | Z.ai | `api.z.ai` (the international platform) | GLM-5.3 and GLM-5.3-Flash | Processed in Singapore; the provider's agreement says content is not stored. |
 | Ollama Cloud | `ollama.com` | the cloud models that take tools | Processed in the United States; not used for training. |
 
-The card of each provider says the same, so you choose knowing it. The panel talks to a provider only from its own server, at that fixed address: there is no field for another address, and the browser never sees the key.
+The card of each built-in provider says the same, so you choose knowing it. The owner can also connect up to five OpenAI-compatible providers: enter a name, API base URL (such as `https://example.com/v1`), model ID, key and optional input and output prices. The panel checks that the model can call a tool before saving. A model can also be chosen from the provider's model list when available. Set its monthly budget on the card, and select it as the main or fallback provider.
+
+The panel calls providers from its own server; keys are sealed and never returned to the browser. Custom endpoints require HTTPS. To use an HTTP endpoint on the panel's local network, explicitly enable local access; the key may be empty for a local model. Link-local addresses are blocked, including cloud metadata endpoints. Follow the provider's own data policy when choosing where to send the conversation. Prices you enter are estimates: leave them at zero only for a free provider.
 
 What the provider receives: the conversation, the assistant's instructions, your notes and the owner's notes, and the results of the tools it calls. Those results pass the same filter as [MCP](../reference/mcp.md#what-an-agent-never-gets): no subscription links or page passwords, no keys, device configurations or tokens, no server passwords, no node addresses. If a message you type looks like a key or a password, the chat asks before sending it.
 

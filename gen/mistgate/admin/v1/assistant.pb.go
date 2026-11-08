@@ -33,6 +33,12 @@ const (
 	AssistantProvider_ASSISTANT_PROVIDER_ZAI AssistantProvider = 3
 	// OpenAI-compatible Chat Completions, https://ollama.com/v1.
 	AssistantProvider_ASSISTANT_PROVIDER_OLLAMA_CLOUD AssistantProvider = 4
+	// Slots for owner-configured OpenAI-compatible providers.
+	AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_1 AssistantProvider = 5
+	AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_2 AssistantProvider = 6
+	AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_3 AssistantProvider = 7
+	AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_4 AssistantProvider = 8
+	AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_5 AssistantProvider = 9
 )
 
 // Enum value maps for AssistantProvider.
@@ -43,6 +49,11 @@ var (
 		2: "ASSISTANT_PROVIDER_DEEPSEEK",
 		3: "ASSISTANT_PROVIDER_ZAI",
 		4: "ASSISTANT_PROVIDER_OLLAMA_CLOUD",
+		5: "ASSISTANT_PROVIDER_CUSTOM_1",
+		6: "ASSISTANT_PROVIDER_CUSTOM_2",
+		7: "ASSISTANT_PROVIDER_CUSTOM_3",
+		8: "ASSISTANT_PROVIDER_CUSTOM_4",
+		9: "ASSISTANT_PROVIDER_CUSTOM_5",
 	}
 	AssistantProvider_value = map[string]int32{
 		"ASSISTANT_PROVIDER_UNSPECIFIED":  0,
@@ -50,6 +61,11 @@ var (
 		"ASSISTANT_PROVIDER_DEEPSEEK":     2,
 		"ASSISTANT_PROVIDER_ZAI":          3,
 		"ASSISTANT_PROVIDER_OLLAMA_CLOUD": 4,
+		"ASSISTANT_PROVIDER_CUSTOM_1":     5,
+		"ASSISTANT_PROVIDER_CUSTOM_2":     6,
+		"ASSISTANT_PROVIDER_CUSTOM_3":     7,
+		"ASSISTANT_PROVIDER_CUSTOM_4":     8,
+		"ASSISTANT_PROVIDER_CUSTOM_5":     9,
 	}
 )
 
@@ -519,7 +535,9 @@ type ChatProviderChoice struct {
 	InputUsdPerMtok  float64 `protobuf:"fixed64,3,opt,name=input_usd_per_mtok,json=inputUsdPerMtok,proto3" json:"input_usd_per_mtok,omitempty"`
 	OutputUsdPerMtok float64 `protobuf:"fixed64,4,opt,name=output_usd_per_mtok,json=outputUsdPerMtok,proto3" json:"output_usd_per_mtok,omitempty"`
 	// Its monthly budget is spent: a turn on it is refused until next month or a higher budget.
-	BudgetReached bool `protobuf:"varint,5,opt,name=budget_reached,json=budgetReached,proto3" json:"budget_reached,omitempty"`
+	BudgetReached bool   `protobuf:"varint,5,opt,name=budget_reached,json=budgetReached,proto3" json:"budget_reached,omitempty"`
+	CustomName    string `protobuf:"bytes,6,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
+	CustomUrl     string `protobuf:"bytes,7,opt,name=custom_url,json=customUrl,proto3" json:"custom_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -587,6 +605,20 @@ func (x *ChatProviderChoice) GetBudgetReached() bool {
 		return x.BudgetReached
 	}
 	return false
+}
+
+func (x *ChatProviderChoice) GetCustomName() string {
+	if x != nil {
+		return x.CustomName
+	}
+	return ""
+}
+
+func (x *ChatProviderChoice) GetCustomUrl() string {
+	if x != nil {
+		return x.CustomUrl
+	}
+	return ""
 }
 
 type AssistantSettings struct {
@@ -760,10 +792,15 @@ type ProviderStatus struct {
 	// This calendar month (UTC), estimated.
 	SpentUsdMonth float64 `protobuf:"fixed64,6,opt,name=spent_usd_month,json=spentUsdMonth,proto3" json:"spent_usd_month,omitempty"`
 	// The last refusal or failure of the provider, a code as in ERRORS; empty when the last call worked.
-	LastErrorCode string `protobuf:"bytes,7,opt,name=last_error_code,json=lastErrorCode,proto3" json:"last_error_code,omitempty"`
-	LastErrorUnix int64  `protobuf:"varint,8,opt,name=last_error_unix,json=lastErrorUnix,proto3" json:"last_error_unix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LastErrorCode    string  `protobuf:"bytes,7,opt,name=last_error_code,json=lastErrorCode,proto3" json:"last_error_code,omitempty"`
+	LastErrorUnix    int64   `protobuf:"varint,8,opt,name=last_error_unix,json=lastErrorUnix,proto3" json:"last_error_unix,omitempty"`
+	CustomName       string  `protobuf:"bytes,9,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
+	CustomUrl        string  `protobuf:"bytes,10,opt,name=custom_url,json=customUrl,proto3" json:"custom_url,omitempty"`
+	AllowLocal       bool    `protobuf:"varint,11,opt,name=allow_local,json=allowLocal,proto3" json:"allow_local,omitempty"`
+	InputUsdPerMtok  float64 `protobuf:"fixed64,12,opt,name=input_usd_per_mtok,json=inputUsdPerMtok,proto3" json:"input_usd_per_mtok,omitempty"`
+	OutputUsdPerMtok float64 `protobuf:"fixed64,13,opt,name=output_usd_per_mtok,json=outputUsdPerMtok,proto3" json:"output_usd_per_mtok,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ProviderStatus) Reset() {
@@ -848,6 +885,41 @@ func (x *ProviderStatus) GetLastErrorCode() string {
 func (x *ProviderStatus) GetLastErrorUnix() int64 {
 	if x != nil {
 		return x.LastErrorUnix
+	}
+	return 0
+}
+
+func (x *ProviderStatus) GetCustomName() string {
+	if x != nil {
+		return x.CustomName
+	}
+	return ""
+}
+
+func (x *ProviderStatus) GetCustomUrl() string {
+	if x != nil {
+		return x.CustomUrl
+	}
+	return ""
+}
+
+func (x *ProviderStatus) GetAllowLocal() bool {
+	if x != nil {
+		return x.AllowLocal
+	}
+	return false
+}
+
+func (x *ProviderStatus) GetInputUsdPerMtok() float64 {
+	if x != nil {
+		return x.InputUsdPerMtok
+	}
+	return 0
+}
+
+func (x *ProviderStatus) GetOutputUsdPerMtok() float64 {
+	if x != nil {
+		return x.OutputUsdPerMtok
 	}
 	return 0
 }
@@ -1213,9 +1285,16 @@ type SetProviderKeyRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Provider AssistantProvider      `protobuf:"varint,1,opt,name=provider,proto3,enum=mistgate.admin.v1.AssistantProvider" json:"provider,omitempty"`
 	// Sealed on arrival; never logged, audited or returned.
-	ApiKey        string `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ApiKey string `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	// Custom provider configuration. Required for a custom slot.
+	CustomName       string  `protobuf:"bytes,3,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
+	CustomUrl        string  `protobuf:"bytes,4,opt,name=custom_url,json=customUrl,proto3" json:"custom_url,omitempty"`
+	CustomModel      string  `protobuf:"bytes,5,opt,name=custom_model,json=customModel,proto3" json:"custom_model,omitempty"`
+	AllowLocal       bool    `protobuf:"varint,6,opt,name=allow_local,json=allowLocal,proto3" json:"allow_local,omitempty"`
+	InputUsdPerMtok  float64 `protobuf:"fixed64,7,opt,name=input_usd_per_mtok,json=inputUsdPerMtok,proto3" json:"input_usd_per_mtok,omitempty"`
+	OutputUsdPerMtok float64 `protobuf:"fixed64,8,opt,name=output_usd_per_mtok,json=outputUsdPerMtok,proto3" json:"output_usd_per_mtok,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SetProviderKeyRequest) Reset() {
@@ -1260,6 +1339,48 @@ func (x *SetProviderKeyRequest) GetApiKey() string {
 		return x.ApiKey
 	}
 	return ""
+}
+
+func (x *SetProviderKeyRequest) GetCustomName() string {
+	if x != nil {
+		return x.CustomName
+	}
+	return ""
+}
+
+func (x *SetProviderKeyRequest) GetCustomUrl() string {
+	if x != nil {
+		return x.CustomUrl
+	}
+	return ""
+}
+
+func (x *SetProviderKeyRequest) GetCustomModel() string {
+	if x != nil {
+		return x.CustomModel
+	}
+	return ""
+}
+
+func (x *SetProviderKeyRequest) GetAllowLocal() bool {
+	if x != nil {
+		return x.AllowLocal
+	}
+	return false
+}
+
+func (x *SetProviderKeyRequest) GetInputUsdPerMtok() float64 {
+	if x != nil {
+		return x.InputUsdPerMtok
+	}
+	return 0
+}
+
+func (x *SetProviderKeyRequest) GetOutputUsdPerMtok() float64 {
+	if x != nil {
+		return x.OutputUsdPerMtok
+	}
+	return 0
 }
 
 type SetProviderKeyResponse struct {
@@ -3902,13 +4023,17 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x06unread\x18\b \x01(\rR\x06unread\x121\n" +
 	"\x13next_follow_up_unix\x18\t \x01(\x03B\x020\x02R\x10nextFollowUpUnix\x126\n" +
 	"\x17timezone_offset_minutes\x18\n" +
-	" \x01(\x05R\x15timezoneOffsetMinutes\"\xef\x01\n" +
+	" \x01(\x05R\x15timezoneOffsetMinutes\"\xaf\x02\n" +
 	"\x12ChatProviderChoice\x12@\n" +
 	"\bprovider\x18\x01 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12+\n" +
 	"\x12input_usd_per_mtok\x18\x03 \x01(\x01R\x0finputUsdPerMtok\x12-\n" +
 	"\x13output_usd_per_mtok\x18\x04 \x01(\x01R\x10outputUsdPerMtok\x12%\n" +
-	"\x0ebudget_reached\x18\x05 \x01(\bR\rbudgetReached\"\x88\x03\n" +
+	"\x0ebudget_reached\x18\x05 \x01(\bR\rbudgetReached\x12\x1f\n" +
+	"\vcustom_name\x18\x06 \x01(\tR\n" +
+	"customName\x12\x1d\n" +
+	"\n" +
+	"custom_url\x18\a \x01(\tR\tcustomUrl\"\x88\x03\n" +
 	"\x11AssistantSettings\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12@\n" +
 	"\bprovider\x18\x02 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12:\n" +
@@ -3921,7 +4046,7 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x0eProviderChoice\x12@\n" +
 	"\bprovider\x18\x01 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12(\n" +
-	"\x10budget_usd_month\x18\x03 \x01(\x01R\x0ebudgetUsdMonth\"\xe5\x02\n" +
+	"\x10budget_usd_month\x18\x03 \x01(\x01R\x0ebudgetUsdMonth\"\xa2\x04\n" +
 	"\x0eProviderStatus\x12@\n" +
 	"\bprovider\x18\x01 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x1c\n" +
 	"\tconnected\x18\x02 \x01(\bR\tconnected\x12\x19\n" +
@@ -3931,7 +4056,16 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x06choice\x18\x05 \x01(\v2!.mistgate.admin.v1.ProviderChoiceR\x06choice\x12&\n" +
 	"\x0fspent_usd_month\x18\x06 \x01(\x01R\rspentUsdMonth\x12&\n" +
 	"\x0flast_error_code\x18\a \x01(\tR\rlastErrorCode\x12*\n" +
-	"\x0flast_error_unix\x18\b \x01(\x03B\x020\x02R\rlastErrorUnix\"\xdd\x01\n" +
+	"\x0flast_error_unix\x18\b \x01(\x03B\x020\x02R\rlastErrorUnix\x12\x1f\n" +
+	"\vcustom_name\x18\t \x01(\tR\n" +
+	"customName\x12\x1d\n" +
+	"\n" +
+	"custom_url\x18\n" +
+	" \x01(\tR\tcustomUrl\x12\x1f\n" +
+	"\vallow_local\x18\v \x01(\bR\n" +
+	"allowLocal\x12+\n" +
+	"\x12input_usd_per_mtok\x18\f \x01(\x01R\x0finputUsdPerMtok\x12-\n" +
+	"\x13output_usd_per_mtok\x18\r \x01(\x01R\x10outputUsdPerMtok\"\xdd\x01\n" +
 	"\x0eAssistantModel\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
@@ -3955,10 +4089,19 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\achoices\x18\x02 \x03(\v2!.mistgate.admin.v1.ProviderChoiceR\achoices\"\xa4\x01\n" +
 	"\x1fUpdateAssistantSettingsResponse\x12@\n" +
 	"\bsettings\x18\x01 \x01(\v2$.mistgate.admin.v1.AssistantSettingsR\bsettings\x12?\n" +
-	"\tproviders\x18\x02 \x03(\v2!.mistgate.admin.v1.ProviderStatusR\tproviders\"r\n" +
+	"\tproviders\x18\x02 \x03(\v2!.mistgate.admin.v1.ProviderStatusR\tproviders\"\xd2\x02\n" +
 	"\x15SetProviderKeyRequest\x12@\n" +
 	"\bprovider\x18\x01 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x17\n" +
-	"\aapi_key\x18\x02 \x01(\tR\x06apiKey\"\x8e\x01\n" +
+	"\aapi_key\x18\x02 \x01(\tR\x06apiKey\x12\x1f\n" +
+	"\vcustom_name\x18\x03 \x01(\tR\n" +
+	"customName\x12\x1d\n" +
+	"\n" +
+	"custom_url\x18\x04 \x01(\tR\tcustomUrl\x12!\n" +
+	"\fcustom_model\x18\x05 \x01(\tR\vcustomModel\x12\x1f\n" +
+	"\vallow_local\x18\x06 \x01(\bR\n" +
+	"allowLocal\x12+\n" +
+	"\x12input_usd_per_mtok\x18\a \x01(\x01R\x0finputUsdPerMtok\x12-\n" +
+	"\x13output_usd_per_mtok\x18\b \x01(\x01R\x10outputUsdPerMtok\"\x8e\x01\n" +
 	"\x16SetProviderKeyResponse\x129\n" +
 	"\x06status\x18\x01 \x01(\v2!.mistgate.admin.v1.ProviderStatusR\x06status\x129\n" +
 	"\x06models\x18\x02 \x03(\v2!.mistgate.admin.v1.AssistantModelR\x06models\"\\\n" +
@@ -4132,13 +4275,18 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x14DeleteMemoryResponse\"\x12\n" +
 	"\x10ForgetAllRequest\"-\n" +
 	"\x11ForgetAllResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\rR\adeleted*\xbb\x01\n" +
+	"\adeleted\x18\x01 \x01(\rR\adeleted*\xe0\x02\n" +
 	"\x11AssistantProvider\x12\"\n" +
 	"\x1eASSISTANT_PROVIDER_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cASSISTANT_PROVIDER_ANTHROPIC\x10\x01\x12\x1f\n" +
 	"\x1bASSISTANT_PROVIDER_DEEPSEEK\x10\x02\x12\x1a\n" +
 	"\x16ASSISTANT_PROVIDER_ZAI\x10\x03\x12#\n" +
-	"\x1fASSISTANT_PROVIDER_OLLAMA_CLOUD\x10\x04*\x8b\x01\n" +
+	"\x1fASSISTANT_PROVIDER_OLLAMA_CLOUD\x10\x04\x12\x1f\n" +
+	"\x1bASSISTANT_PROVIDER_CUSTOM_1\x10\x05\x12\x1f\n" +
+	"\x1bASSISTANT_PROVIDER_CUSTOM_2\x10\x06\x12\x1f\n" +
+	"\x1bASSISTANT_PROVIDER_CUSTOM_3\x10\a\x12\x1f\n" +
+	"\x1bASSISTANT_PROVIDER_CUSTOM_4\x10\b\x12\x1f\n" +
+	"\x1bASSISTANT_PROVIDER_CUSTOM_5\x10\t*\x8b\x01\n" +
 	"\x0fAssistantEffort\x12 \n" +
 	"\x1cASSISTANT_EFFORT_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16ASSISTANT_EFFORT_QUICK\x10\x01\x12\x1b\n" +

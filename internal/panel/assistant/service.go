@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -70,6 +71,9 @@ func New(c Config) *Service {
 		s.providers[provider] = injected
 	}
 	for _, spec := range providerSpecs {
+		if isCustomProvider(spec.provider) {
+			continue
+		}
 		if s.providers[spec.provider] != nil {
 			continue
 		}
@@ -223,7 +227,14 @@ func (s *Service) chatChoices(ctx context.Context, first adminv1.AssistantProvid
 			return nil, err
 		}
 		p := listedPrice(spec, model)
-		choice := &adminv1.ChatProviderChoice{Provider: spec.provider, Model: model, InputUsdPerMtok: p.input, OutputUsdPerMtok: p.output, BudgetReached: row.budget <= 0 || spent >= row.budget}
+		if isCustomProvider(spec.provider) {
+			p = price{row.inputPrice, row.outputPrice}
+		}
+		var origin string
+		if u, e := url.Parse(row.customURL); e == nil && u.Host != "" {
+			origin = u.Scheme + "://" + u.Host
+		}
+		choice := &adminv1.ChatProviderChoice{Provider: spec.provider, Model: model, InputUsdPerMtok: p.input, OutputUsdPerMtok: p.output, BudgetReached: row.budget <= 0 || spent >= row.budget, CustomName: row.customName, CustomUrl: origin}
 		if spec.provider == first {
 			out = append([]*adminv1.ChatProviderChoice{choice}, out...)
 		} else {

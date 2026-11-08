@@ -5,7 +5,7 @@ import { SaveBar } from "@/screens/subscriptions/ui";
 import { RowList, Section, SettingRow } from "./parts";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
-import { BrandMark, modelBrand, providerBrand } from "@/components/assistant/brand-icons";
+import { BrandMark, customProviderBrand, modelBrand, providerBrand } from "@/components/assistant/brand-icons";
 import { Modal } from "@/components/ui/modal";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { Segmented } from "@/components/ui/segmented";
@@ -24,9 +24,9 @@ import { useFmt } from "@/lib/format";
 import { plain, type Plain } from "@/lib/plain";
 
 /** A provider's or a model maker's mark (components/assistant/brand-icons), or nothing for one without a known mark. */
-const provMark = (provider: AssistantProvider, size = 14) => {
-  const brand = providerBrand[provider];
-  return brand ? <BrandMark brand={brand} size={size} /> : undefined;
+const provMark = (provider: AssistantProvider, size = 14, url = "") => {
+  const brand = providerBrand[provider] ?? customProviderBrand(url);
+  return brand ? <BrandMark brand={brand} size={size} /> : provider >= AssistantProvider.CUSTOM_1 && provider <= AssistantProvider.CUSTOM_5 ? <Icon name="layers" size={size} /> : undefined;
 };
 const modelMark = (model: string) => {
   const brand = modelBrand(model);
@@ -94,6 +94,8 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
   const rows = providers
     .map((p) => ({ p, status: statuses.find((s) => s.provider === p.id) ?? ({ provider: p.id, connected: false } as Status) }))
     .sort((a, b) => rank(a.status) - rank(b.status));
+  const custom = statuses.filter((s) => s.provider >= AssistantProvider.CUSTOM_1 && s.provider <= AssistantProvider.CUSTOM_5);
+  const displayName = (s: Status) => s.customName || (s.provider >= AssistantProvider.CUSTOM_1 ? `${t("ai.custom.title")} ${s.provider - AssistantProvider.CUSTOM_1 + 1}` : t(providerName(s.provider)));
 
   return (
     <div className="flex flex-col gap-6">
@@ -113,7 +115,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                 className="min-w-[200px]"
                 value={String(shownProvider)}
                 onValueChange={(v) => set({ provider: Number(v) as AssistantProvider })}
-                options={connected.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)), icon: provMark(s.provider) }))}
+                options={connected.map((s) => ({ value: String(s.provider), label: displayName(s), icon: provMark(s.provider, 14, s.customUrl) }))}
               />
             )}
           </SettingRow>
@@ -124,7 +126,7 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
                 className="min-w-[200px]"
                 value={String(shownFallback)}
                 onValueChange={(v) => set({ fallbackProvider: Number(v) as AssistantProvider })}
-                options={[{ value: String(AssistantProvider.UNSPECIFIED), label: t("ai.set.fallbackNone") }, ...fallbacks.map((s) => ({ value: String(s.provider), label: t(providerName(s.provider)), icon: provMark(s.provider) }))]}
+                options={[{ value: String(AssistantProvider.UNSPECIFIED), label: t("ai.set.fallbackNone") }, ...fallbacks.map((s) => ({ value: String(s.provider), label: displayName(s), icon: provMark(s.provider, 14, s.customUrl) }))]}
               />
             </SettingRow>
           )}
@@ -195,6 +197,11 @@ function SettingsForm({ data }: { data: Plain<GetAssistantSettingsResponse> }) {
               onChoice={(c) => setChoices((all) => ({ ...all, [p.id]: c }))}
             />
           ))}
+          {custom.map((status) => (
+            <ProviderRow key={status.provider} status={status} name={displayName(status)} data={status.customUrl || t("ai.custom.hint")} inUse={shownProvider === status.provider && status.connected}
+              choice={choices[status.provider] ?? ({ provider: status.provider, model: "", budgetUsdMonth: 20 } as Choice)}
+              onChoice={(c) => setChoices((all) => ({ ...all, [status.provider]: c }))} />
+          ))}
         </RowList>
       </Section>
 
@@ -222,6 +229,13 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
   const qc = useQueryClient();
   const [entering, setEntering] = useState(false);
   const [key, setKey] = useState("");
+  const custom = status.provider >= AssistantProvider.CUSTOM_1 && status.provider <= AssistantProvider.CUSTOM_5;
+  const [customName, setCustomName] = useState(status.customName || "");
+  const [customUrl, setCustomUrl] = useState(status.customUrl || "");
+  const [customModel, setCustomModel] = useState(status.choice?.model || "");
+  const [allowLocal, setAllowLocal] = useState(status.allowLocal || false);
+  const [inputPrice, setInputPrice] = useState(String(status.inputUsdPerMtok || 0));
+  const [outputPrice, setOutputPrice] = useState(String(status.outputUsdPerMtok || 0));
   const [removing, setRemoving] = useState(false);
   const [open, setOpen] = useState(inUse);
   const models = useQuery({
@@ -236,7 +250,7 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
     toast.error(k ? t(k) : errorText(e, t));
   };
   const setKeyM = useMutation({
-    mutationFn: () => guard(() => assistant.setProviderKey({ provider: status.provider, apiKey: key.trim() })),
+    mutationFn: () => guard(() => assistant.setProviderKey({ provider: status.provider, apiKey: key.trim(), customName, customUrl, customModel, allowLocal, inputUsdPerMtok: Number(inputPrice), outputUsdPerMtok: Number(outputPrice) })),
     onSuccess: () => {
       setKey("");
       setEntering(false);
@@ -265,13 +279,13 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
       <div className="flex items-center gap-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <b className="flex items-center gap-2 text-[13.5px] font-medium">
-            {provMark(status.provider, 15)}
+            {provMark(status.provider, 15, status.customUrl)}
             {name}
             {inUse && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-semibold text-accent-text">{t("ai.prov.inUse")}</span>}
           </b>
           <span className={cx("flex items-center gap-1.5 text-xs", status.connected ? "text-ok-text" : "text-muted")}>
             {status.connected && <span aria-hidden className="size-1.5 rounded-full bg-ok" />}
-            {status.connected ? t("ai.prov.connected", { hint: status.keyHint }) : t("ai.prov.notConnected")}
+            {status.connected ? (custom && !status.keyHint ? t("ai.custom.keyless") : t("ai.prov.connected", { hint: status.keyHint })) : t("ai.prov.notConnected")}
           </span>
         </div>
         {!entering && (
@@ -311,12 +325,20 @@ function ProviderRow({ status, name, data, inUse, choice, onChoice }: { status: 
       )}
       {entering && (
         <div className="flex flex-col gap-2 rounded-field bg-surface-2 p-3">
+          {custom && <>
+            <TextField label={t("ai.custom.name")} value={customName} onChange={(e) => setCustomName(e.target.value)} />
+            <TextField label={t("ai.custom.url")} placeholder="https://example.com/v1" value={customUrl} onChange={(e) => setCustomUrl(e.target.value)} />
+            <TextField label={t("ai.custom.model")} value={customModel} onChange={(e) => setCustomModel(e.target.value)} />
+            <TextField label={t("ai.custom.input")} type="number" min="0" value={inputPrice} onChange={(e) => setInputPrice(e.target.value)} />
+            <TextField label={t("ai.custom.output")} type="number" min="0" value={outputPrice} onChange={(e) => setOutputPrice(e.target.value)} />
+            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={allowLocal} onChange={(e) => setAllowLocal(e.target.checked)} />{t("ai.custom.local")}</label>
+          </>}
           <TextField type="password" label={t("ai.prov.keyLabel", { name })} placeholder={t("ai.prov.keyPh")} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} mono />
           <div className="flex justify-end gap-2">
             <Button type="button" size="sm" variant="ghost" onClick={() => (setEntering(false), setKey(""))}>
               {t("ai.prov.cancel")}
             </Button>
-            <Button type="button" size="sm" variant="primary" disabled={!key.trim() || setKeyM.isPending} onClick={() => setKeyM.mutate()}>
+            <Button type="button" size="sm" variant="primary" disabled={setKeyM.isPending || (custom ? !customName.trim() || !customUrl.trim() || !customModel.trim() || (!key.trim() && !allowLocal) : !key.trim())} onClick={() => setKeyM.mutate()}>
               {t("ai.prov.check")}
             </Button>
           </div>

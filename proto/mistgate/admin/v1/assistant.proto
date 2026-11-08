@@ -20,7 +20,8 @@ import "mistgate/admin/v1/integrations.proto";
 //
 // KEYS. A provider key is sealed with the panel vault (AAD "assistant-provider:<provider>") and never returned: the panel
 // shows the provider, the last four characters, when it was added and the last error. The panel calls a provider only from
-// the server, over HTTPS, to the provider's fixed address (no custom URL), without following redirects to another host.
+// the server. Custom endpoints use HTTPS, or HTTP for local addresses only when explicitly allowed; redirects cannot leave
+// the configured host, and link-local addresses are blocked.
 //
 // LIMITS. Per turn: at most 24 tool calls, 120 s per model call, 10 minutes per turn. Per admin: 20 turns a minute, one
 // running turn per conversation. Per provider: the owner's monthly budget in US dollars, estimated from the provider's
@@ -97,6 +98,12 @@ enum AssistantProvider {
   ASSISTANT_PROVIDER_ZAI = 3;
   // OpenAI-compatible Chat Completions, https://ollama.com/v1.
   ASSISTANT_PROVIDER_OLLAMA_CLOUD = 4;
+  // Slots for owner-configured OpenAI-compatible providers.
+  ASSISTANT_PROVIDER_CUSTOM_1 = 5;
+  ASSISTANT_PROVIDER_CUSTOM_2 = 6;
+  ASSISTANT_PROVIDER_CUSTOM_3 = 7;
+  ASSISTANT_PROVIDER_CUSTOM_4 = 8;
+  ASSISTANT_PROVIDER_CUSTOM_5 = 9;
 }
 
 // How hard the model thinks: Anthropic effort low / medium / high, reasoning_effort where a provider takes one.
@@ -150,6 +157,8 @@ message ChatProviderChoice {
   double output_usd_per_mtok = 4;
   // Its monthly budget is spent: a turn on it is refused until next month or a higher budget.
   bool budget_reached = 5;
+  string custom_name = 6;
+  string custom_url = 7;
 }
 
 message AssistantSettings {
@@ -188,6 +197,11 @@ message ProviderStatus {
   // The last refusal or failure of the provider, a code as in ERRORS; empty when the last call worked.
   string last_error_code = 7;
   int64 last_error_unix = 8 [jstype = JS_NUMBER];
+  string custom_name = 9;
+  string custom_url = 10;
+  bool allow_local = 11;
+  double input_usd_per_mtok = 12;
+  double output_usd_per_mtok = 13;
 }
 
 message AssistantModel {
@@ -233,6 +247,13 @@ message SetProviderKeyRequest {
   AssistantProvider provider = 1;
   // Sealed on arrival; never logged, audited or returned.
   string api_key = 2;
+  // Custom provider configuration. Required for a custom slot.
+  string custom_name = 3;
+  string custom_url = 4;
+  string custom_model = 5;
+  bool allow_local = 6;
+  double input_usd_per_mtok = 7;
+  double output_usd_per_mtok = 8;
 }
 
 message SetProviderKeyResponse {
