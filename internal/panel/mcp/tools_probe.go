@@ -154,7 +154,7 @@ func (c *call) pathProbe(in pathProbeArg) (any, error) {
 		req.Ports = append(req.Ports, uint32(p))
 	}
 	for _, s := range in.Sizes {
-		if s < 0 {
+		if s < 64 || s > 1472 {
 			return nil, errors.New("sizes: 64 to 1472")
 		}
 		req.Sizes = append(req.Sizes, uint32(s))

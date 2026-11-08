@@ -30,9 +30,10 @@ var decoyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)
 
 // fakeSrc knows the tokens in valid and counts the lookups.
 type fakeSrc struct {
-	mu    sync.Mutex
-	valid map[string]access.SubView
-	calls int
+	mu     sync.Mutex
+	valid  map[string]access.SubView
+	calls  int
+	checks int
 }
 
 func (f *fakeSrc) Subscription(_ context.Context, token string) (access.SubView, error) {
@@ -49,6 +50,7 @@ func (f *fakeSrc) Subscription(_ context.Context, token string) (access.SubView,
 func (f *fakeSrc) CheckSubscriptionToken(_ context.Context, token string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.checks++
 	if _, ok := f.valid[token]; !ok {
 		return access.ErrUnknownToken
 	}
@@ -61,10 +63,23 @@ func (f *fakeSrc) lookups() int {
 	return f.calls
 }
 
+func (f *fakeSrc) checkLookups() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.checks
+}
+
 func (f *fakeSrc) set(token string, v access.SubView) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.valid[token] = v
+}
+
+func (f *fakeSrc) rotate(old, next string, v access.SubView) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.valid, old)
+	f.valid[next] = v
 }
 
 type fakeEvents struct{ ch chan store.EventRow }
@@ -222,8 +237,8 @@ func TestFetchesAreServedFromACache(t *testing.T) {
 	r.src.set(tokA, access.SubView{UserName: "alice", Status: access.StatusActive, Lines: []string{"hysteria2://new@de1.example.com:443/"}, Total: 200})
 	r.now = r.now.Add(9 * time.Second)
 	again := r.get("198.51.100.9", tokA) // another client: the cache is per token
-	if r.src.lookups() != 1 || again.Body.String() != first.Body.String() || again.Header().Get("Subscription-Userinfo") != first.Header().Get("Subscription-Userinfo") {
-		t.Fatalf("not served from the cache: %d lookups, %q", r.src.lookups(), again.Body.String())
+	if r.src.lookups() != 1 || r.src.checkLookups() != 1 || again.Body.String() != first.Body.String() || again.Header().Get("Subscription-Userinfo") != first.Header().Get("Subscription-Userinfo") {
+		t.Fatalf("not served from the cache after checking the token: %d lookups, %d checks, %q", r.src.lookups(), r.src.checkLookups(), again.Body.String())
 	}
 	for _, k := range []string{"Content-Type", "Cache-Control", "Profile-Title", "Profile-Update-Interval"} {
 		if again.Header().Get(k) != first.Header().Get(k) {
@@ -246,6 +261,24 @@ func TestFetchesAreServedFromACache(t *testing.T) {
 	r.now = r.now.Add(11 * time.Second)
 	if rec := r.get("203.0.113.1", tokA); !isDecoy(rec) {
 		t.Errorf("rotated link: %d", rec.Code)
+	}
+}
+
+func TestRotatedTokenIsRejectedDuringTheCacheWindow(t *testing.T) {
+	r := newRig(t, nil)
+	if rec := r.get("203.0.113.1", tokA); rec.Code != http.StatusOK {
+		t.Fatalf("first fetch: %d", rec.Code)
+	}
+	r.src.rotate(tokA, unknownToken(100), access.SubView{UserName: "alice", Status: access.StatusActive, Lines: []string{"hysteria2://new@de1.example.com:443/"}})
+	r.now = r.now.Add(time.Second)
+	if rec := r.get("203.0.113.1", tokA); !isDecoy(rec) {
+		t.Fatalf("rotated token returned cached data: %d", rec.Code)
+	}
+	if r.src.lookups() != 1 || r.src.checkLookups() != 1 {
+		t.Fatalf("old token was rendered instead of rejected: %d view lookups, %d token checks", r.src.lookups(), r.src.checkLookups())
+	}
+	if _, ok := r.h.(*handler).tokens.Get(tokA); ok {
+		t.Fatal("rotated token stayed in the cache map")
 	}
 }
 

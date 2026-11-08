@@ -158,21 +158,22 @@ describe("memoizeRetry", () => {
 
 describe("forwardLink", () => {
   const forwarded = new Response("101");
+  const nodeId = `nod_${"a".repeat(26)}`;
   const ns = () => {
     const fetch = vi.fn(async (_request: Request) => forwarded);
     const idFromName = vi.fn((name: string) => name);
     const get = vi.fn((_id: string) => ({ fetch }));
     return { ns: { idFromName, get } as unknown as Parameters<typeof forwardLink>[0], fetch, idFromName, get };
   };
-  const request = new Request("https://example.com/p/link/nod_1", { headers: { Upgrade: "websocket" } });
+  const request = new Request(`https://example.com/p/link/${nodeId}`, { headers: { Upgrade: "websocket" } });
   const answer = (status: number, headers: [string, string][]) => ({ status, headers, body: new Uint8Array(), waitUntil: Promise.resolve() });
 
   it("sends the original request, as it is, to the object of the marked node, whatever the header's case", async () => {
     for (const name of ["X-Mistgate-Link", "x-mistgate-link"]) {
       const f = ns();
-      expect(await forwardLink(f.ns, request, answer(204, [[name, "nod_1"]]))).toBe(forwarded);
-      expect(f.idFromName).toHaveBeenCalledWith("nod_1");
-      expect(f.get).toHaveBeenCalledWith("nod_1");
+      expect(await forwardLink(f.ns, request, answer(204, [[name, nodeId]]))).toBe(forwarded);
+      expect(f.idFromName).toHaveBeenCalledWith(nodeId);
+      expect(f.get).toHaveBeenCalledWith(nodeId);
       const sent = f.fetch.mock.calls[0]?.[0];
       expect(sent).toBe(request);
       expect(sent?.headers.get("Upgrade")).toBe("websocket");
@@ -183,8 +184,16 @@ describe("forwardLink", () => {
   it("leaves any other panel answer alone", () => {
     const f = ns();
     expect(forwardLink(f.ns, request, answer(204, []))).toBeUndefined();
-    expect(forwardLink(f.ns, request, answer(200, [["X-Mistgate-Link", "nod_1"]]))).toBeUndefined();
+    expect(forwardLink(f.ns, request, answer(200, [["X-Mistgate-Link", nodeId]]))).toBeUndefined();
     expect(forwardLink(f.ns, request, answer(204, [["X-Mistgate-Link", ""]]))).toBeUndefined();
+    expect(f.get).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed node id before creating a Durable Object", async () => {
+    const f = ns();
+    const out = await forwardLink(f.ns, request, answer(204, [["X-Mistgate-Link", "nod_fabricated"]]));
+    expect(out?.status).toBe(404);
+    expect(f.idFromName).not.toHaveBeenCalled();
     expect(f.get).not.toHaveBeenCalled();
   });
 });
@@ -319,7 +328,7 @@ describe("forwardAsset", () => {
       const [target, init] = fetchUpstream.mock.calls[0]!;
       expect(target.href).toBe(url);
       expect(init.method).toBe("GET");
-      expect(init.redirect).toBe("follow");
+      expect(init.redirect).toBe("manual");
       const sent = new Headers(init.headers);
       expect([...sent.keys()].sort()).toEqual(["accept-encoding", "range", "user-agent"]);
       expect(sent.get("range")).toBe("bytes=100-");
@@ -416,10 +425,38 @@ describe("forwardAsset", () => {
   });
 
   it("does not fetch a marker that is not an https URL", async () => {
-    for (const bad of ["http://github.com/a", "file:///etc/passwd", "not a url"]) {
+    for (const bad of ["http://github.com/a", "file:///etc/passwd", "not a url", "https://untrusted.example/file", "https://github.com:8443/file"]) {
       const fetchUpstream = upstream(new Response("x"));
       expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, bad]]), fetchUpstream))!.status, bad).toBe(502);
       expect(fetchUpstream).not.toHaveBeenCalled();
     }
+  });
+
+  it("follows a bounded redirect chain only to trusted GitHub release hosts", async () => {
+    const fetchUpstream = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: "https://objects.githubusercontent.com/release/file" } }))
+      .mockResolvedValueOnce(new Response(null, { status: 307, headers: { Location: "https://release-assets.githubusercontent.com/file" } }))
+      .mockResolvedValueOnce(new Response("file-bytes", { status: 200 }));
+    const out = (await forwardAsset(request(), answer(204, [[ASSET_MARKER, url]]), fetchUpstream))!;
+    expect(out.status).toBe(200);
+    expect(await out.text()).toBe("file-bytes");
+    expect(fetchUpstream).toHaveBeenCalledTimes(3);
+    expect(fetchUpstream.mock.calls.map(([target]) => target.hostname)).toEqual([
+      "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
+    ]);
+    for (const [, init] of fetchUpstream.mock.calls) expect(init.redirect).toBe("manual");
+
+    const untrusted = vi.fn(async () => new Response(null, { status: 302, headers: { Location: "https://untrusted.example/file" } }));
+    expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, url]]), untrusted))!.status).toBe(502);
+    expect(untrusted).toHaveBeenCalledOnce();
+  });
+
+  it("stops after three redirects", async () => {
+    const fetchUpstream = vi.fn(async (target: URL) => new Response(null, {
+      status: 302,
+      headers: { Location: `https://objects.githubusercontent.com/${target.pathname.length}` },
+    }));
+    expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, url]]), fetchUpstream))!.status).toBe(502);
+    expect(fetchUpstream).toHaveBeenCalledTimes(4);
   });
 });

@@ -96,6 +96,7 @@ export function toResponse(response: FetchResponse): Response {
 
 /** The header of the panel's answer to an agent link upgrade (fleet.LinkMarkerHeader). */
 export const LINK_MARKER = "x-mistgate-link";
+const NODE_ID_PATTERN = /^nod_[a-z2-7]{26}$/;
 
 /**
  * The panel cannot hold a WebSocket, so it answers an agent link upgrade with 204 and the node's id instead of upgrading.
@@ -106,10 +107,25 @@ export const LINK_MARKER = "x-mistgate-link";
 export function forwardLink(ns: DurableObjectNamespace<NodeLink>, request: Request, answer: FetchResponse): Promise<Response> | undefined {
   const id = answer.status === 204 ? answer.headers.find(([name]) => name.toLowerCase() === LINK_MARKER)?.[1] : undefined;
   if (!id) return undefined;
+  if (!NODE_ID_PATTERN.test(id)) return Promise.resolve(new Response("Not Found", { status: 404 }));
   return ns.get(ns.idFromName(id)).fetch(request);
 }
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+const RELEASE_HOSTS = new Set(["github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"]);
+const MAX_ASSET_REDIRECTS = 3;
+
+function isReleaseURL(url: URL): boolean {
+  return url.protocol === "https:" && url.username === "" && url.password === "" && (!url.port || url.port === "443") && RELEASE_HOSTS.has(url.hostname.toLowerCase());
+}
+
+function isLoopbackURL(url: URL): boolean {
+  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+}
+
+function isRedirect(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
 
 /** The header of the panel's answer to a node update download (fleet.AssetMarkerHeader): the release asset's URL. */
 export const ASSET_MARKER = "x-mistgate-asset";
@@ -119,9 +135,9 @@ export const ASSET_MARKER = "x-mistgate-asset";
  * of the bytes. The Worker fetches that URL (following GitHub's redirect to the signed asset host) and returns the stream
  * unchanged: no JS touches the bytes and nothing is buffered. Upstream gets only Range (resume), User-Agent and
  * Accept-Encoding: identity (so ranges are byte ranges of the file itself); no Authorization, no cookies. 200 and 206 pass
- * with their length headers, 416 stays 416, anything else is 502. The node checks size and SHA-256 itself, so a redirect
- * cannot plant bytes. The marker never reaches the client. Undefined for any other panel answer.
- * ponytail: any https redirect target is followed; restrict hosts if it ever matters.
+ * with their length headers, 416 stays 416, anything else is 502. The node checks size and SHA-256 itself. Redirects are
+ * followed manually and only to the GitHub hosts accepted by the panel. The marker never reaches the client. Undefined for
+ * any other panel answer.
  */
 export function forwardAsset(request: FetchRequest, answer: FetchResponse, fetchUpstream: (url: URL, init: RequestInit) => Promise<Response> = fetch): Promise<Response> | undefined {
   const marker = answer.status === 204 ? answer.headers.find(([name]) => name.toLowerCase() === ASSET_MARKER)?.[1] : undefined;
@@ -133,8 +149,8 @@ export function forwardAsset(request: FetchRequest, answer: FetchResponse, fetch
     } catch {
       return new Response("Bad Gateway", { status: 502 });
     }
-    // https only; plain http just for a loopback host, where the e2e's fake release lives (no Cloudflare edge reaches a loopback)
-    if (url.protocol !== "https:" && !(url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname))) return new Response("Bad Gateway", { status: 502 });
+    // The local e2e fake release uses loopback HTTP; deployed release downloads use the hosts trusted by the panel.
+    if (!isReleaseURL(url) && !isLoopbackURL(url)) return new Response("Bad Gateway", { status: 502 });
     const headers = new Headers({ "Accept-Encoding": "identity" });
     for (const [name, value] of request.headers) {
       const lower = name.toLowerCase();
@@ -143,7 +159,24 @@ export function forwardAsset(request: FetchRequest, answer: FetchResponse, fetch
     if (!headers.has("user-agent")) headers.set("User-Agent", "mistgate-edge");
     let upstream: Response;
     try {
-      upstream = await fetchUpstream(url, { method: request.method === "HEAD" ? "HEAD" : "GET", headers, redirect: "follow" });
+      const method = request.method === "HEAD" ? "HEAD" : "GET";
+      let redirects = 0;
+      for (;;) {
+        upstream = await fetchUpstream(url, { method, headers, redirect: "manual" });
+        if (!isRedirect(upstream.status)) break;
+        const location = upstream.headers.get("Location");
+        await upstream.body?.cancel();
+        if (!location || redirects >= MAX_ASSET_REDIRECTS) return new Response("Bad Gateway", { status: 502 });
+        let next: URL;
+        try {
+          next = new URL(location, url);
+        } catch {
+          return new Response("Bad Gateway", { status: 502 });
+        }
+        if (!isReleaseURL(next)) return new Response("Bad Gateway", { status: 502 });
+        url = next;
+        redirects++;
+      }
     } catch (error) {
       console.error("asset fetch failed:", error instanceof Error ? error.message : String(error));
       return new Response("Bad Gateway", { status: 502 });

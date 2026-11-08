@@ -250,6 +250,11 @@ type NodeMetricsRowV struct {
 	NetTxBps     uint64  `json:"net_tx_bps"`
 	TrafficToday uint64  `json:"traffic_today_bytes"`
 	OnlineTotal  uint32  `json:"online_total"`
+	// From agents that report them (absent otherwise: not known, not zero).
+	StealPct         *float32 `json:"steal_pct,omitempty"`
+	ConntrackFillPct *float32 `json:"conntrack_fill_pct,omitempty"`
+	AgentCPUPct      *float32 `json:"agent_cpu_pct,omitempty"`
+	AgentRSS         *uint64  `json:"agent_rss_bytes,omitempty"`
 }
 
 // FleetMetricsV is node_metrics without a node.
@@ -326,9 +331,16 @@ func (c *call) fleetMetrics() (any, error) {
 			return nil, apiError(err)
 		}
 		m := nodeMetricsView(r.Msg)
-		v.Nodes = append(v.Nodes, NodeMetricsRowV{ID: m.ID, Name: m.Name, Status: m.Status, HasMetrics: m.HasMetrics, AtUnix: m.AtUnix, CPUPct: m.CPUPct,
+		row := NodeMetricsRowV{ID: m.ID, Name: m.Name, Status: m.Status, HasMetrics: m.HasMetrics, AtUnix: m.AtUnix, CPUPct: m.CPUPct,
 			SoftIRQPct: m.SoftIRQPct, Load1: m.Load1, RAMUsed: m.RAMUsed, RAMTotal: m.RAMTotal, DiskUsed: m.DiskUsed, DiskTotal: m.DiskTotal,
-			NetRxBps: m.NetRxBps, NetTxBps: m.NetTxBps, TrafficToday: m.TrafficToday, OnlineTotal: sumUsers(r.Msg.GetNode().GetOnline())})
+			NetRxBps: m.NetRxBps, NetTxBps: m.NetTxBps, TrafficToday: m.TrafficToday, OnlineTotal: sumUsers(r.Msg.GetNode().GetOnline())}
+		if x := m.Res; x != nil {
+			row.StealPct, row.AgentCPUPct, row.AgentRSS = &x.StealPct, &x.AgentCPUPct, &x.AgentRSS
+			if x.ConntrackMax > 0 {
+				row.ConntrackFillPct = &x.ConntrackFillPct
+			}
+		}
+		v.Nodes = append(v.Nodes, row)
 	}
 	return v, nil
 }

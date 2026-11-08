@@ -457,6 +457,60 @@ func TestAssistantChatPlansStaySecretAndToolResultsAreUntrusted(t *testing.T) {
 	}
 }
 
+func TestAssistantChatRedactsUserCredentialsBeforeHistoryAndStorage(t *testing.T) {
+	f := newAssistantFixture(t)
+	ctx := context.Background()
+	text := "The word password is harmless; see https://example.com/550e8400-e29b-41d4-a716-446655440000 for node de1. SSH password: test-only-password"
+	stream, err := f.client.Chat(ctx, connect.NewRequest(&adminv1.ChatRequest{Text: text}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := drainChat(t, stream)
+	if len(events) == 0 || events[0].GetStarted() == nil {
+		t.Fatalf("chat did not start: %+v", events)
+	}
+	conversationID := events[0].GetStarted().GetConversationId()
+	if conversationID == "" {
+		t.Fatal("chat returned an empty conversation id")
+	}
+
+	historyFound := false
+	for _, req := range f.adapter.requests() {
+		for _, raw := range req.History {
+			got := string(raw)
+			if strings.Contains(got, "test-only-password") {
+				t.Fatalf("provider history contains the password: %s", got)
+			}
+			if strings.Contains(got, "SSH password: [removed: looks like a password]") {
+				if !strings.Contains(got, "The word password is harmless") || !strings.Contains(got, "550e8400-e29b-41d4-a716-446655440000") || !strings.Contains(got, "node de1") {
+					t.Fatalf("ordinary text was changed in provider history: %s", got)
+				}
+				historyFound = true
+			}
+		}
+	}
+	if !historyFound {
+		t.Fatal("provider history did not contain the redacted user message")
+	}
+	conversation, err := f.client.GetConversation(ctx, connect.NewRequest(&adminv1.GetConversationRequest{Id: conversationID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, message := range conversation.Msg.GetMessages() {
+		if message.GetRole() != adminv1.ChatRole_CHAT_ROLE_USER {
+			continue
+		}
+		if strings.Contains(message.GetText(), "test-only-password") || !strings.Contains(message.GetText(), "[removed: looks like a password]") {
+			t.Fatalf("stored user message = %q", message.GetText())
+		}
+		if !strings.Contains(message.GetText(), "The word password is harmless") || !strings.Contains(message.GetText(), "550e8400-e29b-41d4-a716-446655440000") || !strings.Contains(message.GetText(), "node de1") {
+			t.Fatalf("ordinary text was changed in stored message: %q", message.GetText())
+		}
+		return
+	}
+	t.Fatal("stored conversation has no user message")
+}
+
 func TestAssistantRealMCPPlanTokenIsSealedAndApplied(t *testing.T) {
 	f := newAssistantFixture(t,
 		modelResponse{Tools: []modelToolCall{scriptedTool("user_enable_plan", "call_real_plan", `{"user_ids":["usr_assistant_real"]}`)}},

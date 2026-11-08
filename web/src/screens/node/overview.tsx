@@ -6,13 +6,15 @@ import { useT } from "@/i18n";
 import type { Plain } from "@/lib/plain";
 import { useFmt } from "@/lib/format";
 import { NodeChecks } from "./checks";
+import { LoadHistory } from "./load-history";
 import { NodeAlerts, NodeTraffic } from "./overview-parts";
+import { ResourcesCard } from "./resources";
 import { OnlineNow, TopToday } from "./users";
 import { WaysStrip, type WaysModel } from "./ways";
 
 /**
- * Gauges (CPU with softirq, RAM, disk, network), traffic, the ways in on one line, then alerts and checks beside who is on
- * the node and the top of the day.
+ * Gauges (CPU with softirq, RAM, disk, network), what took the machine and its load over the hours, traffic, the ways in
+ * on one line, then alerts and checks beside who is on the node and the top of the day.
  */
 export function OverviewTab({ data, ways }: { data: Plain<GetNodeResponse>; ways?: WaysModel }) {
   const t = useT();
@@ -87,6 +89,12 @@ export function OverviewTab({ data, ways }: { data: Plain<GetNodeResponse>; ways
       {/* a node that was there and went quiet has stale readings, not "not yet" ones */}
       {(!m || offline) && (
         <p className="-mt-1 text-xs text-muted">{offline && node.lastSeenUnix > 0 ? t("node.m.offline", { time: fmt.stamp(node.lastSeenUnix) }) : t("node.m.none")}</p>
+      )}
+      {node.status !== NodeStatus.RETIRED && (
+        <div className="grid items-start gap-3.5 lg:grid-cols-2">
+          <ResourcesCard metrics={m} cpus={f?.cpuCount ?? 0} />
+          <LoadHistory nodeId={node.id} />
+        </div>
       )}
       <NodeTraffic nodeId={node.id} />
       {ways && node.status !== NodeStatus.RETIRED && <WaysStrip data={data} w={ways} />}

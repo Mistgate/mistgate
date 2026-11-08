@@ -88,15 +88,20 @@ func (f *Fleet) startSpeed(ctx context.Context, a, b string) (func(), error) {
 			return nil, retry(nodeTimes[id])
 		}
 	}
+	if p.active >= maxActiveProbes {
+		return nil, activeProbeLimitError()
+	}
 	p.speedCaller[actor] = append(callerTimes, now)
 	for _, id := range []string{a, b} {
 		p.speedNode[id] = append(nodeTimes[id], now)
 		p.speedBusy[id] = struct{}{}
 	}
+	p.active++
 	return func() {
 		p.mu.Lock()
 		delete(p.speedBusy, a)
 		delete(p.speedBusy, b)
+		p.active--
 		p.mu.Unlock()
 	}, nil
 }

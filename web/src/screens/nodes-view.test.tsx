@@ -13,7 +13,7 @@ import { NodesScreen } from "./nodes";
 
 // The List | Map switch of the Nodes page: the URL's ?view=map, else what this browser used last; the list on a phone.
 
-const ctl = vi.hoisted(() => ({ search: {} as { view?: "map"; focus?: string }, navigate: vi.fn() }));
+const ctl = vi.hoisted(() => ({ search: {} as { view?: "map" | "load"; focus?: string }, navigate: vi.fn() }));
 vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) } }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
@@ -23,6 +23,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/components/add-node", () => ({ useAddNode: () => vi.fn() }));
 vi.mock("./nodes-map", () => ({ FleetMap: ({ focus }: { focus?: string }) => <div data-testid="fleet-map">{focus ?? "-"}</div> }));
+vi.mock("./nodes-load", () => ({ FleetLoad: () => <div data-testid="fleet-load" /> }));
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,12 +43,12 @@ afterEach(() => {
 });
 
 const node = (id: string, name: string) => ({ id, name, countryCode: "DE", location: "", provider: "", address: `${name}.example.com`, status: NodeStatus.ONLINE, protocols: [], online: [], trafficTodayBytes: 0, hasMetrics: false, cpuPct: 0, uptimeS: 0, agentVersion: "0.3.1" });
-async function mount() {
+async function mount(edition = "") {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  qc.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role: Role.OWNER } } as never);
+  qc.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role: Role.OWNER }, edition } as never);
   qc.setQueryData(updatesQuery.queryKey, { nodes: [] } as never);
   qc.setQueryData(nodesQuery.queryKey, { nodes: [node("nod_de1", "de1"), node("nod_nl1", "nl1")], expectedAgentVersion: "0.3.1" } as never);
   await act(async () =>
@@ -88,11 +89,41 @@ describe("the List | Map switch", () => {
     expect(ctl.navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: {} }));
   });
 
-  it("is the list only on a phone, with no switch", async () => {
+  it("has no map on a phone: the switch offers the list and the load", async () => {
     (window as { matchMedia?: unknown }).matchMedia = () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
     ctl.search = { view: "map" };
     await mount();
     expect(document.querySelector("[data-testid=fleet-map]")).toBeNull();
+    const options = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label='Nodes view'] [role=radio]")].map((r) => r.textContent);
+    expect(options).toEqual(["List", "Load"]);
+  });
+
+  it("shows the load for ?view=load and remembers it", async () => {
+    ctl.search = { view: "load" };
+    await mount();
+    expect(document.querySelector("[data-testid=fleet-load]")).not.toBeNull();
+    await click(radio("Map"));
+    expect(localStorage.getItem("nodes.view")).toBe("map");
+    expect(ctl.navigate).toHaveBeenLastCalledWith(expect.objectContaining({ search: { view: "map" } }));
+    act(() => root!.unmount());
+    host!.remove();
+    ctl.search = {};
+    localStorage.setItem("nodes.view", "load");
+    await mount();
+    expect(document.querySelector("[data-testid=fleet-load]")).not.toBeNull();
+  });
+
+  it("offers no load on the Cloudflare edition, whatever the URL says", async () => {
+    ctl.search = { view: "load" };
+    await mount("edge");
+    expect(document.querySelector("[data-testid=fleet-load]")).toBeNull();
+    const options = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label='Nodes view'] [role=radio]")].map((r) => r.textContent);
+    expect(options).toEqual(["List", "Map"]);
+    // on a phone the edition has nothing to switch to
+    act(() => root!.unmount());
+    host!.remove();
+    (window as { matchMedia?: unknown }).matchMedia = () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
+    await mount("edge");
     expect(document.querySelector("[role=radiogroup][aria-label='Nodes view']")).toBeNull();
   });
 });

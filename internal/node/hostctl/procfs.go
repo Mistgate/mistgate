@@ -10,67 +10,6 @@ import (
 
 // Pure parsers for /proc files. They are not behind the Linux build tag so they are tested everywhere.
 
-type cpuSample struct{ total, idle, softirq uint64 }
-
-// parseCPUStat reads the aggregate "cpu" line of /proc/stat:
-// user nice system idle iowait irq softirq steal [guest guest_nice]. guest time is already inside user.
-func parseCPUStat(s string) (cpuSample, bool) {
-	for _, line := range strings.Split(s, "\n") {
-		f := strings.Fields(line)
-		if len(f) < 8 || f[0] != "cpu" {
-			continue
-		}
-		var v [8]uint64
-		var total uint64
-		for i := range v {
-			n, err := strconv.ParseUint(f[i+1], 10, 64)
-			if err != nil {
-				return cpuSample{}, false
-			}
-			v[i] = n
-			total += n
-		}
-		return cpuSample{total: total, idle: v[3] + v[4], softirq: v[6]}, true
-	}
-	return cpuSample{}, false
-}
-
-// cpuPct turns two samples into (busy %, softirq %).
-func cpuPct(prev, cur cpuSample) (busy, soft float64) {
-	if cur.total <= prev.total || cur.idle < prev.idle || cur.softirq < prev.softirq {
-		return 0, 0
-	}
-	dt := float64(cur.total - prev.total)
-	busy = (dt - float64(cur.idle-prev.idle)) * 100 / dt
-	soft = float64(cur.softirq-prev.softirq) * 100 / dt
-	return clamp100(busy), clamp100(soft)
-}
-
-func clamp100(f float64) float64 {
-	return min(max(f, 0), 100)
-}
-
-// parseMeminfo returns MemTotal and MemAvailable in bytes (0 if missing).
-func parseMeminfo(s string) (total, avail uint64) {
-	for _, line := range strings.Split(s, "\n") {
-		f := strings.Fields(line)
-		if len(f) < 2 {
-			continue
-		}
-		n, err := strconv.ParseUint(f[1], 10, 64)
-		if err != nil {
-			continue
-		}
-		switch f[0] {
-		case "MemTotal:":
-			total = n * 1024
-		case "MemAvailable:":
-			avail = n * 1024
-		}
-	}
-	return
-}
-
 // parseNetDev returns the rx/tx byte counters of one interface from /proc/net/dev.
 func parseNetDev(s, iface string) (rx, tx uint64, ok bool) {
 	sc := bufio.NewScanner(strings.NewReader(s))

@@ -214,7 +214,7 @@ func LinkChallenge(audience string) (nonce, frame []byte, err error) {
 // (agentlink.WantsSeal; nil = a plain session with an older agent). One database read (the node's certificates).
 func (f *Fleet) linkAccept(ctx context.Context, nodeID, audience string, nonce, authFrame []byte) (peerCert, []byte, []byte, bool) {
 	var auth agentv1.LinkAuth
-	if proto.Unmarshal(authFrame, &auth) != nil || auth.NodeId != nodeID || len(auth.Nonce) != 32 {
+	if !validLinkNodeID(nodeID) || proto.Unmarshal(authFrame, &auth) != nil || auth.NodeId != nodeID || len(auth.Nonce) != 32 {
 		return peerCert{}, nil, nil, false
 	}
 	pc, pub, ok := f.verifyLinkAuth(ctx, nodeID, agentlink.AgentDigest(nodeID, audience, nonce), auth.Signature)
@@ -273,7 +273,19 @@ func linkNodePath(path string) (string, bool) {
 		return "", false
 	}
 	id := strings.TrimPrefix(path, "/link/")
-	return id, id != "" && !strings.Contains(id, "/")
+	return id, validLinkNodeID(id)
+}
+
+func validLinkNodeID(id string) bool {
+	if len(id) != len("nod_")+26 || !strings.HasPrefix(id, "nod_") {
+		return false
+	}
+	for _, ch := range id[len("nod_"):] {
+		if !('a' <= ch && ch <= 'z') && !('2' <= ch && ch <= '7') {
+			return false
+		}
+	}
+	return true
 }
 
 // verifyLinkAuth returns the certificate that signed digest and its key.

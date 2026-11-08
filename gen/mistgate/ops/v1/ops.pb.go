@@ -1780,6 +1780,1215 @@ func (x *GetDebugCaptureResponse) GetSources() []string {
 	return nil
 }
 
+type GetPanelResourcesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPanelResourcesRequest) Reset() {
+	*x = GetPanelResourcesRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPanelResourcesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPanelResourcesRequest) ProtoMessage() {}
+
+func (x *GetPanelResourcesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPanelResourcesRequest.ProtoReflect.Descriptor instead.
+func (*GetPanelResourcesRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{28}
+}
+
+// The panel's own process.
+type PanelProcess struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// CPU time since the previous read, in percent of the whole machine (all CPUs): 25 on four CPUs is one CPU fully used.
+	CpuPct   float32 `protobuf:"fixed32,1,opt,name=cpu_pct,json=cpuPct,proto3" json:"cpu_pct,omitempty"`
+	RssBytes uint64  `protobuf:"varint,2,opt,name=rss_bytes,json=rssBytes,proto3" json:"rss_bytes,omitempty"`
+	// The Go runtime: all memory it mapped from the OS, the part in heap objects, and its goroutines.
+	GoTotalBytes uint64 `protobuf:"varint,3,opt,name=go_total_bytes,json=goTotalBytes,proto3" json:"go_total_bytes,omitempty"`
+	GoHeapBytes  uint64 `protobuf:"varint,4,opt,name=go_heap_bytes,json=goHeapBytes,proto3" json:"go_heap_bytes,omitempty"`
+	Goroutines   uint32 `protobuf:"varint,5,opt,name=goroutines,proto3" json:"goroutines,omitempty"`
+	Threads      uint32 `protobuf:"varint,6,opt,name=threads,proto3" json:"threads,omitempty"`
+	// Open file descriptors (sockets among them) and the soft limit (0 = not known).
+	OpenFds       uint32 `protobuf:"varint,7,opt,name=open_fds,json=openFds,proto3" json:"open_fds,omitempty"`
+	FdLimit       uint32 `protobuf:"varint,8,opt,name=fd_limit,json=fdLimit,proto3" json:"fd_limit,omitempty"`
+	UptimeS       uint64 `protobuf:"varint,9,opt,name=uptime_s,json=uptimeS,proto3" json:"uptime_s,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PanelProcess) Reset() {
+	*x = PanelProcess{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PanelProcess) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PanelProcess) ProtoMessage() {}
+
+func (x *PanelProcess) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PanelProcess.ProtoReflect.Descriptor instead.
+func (*PanelProcess) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *PanelProcess) GetCpuPct() float32 {
+	if x != nil {
+		return x.CpuPct
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetRssBytes() uint64 {
+	if x != nil {
+		return x.RssBytes
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetGoTotalBytes() uint64 {
+	if x != nil {
+		return x.GoTotalBytes
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetGoHeapBytes() uint64 {
+	if x != nil {
+		return x.GoHeapBytes
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetGoroutines() uint32 {
+	if x != nil {
+		return x.Goroutines
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetThreads() uint32 {
+	if x != nil {
+		return x.Threads
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetOpenFds() uint32 {
+	if x != nil {
+		return x.OpenFds
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetFdLimit() uint32 {
+	if x != nil {
+		return x.FdLimit
+	}
+	return 0
+}
+
+func (x *PanelProcess) GetUptimeS() uint64 {
+	if x != nil {
+		return x.UptimeS
+	}
+	return 0
+}
+
+// The machine the panel runs on. Zeros where it cannot be read (not a Linux host).
+type PanelHost struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Cpus  uint32                 `protobuf:"varint,1,opt,name=cpus,proto3" json:"cpus,omitempty"`
+	// Since the previous read, in percent of all CPUs: busy (everything but idle and I/O wait; steal included), the part the
+	// hypervisor gave to other guests, and the idle time spent waiting for the disk.
+	CpuBusyPct     float32 `protobuf:"fixed32,2,opt,name=cpu_busy_pct,json=cpuBusyPct,proto3" json:"cpu_busy_pct,omitempty"`
+	StealPct       float32 `protobuf:"fixed32,3,opt,name=steal_pct,json=stealPct,proto3" json:"steal_pct,omitempty"`
+	IowaitPct      float32 `protobuf:"fixed32,4,opt,name=iowait_pct,json=iowaitPct,proto3" json:"iowait_pct,omitempty"`
+	Load1          float32 `protobuf:"fixed32,5,opt,name=load1,proto3" json:"load1,omitempty"`
+	RamUsedBytes   uint64  `protobuf:"varint,6,opt,name=ram_used_bytes,json=ramUsedBytes,proto3" json:"ram_used_bytes,omitempty"`
+	RamTotalBytes  uint64  `protobuf:"varint,7,opt,name=ram_total_bytes,json=ramTotalBytes,proto3" json:"ram_total_bytes,omitempty"`
+	SwapUsedBytes  uint64  `protobuf:"varint,8,opt,name=swap_used_bytes,json=swapUsedBytes,proto3" json:"swap_used_bytes,omitempty"`
+	SwapTotalBytes uint64  `protobuf:"varint,9,opt,name=swap_total_bytes,json=swapTotalBytes,proto3" json:"swap_total_bytes,omitempty"`
+	// The file system that holds the panel's data directory.
+	DiskUsedBytes  uint64 `protobuf:"varint,10,opt,name=disk_used_bytes,json=diskUsedBytes,proto3" json:"disk_used_bytes,omitempty"`
+	DiskTotalBytes uint64 `protobuf:"varint,11,opt,name=disk_total_bytes,json=diskTotalBytes,proto3" json:"disk_total_bytes,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PanelHost) Reset() {
+	*x = PanelHost{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PanelHost) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PanelHost) ProtoMessage() {}
+
+func (x *PanelHost) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PanelHost.ProtoReflect.Descriptor instead.
+func (*PanelHost) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PanelHost) GetCpus() uint32 {
+	if x != nil {
+		return x.Cpus
+	}
+	return 0
+}
+
+func (x *PanelHost) GetCpuBusyPct() float32 {
+	if x != nil {
+		return x.CpuBusyPct
+	}
+	return 0
+}
+
+func (x *PanelHost) GetStealPct() float32 {
+	if x != nil {
+		return x.StealPct
+	}
+	return 0
+}
+
+func (x *PanelHost) GetIowaitPct() float32 {
+	if x != nil {
+		return x.IowaitPct
+	}
+	return 0
+}
+
+func (x *PanelHost) GetLoad1() float32 {
+	if x != nil {
+		return x.Load1
+	}
+	return 0
+}
+
+func (x *PanelHost) GetRamUsedBytes() uint64 {
+	if x != nil {
+		return x.RamUsedBytes
+	}
+	return 0
+}
+
+func (x *PanelHost) GetRamTotalBytes() uint64 {
+	if x != nil {
+		return x.RamTotalBytes
+	}
+	return 0
+}
+
+func (x *PanelHost) GetSwapUsedBytes() uint64 {
+	if x != nil {
+		return x.SwapUsedBytes
+	}
+	return 0
+}
+
+func (x *PanelHost) GetSwapTotalBytes() uint64 {
+	if x != nil {
+		return x.SwapTotalBytes
+	}
+	return 0
+}
+
+func (x *PanelHost) GetDiskUsedBytes() uint64 {
+	if x != nil {
+		return x.DiskUsedBytes
+	}
+	return 0
+}
+
+func (x *PanelHost) GetDiskTotalBytes() uint64 {
+	if x != nil {
+		return x.DiskTotalBytes
+	}
+	return 0
+}
+
+// The panel's SQLite database. It is read at most once a minute.
+type PanelDatabase struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The main file and its write-ahead log.
+	FileBytes uint64 `protobuf:"varint,1,opt,name=file_bytes,json=fileBytes,proto3" json:"file_bytes,omitempty"`
+	WalBytes  uint64 `protobuf:"varint,2,opt,name=wal_bytes,json=walBytes,proto3" json:"wal_bytes,omitempty"`
+	// Pages in the file, the free ones among them (space a VACUUM would give back), and the page size in bytes.
+	PageCount     uint64 `protobuf:"varint,3,opt,name=page_count,json=pageCount,proto3" json:"page_count,omitempty"`
+	FreelistCount uint64 `protobuf:"varint,4,opt,name=freelist_count,json=freelistCount,proto3" json:"freelist_count,omitempty"`
+	PageSize      uint32 `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	MeasuredUnix  int64  `protobuf:"varint,6,opt,name=measured_unix,json=measuredUnix,proto3" json:"measured_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PanelDatabase) Reset() {
+	*x = PanelDatabase{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PanelDatabase) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PanelDatabase) ProtoMessage() {}
+
+func (x *PanelDatabase) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PanelDatabase.ProtoReflect.Descriptor instead.
+func (*PanelDatabase) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PanelDatabase) GetFileBytes() uint64 {
+	if x != nil {
+		return x.FileBytes
+	}
+	return 0
+}
+
+func (x *PanelDatabase) GetWalBytes() uint64 {
+	if x != nil {
+		return x.WalBytes
+	}
+	return 0
+}
+
+func (x *PanelDatabase) GetPageCount() uint64 {
+	if x != nil {
+		return x.PageCount
+	}
+	return 0
+}
+
+func (x *PanelDatabase) GetFreelistCount() uint64 {
+	if x != nil {
+		return x.FreelistCount
+	}
+	return 0
+}
+
+func (x *PanelDatabase) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *PanelDatabase) GetMeasuredUnix() int64 {
+	if x != nil {
+		return x.MeasuredUnix
+	}
+	return 0
+}
+
+// The admin API's calls (the admin UI and API tokens over /api; not /mcp or /metrics) over the last window_s seconds.
+type PanelRpcLoad struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	WindowS  uint32                 `protobuf:"varint,1,opt,name=window_s,json=windowS,proto3" json:"window_s,omitempty"`
+	Requests uint64                 `protobuf:"varint,2,opt,name=requests,proto3" json:"requests,omitempty"`
+	// Calls that ended in a server error (HTTP 5xx), and in a refusal or a bad request (4xx).
+	ServerErrors uint64 `protobuf:"varint,3,opt,name=server_errors,json=serverErrors,proto3" json:"server_errors,omitempty"`
+	ClientErrors uint64 `protobuf:"varint,4,opt,name=client_errors,json=clientErrors,proto3" json:"client_errors,omitempty"`
+	// The 95th percentile of the time to answer a unary call, in milliseconds (streams are left out); 0 without calls.
+	P95Ms         float32 `protobuf:"fixed32,5,opt,name=p95_ms,json=p95Ms,proto3" json:"p95_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PanelRpcLoad) Reset() {
+	*x = PanelRpcLoad{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PanelRpcLoad) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PanelRpcLoad) ProtoMessage() {}
+
+func (x *PanelRpcLoad) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PanelRpcLoad.ProtoReflect.Descriptor instead.
+func (*PanelRpcLoad) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *PanelRpcLoad) GetWindowS() uint32 {
+	if x != nil {
+		return x.WindowS
+	}
+	return 0
+}
+
+func (x *PanelRpcLoad) GetRequests() uint64 {
+	if x != nil {
+		return x.Requests
+	}
+	return 0
+}
+
+func (x *PanelRpcLoad) GetServerErrors() uint64 {
+	if x != nil {
+		return x.ServerErrors
+	}
+	return 0
+}
+
+func (x *PanelRpcLoad) GetClientErrors() uint64 {
+	if x != nil {
+		return x.ClientErrors
+	}
+	return 0
+}
+
+func (x *PanelRpcLoad) GetP95Ms() float32 {
+	if x != nil {
+		return x.P95Ms
+	}
+	return 0
+}
+
+type GetPanelResourcesResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	NowUnix  int64                  `protobuf:"varint,1,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
+	Process  *PanelProcess          `protobuf:"bytes,2,opt,name=process,proto3" json:"process,omitempty"`
+	Host     *PanelHost             `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	Database *PanelDatabase         `protobuf:"bytes,4,opt,name=database,proto3" json:"database,omitempty"`
+	// Agents connected now, and the nodes that are not retired.
+	AgentsConnected uint32        `protobuf:"varint,5,opt,name=agents_connected,json=agentsConnected,proto3" json:"agents_connected,omitempty"`
+	Nodes           uint32        `protobuf:"varint,6,opt,name=nodes,proto3" json:"nodes,omitempty"`
+	Rpc             *PanelRpcLoad `protobuf:"bytes,7,opt,name=rpc,proto3" json:"rpc,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetPanelResourcesResponse) Reset() {
+	*x = GetPanelResourcesResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPanelResourcesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPanelResourcesResponse) ProtoMessage() {}
+
+func (x *GetPanelResourcesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPanelResourcesResponse.ProtoReflect.Descriptor instead.
+func (*GetPanelResourcesResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetPanelResourcesResponse) GetNowUnix() int64 {
+	if x != nil {
+		return x.NowUnix
+	}
+	return 0
+}
+
+func (x *GetPanelResourcesResponse) GetProcess() *PanelProcess {
+	if x != nil {
+		return x.Process
+	}
+	return nil
+}
+
+func (x *GetPanelResourcesResponse) GetHost() *PanelHost {
+	if x != nil {
+		return x.Host
+	}
+	return nil
+}
+
+func (x *GetPanelResourcesResponse) GetDatabase() *PanelDatabase {
+	if x != nil {
+		return x.Database
+	}
+	return nil
+}
+
+func (x *GetPanelResourcesResponse) GetAgentsConnected() uint32 {
+	if x != nil {
+		return x.AgentsConnected
+	}
+	return 0
+}
+
+func (x *GetPanelResourcesResponse) GetNodes() uint32 {
+	if x != nil {
+		return x.Nodes
+	}
+	return 0
+}
+
+func (x *GetPanelResourcesResponse) GetRpc() *PanelRpcLoad {
+	if x != nil {
+		return x.Rpc
+	}
+	return nil
+}
+
+type GetFleetLoadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The window in hours, 1 to 720; 0 means 168 (a week holds the busy hour of every weekday).
+	Hours         uint32 `protobuf:"varint,1,opt,name=hours,proto3" json:"hours,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFleetLoadRequest) Reset() {
+	*x = GetFleetLoadRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFleetLoadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFleetLoadRequest) ProtoMessage() {}
+
+func (x *GetFleetLoadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFleetLoadRequest.ProtoReflect.Descriptor instead.
+func (*GetFleetLoadRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetFleetLoadRequest) GetHours() uint32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+// What to do about a node's load. The admin UI and the assistant word it from code and params.
+type LoadRecommendation struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// update_agent (the agent predates the resource fields: steal, swap, conntrack and its own cost are not known),
+	// steal_high (steal_pct: the provider oversells the host; move the node), conntrack_near_limit (fill_pct, limit),
+	// cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom),
+	// cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), bandwidth_busy (peak_pct, link_mbps, and target,
+	// target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
+	// agent_memory_growing (growth_pct_day, rss_mb, days: the agent's daily peak memory climbs faster than its people).
+	Code string `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	// "info", "warn" or "crit".
+	Severity string `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"`
+	// Plain decimal numbers and node names.
+	Params        map[string]string `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoadRecommendation) Reset() {
+	*x = LoadRecommendation{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoadRecommendation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoadRecommendation) ProtoMessage() {}
+
+func (x *LoadRecommendation) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoadRecommendation.ProtoReflect.Descriptor instead.
+func (*LoadRecommendation) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *LoadRecommendation) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *LoadRecommendation) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *LoadRecommendation) GetParams() map[string]string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
+// One node's load over the window. An optional field that is unset is not known: no hour carried it (an agent that predates
+// the resource fields), or there is nothing to measure.
+type NodeLoad struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	NodeId    string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName  string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	Connected bool                   `protobuf:"varint,3,opt,name=connected,proto3" json:"connected,omitempty"`
+	Cpus      uint32                 `protobuf:"varint,4,opt,name=cpus,proto3" json:"cpus,omitempty"`
+	// "ok", "busy", "overloaded", or "unknown" (no hour of host load in the window).
+	Status string `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	// What runs out first once it is at least halfway to its limit: cpu, steal, bandwidth, ram, conntrack or disk; "" otherwise.
+	Bottleneck string `protobuf:"bytes,6,opt,name=bottleneck,proto3" json:"bottleneck,omitempty"`
+	// Hours of the window with samples, and those whose samples carried the resource fields.
+	HoursWithData uint32 `protobuf:"varint,7,opt,name=hours_with_data,json=hoursWithData,proto3" json:"hours_with_data,omitempty"`
+	ExtHours      uint32 `protobuf:"varint,8,opt,name=ext_hours,json=extHours,proto3" json:"ext_hours,omitempty"`
+	// The busy hour: the hour with the highest CPU mean, that mean, and the mean people online in it.
+	BusyHourUnix   int64   `protobuf:"varint,9,opt,name=busy_hour_unix,json=busyHourUnix,proto3" json:"busy_hour_unix,omitempty"`
+	BusyHourCpuPct float32 `protobuf:"fixed32,10,opt,name=busy_hour_cpu_pct,json=busyHourCpuPct,proto3" json:"busy_hour_cpu_pct,omitempty"`
+	PeopleBusyHour float32 `protobuf:"fixed32,11,opt,name=people_busy_hour,json=peopleBusyHour,proto3" json:"people_busy_hour,omitempty"`
+	PeoplePeak     uint32  `protobuf:"varint,12,opt,name=people_peak,json=peoplePeak,proto3" json:"people_peak,omitempty"`
+	// The 95th percentile of the hourly CPU peaks.
+	CpuPeakP95Pct float32 `protobuf:"fixed32,13,opt,name=cpu_peak_p95_pct,json=cpuPeakP95Pct,proto3" json:"cpu_peak_p95_pct,omitempty"`
+	// The 95th percentile of the hourly steal means.
+	StealP95Pct *float32 `protobuf:"fixed32,14,opt,name=steal_p95_pct,json=stealP95Pct,proto3,oneof" json:"steal_p95_pct,omitempty"`
+	// The highest hourly peak of connection-tracking entries against the limit.
+	ConntrackPeakPct *float32 `protobuf:"fixed32,15,opt,name=conntrack_peak_pct,json=conntrackPeakPct,proto3,oneof" json:"conntrack_peak_pct,omitempty"`
+	RamPeakPct       *float32 `protobuf:"fixed32,16,opt,name=ram_peak_pct,json=ramPeakPct,proto3,oneof" json:"ram_peak_pct,omitempty"`
+	SwapUsedMaxBytes *uint64  `protobuf:"varint,17,opt,name=swap_used_max_bytes,json=swapUsedMaxBytes,proto3,oneof" json:"swap_used_max_bytes,omitempty"`
+	// The latest sample's root file system.
+	DiskUsedPct *float32 `protobuf:"fixed32,18,opt,name=disk_used_pct,json=diskUsedPct,proto3,oneof" json:"disk_used_pct,omitempty"`
+	// The highest hourly peaks of the main NIC, bits per second.
+	RxPeakBps uint64 `protobuf:"varint,19,opt,name=rx_peak_bps,json=rxPeakBps,proto3" json:"rx_peak_bps,omitempty"`
+	TxPeakBps uint64 `protobuf:"varint,20,opt,name=tx_peak_bps,json=txPeakBps,proto3" json:"tx_peak_bps,omitempty"`
+	// The capacity the traffic is set against: the owner's ("configured", Node.bandwidth_mbps) or the link speed the agent
+	// reported ("nic"); 0 and "" = not known.
+	CapacityMbps     uint32   `protobuf:"varint,21,opt,name=capacity_mbps,json=capacityMbps,proto3" json:"capacity_mbps,omitempty"`
+	CapacitySource   string   `protobuf:"bytes,22,opt,name=capacity_source,json=capacitySource,proto3" json:"capacity_source,omitempty"`
+	BandwidthPeakPct *float32 `protobuf:"fixed32,23,opt,name=bandwidth_peak_pct,json=bandwidthPeakPct,proto3,oneof" json:"bandwidth_peak_pct,omitempty"`
+	// The agent process: mean and peak CPU in percent of the machine, peak memory, and how fast its daily peak memory grows
+	// (percent per day, from three days on).
+	AgentCpuAvgPct          *float32 `protobuf:"fixed32,24,opt,name=agent_cpu_avg_pct,json=agentCpuAvgPct,proto3,oneof" json:"agent_cpu_avg_pct,omitempty"`
+	AgentCpuMaxPct          *float32 `protobuf:"fixed32,25,opt,name=agent_cpu_max_pct,json=agentCpuMaxPct,proto3,oneof" json:"agent_cpu_max_pct,omitempty"`
+	AgentRssMaxBytes        *uint64  `protobuf:"varint,26,opt,name=agent_rss_max_bytes,json=agentRssMaxBytes,proto3,oneof" json:"agent_rss_max_bytes,omitempty"`
+	AgentRssGrowthPctPerDay *float32 `protobuf:"fixed32,27,opt,name=agent_rss_growth_pct_per_day,json=agentRssGrowthPctPerDay,proto3,oneof" json:"agent_rss_growth_pct_per_day,omitempty"`
+	// "ok" when the per-person costs could be read from the hours (a least-squares fit of the hourly CPU mean on the hourly
+	// mean people online); otherwise why not: "few_hours" (under 24 hours with samples), "flat" (people online changed by
+	// fewer than 4), "no_trend" (the CPU does not rise with the people).
+	Fit                    string   `protobuf:"bytes,28,opt,name=fit,proto3" json:"fit,omitempty"`
+	CpuPctPerHundredPeople *float32 `protobuf:"fixed32,29,opt,name=cpu_pct_per_hundred_people,json=cpuPctPerHundredPeople,proto3,oneof" json:"cpu_pct_per_hundred_people,omitempty"`
+	MbpsPerPerson          *float32 `protobuf:"fixed32,30,opt,name=mbps_per_person,json=mbpsPerPerson,proto3,oneof" json:"mbps_per_person,omitempty"`
+	// People the node could add before its busy-hour CPU mean reaches 80% (and, with a known link and per-person traffic, its
+	// busier direction 90% of the link). 0 when it is overloaded already.
+	HeadroomPeople *uint32 `protobuf:"varint,31,opt,name=headroom_people,json=headroomPeople,proto3,oneof" json:"headroom_people,omitempty"`
+	// Most severe first.
+	Recommendations []*LoadRecommendation `protobuf:"bytes,32,rep,name=recommendations,proto3" json:"recommendations,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *NodeLoad) Reset() {
+	*x = NodeLoad{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeLoad) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeLoad) ProtoMessage() {}
+
+func (x *NodeLoad) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeLoad.ProtoReflect.Descriptor instead.
+func (*NodeLoad) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *NodeLoad) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeLoad) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *NodeLoad) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *NodeLoad) GetCpus() uint32 {
+	if x != nil {
+		return x.Cpus
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *NodeLoad) GetBottleneck() string {
+	if x != nil {
+		return x.Bottleneck
+	}
+	return ""
+}
+
+func (x *NodeLoad) GetHoursWithData() uint32 {
+	if x != nil {
+		return x.HoursWithData
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetExtHours() uint32 {
+	if x != nil {
+		return x.ExtHours
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetBusyHourUnix() int64 {
+	if x != nil {
+		return x.BusyHourUnix
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetBusyHourCpuPct() float32 {
+	if x != nil {
+		return x.BusyHourCpuPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetPeopleBusyHour() float32 {
+	if x != nil {
+		return x.PeopleBusyHour
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetPeoplePeak() uint32 {
+	if x != nil {
+		return x.PeoplePeak
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetCpuPeakP95Pct() float32 {
+	if x != nil {
+		return x.CpuPeakP95Pct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetStealP95Pct() float32 {
+	if x != nil && x.StealP95Pct != nil {
+		return *x.StealP95Pct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetConntrackPeakPct() float32 {
+	if x != nil && x.ConntrackPeakPct != nil {
+		return *x.ConntrackPeakPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetRamPeakPct() float32 {
+	if x != nil && x.RamPeakPct != nil {
+		return *x.RamPeakPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetSwapUsedMaxBytes() uint64 {
+	if x != nil && x.SwapUsedMaxBytes != nil {
+		return *x.SwapUsedMaxBytes
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetDiskUsedPct() float32 {
+	if x != nil && x.DiskUsedPct != nil {
+		return *x.DiskUsedPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetRxPeakBps() uint64 {
+	if x != nil {
+		return x.RxPeakBps
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetTxPeakBps() uint64 {
+	if x != nil {
+		return x.TxPeakBps
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetCapacityMbps() uint32 {
+	if x != nil {
+		return x.CapacityMbps
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetCapacitySource() string {
+	if x != nil {
+		return x.CapacitySource
+	}
+	return ""
+}
+
+func (x *NodeLoad) GetBandwidthPeakPct() float32 {
+	if x != nil && x.BandwidthPeakPct != nil {
+		return *x.BandwidthPeakPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetAgentCpuAvgPct() float32 {
+	if x != nil && x.AgentCpuAvgPct != nil {
+		return *x.AgentCpuAvgPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetAgentCpuMaxPct() float32 {
+	if x != nil && x.AgentCpuMaxPct != nil {
+		return *x.AgentCpuMaxPct
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetAgentRssMaxBytes() uint64 {
+	if x != nil && x.AgentRssMaxBytes != nil {
+		return *x.AgentRssMaxBytes
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetAgentRssGrowthPctPerDay() float32 {
+	if x != nil && x.AgentRssGrowthPctPerDay != nil {
+		return *x.AgentRssGrowthPctPerDay
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetFit() string {
+	if x != nil {
+		return x.Fit
+	}
+	return ""
+}
+
+func (x *NodeLoad) GetCpuPctPerHundredPeople() float32 {
+	if x != nil && x.CpuPctPerHundredPeople != nil {
+		return *x.CpuPctPerHundredPeople
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetMbpsPerPerson() float32 {
+	if x != nil && x.MbpsPerPerson != nil {
+		return *x.MbpsPerPerson
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetHeadroomPeople() uint32 {
+	if x != nil && x.HeadroomPeople != nil {
+		return *x.HeadroomPeople
+	}
+	return 0
+}
+
+func (x *NodeLoad) GetRecommendations() []*LoadRecommendation {
+	if x != nil {
+		return x.Recommendations
+	}
+	return nil
+}
+
+type LoadNodeRef struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	NodeId         string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeName       string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	Status         string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	BusyHourCpuPct float32                `protobuf:"fixed32,4,opt,name=busy_hour_cpu_pct,json=busyHourCpuPct,proto3" json:"busy_hour_cpu_pct,omitempty"`
+	HeadroomPeople *uint32                `protobuf:"varint,5,opt,name=headroom_people,json=headroomPeople,proto3,oneof" json:"headroom_people,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *LoadNodeRef) Reset() {
+	*x = LoadNodeRef{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoadNodeRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoadNodeRef) ProtoMessage() {}
+
+func (x *LoadNodeRef) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoadNodeRef.ProtoReflect.Descriptor instead.
+func (*LoadNodeRef) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *LoadNodeRef) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *LoadNodeRef) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *LoadNodeRef) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *LoadNodeRef) GetBusyHourCpuPct() float32 {
+	if x != nil {
+		return x.BusyHourCpuPct
+	}
+	return 0
+}
+
+func (x *LoadNodeRef) GetHeadroomPeople() uint32 {
+	if x != nil && x.HeadroomPeople != nil {
+		return *x.HeadroomPeople
+	}
+	return 0
+}
+
+type FleetLoadSummary struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Ok         uint32                 `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Busy       uint32                 `protobuf:"varint,2,opt,name=busy,proto3" json:"busy,omitempty"`
+	Overloaded uint32                 `protobuf:"varint,3,opt,name=overloaded,proto3" json:"overloaded,omitempty"`
+	Unknown    uint32                 `protobuf:"varint,4,opt,name=unknown,proto3" json:"unknown,omitempty"`
+	// The headroom of the nodes whose headroom is known, added up, and how many nodes those are.
+	HeadroomPeople uint32 `protobuf:"varint,5,opt,name=headroom_people,json=headroomPeople,proto3" json:"headroom_people,omitempty"`
+	HeadroomNodes  uint32 `protobuf:"varint,6,opt,name=headroom_nodes,json=headroomNodes,proto3" json:"headroom_nodes,omitempty"`
+	// Up to three nodes closest to a limit, most loaded first; up to three that are not busy, most headroom first.
+	MostLoaded    []*LoadNodeRef `protobuf:"bytes,7,rep,name=most_loaded,json=mostLoaded,proto3" json:"most_loaded,omitempty"`
+	MostFree      []*LoadNodeRef `protobuf:"bytes,8,rep,name=most_free,json=mostFree,proto3" json:"most_free,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FleetLoadSummary) Reset() {
+	*x = FleetLoadSummary{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FleetLoadSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FleetLoadSummary) ProtoMessage() {}
+
+func (x *FleetLoadSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FleetLoadSummary.ProtoReflect.Descriptor instead.
+func (*FleetLoadSummary) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *FleetLoadSummary) GetOk() uint32 {
+	if x != nil {
+		return x.Ok
+	}
+	return 0
+}
+
+func (x *FleetLoadSummary) GetBusy() uint32 {
+	if x != nil {
+		return x.Busy
+	}
+	return 0
+}
+
+func (x *FleetLoadSummary) GetOverloaded() uint32 {
+	if x != nil {
+		return x.Overloaded
+	}
+	return 0
+}
+
+func (x *FleetLoadSummary) GetUnknown() uint32 {
+	if x != nil {
+		return x.Unknown
+	}
+	return 0
+}
+
+func (x *FleetLoadSummary) GetHeadroomPeople() uint32 {
+	if x != nil {
+		return x.HeadroomPeople
+	}
+	return 0
+}
+
+func (x *FleetLoadSummary) GetHeadroomNodes() uint32 {
+	if x != nil {
+		return x.HeadroomNodes
+	}
+	return 0
+}
+
+func (x *FleetLoadSummary) GetMostLoaded() []*LoadNodeRef {
+	if x != nil {
+		return x.MostLoaded
+	}
+	return nil
+}
+
+func (x *FleetLoadSummary) GetMostFree() []*LoadNodeRef {
+	if x != nil {
+		return x.MostFree
+	}
+	return nil
+}
+
+type GetFleetLoadResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	NowUnix int64                  `protobuf:"varint,1,opt,name=now_unix,json=nowUnix,proto3" json:"now_unix,omitempty"`
+	Hours   uint32                 `protobuf:"varint,2,opt,name=hours,proto3" json:"hours,omitempty"`
+	// Every node that is not retired, most pressing first.
+	Nodes         []*NodeLoad       `protobuf:"bytes,3,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Summary       *FleetLoadSummary `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFleetLoadResponse) Reset() {
+	*x = GetFleetLoadResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFleetLoadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFleetLoadResponse) ProtoMessage() {}
+
+func (x *GetFleetLoadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFleetLoadResponse.ProtoReflect.Descriptor instead.
+func (*GetFleetLoadResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetFleetLoadResponse) GetNowUnix() int64 {
+	if x != nil {
+		return x.NowUnix
+	}
+	return 0
+}
+
+func (x *GetFleetLoadResponse) GetHours() uint32 {
+	if x != nil {
+		return x.Hours
+	}
+	return 0
+}
+
+func (x *GetFleetLoadResponse) GetNodes() []*NodeLoad {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+func (x *GetFleetLoadResponse) GetSummary() *FleetLoadSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
 var File_mistgate_ops_v1_ops_proto protoreflect.FileDescriptor
 
 const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
@@ -1931,7 +3140,143 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\arecords\x18\x02 \x03(\v2\x1c.mistgate.ops.v1.DebugRecordR\arecords\x12#\n" +
 	"\vnext_cursor\x18\x03 \x01(\x03B\x020\x02R\n" +
 	"nextCursor\x12\x18\n" +
-	"\asources\x18\x04 \x03(\tR\asources2\xbe\t\n" +
+	"\asources\x18\x04 \x03(\tR\asources\"\x1a\n" +
+	"\x18GetPanelResourcesRequest\"\xa9\x02\n" +
+	"\fPanelProcess\x12\x17\n" +
+	"\acpu_pct\x18\x01 \x01(\x02R\x06cpuPct\x12\x1f\n" +
+	"\trss_bytes\x18\x02 \x01(\x04B\x020\x02R\brssBytes\x12(\n" +
+	"\x0ego_total_bytes\x18\x03 \x01(\x04B\x020\x02R\fgoTotalBytes\x12&\n" +
+	"\rgo_heap_bytes\x18\x04 \x01(\x04B\x020\x02R\vgoHeapBytes\x12\x1e\n" +
+	"\n" +
+	"goroutines\x18\x05 \x01(\rR\n" +
+	"goroutines\x12\x18\n" +
+	"\athreads\x18\x06 \x01(\rR\athreads\x12\x19\n" +
+	"\bopen_fds\x18\a \x01(\rR\aopenFds\x12\x19\n" +
+	"\bfd_limit\x18\b \x01(\rR\afdLimit\x12\x1d\n" +
+	"\buptime_s\x18\t \x01(\x04B\x020\x02R\auptimeS\"\x9d\x03\n" +
+	"\tPanelHost\x12\x12\n" +
+	"\x04cpus\x18\x01 \x01(\rR\x04cpus\x12 \n" +
+	"\fcpu_busy_pct\x18\x02 \x01(\x02R\n" +
+	"cpuBusyPct\x12\x1b\n" +
+	"\tsteal_pct\x18\x03 \x01(\x02R\bstealPct\x12\x1d\n" +
+	"\n" +
+	"iowait_pct\x18\x04 \x01(\x02R\tiowaitPct\x12\x14\n" +
+	"\x05load1\x18\x05 \x01(\x02R\x05load1\x12(\n" +
+	"\x0eram_used_bytes\x18\x06 \x01(\x04B\x020\x02R\framUsedBytes\x12*\n" +
+	"\x0fram_total_bytes\x18\a \x01(\x04B\x020\x02R\rramTotalBytes\x12*\n" +
+	"\x0fswap_used_bytes\x18\b \x01(\x04B\x020\x02R\rswapUsedBytes\x12,\n" +
+	"\x10swap_total_bytes\x18\t \x01(\x04B\x020\x02R\x0eswapTotalBytes\x12*\n" +
+	"\x0fdisk_used_bytes\x18\n" +
+	" \x01(\x04B\x020\x02R\rdiskUsedBytes\x12,\n" +
+	"\x10disk_total_bytes\x18\v \x01(\x04B\x020\x02R\x0ediskTotalBytes\"\xe7\x01\n" +
+	"\rPanelDatabase\x12!\n" +
+	"\n" +
+	"file_bytes\x18\x01 \x01(\x04B\x020\x02R\tfileBytes\x12\x1f\n" +
+	"\twal_bytes\x18\x02 \x01(\x04B\x020\x02R\bwalBytes\x12!\n" +
+	"\n" +
+	"page_count\x18\x03 \x01(\x04B\x020\x02R\tpageCount\x12)\n" +
+	"\x0efreelist_count\x18\x04 \x01(\x04B\x020\x02R\rfreelistCount\x12\x1b\n" +
+	"\tpage_size\x18\x05 \x01(\rR\bpageSize\x12'\n" +
+	"\rmeasured_unix\x18\x06 \x01(\x03B\x020\x02R\fmeasuredUnix\"\xb2\x01\n" +
+	"\fPanelRpcLoad\x12\x19\n" +
+	"\bwindow_s\x18\x01 \x01(\rR\awindowS\x12\x1e\n" +
+	"\brequests\x18\x02 \x01(\x04B\x020\x02R\brequests\x12'\n" +
+	"\rserver_errors\x18\x03 \x01(\x04B\x020\x02R\fserverErrors\x12'\n" +
+	"\rclient_errors\x18\x04 \x01(\x04B\x020\x02R\fclientErrors\x12\x15\n" +
+	"\x06p95_ms\x18\x05 \x01(\x02R\x05p95Ms\"\xd1\x02\n" +
+	"\x19GetPanelResourcesResponse\x12\x1d\n" +
+	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x127\n" +
+	"\aprocess\x18\x02 \x01(\v2\x1d.mistgate.ops.v1.PanelProcessR\aprocess\x12.\n" +
+	"\x04host\x18\x03 \x01(\v2\x1a.mistgate.ops.v1.PanelHostR\x04host\x12:\n" +
+	"\bdatabase\x18\x04 \x01(\v2\x1e.mistgate.ops.v1.PanelDatabaseR\bdatabase\x12)\n" +
+	"\x10agents_connected\x18\x05 \x01(\rR\x0fagentsConnected\x12\x14\n" +
+	"\x05nodes\x18\x06 \x01(\rR\x05nodes\x12/\n" +
+	"\x03rpc\x18\a \x01(\v2\x1d.mistgate.ops.v1.PanelRpcLoadR\x03rpc\"+\n" +
+	"\x13GetFleetLoadRequest\x12\x14\n" +
+	"\x05hours\x18\x01 \x01(\rR\x05hours\"\xc8\x01\n" +
+	"\x12LoadRecommendation\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1a\n" +
+	"\bseverity\x18\x02 \x01(\tR\bseverity\x12G\n" +
+	"\x06params\x18\x03 \x03(\v2/.mistgate.ops.v1.LoadRecommendation.ParamsEntryR\x06params\x1a9\n" +
+	"\vParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe5\f\n" +
+	"\bNodeLoad\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1c\n" +
+	"\tconnected\x18\x03 \x01(\bR\tconnected\x12\x12\n" +
+	"\x04cpus\x18\x04 \x01(\rR\x04cpus\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12\x1e\n" +
+	"\n" +
+	"bottleneck\x18\x06 \x01(\tR\n" +
+	"bottleneck\x12&\n" +
+	"\x0fhours_with_data\x18\a \x01(\rR\rhoursWithData\x12\x1b\n" +
+	"\text_hours\x18\b \x01(\rR\bextHours\x12(\n" +
+	"\x0ebusy_hour_unix\x18\t \x01(\x03B\x020\x02R\fbusyHourUnix\x12)\n" +
+	"\x11busy_hour_cpu_pct\x18\n" +
+	" \x01(\x02R\x0ebusyHourCpuPct\x12(\n" +
+	"\x10people_busy_hour\x18\v \x01(\x02R\x0epeopleBusyHour\x12\x1f\n" +
+	"\vpeople_peak\x18\f \x01(\rR\n" +
+	"peoplePeak\x12'\n" +
+	"\x10cpu_peak_p95_pct\x18\r \x01(\x02R\rcpuPeakP95Pct\x12'\n" +
+	"\rsteal_p95_pct\x18\x0e \x01(\x02H\x00R\vstealP95Pct\x88\x01\x01\x121\n" +
+	"\x12conntrack_peak_pct\x18\x0f \x01(\x02H\x01R\x10conntrackPeakPct\x88\x01\x01\x12%\n" +
+	"\fram_peak_pct\x18\x10 \x01(\x02H\x02R\n" +
+	"ramPeakPct\x88\x01\x01\x126\n" +
+	"\x13swap_used_max_bytes\x18\x11 \x01(\x04B\x020\x02H\x03R\x10swapUsedMaxBytes\x88\x01\x01\x12'\n" +
+	"\rdisk_used_pct\x18\x12 \x01(\x02H\x04R\vdiskUsedPct\x88\x01\x01\x12\"\n" +
+	"\vrx_peak_bps\x18\x13 \x01(\x04B\x020\x02R\trxPeakBps\x12\"\n" +
+	"\vtx_peak_bps\x18\x14 \x01(\x04B\x020\x02R\ttxPeakBps\x12#\n" +
+	"\rcapacity_mbps\x18\x15 \x01(\rR\fcapacityMbps\x12'\n" +
+	"\x0fcapacity_source\x18\x16 \x01(\tR\x0ecapacitySource\x121\n" +
+	"\x12bandwidth_peak_pct\x18\x17 \x01(\x02H\x05R\x10bandwidthPeakPct\x88\x01\x01\x12.\n" +
+	"\x11agent_cpu_avg_pct\x18\x18 \x01(\x02H\x06R\x0eagentCpuAvgPct\x88\x01\x01\x12.\n" +
+	"\x11agent_cpu_max_pct\x18\x19 \x01(\x02H\aR\x0eagentCpuMaxPct\x88\x01\x01\x126\n" +
+	"\x13agent_rss_max_bytes\x18\x1a \x01(\x04B\x020\x02H\bR\x10agentRssMaxBytes\x88\x01\x01\x12B\n" +
+	"\x1cagent_rss_growth_pct_per_day\x18\x1b \x01(\x02H\tR\x17agentRssGrowthPctPerDay\x88\x01\x01\x12\x10\n" +
+	"\x03fit\x18\x1c \x01(\tR\x03fit\x12?\n" +
+	"\x1acpu_pct_per_hundred_people\x18\x1d \x01(\x02H\n" +
+	"R\x16cpuPctPerHundredPeople\x88\x01\x01\x12+\n" +
+	"\x0fmbps_per_person\x18\x1e \x01(\x02H\vR\rmbpsPerPerson\x88\x01\x01\x12,\n" +
+	"\x0fheadroom_people\x18\x1f \x01(\rH\fR\x0eheadroomPeople\x88\x01\x01\x12M\n" +
+	"\x0frecommendations\x18  \x03(\v2#.mistgate.ops.v1.LoadRecommendationR\x0frecommendationsB\x10\n" +
+	"\x0e_steal_p95_pctB\x15\n" +
+	"\x13_conntrack_peak_pctB\x0f\n" +
+	"\r_ram_peak_pctB\x16\n" +
+	"\x14_swap_used_max_bytesB\x10\n" +
+	"\x0e_disk_used_pctB\x15\n" +
+	"\x13_bandwidth_peak_pctB\x14\n" +
+	"\x12_agent_cpu_avg_pctB\x14\n" +
+	"\x12_agent_cpu_max_pctB\x16\n" +
+	"\x14_agent_rss_max_bytesB\x1f\n" +
+	"\x1d_agent_rss_growth_pct_per_dayB\x1d\n" +
+	"\x1b_cpu_pct_per_hundred_peopleB\x12\n" +
+	"\x10_mbps_per_personB\x12\n" +
+	"\x10_headroom_people\"\xc8\x01\n" +
+	"\vLoadNodeRef\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12)\n" +
+	"\x11busy_hour_cpu_pct\x18\x04 \x01(\x02R\x0ebusyHourCpuPct\x12,\n" +
+	"\x0fheadroom_people\x18\x05 \x01(\rH\x00R\x0eheadroomPeople\x88\x01\x01B\x12\n" +
+	"\x10_headroom_people\"\xba\x02\n" +
+	"\x10FleetLoadSummary\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\rR\x02ok\x12\x12\n" +
+	"\x04busy\x18\x02 \x01(\rR\x04busy\x12\x1e\n" +
+	"\n" +
+	"overloaded\x18\x03 \x01(\rR\n" +
+	"overloaded\x12\x18\n" +
+	"\aunknown\x18\x04 \x01(\rR\aunknown\x12'\n" +
+	"\x0fheadroom_people\x18\x05 \x01(\rR\x0eheadroomPeople\x12%\n" +
+	"\x0eheadroom_nodes\x18\x06 \x01(\rR\rheadroomNodes\x12=\n" +
+	"\vmost_loaded\x18\a \x03(\v2\x1c.mistgate.ops.v1.LoadNodeRefR\n" +
+	"mostLoaded\x129\n" +
+	"\tmost_free\x18\b \x03(\v2\x1c.mistgate.ops.v1.LoadNodeRefR\bmostFree\"\xb9\x01\n" +
+	"\x14GetFleetLoadResponse\x12\x1d\n" +
+	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x12\x14\n" +
+	"\x05hours\x18\x02 \x01(\rR\x05hours\x12/\n" +
+	"\x05nodes\x18\x03 \x03(\v2\x19.mistgate.ops.v1.NodeLoadR\x05nodes\x12;\n" +
+	"\asummary\x18\x04 \x01(\v2!.mistgate.ops.v1.FleetLoadSummaryR\asummary2\x87\v\n" +
 	"\n" +
 	"OpsService\x12a\n" +
 	"\x0eGetLogSettings\x12&.mistgate.ops.v1.GetLogSettingsRequest\x1a'.mistgate.ops.v1.GetLogSettingsResponse\x12X\n" +
@@ -1946,7 +3291,9 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x11StartDebugCapture\x12).mistgate.ops.v1.StartDebugCaptureRequest\x1a*.mistgate.ops.v1.StartDebugCaptureResponse\x12g\n" +
 	"\x10StopDebugCapture\x12(.mistgate.ops.v1.StopDebugCaptureRequest\x1a).mistgate.ops.v1.StopDebugCaptureResponse\x12j\n" +
 	"\x11ListDebugCaptures\x12).mistgate.ops.v1.ListDebugCapturesRequest\x1a*.mistgate.ops.v1.ListDebugCapturesResponse\x12d\n" +
-	"\x0fGetDebugCapture\x12'.mistgate.ops.v1.GetDebugCaptureRequest\x1a(.mistgate.ops.v1.GetDebugCaptureResponseB\xb5\x01\n" +
+	"\x0fGetDebugCapture\x12'.mistgate.ops.v1.GetDebugCaptureRequest\x1a(.mistgate.ops.v1.GetDebugCaptureResponse\x12j\n" +
+	"\x11GetPanelResources\x12).mistgate.ops.v1.GetPanelResourcesRequest\x1a*.mistgate.ops.v1.GetPanelResourcesResponse\x12[\n" +
+	"\fGetFleetLoad\x12$.mistgate.ops.v1.GetFleetLoadRequest\x1a%.mistgate.ops.v1.GetFleetLoadResponseB\xb5\x01\n" +
 	"\x13com.mistgate.ops.v1B\bOpsProtoP\x01Z6github.com/mistgate/mistgate/gen/mistgate/ops/v1;opsv1\xa2\x02\x03MOX\xaa\x02\x0fMistgate.Ops.V1\xca\x02\x0fMistgate\\Ops\\V1\xe2\x02\x1bMistgate\\Ops\\V1\\GPBMetadata\xea\x02\x11Mistgate::Ops::V1b\x06proto3"
 
 var (
@@ -1961,7 +3308,7 @@ func file_mistgate_ops_v1_ops_proto_rawDescGZIP() []byte {
 	return file_mistgate_ops_v1_ops_proto_rawDescData
 }
 
-var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*GetLogSettingsRequest)(nil),      // 0: mistgate.ops.v1.GetLogSettingsRequest
 	(*GetLogSettingsResponse)(nil),     // 1: mistgate.ops.v1.GetLogSettingsResponse
@@ -1991,51 +3338,78 @@ var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*GetDebugCaptureRequest)(nil),     // 25: mistgate.ops.v1.GetDebugCaptureRequest
 	(*DebugRecord)(nil),                // 26: mistgate.ops.v1.DebugRecord
 	(*GetDebugCaptureResponse)(nil),    // 27: mistgate.ops.v1.GetDebugCaptureResponse
-	nil,                                // 28: mistgate.ops.v1.PanelLogEntry.AttrsEntry
-	nil,                                // 29: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
-	nil,                                // 30: mistgate.ops.v1.DebugRecord.AttrsEntry
+	(*GetPanelResourcesRequest)(nil),   // 28: mistgate.ops.v1.GetPanelResourcesRequest
+	(*PanelProcess)(nil),               // 29: mistgate.ops.v1.PanelProcess
+	(*PanelHost)(nil),                  // 30: mistgate.ops.v1.PanelHost
+	(*PanelDatabase)(nil),              // 31: mistgate.ops.v1.PanelDatabase
+	(*PanelRpcLoad)(nil),               // 32: mistgate.ops.v1.PanelRpcLoad
+	(*GetPanelResourcesResponse)(nil),  // 33: mistgate.ops.v1.GetPanelResourcesResponse
+	(*GetFleetLoadRequest)(nil),        // 34: mistgate.ops.v1.GetFleetLoadRequest
+	(*LoadRecommendation)(nil),         // 35: mistgate.ops.v1.LoadRecommendation
+	(*NodeLoad)(nil),                   // 36: mistgate.ops.v1.NodeLoad
+	(*LoadNodeRef)(nil),                // 37: mistgate.ops.v1.LoadNodeRef
+	(*FleetLoadSummary)(nil),           // 38: mistgate.ops.v1.FleetLoadSummary
+	(*GetFleetLoadResponse)(nil),       // 39: mistgate.ops.v1.GetFleetLoadResponse
+	nil,                                // 40: mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	nil,                                // 41: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	nil,                                // 42: mistgate.ops.v1.DebugRecord.AttrsEntry
+	nil,                                // 43: mistgate.ops.v1.LoadRecommendation.ParamsEntry
 }
 var file_mistgate_ops_v1_ops_proto_depIdxs = []int32{
-	28, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	40, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
 	5,  // 1: mistgate.ops.v1.GetPanelLogsResponse.entries:type_name -> mistgate.ops.v1.PanelLogEntry
 	7,  // 2: mistgate.ops.v1.GetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
-	29, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	41, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
 	7,  // 4: mistgate.ops.v1.SetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
 	18, // 5: mistgate.ops.v1.StartDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	18, // 6: mistgate.ops.v1.StopDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	18, // 7: mistgate.ops.v1.ListDebugCapturesResponse.captures:type_name -> mistgate.ops.v1.DebugCaptureInfo
-	30, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
+	42, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
 	18, // 9: mistgate.ops.v1.GetDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	26, // 10: mistgate.ops.v1.GetDebugCaptureResponse.records:type_name -> mistgate.ops.v1.DebugRecord
-	0,  // 11: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
-	2,  // 12: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
-	4,  // 13: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
-	8,  // 14: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
-	10, // 15: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
-	12, // 16: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
-	14, // 17: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
-	16, // 18: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
-	19, // 19: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
-	21, // 20: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
-	23, // 21: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
-	25, // 22: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
-	1,  // 23: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
-	3,  // 24: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
-	6,  // 25: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
-	9,  // 26: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
-	11, // 27: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
-	13, // 28: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
-	15, // 29: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
-	17, // 30: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
-	20, // 31: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
-	22, // 32: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
-	24, // 33: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
-	27, // 34: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
-	23, // [23:35] is the sub-list for method output_type
-	11, // [11:23] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	29, // 11: mistgate.ops.v1.GetPanelResourcesResponse.process:type_name -> mistgate.ops.v1.PanelProcess
+	30, // 12: mistgate.ops.v1.GetPanelResourcesResponse.host:type_name -> mistgate.ops.v1.PanelHost
+	31, // 13: mistgate.ops.v1.GetPanelResourcesResponse.database:type_name -> mistgate.ops.v1.PanelDatabase
+	32, // 14: mistgate.ops.v1.GetPanelResourcesResponse.rpc:type_name -> mistgate.ops.v1.PanelRpcLoad
+	43, // 15: mistgate.ops.v1.LoadRecommendation.params:type_name -> mistgate.ops.v1.LoadRecommendation.ParamsEntry
+	35, // 16: mistgate.ops.v1.NodeLoad.recommendations:type_name -> mistgate.ops.v1.LoadRecommendation
+	37, // 17: mistgate.ops.v1.FleetLoadSummary.most_loaded:type_name -> mistgate.ops.v1.LoadNodeRef
+	37, // 18: mistgate.ops.v1.FleetLoadSummary.most_free:type_name -> mistgate.ops.v1.LoadNodeRef
+	36, // 19: mistgate.ops.v1.GetFleetLoadResponse.nodes:type_name -> mistgate.ops.v1.NodeLoad
+	38, // 20: mistgate.ops.v1.GetFleetLoadResponse.summary:type_name -> mistgate.ops.v1.FleetLoadSummary
+	0,  // 21: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
+	2,  // 22: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
+	4,  // 23: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
+	8,  // 24: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
+	10, // 25: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
+	12, // 26: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
+	14, // 27: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
+	16, // 28: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
+	19, // 29: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
+	21, // 30: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
+	23, // 31: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
+	25, // 32: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
+	28, // 33: mistgate.ops.v1.OpsService.GetPanelResources:input_type -> mistgate.ops.v1.GetPanelResourcesRequest
+	34, // 34: mistgate.ops.v1.OpsService.GetFleetLoad:input_type -> mistgate.ops.v1.GetFleetLoadRequest
+	1,  // 35: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
+	3,  // 36: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
+	6,  // 37: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
+	9,  // 38: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
+	11, // 39: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
+	13, // 40: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
+	15, // 41: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
+	17, // 42: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
+	20, // 43: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
+	22, // 44: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
+	24, // 45: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
+	27, // 46: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
+	33, // 47: mistgate.ops.v1.OpsService.GetPanelResources:output_type -> mistgate.ops.v1.GetPanelResourcesResponse
+	39, // 48: mistgate.ops.v1.OpsService.GetFleetLoad:output_type -> mistgate.ops.v1.GetFleetLoadResponse
+	35, // [35:49] is the sub-list for method output_type
+	21, // [21:35] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_ops_v1_ops_proto_init() }
@@ -2044,13 +3418,15 @@ func file_mistgate_ops_v1_ops_proto_init() {
 		return
 	}
 	file_mistgate_ops_v1_ops_proto_msgTypes[16].OneofWrappers = []any{}
+	file_mistgate_ops_v1_ops_proto_msgTypes[36].OneofWrappers = []any{}
+	file_mistgate_ops_v1_ops_proto_msgTypes[37].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_ops_v1_ops_proto_rawDesc), len(file_mistgate_ops_v1_ops_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

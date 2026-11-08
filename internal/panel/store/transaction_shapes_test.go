@@ -49,6 +49,7 @@ var transactionShape1 = map[string]string{
 	"provision.go:createNodeProvisionJob":            "The job insert and optional queued event run in one fixed batch.",
 	"store.go:SetSettingsIfAbsent":                   "Inserts each missing setting and reads the stored values back in one batch.",
 	"store.go:SetSettings":                           "Upserts the supplied settings in one fixed batch.",
+	"store.go:SetAndDeleteSettings":                  "Retention upserts and resets run in the same fixed atomic batch.",
 	"access_linkmode.go:SaveSubscriptionSettings":    "The settings upserts, the mode and, for STRICT, the revoke of every shared device run in one fixed batch.",
 	"telegram.go:ClearTelegramBot":                   "Deletes links, pending link codes, and the bot as one fixed batch.",
 	"telegram.go:UnlinkTelegram":                     "Deletes the chat link and pending link code as one fixed batch.",

@@ -59,6 +59,9 @@ func TestReadToolsLeakNothing(t *testing.T) {
 		{"node_journal", map[string]any{"node": "de1", "query": "failed"}},
 		{"audit_search", map[string]any{}},
 		{"updates_status", map[string]any{}},
+		{"capacity_report", map[string]any{}},
+		{"capacity_report", map[string]any{"node": "de1", "hours": 720}},
+		{"panel_resources", map[string]any{}},
 	}
 	for _, c := range calls {
 		out := mustOK(t, s, c.tool, c.args)
@@ -80,9 +83,13 @@ func TestAuditSearchDropsNodeAddressesFromParams(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)
 	s := e.session(secret)
-	v := decode[AuditV](t, mustOK(t, s, "audit_search", map[string]any{}))
+	out := mustOK(t, s, "audit_search", map[string]any{})
+	v := decode[AuditV](t, out)
 	if len(v.Entries) != 1 {
 		t.Fatalf("entries = %+v", v.Entries)
+	}
+	if strings.Contains(out, "198.51.100.5") || strings.Contains(out, `"ip"`) {
+		t.Errorf("audit result returned the stored client IP: %s", out)
 	}
 	var params map[string]any
 	if err := json.Unmarshal([]byte(v.Entries[0].Params), &params); err != nil {
@@ -97,6 +104,22 @@ func TestAuditSearchDropsNodeAddressesFromParams(t *testing.T) {
 	nested, _ := params["nested"].(map[string]any)
 	if _, ok := nested["address"]; ok || nested["keep"] != "yes" || params["k"] == nil {
 		t.Errorf("params after address removal = %v", params)
+	}
+}
+
+func TestHealthViewsRemoveAddressesFromErrorDetailsAndAlertParams(t *testing.T) {
+	checks := checksView(&adminv1.GetChecksResponse{Rows: []*adminv1.CheckRow{{NodeId: nodeA, NodeName: "de1", Cells: []*adminv1.CheckCell{{
+		Last: &adminv1.CheckResult{ErrorDetail: "exit 203.0.113.8 via 2001:db8::1"},
+	}}}}})
+	got := checks.Rows[0].Cells[0].ErrorInfo
+	if strings.Contains(got, "203.0.113.8") || strings.Contains(got, "2001:db8::1") {
+		t.Errorf("check error detail returned an address: %q", got)
+	}
+	alert := alertView(&adminv1.Alert{Params: map[string]string{"ipv4": "exit 203.0.113.9", "ipv6": "target 2001:db8::2"}})
+	for key, value := range alert.Params {
+		if strings.Contains(value, "203.0.113.9") || strings.Contains(value, "2001:db8::2") {
+			t.Errorf("alert param %q returned an address: %q", key, value)
+		}
 	}
 }
 

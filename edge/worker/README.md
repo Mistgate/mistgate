@@ -162,18 +162,19 @@ name; its own `fetch` answers 404 without starting Go.
 | `limit` | `async (request) => {ok, retryAfterMs, remaining, first}`: one call to the `Limiter` object of the request's (name, key); a rejection makes the panel refuse the request |
 | `provision` | `{role: "forward" \| "serve", kick?, sshConnect?}`: the main Worker is a `forward` role (with `kick` when `PROVISIONER` is bound); the Provisioner script is `serve` and needs both functions |
 | `adminHost`, `adminPrefix`, `subPrefix` | optional `ADMIN_HOST`, `ADMIN_PREFIX`, `SUB_PREFIX`, first run only |
-| `setupTokenSHA256` | optional `SETUP_TOKEN_SHA256` secret: 64 lowercase hex characters, the SHA-256 of a setup token the deployer chose (see below); anything else makes `init` fail before it writes |
+| `setupTokenSHA256` | `SETUP_TOKEN_SHA256` secret: 64 lowercase hex characters, the SHA-256 of a setup token the deployer chose (see below); anything else makes `init` fail before it writes. Without it no owner can be created |
 
-On a fresh database the panel prints the one-time setup link (it holds the secret admin path) to the Worker log once;
-a later isolate only says that a link was already issued.
+On a fresh database without `SETUP_TOKEN_SHA256` the panel creates no setup token and prints no setup link: a link in the
+Worker's log would let anyone who can read that log (another member of the Cloudflare account, a Logpush destination) create
+the owner first. The log says to set the secret instead. (Versions before November 2026 printed a random link there; one
+already issued stays valid until it expires and is not printed again.)
 
 The first-run settings (prefixes, agent SNI, RP ID and origins) are stored with "insert if absent" and read back, so isolates
 that start on an empty database at the same time all build from the values of the first write.
 
-## Unattended first deploy (`SETUP_TOKEN_SHA256`)
+## First owner (`SETUP_TOKEN_SHA256`)
 
-The random setup link above ends up in Cloudflare's log and a deploy tool cannot read it. With the secret set, the deployer
-picks the token instead and the panel only ever sees its hash:
+`mistgate edge deploy` does this for you. By hand, the deployer picks the setup token and gives the panel only its hash:
 
 ```sh
 TOKEN=$(openssl rand -hex 32)        # keep it; it is the credential
@@ -188,16 +189,15 @@ printf %s "$TOKEN" | sha256sum | cut -d' ' -f1 | wrangler secret put SETUP_TOKEN
   `<PUBLIC_URL><ADMIN_PREFIX>setup#<TOKEN>` with a secret path (for example `https://panel.example.com/some-secret/setup#<TOKEN>`).
   The `#` part never reaches a server log. A deploy tool can also call `AuthService/BeginSetup` with the token as `setupToken`.
 - After the first admin exists the secret does nothing; remove it.
-- If `SETUP_TOKEN_SHA256` is not set nothing changes: a random token and a printed link.
+- If `SETUP_TOKEN_SHA256` is not set, no owner can be created until it is: set it and deploy again.
 
 ## Scheduled background work
 
 The jobs Worker (`wrangler.jobs.example.toml`) is the only one with a cron trigger, once a minute. In `wrangler dev` the other scripts are reached by service binding only, and the tick is fired through the local explorer API (`POST /cdn-cgi/local/explorer/api/local/scheduled?worker=<name>-jobs`, body `{"cron":"* * * * *"}`; `/cdn-cgi/handler/scheduled` reaches only the listening script). Each tick sweeps user status and silent nodes and moves node update rollouts along (`NodeLink.send`, above); at UTC minute 17
 it also runs health retention, and at minutes divisible by 10 it runs the desired-state safety net.
 
-With `PUBLIC_URL` set, the first cron tick after deployment (within about 60 seconds) may initialize a fresh database and
-print the one-time setup link in that cron invocation's log. Run `wrangler tail` before the first deploy to capture it;
-the link is only re-issued after it expires. With `SETUP_TOKEN_SHA256` set (above) nothing is printed but the expiry.
+With `PUBLIC_URL` set, the first cron tick after deployment (within about 60 seconds) may initialize a fresh database; with
+`SETUP_TOKEN_SHA256` set (above) its log shows only the token's expiry, never a link.
 
 ## Build and run locally
 

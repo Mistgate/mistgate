@@ -4,6 +4,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -30,12 +31,14 @@ const (
 
 type insightWorld struct {
 	*world
-	events  []*adminv1.Event // newest first
-	active  []*adminv1.Alert
-	history []*adminv1.Alert
-	conn    *adminv1.GetUserConnectionResponse
-	checks  *adminv1.GetChecksResponse
-	audit   []*adminv1.AuditEntry
+	events          []*adminv1.Event // newest first
+	active          []*adminv1.Alert
+	history         []*adminv1.Alert
+	conn            *adminv1.GetUserConnectionResponse
+	checks          *adminv1.GetChecksResponse
+	audit           []*adminv1.AuditEntry
+	reachabilityErr error
+	pathLossErr     error
 }
 
 func ev(id, at int64, sev adminv1.EventSeverity, code, node, name string, params map[string]string) *adminv1.Event {
@@ -190,8 +193,18 @@ func (w *insightWorld) GetChecks(context.Context, *connect.Request[adminv1.GetCh
 }
 
 func (w *insightWorld) GetReachabilityHistory(context.Context, *connect.Request[adminv1.GetReachabilityHistoryRequest]) (*connect.Response[adminv1.GetReachabilityHistoryResponse], error) {
+	if w.reachabilityErr != nil {
+		return nil, w.reachabilityErr
+	}
 	return connect.NewResponse(&adminv1.GetReachabilityHistoryResponse{Country: "RU", Nodes: []*adminv1.NodeReachabilityHistory{{NodeId: nodeC, Lanes: []*adminv1.ReachabilityLane{{Source: "globalping",
 		Points: []*adminv1.ReachabilityPoint{{AtUnix: insNow - 40*hour, Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_OK}, {AtUnix: insNow - 30*hour, Verdict: adminv1.CountryVerdict_COUNTRY_VERDICT_BLOCKED}}}}}}}), nil
+}
+
+func (w *insightWorld) GetPathLoss(ctx context.Context, r *connect.Request[adminv1.GetPathLossRequest]) (*connect.Response[adminv1.GetPathLossResponse], error) {
+	if w.pathLossErr != nil {
+		return nil, w.pathLossErr
+	}
+	return w.world.GetPathLoss(ctx, r)
 }
 
 func (w *insightWorld) api(a *fakeAuth) http.Handler {
@@ -486,6 +499,19 @@ func TestFleetDigestCountsOnlyTheWindow(t *testing.T) {
 	}
 	for _, bad := range []map[string]any{{"hours": 73}, {"hours": -1}} {
 		mustFail(t, s, "fleet_digest", bad)
+	}
+}
+
+func TestFleetDigestListsReachabilityAndPathLossErrorsAsUnavailable(t *testing.T) {
+	e, iw := newInsightEnv(t)
+	iw.reachabilityErr = errors.New("reachability feed unavailable")
+	iw.pathLossErr = errors.New("path loss unavailable")
+	_, secret := e.token(ProfileReadonly)
+	d := decode[DigestV](t, mustOK(t, e.session(secret), "fleet_digest", map[string]any{"hours": 24}))
+	for _, source := range []string{"reachability_history", "path_loss"} {
+		if !slices.Contains(d.Unavailable, source) {
+			t.Errorf("unavailable = %v, missing %q", d.Unavailable, source)
+		}
 	}
 }
 

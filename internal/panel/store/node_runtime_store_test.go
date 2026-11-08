@@ -91,8 +91,13 @@ func nodeRuntimeStoreProof(t *testing.T, st *Store) {
 			t.Fatalf("IngestStats #%d = %+v, %v", seq, out, err)
 		}
 	}
+	// The first sample of the hour comes from an agent that predates the resource fields, the next two from an updated one.
 	ingest(hour, HostSample{CPUPct: 10, SoftirqPct: 2, Load1: 0.5, RAMUsed: 100, RAMTotal: 1000, RxBps: 1000, TxBps: 2000, Sessions: 3})
-	ingest(hour, HostSample{CPUPct: 30, SoftirqPct: 6.5, Load1: 1.25, RAMUsed: 300, RAMTotal: 1000, RxBps: 3000, TxBps: 500, Sessions: 9})
+	ingest(hour, HostSample{CPUPct: 30, SoftirqPct: 6.5, Load1: 1.25, RAMUsed: 300, RAMTotal: 1000, RxBps: 3000, TxBps: 500, Sessions: 9,
+		Ext: &HostSampleExt{StealPct: 4, IOWaitPct: 1.5, SwapUsed: 70, ConntrackCount: 800, ConntrackMax: 1000, TCPSockets: 40, NICSpeedMbps: 1000,
+			AgentCPUPct: 6, AgentRSS: 90}})
+	ingest(hour, HostSample{CPUPct: 20, RAMUsed: 200, RAMTotal: 1000, Sessions: 6,
+		Ext: &HostSampleExt{StealPct: 10, IOWaitPct: 0.5, SwapUsed: 20, ConntrackCount: 300, ConntrackMax: 2000, TCPSockets: 50, AgentCPUPct: 2, AgentRSS: 60}})
 	ingest(hour-3600, HostSample{CPUPct: 50, RAMUsed: 50, RAMTotal: 1000, Sessions: 1})
 	seq++
 	if out, err := st.IngestStats(ctx, FleetStatsIn{NodeID: "nod_rt_a", Instance: "host-hour", Seq: seq, Now: base, HourStart: hour}); err != nil || out.Duplicate { // no HostMetrics: nothing stored
@@ -106,9 +111,19 @@ func nodeRuntimeStoreProof(t *testing.T, st *Store) {
 		t.Fatalf("host hours = %+v", hours)
 	}
 	h := hours[1]
-	if h.Samples != 2 || h.CPUAvg != 20 || h.CPUMax != 30 || h.SoftirqMax != 6.5 || h.LoadMax != 1.25 || h.RAMUsedMax != 300 || h.RAMTotal != 1000 ||
-		h.RxAvg != 2000 || h.RxMax != 3000 || h.TxAvg != 1250 || h.TxMax != 2000 || h.SessionsMax != 9 {
+	if h.Samples != 3 || h.CPUAvg != 20 || h.CPUMax != 30 || h.SoftirqMax != 6.5 || h.LoadMax != 1.25 || h.RAMUsedMax != 300 || h.RAMTotal != 1000 ||
+		h.RxAvg != 1333 || h.RxMax != 3000 || h.TxAvg != 833 || h.TxMax != 2000 || h.SessionsMax != 9 || h.SessionsAvg != 6 {
 		t.Errorf("rolled hour = %+v", h)
+	}
+	// The resource fields average over the two samples that carried them; the limit and the NIC speed are the latest the agent
+	// sent (the last sample's NIC speed of 0 means "not known" and is still the latest value).
+	if h.ExtSamples != 2 || h.StealAvg != 7 || h.StealMax != 10 || h.IOWaitMax != 1.5 || h.SwapUsedMax != 70 || h.ConntrackMax != 800 ||
+		h.ConntrackLimit != 2000 || h.TCPSocketsMax != 50 || h.NICSpeedMbps != 0 || h.AgentCPUAvg != 4 || h.AgentCPUMax != 6 || h.AgentRSSMax != 90 {
+		t.Errorf("resource fields of the hour = %+v", h)
+	}
+	// An hour of an old agent only: nothing of them is known.
+	if o := hours[0]; o.ExtSamples != 0 || o.StealAvg != 0 || o.AgentRSSMax != 0 || o.SessionsAvg != 1 {
+		t.Errorf("old agent's hour = %+v", o)
 	}
 	if one, err := st.NodeHostHours(ctx, "nod_rt_a", base, 1); err != nil || len(one) != 1 || one[0].HourStart != hour {
 		t.Errorf("a one-hour window = %+v, %v", one, err)
@@ -128,5 +143,27 @@ func nodeRuntimeStoreProof(t *testing.T, st *Store) {
 	}
 	if hours, err = st.NodeHostHours(ctx, "nod_rt_a", base, 24); err != nil || len(hours) != 1 || hours[0].HourStart != hour {
 		t.Errorf("after the prune: %+v, %v", hours, err)
+	}
+	// The daily prune removes at most one batch; the next sweep clears the backlog.
+	_, err = st.W.ExecContext(ctx, `WITH RECURSIVE seq(n) AS (
+		SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < ?
+	)
+	INSERT INTO node_host_hour (node_id, hour_start)
+	SELECT 'nod_rt_a', ? - (n * 3600) FROM seq`, nodeHostHourPruneBatch+1, hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := st.PruneNodeHostHours(ctx, base)
+	if err != nil || got != nodeHostHourPruneBatch {
+		t.Fatalf("first sweep pruned %d rows: %v, want %d", got, err, nodeHostHourPruneBatch)
+	}
+	var left int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM node_host_hour WHERE node_id = 'nod_rt_a'`).Scan(&left); err != nil || left != 2 {
+		t.Fatalf("rows after first sweep = %d, %v, want one expired and the current hour", left, err)
+	}
+	got, err = st.PruneNodeHostHours(ctx, base)
+	if err != nil || got != 1 {
+		t.Fatalf("next sweep pruned %d rows: %v, want the remaining expired row", got, err)
 	}
 }

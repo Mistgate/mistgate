@@ -349,9 +349,23 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.suspect(suspect)
 		}
 		if res != nil {
-			h.notSupported(w, r, hint, app)
-			h.respond(w, r, token, *res, set, sf, format)
-			return
+			checker, ok := h.src.(TokenChecker)
+			if !ok {
+				res = nil // a source that cannot confirm the token cannot serve a cached view
+			} else if err := checker.CheckSubscriptionToken(r.Context(), token); errors.Is(err, access.ErrUnknownToken) {
+				h.tokens.Delete(token)
+				h.miss(r.Context(), client)
+				h.decoy.ServeHTTP(w, r)
+				return
+			} else if err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			if res != nil {
+				h.notSupported(w, r, hint, app)
+				h.respond(w, r, token, *res, set, sf, format)
+				return
+			}
 		}
 		admitted = true
 	}

@@ -228,10 +228,13 @@ func readTools() []toolDef {
 
 		readTool("node_metrics", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceGetNodeHostHistoryProcedure),
 			"The node's current gauges (CPU, RAM, disk, network), traffic today, online users per protocol and today's top users. "+
+				"From agents that report them, resources adds CPU steal and I/O wait, swap, connection tracking (count, max, fill), TCP and UDP sockets, the NIC's link speed, "+
+				"and the agent process itself (CPU in percent of the machine, memory, goroutines, threads, open files against the limit): every engine runs inside it, so that is what Mistgate costs the node; "+
+				"without resources the agent is too old to say (not known, not zero). For load over time, bottlenecks and headroom use capacity_report. "+
 				"With hours (1 to 720) it also returns the host load per hour (series: CPU mean and peak, softirq peak, RAM peak, network mean and peak, sessions peak; oldest first; "+
 				"windows over 96 hours are grouped into bucket_hours-long points) and peaks over the whole window with the hour of each. "+
 				"The history is kept 90 days and starts when the panel first stored it; an hour with no sample is absent. "+
-				"With no node: one compact row of current gauges for every node that is not retired (no top users, no history).",
+				"With no node: one compact row of current gauges for every node that is not retired (no top users, no history; steal, conntrack fill and the agent's CPU and memory when known).",
 			func(c *call, in nodeMetricsArg) (any, error) {
 				if in.Node == "" {
 					if in.Hours != 0 {
@@ -540,7 +543,7 @@ func readTools() []toolDef {
 					v.Entries = append(v.Entries, auditV{
 						ID: e.GetId(), Time: e.GetTimeUnix(), Source: enumName("AUDIT_SOURCE_", e.GetSource().String()),
 						ActorID: clean(e.GetActorId(), 80), ActorName: nm(e.GetActorName()), Action: clean(e.GetAction(), 80),
-						Params: auditParamsWithoutAddresses(e.GetParamsJson()), Result: clean(e.GetResult(), 60), IP: clean(e.GetIp(), 64),
+						Params: auditParamsWithoutAddresses(e.GetParamsJson()), Result: clean(e.GetResult(), 60),
 					})
 				}
 				v.NextBeforeID = r.Msg.GetNextBeforeId()

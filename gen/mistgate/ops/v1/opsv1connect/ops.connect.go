@@ -64,6 +64,11 @@ const (
 	// OpsServiceGetDebugCaptureProcedure is the fully-qualified name of the OpsService's
 	// GetDebugCapture RPC.
 	OpsServiceGetDebugCaptureProcedure = "/mistgate.ops.v1.OpsService/GetDebugCapture"
+	// OpsServiceGetPanelResourcesProcedure is the fully-qualified name of the OpsService's
+	// GetPanelResources RPC.
+	OpsServiceGetPanelResourcesProcedure = "/mistgate.ops.v1.OpsService/GetPanelResources"
+	// OpsServiceGetFleetLoadProcedure is the fully-qualified name of the OpsService's GetFleetLoad RPC.
+	OpsServiceGetFleetLoadProcedure = "/mistgate.ops.v1.OpsService/GetFleetLoad"
 )
 
 // OpsServiceClient is a client for the mistgate.ops.v1.OpsService service.
@@ -98,6 +103,12 @@ type OpsServiceClient interface {
 	ListDebugCaptures(context.Context, *connect.Request[v1.ListDebugCapturesRequest]) (*connect.Response[v1.ListDebugCapturesResponse], error)
 	// The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
 	GetDebugCapture(context.Context, *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error)
+	// What the panel itself costs: its process (CPU, memory, Go runtime, threads, descriptors), the machine it runs on, its
+	// database and the admin API's load over the last minutes. Numbers only: no address, path or name of a person.
+	GetPanelResources(context.Context, *connect.Request[v1.GetPanelResourcesRequest]) (*connect.Response[v1.GetPanelResourcesResponse], error)
+	// How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
+	// how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
+	GetFleetLoad(context.Context, *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error)
 }
 
 // NewOpsServiceClient constructs a client for the mistgate.ops.v1.OpsService service. By default,
@@ -183,6 +194,18 @@ func NewOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(opsServiceMethods.ByName("GetDebugCapture")),
 			connect.WithClientOptions(opts...),
 		),
+		getPanelResources: connect.NewClient[v1.GetPanelResourcesRequest, v1.GetPanelResourcesResponse](
+			httpClient,
+			baseURL+OpsServiceGetPanelResourcesProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("GetPanelResources")),
+			connect.WithClientOptions(opts...),
+		),
+		getFleetLoad: connect.NewClient[v1.GetFleetLoadRequest, v1.GetFleetLoadResponse](
+			httpClient,
+			baseURL+OpsServiceGetFleetLoadProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("GetFleetLoad")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -200,6 +223,8 @@ type opsServiceClient struct {
 	stopDebugCapture   *connect.Client[v1.StopDebugCaptureRequest, v1.StopDebugCaptureResponse]
 	listDebugCaptures  *connect.Client[v1.ListDebugCapturesRequest, v1.ListDebugCapturesResponse]
 	getDebugCapture    *connect.Client[v1.GetDebugCaptureRequest, v1.GetDebugCaptureResponse]
+	getPanelResources  *connect.Client[v1.GetPanelResourcesRequest, v1.GetPanelResourcesResponse]
+	getFleetLoad       *connect.Client[v1.GetFleetLoadRequest, v1.GetFleetLoadResponse]
 }
 
 // GetLogSettings calls mistgate.ops.v1.OpsService.GetLogSettings.
@@ -262,6 +287,16 @@ func (c *opsServiceClient) GetDebugCapture(ctx context.Context, req *connect.Req
 	return c.getDebugCapture.CallUnary(ctx, req)
 }
 
+// GetPanelResources calls mistgate.ops.v1.OpsService.GetPanelResources.
+func (c *opsServiceClient) GetPanelResources(ctx context.Context, req *connect.Request[v1.GetPanelResourcesRequest]) (*connect.Response[v1.GetPanelResourcesResponse], error) {
+	return c.getPanelResources.CallUnary(ctx, req)
+}
+
+// GetFleetLoad calls mistgate.ops.v1.OpsService.GetFleetLoad.
+func (c *opsServiceClient) GetFleetLoad(ctx context.Context, req *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error) {
+	return c.getFleetLoad.CallUnary(ctx, req)
+}
+
 // OpsServiceHandler is an implementation of the mistgate.ops.v1.OpsService service.
 type OpsServiceHandler interface {
 	// The log level now in force, the one the panel started with, and the size of the ring.
@@ -294,6 +329,12 @@ type OpsServiceHandler interface {
 	ListDebugCaptures(context.Context, *connect.Request[v1.ListDebugCapturesRequest]) (*connect.Response[v1.ListDebugCapturesResponse], error)
 	// The records of one capture, oldest first, with filters. Every record passes the panel's scrubbers again on the way out.
 	GetDebugCapture(context.Context, *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error)
+	// What the panel itself costs: its process (CPU, memory, Go runtime, threads, descriptors), the machine it runs on, its
+	// database and the admin API's load over the last minutes. Numbers only: no address, path or name of a person.
+	GetPanelResources(context.Context, *connect.Request[v1.GetPanelResourcesRequest]) (*connect.Response[v1.GetPanelResourcesResponse], error)
+	// How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
+	// how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
+	GetFleetLoad(context.Context, *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error)
 }
 
 // NewOpsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -375,6 +416,18 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(opsServiceMethods.ByName("GetDebugCapture")),
 		connect.WithHandlerOptions(opts...),
 	)
+	opsServiceGetPanelResourcesHandler := connect.NewUnaryHandler(
+		OpsServiceGetPanelResourcesProcedure,
+		svc.GetPanelResources,
+		connect.WithSchema(opsServiceMethods.ByName("GetPanelResources")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceGetFleetLoadHandler := connect.NewUnaryHandler(
+		OpsServiceGetFleetLoadProcedure,
+		svc.GetFleetLoad,
+		connect.WithSchema(opsServiceMethods.ByName("GetFleetLoad")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.ops.v1.OpsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OpsServiceGetLogSettingsProcedure:
@@ -401,6 +454,10 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 			opsServiceListDebugCapturesHandler.ServeHTTP(w, r)
 		case OpsServiceGetDebugCaptureProcedure:
 			opsServiceGetDebugCaptureHandler.ServeHTTP(w, r)
+		case OpsServiceGetPanelResourcesProcedure:
+			opsServiceGetPanelResourcesHandler.ServeHTTP(w, r)
+		case OpsServiceGetFleetLoadProcedure:
+			opsServiceGetFleetLoadHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -456,4 +513,12 @@ func (UnimplementedOpsServiceHandler) ListDebugCaptures(context.Context, *connec
 
 func (UnimplementedOpsServiceHandler) GetDebugCapture(context.Context, *connect.Request[v1.GetDebugCaptureRequest]) (*connect.Response[v1.GetDebugCaptureResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetDebugCapture is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) GetPanelResources(context.Context, *connect.Request[v1.GetPanelResourcesRequest]) (*connect.Response[v1.GetPanelResourcesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetPanelResources is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) GetFleetLoad(context.Context, *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetFleetLoad is not implemented"))
 }

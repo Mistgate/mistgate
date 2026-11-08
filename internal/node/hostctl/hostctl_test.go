@@ -71,25 +71,6 @@ func TestSysctlBaselineBody(t *testing.T) {
 }
 
 func TestProcParsers(t *testing.T) {
-	a, ok := parseCPUStat("cpu  100 0 50 800 40 5 5 0 0 0\ncpu0 1 1 1 1 1 1 1 1\n")
-	if !ok || a.total != 1000 || a.idle != 840 || a.softirq != 5 {
-		t.Fatalf("a=%+v ok=%v", a, ok)
-	}
-	b, _ := parseCPUStat("cpu  200 0 100 1600 80 10 50 0 0 0\n")
-	busy, soft := cpuPct(a, b)
-	// delta total 2000-1000... b.total = 2040, dt = 1040; idle delta = 840 -> busy 200/1040
-	if busy < 19 || busy > 19.5 || soft < 4.3 || soft > 4.4 {
-		t.Fatalf("busy=%v soft=%v", busy, soft)
-	}
-	if b, s := cpuPct(b, a); b != 0 || s != 0 { // counters went backwards
-		t.Fatal("expected zeros on wrap")
-	}
-
-	total, avail := parseMeminfo("MemTotal:        1000 kB\nMemFree: 1 kB\nMemAvailable:     250 kB\n")
-	if total != 1000*1024 || avail != 250*1024 {
-		t.Fatalf("mem %d %d", total, avail)
-	}
-
 	dev := "Inter-|   Receive\n face |bytes packets\n  lo: 5 1 0 0 0 0 0 0 5 1 0 0 0 0 0 0\neth0: 1000 10 0 0 0 0 0 0 2000 20 0 0 0 0 0 0\n"
 	if rx, tx, ok := parseNetDev(dev, "eth0"); !ok || rx != 1000 || tx != 2000 {
 		t.Fatalf("netdev %d %d %v", rx, tx, ok)

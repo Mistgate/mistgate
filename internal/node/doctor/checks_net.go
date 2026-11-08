@@ -1059,14 +1059,6 @@ func parseConntrackDrops(content string) (uint64, bool) {
 	return 0, false
 }
 
-func conntrackAtCapacity(count, max uint64) bool {
-	if max == 0 {
-		return false
-	}
-	threshold := max/5*4 + (max%5*4+4)/5 // ceil(80% of max), without overflowing uint64.
-	return count >= threshold
-}
-
 // addConntrackParams reports the table's fill whenever it was read. The drops come from /proc/net/stat/nf_conntrack,
 // which kernels built without CONFIG_NF_CONNTRACK_PROCFS (Ubuntu's) do not have: then there is no drops param.
 func addConntrackParams(params map[string]string, snapshot conntrackSnapshot, dropsOK bool) map[string]string {
@@ -1089,11 +1081,12 @@ func containsField(s, want string) bool {
 	return false
 }
 
+// checkNetBaseline compares the settings with the baseline. The connection-tracking table's fill is reported in its params
+// (the table's size is part of the baseline), but a full table is conntrack_fill's verdict, not a baseline difference.
 func checkNetBaseline(_ context.Context, e *Env) Result {
 	diff, fixable, notes := baselineDiff(e)
 	conntrack, hasConntrack := readConntrackSnapshot(e)
-	underPressure := conntrack.hasCountAndMax && conntrackAtCapacity(conntrack.count, conntrack.max)
-	if len(diff) == 0 && !underPressure {
+	if len(diff) == 0 {
 		if len(notes) > 0 {
 			params := addConntrackParams(addUDPBufferErrorParams(p("notes", strings.Join(notes, ",")), e), conntrack, hasConntrack)
 			return Result{Status: OK, Code: CodeBaselineNotes, Params: params, Detail: noteText(notes)}
@@ -1101,21 +1094,8 @@ func checkNetBaseline(_ context.Context, e *Env) Result {
 		params := addConntrackParams(addUDPBufferErrorParams(p(), e), conntrack, hasConntrack)
 		return Result{Status: OK, Code: CodeBaselineOK, Params: params, Detail: "fq, bbr, conntrack, UDP buffers and the journald cap are in place"}
 	}
-	reportedDiff := append([]string(nil), diff...)
-	if underPressure {
-		reportedDiff = append(reportedDiff, "conntrack_pressure")
-	}
-	params := addConntrackParams(addUDPBufferErrorParams(p("differs", strings.Join(reportedDiff, ","), "notes", strings.Join(notes, ",")), e), conntrack, hasConntrack)
-	r := Result{Status: Warn, Code: CodeBaselineDiff, Params: params}
-	if len(diff) > 0 {
-		r.Detail = "baseline differs: " + strings.Join(diff, ", ")
-	}
-	if underPressure {
-		if r.Detail != "" {
-			r.Detail += "; "
-		}
-		r.Detail += fmt.Sprintf("conntrack table is at least 80%% full (%d/%d entries)", conntrack.count, conntrack.max)
-	}
+	params := addConntrackParams(addUDPBufferErrorParams(p("differs", strings.Join(diff, ","), "notes", strings.Join(notes, ",")), e), conntrack, hasConntrack)
+	r := Result{Status: Warn, Code: CodeBaselineDiff, Params: params, Detail: "baseline differs: " + strings.Join(diff, ", ")}
 	if len(notes) > 0 {
 		if r.Detail != "" {
 			r.Detail += "; "

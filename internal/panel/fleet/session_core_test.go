@@ -1337,6 +1337,57 @@ func TestSessionCoreDuplicateStatsAndEvents(t *testing.T) {
 	}
 }
 
+func TestSessionCoreStaleStatsSkipHostHistory(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-stale-host")
+	connected := stepHello(t, core, ctx, state, now, hello("instance-stale-host", 0, "").GetHello())
+	end := now.Add(-maxStatsAge - time.Hour)
+	frame := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: end.Add(-10 * time.Second).Unix(), IntervalEndUnix: end.Unix(),
+		Host: &agentv1.HostMetrics{CpuPct: 75, RamUsedBytes: 1024, RamTotalBytes: 2048, NetRxBps: 100, NetTxBps: 200},
+	}}}
+	if _, err := coreStep(ctx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: frame}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := e.st.NodeHostHours(e.ctx, state.NodeID, now, 1)
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("host history after stale stats = %+v, %v, want no current-hour sample", rows, err)
+	}
+}
+
+func TestBuildFleetLiveKeepsBoundedUnknownRunningInbounds(t *testing.T) {
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	health := make([]*agentv1.InboundHealth, maxLiveRunningInbounds+2)
+	known := make(map[string]bool, 64)
+	for i := range 64 {
+		id := fmt.Sprintf("inb_known_%02d", i)
+		known[id] = true
+		health[i] = &agentv1.InboundHealth{InboundId: id, State: agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING}
+	}
+	health[64] = &agentv1.InboundHealth{InboundId: "inb_unknown_failed", State: agentv1.InboundRunState_INBOUND_RUN_STATE_FAILED}
+	health[65] = &agentv1.InboundHealth{InboundId: "inb_unknown_stopped", State: agentv1.InboundRunState_INBOUND_RUN_STATE_STOPPED}
+	for i := 66; i < len(health); i++ {
+		health[i] = &agentv1.InboundHealth{InboundId: fmt.Sprintf("inb_unknown_%d", i), State: agentv1.InboundRunState_INBOUND_RUN_STATE_STARTING}
+	}
+	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-time.Second).Unix(), IntervalEndUnix: now.Unix(), Health: health}
+	projection, _, tooLarge := buildFleetLive(SessionState{}, stats, nil, now, nil)
+	if tooLarge || !projection.Apply {
+		t.Fatalf("projection = %+v, tooLarge=%t", projection, tooLarge)
+	}
+	var view liveJSONView
+	if err := json.Unmarshal([]byte(projection.LiveJSON), &view); err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Health) != 64 || len(view.RunningInboundIDs) != maxLiveRunningInbounds {
+		t.Fatalf("live bounds: health=%d running inbounds=%d", len(view.Health), len(view.RunningInboundIDs))
+	}
+	unknown := unknownRunningInboundIDs(view.RunningInboundIDs, known)
+	unknownText := strings.Join(unknown, "\n")
+	if len(unknown) == 0 || unknown[0] != "inb_unknown_100" || !strings.Contains(unknownText, "inb_unknown_66") ||
+		strings.Contains(unknownText, "inb_unknown_failed") || strings.Contains(unknownText, "inb_unknown_stopped") {
+		t.Fatalf("unknown running inbounds = %v", unknown)
+	}
+}
+
 func TestNodeLiveProjectionBoundsAndSanitizesStats(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "core-live-bounds")
 	ids := e.fixture(state.NodeID)

@@ -782,7 +782,7 @@ func latest(ts ...time.Time) time.Time {
 
 // checkOrder is the fixed order of agent.proto "CHECK IDS"; unknown ids go after these, by name.
 var checkOrder = []string{"disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft",
-	"port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation"}
+	"port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation", "security_updates", "cpu_steal", "conntrack_fill", "agent_fds"}
 
 func checkRank(id string) int {
 	for i, c := range checkOrder {
@@ -895,9 +895,9 @@ func unitGenerationNeedsWarning(rows []store.DoctorRow, unitRow store.DoctorRow)
 }
 
 // transientSkip are the doctor's SKIP codes that mean "not now", not "nothing to check": they hold the check's alert
-// (internal/node/doctor/codes.go: CodeCPUCollecting, CodeDstateCut, CodeSkipTimeout, CodeSkipInternal; the panel does not
-// import the node's package).
-var transientSkip = map[string]bool{"cpu_softirq.collecting": true, "dstate_tasks.interrupted": true, "skip.timeout": true, "skip.internal": true}
+// (internal/node/doctor/codes.go: CodeCPUCollecting, CodeStealCollecting, CodeDstateCut, CodeSkipTimeout, CodeSkipInternal; the
+// panel does not import the node's package).
+var transientSkip = map[string]bool{"cpu_softirq.collecting": true, "cpu_steal.collecting": true, "dstate_tasks.interrupted": true, "skip.timeout": true, "skip.internal": true}
 
 // certWhy is the reason of a certificate alert about one profile: it names the profile and its domain (the agent's
 // own certificate keeps the doctor's general text).

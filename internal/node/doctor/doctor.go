@@ -73,6 +73,9 @@ const (
 	CheckWarpPath        = "warp_path"
 	CheckUnitGeneration  = "unit_generation"
 	CheckSecurityUpdates = "security_updates"
+	CheckCPUSteal        = "cpu_steal"
+	CheckConntrackFill   = "conntrack_fill"
+	CheckAgentFDs        = "agent_fds"
 )
 
 // Fix ids (agent.proto "FIX IDS").
@@ -140,6 +143,9 @@ var checks = []check{
 	{CheckWarpPath, checkWarpPath},
 	{CheckUnitGeneration, checkUnitGeneration},
 	{CheckSecurityUpdates, checkSecurityUpdates},
+	{CheckCPUSteal, checkCPUSteal},
+	{CheckConntrackFill, checkConntrackFill},
+	{CheckAgentFDs, checkAgentFDs},
 }
 
 // CheckIDs returns every check id in report order.

@@ -166,6 +166,8 @@ type Sample struct {
 	CPU     float64 // total busy %
 	Softirq float64 // softirq %
 	Load1   float64
+	// Steal is the share the hypervisor gave to other guests, % (inside CPU).
+	Steal float64
 }
 
 // Container is a docker container as far as foreign_vpn cares.

@@ -320,7 +320,7 @@ function advanceClock(ms) {
 // agent played by node:crypto. agentlink signs the SHA-256 digest of "domain NUL node NUL audience NUL nonce(s)", which is
 // plain ECDSA-SHA256 over that preimage, in IEEE P1363 r||s form.
 async function assertLinkHandshake(panel) {
-  const nodeID = "nod_bridge";
+  const nodeID = "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa";
   const audience = "link.example.com";
   const link = (op, args) => Promise.race([panel.link(op, args), wasmFailure]);
   const nodeKey = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -401,7 +401,7 @@ async function assertLinkHandshake(panel) {
   await opened.waitUntil;
 
   // A Hello on a bare node (no inbounds) costs 5 D1 calls. Its update cost is the per-isolate "updating" cache (10 s): a
-  // stale cache adds one read of the active rollout, and a second one for its steps when there is a rollout. nod_bridge has
+  // stale cache adds one read of the active rollout, and a second one for its steps when there is a rollout. The bridge node has
   // inbounds, so its own Hello is dominated by their reads. The clock is moved forward instead of sleeping, and each node
   // and rollout is removed afterwards, so later counts and the connected-node lists are unchanged.
   const helloCost = async (id, { advanceMs = 0, rollout = false } = {}) => {
@@ -691,6 +691,9 @@ async function run() {
         },
       },
     };
+    // The owner's setup token is one the deployer chose; the panel gets only its hash (SETUP_TOKEN_SHA256).
+    const ownerToken = randomBytes(32).toString("hex");
+    const ownerHash = crypto.createHash("sha256").update(ownerToken).digest("hex");
     try {
       await assert.rejects(Promise.race([
         firstPanel.init({ ...initOptions, publicURL: "https://192.0.2.10" }), // WebAuthn refuses an IP-address RP ID
@@ -702,7 +705,7 @@ async function run() {
       assert.equal(Number(settingsAfterFailure), 0, "failed first init leaves no settings behind");
 
       // A setup token hash from the deployer (SETUP_TOKEN_SHA256): the panel offers it, logs only its expiry, and never
-      // revives an expired one. The database is emptied again afterwards, so the random-token flow below starts clean.
+      // revives an expired one. The database is emptied again afterwards, so the owner's flow below starts clean.
       const scenarioStart = logs.length;
       const deployerToken = randomBytes(32).toString("hex");
       const deployerHash = crypto.createHash("sha256").update(deployerToken).digest("hex");
@@ -750,23 +753,33 @@ async function run() {
       for (const table of ["setup_token", "auth_ceremony"]) await globalThis.__d1.prepare(`DELETE FROM ${table}`).run();
       await globalThis.__d1.prepare("DELETE FROM setting WHERE k NOT IN ('sub_rules_m3', 'sub_rules_singbox', 'link_device_limit')").run();
 
-      firstInstance = await Promise.race([firstPanel.init(initOptions), wasmFailure]);
-      secondPanel = await startIsolate(bytes, expiredPanel);
-      secondInstance = await Promise.race([secondPanel.init(initOptions), wasmFailure]);
+      // Without SETUP_TOKEN_SHA256 the panel mints no token and prints no link (a link in the Worker's log would let anyone who
+      // can read that log create the owner); it says how to set the secret.
+      const plainPanel = await startIsolate(bytes, expiredPanel);
+      await Promise.race([plainPanel.init(initOptions), wasmFailure]);
+      const plainLogs = logs.map((args) => args.map(String).join(" "));
+      assert.ok(plainLogs.some((line) => line.startsWith("No admin yet.") && line.includes("SETUP_TOKEN_SHA256")), "without the secret the log says to set it");
+      assert.ok(!plainLogs.some((line) => line.includes("/setup#") || line.includes("test-admin")), "without the secret no setup link and no address is printed");
+      assert.equal(Number(await globalThis.__d1.prepare("SELECT count(*) AS n FROM setup_token").first("n")), 0, "without the secret no setup token is minted");
+      logs.length = 0;
+
+      firstInstance = await Promise.race([firstPanel.init({ ...initOptions, setupTokenSHA256: ownerHash }), wasmFailure]);
+      secondPanel = await startIsolate(bytes, plainPanel);
+      secondInstance = await Promise.race([secondPanel.init({ ...initOptions, setupTokenSHA256: ownerHash }), wasmFailure]);
     } finally {
       console.log = consoleLog;
     }
     assert.equal(firstInstance, firstPanel, "first isolate init returns the panel API");
     assert.equal(secondInstance, secondPanel, "fresh isolate init returns the panel API");
     // Two wasm instances in this Node process model separate Worker isolates with shared D1 and limiter callbacks.
-    const setupMessages = logs.map((args) => String(args[0])).filter((message) => message.startsWith("No admin yet."));
-    const newLinks = setupMessages.filter((message) => message.includes("Create one") && message.includes("/setup#"));
-    const existingLinks = setupMessages.filter((message) => message.includes("already issued"));
-    if (newLinks.length !== 1 || existingLinks.length !== 1 || !existingLinks[0].includes("expires at")) {
-      throw new Error("a second isolate must log the existing setup link expiry without issuing another link");
+    const setupMessages = logs.map((args) => args.map(String).join(" ")).filter((message) => message.startsWith("No admin yet."));
+    if (setupMessages.length !== 2 || !setupMessages.every((message) => message.includes("accepted until"))) {
+      throw new Error("both isolates must log only the expiry of the deployer's token: " + JSON.stringify(setupMessages));
     }
-    const setupMatch = newLinks[0].match(/\/setup#([A-Za-z0-9_-]+)/);
-    if (!setupMatch || existingLinks[0].includes(setupMatch[1])) throw new Error("setup logs did not keep the token private to its first link");
+    if (logs.some((args) => args.map(String).join(" ").includes(ownerToken) || args.map(String).join(" ").includes("/setup#"))) {
+      throw new Error("no log line may show the owner's token or a setup link");
+    }
+    const setupMatch = [null, ownerToken];
 
     const setupPage = await bridgeRequestFor(firstPanel, "https://example.com/test-admin/setup", {
       headers: { "CF-Connecting-IP": "127.0.0.1" },
@@ -939,13 +952,13 @@ async function run() {
 
     // Seed the node fixture like the Go subscription fixtures, then create the profiles and access rows through the admin API.
     await globalThis.__d1.prepare("INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind("nod_bridge", "node de", "de.example.com", "active", 1).run();
+      .bind("nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "node de", "de.example.com", "active", 1).run();
     const hysteriaProfile = await connectRPC(secondPanel, "ProfileService/CreateProfile", {
       protocol: "hysteria2", name: "bridge-hysteria2",
     }, adminCookie);
     assert.equal(hysteriaProfile.response.status, 200, "the admin API creates a Hysteria2 profile");
     const hysteriaInbound = await connectRPC(secondPanel, "ProfileService/CreateInbound", {
-      profileId: hysteriaProfile.message.profile.id, nodeId: "nod_bridge",
+      profileId: hysteriaProfile.message.profile.id, nodeId: "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa",
     }, adminCookie);
     assert.equal(hysteriaInbound.response.status, 200, "the admin API deploys the Hysteria2 profile");
     const awgProfile = await connectRPC(secondPanel, "ProfileService/CreateProfile", {
@@ -953,7 +966,7 @@ async function run() {
     }, adminCookie);
     assert.equal(awgProfile.response.status, 200, "the admin API creates an AmneziaWG profile");
     const awgInbound = await connectRPC(secondPanel, "ProfileService/CreateInbound", {
-      profileId: awgProfile.message.profile.id, nodeId: "nod_bridge",
+      profileId: awgProfile.message.profile.id, nodeId: "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa",
     }, adminCookie);
     assert.equal(awgInbound.response.status, 200, "the admin API deploys the AmneziaWG profile");
     const group = await connectRPC(secondPanel, "GroupService/CreateGroup", {
@@ -1167,7 +1180,7 @@ async function run() {
     const baseCronDate = new Date();
     // This node is deliberately disconnected for the fleet fan-out assertion but still inside the blip window, so the
     // evaluator pass has no alert transition to add a variable Telegram node-name lookup.
-    await globalThis.__d1.prepare("UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'nod_bridge'")
+    await globalThis.__d1.prepare("UPDATE node SET last_seen_at = ?, last_connected_at = ? WHERE id = 'nod_aaaaaaaaaaaaaaaaaaaaaaaaaa'")
       .bind(nowS, nowS).run();
     const normalCronDate = new Date(baseCronDate);
     normalCronDate.setUTCMinutes(3, 0, 0);

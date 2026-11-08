@@ -62,3 +62,31 @@ func TestSweepAppliesTheOwnersRetention(t *testing.T) {
 		t.Fatalf("traffic rows left after 90 days: buckets %d, node hours %d", b, h)
 	}
 }
+
+func TestSweepSkipsPolicyPrunesWhenSettingsReadFails(t *testing.T) {
+	e := newEnv(t)
+	now := e.clock.Now()
+	day := 24 * time.Hour
+	e.exec(`INSERT INTO setting (k, v) VALUES ('retention.audit_days', '1095')`)
+	e.exec(`INSERT INTO audit (ts, actor, action, params, result, source) VALUES (?, 'a', 'retained', '{}', 'ok', 'panel')`, now.Add(-500*day).Unix())
+	e.exec(`INSERT INTO country_check (node_id, country, family, at, verdict) VALUES ('de1', 'DE', 4, ?, 'unknown')`, now.Add(-8*day).Unix())
+	if _, err := e.st.W.ExecContext(e.ctx, `DROP TABLE setting`); err != nil {
+		t.Fatal(err)
+	}
+
+	e.s.sweep(e.ctx)
+
+	var audits, countries int
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM audit WHERE action = 'retained'`).Scan(&audits); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT count(*) FROM country_check WHERE node_id = 'de1'`).Scan(&countries); err != nil {
+		t.Fatal(err)
+	}
+	if audits != 1 {
+		t.Fatalf("500-day audit row after unreadable settings: %d, want it retained", audits)
+	}
+	if countries != 0 {
+		t.Fatalf("fixed seven-day country retention left %d rows, want it to run", countries)
+	}
+}

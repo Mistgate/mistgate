@@ -111,6 +111,20 @@ type HostSample struct {
 	RAMUsed, RAMTotal         uint64
 	RxBps, TxBps              uint64
 	Sessions                  int
+	// Ext is set when the agent sent the resource fields (HostMetrics.agent present, migration 00110); without it the fields
+	// below are not known and are not folded in.
+	Ext *HostSampleExt
+}
+
+// HostSampleExt is what an agent with the resource fields adds to a sample.
+type HostSampleExt struct {
+	StealPct, IOWaitPct          float64
+	SwapUsed                     uint64
+	ConntrackCount, ConntrackMax uint64
+	TCPSockets                   uint32
+	NICSpeedMbps                 uint32
+	AgentCPUPct                  float64
+	AgentRSS                     uint64
 }
 
 func x100(v float64) int64 {
@@ -125,10 +139,23 @@ func x100(v float64) int64 {
 func HostHourStmt(nodeID string, hourStart int64, s HostSample) Stmt {
 	cpu, soft, load := x100(s.CPUPct), x100(s.SoftirqPct), x100(s.Load1)
 	rx, tx := i64(min(s.RxBps, 1<<50)), i64(min(s.TxBps, 1<<50))
+	sessions := int64(max(s.Sessions, 0))
+	// Without the resource fields the ext columns get zeros: ext_samples does not count the sample, maxima are unchanged, and
+	// nic_speed_mbps and conntrack_limit (latest values, not maxima) keep what an earlier sample of the hour said.
+	var ext, steal, iowait, swap, ctCount, ctMax, tcpSocks, nic, agentCPU, agentRSS int64
+	if e := s.Ext; e != nil {
+		ext = 1
+		steal, iowait, agentCPU = x100(e.StealPct), x100(e.IOWaitPct), x100(e.AgentCPUPct)
+		swap, ctCount, ctMax, agentRSS = i64(e.SwapUsed), i64(e.ConntrackCount), i64(e.ConntrackMax), i64(e.AgentRSS)
+		tcpSocks, nic = int64(e.TCPSockets), int64(e.NICSpeedMbps)
+	}
 	return Stmt{Query: `
 		INSERT INTO node_host_hour (node_id, hour_start, samples, cpu_sum_x100, cpu_max_x100, softirq_max_x100, load1_max_x100,
-			ram_used_max, ram_total, rx_bps_sum, rx_bps_max, tx_bps_sum, tx_bps_max, sessions_max)
-		VALUES (?1, ?2, 1, ?3, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?9, ?10)
+			ram_used_max, ram_total, rx_bps_sum, rx_bps_max, tx_bps_sum, tx_bps_max, sessions_max, sessions_sum,
+			ext_samples, steal_sum_x100, steal_max_x100, iowait_max_x100, swap_used_max, conntrack_max, conntrack_limit,
+			tcp_sockets_max, nic_speed_mbps, agent_cpu_sum_x100, agent_cpu_max_x100, agent_rss_max)
+		VALUES (?1, ?2, 1, ?3, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?9, ?10, ?10,
+			?11, ?12, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?19, ?20)
 		ON CONFLICT (node_id, hour_start) DO UPDATE SET
 			samples = samples + 1, cpu_sum_x100 = cpu_sum_x100 + excluded.cpu_sum_x100,
 			cpu_max_x100 = max(cpu_max_x100, excluded.cpu_max_x100),
@@ -137,8 +164,19 @@ func HostHourStmt(nodeID string, hourStart int64, s HostSample) Stmt {
 			ram_used_max = max(ram_used_max, excluded.ram_used_max), ram_total = excluded.ram_total,
 			rx_bps_sum = rx_bps_sum + excluded.rx_bps_sum, rx_bps_max = max(rx_bps_max, excluded.rx_bps_max),
 			tx_bps_sum = tx_bps_sum + excluded.tx_bps_sum, tx_bps_max = max(tx_bps_max, excluded.tx_bps_max),
-			sessions_max = max(sessions_max, excluded.sessions_max)`,
-		Args: []any{nodeID, hourStart, cpu, soft, load, i64(s.RAMUsed), i64(s.RAMTotal), rx, tx, int64(max(s.Sessions, 0))}}
+			sessions_max = max(sessions_max, excluded.sessions_max), sessions_sum = sessions_sum + excluded.sessions_sum,
+			ext_samples = ext_samples + excluded.ext_samples,
+			steal_sum_x100 = steal_sum_x100 + excluded.steal_sum_x100, steal_max_x100 = max(steal_max_x100, excluded.steal_max_x100),
+			iowait_max_x100 = max(iowait_max_x100, excluded.iowait_max_x100),
+			swap_used_max = max(swap_used_max, excluded.swap_used_max), conntrack_max = max(conntrack_max, excluded.conntrack_max),
+			conntrack_limit = CASE WHEN excluded.ext_samples > 0 THEN excluded.conntrack_limit ELSE conntrack_limit END,
+			tcp_sockets_max = max(tcp_sockets_max, excluded.tcp_sockets_max),
+			nic_speed_mbps = CASE WHEN excluded.ext_samples > 0 THEN excluded.nic_speed_mbps ELSE nic_speed_mbps END,
+			agent_cpu_sum_x100 = agent_cpu_sum_x100 + excluded.agent_cpu_sum_x100,
+			agent_cpu_max_x100 = max(agent_cpu_max_x100, excluded.agent_cpu_max_x100),
+			agent_rss_max = max(agent_rss_max, excluded.agent_rss_max)`,
+		Args: []any{nodeID, hourStart, cpu, soft, load, i64(s.RAMUsed), i64(s.RAMTotal), rx, tx, sessions,
+			ext, steal, iowait, swap, ctCount, ctMax, tcpSocks, nic, agentCPU, agentRSS}}
 }
 
 // HostHour is one hour of a node's host load: means and peaks.
@@ -149,6 +187,18 @@ type HostHour struct {
 	RAMUsedMax, RAMTotal                uint64
 	RxAvg, RxMax, TxAvg, TxMax          uint64
 	SessionsMax                         uint32
+	// SessionsAvg is the mean people online over the hour's samples.
+	SessionsAvg float64
+	// ExtSamples is how many samples carried the resource fields; the fields below are 0 when it is 0 (an agent that
+	// predates them) and mean "not known", not "none".
+	ExtSamples                    uint32
+	StealAvg, StealMax, IOWaitMax float64
+	SwapUsedMax                   uint64
+	ConntrackMax, ConntrackLimit  uint64
+	TCPSocketsMax                 uint32
+	NICSpeedMbps                  uint32
+	AgentCPUAvg, AgentCPUMax      float64
+	AgentRSSMax                   uint64
 }
 
 // NodeHostHours reads a node's hourly host load for the last hours (at most HostMaxHours), oldest first.
@@ -157,7 +207,9 @@ func (s *Store) NodeHostHours(ctx context.Context, nodeID string, now time.Time,
 	since := now.UTC().Truncate(time.Hour).Add(-time.Duration(hours-1) * time.Hour).Unix()
 	rows, err := s.R.QueryContext(ctx, `
 		SELECT hour_start, samples, cpu_sum_x100, cpu_max_x100, softirq_max_x100, load1_max_x100, ram_used_max, ram_total,
-			rx_bps_sum, rx_bps_max, tx_bps_sum, tx_bps_max, sessions_max
+			rx_bps_sum, rx_bps_max, tx_bps_sum, tx_bps_max, sessions_max, sessions_sum,
+			ext_samples, steal_sum_x100, steal_max_x100, iowait_max_x100, swap_used_max, conntrack_max, conntrack_limit,
+			tcp_sockets_max, nic_speed_mbps, agent_cpu_sum_x100, agent_cpu_max_x100, agent_rss_max
 		FROM node_host_hour WHERE node_id = ? AND hour_start >= ? AND samples > 0 ORDER BY hour_start`, nodeID, since)
 	if err != nil {
 		return nil, err
@@ -166,10 +218,22 @@ func (s *Store) NodeHostHours(ctx context.Context, nodeID string, now time.Time,
 	var out []HostHour
 	for rows.Next() {
 		var h HostHour
-		var samples, cpuSum, cpuMax, softMax, loadMax, ramMax, ramTotal, rxSum, rxMax, txSum, txMax, sessions int64
+		var samples, cpuSum, cpuMax, softMax, loadMax, ramMax, ramTotal, rxSum, rxMax, txSum, txMax, sessions, sessionsSum int64
+		var ext, stealSum, stealMax, iowaitMax, swapMax, ctMax, ctLimit, tcpMax, nic, agentSum, agentMax, agentRSS int64
 		if err := rows.Scan(&h.HourStart, &samples, &cpuSum, &cpuMax, &softMax, &loadMax, &ramMax, &ramTotal,
-			&rxSum, &rxMax, &txSum, &txMax, &sessions); err != nil {
+			&rxSum, &rxMax, &txSum, &txMax, &sessions, &sessionsSum,
+			&ext, &stealSum, &stealMax, &iowaitMax, &swapMax, &ctMax, &ctLimit, &tcpMax, &nic, &agentSum, &agentMax, &agentRSS); err != nil {
 			return nil, err
+		}
+		pos := func(v int64) uint64 { return uint64(max(v, 0)) }
+		u32 := func(v int64) uint32 { return uint32(min(max(v, 0), math.MaxUint32)) }
+		h.SessionsAvg = float64(max(sessionsSum, 0)) / float64(max(samples, 1))
+		if ext > 0 {
+			h.ExtSamples = u32(ext)
+			h.StealAvg, h.StealMax, h.IOWaitMax = float64(stealSum)/float64(ext)/100, float64(stealMax)/100, float64(iowaitMax)/100
+			h.SwapUsedMax, h.ConntrackMax, h.ConntrackLimit = pos(swapMax), pos(ctMax), pos(ctLimit)
+			h.TCPSocketsMax, h.NICSpeedMbps = u32(tcpMax), u32(nic)
+			h.AgentCPUAvg, h.AgentCPUMax, h.AgentRSSMax = float64(agentSum)/float64(ext)/100, float64(agentMax)/100, pos(agentRSS)
 		}
 		n := max(samples, 1)
 		h.Samples = uint32(min(samples, math.MaxUint32))
@@ -182,9 +246,15 @@ func (s *Store) NodeHostHours(ctx context.Context, nodeID string, now time.Time,
 	return out, rows.Err()
 }
 
-// PruneNodeHostHours drops hour rows older than the cut (the hour bucket that touches the cut stays).
+const nodeHostHourPruneBatch = 1000
+
+// PruneNodeHostHours drops up to one batch of hour rows older than the cut (the hour bucket that touches the cut stays).
+// Rows left after this batch are removed on a later sweep.
 func (s *Store) PruneNodeHostHours(ctx context.Context, before time.Time) (int64, error) {
-	res, err := s.W.ExecContext(ctx, `DELETE FROM node_host_hour WHERE hour_start < ?`, hourBucket(before))
+	res, err := s.W.ExecContext(ctx, `DELETE FROM node_host_hour
+		WHERE (node_id, hour_start) IN (
+			SELECT node_id, hour_start FROM node_host_hour WHERE hour_start < ? LIMIT ?
+		)`, hourBucket(before), nodeHostHourPruneBatch)
 	if err != nil {
 		return 0, err
 	}

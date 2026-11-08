@@ -29,6 +29,9 @@ func (s *Server) requestID(next http.Handler) http.Handler {
 		if p := r.URL.Path; strings.HasPrefix(p, "/api/") || p == "/mcp" || p == "/metrics" {
 			path = p
 		}
+		if s.cfg.RPCStats != nil && strings.HasPrefix(r.URL.Path, "/api/") {
+			s.cfg.RPCStats.Record(status, time.Since(start), isStream(r))
+		}
 		if status >= 500 {
 			s.cfg.Log.WarnContext(ctx, "http: request failed", "code", "http_server_error", "status", status, "method", r.Method, "path", path, "ms", time.Since(start).Milliseconds())
 		} else {

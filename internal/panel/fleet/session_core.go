@@ -299,7 +299,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 		return nil
 	}
 	if h.NodeId != "" && h.NodeId != tr.state.NodeID {
-		c.f.log.Warn("hello names another node than the certificate", "cert_node", tr.state.NodeID)
+		c.f.log.Warn("hello names another node than the certificate", "code", "node_identity_mismatch", "cert_node", tr.state.NodeID)
 	}
 	info := helloInfo(h)
 	prev, acked, err := c.f.st.NodeHello(ctx, tr.state.NodeID, tr.state.OwnerGeneration, info, event.At)
@@ -308,7 +308,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 		return nil
 	}
 	if err != nil {
-		c.f.log.Error("hello", "node", tr.state.NodeID, "err", err)
+		c.f.log.Error("hello", "code", "hello_failed", "node", tr.state.NodeID, "err", err)
 		tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
 		return nil
 	}
@@ -426,7 +426,7 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 		c.agentEvent(ctx, tr, m.Seq, m.GetEvent(), event.At)
 	case m.GetApplyResult() != nil:
 		if err := c.applyResult(ctx, tr, m.GetApplyResult(), event.At); err != nil {
-			c.f.log.Warn("apply result", "node", tr.state.NodeID, "err", err)
+			c.f.log.Warn("apply result", "code", "apply_result_failed", "node", tr.state.NodeID, "err", err)
 		}
 	case m.GetCommandResult() != nil:
 		r := m.GetCommandResult()
@@ -525,7 +525,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		in.Sessions = append(in.Sessions, store.FleetSessionRef{CredID: se.CredId, InboundID: se.InboundId, ConnectedAt: connectedAt})
 	}
 	in.Certs = certStats(st, now)
-	in.Host = hostSample(st)
+	in.Host = hostSample(st, stale)
 	out, err := c.f.st.IngestStats(ctx, in)
 	if projectionTooLarge {
 		c.f.warnOversizedLiveProjection(projectionState.NodeID)
@@ -534,7 +534,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		// Do not ack and do not go on: a later ack would cover this seq and lose the batch. The agent
 		// reconnects and resends from HelloAck.acked_seq. But a batch the database refuses twice will be
 		// refused every time, and resending it would wedge this node's stats for good: drop it then.
-		c.f.log.Error("ingest stats", "node", tr.state.NodeID, "err", err)
+		c.f.log.Error("ingest stats", "code", "stats_ingest_failed", "node", tr.state.NodeID, "err", err)
 		if tr.state.Poison == nil || tr.state.Poison.Instance != tr.state.InstanceID || tr.state.Poison.Seq != seq {
 			tr.state.Poison = &PoisonBatch{Instance: tr.state.InstanceID, Seq: seq}
 			tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
@@ -548,7 +548,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 			markCoreAck(tr, seq, now)
 		}
 		tr.state.Poison = nil
-		c.f.log.Error("stats batch refused by the database twice, dropped", "node", tr.state.NodeID, "seq", seq)
+		c.f.log.Error("stats batch refused by the database twice, dropped", "code", "stats_batch_refused", "node", tr.state.NodeID, "seq", seq)
 		c.f.event(ctx, 3, "stats_dropped", tr.state.NodeID, map[string]string{"reason": "database_refused", "seq": fmt.Sprint(seq)})
 		return
 	}
@@ -559,7 +559,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		}
 		c.l3Stats(ctx, tr.state, st, now)
 		if out.Skipped > 0 {
-			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "node", tr.state.NodeID, "count", out.Skipped)
+			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "code", "stats_entries_dropped", "node", tr.state.NodeID, "count", out.Skipped)
 		}
 		if stale {
 			c.f.event(ctx, 2, "stats_stale", tr.state.NodeID, map[string]string{"age_hours": fmt.Sprint(int(now.Sub(time.Unix(st.IntervalEndUnix, 0)).Hours()))})
@@ -574,13 +574,14 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 }
 
 type liveJSONView struct {
-	IntervalEndUnix int64             `json:"interval_end_unix"`
-	MetricsAtUnix   int64             `json:"metrics_at_unix"`
-	Metrics         *liveJSONMetrics  `json:"metrics,omitempty"`
-	Health          []liveJSONHealth  `json:"health"`
-	Online          []liveJSONOnline  `json:"online"`
-	UserDownBPS     map[string]uint64 `json:"user_down_bps"`
-	UploadBPS       uint64            `json:"upload_bps"`
+	IntervalEndUnix   int64             `json:"interval_end_unix"`
+	MetricsAtUnix     int64             `json:"metrics_at_unix"`
+	Metrics           *liveJSONMetrics  `json:"metrics,omitempty"`
+	Health            []liveJSONHealth  `json:"health"`
+	RunningInboundIDs []string          `json:"running_inbound_ids,omitempty"`
+	Online            []liveJSONOnline  `json:"online"`
+	UserDownBPS       map[string]uint64 `json:"user_down_bps"`
+	UploadBPS         uint64            `json:"upload_bps"`
 }
 
 type liveJSONMetrics struct {
@@ -594,6 +595,47 @@ type liveJSONMetrics struct {
 	RxBPS          uint64  `json:"rx_bps"`
 	TxBPS          uint64  `json:"tx_bps"`
 	UptimeS        uint64  `json:"uptime_s"`
+	// Present when the agent sends the resource fields (HostMetrics.agent); nil from older agents.
+	Res *liveJSONResources `json:"res,omitempty"`
+}
+
+// liveJSONResources is what an agent with the resource fields adds to the live metrics.
+type liveJSONResources struct {
+	StealPct       float64 `json:"steal_pct"`
+	IOWaitPct      float64 `json:"iowait_pct"`
+	SwapUsed       uint64  `json:"swap_used"`
+	SwapTotal      uint64  `json:"swap_total"`
+	ConntrackCount uint64  `json:"ct_count"`
+	ConntrackMax   uint64  `json:"ct_max"`
+	TCPSockets     uint32  `json:"tcp"`
+	UDPSockets     uint32  `json:"udp"`
+	NICSpeedMbps   uint32  `json:"nic_mbps"`
+	AgentCPUPct    float64 `json:"agent_cpu_pct"`
+	AgentRSS       uint64  `json:"agent_rss"`
+	AgentGoTotal   uint64  `json:"agent_go_total"`
+	AgentGoHeap    uint64  `json:"agent_go_heap"`
+	Goroutines     uint32  `json:"goroutines"`
+	Threads        uint32  `json:"threads"`
+	FDs            uint32  `json:"fds"`
+	FDLimit        uint32  `json:"fd_limit"`
+}
+
+// liveResources clamps the agent's resource fields like the rest of the live metrics: a bogus agent cannot store a number a
+// chart cannot hold. nil when the agent did not send them.
+func liveResources(m *agentv1.HostMetrics) *liveJSONResources {
+	a := m.GetAgent()
+	if a == nil {
+		return nil
+	}
+	pct := func(v float32) float64 { return clampLiveFloat(finiteLiveFloat(float64(v)), 0, 100) }
+	const maxBytes = uint64(1 << 50)
+	return &liveJSONResources{
+		StealPct: pct(m.StealPct), IOWaitPct: pct(m.IowaitPct), SwapUsed: min(m.SwapUsedBytes, maxBytes), SwapTotal: min(m.SwapTotalBytes, maxBytes),
+		ConntrackCount: min(m.ConntrackCount, 1<<40), ConntrackMax: min(m.ConntrackMax, 1<<40), TCPSockets: m.TcpSockets, UDPSockets: m.UdpSockets,
+		NICSpeedMbps: min(m.NicSpeedMbps, 10_000_000), AgentCPUPct: pct(a.CpuPct), AgentRSS: min(a.RssBytes, maxBytes),
+		AgentGoTotal: min(a.GoTotalBytes, maxBytes), AgentGoHeap: min(a.GoHeapBytes, maxBytes), Goroutines: a.Goroutines, Threads: a.Threads,
+		FDs: a.OpenFds, FDLimit: a.FdLimit,
+	}
 }
 
 type liveJSONHealth struct {
@@ -625,10 +667,11 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 	}
 	const maxRate = uint64(1 << 50)
 	view := liveJSONView{
-		IntervalEndUnix: end,
-		Health:          make([]liveJSONHealth, 0, min(len(st.Health), 64)),
-		Online:          make([]liveJSONOnline, 0, min(len(st.Sessions), 2000)),
-		UserDownBPS:     make(map[string]uint64),
+		IntervalEndUnix:   end,
+		Health:            make([]liveJSONHealth, 0, min(len(st.Health), 64)),
+		RunningInboundIDs: make([]string, 0, min(len(st.Health), maxLiveRunningInbounds)),
+		Online:            make([]liveJSONOnline, 0, min(len(st.Sessions), 2000)),
+		UserDownBPS:       make(map[string]uint64),
 	}
 	projection := store.FleetLive{Apply: true, Drift: state.Drift}
 	if metrics := st.Host; metrics != nil {
@@ -639,18 +682,27 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 			CPUPct: cpu, SoftirqPct: finiteLiveFloat(float64(metrics.SoftirqPct)), Load1: finiteLiveFloat(float64(metrics.Load1)),
 			RAMUsedBytes: metrics.RamUsedBytes, RAMTotalBytes: metrics.RamTotalBytes,
 			DiskUsedBytes: metrics.DiskUsedBytes, DiskTotalBytes: metrics.DiskTotalBytes, RxBPS: rxBPS, TxBPS: txBPS, UptimeS: metrics.UptimeS,
+			Res: liveResources(metrics),
 		}
 		projection.SampleAt, projection.RxBps, projection.TxBps = view.MetricsAtUnix, rxBPS, txBPS
 		projection.CPUPct = int64(math.Round(cpu))
 	}
+	runningInboundIDs := make(map[string]struct{}, min(len(st.Health), maxLiveRunningInbounds))
 	for _, h := range st.Health {
-		if len(view.Health) == 64 {
-			break
-		}
 		if h == nil {
 			continue
 		}
-		view.Health = append(view.Health, liveJSONHealth{InboundID: clip(h.InboundId, 64), RunState: runState(h.State), Detail: clip(h.Detail, 256)})
+		if (h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_RUNNING || h.State == agentv1.InboundRunState_INBOUND_RUN_STATE_STARTING) &&
+			h.InboundId != "" && len(view.RunningInboundIDs) < maxLiveRunningInbounds {
+			id := clip(h.InboundId, 64)
+			if _, exists := runningInboundIDs[id]; !exists {
+				runningInboundIDs[id] = struct{}{}
+				view.RunningInboundIDs = append(view.RunningInboundIDs, id)
+			}
+		}
+		if len(view.Health) < 64 {
+			view.Health = append(view.Health, liveJSONHealth{InboundID: clip(h.InboundId, 64), RunState: runState(h.State), Detail: clip(h.Detail, 256)})
+		}
 	}
 	users := make(map[string]int64)
 	devices := make(map[string]int64) // device id -> its newest session: the same as users, one level down
@@ -702,6 +754,8 @@ func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.
 
 const maxFleetLiveJSONBytes = 1_500_000
 
+const maxLiveRunningInbounds = 256
+
 // maxNodeSentBytes is where the node_sent digest of a node is warned about: under D1's 2 MB per row, with the room a
 // few more devices need. On the VPS edition the row has no such limit and the warning only says how big it has grown.
 const maxNodeSentBytes = 1_500_000
@@ -709,13 +763,13 @@ const maxNodeSentBytes = 1_500_000
 func (f *Fleet) warnOversizedSent(nodeID string, size int) {
 	if _, loaded := f.sentSizeWarnings.LoadOrStore(nodeID, struct{}{}); !loaded {
 		f.log.Warn("node_sent digest of the node is close to the 2 MB row limit of Cloudflare D1: fewer devices or inbounds on it",
-			"node", nodeID, "bytes", size, "warn_at", maxNodeSentBytes)
+			"code", "sent_digest_near_limit", "node", nodeID, "bytes", size, "warn_at", maxNodeSentBytes)
 	}
 }
 
 func (f *Fleet) warnOversizedLiveProjection(nodeID string) {
 	if _, loaded := f.liveProjectionWarnings.LoadOrStore(nodeID, struct{}{}); !loaded {
-		f.log.Warn("node live projection exceeds the row size limit; retaining the previous row", "node", nodeID)
+		f.log.Warn("node live projection exceeds the row size limit; retaining the previous row", "code", "live_projection_too_large", "node", nodeID)
 	}
 }
 
@@ -751,7 +805,7 @@ func clampLiveFloat(value, minValue, maxValue float64) float64 {
 }
 
 func (c *SessionCore) rejectStats(ctx context.Context, state *SessionState, g guardedStats, now time.Time) {
-	c.f.log.Warn("stats batch failed the sanity check, traffic dropped", "node", state.NodeID, "deltas", g.rejected, "reason", g.reason)
+	c.f.log.Warn("stats batch failed the sanity check, traffic dropped", "code", "stats_sanity_rejected", "node", state.NodeID, "deltas", g.rejected, "reason", g.reason)
 	if !state.LastReject.IsZero() && now.Sub(state.LastReject) < rejectEventEvery {
 		return
 	}
@@ -844,7 +898,7 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 	}
 	dup, err := c.f.st.IngestEvent(ctx, tr.state.NodeID, tr.state.InstanceID, seq, now, row)
 	if err != nil {
-		c.f.log.Error("ingest event", "node", tr.state.NodeID, "err", err)
+		c.f.log.Error("ingest event", "code", "event_ingest_failed", "node", tr.state.NodeID, "err", err)
 		tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
 		return
 	}
@@ -877,7 +931,7 @@ func (c *SessionCore) warpAttention(ctx context.Context, tr *coreTransition, rea
 		return
 	}
 	if err := w.NeedsAttention(ctx, tr.state.NodeID, reason); err != nil {
-		c.f.log.Warn("record warp attention", "node", tr.state.NodeID, "err", err)
+		c.f.log.Warn("record warp attention", "code", "warp_attention_failed", "node", tr.state.NodeID, "err", err)
 		return
 	}
 	if reason == warpReasonLadder {
@@ -908,7 +962,7 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 			if pin, ok := protocols.NormalizePin(ir.CertPinSha256); ok {
 				ia.CertPin = pin
 			} else {
-				c.f.log.Warn("node reported a malformed certificate pin, ignored", "node", tr.state.NodeID, "inbound", ir.InboundId)
+				c.f.log.Warn("node reported a malformed certificate pin, ignored", "code", "invalid_certificate_pin", "node", tr.state.NodeID, "inbound", ir.InboundId)
 			}
 		}
 		if ir.CertNotAfterUnix > 0 {
@@ -919,14 +973,14 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	in = append(in, withheldApplied(tr.state.SentWithheld)...)
 	c.updateApplyDrift(ctx, tr, r)
 	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, tr.state.OwnerGeneration, tr.state.Drift, r.Revision, r.StateHash, in, now); err != nil {
-		c.f.log.Warn("record apply result", "node", tr.state.NodeID, "err", err)
+		c.f.log.Warn("record apply result", "code", "apply_result_failed", "node", tr.state.NodeID, "err", err)
 	}
 	status := "applied"
 	if r.Status == agentv1.ApplyStatus_APPLY_STATUS_PARTIAL {
 		status = "partial"
 	}
 	if err := c.f.st.RecordNodeApplyMeta(ctx, tr.state.NodeID, status, r.DurationMs, tr.state.Drift, now); err != nil {
-		c.f.log.Warn("record apply time", "node", tr.state.NodeID, "err", err)
+		c.f.log.Warn("record apply time", "code", "apply_time_failed", "node", tr.state.NodeID, "err", err)
 	}
 	c.relaysApplied(ctx, tr.state.NodeID, r, len(in) > 0, now)
 	return nil
@@ -962,24 +1016,32 @@ func (c *SessionCore) helloInSync(ctx context.Context, nodeID string, state *Ses
 		return err
 	}
 	if err := c.f.st.RecordNodeApplyMeta(ctx, nodeID, "in_sync", 0, false, c.f.now()); err != nil {
-		c.f.log.Warn("record in-sync time", "node", nodeID, "err", err)
+		c.f.log.Warn("record in-sync time", "code", "in_sync_time_failed", "node", nodeID, "err", err)
 	}
 	return nil
 }
 
 // hostSample is the batch's HostMetrics for the hourly host rollup (nil: the agent sent none). Values are clamped like the
 // live projection's: a bogus agent cannot write a number SQLite or a chart cannot hold.
-func hostSample(st *agentv1.StatsBatch) *store.HostSample {
+func hostSample(st *agentv1.StatsBatch, stale bool) *store.HostSample {
+	if stale {
+		return nil
+	}
 	m := st.Host
 	if m == nil {
 		return nil
 	}
 	const maxRate = uint64(1 << 50)
-	return &store.HostSample{
+	s := &store.HostSample{
 		CPUPct: clampLiveFloat(float64(m.CpuPct), 0, 100), SoftirqPct: clampLiveFloat(finiteLiveFloat(float64(m.SoftirqPct)), 0, 100),
 		Load1: max(finiteLiveFloat(float64(m.Load1)), 0), RAMUsed: m.RamUsedBytes, RAMTotal: m.RamTotalBytes,
 		RxBps: min(m.NetRxBps, maxRate), TxBps: min(m.NetTxBps, maxRate), Sessions: min(len(st.Sessions), maxStatsDeltas),
 	}
+	if r := liveResources(m); r != nil {
+		s.Ext = &store.HostSampleExt{StealPct: r.StealPct, IOWaitPct: r.IOWaitPct, SwapUsed: r.SwapUsed, ConntrackCount: r.ConntrackCount,
+			ConntrackMax: r.ConntrackMax, TCPSockets: r.TCPSockets, NICSpeedMbps: r.NICSpeedMbps, AgentCPUPct: r.AgentCPUPct, AgentRSS: r.AgentRSS}
+	}
+	return s
 }
 
 func (c *SessionCore) requestDesiredPreparation(tr *coreTransition) {
@@ -1008,7 +1070,7 @@ func (c *SessionCore) desiredPrepared(ctx context.Context, tr *coreTransition, e
 	}
 	if event.Prepared.node.State != "retired" && event.Prepared.desired != nil && len(event.Prepared.desired.withheld) > 0 {
 		if err := c.f.st.FailWithheldInbounds(ctx, event.Prepared.node.ID, event.Prepared.desired.withheld, withheldReason, event.At); err != nil {
-			c.f.log.Warn("mark withheld inbounds", "node", event.Prepared.node.ID, "err", err)
+			c.f.log.Warn("mark withheld inbounds", "code", "withheld_inbounds_failed", "node", event.Prepared.node.ID, "err", err)
 		}
 	}
 	if err := c.applyPreparedDesired(ctx, tr, event.Prepared, event.At); err != nil {
@@ -1233,7 +1295,7 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 			continue
 		}
 		if err := c.f.st.SetInboundAwgHealth(ctx, nodeID, h.InboundId, string(b), now); err != nil {
-			c.f.log.Warn("store awg health", "node", nodeID, "inbound", h.InboundId, "err", err)
+			c.f.log.Warn("store awg health", "code", "store_failed", "node", nodeID, "inbound", h.InboundId, "err", err)
 		}
 	}
 	w := c.f.warpModule()
@@ -1246,7 +1308,7 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 		state.L3.Warp = warpMemo
 		state.L3.WarpChangeKey = warpKey
 		if err := w.StoreHealth(ctx, nodeID, st.Warp); err != nil {
-			c.f.log.Warn("store warp health", "node", nodeID, "err", err)
+			c.f.log.Warn("store warp health", "code", "store_failed", "node", nodeID, "err", err)
 		}
 	}
 	up := st.Warp.State == agentv1.WarpState_WARP_STATE_UP
@@ -1255,7 +1317,7 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 		// again, not a stale "needs attention").
 		if a, err := c.f.st.WarpAccount(ctx, nodeID); err == nil && a.Attention != "" {
 			if err := w.NeedsAttention(ctx, nodeID, ""); err != nil {
-				c.f.log.Warn("clear warp attention", "node", nodeID, "err", err)
+				c.f.log.Warn("clear warp attention", "code", "warp_attention_clear_failed", "node", nodeID, "err", err)
 			}
 		}
 	}

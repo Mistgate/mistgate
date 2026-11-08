@@ -9,7 +9,7 @@ import (
 // agent's whole life.
 const ringSize = 256
 
-// Ring keeps the last ringSize host samples for cpu_softirq and the idle-load rule. Safe for concurrent use.
+// Ring keeps the last ringSize host samples for cpu_softirq, cpu_steal and the idle-load rule. Safe for concurrent use.
 type Ring struct {
 	mu   sync.Mutex
 	buf  [ringSize]Sample

@@ -11,6 +11,8 @@ import { warpErrorLine } from "./warp-error";
 const MiB = 1024 * 1024;
 /** Params that hold a size in MiB, and the formatted size added next to them. */
 const sizes: Record<string, string> = { free_mb: "free", journal_mb: "journal", cap_mb: "cap", btmp_mb: "btmp" };
+/** Params that are counts: written with the language's digit grouping. */
+const counts = new Set(["count", "max", "fds", "limit"]);
 /** Params that are single machine tokens. */
 const tokens = new Set(["missing", "differs", "notes", "reason", "ntp_synced", "mode", "backend", "state", "connect", "ipv6", "oom_kills", "hint", "error"]);
 /** Params that are comma separated lists; the ones in `tokens` are worded item by item. */
@@ -35,6 +37,7 @@ export function itemParams(t: T, fmt: Fmt, item: Pick<DoctorItem, "params">): Pa
     if (k in sizes && v !== "" && Number.isFinite(n)) p[sizes[k]!] = fmt.bytes(n * MiB, 1024);
     else if (k === "offset_s" && v !== "" && Number.isFinite(n)) p[k] = fmt.num(Math.abs(n), 0);
     else if (k === "median_ms" && v !== "" && Number.isFinite(n)) p[k] = fmt.num(n, 0);
+    else if (counts.has(k) && v !== "" && Number.isFinite(n)) p[k] = fmt.num(n, 0);
     else if (k === "error") p[k] = warpErrorLine(t, v) || v; // WARP's last_error: the same words as the WARP card
     else if (lists.has(k)) p[k] = v.split(",").map((x) => (tokens.has(k) ? word(t, x) : x)).join(", ");
     else if (tokens.has(k)) p[k] = word(t, v);

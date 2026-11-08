@@ -23,12 +23,13 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/sysstat"
 )
 
 // The metrics endpoint: fleet gauges for a scraper, in the OpenMetrics text format. It is off until the owner turns it on
 // (Settings -> System), answers 404 while off, and asks for a bearer secret of its own, made by the owner's request and stored
 // only as a hash. It never names a person and never carries an address: gauges are counts and per-node numbers keyed by the
-// node's name.
+// node's name, and the panel process's own memory, goroutines and database size.
 
 const (
 	metricsEnabledKey   = "metrics.enabled"
@@ -39,10 +40,14 @@ const (
 )
 
 type metricsState struct {
-	mu      sync.Mutex
-	at      time.Time
-	body    []byte
-	hashHex string // last token hash seen, to drop the cache when the token changes
+	mu            sync.Mutex
+	at            time.Time
+	body          []byte
+	hashHex       string // token hash used to build the cached body
+	configAt      time.Time
+	configSet     bool
+	configEnabled bool
+	configHash    string
 }
 
 func (r rpc) GetMetricsSettings(ctx context.Context, _ *connect.Request[opsv1.GetMetricsSettingsRequest]) (*connect.Response[opsv1.GetMetricsSettingsResponse], error) {
@@ -81,6 +86,8 @@ func (r rpc) SetMetricsSettings(ctx context.Context, req *connect.Request[opsv1.
 	}
 	s.m.mu.Lock()
 	s.m.body = nil
+	s.m.hashHex = ""
+	s.m.configSet = false
 	s.m.mu.Unlock()
 	state := "off"
 	if enabled {
@@ -111,11 +118,27 @@ func (s *Service) metricsConfig(ctx context.Context) (enabled bool, hash string,
 	return kv[metricsEnabledKey] == "1", kv[metricsTokenHashKey], nil
 }
 
+func (s *Service) cachedMetricsConfig(ctx context.Context) (enabled bool, hash string, err error) {
+	s.m.mu.Lock()
+	defer s.m.mu.Unlock()
+	now := s.cfg.Now()
+	if s.m.configSet && now.Sub(s.m.configAt) < metricsCacheFor {
+		return s.m.configEnabled, s.m.configHash, nil
+	}
+	enabled, hash, err = s.metricsConfig(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	s.m.configAt, s.m.configSet = now, true
+	s.m.configEnabled, s.m.configHash = enabled, hash
+	return enabled, hash, nil
+}
+
 // MetricsHandler serves /metrics and reports whether it answered. Off, or with no token made yet, it writes nothing and returns
 // false, so the admin answers as for any unknown path. A missing or wrong token: 401.
 func (s *Service) MetricsHandler() func(w http.ResponseWriter, r *http.Request) bool {
 	return func(w http.ResponseWriter, r *http.Request) bool {
-		enabled, hash, err := s.metricsConfig(r.Context())
+		enabled, hash, err := s.cachedMetricsConfig(r.Context())
 		if err != nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return true
@@ -183,6 +206,14 @@ func (s *Service) gather(ctx context.Context) []byte {
 	defer cancel()
 	var m expo
 	m.gauge("mistgate_build_info", "Build of this panel; the value is always 1.", sample{labels: lbl("version", buildinfo.Version), v: 1})
+	// The panel process itself. A sampler of its own: the one of GetPanelResources measures CPU between its own reads.
+	if rss := (&sysstat.ProcSampler{}).Sample().RSS; rss > 0 {
+		m.gauge("process_resident_memory_bytes", "Resident memory of the panel process, bytes.", sample{v: float64(rss)})
+	}
+	m.gauge("go_goroutines", "Goroutines of the panel process.", sample{v: float64(sysstat.ReadGoRuntime().Goroutines)})
+	if db, at := s.dbStats(ctx); !at.IsZero() {
+		m.gauge("mistgate_db_bytes", "Size of the panel's database: the main file and its write-ahead log, bytes.", sample{v: float64(db.file + db.wal)})
+	}
 	if s.cfg.Fleet != nil {
 		fc := adminv1connect.NewFleetServiceClient(client(s.cfg.Fleet), "http://panel.invalid")
 		if r, err := fc.Overview(ctx, connect.NewRequest(&adminv1.OverviewRequest{EventLimit: 1})); err == nil {

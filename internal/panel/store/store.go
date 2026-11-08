@@ -231,11 +231,13 @@ func (s *Store) ListAuditQuery(ctx context.Context, q AuditQuery) ([]AuditRow, e
 	return out, rows.Err()
 }
 
-// PruneAudit deletes audit rows older than before, in batches so the single writer is never held for long (the audit_ts
-// index serves the scan). It returns the number of rows removed.
+const auditPruneMaxBatches = 5
+
+// PruneAudit deletes a bounded number of audit rows per sweep so a large backlog cannot use the whole D1 budget. The audit_ts
+// index serves each batch scan. Rows left after the last batch are removed on a later sweep.
 func (s *Store) PruneAudit(ctx context.Context, before time.Time, batch int) (int64, error) {
 	var total int64
-	for {
+	for batches := 0; batches < auditPruneMaxBatches; batches++ {
 		res, err := s.W.ExecContext(ctx, `DELETE FROM audit WHERE id IN (SELECT id FROM audit WHERE ts < ? LIMIT ?)`, unix(before), batch)
 		if err != nil {
 			return total, err
@@ -246,6 +248,7 @@ func (s *Store) PruneAudit(ctx context.Context, before time.Time, batch int) (in
 			return total, nil
 		}
 	}
+	return total, nil
 }
 
 // Setting returns a setting value, or ErrNotFound.
@@ -301,6 +304,22 @@ func (s *Store) SetSettings(ctx context.Context, kv map[string]string) error {
 // DeleteSettings removes the settings; a key that is not there is ignored.
 func (s *Store) DeleteSettings(ctx context.Context, keys ...string) error {
 	_, err := s.W.ExecContext(ctx, `DELETE FROM setting WHERE k IN (SELECT value FROM json_each(?))`, accJSON(keys))
+	return err
+}
+
+// SetAndDeleteSettings applies setting upserts and deletes in one atomic batch.
+func (s *Store) SetAndDeleteSettings(ctx context.Context, kv map[string]string, keys ...string) error {
+	stmts := make([]Stmt, 0, len(kv)+1)
+	for k, v := range kv {
+		stmts = append(stmts, Stmt{Query: `INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`, Args: []any{k, v}})
+	}
+	if len(keys) > 0 {
+		stmts = append(stmts, Stmt{Query: `DELETE FROM setting WHERE k IN (SELECT value FROM json_each(?))`, Args: []any{accJSON(keys)}})
+	}
+	if len(stmts) == 0 {
+		return nil
+	}
+	_, err := s.batch(ctx, stmts...)
 	return err
 }
 

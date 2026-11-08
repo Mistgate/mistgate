@@ -486,6 +486,13 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 			resp.Metrics = &adminv1.NodeMetrics{CpuPct: float32(m.CPUPct), SoftirqPct: float32(m.SoftirqPct), Load1: float32(m.Load1), RamUsedBytes: m.RAMUsedBytes,
 				RamTotalBytes: m.RAMTotalBytes, DiskUsedBytes: m.DiskUsedBytes, DiskTotalBytes: m.DiskTotalBytes,
 				NetRxBps: m.RxBPS, NetTxBps: m.TxBPS, AtUnix: view.MetricsAtUnix}
+			if r := m.Res; r != nil {
+				pm := resp.Metrics
+				pm.StealPct, pm.IowaitPct, pm.SwapUsedBytes, pm.SwapTotalBytes = float32(r.StealPct), float32(r.IOWaitPct), r.SwapUsed, r.SwapTotal
+				pm.ConntrackCount, pm.ConntrackMax, pm.TcpSockets, pm.UdpSockets, pm.NicSpeedMbps = r.ConntrackCount, r.ConntrackMax, r.TCPSockets, r.UDPSockets, r.NICSpeedMbps
+				pm.Agent = &adminv1.ProcessUsage{CpuPct: float32(r.AgentCPUPct), RssBytes: r.AgentRSS, GoTotalBytes: r.AgentGoTotal, GoHeapBytes: r.AgentGoHeap,
+					Goroutines: r.Goroutines, Threads: r.Threads, OpenFds: r.FDs, FdLimit: r.FDLimit}
+			}
 		}
 		resp.OnlineUsers, err = f.onlineUsers(ctx, view)
 		if err != nil {

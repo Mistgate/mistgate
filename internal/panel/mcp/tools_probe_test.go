@@ -112,6 +112,11 @@ func TestPathProbeSendsNodeIdsAndTheSweep(t *testing.T) {
 	mustFail(t, s, "path_probe", map[string]any{"from": "nl1", "to": "http://example.com/", "kind": "tcp"})
 	mustFail(t, s, "path_probe", map[string]any{"from": "nl1", "to": "de1", "kind": "icmp"})
 	mustFail(t, s, "path_probe", map[string]any{"from": "nl1", "to": "de1", "kind": "udp", "ports": []int{70000}})
+	for _, size := range []int{63, 1473, 4294967360} {
+		if msg := mustFail(t, s, "path_probe", map[string]any{"from": "nl1", "to": "de1", "kind": "udp", "sizes": []int{size}}); !strings.Contains(msg, "sizes: 64 to 1472") {
+			t.Errorf("size %d error = %q, want the supported range", size, msg)
+		}
+	}
 	if len(e.w.probeReqs) != before {
 		t.Errorf("the panel was asked for a bad request: %d calls", len(e.w.probeReqs)-before)
 	}

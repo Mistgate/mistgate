@@ -414,14 +414,15 @@ func offerSetup(ctx context.Context, st *store.Store, opts initOptions, in app.I
 		return err
 	}
 	if tokenExists {
+		// A token a version before this one minted and printed: it stays valid until it expires, and is not printed again.
 		console.Call("log", "No admin yet. A setup link was already issued; expires at "+expiry.UTC().Format(time.RFC3339))
 		return nil
 	}
-	token, err := auth.IssueSetupToken(ctx, st, now)
-	if err != nil {
-		return err
-	}
-	console.Call("log", "No admin yet. Create one (link works once, 30 minutes):\n  "+in.AdminURL()+"setup#"+token)
+	// Without the deployer's hash no token is minted: a setup link in the Worker's log would let anyone who can read that log
+	// (another member of the Cloudflare account, a Logpush destination) create the owner first. The log says what to do.
+	console.Call("log", "No admin yet. Set the SETUP_TOKEN_SHA256 secret to the SHA-256 of a setup token you choose and deploy again, "+
+		"then open the admin address with setup#<that token> (mistgate edge deploy does this for you; see edge/worker/README.md). "+
+		"No setup link is printed: anyone who can read this log could use it.")
 	return nil
 }
 

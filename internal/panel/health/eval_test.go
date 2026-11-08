@@ -2000,6 +2000,7 @@ func TestDoctorSkipThatCannotJudgeYetKeepsTheAlert(t *testing.T) {
 		keep bool
 	}{
 		{"cpu_softirq.collecting", true},
+		{"cpu_steal.collecting", true},
 		{"dstate_tasks.interrupted", true},
 		{"skip.timeout", true},
 		{"skip.internal", true},
@@ -2007,12 +2008,16 @@ func TestDoctorSkipThatCannotJudgeYetKeepsTheAlert(t *testing.T) {
 		{"ipv6.disabled", false},
 	} {
 		t.Run(tc.code, func(t *testing.T) {
+			check, _, _ := strings.Cut(tc.code, ".")
+			if check == "skip" || check == "ipv6" || check == "dstate_tasks" {
+				check = "cpu_softirq"
+			}
 			e := newEnv(t)
 			e.node("de1", "hetzner", true)
-			e.report("de1", false, res("cpu_softirq", dWarn, "", "softirq_pct", "62"), res("disk_space", dOK, ""))
-			want(t, e.active(), "doctor_warn/de1/cpu_softirq")
-			e.report("de1", false, withCode(res("cpu_softirq", dSkip, ""), tc.code), res("disk_space", dOK, ""))
-			if _, open := e.active()["doctor_warn/de1/cpu_softirq"]; open != tc.keep {
+			e.report("de1", false, res(check, dWarn, "", "softirq_pct", "62"), res("disk_space", dOK, ""))
+			want(t, e.active(), "doctor_warn/de1/"+check)
+			e.report("de1", false, withCode(res(check, dSkip, ""), tc.code), res("disk_space", dOK, ""))
+			if _, open := e.active()["doctor_warn/de1/"+check]; open != tc.keep {
 				t.Errorf("skip %q: alert open = %v, want %v", tc.code, open, tc.keep)
 			}
 		})

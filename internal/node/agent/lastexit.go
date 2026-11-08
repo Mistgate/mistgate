@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -145,15 +146,19 @@ func (a *Agent) previousExit(ctx context.Context, hadPrevious, updated bool, rea
 // recordCrash adds this crash restart to the crash log, drops the ones older than the window and returns how many are left.
 func (a *Agent) recordCrash(now time.Time) int {
 	p := filepath.Join(a.cfg.StateDir, fileCrashLog)
-	var keep []int64
-	if f, err := os.Open(p); err == nil {
-		sc := bufio.NewScanner(f)
+	keep := make([]int64, 0, maxCrashLog)
+	if b := readAgentStateFile(p); len(b) > 0 {
+		sc := bufio.NewScanner(bytes.NewReader(b))
 		for sc.Scan() {
 			if t, err := strconv.ParseInt(strings.TrimSpace(sc.Text()), 10, 64); err == nil && now.Sub(time.Unix(t, 0)) < crashLoopWindow && t <= now.Unix() {
-				keep = append(keep, t)
+				if len(keep) == maxCrashLog {
+					copy(keep, keep[1:])
+					keep[len(keep)-1] = t
+				} else {
+					keep = append(keep, t)
+				}
 			}
 		}
-		f.Close()
 	}
 	keep = append(keep, now.Unix())
 	if len(keep) > maxCrashLog {
