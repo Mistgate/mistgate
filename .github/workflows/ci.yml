@@ -8,10 +8,11 @@ on:
 
 jobs:
   race:
-    # The agent session (panel and node) is concurrent by design; the race detector guards it. fleet takes 20-22 min
-    # under -race on a hosted runner (700-1300 s), agent 3 min. Run as two matrix jobs in November 2026, fleet alone took
-    # 25-36 min on the same code (the matrix jobs landed on slower runners), so they run together again. The limit has room
-    # for the per-batch host-hour write and for runner variance; a package that needs more than that is a finding.
+    # The agent session (panel and node) is concurrent by design; the race detector guards it. Each fleet test opens a
+    # migrated store; migrating a new file takes 4.3 s under -race, which with four hundred tests and 116 migrations pushed
+    # the job past 50 min in November 2026. The tests now open a copy of a database migrated once per binary
+    # (internal/panel/store/storetest): fleet takes 137 s under -race on a workstation (was 1790 s), agent 150 s. The limit
+    # keeps a wide margin for hosted runners, which are about 1.7 times slower; a package that needs more is a finding.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
