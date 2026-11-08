@@ -911,6 +911,14 @@ func planWaitingText(l L, tool, token, adminURL string) string {
 	)
 }
 
+func followUpProblemText(l L, summary, adminURL string) string {
+	return join(
+		"<b>"+l.pick("The assistant came back with a problem", "Ассистент вернулся с проблемой", "AI 助手回来报告了一个问题")+"</b>",
+		data(summary, 300),
+		link(adminURL, "ai?tab=memory", l.pick("Open the conversation in AI → Memory", "Открыть разговор в «ИИ» → «Память»", "在「AI → 记忆」中打开对话")),
+	)
+}
+
 func awgPrepareFailedText(l L, node, code, adminURL string) string {
 	return join(
 		"<b>"+l.pick("The AmneziaWG kernel module could not be built", "Не удалось собрать модуль ядра AmneziaWG", "无法构建 AmneziaWG 内核模块")+"</b>",

@@ -74,6 +74,9 @@ const (
 	// AssistantServiceDismissPlanProcedure is the fully-qualified name of the AssistantService's
 	// DismissPlan RPC.
 	AssistantServiceDismissPlanProcedure = "/mistgate.admin.v1.AssistantService/DismissPlan"
+	// AssistantServiceCancelFollowUpProcedure is the fully-qualified name of the AssistantService's
+	// CancelFollowUp RPC.
+	AssistantServiceCancelFollowUpProcedure = "/mistgate.admin.v1.AssistantService/CancelFollowUp"
 	// AssistantServiceListMemoryProcedure is the fully-qualified name of the AssistantService's
 	// ListMemory RPC.
 	AssistantServiceListMemoryProcedure = "/mistgate.admin.v1.AssistantService/ListMemory"
@@ -116,6 +119,9 @@ type AssistantServiceClient interface {
 	// plan is never applied here (its host key and login are confirmed in the approval inbox).
 	ApplyPlan(context.Context, *connect.Request[v1.ApplyPlanRequest]) (*connect.Response[v1.ApplyPlanResponse], error)
 	DismissPlan(context.Context, *connect.Request[v1.DismissPlanRequest]) (*connect.Response[v1.DismissPlanResponse], error)
+	// Removes a follow-up the assistant set in one of the admin's own conversations (the "Cancel" on its line). A follow-up
+	// whose turn is running now is not removed: Stop ends the turn.
+	CancelFollowUp(context.Context, *connect.Request[v1.CancelFollowUpRequest]) (*connect.Response[v1.CancelFollowUpResponse], error)
 	// The admin's own notes the assistant reads in every conversation (at most 100 of 400 characters).
 	ListMemory(context.Context, *connect.Request[v1.ListMemoryRequest]) (*connect.Response[v1.ListMemoryResponse], error)
 	SaveMemory(context.Context, *connect.Request[v1.SaveMemoryRequest]) (*connect.Response[v1.SaveMemoryResponse], error)
@@ -218,6 +224,12 @@ func NewAssistantServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(assistantServiceMethods.ByName("DismissPlan")),
 			connect.WithClientOptions(opts...),
 		),
+		cancelFollowUp: connect.NewClient[v1.CancelFollowUpRequest, v1.CancelFollowUpResponse](
+			httpClient,
+			baseURL+AssistantServiceCancelFollowUpProcedure,
+			connect.WithSchema(assistantServiceMethods.ByName("CancelFollowUp")),
+			connect.WithClientOptions(opts...),
+		),
 		listMemory: connect.NewClient[v1.ListMemoryRequest, v1.ListMemoryResponse](
 			httpClient,
 			baseURL+AssistantServiceListMemoryProcedure,
@@ -261,6 +273,7 @@ type assistantServiceClient struct {
 	stopTurn                *connect.Client[v1.StopTurnRequest, v1.StopTurnResponse]
 	applyPlan               *connect.Client[v1.ApplyPlanRequest, v1.ApplyPlanResponse]
 	dismissPlan             *connect.Client[v1.DismissPlanRequest, v1.DismissPlanResponse]
+	cancelFollowUp          *connect.Client[v1.CancelFollowUpRequest, v1.CancelFollowUpResponse]
 	listMemory              *connect.Client[v1.ListMemoryRequest, v1.ListMemoryResponse]
 	saveMemory              *connect.Client[v1.SaveMemoryRequest, v1.SaveMemoryResponse]
 	deleteMemory            *connect.Client[v1.DeleteMemoryRequest, v1.DeleteMemoryResponse]
@@ -337,6 +350,11 @@ func (c *assistantServiceClient) DismissPlan(ctx context.Context, req *connect.R
 	return c.dismissPlan.CallUnary(ctx, req)
 }
 
+// CancelFollowUp calls mistgate.admin.v1.AssistantService.CancelFollowUp.
+func (c *assistantServiceClient) CancelFollowUp(ctx context.Context, req *connect.Request[v1.CancelFollowUpRequest]) (*connect.Response[v1.CancelFollowUpResponse], error) {
+	return c.cancelFollowUp.CallUnary(ctx, req)
+}
+
 // ListMemory calls mistgate.admin.v1.AssistantService.ListMemory.
 func (c *assistantServiceClient) ListMemory(ctx context.Context, req *connect.Request[v1.ListMemoryRequest]) (*connect.Response[v1.ListMemoryResponse], error) {
 	return c.listMemory.CallUnary(ctx, req)
@@ -385,6 +403,9 @@ type AssistantServiceHandler interface {
 	// plan is never applied here (its host key and login are confirmed in the approval inbox).
 	ApplyPlan(context.Context, *connect.Request[v1.ApplyPlanRequest]) (*connect.Response[v1.ApplyPlanResponse], error)
 	DismissPlan(context.Context, *connect.Request[v1.DismissPlanRequest]) (*connect.Response[v1.DismissPlanResponse], error)
+	// Removes a follow-up the assistant set in one of the admin's own conversations (the "Cancel" on its line). A follow-up
+	// whose turn is running now is not removed: Stop ends the turn.
+	CancelFollowUp(context.Context, *connect.Request[v1.CancelFollowUpRequest]) (*connect.Response[v1.CancelFollowUpResponse], error)
 	// The admin's own notes the assistant reads in every conversation (at most 100 of 400 characters).
 	ListMemory(context.Context, *connect.Request[v1.ListMemoryRequest]) (*connect.Response[v1.ListMemoryResponse], error)
 	SaveMemory(context.Context, *connect.Request[v1.SaveMemoryRequest]) (*connect.Response[v1.SaveMemoryResponse], error)
@@ -483,6 +504,12 @@ func NewAssistantServiceHandler(svc AssistantServiceHandler, opts ...connect.Han
 		connect.WithSchema(assistantServiceMethods.ByName("DismissPlan")),
 		connect.WithHandlerOptions(opts...),
 	)
+	assistantServiceCancelFollowUpHandler := connect.NewUnaryHandler(
+		AssistantServiceCancelFollowUpProcedure,
+		svc.CancelFollowUp,
+		connect.WithSchema(assistantServiceMethods.ByName("CancelFollowUp")),
+		connect.WithHandlerOptions(opts...),
+	)
 	assistantServiceListMemoryHandler := connect.NewUnaryHandler(
 		AssistantServiceListMemoryProcedure,
 		svc.ListMemory,
@@ -537,6 +564,8 @@ func NewAssistantServiceHandler(svc AssistantServiceHandler, opts ...connect.Han
 			assistantServiceApplyPlanHandler.ServeHTTP(w, r)
 		case AssistantServiceDismissPlanProcedure:
 			assistantServiceDismissPlanHandler.ServeHTTP(w, r)
+		case AssistantServiceCancelFollowUpProcedure:
+			assistantServiceCancelFollowUpHandler.ServeHTTP(w, r)
 		case AssistantServiceListMemoryProcedure:
 			assistantServiceListMemoryHandler.ServeHTTP(w, r)
 		case AssistantServiceSaveMemoryProcedure:
@@ -608,6 +637,10 @@ func (UnimplementedAssistantServiceHandler) ApplyPlan(context.Context, *connect.
 
 func (UnimplementedAssistantServiceHandler) DismissPlan(context.Context, *connect.Request[v1.DismissPlanRequest]) (*connect.Response[v1.DismissPlanResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.AssistantService.DismissPlan is not implemented"))
+}
+
+func (UnimplementedAssistantServiceHandler) CancelFollowUp(context.Context, *connect.Request[v1.CancelFollowUpRequest]) (*connect.Response[v1.CancelFollowUpResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.AssistantService.CancelFollowUp is not implemented"))
 }
 
 func (UnimplementedAssistantServiceHandler) ListMemory(context.Context, *connect.Request[v1.ListMemoryRequest]) (*connect.Response[v1.ListMemoryResponse], error) {

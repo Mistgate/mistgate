@@ -175,7 +175,7 @@ const installApproval = {
 
 function fakeChat(messages: Msg[], running = false): ChatApi {
   const none = async () => {};
-  return { conversationId: "cnv_2", messages, running, error: null, send: none, stop: none, open: none, reset: () => {}, apply: none, dismiss: none, forget: none } as unknown as ChatApi;
+  return { conversationId: "cnv_2", messages, running, live: running, error: null, followUps: [], send: none, stop: none, open: none, refresh: () => {}, reset: () => {}, apply: none, dismiss: none, forget: none, cancelFollowUp: none } as unknown as ChatApi;
 }
 
 export function AiKit() {

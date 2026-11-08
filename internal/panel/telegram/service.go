@@ -652,6 +652,13 @@ func (s *Service) PlanWaiting(tool, tokenName string) {
 	s.enqueue(item{to: ownerOnly, text: func(l L, _ string) string { return planWaitingText(l, tool, tokenName, adminURL) }})
 }
 
+// FollowUpProblem tells an admin that a follow-up of their assistant found a problem: only that admin's chat, and only when
+// the follow-up asked for Telegram (the person asked the assistant for it). The summary is the model's one line, scrubbed.
+func (s *Service) FollowUpProblem(adminID, summary string) {
+	adminURL := s.cfg.AdminURL
+	s.enqueue(item{to: func(l store.TelegramLinkRow) bool { return l.AdminID == adminID }, text: func(l L, _ string) string { return followUpProblemText(l, summary, adminURL) }})
+}
+
 // AwgPrepareFailed announces a failed build of the AmneziaWG kernel module on a node (the same failure is told once).
 func (s *Service) AwgPrepareFailed(nodeID, code string, at int64) {
 	key := "awgprep/" + nodeID + "/" + strconv.FormatInt(at, 10)

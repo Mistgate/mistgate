@@ -71,6 +71,14 @@ with its tools and the operator profile; its answer lands in a conversation and,
 or Telegram). Tools `tasks_list`, `task_get`, `task_run_now`, and create, update and delete as plans. A task that fails
 says so; provider errors retry with a fallback provider when one is set. VPS edition first.
 
+Amended 2026-11-08: **follow-ups**. A third, one-time kind, bound to a conversation instead of a schedule: the assistant's
+local tool `follow_up` (30 s to 24 h ahead, or that long after a plan of the conversation is applied, with a note) makes
+the panel continue that conversation by itself, as its admin, through the chat's own turn (the same tools, profile,
+limits and plan cards; nothing applied without the click). They live in `assistant_follow_up` (migration 00117), not in
+`scheduled_task`, and run on the same scheduler: a lease per row so each runs once, recovery at start, the in-run retries
+and the fallback provider of an assistant task, the monthly budget. One missed while the panel was down runs once on
+start, or is dropped with a note in the conversation when more than a day late. At most 3 per conversation, 20 per admin.
+
 ### 6. Safety model
 
 - Profiles: readonly (reads, no probes), operator (reads, probes, plans), admin (everything, still plan/apply for
@@ -111,6 +119,7 @@ when the admin Worker has room; otherwise they move to a VPS-only service and th
 | Resources: HostMetrics 11 to 20, host hours, capacity, panel resources, load checks, UI | merged |
 | Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | merged (`links/3`; the kernel AWG backend cannot tell initiations from responses and says so) |
 | Scheduled tasks, provider fallback | merged |
+| Assistant follow-ups (one-time continuation of a conversation, on the tasks' scheduler) | merged |
 | Censorship simulation and dev-fleet MCP runs | next |
 | Coarse network (ASN) bucket per hour, no addresses | to decide with the owner (privacy) |
 

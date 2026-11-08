@@ -19,6 +19,24 @@
   },
   {
     "type": "index",
+    "name": "assistant_follow_up_admin",
+    "tbl_name": "assistant_follow_up",
+    "sql": "CREATE INDEX assistant_follow_up_admin ON assistant_follow_up (admin_id)"
+  },
+  {
+    "type": "index",
+    "name": "assistant_follow_up_conversation",
+    "tbl_name": "assistant_follow_up",
+    "sql": "CREATE INDEX assistant_follow_up_conversation ON assistant_follow_up (conversation_id, due_at)"
+  },
+  {
+    "type": "index",
+    "name": "assistant_follow_up_due",
+    "tbl_name": "assistant_follow_up",
+    "sql": "CREATE INDEX assistant_follow_up_due ON assistant_follow_up (due_at)"
+  },
+  {
+    "type": "index",
     "name": "assistant_memory_admin",
     "tbl_name": "assistant_memory",
     "sql": "CREATE INDEX assistant_memory_admin ON assistant_memory(admin_id, created_at, id)"
@@ -537,7 +555,13 @@
     "type": "table",
     "name": "assistant_conversation",
     "tbl_name": "assistant_conversation",
-    "sql": "CREATE TABLE assistant_conversation ( id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, title_enc BLOB NOT NULL DEFAULT X'', summary_enc BLOB NOT NULL DEFAULT X'', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, segment INTEGER NOT NULL DEFAULT 0 , task_id TEXT NOT NULL DEFAULT '') STRICT"
+    "sql": "CREATE TABLE assistant_conversation ( id TEXT PRIMARY KEY, admin_id TEXT NOT NULL, title_enc BLOB NOT NULL DEFAULT X'', summary_enc BLOB NOT NULL DEFAULT X'', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, segment INTEGER NOT NULL DEFAULT 0 , task_id TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0 CHECK (unread IN (0, 1))) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "assistant_follow_up",
+    "tbl_name": "assistant_follow_up",
+    "sql": "CREATE TABLE assistant_follow_up ( id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, admin_id TEXT NOT NULL, note_enc BLOB NOT NULL, plan_id TEXT NOT NULL DEFAULT '', delay_s INTEGER NOT NULL DEFAULT 0, notify_telegram INTEGER NOT NULL DEFAULT 0 CHECK (notify_telegram IN (0, 1)), created_at INTEGER NOT NULL, due_at INTEGER NOT NULL DEFAULT 0, lease_id TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0 ) STRICT"
   },
   {
     "type": "table",

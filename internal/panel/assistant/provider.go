@@ -105,7 +105,7 @@ func codeConnect(code string) error {
 		cc = connect.CodeUnavailable
 	case "budget_reached", "rate_limited":
 		cc = connect.CodeResourceExhausted
-	case "assistant_off", "not_allowed", "no_provider", "turn_running", "plan_not_pending":
+	case "assistant_off", "not_allowed", "no_provider", "turn_running", "plan_not_pending", "follow_up_not_pending":
 		cc = connect.CodeFailedPrecondition
 	case "text_too_long", "note_too_long", "too_many_notes", "invalid_provider", "invalid_effort":
 		cc = connect.CodeInvalidArgument

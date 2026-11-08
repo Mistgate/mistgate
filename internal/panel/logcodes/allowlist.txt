@@ -39,7 +39,6 @@ app/integrations_mcp.go	mcp endpoint is off	1
 app/mcp_internal.go	audit mcp row	1
 app/mcp_internal.go	mcp plan sweep	1
 app/roles.go	wake the provisioner	1
-assistant/chat.go	assistant turn save failed	1
 assistant/data.go	assistant usage reconciliation failed	1
 assistant/service.go	assistant audit write failed	1
 assistant/service.go	assistant provider configuration	1

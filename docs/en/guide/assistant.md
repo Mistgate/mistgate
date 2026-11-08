@@ -68,6 +68,17 @@ Conversations and notes are sealed in the panel's database and private to each a
 - Names, notes and log lines from nodes and people are data to the assistant, never instructions; it has no tool that reaches the internet; the chat shows no images and no HTML, links to the admin's pages stay in the admin and other links open apart.
 - Even if a node name or a note talked the model into proposing something, it would only be a card: the change happens when a person reads it and presses **Apply**.
 
+## Follow-ups
+
+The assistant answers your messages, and it can also come back by itself. When it starts or prepares something that finishes later (a debug capture of a node, a speed test, checks whose results come later, a rollout or a node update, a relay), it sets a follow-up: a time a little after the job ends and a note of what to read then. The conversation shows a quiet line such as "I'll come back with the result at 15:41 (in 9 min) · Cancel", in the panel's time zone.
+
+- At that time the panel continues the same conversation on its own, with the browser closed too: the assistant sees the conversation so far, reads the result with its tools and answers. The answer is marked **On a timer**, and a dot on the chat button and in the list of conversations says it came while you were away.
+- A follow-up for a change that starts only when you apply its plan (a debug capture, a speed test) waits for the apply and counts from it; if you dismiss the plan or let it expire, the follow-up goes too.
+- It works exactly as when you write: the tools and rights of your role, the same limits and budget. It may prepare a plan, but nothing changes until you press **Apply** on its card.
+- At most 3 follow-ups wait in a conversation and 20 for an admin, each from 30 seconds to 24 hours ahead. **Cancel** on the line removes one; deleting the conversation removes its follow-ups.
+- When a follow-up cannot run (the assistant is off, the month's budget is spent, the provider keeps failing), the conversation gets a short note with the reason. One the panel missed while it was down runs once when it starts again, unless it is more than a day late: then it is dropped with a note.
+- If you ask for it ("tell me in Telegram if something is wrong"), a follow-up that finds a problem also sends one line to your linked Telegram chat.
+
 ## Scheduled tasks
 
 The panel can check the fleet on its own, on a schedule, and tell you when it finds something: open **AI → Scheduled tasks**. The owner creates, changes and deletes tasks; helpers see them and may **Run now**; read-only admins do not see them.

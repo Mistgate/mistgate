@@ -77,6 +77,31 @@ type fakeAssistant struct {
 	out     assistant.ScheduledOutcome
 	entered chan struct{}
 	release chan struct{}
+	// the follow-ups it was given, and what it says of them
+	followUps   []store.AssistantFollowUp
+	followOut   assistant.FollowUpOutcome
+	followEnter chan struct{}
+	followHold  chan struct{}
+}
+
+func (a *fakeAssistant) RunFollowUp(ctx context.Context, f store.AssistantFollowUp) assistant.FollowUpOutcome {
+	a.mu.Lock()
+	a.followUps = append(a.followUps, f)
+	out, enter, hold := a.followOut, a.followEnter, a.followHold
+	a.mu.Unlock()
+	if enter != nil {
+		enter <- struct{}{}
+	}
+	if hold != nil {
+		select {
+		case <-hold:
+		case <-ctx.Done():
+		}
+	}
+	if out.Status == "" {
+		out.Status = "ran"
+	}
+	return out
 }
 
 func (a *fakeAssistant) RunScheduled(ctx context.Context, run assistant.ScheduledRun) assistant.ScheduledOutcome {

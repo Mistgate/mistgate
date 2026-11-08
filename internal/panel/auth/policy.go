@@ -323,6 +323,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.AssistantServiceStopTurnProcedure:                levelRead,
 	adminv1connect.AssistantServiceApplyPlanProcedure:               levelRead,
 	adminv1connect.AssistantServiceDismissPlanProcedure:             levelRead,
+	adminv1connect.AssistantServiceCancelFollowUpProcedure:          levelRead,
 	adminv1connect.AssistantServiceListMemoryProcedure:              levelRead,
 	adminv1connect.AssistantServiceSaveMemoryProcedure:              levelRead,
 	adminv1connect.AssistantServiceDeleteMemoryProcedure:            levelRead,
