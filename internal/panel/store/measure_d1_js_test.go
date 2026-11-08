@@ -290,7 +290,9 @@ func TestD1IngestStatsAtEdgeCap(t *testing.T) {
 		in.Links = append(in.Links, FleetLink{CredID: in.Traffic[i].CredID, InboundID: in.Traffic[i].InboundID, Connects: 1 << 30, Rejects: 1 << 30,
 			Drops: 1 << 30, Stalls: 1 << 30, OnlineS: 1 << 30, UnknownKeys: 1 << 30, Hellos: 1 << 30, Handshakes: 1 << 30,
 			ClientCloses: 1 << 30, Freezes: 1 << 30, Quiet: 1 << 30, Accepted: 1 << 30, HellosForeign: 1 << 30,
-			RttMSSum: ^uint64(0), RttSamples: 1 << 30, PktsSent: ^uint64(0), PktsLost: ^uint64(0)})
+			RttMSSum: ^uint64(0), RttSamples: 1 << 30, PktsSent: ^uint64(0), PktsLost: ^uint64(0),
+			HsUnfinished: 1 << 30, TLSAlertsSent: 1 << 30, TLSAlertsRecv: 1 << 30, TLSCertRefused: 1 << 30, RealityFallback: 1 << 30,
+			AuthFailed: 1 << 30, TCPStalls: 1 << 30, TCPStalls16K: 1 << 30, Initiations: 1 << 30, Responses: 1 << 30, ResponsesUnmatched: 1 << 30})
 	}
 	journalValue := strings.Repeat("界", 160)
 	for i := range maxNodeJournalRows {

@@ -1,6 +1,7 @@
 package access
 
 import (
+	"slices"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -86,4 +87,54 @@ func TestGetUserConnection(t *testing.T) {
 	}
 	_, err = e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: "usr_missing"}))
 	wantCode(t, err, connect.CodeNotFound)
+}
+
+// links/3 per key: an AmneziaWG key on the userspace backend has its handshake counts; on the kernel backend, or with an agent
+// without links/3, they are listed as unsupported (their zero means nothing).
+func TestGetUserConnectionLinks3(t *testing.T) {
+	f := newFixture(t)
+	e := f.e
+	e.sql(`UPDATE node SET agent_caps = 'links/1 links/2 links/3 awg/1' WHERE id = 'nod_de1'`)
+	e.sql(`UPDATE profile SET protocol = 'awg' WHERE id = ?`, f.profile)
+	e.sql(`UPDATE inbound SET awg_health_json = '{"backend":"userspace"}', awg_health_at = 1 WHERE id = ?`, f.inbound)
+	g := e.group("awg", f.profile)
+	alice := e.user("alice", g, nil).User
+	var cred string
+	if err := e.st.R.QueryRow(`SELECT id FROM device_credential WHERE user_id = ? ORDER BY id LIMIT 1`, alice.Id).Scan(&cred); err != nil {
+		t.Fatal(err)
+	}
+	e.sql(`UPDATE device_credential SET protocol = 'awg' WHERE id = ?`, cred)
+	hour := e.clock.Unix() / 3600 * 3600
+	e.sql(`INSERT INTO link_hour (node_id, hour_start, inbound_id, cred_id, user_id, initiations, responses, responses_unmatched)
+		VALUES ('nod_de1', ?, ?, ?, ?, 9, 8, 7)`, hour, f.inbound, cred, alice.Id)
+
+	read := func() *adminv1.DeviceConnection {
+		t.Helper()
+		resp, err := e.s.GetUserConnection(e.ctx, req(&adminv1.GetUserConnectionRequest{UserId: alice.Id, ByHour: true}))
+		if err != nil || len(resp.Msg.Rows) != 1 {
+			t.Fatalf("GetUserConnection = %+v, %v", resp, err)
+		}
+		return resp.Msg.Rows[0]
+	}
+	row := read()
+	if row.Initiations != 9 || row.Responses != 8 || row.ResponsesUnmatched != 7 || len(row.Hours) != 1 || row.Hours[0].ResponsesUnmatched != 7 {
+		t.Errorf("AWG key row = %+v", row)
+	}
+	for _, f := range []string{"initiations", "responses", "responses_unmatched"} {
+		if slices.Contains(row.Unsupported, f) {
+			t.Errorf("userspace backend: %s unsupported (%v)", f, row.Unsupported)
+		}
+	}
+	if !slices.Contains(row.Unsupported, "tcp_stalls") {
+		t.Errorf("AWG has no TCP stalls, unsupported = %v", row.Unsupported)
+	}
+	e.sql(`UPDATE inbound SET awg_health_json = '{"backend":"kernel"}' WHERE id = ?`, f.inbound)
+	if row = read(); !slices.Contains(row.Unsupported, "initiations") {
+		t.Errorf("kernel backend: unsupported = %v, want initiations", row.Unsupported)
+	}
+	e.sql(`UPDATE inbound SET awg_health_json = '{"backend":"userspace"}' WHERE id = ?`, f.inbound)
+	e.sql(`UPDATE node SET agent_caps = 'links/1 links/2 awg/1' WHERE id = 'nod_de1'`)
+	if row = read(); !slices.Contains(row.Unsupported, "responses_unmatched") {
+		t.Errorf("an agent without links/3: unsupported = %v, want responses_unmatched", row.Unsupported)
+	}
 }
