@@ -29,6 +29,45 @@ type userspace struct {
 	mu      sync.Mutex
 	devs    map[string]*device.Device
 	unknown map[string]*atomic.Uint32
+	hs      map[string]*peerHandshakes
+}
+
+// peerHandshakes counts the handshakes of each peer of one device from its log (handshakeLogKind), keyed by the device's
+// peer; TakeHandshakes turns the peers into keys.
+type peerHandshakes struct {
+	mu     sync.Mutex
+	byPeer map[*device.Peer]handshakeCounts
+}
+
+func (p *peerHandshakes) log(format string, args []any) {
+	kind := handshakeLogKind(format)
+	if kind == 0 || len(args) == 0 {
+		return
+	}
+	peer, ok := args[0].(*device.Peer)
+	if !ok || peer == nil {
+		return
+	}
+	p.mu.Lock()
+	c := p.byPeer[peer]
+	switch kind {
+	case 1:
+		c.initiations++
+	case 2:
+		c.responses++
+	case -2:
+		c.responses -= min(c.responses, 1)
+	}
+	p.byPeer[peer] = c
+	p.mu.Unlock()
+}
+
+func (p *peerHandshakes) take() map[*device.Peer]handshakeCounts {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := p.byPeer
+	p.byPeer = map[*device.Peer]handshakeCounts{}
+	return out
 }
 
 func newUserspace(log *slog.Logger) (*userspace, error) {
@@ -37,7 +76,7 @@ func newUserspace(log *slog.Logger) (*userspace, error) {
 		return nil, fmt.Errorf("/dev/net/tun is not usable: %w", err)
 	}
 	f.Close()
-	return &userspace{log: log, devs: map[string]*device.Device{}, unknown: map[string]*atomic.Uint32{}}, nil
+	return &userspace{log: log, devs: map[string]*device.Device{}, unknown: map[string]*atomic.Uint32{}, hs: map[string]*peerHandshakes{}}, nil
 }
 
 func (u *userspace) Name() string { return "userspace" }
@@ -70,13 +109,17 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 		return fmt.Errorf("create tun %s: %w", name, err)
 	}
 	unknown := &atomic.Uint32{}
+	hs := &peerHandshakes{byPeer: map[*device.Peer]handshakeCounts{}}
 	logger := &device.Logger{
-		Verbosef: func(format string, _ ...any) {
+		Verbosef: func(format string, args ...any) {
 			if isUnknownInitiationLog(format) {
 				unknown.Add(1)
+				return
 			}
+			hs.log(format, args)
 		},
 		Errorf: func(f string, a ...any) {
+			hs.log(f, a) // a response that did not leave
 			msg, template := userspaceErrorLogMessage(f, a...)
 			// A server learns a device's address only when the device writes first: after every restart, replies
 			// queued for a device that has not reconnected yet log this until it does. Expected, not an error.
@@ -109,7 +152,31 @@ func (u *userspace) Create(ctx context.Context, name string, d deviceConfig) err
 	}
 	u.devs[name] = dev // u.mu is held since the top of Create
 	u.unknown[name] = unknown
+	u.hs[name] = hs
 	return nil
+}
+
+// TakeHandshakes resolves the counted peers of the device to the given keys (a peer removed since is dropped).
+func (u *userspace) TakeHandshakes(name string, keys [][32]byte) map[[32]byte]handshakeCounts {
+	u.mu.Lock()
+	dev, hs := u.devs[name], u.hs[name]
+	u.mu.Unlock()
+	if dev == nil || hs == nil {
+		return nil
+	}
+	counted := hs.take()
+	if len(counted) == 0 {
+		return nil
+	}
+	out := make(map[[32]byte]handshakeCounts, len(counted))
+	for _, key := range keys {
+		if peer := dev.LookupPeer(device.NoisePublicKey(key)); peer != nil {
+			if c, ok := counted[peer]; ok {
+				out[key] = c
+			}
+		}
+	}
+	return out
 }
 
 // gatedTUN keeps the TUN reader of amneziawg-go from reading before the device is configured. RoutineReadFromTUN,
@@ -215,6 +282,7 @@ func (u *userspace) Destroy(ctx context.Context, name string) error {
 	d := u.devs[name]
 	delete(u.devs, name)
 	delete(u.unknown, name)
+	delete(u.hs, name)
 	u.mu.Unlock()
 	if d != nil {
 		d.Close() // closes the TUN, which removes the interface
@@ -230,6 +298,7 @@ func (u *userspace) Close() error {
 		_ = deleteLink(n)
 		delete(u.devs, n)
 		delete(u.unknown, n)
+		delete(u.hs, n)
 	}
 	return nil
 }

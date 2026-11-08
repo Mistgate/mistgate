@@ -54,6 +54,8 @@ type credState struct {
 	person     atomic.Pointer[ratelimit.Limiter] // the person limit: the bucket of the whole user on this node (ratelimit.Registry)
 	up, down   atomic.Uint64
 	removed    atomic.Bool
+	// links/3 events (links.go): connections whose first request carried this key, and how many of them stalled.
+	connects, tcpStalls, tcpStalls16K atomic.Uint32
 
 	now   func() time.Time
 	after afterFunc
@@ -252,6 +254,20 @@ func (cs *credState) cancelLinks() int {
 	return 0
 }
 
+func (cs *credState) stall(stalled, first16K bool) {
+	if stalled {
+		cs.tcpStalls.Add(1)
+		if first16K {
+			cs.tcpStalls16K.Add(1)
+		}
+	}
+}
+
+func (cs *credState) takeLinkStats() plugin.LinkStat {
+	return plugin.LinkStat{CredID: cs.id, InboundID: cs.inboundID, Connects: cs.connects.Swap(0), TCPStalls: cs.tcpStalls.Swap(0),
+		TCPStalls16K: cs.tcpStalls16K.Swap(0)}
+}
+
 func (cs *credState) session() (time.Time, bool) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -422,6 +438,10 @@ func (in *inbound) dispatch(ctx context.Context, link *transport.Link) error {
 	handle, ok := cs.addLink(ctx, link, inboundSession.Conn)
 	if !ok {
 		return errors.New("credential unavailable")
+	}
+	// The first request of a TCP connection makes it a connection of this key (a mux or XUDP connection carries more).
+	if tc := trackedConnOf(inboundSession.Conn); tc != nil && tc.markSession(cs) {
+		cs.connects.Add(1)
 	}
 	stopOnInbound := context.AfterFunc(in.ctx, handle.stop)
 	if in.ctx.Err() != nil {

@@ -42,8 +42,9 @@ type eng struct {
 	out   func(string) (engine.Egress, error)
 	users *ratelimit.Registry // the person limit buckets (shared with the other engines of the agent)
 
-	unknownMu   sync.Mutex
+	unknownMu   sync.Mutex // guards unknownKeys and handshakes
 	unknownKeys map[string]*unknownKeyTracker
+	handshakes  map[string]*inboundCounters // links/3, by inbound id (links.go)
 
 	torrentEnabled atomic.Bool
 	idleTimeout    time.Duration
@@ -111,7 +112,7 @@ func New(env engine.Env) (engine.Engine, error) {
 	after := afterFunc(func(d time.Duration, f func()) stoppable { return time.AfterFunc(d, f) })
 	e := &eng{
 		env: env, log: logger, now: now, after: after, idleTimeout: 300 * time.Second,
-		inbounds: make(map[string]*inbound), unknownKeys: make(map[string]*unknownKeyTracker),
+		inbounds: make(map[string]*inbound), unknownKeys: make(map[string]*unknownKeyTracker), handshakes: make(map[string]*inboundCounters),
 	}
 	e.out = env.Egress
 	if e.users = env.UserLimits; e.users == nil {
@@ -239,6 +240,9 @@ func (in *inbound) start(ctx context.Context) error {
 		return err
 	}
 	tracker := newTCPConnTracker(in.spec.ID, in.generation)
+	tracker.counters = in.e.handshakeCounters(in.spec.ID)
+	tracker.reality = in.cfg.security == "reality"
+	tracker.stalls = tracker.reality && in.cfg.transport == "tcp"
 	tracker.register()
 	in.connTracker = tracker
 	started := false
@@ -331,7 +335,10 @@ func (in *inbound) start(ctx context.Context) error {
 		return err
 	}
 	if in.cfg.security == "tls" {
-		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, tlsFrontProtos(in.cfg.transport), in.tlsSocketNetwork, in.tlsSocketAddr)
+		// links/3: the front counts its own handshakes, and its TCP stalls only when people reach it directly (behind a CDN
+		// the connection is the CDN's)
+		links := frontLinks{counters: in.e.handshakeCounters(in.spec.ID), serverName: in.spec.TLS.ServerName, stalls: in.cfg.cdnHost == ""}
+		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, tlsFrontProtos(in.cfg.transport), in.tlsSocketNetwork, in.tlsSocketAddr, links)
 		if err != nil {
 			return err
 		}
@@ -532,10 +539,16 @@ func (e *eng) Collect(context.Context) (engine.Collected, error) {
 			out.Traffic = append(out.Traffic, plugin.UserTraffic{CredID: cs.id, InboundID: cs.inboundID, Up: up, Down: down})
 		}
 	}
+	links := func(stat plugin.LinkStat) {
+		if !stat.Zero() {
+			out.Links = append(out.Links, stat)
+		}
+	}
 	for _, in := range e.sortedInbounds() {
 		if ix := in.idx.Load(); ix != nil {
 			for _, cs := range ix.byID {
 				flush(cs)
+				links(cs.takeLinkStats())
 				if !cs.removed.Load() {
 					if since, open := cs.session(); open {
 						out.Sessions = append(out.Sessions, plugin.Session{CredID: cs.id, InboundID: in.spec.ID, Since: since})
@@ -547,6 +560,7 @@ func (e *eng) Collect(context.Context) (engine.Collected, error) {
 	keep := e.retired[:0]
 	for _, cs := range e.retired {
 		flush(cs)
+		links(cs.takeLinkStats())
 		_, open := cs.session()
 		if open || cs.up.Load() != 0 || cs.down.Load() != 0 {
 			keep = append(keep, cs)
@@ -554,12 +568,22 @@ func (e *eng) Collect(context.Context) (engine.Collected, error) {
 	}
 	e.retired = keep
 	e.unknownMu.Lock()
+	rows := make(map[string]plugin.LinkStat, len(e.handshakes))
+	for inboundID, counters := range e.handshakes {
+		rows[inboundID] = counters.take(inboundID)
+	}
 	for inboundID, counter := range e.unknownKeys {
-		if count := counter.count.Swap(0); count != 0 {
-			out.Links = append(out.Links, plugin.LinkStat{InboundID: inboundID, UnknownKeys: count})
+		row, ok := rows[inboundID]
+		if !ok {
+			row.InboundID = inboundID
 		}
+		row.UnknownKeys = counter.count.Swap(0)
+		rows[inboundID] = row
 	}
 	e.unknownMu.Unlock()
+	for _, row := range rows {
+		links(row)
+	}
 	sort.Slice(out.Traffic, func(i, j int) bool {
 		a, b := out.Traffic[i], out.Traffic[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
@@ -568,7 +592,10 @@ func (e *eng) Collect(context.Context) (engine.Collected, error) {
 		a, b := out.Sessions[i], out.Sessions[j]
 		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && (a.CredID < b.CredID || (a.CredID == b.CredID && a.Since.Before(b.Since))))
 	})
-	sort.Slice(out.Links, func(i, j int) bool { return out.Links[i].InboundID < out.Links[j].InboundID })
+	sort.Slice(out.Links, func(i, j int) bool {
+		a, b := out.Links[i], out.Links[j]
+		return a.InboundID < b.InboundID || (a.InboundID == b.InboundID && a.CredID < b.CredID)
+	})
 	return out, nil
 }
 

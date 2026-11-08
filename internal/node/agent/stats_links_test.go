@@ -82,6 +82,58 @@ func TestBuildBatchLinkCounterWindow(t *testing.T) {
 	}
 }
 
+// links/3: the TCP stalls are events (the next batch), the handshake failures and the AmneziaWG handshake counts are volume
+// (held to the 10-minute boundary with hellos and accepted, so their ratios hold within one bucket).
+func TestBuildBatchLinkCountersV3(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	h.a.statsEvery = 10 * time.Second
+	h.a.linkWindow = 10 * time.Minute
+	start := time.Date(2026, 11, 7, 12, 9, 40, 0, time.UTC)
+	collect := func(from, to time.Time, c engine.Collected) *pb.StatsBatch {
+		t.Helper()
+		h.eng.mu.Lock()
+		h.eng.collectQueue = append(h.eng.collectQueue, c)
+		h.eng.mu.Unlock()
+		return h.a.buildBatch(context.Background(), from, to)
+	}
+	first := collect(start, start.Add(10*time.Second), engine.Collected{Links: []plugin.LinkStat{
+		{CredID: "crd_v", InboundID: "inb_v", Connects: 1, TCPStalls: 2, TCPStalls16K: 1},
+		{InboundID: "inb_v", Hellos: 5, HellosForeign: 1, RealityFallback: 2, AuthFailed: 1, HsUnfinished: 1},
+		{InboundID: "inb_h", TLSAlertsSent: 1, TLSAlertsRecv: 2, TLSCertRefused: 2, HsUnfinished: 3},
+		{CredID: "crd_w", InboundID: "inb_w", Initiations: 3, Responses: 3, ResponsesUnmatched: 2},
+	}})
+	if len(first.Links) != 1 || !sameLinkCounters(first.Links[0], &pb.LinkCounters{CredId: "crd_v", InboundId: "inb_v", Connects: 1}) ||
+		first.Links[0].TcpStalls != 2 || first.Links[0].TcpStalls_16K != 1 {
+		t.Fatalf("the stalls leave at once, the rest waits for the boundary: %+v", first.Links)
+	}
+	boundary := collect(start.Add(10*time.Second), start.Add(20*time.Second), engine.Collected{Links: []plugin.LinkStat{
+		{CredID: "crd_w", InboundID: "inb_w", Initiations: 1, Responses: 1},
+	}})
+	rows := map[string]*pb.LinkCounters{}
+	for _, r := range boundary.Links {
+		rows[r.InboundId+"/"+r.CredId] = r
+	}
+	if r := rows["inb_v/"]; r == nil || r.Hellos != 5 || r.HellosForeign != 1 || r.RealityFallback != 2 || r.AuthFailed != 1 || r.HsUnfinished != 1 {
+		t.Fatalf("VLESS inbound row = %+v", r)
+	}
+	if r := rows["inb_h/"]; r == nil || r.TlsAlertsSent != 1 || r.TlsAlertsRecv != 2 || r.TlsCertRefused != 2 || r.HsUnfinished != 3 {
+		t.Fatalf("Hysteria2 inbound row = %+v", r)
+	}
+	if r := rows["inb_w/crd_w"]; r == nil || r.Initiations != 4 || r.Responses != 4 || r.ResponsesUnmatched != 2 {
+		t.Fatalf("AmneziaWG key row = %+v", r)
+	}
+	if len(boundary.Links) != 3 {
+		t.Fatalf("boundary rows = %+v", boundary.Links)
+	}
+}
+
+func TestCapabilitiesAdvertiseLinkCountersV3(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	if !contains(h.a.capabilities(), "links/3") {
+		t.Fatalf("capabilities = %v, want links/3", h.a.capabilities())
+	}
+}
+
 func TestCapabilitiesAdvertiseLinkCountersV2(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true})
 	if !contains(h.a.capabilities(), "links/2") {

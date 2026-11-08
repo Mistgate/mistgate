@@ -237,4 +237,17 @@ message LinkHour {
   uint32 loss_permille = 16;
   uint32 rtt_samples = 17;
   uint64 pkts_sent = 18 [jstype = JS_NUMBER];
+  // Agents that list "links/3" (see InboundConnections); device rows carry only the per-key ones (tcp_stalls,
+  // tcp_stalls_16k, initiations, responses, responses_unmatched).
+  uint32 hs_unfinished = 19;
+  uint32 tls_alerts_sent = 20;
+  uint32 tls_alerts_recv = 21;
+  uint32 tls_cert_refused = 22;
+  uint32 reality_fallback = 23;
+  uint32 auth_failed = 24;
+  uint32 tcp_stalls = 25;
+  uint32 tcp_stalls_16k = 26;
+  uint32 initiations = 27;
+  uint32 responses = 28;
+  uint32 responses_unmatched = 29;
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	xlog "github.com/xtls/xray-core/common/log"
 )
@@ -42,6 +43,10 @@ func (xrayLogHandler) Handle(message xlog.Message) {
 		level = slog.LevelError
 	case xlog.Severity_Warning:
 		level = slog.LevelWarn
+	case xlog.Severity_Info:
+		// REALITY's verdict on a connection it refused is an Info line (links.go); nothing else at Info is kept
+		realityVerdict(fmt.Sprint(general.Content), time.Now())
+		return
 	default:
 		return
 	}

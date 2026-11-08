@@ -1459,6 +1459,56 @@ type deviceConnV struct {
 	LossPermille *uint32     `json:"loss_permille,omitempty"`
 	RttSamples   uint32      `json:"rtt_samples,omitempty"`
 	PktsSent     uint64      `json:"pkts_sent,omitempty"`
+	keyReasonsV
+	Unsupported []string `json:"unsupported,omitempty"`
+}
+
+// keyReasonsV are the links/3 counters of a key (agent.proto LinkCounters).
+type keyReasonsV struct {
+	TCPStalls          uint32 `json:"tcp_stalls,omitempty"`
+	TCPStalls16K       uint32 `json:"tcp_stalls_16k,omitempty"`
+	Initiations        uint32 `json:"initiations,omitempty"`
+	Responses          uint32 `json:"responses,omitempty"`
+	ResponsesUnmatched uint32 `json:"responses_unmatched,omitempty"`
+}
+
+// linkReasonsV are all the links/3 counters of an inbound or an hour.
+type linkReasonsV struct {
+	HsUnfinished    uint32 `json:"hs_unfinished,omitempty"`
+	TLSAlertsSent   uint32 `json:"tls_alerts_sent,omitempty"`
+	TLSAlertsRecv   uint32 `json:"tls_alerts_recv,omitempty"`
+	TLSCertRefused  uint32 `json:"tls_cert_refused,omitempty"`
+	RealityFallback uint32 `json:"reality_fallback,omitempty"`
+	AuthFailed      uint32 `json:"auth_failed,omitempty"`
+	keyReasonsV
+}
+
+type linkReasonsSource interface {
+	GetHsUnfinished() uint32
+	GetTlsAlertsSent() uint32
+	GetTlsAlertsRecv() uint32
+	GetTlsCertRefused() uint32
+	GetRealityFallback() uint32
+	GetAuthFailed() uint32
+	keyReasonsSource
+}
+
+type keyReasonsSource interface {
+	GetTcpStalls() uint32
+	GetTcpStalls_16K() uint32
+	GetInitiations() uint32
+	GetResponses() uint32
+	GetResponsesUnmatched() uint32
+}
+
+func keyReasonsView(s keyReasonsSource) keyReasonsV {
+	return keyReasonsV{TCPStalls: s.GetTcpStalls(), TCPStalls16K: s.GetTcpStalls_16K(), Initiations: s.GetInitiations(), Responses: s.GetResponses(),
+		ResponsesUnmatched: s.GetResponsesUnmatched()}
+}
+
+func linkReasonsView(s linkReasonsSource) linkReasonsV {
+	return linkReasonsV{HsUnfinished: s.GetHsUnfinished(), TLSAlertsSent: s.GetTlsAlertsSent(), TLSAlertsRecv: s.GetTlsAlertsRecv(),
+		TLSCertRefused: s.GetTlsCertRefused(), RealityFallback: s.GetRealityFallback(), AuthFailed: s.GetAuthFailed(), keyReasonsV: keyReasonsView(s)}
 }
 
 type nodeWithoutV struct {
@@ -1486,7 +1536,7 @@ func userConnectionView(r *adminv1.GetUserConnectionResponse, nodes []*adminv1.N
 			LastHourUnix: d.GetLastHourUnix(), Platform: clean(d.GetPlatform(), 40), Client: clean(d.GetClient(), 80), Kind: clean(d.GetKind(), 40),
 			Hours: []linkHourV{}, ClientCloses: d.GetClientCloses(), Freezes: d.GetFreezes(), Quiet: d.GetQuiet(),
 			RttMs: metricWhen(d.GetRttMs(), d.GetRttSamples() > 0), LossPermille: metricWhen(d.GetLossPermille(), d.GetPktsSent() > 0),
-			RttSamples: d.GetRttSamples(), PktsSent: d.GetPktsSent()}
+			RttSamples: d.GetRttSamples(), PktsSent: d.GetPktsSent(), keyReasonsV: keyReasonsView(d), Unsupported: append([]string(nil), d.GetUnsupported()...)}
 		for _, h := range d.GetHours() {
 			dv.Hours = append(dv.Hours, linkHourView(h))
 		}
@@ -1541,6 +1591,7 @@ type inboundConnV struct {
 	LossPermille  *uint32       `json:"loss_permille,omitempty"`
 	RttSamples    uint32        `json:"rtt_samples,omitempty"`
 	PktsSent      uint64        `json:"pkts_sent,omitempty"`
+	linkReasonsV
 }
 
 type linkHourV struct {
@@ -1562,6 +1613,7 @@ type linkHourV struct {
 	LossPermille  *uint32 `json:"loss_permille,omitempty"`
 	RttSamples    uint32  `json:"rtt_samples,omitempty"`
 	PktsSent      uint64  `json:"pkts_sent,omitempty"`
+	linkReasonsV
 }
 
 type clientConnV struct {
@@ -1591,7 +1643,8 @@ func linkHourView(h *adminv1.LinkHour) linkHourV {
 		Stalls: h.GetStalls(), OnlineS: h.GetOnlineS(), UnknownKeys: h.GetUnknownKeys(), Hellos: h.GetHellos(), Handshakes: h.GetHandshakes(),
 		ClientCloses: h.GetClientCloses(), Freezes: h.GetFreezes(), Quiet: h.GetQuiet(), Accepted: h.GetAccepted(),
 		HellosForeign: h.GetHellosForeign(), RttMs: metricWhen(h.GetRttMs(), h.GetRttSamples() > 0),
-		LossPermille: metricWhen(h.GetLossPermille(), h.GetPktsSent() > 0), RttSamples: h.GetRttSamples(), PktsSent: h.GetPktsSent()}
+		LossPermille: metricWhen(h.GetLossPermille(), h.GetPktsSent() > 0), RttSamples: h.GetRttSamples(), PktsSent: h.GetPktsSent(),
+		linkReasonsV: linkReasonsView(h)}
 }
 
 func metricWhen(value uint32, available bool) *uint32 {
@@ -1608,7 +1661,8 @@ func inboundConnectionsView(i *adminv1.InboundConnections) inboundConnV {
 		KeysStalled: i.GetKeysStalled(), KeysTried: i.GetKeysTried(), Unsupported: append([]string(nil), i.GetUnsupported()...),
 		Hours: []linkHourV{}, Clients: []clientConnV{}, ClientCloses: i.GetClientCloses(), Freezes: i.GetFreezes(), Quiet: i.GetQuiet(),
 		Accepted: i.GetAccepted(), HellosForeign: i.GetHellosForeign(), RttMs: metricWhen(i.GetRttMs(), i.GetRttSamples() > 0),
-		LossPermille: metricWhen(i.GetLossPermille(), i.GetPktsSent() > 0), RttSamples: i.GetRttSamples(), PktsSent: i.GetPktsSent()}
+		LossPermille: metricWhen(i.GetLossPermille(), i.GetPktsSent() > 0), RttSamples: i.GetRttSamples(), PktsSent: i.GetPktsSent(),
+		linkReasonsV: linkReasonsView(i)}
 	for _, h := range i.GetHours() {
 		v.Hours = append(v.Hours, linkHourView(h))
 	}

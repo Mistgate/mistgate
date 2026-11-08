@@ -168,6 +168,10 @@ type inbound struct {
 	handshakes      atomic.Uint32
 	accepted        atomic.Uint32
 	hellosForeign   atomic.Uint32
+	hsUnfinished    atomic.Uint32 // links/3 (handshake.go)
+	tlsAlertsSent   atomic.Uint32
+	tlsAlertsRecv   atomic.Uint32
+	tlsCertRefused  atomic.Uint32
 	mu              sync.Mutex // guards the fields below
 	state           plugin.RunState
 	requestMu       sync.Mutex
@@ -348,6 +352,7 @@ func (in *inbound) start(ctx context.Context) error {
 	if in.e.quicIdleTimeout > 0 {
 		serverCfg.QUICConfig.MaxIdleTimeout = in.e.quicIdleTimeout
 	}
+	serverCfg.QUICConfig.ConnContext = in.connContext
 	srv, err := server.NewServer(serverCfg)
 	if err != nil {
 		conn.Close() // NewServer only closes it on some failures
@@ -544,7 +549,7 @@ func (e *eng) Collect(ctx context.Context) (engine.Collected, error) {
 		}
 	}
 	links := func(stat plugin.LinkStat) {
-		if stat.Connects|stat.Rejects|stat.Drops|stat.Stalls|stat.UnknownKeys|stat.Hellos|stat.Handshakes|stat.ClientCloses|stat.Freezes|stat.Quiet|stat.Accepted|stat.HellosForeign|stat.RTTSamples != 0 || stat.RTTMSSum|stat.PktsSent|stat.PktsLost != 0 {
+		if !stat.Zero() {
 			out.Links = append(out.Links, stat)
 		}
 	}

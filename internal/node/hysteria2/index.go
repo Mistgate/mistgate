@@ -285,7 +285,10 @@ func (in *inbound) Disconnect(addr net.Addr, id string, err error) {
 	}
 }
 
-func (in *inbound) Accepted(*quic.Conn) { in.accepted.Add(1) }
+func (in *inbound) Accepted(conn *quic.Conn) {
+	in.accepted.Add(1)
+	markAccepted(conn)
+}
 
 func (in *inbound) ConnConnect(conn *quic.Conn, id string, _ uint64) {
 	cs := in.idx.Load().byID[id]
@@ -407,6 +410,8 @@ func (in *inbound) takeLinkStats() plugin.LinkStat {
 	return plugin.LinkStat{
 		InboundID: in.spec.ID, UnknownKeys: in.unknownKeys.Swap(0), Hellos: in.hellos.Swap(0), Handshakes: in.handshakes.Swap(0),
 		Accepted: in.accepted.Swap(0), HellosForeign: in.hellosForeign.Swap(0),
+		HsUnfinished: in.hsUnfinished.Swap(0), TLSAlertsSent: in.tlsAlertsSent.Swap(0), TLSAlertsRecv: in.tlsAlertsRecv.Swap(0),
+		TLSCertRefused: in.tlsCertRefused.Swap(0),
 	}
 }
 

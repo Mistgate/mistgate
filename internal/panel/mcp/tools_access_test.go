@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 )
 
 // Fixtures for the access_report rules and the block classifier: pure inputs, no panel.
@@ -247,7 +249,7 @@ func TestAccessAWGHandshakeNoReply(t *testing.T) {
 	f := newFx().node("fi1", "FI", "online").node("msk1", "RU", "online").group("family", "prf_awg", "prf_hy2").users("family", 3, 1699990000)
 	a := f.inbound("fi1", "prf_awg", "awg", 51820)
 	h := f.inbound("fi1", "prf_hy2", "hysteria2", 443)
-	f.in.Totals[a] = accTotals{Protocol: "awg", Stalls: 12, KeysStalled: 4, KeysTried: 4}
+	f.in.Totals[a] = accTotals{Protocol: "awg", Stalls: 12, KeysStalled: 4, KeysTried: 4, Unsupported: connectiondiag.UnsupportedCounters("awg")} // an agent without links/3
 	f.in.Totals[h] = hy2Good()
 	f.rows("family", a, "fi1", accRow{Stalls: 4})
 	f.rows("family", h, "fi1", accRow{Connects: 4})
@@ -262,7 +264,7 @@ func TestAccessAWGHandshakeNoReply(t *testing.T) {
 		t.Fatalf("awg finding: %+v", fd)
 	}
 	c := classOf(r, "fi1", clsFingerprinted)
-	if c == nil || c.Confidence != confLow || c.protocol != "awg" || len(c.Unknown) == 0 || !strings.Contains(c.Unknown[0], "per-reason handshake counters") {
+	if c == nil || c.Confidence != confLow || c.protocol != "awg" || len(c.Unknown) == 0 || !strings.Contains(c.Unknown[0], "is not known") {
 		t.Fatalf("fingerprinted: %+v", c)
 	}
 	for _, cell := range r.Matrix {

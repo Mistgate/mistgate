@@ -469,13 +469,22 @@ type DeviceConnection struct {
 	// With by_hour: the hours of the window that have a counter, oldest first.
 	Hours []*LinkHour `protobuf:"bytes,16,rep,name=hours,proto3" json:"hours,omitempty"`
 	// Hysteria2 with agents that list "links/2"; what they mean is under InboundConnections (node.proto).
-	ClientCloses  uint32 `protobuf:"varint,17,opt,name=client_closes,json=clientCloses,proto3" json:"client_closes,omitempty"`
-	Freezes       uint32 `protobuf:"varint,18,opt,name=freezes,proto3" json:"freezes,omitempty"`
-	Quiet         uint32 `protobuf:"varint,19,opt,name=quiet,proto3" json:"quiet,omitempty"`
-	RttMs         uint32 `protobuf:"varint,20,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
-	LossPermille  uint32 `protobuf:"varint,21,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
-	RttSamples    uint32 `protobuf:"varint,22,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
-	PktsSent      uint64 `protobuf:"varint,23,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
+	ClientCloses uint32 `protobuf:"varint,17,opt,name=client_closes,json=clientCloses,proto3" json:"client_closes,omitempty"`
+	Freezes      uint32 `protobuf:"varint,18,opt,name=freezes,proto3" json:"freezes,omitempty"`
+	Quiet        uint32 `protobuf:"varint,19,opt,name=quiet,proto3" json:"quiet,omitempty"`
+	RttMs        uint32 `protobuf:"varint,20,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	LossPermille uint32 `protobuf:"varint,21,opt,name=loss_permille,json=lossPermille,proto3" json:"loss_permille,omitempty"`
+	RttSamples   uint32 `protobuf:"varint,22,opt,name=rtt_samples,json=rttSamples,proto3" json:"rtt_samples,omitempty"`
+	PktsSent     uint64 `protobuf:"varint,23,opt,name=pkts_sent,json=pktsSent,proto3" json:"pkts_sent,omitempty"`
+	// The per-key counters of agents that list "links/3" (InboundConnections in node.proto says what they mean): VLESS
+	// tcp_stalls and tcp_stalls_16k, AmneziaWG (userspace backend) initiations, responses and responses_unmatched.
+	TcpStalls          uint32 `protobuf:"varint,24,opt,name=tcp_stalls,json=tcpStalls,proto3" json:"tcp_stalls,omitempty"`
+	TcpStalls_16K      uint32 `protobuf:"varint,25,opt,name=tcp_stalls_16k,json=tcpStalls16k,proto3" json:"tcp_stalls_16k,omitempty"`
+	Initiations        uint32 `protobuf:"varint,26,opt,name=initiations,proto3" json:"initiations,omitempty"`
+	Responses          uint32 `protobuf:"varint,27,opt,name=responses,proto3" json:"responses,omitempty"`
+	ResponsesUnmatched uint32 `protobuf:"varint,28,opt,name=responses_unmatched,json=responsesUnmatched,proto3" json:"responses_unmatched,omitempty"`
+	// Which of these five this row's protocol, transport, AWG backend or agent does not count: their zero means nothing.
+	Unsupported   []string `protobuf:"bytes,29,rep,name=unsupported,proto3" json:"unsupported,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -669,6 +678,48 @@ func (x *DeviceConnection) GetPktsSent() uint64 {
 		return x.PktsSent
 	}
 	return 0
+}
+
+func (x *DeviceConnection) GetTcpStalls() uint32 {
+	if x != nil {
+		return x.TcpStalls
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetTcpStalls_16K() uint32 {
+	if x != nil {
+		return x.TcpStalls_16K
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetInitiations() uint32 {
+	if x != nil {
+		return x.Initiations
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetResponses() uint32 {
+	if x != nil {
+		return x.Responses
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetResponsesUnmatched() uint32 {
+	if x != nil {
+		return x.ResponsesUnmatched
+	}
+	return 0
+}
+
+func (x *DeviceConnection) GetUnsupported() []string {
+	if x != nil {
+		return x.Unsupported
+	}
+	return nil
 }
 
 type GetUserConnectionResponse struct {
@@ -3852,7 +3903,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x18GetUserConnectionRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05hours\x18\x02 \x01(\rR\x05hours\x12\x17\n" +
-	"\aby_hour\x18\x03 \x01(\bR\x06byHour\"\xbe\x05\n" +
+	"\aby_hour\x18\x03 \x01(\bR\x06byHour\"\x96\a\n" +
 	"\x10DeviceConnection\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
@@ -3879,7 +3930,14 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\rloss_permille\x18\x15 \x01(\rR\flossPermille\x12\x1f\n" +
 	"\vrtt_samples\x18\x16 \x01(\rR\n" +
 	"rttSamples\x12\x1f\n" +
-	"\tpkts_sent\x18\x17 \x01(\x04B\x020\x02R\bpktsSent\"\xcc\x01\n" +
+	"\tpkts_sent\x18\x17 \x01(\x04B\x020\x02R\bpktsSent\x12\x1d\n" +
+	"\n" +
+	"tcp_stalls\x18\x18 \x01(\rR\ttcpStalls\x12$\n" +
+	"\x0etcp_stalls_16k\x18\x19 \x01(\rR\ftcpStalls16k\x12 \n" +
+	"\vinitiations\x18\x1a \x01(\rR\vinitiations\x12\x1c\n" +
+	"\tresponses\x18\x1b \x01(\rR\tresponses\x12/\n" +
+	"\x13responses_unmatched\x18\x1c \x01(\rR\x12responsesUnmatched\x12 \n" +
+	"\vunsupported\x18\x1d \x03(\tR\vunsupported\"\xcc\x01\n" +
 	"\x19GetUserConnectionResponse\x12!\n" +
 	"\n" +
 	"since_unix\x18\x01 \x01(\x03B\x020\x02R\tsinceUnix\x12\x1d\n" +

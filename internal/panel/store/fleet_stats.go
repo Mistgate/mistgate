@@ -250,7 +250,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		// per handshake that reached authentication) go to the inbound row as probe_handshakes, which the reads take off the
 		// inbound's hellos and handshakes (migration 00077), and the packets the node sent to the check and lost go there as
 		// probe_pkts_sent and probe_pkts_lost (00081).
-		linkRows := make([][]any, 0, len(in.Links))
+		linkRows := make([]linkRow, 0, len(in.Links))
 		for _, l := range in.Links {
 			if l.zero() {
 				continue
@@ -266,9 +266,10 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				if !ok && probes[l.CredID] {
 					out.Probe++
 					if _, on := onNode[l.InboundID]; on && (l.Connects|l.Rejects != 0 || l.PktsSent|l.PktsLost != 0) {
-						probe := min(uint64(l.Connects)+uint64(l.Rejects), maxLinkCount)
-						linkRows = append(linkRows, []any{"", l.InboundID, "", 0, 0, 0, 0, 0, 0, 0, 0, probe,
-							0, 0, 0, 0, 0, 0, 0, 0, 0, min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum)})
+						r := linkRow{inbound: l.InboundID}
+						r.n[lcProbeHandshakes] = min(uint64(l.Connects)+uint64(l.Rejects), maxLinkCount)
+						r.n[lcProbePktsSent], r.n[lcProbePktsLost] = min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum)
+						linkRows = append(linkRows, r)
 					}
 					continue
 				}
@@ -278,12 +279,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 				}
 				user = ref.UserID
 			}
-			linkRows = append(linkRows, []any{l.CredID, l.InboundID, user, min(l.Connects, maxLinkCount), min(l.Rejects, maxLinkCount),
-				min(l.Drops, maxLinkCount), min(l.Stalls, maxLinkCount), min(l.OnlineS, maxLinkCount), min(l.UnknownKeys, maxLinkCount),
-				min(l.Hellos, maxLinkCount), min(l.Handshakes, maxLinkCount), 0, min(l.ClientCloses, maxLinkCount),
-				min(l.Freezes, maxLinkCount), min(l.Quiet, maxLinkCount), min(l.Accepted, maxLinkCount),
-				min(l.HellosForeign, maxLinkCount), min(l.RttMSSum, maxLinkSum), min(l.RttSamples, maxLinkCount),
-				min(l.PktsSent, maxLinkSum), min(l.PktsLost, maxLinkSum), 0, 0})
+			linkRows = append(linkRows, l.row(user))
 		}
 
 		// Peaks: distinct users / devices per protocol in this snapshot.
@@ -407,7 +403,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 
 func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets []fleetStatsBucketWrite,
 	hours []fleetStatsHourWrite, users []fleetStatsUserWrite, devices []fleetStatsDeviceWrite, certs []fleetInboundCertWrite,
-	touches []fleetDeviceTouchWrite, links [][]any, live FleetLive) ([]Stmt, error) {
+	touches []fleetDeviceTouchWrite, links []linkRow, live FleetLive) ([]Stmt, error) {
 	bucketJSON, err := json.Marshal(buckets)
 	if err != nil {
 		return nil, err

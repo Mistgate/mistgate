@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 	"google.golang.org/protobuf/proto"
@@ -34,6 +36,13 @@ type tcpConnTrackerKey struct {
 
 type tcpConnTracker struct {
 	key tcpConnTrackerKey
+
+	// links/3 (links.go): the inbound's counters; reality says Xray runs REALITY on these connections (their closes before a
+	// key are kept for its verdict, and their first bytes are the client's ClientHello); stalls says a connection's key
+	// gets the TCP stall it ended with (REALITY over RAW: the connection is the client's TCP connection and one session).
+	counters *inboundCounters
+	reality  bool
+	stalls   bool
 
 	mu     sync.Mutex
 	conns  map[*trackedTCPConn]struct{}
@@ -72,6 +81,9 @@ func (t *tcpConnTracker) stop() {
 
 func (t *tcpConnTracker) track(conn net.Conn) net.Conn {
 	tracked := &trackedTCPConn{Conn: conn, tracker: t}
+	if !t.reality {
+		tracked.peeked.Store(true) // only a REALITY connection starts with the client's ClientHello
+	}
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
@@ -93,12 +105,57 @@ type trackedTCPConn struct {
 	net.Conn
 	tracker *tcpConnTracker
 	once    sync.Once
+
+	// links/3. The first six bytes, read by one reader at a time (REALITY, then the VLESS handler) until peeked; session is
+	// the key of the first request on the connection (dispatch).
+	head    [6]byte
+	headLen int
+	peeked  atomic.Bool
+	session atomic.Pointer[credState]
+}
+
+// Read passes through; until the first six bytes are in it notes whether the connection opened with a ClientHello. Vision
+// reads the raw socket past the handshake (RawConn), so this costs one atomic load per read of the handshake at most.
+func (c *trackedTCPConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	if n > 0 && !c.peeked.Load() {
+		c.peek(b[:n])
+	}
+	return n, err
+}
+
+func (c *trackedTCPConn) peek(b []byte) {
+	c.headLen += copy(c.head[c.headLen:], b)
+	if c.headLen > 0 && c.head[0] != 0x16 {
+		c.peeked.Store(true) // not TLS
+		return
+	}
+	if c.headLen < len(c.head) {
+		return
+	}
+	c.peeked.Store(true)
+	if c.tracker.reality && c.tracker.counters != nil && isClientHello(c.head) {
+		c.tracker.counters.hellos.Add(1)
+	}
+}
+
+// markSession records the key of the connection's first request; it reports whether this was the first.
+func (c *trackedTCPConn) markSession(cs *credState) bool {
+	return c.session.CompareAndSwap(nil, cs)
 }
 
 func (c *trackedTCPConn) Close() error {
 	var err error
 	c.once.Do(func() {
 		c.tracker.remove(c)
+		if cs := c.session.Load(); cs != nil {
+			if c.tracker.stalls {
+				cs.stall(tcpStall(c.Conn))
+			}
+		} else if addr := c.Conn.RemoteAddr(); addr != nil && c.tracker.reality && c.tracker.counters != nil {
+			// no key reached the engine: REALITY may be about to log why (links.go, realityVerdict)
+			rememberClose(addr.String(), c.tracker.counters, time.Now())
+		}
 		err = c.Conn.Close()
 	})
 	return err

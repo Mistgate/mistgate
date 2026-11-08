@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -134,6 +135,10 @@ type QUICConfig struct {
 	DisablePathMTUDiscovery        bool // The server may still override this to true on unsupported platforms.
 	DisableGSO                     bool
 	DisableStatelessReset          bool
+	// ConnContext is quic.Transport.ConnContext (a Mistgate patch, see MISTGATE.md): called for every connection the
+	// server creates, before its handshake; the context it is given ends when the connection does, also when the
+	// handshake fails, with the reason as its cause. nil = not set.
+	ConnContext func(context.Context, *quic.ClientInfo) (context.Context, error)
 }
 
 type CongestionConfig struct {

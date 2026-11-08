@@ -97,6 +97,10 @@ type accRow struct {
 	RttMs, RttSamples                   uint32
 	LossPermille                        uint32
 	PktsSent                            uint64
+	// links/3 per key, and which of them this row cannot have (DeviceConnection.unsupported)
+	TCPStalls, TCPStalls16K                    uint32
+	Initiations, Responses, ResponsesUnmatched uint32
+	Unsupported                                []string
 }
 
 // accTotals is an inbound with all its keys (GetFleetConnections).
@@ -111,6 +115,10 @@ type accTotals struct {
 	LossPermille                                uint32
 	PktsSent                                    uint64
 	Unsupported                                 []string
+	// links/3: why handshakes failed (tools_access_reasons.go reads them)
+	HsUnfinished, TLSAlertsSent, TLSAlertsRecv, TLSCertRefused uint32
+	RealityFallback, AuthFailed, TCPStalls, TCPStalls16K       uint32
+	Initiations, Responses, ResponsesUnmatched                 uint32
 }
 
 type accTSPUPort struct {
@@ -280,23 +288,36 @@ func has(list []string, s string) bool { return slices.Contains(list, s) }
 
 func (t accTotals) unsupportedHas(f string) bool { return has(t.Unsupported, f) }
 
-// health reads an inbound's own counters (all keys together): working, failing or unknown. VLESS keeps no connect counter,
-// only online_s.
+// health reads an inbound's own counters (all keys together): working, failing or unknown. VLESS counts connects only with
+// links/3 over REALITY TCP; otherwise only online_s and, with links/3, its handshakes.
 func (t accTotals) health(proto string) string {
+	lost, _ := t.answerLost(proto)
 	switch normProtocol(proto) {
 	case "vless":
+		if freeze, conf, _ := t.tcpFreeze(); freeze && conf == confHigh {
+			return stateFailing // connects, then freezes after the first bytes
+		}
+		if t.known("connects") && t.Connects >= minFleetAttempts {
+			return stateWorking
+		}
 		if t.OnlineS > 0 {
 			return stateWorking
+		}
+		if lost || t.known("connects") && t.Connects == 0 && t.oursHellos() >= minHellosNoHS {
+			return stateFailing
 		}
 		return stateUnknown
 	case "awg":
 		if t.Connects >= minFleetAttempts && t.Stalls*2 <= t.Connects {
 			return stateWorking
 		}
-		if t.Stalls >= minFleetAttempts && t.Connects == 0 {
+		if t.Stalls >= minFleetAttempts && t.Connects == 0 || lost && t.Connects*2 < t.Responses {
 			return stateFailing
 		}
 	case "hysteria2":
+		if lost && t.Connects*2 < t.oursHellos() {
+			return stateFailing
+		}
 		att := t.Connects + t.Rejects + t.Freezes
 		if t.Connects >= minFleetAttempts && t.Freezes*5 <= t.Connects {
 			return stateWorking
@@ -750,20 +771,55 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 		udpWorks = true
 	}
 
-	// tcp throttled: connects fine, downloads stall (the 16 KB pattern).
+	// tcp throttled: connects fine, downloads stall (the 16 KB pattern), as kl!ck users see it and as the node's own VLESS
+	// connections show it (links/3 tcp_stalls_16k: the client stopped acknowledging after 8 to 32 KiB).
 	if !ipBlocked {
+		type freezeEv struct {
+			conf    string
+			ev      []string
+			d       map[string]string
+			counted bool // some VLESS server of the node counts its stalls at all
+		}
+		var fz freezeEv
+		for _, x := range tcpIn {
+			t := in.Totals[x.ID]
+			if normProtocol(x.Protocol) != "vless" || !t.known("tcp_stalls_16k") {
+				continue
+			}
+			fz.counted = true
+			if ok, conf, d := t.tcpFreeze(); ok && (fz.d == nil || conf == confHigh) {
+				fz.conf, fz.d = conf, d
+				fz.ev = append(fz.ev, "conn:"+x.ID)
+			} else if ok {
+				fz.ev = append(fz.ev, "conn:"+x.ID)
+			}
+		}
+		klickVLESS := false
 		for _, k := range kindsOf(km) {
 			if isUDPProto(k.Kind) || k.DLChecked < throttleMinStalls || k.DLStalled < throttleMinStalls || k.DLStalled*2 < k.DLChecked {
 				continue
 			}
 			conf := confMedium
 			e := []string{"klick:" + n.ID + ":" + k.Kind}
-			unk := []string{"VLESS keeps no stall or byte counter per connection: a counter of bytes before the stall would confirm it"}
+			var unk []string
 			d := map[string]string{"dl_checked": u32(k.DLChecked), "dl_stalled": u32(k.DLStalled), "kind": k.Kind}
 			if (len(open) > 0 || (cc != nil && cc.Verdict == "ok")) && k.DLStalled >= 3 && k.DLStalled*5 >= k.DLChecked*klickBadShareNum {
 				conf = confHigh
 				e = append(e, "check:"+n.ID)
 				d["tcp_connects"] = "yes"
+			}
+			if normProtocol(k.Kind) == "vless" {
+				klickVLESS = true
+				switch {
+				case fz.d != nil:
+					conf = confHigh // the node's own connections freeze the same way
+					e = append(e, fz.ev...)
+					reasonDetail(d, fz.d)
+				case fz.counted:
+					d["tcp_stalls_16k"] = "0" // the node's VLESS connections do not freeze: maybe other servers, or other people
+				default:
+					unk = append(unk, "the node's VLESS servers count no TCP stalls (an agent without links/3, or a transport where the node does not hold the client's TCP connection): tcp_stalls_16k would confirm it")
+				}
 			}
 			if udpWorks {
 				d["udp_works"] = "yes"
@@ -771,6 +827,20 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 			add(blockClassV{Class: clsTCPThrottled, Scope: "protocol:" + normProtocol(k.Kind), Confidence: conf, hard: true, protocol: normProtocol(k.Kind), Evidence: e, Detail: d, Unknown: unk,
 				Explain: "TCP connects, but a download stalls after a few KB for kl!ck users (" + u32(k.DLStalled) + " of " + u32(k.DLChecked) + "): the DPI freezes the stream. " +
 					"A port change does not help; UDP protocols or XHTTP behind a CDN do."})
+		}
+		if fz.d != nil && !klickVLESS {
+			conf := fz.conf
+			if !tcpWorks && conf == confHigh {
+				conf = confMedium
+			}
+			d := map[string]string{"kind": "vless"}
+			reasonDetail(d, fz.d)
+			if udpWorks {
+				d["udp_works"] = "yes"
+			}
+			add(blockClassV{Class: clsTCPThrottled, Scope: "protocol:vless", Confidence: conf, hard: true, protocol: "vless", Evidence: append(fz.ev, "check:"+n.ID), Detail: d,
+				Explain: "VLESS connections reach the node and their data stops after the first 8 to 32 KiB (" + fz.d["tcp_stalls_16k"] + " connections): the client stopped " +
+					"acknowledging, the TSPU's freeze of a TCP stream after its first bytes. A port change does not help; UDP protocols or XHTTP behind a CDN do."})
 		}
 	}
 
@@ -823,8 +893,22 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 		if udpBroken == 0 {
 			unk = append(unk, "no UDP port check from an in-country node: run path_probe udp from one of your nodes in the country")
 		}
-		add(blockClassV{Class: clsUDPBlocked, Scope: "protocol:udp", Confidence: conf, hard: true, protocol: "udp", Evidence: append(ev, "check:"+n.ID), Unknown: unk,
-			Detail:  map[string]string{"udp_inbounds": strconv.Itoa(len(udpIn)), "tcp_works": "yes"},
+		d := map[string]string{"udp_inbounds": strconv.Itoa(len(udpIn)), "tcp_works": "yes"}
+		lostAll := len(failingUDP) > 0
+		for _, x := range failingUDP {
+			t := in.Totals[x.ID]
+			if lost, ld := t.answerLost(x.Protocol); lost {
+				reasonDetail(d, ld) // the node answered, and the answers did not come back
+			} else {
+				lostAll = false
+				unk = append(unk, t.reasonsUnknown(x.Protocol)...)
+			}
+		}
+		if lostAll && conf == confMedium {
+			conf = confHigh
+		}
+		add(blockClassV{Class: clsUDPBlocked, Scope: "protocol:udp", Confidence: conf, hard: true, protocol: "udp", Evidence: append(ev, "check:"+n.ID), Unknown: sortedUnique(unk),
+			Detail:  d,
 			Explain: "UDP does not get through (packets from inside the country are lost, or QUIC and WireGuard handshakes never complete) while TCP works: UDP is cut. Use TCP protocols on 443."})
 	}
 	if len(failingUDP) > 0 && len(workingUDP) > 0 && !ipBlocked {
@@ -842,11 +926,31 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 			if udpOKIn > 0 || udpOKAny > 0 {
 				d["udp_port_check"] = "ok"
 			}
+			t := in.Totals[x.ID]
+			unk := t.reasonsUnknown(x.Protocol)
+			explain := normProtocol(x.Protocol) + " fails while " + normProtocol(workingUDP[0].Protocol) + " works on the same node and UDP is not blocked as a whole: the DPI may recognise this protocol. The signal is weak."
+			if lost, ld := t.answerLost(x.Protocol); lost {
+				// the node got the handshake and answered; the answer never came back, while another UDP protocol's does
+				reasonDetail(d, ld)
+				conf = map[string]string{confLow: confMedium, confMedium: confHigh}[conf]
+				explain = normProtocol(x.Protocol) + " handshakes reach the node and its answers do not come back, while " + normProtocol(workingUDP[0].Protocol) +
+					" works on the same node: the DPI recognises this protocol and drops what follows its first packet."
+			} else if len(unk) == 0 {
+				unk = []string{"the node sees no lost answers for this protocol: its handshakes may be dropped before they reach the node (compare udp_rx_packets of the AWG port, or run path_probe udp)"}
+			}
 			add(blockClassV{Class: clsFingerprinted, Scope: "protocol:" + normProtocol(x.Protocol), Confidence: conf, hard: true, protocol: normProtocol(x.Protocol), inbound: x.ID, Evidence: e, Detail: d,
-				Unknown: []string{"per-reason handshake counters (initiations seen, replies sent, replies lost; QUIC alerts) would confirm it: today the counters only say handshakes did not complete"},
-				Explain: normProtocol(x.Protocol) + " fails while " + normProtocol(workingUDP[0].Protocol) + " works on the same node and UDP is not blocked as a whole: the DPI may recognise this protocol. The signal is weak."})
+				Unknown: unk, Explain: explain})
 		}
 	}
+	have := func(cls, scope string) bool {
+		for _, c := range out.Classes {
+			if c.Class == cls && c.Scope == scope {
+				return true
+			}
+		}
+		return false
+	}
+	b.addReasonClasses(n, tcpWorks, add, broken, have)
 }
 
 func kindsOf(k *accKlick) []accKlickKind {
