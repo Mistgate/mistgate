@@ -44,7 +44,7 @@ var (
 )
 
 // vlessVariantSQL is the part of a VLESS profile's settings that decides which connection counters its inbounds have
-// (connectiondiag.VLESSVariant): security, transport and the CDN host, as a small JSON object; '' for other protocols.
+// (connectiondiag.VLESSVariant): security, transport and the CDN host, as a small JSON object; an empty string for other protocols.
 const vlessVariantSQL = `CASE WHEN p.protocol = 'vless' THEN json_object('security', json_extract(p.settings_json, '$.security'),
 	'transport', json_extract(p.settings_json, '$.transport'),
 	'cdn', json_object('host', COALESCE(json_extract(p.settings_json, '$.cdn.host'), ''))) ELSE '' END`
