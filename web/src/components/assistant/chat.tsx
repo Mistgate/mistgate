@@ -402,7 +402,10 @@ function History({ onPick }: { onPick: (id: string) => void }) {
         {q.data?.length === 0 && <p className="py-6 text-center text-[13px] text-muted">{t("ai.conv.empty")}</p>}
         {q.data?.map((c) => (
           <button key={c.id} type="button" onClick={() => onPick(c.id)} className="flex flex-col items-start gap-0.5 rounded-field px-2.5 py-2 text-start hover:bg-surface-2">
-            <span className="w-full truncate text-[13px] font-semibold">{c.title || t("ai.conv.untitled")}</span>
+            <span className="flex w-full items-center gap-1.5">
+              <span className="min-w-0 truncate text-[13px] font-semibold">{c.title || t("ai.conv.untitled")}</span>
+              {c.taskId && <span className="flex-none rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-semibold text-accent-text">{t("ai.conv.scheduled")}</span>}
+            </span>
             <span className="text-[11px] text-muted">
               {fmt.ago(c.updatedUnix)} · {t.n("ai.conv.messages", c.messages)}
             </span>

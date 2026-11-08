@@ -27,8 +27,8 @@ const (
 	OpsStopDebugCaptureProcedure  = "/mistgate.ops.v1.OpsService/StopDebugCapture"
 	OpsListDebugCapturesProcedure = "/mistgate.ops.v1.OpsService/ListDebugCaptures"
 	OpsGetDebugCaptureProcedure   = "/mistgate.ops.v1.OpsService/GetDebugCapture"
-	OpsGetPanelResourcesProcedure  = "/mistgate.ops.v1.OpsService/GetPanelResources"
-	OpsGetFleetLoadProcedure       = "/mistgate.ops.v1.OpsService/GetFleetLoad"
+	OpsGetPanelResourcesProcedure = "/mistgate.ops.v1.OpsService/GetPanelResources"
+	OpsGetFleetLoadProcedure      = "/mistgate.ops.v1.OpsService/GetFleetLoad"
 )
 
 func init() {

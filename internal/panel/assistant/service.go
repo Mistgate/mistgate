@@ -45,6 +45,8 @@ type Service struct {
 	mu        sync.RWMutex
 	tools     mcp.AssistantRuntime
 	running   map[string]activeAssistantTurn
+	// retryWaits are the waits between the attempts of a scheduled run's model call (nil: 5 s, then 30 s).
+	retryWaits []time.Duration
 }
 
 type activeAssistantTurn struct {

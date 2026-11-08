@@ -1,0 +1,273 @@
+syntax = "proto3";
+
+package mistgate.tasks.v1;
+
+// SCHEDULED TASKS (design/adr/0017-agent-operable-fleet.md, section 5): the owner's periodic checks of the fleet. Two kinds:
+//
+//   - a CHECK task runs a list of the panel's own MCP read and run tools (fleet_digest, checks_run_now, block_diagnosis,
+//     path_probe ...) with their arguments, no model involved; each step may carry conditions on its result, and a run whose
+//     condition holds "found a problem";
+//   - an ASSISTANT task gives a prompt to the assistant (ADR 0014) on a schedule. It runs with the operator profile, never the
+//     admin one: it reads, runs probes and may prepare plans, but never applies one. Its answer goes into a conversation of the
+//     task's own, and it ends with a verdict (task_verdict) that says whether it found a problem.
+//
+// A problem opens the alert SCHEDULED_CHECK (it closes itself when a later run is clean); three failed runs in a row open
+// SCHEDULED_TASK_FAILING. Either may also go to Telegram (notify_telegram).
+//
+// A package of its own, like mistgate.ops.v1 and mistgate.probe.v1: the Cloudflare edition does not run scheduled tasks and its
+// admin Worker does not link these messages (that edition answers UNIMPLEMENTED "not available on this edition"). Reads and
+// "run now" are for the owner and helpers (operator-profile tokens through MCP: tasks_list, task_get, task_runs, task_run_now);
+// creating, changing and deleting a task are the owner's (MCP: task_create_plan / task_update_plan / task_delete_plan, applied
+// only after the owner approved them).
+//
+// ERRORS. A refusal's message is a code, sometimes with parameters ("schedule_too_often: min=15"): task_not_found,
+// too_many_tasks, invalid_name, invalid_kind, invalid_schedule, schedule_too_often, invalid_step, unknown_tool,
+// tool_not_allowed, invalid_args, invalid_condition, too_many_steps, empty_prompt, prompt_too_long, secret_in_task,
+// task_running, too_soon (a manual run right after another), tools_unavailable.
+//
+// RUN REASONS (TaskRun.reason): tool_failed, tool_error, no_verdict, provider_unreachable, provider_overloaded,
+// rate_limited, bad_key, no_balance, budget_reached, assistant_off, no_provider, not_allowed, conversation_busy, timeout,
+// interrupted (the panel stopped during the run), tools_unavailable, refused, internal.
+service TasksService {
+  // Every task, with its schedule, its last run and when it runs next. The panel's time zone comes with it.
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  // One task.
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  // A new task (the owner's). The definition is checked here: the tools a check may run, their arguments against each tool's
+  // schema, the conditions, the schedule's minimum interval, and no secret in a name, an argument or a prompt.
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  // Replaces a task's definition (the owner's); its run history stays.
+  rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
+  // Deletes a task and its runs (the owner's). An assistant task's conversation stays with the owner until deleted there.
+  rpc DeleteTask(DeleteTaskRequest) returns (DeleteTaskResponse);
+  // Starts a run now, outside the schedule. One run of a task at a time (FAILED_PRECONDITION task_running); a manual run at most
+  // once a minute for a check task and once in five minutes for an assistant task (FAILED_PRECONDITION too_soon). Returns at once:
+  // the run is in ListTaskRuns.
+  rpc RunTaskNow(RunTaskNowRequest) returns (RunTaskNowResponse);
+  // A task's runs, newest first: the last 50, at most 30 days.
+  rpc ListTaskRuns(ListTaskRunsRequest) returns (ListTaskRunsResponse);
+  // The tools a check step may run (the operator profile's read and run tools), with their input schemas, for the editor.
+  rpc ListCheckTools(ListCheckToolsRequest) returns (ListCheckToolsResponse);
+}
+
+enum TaskKind {
+  TASK_KIND_UNSPECIFIED = 0;
+  TASK_KIND_CHECK = 1;
+  TASK_KIND_ASSISTANT = 2;
+}
+
+enum ScheduleKind {
+  SCHEDULE_KIND_UNSPECIFIED = 0;
+  // every every_minutes minutes, counted from midnight in the panel's time zone (every 15 minutes: :00, :15, :30, :45)
+  SCHEDULE_KIND_EVERY = 1;
+  // every day at minute_of_day
+  SCHEDULE_KIND_DAILY = 2;
+  // every week on weekday at minute_of_day
+  SCHEDULE_KIND_WEEKLY = 3;
+}
+
+// When a task runs. Times are in the panel's time zone (ListTasksResponse.timezone_offset_minutes, the one of the update
+// schedules); every run starts up to a few minutes after its time (a fixed delay of the task's own), so tasks do not all
+// start on the same second. A run the panel missed while it was down runs once when it starts, not once per missed time.
+message Schedule {
+  ScheduleKind kind = 1;
+  // EVERY: 5 (a check task) or 15 (an assistant task) to 10080 minutes.
+  uint32 every_minutes = 2;
+  // DAILY and WEEKLY: the minute of the day, 0 to 1439.
+  uint32 minute_of_day = 3;
+  // WEEKLY: 0 Sunday to 6 Saturday.
+  uint32 weekday = 4;
+}
+
+// A condition on a step's result (the tool's JSON). It holds when any value at path matches; a step with a condition that
+// holds found a problem.
+message Condition {
+  // Dotted names; "name[]" walks every element of the list name; "**." finds the next name at any depth ("**.severity" is
+  // every severity field of the result). Empty: the whole result. At most 200 characters.
+  string path = 1;
+  // severity_at_least (value info, warning, error or critical; "warn" and "fail" are read as warning and error), eq, ne,
+  // in, not_in (value: a comma-separated list), gt, gte, lt, lte (value: a number), nonempty (a list, an object or a text
+  // that is not empty, true, a number other than 0), contains (a text, ignoring case).
+  string op = 2;
+  string value = 3;
+}
+
+message CheckStep {
+  // An MCP tool from ListCheckTools.
+  string tool = 1;
+  // Its arguments: a JSON object, at most 4 KiB, checked against the tool's schema. Ids and names, never a secret.
+  string args_json = 2;
+  // At most 5.
+  repeated Condition conditions = 3;
+  // The tool failing (a node offline, a probe refused) counts as a problem; otherwise it fails the run.
+  bool error_is_problem = 4;
+}
+
+// What the owner writes.
+message TaskInput {
+  // 1 to 80 characters.
+  string name = 1;
+  TaskKind kind = 2;
+  bool enabled = 3;
+  Schedule schedule = 4;
+  // CHECK: 1 to 8 steps, run in order.
+  repeated CheckStep steps = 5;
+  // ASSISTANT: what to do, 1 to 4000 characters. The answer ends with a verdict the panel asks for itself.
+  string prompt = 6;
+  // A problem, and a task that keeps failing, also go to the Telegram chats linked for alerts.
+  bool notify_telegram = 7;
+}
+
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  RUN_STATUS_RUNNING = 1;
+  // nothing to report
+  RUN_STATUS_OK = 2;
+  // a condition held, or the assistant's verdict says so
+  RUN_STATUS_PROBLEM = 3;
+  // the run could not do its work: reason says why
+  RUN_STATUS_FAILED = 4;
+  // not started: the assistant is off, the budget is spent ... (reason)
+  RUN_STATUS_SKIPPED = 5;
+}
+
+// One step of a check run.
+message StepResult {
+  string tool = 1;
+  // The tool answered.
+  bool ok = 2;
+  bool problem = 3;
+  // The tool's refusal, cleaned.
+  string error = 4;
+  // What matched: "<path> = <value>", at most 5.
+  repeated string matches = 5;
+  // The start of the result (at most 2000 characters), scrubbed like every MCP result.
+  string excerpt = 6;
+  uint32 duration_ms = 7;
+}
+
+message TaskRun {
+  string id = 1;
+  string task_id = 2;
+  // "schedule", "manual" or "missed" (its time passed while the panel was down: one run on start).
+  string trigger = 3;
+  RunStatus status = 4;
+  // A code (see RUN REASONS); empty for ok and for a problem.
+  string reason = 5;
+  // One line: what the problem is (the matches of a check, the assistant's verdict), or what failed. At most 300 characters,
+  // scrubbed; words from the fleet's data are untrusted.
+  string summary = 6;
+  int64 started_unix = 7 [jstype = JS_NUMBER];
+  // 0 while running.
+  int64 finished_unix = 8 [jstype = JS_NUMBER];
+  // CHECK: one per step.
+  repeated StepResult steps = 9;
+  // ASSISTANT: the conversation the answer is in (the task's own), and the provider, model and cost of the run.
+  string conversation_id = 10;
+  string provider = 11;
+  string model = 12;
+  double usd = 13;
+  // The run went to the fallback provider of the assistant settings after the main one failed.
+  bool fell_back = 14;
+  // Who started a manual run (an admin's name, or the token's).
+  string actor = 15;
+}
+
+message Task {
+  string id = 1;
+  string name = 2;
+  TaskKind kind = 3;
+  bool enabled = 4;
+  Schedule schedule = 5;
+  repeated CheckStep steps = 6;
+  string prompt = 7;
+  bool notify_telegram = 8;
+  // ASSISTANT: the task's conversation (each run is a part of it; the owner can go on from the last one in the chat).
+  string conversation_id = 9;
+  int64 created_unix = 10 [jstype = JS_NUMBER];
+  int64 updated_unix = 11 [jstype = JS_NUMBER];
+  // 0 when disabled.
+  int64 next_run_unix = 12 [jstype = JS_NUMBER];
+  // The newest run, if any.
+  TaskRun last_run = 13;
+  // Failed runs in a row; three open SCHEDULED_TASK_FAILING.
+  uint32 fail_streak = 14;
+  // The last finished run (not failed or skipped) found a problem: SCHEDULED_CHECK is open.
+  bool problem = 15;
+  string problem_summary = 16;
+  bool running = 17;
+}
+
+message ListTasksRequest {}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  // The panel's time zone, the one schedules are in.
+  int32 timezone_offset_minutes = 2;
+  int64 now_unix = 3 [jstype = JS_NUMBER];
+  // At most this many tasks.
+  uint32 max_tasks = 4;
+}
+
+message GetTaskRequest {
+  string id = 1;
+}
+
+message GetTaskResponse {
+  Task task = 1;
+  int32 timezone_offset_minutes = 2;
+}
+
+message CreateTaskRequest {
+  TaskInput task = 1;
+}
+
+message CreateTaskResponse {
+  Task task = 1;
+}
+
+message UpdateTaskRequest {
+  string id = 1;
+  TaskInput task = 2;
+}
+
+message UpdateTaskResponse {
+  Task task = 1;
+}
+
+message DeleteTaskRequest {
+  string id = 1;
+}
+
+message DeleteTaskResponse {}
+
+message RunTaskNowRequest {
+  string id = 1;
+}
+
+message RunTaskNowResponse {
+  string run_id = 1;
+}
+
+message ListTaskRunsRequest {
+  string task_id = 1;
+  // 1 to 50; 0 means 20.
+  uint32 limit = 2;
+}
+
+message ListTaskRunsResponse {
+  repeated TaskRun runs = 1;
+}
+
+message ListCheckToolsRequest {}
+
+message CheckTool {
+  string name = 1;
+  string description = 2;
+  // The tool's JSON schema of its arguments.
+  string input_schema_json = 3;
+}
+
+message ListCheckToolsResponse {
+  repeated CheckTool tools = 1;
+}

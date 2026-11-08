@@ -15,18 +15,20 @@ import { McpCard } from "@/screens/integrations/mcp";
 import { TokensCard } from "@/screens/integrations/tokens";
 import { MemoryTab } from "./memory";
 import { AssistantTab } from "./settings";
+import { TasksTab } from "./tasks";
 import type { AiTab } from "./tabs";
 
 /**
  * /ai (ADR 0014): the assistant (its providers and settings, the owner's), what it remembers and the conversations (each
- * admin's own), MCP with the API tokens for outside agents, and the changes waiting for the owner's decision.
+ * admin's own), the scheduled tasks (ADR 0017), MCP with the API tokens for outside agents, and the changes waiting for the
+ * owner's decision.
  */
 export function AiScreen() {
   const t = useT();
   const owner = useIsOwner();
   const edition = useEdition();
   const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as { tab?: AiTab; plan?: string };
+  const search = useSearch({ strict: false }) as { tab?: AiTab; plan?: string; task?: string };
   const tab = search.tab ?? (owner ? "assistant" : "memory");
   const approvals = useQuery({ ...approvalsQuery, enabled: owner });
   const waiting = approvals.data?.awaiting ?? 0;
@@ -43,6 +45,8 @@ export function AiScreen() {
   const items: TabItem[] = [
     { value: "assistant", label: t("ai.tab.assistant"), content: edition.off("assistant") ? noAssistant : owner ? <AssistantTab /> : ownerOnly },
     { value: "memory", label: t("ai.tab.memory"), content: edition.off("assistant") ? noAssistant : <MemoryTab /> },
+    // the owner's scheduled checks: read and run by the owner and helpers, written by the owner (the tab says what the rest may not)
+    { value: "tasks", label: t("ai.tab.tasks"), content: <TasksTab focus={search.task} /> },
     {
       value: "mcp",
       label: t("ai.tab.mcp"),

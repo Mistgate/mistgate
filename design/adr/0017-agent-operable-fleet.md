@@ -98,7 +98,7 @@ Probes, debug capture, panel logs and resources, capacity and scheduled tasks ar
 stubs that answer Unimplemented). Reads over data both editions store (host history, events, audit) work on both
 when the admin Worker has room; otherwise they move to a VPS-only service and the UI hides them on edge.
 
-## Status (2026-11-07)
+## Status (2026-11-08)
 
 | Piece | State |
 | --- | --- |
@@ -106,11 +106,11 @@ when the admin Worker has room; otherwise they move to a VPS-only service and th
 | Probes: path_probe, node_trace, node_dns_check | merged |
 | Panel logs, request codes, retention, export, /metrics | merged |
 | access_report, block_diagnosis | merged |
-| path_speed, engine benchmarks, dev fleet | in progress |
-| Node debug capture | in progress |
-| Resources: HostMetrics 11 to 20, host hours, capacity, panel resources, load checks, UI | in progress |
-| Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | in review (`links/3`; the kernel AWG backend cannot tell initiations from responses) |
-| Scheduled tasks, provider fallback | next |
+| path_speed, engine benchmarks, dev fleet | merged |
+| Node debug capture | merged |
+| Resources: HostMetrics 11 to 20, host hours, capacity, panel resources, load checks, UI | merged |
+| Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | merged (`links/3`; the kernel AWG backend cannot tell initiations from responses and says so) |
+| Scheduled tasks, provider fallback | merged |
 | Censorship simulation and dev-fleet MCP runs | next |
 | Coarse network (ASN) bucket per hour, no addresses | to decide with the owner (privacy) |
 

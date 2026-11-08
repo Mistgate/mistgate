@@ -183,7 +183,10 @@ function Conversations() {
         {list.map((c) => (
           <li key={c.id} className="flex items-center gap-2.5 py-2.5 first:pt-0">
             <button type="button" onClick={() => openInChat(c.id)} className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-start">
-              <span className="w-full truncate text-[13px] font-semibold">{c.title || t("ai.conv.untitled")}</span>
+              <span className="flex w-full items-center gap-1.5">
+                <span className="min-w-0 truncate text-[13px] font-semibold">{c.title || t("ai.conv.untitled")}</span>
+                {c.taskId && <span className="flex-none rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-semibold text-accent-text">{t("ai.conv.scheduled")}</span>}
+              </span>
               <span className="text-[11px] text-muted">
                 {fmt.ago(c.updatedUnix)} · {t.n("ai.conv.messages", c.messages)}
               </span>

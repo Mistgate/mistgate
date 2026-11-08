@@ -51,6 +51,32 @@ func TestAlertOpenIsOneMessageAndDuplicatesAreSuppressed(t *testing.T) {
 	}
 }
 
+// A scheduled task's alert goes to Telegram only when the owner asked for it on the task.
+func TestScheduledTaskAlertsGoOnlyWhenAskedFor(t *testing.T) {
+	e := newEnv(t)
+	owner := e.addAdmin("adm_o", "Owner", store.RoleOwner)
+	e.setBot()
+	e.link(owner, 777)
+	e.run()
+
+	quiet := alert("scheduled_check", "", 2)
+	quiet.Subject = "tsk_quiet"
+	quiet.Params = map[string]string{"task": "Quiet", "summary": "x", "telegram": "0"}
+	e.svc.AlertTransition(quiet, false)
+	loud := alert("scheduled_check", "", 2)
+	loud.Subject = "tsk_loud"
+	loud.Params = map[string]string{"task": "Morning check", "summary": "fleet_digest: totals.nodes_problem_now = 2", "telegram": "1"}
+	e.svc.AlertTransition(loud, false)
+	waitFor(t, "the task alert", func() bool { return len(e.tg.sentTo(777)) == 1 })
+	e.quiet(1, 150*time.Millisecond)
+	got := e.tg.sentTo(777)[0]
+	for _, want := range []string{"Scheduled check found a problem", "Morning check", "nodes_problem_now = 2"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("message %q lacks %q", got, want)
+		}
+	}
+}
+
 // The panel language decides the words; a resolve says how long the alert lasted, and an alert that comes back after it
 // resolved is announced again.
 func TestResolveCarriesDurationInThePanelLanguage(t *testing.T) {
