@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// linkReasonsStoreProof runs on SQLite and on D1 (link_hour_test.go, d1_store_test.go): the links/3 counters (migration 00115) go
+// linkReasonsStoreProof runs on SQLite and on D1 (link_hour_test.go, d1_store_test.go): the links/3 counters (migration 00114) go
 // in with the batch's one statement, add up inside an hour, and come back in the node report, the fleet sums and a person's rows,
 // with what decides which of them an inbound can have (the VLESS settings, the AWG backend).
 func linkReasonsStoreProof(t *testing.T, st *Store) {

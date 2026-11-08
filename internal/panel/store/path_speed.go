@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// The rows behind path_speed (migration 00107) and path_speed_start (00116): results and start reservations for the bounded
+// The rows behind path_speed (migration 00107) and path_speed_start (00115): results and start reservations for the bounded
 // throughput tests between two nodes. They exist for the MCP tool of the VPS edition; the Cloudflare edition has no caller for
 // them, so this file is not in the Workers' wasm.
 
