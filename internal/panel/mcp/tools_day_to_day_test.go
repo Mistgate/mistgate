@@ -268,6 +268,7 @@ func TestDNSPresetPlansAndApplies(t *testing.T) {
 
 func TestNodeUpdatePlanAppliesOnlyMetadataAndSubscriptionSwitches(t *testing.T) {
 	e := newTestEnv(t)
+	e.w.inboundWarnings = []*adminv1.StatusReason{{Code: "inbound_no_way_in", Params: map[string]string{"node": "de1", "profile": "Main", "reason": "no_usable_relay"}}}
 	_, admin := e.token(ProfileAdmin)
 	s := e.session(admin)
 	p := planOf(t, s, "node_update", map[string]any{"node": nodeA, "name": "de2", "country_code": "nl", "location": "Amsterdam", "provider": "ExampleHost", "notes": "new operator note", "direct_in_subscriptions": []any{map[string]any{"inbound_id": "inb_1", "included": true}}})
@@ -276,6 +277,10 @@ func TestNodeUpdatePlanAppliesOnlyMetadataAndSubscriptionSwitches(t *testing.T) 
 	}
 	if len(factIn(t, p.Facts, "notes").UntrustedParams) == 0 || !factIn(t, p.Facts, "direct_in_subscriptions").Untrusted {
 		t.Fatalf("untrusted node facts: %+v", p.Facts)
+	}
+	warning := factIn(t, p.Facts, "warning")
+	if warning.Code != "inbound_no_way_in" || warning.Params["reason"] != "no_usable_relay" || !slices.Contains(warning.UntrustedParams, "node") {
+		t.Fatalf("validation warning missing from plan: %+v", warning)
 	}
 	if len(e.w.nodeUpdateReq) != 0 || len(e.w.inboundUpdateReq) != 1 || !e.w.inboundUpdateReq[0].GetValidateOnly() || !e.w.calls(adminv1connect.ProfileServiceUpdateInboundProcedure)[0].Planning {
 		t.Fatal("node plan performed a write instead of dry-run validation")

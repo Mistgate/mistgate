@@ -54,15 +54,17 @@ type accNode struct {
 }
 
 type accUDPCheck struct {
-	Port    uint32
-	Verdict string // ok, lossy, broken, ""
-	Sender  string // "panel" or a node name
+	Port        uint32
+	Verdict     string // ok, lossy, broken, ""
+	Sender      string // "panel" or a node name
+	CheckedUnix int64
 }
 
 type accTCPCheck struct {
-	Port    uint32
-	Verdict string // ours, other, refused, timeout, busy
-	Sender  string
+	Port        uint32
+	Verdict     string // ours, other, refused, timeout, busy
+	Sender      string
+	CheckedUnix int64
 }
 
 type accInbound struct {
@@ -414,7 +416,7 @@ func (t accKlickTally) mostlyOK() bool {
 	return t.Reports >= klickMinReports && t.OK*klickBadShareDen >= t.Reports*klickBadShareNum
 }
 
-func tspuIndex(ports []accTSPUPort) (open, blocked, timeout []uint32, all bool) {
+func tspuIndex(ports []accTSPUPort) (open, blocked, timeout []uint32) {
 	for _, p := range ports {
 		switch p.Verdict {
 		case "open":
@@ -423,13 +425,21 @@ func tspuIndex(ports []accTSPUPort) (open, blocked, timeout []uint32, all bool) 
 			blocked = append(blocked, p.Port)
 		case "timeout":
 			timeout = append(timeout, p.Port)
+		case "refused":
+			// A refusal is an answer from that port, but not a usable server port.
 		}
 	}
 	slices.Sort(open)
 	slices.Sort(blocked)
 	slices.Sort(timeout)
-	all = len(open) == 0 && len(blocked)+len(timeout) > 0 && len(blocked) > 0
-	return
+	return open, blocked, timeout
+}
+
+const accessPortCheckFreshFor = int64(24 * 60 * 60)
+
+func accessPortCheckFresh(now, checked int64) bool {
+	age := now - checked
+	return checked > 0 && age >= 0 && age < accessPortCheckFreshFor
 }
 
 func portList(p []uint32) string {
@@ -488,13 +498,12 @@ func (b *blockCtx) diagnose(n *accNode) blockNodeV {
 	}
 	var vs vantSum
 	var open, blocked, timeout []uint32
-	var tspuAll bool
 	country := strings.ToUpper(n.Country)
 	if cc != nil {
 		out.Country, out.Verdict, out.Confidence = cc.Country, cc.Verdict, cc.Confidence
 		country = cc.Country
 		vs = summarizeVantages(cc.Vantages)
-		open, blocked, timeout, tspuAll = tspuIndex(cc.TSPU)
+		open, blocked, timeout = tspuIndex(cc.TSPU)
 		out.OpenPorts, out.BadPorts = open, append(slices.Clone(blocked), timeout...)
 		slices.Sort(out.BadPorts)
 	}
@@ -521,7 +530,7 @@ func (b *blockCtx) diagnose(n *accNode) blockNodeV {
 		}
 	}
 	for _, t := range n.TCPChecks {
-		if t.Verdict == "refused" && !b.inCountry(t.Sender, country) && !broken[t.Port] {
+		if accessPortCheckFresh(in.NowUnix, t.CheckedUnix) && t.Verdict == "refused" && !b.inCountry(t.Sender, country) && !broken[t.Port] {
 			broken[t.Port] = true
 			add(blockClassV{Class: clsBroken, Scope: portScope(t.Port, "tcp"), Confidence: confMedium, hard: true, port: t.Port,
 				Evidence: []string{"port:" + n.ID + ":" + u32(t.Port)}, Detail: map[string]string{"tcp_check": "refused"},
@@ -579,13 +588,13 @@ func (b *blockCtx) diagnose(n *accNode) blockNodeV {
 
 	// ip blocked: every TCP port dark (TSPU) or the verdict says nothing gets through, and no eyeball network reaches.
 	ipBlocked := false
-	if !whitelist && vs.reachE == 0 && ((verdictBlocked && (vs.darkE >= 1 || (len(cc.Vantages) == 0 && cc.Confidence != "listed"))) || tspuAll) {
+	if !whitelist && vs.reachE == 0 && verdictBlocked && (vs.darkE >= 1 || (len(cc.Vantages) == 0 && cc.Confidence != "listed")) {
 		ipBlocked = true
 		conf := confMedium
 		switch {
-		case verdictBlocked && vs.darkE >= 2 && vs.fixedDark >= 1 && (tspuAll || listed):
+		case verdictBlocked && vs.darkE >= 2 && vs.fixedDark >= 1 && listed:
 			conf = confHigh
-		case verdictBlocked && cc.Confidence == "dc_only" && !tspuAll:
+		case verdictBlocked && cc.Confidence == "dc_only":
 			conf = confLow
 		}
 		scope := "ip"
@@ -594,10 +603,6 @@ func (b *blockCtx) diagnose(n *accNode) blockNodeV {
 		}
 		e := slices.Clone(ev)
 		d := map[string]string{"verdict": cc.Verdict, "scope": scope}
-		if tspuAll {
-			e = append(e, "tspu:"+n.ID)
-			d["tspu_blocked_ports"] = portList(append(slices.Clone(blocked), timeout...))
-		}
 		if listed {
 			d["listed"] = strings.Join(cc.ListedBy, ",")
 		}
@@ -734,7 +739,7 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 	var open []uint32
 	country := strings.ToUpper(n.Country)
 	if cc != nil {
-		open, _, _, _ = tspuIndex(cc.TSPU)
+		open, _, _ = tspuIndex(cc.TSPU)
 		country = cc.Country
 	}
 	tcpWorks := len(open) > 0
@@ -848,6 +853,9 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 	var udpBroken, udpOKIn, udpOKAny int
 	var ev []string
 	for _, u := range n.UDPChecks {
+		if !accessPortCheckFresh(in.NowUnix, u.CheckedUnix) {
+			continue
+		}
 		in := b.inCountry(u.Sender, country)
 		switch {
 		case u.Verdict == "broken" && in:
@@ -888,24 +896,19 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 		case udpBroken > 0:
 			conf = confHigh
 		case len(failingUDP) > 0:
-			conf = confMedium
+			conf = confLow
 		}
 		if udpBroken == 0 {
 			unk = append(unk, "no UDP port check from an in-country node: run path_probe udp from one of your nodes in the country")
 		}
 		d := map[string]string{"udp_inbounds": strconv.Itoa(len(udpIn)), "tcp_works": "yes"}
-		lostAll := len(failingUDP) > 0
 		for _, x := range failingUDP {
 			t := in.Totals[x.ID]
 			if lost, ld := t.answerLost(x.Protocol); lost {
 				reasonDetail(d, ld) // the node answered, and the answers did not come back
 			} else {
-				lostAll = false
 				unk = append(unk, t.reasonsUnknown(x.Protocol)...)
 			}
-		}
-		if lostAll && conf == confMedium {
-			conf = confHigh
 		}
 		add(blockClassV{Class: clsUDPBlocked, Scope: "protocol:udp", Confidence: conf, hard: true, protocol: "udp", Evidence: append(ev, "check:"+n.ID), Unknown: sortedUnique(unk),
 			Detail:  d,
