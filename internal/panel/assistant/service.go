@@ -45,8 +45,10 @@ type Service struct {
 	mu        sync.RWMutex
 	tools     mcp.AssistantRuntime
 	running   map[string]activeAssistantTurn
-	// retryWaits are the waits between the attempts of a scheduled run's model call (nil: 5 s, then 30 s).
+	// retryWaits are the waits between the attempts of a scheduled run's or a follow-up's model call (nil: 5 s, then 30 s).
 	retryWaits []time.Duration
+	// notify sends a follow-up's problem to Telegram (SetFollowUpNotifier); nil: nothing is sent
+	notify FollowUpNotifier
 }
 
 type activeAssistantTurn struct {
@@ -264,6 +266,16 @@ func (s *Service) GetAssistantAccess(ctx context.Context, _ *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
+	// the chat button's dot and its next look: the conversations a follow-up answered, the admin's next follow-up
+	unread, next, err := s.st.UnreadAssistantConversations(ctx, admin.ID)
+	if err != nil {
+		return nil, err
+	}
+	resp.Unread = uint32(max(unread, 0))
+	if !next.IsZero() {
+		resp.NextFollowUpUnix = next.Unix()
+	}
+	resp.TimezoneOffsetMinutes = int32(s.panelOffset(ctx))
 	return connect.NewResponse(resp), nil
 }
 

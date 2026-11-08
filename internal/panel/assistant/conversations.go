@@ -26,6 +26,8 @@ type messageBody struct {
 	Remembered []*adminv1.MemoryNote `json:"remembered,omitempty"`
 	End        string                `json:"end,omitempty"`
 	Transcript []json.RawMessage     `json:"transcript,omitempty"`
+	// FollowUp marks the messages of a follow-up's turn, and the note of one that did not run
+	FollowUp *adminv1.FollowUpTurn `json:"follow_up,omitempty"`
 }
 
 type messageRow struct {
@@ -108,7 +110,7 @@ func (s *Service) conversation(ctx context.Context, adminID, id string) (*adminv
 	summary := &adminv1.ConversationSummary{}
 	var titleEnc, summaryEnc []byte
 	var segment int
-	err := s.st.R.QueryRowContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,segment,task_id FROM assistant_conversation WHERE id=? AND admin_id=?`, id, adminID).Scan(&summary.Id, &titleEnc, &summaryEnc, &summary.CreatedUnix, &summary.UpdatedUnix, &segment, &summary.TaskId)
+	err := s.st.R.QueryRowContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,segment,task_id,unread FROM assistant_conversation WHERE id=? AND admin_id=?`, id, adminID).Scan(&summary.Id, &titleEnc, &summaryEnc, &summary.CreatedUnix, &summary.UpdatedUnix, &segment, &summary.TaskId, &summary.Unread)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, connect.NewError(connect.CodeNotFound, errors.New("conversation not found"))
 	}
@@ -157,7 +159,11 @@ func (s *Service) ListConversations(ctx context.Context, req *connect.Request[ad
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("page token is invalid"))
 		}
 	}
-	rows, err := s.st.R.QueryContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,(SELECT count(*) FROM assistant_message m WHERE m.conversation_id=c.id AND m.admin_id=c.admin_id),task_id FROM assistant_conversation c WHERE admin_id=? ORDER BY updated_at DESC,id DESC LIMIT 5000`, admin.ID)
+	next, err := s.st.NextAssistantFollowUps(ctx, admin.ID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.st.R.QueryContext(ctx, `SELECT id,title_enc,summary_enc,created_at,updated_at,(SELECT count(*) FROM assistant_message m WHERE m.conversation_id=c.id AND m.admin_id=c.admin_id),task_id,unread FROM assistant_conversation c WHERE admin_id=? ORDER BY updated_at DESC,id DESC LIMIT 5000`, admin.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,10 +174,13 @@ func (s *Service) ListConversations(ctx context.Context, req *connect.Request[ad
 		var id string
 		var titleEnc, summaryEnc []byte
 		var item adminv1.ConversationSummary
-		if err = rows.Scan(&id, &titleEnc, &summaryEnc, &item.CreatedUnix, &item.UpdatedUnix, &item.Messages, &item.TaskId); err != nil {
+		if err = rows.Scan(&id, &titleEnc, &summaryEnc, &item.CreatedUnix, &item.UpdatedUnix, &item.Messages, &item.TaskId, &item.Unread); err != nil {
 			return nil, err
 		}
 		item.Id = id
+		if due, ok := next[id]; ok {
+			item.FollowUpUnix = due.Unix()
+		}
 		item.Title, err = openText(s.vault, titleEnc, ConversationTitleAAD(id))
 		if err != nil {
 			return nil, err
@@ -240,7 +249,7 @@ func (s *Service) GetConversation(ctx context.Context, req *connect.Request[admi
 				}
 			}
 		}
-		resp.Messages = append(resp.Messages, &adminv1.ChatMessage{Id: row.id, Role: role, Text: body.Text, CreatedUnix: row.created, Context: body.Context, Tools: body.Tools, Plans: body.Plans, Remembered: body.Remembered, End: body.End})
+		resp.Messages = append(resp.Messages, &adminv1.ChatMessage{Id: row.id, Role: role, Text: body.Text, CreatedUnix: row.created, Context: body.Context, Tools: body.Tools, Plans: body.Plans, Remembered: body.Remembered, End: body.End, FollowUp: body.FollowUp})
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -251,6 +260,16 @@ func (s *Service) GetConversation(ctx context.Context, req *connect.Request[admi
 		return nil, err
 	}
 	resp.Running = n > 0
+	if resp.FollowUps, err = s.pendingFollowUps(ctx, admin.ID, req.Msg.Id); err != nil {
+		return nil, err
+	}
+	// opened: what a follow-up answered while the admin was away is read now
+	if summary.Unread {
+		if err = s.st.SetAssistantConversationUnread(ctx, admin.ID, req.Msg.Id, false); err != nil {
+			return nil, err
+		}
+		resp.Conversation.Unread = false
+	}
 	return connect.NewResponse(resp), nil
 }
 

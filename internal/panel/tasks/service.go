@@ -8,6 +8,9 @@
 //     (store.ScheduledTokenID). No model is involved: each step's conditions are tested on the tool's JSON result.
 //   - An assistant task gives its prompt to the assistant (assistant.Service.RunScheduled), same identity and profile.
 //
+// The same scheduler runs the assistant's follow-ups (follow_up.go): one-time continuations of a conversation, held under a
+// lease of their own so each runs once.
+//
 // The scheduler wakes every 20 seconds (and at once after a change), takes the due tasks, and starts a run of each that no run
 // holds: a lease in the task's row means one run of a task at a time, and the run row is written with it. Runs are bounded (a
 // check run 5 minutes, an assistant run assistant.ScheduledRunLimit) and at most two check runs and one assistant run go at
@@ -42,16 +45,18 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
-// Assistant runs a scheduled assistant task: assistant.Service.RunScheduled.
+// Assistant runs a scheduled assistant task (assistant.Service.RunScheduled) and a follow-up the assistant set in a
+// conversation (RunFollowUp).
 type Assistant interface {
 	RunScheduled(context.Context, assistant.ScheduledRun) assistant.ScheduledOutcome
+	RunFollowUp(context.Context, store.AssistantFollowUp) assistant.FollowUpOutcome
 }
 
 // Config configures Service.
 type Config struct {
 	Store *store.Store
 	Vault *vault.Vault
-	// Assistant runs the assistant tasks; nil: they are skipped (assistant_off).
+	// Assistant runs the assistant tasks and the follow-ups; nil: the tasks are skipped (assistant_off), no follow-up runs.
 	Assistant Assistant
 	Now       func() time.Time
 	Log       *slog.Logger
@@ -94,6 +99,7 @@ type Service struct {
 	wake      chan struct{}
 	checkSem  chan struct{}
 	assistSem chan struct{}
+	followSem chan struct{}
 	wg        sync.WaitGroup
 }
 
@@ -114,7 +120,8 @@ func New(cfg Config) *Service {
 		cfg.Tick = defaultTick
 	}
 	return &Service{cfg: cfg, running: map[string]*activeRun{}, wake: make(chan struct{}, 1),
-		checkSem: make(chan struct{}, checkRunsAtOnce), assistSem: make(chan struct{}, assistantRunsAtOnce), base: context.Background()}
+		checkSem: make(chan struct{}, checkRunsAtOnce), assistSem: make(chan struct{}, assistantRunsAtOnce), followSem: make(chan struct{}, followUpsAtOnce),
+		base: context.Background()}
 }
 
 type activeRun struct{ cancel context.CancelFunc }

@@ -35,6 +35,7 @@ func (assistantUnavailableRPC) Handler(...connect.HandlerOption) (string, http.H
 			adminv1connect.AssistantServiceStopTurnProcedure,
 			adminv1connect.AssistantServiceApplyPlanProcedure,
 			adminv1connect.AssistantServiceDismissPlanProcedure,
+			adminv1connect.AssistantServiceCancelFollowUpProcedure,
 			adminv1connect.AssistantServiceListMemoryProcedure,
 			adminv1connect.AssistantServiceSaveMemoryProcedure,
 			adminv1connect.AssistantServiceDeleteMemoryProcedure,

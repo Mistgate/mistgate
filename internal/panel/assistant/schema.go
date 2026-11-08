@@ -212,5 +212,6 @@ func assistantToolSchemas() []mcp.AssistantTool {
 		{Name: "conversation_search", Description: "Search the person's own past conversation titles and summaries by words.", InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","maxLength":200}},"required":["query"],"additionalProperties":false}`)},
 		{Name: "conversation_read", Description: "Read one of the person's own past conversations as a compact summary.", InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}`)},
 	}
-	return append(append(tools, uiToolSchemas()...), uiSecretToolSchema())
+	tools = append(append(tools, uiToolSchemas()...), uiSecretToolSchema())
+	return append(tools, followUpSchemas()...)
 }

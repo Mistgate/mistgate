@@ -399,9 +399,15 @@ type GetAssistantAccessResponse struct {
 	// empty when the assistant is off or not for this admin. No keys, no budgets: only what the picker shows.
 	Choices []*ChatProviderChoice `protobuf:"bytes,6,rep,name=choices,proto3" json:"choices,omitempty"`
 	// The panel's thinking depth, what a turn uses unless the admin picks another.
-	Effort        AssistantEffort `protobuf:"varint,7,opt,name=effort,proto3,enum=mistgate.admin.v1.AssistantEffort" json:"effort,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Effort AssistantEffort `protobuf:"varint,7,opt,name=effort,proto3,enum=mistgate.admin.v1.AssistantEffort" json:"effort,omitempty"`
+	// The admin's conversations a follow-up answered while they were away, not opened since: the chat button's dot.
+	Unread uint32 `protobuf:"varint,8,opt,name=unread,proto3" json:"unread,omitempty"`
+	// When the admin's next follow-up is due (unix seconds); 0 = none. The chat button looks again soon after it.
+	NextFollowUpUnix int64 `protobuf:"varint,9,opt,name=next_follow_up_unix,json=nextFollowUpUnix,proto3" json:"next_follow_up_unix,omitempty"`
+	// The panel's time zone, minutes east of UTC (the one of the scheduled tasks): follow-up times are shown in it.
+	TimezoneOffsetMinutes int32 `protobuf:"varint,10,opt,name=timezone_offset_minutes,json=timezoneOffsetMinutes,proto3" json:"timezone_offset_minutes,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *GetAssistantAccessResponse) Reset() {
@@ -481,6 +487,27 @@ func (x *GetAssistantAccessResponse) GetEffort() AssistantEffort {
 		return x.Effort
 	}
 	return AssistantEffort_ASSISTANT_EFFORT_UNSPECIFIED
+}
+
+func (x *GetAssistantAccessResponse) GetUnread() uint32 {
+	if x != nil {
+		return x.Unread
+	}
+	return 0
+}
+
+func (x *GetAssistantAccessResponse) GetNextFollowUpUnix() int64 {
+	if x != nil {
+		return x.NextFollowUpUnix
+	}
+	return 0
+}
+
+func (x *GetAssistantAccessResponse) GetTimezoneOffsetMinutes() int32 {
+	if x != nil {
+		return x.TimezoneOffsetMinutes
+	}
+	return 0
 }
 
 type ChatProviderChoice struct {
@@ -1545,7 +1572,11 @@ type ConversationSummary struct {
 	UpdatedUnix int64  `protobuf:"varint,4,opt,name=updated_unix,json=updatedUnix,proto3" json:"updated_unix,omitempty"`
 	Messages    uint32 `protobuf:"varint,5,opt,name=messages,proto3" json:"messages,omitempty"`
 	// The scheduled task (mistgate.tasks.v1) whose runs write here; empty for a conversation a person started.
-	TaskId        string `protobuf:"bytes,6,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	TaskId string `protobuf:"bytes,6,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	// A follow-up answered here (or left a note) after the admin last opened it.
+	Unread bool `protobuf:"varint,7,opt,name=unread,proto3" json:"unread,omitempty"`
+	// The time of this conversation's next follow-up, unix seconds; 0 = none, or only ones that wait for a plan.
+	FollowUpUnix  int64 `protobuf:"varint,8,opt,name=follow_up_unix,json=followUpUnix,proto3" json:"follow_up_unix,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1620,6 +1651,20 @@ func (x *ConversationSummary) GetTaskId() string {
 		return x.TaskId
 	}
 	return ""
+}
+
+func (x *ConversationSummary) GetUnread() bool {
+	if x != nil {
+		return x.Unread
+	}
+	return false
+}
+
+func (x *ConversationSummary) GetFollowUpUnix() int64 {
+	if x != nil {
+		return x.FollowUpUnix
+	}
+	return 0
 }
 
 // One tool call of a turn, as the chat shows it ("Read nodes · 12", expandable to the call).
@@ -1959,7 +2004,10 @@ type ChatMessage struct {
 	Plans      []*PlanCard   `protobuf:"bytes,7,rep,name=plans,proto3" json:"plans,omitempty"`
 	Remembered []*MemoryNote `protobuf:"bytes,8,rep,name=remembered,proto3" json:"remembered,omitempty"`
 	// How the assistant's turn ended: "end", "stopped", "limit", "refused", "budget", "error".
-	End           string `protobuf:"bytes,9,opt,name=end,proto3" json:"end,omitempty"`
+	End string `protobuf:"bytes,9,opt,name=end,proto3" json:"end,omitempty"`
+	// Set on the two messages of a turn a follow-up started (the panel's line that opens it, CHAT_ROLE_USER, whose text is
+	// the note; and the answer), and on the note a follow-up that did not run leaves.
+	FollowUp      *FollowUpTurn `protobuf:"bytes,10,opt,name=follow_up,json=followUp,proto3" json:"follow_up,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2057,6 +2105,202 @@ func (x *ChatMessage) GetEnd() string {
 	return ""
 }
 
+func (x *ChatMessage) GetFollowUp() *FollowUpTurn {
+	if x != nil {
+		return x.FollowUp
+	}
+	return nil
+}
+
+// A follow-up the assistant set (its local tool follow_up): at its time the panel continues the conversation by itself.
+type FollowUp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "afu_...".
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// What the assistant will do then, in its own words (scrubbed; untrusted text).
+	Note string `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	// When it is due, unix seconds; 0 while it waits for its plan to be applied.
+	DueUnix     int64 `protobuf:"varint,3,opt,name=due_unix,json=dueUnix,proto3" json:"due_unix,omitempty"`
+	CreatedUnix int64 `protobuf:"varint,4,opt,name=created_unix,json=createdUnix,proto3" json:"created_unix,omitempty"`
+	// The plan of this conversation whose apply starts the clock, and how long after the apply it is due; empty when it
+	// counts from when it was set.
+	PlanId string `protobuf:"bytes,5,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
+	DelayS uint32 `protobuf:"varint,6,opt,name=delay_s,json=delayS,proto3" json:"delay_s,omitempty"`
+	// Its turn is running now (it cannot be cancelled; Stop ends it).
+	Running       bool `protobuf:"varint,7,opt,name=running,proto3" json:"running,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FollowUp) Reset() {
+	*x = FollowUp{}
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FollowUp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FollowUp) ProtoMessage() {}
+
+func (x *FollowUp) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FollowUp.ProtoReflect.Descriptor instead.
+func (*FollowUp) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *FollowUp) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FollowUp) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *FollowUp) GetDueUnix() int64 {
+	if x != nil {
+		return x.DueUnix
+	}
+	return 0
+}
+
+func (x *FollowUp) GetCreatedUnix() int64 {
+	if x != nil {
+		return x.CreatedUnix
+	}
+	return 0
+}
+
+func (x *FollowUp) GetPlanId() string {
+	if x != nil {
+		return x.PlanId
+	}
+	return ""
+}
+
+func (x *FollowUp) GetDelayS() uint32 {
+	if x != nil {
+		return x.DelayS
+	}
+	return 0
+}
+
+func (x *FollowUp) GetRunning() bool {
+	if x != nil {
+		return x.Running
+	}
+	return false
+}
+
+// What a follow-up's turn was, on its messages.
+type FollowUpTurn struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The follow-up's id.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// When the assistant set it and when it was due (a turn may start later, after a stop of the panel).
+	SetUnix int64 `protobuf:"varint,2,opt,name=set_unix,json=setUnix,proto3" json:"set_unix,omitempty"`
+	DueUnix int64 `protobuf:"varint,3,opt,name=due_unix,json=dueUnix,proto3" json:"due_unix,omitempty"`
+	// "" when its turn ran; "failed" when it did not run or its turn failed (reason: a code as in ERRORS, or "internal",
+	// "interrupted"); "missed" when the panel could not run it until more than a day after its time.
+	Outcome string `protobuf:"bytes,4,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	Reason  string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The note, on the message a follow-up that did not run leaves (it has no line of its own).
+	Note          string `protobuf:"bytes,6,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FollowUpTurn) Reset() {
+	*x = FollowUpTurn{}
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FollowUpTurn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FollowUpTurn) ProtoMessage() {}
+
+func (x *FollowUpTurn) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FollowUpTurn.ProtoReflect.Descriptor instead.
+func (*FollowUpTurn) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *FollowUpTurn) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FollowUpTurn) GetSetUnix() int64 {
+	if x != nil {
+		return x.SetUnix
+	}
+	return 0
+}
+
+func (x *FollowUpTurn) GetDueUnix() int64 {
+	if x != nil {
+		return x.DueUnix
+	}
+	return 0
+}
+
+func (x *FollowUpTurn) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+func (x *FollowUpTurn) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *FollowUpTurn) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 type ListConversationsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Words to find in titles and summaries; empty = all.
@@ -2070,7 +2314,7 @@ type ListConversationsRequest struct {
 
 func (x *ListConversationsRequest) Reset() {
 	*x = ListConversationsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2082,7 +2326,7 @@ func (x *ListConversationsRequest) String() string {
 func (*ListConversationsRequest) ProtoMessage() {}
 
 func (x *ListConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[25]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2095,7 +2339,7 @@ func (x *ListConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConversationsRequest.ProtoReflect.Descriptor instead.
 func (*ListConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{25}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListConversationsRequest) GetQuery() string {
@@ -2129,7 +2373,7 @@ type ListConversationsResponse struct {
 
 func (x *ListConversationsResponse) Reset() {
 	*x = ListConversationsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2141,7 +2385,7 @@ func (x *ListConversationsResponse) String() string {
 func (*ListConversationsResponse) ProtoMessage() {}
 
 func (x *ListConversationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[26]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2154,7 +2398,7 @@ func (x *ListConversationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConversationsResponse.ProtoReflect.Descriptor instead.
 func (*ListConversationsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{26}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListConversationsResponse) GetConversations() []*ConversationSummary {
@@ -2180,7 +2424,7 @@ type GetConversationRequest struct {
 
 func (x *GetConversationRequest) Reset() {
 	*x = GetConversationRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2192,7 +2436,7 @@ func (x *GetConversationRequest) String() string {
 func (*GetConversationRequest) ProtoMessage() {}
 
 func (x *GetConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[27]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2205,7 +2449,7 @@ func (x *GetConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConversationRequest.ProtoReflect.Descriptor instead.
 func (*GetConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{27}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetConversationRequest) GetId() string {
@@ -2219,15 +2463,17 @@ type GetConversationResponse struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Conversation *ConversationSummary   `protobuf:"bytes,1,opt,name=conversation,proto3" json:"conversation,omitempty"`
 	Messages     []*ChatMessage         `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
-	// A turn of this conversation is running now (opened in another tab): the chat shows it as busy.
-	Running       bool `protobuf:"varint,3,opt,name=running,proto3" json:"running,omitempty"`
+	// A turn of this conversation is running now (opened in another tab, or a follow-up's): the chat shows it as busy.
+	Running bool `protobuf:"varint,3,opt,name=running,proto3" json:"running,omitempty"`
+	// The follow-ups waiting in this conversation, the soonest first. Opening the conversation marks it read.
+	FollowUps     []*FollowUp `protobuf:"bytes,4,rep,name=follow_ups,json=followUps,proto3" json:"follow_ups,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetConversationResponse) Reset() {
 	*x = GetConversationResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2239,7 +2485,7 @@ func (x *GetConversationResponse) String() string {
 func (*GetConversationResponse) ProtoMessage() {}
 
 func (x *GetConversationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[28]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2252,7 +2498,7 @@ func (x *GetConversationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConversationResponse.ProtoReflect.Descriptor instead.
 func (*GetConversationResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{28}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetConversationResponse) GetConversation() *ConversationSummary {
@@ -2276,6 +2522,13 @@ func (x *GetConversationResponse) GetRunning() bool {
 	return false
 }
 
+func (x *GetConversationResponse) GetFollowUps() []*FollowUp {
+	if x != nil {
+		return x.FollowUps
+	}
+	return nil
+}
+
 type DeleteConversationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -2285,7 +2538,7 @@ type DeleteConversationRequest struct {
 
 func (x *DeleteConversationRequest) Reset() {
 	*x = DeleteConversationRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2297,7 +2550,7 @@ func (x *DeleteConversationRequest) String() string {
 func (*DeleteConversationRequest) ProtoMessage() {}
 
 func (x *DeleteConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[29]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2310,7 +2563,7 @@ func (x *DeleteConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConversationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{29}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *DeleteConversationRequest) GetId() string {
@@ -2328,7 +2581,7 @@ type DeleteConversationResponse struct {
 
 func (x *DeleteConversationResponse) Reset() {
 	*x = DeleteConversationResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2340,7 +2593,7 @@ func (x *DeleteConversationResponse) String() string {
 func (*DeleteConversationResponse) ProtoMessage() {}
 
 func (x *DeleteConversationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[30]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2353,7 +2606,7 @@ func (x *DeleteConversationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConversationResponse.ProtoReflect.Descriptor instead.
 func (*DeleteConversationResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{30}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{32}
 }
 
 type DeleteAllConversationsRequest struct {
@@ -2366,7 +2619,7 @@ type DeleteAllConversationsRequest struct {
 
 func (x *DeleteAllConversationsRequest) Reset() {
 	*x = DeleteAllConversationsRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2378,7 +2631,7 @@ func (x *DeleteAllConversationsRequest) String() string {
 func (*DeleteAllConversationsRequest) ProtoMessage() {}
 
 func (x *DeleteAllConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[31]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2391,7 +2644,7 @@ func (x *DeleteAllConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAllConversationsRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAllConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{31}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DeleteAllConversationsRequest) GetAllAdmins() bool {
@@ -2410,7 +2663,7 @@ type DeleteAllConversationsResponse struct {
 
 func (x *DeleteAllConversationsResponse) Reset() {
 	*x = DeleteAllConversationsResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2422,7 +2675,7 @@ func (x *DeleteAllConversationsResponse) String() string {
 func (*DeleteAllConversationsResponse) ProtoMessage() {}
 
 func (x *DeleteAllConversationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[32]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2435,7 +2688,7 @@ func (x *DeleteAllConversationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAllConversationsResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAllConversationsResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{32}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *DeleteAllConversationsResponse) GetDeleted() uint32 {
@@ -2463,7 +2716,7 @@ type ChatRequest struct {
 
 func (x *ChatRequest) Reset() {
 	*x = ChatRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2475,7 +2728,7 @@ func (x *ChatRequest) String() string {
 func (*ChatRequest) ProtoMessage() {}
 
 func (x *ChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[33]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2488,7 +2741,7 @@ func (x *ChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatRequest.ProtoReflect.Descriptor instead.
 func (*ChatRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{33}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ChatRequest) GetConversationId() string {
@@ -2537,7 +2790,7 @@ type ChatStarted struct {
 
 func (x *ChatStarted) Reset() {
 	*x = ChatStarted{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2549,7 +2802,7 @@ func (x *ChatStarted) String() string {
 func (*ChatStarted) ProtoMessage() {}
 
 func (x *ChatStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[34]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2562,7 +2815,7 @@ func (x *ChatStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatStarted.ProtoReflect.Descriptor instead.
 func (*ChatStarted) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{34}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ChatStarted) GetConversationId() string {
@@ -2598,7 +2851,7 @@ type TurnUsage struct {
 
 func (x *TurnUsage) Reset() {
 	*x = TurnUsage{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2610,7 +2863,7 @@ func (x *TurnUsage) String() string {
 func (*TurnUsage) ProtoMessage() {}
 
 func (x *TurnUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[35]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2623,7 +2876,7 @@ func (x *TurnUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnUsage.ProtoReflect.Descriptor instead.
 func (*TurnUsage) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{35}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *TurnUsage) GetInputTokens() int64 {
@@ -2659,7 +2912,7 @@ type TurnDone struct {
 
 func (x *TurnDone) Reset() {
 	*x = TurnDone{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2671,7 +2924,7 @@ func (x *TurnDone) String() string {
 func (*TurnDone) ProtoMessage() {}
 
 func (x *TurnDone) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[36]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2684,7 +2937,7 @@ func (x *TurnDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnDone.ProtoReflect.Descriptor instead.
 func (*TurnDone) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{36}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *TurnDone) GetEnd() string {
@@ -2714,6 +2967,8 @@ type ChatResponse struct {
 	//	*ChatResponse_Usage
 	//	*ChatResponse_Done
 	//	*ChatResponse_Error
+	//	*ChatResponse_FollowUp
+	//	*ChatResponse_FollowUpCancelled
 	Event         isChatResponse_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2721,7 +2976,7 @@ type ChatResponse struct {
 
 func (x *ChatResponse) Reset() {
 	*x = ChatResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2733,7 +2988,7 @@ func (x *ChatResponse) String() string {
 func (*ChatResponse) ProtoMessage() {}
 
 func (x *ChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[37]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2746,7 +3001,7 @@ func (x *ChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatResponse.ProtoReflect.Descriptor instead.
 func (*ChatResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{37}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ChatResponse) GetEvent() isChatResponse_Event {
@@ -2837,6 +3092,24 @@ func (x *ChatResponse) GetError() *AssistantError {
 	return nil
 }
 
+func (x *ChatResponse) GetFollowUp() *FollowUp {
+	if x != nil {
+		if x, ok := x.Event.(*ChatResponse_FollowUp); ok {
+			return x.FollowUp
+		}
+	}
+	return nil
+}
+
+func (x *ChatResponse) GetFollowUpCancelled() string {
+	if x != nil {
+		if x, ok := x.Event.(*ChatResponse_FollowUpCancelled); ok {
+			return x.FollowUpCancelled
+		}
+	}
+	return ""
+}
+
 type isChatResponse_Event interface {
 	isChatResponse_Event()
 }
@@ -2881,6 +3154,16 @@ type ChatResponse_Error struct {
 	Error *AssistantError `protobuf:"bytes,9,opt,name=error,proto3,oneof"`
 }
 
+type ChatResponse_FollowUp struct {
+	// The model set a follow-up in this turn (its line appears in the chat).
+	FollowUp *FollowUp `protobuf:"bytes,10,opt,name=follow_up,json=followUp,proto3,oneof"`
+}
+
+type ChatResponse_FollowUpCancelled struct {
+	// The model cancelled a follow-up in this turn: its id.
+	FollowUpCancelled string `protobuf:"bytes,11,opt,name=follow_up_cancelled,json=followUpCancelled,proto3,oneof"`
+}
+
 func (*ChatResponse_Started) isChatResponse_Event() {}
 
 func (*ChatResponse_TextDelta) isChatResponse_Event() {}
@@ -2899,6 +3182,10 @@ func (*ChatResponse_Done) isChatResponse_Event() {}
 
 func (*ChatResponse_Error) isChatResponse_Event() {}
 
+func (*ChatResponse_FollowUp) isChatResponse_Event() {}
+
+func (*ChatResponse_FollowUpCancelled) isChatResponse_Event() {}
+
 type StopTurnRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
@@ -2908,7 +3195,7 @@ type StopTurnRequest struct {
 
 func (x *StopTurnRequest) Reset() {
 	*x = StopTurnRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2920,7 +3207,7 @@ func (x *StopTurnRequest) String() string {
 func (*StopTurnRequest) ProtoMessage() {}
 
 func (x *StopTurnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[38]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2933,7 +3220,7 @@ func (x *StopTurnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTurnRequest.ProtoReflect.Descriptor instead.
 func (*StopTurnRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{38}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *StopTurnRequest) GetConversationId() string {
@@ -2951,7 +3238,7 @@ type StopTurnResponse struct {
 
 func (x *StopTurnResponse) Reset() {
 	*x = StopTurnResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2963,7 +3250,7 @@ func (x *StopTurnResponse) String() string {
 func (*StopTurnResponse) ProtoMessage() {}
 
 func (x *StopTurnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[39]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2976,7 +3263,7 @@ func (x *StopTurnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTurnResponse.ProtoReflect.Descriptor instead.
 func (*StopTurnResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{39}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{41}
 }
 
 type ApplyPlanRequest struct {
@@ -2989,7 +3276,7 @@ type ApplyPlanRequest struct {
 
 func (x *ApplyPlanRequest) Reset() {
 	*x = ApplyPlanRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3001,7 +3288,7 @@ func (x *ApplyPlanRequest) String() string {
 func (*ApplyPlanRequest) ProtoMessage() {}
 
 func (x *ApplyPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[40]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3014,7 +3301,7 @@ func (x *ApplyPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyPlanRequest.ProtoReflect.Descriptor instead.
 func (*ApplyPlanRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{40}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ApplyPlanRequest) GetConversationId() string {
@@ -3040,7 +3327,7 @@ type ApplyPlanResponse struct {
 
 func (x *ApplyPlanResponse) Reset() {
 	*x = ApplyPlanResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3052,7 +3339,7 @@ func (x *ApplyPlanResponse) String() string {
 func (*ApplyPlanResponse) ProtoMessage() {}
 
 func (x *ApplyPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[41]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3065,7 +3352,7 @@ func (x *ApplyPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyPlanResponse.ProtoReflect.Descriptor instead.
 func (*ApplyPlanResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{41}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ApplyPlanResponse) GetPlan() *PlanCard {
@@ -3085,7 +3372,7 @@ type DismissPlanRequest struct {
 
 func (x *DismissPlanRequest) Reset() {
 	*x = DismissPlanRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3097,7 +3384,7 @@ func (x *DismissPlanRequest) String() string {
 func (*DismissPlanRequest) ProtoMessage() {}
 
 func (x *DismissPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[42]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3110,7 +3397,7 @@ func (x *DismissPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissPlanRequest.ProtoReflect.Descriptor instead.
 func (*DismissPlanRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{42}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *DismissPlanRequest) GetConversationId() string {
@@ -3136,7 +3423,7 @@ type DismissPlanResponse struct {
 
 func (x *DismissPlanResponse) Reset() {
 	*x = DismissPlanResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3148,7 +3435,7 @@ func (x *DismissPlanResponse) String() string {
 func (*DismissPlanResponse) ProtoMessage() {}
 
 func (x *DismissPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[43]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3161,7 +3448,7 @@ func (x *DismissPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissPlanResponse.ProtoReflect.Descriptor instead.
 func (*DismissPlanResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{43}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DismissPlanResponse) GetPlan() *PlanCard {
@@ -3169,6 +3456,94 @@ func (x *DismissPlanResponse) GetPlan() *PlanCard {
 		return x.Plan
 	}
 	return nil
+}
+
+type CancelFollowUpRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Id             string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CancelFollowUpRequest) Reset() {
+	*x = CancelFollowUpRequest{}
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelFollowUpRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelFollowUpRequest) ProtoMessage() {}
+
+func (x *CancelFollowUpRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelFollowUpRequest.ProtoReflect.Descriptor instead.
+func (*CancelFollowUpRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *CancelFollowUpRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *CancelFollowUpRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CancelFollowUpResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelFollowUpResponse) Reset() {
+	*x = CancelFollowUpResponse{}
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelFollowUpResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelFollowUpResponse) ProtoMessage() {}
+
+func (x *CancelFollowUpResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelFollowUpResponse.ProtoReflect.Descriptor instead.
+func (*CancelFollowUpResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{47}
 }
 
 type ListMemoryRequest struct {
@@ -3179,7 +3554,7 @@ type ListMemoryRequest struct {
 
 func (x *ListMemoryRequest) Reset() {
 	*x = ListMemoryRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3191,7 +3566,7 @@ func (x *ListMemoryRequest) String() string {
 func (*ListMemoryRequest) ProtoMessage() {}
 
 func (x *ListMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[44]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3204,7 +3579,7 @@ func (x *ListMemoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMemoryRequest.ProtoReflect.Descriptor instead.
 func (*ListMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{44}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{48}
 }
 
 type ListMemoryResponse struct {
@@ -3216,7 +3591,7 @@ type ListMemoryResponse struct {
 
 func (x *ListMemoryResponse) Reset() {
 	*x = ListMemoryResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3228,7 +3603,7 @@ func (x *ListMemoryResponse) String() string {
 func (*ListMemoryResponse) ProtoMessage() {}
 
 func (x *ListMemoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[45]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3241,7 +3616,7 @@ func (x *ListMemoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMemoryResponse.ProtoReflect.Descriptor instead.
 func (*ListMemoryResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{45}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *ListMemoryResponse) GetNotes() []*MemoryNote {
@@ -3262,7 +3637,7 @@ type SaveMemoryRequest struct {
 
 func (x *SaveMemoryRequest) Reset() {
 	*x = SaveMemoryRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3274,7 +3649,7 @@ func (x *SaveMemoryRequest) String() string {
 func (*SaveMemoryRequest) ProtoMessage() {}
 
 func (x *SaveMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[46]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3287,7 +3662,7 @@ func (x *SaveMemoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveMemoryRequest.ProtoReflect.Descriptor instead.
 func (*SaveMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{46}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *SaveMemoryRequest) GetId() string {
@@ -3313,7 +3688,7 @@ type SaveMemoryResponse struct {
 
 func (x *SaveMemoryResponse) Reset() {
 	*x = SaveMemoryResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3325,7 +3700,7 @@ func (x *SaveMemoryResponse) String() string {
 func (*SaveMemoryResponse) ProtoMessage() {}
 
 func (x *SaveMemoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[47]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3338,7 +3713,7 @@ func (x *SaveMemoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveMemoryResponse.ProtoReflect.Descriptor instead.
 func (*SaveMemoryResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{47}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *SaveMemoryResponse) GetNote() *MemoryNote {
@@ -3357,7 +3732,7 @@ type DeleteMemoryRequest struct {
 
 func (x *DeleteMemoryRequest) Reset() {
 	*x = DeleteMemoryRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3369,7 +3744,7 @@ func (x *DeleteMemoryRequest) String() string {
 func (*DeleteMemoryRequest) ProtoMessage() {}
 
 func (x *DeleteMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[48]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3382,7 +3757,7 @@ func (x *DeleteMemoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMemoryRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{48}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *DeleteMemoryRequest) GetId() string {
@@ -3400,7 +3775,7 @@ type DeleteMemoryResponse struct {
 
 func (x *DeleteMemoryResponse) Reset() {
 	*x = DeleteMemoryResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3412,7 +3787,7 @@ func (x *DeleteMemoryResponse) String() string {
 func (*DeleteMemoryResponse) ProtoMessage() {}
 
 func (x *DeleteMemoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[49]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3425,7 +3800,7 @@ func (x *DeleteMemoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMemoryResponse.ProtoReflect.Descriptor instead.
 func (*DeleteMemoryResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{49}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{53}
 }
 
 type ForgetAllRequest struct {
@@ -3436,7 +3811,7 @@ type ForgetAllRequest struct {
 
 func (x *ForgetAllRequest) Reset() {
 	*x = ForgetAllRequest{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3448,7 +3823,7 @@ func (x *ForgetAllRequest) String() string {
 func (*ForgetAllRequest) ProtoMessage() {}
 
 func (x *ForgetAllRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[50]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3461,7 +3836,7 @@ func (x *ForgetAllRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetAllRequest.ProtoReflect.Descriptor instead.
 func (*ForgetAllRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{50}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{54}
 }
 
 type ForgetAllResponse struct {
@@ -3473,7 +3848,7 @@ type ForgetAllResponse struct {
 
 func (x *ForgetAllResponse) Reset() {
 	*x = ForgetAllResponse{}
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[51]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3485,7 +3860,7 @@ func (x *ForgetAllResponse) String() string {
 func (*ForgetAllResponse) ProtoMessage() {}
 
 func (x *ForgetAllResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[51]
+	mi := &file_mistgate_admin_v1_assistant_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3498,7 +3873,7 @@ func (x *ForgetAllResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgetAllResponse.ProtoReflect.Descriptor instead.
 func (*ForgetAllResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{51}
+	return file_mistgate_admin_v1_assistant_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *ForgetAllResponse) GetDeleted() uint32 {
@@ -3515,7 +3890,7 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"!mistgate/admin/v1/assistant.proto\x12\x11mistgate.admin.v1\x1a$mistgate/admin/v1/integrations.proto\"$\n" +
 	"\x0eAssistantError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\"\x1b\n" +
-	"\x19GetAssistantAccessRequest\"\xc4\x02\n" +
+	"\x19GetAssistantAccessRequest\"\xc7\x03\n" +
 	"\x1aGetAssistantAccessResponse\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12@\n" +
@@ -3523,7 +3898,11 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x05model\x18\x04 \x01(\tR\x05model\x12\x1b\n" +
 	"\tread_only\x18\x05 \x01(\bR\breadOnly\x12?\n" +
 	"\achoices\x18\x06 \x03(\v2%.mistgate.admin.v1.ChatProviderChoiceR\achoices\x12:\n" +
-	"\x06effort\x18\a \x01(\x0e2\".mistgate.admin.v1.AssistantEffortR\x06effort\"\xef\x01\n" +
+	"\x06effort\x18\a \x01(\x0e2\".mistgate.admin.v1.AssistantEffortR\x06effort\x12\x16\n" +
+	"\x06unread\x18\b \x01(\rR\x06unread\x121\n" +
+	"\x13next_follow_up_unix\x18\t \x01(\x03B\x020\x02R\x10nextFollowUpUnix\x126\n" +
+	"\x17timezone_offset_minutes\x18\n" +
+	" \x01(\x05R\x15timezoneOffsetMinutes\"\xef\x01\n" +
 	"\x12ChatProviderChoice\x12@\n" +
 	"\bprovider\x18\x01 \x01(\x0e2$.mistgate.admin.v1.AssistantProviderR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12+\n" +
@@ -3595,14 +3974,16 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x14\n" +
 	"\x05label\x18\x03 \x01(\tR\x05label\x12\x14\n" +
-	"\x05route\x18\x04 \x01(\tR\x05route\"\xbe\x01\n" +
+	"\x05route\x18\x04 \x01(\tR\x05route\"\x80\x02\n" +
 	"\x13ConversationSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12%\n" +
 	"\fcreated_unix\x18\x03 \x01(\x03B\x020\x02R\vcreatedUnix\x12%\n" +
 	"\fupdated_unix\x18\x04 \x01(\x03B\x020\x02R\vupdatedUnix\x12\x1a\n" +
 	"\bmessages\x18\x05 \x01(\rR\bmessages\x12\x17\n" +
-	"\atask_id\x18\x06 \x01(\tR\x06taskId\"\x9b\x01\n" +
+	"\atask_id\x18\x06 \x01(\tR\x06taskId\x12\x16\n" +
+	"\x06unread\x18\a \x01(\bR\x06unread\x12(\n" +
+	"\x0efollow_up_unix\x18\b \x01(\x03B\x020\x02R\ffollowUpUnix\"\x9b\x01\n" +
 	"\bToolCall\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04tool\x18\x02 \x01(\tR\x04tool\x12\x1b\n" +
@@ -3633,7 +4014,7 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\fcreated_unix\x18\x03 \x01(\x03B\x020\x02R\vcreatedUnix\x12%\n" +
 	"\fupdated_unix\x18\x04 \x01(\x03B\x020\x02R\vupdatedUnix\x12!\n" +
 	"\fby_assistant\x18\x05 \x01(\bR\vbyAssistant\x12'\n" +
-	"\x0fconversation_id\x18\x06 \x01(\tR\x0econversationId\"\xfa\x02\n" +
+	"\x0fconversation_id\x18\x06 \x01(\tR\x0econversationId\"\xb8\x03\n" +
 	"\vChatMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x1b.mistgate.admin.v1.ChatRoleR\x04role\x12\x12\n" +
@@ -3645,7 +4026,24 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\n" +
 	"remembered\x18\b \x03(\v2\x1d.mistgate.admin.v1.MemoryNoteR\n" +
 	"remembered\x12\x10\n" +
-	"\x03end\x18\t \x01(\tR\x03end\"e\n" +
+	"\x03end\x18\t \x01(\tR\x03end\x12<\n" +
+	"\tfollow_up\x18\n" +
+	" \x01(\v2\x1f.mistgate.admin.v1.FollowUpTurnR\bfollowUp\"\xc0\x01\n" +
+	"\bFollowUp\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\x12\x1d\n" +
+	"\bdue_unix\x18\x03 \x01(\x03B\x020\x02R\adueUnix\x12%\n" +
+	"\fcreated_unix\x18\x04 \x01(\x03B\x020\x02R\vcreatedUnix\x12\x17\n" +
+	"\aplan_id\x18\x05 \x01(\tR\x06planId\x12\x17\n" +
+	"\adelay_s\x18\x06 \x01(\rR\x06delayS\x12\x18\n" +
+	"\arunning\x18\a \x01(\bR\arunning\"\xa2\x01\n" +
+	"\fFollowUpTurn\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\bset_unix\x18\x02 \x01(\x03B\x020\x02R\asetUnix\x12\x1d\n" +
+	"\bdue_unix\x18\x03 \x01(\x03B\x020\x02R\adueUnix\x12\x18\n" +
+	"\aoutcome\x18\x04 \x01(\tR\aoutcome\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x12\n" +
+	"\x04note\x18\x06 \x01(\tR\x04note\"e\n" +
 	"\x18ListConversationsRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\rR\x05limit\x12\x1d\n" +
@@ -3655,11 +4053,13 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\rconversations\x18\x01 \x03(\v2&.mistgate.admin.v1.ConversationSummaryR\rconversations\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"(\n" +
 	"\x16GetConversationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xbb\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xf7\x01\n" +
 	"\x17GetConversationResponse\x12J\n" +
 	"\fconversation\x18\x01 \x01(\v2&.mistgate.admin.v1.ConversationSummaryR\fconversation\x12:\n" +
 	"\bmessages\x18\x02 \x03(\v2\x1e.mistgate.admin.v1.ChatMessageR\bmessages\x12\x18\n" +
-	"\arunning\x18\x03 \x01(\bR\arunning\"+\n" +
+	"\arunning\x18\x03 \x01(\bR\arunning\x12:\n" +
+	"\n" +
+	"follow_ups\x18\x04 \x03(\v2\x1b.mistgate.admin.v1.FollowUpR\tfollowUps\"+\n" +
 	"\x19DeleteConversationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1c\n" +
 	"\x1aDeleteConversationResponse\">\n" +
@@ -3684,7 +4084,7 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x03usd\x18\x03 \x01(\x01R\x03usd\"2\n" +
 	"\bTurnDone\x12\x10\n" +
 	"\x03end\x18\x01 \x01(\tR\x03end\x12\x14\n" +
-	"\x05title\x18\x02 \x01(\tR\x05title\"\x92\x04\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\"\x80\x05\n" +
 	"\fChatResponse\x12:\n" +
 	"\astarted\x18\x01 \x01(\v2\x1e.mistgate.admin.v1.ChatStartedH\x00R\astarted\x12\x1f\n" +
 	"\n" +
@@ -3697,7 +4097,10 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"remembered\x124\n" +
 	"\x05usage\x18\a \x01(\v2\x1c.mistgate.admin.v1.TurnUsageH\x00R\x05usage\x121\n" +
 	"\x04done\x18\b \x01(\v2\x1b.mistgate.admin.v1.TurnDoneH\x00R\x04done\x129\n" +
-	"\x05error\x18\t \x01(\v2!.mistgate.admin.v1.AssistantErrorH\x00R\x05errorB\a\n" +
+	"\x05error\x18\t \x01(\v2!.mistgate.admin.v1.AssistantErrorH\x00R\x05error\x12:\n" +
+	"\tfollow_up\x18\n" +
+	" \x01(\v2\x1b.mistgate.admin.v1.FollowUpH\x00R\bfollowUp\x120\n" +
+	"\x13follow_up_cancelled\x18\v \x01(\tH\x00R\x11followUpCancelledB\a\n" +
 	"\x05event\":\n" +
 	"\x0fStopTurnRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"\x12\n" +
@@ -3711,7 +4114,11 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x17\n" +
 	"\aplan_id\x18\x02 \x01(\tR\x06planId\"F\n" +
 	"\x13DismissPlanResponse\x12/\n" +
-	"\x04plan\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.PlanCardR\x04plan\"\x13\n" +
+	"\x04plan\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.PlanCardR\x04plan\"P\n" +
+	"\x15CancelFollowUpRequest\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"\x18\n" +
+	"\x16CancelFollowUpResponse\"\x13\n" +
 	"\x11ListMemoryRequest\"I\n" +
 	"\x12ListMemoryResponse\x123\n" +
 	"\x05notes\x18\x01 \x03(\v2\x1d.mistgate.admin.v1.MemoryNoteR\x05notes\"7\n" +
@@ -3754,7 +4161,7 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x11PLAN_STATE_FAILED\x10\x04\x12\x17\n" +
 	"\x13PLAN_STATE_REJECTED\x10\x05\x12\x18\n" +
 	"\x14PLAN_STATE_DISMISSED\x10\x06\x12\x16\n" +
-	"\x12PLAN_STATE_EXPIRED\x10\a2\xdc\x0e\n" +
+	"\x12PLAN_STATE_EXPIRED\x10\a2\xc3\x0f\n" +
 	"\x10AssistantService\x12q\n" +
 	"\x12GetAssistantAccess\x12,.mistgate.admin.v1.GetAssistantAccessRequest\x1a-.mistgate.admin.v1.GetAssistantAccessResponse\x12w\n" +
 	"\x14GetAssistantSettings\x12..mistgate.admin.v1.GetAssistantSettingsRequest\x1a/.mistgate.admin.v1.GetAssistantSettingsResponse\x12\x80\x01\n" +
@@ -3769,7 +4176,8 @@ const file_mistgate_admin_v1_assistant_proto_rawDesc = "" +
 	"\x04Chat\x12\x1e.mistgate.admin.v1.ChatRequest\x1a\x1f.mistgate.admin.v1.ChatResponse0\x01\x12S\n" +
 	"\bStopTurn\x12\".mistgate.admin.v1.StopTurnRequest\x1a#.mistgate.admin.v1.StopTurnResponse\x12V\n" +
 	"\tApplyPlan\x12#.mistgate.admin.v1.ApplyPlanRequest\x1a$.mistgate.admin.v1.ApplyPlanResponse\x12\\\n" +
-	"\vDismissPlan\x12%.mistgate.admin.v1.DismissPlanRequest\x1a&.mistgate.admin.v1.DismissPlanResponse\x12Y\n" +
+	"\vDismissPlan\x12%.mistgate.admin.v1.DismissPlanRequest\x1a&.mistgate.admin.v1.DismissPlanResponse\x12e\n" +
+	"\x0eCancelFollowUp\x12(.mistgate.admin.v1.CancelFollowUpRequest\x1a).mistgate.admin.v1.CancelFollowUpResponse\x12Y\n" +
 	"\n" +
 	"ListMemory\x12$.mistgate.admin.v1.ListMemoryRequest\x1a%.mistgate.admin.v1.ListMemoryResponse\x12Y\n" +
 	"\n" +
@@ -3791,7 +4199,7 @@ func file_mistgate_admin_v1_assistant_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_assistant_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mistgate_admin_v1_assistant_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
+var file_mistgate_admin_v1_assistant_proto_msgTypes = make([]protoimpl.MessageInfo, 56)
 var file_mistgate_admin_v1_assistant_proto_goTypes = []any{
 	(AssistantProvider)(0),                  // 0: mistgate.admin.v1.AssistantProvider
 	(AssistantEffort)(0),                    // 1: mistgate.admin.v1.AssistantEffort
@@ -3823,34 +4231,38 @@ var file_mistgate_admin_v1_assistant_proto_goTypes = []any{
 	(*PlanCard)(nil),                        // 27: mistgate.admin.v1.PlanCard
 	(*MemoryNote)(nil),                      // 28: mistgate.admin.v1.MemoryNote
 	(*ChatMessage)(nil),                     // 29: mistgate.admin.v1.ChatMessage
-	(*ListConversationsRequest)(nil),        // 30: mistgate.admin.v1.ListConversationsRequest
-	(*ListConversationsResponse)(nil),       // 31: mistgate.admin.v1.ListConversationsResponse
-	(*GetConversationRequest)(nil),          // 32: mistgate.admin.v1.GetConversationRequest
-	(*GetConversationResponse)(nil),         // 33: mistgate.admin.v1.GetConversationResponse
-	(*DeleteConversationRequest)(nil),       // 34: mistgate.admin.v1.DeleteConversationRequest
-	(*DeleteConversationResponse)(nil),      // 35: mistgate.admin.v1.DeleteConversationResponse
-	(*DeleteAllConversationsRequest)(nil),   // 36: mistgate.admin.v1.DeleteAllConversationsRequest
-	(*DeleteAllConversationsResponse)(nil),  // 37: mistgate.admin.v1.DeleteAllConversationsResponse
-	(*ChatRequest)(nil),                     // 38: mistgate.admin.v1.ChatRequest
-	(*ChatStarted)(nil),                     // 39: mistgate.admin.v1.ChatStarted
-	(*TurnUsage)(nil),                       // 40: mistgate.admin.v1.TurnUsage
-	(*TurnDone)(nil),                        // 41: mistgate.admin.v1.TurnDone
-	(*ChatResponse)(nil),                    // 42: mistgate.admin.v1.ChatResponse
-	(*StopTurnRequest)(nil),                 // 43: mistgate.admin.v1.StopTurnRequest
-	(*StopTurnResponse)(nil),                // 44: mistgate.admin.v1.StopTurnResponse
-	(*ApplyPlanRequest)(nil),                // 45: mistgate.admin.v1.ApplyPlanRequest
-	(*ApplyPlanResponse)(nil),               // 46: mistgate.admin.v1.ApplyPlanResponse
-	(*DismissPlanRequest)(nil),              // 47: mistgate.admin.v1.DismissPlanRequest
-	(*DismissPlanResponse)(nil),             // 48: mistgate.admin.v1.DismissPlanResponse
-	(*ListMemoryRequest)(nil),               // 49: mistgate.admin.v1.ListMemoryRequest
-	(*ListMemoryResponse)(nil),              // 50: mistgate.admin.v1.ListMemoryResponse
-	(*SaveMemoryRequest)(nil),               // 51: mistgate.admin.v1.SaveMemoryRequest
-	(*SaveMemoryResponse)(nil),              // 52: mistgate.admin.v1.SaveMemoryResponse
-	(*DeleteMemoryRequest)(nil),             // 53: mistgate.admin.v1.DeleteMemoryRequest
-	(*DeleteMemoryResponse)(nil),            // 54: mistgate.admin.v1.DeleteMemoryResponse
-	(*ForgetAllRequest)(nil),                // 55: mistgate.admin.v1.ForgetAllRequest
-	(*ForgetAllResponse)(nil),               // 56: mistgate.admin.v1.ForgetAllResponse
-	(*ApprovalFact)(nil),                    // 57: mistgate.admin.v1.ApprovalFact
+	(*FollowUp)(nil),                        // 30: mistgate.admin.v1.FollowUp
+	(*FollowUpTurn)(nil),                    // 31: mistgate.admin.v1.FollowUpTurn
+	(*ListConversationsRequest)(nil),        // 32: mistgate.admin.v1.ListConversationsRequest
+	(*ListConversationsResponse)(nil),       // 33: mistgate.admin.v1.ListConversationsResponse
+	(*GetConversationRequest)(nil),          // 34: mistgate.admin.v1.GetConversationRequest
+	(*GetConversationResponse)(nil),         // 35: mistgate.admin.v1.GetConversationResponse
+	(*DeleteConversationRequest)(nil),       // 36: mistgate.admin.v1.DeleteConversationRequest
+	(*DeleteConversationResponse)(nil),      // 37: mistgate.admin.v1.DeleteConversationResponse
+	(*DeleteAllConversationsRequest)(nil),   // 38: mistgate.admin.v1.DeleteAllConversationsRequest
+	(*DeleteAllConversationsResponse)(nil),  // 39: mistgate.admin.v1.DeleteAllConversationsResponse
+	(*ChatRequest)(nil),                     // 40: mistgate.admin.v1.ChatRequest
+	(*ChatStarted)(nil),                     // 41: mistgate.admin.v1.ChatStarted
+	(*TurnUsage)(nil),                       // 42: mistgate.admin.v1.TurnUsage
+	(*TurnDone)(nil),                        // 43: mistgate.admin.v1.TurnDone
+	(*ChatResponse)(nil),                    // 44: mistgate.admin.v1.ChatResponse
+	(*StopTurnRequest)(nil),                 // 45: mistgate.admin.v1.StopTurnRequest
+	(*StopTurnResponse)(nil),                // 46: mistgate.admin.v1.StopTurnResponse
+	(*ApplyPlanRequest)(nil),                // 47: mistgate.admin.v1.ApplyPlanRequest
+	(*ApplyPlanResponse)(nil),               // 48: mistgate.admin.v1.ApplyPlanResponse
+	(*DismissPlanRequest)(nil),              // 49: mistgate.admin.v1.DismissPlanRequest
+	(*DismissPlanResponse)(nil),             // 50: mistgate.admin.v1.DismissPlanResponse
+	(*CancelFollowUpRequest)(nil),           // 51: mistgate.admin.v1.CancelFollowUpRequest
+	(*CancelFollowUpResponse)(nil),          // 52: mistgate.admin.v1.CancelFollowUpResponse
+	(*ListMemoryRequest)(nil),               // 53: mistgate.admin.v1.ListMemoryRequest
+	(*ListMemoryResponse)(nil),              // 54: mistgate.admin.v1.ListMemoryResponse
+	(*SaveMemoryRequest)(nil),               // 55: mistgate.admin.v1.SaveMemoryRequest
+	(*SaveMemoryResponse)(nil),              // 56: mistgate.admin.v1.SaveMemoryResponse
+	(*DeleteMemoryRequest)(nil),             // 57: mistgate.admin.v1.DeleteMemoryRequest
+	(*DeleteMemoryResponse)(nil),            // 58: mistgate.admin.v1.DeleteMemoryResponse
+	(*ForgetAllRequest)(nil),                // 59: mistgate.admin.v1.ForgetAllRequest
+	(*ForgetAllResponse)(nil),               // 60: mistgate.admin.v1.ForgetAllResponse
+	(*ApprovalFact)(nil),                    // 61: mistgate.admin.v1.ApprovalFact
 }
 var file_mistgate_admin_v1_assistant_proto_depIdxs = []int32{
 	0,  // 0: mistgate.admin.v1.GetAssistantAccessResponse.provider:type_name -> mistgate.admin.v1.AssistantProvider
@@ -3878,72 +4290,77 @@ var file_mistgate_admin_v1_assistant_proto_depIdxs = []int32{
 	11, // 22: mistgate.admin.v1.RemoveProviderKeyResponse.status:type_name -> mistgate.admin.v1.ProviderStatus
 	0,  // 23: mistgate.admin.v1.ListProviderModelsRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
 	12, // 24: mistgate.admin.v1.ListProviderModelsResponse.models:type_name -> mistgate.admin.v1.AssistantModel
-	57, // 25: mistgate.admin.v1.PlanCard.facts:type_name -> mistgate.admin.v1.ApprovalFact
+	61, // 25: mistgate.admin.v1.PlanCard.facts:type_name -> mistgate.admin.v1.ApprovalFact
 	4,  // 26: mistgate.admin.v1.PlanCard.state:type_name -> mistgate.admin.v1.PlanState
 	3,  // 27: mistgate.admin.v1.ChatMessage.role:type_name -> mistgate.admin.v1.ChatRole
 	24, // 28: mistgate.admin.v1.ChatMessage.context:type_name -> mistgate.admin.v1.PageContext
 	26, // 29: mistgate.admin.v1.ChatMessage.tools:type_name -> mistgate.admin.v1.ToolCall
 	27, // 30: mistgate.admin.v1.ChatMessage.plans:type_name -> mistgate.admin.v1.PlanCard
 	28, // 31: mistgate.admin.v1.ChatMessage.remembered:type_name -> mistgate.admin.v1.MemoryNote
-	25, // 32: mistgate.admin.v1.ListConversationsResponse.conversations:type_name -> mistgate.admin.v1.ConversationSummary
-	25, // 33: mistgate.admin.v1.GetConversationResponse.conversation:type_name -> mistgate.admin.v1.ConversationSummary
-	29, // 34: mistgate.admin.v1.GetConversationResponse.messages:type_name -> mistgate.admin.v1.ChatMessage
-	24, // 35: mistgate.admin.v1.ChatRequest.context:type_name -> mistgate.admin.v1.PageContext
-	0,  // 36: mistgate.admin.v1.ChatRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
-	1,  // 37: mistgate.admin.v1.ChatRequest.effort:type_name -> mistgate.admin.v1.AssistantEffort
-	39, // 38: mistgate.admin.v1.ChatResponse.started:type_name -> mistgate.admin.v1.ChatStarted
-	26, // 39: mistgate.admin.v1.ChatResponse.tool_started:type_name -> mistgate.admin.v1.ToolCall
-	26, // 40: mistgate.admin.v1.ChatResponse.tool_finished:type_name -> mistgate.admin.v1.ToolCall
-	27, // 41: mistgate.admin.v1.ChatResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	28, // 42: mistgate.admin.v1.ChatResponse.remembered:type_name -> mistgate.admin.v1.MemoryNote
-	40, // 43: mistgate.admin.v1.ChatResponse.usage:type_name -> mistgate.admin.v1.TurnUsage
-	41, // 44: mistgate.admin.v1.ChatResponse.done:type_name -> mistgate.admin.v1.TurnDone
-	5,  // 45: mistgate.admin.v1.ChatResponse.error:type_name -> mistgate.admin.v1.AssistantError
-	27, // 46: mistgate.admin.v1.ApplyPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	27, // 47: mistgate.admin.v1.DismissPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
-	28, // 48: mistgate.admin.v1.ListMemoryResponse.notes:type_name -> mistgate.admin.v1.MemoryNote
-	28, // 49: mistgate.admin.v1.SaveMemoryResponse.note:type_name -> mistgate.admin.v1.MemoryNote
-	6,  // 50: mistgate.admin.v1.AssistantService.GetAssistantAccess:input_type -> mistgate.admin.v1.GetAssistantAccessRequest
-	14, // 51: mistgate.admin.v1.AssistantService.GetAssistantSettings:input_type -> mistgate.admin.v1.GetAssistantSettingsRequest
-	16, // 52: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:input_type -> mistgate.admin.v1.UpdateAssistantSettingsRequest
-	18, // 53: mistgate.admin.v1.AssistantService.SetProviderKey:input_type -> mistgate.admin.v1.SetProviderKeyRequest
-	20, // 54: mistgate.admin.v1.AssistantService.RemoveProviderKey:input_type -> mistgate.admin.v1.RemoveProviderKeyRequest
-	22, // 55: mistgate.admin.v1.AssistantService.ListProviderModels:input_type -> mistgate.admin.v1.ListProviderModelsRequest
-	30, // 56: mistgate.admin.v1.AssistantService.ListConversations:input_type -> mistgate.admin.v1.ListConversationsRequest
-	32, // 57: mistgate.admin.v1.AssistantService.GetConversation:input_type -> mistgate.admin.v1.GetConversationRequest
-	34, // 58: mistgate.admin.v1.AssistantService.DeleteConversation:input_type -> mistgate.admin.v1.DeleteConversationRequest
-	36, // 59: mistgate.admin.v1.AssistantService.DeleteAllConversations:input_type -> mistgate.admin.v1.DeleteAllConversationsRequest
-	38, // 60: mistgate.admin.v1.AssistantService.Chat:input_type -> mistgate.admin.v1.ChatRequest
-	43, // 61: mistgate.admin.v1.AssistantService.StopTurn:input_type -> mistgate.admin.v1.StopTurnRequest
-	45, // 62: mistgate.admin.v1.AssistantService.ApplyPlan:input_type -> mistgate.admin.v1.ApplyPlanRequest
-	47, // 63: mistgate.admin.v1.AssistantService.DismissPlan:input_type -> mistgate.admin.v1.DismissPlanRequest
-	49, // 64: mistgate.admin.v1.AssistantService.ListMemory:input_type -> mistgate.admin.v1.ListMemoryRequest
-	51, // 65: mistgate.admin.v1.AssistantService.SaveMemory:input_type -> mistgate.admin.v1.SaveMemoryRequest
-	53, // 66: mistgate.admin.v1.AssistantService.DeleteMemory:input_type -> mistgate.admin.v1.DeleteMemoryRequest
-	55, // 67: mistgate.admin.v1.AssistantService.ForgetAll:input_type -> mistgate.admin.v1.ForgetAllRequest
-	7,  // 68: mistgate.admin.v1.AssistantService.GetAssistantAccess:output_type -> mistgate.admin.v1.GetAssistantAccessResponse
-	15, // 69: mistgate.admin.v1.AssistantService.GetAssistantSettings:output_type -> mistgate.admin.v1.GetAssistantSettingsResponse
-	17, // 70: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:output_type -> mistgate.admin.v1.UpdateAssistantSettingsResponse
-	19, // 71: mistgate.admin.v1.AssistantService.SetProviderKey:output_type -> mistgate.admin.v1.SetProviderKeyResponse
-	21, // 72: mistgate.admin.v1.AssistantService.RemoveProviderKey:output_type -> mistgate.admin.v1.RemoveProviderKeyResponse
-	23, // 73: mistgate.admin.v1.AssistantService.ListProviderModels:output_type -> mistgate.admin.v1.ListProviderModelsResponse
-	31, // 74: mistgate.admin.v1.AssistantService.ListConversations:output_type -> mistgate.admin.v1.ListConversationsResponse
-	33, // 75: mistgate.admin.v1.AssistantService.GetConversation:output_type -> mistgate.admin.v1.GetConversationResponse
-	35, // 76: mistgate.admin.v1.AssistantService.DeleteConversation:output_type -> mistgate.admin.v1.DeleteConversationResponse
-	37, // 77: mistgate.admin.v1.AssistantService.DeleteAllConversations:output_type -> mistgate.admin.v1.DeleteAllConversationsResponse
-	42, // 78: mistgate.admin.v1.AssistantService.Chat:output_type -> mistgate.admin.v1.ChatResponse
-	44, // 79: mistgate.admin.v1.AssistantService.StopTurn:output_type -> mistgate.admin.v1.StopTurnResponse
-	46, // 80: mistgate.admin.v1.AssistantService.ApplyPlan:output_type -> mistgate.admin.v1.ApplyPlanResponse
-	48, // 81: mistgate.admin.v1.AssistantService.DismissPlan:output_type -> mistgate.admin.v1.DismissPlanResponse
-	50, // 82: mistgate.admin.v1.AssistantService.ListMemory:output_type -> mistgate.admin.v1.ListMemoryResponse
-	52, // 83: mistgate.admin.v1.AssistantService.SaveMemory:output_type -> mistgate.admin.v1.SaveMemoryResponse
-	54, // 84: mistgate.admin.v1.AssistantService.DeleteMemory:output_type -> mistgate.admin.v1.DeleteMemoryResponse
-	56, // 85: mistgate.admin.v1.AssistantService.ForgetAll:output_type -> mistgate.admin.v1.ForgetAllResponse
-	68, // [68:86] is the sub-list for method output_type
-	50, // [50:68] is the sub-list for method input_type
-	50, // [50:50] is the sub-list for extension type_name
-	50, // [50:50] is the sub-list for extension extendee
-	0,  // [0:50] is the sub-list for field type_name
+	31, // 32: mistgate.admin.v1.ChatMessage.follow_up:type_name -> mistgate.admin.v1.FollowUpTurn
+	25, // 33: mistgate.admin.v1.ListConversationsResponse.conversations:type_name -> mistgate.admin.v1.ConversationSummary
+	25, // 34: mistgate.admin.v1.GetConversationResponse.conversation:type_name -> mistgate.admin.v1.ConversationSummary
+	29, // 35: mistgate.admin.v1.GetConversationResponse.messages:type_name -> mistgate.admin.v1.ChatMessage
+	30, // 36: mistgate.admin.v1.GetConversationResponse.follow_ups:type_name -> mistgate.admin.v1.FollowUp
+	24, // 37: mistgate.admin.v1.ChatRequest.context:type_name -> mistgate.admin.v1.PageContext
+	0,  // 38: mistgate.admin.v1.ChatRequest.provider:type_name -> mistgate.admin.v1.AssistantProvider
+	1,  // 39: mistgate.admin.v1.ChatRequest.effort:type_name -> mistgate.admin.v1.AssistantEffort
+	41, // 40: mistgate.admin.v1.ChatResponse.started:type_name -> mistgate.admin.v1.ChatStarted
+	26, // 41: mistgate.admin.v1.ChatResponse.tool_started:type_name -> mistgate.admin.v1.ToolCall
+	26, // 42: mistgate.admin.v1.ChatResponse.tool_finished:type_name -> mistgate.admin.v1.ToolCall
+	27, // 43: mistgate.admin.v1.ChatResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	28, // 44: mistgate.admin.v1.ChatResponse.remembered:type_name -> mistgate.admin.v1.MemoryNote
+	42, // 45: mistgate.admin.v1.ChatResponse.usage:type_name -> mistgate.admin.v1.TurnUsage
+	43, // 46: mistgate.admin.v1.ChatResponse.done:type_name -> mistgate.admin.v1.TurnDone
+	5,  // 47: mistgate.admin.v1.ChatResponse.error:type_name -> mistgate.admin.v1.AssistantError
+	30, // 48: mistgate.admin.v1.ChatResponse.follow_up:type_name -> mistgate.admin.v1.FollowUp
+	27, // 49: mistgate.admin.v1.ApplyPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	27, // 50: mistgate.admin.v1.DismissPlanResponse.plan:type_name -> mistgate.admin.v1.PlanCard
+	28, // 51: mistgate.admin.v1.ListMemoryResponse.notes:type_name -> mistgate.admin.v1.MemoryNote
+	28, // 52: mistgate.admin.v1.SaveMemoryResponse.note:type_name -> mistgate.admin.v1.MemoryNote
+	6,  // 53: mistgate.admin.v1.AssistantService.GetAssistantAccess:input_type -> mistgate.admin.v1.GetAssistantAccessRequest
+	14, // 54: mistgate.admin.v1.AssistantService.GetAssistantSettings:input_type -> mistgate.admin.v1.GetAssistantSettingsRequest
+	16, // 55: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:input_type -> mistgate.admin.v1.UpdateAssistantSettingsRequest
+	18, // 56: mistgate.admin.v1.AssistantService.SetProviderKey:input_type -> mistgate.admin.v1.SetProviderKeyRequest
+	20, // 57: mistgate.admin.v1.AssistantService.RemoveProviderKey:input_type -> mistgate.admin.v1.RemoveProviderKeyRequest
+	22, // 58: mistgate.admin.v1.AssistantService.ListProviderModels:input_type -> mistgate.admin.v1.ListProviderModelsRequest
+	32, // 59: mistgate.admin.v1.AssistantService.ListConversations:input_type -> mistgate.admin.v1.ListConversationsRequest
+	34, // 60: mistgate.admin.v1.AssistantService.GetConversation:input_type -> mistgate.admin.v1.GetConversationRequest
+	36, // 61: mistgate.admin.v1.AssistantService.DeleteConversation:input_type -> mistgate.admin.v1.DeleteConversationRequest
+	38, // 62: mistgate.admin.v1.AssistantService.DeleteAllConversations:input_type -> mistgate.admin.v1.DeleteAllConversationsRequest
+	40, // 63: mistgate.admin.v1.AssistantService.Chat:input_type -> mistgate.admin.v1.ChatRequest
+	45, // 64: mistgate.admin.v1.AssistantService.StopTurn:input_type -> mistgate.admin.v1.StopTurnRequest
+	47, // 65: mistgate.admin.v1.AssistantService.ApplyPlan:input_type -> mistgate.admin.v1.ApplyPlanRequest
+	49, // 66: mistgate.admin.v1.AssistantService.DismissPlan:input_type -> mistgate.admin.v1.DismissPlanRequest
+	51, // 67: mistgate.admin.v1.AssistantService.CancelFollowUp:input_type -> mistgate.admin.v1.CancelFollowUpRequest
+	53, // 68: mistgate.admin.v1.AssistantService.ListMemory:input_type -> mistgate.admin.v1.ListMemoryRequest
+	55, // 69: mistgate.admin.v1.AssistantService.SaveMemory:input_type -> mistgate.admin.v1.SaveMemoryRequest
+	57, // 70: mistgate.admin.v1.AssistantService.DeleteMemory:input_type -> mistgate.admin.v1.DeleteMemoryRequest
+	59, // 71: mistgate.admin.v1.AssistantService.ForgetAll:input_type -> mistgate.admin.v1.ForgetAllRequest
+	7,  // 72: mistgate.admin.v1.AssistantService.GetAssistantAccess:output_type -> mistgate.admin.v1.GetAssistantAccessResponse
+	15, // 73: mistgate.admin.v1.AssistantService.GetAssistantSettings:output_type -> mistgate.admin.v1.GetAssistantSettingsResponse
+	17, // 74: mistgate.admin.v1.AssistantService.UpdateAssistantSettings:output_type -> mistgate.admin.v1.UpdateAssistantSettingsResponse
+	19, // 75: mistgate.admin.v1.AssistantService.SetProviderKey:output_type -> mistgate.admin.v1.SetProviderKeyResponse
+	21, // 76: mistgate.admin.v1.AssistantService.RemoveProviderKey:output_type -> mistgate.admin.v1.RemoveProviderKeyResponse
+	23, // 77: mistgate.admin.v1.AssistantService.ListProviderModels:output_type -> mistgate.admin.v1.ListProviderModelsResponse
+	33, // 78: mistgate.admin.v1.AssistantService.ListConversations:output_type -> mistgate.admin.v1.ListConversationsResponse
+	35, // 79: mistgate.admin.v1.AssistantService.GetConversation:output_type -> mistgate.admin.v1.GetConversationResponse
+	37, // 80: mistgate.admin.v1.AssistantService.DeleteConversation:output_type -> mistgate.admin.v1.DeleteConversationResponse
+	39, // 81: mistgate.admin.v1.AssistantService.DeleteAllConversations:output_type -> mistgate.admin.v1.DeleteAllConversationsResponse
+	44, // 82: mistgate.admin.v1.AssistantService.Chat:output_type -> mistgate.admin.v1.ChatResponse
+	46, // 83: mistgate.admin.v1.AssistantService.StopTurn:output_type -> mistgate.admin.v1.StopTurnResponse
+	48, // 84: mistgate.admin.v1.AssistantService.ApplyPlan:output_type -> mistgate.admin.v1.ApplyPlanResponse
+	50, // 85: mistgate.admin.v1.AssistantService.DismissPlan:output_type -> mistgate.admin.v1.DismissPlanResponse
+	52, // 86: mistgate.admin.v1.AssistantService.CancelFollowUp:output_type -> mistgate.admin.v1.CancelFollowUpResponse
+	54, // 87: mistgate.admin.v1.AssistantService.ListMemory:output_type -> mistgate.admin.v1.ListMemoryResponse
+	56, // 88: mistgate.admin.v1.AssistantService.SaveMemory:output_type -> mistgate.admin.v1.SaveMemoryResponse
+	58, // 89: mistgate.admin.v1.AssistantService.DeleteMemory:output_type -> mistgate.admin.v1.DeleteMemoryResponse
+	60, // 90: mistgate.admin.v1.AssistantService.ForgetAll:output_type -> mistgate.admin.v1.ForgetAllResponse
+	72, // [72:91] is the sub-list for method output_type
+	53, // [53:72] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_assistant_proto_init() }
@@ -3952,7 +4369,7 @@ func file_mistgate_admin_v1_assistant_proto_init() {
 		return
 	}
 	file_mistgate_admin_v1_integrations_proto_init()
-	file_mistgate_admin_v1_assistant_proto_msgTypes[37].OneofWrappers = []any{
+	file_mistgate_admin_v1_assistant_proto_msgTypes[39].OneofWrappers = []any{
 		(*ChatResponse_Started)(nil),
 		(*ChatResponse_TextDelta)(nil),
 		(*ChatResponse_ToolStarted)(nil),
@@ -3962,6 +4379,8 @@ func file_mistgate_admin_v1_assistant_proto_init() {
 		(*ChatResponse_Usage)(nil),
 		(*ChatResponse_Done)(nil),
 		(*ChatResponse_Error)(nil),
+		(*ChatResponse_FollowUp)(nil),
+		(*ChatResponse_FollowUpCancelled)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3969,7 +4388,7 @@ func file_mistgate_admin_v1_assistant_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_assistant_proto_rawDesc), len(file_mistgate_admin_v1_assistant_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   52,
+			NumMessages:   56,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

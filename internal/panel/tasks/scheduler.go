@@ -44,6 +44,13 @@ func (s *Service) Run(ctx context.Context) {
 	for {
 		if recoveryPending {
 			n, err := s.cfg.Store.RecoverScheduledRuns(ctx, s.now())
+			if err == nil && s.cfg.Assistant != nil {
+				// follow-ups a stop of the panel left running run again
+				var back int64
+				if back, err = s.cfg.Store.RecoverAssistantFollowUps(ctx); err == nil && back > 0 {
+					s.cfg.Log.Info("tasks: follow-ups interrupted by the last stop", "count", back)
+				}
+			}
 			if err != nil {
 				if ctx.Err() == nil {
 					s.cfg.Log.Warn("tasks: recover interrupted runs", "code", "scheduled_recover_failed", "err", err)
@@ -57,6 +64,7 @@ func (s *Service) Run(ctx context.Context) {
 		}
 		if !recoveryPending {
 			s.dispatch(ctx)
+			s.dispatchFollowUps(ctx)
 		}
 		select {
 		case <-ctx.Done():

@@ -32,6 +32,14 @@ import "mistgate/admin/v1/integrations.proto";
 //   INVALID_ARGUMENT "bad_key", "no_balance", "text_too_long", "note_too_long", "too_many_notes";
 //   PERMISSION_DENIED as for the rest of the admin (owner-only, step-up with its StepUpRequired detail).
 // Errors that happen inside a running turn arrive as ChatResponse.error with the same codes, and the turn ends.
+//
+// FOLLOW-UPS. The model may set a follow-up with its local tool follow_up (in 30 s to 24 h, or that long after a plan of the
+// conversation is applied): at that time the panel continues the conversation by itself, as its admin, through the same turn
+// as Chat (the same tools, profile, limits and plan cards; nothing is applied without the human's click), starting from a
+// line "Follow-up you set at ...". It runs on the server, with the browser closed too. At most 3 wait per conversation and 20
+// per admin. A follow-up that cannot run leaves a short note in the conversation with the reason; one the panel could not run
+// for more than a day after its time (it was down) is dropped with such a note. A conversation a follow-up answered is unread
+// until GetConversation opens it.
 
 service AssistantService {
   // Whether this admin may use the assistant now, and with what: the floating chat button reads it.
@@ -63,6 +71,9 @@ service AssistantService {
   // plan is never applied here (its host key and login are confirmed in the approval inbox).
   rpc ApplyPlan(ApplyPlanRequest) returns (ApplyPlanResponse);
   rpc DismissPlan(DismissPlanRequest) returns (DismissPlanResponse);
+  // Removes a follow-up the assistant set in one of the admin's own conversations (the "Cancel" on its line). A follow-up
+  // whose turn is running now is not removed: Stop ends the turn.
+  rpc CancelFollowUp(CancelFollowUpRequest) returns (CancelFollowUpResponse);
 
   // The admin's own notes the assistant reads in every conversation (at most 100 of 400 characters).
   rpc ListMemory(ListMemoryRequest) returns (ListMemoryResponse);
@@ -122,6 +133,12 @@ message GetAssistantAccessResponse {
   repeated ChatProviderChoice choices = 6;
   // The panel's thinking depth, what a turn uses unless the admin picks another.
   AssistantEffort effort = 7;
+  // The admin's conversations a follow-up answered while they were away, not opened since: the chat button's dot.
+  uint32 unread = 8;
+  // When the admin's next follow-up is due (unix seconds); 0 = none. The chat button looks again soon after it.
+  int64 next_follow_up_unix = 9 [jstype = JS_NUMBER];
+  // The panel's time zone, minutes east of UTC (the one of the scheduled tasks): follow-up times are shown in it.
+  int32 timezone_offset_minutes = 10;
 }
 
 message ChatProviderChoice {
@@ -260,6 +277,10 @@ message ConversationSummary {
   uint32 messages = 5;
   // The scheduled task (mistgate.tasks.v1) whose runs write here; empty for a conversation a person started.
   string task_id = 6;
+  // A follow-up answered here (or left a note) after the admin last opened it.
+  bool unread = 7;
+  // The time of this conversation's next follow-up, unix seconds; 0 = none, or only ones that wait for a plan.
+  int64 follow_up_unix = 8 [jstype = JS_NUMBER];
 }
 
 enum ChatRole {
@@ -345,6 +366,41 @@ message ChatMessage {
   repeated MemoryNote remembered = 8;
   // How the assistant's turn ended: "end", "stopped", "limit", "refused", "budget", "error".
   string end = 9;
+  // Set on the two messages of a turn a follow-up started (the panel's line that opens it, CHAT_ROLE_USER, whose text is
+  // the note; and the answer), and on the note a follow-up that did not run leaves.
+  FollowUpTurn follow_up = 10;
+}
+
+// A follow-up the assistant set (its local tool follow_up): at its time the panel continues the conversation by itself.
+message FollowUp {
+  // "afu_...".
+  string id = 1;
+  // What the assistant will do then, in its own words (scrubbed; untrusted text).
+  string note = 2;
+  // When it is due, unix seconds; 0 while it waits for its plan to be applied.
+  int64 due_unix = 3 [jstype = JS_NUMBER];
+  int64 created_unix = 4 [jstype = JS_NUMBER];
+  // The plan of this conversation whose apply starts the clock, and how long after the apply it is due; empty when it
+  // counts from when it was set.
+  string plan_id = 5;
+  uint32 delay_s = 6;
+  // Its turn is running now (it cannot be cancelled; Stop ends it).
+  bool running = 7;
+}
+
+// What a follow-up's turn was, on its messages.
+message FollowUpTurn {
+  // The follow-up's id.
+  string id = 1;
+  // When the assistant set it and when it was due (a turn may start later, after a stop of the panel).
+  int64 set_unix = 2 [jstype = JS_NUMBER];
+  int64 due_unix = 3 [jstype = JS_NUMBER];
+  // "" when its turn ran; "failed" when it did not run or its turn failed (reason: a code as in ERRORS, or "internal",
+  // "interrupted"); "missed" when the panel could not run it until more than a day after its time.
+  string outcome = 4;
+  string reason = 5;
+  // The note, on the message a follow-up that did not run leaves (it has no line of its own).
+  string note = 6;
 }
 
 message ListConversationsRequest {
@@ -367,8 +423,10 @@ message GetConversationRequest {
 message GetConversationResponse {
   ConversationSummary conversation = 1;
   repeated ChatMessage messages = 2;
-  // A turn of this conversation is running now (opened in another tab): the chat shows it as busy.
+  // A turn of this conversation is running now (opened in another tab, or a follow-up's): the chat shows it as busy.
   bool running = 3;
+  // The follow-ups waiting in this conversation, the soonest first. Opening the conversation marks it read.
+  repeated FollowUp follow_ups = 4;
 }
 
 message DeleteConversationRequest {
@@ -434,6 +492,10 @@ message ChatResponse {
     TurnDone done = 8;
     // Last event of a turn that failed; the code as in ERRORS.
     AssistantError error = 9;
+    // The model set a follow-up in this turn (its line appears in the chat).
+    FollowUp follow_up = 10;
+    // The model cancelled a follow-up in this turn: its id.
+    string follow_up_cancelled = 11;
   }
 }
 
@@ -460,6 +522,13 @@ message DismissPlanRequest {
 message DismissPlanResponse {
   PlanCard plan = 1;
 }
+
+message CancelFollowUpRequest {
+  string conversation_id = 1;
+  string id = 2;
+}
+
+message CancelFollowUpResponse {}
 
 message ListMemoryRequest {}
 
