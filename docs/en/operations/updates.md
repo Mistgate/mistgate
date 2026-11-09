@@ -129,7 +129,7 @@ Each update is pinned to a release:
 ### One node's update
 
 1. The panel sends the signed manifest. The agent checks it, downloads its file, keeps its current binary as `<binary>.prev`, puts the new one in its place and restarts itself in place (systemd sees nothing). The node is offline for a few seconds; the admin shows it as updating, not as an outage.
-2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Download timeout**); the window is captured when the command is sent, and a transfer with no data for 90 seconds still fails. Changing the setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
+2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Download timeout**); the window is captured when the command is sent, and a transfer that sends nothing for 90 seconds is resumed where it stopped, up to three times, within the window. Changing the setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
 3. The **gate** runs for up to 5 minutes after the node is back. It passes when all of this holds:
    - the new build has committed: it connected and applied its configuration without a failed profile;
    - the configuration the node applied is the panel's;
