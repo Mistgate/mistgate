@@ -60,7 +60,10 @@ func (l *kernelDebugLease) close() []error {
 	return l.closeFn()
 }
 
-type awgKernelDebugEngine interface {
+// AWGKernelDebugEngine is what the kernel-log capture asks the awg engine: whether it runs on the kernel module and
+// its interfaces, and the unknown-peer events. The node's awg engine is a wrapper (cmd/mistgate-node), which must
+// forward both: without them a capture on a real node silently reads no AWG lines.
+type AWGKernelDebugEngine interface {
 	KernelDebugInfo() (bool, []awg.KernelDebugInterface)
 	WatchKernelUnknownPeers(func(string)) (bool, func())
 }
@@ -297,8 +300,8 @@ func sourceWanted(sources map[string]bool, source string) bool {
 	return sources == nil || sources[source]
 }
 
-func (a *Agent) awgKernelSnapshot() (awgKernelDebugEngine, bool, []awg.KernelDebugInterface) {
-	e, ok := a.engines[awg.Protocol].(awgKernelDebugEngine)
+func (a *Agent) awgKernelSnapshot() (AWGKernelDebugEngine, bool, []awg.KernelDebugInterface) {
+	e, ok := a.engines[awg.Protocol].(AWGKernelDebugEngine)
 	if !ok {
 		return nil, false, nil
 	}

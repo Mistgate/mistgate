@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/node/agent"
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -85,6 +86,24 @@ func (l *awgEngine) NodeSettings(ctx context.Context, st *pb.NodeSettings) bool 
 	}
 	l.eng, l.built = nil, ""
 	return true
+}
+
+var _ agent.AWGKernelDebugEngine = (*awgEngine)(nil)
+
+// KernelDebugInfo implements agent.AWGKernelDebugEngine: an engine never built serves no AWG, so there is nothing to read.
+func (l *awgEngine) KernelDebugInfo() (bool, []awg.KernelDebugInterface) {
+	if e := l.peek(); e != nil {
+		return e.KernelDebugInfo()
+	}
+	return false, nil
+}
+
+// WatchKernelUnknownPeers implements agent.AWGKernelDebugEngine.
+func (l *awgEngine) WatchKernelUnknownPeers(fn func(string)) (bool, func()) {
+	if e := l.peek(); e != nil {
+		return e.WatchKernelUnknownPeers(fn)
+	}
+	return false, func() {}
 }
 
 // BackendStatus is the doctor's view (the agent asserts this method).
