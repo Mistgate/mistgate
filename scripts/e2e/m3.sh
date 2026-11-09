@@ -1579,8 +1579,10 @@ m3_json() {
     [ -z "${in_s[$k]:-}" ] || die "sing-box: the server $k must be absent (self-signed Hysteria2 and XHTTP are not expressible) but is in the profile"
   done
   jq -e '[.outbounds[] | select(.type == "hysteria2" or .transport.type == "xhttp")] | length == 0' "$SF" >/dev/null || die "the sing-box profile has a hysteria2 or xhttp outbound"
-  jq -e '.outbounds[] | select(.type == "selector") | (.outbounds - ["direct"] | length) == '"$want_s" "$SF" >/dev/null || die "the sing-box selector does not list exactly the $want_s servers"
-  pass "coverage: Xray JSON has all $want_x servers (${!in_x[*]}); sing-box has ${!in_s[*]} and neither the self-signed hysteria2 inbounds nor XHTTP"
+  # automatic server choice is on by default: with more than one server the selector starts on an urltest "Auto" over them
+  jq -e '.outbounds[] | select(.type == "urltest") | select(.tag == "Auto") | (.outbounds | length) == '"$want_s" "$SF" >/dev/null || die "the sing-box profile has no Auto urltest over the $want_s servers"
+  jq -e '.outbounds[] | select(.type == "selector") | (.outbounds[0] == "Auto" and .default == "Auto" and (.outbounds - ["direct", "Auto"] | length) == '"$want_s"')' "$SF" >/dev/null || die "the sing-box selector does not start on Auto and list exactly the $want_s servers"
+  pass "coverage: Xray JSON has all $want_x servers (${!in_x[*]}); sing-box has ${!in_s[*]}, an Auto urltest over them as the selector's default, and neither the self-signed hysteria2 inbounds nor XHTTP"
 
   # ---- the sing-box documents are valid for the cores as served
   for ver in $SB_VERSIONS; do
