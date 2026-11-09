@@ -11,7 +11,7 @@ export const T = {
     onPage: "On this page", prev: "Previous", next: "Next", edit: "Edit this page on GitHub", theme: "Switch theme", github: "Mistgate on GitHub", stars: "Mistgate on GitHub, {n} stars",
     language: "Language", copy: "Copy", copied: "Copied", table: "Table", plain: "Text", diagram: "Diagram", permalink: "Link to the section", pending: "This page is not written yet", roadmap: "Roadmap phases",
     license: "Released under AGPL-3.0", other: "Other",
-    inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", reachability: "Reachability", updates: "Updates", integrations: "Integrations", settings: "Settings" },
+    inAdmin: "In the admin", sections: { overview: "Overview", nodes: "Nodes", users: "Users", profiles: "Profiles", subscriptions: "Subscriptions", health: "Health", reachability: "Reachability", updates: "Updates", ai: "AI", integrations: "Integrations", settings: "Settings" },
     notFound: "Page not found", notFoundText: "There is no such page. It may have moved or not been written yet.", toHome: "Go to the documentation",
   },
   ru: {
@@ -21,7 +21,7 @@ export const T = {
     onPage: "На этой странице", prev: "Назад", next: "Дальше", edit: "Править страницу на GitHub", theme: "Сменить тему", github: "Mistgate на GitHub", stars: "Mistgate на GitHub, звёзд: {n}",
     language: "Язык", copy: "Копировать", copied: "Скопировано", table: "Таблица", plain: "Текст", diagram: "Схема", permalink: "Ссылка на раздел", pending: "Эта страница ещё не написана", roadmap: "Этапы плана",
     license: "Лицензия AGPL-3.0", other: "Прочее",
-    inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", reachability: "Доступность", updates: "Обновления", integrations: "Интеграции", settings: "Настройки" },
+    inAdmin: "В админке", sections: { overview: "Обзор", nodes: "Ноды", users: "Пользователи", profiles: "Профили", subscriptions: "Подписки", health: "Здоровье", reachability: "Доступность", updates: "Обновления", ai: "ИИ", integrations: "Интеграции", settings: "Настройки" },
     notFound: "Страница не найдена", notFoundText: "Такой страницы нет. Возможно, она переехала или ещё не написана.", toHome: "К документации",
   },
   zh: {
@@ -31,7 +31,7 @@ export const T = {
     onPage: "本页内容", prev: "上一页", next: "下一页", edit: "在 GitHub 上编辑此页", theme: "切换主题", github: "GitHub 上的 Mistgate", stars: "GitHub 上的 Mistgate，{n} 个星标",
     language: "语言", copy: "复制", copied: "已复制", table: "表格", plain: "文本", diagram: "示意图", permalink: "链接到此小节", pending: "此页尚未撰写", roadmap: "路线图阶段",
     license: "基于 AGPL-3.0 发布", other: "其他",
-    inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", reachability: "可达性", updates: "更新", integrations: "集成", settings: "设置" },
+    inAdmin: "在管理后台", inAdminSep: "：", sections: { overview: "概览", nodes: "节点", users: "用户", profiles: "协议配置", subscriptions: "订阅", health: "运行状况", reachability: "可达性", updates: "更新", ai: "AI", integrations: "集成", settings: "设置" },
     notFound: "页面不存在", notFoundText: "没有这个页面。它可能已移动，或尚未撰写。", toHome: "前往文档",
   },
   // Persian, right to left; the words of the admin's glossary (web/src/i18n/fa.ts), in the README's formal «شما»
@@ -43,7 +43,7 @@ export const T = {
     language: "زبان", copy: "کپی", copied: "کپی شد", table: "جدول", plain: "متن", diagram: "نمودار", permalink: "پیوند به این بخش", pending: "این صفحه هنوز نوشته نشده است", roadmap: "مرحله‌های نقشهٔ راه",
     license: "منتشرشده با مجوز AGPL-3.0", other: "سایر صفحه‌ها", inEnglish: "این صفحه هنوز ترجمه نشده است و به انگلیسی باز می‌شود",
     callouts: { note: "نکته", tip: "توصیه", warning: "هشدار", danger: "خطر" },
-    inAdmin: "در پنل مدیریت", sections: { overview: "نمای کلی", nodes: "نودها", users: "کاربران", profiles: "پروفایل‌ها", subscriptions: "اشتراک‌ها", health: "سلامت", reachability: "دسترس‌پذیری", updates: "به‌روزرسانی‌ها", integrations: "یکپارچه‌سازی‌ها", settings: "تنظیمات" },
+    inAdmin: "در پنل مدیریت", sections: { overview: "نمای کلی", nodes: "نودها", users: "کاربران", profiles: "پروفایل‌ها", subscriptions: "اشتراک‌ها", health: "سلامت", reachability: "دسترس‌پذیری", updates: "به‌روزرسانی‌ها", ai: "هوش مصنوعی", integrations: "یکپارچه‌سازی‌ها", settings: "تنظیمات" },
     notFound: "صفحه پیدا نشد", notFoundText: "چنین صفحه‌ای وجود ندارد. شاید جابه‌جا شده یا هنوز نوشته نشده باشد.", toHome: "رفتن به مستندات",
   },
   // Turkish; the words of the admin's glossary (web/src/i18n/tr.ts), in the README's formal «siz»
@@ -55,7 +55,7 @@ export const T = {
     language: "Dil", copy: "Kopyala", copied: "Kopyalandı", table: "Tablo", plain: "Metin", diagram: "Şema", permalink: "Bu bölümün bağlantısı", pending: "Bu sayfa henüz yazılmadı", roadmap: "Yol haritasının aşamaları",
     license: "AGPL-3.0 lisansıyla yayımlanır", other: "Diğer sayfalar", inEnglish: "Bu sayfa henüz çevrilmedi, İngilizce açılır",
     callouts: { note: "Not", tip: "İpucu", warning: "Uyarı", danger: "Tehlike" },
-    inAdmin: "Yönetim panelinde", sections: { overview: "Genel bakış", nodes: "Düğümler", users: "Kullanıcılar", profiles: "Profiller", subscriptions: "Abonelikler", health: "Sağlık", reachability: "Erişilebilirlik", updates: "Güncellemeler", integrations: "Entegrasyonlar", settings: "Ayarlar" },
+    inAdmin: "Yönetim panelinde", sections: { overview: "Genel bakış", nodes: "Düğümler", users: "Kullanıcılar", profiles: "Profiller", subscriptions: "Abonelikler", health: "Sağlık", reachability: "Erişilebilirlik", updates: "Güncellemeler", ai: "Yapay zekâ", integrations: "Entegrasyonlar", settings: "Ayarlar" },
     notFound: "Sayfa bulunamadı", notFoundText: "Böyle bir sayfa yok. Taşınmış ya da henüz yazılmamış olabilir.", toHome: "Belgelere git",
   },
 };
@@ -85,7 +85,7 @@ export const PAGE_SECTION = {
   "operations/health": "health", "operations/troubleshooting": "health",
   "operations/reachability": "reachability",
   "operations/updates": "updates", "operations/releases": "updates",
-  "getting-started/ai-agents": "integrations", "operations/telegram-alerts": "integrations", "reference/api": "integrations", "reference/mcp": "integrations",
+  "guide/assistant": "ai", "getting-started/ai-agents": "ai", "reference/api": "ai", "reference/mcp": "ai", "operations/telegram-alerts": "integrations",
   "getting-started/install-panel": "settings", "guide/decoy-site": "settings", "operations/backups": "settings", "operations/security": "settings", "operations/panel-watcher": "settings",
 };
 // pages that wear a section's colour but describe no screen of the admin: no "In the admin" label on them

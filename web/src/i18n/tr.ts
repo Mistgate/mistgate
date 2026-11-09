@@ -93,7 +93,7 @@ const core: CoreMessages = {
   "section.health.desc": "Uyarılar, istemci gözüyle kontroller ve Teşhis.",
   "section.reachability.desc": "Düğümlerin bir ülkenin içinden açılıp açılmadığı: kaynaklar, her düğümün sonucu ve haftalık geçmişi.",
   "section.updates.desc": "Panel ve düğüm ajanı sürümleri, aşamalı dağıtımlar ve geri alma.",
-  "section.integrations.desc": "Betikler için API token'ları, yapay zekâ ajanları için MCP ve onayını istedikleri değişiklikler.",
+  "section.integrations.desc": "Telegram uyarıları: her yönetici kendi sohbetini bağlar.",
   "section.settings.desc": "Yöneticiler, güvenlik, yedekler ve alan adları.",
   "section.empty": "Burada henüz bir şey yok",
   "header.search": "Düğüm, kullanıcı ve bölüm ara",

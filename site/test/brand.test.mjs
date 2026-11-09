@@ -23,6 +23,13 @@ test("the docs use the panel's colour tokens in both themes", () => {
   }
 });
 
+// the panel keeps some strings in split files; ai.ts holds one block per language
+const aiFile = readFileSync(join(root, "web/src/i18n/ai.ts"), "utf8");
+const panelStrings = (lang) => {
+  const at = aiFile.indexOf(`export const ${lang}`);
+  return readFileSync(join(root, `web/src/i18n/${lang}.ts`), "utf8") + aiFile.slice(at, aiFile.indexOf("\n};", at));
+};
+
 test("the accent is the panel's lavender", () => {
   assert.equal(value(block(panelCss, ":root"), "accent-lavender"), "#b8acf2");
   assert.equal(value(docsCss, "accent"), "#b8acf2");
@@ -30,14 +37,14 @@ test("the accent is the panel's lavender", () => {
 
 test("section names match the panel's sidebar in both languages", () => {
   for (const lang of LANGS.filter((l) => COMPLETE[l])) { // zh joins when COMPLETE.zh is true: until then its wording is a placeholder
-    const i18n = readFileSync(join(root, `web/src/i18n/${lang}.ts`), "utf8");
+    const i18n = panelStrings(lang);
     for (const [id, label] of Object.entries(T[lang].sections)) assert.match(i18n, new RegExp(`"nav\\.${id}": "${label}"`), `${lang} nav.${id}`);
   }
 });
 
 test("the home page describes each admin section in the panel's own words", () => {
   for (const lang of LANGS.filter((l) => COMPLETE[l])) { // zh joins when COMPLETE.zh is true: until then its wording is a placeholder
-    const i18n = readFileSync(join(root, `web/src/i18n/${lang}.ts`), "utf8");
+    const i18n = panelStrings(lang);
     for (const [id, desc] of Object.entries(LANDING[lang].desc)) {
       assert.equal(new RegExp(`"section\\.${id}\\.desc": "([^"]+)"`).exec(i18n)?.[1], desc, `${lang} section.${id}.desc`);
     }

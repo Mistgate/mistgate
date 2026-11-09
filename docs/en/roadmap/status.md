@@ -3,23 +3,25 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.80
+  meta: v0.1.0 – v0.1.81
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.80
+      release: v0.1.81
       current: true
       points:
-        - "**Release channels.** Stable, Testing and Development: the chip next to the panel's version on the Updates page picks which releases the panel offers, for itself and its nodes; moving to a more stable channel never installs anything older, and the installer takes `--channel`. See [Updates](../operations/updates.md#release-channels)."
-        - "**A backup before the panel updates itself.** **Update panel** first opens a window: what happens, a backup to Cloudflare R2 (or the way to set it up) and an encrypted file on this computer; **Settings → Backups** downloads one too. See [Backups](../operations/backups.md#a-copy-on-this-computer)."
-        - "**Restore from a backup.** In **Settings → Backups** the panel checks a backup (a file or one in R2) and shows what is in it before anything changes, then swaps its data and keeps the previous data aside; on a new server `install.sh --restore` does it before the first start. See [Backups](../operations/backups.md#restore-in-the-panel)."
-        - "**AmneziaWG out of the link apps.** A switch under **Subscriptions → Who gets what** takes AmneziaWG out of kl!ck and the other Mihomo apps when people use it in AmneziaVPN anyway. See [Subscriptions](../guide/subscriptions.md#amneziawg-in-apps-on-the-link)."
+        - "**The assistant.** A chat in the admin (**AI → Assistant**, **Ctrl+J**) with a cloud model you connect with your own API key: Anthropic, DeepSeek, Z.ai, Ollama Cloud or up to five OpenAI-compatible providers of your own. It reads with the panel's own tools and prepares every change as a card; nothing changes until a person presses **Apply**. It can come back to a conversation by itself, and the owner can put checks and assistant tasks on a schedule. VPS edition only. See [Assistant](../guide/assistant.md#turn-it-on)."
+        - "**A fleet an agent can run.** MCP gets the day-to-day changes (groups, DNS presets, subscription texts and rules, closing alerts), reads that answer in one call (`fleet_digest`, `timeline`, `user_diagnose`, `nodes_get`, `node_runtime`), tests between your own nodes (`path_probe`, `node_trace`, `node_dns_check`, and `path_speed` with the owner's approval), and `access_report` and `block_diagnosis`, which say how a node is blocked and what to change. Probes need the agent v0.1.81. See [MCP](../reference/mcp.md#read-tools)."
+        - "**Why handshakes fail.** The 24 h line under each profile and the MCP reads name the reasons: no reply, a refused certificate, a wrong REALITY key, a stream frozen after 16 KB, answers lost and others. Needs the agent v0.1.81. See [Nodes](../guide/nodes.md#profiles)."
+        - "**What the machines cost.** A **Resources** card and a load history on a node, **Nodes → Load** with the room left for more people, **Settings → System → Panel resources**, and three new doctor checks (CPU steal, connection tracking, the agent's open files). VPS edition only. See [Nodes](../guide/nodes.md#load)."
+        - "**Panel logs, retention and a debug capture.** In **Settings → System**: the panel's logs with request codes, how long each table keeps its rows, an export and a token-guarded `/metrics`; on a node, a debug capture with its kernel log. VPS edition only. See [Troubleshooting](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics)."
+        - "**Ways in as a graph, a fleet map and closing alerts.** **Ways in** has a graph beside the list where the owner draws and moves relays, **Nodes** has a map of the whole fleet, **Close** takes an alert off the list while its problem goes on, and the reveal animation (Beta) is off by default. See [Health](../operations/health.md#closing)."
     - title: Profiles
       section: profiles
       points:
@@ -39,6 +41,7 @@ Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production
         - "[A decoy site per node](../guide/decoy-site.md#nodes-three-options): the built-in one, the panel's site or an archive of its own."
         - "[Relays through an entry node](../guide/relays.md): checked before they are switched on, watched every 5 minutes, a copy of the server in subscriptions."
         - "[IPv6 entry](../guide/nodes.md#ipv6-entry): the node's servers at one of its IPv6 addresses, checked from outside before they are turned on."
+        - "[Resources and load](../guide/nodes.md#load): what a node and Mistgate itself cost the server, a **Load** view with the room left for more people, a [debug capture](../operations/troubleshooting.md#debug-capture-of-one-node) of one node, a map of the fleet and the ways in as a graph."
     - title: Users
       section: users
       points:
@@ -62,6 +65,7 @@ Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
+        - "[Closing an alert](../operations/health.md#closing) until its problem goes away, and the doctor's [21 checks](../operations/health.md#the-checks), among them CPU steal, connection tracking and the agent's open files."
     - title: Updates
       section: updates
       points:
@@ -75,17 +79,19 @@ Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production
       section: integrations
       points:
         - "[API tokens](../reference/api.md) with the readonly, operator and admin profiles."
-        - "The [MCP server](../reference/mcp.md) with plan / apply and owner approvals; ready prompts in the [AI agent guide](../getting-started/ai-agents.md)."
+        - "The [MCP server](../reference/mcp.md) with plan / apply and owner approvals, now with day-to-day changes, one-call reads, probes between your nodes, diagnosis and scheduled tasks; ready prompts in the [AI agent guide](../getting-started/ai-agents.md)."
         - "[Telegram alerts](../operations/telegram-alerts.md) to the admins who link their chat: health, releases, failed backups, plans waiting for approval, sign-in security."
+        - "The [assistant](../guide/assistant.md): a chat with a cloud model that prepares changes as cards, with [follow-ups](../guide/assistant.md#follow-ups) and [scheduled tasks](../guide/assistant.md#scheduled-tasks)."
     - title: Settings
       section: settings
       points:
         - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese, the admin and the user page also in Persian and Turkish; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, or to a file on the owner's computer; restore in the panel or on a new server with the installer."
+        - "[Panel logs, retention, export and metrics](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics) for the owner, and an opt-in reveal animation (Beta)."
 - status: now
   title: Now
-  meta: v0.1.34 – v0.1.80
+  meta: v0.1.34 – v0.1.81
   lead: What the latest releases added is being tested in production; fixes and corrections to the docs come out of it.
   cards:
     - title: VLESS in production
@@ -121,6 +127,12 @@ Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production
     - title: MTProto in production
       section: profiles
       text: "New in v0.1.69 and experimental. It has not been tried against real blocking yet: give the link to one or two people first and check that Telegram connects from their networks before you hand it out widely. See [MTProto](../guide/mtproto.md)."
+    - title: The assistant in production
+      section: integrations
+      text: "New in v0.1.81. It sends the conversation and what its tools read to the provider you choose, so read where each provider's data goes before you connect one, and set a monthly budget. Start with **Only me** under **Who may use it**, and read a plan card's wording before you press **Apply**. See [Providers and where your data goes](../guide/assistant.md#providers-and-where-your-data-goes)."
+    - title: Blocking diagnosis in production
+      section: health
+      text: "New in v0.1.81. `block_diagnosis` and `access_report` apply fixed rules to the nodes' counters and the country checks; where two causes look alike they say so, with low confidence. A lab of staged blocking checks seven of the classes before each release that touches them (an address, a port, UDP, a TCP freeze, a whitelist, one operator, a broken node); protocol fingerprinting and regional are tested on constructed counters only. The handshake counters need the agent v0.1.81. Read the evidence they list before you move people. See [Assistant](../guide/assistant.md#work-out-what-does-not-open)."
 - status: next
   title: Next
   lead: The next items in the queue.
@@ -144,7 +156,8 @@ Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production
       points:
         - "encrypted backups and restore;"
         - "Telegram alerts;"
-        - "MCP and new API tokens;"
+        - "MCP, the assistant, scheduled tasks and new API tokens;"
+        - "probes, the debug capture, panel logs and the Load view;"
         - "client-eye tunnel checks;"
         - "node and panel updates from the admin;"
         - "live node logs, an Own site decoy for a node, and WARP registration."
@@ -203,3 +216,7 @@ Mistgate is in **beta**; the current release is `v0.1.80`. It runs in production
 - sing-box JSON has no XHTTP and cannot pin a self-signed Hysteria2 certificate; Gecko and AmneziaWG go out only in Mihomo YAML. A server a format cannot carry is left out of that format. See [What works where](../guide/subscriptions.md#what-works-where).
 - The country check looks from a few probes, not from every network, and the block lists cover Russia only. `listed` means the address is in a registry, not that its traffic is cut.
 - Some defaults are country-specific (Yandex DNS for Russia, AliDNS and DNSPod for China, the doctor's control domains, split-DNS presets); all of them are settings.
+- The assistant sends the conversation, its instructions, your notes and what its tools read to the cloud provider you connect, so that provider's data policy applies. Prices you enter are estimates, and the monthly budget is measured from them. See [Providers and where your data goes](../guide/assistant.md#providers-and-where-your-data-goes).
+- The assistant, MCP, scheduled tasks, probes, the speed test, the debug capture, panel logs, panel resources and the Load view are in the VPS edition only. See [the list](../getting-started/install-edge.md#not-available-in-this-edition-yet).
+- The diagnosis is only as good as the counters. VLESS keeps no attempt counter, and the kernel AmneziaWG backend cannot tell a handshake initiation from an answer; where two causes look alike, `block_diagnosis` says so with low confidence. Agents before v0.1.81 do not count why handshakes fail or what a node's machine is short of: the panel says "not known".
+- Scheduled tasks follow the panel's fixed UTC offset and do not follow daylight-saving time: set the offset again when local time changes.

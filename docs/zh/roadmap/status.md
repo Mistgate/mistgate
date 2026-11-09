@@ -3,23 +3,25 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.80
+  meta: v0.1.0 – v0.1.81
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: tag
-      release: v0.1.80
+      release: v0.1.81
       current: true
       points:
-        - "**发布渠道。** 稳定版、测试版和开发版：更新页面中面板版本旁的标签决定面板为自己和节点提供哪些版本；切换到更稳定的渠道时不会安装任何更旧的版本，安装程序支持 `--channel`。参见[更新](../operations/updates.md#发布渠道)。"
-        - "**面板更新前的备份。** **更新面板**会先打开一个窗口：说明会发生什么、备份到 Cloudflare R2（或设置方法），以及保存到这台电脑的加密文件；**设置 → 备份**也可以下载。参见[备份](../operations/backups.md#保存到电脑的副本)。"
-        - "**从备份恢复。** 在**设置 → 备份**中，面板会先检查备份（文件或 R2 中的备份）并在任何改动前显示其中内容，然后替换数据并单独保留之前的数据；在新服务器上，`install.sh --restore` 会在首次启动前完成同样的操作。参见[备份](../operations/backups.md#在面板中恢复)。"
-        - "**从订阅类应用中移除 AmneziaWG。** **订阅 → 下发规则**下的开关可以在用户本来就使用 AmneziaVPN 时，从 kl!ck 和其他 Mihomo 应用中移除 AmneziaWG。参见[订阅](../guide/subscriptions.md#订阅类应用中的-amneziawg)。"
+        - "**助手。** 管理后台中的聊天（**AI → 助手**，**Ctrl+J**），连接你用自己的 API 密钥接入的云端模型：Anthropic、DeepSeek、Z.ai、Ollama Cloud，或最多五个你自己的 OpenAI 兼容提供商。它用面板自己的工具读取数据，并把每项更改整理成卡片；在有人点击**应用**之前不会有任何更改。它能自己回到对话中，所有者还可以让检查和助手任务按计划运行。仅限 VPS 版。参见[助手](../guide/assistant.md#开启)。"
+        - "**智能体可运维的集群。** MCP 新增了日常更改（分组、DNS 预设、订阅文案和规则、关闭告警）、一次调用即可得到答案的读取（`fleet_digest`、`timeline`、`user_diagnose`、`nodes_get`、`node_runtime`）、你自己节点之间的测试（`path_probe`、`node_trace`、`node_dns_check`，以及经所有者批准的 `path_speed`），还有 `access_report` 和 `block_diagnosis`，它们说明节点是怎么被封的以及该改什么。探测需要 Agent v0.1.81。参见 [MCP](../reference/mcp.md#读取工具)。"
+        - "**握手为什么失败。** 每个协议配置下的「24 小时」一行和 MCP 读取会写明原因：无回复、证书被拒绝、REALITY 密钥错误、16 KB 后冻结的数据流、应答丢失等。需要 Agent v0.1.81。参见[节点](../guide/nodes.md#协议配置)。"
+        - "**机器的开销。** 节点上的**资源**卡片和负载历史、显示还能容纳多少人的**节点 → 负载**、**设置 → 系统 → 面板资源**，以及节点诊断新增的三项检查（CPU steal、连接跟踪、Agent 打开的文件）。仅限 VPS 版。参见[节点](../guide/nodes.md#负载)。"
+        - "**面板日志、保留时间和调试抓取。** **设置 → 系统**中有带请求码的面板日志、每张表的保留时间、导出，以及需令牌的 `/metrics`；节点上则有包含内核日志的调试抓取。仅限 VPS 版。参见[故障排查](../operations/troubleshooting.md#面板日志保留时间导出和指标)。"
+        - "**图形化的入口、节点地图和关闭告警。** **入口**标签在列表旁有一张图，所有者可在其中连线和移动中继；**节点**页面有整个集群的地图；**关闭**会在问题持续期间把告警移出列表；出现动画（测试版）默认关闭。参见[健康](../operations/health.md#关闭)。"
     - title: 协议配置
       section: profiles
       points:
@@ -39,6 +41,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`�
         - "[每个节点的伪装站点](../guide/decoy-site.md#节点三种选项)：使用内置站点、面板站点或自己的站点压缩包。"
         - "[通过入口节点中转](../guide/relays.md)：启用前检查，每 5 分钟监测一次，订阅中提供该服务器的副本。"
         - "[IPv6 入口](../guide/nodes.md#ipv6-入口)：节点的服务器使用其某个 IPv6 地址，开启前从外部检测。"
+        - "[资源与负载](../guide/nodes.md#负载)：节点和 Mistgate 自身占用多少服务器资源、显示还能容纳多少人的**负载**视图、单个节点的[调试抓取](../operations/troubleshooting.md#单个节点的调试抓取)，以及集群地图和图形化的入口。"
     - title: 用户
       section: users
       points:
@@ -62,6 +65,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`�
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
+        - "[关闭告警](../operations/health.md#关闭)直到问题消失，以及节点诊断的 [21 项检查](../operations/health.md#检查项目)，其中包括 CPU steal、连接跟踪和 Agent 打开的文件。"
     - title: 更新
       section: updates
       points:
@@ -75,17 +79,19 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`�
       section: integrations
       points:
         - "[API 令牌](../reference/api.md)支持只读、操作员和管理员权限级别。"
-        - "[MCP 服务器](../reference/mcp.md)支持计划 / 执行和所有者审批；[AI 智能体指南](../getting-started/ai-agents.md)提供可直接使用的提示词。"
+        - "[MCP 服务器](../reference/mcp.md)支持计划 / 执行和所有者审批，现已包含日常更改、一次调用的读取、节点之间的探测、诊断和计划任务；[AI 智能体指南](../getting-started/ai-agents.md)提供可直接使用的提示词。"
         - "[Telegram 告警](../operations/telegram-alerts.md)会发送给关联聊天的管理员：包括运行状况、发布版本、备份失败、等待审批的计划和登录安全事件。"
+        - "[助手](../guide/assistant.md)：与云端模型聊天并以卡片形式准备更改，含[定时回访](../guide/assistant.md#定时回访)和[计划任务](../guide/assistant.md#计划任务)。"
     - title: 设置
       section: settings
       points:
         - "管理后台、用户页面、节点安装页面、Telegram 消息和本文档提供英语、俄语和简体中文，管理后台和用户页面还提供波斯语和土耳其语；支持使用通行密钥或密码加身份验证器验证码登录，可选 Cloudflare Turnstile，并提供审计日志。参见[安全](../operations/security.md)。"
         - "[伪装站点](../guide/decoy-site.md)会显示在面板地址上，向陌生人隐藏管理后台。"
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2 并设置保留期限，或保存为所有者电脑上的文件；可在面板中恢复，或用安装程序在新服务器上恢复。"
+        - "所有者可用的[面板日志、保留时间、导出和指标](../operations/troubleshooting.md#面板日志保留时间导出和指标)，以及可选的出现动画（测试版）。"
 - status: now
   title: 进行中
-  meta: v0.1.34 – v0.1.80
+  meta: v0.1.34 – v0.1.81
   lead: 最新发布版本添加的功能正在生产环境中测试；测试结果用于改进功能和修正文档。
   cards:
     - title: 在生产环境中测试 VLESS
@@ -121,6 +127,12 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`�
     - title: 在生产环境中使用 MTProto
       section: profiles
       text: "v0.1.69 新增，实验性。它尚未在真实封锁环境中验证过：先把链接给一两个人，确认 Telegram 能从他们的网络连上，再大范围分发。参见 [MTProto](../guide/mtproto.md)。"
+    - title: 在生产环境中使用助手
+      section: integrations
+      text: "v0.1.81 新增。它会把对话和工具读取的内容发给你选择的提供商，所以连接提供商之前请先看清它的数据去向，并设置月度预算。先在**谁可以使用**中选择**仅我自己**，按下**应用**之前先读一遍计划卡片的措辞。参见[提供商与数据去向](../guide/assistant.md#提供商与数据去向)。"
+    - title: 在生产环境中测试封锁诊断
+      section: health
+      text: "v0.1.81 新增。`block_diagnosis` 和 `access_report` 对节点的计数和国家视角检测应用固定规则；两种原因看起来一样时，它们会如实说明，并标明低置信度。每次发布涉及诊断的版本之前，模拟封锁实验环境都会检验其中七类（地址、端口、UDP、TCP 冻结、白名单、单一运营商、节点故障）；协议识别和地区只在人为构造的计数上测试过。握手计数需要 Agent v0.1.81。迁移用户之前，请先读一遍它列出的依据。参见[助手](../guide/assistant.md#排查哪些连不上)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。
@@ -144,7 +156,8 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`�
       points:
         - "加密备份和恢复；"
         - "Telegram 告警；"
-        - "MCP 和新 API 令牌；"
+        - "MCP、助手、计划任务和新 API 令牌；"
+        - "探测、调试抓取、面板日志和负载视图；"
         - "客户端视角隧道检测；"
         - "从管理后台更新节点和面板；"
         - "实时节点日志、节点自有站点伪装以及 WARP 注册。"
@@ -203,3 +216,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.80`�
 - sing-box JSON 没有 XHTTP，也无法按指纹校验自签名的 Hysteria2 证书；Gecko 和 AmneziaWG 只通过 Mihomo YAML 下发。格式无法承载的服务器不会出现在该格式中。参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)。
 - 国家视角检测只从少数探测点观察，而不是从每个网络观察，封锁名单也只覆盖俄罗斯。`listed`（在名录中）表示地址在名录里，不表示它的流量被丢弃。
 - 部分默认值因国家而异（俄罗斯使用 Yandex DNS，中国使用 AliDNS 和 DNSPod，诊断使用各国对应的检测域名，DNS 分流预设）；这些都可以在设置中修改。
+- 助手会把对话、它的指令、你的备注和工具读取的内容发给你连接的云端提供商，因此适用该提供商的数据政策。你填写的价格只是估算，月度预算按它计算。参见[提供商与数据去向](../guide/assistant.md#提供商与数据去向)。
+- 助手、MCP、计划任务、探测、测速、调试抓取、面板日志、面板资源和负载视图仅在 VPS 版中提供。参见[清单](../getting-started/install-edge.md#此版本中尚不可用的功能)。
+- 诊断的好坏取决于计数。VLESS 没有尝试次数的计数，内核版 AmneziaWG 后端分不清握手的发起和应答；两种原因看起来一样时，`block_diagnosis` 会如实说明并标明低置信度。早于 v0.1.81 的 Agent 不会统计握手为什么失败，也不统计节点机器缺什么：面板会显示「未知」。
+- 计划任务遵循面板固定的 UTC 偏移，不会自动跟随夏令时：本地时间改变时请重新设置偏移。

@@ -91,7 +91,7 @@ const core = {
   "section.health.desc": "Alerts, client-eye checks and the fleet doctor.",
   "section.reachability.desc": "Whether the nodes open from inside a country: the sources, each node’s verdict and its week.",
   "section.updates.desc": "Panel and node agent versions, staged rollouts and rollback.",
-  "section.integrations.desc": "API tokens for scripts, MCP for AI agents and the changes they ask you to approve.",
+  "section.integrations.desc": "Telegram alerts: every admin links their own chat.",
   "section.settings.desc": "Admins, security, backups and domains.",
   "section.empty": "Nothing here yet",
 

@@ -84,7 +84,7 @@ const core: CoreMessages = {
   "section.health.desc": "Алерты, проверки глазами клиента и доктор флота.",
   "section.reachability.desc": "Открываются ли ноды изнутри страны: источники, вердикт каждой ноды и её неделя.",
   "section.updates.desc": "Версии панели и агентов нод, поэтапные выкатки и откат.",
-  "section.integrations.desc": "API-токены для скриптов, MCP для ИИ-агентов и изменения, которые они просят одобрить.",
+  "section.integrations.desc": "Оповещения в Telegram: каждый админ привязывает свой чат.",
   "section.settings.desc": "Админы, безопасность, бэкапы и домены.",
   "section.empty": "Здесь пока пусто",
 

@@ -85,7 +85,7 @@ const core: CoreMessages = {
   "section.health.desc": "告警、客户端视角检测和集群诊断。",
   "section.reachability.desc": "能否从某个国家境内访问节点：各个来源、每个节点的结论及其最近一周。",
   "section.updates.desc": "面板和节点 Agent 的版本、分批滚动更新与回滚。",
-  "section.integrations.desc": "脚本使用的 API 令牌、供 AI 智能体使用的 MCP，以及需要你审批的变更。",
+  "section.integrations.desc": "Telegram 提醒：每位管理员都可以绑定自己的聊天。",
   "section.settings.desc": "管理员、安全、备份和域名。",
   "section.empty": "这里还没有内容",
 
