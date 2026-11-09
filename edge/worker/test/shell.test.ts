@@ -451,6 +451,22 @@ describe("forwardAsset", () => {
     expect(untrusted).toHaveBeenCalledOnce();
   });
 
+  it("follows a loopback release's redirect within loopback only (the e2e's fake release), never from GitHub to loopback", async () => {
+    const local = "http://127.0.0.1:8099/v1/mistgate-node-linux-amd64";
+    const fetchUpstream = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: "http://127.0.0.1:8099/cdn/v1/mistgate-node-linux-amd64" } }))
+      .mockResolvedValueOnce(new Response("file-bytes", { status: 206, headers: { "Content-Range": "bytes 4-13/14" } }));
+    const out = (await forwardAsset(request(), answer(204, [[ASSET_MARKER, local]]), fetchUpstream))!;
+    expect(out.status).toBe(206);
+    expect(fetchUpstream.mock.calls.map(([target]) => target.pathname)).toEqual(["/v1/mistgate-node-linux-amd64", "/cdn/v1/mistgate-node-linux-amd64"]);
+
+    const toLoopback = vi.fn(async () => new Response(null, { status: 302, headers: { Location: "http://127.0.0.1:8099/file" } }));
+    expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, url]]), toLoopback))!.status).toBe(502);
+    expect(toLoopback).toHaveBeenCalledOnce();
+    const outOfLoopback = vi.fn(async () => new Response(null, { status: 302, headers: { Location: "http://203.0.113.10/file" } }));
+    expect((await forwardAsset(request(), answer(204, [[ASSET_MARKER, local]]), outOfLoopback))!.status).toBe(502);
+  });
+
   it("stops after three redirects", async () => {
     const fetchUpstream = vi.fn(async (target: URL) => new Response(null, {
       status: 302,
