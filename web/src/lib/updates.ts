@@ -1,6 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { halo } from "@/components/fx/halo";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import type { StatusKind } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
@@ -452,10 +453,12 @@ export function useUpdateActions() {
   });
 
   /** Runs one call; resolves true when it went through (the dialogs close on it). */
-  const run = (fn: () => Promise<unknown>, done?: string) =>
+  // wave: the halo from the button that did it, for what starts or saves something (not for pause, cancel or rollback)
+  const run = (fn: () => Promise<unknown>, done?: string, wave = false) =>
     call.mutateAsync(fn).then(
       () => {
         if (done) toast(done);
+        if (wave) halo("save");
         return true;
       },
       () => false,
@@ -465,7 +468,7 @@ export function useUpdateActions() {
     busy: call.isPending || checkPanel.isPending,
     /** Updates the nodes to the bundle the owner saw; the server refuses when the trusted bundle is another one by then. */
     start: (nodeIds: string[], bundle: { version: string; built: number }) =>
-      run(() => updates.startRollout({ nodeIds, batchSize: 0, expectedVersion: bundle.version, expectedBuilt: BigInt(bundle.built) }), t("up.start.started")),
+      run(() => updates.startRollout({ nodeIds, batchSize: 0, expectedVersion: bundle.version, expectedBuilt: BigInt(bundle.built) }), t("up.start.started"), true),
     scheduleNode: (input: { nodeId: string; localDatetime: string; timezoneOffsetMinutes: number; expectedVersion: string; expectedBuilt: number }) =>
       run(() => updates.scheduleNodeUpdate({
         nodeId: input.nodeId,
@@ -473,19 +476,19 @@ export function useUpdateActions() {
         timezoneOffsetMinutes: input.timezoneOffsetMinutes,
         expectedVersion: input.expectedVersion,
         expectedBuilt: BigInt(input.expectedBuilt),
-      }), t("up.schedule.saved")),
+      }), t("up.schedule.saved"), true),
     cancelNodeSchedule: (nodeId: string) => run(() => updates.cancelNodeUpdateSchedule({ nodeId }), t("up.schedule.cancelled")),
-    setUpdateTimezone: (timezoneOffsetMinutes: number) => run(() => updates.setUpdateTimezone({ timezoneOffsetMinutes }), t("up.timezone.saved")),
+    setUpdateTimezone: (timezoneOffsetMinutes: number) => run(() => updates.setUpdateTimezone({ timezoneOffsetMinutes }), t("up.timezone.saved"), true),
     /** The release channel (ADR 0011): the next check uses it at once. */
-    setChannel: (channel: string) => run(() => updates.setUpdateChannel({ channel }), t("common.saved")),
+    setChannel: (channel: string) => run(() => updates.setUpdateChannel({ channel }), t("common.saved"), true),
     pause: (id: string) => run(() => updates.pauseRollout({ rolloutId: id }), t("up.toast.paused")),
-    resume: (id: string) => run(() => updates.resumeRollout({ rolloutId: id }), t("up.toast.resumed")),
+    resume: (id: string) => run(() => updates.resumeRollout({ rolloutId: id }), t("up.toast.resumed"), true),
     cancel: (id: string) => run(() => updates.cancelRollout({ rolloutId: id }), t("up.toast.cancelled")),
     rollback: (n: { id: string; name: string }) => run(() => updates.rollbackNode({ nodeId: n.id }), t("up.toast.rollback", { name: n.name })),
     rescan: () => run(() => updates.rescanBundle({}), t("up.bundle.rescanned")),
     checkPanel: () => checkPanel.mutateAsync().then(() => true, () => false),
     /** Installs exactly the signed release the owner saw (its version and this architecture's SHA-256). */
     installPanel: (release: { version: string; sha256: string }) =>
-      run(() => updates.installPanelUpdate({ expectedVersion: release.version, expectedSha256: release.sha256 }), t("up.panel.installStarted")),
+      run(() => updates.installPanelUpdate({ expectedVersion: release.version, expectedSha256: release.sha256 }), t("up.panel.installStarted"), true),
   };
 }
