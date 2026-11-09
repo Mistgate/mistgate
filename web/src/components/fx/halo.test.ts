@@ -78,6 +78,21 @@ describe("halo", () => {
   });
 });
 
+describe("halo and toasts", () => {
+  it("plays while a toast is up: a toast is a dialog, but not a window to wait for", async () => {
+    const viewport = document.createElement("div");
+    viewport.setAttribute("data-toast-viewport", "");
+    const toast = document.createElement("div");
+    toast.setAttribute("role", "dialog");
+    viewport.append(toast);
+    document.body.append(viewport);
+    halo("save", { origin });
+    await vi.advanceTimersByTimeAsync(48);
+    expect(blocks[0]!.style.transform).toContain("translate3d");
+    viewport.remove();
+  });
+});
+
 describe("ringColors", () => {
   it("keeps the first ring for lavender, has one for each accent, and turns the nearest one for any other colour", () => {
     expect(ringColors("#b8acf2")[1]).toEqual([0.63, 0.43, 1]);

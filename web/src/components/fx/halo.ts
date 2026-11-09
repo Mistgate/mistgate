@@ -55,7 +55,9 @@ export function halo(kind: FxKind | null, opts: { target?: HTMLElement | null; o
 /** Stops the halo that is playing, if any (tests). */
 export const stopHalo = () => stopCurrent?.();
 
-const windowOpen = () => [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((d) => !d.closest("[data-fx-halo]"));
+// A toast is a dialog too (role="dialog"), and every save shows one: it must not hold the halo, or nothing saved would play it.
+const windowOpen = () =>
+  [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((d) => !d.closest("[data-fx-halo]") && !d.closest("[data-toast-viewport]"));
 
 function whenClear(page: boolean): Promise<boolean> {
   if (!page || !windowOpen()) return Promise.resolve(true);
