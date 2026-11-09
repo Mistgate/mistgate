@@ -25,10 +25,13 @@ import (
 // 60% mean has minutes at the ceiling inside it. The others match the node doctor's, so the Load view and the doctor's
 // alerts do not disagree.
 const (
-	CPUBusyPct       = 60.0 // busy-hour CPU mean
-	CPUOverPct       = 80.0
-	CPUPeakBusyPct   = 85.0 // p95 of the hourly CPU peaks
-	CPUPeakOverPct   = 97.0
+	CPUBusyPct = 60.0 // busy-hour CPU mean
+	CPUOverPct = 80.0
+	// The hourly CPU peaks are judged by their 75th percentile, the peak most hours stay under: a server's own upkeep (the
+	// distribution's updates, a restart) spikes a small box to 100% for a moment in a few hours a day, and the 95th percentile
+	// read that as an overloaded node at a 10% busy hour. Peaks alone make a node busy at most: what people feel is the mean.
+	CPUPeakBusyPct   = 85.0 // p75 of the hourly CPU peaks
+	CPUPeakOverPct   = 97.0 // the pressure scale of the peaks (never "overloaded" by itself)
 	StealBusyPct     = 10.0 // p95 of the hourly steal means (doctor cpu_steal: 10 / 25 over 10 minutes)
 	StealOverPct     = 25.0
 	LinkBusyPct      = 70.0 // the busier direction's hourly peak against the link
@@ -146,7 +149,8 @@ type Report struct {
 	BusyHourCPU    float64
 	PeopleBusyHour float64
 	PeoplePeak     uint32
-	CPUPeakP95     float64
+	CPUPeakP95     float64 // the highest peaks, shown; a few spikes push it to 100
+	CPUPeakTypical float64 // p75 of the hourly peaks: what the status and the advice read
 
 	StealP95         *float64
 	ConntrackPeakPct *float64
@@ -297,6 +301,7 @@ func Read(n Node) Report {
 		}
 	}
 	r.CPUPeakP95 = p95(peaks)
+	r.CPUPeakTypical = percentile(peaks, 0.75)
 	if len(steals) > 0 {
 		r.StealP95 = ptr(p95(steals))
 	}
@@ -443,32 +448,36 @@ func (r *Report) judge() {
 		name       string
 		value      float64
 		busy, over float64
+		busyOnly   bool // may make the node busy, never overloaded
 	}
 	var all []res
-	all = append(all, res{ResCPU, r.BusyHourCPU, CPUBusyPct, CPUOverPct}, res{ResCPU, r.CPUPeakP95, CPUPeakBusyPct, CPUPeakOverPct})
+	all = append(all, res{ResCPU, r.BusyHourCPU, CPUBusyPct, CPUOverPct, false}, res{ResCPU, r.CPUPeakTypical, CPUPeakBusyPct, CPUPeakOverPct, true})
 	if r.StealP95 != nil {
-		all = append(all, res{ResSteal, *r.StealP95, StealBusyPct, StealOverPct})
+		all = append(all, res{ResSteal, *r.StealP95, StealBusyPct, StealOverPct, false})
 	}
 	if r.BandwidthPeakPct != nil {
-		all = append(all, res{ResBandwidth, *r.BandwidthPeakPct, LinkBusyPct, LinkOverPct})
+		all = append(all, res{ResBandwidth, *r.BandwidthPeakPct, LinkBusyPct, LinkOverPct, false})
 	}
 	if r.RAMPeakPct != nil {
-		all = append(all, res{ResRAM, *r.RAMPeakPct, RAMBusyPct, RAMOverPct})
+		all = append(all, res{ResRAM, *r.RAMPeakPct, RAMBusyPct, RAMOverPct, false})
 	}
 	if r.ConntrackPeakPct != nil {
-		all = append(all, res{ResConntrack, *r.ConntrackPeakPct, ConntrackBusyPct, ConntrackOverPct})
+		all = append(all, res{ResConntrack, *r.ConntrackPeakPct, ConntrackBusyPct, ConntrackOverPct, false})
 	}
 	if r.DiskUsedPct != nil {
-		all = append(all, res{ResDisk, *r.DiskUsedPct, DiskBusyPct, DiskOverPct})
+		all = append(all, res{ResDisk, *r.DiskUsedPct, DiskBusyPct, DiskOverPct, false})
 	}
 	r.Status = StatusOK
 	for _, x := range all {
 		p := finite(x.value / x.over)
+		if x.busyOnly {
+			p = min(p, 0.99) // below the "overloaded" line, whatever the peaks
+		}
 		if p > r.Pressure {
 			r.Pressure, r.Bottleneck = p, x.name
 		}
 		switch {
-		case x.value >= x.over:
+		case x.value >= x.over && !x.busyOnly:
 			r.Status = StatusOverloaded
 		case x.value >= x.busy && r.Status == StatusOK:
 			r.Status = StatusBusy
@@ -501,8 +510,8 @@ func (r *Report) recommend() {
 	if r.ConntrackPeakPct != nil && *r.ConntrackPeakPct >= ConntrackBusyPct {
 		add(RecConntrackNearLimit, sevOf(*r.ConntrackPeakPct >= ConntrackOverPct), "fill_pct", itoa(*r.ConntrackPeakPct), "limit", strconv.FormatUint(r.ConntrackLimit, 10))
 	}
-	if r.BusyHourCPU >= CPUBusyPct || r.CPUPeakP95 >= CPUPeakBusyPct {
-		add(RecCPUBusy, sevOf(r.BusyHourCPU >= CPUOverPct || r.CPUPeakP95 >= CPUPeakOverPct), "cpu_pct", itoa(r.BusyHourCPU), "peak_pct", itoa(r.CPUPeakP95))
+	if r.BusyHourCPU >= CPUBusyPct || r.CPUPeakTypical >= CPUPeakBusyPct {
+		add(RecCPUBusy, sevOf(r.BusyHourCPU >= CPUOverPct), "cpu_pct", itoa(r.BusyHourCPU), "peak_pct", itoa(r.CPUPeakTypical))
 	}
 	if r.BandwidthPeakPct != nil && *r.BandwidthPeakPct >= LinkBusyPct {
 		add(RecBandwidthBusy, sevOf(*r.BandwidthPeakPct >= LinkOverPct), "peak_pct", itoa(*r.BandwidthPeakPct), "link_mbps", strconv.Itoa(int(r.LinkMbps)))
@@ -650,13 +659,16 @@ func mean(v []float64) float64 {
 }
 
 // p95 is the nearest-rank 95th percentile (0 for none).
-func p95(v []float64) float64 {
+func p95(v []float64) float64 { return percentile(v, 0.95) }
+
+// percentile is the nearest-rank q-th percentile, q in (0, 1] (0 for none).
+func percentile(v []float64, q float64) float64 {
 	if len(v) == 0 {
 		return 0
 	}
 	s := append([]float64(nil), v...)
 	sort.Float64s(s)
-	i := int(math.Ceil(0.95*float64(len(s)))) - 1
+	i := int(math.Ceil(q*float64(len(s)))) - 1
 	return finite(s[min(max(i, 0), len(s)-1)])
 }
 

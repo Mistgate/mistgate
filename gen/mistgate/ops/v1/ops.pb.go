@@ -2484,8 +2484,11 @@ type NodeLoad struct {
 	HeadroomPeople *uint32 `protobuf:"varint,31,opt,name=headroom_people,json=headroomPeople,proto3,oneof" json:"headroom_people,omitempty"`
 	// Most severe first.
 	Recommendations []*LoadRecommendation `protobuf:"bytes,32,rep,name=recommendations,proto3" json:"recommendations,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The 75th percentile of the hourly CPU peaks: the peak most hours stay under. The status and the advice read it, not the
+	// 95th: a few spikes of a server's own upkeep do not make a node busy, and peaks alone never make it overloaded.
+	CpuPeakTypicalPct float32 `protobuf:"fixed32,33,opt,name=cpu_peak_typical_pct,json=cpuPeakTypicalPct,proto3" json:"cpu_peak_typical_pct,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *NodeLoad) Reset() {
@@ -2740,6 +2743,13 @@ func (x *NodeLoad) GetRecommendations() []*LoadRecommendation {
 		return x.Recommendations
 	}
 	return nil
+}
+
+func (x *NodeLoad) GetCpuPeakTypicalPct() float32 {
+	if x != nil {
+		return x.CpuPeakTypicalPct
+	}
+	return 0
 }
 
 type LoadNodeRef struct {
@@ -3200,7 +3210,7 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x06params\x18\x03 \x03(\v2/.mistgate.ops.v1.LoadRecommendation.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe5\f\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x96\r\n" +
 	"\bNodeLoad\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1c\n" +
@@ -3239,7 +3249,8 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"R\x16cpuPctPerHundredPeople\x88\x01\x01\x12+\n" +
 	"\x0fmbps_per_person\x18\x1e \x01(\x02H\vR\rmbpsPerPerson\x88\x01\x01\x12,\n" +
 	"\x0fheadroom_people\x18\x1f \x01(\rH\fR\x0eheadroomPeople\x88\x01\x01\x12M\n" +
-	"\x0frecommendations\x18  \x03(\v2#.mistgate.ops.v1.LoadRecommendationR\x0frecommendationsB\x10\n" +
+	"\x0frecommendations\x18  \x03(\v2#.mistgate.ops.v1.LoadRecommendationR\x0frecommendations\x12/\n" +
+	"\x14cpu_peak_typical_pct\x18! \x01(\x02R\x11cpuPeakTypicalPctB\x10\n" +
 	"\x0e_steal_p95_pctB\x15\n" +
 	"\x13_conntrack_peak_pctB\x0f\n" +
 	"\r_ram_peak_pctB\x16\n" +

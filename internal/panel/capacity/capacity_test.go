@@ -231,13 +231,45 @@ func TestSaturatedNode(t *testing.T) {
 		t.Fatalf("an overloaded node has room: %v", r.Headroom)
 	}
 	c := rec(r, RecCPUBusy)
-	if c == nil || c.Severity != SevCrit || c.Params["cpu_pct"] != "95" || c.Params["peak_pct"] != "100" || r.Recs[0].Code != RecCPUBusy {
+	// peak_pct is the typical peak (p75 of the hourly peaks), not the highest one
+	if c == nil || c.Severity != SevCrit || c.Params["cpu_pct"] != "95" || c.Params["peak_pct"] != "91" || r.Recs[0].Code != RecCPUBusy {
 		t.Fatalf("recs %+v", r.Recs)
 	}
 	if r.CPUPeakP95 != 100 || r.LinkMbps != 1000 || r.LinkSource != "nic" {
 		t.Fatalf("peaks %v link %d %q", r.CPUPeakP95, r.LinkMbps, r.LinkSource)
 	}
 	finiteEverywhere(t, r)
+}
+
+// A small box at a 10% busy hour whose CPU touched 100% for a moment in three hours of 29 (the distribution's own updates):
+// not overloaded, its headroom stands, no advice to move people. The same spikes in most hours make it busy, never overloaded.
+func TestCPUSpikes(t *testing.T) {
+	hours := func(spiky func(i int) bool) []hour {
+		out := steady(29, 4, 0.5, daily(2, 12), &store.HostHour{AgentCPUAvg: 4, AgentCPUMax: 20, ConntrackLimit: 65536})
+		for i := range out {
+			if spiky(i) {
+				out[i].peak = 100
+			}
+		}
+		return out
+	}
+	rare := Read(Node{Name: "de1", Connected: true, Hours: build(hours(func(i int) bool { return i == 3 || i == 14 || i == 27 }))})
+	if rare.Status != StatusOK || rec(rare, RecCPUBusy) != nil || rare.Headroom == nil || *rare.Headroom == 0 {
+		t.Fatalf("rare spikes: status %s headroom %v recs %+v", rare.Status, rare.Headroom, rare.Recs)
+	}
+	if rare.CPUPeakP95 != 100 || rare.CPUPeakTypical >= CPUPeakBusyPct {
+		t.Fatalf("rare spikes: p95 %v typical %v", rare.CPUPeakP95, rare.CPUPeakTypical)
+	}
+	often := Read(Node{Name: "de1", Connected: true, Hours: build(hours(func(i int) bool { return i%4 != 0 }))})
+	c := rec(often, RecCPUBusy)
+	if often.Status != StatusBusy || often.Bottleneck != ResCPU || often.Pressure >= 1 || c == nil || c.Severity != SevWarn || c.Params["peak_pct"] != "100" {
+		t.Fatalf("frequent spikes: status %s bottleneck %s pressure %v recs %+v", often.Status, often.Bottleneck, often.Pressure, often.Recs)
+	}
+	if often.Headroom == nil || *often.Headroom == 0 {
+		t.Fatalf("frequent spikes at a low mean keep their headroom: %v", often.Headroom)
+	}
+	finiteEverywhere(t, rare)
+	finiteEverywhere(t, often)
 }
 
 func TestEachResource(t *testing.T) {

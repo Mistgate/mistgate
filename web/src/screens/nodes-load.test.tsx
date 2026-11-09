@@ -47,7 +47,7 @@ const load = {
   nodes: [
     {
       nodeId: "nod_1", nodeName: "de1", connected: true, cpus: 2, status: "overloaded", bottleneck: "cpu", hoursWithData: 168, extHours: 100,
-      busyHourUnix: 1_799_990_000n, busyHourCpuPct: 86, peopleBusyHour: 120, peoplePeak: 140, cpuPeakP95Pct: 99, stealP95Pct: 3, ramPeakPct: 60,
+      busyHourUnix: 1_799_990_000n, busyHourCpuPct: 86, peopleBusyHour: 120, peoplePeak: 140, cpuPeakP95Pct: 99, cpuPeakTypicalPct: 91, stealP95Pct: 3, ramPeakPct: 60,
       rxPeakBps: 300e6, txPeakBps: 280e6, capacityMbps: 500, capacitySource: "configured", bandwidthPeakPct: 60, fit: "ok", cpuPctPerHundredPeople: 55,
       mbpsPerPerson: 1.2, headroomPeople: 0, agentCpuAvgPct: 12, agentCpuMaxPct: 30, agentRssMaxBytes: 300n * 1024n * 1024n, agentRssGrowthPctPerDay: 0.4,
       recommendations: [
@@ -96,6 +96,7 @@ describe("the Load view", () => {
     expect(after).toContain("55%"); // CPU per 100 people
     expect(after).toContain("60% of your 500 Mbit/s");
     expect(after).toContain("12% mean, 30% peak");
+    expect(after).toContain("usually 91%, highest 99%"); // the peaks the status reads, then the highest
     expect(after).toContain("not known"); // de1's conntrack peak: absent, not zero
 
     // an old agent says what it lacks; a node without hours says it has none

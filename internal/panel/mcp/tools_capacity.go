@@ -20,7 +20,7 @@ func capacityTools() []toolDef {
 	return []toolDef{
 		readTool("capacity_report", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, opsv1connect.OpsServiceGetFleetLoadProcedure),
 			"How loaded each node was over the last hours (default 168, 1 to 720) and how many more people it can take: per node a status (ok, busy, overloaded, unknown = no data), "+
-				"the bottleneck that runs out first (cpu, steal, bandwidth, ram, conntrack, disk), the busy hour (highest hourly CPU mean) with its CPU and people, people at peak, p95 of the hourly CPU peaks, "+
+				"the bottleneck that runs out first (cpu, steal, bandwidth, ram, conntrack, disk), the busy hour (highest hourly CPU mean) with its CPU and people, people at peak, the hourly CPU peaks as their p95 (the highest) and cpu_peak_typical_pct (p75, what most hours stay under; the status reads this one, and peaks alone make a node busy at most, never overloaded: a few spikes to 100% are the server's own upkeep, not people), "+
 				"steal p95, conntrack and RAM peaks, swap, disk, traffic peaks against the owner's bandwidth or the NIC's link speed, the agent's own CPU and memory with its daily growth, "+
 				"cpu_per_100_people_pct and mbps_per_person (a fit over the hours; fit says few_hours, flat or no_trend when the data cannot carry one: then say there is not enough data), "+
 				"headroom_people (people it can add before its busy hour reaches 80% CPU), and recommendations as codes with params: update_agent, steal_high (the provider oversells the host: move the node), "+
@@ -84,6 +84,7 @@ type nodeLoadV struct {
 	PeopleBusyHour  float32    `json:"people_busy_hour"`
 	PeoplePeak      uint32     `json:"people_peak"`
 	CPUPeakP95      float32    `json:"cpu_peak_p95_pct"`
+	CPUPeakTypical  float32    `json:"cpu_peak_typical_pct"`
 	StealP95        *float32   `json:"steal_p95_pct,omitempty"`
 	ConntrackPeak   *float32   `json:"conntrack_peak_pct,omitempty"`
 	RAMPeak         *float32   `json:"ram_peak_pct,omitempty"`
@@ -161,7 +162,7 @@ func capacityView(r *opsv1.GetFleetLoadResponse, nodeID string) *CapacityV {
 			NodeID: clean(n.GetNodeId(), 64), NodeName: nm(n.GetNodeName()), Connected: n.GetConnected(), CPUs: n.GetCpus(),
 			Status: clean(n.GetStatus(), 16), Bottleneck: clean(n.GetBottleneck(), 16), HoursWithData: n.GetHoursWithData(), ExtHours: n.GetExtHours(),
 			BusyHourUnix: n.GetBusyHourUnix(), BusyHourCPU: n.GetBusyHourCpuPct(), PeopleBusyHour: n.GetPeopleBusyHour(), PeoplePeak: n.GetPeoplePeak(),
-			CPUPeakP95: n.GetCpuPeakP95Pct(), StealP95: n.StealP95Pct, ConntrackPeak: n.ConntrackPeakPct, RAMPeak: n.RamPeakPct,
+			CPUPeakP95: n.GetCpuPeakP95Pct(), CPUPeakTypical: n.GetCpuPeakTypicalPct(), StealP95: n.StealP95Pct, ConntrackPeak: n.ConntrackPeakPct, RAMPeak: n.RamPeakPct,
 			SwapUsedMax: n.SwapUsedMaxBytes, DiskUsed: n.DiskUsedPct, RxPeakBps: n.GetRxPeakBps(), TxPeakBps: n.GetTxPeakBps(),
 			CapacityMbps: n.GetCapacityMbps(), CapacitySource: clean(n.GetCapacitySource(), 16), BandwidthPeak: n.BandwidthPeakPct,
 			AgentCPUAvg: n.AgentCpuAvgPct, AgentCPUMax: n.AgentCpuMaxPct, AgentRSSMax: n.AgentRssMaxBytes, AgentRSSGrowth: n.AgentRssGrowthPctPerDay,

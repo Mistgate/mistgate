@@ -408,6 +408,9 @@ message NodeLoad {
   optional uint32 headroom_people = 31;
   // Most severe first.
   repeated LoadRecommendation recommendations = 32;
+  // The 75th percentile of the hourly CPU peaks: the peak most hours stay under. The status and the advice read it, not the
+  // 95th: a few spikes of a server's own upkeep do not make a node busy, and peaks alone never make it overloaded.
+  float cpu_peak_typical_pct = 33;
 }
 
 message LoadNodeRef {

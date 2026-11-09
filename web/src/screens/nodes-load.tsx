@@ -205,7 +205,7 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
   if (n.status !== "unknown") {
     facts.push(
       { label: t("load.d.busyHour"), value: t("load.d.busyHour.value", { time: fmt.stamp(n.busyHourUnix), cpu: pct(n.busyHourCpuPct), people: fmt.num(n.peopleBusyHour, 0) }) },
-      { label: t("load.d.peaks"), value: pct(n.cpuPeakP95Pct) },
+      { label: t("load.d.peaks"), value: t("load.d.peaks.value", { typical: pct(n.cpuPeakTypicalPct), top: pct(n.cpuPeakP95Pct) }) },
       { label: t("load.d.cpuPer100"), value: n.cpuPctPerHundredPeople !== undefined ? pct(n.cpuPctPerHundredPeople) : fitWhy ? t(fitWhy) : t("load.d.unknown") },
       { label: t("load.d.perPerson"), value: n.mbpsPerPerson !== undefined ? `${fmt.num(n.mbpsPerPerson, 2)} ${t("unit.mbit")}` : t("load.d.unknown") },
       { label: t("load.d.steal"), value: pct(n.stealP95Pct) },
