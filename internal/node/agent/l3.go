@@ -148,6 +148,9 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
 	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capLinks3, capJournal, capProbe, capSpeed, capDebug}
+	if kernelDebugSupported() {
+		caps = append(caps, capDebug2)
+	}
 	if _, ok := a.engines[awg.Protocol]; ok {
 		caps = append(caps, capAWG)
 	}

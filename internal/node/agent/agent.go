@@ -104,20 +104,22 @@ type Config struct {
 	// 10 s batches, and 32 MiB).
 	MaxPending      int
 	MaxPendingBytes int
+	kernelDebugOpts kernelDebugOptions // OS paths and the command runner are replaceable by package tests.
 }
 
 // Agent is the node agent. Build it with New and run it with Run.
 type Agent struct {
-	cfg       Config
-	startedAt time.Time
-	log       *slog.Logger
-	ring      *logRing
-	journal   *journal
-	debug     *debugState
-	host      hostctl.Host
-	meta      Meta
-	id        atomic.Pointer[identity]
-	decoySite *decoy.Site
+	cfg         Config
+	startedAt   time.Time
+	log         *slog.Logger
+	ring        *logRing
+	journal     *journal
+	debug       *debugState
+	kernelDebug *kernelDebugEnvironment
+	host        hostctl.Host
+	meta        Meta
+	id          atomic.Pointer[identity]
+	decoySite   *decoy.Site
 
 	engines   map[string]engine.Engine
 	protocols []string // sorted keys of engines
@@ -421,6 +423,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 		a.protocols = append(a.protocols, proto)
 	}
 	sort.Strings(a.protocols)
+	a.kernelDebug = newKernelDebugEnvironment(cfg.kernelDebugOpts)
+	a.resetKernelDebugAtStart()
 	doctorEnv := a.doctorEnv()
 	a.doc = doctor.New(doctorEnv)
 	a.doctorRun = doctorEnv.Run
@@ -480,6 +484,7 @@ func (a *Agent) knows(protocol string) bool { _, ok := a.engines[protocol]; retu
 
 func (a *Agent) closeEngines() {
 	a.closeOnce.Do(func() {
+		a.debug.shutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		for _, p := range a.protocols {

@@ -46,6 +46,11 @@ type unknownPeerSource interface {
 	TakeUnknownPeers(name string) uint32
 }
 
+// unknownPeerWatcher subscribes to kernel notifications for the lifetime of a debug capture.
+type unknownPeerWatcher interface {
+	WatchUnknownPeers(fn func(ifname string)) func()
+}
+
 const unknownInitiationLogFormat = "Received invalid initiation message from %s"
 
 func isUnknownInitiationLog(format string) bool {

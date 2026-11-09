@@ -131,3 +131,15 @@ func TestClean(t *testing.T) {
 		t.Errorf("cleanMap: %v", m)
 	}
 }
+
+func TestDebugCaptureAttributeScrubKeepsAWGKernelFields(t *testing.T) {
+	got := scrubDebugCaptureAttrs(map[string]string{"event": "initiation_in", "peer": "7", "inbound": "inb_awg", "code": "keep", "secret": "drop"})
+	for key, want := range map[string]string{"event": "initiation_in", "peer": "7", "inbound": "inb_awg", "code": "keep"} {
+		if got[key] != want {
+			t.Errorf("attribute %s = %q, want %q", key, got[key], want)
+		}
+	}
+	if _, ok := got["secret"]; ok {
+		t.Errorf("unlisted attribute survived: %v", got)
+	}
+}

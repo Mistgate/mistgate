@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mistgate/mistgate/internal/logscrub"
 )
 
 // scrub is the last wall: every string an agent can see is run through it, after the projection has
@@ -156,3 +158,16 @@ func ScrubText(s string) string { return scrub(s) }
 
 // ScrubJSON applies the final serialized-result scrubbers to assistant tool output.
 func ScrubJSON(s string) string { return scrubJSON(s) }
+
+func scrubDebugCaptureAttrs(attrs map[string]string) map[string]string {
+	if len(attrs) == 0 {
+		return nil
+	}
+	out := make(map[string]string)
+	for _, key := range logscrub.JournalAttrs {
+		if value, ok := attrs[key]; ok {
+			out[key] = value
+		}
+	}
+	return out
+}

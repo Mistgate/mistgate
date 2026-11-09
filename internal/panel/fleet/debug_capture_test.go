@@ -66,6 +66,57 @@ loop:
 	}
 }
 
+func TestDebugCaptureKernelSourceNeedsDebug2ButEmptySourcesKeepDebug1(t *testing.T) {
+	x, a := newL3Env(t)
+	c, _, _ := connectCaps(a, "old-kernel", debugCaps...)
+	if _, err := x.f.StartDebugCapture(x.ctx, DebugStart{NodeID: a.nodeID, Level: "debug", Sources: []string{"kernel"}, DurationS: 30}); err == nil || err.Error() != "failed_precondition: this node's agent is too old for the kernel source: update the node" {
+		t.Fatalf("kernel source on a debug/1 agent: %v", err)
+	}
+	select {
+	case frame := <-c.in:
+		if frame.GetDebugCapture() != nil {
+			t.Fatal("a debug/1 agent was asked for the kernel source")
+		}
+	case <-time.After(100 * time.Millisecond):
+	}
+	empty := answerDebug(c, &agentv1.CommandResult{Ok: true})
+	emptyRow, err := x.f.StartDebugCapture(x.ctx, DebugStart{NodeID: a.nodeID, Level: "debug", DurationS: 30})
+	if err != nil {
+		t.Fatalf("empty sources on a debug/1 agent: %v", err)
+	}
+	if frame := <-empty; len(frame.GetSources()) != 0 {
+		t.Errorf("empty source list changed to %v", frame.GetSources())
+	}
+	stopAsked := make(chan *agentv1.DebugCapture, 1)
+	go func() {
+		m := c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetDebugCapture() != nil })
+		p := m.GetDebugCapture()
+		stopAsked <- p
+		c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_DebugReport{DebugReport: &agentv1.DebugCaptureReport{
+			RequestId: emptyRow.ID, Eof: true, EndReason: "stopped"}}})
+		c.send(0, &agentv1.ConnectRequest{Message: &agentv1.ConnectRequest_CommandResult{CommandResult: &agentv1.CommandResult{RequestId: p.RequestId, Ok: true}}})
+	}()
+	if _, err := x.f.StopDebugCapture(x.ctx, emptyRow.ID); err != nil {
+		t.Fatalf("stop empty-source capture: %v", err)
+	}
+	if frame := <-stopAsked; !frame.Stop || frame.CaptureId != emptyRow.ID {
+		t.Errorf("empty-source capture stop frame = %+v", frame)
+	}
+
+	c2, _, _ := connectCaps(a, "new-kernel", append(append([]string(nil), debugCaps...), capDebug2)...)
+	got := answerDebug(c2, &agentv1.CommandResult{Ok: true})
+	row, err := x.f.StartDebugCapture(x.ctx, DebugStart{NodeID: a.nodeID, Level: "debug", Sources: []string{"kernel"}, DurationS: 30})
+	if err != nil {
+		t.Fatalf("kernel source on a debug/2 agent: %v", err)
+	}
+	if frame := <-got; len(frame.GetSources()) != 1 || frame.GetSources()[0] != "kernel" {
+		t.Errorf("sources sent to debug/2 agent = %v", frame.GetSources())
+	}
+	if row.State != "running" {
+		t.Errorf("capture state = %q", row.State)
+	}
+}
+
 func TestDebugCaptureValidatesTheRequest(t *testing.T) {
 	x, a := newL3Env(t)
 	connectCaps(a, "new", debugCaps...)

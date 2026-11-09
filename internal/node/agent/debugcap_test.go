@@ -377,7 +377,8 @@ func TestDebugRecordsAreScrubbedOnTheNode(t *testing.T) {
 	add("xray", "accepted tcp:canary-site.example.com:443 from 198.51.100.7:51000 sni canary-sni.example.org", map[string]string{
 		"err": "dial tcp 203.0.113.5:443: i/o timeout to host.example.net", "user": "alice@example.com", "path": "/etc/secret",
 	})
-	add("agent", "client [2001:db8::7]:5555 key "+key+" hex "+hexKey, map[string]string{"state": "ok 192.0.2.10", "token": key, "code": "x"})
+	add("agent", "client [2001:db8::7]:5555 key "+key+" hex "+hexKey, map[string]string{"state": "ok 192.0.2.10", "token": key, "code": "x",
+		"event": "initiation_in", "peer": "7", "inbound": "inb_awg"})
 	var all []string
 	for _, r := range d.cur.recs {
 		all = append(all, r.msg)
@@ -395,7 +396,7 @@ func TestDebugRecordsAreScrubbedOnTheNode(t *testing.T) {
 			t.Errorf("%q survived the scrub:\n%s", canary, text)
 		}
 	}
-	for _, want := range []string{"<host>", "<ip>:port", "<key>", "state=ok <ip>", "code=x"} {
+	for _, want := range []string{"<host>", "<ip>:port", "<key>", "state=ok <ip>", "code=x", "event=initiation_in", "peer=7", "inbound=inb_awg"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("missing %q in\n%s", want, text)
 		}

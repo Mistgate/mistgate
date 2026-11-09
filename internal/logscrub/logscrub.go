@@ -22,7 +22,7 @@ const (
 // JournalEntry).
 var JournalAttrs = [...]string{
 	"inbound", "protocol", "profile", "port", "state", "reason", "code", "backend", "mode", "version",
-	"kernel", "iface", "check", "fix", "count", "err", "error",
+	"kernel", "iface", "check", "fix", "count", "err", "error", "event", "peer",
 }
 
 // candidate finds what may be an address: a bracketed IPv6 (with zone and port), an IPv4 (with port), or an unbracketed IPv6
