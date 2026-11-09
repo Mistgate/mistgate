@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ChatMarkdown, useSmoothText } from "@/components/assistant/markdown";
 import { halo } from "@/components/fx/halo";
 import { Fresh } from "@/components/fx/fresh";
 import { markFresh } from "@/components/fx/registry";
@@ -19,11 +20,49 @@ const seed = countries.flatMap((country, i) => [1, 2].map((n) => ({
   load: 12 + (i * 11 + n * 7) % 67,
 })));
 
+// A made-up answer, fed in lumps of 10..70 characters every 60..260 ms, the way a model's stream arrives.
+const sample = `Проверил ноды за последние сутки.
+
+**Что вижу**
+- На **de1** потерь нет, подключения 30–60 мс.
+- **nl1** перегружена: CPU 78%, половину людей можно перенести на **nl2**.
+- Всплески \`check_failed\` на **fi1** идут пачками после двух перезапусков панели, это не отказы ноды.
+
+**Что бы я сделал**
+1. Включить **de1** для группы «Семья» — самая чистая нода.
+2. Перенести половину людей с **nl1** на **nl2** → \`group_update_plan\`.
+3. Проверить ключи REALITY на **fi1**, прежде чем что-то менять.
+
+Скажи, какой пункт готовить планом.`;
+
+function StreamDemo({ run }: { run: number }) {
+  const [text, setText] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  useEffect(() => {
+    if (!run) return;
+    let at = -1;
+    let timer = 0;
+    const tick = () => {
+      // the first tick clears the last run, the next ones bring the answer in
+      setStreaming(true);
+      at = at < 0 ? 0 : Math.min(sample.length, at + 10 + Math.floor(Math.random() * 60));
+      setText(sample.slice(0, at));
+      if (at < sample.length) timer = window.setTimeout(tick, 60 + Math.random() * 200);
+      else setStreaming(false);
+    };
+    timer = window.setTimeout(tick, 300);
+    return () => clearTimeout(timer);
+  }, [run]);
+  const [shown, streamed] = useSmoothText(text, streaming);
+  return shown ? <ChatMarkdown text={shown} words={streamed} /> : null;
+}
+
 export function HaloKit() {
   const on = useEffectsEnabled();
   const accent = useAccent();
   const [nodes, setNodes] = useState(seed);
   const [chat, setChat] = useState(false);
+  const [stream, setStream] = useState(0);
   const thread = useRef<HTMLDivElement>(null);
   const create = () => {
     const id = `sg${nodes.length + 1}-1`;
@@ -66,11 +105,12 @@ export function HaloKit() {
       </div>
       {chat && (
         <section data-fx-halo className="fixed end-4 top-4 bottom-4 z-30 flex w-[400px] flex-col overflow-hidden rounded-card-lg border border-line bg-surface shadow-(--shadow-dock)">
-          <header className="flex items-center justify-between border-b border-line px-5 py-3"><b>Assistant</b><Button size="sm" onClick={answer}>Answer done</Button></header>
+          <header className="flex items-center justify-between gap-2 border-b border-line px-5 py-3"><b className="flex-1">Assistant</b><Button size="sm" variant="secondary" onClick={() => setStream((n) => n + 1)}>Stream</Button><Button size="sm" onClick={answer}>Answer done</Button></header>
           <div ref={thread} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-5 text-sm">
             <p className="self-end rounded-2xl bg-accent-soft px-3 py-2">Which nodes are overloaded?</p>
             <p className="rounded-2xl bg-fg/[0.04] px-3 py-2">Two nodes are above 70% CPU: ca8-1 and fr5-2. Both have spare capacity on their neighbours.</p>
             <p className="rounded-2xl bg-fg/[0.04] px-3 py-2">I can move half of the people from ca8-1 to ca8-2. Want me to plan it?</p>
+            <StreamDemo run={stream} />
           </div>
         </section>
       )}

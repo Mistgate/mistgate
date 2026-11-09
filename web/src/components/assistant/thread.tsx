@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
 import { dayLabel, minutesText, useFmt } from "@/lib/format";
 import { nodesQuery } from "@/lib/queries";
 import { useNow } from "@/lib/time";
-import { ChatMarkdown, type ChatEntity } from "./markdown";
+import { ChatMarkdown, useSmoothText, type ChatEntity } from "./markdown";
 import { PlanCardView } from "./plan-card";
 import type { ChatApi } from "./chat";
 import { actionOf } from "@/lib/ui-actions";
@@ -217,6 +217,7 @@ function UserBubble({ m, first, last }: { m: Msg; first: boolean; last: boolean 
 function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }: { m: Msg; first: boolean; avatar: boolean; running: boolean; owner: boolean; chat: ChatApi; onNavigate: () => void }) {
   const t = useT();
   const { interim, answer } = splitText(m);
+  const [shown, streamed] = useSmoothText(answer, running);
   const fmt = useFmt();
   const [busy, setBusy] = useState("");
   const live = m as LiveMsg;
@@ -235,9 +236,9 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
         {(first || m.followUp) && <Header name={t("ai.chat.title")} time={m.createdUnix > 0 ? fmt.clock(m.createdUnix) : ""} label={m.followUp ? <TimerLabel /> : undefined} />}
         {(interim || (running && shownTools.length > 0)) && <Thinking m={live} running={running} interim={interim} />}
         {shownTools.length > 0 && <ToolGroup tools={shownTools} running={running} workedMs={interim ? undefined : live.workedMs} />}
-        {answer && (
+        {shown && (
           <div data-slot="bubble" className="max-w-full">
-            <ChatMarkdown text={answer} onNavigate={onNavigate} entities={entities} />
+            <ChatMarkdown text={shown} onNavigate={onNavigate} entities={entities} words={streamed} />
           </div>
         )}
         {actions.map((a) => (a.action.kind === "secret" ? <SecretCard key={a.id} toolId={a.id} action={a.action} owner={owner} /> : <ActionCard key={a.id} toolId={a.id} action={a.action} onNavigate={onNavigate} />))}

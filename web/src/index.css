@@ -518,6 +518,27 @@
   }
 }
 
+/* A word of an answer as it streams in (useSmoothText in components/assistant/markdown.tsx): from clear and a little soft to
+   sharp. Only the words that just arrived are animating at any moment. */
+@keyframes mg-word-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+.chat-word {
+  animation: mg-word-in 0.45s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-word {
+    animation: none;
+  }
+}
+
 /*
  * Simplified Chinese (<html lang="zh-CN">). Unlayered on purpose: it beats the utilities. Ideographs are set solid, so the
  * tight tracking meant for Latin headings is dropped and the lines get a little more air; nothing else changes.

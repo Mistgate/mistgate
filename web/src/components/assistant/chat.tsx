@@ -359,6 +359,22 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
     if (el && growth >= 0) el.scrollTop = el.scrollHeight;
   }, [growth]);
 
+  // the answer is revealed word by word after its text has arrived (useSmoothText): stay at the bottom while it grows,
+  // unless the admin has scrolled up to read
+  useEffect(() => {
+    const el = list.current;
+    const content = el?.firstElementChild;
+    if (!el || !content || history || typeof ResizeObserver === "undefined") return; // the history list does not grow
+    let height = content.getBoundingClientRect().height;
+    const ro = new ResizeObserver(() => {
+      const grew = content.getBoundingClientRect().height - height;
+      height += grew;
+      if (grew > 0 && el.scrollHeight - el.scrollTop - el.clientHeight - grew < 48) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [history]);
+
   // a turn watched to its end: the halo runs out from the end of the answer, inside the panel
   const wasLive = useRef(chat.live);
   useEffect(() => {
