@@ -27,11 +27,12 @@ var reservedNames = []string{"DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATI
 
 // mihomoProfile is what the assembler needs about one user's subscription.
 type mihomoProfile struct {
-	title  string
-	lines  []string // proxies, each a YAML list with one element (plugin.Fragment.Data)
-	names  []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
-	preset *dns.Preset
-	log    *slog.Logger
+	title      string
+	lines      []string // proxies, each a YAML list with one element (plugin.Fragment.Data)
+	names      []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
+	preset     *dns.Preset
+	autoSelect bool
+	log        *slog.Logger
 }
 
 func strNode(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v} }
@@ -40,6 +41,9 @@ func quoted(v string) *yaml.Node {
 }
 func boolNode(b bool) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: strconv.FormatBool(b)}
+}
+func intNode(i int) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(i)}
 }
 func seqNode(items ...*yaml.Node) *yaml.Node {
 	return &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: items}
@@ -140,12 +144,26 @@ func (p mihomoProfile) build() ([]byte, error) {
 	if group == "" {
 		group = "Proxy"
 	}
-	members := append(slices.Clone(names), "DIRECT")
+	selectMembers := slices.Clone(names)
+	var autoGroup *yaml.Node
+	if p.autoSelect && len(names) > 1 {
+		auto := uniqueName("Auto", taken)
+		selectMembers = append([]string{auto}, selectMembers...)
+		autoGroup = newMap().
+			set("name", quoted(auto)).set("type", strNode("url-test")).set("proxies", quotedSeq(names)).
+			set("url", quoted("https://www.gstatic.com/generate_204")).set("interval", intNode(300)).
+			set("tolerance", intNode(50)).set("lazy", boolNode(true)).set("timeout", intNode(5000)).n
+	}
+	members := append(selectMembers, "DIRECT")
 
 	root := newMap()
 	root.set("proxies", proxies)
-	root.set("proxy-groups", seqNode(newMap().
-		set("name", quoted(group)).set("type", strNode("select")).set("proxies", quotedSeq(members)).n))
+	groups := seqNode(newMap().
+		set("name", quoted(group)).set("type", strNode("select")).set("proxies", quotedSeq(members)).n)
+	if autoGroup != nil {
+		groups.Content = append(groups.Content, autoGroup)
+	}
+	root.set("proxy-groups", groups)
 
 	var direct []string
 	var providers, block []dns.MihomoProvider

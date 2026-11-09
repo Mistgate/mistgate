@@ -131,8 +131,8 @@ func TestSubscriptionSettingsPlansAndApplies(t *testing.T) {
 				t.Fatalf("texts: %+v", e.w.subs)
 			}
 		}},
-		{"link_limits", map[string]any{"mode": "strict", "link_awg": false}, func(t *testing.T, e *testEnv) {
-			if e.w.subs.GetLinkDeviceLimit() != adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT || e.w.subs.GetLinkAwg() {
+		{"link_limits", map[string]any{"mode": "strict", "link_awg": false, "link_auto_select": false}, func(t *testing.T, e *testEnv) {
+			if e.w.subs.GetLinkDeviceLimit() != adminv1.LinkDeviceLimit_LINK_DEVICE_LIMIT_STRICT || e.w.subs.GetLinkAwg() || e.w.subs.GetLinkAutoSelect() {
 				t.Fatalf("link limits: %+v", e.w.subs)
 			}
 		}},

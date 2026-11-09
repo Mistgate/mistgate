@@ -229,7 +229,7 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	// The audit row says that the settings changed and how big they are, never their texts.
 	params, _ := json.Marshal(map[string]any{
 		"apps": len(set.Apps), "rules": len(set.Rules), "link_device_limit": store.LinkModeOf(linkModeWord(set)),
-		"link_awg": subsettings.LinkAWG(set), "shared_revoked": revoked,
+		"link_awg": subsettings.LinkAWG(set), "link_auto_select": subsettings.LinkAutoSelect(set), "shared_revoked": revoked,
 	})
 	entry := store.AuditEntry{Actor: admin.ID, Action: "subscription_settings_update", Result: "ok", Params: string(params)}
 	if ip := auth.ClientIPFrom(ctx); ip.IsValid() {

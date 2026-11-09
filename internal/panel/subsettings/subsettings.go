@@ -140,6 +140,12 @@ func LinkAWG(s *adminv1.SubscriptionSettings) bool {
 	return s == nil || s.LinkAwg == nil || *s.LinkAwg
 }
 
+// LinkAutoSelect reports whether Mihomo and sing-box profiles include an automatic server group. Settings stored before
+// the switch existed have no key: absent means on, so an upgrade keeps the current server list usable by default.
+func LinkAutoSelect(s *adminv1.SubscriptionSettings) bool {
+	return s == nil || s.LinkAutoSelect == nil || *s.LinkAutoSelect
+}
+
 // DNSChoice reports whether people may pick the DNS of each server on the public page (DnsService.SetNodeDnsOptions says what
 // is offered). Settings stored before the key existed have none: absent means off, a new feature does not switch itself on.
 func DNSChoice(s *adminv1.SubscriptionSettings) bool {

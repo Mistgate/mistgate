@@ -633,7 +633,7 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	ctx := r.Context()
 	b := h.brand(ctx)
 	title := h.title(set, b)
-	p := mihomoProfile{title: title, lines: v.Lines, log: h.cfg.Log}
+	p := mihomoProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), log: h.cfg.Log}
 	if note := stateNote(v, b.Language, h.cfg.Now()); note != "" {
 		p.lines, p.names = []string{placeholderProxy}, []string{note}
 	} else if !subsettings.LinkAWG(set) && len(v.Lines) == 0 && len(v.AWGProfiles) > 0 {

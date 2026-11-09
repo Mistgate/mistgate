@@ -80,7 +80,7 @@ func TestMihomoCoreAcceptsTheProfiles(t *testing.T) {
 		{"no plain server (the system resolver for the nodes)", "Example", &dns.Preset{Name: "mullvad", Transport: dns.KindPlain, Servers: []dns.Server{{Variant: "mullvad/standard"}}}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			b, err := mihomoProfile{title: c.title, lines: all, names: names, preset: c.preset}.build()
+			b, err := mihomoProfile{title: c.title, lines: all, names: names, preset: c.preset, autoSelect: true}.build()
 			if err != nil {
 				t.Fatal(err)
 			}

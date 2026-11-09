@@ -3,6 +3,7 @@ import { useState } from "react";
 import { SectionLabel } from "@/components/ui/bits";
 import { HappPing, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
 import { FormatsTab } from "@/screens/subscriptions/formats";
+import { LinkAutoCard } from "@/screens/subscriptions/link-auto";
 import { LinkAwgCard, LinkAwgOffDialog } from "@/screens/subscriptions/link-awg";
 import type { Settings } from "@/screens/subscriptions/model";
 import { clientsQuery, settingsQuery } from "@/screens/subscriptions/queries";
@@ -71,7 +72,9 @@ export function SubsKit() {
         )}
         {awg && (
           <div data-shot="subs-link-awg" className="flex flex-col gap-3">
-            <SectionLabel>Subscriptions → Who gets what: AmneziaWG in apps on the link</SectionLabel>
+            <SectionLabel>Subscriptions → Who gets what: automatic server choice, AmneziaWG in apps on the link</SectionLabel>
+            <LinkAutoCard settings={shown} />
+            <LinkAutoCard settings={{ ...shown, linkAutoSelect: false } as Settings} />
             <LinkAwgCard settings={shown} />
           </div>
         )}

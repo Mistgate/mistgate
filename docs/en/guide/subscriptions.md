@@ -53,9 +53,13 @@ The **Apps & formats** tab lists the apps the protocols work with and what each 
 Both are built from the same profiles and the same access as the link list. They differ in what a format can carry ([What works where](#what-works-where)) and in how the app is wired.
 
 - **Xray JSON** is an array of configs, one per server; the server's name is the `remarks` of its config. Each config opens a local SOCKS proxy on `127.0.0.1:10808`, which the app's own VPN mode feeds. Other apps on the device can see that port, and some VPN checks look for it. There is no HTTP proxy, no API and no statistics port. The DNS preset is written into every config.
-- **sing-box JSON** is one profile: a switch with every server (the first is the default), a TUN interface, and the DNS preset. It opens no local proxy. It needs sing-box 1.12 or newer.
+- **sing-box JSON** is one profile: a selector with every server, a TUN interface, and the DNS preset. When automatic selection is on, its `Auto` option tests the servers; otherwise the first server is the default. It opens no local proxy. It needs sing-box 1.12 or newer.
 
 The names follow the template of [Names & texts](#names-texts). Xray JSON keeps the link list's 30-character limit and, for Happ, the load; sing-box JSON keeps the full names and never adds the load.
+
+### Automatic server choice
+
+When **Automatic server choice**, a card under the rules of **Who gets what**, is on (the default), Mihomo/Clash YAML and sing-box JSON include an `Auto` group that tests each server at `https://www.gstatic.com/generate_204` every five minutes. The check goes through the server being tested, so a site blocked on the user's home connection does not affect it. A new install starts on `Auto`; a person's manual pick in the app remains in effect. With one server, there is no `Auto` group. This setting does not affect Happ (Xray JSON) or AmneziaVPN.
 
 **Planned:** subscription mirrors.
 
@@ -155,7 +159,7 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 | `Routing` | The link list for Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
 | `Ping-Type`, `Ping-Result`, `Subscription-Ping-Onopen-Enabled` | Happ only, and only when **Ping in Happ** is not **App default**: how Happ pings the servers, the delay in ms, and whether it pings when it opens. See [Names & texts](#names-texts). |
 
-The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has one proxy group with every server and a `dns:` section; Xray JSON has one config per server; sing-box JSON has one switch with every server. Each takes the person's DNS preset in its own form.
+The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has a `select` group and, when enabled, an `Auto` group over the servers, plus a `dns:` section; Xray JSON has one config per server; sing-box JSON has one selector and, when enabled, an `Auto` URL test. Each takes the person's DNS preset in its own form.
 
 ## Extra servers: over IPv6 and through a relay
 

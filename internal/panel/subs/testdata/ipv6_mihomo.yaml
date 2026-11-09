@@ -37,9 +37,21 @@ proxy-groups:
   - name: "Example VPN"
     type: select
     proxies:
+      - "Auto"
       - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium"
       - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · IPv6"
       - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · via FI"
       - "DIRECT"
+  - name: "Auto"
+    type: url-test
+    proxies:
+      - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium"
+      - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · IPv6"
+      - "\U0001F1E9\U0001F1EA DE · Hysteria2 premium · via FI"
+    url: "https://www.gstatic.com/generate_204"
+    interval: 300
+    tolerance: 50
+    lazy: true
+    timeout: 5000
 rules:
   - "MATCH,Example VPN"

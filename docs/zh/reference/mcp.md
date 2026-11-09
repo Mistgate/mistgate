@@ -132,7 +132,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
 | `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置（每个都带有包含它的订阅格式）和节点。不返回订阅内容或链接。 |
-| `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：应用、页面选项、按 User-Agent 下发的有序规则、实例 DNS 默认值、链接应用的 DNS 推荐、链接设备数量限制模式、链接中的 AmneziaWG 开关、Happ 延迟检测设置、服务器名称模板、标题、公告、联系链接和更新间隔。另含共享链接用户和链接 AmneziaWG 密钥的实时数量。不含任何用户的链接或密钥。 |
+| `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：应用、页面选项、按 User-Agent 下发的有序规则、实例 DNS 默认值、链接应用的 DNS 推荐、链接设备数量限制模式、链接中的 AmneziaWG 和自动选择服务器开关、Happ 延迟检测设置、服务器名称模板、标题、公告、联系链接和更新间隔。另含共享链接用户和链接 AmneziaWG 密钥的实时数量。不含任何用户的链接或密钥。 |
 | `alerts_list` | 只读 | 活跃告警；设置 `include_history` 后也会返回已关闭的告警（`window_s` 最长为 30 天）。 `min_severity`（`info`、`warning`、`critical`）和 `kind` 可缩小列表范围。 |
 | `health_summary` | 只读 | 简要统计：已部署的合成检查按最新状态的数量，以及活跃告警按严重程度的数量。单条记录请用 `alerts_list` 或 `checks_results`。 |
 | `reachability_history` | 只读 | 可达性页面的国家、地址族、活跃来源，以及每个节点在 1 到 7 天内按来源给出的判定时间线。`family` 为 4（IPv4）或 6（IPv6）。 |
@@ -173,7 +173,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
 | `subscription_rules_set` | 操作员 | 完整的有序 `rules` 列表，每项为 `ua_contains` 加 `format`（`base64_uris`、`user_page`、`decoy`、`mihomo_yaml`、`xray_json`、`singbox_json`）；第一个匹配项生效 | 始终 |
 | `subscription_texts_set` | 操作员 | 仅需更改的字段：`title`、`announcement`、`support_url`、`update_interval_hours`、`server_name_template` | 始终 |
-| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG），或两者。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥 | 始终 |
+| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo 和 sing-box 中添加 Auto 分组），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥 | 始终 |
 | `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
 | `dns_settings_set` | 操作员 | `default_preset_id`、有序的 `link_preset_ids` 和 `link_default_preset_id`；只需提供要更改的字段 | 始终 |
 | `group_create` | 操作员 | `name`，可选 `profile_ids`、`dns_preset_id`（留空则使用实例默认值）、`color` 和 `disabled_node_ids`。分组没有备注和配额字段 | 否 |

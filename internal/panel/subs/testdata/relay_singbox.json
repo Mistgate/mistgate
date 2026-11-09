@@ -29,11 +29,23 @@
       "type": "selector",
       "tag": "Example VPN",
       "outbounds": [
+        "Auto",
         "🇩🇪 DE · Hysteria2 premium",
         "🇩🇪 DE · Hysteria2 premium · via FI",
         "direct"
       ],
-      "default": "🇩🇪 DE · Hysteria2 premium"
+      "default": "Auto"
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto",
+      "outbounds": [
+        "🇩🇪 DE · Hysteria2 premium",
+        "🇩🇪 DE · Hysteria2 premium · via FI"
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 50
     },
     {
       "hop_interval": "30s",

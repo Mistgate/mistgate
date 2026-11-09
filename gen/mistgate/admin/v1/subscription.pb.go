@@ -287,9 +287,11 @@ type SubscriptionSettings struct {
 	HappPingOnOpen bool `protobuf:"varint,13,opt,name=happ_ping_on_open,json=happPingOnOpen,proto3" json:"happ_ping_on_open,omitempty"`
 	// AmneziaWG servers in what the subscription link hands out (today only the Mihomo profile carries them).
 	// Absent = true: settings stored before this switch existed keep today's behaviour.
-	LinkAwg       *bool `protobuf:"varint,14,opt,name=link_awg,json=linkAwg,proto3,oneof" json:"link_awg,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LinkAwg *bool `protobuf:"varint,14,opt,name=link_awg,json=linkAwg,proto3,oneof" json:"link_awg,omitempty"`
+	// Include automatic server selection in Mihomo and sing-box subscription profiles; absent means on.
+	LinkAutoSelect *bool `protobuf:"varint,15,opt,name=link_auto_select,json=linkAutoSelect,proto3,oneof" json:"link_auto_select,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -416,6 +418,13 @@ func (x *SubscriptionSettings) GetHappPingOnOpen() bool {
 func (x *SubscriptionSettings) GetLinkAwg() bool {
 	if x != nil && x.LinkAwg != nil {
 		return *x.LinkAwg
+	}
+	return false
+}
+
+func (x *SubscriptionSettings) GetLinkAutoSelect() bool {
+	if x != nil && x.LinkAutoSelect != nil {
+		return *x.LinkAutoSelect
 	}
 	return false
 }
@@ -1278,7 +1287,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xee\x05\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xb2\x06\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -1295,9 +1304,11 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\blink_dns\x18\v \x01(\v2!.mistgate.admin.v1.LinkDnsOptionsR\alinkDns\x128\n" +
 	"\thapp_ping\x18\f \x01(\x0e2\x1b.mistgate.admin.v1.HappPingR\bhappPing\x12)\n" +
 	"\x11happ_ping_on_open\x18\r \x01(\bR\x0ehappPingOnOpen\x12\x1e\n" +
-	"\blink_awg\x18\x0e \x01(\bH\x01R\alinkAwg\x88\x01\x01B\x14\n" +
+	"\blink_awg\x18\x0e \x01(\bH\x01R\alinkAwg\x88\x01\x01\x12-\n" +
+	"\x10link_auto_select\x18\x0f \x01(\bH\x02R\x0elinkAutoSelect\x88\x01\x01B\x14\n" +
 	"\x12_link_device_limitB\v\n" +
-	"\t_link_awg\"[\n" +
+	"\t_link_awgB\x13\n" +
+	"\x11_link_auto_select\"[\n" +
 	"\x0eLinkDnsOptions\x12\x1d\n" +
 	"\n" +
 	"preset_ids\x18\x01 \x03(\tR\tpresetIds\x12*\n" +

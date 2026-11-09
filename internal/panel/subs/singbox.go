@@ -9,6 +9,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -25,10 +26,11 @@ const (
 
 // singboxProfile is what the assembler needs about one user's subscription.
 type singboxProfile struct {
-	title  string
-	lines  []string // outbounds, each one JSON object without a tag (plugin.Fragment.Data)
-	names  []string // the tag of each line, parallel to lines ("" or missing = "server")
-	preset *dns.Preset
+	title      string
+	lines      []string // outbounds, each one JSON object without a tag (plugin.Fragment.Data)
+	names      []string // the tag of each line, parallel to lines ("" or missing = "server")
+	preset     *dns.Preset
+	autoSelect bool
 	// note: the one entry that says why there are no servers; "" = build the servers. none: the entry for a person whose servers
 	// all failed to render (never an empty answer).
 	note, none string
@@ -61,6 +63,15 @@ type singboxSelector struct {
 	Tag       string   `json:"tag"`
 	Outbounds []string `json:"outbounds"`
 	Default   string   `json:"default,omitempty"`
+}
+
+type singboxURLTest struct {
+	Type      string   `json:"type"`
+	Tag       string   `json:"tag"`
+	Outbounds []string `json:"outbounds"`
+	URL       string   `json:"url"`
+	Interval  string   `json:"interval"`
+	Tolerance int      `json:"tolerance"`
 }
 
 type singboxRoute struct {
@@ -131,7 +142,22 @@ func (p singboxProfile) build() ([]byte, error) {
 	if group == "" {
 		group = "Proxy"
 	}
-	sel, _ := json.Marshal(singboxSelector{Type: "selector", Tag: group, Outbounds: append(slices.Clone(tags), singboxDirectTag), Default: tags[0]})
+	selectOutbounds := slices.Clone(tags)
+	selectDefault := tags[0]
+	var auto json.RawMessage
+	if p.autoSelect && len(tags) > 1 {
+		autoTag := uniqueName("Auto", taken)
+		selectOutbounds = append([]string{autoTag}, selectOutbounds...)
+		selectDefault = autoTag
+		var err error
+		auto, err = json.Marshal(singboxURLTest{
+			Type: "urltest", Tag: autoTag, Outbounds: slices.Clone(tags), URL: "https://www.gstatic.com/generate_204", Interval: "5m", Tolerance: 50,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	sel, _ := json.Marshal(singboxSelector{Type: "selector", Tag: group, Outbounds: append(selectOutbounds, singboxDirectTag), Default: selectDefault})
 
 	cfg := singboxConfig{
 		Log:      singboxLog{Level: "warn"},
@@ -176,7 +202,11 @@ func (p singboxProfile) build() ([]byte, error) {
 			Servers: []dns.SingboxServer{{Type: "local", Tag: dns.SingboxLocalTag}}, Final: dns.SingboxLocalTag, Strategy: "ipv4_only",
 		}
 	}
-	cfg.Outbounds = append(append([]json.RawMessage{sel}, servers...), singboxDirect())
+	if len(auto) > 0 {
+		cfg.Outbounds = append(append([]json.RawMessage{sel, auto}, servers...), singboxDirect())
+	} else {
+		cfg.Outbounds = append(append([]json.RawMessage{sel}, servers...), singboxDirect())
+	}
 	return json.Marshal(cfg)
 }
 
@@ -209,7 +239,7 @@ func (p singboxProfile) placeholder(note string) ([]byte, error) {
 func (h *handler) writeSingbox(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
 	title := h.title(set, b)
-	p := singboxProfile{title: title, lines: v.Lines, log: h.cfg.Log, note: h.appNote(v, b.Language, plugin.FormatSingbox), none: noServersNote(b.Language)}
+	p := singboxProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), log: h.cfg.Log, note: h.appNote(v, b.Language, plugin.FormatSingbox), none: noServersNote(b.Language)}
 	if p.note == "" {
 		p.preset = h.linkPreset(r.Context(), v)
 		if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {

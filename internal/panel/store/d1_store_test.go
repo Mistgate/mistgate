@@ -189,6 +189,26 @@ func TestD1StoreSmoke(t *testing.T) {
 	}
 }
 
+func TestD1SubscriptionAutoSelectSettingRoundTrips(t *testing.T) {
+	binding := js.Global().Get("__d1")
+	binding.Call("__reset")
+	st, err := OpenD1(context.Background(), binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	for _, value := range []string{`{"link_auto_select":true}`, `{"link_auto_select":false}`, `{"title":"old settings"}`} {
+		if err := st.SetSettings(ctx, map[string]string{"subscription_settings": value}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.Setting(ctx, "subscription_settings")
+		if err != nil || got != value {
+			t.Fatalf("D1 subscription_settings = %q, %v; want %q", got, err, value)
+		}
+	}
+}
+
 func TestD1AssistantBudgetSettingsAndConversationBehavior(t *testing.T) {
 	ctx := context.Background()
 	st := openD1Store(t)

@@ -343,6 +343,100 @@ func TestSingboxGolden(t *testing.T) {
 	}
 }
 
+func TestSingboxAutoSelect(t *testing.T) {
+	tests := []struct {
+		name  string
+		auto  bool
+		names []string
+	}{
+		{name: "on with hostile names and Auto collision", auto: true, names: []string{"Auto", "node, \"#1", "- yaml: [special]\nname: injected"}},
+		{name: "on with one server", auto: true, names: []string{"de1"}},
+		{name: "off", auto: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var lines, names []string
+			preset := docPresets[0].preset
+			if tc.name == "off" {
+				lines, names = fixtures(t, singboxFragments), jsonNames
+			} else {
+				names = tc.names
+				for range names {
+					lines = append(lines, fixture(t, singboxFragments[0]))
+				}
+			}
+			b, err := (singboxProfile{title: "Example VPN", lines: lines, names: names, preset: preset, autoSelect: tc.auto}).build()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.name == "off" {
+				baseline, err := os.ReadFile(filepath.Join("testdata", "singbox_standard.json"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var compact bytes.Buffer
+				if err := json.Compact(&compact, baseline); err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(b, compact.Bytes()) {
+					t.Fatalf("off profile differs from today's fixture:\n%s", b)
+				}
+				return
+			}
+			m := decodeObject(t, b)
+			out := m["outbounds"].([]any)
+			selector := out[0].(map[string]any)
+			if len(names) == 1 {
+				if len(out) != 3 || selector["default"] != names[0] || !slices.Equal(anyStrings(t, selector["outbounds"]), []string{names[0], "direct"}) {
+					t.Errorf("one-server outbounds = %v", out)
+				}
+				return
+			}
+			auto := out[1].(map[string]any)
+			autoTag := auto["tag"].(string)
+			if len(out) != len(names)+3 || auto["type"] != "urltest" || autoTag == "Auto" ||
+				selector["default"] != autoTag || !slices.Equal(anyStrings(t, selector["outbounds"]), append([]string{autoTag}, append(names, "direct")...)) ||
+				!slices.Equal(anyStrings(t, auto["outbounds"]), names) {
+				t.Fatalf("selector=%v urltest=%v outbounds=%v", selector, auto, out)
+			}
+			if auto["url"] != "https://www.gstatic.com/generate_204" || auto["interval"] != "5m" || auto["tolerance"] != float64(50) {
+				t.Errorf("urltest settings = %v", auto)
+			}
+			seen := map[string]bool{}
+			for _, tag := range tagsOf(t, out) {
+				if seen[tag] {
+					t.Errorf("duplicate outbound tag %q", tag)
+				}
+				seen[tag] = true
+			}
+			serverTags := map[string]bool{}
+			for _, tag := range anyStrings(t, auto["outbounds"]) {
+				serverTags[tag] = true
+			}
+			if serverTags[autoTag] || auto["outbounds"].([]any)[1] != "node, \"#1" || auto["outbounds"].([]any)[2] != "- yaml: [special]\nname: injected" {
+				t.Errorf("hostile scalar values changed or collided: selector=%v urltest=%v", selector, auto)
+			}
+		})
+	}
+}
+
+func anyStrings(t *testing.T, v any) []string {
+	t.Helper()
+	x, ok := v.([]any)
+	if !ok {
+		t.Fatalf("%T is not a JSON array", v)
+	}
+	out := make([]string, len(x))
+	for i, item := range x {
+		var ok bool
+		out[i], ok = item.(string)
+		if !ok {
+			t.Fatalf("array item %d is %T, not a string", i, item)
+		}
+	}
+	return out
+}
+
 // checkSingboxDoc is what every document of the sing-box format has to look like, whatever the preset.
 func checkSingboxDoc(t *testing.T, b []byte, names []string, preset *dns.Preset) {
 	t.Helper()

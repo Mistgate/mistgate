@@ -18,7 +18,7 @@ func TestSingboxCoreAcceptsTheDocuments(t *testing.T) {
 	lines := fixtures(t, singboxFragments)
 	for _, c := range docPresets {
 		t.Run(c.name, func(t *testing.T) {
-			b, err := singboxProfile{title: "Example VPN", lines: lines, names: jsonNames, preset: c.preset}.build()
+			b, err := singboxProfile{title: "Example VPN", lines: lines, names: jsonNames, preset: c.preset, autoSelect: true}.build()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -27,7 +27,7 @@ func TestSingboxCoreAcceptsTheDocuments(t *testing.T) {
 	}
 	for _, c := range adsDocPresets { // the predefined DNS rule and the reject rule of BlockAds (sing-box 1.12+)
 		t.Run(c.name, func(t *testing.T) {
-			b, err := singboxProfile{title: "Example VPN", lines: lines, names: jsonNames, preset: c.preset}.build()
+			b, err := singboxProfile{title: "Example VPN", lines: lines, names: jsonNames, preset: c.preset, autoSelect: true}.build()
 			if err != nil {
 				t.Fatal(err)
 			}

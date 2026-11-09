@@ -53,6 +53,8 @@ message SubscriptionSettings {
   // AmneziaWG servers in what the subscription link hands out (today only the Mihomo profile carries them).
   // Absent = true: settings stored before this switch existed keep today's behaviour.
   optional bool link_awg = 14;
+  // Include automatic server selection in Mihomo and sing-box subscription profiles; absent means on.
+  optional bool link_auto_select = 15;
 }
 
 // The ping-type header Happ is sent (only Happ, only when set), with ping-result: time (the delay in ms, not an icon).

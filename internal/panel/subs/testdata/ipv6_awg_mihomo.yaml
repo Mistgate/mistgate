@@ -111,11 +111,24 @@ proxy-groups:
   - name: "Mistgate"
     type: select
     proxies:
+      - "Auto"
       - "p"
       - "p · IPv6"
       - "awg31"
       - "awg31 · IPv6"
       - "DIRECT"
+  - name: "Auto"
+    type: url-test
+    proxies:
+      - "p"
+      - "p · IPv6"
+      - "awg31"
+      - "awg31 · IPv6"
+    url: "https://www.gstatic.com/generate_204"
+    interval: 300
+    tolerance: 50
+    lazy: true
+    timeout: 5000
 dns:
   enable: true
   ipv6: false

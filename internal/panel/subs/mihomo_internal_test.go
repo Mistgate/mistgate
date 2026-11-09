@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -79,9 +80,14 @@ func cnSplit() *dns.Preset {
 type profileDoc struct {
 	Proxies []map[string]any `yaml:"proxies"`
 	Groups  []struct {
-		Name    string   `yaml:"name"`
-		Type    string   `yaml:"type"`
-		Proxies []string `yaml:"proxies"`
+		Name      string   `yaml:"name"`
+		Type      string   `yaml:"type"`
+		Proxies   []string `yaml:"proxies"`
+		URL       string   `yaml:"url"`
+		Interval  int      `yaml:"interval"`
+		Tolerance int      `yaml:"tolerance"`
+		Lazy      bool     `yaml:"lazy"`
+		Timeout   int      `yaml:"timeout"`
 	} `yaml:"proxy-groups"`
 	DNS   map[string]any `yaml:"dns"`
 	Rules []string       `yaml:"rules"`
@@ -128,6 +134,82 @@ func TestMihomoProfileGolden(t *testing.T) {
 	ns := d.DNS["nameserver"].([]any)
 	if ns[0] != "1.1.1.1#Example%20VPN" {
 		t.Errorf("nameserver = %v", ns)
+	}
+}
+
+func TestMihomoAutoSelect(t *testing.T) {
+	tests := []struct {
+		name  string
+		auto  bool
+		names []string
+	}{
+		{name: "on with hostile names and Auto collision", auto: true, names: []string{"Auto", "node, #1", "- yaml: [special]\nname: injected"}},
+		{name: "on with one server", auto: true, names: []string{"de1"}},
+		{name: "off", auto: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lines, names := []string{fixture(t, hy2Line)}, tc.names
+			if tc.name == "off" {
+				lines = []string{fixture(t, hy2Line), fixture(t, awgLine)}
+				want, err := os.ReadFile(filepath.Join("testdata", "mihomo_profile.yaml"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var baseline profileDoc
+				if err := yaml.Unmarshal(want, &baseline); err != nil {
+					t.Fatal(err)
+				}
+				for _, proxy := range baseline.Proxies {
+					names = append(names, proxy["name"].(string))
+				}
+			}
+			for len(lines) < len(names) {
+				lines = append(lines, fixture(t, hy2Line))
+			}
+			b, err := (mihomoProfile{title: "Example VPN", lines: lines, names: names, preset: ruSplit(), autoSelect: tc.auto}).build()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.name == "off" {
+				want, _ := os.ReadFile(filepath.Join("testdata", "mihomo_profile.yaml"))
+				if !bytes.Equal(b, want) {
+					t.Fatalf("off profile differs from today's fixture:\n%s", b)
+				}
+				return
+			}
+			d := parseProfile(t, b)
+			wantGroups := 1
+			if len(names) > 1 {
+				wantGroups = 2
+			}
+			if len(d.Groups) != wantGroups {
+				t.Fatalf("groups = %+v", d.Groups)
+			}
+			if len(names) == 1 {
+				if d.Groups[0].Type != "select" || !slices.Equal(d.Groups[0].Proxies, []string{names[0], "DIRECT"}) {
+					t.Errorf("one-server group = %+v", d.Groups[0])
+				}
+				return
+			}
+			selectGroup, autoGroup := d.Groups[0], d.Groups[1]
+			if selectGroup.Type != "select" || autoGroup.Type != "url-test" ||
+				len(d.Proxies) != len(names) || len(autoGroup.Proxies) != len(names) ||
+				!slices.Equal(selectGroup.Proxies[1:len(selectGroup.Proxies)-1], autoGroup.Proxies) ||
+				selectGroup.Proxies[0] != autoGroup.Name || selectGroup.Proxies[len(selectGroup.Proxies)-1] != "DIRECT" {
+				t.Fatalf("groups = %+v; proxies = %+v", d.Groups, d.Proxies)
+			}
+			if autoGroup.URL != "https://www.gstatic.com/generate_204" || autoGroup.Interval != 300 || autoGroup.Tolerance != 50 || !autoGroup.Lazy || autoGroup.Timeout != 5000 {
+				t.Errorf("url-test settings = %+v", autoGroup)
+			}
+			seen := map[string]bool{}
+			for _, proxy := range d.Proxies {
+				seen[proxy["name"].(string)] = true
+			}
+			if seen[autoGroup.Name] || autoGroup.Proxies[0] != "Auto" || autoGroup.Proxies[1] != "node, #1" || autoGroup.Proxies[2] != "- yaml: [special]\nname: injected" {
+				t.Errorf("hostile scalar values changed or collided: group=%+v proxies=%+v", autoGroup, d.Proxies)
+			}
+		})
 	}
 }
 

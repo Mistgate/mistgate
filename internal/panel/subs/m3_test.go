@@ -70,6 +70,7 @@ type profile struct {
 	Proxies []map[string]any `yaml:"proxies"`
 	Groups  []struct {
 		Name    string   `yaml:"name"`
+		Type    string   `yaml:"type"`
 		Proxies []string `yaml:"proxies"`
 	} `yaml:"proxy-groups"`
 	DNS   map[string]any `yaml:"dns"`
@@ -144,7 +145,9 @@ func TestMihomoSubscription(t *testing.T) {
 	if nh != "p" || nw != "awg31" {
 		t.Errorf("names = %q %q", nh, nw)
 	}
-	if len(p.Groups) != 1 || p.Groups[0].Name != title || strings.Join(p.Groups[0].Proxies, "|") != p.Proxies[0]["name"].(string)+"|"+p.Proxies[1]["name"].(string)+"|DIRECT" {
+	if len(p.Groups) != 2 || p.Groups[0].Name != title || p.Groups[0].Type != "select" || p.Groups[0].Proxies[0] != p.Groups[1].Name ||
+		p.Groups[1].Type != "url-test" || strings.Join(p.Groups[0].Proxies, "|") != p.Groups[1].Name+"|"+p.Proxies[0]["name"].(string)+"|"+p.Proxies[1]["name"].(string)+"|DIRECT" ||
+		strings.Join(p.Groups[1].Proxies, "|") != p.Proxies[0]["name"].(string)+"|"+p.Proxies[1]["name"].(string) {
 		t.Errorf("groups = %+v (title %q)", p.Groups, title)
 	}
 	if p.Rules[len(p.Rules)-1] != "MATCH,"+title || p.Rules[0] != "DOMAIN-SUFFIX,ru,DIRECT" {
@@ -381,8 +384,14 @@ func TestSubscriptionOrderByLocationAndProtocol(t *testing.T) {
 	if !slices.Equal(gotProxies, wantProxies) {
 		t.Errorf("Mihomo proxy order = %v, want %v", gotProxies, wantProxies)
 	}
-	wantGroup := append(slices.Clone(wantProxies), "DIRECT")
-	if len(p.Groups) != 1 || !slices.Equal(p.Groups[0].Proxies, wantGroup) {
+	if len(p.Groups) != 2 {
+		t.Fatalf("Mihomo groups = %+v, want select and Auto", p.Groups)
+	}
+	wantAutoGroup := slices.Clone(wantProxies)
+	wantGroup := append([]string{p.Groups[1].Name}, wantProxies...)
+	wantGroup = append(wantGroup, "DIRECT")
+	if p.Groups[0].Type != "select" || p.Groups[1].Type != "url-test" ||
+		!slices.Equal(p.Groups[0].Proxies, wantGroup) || !slices.Equal(p.Groups[1].Proxies, wantAutoGroup) {
 		t.Errorf("Mihomo select group = %+v, want %v", p.Groups, wantGroup)
 	}
 
@@ -552,8 +561,11 @@ func TestMihomoHostileNames(t *testing.T) {
 	_, tok := m.newUser("al\"ice - x", nil)
 	rec := fetch(h, "/"+tok, mihomoUA)
 	p := parseYAML(t, rec.Body.Bytes())
-	if len(p.Proxies) != 2 || len(p.Groups) != 1 || len(p.Rules) < 2 {
+	if len(p.Proxies) != 2 || len(p.Groups) != 2 || len(p.Rules) < 2 {
 		t.Fatalf("proxies=%d groups=%d rules=%d\n%s", len(p.Proxies), len(p.Groups), len(p.Rules), rec.Body.String())
+	}
+	if p.Groups[0].Type != "select" || p.Groups[1].Type != "url-test" || p.Groups[0].Proxies[0] != p.Groups[1].Name {
+		t.Errorf("automatic selection groups = %+v", p.Groups)
 	}
 	for _, px := range p.Proxies {
 		if px["type"] == "direct" || strings.Contains(px["name"].(string), "\n") {

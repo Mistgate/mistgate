@@ -60,6 +60,9 @@ func TestSubscriptionSettingsAuditIncludesLinkAWG(t *testing.T) {
 		if got, ok := params["link_awg"].(bool); !ok || got {
 			t.Fatalf("audit link_awg = %v; want false", params["link_awg"])
 		}
+		if got, ok := params["link_auto_select"].(bool); !ok || !got {
+			t.Fatalf("audit link_auto_select = %v; want true by default", params["link_auto_select"])
+		}
 		return
 	}
 	t.Fatal("subscription settings audit row is missing")

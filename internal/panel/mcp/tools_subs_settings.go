@@ -261,9 +261,10 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 
 type subsLinkLimitsArgs struct {
 	ReasonField
-	Mode         *string `json:"mode,omitempty" jsonschema:"track counts only; enforce refuses new devices over the limit; strict also refuses apps without a device id"`
-	LinkAWG      *bool   `json:"link_awg,omitempty" jsonschema:"include AmneziaWG servers in subscription link apps"`
-	SettingsHash string  `json:"settings_hash,omitempty" jsonschema:"-"`
+	Mode           *string `json:"mode,omitempty" jsonschema:"track counts only; enforce refuses new devices over the limit; strict also refuses apps without a device id"`
+	LinkAWG        *bool   `json:"link_awg,omitempty" jsonschema:"include AmneziaWG servers in subscription link apps"`
+	LinkAutoSelect *bool   `json:"link_auto_select,omitempty" jsonschema:"include automatic server selection in Mihomo and sing-box subscription profiles"`
+	SettingsHash   string  `json:"settings_hash,omitempty" jsonschema:"-"`
 }
 
 var linkModes = map[string]adminv1.LinkDeviceLimit{
@@ -287,10 +288,10 @@ func linkModeWord(s *adminv1.SubscriptionSettings) string {
 
 var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 	name: "subscription_link_limits_set", min: ProfileOperator, danger: true, procs: settingsProcs,
-	desc: "Set device-limit handling for subscription link apps and whether link apps include AmneziaWG entries. Strict mode refuses shared no-device-id users; turning link_awg off drops their link keys on the next fetch. Always waits for owner approval.",
+	desc: "Set device-limit handling for subscription link apps, whether link apps include AmneziaWG entries, and whether Mihomo and sing-box profiles include automatic server selection. Strict mode refuses shared no-device-id users; turning link_awg off drops their link keys on the next fetch. Always waits for owner approval.",
 	plan: func(c *call, a subsLinkLimitsArgs) (*planned, error) {
-		if a.Mode == nil && a.LinkAWG == nil {
-			return nil, errors.New("give mode, link_awg, or both")
+		if a.Mode == nil && a.LinkAWG == nil && a.LinkAutoSelect == nil {
+			return nil, errors.New("give mode, link_awg, link_auto_select, or a combination")
 		}
 		cur, err := c.subscriptionSnapshot()
 		if err != nil {
@@ -325,6 +326,13 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 				}
 			}
 		}
+		if a.LinkAutoSelect != nil {
+			before := subsettings.LinkAutoSelect(cur.settings)
+			if before != *a.LinkAutoSelect {
+				next.LinkAutoSelect = a.LinkAutoSelect
+				facts = append(facts, changeFact("link_auto_select", strconv.FormatBool(before)+" -> "+strconv.FormatBool(*a.LinkAutoSelect), strconv.FormatBool(before), strconv.FormatBool(*a.LinkAutoSelect)))
+			}
+		}
 		if len(facts) == 0 {
 			return nil, errors.New("nothing to change: the settings already look like this")
 		}
@@ -332,7 +340,7 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 			return nil, err
 		}
 		a.SettingsHash = cur.hash
-		return &planned{Summary: "Change link-app device-limit handling or AmneziaWG links. The owner must approve this shared change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
+		return &planned{Summary: "Change link-app device-limit handling, AmneziaWG links, or automatic server selection. The owner must approve this shared change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
 	},
 	apply: func(c *call, a subsLinkLimitsArgs, _ Plan) (done, error) {
 		cur, err := c.subscriptionSnapshot()
@@ -349,6 +357,9 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 		}
 		if a.LinkAWG != nil {
 			next.LinkAwg = a.LinkAWG
+		}
+		if a.LinkAutoSelect != nil {
+			next.LinkAutoSelect = a.LinkAutoSelect
 		}
 		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
 			return done{}, err
