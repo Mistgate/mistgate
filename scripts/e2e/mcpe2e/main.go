@@ -409,9 +409,18 @@ func runExternalSweep(e *env, s *sdk.ClientSession) {
 		if a == nil {
 			a = map[string]any{}
 		}
-		_, isErr, err := e.call(s, name, a)
+		text, isErr, err := e.call(s, name, a)
+		// the live check's gate refuses a node whose checks ran in the last 30 s, the panel's own rounds included: wait it out once
+		if isErr && (strings.Contains(text, "checks_recent") || strings.Contains(text, "less than 30 seconds ago")) {
+			time.Sleep(31 * time.Second)
+			text, isErr, err = e.call(s, name, a)
+		}
 		ok := err == nil && (!isErr || needsFixture[name])
-		e.check(name, ok, "tool error=%v protocol error=%v", isErr, err != nil)
+		detail := ""
+		if isErr && !ok {
+			detail = ": " + text[:min(len(text), 200)]
+		}
+		e.check(name, ok, "tool error=%v protocol error=%v%s", isErr, err != nil, detail)
 		time.Sleep(500 * time.Millisecond) // the token allows 120 MCP requests per minute
 	}
 }
