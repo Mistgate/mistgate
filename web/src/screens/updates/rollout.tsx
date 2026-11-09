@@ -28,16 +28,19 @@ function size(n: number): string {
   return `${(n / 1024 ** 2).toFixed(1)} MiB`;
 }
 
+/** A node whose update is under way and reports how far it got: its chip takes the whole row for the bar. */
+const showsProgress = (step: Step) => !!step.downloadPhase && step.state === StepState.SENT;
+
 function DownloadProgress({ step }: { step: Step }) {
   const t = useT();
-  if (!step.downloadPhase || step.state !== StepState.SENT) return null;
+  if (!showsProgress(step)) return null;
   const total = step.totalBytes;
   const done = Math.min(step.downloadedBytes, total || step.downloadedBytes);
   const percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
   const downloading = step.downloadPhase === "downloading";
   return (
     <div
-      className="basis-full flex min-w-48 max-w-sm flex-col gap-1 text-[11px] text-muted sm:ms-auto sm:basis-auto"
+      className="flex min-w-48 basis-full flex-col gap-1 text-[11px] text-muted sm:ms-2 sm:flex-1 sm:basis-0"
       role="progressbar"
       aria-label={t("up.download.aria", { percent })}
       aria-valuemin={0}
@@ -68,7 +71,7 @@ function NodeChip({ step, toVersion }: { step: Step; toVersion: string }) {
   const info = stepInfo(step.state);
   const label = step.state === StepState.PASSED ? t("up.step.to", { version: toVersion }) : t(info.key);
   return (
-    <li className="flex min-h-7 flex-wrap items-center gap-2 rounded-ctl border border-line bg-surface-2 px-2.5 py-1 text-xs">
+    <li className={cx("flex min-h-7 flex-wrap items-center gap-2 rounded-ctl border border-line bg-surface-2 px-2.5 py-1 text-xs", showsProgress(step) && "w-full")}>
       <StatusDot kind={info.kind} />
       <Link to="/nodes/$id" params={{ id: step.nodeId }} className="font-mono font-bold hover:underline">
         {step.nodeName}
