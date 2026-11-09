@@ -607,7 +607,7 @@ func encodeOperators(input []Operator, ipv4 []IPv4Range, ipv6 []IPv6Range) ([]as
 			return nil, nil, fmt.Errorf("asndb: duplicate or reserved ASN %d", operator.ASN)
 		}
 		if _, ok := used[operator.ASN]; !ok {
-			return nil, nil, fmt.Errorf("asndb: ASN %d has a name but no routed range", operator.ASN)
+			continue // its only ranges lost a shared IPv6 /64 to another ASN: a name nothing points to
 		}
 		if !utf8.ValidString(operator.Name) || operator.Name == "" || len(operator.Name) > maxOperatorBytes || hasControl([]byte(operator.Name)) || containsAddressLike(operator.Name) {
 			return nil, nil, fmt.Errorf("asndb: ASN %d has an invalid or unclean operator name", operator.ASN)

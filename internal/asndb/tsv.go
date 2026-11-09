@@ -152,10 +152,12 @@ func AppendTSV(r io.Reader, family Family, table *Table) error {
 				if start < prev6.Start {
 					return fmt.Errorf("asndb: TSV line %d is unsorted", lineNo)
 				}
-				if start <= prev6.End {
-					if asn != prev6.ASN {
-						return fmt.Errorf("asndb: TSV line %d assigns a different ASN within the same IPv6 /64", lineNo)
-					}
+				if start <= prev6.End && asn != prev6.ASN {
+					// Two ASNs share this /64: the source splits it (a /127 of a transit link, an unrouted hole). The table
+					// keeps one ASN per /64, the one that covers more of it, and never lets unrouted space (ASN 0) win.
+					shareV6(table, table.sourceV6Start, table.sourceV6End, startAddr, endAddr, asn)
+					prev6 = &table.IPv6[len(table.IPv6)-1]
+				} else if start <= prev6.End {
 					if end > prev6.End {
 						table.IPv6[len(table.IPv6)-1].End = end
 						prev6.End = end
@@ -198,6 +200,43 @@ func AppendTSV(r io.Reader, family Family, table *Table) error {
 	return nil
 }
 
+// shareV6 settles a /64 that the previous source line (prevStart..prevEnd, already the last range of the table) and the
+// next one (start..end, ASN asn) both reach into. Coverage is counted in addresses of that /64.
+func shareV6(table *Table, prevStart, prevEnd, start, end netip.Addr, asn uint32) {
+	last := len(table.IPv6) - 1
+	prev := table.IPv6[last]
+	shared := prev.End // the /64 of the previous line's end, and of the next line's start
+	low := func(a netip.Addr) uint64 { b := a.As16(); return binary.BigEndian.Uint64(b[8:]) }
+	high := func(a netip.Addr) uint64 { b := a.As16(); return binary.BigEndian.Uint64(b[:8]) }
+	prevLo := uint64(0)
+	if high(prevStart) == shared {
+		prevLo = low(prevStart)
+	}
+	prevCover := low(prevEnd) - prevLo // one less than the count; both sides alike, so the comparison holds
+	nextHi := ^uint64(0)
+	if high(end) == shared {
+		nextHi = low(end)
+	}
+	nextCover := nextHi - low(start)
+	endHigh := high(end)
+	nextWins := asn != 0 && (prev.ASN == 0 || nextCover > prevCover)
+	if !nextWins {
+		if endHigh > shared {
+			table.IPv6 = append(table.IPv6, IPv6Range{Start: shared + 1, End: endHigh, ASN: asn})
+		}
+		return
+	}
+	if prev.Start == shared {
+		table.IPv6[last].ASN = asn
+		if endHigh > table.IPv6[last].End {
+			table.IPv6[last].End = endHigh
+		}
+		return
+	}
+	table.IPv6[last].End = shared - 1
+	table.IPv6 = append(table.IPv6, IPv6Range{Start: shared, End: endHigh, ASN: asn})
+}
+
 func (table *Table) addOperator(operator Operator) error {
 	if table.operators == nil {
 		table.operators = make(map[uint32]Operator, len(table.ASNs))
@@ -236,7 +275,8 @@ func parseIPv4(value string) (uint32, error) {
 
 func parseCountry(value string) (string, error) {
 	value = strings.ToUpper(value)
-	if value == "" || value == "-" || value == "--" || value == "??" {
+	// iptoasn writes "None" on the lines of unrouted space (ASN 0) and "Unknown" where the registry gives no country.
+	if value == "" || value == "-" || value == "--" || value == "??" || value == "NONE" || value == "UNKNOWN" {
 		return "", nil
 	}
 	if len(value) != 2 || value[0] < 'A' || value[0] > 'Z' || value[1] < 'A' || value[1] > 'Z' {
