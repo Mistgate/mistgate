@@ -200,8 +200,8 @@ func TestApplyDuplicateRequestDoesNotReportFailure(t *testing.T) {
 		u.activeMu.Unlock()
 	}()
 	res, finish := u.Apply(context.Background(), e.req(manifest, sig), src)
-	if finish != nil || res.Error != "busy" {
-		t.Fatalf("duplicate apply = (%+v, %v), want busy without finish", res, finish)
+	if finish != nil || res != nil {
+		t.Fatalf("duplicate apply = (%+v, %v), want no result and no finish", res, finish)
 	}
 	for _, p := range src.progress {
 		if p.Phase == "failed" {
@@ -348,10 +348,11 @@ func TestApplySwapsAndMarks(t *testing.T) {
 	if e.execCount() != 1 || e.execs[0] != e.exe {
 		t.Errorf("execs = %v", e.execs)
 	}
-	// One update at a time: the process is about to be replaced.
+	// One update at a time: the process is about to be replaced. A redelivery of the same
+	// request gets no answer at all, busy or otherwise.
 	res2, _ := u.Apply(context.Background(), e.req(man, sig), src)
-	if res2.Error != "busy" {
-		t.Errorf("second apply = %v", res2)
+	if res2 != nil {
+		t.Errorf("second apply = %v, want none", res2)
 	}
 }
 

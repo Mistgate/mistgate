@@ -387,6 +387,11 @@ func (a *Agent) rollbackUpdate(s *session, r *pb.RollbackAgent) {
 }
 
 func (a *Agent) finishCommand(s *session, res *pb.CommandResult, fin update.Finish) {
+	if res == nil {
+		// A redelivery of a command that is still running: it gets no answer, the original
+		// run sends the terminal one for that request id.
+		return
+	}
 	if fin == nil {
 		s.send(cmdResult(res))
 		return

@@ -554,11 +554,6 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		u.log.Warn("update refused", "code", res.Error, "err", err)
 		return res, nil
 	}
-	busyResult := func() (*pb.CommandResult, Finish) {
-		res.Error = "busy"
-		res.Detail = "another update or rollback is in progress"
-		return res, nil
-	}
 	if u.cfg.Key == nil {
 		return fail(step("unsigned_build", errors.New("unsigned build: update by hand")))
 	}
@@ -583,10 +578,10 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		duplicate := req.RequestId != "" && req.RequestId == u.activeRequest
 		u.activeMu.Unlock()
 		if duplicate {
-			// A redelivery of the same command is still in flight. Do not emit a
-			// terminal frame for it: that would poison the progress stream of the
-			// original request.
-			return busyResult()
+			// A redelivery of the same command is still in flight. Send nothing: the original
+			// run answers this request id when it finishes, and any terminal frame from here
+			// would end it while the download is still going.
+			return nil, nil
 		}
 		return fail(step("busy", errors.New("another update or rollback is in progress")))
 	}
