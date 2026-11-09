@@ -328,8 +328,9 @@ func TestCheckRunsRaiseAndCloseTheirAlerts(t *testing.T) {
 	}
 	id := resp.Msg.Task.Id
 	f.rt.set("fleet_digest", `{"totals":{"nodes_problem_now":2},"problem_nodes":[{"name":"nl1"}]}`, false)
-	// created at 10:00:00, the task's first slot is 10:00 plus its own delay (under 90 s)
-	f.advance(2 * time.Minute)
+	// created at 10:00:00: the first slot is 10:00 plus the task's own delay (under 90 s), or 10:15 when that delay is 0
+	created, _ := f.st.ScheduledTask(context.Background(), id)
+	f.advance(created.NextRunAt.Sub(f.now()) + time.Second)
 	f.runDue(t)
 	runs, _ := f.st.ScheduledTaskRuns(context.Background(), id, 10)
 	if len(runs) != 1 || runs[0].Status != "problem" || runs[0].Trigger != "schedule" || !strings.Contains(runs[0].Summary, "totals.nodes_problem_now = 2") {
@@ -438,7 +439,8 @@ func TestAssistantTaskRuns(t *testing.T) {
 	if _, err = r.RunTaskNow(f.as(f.owner), connect.NewRequest(&tasksv1.RunTaskNowRequest{Id: id})); code(err) != "too_soon" {
 		t.Fatalf("second manual run: %v", err)
 	}
-	f.advance(6 * time.Minute)
+	// past the next slot whatever the task's jitter: its id gives 0 to 90 s, and with 0 the slot after 10:00 is 10:15
+	f.advance(17 * time.Minute)
 	f.svc.cfg.Assistant = nil
 	f.runDue(t)
 	runs, _ := f.st.ScheduledTaskRuns(context.Background(), id, 1)
