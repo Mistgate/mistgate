@@ -4,6 +4,12 @@ go 1.27
 
 toolchain go1.27.3
 
+// Go opens every listener with Multipath TCP by default since 1.24. CVE-2026-98432 (a use-after-free in the kernel's
+// IPv4 TCP, remote root shown through an MPTCP listener) makes that the way in, and nothing here needs MPTCP: the
+// panel, the node agent and the Xray and Hysteria listeners it hosts open plain TCP sockets. Xray did the same in
+// v26.10.31.
+godebug multipathtcp=0
+
 tool github.com/bufbuild/buf/cmd/buf
 
 require (
