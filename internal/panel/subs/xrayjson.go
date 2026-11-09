@@ -9,6 +9,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/subsettings"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -23,11 +24,14 @@ import (
 // on the apps' queries and not only on routing.
 
 const (
-	xraySocksPort = 10808
-	xrayProxyTag  = "proxy"
-	xrayDirectTag = "direct"
-	xrayDNSOutTag = "dns-out"
-	xrayBlockTag  = "block"
+	xraySocksPort       = 10808
+	xrayProxyTag        = "proxy"
+	xrayDirectTag       = "direct"
+	xrayDNSOutTag       = "dns-out"
+	xrayBlockTag        = "block"
+	xrayAutoProxyPrefix = "proxy-"
+	xrayAutoBalancerTag = "auto"
+	xrayAutoProbeURL    = "https://www.gstatic.com/generate_204"
 )
 
 // xrayPrivate are the destinations that never go through the proxy; written out, not geoip:private, so that no geo file is needed.
@@ -35,9 +39,10 @@ var xrayPrivate = []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127
 
 // xrayProfile is what the assembler needs about one user's subscription.
 type xrayProfile struct {
-	lines  []string // outbounds, each one JSON object without a tag (plugin.Fragment.Data)
-	names  []string // the remarks of each line, parallel to lines ("" or missing = a numbered default)
-	preset *dns.Preset
+	lines      []string // outbounds, each one JSON object without a tag (plugin.Fragment.Data)
+	names      []string // the remarks of each line, parallel to lines ("" or missing = a numbered default)
+	preset     *dns.Preset
+	autoSelect bool
 	// note: the one entry that says why there are no servers (no access, a refused device); "" = build the servers.
 	// none: the entry for a person whose servers all failed to render (never an empty answer).
 	note, none string
@@ -45,12 +50,20 @@ type xrayProfile struct {
 }
 
 type xrayConfig struct {
-	Remarks   string            `json:"remarks"`
-	Log       xrayLog           `json:"log"`
-	DNS       *dns.XraySection  `json:"dns,omitempty"`
-	Inbounds  []xrayInbound     `json:"inbounds"`
-	Outbounds []json.RawMessage `json:"outbounds"`
-	Routing   xrayRouting       `json:"routing"`
+	Remarks     string            `json:"remarks"`
+	Log         xrayLog           `json:"log"`
+	DNS         *dns.XraySection  `json:"dns,omitempty"`
+	Observatory *xrayObservatory  `json:"observatory,omitempty"`
+	Inbounds    []xrayInbound     `json:"inbounds"`
+	Outbounds   []json.RawMessage `json:"outbounds"`
+	Routing     xrayRouting       `json:"routing"`
+}
+
+type xrayObservatory struct {
+	SubjectSelector   []string `json:"subjectSelector"`
+	ProbeURL          string   `json:"probeURL"`
+	ProbeInterval     string   `json:"probeInterval"`
+	EnableConcurrency bool     `json:"enableConcurrency"`
 }
 
 type xrayLog struct {
@@ -78,8 +91,20 @@ type xraySniffing struct {
 }
 
 type xrayRouting struct {
-	DomainStrategy string     `json:"domainStrategy"`
-	Rules          []xrayRule `json:"rules"`
+	DomainStrategy string         `json:"domainStrategy"`
+	Rules          []xrayRule     `json:"rules"`
+	Balancers      []xrayBalancer `json:"balancers,omitempty"`
+}
+
+type xrayBalancer struct {
+	Tag         string               `json:"tag"`
+	Selector    []string             `json:"selector"`
+	Strategy    xrayBalancerStrategy `json:"strategy"`
+	FallbackTag string               `json:"fallbackTag,omitempty"`
+}
+
+type xrayBalancerStrategy struct {
+	Type string `json:"type"`
 }
 
 type xrayRule struct {
@@ -89,7 +114,8 @@ type xrayRule struct {
 	Domain      []string `json:"domain,omitempty"`
 	Port        string   `json:"port,omitempty"`
 	Network     string   `json:"network,omitempty"`
-	OutboundTag string   `json:"outboundTag"`
+	OutboundTag string   `json:"outboundTag,omitempty"`
+	BalancerTag string   `json:"balancerTag,omitempty"`
 }
 
 func xrayLoopback(tag string, port int) xrayInbound {
@@ -156,6 +182,7 @@ func (p xrayProfile) build() ([]byte, error) {
 		}
 	}
 	var configs []xrayConfig
+	var autoOutbounds []json.RawMessage
 	for i, line := range p.lines {
 		ob, ok := tagged([]byte(line), "protocol", xrayProxyTag)
 		if !ok {
@@ -163,6 +190,12 @@ func (p xrayProfile) build() ([]byte, error) {
 				p.log.Warn("xray json: a rendered outbound was skipped", "index", i)
 			}
 			continue
+		}
+		if p.autoSelect {
+			tag := xrayAutoProxyPrefix + strconv.Itoa(len(configs)+1)
+			if autoOutbound, ok := tagged(ob, "protocol", tag); ok {
+				autoOutbounds = append(autoOutbounds, autoOutbound)
+			}
 		}
 		name := "server " + strconv.Itoa(len(configs)+1)
 		if i < len(p.names) && p.names[i] != "" {
@@ -181,6 +214,36 @@ func (p xrayProfile) build() ([]byte, error) {
 	}
 	if len(configs) == 0 {
 		return xrayPlaceholder(p.none)
+	}
+	if p.autoSelect && len(configs) > 1 {
+		taken := make(map[string]bool, len(configs))
+		for _, c := range configs {
+			taken[c.Remarks] = true
+		}
+		balancerRules := xrayAutoRules(d)
+		auto := xrayConfig{
+			Remarks: uniqueName("Auto", taken), Log: xrayLog{Level: "warning"},
+			Inbounds:  []xrayInbound{xrayLoopback("socks", xraySocksPort)},
+			Outbounds: append(autoOutbounds, outbounds[1:]...),
+			Routing: xrayRouting{
+				DomainStrategy: "AsIs",
+				Rules:          balancerRules,
+				Balancers: []xrayBalancer{{
+					Tag: xrayAutoBalancerTag, Selector: []string{xrayAutoProxyPrefix},
+					// Xray starts probing immediately, but traffic can arrive before the first result. leastPing then has no target, so
+					// fallbackTag routes startup traffic through the first server.
+					Strategy: xrayBalancerStrategy{Type: "leastPing"}, FallbackTag: xrayAutoProxyPrefix + "1",
+				}},
+			},
+			Observatory: &xrayObservatory{
+				SubjectSelector: []string{xrayAutoProxyPrefix}, ProbeURL: xrayAutoProbeURL,
+				ProbeInterval: "5m", EnableConcurrency: true,
+			},
+		}
+		if d != nil {
+			auto.DNS = &d.Section
+		}
+		configs = append([]xrayConfig{auto}, configs...)
 	}
 	return json.Marshal(configs)
 }
@@ -220,6 +283,19 @@ func xrayRules(d *dns.XrayDNS) []xrayRule {
 	return append(rules, xrayRule{Type: "field", Network: "tcp,udp", OutboundTag: xrayProxyTag})
 }
 
+// xrayAutoRules sends only the rules that would use the per-server proxy through the balancer. Direct, DNS and block rules stay
+// bound to their original outbounds.
+func xrayAutoRules(d *dns.XrayDNS) []xrayRule {
+	rules := xrayRules(d)
+	for i := range rules {
+		if rules[i].OutboundTag == xrayProxyTag {
+			rules[i].OutboundTag = ""
+			rules[i].BalancerTag = xrayAutoBalancerTag
+		}
+	}
+	return rules
+}
+
 // xrayPlaceholder is the one entry of a person who gets no server: a config whose remarks say why and whose only outbound is a
 // socks proxy nobody listens on (127.0.0.1 port 1), so it never connects.
 func xrayPlaceholder(note string) ([]byte, error) {
@@ -240,7 +316,7 @@ func xrayPlaceholder(note string) ([]byte, error) {
 // load percentage only for Happ), the dns section of the user's effective preset.
 func (h *handler) writeXrayJSON(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
-	p := xrayProfile{lines: v.Lines, log: h.cfg.Log, note: h.appNote(v, b.Language, plugin.FormatXrayJSON), none: noServersNote(b.Language)}
+	p := xrayProfile{lines: v.Lines, log: h.cfg.Log, autoSelect: subsettings.LinkAutoSelect(set), note: h.appNote(v, b.Language, plugin.FormatXrayJSON), none: noServersNote(b.Language)}
 	if p.note == "" {
 		p.preset = h.linkPreset(r.Context(), v)
 		if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {

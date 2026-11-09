@@ -1486,7 +1486,7 @@ json_secrets() {
 # self-signed) is covered by a probe: a hand-made hy2 outbound with the credentials of the Xray document.
 m3_json() {
   step "tunnels.7 Xray JSON and sing-box: the documents of the subscription run in real clients (Xray, sing-box ${SB_VERSIONS:-1.12.25}), placeholders, DNS"
-  local t0 ver sb i k port label tag src
+  local t0 ver sb i k port label tag src auto_i auto_name want_x_docs
   t0=$(date +%s)
   write_json_helpers
   mk_ns cli7 198.18.57
@@ -1512,6 +1512,8 @@ m3_json() {
   new_user gina "$grp"
   local gina=$U_ID j_url=$U_URL
   want_x=${#profiles[@]} want_s=2
+  want_x_docs=$want_x
+  [ "$want_x" -lt 2 ] || want_x_docs=$((want_x + 1))
   [ -z "$twin" ] || want_s=3 # (REALITY TCP, WS, and the WARP twin)
 
   local -A lab lport
@@ -1531,10 +1533,10 @@ m3_json() {
   }
   docs_ready() {
     jget xray-json 'v2rayNG/1.10.20' "$XF" "$WORK/json-xray.hdr" && jget sing-box 'v2rayNG/1.10.20' "$SF" "$WORK/json-singbox.hdr" \
-      && jq -e --argjson n "$want_x" 'type == "array" and length == $n' "$XF" >/dev/null \
+      && jq -e --argjson n "$want_x_docs" 'type == "array" and length == $n' "$XF" >/dev/null \
       && jq -e --argjson n "$want_s" '[.outbounds[] | select(.type == "hysteria2" or .type == "vless")] | length == $n' "$SF" >/dev/null
   }
-  wait_for 60 "the Xray JSON ($want_x servers) and the sing-box profile ($want_s servers)" docs_ready \
+  wait_for 60 "the Xray JSON ($want_x servers plus Auto when eligible) and the sing-box profile ($want_s servers)" docs_ready \
     || die "the documents are not what the group holds: xray $(jq -c 'if type == "array" then length else "not an array" end' "$XF" 2>&1 | head -c 80), sing-box $(jq -c '[.outbounds[] | .type]' "$SF" 2>&1 | head -c 200)"
   json_secrets "$XF" "$SF"
   jget '' 'SFA (sing-box 1.14.3; language en_US)' "$UF" "$WORK/json-singbox-ua.hdr" || die "the fetch by the sing-box UA failed"
@@ -1552,11 +1554,30 @@ m3_json() {
   json_secrets "$UF"
   [ "$(jq -S . "$SF")" = "$(jq -S . "$UF")" ] || die "the sing-box default rule (UA SFA) did not hand out the same profile as ?format=sing-box"
   [ "$(jq -S . "$SF")" = "$(jq -S . "$GF.json")" ] || die "the gzip body differs from the plain one"
-  pass "fetch: ?format=xray-json (a JSON array of $want_x) and ?format=sing-box, and sing-box by the UA 'SFA (sing-box ...)' without the parameter (the same profile): 200, application/json, no Routing, Subscription-Userinfo present, gzip when accepted and identical once decompressed"
+  pass "fetch: ?format=xray-json (a JSON array of $want_x_docs) and ?format=sing-box, and sing-box by the UA 'SFA (sing-box ...)' without the parameter (the same profile): 200, application/json, no Routing, Subscription-Userinfo present, gzip when accepted and identical once decompressed"
 
   # ---- which server is in which document: the present cells and the absent ones
   local -A in_x in_s
-  for ((i = 0; i < want_x; i++)); do
+  auto_i="" auto_name=""
+  if [ "$want_x" -gt 1 ]; then
+    auto_i=$(jq -r '[to_entries[] | select(any(.value.routing.balancers[]?; .tag == "auto")) | (.key | tonumber)] | if length == 1 then .[0] else empty end' "$XF")
+    [ -n "$auto_i" ] || die "the Xray array does not contain exactly one Auto balancer config"
+    auto_name=$(jq -r --argjson i "$auto_i" '.[$i].remarks' "$XF")
+    [ "$(jq -r '.[0].remarks' "$XF")" = "$auto_name" ] || die "the Xray Auto config is not the first array element"
+    jq -e --argjson i "$auto_i" --argjson n "$want_x" --arg prefix "proxy-" --arg probe "https://www.gstatic.com/generate_204" '
+      .[$i] as $c |
+      [$c.outbounds[] | select(.tag | startswith($prefix)) | .tag] as $proxyTags |
+      [$c.inbounds[].tag, $c.outbounds[].tag, $c.routing.balancers[].tag] as $allTags |
+      ($proxyTags == [range(1; $n + 1) | $prefix + tostring]) and
+      ([$allTags[] | select(startswith($prefix))] == $proxyTags) and
+      ($c.routing.balancers == [{tag:"auto", selector:[$prefix], strategy:{type:"leastPing"}, fallbackTag:"proxy-1"}]) and
+      ($c.observatory.subjectSelector == [$prefix] and $c.observatory.probeURL == $probe and $c.observatory.probeInterval == "5m" and $c.observatory.enableConcurrency == true) and
+      ([ $c.routing.rules[] | select(.balancerTag == "auto") ] | length > 0) and
+      (all($c.routing.rules[]; .outboundTag != "proxy"))' "$XF" >/dev/null \
+      || die "the Xray Auto config has the wrong proxy selector, leastPing balancer, fallback, observatory or routing rules"
+  fi
+  for ((i = 0; i < want_x_docs; i++)); do
+    if [ -n "$auto_name" ] && [ "$(jq -r --argjson i "$i" '.[$i].remarks' "$XF")" = "$auto_name" ]; then continue; fi
     port=$(jq -r --argjson i "$i" '.[$i].outbounds[] | select(.tag == "proxy") | (.settings.port // .settings.vnext[0].port)' "$XF")
     label=${lab[$port]:-}
     [ -n "$label" ] || die "the Xray document has an element on port $port that no profile of the group owns"
@@ -1564,7 +1585,7 @@ m3_json() {
     in_x[$label]=$i
   done
   jq -e 'all(.[]; (.remarks | type == "string" and length > 0))' "$XF" >/dev/null || die "an Xray element has no remarks"
-  [ "$(jq '[.[].remarks] | unique | length' "$XF")" = "$want_x" ] || die "the remarks of the Xray elements are not unique"
+  [ "$(jq '[.[].remarks] | unique | length' "$XF")" = "$want_x_docs" ] || die "the remarks of the Xray elements are not unique"
   for k in "${lab[@]}"; do [ -n "${in_x[$k]:-}" ] || die "Xray JSON: the server $k is missing"; done
   while read -r port; do
     label=${lab[$port]:-}
@@ -1582,7 +1603,7 @@ m3_json() {
   # automatic server choice is on by default: with more than one server the selector starts on an urltest "Auto" over them
   jq -e '.outbounds[] | select(.type == "urltest") | select(.tag == "Auto") | (.outbounds | length) == '"$want_s" "$SF" >/dev/null || die "the sing-box profile has no Auto urltest over the $want_s servers"
   jq -e '.outbounds[] | select(.type == "selector") | (.outbounds[0] == "Auto" and .default == "Auto" and (.outbounds - ["direct", "Auto"] | length) == '"$want_s"')' "$SF" >/dev/null || die "the sing-box selector does not start on Auto and list exactly the $want_s servers"
-  pass "coverage: Xray JSON has all $want_x servers (${!in_x[*]}); sing-box has ${!in_s[*]}, an Auto urltest over them as the selector's default, and neither the self-signed hysteria2 inbounds nor XHTTP"
+  pass "coverage: Xray JSON has Auto first plus all $want_x servers (${!in_x[*]}); sing-box has ${!in_s[*]}, an Auto urltest over them as the selector's default, and neither the self-signed hysteria2 inbounds nor XHTTP"
 
   # ---- the sing-box documents are valid for the cores as served
   for ver in $SB_VERSIONS; do
@@ -1626,7 +1647,7 @@ PY
   pass "block_ads: sing-box gets the list as the first DNS rule (NXDOMAIN) and a reject route, and sing-box check accepts it ($SB_VERSIONS); $ads_mh"
 
   # ---- Xray: every element in a client of its own; the node (or the WARP address) is what the fake internet sees; DNS is intercepted
-  local pin conf cp dns_ok dns_bad
+  local pin conf cp dns_ok dns_bad auto_conf auto_log auto_pid auto_dead auto_ws_tag auto_ws_sni auto_pin auto_src
   cns_listening() { [ -n "$(cns "$cli7_PID" ss -Hltn "sport = :$1")" ]; } # <port>
   j_who() { # <socks port> <path>: the address whoami saw through a client ("" = none); retries, the first REALITY handshake can take seconds
     local r out=""
@@ -1662,7 +1683,47 @@ PY
     say "xray $label: the fake internet sees $src; DNS to a dead address: blocked name -> $dns_bad, other -> $dns_ok (via the preset's resolver)"
     stop_pid "$cp"
   done
-  pass "real xray ($(basename "$XRAY")): all $want_x elements run (hy2 with its pin, REALITY XHTTP and TCP Vision, TLS WebSocket${twin:+, both WARP twins}), the fake internet sees the node (the WARP address for the twins), and DNS to an unreachable resolver is intercepted and answered from the preset (blocked name -> 0.0.0.0)"
+  if [ "$want_x" -gt 1 ]; then
+    # Pin the WebSocket certificate just as the individual-server check does, then kill proxy-1, the configured fallback. Auto can
+    # reach whoami only after its first observatory results exclude that dead outbound.
+    auto_ws_tag=$(jq -r --argjson i "$auto_i" --argjson p "${lport[ws]}" '.[$i].outbounds[] | select((.settings.vnext[0].port // .settings.port) == $p) | .tag' "$XF")
+    [ -n "$auto_ws_tag" ] || die "the Xray Auto config has no WebSocket outbound for the TLS pin check"
+    auto_ws_sni=$(jq -r --argjson i "$auto_i" --arg tag "$auto_ws_tag" '.[$i].outbounds[] | select(.tag == $tag) | .streamSettings.tlsSettings.serverName // empty' "$XF")
+    [ -n "$auto_ws_sni" ] || die "the Xray Auto WebSocket outbound has no TLS server name"
+    auto_pin=$(tls_pin "${lport[ws]}" "$auto_ws_sni") || die "could not read the Xray Auto WebSocket certificate pin"
+    auto_dead=$(free_port udp)
+    auto_conf=$WORK/json-xray-auto.json auto_log=$WORK/client-xray-json-auto.log
+    jq --argjson i "$auto_i" --arg gw "$cli7_GW" --arg who "$WHOAMI" --arg tag "$auto_ws_tag" --arg pin "$auto_pin" --argjson dead "$auto_dead" '
+      .[$i]
+      | .observatory.probeURL = ("http://" + $who + "/xray-auto-probe")
+      | .observatory.probeInterval = "2s"
+      | (.outbounds[] | select(.tag | startswith("proxy-")) | .settings) |=
+          (if has("address") then .address = $gw else . end | if has("vnext") then .vnext[].address = $gw else . end)
+      | (.outbounds[] | select(.tag == "proxy-1") | .settings.port) = $dead
+      | (.outbounds[] | select(.tag == $tag) | .streamSettings.tlsSettings).pinnedPeerCertSha256 = $pin' "$XF" >"$auto_conf" \
+      || die "could not prepare the Xray Auto config with the fake probe URL and one dead outbound"
+    spawn nsenter -t "$cli7_PID" -n -- "$XRAY" run -c "$auto_conf" >"$auto_log" 2>&1
+    auto_pid=$LAST_PID
+    wait_for 15 "Xray Auto to listen" cns_listening 10808 && alive "$auto_pid" \
+      || { redact <"$auto_log" | tail -n 8; die "Xray Auto did not start with its balancer and observatory"; }
+    auto_probe_seen() { grep -q ' /xray-auto-probe' "$WORK/whoami.log"; }
+    wait_for 20 "the Xray Auto observatory to probe the fake internet" auto_probe_seen && alive "$auto_pid" \
+      || { redact <"$auto_log" | tail -n 8; die "Xray Auto did not send a probe to the fake HTTP endpoint"; }
+    auto_src=$(j_who 10808 "json-xray-auto-after-probe")
+    if [ "$auto_src" != "$DIRECT_SRC" ] && { [ -z "$twin" ] || [ "$auto_src" != "$WARP_SRC" ]; }; then
+      redact <"$auto_log" | tail -n 8
+      die "Xray Auto did not route around dead proxy-1 after probing: the fake internet saw '$auto_src', expected the node or its WARP egress"
+    fi
+    sleep 3
+    auto_src=$(j_who 10808 "json-xray-auto-stays-live")
+    if [ "$auto_src" != "$DIRECT_SRC" ] && { [ -z "$twin" ] || [ "$auto_src" != "$WARP_SRC" ]; }; then
+      redact <"$auto_log" | tail -n 8
+      die "Xray Auto stopped passing after observatory probes: the fake internet saw '$auto_src', expected the node or its WARP egress"
+    fi
+    say "xray Auto: observatory reached the fake HTTP endpoint; with fallback proxy-1 dead, requests kept reaching the fake internet from $auto_src"
+    stop_pid "$auto_pid"
+  fi
+  pass "real xray ($(basename "$XRAY")): all $want_x server elements run (hy2 with its pin, REALITY XHTTP and TCP Vision, TLS WebSocket${twin:+, both WARP twins}), and the Auto element switches away from dead proxy-1 after probing; the fake internet sees the node (the WARP address for the twins), and DNS to an unreachable resolver is intercepted and answered from the preset (blocked name -> 0.0.0.0)"
 
   # ---- sing-box: the TUN inbound is replaced by a mixed one, the selector is pointed at one server at a time
   local mport sconf sdir sp sbl

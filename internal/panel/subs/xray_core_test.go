@@ -41,24 +41,24 @@ func TestXrayCoreBuildsTheDocuments(t *testing.T) {
 			if c.name == "cn_split" {
 				geoAssets(t) // geosite:cn and geoip:cn are looked up in the data files while the config is built
 			}
-			b, err := xrayProfile{lines: lines, names: jsonNames, preset: c.preset}.build()
+			b, err := xrayProfile{lines: lines, names: jsonNames, preset: c.preset, autoSelect: true}.build()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := jsoncheck.XrayBuildArray(t, b); len(got) != len(lines) {
-				t.Errorf("%d configs", len(got))
+			if got := jsoncheck.XrayBuildArray(t, b); len(got) != len(lines)+1 {
+				t.Errorf("%d configs, want Auto and %d servers", len(got), len(lines))
 			}
 		})
 	}
 	for _, c := range adsDocPresets { // geosite:category-ads-all is looked up in the data file too
 		t.Run(c.name, func(t *testing.T) {
 			geoAssets(t)
-			b, err := xrayProfile{lines: lines, names: jsonNames, preset: c.preset}.build()
+			b, err := xrayProfile{lines: lines, names: jsonNames, preset: c.preset, autoSelect: true}.build()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := jsoncheck.XrayBuildArray(t, b); len(got) != len(lines) {
-				t.Errorf("%d configs", len(got))
+			if got := jsoncheck.XrayBuildArray(t, b); len(got) != len(lines)+1 {
+				t.Errorf("%d configs, want Auto and %d servers", len(got), len(lines))
 			}
 		})
 	}

@@ -173,7 +173,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
 | `subscription_rules_set` | 操作员 | 完整的有序 `rules` 列表，每项为 `ua_contains` 加 `format`（`base64_uris`、`user_page`、`decoy`、`mihomo_yaml`、`xray_json`、`singbox_json`）；第一个匹配项生效 | 始终 |
 | `subscription_texts_set` | 操作员 | 仅需更改的字段：`title`、`announcement`、`support_url`、`update_interval_hours`、`server_name_template` | 始终 |
-| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo 和 sing-box 中添加 Auto 分组），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥 | 始终 |
+| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo、sing-box 和 Xray JSON 中把 Auto 放在最前），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥 | 始终 |
 | `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
 | `dns_settings_set` | 操作员 | `default_preset_id`、有序的 `link_preset_ids` 和 `link_default_preset_id`；只需提供要更改的字段 | 始终 |
 | `group_create` | 操作员 | `name`，可选 `profile_ids`、`dns_preset_id`（留空则使用实例默认值）、`color` 和 `disabled_node_ids`。分组没有备注和配额字段 | 否 |

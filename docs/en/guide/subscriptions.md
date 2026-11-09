@@ -52,14 +52,16 @@ The **Apps & formats** tab lists the apps the protocols work with and what each 
 
 Both are built from the same profiles and the same access as the link list. They differ in what a format can carry ([What works where](#what-works-where)) and in how the app is wired.
 
-- **Xray JSON** is an array of configs, one per server; the server's name is the `remarks` of its config. Each config opens a local SOCKS proxy on `127.0.0.1:10808`, which the app's own VPN mode feeds. Other apps on the device can see that port, and some VPN checks look for it. There is no HTTP proxy, no API and no statistics port. The DNS preset is written into every config.
+- **Xray JSON** is an array of configs, one per server; the server's name is the `remarks` of its config. When automatic selection is on, an `Auto` config with every server comes first. Each config opens a local SOCKS proxy on `127.0.0.1:10808`, which the app's own VPN mode feeds. Other apps on the device can see that port, and some VPN checks look for it. There is no HTTP proxy, no API and no statistics port. The DNS preset is written into every config.
 - **sing-box JSON** is one profile: a selector with every server, a TUN interface, and the DNS preset. When automatic selection is on, its `Auto` option tests the servers; otherwise the first server is the default. It opens no local proxy. It needs sing-box 1.12 or newer.
 
 The names follow the template of [Names & texts](#names-texts). Xray JSON keeps the link list's 30-character limit and, for Happ, the load; sing-box JSON keeps the full names and never adds the load.
 
 ### Automatic server choice
 
-When **Automatic server choice**, a card under the rules of **Who gets what**, is on (the default), Mihomo/Clash YAML and sing-box JSON include an `Auto` group that tests each server at `https://www.gstatic.com/generate_204` every five minutes. The check goes through the server being tested, so a site blocked on the user's home connection does not affect it. A new install starts on `Auto`; a person's manual pick in the app remains in effect. With one server, there is no `Auto` group. This setting does not affect Happ (Xray JSON) or AmneziaVPN.
+When **Automatic server choice**, a card under the rules of **Who gets what**, is on (the default), Mihomo/Clash YAML and sing-box JSON include an `Auto` group, and Xray JSON an `Auto` config first, that tests each server at `https://www.gstatic.com/generate_204` every five minutes. The check goes through the server being tested, so a site blocked on the user's home connection does not affect it. A new install starts on `Auto`; a person's manual pick in the app remains in effect. With one server, there is no `Auto`. This setting does not affect AmneziaVPN, nor Happ on the link list, which has no groups.
+
+The Xray `Auto` config holds every server and sends traffic through a `leastPing` balancer fed by Xray's observatory: each new connection takes the server that answered fastest at the last check, the first server until the first check is in. Unlike Mihomo's `url-test`, it has no tolerance, so when two servers answer about as fast, new connections may move between them after a check.
 
 **Planned:** subscription mirrors.
 

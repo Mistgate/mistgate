@@ -57,7 +57,7 @@ describe("Automatic server choice", () => {
   it("is on when the settings predate the switch, and turns off at once", async () => {
     await mount(undefined);
     expect(toggle().getAttribute("aria-checked")).toBe("true");
-    expect(document.body.textContent).toContain("an “Auto” group first");
+    expect(document.body.textContent).toContain("apps on Xray JSON get “Auto” first");
     await click(toggle());
     await settle();
     expect(saved()).toBe(false);

@@ -263,7 +263,7 @@ type subsLinkLimitsArgs struct {
 	ReasonField
 	Mode           *string `json:"mode,omitempty" jsonschema:"track counts only; enforce refuses new devices over the limit; strict also refuses apps without a device id"`
 	LinkAWG        *bool   `json:"link_awg,omitempty" jsonschema:"include AmneziaWG servers in subscription link apps"`
-	LinkAutoSelect *bool   `json:"link_auto_select,omitempty" jsonschema:"include automatic server selection in Mihomo and sing-box subscription profiles"`
+	LinkAutoSelect *bool   `json:"link_auto_select,omitempty" jsonschema:"put automatic server selection (Auto) first in the Mihomo, sing-box and Xray JSON subscription documents"`
 	SettingsHash   string  `json:"settings_hash,omitempty" jsonschema:"-"`
 }
 
