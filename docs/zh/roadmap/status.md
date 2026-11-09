@@ -3,25 +3,23 @@ title: 状态和路线图
 description: 了解 Mistgate 已发布版本的功能、当前测试内容、后续计划、1.0 发布条件，以及当前版本的已知限制。
 ---
 
-Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
+Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.82`。它已用于生产环境，但在 1.0 之前，API、存储设置和节点协议仍可能发生变化。本文档的其他部分仅描述当前代码的实际行为；计划集中在本页。计划没有日期：「下一步」和「以后」表示顺序，不代表时间安排。
 
 ```roadmap
 - status: released
   title: 已发布
-  meta: v0.1.0 – v0.1.81
+  meta: v0.1.0 – v0.1.82
   lead: 以下功能已包含在发布版本和文档中。先介绍当前版本带来的内容，再按管理后台的分区介绍其他内容。
   cards:
     - title: 当前版本的新内容
       icon: tag
-      release: v0.1.81
+      release: v0.1.82
       current: true
       points:
-        - "**助手。** 管理后台中的聊天（**AI → 助手**，**Ctrl+J**），连接你用自己的 API 密钥接入的云端模型：Anthropic、DeepSeek、Z.ai、Ollama Cloud，或最多五个你自己的 OpenAI 兼容提供商。它用面板自己的工具读取数据，并把每项更改整理成卡片；在有人点击**应用**之前不会有任何更改。它能自己回到对话中，所有者还可以让检查和助手任务按计划运行。仅限 VPS 版。参见[助手](../guide/assistant.md#开启)。"
-        - "**智能体可运维的集群。** MCP 新增了日常更改（分组、DNS 预设、订阅文案和规则、关闭告警）、一次调用即可得到答案的读取（`fleet_digest`、`timeline`、`user_diagnose`、`nodes_get`、`node_runtime`）、你自己节点之间的测试（`path_probe`、`node_trace`、`node_dns_check`，以及经所有者批准的 `path_speed`），还有 `access_report` 和 `block_diagnosis`，它们说明节点是怎么被封的以及该改什么。探测需要 Agent v0.1.81。参见 [MCP](../reference/mcp.md#读取工具)。"
-        - "**握手为什么失败。** 每个协议配置下的「24 小时」一行和 MCP 读取会写明原因：无回复、证书被拒绝、REALITY 密钥错误、16 KB 后冻结的数据流、应答丢失等。需要 Agent v0.1.81。参见[节点](../guide/nodes.md#协议配置)。"
-        - "**机器的开销。** 节点上的**资源**卡片和负载历史、显示还能容纳多少人的**节点 → 负载**、**设置 → 系统 → 面板资源**，以及节点诊断新增的三项检查（CPU steal、连接跟踪、Agent 打开的文件）。仅限 VPS 版。参见[节点](../guide/nodes.md#负载)。"
-        - "**面板日志、保留时间和调试抓取。** **设置 → 系统**中有带请求码的面板日志、每张表的保留时间、导出，以及需令牌的 `/metrics`；节点上则有包含内核日志的调试抓取。仅限 VPS 版。参见[故障排查](../operations/troubleshooting.md#面板日志保留时间导出和指标)。"
-        - "**图形化的入口、节点地图和关闭告警。** **入口**标签在列表旁有一张图，所有者可在其中连线和移动中继；**节点**页面有整个集群的地图；**关闭**会在问题持续期间把告警移出列表；出现动画（测试版）默认关闭。参见[健康](../operations/health.md#关闭)。"
+        - "**应用中的自动选服务器。** kl!ck 及其他 Mihomo 应用以及 sing-box 会把 **Auto** 组放在第一位：应用每五分钟通过各服务器本身测试一次，选用可用且较快的服务器，服务器失效时自动切换；用户手动选择的服务器仍然优先。默认开启，开关在**订阅 → 下发规则**中；Happ 和 AmneziaVPN 不受影响。参见[自动选择服务器](../guide/subscriptions.md#自动选择服务器)。"
+        - "**慢速链路上的更新。** Agent 下载有单独的时间窗口：默认 30 分钟，可在**设置 → 系统 → 下载超时**中设为 5 分钟到 2 小时；滚动更新会实时显示每个节点的下载阶段、进度、大小和速度。需要 Agent v0.1.82；旧版 Agent 仍为 10 分钟。参见[单节点更新过程](../operations/updates.md#单节点更新过程)。"
+        - "**负载视图看常见峰值。** **节点 → 负载**不再因为几次短暂的 100% CPU（例如服务器自身的更新）把节点判为过载：状态看的是大多数小时都低于的峰值，详情中同时显示常见峰值和最高峰值。参见[负载](../guide/nodes.md#负载)。"
+        - "**调试抓取中的 AmneziaWG 内核日志。** 对使用 AmneziaWG 内核模块的节点进行抓取时，会打开模块的调试输出，并按接口汇总其握手；在 v0.1.81 中，它在真实节点上读不到任何 AmneziaWG 日志行。需要 Agent v0.1.82。参见[调试抓取](../operations/troubleshooting.md#单个节点的调试抓取)。"
     - title: 协议配置
       section: profiles
       points:
@@ -54,6 +52,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
         - "[订阅类应用的设备上限](../guide/subscriptions.md#订阅类应用的设备上限)有三种模式：**仅计数**、**限制**和**严格**。"
         - "[用户页面](../guide/user-page.md)：按平台提供说明、二维码、供 AmneziaVPN 使用的 `vpn://` 密钥，以及用户自己的设备；用户可以[重命名和删除](../guide/user-page.md#自助管理设备)这些设备，页面上还有复制链接的按钮。"
         - "提供 [DNS 预设](../guide/dns.md)，可用国家列表设置「直连」（中国：国内网站直连），以及[在应用中拦截广告](../guide/dns.md#广告和跟踪器)；用户可以在用户页面中为订阅类应用选择 DNS，并为密钥按服务器选择 DNS。"
+        - "[自动选择服务器](../guide/subscriptions.md#自动选择服务器)：Mihomo 和 sing-box 配置中的 **Auto** 组，让应用自动切换到可用的服务器。"
     - title: 运行状况
       section: health
       points:
@@ -75,6 +74,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
         - "面板及其节点的[发布渠道](../operations/updates.md#发布渠道)（稳定版、测试版、开发版），以及面板自我更新前提供的备份。"
         - "[单行命令安装面板](../getting-started/install-panel.md#一行安装)，并验证发布签名。"
         - "[可复现发布版本](../operations/releases.md)，使用标签离线签名。"
+        - "[适用于慢速链路的下载窗口](../operations/updates.md#单节点更新过程)，默认 30 分钟，并在滚动更新中显示每个节点的下载进度。"
     - title: 集成
       section: integrations
       points:
@@ -140,12 +140,6 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
     - title: Mistgate 客户端
       icon: monitor
       text: "我们自己的桌面应用，先做 Windows 版。它直接与面板通信，而不只是通过订阅链接；自己支持 Hysteria2 和 AmneziaWG，内置 TSPU 及其他封锁的检测器，并在用户同意后把调试报告发送到面板。工作会在单独的仓库中开始。在此之前，用户继续使用现有应用连接：参见[客户端应用](../guide/client-apps.md)。"
-    - title: 应用中的自动选服务器
-      section: subscriptions
-      text: "Mihomo 配置中的 `url-test` 组和 sing-box 中的 `urltest`，让应用自己选择可用且较快的服务器，而不是列表中的第一个（issue #44）。默认开启，带开关。参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)。"
-    - title: 缓慢的 Agent 更新
-      section: updates
-      text: "可配置的 Agent 下载超时时间和实时进度，适用于链路较慢的节点（PR #43）。目前面板固定等待 Agent 应答 10 分钟，下载也计入其中。参见[已签名的节点 Agent 更新](../operations/updates.md)。"
     - title: 连接来自哪个运营商
       section: reachability
       text: "按小时统计每个连接所属的网络（ASN），绝不记录地址：按运营商汇总（默认开启）和按人记录的模式（默认关闭），都保留 7 天。这样诊断能区分不同运营商。目前面板只能从国家检测的探测点和 kl!ck 用户的报告中得知运营商。参见[助手](../guide/assistant.md#排查哪些连不上)。"

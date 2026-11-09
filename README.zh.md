@@ -28,7 +28,7 @@
 面板装在一台服务器上，你的 VPN 服务器作为节点加进来。每个人拿到一个订阅链接，应用会自动获取他可以用的所有服务器。面板负责让节点保持正确配置，并持续检测它们。
 
 - 在浏览器里用 IP 添加节点，使用面板自己的 SSH 密钥（在服务商处添加一次）或 root 密码。面板会固定 SSH 主机密钥、检查服务器、在已启用的 UFW 或 firewalld 中开放端口，并安装已签名的 Agent；在节点卡片中还能更换密码、管理服务器的 SSH 密钥。也可以用一条一次性命令安装。[添加节点](docs/zh/getting-started/add-node.md)
-- 每人一个链接。基于 Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）从中获取全部三种协议，Happ 获取 Hysteria2 和 VLESS，AmneziaVPN 则在用户页面上为每台设备取一个密钥。[客户端应用](docs/zh/guide/client-apps.md)
+- 每人一个链接。基于 Mihomo 内核的应用（kl!ck、FlClash、Clash Verge Rev）从中获取全部三种协议，Happ 获取 Hysteria2 和 VLESS，AmneziaVPN 则在用户页面上为每台设备取一个密钥。Mihomo 和 sing-box 应用会自动切换到可用的服务器。[客户端应用](docs/zh/guide/client-apps.md)
 - 面板每 5 分钟像应用一样连接一次每台服务器。每个节点上的诊断运行 21 项主机检查，并提供八种修复，只有你确认后才会执行。告警显示在管理后台，也会发到 Telegram。[运行状况](docs/zh/operations/health.md)
 - 某些网络无法访问某台服务器时，用户可以经由你的另一个节点连接，该节点只转发加密流量。面板在启用前检查路径，之后持续监测；节点页面的入口以图的形式列在列表旁，展示用户如何到达服务器；节点列表页还有整个集群的地图。[中转](docs/zh/guide/relays.md)
 - 可选的检测：按网络查看你的服务器在某国境内能否打开——Globalping 在家庭和移动网络中通过 IPv4 和 IPv6 的探测、志愿者和 SIM 探测点、封锁名单，以及从你自己节点发起的 TSPU 探测。大多数来源只在俄罗斯可用。[可达性](docs/zh/operations/reachability.md)

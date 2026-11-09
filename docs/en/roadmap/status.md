@@ -3,25 +3,23 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.1.82`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.81
+  meta: v0.1.0 – v0.1.82
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.81
+      release: v0.1.82
       current: true
       points:
-        - "**The assistant.** A chat in the admin (**AI → Assistant**, **Ctrl+J**) with a cloud model you connect with your own API key: Anthropic, DeepSeek, Z.ai, Ollama Cloud or up to five OpenAI-compatible providers of your own. It reads with the panel's own tools and prepares every change as a card; nothing changes until a person presses **Apply**. It can come back to a conversation by itself, and the owner can put checks and assistant tasks on a schedule. VPS edition only. See [Assistant](../guide/assistant.md#turn-it-on)."
-        - "**A fleet an agent can run.** MCP gets the day-to-day changes (groups, DNS presets, subscription texts and rules, closing alerts), reads that answer in one call (`fleet_digest`, `timeline`, `user_diagnose`, `nodes_get`, `node_runtime`), tests between your own nodes (`path_probe`, `node_trace`, `node_dns_check`, and `path_speed` with the owner's approval), and `access_report` and `block_diagnosis`, which say how a node is blocked and what to change. Probes need the agent v0.1.81. See [MCP](../reference/mcp.md#read-tools)."
-        - "**Why handshakes fail.** The 24 h line under each profile and the MCP reads name the reasons: no reply, a refused certificate, a wrong REALITY key, a stream frozen after 16 KB, answers lost and others. Needs the agent v0.1.81. See [Nodes](../guide/nodes.md#profiles)."
-        - "**What the machines cost.** A **Resources** card and a load history on a node, **Nodes → Load** with the room left for more people, **Settings → System → Panel resources**, and three new doctor checks (CPU steal, connection tracking, the agent's open files). VPS edition only. See [Nodes](../guide/nodes.md#load)."
-        - "**Panel logs, retention and a debug capture.** In **Settings → System**: the panel's logs with request codes, how long each table keeps its rows, an export and a token-guarded `/metrics`; on a node, a debug capture with its kernel log. VPS edition only. See [Troubleshooting](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics)."
-        - "**Ways in as a graph, a fleet map and closing alerts.** **Ways in** has a graph beside the list where the owner draws and moves relays, **Nodes** has a map of the whole fleet, **Close** takes an alert off the list while its problem goes on, and the reveal animation (Beta) is off by default. See [Health](../operations/health.md#closing)."
+        - "**Automatic server choice in the apps.** kl!ck and the other Mihomo apps, and sing-box, get an **Auto** group first: every five minutes the app tests each server through that server, takes a fast working one and moves on by itself when it fails; a server the person picked by hand still wins. On by default, with a switch under **Subscriptions → Who gets what**; Happ and AmneziaVPN are not affected. See [Automatic server choice](../guide/subscriptions.md#automatic-server-choice)."
+        - "**Updates over slow links.** The agent's download has its own window, 30 minutes by default and 5 minutes to 2 hours in **Settings → System → Download timeout**, and the rollout shows each node's download as it goes: the phase, the progress, the size and the speed. Needs the agent v0.1.82; older agents keep their 10 minutes. See [One node's update](../operations/updates.md#one-nodes-update)."
+        - "**Load reads the usual peaks.** **Nodes → Load** no longer calls a node overloaded for a few moments at 100% CPU, such as the server's own updates: the status reads the peak most hours stay under, and the details show the usual and the highest peaks. See [Load](../guide/nodes.md#load)."
+        - "**The AmneziaWG kernel log in a debug capture.** A capture of a node on the AmneziaWG kernel module turns the module's debug output on and sums up its handshakes per interface; in v0.1.81 it read no AmneziaWG lines on real nodes. Needs the agent v0.1.82. See [Debug capture](../operations/troubleshooting.md#debug-capture-of-one-node)."
     - title: Profiles
       section: profiles
       points:
@@ -54,6 +52,7 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
         - "The [device limit for apps on the link](../guide/subscriptions.md#device-limit-for-apps-on-the-link) in the modes **Only count**, **Limit** and **Strict**."
         - "The [user page](../guide/user-page.md): per-platform instructions, QR codes, `vpn://` keys for AmneziaVPN, and the person's own devices, which they can [rename and remove](../guide/user-page.md#self-service-devices), with a button to copy the link."
         - "[DNS presets](../guide/dns.md), with country lists for \"direct\" (China: Chinese sites direct) and [ads blocked in the apps](../guide/dns.md#ads-and-trackers); on the user page, a DNS choice for the link apps and one per server for the keys."
+        - "[Automatic server choice](../guide/subscriptions.md#automatic-server-choice): an **Auto** group in the Mihomo and sing-box profiles that moves the app to a working server by itself."
     - title: Health
       section: health
       points:
@@ -75,6 +74,7 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
         - "[Release channels](../operations/updates.md#release-channels) (stable, testing, development) for the panel and its nodes, and a backup offered before the panel updates itself."
         - "[A one-line panel install](../getting-started/install-panel.md#one-line-install) that verifies the release signature."
         - "[Reproducible releases](../operations/releases.md) signed offline from the tag."
+        - "[A download window for slow links](../operations/updates.md#one-nodes-update), 30 minutes by default, and each node's download progress in the rollout."
     - title: Integrations
       section: integrations
       points:
@@ -140,12 +140,6 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
     - title: Mistgate client
       icon: monitor
       text: "Our own desktop app, Windows first. It talks to the panel natively, not only through a subscription link, speaks Hysteria2 and AmneziaWG itself, has built-in detectors of TSPU and other blocking, and sends debug reports to the panel with the person's consent. The work starts in a separate repository. Until then people connect with existing apps: see [Client apps](../guide/client-apps.md)."
-    - title: Automatic server choice in the apps
-      section: subscriptions
-      text: "A `url-test` group in the Mihomo profile and `urltest` in sing-box, so the app picks a working, fast server by itself instead of the first one in the list (issue #44). On by default, with a switch. See [What works where](../guide/subscriptions.md#what-works-where)."
-    - title: Slow agent updates
-      section: updates
-      text: "A configurable timeout for the agent's download, with live progress, for nodes on slow links (PR #43). Today the panel waits a fixed 10 minutes for the agent's answer, the download included. See [Signed node agent updates](../operations/updates.md)."
     - title: Which operator a connection comes from
       section: reachability
       text: "The network (ASN) of each connection, counted per hour, never the address: an aggregate per operator, on by default, and a mode per person, off by default, both kept 7 days. It lets the diagnosis tell operators apart. Today the panel learns operators only from the country check's probes and the reports of kl!ck users. See [Assistant](../guide/assistant.md#work-out-what-does-not-open)."
