@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
+import { halo } from "@/components/fx/halo";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
@@ -407,6 +408,7 @@ export function GroupEditModal({ group, open, onOpenChange }: { group: Group | u
             onCreated={(g) => {
               onOpenChange(false);
               toast(t("users.groupSaved", { name: g.name }));
+              halo("save");
             }}
           />
         </div>

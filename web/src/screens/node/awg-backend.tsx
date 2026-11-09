@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { halo } from "@/components/fx/halo";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -168,6 +169,7 @@ export function AwgBackendCard({ data }: { data: Plain<GetNodeResponse> }) {
       case PrepareAwgOutcome.READY: // the module is loaded: switching is just a setting
         await save("kernel");
         toast(t("awg.backend.saved"));
+        halo("save");
         break;
       case PrepareAwgOutcome.NEEDS_PREPARE:
         setConfirm(true);
@@ -203,6 +205,7 @@ export function AwgBackendCard({ data }: { data: Plain<GetNodeResponse> }) {
     return run(async () => {
       await save(mode);
       toast(t("awg.backend.saved"));
+      halo("save");
     });
   }
 

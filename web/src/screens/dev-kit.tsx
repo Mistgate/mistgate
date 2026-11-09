@@ -46,6 +46,7 @@ import { profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { DevicesPanel } from "@/screens/users/user-detail";
 import { dnsPresetsQuery } from "@/screens/subscriptions/queries";
 import type { ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
+import { HaloKit } from "./dev-kit-halo";
 import { FleetKit } from "./dev-kit-fleet";
 import { ProfileApprovalsKit, SettingsDemos } from "./dev-kit-settings";
 import { PolishKit } from "./dev-kit-polish";
@@ -297,6 +298,7 @@ export default function DevKit() {
   // ?only=dns|ads|edge|node|health|users|subs|approvals|ipv6|ports|ssh|bulk|bulk-users|graph: one kit alone, for its screenshots;
   // ?only=bulk-page and bulk-users-page are whole pages (the Nodes screen, the People tab, in the shell's frame), drawn without the kit's column
   const which = new URLSearchParams(location.search).get("only") ?? "";
+  if (which === "halo") return <HaloKit />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
   const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, subs: SubsKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, ssh: SSHKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, fx: FxKit, graph: GraphKit }[which];

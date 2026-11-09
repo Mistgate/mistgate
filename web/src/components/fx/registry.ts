@@ -3,6 +3,7 @@
 // sweep once. A mark is taken once, so a refetch, a re-render or coming back to the list never sweeps again; and it expires,
 // so a thing that never shows up (the person went elsewhere) does not sweep an hour later.
 import { effectsFor } from "@/lib/effects";
+import { halo } from "./halo";
 
 /** How long a mark waits for its item to show up. */
 export const FRESH_TTL_MS = 60_000;
@@ -26,6 +27,7 @@ export function markFresh(kind: string, id: string): void {
   expire();
   marks.set(keyOf(kind, id), clock());
   listeners.forEach((l) => l(kind, id));
+  halo("create");
 }
 
 /** Whether `kind`/`id` is marked and not expired; does not take the mark. */

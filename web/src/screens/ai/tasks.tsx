@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState, type ReactNode } from "react";
+import { halo } from "@/components/fx/halo";
 import { Card } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Icon, NavIcon } from "@/components/ui/icons";
@@ -372,6 +373,7 @@ function TaskEditor({ editing, tz, onClose, onSaved }: { editing: Editing; tz: n
     },
     onSuccess: () => {
       toast(t(editing.task ? "task.saved" : "task.created"));
+      halo(editing.task ? "save" : "create");
       onSaved();
       onClose();
     },

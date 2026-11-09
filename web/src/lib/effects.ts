@@ -33,10 +33,11 @@ export function useEffectsEnabled(): boolean {
   return useSyncExternalStore(subscribe, effectsEnabled, () => false);
 }
 
-// The two moments the effect plays at, each its own switch under the main one (Settings -> Interface): "create" is a new thing
-// appearing in its list, "pages" is a page opening (the route sweep, the first sweep after sign-in, the list entrance).
-export type FxKind = "create" | "pages";
-const kinds: Record<FxKind, boolean> = { create: readPref("fx-create") !== "off", pages: readPref("fx-pages") !== "off" };
+// The moments the effects play at, each its own switch under the main one (Settings -> Interface): "create" is a new thing
+// appearing in its list (and the halo from the button that made it), "save" the halo when something is saved or the
+// assistant has answered, "pages" a page opening (the first sweep after sign-in, the list entrance).
+export type FxKind = "create" | "save" | "pages";
+const kinds: Record<FxKind, boolean> = { create: readPref("fx-create") !== "off", save: readPref("fx-save") !== "off", pages: readPref("fx-pages") !== "off" };
 
 /** Whether the effect plays for this moment: the main switch and the moment's own. */
 export const effectsFor = (kind: FxKind) => effectsEnabled() && kinds[kind];

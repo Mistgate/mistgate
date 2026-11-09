@@ -2,6 +2,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
+import { halo } from "@/components/fx/halo";
 import { Button } from "@/components/ui/button";
 import { IconChip } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
@@ -754,6 +755,7 @@ export function ChangeRelayPort({ r, onClose }: { r: RelayMsg; onClose: () => vo
       await relaysApi.updateRelay({ id: r.id, port: n });
       onClose();
       toast(t("common.saved"));
+      halo("save");
     } catch (e) {
       setError(e);
     } finally {

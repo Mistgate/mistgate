@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { halo } from "@/components/fx/halo";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
@@ -358,6 +359,17 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
     if (el && growth >= 0) el.scrollTop = el.scrollHeight;
   }, [growth]);
 
+  // a turn watched to its end: the halo runs out from the end of the answer, inside the panel
+  const wasLive = useRef(chat.live);
+  useEffect(() => {
+    const el = list.current;
+    if (wasLive.current && !chat.live && el && tail?.end === "end") {
+      const r = el.getBoundingClientRect();
+      halo("save", { target: el, origin: { x: r.left + r.width / 2, y: r.bottom - 24 } });
+    }
+    wasLive.current = chat.live;
+  }, [chat.live, tail?.end]);
+
   function submit(force = false) {
     const body = text.trim();
     if (!body || chat.running) return;
@@ -372,6 +384,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
 
   return (
     <section
+      data-fx-halo
       role="dialog"
       aria-label={t("ai.chat.title")}
       className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-surface md:inset-auto md:end-4 md:top-4 md:bottom-4 md:w-[440px] md:rounded-card-lg md:border md:border-line md:shadow-(--shadow-dock)"
