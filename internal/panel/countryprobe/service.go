@@ -56,7 +56,7 @@ const (
 
 	// busyRetry: a probe node that was busy is asked again after this, not after the whole interval.
 	busyRetry = 5 * time.Minute
-	testEvery = 60 * time.Second
+	testEvery = censorSimTestEvery
 	// runBudget bounds a whole run. ponytail: a fleet so big that its batches do not fit loses the batches at the end every time;
 	// rotate the starting batch if a fleet ever gets that big.
 	runBudget = 30 * time.Minute
@@ -573,7 +573,7 @@ func (s *Service) due(ctx context.Context, st settings) (bool, error) {
 // happens (no command, no request of any kind) while the source is off, has no probe node, covers another country, or on the
 // Cloudflare edition; the probe node being offline or too old skips the round without a trace.
 func (s *Service) Tick(ctx context.Context) bool {
-	if s.cfg.Edge {
+	if s.cfg.Edge || censorSimManualOnly {
 		return false
 	}
 	gen := s.generation()

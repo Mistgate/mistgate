@@ -8,7 +8,7 @@ import (
 )
 
 // countryPollInterval is how often the scheduler looks whether a country round is due; a round itself is up to a minute.
-const countryPollInterval = 30 * time.Second
+var countryPollInterval = censorSimCountryPollInterval()
 
 func (s *Service) runCountryChecks(ctx context.Context) {
 	if s.cfg.Country == nil {

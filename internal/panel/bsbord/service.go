@@ -58,11 +58,13 @@ const (
 	maxTargets         = 10
 	maxPendingAge      = 23 * time.Hour
 	requestGap         = time.Second
-	pollEvery          = 30 * time.Second
 	testEvery          = 10 * time.Second
 )
 
-var errTickSuperseded = errors.New("bsbord: tick was superseded")
+var (
+	errTickSuperseded = errors.New("bsbord: tick was superseded")
+	pollEvery         = censorSimBsbordPollInterval()
+)
 
 // Config configures Service. Store, Vault, StepUp and Targets are required.
 type Config struct {

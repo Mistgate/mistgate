@@ -120,7 +120,8 @@ when the admin Worker has room; otherwise they move to a VPS-only service and th
 | Handshake failure reasons in LinkCounters (VLESS attempts, TLS alerts, AWG initiations without reply, QUIC failures) | merged (`links/3`; the kernel AWG backend cannot tell initiations from responses and says so) |
 | Scheduled tasks, provider fallback | merged |
 | Assistant follow-ups (one-time continuation of a conversation, on the tasks' scheduler) | merged |
-| Censorship simulation and dev-fleet MCP runs | next |
+| Censorship simulation | on branch feat/censor-sim: ip_blocked, port_blocked, udp_blocked, tcp_throttled, whitelist_mode, operator_specific, not_blocked_but_broken; protocol_fingerprinted and regional remain table-test only |
+| Dev-fleet MCP run | on branch feat/censor-sim: full read-tool sweep against de1, nl1 and fi1, with no-secrets scan and teardown |
 | Coarse network (ASN) bucket per hour, no addresses | to decide with the owner (privacy) |
 
 ## Consequences

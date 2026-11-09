@@ -20,10 +20,11 @@ import (
 
 const (
 	jitter        = 10 * time.Second
-	manualMinGap  = 30 * time.Second // RunChecksNow: at most one round per inbound per 30 s
 	firstRunSpan  = 30 * time.Second // a new target is first probed within this, spread
 	recentSamples = 30               // rounds read back to rebuild a fail streak after a restart
 )
+
+var manualMinGap = censorSimManualCheckGap(30 * time.Second) // RunChecksNow: at most one round per inbound per 30 s
 
 // cell is the state of one inbound: its last round and how many rounds in a row failed.
 type cell struct {

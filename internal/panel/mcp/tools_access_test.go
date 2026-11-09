@@ -578,6 +578,26 @@ func TestBlockUDPBlocked(t *testing.T) {
 	}
 }
 
+func TestBlockUDPBlockedUsesPerSenderVerdictsFromConfirmedCheck(t *testing.T) {
+	f := newFx().node("de1", "DE", "online").node("msk1", "RU", "online").node("nl1", "NL", "online").group("g", "prf_hy2").users("g", 2, 1)
+	f.inbound("de1", "prf_hy2", "hysteria2", 4433)
+	f.in.Nodes[0].UDPChecks = []accUDPCheck{{Port: 4433, Verdict: "ok", Sender: "msk1", SenderVerdict: "broken",
+		ConfirmSender: "nl1", ConfirmVerdict: "ok", CheckedUnix: f.in.NowUnix}}
+	f.in.Loss = []accLoss{{FromID: "nod_msk1", FromName: "msk1", ToID: "nod_de1", ToName: "de1", LossPct: 100}}
+	f.cc("de1", "ok", func(c *accCountry) { c.TSPU = ports(443, "open") })
+	if c := classOf(buildAccess(f.in), "de1", clsUDPBlocked); c == nil || c.Confidence != confHigh {
+		t.Fatalf("country UDP drop hidden by out-of-country confirmation: %+v", c)
+	}
+
+	// An in-country sender that succeeds is evidence against a country-wide UDP cut, even if an outside confirmer fails.
+	f.in.Nodes[0].UDPChecks[0].SenderVerdict = "ok"
+	f.in.Nodes[0].UDPChecks[0].ConfirmVerdict = "broken"
+	f.in.Loss = nil
+	if c := classOf(buildAccess(f.in), "de1", clsUDPBlocked); c != nil {
+		t.Fatalf("out-of-country UDP failure overrode the in-country success: %+v", c)
+	}
+}
+
 func TestBlockIgnoresStalePortChecks(t *testing.T) {
 	f := newFx().node("de1", "DE", "online").node("msk1", "RU", "online").group("g", "prf_vless", "prf_hy2").users("g", 2, 1)
 	f.inbound("de1", "prf_vless", "vless", 8443)

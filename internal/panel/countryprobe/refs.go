@@ -39,6 +39,9 @@ var referencesByCountry = map[string]References{
 
 // ReferencesFor are the references of a country; ok is false when it has none (the probe does not apply there).
 func ReferencesFor(country string) (References, bool) {
+	if r, ok := censorSimReferences(country); ok {
+		return r, true
+	}
 	r, ok := referencesByCountry[strings.ToUpper(country)]
 	return r, ok
 }

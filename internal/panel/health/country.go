@@ -57,6 +57,9 @@ var countryControls = map[string]string{
 }
 
 func countryControl(country string) (string, uint16) {
+	if host, port, ok := censorSimCountryControl(country); ok {
+		return host, port
+	}
 	if host, ok := countryControls[country]; ok {
 		return host, 443
 	}
@@ -66,6 +69,9 @@ func countryControl(country string) (string, uint16) {
 // countryControl6 is the control site of an IPv6 round: a name that has an IPv6 address and is never blocked. Only Russia's is
 // domestic; every other country uses Cloudflare's, and no other country's site is guessed to have an AAAA record.
 func countryControl6(country string) (string, uint16) {
+	if host, port, ok := censorSimCountryControl(country); ok {
+		return host, port
+	}
 	if country == "RU" {
 		return "ya.ru", 443
 	}
@@ -530,7 +536,7 @@ func (s *Service) CountryTick(ctx context.Context) bool {
 		s.countryIPv6Facts(ctx, nodes)
 		s.countryIPv6Members(ctx, cc.Country, nodes)
 	}
-	probes, every, _ := countryPlan(nodes, cc.Interval, src.HourlyLimit())
+	probes, every, _ := countryPlan(nodes, censorSimCountryInterval(cc.Interval), censorSimCountryHourlyLimit(src.HourlyLimit()))
 	s.countryNoteStretch(cc.Interval, every)
 	now := s.now()
 	families := []int{familyV4} // in this order: IPv4 goes first when both are due

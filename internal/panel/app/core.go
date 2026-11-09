@@ -274,7 +274,9 @@ func wireCore(c Config) (*core, error) {
 	k.cr = countryreach.New(st, log, c.Clock, func(ctx context.Context, since time.Time, family int) ([]string, []*adminv1.NodeReachabilityHistory, error) {
 		return hl.CountryHistory(ctx, since, family)
 	})
+	gpBase, gpPoll := censorSimGlobalping()
 	k.gp, err = globalping.New(globalping.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: k.cr.Country,
+		BaseURL: gpBase, PollDelay: gpPoll,
 		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }})
 	if err != nil {
 		return nil, err
@@ -293,6 +295,7 @@ func wireCore(c Config) (*core, error) {
 	// Bsbord, the paid mobile-operator source: the online nodes' addresses and TLS ports are read the way the health module reads
 	// them, hence the late binding to hl.
 	k.bs, err = bsbord.New(bsbord.Config{Store: st, Vault: vlt, StepUp: authSvc.RequireStepUp, Log: log, Now: c.Clock, Country: k.cr.Country,
+		BaseURL:  censorSimBsbord(),
 		Targets:  func(ctx context.Context) ([]health.CountryTarget, error) { return hl.CountryTargets(ctx) },
 		OnChange: func(ctx context.Context) { hl.ReconcileCountry(ctx) }, Edge: edge, RoundLease: callLease})
 	if err != nil {

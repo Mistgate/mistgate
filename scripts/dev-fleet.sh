@@ -7,6 +7,7 @@
 #   scripts/dev-fleet.sh [--netem "delay 25ms loss 0.5%"] [--profile readonly|operator|admin] [--keep-bin DIR]
 #   scripts/dev-fleet.sh --status
 #   scripts/dev-fleet.sh --down
+#   scripts/dev-fleet.sh --mcp-e2e  # run the full MCP read-tool sweep, print its table, then tear down
 #
 # It prints the admin URL and an MCP token (made by scripts/e2e/mcp-token.sh, the owner's session plus a step-up, the way the
 # e2e tests do it); the admin profile is the default because path_speed needs it. The panel's admin listens on loopback inside
@@ -24,9 +25,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 STATE=${MG_DEVFLEET_DIR:-/tmp/mg-devfleet}
+# --down removes the state directory: never let it point at a home directory or the root
+case "$STATE" in
+  /|/home|/home/*|/root|/root/*) echo "refusing to use or remove $STATE" >&2; exit 2 ;;
+esac
 NODES=(de1 nl1 fi1)
 PUB=8443 ADM=8081
-NETEM="" PROFILE=admin KEEP_BIN="" ACTION=up TRACE=""
+NETEM="" PROFILE=admin KEEP_BIN="" ACTION=up TRACE="" MCP_E2E=""
 args=("$@")
 while [ $# -gt 0 ]; do
   case $1 in
@@ -34,6 +39,7 @@ while [ $# -gt 0 ]; do
     --profile) PROFILE=${2:?--profile needs readonly, operator or admin}; shift ;;
     --keep-bin) KEEP_BIN=${2:?--keep-bin needs a directory with mistgate and mistgate-node}; shift ;;
     --trace) TRACE=1 ;;
+    --mcp-e2e) MCP_E2E=1 ;;
     --down) ACTION=down ;;
     --status) ACTION=status ;;
     -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
@@ -55,22 +61,36 @@ if [ "$(uname -s)" != Linux ] || [ "$(id -u)" != 0 ]; then
 fi
 
 [ -z "$TRACE" ] || set -x
+[ -z "$MCP_E2E" ] || [ "$PROFILE" = admin ] || { echo "--mcp-e2e needs the admin profile" >&2; exit 2; }
 say() { printf '[dev-fleet] %s\n' "$*"; }
 die() { printf '[dev-fleet] FAIL %s\n' "$*" >&2; exit 1; }
 
 # only ever our own: a namespace named mgdf-*, a pid we wrote down
+proc_start() {
+  local line rest i
+  IFS= read -r line <"/proc/$1/stat" || return 1
+  rest=${line##*) }
+  set -- $rest
+  for ((i = 0; i < 19; i++)); do shift; done
+  printf '%s' "${1:-}"
+}
+
 down() {
-  local pid ns
+  local pid start ns
   if [ -r "$STATE/pids" ]; then
-    while read -r pid; do [ -n "$pid" ] && kill "$pid" 2>/dev/null || true; done <"$STATE/pids"
+    while read -r pid start; do
+      [ -n "$pid" ] && [ -n "$start" ] && [ "$(proc_start "$pid" 2>/dev/null || true)" = "$start" ] \
+        && kill -TERM "$pid" 2>/dev/null || true
+    done <"$STATE/pids"
     sleep 1
-    while read -r pid; do [ -n "$pid" ] && kill -KILL "$pid" 2>/dev/null || true; done <"$STATE/pids"
+    while read -r pid start; do
+      [ -n "$pid" ] && [ -n "$start" ] && [ "$(proc_start "$pid" 2>/dev/null || true)" = "$start" ] \
+        && kill -KILL "$pid" 2>/dev/null || true
+    done <"$STATE/pids"
   fi
-  for ns in $(ip netns list 2>/dev/null | awk '/^mgdf-/ {print $1}'); do
-    for pid in $(ip netns pids "$ns" 2>/dev/null); do kill -KILL "$pid" 2>/dev/null || true; done
-    ip netns del "$ns" 2>/dev/null || true
-    rm -rf "/etc/netns/$ns"
-  done
+  if [ -r "$STATE/namespaces" ]; then
+    while read -r ns; do [ -n "$ns" ] && ip netns del "$ns" 2>/dev/null || true; done <"$STATE/namespaces"
+  fi
   rm -rf "$STATE"
 }
 
@@ -107,23 +127,31 @@ else
   go build -o "$STATE/bin/mistgate" ./cmd/mistgate
   go build -o "$STATE/bin/mistgate-node" ./cmd/mistgate-node
 fi
+if [ -n "$MCP_E2E" ]; then
+  say "building the MCP sweep and token helpers"
+  go build -o "$STATE/bin/mcpe2e" ./scripts/e2e/mcpe2e
+  go build -o "$STATE/bin/mcptoken" ./scripts/e2e/mcptoken
+fi
 PANEL_BIN=$STATE/bin/mistgate NODE_BIN=$STATE/bin/mistgate-node
 
 # ---------------------------------------------------------------- namespaces: one bridge, five members
-ip netns add mgdf-hub
+add_namespace() {
+  printf '%s\n' "$1" >>"$STATE/namespaces"
+  ip netns add "$1"
+}
+: >"$STATE/namespaces"
+add_namespace mgdf-hub
 ip -n mgdf-hub link set lo up
 ip -n mgdf-hub link add br0 type bridge
 ip -n mgdf-hub link set br0 up
 member() { # <name> <last octet>: namespace mgdf-<name> with eth0 on the bridge
   local name=$1 ns=mgdf-$1
-  ip netns add "$ns"
+  add_namespace "$ns"
   ip link add "v-$name" netns mgdf-hub type veth peer name eth0 netns "$ns"
   ip -n mgdf-hub link set "v-$name" master br0 up
   ip -n "$ns" link set lo up
   ip -n "$ns" addr add "10.77.0.$2/24" dev eth0
   ip -n "$ns" link set eth0 up
-  mkdir -p "/etc/netns/$ns"
-  printf 'nameserver 127.0.0.1\n' >"/etc/netns/$ns/resolv.conf"
 }
 member panel 1
 octet=11
@@ -140,7 +168,8 @@ spawn_in() { # <namespace> <logfile> <command...>: a daemon in a namespace, its 
   local ns=$1 log=$2
   shift 2
   ip netns exec "$ns" setsid "$@" >>"$log" 2>&1 </dev/null &
-  echo $! >>"$STATE/pids"
+  local pid=$!
+  printf '%s %s\n' "$pid" "$(proc_start "$pid")" >>"$STATE/pids"
 }
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 2 -subj /CN=localhost \
   -addext subjectAltName=DNS:localhost,IP:10.77.0.1 -keyout "$STATE/pub.key" -out "$STATE/pub.crt" 2>/dev/null
@@ -196,6 +225,8 @@ declare -A NODE_ID
 for n in "${NODES[@]}"; do
   ENROLL=$(api NodeService/CreateEnrollment "{\"name\":\"$n\",\"address\":\"10.77.0.$octet\"}")
   NODE_ID[$n]=$(jq -r .node.id <<<"$ENROLL")
+  # A declared lab capacity prevents the first-enrollment path from asking the node for a public speed test.
+  api NodeService/UpdateNode "$(jq -nc --arg id "${NODE_ID[$n]}" '{nodeId:$id,bandwidthMbps:100}')" >/dev/null
   LINE=$(jq -r .installCommand <<<"$ENROLL" | grep -m1 ' enroll ')
   flag() { sed -n "s/.* --$1 \([^ ]*\).*/\1/p" <<<"$LINE"; }
   mkdir -p "$STATE/node/$n"
@@ -219,7 +250,24 @@ umask 077
 ( printf 'MG_ADMIN_URL=%s\nMG_OWNER_COOKIE=%s\nMG_TOTP_SECRET=%s\nMG_NETNS=%s\n' "$ADMIN" "${COOKIE#__Host-sid=}" "$TOTP_SECRET" mgdf-panel >"$STATE/owner.env" )
 echo
 say "admin URL: $ADMIN/   (loopback inside the namespace mgdf-panel: reach it with  ip netns exec mgdf-panel <command>)"
-say "the owner: login $LOGIN, authenticator secret and session cookie in $STATE/owner.env (0600); a throwaway panel, never a real one"
+if [ -z "$MCP_E2E" ]; then
+  say "the owner: login $LOGIN, authenticator secret and session cookie in $STATE/owner.env (0600); a throwaway panel, never a real one"
+fi
+if [ -n "$MCP_E2E" ]; then
+  umask 077
+  set -a
+  # shellcheck disable=SC1090
+  . "$STATE/owner.env"
+  set +a
+  inpanel "$STATE/bin/mcptoken" -profile admin -name dev-fleet-e2e >"$STATE/mcp-token.out" 2>"$STATE/mcp-token.log" || die "could not mint the throwaway admin token (see $STATE/mcp-token.log)"
+  unset MG_OWNER_COOKIE MG_TOTP_SECRET MG_NETNS
+  inpanel "$STATE/bin/mcpe2e" -url "$ADMIN" -token-file "$STATE/mcp-token.out" -secret-file "$STATE/owner.env" \
+    -addresses "10.77.0.1,10.77.0.11,10.77.0.12,10.77.0.13" -sweep
+  down
+  trap - EXIT
+  say "the MCP sweep passed and namespaces mgdf-* and $STATE are gone"
+  exit 0
+fi
 if [ -x scripts/e2e/mcp-token.sh ] || [ -f scripts/e2e/mcp-token.sh ]; then
   say "MCP token ($PROFILE profile), printed once:"
   # the token script runs `go run ./scripts/e2e/mcptoken` inside the panel's namespace; wait for the next 30 s authenticator step

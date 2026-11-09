@@ -55,6 +55,11 @@ End-to-end tests:
   reloaded in the middle of an upload; `--ssh-only` skips the traffic steps.
 - `scripts/e2e-mcp.sh [-mode listener|prefix|both] [-keep]`: API tokens and MCP against a real panel on loopback, any
   OS, no internet, about a minute.
+- `scripts/e2e-wsl.sh --censor`: the isolated private-address TSPU lab; real node probes and client measurements assert
+  `block_diagnosis` for IP/port/UDP blocks, TCP throttling, whitelist and operator-specific behavior, and a failed inbound.
+  Run before a release that changes block diagnosis or its probe evidence.
+- `scripts/e2e-wsl.sh --mcp-fleet`: starts the throwaway dev fleet, runs the full MCP read-tool sweep and no-secrets scan, then
+  tears it down. Run before each release that changes MCP tools or their read contracts.
 - `scripts/dev-fleet.sh [--netem "delay 25ms loss 0.5%"] | --down`: a throwaway panel and three node agents (de1, nl1, fi1) in
   network namespaces on one Linux host (WSL as root), for a coding agent to run `path_probe`, `node_trace`, `path_speed` and
   `checks_run_now` against real agents; prints the admin URL and an MCP token. See

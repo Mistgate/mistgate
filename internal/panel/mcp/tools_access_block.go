@@ -54,10 +54,13 @@ type accNode struct {
 }
 
 type accUDPCheck struct {
-	Port        uint32
-	Verdict     string // ok, lossy, broken, ""
-	Sender      string // "panel" or a node name
-	CheckedUnix int64
+	Port           uint32
+	Verdict        string // aggregate: ok, lossy, broken, ""
+	Sender         string // "panel" or a node name
+	SenderVerdict  string // the first sender before confirmation, when available
+	ConfirmSender  string
+	ConfirmVerdict string
+	CheckedUnix    int64
 }
 
 type accTCPCheck struct {
@@ -856,15 +859,25 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 		if !accessPortCheckFresh(in.NowUnix, u.CheckedUnix) {
 			continue
 		}
-		in := b.inCountry(u.Sender, country)
-		switch {
-		case u.Verdict == "broken" && in:
-			udpBroken++
-			ev = append(ev, "port:"+n.ID+":"+u32(u.Port))
-		case u.Verdict == "ok" && in:
-			udpOKIn++
-		case u.Verdict == "ok":
-			udpOKAny++
+		senderVerdict := u.SenderVerdict
+		if senderVerdict == "" {
+			senderVerdict = u.Verdict
+		}
+		account := func(verdict, sender string) {
+			inCountry := b.inCountry(sender, country)
+			switch {
+			case verdict == "broken" && inCountry:
+				udpBroken++
+				ev = append(ev, "port:"+n.ID+":"+u32(u.Port))
+			case verdict == "ok" && inCountry:
+				udpOKIn++
+			case verdict == "ok":
+				udpOKAny++
+			}
+		}
+		account(senderVerdict, u.Sender)
+		if u.ConfirmSender != "" {
+			account(u.ConfirmVerdict, u.ConfirmSender)
 		}
 	}
 	for _, l := range in.Loss {

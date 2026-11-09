@@ -246,7 +246,8 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 				State: inboundStateName(x.GetState()), LastErrorCode: errorCode(x.GetLastError())})
 		}
 		for _, p := range r.Msg.GetPortChecks() {
-			n.UDPChecks = append(n.UDPChecks, accUDPCheck{Port: p.GetPort(), Verdict: clean(p.GetVerdict(), 12), Sender: nm(p.GetSender()), CheckedUnix: p.GetCheckedUnix()})
+			n.UDPChecks = append(n.UDPChecks, accUDPCheck{Port: p.GetPort(), Verdict: clean(p.GetVerdict(), 12), Sender: nm(p.GetSender()),
+				SenderVerdict: clean(p.GetSenderVerdict(), 12), ConfirmSender: nm(p.GetConfirmSender()), ConfirmVerdict: clean(p.GetConfirmVerdict(), 12), CheckedUnix: p.GetCheckedUnix()})
 		}
 		for _, t := range r.Msg.GetTcpChecks() {
 			n.TCPChecks = append(n.TCPChecks, accTCPCheck{Port: t.GetPort(), Verdict: clean(t.GetVerdict(), 12), Sender: nm(t.GetSender()), CheckedUnix: t.GetCheckedUnix()})
