@@ -23,9 +23,9 @@ Mistgate is a self-hosted panel for a small VPN fleet that you run on your own s
 
 - **Not a VPN service.** You bring the servers and the domain names and you run everything. Mistgate does not rent servers or sell access.
 - **Not a billing system.** There are no payments, tariffs or invoices. Traffic quotas, terms and device limits are limits you set yourself.
-- **Not a client app.** People connect with existing apps: a subscription app such as Happ, or an app on the mihomo core such as kl!ck (recommended on Windows and macOS), Clash Verge or FlClash, and AmneziaVPN for AmneziaWG keys.
+- **Not a client app.** People connect with existing apps: a subscription app such as Happ, or an app on the mihomo core such as kl!ck (recommended on Windows and macOS), Clash Verge or FlClash, and AmneziaVPN for AmneziaWG keys. An app of our own is **Planned**.
 - **Not finished.** This is an early release: the API, the stored settings and the node protocol may still change before 1.0. The data model is sized for about 5000 users and 50 nodes.
-- **Not a one-click installer.** You install the panel by hand, from the Linux binaries of a GitHub release or built from source. A node is added from the admin, either automatically over SSH or with a one-time install command you run on the server. A one-line installer for the panel is **Planned**.
+- **Not a one-click installer.** The panel installs with [one command](install-panel.md#one-line-install) on a server of your own, or by hand from the Linux binaries of a GitHub release or built from source; you bring the server and the domain and create the owner account in your browser. A node is added from the admin, either automatically over SSH or with a one-time install command you run on the server.
 
 ## Who it is for
 

@@ -60,8 +60,8 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
         - "[客户端视角检测](../operations/health.md#客户端视角检测)：面板每 5 分钟像应用一样连接到服务器，包括 VLESS（REALITY 和 TLS，直连或通过 CDN）。"
         - "来自节点的[连接计数](../guide/nodes.md#协议配置)：连接次数、连接后立即断开、被拒绝的密钥、未完成的握手、在线时长和未知密钥，在用户页面按可归属的设备显示，在节点上按协议配置显示。统计 Hysteria2 和 AmneziaWG 的事件计数，并统计 VLESS 会话时长以及（v0.1.79 及以上版本 Agent 的）未知密钥；Hysteria2 还会记录连接如何结束（路径**冻结**、客户端**静默**或主动关闭）以及延迟和丢包；只有计数，保留 7 天（168 小时）。"
         - "[节点运行记录](../guide/nodes.md#运行记录)：每个节点 Agent 及其引擎 7 天内的警告和错误，不含客户端地址，所有管理员均可查看，也可通过 MCP 获取。"
-        - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元；以及 Debian 和 Ubuntu 上的**开启安全更新**。"
-        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点，使用 cheburcheck 的志愿者探测点和 bsbord 的移动 SIM 探测点（包括克里米亚，设有每月上限），比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警。"
+        - "[节点诊断](../operations/health.md#节点诊断)：检查主机并安全修复问题，其中[**刷新服务单元**](../operations/health.md#修复)可在管理后台中重写 Agent 的 systemd 单元；服务器关闭自动安全更新时的警告，以及 Debian 和 Ubuntu 上的修复**开启安全更新**。"
+        - "[可达性](../operations/reachability.md)：独立的部分，显示每个节点最近一周的情况；通过 Globalping 使用俄罗斯境内的探测点，使用 cheburcheck 的志愿者探测点和 bsbord 的移动 SIM 探测点（包括克里米亚，设有每月上限），比对 antifilter 封锁名单，从你在俄罗斯的节点运行 TSPU 探测，并接收 kl!ck 用户从自己网络发来的报告；每个来源单独开启，默认关闭；节点从该国无法连接时会打开告警；节点的 IPv6 可用时，也会按其 IPv6 地址检测。"
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
@@ -137,36 +137,40 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
   title: 下一步
   lead: 队列中的下一批计划。
   cards:
-    - title: IPv6：用于检测，也作为入口
-      section: health
-      text: "通过 IPv6 检测可达性和带管理后台卡片的 IPv6 入口已在最新版本中；接下来是一键更换 IPv6 地址。"
+    - title: Mistgate 客户端
+      icon: monitor
+      text: "我们自己的桌面应用，先做 Windows 版。它直接与面板通信，而不只是通过订阅链接；自己支持 Hysteria2 和 AmneziaWG，内置 TSPU 及其他封锁的检测器，并在用户同意后把调试报告发送到面板。工作会在单独的仓库中开始。在此之前，用户继续使用现有应用连接：参见[客户端应用](../guide/client-apps.md)。"
+    - title: 应用中的自动选服务器
+      section: subscriptions
+      text: "Mihomo 配置中的 `url-test` 组和 sing-box 中的 `urltest`，让应用自己选择可用且较快的服务器，而不是列表中的第一个（issue #44）。默认开启，带开关。参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)。"
+    - title: 缓慢的 Agent 更新
+      section: updates
+      text: "可配置的 Agent 下载超时时间和实时进度，适用于链路较慢的节点（PR #43）。目前面板固定等待 Agent 应答 10 分钟，下载也计入其中。参见[已签名的节点 Agent 更新](../operations/updates.md)。"
+    - title: 连接来自哪个运营商
+      section: reachability
+      text: "按小时统计每个连接所属的网络（ASN），绝不记录地址：按运营商汇总（默认开启）和按人记录的模式（默认关闭），都保留 7 天。这样诊断能区分不同运营商。目前面板只能从国家检测的探测点和 kl!ck 用户的报告中得知运营商。参见[助手](../guide/assistant.md#排查哪些连不上)。"
+    - title: 一键更换 IPv6 地址
+      section: nodes
+      text: "IPv6 入口和通过 IPv6 的可达性检测自 v0.1.65 起已在发布版本中。节点 Agent 已能在服务器的出口网卡上保留一个额外地址；缺少的是面板这一半：一键用服务器自己 /64 网段中的新地址替换入口地址。参见 [IPv6 入口](../guide/nodes.md#ipv6-入口)。"
     - title: 你的用户在哪里
       section: settings
-      text: "首次设置和设置中的地区：DNS 预设、直连列表、推荐应用和可达性检测都跟随你选择的国家。第一个是中国：「国内网站直连」已在最新版本中。"
+      text: "首次设置和设置中的地区：DNS 预设、直连列表、推荐应用和可达性检测都跟随你选择的国家。与中国相关的部分已经有了（v0.1.64 起「国内网站直连」；v0.1.78 起节点诊断中的 AliDNS、DNSPod 和百度检查）；地区设置本身还没有。"
     - title: 看起来像普通自托管服务的伪装站
       section: settings
       text: "内置的伪装站：状态页、文件分享或某个服务的登录页样式，每个安装都不同，包括 404、429 和 robots.txt 的响应，扫描器无法识别；在那里登录总是失败，也不会保存任何内容。"
-    - title: 在真实账户上运行 Cloudflare 版
-      icon: globe
-      tag: 预览版
-      text: "首次在真实 Cloudflare 账户上运行 `mistgate edge deploy`：六个 Worker、带域名的路由器和 `--rollback`。目前只在模拟的 Cloudflare 环境中测试过命令和面板。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。"
     - title: 让 Cloudflare 版具备与 VPS 版相同的功能
       icon: layers
       text: "为六个 Worker 的版本补齐目前尚未提供的功能："
       points:
         - "加密备份和恢复；"
-        - "Telegram 告警；"
         - "MCP、助手、计划任务和新 API 令牌；"
         - "探测、调试抓取、面板日志和负载视图；"
         - "客户端视角隧道检测；"
-        - "从管理后台更新节点和面板；"
-        - "实时节点日志、节点自有站点伪装以及 WARP 注册。"
+        - "从管理后台更新面板；"
+        - "实时节点日志和节点自有站点伪装。"
     - title: 通过 cloud-init 安装
       section: settings
       text: "从云服务器的 user-data 无人值守地安装面板和节点，并提供常见云平台的现成示例。"
-    - title: 诊断检查安全更新
-      section: health
-      text: "当服务器关闭了自动安全更新时，诊断项会发出警告，并提供开启它们的修复。"
 - status: later
   title: 以后
   lead: 已计划，但尚未进入下一批队列。
@@ -189,6 +193,10 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
     - title: 在 VPS 版和 Cloudflare 版之间迁移
       icon: refresh
       text: "在两个版本之间迁移用户、节点和订阅链接，同时保持链接可用。目前要使用另一个版本，需要重新配置集群。参见[迁移](../getting-started/install-edge.md#在-vps-面板和-cloudflare-版之间迁移)。"
+    - title: 在真实账户上运行 Cloudflare 版
+      icon: globe
+      tag: 预览版
+      text: "首次在真实 Cloudflare 账户上运行 `mistgate edge deploy`：六个 Worker、带域名的路由器和 `--rollback`。目前只在模拟的 Cloudflare 环境中测试过命令和面板。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。"
 - status: goal
   title: 迈向 1.0
   lead: 1.0 的发布条件。达到这些条件前仍可能有不兼容变更。
@@ -206,7 +214,6 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.81`�
 - 如果节点 Agent 没有报告所需能力，客户端视角检测会跳过 VLESS。v0.1.34 之前的 Agent 没有 VLESS 引擎；TLS 协议配置还需要 `vless-tls/1`（v0.1.36 或更高版本）。
 - **检测端口**只从一个位置检测：集群中的另一节点或面板主机。对于 VLESS 端口，它会使用预期名称执行 TLS 握手，不会执行 REALITY 握手。
 - SSH 安装使用面板自己的密钥、密码，或一次性使用所有者自己的私钥登录，节点卡片可以管理 `authorized_keys`。在 sshd 中关闭密码登录和轮换面板密钥，目前尚未提供。见[通过 SSH 安装节点](../getting-started/ssh-install.md)。
-- MCP 现在可以在所有者批准后创建、修改协议配置，并将其部署到节点和分组。分组需要预先在管理后台创建。
 - 备份可保存到 Cloudflare R2 或所有者电脑上的文件。恢复功能在 VPS 版中提供（面板和安装程序）；Cloudflare 版的数据保存在 D1 中，暂不支持恢复。
 - 面板不会创建 Cloudflare 账户、存储桶或令牌；你需要提供一个仅限存储桶且具有读取、写入和删除权限的令牌。
 - Cloudflare 版仍处于预览阶段，尚未在真实 Cloudflare 账户上试过，也尚未提供部分功能（参见[列表](../getting-started/install-edge.md#此版本中尚不可用的功能)），也无法在 Cloudflare 版和 VPS 面板之间迁移集群。

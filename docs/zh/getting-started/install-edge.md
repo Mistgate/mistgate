@@ -5,7 +5,7 @@ description: 使用 mistgate edge deploy 在 Cloudflare 上运行面板，无需
 
 Cloudflare 版是为 WebAssembly 构建的同一面板，由六个 Cloudflare Workers 和一个 D1 数据库运行，无需在自有 Linux 服务器上运行二进制文件。运行一条命令 `mistgate edge deploy` 即可在 Cloudflare 账户中创建所有内容。节点仍然是你自己的服务器，照常从管理后台添加。本页介绍如何从 Cloudflare 账户开始，在管理后台创建所有者账户。示例使用 `panel.example.com`。
 
-> **警告：** 此版本为预览版。`mistgate edge deploy` 和面板已在模拟的 Cloudflare 环境中测试，并自 2026 年 10 月起在一个真实账户上配合一个测试节点运行。从 v0.1.36 起，发布版本中已包含 Cloudflare 版发布包。不要将依赖面板的用户迁移到此版本。部分功能尚不可用，见下文「此版本中尚不可用的功能」。如果现在需要可靠的面板，使用[安装面板](install-panel.md)。
+> **警告：** 此版本为预览版。`mistgate edge deploy` 和面板已在模拟的 Cloudflare 环境中测试；2026 年 10 月曾在一个真实账户上配合一个测试节点完成首次部署，但尚未在真实账户上完整测试。从 v0.1.36 起，发布版本中已包含 Cloudflare 版发布包。不要将依赖面板的用户迁移到此版本。部分功能尚不可用，见下文「此版本中尚不可用的功能」。如果现在需要可靠的面板，使用[安装面板](install-panel.md)。
 
 ## 要求
 

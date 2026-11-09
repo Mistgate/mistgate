@@ -60,8 +60,8 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
         - "[Client-eye checks](../operations/health.md#client-eye-checks): every 5 minutes the panel connects to the servers the way an app does, VLESS included (REALITY and TLS, directly or through the CDN)."
         - "[Connection counters](../guide/nodes.md#profiles) from the nodes: connections, drops right after connecting, refused keys, handshakes that never complete, time online and unknown keys, per device on a person's page when attribution is available and per profile on the node. Hysteria2 and AmneziaWG event counters, plus VLESS session time and, with an agent from v0.1.79, unknown keys; for Hysteria2 also how connections end (a **frozen** path, a **quiet** client, a close), RTT and loss; counts only, kept 7 days (168 hours)."
         - "The [node journal](../guide/nodes.md#journal): the warnings and errors of each node's agent and engines for 7 days, without client addresses, for every admin and in MCP."
-        - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin, and **Turn on security updates** on Debian and Ubuntu."
-        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, cheburcheck's volunteer probes and bsbord's mobile SIM probes (Crimea included, with a monthly cap), the antifilter block lists, a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country."
+        - "The [node doctor](../operations/health.md#node-doctor): host checks and safe fixes, among them [**Refresh the service**](../operations/health.md#fixes), which rewrites the agent's systemd unit from the admin, a warning when the server's automatic security updates are off, and the fix **Turn on security updates** on Debian and Ubuntu."
+        - "[Reachability](../operations/reachability.md), a section of its own with each node's week: probes inside Russia through Globalping, cheburcheck's volunteer probes and bsbord's mobile SIM probes (Crimea included, with a monthly cap), the antifilter block lists, a TSPU probe from your own node in Russia and the reports of kl!ck users from their own networks, each switched on separately and off by default, with an alert when a node is unreachable from the country; each node is also measured over its IPv6 address when its IPv6 works."
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
@@ -137,36 +137,40 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
   title: Next
   lead: The next items in the queue.
   cards:
-    - title: IPv6 for reachability and as a way in
-      section: health
-      text: "Reachability checks over IPv6 and the IPv6 entry with its card in the admin are in the latest releases; next a new IPv6 address in one click."
+    - title: Mistgate client
+      icon: monitor
+      text: "Our own desktop app, Windows first. It talks to the panel natively, not only through a subscription link, speaks Hysteria2 and AmneziaWG itself, has built-in detectors of TSPU and other blocking, and sends debug reports to the panel with the person's consent. The work starts in a separate repository. Until then people connect with existing apps: see [Client apps](../guide/client-apps.md)."
+    - title: Automatic server choice in the apps
+      section: subscriptions
+      text: "A `url-test` group in the Mihomo profile and `urltest` in sing-box, so the app picks a working, fast server by itself instead of the first one in the list (issue #44). On by default, with a switch. See [What works where](../guide/subscriptions.md#what-works-where)."
+    - title: Slow agent updates
+      section: updates
+      text: "A configurable timeout for the agent's download, with live progress, for nodes on slow links (PR #43). Today the panel waits a fixed 10 minutes for the agent's answer, the download included. See [Signed node agent updates](../operations/updates.md)."
+    - title: Which operator a connection comes from
+      section: reachability
+      text: "The network (ASN) of each connection, counted per hour, never the address: an aggregate per operator, on by default, and a mode per person, off by default, both kept 7 days. It lets the diagnosis tell operators apart. Today the panel learns operators only from the country check's probes and the reports of kl!ck users. See [Assistant](../guide/assistant.md#work-out-what-does-not-open)."
+    - title: A new IPv6 address in one click
+      section: nodes
+      text: "The IPv6 entry and the reachability checks over IPv6 are in the releases since v0.1.65. The node agent already keeps an extra address on the server's uplink; the panel's half is missing: replacing the entry's address with a new one from the server's own /64 in one click. See [IPv6 entry](../guide/nodes.md#ipv6-entry)."
     - title: Where your people are
       section: settings
-      text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China is the first: Chinese sites direct is in the latest release."
+      text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China's pieces are already in (Chinese sites direct since v0.1.64; AliDNS, DNSPod and a Baidu check in the node doctor since v0.1.78); the setting itself is not."
     - title: Decoys that look like an ordinary self-hosted service
       section: settings
       text: "Built-in decoy sites in the style of a status page, a file share or a service's sign-in page, different on every installation, down to the 404, 429 and robots.txt answers, so that probers cannot recognise them; a sign-in there always fails and keeps nothing."
-    - title: The Cloudflare edition on a real account
-      icon: globe
-      tag: Preview
-      text: "The first run of `mistgate edge deploy` on a real Cloudflare account: the six Workers, the router with the domain, and `--rollback`. So far the command and the panel have been tested against a simulated Cloudflare only. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
     - title: The Cloudflare edition on par with the VPS
       icon: layers
       text: "Bring to the six-Worker edition what it does not have yet:"
       points:
         - "encrypted backups and restore;"
-        - "Telegram alerts;"
         - "MCP, the assistant, scheduled tasks and new API tokens;"
         - "probes, the debug capture, panel logs and the Load view;"
         - "client-eye tunnel checks;"
-        - "node and panel updates from the admin;"
-        - "live node logs, an Own site decoy for a node, and WARP registration."
+        - "updating the panel from the admin;"
+        - "live node logs and an Own site decoy for a node."
     - title: Install from cloud-init
       section: settings
       text: "An unattended install of the panel and of a node from a cloud server's user-data, with ready examples for common clouds."
-    - title: The doctor checks security updates
-      section: health
-      text: "A doctor item that warns when the server's automatic security updates are off, with a fix that turns them on."
 - status: later
   title: Later
   lead: Planned, but not next in the queue.
@@ -189,6 +193,10 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
     - title: Moving between the VPS and the Cloudflare edition
       icon: refresh
       text: "Moving users, nodes and subscription links either way, with the links still working. Today a fleet is set up again for the other edition. See [Moving](../getting-started/install-edge.md#moving-between-a-vps-panel-and-the-edge)."
+    - title: The Cloudflare edition on a real account
+      icon: globe
+      tag: Preview
+      text: "The first run of `mistgate edge deploy` on a real Cloudflare account: the six Workers, the router with the domain, and `--rollback`. So far the command and the panel have been tested against a simulated Cloudflare only. See [Install the Cloudflare edition](../getting-started/install-edge.md)."
 - status: goal
   title: Road to 1.0
   lead: The conditions for 1.0. Until then, breaking changes are possible.
@@ -206,7 +214,6 @@ Mistgate is in **beta**; the current release is `v0.1.81`. It runs in production
 - Client-eye checks skip VLESS when the node agent does not report the required capability. Agents before v0.1.34 have no VLESS engine; TLS profiles also require `vless-tls/1` (v0.1.36 or later).
 - **Check ports** looks from one vantage point: another node of the fleet or the panel host. On VLESS ports it runs a TLS handshake with the expected name, not a REALITY handshake.
 - The SSH installation logs in with the panel's own key, a password, or once with the owner's own private key, and the node card manages `authorized_keys`. Closing password login in sshd and rotating the panel's key are not there yet. See [Install a node over SSH](../getting-started/ssh-install.md).
-- MCP can now create and update profiles and deploy them to nodes and groups with the owner's approval; create groups in the admin first.
 - Backups go to Cloudflare R2 or to a file on the owner's computer. Restore is in the VPS edition (the panel and the installer); the Cloudflare edition keeps its data in D1 and has no restore yet.
 - The panel does not create a Cloudflare account, a bucket or a token: you supply a bucket-scoped token with read, write and delete access.
 - The Cloudflare edition is a preview, not yet tried on a real Cloudflare account: some features are not available in it yet (see [the list](../getting-started/install-edge.md#not-available-in-this-edition-yet)), and a fleet cannot be moved between it and a VPS panel.

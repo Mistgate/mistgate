@@ -52,7 +52,7 @@ Mistgate 需要一台 Linux 面板服务器、一台或多台 Linux 节点服务
 
 | 工具 | 版本 |
 |:--|:--|
-| Go | 1.27。`go.mod` 指定工具链版本（`go1.27.1`）；使用默认的 `GOTOOLCHAIN=auto` 时，较旧版本的 Go 会自动下载该工具链。 |
+| Go | 1.27。`go.mod` 指定工具链版本（`go1.27.3`）；使用默认的 `GOTOOLCHAIN=auto` 时，较旧版本的 Go 会自动下载该工具链。 |
 | Node.js | 22（CI 使用的版本）或更高版本：管理后台 SPA 需要构建并嵌入面板二进制文件。 |
 | pnpm | 10：`web/package.json` 固定使用 `pnpm@10.33.2`，启用 Corepack 时由它管理版本。 |
 | make 和 POSIX shell | 在 Windows 上使用 Git Bash 或 WSL。 |

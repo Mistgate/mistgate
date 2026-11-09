@@ -52,7 +52,7 @@ Every [GitHub release](https://github.com/Mistgate/mistgate/releases/latest) car
 
 | Tool | Version |
 |:--|:--|
-| Go | 1.27. `go.mod` names the toolchain (`go1.27.1`); with `GOTOOLCHAIN=auto` (the default) an older Go downloads it. |
+| Go | 1.27. `go.mod` names the toolchain (`go1.27.3`); with `GOTOOLCHAIN=auto` (the default) an older Go downloads it. |
 | Node.js | 22 (what CI builds with) or newer: the admin SPA is built and embedded into the panel binary. |
 | pnpm | 10: `web/package.json` pins `pnpm@10.33.2`, which Corepack uses when it is on. |
 | make and a POSIX shell | On Windows, Git Bash or WSL. |

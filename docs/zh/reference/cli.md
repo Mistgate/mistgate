@@ -247,6 +247,7 @@ mistgate edge setup-link --file FILE
 | `run` | 在前台运行 Agent。 |
 | `cleanup-net` | 移除 Agent 的隧道接口、WARP 路由和 nftables 表。 |
 | `awg prepare-kernel` | 安装 AmneziaWG 内核模块。 |
+| `host enable-security-updates` | 开启自动安全更新（Debian 和 Ubuntu）。 |
 | `version` | 显示版本、构建时间和发布密钥指纹。 |
 
 `enroll` 和 `run` 都使用 `--state-dir`；两者必须指定同一目录。退出代码：成功为 0，错误为 1，用法错误为 2；节点尚未注册时 `run` 返回 78（此时 systemd 不会重启 Agent）。
@@ -311,7 +312,9 @@ next: mistgate-node install   (or, in the foreground: mistgate-node run)
 
 ### mistgate-node cleanup-net
 
-不接收参数。移除 Agent 的隧道接口、隧道 nftables 表，以及 WARP 设备、路由、规则和表（如果存在）。不需要状态目录或面板。服务单元每次停止后都会运行此命令；Agent 启动时会重新创建这些内容。
+移除 Agent 的隧道接口、隧道 nftables 表，以及 WARP 设备、路由、规则和表（如果存在）。不需要状态目录或面板。服务单元每次停止后都会运行此命令；Agent 启动时会重新创建这些内容。
+
+Agent 为 [IPv6 入口](../guide/nodes.md#ipv6-入口)保留的 IPv6 地址在停止、重启和更新后仍会保留。`--ipv6-addresses` 会一并移除它们，但只限 Agent 自己添加的地址（记录在状态目录的 `ipv6-owned.json` 中，`--state-dir`），绝不动主机自带的地址；用于手动清理服务器。
 
 ### mistgate-node awg prepare-kernel
 
@@ -330,6 +333,10 @@ mistgate-node awg prepare-kernel --yes    # 执行命令
 | `--timeout` | `45m` | 本次运行的最长时限。 |
 
 它会使用 apt 安装软件包（非交互式；如其他包管理器持有锁，最多等待 30 分钟）。支持 Debian 和 Ubuntu；不支持容器；必须关闭 Secure Boot 并使用 systemd。参见 [AmneziaWG](../guide/amneziawg.md)。
+
+### mistgate-node host enable-security-updates
+
+开启自动安全更新。仅限 Linux，以 root 身份运行。需要时安装 `unattended-upgrades`，并启用 APT 的周期性设置和 apt-daily 定时器；不会安装升级，也不会重启。不带 `--yes` 时只说明将做的更改。`--status-file` 把进度写入文件（诊断的修复**开启安全更新**运行此命令时，Agent 用它跟踪进度），`--timeout` 限制运行时间（默认 `20m`）。参见[修复](../operations/health.md#修复)。
 
 ### mistgate-node version
 

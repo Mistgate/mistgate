@@ -36,7 +36,7 @@ Paneli bir sunucuya kurar, VPN sunucularınızı ona düğüm olarak eklersiniz.
 - Panelin adresini açan yabancılar bir kamuflaj sitesi görür; yönetim paneli gizli bir yolun ya da ana bilgisayar adının arkasındadır.
 - Yerleşik asistan (kendi anahtarınızla bağladığınız bir bulut modeli) düğümleriniz ve kişiler hakkındaki sorulara yanıt verir ve değişiklikleri sizin uygulayacağınız kartlar olarak hazırlar. MCP, dışarıdaki bir yapay zekâ ajanının düğümlerin durumunu okumasına, düğümler arasındaki yolları sınamasına ve değişiklik planlamasına izin verir; riskli olanlar yönetim panelinde sizin onayınızı bekler. [Asistan](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
 
-Henüz olmayanlar: Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](docs/en/getting-started/install-edge.md). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.
+Henüz olmayanlar: kendi uygulamamız (planlandı); Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](docs/en/getting-started/install-edge.md). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.
 
 ## Protokoller
 
@@ -55,7 +55,7 @@ Bir protokol, ikili dosyalara derlenmiş iki yarıdan oluşur. Panel tarafında 
 
 ## Kararlı mı?
 
-Beta aşamasında ve henüz genç: v0.1.0 etiketi 2026-10-03'te atıldı, v0.1.63 (2026-10-27) ise 64. etiket. 1.0'a kadar API, kayıtlı ayarlar ve düğüm protokolü değişebilir. Sürümler henüz eski sürümlerden otomatik bir yükseltme testinden geçmiyor; bu, [1.0 koşullarından](docs/en/roadmap/status.md) biri.
+Beta aşamasında ve henüz genç: v0.1.0 etiketi 2026-10-03'te atıldı, v0.1.81 ise 82. etiket. 1.0'a kadar API, kayıtlı ayarlar ve düğüm protokolü değişebilir. Sürümler henüz eski sürümlerden otomatik bir yükseltme testinden geçmiyor; bu, [1.0 koşullarından](docs/en/roadmap/status.md) biri.
 
 Ben kendi altı sunucumda, ailem ve arkadaşlarım için kullanıyorum.
 

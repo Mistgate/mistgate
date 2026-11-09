@@ -40,6 +40,7 @@ There is no built-in limit on users or nodes. Mistgate is built for a small flee
 - WARP uses its IPv4 endpoint, so a node without IPv6 is fine for WARP.
 - The panel listens on whatever `--listen` names; `:443` covers IPv4 and IPv6.
 - Rate limits and sign-in lockouts treat one IPv6 /64 as one client.
+- A node whose IPv6 works can also offer an [IPv6 entry](../guide/nodes.md#ipv6-entry): one more server at its IPv6 address, for people whose network blocks the node's IPv4 address.
 
 ## Can the panel run behind Cloudflare?
 
@@ -53,7 +54,7 @@ Cloudflare then sees the admin's traffic, including its secret address. The Clou
 
 ## Can the panel run on Cloudflare Workers, with no server?
 
-As a preview, yes: `mistgate edge deploy` puts the panel on six Workers and a D1 database in your Cloudflare account. It needs Workers Paid and a domain on Cloudflare DNS. Alerts, Telegram and node updates work there; backups, MCP, tunnel checks, the live node log (the saved journal works) and updating the panel from the admin are not available yet. See [Install the Cloudflare edition](../getting-started/install-edge.md).
+As a preview, yes: `mistgate edge deploy` puts the panel on six Workers and a D1 database in your Cloudflare account. It needs Workers Paid and a domain on Cloudflare DNS. Alerts, Telegram and node updates work there; backups, MCP, the assistant, tunnel checks, the live node log (the saved journal works) and updating the panel from the admin are not available yet. See [Install the Cloudflare edition](../getting-started/install-edge.md).
 
 ## Can I migrate from another panel?
 

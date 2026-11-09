@@ -185,7 +185,7 @@ An Admin token can read protocol schemas and profile state, then create, update 
 
 **Approve** asks for your passkey or authenticator code once more. For a node installation the approval card also shows the SHA-256 host key fingerprint the panel read and its key type: compare it with a trusted copy (your provider's console), tick the confirmation and choose how the panel logs in: **Panel key** or **Password** (type the server's SSH password there). The panel keeps the choice, and a typed password, sealed to that one plan; the agent's apply carries only the confirm token, so a password never passes through the agent or its model provider. Plans expire 10 minutes after they are made.
 
-The agent never gets subscription links, device keys or configurations, page passwords or any server password; node addresses are hidden from it too, except the SSH endpoint and login an Admin token works with. A password change through MCP (`node_server_password_rotate_plan`, then `node_server_password_rotate_apply`) makes the panel generate the new password; you reveal it in the node's **Settings → SSH access**.
+The agent never gets subscription links, device keys or configurations, page passwords or any server password; node addresses are hidden from it too, except the SSH endpoint and login an Admin token works with. A password change through MCP (`node_server_password_rotate_plan`, then `node_server_password_rotate_apply`) makes the panel generate the new password; you reveal it in the node's **Server → SSH access**.
 
 ### Try it on a test panel
 

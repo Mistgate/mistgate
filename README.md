@@ -36,7 +36,7 @@ You put the panel on one server and add your VPN servers to it as nodes. Each pe
 - Strangers who open the panel's address see a decoy site; the admin is behind a secret path or host name.
 - A built-in assistant (a cloud model you connect with your own key) answers about your nodes and people and prepares changes you apply. MCP lets an outside AI agent read the fleet, test paths between your nodes and plan changes; risky ones wait for your approval in the admin. [Assistant](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
 
-Not there yet: a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](docs/en/getting-started/install-edge.md). Some defaults lean towards users in Russia; all of them are settings.
+Not there yet: an app of our own (planned), a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](docs/en/getting-started/install-edge.md). Some defaults lean towards users in Russia; all of them are settings.
 
 ## Protocols
 
@@ -55,7 +55,7 @@ A protocol is two halves compiled into the binaries. On the panel, one Go interf
 
 ## Is it stable?
 
-It is beta, and young: v0.1.0 was tagged on 2026-10-03, and v0.1.63 (2026-10-27) is the 64th tag. Until 1.0 the API, the stored settings and the node protocol may still change. Releases do not go through an automated upgrade test from older versions yet; that is one of the [conditions for 1.0](docs/en/roadmap/status.md).
+It is beta, and young: v0.1.0 was tagged on 2026-10-03, and v0.1.81 is the 82nd tag. Until 1.0 the API, the stored settings and the node protocol may still change. Releases do not go through an automated upgrade test from older versions yet; that is one of the [conditions for 1.0](docs/en/roadmap/status.md).
 
 I run it on my own six servers for family and friends.
 

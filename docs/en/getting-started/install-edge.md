@@ -5,7 +5,7 @@ description: "Run the panel on Cloudflare Workers instead of a server with mistg
 
 The Cloudflare edition is the same panel, built for WebAssembly and run by six Cloudflare Workers with a D1 database, instead of a binary on your own Linux server. One command, `mistgate edge deploy`, creates everything on your Cloudflare account. The nodes are still your servers, added from the admin as usual. This page takes you from a Cloudflare account to the owner account in the admin. The examples use `panel.example.com`.
 
-> **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare and run on a real account with one test node since October 2026. The edge bundle is in the releases since v0.1.36. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
+> **Warning:** this edition is a preview. `mistgate edge deploy` and the panel have been tested against a simulated Cloudflare; a first deploy on a real account with one test node came up in October 2026, but the edition has not been fully tested on a real account yet. The edge bundle is in the releases since v0.1.36. Do not move a panel that people depend on here. Some features are not available yet: see "Not available in this edition yet" below. If you want a panel you can rely on today, use [Install the panel](install-panel.md).
 
 ## Requirements
 

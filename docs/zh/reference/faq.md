@@ -40,6 +40,7 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 - WARP 使用 IPv4 端点，因此没有 IPv6 的节点也可以使用 WARP。
 - 面板会监听 `--listen` 指定的地址；`:443` 同时覆盖 IPv4 和 IPv6。
 - 速率限制和登录锁定会将一个 IPv6 /64 视为一个客户端。
+- IPv6 可用的节点还可以提供 [IPv6 入口](../guide/nodes.md#ipv6-入口)：在它的 IPv6 地址上多一个服务器，供所在网络封锁了该节点 IPv4 地址的用户使用。
 
 ## 面板可以运行在 Cloudflare 代理之后吗？
 
@@ -53,7 +54,7 @@ Mistgate 由两个静态 Go 二进制文件组成：内嵌 SQLite 数据库和�
 
 ## 面板可以不使用服务器，直接运行在 Cloudflare Workers 上吗？
 
-可以作为预览版使用：`mistgate edge deploy` 会将面板部署到 Cloudflare 账户中的六个 Worker 和一个 D1 数据库。它需要 Workers Paid 计划和 Cloudflare DNS 中的域名。告警、Telegram 和节点更新均可使用；备份、MCP、隧道检测、节点实时日志（已保存的运行记录可用）以及从管理后台更新面板本身暂不支持。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。
+可以作为预览版使用：`mistgate edge deploy` 会将面板部署到 Cloudflare 账户中的六个 Worker 和一个 D1 数据库。它需要 Workers Paid 计划和 Cloudflare DNS 中的域名。告警、Telegram 和节点更新均可使用；备份、MCP、助手、隧道检测、节点实时日志（已保存的运行记录可用）以及从管理后台更新面板本身暂不支持。参见[安装 Cloudflare 版](../getting-started/install-edge.md)。
 
 ## 可以从其他面板迁移吗？
 

@@ -247,6 +247,7 @@ Prints `mistgate <version>`, then `built <time>` when the binary was built with 
 | `run` | Runs the agent in the foreground. |
 | `cleanup-net` | Removes the agent's tunnel interfaces, WARP routes and nftables tables. |
 | `awg prepare-kernel` | Installs the AmneziaWG kernel module. |
+| `host enable-security-updates` | Turns on automatic security updates (Debian and Ubuntu). |
 | `version` | Prints the version, the build time and the release key fingerprint. |
 
 `enroll` and `run` take `--state-dir`; give them the same directory. Exit codes: 0 success, 1 an error, 2 bad usage, 78 from `run` when the node is not enrolled (systemd does not restart the agent then).
@@ -311,7 +312,9 @@ It exits with 78 when the state directory holds no identity, and with 0 when the
 
 ### mistgate-node cleanup-net
 
-Takes no arguments. Removes the tunnel interfaces of the agent, its tunnel nftables table and, when present, the WARP device, routes, rules and table. It needs no state and no panel. The unit runs it after every stop; the agent creates everything again when it starts.
+Removes the tunnel interfaces of the agent, its tunnel nftables table and, when present, the WARP device, routes, rules and table. It needs no state and no panel. The unit runs it after every stop; the agent creates everything again when it starts.
+
+The IPv6 addresses the agent holds for the [IPv6 entry](../guide/nodes.md#ipv6-entry) stay through a stop, a restart and an update. `--ipv6-addresses` also removes them, only those the agent added (named in `ipv6-owned.json` in the state directory, `--state-dir`), never the host's own; use it for a hand clean of the server.
 
 ### mistgate-node awg prepare-kernel
 
@@ -330,6 +333,10 @@ mistgate-node awg prepare-kernel --yes    # runs it
 | `--timeout` | `45m` | Hard limit of the run. |
 
 It installs packages with apt (non-interactive, waiting up to 30 minutes for another package manager's lock). Supported: Debian and Ubuntu, not a container, without Secure Boot, with systemd. See [AmneziaWG](../guide/amneziawg.md).
+
+### mistgate-node host enable-security-updates
+
+Turns on automatic security updates. Linux only, as root. It installs `unattended-upgrades` if needed and enables the APT periodic settings and the apt-daily timers; it installs no upgrades and does not reboot. Without `--yes` it only describes the changes. `--status-file` writes progress to a file (the agent uses it when the doctor's fix **Turn on security updates** runs the command) and `--timeout` limits the run (default `20m`). See [Fixes](../operations/health.md#fixes).
 
 ### mistgate-node version
 
