@@ -84,6 +84,10 @@ jobs:
           printf 'version=%s\nbuilt=%s\ncommit=%s\n' "$TAG" "$(git log -1 --format=%ct)" "$(git rev-parse HEAD)" > release/BUILDINFO
           go run ./cmd/mistgate release build --version "$TAG" --key "$RELEASE_KEY" --out release \
             mistgate-node-linux-amd64 mistgate-node-linux-arm64
+          # the network (ASN) table from iptoasn.com: a release does not wait for a third-party site, it goes out without
+          # the table (and the nodes keep the one they have) when the source is down, stale or too small
+          go run ./cmd/mistgate release asndb --out release/mistgate-asndb-data-any \
+            || echo "::warning::No ASN table in this release: release asndb failed (see above)"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: node
@@ -199,6 +203,7 @@ jobs:
           set -euo pipefail
           cd release
           bins=(mistgate-linux-amd64 mistgate-linux-arm64 mistgate-node-linux-amd64 mistgate-node-linux-arm64 mistgate-edge.tar.gz)
+          [ ! -f mistgate-asndb-data-any ] || bins+=(mistgate-asndb-data-any)
           sha256sum "${bins[@]}" > SHA256SUMS
           channel=stable
           release_flags=()
@@ -211,4 +216,4 @@ jobs:
           fi
           gh release create "$TAG" "${bins[@]}" SHA256SUMS BUILDINFO install.sh --repo "$GITHUB_REPOSITORY" --verify-tag \
             --draft --title "$TAG" --generate-notes "${release_flags[@]}"
-          echo "::notice::The $channel release stays a draft until the owner rebuilds the binaries and the edge bundle from the tag, signs them with mistgate release sign and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig, panel-manifest.sshsig, edge-manifest.json and edge-manifest.sig. Publish it only after all seven are attached."
+          echo "::notice::The $channel release stays a draft until the owner rebuilds the binaries and edge bundle from the tag, validates and signs mistgate-asndb-data-any (when the release has it) with mistgate release sign, and uploads manifest.json, manifest.sig, panel-manifest.json, panel-manifest.sig, panel-manifest.sshsig, edge-manifest.json and edge-manifest.sig. Publish it only after all seven are attached."

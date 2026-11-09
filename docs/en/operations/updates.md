@@ -7,6 +7,8 @@ Node agents update themselves, but only to a build signed with the release key. 
 
 This page is for running a fleet. Making the release key, signing releases and publishing them is in [Releases and signing](releases.md).
 
+The signed node bundle also carries an IPv4 and IPv6 range table with ASN operator names, generated from iptoasn.com (PDDL 1.0). It contains network ranges, not client addresses or records about people.
+
 ## How trust works
 
 - There is one Ed25519 key pair, the **release key**. Its private half stays offline with whoever signs the releases; both binaries carry the public half, stamped in at build time. The official binaries carry the project's key. The panel also saves the key in `<data-dir>/release.pub` on its first start.

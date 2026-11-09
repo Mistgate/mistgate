@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/mod/modfile"
 
+	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/release"
 )
@@ -25,6 +26,7 @@ const releaseUsage = `usage:
   mistgate release keygen --out FILE
   mistgate release build --version V [--built UNIX] [--key PUBLIC] [--source DIR] NAME... --out DIR
   mistgate release sign --key FILE --version V [--built UNIX] [--expires 30d] [--source DIR] BINARY... --out DIR
+  mistgate release asndb [--v4 PATH_OR_HTTPS_URL] [--v6 PATH_OR_HTTPS_URL] --out FILE
   mistgate release trust-key [--data-dir DIR]
 
   keygen  make the owner's release key: the private key goes to FILE (mode 0600, never overwritten), the public key and
@@ -32,7 +34,8 @@ const releaseUsage = `usage:
   build   build release binaries (mistgate-linux-<arch>, mistgate-node-linux-<arch>) or the edge bundle from the checkout --source (default
           .) the one reproducible way; CI and make build use it. --built defaults to the commit time of the checkout.
   sign    rebuild every binary from --source, which must be a clean checkout of the tag --version, refuse any binary
-          that does not come out byte for byte the same, then write DIR/manifest.json and DIR/manifest.sig for the node
+          that does not come out byte for byte the same, and validate the source date and counts of
+          mistgate-asndb-data-any (signed as supplied, not rebuilt), then write DIR/manifest.json and DIR/manifest.sig for the node
           binaries, DIR/panel-manifest.json, DIR/panel-manifest.sig and DIR/panel-manifest.sshsig for the panel
           binaries, and copy the binaries into DIR. Signing a panel binary needs the SPA built in --source first (cd web && pnpm install
           --frozen-lockfile && pnpm build).
@@ -41,6 +44,8 @@ const releaseUsage = `usage:
   edge bundle  the Cloudflare edition: the name mistgate-edge.tar.gz given to build or sign. It holds the five role wasm files,
           the six Worker scripts, the SPA and edge.json, in a deterministic tarball. It needs the SPA built in --source and the pinned
           esbuild installed there (cd edge/worker && pnpm install --frozen-lockfile).
+  asndb   build the release-pinned IPv4/IPv6-to-ASN table from ip2asn TSV sources (HTTPS by default; gzip is accepted).
+          Local TSV files are also accepted. The output source timestamp, range count and ASN count are checked before signing.
   trust-key  after a key rotation: make the release key compiled into this binary the installation's key
           (<data-dir>/release.pub). Until then a panel whose compiled key differs from release.pub trusts no bundle.
           Restart the panel afterwards.
@@ -58,6 +63,8 @@ func runRelease(args []string, out io.Writer) error {
 		return releaseBuild(args[1:], out)
 	case "sign":
 		return releaseSign(args[1:], out, time.Now())
+	case "asndb":
+		return releaseASNDB(args[1:], out, time.Now())
 	case "trust-key":
 		return releaseTrustKey(args[1:], out)
 	}
@@ -259,7 +266,13 @@ func checkReproduced(src, version string, built int64, key string, bins []string
 	defer os.RemoveAll(tmp)
 	for _, b := range bins {
 		name := filepath.Base(b)
-		base, _, _, _ := release.ParseBinaryName(name)
+		base, goos, goarch, _ := release.ParseBinaryName(name)
+		if base == "mistgate-asndb" {
+			if goos != "data" || goarch != "any" {
+				return fmt.Errorf("%s: ASN table must be named mistgate-asndb-data-any", name)
+			}
+			continue // the owner signs the source-derived table; it is not reproducible from the tagged source tree
+		}
 		if base == "mistgate" || name == release.EdgeBundleName {
 			if _, err := os.Stat(filepath.Join(src, "web", "dist", "index.html")); err != nil {
 				return fmt.Errorf("%s embeds the admin SPA: build it in %s first (cd web && pnpm install --frozen-lockfile && pnpm build)", name, src)
@@ -343,6 +356,10 @@ func releaseBuild(args []string, out io.Writer) error {
 }
 
 func releaseSign(args []string, out io.Writer, now time.Time) error {
+	return releaseSignWithASNDBLimits(args, out, now, asndb.DefaultReleaseLimits())
+}
+
+func releaseSignWithASNDBLimits(args []string, out io.Writer, now time.Time, asnLimits asndb.ReleaseLimits) error {
 	fs := flag.NewFlagSet("release sign", flag.ContinueOnError)
 	keyFile := fs.String("key", "", "release private key file (made by release keygen)")
 	version := fs.String("version", "", "the release tag, e.g. v0.1.4")
@@ -415,14 +432,22 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 		if err != nil {
 			return err
 		}
-		base, _, _, _ := release.ParseBinaryName(f.Name)
+		base, goos, goarch, _ := release.ParseBinaryName(f.Name)
 		switch base {
 		case "mistgate-node":
+			node.Files = append(node.Files, f)
+		case "mistgate-asndb":
+			if goos != "data" || goarch != "any" {
+				return fmt.Errorf("%s: ASN table must be named mistgate-asndb-data-any", b)
+			}
+			if err := validateASNDBFileWithLimits(b, now, asnLimits); err != nil {
+				return fmt.Errorf("%s: %w", f.Name, err)
+			}
 			node.Files = append(node.Files, f)
 		case "mistgate":
 			panel.Files = append(panel.Files, f)
 		default:
-			return fmt.Errorf("%s: only mistgate-node-<os>-<arch> and mistgate-<os>-<arch> binaries are signed", b)
+			return fmt.Errorf("%s: only mistgate-node-<os>-<arch>, mistgate-asndb-data-any and mistgate-<os>-<arch> files are signed", b)
 		}
 	}
 	if edge != nil {
@@ -466,8 +491,9 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 	}
 	for _, b := range bins {
 		mode := os.FileMode(0o755)
-		if filepath.Base(b) == release.EdgeBundleName {
-			mode = 0o644 // not an executable
+		base, _, _, _ := release.ParseBinaryName(filepath.Base(b))
+		if filepath.Base(b) == release.EdgeBundleName || base == "mistgate-asndb" {
+			mode = 0o644 // data files and the edge bundle are not executables
 		}
 		if err := copyInto(b, filepath.Join(*outDir, filepath.Base(b)), mode); err != nil {
 			return err
@@ -514,7 +540,7 @@ func releaseSign(args []string, out io.Writer, now time.Time) error {
 			fmt.Fprintf(out, "  %-32s %10d bytes  sha256 %s\n", f.Name, f.Size, f.SHA256[:12])
 		}
 	}
-	fmt.Fprintf(out, "rebuilt from %s and signed with key %s\nUpload the manifests and signatures, including %s, in %s to the release, or copy the node bundle to <data-dir>/dist on the panel.\n",
+	fmt.Fprintf(out, "checked release files for %s and signed with key %s\nUpload the manifests and signatures, including %s, in %s to the release, or copy the node bundle to <data-dir>/dist on the panel.\n",
 		*version, buildinfo.KeyFingerprint(pub), release.PanelSSHSIGName, *outDir)
 	return nil
 }

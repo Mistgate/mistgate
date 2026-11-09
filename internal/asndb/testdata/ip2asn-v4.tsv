@@ -1,0 +1,5 @@
+192.0.2.0	192.0.2.255	64500	DE	Example Telecom
+198.51.100.0	198.51.100.63	64500	DE	Example Telecom
+198.51.100.64	198.51.100.127	64500	DE	Example Telecom
+198.51.100.128	198.51.100.255	64501	NL	Example Transit 192.0.2.9
+203.0.113.0	203.0.113.255	64502	GB	Example Network with an intentionally long operator name for truncation

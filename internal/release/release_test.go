@@ -299,6 +299,37 @@ func TestFileFor(t *testing.T) {
 	}
 }
 
+func TestASNDataFileDoesNotMatchNodePlatform(t *testing.T) {
+	m := &Manifest{
+		Schema:  Schema,
+		Version: "v0.1.4",
+		Built:   1,
+		Expires: 2,
+		Files: []File{
+			{OS: "data", Arch: "any", Name: "mistgate-asndb-data-any", Size: 1, SHA256: strings.Repeat("0", 64)},
+			{OS: "linux", Arch: "amd64", Name: "mistgate-node-linux-amd64", Size: 1, SHA256: strings.Repeat("1", 64)},
+		},
+	}
+	body, err := m.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := Parse(body)
+	if err != nil {
+		t.Fatalf("manifest with the ASN data file did not parse: %v", err)
+	}
+	if f, err := parsed.FileFor("linux", "amd64"); err != nil || f.Name != "mistgate-node-linux-amd64" {
+		t.Fatalf("node selected %+v, %v", f, err)
+	}
+	if _, err := parsed.FileFor("data", "any"); err != nil {
+		t.Fatalf("data entry is not addressable by its manifest metadata: %v", err)
+	}
+	parsed.Files = parsed.Files[:1]
+	if _, err := parsed.FileFor("linux", "amd64"); !errors.Is(err, ErrNoFile) {
+		t.Fatalf("old agent matched the ASN data file: %v", err)
+	}
+}
+
 func TestVerifyFile(t *testing.T) {
 	m := sampleManifest()
 	f := m.Files[0] // "binary", 6 bytes
