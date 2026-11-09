@@ -3,20 +3,24 @@
 
 export type Vec3 = readonly [number, number, number];
 
-/** One palette: the four vectors of the formula and the stretch of `t` the band spans, trailing edge (t0) to leading edge (t1). */
-export type CosinePalette = { a: Vec3; b: Vec3; c: Vec3; d: Vec3; t0: number; t1: number };
+/**
+ * One palette: the four vectors of the formula and the stretch of `t` the band spans, trailing edge (t0) to leading edge (t1).
+ * With `ring` the formula is not used: the band runs through the halo's four colours instead (ringPalette), so the two match.
+ */
+export type CosinePalette = { a: Vec3; b: Vec3; c: Vec3; d: Vec3; t0: number; t1: number; ring?: Ring };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 /** The colour of the palette at `t`, each channel 0..1. */
 export function cosineColor(p: CosinePalette, t: number): Vec3 {
+  if (p.ring) return ringColor(p.ring, (t - 0.5) * 3);
   const ch = (i: 0 | 1 | 2) => clamp01(p.a[i] + p.b[i] * Math.cos(2 * Math.PI * (p.c[i] * t + p.d[i])));
   return [ch(0), ch(1), ch(2)];
 }
 
-export const paletteNames = ["spectrum", "prism", "lagoon", "berry", "citrus", "azure", "ember", "accent"] as const;
+export const paletteNames = ["ring", "spectrum", "prism", "lagoon", "berry", "citrus", "azure", "ember", "accent"] as const;
 export type PaletteName = (typeof paletteNames)[number];
-type Fixed = Exclude<PaletteName, "accent">;
+type Fixed = Exclude<PaletteName, "accent" | "ring">;
 
 const v = (x: number, y: number, z: number): Vec3 => [x, y, z];
 
@@ -54,10 +58,69 @@ export function accentPalette(hex: string): CosinePalette {
   return { a: v(a, a, a), b: v(b, b, b), c, d, t0: 0.18, t1: 0.82 };
 }
 
+/** The halo's ring of the accent as a band palette: the default, so a band and the halo of the same moment are one colour. */
+export const ringPalette = (accent: string): CosinePalette => ({ a: v(0, 0, 0), b: v(0, 0, 0), c: v(0, 0, 0), d: v(0, 0, 0), t0: 0, t1: 1, ring: ringColors(accent) });
+
 export function resolvePalette(p: PaletteName | CosinePalette | undefined, accent: string): CosinePalette {
   if (typeof p === "object") return p;
   if (p === "accent") return accentPalette(accent);
-  return palettes[p ?? "spectrum"];
+  if (p === undefined || p === "ring") return ringPalette(accent);
+  return palettes[p];
+}
+
+// --- the ring ---
+
+/** Four colours, inside to outside (on a band: trailing edge to leading edge). */
+export type Ring = readonly [Vec3, Vec3, Vec3, Vec3];
+const lavender = "#b8acf2";
+
+// The halo's four colours, inside to outside, for each accent preset (lib/accent.ts): the accent's own colour second, a cooler neighbour inside
+// it and warmer ones outside. Lavender keeps the first one (blue, violet, pink, peach).
+const rings: Record<string, Ring> = {
+  [lavender]: [[0.31, 0.55, 1], [0.63, 0.43, 1], [1, 0.43, 0.71], [1, 0.75, 0.55]],
+  "#7dd3a0": [[0.3, 0.7, 1], [0.35, 0.9, 0.62], [0.7, 0.95, 0.45], [1, 0.9, 0.55]],
+  "#8ec8ea": [[0.42, 0.45, 1], [0.35, 0.75, 1], [0.35, 0.95, 0.85], [0.75, 1, 0.8]],
+  "#dcc68c": [[1, 0.55, 0.55], [1, 0.68, 0.35], [1, 0.85, 0.4], [1, 0.96, 0.75]],
+  "#e6a6b0": [[0.7, 0.45, 1], [1, 0.45, 0.7], [1, 0.55, 0.5], [1, 0.78, 0.55]],
+  "#b0cc90": [[0.3, 0.8, 0.75], [0.55, 0.85, 0.45], [0.85, 0.92, 0.4], [1, 0.92, 0.65]],
+};
+
+const rgbOf = (hex: string): Vec3 => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as unknown as Vec3;
+
+function hueOf([r, g, b]: Vec3): number {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (d === 0) return 0;
+  const h = max === r ? (g - b) / d : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+/** The SVG hue-rotate matrix: turns a colour round the colour wheel, keeping its brightness. */
+function rotate([r, g, b]: Vec3, deg: number): Vec3 {
+  const c = Math.cos((deg * Math.PI) / 180);
+  const s = Math.sin((deg * Math.PI) / 180);
+  return [
+    clamp01((0.213 + 0.787 * c - 0.213 * s) * r + (0.715 - 0.715 * c - 0.715 * s) * g + (0.072 - 0.072 * c + 0.928 * s) * b),
+    clamp01((0.213 - 0.213 * c + 0.143 * s) * r + (0.715 + 0.285 * c + 0.14 * s) * g + (0.072 - 0.072 * c - 0.283 * s) * b),
+    clamp01((0.213 - 0.213 * c - 0.787 * s) * r + (0.715 - 0.715 * c + 0.715 * s) * g + (0.072 + 0.928 * c + 0.072 * s) * b),
+  ];
+}
+
+/** The ring for an accent: a preset's own, or for any other colour the nearest preset's, turned to that colour's hue. */
+export function ringColors(accent: string): Ring {
+  const hex = /^#[0-9a-f]{6}$/i.test(accent) ? accent.toLowerCase() : lavender;
+  if (rings[hex]) return rings[hex]!;
+  const hue = hueOf(rgbOf(hex));
+  const gap = (preset: string) => ((hue - hueOf(rgbOf(preset)) + 540) % 360) - 180;
+  const nearest = Object.keys(rings).reduce((a, b) => (Math.abs(gap(b)) < Math.abs(gap(a)) ? b : a));
+  return rings[nearest]!.map((c) => rotate(c, gap(nearest))) as unknown as Ring;
+}
+
+/** The ring's colour at `x` across it (-1.5 the inside colour .. 1.5 the outside one): the four blended smoothly, as the halo does. */
+export function ringColor(ring: Ring, x: number): Vec3 {
+  const w = ring.map((_, i) => Math.exp(-(((x - i + 1.5) / 0.8) ** 2)));
+  const sum = w.reduce((a, b) => a + b, 0) + 1e-4;
+  return [0, 1, 2].map((ch) => ring.reduce((acc, c, i) => acc + c[ch]! * w[i]!, 0) / sum) as unknown as Vec3;
 }
 
 /** A palette as `n` CSS colour stops, `lift` of the way to white (the CSS fallback's gradient, and the dev kit's swatches). */

@@ -40,7 +40,8 @@ export function HaloKit() {
         <strong>Mistgate <span className="font-normal text-muted">/ halo</span></strong>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-muted"><input type="checkbox" checked={on} onChange={(e) => setEffectsEnabled(e.target.checked)} />Effects</label>
-          <select aria-label="Accent" value={accent} onChange={(e) => setAccent(e.target.value)} className="rounded-ctl border border-line bg-canvas px-2 py-1 text-xs">{accentPresets.map((p) => <option key={p.id} value={p.color}>{p.id}</option>)}</select>
+          <select aria-label="Accent" value={accent} onChange={(e) => setAccent(e.target.value)} className="rounded-ctl border border-line bg-canvas px-2 py-1 text-xs">{accentPresets.map((p) => <option key={p.id} value={p.color}>{p.id}</option>)}{!accentPresets.some((p) => p.color === accent) && <option value={accent}>custom</option>}</select>
+          <input type="color" aria-label="Custom accent" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-7 w-9 cursor-pointer rounded-ctl border border-line bg-canvas" />
           <Button size="sm" variant="secondary" onClick={() => setChat((v) => !v)}>Assistant</Button>
           <ThemeToggle />
         </div>

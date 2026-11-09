@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setEffectKind, setEffectsEnabled } from "@/lib/effects";
-import { halo, ringColors, stopHalo } from "./halo";
+import { halo, stopHalo } from "./halo";
+import { ringColors } from "./palette";
 
 const realRect = HTMLElement.prototype.getBoundingClientRect;
 const realContext = HTMLCanvasElement.prototype.getContext;

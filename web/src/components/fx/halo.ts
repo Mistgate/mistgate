@@ -3,8 +3,8 @@
 // created, saved, or the assistant has answered; a new one replaces the one playing. Only transforms and one canvas of
 // light: nothing of the page is copied, so it starts in the frame it is asked for. Off with the effects, off with reduced
 // motion (it is decoration only: nothing appears or changes under it).
-import { accentPresets, defaultAccent, isHex } from "@/lib/accent";
 import { effectsEnabled, effectsFor, prefersReducedMotion, type FxKind } from "@/lib/effects";
+import { ringColors } from "./palette";
 
 type Point = { x: number; y: number };
 
@@ -125,51 +125,6 @@ function run(target: HTMLElement, host: HTMLElement | null, origin: Point, done:
     light?.remove();
     for (const it of items) it.el.style.transform = it.transform;
   };
-}
-
-type Rgb = [number, number, number];
-
-// The ring's four colours, inside to outside, for each accent: the accent's own colour second, a cooler neighbour inside
-// it and warmer ones outside. Lavender keeps the first one (blue, violet, pink, peach).
-const rings: Record<string, Rgb[]> = {
-  "#b8acf2": [[0.31, 0.55, 1], [0.63, 0.43, 1], [1, 0.43, 0.71], [1, 0.75, 0.55]],
-  "#7dd3a0": [[0.3, 0.7, 1], [0.35, 0.9, 0.62], [0.7, 0.95, 0.45], [1, 0.9, 0.55]],
-  "#8ec8ea": [[0.42, 0.45, 1], [0.35, 0.75, 1], [0.35, 0.95, 0.85], [0.75, 1, 0.8]],
-  "#dcc68c": [[1, 0.55, 0.55], [1, 0.68, 0.35], [1, 0.85, 0.4], [1, 0.96, 0.75]],
-  "#e6a6b0": [[0.7, 0.45, 1], [1, 0.45, 0.7], [1, 0.55, 0.5], [1, 0.78, 0.55]],
-  "#b0cc90": [[0.3, 0.8, 0.75], [0.55, 0.85, 0.45], [0.85, 0.92, 0.4], [1, 0.92, 0.65]],
-};
-
-const rgbOf = (hex: string): Rgb => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as Rgb;
-
-function hueOf([r, g, b]: Rgb): number {
-  const max = Math.max(r, g, b);
-  const d = max - Math.min(r, g, b);
-  if (d === 0) return 0;
-  const h = max === r ? (g - b) / d : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return (h * 60 + 360) % 360;
-}
-
-/** The SVG hue-rotate matrix: turns a colour round the colour wheel, keeping its brightness. */
-function rotate([r, g, b]: Rgb, deg: number): Rgb {
-  const c = Math.cos((deg * Math.PI) / 180);
-  const s = Math.sin((deg * Math.PI) / 180);
-  const clamp = (v: number) => Math.min(1, Math.max(0, v));
-  return [
-    clamp((0.213 + 0.787 * c - 0.213 * s) * r + (0.715 - 0.715 * c - 0.715 * s) * g + (0.072 - 0.072 * c + 0.928 * s) * b),
-    clamp((0.213 - 0.213 * c + 0.143 * s) * r + (0.715 + 0.285 * c + 0.14 * s) * g + (0.072 - 0.072 * c - 0.283 * s) * b),
-    clamp((0.213 - 0.213 * c - 0.787 * s) * r + (0.715 - 0.715 * c + 0.715 * s) * g + (0.072 + 0.928 * c + 0.072 * s) * b),
-  ];
-}
-
-/** The ring for an accent: a preset's own, or for any other colour the nearest preset's, turned to that colour's hue. */
-export function ringColors(accent: string): Rgb[] {
-  const hex = isHex(accent) ? accent.toLowerCase() : defaultAccent;
-  if (rings[hex]) return rings[hex]!;
-  const hue = hueOf(rgbOf(hex));
-  const gap = (preset: string) => ((hue - hueOf(rgbOf(preset)) + 540) % 360) - 180;
-  const nearest = accentPresets.map((p) => p.color as string).reduce((a, b) => (Math.abs(gap(b)) < Math.abs(gap(a)) ? b : a));
-  return rings[nearest]!.map((c) => rotate(c, gap(nearest)));
 }
 
 // The light: the four colours blended across the ring, fading out on both sides of it.
