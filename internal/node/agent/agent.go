@@ -229,6 +229,7 @@ type Agent struct {
 
 	linkPingEvery   time.Duration // 0 = NodeSettings.keepalive_interval_s (20 s): how often the link is pinged
 	linkPingTimeout time.Duration // 0 = NodeSettings.keepalive_timeout_s (45 s): how long a pong may take
+	updateLinkIdle  time.Duration // test seam; 0 = the updater's common no-data timeout
 
 	busy atomic.Int32 // operations started by a session that ending it would cut short (goBusy)
 

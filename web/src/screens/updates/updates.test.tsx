@@ -714,6 +714,21 @@ describe("the nodes of a rollout in progress", () => {
     expect(row("de1").textContent).toContain("Updating…");
   });
 
+  it("shows live download progress with accessible progress semantics", async () => {
+    await mount(
+      page({
+        nodes: [node({ nodeId: "nod_1", name: "de1", state: NodeUpdateState.UPDATING })],
+        rollout: rollout({
+          steps: [step({ nodeId: "nod_1", nodeName: "de1", state: StepState.SENT, downloadPhase: "downloading", downloadedBytes: 512, totalBytes: 1024, bytesPerSecond: 128 })],
+        }),
+      }),
+    );
+    const progress = document.querySelector<HTMLElement>('div[role="progressbar"][aria-valuenow="50"]');
+    expect(progress?.getAttribute("aria-label")).toBe("Download progress: 50%");
+    expect(progress?.textContent).toContain("50% · 128 B/s");
+    expect(progress?.textContent).toContain("512 B / 1 KiB");
+  });
+
   it("subtitle a stage of one node neutrally (it is not always the next one) and a stage of several as together", async () => {
     await mount(page({ nodes: fleet, rollout: rollout({ steps: [...steps, step({ nodeId: "nod_6", nodeName: "x1", stage: 3, state: StepState.PENDING })] }) }));
     const stages = [...document.querySelectorAll("ol > li")].map((li) => li.firstElementChild!.textContent);

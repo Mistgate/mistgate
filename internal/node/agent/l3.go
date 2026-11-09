@@ -194,6 +194,9 @@ func (a *Agent) capabilities() []string {
 	if a.linkOnly() {
 		if slices.Contains(updateCaps, update.CapUpdate) {
 			caps = append(caps, capUpdateLink)
+			if slices.Contains(updateCaps, update.CapUpdateTimeout) {
+				caps = append(caps, update.CapUpdateTimeout)
+			}
 			if slices.Contains(updateCaps, update.CapGuard) {
 				caps = append(caps, update.CapGuard)
 			}

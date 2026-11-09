@@ -1119,6 +1119,39 @@ func TestUpdateTimeouts(t *testing.T) {
 	})
 }
 
+func TestUpdateTimeoutSnapshotSurvivesSettingChangeAndRestart(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	nodeID := e.addNode("timeout_snapshot", nodeOpts{caps: []string{"doctor/1", capUpdate, updateTimeoutCapability, capGuard}})
+	if err := e.st.SetSettingIfChanged(e.ctx, updateDownloadTimeoutKey, "3600"); err != nil {
+		t.Fatal(err)
+	}
+	e.fl.onUpdate = func(string) (*agentv1.CommandResult, error) {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("the node link dropped"))
+	}
+	e.startRollout()
+	e.tick()
+	x := e.wantStep(nodeID, store.StepSent, "")
+	if x.AnswerWait != 61*time.Minute {
+		t.Fatalf("captured answer wait = %s, want 61m", x.AnswerWait)
+	}
+
+	if err := e.st.SetSettingIfChanged(e.ctx, updateDownloadTimeoutKey, "300"); err != nil {
+		t.Fatal(err)
+	}
+	e.clk.Advance(10 * time.Minute)
+	e.tick()
+	e.wantStep(nodeID, store.StepSent, "")
+
+	e.restart()
+	e.clk.Advance(50 * time.Minute)
+	e.tick()
+	e.wantStep(nodeID, store.StepSent, "")
+	e.clk.Advance(5*time.Minute + time.Second)
+	e.tick()
+	e.wantStep(nodeID, store.StepFailed, "no_answer")
+}
+
 func TestUpdateTimeoutDefersWhenNodeReadFailsOnce(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()

@@ -42,14 +42,16 @@ type Fleet interface {
 	HasSession(nodeID string) bool
 	// UpdateAgent sends a signed manifest and waits for the CommandResult (the download is part of it).
 	// FAILED_PRECONDITION when the node is not connected or did not list "update/1": nothing was sent.
-	UpdateAgent(ctx context.Context, nodeID string, manifest, signature []byte, wait time.Duration) (*agentv1.CommandResult, error)
+	UpdateAgentWithRequestID(ctx context.Context, nodeID, requestID string, manifest, signature []byte, wait, downloadTimeout time.Duration) (*agentv1.CommandResult, error)
 	// RollbackAgent asks the node to put its previous binary back; same preconditions.
 	RollbackAgent(ctx context.Context, nodeID string, wait time.Duration) (*agentv1.CommandResult, error)
 	// SendUpdateAgent hands an edge update command to the live node link without waiting for its result.
-	SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time) error
+	SendUpdateAgent(ctx context.Context, nodeID, requestID string, manifest, signature []byte, downloadToken string, deadline time.Time, downloadTimeout time.Duration) error
 	// SendRollbackAgent hands an edge rollback command to the live node link without waiting for its result.
 	SendRollbackAgent(ctx context.Context, nodeID, requestID string, deadline time.Time) error
 }
+
+const updateTimeoutCapability = "update-timeout/1"
 
 // Health is what the rollout gate needs from the health module (*health.Service implements it); nil = no probe gate.
 type Health interface {
@@ -147,6 +149,9 @@ type Service struct {
 	inflight        map[string]bool      // node id -> a command goroutine owns its step (UpdateAgent or RollbackAgent)
 	orphans         map[string]bool      // node id -> its step was SENT when this process started (nobody waits for the answer)
 	failing         map[string]time.Time // node id -> since when a new FAILED inbound has been seen in the gate
+	progressMu      sync.RWMutex
+	progress        map[string]progressState // node id -> latest update progress
+	progressActive  map[string]progressExpectation
 
 	updMu             sync.RWMutex
 	updating          map[string]bool // node id -> has a SENT or GATING step (fleet.Updates.Updating)
@@ -154,6 +159,15 @@ type Service struct {
 	updRefreshMu      sync.Mutex
 
 	wake chan struct{}
+}
+
+type progressState struct {
+	RequestID   string
+	Phase       string
+	Downloaded  uint64
+	Total       uint64
+	Speed       uint64
+	UpdatedUnix int64
 }
 
 // New builds the module and reads the bundle directory once. Call Run to start the worker, fleet.SetUpdates and
@@ -188,7 +202,7 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 	s := &Service{st: st, fl: fl, hl: hl, cfg: cfg, log: cfg.Log, now: cfg.Now,
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
 		inflight: map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
-		updating: map[string]bool{}, wake: make(chan struct{}, 1)}
+		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
 	if cfg.DataDir != "" { // without one there is no bundle (and no relative "dist" in whatever the working directory is)
 		s.dist = filepath.Join(cfg.DataDir, "dist")
 	}

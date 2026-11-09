@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -114,10 +115,12 @@ type fakeSrc struct {
 	failed    []string
 	offsets   []uint64
 	calls     int
+	progress  []*pb.UpdateProgress
 }
 
-func (s *fakeSrc) Now() time.Time   { return s.now }
-func (s *fakeSrc) Failed() []string { return s.failed }
+func (s *fakeSrc) Now() time.Time                { return s.now }
+func (s *fakeSrc) Failed() []string              { return s.failed }
+func (s *fakeSrc) Progress(p *pb.UpdateProgress) { s.progress = append(s.progress, p) }
 func (s *fakeSrc) Fetch(_ context.Context, name string, off uint64, w io.Writer) (uint64, error) {
 	s.calls++
 	s.offsets = append(s.offsets, off)
@@ -144,6 +147,91 @@ func (s *fakeSrc) Fetch(_ context.Context, name string, off uint64, w io.Writer)
 }
 
 func (e *env) src(content []byte) *fakeSrc { return &fakeSrc{now: e.now, content: content} }
+
+func TestDownloadReportsProgressAndStopsOnIdle(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(func(c *Config) { c.IdleTimeout = 20 * time.Millisecond })
+	f := release.File{Name: "node", Size: int64(len(newBin))}
+	var got []*pb.UpdateProgress
+	src := e.src(newBin)
+	src.now = e.now.Add(time.Hour)
+	if err := u.download(context.Background(), src, f, time.Second, func(p *pb.UpdateProgress) { got = append(got, p) }); err != nil {
+		t.Fatalf("download = %v", err)
+	}
+	if len(got) == 0 || got[0].Phase != "downloading" || got[len(got)-1].BytesDownloaded != uint64(len(newBin)) {
+		t.Fatalf("progress = %+v", got)
+	}
+	if got[0].UpdatedUnix != src.now.Unix() {
+		t.Fatalf("progress timestamp = %d, want source clock %d", got[0].UpdatedUnix, src.now.Unix())
+	}
+	stalled := &stallSrc{}
+	err := u.download(context.Background(), stalled, f, time.Second, nil)
+	if err == nil || !strings.Contains(err.Error(), "download idle timeout") {
+		t.Fatalf("stall error = %v", err)
+	}
+}
+
+func TestDownloadDoesNotTreatBusyPanelAsIdleStall(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(func(c *Config) {
+		c.IdleTimeout = 20 * time.Millisecond
+		c.RetryWait = 50 * time.Millisecond
+	})
+	src := e.src(newBin)
+	src.retry = 1
+	if err := u.download(context.Background(), src, release.File{Name: "node", Size: int64(len(newBin))}, time.Second, nil); err != nil {
+		t.Fatalf("download after a busy slot = %v", err)
+	}
+}
+
+func TestApplyDuplicateRequestDoesNotReportFailure(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	manifest, sig := e.manifest(newBin, newBuilt, nil)
+	src := e.src(newBin)
+	u.busy.Store(true)
+	u.activeMu.Lock()
+	u.activeRequest = "req-1"
+	u.activeMu.Unlock()
+	defer func() {
+		u.activeMu.Lock()
+		u.activeRequest = ""
+		u.busy.Store(false)
+		u.activeMu.Unlock()
+	}()
+	res, finish := u.Apply(context.Background(), e.req(manifest, sig), src)
+	if finish != nil || res != nil {
+		t.Fatalf("duplicate apply = (%+v, %v), want no result and no finish", res, finish)
+	}
+	for _, p := range src.progress {
+		if p.Phase == "failed" {
+			t.Fatalf("duplicate emitted terminal progress: %+v", src.progress)
+		}
+	}
+}
+
+func TestProgressSpeedUsesLatestInterval(t *testing.T) {
+	e := newEnv(t)
+	current := e.now
+	var got []*pb.UpdateProgress
+	tracker := newProgressTracker(func(p *pb.UpdateProgress) { got = append(got, p) }, int64(len(newBin)), func() time.Time { return current })
+	current = current.Add(5 * time.Second)
+	tracker.add(100)
+	current = current.Add(5 * time.Second)
+	tracker.add(300)
+	if len(got) != 3 || got[1].BytesPerSecond != 20 || got[2].BytesPerSecond != 60 {
+		t.Fatalf("progress = %+v, want interval speeds 20 and 60 B/s", got)
+	}
+}
+
+type stallSrc struct{}
+
+func (stallSrc) Now() time.Time   { return time.Now() }
+func (stallSrc) Failed() []string { return nil }
+func (stallSrc) Fetch(ctx context.Context, _ string, _ uint64, _ io.Writer) (uint64, error) {
+	<-ctx.Done()
+	return 0, ctx.Err()
+}
 
 func TestUnitRefreshReservationBlocksUpdatesUntilOutcome(t *testing.T) {
 	e := newEnv(t)
@@ -260,10 +348,11 @@ func TestApplySwapsAndMarks(t *testing.T) {
 	if e.execCount() != 1 || e.execs[0] != e.exe {
 		t.Errorf("execs = %v", e.execs)
 	}
-	// One update at a time: the process is about to be replaced.
+	// One update at a time: the process is about to be replaced. A redelivery of the same
+	// request gets no answer at all, busy or otherwise.
 	res2, _ := u.Apply(context.Background(), e.req(man, sig), src)
-	if res2.Error != "busy" {
-		t.Errorf("second apply = %v", res2)
+	if res2 != nil {
+		t.Errorf("second apply = %v, want none", res2)
 	}
 }
 
@@ -801,8 +890,8 @@ func TestCapabilities(t *testing.T) {
 		mut  func(*Config)
 		want []string
 	}{
-		{"signed, writable, guarded unit", nil, []string{"update/1", "update-guard/1"}},
-		{"generation 1 unit: writable dir in a foreground run", func(c *Config) { c.UnitGen = 1 }, []string{"update/1"}},
+		{"signed, writable, guarded unit", nil, []string{"update/1", "update-timeout/1", "update-guard/1"}},
+		{"generation 1 unit: writable dir in a foreground run", func(c *Config) { c.UnitGen = 1 }, []string{"update/1", "update-timeout/1"}},
 		{"unsigned build", func(c *Config) { c.Key = nil }, nil},
 		{"not linux", func(c *Config) { c.GOOS = "darwin" }, nil},
 		{"executable directory not writable", func(c *Config) { c.ExePath = filepath.Join(e.dir, "nope", "x") }, nil},

@@ -492,6 +492,12 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 			deletePending(tr.state, r.RequestId)
 			tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: r.RequestId, Reply: event.Frame})
 		}
+	case m.GetUpdateProgress() != nil:
+		if u := c.f.updates(); u != nil {
+			if err := u.RecordProgress(ctx, tr.state.NodeID, m.GetUpdateProgress()); err != nil {
+				c.f.log.Warn("record update progress", "code", "update_progress_store_failed", "node", tr.state.NodeID, "err", err)
+			}
+		}
 	}
 }
 

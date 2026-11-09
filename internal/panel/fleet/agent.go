@@ -758,6 +758,13 @@ func (f *Fleet) askWithLive(ctx context.Context, nodeID string, wait time.Durati
 	if build != nil {
 		frame = build(id)
 	}
+	return f.askFrame(ctx, nodeID, id, frame, wait, knownLive)
+}
+
+func (f *Fleet) askFrame(ctx context.Context, nodeID, id string, frame *agentv1.ConnectResponse, wait time.Duration, knownLive *store.NodeLiveRow) (*agentv1.ConnectRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if requestKind(frame) == 0 {
 		return nil, errNoAnswer
 	}
@@ -794,6 +801,17 @@ func (f *Fleet) command(ctx context.Context, nodeID string, wait time.Duration, 
 
 func (f *Fleet) commandWithLive(ctx context.Context, nodeID string, wait time.Duration, build func(reqID string) *agentv1.ConnectResponse, live *store.NodeLiveRow) (*agentv1.CommandResult, error) {
 	reply, err := f.askWithLive(ctx, nodeID, wait, build, live)
+	if err != nil {
+		return nil, err
+	}
+	if result := reply.GetCommandResult(); result != nil {
+		return result, nil
+	}
+	return nil, errLinkLost
+}
+
+func (f *Fleet) commandWithRequestID(ctx context.Context, nodeID, requestID string, wait time.Duration, frame *agentv1.ConnectResponse) (*agentv1.CommandResult, error) {
+	reply, err := f.askFrame(ctx, nodeID, requestID, frame, wait, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -177,7 +177,7 @@ var updateReasons = map[string]localizedText{
 	"inbound_failed":       {en: "a profile that worked before broke", ru: "сломался профиль, который работал до обновления", zh: "之前正常的协议配置出了故障"},
 	"probe_failed":         {en: "the client-eye check failed", ru: "не прошла проверка глазами клиента", zh: "客户端视角检测失败"},
 	"not_reconnected":      {en: "the node did not come back within 3 minutes", ru: "нода не вернулась на связь за 3 минуты", zh: "节点未在 3 分钟内重新连接"},
-	"no_answer":            {en: "the node did not answer the update command in 10 minutes", ru: "нода не ответила на команду обновления за 10 минут", zh: "节点未在 10 分钟内响应更新命令"},
+	"no_answer":            {en: "the node did not answer within its download window", ru: "нода не ответила в отведённое для загрузки время", zh: "节点未在其下载窗口内响应"},
 	"rolled_back_by_agent": {en: "the node went back to the previous version by itself", ru: "нода сама вернулась на прошлую версию", zh: "节点自行回到了上一个版本"},
 	"agent_failed":         {en: "the node reported that the update failed", ru: "нода сообщила, что обновление не удалось", zh: "节点报告更新失败"},
 }
@@ -885,6 +885,7 @@ var toolTitles = map[string]localizedText{
 	"node_update_schedule":        {en: "Schedule a node update", ru: "Запланировать обновление ноды", zh: "定时更新节点"},
 	"node_update_schedule_cancel": {en: "Cancel a scheduled node update", ru: "Отменить запланированное обновление ноды", zh: "取消节点的定时更新"},
 	"update_timezone":             {en: "Change the time zone of update schedules", ru: "Сменить часовой пояс расписания обновлений", zh: "更改更新计划的时区"},
+	"update_download_timeout":     {en: "Change the update download timeout", ru: "Изменить тайм-аут загрузки обновлений", zh: "更改更新下载超时"},
 	"retention":                   {en: "Change how long the panel keeps its data", ru: "Изменить сроки хранения данных панели", zh: "更改面板的数据保留时间"},
 	"node_rollback":               {en: "Roll a node back", ru: "Откатить ноду", zh: "回滚节点"},
 	"node_install":                {en: "Install a node over SSH", ru: "Установить ноду по SSH", zh: "通过 SSH 安装节点"},
