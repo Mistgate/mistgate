@@ -730,6 +730,7 @@ message Hello {
   // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "journal/1" (StatsBatch.journal; see
   // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
+  // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
   // Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -741,6 +742,9 @@ message Hello {
   string decoy_mode = 14;
   // SHA-256 of the active panel or own bundle, lowercase hex; empty for builtin.
   string decoy_sha256 = 15;
+  // SHA-256 of the ASN database file currently loaded by this agent; empty when no matching table is loaded.
+  // Client addresses are never sent.
+  string networks_db_sha256 = 16;
 }
 
 enum UpdateOutcome {
@@ -809,6 +813,44 @@ message StatsBatch {
   // The journal since the previous batch (agents with "journal/1"); see JournalEntry. At most 64 entries, one of them the
   // overflow entry when more kinds came; ordered by first_unix. A coalescer adds the counts of entries with the same key.
   repeated JournalEntry journal = 10;
+  // Per (inbound, ASN) network counts since the previous 10-minute UTC window. ASN 0 means unknown or folded.
+  // Client addresses are never sent.
+  repeated NetworkCounters networks = 11;
+  // Per credential network connects in this window, sent only in network mode 2. Client addresses are never sent.
+  repeated PersonNetwork person_networks = 12;
+  // SHA-256 of the ASN database file currently loaded by this agent; empty when no matching table is loaded.
+  // Client addresses are never sent.
+  string networks_db_sha256 = 13;
+}
+
+// Aggregated client-network counts for one inbound and ASN. Address data is never included.
+message NetworkCounters {
+  // Inbound that observed these connection events.
+  string inbound_id = 1;
+  // 0 means unknown, absent from the table, private, or folded from a row with fewer than three people.
+  uint32 asn = 2;
+  // Connection attempts observed by the engine during the window.
+  uint32 attempts = 3;
+  // Handshakes or attempts that did not complete, where the engine can distinguish them.
+  uint32 unfinished = 4;
+  // Connections that reached the engine's authenticated or established event.
+  uint32 connects = 5;
+  // Connections that froze or broke after establishment, where the engine can distinguish them.
+  uint32 broken = 6;
+  // Count of distinct user identities with activity in this row; identities and addresses are never sent.
+  uint32 people = 7;
+}
+
+// Per-person network connects for network mode 2. Address data is never included.
+message PersonNetwork {
+  // Credential that opened these connections.
+  string cred_id = 1;
+  // Inbound that accepted the credential.
+  string inbound_id = 2;
+  // 0 means unknown or absent from the table.
+  uint32 asn = 3;
+  // Connections for this credential during the window.
+  uint32 connects = 4;
 }
 
 // NODE JOURNAL. The warnings and errors of the agent and its engines, kept by the panel (7 days) so an admin can read what
@@ -1464,6 +1506,14 @@ message NodeSettings {
   // predates the field sends) = say nothing about the addresses: the agent adds and removes none and keeps asserting the
   // ones it already holds. The panel sets it together with the list, to agents with "ipv6-addr/1".
   bool ipv6_addresses_managed = 11;
+  // Network counts: 0 off, 1 aggregated operators, 2 aggregated operators plus per-credential person rows.
+  // The node maps addresses to ASNs locally; an address is never sent. Read only by agents with "nets/1".
+  uint32 networks = 12;
+  // Signed node-bundle file to fetch for network counts, normally "mistgate-asndb-data-any".
+  // Empty means no table is configured. Client addresses are never sent.
+  string networks_db_name = 13;
+  // SHA-256 of the named database file, lowercase hex. Client addresses are never sent.
+  string networks_db_sha256 = 14;
 }
 
 message DesiredState {

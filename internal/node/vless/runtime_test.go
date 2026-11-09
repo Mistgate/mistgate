@@ -365,6 +365,10 @@ func newXrayClientSNI(t *testing.T, serverName string, serverPort uint16, transp
 // newXrayClientShortID is newXrayClientSNI with the REALITY short id of its choice (one the inbound does not hold fails
 // REALITY authentication).
 func newXrayClientShortID(t *testing.T, serverName, shortIDHex string, serverPort uint16, transport, credID, userID, flow string, mux bool) *xrayClient {
+	return newXrayClientShortIDFrom(t, serverName, shortIDHex, serverPort, transport, credID, userID, flow, mux, "")
+}
+
+func newXrayClientShortIDFrom(t *testing.T, serverName, shortIDHex string, serverPort uint16, transport, credID, userID, flow string, mux bool, sourceIP string) *xrayClient {
 	t.Helper()
 	socksPort := reservePort(t)
 	transportName := "tcp"
@@ -395,6 +399,9 @@ func newXrayClientShortID(t *testing.T, serverName, shortIDHex string, serverPor
 		})},
 	}
 	sender := &proxyman.SenderConfig{StreamSettings: stream}
+	if sourceIP != "" {
+		sender.Via = xnet.NewIPOrDomain(xnet.IPAddress(net.ParseIP(sourceIP)))
+	}
 	if mux {
 		sender.MultiplexSettings = &proxyman.MultiplexingConfig{Enabled: true, Concurrency: 8}
 	}

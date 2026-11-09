@@ -14,6 +14,7 @@ import (
 
 	"github.com/apernet/hysteria/core/v2/server"
 	quic "github.com/apernet/quic-go"
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -246,6 +247,7 @@ func (cs *credState) clampKicks(open int32) {
 // The old EventLogger methods below retain address-keyed state only for compatibility with an unpatched core.
 type session struct {
 	cs                 *credState
+	asn                uint32
 	since              time.Time
 	conn               *quic.Conn
 	startBytes         uint64
@@ -259,7 +261,15 @@ func (in *inbound) Connect(addr net.Addr, id string, _ uint64) {
 	if cs == nil {
 		return
 	}
-	s := &session{cs: cs, since: in.e.now(), startBytes: cs.bytesMoved()}
+	asn := nets.LookupAddr(in.e.env.Nets, addr)
+	if in.e.env.Nets != nil {
+		userID := ""
+		if owner := cs.owner.Load(); owner != nil {
+			userID = owner.userID
+		}
+		in.e.env.Nets.Add(in.spec.ID, asn, nets.Connect, cs.id, userID)
+	}
+	s := &session{cs: cs, asn: asn, since: in.e.now(), startBytes: cs.bytesMoved()}
 	cs.conns.Add(1)
 	cs.connects.Add(1)
 	in.smu.Lock()
@@ -295,9 +305,22 @@ func (in *inbound) ConnConnect(conn *quic.Conn, id string, _ uint64) {
 	if cs == nil || conn == nil {
 		return
 	}
+	asn := uint32(0)
+	if hs, ok := conn.Context().Value(handshakeKey{}).(*handshake); ok && hs != nil {
+		asn = hs.asn
+	} else {
+		asn = nets.LookupAddr(in.e.env.Nets, conn.RemoteAddr())
+	}
+	if in.e.env.Nets != nil {
+		userID := ""
+		if owner := cs.owner.Load(); owner != nil {
+			userID = owner.userID
+		}
+		in.e.env.Nets.Add(in.spec.ID, asn, nets.Connect, cs.id, userID)
+	}
 	stats := connStats(conn)
 	s := &session{
-		cs: cs, since: in.e.now(), conn: conn, startBytes: stats.BytesSent + stats.BytesReceived,
+		cs: cs, asn: asn, since: in.e.now(), conn: conn, startBytes: stats.BytesSent + stats.BytesReceived,
 		last: stats, silencePacketsRecv: stats.PacketsReceived, silencePacketsSent: stats.PacketsSent,
 	}
 	// the handshake and the authentication are this key's too: their packets, and the ones lost on the way
@@ -365,6 +388,7 @@ func addConnectionDelta(cs *credState, previous, current quic.ConnectionStats) {
 
 func (in *inbound) endSession(s *session, err error) {
 	cs := s.cs
+	broken := false
 	var stats quic.ConnectionStats
 	if s.conn != nil {
 		stats = connStats(s.conn)
@@ -374,6 +398,7 @@ func (in *inbound) endSession(s *session, err error) {
 	if errors.As(err, &idleTimeout) {
 		if isFreezeAtClose(stats, s.last, s.silencePacketsRecv, s.silencePacketsSent) && s.conn != nil {
 			cs.freezes.Add(1)
+			broken = true
 		} else {
 			cs.quiet.Add(1)
 		}
@@ -383,9 +408,18 @@ func (in *inbound) endSession(s *session, err error) {
 		}
 		if moved < s.startBytes || moved-s.startBytes < 64<<10 || in.e.now().Sub(s.since) < 60*time.Second {
 			cs.drops.Add(1)
+			broken = true
 		}
 	} else if isClientClose(err) {
 		cs.clientCloses.Add(1)
+	}
+	// Ordinary client closes have no failure signal, so only an observed freeze or short idle-timeout drop is counted broken.
+	if broken && in.e.env.Nets != nil {
+		userID := ""
+		if owner := cs.owner.Load(); owner != nil {
+			userID = owner.userID
+		}
+		in.e.env.Nets.Add(in.spec.ID, s.asn, nets.Broken, cs.id, userID)
 	}
 	cs.clampKicks(cs.conns.Add(-1))
 }

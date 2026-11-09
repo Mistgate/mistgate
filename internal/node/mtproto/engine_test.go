@@ -28,6 +28,8 @@ import (
 	mp "github.com/mistgate/mistgate/internal/mtproto"
 	"github.com/mistgate/mistgate/internal/mtproto/mtprototest"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/nets"
+	"github.com/mistgate/mistgate/internal/node/netstest"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -128,6 +130,29 @@ func key(b byte) (k [16]byte) {
 		k[i] = b<<4 | byte(i)
 	}
 	return k
+}
+
+func TestOpenedCountsNetworkWithoutKeepingRemoteAddress(t *testing.T) {
+	agg := nets.New(2)
+	db, err := netstest.LoopbackDB(64500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agg.SetTable(db, "fixture-sha")
+	certs := &fakeCerts{acme: testCert(t, ownDomain), self: testCert(t, ownDomain)}
+	c := credential("crd_alice", key(1))
+	c.UserID = "alice"
+	f := newFixture(t, engine.Env{Certs: certs, Nets: agg}, `{"domains":["de1.example.com"]}`, c)
+	client := f.client(key(1), ownDomain)
+	_ = client.Conn.Close()
+
+	networks, people := agg.Take()
+	if len(networks) != 1 || networks[0].Asn != 0 || networks[0].Attempts != 1 || networks[0].Connects != 1 || networks[0].People != 1 {
+		t.Fatalf("network counters = %+v", networks)
+	}
+	if len(people) != 1 || people[0].CredId != "crd_alice" || people[0].Asn != 64500 || people[0].Connects != 1 {
+		t.Fatalf("person counters = %+v", people)
+	}
 }
 
 type fixture struct {

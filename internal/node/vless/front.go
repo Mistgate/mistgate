@@ -26,6 +26,7 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -124,16 +125,21 @@ type tlsFront struct {
 }
 
 // frontLinks is what the front counts of its handshakes (links.go): into counters (nil: nothing), hellos for another name
-// than serverName, and the TCP stall of a connection that got through when stalls is set.
+// than serverName, and the TCP stall of a connection that got through when stalls is set. A front knows no user key because
+// Xray authenticates it behind the Unix socket, so its connect rows have no person entry and fold into ASN 0 for k=3.
 type frontLinks struct {
-	counters   *inboundCounters
-	serverName string
-	stalls     bool
+	counters      *inboundCounters
+	serverName    string
+	stalls        bool
+	nets          *nets.Aggregator
+	inboundID     string
+	countNetworks bool
 }
 
 type tlsFrontConn struct {
 	client   net.Conn
 	upstream net.Conn
+	asn      uint32
 }
 
 func tlsFrontProtos(transport string) []string {
@@ -176,6 +182,10 @@ func (f *tlsFront) accept() {
 			continue
 		}
 		state := &tlsFrontConn{client: conn}
+		if f.links.countNetworks && f.links.nets != nil && f.links.nets.Enabled() {
+			state.asn = nets.LookupAddr(f.links.nets, conn.RemoteAddr())
+			f.links.nets.Add(f.links.inboundID, state.asn, nets.Attempt, "", "")
+		}
 		f.mu.Lock()
 		if f.closed {
 			f.mu.Unlock()
@@ -196,8 +206,14 @@ func (f *tlsFront) serve(state *tlsFrontConn) {
 		f.mu.Lock()
 		delete(f.conns, state)
 		f.mu.Unlock()
-		if through && f.links.stalls && f.links.counters != nil {
-			f.links.counters.stall(tcpStall(state.client))
+		if through && f.links.stalls {
+			stalled, first16K := tcpStall(state.client)
+			if f.links.counters != nil {
+				f.links.counters.stall(stalled, first16K)
+			}
+			if f.links.countNetworks && stalled && first16K && f.links.nets != nil {
+				f.links.nets.Add(f.links.inboundID, state.asn, nets.Broken, "", "")
+			}
 		}
 		_ = state.client.Close()
 		if state.upstream != nil {
@@ -234,6 +250,9 @@ func (f *tlsFront) serve(state *tlsFrontConn) {
 			case hello:
 				// the node answered the hello; the client never finished (the deadline passed, or it went away)
 				c.hsUnfinished.Add(1)
+				if f.links.countNetworks && f.links.nets != nil {
+					f.links.nets.Add(f.links.inboundID, state.asn, nets.Unfinished, "", "")
+				}
 			}
 		}
 		return
@@ -255,6 +274,11 @@ func (f *tlsFront) serve(state *tlsFrontConn) {
 	state.upstream = upstream
 	through = true
 	f.mu.Unlock()
+	// The front sees only an established TLS stream; its user credential is behind Xray and cannot be attached here.
+	// Take folds this unidentified connect into ASN 0 to preserve k=3.
+	if f.links.countNetworks && f.links.nets != nil {
+		f.links.nets.Add(f.links.inboundID, state.asn, nets.Connect, "", "")
+	}
 
 	finished := make(chan struct{}, 2)
 	go func() {

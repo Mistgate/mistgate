@@ -57,6 +57,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	}
 	if ds.Settings != nil {
 		a.settings.Store(ds.Settings)
+		a.configureNetworks(ds.Settings)
 	}
 	if ds.StateHash != "" && ds.StateHash != next.hash() {
 		// Not fatal: the authoritative comparison is the observed hash below, but this tells us whether the

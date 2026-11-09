@@ -44,6 +44,8 @@ const (
 	capClientIPv6 = "client-ipv6/1"
 	capWSLink     = "ws-link/1"
 	capLinkCounts = "links/1"
+	// capNets enables locally mapped ASN counters. Link-only agents cannot fetch the signed table in v1.
+	capNets = "nets/1"
 	// capLinks2: the Hysteria2 connection endings, RTT and packet counters of StatsBatch.links (agent.proto LinkCounters from
 	// client_closes on). Listed with links/1, which a panel checks for the counters at all.
 	capLinks2 = "links/2"
@@ -148,6 +150,9 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
 	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capLinks3, capJournal, capProbe, capSpeed, capDebug}
+	if !a.linkOnly() {
+		caps = append(caps, capNets)
+	}
 	if kernelDebugSupported() {
 		caps = append(caps, capDebug2)
 	}

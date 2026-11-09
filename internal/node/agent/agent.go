@@ -41,6 +41,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/node/speedtest"
 	"github.com/mistgate/mistgate/internal/node/update"
@@ -121,9 +122,14 @@ type Agent struct {
 	id          atomic.Pointer[identity]
 	decoySite   *decoy.Site
 
-	engines   map[string]engine.Engine
-	protocols []string // sorted keys of engines
-	closeOnce sync.Once
+	engines            map[string]engine.Engine
+	protocols          []string // sorted keys of engines
+	closeOnce          sync.Once
+	nets               *nets.Aggregator
+	networkWake        chan struct{}
+	networkTarget      atomic.Pointer[networkTableTarget]
+	networkFetchMu     sync.Mutex
+	networkFetchCancel context.CancelFunc
 
 	torrentEventsMu sync.Mutex
 	torrentEvents   map[string]time.Time
@@ -379,6 +385,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	a := &Agent{
 		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
 		decoySite:     site,
+		nets:          nets.New(0),
+		networkWake:   make(chan struct{}, 1),
 		log:           slog.New(&ringHandler{ring: ring, journal: journal, dbg: dbg, inner: inner}),
 		engines:       map[string]engine.Engine{},
 		torrentEvents: map[string]time.Time{},
@@ -411,6 +419,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 			DNS:        a.DNS,
 			Masquerade: a.masquerade,
 			Now:        a.now,
+			Nets:       a.nets,
 		})
 		if err != nil {
 			a.closeEngines()
@@ -522,7 +531,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.warm = true
 
 	var wg sync.WaitGroup
-	loops := []func(context.Context){a.worker, a.collectLoop, a.renewLoop, a.sweepLoop}
+	loops := []func(context.Context){a.worker, a.collectLoop, a.renewLoop, a.sweepLoop, a.networkTableLoop}
 	if a.cfg.Warp != nil {
 		loops = append(loops, a.cfg.Warp.Run)
 	}
@@ -561,6 +570,7 @@ func (a *Agent) restore(ctx context.Context) {
 	}
 	if m.settings != nil {
 		a.settings.Store(m.settings)
+		a.configureNetworks(m.settings)
 	}
 	a.syncOwnedIPv6(ctx) // the addresses come back with the agent, without the panel
 	results := a.reconcile(ctx, m, nil)
@@ -1018,6 +1028,7 @@ func (a *Agent) hello(ctx context.Context) *pb.ConnectRequest {
 		NodeId: a.meta.NodeID, AgentVersion: a.cfg.Version, ApiVersion: apiVersion, InstanceId: a.instanceID,
 		NextSeq: next, FirstUnackedSeq: first, AppliedRevision: rev, AppliedStateHash: hash,
 		Capabilities: a.capabilities(), Built: a.cfg.Built,
+		NetworksDbSha256: a.nets.LoadedSHA(),
 	}
 	h.DecoyMode, h.DecoySha256 = a.decoySite.State()
 	if o := a.upd.Outcome(); o != nil {
@@ -1056,6 +1067,7 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 		changed := ack.Settings.GetClientIpv6Disabled() != a.settings.Load().GetClientIpv6Disabled() ||
 			ipv6AddrSettingsChanged(a.settings.Load(), ack.Settings) // the sweep that follows the connect puts the addresses right
 		a.settings.Store(ack.Settings)
+		a.configureNetworks(ack.Settings)
 		if changed {
 			a.clientIPv6DoctorPending.Store(true)
 		}

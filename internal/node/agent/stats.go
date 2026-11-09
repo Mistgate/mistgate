@@ -101,7 +101,11 @@ func (a *Agent) collectLoop(ctx context.Context) {
 }
 
 func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsBatch {
-	b := &pb.StatsBatch{IntervalStartUnix: start.Unix(), IntervalEndUnix: end.Unix()}
+	var networksSHA string
+	if a.nets != nil {
+		networksSHA = a.nets.LoadedSHA()
+	}
+	b := &pb.StatsBatch{IntervalStartUnix: start.Unix(), IntervalEndUnix: end.Unix(), NetworksDbSha256: networksSHA}
 	off := time.Duration(a.offset.Load()) * time.Second
 	var links []plugin.LinkStat
 	for _, p := range a.protocols {
@@ -134,6 +138,13 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 		}
 	}
 	a.addLinkCounters(b, links, start, end)
+	window := a.linkWindow
+	if window <= 0 {
+		window = defaultLinkCounterWindow
+	}
+	if end.After(start) && end.UTC().Truncate(window).After(start.UTC().Truncate(window)) {
+		b.Networks, b.PersonNetworks = a.nets.Take()
+	}
 	a.l3Health(ctx, b, off)
 	m := a.host.Metrics()
 	a.hostRing.Add(doctor.Sample{At: a.now(), CPU: m.CPUPct, Softirq: m.SoftirqPct, Load1: m.Load1, Steal: m.StealPct})

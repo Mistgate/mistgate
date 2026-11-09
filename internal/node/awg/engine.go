@@ -29,6 +29,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/node/awg/awgcfg"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -571,11 +572,14 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 			}
 			p := in.prev[h.PublicKey]
 			pending := p.pending
+			var attempts, unfinished uint32
 			if counted {
 				c := hs[h.PublicKey]
+				attempts = c.initiations
 				advanced := p.seen && h.LastHS.After(p.hs) || !p.seen && h.LastHS.After(in.since)
 				var unmatched uint32
 				unmatched, pending = handshakeRound(p.pending, c.responses, advanced)
+				unfinished = unmatched
 				if c.initiations|c.responses|unmatched != 0 {
 					stat := linkStatFor(links, in.spec.ID, w.credID)
 					stat.Initiations += c.initiations
@@ -583,18 +587,45 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 					stat.ResponsesUnmatched += unmatched
 				}
 			}
+			connect, stalled := false, false
 			if p.seen {
 				if !p.online && h.LastHS.After(p.hs) {
 					linkStatFor(links, in.spec.ID, w.credID).Connects++
+					connect = true
 				}
 				if h.RxBytes > p.rx && handshakeOlderThan(h.LastHS, now) {
 					linkStatFor(links, in.spec.ID, w.credID).Stalls++
+					stalled = true
 				}
 			} else if h.LastHS.After(in.since) {
 				// The first round that sees the peer: a handshake made since the inbound runs is a connection that came between
 				// two rounds (a new device connects within seconds). An older one predates this agent: a kernel interface kept
 				// across a restart.
 				linkStatFor(links, in.spec.ID, w.credID).Connects++
+				connect = true
+			}
+			if e.env.Nets != nil && e.env.Nets.Enabled() && h.Endpoint.IsValid() && (attempts|unfinished != 0 || connect || stalled) {
+				asn := e.env.Nets.Lookup(h.Endpoint.Addr().Unmap())
+				if !counted {
+					// Kernel snapshots expose connects and later stalls, but cannot distinguish unanswered initiations.
+					if connect {
+						attempts++
+					}
+				}
+				if stalled {
+					if attempts < ^uint32(0) {
+						attempts++
+					}
+					if unfinished < ^uint32(0) {
+						unfinished++
+					}
+				}
+				e.env.Nets.AddN(in.spec.ID, asn, nets.Attempt, "", w.userID, attempts)
+				e.env.Nets.AddN(in.spec.ID, asn, nets.Unfinished, "", w.userID, unfinished)
+				if connect {
+					e.env.Nets.Add(in.spec.ID, asn, nets.Connect, w.credID, w.userID)
+				}
+				// AWG exposes no per-peer close result, so this hook cannot report broken connections.
 			}
 			e.addTraffic(in.spec.ID, w.credID, deltaOf(p.rx, h.RxBytes), deltaOf(p.tx, h.TxBytes))
 			in.prev[h.PublicKey] = counters{rx: h.RxBytes, tx: h.TxBytes, hs: h.LastHS, online: online(h, now), seen: true, pending: pending}

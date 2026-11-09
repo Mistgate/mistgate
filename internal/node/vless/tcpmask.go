@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/xtls/xray-core/transport/internet/finalmask"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -41,6 +42,7 @@ type tcpConnTracker struct {
 	// key are kept for its verdict, and their first bytes are the client's ClientHello); stalls says a connection's key
 	// gets the TCP stall it ended with (REALITY over RAW: the connection is the client's TCP connection and one session).
 	counters *inboundCounters
+	nets     *nets.Aggregator
 	reality  bool
 	stalls   bool
 
@@ -81,6 +83,10 @@ func (t *tcpConnTracker) stop() {
 
 func (t *tcpConnTracker) track(conn net.Conn) net.Conn {
 	tracked := &trackedTCPConn{Conn: conn, tracker: t}
+	if t.stalls && t.nets != nil && t.nets.Enabled() {
+		tracked.asn = nets.LookupAddr(t.nets, conn.RemoteAddr())
+		t.nets.Add(t.key.inboundID, tracked.asn, nets.Attempt, "", "")
+	}
 	if !t.reality {
 		tracked.peeked.Store(true) // only a REALITY connection starts with the client's ClientHello
 	}
@@ -104,6 +110,7 @@ func (t *tcpConnTracker) remove(conn *trackedTCPConn) {
 type trackedTCPConn struct {
 	net.Conn
 	tracker *tcpConnTracker
+	asn     uint32
 	once    sync.Once
 
 	// links/3. The first six bytes, read by one reader at a time (REALITY, then the VLESS handler) until peeked; session is
@@ -141,7 +148,17 @@ func (c *trackedTCPConn) peek(b []byte) {
 
 // markSession records the key of the connection's first request; it reports whether this was the first.
 func (c *trackedTCPConn) markSession(cs *credState) bool {
-	return c.session.CompareAndSwap(nil, cs)
+	if !c.session.CompareAndSwap(nil, cs) {
+		return false
+	}
+	if c.tracker.stalls && c.tracker.nets != nil {
+		userID := ""
+		if owner := cs.owner.Load(); owner != nil {
+			userID = owner.userID
+		}
+		c.tracker.nets.Add(c.tracker.key.inboundID, c.asn, nets.Connect, cs.id, userID)
+	}
+	return true
 }
 
 func (c *trackedTCPConn) Close() error {
@@ -150,11 +167,23 @@ func (c *trackedTCPConn) Close() error {
 		c.tracker.remove(c)
 		if cs := c.session.Load(); cs != nil {
 			if c.tracker.stalls {
-				cs.stall(tcpStall(c.Conn))
+				stalled, first16K := tcpStall(c.Conn)
+				cs.stall(stalled, first16K)
+				if stalled && first16K && c.tracker.nets != nil {
+					userID := ""
+					if owner := cs.owner.Load(); owner != nil {
+						userID = owner.userID
+					}
+					c.tracker.nets.Add(c.tracker.key.inboundID, c.asn, nets.Broken, cs.id, userID)
+				}
 			}
 		} else if addr := c.Conn.RemoteAddr(); addr != nil && c.tracker.reality && c.tracker.counters != nil {
 			// no key reached the engine: REALITY may be about to log why (links.go, realityVerdict)
-			rememberClose(addr.String(), c.tracker.counters, time.Now())
+			agg := c.tracker.nets
+			if !c.tracker.stalls {
+				agg = nil
+			}
+			rememberNetworkClose(addr.String(), c.tracker.counters, c.asn, c.tracker.key.inboundID, agg, time.Now())
 		}
 		err = c.Conn.Close()
 	})

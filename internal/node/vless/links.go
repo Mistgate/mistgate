@@ -14,6 +14,7 @@ import (
 	"github.com/xtls/xray-core/transport/internet/stat"
 
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -110,19 +111,22 @@ var recentCloses struct {
 type recentClose struct {
 	addr     string
 	counters *inboundCounters
+	asn      uint32
+	inbound  string
+	nets     *nets.Aggregator
 	at       time.Time
 }
 
-func rememberClose(addr string, counters *inboundCounters, now time.Time) {
+func rememberNetworkClose(addr string, counters *inboundCounters, asn uint32, inboundID string, agg *nets.Aggregator, now time.Time) {
 	recentCloses.mu.Lock()
-	recentCloses.ring[recentCloses.next] = recentClose{addr: addr, counters: counters, at: now}
+	recentCloses.ring[recentCloses.next] = recentClose{addr: addr, counters: counters, asn: asn, inbound: inboundID, nets: agg, at: now}
 	recentCloses.next = (recentCloses.next + 1) % len(recentCloses.ring)
 	recentCloses.mu.Unlock()
 }
 
 // takeClose finds and forgets the newest close of addr within the TTL. A taken entry keeps its time and is skipped, so a
 // verdict that comes after another connection's still finds its own.
-func takeClose(addr string, now time.Time) *inboundCounters {
+func takeClose(addr string, now time.Time) *recentClose {
 	recentCloses.mu.Lock()
 	defer recentCloses.mu.Unlock()
 	n := len(recentCloses.ring)
@@ -132,9 +136,9 @@ func takeClose(addr string, now time.Time) *inboundCounters {
 			return nil // never used, or older than the TTL: older entries are older still
 		}
 		if e.counters != nil && e.addr == addr {
-			c := e.counters
+			c := *e
 			*e = recentClose{at: e.at}
-			return c
+			return &c
 		}
 	}
 	return nil
@@ -159,15 +163,18 @@ func realityVerdict(content string, now time.Time) bool {
 	}
 	switch {
 	case strings.HasPrefix(reason, "server name mismatch"):
-		c.realityFallback.Add(1)
-		c.hellosForeign.Add(1)
+		c.counters.realityFallback.Add(1)
+		c.counters.hellosForeign.Add(1)
 	case strings.HasPrefix(reason, "authentication failed"):
-		c.realityFallback.Add(1)
-		c.authFailed.Add(1)
+		c.counters.realityFallback.Add(1)
+		c.counters.authFailed.Add(1)
 	case strings.HasPrefix(reason, "failed to read client hello"), strings.HasPrefix(reason, "unsupported TLS version"):
-		c.realityFallback.Add(1)
+		c.counters.realityFallback.Add(1)
 	case strings.HasPrefix(reason, "handshake did not complete"):
-		c.hsUnfinished.Add(1)
+		c.counters.hsUnfinished.Add(1)
+		if c.nets != nil {
+			c.nets.Add(c.inbound, c.asn, nets.Unfinished, "", "")
+		}
 	}
 	// "target sent incorrect server hello": the target is broken, which the target probe at the start reports
 	return true

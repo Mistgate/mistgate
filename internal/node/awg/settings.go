@@ -109,6 +109,7 @@ type credJSON struct {
 // wantPeer is one credential as a WireGuard peer.
 type wantPeer struct {
 	credID  string
+	userID  string
 	pub     [32]byte
 	psk     *[32]byte
 	allowed []netip.Prefix // sorted
@@ -144,7 +145,7 @@ func parsePeers(cfg nodeConfig, creds []plugin.UserCred) (map[[32]byte]*wantPeer
 		if !ok {
 			return nil, fmt.Errorf("credential %s: public_key must be base64 of 32 bytes", c.CredID)
 		}
-		w := &wantPeer{credID: c.CredID, pub: pub}
+		w := &wantPeer{credID: c.CredID, userID: c.UserID, pub: pub}
 		if j.PSK != "" {
 			k, ok := awgcfg.DecodeKey(j.PSK)
 			if !ok {

@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"maps"
 	"net"
+	"net/netip"
 	"slices"
 	"sort"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 
 	mp "github.com/mistgate/mistgate/internal/mtproto"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -220,6 +222,7 @@ type credState struct {
 	id        string
 	inboundID string
 	key       [mp.KeyLen]byte
+	userID    atomic.Pointer[string]
 
 	up, down atomic.Uint64
 	sessions atomic.Int32
@@ -387,7 +390,9 @@ func (e *Engine) Remove(ctx context.Context, inboundID string) error {
 func buildFreshIndex(inboundID string, parsed []parsedCred) *credIndex {
 	ix := &credIndex{current: make(map[string]*credState, len(parsed))}
 	for _, p := range parsed {
-		ix.current[p.cred.CredID] = &credState{id: p.cred.CredID, inboundID: inboundID, key: p.key}
+		cs := &credState{id: p.cred.CredID, inboundID: inboundID, key: p.key}
+		storeOwner(cs, p.cred.UserID)
+		ix.current[p.cred.CredID] = cs
 	}
 	return ix
 }
@@ -413,6 +418,7 @@ func buildIndex(inboundID string, old *credIndex, parsed []parsedCred) *credInde
 		if cs == nil {
 			cs = &credState{id: p.cred.CredID, inboundID: inboundID, key: p.key}
 		}
+		storeOwner(cs, p.cred.UserID)
 		ix.current[p.cred.CredID] = cs
 	}
 	for id, cs := range old.current {
@@ -526,8 +532,8 @@ type inboundObserver struct{ in *inbound }
 
 func (o inboundObserver) Opened(info mp.SessionInfo) {
 	o.in.smu.Lock()
-	defer o.in.smu.Unlock()
 	if o.in.sessions == nil {
+		o.in.smu.Unlock()
 		return // the inbound stopped
 	}
 	cs := o.in.idx.Load().lookup(info.CredentialID)
@@ -535,6 +541,45 @@ func (o inboundObserver) Opened(info mp.SessionInfo) {
 		cs.sessions.Add(1)
 	}
 	o.in.sessions[info.ID] = sessionEntry{info: info, cs: cs}
+	o.in.smu.Unlock()
+
+	// Opened follows Fake TLS authentication. MTProto exposes no separate failed-handshake or broken-close event.
+	if agg := o.in.e.env.Nets; agg != nil && agg.Enabled() {
+		asn := agg.Lookup(mtprotoClientAddr(info.Remote))
+		userID := ""
+		if cs != nil {
+			if owner := cs.userID.Load(); owner != nil {
+				userID = *owner
+			}
+		}
+		agg.Add(o.in.spec.ID, asn, nets.Attempt, "", userID)
+		agg.Add(o.in.spec.ID, asn, nets.Connect, info.CredentialID, userID)
+	}
+}
+
+func storeOwner(cs *credState, userID string) {
+	if cs == nil {
+		return
+	}
+	if userID == "" {
+		cs.userID.Store(nil)
+		return
+	}
+	owner := userID
+	cs.userID.Store(&owner)
+}
+
+// mtprotoClientAddr parses the peer address while it is still inside the engine. The address is never retained.
+func mtprotoClientAddr(remote string) netip.Addr {
+	host, _, err := net.SplitHostPort(remote)
+	if err != nil {
+		host = remote
+	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return netip.Addr{}
+	}
+	return addr.Unmap()
 }
 
 func (o inboundObserver) Closed(info mp.SessionInfo) {

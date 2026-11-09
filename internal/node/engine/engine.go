@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/node/ratelimit"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -114,6 +115,8 @@ type Env struct {
 	// UserLimits holds the person limit buckets, shared by every engine of the agent so that a person's hysteria2 and vless
 	// credentials draw on one bucket. Nil: the engine keeps a registry of its own.
 	UserLimits *ratelimit.Registry
+	// Nets resolves client addresses inside an engine and records only ASN-level connection events. Nil disables counting.
+	Nets *nets.Aggregator
 }
 
 // Event is a small, protocol-neutral signal from an engine to the node agent.

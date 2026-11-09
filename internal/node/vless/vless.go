@@ -241,6 +241,7 @@ func (in *inbound) start(ctx context.Context) error {
 	}
 	tracker := newTCPConnTracker(in.spec.ID, in.generation)
 	tracker.counters = in.e.handshakeCounters(in.spec.ID)
+	tracker.nets = in.e.env.Nets
 	tracker.reality = in.cfg.security == "reality"
 	tracker.stalls = tracker.reality && in.cfg.transport == "tcp"
 	tracker.register()
@@ -337,7 +338,12 @@ func (in *inbound) start(ctx context.Context) error {
 	if in.cfg.security == "tls" {
 		// links/3: the front counts its own handshakes, and its TCP stalls only when people reach it directly (behind a CDN
 		// the connection is the CDN's)
-		links := frontLinks{counters: in.e.handshakeCounters(in.spec.ID), serverName: in.spec.TLS.ServerName, stalls: in.cfg.cdnHost == ""}
+		// The front sees direct TCP peers before XHTTP or WebSocket framing; a CDN path hides the real client.
+		links := frontLinks{
+			counters: in.e.handshakeCounters(in.spec.ID), serverName: in.spec.TLS.ServerName,
+			stalls: in.cfg.cdnHost == "", nets: in.e.env.Nets, inboundID: in.spec.ID,
+			countNetworks: in.cfg.cdnHost == "",
+		}
 		front, err := startTLSFront(in.spec.ID, in.spec.Listen.Port, in.cert.GetCertificate, tlsFrontProtos(in.cfg.transport), in.tlsSocketNetwork, in.tlsSocketAddr, links)
 		if err != nil {
 			return err
