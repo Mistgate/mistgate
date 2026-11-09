@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Fragment, useMemo, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
 import { cx } from "@/lib/cx";
 import { parseInline, safeHttpsUrl, type Inline } from "@/components/mini-markdown";
@@ -163,7 +163,15 @@ export function parseChatMarkdown(src: string): Block[] {
   return blocks;
 }
 
-type Ctx = { onNavigate?: () => void; entities?: readonly ChatEntity[]; pattern?: RegExp | null; bold?: boolean };
+type Ctx = { onNavigate?: () => void; entities?: readonly ChatEntity[]; pattern?: RegExp | null; bold?: boolean; words?: boolean };
+
+/**
+ * A run of text as one span per word, each fading in as it mounts (.chat-word): an answer that streams in. The key is the
+ * word's place in its run, so a word already shown keeps its element and never fades in again.
+ */
+function wordSpans(text: string, key: string): ReactNode[] {
+  return text.split(/(\s+)/).map((w, i) => (!w || /^\s/.test(w) ? w : <span key={`${key}.${i}`} className="chat-word">{w}</span>));
+}
 
 function EntityChip({ e, label, onNavigate }: { e: ChatEntity; label: string; onNavigate?: () => void }) {
   return (
@@ -183,18 +191,20 @@ function EntityChip({ e, label, onNavigate }: { e: ChatEntity; label: string; on
 /** Plain text with the names of known things drawn as chips. */
 function linkify(text: string, ctx: Ctx, keyBase: string): ReactNode[] {
   const { pattern, entities } = ctx;
-  if (!pattern || !entities?.length) return [text];
+  const plain = (s: string, at: number) => (ctx.words ? wordSpans(s, `${keyBase}-${at}`) : s);
+  if (!pattern || !entities?.length) return [plain(text, 0)];
   const out: ReactNode[] = [];
   let last = 0;
   for (const m of text.matchAll(pattern)) {
     const name = m[1]!;
     const e = entities.find((x) => x.name === name);
     if (!e || (commonWords.has(name.toLowerCase()) && !ctx.bold)) continue;
-    if (m.index! > last) out.push(text.slice(last, m.index));
-    out.push(<EntityChip key={`${keyBase}-${m.index}`} e={e} label={name} onNavigate={ctx.onNavigate} />);
+    if (m.index! > last) out.push(plain(text.slice(last, m.index), last));
+    const chip = <EntityChip e={e} label={name} onNavigate={ctx.onNavigate} />;
+    out.push(ctx.words ? <span key={`${keyBase}-${m.index}`} className="chat-word">{chip}</span> : <Fragment key={`${keyBase}-${m.index}`}>{chip}</Fragment>);
     last = m.index! + name.length;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < text.length) out.push(plain(text.slice(last), last));
   return out;
 }
 
@@ -214,7 +224,7 @@ function inline(nodes: Inline[], ctx: Ctx): ReactNode[] {
         return <em key={i}>{inline(n.children, ctx)}</em>;
       case "code":
         return (
-          <code key={i} className="rounded-md bg-fg/[0.07] px-1.5 py-0.5 font-mono text-[0.84em] font-normal whitespace-nowrap">
+          <code key={i} className={cx("rounded-md bg-fg/[0.07] px-1.5 py-0.5 font-mono text-[0.84em] font-normal whitespace-nowrap", ctx.words && "chat-word")}>
             {n.text}
           </code>
         );
@@ -243,11 +253,11 @@ const alignCls = { left: "text-start", right: "text-end", center: "text-center" 
 
 /**
  * An answer of the assistant. onNavigate: a page link was followed (the chat may close on a phone). entities: the things the
- * panel knows by name (nodes), drawn as chips that open them.
+ * panel knows by name (nodes), drawn as chips that open them. words: the answer is streaming in, each new word fades in.
  */
-export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onNavigate?: () => void; entities?: readonly ChatEntity[] }) {
+export function ChatMarkdown({ text, onNavigate, entities, words }: { text: string; onNavigate?: () => void; entities?: readonly ChatEntity[]; words?: boolean }) {
   const pattern = useMemo(() => entityPattern(entities ?? []), [entities]);
-  const ctx: Ctx = { onNavigate, entities, pattern };
+  const ctx: Ctx = { onNavigate, entities, pattern, words };
   const inlineCtx = (c: Inline[]) => inline(c, ctx);
   return (
     <div className="flex flex-col gap-3 text-[15px] leading-[1.65] font-normal text-pretty break-words">
@@ -333,4 +343,67 @@ export function ChatMarkdown({ text, onNavigate, entities }: { text: string; onN
       })}
     </div>
   );
+}
+
+/** Where the text's last whole word ends (just past its last whitespace); 0 when there is none yet. */
+const wholeWords = (text: string) => {
+  const m = /\s\S*$/.exec(text);
+  return m ? m.index + 1 : 0;
+};
+
+/**
+ * While streaming, a stop never leaves a half behind: not inside a **bold** or `code` whose end has not arrived (it waits
+ * before it, or goes on past its end when that is there), nor just after a list marker or heading mark (no bare bullet).
+ */
+export function settle(text: string, stop: number, end: number): number {
+  for (const mark of ["**", "`"]) {
+    if ((text.slice(0, stop).split(mark).length - 1) % 2 === 0) continue;
+    const close = text.indexOf(mark, stop);
+    if (close >= 0 && close + mark.length <= end) {
+      const rest = text.slice(close + mark.length, end).search(/\s/);
+      stop = rest < 0 ? end : close + mark.length + rest;
+    } else stop = text.lastIndexOf(mark, stop - 1);
+  }
+  const bare = /(^|\n)[ \t]*(?:[-*+]|\d+[.)]|#{1,6})[ \t]*$/.exec(text.slice(0, stop));
+  return bare ? bare.index + bare[1]!.length : stop;
+}
+
+/**
+ * The answer as it is shown while it streams: it follows the text that has arrived word by word, faster the further behind it
+ * is (a backlog clears in about 0.4 s, and it never goes slower than 60 characters a second), so chunks of any size flow in
+ * evenly instead of landing in lumps. While `streaming`, a word still arriving waits for its end. Text that is already there
+ * when the bubble mounts (history) is shown at once. The second value: this bubble streamed (its words fade in).
+ */
+export function useSmoothText(text: string, streaming: boolean): [string, boolean] {
+  const [shown, setShown] = useState(text);
+  const [animated, setAnimated] = useState(false);
+  const ref = useRef(text);
+  useEffect(() => {
+    if (!text.startsWith(ref.current)) {
+      // replaced, not grown (another conversation, or the words so far became the turn's thinking): no reveal
+      ref.current = text;
+      setShown(text);
+      return;
+    }
+    const end = streaming ? Math.max(ref.current.length, wholeWords(text)) : text.length;
+    if (ref.current.length >= end) return;
+    setAnimated(true);
+    let raf = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(50, now - last);
+      last = now;
+      const at = ref.current.length;
+      const next = Math.min(end, at + Math.max(1, Math.round(dt * Math.max(0.06, (end - at) / 400))));
+      const rest = text.slice(next, end).search(/\s/); // finish the word it stopped in
+      const stop = streaming ? settle(text, rest < 0 ? end : next + rest, end) : rest < 0 ? end : next + rest;
+      if (stop <= at) return; // waits for the rest of a bold, a code span or a list line
+      ref.current = text.slice(0, stop);
+      setShown(ref.current);
+      if (ref.current.length < end) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [text, streaming]);
+  return [shown, animated];
 }

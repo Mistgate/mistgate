@@ -29,6 +29,7 @@ import { zh as observabilityZh } from "./observability";
 import { zh as debugZh } from "./debug";
 import { zh as resourcesZh } from "./resources";
 import { zh as tasksZh } from "./tasks";
+import { zh as followupZh } from "./followup";
 
 // Simplified Chinese (zh-CN). Typed against the English shape: a missing or extra key fails `pnpm typecheck`. Plurals: one form, no "|".
 // `core` is the shell, auth and navigation copy (what ru.ts keeps in its own `core`).
@@ -164,8 +165,9 @@ const core: CoreMessages = {
   "settings.fx.beta": "测试版",
   "settings.fx.show": "演示",
   "settings.fx.create": "创建内容时",
+  "settings.fx.save": "保存内容或助手回答时",
   "settings.fx.pages": "打开页面时",
-  "settings.fx.hint": "新的节点、用户、分组或配置会在一道轻柔的彩色光波下显现。关闭，或系统设置了减少动态效果时，新内容会直接出现。",
+  "settings.fx.hint": "新的节点、用户、分组或配置会在一道轻柔的彩色光波下显现，一圈柔和的光环从你按下的按钮处扩散开。关闭，或系统设置了减少动态效果时，新内容会直接出现。",
   "settings.device": "仅限此设备",
 
   "auth.setup.welcomeTitle": "你好！",
@@ -289,4 +291,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "本节点站点或其他站点",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh };

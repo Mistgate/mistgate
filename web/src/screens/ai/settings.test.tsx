@@ -9,11 +9,13 @@ import { AssistantTab } from "./settings";
 
 const getAssistantSettings = vi.fn();
 const updateAssistantSettings = vi.fn();
+const setProviderKey = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   assistant: {
     getAssistantSettings: (...a: unknown[]) => getAssistantSettings(...a),
     updateAssistantSettings: (...a: unknown[]) => updateAssistantSettings(...a),
+    setProviderKey: (...a: unknown[]) => setProviderKey(...a),
     listProviderModels: async () => ({ models: [{ id: "deepseek-v4.1-flash", name: "deepseek-v4.1-flash", contextTokens: 0n, inputUsdPerMtok: 0.3, outputUsdPerMtok: 1.2, recommended: true }] }),
   },
 }));
@@ -35,6 +37,7 @@ afterEach(() => {
   root = host = null;
   getAssistantSettings.mockReset();
   updateAssistantSettings.mockReset();
+  setProviderKey.mockReset();
 });
 
 const status = (provider: AssistantProvider, connected: boolean) => ({
@@ -48,11 +51,11 @@ const status = (provider: AssistantProvider, connected: boolean) => ({
   lastErrorUnix: 0n,
 });
 
-async function mount() {
+async function mount(includeCustom = false) {
   // what a panel answers before the owner ever picked a provider: none stored, only Ollama Cloud connected
   getAssistantSettings.mockResolvedValue({
     settings: { enabled: true, provider: AssistantProvider.UNSPECIFIED, effort: AssistantEffort.UNSPECIFIED, audience: AssistantAudience.UNSPECIFIED, panelNotes: "", retentionDays: 90 },
-    providers: [status(AssistantProvider.ANTHROPIC, false), status(AssistantProvider.DEEPSEEK, false), status(AssistantProvider.ZAI, false), status(AssistantProvider.OLLAMA_CLOUD, true)],
+    providers: [status(AssistantProvider.ANTHROPIC, false), status(AssistantProvider.DEEPSEEK, false), status(AssistantProvider.ZAI, false), status(AssistantProvider.OLLAMA_CLOUD, true), ...(includeCustom ? [status(AssistantProvider.CUSTOM_1, false)] : [])],
     usage: [],
   });
   updateAssistantSettings.mockResolvedValue({ settings: {}, providers: [] });
@@ -100,5 +103,27 @@ describe("the assistant's settings", () => {
     expect(saveButton()).toBeDefined();
     await click([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Discard"));
     expect(saveButton()).toBeUndefined();
+  });
+
+  it("lets the owner configure a local custom provider without a key", async () => {
+    await mount(true);
+    const card = [...document.querySelectorAll("section b")].find((b) => b.textContent?.includes("Custom provider 1"))?.closest("div.flex.flex-col.gap-3");
+    expect(card).toBeTruthy();
+    await click([...card!.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Connect"));
+    const fill = async (label: string, value: string) => {
+      const input = [...card!.querySelectorAll("label")].find((el) => el.textContent?.includes(label))?.parentElement?.querySelector("input") as HTMLInputElement;
+      expect(input).toBeTruthy();
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    await fill("Name", "Local model");
+    await fill("API address", "http://127.0.0.1:11434/v1");
+    await fill("Model ID", "model-test");
+    await click(card!.querySelector('input[type="checkbox"]'));
+    setProviderKey.mockResolvedValue({});
+    await click([...card!.querySelectorAll("button")].find((b) => b.textContent?.includes("Check and save")));
+    expect(setProviderKey).toHaveBeenCalledWith(expect.objectContaining({ provider: AssistantProvider.CUSTOM_1, customName: "Local model", customModel: "model-test", allowLocal: true, apiKey: "" }));
   });
 });

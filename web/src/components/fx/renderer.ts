@@ -66,8 +66,9 @@ uniform vec2 uOrigin;
 uniform vec2 uSize;
 uniform vec2 uDir;
 uniform float uCenter, uHalf, uAlpha, uBright, uWave, uRipple, uTime, uSeed, uRadius;
-uniform vec3 pA, pB, pC, pD;
+uniform vec3 pA, pB, pC, pD, pS0, pS1, pS2, pS3;
 uniform vec2 pT;
+uniform float pRing;
 
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vnoise(vec2 p){
@@ -75,7 +76,14 @@ float vnoise(vec2 p){
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-vec3 pal(float t){ return clamp(pA + pB * cos(6.28318 * (pC * t + pD)), 0.0, 1.0); }
+vec3 pal(float t){
+  if (pRing > 0.5) { // the halo's four colours (palette.ts ringColor)
+    float x = (t - 0.5) * 3.0;
+    float w0 = exp(-pow((x + 1.5) / 0.8, 2.0)), w1 = exp(-pow((x + 0.5) / 0.8, 2.0)), w2 = exp(-pow((x - 0.5) / 0.8, 2.0)), w3 = exp(-pow((x - 1.5) / 0.8, 2.0));
+    return (w0 * pS0 + w1 * pS1 + w2 * pS2 + w3 * pS3) / (w0 + w1 + w2 + w3 + 0.0001);
+  }
+  return clamp(pA + pB * cos(6.28318 * (pC * t + pD)), 0.0, 1.0);
+}
 
 void main(){
   vec2 css = vec2(gl_FragCoord.x, uBuf.y - gl_FragCoord.y) / uDpr;
@@ -110,7 +118,7 @@ void main(){
   gl_FragColor = vec4((col * uBright + g) * a, a);
 }`;
 
-const uniformNames = ["uBuf", "uDpr", "uOrigin", "uSize", "uDir", "uCenter", "uHalf", "uAlpha", "uBright", "uWave", "uRipple", "uTime", "uSeed", "uRadius", "pA", "pB", "pC", "pD", "pT"] as const;
+const uniformNames = ["uBuf", "uDpr", "uOrigin", "uSize", "uDir", "uCenter", "uHalf", "uAlpha", "uBright", "uWave", "uRipple", "uTime", "uSeed", "uRadius", "pA", "pB", "pC", "pD", "pT", "pS0", "pS1", "pS2", "pS3", "pRing"] as const;
 
 class GlPainter implements Painter {
   private layer = makeLayer();
@@ -222,6 +230,8 @@ class GlPainter implements Painter {
     gl.uniform3f(loc.pC, ...p.c);
     gl.uniform3f(loc.pD, ...p.d);
     gl.uniform2f(loc.pT, p.t0, p.t1);
+    gl.uniform1f(loc.pRing, p.ring ? 1 : 0);
+    if (p.ring) [loc.pS0, loc.pS1, loc.pS2, loc.pS3].forEach((l, i) => gl.uniform3f(l, ...p.ring![i]!));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

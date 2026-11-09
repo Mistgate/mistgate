@@ -31,6 +31,7 @@ import { en as observabilityEn } from "./observability";
 import { en as debugEn } from "./debug";
 import { en as resourcesEn } from "./resources";
 import { en as tasksEn } from "./tasks";
+import { en as followupEn } from "./followup";
 
 // The shell, auth and navigation copy. The screens' own copy lives next to their owners: ops.ts (overview, nodes,
 // settings), users.ts and profiles.ts; `en` below is all of it, so `MessageKey` covers every key.
@@ -170,8 +171,9 @@ const core = {
   "settings.fx.beta": "Beta",
   "settings.fx.show": "Show",
   "settings.fx.create": "When something is created",
+  "settings.fx.save": "When something is saved or the assistant answers",
   "settings.fx.pages": "When pages open",
-  "settings.fx.hint": "A new node, person, group or profile appears under a light wave of colour. Off, or with reduced motion set in your system, new things simply appear.",
+  "settings.fx.hint": "A new node, person, group or profile appears under a light wave of colour, and a soft ring of light runs out from the button you pressed. Off, or with reduced motion set in your system, new things simply appear.",
   "settings.device": "Only on this device",
 
   "auth.setup.welcomeTitle": "Hi!",
@@ -304,7 +306,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

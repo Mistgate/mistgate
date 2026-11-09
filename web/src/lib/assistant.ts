@@ -1,6 +1,6 @@
 import { ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
-import { AssistantErrorSchema, AssistantProvider, ChatRole, PlanState, type ChatMessage, type MemoryNote, type PageContext, type PlanCard, type ToolCall } from "@/gen/mistgate/admin/v1/assistant_pb";
+import { AssistantErrorSchema, AssistantProvider, ChatRole, PlanState, type ChatMessage, type FollowUp as FollowUpPb, type GetAssistantAccessResponse, type MemoryNote, type PageContext, type PlanCard, type ToolCall } from "@/gen/mistgate/admin/v1/assistant_pb";
 import type { MessageKey } from "@/i18n/en";
 import { assistant } from "./api";
 import { plain, type Plain } from "./plain";
@@ -13,12 +13,24 @@ export type Plan = Plain<PlanCard>;
 export type Tool = Plain<ToolCall>;
 export type Note = Plain<MemoryNote>;
 export type Context = Plain<PageContext>;
+export type FollowUp = Plain<FollowUpPb>;
 
 export const accessQuery = queryOptions({
   queryKey: ["assistant", "access"],
   queryFn: async ({ signal }) => plain(await assistant.getAssistantAccess({}, { signal })),
   staleTime: 30_000,
 });
+
+/**
+ * When the chat button should ask again: soon after the admin's next follow-up is due (its answer makes the unread dot), every
+ * 15 s while one is due and not answered yet (it runs), never when none waits.
+ */
+export function followUpPoll(access: Pick<Plain<GetAssistantAccessResponse>, "nextFollowUpUnix"> | undefined, now = Date.now()): number | false {
+  const next = Number(access?.nextFollowUpUnix ?? 0);
+  if (!next) return false;
+  const ms = next * 1000 - now;
+  return ms > 0 ? Math.min(ms + 5_000, 10 * 60_000) : 15_000;
+}
 
 export const settingsQuery = queryOptions({
   queryKey: ["assistant", "settings"],
@@ -57,7 +69,14 @@ export const providerName = (p: AssistantProvider): MessageKey => providers.find
 const errorCodes = new Set([
   "assistant_off", "not_allowed", "no_provider", "edition", "turn_running", "plan_not_pending", "budget_reached", "rate_limited",
   "provider_unreachable", "provider_overloaded", "bad_key", "no_balance", "text_too_long", "note_too_long", "too_many_notes",
+  "follow_up_not_pending",
 ]);
+
+/** Why a follow-up did not run, in words: the reasons of its own, then the codes the chat's errors word. */
+export function followUpReasonKey(reason: string): MessageKey | null {
+  if (reason === "interrupted" || reason === "internal") return `ai.fu.reason.${reason}`;
+  return assistantErrorKey(reason);
+}
 
 /** The words for an assistant refusal (the AssistantError detail of a Connect error, or a code from the stream), or null. */
 export function assistantErrorKey(e: unknown): MessageKey | null {

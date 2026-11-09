@@ -29,6 +29,7 @@ import { tr as observabilityTr } from "./observability";
 import { tr as debugTr } from "./debug";
 import { tr as resourcesTr } from "./resources";
 import { tr as tasksTr } from "./tasks";
+import { tr as followupTr } from "./followup";
 
 // Turkish (tr). Typed against the English shape: a missing or extra key fails `pnpm typecheck`.
 // The admin speaks to the owner as «sen» (İstersen…, ajanı güncelle, emin misin?); buttons and tabs are short imperatives
@@ -166,8 +167,9 @@ const core: CoreMessages = {
   "settings.fx.beta": "Beta",
   "settings.fx.show": "Göster",
   "settings.fx.create": "Bir şey oluşturulduğunda",
+  "settings.fx.save": "Bir şey kaydedildiğinde veya asistan yanıtladığında",
   "settings.fx.pages": "Sayfalar açıldığında",
-  "settings.fx.hint": "Yeni bir düğüm, kişi, grup veya profil hafif bir renk dalgasının altında belirir. Kapalıyken ya da sistemde hareketi azaltma açıkken yeni öğeler doğrudan görünür.",
+  "settings.fx.hint": "Yeni bir düğüm, kişi, grup veya profil hafif bir renk dalgasının altında belirir ve bastığınız düğmeden yumuşak bir ışık halkası yayılır. Kapalıyken ya da sistemde hareketi azaltma açıkken yeni öğeler doğrudan görünür.",
   "settings.device": "Yalnızca bu cihazda",
   "auth.setup.welcomeTitle": "Merhaba!",
   "auth.setup.welcomeBody": "Burası {brand}: VPN sunucuların için bir panel. Önce bir dil seç; sonra değiştirebilirsin.",
@@ -287,4 +289,4 @@ const core: CoreMessages = {
   "field.reality.target_kind.invalid_enum": "Bu düğümün sitesi ya da başka bir site",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr };

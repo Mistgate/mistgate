@@ -170,12 +170,13 @@ func (s *Store) DeleteAssistantConversation(ctx context.Context, adminID, id str
 		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation deleted in assistant' WHERE id IN (SELECT id FROM assistant_plan WHERE conversation_id=? AND admin_id=?) AND status IN ('planned','awaiting','approved')`, Args: []any{id, adminID}},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id=? AND admin_id=?`, Args: []any{id, adminID}},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id=? AND admin_id=?`, Args: []any{id, adminID}},
+		Stmt{Query: `DELETE FROM assistant_follow_up WHERE conversation_id=? AND admin_id=?`, Args: []any{id, adminID}},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE id=? AND admin_id=?`, Args: []any{id, adminID}},
 	)
 	if err != nil {
 		return false, err
 	}
-	return results[3].RowsAffected > 0, nil
+	return results[4].RowsAffected > 0, nil
 }
 
 func (s *Store) DeleteAssistantConversations(ctx context.Context, adminID string, all bool) (int64, error) {
@@ -191,12 +192,13 @@ func (s *Store) DeleteAssistantConversations(ctx context.Context, adminID string
 		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation deleted in assistant' WHERE id IN (SELECT p.id FROM assistant_plan p JOIN assistant_conversation c ON c.id=p.conversation_id WHERE ` + planWhere + `) AND status IN ('planned','awaiting','approved')`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
+		Stmt{Query: `DELETE FROM assistant_follow_up WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE ` + where + `)`, Args: args},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE ` + where, Args: args},
 	)
 	if err != nil {
 		return 0, err
 	}
-	return results[3].RowsAffected, nil
+	return results[4].RowsAffected, nil
 }
 
 func (s *Store) RetainAssistantConversations(ctx context.Context, cutoff time.Time) (int64, error) {
@@ -204,12 +206,13 @@ func (s *Store) RetainAssistantConversations(ctx context.Context, cutoff time.Ti
 		Stmt{Query: `UPDATE mcp_plan SET status='cancelled',error='conversation expired from assistant' WHERE id IN (SELECT p.id FROM assistant_plan p JOIN assistant_conversation c ON c.id=p.conversation_id WHERE c.updated_at < ?) AND status IN ('planned','awaiting','approved')`, Args: []any{unix(cutoff)}},
 		Stmt{Query: `DELETE FROM assistant_plan WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE updated_at < ?)`, Args: []any{unix(cutoff)}},
 		Stmt{Query: `DELETE FROM assistant_message WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE updated_at < ?)`, Args: []any{unix(cutoff)}},
+		Stmt{Query: `DELETE FROM assistant_follow_up WHERE conversation_id IN (SELECT id FROM assistant_conversation WHERE updated_at < ?)`, Args: []any{unix(cutoff)}},
 		Stmt{Query: `DELETE FROM assistant_conversation WHERE updated_at < ?`, Args: []any{unix(cutoff)}},
 	)
 	if err != nil {
 		return 0, err
 	}
-	return results[3].RowsAffected, nil
+	return results[4].RowsAffected, nil
 }
 
 func (s *Store) AssistantRetention(ctx context.Context, now time.Time) error {

@@ -7,11 +7,12 @@ import { InlineApproval } from "./inline-approval";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { splitText, type LiveMsg, type LiveTool, type Msg, type Note } from "@/lib/assistant";
+import { accessQuery, followUpReasonKey, splitText, type FollowUp, type LiveMsg, type LiveTool, type Msg, type Note } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
-import { dayLabel, useFmt } from "@/lib/format";
+import { dayLabel, minutesText, useFmt } from "@/lib/format";
 import { nodesQuery } from "@/lib/queries";
-import { ChatMarkdown, type ChatEntity } from "./markdown";
+import { useNow } from "@/lib/time";
+import { ChatMarkdown, useSmoothText, type ChatEntity } from "./markdown";
 import { PlanCardView } from "./plan-card";
 import type { ChatApi } from "./chat";
 import { actionOf } from "@/lib/ui-actions";
@@ -38,7 +39,10 @@ function endText(end: string): MessageKey | null {
   }
 }
 
-const hasContent = (m: Msg) => m.role === ChatRole.USER || !!m.text || m.tools.length > 0 || m.plans.length > 0 || m.remembered.length > 0 || !!endText(m.end);
+/** The assistant's own words, tools, cards or notes: what makes its bubble (a follow-up that did not run has none of them). */
+const hasAnswer = (m: Msg) => !!m.text || m.tools.length > 0 || m.plans.length > 0 || m.remembered.length > 0;
+
+const hasContent = (m: Msg) => m.role === ChatRole.USER || hasAnswer(m) || !!endText(m.end) || !!m.followUp?.outcome;
 
 function dayKey(unix: number) {
   const d = new Date(unix * 1000);
@@ -98,11 +102,84 @@ function CheckingLabel({ tool }: { tool: string }) {
   );
 }
 
-function Header({ name, time }: { name: string; time: string }) {
+function Header({ name, time, label }: { name: string; time: string; label?: ReactNode }) {
   return (
     <div className="flex h-7 items-center gap-2 text-xs">
       <b className="font-medium text-fg">{name}</b>
+      {label}
       {time && <span className="text-muted">{time}</span>}
+    </div>
+  );
+}
+
+/** "On a timer": a turn a follow-up started, not one the person asked for. */
+export function TimerLabel() {
+  const t = useT();
+  return (
+    <span data-slot="timer" className="inline-flex flex-none items-center gap-1 rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-semibold text-accent-text">
+      <Icon name="clock" size={10} />
+      {t("ai.fu.label")}
+    </span>
+  );
+}
+
+/** The line a follow-up's turn starts from: not the person's words but the assistant's own note, and when it was set. */
+function FollowUpLine({ m, first, tz }: { m: Msg; first: boolean; tz: number }) {
+  const t = useT();
+  const fmt = useFmt();
+  const set = Number(m.followUp?.setUnix ?? 0);
+  return (
+    <div data-role="follow-up" className={cx("chat-in flex flex-col items-end gap-1", first ? "mt-6" : "mt-2")}>
+      <span className="flex items-center gap-1.5 px-1 text-[11px] text-faint">
+        <TimerLabel />
+        {set > 0 && <span>{t("ai.fu.line", { time: fmt.stampAt(set, tz) })}</span>}
+      </span>
+      <div className="max-w-[82%] rounded-[18px] border border-dashed border-line px-4 py-2.5 text-[13.5px] leading-[1.55] break-words whitespace-pre-wrap text-muted">{m.text}</div>
+    </div>
+  );
+}
+
+/** What a follow-up that did not run (or whose turn failed) leaves: for when it was, why, and what it was to do. */
+function FollowUpNote({ m, tz, withNote }: { m: Msg; tz: number; withNote: boolean }) {
+  const t = useT();
+  const fmt = useFmt();
+  const fu = m.followUp!;
+  const time = fmt.stampAt(Number(fu.dueUnix), tz);
+  const key = followUpReasonKey(fu.reason);
+  const reason = key ? t(key) : fu.reason;
+  return (
+    <div role="status" data-role="follow-up-note" className="chat-in my-5 flex flex-col items-center gap-1.5 text-center">
+      <TimerLabel />
+      <span className="max-w-[85%] text-[11.5px] text-pretty text-muted">{fu.outcome === "missed" ? t("ai.fu.missed", { time }) : t("ai.fu.failed", { time, reason })}</span>
+      {withNote && fu.note && <span className="max-w-[85%] text-[11px] text-pretty text-faint">{t("common.quoted", { name: fu.note })}</span>}
+    </div>
+  );
+}
+
+/** A follow-up that waits: when it comes back, in the panel's time zone and from now, with Cancel. */
+function PendingFollowUp({ f, tz, onCancel }: { f: FollowUp; tz: number; onCancel: () => void }) {
+  const t = useT();
+  const fmt = useFmt();
+  const now = useNow(30_000);
+  const due = Number(f.dueUnix);
+  const coming = f.running || (due > 0 && due * 1000 <= now);
+  const text = coming
+    ? t("ai.fu.now")
+    : due > 0
+      ? t("ai.fu.pending", { time: fmt.stampAt(due, tz), left: minutesText(t, Math.ceil((due * 1000 - now) / 60_000)) })
+      : t("ai.fu.afterPlan", { left: minutesText(t, Math.ceil(f.delayS / 60)) });
+  return (
+    <div role="status" data-role="follow-up-pending" className="chat-in mt-4 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-[11.5px] text-muted">
+      <Icon name="clock" size={12} className="flex-none text-accent-text" />
+      <span className="text-pretty">{text}</span>
+      {!coming && (
+        <>
+          <span aria-hidden>·</span>
+          <button type="button" onClick={onCancel} className="font-medium text-accent-text hover:underline">
+            {t("ai.fu.cancel")}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -140,6 +217,7 @@ function UserBubble({ m, first, last }: { m: Msg; first: boolean; last: boolean 
 function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }: { m: Msg; first: boolean; avatar: boolean; running: boolean; owner: boolean; chat: ChatApi; onNavigate: () => void }) {
   const t = useT();
   const { interim, answer } = splitText(m);
+  const [shown, streamed] = useSmoothText(answer, running);
   const fmt = useFmt();
   const [busy, setBusy] = useState("");
   const live = m as LiveMsg;
@@ -155,12 +233,12 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
     <div data-role="assistant" className={cx("chat-in flex items-start gap-3", first ? "mt-6" : "mt-3")}>
       <Slot show={avatar} />
       <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
-        {first && <Header name={t("ai.chat.title")} time={m.createdUnix > 0 ? fmt.clock(m.createdUnix) : ""} />}
+        {(first || m.followUp) && <Header name={t("ai.chat.title")} time={m.createdUnix > 0 ? fmt.clock(m.createdUnix) : ""} label={m.followUp ? <TimerLabel /> : undefined} />}
         {(interim || (running && shownTools.length > 0)) && <Thinking m={live} running={running} interim={interim} />}
         {shownTools.length > 0 && <ToolGroup tools={shownTools} running={running} workedMs={interim ? undefined : live.workedMs} />}
-        {answer && (
+        {shown && (
           <div data-slot="bubble" className="max-w-full">
-            <ChatMarkdown text={answer} onNavigate={onNavigate} entities={entities} />
+            <ChatMarkdown text={shown} onNavigate={onNavigate} entities={entities} words={streamed} />
           </div>
         )}
         {actions.map((a) => (a.action.kind === "secret" ? <SecretCard key={a.id} toolId={a.id} action={a.action} owner={owner} /> : <ActionCard key={a.id} toolId={a.id} action={a.action} onNavigate={onNavigate} />))}
@@ -197,6 +275,8 @@ function AssistantBubble({ m, first, avatar, running, owner, chat, onNavigate }:
 export function Thread({ chat, owner, onNavigate }: { chat: ChatApi; owner: boolean; onNavigate: () => void }) {
   const t = useT();
   const fmt = useFmt();
+  // follow-up times are the panel's, like the scheduled tasks'
+  const tz = useQuery(accessQuery).data?.timezoneOffsetMinutes ?? 0;
   const all = chat.messages;
   const last = all[all.length - 1];
   const shown = all.filter(hasContent);
@@ -213,18 +293,24 @@ export function Thread({ chat, owner, onNavigate }: { chat: ChatApi; owner: bool
     if (newDay) out.push(<Rule key={`day-${m.id}`}>{dayLabel(t, fmt, m.createdUnix)}</Rule>);
     const first = !prev || prev.role !== m.role || newDay;
     if (m.role === ChatRole.USER) {
-      out.push(<UserBubble key={m.id} m={m} first={first} last={m === lastUser} />);
+      out.push(m.followUp ? <FollowUpLine key={m.id} m={m} first={first} tz={tz} /> : <UserBubble key={m.id} m={m} first={first} last={m === lastUser} />);
     } else {
       const isTail = m === lastShown;
-      out.push(<AssistantBubble key={m.id} m={m} first={first} avatar={first} running={chat.running && isTail} owner={owner} chat={chat} onNavigate={onNavigate} />);
+      // a follow-up that did not run has no bubble, only its note
+      const silent = !!m.followUp?.outcome && !hasAnswer(m);
+      if (!silent) out.push(<AssistantBubble key={m.id} m={m} first={first} avatar={first} running={chat.running && isTail} owner={owner} chat={chat} onNavigate={onNavigate} />);
       const end = endText(m.end);
       if (end) out.push(<Rule key={`end-${m.id}`} role="status">{t(end)}</Rule>);
+      if (m.followUp?.outcome) out.push(<FollowUpNote key={`fu-${m.id}`} m={m} tz={tz} withNote={silent} />);
     }
   });
 
   return (
     <>
       {out}
+      {(chat.followUps ?? []).map((f) => (
+        <PendingFollowUp key={f.id} f={f} tz={tz} onCancel={() => void chat.cancelFollowUp?.(f.id)} />
+      ))}
       {typing && <Typing avatar={lastShown?.role !== ChatRole.ASSISTANT} label={openTool ? <CheckingLabel tool={openTool.tool} /> : t("ai.chat.typing")} />}
       {chat.error && (
         <Rule tone="danger" role="alert">

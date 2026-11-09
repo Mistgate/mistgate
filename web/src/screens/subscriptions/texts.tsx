@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { halo } from "@/components/fx/halo";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { FlagText } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
@@ -89,7 +90,10 @@ function TextsForm({ data }: { data: Data }) {
         happPing: f.ping,
         happPingOnOpen: f.pingOnOpen,
       }))
-      .then(() => toast(t("subs.saved")))
+      .then(() => {
+        toast(t("subs.saved"));
+        halo("save");
+      })
       .catch((e: unknown) => toast.error(errorText(e, t)));
   }
 

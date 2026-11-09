@@ -18,6 +18,7 @@ import (
 
 // capDebug is listed in Hello.capabilities: the panel sends DebugCapture only to agents that have it.
 const capDebug = "debug/1"
+const capDebug2 = "debug/2"
 
 const (
 	debugMaxRecords  = 20000
@@ -36,12 +37,16 @@ var keyRun = regexp.MustCompile(`[A-Za-z0-9+/_=-]{32,}`)
 
 // debugCapture is one running or finished capture. recs is guarded by debugState.mu.
 type debugCapture struct {
-	id      string
-	level   slog.Level
-	sources map[string]bool // nil = every source
-	end     time.Time
-	prev    slog.Level // the level to put back
-	timer   *time.Timer
+	id              string
+	level           slog.Level
+	sources         map[string]bool // nil = every source
+	started         time.Time
+	end             time.Time
+	prev            slog.Level // the level to put back
+	timer           *time.Timer
+	onEnd           func(*debugCapture, string)
+	reservedRecords int
+	reservedBytes   int
 
 	recs    []logRecord
 	bytes   int
@@ -86,27 +91,81 @@ func (d *debugState) wants(source string, l slog.Level) bool {
 }
 
 // add keeps a record in the running capture, scrubbed. A record below Info that no capture wants never gets here.
-func (d *debugState) add(l slog.Level, rec logRecord) {
+type debugAddResult uint8
+
+const (
+	debugAddSkipped debugAddResult = iota
+	debugAddStored
+	debugAddCapped
+)
+
+func (d *debugState) add(l slog.Level, rec logRecord) debugAddResult {
 	if d == nil || !d.wants(rec.source, l) {
-		return
+		return debugAddSkipped
 	}
 	c := d.active.Load()
 	rec = scrubCaptured(rec, l)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.cur != c { // the capture ended while this record was being cleaned
+		return debugAddSkipped
+	}
+	if !appendDebugRecord(c, rec, true) {
+		c.dropped = incrementJournalCount(c.dropped)
+		return debugAddCapped
+	}
+	return debugAddStored
+}
+
+func appendDebugRecord(c *debugCapture, rec logRecord, reserve bool) bool {
+	maxRecords, maxBytes := debugMaxRecords, debugMaxBytes
+	if reserve {
+		maxRecords -= c.reservedRecords
+		maxBytes -= c.reservedBytes
+	}
+	if maxRecords < 0 {
+		maxRecords = 0
+	}
+	if maxBytes < 0 {
+		maxBytes = 0
+	}
+	size := debugRecordSize(rec)
+	if len(c.recs) >= maxRecords || c.bytes+size > maxBytes {
+		return false
+	}
+	c.recs = append(c.recs, rec)
+	c.bytes += size
+	return true
+}
+
+func debugRecordSize(rec logRecord) int {
 	size := len(rec.msg) + len(rec.source) + debugRecordExtra
 	for k, v := range rec.attrs {
 		size += len(k) + len(v)
 	}
+	return size
+}
+
+func (d *debugState) addFinal(c *debugCapture, recs ...logRecord) {
+	if d == nil || c == nil {
+		return
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.cur != c { // the capture ended while this record was being cleaned
-		return
+	for _, rec := range recs {
+		level := slog.LevelInfo
+		if rec.level == pb.Severity_SEVERITY_WARNING {
+			level = slog.LevelWarn
+		} else if rec.level == pb.Severity_SEVERITY_ERROR {
+			level = slog.LevelError
+		} else if rec.level == pb.Severity_SEVERITY_DEBUG {
+			level = slog.LevelDebug
+		}
+		clean := scrubCaptured(rec, level)
+		if !appendDebugRecord(c, clean, false) {
+			c.dropped = incrementJournalCount(c.dropped)
+		}
 	}
-	if len(c.recs) >= debugMaxRecords || c.bytes+size > debugMaxBytes {
-		c.dropped = incrementJournalCount(c.dropped)
-		return
-	}
-	c.recs = append(c.recs, rec)
-	c.bytes += size
 }
 
 // scrubCaptured is the journal's pass over a record, plus key-shaped runs: addresses become <ip>, xray's names are cut, only the
@@ -169,7 +228,7 @@ func validSource(s string) bool {
 }
 
 // start begins a capture; busy while another runs. expire is called when the time is up.
-func (d *debugState) start(id string, level slog.Level, sources map[string]bool, dur time.Duration, expire func(id string)) (time.Time, bool) {
+func (d *debugState) start(id string, level slog.Level, sources map[string]bool, dur time.Duration, expire func(id string), prepare ...func(*debugCapture)) (time.Time, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.cur != nil {
@@ -181,12 +240,16 @@ func (d *debugState) start(id string, level slog.Level, sources map[string]bool,
 		}
 		d.done = nil
 	}
-	c := &debugCapture{id: id, level: level, sources: sources, end: d.now().Add(dur), prev: d.lv.Level()}
+	started := d.now()
+	c := &debugCapture{id: id, level: level, sources: sources, started: started, end: started.Add(dur), prev: d.lv.Level()}
 	d.cur = c
 	if level < c.prev {
 		d.lv.Set(level) // the raise: slog skips the work of a record nobody wants
 	}
 	d.active.Store(c)
+	for _, fn := range prepare {
+		fn(c)
+	}
 	c.timer = time.AfterFunc(dur, func() { expire(id) })
 	return c.end, true
 }
@@ -194,9 +257,9 @@ func (d *debugState) start(id string, level slog.Level, sources map[string]bool,
 // finish ends the running capture with this id, puts the level back and keeps the records as finished. nil when there is none.
 func (d *debugState) finish(id, reason string) *debugCapture {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	c := d.cur
 	if c == nil || c.id != id {
+		d.mu.Unlock()
 		return nil
 	}
 	c.timer.Stop()
@@ -204,6 +267,11 @@ func (d *debugState) finish(id, reason string) *debugCapture {
 	d.lv.Set(c.prev)
 	d.cur = nil
 	d.done = &debugFinished{c: c, reason: reason, at: d.now()}
+	onEnd := c.onEnd
+	d.mu.Unlock()
+	if onEnd != nil {
+		onEnd(c, reason)
+	}
 	return c
 }
 
@@ -247,12 +315,17 @@ func (d *debugState) shutdown() {
 		return
 	}
 	d.mu.Lock()
-	defer d.mu.Unlock()
-	if c := d.cur; c != nil {
-		c.timer.Stop()
+	var c *debugCapture
+	if running := d.cur; running != nil {
+		running.timer.Stop()
 		d.active.Store(nil)
-		d.lv.Set(c.prev)
+		d.lv.Set(running.prev)
 		d.cur = nil
+		c = running
+	}
+	d.mu.Unlock()
+	if c != nil && c.onEnd != nil {
+		c.onEnd(c, "shutdown")
 	}
 }
 
@@ -281,7 +354,7 @@ func (a *Agent) debugCapture(s *session, r *pb.DebugCapture) {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: bad}))
 		return
 	}
-	end, ok := a.debug.start(r.RequestId, level, sources, dur, a.debugExpired)
+	end, ok := a.debug.start(r.RequestId, level, sources, dur, a.debugExpired, a.prepareKernelCapture)
 	if !ok {
 		s.send(cmdResult(&pb.CommandResult{RequestId: r.RequestId, Error: "busy"}))
 		return

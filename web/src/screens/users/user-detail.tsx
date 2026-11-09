@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Code } from "@connectrpc/connect";
+import { halo } from "@/components/fx/halo";
 import type { DeviceConfig } from "@/gen/mistgate/admin/v1/device_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { LinkDeviceLimit } from "@/gen/mistgate/admin/v1/subscription_pb";
@@ -284,6 +285,7 @@ function SubscriptionNamePanel({ user, actions }: { user: User; actions: Actions
     try {
       await actions.update({ subscriptionName: trimmed });
       toast(t("users.subscriptionNameSaved"));
+      halo("save");
     } catch {
       // actions.update displays the server error and keeps the draft available for correction.
     } finally {

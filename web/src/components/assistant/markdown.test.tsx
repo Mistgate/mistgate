@@ -1,7 +1,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ChatMarkdown, internalPath, parseChatMarkdown } from "./markdown";
+import { ChatMarkdown, internalPath, parseChatMarkdown, settle } from "./markdown";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, params, className, ...rest }: { children?: ReactNode; to: string; params?: { id?: string }; className?: string; "data-entity"?: string }) => (
@@ -122,5 +122,16 @@ describe("the assistant's Markdown", () => {
 
   it("leaves a line with a pipe but no separator row as text", () => {
     expect(parseChatMarkdown("a | b\nnot a table")).toEqual([expect.objectContaining({ kind: "paragraph" })]);
+  });
+});
+
+describe("settle (the streaming reveal)", () => {
+  it("never stops inside an unfinished bold or code span, or on a bare list marker", () => {
+    expect(settle("Hi **bo", 7, 7)).toBe(3); // waits before the bold
+    expect(settle("Hi **bold** and", 7, 15)).toBe(11); // or goes past its end when it is there
+    expect(settle("x `co", 5, 5)).toBe(2);
+    expect(settle("a\n- ", 4, 4)).toBe(2); // no bullet without its words
+    expect(settle("a\n## ", 5, 5)).toBe(2);
+    expect(settle("plain words here", 6, 16)).toBe(6);
   });
 });

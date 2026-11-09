@@ -28,7 +28,9 @@ A round button appears at the bottom corner of every page for the admins it is o
 | Z.ai | `api.z.ai` (the international platform) | GLM-5.3 and GLM-5.3-Flash | Processed in Singapore; the provider's agreement says content is not stored. |
 | Ollama Cloud | `ollama.com` | the cloud models that take tools | Processed in the United States; not used for training. |
 
-The card of each provider says the same, so you choose knowing it. The panel talks to a provider only from its own server, at that fixed address: there is no field for another address, and the browser never sees the key.
+The card of each built-in provider says the same, so you choose knowing it. The owner can also connect up to five OpenAI-compatible providers: enter a name, API base URL (such as `https://example.com/v1`), model ID, key and optional input and output prices. The panel checks that the model can call a tool before saving. A model can also be chosen from the provider's model list when available. Set its monthly budget on the card, and select it as the main or fallback provider.
+
+The panel calls providers from its own server; keys are sealed and never returned to the browser. Custom endpoints require HTTPS. To use an HTTP endpoint on the panel's local network, explicitly enable local access; the key may be empty for a local model. Link-local addresses are blocked, including cloud metadata endpoints. Follow the provider's own data policy when choosing where to send the conversation. Prices you enter are estimates: leave them at zero only for a free provider.
 
 What the provider receives: the conversation, the assistant's instructions, your notes and the owner's notes, and the results of the tools it calls. Those results pass the same filter as [MCP](../reference/mcp.md#what-an-agent-never-gets): no subscription links or page passwords, no keys, device configurations or tokens, no server passwords, no node addresses. If a message you type looks like a key or a password, the chat asks before sending it.
 
@@ -67,6 +69,17 @@ Conversations and notes are sealed in the panel's database and private to each a
 - The key is sealed with the panel's master key, entered by the owner after a passkey or code, and never shown, logged or written to the audit log.
 - Names, notes and log lines from nodes and people are data to the assistant, never instructions; it has no tool that reaches the internet; the chat shows no images and no HTML, links to the admin's pages stay in the admin and other links open apart.
 - Even if a node name or a note talked the model into proposing something, it would only be a card: the change happens when a person reads it and presses **Apply**.
+
+## Follow-ups
+
+The assistant answers your messages, and it can also come back by itself. When it starts or prepares something that finishes later (a debug capture of a node, a speed test, checks whose results come later, a rollout or a node update, a relay), it sets a follow-up: a time a little after the job ends and a note of what to read then. The conversation shows a quiet line such as "I'll come back with the result at 15:41 (in 9 min) · Cancel", in the panel's time zone.
+
+- At that time the panel continues the same conversation on its own, with the browser closed too: the assistant sees the conversation so far, reads the result with its tools and answers. The answer is marked **On a timer**, and a dot on the chat button and in the list of conversations says it came while you were away.
+- A follow-up for a change that starts only when you apply its plan (a debug capture, a speed test) waits for the apply and counts from it; if you dismiss the plan or let it expire, the follow-up goes too.
+- It works exactly as when you write: the tools and rights of your role, the same limits and budget. It may prepare a plan, but nothing changes until you press **Apply** on its card.
+- At most 3 follow-ups wait in a conversation and 20 for an admin, each from 30 seconds to 24 hours ahead. **Cancel** on the line removes one; deleting the conversation removes its follow-ups.
+- When a follow-up cannot run (the assistant is off, the month's budget is spent, the provider keeps failing), the conversation gets a short note with the reason. One the panel missed while it was down runs once when it starts again, unless it is more than a day late: then it is dropped with a note.
+- If you ask for it ("tell me in Telegram if something is wrong"), a follow-up that finds a problem also sends one line to your linked Telegram chat.
 
 ## Scheduled tasks
 

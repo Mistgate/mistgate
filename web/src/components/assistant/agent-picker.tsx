@@ -2,7 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Icon, type IconName } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { AssistantEffort, AssistantProvider } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
@@ -11,17 +11,17 @@ import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { readPref, writePref } from "@/lib/storage";
 import { AUTO_OPEN_KEY } from "@/lib/ui-actions";
+import { BrandMark, customProviderBrand, modelBrand, providerBrand } from "./brand-icons";
 
 // The chat's agent picker: which connected provider answers this turn and how hard it thinks. The choice is the browser's
 // (localStorage) and goes with every turn (ChatRequest.provider / .effort); empty means the panel's own setting. The list of
 // connected providers (with their model and price) comes from the access the panel answers every admin.
 
-const providerIcon: Record<number, IconName> = {
-  [AssistantProvider.ANTHROPIC]: "sparkle",
-  [AssistantProvider.DEEPSEEK]: "network",
-  [AssistantProvider.ZAI]: "bolt",
-  [AssistantProvider.OLLAMA_CLOUD]: "server",
-};
+/** The provider's own mark, or the generic one for a provider without a known mark. */
+function ProviderMark({ provider, size, url = "" }: { provider: number; size: number; url?: string }) {
+  const brand = providerBrand[provider as AssistantProvider] ?? customProviderBrand(url);
+  return brand ? <BrandMark brand={brand} size={size} /> : <Icon name="layers" size={size} />;
+}
 
 const efforts = [
   [AssistantEffort.QUICK, "ai.effort.quick", "ai.pick.quickD"],
@@ -40,7 +40,7 @@ export type Pick = {
   setProvider: (p: number) => void;
   setEffort: (e: number) => void;
   /** The connected providers, the panel's own first. A provider whose month's budget is spent can be seen but not picked. */
-  options: { id: number; name: string; model: string; inUsd: number; outUsd: number; budgetReached: boolean; isDefault: boolean }[];
+  options: { id: number; name: string; model: string; inUsd: number; outUsd: number; budgetReached: boolean; isDefault: boolean; url: string }[];
   /** The provider and the depth in effect, in words: "Ollama Cloud · deepseek-v4.1-flash". */
   label: string;
   selectedProvider: number;
@@ -53,7 +53,7 @@ export function usePick({ provider: accessProvider, model: accessModel }: { prov
   const [stored, setStored] = useState(() => ({ provider: readNum(PROVIDER_KEY), effort: readNum(EFFORT_KEY) }));
   const choices = q.data?.choices ?? [];
   const def = choices[0]?.provider ?? accessProvider ?? 0;
-  const options = choices.map((c, i) => ({ id: c.provider as number, name: t(providerName(c.provider)), model: c.model, inUsd: c.inputUsdPerMtok, outUsd: c.outputUsdPerMtok, budgetReached: c.budgetReached, isDefault: i === 0 }));
+  const options = choices.map((c, i) => ({ id: c.provider as number, name: c.customName || t(providerName(c.provider)), model: c.model, inUsd: c.inputUsdPerMtok, outUsd: c.outputUsdPerMtok, budgetReached: c.budgetReached, isDefault: i === 0, url: c.customUrl }));
   // a saved provider that is no longer connected (or whose budget is spent) falls back to the default without a word
   const valid = options.some((o) => o.id === stored.provider && !o.budgetReached);
   const provider = valid ? stored.provider : 0;
@@ -93,7 +93,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen }: { pick: Pi
   return (
     <Menu.Root defaultOpen={defaultOpen}>
       <Menu.Trigger aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} className="flex min-w-0 items-center gap-1.5 rounded-full px-2 py-1.5 text-xs text-muted transition-colors outline-none hover:bg-surface-2 hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-surface-2 data-popup-open:text-fg">
-        <Icon name="layers" size={14} />
+        <ProviderMark provider={pick.selectedProvider} size={14} url={pick.options.find((o) => o.id === pick.selectedProvider)?.url} />
         <span className="min-w-0 truncate">{pick.label || t("ai.pick.agent")}</span>
         <Icon name="chevronDown" size={12} />
       </Menu.Trigger>
@@ -105,16 +105,17 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen }: { pick: Pi
                 <Menu.RadioGroup value={String(pick.selectedProvider)} onValueChange={(v) => pick.setProvider(pick.options.find((o) => String(o.id) === v)?.isDefault ? 0 : Number(v))} aria-label={t("ai.pick.agent")}>
                   {pick.options.map((o) => (
                     <Menu.RadioItem key={o.id} value={String(o.id)} closeOnClick={false} disabled={o.budgetReached} className={cx(item, o.budgetReached && "opacity-50")}>
-                      <span aria-hidden className="mt-0.5 grid size-7 flex-none place-items-center rounded-lg bg-accent-soft text-accent-text">
-                        <Icon name={providerIcon[o.id] ?? "layers"} size={14} />
+                      <span aria-hidden className="mt-0.5 grid size-7 flex-none place-items-center rounded-lg bg-surface-2 text-fg">
+                        <ProviderMark provider={o.id} size={15} url={o.url} />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="flex items-center gap-2 text-[13px] font-semibold">
                           {o.name}
                           {o.isDefault && <span className="rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium text-muted">{t("ai.pick.default")}</span>}
                         </span>
-                        <span className="truncate text-xs text-muted">
-                          {o.budgetReached ? t("ai.pick.budget") : o.model || t("ai.prov.modelDefault")}
+                        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+                          {!o.budgetReached && modelBrand(o.model) && <BrandMark brand={modelBrand(o.model)!} size={12} className="flex-none" />}
+                          <span className="truncate">{o.budgetReached ? t("ai.pick.budget") : o.model || t("ai.prov.modelDefault")}</span>
                         </span>
                         {!o.budgetReached && o.inUsd > 0 && <span className="text-[11px] text-faint">{t("ai.prov.price", { in: money(o.inUsd), out: money(o.outUsd) })}</span>}
                       </span>

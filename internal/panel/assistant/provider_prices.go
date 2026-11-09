@@ -42,6 +42,16 @@ var providerSpecs = []providerSpec{
 			{id: "gemma4", name: "Gemma 4", context: 256000, inputPrice: .14, outputPrice: .40}}},
 }
 
+func init() {
+	for p := adminv1.AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_1; p <= adminv1.AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_5; p++ {
+		providerSpecs = append(providerSpecs, providerSpec{provider: p})
+	}
+}
+
+func isCustomProvider(p adminv1.AssistantProvider) bool {
+	return p >= adminv1.AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_1 && p <= adminv1.AssistantProvider_ASSISTANT_PROVIDER_CUSTOM_5
+}
+
 func specFor(provider adminv1.AssistantProvider) (providerSpec, bool) {
 	for _, spec := range providerSpecs {
 		if spec.provider == provider {

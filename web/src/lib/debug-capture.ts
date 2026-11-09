@@ -13,7 +13,7 @@ export type DebugCapture = Plain<DebugCaptureInfo>;
 export type DebugRecords = Plain<GetDebugCaptureResponse>;
 
 /** The log sources a capture may name (what the agent labels its records with); none picked means all. */
-export const debugSources = ["agent", "hysteria2", "vless", "xray", "awg", "update"] as const;
+export const debugSources = ["agent", "hysteria2", "vless", "xray", "awg", "kernel", "update"] as const;
 /** The lengths the button offers; the panel takes 1 to 900 seconds. */
 export const debugMinutes = [1, 5, 10, 15] as const;
 export const debugLevels = ["debug", "info"] as const;

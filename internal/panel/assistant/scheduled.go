@@ -305,7 +305,7 @@ func (s *Service) scheduledTurn(ctx context.Context, admin store.Admin, tokenID,
 		return res
 	}
 	defer zero(keyBytes)
-	adapter := s.providers[provider]
+	adapter := s.adapterForRow(provider, row)
 	if adapter == nil {
 		res.code = "provider_unreachable"
 		return res

@@ -8,6 +8,7 @@ import { Card, SectionLabel } from "@/components/ui/bits";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { halo } from "@/components/fx/halo";
 import { pageSweepOptions } from "@/components/fx/page";
 import { setEffectKind, setEffectsEnabled, useEffectKind, useEffectsEnabled, type FxKind } from "@/lib/effects";
 import { useEdition } from "@/lib/edition";
@@ -100,7 +101,10 @@ export function InterfacePage() {
             <span className="text-xs leading-snug text-muted">{t("settings.fx.hint")}</span>
           </span>
           {effects && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => fxRow.current && void sweep(fxRow.current, pageSweepOptions())}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => {
+              halo(null);
+              if (fxRow.current) void sweep(fxRow.current, pageSweepOptions());
+            }}>
               {t("settings.fx.show")}
             </Button>
           )}
@@ -109,7 +113,7 @@ export function InterfacePage() {
         )}
         {effects && !edition.edge && (
           <>
-            {(["create", "pages"] as const).map((k) => (
+            {(["create", "save", "pages"] as const).map((k) => (
               <FxKindRow key={k} kind={k} label={t(`settings.fx.${k}`)} />
             ))}
           </>
@@ -174,6 +178,7 @@ function BrandForm({ stored }: { stored: Plain<Instance> }) {
     onSuccess: (r) => {
       const i = r.instance!;
       toast(t("common.saved"));
+      halo("save");
       setLogo({ kind: "keep" });
       void applyBrand(i, i.logoVersion);
       qc.setQueryData(instanceQuery.queryKey, plain(r));

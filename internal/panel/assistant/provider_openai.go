@@ -26,6 +26,9 @@ type openAIAdapter struct {
 func (a *openAIAdapter) Provider() adminv1.AssistantProvider { return a.kind }
 
 func (a *openAIAdapter) Check(ctx context.Context, key string) ([]modelInfo, error) {
+	if isCustomProvider(a.kind) {
+		return a.checkCustom(ctx, key)
+	}
 	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI {
 		body, _ := json.Marshal(map[string]any{
 			"model": a.defaultModel, "messages": []any{map[string]any{"role": "user", "content": "ok"}},
@@ -88,6 +91,81 @@ func (a *openAIAdapter) Check(ctx context.Context, key string) ([]modelInfo, err
 	return models, nil
 }
 
+// checkCustom makes the model actually call a harmless tool; a successful HTTP
+// response alone does not establish that a compatible endpoint supports tools.
+func (a *openAIAdapter) checkCustom(ctx context.Context, key string) ([]modelInfo, error) {
+	if a.defaultModel == "" {
+		return nil, apiError("provider_unreachable")
+	}
+	body, _ := json.Marshal(map[string]any{
+		"model": a.defaultModel, "messages": []any{map[string]any{"role": "user", "content": "Call the test tool."}},
+		"tools":       []any{map[string]any{"type": "function", "function": map[string]any{"name": "mistgate_test", "description": "Test tool", "parameters": map[string]any{"type": "object", "properties": map[string]any{}}}}},
+		"tool_choice": map[string]any{"type": "function", "function": map[string]any{"name": "mistgate_test"}},
+		"max_tokens":  128,
+	})
+	resp, err := a.http.request(ctx, http.MethodPost, "chat/completions", key, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, statusError(resp.StatusCode, resp.Body)
+	}
+	var result struct {
+		Choices []struct {
+			Message struct {
+				ToolCalls []struct {
+					Function struct {
+						Name string `json:"name"`
+					} `json:"function"`
+				} `json:"tool_calls"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&result) != nil {
+		return nil, apiError("provider_unreachable")
+	}
+	for _, choice := range result.Choices {
+		for _, call := range choice.Message.ToolCalls {
+			if call.Function.Name == "mistgate_test" {
+				return a.customModels(ctx, key), nil
+			}
+		}
+	}
+	return nil, apiError("provider_unreachable")
+}
+
+// Discovery is optional: several compatible servers do not implement /models.
+// A manually supplied model remains usable after the tool probe above.
+func (a *openAIAdapter) customModels(ctx context.Context, key string) []modelInfo {
+	models := []modelInfo{{id: a.defaultModel, name: a.defaultModel}}
+	resp, err := a.http.request(ctx, http.MethodGet, "models", key, "", nil)
+	if err != nil {
+		return models
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return models
+	}
+	var result struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&result) != nil {
+		return models
+	}
+	seen := map[string]bool{a.defaultModel: true}
+	for _, item := range result.Data {
+		id := strings.TrimSpace(item.ID)
+		if id != "" && len(id) <= 256 && !seen[id] && len(models) < 500 {
+			seen[id] = true
+			models = append(models, modelInfo{id: id, name: id})
+		}
+	}
+	return models
+}
+
 func ollamaModelSupportsTools(id string, supports *bool, capabilities []string, curated []modelInfo) bool {
 	if supports != nil {
 		return *supports
@@ -137,7 +215,7 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_DEEPSEEK || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI {
 		bodyMap["reasoning_effort"] = openAIReasoningEffort(a.kind, req.Effort)
 	}
-	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_DEEPSEEK || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_OLLAMA_CLOUD {
+	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_DEEPSEEK || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI || a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_OLLAMA_CLOUD || isCustomProvider(a.kind) {
 		bodyMap["stream_options"] = map[string]any{"include_usage": true}
 	}
 	if a.kind == adminv1.AssistantProvider_ASSISTANT_PROVIDER_ZAI {
@@ -150,6 +228,17 @@ func (a *openAIAdapter) Stream(ctx context.Context, key string, req modelRequest
 	resp, err := a.http.request(ctx, http.MethodPost, "chat/completions", key, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return modelResponse{}, err
+	}
+	// Some compatible servers reject stream_options. Retry once without it;
+	// when usage is absent the reservation remains the conservative estimate.
+	if isCustomProvider(a.kind) && resp.StatusCode == http.StatusBadRequest {
+		resp.Body.Close()
+		delete(bodyMap, "stream_options")
+		body, _ = json.Marshal(bodyMap)
+		resp, err = a.http.request(ctx, http.MethodPost, "chat/completions", key, "application/json", bytes.NewReader(body))
+		if err != nil {
+			return modelResponse{}, err
+		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { halo } from "@/components/fx/halo";
 import { Card, SectionLabel } from "@/components/ui/bits";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
@@ -28,7 +29,10 @@ export function LinkAwgCard({ settings }: { settings: Settings }) {
 
   const apply = (v: boolean) =>
     save.mutateAsync((cur) => ({ ...cur, linkAwg: v })).then(
-      () => toast(t("subs.saved")),
+      () => {
+        toast(t("subs.saved"));
+        halo("save");
+      },
       (e: unknown) => {
         toast.error(errorText(e, t));
         throw e;

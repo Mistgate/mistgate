@@ -34,6 +34,8 @@ type fakeBackend struct {
 	removeCalls  int
 	unknown      uint32
 	unknownTakes int
+	watchers     map[uint64]func(string)
+	nextWatcher  uint64
 }
 
 type fakeDev struct {
@@ -177,6 +179,35 @@ func (f *fakeBackend) TakeUnknownPeers(string) uint32 {
 	n := f.unknown
 	f.unknown = 0
 	return n
+}
+
+func (f *fakeBackend) WatchUnknownPeers(fn func(string)) func() {
+	f.mu.Lock()
+	if f.watchers == nil {
+		f.watchers = map[uint64]func(string){}
+	}
+	f.nextWatcher++
+	id := f.nextWatcher
+	f.watchers[id] = fn
+	f.mu.Unlock()
+	return func() {
+		f.mu.Lock()
+		delete(f.watchers, id)
+		f.mu.Unlock()
+	}
+}
+
+func (f *fakeBackend) emitUnknownPeer(ifname string) {
+	f.mu.Lock()
+	f.unknown++
+	watchers := make([]func(string), 0, len(f.watchers))
+	for _, fn := range f.watchers {
+		watchers = append(watchers, fn)
+	}
+	f.mu.Unlock()
+	for _, fn := range watchers {
+		fn(ifname)
+	}
 }
 
 func (f *fakeBackend) unknownReadCount() int {

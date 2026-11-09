@@ -173,7 +173,8 @@ export function forwardAsset(request: FetchRequest, answer: FetchResponse, fetch
         } catch {
           return new Response("Bad Gateway", { status: 502 });
         }
-        if (!isReleaseURL(next)) return new Response("Bad Gateway", { status: 502 });
+        // GitHub may only send us on to its own hosts; the e2e's loopback fake release may redirect within loopback, never out of it
+        if (!isReleaseURL(next) && !(isLoopbackURL(url) && isLoopbackURL(next))) return new Response("Bad Gateway", { status: 502 });
         url = next;
         redirects++;
       }

@@ -42,7 +42,7 @@ func TestDebugCaptureLifecycleAndFilters(t *testing.T) {
 	debugKey := strings.Repeat("z", 40)
 	lines := []DebugLineIn{
 		{AtMs: now.UnixMilli(), Level: 4, Source: "hysteria2", Message: "dial 203.0.113.7:4433 failed SNI=private-client.example UUID=" + debugUUID + " key=" + debugKey,
-			Attrs: map[string]string{"err": "refused by 198.51.100.4", "user": "alice", "code": "dial"}},
+			Attrs: map[string]string{"err": "refused by 198.51.100.4", "user": "alice", "code": "dial", "event": "initiation_in", "peer": "7", "inbound": "inb_awg"}},
 		{AtMs: now.UnixMilli() + 1, Level: 1, Source: "xray", Message: "accepted tcp:canary.example.net:443 via secret-admin-path", Attrs: map[string]string{"state": "ok"}},
 		{AtMs: now.UnixMilli() + 2, Level: 2, Source: "agent", Message: "SNI agent-secret.example.com seen"},
 		{AtMs: now.UnixMilli() + 3, Level: 3, Source: "bad source!", Message: "Boom_100%"},
@@ -92,6 +92,11 @@ func TestDebugCaptureLifecycleAndFilters(t *testing.T) {
 	}
 	if _, has := all[0].Attrs["user"]; has {
 		t.Error("an attribute outside the allow-list was stored")
+	}
+	for key, want := range map[string]string{"event": "initiation_in", "peer": "7", "inbound": "inb_awg"} {
+		if all[0].Attrs[key] != want {
+			t.Errorf("AWG kernel attribute %s = %q, want %q", key, all[0].Attrs[key], want)
+		}
 	}
 
 	check := func(name string, f DebugLineFilter, want ...int64) {

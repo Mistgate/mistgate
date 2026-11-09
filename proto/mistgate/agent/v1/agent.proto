@@ -565,10 +565,14 @@ package mistgate.agent.v1;
 //   The agent keeps its own structured log in a ring buffer (last 5000 records). LogRequest reads it.
 //   Follow streams end on LogCancel, after follow_max_seconds (capped at 600), or on stream loss.
 //
-// DEBUG CAPTURE (additive; capability "debug/1")
+// DEBUG CAPTURE (additive; capability "debug/1", with kernel log and AWG kernel debug on "debug/2")
 //   The panel asks one node to log more for a short while. Nothing here is on by default and nothing survives a restart.
 //   - CAPABILITY GATE. The panel sends DebugCapture ONLY to a stream whose Hello carried "debug/1"; an older agent is never
 //     asked (the admin call answers FAILED_PRECONDITION "agent too old").
+//     A request naming the "kernel" source also needs "debug/2"; this source reads the node kernel log and an AWG kernel
+//     backend can enable the module's dynamic debug for the capture.
+//   - SOURCES. "kernel" reads the kernel log from 30 minutes before the capture through its end; firewall packet-log lines
+//     are counted in the summary but not kept. "awg" on the kernel backend includes module lines and a per-interface summary.
 //   - START. DebugCapture{request_id, level, sources, duration_s} is answered with one CommandResult: ok, or error "busy"
 //     (a capture is already running on this node), "invalid" (a level, a source or a duration it does not accept) or
 //     "unsupported". level is "debug" or "info"; sources names the agent's own log sources ("agent", "hysteria2", "xray",
@@ -724,7 +728,7 @@ message Hello {
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
   // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE").
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.

@@ -12,6 +12,8 @@ import {
   resolveDirection,
   resolveEasing,
   resolvePalette,
+  ringColor,
+  ringColors,
   revealEdges,
   revealMask,
 } from "./palette";
@@ -53,7 +55,11 @@ describe("cosine palettes", () => {
       const p = resolvePalette(n, "#7dd3a0");
       expect(p.t1).toBeGreaterThan(p.t0);
     }
-    expect(resolvePalette(undefined, "#000000")).toBe(palettes.spectrum);
+    // the default is the halo's ring of the accent: the band and the halo of one moment are the same colours
+    const ring = resolvePalette(undefined, "#b8acf2");
+    expect(ring.ring).toEqual(ringColors("#b8acf2"));
+    expect(cosineColor(ring, 0)).toEqual(ringColor(ring.ring!, -1.5));
+    expect(cosineColor(ring, 0)[2]).toBeGreaterThan(0.9); // lavender's ring starts blue
     expect(resolvePalette(palettes.ember, "#000000")).toBe(palettes.ember);
   });
 

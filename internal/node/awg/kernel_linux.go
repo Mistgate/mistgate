@@ -23,8 +23,10 @@ type kernel struct {
 	cl   *awgnl.Client
 	stop func() // ends the "auth" multicast watcher
 
-	mu      sync.Mutex
-	unknown map[string]uint32 // unknown-peer events per interface since the last take
+	mu        sync.Mutex
+	unknown   map[string]uint32 // unknown-peer events per interface since the last take
+	watchers  map[uint64]func(string)
+	nextWatch uint64
 }
 
 func newKernel(log *slog.Logger) (*kernel, error) {
@@ -32,19 +34,41 @@ func newKernel(log *slog.Logger) (*kernel, error) {
 	if err != nil {
 		return nil, err
 	}
-	k := &kernel{log: log, cl: cl, unknown: map[string]uint32{}}
+	k := &kernel{log: log, cl: cl, unknown: map[string]uint32{}, watchers: map[uint64]func(string){}}
 	// Best effort (never ran against a real module): without the group, only the
 	// counter stays 0.
-	if stop, err := cl.WatchUnknownPeers(func(ifname string) {
-		k.mu.Lock()
-		k.unknown[ifname]++
-		k.mu.Unlock()
-	}); err != nil {
+	if stop, err := cl.WatchUnknownPeers(k.noteUnknownPeer); err != nil {
 		log.Info("awg: the \"auth\" multicast group is not watched", "err", err)
 	} else {
 		k.stop = stop
 	}
 	return k, nil
+}
+
+func (k *kernel) noteUnknownPeer(ifname string) {
+	k.mu.Lock()
+	k.unknown[ifname]++
+	watchers := make([]func(string), 0, len(k.watchers))
+	for _, fn := range k.watchers {
+		watchers = append(watchers, fn)
+	}
+	k.mu.Unlock()
+	for _, fn := range watchers {
+		fn(ifname)
+	}
+}
+
+func (k *kernel) WatchUnknownPeers(fn func(ifname string)) func() {
+	k.mu.Lock()
+	k.nextWatch++
+	id := k.nextWatch
+	k.watchers[id] = fn
+	k.mu.Unlock()
+	return func() {
+		k.mu.Lock()
+		delete(k.watchers, id)
+		k.mu.Unlock()
+	}
 }
 
 func (k *kernel) Name() string { return "kernel" }

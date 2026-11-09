@@ -137,7 +137,7 @@ func (c *call) debugLogs(in debugLogsArg) (any, error) {
 	}
 	for _, e := range r.Msg.GetRecords() {
 		rec := debugRecordV{Seq: e.GetSeq(), TimeMs: e.GetTimeUnixMs(), Level: clean(e.GetLevel(), 8), Source: clean(e.GetSource(), 32), Message: clean(e.GetMessage(), 300)}
-		for k, val := range e.GetAttrs() {
+		for k, val := range scrubDebugCaptureAttrs(e.GetAttrs()) {
 			if rec.Attrs == nil {
 				rec.Attrs = map[string]string{}
 			}
@@ -152,7 +152,7 @@ type debugCaptureArgs struct {
 	ReasonField
 	Node     string   `json:"node" jsonschema:"node id or exact name"`
 	Level    string   `json:"level,omitempty" jsonschema:"debug (default) or info: the lowest level the capture keeps"`
-	Sources  []string `json:"sources,omitempty" jsonschema:"log sources to capture, at most 8 (agent, hysteria2, xray, awg ...); empty = all"`
+	Sources  []string `json:"sources,omitempty" jsonschema:"log sources to capture, at most 8 (agent, hysteria2, xray, awg, kernel); kernel is the node kernel log from 30 minutes before start through the capture, with firewall packet lines counted but not kept; awg on a kernel-backend node enables module debug and adds a summary with unanswered initiations; empty = all"`
 	Duration int      `json:"duration_s,omitempty" jsonschema:"seconds, 1 to 900; default 300"`
 }
 
@@ -161,6 +161,8 @@ var debugCapture = changeSpec[debugCaptureArgs]{
 	procs: procs(adminv1connect.NodeServiceListNodesProcedure, opsv1connect.OpsServiceStartDebugCaptureProcedure),
 	desc: "Capture one node's debug log for a few minutes: the node raises its log level for the chosen sources, keeps up to 20000 records (4 MiB) and ships them to the panel when the time is up (at most 15 minutes); " +
 		"then it puts the level back, and a restart of the agent ends the capture too. Read the result with node_debug_logs. The node must be online and its agent must support it (an older agent is refused). " +
+		"The kernel source reads the node's kernel log from 30 minutes before capture start through the end; firewall packet-log lines are counted in the summary and not kept. " +
+		"On a kernel-backend node, choosing awg turns on the module's debug output for the capture and adds a summary with handshake initiations that had no response within 5 seconds. " +
 		"One capture per node at a time. Records are cleaned on the node and in the panel: client addresses, secret names, keys and (for xray) host names are cut out. The start is audit-logged with who asked, the node, the sources and the duration.",
 	plan: func(c *call, a debugCaptureArgs) (*planned, error) {
 		level := a.Level

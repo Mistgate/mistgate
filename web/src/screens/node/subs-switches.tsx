@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { halo } from "@/components/fx/halo";
 import { Block } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -47,7 +48,10 @@ export function useInSubscriptions(nodeId: string, nodeName: string) {
       setAsk(null);
       // a change the graph made says what it did and offers the way back
       if (v.report) toast(v.report, { undo: () => set.mutate({ id: v.id, on: !v.on }) });
-      else toast(t("common.saved"));
+      else {
+        toast(t("common.saved"));
+        halo("save");
+      }
     },
     onError: (e) => setError(errorText(e, t)),
     onSettled: refresh,

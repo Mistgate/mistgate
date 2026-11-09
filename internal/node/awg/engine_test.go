@@ -44,6 +44,31 @@ func TestApplyBuildsInterfaceAndPeers(t *testing.T) {
 	}
 }
 
+func TestKernelDebugInfoAndUnknownPeerWatch(t *testing.T) {
+	e, fb, _ := newTestEngine(t)
+	fb.name = "kernel"
+	mustApply(t, e, spec(t, "inb_awg", 51842, nil), cred("c1", 0x11, 5))
+	kernel, interfaces := e.KernelDebugInfo()
+	if !kernel || len(interfaces) != 1 || interfaces[0] != (KernelDebugInterface{InboundID: "inb_awg", Name: p1}) {
+		t.Fatalf("KernelDebugInfo = %t %+v", kernel, interfaces)
+	}
+	var got string
+	ok, stop := e.WatchKernelUnknownPeers(func(ifname string) { got = ifname })
+	if !ok || stop == nil {
+		t.Fatalf("kernel unknown-peer subscription = %t, stop function present = %t", ok, stop != nil)
+	}
+	fb.emitUnknownPeer(p1)
+	if got != p1 {
+		t.Errorf("unknown-peer interface = %q, want %q", got, p1)
+	}
+	stop()
+	got = ""
+	fb.emitUnknownPeer(p1)
+	if got != "" {
+		t.Errorf("stopped watcher received %q", got)
+	}
+}
+
 func TestUsersOnlyChangeIsLiveAndNeverReAddsAnUnchangedPeer(t *testing.T) {
 	e, fb, _ := newTestEngine(t)
 	s := spec(t, "inb1", 51842, nil)

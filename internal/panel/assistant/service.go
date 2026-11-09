@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,8 +46,10 @@ type Service struct {
 	mu        sync.RWMutex
 	tools     mcp.AssistantRuntime
 	running   map[string]activeAssistantTurn
-	// retryWaits are the waits between the attempts of a scheduled run's model call (nil: 5 s, then 30 s).
+	// retryWaits are the waits between the attempts of a scheduled run's or a follow-up's model call (nil: 5 s, then 30 s).
 	retryWaits []time.Duration
+	// notify sends a follow-up's problem to Telegram (SetFollowUpNotifier); nil: nothing is sent
+	notify FollowUpNotifier
 }
 
 type activeAssistantTurn struct {
@@ -68,6 +71,9 @@ func New(c Config) *Service {
 		s.providers[provider] = injected
 	}
 	for _, spec := range providerSpecs {
+		if isCustomProvider(spec.provider) {
+			continue
+		}
 		if s.providers[spec.provider] != nil {
 			continue
 		}
@@ -221,7 +227,14 @@ func (s *Service) chatChoices(ctx context.Context, first adminv1.AssistantProvid
 			return nil, err
 		}
 		p := listedPrice(spec, model)
-		choice := &adminv1.ChatProviderChoice{Provider: spec.provider, Model: model, InputUsdPerMtok: p.input, OutputUsdPerMtok: p.output, BudgetReached: row.budget <= 0 || spent >= row.budget}
+		if isCustomProvider(spec.provider) {
+			p = price{row.inputPrice, row.outputPrice}
+		}
+		var origin string
+		if u, e := url.Parse(row.customURL); e == nil && u.Host != "" {
+			origin = u.Scheme + "://" + u.Host
+		}
+		choice := &adminv1.ChatProviderChoice{Provider: spec.provider, Model: model, InputUsdPerMtok: p.input, OutputUsdPerMtok: p.output, BudgetReached: row.budget <= 0 || spent >= row.budget, CustomName: row.customName, CustomUrl: origin}
 		if spec.provider == first {
 			out = append([]*adminv1.ChatProviderChoice{choice}, out...)
 		} else {
@@ -264,6 +277,16 @@ func (s *Service) GetAssistantAccess(ctx context.Context, _ *connect.Request[adm
 	if err != nil {
 		return nil, err
 	}
+	// the chat button's dot and its next look: the conversations a follow-up answered, the admin's next follow-up
+	unread, next, err := s.st.UnreadAssistantConversations(ctx, admin.ID)
+	if err != nil {
+		return nil, err
+	}
+	resp.Unread = uint32(max(unread, 0))
+	if !next.IsZero() {
+		resp.NextFollowUpUnix = next.Unix()
+	}
+	resp.TimezoneOffsetMinutes = int32(s.panelOffset(ctx))
 	return connect.NewResponse(resp), nil
 }
 

@@ -1,6 +1,7 @@
 import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { halo } from "@/components/fx/halo";
 import { EditionNotice } from "@/components/edition-notice";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { SectionLabel } from "@/components/ui/bits";
@@ -156,6 +157,7 @@ function BackupsForm({ stored }: { stored: Stored }) {
       setDraft((current) => ({ ...current, secretAccessKey: "", clearSecret: false }));
       void qc.invalidateQueries({ queryKey: backupsKey });
       toast(t("set.backups.saved"));
+      halo("save");
     },
     onError: (error) => {
       if (isStepUpCancelled(error)) return;

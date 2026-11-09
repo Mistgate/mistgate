@@ -27,13 +27,16 @@ type settingsRow struct {
 }
 
 type providerRow struct {
-	sealed    []byte
-	hint      string
-	added     int64
-	model     string
-	budget    float64
-	errorCode string
-	errorAt   int64
+	sealed                  []byte
+	hint                    string
+	added                   int64
+	model                   string
+	budget                  float64
+	errorCode               string
+	errorAt                 int64
+	customName, customURL   string
+	allowLocal              bool
+	inputPrice, outputPrice float64
 }
 
 func (s *Service) readSettings(ctx context.Context) (settingsRow, error) {
@@ -46,7 +49,7 @@ func (s *Service) readSettings(ctx context.Context) (settingsRow, error) {
 
 func (s *Service) readProviderRow(ctx context.Context, p adminv1.AssistantProvider) (providerRow, error) {
 	var row providerRow
-	err := s.st.R.QueryRowContext(ctx, `SELECT key_enc,key_hint,added_at,model,budget_usd,last_error_code,last_error_at FROM assistant_provider WHERE provider=?`, int32(p)).Scan(&row.sealed, &row.hint, &row.added, &row.model, &row.budget, &row.errorCode, &row.errorAt)
+	err := s.st.R.QueryRowContext(ctx, `SELECT key_enc,key_hint,added_at,model,budget_usd,last_error_code,last_error_at,custom_name,custom_url,allow_local,input_usd_per_mtok,output_usd_per_mtok FROM assistant_provider WHERE provider=?`, int32(p)).Scan(&row.sealed, &row.hint, &row.added, &row.model, &row.budget, &row.errorCode, &row.errorAt, &row.customName, &row.customURL, &row.allowLocal, &row.inputPrice, &row.outputPrice)
 	return row, err
 }
 
@@ -77,12 +80,30 @@ func (s *Service) clearProviderError(ctx context.Context, p adminv1.AssistantPro
 }
 
 func (s *Service) models(ctx context.Context, p adminv1.AssistantProvider, key string) ([]modelInfo, error) {
-	a := s.providers[p]
+	var a adapter
+	if isCustomProvider(p) {
+		row, err := s.readProviderRow(ctx, p)
+		if err != nil || len(row.sealed) == 0 {
+			return nil, apiError("provider_unreachable")
+		}
+		plain, err := s.vault.Open(row.sealed, ProviderKeyAAD(p))
+		if err != nil {
+			return nil, apiError("provider_unreachable")
+		}
+		defer zero(plain)
+		key = string(plain)
+		a = s.adapterForRow(p, row)
+	} else {
+		a = s.providers[p]
+	}
 	if a == nil {
 		return nil, apiError("provider_unreachable")
 	}
 	callCtx, cancel := context.WithTimeout(ctx, providerTimeout)
 	defer cancel()
+	if custom, ok := a.(*openAIAdapter); ok && isCustomProvider(p) {
+		return custom.customModels(callCtx, key), nil
+	}
 	return a.Check(callCtx, key)
 }
 
@@ -103,7 +124,7 @@ func providerProto(s *Service, ctx context.Context, p adminv1.AssistantProvider)
 	if model == "" {
 		model = defaultModel(p)
 	}
-	return &adminv1.ProviderStatus{Provider: p, Connected: len(row.sealed) > 0, KeyHint: row.hint, AddedUnix: row.added,
+	return &adminv1.ProviderStatus{Provider: p, Connected: len(row.sealed) > 0, KeyHint: row.hint, AddedUnix: row.added, CustomName: row.customName, CustomUrl: row.customURL, AllowLocal: row.allowLocal, InputUsdPerMtok: row.inputPrice, OutputUsdPerMtok: row.outputPrice,
 		Choice: &adminv1.ProviderChoice{Provider: p, Model: model, BudgetUsdMonth: row.budget}, SpentUsdMonth: spent, LastErrorCode: row.errorCode, LastErrorUnix: row.errorAt}, nil
 }
 
@@ -220,6 +241,27 @@ func (s *Service) UpdateAssistantSettings(ctx context.Context, req *connect.Requ
 			if !found {
 				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("provider model is not available"))
 			}
+			if isCustomProvider(choice.Provider) {
+				row, e := s.readProviderRow(ctx, choice.Provider)
+				if e != nil {
+					return nil, e
+				}
+				if row.model != choice.Model {
+					h, e := customProviderHTTP(row.customURL, row.allowLocal)
+					if e != nil {
+						return nil, codeConnect("provider_unreachable")
+					}
+					key, e := s.vault.Open(row.sealed, ProviderKeyAAD(choice.Provider))
+					if e != nil {
+						return nil, codeConnect("no_provider")
+					}
+					_, e = (&openAIAdapter{kind: choice.Provider, http: h, defaultModel: choice.Model}).Check(ctx, string(key))
+					zero(key)
+					if e != nil {
+						return nil, codeConnect(providerCode(e))
+					}
+				}
+			}
 		}
 		model := choice.Model
 		if model == "" {
@@ -264,6 +306,9 @@ func (s *Service) SetProviderKey(ctx context.Context, req *connect.Request[admin
 	}
 	if err = s.auth.RequireStepUp(ctx); err != nil {
 		return nil, err
+	}
+	if isCustomProvider(req.Msg.Provider) {
+		return s.setCustomProvider(ctx, admin, req.Msg)
 	}
 	provider, key := req.Msg.Provider, []byte(strings.TrimSpace(req.Msg.ApiKey))
 	defer zero(key)

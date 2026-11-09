@@ -34,6 +34,10 @@ func (k *core) attachAssistantRuntime(api http.Handler) {
 	service, ok := k.asst.(*assistant.Service)
 	if ok {
 		service.SetToolRuntime(runtime)
+		// a follow-up that found a problem tells its admin's Telegram, when the follow-up asked for it
+		if k.tg != nil {
+			service.SetFollowUpNotifier(k.tg.FollowUpProblem)
+		}
 	}
 	k.attachTasksRuntime(runtime)
 }

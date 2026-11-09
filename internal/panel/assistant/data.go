@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -28,6 +29,9 @@ func MemoryAAD(id string) string              { return "assistant-memory:" + id 
 func PanelNotesAAD() string                   { return "assistant-settings:panel-notes" }
 
 func providerSlug(p adminv1.AssistantProvider) string {
+	if isCustomProvider(p) {
+		return "custom-" + strconv.Itoa(int(p))
+	}
 	switch p {
 	case adminv1.AssistantProvider_ASSISTANT_PROVIDER_ANTHROPIC:
 		return "anthropic"
@@ -55,6 +59,7 @@ type callReservation struct {
 	id, month    string
 	estimatedIn  int64
 	estimatedUSD float64
+	price        price
 }
 
 func maxOutputTokens(value, fallback int64) int64 {
@@ -79,7 +84,11 @@ func estimateRequestInputTokens(req modelRequest) int64 {
 func (s *Service) reserveProviderCall(ctx context.Context, adminID string, p adminv1.AssistantProvider, model string, budget float64, req modelRequest) (callReservation, error) {
 	maxOutput := maxOutputTokens(req.MaxOutputTokens, defaultMaxOutputTokens)
 	inTokens := estimateRequestInputTokens(req)
-	estimate := estimatePrice(p, model, inTokens, maxOutput)
+	price, err := s.providerPrice(ctx, p, model)
+	if err != nil {
+		return callReservation{}, err
+	}
+	estimate := calculatePrice(price, inTokens, maxOutput)
 	if math.IsNaN(estimate) || math.IsInf(estimate, 0) || estimate < 0 {
 		return callReservation{}, apiError("budget_reached")
 	}
@@ -92,14 +101,14 @@ func (s *Service) reserveProviderCall(ctx context.Context, adminID string, p adm
 	if !accepted {
 		return callReservation{}, apiError("budget_reached")
 	}
-	return callReservation{id: reservationID, month: month, estimatedIn: inTokens, estimatedUSD: estimate}, nil
+	return callReservation{id: reservationID, month: month, estimatedIn: inTokens, estimatedUSD: estimate, price: price}, nil
 }
 
 func (s *Service) reconcileProviderCall(ctx context.Context, reservation callReservation, adminID string, p adminv1.AssistantProvider, model string, input, output int64, reported, turn bool) float64 {
 	amount := reservation.estimatedUSD
 	if reported {
 		input, output = max(input, 0), max(output, 0)
-		amount = estimatePrice(p, model, input, output)
+		amount = calculatePrice(reservation.price, input, output)
 	} else {
 		input, output = 0, 0
 	}
@@ -163,7 +172,10 @@ func (s *Service) assistantTurnAllowed(ctx context.Context, adminID, role string
 }
 
 func estimatePrice(p adminv1.AssistantProvider, model string, input, output int64) float64 {
-	price := priceFor(p, model)
+	return calculatePrice(priceFor(p, model), input, output)
+}
+
+func calculatePrice(price price, input, output int64) float64 {
 	if input < 0 {
 		input = 0
 	}
@@ -171,6 +183,25 @@ func estimatePrice(p adminv1.AssistantProvider, model string, input, output int6
 		output = 0
 	}
 	return (float64(input)*price.input + float64(output)*price.output) / 1_000_000
+}
+
+func (s *Service) providerEstimatePrice(ctx context.Context, p adminv1.AssistantProvider, model string, input, output int64) float64 {
+	price, err := s.providerPrice(ctx, p, model)
+	if err != nil {
+		return math.NaN()
+	}
+	return calculatePrice(price, input, output)
+}
+
+func (s *Service) providerPrice(ctx context.Context, p adminv1.AssistantProvider, model string) (price, error) {
+	if !isCustomProvider(p) {
+		return priceFor(p, model), nil
+	}
+	row, err := s.readProviderRow(ctx, p)
+	if err != nil {
+		return price{}, err
+	}
+	return price{row.inputPrice, row.outputPrice}, nil
 }
 
 func cleanContextText(s string, limit int) string {

@@ -165,6 +165,42 @@ type inbound struct {
 	unknownForHealth uint32 // copied from the single TakeUnknownPeers read in Collect
 }
 
+// KernelDebugInterface identifies an active AWG kernel interface without exposing the engine's internal state.
+type KernelDebugInterface struct {
+	InboundID string
+	Name      string
+}
+
+// KernelDebugInfo reports whether the engine uses the kernel backend and which active interfaces belong to each inbound.
+func (e *Engine) KernelDebugInfo() (bool, []KernelDebugInterface) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.backend == nil || e.backend.Name() != "kernel" {
+		return false, nil
+	}
+	var out []KernelDebugInterface
+	for _, in := range e.sortedInbounds() {
+		if in.up {
+			out = append(out, KernelDebugInterface{InboundID: in.spec.ID, Name: in.cfg.name})
+		}
+	}
+	return true, out
+}
+
+// WatchKernelUnknownPeers forwards kernel unknown-peer events until the returned stop function is called.
+func (e *Engine) WatchKernelUnknownPeers(fn func(ifname string)) (bool, func()) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.backend == nil || e.backend.Name() != "kernel" {
+		return false, func() {}
+	}
+	source, ok := e.backend.(unknownPeerWatcher)
+	if !ok {
+		return true, func() {}
+	}
+	return true, source.WatchUnknownPeers(fn)
+}
+
 // Protocol implements engine.Engine.
 func (e *Engine) Protocol() string { return Protocol }
 
