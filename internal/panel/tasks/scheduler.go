@@ -111,7 +111,7 @@ func (s *Service) dispatch(ctx context.Context) {
 // notBefore, for a manual run, refuses one that comes sooner than the task's manual cooldown; release gives back its slot.
 func (s *Service) start(t store.ScheduledTask, trigger, actor string, notBefore time.Time, release func()) (string, bool, error) {
 	now := s.now()
-	run := store.ScheduledTaskRun{ID: store.NewID("run_"), TaskID: t.ID, Trigger: trigger, Actor: actor, StartedAt: now}
+	run := store.ScheduledTaskRun{ID: store.NewID("run_"), TaskID: t.ID, TaskVersion: t.Version, Trigger: trigger, Actor: actor, StartedAt: now}
 	lease := store.NewID("lease_")
 	s.mu.Lock()
 	base := s.base
@@ -253,6 +253,12 @@ func (s *Service) runCheck(ctx context.Context, t store.ScheduledTask) outcome {
 	var o outcome
 	var problems, failures []string
 	for _, st := range steps {
+		if !CheckToolName(st.Tool) {
+			sr := stepResult{Tool: st.Tool, Error: "tool is no longer allowed for scheduled checks"}
+			failures = append(failures, st.Tool+": "+sr.Error)
+			o.detail.Steps = append(o.detail.Steps, sr)
+			continue
+		}
 		if ctx.Err() != nil {
 			failures = append(failures, st.Tool+": timeout")
 			o.detail.Steps = append(o.detail.Steps, stepResult{Tool: st.Tool, Error: "timeout"})
@@ -274,6 +280,9 @@ func (s *Service) runCheck(ctx context.Context, t store.ScheduledTask) outcome {
 			} else {
 				failures = append(failures, st.Tool+": "+clip(sr.Error, 120))
 			}
+		} else if !json.Valid([]byte(res.Text)) {
+			sr.Error = "tool returned invalid JSON"
+			failures = append(failures, st.Tool+": "+sr.Error)
 		} else {
 			sr.OK = true
 			text := mcp.ScrubJSON(res.Text)
@@ -283,9 +292,16 @@ func (s *Service) runCheck(ctx context.Context, t store.ScheduledTask) outcome {
 				if left <= 0 {
 					break
 				}
-				sr.Matches = append(sr.Matches, c.Match([]byte(text), left)...)
+				matches, err := c.Match([]byte(text), left)
+				if err != nil {
+					sr.OK = false
+					sr.Error = "tool returned invalid JSON"
+					failures = append(failures, st.Tool+": "+sr.Error)
+					break
+				}
+				sr.Matches = append(sr.Matches, matches...)
 			}
-			if len(sr.Matches) > 0 {
+			if sr.OK && len(sr.Matches) > 0 {
 				sr.Problem = true
 				problems = append(problems, st.Tool+": "+strings.Join(sr.Matches, ", "))
 			}

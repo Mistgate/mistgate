@@ -175,6 +175,37 @@ func (s *Store) EnsureAssistantToken(ctx context.Context, adminID, profile strin
 	return t, nil
 }
 
+// EnsureAssistantFollowUpToken creates the hidden identity used by unattended follow-up turns at the admin's own read profile.
+func (s *Store) EnsureAssistantFollowUpToken(ctx context.Context, adminID, profile string, now time.Time) (APIToken, error) {
+	if adminID == "" || profile != ProfileReadonly && profile != ProfileOperator && profile != ProfileAdmin {
+		return APIToken{}, errors.New("store: invalid assistant follow-up identity")
+	}
+	id := FollowUpTokenID(adminID)
+	secretHash := make([]byte, 32)
+	if _, err := rand.Read(secretHash); err != nil {
+		return APIToken{}, err
+	}
+	const name = "Assistant follow-ups"
+	const expires = int64(253402300799)
+	_, err := s.W.ExecContext(ctx, `INSERT INTO api_token
+		(id, name, name_key, profile, secret_hash, hint, rate_per_min, created_by, created_at, expires_at, assistant_only)
+		VALUES (?, ?, ?, ?, ?, '', 600, ?, ?, ?, 1)
+		ON CONFLICT(id) DO UPDATE SET profile = excluded.profile, created_by = excluded.created_by,
+			expires_at = excluded.expires_at, revoked_at = 0, revoked_by = ''
+		WHERE api_token.assistant_only = 1`, id, name, strings.ToLower(name), profile, secretHash, adminID, unix(now), expires)
+	if err != nil {
+		return APIToken{}, err
+	}
+	t, err := s.GetAssistantToken(ctx, id)
+	if err != nil {
+		return APIToken{}, err
+	}
+	if !t.AssistantOnly || t.CreatedBy != adminID || t.Profile != profile {
+		return APIToken{}, errors.New("store: assistant follow-up token identity conflict")
+	}
+	return t, nil
+}
+
 // assistantTokenID derives the id of a hidden identity of an admin: the same admin always gets the same row.
 func assistantTokenID(label, prefix, adminID string) string {
 	h := sha256.Sum256([]byte(label + adminID))
@@ -187,6 +218,11 @@ func assistantTokenID(label, prefix, adminID string) string {
 // from the admin's assistant identity, which carries the admin's own profile.
 func ScheduledTokenID(adminID string) string {
 	return assistantTokenID("mistgate scheduled task identity:", "sct_", adminID)
+}
+
+// FollowUpTokenID is the hidden identity of an admin's unattended assistant follow-up turns.
+func FollowUpTokenID(adminID string) string {
+	return assistantTokenID("mistgate assistant follow-up identity:", "afu_", adminID)
 }
 
 // RevokeAssistantToken revokes a hidden assistant identity and cancels its pending MCP plans in one batch.

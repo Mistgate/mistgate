@@ -26,6 +26,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
@@ -69,6 +70,7 @@ const (
 	keyChannel
 	keyPlanning
 	keyApproved
+	keyAssistant
 )
 
 // fakeAuth stands in for auth.Service: it authenticates bearer tokens and enforces the role policy, the token allow-list
@@ -167,14 +169,21 @@ func (a *fakeAuth) WithPlanning(ctx context.Context) context.Context {
 func (a *fakeAuth) WithApprovedStepUp(ctx context.Context, planID string) context.Context {
 	return context.WithValue(ctx, keyApproved, planID)
 }
+func (a *fakeAuth) WithAssistant(ctx context.Context, identity AssistantIdentity) context.Context {
+	return context.WithValue(ctx, keyAssistant, identity)
+}
 
 // requireSession is auth.RequireSession for a Bearer request.
 func (a *fakeAuth) requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t, ok := a.lookup(r)
 		if !ok {
-			http.Error(w, `{"code":"unauthenticated","message":"not signed in"}`, http.StatusUnauthorized)
-			return
+			identity, hasAssistant := r.Context().Value(keyAssistant).(AssistantIdentity)
+			if !hasAssistant || identity.TokenID == "" {
+				http.Error(w, `{"code":"unauthenticated","message":"not signed in"}`, http.StatusUnauthorized)
+				return
+			}
+			t = &fakeToken{ID: identity.TokenID, Profile: Profile(identity.Profile)}
 		}
 		path := r.URL.Path
 		need := auth.TokenProcedureRole(path)
@@ -586,6 +595,10 @@ func (w *world) ListNodes(context.Context, *connect.Request[adminv1.ListNodesReq
 	}}), nil
 }
 
+func (w *world) ListDebugCaptures(context.Context, *connect.Request[opsv1.ListDebugCapturesRequest]) (*connect.Response[opsv1.ListDebugCapturesResponse], error) {
+	return connect.NewResponse(&opsv1.ListDebugCapturesResponse{Captures: []*opsv1.DebugCaptureInfo{{CaptureId: "cap_test_1", NodeName: "de1", State: "done"}}}), nil
+}
+
 func (w *world) SetNodeDecoyMode(_ context.Context, r *connect.Request[adminv1.SetNodeDecoyModeRequest]) (*connect.Response[adminv1.SetNodeDecoyModeResponse], error) {
 	w.mu.Lock()
 	w.nodeDecoyReqs = append(w.nodeDecoyReqs, r.Msg)
@@ -794,7 +807,35 @@ func (w *world) ListUsers(ctx context.Context, r *connect.Request[adminv1.ListUs
 			us = append(us, u.User)
 		}
 	}
-	return connect.NewResponse(&adminv1.ListUsersResponse{Users: us, Counts: &adminv1.UserCounts{All: uint32(len(w.users))}}), nil
+	slices.SortFunc(us, func(a, b *adminv1.User) int {
+		if c := strings.Compare(strings.ToLower(a.GetName()), strings.ToLower(b.GetName())); c != 0 {
+			return c
+		}
+		return strings.Compare(a.GetId(), b.GetId())
+	})
+	if r.Msg.GetPageToken() != "" {
+		if raw, err := base64.RawURLEncoding.DecodeString(r.Msg.GetPageToken()); err == nil {
+			const prefix = "\x00mistgate-user-list-v1:"
+			payload := string(raw)
+			if strings.HasPrefix(payload, prefix) && len(payload) > len(prefix)+1 && payload[len(prefix)] == 'a' {
+				name := payload[len(prefix)+1:]
+				us = slices.DeleteFunc(us, func(user *adminv1.User) bool { return strings.ToLower(user.GetName()) <= strings.ToLower(name) })
+			}
+		}
+	}
+	pageSize := int(r.Msg.GetPageSize())
+	if pageSize < 1 {
+		pageSize = 50
+	}
+	response := &adminv1.ListUsersResponse{Counts: &adminv1.UserCounts{All: uint32(len(w.users))}}
+	if len(us) > pageSize {
+		response.Users = us[:pageSize]
+		lastName := response.Users[len(response.Users)-1].GetName()
+		response.NextPageToken = base64.RawURLEncoding.EncodeToString([]byte("\x00mistgate-user-list-v1:a" + lastName))
+	} else {
+		response.Users = us
+	}
+	return connect.NewResponse(response), nil
 }
 
 func (w *world) GetUser(_ context.Context, r *connect.Request[adminv1.GetUserRequest]) (*connect.Response[adminv1.GetUserResponse], error) {

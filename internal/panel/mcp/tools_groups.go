@@ -323,7 +323,7 @@ var groupUpdate = changeSpec[groupUpdateArgs]{
 			facts = append(facts, safeTextChange("name", before.GetName(), *a.Name))
 		}
 		if a.ProfileIDs != nil {
-			facts = append(facts, safeTextChange("profile_ids", listOrNone(cleanIDs(before.GetProfileIds())), listOrNone(cleanIDs(*a.ProfileIDs))))
+			facts = append(facts, changedIDFacts("profile_ids", before.GetProfileIds(), *a.ProfileIDs)...)
 		}
 		if a.DNSPresetID != nil && *a.DNSPresetID != before.GetDnsPresetId() {
 			facts = append(facts, safeTextChange("dns_preset_id", before.GetDnsPresetId(), *a.DNSPresetID))
@@ -332,7 +332,7 @@ var groupUpdate = changeSpec[groupUpdateArgs]{
 			facts = append(facts, changeFact("color", valueOrDefault(before.GetColor(), "automatic")+" -> "+valueOrDefault(*a.Color, "automatic"), before.GetColor(), *a.Color))
 		}
 		if a.DisabledNodeIDs != nil {
-			facts = append(facts, safeTextChange("disabled_node_ids", listOrNone(cleanIDs(before.GetDisabledNodeIds())), listOrNone(cleanIDs(*a.DisabledNodeIDs))))
+			facts = append(facts, changedIDFacts("disabled_node_ids", before.GetDisabledNodeIds(), *a.DisabledNodeIDs)...)
 		}
 		if impact := r.Msg.GetImpact(); impact != nil && impact.GetUsers() > 0 {
 			facts = append(facts, codedFact("access_impact", fmt.Sprintf("%d group users may lose or gain profiles", impact.GetUsers()), "users", "n", strconv.FormatUint(uint64(impact.GetUsers()), 10)))

@@ -368,7 +368,7 @@ function TaskEditor({ editing, tz, onClose, onSaved }: { editing: Editing; tz: n
   const save = useMutation({
     mutationFn: async () => {
       const task = inputOf(draft, schemas);
-      if (editing.task) await tasksApi.updateTask({ id: editing.task.id, task });
+      if (editing.task) await tasksApi.updateTask({ id: editing.task.id, task, expectedVersion: BigInt(editing.task.version) });
       else await tasksApi.createTask({ task });
     },
     onSuccess: () => {

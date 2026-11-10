@@ -15,6 +15,11 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 )
 
+var (
+	providerCGNAT          = netip.MustParsePrefix("100.64.0.0/10")
+	providerIPv4Compatible = netip.MustParsePrefix("::/96")
+)
+
 // customProviderHTTP validates every resolved address at connection time, so DNS
 // changes cannot turn a previously accepted hostname into a metadata endpoint.
 func customProviderHTTP(base string, allowLocal bool) (providerHTTP, error) {
@@ -78,13 +83,81 @@ func (s *Service) adapterForRow(p adminv1.AssistantProvider, row providerRow) ad
 }
 
 func allowedProviderIP(ip netip.Addr, httpOnly, allowLocal bool) bool {
-	ip = ip.Unmap()
+	ip = unwrapProviderIP(ip)
 	if !ip.IsValid() || ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return false
 	}
-	local := ip.IsLoopback() || ip.IsPrivate()
-	if local && !allowLocal {
+	local := ip.IsLoopback() || ip.IsPrivate() || providerCGNAT.Contains(ip)
+	if local {
+		return allowLocal
+	}
+	if !ip.IsGlobalUnicast() {
 		return false
 	}
-	return !httpOnly || local
+	return !httpOnly && !providerSpecialAddress(ip)
+}
+
+func unwrapProviderIP(ip netip.Addr) netip.Addr {
+	if !ip.IsValid() {
+		return ip
+	}
+	if ip.IsUnspecified() || ip.IsLoopback() {
+		return ip
+	}
+	if ip.Is4In6() {
+		return ip.Unmap()
+	}
+	if ip.Is6() {
+		if v4, ok := embeddedIPv4(ip, providerIPv4Compatible); ok {
+			return v4
+		}
+		if v4, ok := embeddedIPv4(ip, netip.MustParsePrefix("64:ff9b::/96")); ok {
+			return v4
+		}
+		if ip.Is6() && netip.MustParsePrefix("2002::/16").Contains(ip) {
+			a := ip.As16()
+			return netip.AddrFrom4([4]byte{a[2], a[3], a[4], a[5]})
+		}
+	}
+	return ip
+}
+
+func embeddedIPv4(ip netip.Addr, prefix netip.Prefix) (netip.Addr, bool) {
+	if !prefix.Contains(ip) || prefix.Bits() != 96 {
+		return netip.Addr{}, false
+	}
+	a := ip.As16()
+	return netip.AddrFrom4([4]byte{a[12], a[13], a[14], a[15]}), true
+}
+
+func providerSpecialAddress(ip netip.Addr) bool {
+	var blocked []netip.Prefix
+	if ip.Is4() {
+		blocked = []netip.Prefix{
+			netip.MustParsePrefix("0.0.0.0/8"),
+			netip.MustParsePrefix("100.64.0.0/10"),
+			netip.MustParsePrefix("192.0.0.0/24"),
+			netip.MustParsePrefix("192.0.2.0/24"),
+			netip.MustParsePrefix("192.88.99.0/24"),
+			netip.MustParsePrefix("198.18.0.0/15"),
+			netip.MustParsePrefix("198.51.100.0/24"),
+			netip.MustParsePrefix("203.0.113.0/24"),
+			netip.MustParsePrefix("240.0.0.0/4"),
+		}
+	} else {
+		blocked = []netip.Prefix{
+			netip.MustParsePrefix("64:ff9b:1::/48"),
+			netip.MustParsePrefix("100::/64"),
+			netip.MustParsePrefix("2001::/23"),
+			netip.MustParsePrefix("2001:db8::/32"),
+			netip.MustParsePrefix("3fff::/20"),
+			netip.MustParsePrefix("fec0::/10"),
+		}
+	}
+	for _, prefix := range blocked {
+		if prefix.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

@@ -593,6 +593,9 @@ func TestRelayChangesOfAnExistingRelay(t *testing.T) {
 	if f := factOf(t, p, "entry_port"); f.Value != "8443 -> 9000" {
 		t.Errorf("entry_port: %+v", f)
 	}
+	if f := factOf(t, p, "server"); !strings.Contains(f.Value, "443") {
+		t.Errorf("the relay server fact was overwritten: %+v", f)
+	}
 	if !strings.Contains(factOf(t, p, "effect").Value, "switched off") {
 		t.Errorf("effect: %q", factOf(t, p, "effect").Value)
 	}

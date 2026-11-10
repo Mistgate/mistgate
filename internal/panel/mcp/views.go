@@ -618,7 +618,7 @@ func (v *UsersV) shrink() bool {
 
 func usersView(r *adminv1.ListUsersResponse) *UsersV {
 	v := &UsersV{
-		Users: []userV{}, NextPageToken: clean(r.GetNextPageToken(), 200),
+		Users: []userV{}, NextPageToken: r.GetNextPageToken(),
 		Total: r.GetCounts().GetAll(), Online: r.GetCounts().GetOnline(), Expiring: r.GetCounts().GetExpiring(),
 		OverQuota: r.GetCounts().GetOverQuota(),
 	}

@@ -43,10 +43,13 @@ func TestScrub(t *testing.T) {
 		}
 	}
 	// ids, versions, hashes and ordinary words are not touched
-	for _, s := range []string{"usr_alice", "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "v1.2.3", "node_blip", "alert.node_down", strings.Repeat("a", 64), "10.8.0.2", "de1.example.com", "https://example.com/550e8400-e29b-41d4-a716-446655440000"} {
+	for _, s := range []string{"usr_alice", "nod_aaaaaaaaaaaaaaaaaaaaaaaaaa", "v1.2.3", "node_blip", "alert.node_down", strings.Repeat("a", 64), "10.8.0.2", "de1.example.com", "https://example.com/docs/page"} {
 		if got := scrub(s); got != s {
 			t.Errorf("%q became %q", s, got)
 		}
+	}
+	if got := scrub("https://example.com/550e8400-e29b-41d4-a716-446655440000"); got != "https://example.com/[uuid]" {
+		t.Errorf("UUID in URL was not redacted as a UUID: %q", got)
 	}
 	// the JSON pass stops a link at the closing quote and leaves the structure intact
 	j := `{"a":"` + canaryVless + `","b":"https://x.example.com/a?b=c","c":"keep"}`

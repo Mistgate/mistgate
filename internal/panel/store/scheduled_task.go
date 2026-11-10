@@ -95,16 +95,17 @@ func (t ScheduledTask) Running(now time.Time) bool { return t.LeaseID != "" && t
 
 // ScheduledTaskRun is one row of scheduled_task_run.
 type ScheduledTaskRun struct {
-	ID         string
-	TaskID     string
-	Trigger    string // "schedule", "manual" or "missed"
-	Status     string // "running", "ok", "problem", "failed" or "skipped"
-	Reason     string
-	Summary    string
-	Detail     string // JSON
-	Actor      string
-	StartedAt  time.Time
-	FinishedAt time.Time
+	ID          string
+	TaskID      string
+	TaskVersion int64  // definition version read when this run was claimed; not part of the run history row
+	Trigger     string // "schedule", "manual" or "missed"
+	Status      string // "running", "ok", "problem", "failed" or "skipped"
+	Reason      string
+	Summary     string
+	Detail      string // JSON
+	Actor       string
+	StartedAt   time.Time
+	FinishedAt  time.Time
 }
 
 const scheduledTaskColumns = `id, name, kind, enabled, schedule_kind, every_minutes, minute_of_day, weekday, steps, prompt_enc,
@@ -176,20 +177,25 @@ func (s *Store) InsertScheduledTask(ctx context.Context, t ScheduledTask, max in
 
 // UpdateScheduledTask replaces a task's definition and its next run. A new definition starts with a clean state: the failure
 // count and the problem of the old one go (the alerts they held close), and the next run tells again. A run in progress keeps
-// its lease. ErrNotFound for an unknown id.
+// its lease. ErrNotFound is returned for an unknown id; ErrConflict is returned when the caller's version is stale.
 func (s *Store) UpdateScheduledTask(ctx context.Context, t ScheduledTask) error {
 	r, err := s.W.ExecContext(ctx, `UPDATE scheduled_task SET name = ?, enabled = ?, schedule_kind = ?, every_minutes = ?, minute_of_day = ?,
 		weekday = ?, steps = ?, prompt_enc = ?, notify_telegram = ?, updated_at = ?, next_run_at = ?,
-		fail_streak = 0, fail_reason = '', problem = 0, problem_summary = '', version = version + 1 WHERE id = ?`,
+		fail_streak = 0, fail_reason = '', problem = 0, problem_summary = '', version = version + 1 WHERE id = ? AND version = ?`,
 		t.Name, scheduledBool(t.Enabled), t.ScheduleKind, t.EveryMinutes, t.MinuteOfDay, t.Weekday, t.Steps, nonNilBlob(t.PromptEnc),
-		scheduledBool(t.NotifyTelegram), unix(t.UpdatedAt), unixOrZero(t.NextRunAt), t.ID)
+		scheduledBool(t.NotifyTelegram), unix(t.UpdatedAt), unixOrZero(t.NextRunAt), t.ID, t.Version)
 	if err != nil {
 		return err
 	}
 	if n, err := r.RowsAffected(); err != nil {
 		return err
 	} else if n == 0 {
-		return ErrNotFound
+		if _, err := s.ScheduledTask(ctx, t.ID); errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		return ErrConflict
 	}
 	return nil
 }
@@ -275,8 +281,8 @@ func (s *Store) ClaimScheduledTask(ctx context.Context, run ScheduledTaskRun, le
 	}
 	results, err := s.batch(ctx,
 		Stmt{Query: `UPDATE scheduled_task SET lease_id = ?, lease_until = ?, last_manual_at = CASE WHEN ? = 1 THEN ? ELSE last_manual_at END
-			WHERE id = ? AND lease_until <= ? AND (? = 0 OR last_manual_at <= ?)`,
-			Args: []any{leaseID, unix(until), manual, unix(now), run.TaskID, unix(now), manual, unixOrZero(notBefore)}},
+			WHERE id = ? AND version = ? AND lease_until <= ? AND (? = 0 OR last_manual_at <= ?)`,
+			Args: []any{leaseID, unix(until), manual, unix(now), run.TaskID, run.TaskVersion, unix(now), manual, unixOrZero(notBefore)}},
 		Stmt{Query: `INSERT INTO scheduled_task_run (id, task_id, trigger_kind, status, actor, started_at)
 			SELECT ?, ?, ?, 'running', ?, ? WHERE EXISTS (SELECT 1 FROM scheduled_task WHERE id = ? AND lease_id = ?)`,
 			Args: []any{run.ID, run.TaskID, run.Trigger, run.Actor, unix(run.StartedAt), run.TaskID, leaseID}},
@@ -303,9 +309,13 @@ func (s *Store) FinishScheduledRun(ctx context.Context, run ScheduledTaskRun, le
 			fail_reason = CASE WHEN ? = 1 THEN ? WHEN ? = 1 THEN '' ELSE fail_reason END,
 			problem = CASE ? WHEN 'problem' THEN 1 WHEN 'ok' THEN 0 ELSE problem END,
 			problem_summary = CASE ? WHEN 'problem' THEN ? WHEN 'ok' THEN '' ELSE problem_summary END
-			WHERE id = ? AND lease_id = ?`,
+			WHERE id = ? AND lease_id = ? AND version = ?`,
 			Args: []any{unixOrZero(next), scheduledBool(failure), scheduledBool(clean), scheduledBool(failure), Clip(run.Reason, 64), scheduledBool(clean),
-				run.Status, run.Status, Clip(run.Summary, 600), run.TaskID, leaseID}},
+				run.Status, run.Status, Clip(run.Summary, 600), run.TaskID, leaseID, run.TaskVersion}},
+		// Updating a definition keeps an in-flight lease so that its worker can release it. The old result must not change the
+		// new definition's schedule or alert state, but the matching worker still gives its lease back when it finishes.
+		Stmt{Query: `UPDATE scheduled_task SET lease_id = '', lease_until = 0 WHERE id = ? AND lease_id = ? AND version <> ?`,
+			Args: []any{run.TaskID, leaseID, run.TaskVersion}},
 	)
 	return err
 }

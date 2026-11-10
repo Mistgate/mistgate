@@ -211,7 +211,11 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 				return nil, err
 			}
 			if *f.dst != *f.in {
-				facts = append(facts, safeTextChange(f.key, *f.dst, *f.in))
+				changeFacts, err := approvalTextChangeFacts(f.key, *f.dst, *f.in)
+				if err != nil {
+					return nil, err
+				}
+				facts = append(facts, changeFacts...)
 				*f.dst = *f.in
 			}
 		}

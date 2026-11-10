@@ -37,6 +37,7 @@ const (
 // clean makes a string from data safe to show an agent: control characters, line breaks and runs of blanks become one
 // space, invisible format characters (zero width, bidi overrides) go, and the rest is cut to max runes with an ellipsis.
 func clean(s string, max int) string {
+	s = removeFormatCharacters(s)
 	s = scrub(s)
 	var b strings.Builder
 	n := 0
@@ -63,6 +64,15 @@ func clean(s string, max int) string {
 		n++
 	}
 	return strings.TrimRight(b.String(), " ")
+}
+
+func removeFormatCharacters(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Co, r) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // cleanMap cleans a map of parameters from data: at most maxParams keys (the first in sorted order), each value cut to

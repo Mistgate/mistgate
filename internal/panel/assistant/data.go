@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -47,6 +48,10 @@ func providerSlug(p adminv1.AssistantProvider) string {
 }
 
 func (s *Service) providerSpend(ctx context.Context, p adminv1.AssistantProvider, month string) (float64, error) {
+	now := s.now()
+	if _, err := s.st.DeleteStaleAssistantBudgetReservations(ctx, now.Add(-providerTimeout-30*time.Second), now); err != nil {
+		return 0, err
+	}
 	var amount float64
 	err := s.st.R.QueryRowContext(ctx, `SELECT
 		COALESCE((SELECT SUM(usd) FROM assistant_usage WHERE month=? AND provider=?),0) +
@@ -92,9 +97,10 @@ func (s *Service) reserveProviderCall(ctx context.Context, adminID string, p adm
 	if math.IsNaN(estimate) || math.IsInf(estimate, 0) || estimate < 0 {
 		return callReservation{}, apiError("budget_reached")
 	}
-	month := monthKey(s.now())
+	now := s.now()
+	month := monthKey(now)
 	reservationID := store.NewID("asres_")
-	accepted, err := s.st.ReserveAssistantBudget(ctx, reservationID, month, adminID, int32(p), model, estimate, budget, s.now())
+	accepted, err := s.st.ReserveAssistantBudget(ctx, reservationID, month, adminID, int32(p), model, estimate, budget, now, now.Add(-providerTimeout-30*time.Second))
 	if err != nil {
 		return callReservation{}, err
 	}

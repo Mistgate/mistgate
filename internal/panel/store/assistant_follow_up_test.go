@@ -5,8 +5,11 @@ package store
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"testing"
 	"time"
+
+	"github.com/pressly/goose/v3"
 )
 
 // A follow-up lives in its conversation: deleting the conversation, all of an admin's, or retention takes it too; one for a
@@ -83,5 +86,34 @@ func TestAssistantFollowUpLifecycle(t *testing.T) {
 	add("afu_b", "cnv_b")
 	if _, err := st.DeleteAssistantConversations(ctx, "adm_a", false); err != nil || count() != 0 {
 		t.Fatalf("delete all: %d left, %v", count(), err)
+	}
+}
+
+func TestFollowUpTelegramMigrationClearsLegacyRequests(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	sub, err := fs.Sub(migrationsFS, "migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectSQLite3, st.W, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 121); err != nil {
+		t.Fatalf("down to the previous migration: %v", err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_follow_up (id,conversation_id,admin_id,note_enc,notify_telegram,created_at) VALUES ('afu_legacy','cnv_legacy','adm_a',X'01',1,1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.UpTo(ctx, 122); err != nil {
+		t.Fatalf("apply request provenance migration: %v", err)
+	}
+	var allowed bool
+	if err := st.R.QueryRowContext(ctx, `SELECT notify_telegram FROM assistant_follow_up WHERE id='afu_legacy'`).Scan(&allowed); err != nil {
+		t.Fatal(err)
+	}
+	if allowed {
+		t.Fatal("legacy model-controlled follow-up notification was retained")
 	}
 }

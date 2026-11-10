@@ -17,6 +17,7 @@ func scheduledFixture(t *testing.T, st *Store, id string, now time.Time) Schedul
 	if err := st.InsertScheduledTask(context.Background(), task, 50); err != nil {
 		t.Fatal(err)
 	}
+	task.Version = 1
 	return task
 }
 
@@ -32,12 +33,12 @@ func TestScheduledTaskLeaseRunAndOutcome(t *testing.T) {
 	if err != nil || len(due) != 1 {
 		t.Fatalf("due: %+v %v", due, err)
 	}
-	run := ScheduledTaskRun{ID: "run_1", TaskID: "tsk_a", Trigger: "schedule", StartedAt: now}
+	run := ScheduledTaskRun{ID: "run_1", TaskID: "tsk_a", TaskVersion: 1, Trigger: "schedule", StartedAt: now}
 	ok, err := st.ClaimScheduledTask(ctx, run, "lease_1", now, now.Add(10*time.Minute), time.Time{})
 	if err != nil || !ok {
 		t.Fatalf("claim: %v %v", ok, err)
 	}
-	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_2", TaskID: "tsk_a", Trigger: "manual", StartedAt: now}, "lease_2", now, now.Add(time.Minute), now); ok {
+	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_2", TaskID: "tsk_a", TaskVersion: 1, Trigger: "manual", StartedAt: now}, "lease_2", now, now.Add(time.Minute), now); ok {
 		t.Fatal("a second run took the lease")
 	}
 	if _, err := st.ScheduledTaskRun(ctx, "run_2"); !errors.Is(err, ErrNotFound) {
@@ -54,15 +55,15 @@ func TestScheduledTaskLeaseRunAndOutcome(t *testing.T) {
 	fail := func(id string, at time.Time) {
 		t.Helper()
 		lease := "lease_" + id
-		if ok, err := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: id, TaskID: "tsk_a", Trigger: "schedule", StartedAt: at}, lease, at, at.Add(time.Minute), time.Time{}); err != nil || !ok {
+		if ok, err := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: id, TaskID: "tsk_a", TaskVersion: 1, Trigger: "schedule", StartedAt: at}, lease, at, at.Add(time.Minute), time.Time{}); err != nil || !ok {
 			t.Fatalf("claim %s: %v %v", id, ok, err)
 		}
-		if err := st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: id, TaskID: "tsk_a", Status: "failed", Reason: "tool_failed", FinishedAt: at}, lease, at.Add(15*time.Minute)); err != nil {
+		if err := st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: id, TaskID: "tsk_a", TaskVersion: 1, Status: "failed", Reason: "tool_failed", FinishedAt: at}, lease, at.Add(15*time.Minute)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// a problem, then three failures in a row: both alert conditions hold
-	if err := st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_1", TaskID: "tsk_a", Status: "problem", Summary: "fleet_digest: totals.nodes_problem_now = 2", FinishedAt: now}, "lease_1", now.Add(15*time.Minute)); err != nil {
+	if err := st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_1", TaskID: "tsk_a", TaskVersion: 1, Status: "problem", Summary: "fleet_digest: totals.nodes_problem_now = 2", FinishedAt: now}, "lease_1", now.Add(15*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	task, _ = st.ScheduledTask(ctx, "tsk_a")
@@ -78,23 +79,23 @@ func TestScheduledTaskLeaseRunAndOutcome(t *testing.T) {
 	}
 	// a skipped run changes neither; a clean one clears both
 	skip := now.Add(10 * time.Minute)
-	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_s", TaskID: "tsk_a", Trigger: "schedule", StartedAt: skip}, "lease_s", skip, skip.Add(time.Minute), time.Time{}); !ok {
+	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_s", TaskID: "tsk_a", TaskVersion: 1, Trigger: "schedule", StartedAt: skip}, "lease_s", skip, skip.Add(time.Minute), time.Time{}); !ok {
 		t.Fatal("claim skip")
 	}
-	_ = st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_s", TaskID: "tsk_a", Status: "skipped", Reason: "budget_reached", FinishedAt: skip}, "lease_s", skip.Add(time.Minute))
+	_ = st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_s", TaskID: "tsk_a", TaskVersion: 1, Status: "skipped", Reason: "budget_reached", FinishedAt: skip}, "lease_s", skip.Add(time.Minute))
 	if task, _ = st.ScheduledTask(ctx, "tsk_a"); task.FailStreak != 3 || !task.Problem {
 		t.Fatalf("a skip changed the state: %+v", task)
 	}
 	clean := now.Add(20 * time.Minute)
-	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_ok", TaskID: "tsk_a", Trigger: "manual", StartedAt: clean}, "lease_ok", clean, clean.Add(time.Minute), clean.Add(-time.Minute)); !ok {
+	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_ok", TaskID: "tsk_a", TaskVersion: 1, Trigger: "manual", StartedAt: clean}, "lease_ok", clean, clean.Add(time.Minute), clean.Add(-time.Minute)); !ok {
 		t.Fatal("a manual run after the cooldown was refused")
 	}
-	_ = st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_ok", TaskID: "tsk_a", Status: "ok", FinishedAt: clean}, "lease_ok", clean.Add(15*time.Minute))
+	_ = st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_ok", TaskID: "tsk_a", TaskVersion: 1, Status: "ok", FinishedAt: clean}, "lease_ok", clean.Add(15*time.Minute))
 	if alerts, _ = st.ScheduledTaskAlerts(ctx); len(alerts) != 0 {
 		t.Fatalf("a clean run left alerts: %+v", alerts)
 	}
 	// the manual cooldown: the last manual run started at `clean`
-	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_m", TaskID: "tsk_a", Trigger: "manual", StartedAt: clean}, "lease_m", clean.Add(time.Second), clean.Add(time.Minute), clean.Add(-time.Minute)); ok {
+	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_m", TaskID: "tsk_a", TaskVersion: 1, Trigger: "manual", StartedAt: clean}, "lease_m", clean.Add(time.Second), clean.Add(time.Minute), clean.Add(-time.Minute)); ok {
 		t.Fatal("a manual run inside the cooldown was taken")
 	}
 	runs, err := st.ScheduledTaskRuns(ctx, "tsk_a", 50)
@@ -113,7 +114,7 @@ func TestScheduledRunsRecoverAfterAStop(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1_800_000_000, 0).UTC()
 	scheduledFixture(t, st, "tsk_b", now)
-	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_x", TaskID: "tsk_b", Trigger: "schedule", StartedAt: now}, "lease_x", now, now.Add(time.Hour), time.Time{}); !ok {
+	if ok, _ := st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_x", TaskID: "tsk_b", TaskVersion: 1, Trigger: "schedule", StartedAt: now}, "lease_x", now, now.Add(time.Hour), time.Time{}); !ok {
 		t.Fatal("claim")
 	}
 	n, err := st.RecoverScheduledRuns(ctx, now.Add(time.Minute))
@@ -126,7 +127,7 @@ func TestScheduledRunsRecoverAfterAStop(t *testing.T) {
 		t.Fatalf("after recovery: %+v %+v", run, task)
 	}
 	// the old lease cannot finish over a new run
-	if err := st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_x", TaskID: "tsk_b", Status: "failed", FinishedAt: now}, "lease_x", now); err != nil {
+	if err := st.FinishScheduledRun(ctx, ScheduledTaskRun{ID: "run_x", TaskID: "tsk_b", TaskVersion: 1, Status: "failed", FinishedAt: now}, "lease_x", now); err != nil {
 		t.Fatal(err)
 	}
 	if task, _ = st.ScheduledTask(ctx, "tsk_b"); task.FailStreak != 0 {
@@ -160,12 +161,42 @@ func TestScheduledTaskLimitUpdateAndDelete(t *testing.T) {
 	if err := st.UpdateScheduledTask(ctx, ScheduledTask{ID: "tsk_none", UpdatedAt: now}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("update of a missing task: %v", err)
 	}
-	_, _ = st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_c", TaskID: "tsk_c", Trigger: "manual", StartedAt: now}, "l", now, now.Add(time.Minute), now)
+	if err := st.UpdateScheduledTask(ctx, task); !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale update: %v", err)
+	}
+	_, _ = st.ClaimScheduledTask(ctx, ScheduledTaskRun{ID: "run_c", TaskID: "tsk_c", TaskVersion: 2, Trigger: "manual", StartedAt: now}, "l", now, now.Add(time.Minute), now)
 	if ok, err := st.DeleteScheduledTask(ctx, "tsk_c"); err != nil || !ok {
 		t.Fatalf("delete: %v %v", ok, err)
 	}
 	if runs, _ := st.ScheduledTaskRuns(ctx, "tsk_c", 50); len(runs) != 0 {
 		t.Fatal("runs outlived their task")
+	}
+}
+
+func TestOldScheduledRunDoesNotChangeAnUpdatedDefinition(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	task := scheduledFixture(t, st, "tsk_version", now)
+	run := ScheduledTaskRun{ID: "run_version", TaskID: task.ID, TaskVersion: task.Version, Trigger: "schedule", StartedAt: now}
+	if ok, err := st.ClaimScheduledTask(ctx, run, "lease_version", now, now.Add(time.Hour), time.Time{}); err != nil || !ok {
+		t.Fatalf("claim: %v %v", ok, err)
+	}
+	task.Name = "Updated check"
+	task.UpdatedAt = now.Add(time.Minute)
+	if err := st.UpdateScheduledTask(ctx, task); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	run.Status, run.Summary, run.FinishedAt = "problem", "old definition found a problem", now.Add(2*time.Minute)
+	if err := st.FinishScheduledRun(ctx, run, "lease_version", now.Add(15*time.Minute)); err != nil {
+		t.Fatalf("finish: %v", err)
+	}
+	got, err := st.ScheduledTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != task.Version+1 || got.Name != "Updated check" || got.Problem || got.ProblemSummary != "" || got.FailStreak != 0 || got.Running(now.Add(3*time.Minute)) {
+		t.Fatalf("old run changed the updated definition: %+v", got)
 	}
 }
 

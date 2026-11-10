@@ -51,6 +51,19 @@ func profileForRole(role string) string {
 	}
 }
 
+func profileForFollowUpRole(role string) string {
+	switch profileForRole(role) {
+	case store.ProfileReadonly:
+		return store.ProfileReadonly
+	case store.ProfileOperator:
+		return store.ProfileOperator
+	case store.ProfileAdmin:
+		return store.ProfileAdmin
+	default:
+		return ""
+	}
+}
+
 func (s *Service) assistantSession(ctx context.Context, admin store.Admin, tokenID string) (mcp.AssistantSession, error) {
 	s.mu.RLock()
 	runtime := s.tools
@@ -62,6 +75,13 @@ func (s *Service) assistantSession(ctx context.Context, admin store.Admin, token
 	if tokenID != "" && tokenID == store.ScheduledTokenID(admin.ID) {
 		// a plan a scheduled task prepared: its apply runs with the identity that made it, the operator profile
 		return runtime.OpenAssistant(ctx, mcp.AssistantIdentity{TokenID: tokenID, Profile: store.ProfileOperator, AdminID: admin.ID, AdminName: admin.DisplayName, Scheduled: true})
+	}
+	if tokenID != "" && tokenID == store.FollowUpTokenID(admin.ID) {
+		profile := profileForFollowUpRole(admin.Role)
+		if profile == "" {
+			return nil, errors.New("assistant follow-up identity is not available for this admin role")
+		}
+		return runtime.OpenAssistant(ctx, mcp.AssistantIdentity{TokenID: tokenID, Profile: profile, AdminID: admin.ID, AdminName: admin.DisplayName, FollowUp: true})
 	}
 	if tokenID == "" {
 		token, err := s.st.EnsureAssistantToken(ctx, admin.ID, profile, s.now())
@@ -104,24 +124,32 @@ func (s *Service) ApplyPlan(ctx context.Context, req *connect.Request[adminv1.Ap
 	}
 	if mcpPlan.NeedsApproval {
 		if admin.Role != store.RoleOwner {
-			card.State = adminv1.PlanState_PLAN_STATE_WAITING_OWNER
-			if err = s.savePlanCard(ctx, p.id, card, "waiting_owner"); err != nil {
-				return nil, err
-			}
-			return connect.NewResponse(&adminv1.ApplyPlanResponse{Plan: card}), nil
-		}
-		if s.auth == nil {
-			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("step-up is unavailable"))
-		}
-		if err = s.auth.RequireStepUp(ctx); err != nil {
-			return nil, err
-		}
-		if mcpPlan.Status == store.PlanAwaiting {
-			if _, err = s.auth.ApproveAssistantMCPPlan(ctx, p.id, admin); err != nil {
+			switch mcpPlan.Status {
+			case store.PlanApproved, store.PlanApplying:
+				// The helper who made this plan may carry out the owner's approved change.
+			case store.PlanAwaiting:
+				card.State = adminv1.PlanState_PLAN_STATE_WAITING_OWNER
+				if err = s.savePlanCard(ctx, p.id, card, "waiting_owner"); err != nil {
+					return nil, err
+				}
+				return connect.NewResponse(&adminv1.ApplyPlanResponse{Plan: card}), nil
+			default:
 				return nil, codeConnect("plan_not_pending")
 			}
-		} else if mcpPlan.Status != store.PlanApproved && mcpPlan.Status != store.PlanApplying {
-			return nil, codeConnect("plan_not_pending")
+		} else {
+			if s.auth == nil {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("step-up is unavailable"))
+			}
+			if err = s.auth.RequireStepUp(ctx); err != nil {
+				return nil, err
+			}
+			if mcpPlan.Status == store.PlanAwaiting {
+				if _, err = s.auth.ApproveAssistantMCPPlan(ctx, p.id, admin); err != nil {
+					return nil, codeConnect("plan_not_pending")
+				}
+			} else if mcpPlan.Status != store.PlanApproved && mcpPlan.Status != store.PlanApplying {
+				return nil, codeConnect("plan_not_pending")
+			}
 		}
 	} else if mcpPlan.Status != store.PlanPlanned && mcpPlan.Status != store.PlanApplying {
 		return nil, codeConnect("plan_not_pending")

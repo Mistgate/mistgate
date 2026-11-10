@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
@@ -13,6 +14,7 @@ const listTasks = vi.fn();
 const listTaskRuns = vi.fn();
 const listCheckTools = vi.fn();
 const createTask = vi.fn();
+const updateTask = vi.fn();
 const runTaskNow = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
@@ -21,7 +23,7 @@ vi.mock("@/lib/api", async (orig) => ({
     listTaskRuns: (...a: unknown[]) => listTaskRuns(...a),
     listCheckTools: (...a: unknown[]) => listCheckTools(...a),
     createTask: (...a: unknown[]) => createTask(...a),
-    updateTask: vi.fn(),
+    updateTask: (...a: unknown[]) => updateTask(...a),
     deleteTask: vi.fn(),
     runTaskNow: (...a: unknown[]) => runTaskNow(...a),
   },
@@ -38,14 +40,14 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const f of [listTasks, listTaskRuns, listCheckTools, createTask, runTaskNow]) f.mockReset();
+  for (const f of [listTasks, listTaskRuns, listCheckTools, createTask, updateTask, runTaskNow]) f.mockReset();
 });
 
 const morning = {
   id: "tsk_morning", name: "Morning check", kind: TaskKind.CHECK, enabled: true, notifyTelegram: true, prompt: "", conversationId: "",
   schedule: { kind: ScheduleKind.DAILY, everyMinutes: 0, minuteOfDay: 450, weekday: 0 },
   steps: [{ tool: "fleet_digest", argsJson: '{"hours":24}', conditions: [{ path: "totals.nodes_problem_now", op: "gt", value: "0" }], errorIsProblem: false }],
-  createdUnix: 1n, updatedUnix: 1n, nextRunUnix: 1_800_000_000n, failStreak: 0, problem: true, problemSummary: "fleet_digest: totals.nodes_problem_now = 2", running: false,
+  version: 7n, createdUnix: 1n, updatedUnix: 1n, nextRunUnix: 1_800_000_000n, failStreak: 0, problem: true, problemSummary: "fleet_digest: totals.nodes_problem_now = 2", running: false,
   lastRun: { id: "run_1", taskId: "tsk_morning", trigger: "schedule", status: RunStatus.PROBLEM, reason: "", summary: "fleet_digest: totals.nodes_problem_now = 2", startedUnix: 1_700_000_000n, finishedUnix: 1_700_000_005n, steps: [], conversationId: "", provider: "", model: "", usd: 0, fellBack: false, actor: "" },
 };
 
@@ -144,5 +146,17 @@ describe("the scheduled tasks", () => {
     expect(req.task.enabled).toBe(true);
     expect(req.task.schedule).toMatchObject({ kind: ScheduleKind.DAILY, minuteOfDay: 450 });
     expect(req.task.steps).toEqual([{ tool: "fleet_digest", argsJson: '{"hours":24}', conditions: [{ path: "totals.nodes_problem_now", op: "gt", value: "0" }], errorIsProblem: false }]);
+  });
+
+  it("save an edit against the version the editor opened with, and say when the task changed meanwhile", async () => {
+    await mount(Role.OWNER);
+    updateTask.mockRejectedValue(new ConnectError("task_changed", Code.Aborted));
+    await click(button("Edit"));
+    await settle();
+    await click(button("Save"));
+    await settle();
+    expect(updateTask).toHaveBeenCalledTimes(1);
+    expect(updateTask.mock.calls[0]![0]).toMatchObject({ id: "tsk_morning", expectedVersion: 7n });
+    expect(document.body.textContent).toContain("The task was changed while you were editing it.");
   });
 });

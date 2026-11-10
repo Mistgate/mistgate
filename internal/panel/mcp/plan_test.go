@@ -337,13 +337,16 @@ func TestUserDisableBulkNeedsTheOwner(t *testing.T) {
 	if !many.NeedsApproval || len(many.Danger) != 1 || many.Danger[0] != "bulk" {
 		t.Errorf("4 users need the owner: %+v", many)
 	}
-	var names Fact
+	var names []string
 	for _, f := range many.Facts {
 		if f.Key == "users" {
-			names = f
+			if !f.Untrusted {
+				t.Errorf("user name fact is not marked untrusted: %+v", f)
+			}
+			names = append(names, f.Value)
 		}
 	}
-	if !names.Untrusted || names.Value != "n0, n1, n2, n3" {
+	if strings.Join(names, ",") != "n0,n1,n2,n3" {
 		t.Errorf("users fact: %+v", names)
 	}
 	applyError(t, s, "user_disable", many.ConfirmToken)

@@ -366,7 +366,12 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 		if a.Port == r.GetPort() {
 			return nil, errors.New("the relay is already on that port")
 		}
-		facts[3] = Fact{Key: "entry_port", Value: strconv.Itoa(int(r.GetPort())) + " -> " + strconv.Itoa(int(a.Port))}
+		for i := range facts {
+			if facts[i].Key == "entry_port" {
+				facts[i] = Fact{Key: "entry_port", Value: strconv.Itoa(int(r.GetPort())) + " -> " + strconv.Itoa(int(a.Port))}
+				break
+			}
+		}
 		summary = "Move one relay to another port on its entry node. The owner has to approve it first."
 		effect = "People who use the second server marked \"via\" need their subscription refreshed to get the new port."
 		if r.GetEnabled() {

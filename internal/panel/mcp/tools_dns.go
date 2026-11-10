@@ -340,13 +340,225 @@ func dnsPresetHash(p *adminv1.DnsPreset) string {
 	return hashText(p.GetId() + "\x00" + p.GetName() + "\x00" + p.GetDescription() + "\x00" + fmt.Sprint(p.GetIpv4Only(), p.GetSplitDirect(), p.GetPreferredTransport(), p.GetBlockAds()) + "\x00" + fmt.Sprint(p.GetServers(), p.GetSplit()))
 }
 
-func dnsMutationFacts(name, description string, p *adminv1.DnsPreset) []Fact {
-	return []Fact{{Key: "name", Value: nm(name), Untrusted: true}, {Key: "description", Value: clean(description, 512), Untrusted: true},
-		codedFact("resolvers", fmt.Sprintf("%d main resolvers and %d split rules", len(p.GetServers()), len(p.GetSplit())), "dns_shape", "servers", strconv.Itoa(len(p.GetServers())), "split", strconv.Itoa(len(p.GetSplit()))),
+const (
+	dnsApprovalMaxResolvers = dns.MaxServers
+	dnsApprovalMaxRules     = 32
+)
+
+type dnsApprovalLine struct {
+	identity  string
+	value     string
+	key       string
+	splitRule bool
+}
+
+func dnsApprovalServer(scope string, server *adminv1.DnsServer) dnsApprovalLine {
+	kind := enumName("DNS_SERVER_KIND_", server.GetKind().String())
+	if kind == "unspecified" {
+		kind = "unspecified"
+	}
+	value := fmt.Sprintf("%s: kind=%s; address=%s; provider variant=%s", scope, kind, server.GetAddress(), server.GetProviderVariant())
+	return dnsApprovalLine{identity: scope + "\x00" + kind + "\x00" + server.GetAddress() + "\x00" + server.GetProviderVariant(), value: value, key: scope}
+}
+
+func dnsQuoteList(items []string) string {
+	quoted := make([]string, 0, len(items))
+	for _, item := range items {
+		quoted = append(quoted, strconv.Quote(item))
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
+}
+
+func dnsApprovalContent(p *adminv1.DnsPreset, existing, strictLines bool) ([]dnsApprovalLine, []dnsApprovalLine, error) {
+	if !existing && len(p.GetSplit()) > dnsApprovalMaxRules {
+		return nil, nil, fmt.Errorf("split[%d] exceeds the approval limit of at most %d split rules", dnsApprovalMaxRules+1, dnsApprovalMaxRules)
+	}
+	if !existing && len(p.GetServers()) > dns.MaxServers {
+		return nil, nil, fmt.Errorf("main DNS resolver list allows at most %d servers", dns.MaxServers)
+	}
+	var resolvers, rules []dnsApprovalLine
+	for i, server := range p.GetServers() {
+		resolvers = append(resolvers, dnsApprovalServer(fmt.Sprintf("main[%d]", i+1), server))
+	}
+	for i, rule := range p.GetSplit() {
+		selector := fmt.Sprintf("split[%d]", i+1)
+		ruleIdentity := "split:" + dnsQuoteList(rule.GetSuffixes())
+		if !existing && len(rule.GetServers()) > dns.MaxServers {
+			return nil, nil, fmt.Errorf("%s resolver list allows at most %d servers", selector, dns.MaxServers)
+		}
+		refs := make([]string, 0, len(rule.GetServers()))
+		resolverIdentities := make([]string, 0, len(rule.GetServers()))
+		for j, server := range rule.GetServers() {
+			ref := fmt.Sprintf("%s.resolver[%d]", selector, j+1)
+			refs = append(refs, ref)
+			line := dnsApprovalServer(ref, server)
+			line.identity = fmt.Sprintf("%s\x00resolver[%d]\x00%s\x00%s\x00%s", ruleIdentity, j+1, server.GetKind().String(), server.GetAddress(), server.GetProviderVariant())
+			resolvers = append(resolvers, line)
+			resolverIdentities = append(resolverIdentities, line.identity)
+		}
+		value := fmt.Sprintf("%s: suffixes=%s; geo=%s; resolvers=%s", selector,
+			dnsQuoteList(rule.GetSuffixes()), dnsQuoteList(rule.GetGeo()), dnsQuoteList(refs))
+		if len(refs) == 0 {
+			value += "; no resolvers"
+		}
+		identity := ruleIdentity + "\x00geo=" + dnsQuoteList(rule.GetGeo()) + "\x00resolvers=" + strings.Join(resolverIdentities, "\x00")
+		rules = append(rules, dnsApprovalLine{identity: identity, value: value, key: selector, splitRule: true})
+	}
+	if existing {
+		for i := range resolvers {
+			resolvers[i].value = scrub(strings.ToValidUTF8(resolvers[i].value, "\uFFFD"))
+		}
+		for i := range rules {
+			rules[i].value = scrub(strings.ToValidUTF8(rules[i].value, "\uFFFD"))
+		}
+		return resolvers, rules, nil
+	}
+	if !strictLines {
+		return resolvers, rules, nil
+	}
+	for _, line := range resolvers {
+		if _, err := approvalFact(line.key, line.value, true); err != nil {
+			return nil, nil, err
+		}
+	}
+	for _, line := range rules {
+		if _, err := approvalTextFacts(line.key, line.value); err != nil {
+			return nil, nil, err
+		}
+	}
+	return resolvers, rules, nil
+}
+
+const dnsApprovalBeforeLineLimit = 12
+
+func dnsApprovalDiffFacts(key string, before, after []dnsApprovalLine) (current []Fact, beforeGroups [][]Fact, omittedBefore int, err error) {
+	oldCounts := make(map[string]int, len(before))
+	currentCounts := make(map[string]int, len(after))
+	values := make(map[string]string, len(before)+len(after))
+	for _, line := range before {
+		oldCounts[line.identity]++
+		values[line.identity] = line.value
+	}
+	for _, line := range after {
+		currentCounts[line.identity]++
+		values[line.identity] = line.value
+	}
+	identities := make([]string, 0, len(oldCounts)+len(currentCounts))
+	seen := make(map[string]struct{}, len(oldCounts)+len(currentCounts))
+	for identity := range oldCounts {
+		seen[identity] = struct{}{}
+		identities = append(identities, identity)
+	}
+	for identity := range currentCounts {
+		if _, ok := seen[identity]; !ok {
+			identities = append(identities, identity)
+		}
+	}
+	slices.Sort(identities)
+	var removed, added []dnsApprovalLine
+	unchanged := 0
+	for _, identity := range identities {
+		oldCount, currentCount := oldCounts[identity], currentCounts[identity]
+		common := min(oldCount, currentCount)
+		unchanged += common
+		for range oldCount - common {
+			removed = append(removed, dnsApprovalLine{identity: identity, value: values[identity]})
+		}
+		for range currentCount - common {
+			added = append(added, dnsApprovalLine{identity: identity, value: values[identity]})
+		}
+	}
+	current = []Fact{{Key: key, Value: fmt.Sprintf("before -> after: %d removed, %d added, %d unchanged", len(removed), len(added), unchanged)}}
+	shownBefore := min(len(removed), dnsApprovalBeforeLineLimit)
+	for _, line := range removed[:shownBefore] {
+		part, err := approvalTextBeforeFacts(key+" before", "removed: "+line.value)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		beforeGroups = append(beforeGroups, part)
+	}
+	for _, line := range added {
+		factKey := key
+		if line.splitRule {
+			factKey = line.key
+		}
+		part, err := approvalTextFacts(factKey, "added: "+line.value)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		current = append(current, part...)
+	}
+	return current, beforeGroups, len(removed) - shownBefore, nil
+}
+
+func dnsMutationFacts(name, description string, before, p *adminv1.DnsPreset) ([]Fact, error) {
+	resolvers, rules, err := dnsApprovalContent(p, false, before == nil)
+	if err != nil {
+		return nil, err
+	}
+	facts := []Fact{{Key: "name", Value: nm(name), Untrusted: true}, {Key: "description", Value: clean(description, 512), Untrusted: true}}
+	var beforeGroups [][]Fact
+	omittedBefore := 0
+	if before == nil {
+		for _, line := range resolvers {
+			fact, err := approvalFact("resolver", line.value, true)
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, fact)
+		}
+		for _, line := range rules {
+			parts, err := approvalTextFacts(line.key, line.value)
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, parts...)
+		}
+	} else {
+		oldResolvers, oldRules, err := dnsApprovalContent(before, true, false)
+		if err != nil {
+			return nil, err
+		}
+		resolverFacts, resolverBefore, resolverOmitted, err := dnsApprovalDiffFacts("resolvers", oldResolvers, resolvers)
+		if err != nil {
+			return nil, err
+		}
+		ruleFacts, ruleBefore, ruleOmitted, err := dnsApprovalDiffFacts("split_rules", oldRules, rules)
+		if err != nil {
+			return nil, err
+		}
+		facts = append(facts, resolverFacts...)
+		facts = append(facts, ruleFacts...)
+		beforeGroups = append(beforeGroups, resolverBefore...)
+		beforeGroups = append(beforeGroups, ruleBefore...)
+		omittedBefore = resolverOmitted + ruleOmitted
+	}
+	facts = append(facts,
 		codedFact("ipv4_only", strconv.FormatBool(p.GetIpv4Only()), "boolean", "value", strconv.FormatBool(p.GetIpv4Only())),
 		codedFact("split_direct", strconv.FormatBool(p.GetSplitDirect()), "boolean", "value", strconv.FormatBool(p.GetSplitDirect())),
 		codedFact("preferred_transport", dnsTransportWord(p.GetPreferredTransport()), "transport", "value", dnsTransportWord(p.GetPreferredTransport())),
-		codedFact("block_ads", strconv.FormatBool(p.GetBlockAds()), "boolean", "value", strconv.FormatBool(p.GetBlockAds()))}
+		codedFact("block_ads", strconv.FormatBool(p.GetBlockAds()), "boolean", "value", strconv.FormatBool(p.GetBlockAds())))
+	return dnsApprovalWithBeforeFacts(facts, beforeGroups, omittedBefore, 16<<10)
+}
+
+func dnsApprovalWithBeforeFacts(after []Fact, beforeGroups [][]Fact, omittedBefore, limit int) ([]Fact, error) {
+	if err := approvalFactsSize(after, limit, "DNS settings"); err != nil {
+		return nil, err
+	}
+	for shown := len(beforeGroups); shown >= 0; shown-- {
+		facts := append([]Fact(nil), after...)
+		for _, group := range beforeGroups[:shown] {
+			facts = append(facts, group...)
+		}
+		omitted := omittedBefore + len(beforeGroups) - shown
+		if omitted > 0 {
+			facts = append(facts, Fact{Key: "before", Value: fmt.Sprintf("%d more before", omitted)})
+		}
+		if err := approvalFactsSize(facts, limit, "DNS settings"); err == nil {
+			return facts, nil
+		}
+	}
+	return nil, fmt.Errorf("DNS settings are too large to show whole in approval; shorten the change")
 }
 
 var dnsPresetCreate = changeSpec[dnsPresetArgs]{
@@ -367,7 +579,11 @@ var dnsPresetCreate = changeSpec[dnsPresetArgs]{
 			}
 		}
 		a.Name, a.Description = p.GetName(), p.GetDescription()
-		return &planned{Summary: "Create a DNS preset that can be assigned to users and groups. The owner must approve this change.", Facts: dnsMutationFacts(a.Name, a.Description, p), Danger: []string{dangerPage}, Params: a}, nil
+		facts, err := dnsMutationFacts(a.Name, a.Description, nil, p)
+		if err != nil {
+			return nil, err
+		}
+		return &planned{Summary: "Create a DNS preset that can be assigned to users and groups. The owner must approve this change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
 	},
 	apply: func(c *call, a dnsPresetArgs, _ Plan) (done, error) {
 		p, err := dnsCleanArgs(a)
@@ -405,7 +621,11 @@ var dnsPresetUpdate = changeSpec[dnsPresetArgs]{
 			return nil, errors.New("nothing to change: this DNS preset already looks like this")
 		}
 		a.BeforeHash, a.Name, a.Description = dnsPresetHash(old), p.GetName(), p.GetDescription()
-		return &planned{Summary: "Update a DNS preset and the settings users receive from it. The owner must approve this change.", Facts: dnsMutationFacts(a.Name, a.Description, p), Danger: []string{dangerPage}, Params: a}, nil
+		facts, err := dnsMutationFacts(a.Name, a.Description, old, p)
+		if err != nil {
+			return nil, err
+		}
+		return &planned{Summary: "Update a DNS preset and the settings users receive from it. The owner must approve this change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
 	},
 	apply: func(c *call, a dnsPresetArgs, _ Plan) (done, error) {
 		old, err := c.dnsPreset(a.PresetID)

@@ -424,7 +424,7 @@ func errCode(err error) string {
 }
 
 // taskFacts are the lines of a task's definition the owner reads: the name and the prompt are the agent's words (untrusted).
-func taskFacts(d spec.Definition) []Fact {
+func taskFacts(d spec.Definition) ([]Fact, error) {
 	enabled := "on"
 	if !d.Enabled {
 		enabled = "off"
@@ -442,22 +442,42 @@ func taskFacts(d spec.Definition) []Fact {
 	}
 	if d.Kind == spec.KindCheck {
 		for i, st := range d.Steps {
-			line := st.Tool
-			if a := string(st.Args); a != "" && a != "{}" {
-				line += " " + clean(a, 200)
-			}
-			for _, cnd := range st.Conditions {
-				line += "; problem when " + clean(strings.TrimSpace(cnd.Path+" "+cnd.Op+" "+cnd.Value), 160)
-			}
+			line := strconv.Itoa(i+1) + ". " + st.Tool
 			if st.ErrorIsProblem {
 				line += "; a failure is a problem"
 			}
-			facts = append(facts, Fact{Key: "step", Value: strconv.Itoa(i+1) + ". " + line, Untrusted: true})
+			part, err := approvalTextFacts("step", line)
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, part...)
+			if a := string(st.Args); a != "" && a != "{}" {
+				part, err := approvalTextFacts("step args", a)
+				if err != nil {
+					return nil, err
+				}
+				facts = append(facts, part...)
+			}
+			for _, cnd := range st.Conditions {
+				condition := "problem when " + strings.TrimSpace(cnd.Path+" "+cnd.Op+" "+cnd.Value)
+				part, err := approvalTextFacts("step condition", condition)
+				if err != nil {
+					return nil, err
+				}
+				facts = append(facts, part...)
+			}
 		}
 	} else {
-		facts = append(facts, Fact{Key: "prompt", Value: clean(d.Prompt, 600), Untrusted: true})
+		part, err := approvalTextFacts("prompt", d.Prompt)
+		if err != nil {
+			return nil, err
+		}
+		facts = append(facts, part...)
 	}
-	return facts
+	if err := approvalFactsSize(facts, 24<<10, "scheduled task details"); err != nil {
+		return nil, err
+	}
+	return facts, nil
 }
 
 type taskCreateArgs struct {
@@ -479,9 +499,13 @@ var taskCreate = changeSpec[taskCreateArgs]{
 		if d, err = c.checkTaskDefinition(d); err != nil {
 			return nil, err
 		}
+		facts, err := taskFacts(d)
+		if err != nil {
+			return nil, err
+		}
 		return &planned{
 			Summary: "Create a scheduled task. The panel runs it on its own at the times below, with the operator profile, and opens an alert when a run finds a problem or keeps failing.",
-			Facts:   taskFacts(d), Danger: []string{dangerSchedule}, Params: taskCreateArgs{taskDefArgs: defArgsOf(d)},
+			Facts:   facts, Danger: []string{dangerSchedule}, Params: taskCreateArgs{taskDefArgs: defArgsOf(d)},
 			AuditParams: map[string]any{"kind": d.Kind, "schedule": d.Schedule.String()},
 		}, nil
 	},
@@ -550,7 +574,7 @@ var taskUpdate = changeSpec[taskUpdateArgs]{
 	procs: procs(tasksv1connect.TasksServiceGetTaskProcedure, tasksv1connect.TasksServiceListCheckToolsProcedure, tasksv1connect.TasksServiceUpdateTaskProcedure),
 	desc: "Change a scheduled task: give task_id and only the fields to change (name, schedule, steps, prompt, notify_telegram, enabled; steps replace all the old ones). Its kind stays. " +
 		taskScheduleWords + taskConditionWords + "A changed task starts with a clean state: its open alerts close and the next run tells again. The plan always waits for the owner; " +
-		"if the task changes in the panel before the apply, the apply fails with changed_since_plan.",
+		"if the task changes in the panel before the apply, the apply fails with task_changed.",
 	plan: func(c *call, a taskUpdateArgs) (*planned, error) {
 		t, err := c.currentTask(a.TaskID)
 		if err != nil {
@@ -585,9 +609,13 @@ var taskUpdate = changeSpec[taskUpdateArgs]{
 		if d, err = c.checkTaskDefinition(d); err != nil {
 			return nil, err
 		}
+		facts, err := taskFacts(d)
+		if err != nil {
+			return nil, err
+		}
 		return &planned{
 			Summary: "Change a scheduled task. The lines below are the task as it will be; its open alerts close and the next run tells again.",
-			Facts:   append([]Fact{{Key: "task_id", Value: clean(t.GetId(), 64)}}, taskFacts(d)...), Danger: []string{dangerSchedule},
+			Facts:   append([]Fact{{Key: "task_id", Value: clean(t.GetId(), 64)}}, facts...), Danger: []string{dangerSchedule},
 			Params:      taskUpdateStored{TaskID: t.GetId(), Version: t.GetVersion(), Def: defArgsOf(d)},
 			AuditParams: map[string]any{"task_id": t.GetId(), "schedule": d.Schedule.String(), "enabled": d.Enabled},
 		}, nil
@@ -597,18 +625,11 @@ var taskUpdate = changeSpec[taskUpdateArgs]{
 		if err := strictJSON([]byte(pl.ParamsJSON), &st); err != nil {
 			return done{}, failure("plan_unreadable", "the stored plan is unreadable: make a new plan")
 		}
-		t, err := c.currentTask(st.TaskID)
-		if err != nil {
-			return done{}, err
-		}
-		if t.GetVersion() != st.Version {
-			return done{}, failure("changed_since_plan", "the task changed since the plan was made: make a new plan")
-		}
 		d, err := st.Def.definition()
 		if err != nil {
 			return done{}, failure("plan_unreadable", "the stored plan is unreadable: make a new plan")
 		}
-		if _, err := c.cl.Tasks.UpdateTask(c.ctx, connect.NewRequest(&tasksv1.UpdateTaskRequest{Id: st.TaskID, Task: inputOf(d)})); err != nil {
+		if _, err := c.cl.Tasks.UpdateTask(c.ctx, connect.NewRequest(&tasksv1.UpdateTaskRequest{Id: st.TaskID, Task: inputOf(d), ExpectedVersion: st.Version})); err != nil {
 			return done{}, apiError(err)
 		}
 		return doneWith("task_updated", "Task "+clean(st.TaskID, 64)+" changed.", "task_id", clean(st.TaskID, 64)), nil

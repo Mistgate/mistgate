@@ -362,7 +362,7 @@ func TestDangerousPlanNeedsTheOwner(t *testing.T) {
 		t.Fatalf("apply before the owner decided: %v", err)
 	}
 	ap, err := s.DecideMCPPlan(ctx, p.ID, "adm_a", true, t0.Add(time.Minute))
-	if err != nil || ap.Status != PlanApproved || ap.DecidedBy != "adm_a" || ap.DecidedByName != "Ada" || !ap.DecidedAt.Equal(t0.Add(time.Minute)) {
+	if err != nil || ap.Status != PlanApproved || ap.DecidedBy != "adm_a" || ap.DecidedByName != "Ada" || !ap.DecidedAt.Equal(t0.Add(time.Minute)) || !ap.ExpiresAt.Equal(t0.Add(PlanTTL)) {
 		t.Fatalf("approve: %+v %v", ap, err)
 	}
 	if _, err := s.DecideMCPPlan(ctx, p.ID, "adm_a", false, t0.Add(time.Minute)); stateOf(err) != PlanApproved {
@@ -386,6 +386,14 @@ func TestDangerousPlanNeedsTheOwner(t *testing.T) {
 	late := newPlan(t, s, tok.ID, "node_rollback", true, t0)
 	if _, err := s.DecideMCPPlan(ctx, late.ID, "adm_a", true, t0.Add(PlanTTL)); stateOf(err) != PlanExpired {
 		t.Fatalf("approve at expiry: %v", err)
+	}
+	lateApproval := newPlan(t, s, tok.ID, "node_fix", true, t0)
+	approvedLate, err := s.DecideMCPPlan(ctx, lateApproval.ID, "adm_a", true, t0.Add(9*time.Minute))
+	if err != nil || !approvedLate.ExpiresAt.Equal(t0.Add(11*time.Minute)) {
+		t.Fatalf("late approval expiry: %+v %v", approvedLate, err)
+	}
+	if _, err := s.BeginApply(ctx, lateApproval.ID, tok.ID, lateApproval.Tool, lateApproval.ParamsHash, lateApproval.ConfirmHash, t0.Add(10*time.Minute+time.Second)); err != nil {
+		t.Fatalf("apply shortly after original expiry: %v", err)
 	}
 	if _, err := s.DecideMCPPlan(ctx, "pln_none", "adm_a", true, t0); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("approve unknown: %v", err)

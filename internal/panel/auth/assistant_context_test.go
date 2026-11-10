@@ -102,3 +102,60 @@ func TestAssistantMCPRequestRevokesIdentityAfterAdminRemoval(t *testing.T) {
 		t.Fatalf("hidden token was not revoked on admin removal: %+v %v", updated, err)
 	}
 }
+
+func TestAssistantFollowUpKeepsReadProfileAndRefreshesAfterRoleChange(t *testing.T) {
+	s, st, clock := newTestService(t)
+	ctx := context.Background()
+	adminID := "adm_followup_cap"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO admin(id,display_name,role,user_handle,created_at) VALUES(?,?,?,?,?)`, adminID, "Owner", store.RoleOwner, []byte("followup-handle"), clock.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_settings(id,enabled,audience) VALUES(1,1,3)`); err != nil {
+		t.Fatal(err)
+	}
+	token, err := st.EnsureAssistantFollowUpToken(ctx, adminID, store.ProfileAdmin, *clock)
+	if err != nil || token.Profile != store.ProfileAdmin {
+		t.Fatalf("follow-up token = %+v, %v", token, err)
+	}
+	hits := 0
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusNoContent)
+	})
+	call := func(path string) int {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "http://panel.invalid"+path, nil)
+		req = req.WithContext(WithAssistantFollowUp(req.Context(), token.ID, token.Profile, adminID, "Owner"))
+		response := httptest.NewRecorder()
+		s.RequireSession(next).ServeHTTP(response, req)
+		return response.Code
+	}
+	if code := call(OpsListDebugCapturesProcedure); code != http.StatusNoContent {
+		t.Fatalf("owner follow-up could not read debug captures: %d", code)
+	}
+	if code := call(adminv1connect.UserServiceListUsersProcedure); code != http.StatusNoContent {
+		t.Fatalf("owner follow-up lost an ordinary read: %d", code)
+	}
+	if hits != 2 {
+		t.Fatalf("owner reads reached the panel API %d times", hits)
+	}
+	if _, err = st.W.ExecContext(ctx, `UPDATE admin SET role=? WHERE id=?`, store.RoleHelper, adminID); err != nil {
+		t.Fatal(err)
+	}
+	if code := call(OpsListDebugCapturesProcedure); code != http.StatusUnauthorized {
+		t.Fatalf("old owner follow-up identity survived demotion: %d", code)
+	}
+	token, err = st.EnsureAssistantFollowUpToken(ctx, adminID, store.ProfileOperator, *clock)
+	if err != nil || token.Profile != store.ProfileOperator {
+		t.Fatalf("helper follow-up token = %+v, %v", token, err)
+	}
+	if code := call(OpsListDebugCapturesProcedure); code != http.StatusForbidden {
+		t.Fatalf("helper follow-up reached owner debug reads: %d", code)
+	}
+	if code := call(adminv1connect.UserServiceListUsersProcedure); code != http.StatusNoContent {
+		t.Fatalf("helper follow-up lost its own read access: %d", code)
+	}
+	if hits != 3 {
+		t.Fatalf("helper read reached the panel API %d times", hits)
+	}
+}

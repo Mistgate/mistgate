@@ -304,7 +304,7 @@ func (c *call) timeline(in timelineArg) (any, error) {
 	var cur *tlItemV
 	if in.Cursor != "" {
 		m := tlCursorShape.FindStringSubmatch(in.Cursor)
-		if m == nil {
+		if m == nil || !validCursor("next_cursor", in.Cursor) {
 			return nil, errors.New("cursor: use next_cursor of the previous page")
 		}
 		at, _ := strconv.ParseInt(m[1], 10, 64)

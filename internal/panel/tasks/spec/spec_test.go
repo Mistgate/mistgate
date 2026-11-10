@@ -150,13 +150,17 @@ func TestConditions(t *testing.T) {
 			t.Errorf("%+v: %v", c.c, err)
 			continue
 		}
-		got := c.c.Match(result, 5)
+		got, err := c.c.Match(result, 5)
+		if err != nil {
+			t.Errorf("%+v: unexpected match error: %v", c.c, err)
+			continue
+		}
 		if strings.Join(got, "|") != strings.Join(c.want, "|") {
 			t.Errorf("%+v: %q, want %q", c.c, got, c.want)
 		}
 	}
-	if got := (Condition{Op: OpNonempty}).Match([]byte("not json"), 5); got != nil {
-		t.Errorf("text matched: %q", got)
+	if _, err := (Condition{Op: OpNonempty}).Match([]byte("not json"), 5); err == nil || err.Error() != "tool result is not valid JSON" {
+		t.Errorf("invalid JSON error = %v", err)
 	}
 	for _, bad := range []Condition{
 		{Path: "a", Op: "like"}, {Path: "a", Op: OpGt, Value: "many"}, {Path: "**", Op: OpNonempty}, {Path: "a..b", Op: OpNonempty},

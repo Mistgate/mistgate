@@ -268,6 +268,9 @@ func (e *env) createPlan(c *call, tool string, params []byte, reason string, pl 
 	now := e.now()
 	confirm := newConfirm()
 	needs := len(pl.Danger) > 0
+	if c.assistant != nil && c.assistant.FollowUp && needs {
+		return nil, errors.New("this plan needs owner approval; tell the person to request it in a live turn")
+	}
 	status := StatusPlanned
 	if needs {
 		status = StatusAwaiting
@@ -291,6 +294,23 @@ func (e *env) createPlan(c *call, tool string, params []byte, reason string, pl 
 		NeedsApproval: needs, Reason: reason, InnerRef: pl.InnerRef, Status: status,
 		CreatedAt: now, ExpiresAt: now.Add(planTTL),
 	}
+	out := &PlanOut{
+		PlanID: p.ID, Summary: pl.Summary, Facts: facts, NeedsApproval: needs, Danger: pl.Danger,
+		ExpiresInS: int(planTTL / time.Second), ConfirmToken: confirm,
+	}
+	if needs {
+		out.Next = fmt.Sprintf("Waiting for the owner to approve plan %s in the admin panel (Integrations, Waiting for you). Tell the user. "+
+			"Do not poll more than once every 30 seconds; call %s_apply with the confirm_token after the owner approved.", p.ID, tool)
+	} else {
+		out.Next = "Show the plan to the user and, once they agree, call " + tool + "_apply with the confirm_token."
+	}
+	encodedOut, err := json.Marshal(out)
+	if err != nil {
+		return nil, errors.New("internal error")
+	}
+	if len(encodedOut) > maxResultBytes {
+		return nil, errors.New("approval details are too large to show whole; shorten the change before planning")
+	}
 	if err := e.cfg.Plans.CreateMCPPlan(c.ctx, p, maxOpenPerToken, maxAwaiting); err != nil {
 		if errors.Is(err, ErrTooManyPlans) {
 			return nil, errors.New("too many open plans: apply or let the old ones expire first")
@@ -303,16 +323,6 @@ func (e *env) createPlan(c *call, tool string, params []byte, reason string, pl 
 		auditParams["params"] = pl.AuditParams
 	}
 	e.audit(c, "mcp_plan", auditParams, "ok")
-	out := &PlanOut{
-		PlanID: p.ID, Summary: pl.Summary, Facts: facts, NeedsApproval: needs, Danger: pl.Danger,
-		ExpiresInS: int(planTTL / time.Second), ConfirmToken: confirm,
-	}
-	if needs {
-		out.Next = fmt.Sprintf("Waiting for the owner to approve plan %s in the admin panel (Integrations, Waiting for you). Tell the user. "+
-			"Do not poll more than once every 30 seconds; call %s_apply with the confirm_token after the owner approved.", p.ID, tool)
-	} else {
-		out.Next = "Show the plan to the user and, once they agree, call " + tool + "_apply with the confirm_token."
-	}
 	return out, nil
 }
 

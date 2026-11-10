@@ -507,6 +507,9 @@ func (n *nodesArg) word() string {
 }
 
 func checkName(s string) error {
+	if uuidShape.MatchString(s) {
+		return errors.New("name looks like a credential id")
+	}
 	if clean(s, 1000) != strings.TrimSpace(s) || s == "" || len([]rune(s)) > 64 {
 		return errors.New("name: 1 to 64 characters, no control characters")
 	}
@@ -534,8 +537,10 @@ type userCreateArgs struct {
 
 var userCreate = changeSpec[userCreateArgs]{
 	name: "user_create", min: ProfileOperator,
-	procs: procs(adminv1connect.UserServiceListUsersProcedure, adminv1connect.UserServiceCreateUserProcedure),
-	desc:  "Create a user. The subscription link is never shown to agents: the owner copies it in the admin panel.",
+	procs: procs(adminv1connect.UserServiceListUsersProcedure, adminv1connect.UserServiceCreateUserProcedure,
+		adminv1connect.GroupServiceListGroupsProcedure, adminv1connect.DnsServiceListDnsPresetsProcedure,
+		adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure),
+	desc: "Create a user. The subscription link is never shown to agents: the owner copies it in the admin panel.",
 	plan: func(c *call, a userCreateArgs) (*planned, error) {
 		if err := checkName(a.Name); err != nil {
 			return nil, err
@@ -549,6 +554,10 @@ var userCreate = changeSpec[userCreateArgs]{
 		if err := validID("group_id", a.GroupID); err != nil {
 			return nil, err
 		}
+		group, err := c.groupByID(a.GroupID)
+		if err != nil {
+			return nil, err
+		}
 		if a.DNSPresetID != "" {
 			if err := validID("dns_preset_id", a.DNSPresetID); err != nil {
 				return nil, err
@@ -560,6 +569,42 @@ var userCreate = changeSpec[userCreateArgs]{
 		}
 		if err := a.Nodes.check(); err != nil {
 			return nil, err
+		}
+		dnsPresetID := a.DNSPresetID
+		dnsSource := "user override"
+		if dnsPresetID == "" {
+			dnsPresetID = group.GetDnsPresetId()
+			dnsSource = "group default"
+		}
+		if dnsPresetID == "" {
+			settings, err := c.subscriptionSnapshot()
+			if err != nil {
+				return nil, err
+			}
+			dnsPresetID = settings.settings.GetDefaultDnsPresetId()
+			dnsSource = "instance default"
+		}
+		dnsPresetName := ""
+		if dnsPresetID != "" {
+			preset, err := c.dnsPreset(dnsPresetID)
+			if err != nil {
+				return nil, err
+			}
+			dnsPresetName = preset.GetName()
+		} else {
+			presets, err := c.cl.DNS.ListDnsPresets(c.ctx, connect.NewRequest(&adminv1.ListDnsPresetsRequest{}))
+			if err != nil {
+				return nil, apiError(err)
+			}
+			for _, preset := range presets.Msg.GetPresets() {
+				if preset.GetIsDefault() {
+					dnsPresetName = preset.GetName()
+					break
+				}
+			}
+			if dnsPresetName == "" {
+				dnsPresetName = "bundled default"
+			}
 		}
 		r, err := c.cl.User.ListUsers(c.ctx, connect.NewRequest(&adminv1.ListUsersRequest{Query: a.Name, PageSize: maxUsersPage}))
 		if err != nil {
@@ -579,8 +624,16 @@ var userCreate = changeSpec[userCreateArgs]{
 			term = plural(int(a.TermDays), "day", "days")
 		}
 		summary := fmt.Sprintf("Create one user with a %s quota (reset: %s), term: %s, on %s.", fmtBytes(a.QuotaBytes), reset, term, a.Nodes.text())
+		deviceLimit := a.DeviceLimit
+		deviceLimitLabel := strconv.FormatUint(uint64(deviceLimit), 10)
+		if deviceLimit == 0 {
+			deviceLimitLabel = "5 (panel default)"
+		}
 		facts := []Fact{
 			{Key: "name", Value: nm(a.Name), Untrusted: true},
+			{Key: "group", Value: nm(group.GetName()), Untrusted: true},
+			{Key: "device_limit", Value: deviceLimitLabel},
+			{Key: "dns_preset", Value: nm(dnsPresetName) + " (" + dnsSource + ")", Untrusted: true},
 			quotaFact(a.QuotaBytes, reset),
 			termFact(a.TermDays),
 			appsFact(a.Apps, apps),
@@ -785,15 +838,13 @@ func usersPlan(enable bool) func(c *call, a usersArgs) (*planned, error) {
 		if err != nil {
 			return nil, err
 		}
-		var names []string
+		var facts []Fact
 		for _, id := range ids {
 			r, err := c.getUser(id)
 			if err != nil {
 				return nil, err
 			}
-			if len(names) < 10 {
-				names = append(names, nm(r.GetUser().GetName()))
-			}
+			facts = append(facts, Fact{Key: "users", Value: nm(r.GetUser().GetName()), Untrusted: true})
 		}
 		verb, effect, code := "Disable", "their connections end and their devices are dropped from the nodes", "disable"
 		var danger []string
@@ -802,17 +853,12 @@ func usersPlan(enable bool) func(c *call, a usersArgs) (*planned, error) {
 		} else if len(ids) > MaxUnattendedBulk {
 			danger = []string{dangerBulk}
 		}
-		list := strings.Join(names, ", ")
-		if len(ids) > len(names) {
-			list += fmt.Sprintf(" and %d more", len(ids)-len(names))
-		}
 		return &planned{
 			Summary: verb + " " + plural(len(ids), "user", "users") + ": " + effect + ".",
-			Facts: []Fact{
+			Facts: append([]Fact{
 				{Key: "count", Value: strconv.Itoa(len(ids))},
-				{Key: "users", Value: list, Untrusted: true},
 				codedFact("effect", effect, code),
-			},
+			}, facts...),
 			Danger: danger, Params: usersArgs{UserIDs: ids},
 		}, nil
 	}
@@ -859,7 +905,7 @@ var userResetTraffic = changeSpec[usersArgs]{
 		if err != nil {
 			return nil, err
 		}
-		var list []string
+		var facts []Fact
 		var used uint64
 		for _, id := range ids {
 			r, err := c.getUser(id)
@@ -867,26 +913,19 @@ var userResetTraffic = changeSpec[usersArgs]{
 				return nil, err
 			}
 			used += r.GetUser().GetUsedBytes()
-			if len(list) < 10 {
-				list = append(list, nm(r.GetUser().GetName()))
-			}
+			facts = append(facts, Fact{Key: "users", Value: nm(r.GetUser().GetName()), Untrusted: true})
 		}
 		var danger []string
 		if len(ids) > MaxUnattendedBulk {
 			danger = []string{dangerBulk}
 		}
-		names := strings.Join(list, ", ")
-		if len(ids) > len(list) {
-			names += fmt.Sprintf(" and %d more", len(ids)-len(list))
-		}
 		return &planned{
 			Summary: "Reset the traffic counter of " + plural(len(ids), "user", "users") + " to zero.",
-			Facts: []Fact{
+			Facts: append([]Fact{
 				{Key: "count", Value: strconv.Itoa(len(ids))},
-				{Key: "users", Value: names, Untrusted: true},
 				codedFact("used", fmtBytes(used)+" in all", "bytes", "bytes", strconv.FormatUint(used, 10)),
 				codedFact("effect", "the used traffic of the current period becomes 0; a user stopped by the quota can connect again", "traffic_reset"),
-			},
+			}, facts...),
 			Danger: danger, Params: usersArgs{UserIDs: ids},
 		}, nil
 	},

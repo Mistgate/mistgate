@@ -34,14 +34,15 @@ const instructions = "Tools of a VPN panel. Reads return structured JSON. A chan
 // The minimum profile is derived from the procedures (a test compares it with the role policy), so a tool cannot claim to
 // be safer than what it calls.
 type toolDef struct {
-	name   string
-	min    Profile  // the lowest profile that sees the tool
-	procs  []string // the panel procedures it calls, "/mistgate.admin.v1.X/Y"
-	free   bool     // returns text from data: carries untrustedNotice
-	isPlan bool     // a <tool>_plan: carries planNotice
-	danger bool     // the change may need the owner's approval
-	desc   string
-	add    func(s *mcp.Server, e *env, desc string)
+	name     string
+	min      Profile  // the lowest profile that sees the tool
+	procs    []string // the panel procedures it calls, "/mistgate.admin.v1.X/Y"
+	free     bool     // returns text from data: carries untrustedNotice
+	readOnly bool     // Follow-up sessions may include this tool because it has no side effects.
+	isPlan   bool     // a <tool>_plan: carries planNotice
+	danger   bool     // the change may need the owner's approval
+	desc     string
+	add      func(s *mcp.Server, e *env, desc string)
 }
 
 func (t toolDef) description() string {
@@ -174,17 +175,24 @@ func result(v any) (*mcp.CallToolResult, any, error) {
 	}
 }
 
-// planResult is result for a plan: the confirm token is the one secret the agent is meant to get, so it travels around the
-// scrubber and is put back afterwards.
+// planResult is result for a plan: it inserts the confirm token into its named field after all other strings are scrubbed.
 func planResult(p *PlanOut) (*mcp.CallToolResult, any, error) {
-	const placeholder = "@@confirm@@"
 	token := p.ConfirmToken
-	p.ConfirmToken = placeholder
+	p.ConfirmToken = ""
 	res, _, err := result(p)
 	p.ConfirmToken = token
 	if err == nil {
 		tc := res.Content[0].(*mcp.TextContent)
-		tc.Text = strings.Replace(tc.Text, placeholder, token, 1)
+		var clean PlanOut
+		if err := json.Unmarshal([]byte(tc.Text), &clean); err != nil {
+			return nil, nil, errors.New("internal error")
+		}
+		clean.ConfirmToken = token
+		b, err := marshal(clean)
+		if err != nil {
+			return nil, nil, errors.New("internal error")
+		}
+		tc.Text = string(b)
 	}
 	return res, nil, err
 }
@@ -208,7 +216,7 @@ func readTool[In any](name string, min Profile, procs []string, desc string, h f
 // readToolWithin is readTool for a read that waits for the nodes longer than a stored read does (a check).
 func readToolWithin[In any](timeout time.Duration, name string, min Profile, procs []string, desc string, h func(c *call, in In) (any, error)) toolDef {
 	return toolDef{
-		name: name, min: min, procs: procs, free: true, desc: desc,
+		name: name, min: min, procs: procs, free: true, readOnly: true, desc: desc,
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{
 				Name: name, Description: desc,

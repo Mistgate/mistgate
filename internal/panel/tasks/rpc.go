@@ -407,7 +407,7 @@ func (r rpc) CreateTask(ctx context.Context, req *connect.Request[tasksv1.Create
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("owner required"))
 	}
 	now := s.now()
-	t, err := s.row(ctx, store.ScheduledTask{ID: store.NewID("tsk_"), CreatedBy: ownerID, CreatedAt: now, UpdatedAt: now}, d)
+	t, err := s.row(ctx, store.ScheduledTask{ID: store.NewID("tsk_"), CreatedBy: ownerID, CreatedAt: now, UpdatedAt: now, Version: 1}, d)
 	if err != nil {
 		return nil, s.internal("encode task", err)
 	}
@@ -466,6 +466,9 @@ func (r rpc) UpdateTask(ctx context.Context, req *connect.Request[tasksv1.Update
 	if err != nil {
 		return nil, err
 	}
+	if expected := req.Msg.GetExpectedVersion(); expected != 0 && expected != uint64(t.Version) {
+		return nil, coded(connect.CodeAborted, "task_changed")
+	}
 	d, err := validate(req.Msg.Task, s.toolsFor(ctx))
 	if err != nil {
 		return nil, err
@@ -479,6 +482,8 @@ func (r rpc) UpdateTask(ctx context.Context, req *connect.Request[tasksv1.Update
 	}
 	if err := s.cfg.Store.UpdateScheduledTask(ctx, t); errors.Is(err, store.ErrNotFound) {
 		return nil, coded(connect.CodeNotFound, "task_not_found")
+	} else if errors.Is(err, store.ErrConflict) {
+		return nil, coded(connect.CodeAborted, "task_changed")
 	} else if err != nil {
 		return nil, s.internal("update task", err)
 	}

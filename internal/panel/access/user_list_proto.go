@@ -48,6 +48,16 @@ func encodeUserListPageToken(name string, descending bool) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(userListPageTokenPrefix + direction + name))
 }
 
+// ValidUserListPageToken accepts only cursors emitted by the current user-list encoding.
+func ValidUserListPageToken(token string) bool {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return false
+	}
+	rest := strings.TrimPrefix(string(raw), userListPageTokenPrefix)
+	return strings.HasPrefix(string(raw), userListPageTokenPrefix) && len(rest) > 1 && (rest[0] == 'a' || rest[0] == 'd')
+}
+
 func decodeUserListPageToken(token string, descending bool) (string, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {

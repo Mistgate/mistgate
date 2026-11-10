@@ -187,7 +187,11 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 			facts = append(facts, safeTextChange("provider", node.GetProvider(), *a.Provider))
 		}
 		if a.Notes != nil && *a.Notes != r.Msg.GetNotes() {
-			facts = append(facts, safeTextChange("notes", r.Msg.GetNotes(), *a.Notes))
+			changeFacts, err := approvalTextChangeFacts("notes", r.Msg.GetNotes(), *a.Notes)
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, changeFacts...)
 		}
 		for _, item := range changed {
 			var inName, profile string

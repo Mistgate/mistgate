@@ -13,6 +13,7 @@ type assistantIdentity struct {
 	tokenID, profile, adminID, adminName string
 	// scheduled: a scheduled task of the admin (WithScheduledTask), not a turn the admin is having
 	scheduled bool
+	followUp  bool
 }
 
 type assistantIdentityKey struct{}
@@ -52,6 +53,20 @@ func WithScheduledTask(ctx context.Context, tokenID, adminID, adminName string) 
 	return store.WithAuditActor(ctx, adminID, scheduledActor(adminID, adminName))
 }
 
+// WithAssistantFollowUp marks an unattended assistant turn with a separate hidden token at the admin's current profile.
+// The MCP session independently limits its change tools to the operator profile.
+func WithAssistantFollowUp(ctx context.Context, tokenID, profile, adminID, adminName string) context.Context {
+	if tokenID == "" || adminID == "" {
+		return ctx
+	}
+	ctx = context.WithValue(ctx, assistantIdentityKey{}, assistantIdentity{
+		tokenID: tokenID, profile: profile, adminID: adminID, adminName: adminName, followUp: true,
+	})
+	ctx = WithChannel(ctx, ChannelMCP)
+	ctx = store.WithAuditSource(ctx, store.AuditAssistant)
+	return store.WithAuditActor(ctx, adminID, "Assistant follow-ups of "+adminName)
+}
+
 func scheduledActor(adminID, adminName string) string {
 	if adminName == "" {
 		return "Scheduled tasks of " + adminID
@@ -67,7 +82,8 @@ func assistantIdentityFrom(ctx context.Context) (assistantIdentity, bool) {
 func (s *Service) serveAssistant(w http.ResponseWriter, r *http.Request, next http.Handler, id assistantIdentity) {
 	tok, err := s.st.GetAssistantToken(r.Context(), id.tokenID)
 	// the scheduled identity and the assistant's are two rows: neither may stand in for the other
-	if err != nil || !tok.AssistantOnly || tok.CreatedBy != id.adminID || (tok.ID == store.ScheduledTokenID(id.adminID)) != id.scheduled {
+	if err != nil || !tok.AssistantOnly || tok.CreatedBy != id.adminID ||
+		(tok.ID == store.ScheduledTokenID(id.adminID)) != id.scheduled || (tok.ID == store.FollowUpTokenID(id.adminID)) != id.followUp {
 		writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
 		return
 	}
@@ -87,6 +103,20 @@ func (s *Service) serveAssistant(w http.ResponseWriter, r *http.Request, next ht
 			return
 		}
 		profile = store.ProfileOperator
+	} else if id.followUp {
+		profile = assistantFollowUpProfile(current.Role)
+		if profile == "" {
+			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
+			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
+			return
+		}
+		var enabled int
+		var audience int64
+		if err = s.st.R.QueryRowContext(r.Context(), `SELECT enabled,audience FROM assistant_settings WHERE id=1`).Scan(&enabled, &audience); err != nil || enabled == 0 || !assistantAudienceAllows(audience, current.Role) {
+			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
+			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
+			return
+		}
 	} else {
 		if profile == "" {
 			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
@@ -161,6 +191,19 @@ func assistantProfile(role string) string {
 		return store.ProfileOperator
 	case store.RoleReadonly:
 		return store.ProfileReadonly
+	default:
+		return ""
+	}
+}
+
+func assistantFollowUpProfile(role string) string {
+	switch assistantProfile(role) {
+	case store.ProfileReadonly:
+		return store.ProfileReadonly
+	case store.ProfileOperator:
+		return store.ProfileOperator
+	case store.ProfileAdmin:
+		return store.ProfileAdmin
 	default:
 		return ""
 	}

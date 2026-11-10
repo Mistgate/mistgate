@@ -230,6 +230,8 @@ message CreateTaskResponse {
 message UpdateTaskRequest {
   string id = 1;
   TaskInput task = 2;
+  // A zero value keeps the update behavior used by older clients.
+  uint64 expected_version = 3;
 }
 
 message UpdateTaskResponse {

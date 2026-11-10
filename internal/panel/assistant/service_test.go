@@ -166,6 +166,9 @@ func (s *fakeAssistantSession) CallTool(ctx context.Context, name string, _ json
 		body, _ := json.Marshal(mcp.PlanOut{PlanID: "plan_assistant_test", Summary: "Remove the selected user", NeedsApproval: true, ExpiresInS: 300, ConfirmToken: assistantTestConfirm})
 		return mcp.AssistantToolResult{Text: string(body)}, nil
 	}
+	if name == "remove_user_apply" {
+		return mcp.AssistantToolResult{Text: `{"status":"applied","result":"User removed."}`}, nil
+	}
 	return mcp.AssistantToolResult{Text: "unexpected tool"}, nil
 }
 
@@ -286,6 +289,9 @@ func (a assistantTestMCPAuth) WithApprovedStepUp(ctx context.Context, planID str
 }
 
 func (assistantTestMCPAuth) WithAssistant(ctx context.Context, identity mcp.AssistantIdentity) context.Context {
+	if identity.FollowUp {
+		return auth.WithAssistantFollowUp(ctx, identity.TokenID, identity.Profile, identity.AdminID, identity.AdminName)
+	}
 	return auth.WithAssistant(ctx, identity.TokenID, identity.Profile, identity.AdminID, identity.AdminName)
 }
 
@@ -482,7 +488,7 @@ func TestAssistantChatRedactsUserCredentialsBeforeHistoryAndStorage(t *testing.T
 				t.Fatalf("provider history contains the password: %s", got)
 			}
 			if strings.Contains(got, "SSH password: [removed: looks like a password]") {
-				if !strings.Contains(got, "The word password is harmless") || !strings.Contains(got, "550e8400-e29b-41d4-a716-446655440000") || !strings.Contains(got, "node de1") {
+				if !strings.Contains(got, "The word password is harmless") || !strings.Contains(got, "https://example.com/[uuid]") || strings.Contains(got, "550e8400-e29b-41d4-a716-446655440000") || !strings.Contains(got, "node de1") {
 					t.Fatalf("ordinary text was changed in provider history: %s", got)
 				}
 				historyFound = true
@@ -503,7 +509,7 @@ func TestAssistantChatRedactsUserCredentialsBeforeHistoryAndStorage(t *testing.T
 		if strings.Contains(message.GetText(), "test-only-password") || !strings.Contains(message.GetText(), "[removed: looks like a password]") {
 			t.Fatalf("stored user message = %q", message.GetText())
 		}
-		if !strings.Contains(message.GetText(), "The word password is harmless") || !strings.Contains(message.GetText(), "550e8400-e29b-41d4-a716-446655440000") || !strings.Contains(message.GetText(), "node de1") {
+		if !strings.Contains(message.GetText(), "The word password is harmless") || !strings.Contains(message.GetText(), "https://example.com/[uuid]") || strings.Contains(message.GetText(), "550e8400-e29b-41d4-a716-446655440000") || !strings.Contains(message.GetText(), "node de1") {
 			t.Fatalf("ordinary text was changed in stored message: %q", message.GetText())
 		}
 		return
@@ -848,12 +854,37 @@ func TestAssistantPlanHumanActionsRequireOwnerAndRespectInbox(t *testing.T) {
 		if err != nil || resp.Msg.Plan.State != adminv1.PlanState_PLAN_STATE_WAITING_OWNER {
 			t.Fatalf("helper action did not wait for owner: %+v %v", resp, err)
 		}
+		if _, err = f.st.DecideMCPPlan(context.Background(), "plan_assistant_test", f.admin.ID, true, time.Now()); err != nil {
+			t.Fatalf("owner approval: %v", err)
+		}
+		conversation, err := f.service.GetConversation(auth.WithAdmin(context.Background(), helper), connect.NewRequest(&adminv1.GetConversationRequest{Id: conversationID}))
+		var approvedCard *adminv1.PlanCard
+		if err == nil {
+			for _, message := range conversation.Msg.Messages {
+				for _, card := range message.Plans {
+					if card.PlanId == "plan_assistant_test" {
+						approvedCard = card
+					}
+				}
+			}
+		}
+		if err != nil || approvedCard == nil || approvedCard.State != adminv1.PlanState_PLAN_STATE_PROPOSED {
+			t.Fatalf("helper did not get an actionable card for the approved plan: %+v %v", conversation, err)
+		}
+		resp, err = f.service.ApplyPlan(auth.WithAdmin(context.Background(), helper), connect.NewRequest(&adminv1.ApplyPlanRequest{ConversationId: conversationID, PlanId: "plan_assistant_test"}))
+		if err != nil || resp.Msg.Plan.State != adminv1.PlanState_PLAN_STATE_APPLIED {
+			t.Fatalf("helper could not apply the owner's approved plan: %+v %v", resp, err)
+		}
 		f.runtime.mu.Lock()
 		defer f.runtime.mu.Unlock()
+		applied := false
 		for _, call := range f.runtime.calls {
-			if strings.HasSuffix(call, "_apply") {
-				t.Fatalf("helper applied an owner plan: %v", f.runtime.calls)
+			if call == "remove_user_apply" {
+				applied = true
 			}
+		}
+		if !applied {
+			t.Fatalf("approved helper plan did not call _apply: %v", f.runtime.calls)
 		}
 	})
 
@@ -1005,8 +1036,9 @@ func TestAssistantBudgetReservationsAreAtomicAndReconciled(t *testing.T) {
 	for range 8 {
 		go func() {
 			id := store.NewID("asres_test_")
+			now := time.Now()
 			<-start
-			ok, err := f.st.ReserveAssistantBudget(ctx, id, month, f.admin.ID, int32(provider), "deepseek-flash", estimate, budget, time.Now())
+			ok, err := f.st.ReserveAssistantBudget(ctx, id, month, f.admin.ID, int32(provider), "deepseek-flash", estimate, budget, now, now.Add(-providerTimeout-30*time.Second))
 			outcomes <- outcome{id: id, ok: ok, err: err}
 		}()
 	}
@@ -1045,6 +1077,78 @@ func TestAssistantBudgetReservationsAreAtomicAndReconciled(t *testing.T) {
 	}
 	if input != 12 || output != 5 || turns != 1 || math.Abs(actual-.007) > 1e-9 {
 		t.Fatalf("usage reconciliation wrote input=%d output=%d turns=%d usd=%v", input, output, turns, actual)
+	}
+}
+
+func TestStaleAssistantBudgetReservationsAreReleasedAtStartupAndRetention(t *testing.T) {
+	f := newAssistantFixture(t)
+	ctx := context.Background()
+	provider := adminv1.AssistantProvider_ASSISTANT_PROVIDER_ANTHROPIC
+	now := time.Now().UTC()
+	month := monthKey(now)
+	if _, err := f.st.W.ExecContext(ctx, `INSERT INTO assistant_budget_reservation(id,month,admin_id,provider,model,estimate_usd,state,created_at) VALUES(?,?,?,?,?,?,'reserved',?)`,
+		"asres_old_guard", month, f.admin.ID, int32(provider), "m", 0.6, now.Add(-48*time.Hour).Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := f.st.ReserveAssistantBudget(ctx, "asres_live_guard", month, f.admin.ID, int32(provider), "m", 0.5, 0.7, now, now.Add(-providerTimeout-30*time.Second)); err != nil || !ok {
+		t.Fatalf("budget guard counted an abandoned reservation: accepted=%v err=%v", ok, err)
+	}
+	before, err := f.service.providerSpend(ctx, provider, month)
+	if err != nil || before < 0.49 || before > 0.51 {
+		t.Fatalf("live reservation spend = %.2f, error %v", before, err)
+	}
+	oldStart := now.Add(-48 * time.Hour)
+	if ok, err := f.st.ReserveAssistantBudget(ctx, "asres_old_start", month, f.admin.ID, int32(provider), "m", 0.5, 1e9, oldStart, oldStart.Add(-providerTimeout-30*time.Second)); err != nil || !ok {
+		t.Fatalf("reserve stale row: %v %v", ok, err)
+	}
+	started := New(Config{Store: f.st, Vault: f.vault, Now: func() time.Time { return now }})
+	afterStart, err := started.providerSpend(ctx, provider, month)
+	if err != nil || afterStart-before > 0.001 {
+		t.Fatalf("startup retained an abandoned reservation: before %.2f after %.2f err %v", before, afterStart, err)
+	}
+	oldSweep := now.Add(-48 * time.Hour)
+	if ok, err := f.st.ReserveAssistantBudget(ctx, "asres_old_sweep", month, f.admin.ID, int32(provider), "m", 0.4, 1e9, oldSweep, oldSweep.Add(-providerTimeout-30*time.Second)); err != nil || !ok {
+		t.Fatalf("reserve second stale row: %v %v", ok, err)
+	}
+	if ok, err := f.st.ReserveAssistantBudget(ctx, "asres_live_sweep", month, f.admin.ID, int32(provider), "m", 0.2, 1e9, now, now.Add(-providerTimeout-30*time.Second)); err != nil || !ok {
+		t.Fatalf("reserve live row: %v %v", ok, err)
+	}
+	if err := started.Retention(ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	afterSweep, err := started.providerSpend(ctx, provider, month)
+	if err != nil || afterSweep-afterStart < 0.19 || afterSweep-afterStart > 0.21 {
+		t.Fatalf("periodic cleanup did not retain only the live reservation: before %.2f after %.2f err %v", afterStart, afterSweep, err)
+	}
+}
+
+func TestLateAssistantUsageIsRecordedAfterReservationCleanup(t *testing.T) {
+	f := newAssistantFixture(t)
+	ctx := context.Background()
+	provider := adminv1.AssistantProvider_ASSISTANT_PROVIDER_ANTHROPIC
+	now := time.Now().UTC()
+	month := monthKey(now)
+	const reservationID = "asres_late_de1"
+	if accepted, err := f.st.ReserveAssistantBudget(ctx, reservationID, month, f.admin.ID, int32(provider), "claude-fixture", .5, 10, now, now.Add(-providerTimeout-30*time.Second)); err != nil || !accepted {
+		t.Fatalf("reservation accepted=%v err=%v", accepted, err)
+	}
+	deleted, err := f.st.DeleteStaleAssistantBudgetReservations(ctx, now.Add(time.Second), now.Add(time.Second))
+	if err != nil || deleted != 1 {
+		t.Fatalf("expired reservation cleanup deleted=%d err=%v", deleted, err)
+	}
+	if err = f.st.ReconcileAssistantBudget(ctx, reservationID, month, f.admin.ID, int32(provider), 21, 7, .004, true, now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.st.ReconcileAssistantBudget(ctx, reservationID, month, f.admin.ID, int32(provider), 21, 7, .004, true, now.Add(3*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var input, output, turns int64
+	var usd float64
+	if err = f.st.R.QueryRowContext(ctx, `SELECT input_tokens,output_tokens,turns,usd FROM assistant_usage WHERE month=? AND admin_id=? AND provider=?`, month, f.admin.ID, int32(provider)).Scan(&input, &output, &turns, &usd); err != nil {
+		t.Fatal(err)
+	}
+	if input != 21 || output != 7 || turns != 1 || math.Abs(usd-.004) > 1e-12 {
+		t.Fatalf("late provider usage = input %d output %d turns %d usd %v", input, output, turns, usd)
 	}
 }
 

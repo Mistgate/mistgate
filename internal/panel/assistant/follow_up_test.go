@@ -24,8 +24,13 @@ func followUpArgs(seconds int, note string) []byte {
 
 // setFollowUp calls the follow_up tool as the model would, in a conversation of the fixture's owner.
 func setFollowUp(t *testing.T, f *assistantFixture, conversationID string, raw []byte) toolExecution {
+	return setFollowUpWithPermission(t, f, conversationID, false, raw)
+}
+
+func setFollowUpWithPermission(t *testing.T, f *assistantFixture, conversationID string, notifyTelegram bool, raw []byte) toolExecution {
 	t.Helper()
-	return f.service.executeLocalTool(context.Background(), f.admin, conversationID, followUpTool, raw)
+	ctx := withFollowUpTelegramPermission(context.Background(), notifyTelegram)
+	return f.service.executeLocalTool(ctx, f.admin, conversationID, followUpTool, raw)
 }
 
 func onlyFollowUp(t *testing.T, f *assistantFixture, conversationID string) store.AssistantFollowUp {
@@ -187,8 +192,8 @@ func TestFollowUpContinuesTheConversationAsItsAdmin(t *testing.T) {
 	f.runtime.mu.Lock()
 	identities := append([]mcp.AssistantIdentity(nil), f.runtime.identities...)
 	f.runtime.mu.Unlock()
-	if len(identities) == 0 || identities[0].Scheduled || identities[0].AdminID != f.admin.ID || identities[0].Profile != store.ProfileAdmin {
-		t.Fatalf("the follow-up did not act as the conversation's admin: %+v", identities)
+	if len(identities) == 0 || identities[0].Scheduled || !identities[0].FollowUp || identities[0].AdminID != f.admin.ID || identities[0].Profile != store.ProfileAdmin {
+		t.Fatalf("the follow-up did not use its owner's read profile: %+v", identities)
 	}
 
 	access, err := f.client.GetAssistantAccess(ctx, connect.NewRequest(&adminv1.GetAssistantAccessRequest{}))
@@ -416,8 +421,8 @@ func TestFollowUpWaitsForABusyConversationAndResumes(t *testing.T) {
 	}
 }
 
-// With notify_telegram the follow-up's turn gives a verdict, and a problem goes to the admin's Telegram; without it the verdict
-// tool is not there and nothing is sent.
+// A follow-up can notify Telegram only when its person's message enabled that permission; without it the verdict tool is not
+// there and nothing is sent.
 func TestFollowUpTelegramOnProblem(t *testing.T) {
 	f := newAssistantFixture(t,
 		modelResponse{Tools: []modelToolCall{scriptedTool(followUpVerdictTool, "call_v", `{"problem":true,"summary":"de1 drops TLS from one network"}`)}},
@@ -433,7 +438,7 @@ func TestFollowUpTelegramOnProblem(t *testing.T) {
 		mu.Unlock()
 	})
 	conv, _ := f.service.createConversation(ctx, f.admin.ID, time.Now())
-	setFollowUp(t, f, conv, []byte(`{"in_seconds":60,"note":"read the capture","notify_telegram":true}`))
+	setFollowUpWithPermission(t, f, conv, true, followUpArgs(60, "read the capture"))
 	if out := f.service.RunFollowUp(ctx, onlyFollowUp(t, f, conv)); out.Status != "ran" {
 		t.Fatalf("%+v", out)
 	}
@@ -454,6 +459,95 @@ func TestFollowUpTelegramOnProblem(t *testing.T) {
 	}
 	if len(sent) != 1 {
 		t.Fatalf("sent %d messages", len(sent))
+	}
+}
+
+func TestFollowUpTelegramPermissionComesFromTheUserTurn(t *testing.T) {
+	for _, tc := range []struct {
+		message string
+		want    bool
+	}{
+		{"Notify me in Telegram if the capture shows errors.", true},
+		{"Ping my Telegram when it is done.", false},
+		{"Let me know via Telegram.", true},
+		{"Send a Telegram message when the update finishes.", false},
+		{"Check again in ten minutes, Telegram me if it fails.", false},
+		{"Send me a message via Telegram when the update finishes.", true},
+		{"Ping me on Telegram when node no.3 is back.", true},
+		{"Please message me on Telegram when the capture is ready.", true},
+		{"\u041f\u0440\u043e\u0432\u0435\u0440\u044c \u0447\u0435\u0440\u0435\u0437 10 \u043c\u0438\u043d\u0443\u0442 \u0438 \u043d\u0430\u043f\u0438\u0448\u0438 \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c.", true},
+		{"\u0421\u043e\u043e\u0431\u0449\u0438 \u0432 \u0422\u0435\u043b\u0435\u0433\u0440\u0430\u043c, \u0435\u0441\u043b\u0438 \u0443\u043f\u0430\u0434\u0451\u0442.", true},
+		{"\u041a\u0438\u043d\u044c \u043c\u043d\u0435 \u0432 \u0442\u0433, \u0435\u0441\u043b\u0438 \u0447\u0442\u043e.", true},
+		{"\u041d\u0430\u043f\u0438\u0448\u0438 \u043c\u043d\u0435 \u0432 Telegram \u043a\u043e\u0433\u0434\u0430 \u0437\u0430\u0445\u0432\u0430\u0442 \u0431\u0443\u0434\u0435\u0442 \u0433\u043e\u0442\u043e\u0432.", true},
+		{"\u0417\u0430\u0432\u0435\u0440\u0448\u0438 \u0438 \u0437\u0430\u0442\u0435\u043c \u0443\u0432\u0435\u0434\u043e\u043c\u0438 \u043c\u0435\u043d\u044f \u0432 Telegram.", true},
+		{"\u041d\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0439 \u043c\u043d\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u0432 Telegram.", false},
+		{"\u0420\u0430\u0441\u0441\u043a\u0430\u0436\u0438 \u043c\u043d\u0435, \u043f\u043e\u0447\u0435\u043c\u0443 \u043d\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e\u0442\u0441\u044f \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u0432 Telegram \u0443 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f.", false},
+		{"\u041d\u0430\u043f\u0438\u0448\u0438 \u043c\u043d\u0435, \u043a\u0430\u043a\u0438\u0435 \u0443\u0437\u043b\u044b \u043e\u0442\u0434\u0430\u044e\u0442 Telegram-\u043f\u0440\u043e\u043a\u0441\u0438.", false},
+		{"Tell me which nodes serve the Telegram proxy.", false},
+		{"Tell me why users cannot open Telegram on de1.", false},
+		{"Write me a summary of Telegram proxy usage.", false},
+		{"Run the capture and tell me here, not in Telegram.", false},
+		{"\u5b8c\u6210\u540e\u5728 Telegram \u4e0a\u901a\u77e5\u6211\u3002", true},
+		{"\u4e0d\u8981\u5728 Telegram \u4e0a\u901a\u77e5\u6211\u3002", false},
+		{"\u544a\u8bc9\u6211\u54ea\u4e9b\u8282\u70b9\u63d0\u4f9b Telegram \u4ee3\u7406\u3002", false},
+		{"Check the capture again and report here.", false},
+		{"I message my team on Telegram.", false},
+		{"Do not send me Telegram notifications.", false},
+		{"Review my Telegram notification settings.", false},
+	} {
+		if got := requestsFollowUpTelegram(tc.message); got != tc.want {
+			t.Errorf("requestsFollowUpTelegram(%q) = %v, want %v", tc.message, got, tc.want)
+		}
+	}
+	f := newAssistantFixture(t)
+	conv, err := f.service.createConversation(context.Background(), f.admin.ID, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	setFollowUp(t, f, conv, []byte(`{"in_seconds":60,"note":"read the capture","notify_telegram":true}`))
+	if onlyFollowUp(t, f, conv).NotifyTelegram {
+		t.Fatal("the model argument enabled Telegram without a user's request")
+	}
+	for _, test := range []struct {
+		name, message string
+		want          bool
+	}{
+		{name: "requested", message: "Please message me on Telegram when the capture is ready.", want: true},
+		{name: "not requested", message: "Check the capture again and report here."},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newAssistantFixture(t,
+				modelResponse{Tools: []modelToolCall{scriptedTool(followUpTool, "call_follow_up", `{"in_seconds":60,"note":"read the capture"}`)}},
+				modelResponse{Text: "I will check later."},
+			)
+			stream, err := f.client.Chat(context.Background(), connect.NewRequest(&adminv1.ChatRequest{Text: test.message}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			conversationID := drainChat(t, stream)[0].GetStarted().ConversationId
+			followUp := onlyFollowUp(t, f, conversationID)
+			if followUp.NotifyTelegram != test.want {
+				t.Fatalf("user message %q stored NotifyTelegram=%v, want %v", test.message, followUp.NotifyTelegram, test.want)
+			}
+			result := f.service.followUpTool(withFollowUpTelegramPermission(context.Background(), test.want), f.admin, conversationID, followUpArgs(60, "read the capture"))
+			var resultBody map[string]any
+			if result.output.err || json.Unmarshal([]byte(result.output.text), &resultBody) != nil || resultBody["notify_telegram"] != test.want {
+				t.Fatalf("follow_up result did not report notify_telegram=%v: %+v", test.want, result)
+			}
+		})
+	}
+}
+
+func TestUserRequestedFollowUpNotificationSurvivesStartup(t *testing.T) {
+	f := newAssistantFixture(t)
+	conversationID, err := f.service.createConversation(context.Background(), f.admin.ID, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	setFollowUpWithPermission(t, f, conversationID, true, followUpArgs(60, "read the capture"))
+	New(Config{Store: f.st, Vault: f.vault})
+	if !onlyFollowUp(t, f, conversationID).NotifyTelegram {
+		t.Fatal("startup cleared a notification permission recorded from the user's turn")
 	}
 }
 

@@ -254,6 +254,39 @@ func TestCheckToolsAreTheOperatorsReadAndRunTools(t *testing.T) {
 	}
 }
 
+func TestUpdateTaskComparesExpectedVersionAndKeepsLegacyZero(t *testing.T) {
+	f := newFixture(t)
+	r := rpc{f.svc}
+	created, err := r.CreateTask(f.as(f.owner), connect.NewRequest(&tasksv1.CreateTaskRequest{Task: checkInput("Morning check")}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.Msg.Task.GetId()
+	if created.Msg.Task.GetVersion() != 1 {
+		t.Fatalf("created task version = %d, want 1", created.Msg.Task.GetVersion())
+	}
+	updated, err := r.UpdateTask(f.as(f.owner), connect.NewRequest(&tasksv1.UpdateTaskRequest{
+		Id: id, ExpectedVersion: 1, Task: checkInput("Evening check"),
+	}))
+	if err != nil || updated.Msg.Task.GetVersion() != 2 || updated.Msg.Task.GetName() != "Evening check" {
+		t.Fatalf("matching version update = %+v, %v", updated, err)
+	}
+	_, err = r.UpdateTask(f.as(f.owner), connect.NewRequest(&tasksv1.UpdateTaskRequest{
+		Id: id, ExpectedVersion: 1, Task: checkInput("Stale check"),
+	}))
+	if code(err) != "task_changed" || connect.CodeOf(err) != connect.CodeAborted {
+		t.Fatalf("stale version error = %v, want task_changed / aborted", err)
+	}
+	stored, err := f.st.ScheduledTask(context.Background(), id)
+	if err != nil || stored.Name != "Evening check" || stored.Version != 2 {
+		t.Fatalf("stale update changed the task: %+v %v", stored, err)
+	}
+	legacy, err := r.UpdateTask(f.as(f.owner), connect.NewRequest(&tasksv1.UpdateTaskRequest{Id: id, Task: checkInput("Legacy update")}))
+	if err != nil || legacy.Msg.Task.GetName() != "Legacy update" || legacy.Msg.Task.GetVersion() != 3 {
+		t.Fatalf("zero-version legacy update = %+v, %v", legacy, err)
+	}
+}
+
 // Only the owner writes tasks, and every definition is checked: the schedule's minimum, the tools, their arguments, the
 // conditions, no secret; the prompt is sealed at rest.
 func TestCreateTaskChecksTheDefinition(t *testing.T) {
@@ -565,7 +598,7 @@ func TestSchedulerRetriesRecoveryUntilTheStoreWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := f.now()
-	if ok, err := f.st.ClaimScheduledTask(context.Background(), store.ScheduledTaskRun{ID: "run_recover", TaskID: resp.Msg.Task.Id, Trigger: "schedule", StartedAt: now},
+	if ok, err := f.st.ClaimScheduledTask(context.Background(), store.ScheduledTaskRun{ID: "run_recover", TaskID: resp.Msg.Task.Id, TaskVersion: int64(resp.Msg.Task.Version), Trigger: "schedule", StartedAt: now},
 		"lease_recover", now, now.Add(time.Hour), time.Time{}); err != nil || !ok {
 		t.Fatalf("claim stale run: %v %v", ok, err)
 	}
@@ -610,6 +643,39 @@ func TestSchedulerRetriesRecoveryUntilTheStoreWorks(t *testing.T) {
 	run, err := f.st.ScheduledTaskRun(context.Background(), "run_recover")
 	if err != nil || run.Status != "failed" || run.Reason != "interrupted" {
 		t.Fatalf("recovered run = %+v, %v", run, err)
+	}
+}
+
+func TestScheduledCheckInvalidJSONFailsTheStep(t *testing.T) {
+	f := newFixture(t)
+	f.rt.set("fleet_digest", `{"last_error":"invalid private key",`, false)
+	task := store.ScheduledTask{ID: "tsk_de1", Kind: "check", CreatedBy: f.owner.ID,
+		Steps: `[{"tool":"fleet_digest","args":{"hours":24},"conditions":[{"path":"last_error","op":"eq","value":"failed"}]}]`}
+	out := f.svc.runCheck(context.Background(), task)
+	if out.status != "failed" || out.reason != "tool_failed" || len(out.detail.Steps) != 1 {
+		t.Fatalf("invalid result outcome = %+v", out)
+	}
+	step := out.detail.Steps[0]
+	if step.OK || step.Error != "tool returned invalid JSON" {
+		t.Fatalf("invalid result step = %+v", step)
+	}
+}
+
+func TestScheduledCheckSkipsStoredTaskToolNames(t *testing.T) {
+	f := newFixture(t)
+	task := store.ScheduledTask{ID: "tsk_nl1", Kind: "check", CreatedBy: f.owner.ID,
+		Steps: `[{"tool":"task_run_now","args":{"task_id":"tsk_de1"}}]`}
+	out := f.svc.runCheck(context.Background(), task)
+	if out.status != "failed" || out.reason != "tool_failed" || len(out.detail.Steps) != 1 {
+		t.Fatalf("disallowed stored tool outcome = %+v", out)
+	}
+	f.rt.mu.Lock()
+	defer f.rt.mu.Unlock()
+	if len(f.rt.calls) != 0 {
+		t.Fatalf("disallowed stored tool was invoked: %v", f.rt.calls)
+	}
+	if out.detail.Steps[0].Error != "tool is no longer allowed for scheduled checks" {
+		t.Fatalf("disallowed tool reason = %+v", out.detail.Steps[0])
 	}
 }
 
@@ -683,7 +749,7 @@ func TestOneRunAtATimeAndRecovery(t *testing.T) {
 	}
 	id := resp.Msg.Task.Id
 	ctx := context.Background()
-	stale := store.ScheduledTaskRun{ID: "run_stale", TaskID: id, Trigger: "schedule", StartedAt: f.now()}
+	stale := store.ScheduledTaskRun{ID: "run_stale", TaskID: id, TaskVersion: int64(resp.Msg.Task.Version), Trigger: "schedule", StartedAt: f.now()}
 	if ok, err := f.st.ClaimScheduledTask(ctx, stale, "lease_stale", f.now(), f.now().Add(time.Hour), time.Time{}); err != nil || !ok {
 		t.Fatalf("claim: %v %v", ok, err)
 	}

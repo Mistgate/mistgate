@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -59,16 +60,170 @@ func FollowUpAAD(id string) string { return "assistant-follow-up:" + id }
 
 func newFollowUpID() string { return store.NewID("afu_") }
 
+type followUpTelegramPermissionKey struct{}
+
+func withFollowUpTelegramPermission(ctx context.Context, allowed bool) context.Context {
+	return context.WithValue(ctx, followUpTelegramPermissionKey{}, allowed)
+}
+
+func followUpTelegramPermission(ctx context.Context) bool {
+	allowed, _ := ctx.Value(followUpTelegramPermissionKey{}).(bool)
+	return allowed
+}
+
+// requestsFollowUpTelegram records only an explicit notification request from the person's own message.
+func requestsFollowUpTelegram(text string) bool {
+	for _, clause := range strings.FieldsFunc(text, func(r rune) bool { return strings.ContainsRune(".!?;,，。？！\r\n…", r) }) {
+		words := followUpWords(clause)
+		if followUpTelegramEnglishRequest(words) || followUpTelegramRussianRequest(words) || followUpTelegramChineseRequest(clause) {
+			return true
+		}
+	}
+	return false
+}
+
+func followUpWords(text string) []string {
+	return strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '\'' && r != '\u2019'
+	})
+}
+
+func followUpTelegramEnglishRequest(words []string) bool {
+	verbs := map[string]struct{}{"notify": {}, "ping": {}, "message": {}, "text": {}, "contact": {}, "send": {}, "write": {}, "tell": {}, "let": {}}
+	connectors := map[string]struct{}{"on": {}, "via": {}, "in": {}, "to": {}}
+	for i, word := range words {
+		if _, ok := verbs[word]; !ok || followUpTelegramEnglishNegated(words, i) {
+			continue
+		}
+		for recipient := i + 1; recipient < len(words) && recipient <= i+4; recipient++ {
+			if words[recipient] != "me" && words[recipient] != "us" {
+				continue
+			}
+			for connector := recipient + 1; connector < len(words) && connector <= recipient+3; connector++ {
+				if _, ok := connectors[words[connector]]; ok && connector+1 < len(words) && words[connector+1] == "telegram" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func followUpTelegramEnglishNegated(words []string, verb int) bool {
+	if verb == 0 {
+		return false
+	}
+	if words[verb-1] == "not" || words[verb-1] == "never" || words[verb-1] == "don't" || words[verb-1] == "dont" {
+		return true
+	}
+	return verb > 1 && words[verb-2] == "do" && words[verb-1] == "not"
+}
+
+func followUpTelegramRussianRequest(words []string) bool {
+	verbs := map[string]struct{}{
+		"напиши": {}, "напишите": {}, "пиши": {}, "пишите": {}, "сообщи": {}, "сообщите": {},
+		"отправь": {}, "отправьте": {}, "кинь": {}, "киньте": {}, "пришли": {}, "пришлите": {},
+		"уведоми": {}, "уведомь": {}, "напомни": {}, "пингани": {},
+	}
+	channels := map[string]struct{}{"telegram": {}, "телеграм": {}, "тг": {}}
+	for i, word := range words {
+		if _, ok := verbs[word]; !ok || i > 0 && (words[i-1] == "не" || words[i-1] == "никогда") {
+			continue
+		}
+		for prep := i + 1; prep+1 < len(words) && prep <= i+4; prep++ {
+			if words[prep] != "в" && words[prep] != "через" {
+				continue
+			}
+			if _, ok := channels[words[prep+1]]; !ok {
+				continue
+			}
+			between := words[i+1 : prep]
+			if len(between) > 0 && (between[0] == "мне" || between[0] == "нам") {
+				between = between[1:]
+				if len(between) <= 2 {
+					return true
+				}
+			} else if len(between) <= 1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func followUpTelegramChineseRequest(sentence string) bool {
+	lower := strings.ToLower(sentence)
+	channels := []string{"telegram", "\u7535\u62a5"}
+	verbs := []string{"\u901a\u77e5", "\u544a\u77e5", "\u63d0\u9192", "\u544a\u8bc9"}
+	for _, channel := range channels {
+		for search := 0; search < len(lower); {
+			relative := strings.Index(lower[search:], channel)
+			if relative < 0 {
+				break
+			}
+			channelAt := search + relative
+			channelEnd := channelAt + len(channel)
+			search = channelEnd
+			prefix := strings.TrimSpace(lower[:channelAt])
+			if !strings.HasSuffix(prefix, "\u5728") && !strings.HasSuffix(prefix, "\u901a\u8fc7") && !strings.HasSuffix(prefix, "\u7528") {
+				continue
+			}
+			afterChannel := strings.TrimLeftFunc(lower[channelEnd:], unicode.IsSpace)
+			if strings.HasPrefix(afterChannel, "\u4e0a") {
+				afterChannel = strings.TrimLeftFunc(strings.TrimPrefix(afterChannel, "\u4e0a"), unicode.IsSpace)
+			}
+			verbAt := -1
+			for _, verb := range verbs {
+				if strings.HasPrefix(afterChannel, verb) {
+					verbAt = channelEnd + len(lower[channelEnd:]) - len(afterChannel)
+					break
+				}
+			}
+			if verbAt < 0 {
+				continue
+			}
+			verbText := ""
+			for _, verb := range verbs {
+				if strings.HasPrefix(lower[verbAt:], verb) {
+					verbText = verb
+					break
+				}
+			}
+			if verbText == "" {
+				continue
+			}
+			afterVerb := strings.TrimLeftFunc(lower[verbAt+len(verbText):], unicode.IsSpace)
+			if !strings.HasPrefix(afterVerb, "\u6211") && !strings.HasPrefix(afterVerb, "\u6211\u4eec") {
+				continue
+			}
+			if followUpTelegramChineseNegated(lower, verbAt) {
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func followUpTelegramChineseNegated(text string, verb int) bool {
+	prefix := strings.TrimRightFunc(text[:verb], unicode.IsSpace)
+	for _, negative := range []string{"\u4e0d\u8981", "\u522b", "\u4e0d\u80fd", "\u4e0d"} {
+		if at := strings.LastIndex(prefix, negative); at >= 0 && len(prefix)-at <= 24 {
+			return true
+		}
+	}
+	return false
+}
 func followUpSchemas() []mcp.AssistantTool {
 	return []mcp.AssistantTool{
 		{
 			Name: followUpTool,
-			Description: "Come back to this conversation later by yourself. In in_seconds (30 to 86400, that is up to 24 hours) the panel starts a turn of this conversation with your note, even when the person has closed the panel; you then read the result with your tools and answer them. " +
+			Description: "Come back to this conversation later by yourself. In in_seconds (30 to 86400, that is up to 24 hours) the panel starts a turn of this conversation with your note, even when the person has closed the panel; you then read the result with your tools and answer them. The follow-up can read at the person's profile, but may prepare only operator-level changes that do not need owner approval. If a change needs owner-level access or owner approval, tell the person to ask for it in a live turn. " +
 				"Call it right after you start or prepare something that finishes later (a debug capture, a speed test, checks whose results come later, a rollout or a node update, a relay check), with in_seconds a little past its end. " +
 				"With plan_id (a plan you made in this conversation) the time counts from when the person applies that plan, and the follow-up goes if the plan is dismissed or expires. " +
 				"note says what to do then: what to read (tool, ids such as a capture or request id), when it ends, what to decide; at most 400 characters, never a secret. " +
-				"notify_telegram: also send the person a Telegram message when you then find a problem; only when they asked for that. At most 3 follow-ups wait in a conversation; the same note at the same time is not set twice.",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{"in_seconds":{"type":"integer"},"note":{"type":"string","maxLength":` + strconv.Itoa(followUpNoteRunes) + `},"plan_id":{"type":"string","maxLength":64},"notify_telegram":{"type":"boolean"}},"required":["in_seconds","note"],"additionalProperties":false}`),
+				"The result says notify_telegram true or false; tell the person whether a Telegram message will come. The panel enables it only when the person's own message explicitly asked for one, and you cannot set it yourself. At most 3 follow-ups wait in a conversation; the same note at the same time is not set twice.",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{"in_seconds":{"type":"integer"},"note":{"type":"string","maxLength":` + strconv.Itoa(followUpNoteRunes) + `},"plan_id":{"type":"string","maxLength":64}},"required":["in_seconds","note"],"additionalProperties":false}`),
 		},
 		{
 			Name:        followUpCancelTool,
@@ -80,7 +235,7 @@ func followUpSchemas() []mcp.AssistantTool {
 
 func followUpVerdictSchema() mcp.AssistantTool {
 	return mcp.AssistantTool{Name: followUpVerdictTool,
-		Description: "Your verdict on this follow-up, called once at the end: problem is true when the person should look at or act on something; summary is one line (at most 200 characters) saying what. A problem goes to their Telegram.",
+		Description: "Your verdict on this follow-up, called once at the end: problem is true when the person should look at or act on something; summary is one line (at most 200 characters) saying what. A problem goes to Telegram only when the person's own message asked for it.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"problem":{"type":"boolean"},"summary":{"type":"string","maxLength":300}},"required":["problem","summary"],"additionalProperties":false}`)}
 }
 
@@ -99,7 +254,7 @@ func recordVerdict(input []byte, into **scheduledVerdict) toolExecution {
 // followUpNote is added to the system prompt of a follow-up's turn.
 const followUpNote = `This turn is a follow-up you set earlier with follow_up: the panel started it by itself at the time you chose. The person may not be watching; they read your answer later, in this conversation.
 - Do what your note says now with your tools (read the result, check again), and answer with what you found as you would have if they had asked: a short lead, then the facts. Do not ask questions; decide from what the tools return, and say what you could not check.
-- You may prepare a plan when a change is clearly needed; the person applies it later on its card.
+- You may prepare an operator-level plan only when it does not need owner approval. If a change needs owner-level access or owner approval, tell the person to ask for it in a live turn.
 - If the job has not finished yet, call follow_up once more for a little later and say so in one line.`
 
 const followUpVerdictNote = `- End by calling follow_up_verdict once: problem=true when you found something the person should look at or act on, false when all is well; summary is one plain line of at most 200 characters (node, group or protocol names are fine), never a secret.`
@@ -196,10 +351,9 @@ func (s *Service) followUpContext(ctx context.Context, adminID, conversationID s
 func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversationID string, raw []byte) toolExecution {
 	fail := func(text string) toolExecution { return toolExecution{output: toolOutput{err: true, text: text}} }
 	var args struct {
-		InSeconds      int    `json:"in_seconds"`
-		Note           string `json:"note"`
-		PlanID         string `json:"plan_id"`
-		NotifyTelegram bool   `json:"notify_telegram"`
+		InSeconds int    `json:"in_seconds"`
+		Note      string `json:"note"`
+		PlanID    string `json:"plan_id"`
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return fail("invalid tool input JSON")
@@ -218,7 +372,7 @@ func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversat
 		return fail("you came back " + strconv.Itoa(chain) + " times in a row without the person writing: answer with what you have and let them ask again")
 	}
 	now := s.now()
-	f := store.AssistantFollowUp{ID: newFollowUpID(), ConversationID: conversationID, AdminID: admin.ID, NotifyTelegram: args.NotifyTelegram, CreatedAt: now}
+	f := store.AssistantFollowUp{ID: newFollowUpID(), ConversationID: conversationID, AdminID: admin.ID, NotifyTelegram: followUpTelegramPermission(ctx), CreatedAt: now}
 	if planID := strings.TrimSpace(args.PlanID); planID != "" {
 		var tool string
 		err := s.st.R.QueryRowContext(ctx, `SELECT tool FROM assistant_plan WHERE id=? AND conversation_id=? AND admin_id=?`, planID, conversationID, admin.ID).Scan(&tool)
@@ -246,7 +400,7 @@ func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversat
 	}
 	offset := s.panelOffset(ctx)
 	result := func(f store.AssistantFollowUp, already bool) toolExecution {
-		out := map[string]any{"set": true, "follow_up_id": f.ID, "note": note}
+		out := map[string]any{"set": true, "follow_up_id": f.ID, "note": note, "notify_telegram": f.NotifyTelegram}
 		if already {
 			out["already_set"] = true
 		}
@@ -499,7 +653,8 @@ func (s *Service) RunFollowUp(ctx context.Context, f store.AssistantFollowUp) Fo
 		system += "\n" + followUpVerdictNote
 	}
 	res, err := s.runTurn(ctx, admin, turnInput{conversationID: f.ConversationID, settings: settings, providers: providers, effort: settings.effort,
-		userText: note, modelText: followUpLine(f, note, now), followUp: mark, note: system, verdict: f.NotifyTelegram},
+		userText: note, modelText: followUpLine(f, note, now), followUp: mark, note: system, verdict: f.NotifyTelegram,
+		followUpTelegramPermission: f.NotifyTelegram},
 		func(*adminv1.ChatResponse) error { return nil })
 	var refused *turnRefusal
 	if errors.As(err, &refused) {

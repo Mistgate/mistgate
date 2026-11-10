@@ -156,6 +156,7 @@ export const en = {
   "task.sched.weeklyAt": "Weekly, {day} at {time}",
 
   "task.err.task_not_found": "The task is gone.",
+  "task.err.task_changed": "The task was changed while you were editing it. Open it again and repeat your changes.",
   "task.err.too_many_tasks": "The panel holds at most {max} tasks.",
   "task.err.invalid_name": "The name is 1 to 80 characters on one line.",
   "task.err.invalid_kind": "A task is a check or an assistant task, and keeps its kind.",
@@ -349,6 +350,7 @@ export const ru: Record<keyof typeof en, string> = {
   "task.sched.weeklyAt": "Каждую неделю, {day}, в {time}",
 
   "task.err.task_not_found": "Задачи больше нет.",
+  "task.err.task_changed": "Задачу изменили, пока ты её редактировал. Открой её заново и повтори правки.",
   "task.err.too_many_tasks": "В панели может быть не больше {max} задач.",
   "task.err.invalid_name": "Название — от 1 до 80 символов в одну строку.",
   "task.err.invalid_kind": "Задача — это проверка или задача ассистента, и вид у неё не меняется.",
@@ -542,6 +544,7 @@ export const zh: Record<keyof typeof en, string> = {
   "task.sched.weeklyAt": "每周{day} {time}",
 
   "task.err.task_not_found": "任务已不存在。",
+  "task.err.task_changed": "在你编辑期间，此任务已被更改。请重新打开并再次修改。",
   "task.err.too_many_tasks": "面板最多保存 {max} 个任务。",
   "task.err.invalid_name": "名称为一行，1 到 80 个字符。",
   "task.err.invalid_kind": "任务分为检查和助手任务，类型创建后不能更改。",
@@ -736,6 +739,7 @@ export const fa: Record<keyof typeof en, string> = {
   "task.sched.weeklyAt": "هر هفته، {day} ساعت {time}",
 
   "task.err.task_not_found": "این کار دیگر وجود ندارد.",
+  "task.err.task_changed": "این کار هنگام ویرایش تو تغییر کرد. دوباره بازش کن و تغییرها را تکرار کن.",
   "task.err.too_many_tasks": "پنل حداکثر {max} کار نگه می‌دارد.",
   "task.err.invalid_name": "نام ۱ تا ۸۰ نویسه در یک خط است.",
   "task.err.invalid_kind": "کار یا بررسی است یا کار دستیار، و نوعش عوض نمی‌شود.",
@@ -929,6 +933,7 @@ export const tr: Record<keyof typeof en, string> = {
   "task.sched.weeklyAt": "Her hafta, {day} {time}",
 
   "task.err.task_not_found": "Görev artık yok.",
+  "task.err.task_changed": "Görev sen düzenlerken değiştirildi. Yeniden aç ve değişikliklerini tekrarla.",
   "task.err.too_many_tasks": "Panel en fazla {max} görev tutar.",
   "task.err.invalid_name": "Ad tek satırda 1 ile 80 karakter arasıdır.",
   "task.err.invalid_kind": "Bir görev ya kontroldür ya asistan görevidir ve türü değişmez.",

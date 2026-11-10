@@ -40,7 +40,8 @@ func TestRedactUserMessage(t *testing.T) {
 	}
 
 	ordinary := "The word password is harmless; https://example.com/550e8400-e29b-41d4-a716-446655440000 is for node de1."
-	if got := redactUserMessage(ordinary); got != ordinary {
+	wantOrdinary := strings.Replace(ordinary, "550e8400-e29b-41d4-a716-446655440000", "[uuid]", 1)
+	if got := redactUserMessage(ordinary); got != wantOrdinary {
 		t.Errorf("ordinary text was changed: %q", got)
 	}
 }

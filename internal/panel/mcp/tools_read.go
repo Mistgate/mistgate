@@ -286,6 +286,9 @@ func readTools() []toolDef {
 				if len(in.Query) > 100 || len(in.PageToken) > 400 {
 					return nil, errors.New("query or page_token too long")
 				}
+				if in.PageToken != "" && !validCursor("next_page_token", in.PageToken) {
+					return nil, errors.New("page_token is invalid")
+				}
 				r, err := c.cl.User.ListUsers(c.ctx, connect.NewRequest(&adminv1.ListUsersRequest{
 					Filter: f, Query: in.Query, GroupId: in.GroupID, PageSize: uint32(size), PageToken: in.PageToken,
 				}))

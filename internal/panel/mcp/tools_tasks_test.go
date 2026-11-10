@@ -91,8 +91,16 @@ func (f *fakeTasks) CreateTask(_ context.Context, r *connect.Request[tasksv1.Cre
 func (f *fakeTasks) UpdateTask(_ context.Context, r *connect.Request[tasksv1.UpdateTaskRequest]) (*connect.Response[tasksv1.UpdateTaskResponse], error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	task, ok := f.tasks[r.Msg.Id]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("task_not_found"))
+	}
 	f.updated = append(f.updated, r.Msg)
-	return connect.NewResponse(&tasksv1.UpdateTaskResponse{Task: f.tasks[r.Msg.Id]}), nil
+	if expected := r.Msg.GetExpectedVersion(); expected != 0 && expected != task.GetVersion() {
+		return nil, connect.NewError(connect.CodeAborted, errors.New("task_changed"))
+	}
+	task.Version++
+	return connect.NewResponse(&tasksv1.UpdateTaskResponse{Task: task}), nil
 }
 
 func (f *fakeTasks) DeleteTask(_ context.Context, r *connect.Request[tasksv1.DeleteTaskRequest]) (*connect.Response[tasksv1.DeleteTaskResponse], error) {
@@ -193,7 +201,7 @@ func TestTaskCreatePlanWaitsForTheOwner(t *testing.T) {
 	for _, f := range p.Facts {
 		facts[f.Key] = f.Value
 	}
-	if facts["schedule"] != "daily 07:30" || !strings.Contains(facts["step"], "fleet_digest") || !strings.Contains(facts["step"], "totals.nodes_problem_now gt 0") || facts["telegram"] != "yes" {
+	if facts["schedule"] != "daily 07:30" || !strings.Contains(facts["step"], "fleet_digest") || !strings.Contains(facts["step condition"], "totals.nodes_problem_now gt 0") || facts["telegram"] != "yes" {
 		t.Fatalf("facts: %v", facts)
 	}
 	if out := applyError(t, s, "task_create", p.ConfirmToken); !strings.Contains(out, "waiting for the owner") || len(e.w.tasks.created) != 0 {
@@ -238,7 +246,7 @@ func TestTaskUpdateAndDeletePlans(t *testing.T) {
 		t.Fatalf("update: %+v", out)
 	}
 	up := e.w.tasks.updated[0]
-	if up.Id != "tsk_morning" || up.Task.Enabled || up.Task.Schedule.EveryMinutes != 30 || up.Task.Name != "Morning check" || len(up.Task.Steps) != 1 {
+	if up.Id != "tsk_morning" || up.ExpectedVersion != 1 || up.Task.Enabled || up.Task.Schedule.EveryMinutes != 30 || up.Task.Name != "Morning check" || len(up.Task.Steps) != 1 {
 		t.Fatalf("the update did not keep the other fields: %+v", up)
 	}
 	// changed in the panel after the plan: the apply refuses
@@ -247,8 +255,11 @@ func TestTaskUpdateAndDeletePlans(t *testing.T) {
 	e.w.tasks.mu.Lock()
 	e.w.tasks.tasks["tsk_morning"].Version++
 	e.w.tasks.mu.Unlock()
-	if out := applyError(t, s, "task_update", p.ConfirmToken); !strings.Contains(out, "changed since the plan") {
+	if out := applyError(t, s, "task_update", p.ConfirmToken); !strings.Contains(out, "task_changed") {
 		t.Fatalf("stale update: %s", out)
+	}
+	if got := e.w.tasks.updated[len(e.w.tasks.updated)-1].GetExpectedVersion(); got != 2 {
+		t.Fatalf("stale update sent expected_version=%d, want the plan's version 2", got)
 	}
 	mustFail(t, s, "task_update_plan", map[string]any{"task_id": "tsk_none", "name": "x"})
 

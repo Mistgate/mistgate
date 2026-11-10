@@ -334,11 +334,11 @@ func (c Condition) holds(v any) bool {
 }
 
 // Match evaluates the condition on a tool's result (JSON) and returns what matched, as "<path> = <value>" lines (at most limit).
-// A result that is not JSON matches nothing.
-func (c Condition) Match(result []byte, limit int) []string {
+// Invalid JSON is an error so a caller cannot mistake a failed tool result for a passing check.
+func (c Condition) Match(result []byte, limit int) ([]string, error) {
 	var doc any
 	if err := json.Unmarshal(result, &doc); err != nil {
-		return nil
+		return nil, errors.New("tool result is not valid JSON")
 	}
 	var out []string
 	for _, f := range values(doc, c.Path) {
@@ -350,7 +350,7 @@ func (c Condition) Match(result []byte, limit int) []string {
 			break
 		}
 	}
-	return out
+	return out, nil
 }
 
 func describe(f found) string {

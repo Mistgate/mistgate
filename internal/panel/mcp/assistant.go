@@ -13,11 +13,11 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// AssistantIdentity is minted by the signed-in AssistantService and is scoped to one MCP session. Scheduled marks the identity
-// of an admin's scheduled tasks (store.ScheduledTokenID, the operator profile), which runs without a person in the loop.
+// AssistantIdentity is minted by the signed-in AssistantService and is scoped to one MCP session. A follow-up keeps its
+// administrator's read profile while the session caps its change tools at the operator profile.
 type AssistantIdentity struct {
 	TokenID, Profile, AdminID, AdminName string
-	Scheduled                            bool
+	Scheduled, FollowUp                  bool
 }
 
 // AssistantTool is one role-filtered tool from the live MCP registry.
@@ -101,13 +101,14 @@ func (s *AssistantServer) OpenAssistant(ctx context.Context, identity AssistantI
 		_ = serverSession.Close()
 		return nil, errors.New("mcp assistant: could not connect tool client")
 	}
-	return &assistantSession{ctx: callCtx, client: clientSession, server: serverSession}, nil
+	return &assistantSession{ctx: callCtx, identity: identity, client: clientSession, server: serverSession}, nil
 }
 
 type assistantSession struct {
-	ctx    context.Context
-	client *sdk.ClientSession
-	server *sdk.ServerSession
+	ctx      context.Context
+	identity AssistantIdentity
+	client   *sdk.ClientSession
+	server   *sdk.ServerSession
 }
 
 func (s *assistantSession) ListTools(ctx context.Context) ([]AssistantTool, error) {
@@ -119,7 +120,7 @@ func (s *assistantSession) ListTools(ctx context.Context) ([]AssistantTool, erro
 			return nil, errors.New("could not list panel tools")
 		}
 		for _, tool := range page.Tools {
-			if strings.HasSuffix(tool.Name, "_apply") {
+			if strings.HasSuffix(tool.Name, "_apply") || !assistantAllowsTool(s.identity, tool.Name) {
 				continue
 			}
 			schema, err := json.Marshal(tool.InputSchema)
@@ -137,6 +138,9 @@ func (s *assistantSession) ListTools(ctx context.Context) ([]AssistantTool, erro
 }
 
 func (s *assistantSession) CallTool(ctx context.Context, name string, args json.RawMessage) (AssistantToolResult, error) {
+	if !assistantAllowsTool(s.identity, name) {
+		return AssistantToolResult{Text: "this tool is outside the follow-up profile; tell the person to ask for it in a live turn", IsError: true}, nil
+	}
 	var input any
 	if len(args) == 0 {
 		input = map[string]any{}
@@ -159,6 +163,23 @@ func (s *assistantSession) CallTool(ctx context.Context, name string, args json.
 		}
 	}
 	return AssistantToolResult{Text: strings.Join(parts, "\n"), IsError: result.IsError}, nil
+}
+
+func assistantAllowsTool(identity AssistantIdentity, name string) bool {
+	if !identity.FollowUp {
+		return true
+	}
+	for _, tool := range registry {
+		if tool.name != name {
+			continue
+		}
+		minimum := tool.min.rank()
+		if minimum > Profile(identity.Profile).rank() {
+			return false
+		}
+		return tool.readOnly || minimum <= ProfileOperator.rank()
+	}
+	return false
 }
 
 func (s *assistantSession) Close() error {

@@ -301,7 +301,7 @@ func (s *Service) currentPlanCard(ctx context.Context, id string) (*adminv1.Plan
 				card.State = adminv1.PlanState_PLAN_STATE_WAITING_OWNER
 			}
 		case plan.Status == store.PlanApproved:
-			card.State = adminv1.PlanState_PLAN_STATE_WAITING_OWNER
+			card.State = adminv1.PlanState_PLAN_STATE_PROPOSED
 		case plan.Status == store.PlanApplied:
 			card.State = adminv1.PlanState_PLAN_STATE_APPLIED
 			card.Result = plan.Result
@@ -429,6 +429,9 @@ func allWords(words []string, haystack string) bool {
 	return true
 }
 func (s *Service) Retention(ctx context.Context, now time.Time) error {
+	if _, err := s.st.DeleteStaleAssistantBudgetReservations(ctx, now.Add(-providerTimeout-30*time.Second), now); err != nil {
+		return err
+	}
 	return s.st.AssistantRetention(ctx, now)
 }
 

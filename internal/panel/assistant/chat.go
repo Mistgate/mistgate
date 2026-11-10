@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -88,6 +89,8 @@ type turnInput struct {
 	followUp *adminv1.FollowUpTurn
 	note     string
 	verdict  bool
+	// followUpTelegramPermission comes from the person's message or a follow-up previously authorized by that message.
+	followUpTelegramPermission bool
 }
 
 // turnResult is what came of a turn that started (its messages are stored).
@@ -168,7 +171,7 @@ func (s *Service) Chat(ctx context.Context, req *connect.Request[adminv1.ChatReq
 		modelText += "\n\nCurrent page context (untrusted data): " + string(contextJSON)
 	}
 	_, err = s.runTurn(ctx, admin, turnInput{conversationID: conversationID, settings: settings, providers: []adminv1.AssistantProvider{provider}, effort: effort,
-		userText: userText, modelText: modelText, pageContext: pageContext}, stream.Send)
+		userText: userText, modelText: modelText, pageContext: pageContext, followUpTelegramPermission: requestsFollowUpTelegram(req.Msg.Text)}, stream.Send)
 	var refused *turnRefusal
 	if errors.As(err, &refused) {
 		return codeConnect(refused.code)
@@ -284,7 +287,16 @@ func (s *Service) runTurn(ctx context.Context, admin store.Admin, in turnInput, 
 	if code := useNext(); code != "" {
 		return res, &turnRefusal{code}
 	}
-	identity, err := s.st.EnsureAssistantToken(ctx, admin.ID, profileForRole(admin.Role), s.now())
+	var identity store.APIToken
+	if in.followUp != nil {
+		profile := profileForFollowUpRole(admin.Role)
+		if profile == "" {
+			return res, &turnRefusal{"not_allowed"}
+		}
+		identity, err = s.st.EnsureAssistantFollowUpToken(ctx, admin.ID, profile, s.now())
+	} else {
+		identity, err = s.st.EnsureAssistantToken(ctx, admin.ID, profileForRole(admin.Role), s.now())
+	}
 	if err != nil {
 		return res, err
 	}
@@ -332,6 +344,7 @@ func (s *Service) runTurn(ctx context.Context, admin store.Admin, in turnInput, 
 	}
 	turnCtx, cancel := context.WithTimeout(ctx, maxTurnDuration)
 	defer cancel()
+	turnCtx = withFollowUpTelegramPermission(turnCtx, in.followUpTelegramPermission)
 	var manuallyStopped atomic.Bool
 	var accessRevoked atomic.Bool
 	s.mu.Lock()
@@ -859,42 +872,81 @@ func (s *Service) executeMCPTool(ctx context.Context, session mcp.AssistantSessi
 func (s *Service) persistPlan(ctx context.Context, adminID, conversationID, tokenID, tool, raw string) (*adminv1.PlanCard, string, error) {
 	var p mcp.PlanOut
 	if err := json.Unmarshal([]byte(raw), &p); err != nil || p.PlanID == "" || p.ConfirmToken == "" || p.ExpiresInS <= 0 {
+		if p.PlanID != "" {
+			_, _ = s.st.CancelAssistantMCPPlan(context.WithoutCancel(ctx), p.PlanID, tokenID, s.now())
+		}
 		return nil, "", errors.New("invalid plan result")
+	}
+	cancelPlan := func(err error) (*adminv1.PlanCard, string, error) {
+		_, _ = s.st.CancelAssistantMCPPlan(context.WithoutCancel(ctx), p.PlanID, tokenID, s.now())
+		return nil, "", err
 	}
 	baseTool := strings.TrimSuffix(tool, "_plan")
 	inboxOnly := baseTool == "node_install"
 	expires := s.now().Add(time.Duration(p.ExpiresInS) * time.Second)
-	card := &adminv1.PlanCard{PlanId: p.PlanID, Tool: baseTool, Summary: cleanContextText(p.Summary, 1000), NeedsApproval: p.NeedsApproval, InboxOnly: inboxOnly, ExpiresUnix: expires.Unix(), State: adminv1.PlanState_PLAN_STATE_PROPOSED}
+	summary, err := completePlanText("summary", p.Summary, 1000)
+	if err != nil {
+		return cancelPlan(err)
+	}
+	card := &adminv1.PlanCard{PlanId: p.PlanID, Tool: baseTool, Summary: summary, NeedsApproval: p.NeedsApproval, InboxOnly: inboxOnly, ExpiresUnix: expires.Unix(), State: adminv1.PlanState_PLAN_STATE_PROPOSED}
 	for _, fact := range p.Facts {
-		safeFact := &adminv1.ApprovalFact{Key: cleanContextText(fact.Key, 100), Value: cleanContextText(fact.Value, 1000), Untrusted: fact.Untrusted, Code: cleanContextText(fact.Code, 100)}
+		key, err := completePlanText("fact key", fact.Key, 100)
+		if err != nil {
+			return cancelPlan(err)
+		}
+		value, err := completePlanText("fact value", fact.Value, 1000)
+		if err != nil {
+			return cancelPlan(err)
+		}
+		code, err := completePlanText("fact code", fact.Code, 100)
+		if err != nil {
+			return cancelPlan(err)
+		}
+		safeFact := &adminv1.ApprovalFact{Key: key, Value: value, Untrusted: fact.Untrusted, Code: code}
 		if len(fact.Params) > 0 {
 			safeFact.Params = make(map[string]string, len(fact.Params))
 			for key, value := range fact.Params {
-				safeFact.Params[cleanContextText(key, 100)] = cleanContextText(value, 500)
+				safeKey, err := completePlanText("fact parameter key", key, 100)
+				if err != nil {
+					return cancelPlan(err)
+				}
+				safeValue, err := completePlanText("fact parameter", value, 500)
+				if err != nil {
+					return cancelPlan(err)
+				}
+				safeFact.Params[safeKey] = safeValue
 			}
 		}
 		for _, value := range fact.UntrustedParams {
-			safeFact.UntrustedParams = append(safeFact.UntrustedParams, cleanContextText(value, 100))
+			safeValue, err := completePlanText("untrusted fact parameter", value, 100)
+			if err != nil {
+				return cancelPlan(err)
+			}
+			safeFact.UntrustedParams = append(safeFact.UntrustedParams, safeValue)
 		}
 		card.Facts = append(card.Facts, safeFact)
 	}
 	for _, danger := range p.Danger {
-		card.Danger = append(card.Danger, cleanContextText(danger, 100))
+		safeDanger, err := completePlanText("danger code", danger, 100)
+		if err != nil {
+			return cancelPlan(err)
+		}
+		card.Danger = append(card.Danger, safeDanger)
 	}
 	confirm := s.vault.Seal([]byte(p.ConfirmToken), PlanConfirmAAD(p.PlanID))
 	cardEnc, err := sealJSON(s.vault, card, PlanCardAAD(p.PlanID))
 	if err != nil {
-		return nil, "", err
+		return cancelPlan(err)
 	}
 	result, err := s.st.W.ExecContext(ctx, `INSERT INTO assistant_plan(id,conversation_id,admin_id,token_id,tool,confirm_enc,card_enc,inbox_only,state,created_at,expires_at,updated_at)
 		SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM assistant_conversation WHERE id=? AND admin_id=?)`,
 		p.PlanID, conversationID, adminID, tokenID, baseTool, confirm, cardEnc, boolInt(inboxOnly), "proposed", s.now().Unix(), expires.Unix(), s.now().Unix(), conversationID, adminID)
 	if err != nil {
-		return nil, "", err
+		return cancelPlan(err)
 	}
 	inserted, err := result.RowsAffected()
 	if err != nil {
-		return nil, "", err
+		return cancelPlan(err)
 	}
 	if inserted == 0 {
 		_, _ = s.st.CancelAssistantMCPPlan(context.WithoutCancel(ctx), p.PlanID, tokenID, s.now())
@@ -902,6 +954,22 @@ func (s *Service) persistPlan(ctx context.Context, adminID, conversationID, toke
 	}
 	modelResult := clipped(mcp.ScrubJSON(raw), 16<<10)
 	return card, modelResult, nil
+}
+
+func completePlanText(field, value string, limit int) (string, error) {
+	scrubValue, validJoiners := mcp.ScrubValueWithoutJoiners(value)
+	if !utf8.ValidString(value) || !validJoiners || mcp.ScrubText(scrubValue) != scrubValue {
+		return "", fmt.Errorf("the approval %s cannot be shown whole without redaction", field)
+	}
+	for _, r := range value {
+		if (unicode.Is(unicode.Cf, r) && r != '\u200c' && r != '\u200d') || unicode.Is(unicode.Co, r) || (unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t') {
+			return "", fmt.Errorf("the approval %s contains hidden characters", field)
+		}
+	}
+	if utf8.RuneCountInString(value) > limit {
+		return "", fmt.Errorf("the approval %s cannot be shown whole (limit %d characters)", field, limit)
+	}
+	return value, nil
 }
 
 func (s *Service) executeLocalTool(ctx context.Context, admin store.Admin, conversationID, name string, raw []byte) toolExecution {

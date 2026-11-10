@@ -1235,11 +1235,13 @@ func (x *CreateTaskResponse) GetTask() *Task {
 }
 
 type UpdateTaskRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Task          *TaskInput             `protobuf:"bytes,2,opt,name=task,proto3" json:"task,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Task  *TaskInput             `protobuf:"bytes,2,opt,name=task,proto3" json:"task,omitempty"`
+	// A zero value keeps the update behavior used by older clients.
+	ExpectedVersion uint64 `protobuf:"varint,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *UpdateTaskRequest) Reset() {
@@ -1284,6 +1286,13 @@ func (x *UpdateTaskRequest) GetTask() *TaskInput {
 		return x.Task
 	}
 	return nil
+}
+
+func (x *UpdateTaskRequest) GetExpectedVersion() uint64 {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return 0
 }
 
 type UpdateTaskResponse struct {
@@ -1827,10 +1836,11 @@ const file_mistgate_tasks_v1_tasks_proto_rawDesc = "" +
 	"\x11CreateTaskRequest\x120\n" +
 	"\x04task\x18\x01 \x01(\v2\x1c.mistgate.tasks.v1.TaskInputR\x04task\"A\n" +
 	"\x12CreateTaskResponse\x12+\n" +
-	"\x04task\x18\x01 \x01(\v2\x17.mistgate.tasks.v1.TaskR\x04task\"U\n" +
+	"\x04task\x18\x01 \x01(\v2\x17.mistgate.tasks.v1.TaskR\x04task\"\x80\x01\n" +
 	"\x11UpdateTaskRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
-	"\x04task\x18\x02 \x01(\v2\x1c.mistgate.tasks.v1.TaskInputR\x04task\"A\n" +
+	"\x04task\x18\x02 \x01(\v2\x1c.mistgate.tasks.v1.TaskInputR\x04task\x12)\n" +
+	"\x10expected_version\x18\x03 \x01(\x04R\x0fexpectedVersion\"A\n" +
 	"\x12UpdateTaskResponse\x12+\n" +
 	"\x04task\x18\x01 \x01(\v2\x17.mistgate.tasks.v1.TaskR\x04task\"#\n" +
 	"\x11DeleteTaskRequest\x12\x0e\n" +

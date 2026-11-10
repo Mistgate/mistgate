@@ -95,6 +95,12 @@ func New(c Config) *Service {
 	if s.st != nil && s.vault != nil {
 		if err := s.ensureRows(context.Background()); err != nil {
 			s.log.Warn("assistant storage initialization failed", "err", err)
+		} else {
+			ctx := context.Background()
+			now := s.now()
+			if _, err := s.st.DeleteStaleAssistantBudgetReservations(ctx, now.Add(-providerTimeout-30*time.Second), now); err != nil {
+				s.log.Warn("assistant budget reservation cleanup failed", "code", "assistant_budget_reservation_cleanup_failed", "err", err)
+			}
 		}
 	}
 	return s

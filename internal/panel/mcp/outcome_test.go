@@ -63,6 +63,15 @@ func TestFactsAndOutcomesCarryCodes(t *testing.T) {
 
 	// user_create: quota, term, apps, nodes
 	p := planOf(t, s, "user_create", map[string]any{"name": "zoe", "group_id": "grp_1", "quota_bytes": 100 << 30, "quota_reset": "month"})
+	if f := factOf(t, p, "group"); f.Value != "family" || !f.Untrusted {
+		t.Errorf("user_create omitted its named access group: %+v", f)
+	}
+	if f := factOf(t, p, "device_limit"); f.Value != "5 (panel default)" {
+		t.Errorf("user_create device limit: %+v", f)
+	}
+	if f := factOf(t, p, "dns_preset"); !strings.Contains(f.Value, "Default DNS") || !f.Untrusted {
+		t.Errorf("user_create omitted its effective DNS preset name: %+v", f)
+	}
 	if f := factOf(t, p, "quota"); f.Code != "quota" || f.Params["bytes"] != "107374182400" || f.Params["reset"] != "month" {
 		t.Errorf("quota: %+v", f)
 	}
@@ -94,8 +103,17 @@ func TestFactsAndOutcomesCarryCodes(t *testing.T) {
 
 	// user_reset_traffic: the names alone (untrusted), the bytes and the effect as codes
 	p = planOf(t, s, "user_reset_traffic", map[string]any{"user_ids": []string{"usr_n0", "usr_n1"}})
-	if f := factOf(t, p, "users"); !f.Untrusted || f.Value != "n0, n1" || f.Code != "" {
-		t.Errorf("users: %+v", f)
+	var userNames []string
+	for _, fact := range p.Facts {
+		if fact.Key == "users" {
+			if !fact.Untrusted || fact.Code != "" {
+				t.Errorf("user name fact: %+v", fact)
+			}
+			userNames = append(userNames, fact.Value)
+		}
+	}
+	if strings.Join(userNames, ",") != "n0,n1" {
+		t.Errorf("reset user names = %v", userNames)
 	}
 	if f := factOf(t, p, "used"); f.Code != "bytes" || f.Params["bytes"] != "6442450944" {
 		t.Errorf("used: %+v", f)

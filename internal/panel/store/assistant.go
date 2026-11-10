@@ -34,7 +34,10 @@ func (s *Store) SaveAssistantSettings(ctx context.Context, choices []AssistantPr
 
 // ReserveAssistantBudget performs the budget check and reservation as one guarded statement. Pending reservations and
 // settled usage for the same provider/month are both included, so concurrent calls cannot spend the same headroom.
-func (s *Store) ReserveAssistantBudget(ctx context.Context, id, month, adminID string, provider int32, model string, estimate, budget float64, now time.Time) (bool, error) {
+func (s *Store) ReserveAssistantBudget(ctx context.Context, id, month, adminID string, provider int32, model string, estimate, budget float64, now, reservationCutoff time.Time) (bool, error) {
+	if _, err := s.DeleteStaleAssistantBudgetReservations(ctx, reservationCutoff, now); err != nil {
+		return false, err
+	}
 	r, err := s.W.ExecContext(ctx, `INSERT INTO assistant_budget_reservation(id,month,admin_id,provider,model,estimate_usd,state,created_at)
 		SELECT ?,?,?,?,?,?,'reserved',?
 		WHERE ? <= MIN(?,COALESCE((SELECT budget_usd FROM assistant_provider WHERE provider=?),0))
@@ -48,21 +51,36 @@ func (s *Store) ReserveAssistantBudget(ctx context.Context, id, month, adminID s
 	return n > 0, err
 }
 
-// ReconcileAssistantBudget settles exactly one reservation and its usage row atomically. Replays do not add usage twice.
+// ReconcileAssistantBudget records one call's usage even when cleanup removed its reservation while the provider was still running.
+// The settled row is the idempotency marker that prevents a repeated reconciliation from adding usage twice.
 func (s *Store) ReconcileAssistantBudget(ctx context.Context, id, month, adminID string, provider int32, input, output int64, amount float64, turn bool, now time.Time) error {
 	turns := 0
 	if turn {
 		turns = 1
 	}
 	_, err := s.batch(ctx,
+		Stmt{Query: `INSERT INTO assistant_budget_reservation(id,month,admin_id,provider,model,estimate_usd,state,created_at,settled_at)
+			VALUES(?,?,?,?,?,?,'reserved',?,0) ON CONFLICT(id) DO NOTHING`,
+			Args: []any{id, month, adminID, provider, "", amount, unix(now)}},
+		Stmt{Query: `UPDATE assistant_budget_reservation SET state='settled',settled_at=0 WHERE id=? AND state='reserved'`, Args: []any{id}},
 		Stmt{Query: `INSERT INTO assistant_usage(month,admin_id,provider,input_tokens,output_tokens,usd,turns)
-			SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM assistant_budget_reservation WHERE id=? AND state='reserved')
+			SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM assistant_budget_reservation WHERE id=? AND state='settled' AND settled_at=0)
 			ON CONFLICT(month,admin_id,provider) DO UPDATE SET input_tokens=input_tokens+excluded.input_tokens,output_tokens=output_tokens+excluded.output_tokens,usd=usd+excluded.usd,turns=turns+excluded.turns
-			WHERE EXISTS (SELECT 1 FROM assistant_budget_reservation WHERE id=? AND state='reserved')`,
+			WHERE EXISTS (SELECT 1 FROM assistant_budget_reservation WHERE id=? AND state='settled' AND settled_at=0)`,
 			Args: []any{month, adminID, provider, input, output, amount, turns, id, id}},
-		Stmt{Query: `DELETE FROM assistant_budget_reservation WHERE id=? AND state='reserved'`, Args: []any{id}},
+		Stmt{Query: `UPDATE assistant_budget_reservation SET settled_at=? WHERE id=? AND state='settled' AND settled_at=0`, Args: []any{unix(now), id}},
 	)
 	return err
+}
+
+// DeleteStaleAssistantBudgetReservations removes stale calls and settled markers from earlier months.
+func (s *Store) DeleteStaleAssistantBudgetReservations(ctx context.Context, before, now time.Time) (int64, error) {
+	r, err := s.W.ExecContext(ctx, `DELETE FROM assistant_budget_reservation
+		WHERE (state = 'reserved' AND created_at < ?) OR (state = 'settled' AND month < ?)`, unix(before), now.UTC().Format("2006-01"))
+	if err != nil {
+		return 0, err
+	}
+	return r.RowsAffected()
 }
 
 // TakeAssistantRate admits one turn in the current minute, with the counter shared by D1 isolates.

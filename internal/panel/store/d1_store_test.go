@@ -228,15 +228,15 @@ func TestD1AssistantBudgetSettingsAndConversationBehavior(t *testing.T) {
 		t.Fatalf("D1 did not save encrypted assistant notes: clear=%q enc=%q", clear, notes)
 	}
 
-	month, provider := "202611", int32(2)
+	month, provider := now.UTC().Format("2006-01"), int32(2)
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_provider(provider,budget_usd) VALUES(?,1)`, provider); err != nil {
 		t.Fatal(err)
 	}
 	firstID, secondID := "asres_d1_first", "asres_d1_second"
-	if ok, err := st.ReserveAssistantBudget(ctx, firstID, month, "adm_d1", provider, "deepseek-flash", .7, 1, now); err != nil || !ok {
+	if ok, err := st.ReserveAssistantBudget(ctx, firstID, month, "adm_d1", provider, "deepseek-flash", .7, 1, now, now.Add(-time.Minute)); err != nil || !ok {
 		t.Fatalf("first D1 reservation: accepted=%v err=%v", ok, err)
 	}
-	if ok, err := st.ReserveAssistantBudget(ctx, secondID, month, "adm_d1", provider, "deepseek-flash", .4, 1, now); err != nil || ok {
+	if ok, err := st.ReserveAssistantBudget(ctx, secondID, month, "adm_d1", provider, "deepseek-flash", .4, 1, now, now.Add(-time.Minute)); err != nil || ok {
 		t.Fatalf("D1 reservation exceeded provider budget: accepted=%v err=%v", ok, err)
 	}
 	if err := st.ReconcileAssistantBudget(ctx, firstID, month, "adm_d1", provider, 10, 4, .25, true, now.Add(time.Second)); err != nil {
@@ -253,8 +253,25 @@ func TestD1AssistantBudgetSettingsAndConversationBehavior(t *testing.T) {
 	if usd != .25 || input != 10 || output != 4 || turns != 1 {
 		t.Fatalf("D1 reconciled assistant usage: usd=%v input=%d output=%d turns=%d", usd, input, output, turns)
 	}
-	if ok, err := st.ReserveAssistantBudget(ctx, secondID, month, "adm_d1", provider, "deepseek-flash", .7, 1, now); err != nil || !ok {
+	if ok, err := st.ReserveAssistantBudget(ctx, secondID, month, "adm_d1", provider, "deepseek-flash", .7, 1, now, now.Add(-time.Minute)); err != nil || !ok {
 		t.Fatalf("D1 did not release reconciled reservation headroom: accepted=%v err=%v", ok, err)
+	}
+	previousMonth := now.AddDate(0, -1, 0).UTC().Format("2006-01")
+	if err := st.ReconcileAssistantBudget(ctx, "asres_d1_previous", previousMonth, "adm_d1", provider, 1, 1, .01, true, now.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if deleted, err := st.DeleteStaleAssistantBudgetReservations(ctx, now.Add(-time.Minute), now); err != nil || deleted != 1 {
+		t.Fatalf("D1 earlier-month cleanup deleted=%d err=%v", deleted, err)
+	}
+	var previousRows, currentRows int
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM assistant_budget_reservation WHERE month=?`, previousMonth).Scan(&previousRows); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.R.QueryRowContext(ctx, `SELECT count(*) FROM assistant_budget_reservation WHERE month=?`, month).Scan(&currentRows); err != nil {
+		t.Fatal(err)
+	}
+	if previousRows != 0 || currentRows != 2 {
+		t.Fatalf("D1 cleanup left previous=%d current=%d reservation rows", previousRows, currentRows)
 	}
 
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_conversation(id,admin_id,title_enc,summary_enc,created_at,updated_at) VALUES('cnv_d1','adm_d1',X'01',X'02',?,?)`, now.Unix(), now.Unix()); err != nil {
