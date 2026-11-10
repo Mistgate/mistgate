@@ -173,7 +173,7 @@ var (
 var awgKernelEvents = []string{
 	"initiation_in", "response_out", "initiation_out", "response_in", "invalid_initiation", "invalid_response",
 	"cookie_in", "cookie_out", "keepalive_in", "keepalive_out", "handshake_retry", "unallowed_src",
-	"keypair_created", "keypair_destroyed", "unknown_peer", "other",
+	"keypair_created", "keypair_destroyed", "unknown_message", "unknown_peer", "other",
 }
 
 func classifyAWGKernelLine(message string) (event, peer string) {
@@ -202,6 +202,10 @@ func classifyAWGKernelLine(message string) (event, peer string) {
 		event = "handshake_retry"
 	case strings.Contains(message, "Packet has unallowed src IP"):
 		event = "unallowed_src"
+	case strings.Contains(message, "Unknown message from"):
+		// A packet that is no AmneziaWG message of this interface: the junk packets a client sends before its initiation
+		// arrive here (a handful per handshake is the obfuscation at work), and so does anything else aimed at the port.
+		event = "unknown_message"
 	case strings.Contains(message, "Keypair ") && strings.Contains(message, " created for peer "):
 		event = "keypair_created"
 	case strings.Contains(message, "Keypair ") && strings.Contains(message, " destroyed for peer "):
@@ -215,7 +219,18 @@ func classifyAWGKernelLine(message string) (event, peer string) {
 	return event, peer
 }
 
+// kernelModulePrefixes are what the modules put before the interface name: the kernel prints the module's name first
+// ("amneziawg: mgawg14491: Receiving handshake initiation ..."). Without stripping it no line was matched to an interface on a
+// real node, so the per-interface counts stayed at zero.
+var kernelModulePrefixes = []string{"amneziawg: ", "wireguard: "}
+
 func kernelInterfaceMessage(message string, interfaces map[string]string) (ifname, inboundID, body string, ok bool) {
+	for _, prefix := range kernelModulePrefixes {
+		if rest, found := strings.CutPrefix(message, prefix); found {
+			message = rest
+			break
+		}
+	}
 	for name, id := range interfaces {
 		prefix := name + ":"
 		if strings.HasPrefix(message, prefix) {
@@ -540,13 +555,17 @@ func (k *kernelCaptureCollector) finish(c *debugCapture, _ string) {
 	if k.awgWanted {
 		for _, name := range sortedKernelInterfaces(k.interfaces) {
 			stats := k.interfaces[name]
+			// The verdict first and only the events that happened: the panel cuts a long message, and a line of sixteen
+			// zero counts pushed the unanswered count out of sight.
 			counts := make(map[string]uint64, len(awgKernelEvents))
 			for _, event := range awgKernelEvents {
-				counts[event] = stats.counts[event]
+				if n := stats.counts[event]; n != 0 {
+					counts[event] = n
+				}
 			}
 			data, _ := json.Marshal(counts)
-			message := fmt.Sprintf("awg kernel summary: event_counts=%s initiations_unanswered=%d suppressed=%d debug_on=%t",
-				data, unansweredKernelInitiations(stats.handshakes), k.suppressed, k.debugOn)
+			message := fmt.Sprintf("awg kernel summary: initiations_unanswered=%d suppressed=%d debug_on=%t event_counts=%s",
+				unansweredKernelInitiations(stats.handshakes), k.suppressed, k.debugOn, data)
 			if stats.cut {
 				message += fmt.Sprintf(" handshakes_cut=%d (the unanswered count covers the first %d handshake lines only)", kernelHandshakesMax, kernelHandshakesMax)
 			}

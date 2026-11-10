@@ -101,6 +101,7 @@ func TestClassifyEveryAWGKernelPhrase(t *testing.T) {
 		{"Sending keepalive packet to peer 17", "keepalive_out", "17"},
 		{"Handshake for peer 17 (203.0.113.7:2408) did not complete after 5 seconds, retrying", "handshake_retry", "17"},
 		{"Packet has unallowed src IP", "unallowed_src", ""},
+		{"Unknown message from 203.0.113.7:2408 encountered, packet dropped", "unknown_message", ""},
 		{"Keypair 3 created for peer 17", "keypair_created", "17"},
 		{"Keypair 3 destroyed for peer 17", "keypair_destroyed", "17"},
 		{"future module diagnostic", "other", ""},
@@ -115,7 +116,7 @@ func TestClassifyEveryAWGKernelPhrase(t *testing.T) {
 			continue
 		}
 		found := false
-		for _, tc := range []string{"initiation_in", "response_out", "initiation_out", "response_in", "invalid_initiation", "invalid_response", "cookie_in", "cookie_out", "keepalive_in", "keepalive_out", "handshake_retry", "unallowed_src", "keypair_created", "keypair_destroyed", "other"} {
+		for _, tc := range []string{"initiation_in", "response_out", "initiation_out", "response_in", "invalid_initiation", "invalid_response", "cookie_in", "cookie_out", "keepalive_in", "keepalive_out", "handshake_retry", "unallowed_src", "unknown_message", "keypair_created", "keypair_destroyed", "other"} {
 			if event == tc {
 				found = true
 			}
@@ -127,7 +128,7 @@ func TestClassifyEveryAWGKernelPhrase(t *testing.T) {
 }
 
 func TestKernelInterfaceAttributesAndUnansweredInitiations(t *testing.T) {
-	ifname, inbound, body, ok := kernelInterfaceMessage("mgawg123: Receiving handshake initiation from peer 17", map[string]string{"mgawg123": "inb_awg"})
+	ifname, inbound, body, ok := kernelInterfaceMessage("amneziawg: mgawg123: Receiving handshake initiation from peer 17", map[string]string{"mgawg123": "inb_awg"})
 	if !ok || ifname != "mgawg123" || inbound != "inb_awg" || body != "Receiving handshake initiation from peer 17" {
 		t.Fatalf("interface match = %q %q %q %t", ifname, inbound, body, ok)
 	}
@@ -230,8 +231,10 @@ func TestKernelCaptureReadsAndSummarisesLogs(t *testing.T) {
 		journalTestLine(base.Add(time.Second), "kernel: net_ratelimit: 4 callbacks suppressed", 4),
 		journalTestLine(base.Add(2*time.Second), "kernel: net_ratelimit: 3 callbacks suppressed", 4),
 		journalTestLine(base.Add(3*time.Second), "[UFW BLOCK] IN=eth0 SRC=203.0.113.7 DST=198.51.100.2 PROTO=UDP", 6),
-		journalTestLine(base.Add(4*time.Second), "mgawg123: Receiving handshake initiation from peer 17 (203.0.113.7:2408)", 7),
-		journalTestLine(base.Add(5*time.Second), "mgawg123: Sending handshake response to peer 17 (203.0.113.7:2408)", 7),
+		// the lines as a real node's kernel prints them: the module name, the interface, the text
+		journalTestLine(base.Add(4*time.Second), "amneziawg: mgawg123: Unknown message from 203.0.113.7:2408 encountered, packet dropped", 7),
+		journalTestLine(base.Add(4*time.Second), "amneziawg: mgawg123: Receiving handshake initiation from peer 17 (203.0.113.7:2408)", 7),
+		journalTestLine(base.Add(5*time.Second), "amneziawg: mgawg123: Sending handshake response to peer 17 (203.0.113.7:2408)", 7),
 		journalTestLine(base.Add(6*time.Second), "mgawg123: Receiving handshake initiation from peer 18 (203.0.113.8:2408)", 7),
 		journalTestLine(base.Add(7*time.Second), "mgawg123: future module diagnostic", 6),
 	}
@@ -281,7 +284,8 @@ func TestKernelCaptureReadsAndSummarisesLogs(t *testing.T) {
 			unknown = true
 		case rec.source == "awg" && rec.attrs["event"] == "summary":
 			awgSummary = strings.Contains(rec.msg, `"initiation_in":2`) && strings.Contains(rec.msg, `"response_out":1`) &&
-				strings.Contains(rec.msg, "initiations_unanswered=1") && strings.Contains(rec.msg, "suppressed=7") && strings.Contains(rec.msg, "debug_on=true")
+				strings.Contains(rec.msg, `"unknown_message":1`) && !strings.Contains(rec.msg, `":0`) &&
+				strings.HasPrefix(rec.msg, "awg kernel summary: initiations_unanswered=1 suppressed=7 debug_on=true ")
 		case rec.source == "kernel" && strings.HasPrefix(rec.msg, "kernel log summary:"):
 			kernelSummary = strings.Contains(rec.msg, "kept=3") && strings.Contains(rec.msg, "firewall_lines=1") && strings.Contains(rec.msg, "dropped_by_caps=0")
 		}
