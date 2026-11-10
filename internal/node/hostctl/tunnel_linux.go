@@ -23,6 +23,7 @@ import (
 type tunnelState struct {
 	mu        sync.Mutex
 	set       []Tunnel
+	published []PublishedPort
 	applied   bool   // set was handed to nft (an empty set means the table is gone)
 	forwardOK bool   // and forwarding is on; false retries the sysctls with the next call
 	v6verdict string // "" the IPv6 rule is as asked; "drop" or "none" when the kernel refused reject (TunnelV6Fallback)
@@ -42,12 +43,16 @@ func (st *tunnelState) currentTime() time.Time {
 
 var _ TunnelHost = (*linuxHost)(nil)
 
-func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
+func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel, published []PublishedPort) error {
+	requested, err := normalizePublishedPorts(published)
+	if err != nil {
+		return err
+	}
 	st := &h.tun
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	now := st.currentTime()
-	same := st.applied && TunnelsEqual(ts, st.set)
+	same := st.applied && TunnelsEqual(ts, st.set) && equalPublishedPorts(requested, st.published)
 	if same {
 		if st.v6verdict != "" && now.Before(st.v6RetryAt) {
 			if st.forwardOK {
@@ -65,7 +70,7 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 			return nil
 		}
 	}
-	script, err := RenderTunnels(ts) // reject before anything is sent to nft
+	script, err := RenderTunnels(ts, requested) // reject before anything is sent to nft
 	if err != nil {
 		return err
 	}
@@ -97,14 +102,14 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 	verdict := ""
 	if err := h.nft(ctx, script, len(ts) == 0); err != nil {
 		if !asksTunnelV6Reject(ts) {
-			st.set, st.v6verdict, st.v6RetryAt = nil, "", time.Time{}
+			st.set, st.published, st.v6verdict, st.v6RetryAt = nil, nil, "", time.Time{}
 			return err
 		}
 		// Retry the exact ruleset once so a transient nft failure does not make us install a weaker IPv6 rule.
 		if retryErr := h.nft(ctx, script, false); retryErr != nil {
 			// If reject is unsupported, preserve tunnel service with drop, then without the IPv6 rule.
-			if verdict = h.tunnelsWithoutReject(ctx, ts); verdict == "" {
-				st.set, st.v6verdict, st.v6RetryAt = nil, "", time.Time{}
+			if verdict = h.tunnelsWithoutReject(ctx, ts, requested); verdict == "" {
+				st.set, st.published, st.v6verdict, st.v6RetryAt = nil, nil, "", time.Time{}
 				return retryErr
 			}
 		}
@@ -115,7 +120,7 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 	} else {
 		st.v6RetryAt = st.currentTime().Add(tunnelV6RetryInterval)
 	}
-	st.set, st.applied = append([]Tunnel(nil), ts...), true
+	st.set, st.published, st.applied = append([]Tunnel(nil), ts...), append([]PublishedPort(nil), requested...), true
 	if len(ts) > 0 {
 		if err := h.enableForwarding(NeedsV6(ts)); err != nil {
 			return err
@@ -128,18 +133,18 @@ func (h *linuxHost) SetTunnels(ctx context.Context, ts []Tunnel) error {
 // tunnelsWithoutReject installs ts with the IPv6 verdict "drop" (apps wait for a timeout instead of an instant ICMP error,
 // but IPv6 stays off), and failing that with no IPv6 rule at all. It returns "drop", "none", or "" when ts has no such rule
 // or nft refuses the table for another reason too.
-func (h *linuxHost) tunnelsWithoutReject(ctx context.Context, ts []Tunnel) string {
+func (h *linuxHost) tunnelsWithoutReject(ctx context.Context, ts []Tunnel, published []PublishedPort) string {
 	if !asksTunnelV6Reject(ts) {
 		return ""
 	}
-	if script, err := renderTunnels(ts, v6Drop); err == nil && h.nft(ctx, script, false) == nil {
+	if script, err := renderTunnels(ts, v6Drop, published); err == nil && h.nft(ctx, script, false) == nil {
 		return "drop"
 	}
 	off := append([]Tunnel(nil), ts...)
 	for i := range off {
 		off[i].RejectV6 = false
 	}
-	if script, err := RenderTunnels(off); err == nil && h.nft(ctx, script, false) == nil {
+	if script, err := RenderTunnels(off, published); err == nil && h.nft(ctx, script, false) == nil {
 		return "none"
 	}
 	return ""
@@ -279,9 +284,9 @@ func deleteOwnLinks() error {
 
 // cleanupTunnels deletes the tunnel table and the links of the AWG engine and the WARP device. Quiet without nft.
 func (h *linuxHost) cleanupTunnels(ctx context.Context) error {
-	script, _ := RenderTunnels(nil)
+	script, _ := RenderTunnels(nil, nil)
 	h.tun.mu.Lock()
-	h.tun.set, h.tun.applied, h.tun.forwardOK, h.tun.carry = nil, false, false, nil
+	h.tun.set, h.tun.published, h.tun.applied, h.tun.forwardOK, h.tun.carry = nil, nil, false, false, nil
 	h.tun.v6verdict, h.tun.v6RetryAt = "", time.Time{}
 	err := h.nft(ctx, script, true)
 	h.tun.mu.Unlock()
@@ -296,7 +301,7 @@ func (h *linuxHost) cleanupTunnels(ctx context.Context) error {
 // table behind): it deletes the tunnel table and every link named mgawg* or mgwarp. The WARP routing rules and routes
 // are removed by internal/node/warp.CleanupHost, which the same subcommand calls.
 func CleanupTunnels(ctx context.Context) error {
-	script, _ := RenderTunnels(nil)
+	script, _ := RenderTunnels(nil, nil)
 	h := &linuxHost{run: execRunner}
 	return errors.Join(h.nft(ctx, script, true), deleteOwnLinks())
 }

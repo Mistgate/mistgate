@@ -28,6 +28,12 @@ const (
 	labPortA, labPortB = 51842, 40001
 )
 
+// What the lab's node publishes besides TCP 443 (always open). The node also listens on labClosedTCP and labClosedUDP,
+// which nothing publishes: a tunnel client must reach the published ports and only those.
+var labPublished = []PublishedPort{{Network: "tcp", Port: 8443}, {Network: "udp", Port: 9443}}
+
+const labClosedTCP, labClosedUDP = 8444, 9444
+
 // TestLabNodeHelper is the process the lab runs inside the node namespace: it installs the tunnel rules with the REAL host
 // owner and exits (the nft table and the sysctls stay in the namespace). Skipped in a normal run.
 func TestLabNodeHelper(t *testing.T) {
@@ -37,7 +43,7 @@ func TestLabNodeHelper(t *testing.T) {
 	h := New(slog.New(slog.DiscardHandler)).(TunnelHost)
 	a := Tunnel{Iface: labIfA, Subnet4: netip.MustParsePrefix("10.66.4.0/22"), Addr4: netip.MustParseAddr("10.66.4.1"), UDPPort: labPortA}
 	b := Tunnel{Iface: labIfB, Subnet4: netip.MustParsePrefix("10.66.8.0/22"), Addr4: netip.MustParseAddr("10.66.8.1"), UDPPort: labPortB}
-	if err := h.SetTunnels(context.Background(), []Tunnel{a, b}); err != nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{a, b}, labPublished); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -97,7 +103,23 @@ h.HTTPServer(("192.0.2.2", 8080), H).serve_forever()`
 s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(("0.0.0.0", 2222)); s.listen(8)
 while True:
     c, _ = s.accept(); c.send(b"node"); c.close()`
-	for _, p := range []struct{ ns, code string }{{nsI, web}, {nsN, own}} {
+	// The node's client-facing listeners on all its addresses: TCP 443 and the published and unpublished ports above, and a
+	// UDP echo on the published and the unpublished UDP port.
+	listeners := `import selectors, socket
+sel = selectors.DefaultSelector()
+for port in (443, 8443, 8444):
+    s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(("0.0.0.0", port)); s.listen(8)
+    sel.register(s, selectors.EVENT_READ)
+for port in (9443, 9444):
+    u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); u.bind(("0.0.0.0", port)); sel.register(u, selectors.EVENT_READ)
+while True:
+    for key, _ in sel.select():
+        s = key.fileobj
+        if s.type == socket.SOCK_DGRAM:
+            data, peer = s.recvfrom(64); s.sendto(data, peer)
+        else:
+            c, _ = s.accept(); c.send(b"node"); c.close()`
+	for _, p := range []struct{ ns, code string }{{nsI, web}, {nsN, own}, {nsN, listeners}} {
 		cmd := exec.Command("ip", "netns", "exec", p.ns, "python3", "-c", p.code)
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
@@ -115,6 +137,26 @@ while True:
 		return strings.TrimSpace(out), err == nil && out != ""
 	}
 
+	// A TCP connect that must be answered by the node's listener, and a UDP datagram that must be echoed; both within 1 s.
+	tcpOpen := func(ns, host string, port int) bool {
+		_, err := try(in(ns, "python3", "-c", fmt.Sprintf(`import socket,sys
+s=socket.socket(); s.settimeout(1)
+try:
+    s.connect(("%s",%d)); sys.exit(0 if s.recv(4)==b"node" else 1)
+except OSError:
+    sys.exit(1)`, host, port))...)
+		return err == nil
+	}
+	udpOpen := func(ns, host string, port int) bool {
+		_, err := try(in(ns, "python3", "-c", fmt.Sprintf(`import socket,sys
+s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(1)
+try:
+    s.sendto(b"x",("%s",%d)); sys.exit(0 if s.recvfrom(8)[0]==b"x" else 1)
+except OSError:
+    sys.exit(1)`, host, port))...)
+		return err == nil
+	}
+
 	// The lab reproduces the hole first: a node that only forwards connects clients to each other and to the node of the
 	// other profile (N1 found exactly this with the nft text of the first draft of the plan).
 	sh(in(nsN, "sysctl", "-w", "net.ipv4.ip_forward=1")...)
@@ -123,6 +165,18 @@ while True:
 	}
 	if got, ok := fetch(nsA, "http://192.0.2.2:8080/"); !ok || got != "10.66.4.5" {
 		t.Fatalf("the lab is wrong: without masquerade the server should see the client address, saw %q ok=%v", got, ok)
+	}
+
+	// Without rules every listener of the node answers a client, so a closed port below is the firewall's doing.
+	for _, port := range []int{443, 8443, labClosedTCP} {
+		if !tcpOpen(nsA, "192.0.2.1", port) {
+			t.Fatalf("the lab is wrong: without rules TCP %d of the node should answer", port)
+		}
+	}
+	for _, port := range []int{9443, labClosedUDP} {
+		if !udpOpen(nsA, "192.0.2.1", port) {
+			t.Fatalf("the lab is wrong: without rules UDP %d of the node should echo", port)
+		}
 	}
 
 	// Install the rules with the real host owner, inside the node namespace.
@@ -159,6 +213,27 @@ try:
 except OSError:
     sys.exit(0)`)...); err != nil {
 		t.Errorf("TCP to the node's own listener is not dropped: %v %s", err, out)
+	}
+	// Hairpin: a full-tunnel client reaches what the node publishes at the node's public address (TCP 443 always, and the
+	// ports passed to SetTunnels) and nothing else that listens there.
+	for _, ns := range []string{nsA, nsB} {
+		for _, port := range []int{443, 8443} {
+			if !tcpOpen(ns, "192.0.2.1", port) {
+				t.Errorf("%s: TCP %d at the node's public address is not reachable from a tunnel", ns, port)
+			}
+		}
+		if !udpOpen(ns, "192.0.2.1", 9443) {
+			t.Errorf("%s: the published UDP 9443 at the node's public address is not reachable from a tunnel", ns)
+		}
+		if tcpOpen(ns, "192.0.2.1", labClosedTCP) {
+			t.Errorf("%s: an unpublished TCP %d is reachable from a tunnel", ns, labClosedTCP)
+		}
+		if udpOpen(ns, "192.0.2.1", labClosedUDP) {
+			t.Errorf("%s: an unpublished UDP %d is reachable from a tunnel", ns, labClosedUDP)
+		}
+		if tcpOpen(ns, "192.0.2.1", 2222) {
+			t.Errorf("%s: the node's service on TCP 2222 is reachable from a tunnel at its public address", ns)
+		}
 	}
 	// The UDP counter counts datagrams to the port from the outside, whether or not anything listens.
 	for i := 0; i < 5; i++ {

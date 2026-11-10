@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -247,6 +248,8 @@ type tunHost struct {
 
 	tmu      sync.Mutex
 	sets     [][]hostctl.Tunnel
+	ports    [][]hostctl.PublishedPort
+	rules    []string
 	err      error
 	v6       string // TunnelV6Fallback
 	counters map[uint16]uint64
@@ -258,14 +261,21 @@ func (h *tunHost) TunnelV6Fallback() string {
 	return h.v6
 }
 
-func (h *tunHost) SetTunnels(_ context.Context, ts []hostctl.Tunnel) error {
+func (h *tunHost) SetTunnels(_ context.Context, ts []hostctl.Tunnel, published []hostctl.PublishedPort) error {
 	h.tmu.Lock()
 	defer h.tmu.Unlock()
 	if h.err != nil {
 		h.ord.add("tunnels:error")
 		return h.err
 	}
+	rules, err := hostctl.RenderTunnels(ts, published)
+	if err != nil {
+		h.ord.add("tunnels:error")
+		return err
+	}
 	h.sets = append(h.sets, append([]hostctl.Tunnel(nil), ts...))
+	h.ports = append(h.ports, append([]hostctl.PublishedPort(nil), published...))
+	h.rules = append(h.rules, rules)
 	h.ord.add("tunnels")
 	return nil
 }
@@ -287,6 +297,24 @@ func (h *tunHost) lastSet() []hostctl.Tunnel {
 		return nil
 	}
 	return h.sets[len(h.sets)-1]
+}
+
+func (h *tunHost) lastPublished() []hostctl.PublishedPort {
+	h.tmu.Lock()
+	defer h.tmu.Unlock()
+	if len(h.ports) == 0 {
+		return nil
+	}
+	return h.ports[len(h.ports)-1]
+}
+
+func (h *tunHost) lastRules() string {
+	h.tmu.Lock()
+	defer h.tmu.Unlock()
+	if len(h.rules) == 0 {
+		return ""
+	}
+	return h.rules[len(h.rules)-1]
 }
 
 func (h *tunHost) setCount() int {
@@ -320,7 +348,7 @@ func newL3Tuned(t *testing.T, unitGen int, withWarp bool, tune func(*Agent)) *l3
 	x.awg = newFakeAwg(x.ord)
 	x.warp = newFakeWarp(x.ord)
 	x.harness = newHarness(t, harnessOpts{
-		extra: map[string]engine.Factory{awg.Protocol: x.awg.factory()},
+		extra: map[string]engine.Factory{awg.Protocol: x.awg.factory(), "hysteria2": newFakeEngine("hysteria2").factory()},
 		wrapHost: func(f *fakeHost) hostctl.Host {
 			x.tun = &tunHost{fakeHost: f, ord: x.ord, counters: map[uint16]uint64{}}
 			return x.tun
@@ -460,6 +488,109 @@ func TestAwgInboundFirewallThenInterfaceAndHealth(t *testing.T) {
 			t.Errorf("awg block on %s", h.InboundId)
 		}
 	}
+}
+
+func TestTunnelFirewallTracksEnabledPublishedInboundPorts(t *testing.T) {
+	x := newL3(t, 3, false)
+	x.host.ssh = []uint16{2222}
+	x.waitConnected()
+
+	awg := awgInb("inb_awg", 51842, "10.66.4", "direct", awgCred("c_awg"))
+	tcp := inb("inb_tcp", 0, 0, cred("c_tcp"))
+	tcp.Spec.Listen.Network, tcp.Spec.Listen.Port = "tcp", 8443
+	udp := inb("inb_udp", 0, 0, cred("c_udp"))
+	udp.Spec.Protocol = "hysteria2"
+	udp.Spec.Listen.Network, udp.Spec.Listen.Port = "udp", 9443
+	udp.Spec.SettingsJson = `{"masquerade":{"tcp_port":8555}}`
+	disabled := inb("inb_disabled", 0, 0, cred("c_disabled"))
+	disabled.Spec.Listen.Network, disabled.Spec.Listen.Port, disabled.Spec.Enabled = "tcp", 9555, false
+	ssh := inb("inb_ssh", 0, 0, cred("c_ssh"))
+	ssh.Spec.Listen.Network, ssh.Spec.Listen.Port = "tcp", 2222
+	ssh22 := inb("inb_ssh_default", 0, 0, cred("c_ssh_default"))
+	ssh22.Spec.Listen.Network, ssh22.Spec.Listen.Port = "tcp", 22
+
+	mustApply(t, x.panel, fullState(1, awg, tcp, udp, disabled, ssh, ssh22))
+	wantPublished := []hostctl.PublishedPort{{Network: "tcp", Port: 8443}, {Network: "tcp", Port: 8555}, {Network: "udp", Port: 9443}}
+	if got := x.tun.lastPublished(); !reflect.DeepEqual(got, wantPublished) {
+		t.Fatalf("published listeners = %+v, want %+v", got, wantPublished)
+	}
+	rules := x.tun.lastRules()
+	if !strings.Contains(rules, `iifname "mgawg*" tcp dport { 443, 8443, 8555 } accept`) ||
+		!strings.Contains(rules, `iifname "mgawg*" udp dport 9443 accept`) {
+		t.Fatalf("enabled listeners are missing from the applied rules:\n%s", rules)
+	}
+	if tunnelAllowRules(rules) != "iifname \"mgawg*\" tcp dport { 443, 8443, 8555 } accept\niifname \"mgawg*\" udp dport 9443 accept" {
+		t.Fatalf("unexpected published-port allowlist:\n%s", tunnelAllowRules(rules))
+	}
+	for _, forbidden := range []string{"51842", "9555", "2222", "dport { 22 }", "dport 22 "} {
+		if strings.Contains(tunnelAllowRules(rules), forbidden) {
+			t.Errorf("disabled, SSH, or tunnel listener %q escaped the allowlist:\n%s", forbidden, tunnelAllowRules(rules))
+		}
+	}
+
+	// A port change replaces the allowlist on the next reconcile while the AWG interface stays installed.
+	tcp.Spec.Listen.Port = 8444
+	mustApply(t, x.panel, fullState(2, awg, tcp, udp, disabled, ssh, ssh22))
+	rules = x.tun.lastRules()
+	if !strings.Contains(tunnelAllowRules(rules), `tcp dport { 443, 8444, 8555 } accept`) || strings.Contains(tunnelAllowRules(rules), "8443") {
+		t.Fatalf("changed TCP port was not applied on the next reconcile:\n%s", tunnelAllowRules(rules))
+	}
+
+	// Disabling the UDP inbound removes its listener from the next applied ruleset.
+	udp.Spec.Enabled = false
+	mustApply(t, x.panel, fullState(3, awg, tcp, udp, disabled, ssh, ssh22))
+	rules = x.tun.lastRules()
+	if tunnelAllowRules(rules) != `iifname "mgawg*" tcp dport { 443, 8444 } accept` {
+		t.Fatalf("disabled UDP listener remained in the allowlist:\n%s", tunnelAllowRules(rules))
+	}
+}
+
+// tunnelPublishedPorts alone: the Hysteria2 HTTPS decoy follows the engine's tcp_port rule (absent = 443, 0 = none), a
+// port that sshd or an AWG tunnel holds is never published, a disabled inbound publishes nothing.
+func TestTunnelPublishedPortsTable(t *testing.T) {
+	spec := func(id, protocol, network string, port uint16, enabled bool, settings string) *inbound {
+		return &inbound{spec: plugin.InboundSpec{ID: id, Protocol: protocol, Enabled: enabled, Settings: []byte(settings),
+			Listen: plugin.Listen{Network: network, Port: port}}}
+	}
+	pp := func(network string, port uint32) hostctl.PublishedPort {
+		return hostctl.PublishedPort{Network: network, Port: port}
+	}
+	for _, tc := range []struct {
+		name string
+		in   []*inbound
+		ssh  []uint16
+		want []hostctl.PublishedPort
+	}{
+		{"hysteria2 default decoy", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, ``)}, nil, []hostctl.PublishedPort{pp("tcp", 443), pp("udp", 8443)}},
+		{"decoy port set", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":9443}}`)}, nil, []hostctl.PublishedPort{pp("tcp", 9443), pp("udp", 8443)}},
+		{"decoy off", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":0}}`)}, nil, []hostctl.PublishedPort{pp("udp", 8443)}},
+		{"decoy on sshd port", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":2222}}`)}, []uint16{2222}, []hostctl.PublishedPort{pp("udp", 8443)}},
+		{"disabled", []*inbound{spec("de1", "hysteria2", "udp", 8443, false, ``), spec("nl1", "vless", "tcp", 8444, false, ``)}, nil, []hostctl.PublishedPort{}},
+		{"mtproto and vless", []*inbound{spec("nl1", "vless", "tcp", 8444, true, ``), spec("de2", "mtproto", "tcp", 8445, true, ``)}, nil, []hostctl.PublishedPort{pp("tcp", 8444), pp("tcp", 8445)}},
+		{"tcp on sshd port", []*inbound{spec("nl1", "vless", "tcp", 2222, true, ``), spec("nl2", "vless", "tcp", 22, true, ``)}, []uint16{2222}, []hostctl.PublishedPort{}},
+		{"udp on port 22 is not ssh", []*inbound{spec("de1", "hysteria2", "udp", 22, true, `{"masquerade":{"tcp_port":0}}`)}, nil, []hostctl.PublishedPort{pp("udp", 22)}},
+		{"awg port claimed by another udp inbound", []*inbound{spec("alice", "awg", "udp", 51842, true, ``), spec("de1", "hysteria2", "udp", 51842, true, `{"masquerade":{"tcp_port":0}}`)}, nil, []hostctl.PublishedPort{}},
+		{"awg itself", []*inbound{spec("alice", "awg", "udp", 51842, true, ``)}, nil, []hostctl.PublishedPort{}},
+	} {
+		m := &model{inbounds: map[string]*inbound{}}
+		for _, in := range tc.in {
+			m.inbounds[in.spec.ID] = in
+		}
+		if got := tunnelPublishedPorts(m, tc.ssh); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: got %+v, want %+v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func tunnelAllowRules(rules string) string {
+	var allow []string
+	for _, line := range strings.Split(rules, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, `iifname "mgawg*" `) && strings.HasSuffix(line, " accept") && strings.Contains(line, " dport ") {
+			allow = append(allow, line)
+		}
+	}
+	return strings.Join(allow, "\n")
 }
 
 func TestStateHashCoversTunnelAndWarp(t *testing.T) {

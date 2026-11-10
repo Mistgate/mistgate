@@ -81,7 +81,7 @@ func unitProbe() int {
 	th, _ := h.(hostctl.TunnelHost)
 	err = th.SetTunnels(context.Background(), []hostctl.Tunnel{{
 		Iface: "mgawg40001", Subnet4: netip.MustParsePrefix("10.66.8.0/22"), Addr4: netip.MustParseAddr("10.66.8.1"), UDPPort: 40001,
-	}})
+	}}, nil)
 	r.SetTunnels = res(err)
 	if b, err := os.ReadFile("/proc/sys/net/ipv4/ip_forward"); err == nil {
 		r.IPForwarding = strings.TrimSpace(string(b))

@@ -73,7 +73,7 @@ func TestSetTunnelsInstallsOnceAndEnablesForwarding(t *testing.T) {
 	h, calls, _ := tunHost(t)
 	ctx := context.Background()
 	ts := []Tunnel{tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")}
-	if err := h.SetTunnels(ctx, ts); err != nil {
+	if err := h.SetTunnels(ctx, ts, nil); err != nil {
 		t.Fatal(err)
 	}
 	var nft []call
@@ -94,14 +94,63 @@ func TestSetTunnelsInstallsOnceAndEnablesForwarding(t *testing.T) {
 	}
 	// The same set again touches nothing.
 	n := len(*calls)
-	if err := h.SetTunnels(ctx, ts); err != nil || len(*calls) != n {
+	if err := h.SetTunnels(ctx, ts, nil); err != nil || len(*calls) != n {
 		t.Fatalf("second call: err=%v calls=%d->%d", err, n, len(*calls))
+	}
+}
+
+func TestSetTunnelsReappliesWhenPublishedPortsChange(t *testing.T) {
+	h, calls, _ := tunHost(t)
+	ctx := context.Background()
+	ts := []Tunnel{tun(51842, "10.66.4.0/22", "")}
+	first := []PublishedPort{{Network: "tcp", Port: 8443}, {Network: "udp", Port: 9443}}
+	if err := h.SetTunnels(ctx, ts, first); err != nil {
+		t.Fatal(err)
+	}
+	countApply := func() int {
+		n := 0
+		for _, c := range *calls {
+			if c.name == "nft" && c.args == "-f -" && strings.Contains(c.stdin, "table inet mistgate_awg {") {
+				n++
+			}
+		}
+		return n
+	}
+	initial := countApply()
+	if initial != 1 {
+		t.Fatalf("initial tunnel table installs = %d", initial)
+	}
+	// Listener order and duplicate entries do not cause an unnecessary table replacement.
+	if err := h.SetTunnels(ctx, ts, []PublishedPort{
+		{Network: "udp", Port: 9443}, {Network: "tcp", Port: 8443}, {Network: "tcp", Port: 8443},
+	}); err != nil || countApply() != initial {
+		t.Fatalf("same listener set: err=%v installs=%d", err, countApply())
+	}
+	if err := h.SetTunnels(ctx, ts, []PublishedPort{{Network: "tcp", Port: 10443}}); err != nil {
+		t.Fatal(err)
+	}
+	if countApply() != initial+1 {
+		t.Fatalf("a changed listener port did not replace the tunnel table: installs=%d", countApply())
+	}
+	var last string
+	found := false
+	for i := len(*calls) - 1; i >= 0; i-- {
+		if (*calls)[i].name == "nft" && (*calls)[i].args == "-f -" && strings.Contains((*calls)[i].stdin, "table inet mistgate_awg {") {
+			last, found = (*calls)[i].stdin, true
+			break
+		}
+	}
+	if !found || !strings.Contains(last, `tcp dport { 443, 10443 } accept`) || strings.Contains(last, "8443") || strings.Contains(last, "9443") {
+		t.Fatalf("replacement rules did not follow the listener set:\n%s", last)
+	}
+	if err := h.SetTunnels(ctx, ts, []PublishedPort{{Network: "tcp", Port: 10443}}); err != nil || countApply() != initial+1 {
+		t.Fatalf("unchanged listener set reinstalled: err=%v installs=%d", err, countApply())
 	}
 }
 
 func TestSetTunnelsIPv4OnlyLeavesIPv6Alone(t *testing.T) {
 	h, _, _ := tunHost(t)
-	if err := h.SetTunnels(context.Background(), []Tunnel{tun(51842, "10.66.4.0/22", "")}); err != nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{tun(51842, "10.66.4.0/22", "")}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if readSys(t, h, "net/ipv4/ip_forward") != "1" || readSys(t, h, "net/ipv6/conf/all/forwarding") != "0" ||
@@ -114,7 +163,7 @@ func TestTunnelCountersSurviveReplacement(t *testing.T) {
 	h, _, counters := tunHost(t)
 	ctx := context.Background()
 	a := tun(51842, "10.66.4.0/22", "")
-	if err := h.SetTunnels(ctx, []Tunnel{a}); err != nil {
+	if err := h.SetTunnels(ctx, []Tunnel{a}, nil); err != nil {
 		t.Fatal(err)
 	}
 	*counters = counterJSON("51842", 100)
@@ -123,7 +172,7 @@ func TestTunnelCountersSurviveReplacement(t *testing.T) {
 		t.Fatalf("counters = %v, %v", got, err)
 	}
 	// A second tunnel replaces the table (the nft counters restart at 0): the 100 are carried over.
-	if err := h.SetTunnels(ctx, []Tunnel{a, tun(40001, "10.66.8.0/22", "")}); err != nil {
+	if err := h.SetTunnels(ctx, []Tunnel{a, tun(40001, "10.66.8.0/22", "")}, nil); err != nil {
 		t.Fatal(err)
 	}
 	*counters = counterJSON("51842", 7)
@@ -132,10 +181,10 @@ func TestTunnelCountersSurviveReplacement(t *testing.T) {
 		t.Fatalf("after replacement: %v", got)
 	}
 	// A port that is removed and comes back starts from zero.
-	if err := h.SetTunnels(ctx, []Tunnel{tun(40001, "10.66.8.0/22", "")}); err != nil {
+	if err := h.SetTunnels(ctx, []Tunnel{tun(40001, "10.66.8.0/22", "")}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.SetTunnels(ctx, []Tunnel{a, tun(40001, "10.66.8.0/22", "")}); err != nil {
+	if err := h.SetTunnels(ctx, []Tunnel{a, tun(40001, "10.66.8.0/22", "")}, nil); err != nil {
 		t.Fatal(err)
 	}
 	*counters = counterJSON("51842", 1)
@@ -148,11 +197,17 @@ func TestSetTunnelsBadInputTouchesNothing(t *testing.T) {
 	h, calls, _ := tunHost(t)
 	bad := tun(51842, "10.66.4.0/22", "")
 	bad.Iface = "eth0"
-	if err := h.SetTunnels(context.Background(), []Tunnel{bad}); err == nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{bad}, nil); err == nil {
 		t.Fatal("accepted")
 	}
 	if len(*calls) != 0 || readSys(t, h, "net/ipv4/ip_forward") != "0" {
 		t.Errorf("a rejected set had effects: %+v", *calls)
+	}
+	if err := h.SetTunnels(context.Background(), []Tunnel{tun(51842, "10.66.4.0/22", "")}, []PublishedPort{{Network: "tcp", Port: 65536}}); err == nil {
+		t.Fatal("accepted an out-of-range published port")
+	}
+	if len(*calls) != 0 || readSys(t, h, "net/ipv4/ip_forward") != "0" {
+		t.Errorf("a rejected published-port set had effects: %+v", *calls)
 	}
 }
 
@@ -165,11 +220,11 @@ func TestSetTunnelsRetriesAfterSysctlFailure(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(h.procSys, "net/ipv4/ip_forward"), 0o755); err != nil { // unwritable as a file
 		t.Fatal(err)
 	}
-	if err := h.SetTunnels(context.Background(), ts); err == nil {
+	if err := h.SetTunnels(context.Background(), ts, nil); err == nil {
 		t.Fatal("a sysctl failure was not reported")
 	}
 	n := len(*calls)
-	_ = h.SetTunnels(context.Background(), ts)
+	_ = h.SetTunnels(context.Background(), ts, nil)
 	if len(*calls) == n {
 		t.Error("the failed set was remembered as installed and never retried")
 	}
@@ -229,7 +284,7 @@ func TestSetTunnelsFallsBackWhenTheKernelHasNoReject(t *testing.T) {
 			h, calls, _ := tunHost(t)
 			failNft(h, calls, tc.fail...)
 			ctx := context.Background()
-			if err := h.SetTunnels(ctx, []Tunnel{a}); err != nil {
+			if err := h.SetTunnels(ctx, []Tunnel{a}, nil); err != nil {
 				t.Fatalf("a missing IPv6 verdict dropped the whole tunnel table: %v", err)
 			}
 			got := lastNft(*calls)
@@ -243,12 +298,12 @@ func TestSetTunnelsFallsBackWhenTheKernelHasNoReject(t *testing.T) {
 				t.Errorf("fallback = %q, want %q", got, tc.fallback)
 			}
 			n := len(*calls)
-			if err := h.SetTunnels(ctx, []Tunnel{a}); err != nil || len(*calls) != n {
+			if err := h.SetTunnels(ctx, []Tunnel{a}, nil); err != nil || len(*calls) != n {
 				t.Errorf("the same set was applied again: err=%v calls=%d->%d", err, n, len(*calls))
 			}
 			// the verdict that works is tried first again for the next set: reject is not remembered as broken
 			b := tun(40001, "10.66.8.0/22", "")
-			if err := h.SetTunnels(ctx, []Tunnel{a, b}); err != nil || h.TunnelV6Fallback() != tc.fallback {
+			if err := h.SetTunnels(ctx, []Tunnel{a, b}, nil); err != nil || h.TunnelV6Fallback() != tc.fallback {
 				t.Errorf("a changed set: err=%v fallback=%q", err, h.TunnelV6Fallback())
 			}
 		})
@@ -256,7 +311,7 @@ func TestSetTunnelsFallsBackWhenTheKernelHasNoReject(t *testing.T) {
 	t.Run("a table nft refuses for another reason is still an error", func(t *testing.T) {
 		h, calls, _ := tunHost(t)
 		failNft(h, calls, "table inet")
-		if err := h.SetTunnels(context.Background(), []Tunnel{a}); err == nil {
+		if err := h.SetTunnels(context.Background(), []Tunnel{a}, nil); err == nil {
 			t.Fatal("not reported")
 		}
 		if h.TunnelV6Fallback() != "" {
@@ -267,7 +322,7 @@ func TestSetTunnelsFallsBackWhenTheKernelHasNoReject(t *testing.T) {
 		h, calls, _ := tunHost(t)
 		failNft(h, calls, "table inet")
 		plain := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
-		if err := h.SetTunnels(context.Background(), []Tunnel{plain}); err == nil {
+		if err := h.SetTunnels(context.Background(), []Tunnel{plain}, nil); err == nil {
 			t.Fatal("not reported")
 		}
 		if n := len(*calls); n != 1 {
@@ -291,7 +346,7 @@ func TestSetTunnelsRetriesRejectOnceBeforeFallingBack(t *testing.T) {
 		return base(ctx, stdin, name, args...)
 	}
 
-	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}, nil); err != nil {
 		t.Fatal(err)
 	}
 	var rejected []string
@@ -324,7 +379,7 @@ func TestSetTunnelsRetriesRejectOnSlowCadence(t *testing.T) {
 		}
 		return base(ctx, stdin, name, args...)
 	}
-	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if h.TunnelV6Fallback() != "drop" {
@@ -334,7 +389,7 @@ func TestSetTunnelsRetriesRejectOnSlowCadence(t *testing.T) {
 	acceptReject = true
 
 	now = now.Add(tunnelV6RetryInterval - time.Nanosecond)
-	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(nftApplyScripts(*calls)); got != initialScripts || h.TunnelV6Fallback() != "drop" {
@@ -342,7 +397,7 @@ func TestSetTunnelsRetriesRejectOnSlowCadence(t *testing.T) {
 	}
 
 	now = now.Add(time.Nanosecond)
-	if err := h.SetTunnels(context.Background(), []Tunnel{a}); err != nil {
+	if err := h.SetTunnels(context.Background(), []Tunnel{a}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(nftApplyScripts(*calls)); got != initialScripts+1 || h.TunnelV6Fallback() != "" ||
@@ -356,7 +411,7 @@ func TestCleanupRemovesTunnelTableAndLinks(t *testing.T) {
 	linksDeleted := 0
 	h.links = func() error { linksDeleted++; return nil }
 	ctx := context.Background()
-	if err := h.SetTunnels(ctx, []Tunnel{tun(51842, "10.66.4.0/22", "")}); err != nil {
+	if err := h.SetTunnels(ctx, []Tunnel{tun(51842, "10.66.4.0/22", "")}, nil); err != nil {
 		t.Fatal(err)
 	}
 	*calls = nil
@@ -374,7 +429,7 @@ func TestCleanupRemovesTunnelTableAndLinks(t *testing.T) {
 	}
 	// After Cleanup the same set is installed again (the agent restarts into a clean host).
 	*calls = nil
-	if err := h.SetTunnels(ctx, []Tunnel{tun(51842, "10.66.4.0/22", "")}); err != nil || len(*calls) == 0 {
+	if err := h.SetTunnels(ctx, []Tunnel{tun(51842, "10.66.4.0/22", "")}, nil); err != nil || len(*calls) == 0 {
 		t.Errorf("not re-installed after cleanup: %v %+v", err, *calls)
 	}
 }
@@ -399,15 +454,22 @@ func TestRenderedTunnelRulesetParses(t *testing.T) {
 	a := tun(51842, "10.66.4.0/22", "fd66:66:0:1::/64")
 	b := tun(40001, "10.66.8.0/22", "")
 	b.ViaWarp = true
-	for name, ts := range map[string][]Tunnel{"two": {a, b}, "one": {a}, "warp only": {b}, "none": nil} {
-		script, err := RenderTunnels(ts)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cmd := exec.Command("nft", "-c", "-f", "-")
-		cmd.Stdin = strings.NewReader(script)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Errorf("%s: nft rejects the script: %v\n%s\n%s", name, err, out, script)
+	for name, ports := range map[string][]PublishedPort{
+		"no ports":   nil,
+		"one tcp":    {{Network: "tcp", Port: 8443}},
+		"tcp+udp":    {{Network: "tcp", Port: 8443}, {Network: "udp", Port: 3478}},
+		"many mixed": {{Network: "udp", Port: 9000}, {Network: "udp", Port: 3478}, {Network: "tcp", Port: 8443}, {Network: "tcp", Port: 65535}},
+	} {
+		for tname, ts := range map[string][]Tunnel{"two": {a, b}, "one": {a}, "warp only": {b}, "none": nil} {
+			script, err := RenderTunnels(ts, ports)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("nft", "-c", "-f", "-")
+			cmd.Stdin = strings.NewReader(script)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Errorf("%s/%s: nft rejects the script: %v\n%s\n%s", name, tname, err, out, script)
+			}
 		}
 	}
 }

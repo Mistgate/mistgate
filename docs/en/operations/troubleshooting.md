@@ -109,6 +109,10 @@ The panel's checks connect with the panel's own key, so a green check says nothi
 2. The **24 h** line under the profile on the node's **Profiles** tab: **unknown keys** that grow while the person tries mean their app comes with a key the node does not know, from a removed device or an old subscription.
 3. Remove the old apps there, then in the app delete the subscription, add the link again and refresh it. One new device appears. Check that the app's list has no entry named after the device limit.
 
+## A proxy on the same server stops working when the VPN is on
+
+A full-tunnel AmneziaWG client can reach the panel on TCP 443 when it shares the node's address, plus other enabled inbounds and the Hysteria2 HTTPS decoy on their configured ports. The AWG UDP listener ports, SSH, and node management ports stay closed from inside the tunnel.
+
 ## The hoster blocks UDP
 
 Hysteria2 and AmneziaWG run over UDP, and some hosters drop UDP on some ports or entirely.

@@ -6,7 +6,7 @@ import "context"
 
 var _ TunnelHost = stub{}
 
-func (stub) SetTunnels(context.Context, []Tunnel) error { return nil }
+func (stub) SetTunnels(context.Context, []Tunnel, []PublishedPort) error { return nil }
 
 func (stub) TunnelCounters(context.Context) (map[uint16]uint64, error) {
 	return map[uint16]uint64{}, nil

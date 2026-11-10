@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/netip"
 	"slices"
@@ -254,7 +256,7 @@ func (a *Agent) syncWarp(ctx context.Context, next *model) {
 	if a.cfg.Warp == nil {
 		if next.warp != nil && !a.warpNoted {
 			a.warpNoted = true
-			a.log.Warn("the panel sent a WARP configuration, this build has no WARP manager")
+			a.log.Warn("the panel sent a WARP configuration, this build has no WARP manager", "code", "warp_manager_unavailable")
 		}
 		return
 	}
@@ -264,7 +266,7 @@ func (a *Agent) syncWarp(ctx context.Context, next *model) {
 		a.warpErr = ""
 	case a.warpErr != shortMsg(err):
 		a.warpErr = shortMsg(err)
-		a.log.Error("warp configuration not applied", "err", err)
+		a.log.Error("warp configuration not applied", "code", "warp_apply_failed", "err", err)
 		a.event(pb.Severity_SEVERITY_ERROR, "warp_needs_attention", "", map[string]string{"reason": "apply_failed", "error": a.warpErr})
 	}
 }
@@ -291,6 +293,61 @@ func tunnelOf(spec plugin.InboundSpec) (hostctl.Tunnel, error) {
 		out.Subnet6, out.Addr6 = t.AddrV6.Masked(), t.AddrV6.Addr()
 	}
 	return out, hostctl.ValidateTunnel(out)
+}
+
+// tunnelPublishedPorts returns the enabled inbound listeners that a tunnel client may reach on the host's other
+// addresses. TCP 443 is added by hostctl; SSH and the node's own AWG UDP ports stay behind the terminal drop.
+func tunnelPublishedPorts(next *model, sshPorts []uint16) []hostctl.PublishedPort {
+	ssh := map[uint16]bool{22: true} // the host falls back to 22 if sshd detection has no answer
+	for _, port := range sshPorts {
+		if port != 0 {
+			ssh[port] = true
+		}
+	}
+	awgUDP := map[uint16]bool{}
+	for _, id := range next.ids() {
+		spec := next.inbounds[id].spec
+		if spec.Enabled && spec.Protocol == awg.Protocol && spec.Listen.Network == "udp" && spec.Listen.Port != 0 {
+			awgUDP[spec.Listen.Port] = true
+		}
+	}
+	seen := map[hostctl.PublishedPort]bool{}
+	for _, id := range next.ids() {
+		spec := next.inbounds[id].spec
+		listen := spec.Listen
+		if !spec.Enabled || listen.Port == 0 || (listen.Network != "tcp" && listen.Network != "udp") {
+			continue
+		}
+		if listen.Network == "tcp" && ssh[listen.Port] || listen.Network == "udp" && awgUDP[listen.Port] {
+			continue
+		}
+		seen[hostctl.PublishedPort{Network: listen.Network, Port: uint32(listen.Port)}] = true
+		if spec.Protocol == "hysteria2" {
+			var settings struct {
+				Masquerade struct {
+					TCPPort *int `json:"tcp_port"`
+				} `json:"masquerade"`
+			}
+			if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
+				continue
+			}
+			port := 443 // hysteria2's HTTPS masquerade default; TCP 443 is also kept unconditionally by hostctl
+			if settings.Masquerade.TCPPort != nil {
+				port = *settings.Masquerade.TCPPort // zero disables the HTTPS listener
+			}
+			if port > 0 && port <= 65535 && !ssh[uint16(port)] {
+				seen[hostctl.PublishedPort{Network: "tcp", Port: uint32(port)}] = true
+			}
+		}
+	}
+	ports := make([]hostctl.PublishedPort, 0, len(seen))
+	for port := range seen {
+		ports = append(ports, port)
+	}
+	slices.SortFunc(ports, func(a, b hostctl.PublishedPort) int {
+		return cmp.Or(strings.Compare(a.Network, b.Network), cmp.Compare(a.Port, b.Port))
+	})
+	return ports
 }
 
 // syncTunnels installs the firewall of the tunnel interfaces and the WARP routes of their client subnets. It runs
@@ -340,7 +397,7 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 	if a.cfg.Warp != nil && (len(warpSubnets) > 0 || a.warpRouted) {
 		if err := a.cfg.Warp.SetRoutedSubnets(ctx, warpSubnets); err != nil {
 			msg := "warp routing: " + shortMsg(err)
-			a.log.Error("warp routing of the client subnets failed", "err", err)
+			a.log.Error("warp routing of the client subnets failed", "code", "warp_client_routes_failed", "err", err)
 			for id := range warpOf {
 				a.blocked[id] = msg
 			}
@@ -363,9 +420,9 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 		a.syncTorrentGuard(ctx, next, nil, true)
 		return
 	}
-	if err := th.SetTunnels(ctx, ts); err != nil {
+	if err := th.SetTunnels(ctx, ts, tunnelPublishedPorts(next, a.host.SSHPorts())); err != nil {
 		msg := "tunnel firewall: " + shortMsg(err)
-		a.log.Error("tunnel firewall not installed", "err", err)
+		a.log.Error("tunnel firewall not installed", "code", "tunnel_firewall_failed", "err", err)
 		for _, t := range ts {
 			for _, id := range next.ids() {
 				if hostctl.TunnelIface(next.inbounds[id].spec.Listen.Port) == t.Iface && !next.inbounds[id].spec.Tunnel.IsZero() {
@@ -386,7 +443,7 @@ func (a *Agent) syncTunnels(ctx context.Context, next *model) {
 			previous := a.tunV6
 			a.tunV6 = mode
 			if mode != "" {
-				a.log.Warn("the kernel refused nft reject: IPv6 from the tunnels is not rejected", "fallback", mode)
+				a.log.Warn("the kernel refused nft reject: IPv6 from the tunnels is not rejected", "code", "tunnel_v6_reject_unsupported", "fallback", mode)
 				a.event(pb.Severity_SEVERITY_WARNING, "tunnel_v6_fallback", "", map[string]string{"mode": mode})
 			} else if previous != "" && tunnelRejectRequested(ts) {
 				a.event(pb.Severity_SEVERITY_INFO, "tunnel_v6_recovered", "", nil)
@@ -412,7 +469,7 @@ func tunnelRejectRequested(ts []hostctl.Tunnel) bool {
 func (a *Agent) blockedFail(ctx context.Context, spec plugin.InboundSpec, why string) error {
 	if e := a.engines[spec.Protocol]; e != nil {
 		if err := e.Remove(ctx, spec.ID); err != nil {
-			a.log.Warn("remove blocked inbound", "inbound", spec.ID, "err", err)
+			a.log.Warn("remove blocked inbound", "code", "blocked_inbound_remove_failed", "inbound", spec.ID, "err", err)
 		}
 	}
 	return errors.New(why)

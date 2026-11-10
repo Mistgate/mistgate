@@ -77,8 +77,8 @@ func (h liveHost) Cleanup(ctx context.Context) error {
 	return hostctl.CleanupTunnels(ctx)
 }
 
-func (h liveHost) SetTunnels(ctx context.Context, ts []hostctl.Tunnel) error {
-	return h.real.SetTunnels(ctx, ts)
+func (h liveHost) SetTunnels(ctx context.Context, ts []hostctl.Tunnel, published []hostctl.PublishedPort) error {
+	return h.real.SetTunnels(ctx, ts, published)
 }
 func (h liveHost) TunnelCounters(ctx context.Context) (map[uint16]uint64, error) {
 	return h.real.TunnelCounters(ctx)
