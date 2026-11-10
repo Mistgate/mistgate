@@ -103,12 +103,13 @@ func (f *Fleet) Link(ctx context.Context, in LinkIn) (LinkOut, error) {
 	c := &linkCall{f: f, ctx: ctx, core: NewSessionCore(f), at: in.At}
 	switch in.Kind {
 	case LinkOpen:
-		// Only Poison carries over: everything else describes the socket that just ended.
+		// Socket-specific fields restart with each connection. The poison record and node traffic bucket carry over so a failed batch and its budget survive reconnect.
 		if in.Generation == 0 {
 			return LinkOut{}, errors.New("link open needs a generation")
 		}
 		c.state = SessionState{Version: sessionStateVersion, NodeID: in.NodeID, OwnerGeneration: in.Generation,
-			PeerCertSerial: in.CertSerial, PeerCertNotAfter: in.CertNotAfter, Poison: state.Poison, Seal: in.Seal}
+			PeerCertSerial: in.CertSerial, PeerCertNotAfter: in.CertNotAfter, Poison: state.Poison, Seal: in.Seal,
+			StatsBudgetLeftNanos: state.StatsBudgetLeftNanos, StatsBudgetAt: state.StatsBudgetAt}
 		if err := c.step(SessionEvent{Kind: EventOpen}); err != nil {
 			return LinkOut{}, err
 		}

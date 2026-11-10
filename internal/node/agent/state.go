@@ -282,7 +282,7 @@ func loadState(dir string, known func(string) bool) (*model, error) {
 		return newModel(), err
 	}
 	var ds pb.DesiredState
-	if err := protojson.Unmarshal(b, &ds); err != nil {
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(b, &ds); err != nil {
 		return newModel(), fmt.Errorf("%s: %w", fileState, err)
 	}
 	ds.BaseRevision = 0

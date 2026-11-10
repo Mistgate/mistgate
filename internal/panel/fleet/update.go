@@ -11,6 +11,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 )
 
 // This file is the seam to the updates module (internal/panel/update): the stream hands
@@ -35,9 +36,9 @@ type Updates interface {
 	// Updating reports that a rollout step of the node is in flight (command sent, reconnect or gate pending): its
 	// stream drops when the agent re-executes, and that is neither a blip nor an outage.
 	Updating(nodeID string) bool
-	// Serve streams the named file of the current trusted bundle from offset: send gets at most 256 KiB at a time
-	// and the size of the whole file. Errors are Connect errors (NOT_FOUND, RESOURCE_EXHAUSTED, FAILED_PRECONDITION).
-	Serve(ctx context.Context, nodeID, name string, offset uint64, send func(chunk []byte, total uint64) error) error
+	// ServeWithWriteDeadline streams the file and arms the HTTP response's write deadline for each chunk.
+	ServeWithWriteDeadline(ctx context.Context, nodeID, name string, offset uint64, setWriteDeadline func(time.Time) error,
+		send func(chunk []byte, total uint64) error) error
 	// NodeBinary is the absolute path, on the panel's server, of the agent binary for the platform in the current
 	// trusted bundle; "" when there is none. The add-node window offers it as a ready scp command.
 	NodeBinary(goos, goarch string) string
@@ -72,7 +73,7 @@ func (a agentService) FetchUpdate(ctx context.Context, req *connect.Request[agen
 	if u == nil {
 		return connect.NewError(connect.CodeUnimplemented, errors.New("this panel does not serve updates"))
 	}
-	return u.Serve(ctx, id, req.Msg.Name, req.Msg.Offset, func(chunk []byte, total uint64) error {
+	return u.ServeWithWriteDeadline(ctx, id, req.Msg.Name, req.Msg.Offset, panelupdate.WriteDeadlineFromContext(ctx), func(chunk []byte, total uint64) error {
 		return stream.Send(&agentv1.FetchUpdateResponse{Data: chunk, TotalSize: total})
 	})
 }

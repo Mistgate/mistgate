@@ -20,7 +20,7 @@ const (
 	// Generation 3 is the L3 protocols: /dev/net/tun is reachable (PrivateDevices=no with exactly that
 	// device allowed), which the userspace AmneziaWG and WARP backends need, and ExecStopPost removes what a crashed
 	// agent leaves behind (the mgawg* and mgwarp interfaces, the tunnel and WARP nft tables, the WARP routes and rules).
-	// The unit refresh runs the installed binary from a transient systemd unit; the agent never writes through its sandbox.
+	// The resolver fix uses a transient systemd unit so existing generation-3 units do not need a refresh.
 )
 
 // safePath keeps anything that could break out of a unit-file line (spaces, quotes, newlines, %, $) out
@@ -34,7 +34,7 @@ var safePath = regexp.MustCompile(`^/[A-Za-z0-9_./-]*$`)
 // (nftables, sysctl) and CAP_NET_BIND_SERVICE (TCP 443 for the masquerade and ACME). Root is deliberate:
 // the host baseline lives in root-owned /etc/sysctl.d and /etc/systemd/journald.conf.d, and a non-root
 // user could not write those or ask systemd to restart journald. ProtectSystem=strict makes everything
-// else read-only; only the state directory and those two drop-in directories are writable.
+// else read-only; only the state directory, the binary directory and the two host configuration directories are writable.
 // ProtectKernelTunables stays off on purpose: the fq + bbr baseline is applied through /proc/sys.
 //
 // Self-update (generation 2): the directory of the binary is writable (the agent puts <bin>.new and <bin>.prev next to

@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +30,47 @@ const (
 	relayInbound  = "inb_exit"
 	relayInbound2 = "inb_exit2"
 )
+
+func TestInboundStateRefreshRequiresARealChange(t *testing.T) {
+	previous := []store.FleetInboundRow{{ID: "inb_de1", State: "active"}}
+	if inboundRunStateChanged(previous, []store.InboundApplied{{ID: "inb_de1", State: "active"}}) {
+		t.Fatal("an unchanged inbound state requested a fleet-wide refresh")
+	}
+	if !inboundRunStateChanged(previous, []store.InboundApplied{{ID: "inb_de1", State: "failed"}}) {
+		t.Fatal("a changed inbound state did not request a fleet-wide refresh")
+	}
+	if inboundRunStateChanged(previous, []store.InboundApplied{{ID: "inb_other", State: "failed"}}) {
+		t.Fatal("a reported inbound outside the node changed its relay state")
+	}
+}
+
+func TestRelayApplyTreatsInboundReadFailureAsChanged(t *testing.T) {
+	var calls []string
+	changed := relayInboundStateChanged([]store.InboundApplied{{ID: "inb_de1", State: "failed"}},
+		func() (bool, error) {
+			calls = append(calls, "has_relays")
+			return true, nil
+		},
+		func() ([]store.FleetInboundRow, error) {
+			calls = append(calls, "fleet_inbounds")
+			return nil, errors.New("read failed")
+		}, func(string, error) {})
+	if !changed {
+		t.Fatal("failed inbound-state read did not request a relay refresh")
+	}
+	if len(calls) != 2 || calls[0] != "has_relays" || calls[1] != "fleet_inbounds" {
+		t.Fatalf("relay read order = %v, want relay check before inbound rows", calls)
+	}
+	calls = nil
+	if relayInboundStateChanged([]store.InboundApplied{{ID: "inb_de1", State: "failed"}},
+		func() (bool, error) { calls = append(calls, "has_relays"); return false, nil },
+		func() ([]store.FleetInboundRow, error) { calls = append(calls, "fleet_inbounds"); return nil, nil }, func(string, error) {}) {
+		t.Fatal("node without relays requested a refresh")
+	}
+	if len(calls) != 1 || calls[0] != "has_relays" {
+		t.Fatalf("inbound rows were read for a node without relays: %v", calls)
+	}
+}
 
 func newRelayEnv(t *testing.T) *relayEnv {
 	t.Helper()

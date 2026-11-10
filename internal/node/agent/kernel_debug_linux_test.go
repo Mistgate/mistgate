@@ -260,7 +260,15 @@ func TestKernelCaptureReadsAndSummarisesLogs(t *testing.T) {
 	if gotArgs[5] != wantSince {
 		t.Errorf("since argument = %q, want %q", gotArgs[5], wantSince)
 	}
-	waitKernelTest(t, func() bool { return kernelTestRecs(d) >= 6 })
+	// Wait until the fake reader has written every line and the capture has stored its summaries before finishing it.
+	waitKernelTest(t, func() bool {
+		select {
+		case <-process.written:
+			return kernelTestRecs(d) >= 6
+		default:
+			return false
+		}
+	})
 	awgEngine.emitUnknown("mgawg123")
 	d.finish("req_summary", "stopped")
 	<-process.waited

@@ -24,8 +24,9 @@ import (
 // fileSrc serves one file from disk, like the panel's FetchUpdate would.
 type fileSrc struct{ path string }
 
-func (fileSrc) Now() time.Time   { return time.Now() }
-func (fileSrc) Failed() []string { return nil }
+func (fileSrc) Now() time.Time      { return time.Now() }
+func (fileSrc) LocalNow() time.Time { return time.Now() }
+func (fileSrc) Failed() []string    { return nil }
 func (f fileSrc) Fetch(_ context.Context, _ string, off uint64, w io.Writer) (uint64, error) {
 	b, err := os.ReadFile(f.path)
 	if err != nil {

@@ -21,7 +21,10 @@ entries=(
   # 46 MiB in November 2026: closing alerts, the server-side audit filters and retention, the split check rollup and the
   # agent crash-loop alert are admin and jobs code the shipped Workers already carry within their own limits; this entry is
   # their sum and ships nowhere. The node runtime, host history and path loss reads stay out of the edge (no MCP there).
-  "mistgate-edge:46"
+  # 47 MiB with the November 2026 audit fixes (46.01 MiB measured): the sign-in reservations, the cold-link window of
+  # subscriptions, the per-node stats budget and the event limits are code of the public, link and admin Workers, each
+  # of which stays within its own limit below; this entry is their sum.
+  "mistgate-edge:47"
   # Hot path: subscriptions, the person's page, devices. Measured 24.7 MiB (fleet + access + subs, no auth service).
   "mistgate-edge-public:28"
   # The agent link: wireCore plus the link driver. Measured 26.4 MiB.

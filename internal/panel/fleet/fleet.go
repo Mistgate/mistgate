@@ -137,14 +137,16 @@ type Fleet struct {
 	tlsExp time.Time
 
 	mu                     sync.Mutex
-	health                 Health                  // set by SetHealth (health.go); guarded by mu
-	upd                    Updates                 // set by SetUpdates (update.go); guarded by mu
-	warp                   Warp                    // set by SetWarp (l3.go); guarded by mu
-	sessions               map[string]*session     // node id -> the one live agent session
-	owners                 map[string]sessionOwner // authenticated streams claim a generation before Hello
-	stuck                  map[string]stuckSeq     // node id -> the stats batch the database refused last (statsguard.go)
-	liveProjectionWarnings sync.Map                // node id -> struct{}; avoids repeating oversized projection warnings
-	sentSizeWarnings       sync.Map                // node id -> struct{}; the same for the node_sent digest
+	statsBudgetMapMu       sync.Mutex
+	statsBudgets           map[string]*statsBudgetEntry // node id -> panel-time traffic budget, retained across sessions
+	health                 Health                       // set by SetHealth (health.go); guarded by mu
+	upd                    Updates                      // set by SetUpdates (update.go); guarded by mu
+	warp                   Warp                         // set by SetWarp (l3.go); guarded by mu
+	sessions               map[string]*session          // node id -> the one live agent session
+	owners                 map[string]sessionOwner      // authenticated streams claim a generation before Hello
+	stuck                  map[string]stuckSeq          // node id -> the stats batch the database refused last (statsguard.go)
+	liveProjectionWarnings sync.Map                     // node id -> struct{}; avoids repeating oversized projection warnings
+	sentSizeWarnings       sync.Map                     // node id -> struct{}; the same for the node_sent digest
 
 	kick                 chan struct{}
 	pokeMu               sync.Mutex
@@ -218,6 +220,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		sessions:             map[string]*session{},
 		owners:               map[string]sessionOwner{},
 		stuck:                map[string]stuckSeq{},
+		statsBudgets:         map[string]*statsBudgetEntry{},
 		portCheckLocks:       map[string]*portCheckLock{},
 		decoySyncing:         map[string]bool{},
 		decoySyncDirty:       map[string]bool{},

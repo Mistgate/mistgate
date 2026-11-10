@@ -1450,7 +1450,7 @@ func TestBuildFleetLiveIsPureDeterministicAndClipsOnlyAgentFields(t *testing.T) 
 	userID, deviceID, protocol := strings.Repeat("u", 70), strings.Repeat("d", 70), strings.Repeat("p", 70)
 	inboundID, detail := strings.Repeat("i", 80), strings.Repeat("x", 300)
 	state := SessionState{Version: sessionStateVersion, NodeID: "nod_projection_pure", OwnerGeneration: 9,
-		LastEndUnix: now.Add(-time.Minute).Unix(), Pending: map[string]PendingRequest{"pending": {Kind: PendingDoctor}}}
+		Pending: map[string]PendingRequest{"pending": {Kind: PendingDoctor}}}
 	stateBefore := state
 	stateBefore.Pending = map[string]PendingRequest{"pending": state.Pending["pending"]}
 	stats := &agentv1.StatsBatch{IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
@@ -1553,7 +1553,7 @@ func TestBuildFleetLiveSkipsOversizedProjection(t *testing.T) {
 	}
 }
 
-func TestOlderStatsBatchLeavesProjectionUnchanged(t *testing.T) {
+func TestOlderNodeIntervalStillProjectsAcceptedStats(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "core-live-older")
 	ids := e.fixture(state.NodeID)
 	tr := stepHello(t, core, ctx, state, now, hello("instance-live-older", 0, "").GetHello())
@@ -1574,16 +1574,16 @@ func TestOlderStatsBatchLeavesProjectionUnchanged(t *testing.T) {
 		IntervalStartUnix: now.Add(-20 * time.Second).Unix(), IntervalEndUnix: now.Add(-time.Second).Unix(),
 		Host: &agentv1.HostMetrics{CpuPct: 99, NetRxBps: 999},
 	}}}
-	second, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: older})
+	_, err = coreStep(ctx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: older})
 	if err != nil {
 		t.Fatal(err)
 	}
 	afterRows, err := e.st.NodeLive(e.ctx, now, state.NodeID, true)
-	if err != nil || !reflect.DeepEqual(beforeRows, afterRows) {
-		t.Fatalf("older batch changed node_live: before=%+v after=%+v err=%v", beforeRows, afterRows, err)
+	if err != nil || len(afterRows) != 1 || afterRows[0].RxBps != 999 || afterRows[0].CPUPct != 99 || afterRows[0].SampleAt != now.Unix() {
+		t.Fatalf("accepted stats after a node clock step did not refresh the live view: rows=%+v err=%v", afterRows, err)
 	}
-	if second.State.LastEndUnix != first.State.LastEndUnix {
-		t.Fatalf("older batch changed core state: end=%d/%d", first.State.LastEndUnix, second.State.LastEndUnix)
+	if reflect.DeepEqual(beforeRows, afterRows) {
+		t.Fatalf("accepted stats after a node clock step left node_live unchanged: %+v", afterRows)
 	}
 }
 
@@ -1639,7 +1639,36 @@ func TestTopRatesKeepsTheHighest(t *testing.T) {
 	}
 }
 
-func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
+func TestSessionCoreHealthUsesOnlyTheNodesLiveInboundSet(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-health-inbound-set")
+	ids := e.fixture(state.NodeID)
+	connected := stepHello(t, core, ctx, state, now, hello("instance-health-inbound-set", 0, "").GetHello())
+	connected.State.L3.AWG = map[string]l3HealthMemo{"inb_retired": {}}
+	health := []*agentv1.InboundHealth{{InboundId: ids.i1, Awg: &agentv1.AwgHealth{}}}
+	pin := strings.Repeat("ab", 32)
+	for i := 0; i < maxLiveRunningInbounds+100; i++ {
+		health = append(health, &agentv1.InboundHealth{InboundId: fmt.Sprintf("inb_fake_%03d", i), Awg: &agentv1.AwgHealth{},
+			CertPinSha256: pin, CertNotAfterUnix: now.Add(time.Hour).Unix()})
+	}
+	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(), Health: health,
+	}}}
+	tr, err := coreStep(ctx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
+	if err != nil || tr.Close != nil {
+		t.Fatalf("stats health transition = %+v, err %v", tr, err)
+	}
+	if len(tr.State.L3.AWG) != 1 || tr.State.L3.AWG[ids.i1].At.IsZero() {
+		t.Fatalf("health memo contains non-owned inbounds or lost the owned inbound: %+v", tr.State.L3.AWG)
+	}
+	if _, ok := tr.State.L3.AWG["inb_retired"]; ok {
+		t.Fatal("a memo entry outside the node's live inbound set was retained")
+	}
+	if got := len(certStats(batch.GetStats(), now)); got > maxLiveRunningInbounds {
+		t.Fatalf("certificate health rows processed = %d, want at most %d", got, maxLiveRunningInbounds)
+	}
+}
+
+func TestSessionCorePermanentStatsFailureIsDroppedImmediately(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "core-poison")
 	ids := e.fixture(state.NodeID)
 	tr := stepHello(t, core, ctx, state, now, hello("instance-poison", 0, "").GetHello())
@@ -1652,39 +1681,42 @@ func TestSessionCorePoisonBatchDroppedAfterReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Close == nil || first.Close.Class != CloseInternal || len(first.Frames) != 0 {
-		t.Fatalf("first refusal = close %v, frames %#v", first.Close, first.Frames)
-	}
-	oldAdapter := newTestSession(e, ctx, nil, state)
-	oldAdapter.persistPoison(first.State.Poison)
-	disconnected, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	oldAdapter.persistPoison(disconnected.State.Poison)
-
-	newOwner, newCtx := e.f.claimOwner(state.NodeID, e.ctx)
-	newCore := NewSessionCore(e.f)
-	newState := SessionState{Version: sessionStateVersion, NodeID: state.NodeID, OwnerGeneration: newOwner,
-		HelloDeadline: now.Add(2 * time.Second).Add(helloTimeout), Poison: e.f.poisonFor(state.NodeID)}
-	newHello, err := coreStep(newCtx, newCore, newState, SessionEvent{Kind: EventHello, At: now.Add(2 * time.Second), Frame: hello("instance-poison", 0, "")})
-	if err != nil || newHello.Close != nil {
-		t.Fatalf("reconnect Hello = close %v, err %v", newHello.Close, err)
-	}
-	second, err := coreStep(newCtx, newCore, newHello.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(3 * time.Second), Frame: batch})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if second.Close != nil || len(second.Frames) != 1 || second.Frames[0].GetAck().GetUpToSeq() != 1 {
-		t.Fatalf("second refusal = close %v, frames %#v", second.Close, second.Frames)
-	}
-	newAdapter := newTestSession(e, newCtx, nil, newState)
-	newAdapter.persistPoison(second.State.Poison)
-	if e.f.poisonFor(state.NodeID) != nil {
-		t.Fatal("the successful drop left poison state behind")
+	if first.Close != nil || len(first.Frames) != 1 || first.Frames[0].GetAck().GetUpToSeq() != 1 || first.State.Poison != nil {
+		t.Fatalf("permanent refusal = close %v, frames %#v, poison %+v", first.Close, first.Frames, first.State.Poison)
 	}
 	if n := e.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'stats_dropped'`, state.NodeID); n != 1 {
 		t.Fatalf("stats_dropped events = %d, want 1", n)
+	}
+}
+
+func TestSessionCoreRetriesTransientStatsFailureBeforePoisonWindow(t *testing.T) {
+	e, core, ctx, state, now := coreFixture(t, "core-poison-retry")
+	ids := e.fixture(state.NodeID)
+	connected := stepHello(t, core, ctx, state, now, hello("instance-poison-retry", 0, "").GetHello())
+	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
+		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
+		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 5}},
+	}}}
+	failedCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	first, err := coreStep(failedCtx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
+	if err != nil || first.Close == nil || first.State.Poison == nil {
+		t.Fatalf("first transient refusal = transition %+v, err %v", first, err)
+	}
+	failedCtx, cancel = context.WithCancel(ctx)
+	cancel()
+	second, err := coreStep(failedCtx, core, first.State, SessionEvent{Kind: EventAgentFrame, At: now.Add(4 * time.Minute), Frame: batch})
+	if err != nil || second.Close == nil || len(second.Frames) != 0 {
+		t.Fatalf("second transient refusal = close %v, frames %#v, err %v", second.Close, second.Frames, err)
+	}
+	if second.State.Poison == nil || !second.State.Poison.FirstFailureAt.Equal(now) {
+		t.Fatalf("the first failure time was not retained: %+v", second.State.Poison)
+	}
+	if got := e.count(`SELECT last_seq FROM node WHERE id = ?`, state.NodeID); got != 0 {
+		t.Fatalf("transient failures advanced last_seq to %d", got)
+	}
+	if got := e.count(`SELECT count(*) FROM event WHERE code = 'stats_dropped'`); got != 0 {
+		t.Fatalf("transient failures recorded %d dropped batches", got)
 	}
 }
 
@@ -1692,15 +1724,17 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "core-poison-skip-error")
 	ids := e.fixture(state.NodeID)
 	connected := stepHello(t, core, ctx, state, now, hello("instance-poison-skip-error", 0, "").GetHello())
-	e.exec(`CREATE TRIGGER reject_core_stats BEFORE INSERT ON traffic_bucket WHEN NEW.user_id = 'usr_alice' BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
 	batch := &agentv1.ConnectRequest{Seq: 1, Message: &agentv1.ConnectRequest_Stats{Stats: &agentv1.StatsBatch{
 		IntervalStartUnix: now.Add(-10 * time.Second).Unix(), IntervalEndUnix: now.Unix(),
 		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 5}},
 	}}}
-	first, err := coreStep(ctx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
+	failedCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	first, err := coreStep(failedCtx, core, connected.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: batch})
 	if err != nil || first.Close == nil || first.State.Poison == nil {
 		t.Fatalf("first refusal = transition %+v, err %v", first, err)
 	}
+	first.State.Poison.FirstFailureAt = now.Add(-statsPoisonRetryWindow)
 	adapter := newTestSession(e, ctx, nil, state)
 	adapter.persistPoison(first.State.Poison)
 	disconnected, err := coreStep(ctx, core, first.State, SessionEvent{Kind: EventDisconnected, At: now.Add(time.Second)})
@@ -1718,6 +1752,7 @@ func TestSessionCoreRetainsPoisonWhenDropCannotAdvanceSequence(t *testing.T) {
 	if err != nil || newHello.Close != nil {
 		t.Fatalf("reconnect Hello = close %v, err %v", newHello.Close, err)
 	}
+	e.exec(`CREATE TRIGGER reject_core_stats BEFORE INSERT ON traffic_bucket WHEN NEW.user_id = 'usr_alice' BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
 	e.exec(`CREATE TRIGGER reject_core_skip_seq BEFORE UPDATE OF last_seq ON node WHEN NEW.last_seq > OLD.last_seq BEGIN SELECT RAISE(ABORT, 'test skip refusal'); END`)
 	second, err := coreStep(newCtx, newCore, newHello.State, SessionEvent{Kind: EventAgentFrame,
 		At: now.Add(3 * time.Second), Frame: batch})

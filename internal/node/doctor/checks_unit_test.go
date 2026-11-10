@@ -48,14 +48,14 @@ func TestUnitGenerationCheck(t *testing.T) {
 
 func TestUnitGenerationRefreshFailureOutcome(t *testing.T) {
 	f := newFake(t)
-	f.put("state/unit-refresh.outcome", `{"at":"2027-01-15T08:00:00Z","from_gen":2,"to_gen":3,"result":"rolled_back","reason":"service did not stay active"}`)
+	f.put("state/unit-refresh.outcome", fmt.Sprintf(`{"at":"2027-01-15T08:00:00Z","from_gen":2,"to_gen":%d,"result":"rolled_back","reason":"service did not stay active"}`, unit.Generation))
 	e := f.env()
 	e.StateDir = "state"
 	e.UnitGen = 2
 	e.UnderSystemd = true
 	r := run(t, New(e), CheckUnitGeneration)
 	if r.Status != Warn || r.Code != "unit_generation.refresh_failed" || r.Params["reason"] != "service did not stay active" ||
-		r.Params["from_gen"] != "2" || r.Params["to_gen"] != "3" {
+		r.Params["from_gen"] != "2" || r.Params["to_gen"] != strconv.Itoa(unit.Generation) {
 		t.Fatalf("refresh failure outcome = %+v", r)
 	}
 }
@@ -73,7 +73,7 @@ func TestUnitGenerationSkipsAnotherSystemdUnit(t *testing.T) {
 
 func TestUnitGenerationRefreshOutcomeMustBeNewerThanAgentStart(t *testing.T) {
 	f := newFake(t)
-	f.put("state/unit-refresh.outcome", `{"at":"2027-01-15T08:00:00Z","from_gen":2,"to_gen":3,"result":"ok"}`)
+	f.put("state/unit-refresh.outcome", fmt.Sprintf(`{"at":"2027-01-15T08:00:00Z","from_gen":2,"to_gen":%d,"result":"ok"}`, unit.Generation))
 	e := f.env()
 	e.StateDir, e.UnitGen, e.UnderSystemd = "state", 2, true
 	e.AgentStartedAt = time.Date(2027, 1, 15, 8, 0, 0, 0, time.UTC)
@@ -85,9 +85,9 @@ func TestUnitGenerationRefreshOutcomeMustBeNewerThanAgentStart(t *testing.T) {
 
 func TestUnitGenerationSuccessfulOutcomeIsReportedAndRemoved(t *testing.T) {
 	f := newFake(t)
-	f.put("state/unit-refresh.outcome", `{"at":"2027-01-15T09:00:00Z","from_gen":2,"to_gen":3,"result":"ok"}`)
+	f.put("state/unit-refresh.outcome", fmt.Sprintf(`{"at":"2027-01-15T09:00:00Z","from_gen":2,"to_gen":%d,"result":"ok"}`, unit.Generation))
 	e := f.env()
-	e.StateDir, e.UnitGen, e.UnderSystemd = "state", 3, true
+	e.StateDir, e.UnitGen, e.UnderSystemd = "state", unit.Generation, true
 	e.AgentStartedAt = time.Date(2027, 1, 15, 8, 0, 0, 0, time.UTC)
 	r := run(t, New(e), CheckUnitGeneration)
 	if r.Status != OK || r.Code != CodeUnitCurrent {
@@ -114,7 +114,7 @@ func TestRefreshUnitFix(t *testing.T) {
 	})
 
 	plan := d.Apply(context.Background(), FixRefreshUnit, true, nil)
-	if !plan.OK || !strings.Contains(plan.Detail, "would start") || !strings.Contains(plan.Detail, "2") || !strings.Contains(plan.Detail, "3") ||
+	if !plan.OK || !strings.Contains(plan.Detail, "would start") || !strings.Contains(plan.Detail, "2") || !strings.Contains(plan.Detail, strconv.Itoa(unit.Generation)) ||
 		!strings.Contains(plan.Detail, "agent restarts") || !strings.Contains(plan.Detail, "connections drop for a few seconds") {
 		t.Fatalf("dry run = %+v", plan)
 	}

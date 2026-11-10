@@ -284,6 +284,48 @@ func TestDebugCaptureEndedWhileOfflineIsShippedOnTheNextSession(t *testing.T) {
 	}
 }
 
+func TestDebugCaptureIsNotShippableUntilEndSummaryIsAppended(t *testing.T) {
+	d := newDebugState(nil, time.Now)
+	entered, release := make(chan struct{}), make(chan struct{})
+	finished := make(chan *debugCapture, 1)
+	var capture *debugCapture
+	if _, ok := d.start("req_de1", slog.LevelInfo, nil, time.Hour, func(string) {}, func(c *debugCapture) {
+		capture = c
+		c.onEnd = func(c *debugCapture, _ string) {
+			close(entered)
+			<-release
+			d.addFinal(c, logRecord{level: pb.Severity_SEVERITY_INFO, source: "awg", msg: "capture summary"})
+		}
+	}); !ok {
+		t.Fatal("capture did not start")
+	}
+	go func() { finished <- d.finish("req_de1", "stopped") }()
+	<-entered
+	if got, _ := d.take("req_de1"); got != nil {
+		t.Fatal("capture became shippable before its summary was appended")
+	}
+	if _, ok := d.start("req_de2", slog.LevelInfo, nil, time.Hour, func(string) {}); ok {
+		t.Fatal("another capture started while the first capture was finishing")
+	}
+	close(release)
+	select {
+	case got := <-finished:
+		if got != capture {
+			t.Fatal("finish returned a different capture")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("capture finish did not complete")
+	}
+	got, reason := d.take("req_de1")
+	if got != capture || reason != "stopped" {
+		t.Fatalf("finished capture = %p %q", got, reason)
+	}
+	records, _ := d.records(got)
+	if len(records) != 1 || records[0].msg != "capture summary" {
+		t.Fatalf("summary records = %+v", records)
+	}
+}
+
 func TestDebugCaptureShipsChunksWithStableSequenceNumbers(t *testing.T) {
 	d := newDebugState(nil, time.Now)
 	if _, ok := d.start("req_chunks", slog.LevelDebug, nil, time.Hour, func(string) {}); !ok {

@@ -1082,6 +1082,26 @@ func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesire
 	return out, rows.Err()
 }
 
+// HasUserCredentialOnNode checks the desired-access joins for one user without building the node's full credential list.
+func (a Access) HasUserCredentialOnNode(ctx context.Context, nodeID, userID string) (bool, error) {
+	var found bool
+	err := a.s.R.QueryRowContext(ctx,
+		`SELECT EXISTS (
+			SELECT 1
+			FROM inbound i
+			JOIN profile p ON p.id = i.profile_id
+			JOIN user_group_profile gp ON gp.profile_id = p.id
+			JOIN user u ON u.id = ? AND u.group_id = gp.group_id AND u.status = 'active'
+			     AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = i.node_id))
+			JOIN device_credential c ON c.user_id = u.id AND c.protocol = p.protocol AND c.revoked_at IS NULL
+			     AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
+			JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
+			WHERE i.node_id = ? AND i.enabled = 1
+			  AND NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)
+		)`, userID, nodeID).Scan(&found)
+	return found, err
+}
+
 // SetUserExpiry sets a user's term end (zero = never).
 func (a Access) SetUserExpiry(ctx context.Context, id string, t time.Time) error {
 	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET expires_at = ? WHERE id = ?`, accNullUnix(t), id)

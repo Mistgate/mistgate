@@ -3,10 +3,13 @@
 package hostctl
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -128,6 +131,99 @@ func TestSetResolverRewritesResolvConfAndCleanupRestoresIt(t *testing.T) {
 	}
 }
 
+func TestSetResolverUsesTransientUnitForResolvConfWrites(t *testing.T) {
+	t.Setenv("MISTGATE_UNIT_GEN", "3")
+	h, calls, _ := fixHost(t, false)
+	orig := "nameserver 10.0.0.1\n"
+	if err := os.WriteFile(h.resolvConfFile, []byte(orig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.SetResolver(context.Background(), []string{"9.9.9.9"}); err != nil {
+		t.Fatal(err)
+	}
+	var writes int
+	for _, call := range *calls {
+		if call.name != "systemd-run" {
+			continue
+		}
+		writes++
+		if !strings.Contains(call.args, "mistgate-resolver-write") || !strings.Contains(call.args, h.resolvConfFile) {
+			t.Errorf("unexpected privileged resolver command: %+v", call)
+		}
+	}
+	if writes != 2 {
+		t.Fatalf("systemd-run writes = %d, calls = %+v", writes, *calls)
+	}
+	if b, err := os.ReadFile(h.resolvConfFile); err != nil || string(b) != orig {
+		t.Fatalf("the sandbox wrote resolv.conf directly: %q, %v", b, err)
+	}
+}
+
+func TestWriteResolverFileUsesTransientUnitBesideTarget(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("the transient resolver writer is Linux-only")
+	}
+	if os.Geteuid() != 0 {
+		t.Skip("a system transient unit needs root on this runner")
+	}
+	if _, err := exec.LookPath("systemd-run"); err != nil {
+		t.Skip("systemd-run is unavailable")
+	}
+	if _, err := exec.Command("systemctl", "show-environment").CombinedOutput(); err != nil {
+		t.Skip("the system systemd manager is unavailable")
+	}
+	t.Setenv("MISTGATE_UNIT_GEN", "3")
+	for _, script := range []string{resolverWriteScript, resolverLinkScript} {
+		if !strings.Contains(script, " EXIT HUP INT TERM") {
+			t.Fatalf("transient resolver script does not clean up after unit termination: %s", script)
+		}
+		for _, positional := range []string{"$1", "$2", "$3", "$4"} {
+			if !strings.Contains(script, positional) {
+				t.Fatalf("transient resolver script lacks positional argument %s: %s", positional, script)
+			}
+		}
+		for _, expansion := range []string{"${", "$$", "$target", "$link", "$tmp", "$dir", "$mode"} {
+			if strings.Contains(script, expansion) {
+				t.Fatalf("transient resolver script contains systemd-expanded text %q: %s", expansion, script)
+			}
+		}
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "resolved.conf.d", "resolved.conf")
+	if _, err := os.Stat(filepath.Dir(target)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("test target directory should start absent, stat error = %v", err)
+	}
+	tmp, err := resolverTempPath(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(tmp) != filepath.Dir(target) {
+		t.Fatalf("temporary file %q is not beside target %q", tmp, target)
+	}
+	h := &linuxHost{run: execRunner}
+	body := bytes.Repeat([]byte("DNS=192.0.2.53\n"), 1<<16)
+	if err := h.writeResolverFileAtTemp(context.Background(), target, tmp, body, 0o640); err != nil {
+		t.Fatalf("transient systemd write: %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || !bytes.Equal(got, body) {
+		t.Fatalf("target contents did not land atomically: equal=%v err=%v", bytes.Equal(got, body), err)
+	}
+	if _, err := os.Stat(filepath.Dir(target)); err != nil {
+		t.Fatalf("transient unit did not create the target directory: %v", err)
+	}
+	if fi, err := os.Stat(target); err != nil || fi.Mode().Perm() != 0o640 {
+		t.Fatalf("target mode = %v, err=%v", fi, err)
+	}
+	if _, err := os.Lstat(tmp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary file remains after the rename: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(target))
+	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(target) {
+		t.Fatalf("temporary files were not cleaned up: entries=%v err=%v", entries, err)
+	}
+}
+
 func TestSetResolverKeepsASymlinkResolvConf(t *testing.T) {
 	h, _, dir := fixHost(t, false)
 	target := filepath.Join(dir, "stub-resolv.conf")
@@ -195,6 +291,23 @@ func TestSetResolverWithSystemdResolved(t *testing.T) {
 	}
 	if count(calls, "systemctl", "restart systemd-resolved") != 2 { // restarted again so the change is undone live
 		t.Fatalf("calls = %+v", *calls)
+	}
+}
+
+func TestSetResolverUsesTransientUnitForResolvedDropIn(t *testing.T) {
+	t.Setenv("MISTGATE_UNIT_GEN", "3")
+	h, calls, _ := fixHost(t, true)
+	if err := h.SetResolver(context.Background(), []string{"77.88.8.8"}); err != nil {
+		t.Fatal(err)
+	}
+	var write *call
+	for i := range *calls {
+		if (*calls)[i].name == "systemd-run" {
+			write = &(*calls)[i]
+		}
+	}
+	if write == nil || !strings.Contains(write.args, "mistgate-resolver-write") || !strings.Contains(write.args, h.resolvedFile) {
+		t.Fatalf("resolved drop-in did not use the transient writer: %+v", *calls)
 	}
 }
 

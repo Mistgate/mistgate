@@ -25,6 +25,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/httpserver/ratelimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/web"
 )
 
@@ -451,6 +452,8 @@ func (s *Server) serveAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	if agentStream(r) {
 		liftDeadlines(w)
+		controller := http.NewResponseController(w)
+		r = r.WithContext(update.WithWriteDeadline(r.Context(), controller.SetWriteDeadline))
 	} else {
 		r.Body = http.MaxBytesReader(w, r.Body, agentUnauthBody)
 	}
@@ -689,10 +692,13 @@ func (s *Server) Serve(ctx context.Context, o ServeOptions) error {
 			ReadHeaderTimeout: 10 * time.Second,
 			ReadTimeout:       30 * time.Second,
 			WriteTimeout:      60 * time.Second,
-			IdleTimeout:       2 * time.Minute,
-			MaxHeaderBytes:    16 << 10,
-			TLSConfig:         tlsCfg,
-			ErrorLog:          log.New(serverLog{s.cfg.Log}, "", 0),
+			// This frees an HTTP/2 handler when a pending write makes no progress for two minutes.
+			// Go 1.27 starts the timer only when data is pending and extends it whenever bytes are written, so idle connections and slow readers that keep making progress are unaffected.
+			HTTP2:          &http.HTTP2Config{WriteByteTimeout: 2 * time.Minute},
+			IdleTimeout:    2 * time.Minute,
+			MaxHeaderBytes: 16 << 10,
+			TLSConfig:      tlsCfg,
+			ErrorLog:       log.New(serverLog{s.cfg.Log}, "", 0),
 		}
 	}
 	tlsCfg, mgr, err := s.publicTLS(o)

@@ -3,6 +3,8 @@ package update
 import (
 	"bytes"
 	"context"
+	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -148,10 +150,33 @@ func TestBundleRescanIfChanged(t *testing.T) {
 	if e.s.current().view.Status != adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED {
 		t.Fatalf("a new bundle is noticed: %+v", e.s.current().view)
 	}
+	// files read right after they were written are read again: a same-size rewrite within one timestamp tick would
+	// otherwise go unnoticed
 	again := e.s.current()
 	e.s.rescanIfChanged()
-	if e.s.current() != again {
-		t.Fatal("unchanged again")
+	if e.s.current() == again {
+		t.Fatal("a directory scanned right after it changed must be scanned again")
+	}
+	// once the files are older than the racy window, an unchanged directory is left alone
+	dist := filepath.Join(e.dir, "dist")
+	old := time.Now().Add(-time.Hour)
+	ents, err := os.ReadDir(dist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ent := range ents {
+		if err := os.Chtimes(filepath.Join(dist, ent.Name()), old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.s.rescanIfChanged()
+	settledScan := e.s.current()
+	if settledScan.view.Status != adminv1.BundleStatus_BUNDLE_STATUS_TRUSTED {
+		t.Fatalf("the settled bundle is trusted: %+v", settledScan.view)
+	}
+	e.s.rescanIfChanged()
+	if e.s.current() != settledScan {
+		t.Fatal("an unchanged directory must not be rescanned")
 	}
 	// an unchanged directory whose trusted manifest has expired is read again: it is no longer trusted
 	e.clk.Advance(1001 * time.Second)
@@ -258,12 +283,13 @@ func TestServeConcurrencyCap(t *testing.T) {
 	name := "mistgate-node-linux-amd64"
 	hold, started := make(chan struct{}), make(chan struct{}, maxServes)
 	var wg sync.WaitGroup
-	for range maxServes {
+	nodes := []string{"nod_a", "nod_b", "nod_c", "nod_d"}
+	for _, nodeID := range nodes {
 		wg.Add(1)
-		go func() {
+		go func(nodeID string) {
 			defer wg.Done()
 			first := true
-			e.s.Serve(e.ctx, "nod_a", name, 0, func([]byte, uint64) error {
+			e.s.Serve(e.ctx, nodeID, name, 0, func([]byte, uint64) error {
 				if first {
 					first = false
 					started <- struct{}{}
@@ -271,7 +297,7 @@ func TestServeConcurrencyCap(t *testing.T) {
 				}
 				return nil
 			})
-		}()
+		}(nodeID)
 	}
 	for range maxServes {
 		<-started
@@ -284,6 +310,72 @@ func TestServeConcurrencyCap(t *testing.T) {
 	wg.Wait()
 	if err := e.s.Serve(e.ctx, "nod_b", name, 0, sink.send); err != nil {
 		t.Errorf("after the others finished: %v", err)
+	}
+}
+
+func TestServeAllowsOnlyOneDownloadPerNode(t *testing.T) {
+	e := newEnv(t)
+	e.bundle("1.0", 10, map[string][]byte{"mistgate-node-linux-amd64": randBytes(300 << 10)})
+	started, hold, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(finished)
+		_ = e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, func([]byte, uint64) error {
+			select {
+			case <-started:
+			default:
+				close(started)
+			}
+			<-hold
+			return nil
+		})
+	}()
+	<-started
+	var sink chunkSink
+	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); connectCode(err) != connect.CodeResourceExhausted {
+		t.Fatalf("second download for one node: %v", err)
+	}
+	close(hold)
+	<-finished
+	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); err != nil {
+		t.Fatalf("download after the first finished: %v", err)
+	}
+}
+
+func TestServeArmsAndClearsWriteDeadlineWhenChunkSendStalls(t *testing.T) {
+	e := newEnv(t)
+	e.bundle("1.0", 10, map[string][]byte{"mistgate-node-linux-amd64": randBytes(300 << 10)})
+	e.s.sendTimeout = 20 * time.Millisecond
+	var deadlines []time.Time
+	setDeadline := func(deadline time.Time) error {
+		deadlines = append(deadlines, deadline)
+		return nil
+	}
+	err := e.s.ServeWithWriteDeadline(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, setDeadline, func([]byte, uint64) error {
+		return os.ErrDeadlineExceeded
+	})
+	if connectCode(err) != connect.CodeUnavailable || !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("stalled send = %v", err)
+	}
+	if len(deadlines) != 2 || deadlines[0].IsZero() || !deadlines[1].IsZero() {
+		t.Fatalf("write deadlines = %v, want one arm and one clear", deadlines)
+	}
+	var sink chunkSink
+	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); err != nil {
+		t.Fatalf("download slot stayed occupied after a stalled send: %v", err)
+	}
+}
+
+func TestServeContinuesWhenWriteDeadlineIsNotSupported(t *testing.T) {
+	e := newEnv(t)
+	want := randBytes(300 << 10)
+	e.bundle("1.0", 10, map[string][]byte{"mistgate-node-linux-amd64": want})
+	var sink chunkSink
+	setDeadline := func(time.Time) error { return http.ErrNotSupported }
+	if err := e.s.ServeWithWriteDeadline(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, setDeadline, sink.send); err != nil {
+		t.Fatalf("download with an unsupported write deadline: %v", err)
+	}
+	if got := sink.bytes(); !bytes.Equal(got, want) {
+		t.Fatalf("downloaded %d bytes, want %d", len(got), len(want))
 	}
 }
 

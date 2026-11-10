@@ -1156,7 +1156,8 @@ func TestEdgeLinkFramesBeforeThePeersCloseAreStepped(t *testing.T) {
 // 6. A failed step closes the socket 1011 and writes nothing; frames queued behind it are dropped; after the reconnect every
 // stats batch is counted exactly once, also the one whose step failed after its database write committed.
 func TestEdgeLinkFailedStepCountsEveryBatchOnce(t *testing.T) {
-	r := newEdgeRig(t, edgeOpts{})
+	// The panel starts with a full six-hour bucket, so this test can keep exercising its original 20 ms batches.
+	r := newEdgeRig(t, edgeOpts{statsEvery: 20 * time.Millisecond})
 	ag := r.start(nil)
 	eventually(t, func() bool { return ag.eng.has("inb_edge") && r.session() == 1 }, "connected")
 	ag.eng.setEmit(true)
@@ -1165,12 +1166,12 @@ func TestEdgeLinkFailedStepCountsEveryBatchOnce(t *testing.T) {
 		return up > 0 && countSteps(r.em.steps(r.nodeID), stepIs(1, fleet.LinkFrame, "stats")) >= 3
 	}, "stats counted")
 
-	// The failing step is slow, so that frames queue behind it (the agent sends a batch every 20 ms).
+	// The failing step lasts longer than a stats interval, so a later batch queues behind it.
 	var slow atomic.Bool
 	r.em.setBefore(func(ctx context.Context, in fleet.LinkIn) {
 		if in.Kind == fleet.LinkFrame && slow.CompareAndSwap(true, false) {
 			select {
-			case <-time.After(200 * time.Millisecond):
+			case <-time.After(1500 * time.Millisecond):
 			case <-ctx.Done():
 			}
 		}

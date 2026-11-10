@@ -55,6 +55,7 @@ type Fleet interface {
 }
 
 const updateTimeoutCapability = "update-timeout/1"
+const bundleSendStallTimeout = 120 * time.Second
 
 // Health is what the rollout gate needs from the health module (*health.Service implements it); nil = no probe gate.
 type Health interface {
@@ -136,11 +137,13 @@ type Service struct {
 	now  func() time.Time
 	dist string
 
-	bmu    sync.Mutex // guards the bundle state and the file hash cache
-	scanMu sync.Mutex // serializes scans and their follow-up table reloads
-	bundle *bundleState
-	hashes map[string]hashEntry
-	serves int // concurrent downloads, guarded by bmu
+	bmu          sync.Mutex // guards the bundle state and the file hash cache
+	scanMu       sync.Mutex // serializes scans and their follow-up table reloads
+	bundle       *bundleState
+	hashes       map[string]hashEntry
+	serves       int // concurrent downloads, guarded by bmu
+	servingNodes map[string]struct{}
+	sendTimeout  time.Duration
 
 	networkTableMu       sync.Mutex
 	networkTableSHA      string
@@ -213,6 +216,7 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 	cfg.Timing.defaults()
 	s := &Service{st: st, fl: fl, hl: hl, cfg: cfg, log: cfg.Log, now: cfg.Now,
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
+		servingNodes: map[string]struct{}{}, sendTimeout: bundleSendStallTimeout,
 		parseNetworkTable: asndb.Parse,
 		inflight:          map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
 		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +22,22 @@ import (
 	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/release"
 )
+
+type writeDeadlineContextKey struct{}
+
+// WithWriteDeadline passes the HTTP handler's per-response write deadline setter to streamed bundle responses.
+func WithWriteDeadline(ctx context.Context, set func(time.Time) error) context.Context {
+	if set == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, writeDeadlineContextKey{}, set)
+}
+
+// WriteDeadlineFromContext returns the HTTP response's write deadline setter when the handler attached one.
+func WriteDeadlineFromContext(ctx context.Context) func(time.Time) error {
+	set, _ := ctx.Value(writeDeadlineContextKey{}).(func(time.Time) error)
+	return set
+}
 
 // The release bundle: <data-dir>/dist/{manifest.json, manifest.sig, <binaries>}.
 
@@ -36,9 +53,20 @@ type fileStamp struct {
 	modTime time.Time
 }
 
+// racyWindow is how close to "now" a file's modification time may be before its size and time stop proving that the
+// file is the one that was read. A file rewritten with the same size within one timestamp tick (a few milliseconds on
+// Linux, up to two seconds on FAT) looks unchanged; inode and ctime do not help, a rewrite in place keeps the inode and
+// ctime ticks like mtime. So, as git does for its index, what was read that soon after the change is read again.
+const racyWindow = 2 * time.Second
+
+// settled reports that a file with this modification time, read at the instant at, cannot have been rewritten
+// unnoticed since: a later rewrite would carry a later timestamp.
+func settled(modTime, at time.Time) bool { return modTime.Before(at.Add(-racyWindow)) }
+
 type hashEntry struct {
 	fileStamp
 	sha string
+	at  time.Time // when the file was hashed, by the system clock the filesystem stamps with
 }
 
 // bundleState is one scan of the directory. It is never modified after it is published, so handlers can share it.
@@ -49,6 +77,7 @@ type bundleState struct {
 	trusted  bool
 	files    map[string]fileStamp // listed files, when trusted
 	stamp    string               // fingerprint of the directory listing, to notice changes
+	settled  bool                 // no file was changed so shortly before the scan that the stamp could miss a rewrite
 }
 
 func bundleErr(b *adminv1.Bundle, status adminv1.BundleStatus, code string, params map[string]string) *adminv1.Bundle {
@@ -212,13 +241,13 @@ func (s *Service) notifyNetworkBundleChanged() {
 	}
 }
 
-// rescanIfChanged is the periodic poll: a scan only when the directory listing (names, sizes, mtimes) changed, or
-// when the trusted manifest has expired since the last scan (an expired bundle must not stay trusted in memory).
+// rescanIfChanged scans again when the directory changed, when the last scan read a file too soon after its change to
+// be sure of it, and when a trusted manifest has expired.
 func (s *Service) rescanIfChanged() {
-	stamp := dirStamp(s.dist)
+	stamp, _ := dirStamp(s.dist)
 	s.bmu.Lock()
 	b := s.bundle
-	same := b != nil && b.stamp == stamp && !(b.trusted && s.now().Unix() > b.manifest.Expires)
+	same := b != nil && b.stamp == stamp && b.settled && !(b.trusted && s.now().Unix() > b.manifest.Expires)
 	s.bmu.Unlock()
 	if !same {
 		s.rescan()
@@ -231,25 +260,29 @@ func (s *Service) current() *bundleState {
 	return s.bundle
 }
 
-// dirStamp is a fingerprint of the regular files in dir.
-func dirStamp(dir string) string {
+// dirStamp is a fingerprint of the regular files in dir, and the newest modification time among them.
+func dirStamp(dir string) (string, time.Time) {
 	if dir == "" {
-		return "missing"
+		return "missing", time.Time{}
 	}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
-		return "missing"
+		return "missing", time.Time{}
 	}
+	var newest time.Time
 	var parts []string
 	for _, e := range ents {
 		fi, err := e.Info()
 		if err != nil || !fi.Mode().IsRegular() {
 			continue
 		}
+		if fi.ModTime().After(newest) {
+			newest = fi.ModTime()
+		}
 		parts = append(parts, fmt.Sprintf("%s:%d:%d", e.Name(), fi.Size(), fi.ModTime().UnixNano()))
 	}
 	sort.Strings(parts)
-	return strings.Join(parts, "|")
+	return strings.Join(parts, "|"), newest
 }
 
 func readSmall(path string, limit int64) ([]byte, error) {
@@ -271,7 +304,9 @@ func readSmall(path string, limit int64) ([]byte, error) {
 // scan checks the bundle step by step; the first check that fails decides its status.
 func (s *Service) scan() *bundleState {
 	now := s.now()
-	bs := &bundleState{stamp: dirStamp(s.dist)}
+	read := time.Now() // the system clock, not the service's: file times come from it
+	stamp, newest := dirStamp(s.dist)
+	bs := &bundleState{stamp: stamp, settled: settled(newest, read)}
 	v := &adminv1.Bundle{ScannedUnix: now.Unix()}
 	bs.view = v
 
@@ -334,22 +369,23 @@ func (s *Service) scan() *bundleState {
 	return bs
 }
 
-// checkFile compares one listed file with its manifest entry: code is "" when it matches. The hash of a file is kept by
-// (size, mtime), so the poll does not re-read 30 MB every minute.
+// checkFile compares one listed file with its manifest entry: code is "" when it matches. A cached hash is used only
+// when the file was settled at the time it was hashed (racyWindow).
 func (s *Service) checkFile(f release.File) (fileStamp, string) {
 	path := filepath.Join(s.dist, f.Name)
 	fi, err := os.Lstat(path) // a symlink is not followed: the bundle is exactly the files in the directory
 	if err != nil || !fi.Mode().IsRegular() {
 		return fileStamp{}, "file_missing"
 	}
-	st := fileStamp{size: fi.Size(), modTime: fi.ModTime()}
+	st := fileStampOf(fi)
 	if st.size != f.Size {
 		return st, "file_mismatch"
 	}
 	s.bmu.Lock()
 	h, ok := s.hashes[f.Name]
 	s.bmu.Unlock()
-	if !ok || h.fileStamp != st {
+	if !ok || h.fileStamp != st || !settled(st.modTime, h.at) {
+		at := time.Now()
 		fh, err := os.Open(path)
 		if err != nil {
 			return st, "file_missing"
@@ -360,7 +396,7 @@ func (s *Service) checkFile(f release.File) (fileStamp, string) {
 		if err != nil {
 			return st, "file_missing"
 		}
-		h = hashEntry{fileStamp: st, sha: hex.EncodeToString(sum.Sum(nil))}
+		h = hashEntry{fileStamp: st, sha: hex.EncodeToString(sum.Sum(nil)), at: at}
 		s.bmu.Lock()
 		s.hashes[f.Name] = h
 		s.bmu.Unlock()
@@ -369,6 +405,10 @@ func (s *Service) checkFile(f release.File) (fileStamp, string) {
 		return st, "file_mismatch"
 	}
 	return st, ""
+}
+
+func fileStampOf(fi os.FileInfo) fileStamp {
+	return fileStamp{size: fi.Size(), modTime: fi.ModTime()}
 }
 
 // NodeBinary is fleet.Updates.NodeBinary: the absolute path of the platform's file of the current trusted bundle, ""
@@ -433,6 +473,17 @@ func (s *Service) OpenNodeBinary(_ context.Context, goos, goarch string) (io.Rea
 // authenticated with its node certificate. Only names in the trusted manifest are served, at most maxServes at a
 // time; the descriptor is opened once, so a file replaced during a download cannot corrupt it.
 func (s *Service) Serve(ctx context.Context, nodeID, name string, offset uint64, send func(chunk []byte, total uint64) error) error {
+	return s.serve(ctx, nodeID, name, offset, nil, send)
+}
+
+// ServeWithWriteDeadline streams one file and bounds each response write with the handler's HTTP write deadline.
+func (s *Service) ServeWithWriteDeadline(ctx context.Context, nodeID, name string, offset uint64,
+	setWriteDeadline func(time.Time) error, send func(chunk []byte, total uint64) error) error {
+	return s.serve(ctx, nodeID, name, offset, setWriteDeadline, send)
+}
+
+func (s *Service) serve(ctx context.Context, nodeID, name string, offset uint64,
+	setWriteDeadline func(time.Time) error, send func(chunk []byte, total uint64) error) error {
 	b := s.current()
 	if b == nil || !b.trusted {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("no trusted bundle"))
@@ -446,15 +497,21 @@ func (s *Service) Serve(ctx context.Context, nodeID, name string, offset uint64,
 		return connect.NewError(connect.CodeNotFound, errors.New("offset beyond the end of the file"))
 	}
 	s.bmu.Lock()
+	if _, alreadyServing := s.servingNodes[nodeID]; alreadyServing {
+		s.bmu.Unlock()
+		return connect.NewError(connect.CodeResourceExhausted, errors.New("a download is already active for this node, retry later"))
+	}
 	if s.serves >= maxServes {
 		s.bmu.Unlock()
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many downloads, retry in a few seconds"))
 	}
 	s.serves++
+	s.servingNodes[nodeID] = struct{}{}
 	s.bmu.Unlock()
 	defer func() {
 		s.bmu.Lock()
 		s.serves--
+		delete(s.servingNodes, nodeID)
 		s.bmu.Unlock()
 	}()
 
@@ -465,7 +522,7 @@ func (s *Service) Serve(ctx context.Context, nodeID, name string, offset uint64,
 	}
 	defer f.Close()
 	fi, err := f.Stat()
-	if err != nil || !fi.Mode().IsRegular() || fi.Size() != entry.Size || !fi.ModTime().Equal(b.files[entry.Name].modTime) {
+	if err != nil || !fi.Mode().IsRegular() || fileStampOf(fi) != b.files[entry.Name] {
 		go s.rescan() // the file is not the one that was verified: look again, the agent retries
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("bundle changed, retry"))
 	}
@@ -480,16 +537,45 @@ func (s *Service) Serve(ctx context.Context, nodeID, name string, offset uint64,
 		}
 		n, rerr := io.ReadFull(f, buf)
 		if n > 0 {
-			if err := send(buf[:n], total); err != nil {
+			if err := s.sendBundleChunk(ctx, setWriteDeadline, send, buf[:n], total); err != nil {
 				return err
 			}
 			sent = true
 		}
 		if rerr != nil { // EOF or ErrUnexpectedEOF: the last chunk has gone
 			if !sent { // offset == size: one empty message tells the agent the total
-				return send(nil, total)
+				return s.sendBundleChunk(ctx, setWriteDeadline, send, nil, total)
 			}
 			return nil
 		}
 	}
+}
+
+func (s *Service) sendBundleChunk(ctx context.Context, setWriteDeadline func(time.Time) error,
+	send func([]byte, uint64) error, chunk []byte, total uint64) error {
+	timeout := s.sendTimeout
+	if timeout <= 0 {
+		timeout = bundleSendStallTimeout
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(timeout)
+	if setWriteDeadline != nil {
+		setErr := setWriteDeadline(deadline)
+		if setErr != nil && !errors.Is(setErr, http.ErrNotSupported) {
+			return setErr
+		}
+		if setErr == nil {
+			defer func() { _ = setWriteDeadline(time.Time{}) }()
+		}
+	}
+	if err := send(chunk, total); err != nil {
+		var timeoutErr interface{ Timeout() bool }
+		if errors.Is(err, os.ErrDeadlineExceeded) || errors.As(err, &timeoutErr) && timeoutErr.Timeout() {
+			return connect.NewError(connect.CodeUnavailable, fmt.Errorf("download send stalled, retry later: %w", err))
+		}
+		return err
+	}
+	return nil
 }

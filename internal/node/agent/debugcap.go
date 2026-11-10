@@ -45,6 +45,7 @@ type debugCapture struct {
 	prev            slog.Level // the level to put back
 	timer           *time.Timer
 	onEnd           func(*debugCapture, string)
+	finishing       bool
 	reservedRecords int
 	reservedBytes   int
 
@@ -107,7 +108,7 @@ func (d *debugState) add(l slog.Level, rec logRecord) debugAddResult {
 	rec = scrubCaptured(rec, l)
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.cur != c { // the capture ended while this record was being cleaned
+	if c == nil || d.cur != c { // The capture can finish after wants returns and before this load.
 		return debugAddSkipped
 	}
 	if !appendDebugRecord(c, rec, true) {
@@ -258,20 +259,25 @@ func (d *debugState) start(id string, level slog.Level, sources map[string]bool,
 func (d *debugState) finish(id, reason string) *debugCapture {
 	d.mu.Lock()
 	c := d.cur
-	if c == nil || c.id != id {
+	if c == nil || c.id != id || c.finishing {
 		d.mu.Unlock()
 		return nil
 	}
+	c.finishing = true
 	c.timer.Stop()
 	d.active.Store(nil)
 	d.lv.Set(c.prev)
-	d.cur = nil
-	d.done = &debugFinished{c: c, reason: reason, at: d.now()}
 	onEnd := c.onEnd
 	d.mu.Unlock()
 	if onEnd != nil {
 		onEnd(c, reason)
 	}
+	d.mu.Lock()
+	if d.cur == c {
+		d.cur = nil
+		d.done = &debugFinished{c: c, reason: reason, at: d.now()}
+	}
+	d.mu.Unlock()
 	return c
 }
 
@@ -317,11 +323,13 @@ func (d *debugState) shutdown() {
 	d.mu.Lock()
 	var c *debugCapture
 	if running := d.cur; running != nil {
-		running.timer.Stop()
-		d.active.Store(nil)
-		d.lv.Set(running.prev)
-		d.cur = nil
-		c = running
+		if !running.finishing {
+			running.timer.Stop()
+			d.active.Store(nil)
+			d.lv.Set(running.prev)
+			d.cur = nil
+			c = running
+		}
 	}
 	d.mu.Unlock()
 	if c != nil && c.onEnd != nil {

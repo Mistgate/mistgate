@@ -135,7 +135,7 @@ func TestRefreshInstallWaitsForStableService(t *testing.T) {
 	states := []string{"active", "active", "active"}
 	var calls []string
 	out, err := RefreshInstall(context.Background(), RefreshConfig{
-		UnitPath: path, Binary: "/usr/local/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", FromGen: 2, ToGen: 3,
+		UnitPath: path, Binary: "/usr/local/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", FromGen: 2, ToGen: Generation,
 		Render: func(string, string, uint64) (string, error) { return "generation 3", nil },
 		Run: func(_ context.Context, name string, args ...string) ([]byte, error) {
 			calls = append(calls, name+" "+strings.Join(args, " "))
@@ -175,7 +175,7 @@ func TestRefreshInstallRollsBackWhenServiceDoesNotStayActive(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	states := []string{"active", "inactive", "inactive", "inactive", "inactive", "active", "active", "active"}
 	out, err := RefreshInstall(context.Background(), RefreshConfig{
-		UnitPath: path, Binary: "/usr/local/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", FromGen: 2, ToGen: 3,
+		UnitPath: path, Binary: "/usr/local/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", FromGen: 2, ToGen: Generation,
 		Render: func(string, string, uint64) (string, error) { return "generation 3", nil },
 		Run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
 			if len(args) > 0 && args[0] == "is-active" {
@@ -210,7 +210,7 @@ func TestRefreshInstallRollsBackAfterCallerCancellation(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	var calls []string
 	out, err := RefreshInstall(ctx, RefreshConfig{
-		UnitPath: path, Binary: "/usr/local/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", FromGen: 2, ToGen: 3,
+		UnitPath: path, Binary: "/usr/local/bin/mistgate-node", StateDir: "/var/lib/mistgate-node", FromGen: 2, ToGen: Generation,
 		Render: func(string, string, uint64) (string, error) { return "generation 3", nil },
 		Run: func(ctx context.Context, name string, args ...string) ([]byte, error) {
 			calls = append(calls, name+" "+strings.Join(args, " "))

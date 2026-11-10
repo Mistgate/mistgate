@@ -49,7 +49,20 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow) ([]plugin.Re
 // relaysApplied keeps what the entry reported for its forwards (RelayResult), and, when the node's inbounds were reported,
 // tells the other nodes to look again: a relay leading to one of them is forwarded only while that server is usable, which
 // the report may have changed.
-func (c *SessionCore) relaysApplied(ctx context.Context, nodeID string, r *agentv1.ApplyResult, inboundsReported bool, now time.Time) {
+func inboundRunStateChanged(previous []store.FleetInboundRow, applied []store.InboundApplied) bool {
+	before := make(map[string]string, len(previous))
+	for _, inbound := range previous {
+		before[inbound.ID] = inbound.State
+	}
+	for _, inbound := range applied {
+		if old, ok := before[inbound.ID]; ok && old != inbound.State {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *SessionCore) relaysApplied(ctx context.Context, nodeID string, r *agentv1.ApplyResult, inboundsReported, inboundStateChanged bool, now time.Time) {
 	if len(r.Relays) > 0 {
 		rs := make([]store.RelayApplied, 0, len(r.Relays))
 		for _, x := range r.Relays {
@@ -59,7 +72,7 @@ func (c *SessionCore) relaysApplied(ctx context.Context, nodeID string, r *agent
 			c.f.log.Warn("record relay results", "node", nodeID, "err", err)
 		}
 	}
-	if !inboundsReported {
+	if !inboundsReported || !inboundStateChanged {
 		return
 	}
 	if has, err := c.f.st.HasRelaysOnNode(ctx, nodeID); err != nil {

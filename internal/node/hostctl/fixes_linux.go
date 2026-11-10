@@ -5,10 +5,14 @@ package hostctl
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Safe fixes for the doctor. Nothing here is reached without an explicit ApplyFix from the panel.
@@ -85,7 +89,7 @@ func (h *linuxHost) SetResolver(ctx context.Context, servers []string) error {
 	}
 	resolved, conf := h.resolverPaths()
 	if plan.Mode == ResolverModeResolved {
-		if _, err := writeIfChanged(resolved, renderResolvedDropIn(plan.After), 0o644); err != nil {
+		if err := h.writeResolverFile(ctx, resolved, []byte(renderResolvedDropIn(plan.After)), 0o644); err != nil {
 			return err
 		}
 		if out, err := h.run(ctx, "", "systemctl", "restart", "systemd-resolved"); err != nil {
@@ -93,16 +97,15 @@ func (h *linuxHost) SetResolver(ctx context.Context, servers []string) error {
 		}
 		return nil
 	}
-	if err := backupResolvConf(conf); err != nil {
+	if err := h.backupResolvConf(ctx, conf); err != nil {
 		return err
 	}
-	_, err = writeIfChanged(conf, renderResolvConf(plan.After), 0o644)
-	return err
+	return h.writeResolverFile(ctx, conf, []byte(renderResolvConf(plan.After)), 0o644)
 }
 
 // backupResolvConf keeps the original resolv.conf once. A symlink (stub resolver, resolvconf) is remembered
 // by target so Cleanup can put the link back instead of a frozen copy of what it pointed at.
-func backupResolvConf(conf string) error {
+func (h *linuxHost) backupResolvConf(ctx context.Context, conf string) error {
 	bak := conf + backupSuffix
 	if _, err := os.Lstat(bak); err == nil {
 		return nil // already backed up by an earlier fix; never overwrite the original with our own file
@@ -111,15 +114,95 @@ func backupResolvConf(conf string) error {
 		return nil // ours without a backup (lost): nothing better to keep
 	}
 	if target, err := os.Readlink(conf); err == nil {
-		if err := os.WriteFile(conf+backupLinkSuffix, []byte(target), 0o644); err != nil {
+		if err := h.writeResolverFile(ctx, conf+backupLinkSuffix, []byte(target), 0o644); err != nil {
 			return err
 		}
 	}
 	orig, _ := os.ReadFile(conf) // a dangling link or a missing file backs up as empty
-	if err := os.WriteFile(bak, orig, 0o644); err != nil {
+	if err := h.writeResolverFile(ctx, bak, orig, 0o644); err != nil {
 		return err
 	}
 	return nil
+}
+
+// These scripts trap signals because RuntimeMaxSec can stop the transient unit before its normal exit cleanup.
+const resolverWriteScript = `set -eu
+mkdir -p -- "$4"
+trap 'rm -f -- "$2"' EXIT HUP INT TERM
+umask 077
+cat >"$2"
+chmod "$3" "$2"
+mv -f -- "$2" "$1"
+`
+
+const resolverLinkScript = `set -eu
+mkdir -p -- "$4"
+trap 'rm -f -- "$3"' EXIT HUP INT TERM
+rm -f -- "$3"
+ln -s -- "$1" "$3"
+mv -f -- "$3" "$2"
+`
+
+const resolverCommandTimeout = 25 * time.Second
+
+func (h *linuxHost) resolverAsRoot(ctx context.Context, stdin, name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, resolverCommandTimeout)
+	defer cancel()
+	run := []string{"--quiet", "--wait", "--pipe", "--collect", "--no-ask-password",
+		fmt.Sprintf("--property=RuntimeMaxSec=%d", int((resolverCommandTimeout-5*time.Second)/time.Second)), "--", name}
+	run = append(run, args...)
+	return h.run(ctx, stdin, "systemd-run", run...)
+}
+
+func (h *linuxHost) writeResolverFile(ctx context.Context, path string, body []byte, mode os.FileMode) error {
+	if os.Getenv("MISTGATE_UNIT_GEN") == "" {
+		_, err := writeIfChanged(path, string(body), mode)
+		return err
+	}
+	tmp, err := resolverTempPath(path)
+	if err != nil {
+		return err
+	}
+	return h.writeResolverFileAtTemp(ctx, path, tmp, body, mode)
+}
+
+func (h *linuxHost) writeResolverFileAtTemp(ctx context.Context, path, tmp string, body []byte, mode os.FileMode) error {
+	_, err := h.resolverAsRoot(ctx, string(body), "/bin/sh", "-c", resolverWriteScript, "mistgate-resolver-write", path, tmp,
+		fmt.Sprintf("%o", mode.Perm()), filepath.Dir(path))
+	return err
+}
+
+func resolverTempPath(target string) (string, error) {
+	var suffix [12]byte
+	if _, err := cryptorand.Read(suffix[:]); err != nil {
+		return "", fmt.Errorf("create resolver temporary name: %w", err)
+	}
+	name := "." + filepath.Base(target) + ".mistgate-tmp-" + hex.EncodeToString(suffix[:])
+	return filepath.Join(filepath.Dir(target), name), nil
+}
+
+func (h *linuxHost) removeResolverFile(ctx context.Context, path string) error {
+	if os.Getenv("MISTGATE_UNIT_GEN") == "" {
+		err := os.Remove(path)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	_, err := h.resolverAsRoot(ctx, "", "rm", "-f", "--", path)
+	return err
+}
+
+func (h *linuxHost) restoreResolverLink(ctx context.Context, path, target string) error {
+	if os.Getenv("MISTGATE_UNIT_GEN") == "" {
+		return restoreLink(path, target)
+	}
+	tmp, err := resolverTempPath(path)
+	if err != nil {
+		return err
+	}
+	_, err = h.resolverAsRoot(ctx, "", "/bin/sh", "-c", resolverLinkScript, "mistgate-resolver-link", target, path, tmp, filepath.Dir(path))
+	return err
 }
 
 // undoResolver removes what SetResolver installed. Called by Cleanup; it works from the files on disk so it
@@ -130,8 +213,10 @@ func (h *linuxHost) undoResolver(ctx context.Context) error {
 		return nil
 	}
 	var errs []error
-	if err := os.Remove(resolved); err == nil {
-		if out, err := h.run(ctx, "", "systemctl", "restart", "systemd-resolved"); err != nil {
+	if _, err := os.Lstat(resolved); err == nil {
+		if err := h.removeResolverFile(ctx, resolved); err != nil {
+			errs = append(errs, err)
+		} else if out, err := h.run(ctx, "", "systemctl", "restart", "systemd-resolved"); err != nil {
 			errs = append(errs, fmt.Errorf("restart systemd-resolved: %w: %s", err, tail(out)))
 		}
 	} else if !os.IsNotExist(err) {
@@ -141,15 +226,13 @@ func (h *linuxHost) undoResolver(ctx context.Context) error {
 	if _, err := os.Lstat(bak); err == nil {
 		if cur, err := os.ReadFile(conf); err == nil && strings.HasPrefix(string(cur), resolverMarker) {
 			if target, err := os.ReadFile(link); err == nil {
-				errs = append(errs, restoreLink(conf, string(target)))
+				errs = append(errs, h.restoreResolverLink(ctx, conf, string(target)))
 			} else {
 				orig, _ := os.ReadFile(bak)
-				_, err := writeIfChanged(conf, string(orig), 0o644)
-				errs = append(errs, err)
+				errs = append(errs, h.writeResolverFile(ctx, conf, orig, 0o644))
 			}
 		}
-		_ = os.Remove(bak)
-		_ = os.Remove(link)
+		errs = append(errs, h.removeResolverFile(ctx, bak), h.removeResolverFile(ctx, link))
 	}
 	return errors.Join(errs...)
 }

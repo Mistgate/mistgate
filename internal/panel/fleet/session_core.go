@@ -23,6 +23,13 @@ const sessionStateVersion = 1
 
 const prepareRetryDelay = 3 * time.Second
 
+const (
+	agentEventBurst          = 10
+	agentEventRefillEvery    = time.Second
+	reliableEventBurst       = 500
+	reliableEventRefillEvery = 200 * time.Millisecond
+)
+
 // maxCertLife bounds the expiry an agent may report: the self-signed certificates the panel makes live 10 years.
 const maxCertLife = 11 * 365 * 24 * time.Hour
 
@@ -41,11 +48,18 @@ type SessionState struct {
 	RetireAt              time.Time                 `json:"rt,omitzero"`
 	NextAckTick           time.Time                 `json:"a,omitzero"`
 	NextCertCheck         time.Time                 `json:"x,omitzero"`
+	EventTokens           uint8                     `json:"evt,omitempty"`
+	EventTokenAt          time.Time                 `json:"evta,omitzero"`
+	ReliableEventTokens   uint16                    `json:"revt,omitempty"`
+	ReliableEventTokenAt  time.Time                 `json:"revta,omitzero"`
+	DroppedEvents         uint64                    `json:"evd,omitempty"`
+	DroppedEventLogAt     time.Time                 `json:"evdl,omitzero"`
 	AckPending            uint64                    `json:"p,omitempty"`
 	AckSent               uint64                    `json:"s,omitempty"`
 	LastAck               time.Time                 `json:"k,omitzero"`
 	LastReject            time.Time                 `json:"r,omitzero"`
-	LastEndUnix           int64                     `json:"e,omitempty"`
+	StatsBudgetLeftNanos  int64                     `json:"sbl,omitempty"`
+	StatsBudgetAt         time.Time                 `json:"sba,omitzero"`
 	LastSeenAt            time.Time                 `json:"v_at,omitzero"`
 	SentRevision          uint64                    `json:"q,omitempty"`
 	SentStateHash         string                    `json:"sh,omitempty"`
@@ -72,10 +86,11 @@ type SessionState struct {
 	SealDown uint64 `json:"sd,omitempty"`
 }
 
-// PoisonBatch identifies the last stats batch refused by the store.
+// PoisonBatch identifies a stats batch refused by the store and when its first refusal happened.
 type PoisonBatch struct {
-	Instance string `json:"i"`
-	Seq      uint64 `json:"s"`
+	Instance       string    `json:"i"`
+	Seq            uint64    `json:"s"`
+	FirstFailureAt time.Time `json:"fa,omitzero"`
 }
 
 // PendingRequest is serialized request metadata. VPS channels remain in the adapter; edge delivery is a later round.
@@ -399,6 +414,7 @@ func (c *SessionCore) request(tr *coreTransition, request *AdminRequest, at time
 	tr.Frames = append(tr.Frames, request.Frame)
 	if kind == PendingRetire {
 		tr.state.RetireAt = at.Add(5 * time.Second)
+		setStatsBudgetState(tr.state, statsBudgetBucket{left: retireStatsBudget, at: at})
 		tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectReply, RequestID: request.RequestID})
 	}
 }
@@ -505,20 +521,24 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 
 func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64, st *agentv1.StatsBatch, now time.Time) {
 	hour, stale := bucketHour(time.Unix(st.IntervalEndUnix, 0), now)
-	g := c.f.guardStats(st, tr.state.AgentCaps)
+	var budget statsBudgetLease
+	if tr.state.RetireAt.IsZero() {
+		budget = c.f.lockStatsBudget(tr.state, now)
+	} else {
+		budget = sessionStatsBudgetLease(tr.state, now)
+	}
+	defer budget.release()
+	g := c.f.guardStatsForSession(st, tr.state.AgentCaps, budget.left)
 	if g.rejected > 0 {
 		c.rejectStats(ctx, tr.state, g, now)
 	}
 	projectionState := *tr.state
 	projectionTooLarge := false
-	var projectionEnd int64
-	projectionBuilt := false
 	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Session: tr.state.OwnerGeneration,
 		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic, Links: g.links, Networks: g.networks, PersonNetworks: g.personNetworks,
 		NetworksDBSHA256: g.networksDBSHA256, Journal: g.journal, JournalSecrets: c.f.cfg.JournalSecrets}
 	in.Live = func(refs map[string]store.FleetCredRef) store.FleetLive {
-		live, end, tooLarge := buildFleetLive(projectionState, st, g.traffic, now, refs)
-		projectionEnd, projectionBuilt = end, true
+		live, _, tooLarge := buildFleetLive(projectionState, st, g.traffic, now, refs)
 		projectionTooLarge = projectionTooLarge || tooLarge
 		return live
 	}
@@ -540,11 +560,15 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	}
 	if err != nil {
 		// Do not ack and do not go on: a later ack would cover this seq and lose the batch. The agent
-		// reconnects and resends from HelloAck.acked_seq. But a batch the database refuses twice will be
-		// refused every time, and resending it would wedge this node's stats for good: drop it then.
+		// reconnects and resends from HelloAck.acked_seq. Permanent failures cannot heal, and repeatedly
+		// failing batches are eventually dropped so they cannot wedge this node's accounting.
 		c.f.log.Error("ingest stats", "code", "stats_ingest_failed", "node", tr.state.NodeID, "err", err)
 		if tr.state.Poison == nil || tr.state.Poison.Instance != tr.state.InstanceID || tr.state.Poison.Seq != seq {
-			tr.state.Poison = &PoisonBatch{Instance: tr.state.InstanceID, Seq: seq}
+			tr.state.Poison = &PoisonBatch{Instance: tr.state.InstanceID, Seq: seq, FirstFailureAt: now}
+		} else if tr.state.Poison.FirstFailureAt.IsZero() {
+			tr.state.Poison.FirstFailureAt = now
+		}
+		if !shouldDropStatsBatch(err, tr.state.Poison.FirstFailureAt, now) {
 			tr.Close = &SessionClose{Class: CloseInternal, Reason: "internal error"}
 			return
 		}
@@ -556,16 +580,14 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 			markCoreAck(tr, seq, now)
 		}
 		tr.state.Poison = nil
-		c.f.log.Error("stats batch refused by the database twice, dropped", "code", "stats_batch_refused", "node", tr.state.NodeID, "seq", seq)
+		c.f.log.Error("stats batch refused by the database and dropped", "code", "stats_batch_refused", "node", tr.state.NodeID, "seq", seq)
 		c.f.event(ctx, 3, "stats_dropped", tr.state.NodeID, map[string]string{"reason": "database_refused", "seq": fmt.Sprint(seq)})
 		return
 	}
 	tr.state.Poison = nil
 	if !out.Duplicate {
-		if projectionBuilt && projectionEnd >= tr.state.LastEndUnix {
-			tr.state.LastEndUnix = projectionEnd
-		}
-		c.l3Stats(ctx, tr.state, st, now)
+		budget.spend(g.creditedSpan)
+		c.l3Stats(ctx, tr.state, st, out.InboundIDs, now)
 		if out.Skipped > 0 {
 			c.f.log.Warn("stats for unknown credentials or foreign inbounds dropped", "code", "stats_entries_dropped", "node", tr.state.NodeID, "count", out.Skipped)
 		}
@@ -665,13 +687,9 @@ type liveJSONOnline struct {
 func buildFleetLive(state SessionState, st *agentv1.StatsBatch, traffic []store.FleetTraffic,
 	now time.Time, refs map[string]store.FleetCredRef) (store.FleetLive, int64, bool) {
 	end := st.IntervalEndUnix
-	// An end time from the future would make every later (honest) batch look older and freeze the live
-	// view: clamp it like the bucket hour.
+	// Clamp an implausibly future node timestamp to panel time so the live view cannot claim a far-future sample.
 	if end > now.Add(maxFuture).Unix() {
 		end = now.Unix()
-	}
-	if end < state.LastEndUnix {
-		return store.FleetLive{}, end, false // an older batch resent after a reconnect
 	}
 	const maxRate = uint64(1 << 50)
 	view := liveJSONView{
@@ -860,7 +878,76 @@ func torrentPortNumber(s string) bool {
 	return err == nil && n > 0 && s == strconv.FormatUint(n, 10)
 }
 
+func allowAgentEvent(state *SessionState, now time.Time, seq uint64) bool {
+	if seq == 0 {
+		return allowEventBucket(&state.EventTokens, &state.EventTokenAt, agentEventBurst, agentEventRefillEvery, now)
+	}
+	return allowEventBucket(&state.ReliableEventTokens, &state.ReliableEventTokenAt, reliableEventBurst, reliableEventRefillEvery, now)
+}
+
+func allowEventBucket[T ~uint8 | ~uint16](tokens *T, tokenAt *time.Time, burst T, refillEvery time.Duration, now time.Time) bool {
+	if tokenAt.IsZero() {
+		*tokens = burst
+		*tokenAt = now
+	} else if now.After(*tokenAt) {
+		refill := T(min(int64(burst), int64(now.Sub(*tokenAt)/refillEvery)))
+		if refill > 0 {
+			if *tokens > burst-refill {
+				*tokens = burst
+			} else {
+				*tokens += refill
+			}
+			*tokenAt = tokenAt.Add(time.Duration(refill) * refillEvery)
+			if *tokens == burst && tokenAt.Before(now) {
+				*tokenAt = now
+			}
+		}
+	}
+	if *tokens == 0 {
+		return false
+	}
+	*tokens--
+	return true
+}
+
+func (c *SessionCore) dropAgentEvent(tr *coreTransition, seq uint64, now time.Time) {
+	if !tr.state.DroppedEventLogAt.IsZero() && deadlineDue(tr.state.DroppedEventLogAt, now) {
+		c.flushDroppedAgentEvents(tr.state)
+	}
+	if tr.state.DroppedEvents < math.MaxUint64 {
+		tr.state.DroppedEvents++
+	}
+	if seq != 0 {
+		markCoreAck(tr, seq, now)
+	}
+	if tr.state.DroppedEventLogAt.IsZero() {
+		tr.state.DroppedEventLogAt = now.Add(time.Minute)
+	}
+}
+
+func (c *SessionCore) flushDroppedAgentEvents(state *SessionState) {
+	if state.DroppedEvents == 0 {
+		state.DroppedEventLogAt = time.Time{}
+		return
+	}
+	c.f.log.Warn("agent event entries dropped", "code", "agent_events_dropped", "node", state.NodeID, "count", state.DroppedEvents)
+	state.DroppedEvents = 0
+	state.DroppedEventLogAt = time.Time{}
+}
+
+func (c *SessionCore) nodeServesUser(ctx context.Context, nodeID, userID string) (bool, error) {
+	return c.f.st.Access().HasUserCredentialOnNode(ctx, nodeID, userID)
+}
+
 func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq uint64, ev *agentv1.Event, now time.Time) {
+	if seq != 0 && seq <= tr.state.AckPending {
+		markCoreAck(tr, seq, now)
+		return
+	}
+	if !allowAgentEvent(tr.state, now, seq) {
+		c.dropAgentEvent(tr, seq, now)
+		return
+	}
 	t := time.Unix(ev.TimeUnix, 0).UTC()
 	if ev.TimeUnix <= 0 || t.After(now.Add(maxFuture)) || ev.Code == "update_committed" {
 		t = now // update_committed: the gate compares it with when the panel sent the update, so a node clock behind must not fail it
@@ -877,6 +964,16 @@ func (c *SessionCore) agentEvent(ctx context.Context, tr *coreTransition, seq ui
 	if row.Code == "torrent_attempt" {
 		row.Params = map[string]string{}
 		if userID := store.Clip(ev.Params["user_id"], 256); userID != "" {
+			served, err := c.nodeServesUser(ctx, tr.state.NodeID, userID)
+			if err != nil {
+				c.f.log.Error("resolve event user", "code", "event_user_lookup_failed", "node", tr.state.NodeID, "err", err)
+				c.dropAgentEvent(tr, seq, now)
+				return
+			}
+			if !served {
+				c.dropAgentEvent(tr, seq, now)
+				return
+			}
 			row.Params["user_id"] = userID
 			if user, err := c.f.st.Access().User(ctx, userID); err == nil && user.Name != "" {
 				row.Params["user_name"] = store.Clip(user.Name, 256)
@@ -980,6 +1077,12 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	}
 	in = append(in, withheldApplied(tr.state.SentWithheld)...)
 	c.updateApplyDrift(ctx, tr, r)
+	inboundStateChanged := relayInboundStateChanged(in,
+		func() (bool, error) { return c.f.st.HasRelaysOnNode(ctx, tr.state.NodeID) },
+		func() ([]store.FleetInboundRow, error) { return c.f.st.FleetInbounds(ctx, tr.state.NodeID, false) },
+		func(code string, err error) {
+			c.f.log.Warn("read apply state for relays", "code", code, "node", tr.state.NodeID, "err", err)
+		})
 	if err := c.f.st.NodeApplied(ctx, tr.state.NodeID, tr.state.OwnerGeneration, tr.state.Drift, r.Revision, r.StateHash, in, now); err != nil {
 		c.f.log.Warn("record apply result", "code", "apply_result_failed", "node", tr.state.NodeID, "err", err)
 	}
@@ -990,8 +1093,29 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 	if err := c.f.st.RecordNodeApplyMeta(ctx, tr.state.NodeID, status, r.DurationMs, tr.state.Drift, now); err != nil {
 		c.f.log.Warn("record apply time", "code", "apply_time_failed", "node", tr.state.NodeID, "err", err)
 	}
-	c.relaysApplied(ctx, tr.state.NodeID, r, len(in) > 0, now)
+	c.relaysApplied(ctx, tr.state.NodeID, r, len(in) > 0, inboundStateChanged, now)
 	return nil
+}
+
+// relayInboundStateChanged checks for a relay before reading inbound rows and requests refresh when that read fails.
+func relayInboundStateChanged(applied []store.InboundApplied, hasRelays func() (bool, error), readInbounds func() ([]store.FleetInboundRow, error), onError func(string, error)) bool {
+	if len(applied) == 0 {
+		return false
+	}
+	has, err := hasRelays()
+	if err != nil {
+		onError("read_relays_failed", err)
+		return true
+	}
+	if !has {
+		return false
+	}
+	previous, err := readInbounds()
+	if err != nil {
+		onError("read_inbound_states_failed", err)
+		return true
+	}
+	return inboundRunStateChanged(previous, applied)
 }
 
 func (c *SessionCore) updateApplyDrift(ctx context.Context, tr *coreTransition, r *agentv1.ApplyResult) {
@@ -1205,6 +1329,9 @@ func (c *SessionCore) alarm(ctx context.Context, tr *coreTransition, event Sessi
 	if deadlineDue(tr.state.NextAckTick, now) {
 		flushCoreAck(tr, now)
 	}
+	if deadlineDue(tr.state.DroppedEventLogAt, now) {
+		c.flushDroppedAgentEvents(tr.state)
+	}
 	pendingIDs := make([]string, 0, len(tr.state.Pending))
 	for id := range tr.state.Pending {
 		pendingIDs = append(pendingIDs, id)
@@ -1262,7 +1389,7 @@ func nextSessionAlarm(state SessionState, now time.Time) *time.Time {
 		}
 	}
 	for _, deadline := range []time.Time{state.HelloDeadline, state.AutoBandwidthDeadline, state.RetireAt,
-		state.NextAckTick, state.PrepareRetryAt} {
+		state.NextAckTick, state.PrepareRetryAt, state.DroppedEventLogAt} {
 		if !deadline.IsZero() {
 			add(deadline)
 		}
@@ -1284,9 +1411,30 @@ func nextSessionAlarm(state SessionState, now time.Time) *time.Time {
 
 // l3Stats stores the AWG and WARP health from a stats batch; the core writes its live view inline. A health
 // write failure is logged but never fails the batch: health is a snapshot, and the next batch replaces it.
-func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agentv1.StatsBatch, now time.Time) {
+func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agentv1.StatsBatch, inboundIDs []string, now time.Time) {
 	nodeID := state.NodeID
-	for _, h := range st.Health {
+	owned := make(map[string]struct{}, len(inboundIDs))
+	for _, id := range inboundIDs {
+		owned[id] = struct{}{}
+	}
+	for id := range state.L3.AWG {
+		if _, ok := owned[id]; !ok {
+			delete(state.L3.AWG, id)
+		}
+	}
+	if len(state.L3.AWG) == 0 {
+		state.L3.AWG = nil
+	}
+	for i, h := range st.Health {
+		if i == maxLiveRunningInbounds {
+			break
+		}
+		if h == nil {
+			continue
+		}
+		if _, ok := owned[h.InboundId]; !ok {
+			continue
+		}
 		if h.Awg == nil {
 			continue
 		}
@@ -1338,7 +1486,13 @@ func (c *SessionCore) l3Stats(ctx context.Context, state *SessionState, st *agen
 // check would never warn), so that value stays unchanged.
 func certStats(st *agentv1.StatsBatch, now time.Time) []store.FleetInboundCert {
 	var certs []store.FleetInboundCert
-	for _, h := range st.Health {
+	for i, h := range st.Health {
+		if i == maxLiveRunningInbounds {
+			break
+		}
+		if h == nil {
+			continue
+		}
 		if h.CertPinSha256 == "" || h.CertNotAfterUnix <= 0 || h.CertNotAfterUnix > now.Add(maxCertLife).Unix() {
 			continue
 		}

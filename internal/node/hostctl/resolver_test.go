@@ -24,6 +24,8 @@ func TestCleanResolvers(t *testing.T) {
 		{"mapped ipv4", []string{"::ffff:1.1.1.1"}, true, "1.1.1.1", false},
 		{"nothing", nil, true, "", true},
 		{"only names", []string{"dns.example.com"}, false, "", true},
+		{"zone with config lines", []string{"fe80::1%x\nDNSSEC=no"}, true, "", true},
+		{"zone with config lines in resolved", []string{"fe80::1%x\nDNSSEC=no"}, false, "", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

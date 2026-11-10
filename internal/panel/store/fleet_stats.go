@@ -58,11 +58,12 @@ type FleetCredRef struct{ UserID, DeviceID, Protocol string }
 
 // FleetStatsOut is the outcome of IngestStats.
 type FleetStatsOut struct {
-	Duplicate bool                    // seq already committed: nothing was written
-	Refs      map[string]FleetCredRef // every credential of the batch that resolved
-	Skipped   int                     // deltas and link rows dropped: unknown credential, or inbound not on this node
-	Probe     int                     // deltas and link rows of the health probe system credential, ignored on purpose (not an anomaly)
-	Users     []string                // users whose used_bytes grew (for the access module's status recompute)
+	Duplicate  bool                    // seq already committed: nothing was written
+	Refs       map[string]FleetCredRef // every credential of the batch that resolved
+	InboundIDs []string                // live inbounds currently assigned to this node
+	Skipped    int                     // deltas and link rows dropped: unknown credential, or inbound not on this node
+	Probe      int                     // deltas and link rows of the health probe system credential, ignored on purpose (not an anomaly)
+	Users      []string                // users whose used_bytes grew (for the access module's status recompute)
 }
 
 type fleetStatsSums struct{ up, down uint64 }
@@ -123,6 +124,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		var instance string
 		var last uint64
 		onNode := map[string]string{} // inbound id -> its protocol
+		liveInboundIDs := map[string]struct{}{}
 		creds := map[string]FleetCredRef{}
 		probes := map[string]bool{}
 
@@ -163,15 +165,19 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		r.add(func(rows [][]any) error {
 			for _, row := range rows {
 				var id, protocol string
-				if err := batchRow(row).Scan(&id, &protocol); err != nil {
+				var live int
+				if err := batchRow(row).Scan(&id, &protocol, &live); err != nil {
 					return err
 				}
 				onNode[id] = protocol
+				if live != 0 {
+					liveInboundIDs[id] = struct{}{}
+				}
 			}
 			return nil
-		}, `SELECT i.id, p.protocol FROM inbound i JOIN profile p ON p.id = i.profile_id WHERE i.node_id = ?
+		}, `SELECT i.id, p.protocol, 1 AS is_live FROM inbound i JOIN profile p ON p.id = i.profile_id WHERE i.node_id = ?
 			UNION ALL
-			SELECT t.inbound_id, t.protocol FROM node_inbound_stats_tombstone t
+			SELECT t.inbound_id, t.protocol, 0 AS is_live FROM node_inbound_stats_tombstone t
 			WHERE t.node_id = ? AND NOT EXISTS (SELECT 1 FROM inbound i WHERE i.id = t.inbound_id AND i.node_id = t.node_id)`, in.NodeID, in.NodeID)
 		r.add(func(rows [][]any) error {
 			for _, row := range rows {
@@ -197,6 +203,11 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		if err := r.run(ctx, s); err != nil {
 			return nil, err
 		}
+		out.InboundIDs = make([]string, 0, len(liveInboundIDs))
+		for id := range liveInboundIDs {
+			out.InboundIDs = append(out.InboundIDs, id)
+		}
+		sort.Strings(out.InboundIDs)
 		// An agent may only attach a journal record to one of this node's inbounds. Keep the record, but remove a
 		// foreign or stale inbound id so it cannot be used to attribute a message to another node.
 		if len(in.Journal) > 0 {
@@ -393,6 +404,9 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 		}
 		certByInbound := make(map[string]FleetInboundCert, len(in.Certs))
 		for _, cert := range in.Certs {
+			if _, ok := liveInboundIDs[cert.InboundID]; !ok {
+				continue
+			}
 			certByInbound[cert.InboundID] = cert
 		}
 		certIDs := make([]string, 0, len(certByInbound))

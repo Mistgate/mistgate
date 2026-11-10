@@ -121,7 +121,7 @@ func restartInbound(id string) *agentv1.ConnectResponse {
 	return &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_RestartInbound{RestartInbound: &agentv1.RestartInbound{RequestId: id}}}
 }
 
-func TestLinkOpenKeepsOnlyPoison(t *testing.T) {
+func TestLinkOpenCarriesPoisonAndNodeStatsBudget(t *testing.T) {
 	r := newLinkRig(t, "alice-open")
 	var old SessionState
 	fillSessionStateValue(t, reflect.ValueOf(&old).Elem())
@@ -137,7 +137,8 @@ func TestLinkOpenKeepsOnlyPoison(t *testing.T) {
 	out := r.call(LinkIn{Kind: LinkOpen, Generation: 7, CertSerial: "0a1b", CertNotAfter: notAfter})
 
 	want := SessionState{Version: sessionStateVersion, NodeID: r.nodeID, OwnerGeneration: 7, PeerCertSerial: "0a1b",
-		PeerCertNotAfter: notAfter, HelloDeadline: r.now.Add(helloTimeout), Poison: &PoisonBatch{Instance: "inst-a", Seq: 41}}
+		PeerCertNotAfter: notAfter, HelloDeadline: r.now.Add(helloTimeout), Poison: &PoisonBatch{Instance: "inst-a", Seq: 41},
+		StatsBudgetLeftNanos: old.StatsBudgetLeftNanos, StatsBudgetAt: old.StatsBudgetAt}
 	if got := r.decoded(); !sessionStateDeepEqual(reflect.ValueOf(got), reflect.ValueOf(want)) {
 		t.Fatalf("open state = %+v\nwant %+v", got, want)
 	}
@@ -599,7 +600,7 @@ func TestLinkRequestPastItsDeadlineIsNotSent(t *testing.T) {
 	}
 }
 
-func TestLinkClosingCallReturnsTheChangedState(t *testing.T) {
+func TestLinkDropsPermanentStatsFailureAndReturnsAck(t *testing.T) {
 	r := newLinkRig(t, "alice-poison")
 	ids := r.e.fixture(r.nodeID)
 	r.helloed(1, "instance-poison")
@@ -609,28 +610,12 @@ func TestLinkClosingCallReturnsTheChangedState(t *testing.T) {
 		Traffic: []*agentv1.TrafficDelta{{CredId: "crd_alice_hy", InboundId: ids.i1, BytesUp: 5}},
 	}}}
 	first := r.frame(batch)
-	if first.Close == nil || first.Close.Code != 1011 || len(first.Frames) != 0 {
-		t.Fatalf("first refusal = close %+v, frames %d; want 1011 and no frame", first.Close, len(first.Frames))
+	frames := linkFrames(t, first)
+	if first.Close != nil || len(frames) != 1 || frames[0].GetAck().GetUpToSeq() != 1 {
+		t.Fatalf("permanent refusal = close %+v, frames %v; want Ack 1 and an open link", first.Close, frames)
 	}
-	if p := r.decoded().Poison; p == nil || p.Instance != "instance-poison" || p.Seq != 1 {
-		t.Fatalf("the closing call did not return Poison: %+v", p)
-	}
-	r.now = r.now.Add(time.Second)
-	r.call(LinkIn{Kind: LinkClosed})
-	// The agent reconnects as generation 2 and resends the batch it never got an Ack for.
-	r.now = r.now.Add(time.Second)
-	r.open(2)
-	if p := r.decoded().Poison; p == nil || p.Seq != 1 {
-		t.Fatalf("open lost Poison: %+v", p)
-	}
-	r.frame(hello("instance-poison", 0, ""))
-	second := r.frame(batch)
-	frames := linkFrames(t, second)
-	if second.Close != nil || len(frames) != 1 || frames[0].GetAck().GetUpToSeq() != 1 {
-		t.Fatalf("second refusal = close %+v, frames %v; want the batch dropped and Ack 1", second.Close, frames)
-	}
-	if r.decoded().Poison != nil {
-		t.Fatalf("the successful drop left Poison behind: %+v", r.decoded().Poison)
+	if p := r.decoded().Poison; p != nil {
+		t.Fatalf("a permanently dropped batch left Poison behind: %+v", p)
 	}
 	if n := r.e.count(`SELECT count(*) FROM event WHERE node_id = ? AND code = 'stats_dropped'`, r.nodeID); n != 1 {
 		t.Fatalf("stats_dropped events = %d, want 1", n)

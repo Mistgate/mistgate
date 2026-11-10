@@ -49,9 +49,15 @@ func ResolverTargets(s Settings) []string {
 func dialAddr(s string) (string, bool) {
 	s = strings.TrimSpace(s)
 	if ap, err := netip.ParseAddrPort(s); err == nil {
+		if ap.Addr().Zone() != "" {
+			return "", false
+		}
 		return ap.String(), true
 	}
 	if a, err := netip.ParseAddr(s); err == nil {
+		if a.Zone() != "" {
+			return "", false
+		}
 		return net.JoinHostPort(a.String(), "53"), true
 	}
 	return "", false

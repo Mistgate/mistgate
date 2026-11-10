@@ -65,6 +65,8 @@ func (s updSource) Progress(p *pb.UpdateProgress) {
 
 func (s updSource) Now() time.Time { return s.a.now() }
 
+func (updSource) LocalNow() time.Time { return time.Now() }
+
 func (s updSource) Failed() []string { return s.a.failedInbounds() }
 
 // Fetch downloads one bundle file and appends to w from offset. VPS agents use the panel's mTLS stream; link-only agents

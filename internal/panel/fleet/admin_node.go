@@ -1079,6 +1079,7 @@ func (s nodeService) RetireNode(ctx context.Context, req *connect.Request[adminv
 		return nil, internalErr(f.log.Error, "retire node", err)
 	}
 	notified := f.notifyRetire(ctx, n.ID, live)
+	f.forgetStatsBudget(n.ID)
 	f.event(ctx, 1, "node_retired", n.ID, map[string]string{"actor": f.cfg.Actor(ctx)})
 	f.audit(ctx, "node.retire", map[string]string{"node_id": n.ID, "name": n.Name})
 	for _, l := range relays {

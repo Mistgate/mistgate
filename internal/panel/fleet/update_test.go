@@ -62,6 +62,11 @@ func (u *fakeUpdates) Updating(id string) bool {
 	return u.updating[id]
 }
 
+func (u *fakeUpdates) ServeWithWriteDeadline(ctx context.Context, nodeID, name string, offset uint64,
+	_ func(time.Time) error, send func(chunk []byte, total uint64) error) error {
+	return u.Serve(ctx, nodeID, name, offset, send)
+}
+
 func (u *fakeUpdates) RecordAnswer(_ context.Context, nodeID, requestID string, result *agentv1.CommandResult) error {
 	u.mu.Lock()
 	u.recorded = append(u.recorded, fakeRecordedAnswer{nodeID: nodeID, requestID: requestID, result: result})

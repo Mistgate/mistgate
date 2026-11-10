@@ -23,10 +23,19 @@ func TestResolverTargets(t *testing.T) {
 		{Settings{Country: "cn"}, "223.5.5.5,119.29.29.29"},
 		{Settings{Country: "ru", Resolvers: []string{"9.9.9.9", "dns.example.com", " 10.0.0.1:5353 "}}, "9.9.9.9,10.0.0.1:5353"},
 		{Settings{Resolvers: []string{"not a resolver"}}, "1.1.1.1,8.8.8.8"},
+		{Settings{Resolvers: []string{"fe80::1%x\nDNSSEC=no"}}, "1.1.1.1,8.8.8.8"},
 	}
 	for _, tc := range tests {
 		if got := strings.Join(ResolverTargets(tc.s), ","); got != tc.want {
 			t.Errorf("%+v: got %s, want %s", tc.s, got, tc.want)
+		}
+	}
+}
+
+func TestDialAddrRejectsIPv6Zones(t *testing.T) {
+	for _, input := range []string{"fe80::1%eth0", "[fe80::1%eth0]:53", "fe80::1%x\nDNSSEC=no"} {
+		if got, ok := dialAddr(input); ok {
+			t.Errorf("dialAddr(%q) = %q, want rejection", input, got)
 		}
 	}
 }

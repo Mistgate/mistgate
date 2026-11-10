@@ -3,6 +3,7 @@ package agent
 import (
 	"errors"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -241,6 +242,30 @@ func TestStateSurvivesRoundTripThroughDisk(t *testing.T) {
 	corrupt(t, dir)
 	if g, err := loadState(dir, known); err == nil || g.revision != 0 {
 		t.Fatalf("corrupt state: %v %v", g, err)
+	}
+}
+
+func TestStateIgnoresFieldsFromNewerBuild(t *testing.T) {
+	m, err := merge(newModel(), fullState(4, inb("inb_de1", 20000, 30000, cred("crd_de1"))), known)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := saveState(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	path := dir + "/" + fileState
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b[:len(b)-1], []byte(`,"futureField":true}`)...)
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadState(dir, known)
+	if err != nil || got.revision != 4 || len(got.inbounds) != 1 {
+		t.Fatalf("newer state did not survive rollback: model=%+v err=%v", got, err)
 	}
 }
 

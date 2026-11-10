@@ -2,7 +2,9 @@ package update
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -10,7 +12,61 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/asndb"
+	"github.com/mistgate/mistgate/internal/release"
 )
+
+// A file rewritten with the same size right after it was hashed can carry the same modification time (the tick of a
+// Linux filesystem is milliseconds long): the cached hash of a file that was not settled when it was hashed is not used.
+func TestHashCacheRechecksSameSizeRewriteRightAfterHashing(t *testing.T) {
+	e := newEnv(t)
+	dist := filepath.Join(e.dir, "dist")
+	if err := os.MkdirAll(dist, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dist, "same-size-table")
+	first, second := []byte("alpha123"), []byte("bravo123")
+	digest := func(data []byte) string {
+		sum := sha256.Sum256(data)
+		return hex.EncodeToString(sum[:])
+	}
+	if err := os.WriteFile(path, first, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	firstFile := release.File{Name: filepath.Base(path), Size: int64(len(first)), SHA256: digest(first)}
+	if _, code := e.s.checkFile(firstFile); code != "" {
+		t.Fatalf("initial file check = %q", code)
+	}
+	if err := os.WriteFile(path, second, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, code := e.s.checkFile(firstFile); code != "file_mismatch" {
+		t.Fatalf("rewritten file passed its stale digest: %q", code)
+	}
+	secondFile := release.File{Name: filepath.Base(path), Size: int64(len(second)), SHA256: digest(second)}
+	if _, code := e.s.checkFile(secondFile); code != "" {
+		t.Fatalf("rewritten file failed its new digest: %q", code)
+	}
+	// a settled file is hashed once: the cached entry is used as long as its size and time stay
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if _, code := e.s.checkFile(secondFile); code != "" {
+		t.Fatalf("settled file check = %q", code)
+	}
+	e.s.bmu.Lock()
+	at := e.s.hashes[secondFile.Name].at
+	e.s.bmu.Unlock()
+	if _, code := e.s.checkFile(secondFile); code != "" {
+		t.Fatalf("settled file check = %q", code)
+	}
+	e.s.bmu.Lock()
+	again := e.s.hashes[secondFile.Name].at
+	e.s.bmu.Unlock()
+	if !again.Equal(at) {
+		t.Fatal("a settled file was hashed again")
+	}
+}
 
 func TestTrustedNetworkTableLoaderHandlesAbsentInvalidAndChangedSHA(t *testing.T) {
 	e := newEnv(t)

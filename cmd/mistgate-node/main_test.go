@@ -20,7 +20,7 @@ func TestRenderUnit(t *testing.T) {
 		"ReadWritePaths=/var/lib/mistgate-node /usr/local/bin /etc/sysctl.d /etc/systemd/journald.conf.d\n",
 		"RestartPreventExitStatus=78\n", "Restart=on-failure\n", "RestartSec=5\n",
 		// Unit generation 2: the three lines that let a node update itself.
-		// Generation 3: /dev/net/tun for the userspace backends, ExecStopPost cleanup.
+		// The resolver fix uses the transient-unit route, so the template remains generation 3.
 		"Environment=MISTGATE_UNIT_GEN=3\n",
 		"PrivateDevices=no\n", "DevicePolicy=closed\n", "DeviceAllow=/dev/net/tun rw\n",
 		"ExecStopPost=-/usr/local/bin/mistgate-node cleanup-net\n",

@@ -42,6 +42,10 @@ func cleanResolvers(servers []string, resolvConf bool) ([]string, error) {
 			skipped = append(skipped, s)
 			continue
 		}
+		if addr.Zone() != "" {
+			skipped = append(skipped, s)
+			continue
+		}
 		addr = addr.Unmap()
 		if addr.IsUnspecified() || addr.IsMulticast() || port == 0 || (resolvConf && port != 53) {
 			skipped = append(skipped, s)

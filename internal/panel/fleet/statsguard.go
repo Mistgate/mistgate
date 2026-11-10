@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"errors"
 	"math"
 	"sort"
 	"time"
@@ -18,7 +19,8 @@ const (
 	// believed to be longer than that.
 	maxBatchSpan = time.Hour
 	// rejectEventEvery limits the stats_rejected events of one stream (the table has no retention).
-	rejectEventEvery = time.Minute
+	rejectEventEvery       = time.Minute
+	statsPoisonRetryWindow = 5 * time.Minute
 )
 
 // guardedStats is a StatsBatch after the sanity checks.
@@ -29,8 +31,9 @@ type guardedStats struct {
 	personNetworks   []store.FleetPersonNetwork
 	networksDBSHA256 string
 	journal          []store.FleetJournal
-	rejected         int    // deltas dropped
-	reason           string // why, for the event; "" when nothing was dropped
+	rejected         int           // deltas dropped
+	reason           string        // why, for the event; "" when nothing was dropped
+	creditedSpan     time.Duration // creditedSpan is the panel-time credit charged if the store accepts this batch.
 }
 
 // guardStats checks the numbers of a batch before they reach used_bytes. A node is trusted with its own
@@ -42,14 +45,32 @@ type guardedStats struct {
 //   - repeated (credential, inbound) pairs are added with saturation before they are judged.
 //
 // The sessions, health and metrics of the batch are not affected, and the stream goes on.
-func (f *Fleet) guardStats(st *agentv1.StatsBatch, streamCaps []string) guardedStats {
-	elapsed := time.Duration(st.IntervalEndUnix-st.IntervalStartUnix) * time.Second
-	elapsed = min(max(elapsed, time.Second), maxBatchSpan)
+func (f *Fleet) guardStatsForSession(st *agentv1.StatsBatch, streamCaps []string, available time.Duration) guardedStats {
+	span := min(claimedStatsSpan(st), max(available, time.Duration(0)))
+	guarded := f.guardStatsElapsed(st, streamCaps, span)
+	guarded.creditedSpan = span
+	return guarded
+}
+
+func claimedStatsSpan(st *agentv1.StatsBatch) time.Duration {
+	if st.IntervalEndUnix <= st.IntervalStartUnix {
+		return time.Second
+	}
+	// Unsigned subtraction preserves the positive difference even when the supplied endpoints cross zero.
+	seconds := uint64(st.IntervalEndUnix) - uint64(st.IntervalStartUnix)
+	if seconds > uint64(maxBatchSpan/time.Second) {
+		return maxBatchSpan
+	}
+	return time.Duration(max(seconds, uint64(1))) * time.Second
+}
+
+func (f *Fleet) guardStatsElapsed(st *agentv1.StatsBatch, streamCaps []string, elapsed time.Duration) guardedStats {
+	elapsed = min(max(elapsed, 0), maxBatchSpan)
 	rate := f.cfg.MaxNodeBytesPerSec
 	if rate == 0 {
 		rate = defaultMaxNodeBytesPerSec
 	}
-	budget := satMul(rate, uint64(elapsed/time.Second))
+	budget := satMulDuration(rate, elapsed)
 
 	links := f.guardLinks(st)
 	networks, personNetworks, networksDBSHA256 := f.guardNetworks(st, streamCaps)
@@ -89,6 +110,18 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch, streamCaps []string) guardedS
 			journal: journal, rejected: len(st.Traffic), reason: "batch_over_limit"}
 	}
 	return out
+}
+
+func satMulDuration(rate uint64, elapsed time.Duration) uint64 {
+	if elapsed <= 0 {
+		return 0
+	}
+	nanosPerSecond := uint64(time.Second)
+	seconds := uint64(elapsed / time.Second)
+	remainder := uint64(elapsed % time.Second)
+	whole := satMul(rate, seconds)
+	frac := satAdd(satMul(rate/nanosPerSecond, remainder), (rate%nanosPerSecond)*remainder/nanosPerSecond)
+	return satAdd(whole, frac)
 }
 
 // guardNetworks makes the owner switch effective even when an agent sends rows it should not send.
@@ -266,6 +299,31 @@ func satMul(a, b uint64) uint64 {
 }
 
 type stuckSeq struct {
-	instance string
-	seq      uint64
+	instance       string
+	seq            uint64
+	firstFailureAt time.Time
+}
+
+func permanentStatsIngestError(err error) bool {
+	if errors.Is(err, store.ErrNotFound) {
+		return true
+	}
+	var coded interface{ Code() int }
+	if !errors.As(err, &coded) {
+		return false
+	}
+	// SQLite reports primary result codes in the low byte and extended result codes above it.
+	switch coded.Code() & 0xff {
+	case 18, // SQLITE_TOOBIG
+		19, // SQLITE_CONSTRAINT
+		20, // SQLITE_MISMATCH
+		25: // SQLITE_RANGE
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldDropStatsBatch(err error, firstFailureAt, now time.Time) bool {
+	return permanentStatsIngestError(err) || !now.Before(firstFailureAt.Add(statsPoisonRetryWindow))
 }

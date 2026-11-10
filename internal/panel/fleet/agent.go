@@ -250,7 +250,7 @@ func (s *session) persistPoison(poison *PoisonBatch) {
 		delete(s.f.stuck, s.nodeID)
 		return
 	}
-	s.f.stuck[s.nodeID] = stuckSeq{instance: poison.Instance, seq: poison.Seq}
+	s.f.stuck[s.nodeID] = stuckSeq{instance: poison.Instance, seq: poison.Seq, firstFailureAt: poison.FirstFailureAt}
 }
 
 func resetSessionAlarm(timer *time.Timer, next *time.Time, now time.Time) {
@@ -272,7 +272,7 @@ func (f *Fleet) poisonFor(nodeID string) *PoisonBatch {
 	if !ok {
 		return nil
 	}
-	return &PoisonBatch{Instance: poison.instance, Seq: poison.seq}
+	return &PoisonBatch{Instance: poison.instance, Seq: poison.seq, FirstFailureAt: poison.firstFailureAt}
 }
 
 // enqueue queues a message for the stream goroutine. A full queue means the agent does not keep up: drop the stream

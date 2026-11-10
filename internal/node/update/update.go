@@ -81,6 +81,7 @@ type Source interface {
 	Fetch(ctx context.Context, name string, offset uint64, w io.Writer) (total uint64, err error)
 	Failed() []string
 	Now() time.Time
+	LocalNow() time.Time
 }
 
 // Finish ends an update or a rollback: it re-executes the new binary. The agent calls it after the CommandResult is on
@@ -519,7 +520,7 @@ func (u *Updater) loadOutcome() {
 		return
 	}
 	lu := &pb.LastUpdate{}
-	if protojson.Unmarshal(b, lu) != nil || lu.Outcome == pb.UpdateOutcome_UPDATE_OUTCOME_UNSPECIFIED {
+	if (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(b, lu) != nil || lu.Outcome == pb.UpdateOutcome_UPDATE_OUTCOME_UNSPECIFIED {
 		_ = os.Remove(u.path(FileOutcome))
 		return
 	}
@@ -562,7 +563,20 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 	if err != nil {
 		return fail(err)
 	}
-	switch err := m.Check(src.Now(), u.cfg.Built); {
+	adjustedNow := src.Now()
+	localNow := src.LocalNow()
+	adjustedExpired, localExpired := adjustedNow.Unix() > m.Expires, localNow.Unix() > m.Expires
+	if adjustedExpired || localExpired {
+		clock := "adjusted"
+		if adjustedExpired && localExpired {
+			clock = "adjusted and local"
+		} else if localExpired {
+			clock = "local"
+		}
+		return fail(fmt.Errorf("%w: expired by %s clock (adjusted time %s; local time %s)", release.ErrExpired, clock,
+			adjustedNow.Format(time.RFC3339Nano), localNow.Format(time.RFC3339Nano)))
+	}
+	switch err := m.Check(adjustedNow, u.cfg.Built); {
 	case errors.Is(err, release.ErrUpToDate):
 		res.Ok, res.Detail, res.Params = true, "already current", map[string]string{"noop": "1"}
 		return res, nil

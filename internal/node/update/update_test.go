@@ -107,6 +107,7 @@ func (e *env) req(manifest, sig []byte) *pb.UpdateAgent {
 // fakeSrc serves content; dropAfter > 0 makes the first call die after that many bytes.
 type fakeSrc struct {
 	now       time.Time
+	localNow  time.Time
 	content   []byte
 	total     uint64 // 0 = len(content)
 	dropAfter int
@@ -118,7 +119,13 @@ type fakeSrc struct {
 	progress  []*pb.UpdateProgress
 }
 
-func (s *fakeSrc) Now() time.Time                { return s.now }
+func (s *fakeSrc) Now() time.Time { return s.now }
+func (s *fakeSrc) LocalNow() time.Time {
+	if !s.localNow.IsZero() {
+		return s.localNow
+	}
+	return s.now
+}
 func (s *fakeSrc) Failed() []string              { return s.failed }
 func (s *fakeSrc) Progress(p *pb.UpdateProgress) { s.progress = append(s.progress, p) }
 func (s *fakeSrc) Fetch(_ context.Context, name string, off uint64, w io.Writer) (uint64, error) {
@@ -226,8 +233,9 @@ func TestProgressSpeedUsesLatestInterval(t *testing.T) {
 
 type stallSrc struct{}
 
-func (stallSrc) Now() time.Time   { return time.Now() }
-func (stallSrc) Failed() []string { return nil }
+func (stallSrc) Now() time.Time      { return time.Now() }
+func (stallSrc) LocalNow() time.Time { return time.Now() }
+func (stallSrc) Failed() []string    { return nil }
 func (stallSrc) Fetch(ctx context.Context, _ string, _ uint64, _ io.Writer) (uint64, error) {
 	<-ctx.Done()
 	return 0, ctx.Err()
@@ -288,6 +296,53 @@ func TestUnitRefreshReservationCanCancelBeforeLaunch(t *testing.T) {
 	release(false)
 	if u.RefreshBusy() {
 		t.Fatal("cancelled refresh left its busy marker")
+	}
+}
+
+func TestApplyRejectsManifestExpiredByLocalClock(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	man, sig := e.manifest(newBin, newBuilt, func(m *release.Manifest) {
+		m.Expires = e.now.Add(time.Minute).Unix()
+	})
+	src := e.src(newBin)
+	src.localNow = e.now.Add(2 * time.Minute)
+	res, finish := u.Apply(context.Background(), e.req(man, sig), src)
+	if res.Error != "expired" || finish != nil || src.calls != 0 || !strings.Contains(res.Detail, "expired by local clock") ||
+		!strings.Contains(res.Detail, "adjusted time "+e.now.Format(time.RFC3339Nano)) ||
+		!strings.Contains(res.Detail, "local time "+src.localNow.Format(time.RFC3339Nano)) {
+		t.Fatalf("result=%+v finish=%v fetches=%d", res, finish != nil, src.calls)
+	}
+}
+
+func TestApplyRejectsManifestExpiredByAdjustedClock(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	man, sig := e.manifest(newBin, newBuilt, func(m *release.Manifest) {
+		m.Expires = e.now.Add(time.Minute).Unix()
+	})
+	src := e.src(newBin)
+	src.now = e.now.Add(2 * time.Minute)
+	src.localNow = e.now
+	res, finish := u.Apply(context.Background(), e.req(man, sig), src)
+	if res.Error != "expired" || finish != nil || src.calls != 0 || !strings.Contains(res.Detail, "expired by adjusted clock") ||
+		!strings.Contains(res.Detail, "adjusted time "+src.now.Format(time.RFC3339Nano)) ||
+		!strings.Contains(res.Detail, "local time "+src.localNow.Format(time.RFC3339Nano)) {
+		t.Fatalf("result=%+v finish=%v fetches=%d", res, finish != nil, src.calls)
+	}
+}
+
+func TestLoadOutcomeIgnoresFieldsFromNewerBuild(t *testing.T) {
+	e := newEnv(t)
+	u := e.updater(nil)
+	data := []byte(`{"outcome":"UPDATE_OUTCOME_FAILED","reason":"de1","futureField":true}`)
+	if err := os.WriteFile(u.path(FileOutcome), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	u.loadOutcome()
+	got := u.Outcome()
+	if got == nil || got.Outcome != pb.UpdateOutcome_UPDATE_OUTCOME_FAILED || got.Reason != "de1" {
+		t.Fatalf("newer outcome did not survive rollback: %+v", got)
 	}
 }
 

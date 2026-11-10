@@ -952,6 +952,7 @@ func TestUnitGenerationSeverityTracksGuardAndTunUse(t *testing.T) {
 		{name: "generation two with userspace awg", gen: "2", more: []*agentv1.DoctorResult{res("awg_backend", dOK, "", "backend", "userspace")}, want: sevWarning},
 		{name: "generation two with userspace warp", gen: "2", more: []*agentv1.DoctorResult{res("warp_path", dOK, "", "backend", "userspace")}, want: sevWarning},
 		{name: "generation two with a tun failure", gen: "2", more: []*agentv1.DoctorResult{res("awg_backend", dFail, "", "hint", "unit_outdated")}, want: sevWarning},
+		{name: "current generation with userspace awg", gen: "3", more: []*agentv1.DoctorResult{res("awg_backend", dOK, "", "backend", "userspace")}, want: sevInfo},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEnv(t)
