@@ -207,7 +207,7 @@ Why it looks like this:
 If another web server must own port 443 on this host, Mistgate can run behind it:
 
 - Run the public listener without TLS on loopback (`--listen 127.0.0.1:8080`, no `--acme-domain`, no `--tls-cert`) and let the proxy terminate TLS for `panel.example.com`, passing the Host header and the path through unchanged.
-- Add `--trusted-proxy 127.0.0.1` so that rate limits, sessions and the audit log see the real client address from `X-Forwarded-For` or `Forwarded`.
+- Add `--trusted-proxy 127.0.0.1` so that rate limits, sessions and the audit log see the real client address from `X-Forwarded-For`. The proxy must set or overwrite that header itself, so a client cannot supply its own; a proxy that only writes `Forwarded` is not supported.
 - Node agents need TLS from the panel itself. Give them a listener of their own and put its address into the install commands: `--agent-listen :8443 --agent-addr panel.example.com:8443`. The proxy must not touch that port.
 
 The agent port is then a port of its own that answers only the secret TLS name; on the shared port 443 it hides behind the decoy site. Prefer the plain setup above when you can.

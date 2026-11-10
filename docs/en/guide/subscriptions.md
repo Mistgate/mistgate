@@ -302,7 +302,7 @@ Rules are saved as soon as you add, move or remove one. On **Names & texts** and
 ## Protection of the links
 
 - **Fetches.** One link answers at most 60 times an hour; more get "too many requests". Fetches within 10 seconds of each other get the same answer.
-- **Guessing.** A network (a /24 for IPv4, a /48 for IPv6) that tries 20 unknown links within a minute gets only the fake 404 for 15 minutes, even for valid links.
+- **Guessing.** A network (a /24 for IPv4, a /48 for IPv6) that tries 20 unknown links within a minute gets the fake 404 for unknown links for 15 minutes, without a lookup. Valid links keep working for the people behind that network: one person guessing behind a shared address does not switch the others off. A valid link the panel has not served since it started is still looked up while the network's count of unknown links during the block stays under 20.
 - **Sharing.** When one link is used from more than 8 networks in a day, the panel writes the event "a subscription link is used from 9 networks a day" and opens the alert "A subscription looks shared". It counts networks, it never stores the addresses. Issue a new link if the old one leaked.
 
 ## Who can do what

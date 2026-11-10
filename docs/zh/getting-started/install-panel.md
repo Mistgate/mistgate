@@ -207,7 +207,7 @@ journalctl -u mistgate -f
 如果同一主机上的其他 Web 服务器必须占用端口 443，Mistgate 可以在它后面运行：
 
 - 在 回环地址 上运行无 TLS 的公网监听器（`--listen 127.0.0.1:8080`，不传入 `--acme-domain`、`--tls-cert`），让代理为 `panel.example.com` 终止 TLS，并原样传递 Host 请求头和路径。
-- 添加 `--trusted-proxy 127.0.0.1`，这样速率限制、会话和审计日志可以从 `X-Forwarded-For` 或 `Forwarded` 获取真实客户端地址。
+- 添加 `--trusted-proxy 127.0.0.1`，这样速率限制、会话和审计日志可以从 `X-Forwarded-For` 获取真实客户端地址。代理必须自行设置或覆盖该请求头，这样客户端无法自行伪造；只写入 `Forwarded` 的代理不受支持。
 - 节点 Agent 必须从面板本身获取 TLS。为它们单独配置一个监听器，并将其地址放入安装命令：`--agent-listen :8443 --agent-addr panel.example.com:8443`。代理不能处理该端口。
 
 这样，Agent 端口会作为独立端口，只响应私密 TLS 名称；在共用的 443 端口上，它会隐藏在伪装站点后面。条件允许时，优先使用上面的直接配置。

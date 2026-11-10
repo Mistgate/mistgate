@@ -50,7 +50,7 @@ mistgate serve --listen :443 --acme-domain panel.example.com
 | `--agent-listen` | `MISTGATE_AGENT_LISTEN` | none (`127.0.0.1:8082` with `--dev`) | 为节点 Agent 单独提供 TLS 监听器。未设置时，Agent 会使用带私密 TLS 名称的公共监听器，因此该监听器必须启用 TLS（使用 `--tls-cert` 或 `--acme-domain`）。 |
 | `--agent-addr` | `MISTGATE_AGENT_ADDR` | `--agent-listen` when it names a host, else the public URL's host and port (443 when none) | Agent 要连接的 `host:port`；此值会写入安装命令。 |
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | 放置自有伪装站点的目录。其中的 `404.html` 和 `429.html` 会替换内置错误页面。 |
-| `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` (comma-separated) | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 和 `Forwarded` 请求头会被采信。可重复指定。未设置时，TCP 对端就是客户端。 |
+| `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` (comma-separated) | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 请求头会被采信。代理必须自行设置或覆盖该请求头；只写入 `Forwarded` 的代理不受支持。可重复指定。未设置时，TCP 对端就是客户端。 |
 | `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | 面板自身的 systemd 单元；面板更新程序在替换二进制文件前后会停止并重新启动它。面板以 root 运行时使用此值；面板以其他用户身份运行时，会启动固定的 root 辅助单元，命令行中会指定该单元本身。 |
 | `--log-level` | `MISTGATE_LOG_LEVEL` | `info` | 启动时的面板日志级别：`debug`、`info`、`warn` 或 `error`。所有者可在面板运行时更改（设置 → 系统）；重启后恢复该值。 |
 | `--log-format` | `MISTGATE_LOG_FORMAT` | `text` | `text` 或 `json`：stderr 上日志的格式。 |

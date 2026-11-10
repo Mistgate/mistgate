@@ -25,7 +25,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | the address setup stored | 为管理后台单独提供普通 HTTP 监听器。仅适用于通过 `setup --admin-listen` 设置的安装；若使用私密前缀或主机名，则会报错。此项会覆盖已存储的地址，但通行密钥仍绑定到 setup 保存的端口。 |
 | `--agent-listen` | `MISTGATE_AGENT_LISTEN` | none (`127.0.0.1:8082` with `--dev`) | 为节点 Agent 接入端点单独提供 TLS 监听器。未设置时，Agent 会使用带私密 TLS 名称的公共监听器，因此公共监听器必须启用 TLS。 |
 | `--agent-addr` | `MISTGATE_AGENT_ADDR` | derived | Agent 要连接的 `host:port`，会写入新安装命令。未设置时：若 `--agent-listen` 指定了具体主机（非空、不是 `0.0.0.0` 或 `[::]`），则使用该值；否则使用公共 URL 的主机和端口（URL 未指定端口时使用 443）。已注册的节点会保留注册时使用的地址。 |
-| `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 和 `Forwarded` 请求头会被采信。可重复指定。未设置时，无论请求头内容如何，TCP 对端都被视为客户端。 |
+| `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 请求头会被采信。代理必须自行设置或覆盖该请求头；只写入 `Forwarded` 的代理不受支持。可重复指定。未设置时，无论请求头内容如何，TCP 对端都被视为客户端。 |
 | `--decoy-dir` | `MISTGATE_DECOY_DIR` | the built-in page | 自有静态伪装站点的目录（`index.html`，可选的 `404.html`、`429.html`、`robots.txt`）。 |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。目录必须已存在（先运行 `mistgate setup`）；每次启动 `serve` 时都会将其权限模式设为 0700。 |
 | `--update-service` | `MISTGATE_UPDATE_SERVICE` | `mistgate.service` (none with `--dev`) | 面板自身的 systemd 单元；替换二进制文件前后，面板更新程序会停止并重新启动它。面板以 root 运行时，此值会决定更新程序以哪个名称启动临时辅助单元。面板以其他用户身份运行时，则会启动固定的 root 辅助单元 `mistgate-panel-update.service`，其命令行会指定单元和数据目录本身（若与你的配置不同，请编辑该单元）；参见[更新](../operations/updates.md)。使用 `--dev` 时，面板不会自更新。 |

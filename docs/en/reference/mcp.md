@@ -310,6 +310,7 @@ The panel also protects the agent and you:
 
 - Text from data is cleaned: control characters, line breaks and invisible formatting characters are removed, and long values are cut.
 - A plan's summary never contains text from data; such values are separate facts marked `untrusted`, and the owner sees them quoted.
+- What the owner approves is shown whole. A long value (a task prompt, a list of resolvers, a text of the user page) comes as numbered facts; a new value that cannot be shown as it is (a hidden or bidirectional control character, or text the redactor would change, such as a key or a link with a token) is refused when the plan is made, with the field named. The value a field has now is shown redacted and never blocks a change.
 - A last pass over every result replaces anything shaped like a secret: API tokens, share links (`hysteria2://…` and the like), tunnel configurations, key material, URL query strings and long URL path segments (the secret prefix, a subscription token) and bare 32-byte keys.
 
 ## What an agent never gets
