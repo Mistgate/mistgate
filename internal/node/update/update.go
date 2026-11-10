@@ -39,6 +39,7 @@ const (
 	FileUnitRefreshPending = "unit-refresh.pending"
 	CapUpdate              = "update/1"
 	CapUpdateTimeout       = "update-timeout/1"
+	CapUpdateSources       = "update-sources/1"
 	CapGuard               = "update-guard/1"
 	CommitWindow           = 5 * time.Minute
 	DefaultIdleTimeout     = 90 * time.Second
@@ -84,6 +85,12 @@ type Source interface {
 	LocalNow() time.Time
 }
 
+// FetcherSource optionally builds the sources requested by an UpdateAgent. Without it the updater keeps the historical
+// single-panel path.
+type FetcherSource interface {
+	Fetchers(m *release.Manifest, f release.File) []Fetcher
+}
+
 // Finish ends an update or a rollback: it re-executes the new binary. The agent calls it after the CommandResult is on
 // the wire and the engines are drained. An error means exec failed; the previous binary is back in place and the agent
 // must exit so the supervisor restarts it.
@@ -111,6 +118,13 @@ type Config struct {
 	Log         *slog.Logger
 	// RetryWait is the pause after ErrRetryLater.
 	RetryWait time.Duration
+	// Source policy timing knobs. Zero values select the production policy.
+	SourceStallTimeout time.Duration
+	SourceSlowAfter    time.Duration
+	SourceSlowWindow   time.Duration
+	SourceSlowInterval time.Duration
+	SourceSlowBytes    uint64
+	SourceBackoff      []time.Duration
 }
 
 // Marker is the content of update.pending (and, after a crash-loop restore, of update.rolledback).
@@ -165,6 +179,24 @@ func New(cfg Config) *Updater {
 	if cfg.RetryWait <= 0 {
 		cfg.RetryWait = defaultRetryWait
 	}
+	if cfg.SourceStallTimeout <= 0 {
+		cfg.SourceStallTimeout = 30 * time.Second
+	}
+	if cfg.SourceSlowAfter <= 0 {
+		cfg.SourceSlowAfter = 30 * time.Second
+	}
+	if cfg.SourceSlowWindow <= 0 {
+		cfg.SourceSlowWindow = 30 * time.Second
+	}
+	if cfg.SourceSlowInterval <= 0 {
+		cfg.SourceSlowInterval = 10 * time.Second
+	}
+	if cfg.SourceSlowBytes == 0 {
+		cfg.SourceSlowBytes = 1 << 20
+	}
+	if cfg.SourceBackoff == nil {
+		cfg.SourceBackoff = []time.Duration{5 * time.Second, 15 * time.Second, 30 * time.Second}
+	}
 	if cfg.Args == nil {
 		cfg.Args = os.Args
 	}
@@ -203,7 +235,7 @@ func (u *Updater) Capabilities() []string {
 	if u == nil || u.cfg.Key == nil || u.cfg.GOOS != "linux" || u.exe == "" || u.probe() != nil {
 		return nil
 	}
-	caps := []string{CapUpdate, CapUpdateTimeout}
+	caps := []string{CapUpdate, CapUpdateTimeout, CapUpdateSources}
 	if u.cfg.UnitGen >= 2 {
 		caps = append(caps, CapGuard)
 	}
@@ -361,7 +393,7 @@ func (u *Updater) Startup() Startup {
 	m, err := readMarker(u.path(FilePending))
 	switch {
 	case err != nil: // unreadable marker: drop it, say so, run as we are
-		u.log.Error("update marker unreadable, dropped", "err", err)
+		u.log.Error("update marker unreadable, dropped", "code", "update_marker_unreadable", "err", err)
 		_ = os.Remove(u.path(FilePending))
 		u.setOutcome(pb.UpdateOutcome_UPDATE_OUTCOME_FAILED, &Marker{}, "failed: bad marker")
 	case m == nil:
@@ -375,10 +407,10 @@ func (u *Updater) Startup() Startup {
 		_ = os.Remove(u.newPath())
 		u.setOutcome(pb.UpdateOutcome_UPDATE_OUTCOME_FAILED, m, ReasonInterrupted)
 	default: // the bundle held a binary that is not the release it claims to be
-		u.log.Error("binary is not the release the update marker describes", "built", u.cfg.Built, "marker_to", m.ToBuilt)
+		u.log.Error("binary is not the release the update marker describes", "code", "update_marker_built_mismatch", "built", u.cfg.Built, "marker_to", m.ToBuilt)
 		fin, err := u.rollbackFor(m, ReasonBuiltMismatch)
 		if err != nil {
-			u.log.Error("rollback failed", "err", err)
+			u.log.Error("rollback failed", "code", "update_rollback_failed", "err", err)
 		}
 		st.Finish = fin
 	}
@@ -478,7 +510,7 @@ func (u *Updater) rollbackFor(m *Marker, reason string) (Finish, error) {
 	_ = os.Remove(u.path(FilePending))
 	_ = os.Remove(u.path(FileStarts))
 	syncDir(filepath.Dir(u.exe))
-	u.log.Warn("rolling back to the previous build", "reason", reason, "from", m.FromVersion, "to", m.ToVersion)
+	u.log.Warn("rolling back to the previous build", "code", "update_rollback_started", "reason", reason, "from", m.FromVersion, "to", m.ToVersion)
 	return u.execFinish(nil), nil
 }
 
@@ -509,7 +541,7 @@ func (u *Updater) setOutcome(o pb.UpdateOutcome, m *Marker, reason string) {
 	u.outcome.Store(lu)
 	if b, err := protojson.Marshal(lu); err == nil {
 		if err := writeAtomic(u.path(FileOutcome), b, 0o600); err != nil {
-			u.log.Error("cannot write update outcome", "err", err)
+			u.log.Error("cannot write update outcome", "code", "update_outcome_write_failed", "err", err)
 		}
 	}
 }
@@ -540,9 +572,14 @@ func (u *Updater) loadOutcome() {
 // binary was swapped and the caller must send the result, drain the engines and call it.
 func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*pb.CommandResult, Finish) {
 	res := &pb.CommandResult{RequestId: req.RequestId}
+	sourceMode := len(req.GetSources()) != 0
+	currentSource := ""
 	report := func(p *pb.UpdateProgress) {
 		if p.RequestId == "" {
 			p.RequestId = req.RequestId
+		}
+		if sourceMode {
+			p.Source = currentSource
 		}
 		if x, ok := src.(interface{ Progress(*pb.UpdateProgress) }); ok {
 			x.Progress(p)
@@ -628,9 +665,48 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 			timeout = maxDownloadTimeout
 		}
 	}
-	if err := u.download(ctx, src, file, timeout, report); err != nil {
+	var used, failed []string
+	var downloadErr error
+	if !sourceMode {
+		downloadErr = u.download(ctx, src, file, timeout, report)
+	} else {
+		var fetchers []Fetcher
+		if provider, ok := src.(FetcherSource); ok {
+			fetchers = provider.Fetchers(m, file)
+		} else {
+			// Test sources and link-only sources without a source provider retain the panel path.
+			fetchers = []Fetcher{{Kind: "panel", Fetch: func(ctx context.Context, offset uint64, w io.Writer) (uint64, error) {
+				return src.Fetch(ctx, file.Name, offset, w)
+			}}}
+		}
+		if len(fetchers) != 0 {
+			currentSource = fetchers[0].Kind
+		}
+		if len(fetchers) == 1 {
+			usedSet := make(map[string]bool, 1)
+			markUsed := func(kind string) {
+				if !usedSet[kind] {
+					usedSet[kind] = true
+					used = append(used, kind)
+				}
+			}
+			selected := selectedFetcher{Source: src, fetcher: fetchers[0], current: func(kind string) { currentSource = kind }, used: markUsed}
+			downloadErr = u.download(ctx, selected, file, timeout, report)
+			if downloadErr != nil {
+				failed = []string{fetchers[0].Kind + ":" + sourceFailureCode(downloadErr)}
+			}
+		} else {
+			used, failed, downloadErr = u.downloadSources(ctx, src, file, timeout, fetchers, report,
+				func(kind string) { currentSource = kind })
+		}
+		res.Params = map[string]string{"sources_used": strings.Join(used, ",")}
+		if downloadErr != nil && len(failed) != 0 {
+			res.Params["sources_failed"] = strings.Join(failed, ",")
+		}
+	}
+	if downloadErr != nil {
 		_ = os.Remove(u.newPath())
-		return fail(err)
+		return fail(downloadErr)
 	}
 	report(&pb.UpdateProgress{RequestId: req.RequestId, Phase: "verifying", BytesDownloaded: uint64(file.Size), BytesTotal: uint64(file.Size), UpdatedUnix: src.Now().Unix()})
 	if err := u.verifyNew(file); err != nil {
@@ -665,9 +741,12 @@ func (u *Updater) Apply(ctx context.Context, req *pb.UpdateAgent, src Source) (*
 		"from_version": marker.FromVersion, "from_built": fmt.Sprint(marker.FromBuilt),
 		"to_version": marker.ToVersion, "to_built": fmt.Sprint(marker.ToBuilt),
 	}
+	if sourceMode {
+		res.Params["sources_used"] = strings.Join(used, ",")
+	}
 	return res, u.execFinish(func() { // exec failed: put the old binary back, forget the marker, let the supervisor restart us
 		if err := os.Rename(u.prev(), u.exe); err != nil {
-			u.log.Error("cannot restore the previous binary after a failed exec; the marker stays for the next start", "err", err)
+			u.log.Error("cannot restore the previous binary after a failed exec; the marker stays for the next start", "code", "update_exec_restore_failed", "err", err)
 		} else {
 			_ = os.Remove(u.path(FilePending))
 		}
@@ -718,7 +797,7 @@ func (u *Updater) Rollback(_ context.Context, req *pb.RollbackAgent) (*pb.Comman
 	syncDir(filepath.Dir(u.exe))
 	done = true
 	u.pend.Store(nil)
-	u.log.Warn("manual rollback: previous binary restored, re-executing", "leaving", u.cfg.Version)
+	u.log.Warn("manual rollback: previous binary restored, re-executing", "code", "update_manual_rollback", "leaving", u.cfg.Version)
 	res.Ok, res.Affected = true, 1
 	res.Params = map[string]string{"from_version": u.cfg.Version, "from_built": fmt.Sprint(u.cfg.Built)}
 	return res, u.execFinish(nil)
@@ -786,9 +865,9 @@ func (u *Updater) download(ctx context.Context, src Source, f release.File, time
 		case idleFired.Load():
 			idleFired.Store(false)
 			if failed >= len(u.cfg.Backoff) {
-				return step("download_failed", errors.New("download idle timeout"))
+				return step("download_failed", errDownloadIdleTimeout)
 			}
-			u.log.Warn("download idle, retrying", "have", cw.n, "of", f.Size)
+			u.log.Warn("download idle, retrying", "code", "update_download_idle", "have", cw.n, "of", f.Size)
 			if !sleep(ctx, u.cfg.Backoff[failed]) {
 				return step("download_failed", ctx.Err())
 			}
@@ -802,7 +881,7 @@ func (u *Updater) download(ctx context.Context, src Source, f release.File, time
 			if failed >= len(u.cfg.Backoff) {
 				return step("download_failed", err)
 			}
-			u.log.Warn("download interrupted, retrying", "have", cw.n, "of", f.Size, "err", err)
+			u.log.Warn("download interrupted, retrying", "code", "update_download_interrupted", "have", cw.n, "of", f.Size, "err", err)
 			if !sleep(ctx, u.cfg.Backoff[failed]) {
 				return step("download_failed", ctx.Err())
 			}
@@ -895,7 +974,10 @@ func (u *Updater) verifyNew(f release.File) error {
 	return nil
 }
 
-var errOverflow = errors.New("update: more bytes than the manifest lists")
+var (
+	errOverflow            = errors.New("update: more bytes than the manifest lists")
+	errDownloadIdleTimeout = errors.New("download idle timeout")
+)
 
 // capWriter refuses to write past the size the signed manifest promised (a bad panel must not fill the disk).
 type capWriter struct {

@@ -1340,8 +1340,10 @@ type UpdateProgress struct {
 	BytesPerSecond  uint64 `protobuf:"varint,5,opt,name=bytes_per_second,json=bytesPerSecond,proto3" json:"bytes_per_second,omitempty"`
 	UpdatedUnix     int64  `protobuf:"varint,6,opt,name=updated_unix,json=updatedUnix,proto3" json:"updated_unix,omitempty"`
 	Error           string `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The source kind currently supplying bytes, when UpdateAgent.sources was set.
+	Source        string `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateProgress) Reset() {
@@ -1423,6 +1425,13 @@ func (x *UpdateProgress) GetError() string {
 	return ""
 }
 
+func (x *UpdateProgress) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
 type Hello struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Informational; the certificate is authoritative.
@@ -1446,7 +1455,8 @@ type Hello struct {
 	// feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
 	// "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
 	// "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-timeout/1" (the
-	// UpdateAgent download timeout field), "update-link/1" (link-only UpdateAgent
+	// UpdateAgent download timeout field), "update-sources/1" (UpdateAgent.sources and UpdateProgress.source;
+	// only together with update/1), "update-link/1" (link-only UpdateAgent
 	// with a Worker download token), "update-guard/1" (the unit has the
 	// crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
 	// InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
@@ -7552,8 +7562,19 @@ type UpdateAgent struct {
 	DownloadToken string `protobuf:"bytes,4,opt,name=download_token,json=downloadToken,proto3" json:"download_token,omitempty"`
 	// Maximum time allowed for downloading the selected bundle file. Zero keeps the agent default.
 	DownloadTimeoutSeconds uint32 `protobuf:"varint,5,opt,name=download_timeout_seconds,json=downloadTimeoutSeconds,proto3" json:"download_timeout_seconds,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Download sources in the order to try ("UPDATE SOURCES"). Empty means "panel" only. Known: "panel"
+	// (FetchUpdate, or the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated
+	// kinds are ignored.
+	Sources []string `protobuf:"bytes,6,rep,name=sources,proto3" json:"sources,omitempty"`
+	// Reserved for "peer": donor host:port, SHA-256 of its one-time certificate, and a 32-byte one-time token.
+	// Peer downloads are not implemented by this agent stage.
+	PeerAddress string `protobuf:"bytes,7,opt,name=peer_address,json=peerAddress,proto3" json:"peer_address,omitempty"`
+	PeerPin     []byte `protobuf:"bytes,8,opt,name=peer_pin,json=peerPin,proto3" json:"peer_pin,omitempty"`
+	PeerToken   []byte `protobuf:"bytes,9,opt,name=peer_token,json=peerToken,proto3" json:"peer_token,omitempty"`
+	// "cloudflare": a presigned HTTPS GET URL of the file in the owner's R2 bucket.
+	CloudflareUrl string `protobuf:"bytes,10,opt,name=cloudflare_url,json=cloudflareUrl,proto3" json:"cloudflare_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateAgent) Reset() {
@@ -7619,6 +7640,41 @@ func (x *UpdateAgent) GetDownloadTimeoutSeconds() uint32 {
 		return x.DownloadTimeoutSeconds
 	}
 	return 0
+}
+
+func (x *UpdateAgent) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *UpdateAgent) GetPeerAddress() string {
+	if x != nil {
+		return x.PeerAddress
+	}
+	return ""
+}
+
+func (x *UpdateAgent) GetPeerPin() []byte {
+	if x != nil {
+		return x.PeerPin
+	}
+	return nil
+}
+
+func (x *UpdateAgent) GetPeerToken() []byte {
+	if x != nil {
+		return x.PeerToken
+	}
+	return nil
+}
+
+func (x *UpdateAgent) GetCloudflareUrl() string {
+	if x != nil {
+		return x.CloudflareUrl
+	}
+	return ""
 }
 
 // Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.
@@ -8095,7 +8151,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fupdate_progress\x18\x13 \x01(\v2!.mistgate.agent.v1.UpdateProgressH\x00R\x0eupdateProgress\x12:\n" +
 	"\tos_status\x18\x14 \x01(\v2\x1b.mistgate.agent.v1.OsStatusH\x00R\bosStatus\x12J\n" +
 	"\fdebug_report\x18( \x01(\v2%.mistgate.agent.v1.DebugCaptureReportH\x00R\vdebugReportB\t\n" +
-	"\amessage\"\x84\x02\n" +
+	"\amessage\"\x9c\x02\n" +
 	"\x0eUpdateProgress\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
@@ -8105,7 +8161,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"bytesTotal\x12,\n" +
 	"\x10bytes_per_second\x18\x05 \x01(\x04B\x020\x02R\x0ebytesPerSecond\x12%\n" +
 	"\fupdated_unix\x18\x06 \x01(\x03B\x020\x02R\vupdatedUnix\x12\x14\n" +
-	"\x05error\x18\a \x01(\tR\x05error\"\xfe\x04\n" +
+	"\x05error\x18\a \x01(\tR\x05error\x12\x16\n" +
+	"\x06source\x18\b \x01(\tR\x06source\"\xfe\x04\n" +
 	"\x05Hello\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12#\n" +
 	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12\x1f\n" +
@@ -8687,14 +8744,21 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x06params\x18\x04 \x03(\v2'.mistgate.agent.v1.ApplyFix.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc7\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe5\x02\n" +
 	"\vUpdateAgent\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
 	"\bmanifest\x18\x02 \x01(\fR\bmanifest\x12\x1c\n" +
 	"\tsignature\x18\x03 \x01(\fR\tsignature\x12%\n" +
 	"\x0edownload_token\x18\x04 \x01(\tR\rdownloadToken\x128\n" +
-	"\x18download_timeout_seconds\x18\x05 \x01(\rR\x16downloadTimeoutSeconds\".\n" +
+	"\x18download_timeout_seconds\x18\x05 \x01(\rR\x16downloadTimeoutSeconds\x12\x18\n" +
+	"\asources\x18\x06 \x03(\tR\asources\x12!\n" +
+	"\fpeer_address\x18\a \x01(\tR\vpeerAddress\x12\x19\n" +
+	"\bpeer_pin\x18\b \x01(\fR\apeerPin\x12\x1d\n" +
+	"\n" +
+	"peer_token\x18\t \x01(\fR\tpeerToken\x12%\n" +
+	"\x0ecloudflare_url\x18\n" +
+	" \x01(\tR\rcloudflareUrl\".\n" +
 	"\rRollbackAgent\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\"@\n" +

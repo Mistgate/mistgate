@@ -63,19 +63,20 @@ type fakePanel struct {
 	dups       int
 	committed  []uint64 // seqs committed, in order
 
-	hellos    chan *pb.Hello
-	applies   chan *pb.ApplyResult
-	cmds      chan *pb.CommandResult
-	logs      chan *pb.LogChunk
-	debugs    chan *pb.DebugCaptureReport
-	connects  chan struct{}
-	doctors   chan *pb.DoctorReport
-	osStatus  chan *pb.OsStatus
-	bundle    map[string][]byte // FetchUpdate serves these by name (guarded by mu)
-	fetches   []uint64          // offsets FetchUpdate was asked for
-	fetchBusy int               // answer RESOURCE_EXHAUSTED this many times first
-	cmdsSeen  atomic.Int64      // CommandResults received, whether or not a test has read them
-	badSeq    atomic.Int64      // DoctorReports that arrived with a seq (they must be unreliable, seq 0)
+	hellos          chan *pb.Hello
+	applies         chan *pb.ApplyResult
+	cmds            chan *pb.CommandResult
+	logs            chan *pb.LogChunk
+	debugs          chan *pb.DebugCaptureReport
+	connects        chan struct{}
+	doctors         chan *pb.DoctorReport
+	osStatus        chan *pb.OsStatus
+	bundle          map[string][]byte // FetchUpdate serves these by name (guarded by mu)
+	fetches         []uint64          // offsets FetchUpdate was asked for
+	fetchBusy       int               // answer RESOURCE_EXHAUSTED this many times first
+	fetchStallAfter uint64            // bytes to send before holding a FetchUpdate stream open
+	cmdsSeen        atomic.Int64      // CommandResults received, whether or not a test has read them
+	badSeq          atomic.Int64      // DoctorReports that arrived with a seq (they must be unreliable, seq 0)
 }
 
 type panelConn struct {

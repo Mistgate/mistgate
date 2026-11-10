@@ -300,7 +300,8 @@ func TestUpdateLinkFetchDoesNotFollowRedirect(t *testing.T) {
 		http.Redirect(w, r, "/redirect", http.StatusFound)
 	}))
 	_, err := (updSource{a: a, token: linkDownloadToken}).Fetch(context.Background(), binName, 0, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "HTTP 302") {
+	var failure *update.FetchFailure
+	if !errors.As(err, &failure) || failure.Code != "http_302" || errors.Is(err, update.ErrPermanent) {
 		t.Fatalf("Fetch error = %v, want transient HTTP 302 error", err)
 	}
 	if redirected.Load() != 0 {
@@ -315,7 +316,8 @@ func TestUpdateLinkFetchRejectsWrongContentRangeStart(t *testing.T) {
 		_, _ = io.WriteString(w, "data")
 	}))
 	_, err := (updSource{a: a, token: linkDownloadToken}).Fetch(context.Background(), binName, 5, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "starts at") {
+	var failure *update.FetchFailure
+	if !errors.As(err, &failure) || failure.Code != "size" || !errors.Is(err, update.ErrPermanent) {
 		t.Fatalf("Fetch error = %v, want wrong Content-Range start error", err)
 	}
 }

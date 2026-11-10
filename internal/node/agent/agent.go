@@ -15,6 +15,7 @@ package agent
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"log/slog"
 	"math"
 	mrand "math/rand/v2"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -152,11 +154,13 @@ type Agent struct {
 	settings                atomic.Pointer[pb.NodeSettings]
 	clientIPv6DoctorPending atomic.Bool
 	clientIPv6DoctorRunning atomic.Bool
-	linkAdvertised          atomic.Bool               // the last HelloAck advertised the signed link
-	linkRetryAt             atomic.Pointer[time.Time] // a link attempt failed before it was established: the link is not tried again before this
-	linkHTTPClient          *http.Client              // test seam; nil uses normal system-root TLS verification
-	linkPlain               bool                      // test seam: dial the link as an older agent that does not seal
-	offset                  atomic.Int64              // seconds: panel clock minus local clock, measured at Hello
+	linkAdvertised          atomic.Bool                                             // the last HelloAck advertised the signed link
+	linkRetryAt             atomic.Pointer[time.Time]                               // a link attempt failed before it was established: the link is not tried again before this
+	linkHTTPClient          *http.Client                                            // test seam; nil uses normal system-root TLS verification
+	updateRootCAs           *x509.CertPool                                          // test seam for loopback source-fetch servers
+	updateDialContext       func(context.Context, string, string) (net.Conn, error) // test seam; production uses a bounded dialer
+	linkPlain               bool                                                    // test seam: dial the link as an older agent that does not seal
+	offset                  atomic.Int64                                            // seconds: panel clock minus local clock, measured at Hello
 	skewed                  atomic.Bool
 	cur                     atomic.Pointer[session]
 	cancel                  context.CancelCauseFunc

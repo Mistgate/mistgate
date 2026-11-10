@@ -109,7 +109,7 @@ func TestLinkOnlyAgentListsLinkUpdateCapability(t *testing.T) {
 	}
 	a.meta.Link = "wss://de1.example.com/" + strings.Repeat("p", 24) + "/"
 	caps := a.capabilities()
-	if !contains(caps, "update-link/1") || contains(caps, "update/1") || !contains(caps, "update-guard/1") ||
+	if !contains(caps, "update-link/1") || contains(caps, "update/1") || contains(caps, "update-sources/1") || !contains(caps, "update-guard/1") ||
 		!contains(caps, "doctor/1") || !contains(caps, "ws-link/1") {
 		t.Errorf("a link-only agent lists %v", caps)
 	}

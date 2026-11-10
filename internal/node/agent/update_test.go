@@ -33,11 +33,12 @@ var (
 )
 
 // FetchUpdate is the fake panel's half of the download: the named file of p.bundle from the asked offset, in small chunks.
-func (p *fakePanel) FetchUpdate(_ context.Context, req *connect.Request[pb.FetchUpdateRequest], stream *connect.ServerStream[pb.FetchUpdateResponse]) error {
+func (p *fakePanel) FetchUpdate(ctx context.Context, req *connect.Request[pb.FetchUpdateRequest], stream *connect.ServerStream[pb.FetchUpdateResponse]) error {
 	p.mu.Lock()
 	p.fetches = append(p.fetches, req.Msg.Offset)
 	data, ok := p.bundle[req.Msg.Name]
 	busy := p.fetchBusy > 0
+	stallAfter := p.fetchStallAfter
 	if busy {
 		p.fetchBusy--
 	}
@@ -48,11 +49,19 @@ func (p *fakePanel) FetchUpdate(_ context.Context, req *connect.Request[pb.Fetch
 	case !ok || req.Msg.Offset > uint64(len(data)):
 		return connect.NewError(connect.CodeNotFound, errors.New("no such file"))
 	}
-	for off := int(req.Msg.Offset); off < len(data); off += 1000 {
-		end := min(off+1000, len(data))
-		if err := stream.Send(&pb.FetchUpdateResponse{Data: data[off:end], TotalSize: uint64(len(data))}); err != nil {
+	end := len(data)
+	if stallAfter > 0 {
+		end = min(end, int(req.Msg.Offset+stallAfter))
+	}
+	for off := int(req.Msg.Offset); off < end; off += 64 * 1024 {
+		chunkEnd := min(off+64*1024, end)
+		if err := stream.Send(&pb.FetchUpdateResponse{Data: data[off:chunkEnd], TotalSize: uint64(len(data))}); err != nil {
 			return err
 		}
+	}
+	if stallAfter > 0 && end < len(data) {
+		<-ctx.Done()
+		return ctx.Err()
 	}
 	return nil
 }
@@ -181,7 +190,8 @@ func TestHelloCarriesUpdateFields(t *testing.T) {
 		if hello.Built != oldBuilt || hello.AgentVersion != "0.1.0-old" || hello.LastUpdate != nil {
 			t.Errorf("hello = %v", hello)
 		}
-		if !contains(hello.Capabilities, "doctor/1") || !contains(hello.Capabilities, "update/1") || !contains(hello.Capabilities, "update-guard/1") {
+		if !contains(hello.Capabilities, "doctor/1") || !contains(hello.Capabilities, "update/1") ||
+			!contains(hello.Capabilities, "update-sources/1") || !contains(hello.Capabilities, "update-guard/1") {
 			t.Errorf("capabilities = %v", hello.Capabilities)
 		}
 	})

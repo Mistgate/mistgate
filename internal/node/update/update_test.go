@@ -945,8 +945,8 @@ func TestCapabilities(t *testing.T) {
 		mut  func(*Config)
 		want []string
 	}{
-		{"signed, writable, guarded unit", nil, []string{"update/1", "update-timeout/1", "update-guard/1"}},
-		{"generation 1 unit: writable dir in a foreground run", func(c *Config) { c.UnitGen = 1 }, []string{"update/1", "update-timeout/1"}},
+		{"signed, writable, guarded unit", nil, []string{"update/1", "update-timeout/1", "update-sources/1", "update-guard/1"}},
+		{"generation 1 unit: writable dir in a foreground run", func(c *Config) { c.UnitGen = 1 }, []string{"update/1", "update-timeout/1", "update-sources/1"}},
 		{"unsigned build", func(c *Config) { c.Key = nil }, nil},
 		{"not linux", func(c *Config) { c.GOOS = "darwin" }, nil},
 		{"executable directory not writable", func(c *Config) { c.ExePath = filepath.Join(e.dir, "nope", "x") }, nil},

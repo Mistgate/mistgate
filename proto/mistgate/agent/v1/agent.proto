@@ -744,6 +744,8 @@ message UpdateProgress {
   uint64 bytes_per_second = 5 [jstype = JS_NUMBER];
   int64 updated_unix = 6 [jstype = JS_NUMBER];
   string error = 7;
+  // The source kind currently supplying bytes, when UpdateAgent.sources was set.
+  string source = 8;
 }
 
 message Hello {
@@ -768,7 +770,8 @@ message Hello {
   // feature's messages only to an agent that lists it. Known: "doctor/1" (RunDoctor, ApplyFix, DoctorReport),
   // "unit-refresh/1" (refresh_unit; Linux launcher available and this process runs under systemd),
   // "update/1" (UpdateAgent, RollbackAgent, FetchUpdate, Hello.last_update), "update-timeout/1" (the
-  // UpdateAgent download timeout field), "update-link/1" (link-only UpdateAgent
+  // UpdateAgent download timeout field), "update-sources/1" (UpdateAgent.sources and UpdateProgress.source;
+  // only together with update/1), "update-link/1" (link-only UpdateAgent
   // with a Worker download token), "update-guard/1" (the unit has the
   // crash-loop guard; informational, see "UPDATE"), "awg/1" (awg inbounds: InboundSpec.tunnel, NodeSettings.awg_backend,
   // InboundHealth.awg), "warp/1" (DesiredState.warp, StatsBatch.warp), "awg-prepare/1" (PrepareAwgKernel; see
@@ -1841,6 +1844,17 @@ message UpdateAgent {
   string download_token = 4;
   // Maximum time allowed for downloading the selected bundle file. Zero keeps the agent default.
   uint32 download_timeout_seconds = 5;
+  // Download sources in the order to try ("UPDATE SOURCES"). Empty means "panel" only. Known: "panel"
+  // (FetchUpdate, or the link route for a link-only agent), "github", "peer", "cloudflare". Unknown and repeated
+  // kinds are ignored.
+  repeated string sources = 6;
+  // Reserved for "peer": donor host:port, SHA-256 of its one-time certificate, and a 32-byte one-time token.
+  // Peer downloads are not implemented by this agent stage.
+  string peer_address = 7;
+  bytes peer_pin = 8;
+  bytes peer_token = 9;
+  // "cloudflare": a presigned HTTPS GET URL of the file in the owner's R2 bucket.
+  string cloudflare_url = 10;
 }
 
 // Panel -> node. Answered with one CommandResult carrying the same request_id, sent BEFORE the agent re-executes.
