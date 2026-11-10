@@ -59,7 +59,8 @@ func TestNetworkSettingsFactsAndModeChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Msg.Mode != 1 || got.Msg.NodesWithNets != 2 || got.Msg.NodesWithMatchingTable != 1 || got.Msg.TableBuiltUnix != 1_800_000_000 ||
+	// nothing is collected until the owner chooses a mode
+	if got.Msg.Mode != 0 || got.Msg.NodesWithNets != 2 || got.Msg.NodesWithMatchingTable != 1 || got.Msg.TableBuiltUnix != 1_800_000_000 ||
 		got.Msg.Ipv4Ranges != 4 || got.Msg.Ipv6Ranges != 3 || got.Msg.Asns != 2 {
 		t.Fatalf("GetNetworkSettings = %+v", got.Msg)
 	}

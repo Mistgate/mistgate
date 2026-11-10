@@ -13,18 +13,23 @@ import (
 
 const SettingNetworkMode = "networks.mode"
 
+// DefaultNetworkMode is the mode of an installation whose owner has not chosen one: 0, nothing is collected. The
+// setting has no place in the admin yet and no page that says what is kept, so collection waits for the owner's
+// explicit choice.
+const DefaultNetworkMode uint32 = 0
+
 var ErrInvalidNetworkMode = errors.New("store: network mode must be 0, 1 or 2")
 
 // ParseNetworkMode returns the stored setting, or the default when it is absent or invalid.
 func ParseNetworkMode(value string) uint32 {
 	mode, err := strconv.ParseUint(value, 10, 32)
 	if err != nil || mode > 2 {
-		return 1
+		return DefaultNetworkMode
 	}
 	return uint32(mode)
 }
 
-// NetworkMode reads the operator setting. A missing row means the default mode 1.
+// NetworkMode reads the operator setting. A missing row means DefaultNetworkMode.
 func (s *Store) NetworkMode(ctx context.Context) (uint32, error) {
 	values, err := s.SettingValues(ctx, []string{SettingNetworkMode})
 	if err != nil {
@@ -129,7 +134,7 @@ func networkHourStmt(nodeID string, hourStart int64, rows []FleetNetwork) (Stmt,
 			CAST(json_extract(row.value, '$.unfinished') AS INTEGER), CAST(json_extract(row.value, '$.connects') AS INTEGER),
 			CAST(json_extract(row.value, '$.broken') AS INTEGER), CAST(json_extract(row.value, '$.people') AS INTEGER)
 		FROM json_each(?2) AS row
-		WHERE coalesce((SELECT v FROM setting WHERE k = 'networks.mode'), '1') <> '0'
+		WHERE coalesce((SELECT v FROM setting WHERE k = 'networks.mode'), '` + strconv.FormatUint(uint64(DefaultNetworkMode), 10) + `') <> '0'
 		ON CONFLICT (node_id, hour_start, inbound_id, asn) DO UPDATE SET
 			attempts = attempts + excluded.attempts,
 			unfinished = unfinished + excluded.unfinished,
@@ -172,12 +177,10 @@ func (s *Store) SaveNetworkMode(ctx context.Context, mode uint32) error {
 	case 1:
 		stmts = append(stmts, Stmt{Query: `DELETE FROM user_network`})
 	}
-	if mode == 1 {
-		stmts = append(stmts, Stmt{Query: `DELETE FROM setting WHERE k = ?`, Args: []any{SettingNetworkMode}})
-	} else {
-		stmts = append(stmts, Stmt{Query: `INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
-			Args: []any{SettingNetworkMode, strconv.FormatUint(uint64(mode), 10)}})
-	}
+	// The choice is always stored, also when it equals the default: an owner's choice must survive a later change of
+	// the default.
+	stmts = append(stmts, Stmt{Query: `INSERT INTO setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
+		Args: []any{SettingNetworkMode, strconv.FormatUint(uint64(mode), 10)}})
 	_, err := s.batch(ctx, stmts...)
 	return err
 }

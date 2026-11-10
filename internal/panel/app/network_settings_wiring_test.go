@@ -55,7 +55,7 @@ func TestNetworkSettingsAndBundleCallbacksAreWired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	notifier := &networkSettingsNotifierProbe{store: st, mode: 1}
+	notifier := &networkSettingsNotifierProbe{store: st, mode: store.DefaultNetworkMode}
 	service := ops.New(ops.Config{
 		Store:                  st,
 		StepUp:                 func(context.Context) error { return nil },
@@ -74,8 +74,8 @@ func TestNetworkSettingsAndBundleCallbacksAreWired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if notifier.mode != 2 || notifier.stateChanges != 1 || notifier.storedAtChange != 1 {
-		t.Fatalf("mode callback state = mode %d, changes %d, persisted mode during callback %d; want 2/1/1",
+	if notifier.mode != 2 || notifier.stateChanges != 1 || notifier.storedAtChange != store.DefaultNetworkMode {
+		t.Fatalf("mode callback state = mode %d, changes %d, persisted mode during callback %d; want 2/1/the default",
 			notifier.mode, notifier.stateChanges, notifier.storedAtChange)
 	}
 	if changed.Msg.Settings.Mode != 2 || changed.Msg.Settings.TableBuiltUnix != 0 {

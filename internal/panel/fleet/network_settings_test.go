@@ -97,6 +97,7 @@ func TestNetworkModeAndBundleChangesResendSettings(t *testing.T) {
 	updates.setNetworkTable("mistgate-asndb-data-any", testNetworkSHA)
 	e.f.SetUpdates(updates)
 	updates.SetNetworkBundleChanged(e.f.StateChanged)
+	e.f.SetNetworkMode(1) // the owner switched the collection on; it is off by default
 	c, _, initial := connectCaps(a, "nets-settings", capNetworks)
 	if initial.Settings == nil || initial.Settings.Networks != 1 || initial.Settings.NetworksDbSha256 != testNetworkSHA {
 		t.Fatalf("initial network settings = %+v", initial.Settings)

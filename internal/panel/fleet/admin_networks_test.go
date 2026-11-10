@@ -54,6 +54,7 @@ func TestGetNetworksAggregatesFlagsAndCleansNames(t *testing.T) {
 	a := e.enroll("de1")
 	ids := e.fixture(a.nodeID)
 	e.f.now = func() time.Time { return now }
+	e.f.SetNetworkMode(1) // the owner switched the collection on; it is off by default
 	e.exec(`UPDATE node SET address = 'de1.example.com', state = 'active', agent_caps = 'nets/1', networks_db_sha256 = ? WHERE id = ?`, testNetworkSHA, a.nodeID)
 	e.exec(`UPDATE node SET name = 'nl1', address = 'nl1.example.com', agent_caps = 'nets/1' WHERE id = ?`, ids.nodeB)
 	e.exec(`INSERT INTO node (id, name, address, state, created_at, agent_caps) VALUES ('nod_fi1', 'fi1', 'fi1.example.com', 'active', 1, '')`)
