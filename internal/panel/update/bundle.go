@@ -496,23 +496,40 @@ func (s *Service) serve(ctx context.Context, nodeID, name string, offset uint64,
 	if offset > total {
 		return connect.NewError(connect.CodeNotFound, errors.New("offset beyond the end of the file"))
 	}
-	s.bmu.Lock()
-	if _, alreadyServing := s.servingNodes[nodeID]; alreadyServing {
+	// A node has one download at a time. An agent that resumes closes its stream and asks again at once, before the
+	// handler of the dropped stream has returned: the new request waits a moment for that slot instead of being
+	// refused, so a resume does not depend on which of the two the panel notices first.
+	wait := time.NewTimer(s.nodeSlotWait)
+	defer wait.Stop()
+	for {
+		s.bmu.Lock()
+		previous, busy := s.servingNodes[nodeID]
+		if !busy {
+			break
+		}
 		s.bmu.Unlock()
-		return connect.NewError(connect.CodeResourceExhausted, errors.New("a download is already active for this node, retry later"))
+		select {
+		case <-previous:
+		case <-wait.C:
+			return connect.NewError(connect.CodeResourceExhausted, errors.New("a download is already active for this node, retry later"))
+		case <-ctx.Done():
+			return connect.NewError(connect.CodeCanceled, ctx.Err())
+		}
 	}
 	if s.serves >= maxServes {
 		s.bmu.Unlock()
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many downloads, retry in a few seconds"))
 	}
 	s.serves++
-	s.servingNodes[nodeID] = struct{}{}
+	done := make(chan struct{})
+	s.servingNodes[nodeID] = done
 	s.bmu.Unlock()
 	defer func() {
 		s.bmu.Lock()
 		s.serves--
 		delete(s.servingNodes, nodeID)
 		s.bmu.Unlock()
+		close(done)
 	}()
 
 	f, err := os.Open(filepath.Join(s.dist, entry.Name))

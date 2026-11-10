@@ -330,12 +330,29 @@ func TestServeAllowsOnlyOneDownloadPerNode(t *testing.T) {
 		})
 	}()
 	<-started
+	// a second download that outlasts the short wait is refused
+	e.s.nodeSlotWait = 20 * time.Millisecond
 	var sink chunkSink
 	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); connectCode(err) != connect.CodeResourceExhausted {
 		t.Fatalf("second download for one node: %v", err)
 	}
+	// a resume asks again before the dropped download has ended: it waits for the slot and then runs
+	e.s.nodeSlotWait = 10 * time.Second
+	resumed := make(chan error, 1)
+	go func() {
+		var resumeSink chunkSink
+		resumed <- e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, resumeSink.send)
+	}()
+	select {
+	case err := <-resumed:
+		t.Fatalf("the resume did not wait for the first download: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
 	close(hold)
 	<-finished
+	if err := <-resumed; err != nil {
+		t.Fatalf("resume after the first download ended: %v", err)
+	}
 	if err := e.s.Serve(e.ctx, "nod_de1", "mistgate-node-linux-amd64", 0, sink.send); err != nil {
 		t.Fatalf("download after the first finished: %v", err)
 	}

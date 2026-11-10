@@ -57,6 +57,11 @@ type Fleet interface {
 const updateTimeoutCapability = "update-timeout/1"
 const bundleSendStallTimeout = 120 * time.Second
 
+// bundleNodeSlotWait is how long a node's download request waits for the node's previous download to end before it
+// is refused. A dropped stream is noticed within milliseconds; a longer wait would only hold a request of a node
+// that really runs two downloads.
+const bundleNodeSlotWait = 5 * time.Second
+
 // Health is what the rollout gate needs from the health module (*health.Service implements it); nil = no probe gate.
 type Health interface {
 	// RunChecksNow schedules an immediate synthetic round for the inbounds of a node (rate limited to one per 30 s).
@@ -141,8 +146,9 @@ type Service struct {
 	scanMu       sync.Mutex // serializes scans and their follow-up table reloads
 	bundle       *bundleState
 	hashes       map[string]hashEntry
-	serves       int // concurrent downloads, guarded by bmu
-	servingNodes map[string]struct{}
+	serves       int                      // concurrent downloads, guarded by bmu
+	servingNodes map[string]chan struct{} // closed when the node's download ends
+	nodeSlotWait time.Duration            // how long a node's next download waits for its previous one to end
 	sendTimeout  time.Duration
 
 	networkTableMu       sync.Mutex
@@ -216,7 +222,7 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 	cfg.Timing.defaults()
 	s := &Service{st: st, fl: fl, hl: hl, cfg: cfg, log: cfg.Log, now: cfg.Now,
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
-		servingNodes: map[string]struct{}{}, sendTimeout: bundleSendStallTimeout,
+		servingNodes: map[string]chan struct{}{}, nodeSlotWait: bundleNodeSlotWait, sendTimeout: bundleSendStallTimeout,
 		parseNetworkTable: asndb.Parse,
 		inflight:          map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
 		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
