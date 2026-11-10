@@ -40,6 +40,9 @@ type FleetStatsIn struct {
 	HourStart        int64 // bucket hour (multiple of 3600), already clamped by the caller
 	Traffic          []FleetTraffic
 	Links            []FleetLink // connection counters (agent.proto LinkCounters), stored in the same hour bucket
+	Networks         []FleetNetwork
+	PersonNetworks   []FleetPersonNetwork
+	NetworksDBSHA256 string // digest the agent has loaded, from StatsBatch.networks_db_sha256
 	Journal          []FleetJournal
 	JournalSecrets   []string // this panel's secret names and path prefixes, removed before the journal is stored
 	Sessions         []FleetSessionRef
@@ -141,6 +144,12 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			if l.CredID != "" && !seenCreds[l.CredID] {
 				seenCreds[l.CredID] = true
 				credIDs = append(credIDs, l.CredID)
+			}
+		}
+		for _, network := range in.PersonNetworks {
+			if network.CredID != "" && !seenCreds[network.CredID] {
+				seenCreds[network.CredID] = true
+				credIDs = append(credIDs, network.CredID)
 			}
 		}
 
@@ -282,6 +291,40 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			linkRows = append(linkRows, l.row(user))
 		}
 
+		networkRows := make([]FleetNetwork, 0, len(in.Networks))
+		for _, network := range in.Networks {
+			if _, ok := onNode[network.InboundID]; !ok {
+				out.Skipped++
+				continue
+			}
+			network.Attempts = min(network.Attempts, uint32(maxLinkCount))
+			network.Unfinished = min(network.Unfinished, uint32(maxLinkCount))
+			network.Connects = min(network.Connects, uint32(maxLinkCount))
+			network.Broken = min(network.Broken, uint32(maxLinkCount))
+			network.People = min(network.People, uint32(maxLinkCount))
+			if network.Attempts|network.Unfinished|network.Connects|network.Broken|network.People == 0 {
+				continue
+			}
+			networkRows = append(networkRows, network)
+		}
+		personRows := make([]userNetworkWrite, 0, len(in.PersonNetworks))
+		for _, network := range in.PersonNetworks {
+			if probes[network.CredID] {
+				out.Probe++
+				continue
+			}
+			ref, ok := creds[network.CredID]
+			if !ok || ref.UserID == "" || onNode[network.InboundID] != ref.Protocol {
+				out.Skipped++
+				continue
+			}
+			if network.Connects == 0 {
+				continue
+			}
+			personRows = append(personRows, userNetworkWrite{UserID: ref.UserID, ASN: network.ASN,
+				Connects: int64(min(network.Connects, uint32(maxLinkCount))), LastHour: in.HourStart})
+		}
+
 		// Peaks: distinct users / devices per protocol in this snapshot.
 		users := map[string]map[string]bool{}
 		devs := map[string]map[string]bool{}
@@ -389,7 +432,8 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 			seenAt := touchAtByDevice[id]
 			touchWrites = append(touchWrites, fleetDeviceTouchWrite{DeviceID: id, LastSeenAt: seenAt, NotAfter: seenAt})
 		}
-		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, deviceWrites, certWrites, touchWrites, linkRows, live)
+		stmts, err := fleetStatsWriteStmts(in, instance, last, bucketWrites, hourWrites, userWrites, deviceWrites, certWrites,
+			touchWrites, linkRows, networkRows, personRows, live)
 		if err != nil {
 			return nil, err
 		}
@@ -403,7 +447,7 @@ func (s *Store) IngestStats(ctx context.Context, in FleetStatsIn) (FleetStatsOut
 
 func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets []fleetStatsBucketWrite,
 	hours []fleetStatsHourWrite, users []fleetStatsUserWrite, devices []fleetStatsDeviceWrite, certs []fleetInboundCertWrite,
-	touches []fleetDeviceTouchWrite, links []linkRow, live FleetLive) ([]Stmt, error) {
+	touches []fleetDeviceTouchWrite, links []linkRow, networks []FleetNetwork, personNetworks []userNetworkWrite, live FleetLive) ([]Stmt, error) {
 	bucketJSON, err := json.Marshal(buckets)
 	if err != nil {
 		return nil, err
@@ -429,6 +473,14 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 		return nil, err
 	}
 	linkStmt, err := linkHourStmt(in.NodeID, in.HourStart, links)
+	if err != nil {
+		return nil, err
+	}
+	networkStmt, err := networkHourStmt(in.NodeID, in.HourStart, networks)
+	if err != nil {
+		return nil, err
+	}
+	personStmt, err := userNetworkStmt(personNetworks)
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +532,13 @@ func fleetStatsWriteStmts(in FleetStatsIn, instance string, last uint64, buckets
 	if in.Host != nil {
 		stmts = append(stmts, HostHourStmt(in.NodeID, in.HourStart, *in.Host))
 	}
-	return append(stmts, commitSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now)), nil
+	if len(networks) > 0 && networkStmt.Query != "" {
+		stmts = append(stmts, networkStmt)
+	}
+	if len(personNetworks) > 0 && personStmt.Query != "" {
+		stmts = append(stmts, personStmt)
+	}
+	return append(stmts, commitStatsSeqStmt(in.NodeID, in.Instance, in.Seq, in.Now, in.NetworksDBSHA256)), nil
 }
 
 func nodeLiveStatsStmt(nodeID string, session uint64, live FleetLive) (Stmt, error) {
@@ -540,6 +598,15 @@ func commitSeqStmt(nodeID, instance string, seq uint64, now time.Time) Stmt {
 	}
 	return Stmt{Query: `UPDATE node SET last_seq = ?, agent_instance_id = ?, last_seen_at = max(last_seen_at, ?) WHERE id = ?`,
 		Args: []any{int64(seq), instance, unix(now), nodeID}}
+}
+
+func commitStatsSeqStmt(nodeID, instance string, seq uint64, now time.Time, networksDBSHA256 string) Stmt {
+	if seq == 0 {
+		return Stmt{Query: `UPDATE node SET last_seen_at = max(last_seen_at, ?), networks_db_sha256 = ? WHERE id = ?`,
+			Args: []any{unix(now), networksDBSHA256, nodeID}}
+	}
+	return Stmt{Query: `UPDATE node SET last_seq = ?, agent_instance_id = ?, last_seen_at = max(last_seen_at, ?), networks_db_sha256 = ? WHERE id = ?`,
+		Args: []any{int64(seq), instance, unix(now), networksDBSHA256, nodeID}}
 }
 
 // satAdd adds without wrapping around; i64 converts without turning a huge value negative. The fleet module

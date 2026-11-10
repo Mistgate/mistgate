@@ -46,6 +46,10 @@ service OpsService {
   // How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
   // how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
   rpc GetFleetLoad(GetFleetLoadRequest) returns (GetFleetLoadResponse);
+  // The per-inbound ASN setting and facts about the panel's currently loaded trusted table and node support.
+  rpc GetNetworkSettings(GetNetworkSettingsRequest) returns (GetNetworkSettingsResponse);
+  // Changes the mode. Turning networks off removes the stored hourly and per-person rows.
+  rpc SetNetworkSettings(SetNetworkSettingsRequest) returns (SetNetworkSettingsResponse);
 }
 
 message GetLogSettingsRequest {}
@@ -440,4 +444,27 @@ message GetFleetLoadResponse {
   // Every node that is not retired, most pressing first.
   repeated NodeLoad nodes = 3;
   FleetLoadSummary summary = 4;
+}
+
+message GetNetworkSettingsRequest {}
+
+message GetNetworkSettingsResponse {
+  // 0 off, 1 operators, 2 operators and per-person recent networks.
+  uint32 mode = 1;
+  // The trusted table's build time and range/operator counts; zero when absent or invalid.
+  int64 table_built_unix = 2 [jstype = JS_NUMBER];
+  uint32 ipv4_ranges = 3;
+  uint32 ipv6_ranges = 4;
+  uint32 asns = 5;
+  uint32 nodes_with_nets = 6;
+  uint32 nodes_with_matching_table = 7;
+}
+
+message SetNetworkSettingsRequest {
+  // 0 off, 1 operators, 2 operators and per-person recent networks.
+  uint32 mode = 1;
+}
+
+message SetNetworkSettingsResponse {
+  GetNetworkSettingsResponse settings = 1;
 }

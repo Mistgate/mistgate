@@ -142,6 +142,18 @@ func (s *Service) sweepPolicyPrunes(ctx context.Context, now time.Time, pol rete
 	} else if n > 0 {
 		s.log.Info("health: pruned node traffic hours", "count", n)
 	}
+	if !s.cfg.Edge { // The edge edition rejects network stats, so these D1 deletes cannot remove any rows.
+		if n, err := s.st.PruneNetworkHours(ctx, now.Add(-pol.Duration("networks_days"))); err != nil && ctx.Err() == nil {
+			s.log.Warn("health: prune network counters", "code", "prune_network_hours_failed", "err", err)
+		} else if n > 0 {
+			s.log.Info("health: pruned network counter hours", "count", n)
+		}
+		if n, err := s.st.PruneUserNetworks(ctx, now.Add(-pol.Duration("networks_days"))); err != nil && ctx.Err() == nil {
+			s.log.Warn("health: prune recent networks", "code", "prune_user_networks_failed", "err", err)
+		} else if n > 0 {
+			s.log.Info("health: pruned recent networks", "count", n)
+		}
+	}
 }
 
 // retentionPolicy reads the owner's retention settings in one call. A read error means policy-driven prunes must wait.

@@ -43,7 +43,7 @@ func (s nodeService) GetNodeJournal(ctx context.Context, req *connect.Request[ad
 		inScope = nodes
 	}
 	for _, n := range inScope {
-		if !capabilityPresent(n.AgentCaps, capJournal) {
+		if !store.CapabilityPresent(n.AgentCaps, capJournal) {
 			resp.NodesWithoutJournal = append(resp.NodesWithoutJournal, n.ID)
 		}
 	}

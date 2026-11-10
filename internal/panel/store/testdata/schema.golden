@@ -289,6 +289,12 @@
   },
   {
     "type": "index",
+    "name": "network_hour_hour_start",
+    "tbl_name": "network_hour",
+    "sql": "CREATE INDEX network_hour_hour_start ON network_hour (hour_start)"
+  },
+  {
+    "type": "index",
     "name": "node_cert_node",
     "tbl_name": "node_cert",
     "sql": "CREATE INDEX node_cert_node ON node_cert (node_id, not_after)"
@@ -502,6 +508,12 @@
     "name": "user_group_profile_profile",
     "tbl_name": "user_group_profile",
     "sql": "CREATE INDEX user_group_profile_profile ON user_group_profile (profile_id)"
+  },
+  {
+    "type": "index",
+    "name": "user_network_last_hour",
+    "tbl_name": "user_network",
+    "sql": "CREATE INDEX user_network_last_hour ON user_network (last_hour)"
   },
   {
     "type": "index",
@@ -793,9 +805,15 @@
   },
   {
     "type": "table",
+    "name": "network_hour",
+    "tbl_name": "network_hour",
+    "sql": "CREATE TABLE network_hour ( node_id TEXT NOT NULL, hour_start INTEGER NOT NULL, inbound_id TEXT NOT NULL, asn INTEGER NOT NULL, attempts INTEGER NOT NULL, unfinished INTEGER NOT NULL, connects INTEGER NOT NULL, broken INTEGER NOT NULL, people INTEGER NOT NULL, PRIMARY KEY (node_id, hour_start, inbound_id, asn) ) STRICT"
+  },
+  {
+    "type": "table",
     "name": "node",
     "tbl_name": "node",
-    "sql": "CREATE TABLE \"node\" ( id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE, address TEXT NOT NULL, country_code TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', dns_resolvers TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(dns_resolvers)), liveness_timeout_s INTEGER NOT NULL DEFAULT 90 CHECK (liveness_timeout_s BETWEEN 15 AND 3600), apply_timeout_s INTEGER NOT NULL DEFAULT 120 CHECK (apply_timeout_s BETWEEN 10 AND 3600), dial_timeout_s INTEGER NOT NULL DEFAULT 15 CHECK (dial_timeout_s BETWEEN 5 AND 120), state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'active', 'retired')), cert_serial TEXT, agent_version TEXT NOT NULL DEFAULT '', api_version INTEGER NOT NULL DEFAULT 0, boot_at INTEGER NOT NULL DEFAULT 0, last_seen_at INTEGER NOT NULL DEFAULT 0, last_connected_at INTEGER NOT NULL DEFAULT 0, last_disconnected_at INTEGER NOT NULL DEFAULT 0, agent_instance_id TEXT NOT NULL DEFAULT '', last_seq INTEGER NOT NULL DEFAULT 0, desired_revision INTEGER NOT NULL DEFAULT 0, desired_hash TEXT NOT NULL DEFAULT '', applied_revision INTEGER NOT NULL DEFAULT 0, applied_hash TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, retired_at INTEGER, agent_built INTEGER NOT NULL DEFAULT 0, agent_caps TEXT NOT NULL DEFAULT '', last_update_json TEXT NOT NULL DEFAULT '' CHECK (last_update_json = '' OR json_valid(last_update_json)), awg_backend TEXT NOT NULL DEFAULT 'auto' CHECK (awg_backend IN ('auto', 'kernel', 'userspace')), awg_prepare_json TEXT NOT NULL DEFAULT '' CHECK (awg_prepare_json = '' OR json_valid(awg_prepare_json)) , torrent_blocker_enabled INTEGER NOT NULL DEFAULT 0 CHECK (torrent_blocker_enabled IN (0, 1)), bandwidth_mbps INTEGER NOT NULL DEFAULT 0 CHECK (bandwidth_mbps BETWEEN 0 AND 1000000), client_ipv6 INTEGER NOT NULL DEFAULT 1 CHECK (client_ipv6 IN (0, 1)), decoy_mode TEXT NOT NULL DEFAULT 'builtin' CHECK (decoy_mode IN ('builtin', 'panel', 'own')), decoy_bundle_hash TEXT NOT NULL DEFAULT '', decoy_agent_mode TEXT NOT NULL DEFAULT '', decoy_agent_hash TEXT NOT NULL DEFAULT '', ipv6_entry TEXT NOT NULL DEFAULT '', ipv6_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(ipv6_json)), udp_filtered_at INTEGER NOT NULL DEFAULT 0, udp_filtered_sender TEXT NOT NULL DEFAULT '', udp_filtered_checked_at INTEGER NOT NULL DEFAULT 0) STRICT"
+    "sql": "CREATE TABLE \"node\" ( id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE, address TEXT NOT NULL, country_code TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', dns_resolvers TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(dns_resolvers)), liveness_timeout_s INTEGER NOT NULL DEFAULT 90 CHECK (liveness_timeout_s BETWEEN 15 AND 3600), apply_timeout_s INTEGER NOT NULL DEFAULT 120 CHECK (apply_timeout_s BETWEEN 10 AND 3600), dial_timeout_s INTEGER NOT NULL DEFAULT 15 CHECK (dial_timeout_s BETWEEN 5 AND 120), state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'active', 'retired')), cert_serial TEXT, agent_version TEXT NOT NULL DEFAULT '', api_version INTEGER NOT NULL DEFAULT 0, boot_at INTEGER NOT NULL DEFAULT 0, last_seen_at INTEGER NOT NULL DEFAULT 0, last_connected_at INTEGER NOT NULL DEFAULT 0, last_disconnected_at INTEGER NOT NULL DEFAULT 0, agent_instance_id TEXT NOT NULL DEFAULT '', last_seq INTEGER NOT NULL DEFAULT 0, desired_revision INTEGER NOT NULL DEFAULT 0, desired_hash TEXT NOT NULL DEFAULT '', applied_revision INTEGER NOT NULL DEFAULT 0, applied_hash TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, retired_at INTEGER, agent_built INTEGER NOT NULL DEFAULT 0, agent_caps TEXT NOT NULL DEFAULT '', last_update_json TEXT NOT NULL DEFAULT '' CHECK (last_update_json = '' OR json_valid(last_update_json)), awg_backend TEXT NOT NULL DEFAULT 'auto' CHECK (awg_backend IN ('auto', 'kernel', 'userspace')), awg_prepare_json TEXT NOT NULL DEFAULT '' CHECK (awg_prepare_json = '' OR json_valid(awg_prepare_json)) , torrent_blocker_enabled INTEGER NOT NULL DEFAULT 0 CHECK (torrent_blocker_enabled IN (0, 1)), bandwidth_mbps INTEGER NOT NULL DEFAULT 0 CHECK (bandwidth_mbps BETWEEN 0 AND 1000000), client_ipv6 INTEGER NOT NULL DEFAULT 1 CHECK (client_ipv6 IN (0, 1)), decoy_mode TEXT NOT NULL DEFAULT 'builtin' CHECK (decoy_mode IN ('builtin', 'panel', 'own')), decoy_bundle_hash TEXT NOT NULL DEFAULT '', decoy_agent_mode TEXT NOT NULL DEFAULT '', decoy_agent_hash TEXT NOT NULL DEFAULT '', ipv6_entry TEXT NOT NULL DEFAULT '', ipv6_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(ipv6_json)), udp_filtered_at INTEGER NOT NULL DEFAULT 0, udp_filtered_sender TEXT NOT NULL DEFAULT '', udp_filtered_checked_at INTEGER NOT NULL DEFAULT 0, networks_db_sha256 TEXT NOT NULL DEFAULT '') STRICT"
   },
   {
     "type": "table",
@@ -1072,6 +1090,12 @@
     "name": "user_link_dns",
     "tbl_name": "user_link_dns",
     "sql": "CREATE TABLE user_link_dns ( user_id TEXT NOT NULL PRIMARY KEY REFERENCES user (id) ON DELETE CASCADE, preset_id TEXT NOT NULL REFERENCES dns_preset (id) ON DELETE CASCADE, updated_at INTEGER NOT NULL ) STRICT"
+  },
+  {
+    "type": "table",
+    "name": "user_network",
+    "tbl_name": "user_network",
+    "sql": "CREATE TABLE user_network ( user_id TEXT NOT NULL, asn INTEGER NOT NULL, connects INTEGER NOT NULL, last_hour INTEGER NOT NULL, PRIMARY KEY (user_id, asn) ) STRICT"
   },
   {
     "type": "table",

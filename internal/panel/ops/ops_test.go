@@ -204,7 +204,7 @@ func TestRetentionSettingsAreValidatedAndStored(t *testing.T) {
 	}
 	d := get()
 	if d["journal_days"] != 7 || d["events_info_days"] != 90 || d["events_warn_days"] != 400 || d["audit_days"] != 400 || d["alerts_days"] != 90 ||
-		d["check_samples_hours"] != 25 || d["host_history_days"] != 90 || d["traffic_bucket_days"] != 400 || d["node_traffic_hour_days"] != 400 || len(d) != 10 {
+		d["check_samples_hours"] != 25 || d["host_history_days"] != 90 || d["traffic_bucket_days"] != 400 || d["node_traffic_hour_days"] != 400 || d["networks_days"] != 7 || len(d) != 11 {
 		t.Fatalf("defaults: %v", d)
 	}
 	for name, vals := range map[string]map[string]uint32{

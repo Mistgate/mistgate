@@ -12,6 +12,7 @@ func TestDefaultsAreWhatThePanelAlwaysDid(t *testing.T) {
 		"audit_days": 400 * 24 * time.Hour, "alerts_days": 90 * 24 * time.Hour, "check_samples_hours": 25 * time.Hour,
 		"check_daily_days": 90 * 24 * time.Hour, "host_history_days": 90 * 24 * time.Hour,
 		"traffic_bucket_days": 400 * 24 * time.Hour, "node_traffic_hour_days": 400 * 24 * time.Hour,
+		"networks_days": 7 * 24 * time.Hour,
 	}
 	if len(Fields) != len(want) {
 		t.Fatalf("%d fields, want %d", len(Fields), len(want))
@@ -36,8 +37,9 @@ func TestParseKeepsOnlyValidValues(t *testing.T) {
 		"retention.journal_days":     "99", // above the maximum of 7
 		"retention.alerts_days":      "ten",
 		"retention.events_warn_days": "",
+		"retention.networks_days":    "8", // above the maximum of seven
 	})
-	checks := map[string]int{"events_info_days": 30, "audit_days": 400, "journal_days": 7, "alerts_days": 90, "events_warn_days": 400}
+	checks := map[string]int{"events_info_days": 30, "audit_days": 400, "journal_days": 7, "alerts_days": 90, "events_warn_days": 400, "networks_days": 7}
 	for k, want := range checks {
 		if got, ok := p.Get(k); !ok || got != want {
 			t.Errorf("%s = %d, want %d", k, got, want)

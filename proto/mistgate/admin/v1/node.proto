@@ -76,6 +76,8 @@ service NodeService {
   // GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
   // and API tokens.
   rpc GetFleetConnections(GetFleetConnectionsRequest) returns (GetFleetConnectionsResponse);
+  // Per-inbound autonomous-system counters for a bounded window. Only ASNs and counts are stored or returned; no client address.
+  rpc GetNetworks(GetNetworksRequest) returns (GetNetworksResponse);
   // What the panel wants a node to run against what the node reports it runs, one node or every node that is not retired: the
   // desired and applied revision and hash, whether they agree, since when they have not, the last apply and, per inbound, the
   // panel's spec version, the applied spec hash, the node's state for it, its last error and certificate expiry. No
@@ -617,6 +619,55 @@ message GetFleetConnectionsResponse {
   int64 now_unix = 2 [jstype = JS_NUMBER];
   // Every node that is not retired, by name.
   repeated NodeConnections nodes = 3;
+}
+
+message GetNetworksRequest {
+  // Whole UTC hour buckets, 1 to 168. 0 means 24.
+  uint32 hours = 1;
+  // Empty means every node that is not retired.
+  string node_id = 2;
+}
+
+message NetworkNodeRef {
+  string node_id = 1;
+  string node_name = 2;
+}
+
+message NetworkHourRow {
+  string node_id = 1;
+  string node_name = 2;
+  string inbound_id = 3;
+  string profile_name = 4;
+  string protocol = 5;
+  uint32 asn = 6;
+  string country = 7;
+  string name = 8;
+  string operator = 9;
+  uint64 attempts = 10 [jstype = JS_NUMBER];
+  uint64 unfinished = 11 [jstype = JS_NUMBER];
+  uint64 connects = 12 [jstype = JS_NUMBER];
+  uint64 broken = 13 [jstype = JS_NUMBER];
+  uint64 peak_people = 14 [jstype = JS_NUMBER];
+  uint64 baseline_attempts = 15 [jstype = JS_NUMBER];
+  uint64 baseline_unfinished = 16 [jstype = JS_NUMBER];
+  uint64 baseline_connects = 17 [jstype = JS_NUMBER];
+  uint64 baseline_broken = 18 [jstype = JS_NUMBER];
+  uint64 baseline_peak_people = 19 [jstype = JS_NUMBER];
+  bool fleet = 20;
+  bool cdn = 21;
+}
+
+message GetNetworksResponse {
+  int64 since_unix = 1 [jstype = JS_NUMBER];
+  int64 now_unix = 2 [jstype = JS_NUMBER];
+  uint32 hours = 3;
+  uint32 mode = 4;
+  // The build time of the trusted panel table, zero when it is absent or invalid.
+  int64 table_built_unix = 5 [jstype = JS_NUMBER];
+  repeated NetworkHourRow rows = 6;
+  repeated NetworkNodeRef nodes_without_nets = 7;
+  repeated NetworkNodeRef nodes_without_table = 8;
+  bool truncated = 9;
 }
 
 message GetNodeJournalRequest {

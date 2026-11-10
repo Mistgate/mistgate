@@ -110,6 +110,9 @@ func appendJSONString(b []byte, s string) []byte {
 // bytes for one value (TestD1IngestStatsAtEdgeCap).
 const maxLinkCount = 1 << 20
 
+// MaxLinkCount is the per-counter bound shared by connection and network statistics.
+const MaxLinkCount = maxLinkCount
+
 // maxLinkSum clamps the wide fields of a row of one batch (rtt_ms_sum, pkts_sent, pkts_lost): about four billion, far above
 // what one key moves in a batch, and low enough that 168 hours of the largest batches cannot overflow an int64 SUM.
 const maxLinkSum = 1 << 32

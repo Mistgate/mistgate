@@ -278,7 +278,7 @@ func TestGuardStatsLimitsLinkRows(t *testing.T) {
 		links[i] = &agentv1.LinkCounters{CredId: fmt.Sprintf("crd_%d", i), InboundId: "inb_cap", Connects: 1,
 			ClientCloses: 2, Freezes: 3, Quiet: 4, Accepted: 5, HellosForeign: 6, RttMsSum: 7, RttSamples: 8, PktsSent: 9, PktsLost: 10}
 	}
-	g := f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000, IntervalEndUnix: 1_010, Links: links})
+	g := f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000, IntervalEndUnix: 1_010, Links: links}, nil)
 	if len(g.links) != maxStatsDeltas || g.rejected != 0 || g.links[maxStatsDeltas-1].CredID != fmt.Sprintf("crd_%d", maxStatsDeltas-1) ||
 		g.links[0].ClientCloses != 2 || g.links[0].Freezes != 3 || g.links[0].Quiet != 4 || g.links[0].Accepted != 5 ||
 		g.links[0].HellosForeign != 6 || g.links[0].RttMSSum != 7 || g.links[0].RttSamples != 8 || g.links[0].PktsSent != 9 || g.links[0].PktsLost != 10 {
@@ -286,7 +286,7 @@ func TestGuardStatsLimitsLinkRows(t *testing.T) {
 	}
 	// a batch whose traffic is refused still gets its counters in
 	deltas := []*agentv1.TrafficDelta{{CredId: "crd_a", InboundId: "inb_cap", BytesUp: 1 << 60}}
-	g = f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000, IntervalEndUnix: 1_010, Traffic: deltas, Links: links[:2]})
+	g = f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000, IntervalEndUnix: 1_010, Traffic: deltas, Links: links[:2]}, nil)
 	if g.rejected != 1 || len(g.links) != 2 {
 		t.Fatalf("a refused delta: rejected %d, links %d, want 1 and 2", g.rejected, len(g.links))
 	}

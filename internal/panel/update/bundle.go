@@ -1,6 +1,7 @@
 package update
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/release"
 )
 
@@ -60,11 +62,154 @@ func bundleErr(b *adminv1.Bundle, status adminv1.BundleStatus, code string, para
 
 // rescan reads the directory and publishes the result.
 func (s *Service) rescan() *bundleState {
+	s.scanMu.Lock()
+	defer s.scanMu.Unlock()
+	return s.rescanLocked(true)
+}
+
+// rescanForRequest publishes the scanned manifest immediately and loads its ASN table in the background. The table can
+// take several megabytes to verify and parse, so an admin refresh must not put that work on the request path.
+func (s *Service) rescanForRequest() *bundleState {
+	s.scanMu.Lock()
+	defer s.scanMu.Unlock()
+	bs := s.rescanLocked(false)
+	go s.reloadNetworkTable()
+	return bs
+}
+
+func (s *Service) rescanLocked(loadTable bool) *bundleState {
+	previous := s.current()
 	bs := s.scan()
 	s.bmu.Lock()
 	s.bundle = bs
 	s.bmu.Unlock()
+	if loadTable {
+		s.reloadNetworkTable()
+	}
+	if networkTableSHA(previous) != networkTableSHA(bs) {
+		s.notifyNetworkBundleChanged()
+	}
 	return bs
+}
+
+func networkTableSHA(bs *bundleState) string {
+	entry, ok := networkTableEntry(bs)
+	if !ok {
+		return ""
+	}
+	return entry.SHA256
+}
+
+func networkTableEntry(bs *bundleState) (release.File, bool) {
+	if bs == nil || !bs.trusted || bs.manifest == nil {
+		return release.File{}, false
+	}
+	for _, entry := range bs.manifest.Files {
+		if entry.OS == "data" && entry.Arch == "any" && entry.Name == "mistgate-asndb-data-any" {
+			return entry, true
+		}
+	}
+	return release.File{}, false
+}
+
+func (s *Service) reloadNetworkTable() {
+	s.networkTableMu.Lock()
+	defer s.networkTableMu.Unlock()
+	for {
+		bs := s.current()
+		entry, ok := networkTableEntry(bs)
+		sha := ""
+		if ok && bs.manifest != nil && s.now().Unix() <= bs.manifest.Expires {
+			sha = entry.SHA256
+		} else {
+			ok = false
+		}
+		if sha == s.networkTableSHA {
+			return
+		}
+		if !ok {
+			s.networkTableSHA = ""
+			s.networkTable.Store(nil)
+			s.networkTableRejected.Store(nil)
+			return
+		}
+		f, _, digest, err := s.OpenNodeBinary(context.Background(), "data", "any")
+		var table *asndb.DB
+		parseRejected := false
+		if err == nil {
+			data, readErr := io.ReadAll(f)
+			closeErr := f.Close()
+			if readErr != nil {
+				err = readErr
+			} else if closeErr != nil {
+				err = closeErr
+			} else {
+				parse := s.parseNetworkTable
+				if parse == nil {
+					parse = asndb.Parse
+				}
+				table, err = parse(bytes.NewReader(data))
+				parseRejected = err != nil
+			}
+			if err == nil && digest != sha {
+				err = errors.New("ASN table digest changed while loading")
+			}
+		}
+		// A newer rescan can publish while the file is parsed. Do not publish the stale table or let its digest hide
+		// the newer one; the next loop loads the current manifest instead.
+		_, currentSHA := s.NetworkTableFile()
+		if currentSHA != sha {
+			continue
+		}
+		if err == nil {
+			s.networkTableSHA = sha
+			s.networkTable.Store(table)
+			s.networkTableRejected.Store(nil)
+			return
+		}
+		s.networkTable.Store(nil)
+		code := "asn_table_load_failed"
+		if parseRejected {
+			s.networkTableSHA = sha
+			rejected := sha
+			s.networkTableRejected.Store(&rejected)
+			code = "asn_table_invalid"
+		}
+		s.log.Warn("update: trusted ASN table could not be loaded", "code", code, "sha256", sha, "err", err)
+		return
+	}
+}
+
+// NetworksTable returns the immutable panel-side table loaded off the request path. Nil means absent or invalid.
+func (s *Service) NetworksTable() *asndb.DB { return s.networkTable.Load() }
+
+// NetworkTableFile returns the trusted bundle file for node streams, when present.
+func (s *Service) NetworkTableFile() (name, sha256 string) {
+	bs := s.current()
+	entry, ok := networkTableEntry(bs)
+	if !ok || bs.manifest == nil || s.now().Unix() > bs.manifest.Expires {
+		return "", ""
+	}
+	if rejected := s.networkTableRejected.Load(); rejected != nil && *rejected == entry.SHA256 {
+		return "", ""
+	}
+	return entry.Name, entry.SHA256
+}
+
+// SetNetworkBundleChanged registers the callback that asks live streams to reconcile after the trusted table digest changes.
+func (s *Service) SetNetworkBundleChanged(callback func()) {
+	s.networkChangedMu.Lock()
+	s.networkBundleChanged = callback
+	s.networkChangedMu.Unlock()
+}
+
+func (s *Service) notifyNetworkBundleChanged() {
+	s.networkChangedMu.RLock()
+	callback := s.networkBundleChanged
+	s.networkChangedMu.RUnlock()
+	if callback != nil {
+		callback()
+	}
 }
 
 // rescanIfChanged is the periodic poll: a scan only when the directory listing (names, sizes, mtimes) changed, or

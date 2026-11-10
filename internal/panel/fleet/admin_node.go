@@ -240,15 +240,6 @@ func pct(used, total uint64) float32 {
 
 // nodeMsg builds the Node message. protos, todayBytes, enabled and live are looked up by the caller once per
 // request.
-func capabilityPresent(caps []string, want string) bool {
-	for _, cap := range caps {
-		if cap == want {
-			return true
-		}
-	}
-	return false
-}
-
 func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor) *adminv1.Node {
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now, health)
@@ -259,9 +250,9 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
 	}
 	caps := live.AgentCaps
-	out.TorrentBlockerSupported = capabilityPresent(caps, capTorrentGuard)
-	out.ClientIpv6Supported = capabilityPresent(caps, capClientIPv6)
-	out.UserRateLimitSupported = capabilityPresent(caps, capUserRateLimit)
+	out.TorrentBlockerSupported = store.CapabilityPresent(caps, capTorrentGuard)
+	out.ClientIpv6Supported = store.CapabilityPresent(caps, capClientIPv6)
+	out.UserRateLimitSupported = store.CapabilityPresent(caps, capUserRateLimit)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
 	out.Ipv6 = ipv6Msg(n, d6)
 	if live.Connected {
@@ -271,7 +262,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		}
 	}
 	out.Warp = f.warpSummary(ctx, n.ID, live.Connected, now)
-	decoySupported := capabilityPresent(caps, capDecoy)
+	decoySupported := store.CapabilityPresent(caps, capDecoy)
 	agentMode := n.DecoyAgentMode
 	if agentMode == "" && !decoySupported {
 		agentMode = decoy.ModeBuiltin
@@ -917,7 +908,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			if !capabilityPresent(cur.AgentCaps, capTorrentGuard) {
+			if !store.CapabilityPresent(cur.AgentCaps, capTorrentGuard) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}
@@ -936,7 +927,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			if !capabilityPresent(cur.AgentCaps, capClientIPv6) {
+			if !store.CapabilityPresent(cur.AgentCaps, capClientIPv6) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}

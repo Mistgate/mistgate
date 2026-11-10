@@ -69,6 +69,12 @@ const (
 	OpsServiceGetPanelResourcesProcedure = "/mistgate.ops.v1.OpsService/GetPanelResources"
 	// OpsServiceGetFleetLoadProcedure is the fully-qualified name of the OpsService's GetFleetLoad RPC.
 	OpsServiceGetFleetLoadProcedure = "/mistgate.ops.v1.OpsService/GetFleetLoad"
+	// OpsServiceGetNetworkSettingsProcedure is the fully-qualified name of the OpsService's
+	// GetNetworkSettings RPC.
+	OpsServiceGetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/GetNetworkSettings"
+	// OpsServiceSetNetworkSettingsProcedure is the fully-qualified name of the OpsService's
+	// SetNetworkSettings RPC.
+	OpsServiceSetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/SetNetworkSettings"
 )
 
 // OpsServiceClient is a client for the mistgate.ops.v1.OpsService service.
@@ -109,6 +115,10 @@ type OpsServiceClient interface {
 	// How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
 	// how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
 	GetFleetLoad(context.Context, *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error)
+	// The per-inbound ASN setting and facts about the panel's currently loaded trusted table and node support.
+	GetNetworkSettings(context.Context, *connect.Request[v1.GetNetworkSettingsRequest]) (*connect.Response[v1.GetNetworkSettingsResponse], error)
+	// Changes the mode. Turning networks off removes the stored hourly and per-person rows.
+	SetNetworkSettings(context.Context, *connect.Request[v1.SetNetworkSettingsRequest]) (*connect.Response[v1.SetNetworkSettingsResponse], error)
 }
 
 // NewOpsServiceClient constructs a client for the mistgate.ops.v1.OpsService service. By default,
@@ -206,6 +216,18 @@ func NewOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(opsServiceMethods.ByName("GetFleetLoad")),
 			connect.WithClientOptions(opts...),
 		),
+		getNetworkSettings: connect.NewClient[v1.GetNetworkSettingsRequest, v1.GetNetworkSettingsResponse](
+			httpClient,
+			baseURL+OpsServiceGetNetworkSettingsProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("GetNetworkSettings")),
+			connect.WithClientOptions(opts...),
+		),
+		setNetworkSettings: connect.NewClient[v1.SetNetworkSettingsRequest, v1.SetNetworkSettingsResponse](
+			httpClient,
+			baseURL+OpsServiceSetNetworkSettingsProcedure,
+			connect.WithSchema(opsServiceMethods.ByName("SetNetworkSettings")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -225,6 +247,8 @@ type opsServiceClient struct {
 	getDebugCapture    *connect.Client[v1.GetDebugCaptureRequest, v1.GetDebugCaptureResponse]
 	getPanelResources  *connect.Client[v1.GetPanelResourcesRequest, v1.GetPanelResourcesResponse]
 	getFleetLoad       *connect.Client[v1.GetFleetLoadRequest, v1.GetFleetLoadResponse]
+	getNetworkSettings *connect.Client[v1.GetNetworkSettingsRequest, v1.GetNetworkSettingsResponse]
+	setNetworkSettings *connect.Client[v1.SetNetworkSettingsRequest, v1.SetNetworkSettingsResponse]
 }
 
 // GetLogSettings calls mistgate.ops.v1.OpsService.GetLogSettings.
@@ -297,6 +321,16 @@ func (c *opsServiceClient) GetFleetLoad(ctx context.Context, req *connect.Reques
 	return c.getFleetLoad.CallUnary(ctx, req)
 }
 
+// GetNetworkSettings calls mistgate.ops.v1.OpsService.GetNetworkSettings.
+func (c *opsServiceClient) GetNetworkSettings(ctx context.Context, req *connect.Request[v1.GetNetworkSettingsRequest]) (*connect.Response[v1.GetNetworkSettingsResponse], error) {
+	return c.getNetworkSettings.CallUnary(ctx, req)
+}
+
+// SetNetworkSettings calls mistgate.ops.v1.OpsService.SetNetworkSettings.
+func (c *opsServiceClient) SetNetworkSettings(ctx context.Context, req *connect.Request[v1.SetNetworkSettingsRequest]) (*connect.Response[v1.SetNetworkSettingsResponse], error) {
+	return c.setNetworkSettings.CallUnary(ctx, req)
+}
+
 // OpsServiceHandler is an implementation of the mistgate.ops.v1.OpsService service.
 type OpsServiceHandler interface {
 	// The log level now in force, the one the panel started with, and the size of the ring.
@@ -335,6 +369,10 @@ type OpsServiceHandler interface {
 	// How loaded each node was over a window of its hourly host load (GetNodeHostHistory's rows), what it runs out of first,
 	// how many more people it can take and what to do about it, with a fleet summary. It never contacts a node.
 	GetFleetLoad(context.Context, *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error)
+	// The per-inbound ASN setting and facts about the panel's currently loaded trusted table and node support.
+	GetNetworkSettings(context.Context, *connect.Request[v1.GetNetworkSettingsRequest]) (*connect.Response[v1.GetNetworkSettingsResponse], error)
+	// Changes the mode. Turning networks off removes the stored hourly and per-person rows.
+	SetNetworkSettings(context.Context, *connect.Request[v1.SetNetworkSettingsRequest]) (*connect.Response[v1.SetNetworkSettingsResponse], error)
 }
 
 // NewOpsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -428,6 +466,18 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(opsServiceMethods.ByName("GetFleetLoad")),
 		connect.WithHandlerOptions(opts...),
 	)
+	opsServiceGetNetworkSettingsHandler := connect.NewUnaryHandler(
+		OpsServiceGetNetworkSettingsProcedure,
+		svc.GetNetworkSettings,
+		connect.WithSchema(opsServiceMethods.ByName("GetNetworkSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	opsServiceSetNetworkSettingsHandler := connect.NewUnaryHandler(
+		OpsServiceSetNetworkSettingsProcedure,
+		svc.SetNetworkSettings,
+		connect.WithSchema(opsServiceMethods.ByName("SetNetworkSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.ops.v1.OpsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OpsServiceGetLogSettingsProcedure:
@@ -458,6 +508,10 @@ func NewOpsServiceHandler(svc OpsServiceHandler, opts ...connect.HandlerOption) 
 			opsServiceGetPanelResourcesHandler.ServeHTTP(w, r)
 		case OpsServiceGetFleetLoadProcedure:
 			opsServiceGetFleetLoadHandler.ServeHTTP(w, r)
+		case OpsServiceGetNetworkSettingsProcedure:
+			opsServiceGetNetworkSettingsHandler.ServeHTTP(w, r)
+		case OpsServiceSetNetworkSettingsProcedure:
+			opsServiceSetNetworkSettingsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -521,4 +575,12 @@ func (UnimplementedOpsServiceHandler) GetPanelResources(context.Context, *connec
 
 func (UnimplementedOpsServiceHandler) GetFleetLoad(context.Context, *connect.Request[v1.GetFleetLoadRequest]) (*connect.Response[v1.GetFleetLoadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetFleetLoad is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) GetNetworkSettings(context.Context, *connect.Request[v1.GetNetworkSettingsRequest]) (*connect.Response[v1.GetNetworkSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.GetNetworkSettings is not implemented"))
+}
+
+func (UnimplementedOpsServiceHandler) SetNetworkSettings(context.Context, *connect.Request[v1.SetNetworkSettingsRequest]) (*connect.Response[v1.SetNetworkSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.ops.v1.OpsService.SetNetworkSettings is not implemented"))
 }

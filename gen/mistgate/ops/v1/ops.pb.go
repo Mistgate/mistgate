@@ -2999,6 +2999,225 @@ func (x *GetFleetLoadResponse) GetSummary() *FleetLoadSummary {
 	return nil
 }
 
+type GetNetworkSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNetworkSettingsRequest) Reset() {
+	*x = GetNetworkSettingsRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNetworkSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNetworkSettingsRequest) ProtoMessage() {}
+
+func (x *GetNetworkSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNetworkSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetNetworkSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{40}
+}
+
+type GetNetworkSettingsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0 off, 1 operators, 2 operators and per-person recent networks.
+	Mode uint32 `protobuf:"varint,1,opt,name=mode,proto3" json:"mode,omitempty"`
+	// The trusted table's build time and range/operator counts; zero when absent or invalid.
+	TableBuiltUnix         int64  `protobuf:"varint,2,opt,name=table_built_unix,json=tableBuiltUnix,proto3" json:"table_built_unix,omitempty"`
+	Ipv4Ranges             uint32 `protobuf:"varint,3,opt,name=ipv4_ranges,json=ipv4Ranges,proto3" json:"ipv4_ranges,omitempty"`
+	Ipv6Ranges             uint32 `protobuf:"varint,4,opt,name=ipv6_ranges,json=ipv6Ranges,proto3" json:"ipv6_ranges,omitempty"`
+	Asns                   uint32 `protobuf:"varint,5,opt,name=asns,proto3" json:"asns,omitempty"`
+	NodesWithNets          uint32 `protobuf:"varint,6,opt,name=nodes_with_nets,json=nodesWithNets,proto3" json:"nodes_with_nets,omitempty"`
+	NodesWithMatchingTable uint32 `protobuf:"varint,7,opt,name=nodes_with_matching_table,json=nodesWithMatchingTable,proto3" json:"nodes_with_matching_table,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GetNetworkSettingsResponse) Reset() {
+	*x = GetNetworkSettingsResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNetworkSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNetworkSettingsResponse) ProtoMessage() {}
+
+func (x *GetNetworkSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNetworkSettingsResponse.ProtoReflect.Descriptor instead.
+func (*GetNetworkSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *GetNetworkSettingsResponse) GetMode() uint32 {
+	if x != nil {
+		return x.Mode
+	}
+	return 0
+}
+
+func (x *GetNetworkSettingsResponse) GetTableBuiltUnix() int64 {
+	if x != nil {
+		return x.TableBuiltUnix
+	}
+	return 0
+}
+
+func (x *GetNetworkSettingsResponse) GetIpv4Ranges() uint32 {
+	if x != nil {
+		return x.Ipv4Ranges
+	}
+	return 0
+}
+
+func (x *GetNetworkSettingsResponse) GetIpv6Ranges() uint32 {
+	if x != nil {
+		return x.Ipv6Ranges
+	}
+	return 0
+}
+
+func (x *GetNetworkSettingsResponse) GetAsns() uint32 {
+	if x != nil {
+		return x.Asns
+	}
+	return 0
+}
+
+func (x *GetNetworkSettingsResponse) GetNodesWithNets() uint32 {
+	if x != nil {
+		return x.NodesWithNets
+	}
+	return 0
+}
+
+func (x *GetNetworkSettingsResponse) GetNodesWithMatchingTable() uint32 {
+	if x != nil {
+		return x.NodesWithMatchingTable
+	}
+	return 0
+}
+
+type SetNetworkSettingsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0 off, 1 operators, 2 operators and per-person recent networks.
+	Mode          uint32 `protobuf:"varint,1,opt,name=mode,proto3" json:"mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNetworkSettingsRequest) Reset() {
+	*x = SetNetworkSettingsRequest{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNetworkSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNetworkSettingsRequest) ProtoMessage() {}
+
+func (x *SetNetworkSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNetworkSettingsRequest.ProtoReflect.Descriptor instead.
+func (*SetNetworkSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *SetNetworkSettingsRequest) GetMode() uint32 {
+	if x != nil {
+		return x.Mode
+	}
+	return 0
+}
+
+type SetNetworkSettingsResponse struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Settings      *GetNetworkSettingsResponse `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNetworkSettingsResponse) Reset() {
+	*x = SetNetworkSettingsResponse{}
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNetworkSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNetworkSettingsResponse) ProtoMessage() {}
+
+func (x *SetNetworkSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_ops_v1_ops_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNetworkSettingsResponse.ProtoReflect.Descriptor instead.
+func (*SetNetworkSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_ops_v1_ops_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *SetNetworkSettingsResponse) GetSettings() *GetNetworkSettingsResponse {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
 var File_mistgate_ops_v1_ops_proto protoreflect.FileDescriptor
 
 const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
@@ -3287,7 +3506,22 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\bnow_unix\x18\x01 \x01(\x03B\x020\x02R\anowUnix\x12\x14\n" +
 	"\x05hours\x18\x02 \x01(\rR\x05hours\x12/\n" +
 	"\x05nodes\x18\x03 \x03(\v2\x19.mistgate.ops.v1.NodeLoadR\x05nodes\x12;\n" +
-	"\asummary\x18\x04 \x01(\v2!.mistgate.ops.v1.FleetLoadSummaryR\asummary2\x87\v\n" +
+	"\asummary\x18\x04 \x01(\v2!.mistgate.ops.v1.FleetLoadSummaryR\asummary\"\x1b\n" +
+	"\x19GetNetworkSettingsRequest\"\x97\x02\n" +
+	"\x1aGetNetworkSettingsResponse\x12\x12\n" +
+	"\x04mode\x18\x01 \x01(\rR\x04mode\x12,\n" +
+	"\x10table_built_unix\x18\x02 \x01(\x03B\x020\x02R\x0etableBuiltUnix\x12\x1f\n" +
+	"\vipv4_ranges\x18\x03 \x01(\rR\n" +
+	"ipv4Ranges\x12\x1f\n" +
+	"\vipv6_ranges\x18\x04 \x01(\rR\n" +
+	"ipv6Ranges\x12\x12\n" +
+	"\x04asns\x18\x05 \x01(\rR\x04asns\x12&\n" +
+	"\x0fnodes_with_nets\x18\x06 \x01(\rR\rnodesWithNets\x129\n" +
+	"\x19nodes_with_matching_table\x18\a \x01(\rR\x16nodesWithMatchingTable\"/\n" +
+	"\x19SetNetworkSettingsRequest\x12\x12\n" +
+	"\x04mode\x18\x01 \x01(\rR\x04mode\"e\n" +
+	"\x1aSetNetworkSettingsResponse\x12G\n" +
+	"\bsettings\x18\x01 \x01(\v2+.mistgate.ops.v1.GetNetworkSettingsResponseR\bsettings2\xe5\f\n" +
 	"\n" +
 	"OpsService\x12a\n" +
 	"\x0eGetLogSettings\x12&.mistgate.ops.v1.GetLogSettingsRequest\x1a'.mistgate.ops.v1.GetLogSettingsResponse\x12X\n" +
@@ -3304,7 +3538,9 @@ const file_mistgate_ops_v1_ops_proto_rawDesc = "" +
 	"\x11ListDebugCaptures\x12).mistgate.ops.v1.ListDebugCapturesRequest\x1a*.mistgate.ops.v1.ListDebugCapturesResponse\x12d\n" +
 	"\x0fGetDebugCapture\x12'.mistgate.ops.v1.GetDebugCaptureRequest\x1a(.mistgate.ops.v1.GetDebugCaptureResponse\x12j\n" +
 	"\x11GetPanelResources\x12).mistgate.ops.v1.GetPanelResourcesRequest\x1a*.mistgate.ops.v1.GetPanelResourcesResponse\x12[\n" +
-	"\fGetFleetLoad\x12$.mistgate.ops.v1.GetFleetLoadRequest\x1a%.mistgate.ops.v1.GetFleetLoadResponseB\xb5\x01\n" +
+	"\fGetFleetLoad\x12$.mistgate.ops.v1.GetFleetLoadRequest\x1a%.mistgate.ops.v1.GetFleetLoadResponse\x12m\n" +
+	"\x12GetNetworkSettings\x12*.mistgate.ops.v1.GetNetworkSettingsRequest\x1a+.mistgate.ops.v1.GetNetworkSettingsResponse\x12m\n" +
+	"\x12SetNetworkSettings\x12*.mistgate.ops.v1.SetNetworkSettingsRequest\x1a+.mistgate.ops.v1.SetNetworkSettingsResponseB\xb5\x01\n" +
 	"\x13com.mistgate.ops.v1B\bOpsProtoP\x01Z6github.com/mistgate/mistgate/gen/mistgate/ops/v1;opsv1\xa2\x02\x03MOX\xaa\x02\x0fMistgate.Ops.V1\xca\x02\x0fMistgate\\Ops\\V1\xe2\x02\x1bMistgate\\Ops\\V1\\GPBMetadata\xea\x02\x11Mistgate::Ops::V1b\x06proto3"
 
 var (
@@ -3319,7 +3555,7 @@ func file_mistgate_ops_v1_ops_proto_rawDescGZIP() []byte {
 	return file_mistgate_ops_v1_ops_proto_rawDescData
 }
 
-var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_mistgate_ops_v1_ops_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
 var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*GetLogSettingsRequest)(nil),      // 0: mistgate.ops.v1.GetLogSettingsRequest
 	(*GetLogSettingsResponse)(nil),     // 1: mistgate.ops.v1.GetLogSettingsResponse
@@ -3361,66 +3597,75 @@ var file_mistgate_ops_v1_ops_proto_goTypes = []any{
 	(*LoadNodeRef)(nil),                // 37: mistgate.ops.v1.LoadNodeRef
 	(*FleetLoadSummary)(nil),           // 38: mistgate.ops.v1.FleetLoadSummary
 	(*GetFleetLoadResponse)(nil),       // 39: mistgate.ops.v1.GetFleetLoadResponse
-	nil,                                // 40: mistgate.ops.v1.PanelLogEntry.AttrsEntry
-	nil,                                // 41: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
-	nil,                                // 42: mistgate.ops.v1.DebugRecord.AttrsEntry
-	nil,                                // 43: mistgate.ops.v1.LoadRecommendation.ParamsEntry
+	(*GetNetworkSettingsRequest)(nil),  // 40: mistgate.ops.v1.GetNetworkSettingsRequest
+	(*GetNetworkSettingsResponse)(nil), // 41: mistgate.ops.v1.GetNetworkSettingsResponse
+	(*SetNetworkSettingsRequest)(nil),  // 42: mistgate.ops.v1.SetNetworkSettingsRequest
+	(*SetNetworkSettingsResponse)(nil), // 43: mistgate.ops.v1.SetNetworkSettingsResponse
+	nil,                                // 44: mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	nil,                                // 45: mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	nil,                                // 46: mistgate.ops.v1.DebugRecord.AttrsEntry
+	nil,                                // 47: mistgate.ops.v1.LoadRecommendation.ParamsEntry
 }
 var file_mistgate_ops_v1_ops_proto_depIdxs = []int32{
-	40, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
+	44, // 0: mistgate.ops.v1.PanelLogEntry.attrs:type_name -> mistgate.ops.v1.PanelLogEntry.AttrsEntry
 	5,  // 1: mistgate.ops.v1.GetPanelLogsResponse.entries:type_name -> mistgate.ops.v1.PanelLogEntry
 	7,  // 2: mistgate.ops.v1.GetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
-	41, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
+	45, // 3: mistgate.ops.v1.SetRetentionRequest.values:type_name -> mistgate.ops.v1.SetRetentionRequest.ValuesEntry
 	7,  // 4: mistgate.ops.v1.SetRetentionResponse.items:type_name -> mistgate.ops.v1.RetentionItem
 	18, // 5: mistgate.ops.v1.StartDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	18, // 6: mistgate.ops.v1.StopDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	18, // 7: mistgate.ops.v1.ListDebugCapturesResponse.captures:type_name -> mistgate.ops.v1.DebugCaptureInfo
-	42, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
+	46, // 8: mistgate.ops.v1.DebugRecord.attrs:type_name -> mistgate.ops.v1.DebugRecord.AttrsEntry
 	18, // 9: mistgate.ops.v1.GetDebugCaptureResponse.capture:type_name -> mistgate.ops.v1.DebugCaptureInfo
 	26, // 10: mistgate.ops.v1.GetDebugCaptureResponse.records:type_name -> mistgate.ops.v1.DebugRecord
 	29, // 11: mistgate.ops.v1.GetPanelResourcesResponse.process:type_name -> mistgate.ops.v1.PanelProcess
 	30, // 12: mistgate.ops.v1.GetPanelResourcesResponse.host:type_name -> mistgate.ops.v1.PanelHost
 	31, // 13: mistgate.ops.v1.GetPanelResourcesResponse.database:type_name -> mistgate.ops.v1.PanelDatabase
 	32, // 14: mistgate.ops.v1.GetPanelResourcesResponse.rpc:type_name -> mistgate.ops.v1.PanelRpcLoad
-	43, // 15: mistgate.ops.v1.LoadRecommendation.params:type_name -> mistgate.ops.v1.LoadRecommendation.ParamsEntry
+	47, // 15: mistgate.ops.v1.LoadRecommendation.params:type_name -> mistgate.ops.v1.LoadRecommendation.ParamsEntry
 	35, // 16: mistgate.ops.v1.NodeLoad.recommendations:type_name -> mistgate.ops.v1.LoadRecommendation
 	37, // 17: mistgate.ops.v1.FleetLoadSummary.most_loaded:type_name -> mistgate.ops.v1.LoadNodeRef
 	37, // 18: mistgate.ops.v1.FleetLoadSummary.most_free:type_name -> mistgate.ops.v1.LoadNodeRef
 	36, // 19: mistgate.ops.v1.GetFleetLoadResponse.nodes:type_name -> mistgate.ops.v1.NodeLoad
 	38, // 20: mistgate.ops.v1.GetFleetLoadResponse.summary:type_name -> mistgate.ops.v1.FleetLoadSummary
-	0,  // 21: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
-	2,  // 22: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
-	4,  // 23: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
-	8,  // 24: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
-	10, // 25: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
-	12, // 26: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
-	14, // 27: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
-	16, // 28: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
-	19, // 29: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
-	21, // 30: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
-	23, // 31: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
-	25, // 32: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
-	28, // 33: mistgate.ops.v1.OpsService.GetPanelResources:input_type -> mistgate.ops.v1.GetPanelResourcesRequest
-	34, // 34: mistgate.ops.v1.OpsService.GetFleetLoad:input_type -> mistgate.ops.v1.GetFleetLoadRequest
-	1,  // 35: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
-	3,  // 36: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
-	6,  // 37: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
-	9,  // 38: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
-	11, // 39: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
-	13, // 40: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
-	15, // 41: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
-	17, // 42: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
-	20, // 43: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
-	22, // 44: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
-	24, // 45: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
-	27, // 46: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
-	33, // 47: mistgate.ops.v1.OpsService.GetPanelResources:output_type -> mistgate.ops.v1.GetPanelResourcesResponse
-	39, // 48: mistgate.ops.v1.OpsService.GetFleetLoad:output_type -> mistgate.ops.v1.GetFleetLoadResponse
-	35, // [35:49] is the sub-list for method output_type
-	21, // [21:35] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	41, // 21: mistgate.ops.v1.SetNetworkSettingsResponse.settings:type_name -> mistgate.ops.v1.GetNetworkSettingsResponse
+	0,  // 22: mistgate.ops.v1.OpsService.GetLogSettings:input_type -> mistgate.ops.v1.GetLogSettingsRequest
+	2,  // 23: mistgate.ops.v1.OpsService.SetLogLevel:input_type -> mistgate.ops.v1.SetLogLevelRequest
+	4,  // 24: mistgate.ops.v1.OpsService.GetPanelLogs:input_type -> mistgate.ops.v1.GetPanelLogsRequest
+	8,  // 25: mistgate.ops.v1.OpsService.GetRetention:input_type -> mistgate.ops.v1.GetRetentionRequest
+	10, // 26: mistgate.ops.v1.OpsService.SetRetention:input_type -> mistgate.ops.v1.SetRetentionRequest
+	12, // 27: mistgate.ops.v1.OpsService.ExportData:input_type -> mistgate.ops.v1.ExportDataRequest
+	14, // 28: mistgate.ops.v1.OpsService.GetMetricsSettings:input_type -> mistgate.ops.v1.GetMetricsSettingsRequest
+	16, // 29: mistgate.ops.v1.OpsService.SetMetricsSettings:input_type -> mistgate.ops.v1.SetMetricsSettingsRequest
+	19, // 30: mistgate.ops.v1.OpsService.StartDebugCapture:input_type -> mistgate.ops.v1.StartDebugCaptureRequest
+	21, // 31: mistgate.ops.v1.OpsService.StopDebugCapture:input_type -> mistgate.ops.v1.StopDebugCaptureRequest
+	23, // 32: mistgate.ops.v1.OpsService.ListDebugCaptures:input_type -> mistgate.ops.v1.ListDebugCapturesRequest
+	25, // 33: mistgate.ops.v1.OpsService.GetDebugCapture:input_type -> mistgate.ops.v1.GetDebugCaptureRequest
+	28, // 34: mistgate.ops.v1.OpsService.GetPanelResources:input_type -> mistgate.ops.v1.GetPanelResourcesRequest
+	34, // 35: mistgate.ops.v1.OpsService.GetFleetLoad:input_type -> mistgate.ops.v1.GetFleetLoadRequest
+	40, // 36: mistgate.ops.v1.OpsService.GetNetworkSettings:input_type -> mistgate.ops.v1.GetNetworkSettingsRequest
+	42, // 37: mistgate.ops.v1.OpsService.SetNetworkSettings:input_type -> mistgate.ops.v1.SetNetworkSettingsRequest
+	1,  // 38: mistgate.ops.v1.OpsService.GetLogSettings:output_type -> mistgate.ops.v1.GetLogSettingsResponse
+	3,  // 39: mistgate.ops.v1.OpsService.SetLogLevel:output_type -> mistgate.ops.v1.SetLogLevelResponse
+	6,  // 40: mistgate.ops.v1.OpsService.GetPanelLogs:output_type -> mistgate.ops.v1.GetPanelLogsResponse
+	9,  // 41: mistgate.ops.v1.OpsService.GetRetention:output_type -> mistgate.ops.v1.GetRetentionResponse
+	11, // 42: mistgate.ops.v1.OpsService.SetRetention:output_type -> mistgate.ops.v1.SetRetentionResponse
+	13, // 43: mistgate.ops.v1.OpsService.ExportData:output_type -> mistgate.ops.v1.ExportDataResponse
+	15, // 44: mistgate.ops.v1.OpsService.GetMetricsSettings:output_type -> mistgate.ops.v1.GetMetricsSettingsResponse
+	17, // 45: mistgate.ops.v1.OpsService.SetMetricsSettings:output_type -> mistgate.ops.v1.SetMetricsSettingsResponse
+	20, // 46: mistgate.ops.v1.OpsService.StartDebugCapture:output_type -> mistgate.ops.v1.StartDebugCaptureResponse
+	22, // 47: mistgate.ops.v1.OpsService.StopDebugCapture:output_type -> mistgate.ops.v1.StopDebugCaptureResponse
+	24, // 48: mistgate.ops.v1.OpsService.ListDebugCaptures:output_type -> mistgate.ops.v1.ListDebugCapturesResponse
+	27, // 49: mistgate.ops.v1.OpsService.GetDebugCapture:output_type -> mistgate.ops.v1.GetDebugCaptureResponse
+	33, // 50: mistgate.ops.v1.OpsService.GetPanelResources:output_type -> mistgate.ops.v1.GetPanelResourcesResponse
+	39, // 51: mistgate.ops.v1.OpsService.GetFleetLoad:output_type -> mistgate.ops.v1.GetFleetLoadResponse
+	41, // 52: mistgate.ops.v1.OpsService.GetNetworkSettings:output_type -> mistgate.ops.v1.GetNetworkSettingsResponse
+	43, // 53: mistgate.ops.v1.OpsService.SetNetworkSettings:output_type -> mistgate.ops.v1.SetNetworkSettingsResponse
+	38, // [38:54] is the sub-list for method output_type
+	22, // [22:38] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_ops_v1_ops_proto_init() }
@@ -3437,7 +3682,7 @@ func file_mistgate_ops_v1_ops_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_ops_v1_ops_proto_rawDesc), len(file_mistgate_ops_v1_ops_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   44,
+			NumMessages:   48,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

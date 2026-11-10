@@ -32,6 +32,7 @@ type SessionState struct {
 	NodeID          string    `json:"n,omitempty"`
 	OwnerGeneration uint64    `json:"o,omitempty"`
 	InstanceID      string    `json:"i,omitempty"`
+	AgentCaps       []string  `json:"ac,omitempty"`
 	LivenessNanos   int64     `json:"l,omitempty"`
 	HelloDeadline   time.Time `json:"h,omitzero"`
 	// LivenessDeadline keeps Go's monotonic reading on the VPS: a wall-clock step cannot close a live session.
@@ -329,7 +330,8 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At, Instance: h.InstanceId})
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
 	autoMeasure = autoMeasure && slices.Contains(info.Caps, capBandwidth)
-	settings := nodeSettings(node, info.Caps)
+	tr.state.AgentCaps = slices.Clone(info.Caps)
+	settings := c.f.nodeSettings(node, info.Caps)
 	tr.state.SentSettingsHash = settingsSig(settings)
 	if autoMeasure {
 		tr.state.AutoBandwidthDeadline = event.At.Add(c.f.measureDelay)
@@ -503,7 +505,7 @@ func (c *SessionCore) agentFrame(ctx context.Context, tr *coreTransition, event 
 
 func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64, st *agentv1.StatsBatch, now time.Time) {
 	hour, stale := bucketHour(time.Unix(st.IntervalEndUnix, 0), now)
-	g := c.f.guardStats(st)
+	g := c.f.guardStats(st, tr.state.AgentCaps)
 	if g.rejected > 0 {
 		c.rejectStats(ctx, tr.state, g, now)
 	}
@@ -512,7 +514,8 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 	var projectionEnd int64
 	projectionBuilt := false
 	in := store.FleetStatsIn{NodeID: tr.state.NodeID, Instance: tr.state.InstanceID, Session: tr.state.OwnerGeneration,
-		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic, Links: g.links, Journal: g.journal, JournalSecrets: c.f.cfg.JournalSecrets}
+		Seq: seq, Now: now, HourStart: hour, Traffic: g.traffic, Links: g.links, Networks: g.networks, PersonNetworks: g.personNetworks,
+		NetworksDBSHA256: g.networksDBSHA256, Journal: g.journal, JournalSecrets: c.f.cfg.JournalSecrets}
 	in.Live = func(refs map[string]store.FleetCredRef) store.FleetLive {
 		live, end, tooLarge := buildFleetLive(projectionState, st, g.traffic, now, refs)
 		projectionEnd, projectionBuilt = end, true
@@ -1098,7 +1101,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 		return errors.New("prepared desired state has no node state")
 	}
 	state.LivenessNanos = int64(time.Duration(node.LivenessTimeoutS) * c.f.unit)
-	settings := nodeSettings(node, node.AgentCaps)
+	settings := c.f.nodeSettings(node, node.AgentCaps)
 	sig := settingsSig(settings)
 	digest := prepared.digest
 	if !state.FullResendPending && state.SentRevision == 0 {

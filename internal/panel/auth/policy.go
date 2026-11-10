@@ -79,6 +79,7 @@ var procedureLevels = map[string]level{
 	NodeDnsCheckProcedure: levelWrite, // resolver timings of the doctor's control domains
 	PathSpeedProcedure:    levelOwner, // moves up to 32 MB between two nodes: owner only, and for tokens only through an approved plan (policy_tokens.go)
 	adminv1connect.NodeServiceGetFleetConnectionsProcedure: levelRead,  // counts only, no address
+	adminv1connect.NodeServiceGetNetworksProcedure:         levelRead,  // ASNs and counts only, no address
 	adminv1connect.NodeServiceUpdateNodeProcedure:          levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from) or moves the address: owner only
 	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:    levelOwner,
 	adminv1connect.NodeServiceUploadNodeDecoyProcedure:     levelOwner,

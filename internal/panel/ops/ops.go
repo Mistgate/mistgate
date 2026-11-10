@@ -49,8 +49,22 @@ type Config struct {
 	RPC *rpcstat.Window
 	// Capacity reads the nodes for GetFleetLoad over a window of hours (fleet.CapacityNodes); nil answers with no nodes.
 	Capacity func(ctx context.Context, hours int) ([]capacity.Node, error)
-	Now      func() time.Time
-	Log      *slog.Logger
+	// NetworkTable is the panel's immutable, currently loaded signed ASN table. Nil means absent or invalid.
+	NetworkTable func() NetworkTable
+	// NetworkBundle returns the data/any file name and digest in the current trusted node bundle.
+	NetworkBundle func() (name, sha256 string)
+	// NetworkSettingsChanged refreshes the stream setting cache and asks connected nodes to reconcile.
+	NetworkSettingsChanged func(mode uint32)
+	Now                    func() time.Time
+	Log                    *slog.Logger
+}
+
+// NetworkTable is the small read-only view the OpsService needs from the loaded table.
+type NetworkTable interface {
+	Built() time.Time
+	IPv4RangeCount() int
+	IPv6RangeCount() int
+	ASNCount() int
 }
 
 // Service is the OpsService.

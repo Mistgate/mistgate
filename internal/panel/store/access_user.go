@@ -561,12 +561,15 @@ func (a Access) AddUsage(ctx context.Context, id string, bytes uint64) error {
 // DeleteUsers deletes users (devices, credentials, node list and traffic rows cascade) and returns the
 // number deleted.
 func (a Access) DeleteUsers(ctx context.Context, ids []string) (int, error) {
-	res, err := a.s.W.ExecContext(ctx, `DELETE FROM user WHERE id IN (SELECT value FROM json_each(?))`, accJSON(ids))
+	args := []any{accJSON(ids)}
+	results, err := a.s.batch(ctx,
+		Stmt{Query: `DELETE FROM user_network WHERE user_id IN (SELECT value FROM json_each(?))`, Args: args},
+		Stmt{Query: `DELETE FROM user WHERE id IN (SELECT value FROM json_each(?))`, Args: args},
+	)
 	if err != nil {
 		return 0, err
 	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
+	return int(results[1].RowsAffected), nil
 }
 
 // AccessUserState is what the status sweep needs about a user.

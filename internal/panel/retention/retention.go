@@ -36,6 +36,7 @@ var Fields = [...]Field{
 	{"host_history_days", 90, 7, 365, day},         // hourly host load of a node
 	{"traffic_bucket_days", 400, 30, 3650, day},    // hourly traffic per person, node and protocol
 	{"node_traffic_hour_days", 400, 30, 3650, day}, // hourly traffic per node
+	{"networks_days", 7, 1, 7, day},                // hourly ASN counters and the recent per-person ASN view
 }
 
 // Keys lists the setting keys, for one batched read.

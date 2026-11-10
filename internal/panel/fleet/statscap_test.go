@@ -18,12 +18,12 @@ func TestGuardStatsRejectsABatchAboveTheCap(t *testing.T) {
 	batch := func(n int) *agentv1.StatsBatch {
 		return &agentv1.StatsBatch{IntervalStartUnix: 1_000, IntervalEndUnix: 1_010, Traffic: deltas[:n]}
 	}
-	g := f.guardStats(batch(maxStatsDeltas + 1))
+	g := f.guardStats(batch(maxStatsDeltas+1), nil)
 	if g.reason != "too_many_deltas" || g.rejected != maxStatsDeltas+1 || len(g.traffic) != 0 {
 		t.Fatalf("a batch of %d deltas: reason %q, rejected %d, kept %d; want too_many_deltas, all rejected, none kept",
 			maxStatsDeltas+1, g.reason, g.rejected, len(g.traffic))
 	}
-	g = f.guardStats(batch(maxStatsDeltas))
+	g = f.guardStats(batch(maxStatsDeltas), nil)
 	if g.reason != "" || g.rejected != 0 || len(g.traffic) != maxStatsDeltas {
 		t.Fatalf("a batch of exactly %d deltas: reason %q, rejected %d, kept %d; want all kept", maxStatsDeltas, g.reason, g.rejected, len(g.traffic))
 	}

@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"math"
+	"sort"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -22,11 +23,14 @@ const (
 
 // guardedStats is a StatsBatch after the sanity checks.
 type guardedStats struct {
-	traffic  []store.FleetTraffic
-	links    []store.FleetLink // connection counters, at most maxStatsDeltas rows
-	journal  []store.FleetJournal
-	rejected int    // deltas dropped
-	reason   string // why, for the event; "" when nothing was dropped
+	traffic          []store.FleetTraffic
+	links            []store.FleetLink // connection counters, at most maxStatsDeltas rows
+	networks         []store.FleetNetwork
+	personNetworks   []store.FleetPersonNetwork
+	networksDBSHA256 string
+	journal          []store.FleetJournal
+	rejected         int    // deltas dropped
+	reason           string // why, for the event; "" when nothing was dropped
 }
 
 // guardStats checks the numbers of a batch before they reach used_bytes. A node is trusted with its own
@@ -38,7 +42,7 @@ type guardedStats struct {
 //   - repeated (credential, inbound) pairs are added with saturation before they are judged.
 //
 // The sessions, health and metrics of the batch are not affected, and the stream goes on.
-func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
+func (f *Fleet) guardStats(st *agentv1.StatsBatch, streamCaps []string) guardedStats {
 	elapsed := time.Duration(st.IntervalEndUnix-st.IntervalStartUnix) * time.Second
 	elapsed = min(max(elapsed, time.Second), maxBatchSpan)
 	rate := f.cfg.MaxNodeBytesPerSec
@@ -48,13 +52,15 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	budget := satMul(rate, uint64(elapsed/time.Second))
 
 	links := f.guardLinks(st)
+	networks, personNetworks, networksDBSHA256 := f.guardNetworks(st, streamCaps)
 	journal := f.guardJournal(st)
 	if len(st.Traffic) > maxStatsDeltas {
-		return guardedStats{links: links, journal: journal, rejected: len(st.Traffic), reason: "too_many_deltas"}
+		return guardedStats{links: links, networks: networks, personNetworks: personNetworks, networksDBSHA256: networksDBSHA256,
+			journal: journal, rejected: len(st.Traffic), reason: "too_many_deltas"}
 	}
 	type key struct{ cred, inbound string }
 	at := map[key]int{}
-	out := guardedStats{links: links, journal: journal}
+	out := guardedStats{links: links, networks: networks, personNetworks: personNetworks, networksDBSHA256: networksDBSHA256, journal: journal}
 	for _, d := range st.Traffic {
 		k := key{d.CredId, d.InboundId}
 		i, dup := at[k]
@@ -79,9 +85,99 @@ func (f *Fleet) guardStats(st *agentv1.StatsBatch) guardedStats {
 	}
 	out.traffic = kept
 	if total > budget {
-		return guardedStats{links: links, journal: journal, rejected: len(st.Traffic), reason: "batch_over_limit"}
+		return guardedStats{links: links, networks: networks, personNetworks: personNetworks, networksDBSHA256: networksDBSHA256,
+			journal: journal, rejected: len(st.Traffic), reason: "batch_over_limit"}
 	}
 	return out
+}
+
+// guardNetworks makes the owner switch effective even when an agent sends rows it should not send.
+func (f *Fleet) guardNetworks(st *agentv1.StatsBatch, caps []string) ([]store.FleetNetwork, []store.FleetPersonNetwork, string) {
+	if !store.CapabilityPresent(caps, capNetworks) {
+		return nil, nil, ""
+	}
+	mode := f.NetworkMode()
+	digest := validNetworksDigest(st.GetNetworksDbSha256())
+	if mode == 0 {
+		return nil, nil, digest
+	}
+	type networkKey struct {
+		inbound string
+		asn     uint32
+	}
+	rows := make(map[networkKey]store.FleetNetwork, len(st.GetNetworks()))
+	overflow := map[string]bool{}
+	nonZero := 0
+	dropped := 0
+	for _, row := range st.GetNetworks() {
+		if row == nil || row.GetInboundId() == "" || len(row.GetInboundId()) > 64 {
+			dropped++
+			continue
+		}
+		key := networkKey{inbound: row.GetInboundId(), asn: row.GetAsn()}
+		if key.asn == 0 && overflow[key.inbound] {
+			dropped++ // the node sends one overflow row for each inbound
+			continue
+		}
+		if _, exists := rows[key]; !exists {
+			if key.asn != 0 {
+				if nonZero == 512 {
+					dropped++
+					continue
+				}
+				nonZero++
+			} else {
+				overflow[key.inbound] = true
+			}
+		}
+		out := rows[key]
+		out.InboundID, out.ASN = key.inbound, key.asn
+		out.Attempts = clampNetworkCounter(out.Attempts, row.GetAttempts())
+		out.Unfinished = clampNetworkCounter(out.Unfinished, row.GetUnfinished())
+		out.Connects = clampNetworkCounter(out.Connects, row.GetConnects())
+		out.Broken = clampNetworkCounter(out.Broken, row.GetBroken())
+		out.People = max(out.People, min(row.GetPeople(), uint32(store.MaxLinkCount)))
+		rows[key] = out
+	}
+	keys := make([]networkKey, 0, len(rows))
+	for key := range rows {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].inbound != keys[j].inbound {
+			return keys[i].inbound < keys[j].inbound
+		}
+		return keys[i].asn < keys[j].asn
+	})
+	networks := make([]store.FleetNetwork, 0, len(keys))
+	for _, key := range keys {
+		networks = append(networks, rows[key])
+	}
+	var people []store.FleetPersonNetwork
+	if mode == 2 {
+		input := st.GetPersonNetworks()
+		if len(input) > 2048 {
+			dropped += len(input) - 2048
+			input = input[:2048]
+		}
+		people = make([]store.FleetPersonNetwork, 0, len(input))
+		for _, row := range input {
+			if row == nil || row.GetCredId() == "" || row.GetInboundId() == "" || len(row.GetCredId()) > 64 || len(row.GetInboundId()) > 64 {
+				dropped++
+				continue
+			}
+			people = append(people, store.FleetPersonNetwork{CredID: row.GetCredId(), InboundID: row.GetInboundId(), ASN: row.GetAsn(),
+				Connects: min(row.GetConnects(), uint32(store.MaxLinkCount))})
+		}
+	}
+	if dropped > 0 && f.log != nil {
+		f.log.Warn("network counters over the row limit or malformed, the rest dropped", "code", "network_stats_dropped", "rows", dropped)
+	}
+	return networks, people, digest
+}
+
+func clampNetworkCounter(current, added uint32) uint32 {
+	return uint32(min(uint64(current)+uint64(min(added, uint32(store.MaxLinkCount))), uint64(store.MaxLinkCount)))
 }
 
 const (

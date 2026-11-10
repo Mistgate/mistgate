@@ -27,7 +27,7 @@ func TestGuardJournalBoundsAndFilters(t *testing.T) {
 		}
 	}
 	entries[1].Level = agentv1.Severity_SEVERITY_INFO
-	g := f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000_000, IntervalEndUnix: 1_000_030, Journal: entries})
+	g := f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000_000, IntervalEndUnix: 1_000_030, Journal: entries}, nil)
 	if len(g.journal) != maxJournalEntries-1 {
 		t.Fatalf("kept %d journal rows, want %d warning/error rows", len(g.journal), maxJournalEntries-1)
 	}
@@ -53,7 +53,7 @@ func TestGuardJournalBoundsAndFilters(t *testing.T) {
 	// times far from the batch's interval are pulled back to it, so no node sorts itself first
 	far := f.guardStats(&agentv1.StatsBatch{IntervalStartUnix: 1_000_000, IntervalEndUnix: 1_000_030, Journal: []*agentv1.JournalEntry{{
 		Level: agentv1.Severity_SEVERITY_ERROR, FirstUnix: 1, LastUnix: 1 << 62,
-	}}})
+	}}}, nil)
 	if j := far.journal[0]; j.FirstAt != 1_000_000-journalSkew || j.LastAt != 1_000_030+journalSkew {
 		t.Errorf("clamped times = %d..%d", j.FirstAt, j.LastAt)
 	}

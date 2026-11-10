@@ -31,6 +31,7 @@ const (
 
 var accessProcs = procs(
 	adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceGetFleetConnectionsProcedure,
+	adminv1connect.NodeServiceGetNetworksProcedure,
 	adminv1connect.NodeServiceGetPathLossProcedure, adminv1connect.UserServiceListUsersProcedure, adminv1connect.UserServiceGetUserConnectionProcedure,
 	adminv1connect.GroupServiceListGroupsProcedure, adminv1connect.ProfileServiceListProfilesProcedure, adminv1connect.HealthServiceGetChecksProcedure,
 	adminv1connect.ClientProbeServiceGetClientProbeProcedure, adminv1connect.RelayServiceListRelaysProcedure,
@@ -38,6 +39,7 @@ var accessProcs = procs(
 
 var blockProcs = procs(
 	adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceGetFleetConnectionsProcedure,
+	adminv1connect.NodeServiceGetNetworksProcedure,
 	adminv1connect.NodeServiceGetPathLossProcedure, adminv1connect.ProfileServiceListProfilesProcedure, adminv1connect.HealthServiceGetChecksProcedure,
 	adminv1connect.ClientProbeServiceGetClientProbeProcedure, adminv1connect.RelayServiceListRelaysProcedure,
 )

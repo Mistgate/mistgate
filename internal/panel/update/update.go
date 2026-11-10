@@ -17,16 +17,19 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
 
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
@@ -134,9 +137,18 @@ type Service struct {
 	dist string
 
 	bmu    sync.Mutex // guards the bundle state and the file hash cache
+	scanMu sync.Mutex // serializes scans and their follow-up table reloads
 	bundle *bundleState
 	hashes map[string]hashEntry
 	serves int // concurrent downloads, guarded by bmu
+
+	networkTableMu       sync.Mutex
+	networkTableSHA      string
+	networkTable         atomic.Pointer[asndb.DB]
+	networkTableRejected atomic.Pointer[string]
+	parseNetworkTable    func(io.Reader) (*asndb.DB, error)
+	networkChangedMu     sync.RWMutex
+	networkBundleChanged func()
 
 	releaseCacheUntil time.Time
 	edgeBundle        *bundleState
@@ -201,7 +213,8 @@ func New(st *store.Store, fl Fleet, hl Health, cfg Config) (*Service, error) {
 	cfg.Timing.defaults()
 	s := &Service{st: st, fl: fl, hl: hl, cfg: cfg, log: cfg.Log, now: cfg.Now,
 		hashes: map[string]hashEntry{}, runCtx: context.Background(),
-		inflight: map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
+		parseNetworkTable: asndb.Parse,
+		inflight:          map[string]bool{}, orphans: map[string]bool{}, failing: map[string]time.Time{},
 		updating: map[string]bool{}, progress: map[string]progressState{}, progressActive: map[string]progressExpectation{}, wake: make(chan struct{}, 1)}
 	if cfg.DataDir != "" { // without one there is no bundle (and no relative "dist" in whatever the working directory is)
 		s.dist = filepath.Join(cfg.DataDir, "dist")

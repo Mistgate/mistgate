@@ -23,12 +23,14 @@ const (
 	// SetLogLevel: an admin-profile token may start one (the MCP tools node_debug_capture_plan / _apply put a plan in front of it)
 	// and read the records back, which are scrubbed on the node, on intake and on the way out. Stopping one is the owner's in the
 	// admin UI (a capture ends by itself), closed to tokens like the export.
-	OpsStartDebugCaptureProcedure = "/mistgate.ops.v1.OpsService/StartDebugCapture"
-	OpsStopDebugCaptureProcedure  = "/mistgate.ops.v1.OpsService/StopDebugCapture"
-	OpsListDebugCapturesProcedure = "/mistgate.ops.v1.OpsService/ListDebugCaptures"
-	OpsGetDebugCaptureProcedure   = "/mistgate.ops.v1.OpsService/GetDebugCapture"
-	OpsGetPanelResourcesProcedure = "/mistgate.ops.v1.OpsService/GetPanelResources"
-	OpsGetFleetLoadProcedure      = "/mistgate.ops.v1.OpsService/GetFleetLoad"
+	OpsStartDebugCaptureProcedure  = "/mistgate.ops.v1.OpsService/StartDebugCapture"
+	OpsStopDebugCaptureProcedure   = "/mistgate.ops.v1.OpsService/StopDebugCapture"
+	OpsListDebugCapturesProcedure  = "/mistgate.ops.v1.OpsService/ListDebugCaptures"
+	OpsGetDebugCaptureProcedure    = "/mistgate.ops.v1.OpsService/GetDebugCapture"
+	OpsGetPanelResourcesProcedure  = "/mistgate.ops.v1.OpsService/GetPanelResources"
+	OpsGetFleetLoadProcedure       = "/mistgate.ops.v1.OpsService/GetFleetLoad"
+	OpsGetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/GetNetworkSettings"
+	OpsSetNetworkSettingsProcedure = "/mistgate.ops.v1.OpsService/SetNetworkSettings"
 )
 
 func init() {
@@ -36,6 +38,7 @@ func init() {
 		OpsGetLogSettingsProcedure, OpsSetLogLevelProcedure, OpsGetPanelLogsProcedure, OpsGetRetentionProcedure,
 		OpsSetRetentionProcedure, OpsExportDataProcedure, OpsGetMetricsSettingsProcedure, OpsSetMetricsSettingsProcedure,
 		OpsStartDebugCaptureProcedure, OpsStopDebugCaptureProcedure, OpsListDebugCapturesProcedure, OpsGetDebugCaptureProcedure,
+		OpsGetNetworkSettingsProcedure, OpsSetNetworkSettingsProcedure,
 	} {
 		procedureLevels[p] = levelOwner
 	}
@@ -50,7 +53,7 @@ func init() {
 		procedureLevels[p] = levelRead
 		tokenProcedures[p] = TokenAccessDirect
 	}
-	for _, p := range []string{OpsSetRetentionProcedure, OpsExportDataProcedure, OpsSetMetricsSettingsProcedure} {
+	for _, p := range []string{OpsSetRetentionProcedure, OpsExportDataProcedure, OpsSetMetricsSettingsProcedure, OpsSetNetworkSettingsProcedure} {
 		stepUpProcedures[p] = true
 	}
 	grantProcedures["retention"] = []string{OpsSetRetentionProcedure}

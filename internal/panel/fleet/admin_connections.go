@@ -30,7 +30,7 @@ func (s nodeService) GetNodeConnections(ctx context.Context, req *connect.Reques
 		return nil, internalErr(f.log.Error, "get node", err)
 	}
 	resp := &adminv1.GetNodeConnectionsResponse{SinceUnix: since.Unix(), NowUnix: now.Unix()}
-	if !capabilityPresent(n.AgentCaps, capLinks) {
+	if !store.CapabilityPresent(n.AgentCaps, capLinks) {
 		return connect.NewResponse(resp), nil
 	}
 	resp.Supported = true
@@ -144,7 +144,7 @@ func (s nodeService) GetFleetConnections(ctx context.Context, req *connect.Reque
 	resp := &adminv1.GetFleetConnectionsResponse{SinceUnix: since.Unix(), NowUnix: now.Unix(), Nodes: []*adminv1.NodeConnections{}}
 	for _, n := range nodes {
 		node := &adminv1.NodeConnections{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode,
-			Supported: capabilityPresent(n.AgentCaps, capLinks), Inbounds: []*adminv1.InboundConnections{}}
+			Supported: store.CapabilityPresent(n.AgentCaps, capLinks), Inbounds: []*adminv1.InboundConnections{}}
 		if node.Supported {
 			for _, in := range n.Inbounds {
 				r := byNode[n.ID][in.ID]

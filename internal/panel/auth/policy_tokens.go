@@ -68,6 +68,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.NodeServiceGetNodeConnectionsProcedure:  TokenAccessDirect,
 	adminv1connect.UserServiceGetUserConnectionProcedure:   TokenAccessDirect,
 	adminv1connect.NodeServiceGetFleetConnectionsProcedure: TokenAccessDirect,
+	adminv1connect.NodeServiceGetNetworksProcedure:         TokenAccessDirect,
 	// The nodes' saved journal (agent.proto JournalEntry): warnings and errors, addresses cut on the node and in the panel.
 	adminv1connect.NodeServiceGetNodeJournalProcedure: TokenAccessDirect,
 	// What a node runs against what the panel wants, its host load per hour and the lossy UDP paths between nodes: hashes cut to

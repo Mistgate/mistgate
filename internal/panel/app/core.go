@@ -403,6 +403,7 @@ func wireCore(c Config) (*core, error) {
 	}
 	upd := k.upd
 	fl.SetUpdates(upd)
+	wireNetworkBundleChanged(fl, upd)
 	hl.AddConditionSource(upd.Conditions)
 	tg.SetSources(telegram.Sources{
 		PanelRelease: func() (string, bool) {

@@ -201,7 +201,7 @@ func (s *Service) startWithActorAndSchedule(ctx context.Context, nodeIDs []strin
 		return store.RolloutRow{}, precondition("a panel update is being installed")
 	}
 	if !s.cfg.Edge {
-		b = s.rescan() // what is on disk now is what ships
+		b = s.rescanForRequest() // what is on disk now is what ships; ASN parsing stays off the request path
 	}
 	if !b.trusted {
 		return store.RolloutRow{}, precondition("no trusted bundle")

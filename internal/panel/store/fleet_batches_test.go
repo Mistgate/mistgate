@@ -393,7 +393,7 @@ func TestFleetStatsWriteBatchStatementCount(t *testing.T) {
 	for i := 0; i < certificates; i++ {
 		certs = append(certs, fleetInboundCertWrite{InboundID: fmt.Sprintf("inb_%03d", i), Pin: "pin", NotAfter: now.Add(time.Hour).Unix()})
 	}
-	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, deviceWrites, certs, touches, nil, FleetLive{})
+	stmts, err := fleetStatsWriteStmts(in, in.Instance, 0, buckets, hours, userWrites, deviceWrites, certs, touches, nil, nil, nil, FleetLive{})
 	if err != nil {
 		t.Fatal(err)
 	}

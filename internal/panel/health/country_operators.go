@@ -74,6 +74,16 @@ type countryOperator struct {
 	ASNs []uint32
 }
 
+// NetworkOperator returns the curated roll-up name for one operator ASN in a country, when known.
+func NetworkOperator(country string, asn uint32) string {
+	for _, operator := range countryOperators[country] {
+		if slices.Contains(operator.ASNs, asn) {
+			return operator.Name
+		}
+	}
+	return ""
+}
+
 // countryWants returns the operator order with never-asked operators first, then the least recently asked. It only
 // considers rounds from the requested country; the stable sort keeps the table order for ties.
 func countryWants(country string, rows []store.CountryCheck) []CountryWant {

@@ -18,16 +18,29 @@ import (
 
 // fakeUpdates is the updates module as the stream sees it.
 type fakeUpdates struct {
-	mu       sync.Mutex
-	updating map[string]bool
-	served   []string // "node/name@offset"
-	recorded []fakeRecordedAnswer
-	data     []byte
-	err      error
-	binary   map[string]string // "linux/amd64" -> path of the trusted bundle's file
-	assetURL string
-	assetErr error
-	assets   []fakeLinkAssetRequest
+	mu                                sync.Mutex
+	updating                          map[string]bool
+	served                            []string // "node/name@offset"
+	recorded                          []fakeRecordedAnswer
+	data                              []byte
+	err                               error
+	binary                            map[string]string // "linux/amd64" -> path of the trusted bundle's file
+	networkTableName, networkTableSHA string
+	assetURL                          string
+	assetErr                          error
+	assets                            []fakeLinkAssetRequest
+}
+
+func (u *fakeUpdates) NetworkTableFile() (name, sha256 string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.networkTableName, u.networkTableSHA
+}
+
+func (u *fakeUpdates) setNetworkTable(name, sha256 string) {
+	u.mu.Lock()
+	u.networkTableName, u.networkTableSHA = name, sha256
+	u.mu.Unlock()
 }
 
 type fakeLinkAssetRequest struct{ nodeID, name, token string }

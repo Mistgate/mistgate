@@ -80,6 +80,8 @@ const (
 	// NodeServiceGetFleetConnectionsProcedure is the fully-qualified name of the NodeService's
 	// GetFleetConnections RPC.
 	NodeServiceGetFleetConnectionsProcedure = "/mistgate.admin.v1.NodeService/GetFleetConnections"
+	// NodeServiceGetNetworksProcedure is the fully-qualified name of the NodeService's GetNetworks RPC.
+	NodeServiceGetNetworksProcedure = "/mistgate.admin.v1.NodeService/GetNetworks"
 	// NodeServiceGetNodeRuntimeProcedure is the fully-qualified name of the NodeService's
 	// GetNodeRuntime RPC.
 	NodeServiceGetNodeRuntimeProcedure = "/mistgate.admin.v1.NodeService/GetNodeRuntime"
@@ -160,6 +162,8 @@ type NodeServiceClient interface {
 	// GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
 	// and API tokens.
 	GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error)
+	// Per-inbound autonomous-system counters for a bounded window. Only ASNs and counts are stored or returned; no client address.
+	GetNetworks(context.Context, *connect.Request[v1.GetNetworksRequest]) (*connect.Response[v1.GetNetworksResponse], error)
 	// What the panel wants a node to run against what the node reports it runs, one node or every node that is not retired: the
 	// desired and applied revision and hash, whether they agree, since when they have not, the last apply and, per inbound, the
 	// panel's spec version, the applied spec hash, the node's state for it, its last error and certificate expiry. No
@@ -292,6 +296,12 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("GetFleetConnections")),
 			connect.WithClientOptions(opts...),
 		),
+		getNetworks: connect.NewClient[v1.GetNetworksRequest, v1.GetNetworksResponse](
+			httpClient,
+			baseURL+NodeServiceGetNetworksProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("GetNetworks")),
+			connect.WithClientOptions(opts...),
+		),
 		getNodeRuntime: connect.NewClient[v1.GetNodeRuntimeRequest, v1.GetNodeRuntimeResponse](
 			httpClient,
 			baseURL+NodeServiceGetNodeRuntimeProcedure,
@@ -333,6 +343,7 @@ type nodeServiceClient struct {
 	getNodeConnections  *connect.Client[v1.GetNodeConnectionsRequest, v1.GetNodeConnectionsResponse]
 	getNodeJournal      *connect.Client[v1.GetNodeJournalRequest, v1.GetNodeJournalResponse]
 	getFleetConnections *connect.Client[v1.GetFleetConnectionsRequest, v1.GetFleetConnectionsResponse]
+	getNetworks         *connect.Client[v1.GetNetworksRequest, v1.GetNetworksResponse]
 	getNodeRuntime      *connect.Client[v1.GetNodeRuntimeRequest, v1.GetNodeRuntimeResponse]
 	getNodeHostHistory  *connect.Client[v1.GetNodeHostHistoryRequest, v1.GetNodeHostHistoryResponse]
 	getPathLoss         *connect.Client[v1.GetPathLossRequest, v1.GetPathLossResponse]
@@ -428,6 +439,11 @@ func (c *nodeServiceClient) GetFleetConnections(ctx context.Context, req *connec
 	return c.getFleetConnections.CallUnary(ctx, req)
 }
 
+// GetNetworks calls mistgate.admin.v1.NodeService.GetNetworks.
+func (c *nodeServiceClient) GetNetworks(ctx context.Context, req *connect.Request[v1.GetNetworksRequest]) (*connect.Response[v1.GetNetworksResponse], error) {
+	return c.getNetworks.CallUnary(ctx, req)
+}
+
 // GetNodeRuntime calls mistgate.admin.v1.NodeService.GetNodeRuntime.
 func (c *nodeServiceClient) GetNodeRuntime(ctx context.Context, req *connect.Request[v1.GetNodeRuntimeRequest]) (*connect.Response[v1.GetNodeRuntimeResponse], error) {
 	return c.getNodeRuntime.CallUnary(ctx, req)
@@ -513,6 +529,8 @@ type NodeServiceHandler interface {
 	// GetNodeConnections of every node that is not retired, in one read (the MCP tool fleet_connections). A read: every role
 	// and API tokens.
 	GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error)
+	// Per-inbound autonomous-system counters for a bounded window. Only ASNs and counts are stored or returned; no client address.
+	GetNetworks(context.Context, *connect.Request[v1.GetNetworksRequest]) (*connect.Response[v1.GetNetworksResponse], error)
 	// What the panel wants a node to run against what the node reports it runs, one node or every node that is not retired: the
 	// desired and applied revision and hash, whether they agree, since when they have not, the last apply and, per inbound, the
 	// panel's spec version, the applied spec hash, the node's state for it, its last error and certificate expiry. No
@@ -641,6 +659,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("GetFleetConnections")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceGetNetworksHandler := connect.NewUnaryHandler(
+		NodeServiceGetNetworksProcedure,
+		svc.GetNetworks,
+		connect.WithSchema(nodeServiceMethods.ByName("GetNetworks")),
+		connect.WithHandlerOptions(opts...),
+	)
 	nodeServiceGetNodeRuntimeHandler := connect.NewUnaryHandler(
 		NodeServiceGetNodeRuntimeProcedure,
 		svc.GetNodeRuntime,
@@ -697,6 +721,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 			nodeServiceGetNodeJournalHandler.ServeHTTP(w, r)
 		case NodeServiceGetFleetConnectionsProcedure:
 			nodeServiceGetFleetConnectionsHandler.ServeHTTP(w, r)
+		case NodeServiceGetNetworksProcedure:
+			nodeServiceGetNetworksHandler.ServeHTTP(w, r)
 		case NodeServiceGetNodeRuntimeProcedure:
 			nodeServiceGetNodeRuntimeHandler.ServeHTTP(w, r)
 		case NodeServiceGetNodeHostHistoryProcedure:
@@ -782,6 +808,10 @@ func (UnimplementedNodeServiceHandler) GetNodeJournal(context.Context, *connect.
 
 func (UnimplementedNodeServiceHandler) GetFleetConnections(context.Context, *connect.Request[v1.GetFleetConnectionsRequest]) (*connect.Response[v1.GetFleetConnectionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetFleetConnections is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) GetNetworks(context.Context, *connect.Request[v1.GetNetworksRequest]) (*connect.Response[v1.GetNetworksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.NodeService.GetNetworks is not implemented"))
 }
 
 func (UnimplementedNodeServiceHandler) GetNodeRuntime(context.Context, *connect.Request[v1.GetNodeRuntimeRequest]) (*connect.Response[v1.GetNodeRuntimeResponse], error) {

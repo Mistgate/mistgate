@@ -41,9 +41,10 @@ type NodeRow struct {
 	RetiredAt                                                 time.Time
 	// From the last Hello: Hello.built, Hello.capabilities and Hello.last_update as JSON
 	// ("" = never reported; see LastUpdateRow).
-	AgentBuilt     int64
-	AgentCaps      []string
-	LastUpdateJSON string
+	AgentBuilt       int64
+	AgentCaps        []string
+	LastUpdateJSON   string
+	NetworksDBSHA256 string
 	// AwgBackend is the node setting "auto" | "kernel" | "userspace" (migration 00014), sent to agents that list awg/1.
 	AwgBackend string
 	// AwgPrepareJSON is the state of the automatic kernel-module build (migration 00019, see AwgPrepareRow); "" = never asked.
@@ -67,7 +68,7 @@ const nodeCols = `id, name, address, country_code, location, provider, notes, dn
 	boot_at, last_seen_at, last_connected_at, last_disconnected_at, agent_instance_id, last_seq,
 	desired_revision, desired_hash, applied_revision, applied_hash, created_at, retired_at,
 	agent_built, agent_caps, last_update_json, awg_backend, awg_prepare_json, torrent_blocker_enabled, bandwidth_mbps, client_ipv6,
-	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json`
+	decoy_mode, decoy_bundle_hash, decoy_agent_mode, decoy_agent_hash, ipv6_entry, ipv6_json, networks_db_sha256`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -84,7 +85,7 @@ func scanNode(r rowScanner) (NodeRow, error) {
 		&boot, &seen, &conn, &disc, &n.AgentInstanceID, &lastSeq,
 		&desRev, &n.DesiredHash, &appRev, &n.AppliedHash, &created, &retired,
 		&n.AgentBuilt, &caps, &n.LastUpdateJSON, &n.AwgBackend, &n.AwgPrepareJSON, &n.TorrentBlockerEnabled, &n.BandwidthMbps, &n.ClientIPv6,
-		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON)
+		&n.DecoyMode, &n.DecoyBundleHash, &n.DecoyAgentMode, &n.DecoyAgentHash, &n.IPv6Entry, &n.IPv6JSON, &n.NetworksDBSHA256)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NodeRow{}, ErrNotFound
 	}
@@ -239,11 +240,12 @@ type HelloInfo struct {
 	Facts        NodeFactsRow
 	// Built is Hello.built, Caps Hello.capabilities. LastUpdateJSON is Hello.last_update as JSON (LastUpdateRow);
 	// "" = the Hello carried none, which keeps what is stored (the agent reports an outcome once).
-	Built          int64
-	Caps           []string
-	LastUpdateJSON string
-	DecoyMode      string
-	DecoyHash      string
+	Built            int64
+	Caps             []string
+	LastUpdateJSON   string
+	NetworksDBSHA256 string
+	DecoyMode        string
+	DecoyHash        string
 }
 
 // NodeHello records a (re)connect: the node becomes active, facts are stored, and the reliable-message
@@ -268,10 +270,11 @@ func (s *Store) NodeHello(ctx context.Context, id string, session uint64, h Hell
 			last_seen_at = ?, last_connected_at = ?, agent_instance_id = ?,
 			last_seq = CASE WHEN agent_instance_id = ? THEN last_seq ELSE 0 END,
 			agent_built = ?, agent_caps = ?, last_update_json = CASE WHEN ? <> '' THEN ? ELSE last_update_json END,
-			decoy_agent_mode = ?, decoy_agent_hash = ?
+			decoy_agent_mode = ?, decoy_agent_hash = ?, networks_db_sha256 = ?
 		WHERE id = ?`,
 			Args: []any{h.AgentVersion, h.APIVersion, fleetUnix(h.BootAt), fleetUnix(h.BootAt), unix(now), unix(now), h.Instance, h.Instance,
-				max(h.Built, 0), strings.Join(h.Caps, " "), h.LastUpdateJSON, h.LastUpdateJSON, h.DecoyMode, h.DecoyHash, id}},
+				max(h.Built, 0), strings.Join(h.Caps, " "), h.LastUpdateJSON, h.LastUpdateJSON, h.DecoyMode, h.DecoyHash,
+				h.NetworksDBSHA256, id}},
 		Stmt{Query: `
 		INSERT INTO node_facts (node_id, hostname, os, kernel, arch, cpu_count, ram_total_bytes, disk_total_bytes, virt, has_ipv6, engines_json, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
