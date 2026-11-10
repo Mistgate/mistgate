@@ -275,3 +275,18 @@ When a node misbehaves and its warnings are not enough, the owner can ask it to 
 - **Limits.** One capture per node at a time, at most 15 minutes, at most 20000 records and 4 MiB (what does not fit is counted, not kept). The node puts its log level back when the capture ends, and a restart of the agent ends it too: nothing is written to disk on the node. The panel keeps a capture and its records 24 hours and at most 5 captures per node; the hourly sweep deletes the rest (VPS edition only).
 - **What is in it.** Every record is cleaned on the node (client addresses become `<ip>`, key-shaped text is removed, host names are cut from xray's lines, and only the node journal's short list of attributes is kept), again when the panel stores it, and once more when it is read, with the panel's secret names removed. Debug lines of the chosen sources go only to the capture, not to the node's own log.
 - **Who and what is recorded.** The owner starts and stops a capture in the admin. An admin-profile token starts one with `node_debug_capture_plan` / `node_debug_capture_apply` and reads it with `node_debug_logs` (a capture or a node, filters `min_level`, `source`, `query`, `limit`, `cursor`). Every start is in the audit log with who asked, the node, the sources and the duration. An agent that is too old (it does not list `debug/1`) and a node that is offline are refused without anything being sent. The Cloudflare edition does not have it.
+
+## Multipath TCP and CVE-2026-98432
+
+CVE-2026-98432 is a flaw in the Linux kernel's IPv4 TCP (CVSS 9.8) that was shown as remote root through a listener that accepts Multipath TCP (MPTCP). Go opens every listener with MPTCP by default since Go 1.24, so the panel, the node agent and the Xray listeners it hosts accepted it up to v0.1.82. From v0.1.83 they open plain TCP, which nothing in Mistgate needs to change: clients that ask for MPTCP fall back to TCP.
+
+The bug itself is in the kernel, so on every node and on the panel's server also:
+
+1. Turn MPTCP off for every program on the host, Caddy and other Go programs included, and keep it off after a reboot:
+
+   ```bash
+   echo 'net.mptcp.enabled = 0' | sudo tee /etc/sysctl.d/99-no-mptcp.conf && sudo sysctl -w net.mptcp.enabled=0
+   ```
+
+2. Restart what listens (`sudo systemctl restart mistgate-node` on a node, `mistgate` on the panel's server, and Caddy where it runs): sockets opened before the change keep MPTCP until then. `ss -Hl -M` lists the MPTCP listeners that are left.
+3. Install your distribution's patched kernel as soon as it is published, and reboot.

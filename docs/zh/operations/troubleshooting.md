@@ -275,3 +275,18 @@ timedatectl
 - **限制。** 每个节点同一时间只有一个抓取，最长 15 分钟，最多 20000 条记录和 4 MiB（放不下的只计数，不保存）。抓取结束时节点会恢复原来的日志级别，Agent 重启也会结束抓取：节点上不会往磁盘写任何东西。面板把一次抓取及其记录保存 24 小时，每个节点最多 5 次；其余的由每小时的清理删除（仅 VPS 版）。
 - **内容。** 每条记录先在节点上清理（客户端地址变成 `<ip>`，类似密钥的文本被去掉，xray 的行去掉主机名，只保留节点日志那份简短的属性列表），面板保存时再清理一次，读取时再清理一次并去掉面板的机密名称。所选来源的调试行只进入抓取，不会进入节点自己的日志。
 - **谁来做、记录什么。** 所有者在管理界面中开始和停止抓取。admin 配置的令牌用 `node_debug_capture_plan` / `node_debug_capture_apply` 开始抓取，用 `node_debug_logs` 读取（指定抓取或节点，筛选项 `min_level`、`source`、`query`、`limit`、`cursor`）。每次开始都会写入审计日志：谁请求的、节点、来源和时长。版本太旧的 Agent（没有 `debug/1`）和离线的节点会被直接拒绝，不会发送任何内容。Cloudflare 版没有此功能。
+
+## Multipath TCP 与 CVE-2026-98432
+
+CVE-2026-98432 是 Linux 内核 IPv4 TCP 中的漏洞（CVSS 9.8），已被证明可通过接受 Multipath TCP（MPTCP）的监听端口远程获取 root。从 Go 1.24 起，Go 默认以 MPTCP 打开每个监听端口，因此在 v0.1.82 及之前，面板、节点 Agent 及其承载的 Xray 端口都接受 MPTCP。从 v0.1.83 起它们只打开普通 TCP；Mistgate 不需要 MPTCP，请求 MPTCP 的客户端会退回普通 TCP。
+
+漏洞本身在内核中，因此在每个节点和面板服务器上还应：
+
+1. 为主机上的所有程序（包括 Caddy 和其他 Go 程序）关闭 MPTCP，并使其在重启后仍然生效：
+
+   ```bash
+   echo 'net.mptcp.enabled = 0' | sudo tee /etc/sysctl.d/99-no-mptcp.conf && sudo sysctl -w net.mptcp.enabled=0
+   ```
+
+2. 重启正在监听的服务（节点上 `sudo systemctl restart mistgate-node`，面板服务器上 `mistgate`，以及运行 Caddy 的主机上的 Caddy）：更改之前打开的端口在重启前仍保留 MPTCP。`ss -Hl -M` 会列出剩余的 MPTCP 监听端口。
+3. 发行版发布修补后的内核后立即安装并重启。
