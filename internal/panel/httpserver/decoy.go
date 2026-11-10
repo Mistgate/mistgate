@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -175,7 +176,7 @@ func (d *decoy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		d.notFound(w, r)
 		return
 	}
-	if !serveFile(w, r, name, f) {
+	if !serveFile(d, w, r, name, f) {
 		d.notFound(w, r)
 	}
 }
@@ -188,12 +189,22 @@ func (d *decoy) robots(w http.ResponseWriter, r *http.Request) {
 // notFound answers with 404.html from the decoy dir if there is one, else the built-in page. It does not
 // return before notFoundFloor has passed since the request arrived.
 func (d *decoy) notFound(w http.ResponseWriter, r *http.Request) {
+	w.Header().Del("Service-Worker-Allowed")
 	if start, ok := r.Context().Value(startKey{}).(time.Time); ok {
 		if wait := notFoundFloor - time.Since(start); wait > 0 {
 			time.Sleep(wait)
 		}
 	}
 	writeHTML(w, r, http.StatusNotFound, d.notFoundBody())
+}
+
+func hasServiceWorkerHeader(r *http.Request) bool {
+	for name := range r.Header {
+		if strings.EqualFold(name, "Service-Worker") {
+			return true
+		}
+	}
+	return false
 }
 
 // tooMany answers 429 in the style of the decoy (429.html from the decoy dir, else the built-in page),
@@ -245,9 +256,9 @@ func writeBody(w http.ResponseWriter, r *http.Request, status int, contentType [
 	}
 }
 
-// serveFile serves an opened file without Last-Modified/ETag, so nothing about the
-// filesystem leaks and every decoy response carries the same header set.
-func serveFile(w http.ResponseWriter, r *http.Request, name string, f fs.File) bool {
+// serveFile sends opened files without Last-Modified or ETag so filesystem details do not leak. Both the decoy and SPA
+// use this point to hide JavaScript from Service-Worker requests.
+func serveFile(d *decoy, w http.ResponseWriter, r *http.Request, name string, f fs.File) bool {
 	rs, ok := f.(io.ReadSeeker)
 	if !ok {
 		b, err := io.ReadAll(f)
@@ -256,8 +267,32 @@ func serveFile(w http.ResponseWriter, r *http.Request, name string, f fs.File) b
 		}
 		rs = bytes.NewReader(b)
 	}
+	contentType := w.Header().Get("Content-Type")
+	if contentType == "" {
+		contentType = mime.TypeByExtension(path.Ext(name))
+	}
+	if hasServiceWorkerHeader(r) && isJavaScriptMIMEType(contentType) {
+		d.notFound(w, r)
+		return true
+	}
 	http.ServeContent(w, r, name, time.Time{}, rs)
 	return true
+}
+
+func isJavaScriptMIMEType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(mediaType) {
+	case "application/ecmascript", "application/javascript", "application/x-ecmascript", "application/x-javascript",
+		"text/ecmascript", "text/javascript", "text/javascript1.0", "text/javascript1.1", "text/javascript1.2",
+		"text/javascript1.3", "text/javascript1.4", "text/javascript1.5", "text/jscript", "text/livescript",
+		"text/x-ecmascript", "text/x-javascript":
+		return true
+	default:
+		return false
+	}
 }
 
 // swapErrors wraps a secret mount so that nothing it answers with 404 or 405 differs from the decoy's 404:

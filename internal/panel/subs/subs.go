@@ -6,8 +6,8 @@
 // of its local server check (probe.go). Unknown tokens get the decoy, so the endpoint cannot be told from any other path of the site.
 //
 // Abuse protection, all in memory and bounded, none of it logging a token or an address:
-//   - token guessing: after MissLimit unknown tokens from one client network within MissWindow, that
-//     network gets only the decoy for BlockFor, even for valid tokens;
+//   - Per-client-network miss and cold-miss windows limit database work from unknown links. Cold valid links do not
+//     spend their network's cold-miss allowance during a lockout.
 //   - per token: fetches within MinInterval are answered from a cache of the rendered response (no
 //     database work), and more than MaxPerHour fetches an hour get a 429;
 //   - link sharing: distinct client networks (/24, /48) seen per token per day are counted (never stored
@@ -289,12 +289,33 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := ""
 	if ip.IsValid() {
 		client = auth.SourceKey(ip)
-		if h.blocked(r.Context(), client) {
-			h.decoy.ServeHTTP(w, r) // even for a valid token: guessing gets nothing out of this
-			return
-		}
 	}
 	token, sub, ok := routeOf(r, h.prefix)
+	checkedColdToken := false
+	if client != "" && h.blocked(r.Context(), client) {
+		if !ok {
+			h.decoy.ServeHTTP(w, r)
+			return
+		}
+		if _, known := h.tokens.Get(token); !known {
+			checker, ok := h.src.(TokenChecker)
+			if !ok || !h.allowColdTokenCheck(r.Context(), client) {
+				h.decoy.ServeHTTP(w, r)
+				return
+			}
+			err := checker.CheckSubscriptionToken(r.Context(), token)
+			if errors.Is(err, access.ErrUnknownToken) {
+				h.recordColdMiss(r.Context(), client)
+				h.decoy.ServeHTTP(w, r)
+				return
+			}
+			if err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			checkedColdToken = true
+		}
+	}
 	if !ok {
 		h.miss(r.Context(), client)
 		h.decoy.ServeHTTP(w, r)
@@ -352,14 +373,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			checker, ok := h.src.(TokenChecker)
 			if !ok {
 				res = nil // a source that cannot confirm the token cannot serve a cached view
-			} else if err := checker.CheckSubscriptionToken(r.Context(), token); errors.Is(err, access.ErrUnknownToken) {
-				h.tokens.Delete(token)
-				h.miss(r.Context(), client)
-				h.decoy.ServeHTTP(w, r)
-				return
-			} else if err != nil {
-				http.Error(w, "internal error", http.StatusInternalServerError)
-				return
+			} else if !checkedColdToken {
+				if err := checker.CheckSubscriptionToken(r.Context(), token); errors.Is(err, access.ErrUnknownToken) {
+					h.tokens.Delete(token)
+					h.miss(r.Context(), client)
+					h.decoy.ServeHTTP(w, r)
+					return
+				} else if err != nil {
+					http.Error(w, "internal error", http.StatusInternalServerError)
+					return
+				}
 			}
 			if res != nil {
 				h.notSupported(w, r, hint, app)
@@ -373,7 +396,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	v, err := h.fetch(r.Context(), token, format, hint, app, !app, noLinkAWG)
 	if errors.Is(err, access.ErrUnknownToken) {
 		h.tokens.Delete(token) // a rotated or deleted link stops being remembered
-		h.miss(r.Context(), client)
+		if !checkedColdToken {
+			h.miss(r.Context(), client)
+		}
 		h.decoy.ServeHTTP(w, r)
 		return
 	}
@@ -739,6 +764,22 @@ func (h *handler) missWindow() securitylimit.Window {
 	return securitylimit.Window{
 		Name: "subscription-miss", Limit: h.cfg.MissLimit, Span: h.cfg.MissWindow, Lockout: h.cfg.BlockFor,
 	}
+}
+
+// allowColdTokenCheck peeks before the database call so valid cold links do not spend the unknown-token allowance.
+func (h *handler) allowColdTokenCheck(ctx context.Context, client string) bool {
+	d, err := h.cfg.Limiter.Peek(ctx, h.coldMissWindow(), "c:"+client)
+	return err == nil && d.Allowed
+}
+
+func (h *handler) recordColdMiss(ctx context.Context, client string) {
+	if _, err := h.cfg.Limiter.Record(ctx, h.coldMissWindow(), "c:"+client); err != nil && h.cfg.Log != nil {
+		h.cfg.Log.Warn("subscription cold-miss limit unavailable", "code", "subscription_cold_miss_record_failed")
+	}
+}
+
+func (h *handler) coldMissWindow() securitylimit.Window {
+	return securitylimit.Window{Name: "subscription-cold-miss", Limit: h.cfg.MissLimit, Span: h.cfg.BlockFor}
 }
 
 // admit counts one fetch of the token: against the hourly cap (retry > 0: refused), towards the day's

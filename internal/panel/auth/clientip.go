@@ -2,19 +2,28 @@ package auth
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 )
 
-// ProxyTrust says which peers are reverse proxies whose X-Forwarded-For / Forwarded
-// headers may be believed. The zero value trusts nobody: the client address is the TCP
-// peer, whatever the headers say.
-type ProxyTrust struct{ prefixes []netip.Prefix }
+// ProxyTrust says which peers are reverse proxies. A configured proxy must set or overwrite
+// X-Forwarded-For; a proxy that only writes Forwarded is not supported. The zero value trusts
+// nobody: the client address is the TCP peer, whatever the headers say.
+// Overwriting that chain prevents a client-supplied address from changing per-client limits.
+type ProxyTrust struct {
+	prefixes []netip.Prefix
+	log      *slog.Logger
+}
+
+var forwardedDisagreementWarning atomic.Bool
+var untrustedForwardedWarning atomic.Bool
 
 // NewProxyTrust trusts the given networks.
-func NewProxyTrust(p []netip.Prefix) ProxyTrust { return ProxyTrust{prefixes: p} }
+func NewProxyTrust(p []netip.Prefix) ProxyTrust { return ProxyTrust{prefixes: p, log: slog.Default()} }
 
 // ParseProxies parses --trusted-proxy values: CIDRs ("10.0.0.0/8") or single addresses.
 func ParseProxies(list []string) ([]netip.Prefix, error) {
@@ -51,10 +60,9 @@ func (t ProxyTrust) trusts(a netip.Addr) bool {
 // proxy. Then the chain is walked from the right (the proxy nearest to us appended
 // last) and the first address that is not itself a trusted proxy is the client, so
 // values the client put at the left of the header are never believed.
-// X-Forwarded-For and Forwarded are both understood; if a request carries both and they
-// name different clients, neither is believed and the proxy's own address is returned
-// (one shared bucket for that request, instead of letting a spoofed header pick one).
-// An unparseable chain falls back to the peer as well.
+// X-Forwarded-For and Forwarded are parsed, but the configured proxy must set or overwrite
+// X-Forwarded-For; when both are present, that chain is authoritative.
+// An unparseable X-Forwarded-For chain falls back to the peer.
 func (t ProxyTrust) ClientIP(remoteAddr string, h http.Header) netip.Addr {
 	peer := parseNode(remoteAddr)
 	if !peer.IsValid() || !t.trusts(peer) {
@@ -71,13 +79,17 @@ func (t ProxyTrust) ClientIP(remoteAddr string, h http.Header) netip.Addr {
 	if len(fwd) > 0 {
 		fromFwd = t.rightmostUntrusted(forwardedFor(fwd))
 		if !fromFwd.IsValid() {
+			if fromXFF.IsValid() {
+				t.warnForwardedDisagreement()
+				return fromXFF
+			}
 			return peer
 		}
 	}
 	switch {
 	case fromXFF.IsValid() && fromFwd.IsValid():
 		if fromXFF != fromFwd {
-			return peer
+			t.warnForwardedDisagreement()
 		}
 		return fromXFF
 	case fromXFF.IsValid():
@@ -86,6 +98,17 @@ func (t ProxyTrust) ClientIP(remoteAddr string, h http.Header) netip.Addr {
 		return fromFwd
 	}
 	return peer
+}
+
+func (t ProxyTrust) warnForwardedDisagreement() {
+	if !forwardedDisagreementWarning.CompareAndSwap(false, true) {
+		return
+	}
+	log := t.log
+	if log == nil {
+		log = slog.Default()
+	}
+	log.Warn("trusted proxy headers disagree; using X-Forwarded-For", "code", "trusted_proxy_headers_disagree")
 }
 
 // rightmostUntrusted walks nodes right to left and returns the first that is not a

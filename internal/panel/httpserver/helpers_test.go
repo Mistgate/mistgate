@@ -72,6 +72,7 @@ func newTestEnvAuth(t testing.TB, authMutate func(*auth.Config), mutate ...func(
 		Dist: fstest.MapFS{
 			"index.html":           {Data: []byte(`<!doctype html><html><head><base href="/"><script type="module" src="./assets/app-abc123.js"></script></head><body>app</body></html>`)},
 			"assets/app-abc123.js": {Data: []byte(`console.log(1)`)},
+			"assets/readme.txt":    {Data: []byte("Example text asset")},
 			".gitkeep":             {Data: nil},
 		},
 		Log: quietLog,

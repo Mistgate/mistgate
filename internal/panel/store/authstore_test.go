@@ -97,6 +97,23 @@ func TestLoginFailures(t *testing.T) {
 	if f, _ := s.LoginFailures(ctx, "bob", later, window); f.Failures != 0 {
 		t.Errorf("not cleared: %+v", f)
 	}
+	for range 2 {
+		if _, err := s.RecordLoginFailure(ctx, "reserved", later, 5, window, lock); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.ReleaseLoginFailure(ctx, "reserved", 5); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := s.LoginFailures(ctx, "reserved", later, window); f.Failures != 1 {
+		t.Errorf("released one reservation cleared the earlier failure: %+v", f)
+	}
+	if err := s.ReleaseLoginFailure(ctx, "reserved", 5); err != nil {
+		t.Fatal(err)
+	}
+	if f, _ := s.LoginFailures(ctx, "reserved", later, window); f.Failures != 0 {
+		t.Errorf("released last reservation left a failure: %+v", f)
+	}
 	// Stale rows (made-up logins) are dropped as new failures come in.
 	for _, name := range []string{"x1", "x2", "x3"} {
 		s.RecordLoginFailure(ctx, name, now, 5, window, lock)
@@ -106,6 +123,28 @@ func TestLoginFailures(t *testing.T) {
 	s.R.QueryRow(`SELECT count(*) FROM login_failure WHERE login IN ('x1','x2','x3')`).Scan(&n)
 	if n != 0 {
 		t.Errorf("%d stale rows survived", n)
+	}
+}
+
+func TestReleaseLoginFailureClearsLockBelowTheLimit(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	for range 5 {
+		if _, err := s.RecordLoginFailure(ctx, "owner", now, 6, time.Hour, 15*time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+	locked, err := s.LockLoginFailure(ctx, "owner", 5, now, time.Hour, 15*time.Minute)
+	if err != nil || !locked.Locked(now) {
+		t.Fatalf("failure state before release: %+v, %v", locked, err)
+	}
+	if err := s.ReleaseLoginFailure(ctx, "owner", 5); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LoginFailures(ctx, "owner", now, time.Hour)
+	if err != nil || got.Failures != 4 || got.Locked(now) {
+		t.Fatalf("failure state after release: %+v, %v; want four failures and no lock", got, err)
 	}
 }
 
@@ -150,8 +189,26 @@ func TestPasswordCredential(t *testing.T) {
 	// A password sign-in makes its session only while the credential it checked is still the current one: a reset that
 	// lands between the check and the insert wins.
 	sess := Session{TokenHash: []byte("tok1"), AdminID: a.ID, CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(time.Hour)}
+	if _, err := s.RecordLoginFailure(ctx, c.Login, now, 5, time.Hour, 15*time.Minute); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.CreatePasswordSession(ctx, sess, c); err != nil {
 		t.Fatalf("session with the current credential: %v", err)
+	}
+	if f, err := s.LoginFailures(ctx, c.Login, now, time.Hour); err != nil || f.Failures != 0 {
+		t.Fatalf("successful password session left login failures: %+v, %v", f, err)
+	}
+	for range 5 {
+		if _, err := s.RecordLoginFailure(ctx, c.Login, now, 5, time.Hour, 15*time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sess.TokenHash = []byte("tok_locked")
+	if err := s.CreatePasswordSession(ctx, sess, c); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("session while the login is locked: %v", err)
+	}
+	if err := s.ClearLoginFailures(ctx, c.Login); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := s.W.ExecContext(ctx, `UPDATE admin_password SET hash = 'new', totp_secret = x'00' WHERE admin_id = ?`, a.ID); err != nil {
 		t.Fatal(err)

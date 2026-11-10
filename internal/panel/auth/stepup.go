@@ -138,12 +138,27 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	if prior.Locked(now) {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too many wrong attempts, try again later"))
 	}
+	attempt, err := s.st.RecordLoginFailure(ctx, key, now, MaxSignInFailures+reservationLockHeadroom, FailureWindow, LockDuration)
+	if err != nil {
+		s.log.Error("reserve step-up attempt", "code", "step_up_attempt_reserve_failed", "err", err)
+		return nil, errInternal(err)
+	}
+	if attempt.Failures > MaxSignInFailures {
+		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too many wrong attempts, try again later"))
+	}
+	releaseAttempt := func() {
+		if err := s.releaseLoginFailure(ctx, key, MaxSignInFailures); err != nil {
+			s.log.Warn("release step-up attempt", "code", "step_up_attempt_release_failed", "err", err)
+		}
+	}
 	refuse := func(reason string, err error) error {
+		if attempt.Failures >= MaxSignInFailures {
+			if _, lockErr := s.st.LockLoginFailure(ctx, key, MaxSignInFailures, now, FailureWindow, LockDuration); lockErr != nil {
+				s.log.Error("lock failed step-up", "code", "step_up_lock_failed", "err", lockErr)
+			}
+		}
 		s.log.Info("step-up failed", "reason", reason, "err", err, "admin", admin.ID, "ip", ip)
 		s.audit(ctx, admin.ID, "stepup", "fail", ip, map[string]any{"reason": reason})
-		if _, rerr := s.st.RecordLoginFailure(ctx, key, now, MaxSignInFailures, FailureWindow, LockDuration); rerr != nil {
-			s.log.Error("record step-up failure", "err", rerr)
-		}
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("step-up failed"))
 	}
 
@@ -157,7 +172,9 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 			return nil, refuse("unknown or foreign ceremony", nil)
 		}
 		if err != nil {
-			return nil, refuse("could not take ceremony", err)
+			releaseAttempt()
+			s.log.Error("take step-up ceremony", "code", "step_up_ceremony_take_failed", "err", err)
+			return nil, errInternal(err)
 		}
 		parsed, err := protocol.ParseCredentialRequestResponseBytes([]byte(m.CredentialJson))
 		if err != nil {
@@ -165,6 +182,7 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 		}
 		pks, err := s.st.PasskeysByAdmin(ctx, admin.ID)
 		if err != nil {
+			releaseAttempt()
 			s.log.Error("list passkeys", "err", err)
 			return nil, errInternal(err)
 		}
@@ -180,6 +198,7 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 			return nil, refuse("sign counter went backwards (cloned authenticator?)", nil)
 		}
 		if err := s.st.TouchPasskey(ctx, cred.ID, cred.Authenticator.SignCount, byte(cred.Flags.ProtocolValue()), now); err != nil {
+			releaseAttempt()
 			s.log.Error("touch passkey", "err", err)
 			return nil, errInternal(err)
 		}
@@ -187,19 +206,23 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 		method = "totp"
 		pw, err := s.st.PasswordByAdmin(ctx, admin.ID)
 		if errors.Is(err, store.ErrNotFound) || s.vault == nil {
+			releaseAttempt()
 			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("no authenticator code is set up for this admin"))
 		} else if err != nil {
+			releaseAttempt()
 			s.log.Error("password credential", "err", err)
 			return nil, errInternal(err)
 		}
 		secret, err := s.vault.Open(pw.TOTPSecret, TOTPSecretAAD(admin.ID))
 		if err != nil {
+			releaseAttempt()
 			s.log.Error("cannot open TOTP secret (wrong master key?)", "admin", admin.ID)
 			return nil, errInternal(err)
 		}
 		step, ok := matchTOTP(secret, m.TotpCode, now)
 		if ok { // single use, and newer than the code that signed in: a replayed or older one is refused
 			if ok, err = s.st.AdvanceTOTPStep(ctx, admin.ID, step); err != nil {
+				releaseAttempt()
 				s.log.Error("advance totp step", "err", err)
 				return nil, errInternal(err)
 			}
@@ -210,10 +233,11 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	}
 
 	if err := s.st.SessionStepUp(ctx, currentHash(req), now); err != nil {
+		releaseAttempt()
 		s.log.Error("record step-up", "err", err)
 		return nil, errInternal(err)
 	}
-	if err := s.st.ClearLoginFailures(ctx, key); err != nil {
+	if err := s.clearLoginFailures(ctx, key); err != nil {
 		s.log.Warn("clear step-up failures", "err", err)
 	}
 	s.audit(ctx, admin.ID, "stepup", "ok", ip, map[string]any{"method": method})

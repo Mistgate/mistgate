@@ -29,22 +29,33 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	return err
 }
 
-// CreatePasswordSession is CreateSession for a password + code sign-in: the row goes in only while the admin's password
-// and authenticator secret are still the ones the sign-in checked, else ErrNotFound. A reset or re-bind that lands
-// between the check and this insert (and ends every session) then cannot be outlived by a session of the old credentials.
+// CreatePasswordSession inserts a password + code sign-in session only while the checked credential is current and the
+// login is not locked. The session insert and successful-sign-in failure reset share one atomic batch. The reset can
+// also clear reservations for wrong checks already inside argon2. Only the handful admitted under this login's limit
+// can finish uncounted. They remain counted against the per-source limit, and every successful sign-in still requires
+// its second factor.
 func (s *Store) CreatePasswordSession(ctx context.Context, sess Session, checked PasswordCred) error {
-	res, err := s.W.ExecContext(ctx, `
+	results, err := s.batch(ctx,
+		Stmt{Query: `
 		INSERT INTO session (token_hash, admin_id, created_at, last_seen_at, expires_at, ip, user_agent, stepup_at)
 		SELECT ?, ?, ?, ?, ?, ?, ?, ?
-		WHERE EXISTS (SELECT 1 FROM admin_password WHERE admin_id = ? AND hash = ? AND totp_secret = ?)`,
-		sess.TokenHash, sess.AdminID, unix(sess.CreatedAt), unix(sess.LastSeenAt), unix(sess.ExpiresAt),
-		sess.IP, sess.UserAgent, unix(sess.CreatedAt), checked.AdminID, checked.Hash, checked.TOTPSecret)
+		WHERE EXISTS (SELECT 1 FROM admin_password WHERE admin_id = ? AND hash = ? AND totp_secret = ?)
+		  AND NOT EXISTS (SELECT 1 FROM login_failure WHERE login = ? AND locked_until > ?)`,
+			Args: []any{sess.TokenHash, sess.AdminID, unix(sess.CreatedAt), unix(sess.LastSeenAt), unix(sess.ExpiresAt),
+				sess.IP, sess.UserAgent, unix(sess.CreatedAt), checked.AdminID, checked.Hash, checked.TOTPSecret,
+				checked.Login, unix(sess.CreatedAt)}},
+		Stmt{Query: `DELETE FROM login_failure
+			WHERE login = ?
+			  AND NOT EXISTS (SELECT 1 FROM login_failure WHERE login = ? AND locked_until > ?)
+			  AND EXISTS (SELECT 1 FROM admin_password WHERE admin_id = ? AND login = ? AND hash = ? AND totp_secret = ?)
+			  AND EXISTS (SELECT 1 FROM session WHERE token_hash = ? AND admin_id = ?)`,
+			Args: []any{checked.Login, checked.Login, unix(sess.CreatedAt), checked.AdminID, checked.Login, checked.Hash, checked.TOTPSecret,
+				sess.TokenHash, sess.AdminID}},
+	)
 	if err != nil {
 		return err
 	}
-	if n, err := res.RowsAffected(); err != nil {
-		return err
-	} else if n == 0 {
+	if results[0].RowsAffected == 0 {
 		return ErrNotFound
 	}
 	return nil

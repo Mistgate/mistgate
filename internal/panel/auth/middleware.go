@@ -40,6 +40,13 @@ func ClientIPFrom(ctx context.Context) netip.Addr {
 
 // ClientIP is the client address for a request under the trusted-proxy rules.
 func (s *Service) ClientIP(r *http.Request) netip.Addr {
+	if len(s.trust.prefixes) == 0 && len(r.Header.Values("X-Forwarded-For")) > 0 {
+		if peer := parseNode(r.RemoteAddr); peer.IsValid() && (peer.IsPrivate() || peer.IsLoopback()) {
+			if untrustedForwardedWarning.CompareAndSwap(false, true) {
+				s.log.Warn("ignoring X-Forwarded-For from a private peer because no trusted proxy is configured", "code", "untrusted_forwarded_header_ignored")
+			}
+		}
+	}
 	return s.trust.ClientIP(r.RemoteAddr, r.Header)
 }
 

@@ -1084,6 +1084,52 @@ func TestD1RewrittenAuthStoreMethods(t *testing.T) {
 		if _, err := st.RecordLoginFailure(ctx, "owner", now, 3, time.Hour, time.Minute); err != nil {
 			t.Fatal(err)
 		}
+		if err := st.ReleaseLoginFailure(ctx, "owner", 3); err != nil {
+			t.Fatalf("release reserved failure: %v", err)
+		}
+		cred, err := st.PasswordByAdmin(ctx, a.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.RecordLoginFailure(ctx, "owner", now, 3, time.Hour, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+		sess := Session{TokenHash: []byte("session-clears-failures"), AdminID: a.ID, CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(time.Hour)}
+		if err := st.CreatePasswordSession(ctx, sess, cred); err != nil {
+			t.Fatalf("create session and clear prior failures: %v", err)
+		}
+		if failure, err := st.LoginFailures(ctx, "owner", now, time.Hour); err != nil || failure.Failures != 0 {
+			t.Fatalf("successful password session left failures: %+v, %v", failure, err)
+		}
+		if err := st.DeleteSession(ctx, sess.TokenHash); err != nil {
+			t.Fatalf("delete verification session: %v", err)
+		}
+		for range 3 {
+			if _, err := st.RecordLoginFailure(ctx, "owner", now, 3, time.Hour, time.Minute); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if failure, err := st.LockLoginFailure(ctx, "owner", 3, now, time.Hour, time.Minute); err != nil || !failure.Locked(now) {
+			t.Fatalf("lock reserved failures: %+v, %v", failure, err)
+		}
+		if err := st.ClearLoginFailures(ctx, "owner"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("PasswordSessionLockout", func(t *testing.T) {
+		for range 3 {
+			if _, err := st.RecordLoginFailure(ctx, "owner", now, 3, time.Hour, time.Minute); err != nil {
+				t.Fatal(err)
+			}
+		}
+		cred, err := st.PasswordByAdmin(ctx, a.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sess := Session{TokenHash: []byte("locked-session"), AdminID: a.ID, CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(time.Hour)}
+		if err := st.CreatePasswordSession(ctx, sess, cred); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("CreatePasswordSession under lock: %v", err)
+		}
 	})
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO session (token_hash, admin_id, created_at, last_seen_at, expires_at, ip, user_agent) VALUES (?, ?, ?, ?, ?, '', '')`, []byte("session-one"), a.ID, now.Unix(), now.Unix(), now.Add(time.Hour).Unix()); err != nil {
 		t.Fatal(err)
@@ -1135,6 +1181,54 @@ func TestD1RewrittenAuthStoreMethods(t *testing.T) {
 		}
 		if cred, err := fresh.PasswordByLogin(ctx, "first"); err != nil || cred.AdminID != admin.ID {
 			t.Fatalf("CreateFirstAdminPassword: %+v %v", cred, err)
+		}
+	})
+	t.Run("AuthCeremonyClassBudgets", func(t *testing.T) {
+		fresh := openD1Store(t)
+		put := func(id, kind, source string) error {
+			return fresh.PutAuthCeremony(ctx, AuthCeremony{
+				ID: id, Kind: kind, Source: source, SessionData: "{}", ExpiresAt: now.Add(time.Minute),
+			}, now, 2, 2)
+		}
+		for _, row := range [][3]string{{"anon_b", "login", "source_a"}, {"anon_a", "setup", "source_b"}} {
+			if err := put(row[0], row[1], row[2]); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := put("anon_c", "login", "source_c"); err != nil {
+			t.Fatalf("anonymous insert at capacity: %v", err)
+		}
+		if _, err := fresh.GetAuthCeremony(ctx, "anon_b", now); !errors.Is(err, ErrAuthCeremonyNotFound) {
+			t.Fatalf("oldest login ceremony survived: %v", err)
+		}
+		if _, err := fresh.GetAuthCeremony(ctx, "anon_a", now); err != nil {
+			t.Fatalf("setup ceremony was evicted: %v", err)
+		}
+		full := openD1Store(t)
+		for _, row := range [][3]string{{"setup_one", "setup", "source_a"}, {"setup_two", "setup-password", "source_b"}} {
+			if err := full.PutAuthCeremony(ctx, AuthCeremony{
+				ID: row[0], Kind: row[1], Source: row[2], SessionData: "{}", ExpiresAt: now.Add(time.Minute),
+			}, now, 2, 2); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := full.PutAuthCeremony(ctx, AuthCeremony{
+			ID: "login_when_no_login_can_be_evicted", Kind: "login", Source: "source_c", SessionData: "{}", ExpiresAt: now.Add(time.Minute),
+		}, now, 2, 2); !errors.Is(err, ErrAuthCeremonyLimit) {
+			t.Fatalf("login insertion into a full non-login class = %v, want limit", err)
+		}
+		for _, id := range []string{"setup_one", "setup_two"} {
+			if _, err := full.GetAuthCeremony(ctx, id, now); err != nil {
+				t.Errorf("non-login ceremony %q was evicted: %v", id, err)
+			}
+		}
+		for _, row := range [][3]string{{"bound_a", "stepup", "source_b"}, {"bound_b", "totp-enroll", "source_b"}} {
+			if err := put(row[0], row[1], row[2]); err != nil {
+				t.Fatalf("session-bound insert with a full anonymous class: %v", err)
+			}
+		}
+		if err := put("bound_c", "add-passkey", "source_c"); !errors.Is(err, ErrAuthCeremonyLimit) {
+			t.Fatalf("session-bound capacity: %v", err)
 		}
 	})
 }

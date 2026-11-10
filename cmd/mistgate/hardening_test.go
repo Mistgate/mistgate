@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -195,6 +197,37 @@ func TestServeRefusesBadConfiguration(t *testing.T) {
 		os.Chmod(filepath.Join(prefixDir, "master.key"), 0o644)
 		if err := runServe([]string{"--data-dir", prefixDir}); err == nil || !strings.Contains(err.Error(), "chmod 600") {
 			t.Errorf("world-readable master key: %v", err)
+		}
+	}
+}
+
+// The help text is the setup contract for owners who configure client IP attribution through a proxy.
+func TestTrustedProxyHelpRequiresXForwardedFor(t *testing.T) {
+	outputFile, err := os.CreateTemp(t.TempDir(), "serve-help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalStderr := os.Stderr
+	os.Stderr = outputFile
+	t.Cleanup(func() {
+		os.Stderr = originalStderr
+		outputFile.Close()
+	})
+	parseErr := runServe([]string{"--help"})
+	os.Stderr = originalStderr
+	if parseErr != flag.ErrHelp {
+		t.Fatalf("serve help: %v, want flag help", parseErr)
+	}
+	if _, err := outputFile.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	output, err := io.ReadAll(outputFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"sets or overwrites X-Forwarded-For", "A proxy that only writes Forwarded is not supported"} {
+		if !bytes.Contains(output, []byte(want)) {
+			t.Errorf("serve help does not contain %q", want)
 		}
 	}
 }

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,9 +57,212 @@ func TestSubscriptionMountIsIndistinguishableFromTheDecoy(t *testing.T) {
 	if r := do(t, http.MethodGet, e.public.URL, subPrefix+valid, xff("203.0.113.45")); r.status != 200 || r.header.Get("Profile-Title") == "" {
 		t.Fatalf("valid token: %d %v", r.status, r.header)
 	}
-	// 203.0.113.44 made 9 misses above: over MissLimit 6, so even its valid token gets the decoy.
+	// The cached valid token remains available behind the blocked client address.
+	if r := do(t, http.MethodGet, e.public.URL, subPrefix+valid, ip); r.status != 200 || r.header.Get("Profile-Title") == "" {
+		t.Fatalf("blocked client with a cached valid token: %d %v", r.status, r.header)
+	}
 	want := do(t, http.MethodGet, e.public.URL, "/nothing", ip)
-	sameResponse(t, "blocked client, valid token", want, do(t, http.MethodGet, e.public.URL, subPrefix+valid, ip))
+	sameResponse(t, "blocked client, unknown token", want, do(t, http.MethodGet, e.public.URL, subPrefix+strings.Repeat("u", 43), ip))
+}
+
+func TestServiceWorkerRequestsReceiveTheDecoy404(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"index.html": "<h1>Example Studio</h1>",
+		"sw.js":      "self.addEventListener('fetch', () => {})",
+		"sw.ecma":    "self.addEventListener('fetch', () => {})",
+		"plain.txt":  "a public text file",
+		"404.html":   "<h1>Lost at sea</h1>",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := mime.AddExtensionType(".ecma", "application/ecmascript"); err != nil {
+		t.Fatal(err)
+	}
+	e := newTestEnv(t, func(c *Config) { c.DecoyDir = dir })
+	header := map[string]string{"Service-Worker": "script"}
+	plainDecoy := do(t, http.MethodGet, e.public.URL, "/sw.js", nil)
+	if plainDecoy.status != http.StatusOK || !strings.HasPrefix(plainDecoy.header.Get("Content-Type"), "text/javascript") {
+		t.Fatalf("ordinary decoy script: %d %q %q", plainDecoy.status, plainDecoy.header.Get("Content-Type"), plainDecoy.body)
+	}
+	markedDecoy := do(t, http.MethodGet, e.public.URL, "/sw.js", header)
+	if markedDecoy.status != http.StatusNotFound {
+		t.Fatalf("service-worker decoy script: %d %q", markedDecoy.status, markedDecoy.body)
+	}
+	plainECMAScript := do(t, http.MethodGet, e.public.URL, "/sw.ecma", nil)
+	markedECMAScript := do(t, http.MethodGet, e.public.URL, "/sw.ecma", header)
+	if plainECMAScript.status != http.StatusOK || plainECMAScript.header.Get("Content-Type") != "application/ecmascript" {
+		t.Fatalf("registered ECMAScript asset: %d %q", plainECMAScript.status, plainECMAScript.header.Get("Content-Type"))
+	}
+	if markedECMAScript.status != http.StatusNotFound || !strings.Contains(markedECMAScript.body, "Lost at sea") {
+		t.Fatalf("service-worker ECMAScript asset: %d %q", markedECMAScript.status, markedECMAScript.body)
+	}
+	plainRoot := do(t, http.MethodGet, e.public.URL, "/", nil)
+	markedRoot := do(t, http.MethodGet, e.public.URL, "/", header)
+	if plainRoot.status != http.StatusOK || markedRoot.status != plainRoot.status || markedRoot.body != plainRoot.body ||
+		markedRoot.header.Get("Content-Type") != plainRoot.header.Get("Content-Type") {
+		t.Fatalf("Service-Worker header changed the HTML root: plain=%d %q %q marked=%d %q %q", plainRoot.status,
+			plainRoot.header.Get("Content-Type"), plainRoot.body, markedRoot.status, markedRoot.header.Get("Content-Type"), markedRoot.body)
+	}
+	for _, tc := range []struct {
+		name string
+		url  string
+		path string
+		head map[string]string
+	}{
+		{name: "prefix admin", url: e.public.URL, path: testPrefix + "assets/app-abc123.js/"},
+		{name: "host admin", url: e.public.URL, path: "/assets/app-abc123.js/", head: map[string]string{"Host": testAdminHst}},
+		{name: "admin listener", url: e.admin.URL, path: "/assets/app-abc123.js/"},
+	} {
+		marked := do(t, http.MethodGet, tc.url, tc.path, headerWithHost(header, tc.head))
+		if marked.status != http.StatusNotFound || !strings.Contains(marked.body, "Lost at sea") {
+			t.Errorf("%s trailing-slash script: %d %q", tc.name, marked.status, marked.body)
+		}
+		if marked.header.Get("Service-Worker-Allowed") != "" {
+			t.Errorf("%s allows a service-worker scope: %q", tc.name, marked.header.Get("Service-Worker-Allowed"))
+		}
+	}
+	if r := do(t, http.MethodGet, e.public.URL, testPrefix+"assets/app-abc123.js", nil); r.status != http.StatusOK || r.body != "console.log(1)" {
+		t.Fatalf("regular admin asset: %d %q", r.status, r.body)
+	}
+	adminPlain := do(t, http.MethodGet, e.admin.URL, "/assets/app-abc123.js", nil)
+	adminMarked := do(t, http.MethodGet, e.admin.URL, "/assets/app-abc123.js", header)
+	if adminPlain.status != http.StatusOK || adminMarked.status != http.StatusNotFound {
+		t.Fatalf("separate admin listener script: plain=%d marked=%d", adminPlain.status, adminMarked.status)
+	}
+	adminRoot := do(t, http.MethodGet, e.admin.URL, "/", nil)
+	adminRootMarked := do(t, http.MethodGet, e.admin.URL, "/", header)
+	if adminRoot.status != http.StatusOK || adminRootMarked.status != adminRoot.status || adminRootMarked.body != adminRoot.body {
+		t.Fatalf("Service-Worker header changed the admin HTML root: plain=%d marked=%d", adminRoot.status, adminRootMarked.status)
+	}
+
+	for _, tc := range []struct {
+		name string
+		url  string
+		path string
+		head map[string]string
+	}{
+		{name: "public root", url: e.public.URL, path: "/"},
+		{name: "prefix admin root", url: e.public.URL, path: testPrefix},
+		{name: "host admin root", url: e.public.URL, path: "/", head: map[string]string{"Host": testAdminHst}},
+		{name: "admin listener root", url: e.admin.URL, path: "/"},
+		{name: "public text asset", url: e.public.URL, path: "/plain.txt"},
+		{name: "prefix admin text asset", url: e.public.URL, path: testPrefix + "assets/readme.txt"},
+		{name: "host admin text asset", url: e.public.URL, path: "/assets/readme.txt", head: map[string]string{"Host": testAdminHst}},
+		{name: "admin listener text asset", url: e.admin.URL, path: "/assets/readme.txt"},
+	} {
+		plain := do(t, http.MethodGet, tc.url, tc.path, tc.head)
+		marked := do(t, http.MethodGet, tc.url, tc.path, headerWithHost(header, tc.head))
+		if marked.status != plain.status || marked.body != plain.body || marked.header.Get("Content-Type") != plain.header.Get("Content-Type") {
+			t.Errorf("%s changed with Service-Worker header: plain=%d %q %q marked=%d %q %q", tc.name, plain.status,
+				plain.header.Get("Content-Type"), plain.body, marked.status, marked.header.Get("Content-Type"), marked.body)
+		}
+	}
+}
+
+func TestJavaScriptMIMETypeSetMatchesBrowserSniffingList(t *testing.T) {
+	for _, contentType := range []string{
+		"application/ecmascript", "application/javascript", "application/x-ecmascript", "application/x-javascript",
+		"text/ecmascript", "text/javascript", "text/javascript1.0", "text/javascript1.1", "text/javascript1.2",
+		"text/javascript1.3", "text/javascript1.4", "text/javascript1.5", "text/jscript", "text/livescript",
+		"text/x-ecmascript", "text/x-javascript",
+	} {
+		if !isJavaScriptMIMEType(contentType) {
+			t.Errorf("%q was not recognized as a JavaScript MIME type", contentType)
+		}
+	}
+	if !isJavaScriptMIMEType("Text/JavaScript; charset=utf-8") {
+		t.Error("case and parameters should not change JavaScript MIME type recognition")
+	}
+	for _, contentType := range []string{"text/plain", "application/json", "text/html"} {
+		if isJavaScriptMIMEType(contentType) {
+			t.Errorf("%q was recognized as a JavaScript MIME type", contentType)
+		}
+	}
+}
+
+func headerWithHost(header, host map[string]string) map[string]string {
+	merged := make(map[string]string, len(header)+len(host))
+	for k, v := range header {
+		merged[k] = v
+	}
+	for k, v := range host {
+		merged[k] = v
+	}
+	return merged
+}
+
+func TestServiceWorkerRequestsUseThePublicRateLimit(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>Example Studio</h1>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sw.js"), []byte("self.addEventListener('fetch', () => {})"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e := limited(t, Limits{Public: Rate{PerSecond: 0.1, Burst: 3}}, func(c *Config) { c.DecoyDir = dir })
+	client := xff("203.0.113.77")
+	header := map[string]string{"Service-Worker": "script", "X-Forwarded-For": "203.0.113.77"}
+	plain := do(t, http.MethodGet, e.public.URL, "/", client)
+	marked := do(t, http.MethodGet, e.public.URL, "/", header)
+	if plain.status != http.StatusOK || marked.status != plain.status || marked.body != plain.body {
+		t.Fatalf("root responses differ: plain=%d %q marked=%d %q", plain.status, plain.body, marked.status, marked.body)
+	}
+	if r := do(t, http.MethodGet, e.public.URL, "/sw.js", header); r.status != http.StatusNotFound {
+		t.Fatalf("marked script response: %d %q", r.status, r.body)
+	}
+	if r := do(t, http.MethodGet, e.public.URL, "/", client); r.status != http.StatusTooManyRequests {
+		t.Fatalf("requests with Service-Worker header skipped the public budget: %d %q", r.status, r.body)
+	}
+}
+
+func TestServiceWorkerAdminRequestsUseTheAdminRateLimit(t *testing.T) {
+	cases := []struct {
+		name string
+		call func(*testing.T, *testEnv, map[string]string) response
+	}{
+		{
+			name: "host admin",
+			call: func(t *testing.T, e *testEnv, header map[string]string) response {
+				return do(t, http.MethodGet, e.public.URL, "/assets/app-abc123.js", withHeader(header, "Host", testAdminHst))
+			},
+		},
+		{
+			name: "prefix admin",
+			call: func(t *testing.T, e *testEnv, header map[string]string) response {
+				return do(t, http.MethodGet, e.public.URL, testPrefix+"assets/app-abc123.js", header)
+			},
+		},
+		{
+			name: "separate admin listener",
+			call: func(t *testing.T, e *testEnv, header map[string]string) response {
+				return do(t, http.MethodGet, e.admin.URL, "/assets/app-abc123.js", header)
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := limited(t, Limits{Public: Rate{PerSecond: -1}, Admin: Rate{PerSecond: 0.1, Burst: 1}})
+			header := map[string]string{"Service-Worker": "script"}
+			if r := tc.call(t, e, header); r.status != http.StatusNotFound {
+				t.Fatalf("script response: %d %q", r.status, r.body)
+			}
+			if r := tc.call(t, e, nil); r.status != http.StatusTooManyRequests {
+				t.Fatalf("service-worker request skipped the admin budget: %d %q", r.status, r.body)
+			}
+		})
+	}
+}
+
+func withHeader(in map[string]string, key, value string) map[string]string {
+	out := make(map[string]string, len(in)+1)
+	for k, v := range in {
+		out[k] = v
+	}
+	out[key] = value
+	return out
 }
 
 func TestAgentLinkUsesOnlyItsSecretPath(t *testing.T) {

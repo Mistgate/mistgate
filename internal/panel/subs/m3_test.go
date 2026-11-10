@@ -926,12 +926,12 @@ func TestSelfServiceUnknownTokenIsADecoyAndAMiss(t *testing.T) {
 			t.Fatalf("unknown token %d: %d %q", i, rec.Code, rec.Body.String())
 		}
 	}
-	// Blocked: even the valid token gets the decoy, for a fetch and for a write.
-	if rec := (call{h, t, tok}).post("/devices", m.addBody("")); rec.Code != 404 || rec.Body.String() != decoyBody {
-		t.Errorf("blocked client, valid token: %d %q", rec.Code, rec.Body.String())
+	// A cold valid token is checked within the lookup budget and then reaches the normal self-service handlers.
+	if rec := (call{h, t, tok}).post("/devices", m.addBody("")); rec.Code != 200 {
+		t.Errorf("blocked client, cold valid token write: %d %q", rec.Code, rec.Body.String())
 	}
-	if rec := fetch(h, "/"+tok, happUA); rec.Body.String() != decoyBody {
-		t.Errorf("blocked client fetch: %q", rec.Body.String())
+	if rec := fetch(h, "/"+tok, happUA); rec.Code != 200 || rec.Body.String() == decoyBody {
+		t.Errorf("blocked client, cold valid token fetch: %d %q", rec.Code, rec.Body.String())
 	}
 }
 

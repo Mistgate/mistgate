@@ -1120,9 +1120,10 @@ async function run() {
     });
     assert.equal(configPair.edge.status, 200, "the AWG device config endpoint succeeds");
 
-    // The subscription miss lockout lives in the shared limiter, not in an isolate: misses on one isolate lock the client
-    // network for a fresh one. Edge only: the VPS oracle sees every request from its loopback peer, so it cannot tell
-    // client networks apart. It runs after the cold fetches above so they still measure the first fetch of the user.
+    // The shared limiter carries subscription miss lockouts across isolates, while a fresh isolate can make a bounded
+    // token check for a cold valid link. This check runs only at the edge because the VPS oracle sees every request from
+    // its loopback peer and cannot tell client networks apart. It runs after the cold fetches above so they still measure
+    // the first fetch of the user.
     async function edgeOnly(label, panel, url, init) {
       const { response, queries } = await countedRequest(label, () => bridgeRequestFor(panel, url, init));
       assertQueryBudget(queries);
@@ -1143,8 +1144,8 @@ async function run() {
     const lockedValid = await edgeOnly("valid subscription from a locked miss network", await freshPanel(), userSubURL, {
       headers: { "CF-Connecting-IP": missClientIP, "User-Agent": missUA },
     });
-    assert.equal(lockedValid.status, 404, "the locked network receives the decoy for a valid token");
-    assert.deepEqual(Buffer.from(lockedValid.body), Buffer.from(missResponse), "the locked valid token matches the decoy response");
+    assert.equal(lockedValid.status, 200, "a cold valid token remains usable from the locked network");
+    assert.notDeepEqual(Buffer.from(lockedValid.body), Buffer.from(missResponse), "the locked valid token receives its subscription");
 
     const otherClient = await edgeOnly("valid subscription from an unaffected client network", await freshPanel(), userSubURL, {
       headers: { "CF-Connecting-IP": "198.51.100.82", "User-Agent": missUA },

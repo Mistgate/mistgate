@@ -240,7 +240,7 @@ func TestConcurrentPasswordVerificationsRespectArgonLimit(t *testing.T) {
 	}
 	t.Cleanup(func() { argon2IDKey = originalIDKey })
 
-	const requests = 16
+	const requests = maxConcurrentArgon2IDKeys + maxArgon2Waiters
 	start := make(chan struct{})
 	results := make(chan error, requests)
 	var wg sync.WaitGroup
@@ -263,6 +263,31 @@ func TestConcurrentPasswordVerificationsRespectArgonLimit(t *testing.T) {
 	}
 	if got := maxActive.Load(); got > maxConcurrentArgon2IDKeys {
 		t.Fatalf("concurrent Argon2 calls = %d, limit = %d", got, maxConcurrentArgon2IDKeys)
+	}
+}
+
+func TestPasswordVerificationRejectsBeyondArgonQueueLimit(t *testing.T) {
+	savedArgon := argon
+	argon.time, argon.memKiB, argon.threads = 1, 8, 1
+	t.Cleanup(func() { argon = savedArgon })
+	encoded, err := hashPassword(context.Background(), nil, "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	argon2Slots <- struct{}{}
+	for range maxArgon2Waiters {
+		argon2Waiters <- struct{}{}
+	}
+	t.Cleanup(func() {
+		for len(argon2Waiters) > 0 {
+			<-argon2Waiters
+		}
+		<-argon2Slots
+	})
+
+	if _, err := verifyPassword(context.Background(), nil, encoded, "correct horse battery"); !errors.Is(err, errArgon2Busy) {
+		t.Fatalf("verification beyond the waiting limit = %v, want busy", err)
 	}
 }
 

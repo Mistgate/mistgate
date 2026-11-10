@@ -581,8 +581,8 @@ func TestPickingADNSSharesTheChainOfTheDeviceCalls(t *testing.T) {
 			t.Fatalf("unknown token %d: %d %q", i, rec.Code, rec.Body.String())
 		}
 	}
-	if rec := (call{m.h, t, tok2}).post("/dns", pickBody("nod_1", "")); rec.Code != 404 || rec.Body.String() != decoyBody {
-		t.Errorf("blocked client, valid token: %d %q", rec.Code, rec.Body.String())
+	if rec := (call{m.h, t, tok2}).post("/dns", pickBody("nod_1", "")); rec.Code != 200 {
+		t.Errorf("blocked client, cold valid token: %d %q", rec.Code, rec.Body.String())
 	}
 
 	// 3. The budget of writes is one for the devices and the DNS: 3 an hour here. A refusal that comes before it costs

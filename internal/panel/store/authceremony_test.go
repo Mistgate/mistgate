@@ -84,6 +84,86 @@ func TestAuthCeremonyGetConsumeAndFail(t *testing.T) {
 	}
 }
 
+func TestAuthCeremonyBudgetsSeparateAnonymousAndSessionBoundRows(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	put := func(id, kind, source string) error {
+		return s.PutAuthCeremony(ctx, AuthCeremony{
+			ID: id, Kind: kind, Source: source, SessionData: "{}", ExpiresAt: now.Add(time.Minute),
+		}, now, 2, 3)
+	}
+	for _, row := range [][3]string{{"anon_c", "login", "source_a"}, {"anon_b", "setup", "source_b"}, {"anon_a", "login", "source_b"}} {
+		if err := put(row[0], row[1], row[2]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := put("anon_d", "setup-password", "source_b"); !errors.Is(err, ErrAuthCeremonyLimit) {
+		t.Fatalf("same-source anonymous budget = %v, want limit", err)
+	}
+	if err := put("anon_e", "login", "source_c"); err != nil {
+		t.Fatalf("anonymous insertion at its full total budget: %v", err)
+	}
+	if _, err := s.GetAuthCeremony(ctx, "anon_c", now); !errors.Is(err, ErrAuthCeremonyNotFound) {
+		t.Fatalf("oldest anonymous ceremony survived eviction: %v", err)
+	}
+	for _, row := range [][3]string{{"bound_a", "stepup", "source_b"}, {"bound_b", "totp-enroll", "source_b"}, {"bound_c", "add-passkey", "source_c"}} {
+		if err := put(row[0], row[1], row[2]); err != nil {
+			t.Fatalf("session-bound ceremony with an anonymous source at its cap: %v", err)
+		}
+	}
+	if err := put("bound_d", "add-passkey", "source_d"); !errors.Is(err, ErrAuthCeremonyLimit) {
+		t.Fatalf("session-bound total budget = %v, want limit", err)
+	}
+}
+
+func TestAuthCeremonyEvictionOnlyRemovesLoginRows(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	put := func(t *testing.T, s *Store, id, kind, source string, maxTotal int) error {
+		t.Helper()
+		return s.PutAuthCeremony(ctx, AuthCeremony{
+			ID: id, Kind: kind, Source: source, SessionData: "{}", ExpiresAt: now.Add(time.Minute),
+		}, now, 8, maxTotal)
+	}
+
+	t.Run("setup survives login eviction", func(t *testing.T) {
+		s := openTemp(t)
+		if err := put(t, s, "setup_password", "setup-password", "owner", 2); err != nil {
+			t.Fatal(err)
+		}
+		if err := put(t, s, "old_login", "login", "first_client", 2); err != nil {
+			t.Fatal(err)
+		}
+		if err := put(t, s, "new_login", "login", "second_client", 2); err != nil {
+			t.Fatalf("login insertion at capacity: %v", err)
+		}
+		if _, err := s.GetAuthCeremony(ctx, "setup_password", now); err != nil {
+			t.Fatalf("setup-password ceremony was evicted: %v", err)
+		}
+		if _, err := s.GetAuthCeremony(ctx, "old_login", now); !errors.Is(err, ErrAuthCeremonyNotFound) {
+			t.Fatalf("old login survived eviction: %v", err)
+		}
+	})
+
+	t.Run("non-login class refuses at capacity", func(t *testing.T) {
+		s := openTemp(t)
+		for _, row := range [][2]string{{"setup", "setup"}, {"setup_password", "setup-password"}} {
+			if err := put(t, s, row[0], row[1], row[0], 2); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := put(t, s, "login", "login", "client", 2); !errors.Is(err, ErrAuthCeremonyLimit) {
+			t.Fatalf("login insertion into full non-login class = %v, want limit", err)
+		}
+		for _, id := range []string{"setup", "setup_password"} {
+			if _, err := s.GetAuthCeremony(ctx, id, now); err != nil {
+				t.Errorf("non-login ceremony %q was evicted: %v", id, err)
+			}
+		}
+	})
+}
+
 func TestAuthCeremonyConcurrentWrongCodeFailuresRespectLimit(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()

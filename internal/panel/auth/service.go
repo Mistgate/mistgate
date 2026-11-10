@@ -42,16 +42,18 @@ const (
 	MaxSignInFailures = 5
 	FailureWindow     = time.Hour
 	LockDuration      = 15 * time.Minute
+	// One reserved attempt beyond the failure limit is needed because the last allowed proof may still be valid.
+	reservationLockHeadroom = 1
 	// MaxSourceFailures failed password sign-ins from one address (IPv4, or an IPv6 /64) within FailureWindow, for
 	// any logins, lock that address for LockDuration. Higher than the per-login limit: one address can be a whole
 	// office behind a NAT. The lock row is keyed "ip:<SourceKey>"; a login cannot contain a colon, so the two never meet.
 	MaxSourceFailures = 10
 	sourceLockPrefix  = "ip:"
 
-	maxCeremonies          = 2048
-	maxCeremoniesPerSource = 8  // pending ceremonies one client (IPv4 address or IPv6 /64) may hold
-	maxSetupCodeTries      = 5  // wrong TOTP codes tolerated on one password-setup ceremony
-	maxPasskeyName         = 64 // characters
+	maxCeremonies          = 2048 // separate pending budgets for anonymous and session-bound ceremonies
+	maxCeremoniesPerSource = 8    // pending ceremonies one client (IPv4 address or IPv6 /64) may hold
+	maxSetupCodeTries      = 5    // wrong TOTP codes tolerated on one password-setup ceremony
+	maxPasskeyName         = 64   // characters
 )
 
 // Config is the relying-party configuration and what the service needs from its host.
@@ -152,6 +154,8 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 	if cfg.Limiter == nil {
 		cfg.Limiter = securitylimit.NewMemory(nil, 0)
 	}
+	trust := NewProxyTrust(cfg.TrustedProxies)
+	trust.log = log
 	s := &Service{
 		sourceURL:  cfg.SourceURL,
 		tsURL:      cfg.TurnstileURL,
@@ -162,7 +166,7 @@ func New(st *store.Store, cfg Config, log *slog.Logger) (*Service, error) {
 		pepper:     passwordPepper(cfg.Vault),
 		log:        log,
 		lim:        cfg.Limiter,
-		trust:      NewProxyTrust(cfg.TrustedProxies),
+		trust:      trust,
 		now:        time.Now,
 		tokTouched: map[string]time.Time{},
 		tokAudited: map[string]time.Time{},

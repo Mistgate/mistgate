@@ -322,3 +322,28 @@ func (s *Store) ClearLoginFailures(ctx context.Context, login string) error {
 	_, err := s.W.ExecContext(ctx, `DELETE FROM login_failure WHERE login = ?`, login)
 	return err
 }
+
+// LockLoginFailure locks a live failure count once it has reached the maximum failed proofs.
+func (s *Store) LockLoginFailure(ctx context.Context, login string, maxFailures int, now time.Time, window, lock time.Duration) (LoginFailure, error) {
+	nowUnix := unix(now)
+	_, err := s.W.ExecContext(ctx, `UPDATE login_failure
+		SET locked_until = CASE WHEN locked_until > ? THEN locked_until ELSE ? END
+		WHERE login = ? AND failures >= ?`, nowUnix, unix(now.Add(lock)), login, maxFailures)
+	if err != nil {
+		return LoginFailure{}, err
+	}
+	return s.LoginFailures(ctx, login, now, window)
+}
+
+// ReleaseLoginFailure removes one reserved attempt without clearing earlier failures and clears a lock when the remaining
+// failure count drops below the limit.
+func (s *Store) ReleaseLoginFailure(ctx context.Context, login string, maxFailures int) error {
+	_, err := s.batch(ctx,
+		Stmt{Query: `DELETE FROM login_failure WHERE login = ? AND failures = 1`, Args: []any{login}},
+		Stmt{Query: `UPDATE login_failure
+			SET failures = failures - 1,
+				locked_until = CASE WHEN failures - 1 >= ? THEN locked_until ELSE 0 END
+			WHERE login = ? AND failures > 1`, Args: []any{maxFailures, login}},
+	)
+	return err
+}

@@ -30,7 +30,21 @@ type AuthCeremony struct {
 	ExpiresAt       time.Time
 }
 
-// PutAuthCeremony prunes up to 100 expired rows, then inserts only while both caps allow it.
+const sessionBoundCeremonyKinds = `kind IN ('stepup', 'add-passkey', 'totp-enroll')`
+
+// Keep this list in sync with the session-bound ceremony kinds in internal/panel/auth.
+func sessionBoundCeremony(kind string) bool {
+	switch kind {
+	case "stepup", "add-passkey", "totp-enroll":
+		return true
+	default:
+		return false
+	}
+}
+
+// PutAuthCeremony prunes expired rows, keeps separate budgets for anonymous and session-bound ceremonies, and evicts
+// the oldest login ceremony when that class reaches its total budget.
+// Setup ceremonies require a setup token, so anonymous login churn cannot evict them.
 func (s *Store) PutAuthCeremony(ctx context.Context, c AuthCeremony, now time.Time, maxPerSource, maxTotal int) error {
 	if c.TokenHash == nil {
 		c.TokenHash = []byte{}
@@ -41,30 +55,41 @@ func (s *Store) PutAuthCeremony(ctx context.Context, c AuthCeremony, now time.Ti
 	if c.AdminUserHandle == nil {
 		c.AdminUserHandle = []byte{}
 	}
-	if _, err := s.W.ExecContext(ctx, `DELETE FROM auth_ceremony WHERE id IN (
-		SELECT id FROM auth_ceremony WHERE expires_at <= ? ORDER BY expires_at LIMIT 100
-	)`, now.Unix()); err != nil {
-		return err
+	classPredicate := `kind NOT IN ('stepup', 'add-passkey', 'totp-enroll')`
+	if sessionBoundCeremony(c.Kind) {
+		classPredicate = sessionBoundCeremonyKinds
 	}
-	result, err := s.W.ExecContext(ctx, `
+	stmts := []Stmt{{Query: `DELETE FROM auth_ceremony WHERE id IN (
+		SELECT id FROM auth_ceremony WHERE expires_at <= ? ORDER BY expires_at LIMIT 100
+	)`, Args: []any{now.Unix()}}}
+	if !sessionBoundCeremony(c.Kind) {
+		stmts = append(stmts, Stmt{Query: `DELETE FROM auth_ceremony
+			WHERE id = (
+				SELECT id FROM auth_ceremony
+				WHERE expires_at > ? AND kind = 'login' AND ` + classPredicate + `
+				ORDER BY rowid LIMIT 1
+			)
+			AND (SELECT count(*) FROM auth_ceremony WHERE expires_at > ? AND ` + classPredicate + `) >= ?
+			AND (SELECT count(*) FROM auth_ceremony WHERE source_key = ? AND expires_at > ? AND ` + classPredicate + `) < ?`,
+			Args: []any{now.Unix(), now.Unix(), maxTotal, c.Source, now.Unix(), maxPerSource}})
+	}
+	stmts = append(stmts, Stmt{Query: `
 		INSERT INTO auth_ceremony (
 			id, kind, source_key, session_data, token_hash, admin_id, admin_user_handle, name, login,
 			password_hash, totp_enc, tries, expires_at
 		)
 		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-		WHERE (SELECT count(*) FROM auth_ceremony WHERE source_key = ? AND expires_at > ?) < ?
-		  AND (SELECT count(*) FROM auth_ceremony WHERE expires_at > ?) < ?`,
-		c.ID, c.Kind, c.Source, c.SessionData, c.TokenHash, c.AdminID, c.AdminUserHandle, c.Name, c.Login,
-		c.PasswordHash, c.TOTPEncrypted, c.Tries, c.ExpiresAt.Unix(),
-		c.Source, now.Unix(), maxPerSource, now.Unix(), maxTotal,
-	)
+		WHERE (SELECT count(*) FROM auth_ceremony WHERE source_key = ? AND expires_at > ? AND ` + classPredicate + `) < ?
+		  AND (SELECT count(*) FROM auth_ceremony WHERE expires_at > ? AND ` + classPredicate + `) < ?`,
+		Args: []any{c.ID, c.Kind, c.Source, c.SessionData, c.TokenHash, c.AdminID, c.AdminUserHandle, c.Name, c.Login,
+			c.PasswordHash, c.TOTPEncrypted, c.Tries, c.ExpiresAt.Unix(),
+			c.Source, now.Unix(), maxPerSource, now.Unix(), maxTotal},
+	})
+	results, err := s.batch(ctx, stmts...)
 	if err != nil {
 		return err
 	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
+	n := results[len(results)-1].RowsAffected
 	if n == 0 {
 		return ErrAuthCeremonyLimit
 	}

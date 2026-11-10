@@ -89,6 +89,21 @@ func (f fakeEvents) InsertEvent(_ context.Context, e store.EventRow) error {
 	return nil
 }
 
+type countingMissLimiter struct {
+	securitylimit.Limiter
+	records int
+	byName  map[string]int
+}
+
+func (l *countingMissLimiter) Record(ctx context.Context, w securitylimit.Window, key string) (securitylimit.Decision, error) {
+	l.records++
+	if l.byName == nil {
+		l.byName = make(map[string]int)
+	}
+	l.byName[w.Name]++
+	return l.Limiter.Record(ctx, w, key)
+}
+
 // rig drives a handler with a fake clock and clients chosen by the X-Test-IP header.
 type rig struct {
 	t     *testing.T
@@ -135,9 +150,8 @@ func isDecoy(rec *httptest.ResponseRecorder) bool {
 
 func unknownToken(i int) string { return fmt.Sprintf("%043d", i) }
 
-// Token guessing: after MissLimit unknown tokens within the window the client network gets only the
-// decoy, for any token, for BlockFor. The block is per IPv4 address and per IPv6 /64, expires, does
-// not cost a lookup and does not reach other clients.
+// Token guessing limits unknown links while allowing cold valid links a bounded check during lockout.
+// Unknown tokens stay on the decoy path without a subscription lookup or another miss record.
 func TestGuessingBlocksTheClientNetwork(t *testing.T) {
 	r := newRig(t, func(c *Config) { c.MissLimit, c.MissWindow, c.BlockFor = 5, time.Minute, 15*time.Minute })
 	bad := "2001:db8:aa:bb::1"
@@ -151,13 +165,22 @@ func TestGuessingBlocksTheClientNetwork(t *testing.T) {
 	}
 	r.get(bad, unknownToken(4)) // the fifth
 	lookups := r.src.lookups()
+	missLimiter := &countingMissLimiter{Limiter: r.h.(*handler).cfg.Limiter}
+	r.h.(*handler).cfg.Limiter = missLimiter
 	for _, ip := range []string{bad, "2001:db8:aa:bb:ffff::7"} { // the same /64, another address
-		if rec := r.get(ip, tokA); !isDecoy(rec) || rec.Header().Get("Subscription-Userinfo") != "" {
-			t.Fatalf("%s: a valid token while blocked: %d %q", ip, rec.Code, rec.Body.String())
+		if rec := r.get(ip, tokA); rec.Code != http.StatusOK || rec.Header().Get("Subscription-Userinfo") == "" {
+			t.Fatalf("%s: a known valid token while blocked: %d %q", ip, rec.Code, rec.Body.String())
 		}
 	}
-	if r.src.lookups() != lookups {
-		t.Error("a blocked client still cost lookups")
+	unknownLookups := r.src.lookups()
+	if rec := r.get(bad, unknownToken(5)); !isDecoy(rec) {
+		t.Fatalf("blocked unknown token: %d %q", rec.Code, rec.Body.String())
+	}
+	if unknownLookups != lookups || r.src.lookups() != unknownLookups {
+		t.Errorf("blocked traffic cost source lookups: before=%d after-valid=%d after-unknown=%d", lookups, unknownLookups, r.src.lookups())
+	}
+	if missLimiter.byName["subscription-miss"] != 0 || missLimiter.byName["subscription-cold-miss"] != 1 {
+		t.Errorf("blocked unknown token records: %+v", missLimiter.byName)
 	}
 	for _, ip := range []string{"2001:db8:aa:cc::1", "203.0.113.7"} { // other clients are unaffected
 		if rec := r.get(ip, tokB); rec.Code != 200 {
@@ -165,18 +188,29 @@ func TestGuessingBlocksTheClientNetwork(t *testing.T) {
 		}
 	}
 	r.now = r.now.Add(14 * time.Minute)
-	if rec := r.get(bad, tokB); !isDecoy(rec) {
-		t.Errorf("block ended early: %d", rec.Code)
+	if rec := r.get(bad, tokB); rec.Code != http.StatusOK {
+		t.Errorf("known token while still blocked: %d", rec.Code)
+	}
+	if rec := r.get(bad, unknownToken(90)); !isDecoy(rec) {
+		t.Errorf("blocked unknown token: %d", rec.Code)
+	}
+	if missLimiter.byName["subscription-miss"] != 0 || missLimiter.byName["subscription-cold-miss"] != 2 {
+		t.Errorf("blocked unknown token records before expiry: %+v", missLimiter.byName)
 	}
 	r.now = r.now.Add(2 * time.Minute)
-	if rec := r.get(bad, tokB); rec.Code != 200 {
-		t.Errorf("still blocked after the period: %d", rec.Code)
+	if rec := r.get(bad, unknownToken(91)); !isDecoy(rec) {
+		t.Errorf("unknown token after block expiry: %d", rec.Code)
+	}
+	if missLimiter.byName["subscription-miss"] != 1 {
+		t.Errorf("expired block recorded %d normal misses, want one", missLimiter.byName["subscription-miss"])
 	}
 }
 
-// Misses that are spread out do not add up, and a request under the prefix that is no token counts as a miss.
+// Misses that are spread out do not add up, and malformed requests count toward the guessing limit.
 func TestGuessingWindowAndMalformedTokens(t *testing.T) {
 	r := newRig(t, func(c *Config) { c.MissLimit, c.MissWindow = 5, time.Minute })
+	misses := &countingMissLimiter{Limiter: r.h.(*handler).cfg.Limiter}
+	r.h.(*handler).cfg.Limiter = misses
 	for i := 0; i < 4; i++ {
 		r.get("198.51.100.1", unknownToken(i))
 	}
@@ -187,11 +221,126 @@ func TestGuessingWindowAndMalformedTokens(t *testing.T) {
 	if rec := r.get("198.51.100.1", tokA); rec.Code != 200 {
 		t.Fatalf("8 misses in two windows blocked the client: %d", rec.Code)
 	}
-	for i := 0; i < 5; i++ {
+	if r.h.(*handler).blocked(context.Background(), "198.51.100.1") {
+		t.Fatal("misses from separate windows kept the client blocked")
+	}
+	beforeMalformed := misses.records
+	beforeChecks := r.src.checkLookups()
+	for i := 0; i < 6; i++ {
 		r.get("198.51.100.2", "short")
 	}
-	if rec := r.get("198.51.100.2", tokA); !isDecoy(rec) {
-		t.Errorf("malformed tokens do not count: %d", rec.Code)
+	if counted := misses.records - beforeMalformed; counted != 5 {
+		t.Fatalf("malformed paths counted %d misses, want the five allowed before lockout", counted)
+	}
+	if !r.h.(*handler).blocked(context.Background(), "198.51.100.2") {
+		t.Fatal("malformed paths did not block the client after five misses")
+	}
+	if got := r.src.checkLookups(); got != beforeChecks {
+		t.Fatalf("malformed paths performed %d cold-token checks", got-beforeChecks)
+	}
+	if rec := r.get("198.51.100.2", tokA); rec.Code != http.StatusOK {
+		t.Errorf("cached valid token behind a blocked network: %d", rec.Code)
+	}
+}
+
+func TestColdValidTokenWorksBehindBlockedAddress(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.MissLimit, c.BlockFor = 1, 15*time.Minute })
+	misses := &countingMissLimiter{Limiter: r.h.(*handler).cfg.Limiter}
+	r.h.(*handler).cfg.Limiter = misses
+	const client = "198.51.100.20"
+	if rec := r.get(client, unknownToken(700)); !isDecoy(rec) {
+		t.Fatalf("first guessing miss: %d %q", rec.Code, rec.Body.String())
+	}
+	if misses.records != 1 || r.src.lookups() != 1 {
+		t.Fatalf("before cold valid token: misses=%d source lookups=%d", misses.records, r.src.lookups())
+	}
+	if _, known := r.h.(*handler).tokens.Get(tokA); known {
+		t.Fatal("the valid token was already warm in this handler")
+	}
+	for i := 0; i < 4; i++ {
+		rec := r.get(client, tokA)
+		if rec.Code != http.StatusOK || rec.Header().Get("Subscription-Userinfo") == "" {
+			t.Fatalf("cold valid token request %d behind blocked client: %d %q", i, rec.Code, rec.Body.String())
+		}
+	}
+	if r.src.checkLookups() != 4 || r.src.lookups() != 2 {
+		t.Fatalf("cold valid token checks=%d subscriptions=%d, want four checks after the initial miss", r.src.checkLookups(), r.src.lookups())
+	}
+	if misses.byName["subscription-miss"] != 1 || misses.byName["subscription-cold-miss"] != 0 {
+		t.Fatalf("successful cold token changed miss windows: %+v", misses.byName)
+	}
+}
+
+func TestColdTokenMissWindowsArePerClientNetwork(t *testing.T) {
+	r := newRig(t, func(c *Config) { c.MissLimit, c.BlockFor = 1, 15*time.Minute })
+	const client1 = "2001:db8:aa:bb::1"
+	const client2 = "2001:db8:aa:bc::2"
+	if rec := r.get(client1, unknownToken(800)); !isDecoy(rec) {
+		t.Fatalf("first guessing miss: %d %q", rec.Code, rec.Body.String())
+	}
+	if rec := r.get(client2, unknownToken(801)); !isDecoy(rec) {
+		t.Fatalf("second network guessing miss: %d %q", rec.Code, rec.Body.String())
+	}
+	for i, client := range []string{client1, client2} {
+		if rec := r.get(client, unknownToken(1000+i)); !isDecoy(rec) {
+			t.Fatalf("cold unknown token for network %s: %d %q", client, rec.Code, rec.Body.String())
+		}
+	}
+	if got := r.src.checkLookups(); got != 2 {
+		t.Fatalf("cold checks across two client networks: %d, want one per network", got)
+	}
+	if got := r.src.lookups(); got != 2 {
+		t.Fatalf("blocked unknown tokens reached subscription fetch: %d lookups after the two initial misses", got)
+	}
+	for i, client := range []string{client1, client2} {
+		if rec := r.get(client, unknownToken(1200+i)); !isDecoy(rec) {
+			t.Fatalf("cold unknown token beyond network limit %s: %d %q", client, rec.Code, rec.Body.String())
+		}
+	}
+	if got := r.src.checkLookups(); got != 2 {
+		t.Fatalf("cold checks after each network reached its limit: %d, want 2", got)
+	}
+}
+
+func TestBlockedClientColdLookupsStayWithinWindowDuringSixteenMinutes(t *testing.T) {
+	r := newRig(t, nil)
+	const client = "198.51.100.40"
+	h := r.h.(*handler)
+	blockedWindows := make([]int, 0, 2)
+	blocked, blockedChecks := false, 0
+	for sec := 0; sec < 16*60; sec++ {
+		blockedNow := h.blocked(context.Background(), client)
+		if blocked && !blockedNow {
+			blockedWindows = append(blockedWindows, blockedChecks)
+			blockedChecks = 0
+		}
+		if !blocked && blockedNow {
+			blockedChecks = 0
+		}
+		beforeChecks := r.src.checkLookups()
+		if rec := r.get(client, unknownToken(10_000+sec)); !isDecoy(rec) {
+			t.Fatalf("unknown token at second %d: %d %q", sec, rec.Code, rec.Body.String())
+		}
+		if blockedNow {
+			blockedChecks += r.src.checkLookups() - beforeChecks
+		}
+		blocked = blockedNow
+		r.now = r.now.Add(time.Second)
+	}
+	if blocked {
+		blockedWindows = append(blockedWindows, blockedChecks)
+	}
+	if len(blockedWindows) != 2 {
+		t.Fatalf("sixteen-minute run had %d blocked intervals, want two", len(blockedWindows))
+	}
+	for i, checks := range blockedWindows {
+		if checks > h.cfg.MissLimit {
+			t.Fatalf("blocked interval %d caused %d cold token checks, want at most %d", i+1, checks, h.cfg.MissLimit)
+		}
+	}
+	total := r.src.lookups() + r.src.checkLookups()
+	if total > 4*h.cfg.MissLimit {
+		t.Fatalf("sixteen-minute run caused %d database lookups, want at most two normal and two blocked-cold windows (%d)", total, 4*h.cfg.MissLimit)
 	}
 }
 
@@ -209,8 +358,11 @@ func TestGuessingLimitIsSharedByHandlers(t *testing.T) {
 	r.get("198.51.100.19", unknownToken(20))
 	r.h = second
 	r.get("198.51.100.19", unknownToken(21))
-	if rec := r.get("198.51.100.19", tokA); !isDecoy(rec) {
-		t.Fatalf("a second handler did not see the shared network block: %d", rec.Code)
+	if rec := r.get("198.51.100.19", tokA); rec.Code != http.StatusOK {
+		t.Fatalf("a cold valid token behind the shared network block: %d %q", rec.Code, rec.Body.String())
+	}
+	if rec := r.get("198.51.100.19", unknownToken(22)); !isDecoy(rec) {
+		t.Fatalf("unknown token behind the shared network block: %d %q", rec.Code, rec.Body.String())
 	}
 	r.h = first
 }

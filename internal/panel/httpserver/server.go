@@ -584,7 +584,7 @@ func (s *Server) AdminListener() http.Handler {
 func (s *Server) newAdmin(base string) http.Handler {
 	api := http.StripPrefix("/api", s.auth.RequireSession(withVersion(s.api)))
 	spa := s.spa(base)
-	return s.requestID(s.securityHeaders(s.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	admin := s.requestID(s.securityHeaders(s.cop.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch p := r.URL.Path; {
 		case p == "/api/recover-login":
 			if !s.auth.RecoveryEnabled() {
@@ -610,6 +610,7 @@ func (s *Server) newAdmin(base string) http.Handler {
 			spa.ServeHTTP(w, r)
 		}
 	}))))
+	return admin
 }
 
 // cloudflare is the one third-party origin the admin pages may use: while the captcha is on, and on the page where the

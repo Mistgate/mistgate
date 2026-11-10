@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base32"
 	"errors"
+	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -146,6 +148,126 @@ func login(s *Service, loginName, password, code string) (*connect.Response[admi
 	return s.PasswordLogin(context.Background(), connect.NewRequest(&adminv1.PasswordLoginRequest{Login: loginName, Password: password, TotpCode: code}))
 }
 
+func TestPasswordLoginLockoutReservesAttemptsBeforeVerification(t *testing.T) {
+	s, st, clock := newTestService(t)
+	_, secret := passwordAdmin(t, s, st, "ada")
+	*clock = clock.Add(time.Minute)
+	good := totpCode(secret, totpStep(*clock))
+	bad := "000000"
+	for delta := int64(-1); delta <= 1; delta++ {
+		if totpCode(secret, totpStep(*clock)+delta) == bad {
+			bad = "000001"
+		}
+	}
+
+	const wrong = 39
+	var reached, verified, returned atomic.Int32
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	var wg sync.WaitGroup
+	originalIDKey, originalHook := argon2IDKey, argon2BeforeAcquireForTest
+	argon2IDKey = func(password, salt []byte, timeCost, memoryKiB uint32, threads uint8, keyLen uint32) []byte {
+		verified.Add(1)
+		<-release
+		return originalIDKey(password, salt, timeCost, memoryKiB, threads, keyLen)
+	}
+	argon2BeforeAcquireForTest = func() { reached.Add(1) }
+	t.Cleanup(func() {
+		unblock()
+		wg.Wait()
+		argon2IDKey, argon2BeforeAcquireForTest = originalIDKey, originalHook
+	})
+
+	type loginResult struct {
+		response *connect.Response[adminv1.PasswordLoginResponse]
+		err      error
+	}
+	correct := make(chan loginResult, 1)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		response, err := login(s, "ada", testPassword, good)
+		correct <- loginResult{response: response, err: err}
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for verified.Load() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("correct proof did not reach the held password check")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	for range wrong {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = login(s, "ada", testPassword, bad)
+			returned.Add(1)
+		}()
+	}
+
+	deadline = time.Now().Add(10 * time.Second)
+	for {
+		failure, err := st.LoginFailures(context.Background(), "ada", *clock, FailureWindow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if failure.Locked(*clock) && returned.Load() >= wrong-(MaxSignInFailures-1) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("burst did not reserve the login limit: reached=%d returned=%d failure=%+v", reached.Load(), returned.Load(), failure)
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	select {
+	case got := <-correct:
+		t.Fatalf("correct proof finished while its check was held: response=%v err=%v", got.response, got.err)
+	default:
+	}
+	unblock()
+	wg.Wait()
+	gotCorrect := <-correct
+	if gotCorrect.err == nil || gotCorrect.response != nil {
+		t.Fatalf("correct proof opened a session after lockout: response=%v err=%v", gotCorrect.response, gotCorrect.err)
+	}
+	if verified.Load() > MaxSignInFailures {
+		t.Fatalf("password verifications in the burst = %d, limit = %d", verified.Load(), MaxSignInFailures)
+	}
+	if verified.Load() == 0 || reached.Load() < verified.Load() {
+		t.Fatalf("no bounded verification work was observed: reached=%d verified=%d", reached.Load(), verified.Load())
+	}
+	if f, err := st.LoginFailures(context.Background(), "ada", *clock, FailureWindow); err != nil || !f.Locked(*clock) || f.Failures < MaxSignInFailures {
+		t.Fatalf("login failure state after burst = %+v, %v", f, err)
+	}
+}
+
+func TestPasswordLoginCanSucceedOnTheLastAllowedAttempt(t *testing.T) {
+	s, st, clock := newTestService(t)
+	_, secret := passwordAdmin(t, s, st, "ada")
+	*clock = clock.Add(time.Minute)
+	good := totpCode(secret, totpStep(*clock))
+	bad := "000000"
+	for delta := int64(-1); delta <= 1; delta++ {
+		if totpCode(secret, totpStep(*clock)+delta) == bad {
+			bad = "000001"
+		}
+	}
+	for range MaxSignInFailures - 1 {
+		if _, err := login(s, "ada", testPassword, bad); err == nil {
+			t.Fatal("wrong code was accepted")
+		}
+	}
+	if _, err := login(s, "ada", testPassword, good); err != nil {
+		t.Fatalf("successful proof on the last allowed attempt: %v", err)
+	}
+	if f, err := st.LoginFailures(context.Background(), "ada", *clock, FailureWindow); err != nil || f.Failures != 0 || f.Locked(*clock) {
+		t.Fatalf("successful sign-in left account failures: %+v, %v", f, err)
+	}
+}
+
 func TestPasswordSetupAndLogin(t *testing.T) {
 	s, st, clock := newTestService(t)
 	ctx := context.Background()
@@ -184,6 +306,9 @@ func TestPasswordSetupAndLogin(t *testing.T) {
 	}
 	if resp.Msg.Admin.Id != adminID || !strings.Contains(resp.Header().Get("Set-Cookie"), "HttpOnly") {
 		t.Errorf("login response: %+v", resp.Msg)
+	}
+	if f, _ := st.LoginFailures(ctx, sourceLockPrefix+"unknown", *clock, FailureWindow); f.Failures != 1 {
+		t.Errorf("successful login left its reserved source attempt behind: %+v", f)
 	}
 	if _, err := login(s, "ada.l", testPassword, code); err == nil {
 		t.Fatal("the same code was accepted twice")
@@ -577,12 +702,31 @@ func TestCeremonyCapPerSource(t *testing.T) {
 	}
 	// The global cap holds however many sources there are.
 	s2, _, _ := newTestService(t)
+	admin := makeAdmin(t, s2, s2.st)
+	sess, err := s2.newSession(ctx, admin.ID, "192.0.2.1", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := range maxCeremonies {
 		if _, err := s2.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: string(rune('A'+i%50)) + string(rune('a'+i/50))}); err != nil {
 			t.Fatalf("ceremony %d: %v", i, err)
 		}
 	}
-	if _, err := s2.putCeremony(ctx, &ceremony{kind: ceremonyLogin, src: "fresh"}); err == nil {
-		t.Fatal("global cap not enforced")
+	var oldest string
+	if err := s2.st.R.QueryRowContext(ctx, `SELECT id FROM auth_ceremony WHERE kind = ? ORDER BY rowid LIMIT 1`, ceremonyLogin).Scan(&oldest); err != nil {
+		t.Fatal(err)
+	}
+	begin, err := s2.BeginLogin(ctx, connect.NewRequest(&adminv1.BeginLoginRequest{}))
+	if err != nil || begin.Msg.CeremonyId == "" {
+		t.Fatalf("fresh BeginLogin at the anonymous cap: response=%v err=%v", begin, err)
+	}
+	if _, ok, err := s2.getCeremony(ctx, oldest, ceremonyLogin); err != nil || ok {
+		t.Fatalf("oldest anonymous ceremony was not evicted: ok=%v err=%v", ok, err)
+	}
+	stepReq := connect.NewRequest(&adminv1.BeginStepUpRequest{})
+	stepReq.Header().Set("Cookie", (&http.Cookie{Name: CookieName, Value: sess.Value}).String())
+	step, err := s2.BeginStepUp(authed(t, s2, sess.Value), stepReq)
+	if err != nil || step.Msg.CeremonyId == "" {
+		t.Fatalf("session-bound BeginStepUp at the anonymous cap: response=%v err=%v", step, err)
 	}
 }

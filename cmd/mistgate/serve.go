@@ -62,7 +62,7 @@ func runServe(args []string) error {
 	logFormat := fs.String("log-format", envOr("MISTGATE_LOG_FORMAT", "text"), "format of the panel log on stderr: text or json")
 	var acmeDomains, trustedProxies listFlag
 	fs.Var(&acmeDomains, "acme-domain", "get a Let's Encrypt certificate for this host name (repeatable; comma-separated env MISTGATE_ACME_DOMAIN); the public listener must be reachable on port 443; using it accepts the CA's terms of service")
-	fs.Var(&trustedProxies, "trusted-proxy", "CIDR or IP of a reverse proxy whose X-Forwarded-For / Forwarded headers are believed (repeatable; env MISTGATE_TRUSTED_PROXY). Without it the TCP peer is the client")
+	fs.Var(&trustedProxies, "trusted-proxy", "CIDR or IP of a reverse proxy that sets or overwrites X-Forwarded-For (repeatable; env MISTGATE_TRUSTED_PROXY). A proxy that only writes Forwarded is not supported; without this the TCP peer is the client")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

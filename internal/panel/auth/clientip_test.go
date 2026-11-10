@@ -1,8 +1,13 @@
 package auth
 
 import (
+	"bytes"
+	"io"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
@@ -40,6 +45,7 @@ func hdr(kv ...string) http.Header {
 func TestClientIP(t *testing.T) {
 	proxies, _ := ParseProxies([]string{"10.0.0.0/8", "127.0.0.1", "fd00::/8"})
 	tr := NewProxyTrust(proxies)
+	tr.log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	none := NewProxyTrust(nil)
 	for _, tc := range []struct {
 		name  string
@@ -64,7 +70,9 @@ func TestClientIP(t *testing.T) {
 		{"Forwarded obfuscated node", tr, "10.0.0.1:1", hdr("Forwarded", `for=_hidden`), "10.0.0.1"},
 		{"Forwarded element without for", tr, "10.0.0.1:1", hdr("Forwarded", `proto=https`), "10.0.0.1"},
 		{"both headers agree", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.5"), "203.0.113.5"},
-		{"both headers disagree: neither is believed", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.99"), "10.0.0.1"},
+		{"both headers disagree: XFF wins", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.99"), "203.0.113.5"},
+		{"unparseable Forwarded does not hide XFF", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "for=unknown"), "203.0.113.5"},
+		{"Forwarded element without for does not hide XFF", tr, "10.0.0.1:1", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", "proto=https"), "203.0.113.5"},
 		{"IPv6 proxy", tr, "[fd00::1]:443", hdr("X-Forwarded-For", "2001:db8::9"), "2001:db8::9"},
 		{"IPv4-mapped peer", tr, "[::ffff:10.0.0.1]:443", hdr("X-Forwarded-For", "203.0.113.5"), "203.0.113.5"},
 		{"unparseable peer", tr, "garbage", hdr("X-Forwarded-For", "203.0.113.5"), ""},
@@ -73,6 +81,40 @@ func TestClientIP(t *testing.T) {
 		if g := map[bool]string{true: got.String(), false: ""}[got.IsValid()]; g != tc.want {
 			t.Errorf("%s: got %q, want %q", tc.name, g, tc.want)
 		}
+	}
+}
+
+func TestUntrustedForwardedHeaderWarningIsLoggedOnce(t *testing.T) {
+	untrustedForwardedWarning.Store(false)
+	s, _, _ := newTestService(t)
+	var output bytes.Buffer
+	s.log = slog.New(slog.NewTextHandler(&output, nil))
+	for range 2 {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		req.RemoteAddr = "127.0.0.1:1234"
+		req.Header.Set("X-Forwarded-For", "203.0.113.7")
+		if got := s.ClientIP(req); got.String() != "127.0.0.1" {
+			t.Fatalf("untrusted forwarded address: %v", got)
+		}
+	}
+	if count := strings.Count(output.String(), "no trusted proxy is configured"); count != 1 {
+		t.Fatalf("warning count = %d, want one: %q", count, output.String())
+	}
+}
+
+func TestForwardedDisagreementWarningIsLoggedOnce(t *testing.T) {
+	forwardedDisagreementWarning.Store(false)
+	var output bytes.Buffer
+	trust := NewProxyTrust([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")})
+	trust.log = slog.New(slog.NewTextHandler(&output, nil))
+	for _, forwarded := range []string{"for=203.0.113.99", "for=unknown"} {
+		got := trust.ClientIP("10.0.0.1:1234", hdr("X-Forwarded-For", "203.0.113.5", "Forwarded", forwarded))
+		if got.String() != "203.0.113.5" {
+			t.Fatalf("X-Forwarded-For was not used: %v", got)
+		}
+	}
+	if count := strings.Count(output.String(), "trusted proxy headers disagree"); count != 1 {
+		t.Fatalf("warning count = %d, want one: %q", count, output.String())
 	}
 }
 

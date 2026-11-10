@@ -483,6 +483,25 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 		s.log.Error("password lookup", "err", err)
 		return nil, errInternal(err)
 	}
+	f, fs, err := s.reservePasswordAttempt(ctx, login, ip, now)
+	if err != nil {
+		s.log.Error("reserve password login attempt", "code", "password_login_attempt_reserve_failed", "err", err)
+		return nil, errInternal(err)
+	}
+	if fs.Failures > MaxSourceFailures {
+		if err := s.releaseLoginFailure(ctx, login, MaxSignInFailures); err != nil {
+			s.log.Warn("release password login attempt", "code", "password_login_attempt_release_failed", "err", err)
+		}
+		s.audit(ctx, "anonymous", "login_password", "locked", ip, nil)
+		return nil, signInFailure(fs, now)
+	}
+	if f.Failures > MaxSignInFailures {
+		if err := s.releaseLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), MaxSourceFailures); err != nil {
+			s.log.Warn("release source password login attempt", "code", "source_login_attempt_release_failed", "err", err)
+		}
+		s.audit(ctx, "anonymous", "login_password", "locked", ip, nil)
+		return nil, signInFailure(f, now)
+	}
 	ok, step := false, int64(0)
 	var hash string
 	if found {
@@ -490,11 +509,13 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 	} else {
 		hash, err = spoofHash(ctx)
 		if err != nil {
+			s.releasePasswordAttempt(ctx, login, ip)
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 		}
 	}
 	pwOK, err := verifyPassword(ctx, s.pepper, hash, req.Msg.Password)
 	if err != nil {
+		s.releasePasswordAttempt(ctx, login, ip)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("server is busy, try again"))
 	}
 	if found && s.vault != nil {
@@ -508,29 +529,52 @@ func (s *Service) PasswordLogin(ctx context.Context, req *connect.Request[adminv
 	}
 	if ok { // a code that was already used (or an older one) is a replay
 		if ok, err = s.st.AdvanceTOTPStep(ctx, cred.AdminID, step); err != nil {
+			s.releasePasswordAttempt(ctx, login, ip)
 			s.log.Error("advance totp step", "err", err)
 			return nil, errInternal(err)
 		}
 	}
 	if !ok {
-		return nil, s.passwordFailed(ctx, login, cred, found, ip, now)
+		return nil, s.passwordFailed(ctx, login, cred, found, ip, now, f, fs)
 	}
 
-	if err := s.st.ClearLoginFailures(ctx, login); err != nil {
-		s.log.Warn("clear login failures", "err", err)
-	}
 	admin, err := s.st.Admin(ctx, cred.AdminID)
 	if err != nil {
+		s.releasePasswordAttempt(ctx, login, ip)
 		s.log.Error("admin of password login", "err", err)
 		return nil, errInternal(err)
 	}
 	cookie, err := s.newSession(ctx, admin.ID, ip.String(), req.Header().Get("User-Agent"), cred)
 	if errors.Is(err, store.ErrNotFound) { // the password or the code was replaced while this sign-in was checked
-		return nil, s.passwordFailed(ctx, login, cred, found, ip, now)
+		f, failureErr := s.st.LoginFailures(ctx, login, now, FailureWindow)
+		if failureErr != nil {
+			s.log.Error("read changed-credential login failures", "code", "changed_credential_login_state_read_failed", "err", failureErr)
+			return nil, errInternal(failureErr)
+		}
+		fs, failureErr := s.st.LoginFailures(ctx, sourceLockPrefix+SourceKey(ip), now, FailureWindow)
+		if failureErr != nil {
+			s.log.Error("read changed-credential source failures", "code", "changed_credential_source_state_read_failed", "err", failureErr)
+			return nil, errInternal(failureErr)
+		}
+		if f.Locked(now) || fs.Locked(now) {
+			if err := s.releaseLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), MaxSourceFailures); err != nil {
+				s.log.Warn("release source password login attempt", "code", "source_login_attempt_release_failed", "err", err)
+			}
+			s.audit(ctx, "anonymous", "login_password", "locked", ip, nil)
+			if fs.Locked(now) {
+				f = fs
+			}
+			return nil, signInFailure(f, now)
+		}
+		return nil, s.passwordFailed(ctx, login, cred, found, ip, now, f, fs)
 	}
 	if err != nil {
+		s.releasePasswordAttempt(ctx, login, ip)
 		s.log.Error("create session", "err", err)
 		return nil, errInternal(err)
+	}
+	if err := s.releaseLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), MaxSourceFailures); err != nil {
+		s.log.Warn("release source login attempt", "code", "source_login_attempt_release_failed", "err", err)
 	}
 	if found && s.pepper != nil && needsRehash(cred.Hash) {
 		s.upgradePasswordHash(ctx, cred, req.Msg.Password)
@@ -553,19 +597,73 @@ func (s *Service) upgradePasswordHash(ctx context.Context, cred store.PasswordCr
 	}
 }
 
-// passwordFailed counts a failed password sign-in and builds the error. Only real
+// passwordFailed reports a reserved password sign-in attempt that failed proof. Only real
 // logins are named in the audit log and events: a mistyped password in the login field
 // must not end up there.
-func (s *Service) passwordFailed(ctx context.Context, login string, cred store.PasswordCred, found bool, ip netip.Addr, now time.Time) error {
-	f, err := s.st.RecordLoginFailure(ctx, login, now, MaxSignInFailures, FailureWindow, LockDuration)
+// reservePasswordAttempt counts both scopes before password verification and locks one reservation beyond the last allowed proof.
+func (s *Service) reservePasswordAttempt(ctx context.Context, login string, ip netip.Addr, now time.Time) (store.LoginFailure, store.LoginFailure, error) {
+	f, err := s.st.RecordLoginFailure(ctx, login, now, MaxSignInFailures+reservationLockHeadroom, FailureWindow, LockDuration)
 	if err != nil {
-		s.log.Error("record login failure", "err", err)
-		return errInternal(err)
+		return store.LoginFailure{}, store.LoginFailure{}, err
 	}
-	fs, err := s.st.RecordLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), now, MaxSourceFailures, FailureWindow, LockDuration)
+	fs, err := s.st.RecordLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), now, MaxSourceFailures+reservationLockHeadroom, FailureWindow, LockDuration)
 	if err != nil {
-		s.log.Error("record source failure", "err", err)
-		return errInternal(err)
+		if releaseErr := s.releaseLoginFailure(ctx, login, MaxSignInFailures); releaseErr != nil {
+			s.log.Warn("release incomplete password attempt", "code", "password_login_attempt_release_failed", "err", releaseErr)
+		}
+		return store.LoginFailure{}, store.LoginFailure{}, err
+	}
+	return f, fs, nil
+}
+
+func (s *Service) releasePasswordAttempt(ctx context.Context, login string, ip netip.Addr) {
+	if err := s.releaseLoginFailure(ctx, login, MaxSignInFailures); err != nil {
+		s.log.Warn("release password login attempt", "code", "password_login_attempt_release_failed", "err", err)
+	}
+	if err := s.releaseLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), MaxSourceFailures); err != nil {
+		s.log.Warn("release source login attempt", "code", "source_login_attempt_release_failed", "err", err)
+	}
+}
+
+const releaseLoginFailureTimeout = 5 * time.Second
+
+// withLoginFailureCleanup gives failure-counter cleanup a bounded context that survives client disconnects.
+func (s *Service) withLoginFailureCleanup(ctx context.Context, cleanup func(context.Context) error) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), releaseLoginFailureTimeout)
+	defer cancel()
+	return cleanup(cleanupCtx)
+}
+
+// releaseLoginFailure returns one reserved attempt without relying on the request connection.
+func (s *Service) releaseLoginFailure(ctx context.Context, login string, maxFailures int) error {
+	return s.withLoginFailureCleanup(ctx, func(cleanupCtx context.Context) error {
+		return s.st.ReleaseLoginFailure(cleanupCtx, login, maxFailures)
+	})
+}
+
+// clearLoginFailures resets a successful proof's failure counter without relying on the request connection.
+func (s *Service) clearLoginFailures(ctx context.Context, login string) error {
+	return s.withLoginFailureCleanup(ctx, func(cleanupCtx context.Context) error {
+		return s.st.ClearLoginFailures(cleanupCtx, login)
+	})
+}
+
+func (s *Service) passwordFailed(ctx context.Context, login string, cred store.PasswordCred, found bool, ip netip.Addr, now time.Time, f, fs store.LoginFailure) error {
+	if f.Failures >= MaxSignInFailures {
+		current, err := s.st.LockLoginFailure(ctx, login, MaxSignInFailures, now, FailureWindow, LockDuration)
+		if err != nil {
+			s.log.Error("lock failed password sign-in", "code", "password_login_lock_failed", "err", err)
+		} else {
+			f = current
+		}
+	}
+	if fs.Failures >= MaxSourceFailures {
+		current, err := s.st.LockLoginFailure(ctx, sourceLockPrefix+SourceKey(ip), MaxSourceFailures, now, FailureWindow, LockDuration)
+		if err != nil {
+			s.log.Error("lock failed source sign-in", "code", "source_login_lock_failed", "err", err)
+		} else {
+			fs = current
+		}
 	}
 	if fs.Locked(now) && !f.Locked(now) {
 		f = fs // report the lock that applies to this client

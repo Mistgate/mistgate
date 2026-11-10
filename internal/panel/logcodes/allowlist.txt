@@ -58,7 +58,6 @@ auth/credentials.go	consume foreign TOTP enrollment ceremony	1
 auth/credentials.go	end other sessions	2
 auth/credentials.go	password credential	3
 auth/credentials.go	password lookup	1
-auth/credentials.go	record step-up failure	1
 auth/credentials.go	set password	1
 auth/credentials.go	set totp secret	1
 auth/credentials.go	step-up failures	1
@@ -70,7 +69,6 @@ auth/handler.go	begin login	1
 auth/handler.go	begin registration	1
 auth/handler.go	cannot open TOTP secret (wrong master key?)	1
 auth/handler.go	check setup token	1
-auth/handler.go	clear login failures	1
 auth/handler.go	consume setup ceremony	1
 auth/handler.go	consume setup ceremony after bad token	1
 auth/handler.go	create first admin	1
@@ -80,8 +78,6 @@ auth/handler.go	load instance settings	1
 auth/handler.go	load turnstile settings	1
 auth/handler.go	login failures	1
 auth/handler.go	password lookup	1
-auth/handler.go	record login failure	1
-auth/handler.go	record source failure	1
 auth/handler.go	source failures	1
 auth/handler.go	touch passkey	1
 auth/handler.go	upgrade password hash	2
@@ -112,7 +108,6 @@ auth/stepup.go	clear step-up failures	1
 auth/stepup.go	list passkeys	2
 auth/stepup.go	password credential	1
 auth/stepup.go	record step-up	1
-auth/stepup.go	record step-up failure	1
 auth/stepup.go	step-up failures	1
 auth/stepup.go	touch passkey	1
 auth/tokens_rpc.go	create api token	1

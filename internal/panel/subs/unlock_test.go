@@ -472,7 +472,7 @@ func TestSelfServiceRefusesADisabledUserEvenWithAFreshPageCache(t *testing.T) {
 	}
 }
 
-func TestSelfServiceRejectsARotatedLinkEvenWithAFreshPageCache(t *testing.T) {
+func TestSelfServiceRejectsARotatedLinkAndAllowsColdValidLinkWhenBlocked(t *testing.T) {
 	m := newM3Rig(t)
 	h, _ := m.handler(func(c *subs.Config) {
 		c.MissLimit, c.BlockFor = 2, time.Hour
@@ -496,7 +496,7 @@ func TestSelfServiceRejectsARotatedLinkEvenWithAFreshPageCache(t *testing.T) {
 	if rec.Code != http.StatusNotFound || rec.Code != unknown.Code || rec.Body.String() != unknown.Body.String() {
 		t.Fatalf("rotated link: %d %q; unknown token: %d %q", rec.Code, rec.Body.String(), unknown.Code, unknown.Body.String())
 	}
-	if rec := (call{h: h, t: t, token: otherToken}).post("/devices", m.addBody("phone")); rec.Code != unknown.Code || rec.Body.String() != unknown.Body.String() {
-		t.Errorf("rotated link did not count as a miss: %d %q", rec.Code, rec.Body.String())
+	if rec := (call{h: h, t: t, token: otherToken}).post("/devices", m.addBody("phone")); rec.Code != http.StatusOK {
+		t.Errorf("cold valid link behind a blocked client: %d %q", rec.Code, rec.Body.String())
 	}
 }

@@ -342,7 +342,7 @@ func TestConcurrentCeremonyFinishesConsumeOnce(t *testing.T) {
 	}
 }
 
-func TestCeremonyConsumeFailuresUseAuthenticationFailureResponses(t *testing.T) {
+func TestCeremonyConsumeFailuresUseProtocolSpecificResponses(t *testing.T) {
 	t.Run("login", func(t *testing.T) {
 		s, st, _ := newTestService(t)
 		_, _, _ = passkeyAdmin(t, s, st)
@@ -384,15 +384,15 @@ func TestCeremonyConsumeFailuresUseAuthenticationFailureResponses(t *testing.T) 
 			t.Fatal(err)
 		}
 		_, err = s.FinishStepUp(authed(t, s, cookie), cookieReq(&adminv1.FinishStepUpRequest{CeremonyId: begin.Msg.CeremonyId}, cookie))
-		if codeOf(err) != connect.CodeUnauthenticated {
-			t.Fatalf("failed ceremony consume returned %v; want step-up failure", err)
+		if codeOf(err) != connect.CodeInternal {
+			t.Fatalf("failed ceremony consume returned %v; want an internal error", err)
 		}
-		if countAuditResult(t, st, "stepup", "fail") != 1 {
-			t.Fatal("failed step-up consume was not audited")
+		if countAuditResult(t, st, "stepup", "fail") != 0 {
+			t.Fatal("a ceremony store error was audited as a wrong proof")
 		}
 		failure, err := st.LoginFailures(context.Background(), stepUpLockKey+admin.ID, *clock, FailureWindow)
-		if err != nil || failure.Failures != 1 {
-			t.Fatalf("step-up failures = %+v, err=%v; want one", failure, err)
+		if err != nil || failure.Failures != 0 {
+			t.Fatalf("step-up failures = %+v, err=%v; want no reserved failure", failure, err)
 		}
 	})
 }

@@ -42,6 +42,7 @@ const (
 	minLogin                  = 3
 	maxLogin                  = 64
 	maxConcurrentArgon2IDKeys = 1
+	maxArgon2Waiters          = 8
 
 	totpDigits = 6
 	totpPeriod = 30 // seconds
@@ -49,10 +50,12 @@ const (
 )
 
 var (
-	argon2Slots = make(chan struct{}, maxConcurrentArgon2IDKeys)
-	argon2IDKey = argon2.IDKey
+	argon2Slots   = make(chan struct{}, maxConcurrentArgon2IDKeys)
+	argon2Waiters = make(chan struct{}, maxArgon2Waiters)
+	argon2IDKey   = argon2.IDKey
 	// argon2BeforeAcquireForTest lets tests know a verification reached the cancellable queue.
 	argon2BeforeAcquireForTest func()
+	errArgon2Busy              = errors.New("argon2 queue is full")
 )
 
 func deriveArgon2IDKey(ctx context.Context, password, salt []byte, timeCost, memoryKiB uint32, threads uint8, keyLen uint32) ([]byte, error) {
@@ -64,8 +67,23 @@ func deriveArgon2IDKey(ctx context.Context, password, salt []byte, timeCost, mem
 	}
 	select {
 	case argon2Slots <- struct{}{}:
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	default:
+		select {
+		case argon2Waiters <- struct{}{}:
+			select {
+			case argon2Slots <- struct{}{}:
+				<-argon2Waiters
+			case <-ctx.Done():
+				<-argon2Waiters
+				return nil, ctx.Err()
+			}
+		default:
+			select {
+			case argon2Slots <- struct{}{}:
+			default:
+				return nil, errArgon2Busy
+			}
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		<-argon2Slots

@@ -45,7 +45,7 @@ func (s *Server) spa(base string) http.Handler {
 					if strings.HasPrefix(name, "assets/") {
 						w.Header()["Cache-Control"] = headerCacheImmutable[:1:1]
 					}
-					if serveFile(w, r, name, f) {
+					if serveFile(s.decoy, w, r, name, f) {
 						return
 					}
 				}

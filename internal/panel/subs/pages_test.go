@@ -534,8 +534,7 @@ func TestUserPageMissingFallsBackToBase64AndLogsOnce(t *testing.T) {
 	}
 }
 
-// An unknown or blocked token behaves exactly like the decoy, for a browser too: nothing of the page, its CSP
-// or any settings-driven header shows.
+// Unknown and malformed tokens behave exactly like the decoy for browsers, so no page or settings-driven header leaks.
 func TestUnknownTokenStaysDecoyForBrowsers(t *testing.T) {
 	r := newRig(t, "/k3xq8")
 	h, _ := r.handler(nil)
@@ -552,7 +551,7 @@ func TestUnknownTokenStaysDecoyForBrowsers(t *testing.T) {
 			t.Errorf("%s: headers %v, decoy %v", name, rec.Header(), ref.Header())
 		}
 	}
-	// The same after the client network was blocked for guessing: even the valid token gets the decoy.
+	// A cold valid token remains usable after the client network is blocked for guessing.
 	h2, _ := r.handler(func(c *subs.Config) {
 		c.MissLimit = 2
 		c.ClientIP = func(*http.Request) netip.Addr { return netip.MustParseAddr("192.0.2.7") }
@@ -560,8 +559,8 @@ func TestUnknownTokenStaysDecoyForBrowsers(t *testing.T) {
 	for range 2 {
 		fetch(h2, "/"+unknown, chrome)
 	}
-	if rec := fetch(h2, "/"+tok, chrome); rec.Code != 404 || rec.Body.String() != decoyBody {
-		t.Errorf("blocked client with a valid token: %d %q", rec.Code, rec.Body.String())
+	if rec := fetch(h2, "/"+tok, chrome); rec.Code != 200 || rec.Body.String() == decoyBody {
+		t.Errorf("blocked client with a cold valid token: %d %q", rec.Code, rec.Body.String())
 	}
 }
 
